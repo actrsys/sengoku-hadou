@@ -853,11 +853,21 @@ class UIInfoManager {
         if (!input) return;
 
         const c = this._bushoSelectorContext ? this._bushoSelectorContext.c : this.ui.currentCastle;
+        const isAlreadySelected = div.classList.contains('selected');
 
         if (e.target.tagName === 'INPUT') { 
             if(!isMulti) {
                 const siblings = document.querySelectorAll('.select-item');
                 siblings.forEach(el => el.classList.remove('selected'));
+                const allInputs = document.querySelectorAll('input[name="sel_busho"]');
+                allInputs.forEach(inp => inp.checked = false);
+                
+                if (isAlreadySelected) {
+                    input.checked = false;
+                } else {
+                    input.checked = true;
+                    div.classList.add('selected');
+                }
             } else {
                  const maxSelect = ['war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy'].includes(actionType) ? 5 : 999;
                  const currentChecked = document.querySelectorAll('input[name="sel_busho"]:checked').length;
@@ -896,9 +906,14 @@ class UIInfoManager {
              }
              input.checked = !input.checked; 
         } else { 
-             input.checked = true; 
              const allItems = document.querySelectorAll('.select-item'); 
              allItems.forEach(item => item.classList.remove('selected')); 
+             const allInputs = document.querySelectorAll('input[name="sel_busho"]');
+             allInputs.forEach(inp => inp.checked = false);
+
+             if (!isAlreadySelected) {
+                 input.checked = true; 
+             }
         }
         if(input.checked) div.classList.add('selected'); else div.classList.remove('selected');
         
