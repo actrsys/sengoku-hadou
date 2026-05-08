@@ -582,7 +582,7 @@
             screen.style.top = '50%';
             screen.style.transform = `translate(-50%, -50%) scale(${scale})`;
         } else {
-            // スマホ版：縮小魔法を使わず、現在の画面から9:16になる実寸サイズを計算します
+            // スマホ版：現在の画面から9:16になる実寸サイズを計算します
             document.body.classList.remove('is-pc');
             const targetRatio = 9 / 16;
             const currentRatio = windowW / windowH;
@@ -598,13 +598,26 @@
                 finalH = windowW / targetRatio;
             }
             
-            // 計算した実寸サイズをそのまま割り当てます
-            screen.style.width = finalW + 'px';
-            screen.style.height = finalH + 'px';
+            // ★ 極端に小さい画面でのレイアウト崩れを防ぐ魔法
+            // 最低限必要な横幅を設定し、それより小さい場合は縮小（scale）して対応します
+            const minMobileWidth = 360; 
+            let canvasW = finalW;
+            let canvasH = finalH;
+            let scale = 1;
+
+            if (finalW < minMobileWidth) {
+                canvasW = minMobileWidth;
+                canvasH = minMobileWidth / targetRatio;
+                scale = finalW / minMobileWidth;
+            }
+            
+            // 計算したサイズと縮小率を割り当てます
+            screen.style.width = canvasW + 'px';
+            screen.style.height = canvasH + 'px';
             screen.style.position = 'absolute';
             screen.style.left = '50%';
             screen.style.top = '50%';
-            screen.style.transform = `translate(-50%, -50%) scale(1)`; // scaleは1（そのまま）にします
+            screen.style.transform = `translate(-50%, -50%) scale(${scale})`;
         }
         
         screen.style.transformOrigin = 'center center';
