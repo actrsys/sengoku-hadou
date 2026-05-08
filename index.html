@@ -562,34 +562,26 @@
     <script>
     function resizeGameScreen() {
         const screen = document.getElementById('game-screen');
-        
-        // スマホやタブレットかどうかを見分ける魔法！
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        
-        // パソコンなら
+        let baseWidth, baseHeight;
+
         if (!isMobile) {
-            document.body.classList.add('is-pc'); // PC用の目印シールを貼る
-            
-            const baseWidth = 1280;
-            const baseHeight = 720;
-            
-            const scaleW = window.innerWidth / baseWidth;
-            const scaleH = window.innerHeight / baseHeight;
-            
-            const scale = Math.min(scaleW, scaleH);
-            
-            screen.style.width = baseWidth + 'px';
-            screen.style.height = baseHeight + 'px';
-            screen.style.zoom = scale; 
-            
+            document.body.classList.add('is-pc');
+            baseWidth = 1280;
+            baseHeight = 720;
         } else {
-            // スマホなら
-            document.body.classList.remove('is-pc'); // PC用の目印シールを剥がす
-            
-            screen.style.width = window.innerWidth + 'px';
-            screen.style.height = window.innerHeight + 'px';
-            screen.style.zoom = 1;
+            document.body.classList.remove('is-pc');
+            baseWidth = 720;
+            baseHeight = 1280;
         }
+
+        const scaleW = window.innerWidth / baseWidth;
+        const scaleH = window.innerHeight / baseHeight;
+        const scale = Math.min(scaleW, scaleH);
+        
+        screen.style.width = baseWidth + 'px';
+        screen.style.height = baseHeight + 'px';
+        screen.style.zoom = scale; 
     }
     
     window.addEventListener('resize', resizeGameScreen);

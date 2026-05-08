@@ -22,18 +22,30 @@ html { width: 100%; height: 100%; overscroll-behavior: none; }
 }
 
 body {
-    font-family: 'FudeGoshirae', serif; /* ここを書き換え！ */
+    font-family: 'FudeGoshirae', serif;
     font-weight: bold;
     margin: 0; padding: 0;
-    background-color: var(--bg-color);
+    background-color: #000000;
     color: var(--text-color);
     height: 100%; width: 100%;
     position: fixed; top: 0; left: 0;
     overflow: hidden;
     overscroll-behavior: none;
-    display: flex; flex-direction: column;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
     -webkit-touch-callout: none;
+}
+
+#game-screen {
+    background-color: var(--bg-color);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
 }
 
 img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
@@ -2126,10 +2138,6 @@ body:not(.is-pc) .war-controls-buttons button { font-size: clamp(0.75rem, 4vw, 1
    PC専用のオーバーライド (body.is-pc)
    ========================================================= */
 body.is-pc {
-    background-color: #111111; display: flex; justify-content: center; align-items: center; margin: 0;
-
-    #game-screen { overflow: hidden; background-color: var(--bg-color); position: relative; }
-    
     #app { flex-direction: row; }
     #top-info-bar, #bottom-command-bar, #pc-map-overlay { display: none !important; }
     #map-reset-zoom { bottom: 20px; right: 20px; }
