@@ -1107,6 +1107,12 @@ class CommandSystem {
                     
                     // その大名家の「大名（当主）」を探して、その人がいる城だけをOK（選択可能）にします！
                     const daimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);
+                    
+                    // ★追加：降伏勧告のとき、相手の大名が「征夷大将軍（ID1の官位）」を持っていたら選べなくします！
+                    if (type === 'dominate' && daimyo && daimyo.courtRankIds && daimyo.courtRankIds.includes(1)) {
+                        return false;
+                    }
+
                     return daimyo && Number(daimyo.castleId) === Number(target.id);
                 }).map(t => t.id);
                 

@@ -1685,8 +1685,12 @@ class DiplomacyManager {
         });
 
         // 支配要求の判定
+        // ★追加：相手の大名が「征夷大将軍（ID1の官位）」を持っているかをチェックします！
+        const isTargetShogun = targetDaimyo && targetDaimyo.courtRankIds && targetDaimyo.courtRankIds.includes(1);
+
         // ★すでに「支配」している相手には、もう支配要求を行わないようにチェックを書き足します！
-        if (!amISubordinate && rel.status !== '支配' && targetClanTotal * 8 <= myPower) {
+        // さらに、相手が征夷大将軍の場合は支配要求（降伏勧告）を行わないようにガードを追加します！
+        if (!amISubordinate && rel.status !== '支配' && targetClanTotal * 8 <= myPower && !isTargetShogun) {
             // 自分の領地と相手の領地が直接くっついているか調べます
             let isDirectlyAdjacent = false;
             const myCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
