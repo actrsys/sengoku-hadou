@@ -564,12 +564,16 @@
         const screen = document.getElementById('game-screen');
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
+        // ★ ブラウザのツールバー（アドレスバーなど）を除外した「本当の表示範囲」を取得します
+        const windowW = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+        const windowH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+
         if (!isMobile) {
             // PC版：1280x720の固定サイズを作り、縮小・拡大（scale）で調整します
             document.body.classList.add('is-pc');
             const baseWidth = 1280;
             const baseHeight = 720;
-            const scale = Math.min(window.innerWidth / baseWidth, window.innerHeight / baseHeight);
+            const scale = Math.min(windowW / baseWidth, windowH / baseHeight);
             
             screen.style.width = baseWidth + 'px';
             screen.style.height = baseHeight + 'px';
@@ -580,8 +584,6 @@
         } else {
             // スマホ版：縮小魔法を使わず、現在の画面から9:16になる実寸サイズを計算します
             document.body.classList.remove('is-pc');
-            const windowW = window.innerWidth;
-            const windowH = window.innerHeight;
             const targetRatio = 9 / 16;
             const currentRatio = windowW / windowH;
             
