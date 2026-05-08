@@ -581,7 +581,10 @@
         
         screen.style.width = baseWidth + 'px';
         screen.style.height = baseHeight + 'px';
-        screen.style.zoom = scale; 
+        
+        screen.style.zoom = '';
+        screen.style.transform = `scale(${scale})`;
+        screen.style.transformOrigin = 'center center';
     }
     
     window.addEventListener('resize', resizeGameScreen);
