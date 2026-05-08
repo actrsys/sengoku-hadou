@@ -1344,10 +1344,10 @@ window.GameEvents.push({
 
         if (isAccepted) {
             // 家臣にすることを承諾した時のお返事です
-            await game.ui.showDialogAsync(`「よくぞご決心なされた。今後はその力、${playerClan.name}にて存分に振るわれよ」`, false, 0, {
+            await game.ui.showDialogAsync(`「よくぞご決心なされた。今後はその力、${playerClan.name}で存分に振るわれよ」`, false, 0, {
                 leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
             });
-            await game.ui.showDialogAsync(`「ははっ！　ありがたき幸せに存じまする！　何なりとお申し付けくださりませ」`, false, 0, {
+            await game.ui.showDialogAsync(`「ははっ！　ありがたき幸せに存じまする！」`, false, 0, {
                 leftFace: envoy.faceIcon, leftName: envoyName
             });
 
