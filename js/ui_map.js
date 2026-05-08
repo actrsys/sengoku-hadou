@@ -164,6 +164,9 @@ Object.assign(UIManager.prototype, {
         let initialPinchDist = null;
 
         sc.addEventListener('touchstart', (e) => {
+            if (e.touches.length >= 2) {
+                e.preventDefault(); 
+            }
             if (e.touches.length === 2) {
                 initialPinchDist = Math.hypot(
                     e.touches[0].pageX - e.touches[1].pageX,
@@ -173,12 +176,14 @@ Object.assign(UIManager.prototype, {
         }, { passive: false });
 
         sc.addEventListener('touchmove', (e) => {
-            if (e.touches.length === 2) {
+            if (e.touches.length >= 2) {
                 e.preventDefault(); 
+            }
+            if (e.touches.length === 2) {
                 if (initialPinchDist === null) return;
                 
                 if (this.isZooming) return;
-
+                
                 const currentDist = Math.hypot(
                     e.touches[0].pageX - e.touches[1].pageX,
                     e.touches[0].pageY - e.touches[1].pageY
