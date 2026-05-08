@@ -250,6 +250,12 @@ Object.assign(UIManager.prototype, {
         // ★ 基準となる「画面にピッタリ合わせる（または覆い尽くす）ためのスケール」を計算します
         let baseScale = isPC ? Math.min(scaleX, scaleY) : Math.max(scaleX, scaleY);
 
+        // ★追加：ブラウザの計算誤差によって、最小まで縮小した時に上下に背景（マップの外側）が見えてしまうのを防ぐ魔法です！
+        // スマホ版の時は、絶対に隙間ができないようにほんの少しだけ（1%）大きめに覆い尽くすように補正します。
+        if (!isPC) {
+            baseScale = baseScale * 1.01;
+        }
+
         // ★ 基準のスケールに対して、設定した倍率（min, mid, max）を掛け算してそれぞれのズームサイズを作ります！
         this.zoomStages = [
             baseScale * (config.min || 1.0),       
@@ -536,6 +542,17 @@ Object.assign(UIManager.prototype, {
         
         // ★追加：一旦、勢力名シールが出ている合図をリセットします
         document.body.classList.remove('showing-daimyo-labels');
+
+        const isSelectionMode = (this.game.selectionMode !== null);
+        const isDaimyoSelect = (this.game.phase === 'daimyo_select');
+
+        // ★超重要修正：マップの大きさを計算する前に、大名選択モードの目印をつけて画面を広げておきます！
+        // （これをしないと、画面が広がる前の小さいサイズでマップが作られてしまい、上下に隙間ができてしまいます）
+        if (isDaimyoSelect) {
+            document.body.classList.add('daimyo-select-mode');
+        } else {
+            document.body.classList.remove('daimyo-select-mode');
+        }
         
         if (!this.hasInitializedMap && this.game.castles.length > 0) {
             this.fitMapToScreen();
@@ -572,10 +589,7 @@ Object.assign(UIManager.prototype, {
             }
         }
 
-        const isSelectionMode = (this.game.selectionMode !== null);
-        const isDaimyoSelect = (this.game.phase === 'daimyo_select');
-
-        if (this.mapGuide) { 
+        if (this.mapGuide) {
             if(isSelectionMode) {
                 this.mapGuide.classList.remove('hidden'); 
                 this.mapGuide.textContent = this.game.commandSystem.getSelectionGuideMessage();
@@ -977,8 +991,6 @@ Object.assign(UIManager.prototype, {
         const confirmButtons = document.querySelector('.daimyo-confirm-buttons');
 
         if (isDaimyoSelect) {
-            document.body.classList.add('daimyo-select-mode'); // 「今は大名選択中だよ！」という目印をつけます
-            
             // まだ大名を選んでいない時
             if (!this.selectedDaimyoId) {
                 // 大名情報の箱と、独立した「開始・戻る」ボタンを隠す
@@ -1002,11 +1014,9 @@ Object.assign(UIManager.prototype, {
                 if (backToScenarioBtn) backToScenarioBtn.classList.add('hidden');
             }
         } else {
-            document.body.classList.remove('daimyo-select-mode'); // 終わったら目印を外します
             if (backToScenarioBtn) backToScenarioBtn.classList.add('hidden');
             if (confirmButtons) confirmButtons.classList.add('hidden');
         }
-        // ==========================================
     },
     
     // ★新魔法：勢力の名前を賢く並べる魔法です
