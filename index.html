@@ -579,11 +579,15 @@
         const scaleH = window.innerHeight / baseHeight;
         const scale = Math.min(scaleW, scaleH);
         
+        // 画面のサイズを固定します
         screen.style.width = baseWidth + 'px';
         screen.style.height = baseHeight + 'px';
         
-        screen.style.zoom = '';
-        screen.style.transform = `scale(${scale})`;
+        // 画面の「真ん中」に基準を置いて、そこから拡大・縮小させます
+        screen.style.position = 'absolute';
+        screen.style.left = '50%';
+        screen.style.top = '50%';
+        screen.style.transform = `translate(-50%, -50%) scale(${scale})`;
         screen.style.transformOrigin = 'center center';
     }
     
