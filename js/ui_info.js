@@ -1386,8 +1386,19 @@ class UIInfoManager {
         const myClan = this.game.clans.find(c => c.id === myClanId);
         
         let myPrincesses = [];
-        if (myClan && myClan.princessIds) {
-            myPrincesses = myClan.princessIds
+        if (myClan) {
+            let pIds = Array.isArray(myClan.princessIds) ? [...myClan.princessIds] : [];
+            const myBushos = this.game.bushos.filter(b => b.clan === myClanId && b.status === 'active');
+            myBushos.forEach(b => {
+                if (Array.isArray(b.wifeIds)) {
+                    b.wifeIds.forEach(wId => {
+                        if (!pIds.includes(wId)) {
+                            pIds.push(wId);
+                        }
+                    });
+                }
+            });
+            myPrincesses = pIds
                 .map(id => this.game.princesses.find(p => p.id === id))
                 .filter(p => p !== undefined); 
         }
