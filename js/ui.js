@@ -1745,6 +1745,11 @@ class UIManager {
                             btnCount++;
                         });
                     }
+                    const emptyCount = 2 - (btnCount % 3);
+                    for(let i=0; i<emptyCount; i++) {
+                        const d = document.createElement('div');
+                        mobileArea.appendChild(d);
+                    }
                     
                     createBtn("戻る", "back", () => menu(parentMenuName));
                 }
