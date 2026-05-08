@@ -268,10 +268,15 @@ class UIInfoManager {
             const baseCastle = this.game.castles.find(c => c.id === leader.castleId);
             if (baseCastle) baseCastleName = baseCastle.name;
         }
-
+        
         const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
         const castlesCount = clanCastles.length;
-        const bushosCount = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active').length;
+        
+        // ★武将のリストを取得して、人数と「派閥があるか」を調べます
+        const clanBushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active');
+        const bushosCount = clanBushos.length;
+        const hasFaction = clanBushos.some(b => (b.factionId || 0) > 0);
+        
         const princessCount = clan.princessIds ? clan.princessIds.length : 0;
         
         let totalGold = 0, totalRice = 0, totalSoldiers = 0, totalHorses = 0, totalGuns = 0, totalGoldIncome = 0, totalRiceIncome = 0;
@@ -338,7 +343,7 @@ class UIInfoManager {
                         <button class="daimyo-detail-action-btn" id="temp-kyoten-btn" ${castlesCount === 0 ? 'disabled' : ''}>拠点</button>
                         <button class="daimyo-detail-action-btn" id="temp-busho-btn" ${bushosCount === 0 ? 'disabled' : ''}>武将</button>
                         <button class="daimyo-detail-action-btn" id="temp-hime-btn" ${princessCount === 0 ? 'disabled' : ''}>姫</button>
-                        <button class="daimyo-detail-action-btn" id="temp-faction-btn" ${bushosCount === 0 ? 'disabled' : ''}>派閥</button>
+                        <button class="daimyo-detail-action-btn" id="temp-faction-btn" ${!hasFaction ? 'disabled' : ''}>派閥</button>
                         <button class="daimyo-detail-action-btn" id="temp-diplo-btn">外交</button>
                     </div>
                 </div>
