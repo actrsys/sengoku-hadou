@@ -194,6 +194,12 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 .sp-footer-box span:last-child { font-variant-numeric: tabular-nums; text-align: right; }
 
 #bottom-command-bar { flex: none; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); border-top: 3px solid #d4af37; padding-bottom: max(5px, env(safe-area-inset-bottom)); padding-left: 5px; padding-right: 5px; z-index: 200; box-shadow: 0 -4px 10px rgba(0,0,0,0.6); height: auto; display: block; }
+
+/* ★スマホ版でのみ、info系ウインドウ（モーダル）が開いている間は下部のコマンドバーを非表示にする魔法 */
+body:not(.is-pc):has(.modal:not(.hidden)) #bottom-command-bar {
+    display: none !important;
+}
+
 #mobile-bottom-info { padding: 0; margin: 0; }
 .command-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 4px 0; }
 .cmd-btn { 
