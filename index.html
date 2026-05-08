@@ -563,32 +563,50 @@
     function resizeGameScreen() {
         const screen = document.getElementById('game-screen');
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        let baseWidth, baseHeight;
 
         if (!isMobile) {
+            // PC版：1280x720の固定サイズを作り、縮小・拡大（scale）で調整します
             document.body.classList.add('is-pc');
-            baseWidth = 1280;
-            baseHeight = 720;
+            const baseWidth = 1280;
+            const baseHeight = 720;
+            const scale = Math.min(window.innerWidth / baseWidth, window.innerHeight / baseHeight);
+            
+            screen.style.width = baseWidth + 'px';
+            screen.style.height = baseHeight + 'px';
+            screen.style.position = 'absolute';
+            screen.style.left = '50%';
+            screen.style.top = '50%';
+            screen.style.transform = `translate(-50%, -50%) scale(${scale})`;
         } else {
+            // スマホ版：縮小魔法を使わず、現在の画面から9:16になる実寸サイズを計算します
             document.body.classList.remove('is-pc');
-            baseWidth = 720;
-            baseHeight = 1280;
+            const windowW = window.innerWidth;
+            const windowH = window.innerHeight;
+            const targetRatio = 9 / 16;
+            const currentRatio = windowW / windowH;
+            
+            let finalW, finalH;
+            if (currentRatio > targetRatio) {
+                // 画面が横に広すぎる場合（左右に黒帯を出します）
+                finalH = windowH;
+                finalW = windowH * targetRatio;
+            } else {
+                // 画面が縦に長すぎる場合（上下に黒帯を出します）
+                finalW = windowW;
+                finalH = windowW / targetRatio;
+            }
+            
+            // 計算した実寸サイズをそのまま割り当てます
+            screen.style.width = finalW + 'px';
+            screen.style.height = finalH + 'px';
+            screen.style.position = 'absolute';
+            screen.style.left = '50%';
+            screen.style.top = '50%';
+            screen.style.transform = `translate(-50%, -50%) scale(1)`; // scaleは1（そのまま）にします
         }
-
-        const scaleW = window.innerWidth / baseWidth;
-        const scaleH = window.innerHeight / baseHeight;
-        const scale = Math.min(scaleW, scaleH);
         
-        // 画面のサイズを固定します
-        screen.style.width = baseWidth + 'px';
-        screen.style.height = baseHeight + 'px';
-        
-        // 画面の「真ん中」に基準を置いて、そこから拡大・縮小させます
-        screen.style.position = 'absolute';
-        screen.style.left = '50%';
-        screen.style.top = '50%';
-        screen.style.transform = `translate(-50%, -50%) scale(${scale})`;
         screen.style.transformOrigin = 'center center';
+        screen.style.zoom = '';
     }
     
     window.addEventListener('resize', resizeGameScreen);
