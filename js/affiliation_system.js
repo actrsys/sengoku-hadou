@@ -64,8 +64,9 @@ class AffiliationSystem {
     /**
      * ② 追放されたり、下野（自分から辞める）して「浪人」になる時の魔法
      * @param {object} busho - 浪人になる武将
+     * @param {string} reason - 浪人になる理由（'banish': 追放, 'desertion': 自発的出奔など）
      */
-    becomeRonin(busho) {
+    becomeRonin(busho, reason = 'desertion') {
         // ★ここから追加：最強の関所！自動で作られた頭領は浪人になれず、ここで消滅します！
         if (busho.isAutoLeader) {
             busho.clan = 0;
@@ -104,6 +105,16 @@ class AffiliationSystem {
         // ★大名家が滅亡したかどうかのチェック（元いた大名家の城が0個なら滅亡と判断します）
         const isClanDestroyed = (oldClanId !== 0) && (this.game.castles.filter(c => c.ownerClan === oldClanId).length === 0);
         
+        // ★追加：大名家が滅亡したわけではない場合（追放や出奔）、元主君を宿敵として記録します
+        if (oldClanId !== 0 && !isClanDestroyed) {
+            const daimyo = this.game.bushos.find(b => b.clan === oldClanId && b.isDaimyo);
+            if (daimyo && busho.id !== daimyo.id && !busho.nemesisIds.includes(daimyo.id)) {
+                const nemesisCount = (reason === 'banish') ? 120 : 60;
+                busho.nemesisList.push({ id: daimyo.id, count: nemesisCount });
+                busho.nemesisIds.push(daimyo.id);
+            }
+        }
+
         // ★新しい処理：滅亡した場合はそのまま留まり、自ら出奔した場合は近いお城を探します
         if (busho.castleId) {
             const currentCastle = this.game.getCastle(busho.castleId);
