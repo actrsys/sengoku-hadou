@@ -337,6 +337,8 @@ class UIInfoManager {
                     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
                         <button class="daimyo-detail-action-btn" id="temp-kyoten-btn">拠点</button>
                         <button class="daimyo-detail-action-btn" id="temp-busho-btn">武将</button>
+                        <button class="daimyo-detail-action-btn" id="temp-hime-btn">姫</button>
+                        <button class="daimyo-detail-action-btn" id="temp-faction-btn">派閥</button>
                         <button class="daimyo-detail-action-btn" id="temp-diplo-btn">外交</button>
                     </div>
                 </div>
@@ -353,7 +355,7 @@ class UIInfoManager {
                 if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                 this.showDiplomacyList(clan.id, clan.name, 'daimyo');
             };
-
+            
             document.getElementById('temp-busho-btn').onclick = (e) => {
                 e.stopPropagation();
                 if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
@@ -361,6 +363,18 @@ class UIInfoManager {
                     customBushos: this.game.bushos.filter(b => b.clan === clanId && b.status === 'active'),
                     customInfoHtml: `<div>${clan.name} 所属武将</div>`
                 });
+            };
+
+            document.getElementById('temp-hime-btn').onclick = (e) => {
+                e.stopPropagation();
+                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+                this.pushModal('princess_list', [false, clan.id, 'view_clan_princess']);
+            };
+
+            document.getElementById('temp-faction-btn').onclick = (e) => {
+                e.stopPropagation();
+                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+                this.showFactionList(clan.id);
             };
 
             // ★情報画面ではスクロールバーは不要なので、位置を戻すだけにします
@@ -1420,7 +1434,7 @@ class UIInfoManager {
 
         let princesses = [];
         let tabsHtml = null;
-
+        
         if (isSelectMode) {
             // ★自家の大名を取得します
             const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo);
@@ -1440,6 +1454,19 @@ class UIInfoManager {
                 return false; // 一門でなければリストから除外します
             });
             this.selectedPrincessId = null; 
+        } else if (doerId === 'view_clan_princess') {
+            const viewClanId = targetCastleId;
+            const viewClan = this.game.clans.find(c => c.id === viewClanId);
+            let pIds = viewClan && Array.isArray(viewClan.princessIds) ? [...viewClan.princessIds] : [];
+            const clanBushos = this.game.bushos.filter(b => b.clan === viewClanId && b.status === 'active');
+            clanBushos.forEach(b => {
+                if (Array.isArray(b.wifeIds)) {
+                    b.wifeIds.forEach(wId => {
+                        if (!pIds.includes(wId)) pIds.push(wId);
+                    });
+                }
+            });
+            princesses = pIds.map(id => this.game.princesses.find(p => p.id === id)).filter(p => p !== undefined && p.status !== 'unborn' && p.status !== 'dead');
         } else {
             if (!this.princessCurrentScope) this.princessCurrentScope = 'clan';
 

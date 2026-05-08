@@ -1514,10 +1514,20 @@ body:not(.is-pc) .daimyo-detail-label {
 body:not(.is-pc) .daimyo-detail-value {
     font-size: 0.85rem;
 }
+body:not(.is-pc) .daimyo-detail-action-btn {
+    min-width: 50px;
+    padding: 5px 6px;
+    font-size: 0.85rem;
+    letter-spacing: 0;
+}
+body:not(.is-pc) .daimyo-detail-container > div:last-child {
+    gap: 5px !important; /* スマホ画面で5つのボタンがはみ出さないように隙間を縮めます */
+}
 
 /* 勢力情報モーダルの専用アクションボタン */
 .daimyo-detail-action-btn {
-    padding: 5px 15px; /* フチを太くした分、余白を減らしてサイズを固定します */
+    min-width: 68px; /* 姫の1文字でも他と同じサイズになるように幅を確保します */
+    padding: 5px 10px; /* ボタンが増えたので横幅の余白を少し減らします */
     font-size: 1rem;
     font-weight: bold;
     color: #fff;
@@ -2307,7 +2317,7 @@ body.is-pc .retreat-btn:hover {
    ★ 専用ロード画面の魔法
    ========================================================= */
 #global-loading-screen {
-    position: absolute; /* ★差し替え：親要素（ゲーム画面）を基準にします */
+    position: absolute; /* 親要素（ゲーム画面）を基準にします */
     top: 0; 
     left: 0; 
     width: 100%; 
