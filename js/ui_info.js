@@ -1738,11 +1738,11 @@ class UIInfoManager {
         const kunishuCount = kunishus.length;
 
         // ★ 武将の人数も数えておきます
-        const targetBushos = this.game.bushos.filter(b => 
+        const targetBushos = castle.ownerClan > 0 ? this.game.bushos.filter(b => 
             b.castleId === castle.id && 
-            (b.status === 'active' || b.status === 'ronin') && 
-            (b.belongKunishuId === 0 || !b.belongKunishuId)
-        );
+            b.status === 'active' && 
+            b.clan === castle.ownerClan
+        ) : [];
         const bushoCount = targetBushos.length;
 
         let totalGoldIncome = GameSystem.calcBaseGoldIncome(castle);
@@ -1917,7 +1917,7 @@ class UIInfoManager {
                     const getCastellanName = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? cb.name : ""; };
                     const getProvinceYomi = (c) => { const p = this.game.provinces && this.game.provinces.find(p => p.id === c.provinceId); return p ? (p.provinceYomi || p.province) : "んんん"; };
                     const getProvinceName = (c) => { const p = this.game.provinces && this.game.provinces.find(p => p.id === c.provinceId); return p ? p.province : ""; };
-                    const getBushoCount = (c) => this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active').length;
+                    const getBushoCount = (c) => c.ownerClan > 0 ? this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active' && b.clan === c.ownerClan).length : 0;
 
                     const getGoldIncome = (c) => GameSystem.calcBaseGoldIncome(c);
                     const getGoldConsume = (c) => {
@@ -2039,7 +2039,7 @@ class UIInfoManager {
                 if (province) provinceName = province.province;
             }
             
-            const castleBushos = this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active');
+            const castleBushos = c.ownerClan > 0 ? this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active' && b.clan === c.ownerClan) : [];
             const bushosCount = castleBushos.length;
             
             let riceIncome = GameSystem.calcBaseRiceIncome(c);
