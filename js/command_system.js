@@ -263,6 +263,11 @@ const CAN_EXECUTE_RULES = {
         }
         
         return hasValidTarget;
+    },
+    // --- 情報用 ---
+    hasFaction: (game) => {
+        // 自勢力の武将の中に、派閥（factionIdが1以上）に所属している人がいるかチェックします
+        return game.bushos.some(b => b.clan === game.playerClanId && b.factionId > 0);
     }
 };
 
@@ -526,7 +531,8 @@ const COMMAND_SPECS = {
     },
     'faction_list': {
         label: "派閥", category: 'INFO',
-        isSystem: true, action: 'faction_list'
+        isSystem: true, action: 'faction_list',
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasFaction(game)
     },
     'princess_list': {
         label: "姫", category: 'INFO',
@@ -1808,9 +1814,8 @@ class CommandSystem {
                         member.loyalty = Math.max(0, member.loyalty - 1);
                     }
                 });
-
-                // ★新しいお引越しセンターの魔法を使います！
-                this.game.affiliationSystem.becomeRonin(busho);
+                
+                this.game.affiliationSystem.becomeRonin(busho, 'banish');
 
                 this.game.ui.showResultModal(`${busho.name}を追放しました`);
                 this.game.ui.updatePanelHeader(); 
@@ -1890,7 +1895,6 @@ class CommandSystem {
             else if (type === 'move_deploy') { 
                 this.game.factionSystem.handleMove(busho, castle.id, targetId); 
                 
-                // ★新しいお引越しセンターの魔法を使います！
                 this.game.affiliationSystem.moveCastle(busho, targetId);
 
                 count++; actionName = "移動"; 
@@ -1961,7 +1965,6 @@ class CommandSystem {
         if (success) { 
             const currentC = this.game.getCurrentTurnCastle(); 
             
-            // ★新しいお引越しセンターの魔法を使います！
             this.game.affiliationSystem.joinClan(target, this.game.playerClanId, currentC.id);
             
             msg = `${target.name}の登用に成功しました！`;
@@ -2178,7 +2181,6 @@ class CommandSystem {
             const b = this.game.getBusho(id);
             this.game.factionSystem.handleMove(b, c.id, targetId); 
             
-            // ★新しいお引越しセンターの魔法を使います！
             this.game.affiliationSystem.moveCastle(b, targetId);
             
             b.isActionDone = true;
