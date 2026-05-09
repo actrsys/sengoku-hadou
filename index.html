@@ -613,8 +613,9 @@
             }
             
             // 計算したサイズと縮小率を割り当てます
-            screen.style.width = canvasW + 'px';
-            screen.style.height = canvasH + 'px';
+            // ★修正：サイズが小数点になるとブラウザの計算誤差で隙間ができるため、整数に丸めます！
+            screen.style.width = Math.ceil(canvasW) + 'px';
+            screen.style.height = Math.ceil(canvasH) + 'px';
             screen.style.position = 'absolute';
             screen.style.left = '50%';
             screen.style.top = '50%';
