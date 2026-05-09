@@ -1145,6 +1145,8 @@ class UIManager {
             descBox.style.display = 'none';
             descBox.innerHTML = '';
         }
+        
+        const confirmBtn = document.getElementById('scenario-confirm-btn');
 
         if (this.scenarioList) {
             this.scenarioList.innerHTML = '';
@@ -1160,7 +1162,6 @@ class UIManager {
                 div.innerHTML = `<strong>${s.name}</strong>`;
                 
                 div.onclick = () => { 
-                    // 1回目に押した時（選択した時）
                     if (selectedScenario !== s) {
                         if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                         
@@ -1174,13 +1175,6 @@ class UIManager {
                             descBox.innerHTML = `<strong style="font-size:1.1rem;">${s.name}</strong><br><br>${s.desc}`;
                             descBox.style.display = 'block';
                         }
-                    } 
-                    // 2回目に押した時（決定した時）
-                    else {
-                        if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
-                        
-                        this.scenarioScreen.classList.add('hidden'); 
-                        onSelect(s.folder); 
                     }
                 };
                 this.scenarioList.appendChild(div);
@@ -1195,6 +1189,17 @@ class UIManager {
                     }
                 }
             });
+            
+            // 決定ボタンを押した時の動きを登録します
+            if (confirmBtn) {
+                confirmBtn.onclick = () => {
+                    if (selectedScenario) {
+                        if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+                        this.scenarioScreen.classList.add('hidden'); 
+                        onSelect(selectedScenario.folder); 
+                    }
+                };
+            }
         }
     }
     async returnToTitle() { 
