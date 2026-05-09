@@ -1796,11 +1796,18 @@ class UIInfoManager {
         const kunishuCount = kunishus.length;
 
         // ★ 武将の人数も数えておきます
-        const targetBushos = castle.ownerClan > 0 ? this.game.bushos.filter(b => 
-            b.castleId === castle.id && 
-            b.status === 'active' && 
-            b.clan === castle.ownerClan
-        ) : [];
+        const targetBushos = this.game.bushos.filter(b => {
+            // まずは、その城にいるかどうかをチェックします
+            if (b.castleId !== castle.id) return false;
+            
+            // 浪人なら無条件でリストに入れます
+            if (b.status === 'ronin') return true;
+            
+            // 城に持ち主（勢力）がいる場合は、その勢力の武将もリストに入れます
+            if (castle.ownerClan > 0 && b.status === 'active' && b.clan === castle.ownerClan) return true;
+            
+            return false;
+        });
         const bushoCount = targetBushos.length;
 
         let totalGoldIncome = GameSystem.calcBaseGoldIncome(castle);
