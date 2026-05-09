@@ -1990,18 +1990,18 @@ class FieldWarManager {
             }
 
             let key = `${x},${y}`;
-			if (this.reachable && this.reachable[key]) {
-			    let path = this.reachable[key].path;
-			    let previewDir = unit.direction; 
-			    if (path && path.length > 0) {
-			        let fromX = (path.length > 1) ? path[path.length - 2].x : unit.x;
-			        let fromY = (path.length > 1) ? path[path.length - 2].y : unit.y;
-			        previewDir = this.getDirection(fromX, fromY, x, y);
-			    }
-			    this.previewTarget = {x: x, y: y, path: path, cost: this.reachable[key].cost, direction: previewDir};
-			    this.state = 'MOVE_PREVIEW';
-			    this.updateMap();
-			} else {
+            if (this.reachable && this.reachable[key]) {
+                let path = this.reachable[key].path;
+                let previewDir = unit.direction; 
+                if (path && path.length > 0) {
+                    let fromX = (path.length > 1) ? path[path.length - 2].x : unit.x;
+                    let fromY = (path.length > 1) ? path[path.length - 2].y : unit.y;
+                    previewDir = this.getDirection(fromX, fromY, x, y);
+                }
+                this.previewTarget = {x: x, y: y, path: path, cost: this.reachable[key].cost, direction: previewDir};
+                this.state = 'MOVE_PREVIEW';
+                this.updateMap();
+            } else {
                 this.cancelAction();
                 if(clickedUnit) this.showUnitInfo(clickedUnit);
             }
@@ -2012,38 +2012,38 @@ class FieldWarManager {
                 return;
             }
 
-			if (this.previewTarget && x === this.previewTarget.x && y === this.previewTarget.y) {
-			    let path = this.previewTarget.path;
-			    if (path && path.length > 0) {
-			        let fromX = unit.x;
-			        let fromY = unit.y;
-			        if (path.length > 1) {
-			            let prevStep = path[path.length - 2];
-			            fromX = prevStep.x;
-			            fromY = prevStep.y;
-			        }
-			        unit.direction = this.getDirection(fromX, fromY, x, y);
-			    }
+            if (this.previewTarget && x === this.previewTarget.x && y === this.previewTarget.y) {
+                let path = this.previewTarget.path;
+                if (path && path.length > 0) {
+                    let fromX = unit.x;
+                    let fromY = unit.y;
+                    if (path.length > 1) {
+                        let prevStep = path[path.length - 2];
+                        fromX = prevStep.x;
+                        fromY = prevStep.y;
+                    }
+                    unit.direction = this.getDirection(fromX, fromY, x, y);
+                }
 
-			    unit.ap -= this.previewTarget.cost;
-			    unit.x = x;
-			    unit.y = y;
+                unit.ap -= this.previewTarget.cost;
+                unit.x = x;
+                unit.y = y;
                 unit.hasMoved = true; // ★ 移動したことを記録
-			    this.log(`${unit.name}隊が移動（向きも変更）。`);
-			    this.nextPhase();
-			} else {
+                this.log(`${unit.name}隊が移動（向きも変更）。`);
+                this.nextPhase();
+            } else {
                 let key = `${x},${y}`;
-				if (this.reachable && this.reachable[key]) {
-				    let path = this.reachable[key].path;
-				    let previewDir = unit.direction;
-				    if (path && path.length > 0) {
-				        let fromX = (path.length > 1) ? path[path.length - 2].x : unit.x;
-				        let fromY = (path.length > 1) ? path[path.length - 2].y : unit.y;
-				        previewDir = this.getDirection(fromX, fromY, x, y);
-				    }
-				    this.previewTarget = {x: x, y: y, path: path, cost: this.reachable[key].cost, direction: previewDir};
-				    this.updateMap();
-				} else {
+                if (this.reachable && this.reachable[key]) {
+                    let path = this.reachable[key].path;
+                    let previewDir = unit.direction;
+                    if (path && path.length > 0) {
+                        let fromX = (path.length > 1) ? path[path.length - 2].x : unit.x;
+                        let fromY = (path.length > 1) ? path[path.length - 2].y : unit.y;
+                        previewDir = this.getDirection(fromX, fromY, x, y);
+                    }
+                    this.previewTarget = {x: x, y: y, path: path, cost: this.reachable[key].cost, direction: previewDir};
+                    this.updateMap();
+                } else {
                     this.cancelAction();
                     if(clickedUnit) this.showUnitInfo(clickedUnit);
                 }
@@ -2058,6 +2058,16 @@ class FieldWarManager {
             
             // ★修正: 攻撃可能範囲なら攻撃
             if (targetUnit && this.canAttackTarget(unit, x, y)) {
+                let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                let turnCost = this.getTurnCost(unit.direction, targetDir);
+                
+                // まっすぐ向くための行動力(方向転換コスト + 攻撃コスト1)が余っているか確認します
+                if (turnCost > 0 && unit.ap >= turnCost + 1) {
+                    unit.ap -= turnCost;
+                    unit.direction = targetDir;
+                    this.log(`${unit.name}隊が攻撃前に対象へ向き直った。`);
+                }
+
                 if (unit.ap >= 1) {
                     unit.ap -= 1;
                     this.executeAttack(unit, targetUnit);
@@ -2096,9 +2106,24 @@ class FieldWarManager {
 
             const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
             // ★修正: 攻撃可能範囲なら攻撃
-            if (targetUnit && unit.ap >= 1 && this.canAttackTarget(unit, x, y)) {
-                unit.ap -= 1;
-                this.executeAttack(unit, targetUnit);
+            if (targetUnit && this.canAttackTarget(unit, x, y)) {
+                let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                let turnCost = this.getTurnCost(unit.direction, targetDir);
+                
+                // まっすぐ向くための行動力(方向転換コスト + 攻撃コスト1)が余っているか確認します
+                if (turnCost > 0 && unit.ap >= turnCost + 1) {
+                    unit.ap -= turnCost;
+                    unit.direction = targetDir;
+                    this.log(`${unit.name}隊が攻撃前に対象へ向き直った。`);
+                }
+
+                if (unit.ap >= 1) {
+                    unit.ap -= 1;
+                    this.executeAttack(unit, targetUnit);
+                } else {
+                    this.cancelAction();
+                    if(clickedUnit) this.showUnitInfo(clickedUnit);
+                }
             } else {
                 this.cancelAction();
                 if(clickedUnit) this.showUnitInfo(clickedUnit);
