@@ -1744,7 +1744,9 @@ Object.assign(WarManager.prototype, {
                 if (s.isPlayerInvolved) {
                     const pid = Number(this.game.playerClanId);
                     const isAtkMain = (Number(s.attacker.ownerClan) === pid);
-                    const isAtkAlly = (s.reinforcement && Number(s.reinforcement.castle.ownerClan) === pid) || (s.selfReinforcement && Number(s.selfReinforcement.castle.ownerClan) === pid);
+                    const isAtkAlly = (s.reinforcement && Number(s.reinforcement.castle.ownerClan) === pid) || 
+                                      (s.selfReinforcement && Number(s.selfReinforcement.castle.ownerClan) === pid) ||
+                                      (s.retreatedReinforcements && s.retreatedReinforcements.some(r => r.isAttackerData && r.data.castle && Number(r.data.castle.ownerClan) === pid));
                     const isAtkSide = isAtkMain || isAtkAlly;
                     
                     // ★追加：ダイアログを出す前にバリアを解除します！
@@ -1770,8 +1772,14 @@ Object.assign(WarManager.prototype, {
                 
             let resultMsg = "";
             const pid = Number(this.game.playerClanId);
-            const isAtkPlayer = (Number(s.attacker.ownerClan) === pid) || (s.reinforcement && Number(s.reinforcement.castle.ownerClan) === pid) || (s.selfReinforcement && Number(s.selfReinforcement.castle.ownerClan) === pid);
-            const isDefPlayer = (Number(s.oldDefClanId) === pid) || (s.defReinforcement && Number(s.defReinforcement.castle.ownerClan) === pid) || (s.defSelfReinforcement && Number(s.defSelfReinforcement.castle.ownerClan) === pid);
+            const isAtkPlayer = (Number(s.attacker.ownerClan) === pid) || 
+                                (s.reinforcement && Number(s.reinforcement.castle.ownerClan) === pid) || 
+                                (s.selfReinforcement && Number(s.selfReinforcement.castle.ownerClan) === pid) ||
+                                (s.retreatedReinforcements && s.retreatedReinforcements.some(r => r.isAttackerData && r.data.castle && Number(r.data.castle.ownerClan) === pid));
+            const isDefPlayer = (Number(s.oldDefClanId) === pid) || 
+                                (s.defReinforcement && Number(s.defReinforcement.castle.ownerClan) === pid) || 
+                                (s.defSelfReinforcement && Number(s.defSelfReinforcement.castle.ownerClan) === pid) ||
+                                (s.retreatedReinforcements && s.retreatedReinforcements.some(r => !r.isAttackerData && r.data.castle && Number(r.data.castle.ownerClan) === pid));
             const enemyName = isAtkPlayer ? (this.game.clans.find(c => c.id === s.oldDefClanId)?.getArmyName() || "敵軍") : s.attacker.name;
 
             if (attackerWon) {
