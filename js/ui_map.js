@@ -25,7 +25,7 @@ const MAP_ZOOM_CONFIG = {
     PC: {
         min: 1.0, // PCの最小サイズ（1.0でピッタリ）
         mid: 3.0, // PCの中間サイズ（3.0倍）
-        max: 6.0  // PCの最大サイズ（5.0倍）
+        max: 6.0  // PCの最大サイズ（6.0倍）
     },
     MOBILE: {
         min: 1.0, // スマホの最小サイズ（1.0で画面全体を覆います）
@@ -896,20 +896,20 @@ Object.assign(UIManager.prototype, {
             }
             
             if (isDaimyoSelect) {
-                 el.style.cursor = 'pointer';
                  if (c.ownerClan === 0) {
+                     el.style.cursor = 'default';
                      el.classList.add('dimmed');
-                 } 
-                 // ★ 修正：赤いピカピカをなくすため selectable-target を削除
-                 
-                 el.onclick = (e) => {
-                     e.stopPropagation();
-                     if (this.isDraggingMap) return;
-                     if (window.AudioManager && c.ownerClan !== 0) {
-                         window.AudioManager.playSE('choice.ogg');
-                     }
-                     this.game.handleDaimyoSelect(c);
-                 };
+                 } else {
+                     el.style.cursor = 'pointer';
+                     el.onclick = (e) => {
+                         e.stopPropagation();
+                         if (this.isDraggingMap) return;
+                         if (window.AudioManager) {
+                             window.AudioManager.playSE('choice.ogg');
+                         }
+                         this.game.handleDaimyoSelect(c);
+                     };
+                 }
             }
             // ★修正：AIのターン中であっても、援軍などで「城を選んでいる最中(isSelectionMode)」なら操作できるようにバリアを解除します！
             else if (!this.game.isProcessingAI || isSelectionMode) {

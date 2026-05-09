@@ -1105,16 +1105,11 @@ class GameManager {
     }
     
     handleDaimyoSelect(castle) {
-        if (castle.ownerClan === 0) {
-            this.ui.showDialog("その城は空き城（中立）のため選択できません。", false);
-            return;
-        }
-        
         const clan = this.clans.find(c => c.id === castle.ownerClan);
         if (!clan) return;
 
         const totalSoldiers = this.getClanTotalSoldiers(clan.id);
-        const leader = this.getBusho(clan.leaderId); 
+        const leader = this.getBusho(clan.leaderId);
         
         // ★ 変更：引数に clan.id を追加して大名選択の光を制御します
         this.ui.showDaimyoConfirmModal(clan.id, clan.name, totalSoldiers, leader, () => {
