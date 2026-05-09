@@ -867,9 +867,21 @@ class WarManager {
 
         if (type === 'retreat') { 
             if (s.turn === 'attacker') { 
-                this.endWar(false, true); 
+                pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">攻撃本隊が撤退を開始した！<br>合戦は終結した！</span>`, log: `${activeArmyName} が撤退を開始した！` });
+                const finalize = () => { this.endWar(false, true); };
+                if (s.isPlayerInvolved && actionMessages.length > 0) {
+                    this.game.ui.showWarActionMessage(actionMessages, finalize);
+                } else {
+                    finalize();
+                }
             } else if (s.turn === 'defender') { 
-                this.executeRetreatLogic(s.defender); 
+                pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">守備本隊が城を放棄し撤退した！<br>合戦は終結した！</span>`, log: `${activeArmyName} が城を放棄し撤退した！` });
+                const finalize = () => { this.executeRetreatLogic(s.defender); };
+                if (s.isPlayerInvolved && actionMessages.length > 0) {
+                    this.game.ui.showWarActionMessage(actionMessages, finalize);
+                } else {
+                    finalize();
+                }
             } else if (['attacker_self_reinf', 'attacker_ally_reinf', 'defender_self_reinf', 'defender_ally_reinf'].includes(s.turn)) {
                 let reinfKey = '';
                 
