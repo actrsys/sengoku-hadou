@@ -35,6 +35,8 @@ class UIManager {
         this.prisonerList = document.getElementById('prisoner-list'); 
         this.successionModal = document.getElementById('succession-modal');
         this.successionList = document.getElementById('succession-list'); 
+        this.resultModal = document.getElementById('result-modal');
+        this.resultBody = document.getElementById('result-body'); 
         this.gunshiModal = document.getElementById('gunshi-modal');
         this.gunshiName = document.getElementById('gunshi-name'); 
         this.gunshiMessage = document.getElementById('gunshi-message');
@@ -70,6 +72,25 @@ class UIManager {
 
         this.bushoDetailModal = document.getElementById('busho-detail-modal');
         this.bushoDetailBody = document.getElementById('busho-detail-body');
+
+        this.onResultModalClose = null;
+
+        // ★結果画面の外側（黒い背景）を押して閉じた時にも音が鳴る
+        if (this.resultModal) {
+            this.resultModal.addEventListener('click', (e) => { 
+                if (e.target === this.resultModal) { 
+                    // ★ここから追加：選択が必須の画面（いつもの「閉じる」ボタンがない時）は、閉じられないように守ります！
+                    const footer = document.getElementById('result-footer');
+                    if (footer && !footer.innerHTML.includes('closeResultModal')) {
+                        return; // 閉じずに何もしないで、そのまま待ちます
+                    }
+                    // ★追加ここまで
+
+                    if (window.AudioManager) window.AudioManager.playSE('cancel.ogg'); 
+                    this.closeResultModal(); 
+                } 
+            });
+        }
 
         // 単なるメッセージ表示のウインドウも、外側を押して閉じられるようにします！
         const dialogModal = document.getElementById('dialog-modal');
@@ -193,7 +214,7 @@ class UIManager {
         }
         
         document.addEventListener('wheel', (e) => {
-            const listObj = e.target.closest('.list-container, #divide-list, .daimyo-list-container, .faction-list-container');
+            const listObj = e.target.closest('.list-container, .result-body, #divide-list, .daimyo-list-container, .faction-list-container');
             if (listObj) {
                 e.preventDefault();
                 listObj.scrollBy({ top: Math.sign(e.deltaY) * 30, behavior: 'smooth' });
@@ -210,7 +231,7 @@ class UIManager {
         document.addEventListener('mousedown', (e) => {
             if (!document.body.classList.contains('is-pc')) return;
 
-            const listObj = e.target.closest('.list-container, #divide-list, .daimyo-list-container, .faction-list-container');
+            const listObj = e.target.closest('.list-container, .result-body, #divide-list, .daimyo-list-container, .faction-list-container');
             if (listObj) {
                 const rect = listObj.getBoundingClientRect();
                 const isScrollbar = (e.clientX > rect.right - 20); 
@@ -469,6 +490,7 @@ class UIManager {
         const checkActive = () => {
             return (this.dialogQueue && this.dialogQueue.length > 0) ||
             isVisible('dialog-modal') ||
+            isVisible('result-modal') ||
             isVisible('intercept-confirm-modal') ||
             isVisible('unit-divide-modal') ||
             isVisible('prisoner-modal') ||
@@ -1032,7 +1054,54 @@ class UIManager {
         this.info.showFactionList(clanId, isDirect);
     }
 
-    closeSelector() {
+    showResultModal(msg, onClose = null, customFooterHtml = null) { 
+        this.hideAIGuardTemporarily(); 
+        if (this.resultBody) {
+            this.resultBody.innerHTML = msg.replace(/\n/g, '<br>');
+            // ここがリストを一番上に戻す魔法です！
+            this.resultBody.scrollTop = 0;
+        }
+        const footer = document.getElementById('result-footer');
+        if (footer) {
+            if (customFooterHtml !== null) {
+                footer.innerHTML = customFooterHtml;
+            } else {
+                // ★変更：青色（btn-primary）からグレー（btn-secondary）に変更します！
+                footer.innerHTML = `<button class="btn-secondary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
+            }
+        }
+        if (this.resultModal) this.resultModal.classList.remove('hidden'); 
+        this.onResultModalClose = onClose;
+    }
+    
+    closeResultModal() { 
+        if (this.resultModal) this.resultModal.classList.add('hidden'); 
+        this.restoreAIGuard(); 
+        
+        // ★追加：結果画面を閉じた時に、鳴っているSEを0.1秒でスッと消す魔法です！
+        if (window.AudioManager && typeof window.AudioManager.fadeOutSe === 'function') {
+            window.AudioManager.fadeOutSe(0.1);
+        }
+
+        // ★ここから書き足します！
+        // 小窓を閉じる時に、必ず「いつもの閉じるボタン」に戻しておきます！
+        const footer = document.getElementById('result-footer');
+        if (footer) {
+            // ★変更：青色（btn-primary）からグレー（btn-secondary）に変更します！
+            footer.innerHTML = `<button class="btn-secondary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
+        }
+        // ★書き足すのはここまで！
+        
+        if (this.onResultModalClose) {
+            const cb = this.onResultModalClose;
+            this.onResultModalClose = null;
+            cb();
+        } else if (this.game) {
+            this.game.checkAllActionsDone();
+        }
+    }
+    
+    closeSelector() { 
         if (this.selectorModal) this.selectorModal.classList.add('hidden'); 
         this.restoreAIGuard(); 
         if (this.selectorConfirmBtn) {
@@ -1843,10 +1912,10 @@ class UIManager {
 
                     castle.gold -= 200;
                     busho.endYear = Number(busho.endYear) + 1;
-                    this.showDialog(`${busho.name}は少し顔色が良くなったようです`, false, () => {
-                        this.updatePanelHeader();
-                        this.renderCommandMenu();
-                    });
+                    this.showResultModal(`${busho.name}は少し顔色が良くなったようです`);
+                    
+                    this.updatePanelHeader();
+                    this.renderCommandMenu();
                 },
                 () => {
                     this.renderNormalInterview(busho);
