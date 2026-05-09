@@ -1470,7 +1470,7 @@ Object.assign(WarManager.prototype, {
                             window.AudioManager.playSE('victory.ogg');
                         }
                     }
-                    this.game.ui.showResultModal(resultMsg, () => { 
+                    this.game.ui.showDialog(resultMsg, false, () => { 
                         this.closeWar(); 
                     });
                 } else {
@@ -1575,7 +1575,7 @@ Object.assign(WarManager.prototype, {
                 if (s.isPlayerInvolved) {
                     // ★修正：結果画面を出す前に合戦画面を消します
                     this.game.ui.setWarModalVisible(false);
-                    this.game.ui.showResultModal(resultMsg, () => { 
+                    this.game.ui.showDialog(resultMsg, false, () => { 
                         this.closeWar(); 
                     });
                 } else {
@@ -1740,9 +1740,9 @@ Object.assign(WarManager.prototype, {
                     const isAtkSide = isAtkMain || isAtkAlly;
                     
                     if (isAtkSide) {
-                        this.game.ui.showResultModal(`敵軍は城を捨てて敗走しました！\n${s.defender.name}を占領します！`, finishWarProcess);
+                        this.game.ui.showDialog(`敵軍は城を捨てて敗走しました！\n${s.defender.name}を占領します！`, false, finishWarProcess);
                     } else {
-                        this.game.ui.showResultModal(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, finishWarProcess);
+                        this.game.ui.showDialog(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, false, finishWarProcess);
                     }
                 } else {
                     // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
@@ -1861,7 +1861,7 @@ Object.assign(WarManager.prototype, {
                     }
                 }
                 
-                this.game.ui.showResultModal(resultMsg, finishWarProcess);
+                this.game.ui.showDialog(resultMsg, false, finishWarProcess);
             }
             else {
                 // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
@@ -1877,7 +1877,7 @@ Object.assign(WarManager.prototype, {
 
             this.game.ui.restoreAIGuardText(true);
 
-            if (this.state.isPlayerInvolved) this.game.ui.showResultModal("合戦処理中にエラーが発生しましたが、\nゲームを継続します。", () => { this.game.finishTurn(); });
+            if (this.state.isPlayerInvolved) this.game.ui.showDialog("合戦処理中にエラーが発生しましたが、\nゲームを継続します。", false, () => { this.game.finishTurn(); });
             else this.game.finishTurn();
         }
     },
