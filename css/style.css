@@ -1832,10 +1832,11 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
 
 .stat-busho { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; color: #fff; font-weight: bold; }
 .reinf-content-wrap { display: flex; width: 100%; }
-.stat-row { display: flex; justify-content: space-between; align-items: center !important; background: rgba(0, 0, 0, 0.4) !important; border-radius: 4px; padding: 2px 6px !important; border-bottom: none !important; font-weight: bold; font-size: 0.8rem !important; box-sizing: border-box !important; }
-.stat-row > div:first-child { color: #ffd54f; }
+.stat-row { display: flex; justify-content: space-between; align-items: center !important; background: rgba(0, 0, 0, 0.4) !important; border-radius: 4px; padding: 2px 6px !important; border-bottom: none !important; font-weight: bold; font-size: 0.8rem !important; box-sizing: border-box !important; min-width: 0; }
+.stat-row > div:first-child { color: #ffd54f; flex-shrink: 0; white-space: nowrap; }
+.stat-row > :last-child { white-space: nowrap; }
 .stat-row-group { display: flex; width: 100%; gap: 10px; border-bottom: none; padding-bottom: 0; align-items: center; }
-.stat-row-group .stat-row { flex: 1; border-bottom: none !important; padding: 2px 6px !important; }
+.stat-row-group .stat-row { flex: 1; border-bottom: none !important; padding: 2px 6px !important; min-width: 0; }
 .stat-val-large { font-size: 0.95rem !important; }
 .war-reinf-card .stat-row { display: flex !important; justify-content: space-between !important; width: 100% !important; box-sizing: border-box !important; }
 
@@ -2118,6 +2119,18 @@ body:not(.is-pc) .responsive-war-face {
 }
 body:not(.is-pc) .responsive-army-stats { 
     flex: 1 !important; 
+}
+body:not(.is-pc) .responsive-army-stats .stat-row-group {
+    gap: 2px !important;
+}
+body:not(.is-pc) .responsive-army-stats .stat-row-group .stat-row {
+    padding: 2px 4px !important;
+}
+body:not(.is-pc) .responsive-army-stats .stat-row-group .stat-row > :last-child {
+    letter-spacing: -1px;
+    transform: scaleX(0.9);
+    transform-origin: right center;
+    display: inline-block;
 }
 
 /* ③ 【スマホ版】援軍だけの魔法 */
