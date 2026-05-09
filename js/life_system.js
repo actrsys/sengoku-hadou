@@ -64,8 +64,12 @@ class LifeSystem {
             let penaltyOldGeneral = 0;  // おじいちゃんになった時のマイナス（智謀以外）
             let penaltyOldInt = 0;      // おじいちゃんになった時のマイナス（智謀だけ）
             
-            // 30歳未満の場合（2歳若くなるごとにマイナス1）
-            if (age < 30) {
+            // 若い時のペナルティ計算
+            if (age < 20) {
+                // 0歳〜19歳の場合（20歳時点でのペナルティ5に加えて、1歳若くなるごとにマイナス1）
+                penaltyYoung = 5 + (20 - age);
+            } else if (age < 30) {
+                // 20歳〜29歳の場合（2歳若くなるごとにマイナス1）
                 penaltyYoung = Math.ceil((30 - age) / 2);
             } 
             
