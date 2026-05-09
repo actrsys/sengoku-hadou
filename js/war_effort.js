@@ -1461,6 +1461,8 @@ Object.assign(WarManager.prototype, {
                 if (s.isPlayerInvolved) {
                     // ★修正：結果画面を出す「前」に合戦画面を消さないと、結果のボタンが押せなくなってしまいます！
                     this.game.ui.setWarModalVisible(false);
+                    // ★追加：ダイアログを出す前にバリアを解除します！
+                    if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                     if (attackerWon) {
                         if (window.AudioManager) {
                             // ★修正：フェードアウトさせると音量が0になって戻らなくなるので、ピタッと止める魔法にします！
@@ -1477,6 +1479,8 @@ Object.assign(WarManager.prototype, {
                     // ★修正：戦闘画面は飛ばしますが、結果のメッセージは表示してタップを待ちます！
                     const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
                     if (!skipAnim) {
+                        // ★追加：ダイアログを出す前にバリアを解除します！
+                        if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                         await this.game.ui.showDialogAsync(resultMsg);
                     }
                     this.closeWar();
@@ -1575,6 +1579,8 @@ Object.assign(WarManager.prototype, {
                 if (s.isPlayerInvolved) {
                     // ★修正：結果画面を出す前に合戦画面を消します
                     this.game.ui.setWarModalVisible(false);
+                    // ★追加：ダイアログを出す前にバリアを解除します！
+                    if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                     this.game.ui.showDialog(resultMsg, false, () => { 
                         this.closeWar(); 
                     });
@@ -1582,6 +1588,8 @@ Object.assign(WarManager.prototype, {
                     // ★追加：AIの城で反乱が起きた時も、専用のメッセージを出してタップを待ちます！
                     const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
                     if (!skipAnim) {
+                        // ★追加：ダイアログを出す前にバリアを解除します！
+                        if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                         await this.game.ui.showDialogAsync(resultMsg);
                     }
                     this.closeWar();
@@ -1739,6 +1747,9 @@ Object.assign(WarManager.prototype, {
                     const isAtkAlly = (s.reinforcement && Number(s.reinforcement.castle.ownerClan) === pid) || (s.selfReinforcement && Number(s.selfReinforcement.castle.ownerClan) === pid);
                     const isAtkSide = isAtkMain || isAtkAlly;
                     
+                    // ★追加：ダイアログを出す前にバリアを解除します！
+                    if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+
                     if (isAtkSide) {
                         this.game.ui.showDialog(`敵軍は城を捨てて敗走しました！\n${s.defender.name}を占領します！`, false, finishWarProcess);
                     } else {
@@ -1748,6 +1759,8 @@ Object.assign(WarManager.prototype, {
                     // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
                     const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
                     if (aiResultMsg && !skipAnim) {
+                        // ★追加：ダイアログを出す前にバリアを解除します！
+                        if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                         await this.game.ui.showDialogAsync(aiResultMsg);
                     }
                     finishWarProcess();
@@ -1851,6 +1864,9 @@ Object.assign(WarManager.prototype, {
             }
             
             if (s.isPlayerInvolved) {
+                // ★追加：ダイアログを出す前にバリアを解除します！
+                if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+
                 if (attackerWon && !isRetreat && isAtkPlayer) {
                     if (window.AudioManager) {
                         // ★修正：フェードアウトさせると音量が0になって戻らなくなるので、ピタッと止める魔法にします！
@@ -1867,6 +1883,8 @@ Object.assign(WarManager.prototype, {
                 // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
                 const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
                 if (aiResultMsg && !skipAnim) {
+                    // ★追加：ダイアログを出す前にバリアを解除します！
+                    if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                     await this.game.ui.showDialogAsync(aiResultMsg);
                 }
                 finishWarProcess();
