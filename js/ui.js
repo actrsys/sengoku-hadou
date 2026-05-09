@@ -2202,12 +2202,15 @@ class UIManager {
             if (targetCard) {
                 targetCard.style.position = 'relative'; 
                 
-                targetCard.classList.remove('anim-damage-shake', 'anim-damage-flash');
+                // ★修正：連続でダメージを受けた時にアニメーションが途切れないよう、クラス解除のタイマーをリセットします
+                if (targetCard.damageAnimTimer) clearTimeout(targetCard.damageAnimTimer);
+                
+                targetCard.classList.remove('anim-damage-shake', 'anim-damage-flash', 'anim-damage-shake-flash');
                 void targetCard.offsetWidth; 
                 
-                // ★追加：回復じゃない時（ダメージの時）だけ揺らします
+                // ★修正：揺れと点滅を両立させるため、合成クラス（anim-damage-shake-flash）を使います！
                 if (!isRecover) {
-                    targetCard.classList.add('anim-damage-shake', 'anim-damage-flash');
+                    targetCard.classList.add('anim-damage-shake-flash');
                 }
                 
                 const pop = document.createElement('div');
@@ -2228,8 +2231,67 @@ class UIManager {
 
                 targetCard.appendChild(pop);
 
+                // アニメーションクラスを外す処理（タイマーで管理）
+                targetCard.damageAnimTimer = setTimeout(() => {
+                    targetCard.classList.remove('anim-damage-shake', 'anim-damage-flash', 'anim-damage-shake-flash');
+                }, 1000);
+
+                // 数字のポップアップを消す処理（独立させておくことで確実に消えるようにします）
                 setTimeout(() => {
-                    targetCard.classList.remove('anim-damage-shake', 'anim-damage-flash');
+                    if (pop.parentNode) pop.parentNode.removeChild(pop);
+                }, 1000);
+            }
+        };
+
+        // 城の防御力の文字がある場所を揺らす専用の魔法です！
+        const applyWallAnim = (dmgStr, isRecover = false) => {
+            let wallEl = document.getElementById('war-def-wall-info');
+            if (wallEl) {
+                // ★修正：揺らす対象を「数字だけ」に、赤く光らせる対象を「八角形の枠」にします！
+                let hexWrap = wallEl.closest('.war-wall-hexagon-wrap');
+                
+                if (!hexWrap) hexWrap = wallEl;
+                
+                // ★修正：タイマーをリセットして連続ダメージでも綺麗に動くようにします
+                if (wallEl.damageAnimTimer) clearTimeout(wallEl.damageAnimTimer);
+                
+                wallEl.classList.remove('anim-damage-shake'); // 数字の揺れをリセット
+                hexWrap.classList.remove('anim-damage-flash'); // 枠の赤い光をリセット
+                void wallEl.offsetWidth; 
+                void hexWrap.offsetWidth; 
+                
+                // ★追加：回復じゃない時（ダメージの時）だけ効果を出します
+                if (!isRecover) {
+                    wallEl.classList.add('anim-damage-shake'); // ★数字だけを揺らします
+                    hexWrap.classList.add('anim-damage-flash');    // 枠の中だけ赤く光らせます
+                }
+                
+                const pop = document.createElement('div');
+                // ★追加：回復の時は緑色のデザインを使います！
+                pop.className = isRecover ? 'recover-popup anim-popup-text' : 'damage-popup anim-popup-text';
+                pop.innerHTML = dmgStr;
+                
+                // ★追加：城壁のダメージも絶対に「ど真ん中」から文字が出るように固定します！
+                pop.style.position = 'absolute';
+                pop.style.top = '50%';
+                pop.style.left = '50%';
+                pop.style.transform = 'translate(-50%, -50%)';
+                pop.style.zIndex = '100';
+                pop.style.pointerEvents = 'none';
+
+                // ★追加：ダメージの文字（-50など）の基準を八角形の枠にします！
+                hexWrap.style.position = 'relative';
+                // 数字そのものではなく、動かない枠の方にダメージ文字をくっつけます
+                hexWrap.appendChild(pop);
+
+                // アニメーションクラスを外す処理（タイマー管理）
+                wallEl.damageAnimTimer = setTimeout(() => {
+                    wallEl.classList.remove('anim-damage-shake');
+                    hexWrap.classList.remove('anim-damage-flash');
+                }, 1000);
+
+                // 数字のポップアップを消す処理
+                setTimeout(() => {
                     if (pop.parentNode) pop.parentNode.removeChild(pop);
                 }, 1000);
             }

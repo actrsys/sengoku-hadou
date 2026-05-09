@@ -68,17 +68,21 @@
 /* -----------------------------------------
    4. 画面が赤く光る（大ダメージを受けた時など）
    ----------------------------------------- */
-/* ★修正：背景色ではなく、枠に赤い影をつけるようにして目立たせます！ */
+/* ★修正：box-shadow は中身に隠れたり元のデザインを壊すため、filter を使って確実に赤く光らせます！ */
 .anim-damage-flash {
     animation: flash-red 0.5s ease-out;
 }
 
-@keyframes flash-red {
-    0%   { box-shadow: inset 0 0 0px transparent; }
-    30%  { box-shadow: inset 0 0 30px rgba(255, 0, 0, 0.8); } /* 内側に赤い影を出す */
-    100% { box-shadow: inset 0 0 0px transparent; }
+/* ★追加：揺れと点滅を同時に適用するための合成クラス */
+.anim-damage-shake-flash {
+    animation: shake 0.5s ease-in-out, flash-red 0.5s ease-out;
 }
 
+@keyframes flash-red {
+    0%   { filter: brightness(1) drop-shadow(0 0 0px transparent); }
+    30%  { filter: brightness(1.3) drop-shadow(0 0 15px rgba(255, 0, 0, 1)); }
+    100% { filter: brightness(1) drop-shadow(0 0 0px transparent); }
+}
 
 /* ★追加：回復ポップアップ用の緑色の専用デザイン */
 .recover-popup {
