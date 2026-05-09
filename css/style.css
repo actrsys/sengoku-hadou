@@ -79,7 +79,7 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
    タイトル画面
    ========================================================= */
 #title-screen {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    position: absolute; top: -2px; left: -2px; width: calc(100% + 4px); height: calc(100% + 4px);
     background: linear-gradient(135deg, #263238 0%, #37474f 100%);
     display: flex; justify-content: center; align-items: flex-start; z-index: 3000;
 }
@@ -886,7 +886,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 /* =========================================================
    各種モーダル・オーバーレイ・ガード
    ========================================================= */
-.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 6000; display: flex; justify-content: center; align-items: center; opacity: 1; transition: opacity 0.2s; padding: env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 60px) env(safe-area-inset-left); box-sizing: border-box; }
+.modal { position: absolute; top: -2px; left: -2px; width: calc(100% + 4px); height: calc(100% + 4px); background: rgba(0,0,0,0.6); z-index: 6000; display: flex; justify-content: center; align-items: center; opacity: 1; transition: opacity 0.2s; padding: env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 60px) env(safe-area-inset-left); box-sizing: border-box; }
 .modal.hidden { opacity: 0; pointer-events: none; display: none !important;} 
 
 /* モーダル（小窓）の重なり順（z-index）の統一リスト */
@@ -1303,7 +1303,7 @@ body:not(.is-pc) .dialog-name-label { font-size: 0.85rem; top: -16px; padding: 2
 }
 
 /* ガード・カットイン */
-#ai-guard { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: transparent; z-index: 5500; display: flex; justify-content: center; align-items: center; color: white; font-size: 1.5rem; font-weight: bold; flex-direction: column; pointer-events: auto; text-shadow: 2px 2px 4px #000, -2px -2px 4px #000, 2px -2px 4px #000, -2px 2px 4px #000; }
+#ai-guard { position: absolute; top: -2px; left: -2px; width: calc(100% + 4px); height: calc(100% + 4px); background: transparent; z-index: 5500; display: flex; justify-content: center; align-items: center; color: white; font-size: 1.5rem; font-weight: bold; flex-direction: column; pointer-events: auto; text-shadow: 2px 2px 4px #000, -2px -2px 4px #000, 2px -2px 4px #000, -2px 2px 4px #000; }
 
 /* ★追加：バリアは残したまま、中の文字とスピナーだけを見えなくする透明マントの魔法！ */
 #ai-guard.hide-text {
@@ -1314,7 +1314,7 @@ body:not(.is-pc) .dialog-name-label { font-size: 0.85rem; top: -16px; padding: 2
     opacity: 0 !important;
 }
 
-.cutin-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 7000; pointer-events: auto; display: flex; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.5s; }
+.cutin-overlay { position: absolute; top: -2px; left: -2px; width: calc(100% + 4px); height: calc(100% + 4px); background: rgba(0,0,0,0.7); z-index: 7000; pointer-events: auto; display: flex; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.5s; }
 .cutin-overlay.fade-in { opacity: 1; }
 .cutin-text { font-size: 2rem; color: #fff; font-weight: bold; text-shadow: 0 0 10px #ff0000; white-space: pre-wrap; text-align: center; transform: scale(0); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 .cutin-overlay.fade-in .cutin-text { transform: scale(1); }
@@ -1642,13 +1642,13 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
 #war-modal { 
     padding: 0 !important; 
     margin: 0 !important;
-    width: 100% !important;
-    height: 100% !important; 
+    width: calc(100% + 4px) !important;
+    height: calc(100% + 4px) !important; 
     box-sizing: border-box !important;
     overflow: hidden !important;
     position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
+    top: -2px !important;
+    left: -2px !important;
 }
 #war-modal .modal-content { 
     width: 100% !important; 
@@ -2343,10 +2343,10 @@ body.is-pc .retreat-btn:hover {
    ========================================================= */
 #global-loading-screen {
     position: absolute; /* 親要素（ゲーム画面）を基準にします */
-    top: 0; 
-    left: 0; 
-    width: 100%; 
-    height: 100%;
+    top: -2px; 
+    left: -2px; 
+    width: calc(100% + 4px); 
+    height: calc(100% + 4px);
     background-color: #263238; /* タイトル画面のような暗い色 */
     z-index: 9999; /* どんな画面よりも手前に出します */
     display: flex;
