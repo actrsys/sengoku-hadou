@@ -73,13 +73,21 @@ class LifeSystem {
                 penaltyYoung = Math.ceil((30 - age) / 2);
             } 
             
-            // 46歳以上の場合（3年歳をとるごとにマイナス1）
-            if (age >= 46) {
+            // 46歳以上の場合のペナルティ計算（智謀以外）
+            if (age >= 61) {
+                // 61歳以上の場合は、60歳までのペナルティ（5）に加えて、さらに2年ごとにマイナス1
+                penaltyOldGeneral = 5 + Math.ceil((age - 60) / 2);
+            } else if (age >= 46) {
+                // 46歳〜60歳までは、3年ごとにマイナス1
                 penaltyOldGeneral = Math.ceil((age - 45) / 3);
             }
 
-            // 智謀（intelligence）は56歳以上の場合（3年歳をとるごとにマイナス1）
-            if (age >= 56) {
+            // 56歳以上の場合のペナルティ計算（智謀だけ）
+            if (age >= 71) {
+                // 71歳以上の場合は、70歳までのペナルティ（5）に加えて、さらに2年ごとにマイナス1
+                penaltyOldInt = 5 + Math.ceil((age - 70) / 2);
+            } else if (age >= 56) {
+                // 56歳〜70歳までは、3年ごとにマイナス1
                 penaltyOldInt = Math.ceil((age - 55) / 3);
             }
             
