@@ -391,6 +391,9 @@ window.GameEvents.push({
                 mapOverlay.addEventListener('touchstart', onTouch, { passive: true });
             });
 
+            // メッセージを出す前に、まず地図（mapOverlay）を画面から消します
+            document.body.removeChild(mapOverlay);
+
             if (damagedProvinceMap.size > 0) {
                 await game.ui.showDialogAsync("各地で被害が発生しているようです……", false, 0);
             } else {
@@ -398,10 +401,11 @@ window.GameEvents.push({
             }
 
         } else {
+            // 被害がなかった場合も、ここで忘れずに地図を消します
+            document.body.removeChild(mapOverlay);
             await game.ui.showDialogAsync("今回は大きな被害はなかったようです。", false, 0);
         }
 
-        document.body.removeChild(mapOverlay);
         // ★マップを閉じた後の硬直時間を3秒（3000）から1秒（1000）に減らしました！
         await new Promise(resolve => setTimeout(resolve, 1000));
 
