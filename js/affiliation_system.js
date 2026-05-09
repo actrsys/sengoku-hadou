@@ -122,45 +122,50 @@ class AffiliationSystem {
 
             // 滅亡ではなく、自ら出奔した場合のみ、お引越し先を探します
             if (oldClanId !== 0 && !isClanDestroyed && currentCastle) {
-                // 自分のもともといた大名家（oldClanId）ではなく、かつ誰かの持ち物であるお城だけを集めます
-                const otherCastles = this.game.castles.filter(c => c.ownerClan !== oldClanId && c.ownerClan !== 0);
+                // --- 波紋のように道を辿って、一番近いお城を探す魔法（幅優先探索） ---
+                let queue = [{ castle: currentCastle, steps: 0 }];
+                let visited = new Set([currentCastle.id]);
+                let foundCandidates = [];
+                let maxSearchSteps = 15; // 念のため、15歩以上遠くは探さないようにします
 
-                if (otherCastles.length > 0) {
-                    // 集めたお城について、距離と城主との相性を計算して記録します
-                    const candidates = otherCastles.map(c => {
-                        // 今いるお城からの直線距離を計算します
-                        const dist = Math.sqrt(Math.pow(c.x - currentCastle.x, 2) + Math.pow(c.y - currentCastle.y, 2));
-                        
-                        // そのお城の城主を探します（城主がいなければ大名を探します）
-                        let lord = this.game.getBusho(c.castellanId);
+                while (queue.length > 0) {
+                    let { castle, steps } = queue.shift();
+                    
+                    // すでに一番近い階層の候補が見つかっていて、さらに遠い階層を見ようとしているなら探索終了！
+                    if (foundCandidates.length > 0 && steps > foundCandidates[0].steps) break;
+                    if (steps > maxSearchSteps) break;
+
+                    // 候補の条件：自分以外 ＆ 空城じゃない ＆ 前いた家じゃない
+                    if (castle.id !== currentCastle.id && castle.ownerClan !== 0 && castle.ownerClan !== oldClanId) {
+                        let lord = this.game.getBusho(castle.castellanId);
                         if (!lord) {
-                            lord = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
+                            lord = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
                         }
-
-                        // 相性のズレを計算します（0から50の間で、数字が小さいほど相性が良いです）
-                        let affDiff = 50; 
+                        let affDiff = 50;
                         if (lord) {
                             const diff = Math.abs(busho.affinity - lord.affinity);
                             affDiff = Math.min(diff, 100 - diff);
                         }
+                        foundCandidates.push({ castle, steps, affDiff });
+                    }
 
-                        return { castle: c, dist: dist, affDiff: affDiff };
-                    });
+                    // 隣接するお城（お隣さん）を次の調査リスト（キュー）に入れます
+                    if (castle.adjacentCastleIds) {
+                        for (let adjId of castle.adjacentCastleIds) {
+                            if (!visited.has(adjId)) {
+                                visited.add(adjId);
+                                let adjC = this.game.getCastle(adjId);
+                                if (adjC) queue.push({ castle: adjC, steps: steps + 1 });
+                            }
+                        }
+                    }
+                }
 
-                    // 距離が近い順番に並べ替えます
-                    candidates.sort((a, b) => a.dist - b.dist);
-
-                    // 近くにあるお城の中から、上位10個だけを「近い範囲」として選び出します
-                    const nearCandidates = candidates.slice(0, 10);
-
-                    // 選ばれた近いお城の中で、一番相性が良い（ズレが小さい）順番に並べ替えます
-                    nearCandidates.sort((a, b) => a.affDiff - b.affDiff);
-
-                    // 一番相性が良いお城が複数ある場合に備えて、一番良い点数と同じお城だけを集めます
-                    const bestAffDiff = nearCandidates[0].affDiff;
-                    const bestGroup = nearCandidates.filter(c => c.affDiff === bestAffDiff);
-                    
-                    // その中からランダムで1つだけ選びます
+                if (foundCandidates.length > 0) {
+                    // 「道なりに一番近いお城たち」の中で、一番相性が良い城を選びます
+                    foundCandidates.sort((a, b) => a.affDiff - b.affDiff);
+                    const bestAffDiff = foundCandidates[0].affDiff;
+                    const bestGroup = foundCandidates.filter(c => c.affDiff === bestAffDiff);
                     targetCastle = bestGroup[Math.floor(Math.random() * bestGroup.length)].castle;
                 }
             }
