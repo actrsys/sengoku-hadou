@@ -1961,8 +1961,8 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
 .hex-mountain { background-color: #795548 !important; background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.15) 50%, transparent 50%) !important; background-size: 10px 10px !important; }
 
 .fw-unit { width: 24px; height: 24px; position: absolute; display: flex; justify-content: center; align-items: center; transition: left 0.3s, top 0.3s, transform 0.3s; pointer-events: none; z-index: 20; }
-.fw-unit-icon { width: 100%; height: 100%; position: absolute; top: 0; left: 0; transform: rotate(var(--fw-dir, 0deg)); transition: transform 0.3s; }
-.fw-unit-icon::before { content: ""; display: block; width: 100%; height: 100%; -webkit-mask-image: url('../data/images/field_war_images/butai_icon.png'); mask-image: url('../data/images/field_war_images/butai_icon.png'); -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; transition: background-color 0.3s; }
+.fw-unit-icon { width: 100%; height: 100%; position: absolute; top: 0; left: 0; transform: rotate(var(--fw-dir, 0deg)) translateZ(0); transition: transform 0.3s; will-change: transform; }
+.fw-unit-icon::before { content: ""; display: block; width: 96%; height: 96%; position: absolute; top: 2%; left: 2%; -webkit-mask-image: url('../data/images/field_war_images/butai_icon.png'); mask-image: url('../data/images/field_war_images/butai_icon.png'); -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; transition: background-color 0.3s; }
 .fw-unit.preview { opacity: 0.6; animation: fw-blink 1s infinite; z-index: 18; }
 
 /* 部隊アイコン下部の兵数表示 */
