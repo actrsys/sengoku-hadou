@@ -1088,6 +1088,9 @@ Object.assign(WarManager.prototype, {
                 await this.game.eventManager.processEvents('after_battle_blink', eventContext);
             }
             // ==========================================
+
+            // ★追加：演出が終わったのでバリアを解除します！（ダイアログが操作できるようにするため）
+            if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
             
             // ★ここから追加：AI同士の戦争の結果メッセージを記憶しておきます（表示は色が塗られた一番最後にします！）
             let aiResultMsg = "";
@@ -1108,9 +1111,6 @@ Object.assign(WarManager.prototype, {
             
             // ★変更：順番待ちができるように async を付けます
             const finishWarProcess = async () => {
-                
-                // ★追加：演出が終わったのでバリアを解除します！
-                if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 
                 // ★ここから追加：合戦結果の画面を閉じたら、平時のBGMに戻す！
                 if (window.AudioManager && s.isPlayerInvolved) {
@@ -1470,7 +1470,7 @@ Object.assign(WarManager.prototype, {
                             window.AudioManager.playSE('victory.ogg');
                         }
                     }
-                    this.game.ui.showResultModal(resultMsg, () => { 
+                    this.game.ui.showDialog(resultMsg, false, () => { 
                         this.closeWar(); 
                     });
                 } else {
@@ -1575,7 +1575,7 @@ Object.assign(WarManager.prototype, {
                 if (s.isPlayerInvolved) {
                     // ★修正：結果画面を出す前に合戦画面を消します
                     this.game.ui.setWarModalVisible(false);
-                    this.game.ui.showResultModal(resultMsg, () => { 
+                    this.game.ui.showDialog(resultMsg, false, () => { 
                         this.closeWar(); 
                     });
                 } else {
@@ -1861,7 +1861,7 @@ Object.assign(WarManager.prototype, {
                     }
                 }
                 
-                this.game.ui.showResultModal(resultMsg, finishWarProcess);
+                this.game.ui.showDialog(resultMsg, false, finishWarProcess);
             }
             else {
                 // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
@@ -1877,7 +1877,7 @@ Object.assign(WarManager.prototype, {
 
             this.game.ui.restoreAIGuardText(true);
 
-            if (this.state.isPlayerInvolved) this.game.ui.showResultModal("合戦処理中にエラーが発生しましたが、\nゲームを継続します。", () => { this.game.finishTurn(); });
+            if (this.state.isPlayerInvolved) this.game.ui.showDialog("合戦処理中にエラーが発生しましたが、\nゲームを継続します。", false, () => { this.game.finishTurn(); });
             else this.game.finishTurn();
         }
     },

@@ -423,15 +423,15 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
    UIコンポーネント（リスト・スクロール・ボタン・バッジ）
    ========================================================= */
 /* スクロールバー装飾（全体適用、hide-native-scroll以外） */
-.list-container::-webkit-scrollbar, .result-body::-webkit-scrollbar, #divide-list::-webkit-scrollbar, .scenario-desc-box::-webkit-scrollbar, .war-controls-desc::-webkit-scrollbar, .fw-floating-log::-webkit-scrollbar { width: 14px; height: 14px; -webkit-appearance: none; }
-.list-container::-webkit-scrollbar-track, .result-body::-webkit-scrollbar-track, #divide-list::-webkit-scrollbar-track, .scenario-desc-box::-webkit-scrollbar-track, .war-controls-desc::-webkit-scrollbar-track, .fw-floating-log::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
-.list-container::-webkit-scrollbar-thumb, .result-body::-webkit-scrollbar-thumb, #divide-list::-webkit-scrollbar-thumb, .scenario-desc-box::-webkit-scrollbar-thumb, .war-controls-desc::-webkit-scrollbar-thumb, .fw-floating-log::-webkit-scrollbar-thumb { background: #78909c; border: 2px solid #e0e0e0; border-radius: 6px; }
-.list-container::-webkit-scrollbar-thumb:hover, .result-body::-webkit-scrollbar-thumb:hover, #divide-list::-webkit-scrollbar-thumb:hover, .scenario-desc-box::-webkit-scrollbar-thumb:hover, .war-controls-desc::-webkit-scrollbar-thumb:hover, .fw-floating-log::-webkit-scrollbar-thumb:hover { background: #546e7a; }
-.list-container::-webkit-scrollbar-button, .result-body::-webkit-scrollbar-button, #divide-list::-webkit-scrollbar-button, .scenario-desc-box::-webkit-scrollbar-button, .war-controls-desc::-webkit-scrollbar-button, .fw-floating-log::-webkit-scrollbar-button { display: none; }
-.list-container::-webkit-scrollbar-button:vertical:single-button, .result-body::-webkit-scrollbar-button:vertical:single-button, #divide-list::-webkit-scrollbar-button:vertical:single-button, .scenario-desc-box::-webkit-scrollbar-button:vertical:single-button, .war-controls-desc::-webkit-scrollbar-button:vertical:single-button, .fw-floating-log::-webkit-scrollbar-button:vertical:single-button { display: block; height: 14px; background-color: #e0e0e0; border: 1px solid #ccc; cursor: pointer; }
-.list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .result-body::-webkit-scrollbar-button:vertical:single-button:decrement, #divide-list::-webkit-scrollbar-button:vertical:single-button:decrement, .scenario-desc-box::-webkit-scrollbar-button:vertical:single-button:decrement, .war-controls-desc::-webkit-scrollbar-button:vertical:single-button:decrement, .fw-floating-log::-webkit-scrollbar-button:vertical:single-button:decrement { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,7 5,3 9,7" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
-.list-container::-webkit-scrollbar-button:vertical:single-button:increment, .result-body::-webkit-scrollbar-button:vertical:single-button:increment, #divide-list::-webkit-scrollbar-button:vertical:single-button:increment, .scenario-desc-box::-webkit-scrollbar-button:vertical:single-button:increment, .war-controls-desc::-webkit-scrollbar-button:vertical:single-button:increment, .fw-floating-log::-webkit-scrollbar-button:vertical:single-button:increment { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,3 5,7 9,3" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
-.list-container::-webkit-scrollbar-button:hover, .result-body::-webkit-scrollbar-button:hover, #divide-list::-webkit-scrollbar-button:hover, .scenario-desc-box::-webkit-scrollbar-button:hover, .war-controls-desc::-webkit-scrollbar-button:hover, .fw-floating-log::-webkit-scrollbar-button:hover { background-color: #cfd8dc; }
+.list-container::-webkit-scrollbar, #divide-list::-webkit-scrollbar, .scenario-desc-box::-webkit-scrollbar, .war-controls-desc::-webkit-scrollbar, .fw-floating-log::-webkit-scrollbar { width: 14px; height: 14px; -webkit-appearance: none; }
+.list-container::-webkit-scrollbar-track, #divide-list::-webkit-scrollbar-track, .scenario-desc-box::-webkit-scrollbar-track, .war-controls-desc::-webkit-scrollbar-track, .fw-floating-log::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
+.list-container::-webkit-scrollbar-thumb, #divide-list::-webkit-scrollbar-thumb, .scenario-desc-box::-webkit-scrollbar-thumb, .war-controls-desc::-webkit-scrollbar-thumb, .fw-floating-log::-webkit-scrollbar-thumb { background: #78909c; border: 2px solid #e0e0e0; border-radius: 6px; }
+.list-container::-webkit-scrollbar-thumb:hover, #divide-list::-webkit-scrollbar-thumb:hover, .scenario-desc-box::-webkit-scrollbar-thumb:hover, .war-controls-desc::-webkit-scrollbar-thumb:hover, .fw-floating-log::-webkit-scrollbar-thumb:hover { background: #546e7a; }
+.list-container::-webkit-scrollbar-button, #divide-list::-webkit-scrollbar-button, .scenario-desc-box::-webkit-scrollbar-button, .war-controls-desc::-webkit-scrollbar-button, .fw-floating-log::-webkit-scrollbar-button { display: none; }
+.list-container::-webkit-scrollbar-button:vertical:single-button, #divide-list::-webkit-scrollbar-button:vertical:single-button, .scenario-desc-box::-webkit-scrollbar-button:vertical:single-button, .war-controls-desc::-webkit-scrollbar-button:vertical:single-button, .fw-floating-log::-webkit-scrollbar-button:vertical:single-button { display: block; height: 14px; background-color: #e0e0e0; border: 1px solid #ccc; cursor: pointer; }
+.list-container::-webkit-scrollbar-button:vertical:single-button:decrement, #divide-list::-webkit-scrollbar-button:vertical:single-button:decrement, .scenario-desc-box::-webkit-scrollbar-button:vertical:single-button:decrement, .war-controls-desc::-webkit-scrollbar-button:vertical:single-button:decrement, .fw-floating-log::-webkit-scrollbar-button:vertical:single-button:decrement { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,7 5,3 9,7" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
+.list-container::-webkit-scrollbar-button:vertical:single-button:increment, #divide-list::-webkit-scrollbar-button:vertical:single-button:increment, .scenario-desc-box::-webkit-scrollbar-button:vertical:single-button:increment, .war-controls-desc::-webkit-scrollbar-button:vertical:single-button:increment, .fw-floating-log::-webkit-scrollbar-button:vertical:single-button:increment { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,3 5,7 9,3" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
+.list-container::-webkit-scrollbar-button:hover, #divide-list::-webkit-scrollbar-button:hover, .scenario-desc-box::-webkit-scrollbar-button:hover, .war-controls-desc::-webkit-scrollbar-button:hover, .fw-floating-log::-webkit-scrollbar-button:hover { background-color: #cfd8dc; }
 
 /* スマホ用自作スクロールバーのための設定 */
 .scroll-wrapper { 
@@ -542,7 +542,6 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     border: none; box-shadow: none; border-radius: 0;
     scroll-padding-top: 40px; box-sizing: border-box; -webkit-overflow-scrolling: auto; overscroll-behavior: none; 
 }
-.result-body { flex: 1; width: 100%; overflow-y: auto; min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; box-sizing: border-box; overscroll-behavior: none; }
 .select-item:last-child { margin-bottom: 0; }
 
 /* 縦の区切り線（子要素全てに適用） */
@@ -893,7 +892,6 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 #intercept-confirm-modal { z-index: 6000; }
 #quantity-modal { z-index: 6500; }
 #settings-modal { z-index: 7000; }
-#result-modal { z-index: 8000; }
 #daimyo-list-modal { z-index: 8100; }
 #daimyo-detail-modal { z-index: 8150; }
 #faction-list-modal { z-index: 8160; }
@@ -1087,11 +1085,9 @@ body:not(.is-pc) .dialog-name-label { font-size: 0.85rem; top: -16px; padding: 2
 /* 戦闘中の思考メッセージ用 */
 /* 各モーダルのサイズ・レイアウト調整 */
 .modal-small { max-width: 400px; }
-.result-content { max-width: 500px !important; }
 .quantity-content { max-width: 400px; }
 .divide-content { max-width: 600px; }
 .daimyo-confirm-content { text-align: center; }
-#result-footer { justify-content: center; }
 #unit-divide-modal h3 { margin-top: 0; }
 .settings-title { margin-top: 0; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
 
@@ -1144,12 +1140,6 @@ body:not(.is-pc) .dialog-name-label { font-size: 0.85rem; top: -16px; padding: 2
     display: none; 
     color: #fff;
     text-shadow: 1px 1px 1px #000;
-}
-
-/* リスト表示時はウィンドウ幅を統一 */
-#result-modal .modal-content:has(.daimyo-list-container, .faction-list-container, .princess-list-container) {
-    max-width: 800px !important;
-    text-align: left !important;
 }
 
 /* =========================================================
