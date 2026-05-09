@@ -1734,7 +1734,16 @@ Object.assign(WarManager.prototype, {
                 this.game.ui.log(`【合戦結果】守備軍の撤退により、${atkArmyName1}が${s.defender.name}を占領しました。`);
                 
                 if (s.isPlayerInvolved) {
-                    this.game.ui.showResultModal(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, finishWarProcess);
+                    const pid = Number(this.game.playerClanId);
+                    const isAtkMain = (Number(s.attacker.ownerClan) === pid);
+                    const isAtkAlly = (s.reinforcement && Number(s.reinforcement.castle.ownerClan) === pid) || (s.selfReinforcement && Number(s.selfReinforcement.castle.ownerClan) === pid);
+                    const isAtkSide = isAtkMain || isAtkAlly;
+                    
+                    if (isAtkSide) {
+                        this.game.ui.showResultModal(`敵軍は城を捨てて敗走しました！\n${s.defender.name}を占領します！`, finishWarProcess);
+                    } else {
+                        this.game.ui.showResultModal(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, finishWarProcess);
+                    }
                 } else {
                     // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
                     const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
@@ -1747,11 +1756,12 @@ Object.assign(WarManager.prototype, {
             }
                 
             let resultMsg = "";
-            const isAtkPlayer = (Number(s.attacker.ownerClan) === Number(this.game.playerClanId));
-            const isDefPlayer = (Number(s.defender.ownerClan) === Number(this.game.playerClanId));
-            const enemyName = isAtkPlayer ? (this.game.clans.find(c => c.id === s.defender.ownerClan)?.getArmyName() || "敵軍") : s.attacker.name;
+            const pid = Number(this.game.playerClanId);
+            const isAtkPlayer = (Number(s.attacker.ownerClan) === pid) || (s.reinforcement && Number(s.reinforcement.castle.ownerClan) === pid) || (s.selfReinforcement && Number(s.selfReinforcement.castle.ownerClan) === pid);
+            const isDefPlayer = (Number(s.oldDefClanId) === pid) || (s.defReinforcement && Number(s.defReinforcement.castle.ownerClan) === pid) || (s.defSelfReinforcement && Number(s.defSelfReinforcement.castle.ownerClan) === pid);
+            const enemyName = isAtkPlayer ? (this.game.clans.find(c => c.id === s.oldDefClanId)?.getArmyName() || "敵軍") : s.attacker.name;
 
-            if (attackerWon) { 
+            if (attackerWon) {
                 // ★ここから書き足し：城側が負けた・撤退した時の追加減少
                 if (!s.defender.isKunishu && !s.isKunishuSubjugation && !s.attacker.isKunishu) {
                     // 民忠をさらに現在の2割減らす
