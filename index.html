@@ -576,12 +576,21 @@
             const baseHeight = 720;
             const scale = Math.min(windowW / baseWidth, windowH / baseHeight);
             
+            // ★追加：画面の真ん中に置くための位置を、小数が出ないように「割り算して四捨五入（Math.round）」で計算します
+            const scaledW = baseWidth * scale;
+            const scaledH = baseHeight * scale;
+            const left = Math.round((windowW - scaledW) / 2);
+            const top = Math.round((windowH - scaledH) / 2);
+            
             screen.style.width = baseWidth + 'px';
             screen.style.height = baseHeight + 'px';
             screen.style.position = 'absolute';
-            screen.style.left = '50%';
-            screen.style.top = '50%';
-            screen.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            screen.style.left = left + 'px';
+            screen.style.top = top + 'px';
+            screen.style.transform = `scale(${scale})`;
+            screen.style.transformOrigin = 'top left'; // ★変更：左上を基準にすることで、小数のズレをなくします
+            screen.style.overflow = 'hidden'; // ★追加：箱からはみ出た部分をバッサリ切り取るハサミです
+            screen.style.backgroundColor = '#000000'; // ★追加：隙間ができても絶対に黒帯と同化させる魔法です
         } else {
             // スマホ版：現在の画面から9:16になる実寸サイズを計算します
             document.body.classList.remove('is-pc');
@@ -600,7 +609,6 @@
             }
             
             // ★ 極端に小さい画面でのレイアウト崩れを防ぐ魔法
-            // 最低限必要な横幅を設定し、それより小さい場合は縮小（scale）して対応します
             const minMobileWidth = 360; 
             let canvasW = finalW;
             let canvasH = finalH;
@@ -612,17 +620,23 @@
                 scale = finalW / minMobileWidth;
             }
             
-            // 計算したサイズと縮小率を割り当てます
-            // ★修正：サイズが小数点になるとブラウザの計算誤差で隙間ができるため、整数に丸めます！
-            screen.style.width = Math.ceil(canvasW) + 'px';
-            screen.style.height = Math.ceil(canvasH) + 'px';
+            // ★追加：画面の真ん中に置くための位置を、小数が出ないように「割り算して四捨五入（Math.round）」で計算します
+            const scaledW = canvasW * scale;
+            const scaledH = canvasH * scale;
+            const left = Math.round((windowW - scaledW) / 2);
+            const top = Math.round((windowH - scaledH) / 2);
+            
+            screen.style.width = canvasW + 'px';
+            screen.style.height = canvasH + 'px';
             screen.style.position = 'absolute';
-            screen.style.left = '50%';
-            screen.style.top = '50%';
-            screen.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            screen.style.left = left + 'px';
+            screen.style.top = top + 'px';
+            screen.style.transform = `scale(${scale})`;
+            screen.style.transformOrigin = 'top left'; // ★変更：左上を基準にすることで、小数のズレをなくします
+            screen.style.overflow = 'hidden'; // ★追加：箱からはみ出た部分をバッサリ切り取るハサミです
+            screen.style.backgroundColor = '#000000'; // ★追加：隙間ができても絶対に黒帯と同化させる魔法です
         }
         
-        screen.style.transformOrigin = 'center center';
         screen.style.zoom = '';
     }
     
