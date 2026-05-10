@@ -678,7 +678,8 @@ class AIOperationManager {
                 }
                 
                 // ★雪国かどうかを判定して「越冬」の準備をします
-                const snowProvs = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 28];
+                // 陸奥、出羽、越後、越中、越前、加賀、能登、若狭、信濃、上野、下野、飛騨、佐渡、蝦夷
+                const snowProvs = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 28, 65, 67];
                 const myCastle = this.game.getCastle(cand.castleId);
                 const targetProvId = cand.target.isKunishuTarget ? myCastle.provinceId : cand.target.provinceId;
                 
