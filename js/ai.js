@@ -1277,6 +1277,12 @@ class AIEngine {
                 horseScore += (horseRatio * 5);
                 gunScore += (gunRatio * 5);
 
+                // 特定の城（石山御坊、雑賀城、赤尾木城、今浜城）なら、鉄砲を少し優先して騎馬を控えます
+                if ([33, 42, 185, 186].includes(castle.id)) {
+                    gunScore += 3;
+                    horseScore -= 3;
+                }
+
                 // 最後にサイコロを振って、少しだけ気まぐれな気持ち（0〜3点）を足し算します
                 horseScore += Math.random() * 3;
                 gunScore += Math.random() * 3;

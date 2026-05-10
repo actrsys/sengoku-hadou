@@ -669,7 +669,14 @@ class GameSystem {
     static calcBuyGunUnitPrice(daimyo, castellan) {
         const eff = this.calcBuyGunEfficiency(daimyo, castellan);
         // 鉄砲の基礎価格5
-        return 5 / (1 + eff / 10);
+        let unitPrice = 5 / (1 + eff / 10);
+        
+        // ★追加：特定の城（今浜城:186、石山御坊:33、雑賀城:42、赤尾木城:185）では、鉄砲の単価を半分にします！
+        if (castellan && [33, 42, 185, 186].includes(castellan.castleId)) {
+            unitPrice = unitPrice / 2;
+        }
+        
+        return unitPrice;
     }
 
     static calcBuyGunCost(amount, daimyo, castellan) {
