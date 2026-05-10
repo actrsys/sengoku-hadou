@@ -24,8 +24,8 @@ const INITIAL_MAP_CENTER_CONFIG = {
 const MAP_ZOOM_CONFIG = {
     PC: {
         min: 1.0, // PCの最小サイズ（1.0でピッタリ）
-        mid: 3.0, // PCの中間サイズ（3.0倍）
-        max: 6.0  // PCの最大サイズ（6.0倍）
+        mid: 4.0, // PCの中間サイズ（4.0倍）
+        max: 8.0  // PCの最大サイズ（8.0倍）
     },
     MOBILE: {
         min: 1.0, // スマホの最小サイズ（1.0で画面全体を覆います）
