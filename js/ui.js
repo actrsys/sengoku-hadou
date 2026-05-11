@@ -751,13 +751,16 @@ class UIManager {
 
             if (dialog.customOpts.isInterview) {
                 modal.classList.add('interview-dialog-modal');
+                if (footer) {
+                    footer.classList.remove('right');
+                    footer.style.justifyContent = '';
+                }
             } else {
                 modal.classList.remove('interview-dialog-modal');
             }
 
             if (footer) {
                 footer.classList.remove('hidden');
-                footer.style.justifyContent = 'center';
 
                 dialog.customOpts.choices.forEach((choice, index) => {
                     const btn = document.createElement('button');
