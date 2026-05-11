@@ -2535,22 +2535,24 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
-    width: 90%;
-    max-width: 600px;
+    width: 100% !important; /* スマホの基本ルールに合わせて100%を許可します */
+    max-width: 600px !important;
     display: flex;
     flex-direction: column;
+    align-items: center !important; /* 中の2つの窓を中央に寄せます */
     gap: 15px; /* 上の窓と下の窓のスキマ */
 }
 
-/* 2. 上側の「メッセージ窓」を新しくデザインします */
-.interview-dialog-modal #dialog-content {
-    background-color: rgba(30, 30, 30, 0.95);
-    border: 3px double #d4af37;
-    border-radius: 10px;
-    padding: 20px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+/* 2. 上側の「メッセージ窓」を新しくデザインします（※指定ミス修正） */
+.interview-dialog-modal .dialog-body-container {
+    background-color: rgba(30, 30, 30, 0.95) !important;
+    border: 3px double #d4af37 !important;
+    border-radius: 10px !important;
+    padding: 20px !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.7) !important;
     box-sizing: border-box;
-    width: 100%;
+    width: 92% !important; /* 画面端に少しスキマを作ります */
+    margin: 0 !important;
 }
 
 /* 3. 下側の「選択肢窓」を上の窓と全く同じ幅にします */
@@ -2559,13 +2561,13 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
-    background-color: rgba(30, 30, 30, 0.95);
-    border: 3px double #d4af37;
-    border-radius: 10px;
-    padding: 20px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+    background-color: rgba(30, 30, 30, 0.95) !important;
+    border: 3px double #d4af37 !important;
+    border-radius: 10px !important;
+    padding: 20px !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.7) !important;
     box-sizing: border-box;
-    width: 100%;
+    width: 92% !important; /* メッセージ窓と同じ幅に揃えます */
     margin: 0 !important;
     justify-content: flex-start !important;
 }
