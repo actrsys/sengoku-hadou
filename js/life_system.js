@@ -558,11 +558,37 @@ class LifeSystem {
                     
                     // 行き先の決定
                     if (nextClanId > 0) {
+                        // ★ここから書き足し：大名家の「姫の名簿」も書き換えます！
+                        // 1. 今までいた大名家（亡くなった夫の家）の名簿から名前を消します
+                        if (busho.clan !== 0) {
+                            const oldClan = this.game.clans.find(c => c.id === busho.clan);
+                            if (oldClan && oldClan.princessIds) {
+                                oldClan.princessIds = oldClan.princessIds.filter(id => id !== princess.id);
+                            }
+                        }
+                        
+                        // 2. 新しく帰る大名家の名簿に名前を書き足します
+                        const newClan = this.game.clans.find(c => c.id === nextClanId);
+                        if (newClan) {
+                            if (!newClan.princessIds) newClan.princessIds = [];
+                            if (!newClan.princessIds.includes(princess.id)) {
+                                newClan.princessIds.push(princess.id);
+                            }
+                        }
+                        
                         princess.currentClanId = nextClanId;
                         princess.status = 'unmarried'; // 再び未婚に戻ります
                     } else {
                         // 戻る場所がどこにもない場合は、もう登場させない
                         princess.status = 'dead';
+                        
+                        // ★ここから書き足し：いなくなってしまうので、今までいた大名家の名簿から名前を消します
+                        if (busho.clan !== 0) {
+                            const oldClan = this.game.clans.find(c => c.id === busho.clan);
+                            if (oldClan && oldClan.princessIds) {
+                                oldClan.princessIds = oldClan.princessIds.filter(id => id !== princess.id);
+                            }
+                        }
                     }
                     
                     // ★追加：夫が死亡したので、夫の一門から外れるようリストを更新します
