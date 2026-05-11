@@ -315,6 +315,8 @@ class AffiliationSystem {
         busho.recognitionNeed = 0;
         busho.factionSeikaku = "無所属";
         busho.factionHoshin = "無所属";
+        busho.factionName = "";
+        busho.factionYomi = "";
         busho.belongKunishuId = 0;
 
         // ★修正：もし軍団の国主だった場合、城の管理システムにお願いして軍団ごと解散させます！
