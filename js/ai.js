@@ -364,11 +364,127 @@ class AIEngine {
 
         const myDaimyo = this.game.bushos.find(b => b.clan === myCastle.ownerClan && b.isDaimyo) || { personality: 'normal', intelligence: 50, duty: 50, nemesisIds: [] };
 
-        // =========================================================================
-        // ★新規追加：周囲の敵対大名をすべて調べて、それぞれの警戒度を計算します！
         const myClanId = myCastle.ownerClan;
         const myClanCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
         const myTotalPower = this.getClanPrestige(myClanId);
+
+        // =========================================================================
+        // ★新規追加：上洛ルート検索（将軍候補がいる場合）
+        const jorakuTargets = new Set();
+        let hasShogunCandidate = false;
+        
+        // 自勢力の武将の中に「左馬頭（ID: 80）」の官位を持つ人がいるか探します！
+        const myBushos = this.game.bushos.filter(b => b.clan === myClanId);
+        for (const b of myBushos) {
+            if (b.courtRankIds && b.courtRankIds.includes(80)) {
+                hasShogunCandidate = true;
+                break;
+            }
+        }
+
+        // 将軍候補がいたら、京都への道を探します！
+        if (hasShogunCandidate) {
+            // まだ持っていない二条城（ID: 26）と槇島城（ID: 90）を探します
+            // すでに片方を持っていても、もう片方を狙うようになります
+            const unownedKyotoCastles = this.game.castles.filter(c => (c.id === 26 || c.id === 90) && c.ownerClan !== myClanId);
+            
+            if (unownedKyotoCastles.length > 0) {
+                // 距離を測るためのノートを作ります
+                const dist = {};
+                const prev = {};
+                this.game.castles.forEach(c => dist[c.id] = Infinity); // 最初は全部「無限遠」にしておきます
+                const queue = [];
+                
+                // 自分の領地は「距離0」として出発点にします
+                myClanCastles.forEach(c => {
+                    dist[c.id] = 0;
+                    queue.push(c.id);
+                });
+                
+                // 道が繋がっているお城を順番に調べていきます
+                while(queue.length > 0) {
+                    let minD = Infinity;
+                    let u = -1;
+                    let uIdx = -1;
+                    // 今一番近いお城を探します
+                    for(let i=0; i<queue.length; i++) {
+                        if (dist[queue[i]] < minD) {
+                            minD = dist[queue[i]];
+                            u = queue[i];
+                            uIdx = i;
+                        }
+                    }
+                    if (u === -1) break;
+                    queue.splice(uIdx, 1);
+                    
+                    const uCastle = this.game.getCastle(u);
+                    if (!uCastle.adjacentCastleIds) continue;
+                    
+                    // お隣のお城への道しるべを書きます
+                    for (const adjId of uCastle.adjacentCastleIds) {
+                        const vCastle = this.game.getCastle(adjId);
+                        if (!vCastle) continue;
+                        
+                        let cost = Infinity; // 最初は通れない壁だと仮定します
+                        
+                        if (vCastle.ownerClan === myClanId) {
+                            cost = 0; // 自分のお城ならスイスイ通れます（コスト0）
+                        } else {
+                            // 同盟国など、攻撃しちゃダメな相手か確認します
+                            let isProtected = false;
+                            if (vCastle.ownerClan !== 0) {
+                                const rel = this.game.getRelation(myClanId, vCastle.ownerClan);
+                                if (rel && this.game.diplomacyManager.isNonAggression(rel.status)) {
+                                    isProtected = true; // 攻撃できないので通れません！
+                                }
+                            }
+                            // 攻撃できる相手（または空き城）なら、1回戦えば通れます（コスト1）
+                            if (!isProtected) {
+                                cost = 1;
+                            }
+                        }
+                        
+                        // 今までの道より近ければ、ノートを書き直します
+                        if (cost !== Infinity) {
+                            if (dist[u] + cost < dist[vCastle.id]) {
+                                dist[vCastle.id] = dist[u] + cost;
+                                prev[vCastle.id] = u; // どこから来たかメモしておきます
+                                if (!queue.includes(vCastle.id)) {
+                                    queue.push(vCastle.id);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // 二条城か槇島城のうち、近い方を目的地に決めます！
+                // もし両方同じ距離でも、片方だけが選ばれるので二重に狙うことはありません！
+                let bestKyotoCastle = null;
+                let minDistToKyoto = Infinity;
+                unownedKyotoCastles.forEach(kc => {
+                    if (dist[kc.id] < minDistToKyoto) {
+                        minDistToKyoto = dist[kc.id];
+                        bestKyotoCastle = kc;
+                    }
+                });
+                
+                // 目的地にたどり着く道があったら、足跡をたどって「次に攻めるべき城」を特定します！
+                if (bestKyotoCastle && minDistToKyoto > 0 && minDistToKyoto !== Infinity) {
+                    let curr = bestKyotoCastle.id;
+                    // 距離が「1（次に攻める場所）」になるまで逆戻りします
+                    // もし目的地が隣のお城（距離1）なら、逆戻りせずそのままターゲットになります（直接攻撃！）
+                    while (curr !== undefined && dist[curr] > 1) {
+                        curr = prev[curr];
+                    }
+                    if (curr !== undefined && dist[curr] === 1) {
+                        jorakuTargets.add(curr); // 上洛の第一歩としてロックオンします！
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // ★新規追加：周囲の敵対大名をすべて調べて、それぞれの警戒度を計算します！
 
         // ★ここから追加：自分が持っている「国」と「地方」が、統一されているか調べる魔法！
         // まずは自分が持っている国と地方の出席番号を書き出します
@@ -884,6 +1000,11 @@ class AIEngine {
                 }
             }
 
+            // ★追加：上洛ルート（二条城・槇島城への最短経路）に乗っている城なら、大幅にスコアを上げる！
+            if (jorakuTargets.has(target.id)) {
+                prob += 30; // 上洛を最優先にして歴史イベントを起こしやすくします！
+            }
+
             // ★保守的・隠居気質な大名の「外に出たくない」ペナルティ！
             if (myDaimyo.personality === 'conservative' || myDaimyo.personality === 'hermit') {
                 // 自分が１つもお城を持っていない「国」への攻撃は気が進まない
@@ -901,6 +1022,9 @@ class AIEngine {
             let maxProb = rel.status === '敵対' ? 60 : 10;
             if (isNemesisDaimyo) {
                 maxProb += 10; // 宿敵の場合は、上限を10%広げて攻めやすくします！
+            }
+            if (jorakuTargets.has(target.id)) {
+                maxProb += 30; // 上洛ルートの場合は上限を大きく広げます！
             }
             
             // 最大値の適用
