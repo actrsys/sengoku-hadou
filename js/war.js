@@ -1145,6 +1145,45 @@ class WarManager {
             return { atkPower: finalAtk, defPower: finalDef };
         };
 
+        // ★今回追加：リーダーの居城によるホーム補正を計算する魔法！
+        const getHomeBonusMult = (role) => {
+            let activeCastle = null;
+            if (role === 'attacker') activeCastle = s.sourceCastle;
+            else if (role === 'attacker_self_reinf') activeCastle = s.selfReinforcement ? s.selfReinforcement.castle : null;
+            else if (role === 'attacker_ally_reinf') activeCastle = s.reinforcement ? s.reinforcement.castle : null;
+            else if (role === 'defender') activeCastle = s.defender;
+            else if (role === 'defender_self_reinf') activeCastle = s.defSelfReinforcement ? s.defSelfReinforcement.castle : null;
+            else if (role === 'defender_ally_reinf') activeCastle = s.defReinforcement ? s.defReinforcement.castle : null;
+            
+            let mult = 1.0;
+            if (activeCastle && this.game && !activeCastle.isKunishu && activeCastle.ownerClan > 0) {
+                let leaderCastle = null;
+                if (activeCastle.legionId > 0 && this.game.legions) {
+                    const legion = this.game.legions.find(l => l.id === activeCastle.legionId);
+                    if (legion && legion.commanderId > 0) {
+                        const commander = this.game.getBusho(legion.commanderId);
+                        if (commander && commander.castleId) leaderCastle = this.game.getCastle(commander.castleId);
+                    }
+                }
+                if (!leaderCastle) {
+                    const daimyo = this.game.bushos.find(b => b.clan === activeCastle.ownerClan && b.isDaimyo);
+                    if (daimyo && daimyo.castleId) leaderCastle = this.game.getCastle(daimyo.castleId);
+                }
+                if (!leaderCastle) leaderCastle = activeCastle;
+
+                if (leaderCastle.provinceId === s.defender.provinceId) mult += 0.1;
+                const leaderProv = this.game.provinces.find(p => p.id === leaderCastle.provinceId);
+                const defProv = this.game.provinces.find(p => p.id === s.defender.provinceId);
+                if (leaderProv && defProv && leaderProv.regionId === defProv.regionId) mult += 0.1;
+            } else if (activeCastle) {
+                if (activeCastle.provinceId === s.defender.provinceId) mult += 0.1;
+                const leaderProv = this.game.provinces.find(p => p.id === activeCastle.provinceId);
+                const defProv = this.game.provinces.find(p => p.id === s.defender.provinceId);
+                if (leaderProv && defProv && leaderProv.regionId === defProv.regionId) mult += 0.1;
+            }
+            return mult;
+        };
+
         let activePowerObj = calcArmyPower(activeBushos, activeSoldiers, activeMorale, activeTraining, (!isAtkTurnGroup && s.turn === 'defender'));
         let activeAtkPower = activePowerObj.atkPower;
 
@@ -1175,6 +1214,9 @@ class WarManager {
             // 算出したボーナス値を、最後に足し算します
             activeAtkPower = activeAtkPower + equipBonusValue;
         }
+
+        // ★ホーム補正を攻撃力に乗せます！
+        activeAtkPower = activeAtkPower * getHomeBonusMult(s.turn);
         
         let targetList = [];
         if (isAtkTurnGroup) {
@@ -1189,7 +1231,8 @@ class WarManager {
         targetList.forEach(t => {
             let pObj = calcArmyPower(t.bushos, t.soldiers, t.morale, t.training, t.isDefendingCastle);
             t.defPower = pObj.defPower;
-            t.atkPower = pObj.atkPower; 
+            // ★反撃パワーにもホーム補正を乗せます！
+            t.atkPower = pObj.atkPower * getHomeBonusMult(t.role); 
         });
 
         let multiplier = 1.0; 

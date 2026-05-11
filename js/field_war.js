@@ -2174,6 +2174,54 @@ class FieldWarManager {
         let defFinalAtk = defBaseAtk * (1 + (defMorale * 1.5 + defTraining) / 1000);
         let defFinalDef = defBaseDef * (1 + (defMorale + defTraining * 1.5) / 1000);
 
+        // ★追加：リーダーの居城によるホーム補正を計算する魔法！
+        const getHomeBonusMult = (unit) => {
+            let activeCastle = null;
+            if (unit.groupId === 'atk_main') activeCastle = this.warState.sourceCastle;
+            else if (unit.groupId === 'atk_self') activeCastle = this.warState.selfReinforcement ? this.warState.selfReinforcement.castle : null;
+            else if (unit.groupId === 'atk_ally') activeCastle = this.warState.reinforcement ? this.warState.reinforcement.castle : null;
+            else if (unit.groupId === 'def_main') activeCastle = this.warState.defender;
+            else if (unit.groupId === 'def_self') activeCastle = this.warState.defSelfReinforcement ? this.warState.defSelfReinforcement.castle : null;
+            else if (unit.groupId === 'def_ally') activeCastle = this.warState.defReinforcement ? this.warState.defReinforcement.castle : null;
+            else if (unit.groupId && unit.groupId.startsWith('def_kunishu_')) {
+                const kunishuId = parseInt(unit.groupId.split('_')[2]);
+                const kunishu = this.game.kunishuSystem.getKunishu(kunishuId);
+                if (kunishu) activeCastle = this.game.getCastle(kunishu.castleId);
+            }
+            
+            let mult = 1.0;
+            if (activeCastle && this.game && !activeCastle.isKunishu && activeCastle.ownerClan > 0) {
+                let leaderCastle = null;
+                if (activeCastle.legionId > 0 && this.game.legions) {
+                    const legion = this.game.legions.find(l => l.id === activeCastle.legionId);
+                    if (legion && legion.commanderId > 0) {
+                        const commander = this.game.getBusho(legion.commanderId);
+                        if (commander && commander.castleId) leaderCastle = this.game.getCastle(commander.castleId);
+                    }
+                }
+                if (!leaderCastle) {
+                    const daimyo = this.game.bushos.find(b => b.clan === activeCastle.ownerClan && b.isDaimyo);
+                    if (daimyo && daimyo.castleId) leaderCastle = this.game.getCastle(daimyo.castleId);
+                }
+                if (!leaderCastle) leaderCastle = activeCastle;
+
+                if (leaderCastle.provinceId === this.warState.defender.provinceId) mult += 0.1;
+                const leaderProv = this.game.provinces.find(p => p.id === leaderCastle.provinceId);
+                const defProv = this.game.provinces.find(p => p.id === this.warState.defender.provinceId);
+                if (leaderProv && defProv && leaderProv.regionId === defProv.regionId) mult += 0.1;
+            } else if (activeCastle) {
+                if (activeCastle.provinceId === this.warState.defender.provinceId) mult += 0.1;
+                const leaderProv = this.game.provinces.find(p => p.id === activeCastle.provinceId);
+                const defProv = this.game.provinces.find(p => p.id === this.warState.defender.provinceId);
+                if (leaderProv && defProv && leaderProv.regionId === defProv.regionId) mult += 0.1;
+            }
+            return mult;
+        };
+
+        // ★ホーム補正を攻撃力に乗せます！
+        atkFinalAtk *= getHomeBonusMult(attacker);
+        defFinalAtk *= getHomeBonusMult(defender);
+
         // ★追加: 派閥による連携バフの計算
         const calcFactionBonus = (targetUnit) => {
             let bonusAtk = 0;
