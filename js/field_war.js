@@ -2133,6 +2133,15 @@ class FieldWarManager {
     }
 
     async executeAttack(attacker, defender) {
+        // ★追加：プレイヤーが参加している戦闘かどうかを一番最初に判定します
+        const isPlayerInvolved = this.units.some(u => u.isPlayer);
+        
+        // ★追加：攻撃の直前に最新の向きを画面に反映させて、少しだけ待ちます（クルッと振り向く動きを見せるため）
+        if (isPlayerInvolved) {
+            this.updateMap();
+            await new Promise(r => setTimeout(r, 200)); // 0.2秒待ってから計算とアニメーション開始
+        }
+
         // それぞれの部隊の専用の箱から、士気と訓練度を取り出します
         let atkMorale = this.groupStats[attacker.groupId] ? this.groupStats[attacker.groupId].morale : 50;
         let atkTraining = this.groupStats[attacker.groupId] ? this.groupStats[attacker.groupId].training : 50;
@@ -2274,7 +2283,6 @@ class FieldWarManager {
         }
 
         // ★追加: プレイヤーがいないAI同士の戦いなら、ダメージを約3分の2（0.666）に減らします！
-        const isPlayerInvolved = this.units.some(u => u.isPlayer);
         if (!isPlayerInvolved) {
             dmgToDef = Math.floor(dmgToDef * 0.666);
             dmgToAtk = Math.floor(dmgToAtk * 0.666);
@@ -2316,7 +2324,22 @@ class FieldWarManager {
                 const popup = document.createElement('div');
                 popup.className = 'fw-damage-popup';
                 popup.innerText = `-${damage}`;
-                el.appendChild(popup);
+                
+                // ★修正: ポップアップを親要素（el）の中ではなく、マップ全体（this.mapEl）に追加します。
+                // これにより、親要素のfilter（点滅効果）の影響を受けず、重なり順も独立します。
+                this.mapEl.appendChild(popup);
+                
+                // ★修正: ポップアップの位置を、親要素の現在の位置から計算して設定します。
+                const elRect = el.getBoundingClientRect(); // 親（部隊アイコン）の画面上の位置を取得
+                const mapRect = this.mapEl.getBoundingClientRect(); // マップの画面上の位置を取得
+                
+                // 親の左上座標をマップ基準の座標に変換
+                const parentX = elRect.left - mapRect.left;
+                const parentY = elRect.top - mapRect.top;
+                
+                // ポップアップを親の中央上部に配置
+                popup.style.left = `${parentX + elRect.width / 2}px`;
+                popup.style.top = `${parentY}px`;
                 
                 // 1秒経ったら自動でお掃除します
                 setTimeout(() => {
@@ -2532,7 +2555,29 @@ class FieldWarManager {
         let isFleeing = (unit.troopType === 'teppo' && distToTarget === 1);
         let shouldMove = true;
         
-        if (unit.troopType !== 'teppo' && distToTarget === 1) {
+        if (unit.troopType === 'teppo') {
+            if (!isFleeing) {
+                // 今の場所から（振り向く体力を使って）攻撃できる敵がいるかチェックします
+                let canAttackNow = false;
+                for (let e of enemies) {
+                    let targetDir = this.getDirection(unit.x, unit.y, e.x, e.y);
+                    let turnCost = this.getTurnCost(unit.direction, targetDir);
+                    let tempUnit = Object.assign({}, unit);
+                    tempUnit.direction = targetDir; // 仮に振り向かせてみる
+                    
+                    if (unit.ap >= turnCost && this.canAttackTarget(tempUnit, e.x, e.y)) {
+                        canAttackNow = true;
+                        break;
+                    }
+                }
+                
+                // 攻撃できるなら、移動せずにその場で構えます！
+                if (canAttackNow) {
+                    shouldMove = false;
+                }
+            }
+        } else if (distToTarget === 1) {
+            // 鉄砲以外の部隊は、敵が目の前にいたら移動しません
             shouldMove = false; 
         }
 

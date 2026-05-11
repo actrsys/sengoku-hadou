@@ -116,14 +116,19 @@
    ----------------------------------------- */
 .fw-damage-popup {
     position: absolute;
-    top: -5px; /* アイコンの少し上からスタートさせます */
-    left: 50%; /* 左右の真ん中を基準にします */
+    /* ★修正: JavaScriptで位置を設定するため、CSSでのtop, leftの初期設定を削除します */
     color: #ff3333;
     font-size: 13px; /* 兵数表示のサイズ感に合わせて小さくしました */
     font-weight: bold;
-    text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+    /* ★修正: 小さなフォントに合わせて、縁取りをシンプルな1pxの白に調整し、ガビガビを解消します */
+    text-shadow: 1px 1px 0 #fff;
+    /* ★追加: フォントがギザギザにならないように、レンダリングを調整します */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     pointer-events: none;
-    z-index: 100;
+    /* ★修正: z-indexを大きくして、全ての部隊アイコンより上に表示されるようにします */
+    z-index: 1000;
     /* 野戦の小さな画面に合わせて、少しだけ上に上がる専用の動きを使います */
     animation: fw-popup 1s ease-out forwards;
 }
