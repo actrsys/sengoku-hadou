@@ -800,7 +800,6 @@ class UIManager {
                         if (footer) footer.appendChild(btn);
                     }
                 });
-            }
         } else if (isEventMode) {
             // 選択肢のないイベント：フッターを隠して画面クリックで進行
             modal.classList.add('event-dialog-modal');
