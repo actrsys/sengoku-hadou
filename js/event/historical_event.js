@@ -2242,45 +2242,72 @@ window.GameEvents.push({
         // ストッパー：三好家自身が将軍を擁立している家だった場合は中止します
         if (miyoshiClanId === sponsorClanId || (shogunClanId !== 0 && miyoshiClanId === shogunClanId)) return false;
 
-        // 3. 伊丹城（ID: 51）を三好家が持っているか確認します
-        const itamiCastle = game.getCastle(51);
-        if (!itamiCastle || itamiCastle.ownerClan !== miyoshiClanId) return false;
-
-        // 4. 池田長正、池田勝正、荒木村重のいずれかが伊丹城の城主か確認します
+        // 3. 摂津衆（池田長正、池田勝正、荒木村重）のいずれかが、三好家の城主であるか確認します
         const targetLordIds = [1902001, 1902002, 1902003];
-        const isTargetLord = targetLordIds.includes(itamiCastle.castellanId);
-        if (!isTargetLord) return false;
+        let targetLord = null;
+        let mainCastle = null;
 
-        // 5. 将軍擁立勢力と三好家が敵対しているか確認します
-        // 外交システムに「この2つの家の関係を教えて」と質問します
+        for (let id of targetLordIds) {
+            const lord = game.getBusho(id);
+            // 三好家にいて、城主のバッジを持っている人を探します
+            if (lord && lord.clan === miyoshiClanId && lord.isCastellan) {
+                const c = game.getCastle(lord.castleId);
+                // そのお城がちゃんと三好家のものか確認します
+                if (c && c.ownerClan === miyoshiClanId) {
+                    targetLord = lord;
+                    mainCastle = c;
+                    break; // 見つかったら探すのをやめます
+                }
+            }
+        }
+        if (!targetLord || !mainCastle) return false;
+
+        // 対象となる城のリストを作ります（国主なら軍団の全城、城主ならその城のみ）
+        let targetCastles = [];
+        if (targetLord.isCommander && game.legions) {
+            const legion = game.legions.find(l => l.clanId === miyoshiClanId && l.commanderId === targetLord.id);
+            if (legion) {
+                targetCastles = game.castles.filter(c => c.ownerClan === miyoshiClanId && c.legionId === legion.legionNo);
+            }
+        }
+        if (targetCastles.length === 0) {
+            targetCastles = [mainCastle];
+        }
+
+        // 4. 将軍擁立勢力と三好家が敵対しているか確認します
         const rel = game.diplomacyManager ? game.diplomacyManager.getRelation(sponsorClanId, miyoshiClanId) : null;
         if (!rel || rel.status !== '敵対') return false;
 
-        // 6. 松永久秀（ID: 1901001）が将軍擁立勢力に所属しているか確認します
+        // 5. 松永久秀（ID: 1901001）が将軍擁立勢力に所属しているか確認します
         const hisahide = game.getBusho(1901001);
         if (!hisahide || hisahide.clan !== sponsorClanId) return false;
 
-        // 7. 伊丹城と、将軍擁立勢力または将軍家の城が隣接しているか確認します
+        // 6. 対象の城のいずれかが、将軍擁立勢力または将軍家の城が隣接しているか確認します
         let isAdjacent = false;
         
-        // まず擁立勢力の城と繋がっているか調べます
         const sponsorCastles = game.castles.filter(c => c.ownerClan === sponsorClanId);
-        for (let sc of sponsorCastles) {
-            if (GameSystem.isAdjacent(sc, itamiCastle)) {
-                isAdjacent = true;
-                break;
-            }
-        }
+        const shogunCastles = shogunClanId !== 0 ? game.castles.filter(c => c.ownerClan === shogunClanId) : [];
 
-        // 擁立勢力と繋がっておらず、将軍家が存在する場合は、将軍家の城とも隣接判定します
-        if (!isAdjacent && shogunClanId !== 0) {
-            const shogunCastles = game.castles.filter(c => c.ownerClan === shogunClanId);
-            for (let sc of shogunCastles) {
-                if (GameSystem.isAdjacent(sc, itamiCastle)) {
+        for (let targetC of targetCastles) {
+            // まず擁立勢力の城と繋がっているか調べます
+            for (let sc of sponsorCastles) {
+                if (GameSystem.isAdjacent(sc, targetC)) {
                     isAdjacent = true;
                     break;
                 }
             }
+            if (isAdjacent) break;
+
+            // 擁立勢力と繋がっておらず、将軍家が存在する場合は、将軍家の城とも隣接判定します
+            if (shogunClanId !== 0) {
+                for (let sc of shogunCastles) {
+                    if (GameSystem.isAdjacent(sc, targetC)) {
+                        isAdjacent = true;
+                        break;
+                    }
+                }
+            }
+            if (isAdjacent) break;
         }
 
         if (!isAdjacent) return false;
@@ -2290,7 +2317,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        // メッセージを出すために必要な人たちや勢力の名前を集めます
+        // メッセージや処理に必要な情報を集めます
         let sponsorClanId = 0;
         const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
         
@@ -2301,82 +2328,138 @@ window.GameEvents.push({
         }
         
         const sponsorClan = game.clans.find(c => c.id === sponsorClanId);
-        
         const nagayasu = game.getBusho(1020006);
         const miyoshiClanId = nagayasu.clan;
 
-        const itamiCastle = game.getCastle(51);
-        const itamiLord = game.getBusho(itamiCastle.castellanId);
+        const targetLordIds = [1902001, 1902002, 1902003];
+        let targetLord = null;
+        let mainCastle = null;
+
+        for (let id of targetLordIds) {
+            const lord = game.getBusho(id);
+            if (lord && lord.clan === miyoshiClanId && lord.isCastellan) {
+                const c = game.getCastle(lord.castleId);
+                if (c && c.ownerClan === miyoshiClanId) {
+                    targetLord = lord;
+                    mainCastle = c;
+                    break;
+                }
+            }
+        }
+        if (!targetLord || !mainCastle) return;
+
+        let targetCastles = [];
+        let legionToDismiss = null;
+        if (targetLord.isCommander && game.legions) {
+            legionToDismiss = game.legions.find(l => l.clanId === miyoshiClanId && l.commanderId === targetLord.id);
+            if (legionToDismiss) {
+                targetCastles = game.castles.filter(c => c.ownerClan === miyoshiClanId && c.legionId === legionToDismiss.legionNo);
+            }
+        }
+        if (targetCastles.length === 0) {
+            targetCastles = [mainCastle];
+        }
+        const targetCastleIds = targetCastles.map(c => c.id);
 
         const sponsorName = sponsorClan ? sponsorClan.name : "擁立勢力";
-        const itamiLordName = itamiLord ? itamiLord.name.replace('|', '') : "伊丹城主";
+        const itamiLordName = targetLord.name.replace('|', '');
+        const castleNameStr = targetLord.isCommander ? "軍団" : mainCastle.name;
+        
+        // 対象となる城の、元の城主（出席番号）をそれぞれ記録しておきます
+        const originalCastellans = {};
+        targetCastles.forEach(c => {
+            originalCastellans[c.id] = c.castellanId;
+        });
 
         // ① 三好家所属でIDが1902001～1902999の武将を全員集めます
         const targetBushos = game.bushos.filter(b => b.clan === miyoshiClanId && b.status === 'active' && b.id >= 1902001 && b.id <= 1902999);
         
-        // その人たちを伊丹城にお引越しさせます
+        // その人たちのうち、対象の城以外にいる人を本城（mainCastle）に集めます
         targetBushos.forEach(busho => {
-            if (busho.castleId !== 51) {
-                // 他の城で城主や軍師をしていたら、そのバッジを外してあげます
+            if (!targetCastleIds.includes(busho.castleId)) {
                 busho.isCastellan = false;
                 busho.isGunshi = false;
-                
                 if (game.affiliationSystem) {
-                    game.affiliationSystem.moveCastle(busho, 51);
+                    game.affiliationSystem.moveCastle(busho, mainCastle.id);
                 } else {
-                    busho.castleId = 51;
+                    busho.castleId = mainCastle.id;
                 }
             }
         });
 
-        // ② 元々伊丹城にいた人で、今回は降伏しない人（対象ID以外）を長逸の居城へ逃がします
-        const residents = game.bushos.filter(b => b.castleId === 51 && b.status === 'active');
-        residents.forEach(busho => {
-            // IDの範囲外の人がいれば、お引越しさせます
-            if (busho.id < 1902001 || busho.id > 1902999) {
-                busho.isCastellan = false; // 城を追い出されるので城主バッジは外れます
-                if (game.affiliationSystem) {
-                    game.affiliationSystem.moveCastle(busho, nagayasu.castleId);
-                } else {
-                    busho.castleId = nagayasu.castleId;
+        // ② 対象の城にいる人で、今回は降伏しない人（対象ID以外）を長逸の居城へ逃がします
+        targetCastles.forEach(castle => {
+            const residents = game.bushos.filter(b => b.castleId === castle.id && b.status === 'active');
+            residents.forEach(busho => {
+                // IDの範囲外の人がいれば、お引越しさせます
+                if (busho.id < 1902001 || busho.id > 1902999) {
+                    busho.isCastellan = false; // 城を追い出されるので城主バッジは外れます
+                    busho.isCommander = false;
+                    if (game.affiliationSystem) {
+                        game.affiliationSystem.moveCastle(busho, nagayasu.castleId);
+                    } else {
+                        busho.castleId = nagayasu.castleId;
+                    }
                 }
+            });
+        });
+
+        // ③ 対象の城の持ち主の看板を「将軍擁立勢力」に掛け替えます
+        targetCastles.forEach(castle => {
+            castle.legionId = 0; // 軍団の所属を外して直轄に戻します
+            if (game.castleManager) {
+                game.castleManager.changeOwner(castle, sponsorClanId, true);
+            } else {
+                castle.ownerClan = sponsorClanId;
             }
         });
 
-        // ③ 伊丹城の持ち主の看板を「将軍擁立勢力」に掛け替えます
-        if (game.castleManager) {
-            game.castleManager.changeOwner(itamiCastle, sponsorClanId, true);
-        } else {
-            itamiCastle.ownerClan = sponsorClanId;
-        }
-
-        // ④ 伊丹城に集めた降伏組（対象IDの武将）を、将軍擁立勢力に所属変更させます
+        // ④ 対象の城に集めた降伏組（対象IDの武将）を、将軍擁立勢力に所属変更させます
         targetBushos.forEach(busho => {
             if (game.affiliationSystem) {
                 // 第4引数に「100」を渡すことで、忠誠度をピッタリ100にセットできます
-                game.affiliationSystem.joinClan(busho, sponsorClanId, 51, 100);
+                game.affiliationSystem.joinClan(busho, sponsorClanId, busho.castleId, 100);
             } else {
                 busho.clan = sponsorClanId;
                 busho.loyalty = 100;
             }
         });
 
-        // ⑤ 降伏を主導した元の城主に、もう一度伊丹城の城主のバッジを付けてあげます
-        if (itamiLord) {
-            itamiLord.isCastellan = true;
-            itamiCastle.castellanId = itamiLord.id;
-            if (game.affiliationSystem) {
-                game.affiliationSystem.updateCastleLord(itamiCastle);
+        // ⑤ 国主だった場合の解任処理と軍団の解散処理をします
+        if (targetLord.isCommander) {
+            targetLord.isCommander = false;
+            if (legionToDismiss) {
+                legionToDismiss.commanderId = 0;
+                legionToDismiss.objective = null;
+                legionToDismiss.status = 'wait';
+                legionToDismiss.targetId = 0;
+                legionToDismiss.route = [];
             }
         }
 
-        // ⑥ 画面に何が起きたかメッセージを出してお知らせします
-        const msg = `将軍を擁立する${sponsorName}の勢いに押され、\n伊丹城の${itamiLordName}ら摂津衆が${sponsorName}に降伏しました！`;
+        // ⑥ 降伏を主導した元の城主たちに、もう一度城主のバッジを付けてあげます
+        targetCastles.forEach(castle => {
+            const oldCastellanId = originalCastellans[castle.id];
+            const newCastellan = game.getBusho(oldCastellanId);
+            // 元の城主が摂津衆（降伏組）なら、そのまま城主に復帰させます
+            if (newCastellan && newCastellan.id >= 1902001 && newCastellan.id <= 1902999 && newCastellan.castleId === castle.id) {
+                newCastellan.isCastellan = true;
+                castle.castellanId = newCastellan.id;
+            } else {
+                castle.castellanId = 0; // 誰もいなければ空っぽにしておきます
+            }
+            if (game.affiliationSystem) {
+                game.affiliationSystem.updateCastleLord(castle);
+            }
+        });
+
+        // ⑦ 画面に何が起きたかメッセージを出してお知らせします
+        const msg = `将軍を擁立する${sponsorName}の勢いに押され、\n${castleNameStr}の${itamiLordName}ら摂津衆が${sponsorName}に降伏しました！`;
         
         game.ui.log(`【イベント】${msg}`);
         await game.ui.showDialogAsync(msg, false, 0);
 
-        // ⑦ 最後に、画面の表示や派閥のデータを最新のものに更新します
+        // ⑧ 最後に、画面の表示や派閥のデータを最新のものに更新します
         if (game.factionSystem) {
             game.factionSystem.updateFactions();
         }
