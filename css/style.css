@@ -934,8 +934,8 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 /* 顔グラフィックの列 */
 .dialog-face-column {
     display: flex;
-    flex-direction: column;
-    align-items: center;
+    flex-direction: column-reverse;
+    align-items: flex-start;
     align-self: flex-start;
     width: 110px; 
     flex-shrink: 0;
