@@ -1840,11 +1840,11 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
 .stat-val-large { font-size: 0.95rem !important; }
 .war-reinf-card .stat-row { display: flex !important; justify-content: space-between !important; width: 100% !important; box-sizing: border-box !important; }
 
-.war-controls-area { display: flex !important; width: 100%; gap: 10px; flex-shrink: 0; height: 150px; box-sizing: border-box; padding: 10px; background: transparent; border-top: none; }
-.war-controls-buttons { flex: 2; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 5px; height: 100%; box-sizing: border-box; }
+.war-controls-area { display: flex !important; width: 100%; gap: 10px; flex-shrink: 0; height: auto; min-height: 100px; box-sizing: border-box; padding: 10px; background: transparent; border-top: none; }
+.war-controls-buttons { flex: 2; display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: max-content; gap: 5px; height: auto; box-sizing: border-box; }
 .war-controls-desc { flex: 3; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 8px; padding: 8px 15px; font-size: 0.95rem; color: #fff; text-shadow: 1px 1px 1px #000; text-align: left; overflow-y: auto; height: 100%; box-sizing: border-box; }
 /* ★攻城戦のコマンドボタンを内政と同じ（cmd-btn）にするための調整 */
-.war-controls-buttons button { height: 100%; width: 100%; font-size: 1rem; padding: 0; }
+.war-controls-buttons button { width: 100%; font-size: 1rem; padding: 0; }
 .war-controls-buttons button.active-cmd { 
     background: linear-gradient(135deg, #7e9d93 0%, #b4ccc5 100%);
     color: #ffffff;
@@ -2149,8 +2149,9 @@ body:not(.is-pc) .war-reinf-card .reinf-face-container { display: flex; justify-
 body:not(.is-pc) .war-reinf-card .responsive-war-face { width: 40px !important; height: 40px !important; }
 
 /* コントロールパネル周り */
-body:not(.is-pc) .war-controls-area { height: 120px !important; gap: 5px !important; flex-shrink: 0 !important; margin-bottom: 5px !important; padding-bottom: 5px !important; box-sizing: border-box !important; }
-body:not(.is-pc) .war-controls-desc { font-size: 0.75rem !important; padding: 5px !important; }
+body:not(.is-pc) .war-controls-area { height: auto !important; min-height: 80px !important; gap: 5px !important; flex-shrink: 0 !important; margin-bottom: 5px !important; padding-bottom: 5px !important; box-sizing: border-box !important; }
+body:not(.is-pc) .war-controls-desc { display: none !important; }
+body:not(.is-pc) .war-controls-buttons { flex: 1 !important; width: 100% !important; align-content: start !important; }
 body:not(.is-pc) .war-controls-buttons button { font-size: clamp(0.75rem, 4vw, 1.1rem) !important; letter-spacing: 0px !important; }
 
 /* =========================================================
@@ -2240,8 +2241,8 @@ body.is-pc {
        ★ 管理しやすい統一版！攻城戦の部隊カード（PC版）
        --------------------------------------------------------- */
     /* コントロールエリア */
-    .war-controls-area { height: 150px; gap: 10px; }
-    .war-controls-buttons { flex: 2; gap: 5px; }
+    .war-controls-area { height: auto; min-height: 120px; gap: 10px; }
+    .war-controls-buttons { flex: 2; gap: 5px; align-content: start; }
     .war-controls-desc { flex: 1; font-size: 0.95rem; }
     .war-controls-buttons button { font-size: 1.1rem !important; letter-spacing: normal; }
 
