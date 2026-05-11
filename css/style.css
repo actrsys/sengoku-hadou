@@ -2526,35 +2526,59 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 .legion-color-8 { background-color: #546e7a; } /* グレー */
 
 /* =========================================================
-   面談専用のメッセージウィンドウ
+   面談専用のメッセージウィンドウ（二画面構成）
    ========================================================= */
+
+/* 1. 外側の枠線を消して、中身を直接見せるようにします */
+.interview-dialog-modal .modal-content.modal-small {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    width: 90%;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* 上の窓と下の窓のスキマ */
+}
+
+/* 2. 上側の「メッセージ窓」を新しくデザインします */
+.interview-dialog-modal #dialog-content {
+    background-color: rgba(30, 30, 30, 0.95);
+    border: 3px double #d4af37;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+    box-sizing: border-box;
+    width: 100%;
+}
+
+/* 3. 下側の「選択肢窓」を上の窓と全く同じ幅にします */
 .interview-dialog-modal .modal-footer {
     display: flex;
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
-    /* メッセージウィンドウとデザインを揃える */
     background-color: rgba(30, 30, 30, 0.95);
     border: 3px double #d4af37;
     border-radius: 10px;
     padding: 20px;
-    margin: 10px auto 20px auto;
-    /* メッセージウィンドウ(modal-small)と横幅を揃える */
-    width: 90%;
-    max-width: 600px;
-    box-sizing: border-box;
     box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0 !important;
     justify-content: flex-start !important;
 }
 
+/* ボタンのデザイン（丸型・左寄せ・アイコン付き） */
 .interview-choice-btn {
     position: relative;
     padding: 10px 15px 10px 45px;
     border: 2px solid #5a4a32;
-    border-radius: 25px; /* 完全に丸みのある形状 */
+    border-radius: 25px;
     background: linear-gradient(to bottom, #3e3a36 0%, #2b2824 100%);
     color: #f1f1f1;
-    font-size: 0.95rem; /* メッセージフォントに近いサイズ感 */
+    font-size: 0.95rem;
     font-family: inherit;
     text-align: left !important;
     cursor: pointer;
@@ -2566,6 +2590,7 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     text-shadow: 1px 1px 1px #000;
 }
 
+/* 立体的な二重丸のアイコン部分 */
 .interview-choice-btn::before {
     content: "";
     position: absolute;
@@ -2575,7 +2600,6 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    /* 立体的な二重丸の図形 */
     background: #222;
     border: 2px solid #d4af37;
     box-shadow: inset 0 0 4px #ffd54f, 1px 1px 2px rgba(0,0,0,0.8);
@@ -2592,6 +2616,11 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     border-radius: 50%;
     background: #ffd54f;
     box-shadow: 0 0 3px #fff;
+}
+
+.interview-choice-btn:hover {
+    background: linear-gradient(to bottom, #4e4a46 0%, #3b3834 100%);
+    border-color: #ffd54f;
 }
 
 .interview-choice-btn:hover {
