@@ -1277,8 +1277,10 @@ class AIEngine {
                 horseScore += (horseRatio * 5);
                 gunScore += (gunRatio * 5);
 
-                // 特定の城（石山御坊、雑賀城、赤尾木城、今浜城）なら、鉄砲を少し優先して騎馬を控えます
-                if ([33, 42, 185, 186].includes(castle.id)) {
+                // ★変更：大名家が鉄砲産地の城（石山御坊:33、雑賀城:42、赤尾木城:185、今浜城:186）を1つでも持っているなら、鉄砲を少し優先して騎馬を控えます
+                // 先ほどと同じように、自分と同じ持ち主の城の中に鉄砲産地があるか探します
+                const hasGunCastleAI = this.game.castles.some(c => c.ownerClan === castle.ownerClan && [33, 42, 185, 186].includes(c.id));
+                if (hasGunCastleAI) {
                     gunScore += 3;
                     horseScore -= 3;
                 }

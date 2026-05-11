@@ -671,8 +671,21 @@ class GameSystem {
         // 鉄砲の基礎価格5
         let unitPrice = 5 / (1 + eff / 10);
         
-        // ★追加：特定の城（今浜城:186、石山御坊:33、雑賀城:42、赤尾木城:185）では、鉄砲の単価を半分にします！
-        if (castellan && [33, 42, 185, 186].includes(castellan.castleId)) {
+        // ★変更：大名家全体のお城を調べて、鉄砲産地の城（石山御坊:33、雑賀城:42、赤尾木城:185、今浜城:186）を持っているか確認します！
+        let hasGunCastle = false;
+        
+        // ゲームがちゃんと動いていて、お殿様（大名）のデータがあるか確認します
+        if (daimyo && window.GameApp && window.GameApp.castles) {
+            // 世界中のすべてのお城の中から、自分の大名家の持ち物で、かつ鉄砲産地の城を探します
+            // some というのは「1つでも見つかったら『はい(true)』と答える」という便利な探し方です
+            hasGunCastle = window.GameApp.castles.some(c => c.ownerClan === daimyo.clan && [33, 42, 185, 186].includes(c.id));
+        } else if (castellan && [33, 42, 185, 186].includes(castellan.castleId)) {
+            // 万が一、お殿様のデータが見つからなかった時のための予備の確認です
+            hasGunCastle = true;
+        }
+        
+        // もし鉄砲産地を1つでも持っていたら、単価を半分（半額）にします！
+        if (hasGunCastle) {
             unitPrice = unitPrice / 2;
         }
         
