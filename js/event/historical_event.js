@@ -2322,11 +2322,12 @@ window.GameEvents.push({
     execute: async function(game) {
         const tomomasa = game.getBusho(1902003);
         const murashige = game.getBusho(1902004);
+        const itamiCastle = game.getCastle(51);
 
-        if (!tomomasa || !murashige) return;
+        if (!tomomasa || !murashige || !itamiCastle) return;
 
-        const targetCastleId = tomomasa.castleId;
-        const targetCastle = game.getCastle(targetCastleId);
+        // 強襲前の城の名前を覚えておきます
+        const castleNameBefore = itamiCastle.name;
         const isCommander = tomomasa.isCommander;
         let legionToTakeover = null;
 
@@ -2334,71 +2335,66 @@ window.GameEvents.push({
             legionToTakeover = game.legions.find(l => l.clanId === tomomasa.clan && l.commanderId === tomomasa.id);
         }
 
-        if (murashige.castleId !== targetCastleId) {
+        // 1. 荒木村重を伊丹城（ID: 51）へ移動させます
+        if (murashige.castleId !== 51) {
             if (game.affiliationSystem) {
-                game.affiliationSystem.moveCastle(murashige, targetCastleId);
+                game.affiliationSystem.moveCastle(murashige, 51);
             } else {
-                murashige.castleId = targetCastleId;
+                murashige.castleId = 51;
             }
+        }
+
+        // 2. 池田知正の役職を外し、荒木村重を新城主に据えます
+        // 知正が以前いたお城の城主データを解除します
+        const oldCastle = game.getCastle(tomomasa.castleId);
+        if (oldCastle && oldCastle.castellanId === tomomasa.id) {
+            oldCastle.castellanId = 0;
         }
 
         tomomasa.isCastellan = false;
         tomomasa.isCommander = false;
 
         murashige.isCastellan = true;
-        if (targetCastle) {
-            targetCastle.castellanId = murashige.id;
-            if (game.affiliationSystem) {
-                game.affiliationSystem.updateCastleLord(targetCastle);
-            }
+        itamiCastle.castellanId = murashige.id;
+        if (game.affiliationSystem) {
+            game.affiliationSystem.updateCastleLord(itamiCastle);
         }
 
+        // 国主だった場合は軍団を引き継ぎます
         if (isCommander && legionToTakeover) {
             murashige.isCommander = true;
             legionToTakeover.commanderId = murashige.id;
         }
 
+        // 功績の調整
         tomomasa.achievementTotal = 0;
         if ((murashige.achievementTotal || 0) < 700) {
             murashige.achievementTotal = 700;
         }
 
-        const itamiCastle = game.getCastle(51);
+        // 3. 伊丹城の防御力強化と改名
+        if ((itamiCastle.maxDefense || 0) < 1000) itamiCastle.maxDefense = 1000;
+        if ((itamiCastle.defense || 0) < 1000) itamiCastle.defense = 1000;
+
         let isRenamed = false;
-        if (itamiCastle) {
-            // 防御力が1000未満だったら、1000に引き上げます
-            if ((itamiCastle.maxDefense || 0) < 1000) {
-                itamiCastle.maxDefense = 1000;
-            }
-            if ((itamiCastle.defense || 0) < 1000) {
-                itamiCastle.defense = 1000;
-            }
-            
-            // 名前が「伊丹城」だったら改名します
-            if (itamiCastle.name === "伊丹城") {
-                itamiCastle.name = "有岡城";
-                itamiCastle.yomi = "ありおかじょう";
-                isRenamed = true;
-            }
+        if (itamiCastle.name === "伊丹城") {
+            itamiCastle.name = "有岡城";
+            itamiCastle.yomi = "ありおかじょう";
+            isRenamed = true;
         }
 
-        // 池田知正の「苗字（池田）」を取り出します
-        const tomomasaFamilyName = tomomasa.familyName || tomomasa.name.split('|')[0] || "池田";
+        // 4. メッセージの表示（個別に表示）
         const murashigeName = murashige.name.replace('|', '');
-        const targetCastleName = targetCastle ? targetCastle.name : "居城";
-        const titleName = isCommander ? "国主" : "城主";
+        const tomomasaFamilyName = tomomasa.familyName || tomomasa.name.split('|')[0] || "池田";
         
-        // 1つ目のメッセージを作ります
-        const msg1 = `${murashigeName}が${targetCastleName}を強襲し、${tomomasaFamilyName}家の実権を握りました！　${murashigeName}が新たな${titleName}となります。`;
-        
+        // メッセージ1：強襲と実権奪取
+        const msg1 = `${murashigeName}が${castleNameBefore}を強襲し、${tomomasaFamilyName}家の実権を握りました！`;
         game.ui.log(`【イベント】荒木村重の池田家乗っ取り：${murashigeName}が${tomomasaFamilyName}家の実権を握りました。`);
-        
-        // 1つ目のメッセージを画面に出して、クリックされるまで待ちます
         await game.ui.showDialogAsync(msg1, false, 0);
 
-        // 改名があった時だけ、2つ目のメッセージを作って画面に出します
+        // メッセージ2：大改修と改名
         if (isRenamed) {
-            const msg2 = `${murashigeName}は自らの居城として伊丹城に大改修を施し、有岡城と改称しました！`;
+            const msg2 = `${murashigeName}は伊丹城を自らの居城と定めて大改修を施し、有岡城と改称しました！`;
             await game.ui.showDialogAsync(msg2, false, 0);
         }
 
