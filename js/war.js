@@ -782,6 +782,10 @@ class WarManager {
                          if (this.game && this.game.ui && typeof this.game.ui.setWarModalVisible === 'function') {
                              this.game.ui.setWarModalVisible(false);
                          }
+                         // ★追加: プレイヤーの部隊がいなくなった瞬間に、BGMを平時に戻す！
+                         if (window.AudioManager) {
+                             window.AudioManager.restoreMemorizedBgm();
+                         }
                      }
                  }
 

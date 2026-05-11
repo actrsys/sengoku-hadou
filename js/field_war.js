@@ -1559,6 +1559,9 @@ class FieldWarManager {
         if (!this.retreatedUnits) this.retreatedUnits = [];
         this.retreatedUnits.push(unit);
         
+        // ★追加: 撤退前のプレイヤー参加状況をメモ
+        const wasPlayerInvolved = this.units.some(u => u.isPlayer);
+
         // 戦場から部隊を消す
         this.units = this.units.filter(u => u.id !== unit.id);
         
@@ -1577,6 +1580,12 @@ class FieldWarManager {
             // ★追加: プレイヤーが操作する部隊がいなくなったら、AI野戦へ移行するため画面を隠す
             const modal = document.getElementById('field-war-modal');
             if (modal) modal.classList.add('hidden');
+            
+            // ★追加: プレイヤーが撤退していなくなった瞬間に、BGMを平時に戻す！
+            if (wasPlayerInvolved && window.AudioManager) {
+                window.AudioManager.restoreMemorizedBgm();
+            }
+            
             this.nextPhaseTurn();
         }
     }
@@ -2478,7 +2487,13 @@ class FieldWarManager {
         } else {
             // ★プレイヤーがいなくなったら画面を隠してAI野戦に移行
             const modal = document.getElementById('field-war-modal');
-            if (modal && isPlayerInvolved) modal.classList.add('hidden');
+            if (modal && isPlayerInvolved) {
+                modal.classList.add('hidden');
+                // ★追加: プレイヤーの部隊が全滅していなくなった瞬間に、BGMを平時に戻す！
+                if (window.AudioManager) {
+                    window.AudioManager.restoreMemorizedBgm();
+                }
+            }
             this.nextPhaseTurn();
         }
     }
