@@ -2183,11 +2183,10 @@ window.GameEvents.push({
         }
 
         // ⑤ メッセージ表示
-        const msg = `${hisahideName}が、${candidateName}を擁立した${sponsorName}の上洛に同調し、${hisahideCastleName}を安堵されました。`;
-        const systemMsg = `（${matsunagaClanName}が${sponsorName}に臣従しました）`;
+        const msg = `${hisahideName}が${sponsorName}の上洛に同調し臣従しました！`;
         
-        game.ui.log(`【イベント】${msg}${systemMsg}`);
-        await game.ui.showDialogAsync(`${msg}\n\n${systemMsg}`, false, 0);
+        game.ui.log(`【イベント】${msg}`);
+        await game.ui.showDialogAsync(msg, false, 0);
 
         // ⑥ 各種更新処理
         game.factionSystem.updateFactions();
@@ -2548,7 +2547,7 @@ window.GameEvents.push({
         });
 
         // ⑦ 画面に何が起きたかメッセージを出してお知らせします
-        const msg = `将軍を擁立する${sponsorName}の勢いに押され、\n${castleNameStr}の${itamiLordName}ら摂津衆が${sponsorName}に降伏しました！`;
+        const msg = `\n${castleNameStr}の${itamiLordName}が${sponsorName}の上洛に同調し臣従しました！`;
         
         game.ui.log(`【イベント】${msg}`);
         await game.ui.showDialogAsync(msg, false, 0);
@@ -2724,11 +2723,10 @@ window.GameEvents.push({
         }
 
         // ⑤ 画面に何が起きたかメッセージを出してお知らせします
-        const msg = `${hatakeyamaName}が、${candidateName}を擁立した${sponsorName}の上洛に同調し、${hatakeyamaCastleName}を安堵されました。`;
-        const systemMsg = `（${hatakeyamaClanName}が${sponsorName}に臣従しました）`;
+        const msg = `${hatakeyamaName}が${sponsorName}の上洛に同調し臣従しました！`;
         
-        game.ui.log(`【イベント】${msg}${systemMsg}`);
-        await game.ui.showDialogAsync(`${msg}\n\n${systemMsg}`, false, 0);
+        game.ui.log(`【イベント】${msg}`);
+        await game.ui.showDialogAsync(msg, false, 0);
 
         // ⑥ 各種システムや画面の表示を最新のものに更新します
         if (game.factionSystem) {
