@@ -1849,14 +1849,14 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
     font-size: 1rem; 
     padding: 0; 
     background: linear-gradient(135deg, #333333 0%, #000000 100%); /* 鉄色の重厚感 */
-    border-color: #a88a2c #d4af37 #5c4008 #d4af37; /* 鈍く光る金枠 */
+    border-color: #fce8a1 #d4af37 #e6c55c #d4af37; /* 枠線を明るくして境界をくっきりさせる */
     text-shadow: 2px 2px 2px #000;
 }
 
 /* 攻城戦の「撤退」ボタンを烈火のような赤に（最優先の視認性） */
 .war-controls-buttons .cmd-btn.back { 
     background: linear-gradient(135deg, #d32f2f 0%, #7b1fa2 100%); /* 危機感を煽る紫がかった赤 */
-    border-color: #ff8a80 #d32f2f #5c0000 #d32f2f;
+    border-color: #ffcdd2 #ff8a80 #ffb3b3 #ff8a80; /* 暗い背景に負けない明るい赤枠 */
     box-shadow: inset 0 0 10px rgba(255,0,0,0.4), 0 2px 4px rgba(0,0,0,0.4);
 }
 
@@ -2260,7 +2260,7 @@ body.is-pc {
        ★ 管理しやすい統一版！攻城戦の部隊カード（PC版）
        --------------------------------------------------------- */
     /* コントロールエリア */
-    .war-controls-area { height: auto; min-height: 120px; gap: 10px; }
+    .war-controls-area { height: 130px; gap: 10px; } /* 高さを固定し、説明文の変化でガタガタ動かないようにする */
     .war-controls-buttons { flex: 2; gap: 5px; align-content: start; }
     .war-controls-desc { flex: 1; font-size: 0.95rem; }
     .war-controls-buttons .cmd-btn { font-size: 1.2rem !important; letter-spacing: 1px; }

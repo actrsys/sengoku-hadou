@@ -2732,15 +2732,15 @@ class UIManager {
 
         // ★撤退コマンドの追加（本隊と援軍で処理を分けます）
         if (s.turn === 'attacker') {
-            options.push({ label: "!!撤退!!", type: "retreat", desc: "【緊急】戦場から離脱し、自領へと退却します。" });
+            options.push({ label: "撤退", type: "retreat", desc: "戦場から離脱し、自領へと退却します。" });
         } else if (s.turn === 'defender') {
             // ★修正：中立の空き城（ownerClanが0）の守備軍は、撤退できないようにガードを追加します！
             if (s.defender.ownerClan !== 0 && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
-                options.push({ label: "!!撤退!!", type: "retreat", desc: "【緊急】城を捨てて、近隣の安全な城へ退却します。" });
+                options.push({ label: "撤退", type: "retreat", desc: "城を捨てて、近隣の安全な城へ退却します。" });
             }
         } else {
             // 援軍の場合は攻撃・守備に関わらず撤退可能
-            options.push({ label: "!!撤退!!", type: "retreat", desc: "【緊急】戦場から離脱し、元の城へ引き上げます。" });
+            options.push({ label: "撤退", type: "retreat", desc: "戦場から離脱し、元の城へ引き上げます。" });
         }
 
         this.warControls.innerHTML = '';
