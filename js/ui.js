@@ -635,20 +635,11 @@ class UIManager {
             let hasContent = false;
             if (faceEl) {
                 if (faceIcon) {
-                    // 画像サイズをギリギリまで（85px）大きくします
-                    faceEl.innerHTML = `<div class="sp-face-wrapper" style="margin: 0; width: 85px; height: 85px;"><img src="data/images/faceicons/${faceIcon}" onerror="this.src='data/images/faceicons/unknown_face.webp'"></div>`;
+                    // 画像サイズはCSSにお任せするため、直接の指定(style)を削除します
+                    faceEl.innerHTML = `<div class="sp-face-wrapper"><img src="data/images/faceicons/${faceIcon}" onerror="this.src='data/images/faceicons/unknown_face.webp'"></div>`;
                     hasContent = true;
                 } else {
                     faceEl.innerHTML = '';
-                }
-            }
-            if (nameEl) {
-                if (nameText) {
-                    nameEl.textContent = nameText;
-                    nameEl.classList.remove('hidden');
-                    hasContent = true;
-                } else {
-                    nameEl.classList.add('hidden');
                 }
             }
             
