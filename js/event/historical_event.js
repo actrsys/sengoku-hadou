@@ -1947,7 +1947,7 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 三好義継追放イベント
+// ★ 三好三人衆による三好義継追放イベント
 // ==========================================
 window.GameEvents.push({
     id: "historical_yoshitsugu_exile",
@@ -2022,13 +2022,13 @@ window.GameEvents.push({
         // ③ 三好義継の貢献度（功績）を0にします
         yoshitsugu.achievementTotal = 0;
 
-        // ④ 三好義継を松永家へお引越しさせ、忠誠度を100にします
+        // ④ 三好義継を松永家に保護させ、忠誠度を100にします
         // お引越しセンターの魔法（joinClan）を使って、古いお城から出して新しいお城に入れます
         game.affiliationSystem.joinClan(yoshitsugu, hisahide.clan, hisahide.castleId, 100);
 
         // ⑤ 画面にメッセージを出してお知らせします
         game.ui.log(`【イベント】三好三人衆が当主・三好義継に対して反旗を翻し、三好義継が追放されました。`);
-        await game.ui.showDialogAsync(`三好三人衆が当主・三好義継に対して反旗を翻しました！\n義継は追放され、敵対していた松永久秀の元へ逃れました。\n三好家は三好長逸が新たな当主となります。`, false, 0);
+        await game.ui.showDialogAsync(`三好三人衆が当主・三好義継に対して反旗を翻しました！\n義継は追放され、松永久秀の元へ逃れました。\n三好家は三好長逸が新たな当主となります。`, false, 0);
 
         // ⑥ 派閥や画面を最新の状態に更新します
         if (game.factionSystem) {
