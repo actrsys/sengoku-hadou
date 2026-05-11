@@ -2238,7 +2238,29 @@ class FieldWarManager {
         let dmgRatio = (atkFinalAtk + defFinalDef) > 0 ? (atkFinalAtk / (atkFinalAtk + defFinalDef)) : 0;
         let dmgToDef = Math.floor(atkFinalAtk * dmgRatio);
 
-        // 8. 反撃ダメージ計算
+        // 8. 連携攻撃によるダメージアップ（サポート部隊1つにつき10%アップ）
+        let supportCount = 0;
+        if (attacker.troopType !== 'teppo') {
+            this.units.forEach(u => {
+                // 自分以外、同じ陣営、鉄砲隊ではない味方を探します
+                if (u.id !== attacker.id && u.isAttacker === attacker.isAttacker && u.troopType !== 'teppo') {
+                    // 敵部隊に隣接しているかを確認します
+                    if (this.getDistance(u.x, u.y, defender.x, defender.y) === 1) {
+                        let dirToDef = this.getDirection(u.x, u.y, defender.x, defender.y);
+                        // 敵部隊に対して正面を向いているかを確認します
+                        if (u.direction === dirToDef) {
+                            supportCount++;
+                        }
+                    }
+                }
+            });
+        }
+        if (supportCount > 0) {
+            // 見つけた味方の数 × 10%（0.1）の分だけダメージを増やします
+            dmgToDef = Math.floor(dmgToDef * (1 + (0.1 * supportCount)));
+        }
+
+        // 9. 反撃ダメージ計算
         let dmgToAtk = 0;
         const dist = this.getDistance(attacker.x, attacker.y, defender.x, defender.y);
         if (dist === 1) { // 反撃は距離1のときのみ
