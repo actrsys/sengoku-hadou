@@ -780,26 +780,26 @@ class UIManager {
                     btn.className = choice.className || 'btn-secondary';
                 }
                 btn.textContent = choice.label;
-                    
-                    // ★追加：ボタンを押せない状態（disabled）にする指示を読み取ります！
-                    if (choice.disabled) {
-                        btn.disabled = true;
-                        btn.classList.add('disabled');
-                    }
-                    
-                    btn.onclick = (e) => {
-                        e.stopPropagation();
-                        if (choice.onClick) choice.onClick();
-                        else this.closeDialog();
-                    };
+                
+                // ★追加：ボタンを押せない状態（disabled）にする指示を読み取ります！
+                if (choice.disabled) {
+                    btn.disabled = true;
+                    btn.classList.add('disabled');
+                }
+                
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (choice.onClick) choice.onClick();
+                    else this.closeDialog();
+                };
 
-                    // ★追加先を「いつものフッター」か「面談用の別の箱」かで分けます
-                    if (dialog.customOpts.isInterview) {
-                        interviewBox.appendChild(btn);
-                    } else {
-                        if (footer) footer.appendChild(btn);
-                    }
-                });
+                // ★追加先を「いつものフッター」か「面談用の別の箱」かで分けます
+                if (dialog.customOpts.isInterview) {
+                    interviewBox.appendChild(btn);
+                } else {
+                    if (footer) footer.appendChild(btn);
+                }
+            });
         } else if (isEventMode) {
             // 選択肢のないイベント：フッターを隠して画面クリックで進行
             modal.classList.add('event-dialog-modal');
