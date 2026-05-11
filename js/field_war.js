@@ -1188,6 +1188,7 @@ class FieldWarManager {
             let iconSize = 16 + Math.min(Math.floor(Math.max(0, u.soldiers - 1) / 1000), 5) * 3;
 
             const uEl = document.createElement('div');
+            uEl.id = `fw-unit-el-${u.id}`; // ★アニメーションのために、部隊ごとに固有の目印（ID）をつけます！
             const isActive = (unit && u.id === unit.id);
             
             // ★ここから差し替え
@@ -2131,7 +2132,7 @@ class FieldWarManager {
         }
     }
 
-    executeAttack(attacker, defender) {
+    async executeAttack(attacker, defender) {
         // それぞれの部隊の専用の箱から、士気と訓練度を取り出します
         let atkMorale = this.groupStats[attacker.groupId] ? this.groupStats[attacker.groupId].morale : 50;
         let atkTraining = this.groupStats[attacker.groupId] ? this.groupStats[attacker.groupId].training : 50;
@@ -2283,8 +2284,71 @@ class FieldWarManager {
         dmgToDef = Math.min(defender.soldiers, dmgToDef);
         dmgToAtk = Math.min(attacker.soldiers, dmgToAtk);
 
-        defender.soldiers -= dmgToDef;
-        attacker.soldiers -= dmgToAtk;
+        // ==========================================
+        // ★ここからアニメーションの魔法です！
+        // ==========================================
+        if (isPlayerInvolved) {
+            this.state = 'ANIMATING'; // ★他の操作をブロックするシールドを展開します！
+
+            const atkEl = document.getElementById(`fw-unit-el-${attacker.id}`);
+            const defEl = document.getElementById(`fw-unit-el-${defender.id}`);
+
+            // 交互に4度ずつ点滅させます（awaitを使って順番を待ちます）
+            if (atkEl && defEl) {
+                for (let i = 0; i < 4; i++) {
+                    atkEl.classList.add('anim-battle-flash');
+                    await new Promise(r => setTimeout(r, 150));
+                    atkEl.classList.remove('anim-battle-flash');
+                    
+                    defEl.classList.add('anim-battle-flash');
+                    await new Promise(r => setTimeout(r, 150));
+                    defEl.classList.remove('anim-battle-flash');
+                }
+            }
+
+            // 点滅が終わったら兵数を減らします
+            defender.soldiers -= dmgToDef;
+            attacker.soldiers -= dmgToAtk;
+
+            // ダメージの数字をポーンと出す仕組みです
+            const showDamagePopup = (damage, el) => {
+                if (!el || damage <= 0) return;
+                const popup = document.createElement('div');
+                popup.className = 'damage-popup anim-popup-text';
+                popup.innerText = `-${damage}`;
+                popup.style.top = '0';
+                popup.style.left = '50%';
+                popup.style.transform = 'translate(-50%, -50%)';
+                popup.style.position = 'absolute';
+                el.appendChild(popup);
+                
+                // 1秒経ったら自動でお掃除します
+                setTimeout(() => {
+                    if (popup.parentNode) popup.parentNode.removeChild(popup);
+                }, 1000);
+            };
+
+            showDamagePopup(dmgToDef, defEl);
+            showDamagePopup(dmgToAtk, atkEl);
+
+            // 画面上の兵士の数字を書き換えます
+            if (defEl) {
+                const soldierText = defEl.querySelector('.fw-unit-soldiers');
+                if (soldierText) soldierText.innerText = defender.soldiers;
+            }
+            if (atkEl) {
+                const soldierText = atkEl.querySelector('.fw-unit-soldiers');
+                if (soldierText) soldierText.innerText = attacker.soldiers;
+            }
+
+            // ポップアップをしっかり見せるために少しだけ待ちます
+            await new Promise(r => setTimeout(r, 800));
+        } else {
+            // プレイヤーがいない（AI同士）ならアニメーションをスキップしてパパッと減らします
+            defender.soldiers -= dmgToDef;
+            attacker.soldiers -= dmgToAtk;
+        }
+        // ==========================================
 
         // 野戦での被害を負傷兵の箱（deadSoldiers）に記録します
         if (attacker.isAttacker) {
@@ -2355,7 +2419,7 @@ class FieldWarManager {
         }
         
         attacker.hasActionDone = true;
-        this.state = 'IDLE';
+        this.state = 'IDLE'; // ★シールドを解除して操作できるように戻します
         
         if (isPlayerInvolved) {
             this.updateMap();
