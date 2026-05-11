@@ -710,7 +710,6 @@ class UIManager {
             footer = modal.querySelector('.modal-footer');
         }
 
-        const choicesContainer = document.getElementById('dialog-choices-container');
         const modalContent = modal.querySelector('.modal-content');
 
         // 前回のイベント設定が残っていたら一旦消しておきます
@@ -723,7 +722,6 @@ class UIManager {
 
         // --- 根本改修：フッターのボタンを動的に生成し、何個でも並べられるようにします ---
         if (footer) footer.innerHTML = ''; 
-        if (choicesContainer) choicesContainer.classList.add('hidden');
 
         // イベントモード専用のクリック操作
         this._currentEventClickHandler = (e) => {
@@ -741,7 +739,7 @@ class UIManager {
         };
 
         const isEventMode = dialog.customOpts && dialog.customOpts.isEvent;
-
+        
         if (dialog.customOpts && dialog.customOpts.choices) {
             // 選択肢がある場合：指定された数だけボタンを並べます
             if (isEventMode) {
@@ -750,9 +748,19 @@ class UIManager {
             } else {
                 modal.classList.remove('event-dialog-modal');
             }
+
+            if (dialog.customOpts.isInterview) {
+                modal.classList.add('interview-dialog-modal');
+                if (footer) {
+                    footer.classList.remove('right');
+                    footer.style.justifyContent = '';
+                }
+            } else {
+                modal.classList.remove('interview-dialog-modal');
+            }
+
             if (footer) {
                 footer.classList.remove('hidden');
-                footer.style.justifyContent = 'center';
 
                 dialog.customOpts.choices.forEach((choice, index) => {
                     const btn = document.createElement('button');
@@ -760,7 +768,11 @@ class UIManager {
                     if (index === 0) btn.id = 'dialog-btn-ok';
 
                     // 3色ボタン（btn-primary, btn-danger, btn-secondary）を適用できるようにします
-                    btn.className = choice.className || 'btn-secondary';
+                    if (dialog.customOpts.isInterview) {
+                        btn.className = 'interview-choice-btn';
+                    } else {
+                        btn.className = choice.className || 'btn-secondary';
+                    }
                     btn.textContent = choice.label;
                     
                     // ★追加：ボタンを押せない状態（disabled）にする指示を読み取ります！
@@ -784,6 +796,7 @@ class UIManager {
         } else if (isEventMode) {
             // 選択肢のないイベント：フッターを隠して画面クリックで進行
             modal.classList.add('event-dialog-modal');
+            modal.classList.remove('interview-dialog-modal');
             if (footer) footer.classList.add('hidden');
             if (modalContent) {
                 modalContent.style.cursor = 'pointer';
@@ -792,6 +805,7 @@ class UIManager {
         } else {
             // 通常のダイアログ：はい/いいえ、または閉じる
             modal.classList.remove('event-dialog-modal');
+            modal.classList.remove('interview-dialog-modal');
             if (footer) {
                 footer.classList.remove('hidden');
                 footer.style.justifyContent = 'center';
@@ -1960,12 +1974,13 @@ class UIManager {
                 { label: "戻る", onClick: () => { this.reopenInterviewSelector(); } }
             ];
         }
-
+        
         // 新しく作った「選択肢（choices）」の機能を指定して、いつものダイアログを呼び出します
         this.showDialog(msg, false, null, null, {
             leftFace: busho.faceIcon,
             leftName: busho.name,
-            choices: choices
+            choices: choices,
+            isInterview: true
         });
     }
     
