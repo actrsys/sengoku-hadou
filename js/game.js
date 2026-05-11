@@ -643,7 +643,43 @@ class GameSystem {
     // ★追加：画面の相場表示に使う「小数点まで正確な1頭の単価」を出す魔法
     static calcBuyHorseUnitPrice(daimyo, castellan) {
         const eff = this.calcBuyHorseEfficiency(daimyo, castellan);
-        return 2 / (1 + eff / 10);
+        let unitPrice = 2 / (1 + eff / 10);
+        
+        // ★変更：軍馬産地を持っているか確認する魔法を追加します！
+        let hasHorseCastle = false;
+        
+        // そのお城が軍馬産地かどうかを判定する小さな魔法です
+        const isHorseProd = (c) => {
+            if (!c) return false;
+            // ①拠点単位（日野江城）
+            if (c.id === 157) return true;
+            
+            // ②国単位（常陸、淡路、肥後、薩摩、大隅、対馬）
+            if ([15, 36, 61, 63, 64, 68].includes(c.provinceId)) return true; 
+            
+            // ③地方単位（東北、甲信）
+            if (window.GameApp && window.GameApp.provinces) {
+                const prov = window.GameApp.provinces.find(p => p.id === c.provinceId);
+                if (prov && (prov.regionId === 1 || prov.regionId === 3)) return true;
+            }
+            return false;
+        };
+
+        if (daimyo && window.GameApp && window.GameApp.castles) {
+            // 大名家全体のお城から探します
+            hasHorseCastle = window.GameApp.castles.some(c => c.ownerClan === daimyo.clan && isHorseProd(c));
+        } else if (castellan && window.GameApp && window.GameApp.castles) {
+            // 城主だけの場合はそのお城が産地か調べます
+            const myCastle = window.GameApp.castles.find(c => c.id === castellan.castleId);
+            hasHorseCastle = isHorseProd(myCastle);
+        }
+        
+        // もし軍馬産地を1つでも持っていたら、単価を半分（半額）にします！
+        if (hasHorseCastle) {
+            unitPrice = unitPrice / 2;
+        }
+        
+        return unitPrice;
     }
 
     static calcBuyHorseCost(amount, daimyo, castellan) {

@@ -1285,6 +1285,23 @@ class AIEngine {
                     horseScore -= 3;
                 }
 
+                // ★追加：大名家が軍馬産地の城を持っているなら、軍馬を少し優先して鉄砲を控えます
+                const hasHorseCastleAI = this.game.castles.some(c => {
+                    if (c.ownerClan !== castle.ownerClan) return false;
+                    // ①拠点単位（日野江城）
+                    if (c.id === 157) return true;
+                    // ②国単位（常陸、淡路、肥後、薩摩、大隅、対馬）
+                    if ([15, 36, 61, 63, 64, 68].includes(c.provinceId)) return true;
+                    const prov = this.game.provinces.find(p => p.id === c.provinceId);
+                    // ③地方単位（東北、甲信）
+                    if (prov && (prov.regionId === 1 || prov.regionId === 3)) return true;
+                    return false;
+                });
+                if (hasHorseCastleAI) {
+                    horseScore += 3;
+                    gunScore -= 3;
+                }
+
                 // 最後にサイコロを振って、少しだけ気まぐれな気持ち（0〜3点）を足し算します
                 horseScore += Math.random() * 3;
                 gunScore += Math.random() * 3;
