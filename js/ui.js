@@ -789,8 +789,8 @@ class UIManager {
                 
                 btn.onclick = (e) => {
                     e.stopPropagation();
-                    if (choice.onClick) choice.onClick();
-                    else this.closeDialog();
+                    // ★修正：選択肢を押した時に、必ずこのウィンドウを閉じてから次の処理に進むようにします
+                    cleanupAndNext(choice.onClick);
                 };
 
                 // ★追加先を「いつものフッター」か「面談用の別の箱」かで分けます
