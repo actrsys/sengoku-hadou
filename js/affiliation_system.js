@@ -49,12 +49,41 @@ class AffiliationSystem {
         // 6. 新しいお城に入ります
         this.enterCastle(busho, newCastleId);
 
+        // ★ここから追加：奥さん（姫）とお引越し先の名簿の手続き！
+        if (busho.wifeIds && busho.wifeIds.length > 0 && this.game) {
+            // 前いた大名家の「姫の名簿」から名前を消します
+            if (oldClanId !== 0) {
+                const oldClan = this.game.clans.find(c => c.id === oldClanId);
+                if (oldClan && oldClan.princessIds) {
+                    oldClan.princessIds = oldClan.princessIds.filter(id => !busho.wifeIds.includes(id));
+                }
+            }
+
+            // 新しい大名家の「姫の名簿」に名前を書き足します
+            const newClan = this.game.clans.find(c => c.id === newClanId);
+            if (newClan && newClan.princessIds) {
+                busho.wifeIds.forEach(wId => {
+                    if (!newClan.princessIds.includes(wId)) {
+                        newClan.princessIds.push(wId);
+                    }
+                });
+            }
+
+            // 姫本人の「所属シール」も新しい大名家に貼り替えます
+            if (this.game.princesses) {
+                busho.wifeIds.forEach(wId => {
+                    const wife = this.game.princesses.find(p => p.id === wId);
+                    if (wife) {
+                        wife.currentClanId = newClanId;
+                    }
+                });
+            }
+        }
+
         // ★ここから追加：人が増えたり減ったりしたので、派閥を新しく組み直す魔法を呼び出します！
         if (this.game && this.game.factionSystem) {
             this.game.factionSystem.updateFactions();
         }
-
-        // ★ここから追加：画面の絵をすぐに描き直す魔法！
         if (this.game && this.game.ui) {
             this.game.ui.renderMap();
             this.game.ui.updatePanelHeader();
@@ -98,6 +127,27 @@ class AffiliationSystem {
         busho.isDaimyo = false;
         busho.isGunshi = false; // ★ここを書き足します！軍師のバッジを外します
         busho.isCommander = false; // ★ここを追加：国主のバッジも外します
+
+        // ★ここから追加：大名家の名簿から姫を消して、姫を無所属（0）にします
+        if (busho.wifeIds && busho.wifeIds.length > 0 && this.game) {
+            // 前いた大名家の「姫の名簿」から名前を消します
+            if (oldClanId !== 0) {
+                const oldClan = this.game.clans.find(c => c.id === oldClanId);
+                if (oldClan && oldClan.princessIds) {
+                    oldClan.princessIds = oldClan.princessIds.filter(id => !busho.wifeIds.includes(id));
+                }
+            }
+
+            // 姫本人の「所属シール」を剥がして「0（無所属）」にします
+            if (this.game.princesses) {
+                busho.wifeIds.forEach(wId => {
+                    const wife = this.game.princesses.find(p => p.id === wId);
+                    if (wife) {
+                        wife.currentClanId = 0;
+                    }
+                });
+            }
+        }
 
         // 4. お城から出ます
         this.leaveCastle(busho);
