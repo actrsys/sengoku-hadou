@@ -2330,21 +2330,17 @@ class FieldWarManager {
                 popup.className = 'fw-damage-popup';
                 popup.innerText = `-${damage}`;
                 
-                // ★修正: ポップアップを親要素（el）の中ではなく、マップ全体（this.mapEl）に追加します。
-                // これにより、親要素のfilter（点滅効果）の影響を受けず、重なり順も独立します。
                 this.mapEl.appendChild(popup);
                 
-                // ★修正: ポップアップの位置を、親要素の現在の位置から計算して設定します。
-                const elRect = el.getBoundingClientRect(); // 親（部隊アイコン）の画面上の位置を取得
-                const mapRect = this.mapEl.getBoundingClientRect(); // マップの画面上の位置を取得
+                // ★修正: 画面の拡大縮小（scale）でズレないように、
+                // 部隊アイコンが持っている「マップ内の正確な座標」を直接読み取って使います！
+                const elLeft = parseFloat(el.style.left);
+                const elTop = parseFloat(el.style.top);
+                const elWidth = parseFloat(el.style.width);
                 
-                // 親の左上座標をマップ基準の座標に変換
-                const parentX = elRect.left - mapRect.left;
-                const parentY = elRect.top - mapRect.top;
-                
-                // ポップアップを親の中央上部に配置
-                popup.style.left = `${parentX + elRect.width / 2}px`;
-                popup.style.top = `${parentY}px`;
+                // ポップアップを部隊アイコンの横幅の真ん中、少し上に配置します
+                popup.style.left = `${elLeft + (elWidth / 2)}px`;
+                popup.style.top = `${elTop}px`;
                 
                 // 1秒経ったら自動でお掃除します
                 setTimeout(() => {
