@@ -2468,6 +2468,24 @@ class FieldWarManager {
             }
         }
 
+        // ★追加：戦闘を行った部隊の武将に経験値をプレゼント（ダメージを与えた時だけ！）
+        if (dmgToDef > 0 && attacker.bushoId && this.game) {
+            const aBusho = this.game.getBusho(attacker.bushoId);
+            // ダミー武将（モブ）ではない、本物の武将かチェックします
+            if (aBusho && aBusho.id && String(aBusho.id).indexOf('dummy') === -1) {
+                aBusho.expLeadership = (aBusho.expLeadership || 0) + 1; // 統率+1
+                aBusho.expStrength = (aBusho.expStrength || 0) + 2;     // 武力+2
+            }
+        }
+        if (dmgToAtk > 0 && defender.bushoId && this.game) {
+            const dBusho = this.game.getBusho(defender.bushoId);
+            // ダミー武将（モブ）ではない、本物の武将かチェックします
+            if (dBusho && dBusho.id && String(dBusho.id).indexOf('dummy') === -1) {
+                dBusho.expLeadership = (dBusho.expLeadership || 0) + 1; // 統率+1
+                dBusho.expStrength = (dBusho.expStrength || 0) + 2;     // 武力+2
+            }
+        }
+
         if (defender.soldiers <= 0) {
             this.log(`${defender.name}隊が壊滅した！`);
             this.units = this.units.filter(u => u.id !== defender.id);
