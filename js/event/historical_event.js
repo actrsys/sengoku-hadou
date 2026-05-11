@@ -2234,12 +2234,24 @@ window.GameEvents.push({
                 }
             }
             
-            // 国主になれた場合、居城をその軍団の所属にします
+            // 松永久秀が国主になれた場合、居城をその軍団の所属にします
             if (newLegionNo !== -1) {
                 hisahide.isCommander = true;
                 if (hisahide.isGunshi) hisahide.isGunshi = false; // 軍師バッジは念のため外します
                 targetCastle.legionId = newLegionNo;
                 targetCastle.isDelegated = true; // AIに委任する状態にします
+                
+                // ★追加：国主になれた場合、元々の配下たちを久秀の城に集合させます
+                matsunagaBushos.forEach(busho => {
+                    if (busho.id !== hisahide.id && busho.castleId !== targetCastle.id) {
+                        busho.isCastellan = false; // お引越しするので城主のバッジは外します
+                        if (game.affiliationSystem) {
+                            game.affiliationSystem.moveCastle(busho, targetCastle.id);
+                        } else {
+                            busho.castleId = targetCastle.id;
+                        }
+                    }
+                });
             }
         }
 
@@ -2727,12 +2739,24 @@ window.GameEvents.push({
                 }
             }
             
-            // 国主になれた場合、居城をその軍団の所属にします
+            // 荒木村重が国主になれた場合、居城をその軍団の所属にします
             if (newLegionNo !== -1) {
                 murashige.isCommander = true;
                 if (murashige.isGunshi) murashige.isGunshi = false; // 軍師バッジは念のため外します
                 murashigeNewCastle.legionId = newLegionNo;
                 murashigeNewCastle.isDelegated = true; // AIに委任する状態にします
+                
+                // ★追加：国主になれた場合、降伏した武将たちを村重の城に集合させます
+                targetBushos.forEach(busho => {
+                    if (busho.id !== murashige.id && busho.castleId !== murashigeNewCastle.id) {
+                        busho.isCastellan = false; // お引越しするので城主のバッジは外します
+                        if (game.affiliationSystem) {
+                            game.affiliationSystem.moveCastle(busho, murashigeNewCastle.id);
+                        } else {
+                            busho.castleId = murashigeNewCastle.id;
+                        }
+                    }
+                });
             }
         }
 
