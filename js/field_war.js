@@ -384,75 +384,6 @@ class FieldWarManager {
             });
         }
 
-        // 防衛側が城を持っている場合、仲良しの諸勢力が「援軍」に来る
-        if (!warState.isKunishuSubjugation && warState.defender.ownerClan !== 0 && warState.defender.ownerClan !== -1) {
-            const kunishus = this.game.kunishuSystem.getKunishusInCastle(warState.defender.id);
-            kunishus.forEach(k => {
-                if (k.isDestroyed) return;
-                const rel = k.getRelation(warState.defender.ownerClan);
-                if (rel >= 70) {
-                    const prob = 0.2 + ((rel - 70) / 30) * 0.8;
-                    if (Math.random() <= prob) {
-                        const members = this.game.kunishuSystem.getKunishuMembers(k.id);
-                        if (members.length > 0) {
-                            members.sort((a, b) => b.leadership - a.leadership);
-                            const bestBusho = members[0];
-                            
-                            if (!this.units.some(u => u.name === bestBusho.name)) {
-                                const uSoldiers = Math.floor(k.soldiers * 0.5); 
-                                // ★修正: 馬と鉄砲は全部持ち込む
-                                const uHorses = k.horses || 0;
-                                const uGuns = k.guns || 0;
-                                // ※サプライズ援軍はすぐに帰る（消費しない）ので、お留守番の数をゼロにする処理は不要です
-                                
-                                if (uSoldiers > 0) {
-                                    // ★追加: 兵科の決定（AIのautoDivideSoldiersの簡易版）
-                                    let type = 'ashigaru';
-                                    let mobility = 4;
-                                    if (uHorses >= uSoldiers * 0.5) {
-                                        type = 'kiba';
-                                        mobility = 6;
-                                    } else if (uGuns >= uSoldiers * 0.5) {
-                                        type = 'teppo';
-                                    }
-                                    
-                                    let deployPos = defAllySlots[defAllyCount % defAllySlots.length];
-                                    let unitGroupId = 'def_kunishu_' + k.id;
-                                    this.units.push({
-                                        id: 'k_' + bestBusho.id,
-                                        groupId: unitGroupId,
-                                        bushoId: bestBusho.id,
-                                        kunishuId: k.id,
-                                        name: bestBusho.name,
-                                        isAttacker: false,
-                                        isPlayer: false, 
-                                        isGeneral: false,
-                                        x: deployPos.x, 
-                                        y: deployPos.y, 
-                                        direction: (defX1 === leftX1) ? 1 : 4,
-                                        mobility: mobility, // ★修正
-                                        ap: mobility,       // ★修正
-                                        soldiers: uSoldiers,
-                                        troopType: type,    // ★修正
-                                        stats: {
-                                            ldr: bestBusho.leadership,
-                                            str: bestBusho.strength,
-                                            int: bestBusho.intelligence,
-                                            charm: bestBusho.charm
-                                        },
-                                        hasActionDone: false,
-                                        hasMoved: false
-                                    });
-                                    defAllyCount++; // ←★ここに「数え棒」を新しく書き足しました！
-                                    this.game.ui.log(`【諸勢力援軍】${bestBusho.name}率いる諸勢力が防衛側の援軍として駆けつけました！`);
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-        
         // それぞれの部隊ごとに兵糧、士気、訓練度を分けて管理する「専用の箱」を作ります！
         this.groupStats = {
             atk_main: { rice: warState.attacker.rice || 0, morale: warState.attacker.morale || 50, training: warState.attacker.training || 50 },
@@ -462,15 +393,6 @@ class FieldWarManager {
             def_ally: warState.defReinforcement ? { rice: warState.defReinforcement.rice || 0, morale: warState.defReinforcement.morale || 50, training: warState.defReinforcement.training || 50 } : null,
             def_self: warState.defSelfReinforcement ? { rice: warState.defSelfReinforcement.rice || 0, morale: warState.defSelfReinforcement.morale || 50, training: warState.defSelfReinforcement.training || 50 } : null,
         };
-
-        // 諸勢力のサプライズ援軍用の箱も作ります（兵糧は使いません）
-        this.units.forEach(u => {
-            if (u.groupId && u.groupId.startsWith('def_kunishu_')) {
-                if (!this.groupStats[u.groupId]) {
-                    this.groupStats[u.groupId] = { rice: 0, morale: 50, training: 50 };
-                }
-            }
-        });
 
         this.turnQueue = [];
         
@@ -748,7 +670,7 @@ class FieldWarManager {
             let side = u.isAttacker ? 'atk' : 'def';
             let tab = 'main';
             if (u.groupId === `${side}_self`) tab = 'self';
-            else if (u.groupId === `${side}_ally` || (u.groupId && u.groupId.startsWith(`${side}_kunishu`))) tab = 'ally';
+            else if (u.groupId === `${side}_ally`) tab = 'ally';
             
             stats[side][tab].soldiers += u.soldiers;
             stats[side][tab].exists = true;
@@ -765,7 +687,7 @@ class FieldWarManager {
             let side = key.startsWith('atk_') ? 'atk' : 'def';
             let tab = 'main';
             if (key.includes('_self')) tab = 'self';
-            else if (key.includes('_ally') || key.includes('_kunishu')) tab = 'ally';
+            else if (key.includes('_ally')) tab = 'ally';
             
             groupCounters[side][tab].rice += this.groupStats[key].rice;
             groupCounters[side][tab].mSum += this.groupStats[key].morale;
@@ -797,7 +719,7 @@ class FieldWarManager {
                 if (u.isAttacker !== isAttacker) return false;
                 if (tab === 'main' && u.groupId.includes('_main')) return true;
                 if (tab === 'self' && u.groupId.includes('_self')) return true;
-                if (tab === 'ally' && (u.groupId.includes('_ally') || u.groupId.includes('_kunishu'))) return true;
+                if (tab === 'ally' && u.groupId.includes('_ally')) return true;
                 return false;
             });
 
@@ -964,13 +886,6 @@ class FieldWarManager {
         } else if (unit.isReinforcement) {
             // 他国の援軍なら、オレンジか緑
             color = unit.isAttacker ? '#ff9800' : '#4caf50';
-        } else if (typeof unit.id === 'string' && unit.id.startsWith('k_')) {
-            // 諸勢力なら、味方側か敵側かで緑かオレンジ
-            if (this.units.some(u => u.isPlayer && !u.isAttacker)) {
-                color = '#4caf50';
-            } else {
-                color = '#ff9800';
-            }
         }
         
         let typeName = '足軽';
@@ -1199,10 +1114,10 @@ class FieldWarManager {
             // ★ここから差し替え
             let colorClass = u.isAttacker ? 'attacker' : 'defender';
             
-            // ★修正: 自勢力の援軍なら「self-ally」、他国や諸勢力の援軍なら「ally」のタグを足します！
+            // ★修正: 自勢力の援軍なら「self-ally」、他国の援軍なら「ally」のタグを足します！
             if (u.isSelfReinforcement) {
                 colorClass += ' self-ally'; 
-            } else if (u.isReinforcement || (typeof u.id === 'string' && u.id.startsWith('k_'))) {
+            } else if (u.isReinforcement) {
                 colorClass += ' ally'; 
             }
 
@@ -2183,11 +2098,6 @@ class FieldWarManager {
             else if (unit.groupId === 'def_main') activeCastle = this.warState.defender;
             else if (unit.groupId === 'def_self') activeCastle = this.warState.defSelfReinforcement ? this.warState.defSelfReinforcement.castle : null;
             else if (unit.groupId === 'def_ally') activeCastle = this.warState.defReinforcement ? this.warState.defReinforcement.castle : null;
-            else if (unit.groupId && unit.groupId.startsWith('def_kunishu_')) {
-                const kunishuId = parseInt(unit.groupId.split('_')[2]);
-                const kunishu = this.game.kunishuSystem.getKunishu(kunishuId);
-                if (kunishu) activeCastle = this.game.getCastle(kunishu.castleId);
-            }
             
             let mult = 1.0;
             if (activeCastle && this.game && !activeCastle.isKunishu && activeCastle.ownerClan > 0) {
