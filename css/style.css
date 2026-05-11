@@ -2529,45 +2529,44 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
    面談専用のメッセージウィンドウ（二画面構成）
    ========================================================= */
 
-/* 1. 外側の枠線を消して、中身を直接見せるようにします */
+/* 1. 外側の枠線を消して透明な箱にします。幅はいつもの小窓（最大400px）のルールにお任せします。 */
 .interview-dialog-modal .modal-content.modal-small {
     background: none !important;
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
-    width: 100% !important; /* スマホの基本ルールに合わせて100%を許可します */
-    max-width: 600px !important;
     display: flex;
     flex-direction: column;
-    align-items: center !important; /* 中の2つの窓を中央に寄せます */
     gap: 15px; /* 上の窓と下の窓のスキマ */
+    width: 95% !important; /* 元の小窓と同じルール */
+    max-width: 400px !important; /* 元の小窓と同じルール */
 }
 
-/* 2. 上側の「メッセージ窓」を新しくデザインします（※指定ミス修正） */
+/* 2. 上側の「メッセージ窓」を、いつものウィンドウと全く同じ見た目に戻します */
 .interview-dialog-modal .dialog-body-container {
-    background-color: rgba(30, 30, 30, 0.95) !important;
-    border: 3px double #d4af37 !important;
-    border-radius: 10px !important;
-    padding: 20px !important;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.7) !important;
-    box-sizing: border-box;
-    width: 92% !important; /* 画面端に少しスキマを作ります */
+    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%) !important;
+    border: 2px solid #d4af37 !important;
+    border-radius: 8px !important;
+    padding: 10px !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
     margin: 0 !important;
 }
 
-/* 3. 下側の「選択肢窓」を上の窓と全く同じ幅にします */
+/* 3. 下側の「選択肢窓」を、上の窓と全く同じデザインと幅にします */
 .interview-dialog-modal .modal-footer {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-    background-color: rgba(30, 30, 30, 0.95) !important;
-    border: 3px double #d4af37 !important;
-    border-radius: 10px !important;
-    padding: 20px !important;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.7) !important;
-    box-sizing: border-box;
-    width: 92% !important; /* メッセージ窓と同じ幅に揃えます */
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%) !important;
+    border: 2px solid #d4af37 !important;
+    border-radius: 8px !important;
+    padding: 15px !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
     margin: 0 !important;
     justify-content: flex-start !important;
 }
@@ -2618,11 +2617,6 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     border-radius: 50%;
     background: #ffd54f;
     box-shadow: 0 0 3px #fff;
-}
-
-.interview-choice-btn:hover {
-    background: linear-gradient(to bottom, #4e4a46 0%, #3b3834 100%);
-    border-color: #ffd54f;
 }
 
 .interview-choice-btn:hover {
