@@ -98,6 +98,9 @@ class UIManager {
             dialogModal.addEventListener('click', (e) => {
                 // ウインドウの外側（黒い背景）を押したか確認します
                 if (e.target === dialogModal) {
+                    // ★追加：面談中（interview-dialog-modalが付いている時）は、外側を押しても何もしない
+                    if (dialogModal.classList.contains('interview-dialog-modal')) return;
+
                     const cancelBtn = document.getElementById('dialog-btn-cancel');
                     // キャンセルボタンが無い、または隠れている（＝選択肢がない単なるメッセージの）時だけ閉じます
                     if (!cancelBtn || cancelBtn.classList.contains('hidden')) {
@@ -741,41 +744,62 @@ class UIManager {
         };
 
         const isEventMode = dialog.customOpts && dialog.customOpts.isEvent;
-        const isInterviewMode = dialog.customOpts && dialog.customOpts.isInterview; // ★追加：面談かどうかの確認
+        const isInterviewMode = dialog.customOpts && dialog.customOpts.isInterview; // ★追加：面談モードの判定
 
-        // ★追加：面談用の特別な箱がすでにあったら、前回のお掃除をしておきます
+        // 面談中かどうかの目印をモーダル自体に付け外しします
+        if (isInterviewMode) {
+            modal.classList.add('interview-dialog-modal');
+        } else {
+            modal.classList.remove('interview-dialog-modal');
+        }
+
+        // 面談用の選択肢コンテナがあったらお掃除
         const oldInterviewContainer = modal.querySelector('.interview-choices-container');
         if (oldInterviewContainer) oldInterviewContainer.remove();
 
+        // ★ここから「メッセージ」と「選択肢」を切り離す魔法
+        if (isInterviewMode && dialog.msg && dialog.customOpts && dialog.customOpts.choices) {
+            // 1. まずは今のメッセージだけを表示するために、一旦選択肢を「隠し持っておく」箱を作ります
+            const originalChoices = dialog.customOpts.choices;
+            dialog.customOpts.choices = null; 
+
+            // 2. このメッセージが閉じた直後に「選択肢だけ」を出すための予約（自分自身をキューの先頭に戻す）をします
+            this.dialogQueue.unshift({
+                ...dialog,
+                msg: "", // 次回はメッセージなし（選択肢のみ）
+                customOpts: { ...dialog.customOpts, choices: originalChoices }
+            });
+            // このまま「メッセージのみ」の処理として下に流れます
+        }
+
+        // メッセージが空っぽ（選択肢のみのステップ）の時は、メッセージの黒枠を消します
+        msgEl.style.display = dialog.msg ? '' : 'none';
+
         if (dialog.customOpts && dialog.customOpts.choices) {
-            // 選択肢がある場合：指定された数だけボタンを並べます
+            // 選択肢がある場合
             if (isEventMode) {
                 modal.classList.add('event-dialog-modal');
                 modal.classList.add('event-choices-active');
             } else {
                 modal.classList.remove('event-dialog-modal');
             }
-
-            // ★ここから追加：面談の時は特別な並べ方をします！
+            
+            // ★面談用の特別なボタン表示
             if (isInterviewMode) {
-                if (footer) footer.classList.add('hidden'); // いつものボタン置き場は隠します
+                if (footer) footer.classList.add('hidden'); 
 
                 const interviewContainer = document.createElement('div');
                 interviewContainer.className = 'interview-choices-container';
-                // 縦に並べるための設定です
                 interviewContainer.style.display = 'flex';
                 interviewContainer.style.flexDirection = 'column';
                 interviewContainer.style.gap = '8px';
-                interviewContainer.style.marginBottom = '15px'; // 下のメッセージとの隙間です
+                interviewContainer.style.marginBottom = '15px';
 
                 dialog.customOpts.choices.forEach((choice, index) => {
                     const btn = document.createElement('button');
                     if (index === 0) btn.id = 'dialog-btn-ok';
-
-                    // 面談専用のデザインクラスを付けます
                     btn.className = 'btn-interview-choice';
-                    
-                    // 左端の二重丸アイコンと、テキストを作ります
+                    // 二重丸アイコンと文字を左寄せで配置します
                     btn.innerHTML = `<span class="interview-choice-icon"></span><span class="interview-choice-text">${choice.label}</span>`;
                     
                     if (choice.disabled) {
@@ -795,28 +819,24 @@ class UIManager {
                     interviewContainer.appendChild(btn);
                 });
 
-                // ★メッセージ（msgEl）の「上」に挿入します！
+                // メッセージエリア（msgEl）のすぐ上に挿入します
                 msgEl.parentNode.insertBefore(interviewContainer, msgEl);
 
             } else {
-                // いつものダイアログの場合
+                // いつものダイアログのボタン
                 if (footer) {
                     footer.classList.remove('hidden');
                     footer.style.justifyContent = 'center';
 
                     dialog.customOpts.choices.forEach((choice, index) => {
                         const btn = document.createElement('button');
-                        // ★追加：最初の選択肢を「okBtn」として扱えるようにお名前シールを貼ります
                         if (index === 0) btn.id = 'dialog-btn-ok';
-
-                        // 3色ボタン（btn-primary, btn-danger, btn-secondary）を適用できるようにします
                         btn.className = choice.className || 'btn-secondary';
                         btn.textContent = choice.label;
                         
-                        // ★追加：ボタンを押せない状態（disabled）にする指示を読み取ります！
                         if (choice.disabled) {
                             btn.disabled = true;
-                            btn.classList.add('disabled'); // 見た目もグレーアウトさせます
+                            btn.classList.add('disabled');
                         }
 
                         btn.onclick = (e) => {

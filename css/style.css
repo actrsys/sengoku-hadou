@@ -822,9 +822,9 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     transform: translateY(1px) !important;
 }
 
-/* ==========================================
+/* =========================================================
    ★ 面談用の特別なボタンのデザイン
-   ========================================================================== */
+   ========================================================= */
 .btn-interview-choice {
     display: flex;
     align-items: center;
@@ -853,7 +853,6 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     width: 14px;
     height: 14px;
     border-radius: 50%; /* まん丸にします */
-    /* 外側の丸と内側の丸をグラデーションで立体的に描画します */
     background: radial-gradient(circle, #d4af37 30%, transparent 35%, transparent 60%, #d4af37 65%);
     box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.6), 1px 1px 2px rgba(0,0,0,0.8);
     margin-right: 12px;
@@ -863,7 +862,25 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .interview-choice-text {
     flex-grow: 1;
     line-height: 1.3;
+    font-size: 0.9rem;
+    text-align: left;
+    margin-left: 5px;
 }
+
+/* モーダルが面談モードの時、背景のメッセージボックスを透明にする（一体化を防ぐ） */
+.interview-dialog-modal .modal-content {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* 面談の選択肢コンテナ自体の位置調整 */
+.interview-choices-container {
+    width: 100%;
+    max-width: 400px; /* ボタンが横に広がりすぎないように */
+    margin: 0 auto;
+}
+/* ========================================================= */
 
 /* ランクバッジ・ゲージ類 */
 .grade-container { 
