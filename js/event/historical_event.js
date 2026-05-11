@@ -2200,6 +2200,106 @@ window.GameEvents.push({
 });
 
 // ==========================================
+// ★ 荒木村重 池田家乗っ取りイベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_araki_takeover",
+    timing: "startMonth_before", 
+    isOneTime: true,             
+    
+    checkCondition: function(game) {
+        // 1. 三好長逸（ID: 1020006）が大名であるか確認します
+        const nagayasu = game.getBusho(1020006);
+        if (!nagayasu || !nagayasu.isDaimyo) return false;
+        
+        // 2. 三好長逸がプレイヤー大名ではないか確認します
+        if (game.playerClanId === nagayasu.clan) return false;
+
+        // 3. 池田知正（ID: 1902003）が存在し、三好長逸の家に所属する城主または国主であるか確認します
+        const tomomasa = game.getBusho(1902003);
+        if (!tomomasa || tomomasa.clan !== nagayasu.clan) return false;
+        if (!tomomasa.isCastellan && !tomomasa.isCommander) return false;
+
+        // 4. 荒木村重（ID: 1902004）が存在し、三好家に所属しているか確認します
+        const murashige = game.getBusho(1902004);
+        if (!murashige || murashige.clan !== nagayasu.clan) return false;
+
+        // 5. 荒木村重が池田知正と同じ場所にいるか確認します
+        if (tomomasa.isCommander) {
+            // 池田知正が国主の場合、同じ軍団に所属しているか
+            if (murashige.legionId !== tomomasa.legionId) return false;
+        } else {
+            // 池田知正が城主の場合、同じ城にいるか
+            if (murashige.castleId !== tomomasa.castleId) return false;
+        }
+
+        return true; 
+    },
+    
+    execute: async function(game) {
+        const tomomasa = game.getBusho(1902003);
+        const murashige = game.getBusho(1902004);
+
+        if (!tomomasa || !murashige) return;
+
+        const targetCastleId = tomomasa.castleId;
+        const targetCastle = game.getCastle(targetCastleId);
+        const isCommander = tomomasa.isCommander;
+        let legionToTakeover = null;
+
+        if (isCommander && game.legions) {
+            legionToTakeover = game.legions.find(l => l.clanId === tomomasa.clan && l.commanderId === tomomasa.id);
+        }
+
+        if (murashige.castleId !== targetCastleId) {
+            if (game.affiliationSystem) {
+                game.affiliationSystem.moveCastle(murashige, targetCastleId);
+            } else {
+                murashige.castleId = targetCastleId;
+            }
+        }
+
+        tomomasa.isCastellan = false;
+        tomomasa.isCommander = false;
+
+        murashige.isCastellan = true;
+        if (targetCastle) {
+            targetCastle.castellanId = murashige.id;
+            if (game.affiliationSystem) {
+                game.affiliationSystem.updateCastleLord(targetCastle);
+            }
+        }
+
+        if (isCommander && legionToTakeover) {
+            murashige.isCommander = true;
+            legionToTakeover.commanderId = murashige.id;
+        }
+
+        tomomasa.achievementTotal = 0;
+        if ((murashige.achievementTotal || 0) < 700) {
+            murashige.achievementTotal = 700;
+        }
+
+        const tomomasaName = tomomasa.name.replace('|', '');
+        const murashigeName = murashige.name.replace('|', '');
+        const titleName = isCommander ? "国主" : "城主";
+        
+        const msg = `${murashigeName}が主君である${tomomasaName}を追放し、実権を握りました！\n${murashigeName}が新たな${titleName}となります。`;
+        
+        game.ui.log(`【イベント】荒木村重の池田家乗っ取り：${murashigeName}が${tomomasaName}を追放しました。`);
+        await game.ui.showDialogAsync(msg, false, 0);
+
+        if (game.factionSystem) {
+            game.factionSystem.updateFactions();
+        }
+        if (game.ui) {
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
+    }
+});
+
+// ==========================================
 // ★ 摂津衆（池田・荒木）臣従イベント
 // ==========================================
 window.GameEvents.push({
@@ -2243,7 +2343,7 @@ window.GameEvents.push({
         if (miyoshiClanId === sponsorClanId || (shogunClanId !== 0 && miyoshiClanId === shogunClanId)) return false;
 
         // 3. 摂津衆（池田長正、池田勝正、荒木村重）のいずれかが、三好家の城主であるか確認します
-        const targetLordIds = [1902001, 1902002, 1902003];
+        const targetLordIds = [1902001, 1902002, 1902004];
         let targetLord = null;
         let mainCastle = null;
 
@@ -2331,7 +2431,7 @@ window.GameEvents.push({
         const nagayasu = game.getBusho(1020006);
         const miyoshiClanId = nagayasu.clan;
 
-        const targetLordIds = [1902001, 1902002, 1902003];
+        const targetLordIds = [1902001, 1902002, 1902004];
         let targetLord = null;
         let mainCastle = null;
 
