@@ -1760,28 +1760,26 @@ class FieldWarManager {
                     if (assign) assign.soldiers = u.soldiers;
                 }
             } else {
-                if (typeof u.id === 'string' && !u.id.startsWith('k_')) {
-                    // 守備側も同じように、メインと援軍を見分けて別の箱にしまいます
-                    if (u.isReinforcement) {
-                        if (u.isSelfReinforcement) {
-                            defSelfReinfSoldiers += u.soldiers;
-                            if (u.troopType === 'kiba') defSelfReinfHorses += u.soldiers;
-                            if (u.troopType === 'teppo') defSelfReinfGuns += u.soldiers;
-                        } else {
-                            defAllyReinfSoldiers += u.soldiers;
-                            if (u.troopType === 'kiba') defAllyReinfHorses += u.soldiers;
-                            if (u.troopType === 'teppo') defAllyReinfGuns += u.soldiers;
-                        }
+                // 守備側も同じように、メインと援軍を見分けて別の箱にしまいます
+                if (u.isReinforcement) {
+                    if (u.isSelfReinforcement) {
+                        defSelfReinfSoldiers += u.soldiers;
+                        if (u.troopType === 'kiba') defSelfReinfHorses += u.soldiers;
+                        if (u.troopType === 'teppo') defSelfReinfGuns += u.soldiers;
                     } else {
-                        defSoldiers += u.soldiers;
-                        if (u.troopType === 'kiba') defHorses += u.soldiers;
-                        if (u.troopType === 'teppo') defGuns += u.soldiers;
+                        defAllyReinfSoldiers += u.soldiers;
+                        if (u.troopType === 'kiba') defAllyReinfHorses += u.soldiers;
+                        if (u.troopType === 'teppo') defAllyReinfGuns += u.soldiers;
                     }
-                    
-                    if (this.warState.defAssignments) {
-                        const assign = this.warState.defAssignments.find(a => a.busho.id === u.bushoId);
-                        if (assign) assign.soldiers = u.soldiers;
-                    }
+                } else {
+                    defSoldiers += u.soldiers;
+                    if (u.troopType === 'kiba') defHorses += u.soldiers;
+                    if (u.troopType === 'teppo') defGuns += u.soldiers;
+                }
+                
+                if (this.warState.defAssignments) {
+                    const assign = this.warState.defAssignments.find(a => a.busho.id === u.bushoId);
+                    if (assign) assign.soldiers = u.soldiers;
                 }
             }
         });
