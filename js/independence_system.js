@@ -318,9 +318,9 @@ class IndependenceSystem {
         // ★メッセージの出し分け
         if (isProxyRebellion) {
             if (isDefection) {
-                msg = `${oldClanName}の${castellan.name}が、${rebellionLeader.name}を誘って${newClanName}に寝返りました！`;
+                msg = `${oldClanName}の${castellan.name}が${rebellionLeader.name}を唆して${newClanName}に寝返りました！`;
             } else {
-                msg = `${oldClanName}の${castellan.name}が、${rebellionLeader.name}を大名として擁立し、独立を宣言しました！`;
+                msg = `${oldClanName}の${castellan.name}が${rebellionLeader.name}を大名として擁立し、独立を宣言しました！`;
             }
         } else {
             if (isDefection) {
