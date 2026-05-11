@@ -916,7 +916,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .modal-content.modal-small {
     position: relative;
     overflow: visible !important; 
-    padding-top: 15px; 
+    padding: 10px; 
     display: flex;
     flex-direction: column;
 }
@@ -927,7 +927,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     align-items: flex-start;
     min-height: 130px; 
     gap: 15px;
-    margin: 10px 0; 
+    margin: 0; 
     order: 1; /* これで一番上に配置されます */
 }
 
@@ -964,9 +964,10 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 #dialog-right-name { right: 20px; }
 
 .message-area {
+    position: relative;
     margin: 0;
     flex: 1;
-    padding: 15px;
+    padding: 10px 15px;
     background: rgba(0, 0, 0, 0.4);
     border: 1px solid rgba(212, 175, 55, 0.3);
     border-radius: 8px;
@@ -2468,7 +2469,7 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 }
 
 /* 次へ進む（▼）マークを追加して分かりやすくします */
-.event-dialog-modal .modal-content.modal-small::after {
+.event-dialog-modal .message-area::after {
     content: "▼";
     position: absolute;
     bottom: 8px;
@@ -2480,7 +2481,7 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 }
 
 /* 選択肢を表示している時は、待機の「▼（次へ進む）」マークを隠します */
-.event-dialog-modal.event-choices-active .modal-content.modal-small::after {
+.event-dialog-modal.event-choices-active .message-area::after {
     display: none !important;
 }
 
