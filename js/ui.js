@@ -866,10 +866,16 @@ class UIManager {
 
         // ★ここから追加：代わりに、右クリック（スマホなら長押し）で「命令終了」を押したことにする魔法です！
         document.addEventListener('contextmenu', (e) => {
-            // ★追加：野戦中は右クリックで「命令終了」を誤爆させないようにガードします！
-            if (this.game && this.game.fieldWarManager && this.game.fieldWarManager.active) {
-                e.preventDefault();
-                return;
+            // ★追加：野戦や攻城戦中は右クリックで「命令終了」を誤爆させないようにガードします！
+            if (this.game) {
+                if (this.game.fieldWarManager && this.game.fieldWarManager.active) {
+                    e.preventDefault();
+                    return;
+                }
+                if (this.game.warManager && this.game.warManager.state && this.game.warManager.state.active) {
+                    e.preventDefault();
+                    return;
+                }
             }
 
             // 画面の中に「命令終了」のボタンがあるか”すべて”探して集めます
@@ -2001,6 +2007,10 @@ class UIManager {
         if (!this.warModal) return;
         if (visible) {
             this.warModal.classList.remove('hidden');
+            // ★追加：攻城戦が始まる時に、平時のコマンドリストを綺麗にお掃除して非表示にします！
+            if (typeof this.clearCommandMenu === 'function') {
+                this.clearCommandMenu();
+            }
         } else {
             this.warModal.classList.add('hidden');
             // ★追加：戦争が終わって画面を閉じる時に、カードの「部隊がいたよシール」を全部ひっぺがします
