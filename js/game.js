@@ -1503,8 +1503,23 @@ class GameManager {
             let income = GameSystem.calcBaseGoldIncome(c);
             income = GameSystem.applyVariance(income, window.MainParams.Economy.IncomeFluctuation);
             if (this.month === 3) income += income * 3;
+
+            // ★ここから追加：港拠点の交易収入ボーナス！
+            //春日山城(ID2)、石山御坊(ID33)、松波城(ID72)、尾山御坊(ID74)、北庄城(ID76)、立花山城(ID148)、内城(ID169)、安濃津城(予定)、土崎港(予定)、十三湊(予定)
+            const portCastleIds = [2, 33, 72, 74, 76, 148, 169]; // 港拠点のIDリスト
+            let portBonus = 0;
+            if (portCastleIds.includes(c.id)) {
+                // 同じ勢力が持っているすべてのお城の総人口を計算します
+                const clanCastles = this.castles.filter(castle => castle.ownerClan === c.ownerClan);
+                const totalClanPopulation = clanCastles.reduce((sum, castle) => sum + castle.population, 0);
+                
+                // ボーナスの計算式です
+                portBonus = Math.floor((c.population / 500) + (c.peoplesLoyalty / 2) + (totalClanPopulation / 1000));
+            }
+            // 3月の3倍ボーナスの後に足し算をするので、このボーナスは3倍にはなりません
+            income += portBonus;
             
-            // ★追加：一揆状態の城は金収入が０になります！
+            // ★追加：一揆状態の城は金収入が０になります！（港ボーナスも一緒に0になります）
             if (c.statusEffects && c.statusEffects.includes('一揆')) {
                 income = 0;
             }
