@@ -2442,6 +2442,32 @@ class FieldWarManager {
 
         this.log(`${attacker.name}隊の${atkWeapon}！${dirMsg} 敵に${dmgToDef}の損害！${counterMsg}`);
         
+        // ★追加：戦闘を行った部隊の所属する軍の訓練度を上昇（上限100）
+        if (this.groupStats[attacker.groupId]) {
+            this.groupStats[attacker.groupId].training = Math.min(100, this.groupStats[attacker.groupId].training + 1);
+        }
+        if (this.groupStats[defender.groupId]) {
+            this.groupStats[defender.groupId].training = Math.min(100, this.groupStats[defender.groupId].training + 1);
+        }
+
+        // ★追加：ダメージ比率による士気の綱引き（最大3）
+        let totalDmg = dmgToDef + dmgToAtk;
+        if (totalDmg > 0) {
+            // お互いのダメージの差を、合計ダメージで割ることで、-1.0 から 1.0 の間の割合を出します
+            let ratio = (dmgToDef - dmgToAtk) / totalDmg;
+            // 割合に3を掛けて四捨五入し、-3 から 3 の間で変動する数値を決めます
+            let atkMoraleChange = Math.round(ratio * 3); 
+            
+            if (atkMoraleChange !== 0) {
+                if (this.groupStats[attacker.groupId]) {
+                    this.groupStats[attacker.groupId].morale = Math.max(0, Math.min(120, this.groupStats[attacker.groupId].morale + atkMoraleChange));
+                }
+                if (this.groupStats[defender.groupId]) {
+                    this.groupStats[defender.groupId].morale = Math.max(0, Math.min(120, this.groupStats[defender.groupId].morale - atkMoraleChange));
+                }
+            }
+        }
+
         if (defender.soldiers <= 0) {
             this.log(`${defender.name}隊が壊滅した！`);
             this.units = this.units.filter(u => u.id !== defender.id);
