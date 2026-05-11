@@ -1843,18 +1843,37 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
 .war-controls-area { display: flex !important; width: 100%; gap: 10px; flex-shrink: 0; height: auto; min-height: 100px; box-sizing: border-box; padding: 10px; background: transparent; border-top: none; }
 .war-controls-buttons { flex: 2; display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: max-content; gap: 5px; height: auto; box-sizing: border-box; }
 .war-controls-desc { flex: 3; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 8px; padding: 8px 15px; font-size: 0.95rem; color: #fff; text-shadow: 1px 1px 1px #000; text-align: left; overflow-y: auto; height: 100%; box-sizing: border-box; }
-/* ★攻城戦のコマンドボタンを内政と同じ（cmd-btn）にするための調整 */
-.war-controls-buttons button { width: 100%; font-size: 1rem; padding: 0; }
-.war-controls-buttons button.active-cmd { 
-    background: linear-gradient(135deg, #7e9d93 0%, #b4ccc5 100%);
-    color: #ffffff;
-    border-color: #d4af37 #fae8ad #fffcf0 #fae8ad;
-    box-shadow: inset 0 0 0 1px rgba(0, 50, 40, 0.6), inset 0 2px 6px rgba(0,0,0,0.5), 0 0px 0px rgba(0,0,0,0);
-    transform: translateY(1px); 
+/* ★攻城戦のコマンドボタンを重厚な「いくさ」仕様にチューン */
+.war-controls-buttons .cmd-btn { 
+    width: 100%; 
+    font-size: 1rem; 
+    padding: 0; 
+    background: linear-gradient(135deg, #333333 0%, #000000 100%); /* 鉄色の重厚感 */
+    border-color: #a88a2c #d4af37 #5c4008 #d4af37; /* 鈍く光る金枠 */
+    text-shadow: 2px 2px 2px #000;
 }
-.war-controls-buttons button.back.active-cmd {
-    background: linear-gradient(135deg, #5a6268 0%, #868e96 100%);
-    border-color: #ced4da #adb5bd #495057 #adb5bd;
+
+/* 攻城戦の「撤退」ボタンを烈火のような赤に（最優先の視認性） */
+.war-controls-buttons .cmd-btn.back { 
+    background: linear-gradient(135deg, #d32f2f 0%, #7b1fa2 100%); /* 危機感を煽る紫がかった赤 */
+    border-color: #ff8a80 #d32f2f #5c0000 #d32f2f;
+    box-shadow: inset 0 0 10px rgba(255,0,0,0.4), 0 2px 4px rgba(0,0,0,0.4);
+}
+
+/* 選択中のコマンドを鮮やかに発光させる */
+.war-controls-buttons .cmd-btn.active-cmd { 
+    background: linear-gradient(135deg, #825a2c 0%, #d4af37 100%);
+    color: #ffffff;
+    border-color: #ffffff #fff2cc #d4af37 #fff2cc;
+    box-shadow: 0 0 15px #ffd54f, inset 0 2px 6px rgba(0,0,0,0.5);
+    transform: translateY(1px) scale(1.02); 
+}
+
+/* 撤退ボタン選択時はさらに激しく発光 */
+.war-controls-buttons .cmd-btn.back.active-cmd {
+    background: linear-gradient(135deg, #f44336 0%, #b71c1c 100%);
+    border-color: #ffffff #ffcdd2 #b71c1c #ffcdd2;
+    box-shadow: 0 0 20px #ff5252, inset 0 2px 6px rgba(0,0,0,0.5);
 }
 
 #war-ai-guard { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 1.5rem; font-weight: bold; z-index: 10; }
@@ -2244,7 +2263,7 @@ body.is-pc {
     .war-controls-area { height: auto; min-height: 120px; gap: 10px; }
     .war-controls-buttons { flex: 2; gap: 5px; align-content: start; }
     .war-controls-desc { flex: 1; font-size: 0.95rem; }
-    .war-controls-buttons button { font-size: 1.1rem !important; letter-spacing: normal; }
+    .war-controls-buttons .cmd-btn { font-size: 1.2rem !important; letter-spacing: 1px; }
 
     /* 全体の配置ルール */
     .war-side-wrapper { flex-direction: row !important; flex: 1 !important; overflow: visible !important;}
