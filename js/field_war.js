@@ -2314,12 +2314,8 @@ class FieldWarManager {
             const showDamagePopup = (damage, el) => {
                 if (!el || damage <= 0) return;
                 const popup = document.createElement('div');
-                popup.className = 'damage-popup anim-popup-text';
+                popup.className = 'fw-damage-popup';
                 popup.innerText = `-${damage}`;
-                popup.style.top = '0';
-                popup.style.left = '50%';
-                popup.style.transform = 'translate(-50%, -50%)';
-                popup.style.position = 'absolute';
                 el.appendChild(popup);
                 
                 // 1秒経ったら自動でお掃除します

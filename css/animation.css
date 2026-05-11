@@ -111,6 +111,29 @@
     50% { filter: brightness(2) drop-shadow(0 0 10px #ffffff); }
 }
 
+/* -----------------------------------------
+   6. 野戦専用の小さなダメージポップアップ
+   ----------------------------------------- */
+.fw-damage-popup {
+    position: absolute;
+    top: -5px; /* アイコンの少し上からスタートさせます */
+    left: 50%; /* 左右の真ん中を基準にします */
+    color: #ff3333;
+    font-size: 13px; /* 兵数表示のサイズ感に合わせて小さくしました */
+    font-weight: bold;
+    text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+    pointer-events: none;
+    z-index: 100;
+    /* 野戦の小さな画面に合わせて、少しだけ上に上がる専用の動きを使います */
+    animation: fw-popup 1s ease-out forwards;
+}
+
+@keyframes fw-popup {
+    0%   { transform: translateX(-50%) translateY(0); opacity: 1; }
+    50%  { transform: translateX(-50%) translateY(-15px); opacity: 1; }
+    100% { transform: translateX(-50%) translateY(-25px); opacity: 0; }
+}
+
 /* =========================================
    マップの地方をぼわーっと光らせるアニメーション
    ========================================= */
