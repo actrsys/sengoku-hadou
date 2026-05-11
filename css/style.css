@@ -931,104 +931,6 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     order: 1; /* これで一番上に配置されます */
 }
 
-/* 選択肢の箱（下側） */
-.dialog-choices {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    margin: 5px 0 15px 0; /* ★メッセージとの間、下のボタンとの間の隙間を調整 */
-    padding: 0;
-    width: 100%;
-    z-index: 9501;
-    order: 2; /* ★メッセージ(order:1)の下に配置されます */
-    box-sizing: border-box;
-}
-
-/* 選択肢ボタンのデザイン */
-.dialog-choice-btn {
-    background: linear-gradient(to right, #3e3a36 0%, #2b2824 50%, #3e3a36 100%);
-    border: 1px solid #a88a2c;
-    border-top: 1.5px solid #d4af37;
-    color: #fff;
-    /* ★左側に三角形を置くスペースを空けるため、左側の余白(padding-left)を35pxに設定します */
-    padding: 12px 15px 12px 35px;
-    border-radius: 4px;
-    font-size: 1.1rem;
-    font-family: 'abashiri-mincho', serif;
-    /* ★文字を左端に揃えます */
-    text-align: left !important;
-    cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 0 5px rgba(255,255,255,0.05);
-    transition: all 0.15s ease-out;
-    text-shadow: 1px 1px 2px #000;
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    margin: 0;
-    position: relative;
-}
-
-/* 選択肢のアイコン（左側の装飾） */
-.dialog-choice-btn::before {
-    /* ★指差しマークのように機能させるため「▶」に変更します */
-    content: "▶";
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #d4af37;
-    font-size: 0.9rem;
-    text-shadow: 1px 1px 0 #000;
-    opacity: 0.7;
-}
-
-/* 選択肢のアイコン（右側の装飾） */
-.dialog-choice-btn::after {
-    /* ★右側の三角形は不要なので消去します */
-    content: none;
-}
-
-/* マウスが乗った時（またはタップした瞬間） */
-.dialog-choice-btn:hover {
-    background: linear-gradient(to right, #54504b 0%, #3e3a36 50%, #54504b 100%);
-    border-color: #ffd54f;
-    color: #ffd54f;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.6), 0 0 10px rgba(212, 175, 55, 0.2);
-}
-
-.dialog-choice-btn:hover::before,
-.dialog-choice-btn:hover::after {
-    opacity: 1;
-    color: #ffd54f;
-    transform: translateY(-50%) scale(1.2);
-}
-
-/* 押した時 */
-.dialog-choice-btn:active {
-    transform: translateY(1px);
-    background: #1a1816;
-    box-shadow: inset 0 2px 5px rgba(0,0,0,0.8);
-    transition: none;
-}
-
-/* マウスが乗った時 */
-.dialog-choice-btn:hover {
-    background: linear-gradient(to right, rgba(58, 107, 70, 0.95) 0%, rgba(42, 90, 54, 1) 50%, rgba(58, 107, 70, 0.95) 100%);
-    border-color: #ffd54f;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0,0,0,0.7), inset 0 0 15px rgba(212, 175, 55, 0.4);
-    color: #ffd54f;
-}
-
-/* 押した時 */
-.dialog-choice-btn:active {
-    transform: translateY(1px);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.8), inset 0 3px 8px rgba(0,0,0,0.6);
-    border-top: 2px solid #825a2c;
-    border-bottom: 1px solid #f9e596;
-}
-
 /* 顔グラフィックの列 */
 .dialog-face-column {
     display: flex;
@@ -2575,20 +2477,6 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     font-size: 1rem;
     animation: fw-blink 1.5s infinite;
     pointer-events: none;
-}
-/* =========================================================
-   イベント時の選択肢ボタンを画面中央に浮かせる
-   ========================================================= */
-#dialog-choices-container.event-choices-container {
-    position: fixed !important;
-    top: 45% !important; /* 真ん中より少し上が見やすいです */
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    width: 90% !important;
-    max-width: 400px !important;
-    z-index: 9999 !important;
-    padding: 0 !important;
-    margin: 0 !important;
 }
 
 /* 選択肢を表示している時は、待機の「▼（次へ進む）」マークを隠します */

@@ -710,7 +710,6 @@ class UIManager {
             footer = modal.querySelector('.modal-footer');
         }
 
-        const choicesContainer = document.getElementById('dialog-choices-container');
         const modalContent = modal.querySelector('.modal-content');
 
         // 前回のイベント設定が残っていたら一旦消しておきます
@@ -723,7 +722,6 @@ class UIManager {
 
         // --- 根本改修：フッターのボタンを動的に生成し、何個でも並べられるようにします ---
         if (footer) footer.innerHTML = ''; 
-        if (choicesContainer) choicesContainer.classList.add('hidden');
 
         // イベントモード専用のクリック操作
         this._currentEventClickHandler = (e) => {
