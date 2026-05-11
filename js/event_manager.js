@@ -71,9 +71,19 @@ class EventManager {
         // 設定で「歴史イベントが発生しない」になっているか確認します
         const isHistoricalOff = (window.GameConfig && window.GameConfig.historicalEvent === false);
 
+        // ★追加：このタイミングで歴史イベントがすでに起きたかをメモする変数です
+        let historicalEventOccurred = false;
+
         for (const ev of targetEvents) {
-            // もし設定がオフで、かつ歴史イベント（IDが "historical_" で始まる）なら、このイベントは無視します！
-            if (isHistoricalOff && ev.id && ev.id.startsWith("historical_")) {
+            const isHistorical = ev.id && ev.id.startsWith("historical_");
+
+            // もし設定がオフで、かつ歴史イベントなら、このイベントは無視します！
+            if (isHistoricalOff && isHistorical) {
+                continue;
+            }
+
+            // ★追加：「ゲーム開始時」以外で、すでにこのタイミングで歴史イベントが起きていたら、他の歴史イベントはお休みにします
+            if (timing !== 'game_start' && isHistorical && historicalEventOccurred) {
                 continue;
             }
 
@@ -97,6 +107,11 @@ class EventManager {
                 // 「try〜catch」という安全装置で魔法を実行します
                 try {
                     await ev.execute(this.game, context);    
+                    
+                    // ★追加：歴史イベントが無事に発生したら、「起きたよ」とメモを残します
+                    if (isHistorical) {
+                        historicalEventOccurred = true;
+                    }
                 } catch (error) {
                     // 裏側で透明なエラーが起きても、ゲームが止まらないようにしてここで受け止めます
                     console.warn(`イベント ${ev.id} の実行中にエラーが出ましたが、進行を継続します:`, error);
