@@ -1225,18 +1225,23 @@ class AIEngine {
             }
 
             // ★変更：鉄砲と軍馬の購入（大名の革新性、自家の装備比率、城の兵士数を元に点数を作ります）
-            // ★追加：攻撃作戦中は出撃・援軍拠点のみ、それ以外は大名居城のみで購入します
             let canBuyEq = false;
+            let isMainBase = false; // ★追加：ここが「特定の城」かどうかを覚えるシールです
             const clanOpsEq = this.game.aiOperationManager.operations[castle.ownerClan];
             const myOpEq = clanOpsEq ? clanOpsEq[castle.legionId] : null;
             if (myOpEq && myOpEq.type === '攻撃') {
                 if (castle.id === myOpEq.stagingBase || castle.id === myOpEq.supportBase) {
-                    canBuyEq = true;
+                    isMainBase = true; // 出撃・援軍拠点なら特定の城のシールを貼ります
                 }
             } else {
                 if (daimyo && daimyo.castleId === castle.id) {
-                    canBuyEq = true;
+                    isMainBase = true; // 大名居城なら特定の城のシールを貼ります
                 }
+            }
+
+            // ★追加：特定の城ならいつでも許可し、それ以外のお城では「20%の確率（サイコロ）」で特別に許可します！
+            if (isMainBase || Math.random() < 0.2) {
+                canBuyEq = true;
             }
 
             if (canBuyEq && castle.gold >= 500 && tradeCount < 5) {
