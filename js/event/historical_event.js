@@ -2208,23 +2208,27 @@ window.GameEvents.push({
     isOneTime: true,             
     
     checkCondition: function(game) {
-        // 1. 三好長逸（ID: 1020006）が大名であるか確認します
+        // 1. 池田長正（ID: 1902001）が死亡しているか確認します
+        const nagamasa = game.getBusho(1902001);
+        if (nagamasa && nagamasa.status !== 'dead') return false;
+
+        // 2. 三好長逸（ID: 1020006）が大名であるか確認します
         const nagayasu = game.getBusho(1020006);
         if (!nagayasu || !nagayasu.isDaimyo) return false;
         
-        // 2. 三好長逸がプレイヤー大名ではないか確認します
+        // 3. 三好長逸がプレイヤー大名ではないか確認します
         if (game.playerClanId === nagayasu.clan) return false;
 
-        // 3. 池田知正（ID: 1902003）が存在し、三好長逸の家に所属する城主または国主であるか確認します
+        // 4. 池田知正（ID: 1902003）が存在し、三好長逸の家に所属する城主または国主であるか確認します
         const tomomasa = game.getBusho(1902003);
         if (!tomomasa || tomomasa.clan !== nagayasu.clan) return false;
         if (!tomomasa.isCastellan && !tomomasa.isCommander) return false;
 
-        // 4. 荒木村重（ID: 1902004）が存在し、三好家に所属しているか確認します
+        // 5. 荒木村重（ID: 1902004）が存在し、三好家に所属しているか確認します
         const murashige = game.getBusho(1902004);
         if (!murashige || murashige.clan !== nagayasu.clan) return false;
 
-        // 5. 荒木村重が池田知正と同じ場所にいるか確認します
+        // 6. 荒木村重が池田知正と同じ場所にいるか確認します
         if (tomomasa.isCommander) {
             // 池田知正が国主の場合、同じ軍団に所属しているか
             if (murashige.legionId !== tomomasa.legionId) return false;
