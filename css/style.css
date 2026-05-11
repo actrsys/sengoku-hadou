@@ -2526,52 +2526,39 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 .legion-color-8 { background-color: #546e7a; } /* グレー */
 
 /* =========================================================
-   面談専用のメッセージウィンドウ（二画面構成・完全版）
+   面談専用の選択肢ウィンドウ（完全独立版）
    ========================================================= */
 
-/* 1. 外側の透明な箱（#dialog-modal を付けてPC版の暴走を完全に封じ込めます） */
-#dialog-modal.interview-dialog-modal .modal-content.modal-small {
-    background: none !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    gap: 15px !important;
-    width: 95% !important; 
-    max-width: 400px !important; /* 絶対に400px以上広がらないように固定 */
-    margin: auto !important;
+/* いつものメッセージウィンドウの下に並べる「全く別の新しい箱」です */
+.interview-choices-box {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    
+    /* いつものウィンドウと全く同じ背景と枠線を描きます */
+    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%);
+    border: 2px solid #d4af37;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    
+    /* いつもの小窓と幅を完全に一致させます（PCでもスマホでも崩れません） */
+    width: 95%; 
+    max-width: 400px;
+    box-sizing: border-box;
+    
+    /* メッセージとの隙間を少し空けて中央に配置します */
+    margin: 15px auto 0 auto;
+    
+    /* モーダルの前面に出すための設定 */
+    position: relative;
+    z-index: 10;
 }
 
-/* 2. 上側のメッセージ窓（余白を10pxに指定して、元のサイズ・見た目を完全再現します） */
-#dialog-modal.interview-dialog-modal .dialog-body-container {
-    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%) !important;
-    border: 2px solid #d4af37 !important;
-    border-radius: 8px !important;
-    padding: 10px !important; /* 元のウィンドウと同じ余白に戻して縮みを直します */
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
-    width: 100% !important; 
-    box-sizing: border-box !important;
-    margin: 0 !important;
-    position: relative !important;
-    min-height: 130px;
-}
-
-/* 3. 下側の選択肢窓（上の窓と寸分違わぬ幅で独立させます） */
-#dialog-modal.interview-dialog-modal .modal-footer {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 10px !important;
-    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%) !important;
-    border: 2px solid #d4af37 !important;
-    border-radius: 8px !important;
-    padding: 10px 15px !important;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    margin: 0 !important;
+/* 面談の時は、いつものメッセージウィンドウの下側の余白を消してスッキリさせます */
+.interview-dialog-modal .modal-content.modal-small {
+    padding-bottom: 0 !important;
 }
 
 /* ボタンのデザイン（指定通り：丸型・左寄せ・アイコン付き・小さめフォント） */

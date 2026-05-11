@@ -748,49 +748,57 @@ class UIManager {
             } else {
                 modal.classList.remove('event-dialog-modal');
             }
+            
+            let interviewBox = modal.querySelector('.interview-choices-box');
+            if (!interviewBox) {
+                interviewBox = document.createElement('div');
+                interviewBox.className = 'interview-choices-box hidden';
+                // いつものメッセージウィンドウ（modalContent）の直下に別の箱として配置します
+                modalContent.parentNode.insertBefore(interviewBox, modalContent.nextSibling);
+            }
+            interviewBox.innerHTML = ''; // 中身をリセット
 
             if (dialog.customOpts.isInterview) {
-                modal.classList.add('interview-dialog-modal');
-                if (footer) {
-                    footer.classList.remove('right');
-                    footer.style.justifyContent = '';
-                }
+                // 面談時は新しい箱を表示し、いつものフッターは隠します
+                interviewBox.classList.remove('hidden');
+                if (footer) footer.classList.add('hidden');
             } else {
-                modal.classList.remove('interview-dialog-modal');
+                // 面談以外の時は新しい箱を隠し、いつものフッターを表示します
+                interviewBox.classList.add('hidden');
+                if (footer) footer.classList.remove('hidden');
             }
 
-            if (footer) {
-                footer.classList.remove('hidden');
+            dialog.customOpts.choices.forEach((choice, index) => {
+                const btn = document.createElement('button');
+                // ★追加：最初の選択肢を「okBtn」として扱えるようにお名前シールを貼ります
+                if (index === 0) btn.id = 'dialog-btn-ok';
 
-                dialog.customOpts.choices.forEach((choice, index) => {
-                    const btn = document.createElement('button');
-                    // ★追加：最初の選択肢を「okBtn」として扱えるようにお名前シールを貼ります
-                    if (index === 0) btn.id = 'dialog-btn-ok';
-
-                    // 3色ボタン（btn-primary, btn-danger, btn-secondary）を適用できるようにします
-                    if (dialog.customOpts.isInterview) {
-                        btn.className = 'interview-choice-btn';
-                    } else {
-                        btn.className = choice.className || 'btn-secondary';
-                    }
-                    btn.textContent = choice.label;
+                // 3色ボタン（btn-primary, btn-danger, btn-secondary）を適用できるようにします
+                if (dialog.customOpts.isInterview) {
+                    btn.className = 'interview-choice-btn';
+                } else {
+                    btn.className = choice.className || 'btn-secondary';
+                }
+                btn.textContent = choice.label;
                     
                     // ★追加：ボタンを押せない状態（disabled）にする指示を読み取ります！
                     if (choice.disabled) {
                         btn.disabled = true;
-                        btn.classList.add('disabled'); // 見た目もグレーアウトさせます
+                        btn.classList.add('disabled');
                     }
-
+                    
                     btn.onclick = (e) => {
                         e.stopPropagation();
-                        if (window.AudioManager) {
-                            if (choice.label === "戻る" || choice.label === "いいえ") window.AudioManager.playSE('cancel.ogg');
-                            else window.AudioManager.playSE('decision.ogg');
-                        }
-                        modal.classList.remove('event-choices-active');
-                        cleanupAndNext(choice.onClick);
+                        if (choice.onClick) choice.onClick();
+                        else this.closeDialog();
                     };
-                    footer.appendChild(btn);
+
+                    // ★追加先を「いつものフッター」か「面談用の別の箱」かで分けます
+                    if (dialog.customOpts.isInterview) {
+                        interviewBox.appendChild(btn);
+                    } else {
+                        if (footer) footer.appendChild(btn);
+                    }
                 });
             }
         } else if (isEventMode) {
