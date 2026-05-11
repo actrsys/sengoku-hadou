@@ -2300,10 +2300,10 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 摂津衆（池田・荒木）臣従イベント
+// ★ 荒木村重臣従イベント
 // ==========================================
 window.GameEvents.push({
-    id: "historical_settsu_submission",
+    id: "historical_murashige_submission",
     timing: "startMonth_before", 
     isOneTime: true,             
     
@@ -2342,22 +2342,16 @@ window.GameEvents.push({
         // ストッパー：三好家自身が将軍を擁立している家だった場合は中止します
         if (miyoshiClanId === sponsorClanId || (shogunClanId !== 0 && miyoshiClanId === shogunClanId)) return false;
 
-        // 3. 摂津衆（池田長正、池田勝正、荒木村重）のいずれかが、三好家の城主であるか確認します
-        const targetLordIds = [1902001, 1902002, 1902004];
+        // 3. 荒木村重（ID: 1902004）が、三好家の城主または国主であるか確認します
+        const murashige = game.getBusho(1902004);
         let targetLord = null;
         let mainCastle = null;
 
-        for (let id of targetLordIds) {
-            const lord = game.getBusho(id);
-            // 三好家にいて、城主のバッジを持っている人を探します
-            if (lord && lord.clan === miyoshiClanId && lord.isCastellan) {
-                const c = game.getCastle(lord.castleId);
-                // そのお城がちゃんと三好家のものか確認します
-                if (c && c.ownerClan === miyoshiClanId) {
-                    targetLord = lord;
-                    mainCastle = c;
-                    break; // 見つかったら探すのをやめます
-                }
+        if (murashige && murashige.clan === miyoshiClanId && (murashige.isCastellan || murashige.isCommander)) {
+            const c = game.getCastle(murashige.castleId);
+            if (c && c.ownerClan === miyoshiClanId) {
+                targetLord = murashige;
+                mainCastle = c;
             }
         }
         if (!targetLord || !mainCastle) return false;
@@ -2431,19 +2425,15 @@ window.GameEvents.push({
         const nagayasu = game.getBusho(1020006);
         const miyoshiClanId = nagayasu.clan;
 
-        const targetLordIds = [1902001, 1902002, 1902004];
+        const murashige = game.getBusho(1902004);
         let targetLord = null;
         let mainCastle = null;
 
-        for (let id of targetLordIds) {
-            const lord = game.getBusho(id);
-            if (lord && lord.clan === miyoshiClanId && lord.isCastellan) {
-                const c = game.getCastle(lord.castleId);
-                if (c && c.ownerClan === miyoshiClanId) {
-                    targetLord = lord;
-                    mainCastle = c;
-                    break;
-                }
+        if (murashige && murashige.clan === miyoshiClanId && (murashige.isCastellan || murashige.isCommander)) {
+            const c = game.getCastle(murashige.castleId);
+            if (c && c.ownerClan === miyoshiClanId) {
+                targetLord = murashige;
+                mainCastle = c;
             }
         }
         if (!targetLord || !mainCastle) return;
@@ -2541,7 +2531,7 @@ window.GameEvents.push({
         targetCastles.forEach(castle => {
             const oldCastellanId = originalCastellans[castle.id];
             const newCastellan = game.getBusho(oldCastellanId);
-            // 元の城主が摂津衆（降伏組）なら、そのまま城主に復帰させます
+            // 元の城主が降伏組なら、そのまま城主に復帰させます
             if (newCastellan && newCastellan.id >= 1902001 && newCastellan.id <= 1902999 && newCastellan.castleId === castle.id) {
                 newCastellan.isCastellan = true;
                 castle.castellanId = newCastellan.id;
