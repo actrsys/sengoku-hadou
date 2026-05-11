@@ -2526,65 +2526,63 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 .legion-color-8 { background-color: #546e7a; } /* グレー */
 
 /* =========================================================
-   面談専用のメッセージウィンドウ（二画面構成・完全同期版）
+   面談専用のメッセージウィンドウ（二画面構成・完全版）
    ========================================================= */
 
-/* 1. 外側の透明な箱：標準の小窓と同じ幅制限をかけ、中身を中央に揃えます */
-.interview-dialog-modal .modal-content.modal-small {
+/* 1. 外側の透明な箱（#dialog-modal を付けてPC版の暴走を完全に封じ込めます） */
+#dialog-modal.interview-dialog-modal .modal-content.modal-small {
     background: none !important;
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
     display: flex !important;
     flex-direction: column !important;
-    gap: 12px !important; /* 窓同士の間隔 */
+    align-items: center !important;
+    gap: 15px !important;
     width: 95% !important; 
-    max-width: 400px !important; /* PC版で広がるのをここで確実に防ぎます */
+    max-width: 400px !important; /* 絶対に400px以上広がらないように固定 */
     margin: auto !important;
-    overflow: visible !important;
-    align-items: stretch !important;
 }
 
-/* 2. 上側のメッセージ窓：いつものデザイン・サイズを完全再現 */
-.interview-dialog-modal .dialog-body-container {
+/* 2. 上側のメッセージ窓（余白を10pxに指定して、元のサイズ・見た目を完全再現します） */
+#dialog-modal.interview-dialog-modal .dialog-body-container {
     background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%) !important;
     border: 2px solid #d4af37 !important;
     border-radius: 8px !important;
-    padding: 10px !important; /* 通常時と同じ余白 */
+    padding: 10px !important; /* 元のウィンドウと同じ余白に戻して縮みを直します */
     box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
+    width: 100% !important; 
     box-sizing: border-box !important;
-    width: 100% !important;
     margin: 0 !important;
     position: relative !important;
     min-height: 130px;
 }
 
-/* 3. 下側の選択肢窓：上の窓と全く同じ幅・色・枠で独立させます */
-.interview-dialog-modal .modal-footer {
+/* 3. 下側の選択肢窓（上の窓と寸分違わぬ幅で独立させます） */
+#dialog-modal.interview-dialog-modal .modal-footer {
     display: flex !important;
     flex-direction: column !important;
     align-items: stretch !important;
-    gap: 8px !important;
+    gap: 10px !important;
     background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%) !important;
     border: 2px solid #d4af37 !important;
     border-radius: 8px !important;
-    padding: 15px !important;
+    padding: 10px 15px !important;
     box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
-    box-sizing: border-box !important;
     width: 100% !important;
+    box-sizing: border-box !important;
     margin: 0 !important;
-    justify-content: flex-start !important;
 }
 
-/* ボタンのデザイン（指定通り：左右が丸い・左寄せ・アイコン付き・小さいフォント） */
+/* ボタンのデザイン（指定通り：丸型・左寄せ・アイコン付き・小さめフォント） */
 .interview-choice-btn {
     position: relative;
     padding: 10px 15px 10px 42px;
     border: 1.5px solid #5a4a32;
-    border-radius: 25px; /* 左右が欠けていない丸い形状 */
+    border-radius: 25px;
     background: linear-gradient(to bottom, #3e3a36 0%, #2b2824 100%);
     color: #f1f1f1;
-    font-size: 0.95rem; /* メッセージのフォントに近い小さめのサイズ */
+    font-size: 0.95rem;
     font-family: inherit;
     text-align: left !important;
     cursor: pointer;
@@ -2596,32 +2594,32 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     text-shadow: 1px 1px 1px #000;
 }
 
-/* 立体的な二重丸のアイコン */
+/* 立体的な二重丸のアイコン部分 */
 .interview-choice-btn::before {
     content: "";
     position: absolute;
     left: 14px;
     top: 50%;
     transform: translateY(-50%);
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     background: #222;
     border: 2px solid #d4af37;
-    box-shadow: inset 0 0 4px #ffd54f, 1px 1px 2px rgba(0,0,0,0.8);
+    box-shadow: inset 0 0 3px #ffd54f, 1px 1px 2px rgba(0,0,0,0.8);
 }
 
 .interview-choice-btn::after {
     content: "";
     position: absolute;
-    left: 19px;
+    left: 18px;
     top: 50%;
     transform: translateY(-50%);
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: #ffd54f;
-    box-shadow: 0 0 3px #fff;
+    box-shadow: 0 0 2px #fff;
 }
 
 .interview-choice-btn:hover {
