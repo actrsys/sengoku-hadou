@@ -1743,7 +1743,10 @@ class GameManager {
                 this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
                 this.ui.showControlPanel(castle); // ★追加：スキップ時も城の情報をババッと切り替えます！
             }
-            this.finishTurn();
+            // ★追加：スマホがパンクしないように、ここでほんの一瞬だけ「息継ぎ（お休み）」をさせます！
+            setTimeout(() => {
+                this.finishTurn();
+            }, 0);
             return;
         }
 
@@ -1755,7 +1758,10 @@ class GameManager {
                 this.ui.showControlPanel(castle); // ★追加：スキップ時も城の情報をババッと切り替えます！
             }
             this.currentIndex++; 
-            this.processTurn(); 
+            // ★追加：空き城を連続で飛ばす時も、スマホがパンクしないように一瞬「息継ぎ」をさせます！
+            setTimeout(() => {
+                this.processTurn(); 
+            }, 0);
             return; 
         }
         
@@ -1901,7 +1907,10 @@ class GameManager {
         }
         
         this.currentIndex++; 
-        this.processTurn(); 
+        // ★追加：ターンが終わって次に行く時も、スマホがパンクしないように一瞬「息継ぎ」をさせます！
+        setTimeout(() => {
+            this.processTurn(); 
+        }, 0);
     }
 
     async endMonth() {
