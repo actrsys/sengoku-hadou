@@ -1290,8 +1290,8 @@ class AIEngine {
                     if (c.ownerClan !== castle.ownerClan) return false;
                     // ①拠点単位（日野江城）
                     if (c.id === 157) return true;
-                    // ②国単位（常陸、淡路、肥後、薩摩、大隅、対馬）
-                    if ([15, 36, 61, 63, 64, 68].includes(c.provinceId)) return true;
+                    // ②国単位（常陸、淡路、肥後、日向、薩摩、大隅、対馬）
+                    if ([15, 36, 61, 62, 63, 64, 68].includes(c.provinceId)) return true;
                     const prov = this.game.provinces.find(p => p.id === c.provinceId);
                     // ③地方単位（東北、甲信）
                     if (prov && (prov.regionId === 1 || prov.regionId === 3)) return true;
