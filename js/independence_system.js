@@ -104,7 +104,32 @@ class IndependenceSystem {
             if (factionLeader) {
                 // 派閥主が、今の殿様よりも独立計画に賛同してくれるかを計算
                 const { joinScore, stayScore } = this.calculateLoyaltyScores(factionLeader, castellan, oldDaimyo);
-                if (joinScore > stayScore) {
+                
+                // ★追加：派閥主自身も、独立・謀反に踏み切れるだけの野心や不満があるか判定します！
+                const I = window.WarParams.Independence || {};
+                const thresholdBase = I.ThresholdBase || 29;
+                const dutyDiv = I.ThresholdDutyDiv || 2;
+                const ambDiv = I.ThresholdAmbitionDiv || 5;
+                const probLoyalty = I.ProbLoyaltyFactor || 2;
+                const probAffinity = I.ProbAffinityFactor || 0.5;
+
+                const leaderThreshold = thresholdBase + ((50 - factionLeader.duty) / dutyDiv) + ((factionLeader.ambition - 50) / ambDiv);
+                
+                let leaderProb = 0;
+                if (factionLeader.loyalty <= leaderThreshold) {
+                    const daimyoBonus = this.calcDaimyoPowerBonus(oldDaimyo);
+                    const affinityDiff = GameSystem.calcAffinityDiff(factionLeader.affinity, oldDaimyo.affinity);
+                    leaderProb = ((leaderThreshold - factionLeader.loyalty) * probLoyalty) + (affinityDiff * probAffinity) - (daimyoBonus * 2);
+                    
+                    // 大名と「一門」関係なら確率を下げる魔法です
+                    const isFamily = factionLeader.familyIds.some(id => oldDaimyo.familyIds.includes(id));
+                    if (isFamily) {
+                        leaderProb = leaderProb * 0.7;
+                    }
+                }
+
+                // スコアで賛同し、かつ派閥主自身の決起確率のサイコロにも成功した場合のみ神輿になる！
+                if (joinScore > stayScore && leaderProb > 0 && (Math.random() * 1000 < leaderProb)) {
                     rebellionLeader = factionLeader; // 派閥主が神輿になる！
                     isProxyRebellion = true;
                 }
