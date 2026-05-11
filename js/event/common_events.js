@@ -858,7 +858,7 @@ window.GameEvents.push({
                 
                 // ★ 新しい魔法：国ごとの「雪が降る確率」のリストです
                 // 100%は「1.0」、1%は「0.01」という書き方をします
-                const snowProbabilities = {1
+                const snowProbabilities = {
                     67: 0.99, // 蝦夷国 (99%)
                     1:  0.99, // 陸奥国 (99%)
                     2:  0.99, // 出羽国 (99%)
