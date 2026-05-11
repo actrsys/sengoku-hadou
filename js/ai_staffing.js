@@ -304,6 +304,30 @@ class AIStaffing {
         newCommander.isCommander = true;
         newCommander.isGunshi = false; // ★ここを書き足します：国主になる時、軍師のバッジを外します
         
+        // ★追加：新国主が派閥に所属している場合、同じ派閥の武将を移動先に集める
+        if (newCommander.factionId !== 0) {
+            // 同じ大名家で、活動中で、同じ派閥で、大名・国主・城主・軍師ではない人を探します
+            const sameFactionBushos = this.game.bushos.filter(b => 
+                b.clan === clanId && 
+                b.status === 'active' && 
+                b.factionId === newCommander.factionId && 
+                !b.isDaimyo && 
+                !b.isCommander && 
+                !b.isCastellan && 
+                !b.isGunshi && 
+                b.id !== newCommander.id
+            );
+
+            // 見つかったお友達を順番に調べます
+            sameFactionBushos.forEach(b => {
+                const bCastle = this.game.getCastle(b.castleId);
+                // そのお友達が今いるお城が「直轄（軍団IDが0）」だったら、新国主のお城へお引越しさせます
+                if (bCastle && bCastle.legionId === 0) {
+                    this.game.affiliationSystem.moveCastle(b, baseCastle.id);
+                }
+            });
+        }
+
         // 対象城の軍団変更
         targetCastles.forEach(c => {
             c.legionId = newLegionNo;
