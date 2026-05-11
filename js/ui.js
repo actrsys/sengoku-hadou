@@ -710,6 +710,7 @@ class UIManager {
             footer = modal.querySelector('.modal-footer');
         }
 
+        const choicesContainer = document.getElementById('dialog-choices-container');
         const modalContent = modal.querySelector('.modal-content');
 
         // 前回のイベント設定が残っていたら一旦消しておきます
@@ -722,6 +723,7 @@ class UIManager {
 
         // --- 根本改修：フッターのボタンを動的に生成し、何個でも並べられるようにします ---
         if (footer) footer.innerHTML = ''; 
+        if (choicesContainer) choicesContainer.classList.add('hidden');
 
         // イベントモード専用のクリック操作
         this._currentEventClickHandler = (e) => {
@@ -739,7 +741,7 @@ class UIManager {
         };
 
         const isEventMode = dialog.customOpts && dialog.customOpts.isEvent;
-        
+
         if (dialog.customOpts && dialog.customOpts.choices) {
             // 選択肢がある場合：指定された数だけボタンを並べます
             if (isEventMode) {
@@ -748,62 +750,40 @@ class UIManager {
             } else {
                 modal.classList.remove('event-dialog-modal');
             }
-            
-            let interviewBox = modal.querySelector('.interview-choices-box');
-            if (!interviewBox) {
-                interviewBox = document.createElement('div');
-                interviewBox.className = 'interview-choices-box hidden';
-                // いつものメッセージウィンドウ（modalContent）の直下に別の箱として配置します
-                modalContent.parentNode.insertBefore(interviewBox, modalContent.nextSibling);
-            }
-            interviewBox.innerHTML = ''; // 中身をリセット
+            if (footer) {
+                footer.classList.remove('hidden');
+                footer.style.justifyContent = 'center';
 
-            if (dialog.customOpts.isInterview) {
-                // 面談時は新しい箱を表示し、いつものフッターは隠します
-                interviewBox.classList.remove('hidden');
-                if (footer) footer.classList.add('hidden');
-            } else {
-                // 面談以外の時は新しい箱を隠し、いつものフッターを表示します
-                interviewBox.classList.add('hidden');
-                if (footer) footer.classList.remove('hidden');
-            }
+                dialog.customOpts.choices.forEach((choice, index) => {
+                    const btn = document.createElement('button');
+                    // ★追加：最初の選択肢を「okBtn」として扱えるようにお名前シールを貼ります
+                    if (index === 0) btn.id = 'dialog-btn-ok';
 
-            dialog.customOpts.choices.forEach((choice, index) => {
-                const btn = document.createElement('button');
-                // ★追加：最初の選択肢を「okBtn」として扱えるようにお名前シールを貼ります
-                if (index === 0) btn.id = 'dialog-btn-ok';
-
-                // 3色ボタン（btn-primary, btn-danger, btn-secondary）を適用できるようにします
-                if (dialog.customOpts.isInterview) {
-                    btn.className = 'interview-choice-btn';
-                } else {
+                    // 3色ボタン（btn-primary, btn-danger, btn-secondary）を適用できるようにします
                     btn.className = choice.className || 'btn-secondary';
-                }
-                btn.textContent = choice.label;
-                
-                // ★追加：ボタンを押せない状態（disabled）にする指示を読み取ります！
-                if (choice.disabled) {
-                    btn.disabled = true;
-                    btn.classList.add('disabled');
-                }
-                
-                btn.onclick = (e) => {
-                    e.stopPropagation();
-                    // ★修正：選択肢を押した時に、必ずこのウィンドウを閉じてから次の処理に進むようにします
-                    cleanupAndNext(choice.onClick);
-                };
+                    btn.textContent = choice.label;
+                    
+                    // ★追加：ボタンを押せない状態（disabled）にする指示を読み取ります！
+                    if (choice.disabled) {
+                        btn.disabled = true;
+                        btn.classList.add('disabled'); // 見た目もグレーアウトさせます
+                    }
 
-                // ★追加先を「いつものフッター」か「面談用の別の箱」かで分けます
-                if (dialog.customOpts.isInterview) {
-                    interviewBox.appendChild(btn);
-                } else {
-                    if (footer) footer.appendChild(btn);
-                }
-            });
+                    btn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (window.AudioManager) {
+                            if (choice.label === "戻る" || choice.label === "いいえ") window.AudioManager.playSE('cancel.ogg');
+                            else window.AudioManager.playSE('decision.ogg');
+                        }
+                        modal.classList.remove('event-choices-active');
+                        cleanupAndNext(choice.onClick);
+                    };
+                    footer.appendChild(btn);
+                });
+            }
         } else if (isEventMode) {
             // 選択肢のないイベント：フッターを隠して画面クリックで進行
             modal.classList.add('event-dialog-modal');
-            modal.classList.remove('interview-dialog-modal');
             if (footer) footer.classList.add('hidden');
             if (modalContent) {
                 modalContent.style.cursor = 'pointer';
@@ -812,7 +792,6 @@ class UIManager {
         } else {
             // 通常のダイアログ：はい/いいえ、または閉じる
             modal.classList.remove('event-dialog-modal');
-            modal.classList.remove('interview-dialog-modal');
             if (footer) {
                 footer.classList.remove('hidden');
                 footer.style.justifyContent = 'center';
@@ -1981,13 +1960,12 @@ class UIManager {
                 { label: "戻る", onClick: () => { this.reopenInterviewSelector(); } }
             ];
         }
-        
+
         // 新しく作った「選択肢（choices）」の機能を指定して、いつものダイアログを呼び出します
         this.showDialog(msg, false, null, null, {
             leftFace: busho.faceIcon,
             leftName: busho.name,
-            choices: choices,
-            isInterview: true
+            choices: choices
         });
     }
     
