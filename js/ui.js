@@ -642,6 +642,17 @@ class UIManager {
                     faceEl.innerHTML = '';
                 }
             }
+
+            if (nameEl) {
+                if (nameText) {
+                    nameEl.textContent = nameText;
+                    nameEl.classList.remove('hidden');
+                    hasContent = true;
+                } else {
+                    nameEl.textContent = '';
+                    nameEl.classList.add('hidden');
+                }
+            }
             
             // どちらか一方しかいない場合は、いない方のスペースを消して詰め、メッセージを広くします
             if (faceEl && faceEl.parentElement) {
