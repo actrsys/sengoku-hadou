@@ -2456,7 +2456,8 @@ window.GameEvents.push({
 
         const sponsorName = sponsorClan ? sponsorClan.name : "擁立勢力";
         const itamiLordName = targetLord.name.replace('|', '');
-        const castleNameStr = targetLord.isCommander ? "軍団" : mainCastle.name;
+        const miyoshiClan = game.clans.find(c => c.id === miyoshiClanId);
+        const miyoshiClanName = miyoshiClan ? miyoshiClan.name : "三好家";
         
         // 対象となる城の、元の城主（出席番号）をそれぞれ記録しておきます
         const originalCastellans = {};
@@ -2547,7 +2548,7 @@ window.GameEvents.push({
         });
 
         // ⑦ 画面に何が起きたかメッセージを出してお知らせします
-        const msg = `\n${castleNameStr}の${itamiLordName}が${sponsorName}の上洛に同調し臣従しました！`;
+        const msg = `\n${miyoshiClanName}の${itamiLordName}が${sponsorName}の上洛に同調し臣従しました！`;
         
         game.ui.log(`【イベント】${msg}`);
         await game.ui.showDialogAsync(msg, false, 0);
