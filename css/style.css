@@ -2123,9 +2123,11 @@ body:not(.is-pc) .responsive-army-stats {
 body:not(.is-pc) .responsive-army-stats .stat-row-group {
     gap: 2px !important;
 }
-body:not(.is-pc) .responsive-army-stats .stat-row-group .stat-row {
+/* ★変更：すべての行で、内側の余白を同じ「4px」にして左右の端をピタッと揃える魔法 */
+body:not(.is-pc) .responsive-army-stats .stat-row {
     padding: 2px 4px !important;
 }
+/* ★変更：文字が広がりすぎるのを防ぐ特殊な魔法は、「訓練」や「士気」のグループの中だけに限定します */
 body:not(.is-pc) .responsive-army-stats .stat-row-group .stat-row > :last-child {
     letter-spacing: -1px;
     transform: scaleX(0.9);
