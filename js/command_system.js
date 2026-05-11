@@ -2066,7 +2066,8 @@ class CommandSystem {
             leftName: busho.name,
             choices: [
                 { label: "戻る", onClick: () => { this.game.ui.reopenInterviewModal(busho); } }
-            ]
+            ],
+            isInterview: true // ★追加：面談の目印です！
         });
     }
 
@@ -2082,7 +2083,8 @@ class CommandSystem {
                 leftName: interviewer.name,
                 choices: [
                     { label: "戻る", onClick: () => { this.game.ui.reopenInterviewModal(interviewer); } }
-                ]
+                ],
+                isInterview: true // ★追加：面談の目印です！
             });
             return;
         }
@@ -2141,7 +2143,8 @@ class CommandSystem {
             leftName: interviewer.name,
             choices: [
                 { label: "戻る", onClick: () => { this.game.ui.reopenInterviewModal(interviewer); } }
-            ]
+            ],
+            isInterview: true // ★追加：面談の目印です！
         });
     }
     

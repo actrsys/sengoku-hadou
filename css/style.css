@@ -822,6 +822,49 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     transform: translateY(1px) !important;
 }
 
+/* ==========================================
+   ★ 面談用の特別なボタンのデザイン
+   ========================================================================== */
+.btn-interview-choice {
+    display: flex;
+    align-items: center;
+    background: rgba(30, 30, 30, 0.85); /* 渋い半透明の黒色 */
+    border: 1px solid rgba(212, 175, 55, 0.6); /* 金色っぽい枠線 */
+    color: #eee;
+    padding: 8px 16px;
+    border-radius: 20px; /* 左右を完全に丸くします（カプセル型） */
+    cursor: pointer;
+    text-align: left; /* 文字を左寄せにします */
+    font-size: 0.95rem; /* 他のメッセージに合わせた小さめの文字サイズ */
+    font-family: inherit;
+    transition: all 0.2s;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.btn-interview-choice:hover, .btn-interview-choice:active {
+    background: rgba(60, 60, 60, 0.95);
+    border-color: rgba(212, 175, 55, 1);
+}
+
+/* 左端の「立体的な二重丸」のアイコン */
+.interview-choice-icon {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%; /* まん丸にします */
+    /* 外側の丸と内側の丸をグラデーションで立体的に描画します */
+    background: radial-gradient(circle, #d4af37 30%, transparent 35%, transparent 60%, #d4af37 65%);
+    box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.6), 1px 1px 2px rgba(0,0,0,0.8);
+    margin-right: 12px;
+    flex-shrink: 0;
+}
+
+.interview-choice-text {
+    flex-grow: 1;
+    line-height: 1.3;
+}
+
 /* ランクバッジ・ゲージ類 */
 .grade-container { 
     display: inline-flex; 
