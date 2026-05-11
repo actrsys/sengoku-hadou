@@ -866,6 +866,12 @@ class UIManager {
 
         // ★ここから追加：代わりに、右クリック（スマホなら長押し）で「命令終了」を押したことにする魔法です！
         document.addEventListener('contextmenu', (e) => {
+            // ★追加：野戦中は右クリックで「命令終了」を誤爆させないようにガードします！
+            if (this.game && this.game.fieldWarManager && this.game.fieldWarManager.active) {
+                e.preventDefault();
+                return;
+            }
+
             // 画面の中に「命令終了」のボタンがあるか”すべて”探して集めます
             const finishBtns = document.querySelectorAll('.cmd-btn.finish');
             

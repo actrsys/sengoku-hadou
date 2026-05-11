@@ -481,6 +481,11 @@ class FieldWarManager {
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
 
         if (isPlayerInvolved) {
+            // ★追加：野戦が始まる時に、平時のコマンドリストを綺麗にお掃除して非表示にします！
+            if (this.game.ui && typeof this.game.ui.clearCommandMenu === 'function') {
+                this.game.ui.clearCommandMenu();
+            }
+
             this.initUI();
             this.updateMap();
             this.updateStatus();
