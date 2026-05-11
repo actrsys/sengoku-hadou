@@ -2227,9 +2227,18 @@ Object.assign(WarManager.prototype, {
             }
         }
 
+        // 名前を3人までで省略する便利なお道具を作ります
+        const formatNames = (names) => {
+            if (names.length <= 3) {
+                return names.join('、');
+            } else {
+                return `${names[0]} 以下${names.length - 1}名`;
+            }
+        };
+
         let msg = "";
-        if (hiredNames.length > 0) msg += `${hiredNames.join('、')} を登用しました。\n`;
-        if (refusedNames.length > 0) msg += `${refusedNames.join('、')} には登用を断られました。`;
+        if (hiredNames.length > 0) msg += `${formatNames(hiredNames)} を登用しました。\n`;
+        if (refusedNames.length > 0) msg += `${formatNames(refusedNames)} には登用を断られました。`;
         if (msg === "") msg = "登用処理が完了しました。";
 
         this.game.ui.showDialog(msg, false, () => {
@@ -2292,9 +2301,20 @@ Object.assign(WarManager.prototype, {
             return;
         }
 
+        // 名前を3人までで省略する便利なお道具を作ります
+        const formatNames = (names) => {
+            if (names.length <= 3) {
+                return names.join('、');
+            } else {
+                return `${names[0]} 以下${names.length - 1}名`;
+            }
+        };
+
+        const displayName = formatNames(targetNames);
+
         // 確認のメッセージダイアログを出します（true にして、２つの選択肢が出るようにします）
         // オプション機能を使って、ボタンの文字と色を直接指定します
-        this.game.ui.showDialog(`${targetNames.join('、')} を本当に処断してよろしいですか？`, true, 
+        this.game.ui.showDialog(`${displayName} を本当に処断してよろしいですか？`, true, 
             () => { 
                 // 「処断する」を選んだ時の処理：ここで初めて処断予定リストに移します
                 for (let id of selectedIds) {
@@ -2305,7 +2325,7 @@ Object.assign(WarManager.prototype, {
                     }
                 }
                 // そして、処断完了のメッセージを出します
-                this.game.ui.showDialog(`${targetNames.join('、')} を処断しました。`, false, () => {
+                this.game.ui.showDialog(`${displayName} を処断しました。`, false, () => {
                     this.openKillSelector();
                 });
             },
