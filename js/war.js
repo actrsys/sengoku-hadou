@@ -761,6 +761,30 @@ class WarManager {
         const executeNext = () => {
              // ★修正：メッセージを読み終わった後、防御が0になっていたら「残りの予定を全て消し飛ばして」すぐに勝敗をつける魔法です
              const doNext = () => {
+                 // ★追加：プレイヤーが操作する部隊がいなくなったかチェックし、いなければAI攻城戦へ移行（画面を隠す）
+                 if (s.isPlayerInvolved) {
+                     let stillInvolved = false;
+                     const checkRoles = [
+                         { turn: 'attacker', key: 'attacker' },
+                         { turn: 'attacker_self_reinf', key: 'selfReinforcement' },
+                         { turn: 'attacker_ally_reinf', key: 'reinforcement' },
+                         { turn: 'defender', key: 'defender' },
+                         { turn: 'defender_self_reinf', key: 'defSelfReinforcement' },
+                         { turn: 'defender_ally_reinf', key: 'defReinforcement' }
+                     ];
+                     for (let r of checkRoles) {
+                         if (s[r.key] && s[r.key].soldiers > 0) {
+                             if (this.checkIsMyTurn({ ...s, turn: r.turn })) stillInvolved = true;
+                         }
+                     }
+                     if (!stillInvolved) {
+                         s.isPlayerInvolved = false;
+                         if (this.game && this.game.ui && typeof this.game.ui.setWarModalVisible === 'function') {
+                             this.game.ui.setWarModalVisible(false);
+                         }
+                     }
+                 }
+
                  if (s.defender.defense <= 0) {
                      // ★追加：城壁が壊れて落ちた場合、少しだけ城壁（防御力）を修復してあげます！
                      s.defender.defense += 150;

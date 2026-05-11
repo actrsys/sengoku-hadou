@@ -1659,6 +1659,9 @@ class FieldWarManager {
                 this.nextPhaseTurn();
             }, 500);
         } else {
+            // ★追加: プレイヤーが操作する部隊がいなくなったら、AI野戦へ移行するため画面を隠す
+            const modal = document.getElementById('field-war-modal');
+            if (modal) modal.classList.add('hidden');
             this.nextPhaseTurn();
         }
     }
@@ -2441,13 +2444,19 @@ class FieldWarManager {
         attacker.hasActionDone = true;
         this.state = 'IDLE'; // ★シールドを解除して操作できるように戻します
         
-        if (isPlayerInvolved) {
+        // ★追加: この戦闘の結果、プレイヤーが操作する部隊が全滅していなくなったかチェック
+        const stillPlayerInvolved = this.units.some(u => u.isPlayer);
+
+        if (stillPlayerInvolved) {
             this.updateMap();
             this.updateStatus();
             setTimeout(() => {
                 this.nextPhaseTurn();
             }, 800);
         } else {
+            // ★プレイヤーがいなくなったら画面を隠してAI野戦に移行
+            const modal = document.getElementById('field-war-modal');
+            if (modal && isPlayerInvolved) modal.classList.add('hidden');
             this.nextPhaseTurn();
         }
     }
