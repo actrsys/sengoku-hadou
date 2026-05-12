@@ -1586,6 +1586,11 @@ class FieldWarManager {
                 window.AudioManager.restoreMemorizedBgm();
             }
             
+            // ★修正: 大元の戦争データにも「プレイヤーはもういない」とメモを残します！
+            if (this.warState) {
+                this.warState.isPlayerInvolved = false;
+            }
+            
             this.nextPhaseTurn();
         }
     }
@@ -2492,6 +2497,11 @@ class FieldWarManager {
                 // ★追加: プレイヤーの部隊が全滅していなくなった瞬間に、BGMを平時に戻す！
                 if (window.AudioManager) {
                     window.AudioManager.restoreMemorizedBgm();
+                }
+                
+                // ★修正: 大元の戦争データにも「プレイヤーはもういない」とメモを残します！
+                if (this.warState) {
+                    this.warState.isPlayerInvolved = false;
                 }
             }
             this.nextPhaseTurn();
