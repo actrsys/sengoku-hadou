@@ -1930,7 +1930,8 @@ class FieldWarManager {
         this.warState.attacker.guns = atkGuns + atkMainWaitGuns;
         if (this.groupStats['atk_main']) {
             this.warState.attacker.rice = this.groupStats['atk_main'].rice;
-            this.warState.attacker.morale = this.groupStats['atk_main'].morale; 
+            this.warState.attacker.morale = this.groupStats['atk_main'].morale;
+            this.warState.attacker.training = this.groupStats['atk_main'].training; // ★追加：訓練度を大元のデータへ書き戻す
         }
 
         if (!this.warState.fieldDeadSoldiers) {
@@ -1947,6 +1948,7 @@ class FieldWarManager {
             if (this.groupStats['atk_ally']) {
                 this.warState.reinforcement.rice = this.groupStats['atk_ally'].rice;
                 this.warState.reinforcement.morale = this.groupStats['atk_ally'].morale;
+                this.warState.reinforcement.training = this.groupStats['atk_ally'].training; // ★追加：訓練度を大元のデータへ書き戻す
             }
         }
 
@@ -1958,6 +1960,7 @@ class FieldWarManager {
             if (this.groupStats['atk_self']) {
                 this.warState.selfReinforcement.rice = this.groupStats['atk_self'].rice;
                 this.warState.selfReinforcement.morale = this.groupStats['atk_self'].morale;
+                this.warState.selfReinforcement.training = this.groupStats['atk_self'].training; // ★追加：訓練度を大元のデータへ書き戻す
             }
         }
 
@@ -1966,7 +1969,8 @@ class FieldWarManager {
         this.warState.defender.fieldGuns = defGuns + defMainWaitGuns;
         if (this.groupStats['def_main']) {
             this.warState.defFieldRice = this.groupStats['def_main'].rice;
-            this.warState.defender.morale = this.groupStats['def_main'].morale; 
+            this.warState.defender.morale = this.groupStats['def_main'].morale;
+            this.warState.defender.training = this.groupStats['def_main'].training; // ★追加：訓練度を大元のデータへ書き戻す
         }
 
         if (this.warState.defReinforcement) {
@@ -1977,6 +1981,7 @@ class FieldWarManager {
             if (this.groupStats['def_ally']) {
                 this.warState.defReinforcement.rice = this.groupStats['def_ally'].rice;
                 this.warState.defReinforcement.morale = this.groupStats['def_ally'].morale;
+                this.warState.defReinforcement.training = this.groupStats['def_ally'].training; // ★追加：訓練度を大元のデータへ書き戻す
             }
         }
 
@@ -1988,6 +1993,7 @@ class FieldWarManager {
             if (this.groupStats['def_self']) {
                 this.warState.defSelfReinforcement.rice = this.groupStats['def_self'].rice;
                 this.warState.defSelfReinforcement.morale = this.groupStats['def_self'].morale;
+                this.warState.defSelfReinforcement.training = this.groupStats['def_self'].training; // ★追加：訓練度を大元のデータへ書き戻す
             }
         }
         
