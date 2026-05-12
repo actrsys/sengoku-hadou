@@ -933,6 +933,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 
 /* 顔グラフィックの列 */
 .dialog-face-column {
+    position: relative; /* 中に浮かせた名前が迷子にならないよう、ここを基準（イカリ）に設定します */
     display: flex;
     flex-direction: column;
     align-items: center;
