@@ -212,17 +212,17 @@
     filter: sepia(0.4) saturate(1.5) hue-rotate(-15deg) brightness(0.85);
 }
 
-/* 夜の表現：全体を青暗くして視界を悪くします */
+/* 夜の表現：視認性を確保しつつ、ほんのり青みがかった深い夜の色にします */
 #fw-main-area.is-night #fw-map {
-    filter: brightness(0.45) contrast(1.2) sepia(0.3) hue-rotate(180deg);
+    filter: brightness(0.65) contrast(1.1) saturate(0.6) hue-rotate(195deg) sepia(0.1);
 }
 
-/* 夕方で雨の時の表現：夕方と雨を混ぜた色にします */
+/* 夕方で雨の時の表現：夕方のオレンジと雨のグレーを混ぜます */
 #fw-main-area.is-evening.is-raining #fw-map {
     filter: sepia(0.3) saturate(1.2) hue-rotate(-10deg) brightness(0.65) contrast(1.1);
 }
 
-/* 夜で雨の時の表現：夜と雨が重なり、一番暗くて見えづらくなります */
+/* 夜で雨の時の表現：夜の青に雨の暗さを加えますが、部隊が見える明るさを維持します */
 #fw-main-area.is-night.is-raining #fw-map {
-    filter: brightness(0.3) contrast(1.1) sepia(0.3) hue-rotate(180deg);
+    filter: brightness(0.55) contrast(1.1) saturate(0.5) hue-rotate(195deg) sepia(0.1);
 }
