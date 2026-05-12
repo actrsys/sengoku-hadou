@@ -401,12 +401,12 @@ Object.assign(WarManager.prototype, {
                 let targetInfoStr = "";
                 if (defCastle.isKunishu) {
                     const provName = defProvData ? defProvData.province : "不明な国";
-                    targetInfoStr = `${provName}の${defCastle.name}の攻略のため、\n`;
+                    targetInfoStr = `${provName}の${defCastle.name}の攻略のため、`;
                 } else if (defCastle.ownerClan === 0) {
                     const provName = defProvData ? defProvData.province : "不明な国";
-                    targetInfoStr = `${provName}の${defCastle.name}の攻略のため、\n`;
+                    targetInfoStr = `${provName}の${defCastle.name}の攻略のため、`;
                 } else {
-                    targetInfoStr = `${defDaimyoName}の${defCastle.name}の攻略のため、\n`;
+                    targetInfoStr = `${defDaimyoName}の${defCastle.name}の攻略のため、`;
                 }
                 
                 this.game.ui.hideAIGuardTemporarily();
@@ -541,7 +541,7 @@ Object.assign(WarManager.prototype, {
                                 
                                 document.getElementById('btn-intercept').onclick = async () => { 
                                     modal.classList.add('hidden'); 
-                                    await this.game.ui.showCutin(`迎撃のため、\n${defCastle.name}から打って出ます！`);
+                                    await this.game.ui.showCutin(`迎撃のため、${defCastle.name}から打って出ます！`);
                                     
                                     this.game.ui.openBushoSelector('def_intercept_deploy', defCastle.id, {
                                         onConfirm: (selectedBushoIds) => {
@@ -784,9 +784,9 @@ Object.assign(WarManager.prototype, {
                             const runFieldWarProcess = async () => {
                                 const guardName = (!defCastle.isKunishu && defCastle.ownerClan === 0) ? "土豪" : "侍大将";
                                 const defLeaderName = defBushos.length > 0 ? defBushos[0].name : guardName;
-                                let interceptMsg = `${defDaimyoName}の${defLeaderName}は、\n${defCastle.name}から打って出ました！`;
+                                let interceptMsg = `${defDaimyoName}の${defLeaderName}は、${defCastle.name}から打って出ました！`;
                                 if (defCastle.isKunishu) {
-                                    interceptMsg = `${defCastle.name}の${defLeaderName}は、\n迎撃のため打って出ました！`;
+                                    interceptMsg = `${defCastle.name}の${defLeaderName}は、迎撃のため打って出ました！`;
                                 }
                                 
                                 this.game.ui.log(interceptMsg.replace('\n', ''));
@@ -836,11 +836,11 @@ Object.assign(WarManager.prototype, {
                 const defLeaderName = (defBusho && defBusho.name) ? defBusho.name : guardName;
                 let siegeMsg = "";
                 let dName = defDaimyoName || "不明";
-                // ★諸勢力の場合のみ「防衛陣地」にします
+                // ★諸勢力の場合のみ「陣」にします
                 if (defCastle.isKunishu) {
-                    siegeMsg = `${defCastle.name}の${defLeaderName}は、\n防衛陣地に立て籠もりました！`;
+                    siegeMsg = `${defCastle.name}の${defLeaderName}は、陣に立て籠もりました！`;
                 } else {
-                    siegeMsg = `${dName}の${defLeaderName}は、\n${defCastle.name}に立て籠もりました！`;
+                    siegeMsg = `${dName}の${defLeaderName}は、${defCastle.name}に立て籠もりました！`;
                 }
                 
                 this.game.ui.log(siegeMsg.replace('\n', ''));
@@ -1425,7 +1425,7 @@ Object.assign(WarManager.prototype, {
                 const leaderName = s.atkBushos[0].name;
                 
                 if (attackerWon) {
-                    resultMsg = `${atkDaimyoName}の${leaderName}が、\n${s.defender.name}の鎮圧に成功しました！`;
+                    resultMsg = `${atkDaimyoName}の${leaderName}が、${s.defender.name}の鎮圧に成功しました！`;
                     this.game.ui.log(`【諸勢力制圧】${atkDaimyoName}の${leaderName}が、${s.defender.name}の鎮圧に成功しました！`);
                     if (kunishu) {
                         kunishu.isDestroyed = true;
@@ -1438,7 +1438,7 @@ Object.assign(WarManager.prototype, {
                         });
                     }
                 } else {
-                    resultMsg = `${atkDaimyoName}の${leaderName}は、\n${s.defender.name}の鎮圧に失敗しました……`;
+                    resultMsg = `${atkDaimyoName}の${leaderName}は、${s.defender.name}の鎮圧に失敗しました……`;
                     this.game.ui.log(`【諸勢力制圧】${atkDaimyoName}の${leaderName}は、${s.defender.name}の鎮圧に失敗しました……`);
                     
                     if (kunishu) {
@@ -1903,7 +1903,7 @@ Object.assign(WarManager.prototype, {
 
             this.game.ui.restoreAIGuardText(true);
 
-            if (this.state.isPlayerInvolved) this.game.ui.showDialog("合戦処理中にエラーが発生しましたが、\nゲームを継続します。", false, () => { this.game.finishTurn(); });
+            if (this.state.isPlayerInvolved) this.game.ui.showDialog("合戦処理中にエラーが発生しましたが、ゲームを継続します。", false, () => { this.game.finishTurn(); });
             else this.game.finishTurn();
         }
     },
@@ -2886,7 +2886,7 @@ Object.assign(WarManager.prototype, {
                 }
 
                 if (finalBushos.length === 0) {
-                    await this.game.ui.showDialogAsync("指揮官の不在により、\n我が軍の兵士は行方不明になりました……", false, 0);
+                    await this.game.ui.showDialogAsync("指揮官の不在により、我が軍の兵士は行方不明になりました……", false, 0);
                     this.game.ui.updatePanelHeader();
                     this.game.ui.renderCommandMenu();
                     onComplete(null);
