@@ -996,11 +996,14 @@ body:not(.is-pc) .dialog-face-column .sp-face-wrapper { width: 75px; height: 75p
 body:not(.is-pc) .dialog-name-label { font-size: 0.85rem; top: -16px; padding: 2px 10px; }
 body:not(.is-pc) #dialog-left-name { left: 3px; }
 
-/* PC版のときだけ、名前を絶対配置のまま下側の枠に重ねる設定です */
+/* PC版：名前を「下側の枠線上」かつ「中央」にピッタリ配置します */
 body.is-pc .dialog-name-label {
-    position: absolute; /* 絶対配置を維持して、枠線に重なるようにします */
-    top: auto;          /* 上側の固定位置を解除します */
-    bottom: -18px;      /* 下側の枠線に重なる位置に固定します */
+    position: absolute;
+    top: auto;
+    bottom: -18px;
+    /* 左右のズレを直し、枠の真ん中に合わせる設定 */
+    left: 50%;
+    transform: translateX(-50%);
 }
 /* 戦闘中の思考メッセージ用 */
 /* 各モーダルのサイズ・レイアウト調整 */

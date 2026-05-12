@@ -651,11 +651,7 @@ class UIManager {
                 }
             }
             if (faceEl && faceEl.parentElement) {
-                if (hasContent) {
-                    faceEl.parentElement.style.display = 'flex';
-                } else {
-                    faceEl.parentElement.style.display = 'none';
-                }
+                faceEl.parentElement.style.display = hasContent ? 'flex' : 'none';
             }
         };
 
