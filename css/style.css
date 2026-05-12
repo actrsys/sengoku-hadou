@@ -996,14 +996,11 @@ body:not(.is-pc) .dialog-face-column .sp-face-wrapper { width: 75px; height: 75p
 body:not(.is-pc) .dialog-name-label { font-size: 0.85rem; top: -16px; padding: 2px 10px; }
 body:not(.is-pc) #dialog-left-name { left: 3px; }
 
-/* PC版のときだけ、名前を顔の下に表示する魔法です */
+/* PC版のときだけ、名前を絶対配置のまま下側の枠に重ねる設定です */
 body.is-pc .dialog-name-label {
-    position: static; /* 枠に重ねるのをやめて、普通の並び方にします */
-    margin-top: 5px; /* 顔画像との間に少しだけ隙間を空けます */
-    order: 2; /* 順番を操作して、名前を顔より下側に表示させます */
-}
-body.is-pc .dialog-face-space {
-    order: 1; /* 順番を操作して、顔画像を上側に表示させます */
+    position: absolute; /* 絶対配置を維持して、枠線に重なるようにします */
+    top: auto;          /* 上側の固定位置を解除します */
+    bottom: -18px;      /* 下側の枠線に重なる位置に固定します */
 }
 /* 戦闘中の思考メッセージ用 */
 /* 各モーダルのサイズ・レイアウト調整 */

@@ -630,7 +630,7 @@ class UIManager {
             rightName = null;
         }
         
-        // 顔画像のサイズや名前の位置はCSSにお任せするため、余計なスタイル指定を削除します
+        // 顔画像の枠をCSS側の指定（正方形）に任せるため、プログラム側のスタイル指定を削除します
         const setFaceAndName = (faceEl, nameEl, faceIcon, nameText) => {
             let hasContent = false;
             if (faceEl) {
@@ -650,8 +650,6 @@ class UIManager {
                     nameEl.classList.add('hidden');
                 }
             }
-            
-            // どちらか一方しかいない場合は、いない方のスペースを消して詰め、メッセージを広くします
             if (faceEl && faceEl.parentElement) {
                 if (hasContent) {
                     faceEl.parentElement.style.display = 'flex';
