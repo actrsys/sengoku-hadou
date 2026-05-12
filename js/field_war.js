@@ -2811,6 +2811,10 @@ class FieldWarManager {
                 if (d < allyMinDistToTarget) allyMinDistToTarget = d;
             });
 
+            // ★追加: 自軍の総大将を探しておく（守備側のロジックで使います）
+            let myGeneral = allies.find(a => a.isGeneral);
+            if (unit.isGeneral) myGeneral = unit;
+
             let aStarPath = this.findAStarPath(unit, targetEnemy.x, targetEnemy.y);
             let aStarIdealHexes = {};
             if (aStarPath && !isFleeing) {
@@ -2844,8 +2848,10 @@ class FieldWarManager {
                     score -= 20; // 川の上で止まると被ダメージが増えるので極力避ける！
                 } else if (terrain_t === 'mountain') {
                     score += 15; // 山は防御力が上がるので、陣取るには良い場所！
+                    if (!unit.isAttacker) score += 40; // ★守備側なら山はさらに大好き！
                 } else if (terrain_t === 'forest') {
                     score += 10; // 森も防御力が少し上がるので好き
+                    if (!unit.isAttacker) score += 20; // ★守備側なら森もさらに好き！
                 }
 
                 if (isFleeing) {
@@ -2859,15 +2865,102 @@ class FieldWarManager {
                         score -= 9999;
                     }
                 } else {
-                    if (aStarIdealHexes[`${nx},${ny}`]) score += 30; 
+                    if (aStarIdealHexes[`${nx},${ny}`]) {
+                        // ★守備側は敵に突っ込むAStarパスへの執着を薄くします
+                        if (!unit.isAttacker) score += 10;
+                        else score += 30;
+                    }
 
                     if (unit.troopType === 'teppo') {
-                        if (dToEnemy === 2) score += 100;
-                        else if (dToEnemy === 3) score += 80;
-                        else if (dToEnemy === 1) score -= 100;
-                        else score -= dToEnemy * 10;
+                        // 雨や夜で視界や火縄が使いにくい時
+                        if (this.weather === 'rain' || this.isNightTurn()) {
+                            if (dToEnemy === 1) {
+                                score -= 100; // わざわざ隣接しに行くのは危険なのでマイナス
+                            } else {
+                                score += dToEnemy * 20; // 敵から離れれば離れるほど安心（スコアプラス）
+                            }
+                        } else {
+                            // 盾になってくれる前衛部隊を探します
+                            const vanguardAllies = allies.filter(a => a.troopType !== 'teppo' && !a.isGeneral);
+                            
+                            if (vanguardAllies.length > 0) {
+                                // 前衛がいる時は、距離3〜4から安全に撃ちたい
+                                if (dToEnemy === 3) score += 100;
+                                else if (dToEnemy === 4) score += 90;
+                                else if (dToEnemy === 2) score += 30; // 近すぎるので少し減点
+                                else if (dToEnemy === 1) score -= 100; // 隣接はダメ！
+                                else {
+                                    // ★守備側なら、遠い敵へ無理に近づかず待機を良しとする
+                                    if (!unit.isAttacker && dToEnemy > 4) score += 20;
+                                    else score -= dToEnemy * 10;
+                                }
+                                
+                                // 前衛の近く（後ろ）をキープするようにします
+                                let minDistToVanguard = 999;
+                                vanguardAllies.forEach(v => {
+                                    let d = this.getDistance(nx, ny, v.x, v.y);
+                                    if (d < minDistToVanguard) minDistToVanguard = d;
+                                });
+                                // 前衛から距離1〜2の場所にいると高評価
+                                if (minDistToVanguard === 1 || minDistToVanguard === 2) score += 40;
+                                else score -= minDistToVanguard * 10;
+                            } else {
+                                // ★修正：前衛がいない時も、できる限り距離3〜4を維持するように！
+                                if (dToEnemy === 3) score += 100;
+                                else if (dToEnemy === 4) score += 90;
+                                else if (dToEnemy === 2) score += 30;
+                                else if (dToEnemy === 1) score -= 100;
+                                else {
+                                    if (!unit.isAttacker && dToEnemy > 4) score += 20;
+                                    else score -= dToEnemy * 10;
+                                }
+                            }
+                        }
+                    } else if (unit.troopType === 'kiba') {
+                        // ★騎馬隊専用：回り込み＆遊撃ロジック
+                        // 1. 基本的な距離ペナルティを軽減（足軽より遠くまで走り回るのを許容する）
+                        score -= dToEnemy * 8;
+
+                        // 2. 回り込み評価：敵の背後や側面のセクター（方向）にいるマスほど高得点
+                        // 敵から見て、そのマスがどの方向にあるかを計算します
+                        let dirFromTargetToHex = this.getDirection(targetEnemy.x, targetEnemy.y, nx, ny);
+                        let sectorDiff = Math.abs(targetEnemy.direction - dirFromTargetToHex);
+                        sectorDiff = Math.min(sectorDiff, 6 - sectorDiff);
+
+                        // sectorDiff: 0=真後ろ, 1=斜め後ろ, 2=真横, 3=正面
+                        if (sectorDiff === 0) score += 100; // 真後ろセクターを最優先で目指す
+                        else if (sectorDiff === 1) score += 60;  // 斜め後ろも好む
+                        else if (sectorDiff === 2) score += 20;  // 横も悪くない
+
+                        // 3. 守備側でも騎馬は「待ち」すぎず、遊撃として動く
+                        if (!unit.isAttacker) {
+                            score += 30; // 待機よりも移動すること自体にボーナス
+                            if (dToEnemy <= 8) score += 40; // 数ターンで届く距離なら積極的に寄る
+                        }
+
+                        // 4. 突撃準備：隣接する場合は「敵の正面以外」を強く好む
+                        if (dToEnemy === 1) {
+                            let atkDir = this.getDirection(nx, ny, targetEnemy.x, targetEnemy.y);
+                            let oppositeAtkDir = (atkDir + 3) % 6;
+                            let hitAngle = Math.abs(targetEnemy.direction - oppositeAtkDir);
+                            hitAngle = Math.min(hitAngle, 6 - hitAngle);
+
+                            if (hitAngle === 3) score += 150; // 背後からの突撃ポジション！
+                            else if (hitAngle === 2) score += 80; // 側面！
+                            else score -= 50; // 正面衝突は騎馬の損害も増えるので避ける
+                        }
+
                     } else {
-                        score -= dToEnemy * 20; 
+                        // ★足軽の動き
+                        if (!unit.isAttacker) {
+                            // 守備側は敵が射程に入るのをじっと待ちます（自分から突っ込まない）
+                            if (dToEnemy === 1) score += 100; // 目の前に来たら最高！殴る！
+                            else if (dToEnemy === 2) score += 40; // すぐそこまで来てる
+                            else score -= dToEnemy * 5; // 遠くても焦らない
+                        } else {
+                            score -= dToEnemy * 20; 
+                        }
+
                         const friendlyTeppos = allies.filter(a => a.troopType === 'teppo');
                         friendlyTeppos.forEach(teppo => {
                             let dToTeppo = this.getDistance(nx, ny, teppo.x, teppo.y);
@@ -2876,6 +2969,16 @@ class FieldWarManager {
                                 score += 50; 
                             }
                         });
+                    }
+
+                    // ★追加: 守備側で総大将ではない場合、総大将の近く（1〜3マス）に陣取る
+                    if (!unit.isAttacker && !unit.isGeneral && myGeneral) {
+                        let dToGen = this.getDistance(nx, ny, myGeneral.x, myGeneral.y);
+                        if (dToGen >= 1 && dToGen <= 3) {
+                            score += 50; // 総大将の近くは安心
+                        } else if (dToGen > 3) {
+                            score -= (dToGen - 3) * 10; // 離れると不安になるので減点
+                        }
                     }
 
                     // 性格による前進意欲の調整
