@@ -850,15 +850,14 @@ class FieldWarManager {
         
         // ★追加：天候と時間帯の文字を更新します
         const weatherEl = document.getElementById('fw-weather-info');
-        const mod = this.turnCount % 10;
         let timeStr = "";
         let timeColor = "";
         
-        // 下1桁が4なら夕方、5〜8なら夜と判定します
-        if (mod === 4) {
+        // ★修正：新しく作った共通の判定機能を使います！
+        if (this.isEveningTurn()) {
             timeStr = " (夕方)";
             timeColor = "#ff8a65"; // 夕焼け色
-        } else if (mod >= 5 && mod <= 8) {
+        } else if (this.isNightTurn()) {
             timeStr = " (夜)";
             timeColor = "#b39ddb"; // 夜の紫色
         }
@@ -868,7 +867,7 @@ class FieldWarManager {
                 weatherEl.innerText = '☔ 雨' + timeStr;
                 weatherEl.style.color = timeColor || '#64b5f6';
             } else {
-                let sunIcon = (mod >= 5 && mod <= 8) ? '🌙' : '☀';
+                let sunIcon = this.isNightTurn() ? '🌙' : '☀';
                 weatherEl.innerText = `${sunIcon} 晴れ${timeStr}`;
                 weatherEl.style.color = timeColor || '#ffb300';
             }
@@ -878,9 +877,9 @@ class FieldWarManager {
         const mainArea = document.getElementById('fw-main-area');
         if (mainArea) {
             mainArea.classList.remove('is-evening', 'is-night');
-            if (mod === 4) {
+            if (this.isEveningTurn()) {
                 mainArea.classList.add('is-evening');
-            } else if (mod >= 5 && mod <= 8) {
+            } else if (this.isNightTurn()) {
                 mainArea.classList.add('is-night');
             }
         }
@@ -994,9 +993,7 @@ class FieldWarManager {
             let maxRange = (this.weather === 'rain') ? 1 : 4;
             
             // ★修正: 夜の時は射程をマイナス2します（雨の時はすでに1なので影響しません）
-            const mod = this.turnCount % 10;
-            const isNight = (mod >= 5 && mod <= 8);
-            if (this.weather !== 'rain' && isNight) {
+            if (this.weather !== 'rain' && this.isNightTurn()) {
                 maxRange -= 2;
             }
 
@@ -1428,6 +1425,18 @@ class FieldWarManager {
         return this.turnQueue[0].isPlayer;
     }
 
+    // ★追加：今のターンが「夕方」かどうかを判定する共通の仕組みです
+    isEveningTurn() {
+        const mod = this.turnCount % 10;
+        return mod === 5; // 下一桁が5なら夕方
+    }
+
+    // ★追加：今のターンが「夜」かどうかを判定する共通の仕組みです
+    isNightTurn() {
+        const mod = this.turnCount % 10;
+        return mod >= 6 && mod <= 8; // 下一桁が6〜8なら夜
+    }
+
     // ★追加：天候を判定して切り替える魔法です
     updateWeather() {
         if (!this.game) return;
@@ -1482,12 +1491,10 @@ class FieldWarManager {
             u.hasMoved = false; // ★ ターン開始時に移動フラグをリセット
             
             // 雨と夜の判定をして行動力を減らします（最低1は確保します）
-            const mod = this.turnCount % 10;
-            const isNight = (mod >= 5 && mod <= 8);
             let penalty = 0;
             
             if (this.weather === 'rain') penalty += 1;
-            if (isNight) penalty += 1;
+            if (this.isNightTurn()) penalty += 1;
 
             // ★追加：士気が80以上なら、足軽と騎馬の行動力を+1するボーナス
             let moraleBonus = 0;
@@ -2329,8 +2336,7 @@ class FieldWarManager {
         }
 
         // ターン数から夜かどうかを判定します
-        const mod = this.turnCount % 10;
-        const isNight = (mod >= 5 && mod <= 8);
+        const isNight = this.isNightTurn(); // ★修正：共通の仕組みから答えをもらいます
 
         let dirMult = 1.0;
         if (defToAtkDiff === 3) {
