@@ -990,8 +990,16 @@ class FieldWarManager {
 
         if (attacker.troopType === 'teppo') {
             if (attacker.hasMoved) return false; // 鉄砲は移動後攻撃不可
-            // ★追加: 雨の時は遠距離攻撃ができず、射程が1になります
-            let maxRange = (this.weather === 'rain') ? 1 : 3;
+            // ★修正: 雨の時は遠距離攻撃ができず、射程が1になります。晴れの通常時は4になります。
+            let maxRange = (this.weather === 'rain') ? 1 : 4;
+            
+            // ★修正: 夜の時は射程をマイナス2します（雨の時はすでに1なので影響しません）
+            const mod = this.turnCount % 10;
+            const isNight = (mod >= 5 && mod <= 8);
+            if (this.weather !== 'rain' && isNight) {
+                maxRange -= 2;
+            }
+
             if (dist > maxRange) return false; 
             if (!this.isFrontDirection(attacker.direction, targetDir)) return false; // 前方3方向のみ
             return true;
@@ -2333,6 +2341,11 @@ class FieldWarManager {
                 atkWeaponMult = 0.3; // 隣接時は威力が落ちる
             } else {
                 atkWeaponMult = 1.5; // 遠距離なら威力が上がる
+                
+                // ★追加: 夜の場合は遠距離ダメージが半分になります
+                if (isNight) {
+                    atkWeaponMult *= 0.5;
+                }
             }
         }
         atkFinalAtk = atkFinalAtk * atkWeaponMult;
