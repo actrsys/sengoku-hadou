@@ -209,24 +209,24 @@
    ========================================= */
 /* 夕方の表現：以前より明るく、でも晴れよりは少し暗くします */
 #fw-main-area.is-evening #fw-map {
-    background-color: #6d503c !important; /* ★追加：タイルの隙間を夕方の影色に直接塗り替えます */
-    filter: sepia(0.3) saturate(1.2) hue-rotate(-10deg) brightness(0.95);
+    background-color: #4a3b2c !important; /* タイルの隙間を夕方の影色に */
+    filter: sepia(0.2) saturate(1.1) hue-rotate(-10deg) brightness(0.9);
 }
 
-/* 夜の表現：緑の鮮やかさを消してから、全体をほんのり青黒く沈めます */
+/* 夜の表現：夕方をベースに、さらに暗くしてほんのり青みを足します（色反転はしません） */
 #fw-main-area.is-night #fw-map {
-    background-color: #1a1c20 !important; /* ★追加：タイルの隙間を夜の暗闇色に直接塗り替えます */
-    filter: grayscale(0.55) sepia(0.2) hue-rotate(200deg) brightness(0.65) contrast(1.1);
+    background-color: #121820 !important; /* タイルの隙間を青黒い暗闇色に */
+    filter: sepia(0.2) saturate(0.9) hue-rotate(10deg) brightness(0.55);
 }
 
-/* 夕方で雨の時の表現：夕方に少し雨の暗さを足します */
+/* 夕方で雨の時の表現：夕方＋雨の暗さ */
 #fw-main-area.is-evening.is-raining #fw-map {
-    background-color: #4a4038 !important; /* ★追加：夕方＋雨の隙間の色 */
-    filter: sepia(0.3) saturate(1.1) hue-rotate(-10deg) brightness(0.8) contrast(1.05);
+    background-color: #3d3329 !important;
+    filter: sepia(0.2) saturate(1.0) hue-rotate(-10deg) brightness(0.75);
 }
 
-/* 夜で雨の時の表現：夜の青黒さに、さらに雨の暗さを足します */
+/* 夜で雨の時の表現：夜＋雨の暗さ */
 #fw-main-area.is-night.is-raining #fw-map {
-    background-color: #121417 !important; /* ★追加：夜＋雨の隙間の色 */
-    filter: grayscale(0.6) sepia(0.2) hue-rotate(200deg) brightness(0.5) contrast(1.1);
+    background-color: #0c1015 !important;
+    filter: sepia(0.2) saturate(0.8) hue-rotate(10deg) brightness(0.45);
 }
