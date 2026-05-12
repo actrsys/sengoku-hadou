@@ -965,7 +965,9 @@ class FieldWarManager {
 
         if (attacker.troopType === 'teppo') {
             if (attacker.hasMoved) return false; // 鉄砲は移動後攻撃不可
-            if (dist > 3) return false; // ★変更：射程は1〜3マスになりました！
+            // ★追加: 雨の時は遠距離攻撃ができず、射程が1になります
+            let maxRange = (this.weather === 'rain') ? 1 : 3;
+            if (dist > maxRange) return false; 
             if (!this.isFrontDirection(attacker.direction, targetDir)) return false; // 前方3方向のみ
             return true;
         } else {
@@ -1445,7 +1447,13 @@ class FieldWarManager {
         this.units.forEach(u => {
             u.hasActionDone = false;
             u.hasMoved = false; // ★ ターン開始時に移動フラグをリセット
-            u.ap = u.mobility;
+            
+            // ★追加: 雨の時は行動力が1下がります（最低1は確保します）
+            if (this.weather === 'rain') {
+                u.ap = Math.max(1, u.mobility - 1);
+            } else {
+                u.ap = u.mobility;
+            }
             
             // 経験値の加算処理
             if (u.bushoId && this.game) {
@@ -2153,6 +2161,12 @@ class FieldWarManager {
         let defBaseAtk = Math.sqrt(defS) + (defender.stats.ldr * 1.5 + defender.stats.str) * (defS / (defS + 150));
         let defBaseDef = Math.sqrt(defS) + (defender.stats.ldr * 1.5 + defender.stats.int) * (defS / (defS + 150));
 
+        // ★追加: 雨の時はすべての部隊の基礎防御力が10%ダウンします
+        if (this.weather === 'rain') {
+            atkBaseDef = atkBaseDef * 0.9;
+            defBaseDef = defBaseDef * 0.9;
+        }
+
         // 2. 最終攻撃力・最終防御力の計算（士気・訓練による補正）
         let atkFinalAtk = atkBaseAtk * (1 + (atkMorale * 1.5 + atkTraining) / 1000);
         let atkFinalDef = atkBaseDef * (1 + (atkMorale + atkTraining * 1.5) / 1000);
@@ -2304,7 +2318,10 @@ class FieldWarManager {
         let terrainMult = 1.0;
         if (terrain === 'forest') terrainMult = 1.15;      // 森は防御力アップ
         else if (terrain === 'mountain') terrainMult = 1.3; // 山はさらに防御力アップ
-        else if (terrain === 'river') terrainMult = 0.7;    // 川は防御力ダウン
+        else if (terrain === 'river') {
+            // ★追加: 雨の時は川での防御力のマイナス補正がより厳しくなります
+            terrainMult = (this.weather === 'rain') ? 0.5 : 0.7;
+        }
         defFinalDef = defFinalDef * terrainMult;
 
         // 7. 与ダメージ計算
