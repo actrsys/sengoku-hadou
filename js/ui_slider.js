@@ -634,18 +634,30 @@ class UISliderManager {
             `;
         }
         
-        let assignments = bushos.map(b => ({ id: b.id, count: 0, type: 'ashigaru' }));
-        
-        let ratioSum = 1.5 + (bushos.length - 1) * 1.0;
-        let baseAmount = Math.floor(totalSoldiers / ratioSum);
-        let remain = totalSoldiers;
+        let assignments = [];
+        if (this.game.warManager && typeof this.game.warManager.autoDivideSoldiers === 'function') {
+            // AIと同じ魔法を使って、能力が高い順に軍馬や鉄砲を賢く配分します！
+            const autoAssigns = this.game.warManager.autoDivideSoldiers(bushos, totalSoldiers, totalHorses, totalGuns);
+            assignments = autoAssigns.map(a => ({
+                id: a.busho.id,
+                count: a.soldiers,
+                type: a.troopType
+            }));
+        } else {
+            // もし魔法が使えなかった時のための予備の配分です
+            assignments = bushos.map(b => ({ id: b.id, count: 0, type: 'ashigaru' }));
+            
+            let ratioSum = 1.5 + (bushos.length - 1) * 1.0;
+            let baseAmount = Math.floor(totalSoldiers / ratioSum);
+            let remain = totalSoldiers;
 
-        for (let i = 1; i < bushos.length; i++) {
-            assignments[i].count = baseAmount;
-            remain -= baseAmount;
-        }
-        if (assignments.length > 0) {
-            assignments[0].count = remain; 
+            for (let i = 1; i < bushos.length; i++) {
+                assignments[i].count = baseAmount;
+                remain -= baseAmount;
+            }
+            if (assignments.length > 0) {
+                assignments[0].count = remain; 
+            }
         }
 
         const updateRemain = (triggerBushoId = null, triggerType = null) => {
@@ -779,13 +791,15 @@ class UISliderManager {
             const div = document.createElement('div');
             div.className = 'qty-row divide-row';
             
+            const myType = assignments[index].type || 'ashigaru';
+            
             div.innerHTML = `
                 <div style="font-weight:bold; width:100%; margin-bottom:0; display:flex; align-items:center; justify-content:space-between;">
                     <span class="slider-row-label">${b.name}</span>
                     <div class="troop-type-selector" id="troop-type-group-${b.id}">
-                        <button class="troop-type-btn active" data-type="ashigaru">足軽</button>
-                        <button class="troop-type-btn" data-type="kiba">騎馬</button>
-                        <button class="troop-type-btn" data-type="teppo">鉄砲</button>
+                        <button class="troop-type-btn ${myType === 'ashigaru' ? 'active' : ''}" data-type="ashigaru">足軽</button>
+                        <button class="troop-type-btn ${myType === 'kiba' ? 'active' : ''}" data-type="kiba">騎馬</button>
+                        <button class="troop-type-btn ${myType === 'teppo' ? 'active' : ''}" data-type="teppo">鉄砲</button>
                     </div>
                 </div>
                 <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
@@ -795,7 +809,7 @@ class UISliderManager {
                     <button class="qty-shortcut-btn" id="div-btn-max-${b.id}" style="order:3;">最大</button>
                     <input type="number" id="div-num-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}" style="order:4;">
                 </div>
-                <input type="hidden" id="div-type-${b.id}" value="ashigaru">
+                <input type="hidden" id="div-type-${b.id}" value="${myType}">
             `;
             listEl.appendChild(div);
             
