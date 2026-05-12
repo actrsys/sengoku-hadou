@@ -29,6 +29,7 @@ class FieldWarManager {
         this.retreatedUnits = []; // ★追加：撤退した部隊をメモする箱
         this.activeAtkTab = 'main'; // 野戦用タブ（攻撃）
         this.activeDefTab = 'main'; // 野戦用タブ（守備）
+        this.weather = 'sunny'; // ★追加：天候を覚える箱（sunny:晴れ, rain:雨）
         window.addEventListener('resize', () => {
             if (this.active) {
                 this.adjustMapScale();
@@ -156,6 +157,9 @@ class FieldWarManager {
         // ★追加：野戦が始まるたびに、タブの選択を一番左（メイン）にリセットします
         this.activeAtkTab = 'main';
         this.activeDefTab = 'main';
+        
+        // ★追加：最初は「晴れ」にしておきます。1ターン目が始まる時にすぐ判定されます。
+        this.weather = 'sunny';
         
         this.hideUnitInfo();
 
@@ -843,6 +847,18 @@ class FieldWarManager {
         if (dateEl && this.game) {
             dateEl.innerText = `${this.game.year}年 ${this.game.month}月`;
         }
+        
+        // ★追加：天候の文字を更新します
+        const weatherEl = document.getElementById('fw-weather-info');
+        if (weatherEl) {
+            if (this.weather === 'rain') {
+                weatherEl.innerText = '☔ 雨';
+                weatherEl.style.color = '#64b5f6'; // 少し暗い水色で雨を表現します
+            } else {
+                weatherEl.innerText = '☀ 晴れ';
+                weatherEl.style.color = '#ffb300'; // 太陽の色です
+            }
+        }
     }
     
     updateMenu() {
@@ -1377,8 +1393,51 @@ class FieldWarManager {
         return this.turnQueue[0].isPlayer;
     }
 
+    // ★追加：天候を判定して切り替える魔法です
+    updateWeather() {
+        if (!this.game) return;
+        
+        const month = this.game.month;
+        const rand = Math.random() * 100; // 0〜100のランダムな数字を出します
+        
+        // 月ごとの確率（％）
+        const toRainProb = { 1:15, 2:15, 3:20, 4:35, 5:50, 6:60, 7:50, 8:35, 9:20, 10:15, 11:15, 12:10 };
+        const toSunnyProb = { 1:70, 2:70, 3:60, 4:30, 5:20, 6:10, 7:20, 8:30, 9:60, 10:70, 11:70, 12:70 };
+        
+        if (this.weather === 'sunny') {
+            if (rand < toRainProb[month]) {
+                this.weather = 'rain';
+                if (this.turnCount > 1) this.log(`天候が崩れ、雨が降り始めました。`);
+            }
+        } else if (this.weather === 'rain') {
+            if (rand < toSunnyProb[month]) {
+                this.weather = 'sunny';
+                this.log(`雨が上がり、天候が回復しました。`);
+            }
+        }
+        
+        // 画面の見た目を更新します
+        const mainArea = document.getElementById('fw-main-area');
+        const weatherLayer = document.getElementById('fw-weather-layer');
+        if (mainArea && weatherLayer) {
+            if (this.weather === 'rain') {
+                mainArea.classList.add('is-raining');
+                weatherLayer.classList.remove('hidden');
+            } else {
+                mainArea.classList.remove('is-raining');
+                weatherLayer.classList.add('hidden');
+            }
+        }
+        
+        // UIの文字を更新します
+        this.updateStatus();
+    }
+
     startTurn() {
         if (!this.active) return;
+
+        // ★追加：毎ターン開始時に天候の判定をします
+        this.updateWeather();
         
         // ★追加：野戦の毎ターン開始時に、参戦している武将へ経験値を加算します
         const isIntTurn = (this.turnCount % 2 === 1);
