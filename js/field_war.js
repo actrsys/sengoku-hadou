@@ -1402,7 +1402,7 @@ class FieldWarManager {
         
         // 月ごとの確率（％）
         const toRainProb = { 1:15, 2:15, 3:20, 4:35, 5:50, 6:60, 7:50, 8:35, 9:20, 10:15, 11:15, 12:10 };
-        const toSunnyProb = { 1:70, 2:70, 3:60, 4:30, 5:20, 6:10, 7:20, 8:30, 9:60, 10:70, 11:70, 12:70 };
+        const toSunnyProb = { 1:70, 2:70, 3:60, 4:50, 5:40, 6:30, 7:40, 8:50, 9:60, 10:70, 11:70, 12:70 };
         
         if (this.weather === 'sunny') {
             if (rand < toRainProb[month]) {
