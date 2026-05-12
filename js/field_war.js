@@ -2752,6 +2752,10 @@ class FieldWarManager {
         let distToTarget = this.getDistance(unit.x, unit.y, targetEnemy.x, targetEnemy.y);
 
         // --- 2. 逃走・移動判定 ---
+        // ★追加: 現在地の地形を調べます（川からの脱出ロジックなどに使います）
+        let currentRow = Math.floor(unit.y / 2);
+        let currentTerrain = (this.grid && this.grid[currentRow] && this.grid[currentRow][unit.x]) ? this.grid[currentRow][unit.x].terrain : 'plain';
+
         if (unit.troopType === 'teppo') {
             if (allies.length === 0 && distToTarget === 1) {
                 if (!isKunishuAttacker) {
@@ -2790,11 +2794,19 @@ class FieldWarManager {
                 // 攻撃できるなら、移動せずにその場で構えます！
                 if (canAttackNow) {
                     shouldMove = false;
+                    // ★追加：守備側で川の上にいる場合は、撃てるとしても移動（脱出）を検討させます
+                    if (!unit.isAttacker && currentTerrain === 'river') {
+                        shouldMove = true;
+                    }
                 }
             }
         } else if (distToTarget === 1) {
             // 鉄砲以外の部隊は、敵が目の前にいたら移動しません
             shouldMove = false; 
+            // ★追加：守備側で川の上にいる場合は、敵が目の前にいても移動（脱出）を検討させます
+            if (!unit.isAttacker && currentTerrain === 'river') {
+                shouldMove = true;
+            }
         }
 
         // --- 3. 移動先マスの選定 (スコア制) ---
@@ -2846,12 +2858,18 @@ class FieldWarManager {
                 
                 if (terrain_t === 'river') {
                     score -= 20; // 川の上で止まると被ダメージが増えるので極力避ける！
+                    if (!unit.isAttacker) score -= 30; // ★追加：守備側はさらに川を嫌がる！
                 } else if (terrain_t === 'mountain') {
                     score += 15; // 山は防御力が上がるので、陣取るには良い場所！
                     if (!unit.isAttacker) score += 40; // ★守備側なら山はさらに大好き！
                 } else if (terrain_t === 'forest') {
                     score += 10; // 森も防御力が少し上がるので好き
                     if (!unit.isAttacker) score += 20; // ★守備側なら森もさらに好き！
+                }
+
+                // ★追加: 守備側で現在地が川の場合、川以外のマスへ脱出することに強いボーナスを与えます
+                if (!unit.isAttacker && currentTerrain === 'river' && terrain_t !== 'river') {
+                    score += 100; // 川からの脱出を最優先！
                 }
 
                 if (isFleeing) {
