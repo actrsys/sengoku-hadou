@@ -2898,7 +2898,6 @@ Object.assign(WarManager.prototype, {
             helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
             helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
             helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
-            finalBushos.forEach(b => b.isActionDone = true);
 
             const selfReinfData = {
                 castle: helperCastle, bushos: finalBushos, soldiers: finalSVal,
@@ -2959,7 +2958,6 @@ Object.assign(WarManager.prototype, {
                 helperCastle.rice = Math.max(0, helperCastle.rice - rR);
                 helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - rH);
                 helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - rG);
-                reinfBushos.forEach(b => b.isActionDone = true);
 
                 const selfReinfData = {
                     castle: helperCastle, bushos: reinfBushos, soldiers: rS,
@@ -3044,7 +3042,6 @@ Object.assign(WarManager.prototype, {
             kunishu.soldiers = Math.max(0, kunishu.soldiers - reinfSoldiers);
             kunishu.horses = 0; // 全部持っていくのでお留守番はゼロになります
             kunishu.guns = 0;   // 全部持っていくのでお留守番はゼロになります
-            reinfBushos.forEach(b => b.isActionDone = true);
 
             this.state.defReinforcement = {
                 castle: helperCastle, kunishuId: kunishu.id, bushos: reinfBushos, soldiers: reinfSoldiers,
@@ -3148,7 +3145,6 @@ Object.assign(WarManager.prototype, {
         helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
         helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
         helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
-        reinfBushos.forEach(b => b.isActionDone = true);
 
         this.state.defReinforcement = {
             castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
@@ -3231,7 +3227,6 @@ Object.assign(WarManager.prototype, {
         helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
         helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
         helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
-        reinfBushos.forEach(b => b.isActionDone = true);
 
         this.state.defReinforcement = {
             castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
