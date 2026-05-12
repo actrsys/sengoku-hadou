@@ -223,7 +223,7 @@ body:not(.is-pc):has(.modal:not(.hidden)) #bottom-command-bar {
     border-radius: 6px; 
     cursor: pointer; 
     font-size: 1.1rem; 
-    font-weight: bold; 
+    font-weight: normal; 
     display: flex; 
     align-items: center; 
     justify-content: center; 
@@ -690,7 +690,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     font-family: 'FudeGoshirae', serif;
     letter-spacing: 0.5px;
     font-size: 1.2rem; 
-    font-weight: bold; 
+    font-weight: normal; 
     cursor: pointer; 
     color: #fff;
     white-space: nowrap; 
