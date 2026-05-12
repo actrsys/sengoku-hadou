@@ -630,12 +630,13 @@ class UIManager {
             rightName = null;
         }
         
-        // 顔画像の枠をCSS側の指定（正方形）に任せるため、プログラム側のスタイル指定を削除します
+        // 顔画像のサイズを 85px に大きくし、名前を枠に重ねるための準備をします
         const setFaceAndName = (faceEl, nameEl, faceIcon, nameText) => {
             let hasContent = false;
             if (faceEl) {
                 if (faceIcon) {
-                    faceEl.innerHTML = `<div class="sp-face-wrapper"><img src="data/images/faceicons/${faceIcon}" onerror="this.src='data/images/faceicons/unknown_face.webp'"></div>`;
+                    // 画像サイズをギリギリまで（85px）大きくします
+                    faceEl.innerHTML = `<div class="sp-face-wrapper" style="margin: 0; width: 85px; height: 85px;"><img src="data/images/faceicons/${faceIcon}" onerror="this.src='data/images/faceicons/unknown_face.webp'"></div>`;
                     hasContent = true;
                 } else {
                     faceEl.innerHTML = '';
@@ -650,8 +651,14 @@ class UIManager {
                     nameEl.classList.add('hidden');
                 }
             }
+            
+            // どちらか一方しかいない場合は、いない方のスペースを消して詰め、メッセージを広くします
             if (faceEl && faceEl.parentElement) {
-                faceEl.parentElement.style.display = hasContent ? 'flex' : 'none';
+                if (hasContent) {
+                    faceEl.parentElement.style.display = 'flex';
+                } else {
+                    faceEl.parentElement.style.display = 'none';
+                }
             }
         };
 
