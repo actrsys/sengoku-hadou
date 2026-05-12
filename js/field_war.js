@@ -2863,8 +2863,8 @@ class FieldWarManager {
                             if (cTerrain === 'mountain' || cTerrain === 'forest') {
                                 // 敵に近すぎる場所は危ないので避けます
                                 let distCampToEnemy = this.getDistance(cx, cy, targetEnemy.x, targetEnemy.y);
-                                // ★修正：敵から距離9未満の場所は危険なので陣地候補から外します！
-                                if (distCampToEnemy >= 9) {
+                                // ★修正：敵から距離6未満の場所は危険なので陣地候補から外します！
+                                if (distCampToEnemy >= 6) {
                                     // 山なら50点、森なら20点。そこから距離が遠い分だけ減点します
                                     let campScore = (cTerrain === 'mountain' ? 50 : 20) - distToMe * 5;
                                     
@@ -2929,8 +2929,8 @@ class FieldWarManager {
 
                 // ★追加：さっき見つけた「理想の陣地」があるなら、そこへ向かうマスにボーナスをつけます！
                 if (idealCampHex) {
-                    // ★修正：ただし、そのマスに行くと敵に近すぎちゃう（距離5以下）場合は危険なのでボーナスを無しにします！
-                    if (dToEnemy >= 6) {
+                    // ★修正：ただし、そのマスに行くと敵に近すぎ（距離5未満）の場合は危険なのでボーナスを無しにします！
+                    if (dToEnemy >= 5) {
                         let dToCamp = this.getDistance(nx, ny, idealCampHex.x, idealCampHex.y);
                         // 陣地にぴったり止まれるなら高得点！
                         if (dToCamp === 0) {
