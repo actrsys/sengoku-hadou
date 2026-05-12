@@ -630,13 +630,12 @@ class UIManager {
             rightName = null;
         }
         
-        // 顔画像のサイズを 85px に大きくし、名前を枠に重ねるための準備をします
+        // 顔画像のサイズや名前の位置はCSSにお任せするため、余計なスタイル指定を削除します
         const setFaceAndName = (faceEl, nameEl, faceIcon, nameText) => {
             let hasContent = false;
             if (faceEl) {
                 if (faceIcon) {
-                    // 画像サイズをギリギリまで（85px）大きくします
-                    faceEl.innerHTML = `<div class="sp-face-wrapper" style="margin: 0; width: 85px; height: 85px;"><img src="data/images/faceicons/${faceIcon}" onerror="this.src='data/images/faceicons/unknown_face.webp'"></div>`;
+                    faceEl.innerHTML = `<div class="sp-face-wrapper"><img src="data/images/faceicons/${faceIcon}" onerror="this.src='data/images/faceicons/unknown_face.webp'"></div>`;
                     hasContent = true;
                 } else {
                     faceEl.innerHTML = '';
