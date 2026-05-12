@@ -1074,8 +1074,8 @@ class WarManager {
             
             if (Math.random() < successRate) {
                 let dmgRatio = (atkInt * 1.5) / ((atkInt * 1.5) + (defInt * 1.5));
-                //火計の最終ダメージ 実行智謀 * ダメージ倍率 * 0.5
-                let baseDamage = atkInt * dmgRatio * 0.5;
+                //火計の最終ダメージ 実行智謀 * ダメージ倍率 * 0.8(調整用)
+                let baseDamage = atkInt * dmgRatio * 0.8;
                 let calcDamage = Math.floor(s.isPlayerInvolved ? baseDamage : baseDamage * 0.666);
                 
                 s.defender.defense = Math.max(0, s.defender.defense - calcDamage);
