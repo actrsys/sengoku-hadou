@@ -848,15 +848,40 @@ class FieldWarManager {
             dateEl.innerText = `${this.game.year}年 ${this.game.month}月`;
         }
         
-        // ★追加：天候の文字を更新します
+        // ★追加：天候と時間帯の文字を更新します
         const weatherEl = document.getElementById('fw-weather-info');
+        const mod = this.turnCount % 10;
+        let timeStr = "";
+        let timeColor = "";
+        
+        // 下1桁が4なら夕方、5〜8なら夜と判定します
+        if (mod === 4) {
+            timeStr = " (夕方)";
+            timeColor = "#ff8a65"; // 夕焼け色
+        } else if (mod >= 5 && mod <= 8) {
+            timeStr = " (夜)";
+            timeColor = "#b39ddb"; // 夜の紫色
+        }
+
         if (weatherEl) {
             if (this.weather === 'rain') {
-                weatherEl.innerText = '☔ 雨';
-                weatherEl.style.color = '#64b5f6'; // 少し暗い水色で雨を表現します
+                weatherEl.innerText = '☔ 雨' + timeStr;
+                weatherEl.style.color = timeColor || '#64b5f6';
             } else {
-                weatherEl.innerText = '☀ 晴れ';
-                weatherEl.style.color = '#ffb300'; // 太陽の色です
+                let sunIcon = (mod >= 5 && mod <= 8) ? '🌙' : '☀';
+                weatherEl.innerText = `${sunIcon} 晴れ${timeStr}`;
+                weatherEl.style.color = timeColor || '#ffb300';
+            }
+        }
+
+        // 時間帯に合わせて画面の色を変える魔法をかけます
+        const mainArea = document.getElementById('fw-main-area');
+        if (mainArea) {
+            mainArea.classList.remove('is-evening', 'is-night');
+            if (mod === 4) {
+                mainArea.classList.add('is-evening');
+            } else if (mod >= 5 && mod <= 8) {
+                mainArea.classList.add('is-night');
             }
         }
     }
@@ -1448,12 +1473,15 @@ class FieldWarManager {
             u.hasActionDone = false;
             u.hasMoved = false; // ★ ターン開始時に移動フラグをリセット
             
-            // ★追加: 雨の時は行動力が1下がります（最低1は確保します）
-            if (this.weather === 'rain') {
-                u.ap = Math.max(1, u.mobility - 1);
-            } else {
-                u.ap = u.mobility;
-            }
+            // 雨と夜の判定をして行動力を減らします（最低1は確保します）
+            const mod = this.turnCount % 10;
+            const isNight = (mod >= 5 && mod <= 8);
+            let penalty = 0;
+            
+            if (this.weather === 'rain') penalty += 1;
+            if (isNight) penalty += 1;
+            
+            u.ap = Math.max(1, u.mobility - penalty);
             
             // 経験値の加算処理
             if (u.bushoId && this.game) {
@@ -2276,9 +2304,16 @@ class FieldWarManager {
             defToAtkDiff = 0; // 鉄砲は常に正面扱い
         }
 
+        // ターン数から夜かどうかを判定します
+        const mod = this.turnCount % 10;
+        const isNight = (mod >= 5 && mod <= 8);
+
         let dirMult = 1.0;
-        if (defToAtkDiff === 3) dirMult = 0.5; // 背後
-        else if (defToAtkDiff === 2) dirMult = 0.8; // 側面
+        if (defToAtkDiff === 3) {
+            dirMult = isNight ? 0.3 : 0.5; // 背後（夜は奇襲への対応が遅れ被害増大）
+        } else if (defToAtkDiff === 2) {
+            dirMult = isNight ? 0.5 : 0.8; // 側面（夜は視界不良で被害増大）
+        }
 
         // 防御側のステータスに向き補正を適用
         defFinalDef = defFinalDef * dirMult;
