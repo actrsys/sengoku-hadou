@@ -1488,8 +1488,24 @@ class FieldWarManager {
             
             if (this.weather === 'rain') penalty += 1;
             if (isNight) penalty += 1;
+
+            // ★追加：士気が80以上なら、足軽と騎馬の行動力を+1するボーナス
+            let moraleBonus = 0;
+            // 部隊の種類（troopType）が足軽（ashigaru）か騎馬（kiba）かを確認します
+            if (u.troopType === 'ashigaru' || u.troopType === 'kiba') {
+                let groupMorale = 50; // 士気の基本値
+                // 自分が所属している軍（メインや友軍など）の専用の箱から、現在の士気を取り出します
+                if (this.groupStats && this.groupStats[u.groupId]) {
+                    groupMorale = this.groupStats[u.groupId].morale;
+                }
+                // 取り出した士気が80以上であれば、ボーナスを「1」にします
+                if (groupMorale >= 80) {
+                    moraleBonus = 1;
+                }
+            }
             
-            u.ap = Math.max(1, u.mobility - penalty);
+            // 元々の移動力からペナルティを引き、先ほど計算したボーナスを足してセットします
+            u.ap = Math.max(1, u.mobility - penalty + moraleBonus);
             
             // 経験値の加算処理
             if (u.bushoId && this.game) {
