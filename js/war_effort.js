@@ -707,10 +707,14 @@ Object.assign(WarManager.prototype, {
                             });
 
                             const threshold = maxPower * 0.7;
+                            
+                            // ★追加：兵士数÷500で、出撃できる武将の数を計算します！（最低1人、最高5人）
+                            const maxDeployCount = Math.max(1, Math.min(5, Math.floor(defCastle.soldiers / 500)));
+                            
                             const defBushos = evaluatedBushos
                                 .filter(eb => eb.perceivedPower > threshold) 
                                 .sort((a, b) => b.perceivedPower - a.perceivedPower) 
-                                .slice(0, 5) 
+                                .slice(0, maxDeployCount) 
                                 .map(eb => eb.busho);
                                 
                             // ★追加：守る武将が誰もいない場合（空き城など）は、ダミーの土豪や侍大将を用意します！
