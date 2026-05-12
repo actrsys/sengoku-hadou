@@ -180,9 +180,10 @@
     z-index: 50; /* マップの上、UIの下に配置します */
 }
 
-/* 雨の時は、画面全体を少し暗くします */
+/* 雨の時は、タイルの隙間を濡れた色にして、暗すぎない程度に全体を調整します */
 #fw-main-area.is-raining #fw-map {
-    filter: brightness(0.7) contrast(1.1);
+    background-color: #3d4a3d !important; /* 濡れた地面のような深い緑色 */
+    filter: brightness(0.85) contrast(1.05); /* 以前より明るめに設定 */
 }
 
 /* こまかい雨の表現：斜めの短い線を複数重ねて、斜めに降らせます */
@@ -219,14 +220,14 @@
     filter: sepia(0.2) saturate(0.9) hue-rotate(10deg) brightness(0.55);
 }
 
-/* 夕方で雨の時の表現：夕方＋雨の暗さ */
+/* 夕方で雨の時の表現：夕方の色を残しつつ、少しだけ明るさを上げました */
 #fw-main-area.is-evening.is-raining #fw-map {
     background-color: #3d3329 !important;
-    filter: sepia(0.2) saturate(1.0) hue-rotate(-10deg) brightness(0.75);
+    filter: sepia(0.2) saturate(1.0) hue-rotate(-10deg) brightness(0.82);
 }
 
-/* 夜で雨の時の表現：夜＋雨の暗さ */
+/* 夜で雨の時の表現：夜の青黒さを維持しつつ、部隊が見える明るさまで上げました */
 #fw-main-area.is-night.is-raining #fw-map {
     background-color: #0c1015 !important;
-    filter: sepia(0.2) saturate(0.8) hue-rotate(10deg) brightness(0.45);
+    filter: sepia(0.1) saturate(0.8) hue-rotate(10deg) brightness(0.55);
 }
