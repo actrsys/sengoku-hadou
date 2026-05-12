@@ -2840,6 +2840,48 @@ class FieldWarManager {
             let myGeneral = allies.find(a => a.isGeneral);
             if (unit.isGeneral) myGeneral = unit;
 
+            // ★追加：守備側で、敵がまだ遠い場合、2～3ターンで到達できそうな「良い陣地（山や森）」を探します！
+            let idealCampHex = null;
+            if (!unit.isAttacker && distToTarget >= 3 && !isFleeing) {
+                let bestCampScore = -Infinity;
+                // 自分の周り5マス（2～3ターンで届く範囲）を見渡します
+                for (let cx = Math.max(0, unit.x - 5); cx <= Math.min(this.cols - 1, unit.x + 5); cx++) {
+                    for (let cy = Math.max(0, unit.y - 10); cy <= Math.min(this.rows * 2 - 1, unit.y + 10); cy++) {
+                        // HEXマップの性質上、存在しないマスは飛ばします
+                        if (cx % 2 !== cy % 2) continue;
+                        
+                        let cRow = Math.floor(cy / 2);
+                        let distToMe = this.getDistance(unit.x, unit.y, cx, cy);
+                        
+                        // 遠すぎず、自分の足元以外の場所をチェックします
+                        if (distToMe > 0 && distToMe <= 5) {
+                            let cTerrain = (this.grid && this.grid[cRow] && this.grid[cRow][cx]) ? this.grid[cRow][cx].terrain : 'plain';
+                            
+                            // 騎馬隊は山に入れないので、山なら無視します
+                            if (unit.troopType === 'kiba' && cTerrain === 'mountain') continue;
+
+                            if (cTerrain === 'mountain' || cTerrain === 'forest') {
+                                // 敵に近すぎる場所は危ないので避けます
+                                let distCampToEnemy = this.getDistance(cx, cy, targetEnemy.x, targetEnemy.y);
+                                // ★修正：敵から距離9未満の場所は危険なので陣地候補から外します！
+                                if (distCampToEnemy >= 9) {
+                                    // 山なら50点、森なら20点。そこから距離が遠い分だけ減点します
+                                    let campScore = (cTerrain === 'mountain' ? 50 : 20) - distToMe * 5;
+                                    
+                                    // 既に味方が陣取っていたら遠慮します
+                                    if (allies.some(a => a.x === cx && a.y === cy)) campScore -= 100;
+                                    
+                                    if (campScore > bestCampScore) {
+                                        bestCampScore = campScore;
+                                        idealCampHex = { x: cx, y: cy };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             let aStarPath = this.findAStarPath(unit, targetEnemy.x, targetEnemy.y);
             let aStarIdealHexes = {};
             if (aStarPath && !isFleeing) {
@@ -2883,6 +2925,21 @@ class FieldWarManager {
                 // ★追加: 守備側で現在地が川の場合、川以外のマスへ脱出することに強いボーナスを与えます
                 if (!unit.isAttacker && currentTerrain === 'river' && terrain_t !== 'river') {
                     score += 100; // 川からの脱出を最優先！
+                }
+
+                // ★追加：さっき見つけた「理想の陣地」があるなら、そこへ向かうマスにボーナスをつけます！
+                if (idealCampHex) {
+                    // ★修正：ただし、そのマスに行くと敵に近すぎちゃう（距離5以下）場合は危険なのでボーナスを無しにします！
+                    if (dToEnemy >= 6) {
+                        let dToCamp = this.getDistance(nx, ny, idealCampHex.x, idealCampHex.y);
+                        // 陣地にぴったり止まれるなら高得点！
+                        if (dToCamp === 0) {
+                            score += 80; // ★150だと高すぎるので少し下げました
+                        } else {
+                            // 陣地に近づくほど高得点になります
+                            score += (5 - dToCamp) * 10; // ★ここも少し下げました
+                        }
+                    }
                 }
 
                 if (isFleeing) {
