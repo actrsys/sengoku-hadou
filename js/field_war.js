@@ -841,7 +841,7 @@ class FieldWarManager {
 
         // 黒帯のターン表示と年月を更新します
         const turnEl = document.getElementById('fw-turn-info');
-        if (turnEl) turnEl.innerText = `残りターン ◯/△`.replace('◯', this.turnCount).replace('△', this.maxTurns);
+        if (turnEl) turnEl.innerText = `残りターン ◯/△`.replace('◯', this.maxTurns - this.turnCount + 1).replace('△', this.maxTurns);
 
         const dateEl = document.getElementById('fw-date-info');
         if (dateEl && this.game) {
