@@ -2220,11 +2220,18 @@ class FieldWarManager {
         let defS = Math.max(0, defender.soldiers);
 
         // 1. 基礎攻撃力・基礎防御力の計算
-        let atkBaseAtk = Math.sqrt(atkS) + (attacker.stats.ldr * 1.5 + attacker.stats.str) * (atkS / (atkS + 150));
-        let atkBaseDef = Math.sqrt(atkS) + (attacker.stats.ldr * 1.5 + attacker.stats.int) * (atkS / (atkS + 150));
+        // 見やすくするために、武将の強さ（能力の塊）を先に計算しておきます
+        let atkAbilityAtk = attacker.stats.ldr * 1.5 + attacker.stats.str;
+        let atkAbilityDef = attacker.stats.ldr * 1.5 + attacker.stats.int;
+        let defAbilityAtk = defender.stats.ldr * 1.5 + defender.stats.str;
+        let defAbilityDef = defender.stats.ldr * 1.5 + defender.stats.int;
+
+        // 今までの計算に加えて、「武将の強さ × 兵力の平方根 ÷ 100」という大軍ボーナスを足します
+        let atkBaseAtk = Math.sqrt(atkS) + atkAbilityAtk * (atkS / (atkS + 150)) + (atkAbilityAtk * Math.sqrt(atkS) / 100);
+        let atkBaseDef = Math.sqrt(atkS) + atkAbilityDef * (atkS / (atkS + 150)) + (atkAbilityDef * Math.sqrt(atkS) / 100);
         
-        let defBaseAtk = Math.sqrt(defS) + (defender.stats.ldr * 1.5 + defender.stats.str) * (defS / (defS + 150));
-        let defBaseDef = Math.sqrt(defS) + (defender.stats.ldr * 1.5 + defender.stats.int) * (defS / (defS + 150));
+        let defBaseAtk = Math.sqrt(defS) + defAbilityAtk * (defS / (defS + 150)) + (defAbilityAtk * Math.sqrt(defS) / 100);
+        let defBaseDef = Math.sqrt(defS) + defAbilityDef * (defS / (defS + 150)) + (defAbilityDef * Math.sqrt(defS) / 100);
 
         // ★追加: 雨の時はすべての部隊の基礎防御力が10%ダウンします
         if (this.weather === 'rain') {
