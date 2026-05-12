@@ -288,6 +288,7 @@ class FieldWarManager {
                     mobility: mobility, 
                     ap: mobility,
                     soldiers: assign.soldiers,
+                    initialSoldiers: assign.soldiers, // ★追加：デフォルトの兵士数を覚えておく
                     troopType: type,
                     stats: {
                         ldr: assign.busho.leadership,
@@ -375,6 +376,7 @@ class FieldWarManager {
                     mobility: mobility, 
                     ap: mobility,
                     soldiers: assign.soldiers,
+                    initialSoldiers: assign.soldiers, // ★追加：デフォルトの兵士数を覚えておく
                     troopType: type,
                     stats: {
                         ldr: assign.busho.leadership,
@@ -2694,22 +2696,33 @@ class FieldWarManager {
 
         // --- 戦力差撤退判定 ---
         let allySoldiers = unit.soldiers, enemySoldiers = 0;
-        allies.forEach(a => allySoldiers += a.soldiers);
-        enemies.forEach(e => enemySoldiers += e.soldiers);
+        let initialAllySoldiers = unit.initialSoldiers, initialEnemySoldiers = 0; // ★追加：初期兵数
+        allies.forEach(a => {
+            allySoldiers += a.soldiers;
+            initialAllySoldiers += a.initialSoldiers; // ★追加
+        });
+        enemies.forEach(e => {
+            enemySoldiers += e.soldiers;
+            initialEnemySoldiers += e.initialSoldiers; // ★追加
+        });
         
         // ★修正：攻撃側の諸勢力かどうかをチェックします（攻撃側の諸勢力は絶対に撤退しません！）
         let isKunishuAttacker = (unit.isAttacker && this.warState.attacker.isKunishu);
         
+        // ★追加：守備側が野戦開始時点で既に撤退ライン（敵の20%未満）だったかどうかの判定
+        let isStartUnderdogDef = !unit.isAttacker && (initialAllySoldiers < initialEnemySoldiers * 0.2);
+        
         // ★修正: 攻撃側の諸勢力でなければ、総大将なら全軍撤退、一般部隊なら個別撤退の判断をします
-        if (!isKunishuAttacker && unit.isGeneral && (allySoldiers < enemySoldiers * 0.2)) {
+        // ただし、守備側で最初から兵力差があった場合は総大将の全軍撤退はしません
+        if (!isKunishuAttacker && unit.isGeneral && (allySoldiers < enemySoldiers * 0.2) && !isStartUnderdogDef) {
             if (isPlayerInvolved) {
                 if (unit.isAttacker) this.log(`${unit.name}軍は攻略を諦め、引き揚げていきました！`);
                 else this.log(`${unit.name}軍は不利を悟り、戦場から離脱しました！`);
             }
             this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
             return;
-        } else if (!isKunishuAttacker && !unit.isGeneral && (unit.soldiers <= 200 || unit.soldiers < enemySoldiers * 0.05)) {
-            // 一般部隊は、自分の兵士が少なすぎるか、敵全体に対して少なすぎたら逃げる
+        } else if (!isKunishuAttacker && !unit.isGeneral && unit.initialSoldiers > 500 && (unit.soldiers <= 200 || unit.soldiers < enemySoldiers * 0.05)) {
+            // ★修正：一般部隊は、元々の兵士数が500より多くて、自分の兵士が少なすぎるか、敵全体に対して少なすぎたら逃げる
             if (isPlayerInvolved) this.log(`${unit.name}隊は被害が大きく、戦場から撤退しました！`);
             this.retreatUnit(unit);
             return;
