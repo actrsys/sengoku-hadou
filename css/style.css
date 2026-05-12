@@ -22,7 +22,7 @@ html { width: 100%; height: 100%; height: 100dvh; overscroll-behavior: none; }
 }
 
 body {
-    font-family: 'FudeGoshirae', serif;
+    font-family: 'abashiri-mincho', serif;
     font-weight: bold;
     margin: 0; padding: 0;
     background-color: #000000;
@@ -212,7 +212,7 @@ body:not(.is-pc):has(.modal:not(.hidden)) #bottom-command-bar {
     border-color: #e6e3d8 #d1c18c #a88a2c #d1c18c;
     background: linear-gradient(135deg, #b0c4b1 0%, #6e8c81 100%); 
     color: #ffffff; 
-    font-family: 'abashiri-mincho', serif;
+    font-family: 'FudeGoshirae', serif;
     letter-spacing: 0.5px;
     text-shadow: 
         1px 1px 0 #0f2b21, -1px -1px 0 #0f2b21, 
@@ -687,7 +687,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
         radial-gradient(circle 12px at bottom left, transparent 11.5px, #000 12px);
     -webkit-mask-composite: source-in;
     mask-composite: intersect;
-    font-family: 'abashiri-mincho', serif;
+    font-family: 'FudeGoshirae', serif;
     letter-spacing: 0.5px;
     font-size: 1.2rem; 
     font-weight: bold; 
@@ -954,7 +954,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     white-space: nowrap;
     z-index: 1000; 
     box-shadow: 0 2px 6px rgba(0,0,0,0.8), inset 0 0 5px rgba(212,175,55,0.4);
-    font-family: 'abashiri-mincho', serif;
+    font-family: 'FudeGoshirae', serif;
     letter-spacing: 1px;
 }
 
@@ -1455,7 +1455,7 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
     border: 2px solid #d4af37;
     border-radius: 4px;
     cursor: pointer;
-    font-family: 'abashiri-mincho', serif;
+    font-family: 'FudeGoshirae', serif;
     letter-spacing: 1px;
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
     transition: all 0.2s ease;
