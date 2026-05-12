@@ -207,22 +207,22 @@
 /* =========================================
    野戦の時間帯（夕方・夜）アニメーション
    ========================================= */
-/* 夕方の表現：全体をオレンジっぽくして少し暗くします */
+/* 夕方の表現：以前より明るく、でも晴れよりは少し暗くします */
 #fw-main-area.is-evening #fw-map {
-    filter: sepia(0.4) saturate(1.5) hue-rotate(-15deg) brightness(0.85);
+    filter: sepia(0.3) saturate(1.2) hue-rotate(-10deg) brightness(0.95);
 }
 
-/* 夜の表現：視認性を確保しつつ、ほんのり青みがかった深い夜の色にします */
+/* 夜の表現：緑の鮮やかさを消してから、全体をほんのり青黒く沈めます */
 #fw-main-area.is-night #fw-map {
-    filter: brightness(0.65) contrast(1.1) saturate(0.6) hue-rotate(195deg) sepia(0.1);
+    filter: grayscale(0.55) sepia(0.2) hue-rotate(200deg) brightness(0.65) contrast(1.1);
 }
 
-/* 夕方で雨の時の表現：夕方のオレンジと雨のグレーを混ぜます */
+/* 夕方で雨の時の表現：夕方に少し雨の暗さを足します */
 #fw-main-area.is-evening.is-raining #fw-map {
-    filter: sepia(0.3) saturate(1.2) hue-rotate(-10deg) brightness(0.65) contrast(1.1);
+    filter: sepia(0.3) saturate(1.1) hue-rotate(-10deg) brightness(0.8) contrast(1.05);
 }
 
-/* 夜で雨の時の表現：夜の青に雨の暗さを加えますが、部隊が見える明るさを維持します */
+/* 夜で雨の時の表現：夜の青黒さに、さらに雨の暗さを足します */
 #fw-main-area.is-night.is-raining #fw-map {
-    filter: brightness(0.55) contrast(1.1) saturate(0.5) hue-rotate(195deg) sepia(0.1);
+    filter: grayscale(0.6) sepia(0.2) hue-rotate(200deg) brightness(0.5) contrast(1.1);
 }
