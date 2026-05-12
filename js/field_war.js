@@ -2895,6 +2895,15 @@ class FieldWarManager {
                     } else {
                         score -= 9999;
                     }
+                    
+                    // ★追加：逃げる時は、マップの端や角（どん詰まり）を避けるようにします！
+                    // 周りにある「行けるマス」の数を数えます
+                    let edgeCheck = this.getNeighbors(nx, ny);
+                    // 普通は6マスありますが、端や角は少なくなります
+                    if (edgeCheck.length < 6) {
+                        // 周りのマスが少ない（行き止まりに近い）ほど、点数を大きくマイナスします
+                        score -= (6 - edgeCheck.length) * 30; 
+                    }
                 } else {
                     if (aStarIdealHexes[`${nx},${ny}`]) {
                         // ★守備側は敵に突っ込むAStarパスへの執着を薄くします
@@ -2909,6 +2918,12 @@ class FieldWarManager {
                                 score -= 100; // わざわざ隣接しに行くのは危険なのでマイナス
                             } else {
                                 score += dToEnemy * 20; // 敵から離れれば離れるほど安心（スコアプラス）
+                            }
+                            
+                            // ★追加：雨や夜で離れる時も、マップの端や角（どん詰まり）を避けるようにします！
+                            let edgeCheck = this.getNeighbors(nx, ny);
+                            if (edgeCheck.length < 6) {
+                                score -= (6 - edgeCheck.length) * 30; 
                             }
                         } else {
                             // 盾になってくれる前衛部隊を探します
