@@ -165,9 +165,11 @@ class LifeSystem {
                                 this.game.ui.log(msg); // 履歴に残します
                                 
                                 // ★ここで「await（待て）」の魔法を使います！
-                                // プレイヤーが画面をクリックしてメッセージを閉じるまで、次の処理には絶対に進みません。
-                                await this.game.ui.showDialogAsync(msg); 
-                                // ==========================================
+                                // 自勢力の武将か、大名の場合のみ画面にメッセージ（ダイアログ）を出します。
+                                // それ以外の武将は履歴（ログ）に残すだけにします。
+                                if (b.clan === this.game.playerClanId || b.isDaimyo) {
+                                    await this.game.ui.showDialogAsync(msg); 
+                                }
                                 
                                 // もし大名だったら、大名家の名前も新しくします
                                 if (b.isDaimyo && b.clan !== 0) {
