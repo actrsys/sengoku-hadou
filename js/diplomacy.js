@@ -5,6 +5,12 @@
  */
 
 class DiplomacyManager {
+    // 外交失敗時の友好度低下量をまとめて管理する「定数（きまりごと）」
+    static PENALTIES = {
+        ALLIANCE_FAILURE: -4,  // 同盟・婚姻に失敗した時
+        DOMINATE_FAILURE: -7   // 支配・従属に失敗した時
+    };
+
     constructor(game) {
         this.game = game;
     }
@@ -751,7 +757,7 @@ class DiplomacyManager {
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
                 this.game.factionSystem.updateRecognition(doer, 30);
             } else {
-                this.updateSentiment(doer.clan, targetClanId, -10);
+                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
                 msg = `同盟の締結に失敗しました……`;
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
@@ -1048,7 +1054,7 @@ class DiplomacyManager {
                 isSuccess = false;
                 this.calcDiplomacyExp(doer, type, isSuccess, true);
                 
-                this.updateSentiment(doer.clan, targetClanId, -5);
+                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.DOMINATE_FAILURE);
                 msg = `要求を跳ね除けられました……`;
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
@@ -1066,7 +1072,7 @@ class DiplomacyManager {
                     doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
                     this.game.factionSystem.updateRecognition(doer, 40);
                 } else {
-                    this.updateSentiment(doer.clan, targetClanId, -5);
+                    this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.DOMINATE_FAILURE);
                     msg = `支配の要求は拒否されました……`;
                     doer.achievementTotal += 5;
                     this.game.factionSystem.updateRecognition(doer, 10);
@@ -1513,7 +1519,7 @@ class DiplomacyManager {
                 this.game.ui.renderMap();
             });
         } else {
-            this.updateSentiment(doer.clan, targetClanId, -10);
+            this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
             doer.isActionDone = true;
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
@@ -1660,12 +1666,12 @@ class DiplomacyManager {
                         if (onComplete) setTimeout(onComplete, 100);
                     });
                 } else if (type === 'alliance') {
-                    this.updateSentiment(doer.clan, targetClanId, -10);
+                    this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
                     this.game.ui.showResultModal(`同盟の提案を拒否しました。`, () => {
                         if (onComplete) setTimeout(onComplete, 100);
                     });
                 } else if (type === 'dominate') {
-                    this.updateSentiment(doer.clan, targetClanId, -5);
+                    this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.DOMINATE_FAILURE);
                     this.game.ui.showResultModal(`従属の要求を断固として拒否しました！`, () => {
                         if (onComplete) setTimeout(onComplete, 100);
                     });
