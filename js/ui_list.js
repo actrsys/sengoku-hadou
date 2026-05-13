@@ -18,41 +18,47 @@ class UIListManager {
         this.currentModalInfo = null;
         if (this.ui && this.ui.selectorModal) this.ui.selectorModal.classList.add('hidden');
         
-        // 武将一覧などで使う状態のリセット
-        this.bushoCurrentTab = 'stats';
-        this.bushoCurrentScope = 'clan';
-        this.bushoCurrentSortKey = null;
-        this.bushoIsSortAsc = false;
-        this.bushoSavedBushos = null;
-        this.bushoSavedSortedBushos = null;
-        this.bushoLastSortStateKey = null;
-        this.bushoLastScope = null;
-        this.bushoSavedData = null;
-        this.bushoSavedSelectedIds = [];
-        
-        // 外交リストのタブ状態リセット
-        this.diploCurrentTab = 'daimyo';
-        
-        // 拠点一覧で使う状態のリセット
-        this.currentKyotenTab = 'status';
-        this.currentKyotenScope = 'clan';
-        this.currentKyotenSortKey = null;
-        this.isKyotenSortAsc = false;
-        this.kyotenSavedCastles = null;
-        this.kyotenSavedSortedCastles = null;
-        this.kyotenLastSortStateKey = null;
-        this.kyotenLastScope = null;
-        
-        this.princessCurrentScope = null;
-        this.princessCurrentSortKey = null;
-        this.isPrincessSortAsc = false;
-        
-        this.factionCurrentSortKey = null;
-        this.isFactionSortAsc = false;
+        // ★修正：「新居（list）」の記憶と「旧居（info）」の記憶、両方を空っぽにします
+        const resetTargets = [this];
+        if (this.ui && this.ui.info) resetTargets.push(this.ui.info);
 
-        // 所領分配のリセット
-        this.allotFiefSelectedIds = null;
-        this.allotFiefSavedState = false;
+        resetTargets.forEach(target => {
+            // 武将一覧などで使う状態のリセット
+            target.bushoCurrentTab = 'stats';
+            target.bushoCurrentScope = 'clan';
+            target.bushoCurrentSortKey = null;
+            target.bushoIsSortAsc = false;
+            target.bushoSavedBushos = null;
+            target.bushoSavedSortedBushos = null;
+            target.bushoLastSortStateKey = null;
+            target.bushoLastScope = null;
+            target.bushoSavedData = null;
+            target.bushoSavedSelectedIds = [];
+            
+            // 外交リストのタブ状態リセット
+            target.diploCurrentTab = 'daimyo';
+            
+            // 拠点一覧で使う状態のリセット
+            target.currentKyotenTab = 'status';
+            target.currentKyotenScope = 'clan';
+            target.currentKyotenSortKey = null;
+            target.isKyotenSortAsc = false;
+            target.kyotenSavedCastles = null;
+            target.kyotenSavedSortedCastles = null;
+            target.kyotenLastSortStateKey = null;
+            target.kyotenLastScope = null;
+            
+            target.princessCurrentScope = null;
+            target.princessCurrentSortKey = null;
+            target.isPrincessSortAsc = false;
+            
+            target.factionCurrentSortKey = null;
+            target.isFactionSortAsc = false;
+
+            // 所領分配のリセット
+            target.allotFiefSelectedIds = null;
+            target.allotFiefSavedState = false;
+        });
     }
 
     // --- ソート状態の一元管理 ---
