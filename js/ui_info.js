@@ -1538,9 +1538,18 @@ class UIInfoManager {
                 const clanB = this.game.clans.find(c => c.id === ((b.husbandId && b.husbandId !== 0) ? b.currentClanId : b.originalClanId));
 
                 switch(this.princessCurrentSortKey) {
-                    case 'name': valA = a.yomi || a.name; valB = b.yomi || b.name; break;
-                    case 'clan': valA = clanA ? (clanA.yomi || clanA.name) : ""; valB = clanB ? (clanB.yomi || clanB.name) : ""; break;
-                    case 'age': valA = this.game.year - a.birthYear; valB = this.game.year - b.birthYear; break;
+                    case 'name': 
+                        valA = a.yomi || a.name; 
+                        valB = b.yomi || b.name; 
+                        break;
+                    case 'clan': 
+                        valA = clanA ? (clanA.yomi || clanA.name) : "んんん"; 
+                        valB = clanB ? (clanB.yomi || clanB.name) : "んんん"; 
+                        break;
+                    case 'age': 
+                        valA = this.game.year - a.birthYear; 
+                        valB = this.game.year - b.birthYear; 
+                        break;
                     case 'family': 
                         const getFamilyScore = (p, clan) => {
                             let mark = 0;
@@ -1554,17 +1563,24 @@ class UIInfoManager {
                             }
                             return mark;
                         };
-                        valA = getFamilyScore(a, clanA); valB = getFamilyScore(b, clanB); 
+                        valA = getFamilyScore(a, clanA); 
+                        valB = getFamilyScore(b, clanB); 
                         break;
-                    case 'father': valA = fatherA ? (fatherA.yomi || fatherA.name) : ""; valB = fatherB ? (fatherB.yomi || fatherB.name) : ""; break;
-                    case 'husband': valA = husbandA ? (husbandA.yomi || husbandA.name) : ""; valB = husbandB ? (husbandB.yomi || husbandB.name) : ""; break;
+                    case 'father': 
+                        valA = fatherA ? (fatherA.yomi || fatherA.name) : "んんん"; 
+                        valB = fatherB ? (fatherB.yomi || fatherB.name) : "んんん"; 
+                        break;
+                    case 'husband': 
+                        valA = husbandA ? (husbandA.yomi || husbandA.name) : "んんん"; 
+                        valB = husbandB ? (husbandB.yomi || husbandB.name) : "んんん"; 
+                        break;
                 }
 
                 if (typeof valA === 'string' && typeof valB === 'string') {
                     let cmp = this.isPrincessSortAsc ? valA.localeCompare(valB, 'ja') : valB.localeCompare(valA, 'ja');
                     if(cmp === 0) {
-                        const nameA = a.name;
-                        const nameB = b.name;
+                        const nameA = a.yomi || a.name;
+                        const nameB = b.yomi || b.name;
                         cmp = this.isPrincessSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
                     }
                     return cmp;
