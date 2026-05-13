@@ -58,8 +58,6 @@ class UIManager {
         
         // 情報表示の専門家（さっき作った新しい箱）を準備しておきます
         this.info = new UIInfoManager(this, this.game);
-        // ★追加：リスト表示の専門家を準備しておきます
-        this.list = new UIListManager(this, this.game);
         // ★追加：スライダーの専門家を準備しておきます
         this.slider = new UISliderManager(this, this.game);
         
