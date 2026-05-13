@@ -97,6 +97,18 @@ class WarSystem {
 class WarManager {
     constructor(game) { this.game = game; this.state = { active: false }; this.pendingPrisoners = []; }
 
+    // ★追加：部隊のデータ（兵士数や士気など）をまとめて取り出す、便利なおまとめ魔法です！
+    getArmyData(role) {
+        const s = this.state;
+        if (role === 'attacker') return { army: s.attacker, bushos: s.atkBushos, soldiers: s.attacker ? s.attacker.soldiers : 0, morale: s.attacker ? s.attacker.morale ?? 50 : 50, training: s.attacker ? s.attacker.training ?? 50 : 50 };
+        if (role === 'attacker_self_reinf') return { army: s.selfReinforcement, bushos: s.selfReinforcement ? s.selfReinforcement.bushos : [], soldiers: s.selfReinforcement ? s.selfReinforcement.soldiers : 0, morale: s.selfReinforcement ? s.selfReinforcement.morale ?? 50 : 50, training: s.selfReinforcement ? s.selfReinforcement.training ?? 50 : 50 };
+        if (role === 'attacker_ally_reinf') return { army: s.reinforcement, bushos: s.reinforcement ? s.reinforcement.bushos : [], soldiers: s.reinforcement ? s.reinforcement.soldiers : 0, morale: s.reinforcement ? s.reinforcement.morale ?? 50 : 50, training: s.reinforcement ? s.reinforcement.training ?? 50 : 50 };
+        if (role === 'defender') return { army: s.defender, bushos: s.defBusho ? [s.defBusho] : [], soldiers: s.defender ? s.defender.soldiers : 0, morale: s.defender ? s.defender.morale ?? 50 : 50, training: s.defender ? s.defender.training ?? 50 : 50 };
+        if (role === 'defender_self_reinf') return { army: s.defSelfReinforcement, bushos: s.defSelfReinforcement ? s.defSelfReinforcement.bushos : [], soldiers: s.defSelfReinforcement ? s.defSelfReinforcement.soldiers : 0, morale: s.defSelfReinforcement ? s.defSelfReinforcement.morale ?? 50 : 50, training: s.defSelfReinforcement ? s.defSelfReinforcement.training ?? 50 : 50 };
+        if (role === 'defender_ally_reinf') return { army: s.defReinforcement, bushos: s.defReinforcement ? s.defReinforcement.bushos : [], soldiers: s.defReinforcement ? s.defReinforcement.soldiers : 0, morale: s.defReinforcement ? s.defReinforcement.morale ?? 50 : 50, training: s.defReinforcement ? s.defReinforcement.training ?? 50 : 50 };
+        return { army: null, bushos: [], soldiers: 0, morale: 50, training: 50 };
+    }
+
     // ★追加：自分が操作できる部隊かどうかを判定する、便利なおまとめ魔法です！
     // 諸勢力（isKunishu, isKunishuForce）の場合は、プレイヤーの城から出てもAIにお任せするようにガードを追加しました。
     checkIsMyTurn(s) {
@@ -488,17 +500,11 @@ class WarManager {
         const s = this.state; 
         const isDefenderTurn = s.turn.startsWith('defender');
 
-        let actor;
-        let mySoldiers = 0;
-        let myMorale = 50;
-        let myArmy = null;
-        
-        if (s.turn === 'attacker') { actor = s.atkBushos[0]; mySoldiers = s.attacker.soldiers; myMorale = s.attacker.morale ?? 50; myArmy = s.attacker; }
-        else if (s.turn === 'attacker_self_reinf') { actor = s.selfReinforcement.bushos[0]; mySoldiers = s.selfReinforcement.soldiers; myMorale = s.selfReinforcement.morale ?? 50; myArmy = s.selfReinforcement; }
-        else if (s.turn === 'attacker_ally_reinf') { actor = s.reinforcement.bushos[0]; mySoldiers = s.reinforcement.soldiers; myMorale = s.reinforcement.morale ?? 50; myArmy = s.reinforcement; }
-        else if (s.turn === 'defender') { actor = s.defBusho; mySoldiers = s.defender.soldiers; myMorale = s.defender.morale ?? 50; myArmy = s.defender; }
-        else if (s.turn === 'defender_self_reinf') { actor = s.defSelfReinforcement.bushos[0]; mySoldiers = s.defSelfReinforcement.soldiers; myMorale = s.defSelfReinforcement.morale ?? 50; myArmy = s.defSelfReinforcement; }
-        else if (s.turn === 'defender_ally_reinf') { actor = s.defReinforcement.bushos[0]; mySoldiers = s.defReinforcement.soldiers; myMorale = s.defReinforcement.morale ?? 50; myArmy = s.defReinforcement; }
+        const armyData = this.getArmyData(s.turn);
+        let myArmy = armyData.army;
+        let actor = armyData.bushos[0];
+        let mySoldiers = armyData.soldiers;
+        let myMorale = armyData.morale;
 
         // ★行動する部隊の軍馬・鉄砲の割合（0.0〜1.0）と、大勢に影響しない程度のスコアボーナス（最大20点）を計算します
         let horseRatio = (myArmy && mySoldiers > 0) ? Math.min(1.0, (myArmy.horses || 0) / mySoldiers) : 0;
@@ -845,13 +851,7 @@ class WarManager {
         };
 
         const getArmyObj = (role) => {
-            if (role === 'attacker') return s.attacker;
-            if (role === 'attacker_self_reinf') return s.selfReinforcement;
-            if (role === 'attacker_ally_reinf') return s.reinforcement;
-            if (role === 'defender') return s.defender;
-            if (role === 'defender_self_reinf') return s.defSelfReinforcement;
-            if (role === 'defender_ally_reinf') return s.defReinforcement;
-            return null;
+            return this.getArmyData(role).army;
         };
 
         // ★新規追加: 勢力名と武将名を組み合わせたカッコいい軍の名前を作る魔法
@@ -930,13 +930,11 @@ class WarManager {
         
         const isAtkTurnGroup = s.turn.startsWith('attacker');
         
-        let activeBushos, activeSoldiers, activeMorale, activeTraining;
-        if (s.turn === 'attacker') { activeBushos = s.atkBushos; activeSoldiers = s.attacker.soldiers; activeMorale = s.attacker.morale ?? 50; activeTraining = s.attacker.training ?? 50; }
-        else if (s.turn === 'attacker_self_reinf') { activeBushos = s.selfReinforcement.bushos; activeSoldiers = s.selfReinforcement.soldiers; activeMorale = s.selfReinforcement.morale ?? 50; activeTraining = s.selfReinforcement.training ?? 50; }
-        else if (s.turn === 'attacker_ally_reinf') { activeBushos = s.reinforcement.bushos; activeSoldiers = s.reinforcement.soldiers; activeMorale = s.reinforcement.morale ?? 50; activeTraining = s.reinforcement.training ?? 50; }
-        else if (s.turn === 'defender') { activeBushos = [s.defBusho]; activeSoldiers = s.defender.soldiers; activeMorale = s.defender.morale ?? 50; activeTraining = s.defender.training ?? 50; }
-        else if (s.turn === 'defender_self_reinf') { activeBushos = s.defSelfReinforcement.bushos; activeSoldiers = s.defSelfReinforcement.soldiers; activeMorale = s.defSelfReinforcement.morale ?? 50; activeTraining = s.defSelfReinforcement.training ?? 50; }
-        else if (s.turn === 'defender_ally_reinf') { activeBushos = s.defReinforcement.bushos; activeSoldiers = s.defReinforcement.soldiers; activeMorale = s.defReinforcement.morale ?? 50; activeTraining = s.defReinforcement.training ?? 50; }
+        const armyData = this.getArmyData(s.turn);
+        let activeBushos = armyData.bushos;
+        let activeSoldiers = armyData.soldiers;
+        let activeMorale = armyData.morale;
+        let activeTraining = armyData.training;
 
         let targetBushos, targetSoldiers = 0, targetMorale, targetTraining;
         
