@@ -75,49 +75,6 @@ class UIManager {
 
         this.onResultModalClose = null;
 
-        // ★結果画面の外側（黒い背景）を押して閉じた時にも音が鳴る
-        if (this.resultModal) {
-            this.resultModal.addEventListener('click', (e) => { 
-                if (e.target === this.resultModal) { 
-                    // ★ここから追加：選択が必須の画面（いつもの「閉じる」ボタンがない時）は、閉じられないように守ります！
-                    const footer = document.getElementById('result-footer');
-                    if (footer && !footer.innerHTML.includes('closeResultModal')) {
-                        return; // 閉じずに何もしないで、そのまま待ちます
-                    }
-                    // ★追加ここまで
-
-                    if (window.AudioManager) window.AudioManager.playSE('cancel.ogg'); 
-                    this.closeResultModal(); 
-                } 
-            });
-        }
-
-        // 単なるメッセージ表示のウインドウも、外側を押して閉じられるようにします！
-        const dialogModal = document.getElementById('dialog-modal');
-        if (dialogModal) {
-            dialogModal.addEventListener('click', (e) => {
-                // ウインドウの外側（黒い背景）を押したか確認します
-                if (e.target === dialogModal) {
-                    const cancelBtn = document.getElementById('dialog-btn-cancel');
-                    // キャンセルボタンが無い、または隠れている（＝選択肢がない単なるメッセージの）時だけ閉じます
-                    if (!cancelBtn || cancelBtn.classList.contains('hidden')) {
-                        const okBtn = document.getElementById('dialog-btn-ok');
-                        if (okBtn) {
-                            // イベント中の場合は選択音、そうでない場合はキャンセル音を鳴らします
-                            if (window.AudioManager) {
-                                if (dialogModal.classList.contains('event-dialog-modal')) {
-                                    window.AudioManager.playSE('choice.ogg');
-                                } else {
-                                    window.AudioManager.playSE('cancel.ogg');
-                                }
-                            }
-                            okBtn.click();
-                        }
-                    }
-                }
-            });
-        }
-        
         if (this.mapZoomInBtn) {
             this.mapZoomInBtn.onclick = (e) => { e.stopPropagation(); this.changeMapZoom(1); };
         }
