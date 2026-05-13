@@ -68,7 +68,8 @@ class InterviewSystem {
             leftFace: busho.faceIcon,
             leftName: busho.name,
             choices: choices,
-            isInterview: true
+            isInterview: true,
+            isEvent: true
         });
     }
     
@@ -124,12 +125,10 @@ class InterviewSystem {
 
         let msg = displayParts.filter(Boolean).join('<br>');
         
-        this.game.ui.showDialog(msg, false, null, null, {
+        this.game.ui.showDialog(msg, false, () => { this.reopenInterviewModal(busho); }, null, {
             leftFace: busho.faceIcon,
             leftName: busho.name,
-            choices: [
-                { label: "戻る", onClick: () => { this.reopenInterviewModal(busho); } }
-            ]
+            isEvent: true
         });
     }
 
@@ -186,12 +185,10 @@ class InterviewSystem {
 
         let msg = displayParts.filter(Boolean).join('<br>');
         
-        this.game.ui.showDialog(msg, false, null, null, {
+        this.game.ui.showDialog(msg, false, () => { this.reopenInterviewModal(interviewer); }, null, {
             leftFace: interviewer.faceIcon,
             leftName: interviewer.name,
-            choices: [
-                { label: "戻る", onClick: () => { this.reopenInterviewModal(interviewer); } }
-            ]
+            isEvent: true
         });
     }
 }
