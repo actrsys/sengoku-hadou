@@ -765,7 +765,7 @@ class UIManager {
                     // ★ここを修正：スマホ版かPC版かで横幅の広げ方を変えます！
                     if (document.body.classList.contains('is-pc')) {
                         footer.style.width = '80%';
-                        footer.style.maxWidth = '300px';
+                        footer.style.maxWidth = '600px';
                     } else {
                         // スマホ版の時は、横幅をいっぱいに広げて左右の隙間をなくします
                         footer.style.width = '100%';
