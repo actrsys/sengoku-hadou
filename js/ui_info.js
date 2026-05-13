@@ -12,161 +12,32 @@ class UIInfoManager {
     
     // --- 共通モーダル（枠の使い回し）管理 ---
     closeCommonModal() {
-        this._stableSortBases = {}; // ★全リスト共通の「前回の並び順」を記憶する箱をリセットします
-
-        this.modalHistory = [];
-        this.currentModalInfo = null;
-        if (this.ui && this.ui.selectorModal) this.ui.selectorModal.classList.add('hidden');
-        
-        // 武将一覧などで使う状態のリセット
-        this.bushoCurrentTab = 'stats';
-        this.bushoCurrentScope = 'clan';
-        this.bushoCurrentSortKey = null;
-        this.bushoIsSortAsc = false;
-        this.bushoSavedBushos = null;
-        this.bushoSavedSortedBushos = null;
-        this.bushoLastSortStateKey = null;
-        this.bushoLastScope = null;
-        this.bushoSavedData = null;
-        this.bushoSavedSelectedIds = [];
-        
-        // 外交リストのタブ状態リセット
-        this.diploCurrentTab = 'daimyo';
-        
-        // 拠点一覧で使う状態のリセット
-        this.currentKyotenTab = 'status';
-        this.currentKyotenScope = 'clan';
-        this.currentKyotenSortKey = null;
-        this.isKyotenSortAsc = false;
-        this.kyotenSavedCastles = null;
-        this.kyotenSavedSortedCastles = null;
-        this.kyotenLastSortStateKey = null;
-        this.kyotenLastScope = null;
-        
-        this.princessCurrentScope = null;
-        this.princessCurrentSortKey = null;
-        this.isPrincessSortAsc = false;
-        
-        this.factionCurrentSortKey = null;
-        this.isFactionSortAsc = false;
-
-        // 所領分配のリセット
-        this.allotFiefSelectedIds = null;
-        this.allotFiefSavedState = false;
+        if(this.ui.list) this.ui.list.closeCommonModal();
     }
 
     // --- ソート状態の一元管理 ---
-    // ★新機能：全リスト共通で「前回の並び順（ベース）」を取得する魔法
     _prepareStableSortBase(listId, baseArray, sortKey) {
-        if (!this._stableSortBases) this._stableSortBases = {};
-        if (!sortKey) {
-            this._stableSortBases[listId] = null;
-            return [...baseArray];
-        }
-        return this._stableSortBases[listId] ? [...this._stableSortBases[listId]] : [...baseArray];
+        return this.ui.list._prepareStableSortBase(listId, baseArray, sortKey);
     }
 
-    // ★新機能：並べ替えが終わったあとに、その結果を共通の箱に保存する魔法
     _saveStableSortResult(listId, sortedArray) {
-        if (!this._stableSortBases) this._stableSortBases = {};
-        // ★修正：空っぽ（null）が渡された時は、複製しようとせずにそのまま空っぽにします！
-        this._stableSortBases[listId] = sortedArray ? [...sortedArray] : null;
+        if(this.ui.list) this.ui.list._saveStableSortResult(listId, sortedArray);
     }
 
     _toggleSortState(currentSortKey, currentIsAsc, clickedSortKey, defaultAscKeys) {
-        if (currentSortKey === clickedSortKey) {
-            const isDefaultAsc = defaultAscKeys.includes(clickedSortKey);
-            // 2回目のクリック（現在の向きがデフォルトと同じ）なら逆向きにする
-            if (currentIsAsc === isDefaultAsc) {
-                return { key: clickedSortKey, isAsc: !currentIsAsc };
-            } else {
-                // 3回目のクリック（現在の向きがデフォルトと逆）ならソートを解除する
-                return { key: null, isAsc: false };
-            }
-        } else {
-            // 1回目のクリック（新しいキー）ならデフォルトの向きでソートする
-            return { key: clickedSortKey, isAsc: defaultAscKeys.includes(clickedSortKey) };
-        }
+        return this.ui.list._toggleSortState(currentSortKey, currentIsAsc, clickedSortKey, defaultAscKeys);
     }
 
     pushModal(pageType, renderArgs) {
-        if (!this.modalHistory) this.modalHistory = [];
-        
-        if (this.currentModalInfo) {
-            // 今開いている画面のスクロール位置をメモしておきます
-            const listEl = document.getElementById('selector-list');
-            this.currentModalInfo.scrollPos = listEl ? listEl.scrollTop : 0;
-            this.modalHistory.push(this.currentModalInfo);
-        }
-        
-        this.currentModalInfo = { pageType, args: renderArgs, scrollPos: 0 };
-        this._renderCurrentModal();
+        if(this.ui.list) this.ui.list.pushModal(pageType, renderArgs);
     }
 
     popModal() {
-        if (!this.modalHistory || this.modalHistory.length === 0) {
-            this.closeCommonModal();
-            return;
-        }
-        // 履歴から一つ前の画面を取り出して復元します
-        this.currentModalInfo = this.modalHistory.pop();
-        this._renderCurrentModal();
+        if(this.ui.list) this.ui.list.popModal();
     }
     
     _renderCurrentModal() {
-        const info = this.currentModalInfo;
-        if (!info) return;
-
-        // ★ここで「情報系画面」かどうかをタグ付け（判定）します
-        const isInfoScreen = ['daimyo_detail', 'busho_detail', 'delegate_setting', 'kunishu_detail', 'castle_detail'].includes(info.pageType);
-
-        // ★枠の大元で、スクロールバーの表示/非表示をクラスで一括管理します
-        const listWrapper = document.getElementById('selector-list-wrapper');
-        const listContainer = document.getElementById('selector-list');
-        
-        if (listWrapper) {
-            if (isInfoScreen) {
-                listWrapper.classList.add('no-custom-scrollbar');
-                if (listContainer) listContainer.style.overflow = 'hidden'; 
-            } else {
-                listWrapper.classList.remove('no-custom-scrollbar');
-                if (listContainer) listContainer.style.overflow = '';
-            }
-        }
-
-        // ★枠の大元で、タブの表示/非表示（ダミータブ）を一括管理します
-        const tabsEl = document.getElementById('selector-tabs');
-        if (tabsEl) {
-            if (isInfoScreen) {
-                tabsEl.classList.add('hidden');
-            } else {
-                tabsEl.classList.remove('hidden');
-                tabsEl.style.justifyContent = 'flex-start';
-                tabsEl.style.paddingLeft = '10px';
-                tabsEl.style.alignItems = 'flex-end';
-                tabsEl.innerHTML = '<div style="display: flex; gap: 5px;"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button></div>';
-            }
-        }
-        
-        // どの画面を描くか判定して専用の魔法を呼び出します
-        if (info.pageType === 'daimyo_list') this._renderDaimyoList(...info.args, info.scrollPos);
-        else if (info.pageType === 'daimyo_detail') this._renderDaimyoDetail(...info.args, info.scrollPos);
-        else if (info.pageType === 'busho_selector') this._renderBushoSelector(...info.args, info.scrollPos);
-        else if (info.pageType === 'busho_detail') this._renderBushoDetail(...info.args, info.scrollPos);
-        else if (info.pageType === 'kyoten_list') this._renderKyotenList(...info.args, info.scrollPos);
-        else if (info.pageType === 'diplo_list') this._renderDiplomacyList(...info.args, info.scrollPos);
-        else if (info.pageType === 'faction_list') this._renderFactionList(...info.args, info.scrollPos);
-        else if (info.pageType === 'princess_list') this._renderPrincessList(...info.args, info.scrollPos);
-        else if (info.pageType === 'delegate_list') this._renderDelegateList(...info.args, info.scrollPos);
-        else if (info.pageType === 'delegate_setting') this._renderDelegateSetting(...info.args, info.scrollPos);
-        else if (info.pageType === 'prisoner_selector') this._renderPrisonerSelector(...info.args, info.scrollPos);
-        else if (info.pageType === 'history_list') this._renderHistoryList(...info.args, info.scrollPos);
-        else if (info.pageType === 'kunishu_list') this._renderKunishuList(...info.args, info.scrollPos);
-        else if (info.pageType === 'kunishu_detail') this._renderKunishuDetail(...info.args, info.scrollPos);
-        else if (info.pageType === 'castle_detail') this._renderCastleDetail(...info.args, info.scrollPos);
-        else if (info.pageType === 'force_selector') this._renderForceSelector(...info.args, info.scrollPos);
-        else if (info.pageType === 'appoint_legion_castle') this._renderAppointLegionCastle(...info.args, info.scrollPos);
-        else if (info.pageType === 'allot_fief') this._renderAllotFief(...info.args, info.scrollPos);
+        // ui_list.js 側で処理するので、ここは空っぽにしておきます！
     }
     
     showDaimyoList() {
@@ -1194,268 +1065,11 @@ class UIInfoManager {
     // ★リスト画面の共通生成工場（ステップ１）
     // ==========================================
     _createBarHtml(percent, type) {
-        const safePercent = Math.min(100, Math.max(0, Number(percent) || 0));
-        return `<div style="display: flex; align-items: center; width: 100%; height: 100%;"><div class="bar-bg bar-bg-${type}"><div class="bar-fill bar-fill-${type}" style="width:${safePercent}%;"></div></div></div>`;
+        return this.ui.list._createBarHtml(percent, type);
     }
 
     _renderListModal(config) {
-        this._currentListRenderId = (this._currentListRenderId || 0) + 1;
-        const currentRenderId = this._currentListRenderId;
-
-        const modal = document.getElementById('selector-modal');
-        const titleEl = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        if (!modal || !listContainer) return;
-        
-        listContainer.style.display = 'none';
-        listContainer.innerHTML = '';
-        modal.classList.remove('hidden');
-
-        if (titleEl) titleEl.textContent = config.title || "";
-
-        if (contextEl) {
-            if (config.contextHtml) {
-                contextEl.classList.remove('hidden');
-                contextEl.innerHTML = config.contextHtml;
-            } else {
-                contextEl.classList.add('hidden');
-            }
-        }
-
-        if (tabsEl) {
-            if (config.tabsHtml) {
-                tabsEl.classList.remove('hidden');
-                tabsEl.innerHTML = config.tabsHtml;
-                
-                // タブ切り替えとスコープ切り替えの一元化
-                if (config.onTabClick) {
-                    const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
-                    tabBtns.forEach(btn => {
-                        btn.onclick = () => {
-                            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                            config.onTabClick(btn.getAttribute('data-tab'));
-                        };
-                    });
-                }
-                if (config.onScopeClick) {
-                    const scopeBtns = tabsEl.querySelectorAll('.busho-scope-btn');
-                    scopeBtns.forEach(btn => {
-                        btn.onclick = () => {
-                            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                            config.onScopeClick(btn.getAttribute('data-scope'));
-                        };
-                    });
-                }
-            } else {
-                tabsEl.classList.add('hidden');
-            }
-        }
-
-        if (backBtn) {
-            if (config.hideBackBtn) {
-                backBtn.style.display = 'none';
-            } else {
-                backBtn.style.display = '';
-                backBtn.textContent = (this.modalHistory && this.modalHistory.length > 0) ? '戻る' : '閉じる';
-                backBtn.onclick = () => {
-                    if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                    if (config.onBack) config.onBack();
-                    this._currentListRenderId++; 
-                    this.popModal();
-                };
-                const footer = backBtn.parentElement;
-                if (footer) footer.style.justifyContent = 'center';
-            }
-        }
-
-        if (confirmBtn) {
-            if (config.onConfirm) {
-                confirmBtn.classList.remove('hidden');
-                confirmBtn.disabled = true;
-                confirmBtn.style.opacity = '0.5';
-                confirmBtn.style.cursor = 'not-allowed';
-                confirmBtn.onclick = () => {
-                    this._currentListRenderId++; 
-                    config.onConfirm();
-                };
-            } else {
-                confirmBtn.classList.add('hidden');
-            }
-        }
-
-        listContainer.className = `list-container ${config.listClass || ''} hide-native-scroll`;
-
-        if (config.gridTemplateSp) listContainer.style.setProperty('--grid-cols-sp', config.gridTemplateSp);
-        else listContainer.style.removeProperty('--grid-cols-sp');
-        
-        if (config.gridTemplatePc) listContainer.style.setProperty('--grid-cols-pc', config.gridTemplatePc);
-        else listContainer.style.removeProperty('--grid-cols-pc');
-
-        let wrapperStyle = "";
-        if (config.minWidth) {
-            wrapperStyle = `width: ${config.minWidth}; min-width: 100%;`;
-        }
-
-        const buildItemHtml = (item, index) => {
-            const cursorStr = item.onClick ? "style='cursor:pointer;'" : "style='cursor:default;'";
-            const extraClass = item.itemClass || '';
-            let clickStr = "";
-            let indexAttr = "";
-            if (item.onClick) {
-                if (typeof item.onClick === 'function') {
-                    indexAttr = `data-action-index="${index}"`; 
-                } else {
-                    clickStr = `onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); ${item.onClick}"`;
-                }
-            }
-            // 先ほどの文字数を数える魔法は取り消して、シンプルな形に戻します
-            const cells = item.cells.map(c => {
-                const strC = String(c);
-                return strC.trim().startsWith('<') ? strC : `<span>${strC}</span>`;
-            }).join('');
-            return `<div class="select-item ${config.itemClass || ''} ${extraClass}" ${cursorStr} ${clickStr} ${indexAttr}>${cells}</div>`;
-        };
-
-        if (!config.items || config.items.length === 0) {
-            let emptyHtml = '';
-            if (config.headers && config.headers.length > 0) {
-                const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
-                emptyHtml += `<div class="list-header ${config.headerClass || ''}">${headerCols}</div>`;
-            }
-            emptyHtml += config.emptyHtml || '<div style="padding: 10px; text-align: center;">データがありません。</div>';
-            listContainer.innerHTML = `<div class="list-inner-wrapper" style="${wrapperStyle}">${emptyHtml}</div>`;
-            listContainer.style.display = 'block';
-            return;
-        }
-
-        const totalItems = config.items.length;
-        const INITIAL_RENDER_COUNT = 30;
-        const CHUNK_SIZE = 50;
-
-        // ★スクロール位置を復元するために、あらかじめ必要な数だけリストを生成しておく魔法
-        let assumedItemHeight = 40; 
-        let requiredItems = config.scrollPos ? Math.ceil(config.scrollPos / assumedItemHeight) + 20 : INITIAL_RENDER_COUNT;
-        const initialLimit = Math.min(totalItems, Math.max(INITIAL_RENDER_COUNT, requiredItems));
-
-        let initialHtmlParts = [];
-        
-        if (config.headers && config.headers.length > 0) {
-            const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
-            initialHtmlParts.push(`<div class="list-header sortable-header ${config.headerClass || ''}">${headerCols}</div>`);
-        }
-
-        for (let i = 0; i < initialLimit; i++) {
-            initialHtmlParts.push(buildItemHtml(config.items[i], i));
-        }
-        
-        for (let i = totalItems; i < 8; i++) {
-            const emptyCells = config.headers ? config.headers.map(() => `<span></span>`).join('') : '';
-            initialHtmlParts.push(`<div class="select-item ${config.itemClass || ''}" style="cursor:default; pointer-events:none;">${emptyCells}</div>`);
-        }
-
-        listContainer.innerHTML = `<div class="list-inner-wrapper" style="${wrapperStyle}">${initialHtmlParts.join('')}</div>`;
-
-        // ★新しい魔法：リストが画面に出た直後に、実際の「枠の幅」と「文字の幅」を測って調整します
-        const adjustTextFit = (startIndex, endIndex) => {
-            const listInner = listContainer.querySelector('.list-inner-wrapper');
-            if (!listInner) return;
-            const itemEls = listInner.querySelectorAll('.select-item');
-            for (let i = startIndex; i < endIndex; i++) {
-                if (itemEls[i]) {
-                    const cells = itemEls[i].children;
-                    for (let j = 0; j < cells.length; j++) {
-                        const cell = cells[j];
-                        // ゲージやアイコンなどの複雑な要素はスキップします
-                        if (cell.querySelector('.bar-bg') || cell.querySelector('.bar-bg-busho') || cell.querySelector('input') || cell.querySelector('img')) continue;
-                        
-                        // はみ出しているかチェック（scrollWidth が clientWidth より大きければはみ出しています）
-                        if (cell.scrollWidth > cell.clientWidth && cell.clientWidth > 0) {
-                            // はみ出している割合を計算して、ギリギリ収まるサイズに縮めます（少しだけ余裕を持たせます）
-                            const ratio = cell.clientWidth / cell.scrollWidth;
-                            const scale = Math.max(0.6, ratio * 0.95); // 限界まで小さくなっても読めるように0.6倍でストップさせます
-                            cell.style.fontSize = `calc(100% * ${scale})`;
-                        }
-                    }
-                }
-            }
-        };
-
-        const attachEvents = (startIndex, endIndex) => {
-            if (config.items) {
-                const actionElements = listContainer.querySelectorAll('[data-action-index]');
-                actionElements.forEach(el => {
-                    if (el.dataset.eventAttached) return;
-                    const index = parseInt(el.getAttribute('data-action-index'));
-                    if (index >= startIndex && index < endIndex && config.items[index] && typeof config.items[index].onClick === 'function') {
-                        el.addEventListener('click', config.items[index].onClick);
-                        el.dataset.eventAttached = "true";
-                    }
-                });
-            }
-            
-            // ★イベントを付けた直後（画面に文字が描画された直後）にサイズ調整の魔法を発動します！
-            requestAnimationFrame(() => {
-                adjustTextFit(startIndex, endIndex);
-            });
-        };
-
-        attachEvents(0, initialLimit);
-
-        if (config.onSortClick) {
-            const headerSpans = listContainer.querySelectorAll('.sortable-header span[data-sort]');
-            headerSpans.forEach(span => {
-                span.onclick = (e) => {
-                    const key = e.currentTarget.getAttribute('data-sort');
-                    if (!key) return;
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    config.onSortClick(key);
-                };
-            });
-        }
-
-        if (window.CustomScrollbar) {
-            if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-        }
-
-        listContainer.style.display = 'block';
-        listContainer.scrollTop = config.scrollPos || 0;
-        if (this.ui.bushoScrollbar) {
-            this.ui.bushoScrollbar.update();
-        }
-
-        if (totalItems > initialLimit) {
-            let currentIndex = initialLimit;
-            const renderNextChunk = () => {
-                if (this._currentListRenderId !== currentRenderId) return;
-
-                const chunkParts = [];
-                const endLimit = Math.min(currentIndex + CHUNK_SIZE, totalItems);
-                
-                for (let i = currentIndex; i < endLimit; i++) {
-                    chunkParts.push(buildItemHtml(config.items[i], i));
-                }
-                
-                const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
-                if (innerWrapper) {
-                    innerWrapper.insertAdjacentHTML('beforeend', chunkParts.join(''));
-                }
-                
-                attachEvents(currentIndex, endLimit);
-                currentIndex = endLimit;
-
-                if (this.ui.bushoScrollbar) this.ui.bushoScrollbar.update();
-
-                if (currentIndex < totalItems) {
-                    requestAnimationFrame(renderNextChunk);
-                }
-            };
-            requestAnimationFrame(renderNextChunk);
-        }
+        if(this.ui.list) this.ui.list._renderListModal(config);
     }
 
     // ==========================================
