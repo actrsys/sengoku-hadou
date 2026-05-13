@@ -2548,7 +2548,6 @@ body.interview-mode #game-screen::after {
     opacity: 1;
     visibility: visible;
     pointer-events: auto; /* ふすまより後ろのマップ等をクリックできないようにブロック */
-    animation: fadeIn 0.3s ease-in;
 }
 
 .interview-dialog-modal .modal-footer {

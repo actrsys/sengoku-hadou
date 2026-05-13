@@ -53,7 +53,10 @@ class InterviewSystem {
         let msg = `「殿、どのようなご用件でしょうか？」`;
         let choices = [
             { label: "調子はどうだ", onClick: () => { this.executeInterviewStatus(busho); } },
-            { label: "他者について聞く", onClick: () => { this.game.ui.openBushoSelector('interview_target', null, { interviewer: busho }); } },
+            { label: "他者について聞く", onClick: () => { 
+                // ★リストを閉じた時（onBack）に、面談メニューに戻るように指示を追加
+                this.game.ui.openBushoSelector('interview_target', null, { interviewer: busho }, () => { this.renderNormalInterview(busho); }); 
+            } },
             { label: "戻る", onClick: () => { 
                 // ★ 面談から抜ける（面談相手を選ぶリストに戻る）ため、ふすまの目印を消します
                 document.body.classList.remove('interview-mode');
@@ -74,7 +77,8 @@ class InterviewSystem {
     }
     
     reopenInterviewModal(busho) {
-        setTimeout(() => this.showInterviewModal(busho), 100);
+        // ★0.1秒待つ処理をなくし、即座に選択肢（通常面談）を描画するように変更
+        this.renderNormalInterview(busho);
     }
 
     // ----------------------------------------------------------------------
