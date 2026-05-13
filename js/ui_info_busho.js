@@ -694,14 +694,14 @@ Object.assign(UIInfoManager.prototype, {
             }
             headers = [
                 !hideActionCol ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
-                `<span class="col-name" data-sort="name">名前${getSortMark('name')}</span>`,
-                `<span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span>`,
-                `<span class="col-stat" data-sort="leadership">統率${getSortMark('leadership')}</span>`,
-                `<span class="col-stat" data-sort="strength">武勇${getSortMark('strength')}</span>`,
-                `<span class="col-stat" data-sort="politics">内政${getSortMark('politics')}</span>`,
-                `<span class="col-stat" data-sort="diplomacy">外交${getSortMark('diplomacy')}</span>`,
-                `<span class="col-stat" data-sort="intelligence">智謀${getSortMark('intelligence')}</span>`,
-                `<span class="col-stat" data-sort="charm">魅力${getSortMark('charm')}</span>`
+                `<span data-sort="name">名前${getSortMark('name')}</span>`,
+                `<span data-sort="rank">身分${getSortMark('rank')}</span>`,
+                `<span data-sort="leadership">統率${getSortMark('leadership')}</span>`,
+                `<span data-sort="strength">武勇${getSortMark('strength')}</span>`,
+                `<span data-sort="politics">内政${getSortMark('politics')}</span>`,
+                `<span data-sort="diplomacy">外交${getSortMark('diplomacy')}</span>`,
+                `<span data-sort="intelligence">智謀${getSortMark('intelligence')}</span>`,
+                `<span data-sort="charm">魅力${getSortMark('charm')}</span>`
             ].filter(Boolean);
         } else {
             headerClassStr += " status-mode";
@@ -716,15 +716,15 @@ Object.assign(UIInfoManager.prototype, {
                 gridPcStr = "35px 100px 140px 140px 50px 50px 60px 1fr";
             }
             headers = [
-                !hideActionCol ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
-                `<span class="col-name" data-sort="name">名前${getSortMark('name')}</span>`,
+                !hideActionCol ? `<span data-sort="action">行動${getSortMark('action')}</span>` : null,
+                `<span data-sort="name">名前${getSortMark('name')}</span>`,
                 // 横スクロールに戻す時のために残しておきます： `<span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span>`,
-                `<span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span>`,
-                `<span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span>`,
-                `<span class="col-age" data-sort="age">年齢${getSortMark('age')}</span>`,
-                `<span class="col-family" data-sort="family">一門${getSortMark('family')}</span>`,
-                `<span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span>`,
-                `<span class="col-faction-leader" data-sort="faction_leader">派閥${getSortMark('faction_leader')}</span>`
+                `<span data-sort="faction">勢力${getSortMark('faction')}</span>`,
+                `<span data-sort="castle">所在${getSortMark('castle')}</span>`,
+                `<span data-sort="age">年齢${getSortMark('age')}</span>`,
+                `<span data-sort="family">一門${getSortMark('family')}</span>`,
+                `<span data-sort="salary">俸禄${getSortMark('salary')}</span>`,
+                `<span data-sort="faction_leader">派閥${getSortMark('faction_leader')}</span>`
             ].filter(Boolean);
         }
 
