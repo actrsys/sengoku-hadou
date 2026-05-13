@@ -265,9 +265,19 @@ class DiplomacyManager {
     }
     
     /**
-     * 外交の成功確率（％）を計算して返す魔法です（0〜100の数値になります）
+     * 外交の成功確率（％）を計算して返す魔法です
+     * 武将のIDなどから、必要な情報を自動で集めて計算します！
      */
-    getDiplomacyProb(doerClanId, targetClanId, type, doerDiplomacy, myPower, targetPower) {
+    getDiplomacyProb(doerId, targetId, type) {
+        // IDから必要な情報を自分で集めます
+        const doer = this.game.getBusho(doerId);
+        const targetCastle = this.game.getCastle(targetId);
+        const targetClanId = targetCastle.ownerClan;
+        const doerClanId = doer.clan;
+        const doerDiplomacy = doer.diplomacy;
+        const myPower = this.game.getClanTotalSoldiers(doerClanId) || 1;
+        const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
+
         const relation = this.getRelation(doerClanId, targetClanId);
         
         // 共通の敵がいるか
@@ -469,11 +479,11 @@ class DiplomacyManager {
     }
 
     /**
-     * 外交の成功判定を行います（AI相手の場合）
+     * 外交の成功判定を行います
      */
-    checkDiplomacySuccess(doerClanId, targetClanId, type, doerDiplomacy, myPower, targetPower) {
-        // ★修正：確率計算は新しい専門部署にお任せして、ここでサイコロを振るだけにします！
-        const prob = this.getDiplomacyProb(doerClanId, targetClanId, type, doerDiplomacy, myPower, targetPower);
+    checkDiplomacySuccess(doerId, targetId, type) {
+        // 外交担当が自分で計算した確率を使って、サイコロを振ります
+        const prob = this.getDiplomacyProb(doerId, targetId, type);
         return (Math.random() * 100) < prob;
     }
     
@@ -671,12 +681,11 @@ class DiplomacyManager {
         
         const targetClanId = targetCastle.ownerClan;
         let msg = "";
-        let aiMsg = ""; // AI同士の場合のメッセージ用
-        let logMsg = ""; // ★追加：履歴に残す用のメッセージです
+        let aiMsg = ""; 
+        let logMsg = ""; 
         const isPlayerInvolved = (doer.clan === this.game.playerClanId || targetClanId === this.game.playerClanId);
 
-        const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
-        const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
+        // ★ ここで兵力などを計算する必要がなくなりました！（成功判定の中で自動でやってくれます）
 
         const doerClanName = this.game.clans.find(c => c.id === doer.clan).name;
         const targetClanName = this.game.clans.find(c => c.id === targetClanId).name;
@@ -684,7 +693,8 @@ class DiplomacyManager {
         if (type === 'goodwill') {
             let isSuccess = true;
             if (targetClanId !== this.game.playerClanId) {
-                isSuccess = this.checkDiplomacySuccess(doer.clan, targetClanId, type, doer.diplomacy, myPower, targetPower);
+                // 成功判定も「誰が」「どこに」「何を」という合図だけでOKです
+                isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, type);
             }
 
             // ★追加：経験値の計算と加算を専門の魔法にお願いします！

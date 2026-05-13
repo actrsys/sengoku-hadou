@@ -1416,9 +1416,8 @@ class CommandSystem {
 
             this.game.ui.showDialog(msg, true, 
                 () => {
-                    const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
-                    const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
-                    const prob = this.game.diplomacyManager.getDiplomacyProb(doer.clan, targetClanId, 'marriage', doer.diplomacy, myPower, targetPower);
+                    // ここも合図だけでとっても綺麗！
+                    const prob = this.game.diplomacyManager.getDiplomacyProb(doerId, targetId, 'marriage');
                     
                     this.showAdviceAndExecute('marriage', () => {
                         this.game.diplomacyManager.executeMarriage(doerId, targetId, princessId, targetBushoId);
@@ -1440,16 +1439,11 @@ class CommandSystem {
         }
 
         if (actionType === 'diplomacy_doer') {
-            const doer = this.game.getBusho(firstId);
-            const targetCastle = this.game.getCastle(targetId);
-            const targetClanId = targetCastle.ownerClan;
-            const myPower = this.game.getClanTotalSoldiers(doer.clan);
-            const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
-            
             if (extraData.subAction === 'goodwill') {
                 this.game.ui.openQuantitySelector('goodwill', selectedIds, targetId);
             } else if (extraData.subAction === 'alliance') {
-                const prob = this.game.diplomacyManager.getDiplomacyProb(doer.clan, targetClanId, 'alliance', doer.diplomacy, myPower, targetPower);
+                // 外交担当に「この条件で確率教えて！」と合図を送るだけ！
+                const prob = this.game.diplomacyManager.getDiplomacyProb(firstId, targetId, 'alliance');
                 this.showAdviceAndExecute('diplomacy', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'alliance'), { trueProb: prob / 100 });
             } else if (extraData.subAction === 'break_alliance') {
                 this.executeWithEvent('break_alliance', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'break_alliance'));
@@ -1658,17 +1652,11 @@ class CommandSystem {
             if (val < 200) { this.game.ui.showDialog("金が足りません", false); return; }
             if (val > 1500) { this.game.ui.showDialog("贈れる金は最大1500までです", false); return; }
             
-            // ★追加: 諸勢力への親善なら
             if (extraData && extraData.isKunishu) {
                 this.showAdviceAndExecute('kunishu_goodwill', () => this.game.kunishuSystem.executeKunishuGoodwill(data[0], extraData.kunishuId, val), { trueProb: 1.0 });
             } else {
-                const doer = this.game.getBusho(data[0]);
-                const targetCastle = this.game.getCastle(targetId);
-                const targetClanId = targetCastle.ownerClan;
-                const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
-                const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
-                const prob = this.game.diplomacyManager.getDiplomacyProb(doer.clan, targetClanId, 'goodwill', doer.diplomacy, myPower, targetPower);
-                
+                // ここでも合図だけ！
+                const prob = this.game.diplomacyManager.getDiplomacyProb(data[0], targetId, 'goodwill');
                 this.showAdviceAndExecute('goodwill', () => this.game.diplomacyManager.executeDiplomacy(data[0], targetId, 'goodwill', val), { trueProb: prob / 100 });
             }
         }
