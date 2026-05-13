@@ -570,6 +570,23 @@ class UIManager {
         const dialog = this.dialogQueue.shift(); 
 
         const modal = document.getElementById('dialog-modal');
+        // ★ここから書き足し：前回の画面で使った特別な配置（真ん中寄せなど）を、一度きれいにリセットしてお掃除します！
+        if (modal) {
+            modal.style.display = '';
+            modal.style.flexDirection = '';
+            modal.style.justifyContent = '';
+            const footer = modal.querySelector('.modal-footer');
+            if (footer) {
+                footer.style.position = '';
+                footer.style.top = '';
+                footer.style.left = '';
+                footer.style.transform = '';
+                footer.style.zIndex = '';
+                footer.style.width = '';
+            }
+        }
+        // ★書き足すのはここまで！
+
         const msgEl = document.getElementById('dialog-message');
         const leftFaceEl = document.getElementById('dialog-left-face');
         const leftNameEl = document.getElementById('dialog-left-name');
@@ -728,6 +745,22 @@ class UIManager {
             if (isEventMode) {
                 modal.classList.add('event-dialog-modal');
                 modal.classList.add('event-choices-active');
+
+                // ★ここから書き足し：メッセージを画面の一番下に配置し、ボタンだけを画面の真ん中に浮かせる魔法です！
+                modal.style.display = 'flex';
+                modal.style.flexDirection = 'column';
+                modal.style.justifyContent = 'flex-end'; // これで文章が下側に固定されます
+
+                if (footer) {
+                    // ボタンが入っている箱（footer）を、画面の高さ50%・幅50%の地点（中央）に固定します
+                    footer.style.position = 'fixed';
+                    footer.style.top = '50%';
+                    footer.style.left = '50%';
+                    footer.style.transform = 'translate(-50%, -50%)'; // 自分の大きさ分だけ戻して、ピッタリ真ん中に合わせます
+                    footer.style.zIndex = '1000'; // 他のものより手前に表示します
+                    footer.style.width = 'auto';  // 横幅はボタンの数に合わせます
+                }
+                // ★書き足すのはここまで！
             } else {
                 modal.classList.remove('event-dialog-modal');
             }
@@ -781,6 +814,12 @@ class UIManager {
             modal.classList.add('event-dialog-modal');
             modal.classList.remove('interview-dialog-modal');
             if (footer) footer.classList.add('hidden');
+
+            // ★ここを書き足し：選択肢がない時も、文章が下側にくるようにします
+            modal.style.display = 'flex';
+            modal.style.flexDirection = 'column';
+            modal.style.justifyContent = 'flex-end';
+
             if (modalContent) {
                 modalContent.style.cursor = 'pointer';
                 modalContent.addEventListener('click', this._currentEventClickHandler);
