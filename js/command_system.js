@@ -934,6 +934,27 @@ class CommandSystem {
     }
     // ==========================================
 
+    // ★追加：道が繋がっているお城をまとめて調べる共通の魔法です！
+    getConnectedCastles(startCastle, clanId) {
+        const connectedCastles = new Set();
+        const queue = [startCastle];
+        connectedCastles.add(Number(startCastle.id));
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const neighbors = this.game.castles.filter(adj => 
+                Number(adj.ownerClan) === Number(clanId) && 
+                GameSystem.isAdjacent(current, adj) &&
+                !connectedCastles.has(Number(adj.id))
+            );
+            for (const n of neighbors) {
+                connectedCastles.add(Number(n.id));
+                queue.push(n);
+            }
+        }
+        return connectedCastles;
+    }
+
     canExecuteCommand(type) {
         const spec = COMMAND_SPECS[type];
         if (!spec) return true;
@@ -1016,8 +1037,7 @@ class CommandSystem {
 
             case 'ally_other': {
                 // ★修正：ターゲットごとに探すのではなく、最初に繋がっている領土をまとめて取得します（超高速化）！
-                // セーブデータロード後は c が魔法を忘れているため、設計図(Castle)から直接借りてきます
-                const connectedForAlly = Castle.prototype.getConnectedCastles.call(c, this.game);
+                const connectedForAlly = this.getConnectedCastles(c, playerClanId);
                 return this.game.castles.filter(target => {
                     if (Number(target.ownerClan) !== playerClanId || target.id === c.id) return false;
                     return connectedForAlly.has(Number(target.id));
@@ -1148,8 +1168,7 @@ class CommandSystem {
                 const allKunishuCastleIds = [...new Set(activeKunishus.map(k => Number(k.castleId)))];
                 
                 // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
-                // セーブデータロード対策として、設計図(Castle)から直接魔法を借りてきます
-                const connectedCastles = Castle.prototype.getConnectedCastles.call(c, this.game);
+                const connectedCastles = this.getConnectedCastles(c, playerClanId);
                 
                 // 集めた城を「フィルター（ふるい）」にかけて、条件に合うものだけを残します！
                 return allKunishuCastleIds.filter(targetCastleId => {
@@ -2445,7 +2464,7 @@ class CommandSystem {
         const pid = this.game.playerClanId;
         
         // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
-        const connectedCastles = atkCastle.getConnectedCastles(this.game);
+        const connectedCastles = this.getConnectedCastles(atkCastle, myClanId);
         
         // ★修正：条件のチェックをすべて「外交の専門部署」に任せます！
         const selfCandidates = this.game.diplomacyManager.findAvailableReinforcements(
