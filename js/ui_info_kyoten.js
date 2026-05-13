@@ -303,41 +303,41 @@ Object.assign(UIInfoManager.prototype, {
             gridSpStr = "2fr 1fr 1fr 1fr 0.8fr 1fr 1fr";
             gridPcStr = "140px 100px 100px 100px 60px 80px 80px 1fr";
             headers = [
-                `<span class="col-castle-name" data-sort="name">拠点名${getSortMark('name')}</span>`,
-                `<span class="col-clan" data-sort="clan">勢力${getSortMark('clan')}</span>`,
-                `<span class="col-castellan" data-sort="castellan">城主${getSortMark('castellan')}</span>`,
-                `<span class="col-province" data-sort="province">国${getSortMark('province')}</span>`,
-                `<span class="col-busho-count" data-sort="bushoCount">武将${getSortMark('bushoCount')}</span>`,
-                `<span class="col-gold" data-sort="gold">金${getSortMark('gold')}</span>`,
-                `<span class="col-rice" data-sort="rice">兵糧${getSortMark('rice')}</span>`,
+                `<span data-sort="name">拠点名${getSortMark('name')}</span>`,
+                `<span data-sort="clan">勢力${getSortMark('clan')}</span>`,
+                `<span data-sort="castellan">城主${getSortMark('castellan')}</span>`,
+                `<span data-sort="province">国${getSortMark('province')}</span>`,
+                `<span data-sort="bushoCount">武将${getSortMark('bushoCount')}</span>`,
+                `<span data-sort="gold">金${getSortMark('gold')}</span>`,
+                `<span data-sort="rice">兵糧${getSortMark('rice')}</span>`,
                 `<span class="pc-only"></span>`
             ];
         } else if (this.currentKyotenTab === 'military') {
             gridSpStr = "2fr 1fr 1fr 1fr 1fr 1fr 1fr";
             gridPcStr = "140px 80px 80px 80px 80px 80px 80px 1fr";
             headers = [
-                `<span class="col-castle-name" data-sort="name">拠点名${getSortMark('name')}</span>`,
-                `<span class="col-soldiers" data-sort="soldiers">兵数${getSortMark('soldiers')}</span>`,
-                `<span class="col-defense" data-sort="defense">防御${getSortMark('defense')}</span>`,
-                `<span class="col-morale" data-sort="morale">士気${getSortMark('morale')}</span>`,
-                `<span class="col-training" data-sort="training">訓練${getSortMark('training')}</span>`,
-                `<span class="col-horses" data-sort="horses">軍馬${getSortMark('horses')}</span>`,
-                `<span class="col-guns" data-sort="guns">鉄砲${getSortMark('guns')}</span>`,
+                `<span data-sort="name">拠点名${getSortMark('name')}</span>`,
+                `<span data-sort="soldiers">兵数${getSortMark('soldiers')}</span>`,
+                `<span data-sort="defense">防御${getSortMark('defense')}</span>`,
+                `<span data-sort="morale">士気${getSortMark('morale')}</span>`,
+                `<span data-sort="training">訓練${getSortMark('training')}</span>`,
+                `<span data-sort="horses">軍馬${getSortMark('horses')}</span>`,
+                `<span data-sort="guns">鉄砲${getSortMark('guns')}</span>`,
                 `<span class="pc-only"></span>`
             ];
         } else if (this.currentKyotenTab === 'economy') {
             gridSpStr = "2.5fr 1fr 0.8fr 1.2fr 1.2fr 1.5fr 1.5fr";
             gridPcStr = "140px 60px 50px 60px 60px 80px 80px 100px 100px";
             headers = [
-                `<span class="col-castle-name" data-sort="name">拠点名${getSortMark('name')}</span>`,
-                `<span class="col-population" data-sort="population">人口${getSortMark('population')}</span>`,
-                `<span class="col-loyalty" data-sort="loyalty">民忠${getSortMark('loyalty')}</span>`,
-                `<span class="col-kokudaka pc-only" data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
-                `<span class="col-commerce pc-only" data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
-                `<span class="col-gold-income" data-sort="goldIncome">金収入/月${getSortMark('goldIncome')}</span>`,
-                `<span class="col-gold-consume" data-sort="goldConsume">金支出/月${getSortMark('goldConsume')}</span>`,
-                `<span class="col-rice-income" data-sort="riceIncome">兵糧収入/年${getSortMark('riceIncome')}</span>`,
-                `<span class="col-rice-consume" data-sort="riceConsume">兵糧支出/年${getSortMark('riceConsume')}</span>`
+                `<span data-sort="name">拠点名${getSortMark('name')}</span>`,
+                `<span data-sort="population">人口${getSortMark('population')}</span>`,
+                `<span data-sort="loyalty">民忠${getSortMark('loyalty')}</span>`,
+                `<span data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
+                `<span data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
+                `<span data-sort="goldIncome">金収入/月${getSortMark('goldIncome')}</span>`,
+                `<span data-sort="goldConsume">金支出/月${getSortMark('goldConsume')}</span>`,
+                `<span data-sort="riceIncome">兵糧収入/年${getSortMark('riceIncome')}</span>`,
+                `<span data-sort="riceConsume">兵糧支出/年${getSortMark('riceConsume')}</span>`
             ];
         }
 
