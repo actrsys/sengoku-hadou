@@ -290,8 +290,12 @@ class DiplomacyManager {
             if (allyCount >= 2) acceptProb -= (allyCount - 1) * 20;
             if (targetPower > myPower) acceptProb *= (myPower / targetPower);
             
+            if (['友好', '同盟', '支配', '従属'].includes(relation.status)) {
+                acceptProb += 30;
+            }
+            
             finalProb = Math.max(0, Math.min(100, acceptProb));
-        } 
+        }
         else if (type === 'alliance') {
             let threshold = commonEnemy ? 90 : 120; 
             let acceptProb = commonEnemy ? 90 : 70; 
@@ -611,6 +615,25 @@ class DiplomacyManager {
     }
     
     /**
+     * ★新設：同盟が成立した時のデータ書き換えを一手に引き受ける専門の魔法です
+     */
+    applyAllianceData(clanA, clanB) {
+        const relation = this.getRelation(clanA, clanB);
+        if (relation) {
+            if (relation.sentiment < 31) {
+                relation.sentiment = 50;
+            } else {
+                relation.sentiment = Math.min(100, relation.sentiment + 20);
+            }
+            const oppRelation = this.getRelation(clanB, clanA);
+            if (oppRelation) oppRelation.sentiment = relation.sentiment;
+        }
+        
+        // 状態を同盟に変更する処理もここにまとめます
+        this.changeStatus(clanA, clanB, '同盟');
+    }
+
+    /**
      * 外交コマンドを実行する魔法です
      */
     executeDiplomacy(doerId, targetCastleId, type, gold = 0) {
@@ -662,7 +685,8 @@ class DiplomacyManager {
             this.calcDiplomacyExp(doer, type, isSuccess, true);
 
             if (isSuccess) {
-                this.changeStatus(doer.clan, targetClanId, '同盟');
+                // ★修正：同盟成立の処理は新しい専門部署にお任せします！
+                this.applyAllianceData(doer.clan, targetClanId);
                 
                 // ★追加：同盟が成功したら、この大名家の「今月の外交目標」を親善に書き換えます
                 const doerClan = this.game.clans.find(c => c.id === doer.clan);
@@ -1595,7 +1619,9 @@ class DiplomacyManager {
                         if (onComplete) setTimeout(onComplete, 100);
                     });
                 } else if (type === 'alliance') {
-                    this.changeStatus(doer.clan, targetClanId, '同盟');
+                    // ★修正：同盟成立の処理は新しい専門部署にお任せします！
+                    this.applyAllianceData(doer.clan, targetClanId);
+                    
                     this.game.ui.log(`${doerClan.name}と同盟を結びました`);
                     this.game.ui.showResultModal(`${doerClan.name} と同盟を結びました！`, () => {
                         if (onComplete) setTimeout(onComplete, 100);
