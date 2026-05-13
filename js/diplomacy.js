@@ -634,6 +634,34 @@ class DiplomacyManager {
     }
 
     /**
+     * ★新設：支配・従属が成立した時のデータ書き換えを一手に引き受ける専門の魔法です
+     */
+    applyDominationData(dominantClanId, subordinateClanId) {
+        // 関係値の調整
+        const relation = this.getRelation(dominantClanId, subordinateClanId);
+        if (relation) {
+            if (relation.sentiment <= 40) {
+                relation.sentiment = 50;
+            } else {
+                relation.sentiment = Math.min(100, relation.sentiment + 10);
+            }
+            const oppRelation = this.getRelation(subordinateClanId, dominantClanId);
+            if (oppRelation) oppRelation.sentiment = relation.sentiment;
+        }
+
+        // 状態を支配・従属に変更します
+        // （changeStatusの仕様で、片方を「支配」にすると相手側は自動で「従属」になります）
+        this.changeStatus(dominantClanId, subordinateClanId, '支配');
+
+        // ★支配した側の大名家の「今月の外交目標」を親善に書き換えます
+        const dominantClan = this.game.clans.find(c => c.id === dominantClanId);
+        if (dominantClan && dominantClan.currentDiplomacyTarget && dominantClan.currentDiplomacyTarget.targetId === subordinateClanId) {
+            dominantClan.currentDiplomacyTarget.action = 'goodwill';
+            dominantClan.currentDiplomacyTarget.gold = 300;
+        }
+    }
+
+    /**
      * 外交コマンドを実行する魔法です
      */
     executeDiplomacy(doerId, targetCastleId, type, gold = 0) {
@@ -955,18 +983,9 @@ class DiplomacyManager {
             this.negotiateSubordinationConditions(doer.clan, targetClanId,
                 (conditionType, conditionData) => {
                     // 要求を呑んで従属が成立した場合
-                    this.changeStatus(doer.clan, targetClanId, '従属');
-                    
-                    const relation = this.getRelation(doer.clan, targetClanId);
-                    if (relation) {
-                        if (relation.sentiment <= 40) {
-                            relation.sentiment = 50;
-                        } else {
-                            relation.sentiment = Math.min(100, relation.sentiment + 10);
-                        }
-                        const oppRelation = this.getRelation(targetClanId, doer.clan);
-                        if (oppRelation) oppRelation.sentiment = relation.sentiment;
-                    }
+                    // ★修正：支配・従属の処理は新しい専門部署にお任せします！
+                    // （相手が自分を支配する、という形で呼び出します）
+                    this.applyDominationData(targetClanId, doer.clan);
 
                     // どの条件を呑んだかでメッセージを変えます
                     let conditionMsg = "";
@@ -1024,26 +1043,8 @@ class DiplomacyManager {
                 this.calcDiplomacyExp(doer, type, isSuccess, true);
                 
                 if (isSuccess) {
-                    this.changeStatus(doer.clan, targetClanId, '支配');
-                    
-                    // ★追加：支配した時に、関係値を調整します！
-                    const relation = this.getRelation(doer.clan, targetClanId);
-                    if (relation) {
-                        if (relation.sentiment <= 40) {
-                            relation.sentiment = 50;
-                        } else {
-                            relation.sentiment = Math.min(100, relation.sentiment + 10);
-                        }
-                        const oppRelation = this.getRelation(targetClanId, doer.clan);
-                        if (oppRelation) oppRelation.sentiment = relation.sentiment;
-                    }
-
-                    // ★追加：支配が成功したら、この大名家の「今月の外交目標」を親善に書き換えます
-                    const doerClan = this.game.clans.find(c => c.id === doer.clan);
-                    if (doerClan && doerClan.currentDiplomacyTarget && doerClan.currentDiplomacyTarget.targetId === targetClanId) {
-                        doerClan.currentDiplomacyTarget.action = 'goodwill';
-                        doerClan.currentDiplomacyTarget.gold = 300; // 支配下への親善は基本の300にします
-                    }
+                    // ★修正：支配・従属の処理は新しい専門部署にお任せします！
+                    this.applyDominationData(doer.clan, targetClanId);
 
                     msg = `${this.game.clans.find(c => c.id === targetClanId).name} を支配下に置くことに成功しました！`;
                     if (!isPlayerInvolved) aiMsg = `${doerClanName} が ${targetClanName} を支配下に置きました！`;
@@ -1627,25 +1628,8 @@ class DiplomacyManager {
                         if (onComplete) setTimeout(onComplete, 100);
                     });
                 } else if (type === 'dominate') {
-                    this.changeStatus(doer.clan, targetClanId, '支配');
-                    
-                    // ★追加：従属した時に、関係値を調整します！
-                    const relation = this.getRelation(doer.clan, targetClanId);
-                    if (relation) {
-                        if (relation.sentiment <= 40) {
-                            relation.sentiment = 50;
-                        } else {
-                            relation.sentiment = Math.min(100, relation.sentiment + 10);
-                        }
-                        const oppRelation = this.getRelation(targetClanId, doer.clan);
-                        if (oppRelation) oppRelation.sentiment = relation.sentiment;
-                    }
-
-                    // ★追加：支配が成功したら、この大名家の「今月の外交目標」を親善に書き換えます
-                    if (doerClan && doerClan.currentDiplomacyTarget && doerClan.currentDiplomacyTarget.targetId === targetClanId) {
-                        doerClan.currentDiplomacyTarget.action = 'goodwill';
-                        doerClan.currentDiplomacyTarget.gold = 300; // 支配下への親善は基本の300にします
-                    }
+                    // ★修正：支配・従属の処理は新しい専門部署にお任せします！
+                    this.applyDominationData(doer.clan, targetClanId);
 
                     this.game.ui.log(`${doerClan.name}に従属しました`);
                     this.game.ui.showResultModal(`${doerClan.name} に従属しました……`, () => {
