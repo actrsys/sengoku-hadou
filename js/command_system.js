@@ -1016,7 +1016,8 @@ class CommandSystem {
 
             case 'ally_other': {
                 // ★修正：ターゲットごとに探すのではなく、最初に繋がっている領土をまとめて取得します（超高速化）！
-                const connectedForAlly = c.getConnectedCastles(this.game);
+                // セーブデータロード後は c が魔法を忘れているため、設計図(Castle)から直接借りてきます
+                const connectedForAlly = Castle.prototype.getConnectedCastles.call(c, this.game);
                 return this.game.castles.filter(target => {
                     if (Number(target.ownerClan) !== playerClanId || target.id === c.id) return false;
                     return connectedForAlly.has(Number(target.id));
@@ -1147,7 +1148,8 @@ class CommandSystem {
                 const allKunishuCastleIds = [...new Set(activeKunishus.map(k => Number(k.castleId)))];
                 
                 // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
-                const connectedCastles = c.getConnectedCastles(this.game);
+                // セーブデータロード対策として、設計図(Castle)から直接魔法を借りてきます
+                const connectedCastles = Castle.prototype.getConnectedCastles.call(c, this.game);
                 
                 // 集めた城を「フィルター（ふるい）」にかけて、条件に合うものだけを残します！
                 return allKunishuCastleIds.filter(targetCastleId => {
