@@ -619,7 +619,7 @@ const COMMAND_SPECS = {
     'tribute': {
         label: "貢物", category: 'DIPLOMACY_COURT',
         costGold: 0, costRice: 0,
-        isMulti: false, hasAdvice: true,
+        isMulti: false, hasAdvice: false,
         startMode: 'busho_select_special', subType: 'tribute_doer', sortKey: 'politics',
         msg: "朝廷に使者を送り、金を献上します",
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasGold200(game, castle)
@@ -1416,9 +1416,13 @@ class CommandSystem {
 
             this.game.ui.showDialog(msg, true, 
                 () => {
-                    this.executeWithEvent('marriage', () => {
-                        this.game.diplomacyManager.executeMarriage(doerId, targetId, princessId, targetBushoId);
-                    });
+                    const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
+                    const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
+                    const prob = this.game.diplomacyManager.getDiplomacyProb(doer.clan, targetClanId, 'marriage', doer.diplomacy, myPower, targetPower);
+                    
+                    this.showAdviceAndExecute('marriage', () => {
+                        this.game.diplomacyManager.executeMarriage(doerId, targetId, princessId, targetBushoId);
+                    }, { trueProb: prob / 100 });
                 },
                 () => {
                     // いいえ：もう一度相手武将選びに戻る
@@ -1658,14 +1662,21 @@ class CommandSystem {
             if (extraData && extraData.isKunishu) {
                 this.showAdviceAndExecute('kunishu_goodwill', () => this.game.kunishuSystem.executeKunishuGoodwill(data[0], extraData.kunishuId, val), { trueProb: 1.0 });
             } else {
-                this.showAdviceAndExecute('goodwill', () => this.game.diplomacyManager.executeDiplomacy(data[0], targetId, 'goodwill', val), { trueProb: 1.0 });
+                const doer = this.game.getBusho(data[0]);
+                const targetCastle = this.game.getCastle(targetId);
+                const targetClanId = targetCastle.ownerClan;
+                const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
+                const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
+                const prob = this.game.diplomacyManager.getDiplomacyProb(doer.clan, targetClanId, 'goodwill', doer.diplomacy, myPower, targetPower);
+                
+                this.showAdviceAndExecute('goodwill', () => this.game.diplomacyManager.executeDiplomacy(data[0], targetId, 'goodwill', val), { trueProb: prob / 100 });
             }
         }
         else if (type === 'tribute_gold') {
             // ★追加：貢物の金額が決まったら、実行の魔法を呼び出します
             const val = parseInt(inputs.gold.num.value);
             if (val < 200) { this.game.ui.showDialog("金が足りません", false); return; }
-            this.showAdviceAndExecute('tribute', () => this.game.courtRankSystem.executeTribute(data[0], val), { trueProb: 1.0 });
+            this.executeWithEvent('tribute', () => this.game.courtRankSystem.executeTribute(data[0], val));
         }
         else if (type === 'headhunt_gold') {
             const val = parseInt(inputs.gold.num.value);
