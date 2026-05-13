@@ -293,7 +293,7 @@ class UIInfoManager {
             items.push({
                 onClick: `window.GameApp.ui.info.showDaimyoDetail(${d.id})`,
                 cells: [
-                    `<span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span>`,
+                    `<span class="col-daimyo-name">${d.name}</span>`,
                     `<span class="col-leader-name">${d.leaderName}</span>`,
                     `<span class="col-castle-count">${d.castlesCount}</span>`,
                     `<span class="col-prestige">${powerBarHtml}</span>`,
