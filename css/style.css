@@ -2473,10 +2473,10 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 .event-dialog-modal .message-area::after {
     content: "▼";
     position: absolute;
-    bottom: 8px;
-    right: 15px;
+    bottom: 4px;
+    right: 8px;
     color: #ffd54f;
-    font-size: 1rem;
+    font-size: 0.8rem;
     animation: fw-blink 1.5s infinite;
     pointer-events: none;
 }
