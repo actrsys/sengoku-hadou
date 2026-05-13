@@ -298,7 +298,7 @@ class DiplomacyManager {
             if (relation.sentiment <= 50) acceptProb = relation.sentiment * 2;
             if (commonEnemy) acceptProb += 30;
             if (allyCount >= 2) acceptProb -= (allyCount - 1) * 20;
-            if (targetPower > myPower) acceptProb *= (myPower / targetPower);
+            if (targetPower > myPower) acceptProb *= (Math.sqrt(myPower) / Math.sqrt(targetPower));
             
             if (['友好', '同盟', '支配', '従属'].includes(relation.status)) {
                 acceptProb += 30;
@@ -315,7 +315,7 @@ class DiplomacyManager {
                 threshold += (allyCount - 1) * 10;  
             }
             if (targetPower > myPower) {
-                acceptProb *= (myPower / targetPower);
+                acceptProb *= (Math.sqrt(myPower) / Math.sqrt(targetPower));
             }
 
             const chance = relation.sentiment + doerDiplomacy;
@@ -335,8 +335,8 @@ class DiplomacyManager {
 
             // ★緩和その１：兵力差による確率の低下を「3分の2」に緩和します！
             if (targetPower > myPower) {
-                // 本来ならどれくらい確率を引かれるか（ペナルティの量）を計算します
-                const penalty = 1.0 - (myPower / targetPower);
+                // 本来ならどれくらい確率を引かれるか（ペナルティの量）を計算します。兵力にはルートをかけて緩和します。
+                const penalty = 1.0 - (Math.sqrt(myPower) / Math.sqrt(targetPower));
                 // ペナルティの量を「3分の2」にオマケしてあげます
                 const mitigatedPenalty = penalty * (2 / 3);
                 // オマケしたあとのペナルティを使って、最終的な確率を計算します
