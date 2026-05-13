@@ -2078,10 +2078,15 @@ class UIInfoManager {
         if (this.kyotenSavedSortedCastles && this.kyotenLastSortStateKey === currentSortStateKey) {
             displayCastles = this.kyotenSavedSortedCastles;
         } else {
-            displayCastles = [...this.kyotenSavedCastles];
-
-            // 基本の並び順として、sortNo を使って順番を整えます
-            displayCastles.sort((a, b) => (a.sortNo || 0) - (b.sortNo || 0));
+            if (this.currentKyotenSortKey) {
+                // ★ソートキーがある時は、前回の並べ替え結果（あれば）をベースにします！
+                // これにより「安定ソート」が働き、前の並び順が維持されます。
+                displayCastles = this.kyotenSavedSortedCastles ? [...this.kyotenSavedSortedCastles] : [...this.kyotenSavedCastles];
+            } else {
+                // ★ソートが解除された時は、最初のリストに戻して基本の並び順にします！
+                displayCastles = [...this.kyotenSavedCastles];
+                displayCastles.sort((a, b) => (a.sortNo || 0) - (b.sortNo || 0));
+            }
 
             if (this.currentKyotenSortKey) {
                 displayCastles.sort((a, b) => {
@@ -2595,7 +2600,13 @@ class UIInfoManager {
         if (this.bushoSavedSortedBushos && this.bushoLastSortStateKey === currentSortStateKey) {
             displayBushos = this.bushoSavedSortedBushos;
         } else {
-            displayBushos = [...this.bushoSavedBushos];
+            if (this.bushoCurrentSortKey) {
+                // ★ソートキーがある時は、前回の並べ替え結果（あれば）をベースにします！
+                displayBushos = this.bushoSavedSortedBushos ? [...this.bushoSavedSortedBushos] : [...this.bushoSavedBushos];
+            } else {
+                // ★ソートが解除された時は、最初のリストに戻します！
+                displayBushos = [...this.bushoSavedBushos];
+            }
 
             if (this.bushoCurrentSortKey) {
                 displayBushos.sort((a, b) => {
