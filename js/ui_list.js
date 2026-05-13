@@ -144,13 +144,14 @@ class UIListManager {
         }
         
         // ★ここは一時的にすべて「ui.info」に橋渡ししておきます（今後少しずつ自分(this)に書き換えます）
-        if (info.pageType === 'daimyo_list') this.ui.info._renderDaimyoList(...info.args, info.scrollPos);
-        else if (info.pageType === 'daimyo_detail') this.ui.info._renderDaimyoDetail(...info.args, info.scrollPos);
+        // （「大名・外交・派閥」の４つは新居(this)の魔法を使うように書き換えました！）
+        if (info.pageType === 'daimyo_list') this._renderDaimyoList(...info.args, info.scrollPos);
+        else if (info.pageType === 'daimyo_detail') this._renderDaimyoDetail(...info.args, info.scrollPos);
         else if (info.pageType === 'busho_selector') this.ui.info._renderBushoSelector(...info.args, info.scrollPos);
         else if (info.pageType === 'busho_detail') this.ui.info._renderBushoDetail(...info.args, info.scrollPos);
         else if (info.pageType === 'kyoten_list') this.ui.info._renderKyotenList(...info.args, info.scrollPos);
-        else if (info.pageType === 'diplo_list') this.ui.info._renderDiplomacyList(...info.args, info.scrollPos);
-        else if (info.pageType === 'faction_list') this.ui.info._renderFactionList(...info.args, info.scrollPos);
+        else if (info.pageType === 'diplo_list') this._renderDiplomacyList(...info.args, info.scrollPos);
+        else if (info.pageType === 'faction_list') this._renderFactionList(...info.args, info.scrollPos);
         else if (info.pageType === 'princess_list') this.ui.info._renderPrincessList(...info.args, info.scrollPos);
         else if (info.pageType === 'delegate_list') this.ui.info._renderDelegateList(...info.args, info.scrollPos);
         else if (info.pageType === 'delegate_setting') this.ui.info._renderDelegateSetting(...info.args, info.scrollPos);
