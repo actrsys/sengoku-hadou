@@ -536,14 +536,14 @@ class UIInfoManager {
                 let valA, valB;
 
                 const getName = (id, leader) => id === 0 ? "無派閥" : (leader && leader.factionName ? leader.factionName : (leader ? leader.name + "派" : "不明"));
-                const getYomi = (id, leader) => id === 0 ? "むはばつ" : (leader && leader.factionYomi ? leader.factionYomi : (leader ? (leader.yomi || leader.name) + "は" : "んんん"));
+                const getYomi = (id, leader) => id === 0 ? "んんん" : (leader && leader.factionYomi ? leader.factionYomi : (leader ? (leader.yomi || leader.name) + "は" : "んんん"));
 
                 switch(this.factionCurrentSortKey) {
                     case 'name': valA = getYomi(a, leaderA); valB = getYomi(b, leaderB); break;
                     case 'leader': valA = a === 0 ? "んんん" : (leaderA ? (leaderA.yomi || leaderA.name) : "んんん"); valB = b === 0 ? "んんん" : (leaderB ? (leaderB.yomi || leaderB.name) : "んんん"); break;
                     case 'count': valA = fDataA.count; valB = fDataB.count; break;
-                    case 'seikaku': valA = a === 0 ? "不明" : (leaderA ? (leaderA.factionSeikaku || "中道") : "不明"); valB = b === 0 ? "不明" : (leaderB ? (leaderB.factionSeikaku || "中道") : "不明"); break;
-                    case 'hoshin': valA = a === 0 ? "不明" : (leaderA ? (leaderA.factionHoshin || "保守的") : "不明"); valB = b === 0 ? "不明" : (leaderB ? (leaderB.factionHoshin || "保守的") : "不明"); break;
+                    case 'seikaku': valA = a === 0 ? "んんん" : (leaderA ? (leaderA.factionSeikaku || "中道") : "んんん"); valB = b === 0 ? "んんん" : (leaderB ? (leaderB.factionSeikaku || "中道") : "んんん"); break;
+                    case 'hoshin': valA = a === 0 ? "んんん" : (leaderA ? (leaderA.factionHoshin || "保守的") : "んんん"); valB = b === 0 ? "んんん" : (leaderB ? (leaderB.factionHoshin || "保守的") : "んんん"); break;
                 }
 
                 if (typeof valA === 'string' && typeof valB === 'string') {
