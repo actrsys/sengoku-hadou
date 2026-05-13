@@ -75,6 +75,32 @@ class UIManager {
 
         this.onResultModalClose = null;
 
+        // イベント中のメッセージ送りだけは、外側を押して進められるように残します
+        const dialogModal = document.getElementById('dialog-modal');
+        if (dialogModal) {
+            dialogModal.addEventListener('click', (e) => {
+                // ウインドウの外側（黒い背景）を押したか確認します
+                if (e.target === dialogModal) {
+                    // ★ここが重要です：イベント中かどうかを判定して、イベントの時だけ動かします
+                    if (dialogModal.classList.contains('event-dialog-modal')) {
+                        const cancelBtn = document.getElementById('dialog-btn-cancel');
+                        // 選択肢がない単なるメッセージの時だけ進めます
+                        if (!cancelBtn || cancelBtn.classList.contains('hidden')) {
+                            const okBtn = document.getElementById('dialog-btn-ok');
+                            if (okBtn) {
+                                // イベント中の選択音を鳴らします
+                                if (window.AudioManager) {
+                                    window.AudioManager.playSE('choice.ogg');
+                                }
+                                okBtn.click();
+                            }
+                        }
+                    }
+                    // イベント以外（普通のメッセージ等）の場合は何もしません＝ボタンを押すまで閉じません
+                }
+            });
+        }
+        
         if (this.mapZoomInBtn) {
             this.mapZoomInBtn.onclick = (e) => { e.stopPropagation(); this.changeMapZoom(1); };
         }
