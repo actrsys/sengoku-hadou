@@ -54,6 +54,10 @@ class UIInfoManager {
         this.factionCurrentSortKey = null;
         this.isFactionSortAsc = false;
 
+        // 諸勢力一覧で使う状態のリセット
+        this.kunishuCurrentSortKey = null;
+        this.isKunishuSortAsc = false;
+
         // 所領分配のリセット
         this.allotFiefSelectedIds = null;
         this.allotFiefSavedState = false;
@@ -1893,6 +1897,70 @@ class UIInfoManager {
         }
         let modeClassStr = isSelectMode ? "" : "view-mode";
 
+        if (this.kunishuCurrentSortKey) {
+            kunishus = this._prepareStableSortBase('kunishu', kunishus, this.kunishuCurrentSortKey);
+            kunishus.sort((a, b) => {
+                let valA, valB;
+                const leaderA = this.game.getBusho(a.leaderId);
+                const leaderB = this.game.getBusho(b.leaderId);
+                const castleA = this.game.getCastle(a.castleId);
+                const castleB = this.game.getCastle(b.castleId);
+                
+                let provinceA = null, provinceB = null;
+                if (castleA && this.game.provinces) provinceA = this.game.provinces.find(p => p.id === castleA.provinceId);
+                if (castleB && this.game.provinces) provinceB = this.game.provinces.find(p => p.id === castleB.provinceId);
+
+                switch(this.kunishuCurrentSortKey) {
+                    case 'name':
+                        valA = a.yomi || a.getName(this.game);
+                        valB = b.yomi || b.getName(this.game);
+                        break;
+                    case 'leader':
+                        valA = leaderA ? (leaderA.yomi || leaderA.name) : "んんん";
+                        valB = leaderB ? (leaderB.yomi || leaderB.name) : "んんん";
+                        break;
+                    case 'castle':
+                        valA = castleA ? (castleA.yomi || castleA.name) : "んんん";
+                        valB = castleB ? (castleB.yomi || castleB.name) : "んんん";
+                        break;
+                    case 'province':
+                        valA = provinceA ? (provinceA.provinceYomi || provinceA.province) : "んんん";
+                        valB = provinceB ? (provinceB.provinceYomi || provinceB.province) : "んんん";
+                        break;
+                    case 'soldiers':
+                        valA = a.soldiers;
+                        valB = b.soldiers;
+                        break;
+                    case 'friend':
+                        valA = a.getRelation(this.game.playerClanId);
+                        valB = b.getRelation(this.game.playerClanId);
+                        break;
+                    case 'relation':
+                        const getRelRank = (k) => {
+                            const r = k.getRelation(this.game.playerClanId);
+                            if (r >= 70) return 0; // 友好
+                            if (r < 40) return 2;  // 敵対
+                            return 1;              // 普通
+                        };
+                        valA = getRelRank(a);
+                        valB = getRelRank(b);
+                        break;
+                }
+
+                let fallbackCmp = 0;
+                if (this.kunishuCurrentSortKey === 'name') {
+                    const nameA = a.getName(this.game);
+                    const nameB = b.getName(this.game);
+                    fallbackCmp = this.isKunishuSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
+                }
+                
+                return this._compareForSort(valA, valB, this.isKunishuSortAsc, fallbackCmp);
+            });
+            this._saveStableSortResult('kunishu', kunishus);
+        } else {
+            this._saveStableSortResult('kunishu', null);
+        }
+
         let items = [];
         kunishus.forEach(kunishu => {
             const kunishuName = kunishu.getName(this.game);
@@ -1938,21 +2006,23 @@ class UIInfoManager {
         });
 
         this.selectedKunishuId = null;
+        
+        const getSortMark = (key) => this._getCommonSortMark(this.kunishuCurrentSortKey, this.isKunishuSortAsc, key);
 
         this._renderListModal({
             title: "諸勢力一覧",
             contextHtml: contextHtml,
             headers: [
-                `<span class="col-kunishu-name">勢力名</span>`,
-                `<span class="col-leader-name">頭領</span>`,
-                `<span class="col-castle-name">所在</span>`,
-                `<span class="col-province">所属</span>`,
-                `<span class="col-soldiers">兵士</span>`,
-                `<span class="col-friend">友好度</span>`,
-                `<span class="col-relation">関係</span>`,
+                `<span class="col-kunishu-name" data-sort="name">勢力名${getSortMark('name')}</span>`,
+                `<span class="col-leader-name" data-sort="leader">頭領${getSortMark('leader')}</span>`,
+                `<span class="col-castle-name" data-sort="castle">所在${getSortMark('castle')}</span>`,
+                `<span class="col-province" data-sort="province">所属${getSortMark('province')}</span>`,
+                `<span class="col-soldiers" data-sort="soldiers">兵士${getSortMark('soldiers')}</span>`,
+                `<span class="col-friend" data-sort="friend">友好度${getSortMark('friend')}</span>`,
+                `<span class="col-relation" data-sort="relation">関係${getSortMark('relation')}</span>`,
                 `<span class="col-empty pc-only"></span>`
             ],
-            headerClass: `kunishu-list-header ${modeClassStr}`,
+            headerClass: `sortable-header kunishu-list-header ${modeClassStr}`,
             itemClass: `kunishu-list-item ${modeClassStr}`,
             listClass: "kunishu-list-container",
             items: items,
@@ -1964,7 +2034,16 @@ class UIInfoManager {
                 if (!this.selectedKunishuId) return;
                 this.closeCommonModal(); 
                 if (onConfirm) onConfirm(this.selectedKunishuId); 
-            } : null
+            } : null,
+            onSortClick: (sortKey) => {
+                const defaultAscKeys = ['name', 'leader', 'castle', 'province', 'relation'];
+                const newState = this._toggleSortState(this.kunishuCurrentSortKey, this.isKunishuSortAsc, sortKey, defaultAscKeys);
+                this.kunishuCurrentSortKey = newState.key;
+                this.isKunishuSortAsc = newState.isAsc;
+                const listEl = document.getElementById('selector-list');
+                const scroll = listEl ? listEl.scrollTop : 0;
+                this._renderKunishuList(kunishus, castle, isSelectMode, onBack, onConfirm, scroll);
+            }
         });
     }
 
