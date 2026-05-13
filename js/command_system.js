@@ -1005,27 +1005,6 @@ class CommandSystem {
         return true;
     }
     
-    // ★追加：自勢力の道が繋がっているお城をまとめて洗い出す共通の魔法です！
-    getConnectedCastles(startCastle, clanId) {
-        const connectedCastles = new Set();
-        const queue = [startCastle];
-        connectedCastles.add(Number(startCastle.id));
-
-        while (queue.length > 0) {
-            const current = queue.shift();
-            const neighbors = this.game.castles.filter(adj => 
-                Number(adj.ownerClan) === Number(clanId) && 
-                GameSystem.isAdjacent(current, adj) &&
-                !connectedCastles.has(Number(adj.id))
-            );
-            for (const n of neighbors) {
-                connectedCastles.add(Number(n.id));
-                queue.push(n);
-            }
-        }
-        return connectedCastles;
-    }
-
     getValidTargets(type) {
         // 援軍要請の時は、すでに計算されている候補リストをそのまま使います！
         if (['atk_self_reinforcement', 'atk_ally_reinforcement', 'def_self_reinforcement', 'def_ally_reinforcement'].includes(type)) {
@@ -1063,7 +1042,7 @@ class CommandSystem {
 
             case 'ally_other': {
                 // ★修正：ターゲットごとに探すのではなく、最初に繋がっている領土をまとめて取得します（超高速化）！
-                const connectedForAlly = this.getConnectedCastles(c, playerClanId);
+                const connectedForAlly = c.getConnectedCastles(this.game);
                 return this.game.castles.filter(target => {
                     if (Number(target.ownerClan) !== playerClanId || target.id === c.id) return false;
                     return connectedForAlly.has(Number(target.id));
@@ -1194,7 +1173,7 @@ class CommandSystem {
                 const allKunishuCastleIds = [...new Set(activeKunishus.map(k => Number(k.castleId)))];
                 
                 // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
-                const connectedCastles = this.getConnectedCastles(c, playerClanId);
+                const connectedCastles = c.getConnectedCastles(this.game);
                 
                 // 集めた城を「フィルター（ふるい）」にかけて、条件に合うものだけを残します！
                 return allKunishuCastleIds.filter(targetCastleId => {
@@ -1309,33 +1288,8 @@ class CommandSystem {
             case 'busho_list': this.game.ui.openBushoSelector('all_busho_list', null, null, null); break;
             case 'princess_list': this.game.ui.showPrincessList(); break;
             case 'kyoten_list': this.game.ui.showKyotenList(); break;
-            case 'appoint_legion_leader_1': this.game.ui.showAppointLegionLeaderModal(1); break;
-            case 'appoint_legion_leader_2': this.game.ui.showAppointLegionLeaderModal(2); break;
-            case 'appoint_legion_leader_3': this.game.ui.showAppointLegionLeaderModal(3); break;
-            case 'appoint_legion_leader_4': this.game.ui.showAppointLegionLeaderModal(4); break;
-            case 'appoint_legion_leader_5': this.game.ui.showAppointLegionLeaderModal(5); break;
-            case 'appoint_legion_leader_6': this.game.ui.showAppointLegionLeaderModal(6); break;
-            case 'appoint_legion_leader_7': this.game.ui.showAppointLegionLeaderModal(7); break;
-            case 'appoint_legion_leader_8': this.game.ui.showAppointLegionLeaderModal(8); break;
-            case 'dismiss_legion_leader_1': this.game.ui.showDismissLegionLeaderConfirm(1); break;
-            case 'dismiss_legion_leader_2': this.game.ui.showDismissLegionLeaderConfirm(2); break;
-            case 'dismiss_legion_leader_3': this.game.ui.showDismissLegionLeaderConfirm(3); break;
-            case 'dismiss_legion_leader_4': this.game.ui.showDismissLegionLeaderConfirm(4); break;
-            case 'dismiss_legion_leader_5': this.game.ui.showDismissLegionLeaderConfirm(5); break;
-            case 'dismiss_legion_leader_6': this.game.ui.showDismissLegionLeaderConfirm(6); break;
-            case 'dismiss_legion_leader_7': this.game.ui.showDismissLegionLeaderConfirm(7); break;
-            case 'dismiss_legion_leader_8': this.game.ui.showDismissLegionLeaderConfirm(8); break;
-            case 'allot_fief_1': this.game.ui.showAllotFiefModal(1); break;
-            case 'allot_fief_2': this.game.ui.showAllotFiefModal(2); break;
-            case 'allot_fief_3': this.game.ui.showAllotFiefModal(3); break;
-            case 'allot_fief_4': this.game.ui.showAllotFiefModal(4); break;
-            case 'allot_fief_5': this.game.ui.showAllotFiefModal(5); break;
-            case 'allot_fief_6': this.game.ui.showAllotFiefModal(6); break;
-            case 'allot_fief_7': this.game.ui.showAllotFiefModal(7); break;
-            case 'allot_fief_8': this.game.ui.showAllotFiefModal(8); break;
-            // ★ここを書き足し！：「settings」と呼ばれたら小窓を開きます
+            // 「settings」と呼ばれたら小窓を開きます
             case 'settings': this.game.ui.showSettingsModal(); break;
-            // ★ここから下を書き足します！
             case 'title':
                 this.game.ui.showDialog("タイトル画面に戻りますか？\n保存していないデータは失われます。", true, () => {
                     // 「はい」を押した時だけ、タイトル画面を呼び出してゲーム画面を隠します
@@ -1343,6 +1297,19 @@ class CommandSystem {
                     const appScreen = document.getElementById('app');
                     if (appScreen) appScreen.classList.add('hidden');
                 });
+                break;
+            default:
+                // ★追加：1〜8までの数字がついている軍団系のコマンドを一つにまとめます！
+                if (action.startsWith('appoint_legion_leader_')) {
+                    const no = parseInt(action.replace('appoint_legion_leader_', ''));
+                    if (!isNaN(no)) this.game.ui.showAppointLegionLeaderModal(no);
+                } else if (action.startsWith('dismiss_legion_leader_')) {
+                    const no = parseInt(action.replace('dismiss_legion_leader_', ''));
+                    if (!isNaN(no)) this.game.ui.showDismissLegionLeaderConfirm(no);
+                } else if (action.startsWith('allot_fief_')) {
+                    const no = parseInt(action.replace('allot_fief_', ''));
+                    if (!isNaN(no)) this.game.ui.showAllotFiefModal(no);
+                }
                 break;
         }
     }
@@ -2502,7 +2469,7 @@ class CommandSystem {
         const pid = this.game.playerClanId;
         
         // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
-        const connectedCastles = this.getConnectedCastles(atkCastle, myClanId);
+        const connectedCastles = atkCastle.getConnectedCastles(this.game);
         
         // ★修正：条件のチェックをすべて「外交の専門部署」に任せます！
         const selfCandidates = this.game.diplomacyManager.findAvailableReinforcements(

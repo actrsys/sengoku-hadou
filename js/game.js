@@ -632,112 +632,82 @@ class GameSystem {
         return Math.ceil(soldiers / efficiency); 
     }
 
-    static calcBuyHorseEfficiency(daimyo, castellan) {
-        const daimyoEff = daimyo ? ((daimyo.politics * 1.5) + (daimyo.charm * 1.5)) / 150 : 0;
-        const castellanEff = castellan ? ((castellan.politics * 1.5) + (castellan.charm * 1.5)) / 150 : 0;
+    // ============================================
+    // ★軍馬・鉄砲の購入計算を共通化する魔法です！
+    // ============================================
+    
+    // 取引の効率を計算します
+    static calcBuyEquipEfficiency(daimyo, castellan, itemType) {
+        const divisor = itemType === 'horse' ? 150 : 300;
+        const daimyoEff = daimyo ? ((daimyo.politics * 1.5) + (daimyo.charm * 1.5)) / divisor : 0;
+        const castellanEff = castellan ? ((castellan.politics * 1.5) + (castellan.charm * 1.5)) / divisor : 0;
         let totalEff = daimyoEff + castellanEff;
-        if (totalEff <= 0) totalEff = 0.1;
-        return totalEff;
+        return totalEff > 0 ? totalEff : 0.1;
     }
 
-    // ★追加：画面の相場表示に使う「小数点まで正確な1頭の単価」を出す魔法
-    static calcBuyHorseUnitPrice(daimyo, castellan) {
-        const eff = this.calcBuyHorseEfficiency(daimyo, castellan);
-        let unitPrice = 2 / (1 + eff / 10);
+    // そのお城が軍馬や鉄砲の産地かどうかを判定する魔法です
+    static isProdCastle(c, itemType) {
+        if (!c) return false;
         
-        // ★変更：軍馬産地を持っているか確認する魔法を追加します！
-        let hasHorseCastle = false;
-        
-        // そのお城が軍馬産地かどうかを判定する小さな魔法です
-        const isHorseProd = (c) => {
-            if (!c) return false;
-            // ①拠点単位（日野江城）
+        if (itemType === 'horse') {
             if (c.id === 157) return true;
-            
-            // ②国単位（常陸、淡路、肥後、日向、薩摩、大隅、対馬）
             if ([15, 36, 61, 62, 63, 64, 68].includes(c.provinceId)) return true; 
-            
-            // ③地方単位（東北、甲信）
             if (window.GameApp && window.GameApp.provinces) {
                 const prov = window.GameApp.provinces.find(p => p.id === c.provinceId);
                 if (prov && (prov.regionId === 1 || prov.regionId === 3)) return true;
             }
-            return false;
-        };
+        } else if (itemType === 'gun') {
+            if ([33, 42, 185, 186].includes(c.id)) return true;
+        }
+        return false;
+    }
 
+    // 画面の相場表示に使う「小数点まで正確な1個の単価」を出す魔法
+    static calcBuyEquipUnitPrice(daimyo, castellan, itemType) {
+        const eff = this.calcBuyEquipEfficiency(daimyo, castellan, itemType);
+        const basePrice = itemType === 'horse' ? 2 : 5;
+        let unitPrice = basePrice / (1 + eff / 10);
+        
+        let hasProdCastle = false;
+        
         if (daimyo && window.GameApp && window.GameApp.castles) {
-            // 大名家全体のお城から探します
-            hasHorseCastle = window.GameApp.castles.some(c => c.ownerClan === daimyo.clan && isHorseProd(c));
+            hasProdCastle = window.GameApp.castles.some(c => c.ownerClan === daimyo.clan && this.isProdCastle(c, itemType));
         } else if (castellan && window.GameApp && window.GameApp.castles) {
-            // 城主だけの場合はそのお城が産地か調べます
             const myCastle = window.GameApp.castles.find(c => c.id === castellan.castleId);
-            hasHorseCastle = isHorseProd(myCastle);
+            hasProdCastle = this.isProdCastle(myCastle, itemType);
+        } else if (castellan && itemType === 'gun') {
+            // 万が一の予備チェック（鉄砲用）
+            hasProdCastle = [33, 42, 185, 186].includes(castellan.castleId);
         }
         
-        // もし軍馬産地を1つでも持っていたら、単価を半分（半額）にします！
-        if (hasHorseCastle) {
+        // 産地を持っていたら単価を半額にします！
+        if (hasProdCastle) {
             unitPrice = unitPrice / 2;
         }
         
         return unitPrice;
     }
 
-    static calcBuyHorseCost(amount, daimyo, castellan) {
-        const unitPrice = this.calcBuyHorseUnitPrice(daimyo, castellan);
+    static calcBuyEquipCost(amount, daimyo, castellan, itemType) {
+        const unitPrice = this.calcBuyEquipUnitPrice(daimyo, castellan, itemType);
         return Math.ceil(amount * unitPrice);
     }
 
-    // ★追加：お買い物スライダーのために「今のお金で最大いくつ買えるか」を逆算する魔法
-    static calcBuyHorseAmount(gold, daimyo, castellan) {
-        const unitPrice = this.calcBuyHorseUnitPrice(daimyo, castellan);
+    static calcBuyEquipAmount(gold, daimyo, castellan, itemType) {
+        const unitPrice = this.calcBuyEquipUnitPrice(daimyo, castellan, itemType);
         return Math.floor(gold / unitPrice);
     }
 
-    static calcBuyGunEfficiency(daimyo, castellan) {
-        const daimyoEff = daimyo ? ((daimyo.politics * 1.5) + (daimyo.charm * 1.5)) / 300 : 0;
-        const castellanEff = castellan ? ((castellan.politics * 1.5) + (castellan.charm * 1.5)) / 300 : 0;
-        let totalEff = daimyoEff + castellanEff;
-        if (totalEff <= 0) totalEff = 0.1;
-        return totalEff;
-    }
+    // 他の場所からの呼び出しが今まで通り動くように、窓口だけ残しておきます
+    static calcBuyHorseEfficiency(daimyo, castellan) { return this.calcBuyEquipEfficiency(daimyo, castellan, 'horse'); }
+    static calcBuyHorseUnitPrice(daimyo, castellan) { return this.calcBuyEquipUnitPrice(daimyo, castellan, 'horse'); }
+    static calcBuyHorseCost(amount, daimyo, castellan) { return this.calcBuyEquipCost(amount, daimyo, castellan, 'horse'); }
+    static calcBuyHorseAmount(gold, daimyo, castellan) { return this.calcBuyEquipAmount(gold, daimyo, castellan, 'horse'); }
 
-    // ★追加：画面の相場表示に使う「小数点まで正確な1挺の単価」を出す魔法
-    static calcBuyGunUnitPrice(daimyo, castellan) {
-        const eff = this.calcBuyGunEfficiency(daimyo, castellan);
-        // 鉄砲の基礎価格5
-        let unitPrice = 5 / (1 + eff / 10);
-        
-        // ★変更：大名家全体のお城を調べて、鉄砲産地の城（石山御坊:33、雑賀城:42、赤尾木城:185、今浜城:186）を持っているか確認します！
-        let hasGunCastle = false;
-        
-        // ゲームがちゃんと動いていて、お殿様（大名）のデータがあるか確認します
-        if (daimyo && window.GameApp && window.GameApp.castles) {
-            // 世界中のすべてのお城の中から、自分の大名家の持ち物で、かつ鉄砲産地の城を探します
-            // some というのは「1つでも見つかったら『はい(true)』と答える」という便利な探し方です
-            hasGunCastle = window.GameApp.castles.some(c => c.ownerClan === daimyo.clan && [33, 42, 185, 186].includes(c.id));
-        } else if (castellan && [33, 42, 185, 186].includes(castellan.castleId)) {
-            // 万が一、お殿様のデータが見つからなかった時のための予備の確認です
-            hasGunCastle = true;
-        }
-        
-        // もし鉄砲産地を1つでも持っていたら、単価を半分（半額）にします！
-        if (hasGunCastle) {
-            unitPrice = unitPrice / 2;
-        }
-        
-        return unitPrice;
-    }
-
-    static calcBuyGunCost(amount, daimyo, castellan) {
-        const unitPrice = this.calcBuyGunUnitPrice(daimyo, castellan);
-        return Math.ceil(amount * unitPrice);
-    }
-
-    // ★修正：新しい計算に合わせて、お金から買える数を逆算するように直しました
-    static calcBuyGunAmount(gold, daimyo, castellan) {
-        const unitPrice = this.calcBuyGunUnitPrice(daimyo, castellan);
-        return Math.floor(gold / unitPrice);
-    }
+    static calcBuyGunEfficiency(daimyo, castellan) { return this.calcBuyEquipEfficiency(daimyo, castellan, 'gun'); }
+    static calcBuyGunUnitPrice(daimyo, castellan) { return this.calcBuyEquipUnitPrice(daimyo, castellan, 'gun'); }
+    static calcBuyGunCost(amount, daimyo, castellan) { return this.calcBuyEquipCost(amount, daimyo, castellan, 'gun'); }
+    static calcBuyGunAmount(gold, daimyo, castellan) { return this.calcBuyEquipAmount(gold, daimyo, castellan, 'gun'); }
 
     static isReachable(game, startCastle, targetCastle, movingClanId) {
         // ★追加：もし城のデータが空っぽだったら、エラーになる前にすぐストップします！
