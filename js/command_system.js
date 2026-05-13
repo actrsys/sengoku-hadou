@@ -1515,13 +1515,13 @@ class CommandSystem {
 
         if (actionType === 'interview') {
             const interviewer = this.game.getBusho(firstId);
-            this.game.ui.showInterviewModal(interviewer);
+            this.game.interviewSystem.showInterviewModal(interviewer);
             return;
         }
         if (actionType === 'interview_target') {
             const target = this.game.getBusho(firstId);
             const interviewer = extraData.interviewer;
-            this.executeInterviewTopic(interviewer, target);
+            this.game.interviewSystem.executeInterviewTopic(interviewer, target);
             return;
         }
 
@@ -2005,130 +2005,6 @@ class CommandSystem {
 
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
-    }
-
-    executeInterviewStatus(busho) {
-        const inno = busho.innovation;
-        let policyText = "";
-        if (inno > 80) policyText = "最近のやり方は少々古臭い気がしますな。もっと新しいことをせねば。";
-        else if (inno < 20) policyText = "古き良き伝統を守ることこそ肝要です。";
-        else policyText = "当家のやり方に特に不満はありません。順調です。";
-        
-        let perceivedLoyalty = busho.loyalty;
-        if (busho.intelligence >= 85 && busho.loyalty < 80) {
-            perceivedLoyalty = Math.max(perceivedLoyalty, 90);
-        } else if (busho.intelligence >= 70 && busho.loyalty < 60) {
-            perceivedLoyalty = Math.max(perceivedLoyalty, 70);
-        }
-
-        let loyaltyText = "";
-        let attitudeText = ""; 
-
-        if (perceivedLoyalty >= 85) {
-            loyaltyText = "身に余る御恩、片時も忘れたことはありませぬ。この身は殿のために。";
-            attitudeText = "";
-        } else if (perceivedLoyalty >= 65) {
-            loyaltyText = "家中はよく治まっております。何も心配なさりませぬよう。";
-            attitudeText = "";
-        } else if (perceivedLoyalty >= 45) {
-            loyaltyText = "特に不満はありません。与えられた役目は果たします。";
-            attitudeText = "";
-        } else if (perceivedLoyalty >= 25) {
-            loyaltyText = "……少し、待遇を見直してはいただけませぬか。";
-            attitudeText = "";
-        } else {
-            loyaltyText = "……";
-            attitudeText = "(目を合わせようとしない。危険な気配を感じる。)";
-        }
-
-        const displayParts = [];
-        displayParts.push(`「${policyText}<br>${loyaltyText}」`); 
-        if (attitudeText) displayParts.push(attitudeText); 
-
-        let msg = displayParts.filter(Boolean).join('<br>');
-        
-        this.game.ui.showDialog(msg, false, null, null, {
-            leftFace: busho.faceIcon,
-            leftName: busho.name,
-            choices: [
-                { label: "戻る", onClick: () => { this.game.ui.reopenInterviewModal(busho); } }
-            ]
-        });
-    }
-
-    executeInterviewTopic(interviewer, target) {
-        if (interviewer.id === target.id) {
-            let comment = "";
-            if (interviewer.ambition > 80) comment = "「俺の力を持ってすれば、天下も夢ではない……はずだ」";
-            else if (interviewer.personality === 'cautious') comment = "「慎重に行かねば、足元をすくわれよう」";
-            else comment = "「今のところは順調か……いや、油断はできん」";
-            
-            this.game.ui.showDialog(`「${target.name}か……<br><br>${comment}」`, false, null, null, {
-                leftFace: interviewer.faceIcon,
-                leftName: interviewer.name,
-                choices: [
-                    { label: "戻る", onClick: () => { this.game.ui.reopenInterviewModal(interviewer); } }
-                ]
-            });
-            return;
-        }
-
-        const dist = GameSystem.calcValueDistance(interviewer, target); 
-        const affinityDiff = GameSystem.calcAffinityDiff(interviewer.affinity, target.affinity); 
-        
-        let affinityText = "";
-        if (dist < 15) affinityText = "あの方とは意気投合します。素晴らしいお方です。";
-        else if (dist < 30) affinityText = "話のわかる相手だと思います。信頼できます。";
-        else if (dist < 50) affinityText = "悪くはありませんが、時折意見が食い違います。";
-        else if (dist < 70) affinityText = "考え方がどうも合いません。理解に苦しみます。";
-        else affinityText = "あやつとは反りが合いません。顔も見たくない程です。";
-
-        let loyaltyText = "";
-        let togaki = ""; 
-
-        if (interviewer.loyalty < 40) {
-            loyaltyText = "さあ……？　他人の腹の内など某には量りかねます。";
-            togaki = "";
-        }
-        else if (affinityDiff > 35) { 
-            if (interviewer.intelligence >= 80) {
-                loyaltyText = "あやつは危険です。裏で妙な動きをしているとの噂も……";
-                togaki = "";
-            } else {
-                loyaltyText = "あやつとは口もききませぬゆえ、何も存じませぬ。";
-                togaki = "";
-            }
-        }
-        else if (target.intelligence > interviewer.intelligence + 20) {
-            loyaltyText = "なかなか内心を見せぬお方です。";
-            togaki = "";
-        }
-        else {
-            const tLoyalty = target.loyalty;
-            if (tLoyalty >= 85) loyaltyText = "殿への忠義は本物でしょう。疑う余地もありません。";
-            else if (tLoyalty >= 65) loyaltyText = "不審な点はありませぬ。真面目に務めております。";
-            else if (tLoyalty >= 45) loyaltyText = "今のところは大人しくしておりますが……";
-            else if (tLoyalty >= 25) loyaltyText = "近頃、何やら不満を漏らしているようです。";
-            else loyaltyText = "油断なりませぬ。野心を抱いている気配があります。";
-        }
-
-        const targetCall = `${target.name}殿ですか……`;
-        const displayParts = [];
-        displayParts.push(`「${targetCall}<br>${affinityText}<br>${loyaltyText}」`); 
-        
-        if (togaki) {
-            displayParts.push(togaki); 
-        }
-
-        let msg = displayParts.filter(Boolean).join('<br>');
-        
-        this.game.ui.showDialog(msg, false, null, null, {
-            leftFace: interviewer.faceIcon,
-            leftName: interviewer.name,
-            choices: [
-                { label: "戻る", onClick: () => { this.game.ui.reopenInterviewModal(interviewer); } }
-            ]
-        });
     }
     
     executeTransport(bushoIds, targetId, vals) {

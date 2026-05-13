@@ -941,6 +941,8 @@ class GameManager {
         this.eventManager = new EventManager(this);
         // ★ 城の管理を専門に行うシステムを呼び出します！
         this.castleManager = new CastleManager(this);
+        // ★ 面談システムを呼び出します！
+        this.interviewSystem = new InterviewSystem(this);
         
         this.phase = 'title';
     }
