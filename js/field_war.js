@@ -2907,6 +2907,11 @@ class FieldWarManager {
                 let score = 0;
                 let dToEnemy = this.getDistance(nx, ny, targetEnemy.x, targetEnemy.y);
 
+                // ★追加：意味もなくウロウロするのを防ぐため、今いる場所（動かない）にボーナスをあげます
+                if (nx === unit.x && ny === unit.y) {
+                    score += 15;
+                }
+
                 // ★追加: 最終的に止まるマスの「地形」を見てスコアを調整します
                 let row_t = Math.floor(ny / 2);
                 let terrain_t = (this.grid && this.grid[row_t] && this.grid[row_t][nx]) ? this.grid[row_t][nx].terrain : 'plain';
