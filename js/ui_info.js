@@ -42,6 +42,11 @@ class UIInfoManager {
         this.kyotenLastScope = null;
         
         this.princessCurrentScope = null;
+        this.princessCurrentSortKey = null;
+        this.isPrincessSortAsc = false;
+        
+        this.factionCurrentSortKey = null;
+        this.isFactionSortAsc = false;
 
         // 所領分配のリセット
         this.allotFiefSelectedIds = null;
@@ -505,7 +510,7 @@ class UIInfoManager {
     _renderFactionList(clanId, isDirect, scrollPos = 0) {
         const clan = this.game.clans.find(c => c.id === clanId);
         if (!clan) return;
-
+        
         const bushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active');
         const factions = {};
         
@@ -518,32 +523,59 @@ class UIInfoManager {
             if (b.isFactionLeader) { factions[fId].leader = b; }
         });
 
-        const fIds = Object.keys(factions).map(Number).filter(id => id !== 0);
-        let nonFactionCount = factions[0] ? factions[0].count : 0;
-        
+        const fIds = Object.keys(factions).map(Number);
         const daimyo = bushos.find(b => b.isDaimyo);
         const daimyoFactionId = daimyo ? daimyo.factionId : -1;
-        
-        fIds.sort((a, b) => {
-            if (a === daimyoFactionId) return -1; 
-            if (b === daimyoFactionId) return 1;  
-            return factions[b].count - factions[a].count; 
-        });
+
+        if (this.factionCurrentSortKey) {
+            fIds.sort((a, b) => {
+                const fDataA = factions[a];
+                const fDataB = factions[b];
+                const leaderA = fDataA.leader;
+                const leaderB = fDataB.leader;
+                let valA, valB;
+
+                const getName = (id, leader) => id === 0 ? "無派閥" : (leader && leader.factionName ? leader.factionName : (leader ? leader.name + "派" : "不明"));
+                const getYomi = (id, leader) => id === 0 ? "むはばつ" : (leader && leader.factionYomi ? leader.factionYomi : (leader ? (leader.yomi || leader.name) + "は" : "んんん"));
+
+                switch(this.factionCurrentSortKey) {
+                    case 'name': valA = getYomi(a, leaderA); valB = getYomi(b, leaderB); break;
+                    case 'leader': valA = a === 0 ? "んんん" : (leaderA ? (leaderA.yomi || leaderA.name) : "んんん"); valB = b === 0 ? "んんん" : (leaderB ? (leaderB.yomi || leaderB.name) : "んんん"); break;
+                    case 'count': valA = fDataA.count; valB = fDataB.count; break;
+                    case 'seikaku': valA = a === 0 ? "不明" : (leaderA ? (leaderA.factionSeikaku || "中道") : "不明"); valB = b === 0 ? "不明" : (leaderB ? (leaderB.factionSeikaku || "中道") : "不明"); break;
+                    case 'hoshin': valA = a === 0 ? "不明" : (leaderA ? (leaderA.factionHoshin || "保守的") : "不明"); valB = b === 0 ? "不明" : (leaderB ? (leaderB.factionHoshin || "保守的") : "不明"); break;
+                }
+
+                if (typeof valA === 'string' && typeof valB === 'string') {
+                    let cmp = this.isFactionSortAsc ? valA.localeCompare(valB, 'ja') : valB.localeCompare(valA, 'ja');
+                    if(cmp === 0 && this.factionCurrentSortKey === 'name'){
+                       const nameA = getName(a, leaderA);
+                       const nameB = getName(b, leaderB);
+                       cmp = this.isFactionSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
+                    }
+                    return cmp;
+                }
+                if (valA === valB) return 0;
+                return this.isFactionSortAsc ? (valA - valB) : (valB - valA);
+            });
+        } else {
+            fIds.sort((a, b) => {
+                if (a === daimyoFactionId) return -1; 
+                if (b === daimyoFactionId) return 1;  
+                if (a === 0) return 1;
+                if (b === 0) return -1;
+                return factions[b].count - factions[a].count; 
+            });
+        }
 
         let items = [];
-        
         fIds.forEach(fId => {
             const fData = factions[fId];
             const leader = fData.leader;
-            let factionNameStr = leader && leader.factionName ? leader.factionName : (leader ? leader.name + "派" : "不明");
+            let factionNameStr = fId === 0 ? "無派閥" : (leader && leader.factionName ? leader.factionName : (leader ? leader.name + "派" : "不明"));
             let count = fData.count;
-            let seikaku = "不明";
-            let hoshin = "不明";
-            
-            if (leader) {
-                seikaku = leader.factionSeikaku || "中道";
-                hoshin = leader.factionHoshin || "保守的";
-            }
+            let seikaku = fId === 0 ? "" : (leader ? (leader.factionSeikaku || "中道") : "不明");
+            let hoshin = fId === 0 ? "" : (leader ? (leader.factionHoshin || "保守的") : "不明");
             
             let seikakuClass = "";
             if (seikaku === '武闘派') seikakuClass = 'text-red';
@@ -558,7 +590,7 @@ class UIInfoManager {
                 nameClass = "text-orange";
             }
             
-            let leaderFullName = leader ? leader.name : "不明";
+            let leaderFullName = fId === 0 ? "" : (leader ? leader.name : "不明");
             
             items.push({
                 onClick: `window.GameApp.ui.info.showFactionBushoList(${clan.id}, ${fId}, '${factionNameStr}')`,
@@ -572,36 +604,38 @@ class UIInfoManager {
                 ]
             });
         });
-        
-        if (nonFactionCount > 0) {
-            items.push({
-                onClick: `window.GameApp.ui.info.showFactionBushoList(${clan.id}, 0, '無派閥')`,
-                cells: [
-                    `<strong class="col-faction-name">無派閥</strong>`,
-                    `<span class="col-leader-name"></span>`,
-                    `<span class="col-busho-count">${nonFactionCount}</span>`,
-                    "", "", ""
-                ]
-            });
-        }
+
+        const getSortMark = (key) => {
+            if (this.factionCurrentSortKey !== key) return '';
+            return this.isFactionSortAsc ? '<span class="sort-mark">▲</span>' : '<span class="sort-mark">▼</span>';
+        };
 
         this._renderListModal({
             title: `${clan.name} 派閥一覧`,
             headers: [
-                `<span class="col-faction-name">派閥名</span>`,
-                `<span class="col-leader-name">派閥主</span>`,
-                `<span class="col-busho-count">武将</span>`,
-                `<span class="col-seikaku">方針</span>`,
-                `<span class="col-hoshin">思想</span>`,
+                `<span class="col-faction-name" data-sort="name">派閥名${getSortMark('name')}</span>`,
+                `<span class="col-leader-name" data-sort="leader">派閥主${getSortMark('leader')}</span>`,
+                `<span class="col-busho-count" data-sort="count">武将${getSortMark('count')}</span>`,
+                `<span class="col-seikaku" data-sort="seikaku">方針${getSortMark('seikaku')}</span>`,
+                `<span class="col-hoshin" data-sort="hoshin">思想${getSortMark('hoshin')}</span>`,
                 `<span></span>`
             ],
-            headerClass: "faction-list-header",
+            headerClass: "sortable-header faction-list-header",
             itemClass: "faction-list-item",
             listClass: "faction-list-container",
             items: items,
             scrollPos: scrollPos,
             gridTemplateSp: "2fr 2fr 1fr 1.2fr 1.2fr 1.5fr",
-            gridTemplatePc: "120px 120px 60px 80px 80px 1fr"
+            gridTemplatePc: "120px 120px 60px 80px 80px 1fr",
+            onSortClick: (sortKey) => {
+                const defaultAscKeys = ['name', 'leader', 'seikaku', 'hoshin'];
+                const newState = this._toggleSortState(this.factionCurrentSortKey, this.isFactionSortAsc, sortKey, defaultAscKeys);
+                this.factionCurrentSortKey = newState.key;
+                this.isFactionSortAsc = newState.isAsc;
+                const listEl = document.getElementById('selector-list');
+                const scroll = listEl ? listEl.scrollTop : 0;
+                this._renderFactionList(clanId, isDirect, scroll);
+            }
         });
     }
 
@@ -1478,7 +1512,7 @@ class UIInfoManager {
             if (this.princessCurrentScope === 'clan' && myPrincesses.length === 0) {
                 this.princessCurrentScope = 'all';
             }
-
+            
             if (this.princessCurrentScope === 'clan') {
                 princesses = myPrincesses;
             } else {
@@ -1491,6 +1525,53 @@ class UIInfoManager {
                     <button class="busho-scope-btn ${this.princessCurrentScope === 'all' ? 'active' : ''}" data-scope="all">全国</button>
                 </div>
             `;
+        }
+
+        if (this.princessCurrentSortKey) {
+            princesses.sort((a, b) => {
+                let valA, valB;
+                const fatherA = this.game.getBusho(a.fatherId);
+                const fatherB = this.game.getBusho(b.fatherId);
+                const husbandA = this.game.getBusho(a.husbandId);
+                const husbandB = this.game.getBusho(b.husbandId);
+                const clanA = this.game.clans.find(c => c.id === ((a.husbandId && a.husbandId !== 0) ? a.currentClanId : a.originalClanId));
+                const clanB = this.game.clans.find(c => c.id === ((b.husbandId && b.husbandId !== 0) ? b.currentClanId : b.originalClanId));
+
+                switch(this.princessCurrentSortKey) {
+                    case 'name': valA = a.yomi || a.name; valB = b.yomi || b.name; break;
+                    case 'clan': valA = clanA ? (clanA.yomi || clanA.name) : ""; valB = clanB ? (clanB.yomi || clanB.name) : ""; break;
+                    case 'age': valA = this.game.year - a.birthYear; valB = this.game.year - b.birthYear; break;
+                    case 'family': 
+                        const getFamilyScore = (p, clan) => {
+                            let mark = 0;
+                            if (clan) {
+                                const daimyo = this.game.getBusho(clan.leaderId);
+                                if (daimyo) {
+                                    const pFamily = Array.isArray(p.familyIds) ? p.familyIds : [];
+                                    const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+                                    if (pFamily.includes(daimyo.id) || dFamily.includes(p.id)) mark = 1;
+                                }
+                            }
+                            return mark;
+                        };
+                        valA = getFamilyScore(a, clanA); valB = getFamilyScore(b, clanB); 
+                        break;
+                    case 'father': valA = fatherA ? (fatherA.yomi || fatherA.name) : ""; valB = fatherB ? (fatherB.yomi || fatherB.name) : ""; break;
+                    case 'husband': valA = husbandA ? (husbandA.yomi || husbandA.name) : ""; valB = husbandB ? (husbandB.yomi || husbandB.name) : ""; break;
+                }
+
+                if (typeof valA === 'string' && typeof valB === 'string') {
+                    let cmp = this.isPrincessSortAsc ? valA.localeCompare(valB, 'ja') : valB.localeCompare(valA, 'ja');
+                    if(cmp === 0) {
+                        const nameA = a.name;
+                        const nameB = b.name;
+                        cmp = this.isPrincessSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
+                    }
+                    return cmp;
+                }
+                if (valA === valB) return 0;
+                return this.isPrincessSortAsc ? (valA - valB) : (valB - valA);
+            });
         }
 
         const items = princesses.map(p => {
@@ -1531,20 +1612,25 @@ class UIInfoManager {
             contextHtml = "<div>嫁がせる姫を選択してください</div>";
         }
 
+        const getSortMark = (key) => {
+            if (this.princessCurrentSortKey !== key) return '';
+            return this.isPrincessSortAsc ? '<span class="sort-mark">▲</span>' : '<span class="sort-mark">▼</span>';
+        };
+
         this._renderListModal({
             title: "姫一覧",
             contextHtml: contextHtml,
             tabsHtml: tabsHtml,
             headers: [
-                `<span class="col-princess-name">姫</span>`,
-                `<span class="col-clan">勢力</span>`,
-                `<span class="col-age">年齢</span>`,
-                `<span class="col-family">一門</span>`,
-                `<span class="col-father">父親</span>`,
-                `<span class="col-husband">配偶者</span>`,
+                `<span class="col-princess-name" data-sort="name">姫${getSortMark('name')}</span>`,
+                `<span class="col-clan" data-sort="clan">勢力${getSortMark('clan')}</span>`,
+                `<span class="col-age" data-sort="age">年齢${getSortMark('age')}</span>`,
+                `<span class="col-family" data-sort="family">一門${getSortMark('family')}</span>`,
+                `<span class="col-father" data-sort="father">父親${getSortMark('father')}</span>`,
+                `<span class="col-husband" data-sort="husband">配偶者${getSortMark('husband')}</span>`,
                 `<span class="pc-only"></span>`
             ],
-            headerClass: "princess-list-header",
+            headerClass: "sortable-header princess-list-header",
             itemClass: "princess-list-item",
             listClass: "princess-list-container",
             items: items,
@@ -1556,6 +1642,15 @@ class UIInfoManager {
             onScopeClick: (scopeKey) => {
                 this.princessCurrentScope = scopeKey;
                 this._renderPrincessList(isSelectMode, targetCastleId, doerId, 0);
+            },
+            onSortClick: (sortKey) => {
+                const defaultAscKeys = ['name', 'clan', 'father', 'husband'];
+                const newState = this._toggleSortState(this.princessCurrentSortKey, this.isPrincessSortAsc, sortKey, defaultAscKeys);
+                this.princessCurrentSortKey = newState.key;
+                this.isPrincessSortAsc = newState.isAsc;
+                const listEl = document.getElementById('selector-list');
+                const scroll = listEl ? listEl.scrollTop : 0;
+                this._renderPrincessList(isSelectMode, targetCastleId, doerId, scroll);
             }
         });
     }
