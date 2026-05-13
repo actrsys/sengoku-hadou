@@ -2608,3 +2608,8 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     transform: translateY(1px);
     box-shadow: inset 0 2px 5px rgba(0,0,0,0.8);
 }
+/* 修正：ヘッダー内のセルは、個別の列クラス設定よりも優先して中央寄せにする */
+.list-header span[data-sort] {
+    justify-content: center !important;
+    padding-left: 0 !important; /* 左寄せ用の余白もリセット */
+}
