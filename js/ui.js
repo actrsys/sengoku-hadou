@@ -583,6 +583,9 @@ class UIManager {
                 footer.style.transform = '';
                 footer.style.zIndex = '';
                 footer.style.width = '';
+                footer.style.maxWidth = '';
+                footer.style.paddingLeft = '';
+                footer.style.paddingRight = '';
             }
         }
         // ★書き足すのはここまで！
@@ -759,9 +762,17 @@ class UIManager {
                     footer.style.transform = 'translate(-50%, -50%)'; // 自分の大きさ分だけ戻して、ピッタリ真ん中に合わせます
                     footer.style.zIndex = '1000'; // 他のものより手前に表示します
                     
-                    // ★ここを修正：文字ピッタリに縮まないよう、幅を確保しつつ広がりすぎないように制限します
-                    footer.style.width = '80%';
-                    footer.style.maxWidth = '300px';
+                    // ★ここを修正：スマホ版かPC版かで横幅の広げ方を変えます！
+                    if (document.body.classList.contains('is-pc')) {
+                        footer.style.width = '80%';
+                        footer.style.maxWidth = '300px';
+                    } else {
+                        // スマホ版の時は、横幅をいっぱいに広げて左右の隙間をなくします
+                        footer.style.width = '100%';
+                        footer.style.maxWidth = '100%';
+                        footer.style.paddingLeft = '0';
+                        footer.style.paddingRight = '0';
+                    }
                 }
             } else {
                 modal.classList.remove('event-dialog-modal');
