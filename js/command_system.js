@@ -744,13 +744,12 @@ class CommandSystem {
             bushos = this.game.getCastleBushos(targetId); 
             infoHtml = "<div>武将一覧です</div>"; 
         }
-        // 【差し替え後】（間の部分が消えます！）
-        else if (actionType === 'all_busho_list') { 
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active');
-            infoHtml = "<div>武将一覧です</div>"; 
-            isMulti = false;
-        }
-        else if (actionType === 'marriage_kinsman') {
+        else if (actionType === 'all_busho_list') { 
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active');
+            infoHtml = "<div>武将一覧です</div>"; 
+            isMulti = false;
+        }
+        else if (actionType === 'marriage_kinsman') {
             const targetClanId = this.game.getCastle(targetId).ownerClan;
             const targetLeaderId = this.game.clans.find(c => c.id === targetClanId)?.leaderId;
             const targetLeader = this.game.getBusho(targetLeaderId);
@@ -765,7 +764,7 @@ class CommandSystem {
             infoHtml = "<div>姫を嫁がせる相手（一門武将）を選択してください</div>";
             isMulti = false;
         }
-        else if (actionType === 'war_general' || actionType === 'kunishu_war_general') {
+        else if (actionType === 'war_general' || actionType === 'kunishu_war_general') {
             if (extraData && extraData.candidates) {
                 bushos = extraData.candidates.map(id => this.game.getBusho(id));
             }
@@ -859,12 +858,12 @@ class CommandSystem {
         // --- 並び替え（ソート） ---
         const isViewOnly = actionType === 'view_only' || actionType === 'all_busho_list';
         
-        bushos.sort((a,b) => {
+        bushos.sort((a,b) => {
             if (isViewOnly) {
-                const getRankScore = (target) => {
-                    if (target.isPrincess) return 5; // ★追加：姫を一番上にします！
-                    if (target.isDaimyo || target.isCastellan) return 10; 
-                    if (target.isGunshi) return 20;
+                const getRankScore = (target) => {
+                    if (target.isPrincess) return 5; // ★追加：姫を一番上にします！
+                    if (target.isDaimyo || target.isCastellan) return 10; 
+                    if (target.isGunshi) return 20;
                     if (target.belongKunishuId && target.belongKunishuId > 0) {
                         const kunishu = this.game.kunishuSystem.getKunishu(target.belongKunishuId);
                         const isBoss = kunishu && (Number(kunishu.leaderId) === Number(target.id));
@@ -1376,50 +1375,50 @@ class CommandSystem {
         }
 
         if (actionType === 'rumor_target_busho') {
-            this.game.ui.openBushoSelector('rumor_doer', targetId, { targetBushoId: firstId });
-            return;
-        }
+            this.game.ui.openBushoSelector('rumor_doer', targetId, { targetBushoId: firstId });
+            return;
+        }
 
-        // ★ここから追加：婚姻のリストで決定ボタンを押した時の動き！
-        if (actionType === 'marriage_princess') {
-            // 使者と姫のIDを覚えて、相手武将のリストを開きます
-            this.game.ui.openBushoSelector('marriage_kinsman', targetId, { 
-                doerId: extraData.doerId, 
-                princessId: firstId 
-            });
-            return;
-        }
-        if (actionType === 'marriage_kinsman') {
-            const doerId = extraData.doerId;
-            const princessId = extraData.princessId;
-            const targetBushoId = firstId;
-            
-            const targetClanId = this.game.getCastle(targetId).ownerClan;
-            const targetClan = this.game.clans.find(c => c.id === targetClanId);
-            const targetBusho = this.game.getBusho(targetBushoId);
-            const princess = this.game.princesses.find(p => p.id === princessId);
-            const doer = this.game.getBusho(doerId);
+        // ★ここから追加：婚姻のリストで決定ボタンを押した時の動き！
+        if (actionType === 'marriage_princess') {
+            // 使者と姫のIDを覚えて、相手武将のリストを開きます
+            this.game.ui.openBushoSelector('marriage_kinsman', targetId, { 
+                doerId: extraData.doerId, 
+                princessId: firstId 
+            });
+            return;
+        }
+        if (actionType === 'marriage_kinsman') {
+            const doerId = extraData.doerId;
+            const princessId = extraData.princessId;
+            const targetBushoId = firstId;
+            
+            const targetClanId = this.game.getCastle(targetId).ownerClan;
+            const targetClan = this.game.clans.find(c => c.id === targetClanId);
+            const targetBusho = this.game.getBusho(targetBushoId);
+            const princess = this.game.princesses.find(p => p.id === princessId);
+            const doer = this.game.getBusho(doerId);
 
-            const msg = `${targetClan.name} の ${targetBusho.name} に、当家の ${princess.name} を嫁がせます。\nよろしいですか？`;
+            const msg = `${targetClan.name} の ${targetBusho.name} に、当家の ${princess.name} を嫁がせます。\nよろしいですか？`;
 
-            this.game.ui.showDialog(msg, true, 
-                () => {
+            this.game.ui.showDialog(msg, true, 
+                () => {
                     // ここも合図だけでとっても綺麗！
                     const prob = this.game.diplomacyManager.getDiplomacyProb(doerId, targetId, 'marriage');
                     
                     this.showAdviceAndExecute('marriage', () => {
                         this.game.diplomacyManager.executeMarriage(doerId, targetId, princessId, targetBushoId);
                     }, { trueProb: prob / 100 });
-                },
-                () => {
-                    // いいえ：もう一度相手武将選びに戻る
-                    this.game.ui.openBushoSelector('marriage_kinsman', targetId, extraData);
-                }
-            );
-            return;
-        }
+                },
+                () => {
+                    // いいえ：もう一度相手武将選びに戻る
+                    this.game.ui.openBushoSelector('marriage_kinsman', targetId, extraData);
+                }
+            );
+            return;
+        }
 
-        if (actionType === 'rumor_doer') {
+        if (actionType === 'rumor_doer') {
             // ★専門部署である StrategySystem の計算魔法を呼びます！
             const trueProb = this.game.strategySystem.getRumorProb(firstId, extraData.targetBushoId);
             this.showAdviceAndExecute('rumor', () => this.game.strategySystem.executeRumor(firstId, targetId, extraData.targetBushoId), { trueProb: trueProb });
@@ -2225,17 +2224,17 @@ class CommandSystem {
         this.game.ui.renderCommandMenu();
         this.game.ui.renderMap();
     }
-
+    
     executeTrade(type, amount) {
-        const castle = this.game.getCurrentTurnCastle(); 
-        // ★ごっそり書き換え！：日本共通の相場ではなく、今いる国の相場を見に行きます！
-        let rate = 1.0;
-        if (castle && this.game.provinces) {
-            const province = this.game.provinces.find(p => p.id === castle.provinceId);
-            if (province && province.marketRate !== undefined) rate = province.marketRate;
-        }
-        
-        if(type === 'buy_rice') { 
+        const castle = this.game.getCurrentTurnCastle(); 
+        // ★ごっそり書き換え！：日本共通の相場ではなく、今いる国の相場を見に行きます！
+        let rate = 1.0;
+        if (castle && this.game.provinces) {
+            const province = this.game.provinces.find(p => p.id === castle.provinceId);
+            if (province && province.marketRate !== undefined) rate = province.marketRate;
+        }
+        
+        if(type === 'buy_rice') {
             // ★修正：端数切り捨てだと無料で買える場合があるので、切り上げ（Math.ceil）にして最低1金はかかるようにします！
             const cost = Math.max(1, Math.ceil(amount * rate));
             if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
@@ -2647,7 +2646,7 @@ class CommandSystem {
             }
 
             const allyCastles = [...new Set(allyForceCandidates.map(fc => fc.castle))];
-
+            
             if (myClanId === pid && !atkCastle.isDelegated) {
                 this.game.ui.showDialog("他勢力に援軍を要請しますか？", true, 
                     () => {
@@ -2659,37 +2658,37 @@ class CommandSystem {
                 );
             } else {
                 allyForceCandidates.sort((a,b) => b.force.soldiers - a.force.soldiers);
-                const best = allyForceCandidates[0];
-                best.castle.selectedForce = best.force; 
+                const best = allyForceCandidates[0];
+                best.castle.selectedForce = best.force; 
 
-                // ★親善と同じように、兵力差で持参金を計算する魔法です！
-                const myPower = this.game.getClanTotalSoldiers(myClanId) || 1;
-                const helperPower = best.force.isKunishu ? best.force.soldiers : (this.game.getClanTotalSoldiers(best.force.id) || 1);
-                const ratio = helperPower / Math.max(1, myPower);
-                
-                let reinfGold = 300;
-                if (ratio >= 3.0) {
-                    reinfGold = 1000;
-                } else if (ratio > 1.5) {
-                    reinfGold = 300 + ((ratio - 1.5) / 1.5) * 700;
-                }
-                reinfGold = Math.floor(reinfGold / 100) * 100;
-                
-                // 足りなければお城の全額にします
-                if (reinfGold > atkCastle.gold) {
-                    reinfGold = atkCastle.gold;
-                }
+                // ★親善と同じように、兵力差で持参金を計算する魔法です！
+                const myPower = this.game.getClanTotalSoldiers(myClanId) || 1;
+                const helperPower = best.force.isKunishu ? best.force.soldiers : (this.game.getClanTotalSoldiers(best.force.id) || 1);
+                const ratio = helperPower / Math.max(1, myPower);
+                
+                let reinfGold = 300;
+                if (ratio >= 3.0) {
+                    reinfGold = 1000;
+                } else if (ratio > 1.5) {
+                    reinfGold = 300 + ((ratio - 1.5) / 1.5) * 700;
+                }
+                reinfGold = Math.floor(reinfGold / 100) * 100;
+                
+                // 足りなければお城の全額にします
+                if (reinfGold > atkCastle.gold) {
+                    reinfGold = atkCastle.gold;
+                }
 
-                // ★ただし、自分が相手を「支配」しているなら強制参加なので、持参金は０にします！
-                if (!best.force.isKunishu) {
-                    const rel = this.game.getRelation(myClanId, best.force.id);
-                    if (rel && rel.status === '支配') {
-                        reinfGold = 0;
-                    }
-                }
+                // ★ただし、自分が相手を「支配」しているなら強制参加なので、持参金は０にします！
+                if (!best.force.isKunishu) {
+                    const rel = this.game.getRelation(myClanId, best.force.id);
+                    if (rel && rel.status === '支配') {
+                        reinfGold = 0;
+                    }
+                }
 
-                this.executeReinforcementRequest(reinfGold, best.castle, atkCastle, targetCastle, currentAtkBushos, currentSVal, rVal, hVal, gVal, selfReinfData);
-            }
+                this.executeReinforcementRequest(reinfGold, best.castle, atkCastle, targetCastle, currentAtkBushos, currentSVal, rVal, hVal, gVal, selfReinfData);
+            }
         };
 
         const askConfirmAndProceedToAlly = (selfReinfData) => {
