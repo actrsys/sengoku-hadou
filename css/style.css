@@ -2549,6 +2549,12 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     justify-content: flex-start !important;
 }
 
+/* スマホ版限定：面談の選択肢を縦並びに強制し、メッセージの上に配置するルール */
+body:not(.is-pc) .interview-dialog-modal .modal-footer {
+    flex-direction: column !important;
+    order: -1 !important;
+}
+
 .interview-choice-btn {
     position: relative;
     padding: 10px 15px 10px 45px;
@@ -2607,9 +2613,4 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     background: #0d1a10;
     transform: translateY(1px);
     box-shadow: inset 0 2px 5px rgba(0,0,0,0.8);
-}
-/* 修正：ヘッダー内のセルは、個別の列クラス設定よりも優先して中央寄せにする */
-.list-header span[data-sort] {
-    justify-content: center !important;
-    padding-left: 0 !important; /* 左寄せ用の余白もリセット */
 }
