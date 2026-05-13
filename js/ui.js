@@ -758,9 +758,11 @@ class UIManager {
                     footer.style.left = '50%';
                     footer.style.transform = 'translate(-50%, -50%)'; // 自分の大きさ分だけ戻して、ピッタリ真ん中に合わせます
                     footer.style.zIndex = '1000'; // 他のものより手前に表示します
-                    footer.style.width = 'auto';  // 横幅はボタンの数に合わせます
+                    
+                    // ★ここを修正：文字ピッタリに縮まないよう、幅を確保しつつ広がりすぎないように制限します
+                    footer.style.width = '80%';
+                    footer.style.maxWidth = '300px';
                 }
-                // ★書き足すのはここまで！
             } else {
                 modal.classList.remove('event-dialog-modal');
             }
