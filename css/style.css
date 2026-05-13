@@ -2532,19 +2532,23 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
    ========================================================= */
 
 /* 面談時のふすま背景（面談モード） */
-body.interview-mode::after {
+body.interview-mode #game-screen::after {
     content: "";
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     z-index: 5000; /* 地図(100)より上で、全てのウインドウ(6000以上)より下の数値に変更 */
-    background-color: #e8dcc7;
+    background-color: #e8dcc7; /* 和紙のような基本色 */
+    
+    /* ふすまの木枠と、ふすま紙の縦模様をCSSグラデーションで表現 */
     background-image:
         linear-gradient(90deg, #4a3318 0px, #4a3318 20px, transparent 20px, transparent calc(50% - 10px), #4a3318 calc(50% - 10px), #4a3318 calc(50% + 10px), transparent calc(50% + 10px), transparent calc(100% - 20px), #4a3318 calc(100% - 20px), #4a3318 100%),
         linear-gradient(0deg, #4a3318 0px, #4a3318 20px, transparent 20px, transparent calc(100% - 20px), #4a3318 calc(100% - 20px), #4a3318 100%),
         repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(0,0,0,0.02) 10px, rgba(0,0,0,0.02) 20px);
-    box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+    
+    box-shadow: inset 0 0 50px rgba(0,0,0,0.5); /* 奥行きを出す影 */
     opacity: 1;
     visibility: visible;
-    pointer-events: auto;
+    pointer-events: auto; /* ふすまより後ろのマップ等をクリックできないようにブロック */
+    animation: fadeIn 0.3s ease-in;
 }
 
 .interview-dialog-modal .modal-footer {
