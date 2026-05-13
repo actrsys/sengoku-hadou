@@ -828,6 +828,12 @@ class UIManager {
             // 通常のダイアログ：はい/いいえ、または閉じる
             modal.classList.remove('event-dialog-modal');
             modal.classList.remove('interview-dialog-modal');
+
+            // ★ここを修正：通常のダイアログでも、必ず縦並び（文章の下にボタン）になるように設定します
+            modal.style.display = 'flex';
+            modal.style.flexDirection = 'column';
+            modal.style.justifyContent = 'center'; // 通常時は画面の中央付近にまとめます
+
             if (footer) {
                 footer.classList.remove('hidden');
                 footer.style.justifyContent = 'center';
