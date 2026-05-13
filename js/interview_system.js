@@ -12,6 +12,9 @@ class InterviewSystem {
     // UI表示: 面談のメイン画面
     // ----------------------------------------------------------------------
     showInterviewModal(busho) {
+        // ★ 面談開始時にふすまの背景を出すための目印（クラス）を付けます
+        document.body.classList.add('interview-mode');
+
         const currentYear = this.game.year;
         const castle = this.game.getCurrentTurnCastle();
 
@@ -30,6 +33,9 @@ class InterviewSystem {
                     busho.endYear = Number(busho.endYear) + 1;
                     this.game.ui.showResultModal(`${busho.name}は少し顔色が良くなったようです`);
                     
+                    // ★ 完全に面談から抜けるので、ふすまの目印を消します
+                    document.body.classList.remove('interview-mode');
+
                     this.game.ui.updatePanelHeader();
                     this.game.ui.renderCommandMenu();
                 },
@@ -48,7 +54,11 @@ class InterviewSystem {
         let choices = [
             { label: "調子はどうだ", onClick: () => { this.executeInterviewStatus(busho); } },
             { label: "他者について聞く", onClick: () => { this.game.ui.openBushoSelector('interview_target', null, { interviewer: busho }); } },
-            { label: "戻る", onClick: () => { this.reopenInterviewSelector(); } }
+            { label: "戻る", onClick: () => { 
+                // ★ 面談から抜ける（面談相手を選ぶリストに戻る）ため、ふすまの目印を消します
+                document.body.classList.remove('interview-mode');
+                this.reopenInterviewSelector(); 
+            } }
         ];
         
         this.game.ui.showDialog(msg, false, null, null, {
