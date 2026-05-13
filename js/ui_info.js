@@ -1,6 +1,6 @@
 /**
  * ui_info.js
- * リストの表示を管理するファイルです
+ * リストなどの情報ウインドウの表示を管理するファイルです
  */
 class UIInfoManager {
     constructor(ui, game) {

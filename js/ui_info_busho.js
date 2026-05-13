@@ -1,6 +1,7 @@
 /**
  * ui_info_busho.js
- * 武将一覧や詳細に関する機能を UIInfoManager に合体させるファイルです。
+ * 武将一覧や詳細に関する機能を UIInfoManager に合体させるファイルです
+ * Object.assignではそれぞれのメソッドの間に必ずカンマが必要です
  */
 Object.assign(UIInfoManager.prototype, {
 

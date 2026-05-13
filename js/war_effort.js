@@ -1,6 +1,7 @@
 /**
  * war_effort.js
  * 戦争の準備（戦前）と、戦後処理・捕虜の処遇などを担当するファイルです
+ * Object.assignではそれぞれのメソッドの間に必ずカンマが必要です
  */
  
 // Object.assign を使って、WarManager に魔法をくっつけます！
