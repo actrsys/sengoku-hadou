@@ -1005,6 +1005,27 @@ class CommandSystem {
 
         return true;
     }
+    
+    // ★追加：自勢力の道が繋がっているお城をまとめて洗い出す共通の魔法です！
+    getConnectedCastles(startCastle, clanId) {
+        const connectedCastles = new Set();
+        const queue = [startCastle];
+        connectedCastles.add(Number(startCastle.id));
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const neighbors = this.game.castles.filter(adj => 
+                Number(adj.ownerClan) === Number(clanId) && 
+                GameSystem.isAdjacent(current, adj) &&
+                !connectedCastles.has(Number(adj.id))
+            );
+            for (const n of neighbors) {
+                connectedCastles.add(Number(n.id));
+                queue.push(n);
+            }
+        }
+        return connectedCastles;
+    }
 
     getValidTargets(type) {
         // 援軍要請の時は、すでに計算されている候補リストをそのまま使います！
@@ -1041,32 +1062,14 @@ class CommandSystem {
                     Number(target.ownerClan) !== playerClanId && target.ownerClan !== 0
                 ).map(t => t.id);
 
-            case 'ally_other': 
+            case 'ally_other': {
+                // ★修正：ターゲットごとに探すのではなく、最初に繋がっている領土をまとめて取得します（超高速化）！
+                const connectedForAlly = this.getConnectedCastles(c, playerClanId);
                 return this.game.castles.filter(target => {
                     if (Number(target.ownerClan) !== playerClanId || target.id === c.id) return false;
-                    
-                    // ★追加：自領のみを通って辿り着けるか調べる魔法！
-                    const visited = new Set();
-                    const queue = [c];
-                    visited.add(c.id);
-
-                    while (queue.length > 0) {
-                        const current = queue.shift();
-                        if (current.id === target.id) return true;
-
-                        const neighbors = this.game.castles.filter(adj => 
-                            adj.ownerClan === playerClanId && 
-                            GameSystem.isAdjacent(current, adj) &&
-                            !visited.has(adj.id)
-                        );
-
-                        for (const n of neighbors) {
-                            visited.add(n.id);
-                            queue.push(n);
-                        }
-                    }
-                    return false;
+                    return connectedForAlly.has(Number(target.id));
                 }).map(t => t.id);
+            }
             
             case 'other_clan_all': 
                 return this.game.castles.filter(target => {
@@ -1084,7 +1087,7 @@ class CommandSystem {
                     // ★追加：降伏勧告と従属願と臣従願は、自領と接している勢力に限定します！
                     if (type === 'dominate' || type === 'subordinate' || type === 'vassalage') {
                         let isAdjacent = false;
-                        const myCastles = this.game.castles.filter(c => Number(c.ownerClan) === playerClanId);
+                        const myCastles = this.game.castles.filter(myC => Number(myC.ownerClan) === playerClanId);
                         for (let mc of myCastles) {
                             if (mc.adjacentCastleIds) {
                                 for (let adjId of mc.adjacentCastleIds) {
@@ -1102,8 +1105,8 @@ class CommandSystem {
 
                     // ★今回追加：臣従願は、相手の威信が自家の「5倍以上」ないと選べないようにします！
                     if (type === 'vassalage') {
-                        const myClan = this.game.clans.find(c => Number(c.id) === playerClanId);
-                        const targetClan = this.game.clans.find(c => Number(c.id) === target.ownerClan);
+                        const myClan = this.game.clans.find(myC => Number(myC.id) === playerClanId);
+                        const targetClan = this.game.clans.find(tgtC => Number(tgtC.id) === target.ownerClan);
                         if (myClan && targetClan) {
                             if (targetClan.daimyoPrestige < myClan.daimyoPrestige * 5) {
                                 return false;
@@ -1167,7 +1170,7 @@ class CommandSystem {
             case 'kunishu_incorporate_valid': {
                 const activeKunishus = this.game.kunishuSystem.getAliveKunishus();
                 const myClanId = playerClanId;
-                const myClan = this.game.clans.find(c => c.id === myClanId);
+                const myClan = this.game.clans.find(clan => clan.id === myClanId);
                 const myPrestige = myClan ? myClan.daimyoPrestige : 0;
 
                 const validKunishus = activeKunishus.filter(k => {
@@ -1191,23 +1194,8 @@ class CommandSystem {
                 // まず諸勢力がいる城を全部集めます（Numberで数字に揃えます）
                 const allKunishuCastleIds = [...new Set(activeKunishus.map(k => Number(k.castleId)))];
                 
-                // ★追加：出陣するお城から道が繋がっている「自勢力の領土ネットワーク」を調べます！
-                const connectedCastles = new Set();
-                const queue = [c];
-                connectedCastles.add(Number(c.id));
-
-                while (queue.length > 0) {
-                    const current = queue.shift();
-                    const neighbors = this.game.castles.filter(adj => 
-                        Number(adj.ownerClan) === Number(playerClanId) && 
-                        GameSystem.isAdjacent(current, adj) &&
-                        !connectedCastles.has(Number(adj.id))
-                    );
-                    for (const n of neighbors) {
-                        connectedCastles.add(Number(n.id));
-                        queue.push(n);
-                    }
-                }
+                // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
+                const connectedCastles = this.getConnectedCastles(c, playerClanId);
                 
                 // 集めた城を「フィルター（ふるい）」にかけて、条件に合うものだけを残します！
                 return allKunishuCastleIds.filter(targetCastleId => {
@@ -1226,7 +1214,7 @@ class CommandSystem {
             
             case 'marriage_valid': {
                 // 1. まず、自分の大名家に嫁がせられる姫（未婚の姫）がいるかチェックします
-                const myClan = this.game.clans.find(c => c.id === playerClanId);
+                const myClan = this.game.clans.find(clan => clan.id === playerClanId);
                 const hasUnmarriedPrincess = myClan && myClan.princessIds && myClan.princessIds.some(pId => {
                     const p = this.game.princesses.find(princess => princess.id === pId);
                     return p && p.status === 'unmarried';
@@ -2467,31 +2455,16 @@ class CommandSystem {
                     this.game.ui.showDefReinforcementSelector(temp.candidates, temp.defCastle, temp.selfReinfData, temp.onComplete);
                 }
             };
-
+            
             // ★追加: 他大名か諸勢力かを選ぶ処理（自軍援軍の時はスルーします）
             if (mode === 'atk_ally_reinforcement' || mode === 'def_ally_reinforcement') {
                 const myClanId = (mode === 'atk_ally_reinforcement') ? temp.atkCastle.ownerClan : temp.defCastle.ownerClan;
                 const enemyClanId = (mode === 'atk_ally_reinforcement') ? temp.targetCastle.ownerClan : this.game.warManager.state.attacker.ownerClan;
                 const isDefending = (mode === 'def_ally_reinforcement');
                 
-                // ★追加：外交の専門部署にお願いするために、繋がっているお城のリストを作ります
-                const connectedCastles = new Set();
                 const startCastle = (mode === 'atk_ally_reinforcement') ? temp.atkCastle : temp.defCastle;
-                const queue = [startCastle];
-                connectedCastles.add(startCastle.id);
-
-                while (queue.length > 0) {
-                    const current = queue.shift();
-                    const neighbors = this.game.castles.filter(adj => 
-                        adj.ownerClan === myClanId && 
-                        GameSystem.isAdjacent(current, adj) &&
-                        !connectedCastles.has(adj.id)
-                    );
-                    for (const n of neighbors) {
-                        connectedCastles.add(n.id);
-                        queue.push(n);
-                    }
-                }
+                // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
+                const connectedCastles = this.getConnectedCastles(startCastle, myClanId);
 
                 // ★修正：条件のチェックをすべて「外交の専門部署」に任せます！
                 // 【原因】ここに渡す情報が1つ抜けていてズレてしまっていました！
@@ -2650,26 +2623,11 @@ class CommandSystem {
             this.game.warManager.state = this.game.warManager.state || {};
             this.game.warManager.state.isKunishuSubjugation = false;
         }
-
+        
         const pid = this.game.playerClanId;
         
-        // ★追加：出陣するお城から道が繋がっている「自勢力の領土ネットワーク」を調べます！
-        const connectedCastles = new Set();
-        const queue = [atkCastle];
-        connectedCastles.add(atkCastle.id);
-
-        while (queue.length > 0) {
-            const current = queue.shift();
-            const neighbors = this.game.castles.filter(adj => 
-                adj.ownerClan === myClanId && 
-                GameSystem.isAdjacent(current, adj) &&
-                !connectedCastles.has(adj.id)
-            );
-            for (const n of neighbors) {
-                connectedCastles.add(n.id);
-                queue.push(n);
-            }
-        }
+        // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
+        const connectedCastles = this.getConnectedCastles(atkCastle, myClanId);
         
         // ★修正：条件のチェックをすべて「外交の専門部署」に任せます！
         const selfCandidates = this.game.diplomacyManager.findAvailableReinforcements(

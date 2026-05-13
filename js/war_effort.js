@@ -7,6 +7,27 @@
 // Object.assign を使って、WarManager に魔法をくっつけます！
 Object.assign(WarManager.prototype, {
 
+    // ★追加：自勢力の道が繋がっているお城をまとめて洗い出す共通の魔法です！
+    getConnectedCastles(startCastle, clanId) {
+        const connectedCastles = new Set();
+        const queue = [startCastle];
+        connectedCastles.add(Number(startCastle.id));
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const neighbors = this.game.castles.filter(adj => 
+                Number(adj.ownerClan) === Number(clanId) && 
+                GameSystem.isAdjacent(current, adj) &&
+                !connectedCastles.has(Number(adj.id))
+            );
+            for (const n of neighbors) {
+                connectedCastles.add(Number(n.id));
+                queue.push(n);
+            }
+        }
+        return connectedCastles;
+    },
+
     // ★追加：落城時などに逃げ込む「味方の城」の候補を探し出す魔法
     getEscapeCandidates(defCastle) {
         const oldOwner = defCastle.ownerClan;
@@ -2618,23 +2639,8 @@ Object.assign(WarManager.prototype, {
             return;
         }
 
-        // ★追加：防衛するお城から道が繋がっている「自勢力の領土ネットワーク」を調べます（専門部署に渡すため）
-        const connectedCastles = new Set();
-        const queue = [defCastle];
-        connectedCastles.add(defCastle.id);
-
-        while (queue.length > 0) {
-            const current = queue.shift();
-            const neighbors = this.game.castles.filter(adj => 
-                adj.ownerClan === defClanId && 
-                GameSystem.isAdjacent(current, adj) &&
-                !connectedCastles.has(adj.id)
-            );
-            for (const n of neighbors) {
-                connectedCastles.add(n.id);
-                queue.push(n);
-            }
-        }
+        // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
+        const connectedCastles = this.getConnectedCastles(defCastle, defClanId);
 
         // ★修正：条件のチェックをすべて「外交の専門部署」に任せます！
         const candidateCastles = this.game.diplomacyManager.findAvailableReinforcements(
@@ -2720,23 +2726,8 @@ Object.assign(WarManager.prototype, {
             return;
         }
 
-        // ★追加：防衛するお城から道が繋がっている「自勢力の領土ネットワーク」を調べます！
-        const connectedCastles = new Set();
-        const queue = [defCastle];
-        connectedCastles.add(defCastle.id);
-
-        while (queue.length > 0) {
-            const current = queue.shift();
-            const neighbors = this.game.castles.filter(adj => 
-                adj.ownerClan === defClanId && 
-                GameSystem.isAdjacent(current, adj) &&
-                !connectedCastles.has(adj.id)
-            );
-            for (const n of neighbors) {
-                connectedCastles.add(n.id);
-                queue.push(n);
-            }
-        }
+        // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
+        const connectedCastles = this.getConnectedCastles(defCastle, defClanId);
 
         // ★修正：条件のチェックをすべて「外交の専門部署」に任せます！
         // （上で作った connectedCastles をそのまま専門部署に渡します）
@@ -2847,139 +2838,40 @@ Object.assign(WarManager.prototype, {
             this.executeDefReinforcement(finalGold, best.castle, defCastle, onComplete);
         }
     },
-
+    
     executeDefSelfReinforcementAuto(helperCastle, defCastle, onComplete) {
-        const myClanId = defCastle.ownerClan;
+        const myClanId = helperCastle.ownerClan;
         
-        let reinfSoldiers = Math.max(500, Math.floor(helperCastle.soldiers * 0.5));
+        let reinfSoldiers = Math.floor(helperCastle.soldiers * 0.5);
+        if (reinfSoldiers < 500) reinfSoldiers = 500;
         if (reinfSoldiers > helperCastle.soldiers) reinfSoldiers = helperCastle.soldiers;
         
-        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => b.clan === helperCastle.ownerClan && b.status === 'active').sort((a,b) => b.strength - a.strength);
-        let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
-        const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
+        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b =>
+            b.clan === helperCastle.ownerClan && b.status === 'active'
+        ).sort((a,b) => b.strength - a.strength);
 
-        let reinfRice = Math.min(helperCastle.rice, Math.max(500, reinfSoldiers)); 
+        let bushoCount = 1;
+        if (reinfSoldiers >= 1500) bushoCount = 2;
+        if (reinfSoldiers >= 2500) bushoCount = 3;
+        if (bushoCount > availableBushos.length) bushoCount = availableBushos.length;
+
+        const reinfBushos = availableBushos.slice(0, bushoCount);
+        const reinfRice = reinfSoldiers; 
         const reinfHorses = (helperCastle.horses || 0) < reinfSoldiers * 0.2 ? 0 : Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
         const reinfGuns = (helperCastle.guns || 0) < reinfSoldiers * 0.2 ? 0 : Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
 
-        // ★追加：AIからの守備援軍も大雪の被害をチェックします！
-        const srcProv = this.game.provinces.find(p => p.id === helperCastle.provinceId);
-        const tgtProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
-        const isHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) || 
-                            (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
+        helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
+        helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
+        helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
+        helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
 
-        const proceed = async () => {
-            let finalSVal = reinfSoldiers;
-            let finalBushos = [...reinfBushos];
-
-            if (isHeavySnow) {
-                const survivingBushos = [];
-                for (let b of finalBushos) {
-                    if (Math.random() < 0.10) {
-                        await this.game.ui.showDialogAsync(`我が軍の${b.name}が凍死しました……`, false, 0);
-                        await this.game.lifeSystem.executeDeath(b);
-                    } else {
-                        survivingBushos.push(b);
-                    }
-                }
-                finalBushos = survivingBushos;
-
-                const lossRate = 0.20 + Math.random() * 0.30;
-                const lostSoldiers = Math.floor(finalSVal * lossRate);
-                finalSVal -= lostSoldiers;
-
-                if (lostSoldiers > 0) {
-                    await this.game.ui.showDialogAsync(`我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
-                }
-
-                if (finalBushos.length === 0) {
-                    await this.game.ui.showDialogAsync("指揮官の不在により、我が軍の兵士は行方不明になりました……", false, 0);
-                    this.game.ui.updatePanelHeader();
-                    this.game.ui.renderCommandMenu();
-                    onComplete(null);
-                    return;
-                }
-            }
-
-            helperCastle.soldiers = Math.max(0, helperCastle.soldiers - finalSVal);
-            helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
-            helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
-            helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
-
-            const selfReinfData = {
-                castle: helperCastle, bushos: finalBushos, soldiers: finalSVal,
-                rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: true,
-                morale: helperCastle.morale || 50, training: helperCastle.training || 50
-            };
-            console.log(`自勢力の援軍が到着しました！兵士数: ${finalSVal}`);
-            
-            let colorClass = "log-color-def";
-            const atkForce = this.state.attacker;
-            const atkClanId = atkForce ? (atkForce.isKunishu ? 0 : atkForce.ownerClan) : 0;
-            const leaderName = finalBushos.length > 0 ? finalBushos[0].name : "総大将";
-            
-            if (atkClanId === this.game.playerClanId) {
-                this.game.ui.showDialog(`${helperCastle.name}の${leaderName}が敵の援軍として参戦しました！`, false, () => {
-                    onComplete(selfReinfData);
-                });
-            } else {
-                this.game.ui.log(`【応援軍】<span class="${colorClass}">${helperCastle.name}の${leaderName}</span>が守備側の援軍として参戦しました。`);
-                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
-                if (skipAnim) {
-                    onComplete(selfReinfData);
-                } else {
-                    this.game.ui.showDialog(`${helperCastle.name}の${leaderName}が守備側の援軍として参戦しました！`, false, () => {
-                        onComplete(selfReinfData);
-                    });
-                }
-            }
+        const selfReinfData = {
+            castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
+            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: false, isSelf: true,
+            morale: helperCastle.morale || 50, training: helperCastle.training || 50
         };
-
-        // ★追加：自分のAI城なら「被害が出ますが送りますか？」と確認してくれます！
-        if (isHeavySnow && myClanId === this.game.playerClanId) {
-            this.game.ui.showDialog(`大雪の影響により、援軍部隊(${helperCastle.name})に被害が出る場合があります。\nそれでも出陣させますか？`, true, () => {
-                proceed();
-            }, () => {
-                onComplete(null);
-            });
-        } else {
-            proceed();
-        }
-    },
-
-    handleBushoSelectionForDefSelfReinf(helperCastleId, selectedIds, onComplete, promptBusho) {
-        const helperCastle = this.game.getCastle(helperCastleId);
-        const reinfBushos = selectedIds.map(id => this.game.getBusho(id));
-        this.game.ui.openQuantitySelector('def_self_reinf_supplies', [helperCastle], null, {
-            onConfirm: (inputs) => {
-                // ★追加：プレイヤーが参戦することになったので、透明化の魔法を解除して文字が見えるようにします！
-                this.game.ui.restoreAIGuardText(true);
-
-                const i = inputs[helperCastle.id] || inputs;
-                const rS = i.soldiers ? parseInt(i.soldiers.num.value) : 500;
-                const rR = i.rice ? parseInt(i.rice.num.value) : 500;
-                const rH = i.horses ? parseInt(i.horses.num.value) : 0;
-                const rG = i.guns ? parseInt(i.guns.num.value) : 0;
-
-                helperCastle.soldiers = Math.max(0, helperCastle.soldiers - rS);
-                helperCastle.rice = Math.max(0, helperCastle.rice - rR);
-                helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - rH);
-                helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - rG);
-
-                const selfReinfData = {
-                    castle: helperCastle, bushos: reinfBushos, soldiers: rS,
-                    rice: rR, horses: rH, guns: rG, isSelf: true,
-                    morale: helperCastle.morale || 50, training: helperCastle.training || 50
-                };
-                
-                // ★修正：こちらも同じく「水色(log-color-def)」にします
-                let colorClass = "log-color-def";
-                let leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
-                this.game.ui.log(`【応援軍】<span class="${colorClass}">${helperCastle.name}の${leaderName}</span>が守備側の援軍として出発しました！`);
-                onComplete(selfReinfData);
-            },
-            onCancel: promptBusho
-        });
+        
+        onComplete(selfReinfData);
     },
 
     executeDefReinforcement(gold, helperCastle, defCastle, onComplete) {
@@ -2987,50 +2879,19 @@ Object.assign(WarManager.prototype, {
 
         const force = helperCastle.selectedForce;
         const myClanId = defCastle.ownerClan;
-
-        // ★追加：戦力比較用の合計兵力算出
-        let defTotalSoldiers = defCastle.soldiers;
-        if (this.state.defSelfReinforcement) defTotalSoldiers += this.state.defSelfReinforcement.soldiers;
         
-        let atkTotalSoldiers = this.state.attacker.soldiers;
-        if (this.state.reinforcement) atkTotalSoldiers += this.state.reinforcement.soldiers;
-        if (this.state.selfReinforcement) atkTotalSoldiers += this.state.selfReinforcement.soldiers;
-
-        // ★ここから追加：大雪の判定です
+        // ★大雪判定
         const srcProv = this.game.provinces.find(p => p.id === helperCastle.provinceId);
         const tgtProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
-        const isHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) ||
+        const isHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) || 
                             (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
 
-        // ★ 追加：諸勢力が選ばれていた場合の特別な処理です！
+        // ★諸勢力の場合
         if (force && force.isKunishu) {
             const kunishu = this.game.kunishuSystem.getKunishu(force.id);
             const currentRel = kunishu.getRelation(myClanId);
             
-            // ★追加：大雪ならAI（諸勢力）は絶対に断ります！
-            let isSuccess = false;
-            if (!isHeavySnow) {
-                const enemyClanId = this.state.attacker.ownerClan;
-                
-                // ★修正：確率の計算を、外交の専門部署にお任せします！
-                const prob = this.game.diplomacyManager.getReinforcementAcceptProb(myClanId, force.id, enemyClanId, gold, true, defTotalSoldiers, atkTotalSoldiers);
-                isSuccess = (Math.random() * 100 < prob);
-            }
-            
-            if (!isSuccess) {
-                if (myClanId === this.game.playerClanId) {
-                    const leader = this.game.getBusho(kunishu.leaderId);
-                    const leaderName = leader ? leader.name : "頭領";
-                    const nameStr = `${kunishu.getName(this.game)}の${leaderName}`;
-                    
-                    // ★メッセージ係にお任せします！
-                    this.reinfMsgHelper.showRefusal(this.game, nameStr, isHeavySnow, onComplete);
-                } else {
-                    onComplete();
-                }
-                return;
-            }
-            
+            // 借りを作ったので友好度が少し下がります
             kunishu.setRelation(myClanId, currentRel - 10);
             
             const rate = currentRel / 200; 
@@ -3039,98 +2900,63 @@ Object.assign(WarManager.prototype, {
             
             const availableBushos = this.game.kunishuSystem.getKunishuMembers(kunishu.id).sort((a,b) => b.strength - a.strength);
             let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
-            const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
-
-            let reinfRice = reinfSoldiers; 
-            // ★軍馬と鉄砲は兵士の2割以上あれば全部持っていく
-            const reinfHorses = (kunishu.horses || 0) < reinfSoldiers * 0.2 ? 0 : (kunishu.horses || 0); 
-            const reinfGuns = (kunishu.guns || 0) < reinfSoldiers * 0.2 ? 0 : (kunishu.guns || 0);
-
+            bushoCount = Math.min(bushoCount, availableBushos.length);
+            const reinfBushos = availableBushos.slice(0, bushoCount);
+            
+            const reinfRice = reinfSoldiers; 
+            const reinfHorses = 0; 
+            const reinfGuns = 0;
+            
             kunishu.soldiers = Math.max(0, kunishu.soldiers - reinfSoldiers);
-            kunishu.horses = 0; // 全部持っていくのでお留守番はゼロになります
-            kunishu.guns = 0;   // 全部持っていくのでお留守番はゼロになります
-
+            
             this.state.defReinforcement = {
                 castle: helperCastle, kunishuId: kunishu.id, bushos: reinfBushos, soldiers: reinfSoldiers,
                 rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false, isKunishuForce: true,
-                morale: 50, training: 50
+                morale: kunishu.morale || 50, training: kunishu.training || 50
             };
-            console.log(`他勢力（諸勢力）の援軍が到着しました！兵士数: ${reinfSoldiers}`);
             
             if (myClanId === this.game.playerClanId) {
                 const leader = this.game.getBusho(kunishu.leaderId);
                 const leaderName = leader ? leader.name : "頭領";
                 const nameStr = `${kunishu.getName(this.game)}の${leaderName}`;
                 
-                // ★メッセージ係にお任せします！
-                this.reinfMsgHelper.showAcceptance(this.game, nameStr, true, defCastle.isDelegated, false, onComplete);
-            } else {
-                const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "頭領";
-                const atkForce = this.state.attacker;
-                const atkClanId = atkForce.isKunishu ? 0 : atkForce.ownerClan;
-                const nameStr = `${kunishu.getName(this.game)}の${leaderName}`;
-                const isEnemy = (atkClanId === this.game.playerClanId);
-                
-                if (isEnemy) {
-                    this.reinfMsgHelper.showAcceptance(this.game, nameStr, true, false, true, onComplete, false);
-                } else {
-                    this.game.ui.log(`【友軍】${defCastle.name}の要請により、${kunishu.getName(this.game)}が守備側の援軍として駆けつけました。`);
-                    this.reinfMsgHelper.showAcceptance(this.game, nameStr, true, false, false, onComplete, false);
-                }
-            }
-            return;
-        }
-
-        // 以降は大名家の処理
-        const helperClanId = helperCastle.ownerClan;
-        const enemyClanId = this.state.attacker.ownerClan;
-
-        const myToHelperRel = this.game.getRelation(myClanId, helperClanId);
-        const helperToEnemyRel = this.game.getRelation(helperClanId, enemyClanId);
-
-        if (helperClanId === this.game.playerClanId) {
-            const myClanName = this.game.clans.find(c => c.id === myClanId)?.name || "不明";
-            // ★相手（AI）から見て、自分が「支配」されている時は、要請を断れない
-            const isBoss = (myToHelperRel.status === '支配');
-            const startSelection = () => this._promptPlayerDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete, isBoss);
-
-            // ★メッセージ係にお任せします！
-            this.reinfMsgHelper.showRequest(this.game, myClanName, "", gold, isBoss, false, startSelection, () => {
-                this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -5);
-                this.game.ui.showDialog(`援軍要請を断りました。`, false, onComplete);
-            });
-            return;
-        }
-
-        // ★追加：大雪ならAIは絶対に断ります！
-        let isSuccess = false;
-        if (myToHelperRel.status === '支配' && !isHeavySnow) isSuccess = true;
-        else if (!isHeavySnow) {
-            // ★修正：確率計算とサイコロは、外交の専門部署にお任せします！
-            const prob = this.game.diplomacyManager.getReinforcementAcceptProb(myClanId, helperClanId, enemyClanId, gold, false, defTotalSoldiers, atkTotalSoldiers);
-            isSuccess = (Math.random() * 100 < prob);
-        }
-
-        if (!isSuccess) {
-            if (myClanId === this.game.playerClanId) {
-                const castellan = this.game.getBusho(helperCastle.castellanId);
-                const castellanName = castellan ? castellan.name : "城主";
-                const nameStr = `${helperCastle.name}の${castellanName}`;
-                
-                // ★メッセージ係にお任せします！
-                this.reinfMsgHelper.showRefusal(this.game, nameStr, isHeavySnow, onComplete);
+                this.game.warManager.reinfMsgHelper.showAcceptance(this.game, nameStr, true, defCastle.isDelegated, false, onComplete, false);
             } else {
                 onComplete();
             }
             return;
         }
 
-        this._applyDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete);
-    },
-    
-    _applyDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete) {
-        const myClanId = defCastle.ownerClan;
+        // 大名家の場合
         const helperClanId = helperCastle.ownerClan;
+        const myToHelperRel = this.game.getRelation(myClanId, helperClanId);
+        
+        if (helperClanId === this.game.playerClanId) {
+            const myClanName = this.game.clans.find(c => c.id === myClanId)?.name || "不明";
+            
+            let targetInfoStr = "";
+            const provData = this.game.provinces.find(p => p.id === defCastle.provinceId);
+            const provName = provData ? provData.province : "不明な国";
+
+            if (defCastle.isKunishu) {
+                const kunishu = this.game.kunishuSystem.getKunishu(defCastle.kunishuId);
+                const kName = kunishu ? kunishu.getName(this.game) : "諸勢力";
+                targetInfoStr = `${provName}の${kName}を防衛するため、\n`;
+            } else if (defCastle.ownerClan === 0) {
+                targetInfoStr = `${provName}の${defCastle.name}を防衛するため、\n`;
+            } else {
+                targetInfoStr = `${defCastle.name}を防衛するため、\n`;
+            }
+
+            const isBoss = (myToHelperRel && myToHelperRel.status === '支配');
+            const startSelection = () => this._promptPlayerDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete, isBoss);
+            
+            this.game.warManager.reinfMsgHelper.showRequest(this.game, myClanName, targetInfoStr, gold, isBoss, false, startSelection, () => {
+                this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
+                this.game.ui.showDialog(`援軍要請を断りました。`, false, onComplete);
+            });
+            return;
+        }
 
         if (!['支配', '従属', '同盟'].includes(myToHelperRel.status)) this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
 
@@ -3142,11 +2968,12 @@ Object.assign(WarManager.prototype, {
         
         const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => b.clan === helperCastle.ownerClan && b.status === 'active').sort((a,b) => b.strength - a.strength);
         let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
-        const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
+        bushoCount = Math.min(bushoCount, availableBushos.length);
 
-        let reinfRice = Math.min(helperCastle.rice, Math.max(500, reinfSoldiers)); 
-        const reinfHorses = (helperCastle.horses || 0) < reinfSoldiers * 0.2 ? 0 : Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
-        const reinfGuns = (helperCastle.guns || 0) < reinfSoldiers * 0.2 ? 0 : Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
+        const reinfBushos = availableBushos.slice(0, bushoCount);
+        const reinfRice = reinfSoldiers; 
+        const reinfHorses = Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
+        const reinfGuns = Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
 
         helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
         helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
@@ -3158,46 +2985,24 @@ Object.assign(WarManager.prototype, {
             rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false,
             morale: helperCastle.morale || 50, training: helperCastle.training || 50
         };
-        console.log(`他勢力（大名家）の援軍が到着しました！兵士数: ${reinfSoldiers}`);
-        
+
         const atkForce = this.state.attacker;
         const atkIsKunishu = atkForce.isKunishu || false;
         const atkId = atkIsKunishu ? atkForce.kunishuId : atkForce.ownerClan;
         const helperIsKunishu = helperCastle.isKunishu || false;
-        // ★修正：守備の援軍と攻撃側の関係悪化処理
+        
         if (this.game.diplomacyManager && !helperIsKunishu && !atkIsKunishu && helperClanId !== 0 && atkId !== 0) {
-            // 援軍に入った時は「敵対」にせず、友好度を7下げるだけにします！
             this.game.diplomacyManager.updateSentiment(helperClanId, atkId, -7);
         }
         
-        if (helperClanId === this.game.playerClanId) this.state.isPlayerInvolved = true;
-
-        const helperClanName = this.game.clans.find(c => c.id === helperClanId)?.name || "援軍";
-
         if (myClanId === this.game.playerClanId) {
             const castellan = this.game.getBusho(helperCastle.castellanId);
             const castellanName = castellan ? castellan.name : "城主";
             const nameStr = `${helperCastle.name}の${castellanName}`;
             
-            // ★メッセージ係にお任せします！
-            this.reinfMsgHelper.showAcceptance(this.game, nameStr, false, defCastle.isDelegated, false, onComplete);
-            
-        } else if (helperClanId === this.game.playerClanId) {
-            const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
-            this.game.ui.showDialog(`${helperClanName}の${leaderName} (${helperCastle.name}) が守備側の援軍に駆けつけました！`, false, onComplete);
+            this.game.warManager.reinfMsgHelper.showAcceptance(this.game, nameStr, false, defCastle.isDelegated, false, onComplete, false);
         } else {
-            const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
-            const isEnemy = (atkId === this.game.playerClanId);
-            const nameStr = `${helperClanName}の${leaderName}`;
-            
-            if (isEnemy) {
-                // ★メッセージ係にお任せします！
-                this.reinfMsgHelper.showAcceptance(this.game, nameStr, false, false, true, onComplete, false);
-            } else {
-                this.game.ui.log(`【友軍】${defCastle.name}の要請により、${helperClanName}が守備側の援軍として駆けつけました。`);
-                // ★メッセージ係にお任せします！
-                this.reinfMsgHelper.showAcceptance(this.game, nameStr, false, false, false, onComplete, false);
-            }
+            onComplete();
         }
     },
 
