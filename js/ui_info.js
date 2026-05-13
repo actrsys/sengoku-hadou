@@ -2186,7 +2186,7 @@ class UIInfoManager {
             gridSpStr = "2fr 1fr 1fr 1fr 0.8fr 1fr 1fr";
             gridPcStr = "140px 100px 100px 100px 60px 80px 80px 1fr";
             headers = [
-                `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
+                `<span class="col-castle-name" data-sort="name">拠点名${getSortMark('name')}</span>`,
                 `<span class="col-clan" data-sort="clan">勢力${getSortMark('clan')}</span>`,
                 `<span class="col-castellan" data-sort="castellan">城主${getSortMark('castellan')}</span>`,
                 `<span class="col-province" data-sort="province">国${getSortMark('province')}</span>`,
@@ -2199,7 +2199,7 @@ class UIInfoManager {
             gridSpStr = "2fr 1fr 1fr 1fr 1fr 1fr 1fr";
             gridPcStr = "140px 80px 80px 80px 80px 80px 80px 1fr";
             headers = [
-                `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
+                `<span class="col-castle-name" data-sort="name">拠点名${getSortMark('name')}</span>`,
                 `<span class="col-soldiers" data-sort="soldiers">兵数${getSortMark('soldiers')}</span>`,
                 `<span class="col-defense" data-sort="defense">防御${getSortMark('defense')}</span>`,
                 `<span class="col-morale" data-sort="morale">士気${getSortMark('morale')}</span>`,
@@ -2212,7 +2212,7 @@ class UIInfoManager {
             gridSpStr = "2.5fr 1fr 0.8fr 1.2fr 1.2fr 1.5fr 1.5fr";
             gridPcStr = "140px 60px 50px 60px 60px 80px 80px 100px 100px";
             headers = [
-                `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
+                `<span class="col-castle-name" data-sort="name">拠点名${getSortMark('name')}</span>`,
                 `<span class="col-population" data-sort="population">人口${getSortMark('population')}</span>`,
                 `<span class="col-loyalty" data-sort="loyalty">民忠${getSortMark('loyalty')}</span>`,
                 `<span class="col-kokudaka pc-only" data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
