@@ -875,6 +875,14 @@ class UIManager {
                 }
             }
 
+            // ★追加：他のウインドウ（設定やinfoウインドウ、ダイアログなど）が開いている時は反応しないようにガードします！
+            // これで「命令を終了しますか？」という確認画面が出ている時の連打も防げます！
+            const openModal = document.querySelector('.modal:not(.hidden)');
+            if (openModal) {
+                e.preventDefault(); // ブラウザ本来のメニューも出さないようにします
+                return; // ここで処理を終わらせて、ボタンを押すのをやめます
+            }
+
             // 画面の中に「命令終了」のボタンがあるか”すべて”探して集めます
             const finishBtns = document.querySelectorAll('.cmd-btn.finish');
             
