@@ -515,7 +515,7 @@ class DiplomacyManager {
 
         const newRel = this.getRelation(doerClanId, targetClanId);
         let newStatus = '普通';
-        if (newRel.sentiment <= 39) newStatus = '敵対';
+        if (newRel.sentiment <= 30) newStatus = '敵対';
         else if (newRel.sentiment >= 70) newStatus = '友好';
         this.changeStatus(doerClanId, targetClanId, newStatus);
 

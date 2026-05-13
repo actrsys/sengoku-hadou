@@ -109,13 +109,14 @@ Object.assign(WarManager.prototype, {
         // どちらかが諸勢力の場合、あるいは中立（0）の場合は外交関係がないので何もしません
         if (atkIsKunishu || defIsKunishu || atkId === 0 || defId === 0) return;
         
-        // 両者の関係を「敵対」にします
         if (this.game.diplomacyManager) {
-            this.game.diplomacyManager.changeStatus(atkId, defId, '敵対');
-            
-            // ★追加：主役同士（援軍じゃない場合）は、友好度を「０」まで減らします！（-100すれば必ず0になります）
             if (!isReinforcement) {
+                // 主役同士の場合は今まで通り「敵対」にして数字も0（-100）にします
+                this.game.diplomacyManager.changeStatus(atkId, defId, '敵対');
                 this.game.diplomacyManager.updateSentiment(atkId, defId, -100);
+            } else {
+                // ★修正：援軍の場合は「敵対」にはせず、友好度を7下げるだけにします！
+                this.game.diplomacyManager.updateSentiment(atkId, defId, -7);
             }
         }
     },
@@ -489,7 +490,8 @@ Object.assign(WarManager.prototype, {
             if (reinforcementData && this.game.diplomacyManager && !reinforcementData.castle.isKunishu && !defCastle.isKunishu) {
                 const helperClan = reinforcementData.castle.ownerClan;
                 if (helperClan !== 0 && defClan !== 0) {
-                    this.game.diplomacyManager.changeStatus(helperClan, defClan, '敵対');
+                    // ★修正：攻撃の援軍に入った時は「敵対」にせず、友好度を7下げるだけにします！
+                    this.game.diplomacyManager.updateSentiment(helperClan, defClan, -7);
                 }
             }
             
@@ -3162,9 +3164,10 @@ Object.assign(WarManager.prototype, {
         const atkIsKunishu = atkForce.isKunishu || false;
         const atkId = atkIsKunishu ? atkForce.kunishuId : atkForce.ownerClan;
         const helperIsKunishu = helperCastle.isKunishu || false;
-        // ★復元：守備の援軍と攻撃側を「敵対」にする処理
+        // ★修正：守備の援軍と攻撃側の関係悪化処理
         if (this.game.diplomacyManager && !helperIsKunishu && !atkIsKunishu && helperClanId !== 0 && atkId !== 0) {
-            this.game.diplomacyManager.changeStatus(helperClanId, atkId, '敵対');
+            // 援軍に入った時は「敵対」にせず、友好度を7下げるだけにします！
+            this.game.diplomacyManager.updateSentiment(helperClanId, atkId, -7);
         }
         
         if (helperClanId === this.game.playerClanId) this.state.isPlayerInvolved = true;
@@ -3243,9 +3246,10 @@ Object.assign(WarManager.prototype, {
         const atkIsKunishu = atkForce.isKunishu || false;
         const atkId = atkIsKunishu ? atkForce.kunishuId : atkForce.ownerClan;
         const helperIsKunishu = helperCastle.isKunishu || false;
-        // ★守備の援軍と攻撃側を「敵対」にする処理
+        // ★修正：守備の援軍と攻撃側の関係悪化処理
         if (this.game.diplomacyManager && !helperIsKunishu && !atkIsKunishu && helperClanId !== 0 && atkId !== 0) {
-            this.game.diplomacyManager.changeStatus(helperClanId, atkId, '敵対');
+            // 援軍に入った時は「敵対」にせず、友好度を7下げるだけにします！
+            this.game.diplomacyManager.updateSentiment(helperClanId, atkId, -7);
         }
         
         this.state.isPlayerInvolved = true;
