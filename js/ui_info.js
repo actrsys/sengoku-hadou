@@ -69,7 +69,8 @@ class UIInfoManager {
     // ★新機能：並べ替えが終わったあとに、その結果を共通の箱に保存する魔法
     _saveStableSortResult(listId, sortedArray) {
         if (!this._stableSortBases) this._stableSortBases = {};
-        this._stableSortBases[listId] = [...sortedArray];
+        // ★修正：空っぽ（null）が渡された時は、複製しようとせずにそのまま空っぽにします！
+        this._stableSortBases[listId] = sortedArray ? [...sortedArray] : null;
     }
 
     _toggleSortState(currentSortKey, currentIsAsc, clickedSortKey, defaultAscKeys) {
