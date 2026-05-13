@@ -12,6 +12,8 @@ class UIInfoManager {
     
     // --- 共通モーダル（枠の使い回し）管理 ---
     closeCommonModal() {
+        this._stableSortBases = {}; // ★全リスト共通の「前回の並び順」を記憶する箱をリセットします
+
         this.modalHistory = [];
         this.currentModalInfo = null;
         if (this.ui && this.ui.selectorModal) this.ui.selectorModal.classList.add('hidden');
@@ -54,6 +56,22 @@ class UIInfoManager {
     }
 
     // --- ソート状態の一元管理 ---
+    // ★新機能：全リスト共通で「前回の並び順（ベース）」を取得する魔法
+    _prepareStableSortBase(listId, baseArray, sortKey) {
+        if (!this._stableSortBases) this._stableSortBases = {};
+        if (!sortKey) {
+            this._stableSortBases[listId] = null;
+            return [...baseArray];
+        }
+        return this._stableSortBases[listId] ? [...this._stableSortBases[listId]] : [...baseArray];
+    }
+
+    // ★新機能：並べ替えが終わったあとに、その結果を共通の箱に保存する魔法
+    _saveStableSortResult(listId, sortedArray) {
+        if (!this._stableSortBases) this._stableSortBases = {};
+        this._stableSortBases[listId] = [...sortedArray];
+    }
+
     _toggleSortState(currentSortKey, currentIsAsc, clickedSortKey, defaultAscKeys) {
         if (currentSortKey === clickedSortKey) {
             const isDefaultAsc = defaultAscKeys.includes(clickedSortKey);
@@ -523,11 +541,12 @@ class UIInfoManager {
             if (b.isFactionLeader) { factions[fId].leader = b; }
         });
 
-        const fIds = Object.keys(factions).map(Number);
+        let fIds = Object.keys(factions).map(Number); // ★constからletに変更します
         const daimyo = bushos.find(b => b.isDaimyo);
         const daimyoFactionId = daimyo ? daimyo.factionId : -1;
 
         if (this.factionCurrentSortKey) {
+            fIds = this._prepareStableSortBase('faction', fIds, this.factionCurrentSortKey); // ★共通の魔法
             fIds.sort((a, b) => {
                 const fDataA = factions[a];
                 const fDataB = factions[b];
@@ -558,6 +577,7 @@ class UIInfoManager {
                 if (valA === valB) return 0;
                 return this.isFactionSortAsc ? (valA - valB) : (valB - valA);
             });
+            this._saveStableSortResult('faction', fIds); // ★結果を保存
         } else {
             fIds.sort((a, b) => {
                 if (a === daimyoFactionId) return -1; 
@@ -566,6 +586,7 @@ class UIInfoManager {
                 if (b === 0) return -1;
                 return factions[b].count - factions[a].count; 
             });
+            this._saveStableSortResult('faction', null); // ★リセット
         }
 
         let items = [];
@@ -1528,6 +1549,7 @@ class UIInfoManager {
         }
 
         if (this.princessCurrentSortKey) {
+            princesses = this._prepareStableSortBase('princess', princesses, this.princessCurrentSortKey); // ★共通の魔法
             princesses.sort((a, b) => {
                 let valA, valB;
                 const fatherA = this.game.getBusho(a.fatherId);
@@ -1588,6 +1610,9 @@ class UIInfoManager {
                 if (valA === valB) return 0;
                 return this.isPrincessSortAsc ? (valA - valB) : (valB - valA);
             });
+            this._saveStableSortResult('princess', princesses); // ★結果を保存
+        } else {
+            this._saveStableSortResult('princess', null); // ★リセット
         }
 
         const items = princesses.map(p => {
@@ -2078,17 +2103,13 @@ class UIInfoManager {
         if (this.kyotenSavedSortedCastles && this.kyotenLastSortStateKey === currentSortStateKey) {
             displayCastles = this.kyotenSavedSortedCastles;
         } else {
-            if (this.currentKyotenSortKey) {
-                // ★ソートキーがある時は、前回の並べ替え結果（あれば）をベースにします！
-                // これにより「安定ソート」が働き、前の並び順が維持されます。
-                displayCastles = this.kyotenSavedSortedCastles ? [...this.kyotenSavedSortedCastles] : [...this.kyotenSavedCastles];
-            } else {
-                // ★ソートが解除された時は、最初のリストに戻して基本の並び順にします！
-                displayCastles = [...this.kyotenSavedCastles];
-                displayCastles.sort((a, b) => (a.sortNo || 0) - (b.sortNo || 0));
-            }
+            displayCastles = this._prepareStableSortBase('kyoten', this.kyotenSavedCastles, this.currentKyotenSortKey); // ★共通の魔法
 
-            if (this.currentKyotenSortKey) {
+            if (!this.currentKyotenSortKey) {
+                // 基本の並び順として、sortNo を使って順番を整えます
+                displayCastles.sort((a, b) => (a.sortNo || 0) - (b.sortNo || 0));
+                this._saveStableSortResult('kyoten', null); // ★リセット
+            } else {
                 displayCastles.sort((a, b) => {
                     let valA = 0, valB = 0;
 
@@ -2149,6 +2170,7 @@ class UIInfoManager {
                     if (valA === valB) return 0;
                     return this.isKyotenSortAsc ? (valA - valB) : (valB - valA);
                 });
+                this._saveStableSortResult('kyoten', displayCastles); // ★結果を保存
             }
 
             this.kyotenSavedSortedCastles = displayCastles;
@@ -2600,13 +2622,7 @@ class UIInfoManager {
         if (this.bushoSavedSortedBushos && this.bushoLastSortStateKey === currentSortStateKey) {
             displayBushos = this.bushoSavedSortedBushos;
         } else {
-            if (this.bushoCurrentSortKey) {
-                // ★ソートキーがある時は、前回の並べ替え結果（あれば）をベースにします！
-                displayBushos = this.bushoSavedSortedBushos ? [...this.bushoSavedSortedBushos] : [...this.bushoSavedBushos];
-            } else {
-                // ★ソートが解除された時は、最初のリストに戻します！
-                displayBushos = [...this.bushoSavedBushos];
-            }
+            displayBushos = this._prepareStableSortBase('busho', this.bushoSavedBushos, this.bushoCurrentSortKey); // ★共通の魔法
 
             if (this.bushoCurrentSortKey) {
                 displayBushos.sort((a, b) => {
@@ -2733,6 +2749,7 @@ class UIInfoManager {
                     if (valA === valB) return 0; 
                     return this.bushoIsSortAsc ? (valA - valB) : (valB - valA);
                 });
+                this._saveStableSortResult('busho', displayBushos); // ★結果を保存
             } else {
                 if (extraData && extraData.isFactionView) {
                     displayBushos.sort((a, b) => {
@@ -2763,6 +2780,7 @@ class UIInfoManager {
                         return getSortRankClan(b) - getSortRankClan(a);
                     });
                 }
+                this._saveStableSortResult('busho', null); // ★リセット
             }
 
             this.bushoSavedSortedBushos = displayBushos;
