@@ -44,26 +44,12 @@ class InterviewSystem {
     }
 
     renderNormalInterview(busho) {
-        const isSelf = busho.isDaimyo && busho.clan === this.game.playerClanId;
-        
-        let msg = "";
-        let choices = [];
-
-        // 自分（大名）の場合は独り言、他人の場合は会話になります
-        if (isSelf) {
-            msg = `（ふむ……${busho.ambition >= 80 ? "天下統一も夢ではないか。" : "家の安泰こそ第一。無理は禁物だ。"}）\n（家中の者たちはどう思っているのか……）`;
-            choices = [
-                { label: "他者について考える", onClick: () => { this.game.ui.openBushoSelector('interview_target', null, { interviewer: busho }); } },
-                { label: "戻る", onClick: () => { this.reopenInterviewSelector(); } }
-            ];
-        } else {
-            msg = `「殿、どのようなご用件でしょうか？」`;
-            choices = [
-                { label: "調子はどうだ", onClick: () => { this.executeInterviewStatus(busho); } },
-                { label: "他者について聞く", onClick: () => { this.game.ui.openBushoSelector('interview_target', null, { interviewer: busho }); } },
-                { label: "戻る", onClick: () => { this.reopenInterviewSelector(); } }
-            ];
-        }
+        let msg = `「殿、どのようなご用件でしょうか？」`;
+        let choices = [
+            { label: "調子はどうだ", onClick: () => { this.executeInterviewStatus(busho); } },
+            { label: "他者について聞く", onClick: () => { this.game.ui.openBushoSelector('interview_target', null, { interviewer: busho }); } },
+            { label: "戻る", onClick: () => { this.reopenInterviewSelector(); } }
+        ];
         
         this.game.ui.showDialog(msg, false, null, null, {
             leftFace: busho.faceIcon,
@@ -137,24 +123,8 @@ class InterviewSystem {
     // ロジック＆UI表示: 「他者について聞く」の結果
     // ----------------------------------------------------------------------
     executeInterviewTopic(interviewer, target) {
-        if (interviewer.id === target.id) {
-            let comment = "";
-            if (interviewer.ambition > 80) comment = "「俺の力を持ってすれば、天下も夢ではない……はずだ」";
-            else if (interviewer.personality === 'cautious') comment = "「慎重に行かねば、足元をすくわれよう」";
-            else comment = "「今のところは順調か……いや、油断はできん」";
-            
-            this.game.ui.showDialog(`「${target.name}か……<br><br>${comment}」`, false, null, null, {
-                leftFace: interviewer.faceIcon,
-                leftName: interviewer.name,
-                choices: [
-                    { label: "戻る", onClick: () => { this.reopenInterviewModal(interviewer); } }
-                ]
-            });
-            return;
-        }
-
         const dist = GameSystem.calcValueDistance(interviewer, target); 
-        const affinityDiff = GameSystem.calcAffinityDiff(interviewer.affinity, target.affinity); 
+        const affinityDiff = GameSystem.calcAffinityDiff(interviewer.affinity, target.affinity);
         
         let affinityText = "";
         if (dist < 15) affinityText = "あの方とは意気投合します。素晴らしいお方です。";
