@@ -983,7 +983,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 
 /* スマホで見るときの微調整（画面が狭いので少し詰めます） */
 body:not(.is-pc) .dialog-body-container { gap: 10px; }
-body:not(.is-pc) .message-area { font-size: 0.95rem; padding: 10px; }
+body:not(.is-pc) .message-area { font-size: 0.9rem; padding: 10px; }
 body:not(.is-pc) .dialog-face-column { width: 75px; }
 body:not(.is-pc) .dialog-name-label { font-size: 0.85rem; top: -16px; padding: 2px 10px; }
 body:not(.is-pc) #dialog-left-name { left: 3px; }
