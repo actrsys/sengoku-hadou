@@ -1458,7 +1458,7 @@ class CommandSystem {
                     { okText: '臣従する', okClass: 'btn-danger', cancelText: 'やめる' }
                 );
             } else if (extraData.subAction === 'dominate') {
-                const prob = this.game.diplomacyManager.getDiplomacyProb(doer.clan, targetClanId, 'dominate', doer.diplomacy, myPower, targetPower);
+                const prob = this.game.diplomacyManager.getDiplomacyProb(firstId, targetId, 'dominate');
                 this.showAdviceAndExecute('diplomacy', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: prob / 100 });
             } else if (extraData.subAction === 'court_truce') {
                 // ★追加：朝廷和睦は条件を満たしていれば確実に成功します！

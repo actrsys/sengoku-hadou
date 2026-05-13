@@ -718,7 +718,7 @@ class DiplomacyManager {
             }
 
         } else if (type === 'alliance') {
-            let isSuccess = this.checkDiplomacySuccess(doer.clan, targetClanId, type, doer.diplomacy, myPower, targetPower);
+            let isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, type);
 
             this.calcDiplomacyExp(doer, type, isSuccess, true);
 
@@ -1040,6 +1040,10 @@ class DiplomacyManager {
         } else if (type === 'dominate') {
             let isSuccess = false;
             
+            // 上で兵力計算を消してしまったので、ここで調べ直します
+            const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
+            const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
+            
             if (myPower / targetPower < 5) {
                 isSuccess = false;
                 this.calcDiplomacyExp(doer, type, isSuccess, true);
@@ -1049,7 +1053,7 @@ class DiplomacyManager {
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
             } else {
-                isSuccess = this.checkDiplomacySuccess(doer.clan, targetClanId, type, doer.diplomacy, myPower, targetPower);
+                isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, type);
                 this.calcDiplomacyExp(doer, type, isSuccess, true);
                 
                 if (isSuccess) {
@@ -1489,10 +1493,8 @@ class DiplomacyManager {
         const targetBusho = this.game.getBusho(targetBushoId);
         const princess = this.game.princesses.find(p => p.id === princessId);
 
-        const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
-        const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
-
-        const isSuccess = this.checkDiplomacySuccess(doer.clan, targetClanId, 'marriage', doer.diplomacy, myPower, targetPower);
+        // 新しい魔法に合わせて合図だけにします
+        const isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, 'marriage');
         
         this.calcDiplomacyExp(doer, 'marriage', isSuccess, true);
 
