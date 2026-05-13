@@ -1431,6 +1431,9 @@ class GameManager {
         this.bushos.forEach(b => {
             // 活動中の武将と浪人のみが対象です（まだ生まれていない人や亡くなった人は無視します）
             if (b.status === 'active' || b.status === 'ronin') {
+                // ★追加：月が替わったら面談の記録をリセットします
+                b.isInterviewed = false;
+
                 if (b.nemesisList && b.nemesisList.length > 0) {
                     // タイマーを1減らして、0より大きい（まだ怒っている）宿敵だけをリストに残します
                     b.nemesisList = b.nemesisList.filter(nemesis => {

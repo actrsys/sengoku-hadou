@@ -15,6 +15,12 @@ class InterviewSystem {
         // ★ 面談開始時にふすまの背景を出すための目印（クラス）を付けます
         document.body.classList.add('interview-mode');
 
+        // ★追加：今月まだ面談していなければ、忠誠度を上げて面談済みシールを貼ります！
+        if (!busho.isInterviewed) {
+            busho.loyalty = Math.min(100, busho.loyalty + 1); // 忠誠度は最大100とします
+            busho.isInterviewed = true;
+        }
+
         const currentYear = this.game.year;
         const castle = this.game.getCurrentTurnCastle();
 

@@ -226,6 +226,27 @@ class Castle {
         // ★追加：毎月の兵糧取引上限
         this.tradeLimit = Number(data.tradeLimit || 0);
     }
+
+    // ★追加：自勢力の道が繋がっているお城をまとめて洗い出す共通の魔法です！
+    getConnectedCastles(game) {
+        const connectedCastles = new Set();
+        const queue = [this];
+        connectedCastles.add(Number(this.id));
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const neighbors = game.castles.filter(adj => 
+                Number(adj.ownerClan) === Number(this.ownerClan) && 
+                GameSystem.isAdjacent(current, adj) &&
+                !connectedCastles.has(Number(adj.id))
+            );
+            for (const n of neighbors) {
+                connectedCastles.add(Number(n.id));
+                queue.push(n);
+            }
+        }
+        return connectedCastles;
+    }
 }
 
 class Busho {
@@ -472,6 +493,9 @@ class Busho {
         this.isCommander = this.isCommander === true;
         this.status = this.status || 'active';
         this.isActionDone = this.isActionDone === true;
+
+        // ★追加：今月面談を行ったかどうかを覚える専用の枠です
+        this.isInterviewed = data.isInterviewed === true;
 
         // ★ここを書き足し！：自動生成された頭領かどうかの「秘密のシール」を貼る専用の枠です！
         this.isAutoLeader = data.isAutoLeader === true;
