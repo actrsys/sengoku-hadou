@@ -309,13 +309,13 @@ class UIInfoManager {
         this._renderListModal({
             title: "勢力一覧",
             headers: [
-                `<span class="col-daimyo-name" data-sort="name">勢力名${getSortMark('name')}</span>`,
-                `<span class="col-leader-name" data-sort="leader">当主${getSortMark('leader')}</span>`,
-                `<span class="col-castle-count" data-sort="castlesCount">拠点${getSortMark('castlesCount')}</span>`,
-                `<span class="col-prestige" data-sort="power">威信${getSortMark('power')}</span>`,
-                `<span class="col-friend" data-sort="friend">友好度${getSortMark('friend')}</span>`,
-                `<span class="col-relation" data-sort="relation">関係${getSortMark('relation')}</span>`,
-                `<span class="col-empty pc-only"></span>`
+                `<span data-sort="name">勢力名${getSortMark('name')}</span>`,
+                `<span data-sort="leader">当主${getSortMark('leader')}</span>`,
+                `<span data-sort="castlesCount">拠点${getSortMark('castlesCount')}</span>`,
+                `<span data-sort="power">威信${getSortMark('power')}</span>`,
+                `<span data-sort="friend">友好度${getSortMark('friend')}</span>`,
+                `<span data-sort="relation">関係${getSortMark('relation')}</span>`,
+                `<span class="pc-only"></span>`
             ],
             headerClass: "sortable-header daimyo-list-header",
             itemClass: "daimyo-list-item",
@@ -1412,12 +1412,12 @@ class UIInfoManager {
             contextHtml: contextHtml,
             tabsHtml: tabsHtml,
             headers: [
-                `<span class="col-princess-name" data-sort="name">姫${getSortMark('name')}</span>`,
-                `<span class="col-clan" data-sort="clan">勢力${getSortMark('clan')}</span>`,
-                `<span class="col-age" data-sort="age">年齢${getSortMark('age')}</span>`,
-                `<span class="col-family" data-sort="family">一門${getSortMark('family')}</span>`,
-                `<span class="col-father" data-sort="father">父親${getSortMark('father')}</span>`,
-                `<span class="col-husband" data-sort="husband">配偶者${getSortMark('husband')}</span>`,
+                `<span data-sort="name">姫${getSortMark('name')}</span>`,
+                `<span data-sort="clan">勢力${getSortMark('clan')}</span>`,
+                `<span data-sort="age">年齢${getSortMark('age')}</span>`,
+                `<span data-sort="family">一門${getSortMark('family')}</span>`,
+                `<span data-sort="father">父親${getSortMark('father')}</span>`,
+                `<span data-sort="husband">配偶者${getSortMark('husband')}</span>`,
                 `<span class="pc-only"></span>`
             ],
             headerClass: "sortable-header princess-list-header",
