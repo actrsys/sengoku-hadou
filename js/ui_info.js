@@ -2289,16 +2289,12 @@ class UIInfoManager {
             gridTemplatePc: gridPcStr,
             onTabClick: (tabKey) => {
                 this.currentKyotenTab = tabKey;
-                this.currentKyotenSortKey = null;
-                this.isKyotenSortAsc = false;
                 const listEl = document.getElementById('selector-list');
                 const scroll = listEl ? listEl.scrollTop : 0;
                 this._renderKyotenList(clanId, scroll);
             },
             onScopeClick: (scopeKey) => {
                 this.currentKyotenScope = scopeKey;
-                this.currentKyotenSortKey = null;
-                this.isKyotenSortAsc = false;
                 const listEl = document.getElementById('selector-list');
                 const scroll = listEl ? listEl.scrollTop : 0;
                 this._renderKyotenList(clanId, scroll);
