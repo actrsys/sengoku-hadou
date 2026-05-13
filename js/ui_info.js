@@ -33,6 +33,10 @@ class UIInfoManager {
         // 外交リストのタブ状態リセット
         this.diploCurrentTab = 'daimyo';
         
+        // 勢力一覧で使う状態のリセット
+        this.daimyoCurrentSortKey = null;
+        this.isDaimyoSortAsc = false;
+        
         // 拠点一覧で使う状態のリセット
         this.currentKyotenTab = 'status';
         this.currentKyotenScope = 'clan';
@@ -201,41 +205,86 @@ class UIInfoManager {
         const clanDataList = activeClans.map(clan => {
             const leader = this.game.getBusho(clan.leaderId);
             const castlesCount = this.game.castles.filter(c => c.ownerClan === clan.id).length;
+            
+            let friendScore = 50;
+            let friendStatus = "普通";
+            if (clan.id !== this.game.playerClanId) {
+                const relation = this.game.getRelation(this.game.playerClanId, clan.id);
+                if (relation) {
+                    friendScore = relation.sentiment;
+                    friendStatus = relation.displayStatus || relation.status; 
+                }
+            } else {
+                friendStatus = "自家";
+            }
+            
             return {
-                id: clan.id, name: clan.name, leaderName: leader ? leader.name : "不明",
-                power: clan.daimyoPrestige, castlesCount: castlesCount
+                id: clan.id, 
+                name: clan.name, 
+                yomi: clan.yomi || clan.name,
+                leaderName: leader ? leader.name : "不明",
+                leaderYomi: leader ? (leader.yomi || leader.name) : "んんん",
+                power: clan.daimyoPrestige, 
+                castlesCount: castlesCount,
+                friendScore: friendScore,
+                friendStatus: friendStatus
             };
         });
         
         const maxPower = clanDataList.length > 0 ? Math.max(...clanDataList.map(c => c.power)) : 1;
-        clanDataList.sort((a, b) => {
-            if (a.id === this.game.playerClanId) return -1;
-            if (b.id === this.game.playerClanId) return 1;
-            return b.power - a.power;
-        });
+        
+        if (this.daimyoCurrentSortKey) {
+            let sortedList = this._prepareStableSortBase('daimyo', clanDataList, this.daimyoCurrentSortKey);
+            sortedList.sort((a, b) => {
+                let valA, valB;
+                
+                switch (this.daimyoCurrentSortKey) {
+                    case 'name': valA = a.yomi; valB = b.yomi; break;
+                    case 'leader': valA = a.leaderYomi; valB = b.leaderYomi; break;
+                    case 'castlesCount': valA = a.castlesCount; valB = b.castlesCount; break;
+                    case 'power': valA = a.power; valB = b.power; break;
+                    case 'friend': 
+                        valA = a.id === this.game.playerClanId ? 999 : a.friendScore;
+                        valB = b.id === this.game.playerClanId ? 999 : b.friendScore;
+                        break;
+                    case 'relation':
+                        const relationRank = { "自家": 0, "婚姻": 1, "同盟": 2, "支配": 3, "従属": 4, "友好": 5, "普通": 6, "敵対": 7 };
+                        valA = relationRank[a.friendStatus] !== undefined ? relationRank[a.friendStatus] : 6;
+                        valB = relationRank[b.friendStatus] !== undefined ? relationRank[b.friendStatus] : 6;
+                        break;
+                }
+
+                let fallbackCmp = 0;
+                if (this.daimyoCurrentSortKey === 'name') {
+                    fallbackCmp = this.isDaimyoSortAsc ? a.name.localeCompare(b.name, 'ja') : b.name.localeCompare(a.name, 'ja');
+                } else if (this.daimyoCurrentSortKey === 'leader') {
+                    fallbackCmp = this.isDaimyoSortAsc ? a.leaderName.localeCompare(b.leaderName, 'ja') : b.leaderName.localeCompare(a.leaderName, 'ja');
+                }
+                
+                return this._compareForSort(valA, valB, this.isDaimyoSortAsc, fallbackCmp);
+            });
+            this._saveStableSortResult('daimyo', sortedList);
+            clanDataList.splice(0, clanDataList.length, ...sortedList);
+        } else {
+            clanDataList.sort((a, b) => {
+                if (a.id === this.game.playerClanId) return -1;
+                if (b.id === this.game.playerClanId) return 1;
+                return b.power - a.power;
+            });
+            this._saveStableSortResult('daimyo', null);
+        }
 
         let items = [];
 
         clanDataList.forEach(d => {
-            let friendScore = 50;
-            let friendStatus = "";
             let statusClass = "text-white";
-            if (d.id !== this.game.playerClanId) {
-                const relation = this.game.getRelation(this.game.playerClanId, d.id);
-                if (relation) {
-                    friendScore = relation.sentiment;
-                    friendStatus = relation.displayStatus || relation.status; 
-                    if (friendStatus === '敵対') statusClass = 'text-red';
-                    else if (friendStatus === '友好') statusClass = 'text-green';
-                    else if (['同盟', '支配', '従属', '婚姻'].includes(friendStatus)) statusClass = 'text-green';
-                }
-            } else {
-                friendStatus = "自家";
-                statusClass = "text-orange";
-            }
+            if (d.friendStatus === '敵対') statusClass = 'text-red';
+            else if (d.friendStatus === '友好') statusClass = 'text-green';
+            else if (['同盟', '支配', '従属', '婚姻'].includes(d.friendStatus)) statusClass = 'text-green';
+            else if (d.friendStatus === '自家') statusClass = 'text-orange';
 
             const powerBarHtml = this._createBarHtml((d.power / maxPower) * 100, 'power');
-            const friendBarHtml = d.id === this.game.playerClanId ? "" : this._createBarHtml(friendScore, 'friend');
+            const friendBarHtml = d.id === this.game.playerClanId ? "" : this._createBarHtml(d.friendScore, 'friend');
             
             items.push({
                 onClick: `window.GameApp.ui.info.showDaimyoDetail(${d.id})`,
@@ -245,30 +294,41 @@ class UIInfoManager {
                     `<span class="col-castle-count">${d.castlesCount}</span>`,
                     `<span class="col-prestige">${powerBarHtml}</span>`,
                     `<span class="col-friend">${friendBarHtml}</span>`,
-                    `<span class="col-relation ${statusClass}">${friendStatus}</span>`,
+                    `<span class="col-relation ${statusClass}">${d.friendStatus}</span>`,
                     `<span class="col-empty pc-only"></span>`
                 ]
             });
         });
 
+        const getSortMark = (key) => this._getCommonSortMark(this.daimyoCurrentSortKey, this.isDaimyoSortAsc, key);
+
         this._renderListModal({
             title: "勢力一覧",
             headers: [
-                `<span class="col-daimyo-name">勢力名</span>`,
-                `<span class="col-leader-name">当主</span>`,
-                `<span class="col-castle-count">拠点</span>`,
-                `<span class="col-prestige">威信</span>`,
-                `<span class="col-friend">友好度</span>`,
-                `<span class="col-relation">関係</span>`,
+                `<span class="col-daimyo-name" data-sort="name">勢力名${getSortMark('name')}</span>`,
+                `<span class="col-leader-name" data-sort="leader">当主${getSortMark('leader')}</span>`,
+                `<span class="col-castle-count" data-sort="castlesCount">拠点${getSortMark('castlesCount')}</span>`,
+                `<span class="col-prestige" data-sort="power">威信${getSortMark('power')}</span>`,
+                `<span class="col-friend" data-sort="friend">友好度${getSortMark('friend')}</span>`,
+                `<span class="col-relation" data-sort="relation">関係${getSortMark('relation')}</span>`,
                 `<span class="col-empty pc-only"></span>`
             ],
-            headerClass: "daimyo-list-header",
+            headerClass: "sortable-header daimyo-list-header",
             itemClass: "daimyo-list-item",
             listClass: "daimyo-list-container",
             items: items,
             scrollPos: scrollPos,
             gridTemplateSp: "2.5fr 2fr 1fr 2fr 2fr 1.5fr",
-            gridTemplatePc: "140px 100px 60px 100px 100px 60px 1fr"
+            gridTemplatePc: "140px 100px 60px 100px 100px 60px 1fr",
+            onSortClick: (sortKey) => {
+                const defaultAscKeys = ['name', 'leader', 'relation'];
+                const newState = this._toggleSortState(this.daimyoCurrentSortKey, this.isDaimyoSortAsc, sortKey, defaultAscKeys);
+                this.daimyoCurrentSortKey = newState.key;
+                this.isDaimyoSortAsc = newState.isAsc;
+                const listEl = document.getElementById('selector-list');
+                const scroll = listEl ? listEl.scrollTop : 0;
+                this._renderDaimyoList(scroll);
+            }
         });
     }
 
