@@ -173,7 +173,7 @@ Object.assign(UIInfoManager.prototype, {
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">身分</span><span class="daimyo-detail-value">${busho.getRankName()}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">年齢</span><span class="daimyo-detail-value">${ageStr}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">年齢</span><span class="daimyo-detail-value">${ageStr !== "" ? ageStr : "&nbsp;"}</span></div>
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
                                 ${getStatRow('leadership', '統率')}
@@ -188,11 +188,12 @@ Object.assign(UIInfoManager.prototype, {
                                 ${getStatRow('charm', '魅力')}
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">俸禄</span><span class="daimyo-detail-value">${salary}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">一門</span><span class="daimyo-detail-value">${isFamily ? "◯" : ""}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">俸禄</span><span class="daimyo-detail-value">${salary !== "" ? salary : "&nbsp;"}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">一門</span><span class="daimyo-detail-value">${isFamily ? "◯" : "&nbsp;"}</span></div>
                             </div>
-                            <div class="daimyo-detail-row">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">派閥</span><span class="daimyo-detail-value">${factionNameStr}</span></div>
+                            <div class="daimyo-detail-row daimyo-detail-2col">
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">派閥</span><span class="daimyo-detail-value">${factionNameStr !== "" ? factionNameStr : "&nbsp;"}</span></div>
+                                <div class="daimyo-detail-stat-box" style="visibility: hidden;"></div>
                             </div>
                         </div>
                     </div>
