@@ -89,6 +89,26 @@ class UIInfoManager {
         }
     }
 
+    // ==========================================
+    // ★共通化ツール：ソート用の共通の魔法
+    // ==========================================
+
+    // ★全リスト共通で使える「▲▼マークを作る魔法」
+    _getCommonSortMark(currentSortKey, isAsc, targetKey) {
+        if (currentSortKey !== targetKey) return '';
+        return isAsc ? '<span class="sort-mark">▲</span>' : '<span class="sort-mark">▼</span>';
+    }
+
+    // ★全リスト共通で使える「文字や数字の大小を比べて並び順を決める魔法」
+    _compareForSort(valA, valB, isAsc, fallbackCmp = 0) {
+        if (typeof valA === 'string' && typeof valB === 'string') {
+            let cmp = isAsc ? valA.localeCompare(valB, 'ja') : valB.localeCompare(valA, 'ja');
+            return cmp === 0 ? fallbackCmp : cmp;
+        }
+        if (valA === valB) return fallbackCmp;
+        return isAsc ? (valA - valB) : (valB - valA);
+    }
+
     pushModal(pageType, renderArgs) {
         if (!this.modalHistory) this.modalHistory = [];
         
@@ -566,17 +586,14 @@ class UIInfoManager {
                     case 'hoshin': valA = a === 0 ? "んんん" : (leaderA ? (leaderA.factionHoshin || "保守的") : "んんん"); valB = b === 0 ? "んんん" : (leaderB ? (leaderB.factionHoshin || "保守的") : "んんん"); break;
                 }
 
-                if (typeof valA === 'string' && typeof valB === 'string') {
-                    let cmp = this.isFactionSortAsc ? valA.localeCompare(valB, 'ja') : valB.localeCompare(valA, 'ja');
-                    if(cmp === 0 && this.factionCurrentSortKey === 'name'){
-                       const nameA = getName(a, leaderA);
-                       const nameB = getName(b, leaderB);
-                       cmp = this.isFactionSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
-                    }
-                    return cmp;
+                let fallbackCmp = 0;
+                if(this.factionCurrentSortKey === 'name'){
+                    const nameA = getName(a, leaderA);
+                    const nameB = getName(b, leaderB);
+                    fallbackCmp = this.isFactionSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
                 }
-                if (valA === valB) return 0;
-                return this.isFactionSortAsc ? (valA - valB) : (valB - valA);
+                
+                return this._compareForSort(valA, valB, this.isFactionSortAsc, fallbackCmp);
             });
             this._saveStableSortResult('faction', fIds); // ★結果を保存
         } else {
@@ -627,10 +644,7 @@ class UIInfoManager {
             });
         });
 
-        const getSortMark = (key) => {
-            if (this.factionCurrentSortKey !== key) return '';
-            return this.isFactionSortAsc ? '<span class="sort-mark">▲</span>' : '<span class="sort-mark">▼</span>';
-        };
+        const getSortMark = (key) => this._getCommonSortMark(this.factionCurrentSortKey, this.isFactionSortAsc, key);
 
         this._renderListModal({
             title: `${clan.name} 派閥一覧`,
@@ -1599,17 +1613,11 @@ class UIInfoManager {
                         break;
                 }
 
-                if (typeof valA === 'string' && typeof valB === 'string') {
-                    let cmp = this.isPrincessSortAsc ? valA.localeCompare(valB, 'ja') : valB.localeCompare(valA, 'ja');
-                    if(cmp === 0) {
-                        const nameA = a.yomi || a.name;
-                        const nameB = b.yomi || b.name;
-                        cmp = this.isPrincessSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
-                    }
-                    return cmp;
-                }
-                if (valA === valB) return 0;
-                return this.isPrincessSortAsc ? (valA - valB) : (valB - valA);
+                const nameA = a.yomi || a.name;
+                const nameB = b.yomi || b.name;
+                const fallbackCmp = this.isPrincessSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
+                
+                return this._compareForSort(valA, valB, this.isPrincessSortAsc, fallbackCmp);
             });
             this._saveStableSortResult('princess', princesses); // ★結果を保存
         } else {
@@ -1654,10 +1662,7 @@ class UIInfoManager {
             contextHtml = "<div>嫁がせる姫を選択してください</div>";
         }
 
-        const getSortMark = (key) => {
-            if (this.princessCurrentSortKey !== key) return '';
-            return this.isPrincessSortAsc ? '<span class="sort-mark">▲</span>' : '<span class="sort-mark">▼</span>';
-        };
+        const getSortMark = (key) => this._getCommonSortMark(this.princessCurrentSortKey, this.isPrincessSortAsc, key);
 
         this._renderListModal({
             title: "姫一覧",
@@ -2158,18 +2163,11 @@ class UIInfoManager {
                         case 'riceConsume': valA = getRiceConsume(a); valB = getRiceConsume(b); break;
                     }
 
-                    if (typeof valA === 'string' && typeof valB === 'string') {
-                        let cmp = this.isKyotenSortAsc ? valA.localeCompare(valB, 'ja') : valB.localeCompare(valA, 'ja');
-                        if (cmp === 0) {
-                            const nameA = this.currentKyotenSortKey === 'clan' ? getClanName(a) : (this.currentKyotenSortKey === 'castellan' ? getCastellanName(a) : (this.currentKyotenSortKey === 'province' ? getProvinceName(a) : a.name));
-                            const nameB = this.currentKyotenSortKey === 'clan' ? getClanName(b) : (this.currentKyotenSortKey === 'castellan' ? getCastellanName(b) : (this.currentKyotenSortKey === 'province' ? getProvinceName(b) : b.name));
-                            cmp = this.isKyotenSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
-                        }
-                        return cmp;
-                    }
+                    const nameA = this.currentKyotenSortKey === 'clan' ? getClanName(a) : (this.currentKyotenSortKey === 'castellan' ? getCastellanName(a) : (this.currentKyotenSortKey === 'province' ? getProvinceName(a) : a.name));
+                    const nameB = this.currentKyotenSortKey === 'clan' ? getClanName(b) : (this.currentKyotenSortKey === 'castellan' ? getCastellanName(b) : (this.currentKyotenSortKey === 'province' ? getProvinceName(b) : b.name));
+                    const fallbackCmp = this.isKyotenSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
                     
-                    if (valA === valB) return 0;
-                    return this.isKyotenSortAsc ? (valA - valB) : (valB - valA);
+                    return this._compareForSort(valA, valB, this.isKyotenSortAsc, fallbackCmp);
                 });
                 this._saveStableSortResult('kyoten', displayCastles); // ★結果を保存
             }
@@ -2178,10 +2176,7 @@ class UIInfoManager {
             this.kyotenLastSortStateKey = currentSortStateKey;
         }
 
-        const getSortMark = (key) => {
-            if (this.currentKyotenSortKey !== key) return '';
-            return this.isKyotenSortAsc ? '<span class="sort-mark">▲</span>' : '<span class="sort-mark">▼</span>';
-        };
+        const getSortMark = (key) => this._getCommonSortMark(this.currentKyotenSortKey, this.isKyotenSortAsc, key);
         
         let headers = [];
         let gridSpStr = "";
