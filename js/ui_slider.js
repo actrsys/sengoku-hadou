@@ -251,7 +251,7 @@ class UISliderManager {
                 numTgt.oninput = numTgtHandler;
                 numTgt.onchange = numTgtHandler; // ★スマホで指を離した時の最終確認
                 
-                updateButtons(0);
+                updateSliderUI(0);
                 this.ui.quantityContainer.appendChild(wrap);
                 return { range, num: numHidden };
                 
@@ -324,7 +324,7 @@ class UISliderManager {
                 num.oninput = numHandler;
                 num.onchange = numHandler; // ★スマホで指を離した時の最終確認
 
-                updateButtons(currentVal);
+                updateSliderUI(currentVal);
                 this.ui.quantityContainer.appendChild(wrap);
                 return { range, num };
             }
