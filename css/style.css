@@ -1301,6 +1301,7 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
     padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
+    max-height: none !important; /* ★追加：最大の高さ制限を解除して下まで伸ばす */
 }
 
 /* ガード・カットイン */
@@ -2056,21 +2057,39 @@ body:not(.is-pc) #quantity-modal.multi-slider-mode,
 body:not(.is-pc) #unit-divide-modal { 
     padding: 0 !important; 
     height: 100dvh !important; 
+    display: flex !important;
+    flex-direction: column !important;
 }
 body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content,
 body:not(.is-pc) #unit-divide-modal .modal-content { 
     width: 100% !important; 
-    height: 95% !important; /* ★少し余裕を持たせて見切れを防ぎます */
+    flex: 1 !important; /* ★ 95% ではなく flex: 1 にして残りの高さをすべて埋めます */
+    height: auto !important; 
     max-width: none !important; 
     max-height: none !important; 
-    margin: auto !important; 
+    margin: 0 !important; 
     border-radius: 0 !important; 
     border: 2px solid #d4af37 !important; 
+    border-bottom: none !important; /* ★ 下の枠線を消してフッターと一体化させます */
     box-sizing: border-box !important;
     padding-top: max(15px, env(safe-area-inset-top)) !important;
-    padding-bottom: max(20px, env(safe-area-inset-bottom)) !important; /* ★正しい名前に修正し、下側に余裕を作ります */
+    padding-bottom: 5px !important; /* ★ 下側の余白を限界まで減らします */
     padding-left: 15px !important;
     padding-right: 15px !important;
+}
+
+/* ★追加：外に出された「決定」ボタンのエリアも、緑ウインドウの一部として一体化させます */
+body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-footer,
+body:not(.is-pc) #unit-divide-modal .modal-footer {
+    flex-shrink: 0 !important;
+    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%) !important;
+    border: 2px solid #d4af37 !important;
+    border-top: none !important;
+    margin: 0 !important;
+    padding: 10px 15px max(15px, env(safe-area-inset-bottom)) 15px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    justify-content: center !important;
 }
 
 /* スマホ版: 大名選択 */
