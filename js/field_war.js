@@ -1604,6 +1604,11 @@ class FieldWarManager {
         if (this.turnQueue.length === 0) {
             this.turnCount++;
             this.consumeRice();
+            this.applyWeatherMoralePenalty(); // ★追加: 天候による士気減少
+            
+            // ★追加: 天候ダメージを受けた直後に士気崩壊をチェックします
+            this.checkMoraleCollapse();
+            
             if (this.checkEndCondition()) return;
             this.startTurn();
             return;
@@ -1733,6 +1738,62 @@ class FieldWarManager {
                 this.groupStats[key].rice = Math.max(0, this.groupStats[key].rice - cons);
             }
         }
+    }
+
+    // ★追加: 天候による士気減少処理
+    applyWeatherMoralePenalty() {
+        let isSnowing = (this.weather === 'snow');
+        if (!this.isHeavySnowBattle && !isSnowing) return;
+
+        let groupSoldiers = {};
+        this.units.forEach(u => {
+            if (!groupSoldiers[u.groupId]) groupSoldiers[u.groupId] = 0;
+            groupSoldiers[u.groupId] += u.soldiers;
+        });
+
+        for (let key in groupSoldiers) {
+            if (this.groupStats[key] && this.groupStats[key].morale > 0) {
+                let soldiers = groupSoldiers[key];
+                let penalty = 0;
+                
+                // 大雪と降雪でそれぞれ基本ペナルティ2。重複すれば4。
+                if (this.isHeavySnowBattle) penalty += 2;
+                if (isSnowing) penalty += 2;
+                
+                // 兵士1000で倍率1(減少4)、兵士10000で倍率0.25(減少1)になる計算式
+                let multiplier = 3000 / (soldiers + 2000);
+                
+                // 1ターンあたりの最低値を保証しつつ四捨五入
+                let actualPenalty = Math.max(1, Math.round(penalty * multiplier));
+                
+                this.groupStats[key].morale = Math.max(0, this.groupStats[key].morale - actualPenalty);
+            }
+        }
+    }
+
+    // ★追加: 全軍の士気をチェックして、0なら即座に壊滅させる共通の魔法です
+    checkMoraleCollapse() {
+        let hasCollapsed = false;
+        // リストの後ろから順番に確認することで、途中で部隊を消してもズレないようにします
+        for (let i = this.units.length - 1; i >= 0; i--) {
+            const u = this.units[i];
+            let unitMorale = 50;
+            if (this.groupStats && this.groupStats[u.groupId]) {
+                unitMorale = this.groupStats[u.groupId].morale;
+            }
+            if (unitMorale <= 0 && u.soldiers > 0) {
+                this.log(`士気が完全に崩壊し、${u.name}隊の兵士たちは戦場から逃亡した！`);
+                u.soldiers = 0;
+                
+                // マップ上にアイコンが残っていたら隠します
+                const el = document.getElementById(`fw-unit-el-${u.id}`);
+                if (el) el.style.display = 'none';
+
+                this.units.splice(i, 1);
+                hasCollapsed = true;
+            }
+        }
+        return hasCollapsed;
     }
 
     // ★追加: 個別部隊の撤退処理
@@ -2711,6 +2772,9 @@ class FieldWarManager {
             this.log(`${defender.name}隊が所属する軍の士気が大きく上がり、友軍の士気も上がった！`);
         }
         
+        // ★追加: 戦闘のダメージや部隊壊滅によって士気が0になった部隊がないか、瞬時にチェックします！
+        this.checkMoraleCollapse();
+
         attacker.hasActionDone = true;
         this.state = 'IDLE'; // ★シールドを解除して操作できるように戻します
         
