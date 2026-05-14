@@ -238,6 +238,10 @@ class UISliderManager {
                 range.oninput = rangeHandler;
                 range.onchange = rangeHandler;
 
+                // ★追加：スライダーを触っている間は、スクロール等が行われないようにバリアを張ります
+                range.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+                range.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
+
                 const numTgtHandler = () => {
                     let v = parseInt(numTgt.value);
                     if (isNaN(v)) return;
@@ -307,7 +311,11 @@ class UISliderManager {
                 range.oninput = rangeHandler;
                 range.onchange = rangeHandler; 
 
-                const numHandler = () => { 
+                // ★追加：スライダーを触っている間は、スクロール等が行われないようにバリアを張ります
+                range.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+                range.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
+
+                const numHandler = () => {
                     let v = parseInt(num.value);
                     if (isNaN(v)) return;
                     if (v < minVal) v = minVal;
@@ -884,6 +892,10 @@ class UISliderManager {
             range.oninput = (e) => onInput(e.target.value, 'range', false);
             range.onchange = (e) => onInput(e.target.value, 'range', true);
             num.oninput = (e) => onInput(e.target.value);
+
+            // ★追加：スライダーを触っている間は、スクロール等が行われないようにバリアを張ります
+            range.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+            range.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
 
             const btnMin = div.querySelector(`#div-btn-min-${b.id}`);
             const btnHalf = div.querySelector(`#div-btn-half-${b.id}`);
