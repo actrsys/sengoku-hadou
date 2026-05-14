@@ -1301,7 +1301,8 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
     padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
-    max-height: none !important; /* ★追加：最大の高さ制限を解除して下まで伸ばす */
+    max-height: none !important;
+    overflow-y: auto !important; /* ★追加：ここがハミ出た分は絶対にスクロールするように念押しします */
 }
 
 /* ガード・カットイン */
@@ -2056,11 +2057,15 @@ body:not(.is-pc) .modal-footer {
 body:not(.is-pc) #quantity-modal.multi-slider-mode,
 body:not(.is-pc) #unit-divide-modal { 
     padding: 0 !important; 
-    height: 100vh !important; /* ★ dvhが効かない環境のための保険です */
-    height: 100dvh !important; 
+    height: 100% !important; /* ★ dvhをやめて、すでに調整済みの親画面に100%ピッタリ合わせます */
+    width: 100% !important;
+    position: absolute !important; /* ★ 親画面の左上にしっかり張り付くようにします */
+    top: 0 !important;
+    left: 0 !important;
     display: flex !important;
     flex-direction: column !important;
-    overflow: hidden !important; /* ★ 画面の外への「はみ出し」を絶対に許さないようにします */
+    overflow: hidden !important; 
+    box-sizing: border-box !important;
 }
 body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content,
 body:not(.is-pc) #unit-divide-modal .modal-content { 
