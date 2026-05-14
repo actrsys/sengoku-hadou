@@ -1502,7 +1502,7 @@ class FieldWarManager {
         const mainArea = document.getElementById('fw-main-area');
         const weatherLayer = document.getElementById('fw-weather-layer');
         if (mainArea && weatherLayer) {
-            mainArea.classList.remove('is-raining', 'is-snowing');
+            mainArea.classList.remove('is-raining', 'is-snowing', 'is-heavy-snow');
             weatherLayer.classList.remove('is-rain', 'is-snow');
             
             if (this.weather === 'rain') {
@@ -1515,6 +1515,11 @@ class FieldWarManager {
                 weatherLayer.classList.add('is-snow');
             } else {
                 weatherLayer.classList.add('hidden');
+            }
+
+            // ★追加：大雪の時は、画面に「大雪（is-heavy-snow）」という目印をつけます
+            if (this.isHeavySnowBattle) {
+                mainArea.classList.add('is-heavy-snow');
             }
         }
         
