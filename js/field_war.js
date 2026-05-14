@@ -1470,12 +1470,12 @@ class FieldWarManager {
         if (this.isHeavySnowBattle) {
             // ★追加: 大雪拠点絡みの戦闘は、雨ではなく雪の判定になります
             if (this.weather === 'sunny') {
-                if (rand < 70) {
+                if (rand < 60) {
                     this.weather = 'snow';
                     if (this.turnCount > 1) this.log(`猛吹雪が戦場を包み込みました。`);
                 }
             } else if (this.weather === 'snow') {
-                if (rand < 10) {
+                if (rand < 15) {
                     this.weather = 'sunny';
                     this.log(`吹雪が弱まり、視界が晴れてきました。`);
                 }
