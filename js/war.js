@@ -1414,7 +1414,7 @@ class WarManager {
         // ★ <br> を使って画面に表示しつつ、横長の記録（ログ）には改行をスペースに変えて書き込みます
         pushMsg({ text: resultMsg, log: `${activeArmyName} ${resultMsg.replace('<br>', ' ')}` });
 
-        // ★追加：援軍の兵士数が0になって全滅した時に、撤退と同じくカードをからっぽにする処理
+        // ★追加：援軍の兵士数が0になって全滅、または士気崩壊した時に、撤退と同じくカードをからっぽにする処理
         const checkReinfDestroyed = () => {
             const reinfRoles = [
                 { role: 'attacker_self_reinf', key: 'selfReinforcement' },
@@ -1426,23 +1426,24 @@ class WarManager {
             reinfRoles.forEach(r => {
                 if (s[r.key]) {
                     if (s[r.key].morale <= 0 && s[r.key].soldiers > 0) {
-                        s[r.key].soldiers = 0;
                         let armyName = getArmyDisplayName(r.role);
                         pushMsg(`${armyName} は士気が崩壊し、戦場から離脱した！`);
-                    }
-                    
-                    // 援軍が存在していて、かつ兵士数が0以下になった場合
-                    if (s[r.key].soldiers <= 0) {
-                        let destroyedArmyName = getArmyDisplayName(r.role);
-                        if (s[r.key].morale > 0) {
-                            pushMsg(`${destroyedArmyName} は壊滅し、戦場から離脱した！`);
+                        
+                        // 裏側のデータでも「撤退した」ことにします（兵士は減らさずに帰還させます）
+                        if (typeof this.retreatReinforcementForce === 'function') {
+                            this.retreatReinforcementForce(r.key); 
+                        } else {
+                            s[r.key] = null; 
                         }
+                    } else if (s[r.key].soldiers <= 0) {
+                        let destroyedArmyName = getArmyDisplayName(r.role);
+                        pushMsg(`${destroyedArmyName} は壊滅し、戦場から離脱した！`);
                         
                         // 裏側のデータでも「撤退した」ことにします
                         if (typeof this.retreatReinforcementForce === 'function') {
                             this.retreatReinforcementForce(r.key); 
                         } else {
-                            s[r.key] = null; // 念のための安全装置
+                            s[r.key] = null; 
                         }
                     }
                 }
