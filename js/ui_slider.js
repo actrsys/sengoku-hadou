@@ -248,22 +248,8 @@ class UISliderManager {
                     const transAmount = v - targetCurrent;
                     updateSliderUI(transAmount);
                 };
-                range.oninput = rangeHandler;
-                range.onchange = rangeHandler; // ★スマホで指を離した時の最終確認
-
-                const numTgtHandler = () => {
-                    let v = parseInt(numTgt.value);
-                    if (isNaN(v)) return;
-                    if (v < targetCurrent) v = targetCurrent;
-                    if (v > targetCurrent + actualMaxTransport) v = targetCurrent + actualMaxTransport;
-                    const transAmount = v - targetCurrent;
-                    range.value = transAmount;
-                    numHidden.value = transAmount;
-                    updateButtons(transAmount);
-                    checkValidQuantity();
-                };
                 numTgt.oninput = numTgtHandler;
-                numTgt.onchange = numTgtHandler; // ★スマホで指を離した時の最終確認
+                numTgt.onchange = numTgtHandler;
                 
                 updateButtons(0);
                 this.ui.quantityContainer.appendChild(wrap);
@@ -844,7 +830,7 @@ class UISliderManager {
             const num = div.querySelector(`#div-num-${b.id}`);
             const typeSel = div.querySelector(`#div-type-${b.id}`);
             
-            const onInput = (val, mode = 'normal') => {
+            const onInput = (val, mode = 'normal', isChangeEvent = false) => {
                 let v = parseInt(val) || 0;
                 
                 let otherSum = 0;
@@ -898,7 +884,7 @@ class UISliderManager {
             // 第3引数（isChangeEvent）で、指を離した時かどうかを判定します
             range.oninput = (e) => onInput(e.target.value, 'range', false);
             range.onchange = (e) => onInput(e.target.value, 'range', true);
-            num.oninput = (e) => onInput(e.target.value);
+            num.oninput = (e) => onInput(e.target.value);fconst setVal = (v) => {
 
             const btnMin = div.querySelector(`#div-btn-min-${b.id}`);
             const btnHalf = div.querySelector(`#div-btn-half-${b.id}`);
