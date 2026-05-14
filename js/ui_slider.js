@@ -220,14 +220,12 @@ class UISliderManager {
                 const rangeHandler = (e) => { 
                     let v = parseInt(range.value);
                     
-                    // ★修正：指を離した時（change）だけ、数字をキリよく揃えるようにします！
-                    if (e && e.type === 'change') {
-                        if (v > 0 && v < actualMaxTransport) { 
-                            if (actualMaxTransport <= 999) {
-                                v = Math.round(v / 10) * 10; 
-                            } else {
-                                v = Math.round(v / 100) * 100; 
-                            }
+                    // ★修正：動かしている最中から常にキリの良い数字に合わせるように元に戻します
+                    if (v > 0 && v < actualMaxTransport) { 
+                        if (actualMaxTransport <= 999) {
+                            v = Math.round(v / 10) * 10; 
+                        } else {
+                            v = Math.round(v / 100) * 100; 
                         }
                     }
                     
@@ -295,15 +293,16 @@ class UISliderManager {
 
                 const rangeHandler = (e) => { 
                     let v = parseInt(range.value);
-                    if (e && e.type === 'change') {
-                        if (v > minVal && v < max) { 
-                            if (max <= 999) {
-                                v = Math.round(v / 10) * 10; 
-                            } else {
-                                v = Math.round(v / 100) * 100; 
-                            }
+                    
+                    // ★修正：動かしている最中から常にキリの良い数字に合わせるように元に戻します
+                    if (v > minVal && v < max) { 
+                        if (max <= 999) {
+                            v = Math.round(v / 10) * 10; 
+                        } else {
+                            v = Math.round(v / 100) * 100; 
                         }
                     }
+                    
                     if (v > max) v = max;
                     if (v < minVal) v = minVal;
                     updateSliderUI(v);
@@ -866,14 +865,12 @@ class UISliderManager {
                 } else if (mode === 'half') {
                     v = Math.floor((1 + maxAllowed) / 2);
                 } else if (mode === 'range') {
-                    // ★変更：ここでも指を離した時（isChangeEventがtrueの時）だけ丸めます
-                    if (isChangeEvent) {
-                        if (v > 1 && v < maxAllowed) {
-                            if (totalSoldiers <= 999) {
-                                v = Math.round(v / 10) * 10;
-                            } else {
-                                v = Math.round(v / 100) * 100;
-                            }
+                    // ★変更：ここも指を動かしている最中から常に丸めるように元に戻します
+                    if (v > 1 && v < maxAllowed) {
+                        if (totalSoldiers <= 999) {
+                            v = Math.round(v / 10) * 10;
+                        } else {
+                            v = Math.round(v / 100) * 100;
                         }
                     }
                     if (v > maxAllowed) v = maxAllowed;
@@ -888,9 +885,9 @@ class UISliderManager {
                 updateRemain(b.id, 'num_change');
             };
 
-            // 第3引数（isChangeEvent）で、指を離した時かどうかを判定します
-            range.oninput = (e) => onInput(e.target.value, 'range', false);
-            range.onchange = (e) => onInput(e.target.value, 'range', true);
+            // ★変更：第3引数は不要になったので元に戻します
+            range.oninput = (e) => onInput(e.target.value, 'range');
+            range.onchange = (e) => onInput(e.target.value, 'range');
             num.oninput = (e) => onInput(e.target.value);
 
             // ★追加：スライダーを触っている間は、スクロール等が行われないようにバリアを張ります
