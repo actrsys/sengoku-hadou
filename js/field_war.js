@@ -1435,11 +1435,31 @@ class FieldWarManager {
     
     // ★追加：大雪の拠点での戦闘かどうかを判定する仕組みです
     isSnowBattle() {
-        if (!this.warState) return false;
+        if (!this.warState || !this.game) return false;
+        
         const atkCastle = this.warState.sourceCastle;
         const defCastle = this.warState.defender;
-        const atkSnow = atkCastle && atkCastle.statusEffects && atkCastle.statusEffects.includes('snow');
-        const defSnow = defCastle && defCastle.statusEffects && defCastle.statusEffects.includes('snow');
+        
+        // まずはお城自体に雪のシールがあるか確認します
+        let atkSnow = atkCastle && atkCastle.statusEffects && atkCastle.statusEffects.includes('snow');
+        let defSnow = defCastle && defCastle.statusEffects && defCastle.statusEffects.includes('snow');
+
+        // ★追加：お城がある「国（Province）」のデータも探して、そこに雪のシールがあるか確認します！
+        if (atkCastle && atkCastle.provinceId && this.game.provinces) {
+            const atkProvince = this.game.provinces.find(p => p.id === atkCastle.provinceId);
+            if (atkProvince && atkProvince.statusEffects && atkProvince.statusEffects.includes('snow')) {
+                atkSnow = true;
+            }
+        }
+        
+        if (defCastle && defCastle.provinceId && this.game.provinces) {
+            const defProvince = this.game.provinces.find(p => p.id === defCastle.provinceId);
+            if (defProvince && defProvince.statusEffects && defProvince.statusEffects.includes('snow')) {
+                defSnow = true;
+            }
+        }
+
+        // 攻撃側と守備側、どちらかの国か城が「大雪」なら、大雪の戦場だと判定します
         return atkSnow || defSnow;
     }
 
