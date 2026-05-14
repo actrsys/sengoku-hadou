@@ -1546,12 +1546,10 @@ class FieldWarManager {
             if (this.weather === 'rain' || this.weather === 'snow') penalty += 1;
             if (this.isNightTurn()) penalty += 1;
 
-            // ★追加: 大雪拠点戦の場合はさらに常時ペナルティと兵力減少
+            // ★追加: 大雪拠点戦の場合はさらに常時ペナルティ
             if (this.isHeavySnowBattle) {
                 penalty += 1; // 常に全ての部隊の行動力マイナス1
-                // 毎ターン全ての部隊の兵力が2%減少（ただし凍死で部隊消滅しないように最低1残す）
-                let lost = Math.floor(u.soldiers * 0.02);
-                u.soldiers = Math.max(1, u.soldiers - lost);
+                // ※移動した時だけ減らすように変更したため、ここでの毎ターンの兵力減少は削除しました
             }
 
             // ★追加：士気が80以上なら、足軽と騎馬の行動力を+1するボーナス
@@ -2156,6 +2154,16 @@ class FieldWarManager {
                 unit.y = y;
                 unit.hasMoved = true; // ★ 移動したことを記録
                 this.log(`${unit.name}隊が移動（向きも変更）。`);
+                
+                // ★追加：大雪の時、動かした直後に兵力を2%減らします！
+                if (this.isHeavySnowBattle) {
+                    let lost = Math.floor(unit.soldiers * 0.02);
+                    if (lost > 0) {
+                        unit.soldiers = Math.max(1, unit.soldiers - lost);
+                        this.log(`【大雪】猛吹雪の中を行軍したため、${unit.name}隊は${lost}の兵を失った。`);
+                    }
+                }
+                
                 this.nextPhase();
             } else {
                 let key = `${x},${y}`;
@@ -3211,8 +3219,23 @@ class FieldWarManager {
                 unit.x = bestTargetHex.x;
                 unit.y = bestTargetHex.y;
                 unit.hasMoved = true;
+                
                 if (isPlayerInvolved) {
                     this.log(`${unit.name}隊が${isFleeing ? '後退' : '移動'}。`);
+                }
+                
+                // ★追加：大雪の時、AIも動かした直後に兵力を2%減らします！
+                if (this.isHeavySnowBattle) {
+                    let lost = Math.floor(unit.soldiers * 0.02);
+                    if (lost > 0) {
+                        unit.soldiers = Math.max(1, unit.soldiers - lost);
+                        if (isPlayerInvolved) {
+                            this.log(`【大雪】猛吹雪の中を行軍したため、${unit.name}隊は${lost}の兵を失った。`);
+                        }
+                    }
+                }
+
+                if (isPlayerInvolved) {
                     this.updateMap();
                     this.updateStatus();
                     await new Promise(r => setTimeout(r, 400));
