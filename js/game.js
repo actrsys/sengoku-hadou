@@ -194,13 +194,13 @@ class DataManager {
                             
                             // 新しい名前を「|」で姓と名に分けます
                             const newNameParts = parts[1].trim().split('|');
-                            latestFamilyName = newNameParts[0] || ""; 
-                            latestGivenName = newNameParts[1] || "";  
+                            latestFamilyName = newNameParts[0] === "0" ? (latestFamilyName || b.familyName) : (newNameParts[0] || ""); 
+                            latestGivenName = newNameParts[1] === "0" ? (latestGivenName || b.givenName) : (newNameParts[1] || "");  
                             
                             // 新しい読み仮名も「|」で姓と名に分けます
                             const newYomiParts = parts[2].trim().split('|');
-                            latestFamilyYomi = newYomiParts[0] || ""; 
-                            latestGivenYomi = newYomiParts[1] || "";  
+                            latestFamilyYomi = newYomiParts[0] === "0" ? (latestFamilyYomi || b.familyYomi) : (newYomiParts[0] || ""); 
+                            latestGivenYomi = newYomiParts[1] === "0" ? (latestGivenYomi || b.givenYomi) : (newYomiParts[1] || "");  
                         }
                     }
                 }
@@ -246,13 +246,13 @@ class DataManager {
                                 const parts = change.split(':');
                                 if (parts.length === 3 && parts[0].trim() === 'daimyo') {
                                     const newNameParts = parts[1].trim().split('|');
-                                    b.familyName = newNameParts[0] || ""; 
-                                    b.givenName = newNameParts[1] || "";  
+                                    b.familyName = newNameParts[0] === "0" ? b.familyName : (newNameParts[0] || ""); 
+                                    b.givenName = newNameParts[1] === "0" ? b.givenName : (newNameParts[1] || "");  
                                     b.name = b.familyName + b.givenName;
                                     
                                     const newYomiParts = parts[2].trim().split('|');
-                                    b.familyYomi = newYomiParts[0] || ""; 
-                                    b.givenYomi = newYomiParts[1] || "";  
+                                    b.familyYomi = newYomiParts[0] === "0" ? b.familyYomi : (newYomiParts[0] || ""); 
+                                    b.givenYomi = newYomiParts[1] === "0" ? b.givenYomi : (newYomiParts[1] || "");  
                                     b.yomi = b.familyYomi + b.givenYomi;
                                 }
                             }

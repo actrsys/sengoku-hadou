@@ -124,13 +124,13 @@ class LifeSystem {
                     if (targetYear <= currentYear) {
                         // 新しい名前を「|」で姓と名に分けます
                         const newNameParts = parts[1].trim().split('|');
-                        const newFamilyName = newNameParts[0] || ""; // 新しい姓
-                        const newGivenName = newNameParts[1] || "";  // 新しい名
+                        const newFamilyName = newNameParts[0] === "0" ? b.familyName : (newNameParts[0] || ""); // 新しい姓（0ならそのまま）
+                        const newGivenName = newNameParts[1] === "0" ? b.givenName : (newNameParts[1] || "");  // 新しい名（0ならそのまま）
                         
                         // 新しい読み仮名も「|」で姓と名に分けます
                         const newYomiParts = parts[2].trim().split('|');
-                        const newFamilyYomi = newYomiParts[0] || ""; // 新しい姓の読み
-                        const newGivenYomi = newYomiParts[1] || "";  // 新しい名の読み
+                        const newFamilyYomi = newYomiParts[0] === "0" ? b.familyYomi : (newYomiParts[0] || ""); // 新しい姓の読み（0ならそのまま）
+                        const newGivenYomi = newYomiParts[1] === "0" ? b.givenYomi : (newYomiParts[1] || "");  // 新しい名の読み（0ならそのまま）
                         
                         const oldName = b.name; // 今の名前をメモしておきます
                         const newName = newFamilyName + newGivenName; // 新しいフルネーム
@@ -825,13 +825,13 @@ class LifeSystem {
                         const oldNameStr = successor.name.replace('|', '');
                         
                         const newNameParts = parts[1].trim().split('|');
-                        successor.familyName = newNameParts[0] || "";
-                        successor.givenName = newNameParts[1] || "";
+                        successor.familyName = newNameParts[0] === "0" ? successor.familyName : (newNameParts[0] || "");
+                        successor.givenName = newNameParts[1] === "0" ? successor.givenName : (newNameParts[1] || "");
                         successor.name = successor.familyName + successor.givenName;
 
                         const newYomiParts = parts[2].trim().split('|');
-                        successor.familyYomi = newYomiParts[0] || "";
-                        successor.givenYomi = newYomiParts[1] || "";
+                        successor.familyYomi = newYomiParts[0] === "0" ? successor.familyYomi : (newYomiParts[0] || "");
+                        successor.givenYomi = newYomiParts[1] === "0" ? successor.givenYomi : (newYomiParts[1] || "");
                         successor.yomi = successor.familyYomi + successor.givenYomi;
 
                         const newNameStr = successor.name.replace('|', '');
@@ -1242,12 +1242,12 @@ class LifeSystem {
                 if (parts.length === 3 && parts[0].trim() === 'daimyo') {
                     const oldNameStr = successor.name.replace('|', '');
                     const newNameParts = parts[1].trim().split('|');
-                    successor.familyName = newNameParts[0] || "";
-                    successor.givenName = newNameParts[1] || "";
+                    successor.familyName = newNameParts[0] === "0" ? successor.familyName : (newNameParts[0] || "");
+                    successor.givenName = newNameParts[1] === "0" ? successor.givenName : (newNameParts[1] || "");
                     successor.name = successor.familyName + successor.givenName;
                     const newYomiParts = parts[2].trim().split('|');
-                    successor.familyYomi = newYomiParts[0] || "";
-                    successor.givenYomi = newYomiParts[1] || "";
+                    successor.familyYomi = newYomiParts[0] === "0" ? successor.familyYomi : (newYomiParts[0] || "");
+                    successor.givenYomi = newYomiParts[1] === "0" ? successor.givenYomi : (newYomiParts[1] || "");
                     successor.yomi = successor.familyYomi + successor.givenYomi;
                     const newNameStr = successor.name.replace('|', '');
                     messages.push(`家督を継ぐにあたり、${oldNameStr}は\n「${newNameStr}」と名を改めました。`);
