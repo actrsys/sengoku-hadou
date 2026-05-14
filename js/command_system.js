@@ -2534,100 +2534,7 @@ class CommandSystem {
                 const confirmMsg = targetCastle.isKunishu ? `${targetCastle.name} を鎮圧しますか？\n今月の命令は終了となります` : `${targetCastle.name}に攻め込みますか？\n今月の命令は終了となります`;
                 this.game.ui.showDialog(confirmMsg, true, 
                     async () => {
-                        // ★「はい」を押した直後に、メイン軍と援軍の雪の被害をまとめて計算します！
-                        let finalAtkBushos = [...atkBushos];
-                        let finalSVal = sVal;
-                        
-                        const srcProv = this.game.provinces.find(p => p.id === atkCastle.provinceId);
-                        const tgtProv = this.game.provinces.find(p => p.id === targetCastle.provinceId);
-                        const isMainHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) || 
-                                                (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
-                                                
-                        let isSelfReinfHeavySnow = false;
-                        if (selfReinfData) {
-                            const reinfProv = this.game.provinces.find(p => p.id === selfReinfData.castle.provinceId);
-                            isSelfReinfHeavySnow = (reinfProv && reinfProv.statusEffects && reinfProv.statusEffects.includes('heavySnow')) || 
-                                                   (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
-                        }
-
-                        // ★メイン軍の被害判定
-                        if (isMainHeavySnow) {
-                            const survivingBushos = [];
-                            for (let b of finalAtkBushos) {
-                                if (Math.random() < 0.10) {
-                                    await this.game.ui.showDialogAsync(`我が軍の${b.name}が凍死しました……`, false, 0);
-                                    await this.game.lifeSystem.executeDeath(b);
-                                } else {
-                                    survivingBushos.push(b);
-                                }
-                            }
-                            finalAtkBushos = survivingBushos;
-
-                            const lossRate = 0.20 + Math.random() * 0.30;
-                            const lostSoldiers = Math.floor(finalSVal * lossRate);
-                            finalSVal -= lostSoldiers;
-
-                            if (lostSoldiers > 0) {
-                                await this.game.ui.showDialogAsync(`我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
-                            }
-                        }
-
-                        // ★自軍援軍の被害判定
-                        if (selfReinfData && isSelfReinfHeavySnow) {
-                            const survivingReinfBushos = [];
-                            for (let b of selfReinfData.bushos) {
-                                if (Math.random() < 0.10) {
-                                    await this.game.ui.showDialogAsync(`援軍の${b.name}が凍死しました……`, false, 0);
-                                    await this.game.lifeSystem.executeDeath(b);
-                                } else {
-                                    survivingReinfBushos.push(b);
-                                }
-                            }
-                            selfReinfData.bushos = survivingReinfBushos;
-
-                            const lossRate = 0.20 + Math.random() * 0.30;
-                            const lostSoldiers = Math.floor(selfReinfData.soldiers * lossRate);
-                            selfReinfData.soldiers -= lostSoldiers;
-
-                            if (lostSoldiers > 0) {
-                                await this.game.ui.showDialogAsync(`援軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
-                            }
-                        }
-
-                        // ★メイン軍が全滅してしまった時の特別ルール！
-                        if (finalAtkBushos.length === 0) {
-                            await this.game.ui.showDialogAsync("我が軍は行方不明になりました……", false, 0);
-                            atkCastle.soldiers = Math.max(0, atkCastle.soldiers - sVal);
-                            atkCastle.rice = Math.max(0, atkCastle.rice - rVal);
-                            atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - hVal);
-                            atkCastle.guns = Math.max(0, (atkCastle.guns || 0) - gVal);
-                            
-                            // メイン軍がいないのに援軍が生き残っていたら、城へ帰します
-                            if (selfReinfData && selfReinfData.bushos.length > 0) {
-                                const hc = selfReinfData.castle;
-                                hc.soldiers = Math.min(99999, hc.soldiers + selfReinfData.soldiers);
-                                hc.rice = Math.min(99999, hc.rice + selfReinfData.rice);
-                                hc.horses = Math.min(99999, (hc.horses || 0) + selfReinfData.horses);
-                                hc.guns = Math.min(99999, (hc.guns || 0) + selfReinfData.guns);
-                                selfReinfData.bushos.forEach(b => b.isActionDone = false);
-                                await this.game.ui.showDialogAsync("メイン軍が壊滅したため、援軍は元の城へ帰還しました。", false, 0);
-                            } else if (selfReinfData && selfReinfData.bushos.length === 0) {
-                                // 援軍も全滅していたらそのまま消滅
-                                await this.game.ui.showDialogAsync("援軍も行方不明になりました……", false, 0);
-                            }
-                            
-                            this.game.ui.updatePanelHeader();
-                            this.game.ui.renderCommandMenu();
-                            return; // 戦争を中止します
-                        }
-
-                        // ★援軍だけ全滅した場合
-                        if (selfReinfData && selfReinfData.bushos.length === 0) {
-                            await this.game.ui.showDialogAsync("援軍は行方不明になりました……", false, 0);
-                            selfReinfData = null; // 援軍はなかったことにします
-                        }
-
-                        proceedToAlly(selfReinfData, finalAtkBushos, finalSVal);
+                        proceedToAlly(selfReinfData, atkBushos, sVal);
                     },
                     () => {
                         // キャンセルした時
@@ -2785,45 +2692,7 @@ class CommandSystem {
                                     (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
 
                 const proceedWar = async () => {
-                    let finalSVal = reinfSoldiers;
-                    let finalBushosData = [...reinfBushosData];
-                    let finalBushos = finalBushosData.map(id => this.game.getBusho(id));
-
-                    if (isHeavySnow) {
-                        // ★修正：武将の凍死を先に判定します！
-                        const survivingBushos = [];
-                        for (let b of finalBushos) {
-                            if (Math.random() < 0.10) {
-                                await this.game.ui.showDialogAsync(`我が軍の${b.name}が凍死しました……`, false, 0);
-                                await this.game.lifeSystem.executeDeath(b);
-                            } else {
-                                survivingBushos.push(b);
-                            }
-                        }
-                        finalBushos = survivingBushos;
-
-                        // ★その次に兵士の遭難を判定します！
-                        const lossRate = 0.20 + Math.random() * 0.30;
-                        const lostSoldiers = Math.floor(finalSVal * lossRate);
-                        finalSVal -= lostSoldiers;
-
-                        if (lostSoldiers > 0) {
-                            await this.game.ui.showDialogAsync(`我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
-                        }
-
-                        if (finalBushos.length === 0) {
-                            await this.game.ui.showDialogAsync("我が軍は行方不明になりました……", false, 0);
-                            helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
-                            helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
-                            helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
-                            helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
-                            
-                            this.game.ui.updatePanelHeader();
-                            this.game.ui.renderCommandMenu();
-                            onComplete(null);
-                            return;
-                        }
-                    }
+                    let finalBushos = reinfBushosData.map(id => this.game.getBusho(id));
 
                     helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
                     helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
@@ -2831,7 +2700,7 @@ class CommandSystem {
                     helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
 
                     const selfReinfData = {
-                        castle: helperCastle, bushos: finalBushos, soldiers: finalSVal,
+                        castle: helperCastle, bushos: finalBushos, soldiers: reinfSoldiers,
                         rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: false, isSelf: true,
                         morale: helperCastle.morale || 50, training: helperCastle.training || 50
                     };
