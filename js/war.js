@@ -421,7 +421,9 @@ class WarManager {
                 this.endWar(true); 
                 return; 
             } 
+            if (s.defender.morale <= 0) { this.endWar(true); return; }
             if (s.defender.soldiers <= 0) { this.endWar(true); return; }
+            if (s.attacker.morale <= 0) { this.endWar(false); return; }
             if (s.attacker.soldiers <= 0) { this.endWar(false); return; } 
             
             if (s.attacker.rice <= 0) { if(s.isPlayerInvolved) this.game.ui.log("攻撃軍の兵糧が尽きました！"); this.endWar(false); return; }
@@ -799,8 +801,12 @@ class WarManager {
                      // ★追加：城壁が壊れて落ちた場合、少しだけ城壁（防御力）を修復してあげます！
                      s.defender.defense += 150;
                      this.endWar(true);
+                 } else if (s.defender.morale <= 0) {
+                     this.endWar(true);
                  } else if (s.defender.soldiers <= 0) {
                      this.endWar(true);
+                 } else if (s.attacker.morale <= 0) {
+                     this.endWar(false);
                  } else if (s.attacker.soldiers <= 0) {
                      this.endWar(false);
                  } else {
@@ -841,8 +847,12 @@ class WarManager {
         const checkDefeatAndPushMsg = () => {
             if (s.defender.defense <= 0) {
                 pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">城の防御が０になった！<br>城は陥落した！</span>`, log: `城防御が0になり、陥落した！` });
+            } else if (s.defender.morale <= 0) {
+                pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">守備本隊の士気が崩壊した！<br>城は陥落した！</span>`, log: `守備本隊の士気が0になり、陥落した！` });
             } else if (s.defender.soldiers <= 0) {
                 pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">守備本隊が全滅した！<br>城は陥落した！</span>`, log: `守備本隊が全滅し、陥落した！` });
+            } else if (s.attacker.morale <= 0) {
+                pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">攻撃本隊の士気が崩壊した！<br>攻撃軍は退却した！</span>`, log: `攻撃本隊の士気が0になり、退却した！` });
             } else if (s.attacker.soldiers <= 0) {
                 // ★修正：攻撃本隊が全滅した時のメッセージも赤色（#d32f2f）に統一！
                 // 赤色にすることで自動でページが進まなくなり、しっかり結果を確認できるようになります。
@@ -1414,16 +1424,26 @@ class WarManager {
             ];
             
             reinfRoles.forEach(r => {
-                // 援軍が存在していて、かつ兵士数が0以下になった場合
-                if (s[r.key] && s[r.key].soldiers <= 0) {
-                    let destroyedArmyName = getArmyDisplayName(r.role);
-                    pushMsg(`${destroyedArmyName} は壊滅し、戦場から離脱した！`);
+                if (s[r.key]) {
+                    if (s[r.key].morale <= 0 && s[r.key].soldiers > 0) {
+                        s[r.key].soldiers = 0;
+                        let armyName = getArmyDisplayName(r.role);
+                        pushMsg(`${armyName} は士気が崩壊し、戦場から離脱した！`);
+                    }
                     
-                    // 裏側のデータでも「撤退した」ことにします
-                    if (typeof this.retreatReinforcementForce === 'function') {
-                        this.retreatReinforcementForce(r.key); 
-                    } else {
-                        s[r.key] = null; // 念のための安全装置
+                    // 援軍が存在していて、かつ兵士数が0以下になった場合
+                    if (s[r.key].soldiers <= 0) {
+                        let destroyedArmyName = getArmyDisplayName(r.role);
+                        if (s[r.key].morale > 0) {
+                            pushMsg(`${destroyedArmyName} は壊滅し、戦場から離脱した！`);
+                        }
+                        
+                        // 裏側のデータでも「撤退した」ことにします
+                        if (typeof this.retreatReinforcementForce === 'function') {
+                            this.retreatReinforcementForce(r.key); 
+                        } else {
+                            s[r.key] = null; // 念のための安全装置
+                        }
                     }
                 }
             });

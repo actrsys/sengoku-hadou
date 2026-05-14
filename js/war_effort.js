@@ -7,25 +7,15 @@
 // Object.assign を使って、WarManager に魔法をくっつけます！
 Object.assign(WarManager.prototype, {
 
-    // ★追加：自勢力の道が繋がっているお城をまとめて洗い出す共通の魔法です！
-    getConnectedCastles(startCastle, clanId) {
-        const connectedCastles = new Set();
-        const queue = [startCastle];
-        connectedCastles.add(Number(startCastle.id));
-
-        while (queue.length > 0) {
-            const current = queue.shift();
-            const neighbors = this.game.castles.filter(adj => 
-                Number(adj.ownerClan) === Number(clanId) && 
-                GameSystem.isAdjacent(current, adj) &&
-                !connectedCastles.has(Number(adj.id))
-            );
-            for (const n of neighbors) {
-                connectedCastles.add(Number(n.id));
-                queue.push(n);
+    // ★追加：大名が他軍団の城に逃げ込んだ時に、元の軍団を解散させる共通の魔法です！
+    handleDaimyoEscape(busho, targetCastle) {
+        if (busho.isDaimyo && targetCastle.legionId !== 0) {
+            if (this.game.castleManager && this.game.castleManager.disbandLegion) {
+                this.game.castleManager.disbandLegion(targetCastle.legionId);
             }
+            targetCastle.legionId = 0;
+            targetCastle.isDelegated = false;
         }
-        return connectedCastles;
     },
 
     // ★追加：落城時などに逃げ込む「味方の城」の候補を探し出す魔法
@@ -1029,14 +1019,8 @@ Object.assign(WarManager.prototype, {
                         // ★新しいお引越しセンターの魔法を使います！
                         this.game.affiliationSystem.moveCastle(b, target.id); 
                         
-                        // ★追加：大名が他軍団の城に逃げ込んだ時の処理
-                        if (b.isDaimyo && target.legionId !== 0) {
-                            if (this.game.castleManager && this.game.castleManager.disbandLegion) {
-                                this.game.castleManager.disbandLegion(target.legionId);
-                            }
-                            target.legionId = 0;
-                            target.isDelegated = false;
-                        }
+                        // ★修正：共通化された大名逃亡処理を呼び出します
+                        this.handleDaimyoEscape(b, target);
                     }
                 });
                 defCastle.gold -= carryGold; defCastle.rice = 0; defCastle.soldiers = 0;
@@ -1559,14 +1543,8 @@ Object.assign(WarManager.prototype, {
                                 // ★新しいお引越しセンターの魔法を使います！
                                 this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
                                 
-                                // ★追加：大名が他軍団の城に逃げ込んだ時の処理
-                                if (b.isDaimyo && escapeCastle.legionId !== 0) {
-                                    if (this.game.castleManager && this.game.castleManager.disbandLegion) {
-                                        this.game.castleManager.disbandLegion(escapeCastle.legionId);
-                                    }
-                                    escapeCastle.legionId = 0;
-                                    escapeCastle.isDelegated = false;
-                                }
+                                // ★修正：共通化された大名逃亡処理を呼び出します
+                                this.handleDaimyoEscape(b, escapeCastle);
                             } else {
                                 // ★味方の城がない場合（最後の城だった場合）：浪人になります
                                 // ★新しいお引越しセンターの魔法を使います！
@@ -1674,8 +1652,11 @@ Object.assign(WarManager.prototype, {
                 // ★追加：攻め込んだ元気な兵士と、城に残っていた兵士の士気と訓練をまぜまぜします！
                 const newTotalSoldiers = totalAtkSurvivors + totalAbsorbed;
                 if (newTotalSoldiers > 0) {
-                    s.defender.training = Math.floor(((s.defender.training || 0) * totalAbsorbed + (s.attacker.training || 0) * totalAtkSurvivors) / newTotalSoldiers);
-                    s.defender.morale = Math.floor(((s.defender.morale || 0) * totalAbsorbed + (s.attacker.morale || 0) * totalAtkSurvivors) / newTotalSoldiers);
+                    let calcTraining = Math.floor(((s.defender.training || 0) * totalAbsorbed + (s.attacker.training || 0) * totalAtkSurvivors) / newTotalSoldiers);
+                    let calcMorale = Math.floor(((s.defender.morale || 0) * totalAbsorbed + (s.attacker.morale || 0) * totalAtkSurvivors) / newTotalSoldiers);
+                    
+                    s.defender.training = ((s.attacker.training || 0) > calcTraining) ? (s.attacker.training || 0) : calcTraining;
+                    s.defender.morale = ((s.attacker.morale || 0) > calcMorale) ? (s.attacker.morale || 0) : calcMorale;
                 }
 
                 // ★追加：城を奪った時の兵士や軍馬、鉄砲の合流にストッパー！
@@ -1964,14 +1945,8 @@ Object.assign(WarManager.prototype, {
                     this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
                     escapees.push(b);
                     
-                    // ★追加：大名が他軍団の城に逃げ込んだ時の処理
-                    if (b.isDaimyo && escapeCastle.legionId !== 0) {
-                        if (this.game.castleManager && this.game.castleManager.disbandLegion) {
-                            this.game.castleManager.disbandLegion(escapeCastle.legionId);
-                        }
-                        escapeCastle.legionId = 0;
-                        escapeCastle.isDelegated = false;
-                    }
+                    // ★修正：共通化された大名逃亡処理を呼び出します
+                    this.handleDaimyoEscape(b, escapeCastle);
                 } else { 
                     // ★新しいお引越しセンターの魔法を使います！
                     this.game.affiliationSystem.becomeRonin(b);
@@ -2640,7 +2615,7 @@ Object.assign(WarManager.prototype, {
         }
 
         // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
-        const connectedCastles = this.getConnectedCastles(defCastle, defClanId);
+        const connectedCastles = defCastle.getConnectedCastles(this.game);
 
         // ★修正：条件のチェックをすべて「外交の専門部署」に任せます！
         const candidateCastles = this.game.diplomacyManager.findAvailableReinforcements(
@@ -2727,7 +2702,7 @@ Object.assign(WarManager.prototype, {
         }
 
         // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
-        const connectedCastles = this.getConnectedCastles(defCastle, defClanId);
+        const connectedCastles = defCastle.getConnectedCastles(this.game);
 
         // ★修正：条件のチェックをすべて「外交の専門部署」に任せます！
         // （上で作った connectedCastles をそのまま専門部署に渡します）
