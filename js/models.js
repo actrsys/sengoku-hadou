@@ -227,24 +227,22 @@ class Castle {
         this.tradeLimit = Number(data.tradeLimit || 0);
     }
 
-    // ★修正：自勢力（または指定した勢力）の道が繋がっているお城をまとめて洗い出す共通の魔法です！（処理を高速化しました）
-    getConnectedCastles(game, targetClanId = this.ownerClan) {
+    // ★追加：自勢力の道が繋がっているお城をまとめて洗い出す共通の魔法です！
+    getConnectedCastles(game) {
         const connectedCastles = new Set();
         const queue = [this];
         connectedCastles.add(Number(this.id));
 
         while (queue.length > 0) {
             const current = queue.shift();
-            if (!current.adjacentCastleIds) continue;
-            
-            for (const adjId of current.adjacentCastleIds) {
-                if (!connectedCastles.has(adjId)) {
-                    const adjCastle = game.getCastle(adjId);
-                    if (adjCastle && Number(adjCastle.ownerClan) === Number(targetClanId)) {
-                        connectedCastles.add(adjId);
-                        queue.push(adjCastle);
-                    }
-                }
+            const neighbors = game.castles.filter(adj => 
+                Number(adj.ownerClan) === Number(this.ownerClan) && 
+                GameSystem.isAdjacent(current, adj) &&
+                !connectedCastles.has(Number(adj.id))
+            );
+            for (const n of neighbors) {
+                connectedCastles.add(Number(n.id));
+                queue.push(n);
             }
         }
         return connectedCastles;
