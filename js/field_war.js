@@ -2155,9 +2155,10 @@ class FieldWarManager {
                 unit.hasMoved = true; // ★ 移動したことを記録
                 this.log(`${unit.name}隊が移動（向きも変更）。`);
                 
-                // ★追加：大雪の時、動かした直後に兵力を2%減らします！
+                // ★追加：大雪の時、動かした直後に兵力を減らします（攻撃側3%、守備側1%）
                 if (this.isHeavySnowBattle) {
-                    let lost = Math.floor(unit.soldiers * 0.02);
+                    let snowPenaltyRate = unit.isAttacker ? 0.03 : 0.01;
+                    let lost = Math.floor(unit.soldiers * snowPenaltyRate);
                     if (lost > 0) {
                         unit.soldiers = Math.max(1, unit.soldiers - lost);
                         this.log(`【大雪】猛吹雪の中を行軍したため、${unit.name}隊は${lost}の兵を失った。`);
@@ -3224,9 +3225,10 @@ class FieldWarManager {
                     this.log(`${unit.name}隊が${isFleeing ? '後退' : '移動'}。`);
                 }
                 
-                // ★追加：大雪の時、AIも動かした直後に兵力を2%減らします！
+                // ★追加：大雪の時、AIも動かした直後に兵力を減らします（攻撃側3%、守備側1%）
                 if (this.isHeavySnowBattle) {
-                    let lost = Math.floor(unit.soldiers * 0.02);
+                    let snowPenaltyRate = unit.isAttacker ? 0.03 : 0.01;
+                    let lost = Math.floor(unit.soldiers * snowPenaltyRate);
                     if (lost > 0) {
                         unit.soldiers = Math.max(1, unit.soldiers - lost);
                         if (isPlayerInvolved) {
