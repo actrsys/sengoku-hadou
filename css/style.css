@@ -2063,28 +2063,26 @@ body:not(.is-pc) #unit-divide-modal {
 body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content,
 body:not(.is-pc) #unit-divide-modal .modal-content { 
     width: 100% !important; 
-    flex: 1 !important; /* ★ 95% ではなく flex: 1 にして残りの高さをすべて埋めます */
+    flex: 1 !important; /* ★ 残りの高さをすべて埋めます */
     height: auto !important; 
     max-width: none !important; 
     max-height: none !important; 
     margin: 0 !important; 
     border-radius: 0 !important; 
-    border: 2px solid #d4af37 !important; 
-    border-bottom: none !important; /* ★ 下の枠線を消してフッターと一体化させます */
+    border: 2px solid #d4af37 !important; /* ★ 下の枠線もちゃんと表示させます */
     box-sizing: border-box !important;
     padding-top: max(15px, env(safe-area-inset-top)) !important;
-    padding-bottom: 5px !important; /* ★ 下側の余白を限界まで減らします */
+    padding-bottom: 5px !important;
     padding-left: 15px !important;
     padding-right: 15px !important;
 }
 
-/* ★追加：外に出された「決定」ボタンのエリアも、緑ウインドウの一部として一体化させます */
+/* ★外に出された「決定」ボタンのエリア */
 body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-footer,
 body:not(.is-pc) #unit-divide-modal .modal-footer {
     flex-shrink: 0 !important;
-    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%) !important;
-    border: 2px solid #d4af37 !important;
-    border-top: none !important;
+    background: transparent !important; /* ★ 背景を透明にしてウインドウの外にあるようにします */
+    border: none !important; /* ★ 枠線も消します */
     margin: 0 !important;
     padding: 10px 15px max(15px, env(safe-area-inset-bottom)) 15px !important;
     width: 100% !important;
