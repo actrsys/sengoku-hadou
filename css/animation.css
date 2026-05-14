@@ -231,3 +231,54 @@
     background-color: #0c1015 !important;
     filter: sepia(0.1) saturate(0.8) hue-rotate(10deg) brightness(0.55);
 }
+
+/* =========================================
+   野戦の雪（大雪の戦場）アニメーション
+   ========================================= */
+/* 大雪の戦場：全体をうっすら白く、雲のようなもやをかける魔法 */
+#fw-main-area.is-snow-battle::before {
+    content: "";
+    position: absolute;
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%;
+    /* 真ん中から外側に向かって、白いもやがかかるようにします */
+    background-image: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 80%);
+    pointer-events: none; /* マウス操作の邪魔をしないようにします */
+    z-index: 45; /* マップの上、UIの下に配置します */
+}
+
+/* マップチップ自体もうっすら白くして寒々しくします */
+#fw-main-area.is-snow-battle #fw-map {
+    filter: brightness(1.2) contrast(0.85) saturate(0.6) hue-rotate(180deg) !important;
+}
+
+/* 雪が降る表現：半透明の白い水玉をたくさん降らせます */
+#fw-main-area.is-snowing #fw-weather-layer {
+    display: block !important;
+    background-image: 
+        radial-gradient(circle 3px at 20px 20px, rgba(255,255,255,0.8) 0%, transparent 100%),
+        radial-gradient(circle 2px at 40px 60px, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(circle 4px at 70px 30px, rgba(255,255,255,0.7) 0%, transparent 100%),
+        radial-gradient(circle 2px at 90px 80px, rgba(255,255,255,0.5) 0%, transparent 100%);
+    background-size: 100px 100px;
+    animation: snow-fall 2s linear infinite;
+    z-index: 50; /* マップやもやより少し上に降らせます */
+}
+
+@keyframes snow-fall {
+    0% { background-position: 0px 0px, 0px 0px, 0px 0px, 0px 0px; }
+    /* 雨と違って、真下に近い角度でゆっくりフワフワ降らせます */
+    100% { background-position: 20px 100px, -10px 100px, 30px 100px, -20px 100px; }
+}
+
+/* 大雪・夕方の表現（夕焼け色を少し残します） */
+#fw-main-area.is-snow-battle.is-evening #fw-map {
+    filter: sepia(0.1) saturate(0.8) hue-rotate(-10deg) brightness(1.0) !important;
+}
+
+/* 大雪・夜の表現（暗い青白さにします） */
+#fw-main-area.is-snow-battle.is-night #fw-map {
+    filter: sepia(0.1) saturate(0.6) hue-rotate(10deg) brightness(0.7) !important;
+}
