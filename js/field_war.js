@@ -144,14 +144,21 @@ class FieldWarManager {
         this.warState = warState;
         this.onComplete = onComplete;
         
-        // ★追加：出撃拠点か守備拠点が「大雪」かどうかを判定する
+        // ★修正：出撃拠点か守備拠点の「ある国（Province）」が「大雪」かどうかを判定する
         let isSourceSnow = false;
-        if (warState.sourceCastle && warState.sourceCastle.statusEffects) {
-            isSourceSnow = warState.sourceCastle.statusEffects.includes('heavySnow');
+        if (warState.sourceCastle && warState.sourceCastle.provinceId) {
+            const sourceProv = this.game.provinces.find(p => p.id === warState.sourceCastle.provinceId);
+            if (sourceProv && sourceProv.statusEffects) {
+                isSourceSnow = sourceProv.statusEffects.includes('heavySnow');
+            }
         }
+
         let isDefSnow = false;
-        if (warState.defender && warState.defender.statusEffects) {
-            isDefSnow = warState.defender.statusEffects.includes('heavySnow');
+        if (warState.defender && warState.defender.provinceId) {
+            const defProv = this.game.provinces.find(p => p.id === warState.defender.provinceId);
+            if (defProv && defProv.statusEffects) {
+                isDefSnow = defProv.statusEffects.includes('heavySnow');
+            }
         }
         this.isHeavySnowBattle = isSourceSnow || isDefSnow;
         
