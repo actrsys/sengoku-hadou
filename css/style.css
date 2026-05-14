@@ -886,8 +886,8 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 /* =========================================================
    各種モーダル・オーバーレイ・ガード
    ========================================================= */
-.modal { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 6000; display: flex; justify-content: center; align-items: center; opacity: 1; transition: opacity 0.2s; padding: env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 60px) env(safe-area-inset-left); box-sizing: border-box; }
-.modal.hidden { opacity: 0; pointer-events: none; display: none !important;} 
+.modal { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 6000; display: flex; justify-content: center; align-items: center; opacity: 1; padding: env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 60px) env(safe-area-inset-left); box-sizing: border-box; }
+.modal.hidden { opacity: 0; pointer-events: none; display: none !important;}
 
 /* モーダル（小窓）の重なり順（z-index）の統一リスト */
 #intercept-confirm-modal { z-index: 6000; }
