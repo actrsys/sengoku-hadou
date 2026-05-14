@@ -737,11 +737,10 @@ class UISliderManager {
                 }
 
                 // ★追加：部隊分割画面でも、青銀のゲージの割合を計算してCSSに教えます
-                let tempMax = totalSoldiers - (sum - d.count);
-                if (d.type === 'kiba') tempMax = Math.min(tempMax, totalHorses - (usedHorses - d.count));
-                if (d.type === 'teppo') tempMax = Math.min(tempMax, totalGuns - (usedGuns - d.count));
-                if (tempMax < 1) tempMax = 1;
-                const percent = tempMax > 1 ? ((d.count - 1) / (tempMax - 1)) * 100 : 0;
+                // ★修正：スライダーのバーのズレを直すため、背景ゲージの割合は全体の最大値と最小値を基準に計算します
+                const actualMax = parseInt(range.max) || 1;
+                const actualMin = parseInt(range.min) || 1;
+                const percent = actualMax > actualMin ? ((d.count - actualMin) / (actualMax - actualMin)) * 100 : 0;
                 range.style.setProperty('--value', percent + '%');
 
                 // ボタンの表示・非表示を数量指定スライダーと揃える魔法
@@ -781,6 +780,30 @@ class UISliderManager {
                         btnMin.style.display = ''; btnMin.disabled = false; btnMin.style.order = 1;
                         btnHalf.style.display = 'none';
                         btnMax.style.display = ''; btnMax.disabled = false; btnMax.style.order = 3;
+                    }
+                }
+
+                // ★追加：兵種ボタンの無効化（余っている軍馬や鉄砲がない場合は押せなくします）
+                const btnKiba = document.getElementById(`troop-type-group-${d.id}`)?.querySelector('[data-type="kiba"]');
+                const btnTeppo = document.getElementById(`troop-type-group-${d.id}`)?.querySelector('[data-type="teppo"]');
+                if (btnKiba) {
+                    const availHorses = totalHorses - (usedHorses - (d.type === 'kiba' ? d.count : 0));
+                    if (availHorses <= 0 && d.type !== 'kiba') {
+                        btnKiba.disabled = true;
+                        btnKiba.classList.add('disabled');
+                    } else {
+                        btnKiba.disabled = false;
+                        btnKiba.classList.remove('disabled');
+                    }
+                }
+                if (btnTeppo) {
+                    const availGuns = totalGuns - (usedGuns - (d.type === 'teppo' ? d.count : 0));
+                    if (availGuns <= 0 && d.type !== 'teppo') {
+                        btnTeppo.disabled = true;
+                        btnTeppo.classList.add('disabled');
+                    } else {
+                        btnTeppo.disabled = false;
+                        btnTeppo.classList.remove('disabled');
                     }
                 }
             });
@@ -910,11 +933,13 @@ class UISliderManager {
             const typeBtns = div.querySelectorAll(`#troop-type-group-${b.id} .troop-type-btn`);
             typeBtns.forEach(btn => {
                 btn.onclick = () => {
+                    if (btn.disabled || btn.classList.contains('disabled')) return; // ★追加：無効なボタンは弾く
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                     typeBtns.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     typeSel.value = btn.getAttribute('data-type');
-                    updateRemain(b.id, 'type_change');
+                    // ★修正：兵種を変更した時は、デフォルトで「最大」の値になるようにします
+                    onInput(0, 'max'); 
                 };
             });
         });
