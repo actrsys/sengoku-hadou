@@ -144,6 +144,17 @@ class FieldWarManager {
         this.warState = warState;
         this.onComplete = onComplete;
         
+        // ★追加：出撃拠点か守備拠点が「大雪」かどうかを判定する
+        let isSourceSnow = false;
+        if (warState.sourceCastle && warState.sourceCastle.statusEffects) {
+            isSourceSnow = warState.sourceCastle.statusEffects.includes('heavySnow');
+        }
+        let isDefSnow = false;
+        if (warState.defender && warState.defender.statusEffects) {
+            isDefSnow = warState.defender.statusEffects.includes('heavySnow');
+        }
+        this.isHeavySnowBattle = isSourceSnow || isDefSnow;
+        
         // ★追加：野戦の「戦争開始前」の合図を出します
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('before_field_war', this.warState);
@@ -407,7 +418,7 @@ class FieldWarManager {
         
         // ★追加：援軍も含めて、プレイヤーが操作する部隊が1つでもあるか調べます！
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
-        
+
         if (isPlayerInvolved) {
             // ★追加：野戦が始まる時に、平時のコマンドリストを綺麗にお掃除して非表示にします！
             if (this.game.ui && typeof this.game.ui.clearCommandMenu === 'function') {
@@ -415,14 +426,6 @@ class FieldWarManager {
             }
 
             this.initUI();
-            
-            // ★追加：大雪の戦場なら、画面にもやをかけるための特別な印をつけます
-            const mainArea = document.getElementById('fw-main-area');
-            if (mainArea) {
-                if (this.isSnowBattle()) mainArea.classList.add('is-snow-battle');
-                else mainArea.classList.remove('is-snow-battle');
-            }
-
             this.updateMap();
             this.updateStatus();
             this.log("両軍、布陣を完了。野戦を開始します！");
@@ -871,14 +874,14 @@ class FieldWarManager {
             timeStr = " (夜)";
             timeColor = "#b39ddb"; // 夜の紫色
         }
-        
+
         if (weatherEl) {
             if (this.weather === 'rain') {
                 weatherEl.innerText = '☔ 雨' + timeStr;
                 weatherEl.style.color = timeColor || '#64b5f6';
             } else if (this.weather === 'snow') {
-                weatherEl.innerText = '❄ 雪' + timeStr;
-                weatherEl.style.color = timeColor || '#ffffff';
+                weatherEl.innerText = '⛄ 雪' + timeStr;
+                weatherEl.style.color = timeColor || '#b3e5fc';
             } else {
                 let sunIcon = this.isNightTurn() ? '🌙' : '☀';
                 weatherEl.innerText = `${sunIcon} 晴れ${timeStr}`;
@@ -999,14 +1002,14 @@ class FieldWarManager {
     canAttackTarget(attacker, targetX, targetY) {
         const dist = this.getDistance(attacker.x, attacker.y, targetX, targetY);
         let targetDir = this.getDirection(attacker.x, attacker.y, targetX, targetY);
-        
+
         if (attacker.troopType === 'teppo') {
             if (attacker.hasMoved) return false; // 鉄砲は移動後攻撃不可
-            // ★修正: 雨や雪、または大雪の戦場では遠距離攻撃ができず、射程が1になります。晴れの通常時は4になります。
-            let maxRange = (this.weather === 'rain' || this.weather === 'snow' || this.isSnowBattle()) ? 1 : 4;
+            // ★修正: 雨・雪の時は遠距離攻撃ができず、射程が1になります。晴れの通常時は4になります。
+            let maxRange = (this.weather === 'rain' || this.weather === 'snow') ? 1 : 4;
             
-            // ★修正: 夜の時は射程をマイナス2します（雨や雪の時はすでに1なので影響しません）
-            if (this.weather !== 'rain' && this.weather !== 'snow' && !this.isSnowBattle() && this.isNightTurn()) {
+            // ★修正: 夜の時は射程をマイナス2します（雨・雪の時はすでに1なので影響しません）
+            if (this.weather !== 'rain' && this.weather !== 'snow' && this.isNightTurn()) {
                 maxRange -= 2;
             }
 
@@ -1432,36 +1435,6 @@ class FieldWarManager {
         }
         return null; // 道が見つからなかった
     }
-    // ▼ 差し替え後（正しい heavySnow バージョン）
-    // ★追加：大雪の拠点での戦闘かどうかを判定する仕組みです
-    isSnowBattle() {
-        if (!this.warState || !this.game) return false;
-        
-        const atkCastle = this.warState.sourceCastle;
-        const defCastle = this.warState.defender;
-        
-        // まずはお城自体にシールがあるか確認します（念のため heavySnow で確認）
-        let atkSnow = atkCastle && atkCastle.statusEffects && atkCastle.statusEffects.includes('heavySnow');
-        let defSnow = defCastle && defCastle.statusEffects && defCastle.statusEffects.includes('heavySnow');
-
-        // ★修正：お城がある「国（Province）」のデータを探し、正しい 'heavySnow' のシールがあるか確認します！
-        if (atkCastle && atkCastle.provinceId && this.game.provinces) {
-            const atkProvince = this.game.provinces.find(p => p.id === atkCastle.provinceId);
-            if (atkProvince && atkProvince.statusEffects && atkProvince.statusEffects.includes('heavySnow')) {
-                atkSnow = true;
-            }
-        }
-        
-        if (defCastle && defCastle.provinceId && this.game.provinces) {
-            const defProvince = this.game.provinces.find(p => p.id === defCastle.provinceId);
-            if (defProvince && defProvince.statusEffects && defProvince.statusEffects.includes('heavySnow')) {
-                defSnow = true;
-            }
-        }
-
-        // 攻撃側と守備側、どちらかの国か城が「大雪」なら、大雪の戦場だと判定します
-        return atkSnow || defSnow;
-    }
 
     isPlayerTurn() {
         if (this.turnQueue.length === 0) return false;
@@ -1479,29 +1452,29 @@ class FieldWarManager {
         const mod = this.turnCount % 10;
         return mod >= 6 && mod <= 8; // 下一桁が6〜8なら夜
     }
-    
+
     // ★追加：天候を判定して切り替える魔法です
     updateWeather() {
         if (!this.game) return;
         
+        const month = this.game.month;
         const rand = Math.random() * 100; // 0〜100のランダムな数字を出します
         
-        if (this.isSnowBattle()) {
-            // ★大雪の戦場の場合（雨ではなく雪になります）
+        if (this.isHeavySnowBattle) {
+            // ★追加: 大雪拠点絡みの戦闘は、雨ではなく雪の判定になります
             if (this.weather === 'sunny') {
                 if (rand < 70) {
                     this.weather = 'snow';
-                    if (this.turnCount > 1) this.log(`雪が激しく降り始めました。`);
+                    if (this.turnCount > 1) this.log(`猛吹雪が戦場を包み込みました。`);
                 }
             } else if (this.weather === 'snow') {
                 if (rand < 10) {
                     this.weather = 'sunny';
-                    this.log(`雪が弱まりました。`);
+                    this.log(`吹雪が弱まり、視界が晴れてきました。`);
                 }
             }
         } else {
             // 月ごとの確率（％）
-            const month = this.game.month;
             const toRainProb = { 1:15, 2:15, 3:20, 4:35, 5:50, 6:60, 7:50, 8:35, 9:20, 10:15, 11:15, 12:10 };
             const toSunnyProb = { 1:70, 2:70, 3:60, 4:50, 5:40, 6:30, 7:40, 8:50, 9:60, 10:70, 11:70, 12:70 };
             
@@ -1523,12 +1496,16 @@ class FieldWarManager {
         const weatherLayer = document.getElementById('fw-weather-layer');
         if (mainArea && weatherLayer) {
             mainArea.classList.remove('is-raining', 'is-snowing');
+            weatherLayer.classList.remove('is-rain', 'is-snow');
+            
             if (this.weather === 'rain') {
                 mainArea.classList.add('is-raining');
                 weatherLayer.classList.remove('hidden');
+                weatherLayer.classList.add('is-rain');
             } else if (this.weather === 'snow') {
                 mainArea.classList.add('is-snowing');
                 weatherLayer.classList.remove('hidden');
+                weatherLayer.classList.add('is-snow');
             } else {
                 weatherLayer.classList.add('hidden');
             }
@@ -1537,29 +1514,13 @@ class FieldWarManager {
         // UIの文字を更新します
         this.updateStatus();
     }
-    
+
     startTurn() {
         if (!this.active) return;
 
         // ★追加：毎ターン開始時に天候の判定をします
         this.updateWeather();
         
-        // ★追加：大雪の戦場での全体ペナルティ（毎ターン兵力が2%減少）
-        if (this.isSnowBattle()) {
-            let hasLost = false;
-            this.units.forEach(u => {
-                let damage = Math.ceil(u.soldiers * 0.02);
-                if (damage > 0) {
-                    // 最低でも1人は残るようにします（ここで0になると処理が複雑になるため）
-                    u.soldiers = Math.max(1, u.soldiers - damage);
-                    hasLost = true;
-                }
-            });
-            if (hasLost) {
-                this.log(`大雪の寒さにより、両軍の兵力が減少しています……`);
-            }
-        }
-
         // ★追加：野戦の毎ターン開始時に、参戦している武将へ経験値を加算します
         const isIntTurn = (this.turnCount % 2 === 1);
         
@@ -1567,12 +1528,19 @@ class FieldWarManager {
             u.hasActionDone = false;
             u.hasMoved = false; // ★ ターン開始時に移動フラグをリセット
             
-            // 雨と夜の判定をして行動力を減らします（最低1は確保します）
+            // 雨、雪、夜の判定をして行動力を減らします（最低1は確保します）
             let penalty = 0;
             
             if (this.weather === 'rain' || this.weather === 'snow') penalty += 1;
             if (this.isNightTurn()) penalty += 1;
-            if (this.isSnowBattle()) penalty += 1; // ★大雪の戦場は常に行動力マイナス1
+
+            // ★追加: 大雪拠点戦の場合はさらに常時ペナルティと兵力減少
+            if (this.isHeavySnowBattle) {
+                penalty += 1; // 常に全ての部隊の行動力マイナス1
+                // 毎ターン全ての部隊の兵力が2%減少（ただし凍死で部隊消滅しないように最低1残す）
+                let lost = Math.floor(u.soldiers * 0.02);
+                u.soldiers = Math.max(1, u.soldiers - lost);
+            }
 
             // ★追加：士気が80以上なら、足軽と騎馬の行動力を+1するボーナス
             let moraleBonus = 0;
@@ -1746,11 +1714,8 @@ class FieldWarManager {
             groupSoldiers[u.groupId] += u.soldiers;
         });
 
-        // 野戦独自の兵糧消費量（兵士数 × 0.005）
-        let consumeRate = 0.005;
-        if (this.isSnowBattle()) {
-            consumeRate = 0.025; // ★大雪の場合は消費量が5倍になります
-        }
+        // 野戦独自の兵糧消費量（兵士数 × 0.005、大雪戦なら5倍の0.025）
+        const consumeRate = this.isHeavySnowBattle ? 0.025 : 0.005;
         
         for (let key in groupSoldiers) {
             if (this.groupStats[key]) {
@@ -2306,7 +2271,7 @@ class FieldWarManager {
         let atkAbilityDef = attacker.stats.ldr * 1.5 + attacker.stats.int;
         let defAbilityAtk = defender.stats.ldr * 1.5 + defender.stats.str;
         let defAbilityDef = defender.stats.ldr * 1.5 + defender.stats.int;
-        
+
         // 今までの計算に加えて、「武将の強さ × 兵力の平方根 ÷ 100」という大軍ボーナスを足します
         let atkBaseAtk = Math.sqrt(atkS) + atkAbilityAtk * (atkS / (atkS + 150)) + (atkAbilityAtk * Math.sqrt(atkS) / 100);
         let atkBaseDef = Math.sqrt(atkS) + atkAbilityDef * (atkS / (atkS + 150)) + (atkAbilityDef * Math.sqrt(atkS) / 100);
@@ -2314,16 +2279,16 @@ class FieldWarManager {
         let defBaseAtk = Math.sqrt(defS) + defAbilityAtk * (defS / (defS + 150)) + (defAbilityAtk * Math.sqrt(defS) / 100);
         let defBaseDef = Math.sqrt(defS) + defAbilityDef * (defS / (defS + 150)) + (defAbilityDef * Math.sqrt(defS) / 100);
 
-        // ★追加: 大雪の戦場では、寒さで全ての部隊の基本攻防が10%ダウンします
-        if (this.isSnowBattle()) {
+        // ★追加：大雪拠点戦の常時ペナルティ（基本攻防力が10%ダウン）
+        if (this.isHeavySnowBattle) {
             atkBaseAtk *= 0.9;
             atkBaseDef *= 0.9;
             defBaseAtk *= 0.9;
             defBaseDef *= 0.9;
         }
 
-        // ★追加: 雨の時はすべての部隊の基礎防御力が10%ダウンします
-        if (this.weather === 'rain') {
+        // ★追加: 雨または雪の時はすべての部隊の基礎防御力が10%ダウンします
+        if (this.weather === 'rain' || this.weather === 'snow') {
             atkBaseDef = atkBaseDef * 0.9;
             defBaseDef = defBaseDef * 0.9;
         }
@@ -2491,8 +2456,8 @@ class FieldWarManager {
         if (terrain === 'forest') terrainMult = 1.15;      // 森は防御力アップ
         else if (terrain === 'mountain') terrainMult = 1.3; // 山はさらに防御力アップ
         else if (terrain === 'river') {
-            // ★追加: 雨の時は川での防御力のマイナス補正がより厳しくなります
-            terrainMult = (this.weather === 'rain') ? 0.5 : 0.7;
+            // ★追加: 雨や雪の時は川での防御力のマイナス補正がより厳しくなります
+            terrainMult = (this.weather === 'rain' || this.weather === 'snow') ? 0.5 : 0.7;
         }
         defFinalDef = defFinalDef * terrainMult;
 
@@ -3061,15 +3026,15 @@ class FieldWarManager {
                     }
 
                     if (unit.troopType === 'teppo') {
-                        // 雨や夜で視界や火縄が使いにくい時
-                        if (this.weather === 'rain' || this.isNightTurn()) {
+                        // 雨や雪、夜で視界や火縄が使いにくい時
+                        if (this.weather === 'rain' || this.weather === 'snow' || this.isNightTurn()) {
                             if (dToEnemy === 1) {
                                 score -= 100; // わざわざ隣接しに行くのは危険なのでマイナス
                             } else {
                                 score += dToEnemy * 20; // 敵から離れれば離れるほど安心（スコアプラス）
                             }
                             
-                            // ★追加：雨や夜で離れる時も、マップの端や角（どん詰まり）を避けるようにします！
+                            // ★追加：雨や雪、夜で離れる時も、マップの端や角（どん詰まり）を避けるようにします！
                             let edgeCheck = this.getNeighbors(nx, ny);
                             if (edgeCheck.length < 6) {
                                 score -= (6 - edgeCheck.length) * 30; 
