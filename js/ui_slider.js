@@ -217,12 +217,10 @@ class UISliderManager {
                 wrap.querySelector(`#btn-half-${id}`).onclick = () => setVal(Math.floor(actualMaxTransport / 2));
                 wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(actualMaxTransport);
 
-                // e（イベント）を受け取るように変更します
                 const rangeHandler = (e) => { 
                     let v = parseInt(range.value);
                     
                     // ★修正：指を離した時（change）だけ、数字をキリよく揃えるようにします！
-                    // 動かしている最中（input）はそのままにするので、なめらかにドラッグできます
                     if (e && e.type === 'change') {
                         if (v > 0 && v < actualMaxTransport) { 
                             if (actualMaxTransport <= 999) {
@@ -247,20 +245,6 @@ class UISliderManager {
                     if (v > targetCurrent + actualMaxTransport) v = targetCurrent + actualMaxTransport;
                     const transAmount = v - targetCurrent;
                     updateSliderUI(transAmount);
-                };
-                range.oninput = rangeHandler;
-                range.onchange = rangeHandler; // ★スマホで指を離した時の最終確認
-
-                const numTgtHandler = () => {
-                    let v = parseInt(numTgt.value);
-                    if (isNaN(v)) return;
-                    if (v < targetCurrent) v = targetCurrent;
-                    if (v > targetCurrent + actualMaxTransport) v = targetCurrent + actualMaxTransport;
-                    const transAmount = v - targetCurrent;
-                    range.value = transAmount;
-                    numHidden.value = transAmount;
-                    updateButtons(transAmount);
-                    checkValidQuantity();
                 };
                 numTgt.oninput = numTgtHandler;
                 numTgt.onchange = numTgtHandler; // ★スマホで指を離した時の最終確認
