@@ -195,9 +195,11 @@ class UISliderManager {
                 const numTgt = wrap.querySelector(`#num-tgt-${id}`);
                 const numHidden = wrap.querySelector(`#num-${id}`);
                 
-                const setVal = (v) => {
-                    if (v < 0) v = 0;
-                    if (v > actualMaxTransport) v = actualMaxTransport;
+                // ★追加：見た目（青銀のゲージ）と数字を同時に更新する専用の魔法です
+                const updateSliderUI = (v) => {
+                    // 現在の値が全体の何％にあたるかを計算して、CSSに教えます
+                    const percent = actualMaxTransport > 0 ? (v / actualMaxTransport) * 100 : 0;
+                    range.style.setProperty('--value', percent + '%');
                     range.value = v;
                     numHidden.value = v;
                     numTgt.value = targetCurrent + v;
@@ -205,29 +207,46 @@ class UISliderManager {
                     checkValidQuantity();
                 };
 
+                const setVal = (v) => {
+                    if (v < 0) v = 0;
+                    if (v > actualMaxTransport) v = actualMaxTransport;
+                    updateSliderUI(v);
+                };
+
                 wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(0);
                 wrap.querySelector(`#btn-half-${id}`).onclick = () => setVal(Math.floor(actualMaxTransport / 2));
                 wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(actualMaxTransport);
 
-                const rangeHandler = () => { 
+                // e（イベント）を受け取るように変更します
+                const rangeHandler = (e) => { 
                     let v = parseInt(range.value);
-                    if (v > 0 && v < actualMaxTransport) { 
-                        if (actualMaxTransport <= 999) {
-                            v = Math.round(v / 10) * 10; 
-                        } else {
-                            v = Math.round(v / 100) * 100; 
+                    
+                    // ★修正：指を離した時（change）だけ、数字をキリよく揃えるようにします！
+                    // 動かしている最中（input）はそのままにするので、なめらかにドラッグできます
+                    if (e && e.type === 'change') {
+                        if (v > 0 && v < actualMaxTransport) { 
+                            if (actualMaxTransport <= 999) {
+                                v = Math.round(v / 10) * 10; 
+                            } else {
+                                v = Math.round(v / 100) * 100; 
+                            }
                         }
                     }
                     
-                    // 【追加】ここで上限・下限を超えないようにブロックします
                     if (v > actualMaxTransport) v = actualMaxTransport;
                     if (v < 0) v = 0;
-                    
-                    range.value = v;
-                    numHidden.value = v;
-                    numTgt.value = targetCurrent + v;
-                    updateButtons(v);
-                    checkValidQuantity(); 
+                    updateSliderUI(v);
+                };
+                range.oninput = rangeHandler;
+                range.onchange = rangeHandler;
+
+                const numTgtHandler = () => {
+                    let v = parseInt(numTgt.value);
+                    if (isNaN(v)) return;
+                    if (v < targetCurrent) v = targetCurrent;
+                    if (v > targetCurrent + actualMaxTransport) v = targetCurrent + actualMaxTransport;
+                    const transAmount = v - targetCurrent;
+                    updateSliderUI(transAmount);
                 };
                 range.oninput = rangeHandler;
                 range.onchange = rangeHandler; // ★スマホで指を離した時の最終確認
@@ -266,50 +285,50 @@ class UISliderManager {
                 const range = wrap.querySelector(`#range-${id}`);
                 const num = wrap.querySelector(`#num-${id}`);
                 
-                const setVal = (v) => {
-                    let actualMax = parseInt(range.max);
-                    if (v < minVal) v = minVal;
-                    if (v > actualMax) v = actualMax;
+                const updateSliderUI = (v) => {
+                    const percent = max > minVal ? ((v - minVal) / (max - minVal)) * 100 : 0;
+                    range.style.setProperty('--value', percent + '%');
                     range.value = v;
                     num.value = v;
                     updateButtons(v);
                     checkValidQuantity();
+                };
+
+                const setVal = (v) => {
+                    let actualMax = parseInt(range.max);
+                    if (v < minVal) v = minVal;
+                    if (v > actualMax) v = actualMax;
+                    updateSliderUI(v);
                 };
 
                 wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(minVal);
                 wrap.querySelector(`#btn-half-${id}`).onclick = () => setVal(Math.floor((minVal + max) / 2));
                 wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(max);
 
-                const rangeHandler = () => { 
+                const rangeHandler = (e) => { 
                     let v = parseInt(range.value);
-                    if (v > minVal && v < max) { 
-                        if (max <= 999) {
-                            v = Math.round(v / 10) * 10; 
-                        } else {
-                            v = Math.round(v / 100) * 100; 
+                    if (e && e.type === 'change') {
+                        if (v > minVal && v < max) { 
+                            if (max <= 999) {
+                                v = Math.round(v / 10) * 10; 
+                            } else {
+                                v = Math.round(v / 100) * 100; 
+                            }
                         }
                     }
-                    
-                    // 【追加】ここで上限・下限を超えないようにブロックします
                     if (v > max) v = max;
                     if (v < minVal) v = minVal;
-                    
-                    range.value = v;
-                    num.value = v;
-                    updateButtons(v);
-                    checkValidQuantity(); 
+                    updateSliderUI(v);
                 };
                 range.oninput = rangeHandler;
-                range.onchange = rangeHandler; // ★スマホで指を離した時の最終確認
+                range.onchange = rangeHandler; 
 
                 const numHandler = () => { 
                     let v = parseInt(num.value);
                     if (isNaN(v)) return;
                     if (v < minVal) v = minVal;
                     if (v > max) v = max;
-                    range.value = v;
-                    updateButtons(v);
-                    checkValidQuantity();
+                    updateSliderUI(v);
                 };
                 num.oninput = numHandler;
                 num.onchange = numHandler; // ★スマホで指を離した時の最終確認
@@ -726,6 +745,14 @@ class UISliderManager {
                     range.value = d.count;
                 }
 
+                // ★追加：部隊分割画面でも、青銀のゲージの割合を計算してCSSに教えます
+                let tempMax = totalSoldiers - (sum - d.count);
+                if (d.type === 'kiba') tempMax = Math.min(tempMax, totalHorses - (usedHorses - d.count));
+                if (d.type === 'teppo') tempMax = Math.min(tempMax, totalGuns - (usedGuns - d.count));
+                if (tempMax < 1) tempMax = 1;
+                const percent = tempMax > 1 ? ((d.count - 1) / (tempMax - 1)) * 100 : 0;
+                range.style.setProperty('--value', percent + '%');
+
                 // ボタンの表示・非表示を数量指定スライダーと揃える魔法
                 let otherSum = sum - d.count;
                 let maxAllowed = totalSoldiers - otherSum;
@@ -846,13 +873,14 @@ class UISliderManager {
                 } else if (mode === 'half') {
                     v = Math.floor((1 + maxAllowed) / 2);
                 } else if (mode === 'range') {
-                    // ★追加：スライダーを動かした時だけ、10単位・100単位で丸める魔法！
-                    if (v > 1 && v < maxAllowed) {
-                        // 全体の兵数が999以下なら10単位、1000以上なら100単位で丸めます
-                        if (totalSoldiers <= 999) {
-                            v = Math.round(v / 10) * 10;
-                        } else {
-                            v = Math.round(v / 100) * 100;
+                    // ★変更：ここでも指を離した時（isChangeEventがtrueの時）だけ丸めます
+                    if (isChangeEvent) {
+                        if (v > 1 && v < maxAllowed) {
+                            if (totalSoldiers <= 999) {
+                                v = Math.round(v / 10) * 10;
+                            } else {
+                                v = Math.round(v / 100) * 100;
+                            }
                         }
                     }
                     if (v > maxAllowed) v = maxAllowed;
@@ -867,8 +895,9 @@ class UISliderManager {
                 updateRemain(b.id, 'num_change');
             };
 
-            range.oninput = (e) => onInput(e.target.value, 'range'); // ★変更：スライダーからの入力だと教えます
-            range.onchange = (e) => onInput(e.target.value, 'range'); // ★追加：スマホで指を離した時の最終確認
+            // 第3引数（isChangeEvent）で、指を離した時かどうかを判定します
+            range.oninput = (e) => onInput(e.target.value, 'range', false);
+            range.onchange = (e) => onInput(e.target.value, 'range', true);
             num.oninput = (e) => onInput(e.target.value);
 
             const btnMin = div.querySelector(`#div-btn-min-${b.id}`);
