@@ -2056,20 +2056,24 @@ body:not(.is-pc) .modal-footer {
 body:not(.is-pc) #quantity-modal.multi-slider-mode,
 body:not(.is-pc) #unit-divide-modal { 
     padding: 0 !important; 
+    height: 100vh !important; /* ★ dvhが効かない環境のための保険です */
     height: 100dvh !important; 
     display: flex !important;
     flex-direction: column !important;
+    overflow: hidden !important; /* ★ 画面の外への「はみ出し」を絶対に許さないようにします */
 }
 body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content,
 body:not(.is-pc) #unit-divide-modal .modal-content { 
     width: 100% !important; 
-    flex: 1 !important; /* ★ 残りの高さをすべて埋めます */
-    height: auto !important; 
+    flex: 1 !important; 
+    min-height: 0 !important; /* ★ height:autoを削除。中身に合わせて無限に伸びるのを防ぎます */
+    display: flex !important; /* ★ 緑ウインドウ自体もFlexboxにして、中のスクロールを正常に機能させます */
+    flex-direction: column !important;
     max-width: none !important; 
     max-height: none !important; 
     margin: 0 !important; 
     border-radius: 0 !important; 
-    border: 2px solid #d4af37 !important; /* ★ 下の枠線もちゃんと表示させます */
+    border: 2px solid #d4af37 !important; 
     box-sizing: border-box !important;
     padding-top: max(15px, env(safe-area-inset-top)) !important;
     padding-bottom: 5px !important;
