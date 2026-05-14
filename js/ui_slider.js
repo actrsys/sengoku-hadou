@@ -844,7 +844,8 @@ class UISliderManager {
             const num = div.querySelector(`#div-num-${b.id}`);
             const typeSel = div.querySelector(`#div-type-${b.id}`);
             
-            const onInput = (val, mode = 'normal') => {
+            // ★修正：第3引数に isChangeEvent を追加して受け取れるようにしました
+            const onInput = (val, mode = 'normal', isChangeEvent = false) => {
                 let v = parseInt(val) || 0;
                 
                 let otherSum = 0;
