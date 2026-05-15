@@ -746,7 +746,7 @@ window.GameEvents.push({
         await window.playProvinceMapEffect(
             game, 
             '疫病', 
-            "【疫病流行】\n各地で恐ろしい疫病が流行の兆しを見せています……", 
+            "恐ろしい疫病が流行の兆しを見せています……", 
             affectedProvIds, 
             128, 0, 128
         );
