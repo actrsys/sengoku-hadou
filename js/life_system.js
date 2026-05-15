@@ -649,6 +649,12 @@ class LifeSystem {
 
         // もし大名だったら、後継ぎを決めます
         if (busho.isDaimyo) {
+            // ★追加：大名が死亡した時、勢力の朝廷貢献度を5分の1に減らします
+            const clan = this.game.clans.find(c => c.id === busho.clan);
+            if (clan) {
+                clan.courtContribution = Math.floor((clan.courtContribution || 0) / 5);
+            }
+
             await this.handleDaimyoDeath(busho);
         }
 
