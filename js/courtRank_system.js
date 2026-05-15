@@ -313,22 +313,10 @@ class CourtRankSystem {
             this.game.factionSystem.updateRecognition(doer, 20);
         }
     }
-
+    
     // 朝廷の信用を消費して強制的に和睦する魔法！
     executeCourtTruce(doerId, targetCastleId) {
-        const doer = this.game.getBusho(doerId);
-        const targetCastle = this.game.getCastle(targetCastleId);
-        if (!targetCastle) return;
-
-        const targetClanId = targetCastle.ownerClan;
-        const targetClanName = this.game.clans.find(c => c.id === targetClanId).name;
-        
-        // 一元化された処理を呼び出します
-        this.applyCourtTruce(doer, targetClanId, 2000);
-
-        this.game.ui.showResultModal(`朝廷の仲裁により、${targetClanName} との間に和睦が結ばれました！\n（和睦期間：６ヶ月）`);
-        
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
+        // メッセージのお仕事も外交システム側で一括管理するようにしたので、そちらを呼び出します
+        this.game.diplomacyManager.executeDiplomacy(doerId, targetCastleId, 'court_truce', 2000);
     }
 }

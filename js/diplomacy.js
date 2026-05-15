@@ -1079,13 +1079,13 @@ class DiplomacyManager {
                     doer.achievementTotal += 5;
                     this.game.factionSystem.updateRecognition(doer, 10);
                 }
-            }// 差し替え後（diplomacy.js）
+            }
         } else if (type === 'court_truce') {
             // 一元化された処理を呼び出します
             this.game.courtRankSystem.applyCourtTruce(doer, targetClanId, gold);
 
             msg = `朝廷の仲裁により、${targetClanName} との和睦が成立しました！`;
-            if (!isPlayerInvolved) aiMsg = `朝廷の仲裁により、 ${doerClanName} と ${targetClanName} との和睦が成立しました。`;
+            if (!isPlayerInvolved) aiMsg = `朝廷の仲裁により、${doerClanName} と ${targetClanName} との和睦が成立しました。`;
             else logMsg = `${doerClanName}が朝廷に働きかけ${targetClanName}と和睦しました`;
 
             if (targetClanId === this.game.playerClanId) {
