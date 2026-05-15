@@ -236,7 +236,7 @@
    野戦の大雪・雪アニメーション
    ========================================= */
 /* ★大雪のベース表現：全体を少し白く、雲のようなもやをかける */
-#fw-main-area.is-heavy-snow::after {
+#fw-main-area.is-heavy-snow::after, #war-visual-area.is-heavy-snow::after {
     content: "";
     position: absolute;
     top: 0; left: 0; width: 100%; height: 100%;
@@ -250,13 +250,13 @@
 }
 
 /* ★大雪の時のマップ：タイルの隙間を雪の積もった色にして、マップ全体をうっすら白くします */
-#fw-main-area.is-heavy-snow #fw-map {
+#fw-main-area.is-heavy-snow #fw-map, #war-visual-area.is-heavy-snow {
     background-color: #d1d8df !important; /* 雪が積もったような白っぽい青みグレー */
     filter: brightness(1.15) contrast(0.9); /* 全体を白っぽく、少しぼんやりさせます */
 }
 
 /* ★雪が降っている時の表現：半透明の白い水玉を降らせます */
-#fw-main-area.is-snowing #fw-weather-layer {
+#fw-main-area.is-snowing #fw-weather-layer, #war-visual-area.is-snowing #war-weather-layer {
     display: block !important;
     /* 丸い水玉（雪）を大きさを変えて2つの層で作ります */
     background-image: 

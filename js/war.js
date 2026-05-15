@@ -403,20 +403,52 @@ class WarManager {
 
         // s.phase がない、または 'init'（ラウンドの最初）の時の準備
         if (!s.phase || s.phase === 'init') {
+            // ★追加：大雪拠点かどうかの判定
+            if (s.isHeavySnow === undefined) {
+                s.isHeavySnow = false;
+                if (s.defender && s.defender.provinceId && this.game && this.game.provinces) {
+                    const defProv = this.game.provinces.find(p => p.id === s.defender.provinceId);
+                    if (defProv && defProv.statusEffects && defProv.statusEffects.includes('heavySnow')) {
+                        s.isHeavySnow = true;
+                    }
+                }
+            }
+
             // ★追加：天候の判定（毎ラウンド開始時）
+            if (s.weather === undefined) s.weather = 'sunny';
             if (s.isRaining === undefined) s.isRaining = false;
             
-            // ★野戦と同じ、月ごとの確率データを準備します
             const month = this.game.month;
-            const toRainProb = { 1:15, 2:15, 3:20, 4:35, 5:50, 6:60, 7:50, 8:35, 9:20, 10:15, 11:15, 12:10 };
-            const toSunnyProb = { 1:70, 2:70, 3:60, 4:50, 5:40, 6:30, 7:40, 8:50, 9:60, 10:70, 11:70, 12:70 };
             const rand = Math.random() * 100;
             
-            // 雨が降るか止むかのサイコロを振ります
-            if (s.isRaining) {
-                if (rand < toSunnyProb[month]) s.isRaining = false; // 月ごとの確率で止みます
+            if (s.isHeavySnow) {
+                // 大雪の時は雨ではなく雪の判定
+                if (s.weather === 'sunny') {
+                    if (rand < 60) {
+                        s.weather = 'snow';
+                        s.isRaining = true;
+                    }
+                } else if (s.weather === 'snow') {
+                    if (rand < 15) {
+                        s.weather = 'sunny';
+                        s.isRaining = false;
+                    }
+                }
             } else {
-                if (rand < toRainProb[month]) s.isRaining = true; // 月ごとの確率で降ります
+                // 通常の雨判定
+                const toRainProb = { 1:15, 2:15, 3:20, 4:35, 5:50, 6:60, 7:50, 8:35, 9:20, 10:15, 11:15, 12:10 };
+                const toSunnyProb = { 1:70, 2:70, 3:60, 4:50, 5:40, 6:30, 7:40, 8:50, 9:60, 10:70, 11:70, 12:70 };
+                if (s.weather === 'sunny') {
+                    if (rand < toRainProb[month]) {
+                        s.weather = 'rain';
+                        s.isRaining = true;
+                    }
+                } else if (s.weather === 'rain') {
+                    if (rand < toSunnyProb[month]) {
+                        s.weather = 'sunny';
+                        s.isRaining = false;
+                    }
+                }
             }
             
             // 画面の見た目（文字とアニメーション）を更新します
@@ -424,15 +456,26 @@ class WarManager {
             const visualArea = document.getElementById('war-visual-area');
             const weatherLayer = document.getElementById('war-weather-layer');
             if (weatherInfo && visualArea && weatherLayer) {
-                if (s.isRaining) {
+                visualArea.classList.remove('is-raining', 'is-snowing', 'is-heavy-snow');
+                weatherLayer.classList.remove('is-rain', 'is-snow', 'hidden');
+
+                if (s.isHeavySnow) {
+                    visualArea.classList.add('is-heavy-snow');
+                }
+
+                if (s.weather === 'rain') {
                     weatherInfo.innerText = "☔ 雨";
                     weatherInfo.style.color = "#88ccff";
                     visualArea.classList.add('is-raining');
-                    weatherLayer.classList.remove('hidden');
+                    weatherLayer.classList.add('is-rain');
+                } else if (s.weather === 'snow') {
+                    weatherInfo.innerText = "⛄ 雪";
+                    weatherInfo.style.color = "#b3e5fc";
+                    visualArea.classList.add('is-snowing');
+                    weatherLayer.classList.add('is-snow');
                 } else {
                     weatherInfo.innerText = "☀ 晴れ";
                     weatherInfo.style.color = "";
-                    visualArea.classList.remove('is-raining');
                     weatherLayer.classList.add('hidden');
                 }
             }
@@ -1271,6 +1314,11 @@ class WarManager {
 
         // ★ホーム補正を攻撃力に乗せます！
         activeAtkPower = activeAtkPower * getHomeBonusMult(s.turn);
+
+        // ★追加：大雪の時、攻撃側の基礎攻撃力が10%ダウン！
+        if (s.isHeavySnow && isAtkTurnGroup) {
+            activeAtkPower = activeAtkPower * 0.9;
+        }
         
         let targetList = [];
         if (isAtkTurnGroup) {
@@ -1287,6 +1335,12 @@ class WarManager {
             t.defPower = pObj.defPower;
             // ★反撃パワーにもホーム補正を乗せます！
             t.atkPower = pObj.atkPower * getHomeBonusMult(t.role); 
+
+            // ★追加：大雪の時、攻撃側は基礎防御力と反撃力が10%ダウン！
+            if (s.isHeavySnow && t.role.startsWith('attacker')) {
+                t.defPower = t.defPower * 0.9;
+                t.atkPower = t.atkPower * 0.9;
+            }
         });
 
         let multiplier = 1.0; 
@@ -1657,17 +1711,36 @@ class WarManager {
                 s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * 0.05));
                 
                 // ★今回追加：毎ターンの終了時（ラウンドの終わり）に、攻撃側の士気を下げます
-                // ★さらに追加：雨が降っていると、士気が追加で1下がります（合計2下がります）！
-                let moraleDrop = s.isRaining ? 2 : 1;
+                let moraleDrop = 1;
+                if (s.isHeavySnow) moraleDrop += 1; // 大雪ペナルティ
+                if (s.weather === 'rain' || s.weather === 'snow') moraleDrop += 1; // 悪天候ペナルティ
+                
                 s.attacker.morale = Math.max(0, (s.attacker.morale ?? 50) - moraleDrop);
+
+                // ★追加：大雪の時、攻撃側の兵士が毎ターン4%減少
+                if (s.isHeavySnow) {
+                    let snowDmg = Math.floor(s.attacker.soldiers * 0.04);
+                    s.attacker.soldiers = Math.max(0, s.attacker.soldiers - snowDmg);
+                    if (snowDmg > 0 && s.isPlayerInvolved) this.game.ui.addWarDetailLog(`【大雪】猛吹雪の中での攻城戦により、攻撃本隊は${snowDmg}の兵を失った。`);
+                }
 
                 if (s.selfReinforcement) {
                     s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * 0.05));
                     s.selfReinforcement.morale = Math.max(0, (s.selfReinforcement.morale ?? 50) - moraleDrop);
+                    if (s.isHeavySnow) {
+                        let snowDmg = Math.floor(s.selfReinforcement.soldiers * 0.04);
+                        s.selfReinforcement.soldiers = Math.max(0, s.selfReinforcement.soldiers - snowDmg);
+                        if (snowDmg > 0 && s.isPlayerInvolved) this.game.ui.addWarDetailLog(`【大雪】猛吹雪により、攻撃側応援軍は${snowDmg}の兵を失った。`);
+                    }
                 }
                 if (s.reinforcement) {
                     s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * 0.05));
                     s.reinforcement.morale = Math.max(0, (s.reinforcement.morale ?? 50) - moraleDrop);
+                    if (s.isHeavySnow) {
+                        let snowDmg = Math.floor(s.reinforcement.soldiers * 0.04);
+                        s.reinforcement.soldiers = Math.max(0, s.reinforcement.soldiers - snowDmg);
+                        if (snowDmg > 0 && s.isPlayerInvolved) this.game.ui.addWarDetailLog(`【大雪】猛吹雪により、攻撃側友軍は${snowDmg}の兵を失った。`);
+                    }
                 }
 
                 s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * 0.05));
