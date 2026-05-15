@@ -58,7 +58,7 @@ const COMMAND_MENU_STRUCTURE = [
     },
     {
         label: "システム",
-        commands: ['history', 'settings', 'save', 'load', 'title']
+        commands: ['history', 'settings', 'save', 'load', 'watch', 'title']
     }
 ];
 
@@ -612,6 +612,7 @@ const COMMAND_SPECS = {
     'settings': { label: "設定", category: 'SYSTEM', isSystem: true, action: 'settings' },
     'save': { label: "セーブ", category: 'SYSTEM', isSystem: true, action: 'save' },
     'load': { label: "ロード", category: 'SYSTEM', isSystem: true, action: 'load' },
+    'watch': { label: "観戦する", category: 'SYSTEM', isSystem: true, action: 'watch' },
     'title': { label: "タイトルへ", category: 'SYSTEM', isSystem: true, action: 'title' }
 };
 
@@ -1301,6 +1302,11 @@ class CommandSystem {
             case 'kyoten_list': this.game.ui.showKyotenList(); break;
             // 「settings」と呼ばれたら小窓を開きます
             case 'settings': this.game.ui.showSettingsModal(); break;
+            case 'watch':
+                this.game.ui.showDialog("AI同士の戦いを観戦しますか？\n（画面の右クリック、または長押しで中断できます）", true, () => {
+                    this.game.startWatchMode();
+                }, null, { okText: '観戦する', okClass: 'btn-primary', cancelText: 'やめる' });
+                break;
             case 'title':
                 this.game.ui.showDialog("タイトル画面に戻りますか？\n保存していないデータは失われます。", true, () => {
                     // 「はい」を押した時だけ、タイトル画面を呼び出してゲーム画面を隠します

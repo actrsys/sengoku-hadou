@@ -933,6 +933,8 @@ class GameManager {
         
         // ★前回のゲームの記憶やフラグを綺麗にお掃除します！
         this.isProcessingAI = false; // AI思考中フラグを解除！
+        this.isWatchMode = false; // ★追加：観戦モードも解除！
+        this.originalPlayerClanId = null; // ★追加
         if (this.aiTimer) {
             clearTimeout(this.aiTimer);
             this.aiTimer = null;
@@ -2041,6 +2043,8 @@ class GameManager {
             try { 
                 // ★ここから追加：前のゲームの記憶やフラグを綺麗にお掃除します！
                 this.isProcessingAI = false; // AI思考中フラグを解除！
+                this.isWatchMode = false; // ★追加：観戦モードも解除！
+                this.originalPlayerClanId = null; // ★追加
                 if (this.aiTimer) {
                     clearTimeout(this.aiTimer);
                     this.aiTimer = null;
@@ -2190,6 +2194,32 @@ class GameManager {
 // ------------------------------
         }; 
         reader.readAsText(file); 
+    }
+
+    // ==========================================
+    // ★ここから追加：観戦モードの切り替え魔法
+    // ==========================================
+    startWatchMode() {
+        this.originalPlayerClanId = this.playerClanId;
+        this.playerClanId = -100;
+        this.isWatchMode = true;
+        
+        // メニューを閉じて、いま選択中の城をAIに任せます
+        if (this.ui && typeof this.ui.clearCommandMenu === 'function') {
+            this.ui.clearCommandMenu();
+        }
+        
+        // 再度ターン処理を呼び出すことで、AI操作のルートに入れます
+        this.processTurn();
+    }
+
+    stopWatchMode() {
+        this.playerClanId = this.originalPlayerClanId;
+        this.isWatchMode = false;
+        
+        if (this.ui) {
+            this.ui.showResultModal("観戦を終了しました。\n次の自勢力のターンから操作を再開します。");
+        }
     }
 }
 

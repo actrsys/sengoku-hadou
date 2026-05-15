@@ -941,6 +941,15 @@ class UIManager {
                 return; // ここで処理を終わらせて、ボタンを押すのをやめます
             }
 
+            // ★追加：観戦モード中の場合は、観戦終了の確認ダイアログを出します！
+            if (this.game && this.game.isWatchMode) {
+                e.preventDefault();
+                this.showDialog("観戦をやめますか？", true, () => {
+                    this.game.stopWatchMode();
+                }, null, { okText: '観戦をやめる', okClass: 'btn-primary', cancelText: '観戦を続ける' });
+                return;
+            }
+
             // 画面の中に「命令終了」のボタンがあるか”すべて”探して集めます
             const finishBtns = document.querySelectorAll('.cmd-btn.finish');
             
