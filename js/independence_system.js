@@ -586,7 +586,7 @@ class IndependenceSystem {
         const otherCastles = this.game.castles.filter(c => c.ownerClan === oldClanId && c.castellanId !== 0 && c.castellanId !== leader.id);
         otherCastles.forEach(castle => {
             const busho = this.game.getBusho(castle.castellanId);
-            if (busho && busho.clan === oldClanId && busho.status === 'active' && busho.factionId !== 0 && busho.factionId === targetFactionId) {
+            if (busho && busho.clan === oldClanId && busho.status === 'active' && busho.factionId !== 0 && busho.factionId === targetFactionId && !busho.isDaimyo && !busho.isCommander && !busho.isFactionLeader) {
                 // ★修正：記憶しておいた元の派閥IDを渡します
                 const { joinScore, stayScore } = this.calculateLoyaltyScores(busho, leader, oldDaimyo, leaderOriginalFactionId);
                 if (joinScore > stayScore) {
@@ -610,7 +610,7 @@ class IndependenceSystem {
         const targetFactionId = (leaderOriginalFactionId !== null && leaderOriginalFactionId !== 0) ? leaderOriginalFactionId : newDaimyo.factionId;
         if (!targetFactionId || targetFactionId === 0) return; 
         
-        const potential = this.game.bushos.filter(b => b.clan === oldClanId && b.status === 'active' && !b.isCastellan && b.factionId === targetFactionId);
+        const potential = this.game.bushos.filter(b => b.clan === oldClanId && b.status === 'active' && !b.isCastellan && b.factionId === targetFactionId && !b.isDaimyo && !b.isCommander && !b.isFactionLeader);
         const mainCastle = this.game.castles.find(c => c.castellanId === newDaimyo.id);
         if (!mainCastle) return;
 
