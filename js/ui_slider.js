@@ -385,11 +385,10 @@ class UISliderManager {
             
             this.ui.tradeTypeInfo.classList.remove('hidden'); 
             this.ui.tradeTypeInfo.textContent = `兵士 1人 ＝ 金 ${singleCost.toFixed(1)}`;
-
+            
             // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
             const costDiv = document.createElement('div');
             costDiv.id = 'dynamic-cost-display';
-            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
             this.ui.quantityContainer.appendChild(costDiv);
 
             inputs.soldiers = createSlider("兵士数", "soldiers", maxSoldiers, 0);

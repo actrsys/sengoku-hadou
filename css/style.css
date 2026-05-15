@@ -2809,3 +2809,11 @@ body:not(.is-pc) .interview-dialog-modal .modal-footer {
     border-left: 7px solid #ffd54f;
     filter: drop-shadow(1px 1px 0 #000); /* 他の文字と同じように黒いフチを付けます */
 }
+/* =========================================================
+   取引結果の大枠レイアウト（JSからスタイルを独立）
+   ========================================================= */
+#dynamic-cost-display {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 15px;
+}
