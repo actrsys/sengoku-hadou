@@ -308,7 +308,7 @@ class DiplomacyManager {
             if (allyCount >= 2) acceptProb -= (allyCount - 1) * 20;
             if (targetPower > myPower) acceptProb *= (Math.sqrt(myPower) / Math.sqrt(targetPower));
             
-            if (['友好', '同盟', '支配', '従属'].includes(relation.status)) {
+            if (['友好', '同盟', '支配', '従属', '和睦'].includes(relation.status)) {
                 acceptProb += 30;
             }
             
