@@ -2846,7 +2846,7 @@ body:not(.is-pc) .interview-dialog-modal .modal-footer {
 .setting-value {
     width: 50px;
     text-align: right;
-    display: flex;
+    display: none;
     justify-content: flex-end;
     align-items: baseline;
     flex-shrink: 0;
