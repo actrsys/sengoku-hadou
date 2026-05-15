@@ -88,16 +88,26 @@ class UISliderManager {
                 const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
                 const castellan = this.game.getBusho(c.castellanId);
                 
-                // ★修正：「金」が上、「アイテム」が下になるように２行の順番を入れ替えました！
+                // ★修正：上下の２行を横並びにし、専用のCSSクラスを使ってデザインを揃えました！
                 const makeGrid = (itemName, afterItem, afterGold) => {
                     return `
-                        <div style="display: inline-grid; grid-template-columns: max-content max-content minmax(3em, auto); column-gap: 1em; text-align: left;">
-                            <div>　金</div>
-                            <div>▶</div>
-                            <div style="text-align: right;">${Math.floor(afterGold)}</div>
-                            <div>${itemName}</div>
-                            <div>▶</div>
-                            <div style="text-align: right;">${Math.floor(afterItem)}</div>
+                        <div class="trade-result-row">
+                            <div class="trade-result-item">
+                                <div class="trade-result-label">金</div>
+                                <div class="trade-arrow-group">
+                                    <div class="trade-arrow-shape"></div>
+                                    <div class="trade-arrow-shape"></div>
+                                </div>
+                                <div class="trade-result-value">${Math.floor(afterGold)}</div>
+                            </div>
+                            <div class="trade-result-item">
+                                <div class="trade-result-label">${itemName}</div>
+                                <div class="trade-arrow-group">
+                                    <div class="trade-arrow-shape"></div>
+                                    <div class="trade-arrow-shape"></div>
+                                </div>
+                                <div class="trade-result-value">${Math.floor(afterItem)}</div>
+                            </div>
                         </div>
                     `;
                 };
