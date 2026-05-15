@@ -1958,7 +1958,7 @@ class GameManager {
             this.ui.showDialog("天下統一！", false, () => {
                 this.ui.returnToTitle(); 
             });
-        } else if (!playerAlive) {
+        } else if (!this.isWatchMode && !playerAlive) {
             this.ui.showDialog("我が大名家は滅亡しました……", false, () => {
                 this.ui.returnToTitle(); 
             });
@@ -2214,11 +2214,14 @@ class GameManager {
     }
 
     stopWatchMode() {
-        this.playerClanId = this.originalPlayerClanId;
         this.isWatchMode = false;
         
         if (this.ui) {
-            this.ui.showResultModal("観戦を終了しました。\n次の自勢力のターンから操作を再開します。");
+            this.ui.showDialog("観戦を終了し、タイトル画面に戻ります。", false, () => {
+                location.reload();
+            });
+        } else {
+            location.reload();
         }
     }
 }
