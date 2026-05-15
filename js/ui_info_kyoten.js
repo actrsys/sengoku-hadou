@@ -335,9 +335,9 @@ Object.assign(UIInfoManager.prototype, {
                 `<span data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
                 `<span data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
                 `<span data-sort="goldIncome">月収入${getSortMark('goldIncome')}</span>`,
-                `<span data-sort="goldConsume">金支出/月${getSortMark('goldConsume')}</span>`,
+                `<span data-sort="goldConsume">月支出${getSortMark('goldConsume')}</span>`,
                 `<span data-sort="riceIncome">年収穫${getSortMark('riceIncome')}</span>`,
-                `<span data-sort="riceConsume">兵糧支出/年${getSortMark('riceConsume')}</span>`
+                `<span data-sort="riceConsume">年米消費${getSortMark('riceConsume')}</span>`
             ];
         }
 
