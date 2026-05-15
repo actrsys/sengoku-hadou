@@ -364,6 +364,29 @@ class AIEngine {
 
         const myDaimyo = this.game.bushos.find(b => b.clan === myCastle.ownerClan && b.isDaimyo) || { personality: 'normal', intelligence: 50, duty: 50, nemesisIds: [] };
 
+        // ★追加：リーダー（直轄なら大名、それ以外なら国主）を特定して、その居城がある地方を調べます！
+        let leader = myDaimyo;
+        if (myCastle.legionId !== 0) {
+            const legion = this.game.legions ? this.game.legions.find(l => l.clanId === myCastle.ownerClan && l.legionNo === myCastle.legionId) : null;
+            if (legion && legion.commanderId) {
+                const commander = this.game.getBusho(legion.commanderId);
+                if (commander) {
+                    leader = commander;
+                }
+            }
+        }
+        
+        let leaderRegionId = 0;
+        if (leader && leader.castleId) {
+            const leaderCastle = this.game.getCastle(leader.castleId);
+            if (leaderCastle) {
+                const leaderProv = this.game.provinces.find(p => p.id === leaderCastle.provinceId);
+                if (leaderProv) {
+                    leaderRegionId = leaderProv.regionId;
+                }
+            }
+        }
+
         const myClanId = myCastle.ownerClan;
         const myClanCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
         const myTotalPower = this.getClanPrestige(myClanId);
@@ -1016,6 +1039,17 @@ class AIEngine {
                 if (tgtProv && !myRegionIds.has(tgtProv.regionId)) {
                     prob -= 5;
                 }
+            }
+
+            // ★今回追加：四国と九州をまたぐ攻撃のスコアを大きく下げる魔法！
+            // 四国地方のIDは8、九州地方のIDは9です。
+            let targetRegionId = 0;
+            const targetProv = this.game.provinces.find(p => p.id === target.provinceId);
+            if (targetProv) {
+                targetRegionId = targetProv.regionId;
+            }
+            if ((leaderRegionId === 8 && targetRegionId === 9) || (leaderRegionId === 9 && targetRegionId === 8)) {
+                prob -= 30; // 四国と九州の間の海越え攻撃はペナルティを与えて後回しにします！
             }
             
             // 攻撃確率の最大値設定
