@@ -34,6 +34,7 @@ class UIInfoManager {
         this.diploCurrentTab = 'daimyo';
         
         // 勢力一覧で使う状態のリセット
+        this.daimyoCurrentTab = 'status';
         this.daimyoCurrentSortKey = null;
         this.isDaimyoSortAsc = false;
         
@@ -206,9 +207,40 @@ class UIInfoManager {
         const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
         this.game.updateAllClanPrestige();
         
+        if (!this.daimyoCurrentTab) this.daimyoCurrentTab = 'status';
+
+        let tabsHtml = `
+            <div style="display: flex; gap: 5px;">
+                <button class="busho-tab-btn ${this.daimyoCurrentTab === 'status' ? 'active' : ''}" data-tab="status">基本</button>
+                <button class="busho-tab-btn ${this.daimyoCurrentTab === 'military' ? 'active' : ''}" data-tab="military">軍事</button>
+                <button class="busho-tab-btn ${this.daimyoCurrentTab === 'economy' ? 'active' : ''}" data-tab="economy">経済</button>
+            </div>
+        `;
+        
         const clanDataList = activeClans.map(clan => {
             const leader = this.game.getBusho(clan.leaderId);
-            const castlesCount = this.game.castles.filter(c => c.ownerClan === clan.id).length;
+            
+            let totalSoldiers = 0, totalHorses = 0, totalGuns = 0;
+            let totalKokudaka = 0, totalCommerce = 0, totalGold = 0, totalRice = 0;
+            let totalGoldIncome = 0, totalRiceIncome = 0;
+            
+            const clanCastles = this.game.castles.filter(c => c.ownerClan === clan.id);
+            const castlesCount = clanCastles.length;
+            
+            clanCastles.forEach(c => {
+                totalSoldiers += c.soldiers || 0;
+                totalHorses += c.horses || 0;
+                totalGuns += c.guns || 0;
+                totalKokudaka += c.kokudaka || 0;
+                totalCommerce += c.commerce || 0;
+                totalGold += c.gold || 0;
+                totalRice += c.rice || 0;
+                totalGoldIncome += GameSystem.calcBaseGoldIncome(c);
+                totalRiceIncome += GameSystem.calcBaseRiceIncome(c);
+            });
+            
+            const bushosCount = this.game.bushos.filter(b => b.clan === clan.id && b.status === 'active').length;
+            const princessCount = clan.princessIds ? clan.princessIds.length : 0;
             
             let friendScore = 50;
             let friendStatus = "普通";
@@ -230,6 +262,17 @@ class UIInfoManager {
                 leaderYomi: leader ? (leader.yomi || leader.name) : "んんん",
                 power: clan.daimyoPrestige, 
                 castlesCount: castlesCount,
+                soldiers: totalSoldiers,
+                horses: totalHorses,
+                guns: totalGuns,
+                bushosCount: bushosCount,
+                princessCount: princessCount,
+                kokudaka: totalKokudaka,
+                commerce: totalCommerce,
+                gold: totalGold,
+                goldIncome: totalGoldIncome,
+                rice: totalRice,
+                riceIncome: totalRiceIncome,
                 friendScore: friendScore,
                 friendStatus: friendStatus
             };
@@ -247,6 +290,17 @@ class UIInfoManager {
                     case 'leader': valA = a.leaderYomi; valB = b.leaderYomi; break;
                     case 'castlesCount': valA = a.castlesCount; valB = b.castlesCount; break;
                     case 'power': valA = a.power; valB = b.power; break;
+                    case 'soldiers': valA = a.soldiers; valB = b.soldiers; break;
+                    case 'horses': valA = a.horses; valB = b.horses; break;
+                    case 'guns': valA = a.guns; valB = b.guns; break;
+                    case 'bushosCount': valA = a.bushosCount; valB = b.bushosCount; break;
+                    case 'princessCount': valA = a.princessCount; valB = b.princessCount; break;
+                    case 'kokudaka': valA = a.kokudaka; valB = b.kokudaka; break;
+                    case 'commerce': valA = a.commerce; valB = b.commerce; break;
+                    case 'gold': valA = a.gold; valB = b.gold; break;
+                    case 'goldIncome': valA = a.goldIncome; valB = b.goldIncome; break;
+                    case 'rice': valA = a.rice; valB = b.rice; break;
+                    case 'riceIncome': valA = a.riceIncome; valB = b.riceIncome; break;
                     case 'friend': 
                         valA = a.id === this.game.playerClanId ? 999 : a.friendScore;
                         valB = b.id === this.game.playerClanId ? 999 : b.friendScore;
@@ -278,37 +332,16 @@ class UIInfoManager {
             this._saveStableSortResult('daimyo', null);
         }
 
-        let items = [];
-
-        clanDataList.forEach(d => {
-            let statusClass = "text-white";
-            if (d.friendStatus === '敵対') statusClass = 'text-red';
-            else if (d.friendStatus === '友好') statusClass = 'text-green';
-            else if (['同盟', '支配', '従属', '婚姻'].includes(d.friendStatus)) statusClass = 'text-green';
-            else if (d.friendStatus === '自家') statusClass = 'text-orange';
-
-            const powerBarHtml = this._createBarHtml((d.power / maxPower) * 100, 'power');
-            const friendBarHtml = d.id === this.game.playerClanId ? "" : this._createBarHtml(d.friendScore, 'friend');
-            
-            items.push({
-                onClick: `window.GameApp.ui.info.showDaimyoDetail(${d.id})`,
-                cells: [
-                    `<span class="col-daimyo-name">${d.name}</span>`,
-                    `<span class="col-leader-name">${d.leaderName}</span>`,
-                    `<span class="col-castle-count">${d.castlesCount}</span>`,
-                    `<span class="col-prestige">${powerBarHtml}</span>`,
-                    `<span class="col-friend">${friendBarHtml}</span>`,
-                    `<span class="col-relation ${statusClass}">${d.friendStatus}</span>`,
-                    `<span class="col-empty pc-only"></span>`
-                ]
-            });
-        });
-
         const getSortMark = (key) => this._getCommonSortMark(this.daimyoCurrentSortKey, this.isDaimyoSortAsc, key);
-
-        this._renderListModal({
-            title: "勢力一覧",
-            headers: [
+        
+        let headers = [];
+        let gridSpStr = "";
+        let gridPcStr = "";
+        
+        if (this.daimyoCurrentTab === 'status') {
+            gridSpStr = "2.5fr 2fr 1fr 2fr 2fr 1.5fr";
+            gridPcStr = "140px 100px 60px 100px 100px 60px 1fr";
+            headers = [
                 `<span data-sort="name">勢力名${getSortMark('name')}</span>`,
                 `<span data-sort="leader">当主${getSortMark('leader')}</span>`,
                 `<span data-sort="castlesCount">拠点${getSortMark('castlesCount')}</span>`,
@@ -316,14 +349,105 @@ class UIInfoManager {
                 `<span data-sort="friend">友好度${getSortMark('friend')}</span>`,
                 `<span data-sort="relation">関係${getSortMark('relation')}</span>`,
                 `<span class="pc-only"></span>`
-            ],
+            ];
+        } else if (this.daimyoCurrentTab === 'military') {
+            gridSpStr = "2fr 1fr 1.2fr 1fr 1fr 1fr 0.8fr";
+            gridPcStr = "140px 60px 80px 80px 80px 60px 50px 1fr";
+            headers = [
+                `<span data-sort="name">勢力名${getSortMark('name')}</span>`,
+                `<span data-sort="castlesCount">拠点${getSortMark('castlesCount')}</span>`,
+                `<span data-sort="soldiers">兵士${getSortMark('soldiers')}</span>`,
+                `<span data-sort="horses">軍馬${getSortMark('horses')}</span>`,
+                `<span data-sort="guns">鉄砲${getSortMark('guns')}</span>`,
+                `<span data-sort="bushosCount">武将${getSortMark('bushosCount')}</span>`,
+                `<span data-sort="princessCount">姫${getSortMark('princessCount')}</span>`,
+                `<span class="pc-only"></span>`
+            ];
+        } else if (this.daimyoCurrentTab === 'economy') {
+            gridSpStr = "2fr 1.2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.5fr";
+            gridPcStr = "140px 80px 80px 80px 100px 80px 100px 1fr";
+            headers = [
+                `<span data-sort="name">勢力名${getSortMark('name')}</span>`,
+                `<span data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
+                `<span data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
+                `<span data-sort="gold">金${getSortMark('gold')}</span>`,
+                `<span data-sort="goldIncome">金収入/月${getSortMark('goldIncome')}</span>`,
+                `<span data-sort="rice">兵糧${getSortMark('rice')}</span>`,
+                `<span data-sort="riceIncome">兵糧収入/年${getSortMark('riceIncome')}</span>`,
+                `<span class="pc-only"></span>`
+            ];
+        }
+
+        let items = [];
+
+        clanDataList.forEach(d => {
+            let cells = [];
+            if (this.daimyoCurrentTab === 'status') {
+                let statusClass = "text-white";
+                if (d.friendStatus === '敵対') statusClass = 'text-red';
+                else if (d.friendStatus === '友好') statusClass = 'text-green';
+                else if (['同盟', '支配', '従属', '婚姻'].includes(d.friendStatus)) statusClass = 'text-green';
+                else if (d.friendStatus === '自家') statusClass = 'text-orange';
+
+                const powerBarHtml = this._createBarHtml((d.power / maxPower) * 100, 'power');
+                const friendBarHtml = d.id === this.game.playerClanId ? "" : this._createBarHtml(d.friendScore, 'friend');
+                
+                cells = [
+                    `<span class="col-daimyo-name">${d.name}</span>`,
+                    `<span class="col-leader-name">${d.leaderName}</span>`,
+                    `<span class="col-castle-count">${d.castlesCount}</span>`,
+                    `<span class="col-prestige">${powerBarHtml}</span>`,
+                    `<span class="col-friend">${friendBarHtml}</span>`,
+                    `<span class="col-relation ${statusClass}">${d.friendStatus}</span>`,
+                    `<span class="col-empty pc-only"></span>`
+                ];
+            } else if (this.daimyoCurrentTab === 'military') {
+                cells = [
+                    `<span class="col-daimyo-name">${d.name}</span>`,
+                    `<span class="col-castle-count">${d.castlesCount}</span>`,
+                    `<span class="col-soldiers">${d.soldiers}</span>`,
+                    `<span class="col-horses">${d.horses}</span>`,
+                    `<span class="col-guns">${d.guns}</span>`,
+                    `<span class="col-busho-count">${d.bushosCount}</span>`,
+                    `<span class="col-busho-count">${d.princessCount}</span>`,
+                    `<span class="col-empty pc-only"></span>`
+                ];
+            } else if (this.daimyoCurrentTab === 'economy') {
+                cells = [
+                    `<span class="col-daimyo-name">${d.name}</span>`,
+                    `<span class="col-kokudaka">${d.kokudaka}</span>`,
+                    `<span class="col-commerce">${d.commerce}</span>`,
+                    `<span class="col-gold">${d.gold}</span>`,
+                    `<span class="col-gold-income">${d.goldIncome}</span>`,
+                    `<span class="col-rice">${d.rice}</span>`,
+                    `<span class="col-rice-income">${d.riceIncome}</span>`,
+                    `<span class="col-empty pc-only"></span>`
+                ];
+            }
+            
+            items.push({
+                onClick: `window.GameApp.ui.info.showDaimyoDetail(${d.id})`,
+                cells: cells
+            });
+        });
+
+        this._renderListModal({
+            title: "勢力一覧",
+            tabsHtml: tabsHtml,
+            headers: headers,
             headerClass: "sortable-header daimyo-list-header",
             itemClass: "daimyo-list-item",
             listClass: "daimyo-list-container",
             items: items,
             scrollPos: scrollPos,
-            gridTemplateSp: "2.5fr 2fr 1fr 2fr 2fr 1.5fr",
-            gridTemplatePc: "140px 100px 60px 100px 100px 60px 1fr",
+            gridTemplateSp: gridSpStr,
+            gridTemplatePc: gridPcStr,
+            onTabClick: (tabKey) => {
+                this.daimyoCurrentTab = tabKey;
+                const listEl = document.getElementById('selector-list');
+                const scroll = listEl ? listEl.scrollTop : 0;
+                this._renderDaimyoList(scroll);
+            },
             onSortClick: (sortKey) => {
                 const defaultAscKeys = ['name', 'leader', 'relation'];
                 const newState = this._toggleSortState(this.daimyoCurrentSortKey, this.isDaimyoSortAsc, sortKey, defaultAscKeys);
