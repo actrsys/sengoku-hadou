@@ -462,60 +462,94 @@
             <div class="modal-content modal-small">
                 <h3 class="settings-title">設定</h3>
                 
-                <div style="margin: 20px 0; text-align: left;">
-                    <label style="font-weight: bold; display: block; margin-bottom: 5px;">BGM 音量</label>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <input type="range" id="setting-bgm-volume" min="0" max="100" value="100" style="flex: 1;">
-                        <span id="setting-bgm-text" style="width: 40px; text-align: right;">100%</span>
+                <div class="setting-row">
+                    <label class="slider-row-label">BGM 音量</label>
+                    <div class="qty-control setting-slider-wrap">
+                        <input type="range" id="setting-bgm-volume" min="0" max="100" value="100" oninput="updateSettingSlider('bgm', this.value)">
+                        <div class="setting-value"><span id="setting-bgm-text">100</span><span class="setting-unit">％</span></div>
                     </div>
                 </div>
 
-                <div style="margin: 20px 0; text-align: left;">
-                    <label style="font-weight: bold; display: block; margin-bottom: 5px;">SE 音量</label>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <input type="range" id="setting-se-volume" min="0" max="100" value="100" style="flex: 1;">
-                        <span id="setting-se-text" style="width: 40px; text-align: right;">100%</span>
+                <div class="setting-row">
+                    <label class="slider-row-label">SE 音量</label>
+                    <div class="qty-control setting-slider-wrap">
+                        <input type="range" id="setting-se-volume" min="0" max="100" value="100" oninput="updateSettingSlider('se', this.value)">
+                        <div class="setting-value"><span id="setting-se-text">100</span><span class="setting-unit">％</span></div>
                     </div>
                 </div>
 
-                <div style="margin: 20px 0; text-align: left;">
-                    <label style="font-weight: bold; display: block; margin-bottom: 5px;">他家戦争の通知</label>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <label><input type="radio" name="setting-ai-war-notify" value="true" onchange="window.GameConfig=window.GameConfig||{}; window.GameConfig.aiWarNotify=true; localStorage.setItem('aiWarNotify', 'true');" checked id="notify-true"> 通知する</label>
-                        <label><input type="radio" name="setting-ai-war-notify" value="false" onchange="window.GameConfig=window.GameConfig||{}; window.GameConfig.aiWarNotify=false; localStorage.setItem('aiWarNotify', 'false');" id="notify-false"> 通知しない</label>
+                <div class="setting-row">
+                    <label class="slider-row-label">他家戦争の通知</label>
+                    <div class="setting-toggle-group">
+                        <button type="button" class="troop-type-btn" id="btn-notify-true" onclick="updateToggleSetting('notify', true)">通知する</button>
+                        <button type="button" class="troop-type-btn" id="btn-notify-false" onclick="updateToggleSetting('notify', false)">通知しない</button>
                     </div>
                 </div>
 
-                <div style="margin: 20px 0; text-align: left;">
-                    <label style="font-weight: bold; display: block; margin-bottom: 5px;">歴史イベント</label>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <label><input type="radio" name="setting-historical-event" value="true" onchange="window.GameConfig=window.GameConfig||{}; window.GameConfig.historicalEvent=true; localStorage.setItem('historicalEvent', 'true');" checked id="historical-true"> 発生する</label>
-                        <label><input type="radio" name="setting-historical-event" value="false" onchange="window.GameConfig=window.GameConfig||{}; window.GameConfig.historicalEvent=false; localStorage.setItem('historicalEvent', 'false');" id="historical-false"> 発生しない</label>
+                <div class="setting-row">
+                    <label class="slider-row-label">歴史イベント</label>
+                    <div class="setting-toggle-group">
+                        <button type="button" class="troop-type-btn" id="btn-historical-true" onclick="updateToggleSetting('historical', true)">発生する</button>
+                        <button type="button" class="troop-type-btn" id="btn-historical-false" onclick="updateToggleSetting('historical', false)">発生しない</button>
                     </div>
                 </div>
+
                 <script>
-                    window.GameConfig = window.GameConfig || {};
-                    const savedNotify = localStorage.getItem('aiWarNotify');
-                    if (savedNotify === 'false') {
-                        window.GameConfig.aiWarNotify = false;
-                        document.addEventListener("DOMContentLoaded", () => {
-                            const rb = document.getElementById('notify-false');
-                            if(rb) rb.checked = true;
-                        });
-                    } else {
-                        window.GameConfig.aiWarNotify = true;
+                    function updateSettingSlider(type, value) {
+                        const range = document.getElementById(`setting-${type}-volume`);
+                        const text = document.getElementById(`setting-${type}-text`);
+                        if (range && text) {
+                            text.textContent = value;
+                            range.style.setProperty('--value', value + '%');
+                        }
                     }
 
-                    const savedHistorical = localStorage.getItem('historicalEvent');
-                    if (savedHistorical === 'false') {
-                        window.GameConfig.historicalEvent = false;
-                        document.addEventListener("DOMContentLoaded", () => {
-                            const rbHistorical = document.getElementById('historical-false');
-                            if(rbHistorical) rbHistorical.checked = true;
-                        });
-                    } else {
-                        window.GameConfig.historicalEvent = true;
+                    function updateToggleSetting(type, isTrue) {
+                        const btnTrue = document.getElementById(`btn-${type}-true`);
+                        const btnFalse = document.getElementById(`btn-${type}-false`);
+                        if (btnTrue && btnFalse) {
+                            if (isTrue) {
+                                btnTrue.classList.add('active');
+                                btnFalse.classList.remove('active');
+                            } else {
+                                btnTrue.classList.remove('active');
+                                btnFalse.classList.add('active');
+                            }
+                        }
+                        
+                        window.GameConfig = window.GameConfig || {};
+                        if (type === 'notify') {
+                            window.GameConfig.aiWarNotify = isTrue;
+                            localStorage.setItem('aiWarNotify', isTrue ? 'true' : 'false');
+                        } else if (type === 'historical') {
+                            window.GameConfig.historicalEvent = isTrue;
+                            localStorage.setItem('historicalEvent', isTrue ? 'true' : 'false');
+                        }
                     }
+
+                    document.addEventListener("DOMContentLoaded", () => {
+                        window.GameConfig = window.GameConfig || {};
+                        
+                        // 通知の初期化
+                        const savedNotify = localStorage.getItem('aiWarNotify');
+                        const isNotify = savedNotify !== 'false';
+                        window.GameConfig.aiWarNotify = isNotify;
+                        updateToggleSetting('notify', isNotify);
+
+                        // 歴史イベントの初期化
+                        const savedHistorical = localStorage.getItem('historicalEvent');
+                        const isHistorical = savedHistorical !== 'false';
+                        window.GameConfig.historicalEvent = isHistorical;
+                        updateToggleSetting('historical', isHistorical);
+
+                        // スライダーの初期化
+                        ['bgm', 'se'].forEach(type => {
+                            const range = document.getElementById(`setting-${type}-volume`);
+                            if (range) {
+                                updateSettingSlider(type, range.value);
+                            }
+                        });
+                    });
                 </script>
 
                 <div class="modal-footer" style="justify-content: center;">
