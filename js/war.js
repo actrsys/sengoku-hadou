@@ -403,6 +403,34 @@ class WarManager {
 
         // s.phase がない、または 'init'（ラウンドの最初）の時の準備
         if (!s.phase || s.phase === 'init') {
+            // ★追加：天候の判定（毎ラウンド開始時）
+            if (s.isRaining === undefined) s.isRaining = false;
+            
+            // 雨が降るか止むかのサイコロを振ります
+            if (s.isRaining) {
+                if (Math.random() < 0.3) s.isRaining = false; // 30%の確率で止みます
+            } else {
+                if (Math.random() < 0.15) s.isRaining = true; // 15%の確率で降ります
+            }
+            
+            // 画面の見た目（文字とアニメーション）を更新します
+            const weatherInfo = document.getElementById('war-weather-info');
+            const visualArea = document.getElementById('war-visual-area');
+            const weatherLayer = document.getElementById('war-weather-layer');
+            if (weatherInfo && visualArea && weatherLayer) {
+                if (s.isRaining) {
+                    weatherInfo.innerText = "☔ 雨";
+                    weatherInfo.style.color = "#88ccff";
+                    visualArea.classList.add('is-raining');
+                    weatherLayer.classList.remove('hidden');
+                } else {
+                    weatherInfo.innerText = "☀ 晴れ";
+                    weatherInfo.style.color = "";
+                    visualArea.classList.remove('is-raining');
+                    weatherLayer.classList.add('hidden');
+                }
+            }
+
             // ★直近5ターンのダメージを記憶する箱を用意します
             s.defDamageHistory = s.defDamageHistory || [];
             s.wallDamageHistory = s.wallDamageHistory || [];
@@ -1220,11 +1248,19 @@ class WarManager {
             if (type === 'charge' || type === 'def_charge') {
                 equipBonusValue = activePowerObj.atkPower * (horseRatio * 0.5);
             } else if (type === 'bow' || type === 'def_bow') {
-                equipBonusValue = activePowerObj.atkPower * (gunRatio * 0.5);
+                // ★追加：雨の時は鉄砲が使えないので、ボーナスは0になります！
+                if (!s.isRaining) {
+                    equipBonusValue = activePowerObj.atkPower * (gunRatio * 0.5);
+                }
             }
             
             // 算出したボーナス値を、最後に足し算します
             activeAtkPower = activeAtkPower + equipBonusValue;
+        }
+
+        // ★追加：雨の時、攻撃側の基礎攻撃力が10%ダウンします（0.9倍になります）！
+        if (s.isRaining && isAtkTurnGroup) {
+            activeAtkPower = activeAtkPower * 0.9;
         }
 
         // ★ホーム補正を攻撃力に乗せます！
@@ -1613,16 +1649,19 @@ class WarManager {
             } else {
                 // 全員の行動が終わったら、兵糧を消費します
                 s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * 0.05));
-                // ★今回追加：毎ターンの終了時（ラウンドの終わり）に、攻撃側の士気を１下げます
-                s.attacker.morale = Math.max(0, (s.attacker.morale ?? 50) - 1);
+                
+                // ★今回追加：毎ターンの終了時（ラウンドの終わり）に、攻撃側の士気を下げます
+                // ★さらに追加：雨が降っていると、士気が追加で1下がります（合計2下がります）！
+                let moraleDrop = s.isRaining ? 2 : 1;
+                s.attacker.morale = Math.max(0, (s.attacker.morale ?? 50) - moraleDrop);
 
                 if (s.selfReinforcement) {
                     s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * 0.05));
-                    s.selfReinforcement.morale = Math.max(0, (s.selfReinforcement.morale ?? 50) - 1);
+                    s.selfReinforcement.morale = Math.max(0, (s.selfReinforcement.morale ?? 50) - moraleDrop);
                 }
                 if (s.reinforcement) {
                     s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * 0.05));
-                    s.reinforcement.morale = Math.max(0, (s.reinforcement.morale ?? 50) - 1);
+                    s.reinforcement.morale = Math.max(0, (s.reinforcement.morale ?? 50) - moraleDrop);
                 }
 
                 s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * 0.05));

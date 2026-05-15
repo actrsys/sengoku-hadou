@@ -170,7 +170,7 @@
 /* =========================================
    野戦の雨アニメーション
    ========================================= */
-#fw-weather-layer {
+#fw-weather-layer, #war-weather-layer {
     position: absolute;
     top: 0;
     left: 0;
@@ -181,13 +181,13 @@
 }
 
 /* 雨の時は、タイルの隙間を濡れた色にして、暗すぎない程度に全体を調整します */
-#fw-main-area.is-raining #fw-map {
+#fw-main-area.is-raining #fw-map, #war-visual-area.is-raining {
     background-color: #3d4a3d !important; /* 濡れた地面のような深い緑色 */
     filter: brightness(0.85) contrast(1.05); /* 以前より明るめに設定 */
 }
 
 /* こまかい雨の表現：斜めの短い線を複数重ねて、斜めに降らせます */
-#fw-main-area.is-raining #fw-weather-layer {
+#fw-main-area.is-raining #fw-weather-layer, #war-visual-area.is-raining #war-weather-layer {
     display: block !important;
     /* 110度の角度で、透明な隙間をたくさん作った細かい雨粒の層を2つ重ねます */
     background-image: 
