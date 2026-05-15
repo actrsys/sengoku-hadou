@@ -1679,7 +1679,7 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 将軍擁立イベント
+// ★ 将軍就任イベント
 // ==========================================
 window.GameEvents.push({
     id: "historical_shogun_coronation", // イベントの固有の名前
@@ -1883,7 +1883,45 @@ window.GameEvents.push({
             }
         }
 
-        // --- 8. 最後に画面を新しく描き直して、メッセージを表示します ---
+        // --- 8. 二条城・槇島城、および将軍擁立勢力へのボーナス処理 ---
+        if (nijoCastle) {
+            if (nijoCastle.soldiers < 5000) nijoCastle.soldiers = 5000;
+            if (nijoCastle.gold < 5000) nijoCastle.gold = 5000;
+            if (nijoCastle.rice < 10000) nijoCastle.rice = 10000;
+            if (nijoCastle.population < 100000) nijoCastle.population = 100000;
+            nijoCastle.training = 100;
+            nijoCastle.morale = 100;
+            nijoCastle.peoplesLoyalty = nijoCastle.maxPeoplesLoyalty || 100;
+            nijoCastle.defense = nijoCastle.maxDefense || 1000;
+        }
+
+        if (makishimaCastle) {
+            if (makishimaCastle.soldiers < 3000) makishimaCastle.soldiers = 3000;
+            if (makishimaCastle.gold < 3000) makishimaCastle.gold = 3000;
+            if (makishimaCastle.rice < 8000) makishimaCastle.rice = 8000;
+            if (makishimaCastle.population < 100000) makishimaCastle.population = 100000;
+            makishimaCastle.training = 100;
+            makishimaCastle.morale = 100;
+            makishimaCastle.peoplesLoyalty = makishimaCastle.maxPeoplesLoyalty || 100;
+            makishimaCastle.defense = makishimaCastle.maxDefense || 1000;
+        }
+
+        // 将軍擁立勢力のすべての拠点にボーナスを与えます
+        const sponsorCastles = game.castles.filter(c => c.ownerClan === sponsorClanId);
+        sponsorCastles.forEach(c => {
+            c.soldiers = Math.min(99999, c.soldiers + 1000);
+            c.gold = Math.min(99999, c.gold + 1000);
+            c.population = Math.min(999999, c.population + 3000);
+            c.rice = Math.min(99999, c.rice + 3000);
+        });
+
+        // 将軍擁立勢力に所属するすべての武将の忠誠度を上げます
+        const sponsorBushos = game.bushos.filter(b => b.clan === sponsorClanId && b.status === 'active');
+        sponsorBushos.forEach(b => {
+            b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
+        });
+
+        // --- 9. 最後に画面を新しく描き直して、メッセージを表示します ---
         if (game.factionSystem) {
             game.factionSystem.updateFactions();
         }
