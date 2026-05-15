@@ -196,12 +196,12 @@ window.GameEvents.push({
                     }
                 }
 
-                let baseDecay = (Math.random() * 3.0) - 1.0; 
-                let northDecay = 1.0 * progress; 
+                let baseDecay = (Math.random() * 1.5) - 0.5; 
+                let northDecay = 0.5 * progress; 
 
                 if (onLand) {
                     landCount++;
-                    let landDecay = 1.0 + (landCount * 0.2); 
+                    let landDecay = 0.5 + (landCount * 0.1); 
                     typhoonRadius -= (baseDecay + northDecay + landDecay);
                 } else {
                     landCount = 0; 
