@@ -406,11 +406,17 @@ class WarManager {
             // ★追加：天候の判定（毎ラウンド開始時）
             if (s.isRaining === undefined) s.isRaining = false;
             
+            // ★野戦と同じ、月ごとの確率データを準備します
+            const month = this.game.month;
+            const toRainProb = { 1:15, 2:15, 3:20, 4:35, 5:50, 6:60, 7:50, 8:35, 9:20, 10:15, 11:15, 12:10 };
+            const toSunnyProb = { 1:70, 2:70, 3:60, 4:50, 5:40, 6:30, 7:40, 8:50, 9:60, 10:70, 11:70, 12:70 };
+            const rand = Math.random() * 100;
+            
             // 雨が降るか止むかのサイコロを振ります
             if (s.isRaining) {
-                if (Math.random() < 0.3) s.isRaining = false; // 30%の確率で止みます
+                if (rand < toSunnyProb[month]) s.isRaining = false; // 月ごとの確率で止みます
             } else {
-                if (Math.random() < 0.15) s.isRaining = true; // 15%の確率で降ります
+                if (rand < toRainProb[month]) s.isRaining = true; // 月ごとの確率で降ります
             }
             
             // 画面の見た目（文字とアニメーション）を更新します
