@@ -1513,7 +1513,9 @@ class AIEngine {
                 // ===== 基本パラメータ =====
                 const targetRice = Math.floor(castle.soldiers * 2.5);
                 const safeRice = Math.floor(castle.soldiers * 2.5);
-                const targetGold = Math.floor(castle.soldiers * 3.0);
+                // 変更：「兵士1人につき3のお金」をキープする設定でしたが、
+                // お金を余らせすぎないように「1.5」に下げて、お財布の紐を緩くします！
+                const targetGold = Math.floor(castle.soldiers * 1.5);
                 
                 // およそ1人集めるのにかかるお金（単価）を、城主の能力で仮計算します
                 const efficiency = ((castellan.leadership * 1.5) + (castellan.charm * 1.5) + (Math.sqrt(castellan.loyalty) * 2) + (Math.sqrt(castle.peoplesLoyalty) * 2)) / 500;
@@ -1556,8 +1558,10 @@ class AIEngine {
                 // ===== 雇用スコア =====
                 const shortSoldiers = Math.max(0, targetSoldiers - castle.soldiers);
                 const shortRatio = shortSoldiers / (targetSoldiers + 1);
-                
-                let scoreDraft = 150 * shortRatio;
+
+                // 変更：そのまま掛け算するとすぐに点数が下がるので、ルート（Math.sqrt）の魔法で
+                // 減り方を緩やかにします。これで目標の9割近くまで積極的に集めるようになります！
+                let scoreDraft = 150 * Math.sqrt(shortRatio);
 
                 // ===== 安全制御 =====
                 if (castle.rice < safeRice) {
@@ -1645,7 +1649,9 @@ class AIEngine {
             // 8. 兵糧売却の判断
             const sellTargetRice = Math.floor(castle.soldiers * 3.5);
             const sellSafeRice = Math.floor(castle.soldiers * 2.0);
-            const targetGold = Math.floor(castle.soldiers * 3.0);
+            // 変更：徴兵の金銭感覚と合わせるため、ここも「1.5」に下げます！
+            // これで、無駄にお米を売りすぎるのを防ぎます。
+            const targetGold = Math.floor(castle.soldiers * 1.5);
             
             const shortageGold = Math.max(0, targetGold - castle.gold);
             const surplusRice = Math.max(0, castle.rice - sellTargetRice);
