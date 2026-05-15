@@ -1295,6 +1295,17 @@ class AIEngine {
             if (province && province.marketRate !== undefined) riceRate = province.marketRate;
         }
 
+        // ★追加：大雪が降っている国（provinceId）のリストを作ります！
+        const heavySnowProvIds = new Set();
+        if (this.game.provinces) {
+            this.game.provinces.forEach(p => {
+                if (p.statusEffects && p.statusEffects.includes('heavySnow')) {
+                    heavySnowProvIds.add(p.id);
+                }
+            });
+        }
+        const isSrcHeavySnow = heavySnowProvIds.has(castle.provinceId);
+
         // ③ 決められた回数だけ、行動を繰り返します！
         for (let step = 0; step < maxActions; step++) {
             // まだ動ける武将を再確認します
@@ -1660,167 +1671,171 @@ class AIEngine {
             }
 
             // ★最初に作った「道が繋がっているお城リスト」から、自分のお城だけを抜いたリストを作ります！
-            const targetCastlesForTransport = reachableMyCastles.filter(c => c.id !== castle.id);
+            // ★追加：大雪のお城は輸送先・移動先から除外します！
+            const targetCastlesForTransport = reachableMyCastles.filter(c => c.id !== castle.id && !heavySnowProvIds.has(c.provinceId));
 
             // ★ここから変更：「お使いメモ（一括輸送）」を作って、まとめて1回で運ぶ魔法です！
             let transportTasks = [];
             let maxTransportScore = 0;
 
-            // ① 徴兵用拠点へのお金輸送
-            if (isPreparingAttack && this.game.aiOperationManager.draftBases) {
-                const clanDrafts = this.game.aiOperationManager.draftBases[castle.ownerClan];
-                const draftBaseId = clanDrafts ? clanDrafts[castle.legionId] : null;
-                if (draftBaseId && draftBaseId !== castle.id && castle.gold >= 1000) {
-                    const isConnected = targetCastlesForTransport.some(c => c.id === draftBaseId);
-                    if (isConnected) {
-                        // メモに「お金を運ぶ」お使いを追加します
-                        transportTasks.push({ type: 'draft_gold', targetId: draftBaseId });
-                        if (maxTransportScore < 350) maxTransportScore = 350;
+            // ★追加：出発元が大雪なら輸送タスクを作りません！
+            if (!isSrcHeavySnow) {
+                // ① 徴兵用拠点へのお金輸送
+                if (isPreparingAttack && this.game.aiOperationManager.draftBases) {
+                    const clanDrafts = this.game.aiOperationManager.draftBases[castle.ownerClan];
+                    const draftBaseId = clanDrafts ? clanDrafts[castle.legionId] : null;
+                    if (draftBaseId && draftBaseId !== castle.id && castle.gold >= 1000) {
+                        const isConnected = targetCastlesForTransport.some(c => c.id === draftBaseId);
+                        if (isConnected) {
+                            // メモに「お金を運ぶ」お使いを追加します
+                            transportTasks.push({ type: 'draft_gold', targetId: draftBaseId });
+                            if (maxTransportScore < 350) maxTransportScore = 350;
+                        }
                     }
                 }
-            }
 
-            // ② 前線基地（出撃用・援軍用）への兵士と兵糧の輸送
-            if (isPreparingAttack && myOp && castle.id !== myOp.stagingBase && castle.id !== myOp.supportBase) {
-                // 周りの敵（仲良しじゃない勢力）の強さを調べて、お留守番の人数を計算します
-                let hasEnemy = false;
-                let maxEnemyTotalSoldiers = 0;
-                let maxEnemyMaxCastleSoldiers = 0;
+                // ② 前線基地（出撃用・援軍用）への兵士と兵糧の輸送
+                if (isPreparingAttack && myOp && castle.id !== myOp.stagingBase && castle.id !== myOp.supportBase) {
+                    // 周りの敵（仲良しじゃない勢力）の強さを調べて、お留守番の人数を計算します
+                    let hasEnemy = false;
+                    let maxEnemyTotalSoldiers = 0;
+                    let maxEnemyMaxCastleSoldiers = 0;
 
-                // 1. お隣のお城を順番に調べます
-                if (castle.adjacentCastleIds) {
-                    for (const adjId of castle.adjacentCastleIds) {
-                        const adj = this.game.getCastle(adjId);
-                        if (!adj || adj.ownerClan === castle.ownerClan) continue; // 自分のお城ならセーフ
+                    // 1. お隣のお城を順番に調べます
+                    if (castle.adjacentCastleIds) {
+                        for (const adjId of castle.adjacentCastleIds) {
+                            const adj = this.game.getCastle(adjId);
+                            if (!adj || adj.ownerClan === castle.ownerClan) continue; // 自分のお城ならセーフ
 
-                        let isFriendly = false;
-                        if (adj.ownerClan !== 0) {
-                            const rel = this.game.getRelation(castle.ownerClan, adj.ownerClan);
-                            // 同盟、和睦、支配、従属のどれかなら仲良しです
-                            if (rel && ['同盟', '和睦', '支配', '従属'].includes(rel.status)) {
-                                isFriendly = true;
-                            }
-                        }
-
-                        // 仲良しじゃない場合（空き城も油断できないので含めます）
-                        if (!isFriendly) {
-                            hasEnemy = true;
+                            let isFriendly = false;
                             if (adj.ownerClan !== 0) {
-                                // その敵の大名家の、全部の兵士数と一番兵士が多いお城を調べます
-                                const enemyCastles = this.game.castles.filter(c => c.ownerClan === adj.ownerClan);
-                                const enemyTotal = enemyCastles.reduce((sum, c) => sum + c.soldiers, 0);
-                                const enemyMax = enemyCastles.length > 0 ? Math.max(...enemyCastles.map(c => c.soldiers)) : 0;
-                                
-                                // 一番大きな勢力の情報をメモしておきます
-                                if (enemyTotal > maxEnemyTotalSoldiers) {
-                                    maxEnemyTotalSoldiers = enemyTotal;
-                                    maxEnemyMaxCastleSoldiers = enemyMax;
+                                const rel = this.game.getRelation(castle.ownerClan, adj.ownerClan);
+                                // 同盟、和睦、支配、従属のどれかなら仲良しです
+                                if (rel && ['同盟', '和睦', '支配', '従属'].includes(rel.status)) {
+                                    isFriendly = true;
+                                }
+                            }
+
+                            // 仲良しじゃない場合（空き城も油断できないので含めます）
+                            if (!isFriendly) {
+                                hasEnemy = true;
+                                if (adj.ownerClan !== 0) {
+                                    // その敵の大名家の、全部の兵士数と一番兵士が多いお城を調べます
+                                    const enemyCastles = this.game.castles.filter(c => c.ownerClan === adj.ownerClan);
+                                    const enemyTotal = enemyCastles.reduce((sum, c) => sum + c.soldiers, 0);
+                                    const enemyMax = enemyCastles.length > 0 ? Math.max(...enemyCastles.map(c => c.soldiers)) : 0;
+                                    
+                                    // 一番大きな勢力の情報をメモしておきます
+                                    if (enemyTotal > maxEnemyTotalSoldiers) {
+                                        maxEnemyTotalSoldiers = enemyTotal;
+                                        maxEnemyMaxCastleSoldiers = enemyMax;
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                // 2. お城にいる諸勢力（国衆）も調べます
-                const kunishus = this.game.kunishuSystem.getKunishusInCastle(castle.id);
-                for (const k of kunishus) {
-                    // 仲良し度が30以下なら敵対しているとみなします
-                    if (k.getRelation(castle.ownerClan) <= 30) {
-                        hasEnemy = true;
-                        if (k.soldiers > maxEnemyTotalSoldiers) {
-                            maxEnemyTotalSoldiers = k.soldiers;
-                            maxEnemyMaxCastleSoldiers = k.soldiers;
+                    // 2. お城にいる諸勢力（国衆）も調べます
+                    const kunishus = this.game.kunishuSystem.getKunishusInCastle(castle.id);
+                    for (const k of kunishus) {
+                        // 仲良し度が30以下なら敵対しているとみなします
+                        if (k.getRelation(castle.ownerClan) <= 30) {
+                            hasEnemy = true;
+                            if (k.soldiers > maxEnemyTotalSoldiers) {
+                                maxEnemyTotalSoldiers = k.soldiers;
+                                maxEnemyMaxCastleSoldiers = k.soldiers;
+                            }
+                        }
+                    }
+
+                    // 基本のお留守番セット（すぐ攻められない安全な場合）
+                    let keepSoldiers = 500;
+                    let keepRice = 1000;
+
+                    // もし周りに敵がいたら、お留守番を増やします
+                    if (hasEnemy) {
+                        // 最大勢力の中で、一番兵士が多いお城の「半分」をお留守番の目標にします
+                        keepSoldiers = Math.floor(maxEnemyMaxCastleSoldiers * 0.5);
+
+                        // でも、自分の軍団全体の兵力が、敵の全体の半分以下なら…
+                        const myCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan && c.legionId === castle.legionId);
+                        const myTotalSoldiers = myCastles.reduce((sum, c) => sum + c.soldiers, 0);
+                        const enemyHalf = maxEnemyTotalSoldiers * 0.5;
+
+                        if (enemyHalf > 0 && myTotalSoldiers <= enemyHalf) {
+                            // 戦力差に合わせて「お留守番は諦めて前線に送る！」と判断します
+                            const ratio = myTotalSoldiers / enemyHalf;
+                            keepSoldiers = Math.floor(keepSoldiers * ratio);
+                        }
+
+                        // 兵糧は、お留守番の兵士の1.2倍を残します
+                        keepRice = Math.floor(keepSoldiers * 1.2);
+                    }
+
+                    // お留守番を残した上で、今回運ぶ分の300人と500の余裕があるか確認します
+                    const canSendSoldiers = castle.soldiers >= (keepSoldiers + 300);
+                    const canSendRice = castle.rice >= (keepRice + 500);
+
+                    if (canSendSoldiers && canSendRice) {
+                        const stagingCastle = this.game.getCastle(myOp.stagingBase);
+                        const supportCastle = myOp.supportBase ? this.game.getCastle(myOp.supportBase) : null;
+
+                        // ★出撃するお城の城主の性格を調べて、出陣する割合を予測します
+                        let stagingSendRate = 0.6;
+                        if (stagingCastle) {
+                            const stagingGeneral = this.game.getBusho(stagingCastle.castellanId);
+                            if (stagingGeneral) {
+                                if (stagingGeneral.personality === 'aggressive') stagingSendRate = 0.8;
+                                if (stagingGeneral.personality === 'conservative') stagingSendRate = 0.4;
+                            }
+                        }
+                        
+                        // ★援軍用のお城の城主の性格も調べます
+                        let supportSendRate = 0.6;
+                        if (supportCastle) {
+                            const supportGeneral = this.game.getBusho(supportCastle.castellanId);
+                            if (supportGeneral) {
+                                if (supportGeneral.personality === 'aggressive') supportSendRate = 0.8;
+                                if (supportGeneral.personality === 'conservative') supportSendRate = 0.4;
+                            }
+                        }
+
+                        // 必要な兵士（requiredForce）を確実に出陣させるために、
+                        // 性格の割合から逆算して、お城に集めておくべき目標の人数を計算します
+                        const stagingSoldierGoal = Math.floor(myOp.requiredForce / stagingSendRate);
+                        // 兵糧は、出陣する人たちの1.5倍を目指します
+                        const stagingRiceGoal = Math.floor(myOp.requiredForce * 1.5);
+                        
+                        const supportSoldierGoal = Math.floor(myOp.requiredForce / supportSendRate);
+                        const supportRiceGoal = Math.floor(myOp.requiredForce * 1.5);
+
+                        // 届け先が出撃用拠点で、まだ目標（兵士か兵糧）に届いていないなら、メモに追加します！
+                        if (stagingCastle && (stagingCastle.soldiers < stagingSoldierGoal || stagingCastle.rice < stagingRiceGoal)) {
+                            transportTasks.push({ type: 'staging', targetId: myOp.stagingBase });
+                            if (maxTransportScore < 900) maxTransportScore = 900; 
+                        } 
+                        // 出撃用がもう十分で、届け先が援軍用拠点で、まだ目標に届いていないならメモに追加します！
+                        else if (supportCastle && (supportCastle.soldiers < supportSoldierGoal || supportCastle.rice < supportRiceGoal)) {
+                            transportTasks.push({ type: 'support', targetId: myOp.supportBase });
+                            if (maxTransportScore < 700) maxTransportScore = 700; 
                         }
                     }
                 }
 
-                // 基本のお留守番セット（すぐ攻められない安全な場合）
-                let keepSoldiers = 500;
-                let keepRice = 1000;
-
-                // もし周りに敵がいたら、お留守番を増やします
-                if (hasEnemy) {
-                    // 最大勢力の中で、一番兵士が多いお城の「半分」をお留守番の目標にします
-                    keepSoldiers = Math.floor(maxEnemyMaxCastleSoldiers * 0.5);
-
-                    // でも、自分の軍団全体の兵力が、敵の全体の半分以下なら…
-                    const myCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan && c.legionId === castle.legionId);
-                    const myTotalSoldiers = myCastles.reduce((sum, c) => sum + c.soldiers, 0);
-                    const enemyHalf = maxEnemyTotalSoldiers * 0.5;
-
-                    if (enemyHalf > 0 && myTotalSoldiers <= enemyHalf) {
-                        // 戦力差に合わせて「お留守番は諦めて前線に送る！」と判断します
-                        const ratio = myTotalSoldiers / enemyHalf;
-                        keepSoldiers = Math.floor(keepSoldiers * ratio);
-                    }
-
-                    // 兵糧は、お留守番の兵士の1.2倍を残します
-                    keepRice = Math.floor(keepSoldiers * 1.2);
-                }
-
-                // お留守番を残した上で、今回運ぶ分の300人と500の余裕があるか確認します
-                const canSendSoldiers = castle.soldiers >= (keepSoldiers + 300);
-                const canSendRice = castle.rice >= (keepRice + 500);
-
-                if (canSendSoldiers && canSendRice) {
-                    const stagingCastle = this.game.getCastle(myOp.stagingBase);
-                    const supportCastle = myOp.supportBase ? this.game.getCastle(myOp.supportBase) : null;
-
-                    // ★出撃するお城の城主の性格を調べて、出陣する割合を予測します
-                    let stagingSendRate = 0.6;
-                    if (stagingCastle) {
-                        const stagingGeneral = this.game.getBusho(stagingCastle.castellanId);
-                        if (stagingGeneral) {
-                            if (stagingGeneral.personality === 'aggressive') stagingSendRate = 0.8;
-                            if (stagingGeneral.personality === 'conservative') stagingSendRate = 0.4;
+                // ③ 通常の輸送（大名のいない城のみ）
+                if (!daimyo || daimyo.castleId !== castle.id) {
+                    const allyCastles = targetCastlesForTransport;
+                    for (const target of allyCastles) {
+                        if ((target.soldiers <= 500 || target.gold <= 500) && castle.soldiers >= 2000 && castle.gold >= 2000) {
+                            transportTasks.push({ type: 'normal_gold_soldier', targetId: target.id });
+                            if (maxTransportScore < 400) maxTransportScore = 400;
+                            break; 
                         }
-                    }
-                    
-                    // ★援軍用のお城の城主の性格も調べます
-                    let supportSendRate = 0.6;
-                    if (supportCastle) {
-                        const supportGeneral = this.game.getBusho(supportCastle.castellanId);
-                        if (supportGeneral) {
-                            if (supportGeneral.personality === 'aggressive') supportSendRate = 0.8;
-                            if (supportGeneral.personality === 'conservative') supportSendRate = 0.4;
+                        if (target.rice <= 2000 && castle.rice >= 5000) {
+                            transportTasks.push({ type: 'normal_rice', targetId: target.id });
+                            if (maxTransportScore < 400) maxTransportScore = 400;
+                            break;
                         }
-                    }
-
-                    // 必要な兵士（requiredForce）を確実に出陣させるために、
-                    // 性格の割合から逆算して、お城に集めておくべき目標の人数を計算します
-                    const stagingSoldierGoal = Math.floor(myOp.requiredForce / stagingSendRate);
-                    // 兵糧は、出陣する人たちの1.5倍を目指します
-                    const stagingRiceGoal = Math.floor(myOp.requiredForce * 1.5);
-                    
-                    const supportSoldierGoal = Math.floor(myOp.requiredForce / supportSendRate);
-                    const supportRiceGoal = Math.floor(myOp.requiredForce * 1.5);
-
-                    // 届け先が出撃用拠点で、まだ目標（兵士か兵糧）に届いていないなら、メモに追加します！
-                    if (stagingCastle && (stagingCastle.soldiers < stagingSoldierGoal || stagingCastle.rice < stagingRiceGoal)) {
-                        transportTasks.push({ type: 'staging', targetId: myOp.stagingBase });
-                        if (maxTransportScore < 900) maxTransportScore = 900; 
-                    } 
-                    // 出撃用がもう十分で、届け先が援軍用拠点で、まだ目標に届いていないならメモに追加します！
-                    else if (supportCastle && (supportCastle.soldiers < supportSoldierGoal || supportCastle.rice < supportRiceGoal)) {
-                        transportTasks.push({ type: 'support', targetId: myOp.supportBase });
-                        if (maxTransportScore < 700) maxTransportScore = 700; 
-                    }
-                }
-            }
-
-            // ③ 通常の輸送（大名のいない城のみ）
-            if (!daimyo || daimyo.castleId !== castle.id) {
-                const allyCastles = targetCastlesForTransport;
-                for (const target of allyCastles) {
-                    if ((target.soldiers <= 500 || target.gold <= 500) && castle.soldiers >= 2000 && castle.gold >= 2000) {
-                        transportTasks.push({ type: 'normal_gold_soldier', targetId: target.id });
-                        if (maxTransportScore < 400) maxTransportScore = 400;
-                        break; 
-                    }
-                    if (target.rice <= 2000 && castle.rice >= 5000) {
-                        transportTasks.push({ type: 'normal_rice', targetId: target.id });
-                        if (maxTransportScore < 400) maxTransportScore = 400;
-                        break;
                     }
                 }
             }
@@ -1838,8 +1853,11 @@ class AIEngine {
 
             // 10. 武将の移動
             // 新しい人事部（AIStaffing）の戦略的な指示に従います！
-            if (this.game.aiStaffing) {
-                const moveActions = this.game.aiStaffing.planMoveAction(castle, availableBushos, reachableMyCastles);
+            // ★追加：大雪なら移動しません！
+            if (this.game.aiStaffing && !isSrcHeavySnow) {
+                // ★追加：移動先として大雪の城を除外したリストを渡します！
+                const validReachableCastles = reachableMyCastles.filter(c => !heavySnowProvIds.has(c.provinceId));
+                const moveActions = this.game.aiStaffing.planMoveAction(castle, availableBushos, validReachableCastles);
                 if (moveActions && moveActions.length > 0) {
                     // 何人もの移動リストを、そのまま全部行動の候補に追加します！
                     actions.push(...moveActions);

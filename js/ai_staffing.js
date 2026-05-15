@@ -12,6 +12,12 @@ class AIStaffing {
         // このお城に大名も国主もいないなら、お引越しの判定はしません
         if (!leader || (!leader.isDaimyo && !leader.isCommander) || leader.castleId !== castle.id) return false;
 
+        // ★追加：今いるお城が大雪なら、お引越しできません！
+        const srcProv = this.game.provinces.find(p => p.id === castle.provinceId);
+        if (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) {
+            return false;
+        }
+
         // ★追加：リーダーの本来の所属軍団IDを取得します
         let targetLegionId = 0;
         if (leader.isCommander) {
@@ -74,6 +80,12 @@ class AIStaffing {
         for (const target of reachableMyCastles) {
             // 今いるお城は調べる必要がないので飛ばします
             if (target.id === castle.id) continue;
+
+            // ★追加：目的地のお城が大雪なら、お引越し先候補から除外します！
+            const tgtProv = this.game.provinces.find(p => p.id === target.provinceId);
+            if (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow')) {
+                continue;
+            }
 
             let score = 0;
 

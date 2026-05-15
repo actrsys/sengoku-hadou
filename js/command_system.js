@@ -191,7 +191,15 @@ const CAN_EXECUTE_RULES = {
         return false;
     },
     // --- 移動・輸送用 ---
+    canMoveOrTransport: (game, castle) => {
+        const province = game.provinces.find(p => p.id === castle.provinceId);
+        if (province && province.statusEffects && province.statusEffects.includes('heavySnow')) {
+            return false;
+        }
+        return true;
+    },
     canTransport: (game, castle) => {
+        if (!CAN_EXECUTE_RULES.canMoveOrTransport(game, castle)) return false;
         if (castle.soldiers <= 0 && castle.gold <= 0 && castle.rice <= 0 && (castle.horses || 0) <= 0 && (castle.guns || 0) <= 0) {
             return false;
         }
@@ -412,9 +420,10 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'map_select', targetType: 'ally_other',
-        sortKey: 'strength'
+        sortKey: 'strength',
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.canMoveOrTransport(game, castle)
     },
-    'banish': { 
+    'banish': {
         label: "追放", category: 'PERSONNEL',
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: false, 
@@ -1040,11 +1049,18 @@ class CommandSystem {
                 const connectedForAlly = this.getConnectedCastles(c, playerClanId);
                 return this.game.castles.filter(target => {
                     if (Number(target.ownerClan) !== playerClanId || target.id === c.id) return false;
+                    
+                    // ★追加：大雪の国の城は移動・輸送先に選べないようにします！
+                    const tgtProv = this.game.provinces.find(p => p.id === target.provinceId);
+                    if (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow')) {
+                        return false;
+                    }
+
                     return connectedForAlly.has(Number(target.id));
                 }).map(t => t.id);
             }
             
-            case 'other_clan_all': 
+            case 'other_clan_all':
                 return this.game.castles.filter(target => {
                     if (target.ownerClan === 0 || Number(target.ownerClan) === playerClanId) return false;
 
