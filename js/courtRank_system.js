@@ -309,13 +309,6 @@ class CourtRankSystem {
         const castle = this.game.getCurrentTurnCastle();
         const costGold = 2000;
 
-        // 金と信用の最終確認（念のためもう一度チェックします）
-        const currentTrust = this.getTrust(this.game.playerClanId);
-        if (castle.gold < costGold || currentTrust < 500) {
-            this.game.ui.showDialog("条件を満たしていないため、実行できませんでした。", false);
-            return;
-        }
-
         // お城の貯金箱からお金を減らします
         castle.gold -= costGold;
         
@@ -327,6 +320,9 @@ class CourtRankSystem {
 
         // 外交状態を強制的に「和睦」にし、期間を「6」にセットします！
         this.game.diplomacyManager.changeStatus(this.game.playerClanId, targetClanId, '和睦', 6);
+
+        // ★追加：和睦が成立したので、友好度を30アップさせます！
+        this.game.diplomacyManager.updateSentiment(this.game.playerClanId, targetClanId, 30);
 
         // 使者は行動済みにします
         doer.isActionDone = true;
