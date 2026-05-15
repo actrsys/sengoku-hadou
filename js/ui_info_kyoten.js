@@ -125,7 +125,7 @@ Object.assign(UIInfoManager.prototype, {
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵糧</span><span class="daimyo-detail-value">${castle.rice}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">年収穫</span><span class="daimyo-detail-value">${totalRiceIncome}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">年米収穫</span><span class="daimyo-detail-value">${totalRiceIncome}</span></div>
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-3col">
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">防御</span><span class="daimyo-detail-value">${castle.defense}</span></div>
@@ -336,7 +336,7 @@ Object.assign(UIInfoManager.prototype, {
                 `<span data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
                 `<span data-sort="goldIncome">月収入${getSortMark('goldIncome')}</span>`,
                 `<span data-sort="goldConsume">月支出${getSortMark('goldConsume')}</span>`,
-                `<span data-sort="riceIncome">年収穫${getSortMark('riceIncome')}</span>`,
+                `<span data-sort="riceIncome">年米収穫${getSortMark('riceIncome')}</span>`,
                 `<span data-sort="riceConsume">年米消費${getSortMark('riceConsume')}</span>`
             ];
         }

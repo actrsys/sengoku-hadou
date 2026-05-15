@@ -373,7 +373,7 @@ class UIInfoManager {
                 `<span data-sort="gold">金${getSortMark('gold')}</span>`,
                 `<span data-sort="goldIncome">月収入${getSortMark('goldIncome')}</span>`,
                 `<span data-sort="rice">兵糧${getSortMark('rice')}</span>`,
-                `<span data-sort="riceIncome">年収穫${getSortMark('riceIncome')}</span>`,
+                `<span data-sort="riceIncome">年米収穫${getSortMark('riceIncome')}</span>`,
                 `<span class="pc-only"></span>`
             ];
         }
@@ -566,7 +566,7 @@ class UIInfoManager {
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉄砲</span><span class="daimyo-detail-value">${totalGuns}</span></div>
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">年収穫</span><span class="daimyo-detail-value">${totalRiceIncome}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">年米収穫</span><span class="daimyo-detail-value">${totalRiceIncome}</span></div>
                                 <div class="daimyo-detail-stat-box" style="visibility: hidden;"></div>
                             </div>
                         </div>
