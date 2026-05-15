@@ -297,6 +297,23 @@ class CourtRankSystem {
         this.game.ui.renderCommandMenu();
     }
     
+    // ★追加：朝廷和睦の実行処理を一元化（プレイヤー・AI共通）
+    applyCourtTruce(doer, targetClanId, gold) {
+        const castle = this.game.getCastle(doer.castleId);
+        if (castle) castle.gold -= gold;
+        
+        this.addTrust(doer.clan, -500);
+        this.calcCourtTruceExp(doer, true);
+        this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '和睦', 6);
+        this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, 30);
+
+        doer.isActionDone = true;
+        doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
+        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) {
+            this.game.factionSystem.updateRecognition(doer, 20);
+        }
+    }
+
     // 朝廷の信用を消費して強制的に和睦する魔法！
     executeCourtTruce(doerId, targetCastleId) {
         const doer = this.game.getBusho(doerId);
@@ -306,30 +323,9 @@ class CourtRankSystem {
         const targetClanId = targetCastle.ownerClan;
         const targetClanName = this.game.clans.find(c => c.id === targetClanId).name;
         
-        const castle = this.game.getCurrentTurnCastle();
-        const costGold = 2000;
+        // 一元化された処理を呼び出します
+        this.applyCourtTruce(doer, targetClanId, 2000);
 
-        // お城の貯金箱からお金を減らします
-        castle.gold -= costGold;
-        
-        // 信用を「500」消費（マイナス）します！
-        this.addTrust(this.game.playerClanId, -500);
-
-        // ★追加：和睦の経験値を計算・加算します！
-        this.calcCourtTruceExp(doer, true);
-
-        // 外交状態を強制的に「和睦」にし、期間を「6」にセットします！
-        this.game.diplomacyManager.changeStatus(this.game.playerClanId, targetClanId, '和睦', 6);
-
-        // ★追加：和睦が成立したので、友好度を30アップさせます！
-        this.game.diplomacyManager.updateSentiment(this.game.playerClanId, targetClanId, 30);
-
-        // 使者は行動済みにします
-        doer.isActionDone = true;
-        doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
-        this.game.factionSystem.updateRecognition(doer, 20);
-
-        // 信用がどれくらい減ったかは見せないようにします
         this.game.ui.showResultModal(`朝廷の仲裁により、${targetClanName} との間に和睦が結ばれました！\n（和睦期間：６ヶ月）`);
         
         this.game.ui.updatePanelHeader();

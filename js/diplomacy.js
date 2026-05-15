@@ -1079,25 +1079,18 @@ class DiplomacyManager {
                     doer.achievementTotal += 5;
                     this.game.factionSystem.updateRecognition(doer, 10);
                 }
-            }
+            }// 差し替え後（diplomacy.js）
         } else if (type === 'court_truce') {
-            const castle = this.game.getCastle(doer.castleId);
-            if (castle) castle.gold -= gold;
-            this.game.courtRankSystem.addTrust(doer.clan, -500);
-            this.game.courtRankSystem.calcCourtTruceExp(doer, true);
-            this.changeStatus(doer.clan, targetClanId, '和睦', 6);
-            this.updateSentiment(doer.clan, targetClanId, 30);
+            // 一元化された処理を呼び出します
+            this.game.courtRankSystem.applyCourtTruce(doer, targetClanId, gold);
 
-            msg = `朝廷の仲裁により、${targetClanName} との間に和睦が結ばれました！\n（和睦期間：６ヶ月）`;
-            if (!isPlayerInvolved) aiMsg = `朝廷の仲裁により${doerClanName} と ${targetClanName} が和睦しました。`;
-            else logMsg = `${doerClanName}が朝廷の仲裁で${targetClanName}と和睦しました`;
+            msg = `朝廷の仲裁により、${targetClanName} との和睦が成立しました！`;
+            if (!isPlayerInvolved) aiMsg = `朝廷の仲裁により、 ${doerClanName} と ${targetClanName} との和睦が成立しました。`;
+            else logMsg = `${doerClanName}が朝廷に働きかけ${targetClanName}と和睦しました`;
 
             if (targetClanId === this.game.playerClanId) {
-                msg = `朝廷の介入により、${doerClanName} と和睦することになりました……`;
+                msg = `朝廷の介入により、当家は ${doerClanName} と和睦することになりました……`;
             }
-
-            doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
-            this.game.factionSystem.updateRecognition(doer, 20);
         }
         doer.isActionDone = true;
         if (isPlayerInvolved) {
