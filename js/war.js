@@ -1708,7 +1708,9 @@ class WarManager {
                 }
             } else {
                 // 全員の行動が終わったら、兵糧を消費します
-                s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * 0.05));
+                // ★追加：大雪時は攻撃側の兵糧消費が倍（0.1）になります
+                let atkRiceRate = s.isHeavySnow ? 0.10 : 0.05;
+                s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * atkRiceRate));
                 
                 // ★今回追加：毎ターンの終了時（ラウンドの終わり）に、攻撃側の士気を下げます
                 let moraleDrop = 1;
@@ -1725,7 +1727,7 @@ class WarManager {
                 }
 
                 if (s.selfReinforcement) {
-                    s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * 0.05));
+                    s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * atkRiceRate));
                     s.selfReinforcement.morale = Math.max(0, (s.selfReinforcement.morale ?? 50) - moraleDrop);
                     if (s.isHeavySnow) {
                         let snowDmg = Math.floor(s.selfReinforcement.soldiers * 0.04);
@@ -1734,7 +1736,7 @@ class WarManager {
                     }
                 }
                 if (s.reinforcement) {
-                    s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * 0.05));
+                    s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * atkRiceRate));
                     s.reinforcement.morale = Math.max(0, (s.reinforcement.morale ?? 50) - moraleDrop);
                     if (s.isHeavySnow) {
                         let snowDmg = Math.floor(s.reinforcement.soldiers * 0.04);
@@ -1743,6 +1745,7 @@ class WarManager {
                     }
                 }
 
+                // 守備側は今まで通り（0.05固定）
                 s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * 0.05));
                 if (s.defSelfReinforcement) s.defSelfReinforcement.rice = Math.max(0, s.defSelfReinforcement.rice - Math.floor(s.defSelfReinforcement.soldiers * 0.05));
                 if (s.defReinforcement) s.defReinforcement.rice = Math.max(0, s.defReinforcement.rice - Math.floor(s.defReinforcement.soldiers * 0.05));
