@@ -1044,7 +1044,7 @@ class DiplomacyManager {
 
             // この場での処理は一旦終了し、あとは交渉のダイアログに任せます
             return;
-
+            
         } else if (type === 'dominate') {
             let isSuccess = false;
             
@@ -1080,6 +1080,24 @@ class DiplomacyManager {
                     this.game.factionSystem.updateRecognition(doer, 10);
                 }
             }
+        } else if (type === 'court_truce') {
+            const castle = this.game.getCastle(doer.castleId);
+            if (castle) castle.gold -= gold;
+            this.game.courtRankSystem.addTrust(doer.clan, -500);
+            this.game.courtRankSystem.calcCourtTruceExp(doer, true);
+            this.changeStatus(doer.clan, targetClanId, '和睦', 6);
+            this.updateSentiment(doer.clan, targetClanId, 30);
+
+            msg = `朝廷の仲裁により、${targetClanName} との間に和睦が結ばれました！\n（和睦期間：６ヶ月）`;
+            if (!isPlayerInvolved) aiMsg = `朝廷の仲裁により${doerClanName} と ${targetClanName} が和睦しました。`;
+            else logMsg = `${doerClanName}が朝廷の仲裁で${targetClanName}と和睦しました`;
+
+            if (targetClanId === this.game.playerClanId) {
+                msg = `朝廷の介入により、${doerClanName} と和睦することになりました……`;
+            }
+
+            doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
+            this.game.factionSystem.updateRecognition(doer, 20);
         }
         doer.isActionDone = true;
         if (isPlayerInvolved) {
@@ -1685,7 +1703,7 @@ class DiplomacyManager {
     /**
      * AIが特定の相手に対して、どの外交コマンドを実行するか判定して返す魔法です
      */
-    
+     
     determineAIDiplomacyAction(myClanId, targetClanId, myPower, targetClanTotal, perceivedTargetTotal, myDaimyoDuty, smartness, isStrategicPartner, allyCount, neighbors) {
         const rel = this.getRelation(myClanId, targetClanId);
 
@@ -1697,6 +1715,44 @@ class DiplomacyManager {
             return { action: 'none', gold: 0 };
         }
         
+        // ★追加：朝廷和睦の判定
+        let enemyCount = 0;
+        const uniqueNeighbors = [...new Set(neighbors.map(c => c.ownerClan))];
+        uniqueNeighbors.forEach(cId => {
+            if (cId !== 0) {
+                const r = this.getRelation(myClanId, cId);
+                if (r && r.status === '敵対') enemyCount++;
+            }
+        });
+
+        const myClan = this.game.clans.find(c => c.id === myClanId);
+        const courtTrust = myClan ? (myClan.courtTrust || 0) : 0;
+
+        if (rel.status === '敵対' && courtTrust >= 500 && enemyCount >= 2) {
+            let isAttackTarget = false;
+            if (this.game.aiOperationManager && this.game.aiOperationManager.operations[myClanId]) {
+                const ops = this.game.aiOperationManager.operations[myClanId];
+                for (const legId in ops) {
+                    const op = ops[legId];
+                    if (op.type === '攻撃' && op.attackTargets) {
+                        if (op.attackTargets.some(t => {
+                            const tCastle = this.game.getCastle(t.targetId);
+                            return tCastle && tCastle.ownerClan === targetClanId;
+                        })) {
+                            isAttackTarget = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!isAttackTarget) {
+                let truceProb = (enemyCount - 1) * 0.2;
+                if (Math.random() < truceProb) {
+                    return { action: 'court_truce', gold: 2000 };
+                }
+            }
+        }
+
         // 仲良しが2つ以上なら、外交する確率を下げる魔法（1つ増えるごとに20%ダウン）
         let sendProbModifier = 1.0;
         if (allyCount >= 2) {

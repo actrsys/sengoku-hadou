@@ -2783,6 +2783,11 @@ class AIEngine {
                  this.game.diplomacyManager.executeDiplomacy(castellan.id, targetCastleId, 'alliance');
                  castellan.isActionDone = true;
              }
+        } else if (targetData.action === 'court_truce') {
+             if (castle.gold >= targetData.gold) {
+                 this.game.diplomacyManager.executeDiplomacy(castellan.id, targetCastleId, 'court_truce', targetData.gold);
+                 castellan.isActionDone = true;
+             }
         }
     }
 }
