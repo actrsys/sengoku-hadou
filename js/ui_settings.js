@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const range = document.getElementById(`setting-${type}-volume`);
         const text = document.getElementById(`setting-${type}-text`);
         if (range && text) {
+            // 白い数字の方には「%」を含めず、純粋な数値だけを入れます
             text.textContent = value;
             range.style.setProperty('--value', value + '%');
         }
@@ -26,6 +27,11 @@ document.addEventListener("DOMContentLoaded", () => {
             range.addEventListener('input', (e) => {
                 updateSettingSlider(type, e.target.value);
             });
+            
+            // ★追加：スマホでスライダーを触っている間は、画面がスクロールしないようにバリアを張ります
+            range.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+            range.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
+
             // 最初に画面が開いた時にも、ゲージと数字をピタッと合わせておきます
             updateSettingSlider(type, range.value);
         }
