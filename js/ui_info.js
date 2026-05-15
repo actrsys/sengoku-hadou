@@ -371,9 +371,9 @@ class UIInfoManager {
                 `<span data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
                 `<span data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
                 `<span data-sort="gold">金${getSortMark('gold')}</span>`,
-                `<span data-sort="goldIncome">金収入/月${getSortMark('goldIncome')}</span>`,
+                `<span data-sort="goldIncome">月収入${getSortMark('goldIncome')}</span>`,
                 `<span data-sort="rice">兵糧${getSortMark('rice')}</span>`,
-                `<span data-sort="riceIncome">兵糧収入/年${getSortMark('riceIncome')}</span>`,
+                `<span data-sort="riceIncome">年収穫${getSortMark('riceIncome')}</span>`,
                 `<span class="pc-only"></span>`
             ];
         }
@@ -558,7 +558,7 @@ class UIInfoManager {
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵士</span><span class="daimyo-detail-value">${totalSoldiers}</span></div>
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">金収入/月</span><span class="daimyo-detail-value">${totalGoldIncome}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">月収入</span><span class="daimyo-detail-value">${totalGoldIncome}</span></div>
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">軍馬</span><span class="daimyo-detail-value">${totalHorses}</span></div>
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
@@ -566,7 +566,7 @@ class UIInfoManager {
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉄砲</span><span class="daimyo-detail-value">${totalGuns}</span></div>
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵糧収入/年</span><span class="daimyo-detail-value">${totalRiceIncome}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">年収穫</span><span class="daimyo-detail-value">${totalRiceIncome}</span></div>
                                 <div class="daimyo-detail-stat-box" style="visibility: hidden;"></div>
                             </div>
                         </div>
