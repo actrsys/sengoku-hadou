@@ -465,7 +465,7 @@
                 <div class="setting-row">
                     <label class="slider-row-label">BGM 音量</label>
                     <div class="qty-control setting-slider-wrap">
-                        <input type="range" id="setting-bgm-volume" min="0" max="100" value="100" oninput="updateSettingSlider('bgm', this.value)">
+                        <input type="range" id="setting-bgm-volume" min="0" max="100" value="100">
                         <div class="setting-value"><span id="setting-bgm-text">100</span><span class="setting-unit">％</span></div>
                     </div>
                 </div>
@@ -473,7 +473,7 @@
                 <div class="setting-row">
                     <label class="slider-row-label">SE 音量</label>
                     <div class="qty-control setting-slider-wrap">
-                        <input type="range" id="setting-se-volume" min="0" max="100" value="100" oninput="updateSettingSlider('se', this.value)">
+                        <input type="range" id="setting-se-volume" min="0" max="100" value="100">
                         <div class="setting-value"><span id="setting-se-text">100</span><span class="setting-unit">％</span></div>
                     </div>
                 </div>
@@ -481,79 +481,21 @@
                 <div class="setting-row">
                     <label class="slider-row-label">他家戦争の通知</label>
                     <div class="setting-toggle-group">
-                        <button type="button" class="troop-type-btn" id="btn-notify-true" onclick="updateToggleSetting('notify', true)">通知する</button>
-                        <button type="button" class="troop-type-btn" id="btn-notify-false" onclick="updateToggleSetting('notify', false)">通知しない</button>
+                        <button type="button" class="troop-type-btn" id="btn-notify-true">通知する</button>
+                        <button type="button" class="troop-type-btn" id="btn-notify-false">通知しない</button>
                     </div>
                 </div>
 
                 <div class="setting-row">
                     <label class="slider-row-label">歴史イベント</label>
                     <div class="setting-toggle-group">
-                        <button type="button" class="troop-type-btn" id="btn-historical-true" onclick="updateToggleSetting('historical', true)">発生する</button>
-                        <button type="button" class="troop-type-btn" id="btn-historical-false" onclick="updateToggleSetting('historical', false)">発生しない</button>
+                        <button type="button" class="troop-type-btn" id="btn-historical-true">発生する</button>
+                        <button type="button" class="troop-type-btn" id="btn-historical-false">発生しない</button>
                     </div>
                 </div>
 
-                <script>
-                    function updateSettingSlider(type, value) {
-                        const range = document.getElementById(`setting-${type}-volume`);
-                        const text = document.getElementById(`setting-${type}-text`);
-                        if (range && text) {
-                            text.textContent = value;
-                            range.style.setProperty('--value', value + '%');
-                        }
-                    }
-
-                    function updateToggleSetting(type, isTrue) {
-                        const btnTrue = document.getElementById(`btn-${type}-true`);
-                        const btnFalse = document.getElementById(`btn-${type}-false`);
-                        if (btnTrue && btnFalse) {
-                            if (isTrue) {
-                                btnTrue.classList.add('active');
-                                btnFalse.classList.remove('active');
-                            } else {
-                                btnTrue.classList.remove('active');
-                                btnFalse.classList.add('active');
-                            }
-                        }
-                        
-                        window.GameConfig = window.GameConfig || {};
-                        if (type === 'notify') {
-                            window.GameConfig.aiWarNotify = isTrue;
-                            localStorage.setItem('aiWarNotify', isTrue ? 'true' : 'false');
-                        } else if (type === 'historical') {
-                            window.GameConfig.historicalEvent = isTrue;
-                            localStorage.setItem('historicalEvent', isTrue ? 'true' : 'false');
-                        }
-                    }
-
-                    document.addEventListener("DOMContentLoaded", () => {
-                        window.GameConfig = window.GameConfig || {};
-                        
-                        // 通知の初期化
-                        const savedNotify = localStorage.getItem('aiWarNotify');
-                        const isNotify = savedNotify !== 'false';
-                        window.GameConfig.aiWarNotify = isNotify;
-                        updateToggleSetting('notify', isNotify);
-
-                        // 歴史イベントの初期化
-                        const savedHistorical = localStorage.getItem('historicalEvent');
-                        const isHistorical = savedHistorical !== 'false';
-                        window.GameConfig.historicalEvent = isHistorical;
-                        updateToggleSetting('historical', isHistorical);
-
-                        // スライダーの初期化
-                        ['bgm', 'se'].forEach(type => {
-                            const range = document.getElementById(`setting-${type}-volume`);
-                            if (range) {
-                                updateSettingSlider(type, range.value);
-                            }
-                        });
-                    });
-                </script>
-
                 <div class="modal-footer" style="justify-content: center;">
-                    <button class="btn-secondary" onclick="document.getElementById('settings-modal').classList.add('hidden')">閉じる</button>
+                    <button id="settings-close-btn" class="btn-secondary">閉じる</button>
                 </div>
             </div>
         </div>
@@ -588,6 +530,7 @@
     <script src="js/ui_info_busho.js"></script>
     <script src="js/ui_info_kyoten.js"></script>
     <script src="js/ui_slider.js"></script>
+    <script src="js/ui_settings.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/ui_map.js"></script>
     <script src="js/castle_manager.js"></script>
