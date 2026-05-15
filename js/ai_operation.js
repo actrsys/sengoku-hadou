@@ -168,7 +168,8 @@ class AIOperationManager {
         adjacentClans.forEach(targetClanId => {
             const rel = this.game.getRelation(clanId, targetClanId);
             // 相手が「同盟」か、自分を支配している（自分の視点で相手が「支配」）場合で、友好度が50以上
-            if (rel && (rel.status === '同盟' || rel.status === '支配') && rel.sentiment >= 50) {
+            // ★追加：ただし、イベントによる関係（isEvent）の場合はストレスを溜めません
+            if (rel && (rel.status === '同盟' || rel.status === '支配') && rel.sentiment >= 50 && !rel.isEvent) {
                 const targetPower = this.game.aiEngine.getClanPrestige(targetClanId);
                 
                 let breakScore = 0; 

@@ -38,6 +38,7 @@ class DiplomacyManager {
                     sentiment: oppData.sentiment,
                     trucePeriod: oppData.trucePeriod || 0,
                     isMarriage: oppData.isMarriage || false,
+                    isEvent: oppData.isEvent || false, // ★追加：イベントフラグもコピーします
                     hostageIds: oppData.hostageIds ? [...oppData.hostageIds] : [], // ★相手が人質リストを持っていればコピー（同期）します
                     subordinateMonths: oppData.subordinateMonths || 0 // ★追加：従属・支配の継続月数も同期します
                 };
@@ -48,6 +49,7 @@ class DiplomacyManager {
                     sentiment: 50,  // 感情値: 0 - 100
                     trucePeriod: 0, // ★初期値は0にします
                     isMarriage: false, // ★今回追加：最初は結婚のシールは貼っていません
+                    isEvent: false, // ★追加：最初はイベントフラグもなし
                     hostageIds: [], // ★新しく空っぽの人質リストを用意します
                     subordinateMonths: 0 // ★追加：従属・支配関係の継続月数を覚える箱
                 };

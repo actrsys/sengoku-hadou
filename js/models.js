@@ -71,6 +71,14 @@ class Clan {
                             // 状態の名前は「和睦」という文字だけに揃えます
                             statusStr = '和睦';
                         }
+
+                        // ★「イベント」という文字が含まれていたらイベントシールのフラグを立てます。
+                        let isEvent = false;
+                        if (statusStr.includes('イベント')) {
+                            isEvent = true;
+                            // 「イベント」の文字を取り除きます
+                            statusStr = statusStr.replace('イベント', '');
+                        }
                         
                         // ★「婚姻」という文字が含まれていたら結婚シールを貼ります。
                         // 同盟の場合は婚姻、従属・支配は従属婚姻・支配婚姻と記述
@@ -79,10 +87,11 @@ class Clan {
                             isMarriage = true;
                             // 「婚姻」の文字を取り除きます（「従属婚姻」なら「従属」だけが残ります）
                             statusStr = statusStr.replace('婚姻', '');
-                            // もし単に「婚姻」とだけ書かれていて空っぽになったら、今まで通り基本の「同盟」にします
-                            if (statusStr === '') {
-                                statusStr = '同盟';
-                            }
+                        }
+                        
+                        // もし単に「婚姻」や「イベント」とだけ書かれていて空っぽになったら、今まで通り基本の「同盟」にします
+                        if (statusStr === '') {
+                            statusStr = '同盟';
                         }
 
                         this.diplomacyValue[targetId] = {
@@ -90,6 +99,7 @@ class Clan {
                             sentiment: sentimentVal,
                             trucePeriod: trucePeriod,
                             isMarriage: isMarriage,
+                            isEvent: isEvent, // ★追加：イベントによる関係かを覚える箱
                             hostageIds: [], // ★新しく人質の出席番号リスト（配列）を追加します
                             subordinateMonths: 0 // ★追加：従属・支配関係の継続月数を覚える箱
                         };

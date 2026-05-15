@@ -743,10 +743,16 @@ window.GameEvents.push({
                 
                 // お互いの関係値を最高の100にします！
                 const relA = game.diplomacyManager.getRelation(motoyasu.clan, nobunaga.clan);
-                if (relA) relA.sentiment = 100;
+                if (relA) {
+                    relA.sentiment = 100;
+                    relA.isEvent = true; // ★追加：イベント同盟のシールを貼ります
+                }
                 
                 const relB = game.diplomacyManager.getRelation(nobunaga.clan, motoyasu.clan);
-                if (relB) relB.sentiment = 100;
+                if (relB) {
+                    relB.sentiment = 100;
+                    relB.isEvent = true; // ★追加：イベント同盟のシールを貼ります
+                }
             }
 
             // 汎用メッセージの表示
