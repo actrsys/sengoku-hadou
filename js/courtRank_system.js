@@ -330,7 +330,7 @@ class CourtRankSystem {
         this.game.factionSystem.updateRecognition(doer, 20);
 
         // 信用がどれくらい減ったかは見せないようにします
-        this.game.ui.showResultModal(`朝廷の威光により、${targetClanName} との間に和睦が結ばれました！\n（和睦期間：６ヶ月）`);
+        this.game.ui.showResultModal(`朝廷の仲裁により、${targetClanName} との間に和睦が結ばれました！\n（和睦期間：６ヶ月）`);
         
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
