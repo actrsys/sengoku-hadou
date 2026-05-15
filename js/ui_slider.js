@@ -25,9 +25,22 @@ class UISliderManager {
 
         this.ui.quantityModal.classList.remove('hidden'); 
         if (this.ui.quantityContainer) this.ui.quantityContainer.innerHTML = '';
-        if (this.ui.charityTypeSelector) this.ui.charityTypeSelector.classList.add('hidden'); 
+        if (this.ui.charityTypeSelector) this.ui.charityTypeSelector.classList.add('hidden');
         if (this.ui.tradeTypeInfo) this.ui.tradeTypeInfo.classList.add('hidden'); 
         const c = this.ui.currentCastle;
+
+        // ★追加：相場の説明文と、動的な数値表示用の箱を作る処理を一元管理します！
+        const setTradeRateInfo = (itemName, unit, amount, price, extraHTML = "", needCostDiv = true) => {
+            this.ui.tradeTypeInfo.classList.remove('hidden');
+            this.ui.tradeTypeInfo.innerHTML = `${itemName} <span style="color:#ffffff;">${amount}</span>${unit} ＝ 金 <span style="color:#ffffff;">${price}</span>${extraHTML ? ' ' + extraHTML : ''}`;
+            
+            // スライダーと一緒に数字が変わる計算用の箱も、ここで自動的に作ってしまいます
+            if (needCostDiv) {
+                const costDiv = document.createElement('div');
+                costDiv.id = 'dynamic-cost-display';
+                this.ui.quantityContainer.appendChild(costDiv);
+            }
+        };
 
         const checkValidQuantity = () => {
             if (!this.ui.quantityConfirmBtn) return;
@@ -383,13 +396,7 @@ class UISliderManager {
             const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(c.peoplesLoyalty) * 2)) / 500;
             const singleCost = 1 / efficiency;
             
-            this.ui.tradeTypeInfo.classList.remove('hidden'); 
-            this.ui.tradeTypeInfo.textContent = `兵士 1人 ＝ 金 ${singleCost.toFixed(1)}`;
-            
-            // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
-            const costDiv = document.createElement('div');
-            costDiv.id = 'dynamic-cost-display';
-            this.ui.quantityContainer.appendChild(costDiv);
+            setTradeRateInfo("兵士", "人", 1, singleCost.toFixed(1));
 
             inputs.soldiers = createSlider("兵士数", "soldiers", maxSoldiers, 0);
             
@@ -476,16 +483,9 @@ class UISliderManager {
             }
             // 城の兵糧上限(99,999)や取引上限を超えないようにします
             const realMaxBuy = Math.min(maxBuy, 99999 - c.rice, c.tradeLimit || 0);
-
-            this.ui.tradeTypeInfo.classList.remove('hidden'); 
-            // ★変更：相場の金額を小数点以下1桁で表示します！
-            this.ui.tradeTypeInfo.textContent = `兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)} (取引上限: ${c.tradeLimit || 0})`;
-
-            // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
-            const costDiv = document.createElement('div');
-            costDiv.id = 'dynamic-cost-display';
-            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
-            this.ui.quantityContainer.appendChild(costDiv);
+            
+            // ★変更：共通関数で相場の表示と数字の箱の作成を行います！
+            setTradeRateInfo("兵糧", "", 10, (10 * rate).toFixed(1), `(取引上限: <span style="color:#ffffff;">${c.tradeLimit || 0}</span>)`);
 
             inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
             
@@ -499,16 +499,9 @@ class UISliderManager {
             // 売ったお金が所持金の上限(99,999)を超えないように、売れる最大量を逆算します
             const maxSellByGold = Math.floor((99999 - c.gold) / rate);
             const realMaxSell = Math.min(c.rice, maxSellByGold, c.tradeLimit || 0);
-
-            this.ui.tradeTypeInfo.classList.remove('hidden'); 
-            // ★変更：相場の金額を小数点以下1桁で表示します！
-            this.ui.tradeTypeInfo.textContent = `兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)} (取引上限: ${c.tradeLimit || 0})`;
-
-            // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
-            const costDiv = document.createElement('div');
-            costDiv.id = 'dynamic-cost-display';
-            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
-            this.ui.quantityContainer.appendChild(costDiv);
+            
+            // ★変更：共通関数で相場の表示と数字の箱の作成を行います！
+            setTradeRateInfo("兵糧", "", 10, (10 * rate).toFixed(1), `(取引上限: <span style="color:#ffffff;">${c.tradeLimit || 0}</span>)`);
 
             inputs.amount = createSlider("売却量", "amount", realMaxSell, 0);
 
@@ -518,9 +511,10 @@ class UISliderManager {
             const maxBuy = price > 0 ? Math.floor(c.gold / price) : 0;
             // 城の矢弾上限(99,999)を超えないようにします
             const realMaxBuy = Math.min(maxBuy, 99999 - (c.ammo || 0));
-
-            this.ui.tradeTypeInfo.classList.remove('hidden'); 
-            this.ui.tradeTypeInfo.textContent = `固定価格: 金${price.toFixed(1)} / 1個`; // 念のためこちらも揃えます
+            
+            // 矢弾は計算結果の箱を使っていないため、最後の引数に false を渡して箱作りをオフにします
+            setTradeRateInfo("矢弾", "個", 1, price.toFixed(1), "", false);
+            
             inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
 
         } else if (type === 'buy_horses') {
@@ -532,17 +526,10 @@ class UISliderManager {
             }
             // 城の軍馬上限(99,999)を超えないようにします
             const realMaxBuy = Math.min(maxBuy, 99999 - (c.horses || 0));
-
+            
             // ★変更：さっき作った「正確な単価の魔法」を使って表示します
             const unitPrice = GameSystem.calcBuyHorseUnitPrice(daimyo, castellan);
-            this.ui.tradeTypeInfo.classList.remove('hidden'); 
-            this.ui.tradeTypeInfo.textContent = `軍馬 1頭 ＝ 金 ${unitPrice.toFixed(1)}`;
-
-            // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
-            const costDiv = document.createElement('div');
-            costDiv.id = 'dynamic-cost-display';
-            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
-            this.ui.quantityContainer.appendChild(costDiv);
+            setTradeRateInfo("軍馬", "頭", 1, unitPrice.toFixed(1));
 
             inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
 
@@ -555,17 +542,10 @@ class UISliderManager {
             }
             // 城の鉄砲上限(99,999)を超えないようにします
             const realMaxBuy = Math.min(maxBuy, 99999 - (c.guns || 0));
-
+            
             // ★変更：さっき作った「正確な単価の魔法」を使って表示します
             const unitPrice = GameSystem.calcBuyGunUnitPrice(daimyo, castellan);
-            this.ui.tradeTypeInfo.classList.remove('hidden'); 
-            this.ui.tradeTypeInfo.textContent = `鉄砲 1挺 ＝ 金 ${unitPrice.toFixed(1)}`;
-
-            // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
-            const costDiv = document.createElement('div');
-            costDiv.id = 'dynamic-cost-display';
-            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
-            this.ui.quantityContainer.appendChild(costDiv);
+            setTradeRateInfo("鉄砲", "挺", 1, unitPrice.toFixed(1));
 
             inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
 

@@ -2817,3 +2817,11 @@ body:not(.is-pc) .interview-dialog-modal .modal-footer {
     justify-content: center;
     margin-bottom: 15px;
 }
+/* =========================================================
+   取引の数値変化のズレ防止
+   ========================================================= */
+.trade-result-value {
+    width: 3.5em; /* 5桁の数字が入るだけの幅を確保して固定します */
+    text-align: right; /* 右端で揃えて桁の増減による左側のズレを防ぎます */
+    font-variant-numeric: tabular-nums; /* 数字の横幅をすべて同じにする魔法です */
+}
