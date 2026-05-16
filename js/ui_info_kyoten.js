@@ -328,31 +328,28 @@ Object.assign(UIInfoManager.prototype, {
                 `<span class="pc-only"></span>`
             ];
         } else if (this.currentKyotenTab === 'military') {
-            gridSpStr = "2fr 1fr 1fr 1fr 1fr 1fr 1fr";
-            gridPcStr = "140px 80px 80px 80px 80px 80px 80px 1fr";
+            gridSpStr = "2fr 1.2fr 1fr 1fr 1fr 1fr";
+            gridPcStr = "140px 100px 80px 80px 80px 80px 1fr";
             headers = [
                 `<span data-sort="name">拠点名${getSortMark('name')}</span>`,
+                `<span>所属</span>`,
                 `<span data-sort="soldiers">兵士${getSortMark('soldiers')}</span>`,
                 `<span data-sort="defense">防御${getSortMark('defense')}</span>`,
-                `<span data-sort="morale">士気${getSortMark('morale')}</span>`,
-                `<span data-sort="training">訓練${getSortMark('training')}</span>`,
                 `<span data-sort="horses">軍馬${getSortMark('horses')}</span>`,
                 `<span data-sort="guns">鉄砲${getSortMark('guns')}</span>`,
                 `<span class="pc-only"></span>`
             ];
         } else if (this.currentKyotenTab === 'economy') {
-            gridSpStr = "2.5fr 1fr 0.8fr 1.2fr 1.2fr 1.5fr 1.5fr";
-            gridPcStr = "140px 60px 50px 60px 60px 80px 80px 100px 100px";
+            gridSpStr = "2fr 1fr 1fr 1fr 1.2fr 1.2fr";
+            gridPcStr = "140px 60px 80px 80px 100px 100px 1fr";
             headers = [
                 `<span data-sort="name">拠点名${getSortMark('name')}</span>`,
                 `<span data-sort="population">人口${getSortMark('population')}</span>`,
-                `<span data-sort="loyalty">民忠${getSortMark('loyalty')}</span>`,
-                `<span data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
-                `<span data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
                 `<span data-sort="goldIncome">月収入${getSortMark('goldIncome')}</span>`,
                 `<span data-sort="goldConsume">月支出${getSortMark('goldConsume')}</span>`,
                 `<span data-sort="riceIncome">年米収穫${getSortMark('riceIncome')}</span>`,
-                `<span data-sort="riceConsume">年米消費${getSortMark('riceConsume')}</span>`
+                `<span data-sort="riceConsume">年米消費${getSortMark('riceConsume')}</span>`,
+                `<span class="pc-only"></span>`
             ];
         }
 
@@ -400,12 +397,16 @@ Object.assign(UIInfoManager.prototype, {
                     `<span class="pc-only"></span>`
                 ];
             } else if (this.currentKyotenTab === 'military') {
+                let legionStr = "直轄";
+                if (c.legionId > 0) {
+                    const numberNames = ["直轄", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
+                    legionStr = numberNames[c.legionId] || `第${c.legionId}席`;
+                }
                 cells = [
                     `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
+                    `<span class="col-legion">${legionStr}</span>`,
                     `<span class="col-soldiers">${c.soldiers}</span>`,
                     `<span class="col-defense">${c.defense}</span>`,
-                    `<span class="col-morale">${c.morale}</span>`,
-                    `<span class="col-training">${c.training}</span>`,
                     `<span class="col-horses">${c.horses || 0}</span>`,
                     `<span class="col-guns">${c.guns || 0}</span>`,
                     `<span class="pc-only"></span>`
@@ -414,13 +415,11 @@ Object.assign(UIInfoManager.prototype, {
                 cells = [
                     `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
                     `<span class="col-population">${c.population}</span>`,
-                    `<span class="col-loyalty">${c.peoplesLoyalty}</span>`,
-                    `<span class="col-kokudaka pc-only">${c.kokudaka}</span>`,
-                    `<span class="col-commerce pc-only">${c.commerce}</span>`,
                     `<span class="col-gold-income">${goldIncome}</span>`,
                     `<span class="col-gold-consume">${consumeGold}</span>`,
                     `<span class="col-rice-income">${riceIncome}</span>`,
-                    `<span class="col-rice-consume">${consumeRiceYear}</span>`
+                    `<span class="col-rice-consume">${consumeRiceYear}</span>`,
+                    `<span class="pc-only"></span>`
                 ];
             }
 
