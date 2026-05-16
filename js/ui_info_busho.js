@@ -208,20 +208,16 @@ Object.assign(UIInfoManager.prototype, {
         if (busho) this.showBushoDetailModal(busho);
     },
     
-    _saveBushoSelection() {
-        const inputs = document.querySelectorAll('input[name="sel_busho"]:checked');
-        if (inputs) {
-            this.bushoSavedSelectedIds = Array.from(inputs).map(i => parseInt(i.value));
-        } else {
-            this.bushoSavedSelectedIds = [];
-        }
-    },
+    // _saveBushoSelection()は不要になったので削除し、UI更新の中に一元化します
 
     _updateBushoSelectorUI() {
         const ctx = this._bushoSelectorContext;
         if (!ctx) return;
         
-        const checkedCount = document.querySelectorAll('input[name="sel_busho"]:checked').length; 
+        const inputs = document.querySelectorAll('input[name="sel_busho"]:checked');
+        this.commonSelectedIds = Array.from(inputs).map(i => parseInt(i.value));
+        const checkedCount = this.commonSelectedIds.length;
+        
         const contextEl = document.getElementById('selector-context-info');
         const confirmBtn = document.getElementById('selector-confirm-btn');
 
@@ -491,7 +487,7 @@ Object.assign(UIInfoManager.prototype, {
         let acc = null;
         if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
 
-        const selectedIdsStr = (this.bushoSavedSelectedIds || []).sort().join('_');
+        const selectedIdsStr = (this.commonSelectedIds || []).sort().join('_');
         const currentSortStateKey = `${this.bushoCurrentSortKey}_${this.bushoIsSortAsc}_${selectedIdsStr}`;
 
         if (this.bushoSavedSortedBushos && this.bushoLastSortStateKey === currentSortStateKey) {
@@ -501,8 +497,8 @@ Object.assign(UIInfoManager.prototype, {
 
             if (this.bushoCurrentSortKey) {
                 displayBushos.sort((a, b) => {
-                    const selA = (this.bushoSavedSelectedIds || []).includes(a.id) ? 1 : 0;
-                    const selB = (this.bushoSavedSelectedIds || []).includes(b.id) ? 1 : 0;
+                    const selA = (this.commonSelectedIds || []).includes(a.id) ? 1 : 0;
+                    const selB = (this.commonSelectedIds || []).includes(b.id) ? 1 : 0;
                     if (selA !== selB) return selB - selA;
 
                     let valA = 0, valB = 0;
@@ -628,8 +624,8 @@ Object.assign(UIInfoManager.prototype, {
             } else {
                 if (extraData && extraData.isFactionView) {
                     displayBushos.sort((a, b) => {
-                        const selA = (this.bushoSavedSelectedIds || []).includes(a.id) ? 1 : 0;
-                        const selB = (this.bushoSavedSelectedIds || []).includes(b.id) ? 1 : 0;
+                        const selA = (this.commonSelectedIds || []).includes(a.id) ? 1 : 0;
+                        const selB = (this.commonSelectedIds || []).includes(b.id) ? 1 : 0;
                         if (selA !== selB) return selB - selA;
 
                         if (a.isFactionLeader && !b.isFactionLeader) return -1;
@@ -640,16 +636,16 @@ Object.assign(UIInfoManager.prototype, {
                     });
                 } else if (actionType === 'all_busho_list' && this.bushoCurrentScope === 'all') {
                     displayBushos.sort((a, b) => {
-                        const selA = (this.bushoSavedSelectedIds || []).includes(a.id) ? 1 : 0;
-                        const selB = (this.bushoSavedSelectedIds || []).includes(b.id) ? 1 : 0;
+                        const selA = (this.commonSelectedIds || []).includes(a.id) ? 1 : 0;
+                        const selB = (this.commonSelectedIds || []).includes(b.id) ? 1 : 0;
                         if (selA !== selB) return selB - selA;
                         
                         return getSortRankAll(b) - getSortRankAll(a);
                     });
                 } else if (isViewMode) {
                     displayBushos.sort((a, b) => {
-                        const selA = (this.bushoSavedSelectedIds || []).includes(a.id) ? 1 : 0;
-                        const selB = (this.bushoSavedSelectedIds || []).includes(b.id) ? 1 : 0;
+                        const selA = (this.commonSelectedIds || []).includes(a.id) ? 1 : 0;
+                        const selB = (this.commonSelectedIds || []).includes(b.id) ? 1 : 0;
                         if (selA !== selB) return selB - selA;
                         
                         return getSortRankClan(b) - getSortRankClan(a);
@@ -734,7 +730,7 @@ Object.assign(UIInfoManager.prototype, {
             let isSelectable = !b.isActionDone; 
             if (isActionFree) isSelectable = true; 
             
-            const isSelected = (this.bushoSavedSelectedIds || []).includes(b.id);
+            const isSelected = (this.commonSelectedIds || []).includes(b.id);
             
             let currentAcc = null;
             const bCastle = this.game.getCastle(b.castleId);
@@ -874,21 +870,18 @@ Object.assign(UIInfoManager.prototype, {
             onConfirm: onConfirmHandler,
             hideBackBtn: extraData && extraData.hideCancel,
             onTabClick: (tabKey) => {
-                this._saveBushoSelection();
                 this.bushoCurrentTab = tabKey;
                 const listEl = document.getElementById('selector-list');
                 const scroll = listEl ? listEl.scrollTop : 0;
                 this._renderBushoSelector(actionType, targetId, extraData, onBack, scroll);
             },
             onScopeClick: (scopeKey) => {
-                this._saveBushoSelection();
                 this.bushoCurrentScope = scopeKey;
                 const listEl = document.getElementById('selector-list');
                 const scroll = listEl ? listEl.scrollTop : 0;
                 this._renderBushoSelector(actionType, targetId, extraData, onBack, scroll);
             },
             onSortClick: (sortKey) => {
-                this._saveBushoSelection();
                 const defaultAscKeys = ['name', 'faction', 'castle', 'faction_leader'];
                 const newState = this._toggleSortState(this.bushoCurrentSortKey, this.bushoIsSortAsc, sortKey, defaultAscKeys);
                 this.bushoCurrentSortKey = newState.key;

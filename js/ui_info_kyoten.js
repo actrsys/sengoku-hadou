@@ -429,9 +429,9 @@ Object.assign(UIInfoManager.prototype, {
             let extraClass = "kyoten-mode";
 
             if (isSelectMode && selectData) {
-                onClickStr = `window.GameApp.ui.info.selectAppointLegionCastle(${selectData.bushoId}, ${selectData.legionNo}, ${c.id}, this)`;
+                onClickStr = (e) => this.handleCommonSelect(c.id, e.currentTarget, false);
                 // 選択されている城を光らせます
-                if (this.selectedCastleIdForLegion === c.id) {
+                if (this.commonSelectedIds && this.commonSelectedIds.includes(c.id)) {
                     extraClass += " selected";
                 }
             }
@@ -457,8 +457,8 @@ Object.assign(UIInfoManager.prototype, {
                 window.GameApp.ui.showAppointLegionLeaderModal(selectData.legionNo);
             };
             onConfirmFunc = () => {
-                if (!this.selectedCastleIdForLegion) return;
-                const castleId = this.selectedCastleIdForLegion;
+                if (!this.commonSelectedIds || this.commonSelectedIds.length === 0) return;
+                const castleId = this.commonSelectedIds[0];
                 
                 window.GameApp.ui.showDialog("よろしいですか？", true, () => {
                     this.closeCommonModal();
@@ -509,20 +509,9 @@ Object.assign(UIInfoManager.prototype, {
 
         // ★追加：タブ切り替えなどで再描画された時に、決定ボタンの状態を復元します！
         if (isSelectMode && selectData) {
-            const confirmBtn = document.getElementById('selector-confirm-btn');
-            if (confirmBtn) {
-                if (this.selectedCastleIdForLegion) {
-                    confirmBtn.disabled = false;
-                    confirmBtn.style.opacity = '1';
-                    confirmBtn.style.cursor = 'pointer';
-                } else {
-                    confirmBtn.disabled = true;
-                    confirmBtn.style.opacity = '0.5';
-                    confirmBtn.style.cursor = 'not-allowed';
-                }
-            }
+            this.updateCommonConfirmBtn();
         }
-    },
+    }
 
     showAppointLegionCastleSelector(bushoId, legionNo) {
         this.closeCommonModal();
@@ -532,33 +521,5 @@ Object.assign(UIInfoManager.prototype, {
         this.kyotenLastScope = null;
         // 拠点一覧（kyoten_list）を選択モードで呼び出します
         this.pushModal('kyoten_list', [this.game.playerClanId, true, { bushoId: bushoId, legionNo: legionNo }]);
-    },
-
-    selectAppointLegionCastle(bushoId, legionNo, castleId, element) {
-        const isAlreadySelected = element.classList.contains('selected');
-
-        // 全てのアイテムから光（selected）を消すために、共通のクラス名（select-item）を使います！
-        const items = document.querySelectorAll('.select-item');
-        items.forEach(item => item.classList.remove('selected'));
-
-        if (isAlreadySelected) {
-            this.selectedCastleIdForLegion = null;
-        } else {
-            element.classList.add('selected');
-            this.selectedCastleIdForLegion = castleId;
-        }
-
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        if (confirmBtn) {
-            if (this.selectedCastleIdForLegion) {
-                confirmBtn.disabled = false;
-                confirmBtn.style.opacity = '1';
-                confirmBtn.style.cursor = 'pointer';
-            } else {
-                confirmBtn.disabled = true;
-                confirmBtn.style.opacity = '0.5';
-                confirmBtn.style.cursor = 'not-allowed';
-            }
-        }
     }
 });

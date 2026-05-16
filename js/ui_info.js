@@ -62,6 +62,9 @@ class UIInfoManager {
         // 所領分配のリセット
         this.allotFiefSelectedIds = null;
         this.allotFiefSavedState = false;
+        
+        // ★全リスト共通の選択状態を記憶する箱
+        this.commonSelectedIds = [];
     }
 
     // --- ソート状態の一元管理 ---
@@ -95,6 +98,67 @@ class UIInfoManager {
         } else {
             // 1回目のクリック（新しいキー）ならデフォルトの向きでソートする
             return { key: clickedSortKey, isAsc: defaultAscKeys.includes(clickedSortKey) };
+        }
+    }
+
+    // ==========================================
+    // ★共通化ツール：リストの選択・解除を行う魔法
+    // ==========================================
+    handleCommonSelect(itemId, element, isMulti = false) {
+        if (!this.commonSelectedIds) this.commonSelectedIds = [];
+
+        const isAlreadySelected = element.classList.contains('selected');
+        let input = element.querySelector('input[type="checkbox"], input[type="radio"]');
+
+        if (!isMulti) {
+            // 単一選択の場合：他の選択をすべて消す
+            const allItems = document.querySelectorAll('.select-item');
+            allItems.forEach(item => {
+                item.classList.remove('selected');
+                const inp = item.querySelector('input[type="checkbox"], input[type="radio"]');
+                if (inp) inp.checked = false;
+            });
+
+            if (isAlreadySelected) {
+                // すでに選ばれていたものをもう一度押した時は、選択を解除します（外す）
+                this.commonSelectedIds = [];
+            } else {
+                // 新しく選んだ時は、それをリストに入れます
+                element.classList.add('selected');
+                if (input) input.checked = true;
+                this.commonSelectedIds = [itemId];
+            }
+        } else {
+            // 複数選択の場合：その項目だけを付け外しする
+            if (isAlreadySelected) {
+                element.classList.remove('selected');
+                if (input) input.checked = false;
+                this.commonSelectedIds = this.commonSelectedIds.filter(id => id !== itemId);
+            } else {
+                element.classList.add('selected');
+                if (input) input.checked = true;
+                if (!this.commonSelectedIds.includes(itemId)) {
+                    this.commonSelectedIds.push(itemId);
+                }
+            }
+        }
+
+        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+        this.updateCommonConfirmBtn();
+    }
+
+    updateCommonConfirmBtn(minCount = 1) {
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        if (confirmBtn) {
+            if (this.commonSelectedIds && this.commonSelectedIds.length >= minCount) {
+                confirmBtn.disabled = false;
+                confirmBtn.style.opacity = '1';
+                confirmBtn.style.cursor = 'pointer';
+            } else {
+                confirmBtn.disabled = true;
+                confirmBtn.style.opacity = '0.5';
+                confirmBtn.style.cursor = 'not-allowed';
+            }
         }
     }
 
@@ -1510,8 +1574,9 @@ class UIInfoManager {
                 }
             }
 
+            const isSelected = this.commonSelectedIds && this.commonSelectedIds.includes(p.id);
             return {
-                onClick: isSelectMode ? `window.GameApp.ui.info.selectPrincess(${p.id}, this)` : null,
+                onClick: isSelectMode ? (e) => this.handleCommonSelect(p.id, e.currentTarget, false) : null,
                 cells: [
                     `<strong class="col-princess-name">${p.name}</strong>`,
                     `<span class="col-clan">${clanName}</span>`,
@@ -1520,7 +1585,8 @@ class UIInfoManager {
                     `<span class="col-father">${father ? father.name : "不明"}</span>`,
                     `<span class="col-husband">${husband ? husband.name : "なし"}</span>`,
                     `<span class="pc-only"></span>` 
-                ]
+                ],
+                itemClass: isSelectMode && isSelected ? "selected" : ""
             };
         });
 
@@ -1567,30 +1633,17 @@ class UIInfoManager {
                 this._renderPrincessList(isSelectMode, targetCastleId, doerId, scroll);
             }
         });
-    }
-
-    selectPrincess(princessId, element) {
-        const items = document.querySelectorAll('.princess-list-item');
-        items.forEach(item => item.classList.remove('selected'));
-
-        element.classList.add('selected');
-        this.selectedPrincessId = princessId;
-
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.style.opacity = '1';
-            confirmBtn.style.cursor = 'pointer';
-        }
+        
+        if (isSelectMode) this.updateCommonConfirmBtn();
     }
 
     confirmPrincessSelection(targetCastleId, doerId) {
-        if (!this.selectedPrincessId) return;
+        if (!this.commonSelectedIds || this.commonSelectedIds.length === 0) return;
+        const selectedId = this.commonSelectedIds[0];
         
         this.closeCommonModal(); 
         
-        window.GameApp.commandSystem.handleBushoSelection('marriage_princess', [this.selectedPrincessId], targetCastleId, { doerId: doerId });
-        this.selectedPrincessId = null; 
+        window.GameApp.commandSystem.handleBushoSelection('marriage_princess', [selectedId], targetCastleId, { doerId: doerId });
     }
     
     // ==========================================
@@ -2107,9 +2160,10 @@ class UIInfoManager {
             if (relVal >= 70) { relStatus = "友好"; relClass = "text-green"; }
             else if (relVal < 40) { relStatus = "敵対"; relClass = "text-red"; }
 
-            let onClickStr = "";
+            const isSelected = this.commonSelectedIds && this.commonSelectedIds.includes(kunishu.id);
+            let onClickStr = null;
             if (isSelectMode) {
-                onClickStr = `window.GameApp.ui.info.selectKunishu(${kunishu.id}, this)`;
+                onClickStr = (e) => this.handleCommonSelect(kunishu.id, e.currentTarget, false);
             } else {
                 onClickStr = `window.GameApp.ui.info.showKunishuDetail(${kunishu.id})`;
             }
@@ -2125,11 +2179,10 @@ class UIInfoManager {
                     `<span class="col-friend">${friendBarHtml}</span>`,
                     `<span class="col-relation ${relClass}" style="font-weight:bold;">${relStatus}</span>`,
                     `<span class="col-empty pc-only"></span>`
-                ]
+                ],
+                itemClass: isSelectMode && isSelected ? "selected" : ""
             });
         });
-
-        this.selectedKunishuId = null;
         
         const getSortMark = (key) => this._getCommonSortMark(this.kunishuCurrentSortKey, this.isKunishuSortAsc, key);
 
@@ -2155,9 +2208,10 @@ class UIInfoManager {
             gridTemplatePc: "120px 120px 120px 60px 80px 100px 60px 1fr",
             onBack: onBack,
             onConfirm: isSelectMode ? () => {
-                if (!this.selectedKunishuId) return;
+                if (!this.commonSelectedIds || this.commonSelectedIds.length === 0) return;
+                const selectedId = this.commonSelectedIds[0];
                 this.closeCommonModal(); 
-                if (onConfirm) onConfirm(this.selectedKunishuId); 
+                if (onConfirm) onConfirm(selectedId); 
             } : null,
             onSortClick: (sortKey) => {
                 const defaultAscKeys = ['name', 'leader', 'castle', 'province', 'relation'];
@@ -2169,23 +2223,8 @@ class UIInfoManager {
                 this._renderKunishuList(kunishus, castle, isSelectMode, onBack, onConfirm, scroll);
             }
         });
-    }
-
-    // ★新規追加：リストから勢力を選んだ時のハイライト処理
-    selectKunishu(kunishuId, element) {
-        const items = document.querySelectorAll('.kunishu-list-item');
-        items.forEach(item => item.classList.remove('selected'));
-
-        element.classList.add('selected');
-
-        this.selectedKunishuId = kunishuId;
-
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.style.opacity = '1';
-            confirmBtn.style.cursor = 'pointer';
-        }
+        
+        if (isSelectMode) this.updateCommonConfirmBtn();
     }
     
     // ==========================================
@@ -2259,16 +2298,18 @@ class UIInfoManager {
                 }
             }
             const friendBarHtml = this._createBarHtml(relVal, 'friend');
+            const isSelected = this.commonSelectedIds && this.commonSelectedIds.includes(index);
             
             items.push({
-                onClick: `window.GameApp.ui.info.selectForce(${index}, this)`,
+                onClick: (e) => this.handleCommonSelect(index, e.currentTarget, false),
                 cells: [
                     `<strong class="col-kunishu-name">${force.name}</strong>`,
                     `<span>${force.leaderName}</span>`,
                     `<span>${force.soldiers}</span>`,
                     `<span>${friendBarHtml}</span>`,
                     `<span class="${statusClass}" style="font-weight:bold;">${relStatus}</span>`
-                ]
+                ],
+                itemClass: isSelected ? "selected" : ""
             });
         });
 
@@ -2285,30 +2326,16 @@ class UIInfoManager {
             gridTemplatePc: "150px 120px 100px 1fr 80px",
             onBack: onCancel,
             onConfirm: () => {
-                if (this.selectedForceIndex === null) return;
+                if (!this.commonSelectedIds || this.commonSelectedIds.length === 0) return;
+                const selectedIndex = this.commonSelectedIds[0];
                 this.closeCommonModal(); 
-                // ★修正：決定ボタンを押した時、そのままデータを返すのではなく、元の形式に戻してあげます！
-                const selectedItem = this.currentForces[this.selectedForceIndex];
+                const selectedItem = this.currentForces[selectedIndex];
                 const selectedForce = selectedItem.force || selectedItem;
                 if (onSelect) onSelect(selectedForce); 
             }
         });
-    }
-
-    selectForce(index, element) {
-        const items = document.querySelectorAll('.force-list-item');
-        items.forEach(item => item.classList.remove('selected'));
-
-        element.classList.add('selected');
-
-        this.selectedForceIndex = index;
-
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        if (confirmBtn) {
-            btn.disabled = false;
-            btn.style.opacity = '1';
-            btn.style.cursor = 'pointer';
-        }
+        
+        this.updateCommonConfirmBtn();
     }
 
     // ==========================================
@@ -2350,18 +2377,18 @@ class UIInfoManager {
         });
 
         if (!this.allotFiefSavedState) {
-            this.allotFiefSelectedIds = [];
+            this.commonSelectedIds = [];
             myCastles.forEach(c => {
                 if (Number(c.legionId) === Number(legionNo)) {
-                    this.allotFiefSelectedIds.push(Number(c.id));
+                    this.commonSelectedIds.push(Number(c.id));
                 }
             });
             this.allotFiefSavedState = true;
         }
 
         myCastles.sort((a, b) => {
-            const aSelected = this.allotFiefSelectedIds.includes(Number(a.id)) ? 1 : 0;
-            const bSelected = this.allotFiefSelectedIds.includes(Number(b.id)) ? 1 : 0;
+            const aSelected = this.commonSelectedIds.includes(Number(a.id)) ? 1 : 0;
+            const bSelected = this.commonSelectedIds.includes(Number(b.id)) ? 1 : 0;
             if (aSelected !== bSelected) return bSelected - aSelected;
             return a.id - b.id;
         });
@@ -2369,7 +2396,7 @@ class UIInfoManager {
         let items = [];
         myCastles.forEach(c => {
             const cId = Number(c.id);
-            const isChecked = this.allotFiefSelectedIds.includes(cId);
+            const isChecked = this.commonSelectedIds.includes(cId);
             const inputHtml = `<input type="checkbox" name="sel_allot_fief" value="${cId}" ${isChecked ? 'checked' : ''} style="display:none;">`;
 
             let originalLegionStr = "直轄";
@@ -2395,7 +2422,27 @@ class UIInfoManager {
             const castellanName = castellan ? castellan.name : "なし";
 
             items.push({
-                onClick: (e) => this.handleAllotFiefSelect(e, cId, legionNo, legionName, c.legionId),
+                onClick: (e) => {
+                    this.handleCommonSelect(cId, e.currentTarget, true);
+                    // 所領分配特有の表示更新（直轄の文字を変えるなど）
+                    const statusSpan = e.currentTarget.querySelector('.status-mark');
+                    const isNowChecked = this.commonSelectedIds.includes(cId);
+                    if (statusSpan) {
+                        if (isNowChecked) {
+                            statusSpan.style.color = '#fdea60';
+                            statusSpan.style.fontWeight = 'bold';
+                            statusSpan.textContent = legionName;
+                        } else {
+                            statusSpan.style.color = '#ccc';
+                            statusSpan.style.fontWeight = 'normal';
+                            if (Number(c.legionId) === Number(legionNo)) {
+                                statusSpan.textContent = "直轄";
+                            } else {
+                                statusSpan.textContent = originalLegionStr;
+                            }
+                        }
+                    }
+                },
                 cells: [
                     `<span class="col-act">${inputHtml}<span class="status-mark" style="${statusStyle}">${displayLegionStr}</span></span>`,
                     `<span class="col-castle-name">${c.name}</span>`,
@@ -2419,70 +2466,19 @@ class UIInfoManager {
             gridTemplateSp: "1.2fr 2fr 1.5fr 1fr 1fr",
             gridTemplatePc: "100px 160px 120px 80px 80px",
             onBack: () => {
-                this.allotFiefSelectedIds = null;
+                this.commonSelectedIds = [];
                 this.allotFiefSavedState = false;
                 this.closeCommonModal();
             },
             onConfirm: () => {
-                const selectedIds = [...this.allotFiefSelectedIds];
+                const selectedIds = [...this.commonSelectedIds];
                 this.closeCommonModal();
-                this.allotFiefSelectedIds = null;
+                this.commonSelectedIds = [];
                 this.allotFiefSavedState = false;
                 window.GameApp.commandSystem.executeAllotFief(legionNo, targetLegionId, selectedIds, myCastles);
             }
         });
         
-        this._updateAllotFiefUI();
-    }
-
-    handleAllotFiefSelect(e, castleId, legionNo, legionName, originalLegionId) {
-        let div = e.currentTarget;
-        let input = div.querySelector('input[name="sel_allot_fief"]');
-        if (!input) return;
-
-        if (!this.allotFiefSelectedIds) {
-            this.allotFiefSelectedIds = [];
-        }
-
-        const cId = Number(castleId);
-        const isCurrentlyChecked = this.allotFiefSelectedIds.includes(cId);
-
-        const statusSpan = div.querySelector('.status-mark');
-
-        if (isCurrentlyChecked) {
-            this.allotFiefSelectedIds = this.allotFiefSelectedIds.filter(id => id !== cId);
-            input.checked = false;
-            div.classList.remove('selected');
-            if (statusSpan) {
-                statusSpan.style.color = '#ccc';
-                statusSpan.style.fontWeight = 'normal';
-                if (Number(originalLegionId) === Number(legionNo)) {
-                    statusSpan.textContent = "直轄";
-                } else {
-                    const numberNames = ["直轄", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
-                    statusSpan.textContent = numberNames[originalLegionId] || `第${originalLegionId}席`;
-                }
-            }
-        } else {
-            if (!this.allotFiefSelectedIds.includes(cId)) this.allotFiefSelectedIds.push(cId);
-            input.checked = true;
-            div.classList.add('selected');
-            if (statusSpan) {
-                statusSpan.style.color = '#fdea60';
-                statusSpan.style.fontWeight = 'bold';
-                statusSpan.textContent = legionName;
-            }
-        }
-        
-        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-        this._updateAllotFiefUI();
-    }
-
-    _updateAllotFiefUI() {
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.style.opacity = 1.0;
-        }
+        this.updateCommonConfirmBtn(0); // 0個でも決定可能（すべて直轄にする場合）
     }
 }
