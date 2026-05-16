@@ -613,7 +613,7 @@ class UIInfoManager {
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">本拠地</span><span class="daimyo-detail-value">${baseCastleName}</span></div>
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-3col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">城</span><span class="daimyo-detail-value">${castlesCount}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">拠点</span><span class="daimyo-detail-value">${castlesCount}</span></div>
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">武将</span><span class="daimyo-detail-value">${bushosCount}</span></div>
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">姫</span><span class="daimyo-detail-value">${princessCount}</span></div>
                             </div>
@@ -1876,7 +1876,7 @@ class UIInfoManager {
                     </div>
                 </div>
                 <div class="daimyo-confirm-stats">
-                    <div class="stat-box"><span>城</span><span class="stat-val">${castlesCount}</span></div>
+                    <div class="stat-box"><span>拠点</span><span class="stat-val">${castlesCount}</span></div>
                     <div class="stat-box"><span>人口</span><span class="stat-val">${totalPopulation}</span></div>
                     <div class="stat-box"><span>武将</span><span class="stat-val">${bushosCount}</span></div>
                     <div class="stat-box"><span>姫</span><span class="stat-val">${princessCount}</span></div>
