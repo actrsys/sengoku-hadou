@@ -2214,15 +2214,34 @@ class GameManager {
     }
 
     stopWatchMode() {
-        this.isWatchMode = false;
-        
-        if (this.ui) {
-            this.ui.showDialog("観戦を終了し、タイトル画面に戻ります。", false, () => {
-                location.reload();
-            });
-        } else {
+        if (!this.ui) {
             location.reload();
+            return;
         }
+
+        // 勢力一覧の画面（タブ・ソート対応版）を呼び出します
+        this.ui.info.showDaimyoSelector((selectedClanId) => {
+            const selectedClan = this.clans.find(c => c.id === selectedClanId);
+            // 勢力が選ばれたら、最終確認のダイアログを出します
+            this.ui.showDialog(`${selectedClan.name}でゲームを再開しますか？`, true, () => {
+                // 「再開する」を選んだら、観戦モードを解除してプレイヤーの勢力を書き換えます
+                this.isWatchMode = false;
+                this.playerClanId = selectedClan.id;
+                
+                // ★追加：観戦中のメニューなどが残らないように、画面を綺麗にお掃除します
+                if (this.ui.clearCommandMenu) {
+                    this.ui.clearCommandMenu();
+                }
+                
+                // マップの表示を更新して、時間を進めます
+                this.ui.renderMap();
+                this.processTurn();
+            }, () => {
+                // 「観戦を続ける」を選んだ時は何もしません
+            }, { okText: '再開する', okClass: 'btn-primary', cancelText: '観戦を続ける' });
+        }, () => {
+            // 勢力一覧で「戻る（閉じる）」を押した時も何もしません
+        });
     }
 }
 
