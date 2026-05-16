@@ -265,10 +265,15 @@ class UIInfoManager {
     
     showDaimyoList() {
         this.closeCommonModal(); 
-        this.pushModal('daimyo_list', []);
+        this.pushModal('daimyo_list', [false, null, null]);
     }
 
-    _renderDaimyoList(scrollPos = 0) {
+    showDaimyoSelector(onSelect, onBack) {
+        this.closeCommonModal();
+        this.pushModal('daimyo_list', [true, onSelect, onBack]);
+    }
+
+    _renderDaimyoList(isSelectMode = false, onSelect = null, onBack = null, scrollPos = 0) {
         const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
         this.game.updateAllClanPrestige();
         
@@ -403,6 +408,11 @@ class UIInfoManager {
         let gridSpStr = "";
         let gridPcStr = "";
         
+        let contextHtml = null;
+        if (isSelectMode) {
+            contextHtml = "<div>担当する勢力を選択してください</div>";
+        }
+        
         if (this.daimyoCurrentTab === 'status') {
             gridSpStr = "2.5fr 2fr 1fr 2fr 2fr 1.5fr";
             gridPcStr = "140px 100px 60px 100px 100px 60px 1fr";
@@ -490,14 +500,24 @@ class UIInfoManager {
                 ];
             }
             
+            const isSelected = this.commonSelectedIds && this.commonSelectedIds.includes(d.id);
+            let onClickStr = null;
+            if (isSelectMode) {
+                onClickStr = (e) => this.handleCommonSelect(d.id, e.currentTarget, false);
+            } else {
+                onClickStr = `window.GameApp.ui.info.showDaimyoDetail(${d.id})`;
+            }
+
             items.push({
-                onClick: `window.GameApp.ui.info.showDaimyoDetail(${d.id})`,
-                cells: cells
+                onClick: onClickStr,
+                cells: cells,
+                itemClass: isSelectMode && isSelected ? "selected" : ""
             });
         });
 
         this._renderListModal({
-            title: "勢力一覧",
+            title: isSelectMode ? "勢力選択" : "勢力一覧",
+            contextHtml: contextHtml,
             tabsHtml: tabsHtml,
             headers: headers,
             headerClass: "sortable-header daimyo-list-header",
@@ -507,11 +527,18 @@ class UIInfoManager {
             scrollPos: scrollPos,
             gridTemplateSp: gridSpStr,
             gridTemplatePc: gridPcStr,
+            onBack: isSelectMode ? onBack : null,
+            onConfirm: isSelectMode ? () => {
+                if (!this.commonSelectedIds || this.commonSelectedIds.length === 0) return;
+                const selectedId = this.commonSelectedIds[0];
+                this.closeCommonModal();
+                if (onSelect) onSelect(selectedId);
+            } : null,
             onTabClick: (tabKey) => {
                 this.daimyoCurrentTab = tabKey;
                 const listEl = document.getElementById('selector-list');
                 const scroll = listEl ? listEl.scrollTop : 0;
-                this._renderDaimyoList(scroll);
+                this._renderDaimyoList(isSelectMode, onSelect, onBack, scroll);
             },
             onSortClick: (sortKey) => {
                 const defaultAscKeys = ['name', 'leader', 'relation'];
@@ -520,9 +547,11 @@ class UIInfoManager {
                 this.isDaimyoSortAsc = newState.isAsc;
                 const listEl = document.getElementById('selector-list');
                 const scroll = listEl ? listEl.scrollTop : 0;
-                this._renderDaimyoList(scroll);
+                this._renderDaimyoList(isSelectMode, onSelect, onBack, scroll);
             }
         });
+
+        if (isSelectMode) this.updateCommonConfirmBtn();
     }
 
     showDaimyoDetail(clanId) {
