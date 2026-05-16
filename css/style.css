@@ -593,7 +593,8 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .select-item .col-province,
 .select-item .col-seikaku,
 .select-item .col-hoshin,
-.select-item .col-relation { 
+.select-item .col-relation,
+.select-item .col-legion { 
     justify-content: flex-start !important; 
     padding-left: 3px !important; 
 }
