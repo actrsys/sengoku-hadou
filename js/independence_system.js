@@ -87,6 +87,9 @@ class IndependenceSystem {
     async executeRebellion(castle, castellan, oldDaimyo, intention = 'indep') {
         const oldClanId = castle.ownerClan;
         
+        // ★追加：誰が裏切ったか後で確認するために、今の「主家」の武将たちをメモしておきます！
+        const oldClanBushoIds = this.game.bushos.filter(b => b.clan === oldClanId).map(b => b.id);
+
         // ★追加：複数のお城が同時に寝返ったか調べるために、最初のお城の持ち主を全部メモしておきます！
         const initialClanMap = new Map();
         this.game.castles.forEach(c => initialClanMap.set(c.id, c.ownerClan));
@@ -377,6 +380,24 @@ class IndependenceSystem {
         // ★修正：記憶しておいた元の派閥ID(leaderOriginalFactionId)を渡して判定させます
         this.resolveFactionWideRebellion(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId);
         this.resolveDistantFactionMembers(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId);
+
+        // ★追加：裏切った武将たち全員を、元の大名の「宿敵」に登録します！（期間は120ヶ月）
+        oldClanBushoIds.forEach(id => {
+            const traitor = this.game.getBusho(id);
+            if (traitor && traitor.clan === newClanId) {
+                // すでに宿敵リストにいるか確認して、いなければ追加します
+                if (!oldDaimyo.nemesisIds.includes(traitor.id)) {
+                    oldDaimyo.nemesisList.push({ id: traitor.id, count: 120 });
+                    oldDaimyo.nemesisIds.push(traitor.id);
+                } else {
+                    // すでにいる場合は、期間を120ヶ月に上書き（延長）してあげます
+                    const nemesis = oldDaimyo.nemesisList.find(n => n.id === traitor.id);
+                    if (nemesis && nemesis.count < 120) {
+                        nemesis.count = 120;
+                    }
+                }
+            }
+        });
 
         this.game.updateCastleLord(castle);
         
