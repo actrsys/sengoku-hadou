@@ -158,17 +158,17 @@ window.GameEvents.push({
                 pathData.push({ x: typhoonX, y: typhoonY, radius: typhoonRadius });
 
                 let moveX = Math.random() * 20 + 5;
-                let moveY = Math.random() * 30 + 15 + (initialScale * 1.5); 
+                let moveY = Math.random() * 25 + 10 + (initialScale * 1.5); 
 
                 let progress = Math.max(0, (height + 500 - typhoonY) / height); 
                 
-                moveX += windStrength * progress * 1.0; 
+                moveX += windStrength * progress * 1.5; 
                 
-                let fallPower = 30 - (initialScale * 2); 
+                let fallPower = 50 - (initialScale * 3); 
                 moveY -= fallPower * Math.pow(progress, 1.5); 
 
                 if (wasOnLand) {
-                    moveY -= 5; 
+                    moveY -= 15; 
                 }
 
                 typhoonX += moveX;
