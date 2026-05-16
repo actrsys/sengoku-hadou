@@ -877,6 +877,7 @@ Object.assign(UIInfoManager.prototype, {
             },
             onScopeClick: (scopeKey) => {
                 this.bushoCurrentScope = scopeKey;
+                this._saveStableSortResult('busho', null); // ★追加：スコープ変更時にソートの記憶をリセット
                 const listEl = document.getElementById('selector-list');
                 const scroll = listEl ? listEl.scrollTop : 0;
                 this._renderBushoSelector(actionType, targetId, extraData, onBack, scroll);

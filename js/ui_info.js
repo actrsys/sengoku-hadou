@@ -71,11 +71,12 @@ class UIInfoManager {
     // ★新機能：全リスト共通で「前回の並び順（ベース）」を取得する魔法
     _prepareStableSortBase(listId, baseArray, sortKey) {
         if (!this._stableSortBases) this._stableSortBases = {};
-        if (!sortKey) {
+        // ★修正：ソートキーがない場合や、前回のリストと人数が違う場合は記憶をリセットします
+        if (!sortKey || !this._stableSortBases[listId] || this._stableSortBases[listId].length !== baseArray.length) {
             this._stableSortBases[listId] = null;
             return [...baseArray];
         }
-        return this._stableSortBases[listId] ? [...this._stableSortBases[listId]] : [...baseArray];
+        return [...this._stableSortBases[listId]];
     }
 
     // ★新機能：並べ替えが終わったあとに、その結果を共通の箱に保存する魔法
@@ -1621,6 +1622,7 @@ class UIInfoManager {
             onConfirm: isSelectMode ? () => this.confirmPrincessSelection(targetCastleId, doerId) : null,
             onScopeClick: (scopeKey) => {
                 this.princessCurrentScope = scopeKey;
+                this._saveStableSortResult('princess', null); // ★追加：スコープ変更時にソートの記憶をリセット
                 this._renderPrincessList(isSelectMode, targetCastleId, doerId, 0);
             },
             onSortClick: (sortKey) => {

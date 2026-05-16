@@ -490,6 +490,7 @@ Object.assign(UIInfoManager.prototype, {
             },
             onScopeClick: (scopeKey) => {
                 this.currentKyotenScope = scopeKey;
+                this._saveStableSortResult('kyoten', null); // ★追加：スコープ変更時にソートの記憶をリセット
                 const listEl = document.getElementById('selector-list');
                 const scroll = listEl ? listEl.scrollTop : 0;
                 this._renderKyotenList(clanId, isSelectMode, selectData, scroll);
