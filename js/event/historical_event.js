@@ -558,7 +558,7 @@ window.GameEvents.push({
         }
         if (!isshikiDaimyo) return false;
 
-        // 織田家と一色家の関係が敵対であるか確認します
+        // 織田家と斎藤家（一色家）の関係が敵対であるか確認します
         const relOdaIsshiki = game.diplomacyManager.getRelation(nobunaga.clan, isshikiDaimyo.clan);
         if (!relOdaIsshiki || relOdaIsshiki.status !== '敵対') return false;
 
