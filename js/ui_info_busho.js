@@ -432,25 +432,22 @@ Object.assign(UIInfoManager.prototype, {
         // デフォルトではヘッダーのソート状態を指定せず、コマンドごとの最適な計算結果順（初期並び順）で表示します
         // （ユーザーがヘッダーをクリックした時のみ this.bushoCurrentSortKey が設定され、ソートが実行されます）
 
-        let tabsHtml = null;
-        if (isViewMode) {
-            let scopeHtml = '';
-            if (actionType === 'all_busho_list') {
-                scopeHtml = `
-                    <div style="display: flex; gap: 5px; margin-left: 15px;">
+        let scopeHtml = '';
+        if (actionType === 'all_busho_list') {
+            scopeHtml = `
+                <div style="display: flex; gap: 5px; margin-left: 15px;">
                         <button class="busho-scope-btn ${this.bushoCurrentScope === 'clan' ? 'active' : ''}" data-scope="clan">自家</button>
                         <button class="busho-scope-btn ${this.bushoCurrentScope === 'all' ? 'active' : ''}" data-scope="all">全国</button>
-                    </div>
-                `;
-            }
-            tabsHtml = `
-                <div style="display: flex; gap: 5px;">
-                    <button class="busho-tab-btn ${this.bushoCurrentTab === 'stats' ? 'active' : ''}" data-tab="stats">基本</button>
-                    <button class="busho-tab-btn ${this.bushoCurrentTab === 'status' ? 'active' : ''}" data-tab="status">状態</button>
                 </div>
-                ${scopeHtml}
             `;
         }
+        let tabsHtml = `
+            <div style="display: flex; gap: 5px;">
+                <button class="busho-tab-btn ${this.bushoCurrentTab === 'stats' ? 'active' : ''}" data-tab="stats">基本</button>
+                <button class="busho-tab-btn ${this.bushoCurrentTab === 'status' ? 'active' : ''}" data-tab="status">状態</button>
+            </div>
+            ${scopeHtml}
+        `;
 
         let displayBushos;
         if (!this.bushoSavedBushos || this.bushoLastScope !== this.bushoCurrentScope) {
