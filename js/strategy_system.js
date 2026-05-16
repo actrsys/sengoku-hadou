@@ -29,7 +29,8 @@ class StrategySystem {
         const targetBusho = this.game.getBusho(targetBushoId);
         const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
         const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
-        let prob = Math.min(1.0, score / (defScore + window.MainParams.Strategy.RumorFactor));
+        let prob = Math.min(1.0, score / (defScore + window.MainParams.Strategy.RumorFactor)) - 0.1;
+        prob = Math.max(0, prob);
         if (targetBusho.isCastellan) prob *= 0.67;
         return prob;
     }
@@ -54,6 +55,8 @@ class StrategySystem {
         const totalOffense = offense + newBonus + doerBonus;
         const totalDefense = defense + lordBonus;
         let successRate = (totalOffense / totalDefense) * 0.5; 
+        
+        successRate = Math.max(0, successRate - 0.1);
         
         // ★ここから追加：引抜先に自分の宿敵がいる場合は、成功率が半分になります！
         if (target.nemesisIds && target.nemesisIds.length > 0) {
@@ -134,7 +137,9 @@ class StrategySystem {
         const targetBusho = this.game.getBusho(targetBushoId);
         const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
         const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
-        let success = Math.random() < (score / (defScore + window.MainParams.Strategy.RumorFactor)); 
+        let prob = (score / (defScore + window.MainParams.Strategy.RumorFactor)) - 0.1;
+        prob = Math.max(0, prob);
+        let success = Math.random() < prob; 
 
         if (targetBusho.isCastellan && success) {
             if (Math.random() > 0.33) {
@@ -175,6 +180,8 @@ class StrategySystem {
         const totalOffense = offense + newBonus + doerBonus;
         const totalDefense = defense + lordBonus;
         let successRate = (totalOffense / totalDefense) * 0.5; 
+
+        successRate = Math.max(0, successRate - 0.1);
 
         // ★ここから追加：引抜先に自分の宿敵がいる場合は、成功率が半分になります！
         if (target.nemesisIds && target.nemesisIds.length > 0) {
