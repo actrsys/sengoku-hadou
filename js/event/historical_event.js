@@ -1077,6 +1077,36 @@ window.GameEvents.push({
 });
 
 // ==========================================
+// ★ 三好実休の死による長慶の寿命減少（裏イベント）
+// ==========================================
+window.GameEvents.push({
+    id: "historical_jikkyuu_death",
+    timing: "startMonth_before", // 毎月の初めにこっそりチェックします
+    isOneTime: true,             // 一度発生したら二度と起きません
+    
+    checkCondition: function(game) {
+        // 1. 三好長慶（ID: 1020001）が生きているか確認します
+        const nagayoshi = game.getBusho(1020001);
+        if (!nagayoshi || nagayoshi.status === 'dead' || nagayoshi.status === 'unborn') return false;
+
+        // 2. 三好実休（ID: 1020002）が亡くなっているか確認します
+        const jikkyuu = game.getBusho(1020002);
+        if (!jikkyuu || jikkyuu.status !== 'dead') return false;
+
+        // 条件をクリアしたらイベント発生の合図を出します
+        return true;
+    },
+    
+    execute: async function(game) {
+        const nagayoshi = game.getBusho(1020001);
+        if (nagayoshi) {
+            // 長慶の寿命（没年）を3年減らします
+            nagayoshi.endYear -= 3;
+        }
+    }
+});
+
+// ==========================================
 // ★ 十河一存の死による長慶の寿命減少（裏イベント）
 // ==========================================
 window.GameEvents.push({
@@ -1161,7 +1191,7 @@ window.GameEvents.push({
         const nagayoshi = game.getBusho(1020001);
         if (nagayoshi) {
             // 長慶の寿命（没年）を5年減らします
-            nagayoshi.endYear -= 5;
+            nagayoshi.endYear -= 3;
         }
     }
 });
@@ -2337,15 +2367,12 @@ window.GameEvents.push({
         const nagayasu = game.getBusho(1020006);
         if (!nagayasu || !nagayasu.isDaimyo) return false;
         
-        // 3. 三好長逸がプレイヤー大名ではないか確認します
-        if (game.playerClanId === nagayasu.clan) return false;
-
-        // 4. 池田知正（ID: 1902003）が存在し、三好長逸の家に所属する城主または国主であるか確認します
+        // 3. 池田知正（ID: 1902003）が存在し、三好長逸の家に所属する城主または国主であるか確認します
         const tomomasa = game.getBusho(1902003);
         if (!tomomasa || tomomasa.clan !== nagayasu.clan) return false;
         if (!tomomasa.isCastellan && !tomomasa.isCommander) return false;
 
-        // 5. 池田知正の居城が伊丹城（ID: 51）であるか、または伊丹城が池田知正の軍団に所属しているか確認します
+        // 4. 池田知正の居城が伊丹城（ID: 51）であるか、または伊丹城が池田知正の軍団に所属しているか確認します
         const itamiCastle = game.getCastle(51);
         if (!itamiCastle || itamiCastle.ownerClan !== nagayasu.clan) return false;
 
@@ -2359,11 +2386,11 @@ window.GameEvents.push({
         }
         if (!isItamiInvolved) return false;
 
-        // 6. 荒木村重（ID: 1902004）が存在し、三好家に所属しているか確認します
+        // 5. 荒木村重（ID: 1902004）が存在し、三好家に所属しているか確認します
         const murashige = game.getBusho(1902004);
         if (!murashige || murashige.clan !== nagayasu.clan) return false;
 
-        // 7. 荒木村重が池田知正と同じ場所にいるか確認します
+        // 6. 荒木村重が池田知正と同じ場所にいるか確認します
         if (tomomasa.isCommander) {
             // 池田知正が国主の場合、同じ軍団に所属しているか
             if (murashige.legionId !== tomomasa.legionId) return false;
