@@ -511,7 +511,7 @@ Object.assign(UIInfoManager.prototype, {
         if (isSelectMode && selectData) {
             this.updateCommonConfirmBtn();
         }
-    }
+    },
 
     showAppointLegionCastleSelector(bushoId, legionNo) {
         this.closeCommonModal();
