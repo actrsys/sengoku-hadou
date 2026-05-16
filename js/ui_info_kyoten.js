@@ -273,6 +273,7 @@ Object.assign(UIInfoManager.prototype, {
 
                     switch (this.currentKyotenSortKey) {
                         case 'name': valA = a.yomi || a.name; valB = b.yomi || b.name; break;
+                        case 'legion': valA = a.legionId || 0; valB = b.legionId || 0; break;
                         case 'clan': valA = getClanYomi(a); valB = getClanYomi(b); break;
                         case 'castellan': valA = getCastellanYomi(a); valB = getCastellanYomi(b); break;
                         case 'province': valA = getProvinceYomi(a); valB = getProvinceYomi(b); break;
@@ -332,7 +333,7 @@ Object.assign(UIInfoManager.prototype, {
             gridPcStr = "140px 100px 80px 80px 80px 80px 1fr";
             headers = [
                 `<span data-sort="name">拠点名${getSortMark('name')}</span>`,
-                `<span>所属</span>`,
+                `<span data-sort="legion">所属${getSortMark('legion')}</span>`,
                 `<span data-sort="soldiers">兵士${getSortMark('soldiers')}</span>`,
                 `<span data-sort="defense">防御${getSortMark('defense')}</span>`,
                 `<span data-sort="horses">軍馬${getSortMark('horses')}</span>`,
@@ -494,7 +495,7 @@ Object.assign(UIInfoManager.prototype, {
                 this._renderKyotenList(clanId, isSelectMode, selectData, scroll);
             },
             onSortClick: (sortKey) => {
-                const defaultAscKeys = ['name', 'clan', 'castellan', 'province'];
+                const defaultAscKeys = ['name', 'clan', 'castellan', 'province', 'legion'];
                 const newState = this._toggleSortState(this.currentKyotenSortKey, this.isKyotenSortAsc, sortKey, defaultAscKeys);
                 this.currentKyotenSortKey = newState.key;
                 this.isKyotenSortAsc = newState.isAsc;
