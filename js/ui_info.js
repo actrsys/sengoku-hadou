@@ -2305,51 +2305,9 @@ class UIInfoManager {
 
         const confirmBtn = document.getElementById('selector-confirm-btn');
         if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.style.opacity = '1';
-            confirmBtn.style.cursor = 'pointer';
-        }
-    }
-
-    showAppointLegionCastleSelector(bushoId, legionNo) {
-        this.closeCommonModal();
-        this.kyotenSavedCastles = null;
-        this.kyotenSavedSortedCastles = null;
-        this.kyotenLastSortStateKey = null;
-        this.kyotenLastScope = null;
-        // 拠点一覧（kyoten_list）を選択モードで呼び出します
-        this.pushModal('kyoten_list', [this.game.playerClanId, true, { bushoId: bushoId, legionNo: legionNo }]);
-    }
-
-    // 古い _renderAppointLegionCastle はもう使わないので、中身を消しておきます！
-    _renderAppointLegionCastle(bushoId, legionNo, scrollPos = 0) {
-    }
-    
-    selectAppointLegionCastle(bushoId, legionNo, castleId, element) {
-        const isAlreadySelected = element.classList.contains('selected');
-
-        // 全てのアイテムから光（selected）を消すために、共通のクラス名（select-item）を使います！
-        const items = document.querySelectorAll('.select-item');
-        items.forEach(item => item.classList.remove('selected'));
-
-        if (isAlreadySelected) {
-            this.selectedCastleIdForLegion = null;
-        } else {
-            element.classList.add('selected');
-            this.selectedCastleIdForLegion = castleId;
-        }
-
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        if (confirmBtn) {
-            if (this.selectedCastleIdForLegion) {
-                confirmBtn.disabled = false;
-                confirmBtn.style.opacity = '1';
-                confirmBtn.style.cursor = 'pointer';
-            } else {
-                confirmBtn.disabled = true;
-                confirmBtn.style.opacity = '0.5';
-                confirmBtn.style.cursor = 'not-allowed';
-            }
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
         }
     }
 
