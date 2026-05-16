@@ -2096,9 +2096,28 @@ window.GameEvents.push({
         // ③ 三好義継の貢献度（功績）を0にします
         yoshitsugu.achievementTotal = 0;
 
-        // ④ 三好義継を松永家に保護させ、忠誠度を100にします
+        // ④ 三好義継を松永家に保護させ、忠誠度を100にする
         // お引越しセンターの魔法（joinClan）を使って、古いお城から出して新しいお城に入れます
         game.affiliationSystem.joinClan(yoshitsugu, hisahide.clan, hisahide.castleId, 100);
+
+        // ★追加：三好長逸家所属の拠点と武将へのペナルティ処理
+        // お城の人口・兵士・民忠を減らします
+        const miyoshiCastles = game.castles.filter(c => c.ownerClan === miyoshiClanId);
+        miyoshiCastles.forEach(c => {
+            c.population = Math.floor(c.population * 0.8); // 人口20%減少（残りが80%）
+            c.soldiers = Math.floor(c.soldiers * 0.7);     // 兵士30%減少（残りが70%）
+            c.peoplesLoyalty = Math.floor((c.peoplesLoyalty || 0) * 0.7); // 民忠30%減少（残りが70%）
+        });
+
+        // 対象以外の武将の忠誠度を減らします
+        const trioList = [1020006, 1020007, 1020008]; // 三好三人衆の出席番号リスト
+        const miyoshiBushos = game.bushos.filter(b => b.clan === miyoshiClanId && b.status === 'active');
+        miyoshiBushos.forEach(b => {
+            // 三好三人衆ではなく、かつ、池田・荒木関連（1902001～1902999）でもない場合
+            if (!trioList.includes(b.id) && !(b.id >= 1902001 && b.id <= 1902999)) {
+                b.loyalty = Math.max(0, (b.loyalty || 0) - 10); // 忠誠度を10下げます（0より下にはならないようにします）
+            }
+        });
 
         // ⑤ 画面にメッセージを出してお知らせします
         game.ui.log(`【イベント】三好三人衆が当主・三好義継に対して反旗を翻し、三好義継が追放されました。`);
