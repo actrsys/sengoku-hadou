@@ -2235,7 +2235,11 @@ class GameManager {
                 
                 // マップの表示を更新して、時間を進めます
                 this.ui.renderMap();
-                this.processTurn();
+                
+                // ★修正：ダイアログが完全に閉じてからターン処理を呼ぶように、ほんの少し（0.1秒）だけ遅らせます！
+                setTimeout(() => {
+                    this.processTurn();
+                }, 100);
             }, () => {
                 // 「観戦を続ける」を選んだ時は何もしません
             }, { okText: '再開する', okClass: 'btn-primary', cancelText: '観戦を続ける' });
