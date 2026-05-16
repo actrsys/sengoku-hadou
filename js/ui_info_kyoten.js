@@ -177,10 +177,11 @@ Object.assign(UIInfoManager.prototype, {
         this.kyotenSavedSortedCastles = null;
         this.kyotenLastSortStateKey = null;
         this.kyotenLastScope = null;
-        this.pushModal('kyoten_list', [clanId]);
+        this.pushModal('kyoten_list', [clanId, false, null]); // ★選択モードではない、という合図を渡します
     },
     
-    _renderKyotenList(clanId, scrollPos = 0) {
+    // ★引数に isSelectMode と selectData を追加して、国主選びの時にも使えるようにしました！
+    _renderKyotenList(clanId, isSelectMode = false, selectData = null, scrollPos = 0) {
         this.kyotenTargetClanId = clanId !== null ? clanId : this.game.playerClanId;
         
         if (!this.currentKyotenTab) this.currentKyotenTab = 'status';
@@ -191,7 +192,8 @@ Object.assign(UIInfoManager.prototype, {
         }
         
         let scopeHtml = '';
-        if (clanId === null) {
+        // ★選択モードの時は「全国」タブは隠して、自家のお城だけを選ばせます
+        if (clanId === null && !isSelectMode) {
             scopeHtml = `
                 <div style="display: flex; gap: 5px; margin-left: 15px;">
                     <button class="busho-scope-btn ${this.currentKyotenScope === 'clan' ? 'active' : ''}" data-scope="clan">自家</button>
@@ -215,6 +217,19 @@ Object.assign(UIInfoManager.prototype, {
             } else {
                 this.kyotenCastles = this.game.castles.filter(c => c.ownerClan === this.kyotenTargetClanId);
             }
+
+            // ★選択モード（国主任命）の時だけ、選んではいけないお城（大名の居城や、すでに国主がいる城）を隠します！
+            if (isSelectMode && selectData) {
+                const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+                this.kyotenCastles = this.kyotenCastles.filter(c => {
+                    if (daimyo && Number(c.id) === Number(daimyo.castleId)) return false;
+                    const isCommanderCastle = this.game.bushos.some(b => Number(b.castleId) === Number(c.id) && b.isCommander && b.clan === this.game.playerClanId);
+                    if (isCommanderCastle) return false;
+                    return true;
+                });
+                this.selectedCastleIdForLegion = null; // リセットしておきます
+            }
+
             this.kyotenSavedCastles = this.kyotenCastles;
             this.kyotenLastScope = this.currentKyotenScope;
             this.kyotenSavedSortedCastles = null;
@@ -409,18 +424,58 @@ Object.assign(UIInfoManager.prototype, {
                 ];
             }
 
+            // ★通常時と選択時でクリックした時の動きを変えます！
+            let onClickStr = `window.GameApp.ui.info.showCastleDetail(${c.id})`;
+            let extraClass = "kyoten-mode";
+
+            if (isSelectMode && selectData) {
+                onClickStr = `window.GameApp.ui.info.selectAppointLegionCastle(${selectData.bushoId}, ${selectData.legionNo}, ${c.id}, this)`;
+                // 選択されている城を光らせます
+                if (this.selectedCastleIdForLegion === c.id) {
+                    extraClass += " selected";
+                }
+            }
+
             items.push({
-                onClick: `window.GameApp.ui.info.showCastleDetail(${c.id})`,
-                cells: cells
+                onClick: onClickStr,
+                cells: cells,
+                itemClass: extraClass
             });
         });
 
+        // ★選択モードの時だけ、タイトルや決定ボタンの魔法を追加します
+        let titleStr = "拠点一覧";
+        let contextHtmlStr = null;
+        let onBackFunc = null;
+        let onConfirmFunc = null;
+
+        if (isSelectMode && selectData) {
+            titleStr = "任せる拠点を選択してください";
+            contextHtmlStr = "<div>任せる拠点を選択してください</div>";
+            onBackFunc = () => {
+                this.closeCommonModal();
+                window.GameApp.ui.showAppointLegionLeaderModal(selectData.legionNo);
+            };
+            onConfirmFunc = () => {
+                if (!this.selectedCastleIdForLegion) return;
+                const castleId = this.selectedCastleIdForLegion;
+                
+                window.GameApp.ui.showDialog("よろしいですか？", true, () => {
+                    this.closeCommonModal();
+                    window.GameApp.commandSystem.executeAppointLegionLeader(selectData.bushoId, selectData.legionNo, castleId);
+                }, () => {
+                    this._renderKyotenList(clanId, isSelectMode, selectData, 0);
+                });
+            };
+        }
+
         this._renderListModal({
-            title: "拠点一覧",
+            title: titleStr,
+            contextHtml: contextHtmlStr,
             tabsHtml: tabsHtml,
             headers: headers,
             headerClass: "sortable-header kyoten-mode",
-            itemClass: "kyoten-mode",
+            itemClass: "", // itemClass は上で個別にセットしたので空にしておきます
             listClass: "kyoten-list-container",
             items: items,
             scrollPos: scrollPos,
@@ -431,13 +486,13 @@ Object.assign(UIInfoManager.prototype, {
                 this.currentKyotenTab = tabKey;
                 const listEl = document.getElementById('selector-list');
                 const scroll = listEl ? listEl.scrollTop : 0;
-                this._renderKyotenList(clanId, scroll);
+                this._renderKyotenList(clanId, isSelectMode, selectData, scroll);
             },
             onScopeClick: (scopeKey) => {
                 this.currentKyotenScope = scopeKey;
                 const listEl = document.getElementById('selector-list');
                 const scroll = listEl ? listEl.scrollTop : 0;
-                this._renderKyotenList(clanId, scroll);
+                this._renderKyotenList(clanId, isSelectMode, selectData, scroll);
             },
             onSortClick: (sortKey) => {
                 const defaultAscKeys = ['name', 'clan', 'castellan', 'province'];
@@ -446,8 +501,10 @@ Object.assign(UIInfoManager.prototype, {
                 this.isKyotenSortAsc = newState.isAsc;
                 const listEl = document.getElementById('selector-list');
                 const scroll = listEl ? listEl.scrollTop : 0;
-                this._renderKyotenList(clanId, scroll);
-            }
+                this._renderKyotenList(clanId, isSelectMode, selectData, scroll);
+            },
+            onBack: onBackFunc,
+            onConfirm: onConfirmFunc
         });
     }
 });
