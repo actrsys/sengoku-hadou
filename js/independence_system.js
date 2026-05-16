@@ -24,7 +24,7 @@ class IndependenceSystem {
         });
 
         const I = window.WarParams.Independence || {};
-        const thresholdBase = I.ThresholdBase || 29;
+        const thresholdBase = I.ThresholdBase || 25;
         const dutyDiv = I.ThresholdDutyDiv || 2;
         const ambDiv = I.ThresholdAmbitionDiv || 5;
 
@@ -63,7 +63,7 @@ class IndependenceSystem {
 
     async calculateAndExecute(castle, castellan, daimyo, threshold) {
         const I = window.WarParams.Independence || {};
-        const probLoyalty = I.ProbLoyaltyFactor || 2;
+        const probLoyalty = I.ProbLoyaltyFactor || 1;
         const probAffinity = I.ProbAffinityFactor || 0.5;
         const daimyoBonus = this.calcDaimyoPowerBonus(daimyo);
         const affinityDiff = GameSystem.calcAffinityDiff(castellan.affinity, daimyo.affinity);
@@ -110,10 +110,10 @@ class IndependenceSystem {
                 
                 // ★追加：派閥主自身も、独立・謀反に踏み切れるだけの野心や不満があるか判定します！
                 const I = window.WarParams.Independence || {};
-                const thresholdBase = I.ThresholdBase || 29;
+                const thresholdBase = I.ThresholdBase || 25;
                 const dutyDiv = I.ThresholdDutyDiv || 2;
                 const ambDiv = I.ThresholdAmbitionDiv || 5;
-                const probLoyalty = I.ProbLoyaltyFactor || 2;
+                const probLoyalty = I.ProbLoyaltyFactor || 1;
                 const probAffinity = I.ProbAffinityFactor || 0.5;
 
                 const leaderThreshold = thresholdBase + ((50 - factionLeader.duty) / dutyDiv) + ((factionLeader.ambition - 50) / ambDiv);
