@@ -253,6 +253,10 @@ class UIManager {
                     } else {
                         currentDragList.scrollBy({ top: -15, behavior: 'smooth' }); 
                     }
+                    
+                    setTimeout(() => {
+                        hasListDragged = false;
+                    }, 100);
                 }
                 isListMouseDown = false;
                 currentDragList = null;
