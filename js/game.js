@@ -2214,15 +2214,47 @@ class GameManager {
     }
 
     stopWatchMode() {
-        this.isWatchMode = false;
-        
-        if (this.ui) {
-            this.ui.showDialog("観戦を終了し、タイトル画面に戻ります。", false, () => {
-                location.reload();
-            });
-        } else {
+        if (!this.ui) {
             location.reload();
+            return;
         }
+
+        // 現在生き残っている大名家を探してリストアップします
+        const activeClans = this.clans.filter(c => c.id !== 0 && this.castles.some(cs => cs.ownerClan === c.id));
+        
+        // リストに表示するためのデータ（名前、当主、兵士数など）を準備します
+        const forces = activeClans.map(clan => {
+            const leader = this.getBusho(clan.leaderId);
+            const clanCastles = this.castles.filter(c => c.ownerClan === clan.id);
+            let totalSoldiers = 0;
+            clanCastles.forEach(c => totalSoldiers += c.soldiers || 0);
+            
+            return {
+                id: clan.id,
+                name: clan.name,
+                leaderName: leader ? leader.name.replace('|', '') : "不明",
+                soldiers: totalSoldiers,
+                isKunishu: false
+            };
+        });
+
+        // 勢力一覧の画面を呼び出します
+        this.ui.showForceSelector(forces, (selectedForce) => {
+            // 勢力が選ばれたら、最終確認のダイアログを出します
+            this.ui.showDialog(`${selectedForce.name}でゲームを再開しますか？`, true, () => {
+                // 「再開する」を選んだら、観戦モードを解除してプレイヤーの勢力を書き換えます
+                this.isWatchMode = false;
+                this.playerClanId = selectedForce.id;
+                
+                // マップの表示を更新して、時間を進めます
+                this.ui.renderMap();
+                this.processTurn();
+            }, () => {
+                // 「観戦を続ける」を選んだ時は何もしません
+            }, { okText: '再開する', okClass: 'btn-primary', cancelText: '観戦を続ける' });
+        }, () => {
+            // 勢力一覧で「戻る（キャンセル）」を押した時も何もしません
+        }, "担当する勢力を選択してください");
     }
 }
 
