@@ -1190,7 +1190,7 @@ window.GameEvents.push({
     execute: async function(game) {
         const nagayoshi = game.getBusho(1020001);
         if (nagayoshi) {
-            // 長慶の寿命（没年）を5年減らします
+            // 長慶の寿命（没年）を3年減らします
             nagayoshi.endYear -= 3;
         }
     }
