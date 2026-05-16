@@ -781,8 +781,8 @@ window.GameEvents.push({
     isOneTime: false,
     
     checkCondition: function(game) {
-        // 0.2%（1000回に2回）の確率で、地震のスイッチが入ります
-        return Math.random() < 0.002;
+        // 5%（100回に5回）の確率で、地震のスイッチが入ります！
+        return Math.random() < 0.05;
     },
     
     execute: async function(game) {
@@ -790,41 +790,122 @@ window.GameEvents.push({
         const allProvIds = [...new Set(game.castles.filter(c => c.provinceId > 0).map(c => c.provinceId))];
         if (allProvIds.length === 0) return;
         
-        // その中から、くじ引きで「ランダムな１つの国」を選びます
+        // その中から、くじ引きで「震源地となるランダムな１つの国」を選びます
         const targetProvId = allProvIds[Math.floor(Math.random() * allProvIds.length)];
-        const affectedProvIds = new Set([targetProvId]);
+
+        // ★地震の規模（1〜10）をくじ引きで決めます！
+        // 数字が小さいほど出やすく、大きいほど出にくい「えぐれたピラミッド状」の確率です。
+        const rand = Math.random();
+        let magnitude = 1;
+        if (rand < 0.30) magnitude = 1;      // 30%の確率で規模1
+        else if (rand < 0.55) magnitude = 2; // 25%の確率で規模2
+        else if (rand < 0.75) magnitude = 3; // 20%の確率で規模3
+        else if (rand < 0.87) magnitude = 4; // 12%の確率で規模4
+        else if (rand < 0.94) magnitude = 5; // 7%の確率で規模5
+        else if (rand < 0.97) magnitude = 6; // 3%の確率で規模6
+        else if (rand < 0.985) magnitude = 7;// 1.5%の確率で規模7
+        else if (rand < 0.993) magnitude = 8;// 0.8%の確率で規模8
+        else if (rand < 0.998) magnitude = 9;// 0.5%の確率で規模9
+        else magnitude = 10;                 // 0.2%の確率で規模10
+
+        // 国の出席番号と、その国の「地震の規模」をセットで覚える箱を用意します
+        let affectedProvinces = new Map();
+        affectedProvinces.set(targetProvId, magnitude);
+
+        // ★豊作や凶作と同じように、隣のお城を辿って地震を広げていく魔法です！
+        let eqQueue = [];
+        game.castles.forEach(c => {
+            if (c.provinceId === targetProvId) {
+                eqQueue.push({ castle: c, distance: 0 });
+            }
+        });
+
+        let visitedCastles = new Set();
+        eqQueue.forEach(q => visitedCastles.add(q.castle.id));
+
+        while (eqQueue.length > 0) {
+            const current = eqQueue.shift();
+            // 遠くまで広がりすぎないようにストッパーをかけます
+            if (current.distance >= 5) continue; 
+            
+            // 今見ているお城の国の「地震の規模」を調べます
+            const currentMag = affectedProvinces.get(current.castle.provinceId) || 0;
+            // 規模が1以下なら、これ以上他の国には伝わりません
+            if (currentMag <= 1) continue; 
+
+            // 道が繋がっているお隣さんのお城を調べます
+            const neighbors = game.castles.filter(c => GameSystem.isAdjacent(current.castle, c));
+            for (let neighbor of neighbors) {
+                if (!visitedCastles.has(neighbor.id)) {
+                    visitedCastles.add(neighbor.id); 
+                    
+                    // お隣さんのお城が「まだ地震が起きていない国」かどうかチェックします
+                    let canSpread = !affectedProvinces.has(neighbor.provinceId);
+                    
+                    // 違う国へは、35%の確率で地震が伝わります！
+                    if (canSpread && Math.random() < 0.35) {
+                        // 伝わる時は、規模が1段階小さくなります
+                        affectedProvinces.set(neighbor.provinceId, currentMag - 1);
+                        eqQueue.push({ castle: neighbor, distance: current.distance + 1 });
+                    } else if (affectedProvinces.has(neighbor.provinceId)) {
+                        // 同じ国の中を伝って、さらに別の国へ繋がる道を探すためにキューに入れます
+                        eqQueue.push({ castle: neighbor, distance: current.distance + 1 });
+                    }
+                }
+            }
+        }
+
+        // 被害を受けた国すべてのリストを作ります
+        const affectedProvIds = new Set(affectedProvinces.keys());
+
+        // 震源地の規模に合わせて、画面に出すメッセージを5段階で変えます！
+        let eqMessage = "";
+        if (magnitude <= 2) {
+            eqMessage = "かすかな地鳴りとともに、大地が小さく揺れました。";
+        } else if (magnitude <= 4) {
+            eqMessage = "突然の地鳴りとともに、大地が揺れました！";
+        } else if (magnitude <= 6) {
+            eqMessage = "大きな地鳴りとともに、大地が激しく揺れました！！";
+        } else if (magnitude <= 8) {
+            eqMessage = "立っていられないほどの猛烈な揺れが、大地を襲いました！！";
+        } else {
+            eqMessage = "天地がひっくり返るかのような、未曾有の大地震が発生しました！！！";
+        }
 
         // ★共通の魔法を呼び出します！（地震の色は、大地を思わせる茶色です）
         await window.playProvinceMapEffect(
             game, 
             '地震', 
-            "大きな地鳴りとともに、大地が激しく揺れました！", 
+            eqMessage, 
             affectedProvIds, 
             139, 69, 19
         );
 
-        // 選ばれた国のお城に地震の被害を与えます
+        // 選ばれた国のお城に、それぞれの「規模」に合わせた地震の被害を与えます
         game.castles.forEach(c => {
             if (c.ownerClan === 0) return; 
             
-            if (affectedProvIds.has(c.provinceId)) {
+            if (affectedProvinces.has(c.provinceId)) {
+                // その国で起きている地震の規模（1〜10）を取り出します
+                const m = affectedProvinces.get(c.provinceId);
+
                 // 城防御力15につき1%のダメージ軽減率を計算します（最大100%カット）
                 const defenseCutRate = Math.min(1.0, Math.floor(c.defense / 15) * 0.01);
 
-                // 兵士数が 5% ～ 15% ランダムで減ります（防御力で被害軽減）
-                const solDropRate = (0.05 + (Math.random() * 0.10)) * (1.0 - defenseCutRate);
+                // 兵士数が規模に応じて減ります（規模1で約1〜3%、規模10で約10〜30%）
+                const solDropRate = ((0.01 + Math.random() * 0.02) * m) * (1.0 - defenseCutRate);
                 c.soldiers = Math.max(0, Math.floor(c.soldiers * (1.0 - solDropRate)));
                 
-                // 人口が 0.1% ～ 5% ランダムで減ります（防御力で被害軽減）
-                const popDropRate = (0.001 + (Math.random() * 0.049)) * (1.0 - defenseCutRate);
+                // 人口が規模に応じて減ります（規模1で約0.1〜0.5%、規模10で約1〜5%）
+                const popDropRate = ((0.001 + Math.random() * 0.004) * m) * (1.0 - defenseCutRate);
                 c.population = Math.max(0, Math.floor(c.population * (1.0 - popDropRate)));
                 
-                // 石高が 5% ～ 30% ランダムで減ります（防御力で被害軽減）
-                const kokuDropRate = (0.05 + (Math.random() * 0.25)) * (1.0 - defenseCutRate);
+                // 石高が規模に応じて減ります（規模1で約1〜3%、規模10で約10〜30%）
+                const kokuDropRate = ((0.01 + Math.random() * 0.02) * m) * (1.0 - defenseCutRate);
                 c.kokudaka = Math.max(0, Math.floor(c.kokudaka * (1.0 - kokuDropRate)));
                 
-                // 城防御が 20% ～ 50% も大きく減ります（城壁や門のダメージは軽減しません）
-                const defDropRate = 0.20 + (Math.random() * 0.30);
+                // 城防御が規模に応じて大きく減ります（規模1で約2〜5%、規模10で約20〜50%）
+                const defDropRate = (0.02 + Math.random() * 0.03) * m;
                 c.defense = Math.max(0, Math.floor(c.defense * (1.0 - defDropRate)));
             }
         });

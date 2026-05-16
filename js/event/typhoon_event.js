@@ -395,7 +395,13 @@ window.GameEvents.push({
             document.body.removeChild(mapOverlay);
 
             if (damagedProvinceMap.size > 0) {
-                await game.ui.showDialogAsync("各地で被害が発生しているようです……", false, 0);
+                if (baseScale <= 3) {
+                    await game.ui.showDialogAsync("小規模な台風により、各地で軽微な被害が発生しているようです……", false, 0);
+                } else if (baseScale <= 7) {
+                    await game.ui.showDialogAsync("強い台風が上陸し、各地で被害が発生しているようです……", false, 0);
+                } else {
+                    await game.ui.showDialogAsync("猛烈な台風が直撃し、各地で甚大な被害が発生しているようです……", false, 0);
+                }
             } else {
                 await game.ui.showDialogAsync("今回は大きな被害はなかったようです。", false, 0);
             }
