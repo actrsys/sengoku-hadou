@@ -332,7 +332,7 @@ Object.assign(UIInfoManager.prototype, {
             gridPcStr = "140px 80px 80px 80px 80px 80px 80px 1fr";
             headers = [
                 `<span data-sort="name">拠点名${getSortMark('name')}</span>`,
-                `<span data-sort="soldiers">兵数${getSortMark('soldiers')}</span>`,
+                `<span data-sort="soldiers">兵士${getSortMark('soldiers')}</span>`,
                 `<span data-sort="defense">防御${getSortMark('defense')}</span>`,
                 `<span data-sort="morale">士気${getSortMark('morale')}</span>`,
                 `<span data-sort="training">訓練${getSortMark('training')}</span>`,
