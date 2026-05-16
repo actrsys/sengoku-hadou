@@ -506,5 +506,21 @@ Object.assign(UIInfoManager.prototype, {
             onBack: onBackFunc,
             onConfirm: onConfirmFunc
         });
+
+        // ★追加：タブ切り替えなどで再描画された時に、決定ボタンの状態を復元します！
+        if (isSelectMode && selectData) {
+            const confirmBtn = document.getElementById('selector-confirm-btn');
+            if (confirmBtn) {
+                if (this.selectedCastleIdForLegion) {
+                    confirmBtn.disabled = false;
+                    confirmBtn.style.opacity = '1';
+                    confirmBtn.style.cursor = 'pointer';
+                } else {
+                    confirmBtn.disabled = true;
+                    confirmBtn.style.opacity = '0.5';
+                    confirmBtn.style.cursor = 'not-allowed';
+                }
+            }
+        }
     }
 });
