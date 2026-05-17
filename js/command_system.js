@@ -1415,11 +1415,11 @@ class CommandSystem {
             } else if (extraData.subAction === 'alliance') {
                 // 外交担当に「この条件で確率教えて！」と合図を送るだけ！
                 const prob = this.game.diplomacyManager.getDiplomacyProb(firstId, targetId, 'alliance');
-                this.showAdviceAndExecute('diplomacy', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'alliance'), { trueProb: prob / 100 });
+                this.showAdviceAndExecute('alliance', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'alliance'), { trueProb: prob / 100 });
             } else if (extraData.subAction === 'break_alliance') {
                 this.executeWithEvent('break_alliance', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'break_alliance'));
             } else if (extraData.subAction === 'subordinate') {
-                this.showAdviceAndExecute('diplomacy', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'subordinate'), { trueProb: 1.0 });
+                this.showAdviceAndExecute('subordinate', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'subordinate'), { trueProb: 1.0 });
             } else if (extraData.subAction === 'vassalage') {
                 this.game.ui.showDialog(`本当に臣従しますか？\n当家は滅亡し、全ての領地を明け渡します。`, true, 
                     () => {
@@ -1430,10 +1430,10 @@ class CommandSystem {
                 );
             } else if (extraData.subAction === 'dominate') {
                 const prob = this.game.diplomacyManager.getDiplomacyProb(firstId, targetId, 'dominate');
-                this.showAdviceAndExecute('diplomacy', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: prob / 100 });
+                this.showAdviceAndExecute('dominate', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: prob / 100 });
             } else if (extraData.subAction === 'court_truce') {
                 // ★追加：朝廷和睦は条件を満たしていれば確実に成功します！
-                this.showAdviceAndExecute('diplomacy', () => this.game.courtRankSystem.executeCourtTruce(firstId, targetId), { trueProb: 1.0 });
+                this.showAdviceAndExecute('court_truce', () => this.game.courtRankSystem.executeCourtTruce(firstId, targetId), { trueProb: 1.0 });
             } else if (extraData.subAction === 'marriage') {
                 // ★変更：新しく作った「姫専用の画面」を開きます！
                 this.game.ui.showPrincessSelector(targetId, firstId);
