@@ -1384,12 +1384,21 @@ class CommandSystem {
 
         // ★ここから追加：婚姻のリストで決定ボタンを押した時の動き！
         if (actionType === 'marriage_princess') {
-            // 自勢力の縁組の場合は、相手武将のリストを開かずに直接結婚させます
+            // 自勢力の縁組の場合は、確認ダイアログを出してから結婚させます
             if (!targetId && this.game.ui.info && this.game.ui.info.arrangeMarriageBushoId) {
                 const busho = this.game.getBusho(this.game.ui.info.arrangeMarriageBushoId);
                 const princess = this.game.princesses.find(p => p.id === firstId);
-                this.executeWithEvent('arrange_marriage', () => this.executeArrangeMarriage(busho, princess));
-                this.game.ui.info.arrangeMarriageBushoId = null; // リセット
+                
+                const msg = `${busho.name} に ${princess.name} を嫁がせます。よろしいですか？`;
+                
+                this.game.ui.showDialog(msg, true, 
+                    () => {
+                        this.executeWithEvent('arrange_marriage', () => this.executeArrangeMarriage(busho, princess));
+                        this.game.ui.info.arrangeMarriageBushoId = null; // リセット
+                    },
+                    null,
+                    { okText: '嫁がせる' }
+                );
                 return;
             }
 
@@ -1411,7 +1420,7 @@ class CommandSystem {
             const princess = this.game.princesses.find(p => p.id === princessId);
             const doer = this.game.getBusho(doerId);
 
-            const msg = `${targetClan.name} の ${targetBusho.name} に、当家の ${princess.name} を嫁がせます。\nよろしいですか？`;
+            const msg = `${targetClan.name} の ${targetBusho.name} に、当家の ${princess.name} を嫁がせます。よろしいですか？`;
 
             this.game.ui.showDialog(msg, true, 
                 () => {
