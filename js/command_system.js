@@ -763,7 +763,7 @@ class CommandSystem {
                 const lFamily = Array.isArray(targetLeader.familyIds) ? targetLeader.familyIds : [];
                 return b.id === targetLeader.id || bFamily.includes(targetLeader.id) || lFamily.includes(b.id);
             });
-            infoHtml = "<div>姫を嫁がせる相手（一門武将）を選択してください</div>";
+            infoHtml = "<div>姫を嫁がせる相手を選択してください</div>";
             isMulti = false;
         }
         else if (actionType === 'war_general' || actionType === 'kunishu_war_general') {
