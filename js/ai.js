@@ -1042,7 +1042,7 @@ class AIEngine {
             }
 
             // ★今回追加：四国と九州をまたぐ攻撃のスコアを大きく下げる魔法！
-            // 四国地方のIDは8、九州地方のIDは9です。
+            // 中国地方のIDは7、四国地方のIDは8、九州地方のIDは9です。
             let targetRegionId = 0;
             const targetProv = this.game.provinces.find(p => p.id === target.provinceId);
             if (targetProv) {
@@ -1050,6 +1050,10 @@ class AIEngine {
             }
             if ((leaderRegionId === 8 && targetRegionId === 9) || (leaderRegionId === 9 && targetRegionId === 8)) {
                 prob -= 30; // 四国と九州の間の海越え攻撃はペナルティを与えて後回しにします！
+            }
+            // ★追加：中国と四国をまたぐ攻撃のスコアを下げる魔法！
+            if ((leaderRegionId === 7 && targetRegionId === 8) || (leaderRegionId === 8 && targetRegionId === 7)) {
+                prob -= 15; // 中国と四国の間の海越え攻撃もペナルティを与えますが、四国九州間よりは軽くします！
             }
             
             // 攻撃確率の最大値設定
