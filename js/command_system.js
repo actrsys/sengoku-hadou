@@ -14,7 +14,7 @@ const COMMAND_MENU_STRUCTURE = [
     },
     {
         label: "軍事",
-        commands: ['war', 'draft', 'training', 'soldier_charity', 'transport', 'kunishu_subjugate']
+        commands: ['war', 'draft', 'training', 'soldier_charity', 'move', 'transport', 'kunishu_subjugate']
     },
     {
         label: "対外",
@@ -31,12 +31,15 @@ const COMMAND_MENU_STRUCTURE = [
         commands: ['buy_rice', 'sell_rice', 'buy_horses', 'buy_guns']
     },
     {
-        label: "人事",
-        commands: ['reward', 'interview', 'employ', 'move', 'succession', 'banish']
+        label: "組織",
+        commands: ['interview', 'employ', 'succession'],
+        subMenus: [
+            { label: "任命", commands: ['appoint_gunshi', 'appoint'] },
+            { label: "賞罰", commands: ['reward', 'banish'] }
+        ]
     },
     {
-        label: "軍団",
-        commands: ['appoint_gunshi', 'appoint'],
+        label: "国主",
         subMenus: [
             {
                 label: "国主任命",
