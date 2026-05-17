@@ -30,6 +30,13 @@ class StrategySystem {
         const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
         const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
         let prob = Math.min(1.0, score / (defScore + window.MainParams.Strategy.RumorFactor)) - 0.1;
+        
+        // ★追加：対象が大名の一門なら成功確率を15%（0.15）下げます
+        const targetLord = this.game.bushos.find(b => b.clan === targetBusho.clan && b.isDaimyo);
+        if (targetLord && targetLord.familyIds && targetLord.familyIds.some(fId => targetBusho.familyIds.includes(fId))) {
+            prob -= 0.15;
+        }
+        
         prob = Math.max(0, prob);
         if (targetBusho.isCastellan) prob *= 0.67;
         return prob;
@@ -57,6 +64,11 @@ class StrategySystem {
         let successRate = (totalOffense / totalDefense) * 0.5; 
         
         successRate = Math.max(0, successRate - 0.1);
+        
+        // ★追加：対象が大名の一門なら成功確率を15%（0.15）下げます
+        if (targetLord && targetLord.familyIds && targetLord.familyIds.some(fId => target.familyIds.includes(fId))) {
+            successRate -= 0.15;
+        }
         
         // ★ここから追加：引抜先に自分の宿敵がいる場合は、成功率が半分になります！
         if (target.nemesisIds && target.nemesisIds.length > 0) {
@@ -138,6 +150,13 @@ class StrategySystem {
         const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
         const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
         let prob = (score / (defScore + window.MainParams.Strategy.RumorFactor)) - 0.1;
+        
+        // ★追加：対象が大名の一門なら成功確率を15%（0.15）下げます
+        const targetLord = this.game.bushos.find(b => b.clan === targetBusho.clan && b.isDaimyo);
+        if (targetLord && targetLord.familyIds && targetLord.familyIds.some(fId => targetBusho.familyIds.includes(fId))) {
+            prob -= 0.15;
+        }
+        
         prob = Math.max(0, prob);
         let success = Math.random() < prob; 
 
@@ -182,6 +201,11 @@ class StrategySystem {
         let successRate = (totalOffense / totalDefense) * 0.5; 
 
         successRate = Math.max(0, successRate - 0.1);
+
+        // ★追加：対象が大名の一門なら成功確率を15%（0.15）下げます
+        if (targetLord && targetLord.familyIds && targetLord.familyIds.some(fId => target.familyIds.includes(fId))) {
+            successRate -= 0.15;
+        }
 
         // ★ここから追加：引抜先に自分の宿敵がいる場合は、成功率が半分になります！
         if (target.nemesisIds && target.nemesisIds.length > 0) {
