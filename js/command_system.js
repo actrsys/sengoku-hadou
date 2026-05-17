@@ -14,13 +14,13 @@ const COMMAND_MENU_STRUCTURE = [
     },
     {
         label: "軍事",
-        items: ['war', 'draft', 'training', 'soldier_charity', 'move', 'transport', 'kunishu_subjugate']
+        items: ['war', 'draft', 'training', 'soldier_charity', 'move', 'transport']
     },
     {
         label: "対外",
         items: [
             { label: "外交", items: ['goodwill', 'alliance', 'marriage', 'dominate', 'subordinate', 'vassalage', 'break_alliance'] },
-            { label: "諸勢力", items: ['kunishu_goodwill', 'kunishu_incorporate'] },
+            { label: "諸勢力", items: ['kunishu_goodwill', 'kunishu_incorporate', 'kunishu_subjugate'] },
             { label: "調略", items: ['sabotage', 'incite', 'rumor', 'headhunt'] },
             { label: "朝廷", items: ['tribute', 'court_truce'] }
         ]
