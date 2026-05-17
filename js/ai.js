@@ -2106,6 +2106,12 @@ class AIEngine {
                             if (targetBusho.isCastellan) {
                                 targetPriority += 5;
                             }
+
+                            // ★追加：ターゲットが敵大名の一門かどうかチェックして、優先度を下げます（成功率が低いため）
+                            const targetLord = this.game.bushos.find(b => b.clan === targetBusho.clan && b.isDaimyo);
+                            if (targetLord && targetLord.familyIds && targetLord.familyIds.some(fId => targetBusho.familyIds.includes(fId))) {
+                                targetPriority -= 15;
+                            }
                             
                             // ★追加：ターゲットが自家の武将を「宿敵」として恨んでいないかチェックします
                             let hasNemesis = false;
