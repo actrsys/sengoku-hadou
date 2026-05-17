@@ -1384,6 +1384,15 @@ class CommandSystem {
 
         // ★ここから追加：婚姻のリストで決定ボタンを押した時の動き！
         if (actionType === 'marriage_princess') {
+            // 自勢力の縁組の場合は、相手武将のリストを開かずに直接結婚させます
+            if (!targetId && this.game.ui.info && this.game.ui.info.arrangeMarriageBushoId) {
+                const busho = this.game.getBusho(this.game.ui.info.arrangeMarriageBushoId);
+                const princess = this.game.princesses.find(p => p.id === firstId);
+                this.executeWithEvent('arrange_marriage', () => this.executeArrangeMarriage(busho, princess));
+                this.game.ui.info.arrangeMarriageBushoId = null; // リセット
+                return;
+            }
+
             // 使者と姫のIDを覚えて、相手武将のリストを開きます
             this.game.ui.openBushoSelector('marriage_kinsman', targetId, { 
                 doerId: extraData.doerId, 
