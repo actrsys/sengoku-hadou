@@ -109,6 +109,11 @@ class GunshiSystem {
 
     // ★軍師の賢さによって、言うこと（予測）が変わる魔法です
     getAdviceMessage(gunshi, action, seed) { 
+        // 従属願の場合は専用のメッセージを返します
+        if (action.type === 'subordinate') {
+            return "何かしらの見返りを要求されるでしょう。";
+        }
+
         // 実際の成功確率を受け取ります（無い場合は絶対に成功するコマンドとして扱います）
         let trueProb = action.trueProb !== undefined ? action.trueProb : 1.0;
         
