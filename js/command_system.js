@@ -1397,7 +1397,7 @@ class CommandSystem {
                         this.game.ui.info.arrangeMarriageBushoId = null; // リセット
                     },
                     null,
-                    { okText: '嫁がせる' }
+                    { okText: '嫁がせる', cancelText: 'やめる' }
                 );
                 return;
             }
@@ -1420,7 +1420,7 @@ class CommandSystem {
             const princess = this.game.princesses.find(p => p.id === princessId);
             const doer = this.game.getBusho(doerId);
 
-            const msg = `${targetClan.name} の ${targetBusho.name} に、当家の ${princess.name} を嫁がせます。\nよろしいですか？`;
+            const msg = `${targetClan.name} の ${targetBusho.name} に、当家の ${princess.name} を嫁がせます。よろしいですか？`;
 
             this.game.ui.showDialog(msg, true, 
                 () => {
@@ -1435,7 +1435,7 @@ class CommandSystem {
                     // いいえ：もう一度相手武将選びに戻る
                     this.game.ui.openBushoSelector('marriage_kinsman', targetId, extraData);
                 },
-                { okText: '嫁がせる' }
+                { okText: '嫁がせる', cancelText: 'やめる' }
             );
             return;
         }
