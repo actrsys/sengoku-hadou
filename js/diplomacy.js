@@ -398,11 +398,11 @@ class DiplomacyManager {
 
         return finalProb;
     }
-
+    
     /**
      * 他の大名家や諸勢力が援軍要請を承諾する確率（％）を計算する魔法です（最新版）
      */
-    getReinforcementAcceptProb(myClanId, helperForceId, enemyClanId, gold, isKunishu, myTotalSoldiers, enemyTotalSoldiers) {
+    getReinforcementAcceptProb(myClanId, helperForceId, enemyClanId, gold, isKunishu, myTotalSoldiers, enemyTotalSoldiers, helperCastleId = 0) {
         // ★ 大名家で、相手を「支配」しているなら100%（諸勢力は支配がないのでチェック不要）
         if (!isKunishu) {
             const myToHelperRel = this.getRelation(myClanId, helperForceId);
@@ -466,11 +466,19 @@ class DiplomacyManager {
         // 0%～100%の範囲に収める
         let prob = Math.max(0, Math.min(1, successRate)) * 100;
         
-        // ★お願いした先の大名家が攻撃の作戦中だったら確率を半分にする
+        // ★お願いした先の大名家の該当拠点（軍団）が攻撃の作戦中だったら確率を半分にする
         if (!isKunishu && this.game.aiOperationManager && this.game.aiOperationManager.operations) {
-            const helperOp = this.game.aiOperationManager.operations[helperForceId];
-            if (helperOp && helperOp.type === '攻撃') {
-                prob = Math.floor(prob / 2);
+            const clanOps = this.game.aiOperationManager.operations[helperForceId];
+            if (clanOps) {
+                let targetLegionId = 0;
+                if (helperCastleId) {
+                    const hCastle = this.game.getCastle(helperCastleId);
+                    if (hCastle) targetLegionId = hCastle.legionId || 0;
+                }
+                const helperOp = clanOps[targetLegionId];
+                if (helperOp && helperOp.type === '攻撃') {
+                    prob = Math.floor(prob / 2);
+                }
             }
         }
 

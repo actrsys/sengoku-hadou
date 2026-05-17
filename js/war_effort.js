@@ -2765,7 +2765,7 @@ Object.assign(WarManager.prototype, {
                 
                 if (candidate.force.isKunishu) {
                     // 諸勢力の場合の確率
-                    realProb = this.game.diplomacyManager.getReinforcementAcceptProb(defClanId, candidate.force.id, atkClanId, 0, true, defTotalSoldiers, atkTotalSoldiers);
+                    realProb = this.game.diplomacyManager.getReinforcementAcceptProb(defClanId, candidate.force.id, atkClanId, 0, true, defTotalSoldiers, atkTotalSoldiers, candidate.castle.id);
                 } else {
                     // 大名家の場合、持参金を計算してから確率を出します
                     const helperClanId = candidate.force.id;
@@ -2783,7 +2783,7 @@ Object.assign(WarManager.prototype, {
                         realProb = 100; // 支配している相手なら100%成功します
                         reinfGold = 0;
                     } else {
-                        realProb = this.game.diplomacyManager.getReinforcementAcceptProb(defClanId, helperClanId, atkClanId, reinfGold, false, defTotalSoldiers, atkTotalSoldiers);
+                        realProb = this.game.diplomacyManager.getReinforcementAcceptProb(defClanId, helperClanId, atkClanId, reinfGold, false, defTotalSoldiers, atkTotalSoldiers, candidate.castle.id);
                     }
                 }
                 
