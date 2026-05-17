@@ -2056,6 +2056,13 @@ Object.assign(WarManager.prototype, {
                 hireProb = Math.max(0, Math.min(0.99, hireProb));
                 hireProb *= 0.5; // 大名は登用しにくくします
 
+                // ★追加：一門の武将が自勢力にいる場合は成功率+0.2
+                const hasFamily = this.game.bushos.some(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.id !== prisoner.id && b.familyIds && prisoner.familyIds && b.familyIds.some(fId => prisoner.familyIds.includes(fId)));
+                if (hasFamily) {
+                    hireProb += 0.2;
+                    hireProb = Math.max(0, Math.min(0.99, hireProb));
+                }
+
                 // 宿敵が登用先の大名家にいる場合は成功率を半分にします
                 if (prisoner.nemesisIds && prisoner.nemesisIds.length > 0) {
                     const hasNemesis = prisoner.nemesisIds.some(nId => {
@@ -2200,6 +2207,13 @@ Object.assign(WarManager.prototype, {
             
             if (this.daimyoHiredBonus) {
                 hireProb += this.daimyoHiredBonus;
+                hireProb = Math.max(0, Math.min(0.99, hireProb));
+            }
+
+            // ★追加：一門の武将が自勢力にいる場合は成功率+0.2
+            const hasFamily = this.game.bushos.some(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.id !== prisoner.id && b.familyIds && prisoner.familyIds && b.familyIds.some(fId => prisoner.familyIds.includes(fId)));
+            if (hasFamily) {
+                hireProb += 0.2;
                 hireProb = Math.max(0, Math.min(0.99, hireProb));
             }
 
@@ -2451,6 +2465,13 @@ Object.assign(WarManager.prototype, {
                 hireProb *= 0.5;
             } else if (!p.isDaimyo && daimyoHiredBonus > 0) {
                 hireProb += daimyoHiredBonus;
+                hireProb = Math.max(0, Math.min(0.99, hireProb));
+            }
+
+            // ★追加：一門の武将が自勢力にいる場合は成功率+0.2
+            const hasFamily = this.game.bushos.some(b => b.clan === winnerClanId && b.status !== 'dead' && b.id !== p.id && b.familyIds && p.familyIds && b.familyIds.some(fId => p.familyIds.includes(fId)));
+            if (hasFamily) {
+                hireProb += 0.2;
                 hireProb = Math.max(0, Math.min(0.99, hireProb));
             }
 

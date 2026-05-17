@@ -803,6 +803,15 @@ class GameSystem {
         
         let prob = 1.0 - threshold;
         
+        // ★追加：一門の武将が自勢力にいる場合は成功率+0.2
+        if (window.GameApp) {
+            const hasFamily = window.GameApp.bushos.some(b => b.clan === recruiter.clan && b.status !== 'dead' && b.id !== target.id && b.familyIds && target.familyIds && b.familyIds.some(fId => target.familyIds.includes(fId)));
+            if (hasFamily) {
+                prob += 0.2;
+                prob = Math.max(0, Math.min(1.0, prob));
+            }
+        }
+
         // ★追加：宿敵が登用主の大名家にいる場合は、成功率を半分にします！
         if (target.nemesisIds && target.nemesisIds.length > 0 && window.GameApp) {
             const hasNemesis = target.nemesisIds.some(nId => {
@@ -836,26 +845,8 @@ class GameSystem {
     }
     
     static calcEmploymentSuccess(recruiter, target, recruiterClanPower, targetClanPower) {
-        // ★追加：諸勢力に所属している武将（頭領など）は引き抜けないようにガードします！
-        if ((target.belongKunishuId || 0) > 0) return false;
-
-        if (target.clan !== 0 && target.ambition > 70 && recruiterClanPower < targetClanPower * 0.7) return false; 
-        const affDiff = this.calcAffinityDiff(recruiter.affinity, target.affinity);
-        let affBonus = (affDiff < 10) ? 30 : (affDiff < 25) ? 15 : (affDiff > 40) ? -10 : 0; 
-        let resistance = target.clan === 0 ? target.ambition : target.loyalty * window.MainParams.Strategy.EmploymentDiff; 
-        
-        // ★追加：宿敵が登用主の大名家にいる場合は、抵抗値を2倍（成功しにくく）します！
-        if (target.nemesisIds && target.nemesisIds.length > 0 && window.GameApp) {
-            const hasNemesis = target.nemesisIds.some(nId => {
-                const nBusho = window.GameApp.getBusho(nId);
-                return nBusho && nBusho.clan === recruiter.clan && nBusho.status !== 'dead';
-            });
-            if (hasNemesis) {
-                resistance *= 2;
-            }
-        }
-        
-        return ((recruiter.charm + affBonus) * (Math.random() + 0.5)) > resistance; 
+        const prob = this.getEmployProb(recruiter, target, recruiterClanPower, targetClanPower);
+        return Math.random() < prob;
     }
 }
 
