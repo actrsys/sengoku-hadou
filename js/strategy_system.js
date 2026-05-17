@@ -31,15 +31,17 @@ class StrategySystem {
         const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
         let prob = Math.min(1.0, score / (defScore + window.MainParams.Strategy.RumorFactor)) - 0.1;
         
-        // ★追加：対象が大名の一門なら成功確率を15%（0.15）下げます
-        const targetLord = this.game.bushos.find(b => b.clan === targetBusho.clan && b.isDaimyo);
-        if (targetLord && targetLord.familyIds && targetLord.familyIds.some(fId => targetBusho.familyIds.includes(fId))) {
-            prob -= 0.15;
+        // ★修正：対象が役職者本人か、その一門かでペナルティを分けます（二重掛け防止）
+        if (targetBusho.isDaimyo || targetBusho.isCastellan || targetBusho.isCommander || targetBusho.isGunshi) {
+            prob -= 0.30;
+        } else {
+            const targetOfficers = this.game.bushos.filter(b => b.clan === targetBusho.clan && (b.isDaimyo || b.isCastellan || b.isCommander || b.isGunshi));
+            if (targetOfficers.some(officer => officer.familyIds && officer.familyIds.some(fId => targetBusho.familyIds.includes(fId)))) {
+                prob -= 0.15;
+            }
         }
         
-        prob = Math.max(0, prob);
-        if (targetBusho.isCastellan) prob *= 0.67;
-        return prob;
+        return Math.max(0, prob);
     }
 
     getHeadhuntProb(doerId, targetBushoId, gold) {
@@ -65,9 +67,14 @@ class StrategySystem {
         
         successRate = Math.max(0, successRate - 0.1);
         
-        // ★追加：対象が大名の一門なら成功確率を15%（0.15）下げます
-        if (targetLord && targetLord.familyIds && targetLord.familyIds.some(fId => target.familyIds.includes(fId))) {
-            successRate -= 0.15;
+        // ★修正：対象が役職者本人か、その一門かでペナルティを分けます（二重掛け防止）
+        if (target.isDaimyo || target.isCastellan || target.isCommander || target.isGunshi) {
+            successRate -= 0.30;
+        } else {
+            const targetOfficers = this.game.bushos.filter(b => b.clan === target.clan && (b.isDaimyo || b.isCastellan || b.isCommander || b.isGunshi));
+            if (targetOfficers.some(officer => officer.familyIds && officer.familyIds.some(fId => target.familyIds.includes(fId)))) {
+                successRate -= 0.15;
+            }
         }
         
         // ★ここから追加：引抜先に自分の宿敵がいる場合は、成功率が半分になります！
@@ -81,8 +88,7 @@ class StrategySystem {
             }
         }
         
-        if (target.isCastellan) successRate *= 0.67;
-        return Math.min(1.0, successRate);
+        return Math.max(0, Math.min(1.0, successRate));
     }
 
     // ★追加: 破壊工作の確率を計算する魔法
@@ -151,20 +157,18 @@ class StrategySystem {
         const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
         let prob = (score / (defScore + window.MainParams.Strategy.RumorFactor)) - 0.1;
         
-        // ★追加：対象が大名の一門なら成功確率を15%（0.15）下げます
-        const targetLord = this.game.bushos.find(b => b.clan === targetBusho.clan && b.isDaimyo);
-        if (targetLord && targetLord.familyIds && targetLord.familyIds.some(fId => targetBusho.familyIds.includes(fId))) {
-            prob -= 0.15;
+        // ★修正：対象が役職者本人か、その一門かでペナルティを分けます（二重掛け防止）
+        if (targetBusho.isDaimyo || targetBusho.isCastellan || targetBusho.isCommander || targetBusho.isGunshi) {
+            prob -= 0.30;
+        } else {
+            const targetOfficers = this.game.bushos.filter(b => b.clan === targetBusho.clan && (b.isDaimyo || b.isCastellan || b.isCommander || b.isGunshi));
+            if (targetOfficers.some(officer => officer.familyIds && officer.familyIds.some(fId => targetBusho.familyIds.includes(fId)))) {
+                prob -= 0.15;
+            }
         }
         
         prob = Math.max(0, prob);
-        let success = Math.random() < prob; 
-
-        if (targetBusho.isCastellan && success) {
-            if (Math.random() > 0.33) {
-                success = false;
-            }
-        }
+        let success = Math.random() < prob;
 
         if (isExecute) {
             if (success) {
@@ -202,9 +206,14 @@ class StrategySystem {
 
         successRate = Math.max(0, successRate - 0.1);
 
-        // ★追加：対象が大名の一門なら成功確率を15%（0.15）下げます
-        if (targetLord && targetLord.familyIds && targetLord.familyIds.some(fId => target.familyIds.includes(fId))) {
-            successRate -= 0.15;
+        // ★修正：対象が役職者本人か、その一門かでペナルティを分けます（二重掛け防止）
+        if (target.isDaimyo || target.isCastellan || target.isCommander || target.isGunshi) {
+            successRate -= 0.30;
+        } else {
+            const targetOfficers = this.game.bushos.filter(b => b.clan === target.clan && (b.isDaimyo || b.isCastellan || b.isCommander || b.isGunshi));
+            if (targetOfficers.some(officer => officer.familyIds && officer.familyIds.some(fId => target.familyIds.includes(fId)))) {
+                successRate -= 0.15;
+            }
         }
 
         // ★ここから追加：引抜先に自分の宿敵がいる場合は、成功率が半分になります！
@@ -219,12 +228,6 @@ class StrategySystem {
         }
 
         let success = Math.random() < successRate;
-
-        if (target.isCastellan && success) {
-            if (Math.random() > 0.33) {
-                success = false;
-            }
-        }
 
         if (isExecute) {
             if (success) {

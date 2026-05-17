@@ -2107,10 +2107,14 @@ class AIEngine {
                                 targetPriority += 5;
                             }
 
-                            // ★追加：ターゲットが敵大名の一門かどうかチェックして、優先度を下げます（成功率が低いため）
-                            const targetLord = this.game.bushos.find(b => b.clan === targetBusho.clan && b.isDaimyo);
-                            if (targetLord && targetLord.familyIds && targetLord.familyIds.some(fId => targetBusho.familyIds.includes(fId))) {
-                                targetPriority -= 15;
+                            // ★修正：ターゲットが役職者本人か、その一門かでAIの優先度ダウンを分けます（二重掛け防止）
+                            if (targetBusho.isDaimyo || targetBusho.isCastellan || targetBusho.isCommander || targetBusho.isGunshi) {
+                                targetPriority -= 30; // 本人の場合は成功率がガクッと下がるので大きく優先度を下げる
+                            } else {
+                                const targetOfficers = this.game.bushos.filter(b => b.clan === targetBusho.clan && (b.isDaimyo || b.isCastellan || b.isCommander || b.isGunshi));
+                                if (targetOfficers.some(officer => officer.familyIds && officer.familyIds.some(fId => targetBusho.familyIds.includes(fId)))) {
+                                    targetPriority -= 15; // 一門の場合は中程度下げる
+                                }
                             }
                             
                             // ★追加：ターゲットが自家の武将を「宿敵」として恨んでいないかチェックします
