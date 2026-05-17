@@ -247,7 +247,24 @@ class LifeSystem {
                 let hasRelative = false;
                 if (activeRelatives.length > 0) {
                     hasRelative = true;
-                    // 一門武将がいる場合、その武将のお城に移動して、所属する大名家も合わせます
+                    // ★ここから変更：複数いる場合は、相性と年齢で一番ピッタリな人を選びます！
+                    activeRelatives.sort((x, y) => {
+                        // 相性の差を計算します
+                        const diffAffinityX = GameSystem.calcAffinityDiff(b.affinity || 0, x.affinity || 0);
+                        const diffAffinityY = GameSystem.calcAffinityDiff(b.affinity || 0, y.affinity || 0);
+                        
+                        // 相性の差が違えば、差が小さい（相性が近い）人を優先します
+                        if (diffAffinityX !== diffAffinityY) {
+                            return diffAffinityX - diffAffinityY;
+                        }
+                        
+                        // 相性の差が全く同じなら、年齢（生まれた年）の差が小さい人を優先します
+                        const diffAgeX = Math.abs((b.birthYear || 1500) - (x.birthYear || 1500));
+                        const diffAgeY = Math.abs((b.birthYear || 1500) - (y.birthYear || 1500));
+                        return diffAgeX - diffAgeY;
+                    });
+
+                    // 並び替えて1番上に来た武将のお城に移動して、所属する大名家も合わせます
                     b.castleId = activeRelatives[0].castleId;
                     b.clan = activeRelatives[0].clan;
                 }
