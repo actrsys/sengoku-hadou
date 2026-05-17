@@ -1,6 +1,6 @@
 /**
  * independence_system.js
- * 城主の独立（謀反）システム
+ * 城主の裏切り（独立・寝返り・謀反）システム
  */
 
 class IndependenceSystem {
@@ -157,19 +157,19 @@ class IndependenceSystem {
                 const rel = this.game.getRelation(oldClanId, clan.id);
                 if (!rel || rel.status !== '敵対') continue;
                 
-                // その敵対大名が持っている城の中に、ここから「3マス以内」の城があるか探します
-                const enemyCastles = this.game.castles.filter(c => c.ownerClan === clan.id);
+                // その敵対大名が持っている城の中に、ここから「隣接している」城があるか探します
                 let isNear = false; // 最初は「近くない」としておきます
-                for (const ec of enemyCastles) {
-                    // タテの距離とヨコの距離を足して、何マス離れているか計算します
-                    const distance = Math.abs(castle.x - ec.x) + Math.abs(castle.y - ec.y);
-                    if (distance <= 3) {
-                        isNear = true; // 3マス以内の城が見つかったら「近い！」とメモします
-                        break; // 1つでも見つかればOKなので、探すのをやめます
+                if (castle.adjacentCastleIds) {
+                    for (const adjId of castle.adjacentCastleIds) {
+                        const adjCastle = this.game.castles.find(c => c.id === adjId);
+                        if (adjCastle && adjCastle.ownerClan === clan.id) {
+                            isNear = true; // 隣接する城の持ち主がこの大名家なら「近い！」とメモします
+                            break; // 1つでも見つかればOKなので、探すのをやめます
+                        }
                     }
                 }
-                // もし3マス以内に城が1つもなかったら、この大名家は遠すぎるので無視（スキップ）します
-                if (!isNear) continue; 
+                // もし隣接する城が1つもなかったら、この大名家は遠すぎるので無視（スキップ）します
+                if (!isNear) continue;
                 
                 const enemyDaimyo = this.game.bushos.find(b => b.clan === clan.id && b.isDaimyo);
                 if (!enemyDaimyo) continue;
