@@ -34,6 +34,7 @@ const COMMAND_MENU_STRUCTURE = [
         items: [
             'employ',
             'interview',
+            'arrange_marriage',
             { label: "任命", items: ['appoint_gunshi', 'appoint'] },
             { label: "賞罰", items: ['reward', 'banish'] },
             'succession'
@@ -410,7 +411,16 @@ const COMMAND_SPECS = {
         msg: "武将と面談します",
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyo(game)
     },
-    'employ': { 
+    'arrange_marriage': { 
+        label: "縁組", category: 'PERSONNEL', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: false, 
+        startMode: 'busho_select_special', subType: 'arrange_marriage_busho',
+        sortKey: 'leadership',
+        msg: "姫を嫁がせる武将を選択してください",
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasUnmarriedPrincess(game) && CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyo(game)
+    },
+    'employ': {
         label: "登用", category: 'PERSONNEL', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: true, 
@@ -719,6 +729,10 @@ class CommandSystem {
         else if (actionType === 'interview') { 
             bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active' && !b.isDaimyo); 
             infoHtml = "<div>面談する武将を選択してください</div>"; 
+        }
+        else if (actionType === 'arrange_marriage_busho') { 
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active' && !b.isDaimyo); 
+            infoHtml = "<div>姫を嫁がせる武将を選択してください</div>"; 
         }
         else if (actionType === 'interview_target') {
             bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active' && b.id !== extraData.interviewer.id && !b.isDaimyo);
@@ -1511,6 +1525,41 @@ class CommandSystem {
             const target = this.game.getBusho(firstId);
             const interviewer = extraData.interviewer;
             this.game.interviewSystem.executeInterviewTopic(interviewer, target);
+            return;
+        }
+
+        if (actionType === 'arrange_marriage_busho') {
+            const targetBusho = this.game.getBusho(firstId);
+            const princesses = this.game.princesses.filter(p => p.currentClanId === this.game.playerClanId && p.status === 'unmarried');
+            
+            if (princesses.length === 0) {
+                this.game.ui.showDialog("嫁がせる未婚の姫がいません。", false);
+                return;
+            }
+
+            const choices = princesses.map(p => ({
+                label: p.name,
+                className: 'btn-primary',
+                onClick: () => {
+                    this.game.ui.showDialog(`${targetBusho.name} に ${p.name} を嫁がせます。\nよろしいですか？`, true, 
+                        () => {
+                            this.executeWithEvent('arrange_marriage', () => this.executeArrangeMarriage(targetBusho, p));
+                        },
+                        null,
+                        { okText: '嫁がせる', okClass: 'btn-primary', cancelText: 'いいえ' }
+                    );
+                }
+            }));
+            choices.push({
+                label: "やめる",
+                className: 'btn-secondary',
+                onClick: () => {}
+            });
+
+            this.game.ui.showDialog("嫁がせる姫を選択してください", false, null, null, {
+                choices: choices,
+                isEvent: true
+            });
             return;
         }
 
@@ -3022,6 +3071,25 @@ class CommandSystem {
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
         this.game.ui.renderMap();
+    }
+
+    executeArrangeMarriage(busho, princess) {
+        princess.husbandId = busho.id;
+        princess.status = 'married';
+        
+        if (!busho.wifeIds.includes(princess.id)) {
+            busho.wifeIds.push(princess.id);
+        }
+
+        princess.updateFamilyIds(this.game.bushos);
+        busho.updateFamilyIds(this.game.princesses);
+
+        busho.loyalty = 100;
+        busho.isActionDone = true;
+
+        this.game.ui.showResultModal(`${busho.name} と ${princess.name} が祝言を挙げました。\n今後、${busho.name} は一門衆として扱われます。`);
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
     }
 
     // ★追加：国主解任の実行
