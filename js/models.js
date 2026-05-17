@@ -601,9 +601,13 @@ class Busho {
         this.wifeIds.forEach(wId => {
             // 姫の名簿から、奥さんのデータを探します
             const wifeData = princesses.find(p => p.id === wId);
-            // 奥さんのデータが見つかって、そのお父さんのIDがまだリストに入っていなければ追加します！
-            if (wifeData && !this.familyIds.includes(wifeData.fatherId)) {
-                this.familyIds.push(wifeData.fatherId);
+            if (wifeData) {
+                // 奥さんが持っている「一門リスト（お父さんの親戚繋がりなど）」を、全部自分のリストに加えます！
+                wifeData.familyIds.forEach(fId => {
+                    if (!this.familyIds.includes(fId)) {
+                        this.familyIds.push(fId);
+                    }
+                });
             }
         });
     }
