@@ -123,8 +123,6 @@ class Castle {
         this.yomi = data.yomi || "";
         this.ownerClan = Number(this.ownerClan);
         this.castellanId = Number(this.castellanId);
-        this.x = Number(this.x);
-        this.y = Number(this.y);
         this.provinceId = Number(this.provinceId || 0); // ★ここを追加！地方の出席番号を覚えるスペースです
         
         // ★今回追加：道だけでなく「海路」かどうかを覚える新しい箱を作ります

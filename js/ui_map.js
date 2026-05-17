@@ -479,8 +479,8 @@ Object.assign(UIManager.prototype, {
         // ★ここから追加：移動が始まる前に、透明なバリアを張って操作できなくします
         sc.style.pointerEvents = 'none';
         
-        const posX = targetCastle.pixelX !== undefined ? targetCastle.pixelX : (targetCastle.x * 80 + 40);
-        const posY = targetCastle.pixelY !== undefined ? targetCastle.pixelY : (targetCastle.y * 80 + 40);
+        const posX = targetCastle.pixelX !== undefined ? targetCastle.pixelX : 0;
+        const posY = targetCastle.pixelY !== undefined ? targetCastle.pixelY : 0;
         
         const currentLeft = parseFloat(this.mapEl.style.left || 0);
         const currentTop = parseFloat(this.mapEl.style.top || 0);
@@ -723,8 +723,8 @@ Object.assign(UIManager.prototype, {
         };
 
         this.game.castles.forEach(c1 => {
-            const pos1X = c1.pixelX !== undefined ? c1.pixelX : (c1.x * 80 + 40);
-            const pos1Y = c1.pixelY !== undefined ? c1.pixelY : (c1.y * 80 + 40);
+            const pos1X = c1.pixelX !== undefined ? c1.pixelX : 0;
+            const pos1Y = c1.pixelY !== undefined ? c1.pixelY : 0;
 
             if (c1.adjacentCastleIds) {
                 c1.adjacentCastleIds.forEach(adjId => {
@@ -736,8 +736,8 @@ Object.assign(UIManager.prototype, {
                     if (!drawnLines.has(pairKey)) {
                         drawnLines.add(pairKey);
 
-                        const pos2X = c2.pixelX !== undefined ? c2.pixelX : (c2.x * 80 + 40);
-                        const pos2Y = c2.pixelY !== undefined ? c2.pixelY : (c2.y * 80 + 40);
+                        const pos2X = c2.pixelX !== undefined ? c2.pixelX : 0;
+                        const pos2Y = c2.pixelY !== undefined ? c2.pixelY : 0;
 
                         const dx = pos2X - pos1X;
                         const dy = pos2Y - pos1Y;
@@ -830,8 +830,8 @@ Object.assign(UIManager.prototype, {
 
             el.dataset.clan = c.ownerClan;
             
-            const posX = c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40);
-            const posY = c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40);
+            const posX = c.pixelX !== undefined ? c.pixelX : 0;
+            const posY = c.pixelY !== undefined ? c.pixelY : 0;
             
             el.style.left = `${posX}px`;
             el.style.top = `${posY}px`;
@@ -1073,8 +1073,8 @@ Object.assign(UIManager.prototype, {
                     }
                     // ★追加ここまで！
 
-                    const posX = castle.pixelX !== undefined ? castle.pixelX : (castle.x * 80 + 40);
-                    const posY = castle.pixelY !== undefined ? castle.pixelY : (castle.y * 80 + 40);
+                    const posX = castle.pixelX !== undefined ? castle.pixelX : 0;
+                    const posY = castle.pixelY !== undefined ? castle.pixelY : 0;
                     
                     labelsData.push({
                         clanId: clan.id,
@@ -1538,8 +1538,8 @@ Object.assign(UIManager.prototype, {
         provinceInfo.forEach((info, provId) => {
             // ★変更：１つの勢力しかいない国でも、どの城の領土かを記録するために全城から陣取りさせます！
             info.castles.forEach(c => {
-                const cx = Math.floor(c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40));
-                const cy = Math.floor(c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40));
+                const cx = Math.floor(c.pixelX !== undefined ? c.pixelX : 0);
+                const cy = Math.floor(c.pixelY !== undefined ? c.pixelY : 0);
                 
                 if (cx >= 0 && cx < width && cy >= 0 && cy < height) {
                     const idx = cy * width + cx;
@@ -1619,8 +1619,8 @@ Object.assign(UIManager.prototype, {
                 let minDistSq = Infinity;
                 for (let j = 0; j < info.castles.length; j++) {
                     const c = info.castles[j];
-                    const cx = c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40);
-                    const cy = c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40);
+                    const cx = c.pixelX !== undefined ? c.pixelX : 0;
+                    const cy = c.pixelY !== undefined ? c.pixelY : 0;
                     // 計算を軽くするため、二乗の記号（**2）ではなく掛け算を使います
                     const dSq = (px - cx) * (px - cx) + (py - cy) * (py - cy);
                     if (dSq < minDistSq) {
@@ -1692,8 +1692,7 @@ Object.assign(UIManager.prototype, {
                 }
             }
         }
-        // ★追加ここまで！
-
+        
         ctx.putImageData(outputData, 0, 0);
         
         // ★ここで描いた勢力の色（写真）を丸ごと記憶します！
