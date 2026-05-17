@@ -1806,14 +1806,15 @@ class UIManager {
                         currentMenuInfo = topItem;
                         break;
                     }
-                    if (topItem.subMenus) {
-                        for (const sub of topItem.subMenus) {
-                            if (sub.label === this.menuState) {
+                    if (topItem.items) {
+                        for (const sub of topItem.items) {
+                            if (typeof sub === 'object' && sub !== null && sub.label === this.menuState) {
                                 currentMenuInfo = sub;
                                 parentMenuName = topItem.label;
                                 break;
                             }
                         }
+                        if (currentMenuInfo) break;
                     }
                 }
                 
@@ -1821,21 +1822,20 @@ class UIManager {
                     menu('MAIN');
                 } else {
                     let btnCount = 0;
-                    if (currentMenuInfo.commands) {
-                        currentMenuInfo.commands.forEach(key => {
-                            const spec = specs[key];
-                            if (spec) {
-                                const isDisabled = typeof this.game.commandSystem.canExecuteCommand === 'function' ? !this.game.commandSystem.canExecuteCommand(key) : false;
-                                createBtn(spec.label, "", () => cmd(key), isDisabled);
+                    if (currentMenuInfo.items) {
+                        currentMenuInfo.items.forEach(item => {
+                            if (typeof item === 'string') {
+                                const spec = specs[item];
+                                if (spec) {
+                                    const isDisabled = typeof this.game.commandSystem.canExecuteCommand === 'function' ? !this.game.commandSystem.canExecuteCommand(item) : false;
+                                    createBtn(spec.label, "", () => cmd(item), isDisabled);
+                                    btnCount++;
+                                }
+                            } else if (typeof item === 'object' && item !== null) {
+                                const isDisabled = this.game.commandSystem.isCategoryDisabled(item.label);
+                                createBtn(item.label, "category", () => menu(item.label), isDisabled);
                                 btnCount++;
                             }
-                        });
-                    }
-                    if (currentMenuInfo.subMenus) {
-                        currentMenuInfo.subMenus.forEach(sub => {
-                            const isDisabled = this.game.commandSystem.isCategoryDisabled(sub.label);
-                            createBtn(sub.label, "category", () => menu(sub.label), isDisabled);
-                            btnCount++;
                         });
                     }
                     const emptyCount = 2 - (btnCount % 3);
@@ -1913,31 +1913,30 @@ class UIManager {
             if (this.pcMenuPath.length <= pathIndex) return;
             
             const activeLabel = this.pcMenuPath[pathIndex];
-            const activeItem = menuList.find(m => m.label === activeLabel);
+            const activeItem = menuList.find(m => typeof m === 'object' && m !== null && m.label === activeLabel);
             if (!activeItem) return;
             
             const col = createCol();
             
-            if (activeItem.commands) {
-                activeItem.commands.forEach(key => {
-                    const spec = specs[key];
-                    if (spec) {
-                        const isDisabled = typeof this.game.commandSystem.canExecuteCommand === 'function' ? !this.game.commandSystem.canExecuteCommand(key) : false;
-                        createBtn(col, spec.label, "", () => cmd(key), isDisabled);
+            if (activeItem.items) {
+                activeItem.items.forEach(item => {
+                    if (typeof item === 'string') {
+                        const spec = specs[item];
+                        if (spec) {
+                            const isDisabled = typeof this.game.commandSystem.canExecuteCommand === 'function' ? !this.game.commandSystem.canExecuteCommand(item) : false;
+                            createBtn(col, spec.label, "", () => cmd(item), isDisabled);
+                        }
+                    } else if (typeof item === 'object' && item !== null) {
+                        const isActive = this.pcMenuPath[pathIndex + 1] === item.label;
+                        const isDisabled = this.game.commandSystem.isCategoryDisabled(item.label);
+                        createBtn(col, item.label, isActive ? "category active" : "category", () => {
+                            this.pcMenuPath = this.pcMenuPath.slice(0, pathIndex + 1);
+                            if (!isActive) this.pcMenuPath.push(item.label);
+                            this.renderPcCommandMenu();
+                        }, isDisabled);
                     }
                 });
-            }
-            if (activeItem.subMenus) {
-                activeItem.subMenus.forEach(sub => {
-                    const isActive = this.pcMenuPath[pathIndex + 1] === sub.label;
-                    const isDisabled = this.game.commandSystem.isCategoryDisabled(sub.label);
-                    createBtn(col, sub.label, isActive ? "category active" : "category", () => {
-                        this.pcMenuPath = this.pcMenuPath.slice(0, pathIndex + 1);
-                        if (!isActive) this.pcMenuPath.push(sub.label);
-                        this.renderPcCommandMenu();
-                    }, isDisabled);
-                });
-                renderSubMenu(activeItem.subMenus, pathIndex + 1, col);
+                renderSubMenu(activeItem.items, pathIndex + 1, col);
             }
         };
         

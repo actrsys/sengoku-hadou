@@ -10,58 +10,57 @@
 const COMMAND_MENU_STRUCTURE = [
     {
         label: "内政",
-        commands: ['farm', 'commerce', 'repair', 'charity']
+        items: ['farm', 'commerce', 'repair', 'charity']
     },
     {
         label: "軍事",
-        commands: ['war', 'draft', 'training', 'soldier_charity', 'move', 'transport', 'kunishu_subjugate']
+        items: ['war', 'draft', 'training', 'soldier_charity', 'move', 'transport', 'kunishu_subjugate']
     },
     {
         label: "対外",
-        // ★ここが「入れ子（サブメニュー）」になる部分です！
-        subMenus: [
-            { label: "外交", commands: ['goodwill', 'alliance', 'marriage', 'dominate', 'subordinate', 'vassalage', 'break_alliance'] },
-            { label: "諸勢力", commands: ['kunishu_goodwill', 'kunishu_incorporate'] },
-            { label: "調略", commands: ['sabotage', 'incite', 'rumor', 'headhunt'] },
-            { label: "朝廷", commands: ['tribute', 'court_truce'] }
+        items: [
+            { label: "外交", items: ['goodwill', 'alliance', 'marriage', 'dominate', 'subordinate', 'vassalage', 'break_alliance'] },
+            { label: "諸勢力", items: ['kunishu_goodwill', 'kunishu_incorporate'] },
+            { label: "調略", items: ['sabotage', 'incite', 'rumor', 'headhunt'] },
+            { label: "朝廷", items: ['tribute', 'court_truce'] }
         ]
     },
     {
         label: "取引",
-        commands: ['buy_rice', 'sell_rice', 'buy_horses', 'buy_guns']
+        items: ['buy_rice', 'sell_rice', 'buy_horses', 'buy_guns']
     },
     {
         label: "組織",
-        commands: ['interview', 'employ', 'succession'],
-        subMenus: [
-            { label: "任命", commands: ['appoint_gunshi', 'appoint'] },
-            { label: "賞罰", commands: ['reward', 'banish'] }
+        items: [
+            { label: "任命", items: ['appoint_gunshi', 'appoint'] },
+            { label: "賞罰", items: ['reward', 'banish'] },
+            'interview', 'employ', 'succession'
         ]
     },
     {
         label: "国主",
-        subMenus: [
+        items: [
             {
                 label: "国主任命",
-                commands: [1, 2, 3, 4, 5, 6, 7, 8].map(n => 'appoint_legion_leader_' + n)
+                items: [1, 2, 3, 4, 5, 6, 7, 8].map(n => 'appoint_legion_leader_' + n)
             },
             {
                 label: "国主解任",
-                commands: [1, 2, 3, 4, 5, 6, 7, 8].map(n => 'dismiss_legion_leader_' + n)
+                items: [1, 2, 3, 4, 5, 6, 7, 8].map(n => 'dismiss_legion_leader_' + n)
             },
             {
                 label: "所領分配",
-                commands: [1, 2, 3, 4, 5, 6, 7, 8].map(n => 'allot_fief_' + n)
+                items: [1, 2, 3, 4, 5, 6, 7, 8].map(n => 'allot_fief_' + n)
             }
         ]
     },
     {
         label: "情報",
-        commands: ['busho_list', 'princess_list', 'kyoten_list', 'faction_list', 'daimyo_list', 'kunishu_list']
+        items: ['busho_list', 'princess_list', 'kyoten_list', 'faction_list', 'daimyo_list', 'kunishu_list']
     },
     {
         label: "システム",
-        commands: ['history', 'settings', 'save', 'load', 'watch', 'title']
+        items: ['history', 'settings', 'save', 'load', 'watch', 'title']
     }
 ];
 
@@ -917,10 +916,12 @@ class CommandSystem {
     isCategoryDisabled(categoryLabel) {
         const findMenu = (list, label) => {
             for (const item of list) {
-                if (item.label === label) return item;
-                if (item.subMenus) {
-                    const found = findMenu(item.subMenus, label);
-                    if (found) return found;
+                if (typeof item === 'object' && item !== null) {
+                    if (item.label === label) return item;
+                    if (item.items) {
+                        const found = findMenu(item.items, label);
+                        if (found) return found;
+                    }
                 }
             }
             return null;
@@ -930,14 +931,13 @@ class CommandSystem {
         if (!targetMenu) return false;
 
         const hasExecutableCommand = (menuItem) => {
-            if (menuItem.commands) {
-                for (const cmdKey of menuItem.commands) {
-                    if (this.canExecuteCommand(cmdKey)) return true;
-                }
-            }
-            if (menuItem.subMenus) {
-                for (const sub of menuItem.subMenus) {
-                    if (hasExecutableCommand(sub)) return true;
+            if (menuItem.items) {
+                for (const item of menuItem.items) {
+                    if (typeof item === 'string') {
+                        if (this.canExecuteCommand(item)) return true;
+                    } else if (typeof item === 'object' && item !== null) {
+                        if (hasExecutableCommand(item)) return true;
+                    }
                 }
             }
             return false;
