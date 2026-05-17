@@ -149,9 +149,6 @@ class IndependenceSystem {
 
         // ★追加：独立志向(indep)でなければ、寝返り先を探します
         if (intention !== 'indep') {
-            // ★変更：寝返り前の「今のままの大名家の戦力」を計算します
-            const oldClanPower = this.calcClanPower(oldClanId);
-
             // 相性の計算基準を rebellionLeader（神輿になる人物）に変更
             const oldAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, oldDaimyo.affinity);
 
@@ -187,14 +184,13 @@ class IndependenceSystem {
                     affinityBonus = oldAffinityDiff - enemyAffinityDiff; 
                 }
 
-                // ★変更：「今の敵対大名戦力」 ＞ 「今の元大名戦力」 になるなら候補に入れます
-                if ((enemyCurrentPower + affinityBonus) > oldClanPower) {
-                    const score = enemyCurrentPower + affinityBonus;
-                    if (score > bestScore) {
-                        bestScore = score;
-                        targetClanId = clan.id;
-                        targetDaimyo = enemyDaimyo;
-                    }
+                // ★変更：元の主家の戦力による足切りをなくし、戦力が低い勢力でも寝返り先の候補に入れます
+                // （戦力が大きいほど score が高くなり選ばれやすいのはそのままです）
+                const score = enemyCurrentPower + affinityBonus;
+                if (score > bestScore) {
+                    bestScore = score;
+                    targetClanId = clan.id;
+                    targetDaimyo = enemyDaimyo;
                 }
             }
         }
