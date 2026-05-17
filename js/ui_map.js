@@ -35,6 +35,7 @@ const MAP_ZOOM_CONFIG = {
 };
 
 // ★ 看板屋さん（UIManager）に、後からマップの魔法を合体させる特別な魔法です！
+//  Object.assignではそれぞれのメソッドの間に必ずカンマが必要です
 Object.assign(UIManager.prototype, {
 
     initMapDrag() {
