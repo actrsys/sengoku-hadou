@@ -1625,21 +1625,21 @@ class GameManager {
 
                 // 役職ごとの経験値追加
                 if (b.isCastellan) {
-                    b.expStrength = (b.expStrength || 0) + 3;
+                    b.expStrength = (b.expStrength || 0) + 1;
                     b.expPolitics = (b.expPolitics || 0) + 3;
                 }
                 
                 if (b.isDaimyo || b.isCommander) {
-                    b.expLeadership = (b.expLeadership || 0) + 5;
-                    b.expDiplomacy = (b.expDiplomacy || 0) + 5;
+                    b.expLeadership = (b.expLeadership || 0) + 2;
+                    b.expDiplomacy = (b.expDiplomacy || 0) + 3;
                     b.expIntelligence = (b.expIntelligence || 0) + 2;
                 }
                 
                 if (b.isGunshi) {
-                    b.expLeadership = (b.expLeadership || 0) + 5;
+                    b.expLeadership = (b.expLeadership || 0) + 2;
                     b.expIntelligence = (b.expIntelligence || 0) + 5;
                     b.expPolitics = (b.expPolitics || 0) + 2;
-                    b.expDiplomacy = (b.expDiplomacy || 0) + 2;
+                    b.expDiplomacy = (b.expDiplomacy || 0) + 3;
                 }
 
                 // 金が足りなかったら城にいる家臣の忠誠度が１下がる
