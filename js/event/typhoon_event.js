@@ -196,8 +196,10 @@ window.GameEvents.push({
                     }
                 }
 
-                let baseDecay = (Math.random() * 1.0) - 0.5; 
-                let northDecay = 0.3 * progress; 
+                // サイコロの目を -0.8 から 0.4 の間になるように変更します。
+                // マイナスの数字（大きくなる力）が出やすくなり、成長しやすくなります。
+                let baseDecay = (Math.random() * 1.2) - 0.8; 
+                let northDecay = 0.3 * progress;
 
                 if (onLand) {
                     landCount++;
