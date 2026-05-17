@@ -414,7 +414,7 @@ const COMMAND_SPECS = {
     'arrange_marriage': { 
         label: "縁組", category: 'PERSONNEL', 
         costGold: 0, costRice: 0, 
-        isMulti: false, hasAdvice: false, 
+        isMulti: false, hasAdvice: true, 
         startMode: 'busho_select_special', subType: 'arrange_marriage_busho',
         sortKey: 'leadership',
         msg: "姫を嫁がせる武将を選択してください",
