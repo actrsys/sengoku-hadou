@@ -2213,7 +2213,8 @@ class AIEngine {
                 if (action.type === 'kunishu_goodwill' && castle.gold >= action.cost) {
                     castle.gold -= action.cost;
                     const kunishu = action.targetKunishu;
-                    const increase = this.game.commandSystem.calcGoodwillIncrease(action.cost, doer);
+                    // 正しい外交の専門部署（diplomacyManager）に計算をお願いするように直します
+                    const increase = this.game.diplomacyManager.calcGoodwillIncrease(action.cost, doer);
                     const currentRel = kunishu.getRelation(castle.ownerClan);
                     kunishu.setRelation(castle.ownerClan, currentRel + increase);
                     
