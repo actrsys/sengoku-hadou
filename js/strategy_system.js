@@ -326,53 +326,71 @@ class StrategySystem {
         }
         return "";
     }
-    
-    // 引抜を実行する魔法
-    executeHeadhunt(doerId, targetBushoId, gold) {
-        const doer = this.game.getBusho(doerId);
-        const target = this.game.getBusho(targetBushoId);
-        const castle = this.game.getCurrentTurnCastle();
-        if (castle.gold < gold) { this.game.ui.showDialog("資金が足りません", false); return; }
-        
-        castle.gold -= gold;
-        
-        // ★専門部署である StrategySystem の計算魔法を呼びます！
-        let isSuccess = this.calcHeadhunt(doerId, targetBushoId, gold, true);
-        
-        // ★追加：隠密チェックを行います
-        const covertMsg = this.handleCovertAction(doerId, target.castleId, isSuccess, 'headhunt', target.isCastellan && isSuccess, target.id);
-        
+
+    // ==========================================
+    // ★調略コマンドの結果を反映する魔法（AIとプレイヤーで一元化！）
+    // ==========================================
+
+    applySabotageEffect(doer, targetCastle, result) {
+        if(result.success) {
+            targetCastle.defense = Math.max(0, targetCastle.defense - result.val); 
+            doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(doer.intelligence * 0.2) + 10;
+            if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 20);
+        } else {
+            doer.achievementTotal = (doer.achievementTotal || 0) + 5;
+            if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+        }
+    }
+
+    applyInciteEffect(doer, targetCastle, result) {
+        if(result.success) {
+            targetCastle.peoplesLoyalty = Math.max(0, targetCastle.peoplesLoyalty - result.val); 
+            doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(doer.intelligence * 0.2) + 10;
+            if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 20);
+        } else {
+            doer.achievementTotal = (doer.achievementTotal || 0) + 5;
+            if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+        }
+    }
+
+    applyRumorEffect(doer, targetBusho, result) {
+        if(result.success) {
+            targetBusho.loyalty = Math.max(0, targetBusho.loyalty - result.val); 
+            doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(doer.intelligence * 0.2) + 10;
+            if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 20);
+        } else {
+            doer.achievementTotal = (doer.achievementTotal || 0) + 5;
+            if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+        }
+    }
+
+    applyHeadhuntEffect(doer, target, destCastle, isSuccess) {
+        let captiveMsgs = [];
         if (isSuccess) {
             const oldCastle = this.game.getCastle(target.castleId);
             const oldClanId = target.clan;
             const newClanId = doer.clan;
             
-            // ★他の大名家から移ってくるので、功績を半分にします！
             if (oldClanId !== 0 && oldClanId !== newClanId) {
-                target.achievementTotal = Math.floor(target.achievementTotal / 2);
+                target.achievementTotal = Math.floor((target.achievementTotal || 0) / 2);
             }
             
             if (target.isCastellan && oldCastle) {
-                // ■ 城主を引き抜いた場合（城ごと寝返る！）
                 this.game.castleManager.changeOwner(oldCastle, newClanId);
                 target.clan = newClanId;
                 target.isActionDone = true;
                 target.status = 'active';
-                target.isGunshi = false; // 念のため軍師を外しておきます
+                target.isGunshi = false;
                 
-                // 部下たちの処理
                 const targetLord = this.game.bushos.find(b => b.clan === oldClanId && b.isDaimyo) || { affinity: 50 };
-                const indSys = this.game.independenceSystem;
-                const captiveMsgs = indSys.resolveSubordinates(oldCastle, target, targetLord, newClanId, oldClanId);
-
-                // 新しく味方になった城主と、ついてきた部下たちの忠誠度を相性に合わせて計算し直します
+                captiveMsgs = this.game.independenceSystem.resolveSubordinates(oldCastle, target, targetLord, newClanId, oldClanId);
+                
                 this.game.getCastleBushos(oldCastle.id).forEach(b => {
                     if (b.clan === newClanId && b.status === 'active') {
                         this.game.affiliationSystem.updateLoyaltyForNewLord(b, newClanId);
                     }
                 });
                 
-                // 本物の軍師「以外」の武将から軍師バッジを没収します！
                 const myGunshi = this.game.bushos.find(b => b.clan === newClanId && b.isGunshi);
                 this.game.getCastleBushos(oldCastle.id).forEach(b => {
                     if (!myGunshi || b.id !== myGunshi.id) {
@@ -383,33 +401,57 @@ class StrategySystem {
                 });
                 
                 this.game.updateCastleLord(oldCastle);
-
-                let msg = `${doer.name}の引抜工作が成功！\n${target.name}が【${oldCastle.name}】ごと我が軍に寝返りました！`;
+            } else {
+                target.belongKunishuId = 0; 
+                target.isActionDone = true; 
+                this.game.affiliationSystem.joinClan(target, newClanId, destCastle.id);
+            }
+            
+            const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
+            doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(maxStat * 0.3);
+            if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 25);
+        } else {
+            doer.achievementTotal = (doer.achievementTotal || 0) + 5;
+            if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+        }
+        return captiveMsgs;
+    }
+    
+    // 引抜を実行する魔法
+    executeHeadhunt(doerId, targetBushoId, gold) {
+        const doer = this.game.getBusho(doerId);
+        const target = this.game.getBusho(targetBushoId);
+        const castle = this.game.getCurrentTurnCastle();
+        if (castle.gold < gold) { this.game.ui.showDialog("資金が足りません", false); return; }
+        
+        castle.gold -= gold;
+        
+        // メモを残す魔法
+        target.lastApproachedClanId = doer.clan;
+        
+        let isSuccess = this.calcHeadhunt(doerId, targetBushoId, gold, true);
+        const covertMsg = this.handleCovertAction(doerId, target.castleId, isSuccess, 'headhunt', target.isCastellan && isSuccess, target.id);
+        
+        const oldCastleName = target.isCastellan ? this.game.getCastle(target.castleId)?.name : "";
+        
+        // ★ 一元化した処理を呼び出します
+        const captiveMsgs = this.applyHeadhuntEffect(doer, target, castle, isSuccess);
+        
+        if (isSuccess) {
+            if (target.isCastellan) {
+                let msg = `${doer.name}の引抜工作が成功！\n${target.name}が【${oldCastleName}】ごと我が軍に寝返りました！`;
                 if (captiveMsgs && captiveMsgs.length > 0) {
                     msg += '\n\n' + captiveMsgs.join('\n');
                 }
                 msg += covertMsg;
                 this.game.ui.showResultModal(msg);
-
             } else {
-                // ■ 普通の武将（城主以外）を引き抜いた場合
-                target.belongKunishuId = 0; 
-                target.isActionDone = true; 
-                
-                // 新しいお引越しセンターの魔法を使います！
-                this.game.affiliationSystem.joinClan(target, newClanId, castle.id);
-                
                 this.game.ui.showResultModal(`${doer.name}の引抜工作が成功！\n${target.name}が我が軍に加わりました！${covertMsg}`);
             }
-            
-            const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
-            doer.achievementTotal += Math.floor(maxStat * 0.3);
-            this.game.factionSystem.updateRecognition(doer, 25);
         } else {
             this.game.ui.showResultModal(`${doer.name}の引抜工作は失敗しました……\n${target.name}は応じませんでした${covertMsg}`);
-            doer.achievementTotal += 5;
-            this.game.factionSystem.updateRecognition(doer, 10);
         }
+        
         doer.isActionDone = true; 
         this.game.ui.updatePanelHeader(); 
         this.game.ui.renderCommandMenu();
@@ -420,23 +462,20 @@ class StrategySystem {
     executeIncite(doerId, targetId) { 
         const doer = this.game.getBusho(doerId);
         const target = this.game.getCastle(targetId); 
-        // ★専門部署である StrategySystem の計算魔法を呼びます！
-        const result = this.calcIncite(doerId, targetId, true); 
         
-        // ★追加：隠密チェックを行います
+        const result = this.calcIncite(doerId, targetId, true); 
         const covertMsg = this.handleCovertAction(doerId, targetId, result.success, 'incite');
 
+        const oldVal = target.peoplesLoyalty;
+        
+        // ★ 一元化した処理を呼び出します
+        this.applyInciteEffect(doer, target, result);
+
         if(result.success) {
-            const oldVal = target.peoplesLoyalty;
-            target.peoplesLoyalty = Math.max(0, target.peoplesLoyalty - result.val); 
             const actualDrop = oldVal - target.peoplesLoyalty;
             this.game.ui.showResultModal(`${doer.name}の扇動が成功！\n${target.name}の民忠が${actualDrop}低下しました${covertMsg}`); 
-            doer.achievementTotal += Math.floor(doer.intelligence * 0.2) + 10;
-            this.game.factionSystem.updateRecognition(doer, 20); 
         } else { 
             this.game.ui.showResultModal(`${doer.name}の扇動は失敗しました${covertMsg}`); 
-            doer.achievementTotal += 5; 
-            this.game.factionSystem.updateRecognition(doer, 10); 
         } 
         doer.isActionDone = true; 
         this.game.ui.updatePanelHeader(); 
@@ -448,23 +487,22 @@ class StrategySystem {
         const doer = this.game.getBusho(doerId); 
         const targetBusho = this.game.getBusho(targetBushoId); 
         
-        // ★専門部署である StrategySystem の計算魔法を呼びます！
-        let result = this.calcRumor(doerId, targetBushoId, true);
+        // メモを残す魔法
+        targetBusho.lastApproachedClanId = doer.clan;
 
-        // ★追加：隠密チェックを行います
+        let result = this.calcRumor(doerId, targetBushoId, true);
         const covertMsg = this.handleCovertAction(doerId, targetBusho.castleId, result.success, 'rumor', false, targetBusho.id);
 
+        const oldVal = targetBusho.loyalty;
+        
+        // ★ 一元化した処理を呼び出します
+        this.applyRumorEffect(doer, targetBusho, result);
+
         if(result.success) { 
-            const oldVal = targetBusho.loyalty;
-            targetBusho.loyalty = Math.max(0, targetBusho.loyalty - result.val); 
             const actualDrop = oldVal - targetBusho.loyalty;
             this.game.ui.showResultModal(`${doer.name}の離間計が成功！\n${targetBusho.name}の忠誠が低下しました${covertMsg}`);
-            doer.achievementTotal += Math.floor(doer.intelligence * 0.2) + 10;
-            this.game.factionSystem.updateRecognition(doer, 20); 
         } else { 
             this.game.ui.showResultModal(`${doer.name}の離間計は失敗しました${covertMsg}`); 
-            doer.achievementTotal += 5; 
-            this.game.factionSystem.updateRecognition(doer, 10); 
         } 
         doer.isActionDone = true; 
         this.game.ui.updatePanelHeader(); 
@@ -477,21 +515,18 @@ class StrategySystem {
         const target = this.game.getCastle(targetId); 
         
         const result = this.calcSabotage(doerId, targetId, true); 
-        
-        // ★追加：隠密チェックを行います
         const covertMsg = this.handleCovertAction(doerId, targetId, result.success, 'sabotage');
 
+        const oldVal = target.defense;
+        
+        // ★ 一元化した処理を呼び出します
+        this.applySabotageEffect(doer, target, result);
+
         if(result.success) {
-            const oldVal = target.defense;
-            target.defense = Math.max(0, target.defense - result.val); 
             const actualDrop = oldVal - target.defense;
             this.game.ui.showResultModal(`${doer.name}の破壊工作が成功！\n${target.name}の防御力が${actualDrop}低下しました${covertMsg}`); 
-            doer.achievementTotal += Math.floor(doer.intelligence * 0.2) + 10;
-            this.game.factionSystem.updateRecognition(doer, 20); 
         } else { 
             this.game.ui.showResultModal(`${doer.name}の破壊工作は失敗しました${covertMsg}`); 
-            doer.achievementTotal += 5; 
-            this.game.factionSystem.updateRecognition(doer, 10); 
         } 
         doer.isActionDone = true; 
         this.game.ui.updatePanelHeader(); 

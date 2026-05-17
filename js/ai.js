@@ -2257,15 +2257,9 @@ class AIEngine {
                 if (action.type === 'sabotage') {
                     const result = this.game.strategySystem.calcSabotage(doer.id, action.targetId, true);
                     this.game.strategySystem.handleCovertAction(doer.id, action.targetId, result.success, 'sabotage');
-                    if (result.success) {
-                        const target = this.game.getCastle(action.targetId);
-                        target.defense = Math.max(0, target.defense - result.val);
-                        doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(doer.intelligence * 0.2) + 10;
-                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 20);
-                    } else {
-                        doer.achievementTotal = (doer.achievementTotal || 0) + 5;
-                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
-                    }
+                    
+                    const target = this.game.getCastle(action.targetId);
+                    this.game.strategySystem.applySabotageEffect(doer, target, result);
                     
                     let keepAction = false;
                     if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
@@ -2281,15 +2275,9 @@ class AIEngine {
                 if (action.type === 'incite') {
                     const result = this.game.strategySystem.calcIncite(doer.id, action.targetId, true);
                     this.game.strategySystem.handleCovertAction(doer.id, action.targetId, result.success, 'incite');
-                    if (result.success) {
-                        const target = this.game.getCastle(action.targetId);
-                        target.peoplesLoyalty = Math.max(0, target.peoplesLoyalty - result.val);
-                        doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(doer.intelligence * 0.2) + 10;
-                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 20);
-                    } else {
-                        doer.achievementTotal = (doer.achievementTotal || 0) + 5;
-                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
-                    }
+                    
+                    const target = this.game.getCastle(action.targetId);
+                    this.game.strategySystem.applyInciteEffect(doer, target, result);
                     
                     let keepAction = false;
                     if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
@@ -2305,15 +2293,11 @@ class AIEngine {
                 if (action.type === 'rumor') {
                     let result = this.game.strategySystem.calcRumor(doer.id, action.targetBushoId, true);
                     const targetBusho = this.game.getBusho(action.targetBushoId);
+                    
+                    targetBusho.lastApproachedClanId = doer.clan;
                     this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, result.success, 'rumor', false, targetBusho.id);
-                    if (result.success) {
-                        targetBusho.loyalty = Math.max(0, targetBusho.loyalty - result.val);
-                        doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(doer.intelligence * 0.2) + 10;
-                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 20);
-                    } else {
-                        doer.achievementTotal = (doer.achievementTotal || 0) + 5;
-                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
-                    }
+                    
+                    this.game.strategySystem.applyRumorEffect(doer, targetBusho, result);
                     
                     let keepAction = false;
                     if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
@@ -2329,52 +2313,13 @@ class AIEngine {
                 if (action.type === 'headhunt' && castle.gold >= action.cost) {
                     castle.gold -= action.cost;
                     const targetBusho = this.game.getBusho(action.targetBushoId);
+                    
+                    targetBusho.lastApproachedClanId = doer.clan;
+
                     let isSuccess = this.game.strategySystem.calcHeadhunt(doer.id, action.targetBushoId, action.gold, true);
                     this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, isSuccess, 'headhunt', targetBusho.isCastellan && isSuccess, targetBusho.id);
-                    if (isSuccess) {
-                        const oldCastle = this.game.getCastle(targetBusho.castleId);
-                        const oldClanId = targetBusho.clan;
-                        const newClanId = doer.clan;
-                        
-                        if (oldClanId !== 0 && oldClanId !== newClanId) {
-                            targetBusho.achievementTotal = Math.floor(targetBusho.achievementTotal / 2);
-                        }
-                        
-                        if (targetBusho.isCastellan && oldCastle) {
-                            this.game.castleManager.changeOwner(oldCastle, newClanId);
-                            targetBusho.clan = newClanId;
-                            targetBusho.isActionDone = true;
-                            targetBusho.status = 'active';
-                            targetBusho.isGunshi = false;
-                            
-                            const targetLord = this.game.bushos.find(b => b.clan === oldClanId && b.isDaimyo) || { affinity: 50 };
-                            this.game.independenceSystem.resolveSubordinates(oldCastle, targetBusho, targetLord, newClanId, oldClanId);
-                            
-                            this.game.getCastleBushos(oldCastle.id).forEach(b => {
-                                if (b.clan === newClanId && b.status === 'active') {
-                                    this.game.affiliationSystem.updateLoyaltyForNewLord(b, newClanId);
-                                }
-                            });
-                            
-                            const myGunshi = this.game.bushos.find(b => b.clan === newClanId && b.isGunshi);
-                            this.game.getCastleBushos(oldCastle.id).forEach(b => {
-                                if (!myGunshi || b.id !== myGunshi.id) {
-                                    if (b.clan === newClanId && b.status === 'active') b.isGunshi = false;
-                                }
-                            });
-                            this.game.updateCastleLord(oldCastle);
-                        } else {
-                            targetBusho.belongKunishuId = 0;
-                            targetBusho.isActionDone = true;
-                            this.game.affiliationSystem.joinClan(targetBusho, newClanId, castle.id);
-                        }
-                        const maxStat = Math.max(targetBusho.strength, targetBusho.intelligence, targetBusho.leadership, targetBusho.charm, targetBusho.diplomacy);
-                        doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(maxStat * 0.3);
-                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 25);
-                    } else {
-                        doer.achievementTotal = (doer.achievementTotal || 0) + 5;
-                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
-                    }
+                    
+                    this.game.strategySystem.applyHeadhuntEffect(doer, targetBusho, castle, isSuccess);
                     
                     let keepAction = false;
                     if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
@@ -2387,6 +2332,7 @@ class AIEngine {
                     if (!keepAction) doer.isActionDone = true; 
                     actionDoneInThisStep = true; break;
                 }
+                
                 if (action.type === 'repair' && castle.gold >= 200) {
                     castle.gold -= 200;
                     const val = GameSystem.calcRepair(doer, 1.0, true);

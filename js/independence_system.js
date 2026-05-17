@@ -186,7 +186,13 @@ class IndependenceSystem {
 
                 // ★変更：元の主家の戦力による足切りをなくし、戦力が低い勢力でも寝返り先の候補に入れます
                 // （戦力が大きいほど score が高くなり選ばれやすいのはそのままです）
-                const score = enemyCurrentPower + affinityBonus;
+                let score = enemyCurrentPower + affinityBonus;
+
+                // ★今回追加：過去に調略を仕掛けてきた勢力なら、寝返りの点数をアップさせます！
+                if (rebellionLeader.lastApproachedClanId === clan.id) {
+                    score += 50; // ボーナスの点数です。バランスを見て調整してくださいね。
+                }
+
                 if (score > bestScore) {
                     bestScore = score;
                     targetClanId = clan.id;

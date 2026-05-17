@@ -509,6 +509,9 @@ class Busho {
 
         // ★ここを書き足し！：自動生成された頭領かどうかの「秘密のシール」を貼る専用の枠です！
         this.isAutoLeader = data.isAutoLeader === true;
+
+        // ★今回追加：引抜や離間計を仕掛けてきた勢力の出席番号を覚えるための箱です！
+        this.lastApproachedClanId = Number(data.lastApproachedClanId || 0);
     }
 
     // ★新しく追加：武将自身のデータには軍団IDを持たせず、今いる「お城」のデータを覗きに行く魔法です！
