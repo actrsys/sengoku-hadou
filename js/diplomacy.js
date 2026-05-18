@@ -1808,9 +1808,9 @@ class DiplomacyManager {
         let introMsg = "";
         if (isDaimyoSelf) {
             if (isEnemy) {
-                introMsg = `「殿、${doerClan.name} 当主・${enemyDaimyoName} と名乗る者が面会を求めております。お会いになられますか？」`;
+                introMsg = `「殿、${doerClan.name}当主・${enemyDaimyoName} と名乗る者が面会を求めております。お会いになられますか？」`;
             } else {
-                introMsg = `「殿、${doerClan.name} 当主・${enemyDaimyoName}様がお見えになっております。お会いになられますか？」`;
+                introMsg = `「殿、${doerClan.name}当主・${enemyDaimyoName}様がお見えになっております。お会いになられますか？」`;
             }
         } else {
             introMsg = `「殿、${doerClan.name} から使者が参っております。お会いになられますか？」`;
@@ -1948,7 +1948,7 @@ class DiplomacyManager {
 
             if (type === 'goodwill') {
                 if (isDaimyoSelf) {
-                    msg1 = `「${enemyCallName}殿直々の頼みとあってはお受けする HTMLありませぬ。ありがたく頂戴いたします」`;
+                    msg1 = `「${enemyCallName}殿直々の頼みとあってはお受けする他ありませぬ。ありがたく頂戴いたします」`;
                 } else {
                     msg1 = `「願ってもない申し出にござる。ありがたく頂戴いたす」`;
                 }
@@ -1990,10 +1990,10 @@ class DiplomacyManager {
                 let greetMsg2 = "";
                 
                 if (isDaimyoSelf) {
-                    greetMsg1 = `「${myCallName}殿。重大な用件ゆえ、此度はわし自ら参った」`;
+                    greetMsg1 = `「${myCallName}殿。重大な用件ゆえ、此度はわし自ら参りました」`;
                     greetMsg2 = `「これは${enemyCallName}殿……して、どのような御用向きでござるか？」`;
                 } else {
-                    greetMsg1 = `「此度は${doerClan.name}当主・${enemyDaimyoName}の名代として罷り越しました。」`;
+                    greetMsg1 = `「此度は${doerClan.name当主・${enemyDaimyoName}の名代として罷り越しました。」`;
                     greetMsg2 = `「うむ。して、御用向きはいかに？」`;
                 }
 
@@ -2022,9 +2022,9 @@ class DiplomacyManager {
                         } else if (type === 'truce') {
                             // ★追加：和睦打診用のセリフ分岐とフッターボタンの初期設定
                             if (isDaimyoSelf) {
-                                demandMsg = `「どうか我らと和睦していただきたい」`;
+                                demandMsg = `「${myCallName}殿。どうか我らと和睦してくだされ」`;
                             } else {
-                                demandMsg = `「我が主は${doerClan.name}との和睦を望んでおりまする」`;
+                                demandMsg = `「${doerClan.name}との和睦が我らの望みでござる」`;
                             }
                             confirmMsg = `「${doerClan.name} との和睦をお受けなされますか？」`;
                             okText = '和睦する';
