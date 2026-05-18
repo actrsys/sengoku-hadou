@@ -742,7 +742,8 @@ class UIInfoManager {
                     id: c.id,
                     name: c.name,
                     sentiment: rel ? rel.sentiment : 50,
-                    status: rel ? (rel.displayStatus || rel.status) : "普通"
+                    status: rel ? (rel.displayStatus || rel.status) : "普通",
+                    trucePeriod: rel ? (rel.trucePeriod || 0) : 0
                 };
             });
         } else if (type === 'daimyo' && this.diploCurrentTab === 'kunishu') {
@@ -752,7 +753,8 @@ class UIInfoManager {
                     id: k.id,
                     name: k.getName(this.game),
                     sentiment: k.getRelation(id, false),
-                    status: k.daimyoRelations[id] ? k.daimyoRelations[id].status : "普通"
+                    status: k.daimyoRelations[id] ? k.daimyoRelations[id].status : "普通",
+                    trucePeriod: k.daimyoRelations[id] ? (k.daimyoRelations[id].trucePeriod || 0) : 0
                 };
             });
         } else if (type === 'kunishu') {
@@ -764,7 +766,8 @@ class UIInfoManager {
                         id: c.id,
                         name: c.name,
                         sentiment: kunishu.getRelation(c.id, false),
-                        status: kunishu.daimyoRelations[c.id] ? kunishu.daimyoRelations[c.id].status : "普通"
+                        status: kunishu.daimyoRelations[c.id] ? kunishu.daimyoRelations[c.id].status : "普通",
+                        trucePeriod: kunishu.daimyoRelations[c.id] ? (kunishu.daimyoRelations[c.id].trucePeriod || 0) : 0
                     };
                 });
             }
@@ -781,12 +784,18 @@ class UIInfoManager {
 
             const friendBarHtml = this._createBarHtml(r.sentiment, 'friend');
 
+            let periodStr = "";
+            if (r.status === '和睦' && r.trucePeriod > 0) {
+                periodStr = `${r.trucePeriod}ヶ月`;
+            }
+
             items.push({
                 onClick: null, 
                 cells: [
                     `<span class="col-daimyo-name" style="font-weight:bold;">${r.name}</span>`,
                     friendBarHtml,
                     `<span class="col-relation ${statusClass}">${r.status}</span>`,
+                    `<span class="col-period">${periodStr}</span>`,
                     ""
                 ]
             });
@@ -797,6 +806,7 @@ class UIInfoManager {
             '<span style="padding-left:5px; justify-content:flex-start;">勢力名</span>',
             '<span>友好度</span>',
             '<span>関係</span>',
+            '<span class="col-period">期間</span>',
             '<span></span>'
         ];
 
@@ -809,8 +819,8 @@ class UIInfoManager {
             listClass: "diplo-list-container",
             items: items,
             scrollPos: scrollPos,
-            gridTemplateSp: "2fr 1.5fr 1fr 3fr",
-            gridTemplatePc: "150px 100px 80px 1fr",
+            gridTemplateSp: "2fr 1.5fr 1fr 1fr 2fr",
+            gridTemplatePc: "150px 100px 80px 80px 1fr",
             onBack: onClose,
             onTabClick: (tabKey) => {
                 this.diploCurrentTab = tabKey;
