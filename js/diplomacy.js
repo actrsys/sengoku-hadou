@@ -714,6 +714,132 @@ class DiplomacyManager {
     isNonAggression(status) {
         return ['同盟', '支配', '従属', '和睦'].includes(status);
     }
+
+    /**
+     * 武将の敬称付き呼び名を取得する共通の魔法です
+     */
+    getCallName(busho) {
+        if (!busho) return "殿";
+        if (busho.courtRankIds && busho.courtRankIds.includes(1)) {
+            return "公方様";
+        }
+        let nameToCall = "";
+        if (busho.courtRankIds && busho.courtRankIds.length > 0 && this.game.courtRankSystem) {
+            const rankName = this.game.courtRankSystem.getHighestRankName(busho);
+            if (rankName !== "なし") {
+                nameToCall = rankName;
+            }
+        }
+        if (!nameToCall) {
+            nameToCall = busho.givenName || busho.name.replace(/^[^|]*\|?/, ''); 
+            if (!nameToCall) nameToCall = busho.name.replace(/\|/g, '');
+        }
+        return nameToCall + "殿";
+    }
+
+    /**
+     * 外交会話のメッセージを一括管理する魔法です
+     */
+    getDiplomacyMessages(type, isSenderDaimyo, senderClanName, receiverClanName, senderCallName, receiverCallName) {
+        let demandMsg = "";
+        let acceptMsg = "";
+        let rejectMsg = "";
+        let replyAcceptMsg = "";
+        let replyRejectMsg = "";
+
+        if (type === 'goodwill') {
+            demandMsg = `「両家の仲を深めるべく参りました。心ばかりですが、どうぞお受け取りくだされ。」`;
+            acceptMsg = isSenderDaimyo ? `「${senderCallName}直々の頼みとあってはお受けする他ありませぬ。ありがたく頂戴いたします」` : `「願ってもない申し出にござる。ありがたく頂戴いたす」`;
+            rejectMsg = `「ううむ、すぐには返答いたしかねる。今日のところはお引き取りを……」`;
+            replyAcceptMsg = `「両家の絆はますます深まりましょう。しからば、拙者はこれにて……」`;
+            replyRejectMsg = `「左様にござるか。ではこれにて失礼いたす」`;
+        } else if (type === 'alliance') {
+            demandMsg = `「両家繁栄の為、どうか我らと盟約を結んでくだされ」`;
+            acceptMsg = `「うむ、承知仕った。これより我らは盟友にござる」`;
+            rejectMsg = `「重大事ゆえ、家中の者と相談の上返答いたす。今日のところはお引き取りくだされ」`;
+            replyAcceptMsg = `「さすがは${receiverCallName}。くれぐれも約定を違えられぬようお願いいたす」`;
+            replyRejectMsg = `「左様にござるか。ではこれにて失礼いたす」`;
+        } else if (type === 'dominate') {
+            demandMsg = `「もはや大勢は決し申した。この上の抵抗は無益にござる。いさぎよく${senderClanName}の傘下に加わられよ」`;
+            acceptMsg = `「……承知仕った。かくなる上は${senderClanName}に従属いたす」`;
+            rejectMsg = `「断る！　まだ負けと決まったわけではござらん。その首叩き斬られたくなければ、早々に立ち去るがよい」`;
+            replyAcceptMsg = `「おお……うかがった甲斐があり申した。共に${senderClanName}を盛り立てて参りましょうぞ」`;
+            replyRejectMsg = `「……拙者は忠告申し上げましたぞ。ではこれにて」`;
+        } else if (type === 'truce') {
+            demandMsg = isSenderDaimyo ? `「${receiverCallName}。どうか我らと和睦してくだされ」` : `「${senderClanName}との和睦が我らの望みでござる」`;
+            acceptMsg = `「うむ、承知いたす。此度の戦には、わしも思うところがないわけではない」`;
+            rejectMsg = `「何をほざくか！　帰って戦の支度をなされるがよい！」`;
+            replyAcceptMsg = isSenderDaimyo ? `「ありがたい……くれぐれもお願い申し上げる」` : `「ははっ、ありがたき幸せに存じまする！」`;
+            replyRejectMsg = `「さらば、次に相まみえるは戦場にござる。ではこれにて御免」`;
+        } else if (type === 'vassalage') {
+            demandMsg = `「どうか我らを${receiverClanName}の末席にお加えいただきたく存じます」`;
+            acceptMsg = `「よくぞご決心なされた。今後はその力、当家で存分に振るわれよ」`;
+            replyAcceptMsg = isSenderDaimyo ? `「恐悦至極……今日より${receiverCallName.replace('殿', '様')}を主君と仰ぎ奉りまする」` : `「ははっ！　ありがたき幸せに存じまする！」`;
+        } else if (type === 'marriage') {
+            demandMsg = `「両家の絆をより強固なものとするため、此度の縁組み、どうかお引き受けくだされ」`;
+            acceptMsg = `「願ってもない申し出にござる。ありがたくお受けいたそう」`;
+            rejectMsg = `「此度の縁組み、当家としてはお受けいたしかねる。お引き取りくだされ」`;
+            replyAcceptMsg = `「おお、ご承諾いただけるか！ 早速持ち帰り、吉日を選びましょうぞ」`;
+            replyRejectMsg = `「……左様にござるか。誠に残念にござる」`;
+        }
+
+        return { demandMsg, acceptMsg, rejectMsg, replyAcceptMsg, replyRejectMsg };
+    }
+
+    /**
+     * プレイヤー側から外交を行った時の会話ダイアログを再生する魔法です
+     */
+    async playDiplomacyConversation(senderBusho, receiverDaimyo, type, isSuccess) {
+        if (!this.game.ui.showDialogAsync) return; 
+
+        const senderClan = this.game.clans.find(c => c.id === senderBusho.clan);
+        const receiverClan = this.game.clans.find(c => c.id === receiverDaimyo.clan);
+
+        const isSenderDaimyo = senderBusho.isDaimyo;
+        const senderClanName = senderClan ? senderClan.name : "当家";
+        const receiverClanName = receiverClan ? receiverClan.name : "貴家";
+
+        const senderCallName = this.getCallName(senderBusho);
+        const receiverCallName = this.getCallName(receiverDaimyo);
+
+        const senderNameStr = senderBusho.name.replace(/\|/g, '');
+        const receiverNameStr = receiverDaimyo.name.replace(/\|/g, '');
+
+        const msgs = this.getDiplomacyMessages(type, isSenderDaimyo, senderClanName, receiverClanName, senderCallName, receiverCallName);
+
+        let greetMsg1 = "";
+        let greetMsg2 = "";
+
+        if (isSenderDaimyo) {
+            greetMsg1 = `「${receiverCallName}。重大な用件ゆえ、此度はわし自ら参りました」`;
+            greetMsg2 = `「これは${senderCallName}……して、どのような御用向きでござるか？」`;
+        } else {
+            const senderDaimyo = this.game.bushos.find(b => b.clan === senderBusho.clan && b.isDaimyo);
+            const senderDaimyoName = senderDaimyo ? senderDaimyo.name.replace(/\|/g, '') : "当主";
+            greetMsg1 = `「此度は${senderClanName}当主・${senderDaimyoName}の名代として罷り越しました」`;
+            greetMsg2 = `「うむ。して、御用向きはいかに？」`;
+        }
+
+        if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
+
+        await this.game.ui.showDialogAsync(greetMsg1, false, 0, { leftFace: senderBusho.faceIcon, leftName: senderNameStr });
+        await this.game.ui.showDialogAsync(greetMsg2, false, 0, { leftFace: receiverDaimyo.faceIcon, leftName: receiverNameStr });
+
+        if (msgs.demandMsg) {
+            await this.game.ui.showDialogAsync(msgs.demandMsg, false, 0, { leftFace: senderBusho.faceIcon, leftName: senderNameStr });
+        }
+
+        if (isSuccess === true) {
+            if (msgs.acceptMsg) await this.game.ui.showDialogAsync(msgs.acceptMsg, false, 0, { leftFace: receiverDaimyo.faceIcon, leftName: receiverNameStr });
+            if (msgs.replyAcceptMsg) await this.game.ui.showDialogAsync(msgs.replyAcceptMsg, false, 0, { leftFace: senderBusho.faceIcon, leftName: senderNameStr });
+        } else if (isSuccess === false) {
+            if (msgs.rejectMsg) await this.game.ui.showDialogAsync(msgs.rejectMsg, false, 0, { leftFace: receiverDaimyo.faceIcon, leftName: receiverNameStr });
+            if (msgs.replyRejectMsg) await this.game.ui.showDialogAsync(msgs.replyRejectMsg, false, 0, { leftFace: senderBusho.faceIcon, leftName: senderNameStr });
+        } else if (isSuccess === 'negotiate') {
+            const negotiateMsg = `「うむ……無条件でというわけにはいかぬな」`;
+            await this.game.ui.showDialogAsync(negotiateMsg, false, 0, { leftFace: receiverDaimyo.faceIcon, leftName: receiverNameStr });
+        }
+    }
     
     /**
      * ★新設：同盟が成立した時のデータ書き換えを一手に引き受ける専門の魔法です
@@ -765,7 +891,7 @@ class DiplomacyManager {
     /**
      * 外交コマンドを実行する魔法です
      */
-    executeDiplomacy(doerId, targetCastleId, type, gold = 0) {
+    async executeDiplomacy(doerId, targetCastleId, type, gold = 0) {
         const doer = this.game.getBusho(doerId);
         const targetCastle = this.game.getCastle(targetCastleId);
         if (!targetCastle) return;
@@ -776,19 +902,20 @@ class DiplomacyManager {
         let logMsg = ""; 
         const isPlayerInvolved = (doer.clan === this.game.playerClanId || targetClanId === this.game.playerClanId);
 
-        // ★ ここで兵力などを計算する必要がなくなりました！（成功判定の中で自動でやってくれます）
-
         const doerClanName = this.game.clans.find(c => c.id === doer.clan).name;
         const targetClanName = this.game.clans.find(c => c.id === targetClanId).name;
 
         if (type === 'goodwill') {
             let isSuccess = true;
             if (targetClanId !== this.game.playerClanId) {
-                // 成功判定も「誰が」「どこに」「何を」という合図だけでOKです
                 isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, type);
             }
 
-            // ★追加：経験値の計算と加算を専門の魔法にお願いします！
+            if (doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
+                const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+                if (targetDaimyo) await this.playDiplomacyConversation(doer, targetDaimyo, type, isSuccess);
+            }
+
             this.calcDiplomacyExp(doer, type, isSuccess, true);
 
             if (isSuccess) {
@@ -811,28 +938,31 @@ class DiplomacyManager {
         } else if (type === 'alliance') {
             let isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, type);
 
+            if (doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
+                const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+                if (targetDaimyo) await this.playDiplomacyConversation(doer, targetDaimyo, type, isSuccess);
+            }
+
             this.calcDiplomacyExp(doer, type, isSuccess, true);
 
             if (isSuccess) {
-                // ★修正：同盟成立の処理は新しい専門部署にお任せします！
                 this.applyAllianceData(doer.clan, targetClanId);
                 
-                // ★追加：同盟が成功したら、この大名家の「今月の外交目標」を親善に書き換えます
                 const doerClan = this.game.clans.find(c => c.id === doer.clan);
                 if (doerClan && doerClan.currentDiplomacyTarget && doerClan.currentDiplomacyTarget.targetId === targetClanId) {
                     doerClan.currentDiplomacyTarget.action = 'goodwill';
                     
-                    // 相手との強さの差（何倍強いか）を計算します
+                    const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
+                    const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
                     const ratio = targetPower / Math.max(1, myPower);
-                    let goodwillGold = 300; // 基本は300にします
+                    let goodwillGold = 300; 
                     
                     if (ratio >= 3.0) {
-                        goodwillGold = 1000; // 相手が3倍以上強ければ1000にします
+                        goodwillGold = 1000; 
                     } else if (ratio > 1.5) {
-                        goodwillGold = 300 + ((ratio - 1.5) / 1.5) * 700; // 1.5倍から3倍の間なら、少しずつ増やします
+                        goodwillGold = 300 + ((ratio - 1.5) / 1.5) * 700; 
                     }
                     
-                    // 100の単位で綺麗に揃えて、新しい親善の金額にセットします
                     doerClan.currentDiplomacyTarget.gold = Math.floor(goodwillGold / 100) * 100;
                 }
 
@@ -859,20 +989,17 @@ class DiplomacyManager {
             
             if (result.escapedHostages.length > 0) {
                 const names = result.escapedHostages.map(b => b.name).join('、');
-                // msgに文章を追加して、断交のメイン画面に表示されるようにします
                 msg += `\n人質として送られていた ${names} は脱走し、無事に帰還しました！`;
                 this.game.ui.log(`人質として送られていた ${names} は脱走し、戻って参りました！`);
             }
 
-            // 姫を１人ずつ順番に処理するための関数です（幼稚園児にもわかる再帰処理です）
             const processPrincesses = async (index) => {
                 if (index >= result.atMercyPrincesses.length) {
-                    // 全ての姫が終わったら、武将の捕虜判定（戦争と同じロジック）へ
                     if (result.capturedHostages.length > 0) {
                         const playerCaptured = result.capturedHostages.filter(b => b.clan === this.game.playerClanId);
                         const aiCaptured = result.capturedHostages.filter(b => b.clan !== this.game.playerClanId);
 
-                        let aiResultMsgs = []; // AIが処遇を決めた結果をまとめる箱です
+                        let aiResultMsgs = []; 
 
                         if (aiCaptured.length > 0) {
                             const aiClans = [...new Set(aiCaptured.map(b => b.clan))];
@@ -904,17 +1031,14 @@ class DiplomacyManager {
                             });
                         }
 
-                        // もしAIがプレイヤーの武将を処遇したメッセージがあれば、ダイアログを出します
                         if (aiResultMsgs.length > 0) {
                             this.game.ui.showDialog(aiResultMsgs.join('\n'), false, () => {
-                                // ダイアログを閉じた後、プレイヤーの捕虜がいれば処遇画面を出します
                                 if (playerCaptured.length > 0) {
                                     this.game.warManager.pendingPrisoners = playerCaptured;
                                     this.game.warManager.startPrisonerPhase();
                                 }
                             });
                         } else {
-                            // メッセージがなければ、そのままプレイヤーの捕虜画面へ進みます
                             if (playerCaptured.length > 0) {
                                 this.game.warManager.pendingPrisoners = playerCaptured;
                                 this.game.warManager.startPrisonerPhase();
@@ -928,7 +1052,6 @@ class DiplomacyManager {
                 const isCapturedByPlayer = (p.currentClanId === this.game.playerClanId);
 
                 if (isCapturedByPlayer) {
-                    // プレイヤーが捕まえている場合：改修されたフッターを使って3択を表示します
                     const pOriginClan = this.game.clans.find(c => c.id === p.originalClanId);
                     const pOriginClanName = pOriginClan ? pOriginClan.name : "他勢力";
                     
@@ -941,9 +1064,8 @@ class DiplomacyManager {
                             choices: [
                                 {
                                     label: '据置',
-                                    className: 'btn-primary', // 緑（青）
+                                    className: 'btn-primary',
                                     onClick: () => {
-                                        // ① セリフ：顔グラと名前あり
                                         this.game.ui.showDialog(
                                             `「これも戦国の世の習い。最後までお供いたしましょう」`,
                                             false,
@@ -958,14 +1080,12 @@ class DiplomacyManager {
                                 },
                                 {
                                     label: '処断',
-                                    className: 'btn-danger', // 赤
+                                    className: 'btn-danger',
                                     onClick: () => {
-                                        // ① セリフ：顔グラと名前あり
                                         this.game.ui.showDialog(
                                             `「私の怨念は必ずや貴方様を取り殺します。きっと非業の最期を遂げることでしょう。」`,
                                             false,
                                             () => {
-                                                // ② ナレーション：顔グラなし
                                                 this.game.ui.showDialog(
                                                     `${p.name}を処断しました。`,
                                                     false,
@@ -986,14 +1106,12 @@ class DiplomacyManager {
                                 },
                                 {
                                     label: '送り返す',
-                                    className: 'btn-secondary', // 銀
+                                    className: 'btn-secondary',
                                     onClick: () => {
-                                        // ① セリフ：顔グラと名前あり
                                         this.game.ui.showDialog(
                                             `「黄泉の国までお連れいただきとうございました……」`,
                                             false,
                                             () => {
-                                                // ② ナレーション：顔グラなし
                                                 this.game.ui.showDialog(
                                                     `${p.name}を親元へと送り返しました。`,
                                                     false,
@@ -1017,16 +1135,13 @@ class DiplomacyManager {
                         }
                     );
                 } else {
-                    // AIが捕まえている場合、一定確率で処断か解放かを決めさせます
                     let aiChoice = Math.random() < 0.5 ? 'kill' : 'release';
                     const aiClan = this.game.clans.find(c => c.id === p.currentClanId);
                     const aiClanName = aiClan ? aiClan.name : "敵勢力";
 
-                    // 姫の正確な出身を調べます（originalClanIdがない場合は父親から判定します）
                     let father = p.fatherId ? this.game.getBusho(p.fatherId) : null;
                     let pOriginClanId = p.originalClanId !== undefined && p.originalClanId !== 0 ? p.originalClanId : (father ? father.clan : 0);
 
-                    // 先に夫の情報をリセットします（メッセージ表示で処理が止まっても確実に消すためです）
                     const husband = this.game.getBusho(p.husbandId);
                     if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
                     p.husbandId = 0;
@@ -1042,7 +1157,6 @@ class DiplomacyManager {
                         p.status = 'unmarried';
                         p.currentClanId = pOriginClanId;
                         
-                        // 元の勢力の名簿に姫を追加して、宙に浮かないようにします
                         const originClan = this.game.clans.find(c => c.id === pOriginClanId);
                         if (originClan) {
                             if (!originClan.princessIds) originClan.princessIds = [];
@@ -1070,7 +1184,7 @@ class DiplomacyManager {
                     this.game.ui.renderMap();
                 }
                 this.game.ui.showResultModal(msg, () => {
-                    processPrincesses(0); // 最初の姫からスタート！
+                    processPrincesses(0); 
                 });
             } else {
                 processPrincesses(0);
@@ -1081,11 +1195,19 @@ class DiplomacyManager {
             const prob = this.getDiplomacyProb(doerId, targetCastleId, type);
             const dice = Math.random() * 100;
             const isSuccess = dice < prob;
-            // ★追加：基本確率に届かなくても、+30%の範囲内なら交渉が発生します
             const canNegotiate = !isSuccess && dice < (prob + 30);
             
-            // 無条件成功、または交渉に持ち込めた場合は成功扱いとして経験値を与えます
             this.calcDiplomacyExp(doer, type, isSuccess || canNegotiate, true);
+
+            if (doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
+                const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+                if (targetDaimyo) {
+                    let convSuccess = false;
+                    if (isSuccess) convSuccess = true;
+                    else if (canNegotiate) convSuccess = 'negotiate';
+                    await this.playDiplomacyConversation(doer, targetDaimyo, type, convSuccess);
+                }
+            }
 
             const handleSuccess = (conditionType, conditionData) => {
                 this.applyDominationData(targetClanId, doer.clan);
@@ -1147,10 +1269,19 @@ class DiplomacyManager {
             const prob = this.getDiplomacyProb(doerId, targetCastleId, type);
             const dice = Math.random() * 100;
             const isSuccess = dice < prob;
-            // ★追加：基本確率に届かなくても、+30%の範囲内なら交渉が発生します
             const canNegotiate = !isSuccess && dice < (prob + 30);
 
             this.calcDiplomacyExp(doer, type, isSuccess || canNegotiate, true);
+
+            if (doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
+                const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+                if (targetDaimyo) {
+                    let convSuccess = false;
+                    if (isSuccess) convSuccess = true;
+                    else if (canNegotiate) convSuccess = 'negotiate';
+                    await this.playDiplomacyConversation(doer, targetDaimyo, type, convSuccess);
+                }
+            }
 
             const handleSuccess = (conditionType, conditionData) => {
                 this.changeStatus(doer.clan, targetClanId, '和睦', 6);
@@ -1217,40 +1348,37 @@ class DiplomacyManager {
         } else if (type === 'dominate') {
             let isSuccess = false;
             
-            // 上で兵力計算を消してしまったので、ここで調べ直します
             const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
             const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
             
             if (myPower / targetPower < 5) {
                 isSuccess = false;
-                this.calcDiplomacyExp(doer, type, isSuccess, true);
-                
-                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.DOMINATE_FAILURE);
-                msg = `要求を跳ね除けられました……`;
-                doer.achievementTotal += 5;
-                this.game.factionSystem.updateRecognition(doer, 10);
             } else {
                 isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, type);
-                this.calcDiplomacyExp(doer, type, isSuccess, true);
-                
-                if (isSuccess) {
-                    // ★修正：支配・従属の処理は新しい専門部署にお任せします！
-                    this.applyDominationData(doer.clan, targetClanId);
+            }
 
-                    msg = `${this.game.clans.find(c => c.id === targetClanId).name} を支配下に置くことに成功しました！`;
-                    if (!isPlayerInvolved) aiMsg = `${doerClanName} が ${targetClanName} を支配下に置きました！`;
-                    else logMsg = `${doerClanName}が${targetClanName}を支配下に置きました`;
-                    doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
-                    this.game.factionSystem.updateRecognition(doer, 40);
-                } else {
-                    this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.DOMINATE_FAILURE);
-                    msg = `支配の要求は拒否されました……`;
-                    doer.achievementTotal += 5;
-                    this.game.factionSystem.updateRecognition(doer, 10);
-                }
+            if (doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
+                const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+                if (targetDaimyo) await this.playDiplomacyConversation(doer, targetDaimyo, type, isSuccess);
+            }
+
+            this.calcDiplomacyExp(doer, type, isSuccess, true);
+
+            if (isSuccess) {
+                this.applyDominationData(doer.clan, targetClanId);
+
+                msg = `${this.game.clans.find(c => c.id === targetClanId).name} を支配下に置くことに成功しました！`;
+                if (!isPlayerInvolved) aiMsg = `${doerClanName} が ${targetClanName} を支配下に置きました！`;
+                else logMsg = `${doerClanName}が${targetClanName}を支配下に置きました`;
+                doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
+                this.game.factionSystem.updateRecognition(doer, 40);
+            } else {
+                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.DOMINATE_FAILURE);
+                msg = `支配の要求は拒否されました……`;
+                doer.achievementTotal += 5;
+                this.game.factionSystem.updateRecognition(doer, 10);
             }
         } else if (type === 'court_truce') {
-            // 一元化された処理を呼び出します
             this.game.courtRankSystem.applyCourtTruce(doer, targetClanId, gold);
 
             msg = `朝廷の仲裁により、${targetClanName} との和睦が成立しました！`;
@@ -1670,7 +1798,7 @@ class DiplomacyManager {
     /**
      * 婚姻コマンドを実行する魔法です
      */
-    executeMarriage(doerId, targetCastleId, princessId, targetBushoId) {
+    async executeMarriage(doerId, targetCastleId, princessId, targetBushoId) {
         const doer = this.game.getBusho(doerId);
         const targetCastle = this.game.getCastle(targetCastleId);
         if (!targetCastle) return;
@@ -1680,13 +1808,17 @@ class DiplomacyManager {
         const targetBusho = this.game.getBusho(targetBushoId);
         const princess = this.game.princesses.find(p => p.id === princessId);
 
-        // 新しい魔法に合わせて合図だけにします
         const isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, 'marriage');
         
+        if (doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
+            const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+            if (targetDaimyo) await this.playDiplomacyConversation(doer, targetDaimyo, 'marriage', isSuccess);
+        }
+
         this.calcDiplomacyExp(doer, 'marriage', isSuccess, true);
 
         if (isSuccess) {
-            this.applyMarriageData(princessId, targetBushoId, targetClanId, true); // ★最後に true を渡して「正室」扱いと伝えます
+            this.applyMarriageData(princessId, targetBushoId, targetClanId, true); 
             doer.isActionDone = true;
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
             this.game.factionSystem.updateRecognition(doer, 30);
@@ -1716,7 +1848,7 @@ class DiplomacyManager {
     /**
      * 臣従願を実行して、相手の大名家に乗り換える魔法です！
      */
-    executeVassalage(doerId, targetCastleId) {
+    async executeVassalage(doerId, targetCastleId) {
         const targetCastle = this.game.getCastle(targetCastleId);
         if (!targetCastle) return;
         
@@ -1724,6 +1856,12 @@ class DiplomacyManager {
         const myClanId = this.game.playerClanId;
         
         const targetClan = this.game.clans.find(c => c.id === targetClanId);
+        const doer = this.game.getBusho(doerId);
+
+        if (doer && doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
+            const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+            if (targetDaimyo) await this.playDiplomacyConversation(doer, targetDaimyo, 'vassalage', true);
+        }
         
         // 1. プレイヤー側の軍団をすべて解散させます（お片付け）
         if (this.game.legions) {
@@ -1753,7 +1891,6 @@ class DiplomacyManager {
         });
 
         // 外交担当者に行動完了のシールを貼ります
-        const doer = this.game.getBusho(doerId);
         if (doer) doer.isActionDone = true;
         
         // 4. プレイヤーの操作担当を、新しい大名家に切り替えます！
@@ -1816,41 +1953,16 @@ class DiplomacyManager {
             introMsg = `「殿、${doerClan.name} から使者が参っております。お会いになられますか？」`;
         }
 
-        const getCallName = (busho) => {
-            if (!busho) return "殿";
-            
-            // ★追加：将軍(ID:1)を持っているかチェックして、持っていれば「公方様」でお返しします
-            if (busho.courtRankIds && busho.courtRankIds.includes(1)) {
-                return "公方様";
-            }
-            
-            let nameToCall = "";
-            // ★修正：新しい官位システムの魔法を使って、一番偉い官位の名前(rankName2)をもらいます
-            if (busho.courtRankIds && busho.courtRankIds.length > 0 && this.game.courtRankSystem) {
-                const rankName = this.game.courtRankSystem.getHighestRankName(busho);
-                if (rankName !== "なし") {
-                    nameToCall = rankName;
-                }
-            }
-            
-            if (!nameToCall) {
-                nameToCall = busho.givenName || busho.name.replace(/^[^|]*\|?/, ''); 
-                if (!nameToCall) nameToCall = busho.name.replace(/\|/g, '');
-            }
-            // ★追加：ここで「殿」をセットにしてくっつけておきます
-            return nameToCall + "殿";
-        };
-
-        // 差し替え後
-        const myCallName = getCallName(myDaimyo);
-        const enemyCallName = getCallName(doer);
+        const myCallName = this.getCallName(myDaimyo);
+        const enemyCallName = this.getCallName(doer);
 
         const myDaimyoFace = myDaimyo ? myDaimyo.faceIcon : 'unknown_face.webp';
         const myDaimyoNameStr = myDaimyo ? myDaimyo.name.replace(/\|/g, '') : '当主';
         const doerNameStr = doer.name.replace(/\|/g, '');
 
+        const msgs = this.getDiplomacyMessages(type, isDaimyoSelf, doerClan.name, targetClan.name, enemyCallName, myCallName);
+
         const doReject = () => {
-            // 拒否（失敗）時の経験値加算
             this.calcDiplomacyExp(doer, type, false, true);
 
             if (type === 'goodwill') {
@@ -1870,7 +1982,6 @@ class DiplomacyManager {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
             } else if (type === 'truce') {
-                // ★追加：和睦不成立時のペナルティと、画面終了時のお知らせを表示
                 this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
                 this.game.ui.showResultModal(`和睦の打診を拒否しました。`, () => {
                     if (onComplete) setTimeout(onComplete, 100);
@@ -1879,23 +1990,8 @@ class DiplomacyManager {
         };
 
         const rejectAction = () => {
-            let msg1 = "";
-            let msg2 = "";
-
-            if (type === 'goodwill') {
-                msg1 = `「ううむ、すぐには返答いたしかねる。今日のところはお引き取りを……」`;
-                msg2 = `「左様にござるか。ではこれにて失礼いたす」`;
-            } else if (type === 'alliance') {
-                msg1 = `「重大事ゆえ、家中の者と相談の上返答いたす。今日のところはお引き取りくだされ」`;
-                msg2 = `「左様にござるか。ではこれにて失礼いたす」`;
-            } else if (type === 'dominate') {
-                msg1 = `「断る！　まだ負けと決まったわけではござらん。その首叩き斬られたくなければ、早々に立ち去るがよい」`;
-                msg2 = `「……拙者は忠告申し上げましたぞ。ではこれにて」`;
-            } else if (type === 'truce') {
-                // ★追加：指示通りの不成立ダイアログテキストを設定
-                msg1 = `「何をほざくか！　帰って戦の支度をなされるがよい！」`;
-                msg2 = `「さらば、次に相まみえるは戦場にござる。ではこれにて御免」`;
-            }
+            let msg1 = msgs.rejectMsg;
+            let msg2 = msgs.replyRejectMsg;
 
             this.game.ui.showDialog(msg1, false, () => {
                 this.game.ui.showDialog(msg2, false, doReject, null, {
@@ -1909,13 +2005,11 @@ class DiplomacyManager {
         };
 
         const doAccept = () => {
-            // 受諾（成功）時の経験値加算
             this.calcDiplomacyExp(doer, type, true, true);
 
             if (type === 'goodwill') {
                 const myCastleObj = this.game.castles.find(c => c.ownerClan === targetClanId);
                 if (myCastleObj) myCastleObj.gold = Math.min(99999, myCastleObj.gold + gold);
-                // ★窓口の時とは違い、専門部署用に少しだけ計算の仕方を整えています
                 const increase = this.calcGoodwillIncrease(gold, doer);
                 this.updateSentiment(doer.clan, targetClanId, increase);
                 this.game.ui.log(`${doerClan.name}からの親善を受け入れました`);
@@ -1923,7 +2017,6 @@ class DiplomacyManager {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
             } else if (type === 'alliance') {
-                // ★修正：同盟成立 of の処理は新しい専門部署にお任せします！
                 this.applyAllianceData(doer.clan, targetClanId);
                 
                 this.game.ui.log(`${doerClan.name}と同盟を結びました`);
@@ -1931,7 +2024,6 @@ class DiplomacyManager {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
             } else if (type === 'dominate') {
-                // ★修正：支配・従属の処理は新しい専門部署にお任せします！
                 this.applyDominationData(doer.clan, targetClanId);
 
                 this.game.ui.log(`${doerClan.name}に従属しました`);
@@ -1939,7 +2031,6 @@ class DiplomacyManager {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
             } else if (type === 'truce') {
-                // ★追加：通常和睦が成立した時の内部ステータス（不可侵6ヶ月）の書き換え処理
                 this.changeStatus(doer.clan, targetClanId, '和睦', 6);
                 const relationA = this.getDiplomacyData(doer.clan, targetClanId);
                 const relationB = this.getDiplomacyData(targetClanId, doer.clan);
@@ -1954,31 +2045,8 @@ class DiplomacyManager {
         };
 
         const acceptAction = () => {
-            let msg1 = "";
-            let msg2 = "";
-
-            if (type === 'goodwill') {
-                if (isDaimyoSelf) {
-                    msg1 = `「${enemyCallName}直々の頼みとあってはお受けする他ありませぬ。ありがたく頂戴いたします」`;
-                } else {
-                    msg1 = `「願ってもない申し出にござる。ありがたく頂戴いたす」`;
-                }
-                msg2 = `「両家の絆はますます深まりましょう。しからば、拙者はこれにて……」`;
-            } else if (type === 'alliance') {
-                msg1 = `「うむ、承知仕った。これより我らは盟友にござる」`;
-                msg2 = `「さすがは${myCallName}。くれぐれも約定を違えられぬようお願いいたす」`;
-            } else if (type === 'dominate') {
-                msg1 = `「……承知仕った。かくなる上は${doerClan.name}に従属いたす」`;
-                msg2 = `「おお……うかがった甲斐があり申した。共に${doerClan.name}を盛り立てて参りましょうぞ」`;
-            } else if (type === 'truce') {
-                // ★追加：指示通りの和睦成立ダイアログテキストを設定
-                msg1 = `「うむ、承知いたす。此度の戦には、わしも思うところがないわけではない」`;
-                if (isDaimyoSelf) {
-                    msg2 = `「ありがたい……くれぐれもお願い申し上げる」`;
-                } else {
-                    msg2 = `「ははっ、ありがたき幸せに存じまする！」`;
-                }
-            }
+            let msg1 = msgs.acceptMsg;
+            let msg2 = msgs.replyAcceptMsg;
 
             if (msg1 && msg2) {
                 this.game.ui.showDialog(msg1, false, () => {
@@ -2010,33 +2078,24 @@ class DiplomacyManager {
 
                 this.game.ui.showDialog(greetMsg1, false, () => {
                     this.game.ui.showDialog(greetMsg2, false, () => {
-                        let demandMsg = "";
+                        let demandMsg = msgs.demandMsg;
                         let confirmMsg = "";
                         let okText = "";
                         let cancelText = "";
                         
                         if (type === 'goodwill') {
-                            demandMsg = `「両家の仲を深めるべく参りました。心ばかりですが、どうぞお受け取りくだされ。」`;
                             confirmMsg = `「${doerClan.name}からの親善の品をお受け取りになられますか？\n（手土産金：${gold}）」`;
                             okText = '受け取る';
                             cancelText = '突き返す';
                         } else if (type === 'alliance') {
-                            demandMsg = `「両家繁栄の為、どうか我らと盟約を結んでくだされ」`;
                             confirmMsg = `「${doerClan.name}との同盟を承諾なされますか？」`;
                             okText = '同盟する';
                             cancelText = '断る';
                         } else if (type === 'dominate') {
-                            demandMsg = `「もはや大勢は決し申した。この上の抵抗は無益にござる。いさぎよく${doerClan.name}の傘下に加わられよ」`;
                             confirmMsg = `「殿……${doerClan.name} に従属なされますか？」`;
                             okText = '従属する';
                             cancelText = '断る';
                         } else if (type === 'truce') {
-                            // ★追加：和睦打診用のセリフ分岐とフッターボタンの初期設定
-                            if (isDaimyoSelf) {
-                                demandMsg = `「${myCallName}。どうか我らと和睦してくだされ」`;
-                            } else {
-                                demandMsg = `「${doerClan.name}との和睦が我らの望みでござる」`;
-                            }
                             confirmMsg = `「${doerClan.name} との和睦をお受けなされますか？」`;
                             okText = '和睦する';
                             cancelText = '断る';
