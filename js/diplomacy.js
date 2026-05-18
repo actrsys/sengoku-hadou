@@ -762,7 +762,7 @@ class DiplomacyManager {
         } else if (type === 'dominate') {
             demandMsg = `「もはや大勢は決し申した。この上の抵抗は無益にござる。いさぎよく${senderClanName}の傘下に加わられよ」`;
             acceptMsg = `「……承知仕った。かくなる上は${senderClanName}に従属いたす」`;
-            rejectMsg = `「断る！　まだ負けと決まったわけではござらん。その首叩き斬られたくなければ、早々に立ち去るがよい」`;
+            rejectMsg = `「断る！　まだ負けと決まったわけではござらん。その素首叩っ斬られとうなくば、早々に立ち去られい！」`;
             replyAcceptMsg = `「おお……うかがった甲斐があり申した。共に${senderClanName}を盛り立てて参りましょうぞ」`;
             replyRejectMsg = `「……拙者は忠告申し上げましたぞ。ではこれにて」`;
         } else if (type === 'truce') {
@@ -989,8 +989,8 @@ class DiplomacyManager {
             
             if (result.escapedHostages.length > 0) {
                 const names = result.escapedHostages.map(b => b.name).join('、');
-                msg += `\n人質として送られていた ${names} は脱走し、無事に帰還しました！`;
-                this.game.ui.log(`人質として送られていた ${names} は脱走し、戻って参りました！`);
+                msg += `\n人質として預けていた ${names} は脱走し、無事に帰還しました！`;
+                this.game.ui.log(`人質として預けていた ${names} は脱走し、戻って参りました！`);
             }
 
             const processPrincesses = async (index) => {
