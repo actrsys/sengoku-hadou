@@ -461,7 +461,51 @@ class DiplomacyManager {
         const powerBonus = -1 + ((Math.sqrt(Math.max(1, myTotalSoldiers)) / 2) / Math.max(0.1, (Math.sqrt(Math.max(1, enemyTotalSoldiers)) / 2)));
         const dutyBonus = 0.5 + (duty / 100);
         
-        let successRate = ((sentimentBonus + goldBonus + relationBonus + enemyHateBonus + powerBonus) * dutyBonus);
+        // ★追加：勢力A（要請元）が滅びたら勢力B（敵）と勢力C（援軍先）が隣接してしまい、かつ敵が強大な場合のバッファ維持ボーナス
+        let bufferBonus = 0;
+        if (!isKunishu && enemyClanId !== 0) {
+            const helperTotalSoldiers = this.game.getClanTotalSoldiers(helperForceId) || 1;
+            // 敵が自分（援軍先）の8割以上の兵力を持っている（格上かそれに迫る勢い）
+            if (enemyTotalSoldiers >= helperTotalSoldiers * 0.8) {
+                let isAlreadyAdjacent = false;
+                let willBeAdjacent = false;
+                
+                const helperCastles = this.game.castles.filter(c => c.ownerClan === helperForceId);
+                const enemyCastles = this.game.castles.filter(c => c.ownerClan === enemyClanId);
+                const myCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
+                
+                // 初めから隣接しているかチェック
+                for (let hc of helperCastles) {
+                    for (let ec of enemyCastles) {
+                        if (GameSystem.isAdjacent(hc, ec)) {
+                            isAlreadyAdjacent = true;
+                            break;
+                        }
+                    }
+                    if (isAlreadyAdjacent) break;
+                }
+                
+                // 隣接していない場合、要請元の城が敵に奪われたら隣接してしまうかチェック
+                if (!isAlreadyAdjacent) {
+                    for (let hc of helperCastles) {
+                        for (let mc of myCastles) {
+                            if (GameSystem.isAdjacent(hc, mc)) {
+                                willBeAdjacent = true;
+                                break;
+                            }
+                        }
+                        if (willBeAdjacent) break;
+                    }
+                    
+                    // 新たに強敵と隣接してしまうならボーナス（0.15 = 15%）を設定
+                    if (willBeAdjacent) {
+                        bufferBonus = 0.15;
+                    }
+                }
+            }
+        }
+        
+        let successRate = ((sentimentBonus + goldBonus + relationBonus + enemyHateBonus + powerBonus + bufferBonus) * dutyBonus);
         
         // 0%～100%の範囲に収める
         let prob = Math.max(0, Math.min(1, successRate)) * 100;
