@@ -1993,7 +1993,7 @@ class DiplomacyManager {
                     greetMsg1 = `「${myCallName}殿。重大な用件ゆえ、此度はわし自ら参りました」`;
                     greetMsg2 = `「これは${enemyCallName}殿……して、どのような御用向きでござるか？」`;
                 } else {
-                    greetMsg1 = `「此度は${doerClan.name当主・${enemyDaimyoName}の名代として罷り越しました。」`;
+                    greetMsg1 = `「此度は${doerClan.name}当主・${enemyDaimyoName}の名代として罷り越しました。」`;
                     greetMsg2 = `「うむ。して、御用向きはいかに？」`;
                 }
 
