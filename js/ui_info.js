@@ -1503,6 +1503,10 @@ class UIInfoManager {
                 }
             });
             princesses = pIds.map(id => this.game.princesses.find(p => p.id === id)).filter(p => p !== undefined && p.status !== 'unborn' && p.status !== 'dead');
+        } else if (doerId === 'view_busho_wife') {
+            const targetBusho = this.game.getBusho(targetCastleId);
+            let pIds = targetBusho && Array.isArray(targetBusho.wifeIds) ? targetBusho.wifeIds : [];
+            princesses = pIds.map(id => this.game.princesses.find(p => p.id === id)).filter(p => p !== undefined && p.status !== 'unborn' && p.status !== 'dead');
         } else {
             if (!this.princessCurrentScope) this.princessCurrentScope = 'clan';
 

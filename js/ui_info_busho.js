@@ -197,8 +197,21 @@ Object.assign(UIInfoManager.prototype, {
                             </div>
                         </div>
                     </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                        <button class="daimyo-detail-action-btn" id="busho-wife-btn" ${(Array.isArray(busho.wifeIds) && busho.wifeIds.length > 0) ? '' : 'disabled'}>配偶者</button>
+                    </div>
                 </div>
             `;
+
+            const btnWife = document.getElementById('busho-wife-btn');
+            if (btnWife && Array.isArray(busho.wifeIds) && busho.wifeIds.length > 0) {
+                btnWife.onclick = (e) => {
+                    e.stopPropagation();
+                    if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+                    this.pushModal('princess_list', [false, busho.id, 'view_busho_wife']);
+                };
+            }
+
             listContainer.scrollTop = scrollPos;
         }
     },
