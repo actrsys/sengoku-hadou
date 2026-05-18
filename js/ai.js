@@ -593,7 +593,7 @@ class AIEngine {
                 if (powerRatio >= 1.0) {
                     let cautionLevel = (powerRatio - 0.5) / (2.5 - 0.8);
                     cautionLevel = Math.min(1.0, Math.max(0.0, cautionLevel));
-                    penalty = cautionLevel * 6.25; // ★周辺の敵に対する警戒ペナルティ
+                    penalty = cautionLevel * 15.0; // ★周辺の敵に対する警戒ペナルティ
                 }
                 if (penalty > 0) {
                     // ★powerには「見誤った威信」を入れておき、後で一番脅威に感じた敵を選べるようにします
@@ -860,12 +860,16 @@ class AIEngine {
 
             // ★複数警戒：周りの敵からのペナルティをすべて足し算します
             let totalCautionPenalty = 0;
-            adjacentEnemyClans.forEach(enemy => {
-                // 「いま攻めようとしている相手」以外の敵からのペナルティだけ足します
-                if (target.ownerClan !== enemy.clanId) {
-                    totalCautionPenalty += enemy.penalty;
-                }
-            });
+            
+            // ★変更：「空き城」または「敵対状態ではない相手」を狙う場合のみ、警戒ペナルティでスコアを抑制します！
+            if (target.ownerClan === 0 || rel.status !== '敵対') {
+                adjacentEnemyClans.forEach(enemy => {
+                    // 「いま攻めようとしている相手」以外の敵からのペナルティだけ足します
+                    if (target.ownerClan !== enemy.clanId) {
+                        totalCautionPenalty += enemy.penalty;
+                    }
+                });
+            }
             prob -= totalCautionPenalty;
 
             // ★今回追加：その城を取った後の戦況を考えて、周囲の敵城や味方城を警戒・計算する魔法！
