@@ -1275,7 +1275,8 @@ window.GameEvents.push({
                         if (game.ui && game.ui.showDialogAsync) {
                             await game.ui.showDialogAsync(`「ははっ！　これから${clanName}のために身命を賭して働きまする！」`, false, 0, {
                                 leftFace: ronin.faceIcon,
-                                leftName: rName
+                                leftName: rName,
+                                isEvent: true
                             });
                             // さらにシステムメッセージを追加します。
                             await game.ui.showDialogAsync(`${rName}が${clanName}に加わりました！`, false, 0);

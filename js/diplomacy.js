@@ -822,22 +822,22 @@ class DiplomacyManager {
 
         if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
 
-        await this.game.ui.showDialogAsync(greetMsg1, false, 0, { leftFace: senderBusho.faceIcon, leftName: senderNameStr });
-        await this.game.ui.showDialogAsync(greetMsg2, false, 0, { leftFace: receiverDaimyo.faceIcon, leftName: receiverNameStr });
+        await this.game.ui.showDialogAsync(greetMsg1, false, 0, { leftFace: senderBusho.faceIcon, leftName: senderNameStr, isEvent: true });
+        await this.game.ui.showDialogAsync(greetMsg2, false, 0, { leftFace: receiverDaimyo.faceIcon, leftName: receiverNameStr, isEvent: true });
 
         if (msgs.demandMsg) {
-            await this.game.ui.showDialogAsync(msgs.demandMsg, false, 0, { leftFace: senderBusho.faceIcon, leftName: senderNameStr });
+            await this.game.ui.showDialogAsync(msgs.demandMsg, false, 0, { leftFace: senderBusho.faceIcon, leftName: senderNameStr, isEvent: true });
         }
 
         if (isSuccess === true) {
-            if (msgs.acceptMsg) await this.game.ui.showDialogAsync(msgs.acceptMsg, false, 0, { leftFace: receiverDaimyo.faceIcon, leftName: receiverNameStr });
-            if (msgs.replyAcceptMsg) await this.game.ui.showDialogAsync(msgs.replyAcceptMsg, false, 0, { leftFace: senderBusho.faceIcon, leftName: senderNameStr });
+            if (msgs.acceptMsg) await this.game.ui.showDialogAsync(msgs.acceptMsg, false, 0, { leftFace: receiverDaimyo.faceIcon, leftName: receiverNameStr, isEvent: true });
+            if (msgs.replyAcceptMsg) await this.game.ui.showDialogAsync(msgs.replyAcceptMsg, false, 0, { leftFace: senderBusho.faceIcon, leftName: senderNameStr, isEvent: true });
         } else if (isSuccess === false) {
-            if (msgs.rejectMsg) await this.game.ui.showDialogAsync(msgs.rejectMsg, false, 0, { leftFace: receiverDaimyo.faceIcon, leftName: receiverNameStr });
-            if (msgs.replyRejectMsg) await this.game.ui.showDialogAsync(msgs.replyRejectMsg, false, 0, { leftFace: senderBusho.faceIcon, leftName: senderNameStr });
+            if (msgs.rejectMsg) await this.game.ui.showDialogAsync(msgs.rejectMsg, false, 0, { leftFace: receiverDaimyo.faceIcon, leftName: receiverNameStr, isEvent: true });
+            if (msgs.replyRejectMsg) await this.game.ui.showDialogAsync(msgs.replyRejectMsg, false, 0, { leftFace: senderBusho.faceIcon, leftName: senderNameStr, isEvent: true });
         } else if (isSuccess === 'negotiate') {
             const negotiateMsg = `「うむ……無条件でというわけにはいかぬな」`;
-            await this.game.ui.showDialogAsync(negotiateMsg, false, 0, { leftFace: receiverDaimyo.faceIcon, leftName: receiverNameStr });
+            await this.game.ui.showDialogAsync(negotiateMsg, false, 0, { leftFace: receiverDaimyo.faceIcon, leftName: receiverNameStr, isEvent: true });
         }
     }
     
@@ -1074,7 +1074,7 @@ class DiplomacyManager {
                                                 processPrincesses(index + 1);
                                             },
                                             null,
-                                            { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name }
+                                            { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name, isEvent: true }
                                         );
                                     }
                                 },
@@ -1100,7 +1100,7 @@ class DiplomacyManager {
                                                 );
                                             },
                                             null,
-                                            { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name }
+                                            { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name, isEvent: true }
                                         );
                                     }
                                 },
@@ -1127,7 +1127,7 @@ class DiplomacyManager {
                                                 );
                                             },
                                             null,
-                                            { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name }
+                                            { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name, isEvent: true }
                                         );
                                     }
                                 }
