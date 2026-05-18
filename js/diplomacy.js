@@ -344,7 +344,9 @@ class DiplomacyManager {
             }
 
             if (chance > threshold) {
-                finalProb = Math.max(0, Math.min(100, acceptProb));
+                finalProb = Math.min(100, acceptProb);
+            } else {
+                finalProb = chance - threshold;
             }
         }
         // ★ここから追加：婚姻の成功確率（同盟より少し成功しやすく緩和します！）
@@ -376,7 +378,9 @@ class DiplomacyManager {
             // オマケしてもらった友好度を使って、成功のハードルを超えられるかチェックします
             const chance = effectiveSentiment + doerDiplomacy;
             if (chance > threshold) {
-                finalProb = Math.max(0, Math.min(100, acceptProb));
+                finalProb = Math.min(100, acceptProb);
+            } else {
+                finalProb = chance - threshold;
             }
         }
         else if (type === 'dominate') {
@@ -1061,10 +1065,16 @@ class DiplomacyManager {
                 processPrincesses(0);
             }
             return;
-
+            
         } else if (type === 'subordinate') {
-            const isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, type);
-            this.calcDiplomacyExp(doer, type, isSuccess, true);
+            const prob = this.getDiplomacyProb(doerId, targetCastleId, type);
+            const dice = Math.random() * 100;
+            const isSuccess = dice < prob;
+            // ★追加：基本確率に届かなくても、+30%の範囲内なら交渉が発生します
+            const canNegotiate = !isSuccess && dice < (prob + 30);
+            
+            // 無条件成功、または交渉に持ち込めた場合は成功扱いとして経験値を与えます
+            this.calcDiplomacyExp(doer, type, isSuccess || canNegotiate, true);
 
             const handleSuccess = (conditionType, conditionData) => {
                 this.applyDominationData(targetClanId, doer.clan);
@@ -1112,17 +1122,24 @@ class DiplomacyManager {
                     }
                 }
             };
-
+            
             if (isSuccess) {
                 handleSuccess('none', null);
-            } else {
+            } else if (canNegotiate) {
                 this.negotiateSubordinationConditions(doer.clan, targetClanId, handleSuccess, handleFailure);
+            } else {
+                handleFailure();
             }
             return;
             
         } else if (type === 'truce') {
-            const isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, type);
-            this.calcDiplomacyExp(doer, type, isSuccess, true);
+            const prob = this.getDiplomacyProb(doerId, targetCastleId, type);
+            const dice = Math.random() * 100;
+            const isSuccess = dice < prob;
+            // ★追加：基本確率に届かなくても、+30%の範囲内なら交渉が発生します
+            const canNegotiate = !isSuccess && dice < (prob + 30);
+
+            this.calcDiplomacyExp(doer, type, isSuccess || canNegotiate, true);
 
             const handleSuccess = (conditionType, conditionData) => {
                 this.changeStatus(doer.clan, targetClanId, '和睦', 6);
@@ -1176,11 +1193,13 @@ class DiplomacyManager {
                     }
                 }
             };
-
+            
             if (isSuccess) {
                 handleSuccess('none', null);
-            } else {
+            } else if (canNegotiate) {
                 this.negotiateTruceConditions(doer.clan, targetClanId, handleSuccess, handleFailure);
+            } else {
+                handleFailure();
             }
             return;
             
