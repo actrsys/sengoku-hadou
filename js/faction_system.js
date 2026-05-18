@@ -277,9 +277,18 @@ class FactionSystem {
                         factionChangePenalty = 5;
                     }
                 }
+
+                // ★追加：一門じゃない場合は少しだけ入りにくくする（点数を上げる）魔法です！
+                let familyPenalty = 0;
+                // 投票する武将とリーダーが、お互いの一門リストに同じ番号を持っているか確認します
+                const isFamily = voter.familyIds && leader.familyIds && voter.familyIds.some(fId => leader.familyIds.includes(fId));
+                // もし一門じゃなかったら、ペナルティとして点数を増やします
+                if (!isFamily) {
+                    familyPenalty = 5; // ちょっとだけ入りにくくするために5点を足します
+                }
                 
                 //基準となる持ち点を「35」点に設定しました。
-                return ((affDiff * 0.5) + (innoDiff * 0.25) + 35) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus - stayFactionBonus + factionChangePenalty;
+                return ((affDiff * 0.5) + (innoDiff * 0.25) + 35) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus - stayFactionBonus + factionChangePenalty + familyPenalty;
             };
 
             // 派閥に入れる処理の共通ルール
