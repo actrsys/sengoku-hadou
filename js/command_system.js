@@ -414,7 +414,7 @@ const COMMAND_SPECS = {
     'arrange_marriage': { 
         label: "縁組", category: 'PERSONNEL', 
         costGold: 0, costRice: 0, 
-        isMulti: false, hasAdvice: true, 
+        isMulti: false, hasAdvice: false, 
         startMode: 'busho_select_special', subType: 'arrange_marriage_busho',
         sortKey: 'leadership',
         msg: "姫を嫁がせる武将を選択してください",
@@ -733,6 +733,7 @@ class CommandSystem {
         else if (actionType === 'arrange_marriage_busho') { 
             bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active' && !b.isDaimyo); 
             infoHtml = "<div>姫を嫁がせる武将を選択してください</div>"; 
+            if (extraData) extraData.allowDone = true;
         }
         else if (actionType === 'interview_target') {
             bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active' && b.id !== extraData.interviewer.id && !b.isDaimyo);
@@ -3082,7 +3083,6 @@ class CommandSystem {
         busho.updateFamilyIds(this.game.princesses);
 
         busho.loyalty = 100;
-        busho.isActionDone = true;
 
         this.game.ui.showResultModal(`${busho.name} と ${princess.name} の祝言がめでたく執り行われました。\n新たな縁によって、当家の結束はより一層強固なものとなりました。`);
         this.game.ui.updatePanelHeader();
