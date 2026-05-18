@@ -34,10 +34,9 @@ const COMMAND_MENU_STRUCTURE = [
         items: [
             'employ',
             'interview',
-            'arrange_marriage',
+            { label: "縁組", items: ['arrange_marriage', 'succession'] },
             { label: "任命", items: ['appoint_gunshi', 'appoint'] },
-            { label: "賞罰", items: ['reward', 'banish'] },
-            'succession'
+            { label: "賞罰", items: ['reward', 'banish'] }
         ]
     },
     {
@@ -412,7 +411,7 @@ const COMMAND_SPECS = {
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyo(game)
     },
     'arrange_marriage': { 
-        label: "縁組", category: 'PERSONNEL', 
+        label: "婚姻", category: 'PERSONNEL', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select_special', subType: 'arrange_marriage_busho',
@@ -554,7 +553,7 @@ const COMMAND_SPECS = {
         startMode: 'map_select', targetType: 'other_clan_all'
     },
     'marriage': {
-        label: "婚姻", category: 'FOREIGN_DAIMYO',
+        label: "婚姻同盟", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'marriage_valid',
