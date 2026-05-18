@@ -34,9 +34,10 @@ const COMMAND_MENU_STRUCTURE = [
         items: [
             'employ',
             'interview',
-            { label: "縁組", items: ['arrange_marriage', 'succession', 'adopt_son'] },
             { label: "任命", items: ['appoint_gunshi', 'appoint'] },
-            { label: "賞罰", items: ['reward', 'banish'] }
+            { label: "賞罰", items: ['reward', 'banish'] },
+            { label: "縁組", items: ['arrange_marriage', 'adopt_son'] },
+            'succession'
         ]
     },
     {
@@ -126,7 +127,17 @@ const CAN_EXECUTE_RULES = {
         });
     },
     canAdoptSon: (game) => {
-        return !CAN_EXECUTE_RULES.hasSuccessor(game);
+        // 条件①：家督相続できる武将が「いない」こと
+        if (CAN_EXECUTE_RULES.hasSuccessor(game)) return false;
+
+        // 条件②：養子にできる武将（自勢力で活動中、大名ではなく、15歳以上若い）が1人以上いること
+        const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
+        if (!daimyo) return false;
+        
+        return game.bushos.some(b => {
+            if (b.clan !== game.playerClanId || b.status !== 'active' || b.isDaimyo) return false;
+            return b.birthYear >= daimyo.birthYear + 15;
+        });
     },
     // --- 軍事用 ---
     canTraining: (game, castle) => {
