@@ -1410,6 +1410,13 @@ class DiplomacyManager {
             this.game.affiliationSystem.moveCastle(b, castleB.id);
         });
 
+        // ★追加：合流先の訓練と士気を割合に応じて再計算します！
+        const totalSoldiers = castleB.soldiers + castleA.soldiers;
+        if (totalSoldiers > 0) {
+            castleB.training = Math.floor(((castleB.training || 0) * castleB.soldiers + (castleA.training || 0) * castleA.soldiers) / totalSoldiers);
+            castleB.morale = Math.floor(((castleB.morale || 0) * castleB.soldiers + (castleA.morale || 0) * castleA.soldiers) / totalSoldiers);
+        }
+
         // ★追加：物資（金・兵糧・兵士・馬・鉄砲）を全て引越し先のお城に運びます！
         castleB.gold = Math.min(99999, castleB.gold + castleA.gold);
         castleB.rice = Math.min(99999, castleB.rice + castleA.rice);
@@ -1428,6 +1435,9 @@ class DiplomacyManager {
         if (castleA.rice < 2500) castleA.rice = 2500;
         if (castleA.defense < 200) castleA.defense = Math.min(200, castleA.maxDefense || 9999);
         if (castleA.peoplesLoyalty < 51) castleA.peoplesLoyalty = 51;
+        // ★追加：割譲した城の訓練・士気が50未満の場合は50にします！
+        if ((castleA.training || 0) < 50) castleA.training = 50;
+        if ((castleA.morale || 0) < 50) castleA.morale = 50;
 
         this.game.castleManager.changeOwner(castleA, dominantClanId, true);
     }
