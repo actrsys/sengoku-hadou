@@ -63,7 +63,7 @@ window.EventTextManager = {
     // ① 清洲同盟（織田家専用：使者の取り次ぎ）
     kiyosu_alliance_oda_arrival: function(args) {
         return [
-            { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「殿。${args.matsudairaFamilyName}家の使者が参っておりまする」` },
+            { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「殿。${args.matsudairaFamilyName}家から使者が参っておりまする」` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「${args.matsudairaFamilyName}か……ふむ」` }
         ];
     },
@@ -101,7 +101,7 @@ window.EventTextManager = {
         return [
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「追い返せ」` },
             { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「へ……？　よろしいのですか？」` },
-            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「どうせ我らと結びたいと申すのであろう。構わぬ。追っ払え」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「我らと結びたいと申すのであろう。構わぬ、追っ払え」` },
             { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「はっ、ははっ！」` }
         ];
     },

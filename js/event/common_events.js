@@ -1396,7 +1396,7 @@ window.GameEvents.push({
         // ダイアログを出す前に、音を鳴らしてバリアを張る魔法を呼びます！
         if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
         
-        await game.ui.showDialogAsync(`${aiClanName}より御使者が参っております。`, false, 0);
+        await game.ui.showDialogAsync(`${aiClanName} から使者が参っております。`, false, 0);
 
         await game.ui.showDialogAsync(`「此度は${aiClanName}当主・${aiDaimyoName}の名代として罷り越しました。急な訪問、平にご容赦くだされ」`, false, 0, {
             leftFace: envoy.faceIcon, leftName: envoyName

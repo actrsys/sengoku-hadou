@@ -1951,6 +1951,56 @@ window.GameEvents.push({
             b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
         });
 
+        // ★追加：将軍家と他勢力との友好度アップ処理
+        // 三好長逸（ID: 1020006）の大名家を探します
+        const nagayasu = game.getBusho(1020006);
+        let nagayasuClanId = 0;
+        if (nagayasu && nagayasu.isDaimyo && nagayasu.clan !== 0) {
+            nagayasuClanId = nagayasu.clan;
+        }
+
+        if (game.diplomacyManager) {
+            game.clans.forEach(otherClan => {
+                // 誰もいない勢力、将軍家自身、将軍擁立家、三好長逸家は除外します
+                if (otherClan.id === 0 || otherClan.id === newClanId || otherClan.id === sponsorClanId || otherClan.id === nagayasuClanId) {
+                    return;
+                }
+
+                let sentimentIncrease = 10; // 基本のアップ量
+
+                // 条件1: 将軍擁立家との友好度が70以上、または同盟・支配・従属関係か確認します
+                const relWithSponsor = game.diplomacyManager.getRelation(sponsorClanId, otherClan.id);
+                let condition1 = false;
+                if (relWithSponsor) {
+                    if (relWithSponsor.sentiment >= 70 || ['同盟', '支配', '従属'].includes(relWithSponsor.status)) {
+                        condition1 = true;
+                    }
+                }
+
+                // 条件2: 三好長逸家と敵対関係か確認します
+                let condition2 = false;
+                if (nagayasuClanId !== 0) {
+                    const relWithNagayasu = game.diplomacyManager.getRelation(nagayasuClanId, otherClan.id);
+                    if (relWithNagayasu && relWithNagayasu.status === '敵対') {
+                        condition2 = true;
+                    }
+                }
+
+                // どちらかの条件を満たしていれば20アップにします
+                if (condition1 || condition2) {
+                    sentimentIncrease = 20;
+                }
+
+                // 外交システムを使って、将軍家と他勢力の友好度をアップさせます
+                game.diplomacyManager.updateSentiment(newClanId, otherClan.id, sentimentIncrease);
+            });
+
+            // ★追加：将軍家と三好長逸家との友好度ダウン処理
+            if (nagayasuClanId !== 0) {
+                game.diplomacyManager.updateSentiment(newClanId, nagayasuClanId, -20);
+            }
+        }
+
         // --- 9. 最後に画面を新しく描き直して、メッセージを表示します ---
         if (game.factionSystem) {
             game.factionSystem.updateFactions();
@@ -2120,8 +2170,8 @@ window.GameEvents.push({
         });
 
         // ⑤ 画面にメッセージを出してお知らせします
-        game.ui.log(`【イベント】三好三人衆が当主・三好義継に対して反旗を翻し、三好義継が追放されました。`);
-        await game.ui.showDialogAsync(`三好三人衆が当主・三好義継に対して反旗を翻しました！\n義継は追放され、松永久秀の元へ逃れました。\n三好家は三好長逸が新たな当主となります。`, false, 0);
+        game.ui.log(`【イベント】三好当主・三好義継が出奔し、松永久秀の元へ逃れました。`);
+        await game.ui.showDialogAsync(`三好義継が悪逆無道の三好三人衆に愛想をつかし、三好家の忠臣・松永久秀の元へ逃れました。三好家は三好長逸が新たな当主となります。`, false, 0);
 
         // ⑥ 派閥や画面を最新の状態に更新します
         if (game.factionSystem) {
