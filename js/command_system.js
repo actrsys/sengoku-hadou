@@ -586,8 +586,7 @@ const COMMAND_SPECS = {
         label: "和睦", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
-        startMode: 'map_select', targetType: 'hostile_clan_only',
-        canExecute: (game, castle) => CAN_EXECUTE_RULES.canSubordinate(game, castle)
+        startMode: 'map_select', targetType: 'hostile_clan_only'
     },
     'dominate': {
         label: "降伏勧告", category: 'FOREIGN_DAIMYO',
@@ -1036,7 +1035,7 @@ class CommandSystem {
         const actionRequiredCommands = [
             'farm', 'commerce', 'repair', 'charity', 
             'war', 'draft', 'training', 'soldier_charity', 'transport', 'kunishu_subjugate', 
-            'goodwill', 'alliance', 'marriage', 'dominate', 'subordinate', 'break_alliance', 
+            'goodwill', 'truce', 'alliance', 'marriage', 'dominate', 'subordinate', 'break_alliance', 
             'kunishu_goodwill', 'kunishu_incorporate', 
             'sabotage', 'incite', 'rumor', 'headhunt', 
             'tribute', 'court_truce', 
