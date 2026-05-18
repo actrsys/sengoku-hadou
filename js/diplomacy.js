@@ -1930,46 +1930,67 @@ class DiplomacyManager {
 
         this.game.ui.showDialog(introMsg, true,
             () => {
-                let demandMsg = "";
-                let confirmMsg = "";
-                let okText = "";
-                let cancelText = "";
+                let greetMsg1 = "";
+                let greetMsg2 = "";
                 
-                if (type === 'goodwill') {
-                    demandMsg = `「此度は両家の仲を深めるべく参りました。心ばかりですが、どうぞお受け取りくだされ。」`;
-                    confirmMsg = `「${doerClan.name}からの親善の品をお受け取りになられますか？\n（手土産金：${gold}）」`;
-                    okText = 'はい（受け取る）';
-                    cancelText = 'いいえ（突き返す）';
-                } else if (type === 'alliance') {
-                    demandMsg = `「両家繁栄の為、どうか我らと盟約を結んでくだされ」`;
-                    confirmMsg = `「${doerClan.name}との同盟にご同意なされますか？」`;
-                    okText = 'はい（承諾する）';
-                    cancelText = 'いいえ（断る）';
-                } else if (type === 'dominate') {
-                    demandMsg = `「もはや大勢は決し申した。この上の抵抗は無益にござる。いさぎよく${doerClan.name}の傘下に加わられよ」`;
-                    confirmMsg = `「殿……${doerClan.name} に従属なされますか？」`;
-                    okText = 'はい（従属する）';
-                    cancelText = 'いいえ（断る）';
+                if (isDaimyoSelf) {
+                    greetMsg1 = `「${myCallName}殿。重大な用件ゆえ、此度はわし自ら参った」`;
+                    greetMsg2 = `「これは${enemyCallName}殿……して、どのような御用向きでござるか？」`;
+                } else {
+                    greetMsg1 = `「此度は${doerClan.name}当主・${enemyDaimyoName}の名代として罷り越しました。」`;
+                    greetMsg2 = `「うむ。して、御用向きはいかに？」`;
                 }
 
-                this.game.ui.showDialog(demandMsg, false,
-                    () => {
-                        this.game.ui.showDialog(confirmMsg, true,
-                            acceptAction,
-                            rejectAction,
+                this.game.ui.showDialog(greetMsg1, false, () => {
+                    this.game.ui.showDialog(greetMsg2, false, () => {
+                        let demandMsg = "";
+                        let confirmMsg = "";
+                        let okText = "";
+                        let cancelText = "";
+                        
+                        if (type === 'goodwill') {
+                            demandMsg = `「両家の仲を深めるべく参りました。心ばかりですが、どうぞお受け取りくだされ。」`;
+                            confirmMsg = `「${doerClan.name}からの親善の品をお受け取りになられますか？\n（手土産金：${gold}）」`;
+                            okText = '受け取る';
+                            cancelText = '突き返す';
+                        } else if (type === 'alliance') {
+                            demandMsg = `「両家繁栄の為、どうか我らと盟約を結んでくだされ」`;
+                            confirmMsg = `「${doerClan.name}との同盟を承諾なされますか？」`;
+                            okText = '同盟する';
+                            cancelText = '断る';
+                        } else if (type === 'dominate') {
+                            demandMsg = `「もはや大勢は決し申した。この上の抵抗は無益にござる。いさぎよく${doerClan.name}の傘下に加わられよ」`;
+                            confirmMsg = `「殿……${doerClan.name} に従属なされますか？」`;
+                            okText = '従属する';
+                            cancelText = '断る';
+                        }
+
+                        this.game.ui.showDialog(demandMsg, false,
+                            () => {
+                                this.game.ui.showDialog(confirmMsg, true,
+                                    acceptAction,
+                                    rejectAction,
+                                    {
+                                        leftFace: nav.faceIcon, leftName: nav.name,
+                                        okText: okText, okClass: 'btn-primary',
+                                        cancelText: cancelText, cancelClass: 'btn-danger'
+                                    }
+                                );
+                            },
+                            null,
                             {
-                                leftFace: nav.faceIcon, leftName: nav.name,
-                                okText: okText, okClass: 'btn-primary',
-                                cancelText: cancelText, cancelClass: 'btn-danger'
+                                leftFace: doer.faceIcon, leftName: doerNameStr,
+                                isEvent: true
                             }
                         );
-                    },
-                    null,
-                    {
-                        leftFace: doer.faceIcon, leftName: doerNameStr,
+                    }, null, {
+                        leftFace: myDaimyoFace, leftName: myDaimyoNameStr,
                         isEvent: true
-                    }
-                );
+                    });
+                }, null, {
+                    leftFace: doer.faceIcon, leftName: doerNameStr,
+                    isEvent: true
+                });
             },
             () => {
                 doReject();
