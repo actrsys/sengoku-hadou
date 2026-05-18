@@ -1818,16 +1818,27 @@ class DiplomacyManager {
 
         const getCallName = (busho) => {
             if (!busho) return "殿";
-            let nameToCall = "";
-            if (busho.courtRankIds && busho.courtRankIds.length > 0 && this.game.courtRanks) {
-                const rank = this.game.courtRanks.find(r => r.id === busho.courtRankIds[0]);
-                if (rank) nameToCall = rank.name;
+            
+            // ★追加：将軍(ID:1)を持っているかチェックして、持っていれば「公方様」でお返しします
+            if (busho.courtRankIds && busho.courtRankIds.includes(1)) {
+                return "公方様";
             }
+            
+            let nameToCall = "";
+            // ★修正：新しい官位システムの魔法を使って、一番偉い官位の名前(rankName2)をもらいます
+            if (busho.courtRankIds && busho.courtRankIds.length > 0 && this.game.courtRankSystem) {
+                const rankName = this.game.courtRankSystem.getHighestRankName(busho);
+                if (rankName !== "なし") {
+                    nameToCall = rankName;
+                }
+            }
+            
             if (!nameToCall) {
                 nameToCall = busho.givenName || busho.name.replace(/^[^|]*\|?/, ''); 
                 if (!nameToCall) nameToCall = busho.name.replace(/\|/g, '');
             }
-            return nameToCall;
+            // ★追加：ここで「殿」をセットにしてくっつけておきます
+            return nameToCall + "殿";
         };
 
         // 差し替え後
@@ -1948,14 +1959,14 @@ class DiplomacyManager {
 
             if (type === 'goodwill') {
                 if (isDaimyoSelf) {
-                    msg1 = `「${enemyCallName}殿直々の頼みとあってはお受けする他ありませぬ。ありがたく頂戴いたします」`;
+                    msg1 = `「${enemyCallName}直々の頼みとあってはお受けする他ありませぬ。ありがたく頂戴いたします」`;
                 } else {
                     msg1 = `「願ってもない申し出にござる。ありがたく頂戴いたす」`;
                 }
                 msg2 = `「両家の絆はますます深まりましょう。しからば、拙者はこれにて……」`;
             } else if (type === 'alliance') {
                 msg1 = `「うむ、承知仕った。これより我らは盟友にござる」`;
-                msg2 = `「さすがは${myCallName}殿。くれぐれも約定を違えられぬようお願いいたす」`;
+                msg2 = `「さすがは${myCallName}。くれぐれも約定を違えられぬようお願いいたす」`;
             } else if (type === 'dominate') {
                 msg1 = `「……承知仕った。かくなる上は${doerClan.name}に従属いたす」`;
                 msg2 = `「おお……うかがった甲斐があり申した。共に${doerClan.name}を盛り立てて参りましょうぞ」`;
@@ -1990,8 +2001,8 @@ class DiplomacyManager {
                 let greetMsg2 = "";
                 
                 if (isDaimyoSelf) {
-                    greetMsg1 = `「${myCallName}殿。重大な用件ゆえ、此度はわし自ら参りました」`;
-                    greetMsg2 = `「これは${enemyCallName}殿……して、どのような御用向きでござるか？」`;
+                    greetMsg1 = `「${myCallName}。重大な用件ゆえ、此度はわし自ら参りました」`;
+                    greetMsg2 = `「これは${enemyCallName}……して、どのような御用向きでござるか？」`;
                 } else {
                     greetMsg1 = `「此度は${doerClan.name}当主・${enemyDaimyoName}の名代として罷り越しました。」`;
                     greetMsg2 = `「うむ。して、御用向きはいかに？」`;
@@ -2022,7 +2033,7 @@ class DiplomacyManager {
                         } else if (type === 'truce') {
                             // ★追加：和睦打診用のセリフ分岐とフッターボタンの初期設定
                             if (isDaimyoSelf) {
-                                demandMsg = `「${myCallName}殿。どうか我らと和睦してくだされ」`;
+                                demandMsg = `「${myCallName}。どうか我らと和睦してくだされ」`;
                             } else {
                                 demandMsg = `「${doerClan.name}との和睦が我らの望みでござる」`;
                             }
