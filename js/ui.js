@@ -923,16 +923,16 @@ class UIManager {
         // 右クリックや長押しのメニューはバグの温床になるので、まるごと封印しました！
         this.contextMenu = document.getElementById('custom-context-menu');
 
-        // ★ここから追加：代わりに、右クリック（スマホなら長押し）で「命令終了」を押したことにする魔法です！
-        document.addEventListener('contextmenu', (e) => {
+        // ★共通化：右クリックやスマホの長押しで実行する中身をひとまとめにします
+        const executeContextMenuAction = (e) => {
             // ★追加：野戦や攻城戦中は右クリックで「命令終了」を誤爆させないようにガードします！
             if (this.game) {
                 if (this.game.fieldWarManager && this.game.fieldWarManager.active) {
-                    e.preventDefault();
+                    if (e && e.preventDefault) e.preventDefault();
                     return;
                 }
                 if (this.game.warManager && this.game.warManager.state && this.game.warManager.state.active) {
-                    e.preventDefault();
+                    if (e && e.preventDefault) e.preventDefault();
                     return;
                 }
             }
@@ -941,13 +941,13 @@ class UIManager {
             // これで「命令を終了しますか？」という確認画面が出ている時の連打も防げます！
             const openModal = document.querySelector('.modal:not(.hidden)');
             if (openModal) {
-                e.preventDefault(); // ブラウザ本来のメニューも出さないようにします
+                if (e && e.preventDefault) e.preventDefault(); // ブラウザ本来のメニューも出さないようにします
                 return; // ここで処理を終わらせて、ボタンを押すのをやめます
             }
 
             // ★追加：観戦モード中の場合は、観戦終了の確認ダイアログを出します！
             if (this.game && this.game.isWatchMode) {
-                e.preventDefault();
+                if (e && e.preventDefault) e.preventDefault();
                 this.showDialog("観戦をやめますか？", true, () => {
                     this.game.stopWatchMode();
                 }, null, { okText: '観戦をやめる', okClass: 'btn-primary', cancelText: '観戦を続ける' });
@@ -968,10 +968,49 @@ class UIManager {
             // 表示されている本物のボタンが見つかった時だけ、ポチッと押します！
             if (visibleBtn) {
                 // ボタンが出ている時だけ、ブラウザ本来の右クリックメニューが出ないように防ぎます
-                e.preventDefault(); 
+                if (e && e.preventDefault) e.preventDefault(); 
                 visibleBtn.click();
             }
-        });
+        };
+
+        // ★ここから追加：代わりに、右クリックで「命令終了」を押したことにする魔法です！
+        document.addEventListener('contextmenu', executeContextMenuAction);
+
+        // ★ここからさらに追加！：スマホでは「contextmenu」がうまく動かないので、自分で長押しを数える魔法を追加します！
+        let longPressTimer = null;
+        let isLongPress = false;
+
+        document.addEventListener('touchstart', (e) => {
+            // 指が2本以上の時は無視します
+            if (e.touches.length > 1) return;
+            isLongPress = false;
+            
+            // 指を置いた瞬間にタイマーをスタートします（0.6秒）
+            longPressTimer = setTimeout(() => {
+                isLongPress = true;
+                executeContextMenuAction(e);
+            }, 600);
+        }, { passive: false });
+
+        document.addEventListener('touchmove', () => {
+            // 指が動いたら長押しのキャンセルです
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchend', (e) => {
+            // 指を離した時もタイマーを止めます
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            // もし既に長押しが発動していたら、余計なクリックが起きないように防ぎます
+            if (isLongPress) {
+                if (e.cancelable) e.preventDefault();
+            }
+        }, { passive: false });
     }
 
     showContextMenu(x, y) {
