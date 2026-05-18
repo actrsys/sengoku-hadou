@@ -8,18 +8,31 @@ class StrategySystem {
         this.game = game;
     }
 
-    // ★追加：対象が役職者本人か、その一門かを判定する魔法です（一元化）
-    // 戻り値：2(役職者本人), 1(役職者の一門), 0(それ以外)
+    // ★追加：対象が役職者本人か、役職持ちの一門か、ただの一門かなどを判定する魔法です（一元化）
+    // 戻り値：3(役職者本人), 2(役職持ちの一門), 1(同じ勢力に一門がいる), 0(それ以外)
     checkOfficerStatus(targetBusho) {
+        // レベル3: 役職者本人
         if (targetBusho.isDaimyo || targetBusho.isCastellan || targetBusho.isCommander || targetBusho.isGunshi) {
-            return 2;
-        } else {
-            const targetOfficers = this.game.bushos.filter(b => b.clan === targetBusho.clan && (b.isDaimyo || b.isCastellan || b.isCommander || b.isGunshi));
-            if (targetOfficers.some(officer => officer.familyIds && officer.familyIds.some(fId => targetBusho.familyIds.includes(fId)))) {
-                return 1;
+            return 3;
+        }
+        
+        // 同じ勢力にいる、自分以外の活動中の武将を集めます
+        const sameClanBushos = this.game.bushos.filter(b => b.clan === targetBusho.clan && b.id !== targetBusho.id && b.status === 'active');
+        
+        // その中に一門の武将がいるか探します
+        const familyInClan = sameClanBushos.filter(b => b.familyIds && targetBusho.familyIds && b.familyIds.some(fId => targetBusho.familyIds.includes(fId)));
+        
+        if (familyInClan.length > 0) {
+            // 一門の中に役職持ちがいるかチェックします
+            const hasOfficerFamily = familyInClan.some(b => b.isDaimyo || b.isCastellan || b.isCommander || b.isGunshi);
+            if (hasOfficerFamily) {
+                return 2; // レベル2: 役職持ちの一門がいる
+            } else {
+                return 1; // レベル1: （役職は持っていないが）一門がいる
             }
         }
-        return 0;
+
+        return 0; // レベル0: どれにも当てはまらない
     }
 
     // ==========================================
@@ -45,10 +58,11 @@ class StrategySystem {
         const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
         let prob = Math.min(1.0, score / (defScore + window.MainParams.Strategy.RumorFactor)) - 0.1;
         
-        // ★修正：対象が役職者本人か、その一門かでペナルティを分けます（一元化対応）
+        // ★修正：対象のステータスに合わせてペナルティを適用します
         const officerStatus = this.checkOfficerStatus(targetBusho);
-        if (officerStatus === 2) prob -= 0.30;
-        else if (officerStatus === 1) prob -= 0.15;
+        if (officerStatus === 3) prob -= 0.30;
+        else if (officerStatus === 2) prob -= 0.20;
+        else if (officerStatus === 1) prob -= 0.10;
         
         return Math.max(0, prob);
     }
@@ -76,10 +90,11 @@ class StrategySystem {
         
         successRate = Math.max(0, successRate - 0.1);
         
-        // ★修正：対象が役職者本人か、その一門かでペナルティを分けます（一元化対応）
+        // ★修正：対象のステータスに合わせてペナルティを適用します
         const officerStatus = this.checkOfficerStatus(target);
-        if (officerStatus === 2) successRate -= 0.30;
-        else if (officerStatus === 1) successRate -= 0.15;
+        if (officerStatus === 3) successRate -= 0.30;
+        else if (officerStatus === 2) successRate -= 0.20;
+        else if (officerStatus === 1) successRate -= 0.10;
         
         // ★ここから追加：引抜先に自分の宿敵がいる場合は、成功率が半分になります！
         if (target.nemesisIds && target.nemesisIds.length > 0) {
@@ -161,10 +176,11 @@ class StrategySystem {
         const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
         let prob = (score / (defScore + window.MainParams.Strategy.RumorFactor)) - 0.1;
         
-        // ★修正：対象が役職者本人か、その一門かでペナルティを分けます（一元化対応）
+        // ★修正：対象のステータスに合わせてペナルティを適用します
         const officerStatus = this.checkOfficerStatus(targetBusho);
-        if (officerStatus === 2) prob -= 0.30;
-        else if (officerStatus === 1) prob -= 0.15;
+        if (officerStatus === 3) prob -= 0.30;
+        else if (officerStatus === 2) prob -= 0.20;
+        else if (officerStatus === 1) prob -= 0.10;
         
         prob = Math.max(0, prob);
         let success = Math.random() < prob;
@@ -205,10 +221,11 @@ class StrategySystem {
 
         successRate = Math.max(0, successRate - 0.1);
 
-        // ★修正：対象が役職者本人か、その一門かでペナルティを分けます（一元化対応）
+        // ★修正：対象のステータスに合わせてペナルティを適用します
         const officerStatus = this.checkOfficerStatus(target);
-        if (officerStatus === 2) successRate -= 0.30;
-        else if (officerStatus === 1) successRate -= 0.15;
+        if (officerStatus === 3) successRate -= 0.30;
+        else if (officerStatus === 2) successRate -= 0.20;
+        else if (officerStatus === 1) successRate -= 0.10;
 
         // ★ここから追加：引抜先に自分の宿敵がいる場合は、成功率が半分になります！
         if (target.nemesisIds && target.nemesisIds.length > 0) {
