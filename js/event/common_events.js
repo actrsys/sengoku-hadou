@@ -1384,8 +1384,8 @@ window.GameEvents.push({
         const envoys = game.bushos.filter(b => b.clan === vassalageOfferClan.id && b.status === 'active' && !b.isDaimyo).sort((a,b) => b.diplomacy - a.diplomacy);
         // もし他に武将がいなければ、仕方ないので大名自身にお使いに行ってもらいます
         envoy = envoys.length > 0 ? envoys[0] : aiDaimyo;
-        
-        // メッセージでお見せするための名前を綺麗に整えます
+
+        // メッセージでお見せするための名前を綺麗に整えます（「織田|信長」の「|」を消す魔法です）
         const envoyName = envoy.name.replace(/\|/g, '');
         const playerDaimyoName = playerDaimyo.name.replace(/\|/g, '');
         const aiClanName = vassalageOfferClan.name;
@@ -1393,34 +1393,26 @@ window.GameEvents.push({
         // 下の名前がわかれば下の名前を、わからなければフルネームを使います
         const aiDaimyoGivenName = aiDaimyo.givenName ? aiDaimyo.givenName : aiDaimyoName;
 
-        // ★外交の共通魔法を使って呼び名を取得します（セリフ自体はイベント独自のものを活かします）
-        const myCallName = game.diplomacyManager.getCallName(playerDaimyo);
-        const isDaimyoSelf = (envoy.id === aiDaimyo.id);
-
         // ダイアログを出す前に、音を鳴らしてバリアを張る魔法を呼びます！
         if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
         
-        let introMsg = "";
-        let greetMsg1 = "";
-        
-        if (isDaimyoSelf) {
-            introMsg = `「殿、${aiClanName}当主・${aiDaimyoName}様がお見えになっております」`;
-            greetMsg1 = `「${myCallName}。急な訪問、平にご容赦くだされ」`;
-        } else {
-            introMsg = `「殿、${aiClanName} から使者が参っております」`;
-            greetMsg1 = `「此度は${aiClanName}当主・${aiDaimyoName}の名代として罷り越しました。急な訪問、平にご容赦くだされ」`;
-        }
-        
-        // 小姓などからの報告
-        await game.ui.showDialogAsync(introMsg, false, 0);
+        await game.ui.showDialogAsync(`${aiClanName} から使者が参っております。`, false, 0);
 
-        // 挨拶
-        await game.ui.showDialogAsync(greetMsg1, false, 0, { leftFace: envoy.faceIcon, leftName: envoyName });
-        await game.ui.showDialogAsync(`「うむ。して、御用向きはいかに？」`, false, 0, { leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName });
+        await game.ui.showDialogAsync(`「此度は${aiClanName}当主・${aiDaimyoName}の名代として罷り越しました。急な訪問、平にご容赦くだされ」`, false, 0, {
+            leftFace: envoy.faceIcon, leftName: envoyName
+        });
 
-        // 用件（臣従願い）
-        await game.ui.showDialogAsync(`「はっ……どうか我らを${playerClan.name}の末席にお加えいただきたく存じます」`, false, 0, { leftFace: envoy.faceIcon, leftName: envoyName });
-        await game.ui.showDialogAsync(`「なんと、家臣になりたいと申されるか」`, false, 0, { leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName });
+        await game.ui.showDialogAsync(`「うむ。して、御用向きはいかに？」`, false, 0, {
+            leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
+        });
+
+        await game.ui.showDialogAsync(`「はっ……どうか我らを${playerClan.name}の末席にお加えいただきたく存じます」`, false, 0, {
+            leftFace: envoy.faceIcon, leftName: envoyName
+        });
+
+        await game.ui.showDialogAsync(`「なんと、家臣になりたいと申されるか」`, false, 0, {
+            leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
+        });
 
         // プレイヤーに決断してもらいます！
         const isAccepted = await new Promise(resolve => {
@@ -1489,15 +1481,7 @@ window.GameEvents.push({
             await game.ui.showDialogAsync(`「すまぬが、他家を取り込むつもりはない。これまで通り当家を支えていただききたく存ずる」`, false, 0, {
                 leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
             });
-            
-            let rejectMsg2 = "";
-            if (isDaimyoSelf) {
-                rejectMsg2 = `「……承知仕った。無念にござる」`;
-            } else {
-                rejectMsg2 = `「……承知仕った。${aiDaimyoGivenName}様にはそのようにお伝えし申す」`;
-            }
-            
-            await game.ui.showDialogAsync(rejectMsg2, false, 0, {
+            await game.ui.showDialogAsync(`「……承知仕った。${aiDaimyoGivenName}様にはそのようにお伝えし申す」`, false, 0, {
                 leftFace: envoy.faceIcon, leftName: envoyName
             });
         }
