@@ -318,12 +318,23 @@ class DiplomacyManager {
             let threshold = commonEnemy ? 90 : 120; 
             let acceptProb = commonEnemy ? 90 : 70; 
 
+            // 和睦と従属願の場合は、同盟よりもハードルを下げて成功しやすくします
+            if (type === 'subordinate' || type === 'truce') {
+                threshold -= 20; // 成功に必要な点数の基準を下げます
+                acceptProb += 10; // 基本の成功確率を少し上げます
+            }
+
             if (allyCount >= 2) {
                 acceptProb -= (allyCount - 1) * 20; 
                 threshold += (allyCount - 1) * 10;  
             }
+
+            // 相手の方が兵力が多い場合のペナルティ計算
             if (targetPower > myPower) {
-                acceptProb *= (Math.sqrt(myPower) / Math.sqrt(targetPower));
+                // ただし、従属願（相手にひれ伏す）の場合は兵力差による確率低下をナシにします！
+                if (type !== 'subordinate') {
+                    acceptProb *= (Math.sqrt(myPower) / Math.sqrt(targetPower));
+                }
             }
 
             const chance = relation.sentiment + doerDiplomacy;
