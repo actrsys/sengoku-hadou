@@ -19,7 +19,7 @@ const COMMAND_MENU_STRUCTURE = [
     {
         label: "対外",
         items: [
-            { label: "外交", items: ['goodwill', 'alliance', 'marriage', 'dominate', 'subordinate', 'vassalage', 'break_alliance'] },
+            { label: "外交", items: ['goodwill', 'truce', 'alliance', 'marriage', 'dominate', 'subordinate', 'vassalage', 'break_alliance'] },
             { label: "諸勢力", items: ['kunishu_goodwill', 'kunishu_incorporate', 'kunishu_subjugate'] },
             { label: "調略", items: ['sabotage', 'incite', 'rumor', 'headhunt'] },
             { label: "朝廷", items: ['tribute', 'court_truce'] }
@@ -581,6 +581,13 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'marriage_valid',
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasUnmarriedPrincess(game)
+    },
+    'truce': {
+        label: "和睦", category: 'FOREIGN_DAIMYO',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: false,
+        startMode: 'map_select', targetType: 'hostile_clan_only',
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.canSubordinate(game, castle)
     },
     'dominate': {
         label: "降伏勧告", category: 'FOREIGN_DAIMYO',
@@ -1502,6 +1509,8 @@ class CommandSystem {
             } else if (extraData.subAction === 'dominate') {
                 const prob = this.game.diplomacyManager.getDiplomacyProb(firstId, targetId, 'dominate');
                 this.showAdviceAndExecute('dominate', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: prob / 100 });
+            } else if (extraData.subAction === 'truce') {
+                this.showAdviceAndExecute('truce', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'truce'), { trueProb: 1.0 });
             } else if (extraData.subAction === 'court_truce') {
                 // ★追加：朝廷和睦は条件を満たしていれば確実に成功します！
                 this.showAdviceAndExecute('court_truce', () => this.game.courtRankSystem.executeCourtTruce(firstId, targetId), { trueProb: 1.0 });
@@ -2372,6 +2381,7 @@ class CommandSystem {
             case 'break_alliance': return "断交する相手を選択してください";
             case 'court_truce': return "朝廷を介して和睦を行う相手を選択してください";
             case 'marriage': return "婚姻同盟を行う相手を選択してください";
+            case 'truce': return "和睦交渉を行う相手を選択してください";
             case 'atk_self_reinforcement': return "援軍を出陣させる城を選択してください";
             case 'atk_ally_reinforcement': return "援軍を要請する城を選択してください";
             case 'def_self_reinforcement': return "援軍を出陣させる城を選択してください";
@@ -2542,6 +2552,8 @@ class CommandSystem {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'vassalage' }, onBackToMap);
         } else if (mode === 'dominate') {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'dominate' }, onBackToMap);
+        } else if (mode === 'truce') {
+            this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'truce' }, onBackToMap);
         } else if (mode === 'court_truce') {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'court_truce' }, onBackToMap);
         } else if (mode === 'marriage') {
