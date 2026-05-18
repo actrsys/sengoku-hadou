@@ -1408,6 +1408,20 @@ class DiplomacyManager {
             this.game.affiliationSystem.moveCastle(b, castleB.id);
         });
 
+        // ★追加：物資（金・兵糧・兵士・馬・鉄砲）を全て引越し先のお城に運びます！
+        castleB.gold = Math.min(99999, castleB.gold + castleA.gold);
+        castleB.rice = Math.min(99999, castleB.rice + castleA.rice);
+        castleB.soldiers = Math.min(99999, castleB.soldiers + castleA.soldiers);
+        castleB.horses = Math.min(99999, (castleB.horses || 0) + (castleA.horses || 0));
+        castleB.guns = Math.min(99999, (castleB.guns || 0) + (castleA.guns || 0));
+
+        // 運び終わったので、元の城（A）の物資はからっぽにします。
+        castleA.gold = 0;
+        castleA.rice = 0;
+        castleA.soldiers = 0;
+        castleA.horses = 0;
+        castleA.guns = 0;
+
         if (castleA.soldiers < 1500) castleA.soldiers = 1500;
         if (castleA.rice < 2500) castleA.rice = 2500;
         if (castleA.defense < 200) castleA.defense = Math.min(200, castleA.maxDefense || 9999);
@@ -1872,7 +1886,7 @@ class DiplomacyManager {
                 const increase = this.calcGoodwillIncrease(gold, doer);
                 this.updateSentiment(doer.clan, targetClanId, increase);
                 this.game.ui.log(`${doerClan.name}からの親善を受け入れました`);
-                this.game.ui.showResultModal(`${doerClan.name} からの親善を受け入れました！　友好度が上昇しました`, () => {
+                this.game.ui.showResultModal(`${doerClan.name}との関係が改善しました！`, () => {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
             } else if (type === 'alliance') {
@@ -1904,7 +1918,7 @@ class DiplomacyManager {
                 } else {
                     msg1 = `「願ってもない申し出にござる。ありがたく頂戴いたす」`;
                 }
-                msg2 = `「まこと、祝着至極に存じまする。しからば、拙者はこれにて……」`;
+                msg2 = `「両家の絆はますます深まりましょう。しからば、拙者はこれにて……」`;
             } else if (type === 'alliance') {
                 msg1 = `「うむ、承知仕った。これより我らは盟友にござる」`;
                 msg2 = `「さすがは${myCallName}殿。くれぐれも約定を違えられぬようお願いいたす」`;
