@@ -109,11 +109,6 @@ class GunshiSystem {
 
     // ★軍師の賢さによって、言うこと（予測）が変わる魔法です
     getAdviceMessage(gunshi, action, seed) { 
-        // 従属願の場合は専用のメッセージを返します
-        if (action.type === 'subordinate') {
-            return "何かしらの見返りを要求されるでしょう。";
-        }
-
         // 実際の成功確率を受け取ります（無い場合は絶対に成功するコマンドとして扱います）
         let trueProb = action.trueProb !== undefined ? action.trueProb : 1.0;
         
@@ -134,6 +129,15 @@ class GunshiSystem {
         const noise = (GameSystem.seededRandom(seed) - 0.5) * 2;
         let perceivedProb = trueProb + noise * maxError;
         perceivedProb = Math.max(0.0, Math.min(1.0, perceivedProb));
+
+        // ★追加：従属願と和睦の場合は、確率によって言うことを切り替えます！
+        if (action.type === 'subordinate' || action.type === 'truce') {
+            if (perceivedProb > 0.95) return "必ずや受け入れられるでしょう。無条件で話がまとまるはずです！"; 
+            if (perceivedProb > 0.7) return "おそらく上手くいくでしょう。ただ、何かしらの見返りを要求される可能性があります。"; 
+            if (perceivedProb > 0.4) return "五分五分といったところです。厳しい条件を要求されるかもしれません。"; 
+            if (perceivedProb > 0.15) return "厳しい交渉になるでしょう。法外な条件を出される恐れがあります。"; 
+            return "おやめください。今の状況では到底受け入れられないでしょう。"; 
+        }
 
         if (perceivedProb > 0.95) return "必ずや成功するでしょう。好機です！"; 
         if (perceivedProb > 0.7) return "おそらく上手くいくでしょう。"; 
