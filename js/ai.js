@@ -2781,6 +2781,19 @@ class AIEngine {
                  this.game.diplomacyManager.executeDiplomacy(castellan.id, targetCastleId, 'alliance');
                  castellan.isActionDone = true;
              }
+        } else if (targetData.action === 'truce') {
+             // ★追加：AI大名がプレイヤー（あなた）に通常和睦を申し込んできた時のバトンタッチ回路
+             if (targetClanId === this.game.playerClanId) {
+                 this.game.diplomacyManager.proposeDiplomacyToPlayer(castellan, targetClanId, 'truce', 0, () => {
+                     castellan.isActionDone = true;
+                     this.game.finishTurn();
+                 });
+                 return 'waiting';
+             } else {
+                 // AI同士で通常和睦を行う場合
+                 this.game.diplomacyManager.executeDiplomacy(castellan.id, targetCastleId, 'truce');
+                 castellan.isActionDone = true;
+             }
         } else if (targetData.action === 'court_truce') {
              if (castle.gold >= targetData.gold) {
                  this.game.diplomacyManager.executeDiplomacy(castellan.id, targetCastleId, 'court_truce', targetData.gold);

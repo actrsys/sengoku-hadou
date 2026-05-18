@@ -1323,14 +1323,16 @@ class DiplomacyManager {
                 }
             }
         } else {
-            if (myLegionCastles.length > 0) {
+            // ★変更：城を譲り渡す際、居残る武将や物資の避難先を「大名居城」に最優先で固定します
+            if (daimyo && daimyo.castleId) {
+                castleB = this.game.getCastle(daimyo.castleId);
+            }
+            if (!castleB && myLegionCastles.length > 0) {
                 castleB = myLegionCastles[0];
-            } else {
+            } else if (!castleB) {
                 const directCastles = myCastles.filter(c => c.legionId === 0);
                 if (directCastles.length > 0) {
                     castleB = directCastles[0];
-                } else if (daimyo && daimyo.castleId) {
-                    castleB = this.game.getCastle(daimyo.castleId);
                 } else {
                     castleB = myCastles[0];
                 }
@@ -1846,6 +1848,12 @@ class DiplomacyManager {
                 this.game.ui.showResultModal(`従属の要求を断固として拒否しました！`, () => {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
+            } else if (type === 'truce') {
+                // ★追加：和睦不成立時のペナルティと、画面終了時のお知らせを表示
+                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
+                this.game.ui.showResultModal(`和睦の打診を拒否しました。`, () => {
+                    if (onComplete) setTimeout(onComplete, 100);
+                });
             }
         };
 
@@ -1862,6 +1870,10 @@ class DiplomacyManager {
             } else if (type === 'dominate') {
                 msg1 = `「断る！　まだ負けと決まったわけではござらん。その首叩き斬られたくなければ、早々に立ち去るがよい」`;
                 msg2 = `「……拙者は忠告申し上げましたぞ。ではこれにて」`;
+            } else if (type === 'truce') {
+                // ★追加：指示通りの不成立ダイアログテキストを設定
+                msg1 = `「何をほざくか！　帰って戦の支度をなされるがよい！」`;
+                msg2 = `「さらば、次に相まみえるは戦場にござる。ではこれにて御免」`;
             }
 
             this.game.ui.showDialog(msg1, false, () => {
@@ -1905,6 +1917,18 @@ class DiplomacyManager {
                 this.game.ui.showResultModal(`${doerClan.name} に従属しました……`, () => {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
+            } else if (type === 'truce') {
+                // ★追加：通常和睦が成立した時の内部ステータス（不可侵6ヶ月）の書き換え処理
+                this.changeStatus(doer.clan, targetClanId, '和睦', 6);
+                const relationA = this.getDiplomacyData(doer.clan, targetClanId);
+                const relationB = this.getDiplomacyData(targetClanId, doer.clan);
+                if (relationA) relationA.sentiment = 50;
+                if (relationB) relationB.sentiment = 50;
+
+                this.game.ui.log(`${doerClan.name}と和睦しました`);
+                this.game.ui.showResultModal(`${doerClan.name} と和睦しました。`, () => {
+                    if (onComplete) setTimeout(onComplete, 100);
+                });
             }
         };
 
@@ -1914,7 +1938,7 @@ class DiplomacyManager {
 
             if (type === 'goodwill') {
                 if (isDaimyoSelf) {
-                    msg1 = `「${enemyCallName}殿直々の頼みとあってはお受けする他ありませぬ。ありがたく頂戴いたします」`;
+                    msg1 = `「${enemyCallName}殿直々の頼みとあってはお受けする HTMLありませぬ。ありがたく頂戴いたします」`;
                 } else {
                     msg1 = `「願ってもない申し出にござる。ありがたく頂戴いたす」`;
                 }
@@ -1925,6 +1949,14 @@ class DiplomacyManager {
             } else if (type === 'dominate') {
                 msg1 = `「……承知仕った。かくなる上は${doerClan.name}に従属いたす」`;
                 msg2 = `「おお……うかがった甲斐があり申した。共に${doerClan.name}を盛り立てて参りましょうぞ」`;
+            } else if (type === 'truce') {
+                // ★追加：指示通りの和睦成立ダイアログテキストを設定
+                msg1 = `「うむ、承知いたす。此度の戦には、わしも思うところがないわけではない」`;
+                if (isDaimyoSelf) {
+                    msg2 = `「ありがたい……くれぐれもお願い申し上げる」`;
+                } else {
+                    msg2 = `「ははっ、ありがたき幸せに存じまする！」`;
+                }
             }
 
             if (msg1 && msg2) {
@@ -1976,6 +2008,16 @@ class DiplomacyManager {
                             demandMsg = `「もはや大勢は決し申した。この上の抵抗は無益にござる。いさぎよく${doerClan.name}の傘下に加わられよ」`;
                             confirmMsg = `「殿……${doerClan.name} に従属なされますか？」`;
                             okText = '従属する';
+                            cancelText = '断る';
+                        } else if (type === 'truce') {
+                            // ★追加：和睦打診用のセリフ分岐とフッターボタンの初期設定
+                            if (isDaimyoSelf) {
+                                demandMsg = `「どうか我らと和睦していただきたい」`;
+                            } else {
+                                demandMsg = `「我が主は${doerClan.name}との和睦を望んでおりまする」`;
+                            }
+                            confirmMsg = `「${doerClan.name} との和睦をお受けなされますか？」`;
+                            okText = '和睦する';
                             cancelText = '断る';
                         }
 
@@ -2045,7 +2087,7 @@ class DiplomacyManager {
         const myClan = this.game.clans.find(c => c.id === myClanId);
         const courtTrust = myClan ? (myClan.courtTrust || 0) : 0;
 
-        if (rel.status === '敵対' && courtTrust >= 500 && enemyCount >= 2) {
+        if (rel.status === '敵対' && enemyCount >= 2) {
             let isAttackTarget = false;
             if (this.game.aiOperationManager && this.game.aiOperationManager.operations[myClanId]) {
                 const ops = this.game.aiOperationManager.operations[myClanId];
@@ -2065,7 +2107,14 @@ class DiplomacyManager {
             if (!isAttackTarget) {
                 let truceProb = (enemyCount - 1) * 0.2;
                 if (Math.random() < truceProb) {
-                    return { action: 'court_truce', gold: 2000 };
+                    if (courtTrust >= 500) {
+                        return { action: 'court_truce', gold: 2000 };
+                    } else {
+                        // ★変更：朝廷和睦ができない時、相手が格上（総兵力2.5倍以上）なら通常和睦を検討
+                        if (targetClanTotal / Math.max(1, myPower) >= 2.5) {
+                            return { action: 'truce', gold: 0 };
+                        }
+                    }
                 }
             }
         }
@@ -2477,9 +2526,86 @@ class DiplomacyManager {
         }
 
         const isPlayer = (requestClanId === this.game.playerClanId);
-        
-        if (!isPlayer) {
+        const isTargetPlayer = (targetClanId === this.game.playerClanId);
+
+        // ★追加：AIからプレイヤーへ和睦を打診してきた場合は、一旦対価なしで進めます
+        if (!isPlayer && isTargetPlayer) {
             if (onSuccess) onSuccess('none', null);
+            return;
+        }
+
+        // ★追加：AI同士が和睦する場合の対価支払いの厳格ルール
+        if (!isPlayer && !isTargetPlayer) {
+            let options = [];
+
+            // 1. 差し出す姫は架空姫（ID9万台：90000以上）のみに限定する
+            if (reqClan.princessIds && reqClan.princessIds.length > 0) {
+                for (let pId of reqClan.princessIds) {
+                    const p = this.game.princesses.find(pr => pr.id === pId && pr.status === 'unmarried' && pr.id >= 90000);
+                    if (p) {
+                        const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && b.status === 'active' && (!b.wifeIds || b.wifeIds.length === 0));
+                        if (tgtBushos.length > 0) {
+                            options.push({ type: 'marriage', princess: p, busho: tgtBushos[0] });
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // 2. 差し出せる一門武将が3人以下の場合は絶対に差し出さない（4人以上いる時だけ候補にする）
+            const reqDaimyo = this.game.bushos.find(b => b.clan === requestClanId && b.isDaimyo);
+            if (reqDaimyo) {
+                const dFamily = Array.isArray(reqDaimyo.familyIds) ? reqDaimyo.familyIds : [];
+                const kinsmen = this.game.bushos.filter(b => {
+                    if (b.clan !== requestClanId || b.isDaimyo || b.status !== 'active') return false;
+                    const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+                    return bFamily.includes(reqDaimyo.id) || dFamily.includes(b.id);
+                });
+                
+                if (kinsmen.length > 3) {
+                    options.push({ type: 'hostage', busho: kinsmen[0] });
+                }
+            }
+
+            // 3. 割譲する城は「大名居城以外」かつ「直轄領（legionId === 0）」のみを対象にする
+            const reqCastles = this.game.castles.filter(c => Number(c.ownerClan) === requestClanId);
+            if (reqCastles.length >= 2) {
+                const reqDaimyoCastleId = reqDaimyo ? reqDaimyo.castleId : -1;
+                const candidateCastles = reqCastles.filter(c => c.id !== reqDaimyoCastleId && c.legionId === 0);
+                
+                if (candidateCastles.length > 0) {
+                    let targetCastle = null;
+                    const tgtCastles = this.game.castles.filter(c => Number(c.ownerClan) === targetClanId);
+                    
+                    for (let sc of candidateCastles) {
+                        let isAdjacent = false;
+                        for (let dc of tgtCastles) {
+                            if (typeof window.GameSystem !== 'undefined' && window.GameSystem.isAdjacent) {
+                                if (window.GameSystem.isAdjacent(sc, dc)) {
+                                    isAdjacent = true; break;
+                                }
+                            } else if (sc.adjacentCastleIds && sc.adjacentCastleIds.includes(dc.id)) {
+                                isAdjacent = true; break;
+                            }
+                        }
+                        if (isAdjacent) {
+                            targetCastle = sc; break;
+                        }
+                    }
+                    if (targetCastle) {
+                        options.push({ type: 'castle', castle: targetCastle });
+                    }
+                }
+            }
+
+            // 対価が何も用意できない場合は、和睦交渉自体を決裂（中止）させる
+            if (options.length === 0) {
+                if (onFailure) onFailure();
+                return;
+            }
+
+            const selectedOption = options[Math.floor(Math.random() * options.length)];
+            if (onSuccess) onSuccess(selectedOption.type, selectedOption);
             return;
         }
 
