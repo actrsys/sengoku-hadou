@@ -696,7 +696,16 @@ class WarManager {
             
             let fireDefBonus = Math.max(0, def - 500) * 0.4;
             let fireRatioBonus = Math.max(0, 2.5 - ratio) * 200;
-            scores['fire'] = fireDefBonus + fireRatioBonus + intBonus - (timidDegree * 100);
+            
+            // ★追加：天候による火計実行のマイナス評価（ペナルティ）を計算します
+            let fireWeatherPenalty = 0;
+            if (s.isHeavySnow && s.isRaining) {
+                fireWeatherPenalty = 500; // 大雪かつ降雪時はスコアを大きく下げます
+            } else if (s.isHeavySnow || s.isRaining) {
+                fireWeatherPenalty = 300; // 大雪のみ、または雨（降雪）のみの場合
+            }
+            
+            scores['fire'] = fireDefBonus + fireRatioBonus + intBonus - (timidDegree * 100) - fireWeatherPenalty;
             
             let bowDefBonus = Math.max(0, def - 600) * 0.3;
             scores['bow'] = 50 + bowDefBonus + (ratio * 50) + gunBonus;
@@ -1154,7 +1163,19 @@ class WarManager {
             let defTrainingAvg = validArmyCount > 0 ? totalTraining / validArmyCount : 50;
             let defMoraleTrainBonus = Math.max(0.01, (defMoraleAvg / 100) + (defTrainingAvg / 100));
             
+            // ★追加：天候による成功率のマイナス分（ペナルティ）を計算します
+            let fireWeatherPenaltyRate = 0;
+            if (s.isHeavySnow && s.isRaining) {
+                fireWeatherPenaltyRate = 0.3; // 大雪かつ降雪時は30%マイナス
+            } else if (s.isHeavySnow || s.isRaining) {
+                fireWeatherPenaltyRate = 0.2; // 大雪のみ、または雨（降雪）のみの場合は20%マイナス
+            }
+            
             let successRate = ((Math.sqrt(10 + atkBestInt) * (Math.sqrt(atkInt) * 2)) / ((Math.sqrt(50 + defBestInt) * (Math.sqrt(defInt) * 2)) * defMoraleTrainBonus) * 0.75) - 0.2;
+            
+            // 計算したペナルティ分を引き算します
+            successRate -= fireWeatherPenaltyRate;
+            
             successRate = Math.max(0, Math.min(0.99, successRate));
             
             if (Math.random() < successRate) {
