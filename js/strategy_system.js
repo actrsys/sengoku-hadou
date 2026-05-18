@@ -119,6 +119,17 @@ class StrategySystem {
         return Math.max(0.01, Math.min(0.99, prob));
     }
     
+    // ★追加: 経験値獲得を共通化する魔法
+    addStrategyExperience(busho, isSuccess, successStr = 5, successInt = 10, failStr = 2, failInt = 5) {
+        if (isSuccess) {
+            busho.expStrength = (busho.expStrength || 0) + successStr;
+            busho.expIntelligence = (busho.expIntelligence || 0) + successInt;
+        } else {
+            busho.expStrength = (busho.expStrength || 0) + failStr;
+            busho.expIntelligence = (busho.expIntelligence || 0) + failInt;
+        }
+    }
+
     // ★追加: 破壊工作の成否とダメージを計算する魔法
     calcSabotage(doerId, targetId, isExecute = false) { 
         const busho = this.game.getBusho(doerId);
@@ -126,15 +137,7 @@ class StrategySystem {
         const prob = this.getSabotageProb(doerId, targetId);
         const success = Math.random() < prob; 
 
-        if (isExecute) {
-            if (success) {
-                busho.expStrength = (busho.expStrength || 0) + 5;
-                busho.expIntelligence = (busho.expIntelligence || 0) + 10;
-            } else {
-                busho.expStrength = (busho.expStrength || 0) + 2;
-                busho.expIntelligence = (busho.expIntelligence || 0) + 5;
-            }
-        }
+        if (isExecute) this.addStrategyExperience(busho, success);
         
         if(!success) return { success: false, val: 0 }; 
         
@@ -149,15 +152,7 @@ class StrategySystem {
         const prob = this.getInciteProb(doerId, targetId);
         const success = Math.random() < prob; 
 
-        if (isExecute) {
-            if (success) {
-                busho.expStrength = (busho.expStrength || 0) + 5;
-                busho.expIntelligence = (busho.expIntelligence || 0) + 10;
-            } else {
-                busho.expStrength = (busho.expStrength || 0) + 2;
-                busho.expIntelligence = (busho.expIntelligence || 0) + 5;
-            }
-        }
+        if (isExecute) this.addStrategyExperience(busho, success);
         
         if(!success) return { success: false, val: 0 }; 
         
@@ -173,15 +168,7 @@ class StrategySystem {
         const prob = this.getRumorProb(doerId, targetBushoId);
         let success = Math.random() < prob;
 
-        if (isExecute) {
-            if (success) {
-                busho.expStrength = (busho.expStrength || 0) + 5;
-                busho.expIntelligence = (busho.expIntelligence || 0) + 10;
-            } else {
-                busho.expStrength = (busho.expStrength || 0) + 2;
-                busho.expIntelligence = (busho.expIntelligence || 0) + 5;
-            }
-        }
+        if (isExecute) this.addStrategyExperience(busho, success);
 
         if(!success) return { success: false, val: 0 }; 
         return { success: true, val: Math.floor((20 + Math.random()*20) / 4) }; 
@@ -193,15 +180,8 @@ class StrategySystem {
         const successRate = this.getHeadhuntProb(doerId, targetBushoId, gold);
         let success = Math.random() < successRate;
 
-        if (isExecute) {
-            if (success) {
-                doer.expStrength = (doer.expStrength || 0) + 10;
-                doer.expIntelligence = (doer.expIntelligence || 0) + 20;
-            } else {
-                doer.expStrength = (doer.expStrength || 0) + 2;
-                doer.expIntelligence = (doer.expIntelligence || 0) + 5;
-            }
-        }
+        // 引抜は少し経験値が多いので、数字を指定して渡します
+        if (isExecute) this.addStrategyExperience(doer, success, 10, 20, 2, 5);
 
         return success;
     }
@@ -322,9 +302,9 @@ class StrategySystem {
     // ★調略コマンドの結果を反映する魔法（AIとプレイヤーで一元化！）
     // ==========================================
 
-    applySabotageEffect(doer, targetCastle, result) {
-        if(result.success) {
-            targetCastle.defense = Math.max(0, targetCastle.defense - result.val); 
+    // ★共通: 功績と派閥承認の更新
+    applyCommonSuccessEffect(doer, isSuccess) {
+        if (isSuccess) {
             doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(doer.intelligence * 0.2) + 10;
             if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 20);
         } else {
@@ -333,26 +313,14 @@ class StrategySystem {
         }
     }
 
-    applyInciteEffect(doer, targetCastle, result) {
-        if(result.success) {
-            targetCastle.peoplesLoyalty = Math.max(0, targetCastle.peoplesLoyalty - result.val); 
-            doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(doer.intelligence * 0.2) + 10;
-            if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 20);
-        } else {
-            doer.achievementTotal = (doer.achievementTotal || 0) + 5;
-            if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+    // ★統合: 効果の適用
+    applyStrategyEffect(actionType, doer, targetObj, result) {
+        if (result.success) {
+            if (actionType === 'sabotage') targetObj.defense = Math.max(0, targetObj.defense - result.val);
+            if (actionType === 'incite') targetObj.peoplesLoyalty = Math.max(0, targetObj.peoplesLoyalty - result.val);
+            if (actionType === 'rumor') targetObj.loyalty = Math.max(0, targetObj.loyalty - result.val);
         }
-    }
-
-    applyRumorEffect(doer, targetBusho, result) {
-        if(result.success) {
-            targetBusho.loyalty = Math.max(0, targetBusho.loyalty - result.val); 
-            doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(doer.intelligence * 0.2) + 10;
-            if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 20);
-        } else {
-            doer.achievementTotal = (doer.achievementTotal || 0) + 5;
-            if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
-        }
+        this.applyCommonSuccessEffect(doer, result.success);
     }
 
     applyHeadhuntEffect(doer, target, destCastle, isSuccess) {
@@ -448,79 +416,57 @@ class StrategySystem {
         this.game.ui.renderCommandMenu();
         this.game.ui.renderMap();
     }
-    
-    // 扇動を実行する魔法
-    executeIncite(doerId, targetId) { 
+
+    // ★統合: 破壊工作・扇動・離間計の実行処理
+    executeBasicStrategy(actionType, doerId, targetId) {
         const doer = this.game.getBusho(doerId);
-        const target = this.game.getCastle(targetId); 
+        const isTargetBusho = (actionType === 'rumor');
+        const targetObj = isTargetBusho ? this.game.getBusho(targetId) : this.game.getCastle(targetId);
         
-        const result = this.calcIncite(doerId, targetId, true); 
-        const covertMsg = this.handleCovertAction(doerId, targetId, result.success, 'incite');
+        if (isTargetBusho) targetObj.lastApproachedClanId = doer.clan;
 
-        const oldVal = target.peoplesLoyalty;
-        
-        // ★ 一元化した処理を呼び出します
-        this.applyInciteEffect(doer, target, result);
+        let result;
+        if (actionType === 'sabotage') result = this.calcSabotage(doerId, targetId, true);
+        else if (actionType === 'incite') result = this.calcIncite(doerId, targetId, true);
+        else if (actionType === 'rumor') result = this.calcRumor(doerId, targetId, true);
 
-        if(result.success) {
-            const actualDrop = oldVal - target.peoplesLoyalty;
-            this.game.ui.showResultModal(`${doer.name}の扇動が成功！\n${target.name}の民忠が${actualDrop}低下しました${covertMsg}`); 
-        } else { 
-            this.game.ui.showResultModal(`${doer.name}の扇動は失敗しました${covertMsg}`); 
+        const targetCastleId = isTargetBusho ? targetObj.castleId : targetId;
+        const covertMsg = this.handleCovertAction(doerId, targetCastleId, result.success, actionType, false, isTargetBusho ? targetId : null);
+
+        let oldVal;
+        if (actionType === 'sabotage') oldVal = targetObj.defense;
+        else if (actionType === 'incite') oldVal = targetObj.peoplesLoyalty;
+        else if (actionType === 'rumor') oldVal = targetObj.loyalty;
+
+        this.applyStrategyEffect(actionType, doer, targetObj, result);
+
+        if (result.success) {
+            let actualDrop = oldVal - (actionType === 'sabotage' ? targetObj.defense : actionType === 'incite' ? targetObj.peoplesLoyalty : targetObj.loyalty);
+            let actionName = actionType === 'sabotage' ? '破壊工作' : actionType === 'incite' ? '扇動' : '離間計';
+            let statName = actionType === 'sabotage' ? '防御力' : actionType === 'incite' ? '民忠' : '忠誠';
+            
+            // 離間計の場合、数値の低下は表示せず低下した事実のみを伝えていた元の仕様に合わせる
+            if (actionType === 'rumor') {
+                this.game.ui.showResultModal(`${doer.name}の${actionName}が成功！\n${targetObj.name}の${statName}が低下しました${covertMsg}`);
+            } else {
+                this.game.ui.showResultModal(`${doer.name}の${actionName}が成功！\n${targetObj.name}の${statName}が${actualDrop}低下しました${covertMsg}`);
+            }
+        } else {
+            let actionName = actionType === 'sabotage' ? '破壊工作' : actionType === 'incite' ? '扇動' : '離間計';
+            this.game.ui.showResultModal(`${doer.name}の${actionName}は失敗しました${covertMsg}`); 
         } 
+        
         doer.isActionDone = true; 
         this.game.ui.updatePanelHeader(); 
         this.game.ui.renderCommandMenu(); 
     }
+
+    // 扇動を実行する魔法
+    executeIncite(doerId, targetId) { this.executeBasicStrategy('incite', doerId, targetId); }
     
     // 離間計を実行する魔法
-    executeRumor(doerId, castleId, targetBushoId) { 
-        const doer = this.game.getBusho(doerId); 
-        const targetBusho = this.game.getBusho(targetBushoId); 
-        
-        // メモを残す魔法
-        targetBusho.lastApproachedClanId = doer.clan;
-
-        let result = this.calcRumor(doerId, targetBushoId, true);
-        const covertMsg = this.handleCovertAction(doerId, targetBusho.castleId, result.success, 'rumor', false, targetBusho.id);
-
-        const oldVal = targetBusho.loyalty;
-        
-        // ★ 一元化した処理を呼び出します
-        this.applyRumorEffect(doer, targetBusho, result);
-
-        if(result.success) { 
-            const actualDrop = oldVal - targetBusho.loyalty;
-            this.game.ui.showResultModal(`${doer.name}の離間計が成功！\n${targetBusho.name}の忠誠が低下しました${covertMsg}`);
-        } else { 
-            this.game.ui.showResultModal(`${doer.name}の離間計は失敗しました${covertMsg}`); 
-        } 
-        doer.isActionDone = true; 
-        this.game.ui.updatePanelHeader(); 
-        this.game.ui.renderCommandMenu(); 
-    }
+    executeRumor(doerId, castleId, targetBushoId) { this.executeBasicStrategy('rumor', doerId, targetBushoId); }
     
-    // ★追加: 破壊工作を実行する魔法
-    executeSabotage(doerId, targetId) { 
-        const doer = this.game.getBusho(doerId);
-        const target = this.game.getCastle(targetId); 
-        
-        const result = this.calcSabotage(doerId, targetId, true); 
-        const covertMsg = this.handleCovertAction(doerId, targetId, result.success, 'sabotage');
-
-        const oldVal = target.defense;
-        
-        // ★ 一元化した処理を呼び出します
-        this.applySabotageEffect(doer, target, result);
-
-        if(result.success) {
-            const actualDrop = oldVal - target.defense;
-            this.game.ui.showResultModal(`${doer.name}の破壊工作が成功！\n${target.name}の防御力が${actualDrop}低下しました${covertMsg}`); 
-        } else { 
-            this.game.ui.showResultModal(`${doer.name}の破壊工作は失敗しました${covertMsg}`); 
-        } 
-        doer.isActionDone = true; 
-        this.game.ui.updatePanelHeader(); 
-        this.game.ui.renderCommandMenu(); 
-    }
+    // 破壊工作を実行する魔法
+    executeSabotage(doerId, targetId) { this.executeBasicStrategy('sabotage', doerId, targetId); }
 }
