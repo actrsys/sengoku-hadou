@@ -217,14 +217,21 @@ class UIInfoManager {
         // ★枠の大元で、スクロールバーの表示/非表示をクラスで一括管理します
         const listWrapper = document.getElementById('selector-list-wrapper');
         const listContainer = document.getElementById('selector-list');
+        // ★大枠のウインドウ（modal-content）も取得して、二重スクロールを防ぎます
+        const selectorModal = document.getElementById('selector-modal');
+        const modalContent = selectorModal ? selectorModal.querySelector('.modal-content') : null;
         
         if (listWrapper) {
             if (isInfoScreen) {
                 listWrapper.classList.add('no-custom-scrollbar');
                 if (listContainer) listContainer.style.overflow = 'hidden'; 
+                // 情報画面は中身が長いので、大枠でスクロールさせます
+                if (modalContent) modalContent.style.setProperty('overflow-y', 'auto', 'important');
             } else {
                 listWrapper.classList.remove('no-custom-scrollbar');
                 if (listContainer) listContainer.style.overflow = '';
+                // リスト画面はリスト自体がスクロールするので、大枠の標準スクロールバーは封印します
+                if (modalContent) modalContent.style.setProperty('overflow-y', 'hidden', 'important');
             }
         }
 
