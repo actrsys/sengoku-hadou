@@ -785,14 +785,14 @@ class DiplomacyManager {
             d.acceptMsg1 = `「……承知仕った。かくなる上は${senderClanName}に従属いたす」`;
             d.acceptMsg2 = `「おお……うかがった甲斐があり申した。共に${senderClanName}を盛り立てて参りましょうぞ」`;
             
-            d.rejectMsg1 = `「断る！　まだ負けと決まったわけではござらん。その首叩き斬られたくなければ、早々に立ち去るがよい」`;
+            d.rejectMsg1 = `「断る！　まだ負けと決まったわけではござらん。その首落とされとうなくば、早々に立ち去るがよい」`;
             d.rejectMsg2 = `「……拙者は忠告申し上げましたぞ。ではこれにて」`;
             
         } else if (type === 'truce') {
             if (isSenderDaimyo) {
-                d.demandMsg = `「${targetCallName}。どうか我らと和睦してくだされ」`;
+                d.demandMsg = `「和睦してくだされ、${targetCallName}。これ以上の戦は無益にござる」`;
             } else {
-                d.demandMsg = `「${senderClanName}との和睦が我らの望みでござる」`;
+                d.demandMsg = `「両家の和睦が我らの望みでござる。どうか矛を納められますよう……」`;
             }
             d.confirmMsg = `「${senderClanName} との和睦をお受けなされますか？」`;
             
@@ -805,14 +805,17 @@ class DiplomacyManager {
             
             d.rejectMsg1 = `「何をほざくか！　帰って戦の支度をなされるがよい！」`;
             d.rejectMsg2 = `「さらば、次に相まみえるは戦場にござる。ではこれにて御免」`;
-
+            
         } else if (type === 'subordinate') {
-            d.demandMsg = `「当家は${targetCallName}の傘下に加わりたく、ご挨拶に伺いました」`;
-            // subordinate はAIから打診されないため confirmMsg は不要
-            d.acceptMsg1 = `「うむ……よかろう。かくなる上は我らのために尽力せい」`;
-            d.acceptMsg2 = `「ははっ、ありがたき幸せに存じまする」`;
-            d.rejectMsg1 = `「断る！　貴様らのような輩を信用できるか。立ち去れ！」`;
-            d.rejectMsg2 = `「……左様にござるか。無念にござる」`;
+            if (isSenderDaimyo) {
+                d.demandMsg = `「我らを${targetCallName}の末席にお加えいただきたく、直々に参りました」`;
+                d.acceptMsg1 = `「よくぞご決心なされた。これからは我が臣下として、その力を存分に振るわれよ」`;
+                d.acceptMsg2 = `「ははっ、恐悦至極に存じまする」`;
+            } else {
+                d.demandMsg = `「${senderClanName}一党、${targetCallName}に臣従いたしまする。誓紙をお納めいただきたい」`;
+                d.acceptMsg1 = `「しかと承った。大儀である」`;
+                d.acceptMsg2 = `「ははっ、ありがたき幸せに存じまする。我が主もさぞや安堵いたしましょう」`;
+            }
         }
 
         return d;
@@ -1874,7 +1877,7 @@ class DiplomacyManager {
             });
         }
     }
-
+    
     /**
      * 臣従願を実行して、相手の大名家に乗り換える魔法です！
      */
@@ -1886,48 +1889,62 @@ class DiplomacyManager {
         const myClanId = this.game.playerClanId;
         
         const targetClan = this.game.clans.find(c => c.id === targetClanId);
-        
-        // 1. プレイヤー側の軍団をすべて解散させます（お片付け）
-        if (this.game.legions) {
-            const myLegions = this.game.legions.filter(l => Number(l.clanId) === Number(myClanId));
-            myLegions.forEach(l => {
-                this.game.castleManager.disbandLegion(l.id);
-            });
-        }
-        
-        // 2. プレイヤー側のお城をすべて対象の大名家にプレゼントして、直轄（0）にします
-        const myCastles = this.game.castles.filter(c => Number(c.ownerClan) === Number(myClanId));
-        myCastles.forEach(c => {
-            this.game.castleManager.changeOwner(c, targetClanId, true, 0);
-        });
-        
-        // 3. プレイヤー側の武将のバッジ（身分）を外し、新しい大名家に入れます
-        const myBushos = this.game.bushos.filter(b => Number(b.clan) === Number(myClanId));
-        myBushos.forEach(b => {
-            b.isDaimyo = false;
-            b.isCommander = false;
-            b.isGunshi = false;
-            
-            b.clan = targetClanId;
-            
-            // 人事部（お引越しセンター）にお願いして、新しい殿様との相性で忠誠度を再計算します！
-            this.game.affiliationSystem.updateLoyaltyForNewLord(b, targetClanId);
-        });
-
-        // 外交担当者に行動完了のシールを貼ります
         const doer = this.game.getBusho(doerId);
-        if (doer) doer.isActionDone = true;
-        
-        // 4. プレイヤーの操作担当を、新しい大名家に切り替えます！
-        this.game.playerClanId = targetClanId;
-        
-        const msg = `当家は ${targetClan.name} に臣従しました。これより ${targetClan.name} として天下統一を目指します！`;
-        
-        this.game.ui.showResultModal(msg, () => {
-            // 新しい大名家の情報に合わせて画面を綺麗に描き直します
-            this.game.ui.updatePanelHeader();
-            this.game.ui.renderCommandMenu();
-            this.game.ui.renderMap();
+        if (!doer) return;
+
+        const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+        const doerClanName = this.game.clans.find(c => c.id === doer.clan).name;
+        const senderCallName = this.getCallName(doer);
+        const targetCallName = this.getCallName(targetDaimyo);
+        const senderDaimyoName = doer.name.replace(/\|/g, '');
+
+        // 臣従願はシステム的に必ず成功するため、会話劇の成否には 'success' を指定します
+        const dialogues = this.getDiplomacyDialogues('subordinate', doerClanName, senderDaimyoName, senderCallName, targetCallName, true, 0);
+
+        this.playDiplomacyDialogue(doer, targetDaimyo, dialogues, 'success', () => {
+            // 1. プレイヤー側の軍団をすべて解散させます（お片付け）
+            if (this.game.legions) {
+                const myLegions = this.game.legions.filter(l => Number(l.clanId) === Number(myClanId));
+                myLegions.forEach(l => {
+                    if (this.game.castleManager && this.game.castleManager.disbandLegion) {
+                        this.game.castleManager.disbandLegion(l.id);
+                    }
+                });
+            }
+            
+            // 2. プレイヤー側のお城をすべて対象の大名家にプレゼントして、直轄（0）にします
+            const myCastles = this.game.castles.filter(c => Number(c.ownerClan) === Number(myClanId));
+            myCastles.forEach(c => {
+                this.game.castleManager.changeOwner(c, targetClanId, true, 0);
+            });
+            
+            // 3. プレイヤー側の武将のバッジ（身分）を外し、新しい大名家に入れます
+            const myBushos = this.game.bushos.filter(b => Number(b.clan) === Number(myClanId));
+            myBushos.forEach(b => {
+                b.isDaimyo = false;
+                b.isCommander = false;
+                b.isGunshi = false;
+                
+                b.clan = targetClanId;
+                
+                // 人事部（お引越しセンター）にお願いして、新しい殿様との相性で忠誠度を再計算します！
+                this.game.affiliationSystem.updateLoyaltyForNewLord(b, targetClanId);
+            });
+
+            // 外交担当者に行動完了のシールを貼ります
+            doer.isActionDone = true;
+            
+            // 4. プレイヤーの操作担当を、新しい大名家に切り替えます！
+            this.game.playerClanId = targetClanId;
+            
+            const msg = `当家は ${targetClan.name} に臣従しました。これより ${targetClan.name} として天下統一を目指します！`;
+            
+            this.game.ui.showResultModal(msg, () => {
+                // 新しい大名家の情報に合わせて画面を綺麗に描き直します
+                this.game.ui.updatePanelHeader();
+                this.game.ui.renderCommandMenu();
+                this.game.ui.renderMap();
+            });
         });
     }
 
