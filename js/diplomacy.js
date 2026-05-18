@@ -318,9 +318,10 @@ class DiplomacyManager {
             let threshold = commonEnemy ? 90 : 120; 
             let acceptProb = commonEnemy ? 90 : 70; 
 
-            // 和睦と従属願の場合は、基本の成功確率を少し上げます
+            // 和睦と従属願の場合は、同盟よりもハードルを下げて成功しやすくします
             if (type === 'subordinate' || type === 'truce') {
-                acceptProb += 10;
+                threshold -= 20; // 成功に必要な点数の基準を下げます
+                acceptProb += 10; // 基本の成功確率を少し上げます
             }
 
             if (allyCount >= 2) {
