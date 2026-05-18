@@ -776,10 +776,10 @@ class DiplomacyManager {
             acceptMsg = `「よくぞご決心なされた。今後はその力、当家で存分に振るわれよ」`;
             replyAcceptMsg = isSenderDaimyo ? `「恐悦至極……今日より${receiverCallName.replace('殿', '様')}を主君と仰ぎ奉りまする」` : `「ははっ！　ありがたき幸せに存じまする！」`;
         } else if (type === 'marriage') {
-            demandMsg = `「両家の絆をより強固なものとするため、此度の縁組み、どうかお引き受けくだされ」`;
+            demandMsg = `「両家の絆を強固なものとするため、此度の縁組み、どうかお引き受けくだされ」`;
             acceptMsg = `「願ってもない申し出にござる。ありがたくお受けいたそう」`;
             rejectMsg = `「此度の縁組み、当家としてはお受けいたしかねる。お引き取りくだされ」`;
-            replyAcceptMsg = `「おお、ご承諾いただけるか！ 早速持ち帰り、吉日を選びましょうぞ」`;
+            replyAcceptMsg = `「おお、ご承諾いただけるか！　早速持ち帰り、吉日を選びましょうぞ」`;
             replyRejectMsg = `「……左様にござるか。誠に残念にござる」`;
         }
 
@@ -815,8 +815,27 @@ class DiplomacyManager {
             greetMsg2 = `「これは${senderCallName}……して、どのような御用向きでござるか？」`;
         } else {
             const senderDaimyo = this.game.bushos.find(b => b.clan === senderBusho.clan && b.isDaimyo);
-            const senderDaimyoName = senderDaimyo ? senderDaimyo.name.replace(/\|/g, '') : "当主";
-            greetMsg1 = `「此度は${senderClanName}当主・${senderDaimyoName}の名代として罷り越しました」`;
+            let daimyoRef = "当主";
+            if (senderDaimyo) {
+                if (senderDaimyo.courtRankIds && senderDaimyo.courtRankIds.includes(1)) {
+                    daimyoRef = "公方";
+                } else {
+                    let rankName = "";
+                    if (senderDaimyo.courtRankIds && senderDaimyo.courtRankIds.length > 0 && this.game.courtRankSystem) {
+                        const rName = this.game.courtRankSystem.getHighestRankName(senderDaimyo);
+                        if (rName !== "なし") rankName = rName;
+                    }
+                    if (rankName) {
+                        const familyName = senderDaimyo.familyName || senderDaimyo.name.split('|')[0] || "";
+                        daimyoRef = `${familyName}${rankName}`;
+                    } else {
+                        daimyoRef = `${senderClanName}当主・${senderDaimyo.name.replace(/\|/g, '')}`;
+                    }
+                }
+            } else {
+                daimyoRef = `${senderClanName}当主`;
+            }
+            greetMsg1 = `「此度は${daimyoRef}様の名代として罷り越しました」`;
             greetMsg2 = `「うむ。して、御用向きはいかに？」`;
         }
 
@@ -2072,7 +2091,27 @@ class DiplomacyManager {
                     greetMsg1 = `「${myCallName}。重大な用件ゆえ、此度はわし自ら参りました」`;
                     greetMsg2 = `「これは${enemyCallName}……して、どのような御用向きでござるか？」`;
                 } else {
-                    greetMsg1 = `「此度は${doerClan.name}当主・${enemyDaimyoName}の名代として罷り越しました。」`;
+                    let daimyoRef = "当主";
+                    if (enemyDaimyo) {
+                        if (enemyDaimyo.courtRankIds && enemyDaimyo.courtRankIds.includes(1)) {
+                            daimyoRef = "公方";
+                        } else {
+                            let rankName = "";
+                            if (enemyDaimyo.courtRankIds && enemyDaimyo.courtRankIds.length > 0 && this.game.courtRankSystem) {
+                                const rName = this.game.courtRankSystem.getHighestRankName(enemyDaimyo);
+                                if (rName !== "なし") rankName = rName;
+                            }
+                            if (rankName) {
+                                const familyName = enemyDaimyo.familyName || enemyDaimyo.name.split('|')[0] || "";
+                                daimyoRef = `${familyName}${rankName}`;
+                            } else {
+                                daimyoRef = `${doerClan.name}当主・${enemyDaimyoName}`;
+                            }
+                        }
+                    } else {
+                        daimyoRef = `${doerClan.name}当主`;
+                    }
+                    greetMsg1 = `「此度は${daimyoRef}様の名代として罷り越しました。」`;
                     greetMsg2 = `「うむ。して、御用向きはいかに？」`;
                 }
 
