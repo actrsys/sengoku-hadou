@@ -546,6 +546,19 @@ class AIEngine {
                 }
             }
         });
+
+        // ★追加：自分の大名家全体が現在隣接している勢力をリストアップします！
+        const allAdjacentClans = new Set();
+        myClanCastles.forEach(myC => {
+            if (myC.adjacentCastleIds) {
+                myC.adjacentCastleIds.forEach(adjId => {
+                    const c = this.game.getCastle(adjId);
+                    if (c && c.ownerClan !== 0 && c.ownerClan !== myClanId) {
+                        allAdjacentClans.add(c.ownerClan);
+                    }
+                });
+            }
+        });
         
         // ★見積もりをする人（評価者）の智謀を決めます
         // プレイヤーの委任城なら「城主（myGeneral）」、敵AIなら「大名（myDaimyo）」の智謀を使います
@@ -876,6 +889,9 @@ class AIEngine {
             // 攻撃目標の城に隣接している城のうち、「敵」や「味方」がいくつあるかを数えます。
             let futureEnemyNeighbors = 0;
             let friendlyNeighbors = 0;
+            let newEnemyClanCount = 0; // ★追加：新しく隣接することになる敵勢力の数
+            const checkedNewClans = new Set(); // ★追加：同じ勢力を重複して数えないためのメモ
+            
             if (target.adjacentCastleIds) {
                 target.adjacentCastleIds.forEach(adjId => {
                     const adjCastle = this.game.getCastle(adjId);
@@ -894,6 +910,15 @@ class AIEngine {
                                 // 敵対、普通、友好なら敵（潜在的な脅威）として数えます
                                 else if (['敵対', '普通', '友好'].includes(adjRel.status)) {
                                     futureEnemyNeighbors++;
+                                    
+                                    // ★追加：その敵勢力が、現在の大名家全体でまだ隣接していない「新しい勢力」かチェックします
+                                    // 今から攻撃する相手の勢力は除外します
+                                    if (adjCastle.ownerClan !== target.ownerClan && !allAdjacentClans.has(adjCastle.ownerClan)) {
+                                        if (!checkedNewClans.has(adjCastle.ownerClan)) {
+                                            newEnemyClanCount++;
+                                            checkedNewClans.add(adjCastle.ownerClan);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -902,6 +927,11 @@ class AIEngine {
             }
             // 敵城が少ないほど優先され、多いほど守りにくいため後回しにします（1城につき4点マイナス）
             prob -= (futureEnemyNeighbors * 4);
+            
+            // ★追加：新しく隣接してしまう敵勢力がいる場合、戦線が広がるのを嫌がって大きくスコアを下げます（1勢力につき15点マイナス）
+            if (newEnemyClanCount > 0) {
+                prob -= (newEnemyClanCount * 15);
+            }
             
             // 味方の隣接城が多いほど守りやすいため優先します（最低1城は隣接しているので -1 して、1城につき3点プラス）
             let bonusCount = Math.max(0, friendlyNeighbors - 1);
