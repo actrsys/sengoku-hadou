@@ -314,7 +314,7 @@ class DiplomacyManager {
             
             finalProb = Math.max(0, Math.min(100, acceptProb));
         }
-        else if (type === 'alliance') {
+        else if (type === 'alliance' || type === 'subordinate' || type === 'truce') {
             let threshold = commonEnemy ? 90 : 120; 
             let acceptProb = commonEnemy ? 90 : 70; 
 
@@ -327,6 +327,22 @@ class DiplomacyManager {
             }
 
             const chance = relation.sentiment + doerDiplomacy;
+
+            if (type === 'subordinate') {
+                const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+                const targetDuty = targetDaimyo ? targetDaimyo.duty : 50;
+                acceptProb += (targetDuty - 50); 
+            } else if (type === 'truce') {
+                let enemyCount = 0;
+                this.game.clans.forEach(c => {
+                    if (c.id !== 0 && c.id !== targetClanId && c.id !== doerClanId) {
+                        const rel = this.getRelation(targetClanId, c.id);
+                        if (rel && rel.status === '敵対') enemyCount++;
+                    }
+                });
+                acceptProb += (enemyCount * 15);
+            }
+
             if (chance > threshold) {
                 finalProb = Math.max(0, Math.min(100, acceptProb));
             }
@@ -1047,104 +1063,125 @@ class DiplomacyManager {
             return;
 
         } else if (type === 'subordinate') {
-            this.calcDiplomacyExp(doer, type, true, true);
+            const isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, type);
+            this.calcDiplomacyExp(doer, type, isSuccess, true);
 
-            // 交渉の魔法を呼び出します
-            this.negotiateSubordinationConditions(doer.clan, targetClanId,
-                (conditionType, conditionData) => {
-                    // 要求を呑んで従属が成立した場合
-                    // ★修正：支配・従属の処理は新しい専門部署にお任せします！
-                    // （相手が自分を支配する、という形で呼び出します）
-                    this.applyDominationData(targetClanId, doer.clan);
+            const handleSuccess = (conditionType, conditionData) => {
+                this.applyDominationData(targetClanId, doer.clan);
 
-                    // どの条件を呑んだかでメッセージを変えます
-                    let conditionMsg = "";
-                    if (conditionType === 'marriage') {
-                        conditionMsg = `\n${conditionData.princess.name} が ${conditionData.busho.name} の側室として迎えられました。`;
-                    } else if (conditionType === 'hostage') {
-                        conditionMsg = `\n${conditionData.busho.name} を人質として差し出しました。`;
-                    } else if (conditionType === 'castle') {
-                        this.applyCastleCessionData(conditionData.castle.id, doer.clan, targetClanId);
-                        conditionMsg = `\n${conditionData.castle.name} を割譲しました。`;
-                    }
+                let conditionMsg = "";
+                if (conditionType === 'marriage') {
+                    conditionMsg = `\n${conditionData.princess.name} が ${conditionData.busho.name} の側室として迎えられました。`;
+                } else if (conditionType === 'hostage') {
+                    conditionMsg = `\n${conditionData.busho.name} を人質として差し出しました。`;
+                } else if (conditionType === 'castle') {
+                    this.applyCastleCessionData(conditionData.castle.id, doer.clan, targetClanId);
+                    conditionMsg = `\n${conditionData.castle.name} を割譲しました。`;
+                }
 
-                    msg = `${this.game.clans.find(c => c.id === targetClanId).name} に従属しました！${conditionMsg}`;
-                    if (!isPlayerInvolved) aiMsg = `${targetClanName} が ${doerClanName} を支配下に置きました！`;
-                    else logMsg = `${doerClanName}が${targetClanName}に従属しました`;
-                    doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
-                    this.game.factionSystem.updateRecognition(doer, 30);
+                msg = `${this.game.clans.find(c => c.id === targetClanId).name} に従属しました！${conditionMsg}`;
+                if (!isPlayerInvolved) aiMsg = `${targetClanName} が ${doerClanName} を支配下に置きました！`;
+                else logMsg = `${doerClanName}が${targetClanName}に従属しました`;
+                doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
+                this.game.factionSystem.updateRecognition(doer, 30);
 
-                    doer.isActionDone = true;
-                    if (isPlayerInvolved) {
-                        this.game.ui.showResultModal(msg);
-                        if (logMsg !== "") this.game.ui.log(logMsg);
-                        if (doer.clan === this.game.playerClanId) {
-                            this.game.ui.updatePanelHeader();
-                            this.game.ui.renderCommandMenu();
-                            this.game.ui.renderMap();
-                        }
-                    }
-                },
-                () => {
-                    // 要求をすべて断って交渉決裂した場合
-                    msg = `条件が折り合わず、${this.game.clans.find(c => c.id === targetClanId).name} への従属を断念しました。`;
-                    if (isPlayerInvolved) {
-                        this.game.ui.showResultModal(msg);
+                doer.isActionDone = true;
+                if (isPlayerInvolved) {
+                    this.game.ui.showResultModal(msg);
+                    if (logMsg !== "") this.game.ui.log(logMsg);
+                    if (doer.clan === this.game.playerClanId) {
+                        this.game.ui.updatePanelHeader();
+                        this.game.ui.renderCommandMenu();
+                        this.game.ui.renderMap();
                     }
                 }
-            );
+            };
 
-            // この場での処理は一旦終了し、あとは交渉のダイアログに任せます
+            const handleFailure = () => {
+                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.DOMINATE_FAILURE);
+                msg = `条件が折り合わず、${this.game.clans.find(c => c.id === targetClanId).name} への従属を断念しました。`;
+                doer.achievementTotal += 5;
+                this.game.factionSystem.updateRecognition(doer, 10);
+                doer.isActionDone = true;
+                if (isPlayerInvolved) {
+                    this.game.ui.showResultModal(msg);
+                    if (doer.clan === this.game.playerClanId) {
+                        this.game.ui.updatePanelHeader();
+                        this.game.ui.renderCommandMenu();
+                        this.game.ui.renderMap();
+                    }
+                }
+            };
+
+            if (isSuccess) {
+                handleSuccess('none', null);
+            } else {
+                this.negotiateSubordinationConditions(doer.clan, targetClanId, handleSuccess, handleFailure);
+            }
             return;
             
         } else if (type === 'truce') {
-            this.calcDiplomacyExp(doer, type, true, true);
+            const isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, type);
+            this.calcDiplomacyExp(doer, type, isSuccess, true);
 
-            this.negotiateTruceConditions(doer.clan, targetClanId,
-                (conditionType, conditionData) => {
-                    this.changeStatus(doer.clan, targetClanId, '和睦', 6);
-                    
-                    const relationA = this.getDiplomacyData(doer.clan, targetClanId);
-                    const relationB = this.getDiplomacyData(targetClanId, doer.clan);
-                    if (relationA) relationA.sentiment = 50;
-                    if (relationB) relationB.sentiment = 50;
+            const handleSuccess = (conditionType, conditionData) => {
+                this.changeStatus(doer.clan, targetClanId, '和睦', 6);
+                
+                const relationA = this.getDiplomacyData(doer.clan, targetClanId);
+                const relationB = this.getDiplomacyData(targetClanId, doer.clan);
+                if (relationA) relationA.sentiment = 50;
+                if (relationB) relationB.sentiment = 50;
 
-                    let conditionMsg = "";
-                    if (conditionType === 'marriage') {
-                        conditionMsg = `\n${conditionData.princess.name} が ${conditionData.busho.name} の側室として迎えられました。`;
-                    } else if (conditionType === 'hostage') {
-                        conditionMsg = `\n${conditionData.busho.name} を人質として差し出しました。`;
-                    } else if (conditionType === 'castle') {
-                        this.applyCastleCessionData(conditionData.castle.id, doer.clan, targetClanId);
-                        conditionMsg = `\n${conditionData.castle.name} を割譲しました。`;
-                    }
+                let conditionMsg = "";
+                if (conditionType === 'marriage') {
+                    conditionMsg = `\n${conditionData.princess.name} が ${conditionData.busho.name} の側室として迎えられました。`;
+                } else if (conditionType === 'hostage') {
+                    conditionMsg = `\n${conditionData.busho.name} を人質として差し出しました。`;
+                } else if (conditionType === 'castle') {
+                    this.applyCastleCessionData(conditionData.castle.id, doer.clan, targetClanId);
+                    conditionMsg = `\n${conditionData.castle.name} を割譲しました。`;
+                }
 
-                    msg = `${this.game.clans.find(c => c.id === targetClanId).name} との和睦が成立しました！${conditionMsg}`;
-                    if (!isPlayerInvolved) aiMsg = `${doerClanName} と ${targetClanName} が和睦しました。`;
-                    else logMsg = `${doerClanName}が${targetClanName}と和睦しました`;
-                    
-                    doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
-                    this.game.factionSystem.updateRecognition(doer, 30);
+                msg = `${this.game.clans.find(c => c.id === targetClanId).name} との和睦が成立しました！${conditionMsg}`;
+                if (!isPlayerInvolved) aiMsg = `${doerClanName} と ${targetClanName} が和睦しました。`;
+                else logMsg = `${doerClanName}が${targetClanName}と和睦しました`;
+                
+                doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
+                this.game.factionSystem.updateRecognition(doer, 30);
 
-                    doer.isActionDone = true;
-                    if (isPlayerInvolved) {
-                        this.game.ui.showResultModal(msg);
-                        if (logMsg !== "") this.game.ui.log(logMsg);
-                        if (doer.clan === this.game.playerClanId) {
-                            this.game.ui.updatePanelHeader();
-                            this.game.ui.renderCommandMenu();
-                            this.game.ui.renderMap();
-                        }
-                    }
-                },
-                () => {
-                    msg = `条件が折り合わず、${this.game.clans.find(c => c.id === targetClanId).name} との和睦は決裂しました。`;
-                    if (isPlayerInvolved) {
-                        this.game.ui.showResultModal(msg);
+                doer.isActionDone = true;
+                if (isPlayerInvolved) {
+                    this.game.ui.showResultModal(msg);
+                    if (logMsg !== "") this.game.ui.log(logMsg);
+                    if (doer.clan === this.game.playerClanId) {
+                        this.game.ui.updatePanelHeader();
+                        this.game.ui.renderCommandMenu();
+                        this.game.ui.renderMap();
                     }
                 }
-            );
+            };
 
+            const handleFailure = () => {
+                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
+                msg = `条件が折り合わず、${this.game.clans.find(c => c.id === targetClanId).name} との和睦は決裂しました。`;
+                doer.achievementTotal += 5;
+                this.game.factionSystem.updateRecognition(doer, 10);
+                doer.isActionDone = true;
+                if (isPlayerInvolved) {
+                    this.game.ui.showResultModal(msg);
+                    if (doer.clan === this.game.playerClanId) {
+                        this.game.ui.updatePanelHeader();
+                        this.game.ui.renderCommandMenu();
+                        this.game.ui.renderMap();
+                    }
+                }
+            };
+
+            if (isSuccess) {
+                handleSuccess('none', null);
+            } else {
+                this.negotiateTruceConditions(doer.clan, targetClanId, handleSuccess, handleFailure);
+            }
             return;
             
         } else if (type === 'dominate') {
@@ -1360,164 +1397,137 @@ class DiplomacyManager {
             return;
         }
 
-        // プレイヤーが従属する側（要求を突きつけられる側）かどうか
         const isPlayer = (subordinateClanId === this.game.playerClanId);
         
-        // AI同士、またはAIがプレイヤーに従属を申し入れてきた場合は、
-        // 将来拡張できるように一旦「無条件で受け入れる」設定にしておきます
         if (!isPlayer) {
             if (onSuccess) onSuccess('none', null);
             return;
         }
 
-        // ステップ1：姫の要求
-        const checkStep1 = () => {
-            let availablePrincess = null;
-            if (subClan.princessIds && subClan.princessIds.length > 0) {
-                for (let pId of subClan.princessIds) {
-                    const p = this.game.princesses.find(pr => pr.id === pId && pr.status === 'unmarried');
-                    if (p) {
-                        availablePrincess = p;
-                        break;
-                    }
+        let options = [];
+
+        let availablePrincess = null;
+        if (subClan.princessIds && subClan.princessIds.length > 0) {
+            for (let pId of subClan.princessIds) {
+                const p = this.game.princesses.find(pr => pr.id === pId && pr.status === 'unmarried');
+                if (p) {
+                    availablePrincess = p;
+                    break;
                 }
             }
+        }
 
-            if (availablePrincess) {
-                // 相手勢力の中で活躍中の武将を候補にします（複室制に対応し、既婚者も除外しません）
-                const domBushos = this.game.bushos.filter(b => b.clan === dominantClanId && b.status === 'active');
-                const domDaimyo = this.game.bushos.find(b => b.clan === dominantClanId && b.isDaimyo);
+        if (availablePrincess) {
+            const domBushos = this.game.bushos.filter(b => b.clan === dominantClanId && b.status === 'active');
+            const domDaimyo = this.game.bushos.find(b => b.clan === dominantClanId && b.isDaimyo);
+            
+            domBushos.sort((a, b) => {
+                const getWeight = (target) => {
+                    const isKinsman = domDaimyo && (target.id === domDaimyo.id || (Array.isArray(target.familyIds) && target.familyIds.includes(domDaimyo.id)) || (domDaimyo.familyIds && domDaimyo.familyIds.includes(target.id)));
+                    const isUnmarried = (!target.wifeIds || target.wifeIds.length === 0);
+                    if (isKinsman && isUnmarried) return 4;
+                    if (isKinsman) return 3;
+                    if (isUnmarried) return 2;
+                    return 1;
+                };
+                const weightA = getWeight(a);
+                const weightB = getWeight(b);
+                if (weightA !== weightB) return weightB - weightA;
                 
-                // 優先順位（一門かつ未婚 > 一門かつ既婚 > 家臣かつ未婚 > 家臣かつ既婚）をつけて並び替えます
-                // その中で最も年齢が近い者を選びます
-                domBushos.sort((a, b) => {
-                    const getWeight = (target) => {
-                        const isKinsman = domDaimyo && (target.id === domDaimyo.id || (Array.isArray(target.familyIds) && target.familyIds.includes(domDaimyo.id)) || (domDaimyo.familyIds && domDaimyo.familyIds.includes(target.id)));
-                        const isUnmarried = (!target.wifeIds || target.wifeIds.length === 0);
-                        if (isKinsman && isUnmarried) return 4;
-                        if (isKinsman) return 3;
-                        if (isUnmarried) return 2;
-                        return 1;
-                    };
-                    const weightA = getWeight(a);
-                    const weightB = getWeight(b);
-                    if (weightA !== weightB) return weightB - weightA;
-                    
-                    return Math.abs(a.birthYear - availablePrincess.birthYear) - Math.abs(b.birthYear - availablePrincess.birthYear);
-                });
+                return Math.abs(a.birthYear - availablePrincess.birthYear) - Math.abs(b.birthYear - availablePrincess.birthYear);
+            });
 
-                const targetBusho = domBushos.length > 0 ? domBushos[0] : null;
+            const targetBusho = domBushos.length > 0 ? domBushos[0] : null;
 
-                if (targetBusho) {
-                    const msg = `${domClan.name}は従属の証として${availablePrincess.name}を${targetBusho.name}に嫁がせることを要求してきました。\n${availablePrincess.name}を差し出しますか？`;
-                    this.game.ui.showDialog(msg, true, 
-                        () => {
-                            // 嫁がせる（成立）
-                            this.applyMarriageData(availablePrincess.id, targetBusho.id, dominantClanId);
-                            if (onSuccess) onSuccess('marriage', { princess: availablePrincess, busho: targetBusho });
-                        },
-                        () => {
-                            // 断ったら次のステップへ
-                            checkStep2();
-                        },
-                        { okText: '嫁がせる', okClass: 'btn-danger', cancelText: '断る' }
-                    );
-                    return;
-                }
+            if (targetBusho) {
+                options.push({ type: 'marriage', princess: availablePrincess, busho: targetBusho });
             }
-            checkStep2();
-        };
+        }
 
-        // ステップ2：人質の要求
-        const checkStep2 = () => {
-            const daimyo = this.game.bushos.find(b => b.clan === subordinateClanId && b.isDaimyo);
-            let hostage = null;
-            if (daimyo) {
-                const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-                const kinsmen = this.game.bushos.filter(b => {
-                    if (b.clan !== subordinateClanId || b.isDaimyo || b.status !== 'active') return false;
-                    const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
-                    return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
-                });
-                if (kinsmen.length > 0) {
-                    // とりあえず見つかった最初の武将を人質候補にします
-                    hostage = kinsmen[0];
-                }
+        const daimyo = this.game.bushos.find(b => b.clan === subordinateClanId && b.isDaimyo);
+        let hostage = null;
+        if (daimyo) {
+            const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+            const kinsmen = this.game.bushos.filter(b => {
+                if (b.clan !== subordinateClanId || b.isDaimyo || b.status !== 'active') return false;
+                const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+                return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
+            });
+            if (kinsmen.length > 0) {
+                hostage = kinsmen[0];
+                options.push({ type: 'hostage', busho: hostage });
             }
+        }
 
-            if (hostage) {
-                const msg = `${domClan.name}は従属の証として${hostage.name}を人質として差し出すことを要求してきました。\n${hostage.name}を人質として送りますか？`;
-                this.game.ui.showDialog(msg, true,
-                    () => {
-                        // 人質を送る（成立）
-                        this.applyHostageData(hostage.id, subordinateClanId, dominantClanId);
-                        if (onSuccess) onSuccess('hostage', { busho: hostage });
-                    },
-                    () => {
-                        // 断ったら次のステップへ
-                        checkStep3();
-                    },
-                    { okText: '人質を送る', okClass: 'btn-danger', cancelText: '断る' }
-                );
-                return;
-            }
-            checkStep3();
-        };
+        const subCastles = this.game.castles.filter(c => Number(c.ownerClan) === subordinateClanId);
+        if (subCastles.length >= 2) {
+            let targetCastle = null;
+            const domCastles = this.game.castles.filter(c => Number(c.ownerClan) === dominantClanId);
+            
+            for (let sc of subCastles) {
+                const castellan = this.game.getBusho(sc.castellanId);
+                if (castellan && castellan.isDaimyo) continue;
 
-        // ステップ3：領地の要求
-        const checkStep3 = () => {
-            const subCastles = this.game.castles.filter(c => Number(c.ownerClan) === subordinateClanId);
-            if (subCastles.length >= 2) {
-                let targetCastle = null;
-                const domCastles = this.game.castles.filter(c => Number(c.ownerClan) === dominantClanId);
-                
-                for (let sc of subCastles) {
-                    // 大名のいる城は避けます
-                    const castellan = this.game.getBusho(sc.castellanId);
-                    if (castellan && castellan.isDaimyo) continue;
-
-                    // 相手の領土と隣接しているかチェック
-                    let isAdjacent = false;
-                    for (let dc of domCastles) {
-                        if (typeof window.GameSystem !== 'undefined' && window.GameSystem.isAdjacent) {
-                            if (window.GameSystem.isAdjacent(sc, dc)) {
-                                isAdjacent = true;
-                                break;
-                            }
-                        } else if (sc.adjacentCastleIds && sc.adjacentCastleIds.includes(dc.id)) {
+                let isAdjacent = false;
+                for (let dc of domCastles) {
+                    if (typeof window.GameSystem !== 'undefined' && window.GameSystem.isAdjacent) {
+                        if (window.GameSystem.isAdjacent(sc, dc)) {
                             isAdjacent = true;
                             break;
                         }
-                    }
-                    if (isAdjacent) {
-                        targetCastle = sc;
+                    } else if (sc.adjacentCastleIds && sc.adjacentCastleIds.includes(dc.id)) {
+                        isAdjacent = true;
                         break;
                     }
                 }
-
-                if (targetCastle) {
-                    const msg = `${domClan.name}は、従属の証として${targetCastle.name}を割譲することを要求してきました。\n${targetCastle.name}を明け渡しますか？`;
-                    this.game.ui.showDialog(msg, true,
-                        () => {
-                            // 明け渡す（成立）※中身は後日作成
-                            if (onSuccess) onSuccess('castle', { castle: targetCastle });
-                        },
-                        () => {
-                            // すべて断ったので交渉決裂（失敗）
-                            if (onFailure) onFailure();
-                        },
-                        { okText: '明け渡す', okClass: 'btn-danger', cancelText: '断る' }
-                    );
-                    return;
+                if (isAdjacent) {
+                    targetCastle = sc;
+                    break;
                 }
             }
-            
-            // 要求できるものが何も無かった場合も交渉決裂とします
-            if (onFailure) onFailure();
-        };
 
-        // 最初のステップを開始します
-        checkStep1();
+            if (targetCastle) {
+                options.push({ type: 'castle', castle: targetCastle });
+            }
+        }
+
+        if (options.length === 0) {
+            if (onFailure) onFailure();
+            return;
+        }
+
+        const selectedOption = options[Math.floor(Math.random() * options.length)];
+
+        if (selectedOption.type === 'marriage') {
+            const msg = `${domClan.name}は従属の条件として${selectedOption.princess.name}を${selectedOption.busho.name}に嫁がせることを要求してきました。\n${selectedOption.princess.name}を差し出しますか？`;
+            this.game.ui.showDialog(msg, true, 
+                () => {
+                    this.applyMarriageData(selectedOption.princess.id, selectedOption.busho.id, dominantClanId);
+                    if (onSuccess) onSuccess('marriage', { princess: selectedOption.princess, busho: selectedOption.busho });
+                },
+                () => { if (onFailure) onFailure(); },
+                { okText: '嫁がせる', okClass: 'btn-danger', cancelText: '断る' }
+            );
+        } else if (selectedOption.type === 'hostage') {
+            const msg = `${domClan.name}は従属の条件として${selectedOption.busho.name}を人質として差し出すことを要求してきました。\n${selectedOption.busho.name}を人質として送りますか？`;
+            this.game.ui.showDialog(msg, true,
+                () => {
+                    this.applyHostageData(selectedOption.busho.id, subordinateClanId, dominantClanId);
+                    if (onSuccess) onSuccess('hostage', { busho: selectedOption.busho });
+                },
+                () => { if (onFailure) onFailure(); },
+                { okText: '人質を送る', okClass: 'btn-danger', cancelText: '断る' }
+            );
+        } else if (selectedOption.type === 'castle') {
+            const msg = `${domClan.name}は、従属の条件として${selectedOption.castle.name}を割譲することを要求してきました。\n${selectedOption.castle.name}を明け渡しますか？`;
+            this.game.ui.showDialog(msg, true,
+                () => {
+                    if (onSuccess) onSuccess('castle', { castle: selectedOption.castle });
+                },
+                () => { if (onFailure) onFailure(); },
+                { okText: '明け渡す', okClass: 'btn-danger', cancelText: '断る' }
+            );
+        }
     }
     
     /**
@@ -2261,136 +2271,129 @@ class DiplomacyManager {
             return;
         }
 
-        const checkStep1 = () => {
-            let availablePrincess = null;
-            if (reqClan.princessIds && reqClan.princessIds.length > 0) {
-                for (let pId of reqClan.princessIds) {
-                    const p = this.game.princesses.find(pr => pr.id === pId && pr.status === 'unmarried');
-                    if (p) {
-                        availablePrincess = p;
-                        break;
-                    }
+        let options = [];
+
+        let availablePrincess = null;
+        if (reqClan.princessIds && reqClan.princessIds.length > 0) {
+            for (let pId of reqClan.princessIds) {
+                const p = this.game.princesses.find(pr => pr.id === pId && pr.status === 'unmarried');
+                if (p) {
+                    availablePrincess = p;
+                    break;
                 }
             }
+        }
 
-            if (availablePrincess) {
-                const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && b.status === 'active');
-                const tgtDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+        if (availablePrincess) {
+            const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && b.status === 'active');
+            const tgtDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+            
+            tgtBushos.sort((a, b) => {
+                const getWeight = (target) => {
+                    const isKinsman = tgtDaimyo && (target.id === tgtDaimyo.id || (Array.isArray(target.familyIds) && target.familyIds.includes(tgtDaimyo.id)) || (tgtDaimyo.familyIds && tgtDaimyo.familyIds.includes(target.id)));
+                    const isUnmarried = (!target.wifeIds || target.wifeIds.length === 0);
+                    if (isKinsman && isUnmarried) return 4;
+                    if (isKinsman) return 3;
+                    if (isUnmarried) return 2;
+                    return 1;
+                };
+                const weightA = getWeight(a);
+                const weightB = getWeight(b);
+                if (weightA !== weightB) return weightB - weightA;
                 
-                tgtBushos.sort((a, b) => {
-                    const getWeight = (target) => {
-                        const isKinsman = tgtDaimyo && (target.id === tgtDaimyo.id || (Array.isArray(target.familyIds) && target.familyIds.includes(tgtDaimyo.id)) || (tgtDaimyo.familyIds && tgtDaimyo.familyIds.includes(target.id)));
-                        const isUnmarried = (!target.wifeIds || target.wifeIds.length === 0);
-                        if (isKinsman && isUnmarried) return 4;
-                        if (isKinsman) return 3;
-                        if (isUnmarried) return 2;
-                        return 1;
-                    };
-                    const weightA = getWeight(a);
-                    const weightB = getWeight(b);
-                    if (weightA !== weightB) return weightB - weightA;
-                    
-                    return Math.abs(a.birthYear - availablePrincess.birthYear) - Math.abs(b.birthYear - availablePrincess.birthYear);
-                });
+                return Math.abs(a.birthYear - availablePrincess.birthYear) - Math.abs(b.birthYear - availablePrincess.birthYear);
+            });
 
-                const targetBusho = tgtBushos.length > 0 ? tgtBushos[0] : null;
+            const targetBusho = tgtBushos.length > 0 ? tgtBushos[0] : null;
 
-                if (targetBusho) {
-                    const msg = `${tgtClan.name}は和睦の条件として${availablePrincess.name}を${targetBusho.name}に嫁がせることを要求してきました。\n${availablePrincess.name}を差し出しますか？`;
-                    this.game.ui.showDialog(msg, true, 
-                        () => {
-                            this.applyMarriageData(availablePrincess.id, targetBusho.id, targetClanId);
-                            if (onSuccess) onSuccess('marriage', { princess: availablePrincess, busho: targetBusho });
-                        },
-                        () => {
-                            checkStep2();
-                        },
-                        { okText: '嫁がせる', okClass: 'btn-danger', cancelText: '断る' }
-                    );
-                    return;
-                }
+            if (targetBusho) {
+                options.push({ type: 'marriage', princess: availablePrincess, busho: targetBusho });
             }
-            checkStep2();
-        };
+        }
 
-        const checkStep2 = () => {
-            const daimyo = this.game.bushos.find(b => b.clan === requestClanId && b.isDaimyo);
-            let hostage = null;
-            if (daimyo) {
-                const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-                const kinsmen = this.game.bushos.filter(b => {
-                    if (b.clan !== requestClanId || b.isDaimyo || b.status !== 'active') return false;
-                    const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
-                    return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
-                });
-                if (kinsmen.length > 0) {
-                    hostage = kinsmen[0];
-                }
+        const daimyo = this.game.bushos.find(b => b.clan === requestClanId && b.isDaimyo);
+        let hostage = null;
+        if (daimyo) {
+            const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+            const kinsmen = this.game.bushos.filter(b => {
+                if (b.clan !== requestClanId || b.isDaimyo || b.status !== 'active') return false;
+                const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+                return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
+            });
+            if (kinsmen.length > 0) {
+                hostage = kinsmen[0];
+                options.push({ type: 'hostage', busho: hostage });
             }
+        }
 
-            if (hostage) {
-                const msg = `${tgtClan.name}は和睦の条件として${hostage.name}を人質として差し出すことを要求してきました。\n${hostage.name}を人質として送りますか？`;
-                this.game.ui.showDialog(msg, true,
-                    () => {
-                        this.applyHostageData(hostage.id, requestClanId, targetClanId);
-                        if (onSuccess) onSuccess('hostage', { busho: hostage });
-                    },
-                    () => {
-                        checkStep3();
-                    },
-                    { okText: '人質を送る', okClass: 'btn-danger', cancelText: '断る' }
-                );
-                return;
-            }
-            checkStep3();
-        };
+        const reqCastles = this.game.castles.filter(c => Number(c.ownerClan) === requestClanId);
+        if (reqCastles.length >= 2) {
+            let targetCastle = null;
+            const tgtCastles = this.game.castles.filter(c => Number(c.ownerClan) === targetClanId);
+            
+            for (let sc of reqCastles) {
+                const castellan = this.game.getBusho(sc.castellanId);
+                if (castellan && castellan.isDaimyo) continue;
 
-        const checkStep3 = () => {
-            const reqCastles = this.game.castles.filter(c => Number(c.ownerClan) === requestClanId);
-            if (reqCastles.length >= 2) {
-                let targetCastle = null;
-                const tgtCastles = this.game.castles.filter(c => Number(c.ownerClan) === targetClanId);
-                
-                for (let sc of reqCastles) {
-                    const castellan = this.game.getBusho(sc.castellanId);
-                    if (castellan && castellan.isDaimyo) continue;
-
-                    let isAdjacent = false;
-                    for (let dc of tgtCastles) {
-                        if (typeof window.GameSystem !== 'undefined' && window.GameSystem.isAdjacent) {
-                            if (window.GameSystem.isAdjacent(sc, dc)) {
-                                isAdjacent = true;
-                                break;
-                            }
-                        } else if (sc.adjacentCastleIds && sc.adjacentCastleIds.includes(dc.id)) {
+                let isAdjacent = false;
+                for (let dc of tgtCastles) {
+                    if (typeof window.GameSystem !== 'undefined' && window.GameSystem.isAdjacent) {
+                        if (window.GameSystem.isAdjacent(sc, dc)) {
                             isAdjacent = true;
                             break;
                         }
-                    }
-                    if (isAdjacent) {
-                        targetCastle = sc;
+                    } else if (sc.adjacentCastleIds && sc.adjacentCastleIds.includes(dc.id)) {
+                        isAdjacent = true;
                         break;
                     }
                 }
-
-                if (targetCastle) {
-                    const msg = `${tgtClan.name}は、和睦の条件として${targetCastle.name}を割譲することを要求してきました。\n${targetCastle.name}を明け渡しますか？`;
-                    this.game.ui.showDialog(msg, true,
-                        () => {
-                            if (onSuccess) onSuccess('castle', { castle: targetCastle });
-                        },
-                        () => {
-                            if (onFailure) onFailure();
-                        },
-                        { okText: '明け渡す', okClass: 'btn-danger', cancelText: '断る' }
-                    );
-                    return;
+                if (isAdjacent) {
+                    targetCastle = sc;
+                    break;
                 }
             }
-            
-            if (onFailure) onFailure();
-        };
 
-        checkStep1();
+            if (targetCastle) {
+                options.push({ type: 'castle', castle: targetCastle });
+            }
+        }
+        
+        if (options.length === 0) {
+            if (onFailure) onFailure();
+            return;
+        }
+
+        const selectedOption = options[Math.floor(Math.random() * options.length)];
+
+        if (selectedOption.type === 'marriage') {
+            const msg = `${tgtClan.name}は和睦の条件として${selectedOption.princess.name}を${selectedOption.busho.name}に嫁がせることを要求してきました。\n${selectedOption.princess.name}を差し出しますか？`;
+            this.game.ui.showDialog(msg, true, 
+                () => {
+                    this.applyMarriageData(selectedOption.princess.id, selectedOption.busho.id, targetClanId);
+                    if (onSuccess) onSuccess('marriage', { princess: selectedOption.princess, busho: selectedOption.busho });
+                },
+                () => { if (onFailure) onFailure(); },
+                { okText: '嫁がせる', okClass: 'btn-danger', cancelText: '断る' }
+            );
+        } else if (selectedOption.type === 'hostage') {
+            const msg = `${tgtClan.name}は和睦の条件として${selectedOption.busho.name}を人質として差し出すことを要求してきました。\n${selectedOption.busho.name}を人質として送りますか？`;
+            this.game.ui.showDialog(msg, true,
+                () => {
+                    this.applyHostageData(selectedOption.busho.id, requestClanId, targetClanId);
+                    if (onSuccess) onSuccess('hostage', { busho: selectedOption.busho });
+                },
+                () => { if (onFailure) onFailure(); },
+                { okText: '人質を送る', okClass: 'btn-danger', cancelText: '断る' }
+            );
+        } else if (selectedOption.type === 'castle') {
+            const msg = `${tgtClan.name}は、和睦の条件として${selectedOption.castle.name}を割譲することを要求してきました。\n${selectedOption.castle.name}を明け渡しますか？`;
+            this.game.ui.showDialog(msg, true,
+                () => {
+                    if (onSuccess) onSuccess('castle', { castle: selectedOption.castle });
+                },
+                () => { if (onFailure) onFailure(); },
+                { okText: '明け渡す', okClass: 'btn-danger', cancelText: '断る' }
+            );
+        }
     }
 }

@@ -1497,7 +1497,8 @@ class CommandSystem {
             } else if (extraData.subAction === 'break_alliance') {
                 this.executeWithEvent('break_alliance', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'break_alliance'));
             } else if (extraData.subAction === 'subordinate') {
-                this.showAdviceAndExecute('subordinate', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'subordinate'), { trueProb: 1.0 });
+                const prob = this.game.diplomacyManager.getDiplomacyProb(firstId, targetId, 'subordinate');
+                this.showAdviceAndExecute('subordinate', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'subordinate'), { trueProb: prob / 100 });
             } else if (extraData.subAction === 'vassalage') {
                 this.game.ui.showDialog(`本当に臣従しますか？\n当家は滅亡し、全ての領地を明け渡します。`, true, 
                     () => {
@@ -1510,7 +1511,8 @@ class CommandSystem {
                 const prob = this.game.diplomacyManager.getDiplomacyProb(firstId, targetId, 'dominate');
                 this.showAdviceAndExecute('dominate', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: prob / 100 });
             } else if (extraData.subAction === 'truce') {
-                this.showAdviceAndExecute('truce', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'truce'), { trueProb: 1.0 });
+                const prob = this.game.diplomacyManager.getDiplomacyProb(firstId, targetId, 'truce');
+                this.showAdviceAndExecute('truce', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'truce'), { trueProb: prob / 100 });
             } else if (extraData.subAction === 'court_truce') {
                 // ★追加：朝廷和睦は条件を満たしていれば確実に成功します！
                 this.showAdviceAndExecute('court_truce', () => this.game.courtRankSystem.executeCourtTruce(firstId, targetId), { trueProb: 1.0 });
