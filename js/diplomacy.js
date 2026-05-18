@@ -1876,7 +1876,7 @@ class DiplomacyManager {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
             } else if (type === 'alliance') {
-                // ★修正：同盟成立の処理は新しい専門部署にお任せします！
+                // ★修正：同盟成立 of の処理は新しい専門部署にお任せします！
                 this.applyAllianceData(doer.clan, targetClanId);
                 
                 this.game.ui.log(`${doerClan.name}と同盟を結びました`);
@@ -1905,6 +1905,9 @@ class DiplomacyManager {
                     msg1 = `「願ってもない申し出にござる。ありがたく頂戴いたす」`;
                 }
                 msg2 = `「まこと、祝着至極に存じまする。しからば、拙者はこれにて……」`;
+            } else if (type === 'alliance') {
+                msg1 = `「うむ、承知仕った。これより我らは盟友にござる」`;
+                msg2 = `「さすがは${myCallName}殿。くれぐれも約定を違えられぬようお願いいたす」`;
             } else if (type === 'dominate') {
                 msg1 = `「……承知仕った。かくなる上は${doerClan.name}に従属いたす」`;
                 msg2 = `「おお……うかがった甲斐があり申した。共に${doerClan.name}を盛り立てて参りましょうぞ」`;
@@ -1935,18 +1938,18 @@ class DiplomacyManager {
                 if (type === 'goodwill') {
                     demandMsg = `「此度は両家の仲を深めるべく参りました。心ばかりですが、どうぞお受け取りくだされ。」`;
                     confirmMsg = `「${doerClan.name}からの親善の品をお受け取りになられますか？\n（手土産金：${gold}）」`;
-                    okText = '受け取る';
-                    cancelText = '突き返す';
+                    okText = 'はい（受け取る）';
+                    cancelText = 'いいえ（突き返す）';
                 } else if (type === 'alliance') {
                     demandMsg = `「両家繁栄の為、どうか我らと盟約を結んでくだされ」`;
                     confirmMsg = `「${doerClan.name}との同盟にご同意なされますか？」`;
-                    okText = '承諾する';
-                    cancelText = '断る';
+                    okText = 'はい（承諾する）';
+                    cancelText = 'いいえ（断る）';
                 } else if (type === 'dominate') {
                     demandMsg = `「もはや大勢は決し申した。この上の抵抗は無益にござる。いさぎよく${doerClan.name}の傘下に加わられよ」`;
                     confirmMsg = `「殿……${doerClan.name} に従属なされますか？」`;
-                    okText = '従属する';
-                    cancelText = '断る';
+                    okText = 'はい（従属する）';
+                    cancelText = 'いいえ（断る）';
                 }
 
                 this.game.ui.showDialog(demandMsg, false,
