@@ -2042,37 +2042,7 @@ Object.assign(WarManager.prototype, {
                 });
             } else {
                 // 滅亡時の登用判定
-                let baseProb = ((recruiter.charm || 50) * 1.5) / ((prisoner.loyalty || 50) * 3);
-                let randomBonus = (Math.random() * 0.2) - 0.1;
-                const recruiterAffinity = recruiter.affinity || 0;
-                const prisonerAffinity = prisoner.affinity || 0;
-                const affinityDiff = Math.abs(recruiterAffinity - prisonerAffinity);
-                let affinityBonus = 0;
-                if (affinityDiff <= 10) affinityBonus = 0.1;
-                else if (affinityDiff >= 50) affinityBonus = -0.3;
-                else affinityBonus = 0.1 - (affinityDiff - 10) * 0.01;
-                
-                let hireProb = baseProb + randomBonus + affinityBonus;
-                hireProb = Math.max(0, Math.min(0.99, hireProb));
-                hireProb *= 0.5; // 大名は登用しにくくします
-
-                // ★追加：一門の武将が自勢力にいる場合は成功率+0.2
-                const hasFamily = this.game.bushos.some(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.id !== prisoner.id && b.familyIds && prisoner.familyIds && b.familyIds.some(fId => prisoner.familyIds.includes(fId)));
-                if (hasFamily) {
-                    hireProb += 0.2;
-                    hireProb = Math.max(0, Math.min(0.99, hireProb));
-                }
-
-                // 宿敵が登用先の大名家にいる場合は成功率を半分にします
-                if (prisoner.nemesisIds && prisoner.nemesisIds.length > 0) {
-                    const hasNemesis = prisoner.nemesisIds.some(nId => {
-                        const nBusho = this.game.getBusho(nId);
-                        return nBusho && nBusho.clan === this.game.playerClanId && nBusho.status !== 'dead';
-                    });
-                    if (hasNemesis) {
-                        hireProb *= 0.5;
-                    }
-                }
+                let hireProb = this.calcPrisonerHireProb(recruiter, prisoner, this.game.playerClanId, true, 0);
 
                 if (hireProb > Math.random()) {
                     // 登用成功時
@@ -2192,41 +2162,7 @@ Object.assign(WarManager.prototype, {
             const friendlyCastles = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
             const isExtinct = (friendlyCastles.length === 0);
 
-            let baseProb = ((recruiter.charm || 50) * 1.5) / ((prisoner.loyalty || 50) * 3) - (isExtinct ? 0 : 0.4);
-            let randomBonus = (Math.random() * 0.2) - 0.1;
-            const recruiterAffinity = recruiter.affinity || 0;
-            const prisonerAffinity = prisoner.affinity || 0;
-            const affinityDiff = Math.abs(recruiterAffinity - prisonerAffinity);
-            let affinityBonus = 0;
-            if (affinityDiff <= 10) affinityBonus = 0.1;
-            else if (affinityDiff >= 50) affinityBonus = -0.3;
-            else affinityBonus = 0.1 - (affinityDiff - 10) * 0.01;
-            
-            let hireProb = baseProb + randomBonus + affinityBonus;
-            hireProb = Math.max(0, Math.min(0.99, hireProb));
-            
-            if (this.daimyoHiredBonus) {
-                hireProb += this.daimyoHiredBonus;
-                hireProb = Math.max(0, Math.min(0.99, hireProb));
-            }
-
-            // ★追加：一門の武将が自勢力にいる場合は成功率+0.2
-            const hasFamily = this.game.bushos.some(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.id !== prisoner.id && b.familyIds && prisoner.familyIds && b.familyIds.some(fId => prisoner.familyIds.includes(fId)));
-            if (hasFamily) {
-                hireProb += 0.2;
-                hireProb = Math.max(0, Math.min(0.99, hireProb));
-            }
-
-            // ★追加：宿敵が登用先の大名家にいる場合は成功率を半分にします
-            if (prisoner.nemesisIds && prisoner.nemesisIds.length > 0) {
-                const hasNemesis = prisoner.nemesisIds.some(nId => {
-                    const nBusho = this.game.getBusho(nId);
-                    return nBusho && nBusho.clan === this.game.playerClanId && nBusho.status !== 'dead';
-                });
-                if (hasNemesis) {
-                    hireProb *= 0.5;
-                }
-            }
+            let hireProb = this.calcPrisonerHireProb(recruiter, prisoner, this.game.playerClanId, isExtinct, this.daimyoHiredBonus || 0);
 
             if (hireProb > Math.random()) {
                 // 登用成功！
@@ -2434,57 +2370,7 @@ Object.assign(WarManager.prototype, {
             
             const isKunishuBoss = (p.belongKunishuId > 0 && p.id === this.game.kunishuSystem.getKunishu(p.belongKunishuId)?.leaderId);
 
-            // 新しい計算式：基本確率を出します（帰る城がない＝滅亡確定ならペナルティをなくします）
-            let baseProb = ((recruiter.charm || 50) * 1.5) / ((p.loyalty || 50) * 3) - (isExtinct ? 0 : 0.4);
-            
-            // ＋0.1 から －0.1 のランダムな運の要素を作ります
-            let randomBonus = (Math.random() * 0.2) - 0.1;
-            
-            // 相性の差を計算して補正します
-            const recruiterAffinity = recruiter.affinity || 0;
-            const prisonerAffinity = p.affinity || 0;
-            const affinityDiff = Math.abs(recruiterAffinity - prisonerAffinity);
-            
-            let affinityBonus = 0;
-            if (affinityDiff <= 10) {
-                affinityBonus = 0.1;
-            } else if (affinityDiff >= 50) {
-                affinityBonus = -0.3;
-            } else {
-                affinityBonus = 0.1 - (affinityDiff - 10) * 0.01;
-            }
-            
-            // 基本確率、ランダムな運、相性補正をすべて足します（途中はマイナスでもOKです）
-            let hireProb = baseProb + randomBonus + affinityBonus;
-            
-            // 全部足した結果を、0%から99%の間に収めます
-            hireProb = Math.max(0, Math.min(0.99, hireProb));
-            
-            // 捕まった武将が大名なら確率を半分にします
-            if (p.isDaimyo && hireProb > 0) {
-                hireProb *= 0.5;
-            } else if (!p.isDaimyo && daimyoHiredBonus > 0) {
-                hireProb += daimyoHiredBonus;
-                hireProb = Math.max(0, Math.min(0.99, hireProb));
-            }
-
-            // ★追加：一門の武将が自勢力にいる場合は成功率+0.2
-            const hasFamily = this.game.bushos.some(b => b.clan === winnerClanId && b.status !== 'dead' && b.id !== p.id && b.familyIds && p.familyIds && b.familyIds.some(fId => p.familyIds.includes(fId)));
-            if (hasFamily) {
-                hireProb += 0.2;
-                hireProb = Math.max(0, Math.min(0.99, hireProb));
-            }
-
-            // ★追加：宿敵が登用先の大名家にいる場合は成功率を半分にします
-            if (p.nemesisIds && p.nemesisIds.length > 0) {
-                const hasNemesis = p.nemesisIds.some(nId => {
-                    const nBusho = this.game.getBusho(nId);
-                    return nBusho && nBusho.clan === winnerClanId && nBusho.status !== 'dead';
-                });
-                if (hasNemesis) {
-                    hireProb *= 0.5;
-                }
-            }
+            let hireProb = this.calcPrisonerHireProb(recruiter, p, winnerClanId, isExtinct, daimyoHiredBonus);
 
             if (!isKunishuBoss && hireProb > Math.random()) {
                 // ★大名が登用に応じた場合は、看板を下ろさせてご褒美をセット！
@@ -3087,5 +2973,49 @@ Object.assign(WarManager.prototype, {
                 b.nemesisIds = b.nemesisList.map(n => n.id);
             }
         });
+    },
+
+    // ★追加：捕虜登用の成功確率を計算する共通の魔法
+    calcPrisonerHireProb(recruiter, prisoner, targetClanId, isExtinct, daimyoHiredBonus = 0) {
+        let baseProb = ((recruiter.charm || 50) * 1.5) / ((prisoner.loyalty || 50) * 3) - (isExtinct ? 0 : 0.4);
+        let randomBonus = (Math.random() * 0.2) - 0.1;
+        const recruiterAffinity = recruiter.affinity || 0;
+        const prisonerAffinity = prisoner.affinity || 0;
+        const affinityDiff = Math.abs(recruiterAffinity - prisonerAffinity);
+        
+        let affinityBonus = 0;
+        if (affinityDiff <= 10) affinityBonus = 0.1;
+        else if (affinityDiff >= 50) affinityBonus = -0.3;
+        else affinityBonus = 0.1 - (affinityDiff - 10) * 0.01;
+        
+        let hireProb = baseProb + randomBonus + affinityBonus;
+        hireProb = Math.max(0, Math.min(0.99, hireProb));
+        
+        if (prisoner.isDaimyo) {
+            hireProb *= 0.5; // 大名は登用しにくくします
+        } else if (daimyoHiredBonus > 0) {
+            hireProb += daimyoHiredBonus;
+            hireProb = Math.max(0, Math.min(0.99, hireProb));
+        }
+
+        // 一門の武将が自勢力にいる場合は成功率+0.2
+        const hasFamily = this.game.bushos.some(b => b.clan === targetClanId && b.status !== 'dead' && b.id !== prisoner.id && b.familyIds && prisoner.familyIds && b.familyIds.some(fId => prisoner.familyIds.includes(fId)));
+        if (hasFamily) {
+            hireProb += 0.2;
+            hireProb = Math.max(0, Math.min(0.99, hireProb));
+        }
+
+        // 宿敵が登用先の大名家にいる場合は成功率を半分にします
+        if (prisoner.nemesisIds && prisoner.nemesisIds.length > 0) {
+            const hasNemesis = prisoner.nemesisIds.some(nId => {
+                const nBusho = this.game.getBusho(nId);
+                return nBusho && nBusho.clan === targetClanId && nBusho.status !== 'dead';
+            });
+            if (hasNemesis) {
+                hireProb *= 0.5;
+            }
+        }
+        
+        return hireProb;
     }
 });
