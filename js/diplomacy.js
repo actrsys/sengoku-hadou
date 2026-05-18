@@ -925,12 +925,12 @@ class DiplomacyManager {
                 const castle = this.game.getCastle(doer.castleId); 
                 if(castle) castle.gold -= gold;
                 
-                msg = `${doer.name}が親善を行いました\n友好度が上昇しました`;
+                msg = `${doer.name}の働きにより、${targetClanName}との関係が改善しました！`;
                 if (isPlayerInvolved) logMsg = `${doerClanName}が${targetClanName}に親善を行いました`;
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
                 this.game.factionSystem.updateRecognition(doer, 15);
             } else {
-                msg = `${this.game.clans.find(c => c.id === targetClanId).name} に親善の品を突き返されました……\n友好度は変わりませんでした`;
+                msg = `${this.game.clans.find(c => c.id === targetClanId).name} に親善の品を突き返されました……`;
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 5);
             }
