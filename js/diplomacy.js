@@ -1853,12 +1853,10 @@ class DiplomacyManager {
             this.game.ui.showDialog(msg1, false, () => {
                 this.game.ui.showDialog(msg2, false, doReject, null, {
                     leftFace: doer.faceIcon, leftName: doerNameStr,
-                    rightFace: myDaimyoFace, rightName: myDaimyoNameStr,
                     isEvent: true
                 });
             }, null, {
-                leftFace: doer.faceIcon, leftName: doerNameStr,
-                rightFace: myDaimyoFace, rightName: myDaimyoNameStr,
+                leftFace: myDaimyoFace, leftName: myDaimyoNameStr,
                 isEvent: true
             });
         };
@@ -1916,12 +1914,10 @@ class DiplomacyManager {
                 this.game.ui.showDialog(msg1, false, () => {
                     this.game.ui.showDialog(msg2, false, doAccept, null, {
                         leftFace: doer.faceIcon, leftName: doerNameStr,
-                        rightFace: myDaimyoFace, rightName: myDaimyoNameStr,
                         isEvent: true
                     });
                 }, null, {
-                    leftFace: doer.faceIcon, leftName: doerNameStr,
-                    rightFace: myDaimyoFace, rightName: myDaimyoNameStr,
+                    leftFace: myDaimyoFace, leftName: myDaimyoNameStr,
                     isEvent: true
                 });
             } else {
@@ -1939,18 +1935,18 @@ class DiplomacyManager {
                 if (type === 'goodwill') {
                     demandMsg = `「此度は両家の仲を深めるべく参りました。心ばかりですが、どうぞお受け取りくだされ。」`;
                     confirmMsg = `「${doerClan.name}からの親善の品をお受け取りになられますか？\n（手土産金：${gold}）」`;
-                    okText = 'はい（受け取る）';
-                    cancelText = 'いいえ（突き返す）';
+                    okText = '受け取る';
+                    cancelText = '突き返す';
                 } else if (type === 'alliance') {
                     demandMsg = `「両家繁栄の為、どうか我らと盟約を結んでくだされ」`;
                     confirmMsg = `「${doerClan.name}との同盟にご同意なされますか？」`;
-                    okText = 'はい（承諾する）';
-                    cancelText = 'いいえ（断る）';
+                    okText = '承諾する';
+                    cancelText = '断る';
                 } else if (type === 'dominate') {
                     demandMsg = `「もはや大勢は決し申した。この上の抵抗は無益にござる。いさぎよく${doerClan.name}の傘下に加わられよ」`;
                     confirmMsg = `「殿……${doerClan.name} に従属なされますか？」`;
-                    okText = 'はい（従属する）';
-                    cancelText = 'いいえ（断る）';
+                    okText = '従属する';
+                    cancelText = '断る';
                 }
 
                 this.game.ui.showDialog(demandMsg, false,
@@ -1968,7 +1964,6 @@ class DiplomacyManager {
                     null,
                     {
                         leftFace: doer.faceIcon, leftName: doerNameStr,
-                        rightFace: myDaimyoFace, rightName: myDaimyoNameStr,
                         isEvent: true
                     }
                 );
