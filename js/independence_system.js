@@ -1440,7 +1440,7 @@ class IndependenceSystem {
                         await this.game.ui.showDialogAsync(`「悪いが貴殿のことは信用できぬ。お引き取り願おう」`, false, 0, {
                             leftFace: myDaimyo ? myDaimyo.faceIcon : 'unknown_face.webp', leftName: myDaimyoNameStr, isEvent: true
                         });
-                        await this.game.ui.showDialogAsync(`「残念なことですな……後悔なれますぞ」`, false, 0, {
+                        await this.game.ui.showDialogAsync(`「残念なことですな……後悔なされますぞ」`, false, 0, {
                             leftFace: rebellionLeader.faceIcon, leftName: traitorNameStr, isEvent: true
                         });
                         resolve(false);
