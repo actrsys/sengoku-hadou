@@ -1369,4 +1369,99 @@ class IndependenceSystem {
             b: parseInt(result[3], 16)
         } : null;
     }
+
+    /**
+     * ★追加：プレイヤー勢力に寝返ろうとした場合の面会処理
+     */
+    async askPlayerForDefection(rebellionLeader, oldClanId) {
+        return new Promise((resolve) => {
+            const playerClan = this.game.clans.find(c => c.id === this.game.playerClanId);
+            const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+            
+            // 案内役の取得 (小姓など)
+            let myCastle = null;
+            if (myDaimyo) myCastle = this.game.getCastle(myDaimyo.castleId);
+            if (!myCastle) myCastle = this.game.castles.find(c => c.ownerClan === this.game.playerClanId);
+            const nav = myCastle ? this.game.getNavigatorInfo(myCastle) : { faceIcon: 'unknown_face.webp', name: '小姓' };
+
+            const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
+            const traitorNameStr = rebellionLeader.name.replace(/\|/g, '');
+            const myDaimyoNameStr = myDaimyo ? myDaimyo.name.replace(/\|/g, '') : '当主';
+
+            // 呼び名の判定
+            let traitorCallName = "";
+            // 官位があるかチェック
+            if (rebellionLeader.courtRankIds && rebellionLeader.courtRankIds.length > 0 && this.game.courtRankSystem) {
+                const rankName = this.game.courtRankSystem.getHighestRankName(rebellionLeader);
+                if (rankName !== "なし") {
+                    traitorCallName = rankName + "殿";
+                }
+            }
+            if (!traitorCallName) {
+                // 官位がなければ下の名（givenNameが無い場合はnameを分割）＋とやら
+                let given = rebellionLeader.givenName;
+                if (!given) {
+                    const parts = rebellionLeader.name.split('|');
+                    given = parts.length > 1 ? parts[1] : parts[0];
+                }
+                traitorCallName = given.replace(/\|/g, '') + "とやら";
+            }
+
+            const greetMsg = `「${oldClanName}の${traitorNameStr}と申す者が殿を頼って参りました。お会いになりますか？」`;
+            
+            const doRejectFirst = () => {
+                resolve(false);
+            };
+
+            const doAcceptFirst = async () => {
+                await this.game.ui.showDialogAsync(`「此度はお目通りをお許しいただき、恐悦至極に存じまする」`, false, 0, {
+                    leftFace: rebellionLeader.faceIcon, leftName: traitorNameStr, isEvent: true
+                });
+
+                await this.game.ui.showDialogAsync(`「うむ……${traitorCallName}。本日は何ゆえ参られたか」`, false, 0, {
+                    leftFace: myDaimyo ? myDaimyo.faceIcon : 'unknown_face.webp', leftName: myDaimyoNameStr, isEvent: true
+                });
+
+                await this.game.ui.showDialogAsync(`「はっ。${oldClanName}には愛想が尽き申した。拙者を${playerClan.name}の家臣にしてくだされ」`, false, 0, {
+                    leftFace: rebellionLeader.faceIcon, leftName: traitorNameStr, isEvent: true
+                });
+
+                this.game.ui.showDialog(`「${traitorNameStr}を家臣に加えますか？」`, true,
+                    async () => { // 家臣に加える
+                        await this.game.ui.showDialogAsync(`「よかろう。今後は当家の一員として働かれるがよい」`, false, 0, {
+                            leftFace: myDaimyo ? myDaimyo.faceIcon : 'unknown_face.webp', leftName: myDaimyoNameStr, isEvent: true
+                        });
+                        await this.game.ui.showDialogAsync(`「ははっ。精一杯働きまする！」`, false, 0, {
+                            leftFace: rebellionLeader.faceIcon, leftName: traitorNameStr, isEvent: true
+                        });
+                        resolve(true);
+                    },
+                    async () => { // 断る
+                        await this.game.ui.showDialogAsync(`「悪いが貴殿のことは信用できぬ。お引き取り願おう」`, false, 0, {
+                            leftFace: myDaimyo ? myDaimyo.faceIcon : 'unknown_face.webp', leftName: myDaimyoNameStr, isEvent: true
+                        });
+                        await this.game.ui.showDialogAsync(`「残念なことですな……後悔なれますぞ」`, false, 0, {
+                            leftFace: rebellionLeader.faceIcon, leftName: traitorNameStr, isEvent: true
+                        });
+                        resolve(false);
+                    },
+                    {
+                        leftFace: nav.faceIcon, leftName: nav.name,
+                        okText: '家臣に加える', okClass: 'btn-primary',
+                        cancelText: '断る', cancelClass: 'btn-danger'
+                    }
+                );
+            };
+
+            this.game.ui.showDialog(greetMsg, true,
+                doAcceptFirst,
+                doRejectFirst,
+                {
+                    leftFace: nav.faceIcon, leftName: nav.name,
+                    okText: '面会する', okClass: 'btn-primary',
+                    cancelText: '断る', cancelClass: 'btn-secondary'
+                }
+            );
+        });
+    }
 }
