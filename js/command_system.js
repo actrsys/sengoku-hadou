@@ -34,7 +34,7 @@ const COMMAND_MENU_STRUCTURE = [
         items: [
             'employ',
             'interview',
-            { label: "縁組", items: ['arrange_marriage', 'succession'] },
+            { label: "縁組", items: ['arrange_marriage', 'succession', 'adopt_son'] },
             { label: "任命", items: ['appoint_gunshi', 'appoint'] },
             { label: "賞罰", items: ['reward', 'banish'] }
         ]
@@ -124,6 +124,9 @@ const CAN_EXECUTE_RULES = {
             const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
             return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
         });
+    },
+    canAdoptSon: (game) => {
+        return !CAN_EXECUTE_RULES.hasSuccessor(game);
     },
     // --- 軍事用 ---
     canTraining: (game, castle) => {
@@ -452,6 +455,15 @@ const COMMAND_SPECS = {
         sortKey: 'leadership',
         msg: "家督を譲る一門武将を選択します",
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasSuccessor(game)
+    },
+    'adopt_son': { 
+        label: "養子", category: 'PERSONNEL', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: false, 
+        startMode: 'busho_select_special', subType: 'adopt_son_target',
+        sortKey: 'leadership',
+        msg: "養子にする武将を選択します",
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.canAdoptSon(game)
     },
     
     // --- 軍団 (LEGION) ---
@@ -839,6 +851,16 @@ class CommandSystem {
                 });
             }
             infoHtml = "<div>家督を譲る一門武将を選択してください</div>";
+        }
+        else if (actionType === 'adopt_son_target') {
+            const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+            if (daimyo) {
+                bushos = this.game.bushos.filter(b => {
+                    if (b.clan !== this.game.playerClanId || b.status !== 'active' || b.isDaimyo) return false;
+                    return b.birthYear >= daimyo.birthYear + 15;
+                });
+            }
+            infoHtml = "<div>養子にする武将を選択してください</div>";
         }
         else {
             // ★追加: 内政などの通常の命令でも、未登場の武将や諸勢力が勝手にリストに出ないようにします
@@ -1638,6 +1660,18 @@ class CommandSystem {
                 },
                 null,
                 { okText: '家督を譲る', okClass: 'btn-danger', cancelText: 'やめる' }
+            );
+            return;
+        }
+
+        if (actionType === 'adopt_son_target') {
+            const bushoA = this.game.getBusho(firstId);
+            this.game.ui.showDialog(`${bushoA.name} を養子にしますか？`, true, 
+                () => {
+                    this.executeWithEvent('adopt_son', () => this.executeAdoptSon(firstId));
+                },
+                null,
+                { okText: '養子にする', cancelText: 'やめる' }
             );
             return;
         }
@@ -3036,6 +3070,24 @@ class CommandSystem {
     executeSuccession(newDaimyoId) {
         // ★家督相続の難しい処理は、専門の life_system.js にお任せして魔法を呼び出します！
         this.game.lifeSystem.executeSuccessionCommand(newDaimyoId);
+    }
+
+    executeAdoptSon(targetId) {
+        const targetBusho = this.game.getBusho(targetId);
+        const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        if (!targetBusho || !daimyo) return;
+
+        targetBusho.adoptiveFatherId = daimyo.id;
+        if (!daimyo.adoptedSonIds.includes(targetBusho.id)) {
+            daimyo.adoptedSonIds.push(targetBusho.id);
+        }
+
+        daimyo.updateFamilyIds(this.game.princesses);
+        targetBusho.updateFamilyIds(this.game.princesses);
+
+        this.game.ui.showResultModal(`${targetBusho.name} を養子として迎え入れました。以降、${targetBusho.name} は当家の一門武将となります。`);
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
     }
 
     // ★追加：所領分配の実行
