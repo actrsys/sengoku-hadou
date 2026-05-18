@@ -2107,12 +2107,14 @@ class AIEngine {
                                 targetPriority += 5;
                             }
 
-                            // ★修正：ターゲットが役職者本人か、その一門かでAIの優先度ダウンを分けます（一元化対応）
+                            // ★修正：ターゲットが役職者本人か、役職持ち一門か、ただの一門かでAIの優先度ダウンを分けます（一元化対応）
                             const officerStatus = this.game.strategySystem.checkOfficerStatus(targetBusho);
-                            if (officerStatus === 2) {
-                                targetPriority -= 30; // 本人の場合は成功率がガクッと下がるので大きく優先度を下げる
+                            if (officerStatus === 3) {
+                                targetPriority -= 30; // 役職者本人の場合は成功率がガクッと下がるので一番大きく優先度を下げる
+                            } else if (officerStatus === 2) {
+                                targetPriority -= 20; // 役職持ち一門の場合は中程度優先度を下げる
                             } else if (officerStatus === 1) {
-                                targetPriority -= 15; // 一門の場合は中程度下げる
+                                targetPriority -= 10; // ただの一門の場合は少し優先度を下げる
                             }
                             
                             // ★追加：ターゲットが自家の武将を「宿敵」として恨んでいないかチェックします
