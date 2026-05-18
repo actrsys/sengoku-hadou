@@ -1766,71 +1766,220 @@ class DiplomacyManager {
             if (doerCastle) doerCastle.gold = Math.max(0, doerCastle.gold - gold);
         }
 
-        let title = "使者の来訪";
-        let msg = "";
+        const targetClan = this.game.clans.find(c => c.id === targetClanId);
+        const myDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+        const enemyDaimyo = this.game.bushos.find(b => b.clan === doer.clan && b.isDaimyo);
         
-        if (type === 'goodwill') {
-            msg = `${doerClan.name} の ${doer.name} が使者として訪れました。\n親善の証として 金${gold} を持参しています。\n受け取りますか？`;
-        } else if (type === 'alliance') {
-            msg = `${doerClan.name} の ${doer.name} が使者として訪れました。\n当家との「同盟」を提案しています。\n受諾しますか？`;
-        } else if (type === 'dominate') {
-            msg = `${doerClan.name} の ${doer.name} が使者として訪れました。\n当家に「従属」するよう要求しています。\n受諾しますか？`;
+        let myCastle = null;
+        if (myDaimyo) myCastle = this.game.getCastle(myDaimyo.castleId);
+        if (!myCastle) myCastle = this.game.castles.find(c => c.ownerClan === targetClanId);
+        const nav = myCastle ? this.game.getNavigatorInfo(myCastle) : { faceIcon: 'unknown_face.webp', name: '小姓' };
+
+        const isEnemy = this.game.getRelation(targetClanId, doer.clan)?.status === '敵対';
+        const isDaimyoSelf = (doer.isDaimyo);
+        const enemyDaimyoName = enemyDaimyo ? enemyDaimyo.name.replace(/\|/g, '') : "当主";
+
+        let introMsg = "";
+        if (isDaimyoSelf) {
+            if (isEnemy) {
+                introMsg = `「殿、${doerClan.name} 当主・${enemyDaimyoName} と名乗る者が面会を求めております。お会いになられますか？」`;
+            } else {
+                introMsg = `「殿、${doerClan.name} 当主・${enemyDaimyoName}様がお見えになっております。お会いになられますか？」`;
+            }
+        } else {
+            introMsg = `「殿、${doerClan.name} から使者が参っております。お会いになられますか？」`;
         }
 
-        this.game.ui.showDialog(msg, true, 
-            () => {
-                // 受諾（成功）時の経験値加算
-                this.calcDiplomacyExp(doer, type, true, true);
+        const getCallName = (busho) => {
+            if (!busho) return "殿";
+            let nameToCall = "";
+            if (busho.courtRankIds && busho.courtRankIds.length > 0 && this.game.courtRanks) {
+                const rank = this.game.courtRanks.find(r => r.id === busho.courtRankIds[0]);
+                if (rank) nameToCall = rank.name;
+            }
+            if (!nameToCall) {
+                nameToCall = busho.givenName || busho.name.replace(/^[^|]*\|?/, ''); 
+                if (!nameToCall) nameToCall = busho.name.replace(/\|/g, '');
+            }
+            return nameToCall;
+        };
 
-                if (type === 'goodwill') {
-                    const myCastle = this.game.castles.find(c => c.ownerClan === targetClanId);
-                    if (myCastle) myCastle.gold = Math.min(99999, myCastle.gold + gold);
-                    // ★窓口の時とは違い、専門部署用に少しだけ計算の仕方を整えています
-                    const increase = this.calcGoodwillIncrease(gold, doer);
-                    this.updateSentiment(doer.clan, targetClanId, increase);
-                    this.game.ui.log(`${doerClan.name}からの親善を受け入れました`);
-                    this.game.ui.showResultModal(`${doerClan.name} からの親善を受け入れました！\n友好度が上昇しました`, () => {
-                        if (onComplete) setTimeout(onComplete, 100);
-                    });
-                } else if (type === 'alliance') {
-                    // ★修正：同盟成立の処理は新しい専門部署にお任せします！
-                    this.applyAllianceData(doer.clan, targetClanId);
-                    
-                    this.game.ui.log(`${doerClan.name}と同盟を結びました`);
-                    this.game.ui.showResultModal(`${doerClan.name} と同盟を結びました！`, () => {
-                        if (onComplete) setTimeout(onComplete, 100);
-                    });
-                } else if (type === 'dominate') {
-                    // ★修正：支配・従属の処理は新しい専門部署にお任せします！
-                    this.applyDominationData(doer.clan, targetClanId);
+        // 差し替え後
+        const myCallName = getCallName(myDaimyo);
+        const enemyCallName = getCallName(doer);
 
-                    this.game.ui.log(`${doerClan.name}に従属しました`);
-                    this.game.ui.showResultModal(`${doerClan.name} に従属しました……`, () => {
-                        if (onComplete) setTimeout(onComplete, 100);
-                    });
+        const myDaimyoFace = myDaimyo ? myDaimyo.faceIcon : 'unknown_face.webp';
+        const myDaimyoNameStr = myDaimyo ? myDaimyo.name.replace(/\|/g, '') : '当主';
+        const doerNameStr = doer.name.replace(/\|/g, '');
+
+        const doReject = () => {
+            // 拒否（失敗）時の経験値加算
+            this.calcDiplomacyExp(doer, type, false, true);
+
+            if (type === 'goodwill') {
+                const doerCastle = this.game.getCastle(doer.castleId);
+                if (doerCastle) doerCastle.gold = Math.min(99999, doerCastle.gold + gold);
+                this.game.ui.showResultModal(`親善の品を突き返しました。`, () => {
+                    if (onComplete) setTimeout(onComplete, 100);
+                });
+            } else if (type === 'alliance') {
+                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
+                this.game.ui.showResultModal(`同盟の提案を拒否しました。`, () => {
+                    if (onComplete) setTimeout(onComplete, 100);
+                });
+            } else if (type === 'dominate') {
+                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.DOMINATE_FAILURE);
+                this.game.ui.showResultModal(`従属の要求を断固として拒否しました！`, () => {
+                    if (onComplete) setTimeout(onComplete, 100);
+                });
+            }
+        };
+
+        const rejectAction = () => {
+            let msg1 = "";
+            let msg2 = "";
+
+            if (type === 'goodwill') {
+                msg1 = `「ううむ、すぐには返答いたしかねる。今日のところはお引き取りを……」`;
+                msg2 = `「左様にござるか。ではこれにて失礼いたす」`;
+            } else if (type === 'alliance') {
+                msg1 = `「重大事ゆえ、家中の者と相談の上返答いたす。今日のところはお引き取りくだされ」`;
+                msg2 = `「左様にござるか。ではこれにて失礼いたす」`;
+            } else if (type === 'dominate') {
+                msg1 = `「断る！　まだ負けと決まったわけではござらん。その首叩き斬られたくなければ、早々に立ち去るがよい」`;
+                msg2 = `「……拙者は忠告申し上げましたぞ。ではこれにて」`;
+            }
+
+            this.game.ui.showDialog(msg1, false, () => {
+                this.game.ui.showDialog(msg2, false, doReject, null, {
+                    leftFace: doer.faceIcon, leftName: doerNameStr,
+                    rightFace: myDaimyoFace, rightName: myDaimyoNameStr,
+                    isEvent: true
+                });
+            }, null, {
+                leftFace: doer.faceIcon, leftName: doerNameStr,
+                rightFace: myDaimyoFace, rightName: myDaimyoNameStr,
+                isEvent: true
+            });
+        };
+
+        const doAccept = () => {
+            // 受諾（成功）時の経験値加算
+            this.calcDiplomacyExp(doer, type, true, true);
+
+            if (type === 'goodwill') {
+                const myCastleObj = this.game.castles.find(c => c.ownerClan === targetClanId);
+                if (myCastleObj) myCastleObj.gold = Math.min(99999, myCastleObj.gold + gold);
+                // ★窓口の時とは違い、専門部署用に少しだけ計算の仕方を整えています
+                const increase = this.calcGoodwillIncrease(gold, doer);
+                this.updateSentiment(doer.clan, targetClanId, increase);
+                this.game.ui.log(`${doerClan.name}からの親善を受け入れました`);
+                this.game.ui.showResultModal(`${doerClan.name} からの親善を受け入れました！　友好度が上昇しました`, () => {
+                    if (onComplete) setTimeout(onComplete, 100);
+                });
+            } else if (type === 'alliance') {
+                // ★修正：同盟成立の処理は新しい専門部署にお任せします！
+                this.applyAllianceData(doer.clan, targetClanId);
+                
+                this.game.ui.log(`${doerClan.name}と同盟を結びました`);
+                this.game.ui.showResultModal(`${doerClan.name} と同盟を結びました！`, () => {
+                    if (onComplete) setTimeout(onComplete, 100);
+                });
+            } else if (type === 'dominate') {
+                // ★修正：支配・従属の処理は新しい専門部署にお任せします！
+                this.applyDominationData(doer.clan, targetClanId);
+
+                this.game.ui.log(`${doerClan.name}に従属しました`);
+                this.game.ui.showResultModal(`${doerClan.name} に従属しました……`, () => {
+                    if (onComplete) setTimeout(onComplete, 100);
+                });
+            }
+        };
+
+        const acceptAction = () => {
+            let msg1 = "";
+            let msg2 = "";
+
+            if (type === 'goodwill') {
+                if (isDaimyoSelf) {
+                    msg1 = `「${enemyCallName}殿直々の頼みとあってはお受けする他ありませぬ。ありがたく頂戴いたします」`;
+                } else {
+                    msg1 = `「願ってもない申し出にござる。ありがたく頂戴いたす」`;
                 }
+                msg2 = `「まこと、祝着至極に存じまする。しからば、拙者はこれにて……」`;
+            } else if (type === 'dominate') {
+                msg1 = `「……承知仕った。かくなる上は${doerClan.name}に従属いたす」`;
+                msg2 = `「おお……うかがった甲斐があり申した。共に${doerClan.name}を盛り立てて参りましょうぞ」`;
+            }
+
+            if (msg1 && msg2) {
+                this.game.ui.showDialog(msg1, false, () => {
+                    this.game.ui.showDialog(msg2, false, doAccept, null, {
+                        leftFace: doer.faceIcon, leftName: doerNameStr,
+                        rightFace: myDaimyoFace, rightName: myDaimyoNameStr,
+                        isEvent: true
+                    });
+                }, null, {
+                    leftFace: doer.faceIcon, leftName: doerNameStr,
+                    rightFace: myDaimyoFace, rightName: myDaimyoNameStr,
+                    isEvent: true
+                });
+            } else {
+                doAccept();
+            }
+        };
+
+        this.game.ui.showDialog(introMsg, true,
+            () => {
+                let demandMsg = "";
+                let confirmMsg = "";
+                let okText = "";
+                let cancelText = "";
+                
+                if (type === 'goodwill') {
+                    demandMsg = `「此度は両家の仲を深めるべく参りました。心ばかりですが、どうぞお受け取りくだされ。」`;
+                    confirmMsg = `「${doerClan.name}からの親善の品をお受け取りになられますか？\n（手土産金：${gold}）」`;
+                    okText = 'はい（受け取る）';
+                    cancelText = 'いいえ（突き返す）';
+                } else if (type === 'alliance') {
+                    demandMsg = `「両家繁栄の為、どうか我らと盟約を結んでくだされ」`;
+                    confirmMsg = `「${doerClan.name}との同盟にご同意なされますか？」`;
+                    okText = 'はい（承諾する）';
+                    cancelText = 'いいえ（断る）';
+                } else if (type === 'dominate') {
+                    demandMsg = `「もはや大勢は決し申した。この上の抵抗は無益にござる。いさぎよく${doerClan.name}の傘下に加わられよ」`;
+                    confirmMsg = `「殿……${doerClan.name} に従属なされますか？」`;
+                    okText = 'はい（従属する）';
+                    cancelText = 'いいえ（断る）';
+                }
+
+                this.game.ui.showDialog(demandMsg, false,
+                    () => {
+                        this.game.ui.showDialog(confirmMsg, true,
+                            acceptAction,
+                            rejectAction,
+                            {
+                                leftFace: nav.faceIcon, leftName: nav.name,
+                                okText: okText, okClass: 'btn-primary',
+                                cancelText: cancelText, cancelClass: 'btn-danger'
+                            }
+                        );
+                    },
+                    null,
+                    {
+                        leftFace: doer.faceIcon, leftName: doerNameStr,
+                        rightFace: myDaimyoFace, rightName: myDaimyoNameStr,
+                        isEvent: true
+                    }
+                );
             },
             () => {
-                // 拒否（失敗）時の経験値加算
-                this.calcDiplomacyExp(doer, type, false, true);
-
-                if (type === 'goodwill') {
-                    const doerCastle = this.game.getCastle(doer.castleId);
-                    if (doerCastle) doerCastle.gold = Math.min(99999, doerCastle.gold + gold);
-                    this.game.ui.showResultModal(`親善の品を突き返しました。`, () => {
-                        if (onComplete) setTimeout(onComplete, 100);
-                    });
-                } else if (type === 'alliance') {
-                    this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
-                    this.game.ui.showResultModal(`同盟の提案を拒否しました。`, () => {
-                        if (onComplete) setTimeout(onComplete, 100);
-                    });
-                } else if (type === 'dominate') {
-                    this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.DOMINATE_FAILURE);
-                    this.game.ui.showResultModal(`従属の要求を断固として拒否しました！`, () => {
-                        if (onComplete) setTimeout(onComplete, 100);
-                    });
-                }
+                doReject();
+            },
+            {
+                leftFace: nav.faceIcon, leftName: nav.name,
+                okText: '面会する', okClass: 'btn-primary',
+                cancelText: '追い返す', cancelClass: 'btn-secondary'
             }
         );
     }
