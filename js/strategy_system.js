@@ -145,12 +145,8 @@ class StrategySystem {
     calcIncite(doerId, targetId, isExecute = false) { 
         const busho = this.game.getBusho(doerId);
         const targetCastle = this.game.getCastle(targetId);
-
-        const strBonus = ((busho.strength * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 150;
-        const intBonus = ((busho.intelligence * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20;
-        const loyaltyBonus = (targetCastle.peoplesLoyalty / 120) + 0.9;
         
-        const prob = Math.max(0.01, Math.min(0.99, strBonus / loyaltyBonus));
+        const prob = this.getInciteProb(doerId, targetId);
         const success = Math.random() < prob; 
 
         if (isExecute) {
@@ -165,24 +161,16 @@ class StrategySystem {
         
         if(!success) return { success: false, val: 0 }; 
         
+        const intBonus = ((busho.intelligence * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20;
+        const loyaltyBonus = (targetCastle.peoplesLoyalty / 120) + 0.9;
         const damage = Math.max(1, Math.floor(intBonus / loyaltyBonus));
         return { success: true, val: damage }; 
     }
     
     calcRumor(doerId, targetBushoId, isExecute = false) { 
         const busho = this.game.getBusho(doerId);
-        const targetBusho = this.game.getBusho(targetBushoId);
-        const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
-        const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
-        let prob = (score / (defScore + window.MainParams.Strategy.RumorFactor)) - 0.1;
         
-        // ★修正：対象のステータスに合わせてペナルティを適用します
-        const officerStatus = this.checkOfficerStatus(targetBusho);
-        if (officerStatus === 3) prob -= 0.30;
-        else if (officerStatus === 2) prob -= 0.20;
-        else if (officerStatus === 1) prob -= 0.10;
-        
-        prob = Math.max(0, prob);
+        const prob = this.getRumorProb(doerId, targetBushoId);
         let success = Math.random() < prob;
 
         if (isExecute) {
@@ -201,43 +189,8 @@ class StrategySystem {
     
     calcHeadhunt(doerId, targetBushoId, gold, isExecute = false) {
         const doer = this.game.getBusho(doerId);
-        const target = this.game.getBusho(targetBushoId);
-        const targetLord = this.game.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
-        const newLord = this.game.bushos.find(b => b.clan === doer.clan && b.isDaimyo) || { affinity: 50 }; 
-
-        const S = window.MainParams.Strategy;
-        const goldEffect = Math.min(S.HeadhuntGoldMaxEffect, gold * S.HeadhuntGoldEffect);
-        const offense = (doer.intelligence * S.HeadhuntIntWeight) + goldEffect;
-        const defense = (target.loyalty * S.HeadhuntLoyaltyWeight) + (target.duty * S.HeadhuntDutyWeight) + S.HeadhuntBaseDiff;
-        const affLord = GameSystem.calcAffinityDiff(target.affinity, targetLord.affinity); 
-        const lordBonus = (50 - affLord) * S.AffinityLordWeight; 
-        const affNew = GameSystem.calcAffinityDiff(target.affinity, newLord.affinity);
-        const newBonus = (50 - affNew) * S.AffinityNewLordWeight; 
-        const affDoer = GameSystem.calcAffinityDiff(target.affinity, doer.affinity);
-        const doerBonus = (50 - affDoer) * S.AffinityDoerWeight; 
-        const totalOffense = offense + newBonus + doerBonus;
-        const totalDefense = defense + lordBonus;
-        let successRate = (totalOffense / totalDefense) * 0.5; 
-
-        successRate = Math.max(0, successRate - 0.1);
-
-        // ★修正：対象のステータスに合わせてペナルティを適用します
-        const officerStatus = this.checkOfficerStatus(target);
-        if (officerStatus === 3) successRate -= 0.30;
-        else if (officerStatus === 2) successRate -= 0.20;
-        else if (officerStatus === 1) successRate -= 0.10;
-
-        // ★ここから追加：引抜先に自分の宿敵がいる場合は、成功率が半分になります！
-        if (target.nemesisIds && target.nemesisIds.length > 0) {
-            const hasNemesis = target.nemesisIds.some(nId => {
-                const nBusho = this.game.getBusho(nId);
-                return nBusho && nBusho.clan === doer.clan && nBusho.status !== 'dead';
-            });
-            if (hasNemesis) {
-                successRate *= 0.5;
-            }
-        }
-
+        
+        const successRate = this.getHeadhuntProb(doerId, targetBushoId, gold);
         let success = Math.random() < successRate;
 
         if (isExecute) {
