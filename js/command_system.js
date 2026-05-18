@@ -585,7 +585,7 @@ const COMMAND_SPECS = {
     'truce': {
         label: "和睦", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
-        isMulti: false, hasAdvice: false,
+        isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'hostile_clan_only',
         canExecute: (game, castle) => CAN_EXECUTE_RULES.canSubordinate(game, castle)
     },
