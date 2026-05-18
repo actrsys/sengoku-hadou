@@ -3084,7 +3084,7 @@ class CommandSystem {
 
         busho.loyalty = 100;
 
-        this.game.ui.showResultModal(`${busho.name} と ${princess.name} の祝言がめでたく執り行われました。\n新たな縁によって、当家の結束はより一層強固なものとなりました。`);
+        this.game.ui.showResultModal(`${busho.name} と ${princess.name} の祝言が執り行われました。新たな縁によって、当家の結束はより一層強固なものとなりました。`);
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
     }
