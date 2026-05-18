@@ -460,7 +460,11 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     display: none !important;
 }
 
-.hide-native-scroll::-webkit-scrollbar { display: none !important; }
+.hide-native-scroll::-webkit-scrollbar { 
+    display: none !important; 
+    width: 0 !important; 
+    height: 0 !important; 
+}
 .hide-native-scroll { 
     -ms-overflow-style: none; scrollbar-width: none; border: none !important; flex: 1; min-width: 0; 
     overflow-y: scroll; overflow-x: auto; overscroll-behavior: none; 
