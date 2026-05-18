@@ -903,12 +903,12 @@ class AIEngine {
                             // 空き城（IDが0）以外なら、関係を調べます
                             const adjRel = this.game.getRelation(myCastle.ownerClan, adjCastle.ownerClan);
                             if (adjRel) {
-                                // 同盟、支配、従属なら味方として数えます
-                                if (['同盟', '支配', '従属'].includes(adjRel.status)) {
+                                // 友好、同盟、支配、従属なら味方として数えます
+                                if (['友好', '同盟', '支配', '従属'].includes(adjRel.status)) {
                                     friendlyNeighbors++;
                                 } 
-                                // 敵対、普通、友好なら敵（潜在的な脅威）として数えます
-                                else if (['敵対', '普通', '友好'].includes(adjRel.status)) {
+                                // 敵対、普通なら敵（潜在的な脅威）として数えます
+                                else if (['敵対', '普通'].includes(adjRel.status)) {
                                     futureEnemyNeighbors++;
                                     
                                     // ★追加：その敵勢力が、現在の大名家全体でまだ隣接していない「新しい勢力」かチェックします
