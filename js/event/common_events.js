@@ -1393,16 +1393,67 @@ window.GameEvents.push({
         // 下の名前がわかれば下の名前を、わからなければフルネームを使います
         const aiDaimyoGivenName = aiDaimyo.givenName ? aiDaimyo.givenName : aiDaimyoName;
 
+        // ★追加：外交システムと同じように、名前や官位を取得する魔法です
+        const getCallName = (busho) => {
+            if (!busho) return "殿";
+            
+            if (busho.courtRankIds && busho.courtRankIds.includes(1)) {
+                return "公方様";
+            }
+            
+            let nameToCall = "";
+            if (busho.courtRankIds && busho.courtRankIds.length > 0 && game.courtRankSystem) {
+                const rankName = game.courtRankSystem.getHighestRankName(busho);
+                if (rankName !== "なし") {
+                    nameToCall = rankName;
+                }
+            }
+            
+            if (!nameToCall) {
+                nameToCall = busho.givenName || busho.name.replace(/^[^|]*\|?/, ''); 
+                if (!nameToCall) nameToCall = busho.name.replace(/\|/g, '');
+            }
+            return nameToCall + "殿";
+        };
+
+        const isDaimyoSelf = (envoy.id === aiDaimyo.id);
+        const myCallName = getCallName(playerDaimyo);
+        const envoyCallName = getCallName(envoy);
+
+        // 小姓役のナビゲーターを取得
+        let myCastle = game.getCastle(playerDaimyo.castleId);
+        if (!myCastle) myCastle = game.castles.find(c => c.ownerClan === playerClanId);
+        const nav = myCastle ? game.getNavigatorInfo(myCastle) : { faceIcon: 'unknown_face.webp', name: '小姓' };
+
+        let introMsg = "";
+        if (isDaimyoSelf) {
+            introMsg = `「殿、${aiClanName}当主・${aiDaimyoName}様がお見えになっております。お会いになられますか？」`;
+        } else {
+            introMsg = `「殿、${aiClanName} から使者が参っております。お会いになられますか？」`;
+        }
+
         // ダイアログを出す前に、音を鳴らしてバリアを張る魔法を呼びます！
         if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
         
-        await game.ui.showDialogAsync(`${aiClanName} から使者が参っております。`, false, 0);
+        await game.ui.showDialogAsync(introMsg, false, 0, {
+            leftFace: nav.faceIcon, leftName: nav.name
+        });
 
-        await game.ui.showDialogAsync(`「此度は${aiClanName}当主・${aiDaimyoName}の名代として罷り越しました。急な訪問、平にご容赦くだされ」`, false, 0, {
+        let greetMsg1 = "";
+        let greetMsg2 = "";
+        if (isDaimyoSelf) {
+            greetMsg1 = `「${myCallName}。重大な用件ゆえ、此度はわし自ら参りました」`;
+            greetMsg2 = `「これは${envoyCallName}……して、どのような御用向きでござるか？」`;
+        } else {
+            greetMsg1 = `「此度は${aiClanName}当主・${aiDaimyoName}の名代として罷り越しました。急な訪問、平にご容赦くだされ」`;
+            greetMsg2 = `「うむ。して、御用向きはいかに？」`;
+        }
+
+        await game.ui.showDialogAsync(greetMsg1, false, 0, {
             leftFace: envoy.faceIcon, leftName: envoyName
         });
 
-        await game.ui.showDialogAsync(`「うむ。して、御用向きはいかに？」`, false, 0, {
+        await game.ui.showDialogAsync(greetMsg2, false, 0, {
             leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
         });
 
@@ -1428,7 +1479,8 @@ window.GameEvents.push({
             await game.ui.showDialogAsync(`「よくぞご決心なされた。今後はその力、${playerClan.name}で存分に振るわれよ」`, false, 0, {
                 leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
             });
-            await game.ui.showDialogAsync(`「ははっ！　ありがたき幸せに存じまする！」`, false, 0, {
+            let replyAccept = isDaimyoSelf ? `「恐悦至極……今日より${myCallName}を主君と仰ぎ奉りまする」` : `「ははっ！　ありがたき幸せに存じまする！」`;
+            await game.ui.showDialogAsync(replyAccept, false, 0, {
                 leftFace: envoy.faceIcon, leftName: envoyName
             });
 
@@ -1481,7 +1533,8 @@ window.GameEvents.push({
             await game.ui.showDialogAsync(`「すまぬが、他家を取り込むつもりはない。これまで通り当家を支えていただききたく存ずる」`, false, 0, {
                 leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
             });
-            await game.ui.showDialogAsync(`「……承知仕った。${aiDaimyoGivenName}様にはそのようにお伝えし申す」`, false, 0, {
+            let replyReject = isDaimyoSelf ? `「……左様にござるか。ではこれにて失礼いたす」` : `「……承知仕った。${aiDaimyoGivenName}様にはそのようにお伝えし申す」`;
+            await game.ui.showDialogAsync(replyReject, false, 0, {
                 leftFace: envoy.faceIcon, leftName: envoyName
             });
         }
