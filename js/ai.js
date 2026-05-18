@@ -2303,7 +2303,8 @@ class AIEngine {
                     this.game.strategySystem.handleCovertAction(doer.id, action.targetId, result.success, 'sabotage');
                     
                     const target = this.game.getCastle(action.targetId);
-                    this.game.strategySystem.applySabotageEffect(doer, target, result);
+                    // ★個別の魔法ではなく、共通の「applyStrategyEffect」を使うように直します！
+                    this.game.strategySystem.applyStrategyEffect('sabotage', doer, target, result);
                     
                     let keepAction = false;
                     if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
@@ -2321,7 +2322,8 @@ class AIEngine {
                     this.game.strategySystem.handleCovertAction(doer.id, action.targetId, result.success, 'incite');
                     
                     const target = this.game.getCastle(action.targetId);
-                    this.game.strategySystem.applyInciteEffect(doer, target, result);
+                    // ★ここも共通の魔法「applyStrategyEffect」に書き換えます！
+                    this.game.strategySystem.applyStrategyEffect('incite', doer, target, result);
                     
                     let keepAction = false;
                     if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
@@ -2341,7 +2343,8 @@ class AIEngine {
                     targetBusho.lastApproachedClanId = doer.clan;
                     this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, result.success, 'rumor', false, targetBusho.id);
                     
-                    this.game.strategySystem.applyRumorEffect(doer, targetBusho, result);
+                    // ★ここも共通の魔法「applyStrategyEffect」に書き換えます！
+                    this.game.strategySystem.applyStrategyEffect('rumor', doer, targetBusho, result);
                     
                     let keepAction = false;
                     if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
