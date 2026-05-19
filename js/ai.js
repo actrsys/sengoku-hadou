@@ -1410,6 +1410,9 @@ class AIEngine {
             const perceivedTraining = Math.min(100, castle.training + errTraining);
             const perceivedMorale = Math.min(100, castle.morale + errMorale);
 
+            // ★追加：お金や兵糧の目標値を計算するための「基準兵数」を決めます（兵士0でも活動できるように最低2000を保証します）
+            const baseSoldiers = Math.max(2000, castle.soldiers);
+
             // 1. 城壁修復（最大値の1/4以下なら超優先！）
             if (perceivedDefense < castle.maxDefense) {
                 let score = 0;
@@ -1549,11 +1552,11 @@ class AIEngine {
             // 3. 徴兵（お金と兵糧の余裕を見ながら、計画的に集めます！）
             if (castle.population > 1000) {
                 // ===== 基本パラメータ =====
-                const targetRice = Math.floor(castle.soldiers * 2.5);
-                const safeRice = Math.floor(castle.soldiers * 2.5);
-                // 変更：「兵士1人につき3のお金」をキープする設定でしたが、
-                // お金を余らせすぎないように「1.5」に下げて、お財布の紐を緩くします！
-                const targetGold = Math.floor(castle.soldiers * 1.5);
+                const targetRice = Math.floor(baseSoldiers * 2.5);
+                // ★修正：最低残す兵糧ラインを2.5から2.0に下げて、徴兵しやすくします
+                const safeRice = Math.floor(baseSoldiers * 2.0);
+                // ★修正：金銭感覚をさらに緩く「1.0」に下げて、お財布の紐を緩くします！
+                const targetGold = Math.floor(baseSoldiers * 1.0);
                 
                 // およそ1人集めるのにかかるお金（単価）を、城主の能力で仮計算します
                 const efficiency = ((castellan.leadership * 1.5) + (castellan.charm * 1.5) + (Math.sqrt(castellan.loyalty) * 2) + (Math.sqrt(castle.peoplesLoyalty) * 2)) / 500;
@@ -1730,11 +1733,12 @@ class AIEngine {
             });
 
             // 8. 兵糧売却の判断
-            const sellTargetRice = Math.floor(castle.soldiers * 3.5);
-            const sellSafeRice = Math.floor(castle.soldiers * 2.0);
+            // ★修正：無駄売りを防ぐため、判断基準を3.0倍にし、残すラインを徴兵基準と同じ2.5倍にします
+            const sellTargetRice = Math.floor(baseSoldiers * 3.0);
+            const sellSafeRice = Math.floor(baseSoldiers * 2.5);
             // 変更：徴兵の金銭感覚と合わせるため、ここも「1.5」に下げます！
             // これで、無駄にお米を売りすぎるのを防ぎます。
-            const targetGold = Math.floor(castle.soldiers * 1.5);
+            const targetGold = Math.floor(baseSoldiers * 1.5);
             
             const shortageGold = Math.max(0, targetGold - castle.gold);
             const surplusRice = Math.max(0, castle.rice - sellTargetRice);
@@ -1761,8 +1765,9 @@ class AIEngine {
             }
             
             // ===== 基本パラメータ =====
-            const targetRice = Math.floor(castle.soldiers * 3.5);
-            const minRice = Math.floor(castle.soldiers * 0.3);
+            // ★修正：無駄買いを防ぎ、売却ラインと合わせるため3.0倍にします
+            const targetRice = Math.floor(baseSoldiers * 3.0);
+            const minRice = Math.floor(baseSoldiers * 0.3);
             const shortage = Math.max(0, targetRice - castle.rice);
             // 目標が0の時はエラーにならないように0にします
             const shortageRate = targetRice > 0 ? shortage / targetRice : 0;
@@ -2474,11 +2479,12 @@ class AIEngine {
                     // ===== 仮想チェック（重要） =====
                     // 最後に、仮想の必要兵糧を計算して、本当に維持できるか最終チェックします！
                     let virtualSoldiers = castle.soldiers + soldiers;
-                    let virtualRiceNeed = virtualSoldiers * 3.5;
+                    // ★修正：売却時の残量(2.5)より低い「2.0」にして、デッドロックを完全に防止します
+                    let virtualRiceNeed = virtualSoldiers * 2.0;
                     
                     if (castle.rice < virtualRiceNeed) {
                         // 維持できないなら、今の兵糧で維持できるギリギリの人数に減らします
-                        soldiers = Math.floor((castle.rice / 3.5) - castle.soldiers);
+                        soldiers = Math.floor((castle.rice / 2.0) - castle.soldiers);
                         soldiers = Math.max(0, soldiers);
                         draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty);
                     }
@@ -2581,10 +2587,12 @@ class AIEngine {
                 if (action.type === 'sell_rice') {
                     let rate = riceRate; // ★高速化：ループの外で調べた相場をそのまま使います！
 
-                    const sellGoalRice = Math.floor(castle.soldiers * 2.0);
+                    // ★修正：売っても徴兵の仮想チェック(2.0)以上の2.5倍を残すようにします
+                    const sellGoalRice = Math.floor(baseSoldiers * 2.5);
                     const canSellAmount = Math.max(0, castle.rice - sellGoalRice);
                     
-                    const targetGold = Math.floor(castle.soldiers * 3.0);
+                    // ★修正：判断時と同じ「1.5」に統一します
+                    const targetGold = Math.floor(baseSoldiers * 1.5);
                     const shortageGold = Math.max(0, targetGold - castle.gold);
                     
                     // 足りないお金分のお米だけを売るように計算します
@@ -2626,15 +2634,16 @@ class AIEngine {
                     let rate = riceRate; // ★高速化：ループの外で調べた相場をそのまま使います！
                     
                     // 一気に余裕まで買います！
-                    const buyTarget = Math.floor(castle.soldiers * 3.5);
+                    // ★修正：目標値を3.0倍に統一します
+                    const buyTarget = Math.floor(baseSoldiers * 3.0);
                     const extendedShortage = Math.max(0, buyTarget - castle.rice);
                     
                     // 欲しい分と、お金で買える分の、少ない方にします
                     let buyAmount = Math.floor(Math.min(extendedShortage, castle.gold / rate, castle.tradeLimit || 0));
                     
                     // ちょい買い防止
-                    const minRice = Math.floor(castle.soldiers * 0.3);
-                    if (buyAmount < castle.soldiers * 0.2) {
+                    const minRice = Math.floor(baseSoldiers * 0.3);
+                    if (buyAmount < Math.floor(baseSoldiers * 0.2)) {
                         if (castle.rice >= minRice) {
                             buyAmount = 0; // 最低限持っているなら、少しだけ買うのはやめます
                         }
