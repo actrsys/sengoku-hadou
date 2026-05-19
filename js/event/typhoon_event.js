@@ -196,10 +196,18 @@ window.GameEvents.push({
                     }
                 }
 
-                // サイコロの目を -0.8 から 0.4 の間になるように変更します。
-                // マイナスの数字（大きくなる力）が出やすくなり、成長しやすくなります。
-                let baseDecay = (Math.random() * 1.2) - 0.8; 
-                let northDecay = 0.3 * progress;
+                // ★海上にいる時は台風が消滅しにくく、陸に上がると弱まりやすくなるようにサイコロを調整します！
+                let baseDecay;
+                if (onLand) {
+                    // 陸上にいる時は少し小さくなりやすいサイコロにします
+                    baseDecay = (Math.random() * 1.2) - 0.4; 
+                } else {
+                    // 海上にいる時はかなり成長しやすいサイコロにします
+                    baseDecay = (Math.random() * 1.5) - 1.2; 
+                }
+                
+                // 北へ行くほど弱まる力も少しだけ優しくします
+                let northDecay = 0.2 * progress;
 
                 if (onLand) {
                     landCount++;
