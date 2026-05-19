@@ -344,7 +344,7 @@ class UIManager {
         // ==========================================
         // ★ここから追加：リストの変化をずっと見張る自動ロボット！
         // ==========================================
-        let isScrollbarUpdating = false; // ★連続で動かないようにするブレーキの箱です
+        let scrollbarTimer = null; // ★ストップウォッチを用意します
         const observer = new MutationObserver((mutations) => {
             let needsUpdate = false;
             mutations.forEach(mutation => {
@@ -353,10 +353,12 @@ class UIManager {
                     needsUpdate = true;
                 }
             });
-            if (needsUpdate && !isScrollbarUpdating) {
-                isScrollbarUpdating = true; // ブレーキをかけます
-                // ★変化があったら、ほんの少しだけ待ってから1回だけまとめて作業します（間引き魔法）
-                setTimeout(() => {
+            if (needsUpdate) {
+                // もしストップウォッチが動いていたら、一度ゼロに戻します
+                if (scrollbarTimer) clearTimeout(scrollbarTimer);
+                
+                // ストップウォッチをスタートして、画面の変化が完全に落ち着いてから仕事をします
+                scrollbarTimer = setTimeout(() => {
                     // ★自分の作業でまた見張りが反応しないように、一時的に耳を塞ぎます
                     observer.disconnect();
                     
@@ -364,7 +366,6 @@ class UIManager {
                     
                     // 作業が終わったら、また見張りを再開します
                     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
-                    isScrollbarUpdating = false; // ブレーキを解除します
                 }, 50);
             }
         });
@@ -380,73 +381,73 @@ class UIManager {
         // ==========================================
         // ★ここから追加：長い名前を自動で見つけてギュッと縮める「文字圧縮ロボット」（レイアウト崩れ完全解決版）
         // ==========================================
-        let isTextUpdating = false; // ★こちらもブレーキ用の箱です
+        let textTimer = null; // ★こちらもストップウォッチを用意します
         const textObserver = new MutationObserver(() => {
-            if (!isTextUpdating) {
-                isTextUpdating = true; // ブレーキをかけます
-                setTimeout(() => {
-                    // ★自分自身の作業でまた見張りが反応しないように、一時的に耳を塞ぎます
-                    textObserver.disconnect();
+            // もしストップウォッチが動いていたら、一度ゼロに戻します
+            if (textTimer) clearTimeout(textTimer);
 
-                    const targetSelectors = [
-                        '#war-atk-name', '#war-def-name', 
-                        '.sp-clan',                       
-                        '.daimyo-detail-name',            
-                        '.daimyo-confirm-info h3',        
-                        '.col-daimyo-name', '.col-clan'   
-                    ];
+            // ストップウォッチをスタートして、画面の変化が完全に落ち着いてから仕事をします
+            textTimer = setTimeout(() => {
+                // ★自分自身の作業でまた見張りが反応しないように、一時的に耳を塞ぎます
+                textObserver.disconnect();
 
-                    const targets = document.querySelectorAll(targetSelectors.join(', '));
+                const targetSelectors = [
+                    '#war-atk-name', '#war-def-name', 
+                    '.sp-clan',                       
+                    '.daimyo-detail-name',            
+                    '.daimyo-confirm-info h3',        
+                    '.col-daimyo-name', '.col-clan'   
+                ];
+
+                const targets = document.querySelectorAll(targetSelectors.join(', '));
+                
+                targets.forEach(el => {
+                    // ★改善点1：リストの枠組み（Grid）を壊さないように、文字を包む「専用の内箱（span）」を作ります
+                    let inner = el.querySelector('.compressed-text-wrapper');
+                    let text = "";
                     
-                    targets.forEach(el => {
-                        // ★改善点1：リストの枠組み（Grid）を壊さないように、文字を包む「専用の内箱（span）」を作ります
-                        let inner = el.querySelector('.compressed-text-wrapper');
-                        let text = "";
+                    if (!inner) {
+                        text = el.textContent.trim();
+                        if (!text) return; // 空っぽなら何もしない
                         
-                        if (!inner) {
-                            text = el.textContent.trim();
-                            if (!text) return; // 空っぽなら何もしない
-                            
-                            el.innerHTML = ''; // 元の文字を消して、内箱に詰め直します
-                            inner = document.createElement('span');
-                            inner.className = 'compressed-text-wrapper';
-                            inner.textContent = text;
-                            el.appendChild(inner);
-                        } else {
-                            text = inner.textContent.trim();
-                        }
-                        
-                        if (inner.dataset.compressedText === text) return;
-                        
-                        if (text.length >= 5) {
-                            let scale = 1.0 - (text.length - 4) * 0.1;
-                            if (scale < 0.55) scale = 0.55; 
-
-                            // ★改善点2：魔法のタネあかし★
-                            // 1. まずフォントサイズ（em）を直接小さくします。
-                            // これによりシステム上の「横幅」も小さくなるため、リストの列が押し広げられなくなります！
-                            inner.style.fontSize = `${scale}em`;
-                            
-                            // 2. フォントサイズを下げたことで「縦幅」も小さくなってしまうので、
-                            // transformの『scaleY（縦方向の引き伸ばし）』を使って、元の高さ（1.0）まで引き伸ばします！
-                            inner.style.transform = `scaleY(${1 / scale})`;
-                            
-                            inner.style.letterSpacing = '-0.5px';
-                        } else {
-                            // 4文字以下の場合は元に戻す
-                            inner.style.fontSize = '';
-                            inner.style.transform = '';
-                            inner.style.letterSpacing = '';
-                        }
-                        
-                        inner.dataset.compressedText = text;
-                    });
+                        el.innerHTML = ''; // 元の文字を消して、内箱に詰め直します
+                        inner = document.createElement('span');
+                        inner.className = 'compressed-text-wrapper';
+                        inner.textContent = text;
+                        el.appendChild(inner);
+                    } else {
+                        text = inner.textContent.trim();
+                    }
                     
-                    // 作業が終わったら、また見張りを再開します
-                    textObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
-                    isTextUpdating = false; // ブレーキを解除します
-                }, 50);
-            }
+                    if (inner.dataset.compressedText === text) return;
+                    
+                    if (text.length >= 5) {
+                        let scale = 1.0 - (text.length - 4) * 0.1;
+                        if (scale < 0.55) scale = 0.55; 
+
+                        // ★改善点2：魔法のタネあかし★
+                        // 1. まずフォントサイズ（em）を直接小さくします。
+                        // これによりシステム上の「横幅」も小さくなるため、リストの列が押し広げられなくなります！
+                        inner.style.fontSize = `${scale}em`;
+                        
+                        // 2. フォントサイズを下げたことで「縦幅」も小さくなってしまうので、
+                        // transformの『scaleY（縦方向の引き伸ばし）』を使って、元の高さ（1.0）まで引き伸ばします！
+                        inner.style.transform = `scaleY(${1 / scale})`;
+                        
+                        inner.style.letterSpacing = '-0.5px';
+                    } else {
+                        // 4文字以下の場合は元に戻す
+                        inner.style.fontSize = '';
+                        inner.style.transform = '';
+                        inner.style.letterSpacing = '';
+                    }
+                    
+                    inner.dataset.compressedText = text;
+                });
+                
+                // 作業が終わったら、また見張りを再開します
+                textObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+            }, 50);
         });
         
         textObserver.observe(document.body, {
