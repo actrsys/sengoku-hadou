@@ -356,8 +356,8 @@ class AIEngine {
         // ★ここを書き足します：出陣する兵士が0人以下の時は、攻撃を諦めます！
         if (sendSoldiers <= 0) return null;
         
-        // 兵糧のチェック (連れて行く兵士数の1.5倍)
-        const requiredRice = Math.floor(sendSoldiers * 1.5);
+        // 兵糧のチェック (連れて行く兵士数の2.5倍：消費分と帰還後の余裕をもたせます)
+        const requiredRice = Math.floor(sendSoldiers * 2.5);
         if (myCastle.rice < requiredRice) return null;
 
         // --- 修正後：正確な見積もりと戦闘力比の計算 ---
@@ -1812,7 +1812,8 @@ class AIEngine {
                 if (isPreparingAttack && this.game.aiOperationManager.draftBases) {
                     const clanDrafts = this.game.aiOperationManager.draftBases[castle.ownerClan];
                     const draftBaseId = clanDrafts ? clanDrafts[castle.legionId] : null;
-                    if (draftBaseId && draftBaseId !== castle.id && castle.gold >= 1000) {
+                    // ★変更：自分の目標額（baseSoldiers * 1.5）に加えて、送る分（500）の余裕がある時だけ送ります
+                    if (draftBaseId && draftBaseId !== castle.id && castle.gold >= Math.floor(baseSoldiers * 1.5) + 500) {
                         const isConnected = targetCastlesForTransport.some(c => c.id === draftBaseId);
                         if (isConnected) {
                             // メモに「お金を運ぶ」お使いを追加します
@@ -1878,7 +1879,8 @@ class AIEngine {
 
                     // 基本のお留守番セット（すぐ攻められない安全な場合）
                     let keepSoldiers = 500;
-                    let keepRice = 1000;
+                    // ★変更：基本のお留守番兵糧も、安全ラインである兵士数の2.5倍にします
+                    let keepRice = Math.floor(keepSoldiers * 2.5);
 
                     // もし周りに敵がいたら、お留守番を増やします
                     if (hasEnemy) {
@@ -1896,8 +1898,8 @@ class AIEngine {
                             keepSoldiers = Math.floor(keepSoldiers * ratio);
                         }
 
-                        // 兵糧は、お留守番の兵士の1.2倍を残します
-                        keepRice = Math.floor(keepSoldiers * 1.2);
+                        // ★変更：兵糧は、お留守番の兵士の2.5倍（安全ライン）を確実に残します
+                        keepRice = Math.floor(keepSoldiers * 2.5);
                     }
 
                     // お留守番を残した上で、今回運ぶ分の300人と500の余裕があるか確認します
@@ -1931,11 +1933,11 @@ class AIEngine {
                         // 必要な兵士（requiredForce）を確実に出陣させるために、
                         // 性格の割合から逆算して、お城に集めておくべき目標の人数を計算します
                         const stagingSoldierGoal = Math.floor(myOp.requiredForce / stagingSendRate);
-                        // 兵糧は、出陣する人たちの1.5倍を目指します
-                        const stagingRiceGoal = Math.floor(myOp.requiredForce * 1.5);
+                        // 兵糧は、出陣する人たちの2.5倍（余裕を持った量）を目指します
+                        const stagingRiceGoal = Math.floor(myOp.requiredForce * 2.5);
                         
                         const supportSoldierGoal = Math.floor(myOp.requiredForce / supportSendRate);
-                        const supportRiceGoal = Math.floor(myOp.requiredForce * 1.5);
+                        const supportRiceGoal = Math.floor(myOp.requiredForce * 2.5);
 
                         // 届け先が出撃用拠点で、まだ目標（兵士か兵糧）に届いていないなら、メモに追加します！
                         if (stagingCastle && (stagingCastle.soldiers < stagingSoldierGoal || stagingCastle.rice < stagingRiceGoal)) {
@@ -1954,12 +1956,14 @@ class AIEngine {
                 if (!daimyo || daimyo.castleId !== castle.id) {
                     const allyCastles = targetCastlesForTransport;
                     for (const target of allyCastles) {
-                        if ((target.soldiers <= 500 || target.gold <= 500) && castle.soldiers >= 2000 && castle.gold >= 2000) {
+                        // ★変更：兵士は最低でも2000＋送る分(500)、金は目標値＋送る分(500)の余裕がある時だけ送ります
+                        if ((target.soldiers <= 500 || target.gold <= 500) && castle.soldiers >= 2500 && castle.gold >= Math.floor(baseSoldiers * 1.5) + 500) {
                             transportTasks.push({ type: 'normal_gold_soldier', targetId: target.id });
                             if (maxTransportScore < 400) maxTransportScore = 400;
                             break; 
                         }
-                        if (target.rice <= 2000 && castle.rice >= 5000) {
+                        // ★変更：米は購入目標値(3.0)に加えて、送る分(1000)の余裕がある時だけ送ります
+                        if (target.rice <= 2000 && castle.rice >= Math.floor(baseSoldiers * 3.0) + 1000) {
                             transportTasks.push({ type: 'normal_rice', targetId: target.id });
                             if (maxTransportScore < 400) maxTransportScore = 400;
                             break;
@@ -2634,8 +2638,11 @@ class AIEngine {
                     let rate = riceRate; // ★高速化：ループの外で調べた相場をそのまま使います！
                     
                     // 一気に余裕まで買います！
-                    // ★修正：目標値を3.0倍に統一します
-                    const buyTarget = Math.floor(baseSoldiers * 3.0);
+                    // ★修正：前線基地なら4.0倍、それ以外は3.0倍を目標にします
+                    let buyTarget = Math.floor(baseSoldiers * 3.0);
+                    if (isPreparingAttack && myOp && (castle.id === myOp.stagingBase || castle.id === myOp.supportBase)) {
+                        buyTarget = Math.floor(baseSoldiers * 4.0);
+                    }
                     const extendedShortage = Math.max(0, buyTarget - castle.rice);
                     
                     // 欲しい分と、お金で買える分の、少ない方にします
@@ -2676,14 +2683,18 @@ class AIEngine {
 
                         // ① 徴兵用のお金のお使い
                         if (task.type === 'draft_gold') {
-                            if (castle.gold >= 500 && targetCastle.gold + 500 <= 99999) {
+                            // ★変更：実行直前にも、自分の目標額以上の余裕があるか最終チェックします
+                            if (castle.gold >= Math.floor(baseSoldiers * 1.5) + 500 && targetCastle.gold + 500 <= 99999) {
                                 castle.gold -= 500;
                                 targetCastle.gold += 500;
                             }
                         } 
                         // ② 前線基地への兵士と兵糧のお使い
                         else if (task.type === 'staging' || task.type === 'support') {
-                            if (castle.soldiers >= 300 && castle.rice >= 500 && targetCastle.soldiers + 300 <= 99999 && targetCastle.rice + 500 <= 99999) {
+                            // ★変更：送った後の兵士数が、最低限のお留守番ライン（500人）とそれに必要な兵糧（2.5倍）を下回らないか最終チェックします
+                            const afterSoldiers = Math.max(0, castle.soldiers - 300);
+                            const requiredRice = Math.floor(afterSoldiers * 2.5);
+                            if (castle.soldiers >= 800 && castle.rice >= requiredRice + 500 && targetCastle.soldiers + 300 <= 99999 && targetCastle.rice + 500 <= 99999) {
                                 castle.soldiers -= 300;
                                 castle.rice -= 500;
                                 
@@ -2704,7 +2715,8 @@ class AIEngine {
                         } 
                         // ③ 普通の金・兵士のお使い
                         else if (task.type === 'normal_gold_soldier') {
-                            if (castle.gold >= 500 && castle.soldiers >= 500 && targetCastle.gold + 500 <= 99999 && targetCastle.soldiers + 500 <= 99999) {
+                            // ★変更：実行直前にも、兵士と金の余裕を最終チェックします
+                            if (castle.gold >= Math.floor(baseSoldiers * 1.5) + 500 && castle.soldiers >= 2500 && targetCastle.gold + 500 <= 99999 && targetCastle.soldiers + 500 <= 99999) {
                                 castle.gold -= 500; 
                                 castle.soldiers -= 500;
                                 
@@ -2725,7 +2737,8 @@ class AIEngine {
                         }
                         // ④ 普通の兵糧のお使い
                         else if (task.type === 'normal_rice') {
-                            if (castle.rice >= 1000 && targetCastle.rice + 1000 <= 99999) {
+                            // ★変更：実行直前にも、米の余裕を最終チェックします
+                            if (castle.rice >= Math.floor(baseSoldiers * 3.0) + 1000 && targetCastle.rice + 1000 <= 99999) {
                                 castle.rice -= 1000;
                                 targetCastle.rice += 1000;
                             }
