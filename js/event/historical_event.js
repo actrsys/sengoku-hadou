@@ -587,6 +587,11 @@ window.GameEvents.push({
         }
         if (!isAdjacent) return false;
 
+        // ★尾張国（地方ID: 23）のすべての城を織田家が所有しているか確認します
+        const owariCastles = game.castles.filter(c => c.provinceId === 23);
+        const ownsAllOwari = owariCastles.length > 0 && owariCastles.every(c => c.ownerClan === nobunaga.clan);
+        if (!ownsAllOwari) return false;
+
         // すべての条件を満たしたらイベント発生です！
         return true;
     },
