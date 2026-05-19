@@ -1940,7 +1940,7 @@ class DiplomacyManager {
     /**
      * AIからプレイヤーへの外交提案を受ける処理です
      */
-    proposeDiplomacyToPlayer(doer, targetClanId, type, gold, onComplete) {
+    proposeDiplomacyToPlayer(doer, targetClanId, type, gold, onComplete, score = 0) {
         const doerClan = this.game.clans.find(c => c.id === doer.clan);
 
         if (type === 'goodwill') {
@@ -2082,6 +2082,144 @@ class DiplomacyManager {
             }
         };
 
+        // ★追加：対価を要求した時の処理
+        const negotiateAction = () => {
+            const requiredScore = 60; // 和睦を決意するスコアライン
+            const penalty = 30; // 対価を要求した時に引かれるスコア
+            
+            if (score - penalty >= requiredScore) {
+                // 対価を提示してくる処理
+                let options = [];
+                const reqClan = doerClan;
+                const tgtClan = targetClan;
+
+                // 1. 姫
+                let availablePrincess = null;
+                if (reqClan.princessIds && reqClan.princessIds.length > 0) {
+                    for (let pId of reqClan.princessIds) {
+                        const p = this.game.princesses.find(pr => pr.id === pId && pr.status === 'unmarried');
+                        if (p) { availablePrincess = p; break; }
+                    }
+                }
+                if (availablePrincess) {
+                    const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && b.status === 'active');
+                    if (tgtBushos.length > 0) {
+                        const targetBusho = tgtBushos.find(b => !b.wifeIds || b.wifeIds.length === 0) || tgtBushos[0];
+                        options.push({ type: 'marriage', princess: availablePrincess, busho: targetBusho });
+                    }
+                }
+
+                // 2. 人質
+                const reqDaimyo = this.game.bushos.find(b => b.clan === doer.clan && b.isDaimyo);
+                if (reqDaimyo) {
+                    const dFamily = Array.isArray(reqDaimyo.familyIds) ? reqDaimyo.familyIds : [];
+                    const kinsmen = this.game.bushos.filter(b => {
+                        if (b.clan !== doer.clan || b.isDaimyo || b.status !== 'active') return false;
+                        const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+                        return bFamily.includes(reqDaimyo.id) || dFamily.includes(b.id);
+                    });
+                    if (kinsmen.length > 0) {
+                        options.push({ type: 'hostage', busho: kinsmen[0] });
+                    }
+                }
+
+                // 3. 城
+                const reqCastles = this.game.castles.filter(c => Number(c.ownerClan) === doer.clan);
+                if (reqCastles.length >= 2) {
+                    const reqDaimyoCastleId = reqDaimyo ? reqDaimyo.castleId : -1;
+                    const candidateCastles = reqCastles.filter(c => c.id !== reqDaimyoCastleId && c.legionId === 0);
+                    if (candidateCastles.length > 0) {
+                        options.push({ type: 'castle', castle: candidateCastles[0] });
+                    }
+                }
+
+                if (options.length === 0) {
+                    // 出せる対価が何もない場合は決裂
+                    this.game.ui.showDialog(`「対価と申されましても、当家には差し出せるものがござらん。此度の話は無かったことに！」`, false, () => {
+                        this.game.ui.showResultModal(`条件が折り合わず、${doerClan.name} の使者は帰っていきました。`, () => {
+                            if (onComplete) setTimeout(onComplete, 100);
+                        });
+                    }, null, { leftFace: doer.faceIcon, leftName: doerNameStr, isEvent: true });
+                    return;
+                }
+
+                const selectedOption = options[Math.floor(Math.random() * options.length)];
+                
+                const onConditionAccept = () => {
+                    this.changeStatus(doer.clan, targetClanId, '和睦', 6);
+                    const relationA = this.getDiplomacyData(doer.clan, targetClanId);
+                    const relationB = this.getDiplomacyData(targetClanId, doer.clan);
+                    if (relationA) relationA.sentiment = 50;
+                    if (relationB) relationB.sentiment = 50;
+
+                    let conditionMsg = "";
+                    if (selectedOption.type === 'marriage') {
+                        // ★修正：既存のapplyMarriageDataを使うとバグるため専用処理に変更
+                        const princess = selectedOption.princess;
+                        const busho = selectedOption.busho;
+                        princess.currentClanId = targetClanId;
+                        princess.husbandId = busho.id;
+                        princess.status = 'married';
+                        
+                        // 相手の姫リストから確実に削除し、味方の武将の妻リストに加える
+                        doerClan.princessIds = doerClan.princessIds.filter(id => id !== princess.id);
+                        if (!busho.wifeIds) busho.wifeIds = [];
+                        if (!busho.wifeIds.includes(princess.id)) busho.wifeIds.push(princess.id);
+                        busho.updateFamilyIds(this.game.princesses);
+                        
+                        // 同盟にはせず、婚姻フラグだけを立てる
+                        if (relationA) relationA.isMarriage = true;
+                        if (relationB) relationB.isMarriage = true;
+
+                        conditionMsg = `\n${princess.name} が ${busho.name} の側室として迎えられました。`;
+                    } else if (selectedOption.type === 'hostage') {
+                        this.applyHostageData(selectedOption.busho.id, doer.clan, targetClanId);
+                        conditionMsg = `\n${selectedOption.busho.name} を人質として迎え入れました。`;
+                    } else if (selectedOption.type === 'castle') {
+                        this.applyCastleCessionData(selectedOption.castle.id, doer.clan, targetClanId);
+                        conditionMsg = `\n${selectedOption.castle.name} を割譲させました。`;
+                    }
+
+                    this.game.ui.log(`${doerClan.name}と条件付きで和睦しました`);
+                    this.game.ui.showResultModal(`${doerClan.name} と和睦しました。${conditionMsg}`, () => {
+                        if (onComplete) setTimeout(onComplete, 100);
+                    });
+                };
+
+                const onConditionReject = () => {
+                    this.game.ui.showDialog(`「左様にござるか。誠に残念にござる……」`, false, () => {
+                        this.game.ui.showResultModal(`${doerClan.name} との和睦は決裂しました。`, () => {
+                            if (onComplete) setTimeout(onComplete, 100);
+                        });
+                    }, null, { leftFace: doer.faceIcon, leftName: doerNameStr, isEvent: true });
+                };
+
+                let conditionText = "";
+                if (selectedOption.type === 'marriage') {
+                    conditionText = `「ならば対価として、当家の ${selectedOption.princess.name} を ${selectedOption.busho.name} 殿に嫁がせましょう。\nこれでいかがか？」`;
+                } else if (selectedOption.type === 'hostage') {
+                    conditionText = `「ならば対価として、当家の ${selectedOption.busho.name} を人質として差し出しましょう。\nこれでいかがか？」`;
+                } else if (selectedOption.type === 'castle') {
+                    conditionText = `「ならば対価として、当家の ${selectedOption.castle.name} を割譲いたしましょう。\nこれでいかがか？」`;
+                }
+
+                this.game.ui.showDialog(conditionText, true, onConditionAccept, onConditionReject, {
+                    leftFace: doer.faceIcon, leftName: doerNameStr,
+                    okText: '承諾する', okClass: 'btn-primary',
+                    cancelText: '断る', cancelClass: 'btn-secondary',
+                    isEvent: true
+                });
+
+            } else {
+                // スコアが足りず決裂
+                this.game.ui.showDialog(`「そのような法外な条件、到底飲めませぬ！ 此度の話は無かったことに！」`, false, () => {
+                    this.game.ui.showResultModal(`条件が折り合わず、${doerClan.name} の使者は帰っていきました。`, () => {
+                        if (onComplete) setTimeout(onComplete, 100);
+                    });
+                }, null, { leftFace: doer.faceIcon, leftName: doerNameStr, isEvent: true });
+            }
+        };
+
         this.game.ui.showDialog(introMsg, true,
             () => {
                 let greetMsg1 = "";
@@ -2136,21 +2274,30 @@ class DiplomacyManager {
                             cancelText = '断る';
                         } else if (type === 'truce') {
                             confirmMsg = `「${doerClan.name} との和睦をお受けなされますか？」`;
-                            okText = '和睦する';
-                            cancelText = '断る';
                         }
 
                         this.game.ui.showDialog(demandMsg, false,
                             () => {
-                                this.game.ui.showDialog(confirmMsg, true,
-                                    acceptAction,
-                                    rejectAction,
-                                    {
+                                if (type === 'truce') {
+                                    this.game.ui.showDialog(confirmMsg, false, null, null, {
                                         leftFace: nav.faceIcon, leftName: nav.name,
-                                        okText: okText, okClass: 'btn-primary',
-                                        cancelText: cancelText, cancelClass: 'btn-danger'
-                                    }
-                                );
+                                        choices: [
+                                            { label: '和睦する', className: 'btn-primary', onClick: acceptAction },
+                                            { label: '対価を要求', className: 'btn-danger', onClick: negotiateAction },
+                                            { label: '断る', className: 'btn-secondary', onClick: rejectAction }
+                                        ]
+                                    });
+                                } else {
+                                    this.game.ui.showDialog(confirmMsg, true,
+                                        acceptAction,
+                                        rejectAction,
+                                        {
+                                            leftFace: nav.faceIcon, leftName: nav.name,
+                                            okText: okText, okClass: 'btn-primary',
+                                            cancelText: cancelText, cancelClass: 'btn-danger'
+                                        }
+                                    );
+                                }
                             },
                             null,
                             {
@@ -2229,9 +2376,10 @@ class DiplomacyManager {
                     if (courtTrust >= 500) {
                         return { action: 'court_truce', gold: 2000 };
                     } else {
-                        // ★変更：朝廷和睦ができない時、相手が格上（総兵力2.5倍以上）なら通常和睦を検討
-                        if (targetClanTotal / Math.max(1, myPower) >= 2.5) {
-                            return { action: 'truce', gold: 0 };
+                        // ★変更：朝廷和睦ができない時、和睦したい度合い（スコア）を計算して判定
+                        let truceScore = (enemyCount * 15) + ((targetClanTotal / Math.max(1, myPower)) * 10);
+                        if (truceScore >= 60) {
+                            return { action: 'truce', gold: 0, score: truceScore };
                         }
                     }
                 }

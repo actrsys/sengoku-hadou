@@ -2787,7 +2787,7 @@ class AIEngine {
                  this.game.diplomacyManager.proposeDiplomacyToPlayer(castellan, targetClanId, 'truce', 0, () => {
                      castellan.isActionDone = true;
                      this.game.finishTurn();
-                 });
+                 }, targetData.score || 0);
                  return 'waiting';
              } else {
                  // AI同士で通常和睦を行う場合
