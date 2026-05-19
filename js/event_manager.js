@@ -87,39 +87,43 @@ class EventManager {
                 continue;
             }
 
-            // 一度きりのイベントで、かつ既にスタンプが押されているなら、条件確認すら飛ばします
-            if (ev.isOneTime && this.game.flags[ev.id]) {
+            // 一度きりイベント用のスタンプ帳を統一して扱います
+            const gameFlags = this.game.flags || {};
+            const appFlags = (window.GameApp && window.GameApp.flags) ? window.GameApp.flags : {};
+
+            // どちらかに記録済みなら、もう実行しません
+            if (ev.isOneTime && (gameFlags[ev.id] || appFlags[ev.id])) {
                 continue;
             }
 
             if (ev.checkCondition(this.game, context)) {
-                if (ev.isOneTime) {
-                    this.game.flags = this.game.flags || {};
-                    this.game.flags[ev.id] = true;
-                    
-                    // 絶対にセーブデータに残すため、本物のゲーム本体にも念押しで記録します
-                    if (window.GameApp) {
-                        window.GameApp.flags = window.GameApp.flags || {};
-                        window.GameApp.flags[ev.id] = true;
-                    }
-                }
 
                 // 「try〜catch」という安全装置で魔法を実行します
                 try {
-                    await ev.execute(this.game, context);    
-                    
-                    // ★追加：歴史イベントが無事に発生したら、「起きたよ」とメモを残します
+                    await ev.execute(this.game, context);
+
+                    // 一度きりイベントは「正常終了後」にスタンプを押します
+                    if (ev.isOneTime) {
+                        this.game.flags = this.game.flags || {};
+                        this.game.flags[ev.id] = true;
+
+                        if (window.GameApp) {
+                            window.GameApp.flags = window.GameApp.flags || {};
+                            window.GameApp.flags[ev.id] = true;
+                        }
+
+                        // 今のゲーム中も処理を軽くするために配列から消しておきます
+                        this.events[timing] = this.events[timing].filter(e => e.id !== ev.id);
+                    }
+
+                    // 歴史イベントが起きたことを記録します
                     if (isHistorical) {
                         historicalEventOccurred = true;
                     }
+
                 } catch (error) {
                     // 裏側で透明なエラーが起きても、ゲームが止まらないようにしてここで受け止めます
                     console.warn(`イベント ${ev.id} の実行中にエラーが出ましたが、進行を継続します:`, error);
-                }
-                
-                if (ev.isOneTime) {
-                    // 今のゲーム中も処理を軽くするために配列から消しておきます
-                    this.events[timing] = this.events[timing].filter(e => e.id !== ev.id);
                 }
             }
         }
