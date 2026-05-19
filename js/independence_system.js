@@ -200,14 +200,27 @@ class IndependenceSystem {
                 }
             }
         }
-        
+
         // ★追加：データが変わってマップの色がフライングで塗り替わるのを防ぐストッパーをかけます！
         this.game.isSuspendingColorUpdate = true;
 
         let isDefection = false;
         let newClanId;
         let newClanName;
-        
+
+        // ★ここから追加：寝返り先が決まったら、プレイヤーかどうかを確認します！
+        if (targetClanId) {
+            if (targetClanId === this.game.playerClanId) {
+                // プレイヤー勢力なら面会イベントを呼び出します
+                const isAccepted = await this.askPlayerForDefection(rebellionLeader, oldClanId);
+                // もし面会で「断る」を選んだら、寝返りは諦めて独立ルートに変更します
+                if (!isAccepted) {
+                    targetClanId = null;
+                }
+            }
+        }
+        // ★ここまで追加
+
         if (targetClanId) {
             isDefection = true;
             newClanId = targetClanId;
