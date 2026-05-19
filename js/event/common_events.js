@@ -203,7 +203,7 @@ window.GameEvents.push({
         
         for (const id of targetIds) {
             const busho = game.getBusho(id);
-            // 武将が見つかったら、寿命（没年）を5年延ばします
+            // 武将が見つかったら、寿命（没年）を10年延ばします
             if (busho) {
                 busho.endYear += 10;
             }
@@ -1480,7 +1480,7 @@ window.GameEvents.push({
             await game.ui.showDialogAsync(`「よくぞご決心なされた。今後はその力、${playerClan.name}で存分に振るわれよ」`, false, 0, {
                 leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
             });
-            let replyAccept = isDaimyoSelf ? `「恐悦至極……今日より${myCallName.replace('殿', '様')}を主君と仰ぎ奉りまする」` : ` `「ははっ！　ありがたき幸せに存じまする！」`;
+            let replyAccept = isDaimyoSelf ? `「恐悦至極……今日より${myCallName.replace('殿', '様')}を主君と仰ぎ奉りまする」` : `「ははっ！　ありがたき幸せに存じまする！」`;
             await game.ui.showDialogAsync(replyAccept, false, 0, {
                 leftFace: envoy.faceIcon, leftName: envoyName
             });
