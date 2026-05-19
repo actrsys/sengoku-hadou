@@ -245,7 +245,7 @@ class IndependenceSystem {
                     const oldRel = this.game.getRelation(oldClanId, otherClan.id);
                     if (oldRel) {
                         let newSentiment = 100 - oldRel.sentiment;
-                        newSentiment = Math.max(30, Math.min(70, newSentiment));
+                        newSentiment = Math.max(30, Math.min(50, newSentiment));
                         
                         let newStatus = '普通';
                         if (newSentiment >= 70) newStatus = '友好';
@@ -274,11 +274,10 @@ class IndependenceSystem {
                     aliveKunishus.forEach(kunishu => {
                         const oldRel = kunishu.getRelation(oldClanId);
                         let newSentiment = 100 - oldRel;
-                        newSentiment = Math.max(30, Math.min(70, newSentiment));
+                        newSentiment = Math.max(30, Math.min(50, newSentiment));
                         kunishu.setRelation(newClanId, newSentiment);
                     });
                 }
-                // ★追加ここまで
             }
 
             this.game.clans.push(newClan);
@@ -908,7 +907,6 @@ class IndependenceSystem {
                 await this.game.ui.playBattleBlink(rebelCastleIds, oldColor, rebelColor, 1000);
                 if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
             }
-            // ★追加ここまで
 
             // 裏で野戦を行います！
             const result = await this.executeSecretFieldWar(daimyoMembers, rebelMembers, oldDaimyo, rebellionLeader);
@@ -1044,7 +1042,7 @@ class IndependenceSystem {
                         const currentRel = this.game.getRelation(clan.id, otherClan.id);
                         if (currentRel) {
                             let newSentiment = 100 - currentRel.sentiment;
-                            newSentiment = Math.max(30, Math.min(70, newSentiment));
+                            newSentiment = Math.max(30, Math.min(50, newSentiment));
                             
                             let newStatus = '普通';
                             if (newSentiment >= 70) newStatus = '友好';
@@ -1071,11 +1069,10 @@ class IndependenceSystem {
                         aliveKunishus.forEach(kunishu => {
                             const currentRel = kunishu.getRelation(clan.id);
                             let newSentiment = 100 - currentRel;
-                            newSentiment = Math.max(30, Math.min(70, newSentiment));
+                            newSentiment = Math.max(30, Math.min(50, newSentiment));
                             kunishu.setRelation(clan.id, newSentiment);
                         });
                     }
-                    // ★追加ここまで
                 }
                 // 勢力情報が変わったので威信を更新
                 if (window.GameApp) window.GameApp.updateAllClanPrestige();
