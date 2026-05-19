@@ -1233,8 +1233,28 @@ class DiplomacyManager {
 
                 let conditionMsg = "";
                 if (conditionType === 'marriage') {
-                    conditionMsg = `\n${conditionData.princess.name} が ${conditionData.busho.name} の側室として迎えられました。`;
+                    const princess = conditionData.princess;
+                    const busho = conditionData.busho;
+                    princess.currentClanId = targetClanId;
+                    princess.husbandId = busho.id;
+                    princess.status = 'married';
+                    
+                    const doerClan = this.game.clans.find(c => c.id === doer.clan);
+                    if (doerClan && doerClan.princessIds) {
+                        doerClan.princessIds = doerClan.princessIds.filter(id => id !== princess.id);
+                    }
+                    if (!busho.wifeIds) busho.wifeIds = [];
+                    if (!busho.wifeIds.includes(princess.id)) busho.wifeIds.push(princess.id);
+                    busho.updateFamilyIds(this.game.princesses);
+                    
+                    const relA = this.getDiplomacyData(doer.clan, targetClanId);
+                    const relB = this.getDiplomacyData(targetClanId, doer.clan);
+                    if (relA) relA.isMarriage = true;
+                    if (relB) relB.isMarriage = true;
+
+                    conditionMsg = `\n${princess.name} が ${busho.name} の側室として迎えられました。`;
                 } else if (conditionType === 'hostage') {
+                    this.applyHostageData(conditionData.busho.id, doer.clan, targetClanId);
                     conditionMsg = `\n${conditionData.busho.name} を人質として差し出しました。`;
                 } else if (conditionType === 'castle') {
                     this.applyCastleCessionData(conditionData.castle.id, doer.clan, targetClanId);
@@ -1312,8 +1332,26 @@ class DiplomacyManager {
 
                 let conditionMsg = "";
                 if (conditionType === 'marriage') {
-                    conditionMsg = `\n${conditionData.princess.name} が ${conditionData.busho.name} の側室として迎えられました。`;
+                    const princess = conditionData.princess;
+                    const busho = conditionData.busho;
+                    princess.currentClanId = targetClanId;
+                    princess.husbandId = busho.id;
+                    princess.status = 'married';
+                    
+                    const doerClan = this.game.clans.find(c => c.id === doer.clan);
+                    if (doerClan && doerClan.princessIds) {
+                        doerClan.princessIds = doerClan.princessIds.filter(id => id !== princess.id);
+                    }
+                    if (!busho.wifeIds) busho.wifeIds = [];
+                    if (!busho.wifeIds.includes(princess.id)) busho.wifeIds.push(princess.id);
+                    busho.updateFamilyIds(this.game.princesses);
+                    
+                    if (relationA) relationA.isMarriage = true;
+                    if (relationB) relationB.isMarriage = true;
+
+                    conditionMsg = `\n${princess.name} が ${busho.name} の側室として迎えられました。`;
                 } else if (conditionType === 'hostage') {
+                    this.applyHostageData(conditionData.busho.id, doer.clan, targetClanId);
                     conditionMsg = `\n${conditionData.busho.name} を人質として差し出しました。`;
                 } else if (conditionType === 'castle') {
                     this.applyCastleCessionData(conditionData.castle.id, doer.clan, targetClanId);
@@ -1705,7 +1743,6 @@ class DiplomacyManager {
             const msg = `${domClan.name}は従属の条件として${selectedOption.princess.name}を${selectedOption.busho.name}に嫁がせることを要求してきました。\n${selectedOption.princess.name}を差し出しますか？`;
             this.game.ui.showDialog(msg, true, 
                 () => {
-                    this.applyMarriageData(selectedOption.princess.id, selectedOption.busho.id, dominantClanId);
                     if (onSuccess) onSuccess('marriage', { princess: selectedOption.princess, busho: selectedOption.busho });
                 },
                 () => { if (onFailure) onFailure(); },
@@ -1715,7 +1752,6 @@ class DiplomacyManager {
             const msg = `${domClan.name}は従属の条件として${selectedOption.busho.name}を人質として差し出すことを要求してきました。\n${selectedOption.busho.name}を人質として送りますか？`;
             this.game.ui.showDialog(msg, true,
                 () => {
-                    this.applyHostageData(selectedOption.busho.id, subordinateClanId, dominantClanId);
                     if (onSuccess) onSuccess('hostage', { busho: selectedOption.busho });
                 },
                 () => { if (onFailure) onFailure(); },
@@ -2974,7 +3010,6 @@ class DiplomacyManager {
             const msg = `${tgtClan.name}は和睦の条件として${selectedOption.princess.name}を${selectedOption.busho.name}に嫁がせることを要求してきました。\n${selectedOption.princess.name}を差し出しますか？`;
             this.game.ui.showDialog(msg, true, 
                 () => {
-                    this.applyMarriageData(selectedOption.princess.id, selectedOption.busho.id, targetClanId);
                     if (onSuccess) onSuccess('marriage', { princess: selectedOption.princess, busho: selectedOption.busho });
                 },
                 () => { if (onFailure) onFailure(); },
@@ -2984,7 +3019,6 @@ class DiplomacyManager {
             const msg = `${tgtClan.name}は和睦の条件として${selectedOption.busho.name}を人質として差し出すことを要求してきました。\n${selectedOption.busho.name}を人質として送りますか？`;
             this.game.ui.showDialog(msg, true,
                 () => {
-                    this.applyHostageData(selectedOption.busho.id, requestClanId, targetClanId);
                     if (onSuccess) onSuccess('hostage', { busho: selectedOption.busho });
                 },
                 () => { if (onFailure) onFailure(); },
