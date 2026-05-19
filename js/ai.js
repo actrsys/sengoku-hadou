@@ -1604,20 +1604,6 @@ class AIEngine {
                 // 減り方を緩やかにします。これで目標の9割近くまで積極的に集めるようになります！
                 let scoreDraft = 150 * Math.sqrt(shortRatio);
 
-                // ★追加：兵糧の年間収穫量を調べて、兵士数がそれに近付いたらブレーキをかけます
-                const annualRiceIncome = GameSystem.calcBaseRiceIncome(castle);
-                
-                // 兵士数と年間収穫量の割合を出します（収穫量が0の時は1.0とします）
-                const soldierToHarvestRatio = annualRiceIncome > 0 ? (castle.soldiers / annualRiceIncome) : 1.0;
-                
-                // 兵士数が収穫量の80%（0.8）を超えたら、少しずつスコアを下げていきます
-                if (soldierToHarvestRatio > 0.8) {
-                    // 0.8の時に1.0倍、1.3以上の時に最低の0.1倍になるような、なめらかなブレーキです
-                    let penaltyMod = 1.0 - ((soldierToHarvestRatio - 0.8) * 1.8);
-                    penaltyMod = Math.max(0.1, penaltyMod); // 最低でも0.1倍は残してバツっと切らないようにします
-                    scoreDraft *= penaltyMod;
-                }
-
                 // ===== 安全制御 =====
                 if (castle.rice < safeRice) {
                     scoreDraft = 0; // 兵糧が危ないならやめる
