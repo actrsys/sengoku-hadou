@@ -1573,7 +1573,7 @@ class AIEngine {
                 
                 // 人口も超えられないようにします
                 maxDraft = Math.min(maxDraft, castle.population);
-
+                
                 // ===== 目標兵力の計算 =====
                 // 自分の軍団全体の「総石高」を調べます！
                 const myCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan && c.legionId === castle.legionId);
@@ -1589,6 +1589,20 @@ class AIEngine {
                     if (n.soldiers > enemyMaxSoldiers) enemyMaxSoldiers = n.soldiers;
                 });
                 targetSoldiers = Math.max(targetSoldiers, Math.floor(enemyMaxSoldiers * 1.2));
+
+                // ★追加：兵糧不足による自滅を防ぐため、そのお城の「年間兵糧収入」から養える限界の人数を計算して上限（キャップ）をかけます！
+                // 年間収入予測 ＝ (石高 ＋ 民忠(仮に50とする)) × (√民忠(仮50) ＋ 2)
+                const estimatedAnnualRice = (castle.kokudaka + 50) * (Math.sqrt(50) + 2);
+                // 兵士1人が1年間に食べる量 ＝ 0.03(消費率) × 12ヶ月 ＝ 0.36
+                const consumePerSoldierYearly = (window.MainParams.Economy.ConsumeRicePerSoldier || 0.03) * 12;
+                // 収入だけで養えるギリギリの人数
+                const maxSustainableSoldiers = Math.floor(estimatedAnnualRice / consumePerSoldierYearly);
+                
+                // 凶作や他の出費（出陣時の兵糧など）に備えて、安全に養えるのはその「80%」までとします
+                const safeLimitSoldiers = Math.floor(maxSustainableSoldiers * 0.8);
+                
+                // 敵が強くても、このお城の限界を超えてまで兵士を雇わないように制限をかけます
+                targetSoldiers = Math.min(targetSoldiers, safeLimitSoldiers);
                 
                 // 「最低でもこれだけは急いで集めたい！」という非常事態のラインを、目標の3分の1にします
                 const minTarget = Math.floor(targetSoldiers / 3);
