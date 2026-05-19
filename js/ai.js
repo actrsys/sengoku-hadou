@@ -1601,18 +1601,17 @@ class AIEngine {
                 // 減り方を緩やかにします。これで目標の9割近くまで積極的に集めるようになります！
                 let scoreDraft = 150 * Math.sqrt(shortRatio);
 
-                // ★追加：年間の米収穫量から養える兵士の限界を計算して、雇いすぎをなめらかに防ぎます！
+                // ★追加：兵糧の年間収穫量を調べて、兵士数がそれに近付いたらブレーキをかけます
                 const annualRiceIncome = GameSystem.calcBaseRiceIncome(castle);
-                const consumeRicePerSoldierYear = (window.MainParams.Economy.ConsumeRicePerSoldier || 0.03) * 12;
-                const maxSustainSoldiers = annualRiceIncome / consumeRicePerSoldierYear;
                 
-                const sustainRatio = maxSustainSoldiers > 0 ? (castle.soldiers / maxSustainSoldiers) : 1.0;
+                // 兵士数と年間収穫量の割合を出します（収穫量が0の時は1.0とします）
+                const soldierToHarvestRatio = annualRiceIncome > 0 ? (castle.soldiers / annualRiceIncome) : 1.0;
                 
-                // 兵士が維持限界の70%（0.7）を超えたら、少しずつスコアを下げていきます
-                if (sustainRatio > 0.7) {
-                    // 0.7で1.0倍、1.0で約0.5倍、1.3以上で最低の0.1倍になるような、なめらかなブレーキ
-                    let penaltyMod = 1.0 - ((sustainRatio - 0.7) * (0.5 / 0.3));
-                    penaltyMod = Math.max(0.1, penaltyMod); // 最低でも0.1倍は残してバツっと切らない
+                // 兵士数が収穫量の80%（0.8）を超えたら、少しずつスコアを下げていきます
+                if (soldierToHarvestRatio > 0.8) {
+                    // 0.8の時に1.0倍、1.3以上の時に最低の0.1倍になるような、なめらかなブレーキです
+                    let penaltyMod = 1.0 - ((soldierToHarvestRatio - 0.8) * 1.8);
+                    penaltyMod = Math.max(0.1, penaltyMod); // 最低でも0.1倍は残してバツっと切らないようにします
                     scoreDraft *= penaltyMod;
                 }
 
@@ -1657,14 +1656,12 @@ class AIEngine {
             if (castle.kokudaka < castle.maxKokudaka) {
                 let score = 30;
                 
-                // ★追加：兵糧の収穫量に余裕がない（兵士が多い）場合は、石高開発の優先度をちょっと上げます！
+                // ★追加：兵士数が年間収穫量の80%を超えていて余裕がない場合は、石高開発の優先度を上げます
                 const annualRiceIncome = GameSystem.calcBaseRiceIncome(castle);
-                const consumeRicePerSoldierYear = (window.MainParams.Economy.ConsumeRicePerSoldier || 0.03) * 12;
-                const maxSustainSoldiers = annualRiceIncome / consumeRicePerSoldierYear;
-                const sustainRatio = maxSustainSoldiers > 0 ? (castle.soldiers / maxSustainSoldiers) : 1.0;
+                const soldierToHarvestRatio = annualRiceIncome > 0 ? (castle.soldiers / annualRiceIncome) : 1.0;
                 
-                if (sustainRatio > 0.7) {
-                    score += 20 * Math.min(1.0, (sustainRatio - 0.7)); // 最大で+20点アップ
+                if (soldierToHarvestRatio > 0.8) {
+                    score += 20 * Math.min(1.0, ((soldierToHarvestRatio - 0.8) * 2.0)); // 最大で+20点アップ
                 }
                 
                 actions.push({ type: 'farm', stat: 'politics', score: score, cost: 200 });
@@ -1674,15 +1671,17 @@ class AIEngine {
             if (castle.commerce < castle.maxCommerce) {
                 let score = 30;
                 
-                // ★追加：金収入に余裕がない場合は、鉱山開発の優先度をちょっと上げます！
+                // ★追加：金収入に余裕がない場合は、鉱山開発の優先度を上げます
                 const monthlyGoldIncome = GameSystem.calcBaseGoldIncome(castle);
                 let monthlyGoldConsume = 0;
+                
                 // 今お城にいる全員の給料を計算します
                 const allCastleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && b.status === 'active');
                 allCastleBushos.forEach(b => {
                     monthlyGoldConsume += b.getSalary(daimyo);
                 });
                 
+                // 収入が給料の2倍未満しかない場合は、ピンチと判断して点数を上げます
                 if (monthlyGoldIncome < monthlyGoldConsume * 2) {
                     let shortageRatio = monthlyGoldIncome > 0 ? (monthlyGoldConsume / monthlyGoldIncome) : 2.0;
                     shortageRatio = Math.min(2.0, shortageRatio);
