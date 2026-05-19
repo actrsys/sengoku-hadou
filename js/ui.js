@@ -370,6 +370,9 @@ class UIManager {
         // ★ここから追加：長い名前を自動で見つけてギュッと縮める「文字圧縮ロボット」（レイアウト崩れ完全解決版）
         // ==========================================
         const textObserver = new MutationObserver(() => {
+            // ★ロボットが自分の作業（文字を包んだり小さくしたり）に反応しないよう、一旦見張りを止めます！
+            textObserver.disconnect();
+
             const targetSelectors = [
                 '#war-atk-name', '#war-def-name', 
                 '.sp-clan',                       
@@ -423,8 +426,16 @@ class UIManager {
                 
                 inner.dataset.compressedText = text;
             });
+
+            // ★ロボットの作業が終わったので、また見張りを再開させます！
+            textObserver.observe(document.body, {
+                childList: true,
+                subtree: true,
+                characterData: true
+            });
         });
         
+        // 最初の見張りのスタート
         textObserver.observe(document.body, {
             childList: true,
             subtree: true,
