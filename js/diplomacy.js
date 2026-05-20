@@ -766,7 +766,7 @@ class DiplomacyManager {
             replyAcceptMsg = `「おお……うかがった甲斐があり申した。共に${senderClanName}を盛り立てて参りましょうぞ」`;
             replyRejectMsg = `「……拙者は忠告申し上げましたぞ。ではこれにて」`;
         } else if (type === 'truce') {
-            demandMsg = isSenderDaimyo ? `「${receiverCallName}。どうか我らと和睦してくだされ」` : `「${senderClanName}との和睦が我らの望みでござる」`;
+            demandMsg = isSenderDaimyo ? `「${receiverCallName}。どうか我らと和睦してくだされ」` : `「両家の和睦が我らの望みでござる」`;
             acceptMsg = `「うむ、承知いたす。此度の戦には、わしも思うところがないわけではない」`;
             rejectMsg = `「何をほざくか！　帰って戦の支度をなされるがよい！」`;
             replyAcceptMsg = isSenderDaimyo ? `「ありがたい……くれぐれもお願い申し上げる」` : `「ははっ、ありがたき幸せに存じまする！」`;
