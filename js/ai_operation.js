@@ -114,8 +114,8 @@ class AIOperationManager {
                 // ★追加：毎月、同盟や自分を支配している相手への不満を溜める魔法です！
                 this.decreaseSentimentForHighTension(clan.id);
 
-                // ★追加：毎月、まずは大名家単位で「誰と外交するか」を考えます！
-                this.thinkMonthlyDiplomacy(clan);
+                // ★変更：外交の専門部署（diplomacy.js）に毎月の外交目標を考えてもらいます！
+                this.game.diplomacyManager.planMonthlyDiplomacy(clan);
             }
             
             if (!this.operations[clan.id]) {
@@ -274,104 +274,7 @@ class AIOperationManager {
             this.draftBases[clanId][legionId] = bestCastle.id;
         }
     }
-
-    // ★今回追加：毎月1回だけ、大名家として外交の狙いを1つに絞って覚えておく魔法です！
-    thinkMonthlyDiplomacy(clan) {
-        // 一旦、今までの記憶を忘れます
-        clan.currentDiplomacyTarget = null;
-
-        const myClanId = clan.id;
-        const myPower = this.game.aiEngine.getClanPrestige(myClanId);
-        const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo) || { duty: 50, intelligence: 50 };
-        const smartness = this.game.aiEngine.getAISmartness(myDaimyo.intelligence);
-
-        // 周りのお城を探します
-        const myCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
-        const neighborCastles = [];
-        myCastles.forEach(myCastle => {
-            if (myCastle.adjacentCastleIds) {
-                myCastle.adjacentCastleIds.forEach(adjId => {
-                    const adjCastle = this.game.getCastle(adjId);
-                    if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== myClanId) {
-                        neighborCastles.push(adjCastle);
-                    }
-                });
-            }
-        });
-
-        // まずは直接お隣さんのリストを作ります
-        const directNeighbors = [...new Set(neighborCastles.map(c => c.ownerClan))];
-        let diplomacyCandidates = [...directNeighbors];
-
-        // ★追加：お隣さんの中で「敵対」している相手がいれば、さらにその向こう隣の勢力もリストに入れます！
-        directNeighbors.forEach(neighborId => {
-            const rel = this.game.getRelation(myClanId, neighborId);
-            if (rel && rel.status === '敵対') {
-                const enemyCastles = this.game.castles.filter(c => c.ownerClan === neighborId);
-                enemyCastles.forEach(enemyCastle => {
-                    if (enemyCastle.adjacentCastleIds) {
-                        enemyCastle.adjacentCastleIds.forEach(adjId => {
-                            const adjCastle = this.game.getCastle(adjId);
-                            // 空き城(0)でもなく、自分でもなく、その敵対勢力自身でもないなら、リストに追加します！
-                            if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== myClanId && adjCastle.ownerClan !== neighborId) {
-                                if (!diplomacyCandidates.includes(adjCastle.ownerClan)) {
-                                    diplomacyCandidates.push(adjCastle.ownerClan);
-                                }
-                            }
-                        });
-                    }
-                });
-            }
-        });
-
-        // 出来上がったリストを、いつもの名前の箱に入れ直します
-        const uniqueNeighbors = diplomacyCandidates;
-        if (uniqueNeighbors.length === 0) return;
-
-        const allyCount = this.game.diplomacyManager.getAllyCount(myClanId);
-        const enemyThreats = [];
-        uniqueNeighbors.forEach(targetClanId => {
-            const rel = this.game.getRelation(myClanId, targetClanId);
-            const isProtected = rel && this.game.diplomacyManager.isNonAggression(rel.status);
-            if (!isProtected) {
-                const trueEnemyPower = this.game.aiEngine.getClanPrestige(targetClanId);
-                const errorRange = Math.min(0.3, Math.max(0, (100 - myDaimyo.intelligence) / 100 * 0.3));
-                const errorRate = 1.0 + (Math.random() - 0.5) * 2 * errorRange;
-                enemyThreats.push({ clanId: targetClanId, power: trueEnemyPower * errorRate });
-            }
-        });
-        
-        enemyThreats.sort((a, b) => b.power - a.power);
-        const mainThreatId = enemyThreats.length > 0 ? enemyThreats[0].clanId : 0; 
-
-        // 優先度が高い順に並べたリストをもらいます
-        const diplomacyTargets = this.game.diplomacyManager.getDiplomacyPriorityList(myClanId, uniqueNeighbors, mainThreatId);
-
-        // 順番に見て、最初に「これをやる！」と決めた相手1人を記憶します
-        for (let targetData of diplomacyTargets) {
-            const targetClanId = targetData.clanId;
-            const targetClanTotal = this.game.aiEngine.getClanPrestige(targetClanId);
-            const threatData = enemyThreats.find(t => t.clanId === targetClanId);
-            const perceivedTargetTotal = threatData ? threatData.power : targetClanTotal;
-
-            // 外交の専門部署に、この相手に何をするか相談します
-            const decision = this.game.diplomacyManager.determineAIDiplomacyAction(
-                myClanId, targetClanId, myPower, targetClanTotal, perceivedTargetTotal, 
-                myDaimyo.duty, smartness, targetData.isStrategicPartner, allyCount, neighborCastles
-            );
-
-            // もし「何もしない」以外なら、これを今月の目標に決定します！
-            if (decision.action !== 'none') {
-                clan.currentDiplomacyTarget = {
-                    targetId: targetClanId,
-                    action: decision.action,
-                    gold: decision.gold
-                };
-                break; // 1つ決めたら探すのをおしまいにします
-            }
-        }
-    }
-
+    
     async generateOperation(clanId, legionId) {
         // ★イベント追加：AIの作戦立案前
         if (this.game.eventManager) {
