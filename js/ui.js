@@ -791,6 +791,15 @@ class UIManager {
                 }
             } else {
                 modal.classList.remove('event-dialog-modal');
+                
+                // ★追加：和睦など、通常の選択肢ダイアログでも縦並びになるように設定します
+                modal.style.display = 'flex';
+                modal.style.flexDirection = 'column';
+                modal.style.justifyContent = 'center';
+                
+                if (footer) {
+                    footer.style.justifyContent = 'center';
+                }
             }
 
             if (dialog.customOpts.isInterview) {
