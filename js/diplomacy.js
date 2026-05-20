@@ -740,7 +740,7 @@ class DiplomacyManager {
     /**
      * 外交会話のメッセージを一括管理する魔法です
      */
-    getDiplomacyMessages(type, isSenderDaimyo, senderClanName, receiverClanName, senderCallName, receiverCallName) {
+    getDiplomacyMessages(type, isSenderDaimyo, senderClanName, receiverClanName, senderCallName, receiverCallName, princessName = "姫", targetBushoName = "貴家") {
         let demandMsg = "";
         let acceptMsg = "";
         let rejectMsg = "";
@@ -776,20 +776,19 @@ class DiplomacyManager {
             acceptMsg = `「よくぞご決心なされた。今後はその力、当家で存分に振るわれよ」`;
             replyAcceptMsg = isSenderDaimyo ? `「恐悦至極……今日より${receiverCallName.replace('殿', '様')}を主君と仰ぎ奉りまする」` : `「ははっ！　ありがたき幸せに存じまする！」`;
         } else if (type === 'marriage') {
-            demandMsg = `「両家の絆を強固なものとするため、此度の縁組み、どうかお引き受けくだされ」`;
+            demandMsg = `「両家の絆を強固なものとするため、当家の${princessName}を${targetBushoName}殿に娶っていただきたい」`;
             acceptMsg = `「願ってもない申し出にござる。ありがたくお受けいたそう」`;
             rejectMsg = `「ううむ……こればかりはお受けいたしかねる。どうかお引き取りくだされ」`;
             replyAcceptMsg = `「おお、ご承諾いただけるか！　早速持ち帰り、吉日を選びましょうぞ」`;
             replyRejectMsg = `「……左様にござるか。まこと残念にござる」`;
         }
-
         return { demandMsg, acceptMsg, rejectMsg, replyAcceptMsg, replyRejectMsg };
     }
-
+    
     /**
      * プレイヤー側から外交を行った時の会話ダイアログを再生する魔法です
      */
-    async playDiplomacyConversation(senderBusho, receiverDaimyo, type, isSuccess, extraData = null) {
+    async playDiplomacyConversation(senderBusho, receiverDaimyo, type, isSuccess, princess = null, targetBusho = null) {
         if (!this.game.ui.showDialogAsync) return; 
 
         const senderClan = this.game.clans.find(c => c.id === senderBusho.clan);
@@ -805,33 +804,25 @@ class DiplomacyManager {
         const senderNameStr = senderBusho.name.replace(/\|/g, '');
         const receiverNameStr = receiverDaimyo.name.replace(/\|/g, '');
 
-        const msgs = this.getDiplomacyMessages(type, isSenderDaimyo, senderClanName, receiverClanName, senderCallName, receiverCallName);
+        let princessName = "姫";
+        if (princess) princessName = princess.name;
 
-        // ★ここから追加：婚姻の時だけ、特別な台詞に書き換える魔法です！
-        if (type === 'marriage' && extraData && extraData.princess && extraData.targetBusho) {
-            const princessName = extraData.princess.name;
-            const targetBusho = extraData.targetBusho;
-            
-            let targetCallStr = "";
+        let targetBushoName = "貴家";
+        if (targetBusho) {
             let rankName = "";
-            
-            // 官位を持っているか調べます
             if (targetBusho.courtRankIds && targetBusho.courtRankIds.length > 0 && this.game.courtRankSystem) {
                 const rName = this.game.courtRankSystem.getHighestRankName(targetBusho);
                 if (rName !== "なし") rankName = rName;
             }
-            
-            // 官位があれば「姓＋官位」、なければ「フルネーム」にします
             if (rankName) {
                 const familyName = targetBusho.familyName || targetBusho.name.split('|')[0] || "";
-                targetCallStr = `${familyName}${rankName}`;
+                targetBushoName = `${familyName}${rankName}`;
             } else {
-                targetCallStr = targetBusho.name.replace(/\|/g, '');
+                targetBushoName = targetBusho.name.replace(/\|/g, '');
             }
-            
-            msgs.demandMsg = `「両家の絆を強固なものとするため、当家の${princessName}を${targetCallStr}殿に娶っていただきたい」`;
         }
-        // ★追加ここまで
+
+        const msgs = this.getDiplomacyMessages(type, isSenderDaimyo, senderClanName, receiverClanName, senderCallName, receiverCallName, princessName, targetBushoName);
 
         let greetMsg1 = "";
         let greetMsg2 = "";
@@ -1893,8 +1884,8 @@ class DiplomacyManager {
         
         if (doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
             const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
-            // ★変更：さっき作った魔法に、姫と相手の武将のデータを一緒に渡すようにします！
-            if (targetDaimyo) await this.playDiplomacyConversation(doer, targetDaimyo, 'marriage', isSuccess, { princess, targetBusho });
+            // ★変更：会話処理に向けて、姫と対象武将のオブジェクトをパスします
+            if (targetDaimyo) await this.playDiplomacyConversation(doer, targetDaimyo, 'marriage', isSuccess, princess, targetBusho);
         }
 
         this.calcDiplomacyExp(doer, 'marriage', isSuccess, true);
