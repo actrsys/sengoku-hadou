@@ -427,7 +427,7 @@ class AIOperationManager {
         // 攻撃作戦の候補を全部記録しておく箱を用意します
         let operationCandidates = [];
 
-        // ★高速化：大雪が降っている国（provinceId）のリストを最初に作っておきます！
+        // ★大雪が降っている国（provinceId）のリストを最初に作っておきます！
         const heavySnowProvIds = new Set();
         this.game.provinces.forEach(p => {
             if (p.statusEffects && p.statusEffects.includes('heavySnow')) {
@@ -583,16 +583,6 @@ class AIOperationManager {
             }
         }
 
-        // ★追加：攻撃拠点の最有力候補（一番スコアが高い攻撃拠点）の兵士数が「√石高 × 200」未満なら、その月は攻撃作戦を諦めます！
-        if (operationCandidates.length > 0) {
-            const topCandidate = operationCandidates[0];
-            const stagingCastle = this.game.getCastle(topCandidate.castleId);
-            if (stagingCastle && stagingCastle.soldiers < Math.sqrt(stagingCastle.kokudaka) * 200) {
-                this.setInternalOperation(clanId, legionId, sabotageTargets);
-                return;
-            }
-        }
-
         // 敵が2つ以上いたら「外交作戦」を考えます！
         if (enemyCount >= 2) {
             // 1年（12ヶ月）の間にどれくらいの確率で立案するかを決めます
@@ -726,11 +716,22 @@ class AIOperationManager {
 
         // すべてのお城を見終わって、もし攻撃の作戦が見つかっていたらサイコロを振ります！
         if (attackTargets.length > 0) {
+            // 第一目標のデータを取り出します
+            const firstTarget = attackTargets[0];
+            
+            // ★追加：一番点数が高かった出撃元のお城の兵士数が、√石高×200以上あるかチェックします！
+            const stagingCastle = this.game.getCastle(firstTarget.stagingBase);
+            if (stagingCastle) {
+                const requiredSoldiers = Math.sqrt(stagingCastle.kokudaka) * 200;
+                if (stagingCastle.soldiers < requiredSoldiers) {
+                    // 兵士が足りない場合は、この月の攻撃作戦を諦めて内政にします
+                    this.setInternalOperation(clanId, legionId, sabotageTargets);
+                    return;
+                }
+            }
+
             // ai.jsでやっていた確率のサイコロをここで振って、やるかどうか決めます
             if (Math.random() * 100 < highestScore) {
-                // 第一目標のデータを取り出します
-                const firstTarget = attackTargets[0];
-                
                 this.operations[clanId][legionId] = {
                     type: '攻撃',
                     attackTargets: attackTargets, // ★追加：第一～第三までの目標リストを全部記憶します
