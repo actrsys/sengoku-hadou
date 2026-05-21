@@ -427,7 +427,7 @@ class AIOperationManager {
         // 攻撃作戦の候補を全部記録しておく箱を用意します
         let operationCandidates = [];
 
-        // ★大雪が降っている国（provinceId）のリストを最初に作っておきます！
+        // ★高速化：大雪が降っている国（provinceId）のリストを最初に作っておきます！
         const heavySnowProvIds = new Set();
         this.game.provinces.forEach(p => {
             if (p.statusEffects && p.statusEffects.includes('heavySnow')) {
@@ -580,6 +580,16 @@ class AIOperationManager {
                 
                 // 上限に達したら探すのをやめます
                 if (sabotageTargets.length >= maxSabotageTargets) break;
+            }
+        }
+
+        // ★追加：攻撃拠点の最有力候補（一番スコアが高い攻撃拠点）の兵士数が「√石高 × 200」未満なら、その月は攻撃作戦を諦めます！
+        if (operationCandidates.length > 0) {
+            const topCandidate = operationCandidates[0];
+            const stagingCastle = this.game.getCastle(topCandidate.castleId);
+            if (stagingCastle && stagingCastle.soldiers < Math.sqrt(stagingCastle.kokudaka) * 200) {
+                this.setInternalOperation(clanId, legionId, sabotageTargets);
+                return;
             }
         }
 
