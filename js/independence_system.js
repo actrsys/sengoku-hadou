@@ -157,18 +157,25 @@ class IndependenceSystem {
                 const rel = this.game.getRelation(oldClanId, clan.id);
                 if (!rel || rel.status !== '敵対') continue;
                 
-                // その敵対大名が持っている城の中に、ここから「隣接している」城があるか探します
+                // ★変更：その敵対大名が、元の主家（oldClanId）の城と「隣接している」か探します
                 let isNear = false; // 最初は「近くない」としておきます
-                if (castle.adjacentCastleIds) {
-                    for (const adjId of castle.adjacentCastleIds) {
-                        const adjCastle = this.game.castles.find(c => c.id === adjId);
-                        if (adjCastle && adjCastle.ownerClan === clan.id) {
-                            isNear = true; // 隣接する城の持ち主がこの大名家なら「近い！」とメモします
-                            break; // 1つでも見つかればOKなので、探すのをやめます
+                
+                // 元の主家が持っているすべてのお城を調べます
+                const oldClanCastles = this.game.castles.filter(c => c.ownerClan === oldClanId);
+                for (const oldCastle of oldClanCastles) {
+                    if (oldCastle.adjacentCastleIds) {
+                        for (const adjId of oldCastle.adjacentCastleIds) {
+                            const adjCastle = this.game.castles.find(c => c.id === adjId);
+                            if (adjCastle && adjCastle.ownerClan === clan.id) {
+                                isNear = true; // 隣接する城の持ち主がこの敵対大名家なら「近い！」とメモします
+                                break;
+                            }
                         }
                     }
+                    if (isNear) break; // 1つでも見つかればOKなので、探すのをやめます
                 }
-                // もし隣接する城が1つもなかったら、この大名家は遠すぎるので無視（スキップ）します
+                
+                // もし元の主家と隣接する城が1つもなかったら、この大名家は遠すぎるので無視（スキップ）します
                 if (!isNear) continue;
                 
                 const enemyDaimyo = this.game.bushos.find(b => b.clan === clan.id && b.isDaimyo);
