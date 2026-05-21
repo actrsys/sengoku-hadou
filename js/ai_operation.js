@@ -583,11 +583,11 @@ class AIOperationManager {
             }
         }
 
-        // ★追加：攻撃拠点の最有力候補（一番スコアが高い攻撃拠点）の兵士数が「√石高 × 300」未満なら、その月は攻撃作戦を諦めます！
+        // ★追加：攻撃拠点の最有力候補（一番スコアが高い攻撃拠点）の兵士数が「√石高 × 200」未満なら、その月は攻撃作戦を諦めます！
         if (operationCandidates.length > 0) {
             const topCandidate = operationCandidates[0];
             const stagingCastle = this.game.getCastle(topCandidate.castleId);
-            if (stagingCastle && stagingCastle.soldiers < Math.sqrt(stagingCastle.kokudaka) * 300) {
+            if (stagingCastle && stagingCastle.soldiers < Math.sqrt(stagingCastle.kokudaka) * 200) {
                 this.setInternalOperation(clanId, legionId, sabotageTargets);
                 return;
             }
