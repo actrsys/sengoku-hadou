@@ -181,6 +181,18 @@ class IndependenceSystem {
                 const enemyDaimyo = this.game.bushos.find(b => b.clan === clan.id && b.isDaimyo);
                 if (!enemyDaimyo) continue;
 
+                // ★今回追加：自拠点（起点となるお城）と直接隣接しているかどうかも調べます！
+                let isDirectlyNear = false;
+                if (castle.adjacentCastleIds) {
+                    for (const adjId of castle.adjacentCastleIds) {
+                        const adjCastle = this.game.castles.find(c => c.id === adjId);
+                        if (adjCastle && adjCastle.ownerClan === clan.id) {
+                            isDirectlyNear = true;
+                            break;
+                        }
+                    }
+                }
+
                 // ★変更：寝返り前の「そのままの敵対大名の戦力」を計算します
                 let enemyCurrentPower = this.calcClanPower(clan.id);
                 
@@ -198,6 +210,11 @@ class IndependenceSystem {
                 // ★今回追加：過去に調略を仕掛けてきた勢力なら、寝返りの点数をアップさせます！
                 if (rebellionLeader.lastApproachedClanId === clan.id) {
                     score += 50; // ボーナスの点数です。バランスを見て調整してくださいね。
+                }
+
+                // ★今回追加：自拠点と直接隣接していない場合は、寝返りたい気持ち（スコア）を少し下げます！
+                if (!isDirectlyNear) {
+                    score -= 20; // マイナスする点数です。バランスを見て数字は好きに変えてみてくださいね。
                 }
 
                 if (score > bestScore) {
