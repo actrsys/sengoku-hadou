@@ -1321,18 +1321,29 @@ class IndependenceSystem {
             }
         }
         
-        // 対象となる周辺大名家の色をリストアップ
-        const existingColors = [];
-        for (const clanId of neighborClanIds) {
+        // ★追加：滅亡していない（城を1つ以上持っている）大名家のリストを作ります
+        const aliveClanIds = new Set(this.game.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan));
+        
+        // ★変更：対象となる大名家の色を、「周辺大名」と「それ以外の生存大名」に分けてリストアップします
+        const neighborColors = [];
+        const otherAliveColors = [];
+        
+        for (const clanId of aliveClanIds) {
             const clan = this.game.clans.find(c => c.id === clanId);
             if (clan && clan.color) {
                 const rgb = this.hexToRgb(clan.color);
-                if (rgb) existingColors.push(rgb);
+                if (rgb) {
+                    if (neighborClanIds.has(clanId)) {
+                        neighborColors.push(rgb); // 周辺の大名家
+                    } else {
+                        otherAliveColors.push(rgb); // それ以外の遠くの大名家
+                    }
+                }
             }
         }
         
-        // 周辺に大名家が一つもない場合は、ランダムな色を返します
-        if (existingColors.length === 0) {
+        // 周辺にも他所にも大名家が一つもない場合は、ランダムな色を返します（念のため）
+        if (neighborColors.length === 0 && otherAliveColors.length === 0) {
             const h = Math.random(); 
             const s = 0.5 + Math.random() * 0.4;
             const l = 0.4 + Math.random() * 0.3;
@@ -1340,7 +1351,7 @@ class IndependenceSystem {
         }
         
         let bestColor = "#ffffff";
-        let maxMinDistance = -1;
+        let maxScore = -1;
         
         // 運任せにならないように、色相(色合い)を均等に分けた候補を36個(10度ずつ)作って比べます
         for (let i = 0; i < 36; i++) {
@@ -1351,17 +1362,35 @@ class IndependenceSystem {
             const hex = this.hslToHex(h, s, l);
             const rgb = this.hexToRgb(hex);
             
-            let minDistance = Infinity;
-            for (const exColor of existingColors) {
-                // RGBの差を計算します
+            // ★周辺の大名家との一番近い色との距離を測ります（最も似てほしくない！）
+            let minNeighborDist = Infinity;
+            for (const exColor of neighborColors) {
                 const dist = Math.sqrt(Math.pow(rgb.r - exColor.r, 2) + Math.pow(rgb.g - exColor.g, 2) + Math.pow(rgb.b - exColor.b, 2));
-                if (dist < minDistance) {
-                    minDistance = dist;
+                if (dist < minNeighborDist) {
+                    minNeighborDist = dist;
                 }
             }
-            
-            if (minDistance > maxMinDistance) {
-                maxMinDistance = minDistance;
+
+            // ★遠くの生存している大名家との一番近い色との距離も測ります
+            let minOtherDist = Infinity;
+            for (const exColor of otherAliveColors) {
+                const dist = Math.sqrt(Math.pow(rgb.r - exColor.r, 2) + Math.pow(rgb.g - exColor.g, 2) + Math.pow(rgb.b - exColor.b, 2));
+                if (dist < minOtherDist) {
+                    minOtherDist = dist;
+                }
+            }
+
+            // 周辺の大名がいなければ満点扱い
+            if (minNeighborDist === Infinity) minNeighborDist = 1000;
+            // 遠くの大名がいなければ満点扱い
+            if (minOtherDist === Infinity) minOtherDist = 1000;
+
+            // ★点数計算：周辺の大名家との違いを最も重視しつつ、全国の大名家とも似ていない色を高得点にします
+            // 「遠くの大名と似ている」のは「隣の大名と似ている」よりはマシなので、遠くの距離は1.5倍甘く評価します
+            let score = Math.min(minNeighborDist, minOtherDist * 1.5);
+
+            if (score > maxScore) {
+                maxScore = score;
                 bestColor = hex;
             }
         }
