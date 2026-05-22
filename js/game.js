@@ -172,6 +172,11 @@ class DataManager {
     static joinData(clans, castles, bushos, princesses = [], legions = []) {
         const startYear = window.MainParams.StartYear; // 今のシナリオの開始年（例：1560年）
         
+        // ★修正：武将が一門情報を取得する前に、先に姫の一門情報（父親のデータ）を完成させておきます！
+        princesses.forEach(p => {
+            p.updateFamilyIds(bushos);
+        });
+
         castles.forEach(c => c.samuraiIds = []);
         bushos.forEach(b => {
             // ==========================================
@@ -295,11 +300,6 @@ class DataManager {
                     b.isGunshi = true;
                 }
             }
-        });
-
-        // ★今回追加：姫自身にも一門情報（父親・夫）を持たせます！
-        princesses.forEach(p => {
-            p.updateFamilyIds(bushos);
         });
 
         // ★ここから軍団の初期設定です！
