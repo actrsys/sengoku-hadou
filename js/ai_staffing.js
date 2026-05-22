@@ -833,7 +833,7 @@ class AIStaffing {
             const emptyCastles = sameLegionCastles.filter(c => c.samuraiIds.length <= 1 && c.id !== castle.id);
             if (emptyCastles.length > 0 && castle.samuraiIds.length > 4) {
                 const lowSkillMovers = availableBushos
-                    .filter(b => b.id !== castle.castellanId && !b.isCommander)
+                    .filter(b => b.id !== castle.castellanId && !b.isCastellan)
                     .sort((a, b) => {
                         const totalA = a.leadership + a.strength + a.politics + a.diplomacy + a.intelligence;
                         const totalB = b.leadership + b.strength + b.politics + b.diplomacy + b.intelligence;
