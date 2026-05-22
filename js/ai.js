@@ -823,9 +823,9 @@ class AIEngine {
             const forceRatio = myForce / Math.max(1, enemyForce);
             
             // ★今回追加：相手が「隙だらけ」かどうかを見極める魔法です！
-            // 敵の兵士数が2000未満で、かつこちらの戦力が2.5倍以上あるか、
+            // 敵の兵士数が1500未満で、かつこちらの戦力が2倍以上あるか、
             // または兵士数に関係なく戦力比が5倍以上ある場合は「隙だらけのチャンス」とみなします。
-            const isVulnerable = (target.soldiers < 2000 && forceRatio >= 2.5) || forceRatio >= 5.0;
+            const isVulnerable = (target.soldiers < 1500 && forceRatio >= 2.0) || forceRatio >= 5.0;
             
             let prob = 0;
             if (forceRatio < 0.4) {
