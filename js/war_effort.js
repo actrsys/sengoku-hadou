@@ -9,7 +9,7 @@ Object.assign(WarManager.prototype, {
 
     // ★追加：大名が他軍団の城に逃げ込んだ時に、元の軍団を解散させる共通の魔法です！
     handleDaimyoEscape(busho, targetCastle) {
-        if (busho.isDaimyo && targetCastle.legionId !== 0) {
+        if (busho.isDaimyo && Number(targetCastle.legionId) !== 0) {
             if (this.game.castleManager && this.game.castleManager.disbandLegion) {
                 this.game.castleManager.disbandLegion(targetCastle.legionId);
             }
@@ -44,7 +44,7 @@ Object.assign(WarManager.prototype, {
         if (candidates.length === 0 && hasDaimyo) {
             // 国主がいない城を優先する
             const withoutCommander = allFriendlyCastles.filter(c => {
-                const legion = this.game.legions ? this.game.legions.find(l => l.id === c.legionId) : null;
+                const legion = this.game.legions ? this.game.legions.find(l => Number(l.id) === Number(c.legionId)) : null;
                 return !legion || !legion.commanderId;
             });
             if (withoutCommander.length > 0) {

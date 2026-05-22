@@ -197,7 +197,7 @@ class AIStaffing {
         }
 
         const myCastles = this.game.castles.filter(c => c.ownerClan === clanId);
-        const myDirectCastles = myCastles.filter(c => c.legionId === 0);
+        const myDirectCastles = myCastles.filter(c => Number(c.legionId) === 0);
         
         // 条件：直轄領が8城以上
         if (myDirectCastles.length < 8) return;
@@ -334,7 +334,7 @@ class AIStaffing {
             sameFactionBushos.forEach(b => {
                 const bCastle = this.game.getCastle(b.castleId);
                 // そのお友達が今いるお城が「直轄（軍団IDが0）」だったら、新国主のお城へお引越しさせます
-                if (bCastle && bCastle.legionId === 0) {
+                if (bCastle && Number(bCastle.legionId) === 0) {
                     this.game.affiliationSystem.moveCastle(b, baseCastle.id);
                 }
             });
@@ -553,7 +553,7 @@ class AIStaffing {
 
         roles.forEach((data, cId) => {
             const c = this.game.getCastle(cId);
-            if (c && c.legionId === legionId) {
+            if (c && Number(c.legionId) === Number(legionId)) {
                 if (data.isBase && data.dangerLevel > 30) isBaseInDanger = true;
                 if (data.role === '前線拠点' && data.dangerLevel > 50) isFrontPushed = true;
             }

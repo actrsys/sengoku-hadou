@@ -23,8 +23,8 @@ class CastleManager {
 
         // ★追加：旧軍団の城がゼロになったかチェックして、ゼロなら壊滅させる
         if (oldOwnerId !== 0 && oldLegionId !== 0) {
-            const remaining = this.game.castles.filter(c => c.ownerClan === oldOwnerId && c.legionId === oldLegionId);
-            const targetLegion = this.game.legions.find(l => l.clanId === oldOwnerId && l.legionNo === oldLegionId);
+            const remaining = this.game.castles.filter(c => Number(c.ownerClan) === oldOwnerId && Number(c.legionId) === oldLegionId);
+            const targetLegion = this.game.legions.find(l => Number(l.clanId) === oldOwnerId && Number(l.legionNo) === oldLegionId);
             
             if (targetLegion) {
                 if (remaining.length === 0) {
