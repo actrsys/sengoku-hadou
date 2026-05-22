@@ -38,8 +38,8 @@ class AIStaffing {
             reachableMyCastles.push(current);
 
             const adjMyCastles = this.game.castles.filter(c => 
-                c.ownerClan === clanId && 
-                c.legionId === targetLegionId && // ★修正：本来の軍団のお城だけに制限します！
+                Number(c.ownerClan) === Number(clanId) && 
+                Number(c.legionId) === Number(targetLegionId) && // ★修正：本来の軍団のお城だけに制限します！
                 GameSystem.isAdjacent(current, c) &&
                 !visitedCastles.has(c.id)
             );
@@ -585,7 +585,7 @@ class AIStaffing {
         const clanId = castle.ownerClan;
         
         // ★追加：武将の移動先を「同じ軍団のお城」だけに限定します！
-        const sameLegionCastles = reachableMyCastles.filter(c => c.legionId === castle.legionId);
+        const sameLegionCastles = reachableMyCastles.filter(c => Number(c.legionId) === Number(castle.legionId));
         
         const bushoTypes = this.evaluateBushos(clanId);
         const castleRoles = this.evaluateCastles(clanId);

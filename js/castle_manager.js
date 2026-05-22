@@ -9,11 +9,11 @@ class CastleManager {
 
     // 城の持ち主を変更する魔法です。isEventがtrueの時は、イベントによる平和的な変更として扱います。
     changeOwner(castle, newOwnerId, isEvent = false, newLegionId = 0) {
-        const oldOwnerId = castle.ownerClan;
-        const oldLegionId = castle.legionId || 0;
+        const oldOwnerId = Number(castle.ownerClan);
+        const oldLegionId = Number(castle.legionId || 0);
 
-        castle.ownerClan = newOwnerId;
-        castle.legionId = newLegionId; // 攻撃側の軍団IDになる
+        castle.ownerClan = Number(newOwnerId);
+        castle.legionId = Number(newLegionId); // 攻撃側の軍団IDになる
 
         // 調査状態などをリセットします
         castle.investigatedUntil = 0;
@@ -204,7 +204,7 @@ class CastleManager {
             
             // ★修正：c.legionIdに入っているのは固有IDではなく「軍団No(1~8)」なので、
             // 大名家の一致と、軍団Noの一致の両方を確認して直轄に戻します！
-            this.game.castles.filter(c => c.ownerClan === legion.clanId && c.legionId === legion.legionNo).forEach(c => {
+            this.game.castles.filter(c => Number(c.ownerClan) === Number(legion.clanId) && Number(c.legionId) === Number(legion.legionNo)).forEach(c => {
                 c.legionId = 0;
                 c.isDelegated = false;
             });

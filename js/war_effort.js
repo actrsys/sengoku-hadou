@@ -20,24 +20,24 @@ Object.assign(WarManager.prototype, {
 
     // ★追加：落城時などに逃げ込む「味方の城」の候補を探し出す魔法
     getEscapeCandidates(defCastle) {
-        const oldOwner = defCastle.ownerClan;
+        const oldOwner = Number(defCastle.ownerClan);
         
         // ★追加：持ち主が0（中立）のお城の場合は、そもそも味方はいないので探しに行きません！
         if (oldOwner === 0) return [];
         
-        const oldLegionId = defCastle.legionId || 0;
-        const allFriendlyCastles = this.game.castles.filter(c => c.ownerClan === oldOwner && c.id !== defCastle.id);
+        const oldLegionId = Number(defCastle.legionId || 0);
+        const allFriendlyCastles = this.game.castles.filter(c => Number(c.ownerClan) === oldOwner && Number(c.id) !== Number(defCastle.id));
         
         if (allFriendlyCastles.length === 0) return [];
         
         const hasDaimyo = this.game.getCastleBushos(defCastle.id).some(b => b.isDaimyo);
         
         // 1. まずは同じ軍団IDの城を探す
-        let candidates = allFriendlyCastles.filter(c => (c.legionId || 0) === oldLegionId);
+        let candidates = allFriendlyCastles.filter(c => Number(c.legionId || 0) === oldLegionId);
         
         // 2. なければ直轄（ID0）の城を探す
         if (candidates.length === 0) {
-            candidates = allFriendlyCastles.filter(c => (c.legionId || 0) === 0);
+            candidates = allFriendlyCastles.filter(c => Number(c.legionId || 0) === 0);
         }
         
         // 3. 大名がいて、直轄領もない場合、他軍団の城へ
