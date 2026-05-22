@@ -97,6 +97,35 @@ window.GameEvents.push({
             }
         });
 
+        // ★ 拠点のマップ画像を読み込みます（当たり判定用です）
+        if (!window.CastleColorImageDataCache) {
+            const castleMapImg = new Image();
+            castleMapImg.src = './data/images/map/japan_colorcode_map.png';
+            
+            await new Promise(resolve => {
+                if (castleMapImg.complete) resolve();
+                else {
+                    castleMapImg.onload = resolve;
+                    castleMapImg.onerror = resolve;
+                    setTimeout(resolve, 1000); 
+                }
+            });
+
+            if (castleMapImg.naturalWidth > 0) {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = castleMapImg.naturalWidth;
+                tempCanvas.height = castleMapImg.naturalHeight;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(castleMapImg, 0, 0);
+                try {
+                    window.CastleColorImageDataCache = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                } catch (e) {
+                    console.error("画像読み取りエラー:", e);
+                }
+            }
+        }
+
+        // ★ 国のマップ画像も白地図を塗るために必要なので、残して読み込みます
         if (!window.ProvinceImageDataCache) {
             const provMapImg = new Image();
             provMapImg.src = './data/images/map/japan_provinces.png';
@@ -125,11 +154,13 @@ window.GameEvents.push({
         }
 
         const pathData = [];
+        const damagedCastleMap = new Map(); // ★ 拠点ごとのダメージを保存する箱を新しく用意します
 
-        if (window.ProvinceImageDataCache) {
-            const width = window.ProvinceImageDataCache.width;
-            const height = window.ProvinceImageDataCache.height;
-            const data = window.ProvinceImageDataCache.data;
+        // ★ 色判定用のデータを拠点マップ（CastleColorImageDataCache）に変えます
+        if (window.CastleColorImageDataCache) {
+            const width = window.CastleColorImageDataCache.width;
+            const height = window.CastleColorImageDataCache.height;
+            const data = window.CastleColorImageDataCache.data;
 
             const getPixelHex = (x, y) => {
                 x = Math.floor(x); y = Math.floor(y);
@@ -150,8 +181,8 @@ window.GameEvents.push({
             const damagedColorCodes = new Set(); 
             const windStrength = 40 - (initialScale * 3) + (Math.random() * 5); 
             
-            let wasOnLand = false; 
-            let landCount = 0; 
+            let wasOnCastle = false; // ★ 陸地ではなく拠点に乗っているか確認します
+            let castleHitCount = 0; 
 
             while (typhoonX < width + typhoonRadius && typhoonY > -typhoonRadius && typhoonY < height + 1000 && typhoonRadius > 30) {
                 
@@ -167,14 +198,14 @@ window.GameEvents.push({
                 let fallPower = 50 - (initialScale * 3); 
                 moveY -= fallPower * Math.pow(progress, 1.5); 
 
-                if (wasOnLand) {
+                if (wasOnCastle) {
                     moveY -= 15; 
                 }
 
                 typhoonX += moveX;
                 typhoonY -= moveY;
 
-                let onLand = false;
+                let onCastle = false;
 
                 if (typhoonX > -typhoonRadius && typhoonX < width + typhoonRadius &&
                     typhoonY > -typhoonRadius && typhoonY < height + typhoonRadius) {
@@ -190,48 +221,59 @@ window.GameEvents.push({
                     for (let pt of checkPoints) {
                         const hex = getPixelHex(pt.x, pt.y);
                         if (hex) {
-                            damagedColorCodes.add(hex.toLowerCase());
-                            onLand = true; 
+                            // ★ 取得した色が「本物の拠点の色」として設定されているか、念のためチェックします！
+                            const lowerHex = hex.toLowerCase();
+                            const isCastleColor = game.castles.some(c => 
+                                (c.color_code && c.color_code.toLowerCase() === lowerHex) || 
+                                (c.colorCode && c.colorCode.toLowerCase() === lowerHex)
+                            );
+                            
+                            if (isCastleColor) {
+                                damagedColorCodes.add(lowerHex);
+                                onCastle = true; 
+                            }
                         }
                     }
                 }
 
-                // ★海上にいる時は台風が消滅しにくく、陸に上がると弱まりやすくなるようにサイコロを調整します！
                 let baseDecay;
-                if (onLand) {
-                    // 陸上にいる時は少し小さくなりやすいサイコロにします（小さくなる率を低下）
-                    baseDecay = (Math.random() * 1.0) - 0.6; 
+                if (onCastle) {
+                    baseDecay = (Math.random() * 1.0) - 0.2; // ★ 拠点（点）に当たった時用に調整
                 } else {
-                    // 海上にいる時はかなり成長しやすいサイコロにします（成長率を上昇）
                     baseDecay = (Math.random() * 1.5) - 1.4; 
                 }
                 
-                // 北へ行くほど弱まる力も少しだけ優しくします
                 let northDecay = 0.1 * progress;
 
-                if (onLand) {
-                    landCount++;
-                    let landDecay = 0.15 + (landCount * 0.03); 
-                    typhoonRadius -= (baseDecay + northDecay + landDecay);
+                if (onCastle) {
+                    castleHitCount++;
+                    let castleDecay = 0.3 + (castleHitCount * 0.1); // ★ 拠点に当たるとゴリッと減衰します
+                    typhoonRadius -= (baseDecay + northDecay + castleDecay);
                 } else {
-                    landCount = 0; 
+                    castleHitCount = 0; 
                     typhoonRadius -= (baseDecay + northDecay);
                 }
 
                 if (typhoonRadius > 250) typhoonRadius = 250;
 
-                wasOnLand = onLand;
+                wasOnCastle = onCastle;
             }
             
             pathData.push({ x: typhoonX, y: typhoonY, radius: typhoonRadius });
 
-            if (game.provinces && game.provinces.length > 0) {
-                for (let prov of game.provinces) {
-                    const provColor = prov.color_code || prov.colorCode;
-                    if (provColor && damagedColorCodes.has(provColor.toLowerCase())) {
+            // ★ 被害を受ける「拠点」と、その拠点が所属する「国」をまとめます
+            if (game.castles && game.castles.length > 0) {
+                for (let castle of game.castles) {
+                    const castleColor = castle.color_code || castle.colorCode;
+                    if (castleColor && damagedColorCodes.has(castleColor.toLowerCase())) {
                         const shift = Math.floor(Math.random() * 3) - 1;
                         let finalScale = Math.max(1, Math.min(10, baseScale + shift));
-                        damagedProvinceMap.set(prov.id, finalScale); 
+                        damagedCastleMap.set(castle.id, finalScale); 
+                        
+                        // ★ ついでに所属している国も登録しておきます（後で白地図を塗るためです）
+                        if (!damagedProvinceMap.has(castle.provinceId)) {
+                            damagedProvinceMap.set(castle.provinceId, finalScale);
+                        }
                     }
                 }
             }
@@ -267,8 +309,9 @@ window.GameEvents.push({
         }
         
         game.castles.forEach(castle => {
-            if (damagedProvinceMap.has(castle.provinceId)) {
-                const finalScale = damagedProvinceMap.get(castle.provinceId);
+            // ★ ダメージ計算を「拠点単位」にします！
+            if (damagedCastleMap.has(castle.id)) {
+                const finalScale = damagedCastleMap.get(castle.id);
                 const dropPercent = finalScale * 0.03;
                 
                 // 城防御力15につき1%のダメージ軽減率を計算します（最大100%カット）
