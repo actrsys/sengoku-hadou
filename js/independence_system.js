@@ -157,14 +157,17 @@ class IndependenceSystem {
                 const rel = this.game.getRelation(oldClanId, clan.id);
                 if (!rel || rel.status !== '敵対') continue;
                 
-                // ★変更：その敵対大名が、元の主家（oldClanId）の城と「隣接している」か探します
+                // ★変更：その敵対大名が、起点の城から「地続きで繋がっている自勢力の城」と隣接しているか探します
                 let isNear = false; // 最初は「近くない」としておきます
                 
-                // 元の主家が持っているすべてのお城を調べます
-                const oldClanCastles = this.game.castles.filter(c => c.ownerClan === oldClanId);
-                for (const oldCastle of oldClanCastles) {
-                    if (oldCastle.adjacentCastleIds) {
-                        for (const adjId of oldCastle.adjacentCastleIds) {
+                // 起点の城から地続きで繋がっている自勢力の城のIDをすべて集めます！
+                const connectedCastleIds = castle.getConnectedCastles(this.game);
+                
+                // 地続きの城を一つずつ調べます
+                for (const connectedId of connectedCastleIds) {
+                    const connectedCastle = this.game.castles.find(c => c.id === connectedId);
+                    if (connectedCastle && connectedCastle.adjacentCastleIds) {
+                        for (const adjId of connectedCastle.adjacentCastleIds) {
                             const adjCastle = this.game.castles.find(c => c.id === adjId);
                             if (adjCastle && adjCastle.ownerClan === clan.id) {
                                 isNear = true; // 隣接する城の持ち主がこの敵対大名家なら「近い！」とメモします
