@@ -808,35 +808,46 @@ class LifeSystem {
 
             let isExternalSuccessor = false;
 
-            // 選ばれた後継ぎが外部の武将（未登場、浪人、諸勢力）だった場合は、急いで迎え入れます！
+            // 外部の武将（未登場、浪人、諸勢力）だった場合はメッセージを用意します
             if (successor.status === 'unborn' || successor.status === 'ronin' || (successor.belongKunishuId || 0) > 0) {
                 isExternalSuccessor = true;
-                const baseCastle = clanCastles.length > 0 ? clanCastles[0] : null;
-
-                if (baseCastle) {
-                    if ((successor.belongKunishuId || 0) > 0) {
-                        const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(successor.belongKunishuId) : null;
-                        const kunishuName = kunishu ? kunishu.getName(this.game) : "諸勢力";
-                        
-                        successor.belongKunishuId = 0;
-                        messages.push(`${kunishuName}より${successor.name.replace('|','')}が\n当主として迎え入れられました。`);
-                    } else if (successor.status === 'ronin') {
-                        messages.push(`${successor.name.replace('|','')}が当主として迎え入れられました。`);
-                    } else {
-                        messages.push(`${successor.name.replace('|','')}が急遽元服し、家督を継ぎました。`);
-                    }
-
-                    // 元々どこかの城にいた場合は、お城を出ます
-                    if (successor.status === 'ronin' || successor.status === 'active') {
-                        this.game.affiliationSystem.leaveCastle(successor);
-                    }
-
-                    successor.status = 'active';
-                    successor.clan = daimyo.clan;
-                    successor.castleId = baseCastle.id;
-                    successor.loyalty = 100;
-                    if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
+                
+                if ((successor.belongKunishuId || 0) > 0) {
+                    const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(successor.belongKunishuId) : null;
+                    const kunishuName = kunishu ? kunishu.getName(this.game) : "諸勢力";
+                    successor.belongKunishuId = 0;
+                    messages.push(`${kunishuName}より${successor.name.replace('|','')}が\n当主として迎え入れられました。`);
+                } else if (successor.status === 'ronin') {
+                    messages.push(`${successor.name.replace('|','')}が当主として迎え入れられました。`);
+                } else {
+                    messages.push(`${successor.name.replace('|','')}が急遽元服し、家督を継ぎました。`);
                 }
+            }
+
+            // 新大名がもし国主だった場合、その国主を解任し軍団を解散させます
+            if (successor.isCommander) {
+                if (this.game.castleManager) {
+                    const oldLegion = this.game.legions ? this.game.legions.find(l => l.commanderId === successor.id) : null;
+                    if (oldLegion) {
+                        this.game.castleManager.disbandLegion(oldLegion.id);
+                    }
+                }
+                successor.isCommander = false;
+            }
+
+            // 選ばれた後継者を、死亡した大名がいた城へ移動させます
+            const baseCastle = this.game.getCastle(daimyo.castleId);
+            if (baseCastle) {
+                // 元々どこかの城にいた場合は、お城を出ます
+                if (successor.status === 'ronin' || successor.status === 'active') {
+                    this.game.affiliationSystem.leaveCastle(successor);
+                }
+
+                successor.status = 'active';
+                successor.clan = daimyo.clan;
+                successor.castleId = baseCastle.id;
+                successor.loyalty = 100;
+                if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
             }
 
             // ★ここから追加：大名になった瞬間に「daimyo:」の改名データがあれば改名する魔法！
@@ -868,14 +879,6 @@ class LifeSystem {
                 const newFace = successor.faceChange.split(':')[1].trim();
                 if (newFace) {
                     successor.faceIcon = newFace;
-                }
-            }
-
-            // ★追加：新大名がもし国主だった場合、その軍団を解散させます
-            if (successor.isCommander && this.game.castleManager) {
-                const oldLegion = this.game.legions ? this.game.legions.find(l => l.commanderId === successor.id) : null;
-                if (oldLegion) {
-                    this.game.castleManager.disbandLegion(oldLegion.id);
                 }
             }
 
@@ -1001,31 +1004,31 @@ class LifeSystem {
 
             if (successor.status === 'unborn' || successor.status === 'ronin' || (successor.belongKunishuId || 0) > 0) {
                 isExternalSuccessor = true;
-                const legionCastles = this.game.castles.filter(c => c.ownerClan === commander.clan && c.legionId === legion.legionNo);
-                const baseCastle = legionCastles.length > 0 ? legionCastles[0] : null;
-
-                if (baseCastle) {
-                    if ((successor.belongKunishuId || 0) > 0) {
-                        const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(successor.belongKunishuId) : null;
-                        const kunishuName = kunishu ? kunishu.getName(this.game) : "諸勢力";
-                        successor.belongKunishuId = 0;
-                        messages.push(`${kunishuName}より${successor.name.replace('|','')}が\n跡継ぎとして迎え入れられました。`);
-                    } else if (successor.status === 'ronin') {
-                        messages.push(`${successor.name.replace('|','')}が跡を継ぎました。`);
-                    } else {
-                        messages.push(`${successor.name.replace('|','')}が急遽元服し、跡を継ぎました。`);
-                    }
-
-                    if (successor.status === 'ronin' || successor.status === 'active') {
-                        this.game.affiliationSystem.leaveCastle(successor);
-                    }
-
-                    successor.status = 'active';
-                    successor.clan = commander.clan;
-                    successor.castleId = baseCastle.id;
-                    successor.loyalty = 100;
-                    if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
+                
+                if ((successor.belongKunishuId || 0) > 0) {
+                    const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(successor.belongKunishuId) : null;
+                    const kunishuName = kunishu ? kunishu.getName(this.game) : "諸勢力";
+                    successor.belongKunishuId = 0;
+                    messages.push(`${kunishuName}より${successor.name.replace('|','')}が\n跡継ぎとして迎え入れられました。`);
+                } else if (successor.status === 'ronin') {
+                    messages.push(`${successor.name.replace('|','')}が跡を継ぎました。`);
+                } else {
+                    messages.push(`${successor.name.replace('|','')}が急遽元服し、跡を継ぎました。`);
                 }
+            }
+
+            // 選ばれた後任者を、死亡した国主がいた城に移動させます
+            const baseCastle = this.game.getCastle(commander.castleId);
+            if (baseCastle) {
+                if (successor.status === 'ronin' || successor.status === 'active') {
+                    this.game.affiliationSystem.leaveCastle(successor);
+                }
+
+                successor.status = 'active';
+                successor.clan = commander.clan;
+                successor.castleId = baseCastle.id;
+                successor.loyalty = 100;
+                if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
             }
 
             // 国主の役職を引き継ぎます
