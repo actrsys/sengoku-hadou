@@ -285,7 +285,7 @@ class AffiliationSystem {
 
     /**
      * ④ お城の「所属（持ち主の大名家）」が変わる時の魔法
-     * 引き抜きや独立、戦争での落城などで使います！
+     * 引き抜きや独立などで使います！（※戦争での落城時は castle_manager.js を使用します）
      * @param {object} castle - 所属が変わるお城
      * @param {number} newClanId - 新しい大名家のID
      */
