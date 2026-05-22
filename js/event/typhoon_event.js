@@ -399,6 +399,10 @@ window.GameEvents.push({
                 };
                 mapOverlay.addEventListener('click', onTouch);
                 mapOverlay.addEventListener('touchstart', onTouch, { passive: true });
+
+                if (game && game.isWatchMode) {
+                    setTimeout(onTouch, 1000);
+                }
             });
 
             // メッセージを出す前に、まず地図（mapOverlay）を画面から消します

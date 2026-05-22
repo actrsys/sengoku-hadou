@@ -560,6 +560,9 @@ class UIManager {
     }
 
     showDialogAsync(msg, isConfirm = false, autoCloseTime = 0, customOpts = null) {
+        if (this.game && this.game.isWatchMode && autoCloseTime === 0) {
+            autoCloseTime = 1000;
+        }
         return new Promise(resolve => {
             this.dialogQueue.push({ msg, isConfirm, onOk: resolve, onCancel: resolve, autoCloseTime, customOpts });
             if (!this.isDialogShowing) {
@@ -569,7 +572,11 @@ class UIManager {
     }
 
     showDialog(msg, isConfirm, onOk, onCancel = null, customOpts = null) {
-        this.dialogQueue.push({ msg, isConfirm, onOk, onCancel, autoCloseTime: 0, customOpts });
+        let autoCloseTime = 0;
+        if (this.game && this.game.isWatchMode) {
+            autoCloseTime = 1000;
+        }
+        this.dialogQueue.push({ msg, isConfirm, onOk, onCancel, autoCloseTime: autoCloseTime, customOpts });
         if (!this.isDialogShowing) {
             this.processDialogQueue();
         }
@@ -907,7 +914,12 @@ class UIManager {
                 if (!modal.classList.contains('hidden')) {
                     // ★修正：今の画面にある本物のokBtnを探して押します
                     const currentOkBtn = document.getElementById('dialog-btn-ok');
-                    if (currentOkBtn) currentOkBtn.click();
+                    if (currentOkBtn) {
+                        currentOkBtn.click();
+                    } else {
+                        // ★追加：ボタンがないイベント画面などの場合は、直接「次へ進む」魔法を呼び出します！
+                        cleanupAndNext(dialog.onOk);
+                    }
                 }
             }, dialog.autoCloseTime);
         }

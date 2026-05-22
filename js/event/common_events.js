@@ -156,6 +156,10 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
         };
         mapOverlay.addEventListener('click', onTouch);
         mapOverlay.addEventListener('touchstart', onTouch, { passive: true });
+
+        if (game && game.isWatchMode) {
+            setTimeout(onTouch, 1000);
+        }
     });
 
     document.body.removeChild(mapOverlay);
