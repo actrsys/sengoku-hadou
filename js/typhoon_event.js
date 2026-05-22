@@ -162,12 +162,14 @@ window.GameEvents.push({
             const height = window.CastleColorImageDataCache.height;
             const data = window.CastleColorImageDataCache.data;
 
+            // 透明な部分を無視し、正確な16進数カラーコードを取得します
             const getPixelHex = (x, y) => {
                 x = Math.floor(x); y = Math.floor(y);
                 if (x < 0 || x >= width || y < 0 || y >= height) return null;
                 const idx = (y * width + x) * 4;
-                if (data[idx+3] === 0) return null; 
-                if (data[idx] === 0 && data[idx+1] === 0 && data[idx+2] === 0) return null; 
+                if (data[idx+3] === 0) return null; // 完全な透明はスキップ
+                
+                // RGB値を確実に6桁の16進数文字列（#付き）に変換します
                 return "#" + ((1 << 24) + (data[idx] << 16) + (data[idx+1] << 8) + data[idx+2]).toString(16).slice(1);
             };
 
@@ -181,16 +183,19 @@ window.GameEvents.push({
             const damagedColorCodes = new Set(); 
             const windStrength = 40 - (initialScale * 3) + (Math.random() * 5); 
 
-            // ★ 処理を軽くするため、先に「本物の拠点の色」のリスト（辞書）を作っておきます
+            // ★ 拠点の色リストを「完全な統一フォーマット（小文字・#付き）」で準備します
             const validCastleColors = new Set();
             if (game.castles) {
                 for (let c of game.castles) {
-                    const cColor = c.color_code || c.colorCode;
-                    if (cColor) validCastleColors.add(cColor.toLowerCase());
+                    let cColor = (c.color_code || c.colorCode || "").trim().toLowerCase();
+                    if (cColor) {
+                        if (!cColor.startsWith("#")) cColor = "#" + cColor;
+                        validCastleColors.add(cColor);
+                    }
                 }
             }
             
-            let wasOnCastle = false; // ★ 陸地ではなく拠点に乗っているか確認します
+            let wasOnCastle = false; 
             let castleHitCount = 0; 
 
             while (typhoonX < width + typhoonRadius && typhoonY > -typhoonRadius && typhoonY < height + 1000 && typhoonRadius > 30) {
@@ -216,7 +221,7 @@ window.GameEvents.push({
 
                 let onCastle = false;
 
-                // ★ 当たり判定の範囲を計算します（台風の円をすっぽり囲む四角形です）
+                // ★ 当たり判定の範囲を計算します
                 if (typhoonX > -typhoonRadius && typhoonX < width + typhoonRadius &&
                     typhoonY > -typhoonRadius && typhoonY < height + typhoonRadius) {
 
@@ -226,10 +231,9 @@ window.GameEvents.push({
                     const startY = Math.max(0, Math.floor(typhoonY - typhoonRadius));
                     const endY = Math.min(height - 1, Math.ceil(typhoonY + typhoonRadius));
 
-                    // ★ 十字の5点だけでなく、円の中を細かく（2ピクセル間隔で）全部調べます！
-                    // これで小さな点の拠点でもすり抜けずにキャッチできます。
-                    for (let y = startY; y <= endY; y += 2) {
-                        for (let x = startX; x <= endX; x += 2) {
+                    // ★ 2マス飛ばしをやめ、1ピクセル単位で「すべての隙間」を完全にスキャンします
+                    for (let y = startY; y <= endY; y++) {
+                        for (let x = startX; x <= endX; x++) {
                             const dx = x - typhoonX;
                             const dy = y - typhoonY;
                             
@@ -237,10 +241,9 @@ window.GameEvents.push({
                             if (dx * dx + dy * dy <= rSq) {
                                 const hex = getPixelHex(x, y);
                                 if (hex) {
-                                    const lowerHex = hex.toLowerCase();
-                                    // 先に作った「正解リスト」にこの色が入っているかチェックします
-                                    if (validCastleColors.has(lowerHex)) {
-                                        damagedColorCodes.add(lowerHex);
+                                    // 読み取った色（既に小文字・#付き）がリストにあるか確認します
+                                    if (validCastleColors.has(hex)) {
+                                        damagedColorCodes.add(hex);
                                         onCastle = true; 
                                     }
                                 }
@@ -251,7 +254,7 @@ window.GameEvents.push({
 
                 let baseDecay;
                 if (onCastle) {
-                    baseDecay = (Math.random() * 1.0) - 0.2; // ★ 拠点に当たった時用に調整
+                    baseDecay = (Math.random() * 1.0) - 0.2; 
                 } else {
                     baseDecay = (Math.random() * 1.5) - 1.4; 
                 }
@@ -260,7 +263,7 @@ window.GameEvents.push({
 
                 if (onCastle) {
                     castleHitCount++;
-                    let castleDecay = 0.3 + (castleHitCount * 0.1); // ★ 拠点に当たるとゴリッと減衰します
+                    let castleDecay = 0.3 + (castleHitCount * 0.1); 
                     typhoonRadius -= (baseDecay + northDecay + castleDecay);
                 } else {
                     castleHitCount = 0; 
@@ -277,15 +280,19 @@ window.GameEvents.push({
             // ★ 被害を受ける「拠点」と、その拠点が所属する「国」をまとめます
             if (game.castles && game.castles.length > 0) {
                 for (let castle of game.castles) {
-                    const castleColor = castle.color_code || castle.colorCode;
-                    if (castleColor && damagedColorCodes.has(castleColor.toLowerCase())) {
-                        const shift = Math.floor(Math.random() * 3) - 1;
-                        let finalScale = Math.max(1, Math.min(10, baseScale + shift));
-                        damagedCastleMap.set(castle.id, finalScale); 
+                    let castleColor = (castle.color_code || castle.colorCode || "").trim().toLowerCase();
+                    if (castleColor) {
+                        if (!castleColor.startsWith("#")) castleColor = "#" + castleColor;
                         
-                        // ★ ついでに所属している国も登録しておきます（後で白地図を塗るためです）
-                        if (!damagedProvinceMap.has(castle.provinceId)) {
-                            damagedProvinceMap.set(castle.provinceId, finalScale);
+                        // 統一フォーマット同士で完璧に一致するかチェックします
+                        if (damagedColorCodes.has(castleColor)) {
+                            const shift = Math.floor(Math.random() * 3) - 1;
+                            let finalScale = Math.max(1, Math.min(10, baseScale + shift));
+                            damagedCastleMap.set(castle.id, finalScale); 
+                            
+                            if (!damagedProvinceMap.has(castle.provinceId)) {
+                                damagedProvinceMap.set(castle.provinceId, finalScale);
+                            }
                         }
                     }
                 }
