@@ -157,8 +157,8 @@ window.GameEvents.push({
                 
                 pathData.push({ x: typhoonX, y: typhoonY, radius: typhoonRadius });
 
-                let moveX = Math.random() * 20 + 5;
-                let moveY = Math.random() * 25 + 10 + (initialScale * 1.5); 
+                let moveX = Math.random() * 25 + 10;
+                let moveY = Math.random() * 30 + 15 + (initialScale * 2.0); 
 
                 let progress = Math.max(0, (height + 500 - typhoonY) / height); 
                 
@@ -199,19 +199,19 @@ window.GameEvents.push({
                 // ★海上にいる時は台風が消滅しにくく、陸に上がると弱まりやすくなるようにサイコロを調整します！
                 let baseDecay;
                 if (onLand) {
-                    // 陸上にいる時は少し小さくなりやすいサイコロにします
-                    baseDecay = (Math.random() * 1.2) - 0.4; 
+                    // 陸上にいる時は少し小さくなりやすいサイコロにします（小さくなる率を低下）
+                    baseDecay = (Math.random() * 1.0) - 0.6; 
                 } else {
-                    // 海上にいる時はかなり成長しやすいサイコロにします
-                    baseDecay = (Math.random() * 1.5) - 1.2; 
+                    // 海上にいる時はかなり成長しやすいサイコロにします（成長率を上昇）
+                    baseDecay = (Math.random() * 1.5) - 1.4; 
                 }
                 
                 // 北へ行くほど弱まる力も少しだけ優しくします
-                let northDecay = 0.2 * progress;
+                let northDecay = 0.1 * progress;
 
                 if (onLand) {
                     landCount++;
-                    let landDecay = 0.2 + (landCount * 0.05); 
+                    let landDecay = 0.15 + (landCount * 0.03); 
                     typhoonRadius -= (baseDecay + northDecay + landDecay);
                 } else {
                     landCount = 0; 
@@ -355,8 +355,8 @@ window.GameEvents.push({
                 }
 
                 if (SHOW_TYPHOON_PATH && pathData.length > 0) {
-                    ctx.lineWidth = 3; 
-                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.4)'; 
+                    ctx.lineWidth = 6; 
+                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; 
                     ctx.setLineDash([8, 8]); 
 
                     for (let i = 0; i < pathData.length; i++) {
@@ -370,7 +370,7 @@ window.GameEvents.push({
                     ctx.beginPath();
                     ctx.setLineDash([20, 20]); 
                     ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; 
-                    ctx.lineWidth = 12; 
+                    ctx.lineWidth = 4; 
                     ctx.lineCap = 'round'; 
                     ctx.lineJoin = 'round'; 
 
