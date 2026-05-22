@@ -162,12 +162,14 @@ window.GameEvents.push({
             const height = window.CastleColorImageDataCache.height;
             const data = window.CastleColorImageDataCache.data;
 
+            // 透明な部分を無視し、正確な16進数カラーコードを取得します
             const getPixelHex = (x, y) => {
                 x = Math.floor(x); y = Math.floor(y);
                 if (x < 0 || x >= width || y < 0 || y >= height) return null;
                 const idx = (y * width + x) * 4;
-                if (data[idx+3] === 0) return null; 
-                if (data[idx] === 0 && data[idx+1] === 0 && data[idx+2] === 0) return null; 
+                if (data[idx+3] === 0) return null; // 完全な透明はスキップ
+                
+                // RGB値を確実に6桁の16進数文字列（#付き）に変換します
                 return "#" + ((1 << 24) + (data[idx] << 16) + (data[idx+1] << 8) + data[idx+2]).toString(16).slice(1);
             };
 
@@ -180,8 +182,21 @@ window.GameEvents.push({
             
             const damagedColorCodes = new Set(); 
             const windStrength = 40 - (initialScale * 3) + (Math.random() * 5); 
+
+            // ★ 拠点の色リストを「完全な統一フォーマット（小文字・#付き）」で準備します
+            const validCastleColors = new Set();
+            if (game.castles) {
+                for (let c of game.castles) {
+                    // ★ ここが修正の要です！拠点のデータ名「castlesColorCode」を真っ先に読み取ります
+                    let cColor = (c.castlesColorCode || c.colorCode || c.color_code || "").trim().toLowerCase();
+                    if (cColor) {
+                        if (!cColor.startsWith("#")) cColor = "#" + cColor;
+                        validCastleColors.add(cColor);
+                    }
+                }
+            }
             
-            let wasOnCastle = false; // ★ 陸地ではなく拠点に乗っているか確認します
+            let wasOnCastle = false; 
             let castleHitCount = 0; 
 
             while (typhoonX < width + typhoonRadius && typhoonY > -typhoonRadius && typhoonY < height + 1000 && typhoonRadius > 30) {
@@ -207,30 +222,32 @@ window.GameEvents.push({
 
                 let onCastle = false;
 
+                // ★ 当たり判定の範囲を計算します
                 if (typhoonX > -typhoonRadius && typhoonX < width + typhoonRadius &&
                     typhoonY > -typhoonRadius && typhoonY < height + typhoonRadius) {
 
-                    const checkPoints = [
-                        { x: typhoonX, y: typhoonY },
-                        { x: typhoonX - typhoonRadius/2, y: typhoonY },
-                        { x: typhoonX + typhoonRadius/2, y: typhoonY },
-                        { x: typhoonX, y: typhoonY - typhoonRadius/2 },
-                        { x: typhoonX, y: typhoonY + typhoonRadius/2 }
-                    ];
+                    const rSq = typhoonRadius * typhoonRadius;
+                    const startX = Math.max(0, Math.floor(typhoonX - typhoonRadius));
+                    const endX = Math.min(width - 1, Math.ceil(typhoonX + typhoonRadius));
+                    const startY = Math.max(0, Math.floor(typhoonY - typhoonRadius));
+                    const endY = Math.min(height - 1, Math.ceil(typhoonY + typhoonRadius));
 
-                    for (let pt of checkPoints) {
-                        const hex = getPixelHex(pt.x, pt.y);
-                        if (hex) {
-                            // ★ 取得した色が「本物の拠点の色」として設定されているか、念のためチェックします！
-                            const lowerHex = hex.toLowerCase();
-                            const isCastleColor = game.castles.some(c => 
-                                (c.color_code && c.color_code.toLowerCase() === lowerHex) || 
-                                (c.colorCode && c.colorCode.toLowerCase() === lowerHex)
-                            );
+                    // ★ 2マス飛ばしをやめ、1ピクセル単位で「すべての隙間」を完全にスキャンします
+                    for (let y = startY; y <= endY; y++) {
+                        for (let x = startX; x <= endX; x++) {
+                            const dx = x - typhoonX;
+                            const dy = y - typhoonY;
                             
-                            if (isCastleColor) {
-                                damagedColorCodes.add(lowerHex);
-                                onCastle = true; 
+                            // 円の内側かどうかを判定します
+                            if (dx * dx + dy * dy <= rSq) {
+                                const hex = getPixelHex(x, y);
+                                if (hex) {
+                                    // 読み取った色（既に小文字・#付き）がリストにあるか確認します
+                                    if (validCastleColors.has(hex)) {
+                                        damagedColorCodes.add(hex);
+                                        onCastle = true; 
+                                    }
+                                }
                             }
                         }
                     }
@@ -238,7 +255,7 @@ window.GameEvents.push({
 
                 let baseDecay;
                 if (onCastle) {
-                    baseDecay = (Math.random() * 1.0) - 0.2; // ★ 拠点（点）に当たった時用に調整
+                    baseDecay = (Math.random() * 1.0) - 0.2; 
                 } else {
                     baseDecay = (Math.random() * 1.5) - 1.4; 
                 }
@@ -247,7 +264,7 @@ window.GameEvents.push({
 
                 if (onCastle) {
                     castleHitCount++;
-                    let castleDecay = 0.3 + (castleHitCount * 0.1); // ★ 拠点に当たるとゴリッと減衰します
+                    let castleDecay = 0.3 + (castleHitCount * 0.1); 
                     typhoonRadius -= (baseDecay + northDecay + castleDecay);
                 } else {
                     castleHitCount = 0; 
@@ -264,15 +281,20 @@ window.GameEvents.push({
             // ★ 被害を受ける「拠点」と、その拠点が所属する「国」をまとめます
             if (game.castles && game.castles.length > 0) {
                 for (let castle of game.castles) {
-                    const castleColor = castle.color_code || castle.colorCode;
-                    if (castleColor && damagedColorCodes.has(castleColor.toLowerCase())) {
-                        const shift = Math.floor(Math.random() * 3) - 1;
-                        let finalScale = Math.max(1, Math.min(10, baseScale + shift));
-                        damagedCastleMap.set(castle.id, finalScale); 
+                    // ★ こちらも修正ポイントです！
+                    let castleColor = (castle.castlesColorCode || castle.colorCode || castle.color_code || "").trim().toLowerCase();
+                    if (castleColor) {
+                        if (!castleColor.startsWith("#")) castleColor = "#" + castleColor;
                         
-                        // ★ ついでに所属している国も登録しておきます（後で白地図を塗るためです）
-                        if (!damagedProvinceMap.has(castle.provinceId)) {
-                            damagedProvinceMap.set(castle.provinceId, finalScale);
+                        // 統一フォーマット同士で完璧に一致するかチェックします
+                        if (damagedColorCodes.has(castleColor)) {
+                            const shift = Math.floor(Math.random() * 3) - 1;
+                            let finalScale = Math.max(1, Math.min(10, baseScale + shift));
+                            damagedCastleMap.set(castle.id, finalScale); 
+                            
+                            if (!damagedProvinceMap.has(castle.provinceId)) {
+                                damagedProvinceMap.set(castle.provinceId, finalScale);
+                            }
                         }
                     }
                 }
