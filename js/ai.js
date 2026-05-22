@@ -822,6 +822,11 @@ class AIEngine {
             const myForce = myCastle.soldiers + (myReinfPower / 3);
             const forceRatio = myForce / Math.max(1, enemyForce);
             
+            // ★今回追加：相手が「隙だらけ」かどうかを見極める魔法です！
+            // 敵の兵士数が2000未満で、かつこちらの戦力が3倍以上あるか、
+            // または兵士数に関係なく戦力比が4倍以上ある場合は「隙だらけのチャンス」とみなします。
+            const isVulnerable = (target.soldiers < 2000 && forceRatio >= 3.0) || forceRatio >= 4.0;
+            
             let prob = 0;
             if (forceRatio < 0.4) {
                 // ★玉砕防止ストッパー：相手が2.5倍以上の絶望的な戦力なら、絶対に城から出ない！
@@ -833,7 +838,12 @@ class AIEngine {
             } else if (forceRatio >= 2.5) {
                 // ★変更：相手がどれだけ弱くても、点数の上限を35点でストップさせます！
                 // これで「弱小勢力への異常な執着」を防ぎます。
-                prob = 35; 
+                // ★さらに追加：ただし、相手が「隙だらけ」の場合は、特別に上限を45点まで引き上げて優先させます！
+                if (isVulnerable) {
+                    prob = 45;
+                } else {
+                    prob = 35; 
+                }
             } else if (forceRatio >= 1.5) {
                 // 相手の1.5倍〜2.5倍の時（有利な戦い）
                 prob = 20 + (forceRatio - 1.5) * 15; 
@@ -888,6 +898,11 @@ class AIEngine {
                     }
                 });
             }
+
+            // ★今回追加：相手が隙だらけなら「サクッと落とせる」と判断して、周りの敵への警戒を半分に減らします！
+            if (isVulnerable) {
+                totalCautionPenalty = totalCautionPenalty / 2;
+            }
             prob -= totalCautionPenalty;
 
             // ★今回追加：その城を取った後の戦況を考えて、周囲の敵城や味方城を警戒・計算する魔法！
@@ -934,8 +949,11 @@ class AIEngine {
             prob -= (futureEnemyNeighbors * 4);
             
             // ★追加：新しく隣接してしまう敵勢力がいる場合、戦線が広がるのを嫌がって大きくスコアを下げます（1勢力につき10点マイナス）
+            // ★今回追加：隙だらけなら、このペナルティも半分にして前向きに攻めさせます！
             if (newEnemyClanCount > 0) {
-                prob -= (newEnemyClanCount * 10);
+                let expandPenalty = newEnemyClanCount * 10;
+                if (isVulnerable) expandPenalty = expandPenalty / 2;
+                prob -= expandPenalty;
             }
             
             // 味方の隣接城が多いほど守りやすいため優先します（最低1城は隣接しているので -1 して、1城につき3点プラス）
@@ -976,7 +994,10 @@ class AIEngine {
                 // すでに敵対している場合は、恐怖を捨てて立ち向かうためペナルティは免除します！
                 if (vsMyPowerRatio >= 1.2 && rel.status !== '敵対') {
                     // 自分より1.2倍以上大きい相手には、一気にペナルティを与えます。
-                    prob -= (vsMyPowerRatio - 1.2) * 30;
+                    // ★今回追加：ただし相手が隙だらけの時は「格上だけど今なら勝てる！」と判断してペナルティを半分にします！
+                    let powerPenalty = (vsMyPowerRatio - 1.2) * 30;
+                    if (isVulnerable) powerPenalty = powerPenalty / 2;
+                    prob -= powerPenalty;
                 }
 
                 // ★今回追加：その城を攻撃して新しく敵対することによって、自軍の城がすべて囲まれてしまう（糧攻状態になってしまう）リスクを計算する魔法！
@@ -1027,6 +1048,7 @@ class AIEngine {
                 });
                 
                 // 囲まれてしまう城が1つでもある場合、攻撃スコアを大きく下げます（1城につき -50 点）
+                // 糧攻状態になるのは致命的なので、ここは隙だらけでもペナルティはそのままにします
                 if (starvingRiskCount > 0) {
                     prob -= (starvingRiskCount * 50);
                 }
