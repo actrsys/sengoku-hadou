@@ -1284,114 +1284,124 @@ class IndependenceSystem {
     
     /**
      * 新大名家用の色を生成する処理
-     * （隣接大名家、およびその大名家に隣接する大名家の色から遠く、見やすい色を選択）
+     * （隣接度合いに応じてペナルティを変え、324パターンの固定色から最適な色を探索）
      */
     generateDistinctColor(castle) {
-        const neighborClanIds = new Set();
-        const degree1Clans = new Set();
+        const degree1Clans = new Set(); // 第1隣接（直接隣接 ＆ 旧主家）
+        const degree2Clans = new Set(); // 第2隣接（第1隣接の隣）
+        const degree3Clans = new Set(); // 第3隣接（第2隣接の隣）
         
-        // 独立元の主家（元の持ち主）も絶対に避ける色として追加しておきます
+        // 独立元の主家（元の持ち主）は絶対に避ける色として第1隣接に設定します
         if (castle.ownerClan !== 0) {
-            neighborClanIds.add(castle.ownerClan);
             degree1Clans.add(castle.ownerClan);
         }
         
-        // 1. 独立する城に隣接する城から「第1隣接大名」を取得
+        // 1. 独立する城に直接隣接する城の持ち主（第1隣接）を取得します
         if (castle.adjacentCastleIds) {
             for (const adjId of castle.adjacentCastleIds) {
                 const adjCastle = this.game.castles.find(c => c.id === adjId);
                 if (adjCastle && adjCastle.ownerClan !== 0) {
                     degree1Clans.add(adjCastle.ownerClan);
-                    neighborClanIds.add(adjCastle.ownerClan);
                 }
             }
         }
         
-        // 2. 「第1隣接大名」が所有するすべての城を起点に、さらに隣接する城の持ち主（第2隣接大名）を取得
+        // 2. 第1隣接大名が所有する城を起点に、さらに隣接する城の持ち主（第2隣接）を取得します
         for (const c of this.game.castles) {
             if (degree1Clans.has(c.ownerClan)) {
                 if (c.adjacentCastleIds) {
                     for (const adjId of c.adjacentCastleIds) {
                         const adjCastle = this.game.castles.find(c2 => c2.id === adjId);
-                        if (adjCastle && adjCastle.ownerClan !== 0) {
-                            neighborClanIds.add(adjCastle.ownerClan);
+                        if (adjCastle && adjCastle.ownerClan !== 0 && !degree1Clans.has(adjCastle.ownerClan)) {
+                            degree2Clans.add(adjCastle.ownerClan);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. 第2隣接大名が所有する城を起点に、さらに隣接する城の持ち主（第3隣接）を取得します
+        for (const c of this.game.castles) {
+            if (degree2Clans.has(c.ownerClan)) {
+                if (c.adjacentCastleIds) {
+                    for (const adjId of c.adjacentCastleIds) {
+                        const adjCastle = this.game.castles.find(c2 => c2.id === adjId);
+                        if (adjCastle && adjCastle.ownerClan !== 0 && !degree1Clans.has(adjCastle.ownerClan) && !degree2Clans.has(adjCastle.ownerClan)) {
+                            degree3Clans.add(adjCastle.ownerClan);
                         }
                     }
                 }
             }
         }
         
-        // ★追加：滅亡していない（城を1つ以上持っている）大名家のリストを作ります
+        // 生存している（城を持っている）大名家のリストを作ります
         const aliveClanIds = new Set(this.game.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan));
         
-        // ★変更：対象となる大名家の色を、「周辺大名」と「それ以外の生存大名」に分けてリストアップします
-        const neighborColors = [];
-        const otherAliveColors = [];
+        // 距離ごとに大名家の色を分ける箱を用意します
+        const deg1Colors = [];
+        const deg2Colors = [];
+        const deg3Colors = [];
+        const otherColors = [];
         
         for (const clanId of aliveClanIds) {
             const clan = this.game.clans.find(c => c.id === clanId);
             if (clan && clan.color) {
                 const rgb = this.hexToRgb(clan.color);
                 if (rgb) {
-                    if (neighborClanIds.has(clanId)) {
-                        neighborColors.push(rgb); // 周辺の大名家
-                    } else {
-                        otherAliveColors.push(rgb); // それ以外の遠くの大名家
-                    }
+                    if (degree1Clans.has(clanId)) deg1Colors.push(rgb);
+                    else if (degree2Clans.has(clanId)) deg2Colors.push(rgb);
+                    else if (degree3Clans.has(clanId)) deg3Colors.push(rgb);
+                    else otherColors.push(rgb);
                 }
             }
-        }
-        
-        // 周辺にも他所にも大名家が一つもない場合は、ランダムな色を返します（念のため）
-        if (neighborColors.length === 0 && otherAliveColors.length === 0) {
-            const h = Math.random(); 
-            const s = 0.5 + Math.random() * 0.4;
-            const l = 0.4 + Math.random() * 0.3;
-            return this.hslToHex(h, s, l);
         }
         
         let bestColor = "#ffffff";
         let maxScore = -1;
         
-        // 運任せにならないように、色相(色合い)を均等に分けた候補を36個(10度ずつ)作って比べます
+        // 色相(H)を36段階、彩度(S)を3段階、明度(L)を3段階の、合計324パターンを総当たりでテストします
+        const s_values = [0.5, 0.75, 1.0];
+        const l_values = [0.3, 0.5, 0.7];
+
         for (let i = 0; i < 36; i++) {
-            const h = i / 36; // 0から1まで均等に色合いをずらします
-            const s = 0.6 + Math.random() * 0.3; // 彩度: 60%〜90%
-            const l = 0.4 + Math.random() * 0.2; // 明度: 40%〜60%
-            
-            const hex = this.hslToHex(h, s, l);
-            const rgb = this.hexToRgb(hex);
-            
-            // ★周辺の大名家との一番近い色との距離を測ります（最も似てほしくない！）
-            let minNeighborDist = Infinity;
-            for (const exColor of neighborColors) {
-                const dist = Math.sqrt(Math.pow(rgb.r - exColor.r, 2) + Math.pow(rgb.g - exColor.g, 2) + Math.pow(rgb.b - exColor.b, 2));
-                if (dist < minNeighborDist) {
-                    minNeighborDist = dist;
+            const h = i / 36; 
+            for (const s of s_values) {
+                for (const l of l_values) {
+                    const hex = this.hslToHex(h, s, l);
+                    const rgb = this.hexToRgb(hex);
+                    
+                    // 各グループ（第1隣接など）の中で、一番似ている（距離が近い）色との差を計算する道具です
+                    const calcMinDist = (colors) => {
+                        let minDist = Infinity;
+                        for (const exColor of colors) {
+                            // 色の違いを計算します
+                            const dist = Math.sqrt(Math.pow(rgb.r - exColor.r, 2) + Math.pow(rgb.g - exColor.g, 2) + Math.pow(rgb.b - exColor.b, 2));
+                            if (dist < minDist) minDist = dist;
+                        }
+                        return minDist === Infinity ? 1000 : minDist; // 比較対象がいなければ満点（1000）
+                    };
+
+                    const dist1 = calcMinDist(deg1Colors);
+                    const dist2 = calcMinDist(deg2Colors);
+                    const dist3 = calcMinDist(deg3Colors);
+                    const distOther = calcMinDist(otherColors);
+
+                    // 点数計算：数字が大きいほど「他の勢力と色が違って見やすい」という意味になります。
+                    // 近くの大名ほど「絶対に似てはいけない」のでそのままの厳しさで評価します。
+                    // 遠くの大名はある程度似ていても仕方ないので、数字を水増しして甘く評価します。
+                    const score = Math.min(
+                        dist1,              // 第1隣接（旧主家含む）はそのまま（最重視）
+                        dist2 * 1.2,        // 第2隣接は少し甘く
+                        dist3 * 1.5,        // 第3隣接はさらに甘く
+                        distOther * 2.0     // 遠方の大名はかなり甘く
+                    );
+
+                    // 一番点数が高かった（一番被らない）色をベストな色として記録します
+                    if (score > maxScore) {
+                        maxScore = score;
+                        bestColor = hex;
+                    }
                 }
-            }
-
-            // ★遠くの生存している大名家との一番近い色との距離も測ります
-            let minOtherDist = Infinity;
-            for (const exColor of otherAliveColors) {
-                const dist = Math.sqrt(Math.pow(rgb.r - exColor.r, 2) + Math.pow(rgb.g - exColor.g, 2) + Math.pow(rgb.b - exColor.b, 2));
-                if (dist < minOtherDist) {
-                    minOtherDist = dist;
-                }
-            }
-
-            // 周辺の大名がいなければ満点扱い
-            if (minNeighborDist === Infinity) minNeighborDist = 1000;
-            // 遠くの大名がいなければ満点扱い
-            if (minOtherDist === Infinity) minOtherDist = 1000;
-
-            // ★点数計算：周辺の大名家との違いを最も重視しつつ、全国の大名家とも似ていない色を高得点にします
-            // 「遠くの大名と似ている」のは「隣の大名と似ている」よりはマシなので、遠くの距離は1.5倍甘く評価します
-            let score = Math.min(minNeighborDist, minOtherDist * 1.5);
-
-            if (score > maxScore) {
-                maxScore = score;
-                bestColor = hex;
             }
         }
         
