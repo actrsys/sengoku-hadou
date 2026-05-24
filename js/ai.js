@@ -870,6 +870,11 @@ class AIEngine {
             const sentiment = typeof rel.sentiment !== 'undefined' ? rel.sentiment : 50; 
             prob += (50 - sentiment) * 0.2;
 
+            // ★追加：関係が「友好」の場合は、攻撃をためらうようにマイナス補正を入れます
+            if (rel.status === '友好') {
+                prob -= 20;
+            }
+
             // 性格による補正関数
             const getPersonalityBonus = (p) => {
                 if (p === 'aggressive') return 5;
@@ -2035,11 +2040,11 @@ class AIEngine {
                 }
             }
             
-            // ★追加 11. 登用（浪人がいる場合、超低確率）
+            // ★追加 11. 登用（浪人がいる場合、やや優先度を上げる）
             const ronins = this.game.getCastleBushos(castle.id).filter(b => b.status === 'ronin');
             if (ronins.length > 0) {
-                // 雀の涙ほどの優先度（5点）にしてあります
-                actions.push({ type: 'employ', stat: 'charm', score: 5, cost: 0, targetRonin: ronins[0] });
+                // 優先度をやや上げて15点にします（上げすぎず、ちょっとすぎないバランス）
+                actions.push({ type: 'employ', stat: 'charm', score: 15, cost: 0, targetRonin: ronins[0] });
             }
 
             // ★追加: 領内の諸勢力への親善（友好度90未満の場合に検討）
@@ -2086,6 +2091,11 @@ class AIEngine {
             const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && b.status === 'active');
             
             for (let b of castleBushos) {
+                // 今月すでに褒美をもらっている人は除外します
+                if (b.lastRewardedTurnId === this.game.getCurrentTurnId()) {
+                    continue;
+                }
+
                 if ((b.recognitionNeed || 0) < 0) {
                     continue; // マイナスの人は飛ばして、次の人の順番に行きます！
                 }
@@ -2316,6 +2326,8 @@ class AIEngine {
                         targetBusho.loyalty = Math.min(100, targetBusho.loyalty + loyaltyUp);
                         
                         // ★「行動済」マークもつけません！
+                        targetBusho.lastRewardedTurnId = this.game.getCurrentTurnId(); // 今月褒美をもらったことを記録します
+                        step--; // 行動回数を消費しないようにします
                         actionDoneInThisStep = true; 
                         break; 
                     }
