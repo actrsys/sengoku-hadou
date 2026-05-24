@@ -1231,41 +1231,53 @@ class GameManager {
         // ★追加：現在生き残っている（城を1つ以上持っている）大名家の出席番号リストを作ります
         const aliveClanIds = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan));
 
-        // まず、今の大名に合わせて本来の名前（baseName）を更新します
+        // まず、今の大名に合わせて本来の名前（baseName）と読み（baseYomi）を更新します
         this.clans.forEach(clan => {
             // ★変更：空き家（0）や、生き残りリストに入っていない（滅亡した）大名家は無視します
             if (clan.id === 0 || !aliveClanIds.has(clan.id)) return; 
             const leader = this.getBusho(clan.leaderId);
             if (leader && leader.familyName) {
                 clan.baseName = leader.familyName + "家";
-            } else if (!clan.baseName) {
-                clan.baseName = clan.name;
+                clan.baseYomi = (leader.familyYomi || "") + "け"; // ★読み仮名も「〇〇け」で覚えます
+            } else {
+                if (!clan.baseName) clan.baseName = clan.name;
+                if (!clan.baseYomi) clan.baseYomi = clan.yomi;
             }
-            // 表示用の名前を一旦本来の名前にリセットします
+            // 表示用の名前と読みを一旦本来のものにリセットします
             clan.name = clan.baseName;
+            clan.yomi = clan.baseYomi;
         });
 
-        // 本来の名前で被っている数を数えます
-        const nameCounts = {};
+        // 本来の名前でグループ分けをして、被っている大名家をまとめます
+        const clanGroups = {};
         this.clans.forEach(clan => {
-            if (clan.id === 0 || !aliveClanIds.has(clan.id)) return; // ★ここも同じようにガードします
+            if (clan.id === 0 || !aliveClanIds.has(clan.id)) return; 
             const baseName = clan.baseName;
-            nameCounts[baseName] = (nameCounts[baseName] || 0) + 1;
+            if (!clanGroups[baseName]) clanGroups[baseName] = [];
+            clanGroups[baseName].push(clan);
         });
 
-        // 1回目のチェック：被っていたら国名（「国」抜き）をつける
-        this.clans.forEach(clan => {
-            if (clan.id === 0 || !aliveClanIds.has(clan.id)) return; // ★ここもガード
-            const baseName = clan.baseName;
-            if (nameCounts[baseName] > 1) {
-                const leader = this.getBusho(clan.leaderId);
-                if (leader) {
-                    const castle = this.getCastle(leader.castleId);
-                    if (castle) {
-                        const province = this.provinces.find(p => p.id === castle.provinceId);
-                        if (province && province.province) {
-                            const provName = province.province.replace(/国$/, "");
-                            clan.name = provName + baseName;
+        // 1回目のチェック：被っていたら、威信が2位以下の勢力に国名（「国」抜き）をつける
+        Object.values(clanGroups).forEach(group => {
+            if (group.length > 1) {
+                // 同じ名前の勢力同士を、大名の威信（daimyoPrestige）が高い順に並べ替えます
+                group.sort((a, b) => b.daimyoPrestige - a.daimyoPrestige);
+
+                // 威信トップ（[0]）には何もつけず、2位以下（[1]以降）にだけ国名をつけます
+                for (let i = 1; i < group.length; i++) {
+                    const clan = group[i];
+                    const leader = this.getBusho(clan.leaderId);
+                    if (leader) {
+                        const castle = this.getCastle(leader.castleId);
+                        if (castle) {
+                            const province = this.provinces.find(p => p.id === castle.provinceId);
+                            if (province && province.province) {
+                                const provName = province.province.replace(/国$/, "");
+                                // ★国名の読みから「のくに」を抜きます
+                                const provYomi = (province.provinceYomi || "").replace(/のくに$/, "");
+                                clan.name = provName + clan.baseName;
+                                clan.yomi = provYomi + clan.baseYomi;
+                            }
                         }
                     }
                 }
@@ -1275,21 +1287,29 @@ class GameManager {
         // 新しい名前で被っている数をもう一度数えます
         const newNameCounts = {};
         this.clans.forEach(clan => {
-            if (clan.id === 0 || !aliveClanIds.has(clan.id)) return; // ★ここもガード
+            if (clan.id === 0 || !aliveClanIds.has(clan.id)) return;
             newNameCounts[clan.name] = (newNameCounts[clan.name] || 0) + 1;
         });
 
-        // 2回目のチェック：国名をつけても被っていたら城名（「城」抜き）をつける
-        this.clans.forEach(clan => {
-            if (clan.id === 0 || !aliveClanIds.has(clan.id)) return; // ★ここもガード
-            const baseName = clan.baseName;
-            if (nameCounts[baseName] > 1 && newNameCounts[clan.name] > 1) {
-                const leader = this.getBusho(clan.leaderId);
-                if (leader) {
-                    const castle = this.getCastle(leader.castleId);
-                    if (castle && castle.name) {
-                        const castleName = castle.name.replace(/城$/, "");
-                        clan.name = castleName + baseName;
+        // 2回目のチェック：国名をつけても被っていたら城・館・御所の名前をつける
+        Object.values(clanGroups).forEach(group => {
+            if (group.length > 1) {
+                // ここでも威信2位以下の勢力だけを対象に、まだ名前が被っているかチェックします
+                for (let i = 1; i < group.length; i++) {
+                    const clan = group[i];
+                    if (newNameCounts[clan.name] > 1) {
+                        const leader = this.getBusho(clan.leaderId);
+                        if (leader) {
+                            const castle = this.getCastle(leader.castleId);
+                            if (castle && castle.name) {
+                                // ★城だけでなく、館（やかた）、御所（ごしょ）、御坊（ごぼう）も抜くように対応します
+                                const castleName = castle.name.replace(/(城|館|御所|御坊)$/, "");
+                                // ★読み仮名からも、じょう、やかた、ごしょ、ごぼうを抜きます
+                                const castleYomi = (castle.yomi || "").replace(/(じょう|やかた|ごしょ|ごぼう)$/, "");
+                                clan.name = castleName + clan.baseName;
+                                clan.yomi = castleYomi + clan.baseYomi;
+                            }
+                        }
                     }
                 }
             }
