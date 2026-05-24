@@ -719,11 +719,22 @@ class AIOperationManager {
             // 第一目標のデータを取り出します
             const firstTarget = attackTargets[0];
             
+            // ★追加：目標が「兵糧攻め状態」かどうかを調べます！
+            let isTargetStarving = false;
+            // 諸勢力ではなく、通常のお城を狙う時だけ確認します
+            if (!firstTarget.isKunishuTarget) {
+                const targetCastle = this.game.getCastle(firstTarget.targetId);
+                if (targetCastle && targetCastle.statusEffects && targetCastle.statusEffects.includes('糧攻')) {
+                    isTargetStarving = true; // 兵糧攻め状態ならシールを貼っておきます
+                }
+            }
+            
             // ★追加：一番点数が高かった出撃元のお城の兵士数が、√石高×200以上あるかチェックします！
             const stagingCastle = this.game.getCastle(firstTarget.stagingBase);
             if (stagingCastle) {
                 const requiredSoldiers = Math.sqrt(stagingCastle.kokudaka) * 200;
-                if (stagingCastle.soldiers < requiredSoldiers) {
+                // ★変更：目標が兵糧攻め状態ではない時だけ、兵士不足の足切りを行います！
+                if (!isTargetStarving && stagingCastle.soldiers < requiredSoldiers) {
                     // 兵士が足りない場合は、この月の攻撃作戦を諦めて内政にします
                     this.setInternalOperation(clanId, legionId, sabotageTargets);
                     return;
