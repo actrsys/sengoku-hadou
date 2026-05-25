@@ -16,6 +16,7 @@ class Clan {
         
         // ★大名家の読み仮名を覚える箱を用意します
         this.yomi = data.yomi || "";
+        this.baseYomi = data.baseYomi || data.yomi || "";
 
         // 外交データの初期化
         this.diplomacyValue = this.diplomacyValue || {};
@@ -183,7 +184,10 @@ class Castle {
         delete this.loyalty;
         
         this.training = Number(this.training || 0);
+        this.maxTraining = Number(data.maxTraining !== undefined ? data.maxTraining : 100);
+
         this.morale = Number(this.morale || 0);
+        this.maxMorale = Number(data.maxMorale !== undefined ? data.maxMorale : 100);
         
         this.kokudaka = Number(this.kokudaka || 0);
         this.maxKokudaka = Number(data.maxKokudaka !== undefined ? data.maxKokudaka : this.kokudaka);
@@ -510,6 +514,9 @@ class Busho {
 
         // ★今回追加：引抜や離間計を仕掛けてきた勢力の出席番号を覚えるための箱です！
         this.lastApproachedClanId = Number(data.lastApproachedClanId || 0);
+
+        // ★追加：最後に褒美をもらった月（ターンID）を覚える箱です！
+        this.lastRewardedTurnId = Number(data.lastRewardedTurnId || 0);
     }
 
     // ★新しく追加：武将自身のデータには軍団IDを持たせず、今いる「お城」のデータを覗きに行く魔法です！

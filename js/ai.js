@@ -1337,9 +1337,10 @@ class AIEngine {
         const gunshiInt = gunshi ? gunshi.intelligence : 0;
         const gunshiCap = Math.floor(50 + (gunshiInt / 2));
 
-        const targetMaxLoyalty = Math.max(Math.floor(50 + (leader.politics / 2)), gunshiCap);
-        const targetMaxTraining = Math.max(Math.floor(50 + (leader.strength / 2)), gunshiCap);
-        const targetMaxMorale = Math.max(Math.floor(50 + (leader.leadership / 2)), gunshiCap);
+        // ★修正：能力が100を超えた時、永遠に「足りない」と勘違いして内政ループするのを防ぐため、本来の最大値でストッパーをかけます！
+        const targetMaxLoyalty = Math.min(castle.maxPeoplesLoyalty || 100, Math.max(Math.floor(50 + (leader.politics / 2)), gunshiCap));
+        const targetMaxTraining = Math.min(castle.maxTraining || 100, Math.max(Math.floor(50 + (leader.strength / 2)), gunshiCap));
+        const targetMaxMorale = Math.min(castle.maxMorale || 100, Math.max(Math.floor(50 + (leader.leadership / 2)), gunshiCap));
 
         // ★魔法の改善：最初にお城の繋がりを1回だけ全部調べて、リストを作ります！
         const reachableMyCastles = [];
