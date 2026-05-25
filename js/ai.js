@@ -1315,9 +1315,11 @@ class AIEngine {
         // ① 大名を取得します（全体で使う用）
         const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
 
-        // ★追加：行動回数の計算基準となる「リーダー（直轄なら大名、それ以外なら国主）」を決めます！
+        // ★追加：行動回数の計算基準となる「リーダー（直轄なら大名、それ以外なら国主）」と「軍師」を決めます！
         let leader = daimyo;
+
         if (castle.legionId !== 0) {
+            // 軍団所属城の場合
             const legion = this.game.legions ? this.game.legions.find(l => l.clanId === castle.ownerClan && l.legionNo === castle.legionId) : null;
             if (legion && legion.commanderId) {
                 const commander = this.game.getBusho(legion.commanderId);
@@ -1326,6 +1328,18 @@ class AIEngine {
                 }
             }
         }
+
+        // ★修正：軍師は大名家（勢力）に1人だけなので、軍団の場所に関係なく勢力全体から探し出します！
+        const gunshi = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isGunshi);
+
+        // ★追加：リーダーと軍師の能力から、AIが「目指すべき最大値（キャップ）」を計算する魔法！
+        // リーダーは各能力、軍師は智謀で計算し、高い方を採用します（50 + 能力/2）
+        const gunshiInt = gunshi ? gunshi.intelligence : 0;
+        const gunshiCap = Math.floor(50 + (gunshiInt / 2));
+
+        const targetMaxLoyalty = Math.max(Math.floor(50 + (leader.politics / 2)), gunshiCap);
+        const targetMaxTraining = Math.max(Math.floor(50 + (leader.strength / 2)), gunshiCap);
+        const targetMaxMorale = Math.max(Math.floor(50 + (leader.leadership / 2)), gunshiCap);
 
         // ★魔法の改善：最初にお城の繋がりを1回だけ全部調べて、リストを作ります！
         const reachableMyCastles = [];
@@ -1477,11 +1491,16 @@ class AIEngine {
                 actions.push({ type: 'repair', stat: 'politics', score: score, cost: 200 });
             }
 
-            // 2. 施し（民忠70以下なら優先！）
-            if (perceivedLoyalty < 100) {
+            // 2. 施し（目標の最大値未満なら優先！）
+            if (perceivedLoyalty < targetMaxLoyalty) {
                 let score = 0;
-                if (perceivedLoyalty <= 70) score = 120; // ★修正：思い込みステータスで判定
-                else score = (100 - perceivedLoyalty) * 2; // ★修正：思い込みステータスで計算
+                // 目標の7割以下なら緊急事態として高いスコアをつけます
+                if (perceivedLoyalty <= targetMaxLoyalty * 0.7) {
+                    score = 120;
+                } else {
+                    // ★修正：固定の100ではなく、目標値からどれだけ足りないかでスコアを出します
+                    score = (targetMaxLoyalty - perceivedLoyalty) * 2;
+                }
                 actions.push({ type: 'charity', stat: 'charm', score: score, cost: 200 }); 
             }
 
@@ -1688,14 +1707,16 @@ class AIEngine {
             }
 
             // 4. 訓練
-            if (perceivedTraining < 100) {
-                let score = 100 - perceivedTraining; // ★修正：思い込みステータスで計算
+            if (perceivedTraining < targetMaxTraining) {
+                // ★修正：固定の100ではなく、目標値からどれだけ足りないかでスコアを出します
+                let score = targetMaxTraining - perceivedTraining;
                 actions.push({ type: 'training', stat: 'leadership', score: score, cost: 0 }); 
             }
 
             // 5. 兵施し（士気）
-            if (perceivedMorale < 100) {
-                let score = 100 - perceivedMorale; // ★修正：思い込みステータスで計算
+            if (perceivedMorale < targetMaxMorale) {
+                // ★修正：固定の100ではなく、目標値からどれだけ足りないかでスコアを出します
+                let score = targetMaxMorale - perceivedMorale;
                 actions.push({ type: 'soldier_charity', stat: 'leadership', score: score, cost: 200 }); 
             }
 
