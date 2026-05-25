@@ -41,7 +41,12 @@ body {
 
 /* 画面内のすべての場所で、専用のカーソル（金の矢尻と赤いひし形）を使う魔法です */
 * {
-    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M 0,0 L 20,8 L 10,10 Z" fill="%23fff59d" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 10,10 L 8,20 Z" fill="%23fbc02d" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,10 10,10 14,6" fill="%23ff8a80" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,10 14,6 18,10" fill="%23ff5252" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,10 10,10 14,14" fill="%23d50000" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,10 18,10 14,14" fill="%23b71c1c" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/></svg>') 0 0, auto !important;
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="14,14 10,10 16,12" fill="%23ff8a80" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,14 10,10 12,16" fill="%23ff5252" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,14 16,12 18,18" fill="%23d50000" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,14 12,16 18,18" fill="%23b71c1c" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 20,8 L 10,10 Z" fill="%23fff59d" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 10,10 L 8,20 Z" fill="%23fbc02d" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/></svg>') 0 0, auto !important;
+}
+
+/* スライダーを掴んだり、ボタンを押したりしている時（押し込み感）の魔法です */
+*:active {
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="12,12 10,10 14,11" fill="%23ff8a80" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="12,12 10,10 11,14" fill="%23ff5252" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="12,12 14,11 15,15" fill="%23d50000" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="12,12 11,14 15,15" fill="%23b71c1c" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 20,8 L 10,10 Z" fill="%23fff176" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 10,10 L 8,20 Z" fill="%23f9a825" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/></svg>') 0 0, auto !important;
 }
 
 #game-screen {
