@@ -36,25 +36,51 @@ window.GameEvents.push({
         const damagedProvinceMap = new Map();
         const damagedPlayerCastles = [];      
         
-        let baseScale = 1;
+        // ★修正：円の大きさ用（visualScale）と、ダメージ規模用（damageScale）を分けます！
+        
+        // 1. まずは「見た目の大きさ（visualScale）」を今まで通りランダムに決めます
+        let visualScale = 1;
         const scaleDice = Math.random() * 100; 
 
         if (scaleDice < 10) {
-            baseScale = 1; 
+            visualScale = 1; 
         } else if (scaleDice < 35) {
-            baseScale = 2; 
+            visualScale = 2; 
         } else if (scaleDice < 65) {
-            baseScale = 3; 
+            visualScale = 3; 
         } else if (scaleDice < 85) {
-            baseScale = 4; 
+            visualScale = 4; 
         } else if (scaleDice < 93) {
-            baseScale = 5; 
+            visualScale = 5; 
         } else if (scaleDice < 97) {
-            baseScale = 6; 
+            visualScale = 6; 
         } else if (scaleDice < 99) {
-            baseScale = 7; 
+            visualScale = 7; 
         } else {
-            baseScale = Math.floor(Math.random() * 3) + 8; 
+            visualScale = Math.floor(Math.random() * 3) + 8; 
+        }
+
+        // 2. 次に「被害の規模（damageScale）」を決めます。
+        // （低い数字が出やすく、高い数字になるほど極端に出にくくなる「えぐれたピラミッド型」の確率です）
+        let damageScale = 1;
+        const damageDice = Math.random() * 100;
+        
+        if (damageDice < 40) {
+            damageScale = 1; // 40% (一番よく出る、ごく軽微な被害)
+        } else if (damageDice < 65) {
+            damageScale = 2; // 25% (そこそこ出る、軽微な被害)
+        } else if (damageDice < 80) {
+            damageScale = 3; // 15%
+        } else if (damageDice < 90) {
+            damageScale = 4; // 10%
+        } else if (damageDice < 95) {
+            damageScale = 5; // 5%
+        } else if (damageDice < 98) {
+            damageScale = 6; // 3%
+        } else if (damageDice < 99.5) {
+            damageScale = 7; // 1.5% (めったに出ない甚大な被害)
+        } else {
+            damageScale = 8; // 0.5% (数年に一度レベルの超レアな大災害)
         }
 
         const mapOverlay = document.createElement('div');
@@ -177,11 +203,12 @@ window.GameEvents.push({
             let typhoonX = -500 + (r * (width * 0.7 + 500)); 
             let typhoonY = height + 500;
             
-            let initialScale = Math.min(10, Math.max(1, baseScale));
+            // ★修正：円の半径や風の強さは「visualScale（見た目の大きさ）」を使います！
+            let initialScale = Math.min(10, Math.max(1, visualScale));
             let typhoonRadius = 100 + (initialScale * 15); 
             
             const damagedColorCodes = new Set(); 
-            const windStrength = 40 - (initialScale * 3) + (Math.random() * 5); 
+            const windStrength = 40 - (initialScale * 3) + (Math.random() * 5);
 
             // ★ 拠点の色リストを「完全な統一フォーマット（小文字・#付き）」で準備します
             const validCastleColors = new Set();
@@ -289,7 +316,8 @@ window.GameEvents.push({
                         // 統一フォーマット同士で完璧に一致するかチェックします
                         if (damagedColorCodes.has(castleColor)) {
                             const shift = Math.floor(Math.random() * 3) - 1;
-                            let finalScale = Math.max(1, Math.min(10, baseScale + shift));
+                            // ★修正：拠点へのダメージ規模は「damageScale」を基準に計算します！
+                            let finalScale = Math.max(1, Math.min(10, damageScale + shift));
                             damagedCastleMap.set(castle.id, finalScale); 
                             
                             if (!damagedProvinceMap.has(castle.provinceId)) {
