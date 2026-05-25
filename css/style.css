@@ -42,15 +42,31 @@ body {
 /* 画面内のすべての場所で、専用のカーソル（金の矢尻と赤いひし形）を使う魔法です */
 *,
 *::before,
-*::after,
-input[type="range"]::-webkit-slider-thumb,
+*::after {
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="14,14 10,10 16,12" fill="%23ff8a80" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,14 10,10 12,16" fill="%23ff5252" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,14 16,12 18,18" fill="%23d50000" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,14 12,16 18,18" fill="%23b71c1c" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 20,8 L 10,10 Z" fill="%23fff59d" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 10,10 L 8,20 Z" fill="%23fbc02d" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/></svg>') 0 0, auto !important;
+}
+
+/* ChromeやSafariのスライダーのツマミ用の魔法です */
+input[type="range"]::-webkit-slider-thumb {
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="14,14 10,10 16,12" fill="%23ff8a80" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,14 10,10 12,16" fill="%23ff5252" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,14 16,12 18,18" fill="%23d50000" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,14 12,16 18,18" fill="%23b71c1c" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 20,8 L 10,10 Z" fill="%23fff59d" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 10,10 L 8,20 Z" fill="%23fbc02d" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/></svg>') 0 0, auto !important;
+}
+
+/* Firefoxのスライダーのツマミ用の魔法です */
 input[type="range"]::-moz-range-thumb {
     cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="14,14 10,10 16,12" fill="%23ff8a80" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,14 10,10 12,16" fill="%23ff5252" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,14 16,12 18,18" fill="%23d50000" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="14,14 12,16 18,18" fill="%23b71c1c" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 20,8 L 10,10 Z" fill="%23fff59d" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 10,10 L 8,20 Z" fill="%23fbc02d" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/></svg>') 0 0, auto !important;
 }
 
 /* スライダーを掴んだり、ボタンを押したりしている時（押し込み感）の魔法です */
-*:active,
-input[type="range"]:active::-webkit-slider-thumb,
+*:active {
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="13,13 10,10 15,11" fill="%23ff8a80" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="13,13 10,10 11,15" fill="%23ff5252" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="13,13 15,11 16,16" fill="%23d50000" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="13,13 11,15 16,16" fill="%23b71c1c" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 20,8 L 10,10 Z" fill="%23fff176" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 10,10 L 8,20 Z" fill="%23f9a825" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/></svg>') 0 0, auto !important;
+}
+
+/* ChromeやSafariの押し込み感です */
+input[type="range"]:active::-webkit-slider-thumb {
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="13,13 10,10 15,11" fill="%23ff8a80" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="13,13 10,10 11,15" fill="%23ff5252" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="13,13 15,11 16,16" fill="%23d50000" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="13,13 11,15 16,16" fill="%23b71c1c" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 20,8 L 10,10 Z" fill="%23fff176" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 10,10 L 8,20 Z" fill="%23f9a825" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/></svg>') 0 0, auto !important;
+}
+
+/* Firefoxの押し込み感です */
 input[type="range"]:active::-moz-range-thumb {
     cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="13,13 10,10 15,11" fill="%23ff8a80" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="13,13 10,10 11,15" fill="%23ff5252" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="13,13 15,11 16,16" fill="%23d50000" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><polygon points="13,13 11,15 16,16" fill="%23b71c1c" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 20,8 L 10,10 Z" fill="%23fff176" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/><path d="M 0,0 L 10,10 L 8,20 Z" fill="%23f9a825" stroke="%23000000" stroke-width="0.8" stroke-linejoin="round"/></svg>') 0 0, auto !important;
 }
