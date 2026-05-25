@@ -560,7 +560,11 @@ class UIManager {
     }
 
     showDialogAsync(msg, isConfirm = false, autoCloseTime = 0, customOpts = null) {
-        if (this.game && this.game.isWatchMode && autoCloseTime === 0) {
+        // ★追加：確認ダイアログ（はい/いいえ等）や、複数の選択肢があるかをチェックします
+        const hasChoices = isConfirm || (customOpts && customOpts.choices && customOpts.choices.length > 0);
+        
+        // ★変更：観戦モード中でも、選択肢がない時だけ自動で閉じるようにします
+        if (this.game && this.game.isWatchMode && autoCloseTime === 0 && !hasChoices) {
             autoCloseTime = 1000;
         }
         return new Promise(resolve => {
@@ -573,7 +577,11 @@ class UIManager {
 
     showDialog(msg, isConfirm, onOk, onCancel = null, customOpts = null) {
         let autoCloseTime = 0;
-        if (this.game && this.game.isWatchMode) {
+        // ★追加：確認ダイアログ（はい/いいえ等）や、複数の選択肢があるかをチェックします
+        const hasChoices = isConfirm || (customOpts && customOpts.choices && customOpts.choices.length > 0);
+        
+        // ★変更：観戦モード中でも、選択肢がない時だけ自動で閉じるようにします
+        if (this.game && this.game.isWatchMode && !hasChoices) {
             autoCloseTime = 1000;
         }
         this.dialogQueue.push({ msg, isConfirm, onOk, onCancel, autoCloseTime: autoCloseTime, customOpts });
