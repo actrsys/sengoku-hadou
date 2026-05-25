@@ -214,9 +214,48 @@ class CourtRankSystem {
             // 一番偉いランクと同じ rankNo を持つ官位だけを残します（飛び級で一気に上がる！）
             const finalCandidates = candidates.filter(r => r.rankNo === bestRankNo);
 
-            // 同じランクの候補が複数ある場合は、ランダムに1つ選びます
-            const index = Math.floor(Math.random() * finalCandidates.length);
-            const selectedRank = finalCandidates[index];
+            // 大名家が所有しているお城を調べ、そこから国（province）の名前を集めます
+            const clanCastles = this.game.castles ? this.game.castles.filter(c => c.clanId === clan.id) : [];
+            const ownedProvinces = [];
+            clanCastles.forEach(c => {
+                if (c.province) {
+                    // 「武蔵国」などの文字列から、一番最後の「国」を取り除いて「武蔵」にします
+                    const pName = c.province.replace(/国$/, '');
+                    if (!ownedProvinces.includes(pName)) {
+                        ownedProvinces.push(pName);
+                    }
+                }
+            });
+
+            // 領地と一致する「◯◯守」「◯◯介」を優先候補として探します
+            const priorityRanks = finalCandidates.filter(r => {
+                const name = r.rankName2;
+                if (!name) return false; // 名前が設定されていなければパスします
+                
+                // ★追加：隠岐守と秋田城介は優先システムから除外するためパスします
+                if (name === "隠岐守" || name === "秋田城介") return false;
+                
+                // 名前の一番最後が「守」か「介」であるか調べます
+                if (name.endsWith("守") || name.endsWith("介")) {
+                    // 最後の1文字（守・介）を切り取って、国名（◯◯の部分）を取り出します
+                    const provinceName = name.slice(0, -1);
+                    
+                    // プレイヤーの領地リストにその国名が含まれているか確認します
+                    return ownedProvinces.includes(provinceName);
+                }
+                return false;
+            });
+
+            let selectedRank;
+            if (priorityRanks.length > 0) {
+                // 領地と一致する候補が見つかった場合は、その中からランダムに選びます
+                const index = Math.floor(Math.random() * priorityRanks.length);
+                selectedRank = priorityRanks[index];
+            } else {
+                // 条件に合う優先候補がない場合は、今まで通り全体の中からランダムに選びます
+                const index = Math.floor(Math.random() * finalCandidates.length);
+                selectedRank = finalCandidates[index];
+            }
 
             // いよいよ官位を授与します！
             if (this.grantRank(leader, selectedRank.id)) {
