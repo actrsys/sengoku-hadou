@@ -806,14 +806,32 @@ Object.assign(UIManager.prototype, {
 
                         path.setAttribute("fill", "transparent");
                         
+                        // ★ここから変更：道そのものを勢力の色で塗る魔法です！
+                        let strokeColor = "rgba(255, 250, 200, 0.9)"; // デフォルトの陸路の色
                         if (isSeaRoute) {
-                            // 海路の時：少し青っぽくして、透明にして、海路っぽく点線にします！
-                            path.setAttribute("stroke", "rgba(100, 200, 255, 0.7)"); 
+                            strokeColor = "rgba(100, 200, 255, 0.7)"; // デフォルトの海路の色
+                        }
+
+                        // 両方の城が同じ勢力（かつ中立ではない）なら、道に勢力の色をつけます！
+                        if (c1.ownerClan !== 0 && c1.ownerClan === c2.ownerClan) {
+                            const clanData = this.game.clans.find(cl => cl.id === c1.ownerClan);
+                            if (clanData && clanData.color) {
+                                // DataManagerの魔法を使って色コードをRGBに変換します
+                                const rgb = DataManager.hexToRgb(clanData.color);
+                                if (rgb) {
+                                    // 海路の時は少し透明（0.7）、陸路ははっきり（0.9）させます
+                                    strokeColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${isSeaRoute ? 0.7 : 0.9})`;
+                                }
+                            }
+                        }
+
+                        path.setAttribute("stroke", strokeColor);
+                        // ★変更ここまで！
+                        
+                        if (isSeaRoute) {
                             path.setAttribute("stroke-width", "2.0");
                             path.setAttribute("stroke-dasharray", "6, 4"); // 6ピクセル描いて4ピクセル休む「点線」の魔法です
                         } else {
-                            // 普通の陸路の時：今まで通りです
-                            path.setAttribute("stroke", "rgba(255, 250, 200, 0.9)"); 
                             path.setAttribute("stroke-width", "1.5");
                             path.removeAttribute("stroke-dasharray"); // 念のため点線の魔法を消しておきます
                         }
