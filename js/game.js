@@ -741,7 +741,13 @@ class GameSystem {
                     // 自分のお城（自領）だけを通り抜けられるようにします！
                     if (Number(next.ownerClan) === Number(movingClanId)) {
                         canPass = true;
-                    } 
+                    } else if (next.ownerClan !== 0) {
+                        // ★追加：同盟、支配、従属の勢力も通り抜けられるようにします！
+                        const rel = game.getRelation(movingClanId, next.ownerClan);
+                        if (rel && ['同盟', '支配', '従属'].includes(rel.status)) {
+                            canPass = true;
+                        }
+                    }
                     
                     if (canPass) {
                         visited.add(next.id);

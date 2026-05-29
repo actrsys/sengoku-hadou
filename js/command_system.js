@@ -1000,8 +1000,7 @@ class CommandSystem {
 
         return !hasExecutableCommand(targetMenu);
     }
-    // ==========================================
-
+    
     // ★追加：道が繋がっているお城をまとめて調べる共通の魔法です！
     getConnectedCastles(startCastle, clanId) {
         const connectedCastles = new Set();
@@ -1020,6 +1019,47 @@ class CommandSystem {
                 queue.push(n);
             }
         }
+        return connectedCastles;
+    }
+
+    // ★追加：同盟・支配・従属の勢力も通って繋がっているお城を調べる移動・輸送用の魔法です！
+    getConnectedCastlesForMove(startCastle, clanId) {
+        const connectedCastles = new Set();
+        const queue = [startCastle];
+        const visited = new Set();
+        visited.add(Number(startCastle.id));
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const neighbors = this.game.castles.filter(adj => {
+                if (!GameSystem.isAdjacent(current, adj)) return false;
+                if (visited.has(Number(adj.id))) return false;
+
+                // 自分のお城なら通れる
+                if (Number(adj.ownerClan) === Number(clanId)) return true;
+                
+                // 他の勢力でも、同盟・支配・従属なら通れる
+                if (adj.ownerClan !== 0) {
+                    const rel = this.game.getRelation(clanId, adj.ownerClan);
+                    if (rel && ['同盟', '支配', '従属'].includes(rel.status)) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+            
+            for (const n of neighbors) {
+                visited.add(Number(n.id));
+                queue.push(n);
+                // 繋がっている「自領」として登録するのは自分のお城だけ！
+                if (Number(n.ownerClan) === Number(clanId)) {
+                    connectedCastles.add(Number(n.id));
+                }
+            }
+        }
+        
+        // 最初のお城も自領として登録します
+        connectedCastles.add(Number(startCastle.id));
         return connectedCastles;
     }
 
@@ -1104,8 +1144,8 @@ class CommandSystem {
                 ).map(t => t.id);
 
             case 'ally_other': {
-                // ★修正：ターゲットごとに探すのではなく、最初に繋がっている領土をまとめて取得します（超高速化）！
-                const connectedForAlly = this.getConnectedCastles(c, playerClanId);
+                // ★修正：同盟・支配・従属を通って繋がっている領土をまとめて取得します！
+                const connectedForAlly = this.getConnectedCastlesForMove(c, playerClanId);
                 return this.game.castles.filter(target => {
                     if (Number(target.ownerClan) !== playerClanId || target.id === c.id) return false;
                     

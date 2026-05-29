@@ -35,18 +35,32 @@ class AIStaffing {
 
         while (searchQueue.length > 0) {
             const current = searchQueue.shift();
-            reachableMyCastles.push(current);
+            
+            // 自軍団のお城なら、お引越し先の候補リストに入れます
+            if (Number(current.ownerClan) === Number(clanId) && Number(current.legionId) === Number(targetLegionId)) {
+                reachableMyCastles.push(current);
+            }
 
-            const adjMyCastles = this.game.castles.filter(c => 
-                Number(c.ownerClan) === Number(clanId) && 
-                Number(c.legionId) === Number(targetLegionId) && // ★修正：本来の軍団のお城だけに制限します！
+            const adjCastles = this.game.castles.filter(c => 
                 GameSystem.isAdjacent(current, c) &&
                 !visitedCastles.has(c.id)
             );
 
-            for (const n of adjMyCastles) {
-                visitedCastles.add(n.id);
-                searchQueue.push(n);
+            for (const n of adjCastles) {
+                let canPass = false;
+                if (Number(n.ownerClan) === Number(clanId)) {
+                    canPass = true; // 自分の大名家なら他の軍団の城でも通行OK
+                } else if (n.ownerClan !== 0) {
+                    const rel = this.game.getRelation(clanId, n.ownerClan);
+                    if (rel && ['同盟', '支配', '従属'].includes(rel.status)) {
+                        canPass = true; // 同盟・支配・従属の勢力も通行OK
+                    }
+                }
+                
+                if (canPass) {
+                    visitedCastles.add(n.id);
+                    searchQueue.push(n);
+                }
             }
         }
 
@@ -584,8 +598,44 @@ class AIStaffing {
         this.clearCacheIfNeeded();
         const clanId = castle.ownerClan;
         
+        // ★追加：移動可能な城を、同盟・支配・従属を通れるルートで探し直します！
+        const myReachableCastles = [];
+        const visitedCastles = new Set();
+        const searchQueue = [castle];
+        visitedCastles.add(castle.id);
+
+        while (searchQueue.length > 0) {
+            const current = searchQueue.shift();
+            
+            if (Number(current.ownerClan) === Number(clanId)) {
+                myReachableCastles.push(current);
+            }
+
+            const adjCastles = this.game.castles.filter(c => 
+                GameSystem.isAdjacent(current, c) &&
+                !visitedCastles.has(c.id)
+            );
+
+            for (const n of adjCastles) {
+                let canPass = false;
+                if (Number(n.ownerClan) === Number(clanId)) {
+                    canPass = true;
+                } else if (n.ownerClan !== 0) {
+                    const rel = this.game.getRelation(clanId, n.ownerClan);
+                    if (rel && ['同盟', '支配', '従属'].includes(rel.status)) {
+                        canPass = true;
+                    }
+                }
+                
+                if (canPass) {
+                    visitedCastles.add(n.id);
+                    searchQueue.push(n);
+                }
+            }
+        }
+        
         // ★追加：武将の移動先を「同じ軍団のお城」だけに限定します！
-        const sameLegionCastles = reachableMyCastles.filter(c => Number(c.legionId) === Number(castle.legionId));
+        const sameLegionCastles = myReachableCastles.filter(c => Number(c.legionId) === Number(castle.legionId));
         
         const bushoTypes = this.evaluateBushos(clanId);
         const castleRoles = this.evaluateCastles(clanId);
