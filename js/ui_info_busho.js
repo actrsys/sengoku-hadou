@@ -63,7 +63,7 @@ Object.assign(UIInfoManager.prototype, {
                 if (daimyo && busho.id !== daimyo.id && !busho.isDaimyo) {
                     const bFamily = Array.isArray(busho.familyIds) ? busho.familyIds : [];
                     const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-                    if (bFamily.includes(daimyo.id) || dFamily.includes(busho.id)) isFamily = true;
+                    if (bFamily.some(fId => dFamily.includes(fId))) isFamily = true;
                 }
             }
         }
@@ -580,7 +580,7 @@ Object.assign(UIInfoManager.prototype, {
                                 if (daimyo) {
                                     const bFam = Array.isArray(busho.familyIds) ? busho.familyIds : [];
                                     const dFam = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-                                    if (bFam.includes(daimyo.id) || dFam.includes(busho.id)) return 1;
+                                    if (bFam.some(fId => dFam.includes(fId))) return 1;
                                 }
                             }
                             return 0;
@@ -784,7 +784,7 @@ Object.assign(UIInfoManager.prototype, {
                     else if (daimyo) {
                         const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                         const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-                        if (bFamily.includes(daimyo.id) || dFamily.includes(b.id)) familyMark = "◯";
+                        if (bFamily.some(fId => dFamily.includes(fId))) familyMark = "◯";
                     }
                 }
                 const bCastleName = bCastle ? bCastle.name : "";
