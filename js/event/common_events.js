@@ -232,8 +232,15 @@ window.GameEvents.push({
         game.castles.forEach(c => {
             // 空き城（ownerClan === 0）ではない時だけ
             if (c.ownerClan !== 0) {
-                // 民忠を1減らします（0未満にはならないように守ります）
-                c.peoplesLoyalty = Math.max(0, c.peoplesLoyalty - 1);
+                if (c.population < 2000 && c.peoplesLoyalty < 50) {
+                    // 詰み防止：人口が2000未満かつ民忠50未満の場合は、民忠を1回復します
+                    c.peoplesLoyalty = Math.min(100, c.peoplesLoyalty + 1);
+                } else if (c.population < 3000) {
+                    // 詰み防止：人口が3000未満の場合は、民忠を変動させません（低下しません）
+                } else {
+                    // それ以外（通常時）は民忠を1減らします（0未満にはならないように守ります）
+                    c.peoplesLoyalty = Math.max(0, c.peoplesLoyalty - 1);
+                }
             }
         });
     }
@@ -267,7 +274,14 @@ window.GameEvents.push({
             const isIkki = c.statusEffects.includes('一揆');
             
             if (isIkki) {
-                // 【一揆中】まずは解除されるかチェックします！
+                // 【一揆中】まずは強制解除されるかチェックします！
+                if (c.population < 3000) {
+                    // 詰み防止：人口が3000未満なら無条件で一揆を解除します
+                    c.statusEffects = c.statusEffects.filter(s => s !== '一揆');
+                    return; // 解除されたら今月の継続ダメージは受けません
+                }
+
+                // 次に通常解除されるかチェックします！
                 if (c.peoplesLoyalty >= 50) {
                     // 民忠50で25%、95以上で100%の確率で解除されます
                     let clearProb = 0.25;
@@ -290,8 +304,8 @@ window.GameEvents.push({
                 c.population = Math.max(0, Math.floor(c.population * 0.98)); // 人口2%減少
 
             } else {
-                // 【平常時】民忠が49以下なら、一揆が起きるかチェックします！
-                if (c.peoplesLoyalty <= 49) {
+                // 【平常時】民忠が49以下かつ、人口が3000以上なら一揆が起きるかチェックします！
+                if (c.peoplesLoyalty <= 49 && c.population >= 3000) {
                     // 民忠49で1%、0で100%の確率で発生します
                     const occurProb = 0.01 + ((49 - c.peoplesLoyalty) / 49) * 0.99;
                     

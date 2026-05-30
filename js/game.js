@@ -1524,7 +1524,14 @@ class GameManager {
             // ★ここは common_events.js の「豊作・凶作イベント」にお引っ越ししました！
             
             let currentLoyalty = Math.max(0, Math.min(100, c.peoplesLoyalty));
-            let growth = Math.floor(((Math.sqrt(c.population) * 2) * ((currentLoyalty - 50) / 100)) + (currentLoyalty / 4));
+            
+            // ★詰み防止：人口2000未満かつ民忠60未満の場合は、民忠60の想定で人口増減を計算します
+            let calcLoyalty = currentLoyalty;
+            if (c.population < 2000 && currentLoyalty < 60) {
+                calcLoyalty = 60;
+            }
+            
+            let growth = Math.floor(((Math.sqrt(c.population) * 2) * ((calcLoyalty - 50) / 100)) + (calcLoyalty / 4));
             c.population = Math.min(999999, Math.max(0, c.population + growth));
 
             // ★追加：毎月の兵士の自然増加計算
