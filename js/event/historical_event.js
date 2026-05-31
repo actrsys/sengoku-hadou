@@ -39,9 +39,9 @@ window.GameEvents.push({
         if (motoyasu.isDaimyo || motoyasu.isCommander) return false;
 
         // ④ 目的のお城（岡崎城：ID48）の状態を確認します
-        // すでに元康が城主ではないこと、かつ「直轄領（軍団IDが0）」であることを確認します
+        // ※元康がすでに城主であっても、国主への昇格を行うためストップせずに進めます
         const okazakiCastle = game.getCastle(48);
-        if (!okazakiCastle || okazakiCastle.castellanId === motoyasu.id || okazakiCastle.legionId !== 0) return false;
+        if (!okazakiCastle) return false;
 
         // ⑤ 勢力同士の外交関係を確認します
         // 織田家と今川家が、同盟・従属・支配・友好関係ではないこと
@@ -72,6 +72,56 @@ window.GameEvents.push({
         // 万が一データが見つからなかった時のための安全装置です
         if (!motoyasu || !okazakiCastle) return;
 
+        // ★追加：岡崎城がすでにどこかの軍団に所属していた場合の処理
+        if (okazakiCastle.legionId !== 0) {
+            const oldLegionId = okazakiCastle.legionId;
+            
+            // 岡崎城を直轄（0）に戻して、委任状態も解除します
+            okazakiCastle.legionId = 0;
+            okazakiCastle.isDelegated = false;
+
+            // 軍団のシステムが存在するか確認します
+            if (game.legions) {
+                // 今川家の該当する軍団のデータを探します
+                const legion = game.legions.find(l => l.clanId === motoyasu.clan && l.legionNo === oldLegionId);
+                
+                if (legion) {
+                    const commander = game.getBusho(legion.commanderId);
+                    
+                    // もし、その軍団の国主本人が岡崎城にいた場合のチェックです
+                    if (commander && commander.castleId === 48) {
+                        // この軍団が持っている「岡崎城以外」のお城を探します
+                        const otherCastles = game.castles.filter(c => c.ownerClan === motoyasu.clan && c.legionId === oldLegionId && c.id !== 48);
+                        
+                        if (otherCastles.length > 0) {
+                            // 別のお城があるなら、その中の一つへ国主をお引越しさせます
+                            const newCastle = otherCastles[0];
+                            if (game.affiliationSystem) {
+                                game.affiliationSystem.moveCastle(commander, newCastle.id);
+                            } else {
+                                commander.castleId = newCastle.id;
+                            }
+                            
+                            // 前の城主バッジを外して、新しいお城の城主に任命し直します
+                            commander.isCastellan = true;
+                            newCastle.castellanId = commander.id;
+                            if (game.affiliationSystem) {
+                                game.affiliationSystem.updateCastleLord(newCastle);
+                            }
+                        } else {
+                            // もし別のお城がなかった場合は、国主を解任して軍団を空っぽ（解散）にします
+                            commander.isCommander = false;
+                            legion.commanderId = 0;
+                            legion.objective = null;
+                            legion.status = 'wait';
+                            legion.targetId = 0;
+                            legion.route = [];
+                        }
+                    }
+                }
+            }
+        }
+
         // 1. 松平元康の功績が699以下なら、強制的に700に引き上げます
         if ((motoyasu.achievementTotal || 0) <= 699) {
             motoyasu.achievementTotal = 700;
@@ -99,7 +149,6 @@ window.GameEvents.push({
         }
 
         // 3. 岡崎城にいる他の武将の城主バッジを外し、元康を新しい城主にします
-        // ※ すでに元康が城主だったとしても、ここで改めて正しくバッジを付け直すので安全です
         const residents = game.bushos.filter(b => b.castleId === 48);
         residents.forEach(b => {
             b.isCastellan = false;
@@ -108,7 +157,56 @@ window.GameEvents.push({
         motoyasu.isCastellan = true;
         okazakiCastle.castellanId = motoyasu.id;
 
-        // 4. システムに城主の変更を確定させ、画面を更新します
+        // ★追加：今川家の国主（軍団1～8）に空きがあるなら、元康を国主にする処理
+        if (game.legions) {
+            const clanLegions = game.legions.filter(l => l.clanId === motoyasu.clan);
+            const activeNos = clanLegions.filter(l => l.commanderId > 0).map(l => l.legionNo);
+            
+            let newLegionNo = -1;
+            let emptyLegion = clanLegions.find(l => l.commanderId === 0);
+            
+            // すでに解散済みの空っぽの軍団があれば、その枠を再利用します
+            if (emptyLegion) {
+                newLegionNo = emptyLegion.legionNo;
+                emptyLegion.commanderId = motoyasu.id;
+            } else {
+                // 無ければ1～8の番号で、まだ使われていない空いている番号を探します
+                for (let i = 1; i <= 8; i++) {
+                    if (!activeNos.includes(i)) {
+                        newLegionNo = i;
+                        break;
+                    }
+                }
+                
+                // 空き番号が見つかったら、新しく軍団のデータを作成します
+                if (newLegionNo !== -1) {
+                    let maxLegionId = 0;
+                    game.legions.forEach(l => { if (l.id > maxLegionId) maxLegionId = l.id; });
+                    const newLegion = typeof Legion !== 'undefined' ? new Legion({
+                        id: maxLegionId + 1,
+                        clanId: motoyasu.clan,
+                        legionNo: newLegionNo,
+                        commanderId: motoyasu.id
+                    }) : {
+                        id: maxLegionId + 1,
+                        clanId: motoyasu.clan,
+                        legionNo: newLegionNo,
+                        commanderId: motoyasu.id
+                    };
+                    game.legions.push(newLegion);
+                }
+            }
+            
+            // 無事に国主になれた場合、岡崎城をその新しい軍団に所属させます
+            if (newLegionNo !== -1) {
+                motoyasu.isCommander = true;
+                if (motoyasu.isGunshi) motoyasu.isGunshi = false; // 念のため軍師バッジを外します
+                okazakiCastle.legionId = newLegionNo;
+                okazakiCastle.isDelegated = true; // AIに委任する状態にします
+            }
+        }
+
+        // 4. システムに城主（と国主）の変更を確定させ、画面を更新します
         if (game.affiliationSystem) {
             game.affiliationSystem.updateCastleLord(okazakiCastle);
         }
@@ -511,11 +609,34 @@ window.GameEvents.push({
                     b.loyalty = Math.min(100, (b.loyalty || 0) + 10);
                 });
 
-                // 城の人口を+20%（上限99万9999）し、民忠を100にする
+                // 城の兵士、人口、民忠のボーナス
                 const matsudairaCastles = game.castles.filter(c => c.ownerClan === motoyasu.clan);
                 matsudairaCastles.forEach(c => {
-                    c.population = Math.min(999999, Math.floor(c.population * 1.2));
-                    c.peoplesLoyalty = 100;
+                    // 民忠を上限にする処理はそのまま残します
+                    c.peoplesLoyalty = c.maxPeoplesLoyalty || 100;
+
+                    // 家康の居城かどうかで処理を分けます
+                    if (c.id === motoyasu.castleId) {
+                        // 【家康の居城の場合】
+                        // 兵士数が3000未満なら3000に、3000以上なら+500します（上限は99999）
+                        if ((c.soldiers || 0) < 3000) {
+                            c.soldiers = 3000;
+                        } else {
+                            c.soldiers = Math.min(99999, (c.soldiers || 0) + 500);
+                        }
+                        // 人口を5000増やします（上限は99万9999）
+                        c.population = Math.min(999999, (c.population || 0) + 5000);
+                    } else {
+                        // 【家康の居城以外の拠点の場合】
+                        // 兵士数が2000未満なら2000に、2000以上なら+500します（上限は99999）
+                        if ((c.soldiers || 0) < 2000) {
+                            c.soldiers = 2000;
+                        } else {
+                            c.soldiers = Math.min(99999, (c.soldiers || 0) + 500);
+                        }
+                        // 人口を2000増やします（上限は99万9999）
+                        c.population = Math.min(999999, (c.population || 0) + 2000);
+                    }
                 });
             }
         }
