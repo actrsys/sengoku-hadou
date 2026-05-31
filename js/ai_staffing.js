@@ -66,8 +66,28 @@ class AIStaffing {
 
         if (reachableMyCastles.length <= 1) return false;
 
+        // ★追加：人口による候補の絞り込み（徴兵数重視）
+        const over20k = reachableMyCastles.filter(c => c.population >= 20000);
+        const over10k = reachableMyCastles.filter(c => c.population >= 10000);
+
+        let validCandidates = reachableMyCastles;
+
+        // 人口2万以上の拠点があり、その中に防御力500以上の拠点がある場合
+        if (over20k.length > 0 && over20k.some(c => c.defense >= 500)) {
+            validCandidates = over20k;
+        } 
+        // 2万以上の拠点が条件を満たさない（または存在しない）が、人口1万以上の拠点があり、その中に防御力500以上の拠点がある場合
+        else if (over10k.length > 0 && over10k.some(c => c.defense >= 500)) {
+            validCandidates = over10k;
+        }
+
         let bestCastle = castle; // まずは「今いるお城」を一番良いお城（基準）としておきます
         let bestScore = 0; // 今のお城の点数は基準なので「0点」です
+
+        // ★追加：今の城が絞り込みで除外された場合は、確実に引っ越すように基準点をうんと低くします
+        if (!validCandidates.includes(castle)) {
+            bestScore = -999999;
+        }
 
         // ★追加：攻撃作戦の出撃元（前線拠点）の出席番号と、性格によるボーナス点数を調べます
         let stagingBaseId = null;
@@ -91,7 +111,7 @@ class AIStaffing {
         }
 
         // 自分が移動できるお城（自領で繋がっているお城）を順番に調べて、点数をつけていきます
-        for (const target of reachableMyCastles) {
+        for (const target of validCandidates) {
             // 今いるお城は調べる必要がないので飛ばします
             if (target.id === castle.id) continue;
 
