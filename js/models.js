@@ -863,15 +863,41 @@ class FamilyLinker {
             const parentIds = [b.realFatherId, b.realMotherId, b.adoptiveFatherId];
             parentIds.forEach(pId => {
                 if (pId > 0) {
+                    if (!b.familyIds.includes(pId)) {
+                        b.familyIds.push(pId);
+                    }
                     const parent = bushos.find(parentBusho => parentBusho.id === pId);
                     if (parent) {
-                        const combinedFamily = Array.from(new Set([...b.familyIds, ...parent.familyIds]));
-                        b.familyIds = [...combinedFamily];
-                        parent.familyIds = [...combinedFamily];
+                        if (!parent.familyIds.includes(b.id)) {
+                            parent.familyIds.push(b.id);
+                        }
                     }
                 }
             });
         });
+
+        let changed = true;
+        while (changed) {
+            changed = false;
+            bushos.forEach(b => {
+                let currentFamilySet = new Set([...b.familyIds]);
+                let originalSize = currentFamilySet.size;
+
+                b.familyIds.forEach(fId => {
+                    const relative = bushos.find(r => r.id === fId);
+                    if (relative) {
+                        relative.familyIds.forEach(id => {
+                            currentFamilySet.add(id);
+                        });
+                    }
+                });
+
+                if (currentFamilySet.size > originalSize) {
+                    b.familyIds = Array.from(currentFamilySet);
+                    changed = true;
+                }
+            });
+        }
     }
 }
 
