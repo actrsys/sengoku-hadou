@@ -1621,7 +1621,21 @@ class AIEngine {
             }
 
             // 3. 徴兵（お金と兵糧の余裕を見ながら、計画的に集めます！）
-            if (castle.population > 1000) {
+            // ★改善：人口が少なすぎるお城（3000人未満）は可哀想なので徴兵の対象から外します！
+            const draftableCastlesPlan = reachableMyCastles.filter(c => c.population >= 3000);
+            
+            // 対象になるお城の「総人口（負担の重さ込み）」を計算します
+            let totalWeightedPopPlan = 0;
+            let actualTotalPopPlan = 0;
+            draftableCastlesPlan.forEach(c => {
+                actualTotalPopPlan += c.population;
+                // 徴兵を実行するお城（自分のお城）は、負担を「1.5倍」重くして計算します
+                let weight = (c.id === castle.id) ? 1.5 : 1.0;
+                totalWeightedPopPlan += Math.floor(c.population * weight);
+            });
+
+            // 徴兵できるお城が1つでもあれば計画を立てます
+            if (draftableCastlesPlan.length > 0 && totalWeightedPopPlan > 1000) {
                 // ===== 基本パラメータ =====
                 const targetRice = Math.floor(baseSoldiers * 2.5);
                 // ★修正：最低残す兵糧ラインを2.5から2.0に下げて、徴兵しやすくします
@@ -1645,8 +1659,8 @@ class AIEngine {
                 // 実際の雇用上限（お金と兵糧、どちらか少ない方に合わせます）
                 let maxDraft = Math.max(0, Math.min(affordByGold, affordByRice));
                 
-                // 人口も超えられないようにします
-                maxDraft = Math.min(maxDraft, castle.population);
+                // ネットワーク全体の人口（重み付けなしの実際の総人口）も超えられないようにします
+                maxDraft = Math.min(maxDraft, actualTotalPopPlan);
 
                 // ===== 目標兵力の計算 =====
                 // 自分の軍団全体の「総石高」を調べます！
@@ -2533,17 +2547,26 @@ class AIEngine {
                     
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
-                if (action.type === 'draft' && castle.gold >= action.cost && castle.population > 1000) {
-                    // 準備段階で決めた「使う予定のお金（cost）」を使います
+                // ★改善：実行する時も、対象になるお城がある時だけ行います！
+                if (action.type === 'draft' && castle.gold >= action.cost) {
+                    // ここでもう一度、徴兵できるお城のリストと重さを計算します
+                    const draftableCastles = reachableMyCastles.filter(c => c.population >= 3000);
+                    if (draftableCastles.length === 0) continue;
+
+                    let totalWeightedPop = 0;
+                    let actualTotalPop = 0;
+                    draftableCastles.forEach(c => {
+                        actualTotalPop += c.population;
+                        let weight = (c.id === castle.id) ? 1.5 : 1.0;
+                        totalWeightedPop += Math.floor(c.population * weight);
+                    });
+
                     let draftCost = action.cost;
-                    
-                    // 実際に行く武将（doer）の能力で、集まる人数を正確に計算します
                     let soldiers = GameSystem.calcDraftFromGold(draftCost, doer, castle.peoplesLoyalty);
                     
-                    // 人口を超えないようにします
-                    if (castle.population < soldiers) {
-                        soldiers = castle.population;
-                        // 人数が減った分、使うお金も減らしてあげます
+                    // ネットワーク全体の人口（実際の総人口）を超えないようにします
+                    if (actualTotalPop < soldiers) {
+                        soldiers = actualTotalPop;
                         draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty);
                     }
 
@@ -2554,32 +2577,48 @@ class AIEngine {
                     }
 
                     // ===== 仮想チェック（重要） =====
-                    // 最後に、仮想の必要兵糧を計算して、本当に維持できるか最終チェックします！
                     let virtualSoldiers = castle.soldiers + soldiers;
-                    // ★修正：売却時の残量(2.5)より低い「2.0」にして、デッドロックを完全に防止します
                     let virtualRiceNeed = virtualSoldiers * 2.0;
                     
                     if (castle.rice < virtualRiceNeed) {
-                        // 維持できないなら、今の兵糧で維持できるギリギリの人数に減らします
                         soldiers = Math.floor((castle.rice / 2.0) - castle.soldiers);
                         soldiers = Math.max(0, soldiers);
                         draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty);
                     }
 
                     if (soldiers > 0 && draftCost > 0) {
-                        // 実行確定：経験値を加算します
                         GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, true);
 
-                        // AIもプレイヤーと同じように、割合で民忠と人口を減らします
-                        const draftRatio = soldiers / castle.population;
-                        const penaltyRatio = draftRatio * 2;
-                        const loyaltyPenalty = Math.floor(castle.peoplesLoyalty * penaltyRatio);
-                        
-                        castle.peoplesLoyalty = Math.max(0, castle.peoplesLoyalty - loyaltyPenalty);
-                        castle.population -= soldiers;
+                        // ★大改善：集めた兵士数を、負担の重さ（ウェイト）に合わせて振り分けます！
+                        let remainingDraft = soldiers;
+                        draftableCastles.forEach((c, index) => {
+                            if (c.population > 0 && totalWeightedPop > 0) {
+                                let popDecrease = 0;
+                                // 最後の1つのお城は、計算のズレ（端数）をすべて引き受けます
+                                if (index === draftableCastles.length - 1) {
+                                    popDecrease = remainingDraft;
+                                } else {
+                                    // 負担の割合（実行拠点は1.5倍）に合わせて人数を決めます
+                                    let weight = (c.id === castle.id) ? 1.5 : 1.0;
+                                    let weightedPop = Math.floor(c.population * weight);
+                                    const ratio = weightedPop / totalWeightedPop;
+                                    popDecrease = Math.floor(soldiers * ratio);
+                                    popDecrease = Math.min(popDecrease, c.population); 
+                                }
+                                
+                                const draftRatio = popDecrease / Math.max(1, c.population);
+                                const penaltyRatio = draftRatio * 2;
+                                const loyaltyPenalty = Math.floor(c.peoplesLoyalty * penaltyRatio);
+                                
+                                c.peoplesLoyalty = Math.max(0, c.peoplesLoyalty - loyaltyPenalty);
+                                c.population = Math.max(0, c.population - popDecrease);
+                                
+                                remainingDraft -= popDecrease;
+                            }
+                        });
 
                         // お城の貯金箱から使った分を減らします
-                        castle.gold -= draftCost; 
+                        castle.gold -= draftCost;
                         
                         const newMorale = Math.max(0, castle.morale - 10);
                         const newTraining = Math.max(0, castle.training - 10);
