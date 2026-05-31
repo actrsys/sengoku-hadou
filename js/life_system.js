@@ -1516,26 +1516,27 @@ class LifeSystem {
         } else {
             father = this.game.getBusho(clan.leaderId);
         }
-        const fatherId = father ? father.id : 0;
+        
+        // ★修正：仕様上、父親なしはありえないため、お父さんが見つからない場合は姫の誕生をキャンセルします
+        if (!father) {
+            return null;
+        }
+        
+        const fatherId = father.id;
 
         // ★追加：お父さんの年齢をチェックして、15歳以上離れるようにします！
         let age = 0;
-        if (father) {
-            const fatherAge = currentYear - father.birthYear;
-            
-            // お父さんが14歳以下の場合は、15歳以上離れた子供は作れないので誕生をキャンセルします
-            if (fatherAge < 15) {
-                return null;
-            }
-            
-            if (isInitial) {
-                // 初期登場時は0〜15歳の中から選びますが、お父さんとの年齢差が最低15歳になるように年齢の上限を制限します
-                const maxAge = Math.min(15, fatherAge - 15);
-                age = Math.floor(Math.random() * (maxAge + 1));
-            }
-        } else {
-            // 万が一お父さんのデータが見つからない場合の予備の計算です
-            age = isInitial ? Math.floor(Math.random() * 16) : 0;
+        const fatherAge = currentYear - father.birthYear;
+        
+        // お父さんが14歳以下の場合は、15歳以上離れた子供は作れないので誕生をキャンセルします
+        if (fatherAge < 15) {
+            return null;
+        }
+        
+        if (isInitial) {
+            // 初期登場時は0〜15歳の中から選びますが、お父さんとの年齢差が最低15歳になるように年齢の上限を制限します
+            const maxAge = Math.min(15, fatherAge - 15);
+            age = Math.floor(Math.random() * (maxAge + 1));
         }
 
         // 年齢の設定です
