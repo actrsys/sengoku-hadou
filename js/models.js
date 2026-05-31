@@ -363,7 +363,11 @@ class Busho {
             this.wifeIds = [Number(data.wife)];
         }
 
-        // ★【ここから書き足し：養父・養子の設定】
+        // ★【ここから書き足し：実父母・養父・養子の設定】
+        // 新しく実父と実母の出席番号を覚える箱を用意します
+        this.realFatherId = Number(data.realFatherId || 0);
+        this.realMotherId = Number(data.realMotherId || 0);
+
         // 養父（お父さん）の出席番号を覚えておきます
         this.adoptiveFatherId = Number(data.adoptiveFatherId || data.adoptiveFather || 0);
 
@@ -591,10 +595,13 @@ class Busho {
         // まずは普段使う用のリストに、金庫（baseFamilyIds）の中身を丸写しします
         this.familyIds = [...this.baseFamilyIds];
         
-        // ★養父が設定されていて、まだリストに入っていなければ追加します！
-        if (this.adoptiveFatherId > 0 && !this.familyIds.includes(this.adoptiveFatherId)) {
-            this.familyIds.push(this.adoptiveFatherId);
-        }
+        // ★実父・実母・養父が設定されていて、まだリストに入っていなければ全員追加します！
+        const parentIds = [this.realFatherId, this.realMotherId, this.adoptiveFatherId];
+        parentIds.forEach(pId => {
+            if (pId > 0 && !this.familyIds.includes(pId)) {
+                this.familyIds.push(pId);
+            }
+        });
 
         // ★養子たちが設定されていて、まだリストに入っていなければ追加します！
         this.adoptedSonIds.forEach(sonId => {
@@ -635,7 +642,14 @@ class Princess {
         this.faceIcon = data.faceIcon || 'unknown_princess_face.webp'; // 姫用の汎用画像
         
         this.originalClanId = Number(this.originalClanId || 0); // 生まれた大名家のID
-        this.fatherId = Number(this.fatherId || 0);             // 父親（武将）のID
+        
+        // ★今回追加：実父母と養父の箱を用意します（昔のfatherIdも読み込めるようにしておきます）
+        this.realFatherId = Number(data.realFatherId || data.fatherId || 0); 
+        this.realMotherId = Number(data.realMotherId || 0);
+        this.adoptiveFatherId = Number(data.adoptiveFatherId || 0);
+        
+        // ※今まで使っていたfatherIdの箱も、他のシステムがエラーにならないよう残しておきます
+        this.fatherId = this.realFatherId; 
         
         // ★ゲーム中にコロコロ変わるデータ（最初は実家と同じにしておきます）
         this.currentClanId = Number(data.currentClanId !== undefined ? data.currentClanId : this.originalClanId);
@@ -667,17 +681,26 @@ class Princess {
     updateFamilyIds(bushos = []) {
         this.familyIds = [...this.baseFamilyIds];
 
-        // 父親の一門を追加（父親が死亡していても追加する）
-        if (this.fatherId > 0) {
-            const father = bushos.find(b => b.id === this.fatherId);
-            if (father) {
-                father.baseFamilyIds.forEach(fId => {
-                    if (!this.familyIds.includes(fId)) {
-                        this.familyIds.push(fId);
-                    }
-                });
+        // 実父・実母・養父のリストを作って、順番に確認します
+        const parentIds = [this.realFatherId, this.realMotherId, this.adoptiveFatherId];
+        
+        parentIds.forEach(pId => {
+            if (pId > 0) {
+                // 親自身をリストに追加します
+                if (!this.familyIds.includes(pId)) {
+                    this.familyIds.push(pId);
+                }
+                // 親が持っている元々の一門（baseFamilyIds）も追加します
+                const parent = bushos.find(b => b.id === pId);
+                if (parent && parent.baseFamilyIds) {
+                    parent.baseFamilyIds.forEach(fId => {
+                        if (!this.familyIds.includes(fId)) {
+                            this.familyIds.push(fId);
+                        }
+                    });
+                }
             }
-        }
+        });
 
         // 夫の一門を追加（夫がいる間だけ追加する）
         if (this.husbandId > 0) {
