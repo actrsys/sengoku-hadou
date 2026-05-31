@@ -1124,6 +1124,10 @@ window.GameEvents.push({
         // 敵対勢力の城が美濃国にひとつでもあったら、イベントは起きません（ストップします）
         if (hasEnemyInMino) return false;
 
+        // 5. ★追加：織田家が清洲城（ID: 7）を所有しているか確認します
+        const kiyosu = game.getCastle(7);
+        if (!kiyosu || kiyosu.ownerClan !== nobunaga.clan) return false;
+
         // すべての条件を無事にクリアしたら、イベント発生の合図（true）を出します
         return true;
     },
@@ -1132,12 +1136,13 @@ window.GameEvents.push({
         // ここからが、イベントが起きた時に実際に実行される処理（結果）です
         const nobunaga = game.getBusho(1006001);
         const inabayama = game.getCastle(3);
+        const kiyosu = game.getCastle(7); // ★追加：清洲城のデータも準備します
         const odaClanId = nobunaga.clan;
 
-        if (!nobunaga || !inabayama) return; // 万が一データがない場合のエラーを防ぎます
+        // 万が一データがない場合のエラーを防ぎます
+        if (!nobunaga || !inabayama || !kiyosu) return; 
 
-        // ★追加：名前が変わってしまう前に、「現在の武将の名前」と「現在のお城の名前」をメモしておきます！
-        // 「|」の記号が含まれている場合は取り除いて、綺麗なくっついた名前にします
+        // 名前が変わってしまう前に、「現在の武将の名前」と「現在のお城の名前」をメモしておきます！
         const nobunagaName = nobunaga.name.replace('|', ''); 
         const oldCastleName = inabayama.name;
 
@@ -1149,11 +1154,33 @@ window.GameEvents.push({
         inabayama.defense = inabayama.maxDefense || 1000;
         inabayama.peoplesLoyalty = inabayama.maxPeoplesLoyalty || 100;
 
-        // ③ 岐阜城の兵士を1000人、人口を5000人増やします（上限の99999や999999を超えないようにストッパーをかけます）
+        // ③ 兵士を1000人増やし、人口は「5000人足した仮の数」を作って覚えておきます
         inabayama.soldiers = Math.min(99999, (inabayama.soldiers || 0) + 1000);
-        inabayama.population = Math.min(999999, (inabayama.population || 0) + 5000);
+        let tempPopulation = (inabayama.population || 0) + 5000;
 
-        // ④ プレイヤーが織田家を担当していない（AIが操作している）場合のみ、特別な整理を行います
+        // ④ ★追加：石高の入れ替え処理
+        const inabayamaKokudaka = inabayama.kokudaka || 0;
+        const kiyosuKokudaka = kiyosu.kokudaka || 0;
+        if (kiyosuKokudaka > inabayamaKokudaka) {
+            // 清洲城の方が石高が高い場合、数字を入れ替えます
+            // その際、そのお城が持てる限界（maxKokudakaや99999）を超えないようにストッパーをかけます
+            inabayama.kokudaka = Math.min(inabayama.maxKokudaka || 99999, kiyosuKokudaka);
+            kiyosu.kokudaka = Math.min(kiyosu.maxKokudaka || 99999, inabayamaKokudaka);
+        }
+
+        // ⑤ ★追加：人口の入れ替え処理
+        const kiyosuPopulation = kiyosu.population || 0;
+        if (tempPopulation <= kiyosuPopulation) {
+            // 5000人を足しても清洲城を上回っていない（少ないか同じ）なら、数字を入れ替えます
+            // 人口の上限は99万9999なので、それを超えないようにストッパーをかけます
+            inabayama.population = Math.min(999999, kiyosuPopulation);
+            kiyosu.population = Math.min(999999, tempPopulation);
+        } else {
+            // 5000人を足して清洲城を上回ったなら、入れ替えずにそのまま足した数を確定させます
+            inabayama.population = Math.min(999999, tempPopulation);
+        }
+
+        // ⑥ プレイヤーが織田家を担当していない（AIが操作している）場合のみ、特別な整理を行います
         if (game.playerClanId !== odaClanId) {
             
             // もし岐阜城が直轄（軍団ID: 0）以外だった場合、織田家のすべての軍団を解散させます
@@ -1199,13 +1226,12 @@ window.GameEvents.push({
             }
         }
 
-        // ⑤ 画面にイベントが起きたことのメッセージを出してお知らせします
-        // ★変更：メモしておいた「現在の名前」の箱（変数）を使ってメッセージを作るようにしました！
+        // ⑦ 画面にイベントが起きたことのメッセージを出してお知らせします
         const msg = `${nobunagaName}が居城を${oldCastleName}に移し、「岐阜城」と改称しました！`;
         game.ui.log(`【イベント】${nobunagaName}が${oldCastleName}を「岐阜城」と改称しました。`);
         await game.ui.showDialogAsync(msg, false, 0);
 
-        // ⑥ 最後に、画面の見た目や情報を、最新のお引越しや名前の状態に描き直します
+        // ⑧ 最後に、画面の見た目や情報を、最新のお引越しや名前の状態に描き直します
         if (game.ui) {
             game.ui.renderMap();
             game.ui.updatePanelHeader();
