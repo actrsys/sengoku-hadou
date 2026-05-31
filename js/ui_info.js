@@ -1500,7 +1500,7 @@ class UIInfoManager {
                 if (myDaimyo) {
                     const pFamily = Array.isArray(p.familyIds) ? p.familyIds : [];
                     const dFamily = Array.isArray(myDaimyo.familyIds) ? myDaimyo.familyIds : [];
-                    if (pFamily.includes(myDaimyo.id) || dFamily.includes(p.id)) {
+                    if (pFamily.some(fId => dFamily.includes(fId))) {
                         return true;
                     }
                 }
@@ -1577,7 +1577,7 @@ class UIInfoManager {
                                 if (daimyo) {
                                     const pFamily = Array.isArray(p.familyIds) ? p.familyIds : [];
                                     const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-                                    if (pFamily.includes(daimyo.id) || dFamily.includes(p.id)) mark = 1;
+                                    if (pFamily.some(fId => dFamily.includes(fId))) mark = 1;
                                 }
                             }
                             return mark;
@@ -1621,7 +1621,7 @@ class UIInfoManager {
                 if (daimyo) {
                     const pFamily = Array.isArray(p.familyIds) ? p.familyIds : [];
                     const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-                    if (pFamily.includes(daimyo.id) || dFamily.includes(p.id)) familyMark = "◯";
+                    if (pFamily.some(fId => dFamily.includes(fId))) familyMark = "◯";
                 }
             }
 
