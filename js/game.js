@@ -172,6 +172,9 @@ class DataManager {
     static joinData(clans, castles, bushos, princesses = [], legions = []) {
         const startYear = window.MainParams.StartYear; // 今のシナリオの開始年（例：1560年）
         
+        // ★追加：姫や武将が情報をやり取りする前に、一番最初に全武将の血縁（金庫）を完成させます！
+        FamilyLinker.linkAdoptiveRelations(bushos);
+
         // ★修正：武将が一門情報を取得する前に、先に姫の一門情報（父親のデータ）を完成させておきます！
         princesses.forEach(p => {
             p.updateFamilyIds(bushos);
@@ -302,8 +305,7 @@ class DataManager {
             }
         });
 
-        // ★models.js側に作った魔法をここで1行だけ呼び出します！
-        FamilyLinker.linkAdoptiveRelations(bushos);
+        // ★削除：ここにあった FamilyLinker.linkAdoptiveRelations(bushos); を消しました
 
         // ★ここから軍団の初期設定です！
         legions.forEach(legion => {

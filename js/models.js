@@ -863,13 +863,14 @@ class FamilyLinker {
             const parentIds = [b.realFatherId, b.realMotherId, b.adoptiveFatherId];
             parentIds.forEach(pId => {
                 if (pId > 0) {
-                    if (!b.familyIds.includes(pId)) {
-                        b.familyIds.push(pId);
+                    // ★直接「金庫（baseFamilyIds）」に書き込みます
+                    if (!b.baseFamilyIds.includes(pId)) {
+                        b.baseFamilyIds.push(pId);
                     }
                     const parent = bushos.find(parentBusho => parentBusho.id === pId);
                     if (parent) {
-                        if (!parent.familyIds.includes(b.id)) {
-                            parent.familyIds.push(b.id);
+                        if (!parent.baseFamilyIds.includes(b.id)) {
+                            parent.baseFamilyIds.push(b.id);
                         }
                     }
                 }
@@ -880,20 +881,20 @@ class FamilyLinker {
         while (changed) {
             changed = false;
             bushos.forEach(b => {
-                let currentFamilySet = new Set([...b.familyIds]);
+                let currentFamilySet = new Set([...b.baseFamilyIds]);
                 let originalSize = currentFamilySet.size;
 
-                b.familyIds.forEach(fId => {
+                b.baseFamilyIds.forEach(fId => {
                     const relative = bushos.find(r => r.id === fId);
                     if (relative) {
-                        relative.familyIds.forEach(id => {
+                        relative.baseFamilyIds.forEach(id => {
                             currentFamilySet.add(id);
                         });
                     }
                 });
 
                 if (currentFamilySet.size > originalSize) {
-                    b.familyIds = Array.from(currentFamilySet);
+                    b.baseFamilyIds = Array.from(currentFamilySet);
                     changed = true;
                 }
             });
