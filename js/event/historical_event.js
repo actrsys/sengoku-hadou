@@ -1082,6 +1082,138 @@ window.GameEvents.push({
 });
 
 // ==========================================
+// ★ 岐阜城改称イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_rename_gifu_castle",
+    timing: "startMonth_before", // 毎月の初めに条件を満たしているかチェックします
+    isOneTime: true,             // このイベントは一度発生したら二度と起きません
+    
+    checkCondition: function(game) {
+        // 1. 織田信長（ID: 1006001）が存在し、大名であるか確認します
+        const nobunaga = game.getBusho(1006001);
+        if (!nobunaga || !nobunaga.isDaimyo || nobunaga.clan === 0) return false;
+
+        // 2. 織田信長の勢力が、稲葉山城（ID: 3）を所有しているか確認します
+        const inabayama = game.getCastle(3);
+        if (!inabayama || inabayama.ownerClan !== nobunaga.clan) return false;
+
+        // 3. すでに城の名前が「岐阜城」になっていないか確認します
+        if (inabayama.name === "岐阜城") return false;
+
+        // 4. 美濃国（地方ID: 27）に、織田家と敵対している勢力の城がないか確認します
+        const odaClanId = nobunaga.clan;
+        const minoCastles = game.castles.filter(c => c.provinceId === 27);
+        
+        let hasEnemyInMino = false;
+        if (game.diplomacyManager) {
+            for (let c of minoCastles) {
+                // 空き城（0）ではなく、織田家自身の城でもない場合を調べます
+                if (c.ownerClan !== 0 && c.ownerClan !== odaClanId) {
+                    // その城の持ち主と織田家の関係をチェックします
+                    const rel = game.diplomacyManager.getRelation(odaClanId, c.ownerClan);
+                    // 敵対状態の勢力が見つかったら、「敵がいる」という目印（フラグ）を立てます
+                    if (rel && rel.status === '敵対') {
+                        hasEnemyInMino = true;
+                        break; // ひとつでも見つかれば十分なので、探すのをやめます
+                    }
+                }
+            }
+        }
+        
+        // 敵対勢力の城が美濃国にひとつでもあったら、イベントは起きません（ストップします）
+        if (hasEnemyInMino) return false;
+
+        // すべての条件を無事にクリアしたら、イベント発生の合図（true）を出します
+        return true;
+    },
+    
+    execute: async function(game) {
+        // ここからが、イベントが起きた時に実際に実行される処理（結果）です
+        const nobunaga = game.getBusho(1006001);
+        const inabayama = game.getCastle(3);
+        const odaClanId = nobunaga.clan;
+
+        if (!nobunaga || !inabayama) return; // 万が一データがない場合のエラーを防ぎます
+
+        // ★追加：名前が変わってしまう前に、「現在の武将の名前」と「現在のお城の名前」をメモしておきます！
+        // 「|」の記号が含まれている場合は取り除いて、綺麗なくっついた名前にします
+        const nobunagaName = nobunaga.name.replace('|', ''); 
+        const oldCastleName = inabayama.name;
+
+        // ① 稲葉山城の名前を「岐阜城」に変更します
+        inabayama.name = "岐阜城";
+        inabayama.yomi = "ぎふじょう";
+
+        // ② 岐阜城の防御力と民忠を、上限（最大値）まで回復させます
+        inabayama.defense = inabayama.maxDefense || 1000;
+        inabayama.peoplesLoyalty = inabayama.maxPeoplesLoyalty || 100;
+
+        // ③ 岐阜城の兵士を1000人、人口を5000人増やします（上限の99999や999999を超えないようにストッパーをかけます）
+        inabayama.soldiers = Math.min(99999, (inabayama.soldiers || 0) + 1000);
+        inabayama.population = Math.min(999999, (inabayama.population || 0) + 5000);
+
+        // ④ プレイヤーが織田家を担当していない（AIが操作している）場合のみ、特別な整理を行います
+        if (game.playerClanId !== odaClanId) {
+            
+            // もし岐阜城が直轄（軍団ID: 0）以外だった場合、織田家のすべての軍団を解散させます
+            if (inabayama.legionId !== 0) {
+                if (game.legions && game.castleManager) {
+                    const odaLegions = game.legions.filter(l => l.clanId === odaClanId && l.commanderId > 0);
+                    odaLegions.forEach(legion => {
+                        game.castleManager.disbandLegion(legion.id); // 城管理システムにお願いして解散させます
+                    });
+                }
+            }
+
+            // もし織田信長本人が岐阜城にいない場合、岐阜城に強制的にお引越しさせて城主にします
+            if (nobunaga.castleId !== 3) {
+                if (game.affiliationSystem) {
+                    // お引越しセンターのシステムにお願いして移動させます
+                    game.affiliationSystem.moveCastle(nobunaga, 3);
+                } else {
+                    // システムがない場合の予備の手動お引越し
+                    const oldCastle = game.getCastle(nobunaga.castleId);
+                    if (oldCastle) {
+                        oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== nobunaga.id);
+                        if (oldCastle.castellanId === nobunaga.id) oldCastle.castellanId = 0;
+                    }
+                    nobunaga.castleId = 3;
+                    if (!inabayama.samuraiIds.includes(nobunaga.id)) {
+                        inabayama.samuraiIds.push(nobunaga.id);
+                    }
+                }
+                
+                // 岐阜城にいる他の武将から城主バッジを外します
+                const residents = game.bushos.filter(b => b.castleId === 3 && b.status === 'active');
+                residents.forEach(b => b.isCastellan = false);
+                
+                // 信長に城主バッジを付けます
+                nobunaga.isCastellan = true;
+                inabayama.castellanId = nobunaga.id;
+
+                // お城のデータを更新して、新しい城主を確定させます
+                if (game.affiliationSystem) {
+                    game.affiliationSystem.updateCastleLord(inabayama);
+                }
+            }
+        }
+
+        // ⑤ 画面にイベントが起きたことのメッセージを出してお知らせします
+        // ★変更：メモしておいた「現在の名前」の箱（変数）を使ってメッセージを作るようにしました！
+        const msg = `${nobunagaName}が居城を${oldCastleName}に移し、「岐阜城」と改称しました！`;
+        game.ui.log(`【イベント】${nobunagaName}が${oldCastleName}を「岐阜城」と改称しました。`);
+        await game.ui.showDialogAsync(msg, false, 0);
+
+        // ⑥ 最後に、画面の見た目や情報を、最新のお引越しや名前の状態に描き直します
+        if (game.ui) {
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
+    }
+});
+
+// ==========================================
 // ★ 三好実休の死による長慶の寿命減少（裏イベント）
 // ==========================================
 window.GameEvents.push({
