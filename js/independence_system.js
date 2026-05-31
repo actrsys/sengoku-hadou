@@ -1290,6 +1290,7 @@ class IndependenceSystem {
         const degree1Clans = new Set(); // 第1隣接（直接隣接 ＆ 旧主家）
         const degree2Clans = new Set(); // 第2隣接（第1隣接の隣）
         const degree3Clans = new Set(); // 第3隣接（第2隣接の隣）
+        const degree4Clans = new Set(); // ★追加：第4隣接（第3隣接の隣）
         
         // 独立元の主家（元の持ち主）は絶対に避ける色として第1隣接に設定します
         if (castle.ownerClan !== 0) {
@@ -1333,6 +1334,20 @@ class IndependenceSystem {
                 }
             }
         }
+
+        // ★追加：4. 第3隣接大名が所有する城を起点に、さらに隣接する城の持ち主（第4隣接）を取得します
+        for (const c of this.game.castles) {
+            if (degree3Clans.has(c.ownerClan)) {
+                if (c.adjacentCastleIds) {
+                    for (const adjId of c.adjacentCastleIds) {
+                        const adjCastle = this.game.castles.find(c2 => c2.id === adjId);
+                        if (adjCastle && adjCastle.ownerClan !== 0 && !degree1Clans.has(adjCastle.ownerClan) && !degree2Clans.has(adjCastle.ownerClan) && !degree3Clans.has(adjCastle.ownerClan)) {
+                            degree4Clans.add(adjCastle.ownerClan);
+                        }
+                    }
+                }
+            }
+        }
         
         // 生存している（城を持っている）大名家のリストを作ります
         const aliveClanIds = new Set(this.game.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan));
@@ -1341,6 +1356,7 @@ class IndependenceSystem {
         const deg1Colors = [];
         const deg2Colors = [];
         const deg3Colors = [];
+        const deg4Colors = []; // ★追加：第4隣接の色を入れる箱
         const otherColors = [];
         
         for (const clanId of aliveClanIds) {
@@ -1351,6 +1367,7 @@ class IndependenceSystem {
                     if (degree1Clans.has(clanId)) deg1Colors.push(rgb);
                     else if (degree2Clans.has(clanId)) deg2Colors.push(rgb);
                     else if (degree3Clans.has(clanId)) deg3Colors.push(rgb);
+                    else if (degree4Clans.has(clanId)) deg4Colors.push(rgb); // ★追加
                     else otherColors.push(rgb);
                 }
             }
@@ -1384,6 +1401,7 @@ class IndependenceSystem {
                     const dist1 = calcMinDist(deg1Colors);
                     const dist2 = calcMinDist(deg2Colors);
                     const dist3 = calcMinDist(deg3Colors);
+                    const dist4 = calcMinDist(deg4Colors); // ★追加
                     const distOther = calcMinDist(otherColors);
 
                     // 点数計算：数字が大きいほど「他の勢力と色が違って見やすい」という意味になります。
@@ -1393,6 +1411,7 @@ class IndependenceSystem {
                         dist1,              // 第1隣接（旧主家含む）はそのまま（最重視）
                         dist2 * 1.2,        // 第2隣接は少し甘く
                         dist3 * 1.5,        // 第3隣接はさらに甘く
+                        dist4 * 1.8,        // ★追加：第4隣接はさらに甘く
                         distOther * 2.0     // 遠方の大名はかなり甘く
                     );
 
