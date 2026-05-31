@@ -50,7 +50,7 @@ Object.assign(UIInfoManager.prototype, {
                 if (leader && busho.id !== leader.id) {
                     const bFamily = Array.isArray(busho.familyIds) ? busho.familyIds : [];
                     const lFamily = Array.isArray(leader.familyIds) ? leader.familyIds : [];
-                    if (bFamily.includes(leader.id) || lFamily.includes(busho.id)) isFamily = true;
+                    if (bFamily.some(fId => lFamily.includes(fId))) isFamily = true;
                 }
             } else {
                 affiliationName = "諸勢力";
