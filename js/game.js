@@ -302,6 +302,9 @@ class DataManager {
             }
         });
 
+        // ★models.js側に作った魔法をここで1行だけ呼び出します！
+        FamilyLinker.linkAdoptiveRelations(bushos);
+
         // ★ここから軍団の初期設定です！
         legions.forEach(legion => {
             // 軍団長に就任する武将を探します

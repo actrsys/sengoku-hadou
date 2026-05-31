@@ -371,17 +371,6 @@ class Busho {
         // 養父（お父さん）の出席番号を覚えておきます
         this.adoptiveFatherId = Number(data.adoptiveFatherId || data.adoptiveFather || 0);
 
-        // 養子（子ども）の出席番号をリストで覚えておきます
-        this.adoptedSonIds = [];
-        if (data.adoptedSonIds && Array.isArray(data.adoptedSonIds)) {
-            this.adoptedSonIds = data.adoptedSonIds;
-        } else if (typeof data.adoptedSons === 'string' && data.adoptedSons.trim() !== "") {
-            // CSVから「1|2」のように届いた文字を数字のリストにします
-            this.adoptedSonIds = String(data.adoptedSons).split('|').map(id => Number(id.trim()));
-        } else if (Number(data.adoptedSons) > 0) {
-            this.adoptedSonIds = [Number(data.adoptedSons)];
-        }
-
         // ★【ここから書き足し：一門設定（修正版）】
         if (data.baseFamilyIds && Array.isArray(data.baseFamilyIds)) {
             this.baseFamilyIds = data.baseFamilyIds;
@@ -600,14 +589,6 @@ class Busho {
         parentIds.forEach(pId => {
             if (pId > 0 && !this.familyIds.includes(pId)) {
                 this.familyIds.push(pId);
-            }
-        });
-
-        // ★養子たちが設定されていて、まだリストに入っていなければ追加します！
-        this.adoptedSonIds.forEach(sonId => {
-            // ★万が一「0」や空っぽのデータがリストに紛れ込んでも、無視するようにガード（sonId > 0）を追加しました！
-            if (sonId > 0 && !this.familyIds.includes(sonId)) {
-                this.familyIds.push(sonId);
             }
         });
 
@@ -872,6 +853,25 @@ class Province {
         this.typhoon = Number(this.typhoon || 0);   // 台風の発生確率（例：0.15）
         this.marketRate = data.marketRate !== undefined ? Number(data.marketRate) : 1.0; // 国ごとの米相場（例：1.0）
         this.statusEffects = Array.isArray(data.statusEffects) ? data.statusEffects : []; // ★豊作・凶作などの「状態異常」
+    }
+}
+
+// ★ここから追加：全員のデータが揃った後に、親と子の一門リストをガッチャンコする魔法
+class FamilyLinker {
+    static linkAdoptiveRelations(bushos) {
+        bushos.forEach(b => {
+            const parentIds = [b.realFatherId, b.realMotherId, b.adoptiveFatherId];
+            parentIds.forEach(pId => {
+                if (pId > 0) {
+                    const parent = bushos.find(parentBusho => parentBusho.id === pId);
+                    if (parent) {
+                        const combinedFamily = Array.from(new Set([...b.familyIds, ...parent.familyIds]));
+                        b.familyIds = [...combinedFamily];
+                        parent.familyIds = [...combinedFamily];
+                    }
+                }
+            });
+        });
     }
 }
 
