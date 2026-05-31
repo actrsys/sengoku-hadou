@@ -615,9 +615,9 @@ window.GameEvents.push({
                     // 民忠を上限にする処理はそのまま残します
                     c.peoplesLoyalty = c.maxPeoplesLoyalty || 100;
 
-                    // 家康の居城かどうかで処理を分けます
+                    // 元康の居城かどうかで処理を分けます
                     if (c.id === motoyasu.castleId) {
-                        // 【家康の居城の場合】
+                        // 【元康の居城の場合】
                         // 兵士数が3000未満なら3000に、3000以上なら+500します（上限は99999）
                         if ((c.soldiers || 0) < 3000) {
                             c.soldiers = 3000;
@@ -627,7 +627,7 @@ window.GameEvents.push({
                         // 人口を5000増やします（上限は99万9999）
                         c.population = Math.min(999999, (c.population || 0) + 5000);
                     } else {
-                        // 【家康の居城以外の拠点の場合】
+                        // 【元康の居城以外の拠点の場合】
                         // 兵士数が2000未満なら2000に、2000以上なら+500します（上限は99999）
                         if ((c.soldiers || 0) < 2000) {
                             c.soldiers = 2000;
@@ -1271,15 +1271,19 @@ window.GameEvents.push({
         inabayama.name = "岐阜城";
         inabayama.yomi = "ぎふじょう";
 
-        // ② 岐阜城の防御力と民忠を、上限（最大値）まで回復させます
-        inabayama.defense = inabayama.maxDefense || 1000;
-        inabayama.peoplesLoyalty = inabayama.maxPeoplesLoyalty || 100;
+        // ② 防御力と石高の最大値（器の大きさ）をそれぞれ500大きくします
+        inabayama.maxDefense = inabayama.maxDefense + 500;
+        inabayama.maxKokudaka = Math.min(99999, inabayama.maxKokudaka + 500);
 
-        // ③ 兵士を1000人増やし、人口は「5000人足した仮の数」を作って覚えておきます
+        // ③ 岐阜城の防御力と民忠を、上限（最大値）まで回復させます
+        inabayama.defense = inabayama.maxDefense;
+        inabayama.peoplesLoyalty = inabayama.maxPeoplesLoyalty;
+
+        // ④ 兵士を1000人増やし、人口は「5000人足した仮の数」を作って覚えておきます
         inabayama.soldiers = Math.min(99999, (inabayama.soldiers || 0) + 1000);
         let tempPopulation = (inabayama.population || 0) + 5000;
 
-        // ④ ★追加：石高の入れ替え処理
+        // ⑤ ★追加：石高の入れ替え処理
         const inabayamaKokudaka = inabayama.kokudaka || 0;
         const kiyosuKokudaka = kiyosu.kokudaka || 0;
         if (kiyosuKokudaka > inabayamaKokudaka) {
@@ -1289,7 +1293,7 @@ window.GameEvents.push({
             kiyosu.kokudaka = Math.min(kiyosu.maxKokudaka || 99999, inabayamaKokudaka);
         }
 
-        // ⑤ ★追加：人口の入れ替え処理
+        // ⑥ ★追加：人口の入れ替え処理
         const kiyosuPopulation = kiyosu.population || 0;
         if (tempPopulation <= kiyosuPopulation) {
             // 5000人を足しても清洲城を上回っていない（少ないか同じ）なら、数字を入れ替えます
@@ -1301,7 +1305,7 @@ window.GameEvents.push({
             inabayama.population = Math.min(999999, tempPopulation);
         }
 
-        // ⑥ プレイヤーが織田家を担当していない（AIが操作している）場合のみ、特別な整理を行います
+        // ⑦ プレイヤーが織田家を担当していない（AIが操作している）場合のみ、特別な整理を行います
         if (game.playerClanId !== odaClanId) {
             
             // もし岐阜城が直轄（軍団ID: 0）以外だった場合、織田家のすべての軍団を解散させます
@@ -1347,12 +1351,157 @@ window.GameEvents.push({
             }
         }
 
-        // ⑦ 画面にイベントが起きたことのメッセージを出してお知らせします
+        // ⑧ 画面にイベントが起きたことのメッセージを出してお知らせします
         const msg = `${nobunagaName}が居城を${oldCastleName}に移し、「岐阜城」と改称しました！`;
         game.ui.log(`【イベント】${nobunagaName}が${oldCastleName}を「岐阜城」と改称しました。`);
         await game.ui.showDialogAsync(msg, false, 0);
 
-        // ⑧ 最後に、画面の見た目や情報を、最新のお引越しや名前の状態に描き直します
+        // ⑨ 最後に、画面の見た目や情報を、最新のお引越しや名前の状態に描き直します
+        if (game.ui) {
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
+    }
+});
+
+// ==========================================
+// ★ 浜松城改称イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_rename_hamamatsu_castle",
+    timing: "startMonth_before", // 毎月の初めに条件を満たしているかチェックします
+    isOneTime: true,             // このイベントは一度発生したら二度と起きません
+    
+    checkCondition: function(game) {
+        // 1. 松平元康（ID: 1004004）が存在し、大名であるか確認します
+        const motoyasu = game.getBusho(1004004);
+        if (!motoyasu || !motoyasu.isDaimyo || motoyasu.clan === 0) return false;
+
+        const matsudairaClanId = motoyasu.clan;
+
+        // 2. 松平元康勢力が岡崎城（ID: 48）を所有しているか確認します
+        const okazaki = game.getCastle(48);
+        if (!okazaki || okazaki.ownerClan !== matsudairaClanId) return false;
+
+        // 3. 遠江国（地方ID: 21）のすべての城を、松平元康勢力が所有しているか確認します
+        // まず遠江国のお城をすべて集めて、すべてが松平家の持ち物か確認します
+        const totomiCastles = game.castles.filter(c => c.provinceId === 21);
+        if (totomiCastles.length === 0) return false;
+        
+        const ownsAllTotomi = totomiCastles.every(c => c.ownerClan === matsudairaClanId);
+        if (!ownsAllTotomi) return false;
+
+        // 4. 曳馬城（ID: 12）を取得し、すでに名前が「浜松城」になっていないか確認します
+        const hikuma = game.getCastle(12);
+        if (!hikuma || hikuma.name === "浜松城") return false;
+
+        // すべての条件を無事にクリアしたら、イベント発生の合図を出します
+        return true;
+    },
+    
+    execute: async function(game) {
+        // ここからが、イベントが起きた時に実際に実行される処理です
+        const motoyasu = game.getBusho(1004004);
+        const hikuma = game.getCastle(12);
+        const okazaki = game.getCastle(48);
+        const matsudairaClanId = motoyasu.clan;
+
+        // 万が一データがない場合のエラーを防ぎます
+        if (!motoyasu || !hikuma || !okazaki) return; 
+
+        // 名前が変わってしまう前に、「現在の武将の名前」と「現在のお城の名前」をメモしておきます
+        const motoyasuName = motoyasu.name.replace('|', ''); 
+        const oldCastleName = hikuma.name;
+
+        // ① 曳馬城の名前を「浜松城」に変更します
+        hikuma.name = "浜松城";
+        hikuma.yomi = "はままつじょう";
+
+        // ②防御力と石高の最大値（器の大きさ）をそれぞれ500大きくします
+        hikuma.maxDefense = hikuma.maxDefense + 500;
+        hikuma.maxKokudaka = Math.min(99999, hikuma.maxKokudaka + 500);
+
+        // ③ 浜松城の防御力と民忠を、上限（最大値）まで回復させます
+        hikuma.defense = hikuma.maxDefense;
+        hikuma.peoplesLoyalty = hikuma.maxPeoplesLoyalty;
+
+        // ④ 兵士を1000人増やし、人口は「5000人足した仮の数」を作って覚えておきます
+        hikuma.soldiers = Math.min(99999, (hikuma.soldiers || 0) + 1000);
+        let tempPopulation = (hikuma.population || 0) + 5000;
+
+        // ⑤ 石高の入れ替え処理
+        const hikumaKokudaka = hikuma.kokudaka || 0;
+        const okazakiKokudaka = okazaki.kokudaka || 0;
+        if (okazakiKokudaka > hikumaKokudaka) {
+            // 岡崎城の方が石高が高い場合、数字を入れ替えます
+            // その際、そのお城が持てる限界を超えないようにストッパーをかけます
+            hikuma.kokudaka = Math.min(hikuma.maxKokudaka || 99999, okazakiKokudaka);
+            okazaki.kokudaka = Math.min(okazaki.maxKokudaka || 99999, hikumaKokudaka);
+        }
+
+        // ⑥ 人口の入れ替え処理
+        const okazakiPopulation = okazaki.population || 0;
+        if (okazakiPopulation > tempPopulation) {
+            // 5000人を足した後の浜松城の人口より、岡崎城の人口の方が大きい（上回っている）なら入れ替えます
+            hikuma.population = Math.min(999999, okazakiPopulation);
+            okazaki.population = Math.min(999999, tempPopulation);
+        } else {
+            // 上回っていないなら、入れ替えずにそのまま足した数を確定させます
+            hikuma.population = Math.min(999999, tempPopulation);
+        }
+
+        // ⑦ プレイヤーが担当していない（AIが操作している）場合のみ、特別な整理を行います
+        if (game.playerClanId !== matsudairaClanId) {
+            
+            // もし浜松城が直轄（軍団ID: 0）以外だった場合、松平家のすべての軍団を解散させます
+            if (hikuma.legionId !== 0) {
+                if (game.legions && game.castleManager) {
+                    const matsudairaLegions = game.legions.filter(l => l.clanId === matsudairaClanId && l.commanderId > 0);
+                    matsudairaLegions.forEach(legion => {
+                        game.castleManager.disbandLegion(legion.id); // 城管理システムにお願いして解散させます
+                    });
+                }
+            }
+
+            // もし松平元康本人が浜松城にいない場合、浜松城に強制的にお引越しさせて城主にします
+            if (motoyasu.castleId !== 12) {
+                if (game.affiliationSystem) {
+                    // お引越しセンターのシステムにお願いして移動させます
+                    game.affiliationSystem.moveCastle(motoyasu, 12);
+                } else {
+                    // システムがない場合の予備の手動お引越し
+                    const oldCastle = game.getCastle(motoyasu.castleId);
+                    if (oldCastle) {
+                        oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== motoyasu.id);
+                        if (oldCastle.castellanId === motoyasu.id) oldCastle.castellanId = 0;
+                    }
+                    motoyasu.castleId = 12;
+                    if (!hikuma.samuraiIds.includes(motoyasu.id)) {
+                        hikuma.samuraiIds.push(motoyasu.id);
+                    }
+                }
+                
+                // 浜松城にいる他の武将から城主バッジを外します
+                const residents = game.bushos.filter(b => b.castleId === 12 && b.status === 'active');
+                residents.forEach(b => b.isCastellan = false);
+                
+                // 元康に城主バッジを付けます
+                motoyasu.isCastellan = true;
+                hikuma.castellanId = motoyasu.id;
+
+                // お城のデータを更新して、新しい城主を確定させます
+                if (game.affiliationSystem) {
+                    game.affiliationSystem.updateCastleLord(hikuma);
+                }
+            }
+        }
+
+        // ⑧ 画面にイベントが起きたことのメッセージを出してお知らせします
+        const msg = `${motoyasuName}が居城を${oldCastleName}に移し、「浜松城」と改称しました！`;
+        game.ui.log(`【イベント】${motoyasuName}が${oldCastleName}を「浜松城」と改称しました。`);
+        await game.ui.showDialogAsync(msg, false, 0);
+
+        // ⑨ 最後に、画面の見た目や情報を、最新のお引越しや名前の状態に描き直します
         if (game.ui) {
             game.ui.renderMap();
             game.ui.updatePanelHeader();
