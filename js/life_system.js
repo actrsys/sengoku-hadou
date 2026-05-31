@@ -1569,6 +1569,7 @@ class LifeSystem {
             faceIcon: 'unknown_princess_face.webp', // 汎用の姫画像
             originalClanId: clanId,
             currentClanId: clanId,
+            realFatherId: fatherId,
             fatherId: fatherId,
             husbandId: 0,
             status: 'unmarried' // 最初から「未婚（結婚可能）」として登場させます

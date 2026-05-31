@@ -625,7 +625,7 @@ class Princess {
         this.originalClanId = Number(this.originalClanId || 0); // 生まれた大名家のID
         
         // ★今回追加：実父母と養父の箱を用意します（昔のfatherIdも読み込めるようにしておきます）
-        this.realFatherId = Number(data.realFatherId || data.fatherId || 0); 
+        this.realFatherId = Number(data.realFatherId !== undefined ? data.realFatherId : (data.fatherId || 0)); 
         this.realMotherId = Number(data.realMotherId || 0);
         this.adoptiveFatherId = Number(data.adoptiveFatherId || 0);
         
