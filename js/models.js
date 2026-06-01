@@ -344,12 +344,31 @@ class Busho {
         } else {
             this.courtRankIds = []; // 何も持っていなければ空っぽのリストにします
         }
+        
         // ★【生没年・登場年】
         // 数字として扱うために Number() で囲みます
         this.birthYear = Number(data.birthYear || 1500); // 生年（空なら1500）
         this.endYear = Number(data.endYear || 1650);     // 没年（空なら1650）
         this.startYear = Number(data.startYear || 1500); // 登場年（空なら1500）
         this.nameChange = data.nameChange || ""; // 変わる年:新しい名前:新しい読み仮名/変わる年... の形式の改名データ
+
+        // ★【ここから書き足し：戦死武将の延命処理】
+        // CSVから戦死フラグを受け取ってシールを貼ります（TRUEなら true になります）
+        this.isKilledInBattle = data.isKilledInBattle === true;
+        
+        // もし戦死のシールが貼られていた場合、本来の寿命を書き換えます！
+        if (this.isKilledInBattle) {
+            // まず、本来死ぬはずだった時の年齢を計算します（没年 - 生年）
+            const originalDeathAge = this.endYear - this.birthYear;
+            
+            if (originalDeathAge < 65) {
+                // 65歳未満で死ぬはずだった場合は、生年に60を足して「60歳まで生きる」ように没年を上書きします
+                this.endYear = this.birthYear + 65;
+            } else {
+                // 65歳以上の場合は、本来の没年にそのまま10年を足して上書きします
+                this.endYear = this.endYear + 10;
+            }
+        }
         
         // ★【ここから書き足し：奥さん（姫）の設定】
         // 姫の「ID（出席番号）」だけを覚えておきます
