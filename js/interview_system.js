@@ -25,7 +25,8 @@ class InterviewSystem {
         const castle = this.game.getCurrentTurnCastle();
 
         // 寿命間近の時の特別な処理
-        if (currentYear >= (busho.endYear - 1)) {
+        // すでに寿命延長済みの場合は発生しないようにします
+        if (currentYear >= (busho.endYear - 1) && !busho.isLifeExtended) {
             this.game.ui.showDialog(`${busho.name}は調子が悪そうだ。\n医師に診せますか？\n（消費：金２００）`, true, 
                 () => {
                     if (castle.gold < 200) {
@@ -36,7 +37,17 @@ class InterviewSystem {
                     }
 
                     castle.gold -= 200;
-                    busho.endYear = Number(busho.endYear) + 1;
+                    
+                    // 討死武将と同じ寿命延長ロジック
+                    const originalDeathAge = busho.endYear - busho.birthYear;
+                    if (originalDeathAge < 55) {
+                        busho.endYear = busho.birthYear + 65;
+                    } else {
+                        busho.endYear = busho.endYear + 10;
+                    }
+                    // 延命処理が無事に終わった印をつけます
+                    busho.isLifeExtended = true;
+
                     this.game.ui.showResultModal(`${busho.name}は少し顔色が良くなったようです`);
                     
                     // ★ 完全に面談から抜けるので、ふすまの目印を消します
