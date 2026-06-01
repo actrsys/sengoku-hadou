@@ -453,8 +453,6 @@ window.GameEvents.push({
                 if (window.EventTextManager && window.EventTextManager.okehazama_imagawa_defend) {
                     await window.EventTextManager.playSequence(game, window.EventTextManager.okehazama_imagawa_defend(args));
                 }
-                // 義元の寿命を10年延ばします
-                yoshimoto.endYear += 10;
                 
                 // ここでイベントを終了して、元の画面に戻ります
                 if (window.AudioManager) window.AudioManager.restoreMemorizedBgm();
