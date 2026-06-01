@@ -361,11 +361,12 @@ class Busho {
             // まず、本来死ぬはずだった時の年齢を計算します（没年 - 生年）
             const originalDeathAge = this.endYear - this.birthYear;
             
-            if (originalDeathAge < 65) {
-                // 65歳未満で死ぬはずだった場合は、生年に60を足して「60歳まで生きる」ように没年を上書きします
+            // 分岐の基準を「55歳」にします
+            if (originalDeathAge < 55) {
+                // 本来55歳未満で死ぬはずだった場合は、「65歳まで生きる」ように没年を上書きします
                 this.endYear = this.birthYear + 65;
             } else {
-                // 65歳以上の場合は、本来の没年にそのまま10年を足して上書きします
+                // 本来55歳以上生きるはずだった場合は、元の寿命に「10年」を足して上書きします
                 this.endYear = this.endYear + 10;
             }
         }
