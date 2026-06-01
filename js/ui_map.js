@@ -1092,10 +1092,43 @@ Object.assign(UIManager.prototype, {
         });
 
         // 2. ぶつかり稽古！重ならないように上下に散らばらせます
+        const mapW = this.game.mapWidth || 1200;
+        const mapH = this.game.mapHeight || 800;
+        const paddingX = 40; // 左右の余白
+        const paddingY = 80; // 上下の余白（UIと被らないように少し広めに設定します）
+
         let iterations = 0;
         let hasCollision = true;
         while (hasCollision && iterations < 20) { 
             hasCollision = false;
+
+            // ★追加：壁とのぶつかり稽古（画面端に寄りすぎている場合は内側に押し返します！）
+            for (let i = 0; i < labelsData.length; i++) {
+                const l = labelsData[i];
+                
+                // 左右の壁チェック
+                if (l.x - l.width / 2 < paddingX) {
+                    l.x = paddingX + l.width / 2;
+                    hasCollision = true;
+                } else if (l.x + l.width / 2 > mapW - paddingX) {
+                    l.x = mapW - paddingX - l.width / 2;
+                    hasCollision = true;
+                }
+                
+                // 上下の壁チェック
+                const currentTop = l.y + l.offsetY - l.height;
+                const currentBottom = l.y + l.offsetY;
+                
+                if (currentTop < paddingY) {
+                    l.offsetY += 8;
+                    hasCollision = true;
+                } else if (currentBottom > mapH - paddingY) {
+                    l.offsetY -= 8;
+                    hasCollision = true;
+                }
+            }
+
+            // ラベル同士のぶつかり稽古
             for (let i = 0; i < labelsData.length; i++) {
                 for (let j = i + 1; j < labelsData.length; j++) {
                     const l1 = labelsData[i];
@@ -1106,14 +1139,10 @@ Object.assign(UIManager.prototype, {
                     const top1 = l1.y + l1.offsetY - l1.height;
                     const bottom1 = l1.y + l1.offsetY;
                     
-                    // ==========================================
-                    // ★ここから下の４行が抜けていました！ごめんなさい！
                     const left2 = l2.x - l2.width / 2;
                     const right2 = l2.x + l2.width / 2;
                     const top2 = l2.y + l2.offsetY - l2.height;
                     const bottom2 = l2.y + l2.offsetY;
-                    // ★書き足すのはここまで！
-                    // ==========================================
 
                     if (left1 < right2 + 5 && right1 + 5 > left2 &&
                         top1 < bottom2 + 5 && bottom1 + 5 > top2) {
