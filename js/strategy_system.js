@@ -56,7 +56,7 @@ class StrategySystem {
         const targetBusho = this.game.getBusho(targetBushoId);
         const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
         const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
-        let prob = Math.min(1.0, score / (defScore + window.MainParams.Strategy.RumorFactor)) - 0.1;
+        let prob = Math.min(1.0, score / (defScore + window.MainParams.Strategy.RumorFactor)) * 0.5;
         
         // ★修正：対象のステータスに合わせてペナルティを適用します
         const officerStatus = this.checkOfficerStatus(targetBusho);
@@ -86,9 +86,7 @@ class StrategySystem {
         const doerBonus = (50 - affDoer) * S.AffinityDoerWeight; 
         const totalOffense = offense + newBonus + doerBonus;
         const totalDefense = defense + lordBonus;
-        let successRate = (totalOffense / totalDefense) * 0.5; 
-        
-        successRate = Math.max(0, successRate - 0.1);
+        let successRate = (totalOffense / totalDefense) * 0.25; 
         
         // ★修正：対象のステータスに合わせてペナルティを適用します
         const officerStatus = this.checkOfficerStatus(target);
