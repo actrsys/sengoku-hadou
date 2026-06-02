@@ -157,7 +157,7 @@ class CourtRankSystem {
 
         // 国主限定の優先官位
         if (busho.isCommander && !busho.isDaimyo) {
-            if (bushoId === 1006004) preferredRankIds = [151; // 木下秀吉: 筑前守
+            if (bushoId === 1006004) preferredRankIds = [151]; // 木下秀吉: 筑前守
             else if (bushoId === 1006002) preferredRankIds = [114]; // 柴田勝家: 修理亮
             else if (bushoId === 1006003) preferredRankIds = [94]; // 丹羽長秀: 越前守
             else if (bushoId === 1006007) preferredRankIds = [161, 162]; // 滝川一益: 左近将監
