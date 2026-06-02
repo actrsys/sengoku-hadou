@@ -41,17 +41,26 @@ window.EventTextManager = {
     // ==========================================
     // ★ イベントごとの台本置き場
     // ==========================================
-    // ① 清洲同盟（パート１：使者の到着まで）
+    // 清洲同盟（使者の到着まで）
     kiyosu_alliance_part1: function(args) {
         return [
             { type: 'log', msg: `今川義元の死後、三河で独立を果たした${args.motoyasuName}は、隣国${args.imagawaFamilyName}家と敵対関係となっていた。` },
             { type: 'log', msg: `${args.motoyasuGivenName}は長年に渡り敵対関係にあった${args.odaFamilyName}家との同盟を模索していた。` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「皆々様方、ご足労いただき感謝申し上げる」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「集まってもらったは、他でもない。${args.odaFamilyName}との同盟の件じゃ。」` },
             { type: 'dialog', leftName: args.kashinAName, leftFace: args.kashinAFace, msg: `「殿、なりませぬぞ」` },
             { type: 'dialog', leftName: args.kashinAName, leftFace: args.kashinAFace, msg: `「${args.odaFamilyName}と我らは、先々代の清孝公の時代より敵対してまいりました。今さら同盟などと、納得できぬ者も多いでしょう」` },
             { type: 'dialog', leftName: args.kashinBName, leftFace: args.kashinBFace, msg: `「そうは申すが、人質を出さぬと決めた以上、${args.imagawaFamilyName}とはもはやこれまで。一触即発の関係にござる」` },
             { type: 'dialog', leftName: args.kashinBName, leftFace: args.kashinBFace, msg: `「その上、三河の掌握もままならぬとなれば、${args.odaFamilyName}の力添え無くして我らの生き残る道はありますまい」` },
-            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「うむ……${args.kashinAGivenName}よ、おぬしの言い分ももっともじゃ」` },
-            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「しかし、それで${args.odaFamilyName}と結ぶは必定であるとわしは考えておる」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「むう……如何したものか……」` }
+        ];
+    },
+
+    // 清洲同盟（松平家専用：使者を送るルート）
+    kiyosu_alliance_matsudaira_accept: function(args) {
+        return [
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「うむ……決めたぞ。」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「${args.kashinAGivenName}よ、おぬしの言い分ももっともじゃ。しかし、${args.odaFamilyName}と結ぶは必定であるとわしは考えておる」` },
             { type: 'dialog', leftName: args.kashinAName, leftFace: args.kashinAFace, msg: `「は……なれど、${args.nobunagaGivenName}は油断ならぬ男。容易にはいきますまい」` },
             { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「うむ。此度はわし自ら${args.nobunagaCastleShort}に赴かねばなるまい」` },
             { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「わし自ら訪問することで、当方の誠意と覚悟を見せるのじゃ。よいな」` },
@@ -59,8 +68,16 @@ window.EventTextManager = {
             { type: 'log', msg: `${args.year}年${args.month}月　${args.nobunagaCastleName}` }
         ];
     },
-
-    // ① 清洲同盟（織田家専用：使者の取り次ぎ）
+    // 清洲同盟（松平家専用：使者を送らないルート）
+    kiyosu_alliance_matsudaira_reject: function(args) {
+        return [
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「……いや、やはり${args.odaFamilyName}と結ぶのは時期尚早か」` },
+            { type: 'dialog', leftName: args.kashinAName, leftFace: args.kashinAFace, msg: `「御意。長年の怨恨、そう容易く拭えるものではありませぬ」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「うむ。此度の話は無かったことにいたそう」` }
+        ];
+    },
+    
+    // 清洲同盟（織田家専用：使者の取り次ぎ）
     kiyosu_alliance_oda_arrival: function(args) {
         return [
             { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「殿。${args.matsudairaFamilyName}家から使者が参っておりまする」` },
@@ -68,7 +85,7 @@ window.EventTextManager = {
         ];
     },
 
-    // ① 清洲同盟（織田家専用：面会決定〜対面）
+    // 清洲同盟（織田家専用：面会決定〜対面）
     kiyosu_alliance_oda_accept: function(args) {
         return [
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「ふっ、会うてやろうではないか。通せ」` },
@@ -77,7 +94,7 @@ window.EventTextManager = {
         ];
     },
 
-    // ① 清洲同盟（パート２：面会して同盟成立ルート）
+    // 清洲同盟（面会して同盟成立ルート）
     kiyosu_alliance_accept: function(args) {
         return [
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「おぬし自ら来るとはのう。よう来た、竹千代」` },
@@ -96,7 +113,7 @@ window.EventTextManager = {
             { type: 'log', msg: `こうして、${args.odaClanName}と${args.matsudairaClanName}の同盟は成立した。` }
         ];
     },
-    // ① 清洲同盟（パート３：追い返すルート）
+    // 清洲同盟（織田家専用：使者を追い返すルート）
     kiyosu_alliance_reject: function(args) {
         return [
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「追い返せ」` },
@@ -105,6 +122,7 @@ window.EventTextManager = {
             { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「はっ、ははっ！」` }
         ];
     },
+    
     //桶狭間の戦い
     okehazama_part1: function(args) {
         return [

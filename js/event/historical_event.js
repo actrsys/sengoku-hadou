@@ -819,6 +819,44 @@ window.GameEvents.push({
             await window.EventTextManager.playSequence(game, window.EventTextManager.kiyosu_alliance_part1(args));
         }
 
+        // ★今回追加：松平プレイヤー専用の使者派遣選択肢
+        let isSendEnvoy = true;
+        if (game.playerClanId === motoyasu.clan) {
+            await new Promise(resolve => {
+                game.ui.showDialog(`「${args.odaFamilyName}家に同盟の使者を送りますか？」`, true, 
+                    () => { isSendEnvoy = true; resolve(); },
+                    () => { isSendEnvoy = false; resolve(); },
+                    {
+                        leftName: args.kashinAName,
+                        leftFace: args.kashinAFace,
+                        okText: "使者を送る",
+                        okClass: "btn-primary",
+                        cancelText: "送らない",
+                        cancelClass: "btn-secondary"
+                    }
+                );
+            });
+        }
+
+        // 使者を送らないルート
+        if (!isSendEnvoy) {
+            if (window.EventTextManager && window.EventTextManager.kiyosu_alliance_matsudaira_reject) {
+                await window.EventTextManager.playSequence(game, window.EventTextManager.kiyosu_alliance_matsudaira_reject(args));
+            }
+            game.ui.log(`【イベント】清洲同盟：${args.matsudairaClanName}は${args.odaClanName}への使者派遣を見送りました。`);
+            
+            // BGMを戻してイベントを終了します
+            if (window.AudioManager) {
+                window.AudioManager.restoreMemorizedBgm();
+            }
+            return;
+        }
+
+        // 使者を送るルートの続きを再生します
+        if (window.EventTextManager && window.EventTextManager.kiyosu_alliance_matsudaira_accept) {
+            await window.EventTextManager.playSequence(game, window.EventTextManager.kiyosu_alliance_matsudaira_accept(args));
+        }
+
         // 同盟を結ぶかどうかの判定用スイッチです（初期値は「結ぶ」にしておきます）
         let isAccept = true;
 
