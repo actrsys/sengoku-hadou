@@ -265,7 +265,12 @@ class IndependenceSystem {
         } else {
             newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
             const newColor = this.generateDistinctColor(castle);
-            // ★新大名家の名前は神輿の人物ベース
+            
+            // ★共通の魔法を呼び出して、大名就任時の改名と顔変更を行います！
+            // この「rebellionLeader._nameChangeInfo」という箱に、変更前と変更後の名前が入ります。
+            rebellionLeader._nameChangeInfo = this.applyDaimyoNameChange(rebellionLeader);
+
+            // ★新大名家の名前は神輿の人物ベース（改名後なら新しい名前が使われます）
             const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name; 
             newClanName = `${familyName}家`;
             
@@ -384,19 +389,29 @@ class IndependenceSystem {
         const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
         let msg = "";
         
+        const castellanNameStr = castellan.name.replace(/\|/g, '');
+        // 改名していれば古い名前を、していなければそのままの名前を表示用に使います
+        const info = rebellionLeader._nameChangeInfo;
+        const leaderNameStr = (info && info.isNameChanged) ? info.oldNameStr : rebellionLeader.name.replace(/\|/g, '');
+        
         // ★メッセージの出し分け
         if (isProxyRebellion) {
             if (isDefection) {
-                msg = `${oldClanName}の${castellan.name}が${rebellionLeader.name}を唆して${newClanName}に寝返りました！`;
+                msg = `${oldClanName}の${castellanNameStr}が${leaderNameStr}を唆して${newClanName}に寝返りました！`;
             } else {
-                msg = `${oldClanName}の${castellan.name}が${rebellionLeader.name}を大名として擁立し、独立を宣言しました！`;
+                msg = `${oldClanName}の${castellanNameStr}が${leaderNameStr}を大名として擁立し、独立を宣言しました！`;
             }
         } else {
             if (isDefection) {
-                msg = `${oldClanName}の${castellan.name}が、${castle.name}ごと${newClanName}に寝返りました！`;
+                msg = `${oldClanName}の${leaderNameStr}が、${castle.name}ごと${newClanName}に寝返りました！`;
             } else {
-                msg = `${oldClanName}の${castellan.name}が、${castle.name}にて独立を宣言しました！`;
+                msg = `${oldClanName}の${leaderNameStr}が、${castle.name}にて独立を宣言しました！`;
             }
+        }
+
+        // ★追加：独立して改名があった場合は、お知らせの文章を足します
+        if (info && info.isNameChanged && !isDefection) {
+            msg += `\n大名となるにあたり、${info.oldNameStr}は「${info.newNameStr}」と名を改めました。`;
         }
         
         // ここで一番最初にログに書き込みます！
@@ -762,6 +777,48 @@ class IndependenceSystem {
         return Math.floor(castle.population / 2000) + Math.floor(castle.soldiers / 20) + Math.floor(castle.kokudaka / 20) + Math.floor(castle.gold / 50) + Math.floor(castle.rice / 100);
     }
     
+    /**
+     * ★新しく追加：大名就任時の改名と顔変更をまとめて行う共通の魔法です！
+     * 実行後、改名したかどうかの結果と、変更前・変更後の名前をセットで返します。
+     */
+    applyDaimyoNameChange(busho) {
+        let oldNameStr = busho.name.replace(/\|/g, '');
+        let newNameStr = "";
+        let isNameChanged = false;
+
+        // 改名のチェック
+        if (busho.nameChange && busho.nameChange.includes('daimyo:')) {
+            const changes = busho.nameChange.split('/');
+            for (const change of changes) {
+                const parts = change.split(':');
+                if (parts.length === 3 && parts[0].trim() === 'daimyo') {
+                    const newNameParts = parts[1].trim().split('|');
+                    busho.familyName = newNameParts[0] === "0" ? busho.familyName : (newNameParts[0] || "");
+                    busho.givenName = newNameParts[1] === "0" ? busho.givenName : (newNameParts[1] || "");
+                    busho.name = busho.familyName + busho.givenName;
+
+                    const newYomiParts = parts[2].trim().split('|');
+                    busho.familyYomi = newYomiParts[0] === "0" ? busho.familyYomi : (newYomiParts[0] || "");
+                    busho.givenYomi = newYomiParts[1] === "0" ? busho.givenYomi : (newYomiParts[1] || "");
+                    busho.yomi = busho.familyYomi + busho.givenYomi;
+
+                    newNameStr = busho.name.replace(/\|/g, '');
+                    isNameChanged = true;
+                }
+            }
+        }
+
+        // 顔変更のチェック
+        if (busho.faceChange && busho.faceChange.startsWith('daimyo:')) {
+            const newFace = busho.faceChange.split(':')[1].trim();
+            if (newFace) {
+                busho.faceIcon = newFace;
+            }
+        }
+
+        return { isNameChanged, oldNameStr, newNameStr };
+    }
+
     // =========================================================================
     // ★ここから追加：お家乗っ取りの作戦会議と、裏での決戦を行う魔法！
     // =========================================================================
@@ -1064,6 +1121,9 @@ class IndependenceSystem {
                     daimyoCastle.isDelegated = false;
                 }
 
+                // ★共通の魔法を呼び出して、大名就任時の改名と顔変更を行います！
+                rebellionLeader._nameChangeInfo = this.applyDaimyoNameChange(rebellionLeader);
+
                 // 勢力名を変更
                 const clan = this.game.clans.find(c => c.id === oldClanId);
                 if (clan) {
@@ -1127,7 +1187,16 @@ class IndependenceSystem {
                 }
 
                 // 結果のメッセージを出します！
-                await this.game.ui.showDialogAsync(`【謀反】${oldDaimyo.name}は討死しました！\n${rebellionLeader.name}が新たな大名となります！`);
+                const oldDaimyoNameStr = oldDaimyo.name.replace(/\|/g, '');
+                const info = rebellionLeader._nameChangeInfo;
+                const leaderNameStr = (info && info.isNameChanged) ? info.oldNameStr : rebellionLeader.name.replace(/\|/g, '');
+                
+                let resultMsg = `【謀反】${oldDaimyoNameStr}は討死しました！\n${leaderNameStr}が新たな大名となります！`;
+                if (info && info.isNameChanged) {
+                    resultMsg += `\n大名となるにあたり、${info.oldNameStr}は「${info.newNameStr}」と名を改めました。`;
+                }
+                
+                await this.game.ui.showDialogAsync(resultMsg);
 
             } else if (result === 'daimyo_win') {
                 // 【主家軍の勝利】
