@@ -150,28 +150,62 @@ class CourtRankSystem {
         const bestRankNo = candidates[0].rankNo;
         const finalCandidates = candidates.filter(r => r.rankNo === bestRankNo);
 
-        // 領地と一致する「◯◯守」「◯◯介」を優先候補として探します
-        const priorityRanks = finalCandidates.filter(r => {
-            const name = r.rankName2;
-            if (!name || name === "隠岐守" || name === "秋田城介") return false;
-            
-            if (name.endsWith("守") || name.endsWith("介")) {
-                const provinceName = name.slice(0, -1);
-                return ownedProvinces.includes(provinceName);
-            }
-            return false;
-        });
+        // ★追加：特定の武将に対する「優先官位」のチェック
+        let preferredRankIds = [];
+        const bushoId = Number(busho.id);
+        const bushoName = busho.name.replace(/\|/g, '');
 
-        let selectedRank;
-        if (priorityRanks.length > 0) {
-            selectedRank = priorityRanks[Math.floor(Math.random() * priorityRanks.length)];
-        } else {
-            selectedRank = finalCandidates[Math.floor(Math.random() * finalCandidates.length)];
+        // 国主限定の優先官位
+        if (busho.isCommander && !busho.isDaimyo) {
+            if (bushoId === 1006004) preferredRankIds = [151; // 木下秀吉: 筑前守
+            else if (bushoId === 1006002) preferredRankIds = [114]; // 柴田勝家: 修理亮
+            else if (bushoId === 1006003) preferredRankIds = [94]; // 丹羽長秀: 越前守
+            else if (bushoId === 1006007) preferredRankIds = [161, 162]; // 滝川一益: 左近将監
+            else if (bushoId === 1900001) preferredRankIds = [196]; // 明智光秀: 日向守
+        }
+        
+        // 大名限定の優先官位
+        if (busho.isDaimyo) {
+            // 織田信長（ID:1006001、または名前で判定）
+            if (bushoId === 1006001 || bushoName === '織田信長') {
+                preferredRankIds = [25, 26, 27, 28, 160]; // 参議、弾正大忠
+            }
+        }
+
+        let selectedRank = null;
+
+        // もし優先官位が設定されていて、一番偉いランクの候補の中にそれが含まれていたら、それを確定で選びます
+        if (preferredRankIds.length > 0) {
+            const preferredCandidates = finalCandidates.filter(r => preferredRankIds.includes(r.id));
+            if (preferredCandidates.length > 0) {
+                // 複数ある場合（左近将監や参議など）はランダムに1つ選びます
+                selectedRank = preferredCandidates[Math.floor(Math.random() * preferredCandidates.length)];
+            }
+        }
+
+        // 優先官位が選ばれなかった場合は、通常通りの選び方をします
+        if (!selectedRank) {
+            // 領地と一致する「◯◯守」「◯◯介」を優先候補として探します
+            const priorityRanks = finalCandidates.filter(r => {
+                const name = r.rankName2;
+                if (!name || name === "隠岐守" || name === "秋田城介") return false;
+                
+                if (name.endsWith("守") || name.endsWith("介")) {
+                    const provinceName = name.slice(0, -1);
+                    return ownedProvinces.includes(provinceName);
+                }
+                return false;
+            });
+
+            if (priorityRanks.length > 0) {
+                selectedRank = priorityRanks[Math.floor(Math.random() * priorityRanks.length)];
+            } else {
+                selectedRank = finalCandidates[Math.floor(Math.random() * finalCandidates.length)];
+            }
         }
 
         // いよいよ官位を授与します！
         if (this.grantRank(busho, selectedRank.id)) {
-            const bushoName = busho.name.replace('|', '');
             const rankFullName = selectedRank.rankName1 ? `${selectedRank.rankName1} ${selectedRank.rankName2}` : selectedRank.rankName2;
             
             const msg = `朝廷より、${bushoName} が ${rankFullName} に叙されました。`;
