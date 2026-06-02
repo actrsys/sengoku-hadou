@@ -51,15 +51,14 @@ window.EventTextManager = {
             { type: 'dialog', leftName: args.kashinAName, leftFace: args.kashinAFace, msg: `「殿、なりませぬぞ」` },
             { type: 'dialog', leftName: args.kashinAName, leftFace: args.kashinAFace, msg: `「${args.odaFamilyName}と我らは、先々代の清孝公の時代より敵対してまいりました。今さら同盟などと、納得できぬ者も多いでしょう」` },
             { type: 'dialog', leftName: args.kashinBName, leftFace: args.kashinBFace, msg: `「そうは申すが、人質を出さぬと決めた以上、${args.imagawaFamilyName}とはもはやこれまで。一触即発の関係にござる」` },
-            { type: 'dialog', leftName: args.kashinBName, leftFace: args.kashinBFace, msg: `「その上、三河の掌握もままならぬとなれば、${args.odaFamilyName}の力添え無くして我らの生き残る道はありますまい」` },
-            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「むう……如何したものか……」` }
+            { type: 'dialog', leftName: args.kashinBName, leftFace: args.kashinBFace, msg: `「その上、三河の掌握もままならぬとなれば、${args.odaFamilyName}の力添え無くして我らの生き残る道はありますまい」` }
         ];
     },
 
     // 清洲同盟（松平家専用：使者を送るルート）
     kiyosu_alliance_matsudaira_accept: function(args) {
         return [
-            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「うむ……決めたぞ。」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「……うむ。決めたぞ」` },
             { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「${args.kashinAGivenName}よ、おぬしの言い分ももっともじゃ。しかし、${args.odaFamilyName}と結ぶは必定であるとわしは考えておる」` },
             { type: 'dialog', leftName: args.kashinAName, leftFace: args.kashinAFace, msg: `「は……なれど、${args.nobunagaGivenName}は油断ならぬ男。容易にはいきますまい」` },
             { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「うむ。此度はわし自ら${args.nobunagaCastleShort}に赴かねばなるまい」` },
