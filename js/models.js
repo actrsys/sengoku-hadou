@@ -350,14 +350,29 @@ class Busho {
         this.birthYear = Number(data.birthYear || 1500); // 生年（空なら1500）
         this.endYear = Number(data.endYear || 1650);     // 没年（空なら1650）
         this.startYear = Number(data.startYear || 1500); // 登場年（空なら1500）
+
+        // ★追加：本来の没年（初期データ）をメモしておきます
+        this.originalEndYear = Number(data.endYear || 1650);
+
         this.nameChange = data.nameChange || ""; // 変わる年:新しい名前:新しい読み仮名/変わる年... の形式の改名データ
 
         // ★【ここから書き足し：戦死武将の延命処理】
         // CSVから戦死フラグを受け取ってシールを貼ります（TRUEなら true になります）
         this.isKilledInBattle = data.isKilledInBattle === true;
+
+        // ★追加1：セーブデータ読み込み時に「何度も寿命が延びてしまうバグ」を防ぐためのシールです
+        this.isLifeExtended = data.isLifeExtended === true;
+
+        // ★追加2：今のシナリオの「開始年」をゲームの設定から取得します
+        const currentStartYear = (window.MainParams && window.MainParams.StartYear) ? window.MainParams.StartYear : 1560;
         
-        // もし戦死のシールが貼られていた場合、本来の寿命を書き換えます！
-        if (this.isKilledInBattle) {
+        // ★絶対防壁：いかなる場合も、初期endYearがシナリオ開始年未満（1560年スタートなら1559以下）の武将は絶対に登場させません！
+        if (!this.isLifeExtended && this.originalEndYear < currentStartYear) {
+            this.isKilledInBattle = false; // 延命フラグを強制的に折ります
+            this.status = 'dead'; // 強制的に死亡状態にしてお城に入れないようにします
+        }
+        // もし戦死フラグがあり、まだ延命処理がされておらず、かつ「ゲーム開始時点でまだ生きている（没年が開始年以上）」場合のみ寿命を書き換えます！
+        else if (this.isKilledInBattle && !this.isLifeExtended && this.endYear >= currentStartYear) {
             // まず、本来死ぬはずだった時の年齢を計算します（没年 - 生年）
             const originalDeathAge = this.endYear - this.birthYear;
             
@@ -369,6 +384,9 @@ class Busho {
                 // 本来55歳以上生きるはずだった場合は、元の寿命に「10年」を足して上書きします
                 this.endYear = this.endYear + 10;
             }
+
+            // 延命処理が無事に終わった印をつけます
+            this.isLifeExtended = true;
         }
         
         // ★【ここから書き足し：奥さん（姫）の設定】

@@ -226,7 +226,7 @@ class DataManager {
             }
             
             // ★ゲーム開始時点で既に寿命を迎えている（昔に亡くなっている）、またはダミー用（startYearが9999）武将の処理です！
-            if (b.endYear < startYear || b.startYear === 9999) {
+            if (b.endYear < startYear || b.startYear === 9999 || b.status === 'dead') {
                 b.status = 'dead'; // 「死亡」の印をつけます
                 b.isDaimyo = false;
                 b.isCastellan = false;
