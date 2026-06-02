@@ -141,6 +141,48 @@ class CourtRankSystem {
     // ==========================================
     // ★ここから追加：月初めの官位授与チェック
     // ==========================================
+    // ★追加：候補官位の中から領地などを考えて1つ選んで授与する共通の魔法
+    selectAndGrantRank(busho, candidates, ownedProvinces, messages) {
+        if (!candidates || candidates.length === 0) return null;
+
+        // 候補の中で「一番偉い（rankNoが一番小さい）ランク」を見つけます
+        candidates.sort((a, b) => a.rankNo - b.rankNo);
+        const bestRankNo = candidates[0].rankNo;
+        const finalCandidates = candidates.filter(r => r.rankNo === bestRankNo);
+
+        // 領地と一致する「◯◯守」「◯◯介」を優先候補として探します
+        const priorityRanks = finalCandidates.filter(r => {
+            const name = r.rankName2;
+            if (!name || name === "隠岐守" || name === "秋田城介") return false;
+            
+            if (name.endsWith("守") || name.endsWith("介")) {
+                const provinceName = name.slice(0, -1);
+                return ownedProvinces.includes(provinceName);
+            }
+            return false;
+        });
+
+        let selectedRank;
+        if (priorityRanks.length > 0) {
+            selectedRank = priorityRanks[Math.floor(Math.random() * priorityRanks.length)];
+        } else {
+            selectedRank = finalCandidates[Math.floor(Math.random() * finalCandidates.length)];
+        }
+
+        // いよいよ官位を授与します！
+        if (this.grantRank(busho, selectedRank.id)) {
+            const bushoName = busho.name.replace('|', '');
+            const rankFullName = selectedRank.rankName1 ? `${selectedRank.rankName1} ${selectedRank.rankName2}` : selectedRank.rankName2;
+            
+            const msg = `朝廷より、${bushoName} が ${rankFullName} に叙されました。`;
+            messages.push(msg);
+            this.game.ui.log(`【叙任】${msg}`);
+            
+            return selectedRank.rankNo; // 新しくもらったランクの数字を返します
+        }
+        return null;
+    }
+
     processMonthlyPromotions() {
         let messages = [];
 
@@ -166,9 +208,7 @@ class CourtRankSystem {
             // ★追加：もし当主が「左馬頭（ID80）」を持っていて、朝廷に「征夷大将軍（ID1）」が空いていたら特別に就任する魔法！
             if (leader.courtRankIds && leader.courtRankIds.includes(80)) {
                 if (this.availableRanks.includes(1)) {
-                    // 征夷大将軍（ID1）を与えます
                     this.grantRank(leader, 1);
-                    // 用済みになった左馬頭（ID80）は朝廷にお返しします
                     leader.courtRankIds = leader.courtRankIds.filter(id => id !== 80);
                     this.returnRank(80);
                     
@@ -176,8 +216,6 @@ class CourtRankSystem {
                     const msg = `${leaderName}が征夷大将軍に就任しました。`;
                     messages.push(msg);
                     this.game.ui.log(`【叙任】${msg}`);
-                    
-                    // 特別な就任をしたので、この月の通常の官位チェックはパスして次の大名へ進みます
                     return;
                 }
             }
@@ -186,94 +224,72 @@ class CourtRankSystem {
             const basePrestige = clan.basePrestige || 0;
             const contribution = clan.courtContribution || 0;
 
-            // 朝廷の「空いている官位」の中から、条件を満たすものを【すべて】探します
+            // ------------------------------------------
+            // 1. 大名の官位チェック
+            // ------------------------------------------
             let candidates = this.ranks.filter(r => {
-                // 条件1：朝廷の在庫にあるか
                 if (!this.availableRanks.includes(r.id)) return false;
-                
-                // 条件2：献金で上がれるのは rankNo: 4 まで（1〜3は除外）
                 if (r.rankNo < 4) return false;
-                
-                // 条件3：IDが80（左馬頭）の官位はイベント用なので、候補から外します
                 if (r.id === 80) return false;
-                
-                // 条件4：今持っている最高ランクより「上（rankNoが小さい）」であるか
-                // ※これで、今のランク以下の官位をもらってしまうのを防ぎます！
                 if (r.rankNo >= currentMaxRankNo) return false;
-                
-                // 条件5：威信と貢献度の基準を満たしているか
                 return basePrestige >= r.necessaryPrestige && contribution >= (r.necessaryPrestige * 4.5);
             });
 
-            if (candidates.length === 0) return; // 条件を満たす空き官位が一つもなければ見送り
-
-            // 候補の中で「一番偉い（rankNoが一番小さい）ランク」を見つけます
-            candidates.sort((a, b) => a.rankNo - b.rankNo);
-            const bestRankNo = candidates[0].rankNo;
-
-            // 一番偉いランクと同じ rankNo を持つ官位だけを残します（飛び級で一気に上がる！）
-            const finalCandidates = candidates.filter(r => r.rankNo === bestRankNo);
-
-            // 大名家が所有しているお城を調べ、そこから国（province）の名前を集めます
+            // 大名家が所有しているお城の国名を集めます
             const clanCastles = this.game.castles ? this.game.castles.filter(c => c.clanId === clan.id) : [];
             const ownedProvinces = [];
             clanCastles.forEach(c => {
                 if (c.province) {
-                    // 「武蔵国」などの文字列から、一番最後の「国」を取り除いて「武蔵」にします
                     const pName = c.province.replace(/国$/, '');
-                    if (!ownedProvinces.includes(pName)) {
-                        ownedProvinces.push(pName);
-                    }
+                    if (!ownedProvinces.includes(pName)) ownedProvinces.push(pName);
                 }
             });
 
-            // 領地と一致する「◯◯守」「◯◯介」を優先候補として探します
-            const priorityRanks = finalCandidates.filter(r => {
-                const name = r.rankName2;
-                if (!name) return false; // 名前が設定されていなければパスします
-                
-                // ★追加：隠岐守と秋田城介は優先システムから除外するためパスします
-                if (name === "隠岐守" || name === "秋田城介") return false;
-                
-                // 名前の一番最後が「守」か「介」であるか調べます
-                if (name.endsWith("守") || name.endsWith("介")) {
-                    // 最後の1文字（守・介）を切り取って、国名（◯◯の部分）を取り出します
-                    const provinceName = name.slice(0, -1);
-                    
-                    // プレイヤーの領地リストにその国名が含まれているか確認します
-                    return ownedProvinces.includes(provinceName);
-                }
-                return false;
-            });
-
-            let selectedRank;
-            if (priorityRanks.length > 0) {
-                // 領地と一致する候補が見つかった場合は、その中からランダムに選びます
-                const index = Math.floor(Math.random() * priorityRanks.length);
-                selectedRank = priorityRanks[index];
-            } else {
-                // 条件に合う優先候補がない場合は、今まで通り全体の中からランダムに選びます
-                const index = Math.floor(Math.random() * finalCandidates.length);
-                selectedRank = finalCandidates[index];
+            // 共通の魔法を呼び出して、大名に官位を授与します
+            const newDaimyoRankNo = this.selectAndGrantRank(leader, candidates, ownedProvinces, messages);
+            if (newDaimyoRankNo !== null) {
+                currentMaxRankNo = newDaimyoRankNo;
             }
 
-            // いよいよ官位を授与します！
-            if (this.grantRank(leader, selectedRank.id)) {
-                // 武将の名前から「|」を取り除いて綺麗にします
-                const leaderName = leader.name.replace('|', '');
+            // ------------------------------------------
+            // 2. 国主たちの官位チェック（大名が官位を持っている場合のみ）
+            // ------------------------------------------
+            if (currentMaxRankNo < 20) {
+                const commanders = this.game.bushos.filter(b => b.clan === clan.id && b.isCommander && b.status === 'active');
                 
-                // rankName1が空欄の場合でも、不自然な空白ができないように整える魔法です
-                const rankFullName = selectedRank.rankName1 ? `${selectedRank.rankName1} ${selectedRank.rankName2}` : selectedRank.rankName2;
-                
-                const msg = `朝廷より、${leaderName} が ${rankFullName} に叙されました。`;
-                messages.push(msg);
-                
-                // 履歴ログにもこっそり残しておきます
-                this.game.ui.log(`【叙任】${leaderName} が ${rankFullName} に叙されました。`);
+                commanders.forEach(commander => {
+                    let cmdrMaxRankNo = 20; 
+                    if (commander.courtRankIds && commander.courtRankIds.length > 0) {
+                        const cmdrValidRanks = commander.courtRankIds.map(id => this.getRankData(id)).filter(r => r);
+                        if (cmdrValidRanks.length > 0) {
+                            cmdrValidRanks.sort((a, b) => a.rankNo - b.rankNo);
+                            cmdrMaxRankNo = cmdrValidRanks[0].rankNo;
+                        }
+                    }
+
+                    let cmdrCandidates = this.ranks.filter(r => {
+                        if (!this.availableRanks.includes(r.id)) return false;
+                        if (r.rankNo < 4) return false;
+                        if (r.id === 80) return false;
+                        if (r.rankNo >= cmdrMaxRankNo) return false;
+                        if (r.rankNo < currentMaxRankNo + 2) return false; // 大名より2低いランクまで
+                        if ((commander.achievementTotal || 0) < r.necessaryPrestige) return false; // 功績チェック
+                        return basePrestige >= r.necessaryPrestige && contribution >= (r.necessaryPrestige * 4.5);
+                    });
+
+                    // 国主がいるお城の国名を調べます
+                    const cmdrProvinces = [];
+                    const cmdrCastle = this.game.castles ? this.game.castles.find(c => c.id === commander.castleId) : null;
+                    if (cmdrCastle && cmdrCastle.province) {
+                        cmdrProvinces.push(cmdrCastle.province.replace(/国$/, ''));
+                    }
+
+                    // 共通の魔法を呼び出して、国主に官位を授与します
+                    this.selectAndGrantRank(commander, cmdrCandidates, cmdrProvinces, messages);
+                });
             }
         });
 
-        // 授与されたメッセージのリストを返します
         return messages;
     }
     
