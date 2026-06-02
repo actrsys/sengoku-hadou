@@ -775,6 +775,12 @@ class DiplomacyManager {
             demandMsg = `「どうか我らを${receiverClanName}の末席にお加えいただきたく存じます」`;
             acceptMsg = `「よくぞご決心なされた。今後はその力、当家で存分に振るわれよ」`;
             replyAcceptMsg = isSenderDaimyo ? `「恐悦至極……今日より${receiverCallName.replace('殿', '様')}を主君と仰ぎ奉りまする」` : `「ははっ！　ありがたき幸せに存じまする！」`;
+        } else if (type === 'subordinate') {
+            demandMsg = `「当家は${receiverClanName}の傘下に入りたく存じます。どうか御庇護を賜りたく……」`;
+            acceptMsg = `「うむ、よき心掛けじゃ。これより当家が後ろ盾となろう」`;
+            rejectMsg = `「貴家のような得体の知れぬ者を傘下には加えられぬ。お引き取りを」`;
+            replyAcceptMsg = isSenderDaimyo ? `「ありがたき幸せ……此度の御恩、決して忘れませぬ」` : `「ははっ！　殿もさぞお喜びになりましょう！」`;
+            replyRejectMsg = `「……左様にござるか。ではこれにて失礼いたす」`;
         } else if (type === 'marriage') {
             demandMsg = `「両家の絆を強固なものとするため、当家の${princessName}を${targetBushoName}殿に娶っていただきたい」`;
             acceptMsg = `「願ってもない申し出にござる。ありがたくお受けいたそう」`;
