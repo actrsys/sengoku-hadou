@@ -1269,25 +1269,53 @@ class GameManager {
         });
 
         // 1回目のチェック：被っていたら、威信が2位以下の勢力に国名（「国」抜き）をつける
+        // ★追加：ただし、同じ国に同名の勢力がいる場合は、最初から城名をつけるようにします！
         Object.values(clanGroups).forEach(group => {
             if (group.length > 1) {
                 // 同じ名前の勢力同士を、大名の威信（daimyoPrestige）が高い順に並べ替えます
                 group.sort((a, b) => b.daimyoPrestige - a.daimyoPrestige);
 
-                // 威信トップ（[0]）には何もつけず、2位以下（[1]以降）にだけ国名をつけます
+                // 各勢力がいる地方（国）をリストアップしておきます
+                const clanProvinces = {};
+                group.forEach(clan => {
+                    const leader = this.getBusho(clan.leaderId);
+                    if (leader) {
+                        const castle = this.getCastle(leader.castleId);
+                        if (castle) {
+                            clanProvinces[clan.id] = castle.provinceId;
+                        }
+                    }
+                });
+
+                // 威信トップ（[0]）には何もつけず、2位以下（[1]以降）にだけ名前をつけます
                 for (let i = 1; i < group.length; i++) {
                     const clan = group[i];
                     const leader = this.getBusho(clan.leaderId);
                     if (leader) {
                         const castle = this.getCastle(leader.castleId);
                         if (castle) {
-                            const province = this.provinces.find(p => p.id === castle.provinceId);
-                            if (province && province.province) {
-                                const provName = province.province.replace(/国$/, "");
-                                // ★国名の読みから「のくに」を抜きます
-                                const provYomi = (province.provinceYomi || "").replace(/のくに$/, "");
-                                clan.name = provName + clan.baseName;
-                                clan.yomi = provYomi + clan.baseYomi;
+                            const myProvId = castle.provinceId;
+                            // 同じグループの中に、同じ国（provinceId）にいる別の勢力がいるかチェックします
+                            const hasSameProvClan = group.some(otherClan => otherClan.id !== clan.id && clanProvinces[otherClan.id] === myProvId);
+
+                            if (hasSameProvClan) {
+                                // 同じ国に別の同名勢力がいる場合は、国名ではなく最初から城名（拠点名）をつけます
+                                if (castle.name) {
+                                    const castleName = castle.name.replace(/(城|館|御所|御坊)$/, "");
+                                    const castleYomi = (castle.yomi || "").replace(/(じょう|やかた|ごしょ|ごぼう)$/, "");
+                                    clan.name = castleName + clan.baseName;
+                                    clan.yomi = castleYomi + clan.baseYomi;
+                                }
+                            } else {
+                                // いなければ今まで通り国名をつける
+                                const province = this.provinces.find(p => p.id === myProvId);
+                                if (province && province.province) {
+                                    const provName = province.province.replace(/国$/, "");
+                                    // ★国名の読みから「のくに」を抜きます
+                                    const provYomi = (province.provinceYomi || "").replace(/のくに$/, "");
+                                    clan.name = provName + clan.baseName;
+                                    clan.yomi = provYomi + clan.baseYomi;
+                                }
                             }
                         }
                     }
