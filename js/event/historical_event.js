@@ -944,6 +944,65 @@ window.GameEvents.push({
 });
 
 // ==========================================
+// ★ 織田信清謀反（独立）イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_nobukiyo_rebellion",
+    timing: "endMonth_before", // 月末の独立チェックなどが始まる前に起こします
+    isOneTime: true,
+    
+    checkCondition: function(game) {
+        // 1. 織田信長（ID: 1006001）が大名であるか確認します
+        const nobunaga = game.getBusho(1006001);
+        if (!nobunaga || !nobunaga.isDaimyo || nobunaga.clan === 0) return false;
+
+        // 2. 一色龍興（ID: 1005011）が大名であるか確認します
+        const tatsuoki = game.getBusho(1005011);
+        if (!tatsuoki || !tatsuoki.isDaimyo || tatsuoki.clan === 0) return false;
+
+        // 3. 織田家と一色家が敵対しているか確認します
+        if (game.diplomacyManager) {
+            const rel = game.diplomacyManager.getRelation(nobunaga.clan, tatsuoki.clan);
+            if (!rel || rel.status !== '敵対') return false;
+        } else {
+            return false;
+        }
+
+        // 4. 尾張国（地方ID: 23）のすべての城を織田家が所有しているか確認します
+        const owariCastles = game.castles.filter(c => c.provinceId === 23);
+        if (owariCastles.length === 0) return false; // 万が一城がない場合はストップします
+        
+        const ownsAllOwari = owariCastles.every(c => c.ownerClan === nobunaga.clan);
+        if (!ownsAllOwari) return false;
+
+        // 5. 織田信清（ID: 1006078）が存在し、大名ではなく、織田家に所属しているか確認します
+        const nobukiyo = game.getBusho(1006078);
+        if (!nobukiyo || nobukiyo.isDaimyo || nobukiyo.clan !== nobunaga.clan) return false;
+
+        // 6. 織田信清が国主であり、かつ犬山城（ID: 73）の城主であるか確認します
+        if (!nobukiyo.isCommander || !nobukiyo.isCastellan || nobukiyo.castleId !== 73) return false;
+
+        // 全ての条件をクリアしたら、イベント発生の合図を出します！
+        return true;
+    },
+    
+    execute: async function(game) {
+        const nobunaga = game.getBusho(1006001);
+        const nobukiyo = game.getBusho(1006078);
+        const inuyamaCastle = game.getCastle(73);
+
+        // 万が一データが見つからなかった時のための安全装置です
+        if (!inuyamaCastle) return;
+
+        // 独立システムにお願いして、強制的に独立を実行してもらいます
+        if (game.independenceSystem) {
+            // 第4引数に 'indep' を渡すことで、純粋な「独立」として処理させます
+            await game.independenceSystem.executeRebellion(inuyamaCastle, nobukiyo, nobunaga, 'indep');
+        }
+    }
+});
+
+// ==========================================
 // ★ 浅井長政 家督相続イベント
 // ==========================================
 window.GameEvents.push({
@@ -3559,8 +3618,8 @@ window.GameEvents.push({
             game.updateAllClanPrestige();
         }
         if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
+                game.ui.renderMap();
+                game.ui.updatePanelHeader();
+            }
         }
-    }
-});
+    });
