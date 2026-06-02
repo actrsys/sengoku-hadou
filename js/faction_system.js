@@ -88,6 +88,9 @@ class FactionSystem {
         const F = window.WarParams.Faction || {};
         const roninThreshold = F.RoninLoyaltyThreshold || 30;
         const roninChanceBase = F.RoninChanceBase || 0.5;
+        
+        // ★追加：出奔率の全体調整用の倍率（0.5なら50%、0.8なら80%に設定可能）
+        const roninMultiplier = 0.5;
 
         // 1. 下野判定
         const roninCandidates = this.game.bushos.filter(b => 
@@ -100,7 +103,8 @@ class FactionSystem {
 
         // ★修正：forEach をやめて、順番待ちができる for...of に変えます！
         for (const b of roninCandidates) {
-            let chance = roninChanceBase - (b.loyalty * 0.01); 
+            // ★基本の計算結果に、先ほど一番上で作った倍率（roninMultiplier）を掛け算します
+            let chance = (roninChanceBase - (b.loyalty * 0.01)) * roninMultiplier;
             
             // ★ここから書き足し：大名と一門なら下野しにくくする魔法！
             // まずは自分の仕えている大名（殿様）を探します
