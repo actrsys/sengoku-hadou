@@ -3705,7 +3705,7 @@ window.GameEvents.push({
         const newNameStr = oldDaimyo.name.replace('|', ''); // 改名後のフルネーム
         
         // 通常の改名メッセージの形でお知らせの文章を作ります
-        messages.push(`${oldNameStr}は出家して家督を譲り、\n「${newNameStr}」と号しました。`);
+        messages.push(`${oldNameStr}は出家して「${newNameStr}」と号しました。`);
 
         // ⑦ 義光の改名・顔変更の魔法（大名になった時に名前や顔が変わる設定があれば適用します）
         if (successor.nameChange && successor.nameChange.includes('daimyo:')) {
