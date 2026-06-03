@@ -1146,7 +1146,7 @@ window.GameEvents.push({
         // ⑪ メッセージを画面に出してお知らせします
         const hisamasaName = oldDaimyo.name.replace('|', '');
         const nagamasaName = successor.name.replace('|', '');
-        const mainMsg = `浅井家の${hisamasaName}が隠居し。\n${nagamasaName}が新たな当主として家督を継ぎました！`;
+        const mainMsg = `浅井家の${hisamasaName}が隠居し、\n${nagamasaName}が新たな当主として家督を継ぎました！`;
         
         game.ui.log(`【イベント】浅井家家督相続：${mainMsg}`);
         messages.unshift(mainMsg); // 一番最初にメインのメッセージを入れます
@@ -3758,7 +3758,7 @@ window.GameEvents.push({
         const clanName = clan ? clan.name : "最上家";
         const yoshiakiName = successor.name.replace('|', '');
 
-        const mainMsg = `${clanName}の${oldNameStr}が隠居し。\n${yoshiakiName}が新たな当主として家督を継ぎました！`;
+        const mainMsg = `${clanName}の${oldNameStr}が隠居し、\n${yoshiakiName}が新たな当主として家督を継ぎました！`;
         
         game.ui.log(`【イベント】最上家家督相続：${mainMsg}`);
         messages.unshift(mainMsg); // 一番最初にメインのメッセージを入れます
