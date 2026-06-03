@@ -3633,8 +3633,8 @@ window.GameEvents.push({
     isOneTime: true,             // 一度発生したら二度と起きません
     
     checkCondition: function(game) {
-        // １．1571年以降であるか確認します
-        if (game.year < 1571) return false;
+        // １．1561年以降であるか確認します
+        if (game.year < 1561) return false;
 
         // ２．最上義守（ID: 1089001）が存在し、大名であるか確認します
         const yoshimori = game.getBusho(1089001);
