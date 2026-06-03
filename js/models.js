@@ -356,8 +356,8 @@ class Busho {
 
         this.nameChange = data.nameChange || ""; // 変わる年:新しい名前:新しい読み仮名/変わる年... の形式の改名データ
 
-        // ★【ここから書き足し：戦死武将の延命処理】
-        // CSVから戦死フラグを受け取ってシールを貼ります（TRUEなら true になります）
+        // ★【ここから書き足し：討死武将の延命処理】
+        // CSVから討死フラグを受け取ってシールを貼ります（TRUEなら true になります）
         this.isKilledInBattle = data.isKilledInBattle === true;
 
         // ★追加1：セーブデータ読み込み時に「何度も寿命が延びてしまうバグ」を防ぐためのシールです
@@ -371,17 +371,17 @@ class Busho {
             this.isKilledInBattle = false; // 延命フラグを強制的に折ります
             this.status = 'dead'; // 強制的に死亡状態にしてお城に入れないようにします
         }
-        // もし戦死フラグがあり、まだ延命処理がされておらず、かつ「ゲーム開始時点でまだ生きている（没年が開始年以上）」場合のみ寿命を書き換えます！
+        // もし討死フラグがあり、まだ延命処理がされておらず、かつ「ゲーム開始時点でまだ生きている（没年が開始年以上）」場合のみ寿命を書き換えます！
         else if (this.isKilledInBattle && !this.isLifeExtended && this.endYear >= currentStartYear) {
             // まず、本来死ぬはずだった時の年齢を計算します（没年 - 生年）
             const originalDeathAge = this.endYear - this.birthYear;
             
-            // 分岐の基準を「55歳」にします
-            if (originalDeathAge < 55) {
-                // 本来55歳未満で死ぬはずだった場合は、「65歳まで生きる」ように没年を上書きします
-                this.endYear = this.birthYear + 65;
+            // 分岐の基準を「45歳」にします
+            if (originalDeathAge < 45) {
+                // 本来45歳未満で死ぬはずだった場合は、「55歳まで生きる」ように没年を上書きします
+                this.endYear = this.birthYear + 55;
             } else {
-                // 本来55歳以上生きるはずだった場合は、元の寿命に「10年」を足して上書きします
+                // 本来45歳以上生きるはずだった場合は、元の寿命に「10年」を足して上書きします
                 this.endYear = this.endYear + 10;
             }
 
