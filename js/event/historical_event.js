@@ -3640,7 +3640,10 @@ window.GameEvents.push({
         const yoshimori = game.getBusho(1089001);
         if (!yoshimori || !yoshimori.isDaimyo || yoshimori.clan === 0) return false;
 
-        // ３．最上義光（ID: 1089002）が存在し、義守と同じ勢力に所属しているか確認します
+        // ３．プレイヤーが最上家（義守の勢力）の担当ではないか確認します
+        if (game.playerClanId === yoshimori.clan) return false;
+
+        // ４．最上義光（ID: 1089002）が存在し、義守と同じ勢力に所属しているか確認します
         const yoshiaki = game.getBusho(1089002);
         if (!yoshiaki || yoshiaki.status !== 'active' || yoshiaki.clan !== yoshimori.clan) return false;
 
