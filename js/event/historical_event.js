@@ -3618,8 +3618,160 @@ window.GameEvents.push({
             game.updateAllClanPrestige();
         }
         if (game.ui) {
-                game.ui.renderMap();
-                game.ui.updatePanelHeader();
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
+    }
+});
+
+// ==========================================
+// ★ 最上義光 家督相続イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_mogami_succession",
+    timing: "startMonth_before", // 毎月の初めに条件を満たしているかチェックします
+    isOneTime: true,             // 一度発生したら二度と起きません
+    
+    checkCondition: function(game) {
+        // １．1571年以降であるか確認します
+        if (game.year < 1571) return false;
+
+        // ２．最上義守（ID: 1089001）が存在し、大名であるか確認します
+        const yoshimori = game.getBusho(1089001);
+        if (!yoshimori || !yoshimori.isDaimyo || yoshimori.clan === 0) return false;
+
+        // ３．最上義光（ID: 1089002）が存在し、義守と同じ勢力に所属しているか確認します
+        const yoshiaki = game.getBusho(1089002);
+        if (!yoshiaki || yoshiaki.status !== 'active' || yoshiaki.clan !== yoshimori.clan) return false;
+
+        // すべての条件をクリアしたらイベント発生の合図を出します！
+        return true;
+    },
+    
+    execute: async function(game) {
+        const oldDaimyo = game.getBusho(1089001);
+        const successor = game.getBusho(1089002);
+        const clanId = oldDaimyo.clan;
+        const messages = [];
+
+        // ① 功績の譲渡（旧大名の功績の3分の1を譲り受けます）
+        const meritTransfer = Math.floor((oldDaimyo.achievementTotal || 0) / 3);
+        successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
+        oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
+
+        // ② 義守から大名のバッジを外します
+        oldDaimyo.isDaimyo = false;
+
+        // ③ もし義光が義守と違うお城にいたら、義守のいるお城へ呼び寄せます
+        if (successor.castleId !== oldDaimyo.castleId) {
+            if (game.affiliationSystem) {
+                game.affiliationSystem.moveCastle(successor, oldDaimyo.castleId);
+            } else {
+                successor.castleId = oldDaimyo.castleId;
             }
         }
-    });
+
+        // ④ 義光を新しい大名、そして城主に任命します
+        successor.isDaimyo = true;
+        successor.isCastellan = true;
+        if (successor.isGunshi) {
+            successor.isGunshi = false; // もし軍師だったらバッジを外します
+        }
+
+        // ⑤ お城の城主データを義光に書き換えます
+        const targetCastle = game.getCastle(successor.castleId);
+        if (targetCastle) {
+            const castleBushos = game.bushos.filter(b => b.castleId === targetCastle.id && b.status === 'active');
+            castleBushos.forEach(b => {
+                if (b.id !== successor.id && b.isCastellan) {
+                    b.isCastellan = false; // 他の人の城主バッジを外します
+                }
+            });
+            targetCastle.castellanId = successor.id;
+            if (game.affiliationSystem) {
+                game.affiliationSystem.updateCastleLord(targetCastle);
+            }
+        }
+
+        // ⑥ 義守の出家と改名処理（栄林と号する）
+        const oldNameStr = oldDaimyo.name.replace('|', ''); // 改名前のフルネームをメモしておきます
+        
+        // 下の名前を「栄林」に変え、読み仮名も設定します
+        oldDaimyo.givenName = "栄林";
+        oldDaimyo.name = oldDaimyo.familyName + oldDaimyo.givenName;
+        oldDaimyo.givenYomi = "えいりん";
+        oldDaimyo.yomi = oldDaimyo.familyYomi + oldDaimyo.givenYomi;
+
+        const newNameStr = oldDaimyo.name.replace('|', ''); // 改名後のフルネーム
+        
+        // 通常の改名メッセージの形でお知らせの文章を作ります
+        messages.push(`${oldNameStr}は出家して家督を譲り、\n「${newNameStr}」と号しました。`);
+
+        // ⑦ 義光の改名・顔変更の魔法（大名になった時に名前や顔が変わる設定があれば適用します）
+        if (successor.nameChange && successor.nameChange.includes('daimyo:')) {
+            const changes = successor.nameChange.split('/');
+            for (const change of changes) {
+                const parts = change.split(':');
+                if (parts.length === 3 && parts[0].trim() === 'daimyo') {
+                    const sucOldNameStr = successor.name.replace('|', '');
+                    const newNameParts = parts[1].trim().split('|');
+                    successor.familyName = newNameParts[0] || "";
+                    successor.givenName = newNameParts[1] || "";
+                    successor.name = successor.familyName + successor.givenName;
+                    const newYomiParts = parts[2].trim().split('|');
+                    successor.familyYomi = newYomiParts[0] || "";
+                    successor.givenYomi = newYomiParts[1] || "";
+                    successor.yomi = successor.familyYomi + successor.givenYomi;
+                    const sucNewNameStr = successor.name.replace('|', '');
+                    messages.push(`家督を継ぐにあたり、${sucOldNameStr}は\n「${sucNewNameStr}」と名を改めました。`);
+                }
+            }
+        }
+
+        if (successor.faceChange && successor.faceChange.startsWith('daimyo:')) {
+            const newFace = successor.faceChange.split(':')[1].trim();
+            if (newFace) {
+                successor.faceIcon = newFace;
+            }
+        }
+
+        // ⑧ 大名家のリーダーを義光に設定します
+        game.changeLeader(clanId, successor.id);
+        successor.isActionDone = true;
+
+        // ⑨ 旧大名の城の城主情報を更新します
+        if (oldDaimyo.castleId) {
+            const oldCastle = game.getCastle(oldDaimyo.castleId);
+            if (oldCastle && game.affiliationSystem) {
+                game.affiliationSystem.updateCastleLord(oldCastle);
+            }
+        }
+
+        // ⑩ 当主交代の共通の魔法を呼び出します（能力差による忠誠度の変化など）
+        // 第4引数に true を入れて、ショックを和らげる設定にしています！
+        if (game.lifeSystem) {
+            game.lifeSystem.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
+        }
+
+        // ⑪ メッセージを画面に出してお知らせします
+        const clan = game.clans.find(c => c.id === clanId);
+        const clanName = clan ? clan.name : "最上家";
+        const yoshiakiName = successor.name.replace('|', '');
+
+        const mainMsg = `${clanName}の${oldNameStr}が隠居し。\n${yoshiakiName}が新たな当主として家督を継ぎました！`;
+        
+        game.ui.log(`【イベント】最上家家督相続：${mainMsg}`);
+        messages.unshift(mainMsg); // 一番最初にメインのメッセージを入れます
+
+        // 溜めておいたメッセージを順番に出します
+        for (const msg of messages) {
+            await game.ui.showDialogAsync(msg, false, 0);
+        }
+
+        // ⑫ 画面を最新の状態に更新します
+        if (game.ui) {
+            game.ui.updatePanelHeader();
+            game.ui.renderMap();
+        }
+    }
+});
