@@ -298,6 +298,11 @@ class KunishuSystem {
                 return; // 大雪なら何もせずにおしまいです
             }
 
+            // ★商人は争いを好まないので、略奪や反乱（蜂起）を起こしません！
+            if (kunishu.ideology === '商人') {
+                return; // 商人なら何もせずにおしまいです
+            }
+
             let actionDone = false;
             
             // まずは「略奪」の判定から行います！
