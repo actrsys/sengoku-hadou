@@ -177,6 +177,10 @@ class DataManager {
 
         // ★修正：武将が一門情報を取得する前に、先に姫の一門情報（父親のデータ）を完成させておきます！
         princesses.forEach(p => {
+            // ★追加：武将と同じように、ダミー用（startYearが9999）の姫を自動で死亡（非登場）扱いにする魔法です！
+            if (p.startYear === 9999) {
+                p.status = 'dead';
+            }
             p.updateFamilyIds(bushos);
         });
 
