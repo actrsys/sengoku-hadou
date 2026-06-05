@@ -1549,8 +1549,8 @@ class UIInfoManager {
             princesses = this._prepareStableSortBase('princess', princesses, this.princessCurrentSortKey); // ★共通の魔法
             princesses.sort((a, b) => {
                 let valA, valB;
-                const fatherA = this.game.getBusho(a.fatherId);
-                const fatherB = this.game.getBusho(b.fatherId);
+                const fatherA = this.game.getBusho(a.realFatherId);
+                const fatherB = this.game.getBusho(b.realFatherId);
                 const husbandA = this.game.getBusho(a.husbandId);
                 const husbandB = this.game.getBusho(b.husbandId);
                 const clanA = this.game.clans.find(c => c.id === ((a.husbandId && a.husbandId !== 0) ? a.currentClanId : a.originalClanId));
@@ -1608,7 +1608,7 @@ class UIInfoManager {
 
         const items = princesses.map(p => {
             const age = this.game.year - p.birthYear + 1;
-            const father = this.game.getBusho(p.fatherId);
+            const father = this.game.getBusho(p.realFatherId);
             const husband = this.game.getBusho(p.husbandId);
             
             const targetClanId = (p.husbandId && p.husbandId !== 0) ? p.currentClanId : p.originalClanId;
