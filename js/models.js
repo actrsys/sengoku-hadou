@@ -662,16 +662,10 @@ class Princess {
         
         this.originalClanId = Number(this.originalClanId || 0); // 生まれた大名家のID
         
-        // ★今回追加：実父母と養父の箱を用意します（昔のfatherIdも読み込めるようにしておきます）
+        // ★修正：お父事もお母さんも、すべて「real」が付いた名前に統一します！
         this.realFatherId = Number(data.realFatherId || data.fatherId || 0); 
-        // ★修正：motherId（母親）も読み込めるように箱を広げます！
         this.realMotherId = Number(data.realMotherId || data.motherId || 0);
         this.adoptiveFatherId = Number(data.adoptiveFatherId || 0);
-        
-        // ※今まで使っていたfatherIdの箱も、他のシステムがエラーにならないよう残しておきます
-        this.fatherId = this.realFatherId; 
-        // ★追加：motherIdの箱も、他のシステムが使いやすいように用意しておきます
-        this.motherId = this.realMotherId;
         
         // ★ゲーム中にコロコロ変わるデータ（最初は実家と同じにしておきます）
         this.currentClanId = Number(data.currentClanId !== undefined ? data.currentClanId : this.originalClanId);

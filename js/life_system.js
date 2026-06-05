@@ -317,9 +317,10 @@ class LifeSystem {
             let targetClanId = 0;
             let fatherNameStr = ""; // ★お父さんの名前を書いておくメモ帳です
 
-            if (p.fatherId > 0) {
+            // ★修正：p.fatherId から p.realFatherId に名前を変更します
+            if (p.realFatherId > 0) {
                 // お父さんがいる場合は、お父さんのいる大名家を探します
-                const father = this.game.getBusho(p.fatherId);
+                const father = this.game.getBusho(p.realFatherId);
                 if (father && father.status !== 'dead' && father.status !== 'unborn' && father.clan !== 0) {
                     targetClanId = father.clan;
                     fatherNameStr = father.name.replace('|', ''); // ★お父さんの名前から「|」を消してメモします
@@ -346,7 +347,7 @@ class LifeSystem {
                         // ★ここから変更：お父さんの身分によってメッセージを切り替えます！
                         let isRoyal = false;
                         const playerDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
-                        const fatherData = this.game.getBusho(p.fatherId); // お父さんのデータをもう一度呼び出します
+                        const fatherData = this.game.getBusho(p.realFatherId); // お父さんのデータをもう一度呼び出します
                         
                         if (playerDaimyo && fatherData) {
                             // お父さんが大名本人か、血の繋がった直接の一門（baseFamilyIdsが共通）かをチェックします
@@ -547,8 +548,8 @@ class LifeSystem {
                     }
 
                     // 実家がない場合、お父さんの一門武将を頼る
-                    if (nextClanId === 0 && princess.fatherId > 0) {
-                        const father = this.game.getBusho(princess.fatherId);
+                    if (nextClanId === 0 && princess.realFatherId > 0) {
+                        const father = this.game.getBusho(princess.realFatherId);
                         if (father) {
                             const relatives = this.game.bushos.filter(b => 
                                 b.status !== 'dead' && b.status !== 'unborn' && b.clan > 0 &&
@@ -1578,8 +1579,8 @@ class LifeSystem {
             faceIcon: 'unknown_princess_face.webp', // 汎用の姫画像
             originalClanId: clanId,
             currentClanId: clanId,
-            fatherId: fatherId,
-            motherId: motherId, // ★お父さんの奥さん（いなければ0）を入れます！
+            realFatherId: fatherId,
+            realMotherId: motherId,
             husbandId: 0,
             status: 'unmarried' // 最初から「未婚（結婚可能）」として登場させます
         };
@@ -1677,7 +1678,7 @@ class LifeSystem {
                     
                     // プレイヤーの大名家だった場合は、画面にお知らせのメッセージを出します
                     if (newPrincess && clan.id === this.game.playerClanId) {
-                        const father = this.game.getBusho(newPrincess.fatherId);
+                        const father = this.game.getBusho(newPrincess.realFatherId);
                         const fatherName = father ? father.name.replace('|', '') : "当家";
                         const msg = `${fatherName}の息女、${newPrincess.name}が誕生しました！`;
                         
