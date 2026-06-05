@@ -191,7 +191,8 @@ class KunishuSystem {
             
             // 毎ターン、相性による友好度の自然変動
             const castellan = this.game.getBusho(castle.castellanId);
-            if (castellan) {
+            // ★ここを変更：商人はビジネスライクなので、城主との相性で勝手に友好度が変動することはありません！
+            if (castellan && kunishu.ideology !== '商人') {
                 const affinityDiff = this.calcIdeologyAffinity(kunishu, castellan);
                 
                 // 25を基準にして、どれくらい離れているか（差分）を計算します
