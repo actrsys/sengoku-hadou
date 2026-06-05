@@ -1559,6 +1559,14 @@ class LifeSystem {
         }
         const endYear = startYear + lifespan;
 
+        // ★ここから追加：お父さんに奥さんがいるか確認して、お母さんを決めます！
+        let motherId = 0; // 最初は「お母さんなし」としておきます
+        if (father.wifeIds && father.wifeIds.length > 0) {
+            // お父さんに奥さんがいる場合は、その奥さんをお母さんにします
+            // （もし奥さんが複数いる場合は、その中からランダムで一人を選びます）
+            motherId = father.wifeIds[Math.floor(Math.random() * father.wifeIds.length)];
+        }
+
         // 上で作った情報をひとつの箱（データ）にまとめます
         const princessData = {
             id: nextId,
@@ -1571,6 +1579,7 @@ class LifeSystem {
             originalClanId: clanId,
             currentClanId: clanId,
             fatherId: fatherId,
+            motherId: motherId, // ★お父さんの奥さん（いなければ0）を入れます！
             husbandId: 0,
             status: 'unmarried' // 最初から「未婚（結婚可能）」として登場させます
         };

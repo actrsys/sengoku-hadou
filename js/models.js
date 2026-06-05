@@ -664,11 +664,14 @@ class Princess {
         
         // ★今回追加：実父母と養父の箱を用意します（昔のfatherIdも読み込めるようにしておきます）
         this.realFatherId = Number(data.realFatherId || data.fatherId || 0); 
-        this.realMotherId = Number(data.realMotherId || 0);
+        // ★修正：motherId（母親）も読み込めるように箱を広げます！
+        this.realMotherId = Number(data.realMotherId || data.motherId || 0);
         this.adoptiveFatherId = Number(data.adoptiveFatherId || 0);
         
         // ※今まで使っていたfatherIdの箱も、他のシステムがエラーにならないよう残しておきます
         this.fatherId = this.realFatherId; 
+        // ★追加：motherIdの箱も、他のシステムが使いやすいように用意しておきます
+        this.motherId = this.realMotherId;
         
         // ★ゲーム中にコロコロ変わるデータ（最初は実家と同じにしておきます）
         this.currentClanId = Number(data.currentClanId !== undefined ? data.currentClanId : this.originalClanId);
