@@ -1630,6 +1630,10 @@ Object.assign(UIManager.prototype, {
             }
         }
 
+        // ★ここから追加：最終的に「どのピクセルがどの勢力になったか」を完璧に記録する箱を用意します！
+        const finalClanMap = new Int32Array(pixelSize);
+        finalClanMap.fill(0);
+
         // ④ 陣取りの結果を使って、実際に画用紙（outputData）に色を塗ります！
         for (let i = 0; i < sd.length; i += 4) {
             if (sd[i+3] === 0) continue;
@@ -1667,6 +1671,9 @@ Object.assign(UIManager.prototype, {
                 targetClanId = info.owner;
             }
 
+            // ★追加：飛び地の計算などもすべて終わった「最終的な勢力」をメモしておきます！
+            finalClanMap[pxIdx] = targetClanId;
+
             const clanRgb = (targetClanId !== 0) ? clanColors.get(targetClanId) : null;
             if (clanRgb) {
                 outputData.data[i] = clanRgb.r;
@@ -1687,37 +1694,88 @@ Object.assign(UIManager.prototype, {
         // 絵の端っこはチェックできないので、1ピクセル内側から調べます
         for (let y = 1; y < height - 1; y++) {
             for (let x = 1; x < width - 1; x++) {
-                const idx = (y * width + x) * 4;
+                const pxIdx = y * width + x;
+                const idx = pxIdx * 4;
                 
                 // もし今の場所が「まだ塗られていない（透明）」なら…
                 if (tempOutput[idx + 3] === 0) {
                     // 上・下・左・右の場所を計算します
-                    const up = ((y - 1) * width + x) * 4;
-                    const down = ((y + 1) * width + x) * 4;
-                    const left = (y * width + (x - 1)) * 4;
-                    const right = (y * width + (x + 1)) * 4;
+                    const upIdx = (y - 1) * width + x;
+                    const downIdx = (y + 1) * width + x;
+                    const leftIdx = y * width + (x - 1);
+                    const rightIdx = y * width + (x + 1);
+
+                    const up = upIdx * 4;
+                    const down = downIdx * 4;
+                    const left = leftIdx * 4;
+                    const right = rightIdx * 4;
 
                     // もし上下左右のどこかに色が塗られていたら、その色をコッソリ借ります！
+                    // ★追加：色と一緒に「勢力ID」もコッソリ借りてメモしておきます（後で境界線を正確に引くため）
                     if (tempOutput[up + 3] > 0) {
                         outputData.data[idx] = tempOutput[up];
                         outputData.data[idx+1] = tempOutput[up+1];
                         outputData.data[idx+2] = tempOutput[up+2];
                         outputData.data[idx+3] = tempOutput[up+3];
+                        finalClanMap[pxIdx] = finalClanMap[upIdx];
                     } else if (tempOutput[down + 3] > 0) {
                         outputData.data[idx] = tempOutput[down];
                         outputData.data[idx+1] = tempOutput[down+1];
                         outputData.data[idx+2] = tempOutput[down+2];
                         outputData.data[idx+3] = tempOutput[down+3];
+                        finalClanMap[pxIdx] = finalClanMap[downIdx];
                     } else if (tempOutput[left + 3] > 0) {
                         outputData.data[idx] = tempOutput[left];
                         outputData.data[idx+1] = tempOutput[left+1];
                         outputData.data[idx+2] = tempOutput[left+2];
                         outputData.data[idx+3] = tempOutput[left+3];
+                        finalClanMap[pxIdx] = finalClanMap[leftIdx];
                     } else if (tempOutput[right + 3] > 0) {
                         outputData.data[idx] = tempOutput[right];
                         outputData.data[idx+1] = tempOutput[right+1];
                         outputData.data[idx+2] = tempOutput[right+2];
                         outputData.data[idx+3] = tempOutput[right+3];
+                        finalClanMap[pxIdx] = finalClanMap[rightIdx];
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // ★ここから追加：勢力と勢力の間に「境界線」を引く魔法です！
+        // ==========================================
+        // 滲ませる処理が終わった後の、完成間近の絵をもう一度チェックします
+        const borderTempOutput = new Uint8ClampedArray(outputData.data);
+
+        for (let y = 1; y < height - 1; y++) {
+            for (let x = 1; x < width - 1; x++) {
+                const pxIdx = y * width + x;
+                const idx = pxIdx * 4;
+                
+                // 色が塗られている（透明じゃない）場所だけをチェックします
+                if (borderTempOutput[idx + 3] > 0) {
+                    const myClan = finalClanMap[pxIdx];
+                    
+                    // 中立（0）の場所は境界線を引かずに飛ばします
+                    if (myClan === 0) continue; 
+                    
+                    // 上下左右のピクセルの勢力IDを調べます
+                    const upClan = finalClanMap[pxIdx - width];
+                    const downClan = finalClanMap[pxIdx + width];
+                    const leftClan = finalClanMap[pxIdx - 1];
+                    const rightClan = finalClanMap[pxIdx + 1];
+
+                    // 「隣が中立（0）ではなく、かつ自分と違う勢力」が１つでもあれば、そこは他の勢力との国境です！
+                    if ((upClan !== 0 && upClan !== myClan) ||
+                        (downClan !== 0 && downClan !== myClan) ||
+                        (leftClan !== 0 && leftClan !== myClan) ||
+                        (rightClan !== 0 && rightClan !== myClan)) {
+                        
+                        // 境界線として、元の色を少し暗くしてクッキリさせます
+                        outputData.data[idx] = Math.max(0, borderTempOutput[idx] - 50);     // R（赤）を暗く
+                        outputData.data[idx+1] = Math.max(0, borderTempOutput[idx+1] - 50); // G（緑）を暗く
+                        outputData.data[idx+2] = Math.max(0, borderTempOutput[idx+2] - 50); // B（青）を暗く
+                        outputData.data[idx+3] = 160; // 不透明度を少し上げて、線を際立たせます
                     }
                 }
             }
