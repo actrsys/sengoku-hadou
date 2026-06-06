@@ -1588,8 +1588,9 @@ Object.assign(UIManager.prototype, {
         });
 
         // ③ 水が広がるように、同じ国の中だけを陣取りしていきます
-        const dx = [0, 1, 0, -1];
-        const dy = [-1, 0, 1, 0];
+        // ★修正：上下左右の4方向から、ナナメを含めた「8方向」に広がるようにします！
+        const dx = [0, 1, 0, -1, 1, 1, -1, -1];
+        const dy = [-1, 0, 1, 0, -1, 1, 1, -1];
         
         while (head < tail) {
             const x = queueX[head];
@@ -1602,7 +1603,8 @@ Object.assign(UIManager.prototype, {
             const currIdx = y * width + x;
             const currDist = distanceMap[currIdx];
 
-            for (let d = 0; d < 4; d++) {
+            // ★修正：調べる方向を「4」から「8」に増やします！
+            for (let d = 0; d < 8; d++) {
                 const nx = x + dx[d];
                 const ny = y + dy[d];
                 
