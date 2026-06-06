@@ -1569,6 +1569,61 @@ class GameManager {
             }
             
             let growth = Math.floor(((Math.sqrt(c.population) * 2) * ((calcLoyalty - 50) / 100)) + (calcLoyalty / 4));
+
+            // ==========================================
+            // ★新しく追加：隣のお城が「敵」か「味方」かを調べて、増える量を計算する魔法！
+            // ==========================================
+            let neighborMultiplier = 1.2; // 基本は一番多い「120%（1.2倍）」にしておきます
+            let totalAdjacent = 0; // 道が繋がっている隣のお城の数
+            let hostileAdjacent = 0; // そのうち、敵かもしれないお城の数
+
+            if (c.adjacentCastleIds && c.adjacentCastleIds.length > 0) {
+                totalAdjacent = c.adjacentCastleIds.length;
+                c.adjacentCastleIds.forEach(adjId => {
+                    const adjCastle = this.getCastle(adjId);
+                    if (adjCastle) {
+                        let isHostile = false; // 「敵かな？」という目印（最初は違うにしておくよ）
+                        
+                        if (adjCastle.ownerClan === c.ownerClan) {
+                            // 同じ大名家のお城なら、もちろん味方！
+                            isHostile = false;
+                        } else if (adjCastle.ownerClan === 0) {
+                            // 誰も住んでいない空き家も、野盗がいるかもしれないので敵扱いにするよ
+                            isHostile = true;
+                        } else {
+                            // 他の大名家のお城の場合は、仲良し手帳（外交データ）を見ます
+                            const rel = this.getRelation(c.ownerClan, adjCastle.ownerClan);
+                            // 同盟、支配、従属、友好のどれかなら味方！ それ以外は敵扱い！
+                            if (rel && ['同盟', '支配', '従属', '友好'].includes(rel.status)) {
+                                isHostile = false;
+                            } else {
+                                isHostile = true;
+                            }
+                        }
+                        
+                        // もし「敵だ！」と分かったら、敵の数を１つ増やします
+                        if (isHostile) {
+                            hostileAdjacent++;
+                        }
+                    } else {
+                        // 万が一お城のデータが見つからなかったら、数え間違いを防ぐために全体の数を１つ減らすよ
+                        totalAdjacent--;
+                    }
+                });
+
+                // 隣にお城がある場合だけ、計算をします
+                if (totalAdjacent > 0) {
+                    // 全部の数で100%（1.0）を割って、敵の数だけ引き算します。最後に最低保証の20%（0.2）を足します！
+                    neighborMultiplier = 0.2 + (1.0 - (hostileAdjacent / totalAdjacent));
+                }
+            }
+
+            // 人口が増える場合だけ、調べた倍率（120%〜20%）をかけ算してあげるよ
+            if (growth > 0) {
+                growth = Math.floor(growth * neighborMultiplier);
+            }
+            // ==========================================
+
             c.population = Math.min(999999, Math.max(0, c.population + growth));
 
             // ★追加：毎月の兵士の自然増加計算
@@ -1609,7 +1664,14 @@ class GameManager {
                 const penaltyMultiplier = Math.max(0, 1.0 - (soldierRatio * 1.25));
 
                 // 最後に、城数で抑制された基本値に、割合ブレーキを「掛け算」します！
-                const soldierGrowth = Math.floor(suppressedGrowth * penaltyMultiplier);
+                let soldierGrowth = Math.floor(suppressedGrowth * penaltyMultiplier);
+
+                // ==========================================
+                // ★さっき調べた倍率を、兵士が増える数にもかけ算してあげるよ！
+                if (soldierGrowth > 0) {
+                    soldierGrowth = Math.floor(soldierGrowth * neighborMultiplier);
+                }
+                // ==========================================
 
                 // 計算した増える人数を、今のお城の兵士の数に足し合わせます（最大99999人まで）
                 c.soldiers = Math.min(99999, c.soldiers + Math.max(0, soldierGrowth));
