@@ -3778,3 +3778,49 @@ window.GameEvents.push({
         }
     }
 });
+
+// ==========================================
+// ★ 宇喜多直家 謀反（クーデター）イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_naoie_rebellion",
+    timing: "endMonth_before", // 月末の独立チェックなどが始まる前に起こします
+    isOneTime: true,
+    
+    checkCondition: function(game) {
+        // 1. 1560年以降であるか確認します
+        if (game.year < 1560) return false;
+
+        // 2. 浦上宗景（ID: 1044001）が存在し、大名であるか確認します
+        const munekage = game.getBusho(1044001);
+        if (!munekage || !munekage.isDaimyo || munekage.clan === 0) return false;
+
+        // 3. 宇喜多直家（ID: 1044004）が存在し、大名ではなく、浦上家に所属しているか確認します
+        const naoie = game.getBusho(1044004);
+        if (!naoie || naoie.isDaimyo || naoie.clan !== munekage.clan) return false;
+
+        // 4. 宇喜多直家が浦上家の国主（軍団長）であるか確認します
+        if (!naoie.isCommander) return false;
+
+        // 5. 独立を起こすためのお城（居城）のデータがちゃんとあるか確認します
+        const castle = game.getCastle(naoie.castleId);
+        if (!castle) return false;
+
+        // 全ての条件をクリアしたら、イベント発生の合図を出します！
+        return true;
+    },
+    
+    execute: async function(game) {
+        const munekage = game.getBusho(1044001);
+        const naoie = game.getBusho(1044004);
+        const castle = game.getCastle(naoie.castleId);
+
+        // 万が一データが見つからなかった時のための安全装置です
+        if (!castle || !munekage || !naoie) return;
+
+        // ★修正：独立(indep)ではなく、謀反の作戦会議を含むクーデター処理を実行します！
+        if (game.independenceSystem) {
+            await game.independenceSystem.planCoupDetatOrRebellion(castle, naoie, munekage);
+        }
+    }
+});
