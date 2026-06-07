@@ -939,12 +939,23 @@ class DiplomacyManager {
     /**
      * 外交コマンドを実行する魔法です
      */
-    async executeDiplomacy(doerId, targetCastleId, type, gold = 0) {
+    async executeDiplomacy(doerId, targetCastleId, type, gold = 0, score = 0) {
         const doer = this.game.getBusho(doerId);
         const targetCastle = this.game.getCastle(targetCastleId);
         if (!targetCastle) return;
         
         const targetClanId = targetCastle.ownerClan;
+        
+        if (doer.clan !== this.game.playerClanId && targetClanId === this.game.playerClanId) {
+            if (['goodwill', 'alliance', 'dominate', 'truce'].includes(type)) {
+                this.proposeDiplomacyToPlayer(doer, targetClanId, type, gold, () => {
+                    if (this.game) this.game.checkAllActionsDone();
+                }, score);
+                doer.isActionDone = true;
+                return; // ここで強制的にストップさせ、勝手に結果画面を出す処理に行かせません！
+            }
+        }
+
         let msg = "";
         let aiMsg = ""; 
         let logMsg = ""; 
