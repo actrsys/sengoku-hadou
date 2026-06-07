@@ -797,6 +797,12 @@ class DiplomacyManager {
     async playDiplomacyConversation(senderBusho, receiverDaimyo, type, isSuccess, princess = null, targetBusho = null) {
         if (!this.game.ui.showDialogAsync) return; 
 
+        // ★今回追加：会話劇が始まった瞬間に、今のBGMをメモして外交用のBGMに変更します！
+        if (window.AudioManager) {
+            window.AudioManager.memorizeCurrentBgm();
+            window.AudioManager.playBGM('SC_ex_Scene3_Odyssey.ogg');
+        }
+
         const senderClan = this.game.clans.find(c => c.id === senderBusho.clan);
         const receiverClan = this.game.clans.find(c => c.id === receiverDaimyo.clan);
 
@@ -2040,6 +2046,12 @@ class DiplomacyManager {
         const doerNameStr = doer.name.replace(/\|/g, '');
 
         const msgs = this.getDiplomacyMessages(type, isDaimyoSelf, doerClan.name, targetClan.name, enemyCallName, myCallName);
+
+        // ★今回追加：AIから使者が来て会話劇が始まる瞬間に、外交用のBGMに変更します！
+        if (window.AudioManager) {
+            window.AudioManager.memorizeCurrentBgm();
+            window.AudioManager.playBGM('SC_ex_Scene3_Odyssey.ogg');
+        }
 
         const doReject = () => {
             this.calcDiplomacyExp(doer, type, false, true);
