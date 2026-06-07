@@ -868,7 +868,7 @@ class DiplomacyManager {
             greetMsg2 = `「うむ。して、御用向きはいかに？」`;
         }
 
-        if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
+        // ★修正：プレイヤーが使者を送った時は、驚かす必要がないのでSE（playEventSoundAndBlock）を鳴らさないように削除しました！
 
         await this.game.ui.showDialogAsync(greetMsg1, false, 0, { leftFace: senderBusho.faceIcon, leftName: senderNameStr, isEvent: true });
         await this.game.ui.showDialogAsync(greetMsg2, false, 0, { leftFace: receiverDaimyo.faceIcon, leftName: receiverNameStr, isEvent: true });
@@ -2047,11 +2047,8 @@ class DiplomacyManager {
 
         const msgs = this.getDiplomacyMessages(type, isDaimyoSelf, doerClan.name, targetClan.name, enemyCallName, myCallName);
 
-        // ★今回追加：AIから使者が来て会話劇が始まる瞬間に、外交用のBGMに変更します！
-        if (window.AudioManager) {
-            window.AudioManager.memorizeCurrentBgm();
-            window.AudioManager.playBGM('SC_ex_Scene3_Odyssey.ogg');
-        }
+        // ★修正：使者が来た瞬間はBGMを変えず、代わりに「使者が来ました！」というお知らせのSEを鳴らします！
+        if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
 
         const doReject = () => {
             this.calcDiplomacyExp(doer, type, false, true);
@@ -2294,6 +2291,12 @@ class DiplomacyManager {
 
         this.game.ui.showDialog(introMsg, true,
             () => {
+                // ★追加：「面会する」を選んで本格的に会話劇が始まる瞬間に、外交用のBGMに変更します！
+                if (window.AudioManager) {
+                    window.AudioManager.memorizeCurrentBgm();
+                    window.AudioManager.playBGM('SC_ex_Scene3_Odyssey.ogg');
+                }
+
                 let greetMsg1 = "";
                 let greetMsg2 = "";
                 

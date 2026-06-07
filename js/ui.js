@@ -527,6 +527,17 @@ class UIManager {
                     }
                 }
             }
+
+            // 会話や結果画面が「すべて」終わって、見えない壁（ガード）がゼロになった瞬間を狙います。
+            if (this.guardHiddenCount === 0) {
+                // 連続した会話の「隙間」をやり過ごすために、ほんの少し（0.1秒）だけ待ちます
+                setTimeout(() => {
+                    // 0.1秒待ってもガードがゼロのままで、外交BGMが鳴っていたら元に戻します！
+                    if (this.guardHiddenCount === 0 && window.AudioManager && window.AudioManager.currentBgmName === 'SC_ex_Scene3_Odyssey.ogg') {
+                        window.AudioManager.restoreMemorizedBgm();
+                    }
+                }, 100);
+            }
         }
     }
     
@@ -1250,12 +1261,6 @@ class UIManager {
             window.AudioManager.fadeOutSe(0.1);
         }
 
-        // ★今回追加：もし外交用のBGMが鳴っていたら、結果画面を閉じた瞬間に元のBGMに戻します！
-        if (window.AudioManager && window.AudioManager.currentBgmName === 'SC_ex_Scene3_Odyssey.ogg') {
-            window.AudioManager.restoreMemorizedBgm();
-        }
-
-        // ★ここから書き足します！
         // 小窓を閉じる時に、必ず「いつもの閉じるボタン」に戻しておきます！
         const footer = document.getElementById('result-footer');
         if (footer) {
