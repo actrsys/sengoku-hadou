@@ -18,14 +18,16 @@ class AudioManager {
         // ★ BGMのカタログ（個別の音量調整つき！）
         // ==========================================
         this.bgmList = {
-            'SC_ex_Town2_Fortress.ogg': { 
-                start: 36603 / 44100, 
-                end: (36603 + 5733088) / 44100,
-                baseVolume: 0.05 
-            },
+            // タイトル画面
             'SC_ex_Town1_Castle.ogg': { 
                 start: 0,
                 end: 3428642 / 44100,
+                baseVolume: 0.05 
+            },
+            // メインBGM
+            'SC_ex_Town2_Fortress.ogg': { 
+                start: 36603 / 44100, 
+                end: (36603 + 5733088) / 44100,
                 baseVolume: 0.05 
             },
             // イベントBGM1
@@ -50,6 +52,12 @@ class AudioManager {
             '08_Legend of bear slaying.ogg': {
                 start: 671034 / 44100, 
                 end: (671034 + 5327048) / 44100,
+                baseVolume: 0.06
+            },
+            // 外交BGM
+            'SC_ex_Scene3_Odyssey.ogg': {
+                start: 0 / 44100, 
+                end: (0 + 3924855) / 44100,
                 baseVolume: 0.06
             },
         };
