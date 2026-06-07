@@ -751,7 +751,7 @@ class DiplomacyManager {
             demandMsg = `「両家の仲を深めるべく参りました。心ばかりですが、どうぞお受け取りくだされ。」`;
             acceptMsg = isSenderDaimyo ? `「${senderCallName}直々の頼みとあってはお受けする他ありませぬ。ありがたく頂戴いたします」` : `「願ってもない申し出にござる。ありがたく頂戴いたす」`;
             rejectMsg = `「ううむ、すぐには返答いたしかねる。今日のところはお引き取りを……」`;
-            replyAcceptMsg = `「両家の絆はますます深まりましょう。しからば、拙者はこれにて……」`;
+            replyAcceptMsg = isSenderDaimyo ? `「ははは……わざわざ出向いた甲斐があったわい」` : `「両家の絆はますます深まりましょう。しからば、拙者はこれにて……」`;
             replyRejectMsg = `「左様にござるか。ではこれにて失礼いたす」`;
         } else if (type === 'alliance') {
             demandMsg = `「両家繁栄の為、どうか我らと盟約を結んでくだされ」`;
