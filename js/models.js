@@ -562,11 +562,41 @@ class Busho {
     // ==========================================
     // ★ここから追加：能力値の「自動計算」の魔法（ゲッター・セッター）です！
     // 誰かが「leadershipはいくつ？」と聞いた時に、秘密の箱の数字と経験値を足して答えます。
-    get leadership() { return Math.min(120, this._leadership + Math.min(20, Math.floor(this.expLeadership / 100))); }
-    get strength() { return Math.min(120, this._strength + Math.min(20, Math.floor(this.expStrength / 100))); }
-    get politics() { return Math.min(120, this._politics + Math.min(20, Math.floor(this.expPolitics / 100))); }
-    get diplomacy() { return Math.min(120, this._diplomacy + Math.min(20, Math.floor(this.expDiplomacy / 100))); }
-    get intelligence() { return Math.min(120, this._intelligence + Math.min(20, Math.floor(this.expIntelligence / 100))); }
+    get leadership() {
+        if (this._leadership < 90) {
+            return Math.min(110, this._leadership + Math.min(30, Math.floor(this.expLeadership / 100)));
+        } else {
+            return Math.min(120, this._leadership + Math.min(20, Math.floor(this.expLeadership / 100)));
+        }
+    }
+    get strength() {
+        if (this._strength < 90) {
+            return Math.min(110, this._strength + Math.min(30, Math.floor(this.expStrength / 100)));
+        } else {
+            return Math.min(120, this._strength + Math.min(20, Math.floor(this.expStrength / 100)));
+        }
+    }
+    get politics() {
+        if (this._politics < 90) {
+            return Math.min(110, this._politics + Math.min(30, Math.floor(this.expPolitics / 100)));
+        } else {
+            return Math.min(120, this._politics + Math.min(20, Math.floor(this.expPolitics / 100)));
+        }
+    }
+    get diplomacy() {
+        if (this._diplomacy < 90) {
+            return Math.min(110, this._diplomacy + Math.min(30, Math.floor(this.expDiplomacy / 100)));
+        } else {
+            return Math.min(120, this._diplomacy + Math.min(20, Math.floor(this.expDiplomacy / 100)));
+        }
+    }
+    get intelligence() {
+        if (this._intelligence < 90) {
+            return Math.min(110, this._intelligence + Math.min(30, Math.floor(this.expIntelligence / 100)));
+        } else {
+            return Math.min(120, this._intelligence + Math.min(20, Math.floor(this.expIntelligence / 100)));
+        }
+    }
 
     // 逆に、年齢の変化などで「leadershipを80にして！」と命令された時は、秘密の箱だけにその数字をしまいます。
     set leadership(val) { this._leadership = val; }
