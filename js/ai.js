@@ -49,6 +49,19 @@ class AIEngine {
     
     async execAI(castle) {
         try {
+            // ★調査用：1560年4月かつ今川家（ClanID: 1）の特定の城なら、一色家（ClanID: 15）への親善を強制記憶
+            if (this.game.year === 1560 && this.game.month === 4 && castle.ownerClan === 1) {
+                const myClan = this.game.clans.find(c => c.id === 1);
+                if (myClan && !myClan.currentDiplomacyTarget) {
+                    myClan.currentDiplomacyTarget = {
+                        targetId: 15,
+                        action: 'goodwill',
+                        gold: 300
+                    };
+                    console.log("【調査】今川家が強制的に一色家へ親善を設定しました");
+                }
+            }
+
             // ★イベント追加：コマンドの選択前（AI操作時）
             if (this.game.eventManager) {
                 await this.game.eventManager.processEvents('before_command', castle);
@@ -2919,7 +2932,7 @@ class AIEngine {
         
         // 記憶されていた作戦（親善、同盟、支配）を実行します！
         if (targetData.action === 'dominate') {
-            if (targetClanId === this.game.playerClanId) {
+            if (Number(targetClanId) === Number(this.game.playerClanId)) {
                 this.game.diplomacyManager.proposeDiplomacyToPlayer(castellan, targetClanId, 'dominate', 0, () => {
                     castellan.isActionDone = true;
                     this.game.finishTurn(); 
@@ -2938,7 +2951,7 @@ class AIEngine {
             if (targetData.gold > castle.gold / 5) return;
 
             if (castle.gold >= targetData.gold) {
-                if (targetClanId === this.game.playerClanId) {
+                if (Number(targetClanId) === Number(this.game.playerClanId)) {
                     this.game.diplomacyManager.proposeDiplomacyToPlayer(castellan, targetClanId, 'goodwill', targetData.gold, () => {
                         castellan.isActionDone = true;
                         this.game.finishTurn();
@@ -2950,7 +2963,7 @@ class AIEngine {
                 }
             }
         } else if (targetData.action === 'alliance') {
-             if (targetClanId === this.game.playerClanId) {
+             if (Number(targetClanId) === Number(this.game.playerClanId)) {
                  this.game.diplomacyManager.proposeDiplomacyToPlayer(castellan, targetClanId, 'alliance', 0, () => {
                      castellan.isActionDone = true;
                      this.game.finishTurn();
@@ -2962,7 +2975,7 @@ class AIEngine {
              }
         } else if (targetData.action === 'truce') {
              // ★追加：AI大名がプレイヤー（あなた）に通常和睦を申し込んできた時のバトンタッチ回路
-             if (targetClanId === this.game.playerClanId) {
+             if (Number(targetClanId) === Number(this.game.playerClanId)) {
                  this.game.diplomacyManager.proposeDiplomacyToPlayer(castellan, targetClanId, 'truce', 0, () => {
                      castellan.isActionDone = true;
                      this.game.finishTurn();
