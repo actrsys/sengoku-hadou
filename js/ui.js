@@ -1250,7 +1250,16 @@ class UIManager {
             window.AudioManager.fadeOutSe(0.1);
         }
 
-        // ★ここから書き足します！
+        // ★今回追加：もし外交用のBGMが鳴っていたら、結果画面を閉じた瞬間に元のBGMに戻します！
+        if (window.AudioManager && window.AudioManager.currentBgmName === 'SC_ex_Scene3_Odyssey.ogg') {
+            if (typeof window.AudioManager.restoreMemorizedBgm === 'function') {
+                window.AudioManager.restoreMemorizedBgm();
+            } else if (window.AudioManager._memorizedBgm) {
+                window.AudioManager.playBGM(window.AudioManager._memorizedBgm);
+                window.AudioManager._memorizedBgm = null;
+            }
+        }
+
         // 小窓を閉じる時に、必ず「いつもの閉じるボタン」に戻しておきます！
         const footer = document.getElementById('result-footer');
         if (footer) {
