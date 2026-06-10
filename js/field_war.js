@@ -443,8 +443,13 @@ class FieldWarManager {
             }
             
             // 野戦の画面が表示されたあとに、大きさをピッタリに合わせる魔法を使います
-            await new Promise(r => setTimeout(r, 100));
-            this.adjustMapScale();
+            setTimeout(() => {
+                this.adjustMapScale();
+                // サイズ調整が終わった後に、確実に操作部隊へカメラを向ける
+                if (this.turnQueue && this.turnQueue.length > 0) {
+                    setTimeout(() => this.scrollToUnit(this.turnQueue[0]), 50);
+                }
+            }, 100); // 画面ができるまで一瞬（0.1秒）だけ待ってから魔法をかけます
         } else {
             // ★プレイヤーがいない場合、画面に野戦マップが出ないように隠します！
             const modal = document.getElementById('field-war-modal');
