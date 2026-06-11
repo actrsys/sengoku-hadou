@@ -3778,3 +3778,46 @@ window.GameEvents.push({
         }
     }
 });
+
+// ==========================================
+// ★ 宇喜多直家 謀反イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_ukita_coup",
+    timing: "endMonth_before", 
+    isOneTime: true,
+    
+    checkCondition: function(game) {
+        // 1. 1569年以降であるか確認します
+        if (game.year < 1569) return false;
+
+        // 2. 浦上宗景（ID: 1044001）が存在し、大名であるか確認します
+        const munekage = game.getBusho(1044001);
+        if (!munekage || !munekage.isDaimyo || munekage.clan === 0) return false;
+
+        // 3. 宇喜多直家（ID: 1044004）が存在し、大名ではないことを確認します
+        const naoie = game.getBusho(1044004);
+        if (!naoie || naoie.isDaimyo) return false;
+
+        // 4. 宇喜多直家が浦上宗景と同じ勢力に所属し、国主であるか確認します
+        if (naoie.clan !== munekage.clan || !naoie.isCommander) return false;
+
+        // 全ての条件を満たしたらイベント発生です！
+        return true;
+    },
+    
+    execute: async function(game) {
+        const munekage = game.getBusho(1044001);
+        const naoie = game.getBusho(1044004);
+        const castle = game.getCastle(naoie.castleId);
+
+        if (!castle) return;
+
+        // ★新しく作った強制発火の魔法を呼び出します
+        // 第4引数に 'coup' を渡すことで、「謀反」として処理させます
+        // ※ 'indep' にすれば独立、'defect' にすれば寝返りとして使えます
+        if (game.independenceSystem && typeof game.independenceSystem.forceAction === 'function') {
+            await game.independenceSystem.forceAction(castle, naoie, munekage, 'coup');
+        }
+    }
+});

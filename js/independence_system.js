@@ -409,13 +409,17 @@ class IndependenceSystem {
             }
         }
 
-        // ★追加：独立して改名があった場合は、お知らせの文章を足します
+        // ★変更：独立して改名があった場合は、お知らせの文章を別にして記憶します
+        let nameChangeMsg = "";
         if (info && info.isNameChanged && !isDefection) {
-            msg += `\n大名となるにあたり、${info.oldNameStr}は「${info.newNameStr}」と名を改めました。`;
+            nameChangeMsg = `大名となるにあたり、${info.oldNameStr}は「${info.newNameStr}」と名を改めました。`;
         }
         
-        // ここで一番最初にログに書き込みます！
+        // ここで一番最初にログに書き込みます！（改名のログも別で書き込みます）
         this.game.ui.log(msg);
+        if (nameChangeMsg !== "") {
+            this.game.ui.log(nameChangeMsg);
+        }
 
         // 部下たちの去就
         // ★主君の基準を rebellionLeader にする
@@ -474,6 +478,11 @@ class IndependenceSystem {
 
         // まずは最初のメッセージを出します
         await this.game.ui.showDialogAsync(msg, false, 0);
+
+        // もし改名があった場合は、ここで続けて改名のダイアログを出します
+        if (nameChangeMsg !== "") {
+            await this.game.ui.showDialogAsync(nameChangeMsg, false, 0);
+        }
 
         // 画面を勝手に触られないようにバリアを張ります
         if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
@@ -819,11 +828,18 @@ class IndependenceSystem {
         return { isNameChanged, oldNameStr, newNameStr };
     }
 
+    /**
+     * ★追加：イベント等で特定の行動（'indep': 独立, 'defect': 寝返り, 'coup': 謀反）を強制的に起こす魔法
+     */
+    async forceAction(castle, castellan, oldDaimyo, forceActionType) {
+        await this.planCoupDetatOrRebellion(castle, castellan, oldDaimyo, forceActionType);
+    }
+
     // =========================================================================
     // ★ここから追加：お家乗っ取りの作戦会議と、裏での決戦を行う魔法！
     // =========================================================================
 
-    async planCoupDetatOrRebellion(castle, castellan, oldDaimyo) {
+    async planCoupDetatOrRebellion(castle, castellan, oldDaimyo, forceAction = null) {
         // 1. まずは反乱のリーダー（神輿）を探します。
         let rebellionLeader = castellan;
         const oldClanId = castle.ownerClan;
@@ -967,6 +983,11 @@ class IndependenceSystem {
         if (coupScore >= maxScore) {
             action = 'coup';
             maxScore = coupScore;
+        }
+
+        // ★追加：イベントから行動が強制指定された場合は、それを最優先します！
+        if (forceAction) {
+            action = forceAction;
         }
         
         // 決定した行動を実行します
@@ -1192,11 +1213,14 @@ class IndependenceSystem {
                 const leaderNameStr = (info && info.isNameChanged) ? info.oldNameStr : rebellionLeader.name.replace(/\|/g, '');
                 
                 let resultMsg = `【謀反】${oldDaimyoNameStr}は討死しました！\n${leaderNameStr}が新たな大名となります！`;
-                if (info && info.isNameChanged) {
-                    resultMsg += `\n大名となるにあたり、${info.oldNameStr}は「${info.newNameStr}」と名を改めました。`;
-                }
-                
                 await this.game.ui.showDialogAsync(resultMsg);
+
+                // ★変更：改名があった場合は、文章を分けてダイアログを出します
+                if (info && info.isNameChanged) {
+                    const nameChangeMsg = `大名となるにあたり、${info.oldNameStr}は「${info.newNameStr}」と名を改めました。`;
+                    this.game.ui.log(nameChangeMsg); // ログにも記録しておきます
+                    await this.game.ui.showDialogAsync(nameChangeMsg);
+                }
 
             } else if (result === 'daimyo_win') {
                 // 【主家軍の勝利】
