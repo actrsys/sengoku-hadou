@@ -992,8 +992,8 @@ class IndependenceSystem {
         
         // 決定した行動を実行します
         if (action === 'coup') {
-            this.game.ui.log(`【謀反】${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました。`);
-            await this.game.ui.showDialogAsync(`【謀反】\n${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました！`);
+            this.game.ui.log(`${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました。`);
+            await this.game.ui.showDialogAsync(`${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました！`);
 
             // ★ここから追加：謀反の時もカメラを移動してチカチカさせます！
             // ただし、プレイヤー大名家の場合は野戦画面になるのでチカチカさせません！
@@ -1031,7 +1031,7 @@ class IndependenceSystem {
 
             if (result === 'rebel_win') {
                 // 【反乱軍の勝利】
-                this.game.ui.log(`【謀反】反乱軍が勝利し、${oldDaimyo.name}は討死しました。`);
+                this.game.ui.log(`反乱軍が勝利し、${oldDaimyo.name}は討死しました。`);
 
                 // ★追加：データが変わってマップの色がフライングで塗り替わるのを防ぐストッパーをかけます！
                 this.game.isSuspendingColorUpdate = true;
@@ -1212,7 +1212,7 @@ class IndependenceSystem {
                 const info = rebellionLeader._nameChangeInfo;
                 const leaderNameStr = (info && info.isNameChanged) ? info.oldNameStr : rebellionLeader.name.replace(/\|/g, '');
                 
-                let resultMsg = `【謀反】${oldDaimyoNameStr}は討死しました！\n${leaderNameStr}が新たな大名となります！`;
+                let resultMsg = `${oldDaimyoNameStr}は討死しました！\n${leaderNameStr}が新たな大名となります！`;
                 await this.game.ui.showDialogAsync(resultMsg);
 
                 // ★変更：改名があった場合は、文章を分けてダイアログを出します
@@ -1224,8 +1224,8 @@ class IndependenceSystem {
 
             } else if (result === 'daimyo_win') {
                 // 【主家軍の勝利】
-                await this.game.ui.showDialogAsync(`【謀反】\n${oldDaimyo.name}が勝利をおさめ、\n首魁の${rebellionLeader.name}は自領に逃亡しました。`);
-                this.game.ui.log(`【謀反】${oldDaimyo.name}が勝利をおさめ、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
+                await this.game.ui.showDialogAsync(`${oldDaimyo.name}が勝利をおさめ、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
+                this.game.ui.log(`${oldDaimyo.name}が勝利をおさめ、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
 
                 // ★追加：後で元に戻せるように、元の功績を覚えておくためのメモ帳を用意します
                 const originalAchievements = new Map();
@@ -1253,8 +1253,8 @@ class IndependenceSystem {
 
             } else {
                 // 【引き分け】
-                await this.game.ui.showDialogAsync(`【謀反】\n決着は着かず、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
-                this.game.ui.log(`【謀反】決着は着かず、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
+                await this.game.ui.showDialogAsync(`決着は着かず、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
+                this.game.ui.log(`決着は着かず、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
 
                 // 全員を強制的に追従させるため、一時的に派閥IDを反乱リーダーと同じにします
                 const dummyFactionId = rebellionLeader.factionId || 999;
