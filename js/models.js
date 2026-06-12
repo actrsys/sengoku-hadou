@@ -406,8 +406,16 @@ class Busho {
         this.realFatherId = Number(data.realFatherId || 0);
         this.realMotherId = Number(data.realMotherId || 0);
 
-        // 養父（お父さん）の出席番号を覚えておきます
-        this.adoptiveFatherId = Number(data.adoptiveFatherId || data.adoptiveFather || 0);
+        // ★養父（お父さん）の出席番号を複数人覚えておけるように箱を大きくします！
+        this.adoptiveFatherIds = [];
+        let rawAdoptiveFather = data.adoptiveFatherIds || data.adoptiveFatherId || data.adoptiveFather;
+        if (Array.isArray(rawAdoptiveFather)) {
+            this.adoptiveFatherIds = rawAdoptiveFather;
+        } else if (typeof rawAdoptiveFather === 'string' && rawAdoptiveFather.trim() !== "") {
+            this.adoptiveFatherIds = rawAdoptiveFather.split('|').map(id => Number(id.trim()));
+        } else if (Number(rawAdoptiveFather) > 0) {
+            this.adoptiveFatherIds = [Number(rawAdoptiveFather)];
+        }
 
         // ★【ここから書き足し：一門設定（修正版）】
         if (data.baseFamilyIds && Array.isArray(data.baseFamilyIds)) {
@@ -652,8 +660,8 @@ class Busho {
         // まずは普段使う用のリストに、金庫（baseFamilyIds）の中身を丸写しします
         this.familyIds = [...this.baseFamilyIds];
         
-        // ★実父・実母・養父が設定されていて、まだリストに入っていなければ全員追加します！
-        const parentIds = [this.realFatherId, this.realMotherId, this.adoptiveFatherId];
+        // ★実父・実母・養父（複数人）が設定されていて、まだリストに入っていなければ全員追加します！
+        const parentIds = [this.realFatherId, this.realMotherId, ...this.adoptiveFatherIds];
         parentIds.forEach(pId => {
             if (pId > 0 && !this.familyIds.includes(pId)) {
                 this.familyIds.push(pId);
@@ -695,7 +703,17 @@ class Princess {
         // ★修正：お父事もお母さんも、すべて「real」が付いた名前に統一します！
         this.realFatherId = Number(data.realFatherId || data.fatherId || 0); 
         this.realMotherId = Number(data.realMotherId || data.motherId || 0);
-        this.adoptiveFatherId = Number(data.adoptiveFatherId || 0);
+        
+        // ★養父（お父さん）の出席番号を複数人覚えておけるようにします！
+        this.adoptiveFatherIds = [];
+        let rawAdoptiveFather = data.adoptiveFatherIds || data.adoptiveFatherId || data.adoptiveFather;
+        if (Array.isArray(rawAdoptiveFather)) {
+            this.adoptiveFatherIds = rawAdoptiveFather;
+        } else if (typeof rawAdoptiveFather === 'string' && rawAdoptiveFather.trim() !== "") {
+            this.adoptiveFatherIds = rawAdoptiveFather.split('|').map(id => Number(id.trim()));
+        } else if (Number(rawAdoptiveFather) > 0) {
+            this.adoptiveFatherIds = [Number(rawAdoptiveFather)];
+        }
         
         // ★ゲーム中にコロコロ変わるデータ（最初は実家と同じにしておきます）
         this.currentClanId = Number(data.currentClanId !== undefined ? data.currentClanId : this.originalClanId);
@@ -727,8 +745,8 @@ class Princess {
     updateFamilyIds(bushos = []) {
         this.familyIds = [...this.baseFamilyIds];
 
-        // 実父・実母・養父のリストを作って、順番に確認します
-        const parentIds = [this.realFatherId, this.realMotherId, this.adoptiveFatherId];
+        // 実父・実母・養父（複数人）のリストを作って、順番に確認します
+        const parentIds = [this.realFatherId, this.realMotherId, ...this.adoptiveFatherIds];
         
         parentIds.forEach(pId => {
             if (pId > 0) {
@@ -925,7 +943,7 @@ class Province {
 class FamilyLinker {
     static linkAdoptiveRelations(bushos) {
         bushos.forEach(b => {
-            const parentIds = [b.realFatherId, b.realMotherId, b.adoptiveFatherId];
+            const parentIds = [b.realFatherId, b.realMotherId, ...b.adoptiveFatherIds];
             parentIds.forEach(pId => {
                 if (pId > 0) {
                     // ★直接「金庫（baseFamilyIds）」に書き込みます
