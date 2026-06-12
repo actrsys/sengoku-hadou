@@ -1833,7 +1833,7 @@ class CommandSystem {
             const inputField = inputs.soldiers || inputs.amount || inputs.gold;
             const val = parseInt(inputField.num.value);
             if (val <= 0) return;
-            this.showAdviceAndExecute('draft', () => this.executeDraft(data, val), { val: val, trueProb: 1.0 });
+            this.executeWithEvent('draft', () => this.executeDraft(data, val));
         }
         else if (type === 'goodwill') {
             const val = parseInt(inputs.gold.num.value);
