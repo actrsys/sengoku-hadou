@@ -49,19 +49,6 @@ class AIEngine {
     
     async execAI(castle) {
         try {
-            // ★調査用：1560年4月かつ今川家（ClanID: 1）の特定の城なら、一色家（ClanID: 15）への親善を強制記憶
-            if (this.game.year === 1560 && this.game.month === 4 && castle.ownerClan === 1) {
-                const myClan = this.game.clans.find(c => c.id === 1);
-                if (myClan && !myClan.currentDiplomacyTarget) {
-                    myClan.currentDiplomacyTarget = {
-                        targetId: 15,
-                        action: 'goodwill',
-                        gold: 300
-                    };
-                    console.log("【調査】今川家が強制的に一色家へ親善を設定しました");
-                }
-            }
-
             // ★イベント追加：コマンドの選択前（AI操作時）
             if (this.game.eventManager) {
                 await this.game.eventManager.processEvents('before_command', castle);
@@ -1658,8 +1645,13 @@ class AIEngine {
                 
                 // およそ1人集めるのにかかるお金（単価）を、城主の能力で仮計算します
                 const efficiency = ((castellan.leadership * 1.5) + (castellan.charm * 1.5) + (Math.sqrt(castellan.loyalty) * 2) + (Math.sqrt(castle.peoplesLoyalty) * 2)) / 500;
-                // 1人あたりのお金。もしゼロになりそうなら安全のために1にします
-                const unitPrice = Math.max(1, 1 / efficiency); 
+                
+                // ★追加：人口によるコスト倍率の計算（プレイヤーと同じように4乗根を使います）
+                const safePop = Math.max(1, castle.population);
+                const costMultiplier = Math.pow(10000 / safePop, 1 / 4);
+
+                // ★変更：1人あたりのお金に、コスト倍率を掛け算します。もしゼロになりそうなら安全のために1にします
+                const unitPrice = Math.max(1, (1 / efficiency) * costMultiplier);
 
                 // ===== 余力計算 =====
                 const surplusGold = Math.max(0, castle.gold - targetGold);
@@ -2575,18 +2567,21 @@ class AIEngine {
                     });
 
                     let draftCost = action.cost;
-                    let soldiers = GameSystem.calcDraftFromGold(draftCost, doer, castle.peoplesLoyalty);
+                    // ★変更：一番後ろに「castle.population」を追加します
+                    let soldiers = GameSystem.calcDraftFromGold(draftCost, doer, castle.peoplesLoyalty, castle.population);
                     
                     // ネットワーク全体の人口（実際の総人口）を超えないようにします
                     if (actualTotalPop < soldiers) {
                         soldiers = actualTotalPop;
-                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty);
+                        // ★変更：isExecuteフラグ（false）と人口を渡します
+                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, false, castle.population);
                     }
 
                     // 兵士が上限（99999）を超えないようにします
                     if (castle.soldiers + soldiers > 99999) {
                         soldiers = 99999 - castle.soldiers;
-                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty);
+                        // ★変更：isExecuteフラグ（false）と人口を渡します
+                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, false, castle.population);
                     }
 
                     // ===== 仮想チェック（重要） =====
@@ -2596,11 +2591,13 @@ class AIEngine {
                     if (castle.rice < virtualRiceNeed) {
                         soldiers = Math.floor((castle.rice / 2.0) - castle.soldiers);
                         soldiers = Math.max(0, soldiers);
-                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty);
+                        // ★変更：isExecuteフラグ（false）と人口を渡します
+                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, false, castle.population);
                     }
 
                     if (soldiers > 0 && draftCost > 0) {
-                        GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, true);
+                        // ★変更：isExecuteフラグ（true）と人口を渡します
+                        GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, true, castle.population);
 
                         // ★大改善：集めた兵士数を、負担の重さ（ウェイト）に合わせて振り分けます！
                         let remainingDraft = soldiers;

@@ -626,19 +626,36 @@ class GameSystem {
         return Math.floor(baseRice);
     }
     
-    // AI用：お金を指定して、集まる兵士数を計算します
-    static calcDraftFromGold(gold, busho, peoplesLoyalty) { 
-        const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
-        return Math.floor(gold * efficiency); 
+    // ★新設：徴兵の「基本効率」を計算する専門部署（ルールブック）
+    // AI用とプレイヤー用、両方の計算の根っこをここで一括管理します
+    static getDraftEfficiency(busho, peoplesLoyalty, population = 10000) {
+        // 武将の能力や民忠による基本効率
+        const baseEfficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
+        
+        // 人口によるコスト倍率（4乗根）
+        const safePop = Math.max(1, population); 
+        const costMultiplier = Math.pow(10000 / safePop, 1 / 4); 
+        
+        // 最終的な効率（数値が大きいほど、安くたくさん雇える状態）を返します
+        return baseEfficiency / costMultiplier;
     }
+
+    // AI用：お金を指定して、集まる兵士数を計算します
+    static calcDraftFromGold(gold, busho, peoplesLoyalty, population = 10000) { 
+        // 専門部署から「効率」をもらってきて、お金に掛け算するだけになります
+        const finalEfficiency = GameSystem.getDraftEfficiency(busho, peoplesLoyalty, population);
+        return Math.floor(gold * finalEfficiency); 
+    }
+
     // プレイヤー用：集めたい兵士数を指定して、必要なお金を計算します
-    static calcDraftCost(soldiers, busho, peoplesLoyalty, isExecute = false) { 
+    static calcDraftCost(soldiers, busho, peoplesLoyalty, isExecute = false, population = 10000) { 
         if (isExecute) {
             busho.expLeadership = (busho.expLeadership || 0) + Math.floor(soldiers / 300);
             busho.expStrength = (busho.expStrength || 0) + Math.floor(soldiers / 200);
         }
-        const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
-        return Math.ceil(soldiers / efficiency); 
+        // 専門部署から「効率」をもらってきて、割り算するだけになります
+        const finalEfficiency = GameSystem.getDraftEfficiency(busho, peoplesLoyalty, population);
+        return Math.ceil(soldiers / finalEfficiency); 
     }
 
     // ============================================
