@@ -941,7 +941,8 @@ class CommandSystem {
                          return typeof GameSystem.calcSoldierCharity === 'function' ? GameSystem.calcSoldierCharity(target, cCastle.soldiers || 1, 1.0) : target.leadership;
                      }
                      if (actionType === 'draft') {
-                         return (target.leadership * 1.5) + (target.charm * 1.5) + (Math.sqrt(target.loyalty) * 2);
+                         // 共通の効率計算ルールを使って並べ替えます（ダミーの数値を渡して純粋な効率を比較します）
+                         return GameSystem.getDraftEfficiency(target, 50, 10000);
                      }
                      if (['war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy'].includes(actionType)) {
                          return (target.leadership * 1.5) + target.strength;
@@ -2317,25 +2318,16 @@ class CommandSystem {
         // ★変更：人口(castle.population)のデータを一番後ろに渡します
         GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty, true, castle.population);
 
-        // ★ 徴兵の割合を計算して、民忠と人口を減らす処理を行います
-        const draftRatio = soldiers / castle.population;          // 徴兵した割合
-        const penaltyRatio = draftRatio * 2;                      // ペナルティはその2倍
-        const loyaltyPenalty = Math.floor(castle.peoplesLoyalty * penaltyRatio); // 今の民忠から減らす量
+        // ★ 徴兵の割合を計算して、民忠と人口を減らす処理を行います（共通ルールを使用）
+        const loyaltyPenalty = GameSystem.calcDraftPenalty(castle.population, soldiers, castle.peoplesLoyalty);
         
         castle.peoplesLoyalty = Math.max(0, castle.peoplesLoyalty - loyaltyPenalty); // 0未満にはならないようにします
         castle.population -= soldiers;                            // 徴兵した分だけ人口を減らします
 
         castle.gold -= costGold;
-        
-        // 新しく入ってきた兵士たちは、まだ訓練も受けていないので基本の低い数字になります
-        const newMorale = 30; 
-        const newTraining = 30; 
-        
-        if (castle.soldiers + soldiers > 0) {
-            castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * soldiers)) / (castle.soldiers + soldiers));
-            castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * soldiers)) / (castle.soldiers + soldiers));
-        }
-        castle.soldiers += soldiers; 
+        
+        // 共通のルールブックを使って、城の訓練度・士気・兵士数を更新します
+        GameSystem.applyDraftTrainingAndMorale(castle, soldiers);
         busho.isActionDone = true; 
         
         busho.achievementTotal += 5;

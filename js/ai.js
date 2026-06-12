@@ -1643,15 +1643,9 @@ class AIEngine {
                 // ★修正：金銭感覚をさらに緩く「1.0」に下げて、お財布の紐を緩くします！
                 const targetGold = Math.floor(baseSoldiers * 1.0);
                 
-                // およそ1人集めるのにかかるお金（単価）を、城主の能力で仮計算します
-                const efficiency = ((castellan.leadership * 1.5) + (castellan.charm * 1.5) + (Math.sqrt(castellan.loyalty) * 2) + (Math.sqrt(castle.peoplesLoyalty) * 2)) / 500;
-                
-                // ★追加：人口によるコスト倍率の計算（プレイヤーと同じように4乗根を使います）
-                const safePop = Math.max(1, castle.population);
-                const costMultiplier = Math.pow(10000 / safePop, 1 / 4);
-
-                // ★変更：1人あたりのお金に、コスト倍率を掛け算します。もしゼロになりそうなら安全のために1にします
-                const unitPrice = Math.max(1, (1 / efficiency) * costMultiplier);
+                // およそ1人集めるのにかかるお金（単価）を、共通のルールブックから計算します
+                const efficiency = GameSystem.getDraftEfficiency(castellan, castle.peoplesLoyalty, castle.population);
+                const unitPrice = Math.max(1, 1 / efficiency);
 
                 // ===== 余力計算 =====
                 const surplusGold = Math.max(0, castle.gold - targetGold);
@@ -2616,9 +2610,8 @@ class AIEngine {
                                     popDecrease = Math.min(popDecrease, c.population); 
                                 }
                                 
-                                const draftRatio = popDecrease / Math.max(1, c.population);
-                                const penaltyRatio = draftRatio * 2;
-                                const loyaltyPenalty = Math.floor(c.peoplesLoyalty * penaltyRatio);
+                                // 共通のルールブックからペナルティを計算します
+                                const loyaltyPenalty = GameSystem.calcDraftPenalty(c.population, popDecrease, c.peoplesLoyalty);
                                 
                                 c.peoplesLoyalty = Math.max(0, c.peoplesLoyalty - loyaltyPenalty);
                                 c.population = Math.max(0, c.population - popDecrease);
@@ -2630,11 +2623,8 @@ class AIEngine {
                         // お城の貯金箱から使った分を減らします
                         castle.gold -= draftCost;
                         
-                        const newMorale = Math.max(0, castle.morale - 10);
-                        const newTraining = Math.max(0, castle.training - 10);
-                        castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * soldiers)) / (castle.soldiers + soldiers));
-                        castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * soldiers)) / (castle.soldiers + soldiers));
-                        castle.soldiers += soldiers;
+                        // 共通のルールブックを使って、城の訓練度・士気・兵士数を更新します
+                        GameSystem.applyDraftTrainingAndMorale(castle, soldiers);
                         
                         // 頑張ったご褒美をあげます
                         doer.achievementTotal = (doer.achievementTotal || 0) + 5;

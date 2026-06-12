@@ -658,6 +658,29 @@ class GameSystem {
         return Math.ceil(soldiers / finalEfficiency); 
     }
 
+    // ★ここから追加：徴兵によるペナルティとステータス低下を一括管理する魔法です！
+    // 人口と民忠の低下量を計算します
+    static calcDraftPenalty(population, draftSoldiers, currentLoyalty) {
+        const draftRatio = draftSoldiers / Math.max(1, population);
+        const penaltyRatio = draftRatio * 2;
+        const loyaltyPenalty = Math.floor(currentLoyalty * penaltyRatio);
+        return loyaltyPenalty;
+    }
+
+    // 新兵が入ってきたことによる、城の訓練度と士気の低下を計算して適用します
+    static applyDraftTrainingAndMorale(castle, newSoldiers) {
+        if (newSoldiers <= 0) return;
+
+        // ★ここで新兵のステータスを決めます。プレイヤーとAIでズレていた部分の統一です。
+        // 今回は「新兵は一律で訓練30・士気30」という設定に統一します。
+        const newMorale = 30; 
+        const newTraining = 30; 
+        
+        castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * newSoldiers)) / (castle.soldiers + newSoldiers));
+        castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * newSoldiers)) / (castle.soldiers + newSoldiers));
+        castle.soldiers += newSoldiers;
+    }
+
     // ============================================
     // ★軍馬・鉄砲の購入計算を共通化する魔法です！
     // ============================================
