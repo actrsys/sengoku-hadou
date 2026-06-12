@@ -2601,7 +2601,7 @@ class AIEngine {
                                 let popDecrease = 0;
                                 // 最後の1つのお城は、計算のズレ（端数）をすべて引き受けます
                                 if (index === draftableCastles.length - 1) {
-                                    popDecrease = remainingDraft;
+                                    popDecrease = Math.min(remainingDraft, c.population);
                                 } else {
                                     // 負担の割合（実行拠点は1.5倍）に合わせて人数を決めます
                                     let weight = (c.id === castle.id) ? 1.5 : 1.0;
