@@ -947,7 +947,77 @@ class CommandSystem {
                      if (['war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy'].includes(actionType)) {
                          return (target.leadership * 1.5) + target.strength;
                      }
+                     
+                     // ==========================================
+                     // ★ここから追加：その他のコマンドでも最適な武将が一番上に来るようにする計算魔法です！
+                     // ==========================================
+                     
+                     // 【外交】外交の成功確率や、親善の友好度上昇量で並べ替えます
+                     if (actionType === 'diplomacy_doer') {
+                         if (extraData && extraData.subAction === 'goodwill') {
+                             // 親善は効果量（友好度がどれくらい上がるか）で比較します。ダミーの金額（1000）を渡して計算させます
+                             if (this.game.diplomacyManager && typeof this.game.diplomacyManager.calcGoodwillIncrease === 'function') {
+                                 return this.game.diplomacyManager.calcGoodwillIncrease(1000, target);
+                             }
+                         } else if (extraData && extraData.subAction) {
+                             // その他の外交は、成功確率の高さで比較します
+                             if (this.game.diplomacyManager && typeof this.game.diplomacyManager.getDiplomacyProb === 'function') {
+                                 return this.game.diplomacyManager.getDiplomacyProb(target.id, targetId, extraData.subAction);
+                             }
+                         }
+                         return target.diplomacy;
+                     }
+                     
+                     // 【登用】登用の成功確率で並べ替えます
+                     if (actionType === 'employ_doer' && extraData && extraData.targetId) {
+                         const employTarget = this.game.getBusho(extraData.targetId);
+                         if (employTarget && typeof GameSystem.getEmployProb === 'function') {
+                             // 自軍と相手軍の兵力はダミー（お互い10000）にして、純粋な武将の能力だけで確率を出します
+                             return GameSystem.getEmployProb(target, employTarget, 10000, 10000);
+                         }
+                         return target.charm;
+                     }
+                     
+                     // 【調略】調略の各種成功確率で並べ替えます
+                     if (actionType === 'rumor_doer' && extraData && extraData.targetBushoId) {
+                         if (this.game.strategySystem && typeof this.game.strategySystem.getRumorProb === 'function') {
+                             return this.game.strategySystem.getRumorProb(target.id, extraData.targetBushoId);
+                         }
+                         return target.intelligence;
+                     }
+                     if (actionType === 'incite_doer') {
+                         if (this.game.strategySystem && typeof this.game.strategySystem.getInciteProb === 'function') {
+                             return this.game.strategySystem.getInciteProb(target.id, targetId);
+                         }
+                         return target.intelligence;
+                     }
+                     if (actionType === 'sabotage_doer') {
+                         if (this.game.strategySystem && typeof this.game.strategySystem.getSabotageProb === 'function') {
+                             return this.game.strategySystem.getSabotageProb(target.id, targetId);
+                         }
+                         return target.intelligence;
+                     }
+                     if (actionType === 'headhunt_doer') {
+                         if (this.game.strategySystem && typeof this.game.strategySystem.getHeadhuntProb === 'function') {
+                             // ダミーの金額（1000金）を渡して確率を計算します
+                             return this.game.strategySystem.getHeadhuntProb(target.id, targetId, 1000);
+                         }
+                         return target.intelligence;
+                     }
+                     
+                     // 【人事】褒美や追放は「忠誠度が一番低い人」を上にしたいので、数字にマイナスをつけて逆順にします！
+                     if (['reward', 'banish'].includes(actionType)) {
+                         return -target.loyalty;
+                     }
+                     
+                     // 【その他】調査は武力と知略のミックスで強さを出します
+                     if (actionType === 'investigate_deploy') {
+                         return target.strength + (target.intelligence * 0.8);
+                     }
+                     
+                     // ==========================================
                  } catch (e) {
+                     console.warn("ソート値の計算中にエラーが発生しました:", e);
                  }
 
                  if (isEnemyTarget) return GameSystem.getPerceivedStatValue(target, sortKey, gunshi, acc, this.game.playerClanId, myDaimyo) || 0;
