@@ -2588,10 +2588,11 @@ class AIEngine {
                         // ★変更：isExecuteフラグ（false）と人口を渡します
                         draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, false, castle.population);
                     }
-
+                    
                     if (soldiers > 0 && draftCost > 0) {
-                        // ★変更：isExecuteフラグ（true）と人口を渡します
-                        GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, true, castle.population);
+                        // ★修正：最終的に決まった人数で、実際に支払うコストを再計算して draftCost に上書きします！
+                        // 同時に isExecute = true を渡して経験値も入れます。
+                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, true, castle.population);
 
                         // ★大改善：集めた兵士数を、負担の重さ（ウェイト）に合わせて振り分けます！
                         let remainingDraft = soldiers;
