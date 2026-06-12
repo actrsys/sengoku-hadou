@@ -729,7 +729,7 @@ class AIOperationManager {
                 }
             }
             
-            // ★追加：一番点数が高かった出撃元のお城の兵士数が、√石高×150以上あるかチェックします！
+            // ★追加：一番点数が高かった出撃元のお城の兵士数が、√石高×200以上あるかチェックします！
             const stagingCastle = this.game.getCastle(firstTarget.stagingBase);
             if (stagingCastle) {
                 const requiredSoldiers = Math.sqrt(stagingCastle.kokudaka) * 200;
