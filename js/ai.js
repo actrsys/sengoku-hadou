@@ -2591,6 +2591,8 @@ class AIEngine {
 
                         // ★大改善：集めた兵士数を、負担の重さ（ウェイト）に合わせて振り分けます！
                         let remainingDraft = soldiers;
+                        const draftTargets = []; // ★追加：一元管理の魔法に渡すリスト
+                        
                         draftableCastles.forEach((c, index) => {
                             if (c.population > 0 && totalWeightedPop > 0) {
                                 let popDecrease = 0;
@@ -2606,13 +2608,7 @@ class AIEngine {
                                     popDecrease = Math.min(popDecrease, c.population); 
                                 }
                                 
-                                const draftRatio = popDecrease / Math.max(1, c.population);
-                                const penaltyRatio = draftRatio * 2;
-                                const loyaltyPenalty = Math.floor(c.peoplesLoyalty * penaltyRatio);
-                                
-                                c.peoplesLoyalty = Math.max(0, c.peoplesLoyalty - loyaltyPenalty);
-                                c.population = Math.max(0, c.population - popDecrease);
-                                
+                                draftTargets.push({ castle: c, soldiers: popDecrease }); // ★リストに追加
                                 remainingDraft -= popDecrease;
                             }
                         });
@@ -2620,11 +2616,10 @@ class AIEngine {
                         // お城の貯金箱から使った分を減らします
                         castle.gold -= draftCost;
                         
+                        // ★ 新しく作った一元管理の魔法を使います！
                         const newMorale = Math.max(0, castle.morale - 10);
                         const newTraining = Math.max(0, castle.training - 10);
-                        castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * soldiers)) / (castle.soldiers + soldiers));
-                        castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * soldiers)) / (castle.soldiers + soldiers));
-                        castle.soldiers += soldiers;
+                        GameSystem.executeDraftProcess(draftTargets, castle, newTraining, newMorale);
                         
                         // 頑張ったご褒美をあげます
                         doer.achievementTotal = (doer.achievementTotal || 0) + 5;

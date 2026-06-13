@@ -2315,32 +2315,24 @@ class CommandSystem {
         // 実行確定：経験値を加算します
         GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty, true);
 
-        // ★ 徴兵の割合を計算して、民忠と人口を減らす処理を行います
-        const draftRatio = soldiers / castle.population;          // 徴兵した割合
-        const penaltyRatio = draftRatio * 2;                      // ペナルティはその2倍
-        const loyaltyPenalty = Math.floor(castle.peoplesLoyalty * penaltyRatio); // 今の民忠から減らす量
-        
-        castle.peoplesLoyalty = Math.max(0, castle.peoplesLoyalty - loyaltyPenalty); // 0未満にはならないようにします
-        castle.population -= soldiers;                            // 徴兵した分だけ人口を減らします
-
         castle.gold -= costGold;
-        
-        // 新しく入ってきた兵士たちは、まだ訓練も受けていないので基本の低い数字になります
-        const newMorale = 30; 
-        const newTraining = 30; 
-        
-        if (castle.soldiers + soldiers > 0) {
-            castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * soldiers)) / (castle.soldiers + soldiers));
-            castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * soldiers)) / (castle.soldiers + soldiers));
-        }
-        castle.soldiers += soldiers; 
+        
+        // ★ 新しく作った一元管理の魔法を使います！
+        // 新しく入ってきた兵士たちは、まだ訓練も受けていないので基本の低い数字(30)になります
+        const result = GameSystem.executeDraftProcess(
+            [{ castle: castle, soldiers: soldiers }], 
+            castle, 
+            30, 
+            30
+        );
+        
         busho.isActionDone = true; 
         
         busho.achievementTotal += 5;
         this.game.factionSystem.updateRecognition(busho, 10);
         
         // ★ 結果のメッセージに、人口と民忠が減ったことも書き足しておきます
-        this.game.ui.showResultModal(`${busho.name}が徴兵を行いました\n兵士+${soldiers}\n(人口-${soldiers} / 民忠-${loyaltyPenalty})`); 
+        this.game.ui.showResultModal(`${busho.name}が徴兵を行いました\n兵士+${result.totalDrafted}\n(人口-${result.totalDrafted} / 民忠-${result.loyaltyPenalty})`); 
         this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
     
