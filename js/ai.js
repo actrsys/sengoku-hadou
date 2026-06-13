@@ -49,6 +49,19 @@ class AIEngine {
     
     async execAI(castle) {
         try {
+            // ★調査用：1560年4月かつ今川家（ClanID: 1）の特定の城なら、一色家（ClanID: 15）への親善を強制記憶
+            if (this.game.year === 1560 && this.game.month === 4 && castle.ownerClan === 1) {
+                const myClan = this.game.clans.find(c => c.id === 1);
+                if (myClan && !myClan.currentDiplomacyTarget) {
+                    myClan.currentDiplomacyTarget = {
+                        targetId: 15,
+                        action: 'goodwill',
+                        gold: 300
+                    };
+                    console.log("【調査】今川家が強制的に一色家へ親善を設定しました");
+                }
+            }
+
             // ★イベント追加：コマンドの選択前（AI操作時）
             if (this.game.eventManager) {
                 await this.game.eventManager.processEvents('before_command', castle);
@@ -2591,8 +2604,6 @@ class AIEngine {
 
                         // ★大改善：集めた兵士数を、負担の重さ（ウェイト）に合わせて振り分けます！
                         let remainingDraft = soldiers;
-                        const draftTargets = []; // ★追加：一元管理の魔法に渡すリスト
-                        
                         draftableCastles.forEach((c, index) => {
                             if (c.population > 0 && totalWeightedPop > 0) {
                                 let popDecrease = 0;
@@ -2608,7 +2619,13 @@ class AIEngine {
                                     popDecrease = Math.min(popDecrease, c.population); 
                                 }
                                 
-                                draftTargets.push({ castle: c, soldiers: popDecrease }); // ★リストに追加
+                                const draftRatio = popDecrease / Math.max(1, c.population);
+                                const penaltyRatio = draftRatio * 2;
+                                const loyaltyPenalty = Math.floor(c.peoplesLoyalty * penaltyRatio);
+                                
+                                c.peoplesLoyalty = Math.max(0, c.peoplesLoyalty - loyaltyPenalty);
+                                c.population = Math.max(0, c.population - popDecrease);
+                                
                                 remainingDraft -= popDecrease;
                             }
                         });
@@ -2616,10 +2633,11 @@ class AIEngine {
                         // お城の貯金箱から使った分を減らします
                         castle.gold -= draftCost;
                         
-                        // ★ 新しく作った一元管理の魔法を使います！
                         const newMorale = Math.max(0, castle.morale - 10);
                         const newTraining = Math.max(0, castle.training - 10);
-                        GameSystem.executeDraftProcess(draftTargets, castle, newTraining, newMorale);
+                        castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * soldiers)) / (castle.soldiers + soldiers));
+                        castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * soldiers)) / (castle.soldiers + soldiers));
+                        castle.soldiers += soldiers;
                         
                         // 頑張ったご褒美をあげます
                         doer.achievementTotal = (doer.achievementTotal || 0) + 5;

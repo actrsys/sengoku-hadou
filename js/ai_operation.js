@@ -729,10 +729,10 @@ class AIOperationManager {
                 }
             }
             
-            // ★追加：一番点数が高かった出撃元のお城の兵士数が、√石高×175以上あるかチェックします！
+            // ★追加：一番点数が高かった出撃元のお城の兵士数が、√石高×200以上あるかチェックします！
             const stagingCastle = this.game.getCastle(firstTarget.stagingBase);
             if (stagingCastle) {
-                const requiredSoldiers = Math.sqrt(stagingCastle.kokudaka) * 175;
+                const requiredSoldiers = Math.sqrt(stagingCastle.kokudaka) * 200;
                 // ★変更：目標が兵糧攻め状態ではない時だけ、兵士不足の足切りを行います！
                 if (!isTargetStarving && stagingCastle.soldiers < requiredSoldiers) {
                     // 兵士が足りない場合は、この月の攻撃作戦を諦めて内政にします

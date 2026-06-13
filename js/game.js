@@ -626,14 +626,9 @@ class GameSystem {
         return Math.floor(baseRice);
     }
     
-    // 徴兵効率の基本計算を一つにまとめました
-    static calcDraftEfficiency(busho, peoplesLoyalty) {
-        return ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
-    }
-
     // AI用：お金を指定して、集まる兵士数を計算します
     static calcDraftFromGold(gold, busho, peoplesLoyalty) { 
-        const efficiency = this.calcDraftEfficiency(busho, peoplesLoyalty);
+        const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
         return Math.floor(gold * efficiency); 
     }
     // プレイヤー用：集めたい兵士数を指定して、必要なお金を計算します
@@ -642,52 +637,8 @@ class GameSystem {
             busho.expLeadership = (busho.expLeadership || 0) + Math.floor(soldiers / 300);
             busho.expStrength = (busho.expStrength || 0) + Math.floor(soldiers / 200);
         }
-        const efficiency = this.calcDraftEfficiency(busho, peoplesLoyalty);
+        const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
         return Math.ceil(soldiers / efficiency); 
-    }
-
-    // 徴兵時の民忠低下ペナルティを計算します
-    static calcDraftLoyaltyPenalty(population, peoplesLoyalty, draftSoldiers) {
-        if (population <= 0) return 0;
-        const draftRatio = draftSoldiers / population;
-        const penaltyRatio = draftRatio * 2; // 民忠低下の倍率（現在は2倍）
-        return Math.floor(peoplesLoyalty * penaltyRatio);
-    }
-
-    // 徴兵時に低下する訓練度や士気の平均を計算します
-    static calcDraftAveragedStat(currentStat, currentSoldiers, newStat, draftSoldiers) {
-        if (currentSoldiers + draftSoldiers <= 0) return currentStat;
-        return Math.floor(((currentStat * currentSoldiers) + (newStat * draftSoldiers)) / (currentSoldiers + draftSoldiers));
-    }
-    
-    // 徴兵の実行処理（プレイヤー・AI共通）
-    static executeDraftProcess(targets, destinationCastle, newTraining, newMorale) {
-        let totalDrafted = 0;
-        let totalLoyaltyPenalty = 0; // プレイヤーへの通知用（代表1城分）
-
-        targets.forEach(target => {
-            const c = target.castle;
-            const draftAmount = target.soldiers;
-            if (draftAmount <= 0) return;
-
-            const penalty = this.calcDraftLoyaltyPenalty(c.population, c.peoplesLoyalty, draftAmount);
-            c.peoplesLoyalty = Math.max(0, c.peoplesLoyalty - penalty);
-            c.population = Math.max(0, c.population - draftAmount);
-            
-            totalDrafted += draftAmount;
-            // プレイヤーが確認しやすいように、兵士が集まる城のペナルティを記録しておきます
-            if (c.id === destinationCastle.id) {
-                totalLoyaltyPenalty = penalty;
-            }
-        });
-
-        if (totalDrafted > 0) {
-            destinationCastle.training = this.calcDraftAveragedStat(destinationCastle.training, destinationCastle.soldiers, newTraining, totalDrafted);
-            destinationCastle.morale = this.calcDraftAveragedStat(destinationCastle.morale, destinationCastle.soldiers, newMorale, totalDrafted);
-            destinationCastle.soldiers += totalDrafted;
-        }
-
-        return { totalDrafted, loyaltyPenalty: totalLoyaltyPenalty };
     }
 
     // ============================================
