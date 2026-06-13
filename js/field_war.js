@@ -2657,6 +2657,45 @@ class FieldWarManager {
         }
         // ==========================================
 
+        // ★追加：武将の死亡フラグ判定（野戦での負傷による死亡フラグ）
+        const checkDeathFlag = (targetUnit, attackerTroopType, isDestroyed) => {
+            // 武将のIDがない場合や、ゲームデータが見つからない場合はストップします
+            if (!targetUnit.bushoId || !this.game) return;
+            const targetBusho = this.game.getBusho(targetUnit.bushoId);
+            if (!targetBusho) return;
+
+            // ★追加：討死武将が「本来の寿命」を過ぎて生き延びているかチェックします
+            let multiplier = 1; // 基本は1倍（そのまま）です
+            if (targetBusho.isKilledInBattle && this.game.year >= targetBusho.originalEndYear) {
+                multiplier = 3; // 条件に当てはまれば確率を3倍にします
+            }
+
+            if (isDestroyed) {
+                // 兵士が0にされた（壊滅した）時は、基本10%の確率でフラグが立ちます
+                if (Math.random() < 0.10 * multiplier) targetBusho.deathFlag = true;
+            } else {
+                // 壊滅していない時は、攻撃してきた兵科によってフラグが立つ確率が変わります
+                let prob = 0;
+                if (attackerTroopType === 'teppo') prob = 0.01; // 鉄砲は1%
+                else if (attackerTroopType === 'kiba') prob = 0.005; // 騎馬は0.5%
+                else if (attackerTroopType === 'ashigaru') prob = 0.001; // 足軽は0.1%
+
+                // 確率のサイコロを振って、当たったらフラグを立てます
+                if (prob > 0 && Math.random() < prob * multiplier) {
+                    targetBusho.deathFlag = true;
+                }
+            }
+        };
+
+        // 守備側が攻撃を受けた時の判定
+        if (dmgToDef > 0) {
+            checkDeathFlag(defender, attacker.troopType, defender.soldiers <= 0);
+        }
+        // 攻撃側が反撃を受けた時の判定
+        if (dmgToAtk > 0) {
+            checkDeathFlag(attacker, defender.troopType, attacker.soldiers <= 0);
+        }
+
         // 野戦での被害を負傷兵の箱（deadSoldiers）に記録します
         if (attacker.isAttacker) {
             this.warState.deadSoldiers.defender += dmgToDef;

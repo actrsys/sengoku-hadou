@@ -548,6 +548,9 @@ class Busho {
 
         // ★追加：最後に褒美をもらった月（ターンID）を覚える箱です！
         this.lastRewardedTurnId = Number(data.lastRewardedTurnId || 0);
+
+        // ★追加：野戦で重傷を負った（死亡フラグが立った）かを覚える箱です！
+        this.deathFlag = data.deathFlag === true;
     }
 
     // ★新しく追加：武将自身のデータには軍団IDを持たせず、今いる「お城」のデータを覗きに行く魔法です！

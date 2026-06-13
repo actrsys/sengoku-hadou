@@ -391,7 +391,7 @@ class LifeSystem {
         // 【変更点①】没年の「1年前（endYear - 1）」を迎えている武将を探すようにしました！
         // プレイヤーの大名武将のみ、寿命を本来の寿命＋５年として計算します！
         const targetBushos = this.game.bushos.filter(b => {
-            if (b.status === 'unborn' || b.status === 'dead') return false;
+            if (b.status === 'dead') return false; // ★変更：未登場（unborn）を除外しないようにしました
             const actualEndYear = (b.isDaimyo && b.clan === this.game.playerClanId) ? b.endYear + 5 : b.endYear;
             return currentYear >= (actualEndYear - 1);
         });
@@ -407,20 +407,51 @@ class LifeSystem {
 
             // サイコロを振って、確率に当たってしまったらお別れです…
             if (Math.random() < deathProb) {
+                const wasUnborn = (b.status === 'unborn'); // ★追加：死ぬ前に未登場だったかメモしておく
                 await this.executeDeath(b);
-                // もしプレイヤーの家臣だったら、その場でお知らせを出します
-                if (b.clan === this.game.playerClanId) {
+                // もしプレイヤーの家臣で、すでに登場していたらお知らせを出します
+                if (b.clan === this.game.playerClanId && !wasUnborn) {
                     const name = b.name.replace('|', '');
-                    this.game.ui.log(`${name}が病によりこの世を去りました…。`);
+                    this.game.ui.log(`${name}が死亡しました……`);
                     // ★一人ずつ順番にダイアログを出して、押すまで待ちます！
-                    await this.game.ui.showDialogAsync(`${name}が病によりこの世を去りました…。`, false, 0);
+                    await this.game.ui.showDialogAsync(`${name}が死亡しました……`, false, 0);
                 }
             }
         }
 
+        // ★追加：死亡フラグ（deathFlag）が立っている武将の死亡判定
+        // すでに寿命で死んだ武将（statusがdead）を除外して、フラグが立っている武将だけを集めます
+        const flagTargetBushos = this.game.bushos.filter(b => b.status !== 'dead' && b.deathFlag === true);
+        
+        for (const b of flagTargetBushos) {
+            // ★追加：討死武将が本来の寿命を過ぎているかチェックして、確率を変えます
+            let deathProb = 0.30; // 基本は30%の確率です
+            if (b.isKilledInBattle && currentYear >= b.originalEndYear) {
+                deathProb = 1.0; // 条件に当てはまれば、100%（確実に）死亡するようにします
+            }
+
+            // 指定された確率で死亡します
+            if (Math.random() < deathProb) {
+                const wasUnborn = (b.status === 'unborn');
+                await this.executeDeath(b);
+                
+                // もしプレイヤーの家臣で、すでに登場していたらお知らせを出します
+                if (b.clan === this.game.playerClanId && !wasUnborn) {
+                    const name = b.name.replace('|', '');
+                    this.game.ui.log(`野戦での傷が元で、${name}が死亡しました……`);
+                    await this.game.ui.showDialogAsync(`野戦での傷が元で、${name}が死亡しました……`, false, 0);
+                }
+            }
+        }
+
+        // ★追加：全ての死亡判定が終わったので、全員のdeathFlagを綺麗にお掃除（false）します！
+        this.game.bushos.forEach(b => {
+            b.deathFlag = false;
+        });
+
         // ★ここから追加：姫の寿命チェックを書き足します！
-        const targetPrincesses = this.game.princesses.filter(p => 
-            p.status !== 'unborn' && p.status !== 'dead' && currentYear >= (p.endYear - 1)
+        const targetPrincesses = this.game.princesses.filter(p =>
+            p.status !== 'dead' && currentYear >= (p.endYear - 1) // ★変更：未登場（unborn）を除外しないようにしました
         );
 
         for (const p of targetPrincesses) {
@@ -428,6 +459,7 @@ class LifeSystem {
             const deathProb = 0.02 + (yearsPassed * 0.02);
 
             if (Math.random() < deathProb) {
+                const wasUnborn = (p.status === 'unborn'); // ★追加：死ぬ前に未登場だったかメモしておく
                 p.status = 'dead'; // 「死亡」の印をつけます
                 
                 // もし結婚していたら、旦那さんの奥さんリストから外します
@@ -480,10 +512,10 @@ class LifeSystem {
                     }
                 }
 
-                // プレイヤーの家にいる姫だったら、悲しいお知らせを表示します
-                if (p.currentClanId === this.game.playerClanId) {
-                    this.game.ui.log(`${p.name}が病によりこの世を去りました…。`);
-                    await this.game.ui.showDialogAsync(`${p.name}が病によりこの世を去りました…。`, false, 0);
+                // プレイヤーの家にいる姫だったら、悲しいお知らせを表示します（未登場の場合は出しません）
+                if (p.currentClanId === this.game.playerClanId && !wasUnborn) {
+                    this.game.ui.log(`${p.name}が死亡しました……`);
+                    await this.game.ui.showDialogAsync(`${p.name}が死亡しました……`, false, 0);
                 }
             }
         }
