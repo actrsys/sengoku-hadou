@@ -1656,11 +1656,8 @@ class AIEngine {
                 // ★修正：金銭感覚をさらに緩く「1.0」に下げて、お財布の紐を緩くします！
                 const targetGold = Math.floor(baseSoldiers * 1.0);
                 
-                // およそ1人集めるのにかかるお金（単価）を、城主の能力で仮計算します
-                // ★修正：AIも自分のお城の人口（castle.population）を含めて正確な単価を計算します！
-                const efficiency = GameSystem.calcDraftEfficiency(castellan, castle.peoplesLoyalty, castle.population);
-                // 1人あたりのお金。もしゼロになりそうなら安全のために1にします
-                const unitPrice = Math.max(1, 1 / efficiency);
+                // ★変更：およそ1人集めるのにかかるお金（単価）を、GameSystemに計算してもらいます！
+                const unitPrice = GameSystem.calcDraftUnitPrice(castellan, castle.peoplesLoyalty, castle.population);
 
                 // ===== 余力計算 =====
                 const surplusGold = Math.max(0, castle.gold - targetGold);

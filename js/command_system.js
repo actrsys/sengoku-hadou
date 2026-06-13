@@ -2297,7 +2297,8 @@ class CommandSystem {
         const busho = this.game.getBusho(bushoIds[0]); 
         
         // 選ばれた兵士数を集めるために必要な「お金」を計算します
-        const costGold = GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty);
+        // ★変更：お城の人口（castle.population）も渡して、正しい金額を計算させます
+        const costGold = GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty, castle.population);
         
         if(castle.gold < costGold) { this.game.ui.showDialog(`資金不足です。(必要: ${costGold}金)`, false); return; } 
         
@@ -2313,7 +2314,8 @@ class CommandSystem {
         }
         
         // 実行確定：経験値を加算します
-        GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty, true);
+        // ★変更：経験値計算の窓口にも、忘れずにお城の人口を渡します
+        GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty, castle.population, true);
 
         // ★ 徴兵の割合を計算して、民忠と人口を減らす処理を行います
         const draftRatio = soldiers / castle.population;          // 徴兵した割合
@@ -2324,12 +2326,12 @@ class CommandSystem {
         castle.population -= soldiers;                            // 徴兵した分だけ人口を減らします
 
         castle.gold -= costGold;
-        
+        
         // 新しく入ってきた兵士たちは、まだ訓練も受けていないので基本の低い数字になります
-        const newMorale = 30; 
-        const newTraining = 30; 
-        
-        if (castle.soldiers + soldiers > 0) {
+        const newMorale = 30; 
+        const newTraining = 30; 
+        
+        if (castle.soldiers + soldiers > 0) {
             castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * soldiers)) / (castle.soldiers + soldiers));
             castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * soldiers)) / (castle.soldiers + soldiers));
         }

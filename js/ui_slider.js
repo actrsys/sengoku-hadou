@@ -370,10 +370,8 @@ class UISliderManager {
             // ★徴兵の最大可能数はルールブックに聞くだけ！
             const realMaxBuy = GameSystem.calcMaxDraftAmount(c, busho);
             
-            // ★変更：手書きの計算式をやめて、GameSystemの一元化された窓口を使うようにしました！
-            // こうすることで、人口の計算式が画面上の「単価」にも正しく反映されます
-            const efficiency = GameSystem.calcDraftEfficiency(busho, c.peoplesLoyalty, c.population);
-            const singleCost = 1 / efficiency;
+            // ★変更：「単価」の計算もGameSystemの窓口にお願いするようにしました！
+            const singleCost = GameSystem.calcDraftUnitPrice(busho, c.peoplesLoyalty, c.population);
             setTradeRateInfo("兵士", "人", 1, singleCost.toFixed(1));
             
             inputs.soldiers = createSlider("兵士数", "soldiers", realMaxBuy, 0);

@@ -646,6 +646,14 @@ class GameSystem {
         return baseEfficiency * popMultiplier;
     }
 
+    // ★追加：徴兵の「兵士1人あたりの単価」を計算する一元化窓口です
+    static calcDraftUnitPrice(busho, peoplesLoyalty, population = 20000) {
+        const efficiency = this.calcDraftEfficiency(busho, peoplesLoyalty, population);
+        // 万が一効率が0になってエラー（0割り）が起きるのを防ぐための安全装置です
+        if (efficiency <= 0) return 9999; 
+        return 1 / efficiency;
+    }
+
     // AI用：お金を指定して、集まる兵士数を計算します
     static calcDraftFromGold(gold, busho, peoplesLoyalty, population = 20000) { 
         const efficiency = this.calcDraftEfficiency(busho, peoplesLoyalty, population);
