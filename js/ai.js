@@ -2384,8 +2384,8 @@ class AIEngine {
                 // --- これより下は、実行する武将（doer）が必要な行動です ---
                 if (availableBushos.length === 0) continue; // 動ける武将がいなければパスします
 
-                // その行動に一番向いている武将を探します（能力値40以上が条件）
-                const bestBushos = availableBushos.filter(b => b[action.stat] >= 40).sort((a, b) => b[action.stat] - a[action.stat]);
+                // その行動に一番向いている武将を探します（一番能力が高い人が実行します）
+                const bestBushos = availableBushos.sort((a, b) => b[action.stat] - a[action.stat]);
                 if (bestBushos.length === 0) continue; // 基準を満たす人がいなければ、この行動は諦めます
                 const doer = bestBushos[0];
 
@@ -2772,7 +2772,9 @@ class AIEngine {
                     // ちょい買い防止
                     const minRice = Math.floor(baseSoldiers * 0.3);
                     if (buyAmount < Math.floor(baseSoldiers * 0.2)) {
-                        if (castle.rice >= minRice) {
+                        // 取引上限(tradeLimit)が原因で少ししか買えない場合は、ちょい買い防止を無視して買えるだけ買います！
+                        const maxCanBuy = Math.floor(castle.tradeLimit || 0);
+                        if (castle.rice >= minRice && buyAmount < maxCanBuy) {
                             buyAmount = 0; // 最低限持っているなら、少しだけ買うのはやめます
                         }
                     }
