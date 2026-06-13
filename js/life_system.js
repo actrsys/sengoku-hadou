@@ -438,8 +438,8 @@ class LifeSystem {
                 // もしプレイヤーの家臣で、すでに登場していたらお知らせを出します
                 if (b.clan === this.game.playerClanId && !wasUnborn) {
                     const name = b.name.replace('|', '');
-                    this.game.ui.log(`野傷が元となり、${name}が死亡しました……`);
-                    await this.game.ui.showDialogAsync(`野傷が元となり、${name}が死亡しました……`, false, 0);
+                    this.game.ui.log(`戦傷が元となって、${name}が死亡しました……`);
+                    await this.game.ui.showDialogAsync(`戦傷が元となって、${name}が死亡しました……`, false, 0);
                 }
             }
         }
@@ -631,14 +631,21 @@ class LifeSystem {
                         princess.currentClanId = nextClanId;
                         princess.status = 'unmarried'; // 再び未婚に戻ります
                     } else {
-                        // 戻る場所がどこにもない場合は、もう登場させない
-                        princess.status = 'dead';
+                        // ★ここから修正：実家も親戚もない場合、夫の家が残っているかチェックします
+                        const husbandClanCastles = busho.clan > 0 ? this.game.castles.filter(c => c.ownerClan === busho.clan) : [];
                         
-                        // ★ここから書き足し：いなくなってしまうので、今までいた大名家の名簿から名前を消します
-                        if (busho.clan !== 0) {
-                            const oldClan = this.game.clans.find(c => c.id === busho.clan);
-                            if (oldClan && oldClan.princessIds) {
-                                oldClan.princessIds = oldClan.princessIds.filter(id => id !== princess.id);
+                        if (husbandClanCastles.length > 0) {
+                            // 夫の家がまだお城を持っていれば、所属も名簿も変えず、「未婚」に戻って居座ります
+                            princess.status = 'unmarried';
+                        } else {
+                            // 夫の家も滅びていて完全に身寄りがないなら、ゲームから退場（死亡）させます
+                            princess.status = 'dead';
+                            
+                            if (busho.clan !== 0) {
+                                const oldClan = this.game.clans.find(c => c.id === busho.clan);
+                                if (oldClan && oldClan.princessIds) {
+                                    oldClan.princessIds = oldClan.princessIds.filter(id => id !== princess.id);
+                                }
                             }
                         }
                     }
