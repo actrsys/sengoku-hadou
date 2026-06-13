@@ -438,8 +438,8 @@ class LifeSystem {
                 // もしプレイヤーの家臣で、すでに登場していたらお知らせを出します
                 if (b.clan === this.game.playerClanId && !wasUnborn) {
                     const name = b.name.replace('|', '');
-                    this.game.ui.log(`野戦での傷が元で、${name}が死亡しました……`);
-                    await this.game.ui.showDialogAsync(`野戦での傷が元で、${name}が死亡しました……`, false, 0);
+                    this.game.ui.log(`野傷が元となり、${name}が死亡しました……`);
+                    await this.game.ui.showDialogAsync(`野傷が元となり、${name}が死亡しました……`, false, 0);
                 }
             }
         }
