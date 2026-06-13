@@ -941,83 +941,12 @@ class CommandSystem {
                          return typeof GameSystem.calcSoldierCharity === 'function' ? GameSystem.calcSoldierCharity(target, cCastle.soldiers || 1, 1.0) : target.leadership;
                      }
                      if (actionType === 'draft') {
-                         // 共通の効率計算ルールを使って並べ替えます（ダミーの数値を渡して純粋な効率を比較します）
-                         return GameSystem.getDraftEfficiency(target, 50, 10000);
+                         return (target.leadership * 1.5) + (target.charm * 1.5) + (Math.sqrt(target.loyalty) * 2);
                      }
                      if (['war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy'].includes(actionType)) {
                          return (target.leadership * 1.5) + target.strength;
                      }
-                     
-                     // ==========================================
-                     // ★ここから追加：その他のコマンドでも最適な武将が一番上に来るようにする計算魔法です！
-                     // ==========================================
-                     
-                     // 【外交】外交の成功確率や、親善の友好度上昇量で並べ替えます
-                     if (actionType === 'diplomacy_doer') {
-                         if (extraData && extraData.subAction === 'goodwill') {
-                             // 親善は効果量（友好度がどれくらい上がるか）で比較します。ダミーの金額（1000）を渡して計算させます
-                             if (this.game.diplomacyManager && typeof this.game.diplomacyManager.calcGoodwillIncrease === 'function') {
-                                 return this.game.diplomacyManager.calcGoodwillIncrease(1000, target);
-                             }
-                         } else if (extraData && extraData.subAction) {
-                             // その他の外交は、成功確率の高さで比較します
-                             if (this.game.diplomacyManager && typeof this.game.diplomacyManager.getDiplomacyProb === 'function') {
-                                 return this.game.diplomacyManager.getDiplomacyProb(target.id, targetId, extraData.subAction);
-                             }
-                         }
-                         return target.diplomacy;
-                     }
-                     
-                     // 【登用】登用の成功確率で並べ替えます
-                     if (actionType === 'employ_doer' && extraData && extraData.targetId) {
-                         const employTarget = this.game.getBusho(extraData.targetId);
-                         if (employTarget && typeof GameSystem.getEmployProb === 'function') {
-                             // 自軍と相手軍の兵力はダミー（お互い10000）にして、純粋な武将の能力だけで確率を出します
-                             return GameSystem.getEmployProb(target, employTarget, 10000, 10000);
-                         }
-                         return target.charm;
-                     }
-                     
-                     // 【調略】調略の各種成功確率で並べ替えます
-                     if (actionType === 'rumor_doer' && extraData && extraData.targetBushoId) {
-                         if (this.game.strategySystem && typeof this.game.strategySystem.getRumorProb === 'function') {
-                             return this.game.strategySystem.getRumorProb(target.id, extraData.targetBushoId);
-                         }
-                         return target.intelligence;
-                     }
-                     if (actionType === 'incite_doer') {
-                         if (this.game.strategySystem && typeof this.game.strategySystem.getInciteProb === 'function') {
-                             return this.game.strategySystem.getInciteProb(target.id, targetId);
-                         }
-                         return target.intelligence;
-                     }
-                     if (actionType === 'sabotage_doer') {
-                         if (this.game.strategySystem && typeof this.game.strategySystem.getSabotageProb === 'function') {
-                             return this.game.strategySystem.getSabotageProb(target.id, targetId);
-                         }
-                         return target.intelligence;
-                     }
-                     if (actionType === 'headhunt_doer') {
-                         if (this.game.strategySystem && typeof this.game.strategySystem.getHeadhuntProb === 'function') {
-                             // ダミーの金額（1000金）を渡して確率を計算します
-                             return this.game.strategySystem.getHeadhuntProb(target.id, targetId, 1000);
-                         }
-                         return target.intelligence;
-                     }
-                     
-                     // 【人事】褒美や追放は「忠誠度が一番低い人」を上にしたいので、数字にマイナスをつけて逆順にします！
-                     if (['reward', 'banish'].includes(actionType)) {
-                         return -target.loyalty;
-                     }
-                     
-                     // 【その他】調査は武力と知略のミックスで強さを出します
-                     if (actionType === 'investigate_deploy') {
-                         return target.strength + (target.intelligence * 0.8);
-                     }
-                     
-                     // ==========================================
                  } catch (e) {
-                     console.warn("ソート値の計算中にエラーが発生しました:", e);
                  }
 
                  if (isEnemyTarget) return GameSystem.getPerceivedStatValue(target, sortKey, gunshi, acc, this.game.playerClanId, myDaimyo) || 0;
@@ -1833,7 +1762,7 @@ class CommandSystem {
             const inputField = inputs.soldiers || inputs.amount || inputs.gold;
             const val = parseInt(inputField.num.value);
             if (val <= 0) return;
-            this.executeWithEvent('draft', () => this.executeDraft(data, val));
+            this.showAdviceAndExecute('draft', () => this.executeDraft(data, val), { val: val, trueProb: 1.0 });
         }
         else if (type === 'goodwill') {
             const val = parseInt(inputs.gold.num.value);
@@ -2368,8 +2297,7 @@ class CommandSystem {
         const busho = this.game.getBusho(bushoIds[0]); 
         
         // 選ばれた兵士数を集めるために必要な「お金」を計算します
-        // ★変更：人口(castle.population)のデータを渡し、実行フラグ(false)を明示します
-        const costGold = GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty, false, castle.population);
+        const costGold = GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty);
         
         if(castle.gold < costGold) { this.game.ui.showDialog(`資金不足です。(必要: ${costGold}金)`, false); return; } 
         
@@ -2385,19 +2313,27 @@ class CommandSystem {
         }
         
         // 実行確定：経験値を加算します
-        // ★変更：人口(castle.population)のデータを一番後ろに渡します
-        GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty, true, castle.population);
+        GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty, true);
 
-        // ★ 徴兵の割合を計算して、民忠と人口を減らす処理を行います（共通ルールを使用）
-        const loyaltyPenalty = GameSystem.calcDraftPenalty(castle.population, soldiers, castle.peoplesLoyalty);
+        // ★ 徴兵の割合を計算して、民忠と人口を減らす処理を行います
+        const draftRatio = soldiers / castle.population;          // 徴兵した割合
+        const penaltyRatio = draftRatio * 2;                      // ペナルティはその2倍
+        const loyaltyPenalty = Math.floor(castle.peoplesLoyalty * penaltyRatio); // 今の民忠から減らす量
         
         castle.peoplesLoyalty = Math.max(0, castle.peoplesLoyalty - loyaltyPenalty); // 0未満にはならないようにします
         castle.population -= soldiers;                            // 徴兵した分だけ人口を減らします
 
         castle.gold -= costGold;
-        
-        // 共通のルールブックを使って、城の訓練度・士気・兵士数を更新します
-        GameSystem.applyDraftTrainingAndMorale(castle, soldiers);
+        
+        // 新しく入ってきた兵士たちは、まだ訓練も受けていないので基本の低い数字になります
+        const newMorale = 30; 
+        const newTraining = 30; 
+        
+        if (castle.soldiers + soldiers > 0) {
+            castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * soldiers)) / (castle.soldiers + soldiers));
+            castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * soldiers)) / (castle.soldiers + soldiers));
+        }
+        castle.soldiers += soldiers; 
         busho.isActionDone = true; 
         
         busho.achievementTotal += 5;

@@ -626,59 +626,19 @@ class GameSystem {
         return Math.floor(baseRice);
     }
     
-    // ★新設：徴兵の「基本効率」を計算する専門部署（ルールブック）
-    // AI用とプレイヤー用、両方の計算の根っこをここで一括管理します
-    static getDraftEfficiency(busho, peoplesLoyalty, population = 10000) {
-        // 武将の能力や民忠による基本効率
-        const baseEfficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
-        
-        // 人口によるコスト倍率（4乗根）
-        const safePop = Math.max(1, population); 
-        const costMultiplier = Math.pow(10000 / safePop, 1 / 4); 
-        
-        // 最終的な効率（数値が大きいほど、安くたくさん雇える状態）を返します
-        return baseEfficiency / costMultiplier;
-    }
-
     // AI用：お金を指定して、集まる兵士数を計算します
-    static calcDraftFromGold(gold, busho, peoplesLoyalty, population = 10000) { 
-        // 専門部署から「効率」をもらってきて、お金に掛け算するだけになります
-        const finalEfficiency = GameSystem.getDraftEfficiency(busho, peoplesLoyalty, population);
-        return Math.floor(gold * finalEfficiency); 
+    static calcDraftFromGold(gold, busho, peoplesLoyalty) { 
+        const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
+        return Math.floor(gold * efficiency); 
     }
-
     // プレイヤー用：集めたい兵士数を指定して、必要なお金を計算します
-    static calcDraftCost(soldiers, busho, peoplesLoyalty, isExecute = false, population = 10000) { 
+    static calcDraftCost(soldiers, busho, peoplesLoyalty, isExecute = false) { 
         if (isExecute) {
             busho.expLeadership = (busho.expLeadership || 0) + Math.floor(soldiers / 300);
             busho.expStrength = (busho.expStrength || 0) + Math.floor(soldiers / 200);
         }
-        // 専門部署から「効率」をもらってきて、割り算するだけになります
-        const finalEfficiency = GameSystem.getDraftEfficiency(busho, peoplesLoyalty, population);
-        return Math.ceil(soldiers / finalEfficiency); 
-    }
-
-    // ★ここから追加：徴兵によるペナルティとステータス低下を一括管理する魔法です！
-    // 人口と民忠の低下量を計算します
-    static calcDraftPenalty(population, draftSoldiers, currentLoyalty) {
-        const draftRatio = draftSoldiers / Math.max(1, population);
-        const penaltyRatio = draftRatio * 2;
-        const loyaltyPenalty = Math.floor(currentLoyalty * penaltyRatio);
-        return loyaltyPenalty;
-    }
-
-    // 新兵が入ってきたことによる、城の訓練度と士気の低下を計算して適用します
-    static applyDraftTrainingAndMorale(castle, newSoldiers) {
-        if (newSoldiers <= 0) return;
-
-        // ★ここで新兵のステータスを決めます。プレイヤーとAIでズレていた部分の統一です。
-        // 今回は「新兵は一律で訓練30・士気30」という設定に統一します。
-        const newMorale = 30; 
-        const newTraining = 30; 
-        
-        castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * newSoldiers)) / (castle.soldiers + newSoldiers));
-        castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * newSoldiers)) / (castle.soldiers + newSoldiers));
-        castle.soldiers += newSoldiers;
+        const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
+        return Math.ceil(soldiers / efficiency); 
     }
 
     // ============================================
