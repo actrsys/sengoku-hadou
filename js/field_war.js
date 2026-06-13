@@ -491,6 +491,10 @@ class FieldWarManager {
                 // 左クリック以外（右クリックなど）は無視します
                 if (e.button !== 0) return;
                 
+                // ★追加: 操作できる部隊のターン（入力待ち）または情報モード以外はドラッグできないようにガードします！
+                const isWaitingInput = this.isPlayerTurn() && ['PHASE_MOVE', 'MOVE_PREVIEW', 'PHASE_DIR', 'PHASE_ATTACK'].includes(this.state);
+                if (!isWaitingInput && !this.isInfoMode) return;
+                
                 // ★マス目の上でもドラッグできるように、邪魔なストッパーを消しました！
                 
                 isDragging = true;
@@ -916,13 +920,29 @@ class FieldWarManager {
         if (cmdGroup) cmdGroup.classList.add('hidden');
         if (infoGroup) infoGroup.classList.add('hidden');
 
+        // ★追加: 自分のターンであり、かつアニメーション中などではない「入力待ち状態」かチェックします
+        const isWaitingInput = this.isPlayerTurn() && ['PHASE_MOVE', 'MOVE_PREVIEW', 'PHASE_DIR', 'PHASE_ATTACK'].includes(this.state);
+
+        // ★追加: 操作できる部隊のターン以外は、スマホ等のスワイプスクロールも無効化します
+        const scrollEl = document.getElementById('fw-map-scroll');
+        if (scrollEl) {
+            if (isWaitingInput || this.isInfoMode) {
+                scrollEl.style.overflow = 'auto';
+                scrollEl.style.touchAction = 'auto'; // スクロール操作を許可
+            } else {
+                scrollEl.style.overflow = 'hidden';
+                scrollEl.style.touchAction = 'none'; // スクロール操作を禁止
+            }
+        }
+
         if (this.isInfoMode) {
             if (statusBar) statusBar.classList.remove('hidden');
             if (infoGroup) infoGroup.classList.remove('hidden');
         } else {
             if (statusBar) statusBar.classList.add('hidden');
             
-            if (this.isPlayerTurn()) {
+            // ★修正: 自分のターンでも、アニメーション中などはメニューを出さないようにします！
+            if (isWaitingInput) {
                 if (this.isCmdMode) {
                     if (cmdGroup) cmdGroup.classList.remove('hidden');
                 } else {
