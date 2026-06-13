@@ -1657,9 +1657,9 @@ class AIEngine {
                 const targetGold = Math.floor(baseSoldiers * 1.0);
                 
                 // およそ1人集めるのにかかるお金（単価）を、城主の能力で仮計算します
-                const efficiency = ((castellan.leadership * 1.5) + (castellan.charm * 1.5) + (Math.sqrt(castellan.loyalty) * 2) + (Math.sqrt(castle.peoplesLoyalty) * 2)) / 500;
+                const efficiency = GameSystem.calcDraftEfficiency(castellan, castle.peoplesLoyalty);
                 // 1人あたりのお金。もしゼロになりそうなら安全のために1にします
-                const unitPrice = Math.max(1, 1 / efficiency); 
+                const unitPrice = Math.max(1, 1 / efficiency);
 
                 // ===== 余力計算 =====
                 const surplusGold = Math.max(0, castle.gold - targetGold);

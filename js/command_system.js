@@ -941,7 +941,7 @@ class CommandSystem {
                          return typeof GameSystem.calcSoldierCharity === 'function' ? GameSystem.calcSoldierCharity(target, cCastle.soldiers || 1, 1.0) : target.leadership;
                      }
                      if (actionType === 'draft') {
-                         return (target.leadership * 1.5) + (target.charm * 1.5) + (Math.sqrt(target.loyalty) * 2);
+                         return typeof GameSystem.calcDraftBushoScore === 'function' ? GameSystem.calcDraftBushoScore(target) : (target.leadership * 1.5) + (target.charm * 1.5);
                      }
                      if (['war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy'].includes(actionType)) {
                          return (target.leadership * 1.5) + target.strength;
