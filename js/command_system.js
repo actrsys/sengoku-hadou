@@ -2317,13 +2317,8 @@ class CommandSystem {
         // ★変更：経験値計算の窓口にも、忘れずにお城の人口を渡します
         GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty, castle.population, true);
 
-        // ★ 徴兵の割合を計算して、民忠と人口を減らす処理を行います
-        const draftRatio = soldiers / castle.population;          // 徴兵した割合
-        const penaltyRatio = draftRatio * 2;                      // ペナルティはその2倍
-        const loyaltyPenalty = Math.floor(castle.peoplesLoyalty * penaltyRatio); // 今の民忠から減らす量
-        
-        castle.peoplesLoyalty = Math.max(0, castle.peoplesLoyalty - loyaltyPenalty); // 0未満にはならないようにします
-        castle.population -= soldiers;                            // 徴兵した分だけ人口を減らします
+        // ★ 徴兵による民忠と人口の減少処理を、GameSystemの専門の魔法にお任せします！
+        const loyaltyPenalty = GameSystem.applyDraftPenalty(castle, soldiers);
 
         castle.gold -= costGold;
         

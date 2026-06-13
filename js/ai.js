@@ -2619,12 +2619,8 @@ class AIEngine {
                                     popDecrease = Math.min(popDecrease, c.population); 
                                 }
                                 
-                                const draftRatio = popDecrease / Math.max(1, c.population);
-                                const penaltyRatio = draftRatio * 2;
-                                const loyaltyPenalty = Math.floor(c.peoplesLoyalty * penaltyRatio);
-                                
-                                c.peoplesLoyalty = Math.max(0, c.peoplesLoyalty - loyaltyPenalty);
-                                c.population = Math.max(0, c.population - popDecrease);
+                                // ★ 徴兵による民忠と人口の減少処理を、GameSystemの専門の魔法にお任せします！
+                                const loyaltyPenalty = GameSystem.applyDraftPenalty(c, popDecrease);
                                 
                                 remainingDraft -= popDecrease;
                             }
