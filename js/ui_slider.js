@@ -97,11 +97,9 @@ class UISliderManager {
             // ★追加：スライダーを動かすたびに呼ばれるこの場所で、必要資金を計算してパタパタ表示します！
             const displayEl = document.getElementById('dynamic-cost-display');
             if (displayEl) {
-                // 計算に使うために、大名と城主をここでも探しておきます
                 const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
                 const castellan = this.game.getBusho(c.castellanId);
                 
-                // ★修正：上下の２行を横並びにし、専用のCSSクラスを使ってデザインを揃えました！
                 const makeGrid = (itemName, afterItem, afterGold) => {
                     return `
                         <div class="trade-result-row">
@@ -130,32 +128,17 @@ class UISliderManager {
                     const busho = this.game.getBusho(data[0]);
                     const cost = GameSystem.calcDraftCost(amount, busho, c.peoplesLoyalty);
                     displayEl.innerHTML = makeGrid("兵士", c.soldiers + amount, c.gold - cost);
-                } else if (type === 'buy_rice') {
+                } else if (['buy_rice', 'buy_ammo', 'buy_horses', 'buy_guns'].includes(type)) {
+                    // ★取引の計算は、すべて GameSystem の窓口にお願いするだけになりました！
                     const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
-                    let rate = 1.0;
-                    if (c && this.game.provinces) {
-                        const province = this.game.provinces.find(p => p.id === c.provinceId);
-                        if (province && province.marketRate !== undefined) rate = province.marketRate;
-                    }
-                    const cost = Math.ceil(amount * rate);
-                    displayEl.innerHTML = makeGrid("兵糧", c.rice + amount, c.gold - cost);
+                    const tradeData = GameSystem.calcTradeCostAndRate(type, amount, c, daimyo, castellan, this.game.provinces);
+                    const itemName = type === 'buy_rice' ? "兵糧" : (type === 'buy_ammo' ? "矢弾" : (type === 'buy_horses' ? "軍馬" : "鉄砲"));
+                    const currentItem = type === 'buy_rice' ? c.rice : (type === 'buy_ammo' ? (c.ammo || 0) : (type === 'buy_horses' ? (c.horses || 0) : (c.guns || 0)));
+                    displayEl.innerHTML = makeGrid(itemName, currentItem + amount, c.gold - tradeData.cost);
                 } else if (type === 'sell_rice') {
                     const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
-                    let rate = 1.0;
-                    if (c && this.game.provinces) {
-                        const province = this.game.provinces.find(p => p.id === c.provinceId);
-                        if (province && province.marketRate !== undefined) rate = province.marketRate;
-                    }
-                    const profit = Math.floor(amount * rate);
-                    displayEl.innerHTML = makeGrid("兵糧", c.rice - amount, c.gold + profit);
-                } else if (type === 'buy_horses') {
-                    const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
-                    const cost = GameSystem.calcBuyHorseCost(amount, daimyo, castellan);
-                    displayEl.innerHTML = makeGrid("軍馬", (c.horses || 0) + amount, c.gold - cost);
-                } else if (type === 'buy_guns') {
-                    const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
-                    const cost = GameSystem.calcBuyGunCost(amount, daimyo, castellan);
-                    displayEl.innerHTML = makeGrid("鉄砲", (c.guns || 0) + amount, c.gold - cost);
+                    const tradeData = GameSystem.calcTradeCostAndRate(type, amount, c, daimyo, castellan, this.game.provinces);
+                    displayEl.innerHTML = makeGrid("兵糧", c.rice - amount, c.gold + tradeData.cost);
                 }
             }
         };
@@ -382,23 +365,16 @@ class UISliderManager {
         
         if (type === 'draft') {
             document.getElementById('quantity-title').textContent = "徴兵"; 
-            
             const busho = this.game.getBusho(data[0]);
-            let maxAffordable = GameSystem.calcDraftFromGold(c.gold, busho, c.peoplesLoyalty);
-            // 金額の端数でお金が足りなくならないよう、確実な数まで減らします
-            while (maxAffordable > 0 && GameSystem.calcDraftCost(maxAffordable, busho, c.peoplesLoyalty) > c.gold) {
-                maxAffordable--;
-            }
-            // 城の兵士数の上限(99,999)を超えないようにします
-            const maxSoldiers = Math.min(c.population, 99999 - c.soldiers, maxAffordable);
             
-            // ★変更：相場の金額を小数点以下1桁で表示します！
+            // ★徴兵の最大可能数はルールブックに聞くだけ！
+            const realMaxBuy = GameSystem.calcMaxDraftAmount(c, busho);
+            
             const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(c.peoplesLoyalty) * 2)) / 500;
             const singleCost = 1 / efficiency;
-            
             setTradeRateInfo("兵士", "人", 1, singleCost.toFixed(1));
-
-            inputs.soldiers = createSlider("兵士数", "soldiers", maxSoldiers, 0);
+            
+            inputs.soldiers = createSlider("兵士数", "soldiers", realMaxBuy, 0);
             
         } else if (type === 'charity') {
             document.getElementById('quantity-title').textContent = "施し"; this.ui.charityTypeSelector.classList.remove('hidden'); const count = data.length; this.ui.quantityContainer.innerHTML = `<p>選択武将: ${count}名</p>`;
@@ -446,10 +422,8 @@ class UISliderManager {
             document.getElementById('quantity-title').textContent = "輸送";
             
             const header = document.createElement('div');
-            header.className = 'qty-row'; // 行のスタイルを合わせます
+            header.className = 'qty-row'; 
             header.style.marginBottom = '5px';
-            // スライダー行と全く同じ要素構成にして、ボタンなどは透明化して配置します
-            // ★変更：左側の項目名を黄色文字にしたのに合わせて、ここも構造を合わせます
             header.innerHTML = `
                 <div class="slider-row-label" style="visibility:hidden;">ダミー</div>
                 <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
@@ -461,94 +435,40 @@ class UISliderManager {
             `;
             this.ui.quantityContainer.appendChild(header);
 
-            const tCastle = this.game.getCastle(targetId); // 輸送先の城のデータを取得します
+            const tCastle = this.game.getCastle(targetId); 
             
-            // 引数は (ラベル, ID, 自分の城の数, 最初は0, 最低は0, 輸送モードフラグ, 相手の城の数, 相手の城の上限) です
             inputs.gold = createSlider("金", "gold", c.gold, 0, 0, true, tCastle.gold, 99999);
             inputs.rice = createSlider("兵糧", "rice", c.rice, 0, 0, true, tCastle.rice, 99999);
             inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, 0, 0, true, tCastle.soldiers, 99999);
             inputs.horses = createSlider("軍馬", "horses", c.horses || 0, 0, 0, true, tCastle.horses || 0, 99999);
             inputs.guns = createSlider("鉄砲", "guns", c.guns || 0, 0, 0, true, tCastle.guns || 0, 99999);
-        } else if (type === 'buy_rice') {
-            document.getElementById('quantity-title').textContent = "兵糧購入"; 
-            let rate = 1.0;
-            if (c && this.game.provinces) {
-                const province = this.game.provinces.find(p => p.id === c.provinceId);
-                if (province && province.marketRate !== undefined) rate = province.marketRate;
-            }
-            let maxBuy = Math.floor(c.gold / rate);
-            // 金額の端数でお金が足りなくならないよう、確実な数まで減らします
-            while (maxBuy > 0 && Math.ceil(maxBuy * rate) > c.gold) {
-                maxBuy--;
-            }
-            // 城の兵糧上限(99,999)や取引上限を超えないようにします
-            const realMaxBuy = Math.min(maxBuy, 99999 - c.rice, c.tradeLimit || 0);
             
-            // ★変更：共通関数で相場の表示と数字の箱の作成を行います！
-            setTradeRateInfo("兵糧", "", 10, (10 * rate).toFixed(1), `(取引上限: <span style="color:#ffffff;">${c.tradeLimit || 0}</span>)`);
-
-            inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
+        } else if (['buy_rice', 'sell_rice', 'buy_ammo', 'buy_horses', 'buy_guns'].includes(type)) {
+            // ★取引の処理は、この一箇所にすべてまとまりました！
+            const itemNameMap = { buy_rice: "兵糧", sell_rice: "兵糧", buy_ammo: "矢弾", buy_horses: "軍馬", buy_guns: "鉄砲" };
+            const unitMap = { buy_rice: "", sell_rice: "", buy_ammo: "個", buy_horses: "頭", buy_guns: "挺" };
+            const labelMap = { buy_rice: "兵糧購入", sell_rice: "兵糧売却", buy_ammo: "矢弾購入", buy_horses: "軍馬購入", buy_guns: "鉄砲購入" };
+            const sliderLabelMap = { buy_rice: "購入量", sell_rice: "売却量", buy_ammo: "購入量", buy_horses: "購入量", buy_guns: "購入量" };
             
-        } else if (type === 'sell_rice') {
-            document.getElementById('quantity-title').textContent = "兵糧売却"; 
-            let rate = 1.0;
-            if (c && this.game.provinces) {
-                const province = this.game.provinces.find(p => p.id === c.provinceId);
-                if (province && province.marketRate !== undefined) rate = province.marketRate;
+            document.getElementById('quantity-title').textContent = labelMap[type];
+            
+            // ★最大可能数をルールブックに聞きます
+            const realMaxAmount = GameSystem.calcMaxTradeAmount(type, c, daimyo, castellan, this.game.provinces);
+            
+            // レート計算（ダミーで1単位、兵糧の場合は10単位渡します）
+            const checkAmount = (type === 'buy_rice' || type === 'sell_rice') ? 10 : 1;
+            const tradeData = GameSystem.calcTradeCostAndRate(type, checkAmount, c, daimyo, castellan, this.game.provinces);
+            
+            let extraStr = "";
+            if (type === 'buy_rice' || type === 'sell_rice') {
+                extraStr = `(取引上限: <span style="color:#ffffff;">${c.tradeLimit || 0}</span>)`;
             }
-            // 売ったお金が所持金の上限(99,999)を超えないように、売れる最大量を逆算します
-            const maxSellByGold = Math.floor((99999 - c.gold) / rate);
-            const realMaxSell = Math.min(c.rice, maxSellByGold, c.tradeLimit || 0);
-            
-            // ★変更：共通関数で相場の表示と数字の箱の作成を行います！
-            setTradeRateInfo("兵糧", "", 10, (10 * rate).toFixed(1), `(取引上限: <span style="color:#ffffff;">${c.tradeLimit || 0}</span>)`);
-
-            inputs.amount = createSlider("売却量", "amount", realMaxSell, 0);
-
-        } else if (type === 'buy_ammo') {
-            document.getElementById('quantity-title').textContent = "矢弾購入"; 
-            const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
-            const maxBuy = price > 0 ? Math.floor(c.gold / price) : 0;
-            // 城の矢弾上限(99,999)を超えないようにします
-            const realMaxBuy = Math.min(maxBuy, 99999 - (c.ammo || 0));
             
             // 矢弾は計算結果の箱を使っていないため、最後の引数に false を渡して箱作りをオフにします
-            setTradeRateInfo("矢弾", "個", 1, price.toFixed(1), "", false);
-            
-            inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
+            const needCostDiv = type !== 'buy_ammo';
+            setTradeRateInfo(itemNameMap[type], unitMap[type], checkAmount, tradeData.rateStr, extraStr, needCostDiv);
 
-        } else if (type === 'buy_horses') {
-            document.getElementById('quantity-title').textContent = "軍馬購入"; 
-            let maxBuy = GameSystem.calcBuyHorseAmount(c.gold, daimyo, castellan);
-            // 金額の端数でお金が足りなくならないよう、確実な数まで減らします
-            while (maxBuy > 0 && GameSystem.calcBuyHorseCost(maxBuy, daimyo, castellan) > c.gold) {
-                maxBuy--;
-            }
-            // 城の軍馬上限(99,999)を超えないようにします
-            const realMaxBuy = Math.min(maxBuy, 99999 - (c.horses || 0));
-            
-            // ★変更：さっき作った「正確な単価の魔法」を使って表示します
-            const unitPrice = GameSystem.calcBuyHorseUnitPrice(daimyo, castellan);
-            setTradeRateInfo("軍馬", "頭", 1, unitPrice.toFixed(1));
-
-            inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
-
-        } else if (type === 'buy_guns') {
-            document.getElementById('quantity-title').textContent = "鉄砲購入"; 
-            let maxBuy = GameSystem.calcBuyGunAmount(c.gold, daimyo, castellan);
-            // 金額の端数でお金が足りなくならないよう、確実な数まで減らします
-            while (maxBuy > 0 && GameSystem.calcBuyGunCost(maxBuy, daimyo, castellan) > c.gold) {
-                maxBuy--;
-            }
-            // 城の鉄砲上限(99,999)を超えないようにします
-            const realMaxBuy = Math.min(maxBuy, 99999 - (c.guns || 0));
-            
-            // ★変更：さっき作った「正確な単価の魔法」を使って表示します
-            const unitPrice = GameSystem.calcBuyGunUnitPrice(daimyo, castellan);
-            setTradeRateInfo("鉄砲", "挺", 1, unitPrice.toFixed(1));
-
-            inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
-
+            inputs.amount = createSlider(sliderLabelMap[type], "amount", realMaxAmount, 0);
         } else if (type === 'war_repair') {
             const s = this.game.warManager.state;
             const defender = s.defender;

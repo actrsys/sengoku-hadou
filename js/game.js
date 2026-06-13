@@ -626,9 +626,20 @@ class GameSystem {
         return Math.floor(baseRice);
     }
     
+    // ★追加：徴兵の武将能力部分の計算（リストの並び替えなどにも使います）
+    static calcDraftBushoScore(busho) {
+        return (busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2);
+    }
+
+    // ★追加：徴兵の「効率」を計算します（ここが複数ファイルで使われる大元の式です）
+    static calcDraftEfficiency(busho, peoplesLoyalty) {
+        const bushoScore = this.calcDraftBushoScore(busho);
+        return (bushoScore + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
+    }
+
     // AI用：お金を指定して、集まる兵士数を計算します
     static calcDraftFromGold(gold, busho, peoplesLoyalty) { 
-        const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
+        const efficiency = this.calcDraftEfficiency(busho, peoplesLoyalty);
         return Math.floor(gold * efficiency); 
     }
     // プレイヤー用：集めたい兵士数を指定して、必要なお金を計算します
@@ -637,7 +648,7 @@ class GameSystem {
             busho.expLeadership = (busho.expLeadership || 0) + Math.floor(soldiers / 300);
             busho.expStrength = (busho.expStrength || 0) + Math.floor(soldiers / 200);
         }
-        const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
+        const efficiency = this.calcDraftEfficiency(busho, peoplesLoyalty);
         return Math.ceil(soldiers / efficiency); 
     }
 
@@ -862,6 +873,102 @@ class GameSystem {
     static calcEmploymentSuccess(recruiter, target, recruiterClanPower, targetClanPower) {
         const prob = this.getEmployProb(recruiter, target, recruiterClanPower, targetClanPower);
         return Math.random() < prob;
+    }
+
+    // ==========================================
+    // ★追加：徴兵の「実際に可能な最大数」を計算する一元化窓口
+    // ==========================================
+    static calcMaxDraftAmount(castle, busho) {
+        let maxAffordable = this.calcDraftFromGold(castle.gold, busho, castle.peoplesLoyalty);
+        // 端数でお金が足りなくならないよう、確実な数まで減らします
+        while (maxAffordable > 0 && this.calcDraftCost(maxAffordable, busho, castle.peoplesLoyalty) > castle.gold) {
+            maxAffordable--;
+        }
+        // 人口や城の最大兵数（99999）を超えないようにします
+        return Math.min(castle.population, 99999 - castle.soldiers, maxAffordable);
+    }
+
+    // ==========================================
+    // ★追加：取引の「実際に可能な最大数」を計算する一元化窓口
+    // ==========================================
+    static calcMaxTradeAmount(type, castle, daimyo, castellan, provinces) {
+        if (type === 'buy_rice') {
+            let rate = 1.0;
+            if (castle && provinces) {
+                const province = provinces.find(p => p.id === castle.provinceId);
+                if (province && province.marketRate !== undefined) rate = province.marketRate;
+            }
+            let maxBuy = Math.floor(castle.gold / rate);
+            while (maxBuy > 0 && Math.ceil(maxBuy * rate) > castle.gold) {
+                maxBuy--;
+            }
+            return Math.min(maxBuy, 99999 - castle.rice, castle.tradeLimit || 0);
+        }
+        else if (type === 'sell_rice') {
+            let rate = 1.0;
+            if (castle && provinces) {
+                const province = provinces.find(p => p.id === castle.provinceId);
+                if (province && province.marketRate !== undefined) rate = province.marketRate;
+            }
+            const maxSellByGold = Math.floor((99999 - castle.gold) / rate);
+            return Math.min(castle.rice, maxSellByGold, castle.tradeLimit || 0);
+        }
+        else if (type === 'buy_ammo') {
+            const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
+            const maxBuy = price > 0 ? Math.floor(castle.gold / price) : 0;
+            return Math.min(maxBuy, 99999 - (castle.ammo || 0));
+        }
+        else if (type === 'buy_horses') {
+            let maxBuy = this.calcBuyHorseAmount(castle.gold, daimyo, castellan);
+            while (maxBuy > 0 && this.calcBuyHorseCost(maxBuy, daimyo, castellan) > castle.gold) {
+                maxBuy--;
+            }
+            return Math.min(maxBuy, 99999 - (castle.horses || 0));
+        }
+        else if (type === 'buy_guns') {
+            let maxBuy = this.calcBuyGunAmount(castle.gold, daimyo, castellan);
+            while (maxBuy > 0 && this.calcBuyGunCost(maxBuy, daimyo, castellan) > castle.gold) {
+                maxBuy--;
+            }
+            return Math.min(maxBuy, 99999 - (castle.guns || 0));
+        }
+        return 0;
+    }
+
+    // ==========================================
+    // ★追加：取引の「必要な費用（または利益）」と「単価」を計算する一元化窓口
+    // ==========================================
+    static calcTradeCostAndRate(type, amount, castle, daimyo, castellan, provinces) {
+        let cost = 0;
+        let rateStr = "0.0";
+        if (type === 'buy_rice') {
+            let rate = 1.0;
+            if (castle && provinces) {
+                const province = provinces.find(p => p.id === castle.provinceId);
+                if (province && province.marketRate !== undefined) rate = province.marketRate;
+            }
+            cost = Math.ceil(amount * rate);
+            rateStr = (10 * rate).toFixed(1);
+        } else if (type === 'sell_rice') {
+            let rate = 1.0;
+            if (castle && provinces) {
+                const province = provinces.find(p => p.id === castle.provinceId);
+                if (province && province.marketRate !== undefined) rate = province.marketRate;
+            }
+            cost = Math.floor(amount * rate); // 売却の場合は利益
+            rateStr = (10 * rate).toFixed(1);
+        } else if (type === 'buy_ammo') {
+            const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
+            cost = price * amount;
+            rateStr = price.toFixed(1);
+        } else if (type === 'buy_horses') {
+            cost = this.calcBuyHorseCost(amount, daimyo, castellan);
+            rateStr = this.calcBuyHorseUnitPrice(daimyo, castellan).toFixed(1);
+        } else if (type === 'buy_guns') {
+            cost = this.calcBuyGunCost(amount, daimyo, castellan);
+            rateStr = this.calcBuyGunUnitPrice(daimyo, castellan).toFixed(1);
+        }
+        return { cost, rateStr };
     }
 }
 
