@@ -1682,9 +1682,9 @@ class AIEngine {
                 const kokudakaBonus = 1 + (Math.sqrt(totalKokudaka) / 100) + (Math.sqrt(castle.kokudaka) / 10);
                 let targetSoldiers = Math.floor(2000 + (castle.kokudaka / 4) * kokudakaBonus);
 
-                // ★追加：攻撃作戦の立案に必要な兵士数（√石高×200）を確実に満たせるように目標を引き上げます！
+                // ★追加：攻撃作戦の立案に必要な兵士数（√石高×175）を確実に満たせるように目標を引き上げます！
                 // 出撃に必要な最低ラインに、少しのお留守番の余裕（1.2倍）を持たせます
-                const requiredForAttack = Math.floor(Math.sqrt(castle.kokudaka) * 200);
+                const requiredForAttack = Math.floor(Math.sqrt(castle.kokudaka) * 175);
                 if (targetSoldiers < requiredForAttack * 1.2) {
                     targetSoldiers = Math.floor(requiredForAttack * 1.2);
                 }
