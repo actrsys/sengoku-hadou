@@ -668,7 +668,31 @@ class GameSystem {
         const efficiency = this.calcDraftEfficiency(busho, peoplesLoyalty, population);
         return Math.ceil(soldiers / efficiency); 
     }
-
+    
+    // ==========================================
+    // ★追加：徴兵時に民忠と人口を減らす処理を一元化する魔法
+    // ==========================================
+    static applyDraftPenalty(castle, soldiers) {
+        // 人口が0以下の時は何もしないように安全対策をします
+        if (castle.population <= 0) return 0;
+        
+        // 徴兵した割合を計算します
+        const draftRatio = soldiers / castle.population;
+        
+        // ペナルティの割合（2倍）を計算します
+        const penaltyRatio = draftRatio * 2;
+        
+        // 今の民忠からどれくらい減らすかを計算します
+        const loyaltyPenalty = Math.floor(castle.peoplesLoyalty * penaltyRatio);
+        
+        // 実際の城のステータスから、民忠と人口を減らします（0未満にはならないようにします）
+        castle.peoplesLoyalty = Math.max(0, castle.peoplesLoyalty - loyaltyPenalty);
+        castle.population = Math.max(0, castle.population - soldiers);
+        
+        // 減らした民忠の量を返してあげます（結果のメッセージ表示などに使えます）
+        return loyaltyPenalty;
+    }
+    
     // ============================================
     // ★軍馬・鉄砲の購入計算を共通化する魔法です！
     // ============================================
