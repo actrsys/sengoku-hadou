@@ -126,7 +126,7 @@ class UISliderManager {
                 if (type === 'draft') {
                     const amount = parseInt(document.getElementById('num-soldiers')?.value) || 0;
                     const busho = this.game.getBusho(data[0]);
-                    const cost = GameSystem.calcDraftCost(amount, busho, c.peoplesLoyalty);
+                    const cost = GameSystem.calcDraftCost(amount, busho, c.peoplesLoyalty, c.population);
                     displayEl.innerHTML = makeGrid("兵士", c.soldiers + amount, c.gold - cost);
                 } else if (['buy_rice', 'buy_ammo', 'buy_horses', 'buy_guns'].includes(type)) {
                     // ★取引の計算は、すべて GameSystem の窓口にお願いするだけになりました！
@@ -370,7 +370,9 @@ class UISliderManager {
             // ★徴兵の最大可能数はルールブックに聞くだけ！
             const realMaxBuy = GameSystem.calcMaxDraftAmount(c, busho);
             
-            const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(c.peoplesLoyalty) * 2)) / 500;
+            // ★変更：手書きの計算式をやめて、GameSystemの一元化された窓口を使うようにしました！
+            // こうすることで、人口の計算式が画面上の「単価」にも正しく反映されます
+            const efficiency = GameSystem.calcDraftEfficiency(busho, c.peoplesLoyalty, c.population);
             const singleCost = 1 / efficiency;
             setTradeRateInfo("兵士", "人", 1, singleCost.toFixed(1));
             

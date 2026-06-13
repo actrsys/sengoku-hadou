@@ -632,23 +632,32 @@ class GameSystem {
     }
 
     // ★追加：徴兵の「効率」を計算します（ここが複数ファイルで使われる大元の式です）
-    static calcDraftEfficiency(busho, peoplesLoyalty) {
+    // （他のファイルから人口が送られてこなかった時の保険として、デフォルトを20000にしています）
+    static calcDraftEfficiency(busho, peoplesLoyalty, population = 20000) {
         const bushoScore = this.calcDraftBushoScore(busho);
-        return (bushoScore + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
+        const baseEfficiency = (bushoScore + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
+        
+        // 人口が0などで計算がおかしくならないよう、最低でも100人はいるものとして安全に計算します
+        const safePopulation = Math.max(100, population);
+        
+        // 人口20000人を基準（1.0倍）として、4乗根（0.25乗）で倍率を計算します
+        const popMultiplier = Math.pow(safePopulation / 20000, 0.25);
+        
+        return baseEfficiency * popMultiplier;
     }
 
     // AI用：お金を指定して、集まる兵士数を計算します
-    static calcDraftFromGold(gold, busho, peoplesLoyalty) { 
-        const efficiency = this.calcDraftEfficiency(busho, peoplesLoyalty);
+    static calcDraftFromGold(gold, busho, peoplesLoyalty, population = 20000) { 
+        const efficiency = this.calcDraftEfficiency(busho, peoplesLoyalty, population);
         return Math.floor(gold * efficiency); 
     }
     // プレイヤー用：集めたい兵士数を指定して、必要なお金を計算します
-    static calcDraftCost(soldiers, busho, peoplesLoyalty, isExecute = false) { 
+    static calcDraftCost(soldiers, busho, peoplesLoyalty, population = 20000, isExecute = false) { 
         if (isExecute) {
             busho.expLeadership = (busho.expLeadership || 0) + Math.floor(soldiers / 300);
             busho.expStrength = (busho.expStrength || 0) + Math.floor(soldiers / 200);
         }
-        const efficiency = this.calcDraftEfficiency(busho, peoplesLoyalty);
+        const efficiency = this.calcDraftEfficiency(busho, peoplesLoyalty, population);
         return Math.ceil(soldiers / efficiency); 
     }
 
@@ -879,9 +888,10 @@ class GameSystem {
     // ★追加：徴兵の「実際に可能な最大数」を計算する一元化窓口
     // ==========================================
     static calcMaxDraftAmount(castle, busho) {
-        let maxAffordable = this.calcDraftFromGold(castle.gold, busho, castle.peoplesLoyalty);
+        // ★変更：計算の窓口に「お城の人口」もセットで渡すようにしました
+        let maxAffordable = this.calcDraftFromGold(castle.gold, busho, castle.peoplesLoyalty, castle.population);
         // 端数でお金が足りなくならないよう、確実な数まで減らします
-        while (maxAffordable > 0 && this.calcDraftCost(maxAffordable, busho, castle.peoplesLoyalty) > castle.gold) {
+        while (maxAffordable > 0 && this.calcDraftCost(maxAffordable, busho, castle.peoplesLoyalty, castle.population) > castle.gold) {
             maxAffordable--;
         }
         // 人口や城の最大兵数（99999）を超えないようにします

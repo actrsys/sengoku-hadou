@@ -1657,7 +1657,8 @@ class AIEngine {
                 const targetGold = Math.floor(baseSoldiers * 1.0);
                 
                 // およそ1人集めるのにかかるお金（単価）を、城主の能力で仮計算します
-                const efficiency = GameSystem.calcDraftEfficiency(castellan, castle.peoplesLoyalty);
+                // ★修正：AIも自分のお城の人口（castle.population）を含めて正確な単価を計算します！
+                const efficiency = GameSystem.calcDraftEfficiency(castellan, castle.peoplesLoyalty, castle.population);
                 // 1人あたりのお金。もしゼロになりそうなら安全のために1にします
                 const unitPrice = Math.max(1, 1 / efficiency);
 
@@ -2575,18 +2576,19 @@ class AIEngine {
                     });
 
                     let draftCost = action.cost;
-                    let soldiers = GameSystem.calcDraftFromGold(draftCost, doer, castle.peoplesLoyalty);
+                    // ★修正：実行時にもお城の人口を渡して、正しい兵士数を計算します
+                    let soldiers = GameSystem.calcDraftFromGold(draftCost, doer, castle.peoplesLoyalty, castle.population);
                     
                     // ネットワーク全体の人口（実際の総人口）を超えないようにします
                     if (actualTotalPop < soldiers) {
                         soldiers = actualTotalPop;
-                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty);
+                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population);
                     }
 
                     // 兵士が上限（99999）を超えないようにします
                     if (castle.soldiers + soldiers > 99999) {
                         soldiers = 99999 - castle.soldiers;
-                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty);
+                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population);
                     }
 
                     // ===== 仮想チェック（重要） =====
@@ -2596,11 +2598,12 @@ class AIEngine {
                     if (castle.rice < virtualRiceNeed) {
                         soldiers = Math.floor((castle.rice / 2.0) - castle.soldiers);
                         soldiers = Math.max(0, soldiers);
-                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty);
+                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population);
                     }
 
                     if (soldiers > 0 && draftCost > 0) {
-                        GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, true);
+                        // ★修正：経験値を入れるための最終実行の際にも人口を渡します（trueの前に差し込みます）
+                        GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population, true);
 
                         // ★大改善：集めた兵士数を、負担の重さ（ウェイト）に合わせて振り分けます！
                         let remainingDraft = soldiers;
