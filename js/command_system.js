@@ -1502,8 +1502,6 @@ class CommandSystem {
     }
     
     handleBushoSelection(actionType, selectedIds, targetId, extraData) {
-
-    handleBushoSelection(actionType, selectedIds, targetId, extraData) {
         if (!selectedIds || selectedIds.length === 0) return;
         const firstId = selectedIds[0];
 
