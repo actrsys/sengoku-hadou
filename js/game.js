@@ -2497,15 +2497,13 @@ class GameManager {
         try {
             // 文字の形に整えます
             const jsonString = JSON.stringify(data);
-            // 日本語が混ざっていても大丈夫なように処理してから、意味不明な文字にシャッフルします
-            const encodedData = btoa(encodeURIComponent(jsonString));
             
-            // シャッフルされたデータを引き出しにしまいます
-            localStorage.setItem("sengoku_save_slot" + slotNo, encodedData);
+            // ★今回はシャッフル（暗号化）をせずに、そのまま引き出しにしまいます
+            localStorage.setItem("sengoku_save_slot" + slotNo, jsonString);
             if (this.ui) this.ui.showDialog("セーブが完了しました。", false);
         } catch (e) {
-            console.error(e);
-            alert("セーブに失敗しました。容量不足の可能性があります。");
+            console.error("セーブエラーの詳細:", e);
+            alert("セーブに失敗しました。エラー原因: " + e.message);
         }
     }
 
@@ -2513,7 +2511,7 @@ class GameManager {
     // ★ここから書き足し：ブラウザ保存用の新しいロード機能
     // ==========================================
     async loadGameFromLocal(slotNo = 1) { 
-        // 1. ブラウザの引き出しから、シャッフルされたデータを取り出します
+        // 1. ブラウザの引き出しからデータを取り出します
         const savedData = localStorage.getItem("sengoku_save_slot" + slotNo);
         if (!savedData) {
             alert("セーブデータがありません。");
@@ -2538,10 +2536,8 @@ class GameManager {
             this.eventManager = new EventManager(this);
             
             // --- 復元作業 ---
-            // シャッフルされた文字を、読める元の文字に戻します
-            const decodedString = decodeURIComponent(atob(savedData));
-            // 文字をゲーム用のデータとして読み込みます
-            const d = JSON.parse(decodedString); 
+            // ★シャッフル（暗号化）していないので、そのままゲーム用のデータとして読み込みます
+            const d = JSON.parse(savedData); 
             
             this.flags = d.flags || {};
             this.year = d.year;
