@@ -2469,9 +2469,9 @@ class GameManager {
     }
     
     // ==========================================
-    // ★ここから書き足し：ブラウザ保存（スロット）用の新しいセーブ機能
+    // ★ここから書き足し：ブラウザ保存（スロット）用の新しいセーブ機能 (IndexedDB版)
     // ==========================================
-    saveGameToLocal(slotNo = 1) { 
+    async saveGameToLocal(slotNo = 1) { 
         const data = { 
             year: this.year, 
             month: this.month, 
@@ -2495,12 +2495,10 @@ class GameManager {
         };
         
         try {
-            // 文字の形に整えます
-            const jsonString = JSON.stringify(data);
+            // ★巨大な倉庫（IndexedDB）の指定のスロット番号に、データを直接保管します！
+            await saveToDB("sengoku_save_slot" + slotNo, data);
             
-            // ★今回はシャッフル（暗号化）をせずに、そのまま引き出しにしまいます
-            localStorage.setItem("sengoku_save_slot" + slotNo, jsonString);
-            if (this.ui) this.ui.showDialog("セーブが完了しました。", false);
+            if (this.ui) this.ui.showDialog(`スロット ${slotNo} にセーブが完了しました。`, false);
         } catch (e) {
             console.error("セーブエラーの詳細:", e);
             alert("セーブに失敗しました。エラー原因: " + e.message);
@@ -2508,13 +2506,19 @@ class GameManager {
     }
 
     // ==========================================
-    // ★ここから書き足し：ブラウザ保存用の新しいロード機能
+    // ★ここから書き足し：ブラウザ保存用の新しいロード機能 (IndexedDB版)
     // ==========================================
     async loadGameFromLocal(slotNo = 1) { 
-        // 1. ブラウザの引き出しからデータを取り出します
-        const savedData = localStorage.getItem("sengoku_save_slot" + slotNo);
-        if (!savedData) {
-            alert("セーブデータがありません。");
+        // 1. 巨大な倉庫（IndexedDB）からデータを取り出します
+        let d = null;
+        try {
+            d = await loadFromDB("sengoku_save_slot" + slotNo);
+        } catch (e) {
+            console.error("ロードエラー:", e);
+        }
+
+        if (!d) {
+            alert(`スロット ${slotNo} にはセーブデータがありません。`);
             return;
         }
 
@@ -2536,9 +2540,7 @@ class GameManager {
             this.eventManager = new EventManager(this);
             
             // --- 復元作業 ---
-            // ★シャッフル（暗号化）していないので、そのままゲーム用のデータとして読み込みます
-            const d = JSON.parse(savedData); 
-            
+            // ★倉庫から取り出したデータをそのまま使います
             this.flags = d.flags || {};
             this.year = d.year;
             this.month = d.month;
@@ -2641,7 +2643,7 @@ class GameManager {
             alert("セーブデータの読み込みに失敗しました。データが壊れている可能性があります。"); 
         } 
     }
-
+    
     // ==========================================
     // ★ここから追加：観戦モードの切り替え魔法
     // ==========================================
@@ -2710,3 +2712,43 @@ window.addEventListener('DOMContentLoaded', () => {
     // ゲームの本体（心臓）を新しく作って、動き出せるようにします
     window.GameApp = new GameManager();
 });
+
+// ==========================================
+// ★ここから追加：セーブデータを大容量の倉庫（IndexedDB）に保存・読み込みする魔法
+// ==========================================
+const DB_NAME = 'SengokuHadoDB';
+const STORE_NAME = 'saves';
+
+function initDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onupgradeneeded = (e) => {
+            e.target.result.createObjectStore(STORE_NAME);
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function saveToDB(key, data) {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).put(data, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+async function loadFromDB(key) {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const request = tx.objectStore(STORE_NAME).get(key);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+// ==========================================
+// ★ここまで追加
+// ==========================================
