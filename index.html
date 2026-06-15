@@ -24,8 +24,7 @@
                 <div class="title-menu">
                     <div id="menu-buttons" class="hidden">
                         <button id="start-btn" class="title-btn" onclick="window.GameApp.startNewGame()">はじめから</button>
-                        <button class="title-btn" onclick="document.getElementById('load-file-input').click()">続きから</button>
-                        <input type="file" id="load-file-input" accept=".json" style="display:none" onchange="window.GameApp.loadGameFromFile(event)">
+                        <button class="title-btn" onclick="window.GameApp.loadGameFromLocal(1)">続きから</button>
                     </div>
 
                     <div id="tap-to-proceed" class="title-tap-message">
