@@ -317,7 +317,7 @@ class DiplomacyManager {
             
             finalProb = Math.max(0, Math.min(100, acceptProb));
 
-            // ★兵力差などで確率が下がっても、必ず50%以上の成功率になるようにお守りします
+            // ★兵力差などで確率が下がっても、必ず50%以上の成功率になるお守り
             if (['友好', '同盟', '支配', '従属'].includes(relation.status) && finalProb < 50) {
                 finalProb = 50;
             }
