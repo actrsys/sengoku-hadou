@@ -2469,6 +2469,177 @@ class GameManager {
     }
 
     // ==========================================
+    // ★ここから書き足し：ブラウザ保存（スロット）用の新しいセーブ機能
+    // ==========================================
+    saveGameToLocal(slotNo = 1) { 
+        // 1. 今のゲームの状態をまとめます（saveGameToFileと同じ中身です）
+        const data = { 
+            year: this.year, 
+            month: this.month, 
+            gameStartYear: this.gameStartYear || window.MainParams.StartYear,
+            gameStartMonth: this.gameStartMonth || window.MainParams.StartMonth,
+            marketRate: this.marketRate,
+            castles: this.castles, 
+            bushos: this.bushos, 
+            clans: this.clans,
+            princesses: this.princesses,
+            provinces: this.provinces,
+            legions: this.legions,
+            playerClanId: this.playerClanId,
+            kunishus: this.kunishuSystem.kunishus,
+            mapWidth: this.mapWidth,
+            mapHeight: this.mapHeight,
+            aiOperations: this.aiOperationManager.save(),
+            turnQueueIds: this.turnQueue.map(c => c.id),
+            currentIndex: this.currentIndex,
+            flags: this.flags || {}
+        };
+        
+        try {
+            // 2. まとめたデータを文字に変換して、ブラウザの引き出し（slot1など）にしまいます
+            localStorage.setItem("sengoku_save_slot" + slotNo, JSON.stringify(data));
+            if (this.ui) this.ui.showDialog("セーブが完了しました。", false);
+        } catch (e) {
+            console.error(e);
+            alert("セーブに失敗しました。容量不足の可能性があります。");
+        }
+    }
+
+    // ==========================================
+    // ★ここから書き足し：ブラウザ保存用の新しいロード機能
+    // ==========================================
+    async loadGameFromLocal(slotNo = 1) { 
+        // 1. ブラウザの引き出しからデータを取り出します
+        const savedData = localStorage.getItem("sengoku_save_slot" + slotNo);
+        if (!savedData) {
+            alert("セーブデータがありません。");
+            return;
+        }
+
+        try {
+            // --- ここから下は loadGameFromFile の中身と同じ、お掃除＆復元作業です ---
+            this.isProcessingAI = false;
+            this.isWatchMode = false;
+            this.originalPlayerClanId = null;
+            if (this.aiTimer) { clearTimeout(this.aiTimer); this.aiTimer = null; }
+            this.selectionMode = null;
+            this.validTargets = [];
+            this.lastMenuState = null;
+            if (this.warManager && this.warManager.state) this.warManager.state.active = false;
+            if (this.ui) {
+                this.ui.logHistory = [];
+                this.ui.clearWarLog();
+                if (typeof this.ui.clearCommandMenu === 'function') this.ui.clearCommandMenu();
+            }
+            this.eventManager = new EventManager(this);
+            
+            // 取り出した文字データをゲームで使える形に戻します
+            const d = JSON.parse(savedData); 
+            
+            this.flags = d.flags || {};
+            this.year = d.year;
+            this.month = d.month;
+            this.gameStartYear = d.gameStartYear || window.MainParams.StartYear;
+            this.gameStartMonth = d.gameStartMonth || window.MainParams.StartMonth;
+            this.playerClanId = d.playerClanId || 1;
+            this.marketRate = d.marketRate !== undefined ? d.marketRate : 1.0;
+            this.mapWidth = d.mapWidth;
+            this.mapHeight = d.mapHeight;
+            this.aiOperationManager.load(d.aiOperations);
+
+            const imageUrls = [
+                './data/images/map/japan_map.png',
+                './data/images/map/shiro_icon001.png',
+                './data/images/map/japan_colorcode_map.png',
+                './data/images/map/japan_white_map.png',
+                './data/images/map/japan_provinces.png'
+            ];
+
+            await Promise.all(imageUrls.map(url => new Promise(resolve => {
+                const img = new Image();
+                img.onload = () => {
+                    if (url.includes('japan_map.png')) {
+                        this.mapWidth = img.width;
+                        this.mapHeight = img.height;
+                    }
+                    resolve();
+                };
+                img.onerror = () => {
+                    if (url.includes('japan_map.png')) {
+                        this.mapWidth = 1200;
+                        this.mapHeight = 800;
+                    }
+                    resolve();
+                };
+                img.src = url;
+            })));
+
+            this.castles = d.castles.map(c => new Castle(c)); 
+            this.bushos = d.bushos.map(b => new Busho(b));
+            this.princesses = (d.princesses || []).map(p => new Princess(p));
+            this.provinces = (d.provinces || []).map(p => new Province(p));
+            this.legions = (d.legions || []).map(l => new Legion(l));
+            
+            this.princesses.forEach(p => p.updateFamilyIds(this.bushos));
+
+            this.legions.forEach(legion => {
+                const commander = this.bushos.find(b => b.id === legion.commanderId);
+                if (commander) commander.isCommander = true;
+            });
+
+            if (d.kunishus) {
+                this.kunishuSystem.setKunishuData(d.kunishus.map(k => new Kunishu(k)));
+            } else {
+                this.kunishuSystem.setKunishuData([]);
+            }
+
+            if (d.clans) {
+                this.clans = d.clans.map(c => new Clan(c));
+            } else {
+                const scenario = SCENARIOS[0]; 
+                await DataManager.loadParameters("./data/parameter.csv");
+                const data = await DataManager.loadAll(scenario.folder);
+                this.clans = data.clans;
+            }
+            
+            const courtRanksText = await DataManager.fetchText("./data/imperialCourtRank.csv").catch(() => "");
+            const courtRanks = courtRanksText ? DataManager.parseCSV(courtRanksText, CourtRank) : [];
+            this.courtRankSystem.setRankData(courtRanks);
+
+            document.getElementById('title-screen').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden'); 
+            
+            this.phase = 'game';
+            
+            if (d.turnQueueIds && d.turnQueueIds.length > 0) {
+                this.turnQueue = d.turnQueueIds.map(id => this.castles.find(c => c.id === id)).filter(c => c !== undefined);
+                this.currentIndex = d.currentIndex || 0;
+            } else {
+                this.turnQueue = [...this.castles].sort(() => Math.random() - 0.5);
+                this.currentIndex = 0;
+            }
+            
+            this.updateAllCastlesLords();
+            this.lifeSystem.updateAllBushosAge();
+            this.updateClanDisplayNames();
+
+            this.ui.hasInitializedMap = false;
+            this.ui.renderMap();
+
+            if (window.AudioManager) {
+                window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
+            }
+
+            await this.ui.showCutin(`ロード完了: ${this.year}年 ${this.month}月`);
+            
+            this.processTurn();
+        } catch(err) { 
+            console.error(err); 
+            alert("セーブデータの読み込みに失敗しました"); 
+        } 
+    }
+
+    // ==========================================
     // ★ここから追加：観戦モードの切り替え魔法
     // ==========================================
     startWatchMode() {
