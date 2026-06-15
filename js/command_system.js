@@ -1380,12 +1380,19 @@ class CommandSystem {
 
     executeSystemCommand(action) {
         switch(action) {
-            case 'save': window.GameApp.saveGameToFile(); break;
-            case 'load': 
-                const f = document.getElementById('load-file-input'); 
-                if(f) f.click(); 
+            case 'save': 
+                // ★書き換え：間違えて押しても大丈夫なように確認画面を出してから、ブラウザの引き出しに暗号化してセーブします！
+                this.game.ui.showDialog("現在の状態をセーブ（上書き）しますか？", true, () => {
+                    this.game.saveGameToLocal(1);
+                }, null, { okText: 'セーブする', okClass: 'btn-primary', cancelText: 'やめる' });
                 break;
-            case 'history': 
+            case 'load': 
+                // ★書き換え：こちらも確認画面を出してから、ブラウザの引き出しからデータを復元します！
+                this.game.ui.showDialog("セーブデータをロードしますか？\n（現在の進行状況は失われます）", true, () => {
+                    this.game.loadGameFromLocal(1);
+                }, null, { okText: 'ロードする', okClass: 'btn-danger', cancelText: 'やめる' });
+                break;
+            case 'history':
                 if (this.game.ui.info) {
                     this.game.ui.info.showHistoryModal(this.game.ui.logHistory);
                 } else {

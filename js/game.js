@@ -2506,10 +2506,51 @@ class GameManager {
     }
 
     // ==========================================
+    // ★ここから書き足し：ブラウザ保存（スロット）用の新しいセーブ機能
+    // ==========================================
+    saveGameToLocal(slotNo = 1) { 
+        const data = { 
+            year: this.year, 
+            month: this.month, 
+            gameStartYear: this.gameStartYear || window.MainParams.StartYear,
+            gameStartMonth: this.gameStartMonth || window.MainParams.StartMonth,
+            marketRate: this.marketRate,
+            castles: this.castles, 
+            bushos: this.bushos, 
+            clans: this.clans,
+            princesses: this.princesses,
+            provinces: this.provinces,
+            legions: this.legions,
+            playerClanId: this.playerClanId,
+            kunishus: this.kunishuSystem.kunishus,
+            mapWidth: this.mapWidth,
+            mapHeight: this.mapHeight,
+            aiOperations: this.aiOperationManager.save(),
+            turnQueueIds: this.turnQueue.map(c => c.id),
+            currentIndex: this.currentIndex,
+            flags: this.flags || {}
+        };
+        
+        try {
+            // 文字の形に整えます
+            const jsonString = JSON.stringify(data);
+            // 日本語が混ざっていても大丈夫なように処理してから、意味不明な文字にシャッフルします
+            const encodedData = btoa(encodeURIComponent(jsonString));
+            
+            // シャッフルされたデータを引き出しにしまいます
+            localStorage.setItem("sengoku_save_slot" + slotNo, encodedData);
+            if (this.ui) this.ui.showDialog("セーブが完了しました。", false);
+        } catch (e) {
+            console.error(e);
+            alert("セーブに失敗しました。容量不足の可能性があります。");
+        }
+    }
+
+    // ==========================================
     // ★ここから書き足し：ブラウザ保存用の新しいロード機能
     // ==========================================
     async loadGameFromLocal(slotNo = 1) { 
-        // 1. ブラウザの引き出しからデータを取り出します
+        // 1. ブラウザの引き出しから、シャッフルされたデータを取り出します
         const savedData = localStorage.getItem("sengoku_save_slot" + slotNo);
         if (!savedData) {
             alert("セーブデータがありません。");
@@ -2517,7 +2558,7 @@ class GameManager {
         }
 
         try {
-            // --- ここから下は loadGameFromFile の中身と同じ、お掃除＆復元作業です ---
+            // --- お掃除作業 ---
             this.isProcessingAI = false;
             this.isWatchMode = false;
             this.originalPlayerClanId = null;
@@ -2533,8 +2574,11 @@ class GameManager {
             }
             this.eventManager = new EventManager(this);
             
-            // 取り出した文字データをゲームで使える形に戻します
-            const d = JSON.parse(savedData); 
+            // --- 復元作業 ---
+            // シャッフルされた文字を、読める元の文字に戻します
+            const decodedString = decodeURIComponent(atob(savedData));
+            // 文字をゲーム用のデータとして読み込みます
+            const d = JSON.parse(decodedString); 
             
             this.flags = d.flags || {};
             this.year = d.year;
@@ -2635,7 +2679,7 @@ class GameManager {
             this.processTurn();
         } catch(err) { 
             console.error(err); 
-            alert("セーブデータの読み込みに失敗しました"); 
+            alert("セーブデータの読み込みに失敗しました。データが壊れている可能性があります。"); 
         } 
     }
 
