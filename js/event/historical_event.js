@@ -257,9 +257,8 @@ window.GameEvents.push({
 
         // ② 登場人物たちの存在や状況を確認します
         // 太原崇孚（雪斎）（ID: 1004057）が死亡しているか確認します（生きていたらストップ）
-        const sessai = game.getBusho(1004057);
-        if (sessai && sessai.status !== 'dead') return false;
-
+        if (!window.EventCheck.isDead(game, 1004057)) return false;
+        
         // 今川義元（ID: 1004001）が大名として存在するか確認します
         const yoshimoto = game.getBusho(1004001);
         if (!yoshimoto || !yoshimoto.isDaimyo) return false;
@@ -684,8 +683,7 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         // 今川義元（ID: 1004001）が死亡しているかを確認します
-        const yoshimoto = game.getBusho(1004001);
-        if (yoshimoto && yoshimoto.status !== 'dead') return false;
+        if (!window.EventCheck.isDead(game, 1004001)) return false;
 
         // 織田信長（ID: 1006001）が大名であるか確認します
         const nobunaga = game.getBusho(1006001);
@@ -1230,8 +1228,7 @@ window.GameEvents.push({
         if (nagamasa.wifeIds && nagamasa.wifeIds.length > 0) return false;
 
         // 5. 今川義元（ID: 1004001）が死亡しているか確認します
-        const yoshimoto = game.getBusho(1004001);
-        if (yoshimoto && yoshimoto.status !== 'dead') return false;
+        if (!window.EventCheck.isDead(game, 1004001)) return false;
 
         // 6. お市（姫ID: 2）を織田家が所有しており、未婚であるか確認します
         if (!game.princesses) return false;
