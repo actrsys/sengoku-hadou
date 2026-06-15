@@ -302,6 +302,15 @@ window.GameEvents.push({
         }
         // 隣接していなければストップします
         if (!isAdjacent) return false;
+
+        // ⑥ ★追加：イベントの配役に必要な人数の武将が揃っているか確認します
+        // 織田家には信長以外に「5人」の武将が必要です
+        const odaBushosCount = game.bushos.filter(b => b.clan === odaClanId && b.status === 'active' && b.id !== nobunaga.id).length;
+        if (odaBushosCount < 5) return false;
+
+        // 今川家には義元と元康以外に「1人」の武将が必要です
+        const imagawaBushosCount = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && b.id !== yoshimoto.id && b.id !== 1004004).length;
+        if (imagawaBushosCount < 1) return false;
         
         // すべての条件をクリアしたら、イベントを発生させます！
         return true;
@@ -710,6 +719,15 @@ window.GameEvents.push({
         const owariCastles = game.castles.filter(c => c.provinceId === 23);
         const ownsAllOwari = owariCastles.length > 0 && owariCastles.every(c => c.ownerClan === nobunaga.clan);
         if (!ownsAllOwari) return false;
+
+        // ★追加：イベントの配役に必要な人数の武将が揃っているか確認します
+        // 松平家には元康以外に「2人」の武将が必要です
+        const matsuBushosCount = game.bushos.filter(b => b.clan === motoyasu.clan && b.id !== motoyasu.id && b.status === 'active').length;
+        if (matsuBushosCount < 2) return false;
+
+        // 織田家には信長以外に「1人」の武将が必要です
+        const odaBushosCount = game.bushos.filter(b => b.clan === nobunaga.clan && b.id !== nobunaga.id && b.status === 'active').length;
+        if (odaBushosCount < 1) return false;
 
         // すべての条件を満たしたらイベント発生です！
         return true;
