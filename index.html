@@ -498,6 +498,29 @@
                 </div>
             </div>
         </div>
+        
+        <div class="modal-footer" style="justify-content: center;">
+                    <button id="settings-close-btn" class="btn-secondary">閉じる</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="saveload-modal" class="modal hidden" style="z-index: 8000;">
+            <div class="modal-content modal-small">
+                <h3 id="saveload-title">セーブ / ロード</h3>
+                <div id="saveload-list" class="list-container" style="max-height: 60vh; overflow-y: auto;">
+                    </div>
+                <div class="modal-footer" style="justify-content: center; margin-top: 15px;">
+                    <button class="btn-secondary" onclick="document.getElementById('saveload-modal').classList.add('hidden')">閉じる</button>
+                </div>
+            </div>
+        </div>
+        <div id="custom-context-menu" class="hidden context-menu">
+            <div class="context-menu-item" id="ctx-menu-back">自拠点に戻る</div>
+            <div class="context-menu-item" id="ctx-menu-finish">命令終了</div>
+        </div>
+    </div>
+        
         <div id="custom-context-menu" class="hidden context-menu">
             <div class="context-menu-item" id="ctx-menu-back">自拠点に戻る</div>
             <div class="context-menu-item" id="ctx-menu-finish">命令終了</div>

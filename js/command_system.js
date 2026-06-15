@@ -1381,16 +1381,12 @@ class CommandSystem {
     executeSystemCommand(action) {
         switch(action) {
             case 'save': 
-                // ★書き換え：間違えて押しても大丈夫なように確認画面を出してから、ブラウザの引き出しに暗号化してセーブします！
-                this.game.ui.showDialog("現在の状態をセーブ（上書き）しますか？", true, () => {
-                    this.game.saveGameToLocal(1);
-                }, null, { okText: 'セーブする', okClass: 'btn-primary', cancelText: 'やめる' });
+                // セーブ画面（スロット選択）を開きます
+                this.showSaveLoadModal('save');
                 break;
             case 'load': 
-                // ★書き換え：こちらも確認画面を出してから、ブラウザの引き出しからデータを復元します！
-                this.game.ui.showDialog("セーブデータをロードしますか？\n（現在の進行状況は失われます）", true, () => {
-                    this.game.loadGameFromLocal(1);
-                }, null, { okText: 'ロードする', okClass: 'btn-danger', cancelText: 'やめる' });
+                // ロード画面（スロット選択）を開きます
+                this.showSaveLoadModal('load');
                 break;
             case 'history':
                 if (this.game.ui.info) {
@@ -1435,6 +1431,77 @@ class CommandSystem {
                 break;
         }
     }
+    
+    // ==========================================
+    // ★セーブ・ロードのスロット選択画面を作る魔法
+    // ==========================================
+    async showSaveLoadModal(mode) {
+        // 先ほど index.html に追加した画面の部品を探します
+        const modal = document.getElementById('saveload-modal');
+        const title = document.getElementById('saveload-title');
+        const list = document.getElementById('saveload-list');
+
+        // セーブかロードかで、タイトルの文字を変えます
+        title.innerText = mode === 'save' ? 'セーブするスロットを選択' : 'ロードするスロットを選択';
+        
+        // 読み込み中の文字を一旦出しておいて、画面を表示します
+        list.innerHTML = '<div style="text-align:center; margin: 20px;">データを確認中...</div>';
+        modal.classList.remove('hidden');
+
+        // リストの中身を空っぽにして作り直します
+        list.innerHTML = '';
+
+        // 1から5までのスロットボタンを作ります（数を増やしたい場合は i <= 5 の数字を変えてください）
+        for (let i = 1; i <= 5; i++) {
+            const btn = document.createElement('button');
+            btn.className = 'btn-primary';
+            btn.style.width = '100%';
+            btn.style.marginBottom = '10px';
+            
+            // 倉庫（IndexedDB）の中身をチェックして、何年のデータか調べます
+            let hasData = false;
+            let dateStr = "空きデータ";
+            try {
+                // game.jsで追加した loadFromDB を呼び出します
+                const d = await loadFromDB("sengoku_save_slot" + i);
+                if (d && d.year) {
+                    hasData = true;
+                    dateStr = `${d.year}年 ${d.month}月`;
+                }
+            } catch(e) {}
+
+            btn.innerText = `スロット ${i} : ${dateStr}`;
+
+            // ロード画面のとき、空きデータならボタンを押せないようにします
+            if (mode === 'load' && !hasData) {
+                btn.className = 'btn-secondary';
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+            }
+
+            // ボタンを押した時の動きを設定します
+            btn.onclick = () => {
+                // まず選択画面を閉じます
+                modal.classList.add('hidden');
+                
+                // 確認画面を出して、OKならIndexedDBへセーブ・ロードを実行します
+                if (mode === 'save') {
+                    this.game.ui.showDialog(`スロット ${i} に現在の状態をセーブ（上書き）しますか？`, true, () => {
+                        this.game.saveGameToLocal(i);
+                    }, null, { okText: 'セーブする', okClass: 'btn-primary', cancelText: 'やめる' });
+                } else {
+                    this.game.ui.showDialog(`スロット ${i} のデータをロードしますか？\n（現在の進行状況は失われます）`, true, () => {
+                        this.game.loadGameFromLocal(i);
+                    }, null, { okText: 'ロードする', okClass: 'btn-danger', cancelText: 'やめる' });
+                }
+            };
+            
+            // 作ったボタンをリストに追加します
+            list.appendChild(btn);
+        }
+    }
+    
+    handleBushoSelection(actionType, selectedIds, targetId, extraData) {
 
     handleBushoSelection(actionType, selectedIds, targetId, extraData) {
         if (!selectedIds || selectedIds.length === 0) return;
