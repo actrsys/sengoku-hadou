@@ -1215,10 +1215,7 @@ window.GameEvents.push({
         // 1. 織田信長（ID: 1006001）が大名であるか確認します
         const nobunaga = window.EventCheck.getDaimyo(game, 1006001);
         if (!nobunaga) return false;
-
-        // 2. プレイヤーが織田家の担当ではないか確認します
-        if (game.playerClanId === nobunaga.clan) return false;
-
+        
         // 3. 浅井長政（ID: 1015002）が大名であるか確認します
         const nagamasa = window.EventCheck.getDaimyo(game, 1015002);
         if (!nagamasa) return false;
