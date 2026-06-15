@@ -308,11 +308,19 @@ class DiplomacyManager {
             if (allyCount >= 2) acceptProb -= (allyCount - 1) * 20;
             if (targetPower > myPower) acceptProb *= (Math.sqrt(myPower) / Math.sqrt(targetPower));
             
-            if (['友好', '同盟', '支配', '従属', '和睦'].includes(relation.status)) {
+            // ★友好・同盟・支配・従属のいずれかの関係なら最終的な確率に+50%、和睦は+30%します
+            if (['友好', '同盟', '支配', '従属'].includes(relation.status)) {
+                acceptProb += 50;
+            } else if (relation.status === '和睦') {
                 acceptProb += 30;
             }
             
             finalProb = Math.max(0, Math.min(100, acceptProb));
+
+            // ★兵力差などで確率が下がっても、必ず50%以上の成功率になるようにお守りします
+            if (['友好', '同盟', '支配', '従属'].includes(relation.status) && finalProb < 50) {
+                finalProb = 50;
+            }
         }
         else if (type === 'alliance' || type === 'subordinate' || type === 'truce') {
             let threshold = commonEnemy ? 90 : 120; 
