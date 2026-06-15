@@ -7,6 +7,30 @@
 window.GameEvents = window.GameEvents || [];
 
 // ==========================================
+// ★ イベント用の便利なチェック係（共通の魔法）
+// ==========================================
+window.EventCheck = {
+    // ① 指定したIDの武将が存在して、「生きている（活動中か浪人）」か確認します
+    isAlive: function(game, bushoId) {
+        const busho = game.getBusho(bushoId);
+        return busho ? (busho.status !== 'dead' && busho.status !== 'unborn') : false;
+    },
+    
+    // ② 指定したIDの武将が存在して、「死んでいる」か確認します
+    isDead: function(game, bushoId) {
+        const busho = game.getBusho(bushoId);
+        return busho ? (busho.status === 'dead') : false;
+    },
+    
+    // ③ 指定したIDの武将が存在して、「大名として活動しているか」確認します
+    isDaimyo: function(game, bushoId) {
+        const busho = game.getBusho(bushoId);
+        // ちゃんと生きていて、大名のバッジを持っていて、どこかの大名家に所属しているか
+        return busho ? (this.isAlive(game, bushoId) && busho.isDaimyo && busho.clan !== 0) : false;
+    }
+};
+
+// ==========================================
 // ★ 桶狭間の戦い（予備）：松平元康 岡崎城主就任（裏イベント）
 // ==========================================
 window.GameEvents.push({
@@ -1632,12 +1656,10 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         // 1. 三好長慶（ID: 1020001）が生きているか確認します
-        const nagayoshi = game.getBusho(1020001);
-        if (!nagayoshi || nagayoshi.status === 'dead' || nagayoshi.status === 'unborn') return false;
+        if (!window.EventCheck.isAlive(game, 1020001)) return false;
 
         // 2. 三好実休（ID: 1020002）が亡くなっているか確認します
-        const jikkyuu = game.getBusho(1020002);
-        if (!jikkyuu || jikkyuu.status !== 'dead') return false;
+        if (!window.EventCheck.isDead(game, 1020002)) return false;
 
         // 条件をクリアしたらイベント発生の合図を出します
         return true;
@@ -1662,12 +1684,10 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         // 1. 三好長慶（ID: 1020001）が生きているか確認します
-        const nagayoshi = game.getBusho(1020001);
-        if (!nagayoshi || nagayoshi.status === 'dead' || nagayoshi.status === 'unborn') return false;
+        if (!window.EventCheck.isAlive(game, 1020001)) return false;
 
         // 2. 十河一存（ID: 1020004）が亡くなっているか確認します
-        const kazumasa = game.getBusho(1020004);
-        if (!kazumasa || kazumasa.status !== 'dead') return false;
+        if (!window.EventCheck.isDead(game, 1020004)) return false;
 
         // 条件をクリアしたらイベント発生の合図を出します
         return true;
@@ -1692,12 +1712,10 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         // 1. 三好長慶（ID: 1020001）が生きているか確認します
-        const nagayoshi = game.getBusho(1020001);
-        if (!nagayoshi || nagayoshi.status === 'dead' || nagayoshi.status === 'unborn') return false;
+        if (!window.EventCheck.isAlive(game, 1020001)) return false;
 
         // 2. 安宅冬康（ID: 1020021）が亡くなっているか確認します
-        const fuyuyasu = game.getBusho(1020021);
-        if (!fuyuyasu || fuyuyasu.status !== 'dead') return false;
+        if (!window.EventCheck.isDead(game, 1020021)) return false;
 
         // 条件をクリアしたらイベント発生の合図を出します
         return true;
@@ -1722,12 +1740,10 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         // 1. 三好長慶（ID: 1020001）が生きているか確認します
-        const nagayoshi = game.getBusho(1020001);
-        if (!nagayoshi || nagayoshi.status === 'dead' || nagayoshi.status === 'unborn') return false;
+        if (!window.EventCheck.isAlive(game, 1020001)) return false;
 
         // 2. 三好義興（ID: 1020009）が亡くなっているか確認します
-        const yoshioki = game.getBusho(1020009);
-        if (!yoshioki || yoshioki.status !== 'dead') return false;
+        if (!window.EventCheck.isDead(game, 1020009)) return false;
 
         // 条件をクリアしたらイベント発生の合図を出します
         return true;
