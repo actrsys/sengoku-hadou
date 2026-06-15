@@ -1222,10 +1222,7 @@ window.GameEvents.push({
 
         // 4. 浅井長政にまだ配偶者（奥さん）がいないことを確認します
         if (nagamasa.wifeIds && nagamasa.wifeIds.length > 0) return false;
-
-        // 5. 今川義元（ID: 1004001）が死亡しているか確認します
-        if (!window.EventCheck.isDead(game, 1004001)) return false;
-
+        
         // 6. お市（姫ID: 2）を織田家が所有しており、未婚であるか確認します
         if (!game.princesses) return false;
         
