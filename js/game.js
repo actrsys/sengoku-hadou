@@ -2467,44 +2467,7 @@ class GameManager {
         }; 
         reader.readAsText(file); 
     }
-
-    // ==========================================
-    // ★ここから書き足し：ブラウザ保存（スロット）用の新しいセーブ機能
-    // ==========================================
-    saveGameToLocal(slotNo = 1) { 
-        // 1. 今のゲームの状態をまとめます（saveGameToFileと同じ中身です）
-        const data = { 
-            year: this.year, 
-            month: this.month, 
-            gameStartYear: this.gameStartYear || window.MainParams.StartYear,
-            gameStartMonth: this.gameStartMonth || window.MainParams.StartMonth,
-            marketRate: this.marketRate,
-            castles: this.castles, 
-            bushos: this.bushos, 
-            clans: this.clans,
-            princesses: this.princesses,
-            provinces: this.provinces,
-            legions: this.legions,
-            playerClanId: this.playerClanId,
-            kunishus: this.kunishuSystem.kunishus,
-            mapWidth: this.mapWidth,
-            mapHeight: this.mapHeight,
-            aiOperations: this.aiOperationManager.save(),
-            turnQueueIds: this.turnQueue.map(c => c.id),
-            currentIndex: this.currentIndex,
-            flags: this.flags || {}
-        };
-        
-        try {
-            // 2. まとめたデータを文字に変換して、ブラウザの引き出し（slot1など）にしまいます
-            localStorage.setItem("sengoku_save_slot" + slotNo, JSON.stringify(data));
-            if (this.ui) this.ui.showDialog("セーブが完了しました。", false);
-        } catch (e) {
-            console.error(e);
-            alert("セーブに失敗しました。容量不足の可能性があります。");
-        }
-    }
-
+    
     // ==========================================
     // ★ここから書き足し：ブラウザ保存（スロット）用の新しいセーブ機能
     // ==========================================
