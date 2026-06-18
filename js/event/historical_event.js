@@ -1338,6 +1338,210 @@ window.GameEvents.push({
 });
 
 // ==========================================
+// ★ 遠山家乗っ取りイベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_toyama_takeover",
+    timing: "busho_death", // ★ 武将が死亡した瞬間にチェックします
+    isOneTime: true,       // 一度だけ発生します
+    
+    checkCondition: function(game, context) {
+        // 1. 死亡した武将のデータを受け取っているか確認します
+        if (!context || !context.deadBusho) return false;
+        const deadBusho = context.deadBusho;
+
+        // 2. 死亡したのが遠山景任（ID: 1012001）であるか確認します
+        if (deadBusho.id !== 1012001) return false;
+
+        // 3. プレイヤーが遠山家を担当している場合はイベントを起こしません
+        if (game.playerClanId === deadBusho.clan) return false;
+
+        // 4. 遠山景任が大名であるか確認します
+        if (!deadBusho.isDaimyo || deadBusho.clan === 0) return false;
+
+        // 5. 織田信長（ID: 1006001）が大名であるか確認します
+        const nobunaga = window.EventCheck.getDaimyo(game, 1006001);
+        if (!nobunaga) return false;
+
+        // 6. 遠山家が織田家に「従属」しているか確認します
+        if (!game.diplomacyManager) return false;
+        const rel = game.diplomacyManager.getRelation(deadBusho.clan, nobunaga.clan);
+        if (!rel || rel.status !== '従属') return false;
+
+        // 7. 織田勝長（ID: 1006092）が存在し、織田信長勢力に所属しているか（生まれていて未登場の場合も含む）確認します
+        const katsunaga = game.getBusho(1006092);
+        if (!katsunaga || katsunaga.status === 'dead' || katsunaga.status === 'not_born') return false;
+        
+        // 勝長が「生まれているが未登場（unborn）」で、出生前フラグが立っている場合はダメ
+        if (katsunaga.status === 'unborn' && katsunaga.isNotBorn) return false;
+        
+        // 勝長の所属が織田家か、未登場なら父親の所属が織田家か確認します
+        let belongsToOda = false;
+        if (katsunaga.clan === nobunaga.clan) {
+            belongsToOda = true;
+        } else if (katsunaga.status === 'unborn' && katsunaga.realFatherId > 0) {
+            const father = game.getBusho(katsunaga.realFatherId);
+            if (father && father.clan === nobunaga.clan) {
+                belongsToOda = true;
+            }
+        }
+        
+        if (!belongsToOda) return false;
+
+        // 全ての条件を満たしたらイベント発生です！
+        return true;
+    },
+    
+    execute: async function(game, context) {
+        const deadBusho = context.deadBusho;
+        const nobunaga = game.getBusho(1006001);
+        const katsunaga = game.getBusho(1006092);
+        
+        const toyamaClanId = deadBusho.clan;
+        const odaClanId = nobunaga.clan;
+        const toyamaClan = game.clans.find(c => c.id === toyamaClanId);
+        const odaClan = game.clans.find(c => c.id === odaClanId);
+        
+        // ★ ここが重要です！通常の死亡メッセージや家督相続を「スキップする」ようにフラグを立てます
+        context.skipNormalMessage = true;
+        context.skipDaimyoSuccession = true;
+
+        // 遠山景任の居城（死ぬ前にいた城）をメモしておきます
+        const targetCastleId = deadBusho.castleId;
+        const targetCastle = game.getCastle(targetCastleId);
+        const castleName = targetCastle ? targetCastle.name : "居城";
+
+        const deadName = deadBusho.name.replace('|', '');
+        const odaName = odaClan ? odaClan.name : "織田家";
+        const katsunagaName = katsunaga.name.replace('|', '');
+
+        // ----------------------------------------------------
+        // 1. 遠山景任勢力が織田信長勢力に吸収される
+        // ----------------------------------------------------
+        // ① 遠山家の軍団をすべて解散させます
+        if (game.legions) {
+            const toyamaLegions = game.legions.filter(l => Number(l.clanId) === Number(toyamaClanId));
+            toyamaLegions.forEach(l => {
+                if (game.castleManager && game.castleManager.disbandLegion) {
+                    game.castleManager.disbandLegion(l.id);
+                }
+            });
+        }
+
+        // ② 遠山家のお城を織田家の直轄（0）として引き渡します
+        const toyamaCastles = game.castles.filter(c => Number(c.ownerClan) === Number(toyamaClanId));
+        toyamaCastles.forEach(c => {
+            if (game.castleManager && game.castleManager.changeOwner) {
+                game.castleManager.changeOwner(c, odaClanId, true, 0); // trueで平和的に引き渡し
+            } else {
+                c.ownerClan = odaClanId;
+            }
+        });
+
+        // ③ 遠山家の武将（死亡した景任以外）を織田家に入れます
+        const toyamaBushos = game.bushos.filter(b => Number(b.clan) === Number(toyamaClanId) && b.id !== deadBusho.id && b.status !== 'dead');
+        toyamaBushos.forEach(b => {
+            b.isDaimyo = false;
+            b.isCommander = false;
+            b.isGunshi = false;
+            b.clan = odaClanId;
+            // 忠誠度の再計算をお願いします
+            if (game.affiliationSystem && game.affiliationSystem.updateLoyaltyForNewLord) {
+                game.affiliationSystem.updateLoyaltyForNewLord(b, odaClanId);
+            }
+        });
+
+        // ④ 遠山家の滅亡フラグを立てます
+        if (toyamaClan) {
+            toyamaClan.extinctionNotified = true;
+        }
+
+        // ----------------------------------------------------
+        // 2. 織田勝長が、遠山景任の養子になる
+        // ----------------------------------------------------
+        katsunaga.adoptiveFatherId = deadBusho.id;
+        
+        // お互いの一門（家族）リストに番号を書き足します
+        if (!katsunaga.baseFamilyIds.includes(deadBusho.id)) {
+            katsunaga.baseFamilyIds.push(deadBusho.id);
+        }
+        if (!deadBusho.baseFamilyIds.includes(katsunaga.id)) {
+            deadBusho.baseFamilyIds.push(katsunaga.id);
+        }
+        // 親戚の繋がりを整理する魔法を呼び出します
+        if (typeof FamilyLinker !== 'undefined' && FamilyLinker.linkAdoptiveRelations) {
+            FamilyLinker.linkAdoptiveRelations(game.bushos);
+        }
+        katsunaga.updateFamilyIds(game.princesses || []);
+
+        // ----------------------------------------------------
+        // 3. 織田勝長が遠山景任の居城の城主になる
+        // ----------------------------------------------------
+        // 勝長がまだ未登場（unborn）の場合は、ゲームに登場（active）させます
+        if (katsunaga.status === 'unborn') {
+            katsunaga.status = 'active';
+            katsunaga.loyalty = 100; // 初登場時は忠誠度100にします
+        }
+
+        if (targetCastle) {
+            // 勝長をそのお城へ移動させます
+            if (katsunaga.castleId !== targetCastleId) {
+                if (game.affiliationSystem) {
+                    game.affiliationSystem.moveCastle(katsunaga, targetCastleId);
+                } else {
+                    katsunaga.castleId = targetCastleId;
+                    if (!targetCastle.samuraiIds.includes(katsunaga.id)) {
+                        targetCastle.samuraiIds.push(katsunaga.id);
+                    }
+                }
+            }
+            
+            // 対象の城の他の武将から城主バッジを外しておきます
+            const residents = game.bushos.filter(b => b.castleId === targetCastleId && b.status === 'active');
+            residents.forEach(b => b.isCastellan = false);
+
+            // 勝長を新しい城主に任命します
+            katsunaga.isCastellan = true;
+            targetCastle.castellanId = katsunaga.id;
+
+            if (game.affiliationSystem) {
+                game.affiliationSystem.updateCastleLord(targetCastle);
+            }
+        }
+
+        // ----------------------------------------------------
+        // 4. 織田勝長の貢献度が500以下なら、500になる
+        // ----------------------------------------------------
+        if ((katsunaga.achievementTotal || 0) < 500) {
+            katsunaga.achievementTotal = 500;
+        }
+
+        // ----------------------------------------------------
+        // 5. メッセージの表示
+        // ----------------------------------------------------
+        const toyamaClanName = toyamaClan ? toyamaClan.name : "遠山家";
+        const msg = `${toyamaClanName}の${deadName}が死亡し、${odaName}の${katsunagaName}が養子入りして家督を継ぎました。`;
+        
+        game.ui.log(`【当主交代】${msg}`);
+        await game.ui.showDialogAsync(msg, false, 0);
+
+        // ----------------------------------------------------
+        // 6. 画面や派閥の更新
+        // ----------------------------------------------------
+        if (game.factionSystem) {
+            game.factionSystem.updateFactions();
+        }
+        if (typeof game.updateAllClanPrestige === 'function') {
+            game.updateAllClanPrestige();
+        }
+        if (game.ui) {
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
+    }
+});
+
+// ==========================================
 // ★ 岐阜城改称イベント
 // ==========================================
 window.GameEvents.push({

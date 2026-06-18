@@ -408,9 +408,17 @@ class LifeSystem {
             // サイコロを振って、確率に当たってしまったらお別れです…
             if (Math.random() < deathProb) {
                 const wasUnborn = (b.status === 'unborn'); // ★追加：死ぬ前に未登場だったかメモしておく
-                await this.executeDeath(b);
-                // もしプレイヤーの家臣で、すでに登場していたらお知らせを出します
-                if (b.clan === this.game.playerClanId && !wasUnborn) {
+                
+                // ★ここから追加：武将死亡時のイベント専用の引き出しを開けます
+                let context = { deadBusho: b, skipNormalMessage: false, skipDaimyoSuccession: false };
+                if (this.game.eventManager) {
+                    await this.game.eventManager.processEvents('busho_death', context);
+                }
+
+                await this.executeDeath(b, context); // ★修正：イベントの結果（context）を渡します
+                
+                // もしプレイヤーの家臣で、すでに登場していて、かつ「イベントで通常のメッセージを消す」指示がなければお知らせを出します
+                if (b.clan === this.game.playerClanId && !wasUnborn && !context.skipNormalMessage) {
                     const name = b.name.replace('|', '');
                     this.game.ui.log(`${name}が死亡しました……`);
                     // ★一人ずつ順番にダイアログを出して、押すまで待ちます！
@@ -433,10 +441,17 @@ class LifeSystem {
             // 指定された確率で死亡します
             if (Math.random() < deathProb) {
                 const wasUnborn = (b.status === 'unborn');
-                await this.executeDeath(b);
                 
-                // もしプレイヤーの家臣で、すでに登場していたらお知らせを出します
-                if (b.clan === this.game.playerClanId && !wasUnborn) {
+                // ★ここから追加：武将死亡時のイベント専用の引き出しを開けます
+                let context = { deadBusho: b, skipNormalMessage: false, skipDaimyoSuccession: false };
+                if (this.game.eventManager) {
+                    await this.game.eventManager.processEvents('busho_death', context);
+                }
+
+                await this.executeDeath(b, context); // ★修正：イベントの結果（context）を渡します
+                
+                // もしプレイヤーの家臣で、すでに登場していて、かつ「イベントで通常のメッセージを消す」指示がなければお知らせを出します
+                if (b.clan === this.game.playerClanId && !wasUnborn && !context.skipNormalMessage) {
                     const name = b.name.replace('|', '');
                     this.game.ui.log(`戦傷が元となり${name}が死亡しました……`);
                     await this.game.ui.showDialogAsync(`戦傷が元となり${name}が死亡しました……`, false, 0);
@@ -523,7 +538,7 @@ class LifeSystem {
     }
 
     // お別れの処理をするところです
-    async executeDeath(busho) {
+    async executeDeath(busho, context = {}) { // ★修正：イベントの指示（context）を受け取れるようにします
         busho.status = 'dead'; // ステータスを「死亡」にします
         
         // ★ここから追加：夫が死亡したことによる姫の帰還処理と婚姻同盟の解消
@@ -712,7 +727,12 @@ class LifeSystem {
                 clan.courtContribution = Math.floor((clan.courtContribution || 0) / 5);
             }
 
-            await this.handleDaimyoDeath(busho);
+            // ★修正：イベントで「通常の家督相続をしない」指示がなければ、後継ぎを決めます
+            if (!context.skipDaimyoSuccession) {
+                await this.handleDaimyoDeath(busho);
+            } else {
+                busho.isDaimyo = false; // イベントで乗っ取られた場合でも、大名バッジはしっかり外しておきます
+            }
         }
 
         // ★もし国主だったら、後任を決めます

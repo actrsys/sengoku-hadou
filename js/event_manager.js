@@ -40,6 +40,7 @@ class EventManager {
             after_command: [],        // コマンド実行直後
 
             after_battle_blink: [], // 地図の点滅が終わった直後の特別な引き出し
+            busho_death: [],         // 武将が死亡した瞬間に呼ばれる特別な引き出し
             shogun_death: []       // 将軍が死亡した直後に呼ばれる特別な引き出し
         };
         
