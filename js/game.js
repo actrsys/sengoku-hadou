@@ -1816,9 +1816,32 @@ class GameManager {
                 let soldierGrowth = Math.floor(suppressedGrowth * penaltyMultiplier);
 
                 // ==========================================
-                // ★さっき調べた倍率を、兵士が増える数にもかけ算してあげるよ！
+                // さっき調べた倍率を、兵士が増える数にもかけ算します
                 if (soldierGrowth > 0) {
                     soldierGrowth = Math.floor(soldierGrowth * neighborMultiplier);
+
+                    // 人口が石高に対して少ない場合、増加量をアップします！
+                    // エラーを防ぐため、石高は最低でも「1」として計算します
+                    const popKokuRatio = c.population / Math.max(1, c.kokudaka);
+                    let popLowBonus = 1.0; // 基本は1.0倍（そのまま）です
+
+                    // ① 人口が石高以下の時（1倍以下）
+                    if (popKokuRatio <= 1) {
+                        popLowBonus = 3.0; // 3倍にします
+                    } 
+                    // ② 人口が石高の5倍以下の時
+                    else if (popKokuRatio <= 5) {
+                        // 1倍〜5倍の間で、3.0倍から1.5倍まで滑らかに減らしていきます
+                        popLowBonus = 3.0 - ((popKokuRatio - 1) / 4) * 1.5;
+                    } 
+                    // ③ 人口が石高の10倍以下の時
+                    else if (popKokuRatio <= 10) {
+                        // 5倍〜10倍の間で、1.5倍から1.0倍まで滑らかに減らしていきます
+                        popLowBonus = 1.5 - ((popKokuRatio - 5) / 5) * 0.5;
+                    }
+
+                    // 最後に、計算したボーナス倍率を掛け算します
+                    soldierGrowth = Math.floor(soldierGrowth * popLowBonus);
                 }
                 // ==========================================
 
@@ -1826,7 +1849,7 @@ class GameManager {
                 c.soldiers = Math.min(99999, c.soldiers + Math.max(0, soldierGrowth));
             }
             
-            // ★追加：毎月月初に取引上限を決定（最大値まで回復）
+            // 毎月月初に取引上限を決定（最大値まで回復）
             c.tradeLimit = Math.floor((c.population / 50) + (c.kokudaka * 4));
         });
 
