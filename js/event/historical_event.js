@@ -1512,8 +1512,8 @@ window.GameEvents.push({
         // ----------------------------------------------------
         // 4. 織田勝長の貢献度が500以下なら、500になる
         // ----------------------------------------------------
-        if ((katsunaga.achievementTotal || 0) < 500) {
-            katsunaga.achievementTotal = 500;
+        if ((katsunaga.achievementTotal || 0) < 300) {
+            katsunaga.achievementTotal = 300;
         }
 
         // ----------------------------------------------------
