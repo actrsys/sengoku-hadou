@@ -166,7 +166,7 @@ const CAN_EXECUTE_RULES = {
     isNotSubordinate: (game) => {
         let isSubordinate = false;
         game.clans.forEach(c => {
-            if (c.id !== 0 && c.id !== Number(game.playerClanId)) {
+            if (c.id !== 0 && c.id !== Number(game.playerClanId) && !c.isDestroyed) {
                 const rel = game.getRelation(game.playerClanId, c.id);
                 if (rel && rel.status === '従属') {
                     isSubordinate = true;
@@ -251,8 +251,8 @@ const CAN_EXECUTE_RULES = {
     // --- 臣従願のルール追加 ---
     canVassalage: (game) => {
         // 条件①：生き残っている大名家が3つ以上あるかチェックします（自分を含めて2つ以下ならダメです）
-        const aliveClans = new Set(game.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan));
-        if (aliveClans.size <= 2) return false;
+        const aliveClans = game.clans.filter(c => c.id !== 0 && !c.isDestroyed);
+        if (aliveClans.length <= 2) return false;
         
         // 条件②：お隣さんの大名家の中に、自家の「5倍以上」の威信を持つ大名家があるかチェックします
         const myClanId = game.playerClanId;

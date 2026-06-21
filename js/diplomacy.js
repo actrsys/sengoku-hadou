@@ -141,7 +141,7 @@ class DiplomacyManager {
      */
     processEndMonth() {
         this.game.clans.forEach(clan => {
-            if (!clan.diplomacyValue) return;
+            if (!clan.diplomacyValue || clan.isDestroyed) return;
             
             for (const targetId in clan.diplomacyValue) {
                 const data = clan.diplomacyValue[targetId];
@@ -177,7 +177,7 @@ class DiplomacyManager {
     getAllyCount(clanId) {
         let count = 0;
         this.game.clans.forEach(c => {
-            if (c.id !== 0 && c.id !== clanId) {
+            if (c.id !== 0 && c.id !== clanId && !c.isDestroyed) {
                 const r = this.getRelation(clanId, c.id);
                 if (r && ['同盟', '支配', '従属'].includes(r.status)) {
                     count++;
@@ -290,7 +290,7 @@ class DiplomacyManager {
         
         // 共通の敵がいるか
         const commonEnemy = this.game.clans.some(c => {
-            if (c.id === 0 || c.id === doerClanId || c.id === targetClanId) return false;
+            if (c.id === 0 || c.id === doerClanId || c.id === targetClanId || c.isDestroyed) return false;
             const r1 = this.getRelation(doerClanId, c.id);
             const r2 = this.getRelation(targetClanId, c.id);
             return r1 && r2 && r1.status === '敵対' && r2.status === '敵対';
@@ -354,7 +354,7 @@ class DiplomacyManager {
             } else if (type === 'truce') {
                 let enemyCount = 0;
                 this.game.clans.forEach(c => {
-                    if (c.id !== 0 && c.id !== targetClanId && c.id !== doerClanId) {
+                    if (c.id !== 0 && c.id !== targetClanId && c.id !== doerClanId && !c.isDestroyed) {
                         const rel = this.getRelation(targetClanId, c.id);
                         if (rel && rel.status === '敵対') enemyCount++;
                     }
@@ -413,7 +413,7 @@ class DiplomacyManager {
                 
                 let isAlreadySubordinate = false;
                 this.game.clans.forEach(c => {
-                    if (c.id !== targetClanId && c.id !== doerClanId) {
+                    if (c.id !== 0 && c.id !== targetClanId && c.id !== doerClanId && !c.isDestroyed) {
                         const rel = this.getRelation(targetClanId, c.id);
                         if (rel && rel.status === '従属') isAlreadySubordinate = true;
                     }
@@ -620,7 +620,7 @@ class DiplomacyManager {
 
         if (isBetrayal) {
             this.game.clans.forEach(c => {
-                if (c.id !== 0 && c.id !== doerClanId && c.id !== targetClanId) {
+                if (c.id !== 0 && c.id !== doerClanId && c.id !== targetClanId && !c.isDestroyed) {
                     this.updateSentiment(doerClanId, c.id, globalDrop);
                 }
             });
@@ -1507,7 +1507,7 @@ class DiplomacyManager {
      */
     clearDominationRelations(clanId) {
         this.game.clans.forEach(c => {
-            if (c.id !== clanId) {
+            if (c.id !== 0 && c.id !== clanId && !c.isDestroyed) {
                 const rel = this.game.getRelation(clanId, c.id);
                 if (rel && (rel.status === '支配' || rel.status === '従属')) {
                     this.changeStatus(clanId, c.id, '普通');
@@ -2438,8 +2438,11 @@ class DiplomacyManager {
         const uniqueNeighbors = [...new Set(neighbors.map(c => c.ownerClan))];
         uniqueNeighbors.forEach(cId => {
             if (cId !== 0) {
-                const r = this.getRelation(myClanId, cId);
-                if (r && r.status === '敵対') enemyCount++;
+                const clan = this.game.clans.find(c => c.id === cId);
+                if (clan && !clan.isDestroyed) {
+                    const r = this.getRelation(myClanId, cId);
+                    if (r && r.status === '敵対') enemyCount++;
+                }
             }
         });
 
@@ -2488,7 +2491,7 @@ class DiplomacyManager {
         // 自分がどこかに従属しているかチェックします
         let amISubordinate = false;
         this.game.clans.forEach(c => {
-            if (c.id !== 0 && c.id !== myClanId) {
+            if (c.id !== 0 && c.id !== myClanId && !c.isDestroyed) {
                 const r = this.getRelation(myClanId, c.id);
                 if (r && r.status === '従属') {
                     amISubordinate = true;
@@ -2692,10 +2695,12 @@ class DiplomacyManager {
             
             const uniqueClans = [...new Set(neighbors.map(c => c.ownerClan))];
             uniqueClans.forEach(clanId => {
+                const clan = this.game.clans.find(c => c.id === clanId);
+                if (!clan || clan.isDestroyed) return;
+                
                 const r = this.getRelation(myClanId, clanId);
                 if (r && !['同盟', '支配', '従属'].includes(r.status)) {
-                    const clan = this.game.clans.find(c => c.id === clanId);
-                    const p = clan ? Math.max(1, clan.daimyoPrestige) : 1;
+                    const p = Math.max(1, clan.daimyoPrestige);
                     if (minEnemyPower === -1 || p < minEnemyPower) {
                         minEnemyPower = p;
                     }
