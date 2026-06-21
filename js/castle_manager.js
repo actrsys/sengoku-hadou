@@ -15,6 +15,42 @@ class CastleManager {
         castle.ownerClan = Number(newOwnerId);
         castle.legionId = Number(newLegionId); // 攻撃側の軍団IDになる
 
+        // 石山城と尾山城のこっそり改名イベント
+        if (castle.id === 33 || castle.id === 74) {
+            let isHonganji = false;
+            
+            // 新しい持ち主が空き城（0）ではない場合、大名が本願寺家かどうか調べます
+            if (newOwnerId !== 0) {
+                const newDaimyo = this.game.bushos.find(b => b.clan === newOwnerId && b.isDaimyo);
+                // 大名の出席番号が1019001〜1019999の間なら本願寺家とみなします
+                if (newDaimyo && newDaimyo.id >= 1019001 && newDaimyo.id <= 1019999) {
+                    isHonganji = true;
+                }
+            }
+
+            // 石山城（ID:33）の改名処理
+            if (castle.id === 33) {
+                if (isHonganji && castle.name === '石山城') {
+                    castle.name = '石山御坊';
+                    castle.yomi = 'いしやまごぼう';
+                } else if (!isHonganji && castle.name === '石山御坊') {
+                    castle.name = '石山城';
+                    castle.yomi = 'いしやまじょう';
+                }
+            }
+            
+            // 尾山城（ID:74）の改名処理
+            if (castle.id === 74) {
+                if (isHonganji && castle.name === '尾山城') {
+                    castle.name = '尾山御坊';
+                    castle.yomi = 'おやまごぼう';
+                } else if (!isHonganji && castle.name === '尾山御坊') {
+                    castle.name = '尾山城';
+                    castle.yomi = 'おやまじょう';
+                }
+            }
+        }
+
         // 調査状態などをリセットします
         castle.investigatedUntil = 0;
         
