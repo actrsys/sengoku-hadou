@@ -1174,8 +1174,8 @@ class AIEngine {
             // 最小値の適用（マイナスになっていたらゼロにします）
             prob = Math.max(0, prob); 
 
-            // ★大魔法：空き城の時は、攻め込むハードルを3倍（確率を3分の1）にします！
-            if (target.ownerClan === 0) {
+            // ★大魔法：空き城、または「敵対関係ではない勢力」の時は、攻め込むハードルを3倍（確率を3分の1）にします！
+            if (target.ownerClan === 0 || rel.status !== '敵対') {
                 prob = prob / 3;
             }
 
