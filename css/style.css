@@ -483,7 +483,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .scroll-wrapper.no-custom-scrollbar {
     padding-right: 0 !important;
     padding-bottom: 0 !important;
-    height: calc(40px * 9 + 4px) !important;
+    height: auto !important;
 }
 .scroll-wrapper.no-custom-scrollbar .custom-scrollbar-track,
 .scroll-wrapper.no-custom-scrollbar .custom-scrollbar-track-x,
@@ -2296,7 +2296,7 @@ body.is-pc {
 
     /* PCリストレイアウト */
     .scroll-wrapper { height: calc(44px * 9 + 28px); max-height: none; flex: 0 0 auto; }
-    .scroll-wrapper.no-custom-scrollbar { height: calc(44px * 9 + 4px) !important; }
+    .scroll-wrapper.no-custom-scrollbar { height: auto !important; }
     .list-container { scroll-padding-top: 44px; }
     .list-header, .select-item { grid-template-columns: var(--grid-cols-pc, 45px 100px 60px repeat(6, 1fr)); font-size: 0.85rem; height: 44px; }
     .list-header.view-mode, .select-item.view-mode { grid-template-columns: var(--grid-cols-pc, 100px 60px repeat(6, 1fr)); }
