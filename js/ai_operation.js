@@ -742,7 +742,8 @@ class AIOperationManager {
             }
 
             // ai.jsでやっていた確率のサイコロをここで振って、やるかどうか決めます
-            if (Math.random() * 100 < highestScore) {
+            // 調整：highestScore（点数）を 1.5倍 にして、作戦を実行しやすくします！
+            if (Math.random() * 100 < (highestScore * 1.5)) {
                 this.operations[clanId][legionId] = {
                     type: '攻撃',
                     attackTargets: attackTargets, // ★追加：第一～第三までの目標リストを全部記憶します
