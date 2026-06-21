@@ -2355,11 +2355,18 @@ Object.assign(WarManager.prototype, {
         // ★大名から先に処理するように並べ替えます
         captives.sort((a, b) => (b.isDaimyo ? 1 : 0) - (a.isDaimyo ? 1 : 0));
         let daimyoHiredBonus = 0; // ★ご褒美の箱
-
+        
         for (const p of captives) { 
             // ★大名家が滅亡している（他に城がない）かをチェックします
             const friendlyCastles = this.game.castles.filter(c => c.ownerClan === p.clan && p.clan !== 0);
             const isExtinct = (friendlyCastles.length === 0);
+
+            // ★討死フラグがあり、本来の寿命を過ぎている武将は必ず処断します！
+            if (p.isKilledInBattle && this.game.year >= p.originalEndYear) {
+                this.registerNemesisForExecuted(p, winnerClanId);
+                await this.game.lifeSystem.executeDeath(p); 
+                continue; 
+            }
 
             // ★変更：fe_system.js の魔法にお任せします！
             if (p.isDaimyo && !isExtinct) { 
