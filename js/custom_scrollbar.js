@@ -169,7 +169,16 @@ class CustomScrollbar {
         };
 
         this.onListScroll = () => {
-            if (!this.isDraggingY && !this.isDraggingX) this.update();
+            if (!this.isDraggingY && !this.isDraggingX) {
+                // ★軽量化：スクロール時の計算に少しだけ休憩（アニメーションフレーム）を挟み、スマホでのカクつきを防ぎます！
+                if (!this._scrollTicking) {
+                    requestAnimationFrame(() => {
+                        this.update();
+                        this._scrollTicking = false;
+                    });
+                    this._scrollTicking = true;
+                }
+            }
         };
 
         // 縦つまみのドラッグ操作

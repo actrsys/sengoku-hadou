@@ -1362,6 +1362,17 @@ class UIInfoManager {
                     const cells = itemEls[i].children;
                     for (let j = 0; j < cells.length; j++) {
                         const cell = cells[j];
+                        
+                        // ★軽量化：名前の列など、実際に文字が長くなりやすい列だけを測るようにして、スマホでの処理落ち（リフロー）を激減させます！
+                        const isNameCol = cell.classList.contains('col-name') || 
+                                          cell.classList.contains('col-daimyo-name') || 
+                                          cell.classList.contains('col-kunishu-name') || 
+                                          cell.classList.contains('col-faction-name') || 
+                                          cell.classList.contains('col-princess-name') ||
+                                          cell.classList.contains('col-castle-name') ||
+                                          cell.classList.contains('col-leader-name');
+                        if (!isNameCol) continue; // 名前の列以外は計算をスキップします
+                        
                         // ゲージやアイコンなどの複雑な要素はスキップします
                         if (cell.querySelector('.bar-bg') || cell.querySelector('.bar-bg-busho') || cell.querySelector('input') || cell.querySelector('img')) continue;
                         
