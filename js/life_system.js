@@ -1497,6 +1497,8 @@ class LifeSystem {
 
             // もしプレイヤーの大名家が滅亡してしまったら…ゲームオーバーです！
             if (clanId === this.game.playerClanId) {
+                // 滅亡状態の印をつけます
+                clan.isDestroyed = true;
                 return new Promise(resolve => {
                     setTimeout(() => {
                         this.game.ui.showDialog("全拠点を失いました。我が大名家は滅亡しました……", false, () => {
@@ -1511,6 +1513,9 @@ class LifeSystem {
                     leader.isDaimyo = false;
                     this.game.affiliationSystem.becomeRonin(leader);
                 }
+                
+                // 滅亡した大名家に印をつけます
+                clan.isDestroyed = true;
             }
         }
     }

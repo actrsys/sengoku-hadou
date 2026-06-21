@@ -18,6 +18,9 @@ class Clan {
         this.yomi = data.yomi || "";
         this.baseYomi = data.baseYomi || data.yomi || "";
 
+        // ★追加：大名家が滅亡したかどうかの印を覚える箱を用意します
+        this.isDestroyed = data.isDestroyed === true;
+
         // 外交データの初期化
         this.diplomacyValue = this.diplomacyValue || {};
         
