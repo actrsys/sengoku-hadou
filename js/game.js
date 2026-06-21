@@ -1398,11 +1398,11 @@ class GameManager {
 
         // まず、今の大名に合わせて本来の名前（baseName）と読み（baseYomi）を更新します
         this.clans.forEach(clan => {
-            // 空き家（0）や、生き残りリストに入っていない（滅亡した）大名家は無視します
+            // ★変更：空き家（0）や、生き残りリストに入っていない（滅亡した）大名家は無視します
             if (clan.id === 0 || !aliveClanIds.has(clan.id)) {
-                // 滅亡した勢力が外交リストなどに幽霊として出ないように、当主の記憶と名前を綺麗に消し去ります！
+                // ★ここを修正！：歴史の記録（姫の実家など）として勢力名は残しつつ、
+                // 当主の記憶だけを消し去ることで、外交の幽霊バグを安全に防ぎます！
                 clan.leaderId = 0;
-                clan.name = "";
                 return; 
             }
             const leader = this.getBusho(clan.leaderId);
