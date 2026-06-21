@@ -72,6 +72,17 @@ class CastleManager {
                 }
             }
         }
+
+        // ★追加：城を奪われた勢力のお城がすべて無くなったかチェックして、ゼロなら滅亡の印をつける
+        if (oldOwnerId !== 0 && oldOwnerId !== newOwnerId) {
+            const allRemainingCastles = this.game.castles.filter(c => Number(c.ownerClan) === oldOwnerId);
+            if (allRemainingCastles.length === 0) {
+                const destroyedClan = this.game.clans.find(c => c.id === oldOwnerId);
+                if (destroyedClan) {
+                    destroyedClan.isDestroyed = true;
+                }
+            }
+        }
         
         // ★修正：イベントでの変更ではない（合戦などでの奪い合いの）場合のみ、忠誠度や諸勢力への影響を発生させます
         if (!isEvent) {
