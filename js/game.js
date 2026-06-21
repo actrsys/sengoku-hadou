@@ -1358,7 +1358,8 @@ class GameManager {
     // ★全ての大名の「威信（daimyoPrestige）」を計算して箱に入れる魔法です
     updateAllClanPrestige() {
         this.clans.forEach(clan => {
-            if (clan.id === 0) return; // 空き家（中立）は計算しません
+            // 空き家（中立）に加えて、滅亡した勢力も計算を飛ばすようにします
+            if (clan.id === 0 || clan.isDestroyed) return;
             const castles = this.castles.filter(c => c.ownerClan === clan.id);
             let pop = 0, sol = 0, koku = 0, gold = 0, rice = 0;
             castles.forEach(c => { 
@@ -1387,19 +1388,15 @@ class GameManager {
             
         });
     }
-    // ==========================================
-
+    
     // ★大名家の表示名を更新する魔法です（同名被りの回避）
     updateClanDisplayNames() {
         if (!this.provinces) return;
 
-        // ★追加：現在生き残っている（城を1つ以上持っている）大名家の出席番号リストを作ります
-        const aliveClanIds = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan));
-
         // まず、今の大名に合わせて本来の名前（baseName）と読み（baseYomi）を更新します
         this.clans.forEach(clan => {
-            // ★変更：空き家（0）や、生き残りリストに入っていない（滅亡した）大名家は無視します
-            if (clan.id === 0 || !aliveClanIds.has(clan.id)) return; 
+            // ★修正：城の数ではなく、滅亡フラグ（isDestroyed）で判定するようにしました
+            if (clan.id === 0 || clan.isDestroyed) return; 
             const leader = this.getBusho(clan.leaderId);
             if (leader && leader.familyName) {
                 clan.baseName = leader.familyName + "家";
@@ -1416,7 +1413,7 @@ class GameManager {
         // 本来の名前でグループ分けをして、被っている大名家をまとめます
         const clanGroups = {};
         this.clans.forEach(clan => {
-            if (clan.id === 0 || !aliveClanIds.has(clan.id)) return; 
+            if (clan.id === 0 || clan.isDestroyed) return; 
             const baseName = clan.baseName;
             if (!clanGroups[baseName]) clanGroups[baseName] = [];
             clanGroups[baseName].push(clan);
@@ -1480,7 +1477,7 @@ class GameManager {
         // 新しい名前で被っている数をもう一度数えます
         const newNameCounts = {};
         this.clans.forEach(clan => {
-            if (clan.id === 0 || !aliveClanIds.has(clan.id)) return;
+            if (clan.id === 0 || clan.isDestroyed) return;
             newNameCounts[clan.name] = (newNameCounts[clan.name] || 0) + 1;
         });
 
@@ -1956,7 +1953,8 @@ class GameManager {
         if (this.month === 1 || this.month === 4 || this.month === 7 || this.month === 10) {
             if (this.aiStaffing) {
                 this.clans.forEach(clan => {
-                    if (clan.id !== 0 && clan.id !== this.playerClanId) {
+                    // ★修正：滅亡フラグをチェックして、生き残っている勢力だけ会議をします
+                    if (clan.id !== 0 && !clan.isDestroyed && clan.id !== this.playerClanId) {
                         // ★追加：国主を決める前に、まずは大名自身に最適な居城を探させてお引越しさせます！
                         const daimyo = this.bushos.find(b => b.clan === clan.id && b.isDaimyo);
                         if (daimyo && daimyo.castleId) {
@@ -2247,10 +2245,11 @@ class GameManager {
         // ★ここから追加：月末のタイミングで大名家の表示名を更新して同名被りを防ぎます！
         this.updateClanDisplayNames();
         
-        const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); 
-        const playerAlive = clans.has(this.playerClanId);
+        // ★修正：城の数ではなく、滅亡フラグを見て生き残っている勢力を数えます
+        const aliveClans = this.clans.filter(c => c.id !== 0 && !c.isDestroyed);
+        const playerAlive = aliveClans.some(c => c.id === this.playerClanId);
         
-        if (clans.size === 1 && playerAlive) {
+        if (aliveClans.length === 1 && playerAlive) {
             this.ui.showDialog("天下統一！", false, () => {
                 this.ui.returnToTitle(); 
             });

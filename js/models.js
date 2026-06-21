@@ -843,7 +843,7 @@ class Kunishu {
             this.kunishuRelations = data.kunishuRelations;
         }
         
-        this.isDestroyed = this.isDestroyed === true;
+        this.isDestroyed = data.isDestroyed === true;
     }
     
     getName(game) {
