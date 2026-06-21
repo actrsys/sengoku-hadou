@@ -2503,7 +2503,11 @@ Object.assign(WarManager.prototype, {
         }
         
         setTimeout(() => {
-             if (window.GameApp) window.GameApp.updateAllClanPrestige(); // ★威信を更新
+             if (window.GameApp) {
+                 window.GameApp.updateAllClanPrestige(); // ★威信を更新
+                 // 合戦が終わった直後にも、滅亡した勢力のお掃除魔法をすぐ実行させます
+                 window.GameApp.updateClanDisplayNames(); 
+             }
              this.game.finishTurn(); 
         }, 100);
     },
