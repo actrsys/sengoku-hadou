@@ -249,6 +249,23 @@ class DiplomacyManager {
             } else {
                 priority -= 500;
             }
+
+            // ★追加：臣従イベントを目指す相手への優先度（スコア）アップ！
+            if (rel.status === '従属' && rel.sentiment < 100) {
+                const myClanData = this.game.clans.find(c => c.id === myClanId);
+                const targetClanData = this.game.clans.find(c => c.id === targetClanId);
+                if (myClanData && targetClanData) {
+                    // 相手の威信が自分の12倍以上あるかを調べます
+                    if (targetClanData.daimyoPrestige >= myClanData.daimyoPrestige * 12) {
+                        // 従属期間が長いほど、臣従を急ぐためスコアを高くします
+                        if ((rel.subordinateMonths || 0) >= 20) {
+                            priority += 150; // 24ヶ月に近いので大きく加点して最優先に！
+                        } else if ((rel.subordinateMonths || 0) >= 12) {
+                            priority += 50;  // 期間が近づいてきたら少し加点して意識し始めます
+                        }
+                    }
+                }
+            }
             
             diplomacyTargets.push({ 
                 clanId: targetClanId, 
@@ -2600,8 +2617,19 @@ class DiplomacyManager {
 
         // 親善・同盟の判定
         // ★修正：同盟や支配・従属状態の相手でも、条件を満たせば親善を行うようにしました！
+
+        // ★追加：臣従イベントの条件（相手の威信12倍以上、従属期間20ヶ月以上）を満たしているか調べます
+        let isAimingVassalage = false;
+        if (rel.status === '従属' && rel.sentiment < 100) {
+            const myClanData = this.game.clans.find(c => c.id === myClanId);
+            const targetClanData = this.game.clans.find(c => c.id === targetClanId);
+            if (myClanData && targetClanData && targetClanData.daimyoPrestige >= myClanData.daimyoPrestige * 12 && (rel.subordinateMonths || 0) >= 20) {
+                isAimingVassalage = true;
+            }
+        }
         
-        if (myPower < perceivedTargetTotal * 0.8 || isStrategicPartner) {
+        // ★修正：臣従を目指している場合も、外交の土俵に上がれるように条件に追加します
+        if (myPower < perceivedTargetTotal * 0.8 || isStrategicPartner || isAimingVassalage) {
             if (Math.random() < smartness * sendProbModifier) {
                 const allianceThreshold = isStrategicPartner ? (window.AIParams.AI.AllianceThreshold || 70) - 15 : (window.AIParams.AI.AllianceThreshold || 70);
                 let goodwillThreshold = isStrategicPartner ? (window.AIParams.AI.GoodwillThreshold || 40) + 20 : (window.AIParams.AI.GoodwillThreshold || 40);
@@ -2624,6 +2652,11 @@ class DiplomacyManager {
                              skipProb += 60; 
                          }
 
+                         // ★追加：臣従を狙っている場合は、足切りされる確率を半分に減らしてあげます
+                         if (isAimingVassalage) {
+                             skipProb = skipProb / 2;
+                         }
+
                          if (Math.random() * 100 < skipProb) {
                              willGoodwill = false;
                          }
@@ -2632,14 +2665,19 @@ class DiplomacyManager {
                      // ★追加：同盟・支配・従属相手への親善は、大名の義理が低いほどサボりやすくなります！
                      if (willGoodwill && ['同盟', '支配', '従属'].includes(rel.status)) {
                          // 義理100で1.0(100%実行)、義理0で0.5(50%の確率で実行)になる計算式です
-                         const executeProb = 0.5 + (myDaimyoDuty / 200);
+                         let executeProb = 0.5 + (myDaimyoDuty / 200);
+                         // ★追加：臣従を目指している時は、サボる確率を少し減らします（確率を+20%アップ）
+                         if (isAimingVassalage) {
+                             executeProb = Math.min(1.0, executeProb + 0.2);
+                         }
+
                          // サイコロを振って、確率より大きい数字が出たら親善をサボります
                          if (Math.random() > executeProb) {
                              willGoodwill = false;
                          }
                      }
 
-                     if (!willGoodwill || (rel.sentiment <= 30 && ratio < 3.0 && !isStrategicPartner)) {
+                     if (!willGoodwill || (rel.sentiment <= 30 && ratio < 3.0 && !isStrategicPartner && !isAimingVassalage)) {
                          return { action: 'none', gold: 0 };
                      } else {
                          // ★追加：関係値が100以上の時は親善しません（念のためのストッパーです）
@@ -2653,6 +2691,12 @@ class DiplomacyManager {
                          } else if (ratio > 1.5) {
                              goodwillGold = 300 + ((ratio - 1.5) / 1.5) * 700;
                          }
+
+                         // ★追加：臣従を目指している場合は、少しだけ奮発して親善しやすくします
+                         if (isAimingVassalage && goodwillGold < 600) {
+                             goodwillGold = 600;
+                         }
+
                          goodwillGold = Math.floor(goodwillGold / 100) * 100; 
                          return { action: 'goodwill', gold: goodwillGold };
                      }
