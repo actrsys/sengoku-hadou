@@ -1771,6 +1771,24 @@ class GameManager {
             }
             // ==========================================
 
+            // ★追加：新しい計算式で「拠点スコア（人口の実質的な上限）」を計算します
+            // 石高ボーナス：√石高 * 500
+            const kokudakaBonus = Math.sqrt(Math.max(0, c.kokudaka)) * 500;
+            
+            // 城壁ボーナス：√城防御 * 200
+            const defenseBonus = Math.sqrt(Math.max(0, c.defense)) * 200;
+            
+            // 民忠スコア：(民忠 ÷ 100) + 0.5
+            const loyaltyScore = (c.peoplesLoyalty / 100) + 0.5;
+            
+            // 拠点スコアを計算します（石高ボーナス＋城壁ボーナス×民忠スコア）
+            const baseScore = (kokudakaBonus + defenseBonus) * loyaltyScore;
+
+            // 人口が拠点スコア以上の時、増える量を20分の1にします
+            if (growth > 0 && c.population >= baseScore) {
+                growth = Math.floor(growth / 20);
+            }
+
             c.population = Math.min(999999, Math.max(0, c.population + growth));
 
             // ★追加：毎月の兵士の自然増加計算
