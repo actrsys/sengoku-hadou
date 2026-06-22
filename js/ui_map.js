@@ -715,13 +715,9 @@ Object.assign(UIManager.prototype, {
 
         // 個別にカーブの角度（深さ）を調整する箱です！
         // 今の標準サイズは「0.05 ～ 0.095」くらいです。
-        const customCurveSizes = {
-            "33-42": 0.2,
-            "87-175": 0.16,
-            "17-72": 0.3,
+        const customCurveSizes = {"17-72": 0.3, "33-42": 0.2, "35-186": 0.3, "87-175": 0.16};
             // 例："7-12": 0.2,   ←かなり大回りなカーブになります
             // 例："3-5": 0.02    ←かなり直線に近い浅いカーブになります
-        };
 
         this.game.castles.forEach(c1 => {
             const pos1X = c1.pixelX !== undefined ? c1.pixelX : 0;
