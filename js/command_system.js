@@ -869,7 +869,6 @@ class CommandSystem {
                 });
             }
             infoHtml = "<div>家督を譲る一門武将を選択してください</div>";
-            if (extraData) extraData.allowDone = true;
         }
         else if (actionType === 'adopt_son_target') {
             const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
