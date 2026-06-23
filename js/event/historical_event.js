@@ -1167,7 +1167,6 @@ window.GameEvents.push({
 
         // ⑧ 大名家のリーダーを長政に設定します
         game.changeLeader(clanId, successor.id);
-        successor.isActionDone = true;
 
         // ⑨ 旧大名の城の城主情報を更新します
         if (oldDaimyo.castleId) {
@@ -3961,7 +3960,6 @@ window.GameEvents.push({
 
         // ⑧ 大名家のリーダーを義光に設定します
         game.changeLeader(clanId, successor.id);
-        successor.isActionDone = true;
 
         // ⑨ 旧大名の城の城主情報を更新します
         if (oldDaimyo.castleId) {

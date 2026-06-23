@@ -1359,7 +1359,6 @@ class LifeSystem {
         }
 
         this.game.changeLeader(clan.id, successor.id);
-        successor.isActionDone = true;
 
         if (oldDaimyo.castleId) {
             const oldCastle = this.game.getCastle(oldDaimyo.castleId);
