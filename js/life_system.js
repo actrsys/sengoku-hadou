@@ -1277,8 +1277,9 @@ class LifeSystem {
         successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
         oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
 
-        // ① 先代大名の役職を外します
+        // ① 先代大名の役職を外し、隠居状態にします
         oldDaimyo.isDaimyo = false;
+        oldDaimyo.isRetired = true;
 
         // ★追加：新大名がもし国主だった場合、その軍団を解散させます
         if (successor.isCommander && this.game.castleManager) {

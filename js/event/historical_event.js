@@ -1101,8 +1101,9 @@ window.GameEvents.push({
         successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
         oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
 
-        // ② 久政から大名のバッジを外します
+        // ② 久政から大名のバッジを外し、隠居状態にします
         oldDaimyo.isDaimyo = false;
+        oldDaimyo.isRetired = true;
 
         // ③ もし長政が久政と違うお城にいたら、久政のいるお城へ呼び寄せます
         if (successor.castleId !== oldDaimyo.castleId) {
@@ -3881,8 +3882,9 @@ window.GameEvents.push({
         successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
         oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
 
-        // ② 義守から大名のバッジを外します
+        // ② 義守から大名のバッジを外し、隠居状態にします
         oldDaimyo.isDaimyo = false;
+        oldDaimyo.isRetired = true;
 
         // ③ もし義光が義守と違うお城にいたら、義守のいるお城へ呼び寄せます
         if (successor.castleId !== oldDaimyo.castleId) {
