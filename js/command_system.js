@@ -116,7 +116,8 @@ const CAN_EXECUTE_RULES = {
         const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
         return game.bushos.some(b => {
             // active（登場済み）または unborn（元服前）を対象にする
-            if (b.clan !== game.playerClanId || b.isDaimyo) return false;
+            // 隠居状態（isRetired）は除外する
+            if (b.clan !== game.playerClanId || b.isDaimyo || b.isRetired) return false;
             if (b.status !== 'active' && b.status !== 'unborn') return false;
             
             // unborn の中でも「出生前」フラグが立っている場合は除外する
@@ -857,7 +858,7 @@ class CommandSystem {
             if (daimyo) {
                 const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
                 bushos = this.game.bushos.filter(b => {
-                    if (b.clan !== this.game.playerClanId || b.isDaimyo) return false;
+                    if (b.clan !== this.game.playerClanId || b.isDaimyo || b.isRetired) return false; // 隠居状態（isRetired）は除外する
                     if (b.status !== 'active' && b.status !== 'unborn') return false;
 
                     // ★追加：unborn の中でも「出生前」フラグが立っている場合は除外する
