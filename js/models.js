@@ -537,6 +537,7 @@ class Busho {
         this.isCastellan = this.isCastellan === true;
         this.isGunshi = this.isGunshi === true;
         this.isCommander = this.isCommander === true;
+        this.isRetired = data.isRetired === true;
         this.status = this.status || 'active';
         this.isActionDone = this.isActionDone === true;
 
@@ -620,6 +621,7 @@ class Busho {
         }
         if (this.isDaimyo) return "大名";
         if (this.isGunshi) return "軍師";
+        if (this.isRetired) return "隠居";
         
         // 国主のシールを持っているか、軍団の名簿に載っているか、両方チェックします！
         const isLegionCommander = this.isCommander || (window.GameApp && window.GameApp.legions && window.GameApp.legions.some(l => l.commanderId === this.id));

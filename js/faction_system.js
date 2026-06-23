@@ -187,9 +187,10 @@ class FactionSystem {
             });
 
             // リーダー候補選出
-            // 条件: 功績500以上 かつ 方針がhermit(隠遁者)ではない
+            // 条件: 功績500以上 かつ 方針がhermit(隠遁者)ではない かつ 隠居ではない
             const candidates = members.filter(b => 
                 !b.isDaimyo && 
+                !b.isRetired && 
                 b.achievementTotal >= achieveLeader && 
                 b.personality !== 'hermit'
             );
