@@ -15,64 +15,59 @@ class KunishuSystem {
         this.kunishus = kunishus;
     }
 
-    // ★ここから追加：頭領がいない諸勢力に、自動で頭領を配置する魔法です！
-    generateMissingLeaders() {
-        // 今いる武将の中で、一番大きいID（出席番号）を探します
+    // ★追加：頭領を自動生成する「共通の魔法（システム）」です！いつでも使い回せます。
+    createAutoLeader(kunishu, inheritedAffinity = 50, inheritedInnovation = 0) {
         let maxId = 0;
         this.game.bushos.forEach(b => {
             if (b.id > maxId) maxId = b.id;
         });
+        const newId = maxId + 1;
+        const currentYear = this.game.year;
 
-        const currentYear = this.game.year; // 今の年（開始年）
+        const newLeader = new Busho({
+            id: newId,
+            name: `|頭領`,
+            leadership: 30,
+            strength: 30,
+            politics: 30,
+            diplomacy: 30,
+            intelligence: 30,
+            charm: 30,
+            innovation: inheritedInnovation,
+            cooperation: 50,
+            ambition: 50,
+            duty: 50,
+            affinity: inheritedAffinity,
+            clan: 0,
+            belongKunishuId: kunishu.id,
+            castleId: kunishu.castleId,
+            birthYear: currentYear - 30,
+            endYear: 9999,
+            startYear: currentYear - 30,
+            status: 'active',
+            isAutoLeader: true
+        });
 
+        this.game.bushos.push(newLeader);
+        kunishu.leaderId = newId;
+
+        const castle = this.game.getCastle(kunishu.castleId);
+        if (castle) {
+            castle.samuraiIds.push(newId);
+        }
+        
+        return newLeader;
+    }
+
+    // ★ここから追加：頭領がいない諸勢力に、自動で頭領を配置する魔法です！（共通の魔法を使ってスッキリさせました）
+    generateMissingLeaders() {
         this.kunishus.forEach(kunishu => {
-            // この諸勢力に所属している武将を探します
             const members = this.getKunishuMembers(kunishu.id);
-            // リーダーがちゃんと生きているか確認します
             const leaderAlive = members.some(b => b.id === kunishu.leaderId);
 
-            // もしリーダーがいないなら、新しい頭領を作ります！
             if (!leaderAlive) {
-                maxId++; // 新しい出席番号を１つ進めます
-                const newId = maxId;
-
-                // 新しい武将（頭領）のデータを作ります
-                // 「|」の左側（名字）を空っぽにして、名前を「頭領」だけにします！
-                const newLeader = new Busho({
-                    id: newId,
-                    name: `|頭領`,
-                    leadership: 30,
-                    strength: 30,
-                    politics: 30,
-                    diplomacy: 30,
-                    intelligence: 30,
-                    charm: 30,
-                    innovation: 0,
-                    cooperation: 50,
-                    ambition: 50,
-                    duty: 50,
-                    affinity: 50,
-                    clan: 0, // 大名には所属していません
-                    belongKunishuId: kunishu.id,
-                    castleId: kunishu.castleId,
-                    birthYear: currentYear - 30, // 今30歳になるように計算します
-                    endYear: 9999, // 不老不死にします
-                    startYear: currentYear - 30, // すでに大人になっている年にします
-                    status: 'active', // バリバリ活動中！（★最後に「,」を付けます）
-                    isAutoLeader: true // ★追加：自動で作られた頭領だという「秘密のシール」を貼っておきます！
-                });
-
-                // 新しく作った頭領を、ゲーム全体の武将リストに登録します！
-                this.game.bushos.push(newLeader);
-                
-                // 諸勢力のリーダーを、この新しい頭領に設定します
-                kunishu.leaderId = newId;
-
-                // 頭領が住むお城のデータにも、「この人がお城に入ったよ」とメモしておきます
-                const castle = this.game.getCastle(kunishu.castleId);
-                if (castle) {
-                    castle.samuraiIds.push(newId);
-                }
+                // 初期設定なので、相性50、革新0を引き継いで頭領を作ります
+                this.createAutoLeader(kunishu, 50, 0);
             }
         });
     }
@@ -472,8 +467,8 @@ class KunishuSystem {
         // 今いるメンバーと、新しく見つけた親戚を合わせます
         const allCandidates = [...members, ...unbornFamily];
 
-        // 兵力が0、または後継ぎ候補が誰もいなくなったら壊滅します
-        if (kunishu.soldiers <= 0 || allCandidates.length === 0) {
+        // 兵力が0になったら壊滅します
+        if (kunishu.soldiers <= 0) {
             kunishu.isDestroyed = true;
             kunishu.soldiers = 0;
             
@@ -499,6 +494,19 @@ class KunishuSystem {
             });
             this.game.ui.log(`【諸勢力壊滅】${this.game.getCastle(kunishu.castleId).name}の諸勢力は壊滅しました。`);
             return;
+        }
+
+        // ★追加：後継ぎ候補が誰もいなくなった場合は、自動で新しい頭領を生成して存続させます
+        if (allCandidates.length === 0) {
+            // 死亡した直前のリーダーの相性と革新性を引き継ぎます
+            const inheritedAffinity = leader ? (leader.affinity || 50) : 50;
+            const inheritedInnovation = leader ? (leader.innovation || 0) : 0;
+
+            // 共通の魔法を呼び出して新しい頭領を作ります！
+            this.createAutoLeader(kunishu, inheritedAffinity, inheritedInnovation);
+
+            this.game.ui.log(`【諸勢力】${this.game.getCastle(kunishu.castleId).name}の諸勢力にて、新たな頭領が立ち上がりました。`);
+            return; // 継承処理はこれでおしまいなので、ここでストップします
         }
 
         // リーダーが死亡等で不在の場合、継承
