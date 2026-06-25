@@ -43,7 +43,6 @@ window.MainParams = {
     データ管理 (DataManager)
    ========================================================================== */
 class DataManager {
-    static genericNames = { surnames: [], names: [] };
     // ★追加：汎用の姫の名前を入れる箱を用意します！
     static genericPrincessNames = [];
     
@@ -57,11 +56,6 @@ class DataManager {
         try {
             await this.loadParameters("./data/parameter.csv");
             if (window.MainParams.System.UseRandomNames) {
-                try {
-                    const namesText = await this.fetchText("./data/generic_officer.csv");
-                    this.parseGenericNames(namesText);
-                } catch (e) { console.warn("汎用武将名ファイルなし"); }
-                
                 // ★ここから追加：generic_princess.csv を読み込む魔法です！
                 try {
                     const princessNamesText = await this.fetchText("./data/generic_princess.csv");
@@ -91,7 +85,6 @@ class DataManager {
             
             // ★準備係（joinData）に、軍団の名簿も一緒に渡して初期設定を行います
             this.joinData(clans, castles, bushos, princesses, legions);
-            if (bushos.length < 50) this.generateGenericBushos(bushos, castles, clans);
             
             try {
                 await this.loadColorMap('./data/images/map/japan_colorcode_map.png', castles);
@@ -372,16 +365,6 @@ class DataManager {
         }
         return result;
     }
-    static parseGenericNames(text) {
-        const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-        if (lines.length < 2) return;
-        for (let i = 1; i < lines.length; i++) {
-            const [surname, name] = lines[i].split(',');
-            if (surname) this.genericNames.surnames.push(surname.trim());
-            if (name) this.genericNames.names.push(name.trim());
-        }
-    }
-
     // ★ここから追加：読み込んだ generic_princess.csv の文字を、名前のリストに翻訳する魔法です！
     static parseGenericPrincessNames(text) {
         // 読み込んだ文字を1行ずつバラバラにして、整理します
@@ -399,38 +382,7 @@ class DataManager {
         }
     }
 
-    static generateGenericBushos(bushos, castles, clans) {
-        let idCounter = 90000;
-        const personalities = ['aggressive', 'cautious', 'balanced'];
-        const useRandom = window.MainParams.System.UseRandomNames && this.genericNames.surnames.length > 0;
-        clans.forEach(clan => {
-            const clanCastles = castles.filter(c => Number(c.ownerClan) === Number(clan.id));
-            if(clanCastles.length === 0) return;
-            for(let i=0; i<3; i++) {
-                const castle = clanCastles[Math.floor(Math.random() * clanCastles.length)];
-                const p = personalities[Math.floor(Math.random() * personalities.length)];
-                let bName = `武将|${String.fromCharCode(65+i)}`;
-                if (useRandom) {
-                    const s = this.genericNames.surnames[Math.floor(Math.random() * this.genericNames.surnames.length)];
-                    const n = this.genericNames.names[Math.floor(Math.random() * this.genericNames.names.length)];
-                    bName = `${s}|${n}`;
-                }
-                bushos.push(new Busho({
-                    id: idCounter++, name: bName, 
-                    strength: 30+Math.floor(Math.random()*40), leadership: 30+Math.floor(Math.random()*40), 
-                    politics: 30+Math.floor(Math.random()*40), diplomacy: 30+Math.floor(Math.random()*40), 
-                    intelligence: 30+Math.floor(Math.random()*40), charm: 30+Math.floor(Math.random()*40), 
-                    loyalty: 80, duty: 30+Math.floor(Math.random()*60),
-                    innovation: Math.floor(Math.random() * 100), cooperation: Math.floor(Math.random() * 100),
-                    clan: clan.id, castleId: castle.id, isCastellan: false, 
-                    personality: p, ambition: 30+Math.floor(Math.random()*40), affinity: Math.floor(Math.random()*100)
-                }));
-                castle.samuraiIds.push(idCounter-1);
-            }
-        });
-    }
-    
-        // ============================================
+    // ============================================
     // ★ここから書き足し！：画像から色を探す魔法です！
     // ============================================
     static async loadColorMap(url, castles) {
