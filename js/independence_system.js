@@ -1027,7 +1027,25 @@ class IndependenceSystem {
             }
 
             // 裏で野戦を行います！
-            const result = await this.executeSecretFieldWar(daimyoMembers, rebelMembers, oldDaimyo, rebellionLeader);
+            const warResult = await this.executeSecretFieldWar(daimyoMembers, rebelMembers, oldDaimyo, rebellionLeader);
+            const result = warResult.result;
+
+            // ★追加：ここで野戦での総被害数を計算し、全拠点から割合で減らします！
+            const totalDead = warResult.deadAttacker + warResult.deadDefender;
+            if (totalDead > 0) {
+                // 旧勢力（oldClanId）が持っている全てのお城を集めます
+                const clanCastles = this.game.castles.filter(c => c.ownerClan === oldClanId);
+                const totalClanSoldiers = clanCastles.reduce((sum, c) => sum + c.soldiers, 0);
+                
+                if (totalClanSoldiers > 0) {
+                    clanCastles.forEach(c => {
+                        // そのお城が全体の兵士の中で何割を持っているかを計算し、被害数を割り振ります
+                        const ratio = c.soldiers / totalClanSoldiers;
+                        const lost = Math.floor(totalDead * ratio);
+                        c.soldiers = Math.max(0, c.soldiers - lost);
+                    });
+                }
+            }
 
             if (result === 'rebel_win') {
                 // 【反乱軍の勝利】
@@ -1284,14 +1302,15 @@ class IndependenceSystem {
         const otherRebelMembers = rebelMembers.filter(b => b.id !== rebellionLeader.id).sort(sortByStr).slice(0, 4);
         const rebelTeamBushos = [rebellionLeader, ...otherRebelMembers];
 
-        // 2. 兵士数を「派閥の人数比」に合わせて、合計10000人を分け合います！
+        // 2. 兵士数を「派閥の人数比」に合わせて、現在の勢力の総兵力を分け合います！
         const totalCount = daimyoMembers.length + rebelMembers.length;
-        const daimyoTotalPool = Math.floor(10000 * (daimyoMembers.length / totalCount));
-        const rebelTotalPool = 10000 - daimyoTotalPool;
-
-        // 実際に決戦場で戦う5人の部隊に、それぞれの取り分を均等に配ります
-        const daimyoPerUnit = Math.floor(daimyoTotalPool / daimyoTeamBushos.length);
-        const rebelPerUnit = Math.floor(rebelTotalPool / rebelTeamBushos.length);
+        
+        // 今のその大名家（旧主家）が持っている兵士の合計を調べます
+        const currentTotalSoldiers = this.game.getClanTotalSoldiers(oldDaimyo.clan);
+        
+        // 調べた兵士の合計数を、それぞれの人数比で分け合います
+        const daimyoTotalPool = Math.floor(currentTotalSoldiers * (daimyoMembers.length / totalCount));
+        const rebelTotalPool = currentTotalSoldiers - daimyoTotalPool;
 
         const daimyoAssignments = daimyoTeamBushos.map(b => ({
             busho: b,
@@ -1315,14 +1334,24 @@ class IndependenceSystem {
         const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name; 
         const rebelClanName = `${familyName}家`;
 
+        // ★追加：大名と謀反リーダーが現在いるお城のデータを探して、士気と訓練度を取り出します！
+        const daimyoCastle = this.game.getCastle(oldDaimyo.castleId);
+        const rebelCastle = this.game.getCastle(rebellionLeader.castleId);
+
+        // 見つからなかった場合の保険として「50」を入れておきます
+        const daimyoMorale = daimyoCastle ? daimyoCastle.morale : 50;
+        const daimyoTraining = daimyoCastle ? daimyoCastle.training : 50;
+        const rebelMorale = rebelCastle ? rebelCastle.morale : 50;
+        const rebelTraining = rebelCastle ? rebelCastle.training : 50;
+
         const fakeWarState = {
             attacker: { 
                 ownerClan: -1, 
                 name: rebelClanName, 
                 soldiers: rebelTotalPool,
-                rice: 5000, 
-                morale: 70, 
-                training: 50,
+                rice: Math.floor(rebelTotalPool * 1.0), // ★反乱軍の兵士数の1.0倍のお米を持たせます
+                morale: rebelMorale,
+                training: rebelTraining,
                 isKunishu: false
             },
             defender: { 
@@ -1330,8 +1359,8 @@ class IndependenceSystem {
                 ownerClan: defClanId, 
                 name: "主家軍", 
                 soldiers: daimyoTotalPool,
-                morale: 50, 
-                training: 50,
+                morale: daimyoMorale,
+                training: daimyoTraining,
                 isDelegated: false,
                 isKunishu: false
             },
@@ -1342,7 +1371,7 @@ class IndependenceSystem {
                 isDelegated: false,
                 isKunishu: false
             },
-            defFieldRice: 5000,
+            defFieldRice: Math.floor(daimyoTotalPool * 1.0), // ★主家軍の兵士数の1.0倍のお米を持たせます
             atkAssignments: rebelAssignments,
             defAssignments: daimyoAssignments,
             deadSoldiers: { attacker: 0, defender: 0 },
@@ -1364,13 +1393,19 @@ class IndependenceSystem {
 
                 // 結果を翻訳して返します
                 // attacker = 反乱軍, defender = 主家軍
+                let finalResult = 'draw';
                 if (resultType === 'attacker_win' || resultType === 'defender_retreat') {
-                    resolve('rebel_win');
+                    finalResult = 'rebel_win';
                 } else if (resultType === 'attacker_lose' || resultType === 'attacker_retreat') {
-                    resolve('daimyo_win');
-                } else {
-                    resolve('draw');
+                    finalResult = 'daimyo_win';
                 }
+                
+                // ★変更：結果と一緒に、記録された被害の数も返します！
+                resolve({ 
+                    result: finalResult, 
+                    deadAttacker: fakeWarState.deadSoldiers.attacker, 
+                    deadDefender: fakeWarState.deadSoldiers.defender 
+                });
             });
         });
     }
