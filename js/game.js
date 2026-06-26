@@ -1478,7 +1478,26 @@ class GameManager {
             this.ui.aiGuard.classList.remove('hidden');
             this.ui.hideAIGuardText(); // ★中身を壊さずに、透明にして文字だけ隠します！
         }
-
+        
+        // 大名と同じ派閥に属している武将の忠誠度アップと承認欲求ダウン
+        this.clans.forEach(clan => {
+            if (clan.id !== 0 && !clan.isDestroyed) {
+                const daimyo = this.bushos.find(b => b.clan === clan.id && b.isDaimyo);
+                // 大名が存在し、何らかの派閥に属している場合
+                if (daimyo && daimyo.factionId > 0) {
+                    this.bushos.forEach(b => {
+                        // 同じ勢力で活動中で、大名と同じ派閥に属している武将を探します
+                        if (b.clan === clan.id && b.status === 'active' && b.factionId === daimyo.factionId) {
+                            // 忠誠度を1上げます（最大100まで）
+                            b.loyalty = Math.min(100, b.loyalty + 1);
+                            // 承認欲求を3下げます（最低0まで）
+                            b.recognitionNeed = Math.max(0, (b.recognitionNeed || 0) - 3);
+                        }
+                    });
+                }
+            }
+        });
+        
         // ★月が替わったら軍師の報告印を消します
         if (this.gunshiSystem) this.gunshiSystem.onStartMonth();
         
