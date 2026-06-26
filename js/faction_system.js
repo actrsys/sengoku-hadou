@@ -46,7 +46,11 @@ class FactionSystem {
             change = Math.floor(change / 2);
         }
 
-        busho.recognitionNeed = Math.max(-100, Math.min(100, busho.recognitionNeed + change));
+        // 設定値から最大値と最小値を取得します（なければ-100と100を予備として使用）
+        const minRec = F.MinRecognition !== undefined ? F.MinRecognition : -100;
+        const maxRec = F.MaxRecognition !== undefined ? F.MaxRecognition : 100;
+
+        busho.recognitionNeed = Math.max(minRec, Math.min(maxRec, busho.recognitionNeed + change));
     }
 
     /**

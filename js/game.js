@@ -1479,19 +1479,22 @@ class GameManager {
             this.ui.hideAIGuardText(); // ★中身を壊さずに、透明にして文字だけ隠します！
         }
         
-        // 大名と同じ派閥に属している武将の忠誠度アップと承認欲求ダウン
+        // 大名と同じ派閥に属している武将の忠誠度アップと承認欲求ダウン（設定値から読み込み）
+        const F = window.WarParams.Faction || {};
+        const minRec = F.MinRecognition !== undefined ? F.MinRecognition : -100;
+        const decayRec = F.SameFactionRecognitionDecay !== undefined ? F.SameFactionRecognitionDecay : 3;
+        const boostLoy = F.SameFactionLoyaltyBoost !== undefined ? F.SameFactionLoyaltyBoost : 1;
+
         this.clans.forEach(clan => {
             if (clan.id !== 0 && !clan.isDestroyed) {
                 const daimyo = this.bushos.find(b => b.clan === clan.id && b.isDaimyo);
-                // 大名が存在し、何らかの派閥に属している場合
                 if (daimyo && daimyo.factionId > 0) {
                     this.bushos.forEach(b => {
-                        // 同じ勢力で活動中で、大名と同じ派閥に属している武将を探します
                         if (b.clan === clan.id && b.status === 'active' && b.factionId === daimyo.factionId) {
-                            // 忠誠度を1上げます（最大100まで）
-                            b.loyalty = Math.min(100, b.loyalty + 1);
-                            // 承認欲求を3下げます（最低0まで）
-                            b.recognitionNeed = Math.max(0, (b.recognitionNeed || 0) - 3);
+                            // 設定された数値ぶん忠誠度を上げます
+                            b.loyalty = Math.min(100, b.loyalty + boostLoy);
+                            // 設定された数値ぶん承認欲求を下げます（最小値チェックも設定から読み込み）
+                            b.recognitionNeed = Math.max(minRec, (b.recognitionNeed || 0) - decayRec);
                         }
                     });
                 }
