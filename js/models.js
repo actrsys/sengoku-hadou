@@ -886,13 +886,24 @@ class Kunishu {
         }
         
         let newVal = Math.max(0, Math.min(100, value));
+        
+        // ★友好度の数値に合わせて、状態（status）の文字も自動で切り替える魔法です！
+        let newStatus = '普通';
+        if (newVal >= 70) {
+            newStatus = '友好';
+        } else if (newVal <= 30) {
+            newStatus = '敵対';
+        }
+
         if (isKunishu) {
             // まだデータがない相手なら、新しくセットを作ります
             if (!this.kunishuRelations[targetId]) this.kunishuRelations[targetId] = { status: '普通', sentiment: 50 };
             this.kunishuRelations[targetId].sentiment = newVal;
+            this.kunishuRelations[targetId].status = newStatus; // ★状態も更新します
         } else {
             if (!this.daimyoRelations[targetId]) this.daimyoRelations[targetId] = { status: '普通', sentiment: 50 };
             this.daimyoRelations[targetId].sentiment = newVal;
+            this.daimyoRelations[targetId].status = newStatus; // ★状態も更新します
         }
     }
     
