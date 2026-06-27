@@ -61,12 +61,12 @@ class DataManager {
                     const princessNamesText = await this.fetchText("./data/generic_princess.csv");
                     this.parseGenericPrincessNames(princessNamesText);
                 } catch (e) { console.warn("汎用姫名ファイルなし"); }
-            }
+            }// 差し替え後
             // ★今回追加：princess.csv と legions.csv も一緒に読み込むようにリストに加えます！
             const [clansText, castlesText, bushosText, kunishusText, courtRanksText, princessesText, provincesText, legionsText] = await Promise.all([                
                 this.fetchText(path + "clans.csv"),                
                 this.fetchText(path + "castles.csv"),                
-                this.fetchText(path + "warriors.csv"),
+                this.fetchCompressed(path + "warriors.bin"), // ★ここを fetchText から fetchCompressed にし、.bin に変更！
                 this.fetchText(path + "kunishuClan.csv").catch(() => ""),
                 this.fetchText("./data/imperialCourtRank.csv").catch(() => ""),
                 this.fetchText(path + "princess.csv").catch(() => ""), 
@@ -160,6 +160,31 @@ class DataManager {
             text = text.slice(1);
         }
         return text;
+    }
+    
+    static async fetchCompressed(url) {
+        // キャッシュ（古いデータ）を読み込まないためのおまじないです
+        const mark = url.includes('?') ? '&v=' : '?v=';
+        const noCacheUrl = url + mark + Date.now();
+        
+        const response = await fetch(noCacheUrl);
+        if (!response.ok) throw new Error(`Failed to load ${url}`);
+        
+        // 1. データを「文字」ではなく「バイナリ（ArrayBuffer）」として受け取ります
+        const arrayBuffer = await response.arrayBuffer();
+        
+        // 2. pakoを使って、圧縮されたバイナリデータを元の状態に解凍します
+        const decompressed = pako.inflate(new Uint8Array(arrayBuffer));
+        
+        // 3. 解凍したデータを、人間の読める「文字（テキスト）」に戻します
+        const textDecoder = new TextDecoder("utf-8");
+        let text = textDecoder.decode(decompressed);
+        
+        // 先頭に不要な見えない文字（BOM）があれば取り除きます
+        if (text.charCodeAt(0) === 0xFEFF) {
+            text = text.slice(1);
+        }
+        return text; // 解凍済みのCSVテキストとして返します
     }
     
     // ★ゲーム開始時の状態を作る魔法です！（今回から軍団の名簿も受け取ります）
