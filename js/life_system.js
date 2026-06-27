@@ -232,6 +232,37 @@ class LifeSystem {
                 if (targetCastle) {
                     targetCastle.samuraiIds.push(b.id);
                 }
+
+                // ★ここから追加：もし今の頭領が「モブ頭領」なら、新しく登場した武将と交代してモブ頭領を消します！
+                if (this.game.kunishuSystem) {
+                    const kunishu = this.game.kunishuSystem.getKunishu(b.belongKunishuId);
+                    if (kunishu) {
+                        const currentLeader = this.game.getBusho(kunishu.leaderId);
+                        
+                        // 今の頭領が自動生成された（isAutoLeaderシールが貼ってある）モブ頭領の場合
+                        if (currentLeader && currentLeader.isAutoLeader) {
+                            // 1. 新しく登場した武将を、諸勢力の新しい頭領に任命します
+                            kunishu.leaderId = b.id;
+                            
+                            // 2. モブ頭領を消去（死亡扱いにしてお城の名簿から消す）します
+                            currentLeader.status = 'dead';
+                            if (targetCastle) {
+                                targetCastle.samuraiIds = targetCastle.samuraiIds.filter(id => id !== currentLeader.id);
+                            }
+                            
+                            // 3. お知らせのメッセージを作って画面に出します
+                            const bushoName = b.name.replace('|', '');
+                            const kunishuName = kunishu.getName(this.game);
+                            const msg = `${bushoName}が${kunishuName}の頭領に就任しました。`;
+                            
+                            // 履歴に残して、ダイアログを画面に表示します
+                            this.game.ui.log(`【頭領交代】${msg}`);
+                            await this.game.ui.showDialogAsync(msg, false, 0);
+                        }
+                    }
+                }
+                // ★追加ここまで
+
             } else {
                 // 登場前:仕官 の場合
                 b.status = 'active';
