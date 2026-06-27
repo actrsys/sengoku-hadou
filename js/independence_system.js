@@ -1312,6 +1312,10 @@ class IndependenceSystem {
         const daimyoTotalPool = Math.floor(currentTotalSoldiers * (daimyoMembers.length / totalCount));
         const rebelTotalPool = currentTotalSoldiers - daimyoTotalPool;
 
+        // 各部隊に割り振る兵士数を計算して箱にしまいます
+        const daimyoPerUnit = Math.floor(daimyoTotalPool / daimyoTeamBushos.length);
+        const rebelPerUnit = Math.floor(rebelTotalPool / rebelTeamBushos.length);
+
         const daimyoAssignments = daimyoTeamBushos.map(b => ({
             busho: b,
             soldiers: daimyoPerUnit,
