@@ -1461,7 +1461,7 @@ class LifeSystem {
             if (reason === 'no_heir') {
                 extMsg = `当主が死亡し、後継ぎがいないため\n${displayClanName}は滅亡しました。`;
             } else {
-                extMsg = `拠点を全て失い、\n${displayClanName}は滅亡しました。`;
+                extMsg = `拠点を全て失い、${displayClanName}は滅亡しました。`;
             }
             
             // 履歴にメッセージを残します
