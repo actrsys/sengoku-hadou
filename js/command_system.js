@@ -942,11 +942,39 @@ class CommandSystem {
                          return typeof GameSystem.calcSoldierCharity === 'function' ? GameSystem.calcSoldierCharity(target, cCastle.soldiers || 1, 1.0) : target.leadership;
                      }
                      if (actionType === 'draft') {
-                         return typeof GameSystem.calcDraftBushoScore === 'function' ? GameSystem.calcDraftBushoScore(target) : (target.leadership * 1.5) + (target.charm * 1.5);
+                         // ★変更：城の実際の民忠と人口を渡して、リアルな「徴兵効率」でソートします
+                         return typeof GameSystem.calcDraftEfficiency === 'function' ? GameSystem.calcDraftEfficiency(target, cCastle.peoplesLoyalty, cCastle.population) : (target.leadership * 1.5) + (target.charm * 1.5);
                      }
                      if (['war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy'].includes(actionType)) {
                          return (target.leadership * 1.5) + target.strength;
                      }
+
+                     // ==========================================
+                     // ★ここから追加：調略系の「成功率 × 効果」による期待値ソート！
+                     // ==========================================
+                     if (actionType === 'sabotage_doer') {
+                         // 破壊工作：武力ベース(成功率)と智謀ベース(ダメージ)の掛け算
+                         const prob = ((target.strength * 1.5) + (Math.sqrt(target.loyalty) * 2)) / 200;
+                         const damage = ((target.intelligence * 1.5) + (Math.sqrt(target.loyalty) * 2)) / 10;
+                         return prob * damage;
+                     }
+                     if (actionType === 'incite_doer') {
+                         // 民心撹乱：武力ベース(成功率)と智謀ベース(ダメージ)の掛け算
+                         // ※敵の民忠をダミーの「50」として計算します（loyaltyBonus = 50/120 + 0.9 ≒ 1.3）
+                         const dummyLoyaltyBonus = 1.3;
+                         const prob = (((target.strength * 1.5) + (Math.sqrt(target.loyalty) * 2)) / 150) / dummyLoyaltyBonus;
+                         const damage = (((target.intelligence * 1.5) + (Math.sqrt(target.loyalty) * 2)) / 20) / dummyLoyaltyBonus;
+                         return prob * damage;
+                     }
+                     if (actionType === 'rumor_doer') {
+                         // 離間計：智謀7割、武力3割のスコア（実際の計算式と同じ比率）
+                         return (target.intelligence * 0.7) + (target.strength * 0.3);
+                     }
+                     if (actionType === 'headhunt_doer') {
+                         // 引抜：智謀の重み（0.8）と、適性を表す魅力などの総合的な強さ
+                         return (target.intelligence * 0.8) + (target.charm * 0.2) + (target.loyalty * 0.1);
+                     }
+                     // ==========================================
                  } catch (e) {
                  }
 
