@@ -2722,8 +2722,8 @@ class DiplomacyManager {
                          // 最大1500金までに制限して、100金単位で綺麗に丸めます
                          goodwillGold = Math.min(1500, Math.floor(goodwillGold / 100) * 100); 
                          
-                         // 0金で親善しないように最低額を100金に保証します
-                         if (goodwillGold < 100) goodwillGold = 100; 
+                         // 0金で親善しないように最低額を200金に保証します
+                         if (goodwillGold < 200) goodwillGold = 200; 
 
                          return { action: 'goodwill', gold: goodwillGold };
                      }
