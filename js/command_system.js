@@ -1879,7 +1879,7 @@ class CommandSystem {
                 this.showAdviceAndExecute('kunishu_goodwill', () => this.game.kunishuSystem.executeKunishuGoodwill(data[0], extraData.kunishuId, val), { trueProb: 1.0 });
             } else {
                 // ここでも合図だけ！
-                const prob = this.game.diplomacyManager.getDiplomacyProb(data[0], targetId, 'goodwill');
+                const prob = this.game.diplomacyManager.getDiplomacyProb(data[0], targetId, 'goodwill', val);
                 this.showAdviceAndExecute('goodwill', () => this.game.diplomacyManager.executeDiplomacy(data[0], targetId, 'goodwill', val), { trueProb: prob / 100 });
             }
         }

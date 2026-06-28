@@ -293,7 +293,7 @@ class DiplomacyManager {
      * 外交の成功確率（％）を計算して返す魔法です
      * 武将のIDなどから、必要な情報を自動で集めて計算します！
      */
-    getDiplomacyProb(doerId, targetId, type) {
+    getDiplomacyProb(doerId, targetId, type, gold = 0) {
         // IDから必要な情報を自分で集めます
         const doer = this.game.getBusho(doerId);
         const targetCastle = this.game.getCastle(targetId);
@@ -324,6 +324,9 @@ class DiplomacyManager {
             if (commonEnemy) acceptProb += 30;
             if (allyCount >= 2) acceptProb -= (allyCount - 1) * 20;
             if (targetPower > myPower) acceptProb *= (Math.sqrt(myPower) / Math.sqrt(targetPower));
+            
+            // ★追加：持参した金による確率アップ（15金につき0.1%アップ。1500金で最大10%アップします）
+            acceptProb += (gold / 15) * 0.1;
             
             // ★友好・同盟・支配・従属のいずれかの関係なら最終的な確率に+50%、和睦は+30%します
             if (['友好', '同盟', '支配', '従属'].includes(relation.status)) {
@@ -597,9 +600,9 @@ class DiplomacyManager {
     /**
      * 外交の成功判定を行います
      */
-    checkDiplomacySuccess(doerId, targetId, type) {
+    checkDiplomacySuccess(doerId, targetId, type, gold = 0) {
         // 外交担当が自分で計算した確率を使って、サイコロを振ります
-        const prob = this.getDiplomacyProb(doerId, targetId, type);
+        const prob = this.getDiplomacyProb(doerId, targetId, type, gold);
         return (Math.random() * 100) < prob;
     }
     
@@ -985,7 +988,7 @@ class DiplomacyManager {
         if (type === 'goodwill') {
             let isSuccess = true;
             if (targetClanId !== this.game.playerClanId) {
-                isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, type);
+                isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, type, gold);
             }
 
             if (doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
@@ -2697,7 +2700,31 @@ class DiplomacyManager {
                              goodwillGold = 600;
                          }
 
-                         goodwillGold = Math.floor(goodwillGold / 100) * 100; 
+                         // ★ここから追加：成功率が70%未満なら、金額を上乗せして確率を上げる賢いAIの魔法！
+                         if (myDaimyo && targetDaimyo && targetDaimyo.castleId) {
+                             // お金0でのベース成功率を予測します
+                             // （※もしこのコードを ai.js に書いている場合は、this.getDiplomacyProb を this.game.diplomacyManager.getDiplomacyProb に変更してください）
+                             const baseProb = this.getDiplomacyProb(myDaimyo.id, targetDaimyo.castleId, 'goodwill', 0);
+                             
+                             if (baseProb < 70) {
+                                 // 70%に届くために足りない確率を計算します
+                                 const shortage = 70 - baseProb;
+                                 // 1%上げるのに150金（0.1%で15金）必要なので、必要な追加金額を計算します
+                                 const neededGold = Math.ceil(shortage * 150);
+                                 
+                                 // AIが元々予定していた金額より多く必要なら、奮発して金額を増やします
+                                 if (goodwillGold < neededGold) {
+                                     goodwillGold = neededGold;
+                                 }
+                             }
+                         }
+
+                         // 最大1500金までに制限して、100金単位で綺麗に丸めます
+                         goodwillGold = Math.min(1500, Math.floor(goodwillGold / 100) * 100); 
+                         
+                         // 0金で親善しないように最低額を100金に保証します
+                         if (goodwillGold < 100) goodwillGold = 100; 
+
                          return { action: 'goodwill', gold: goodwillGold };
                      }
                 } else if (rel.sentiment > allianceThreshold) {
