@@ -965,6 +965,21 @@ class CommandSystem {
                          return typeof StrategySystem.calcHeadhuntScore === 'function' ? StrategySystem.calcHeadhuntScore(target) : 0;
                      }
                      // ==========================================
+                     // ★追加：外交コマンドの時は、外交の専門部署に「成功率」を計算させてそれで並べ替えます！
+                     if (actionType === 'diplomacy_doer' && extraData && extraData.subAction) {
+                         const subType = extraData.subAction;
+                         if (['goodwill', 'alliance', 'subordinate', 'truce', 'marriage', 'dominate'].includes(subType)) {
+                             // diplomacy.js で一元管理されている魔法を呼び出します
+                             if (this.game && this.game.diplomacyManager && typeof this.game.diplomacyManager.getDiplomacyProb === 'function') {
+                                 const prob = this.game.diplomacyManager.getDiplomacyProb(target.id, targetId, subType);
+                                 // 同じ成功率なら、外交力が高い人が少しだけ上に来るように「小数点」でオマケをつけます
+                                 return prob + (target.diplomacy * 0.001);
+                             }
+                         }
+                         // 成功率の計算がないもの（朝廷和睦や断交など）は、シンプルに外交力を使います
+                         return target.diplomacy;
+                     }
+                     // ==========================================
                  } catch (e) {
                  }
 
