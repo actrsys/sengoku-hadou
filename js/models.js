@@ -804,13 +804,12 @@ class Kunishu {
         
         this.ideology = this.ideology || '地縁';
         
-        // ★修正: 友好度管理の箱を「大名用」と「諸勢力用」に分けました
+        // ★友好度管理の箱です
         this.daimyoRelations = {};
-        this.kunishuRelations = {};
         
         // CSVの大名用データを翻訳して箱に入れる
         if (typeof data.daimyoRelations === 'string' && data.daimyoRelations.trim() !== "") {
-            const parts = data.daimyoRelations.split('|'); // ★「,」ではなく「|」で区切るようにしました
+            const parts = data.daimyoRelations.split('|');
             parts.forEach(part => {
                 const items = part.split(':');
                 if (items.length >= 3) { // ★ID、状態、関係値の3つがあるかチェックします
@@ -825,24 +824,6 @@ class Kunishu {
             });
         } else if (typeof data.daimyoRelations === 'object') {
             this.daimyoRelations = data.daimyoRelations;
-        }
-
-        // CSVの諸勢力用データを翻訳して箱に入れる
-        if (typeof data.kunishuRelations === 'string' && data.kunishuRelations.trim() !== "") {
-            const parts = data.kunishuRelations.split('|'); // ★こちらも「|」で区切ります
-            parts.forEach(part => {
-                const items = part.split(':');
-                if (items.length >= 3) { // ★3つあるかチェック
-                    const targetId = Number(items[0].trim());
-                    const statusStr = items[1].trim();
-                    const value = Number(items[2].trim());
-                    if (!isNaN(targetId) && !isNaN(value)) {
-                        this.kunishuRelations[targetId] = { status: statusStr, sentiment: value };
-                    }
-                }
-            });
-        } else if (typeof data.kunishuRelations === 'object') {
-            this.kunishuRelations = data.kunishuRelations;
         }
         
         this.isDestroyed = data.isDestroyed === true;
@@ -863,20 +844,15 @@ class Kunishu {
         return "諸勢力";
     }
 
-    // ★修正: 仲良し度を調べる機能
-    getRelation(targetId, isKunishu = false) {
-        if (isKunishu) {
-            // 箱の中の「sentiment（関係値）」だけを取り出して返します
-            return this.kunishuRelations[targetId] !== undefined ? this.kunishuRelations[targetId].sentiment : 50;
-        } else {
-            return this.daimyoRelations[targetId] !== undefined ? this.daimyoRelations[targetId].sentiment : 50;
-        }
+    // ★修正: 仲良し度を調べる機能（大名用の箱だけを見ます）
+    getRelation(targetId) {
+        return this.daimyoRelations[targetId] !== undefined ? this.daimyoRelations[targetId].sentiment : 50;
     }
 
     // ★修正: 仲良し度を書き込む機能（傭兵ボーナス追加）
-    setRelation(targetId, value, isKunishu = false) {
+    setRelation(targetId, value) {
         // 今の友好度を調べて、どれくらい増減するのか計算します
-        let currentVal = this.getRelation(targetId, isKunishu);
+        let currentVal = this.getRelation(targetId);
         let diff = value - currentVal;
         
         // 傭兵で、かつ友好度が増える時だけ、増える量を1.2倍にします！
@@ -895,16 +871,9 @@ class Kunishu {
             newStatus = '敵対';
         }
 
-        if (isKunishu) {
-            // まだデータがない相手なら、新しくセットを作ります
-            if (!this.kunishuRelations[targetId]) this.kunishuRelations[targetId] = { status: '普通', sentiment: 50 };
-            this.kunishuRelations[targetId].sentiment = newVal;
-            this.kunishuRelations[targetId].status = newStatus; // ★状態も更新します
-        } else {
-            if (!this.daimyoRelations[targetId]) this.daimyoRelations[targetId] = { status: '普通', sentiment: 50 };
-            this.daimyoRelations[targetId].sentiment = newVal;
-            this.daimyoRelations[targetId].status = newStatus; // ★状態も更新します
-        }
+        if (!this.daimyoRelations[targetId]) this.daimyoRelations[targetId] = { status: '普通', sentiment: 50 };
+        this.daimyoRelations[targetId].sentiment = newVal;
+        this.daimyoRelations[targetId].status = newStatus; // ★状態も更新します
     }
     
 }
