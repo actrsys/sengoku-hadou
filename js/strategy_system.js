@@ -7,7 +7,43 @@ class StrategySystem {
     constructor(game) {
         this.game = game;
     }
+    
+    // ==========================================
+    // ★調略の能力スコアを計算する共通の処理（一箇所で管理・完全版）
+    // ==========================================
+    // --- 破壊工作 ---
+    static getSabotageProbBase(busho) {
+        return ((busho.strength * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 200;
+    }
+    static getSabotageDamageBase(busho) {
+        return ((busho.intelligence * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 10;
+    }
+    static calcSabotageScore(busho) {
+        return StrategySystem.getSabotageProbBase(busho) * StrategySystem.getSabotageDamageBase(busho);
+    }
 
+    // --- 民心撹乱（扇動） ---
+    static getInciteProbBase(busho) {
+        return ((busho.strength * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 150;
+    }
+    static getInciteDamageBase(busho) {
+        return ((busho.intelligence * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20;
+    }
+    static calcInciteScore(busho) {
+        const dummyLoyaltyBonus = 1.3;
+        return (StrategySystem.getInciteProbBase(busho) / dummyLoyaltyBonus) * (StrategySystem.getInciteDamageBase(busho) / dummyLoyaltyBonus);
+    }
+
+    // --- 離間計 ---
+    static calcRumorScore(busho) {
+        return (busho.intelligence * 0.7) + (busho.strength * 0.3);
+    }
+
+    // --- 引抜 ---
+    static calcHeadhuntScore(busho) {
+        return (busho.intelligence * 0.8) + (busho.charm * 0.2) + (busho.loyalty * 0.1);
+    }
+    
     // ★追加：対象が役職者本人か、役職持ちの一門か、ただの一門かなどを判定する魔法です（一元化）
     // 戻り値：3(役職者本人), 2(役職持ちの一門), 1(同じ勢力に一門がいる), 0(それ以外)
     checkOfficerStatus(targetBusho) {
@@ -43,8 +79,8 @@ class StrategySystem {
         const busho = this.game.getBusho(doerId);
         const targetCastle = this.game.getCastle(targetId);
 
-        const strBonus = ((busho.strength * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 150;
-        const intBonus = ((busho.intelligence * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20;
+        // ★共通処理から基礎確率を呼び出す
+        const strBonus = StrategySystem.getInciteProbBase(busho);
         const loyaltyBonus = (targetCastle.peoplesLoyalty / 120) + 0.9;
         
         const prob = strBonus / loyaltyBonus;
@@ -54,7 +90,9 @@ class StrategySystem {
     getRumorProb(doerId, targetBushoId) {
         const busho = this.game.getBusho(doerId);
         const targetBusho = this.game.getBusho(targetBushoId);
-        const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
+        
+        // ★共通処理から基礎スコアを呼び出す
+        const score = StrategySystem.calcRumorScore(busho); 
         const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
         let prob = Math.min(1.0, score / (defScore + window.MainParams.Strategy.RumorFactor)) * 0.5;
         
@@ -112,7 +150,8 @@ class StrategySystem {
     getSabotageProb(doerId, targetId) {
         const busho = this.game.getBusho(doerId);
 
-        const prob = ((busho.strength * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 200;
+        // ★共通処理から基礎確率を呼び出す
+        const prob = StrategySystem.getSabotageProbBase(busho);
         
         return Math.max(0.01, Math.min(0.99, prob));
     }
@@ -139,7 +178,8 @@ class StrategySystem {
         
         if(!success) return { success: false, val: 0 }; 
         
-        const damage = Math.max(1, Math.floor(((busho.intelligence * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 10));
+        // ★共通処理から基礎ダメージを呼び出す
+        const damage = Math.max(1, Math.floor(StrategySystem.getSabotageDamageBase(busho)));
         return { success: true, val: damage }; 
     }
     
@@ -154,7 +194,8 @@ class StrategySystem {
         
         if(!success) return { success: false, val: 0 }; 
         
-        const intBonus = ((busho.intelligence * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20;
+        // ★共通処理から基礎ダメージを呼び出す
+        const intBonus = StrategySystem.getInciteDamageBase(busho);
         const loyaltyBonus = (targetCastle.peoplesLoyalty / 120) + 0.9;
         const damage = Math.max(1, Math.floor(intBonus / loyaltyBonus));
         return { success: true, val: damage }; 

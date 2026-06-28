@@ -950,29 +950,19 @@ class CommandSystem {
                      }
 
                      // ==========================================
-                     // ★ここから追加：調略系の「成功率 × 効果」による期待値ソート！
+                     // ★変更：計算式を strategy_system.js の共通処理から呼び出すようにしました
                      // ==========================================
                      if (actionType === 'sabotage_doer') {
-                         // 破壊工作：武力ベース(成功率)と智謀ベース(ダメージ)の掛け算
-                         const prob = ((target.strength * 1.5) + (Math.sqrt(target.loyalty) * 2)) / 200;
-                         const damage = ((target.intelligence * 1.5) + (Math.sqrt(target.loyalty) * 2)) / 10;
-                         return prob * damage;
+                         return typeof StrategySystem.calcSabotageScore === 'function' ? StrategySystem.calcSabotageScore(target) : 0;
                      }
                      if (actionType === 'incite_doer') {
-                         // 民心撹乱：武力ベース(成功率)と智謀ベース(ダメージ)の掛け算
-                         // ※敵の民忠をダミーの「50」として計算します（loyaltyBonus = 50/120 + 0.9 ≒ 1.3）
-                         const dummyLoyaltyBonus = 1.3;
-                         const prob = (((target.strength * 1.5) + (Math.sqrt(target.loyalty) * 2)) / 150) / dummyLoyaltyBonus;
-                         const damage = (((target.intelligence * 1.5) + (Math.sqrt(target.loyalty) * 2)) / 20) / dummyLoyaltyBonus;
-                         return prob * damage;
+                         return typeof StrategySystem.calcInciteScore === 'function' ? StrategySystem.calcInciteScore(target) : 0;
                      }
                      if (actionType === 'rumor_doer') {
-                         // 離間計：智謀7割、武力3割のスコア（実際の計算式と同じ比率）
-                         return (target.intelligence * 0.7) + (target.strength * 0.3);
+                         return typeof StrategySystem.calcRumorScore === 'function' ? StrategySystem.calcRumorScore(target) : 0;
                      }
                      if (actionType === 'headhunt_doer') {
-                         // 引抜：智謀の重み（0.8）と、適性を表す魅力などの総合的な強さ
-                         return (target.intelligence * 0.8) + (target.charm * 0.2) + (target.loyalty * 0.1);
+                         return typeof StrategySystem.calcHeadhuntScore === 'function' ? StrategySystem.calcHeadhuntScore(target) : 0;
                      }
                      // ==========================================
                  } catch (e) {
