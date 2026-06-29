@@ -1048,9 +1048,9 @@ window.GameEvents.push({
         if (!inuyamaCastle) return;
 
         // 独立システムにお願いして、強制的に独立を実行してもらいます
-        if (game.independenceSystem) {
+        if (game.independenceSystem && typeof game.independenceSystem.forceAction === 'function') {
             // 第4引数に 'indep' を渡すことで、純粋な「独立」として処理させます
-            await game.independenceSystem.executeRebellion(inuyamaCastle, nobukiyo, nobunaga, 'indep');
+            await game.independenceSystem.forceAction(inuyamaCastle, nobukiyo, nobunaga, 'indep');
         }
     }
 });
