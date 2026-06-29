@@ -1983,8 +1983,7 @@ window.GameEvents.push({
         if (!context || !context.deadShogunClanId) return false;
 
         // 世界に将軍候補（ID80:左馬頭）が存在するか確認します
-        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
-        if (candidate && (candidate.status === 'unborn' || candidate.status === 'dead')) return false;
+        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80) && b.status !== 'unborn' && b.status !== 'dead');
         if (!candidate) return false;
 
         // 候補が浪人か、諸勢力所属で頭領ではない場合のみイベントを起こします
