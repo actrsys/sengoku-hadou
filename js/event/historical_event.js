@@ -627,7 +627,7 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 松平元康（徳川家康）独立イベント
+// ★ 松平元康（徳川家康） 独立イベント
 // ==========================================
 window.GameEvents.push({
     id: "historical_ieyasu_independence",
@@ -1001,7 +1001,7 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 織田信清謀反（独立）イベント
+// ★ 織田信清 独立イベント
 // ==========================================
 window.GameEvents.push({
     id: "historical_nobukiyo_rebellion",
@@ -2611,7 +2611,7 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 松永久秀独立イベント
+// ★ 松永久秀 独立イベント
 // ==========================================
 window.GameEvents.push({
     id: "historical_hisahide_independence",
