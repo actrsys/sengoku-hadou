@@ -833,6 +833,14 @@ Object.assign(UIManager.prototype, {
             el.style.left = `${posX}px`;
             el.style.top = `${posY}px`;
 
+            // ★城の石高と城防御の合計値によってサイズを変動させる魔法
+            const totalValue = (c.kokudaka || 0) + (c.defense || 0);
+            const deficit = Math.max(0, 4000 - totalValue); // 4000に足りない分を計算します
+            const scaleDownPercent = Math.floor(deficit / 200); // 200不足するごとに1%縮小します
+            const scaleRatio = 1 - (scaleDownPercent * 0.01);
+            const currentScale = 0.41 * scaleRatio; // 基本のサイズ(0.41)に倍率を掛けます
+            el.style.setProperty('--castle-scale', currentScale);
+
             if (c.isDone) el.classList.add('done');
             const castellan = this.game.getBusho(c.castellanId); const clanData = this.game.clans.find(cl => cl.id === c.ownerClan);
             

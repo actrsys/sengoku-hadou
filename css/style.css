@@ -392,10 +392,10 @@ body:not(.is-pc):has(.modal:not(.hidden)) #bottom-command-bar {
 #map-guide { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 8px 20px; border-radius: 20px; pointer-events: none; z-index: 600; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
 
 /* --- 城カード --- */
-.castle-card { width: var(--map-tile-size); height: var(--map-tile-size); background-color: transparent; border: none; box-shadow: none; border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; padding: 2px; cursor: pointer; font-size: 0.75rem; position: absolute; transform: translate(-50%, -60%) scale(0.41); z-index: 10; filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5)); }
+.castle-card { width: var(--map-tile-size); height: var(--map-tile-size); background-color: transparent; border: none; box-shadow: none; border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; padding: 2px; cursor: pointer; font-size: 0.75rem; position: absolute; transform: translate(-50%, -60%) scale(var(--castle-scale, 0.41)); z-index: 10; filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5)); }
 .castle-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url('../data/images/map/shiro_icon001.png'); background-size: contain; background-position: center; background-repeat: no-repeat; z-index: 2; pointer-events: none; }
 .castle-card::after { content: ""; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); width: 90%; height: 15%; background: rgba(0, 0, 0, 1.0); border-radius: 50%; z-index: 1; pointer-events: none; }
-.castle-card:hover { transform: translate(-50%, calc(-60% - 2px)) scale(0.41); filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.5)); z-index: 100 !important; }
+.castle-card:hover { transform: translate(-50%, calc(-60% - 2px)) scale(var(--castle-scale, 0.41)); filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.5)); z-index: 100 !important; }
 .castle-card.active-turn { filter: drop-shadow(0 0 8px #ff9800); z-index: 15; }
 .castle-card.selectable-target { filter: drop-shadow(0 0 8px #e91e63); animation: pulse-shadow 1s infinite; z-index: 25; cursor: crosshair; }
 .castle-card.dimmed { opacity: 0.3; filter: grayscale(80%); }
@@ -403,11 +403,11 @@ body:not(.is-pc):has(.modal:not(.hidden)) #bottom-command-bar {
 
 /* 城の光る縁取り（外交） */
 .castle-card.glow-blue { filter: drop-shadow(0 0 6px rgba(66, 165, 245, 0.8)) drop-shadow(0 0 10px rgba(30, 136, 229, 0.8)) !important; }
-.castle-card.glow-blue:hover { filter: drop-shadow(0 0 8px rgba(66, 165, 245, 1)) drop-shadow(0 0 12px rgba(30, 136, 229, 1)) !important; transform: translate(-50%, calc(-60% - 2px)) scale(0.41); z-index: 100 !important; }
+.castle-card.glow-blue:hover { filter: drop-shadow(0 0 8px rgba(66, 165, 245, 1)) drop-shadow(0 0 12px rgba(30, 136, 229, 1)) !important; transform: translate(-50%, calc(-60% - 2px)) scale(var(--castle-scale, 0.41)); z-index: 100 !important; }
 .castle-card.glow-red { filter: drop-shadow(0 0 6px rgba(239, 83, 80, 0.8)) drop-shadow(0 0 10px rgba(229, 57, 53, 0.8)) !important; }
-.castle-card.glow-red:hover { filter: drop-shadow(0 0 8px rgba(239, 83, 80, 1)) drop-shadow(0 0 12px rgba(229, 57, 53, 1)) !important; transform: translate(-50%, calc(-60% - 2px)) scale(0.41); z-index: 100 !important; }
+.castle-card.glow-red:hover { filter: drop-shadow(0 0 8px rgba(239, 83, 80, 1)) drop-shadow(0 0 12px rgba(229, 57, 53, 1)) !important; transform: translate(-50%, calc(-60% - 2px)) scale(var(--castle-scale, 0.41)); z-index: 100 !important; }
 .castle-card.glow-green { filter: drop-shadow(0 0 6px rgba(59, 255, 156, 0.8)) drop-shadow(0 0 10px rgba(67, 160, 71, 0.8)) !important; }
-.castle-card.glow-green:hover { filter: drop-shadow(0 0 8px rgba(59, 255, 156, 1)) drop-shadow(0 0 12px rgba(67, 160, 71, 1)) !important; transform: translate(-50%, calc(-60% - 2px)) scale(0.41); z-index: 100 !important; }
+.castle-card.glow-green:hover { filter: drop-shadow(0 0 8px rgba(59, 255, 156, 1)) drop-shadow(0 0 12px rgba(67, 160, 71, 1)) !important; transform: translate(-50%, calc(-60% - 2px)) scale(var(--castle-scale, 0.41)); z-index: 100 !important; }
 
 /* 城のホバー情報 */
 .hover-info { position: absolute; bottom: 80%; left: -200%; right: -200%; margin: 0 auto; width: max-content; transform: scale(0.5); transform-origin: bottom center; background: rgba(0, 0, 0, 0.85); color: #fff; padding: 8px 15px; border-radius: 6px; border: 1px solid #777; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 0.15s ease-out, transform 0.15s ease-out; display: flex; flex-direction: column; align-items: flex-start; white-space: nowrap; z-index: 100; }
