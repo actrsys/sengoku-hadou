@@ -108,12 +108,12 @@ window.GameEvents.push({
     checkCondition: function(game) {
         // ① まず、主要な登場人物の確認をします
         // 今川義元（ID: 1004001）が大名として存在するか
-        const yoshimoto = game.getBusho(1004001);
-        if (!yoshimoto || !yoshimoto.isDaimyo) return false;
+        const yoshimoto = window.EventCheck.getDaimyo(game, 1004001);
+        if (!yoshimoto) return false;
 
         // 織田信長（ID: 1006001）が大名として存在するか
-        const nobunaga = game.getBusho(1006001);
-        if (!nobunaga || !nobunaga.isDaimyo || nobunaga.clan === 0) return false;
+        const nobunaga = window.EventCheck.getDaimyo(game, 1006001);
+        if (!nobunaga) return false;
 
         // ② プレイヤーが今川家を担当している場合は、勝手な移動を防ぐためここで止めます
         const imagawaClanId = yoshimoto.clan;
@@ -301,11 +301,8 @@ window.GameEvents.push({
         if (game.affiliationSystem) {
             game.affiliationSystem.updateCastleLord(okazakiCastle);
         }
-
-        if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
-        }
+        
+        if (window.EventAction) window.EventAction.refreshScreen(game);
     }
 });
 
@@ -327,15 +324,15 @@ window.GameEvents.push({
         if (!window.EventCheck.isDead(game, 1004057)) return false;
         
         // 今川義元（ID: 1004001）が大名として存在するか確認します
-        const yoshimoto = game.getBusho(1004001);
-        if (!yoshimoto || !yoshimoto.isDaimyo) return false;
+        const yoshimoto = window.EventCheck.getDaimyo(game, 1004001);
+        if (!yoshimoto) return false;
         
         // 今川義元が駿府城（ID: 13）にいるか確認します
         if (yoshimoto.castleId !== 13) return false;
         
         // 織田信長（ID: 1006001）が大名として存在するか確認します
-        const nobunaga = game.getBusho(1006001);
-        if (!nobunaga || !nobunaga.isDaimyo) return false;
+        const nobunaga = window.EventCheck.getDaimyo(game, 1006001);
+        if (!nobunaga) return false;
         
         // 織田信長が清洲城（ID: 7）にいるか確認します
         if (nobunaga.castleId !== 7) return false;
@@ -373,25 +370,9 @@ window.GameEvents.push({
             return c && c.ownerClan === imagawaClanId;
         });
         if (!hasAllImagawaCastles) return false;
-
-        // ⑤ 最後に、一番計算に手間のかかる「領地の隣接確認」をします
-        // 織田家と今川家の領地（お城同士の道）が隣接しているか確認します
-        const odaCastles = game.castles.filter(c => c.ownerClan === odaClanId);
-        const imagawaCastles = game.castles.filter(c => c.ownerClan === imagawaClanId);
-        let isAdjacent = false;
         
-        for (let oc of odaCastles) {
-            for (let ic of imagawaCastles) {
-                // GameSystemを使って、道が繋がっているか調べます
-                if (GameSystem.isAdjacent(oc, ic)) {
-                    isAdjacent = true;
-                    break;
-                }
-            }
-            if (isAdjacent) break;
-        }
-        // 隣接していなければストップします
-        if (!isAdjacent) return false;
+        // ⑤ 最後に、一番計算に手間のかかる「領地の隣接確認」をします
+        if (!window.EventCheck.areClansAdjacent(game, odaClanId, imagawaClanId)) return false;
 
         // ⑥ ★追加：イベントの配役に必要な人数の武将が揃っているか確認します
         // 織田家には信長以外に「5人」の武将が必要です
@@ -555,11 +536,7 @@ window.GameEvents.push({
                 
                 // ここでイベントを終了して、元の画面に戻ります
                 if (window.AudioManager) window.AudioManager.restoreMemorizedBgm();
-                if (game.factionSystem) game.factionSystem.updateFactions();
-                if (game.ui) {
-                    game.ui.renderMap();
-                    game.ui.updatePanelHeader();
-                }
+                if (window.EventAction) window.EventAction.refreshScreen(game);
                 return;
             }
         } else {
@@ -630,13 +607,7 @@ window.GameEvents.push({
         }
         
         // 画面の情報を最新のものに更新します
-        if (game.factionSystem) {
-            game.factionSystem.updateFactions();
-        }
-        if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
-        }
+        if (window.EventAction) window.EventAction.refreshScreen(game);
     }
 });
 
@@ -650,12 +621,11 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         // 1. 今川義元（ID: 1004001）が死亡しているか確認します
-        const yoshimoto = game.getBusho(1004001);
-        if (!yoshimoto || yoshimoto.status !== 'dead') return false;
-
+        if (!window.EventCheck.isDead(game, 1004001)) return false;
+        
         // 2. 今川氏真（ID: 1004011）が大名であるか確認します
-        const ujizane = game.getBusho(1004011);
-        if (!ujizane || !ujizane.isDaimyo || ujizane.clan === 0) return false;
+        const ujizane = window.EventCheck.getDaimyo(game, 1004011);
+        if (!ujizane) return false;
 
         // 3. 松平元康（ID: 1004004）が存在し、大名ではないことを確認します
         const motoyasu = game.getBusho(1004004);
@@ -999,10 +969,7 @@ window.GameEvents.push({
             await game.ui.showDialogAsync(`${args.odaClanName} が ${args.matsudairaClanName} と同盟を締結しました！`, false, 0);
 
             // 画面や情報を最新の状態に更新します
-            if (game.ui) {
-                game.ui.renderMap();
-                game.ui.updatePanelHeader();
-            }
+            if (window.EventAction) window.EventAction.refreshScreen(game);
         } 
         // 追い返す（同盟を結ばない）ルート
         else {
@@ -1086,8 +1053,8 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         // 1. 浅井久政（ID: 1015001）が存在し、大名であるか確認します
-        const hisamasa = game.getBusho(1015001);
-        if (!hisamasa || !hisamasa.isDaimyo || hisamasa.clan === 0) return false;
+        const hisamasa = window.EventCheck.getDaimyo(game, 1015001);
+        if (!hisamasa) return false;
 
         // 2. プレイヤーが浅井家の担当ではないか確認します
         if (game.playerClanId === hisamasa.clan) return false;
@@ -1222,10 +1189,7 @@ window.GameEvents.push({
         }
 
         // ⑫ 画面を最新の状態に更新します
-        if (game.ui) {
-            game.ui.updatePanelHeader();
-            game.ui.renderMap();
-        }
+        if (window.EventAction) window.EventAction.refreshScreen(game);
     }
 });
 
@@ -1356,10 +1320,7 @@ window.GameEvents.push({
         await game.ui.showDialogAsync(msg, false, 0);
 
         // ⑥ 画面や情報を最新の状態に更新します
-        if (game.ui) {
-            game.ui.updatePanelHeader();
-            game.ui.renderMap();
-        }
+        if (window.EventAction) window.EventAction.refreshScreen(game);
     }
 });
 
@@ -1554,16 +1515,7 @@ window.GameEvents.push({
         // ----------------------------------------------------
         // 6. 画面や派閥の更新
         // ----------------------------------------------------
-        if (game.factionSystem) {
-            game.factionSystem.updateFactions();
-        }
-        if (typeof game.updateAllClanPrestige === 'function') {
-            game.updateAllClanPrestige();
-        }
-        if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
-        }
+        if (window.EventAction) window.EventAction.refreshScreen(game);
     }
 });
 
@@ -1577,8 +1529,8 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         // 1. 織田信長（ID: 1006001）が存在し、大名であるか確認します
-        const nobunaga = game.getBusho(1006001);
-        if (!nobunaga || !nobunaga.isDaimyo || nobunaga.clan === 0) return false;
+        const nobunaga = window.EventCheck.getDaimyo(game, 1006001);
+        if (!nobunaga) return false;
 
         // 2. 織田信長の勢力が、稲葉山城（ID: 3）を所有しているか確認します
         const inabayama = game.getCastle(3);
@@ -1722,10 +1674,7 @@ window.GameEvents.push({
         await game.ui.showDialogAsync(msg, false, 0);
 
         // ⑨ 最後に、画面の見た目や情報を、最新のお引越しや名前の状態に描き直します
-        if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
-        }
+        if (window.EventAction) window.EventAction.refreshScreen(game);
     }
 });
 
@@ -1739,8 +1688,8 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         // 1. 松平元康（ID: 1004004）が存在し、大名であるか確認します
-        const motoyasu = game.getBusho(1004004);
-        if (!motoyasu || !motoyasu.isDaimyo || motoyasu.clan === 0) return false;
+        const motoyasu = window.EventCheck.getDaimyo(game, 1004004);
+        if (!motoyasu) return false;
 
         const matsudairaClanId = motoyasu.clan;
 
@@ -1862,10 +1811,7 @@ window.GameEvents.push({
         await game.ui.showDialogAsync(msg, false, 0);
 
         // ⑨ 最後に、画面の見た目や情報を、最新のお引越しや名前の状態に描き直します
-        if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
-        }
+        if (window.EventAction) window.EventAction.refreshScreen(game);
     }
 });
 
@@ -1995,8 +1941,8 @@ window.GameEvents.push({
         if (nagayoshi && nagayoshi.status !== 'dead') return false;
 
         // 2. 三好義継（ID: 1020033）が大名として存在するか確認します
-        const yoshitsugu = game.getBusho(1020033);
-        if (!yoshitsugu || !yoshitsugu.isDaimyo || yoshitsugu.clan === 0) return false;
+        const yoshitsugu = window.EventCheck.getDaimyo(game, 1020033);
+        if (!yoshitsugu) return false;
         
         const miyoshiClanId = yoshitsugu.clan;
 
@@ -2011,8 +1957,8 @@ window.GameEvents.push({
         }
 
         // 4. 足利義輝（ID: 1017001）が生存しており、大名であるか確認します
-        const yoshiteru = game.getBusho(1017001);
-        if (!yoshiteru || yoshiteru.status === 'dead' || yoshiteru.status === 'unborn' || !yoshiteru.isDaimyo || yoshiteru.clan === 0) return false;
+        const yoshiteru = window.EventCheck.getDaimyo(game, 1017001);
+        if (!yoshiteru) return false;
         
         const ashikagaClanId = yoshiteru.clan;
 
@@ -2385,12 +2331,7 @@ window.GameEvents.push({
         }
 
         // 派閥や画面を最新の状態に更新します
-        if (game.factionSystem) {
-            game.factionSystem.updateFactions();
-        }
-        if (game.ui) {
-            game.ui.renderMap();
-        }
+        if (window.EventAction) window.EventAction.refreshScreen(game);
     }
 });
 
@@ -2466,9 +2407,7 @@ window.GameEvents.push({
         game.ui.log(`(将軍候補の${name}が、幕府再興のため二条城へ入城しました)`);
         
         // 画面の見た目をお引越し後の最新の状態に更新します
-        if (game.ui) {
-            game.ui.renderMap();
-        }
+        if (window.EventAction) window.EventAction.refreshScreen(game);
     }
 });
 
@@ -2766,19 +2705,7 @@ window.GameEvents.push({
         }
 
         // --- 9. 最後に画面を新しく描き直して、メッセージを表示します ---
-        if (game.factionSystem) {
-            game.factionSystem.updateFactions();
-        }
-
-        // ★追加：城の持ち主が変わったので、システムに大名家の「威信」を再計算してもらいます
-        if (typeof game.updateAllClanPrestige === 'function') {
-            game.updateAllClanPrestige();
-        }
-
-        if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
-        }
+        if (window.EventAction) window.EventAction.refreshScreen(game);
 
         const candidateName = candidate.name.replace('|', '');
         const sponsorName = sponsorClan.name;
@@ -2797,16 +2724,14 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         // 1. 三好長慶（ID: 1020001）が死亡しているか確認します
-        const nagayoshi = game.getBusho(1020001);
-        if (!nagayoshi || nagayoshi.status !== 'dead') return false;
-
+        if (!window.EventCheck.isDead(game, 1020001)) return false;
+        
         // 2. 三好義継（ID: 1020033）が大名であるか確認します
-        const yoshitsugu = game.getBusho(1020033);
-        if (!yoshitsugu || !yoshitsugu.isDaimyo || yoshitsugu.clan === 0) return false;
+        const yoshitsugu = window.EventCheck.getDaimyo(game, 1020033);
+        if (!yoshitsugu) return false;
 
         // 3. 松永長頼（ID: 1901002）が死亡しているか確認します
-        const nagayori = game.getBusho(1901002);
-        if (!nagayori || nagayori.status !== 'dead') return false;
+        if (!window.EventCheck.isDead(game, 1901002)) return false;
 
         // 4. 松永久秀（ID: 1901001）が存在し、大名ではないことを確認します
         const hisahide = game.getBusho(1901001);
@@ -2844,16 +2769,15 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         // 1. 三好長慶（ID: 1020001）が死亡しているか確認します
-        const nagayoshi = game.getBusho(1020001);
-        if (!nagayoshi || nagayoshi.status !== 'dead') return false;
-
+        if (!window.EventCheck.isDead(game, 1020001)) return false;
+        
         // 2. 三好義継（ID: 1020033）が大名であるか確認します
-        const yoshitsugu = game.getBusho(1020033);
-        if (!yoshitsugu || !yoshitsugu.isDaimyo || yoshitsugu.clan === 0) return false;
+        const yoshitsugu = window.EventCheck.getDaimyo(game, 1020033);
+        if (!yoshitsugu) return false;
 
         // 3. 松永久秀（ID: 1901001）が大名であるか確認します
-        const hisahide = game.getBusho(1901001);
-        if (!hisahide || !hisahide.isDaimyo || hisahide.clan === 0) return false;
+        const hisahide = window.EventCheck.getDaimyo(game, 1901001);
+        if (!hisahide) return false;
 
         // 4. 三好家に三好三人衆（長逸、政生、岩成友通）が所属しているか確認します
         const trioIds = [1020006, 1020007, 1020008];
@@ -2938,16 +2862,7 @@ window.GameEvents.push({
         await game.ui.showDialogAsync(`三好義継が悪逆無道の三好三人衆に愛想をつかし、三好家の忠臣・松永久秀の元へ逃れました。三好家は三好長逸が新たな当主となります。`, false, 0);
 
         // ⑥ 派閥や画面を最新の状態に更新します
-        if (game.factionSystem) {
-            game.factionSystem.updateFactions();
-        }
-        if (typeof game.updateAllClanPrestige === 'function') {
-            game.updateAllClanPrestige();
-        }
-        if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
-        }
+        if (window.EventAction) window.EventAction.refreshScreen(game);
     }
 });
 
@@ -2985,14 +2900,14 @@ window.GameEvents.push({
         } else {
             return false; // どちらもいなければイベントは起きません
         }
-
+        
         // 2. 三好長逸（ID: 1020006）が大名であるか確認します
-        const nagayasu = game.getBusho(1020006);
-        if (!nagayasu || !nagayasu.isDaimyo) return false;
+        const nagayasu = window.EventCheck.getDaimyo(game, 1020006);
+        if (!nagayasu) return false;
 
         // 3. 松永久秀（ID: 1901001）が大名であるか確認します
-        const hisahide = game.getBusho(1901001);
-        if (!hisahide || !hisahide.isDaimyo) return false;
+        const hisahide = window.EventCheck.getDaimyo(game, 1901001);
+        if (!hisahide) return false;
         const matsunagaClanId = hisahide.clan;
 
         // ストッパー：松永家がすでに将軍を擁立している家だった場合は中止します
@@ -3174,12 +3089,7 @@ window.GameEvents.push({
         await game.ui.showDialogAsync(msg, false, 0);
 
         // ⑥ 各種更新処理
-        game.factionSystem.updateFactions();
-        if (typeof game.updateAllClanPrestige === 'function') game.updateAllClanPrestige();
-        if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
-        }
+        if (window.EventAction) window.EventAction.refreshScreen(game);
     }
 });
 
@@ -3195,10 +3105,10 @@ window.GameEvents.push({
         // 1. 池田長正（ID: 1902001）が死亡しているか確認します
         const nagamasa = game.getBusho(1902001);
         if (nagamasa && nagamasa.status !== 'dead') return false;
-
+        
         // 2. 三好長逸（ID: 1020006）が大名であるか確認します
-        const nagayasu = game.getBusho(1020006);
-        if (!nagayasu || !nagayasu.isDaimyo) return false;
+        const nagayasu = window.EventCheck.getDaimyo(game, 1020006);
+        if (!nagayasu) return false;
         
         // 3. 池田知正（ID: 1902003）が存在し、三好長逸の家に所属する城主または国主であるか確認します
         const tomomasa = game.getBusho(1902003);
@@ -3314,13 +3224,8 @@ window.GameEvents.push({
             await game.ui.showDialogAsync(msg2, false, 0);
         }
 
-        if (game.factionSystem) {
-            game.factionSystem.updateFactions();
-        }
-        if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
-        }
+        // 各種情報更新処理
+        if (window.EventAction) window.EventAction.refreshScreen(game);
     }
 });
 
@@ -3671,16 +3576,7 @@ window.GameEvents.push({
         await game.ui.showDialogAsync(msg, false, 0);
 
         // ⑧ 最後に、画面の表示や派閥のデータを最新のものに更新します
-        if (game.factionSystem) {
-            game.factionSystem.updateFactions();
-        }
-        if (typeof game.updateAllClanPrestige === 'function') {
-            game.updateAllClanPrestige();
-        }
-        if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
-        }
+        if (window.EventAction) window.EventAction.refreshScreen(game);
     }
 });
 
@@ -3830,16 +3726,7 @@ window.GameEvents.push({
         await game.ui.showDialogAsync(msg, false, 0);
 
         // ⑥ 各種システムや画面の表示を最新のものに更新します
-        if (game.factionSystem) {
-            game.factionSystem.updateFactions();
-        }
-        if (typeof game.updateAllClanPrestige === 'function') {
-            game.updateAllClanPrestige();
-        }
-        if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
-        }
+        if (window.EventAction) window.EventAction.refreshScreen(game);
     }
 });
 
@@ -3854,10 +3741,10 @@ window.GameEvents.push({
     checkCondition: function(game) {
         // １．1561年以降であるか確認します
         if (game.year < 1561) return false;
-
+        
         // ２．最上義守（ID: 1089001）が存在し、大名であるか確認します
-        const yoshimori = game.getBusho(1089001);
-        if (!yoshimori || !yoshimori.isDaimyo || yoshimori.clan === 0) return false;
+        const yoshimori = window.EventCheck.getDaimyo(game, 1089001);
+        if (!yoshimori) return false;
 
         // ３．プレイヤーが最上家（義守の勢力）の担当ではないか確認します
         if (game.playerClanId === yoshimori.clan) return false;
@@ -3991,10 +3878,7 @@ window.GameEvents.push({
         }
 
         // ⑫ 画面を最新の状態に更新します
-        if (game.ui) {
-            game.ui.updatePanelHeader();
-            game.ui.renderMap();
-        }
+        if (window.EventAction) window.EventAction.refreshScreen(game);
     }
 });
 
@@ -4009,10 +3893,10 @@ window.GameEvents.push({
     checkCondition: function(game) {
         // 1. 1569年以降であるか確認します
         if (game.year < 1569) return false;
-
+        
         // 2. 浦上宗景（ID: 1044001）が存在し、大名であるか確認します
-        const munekage = game.getBusho(1044001);
-        if (!munekage || !munekage.isDaimyo || munekage.clan === 0) return false;
+        const munekage = window.EventCheck.getDaimyo(game, 1044001);
+        if (!munekage) return false;
 
         // 3. 宇喜多直家（ID: 1044004）が存在し、大名ではないことを確認します
         const naoie = game.getBusho(1044004);
