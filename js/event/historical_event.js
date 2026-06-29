@@ -48,6 +48,52 @@ window.EventCheck = {
         const ids = Array.isArray(bushoIds) ? bushoIds : [bushoIds];
         // リストの「全員(every)」が、getDaimyoの条件をクリアできるかチェックします
         return ids.every(id => this.getDaimyo(game, id) !== null);
+    },
+    
+    // ⑥ ★「勢力同士の領地が隣接しているか」確認します
+    areClansAdjacent: function(game, clanIdA, clanIdB) {
+        const castlesA = game.castles.filter(c => c.ownerClan === clanIdA);
+        const castlesB = game.castles.filter(c => c.ownerClan === clanIdB);
+        
+        // どちらかが城を持っていなければ隣接していません
+        if (castlesA.length === 0 || castlesB.length === 0) return false;
+
+        for (let ca of castlesA) {
+            for (let cb of castlesB) {
+                if (typeof GameSystem !== 'undefined' && GameSystem.isAdjacent(ca, cb)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    },
+
+    // ⑦ ★「指定した地方（国）の城を全て持っているか」確認します
+    ownsAllCastlesInProvince: function(game, clanId, provinceId) {
+        const provinceCastles = game.castles.filter(c => c.provinceId === provinceId);
+        // その地方に城が無い場合は false を返します
+        if (provinceCastles.length === 0) return false;
+        // その地方の城の「全員(every)」が、指定の勢力のものかチェックします
+        return provinceCastles.every(c => c.ownerClan === clanId);
+    }
+};
+
+// ==========================================
+// ★ イベント実行用の便利な魔法（新しく追加します）
+// ==========================================
+window.EventAction = {
+    // ① 画面の見た目や情報を最新の状態に描き直します（お片付け）
+    refreshScreen: function(game) {
+        if (game.factionSystem) {
+            game.factionSystem.updateFactions();
+        }
+        if (typeof game.updateAllClanPrestige === 'function') {
+            game.updateAllClanPrestige();
+        }
+        if (game.ui) {
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
     }
 };
 
@@ -729,26 +775,10 @@ window.GameEvents.push({
         if (!rel || (rel.status !== '敵対' && rel.status !== '普通' && rel.status !== '友好')) return false;
 
         // 織田家と松平家の領地（お城同士の道）が隣接しているか確認します
-        const odaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
-        const matsudairaCastles = game.castles.filter(c => c.ownerClan === motoyasu.clan);
-        let isAdjacent = false;
-        
-        for (let oc of odaCastles) {
-            for (let mc of matsudairaCastles) {
-                // GameSystem.isAdjacent を使って、道が繋がっているか調べます
-                if (GameSystem.isAdjacent(oc, mc)) {
-                    isAdjacent = true;
-                    break;
-                }
-            }
-            if (isAdjacent) break;
-        }
-        if (!isAdjacent) return false;
+        if (!window.EventCheck.areClansAdjacent(game, nobunaga.clan, motoyasu.clan)) return false;
 
         // ★尾張国（地方ID: 23）のすべての城を織田家が所有しているか確認します
-        const owariCastles = game.castles.filter(c => c.provinceId === 23);
-        const ownsAllOwari = owariCastles.length > 0 && owariCastles.every(c => c.ownerClan === nobunaga.clan);
-        if (!ownsAllOwari) return false;
+        if (!window.EventCheck.ownsAllCastlesInProvince(game, nobunaga.clan, 23)) return false;
 
         // ★追加：イベントの配役に必要な人数の武将が揃っているか確認します
         // 松平家には元康以外に「2人」の武将が必要です
@@ -1017,11 +1047,7 @@ window.GameEvents.push({
         }
 
         // 4. 尾張国（地方ID: 23）のすべての城を織田家が所有しているか確認します
-        const owariCastles = game.castles.filter(c => c.provinceId === 23);
-        if (owariCastles.length === 0) return false; // 万が一城がない場合はストップします
-        
-        const ownsAllOwari = owariCastles.every(c => c.ownerClan === nobunaga.clan);
-        if (!ownsAllOwari) return false;
+        if (!window.EventCheck.ownsAllCastlesInProvince(game, nobunaga.clan, 23)) return false;
 
         // 5. 織田信清（ID: 1006078）が存在し、大名ではなく、織田家に所属しているか確認します
         const nobukiyo = game.getBusho(1006078);
@@ -1723,12 +1749,7 @@ window.GameEvents.push({
         if (!okazaki || okazaki.ownerClan !== matsudairaClanId) return false;
 
         // 3. 遠江国（地方ID: 21）のすべての城を、松平元康勢力が所有しているか確認します
-        // まず遠江国のお城をすべて集めて、すべてが松平家の持ち物か確認します
-        const totomiCastles = game.castles.filter(c => c.provinceId === 21);
-        if (totomiCastles.length === 0) return false;
-        
-        const ownsAllTotomi = totomiCastles.every(c => c.ownerClan === matsudairaClanId);
-        if (!ownsAllTotomi) return false;
+        if (!window.EventCheck.ownsAllCastlesInProvince(game, matsudairaClanId, 21)) return false;
 
         // 4. 曳馬城（ID: 12）を取得し、すでに名前が「浜松城」になっていないか確認します
         const hikuma = game.getCastle(12);
@@ -1999,24 +2020,7 @@ window.GameEvents.push({
         if (game.playerClanId === ashikagaClanId) return false;
 
         // 6. 足利家と三好家の領地（お城同士の道）が隣接しているか確認します
-        const ashikagaCastles = game.castles.filter(c => c.ownerClan === ashikagaClanId);
-        const miyoshiCastles = game.castles.filter(c => c.ownerClan === miyoshiClanId);
-        
-        // どちらかがお城を一つも持っていなければ条件を満たしません
-        if (ashikagaCastles.length === 0 || miyoshiCastles.length === 0) return false;
-
-        let isAdjacent = false;
-        for (let ac of ashikagaCastles) {
-            for (let mc of miyoshiCastles) {
-                // GameSystemを使って、道が繋がっているか調べます
-                if (GameSystem.isAdjacent(ac, mc)) {
-                    isAdjacent = true;
-                    break;
-                }
-            }
-            if (isAdjacent) break;
-        }
-        if (!isAdjacent) return false;
+        if (!window.EventCheck.areClansAdjacent(game, ashikagaClanId, miyoshiClanId)) return false;
 
         // すべての条件を満たしたらイベント発生の合図を出します
         return true;
@@ -2100,12 +2104,7 @@ window.GameEvents.push({
         }
 
         // ⑧ 画面更新
-        if (game.factionSystem) game.factionSystem.updateFactions();
-        if (typeof game.updateAllClanPrestige === 'function') game.updateAllClanPrestige();
-        if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
-        }
+        if (window.EventAction) window.EventAction.refreshScreen(game);
 
         if (game.playerClanId === ashikagaClanId) {
             setTimeout(() => {
@@ -2134,7 +2133,8 @@ window.GameEvents.push({
         if (!context || !context.deadShogunClanId) return false;
 
         // 世界に将軍候補（ID80:左馬頭）が存在するか確認します
-        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80) && b.status !== 'unborn' && b.status !== 'dead');
+        const candidate = window.EventCheck.getShogunCandidate(game);
+        if (candidate && (candidate.status === 'unborn' || candidate.status === 'dead')) return false;
         if (!candidate) return false;
 
         // 候補が浪人か、諸勢力所属で頭領ではない場合のみイベントを起こします
