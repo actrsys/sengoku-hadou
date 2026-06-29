@@ -94,6 +94,50 @@ window.EventAction = {
             game.ui.renderMap();
             game.ui.updatePanelHeader();
         }
+    },
+
+    // ② 武将を安全に別のお城へお引越しさせます（新魔法）
+    moveBusho: function(game, busho, targetCastleId) {
+        if (!busho || busho.castleId === targetCastleId) return;
+        
+        if (game.affiliationSystem) {
+            game.affiliationSystem.moveCastle(busho, targetCastleId);
+        } else {
+            // システムがない場合の予備の手動お引越し
+            const oldCastle = game.getCastle(busho.castleId);
+            if (oldCastle) {
+                oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== busho.id);
+                if (oldCastle.castellanId === busho.id) {
+                    oldCastle.castellanId = 0;
+                    busho.isCastellan = false;
+                }
+            }
+            busho.castleId = targetCastleId;
+            const targetCastle = game.getCastle(targetCastleId);
+            if (targetCastle && !targetCastle.samuraiIds.includes(busho.id)) {
+                targetCastle.samuraiIds.push(busho.id);
+            }
+        }
+    },
+
+    // ③ 武将を新しい城主に任命して、お城の看板も書き換えます（新魔法）
+    appointCastellan: function(game, busho, castle) {
+        if (!busho || !castle) return;
+        
+        // 今いる城主のバッジを外します
+        const oldCastellan = game.getBusho(castle.castellanId);
+        if (oldCastellan && oldCastellan.id !== busho.id) {
+            oldCastellan.isCastellan = false;
+        }
+        
+        // 新しい城主にバッジをつけます
+        busho.isCastellan = true;
+        castle.castellanId = busho.id;
+        
+        // システムに報告します
+        if (game.affiliationSystem) {
+            game.affiliationSystem.updateCastleLord(castle);
+        }
     }
 };
 
@@ -217,36 +261,12 @@ window.GameEvents.push({
         if ((motoyasu.achievementTotal || 0) <= 699) {
             motoyasu.achievementTotal = 700;
         }
-
+        
         // 2. 元康が別のお城にいる場合、安全に岡崎城へお引越しさせます
-        if (motoyasu.castleId !== 48) {
-            if (game.affiliationSystem) {
-                game.affiliationSystem.moveCastle(motoyasu, 48);
-            } else {
-                // システムがない場合の予備の手動お引越し
-                const oldCastle = game.getCastle(motoyasu.castleId);
-                if (oldCastle) {
-                    oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== motoyasu.id);
-                    if (oldCastle.castellanId === motoyasu.id) {
-                        oldCastle.castellanId = 0;
-                        motoyasu.isCastellan = false;
-                    }
-                }
-                motoyasu.castleId = 48;
-                if (!okazakiCastle.samuraiIds.includes(motoyasu.id)) {
-                    okazakiCastle.samuraiIds.push(motoyasu.id);
-                }
-            }
-        }
+        window.EventAction.moveBusho(game, motoyasu, 48);
 
         // 3. 岡崎城にいる他の武将の城主バッジを外し、元康を新しい城主にします
-        const residents = game.bushos.filter(b => b.castleId === 48);
-        residents.forEach(b => {
-            b.isCastellan = false;
-        });
-
-        motoyasu.isCastellan = true;
-        okazakiCastle.castellanId = motoyasu.id;
+        window.EventAction.appointCastellan(game, motoyasu, okazakiCastle);
 
         // ★追加：今川家の国主（軍団1～8）に空きがあるなら、元康を国主にする処理
         if (game.legions) {
@@ -1097,37 +1117,19 @@ window.GameEvents.push({
         // ② 久政から大名のバッジを外し、隠居状態にします
         oldDaimyo.isDaimyo = false;
         oldDaimyo.isRetired = true;
-
+        
         // ③ もし長政が久政と違うお城にいたら、久政のいるお城へ呼び寄せます
-        if (successor.castleId !== oldDaimyo.castleId) {
-            if (game.affiliationSystem) {
-                game.affiliationSystem.moveCastle(successor, oldDaimyo.castleId);
-            } else {
-                successor.castleId = oldDaimyo.castleId;
-            }
-        }
+        window.EventAction.moveBusho(game, successor, oldDaimyo.castleId);
 
-        // ④ 長政を新しい大名、そして城主に任命します
+        // ④ 長政を新しい大名に任命します（城主任命は後で行います）
         successor.isDaimyo = true;
-        successor.isCastellan = true;
         if (successor.isGunshi) {
             successor.isGunshi = false; // もし軍師だったらバッジを外します
         }
 
         // ⑤ お城の城主データを長政に書き換えます
         const targetCastle = game.getCastle(successor.castleId);
-        if (targetCastle) {
-            const castleBushos = game.bushos.filter(b => b.castleId === targetCastle.id && b.status === 'active');
-            castleBushos.forEach(b => {
-                if (b.id !== successor.id && b.isCastellan) {
-                    b.isCastellan = false; // 他の人の城主バッジを外します
-                }
-            });
-            targetCastle.castellanId = successor.id;
-            if (game.affiliationSystem) {
-                game.affiliationSystem.updateCastleLord(targetCastle);
-            }
-        }
+        window.EventAction.appointCastellan(game, successor, targetCastle);
 
         // ⑥ 改名の魔法（大名になった時に名前が変わる設定があれば適用します）
         if (successor.nameChange && successor.nameChange.includes('daimyo:')) {
@@ -1469,31 +1471,13 @@ window.GameEvents.push({
             katsunaga.status = 'active';
             katsunaga.loyalty = 100; // 初登場時は忠誠度100にします
         }
-
+        
         if (targetCastle) {
             // 勝長をそのお城へ移動させます
-            if (katsunaga.castleId !== targetCastleId) {
-                if (game.affiliationSystem) {
-                    game.affiliationSystem.moveCastle(katsunaga, targetCastleId);
-                } else {
-                    katsunaga.castleId = targetCastleId;
-                    if (!targetCastle.samuraiIds.includes(katsunaga.id)) {
-                        targetCastle.samuraiIds.push(katsunaga.id);
-                    }
-                }
-            }
-            
-            // 対象の城の他の武将から城主バッジを外しておきます
-            const residents = game.bushos.filter(b => b.castleId === targetCastleId && b.status === 'active');
-            residents.forEach(b => b.isCastellan = false);
+            window.EventAction.moveBusho(game, katsunaga, targetCastleId);
 
             // 勝長を新しい城主に任命します
-            katsunaga.isCastellan = true;
-            targetCastle.castellanId = katsunaga.id;
-
-            if (game.affiliationSystem) {
-                game.affiliationSystem.updateCastleLord(targetCastle);
-            }
+            window.EventAction.appointCastellan(game, katsunaga, targetCastle);
         }
 
         // ----------------------------------------------------
@@ -1634,37 +1618,11 @@ window.GameEvents.push({
                     });
                 }
             }
-
+            
             // もし織田信長本人が岐阜城にいない場合、岐阜城に強制的にお引越しさせて城主にします
             if (nobunaga.castleId !== 3) {
-                if (game.affiliationSystem) {
-                    // お引越しセンターのシステムにお願いして移動させます
-                    game.affiliationSystem.moveCastle(nobunaga, 3);
-                } else {
-                    // システムがない場合の予備の手動お引越し
-                    const oldCastle = game.getCastle(nobunaga.castleId);
-                    if (oldCastle) {
-                        oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== nobunaga.id);
-                        if (oldCastle.castellanId === nobunaga.id) oldCastle.castellanId = 0;
-                    }
-                    nobunaga.castleId = 3;
-                    if (!inabayama.samuraiIds.includes(nobunaga.id)) {
-                        inabayama.samuraiIds.push(nobunaga.id);
-                    }
-                }
-                
-                // 岐阜城にいる他の武将から城主バッジを外します
-                const residents = game.bushos.filter(b => b.castleId === 3 && b.status === 'active');
-                residents.forEach(b => b.isCastellan = false);
-                
-                // 信長に城主バッジを付けます
-                nobunaga.isCastellan = true;
-                inabayama.castellanId = nobunaga.id;
-
-                // お城のデータを更新して、新しい城主を確定させます
-                if (game.affiliationSystem) {
-                    game.affiliationSystem.updateCastleLord(inabayama);
-                }
+                window.EventAction.moveBusho(game, nobunaga, 3);
+                window.EventAction.appointCastellan(game, nobunaga, inabayama);
             }
         }
 
@@ -1771,37 +1729,11 @@ window.GameEvents.push({
                     });
                 }
             }
-
+            
             // もし松平元康本人が浜松城にいない場合、浜松城に強制的にお引越しさせて城主にします
             if (motoyasu.castleId !== 12) {
-                if (game.affiliationSystem) {
-                    // お引越しセンターのシステムにお願いして移動させます
-                    game.affiliationSystem.moveCastle(motoyasu, 12);
-                } else {
-                    // システムがない場合の予備の手動お引越し
-                    const oldCastle = game.getCastle(motoyasu.castleId);
-                    if (oldCastle) {
-                        oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== motoyasu.id);
-                        if (oldCastle.castellanId === motoyasu.id) oldCastle.castellanId = 0;
-                    }
-                    motoyasu.castleId = 12;
-                    if (!hikuma.samuraiIds.includes(motoyasu.id)) {
-                        hikuma.samuraiIds.push(motoyasu.id);
-                    }
-                }
-                
-                // 浜松城にいる他の武将から城主バッジを外します
-                const residents = game.bushos.filter(b => b.castleId === 12 && b.status === 'active');
-                residents.forEach(b => b.isCastellan = false);
-                
-                // 元康に城主バッジを付けます
-                motoyasu.isCastellan = true;
-                hikuma.castellanId = motoyasu.id;
-
-                // お城のデータを更新して、新しい城主を確定させます
-                if (game.affiliationSystem) {
-                    game.affiliationSystem.updateCastleLord(hikuma);
-                }
+                window.EventAction.moveBusho(game, motoyasu, 12);
+                window.EventAction.appointCastellan(game, motoyasu, hikuma);
             }
         }
 
@@ -2815,20 +2747,11 @@ window.GameEvents.push({
         // 長逸に大名バッジをつけます（もし軍師だった場合はバッジを外します）
         nagayasu.isDaimyo = true;
         nagayasu.isGunshi = false;
-
+        
         // ② 三好長逸を、今いるお城の城主にします
         const nagayasuCastle = game.getCastle(nagayasu.castleId);
         if (nagayasuCastle) {
-            // 元々いた城主のバッジを外します
-            const oldCastellan = game.getBusho(nagayasuCastle.castellanId);
-            if (oldCastellan && oldCastellan.id !== nagayasu.id) {
-                oldCastellan.isCastellan = false;
-            }
-            nagayasu.isCastellan = true;
-            nagayasuCastle.castellanId = nagayasu.id;
-            
-            // システムにお城の持ち主が変わったことを伝えます
-            game.affiliationSystem.updateCastleLord(nagayasuCastle);
+            window.EventAction.appointCastellan(game, nagayasu, nagayasuCastle);
         }
 
         // ③ 三好義継の貢献度（功績）を0にします
@@ -2991,7 +2914,7 @@ window.GameEvents.push({
         matsunagaBushos.forEach(busho => {
             game.affiliationSystem.joinClan(busho, sponsorClanId, busho.castleId, 100);
         });
-
+        
         // ③ 松永久秀を改めて城主に任命する処理
         // 信貴山城（ID: 39）が元々松永家のものだった場合、松永久秀を信貴山城へお引越しさせます
         const shigisanCastle = matsunagaCastles.find(c => c.id === 39);
@@ -2999,22 +2922,12 @@ window.GameEvents.push({
         
         if (shigisanCastle) {
             targetCastle = shigisanCastle;
-            if (hisahide.castleId !== 39) {
-                if (game.affiliationSystem) {
-                    game.affiliationSystem.moveCastle(hisahide, 39);
-                } else {
-                    hisahide.castleId = 39;
-                }
-            }
+            window.EventAction.moveBusho(game, hisahide, 39);
         }
         
         // 城主のバッジを渡します
-        hisahide.isCastellan = true;
         if (targetCastle) {
-            targetCastle.castellanId = hisahide.id;
-            if (game.affiliationSystem) {
-                game.affiliationSystem.updateCastleLord(targetCastle);
-            }
+            window.EventAction.appointCastellan(game, hisahide, targetCastle);
         }
 
         // 臣従先の勢力に軍団の空き（1〜8）があるか確認し、空きがあれば国主に任命します
@@ -3067,11 +2980,7 @@ window.GameEvents.push({
                 matsunagaBushos.forEach(busho => {
                     if (busho.id !== hisahide.id && busho.castleId !== targetCastle.id) {
                         busho.isCastellan = false; // お引越しするので城主のバッジは外します
-                        if (game.affiliationSystem) {
-                            game.affiliationSystem.moveCastle(busho, targetCastle.id);
-                        } else {
-                            busho.castleId = targetCastle.id;
-                        }
+                        window.EventAction.moveBusho(game, busho, targetCastle.id);
                     }
                 });
             }
@@ -3160,15 +3069,9 @@ window.GameEvents.push({
         if (isCommander && game.legions) {
             legionToTakeover = game.legions.find(l => l.clanId === tomomasa.clan && l.commanderId === tomomasa.id);
         }
-
+        
         // 1. 荒木村重を伊丹城（ID: 51）へ移動させます
-        if (murashige.castleId !== 51) {
-            if (game.affiliationSystem) {
-                game.affiliationSystem.moveCastle(murashige, 51);
-            } else {
-                murashige.castleId = 51;
-            }
-        }
+        window.EventAction.moveBusho(game, murashige, 51);
 
         // 2. 池田知正の役職を外し、荒木村重を新城主に据えます
         // 知正が以前いたお城の城主データを解除します
@@ -3180,11 +3083,7 @@ window.GameEvents.push({
         tomomasa.isCastellan = false;
         tomomasa.isCommander = false;
 
-        murashige.isCastellan = true;
-        itamiCastle.castellanId = murashige.id;
-        if (game.affiliationSystem) {
-            game.affiliationSystem.updateCastleLord(itamiCastle);
-        }
+        window.EventAction.appointCastellan(game, murashige, itamiCastle);
 
         // 国主だった場合は軍団を引き継ぎます
         if (isCommander && legionToTakeover) {
@@ -3400,11 +3299,7 @@ window.GameEvents.push({
             if (!targetCastleIds.includes(busho.castleId)) {
                 busho.isCastellan = false;
                 busho.isGunshi = false;
-                if (game.affiliationSystem) {
-                    game.affiliationSystem.moveCastle(busho, mainCastle.id);
-                } else {
-                    busho.castleId = mainCastle.id;
-                }
+                window.EventAction.moveBusho(game, busho, mainCastle.id);
             }
         });
 
@@ -3416,11 +3311,7 @@ window.GameEvents.push({
                 if (busho.id < 1902001 || busho.id > 1902999) {
                     busho.isCastellan = false; // 城を追い出されるので城主バッジは外れます
                     busho.isCommander = false;
-                    if (game.affiliationSystem) {
-                        game.affiliationSystem.moveCastle(busho, nagayasu.castleId);
-                    } else {
-                        busho.castleId = nagayasu.castleId;
-                    }
+                    window.EventAction.moveBusho(game, busho, nagayasu.castleId);
                 }
             });
         });
@@ -3470,20 +3361,9 @@ window.GameEvents.push({
             if (itamiCastle) {
                 if (castle.id === 51) {
                     // もし村重が別のお城にいたら、伊丹城へお引越しさせます
-                    if (murashige.castleId !== 51) {
-                        if (game.affiliationSystem) {
-                            game.affiliationSystem.moveCastle(murashige, 51);
-                        } else {
-                            murashige.castleId = 51;
-                        }
-                    }
-                    murashige.isCastellan = true;
-                    castle.castellanId = murashige.id;
+                    window.EventAction.moveBusho(game, murashige, 51);
                     murashigeNewCastle = castle;
-                    
-                    if (game.affiliationSystem) {
-                        game.affiliationSystem.updateCastleLord(castle);
-                    }
+                    window.EventAction.appointCastellan(game, murashige, castle);
                     return; // 伊丹城の処理はこれで終わりなので、次のお城へ進みます
                 } else {
                     // 伊丹城がある場合、村重は他のお城の城主にはなれません
@@ -3559,11 +3439,7 @@ window.GameEvents.push({
                 targetBushos.forEach(busho => {
                     if (busho.id !== murashige.id && busho.castleId !== murashigeNewCastle.id) {
                         busho.isCastellan = false; // お引越しするので城主のバッジは外します
-                        if (game.affiliationSystem) {
-                            game.affiliationSystem.moveCastle(busho, murashigeNewCastle.id);
-                        } else {
-                            busho.castleId = murashigeNewCastle.id;
-                        }
+                        window.EventAction.moveBusho(game, busho, murashigeNewCastle.id);
                     }
                 });
             }
@@ -3706,12 +3582,10 @@ window.GameEvents.push({
         hatakeyamaBushos.forEach(busho => {
             game.affiliationSystem.joinClan(busho, sponsorClanId, busho.castleId, 100);
         });
-
+        
         // ③ 畠山大名を改めて城主に任命します（joinClanの中で大名や城主のバッジは一度外れているため）
-        hatakeyamaDaimyo.isCastellan = true;
         if (hatakeyamaCastle) {
-            hatakeyamaCastle.castellanId = hatakeyamaDaimyo.id;
-            game.affiliationSystem.updateCastleLord(hatakeyamaCastle);
+            window.EventAction.appointCastellan(game, hatakeyamaDaimyo, hatakeyamaCastle);
         }
 
         // ④ 畠山家という勢力自体を終了させます（滅亡フラグを立てます）
@@ -3771,37 +3645,19 @@ window.GameEvents.push({
         // ② 義守から大名のバッジを外し、隠居状態にします
         oldDaimyo.isDaimyo = false;
         oldDaimyo.isRetired = true;
-
+        
         // ③ もし義光が義守と違うお城にいたら、義守のいるお城へ呼び寄せます
-        if (successor.castleId !== oldDaimyo.castleId) {
-            if (game.affiliationSystem) {
-                game.affiliationSystem.moveCastle(successor, oldDaimyo.castleId);
-            } else {
-                successor.castleId = oldDaimyo.castleId;
-            }
-        }
+        window.EventAction.moveBusho(game, successor, oldDaimyo.castleId);
 
-        // ④ 義光を新しい大名、そして城主に任命します
+        // ④ 義光を新しい大名に任命します（城主任命は後で行います）
         successor.isDaimyo = true;
-        successor.isCastellan = true;
         if (successor.isGunshi) {
             successor.isGunshi = false; // もし軍師だったらバッジを外します
         }
 
         // ⑤ お城の城主データを義光に書き換えます
         const targetCastle = game.getCastle(successor.castleId);
-        if (targetCastle) {
-            const castleBushos = game.bushos.filter(b => b.castleId === targetCastle.id && b.status === 'active');
-            castleBushos.forEach(b => {
-                if (b.id !== successor.id && b.isCastellan) {
-                    b.isCastellan = false; // 他の人の城主バッジを外します
-                }
-            });
-            targetCastle.castellanId = successor.id;
-            if (game.affiliationSystem) {
-                game.affiliationSystem.updateCastleLord(targetCastle);
-            }
-        }
+        window.EventAction.appointCastellan(game, successor, targetCastle);
 
         // ⑥ 義守の出家と改名処理（栄林と号する）
         const oldNameStr = oldDaimyo.name.replace('|', ''); // 改名前のフルネームをメモしておきます
