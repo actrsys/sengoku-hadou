@@ -2011,7 +2011,7 @@ window.GameEvents.push({
         if (!context || !context.deadShogunClanId) return false;
 
         // 世界に将軍候補（ID80:左馬頭）が存在するか確認します
-        const candidate = window.EventCheck.getShogunCandidate(game);
+        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
         if (candidate && (candidate.status === 'unborn' || candidate.status === 'dead')) return false;
         if (!candidate) return false;
 
