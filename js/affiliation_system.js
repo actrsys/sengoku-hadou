@@ -554,6 +554,9 @@ class AffiliationSystem {
             if (b.isFactionLeader) {
                 b._lordScore += 10000; 
             }
+            if (b.isRetired) {
+                b._lordScore -= 50000;
+            }
             if (b.isGunshi) {
                 b._lordScore -= 100000; 
             }
