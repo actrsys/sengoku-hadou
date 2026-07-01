@@ -846,13 +846,40 @@ class LifeSystem {
         if (allCandidates.length > 0) {
             let successor = null;
 
+            // ★追加：プレイヤー・AI問わず、まず全員を「自動家督相続の優先度」の順番に並び替えます！
+            allCandidates.forEach(b => {
+                b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
+                b._affinityDiff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
+                b._baseScore = b.leadership + b.intelligence;
+            });
+
+            allCandidates.sort((a, b) => {
+                // 一門（親戚）を優先します
+                if (a._isRelative && !b._isRelative) return -1;
+                if (!a._isRelative && b._isRelative) return 1;
+                
+                // どちらも一門（またはどちらも一門ではない）場合は、相性などを比べます
+                if (a._isRelative && b._isRelative) {
+                    if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
+                    
+                    const aIsYounger = a.birthYear > daimyo.birthYear;
+                    const bIsYounger = b.birthYear > daimyo.birthYear;
+                    if (aIsYounger && !bIsYounger) return -1;
+                    if (!aIsYounger && bIsYounger) return 1;
+                    
+                    if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
+                }
+                // 血の繋がりに関係なく、最後は能力の高さで決めます
+                return b._baseScore - a._baseScore;
+            });
+
             // ★ここから変更：プレイヤーの家なら自分で選ぶ魔法を復活させます！
             // 念のため、文字と数字の違いで誤判定（勝手にAIが決めてしまうバグ）が起きないように Number() で包んで比較します
             if (Number(daimyo.clan) === Number(this.game.playerClanId)) {
                 // プレイヤーが選ぶまで「待つ」魔法です
                 await new Promise(resolve => {
                     this.game.ui.info.openBushoSelector('succession', null, {
-                        customBushos: allCandidates,
+                        customBushos: allCandidates, // ★上で並び替えたリストをそのまま渡します
                         customTitle: "後継者を選択",
                         hideCancel: true, // 逃げられないように戻るボタンを消します
                         onConfirm: (selectedIds) => {
@@ -863,34 +890,7 @@ class LifeSystem {
                     });
                 });
             } else {
-                // AIの場合は、自動で一番ふさわしい人を計算して選びます
-                allCandidates.forEach(b => {
-                    b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
-                    b._affinityDiff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
-                    b._baseScore = b.leadership + b.intelligence;
-                });
-
-                allCandidates.sort((a, b) => {
-                    // 一門（親戚）を優先します
-                    if (a._isRelative && !b._isRelative) return -1;
-                    if (!a._isRelative && b._isRelative) return 1;
-                    
-                    // どちらも一門（またはどちらも一門ではない）場合は、相性などを比べます
-                    if (a._isRelative && b._isRelative) {
-                        if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
-                        
-                        const aIsYounger = a.birthYear > daimyo.birthYear;
-                        const bIsYounger = b.birthYear > daimyo.birthYear;
-                        if (aIsYounger && !bIsYounger) return -1;
-                        if (!aIsYounger && bIsYounger) return 1;
-                        
-                        if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
-                    }
-                    // 血の繋がりに関係なく、最後は能力の高さで決めます
-                    return b._baseScore - a._baseScore;
-                });
-
-                // 一番上に来た人を後継ぎにします！
+                // AIの場合は、自動で一番ふさわしい人（一番上に来た人）を後継ぎにします！
                 successor = allCandidates[0];
             }
 
@@ -1057,38 +1057,24 @@ class LifeSystem {
         if (allCandidates.length > 0) {
             let successor = null;
 
-            if (Number(commander.clan) === Number(this.game.playerClanId)) {
-                // プレイヤーの勢力なら、自分で選ぶ画面を出します
-                await new Promise(resolve => {
-                    this.game.ui.info.openBushoSelector('succession_commander', null, {
-                        customBushos: allCandidates,
-                        customTitle: "後任の国主を選択",
-                        hideCancel: true, 
-                        onConfirm: (selectedIds) => {
-                            successor = this.game.getBusho(selectedIds[0]);
-                            resolve();
-                        }
-                    });
-                });
-            } else {
-                // AIの場合は自動で選びます
-                allCandidates.forEach(b => {
-                    b._isRelative = commander.familyIds.some(fId => b.familyIds.includes(fId));
-                    b._affinityDiff = Math.abs((commander.affinity || 0) - (b.affinity || 0));
-                    b._baseScore = b.leadership + b.intelligence;
-                });
+            // ★変更：プレイヤー・AI問わず、自動でふさわしい人を計算して選びます
+            allCandidates.forEach(b => {
+                b._isRelative = commander.familyIds.some(fId => b.familyIds.includes(fId));
+                b._affinityDiff = Math.abs((commander.affinity || 0) - (b.affinity || 0));
+                b._baseScore = b.leadership + b.intelligence;
+            });
 
-                allCandidates.sort((a, b) => {
-                    if (a._isRelative && !b._isRelative) return -1;
-                    if (!a._isRelative && b._isRelative) return 1;
-                    if (a._isRelative && b._isRelative) {
-                        if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
-                    }
-                    return b._baseScore - a._baseScore;
-                });
+            allCandidates.sort((a, b) => {
+                if (a._isRelative && !b._isRelative) return -1;
+                if (!a._isRelative && b._isRelative) return 1;
+                if (a._isRelative && b._isRelative) {
+                    if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
+                }
+                return b._baseScore - a._baseScore;
+            });
 
-                successor = allCandidates[0];
-            }
+            // ★並び替えて一番上に来た人を、自動で後任の国主にします！
+            successor = allCandidates[0];
 
             const originalName = successor.name.replace('|', '');
             let isExternalSuccessor = false;
