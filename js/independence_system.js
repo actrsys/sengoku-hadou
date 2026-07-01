@@ -84,7 +84,7 @@ class IndependenceSystem {
         }
     }
     
-    async executeRebellion(castle, castellan, oldDaimyo, intention = 'indep') {
+    async executeRebellion(castle, castellan, oldDaimyo, intention = 'indep', forceTargetClanId = null) {
         const oldClanId = castle.ownerClan;
         
         // ★追加：誰が裏切ったか後で確認するために、今の「主家」の武将たちをメモしておきます！
@@ -141,14 +141,19 @@ class IndependenceSystem {
 
         // ★修正：独立・寝返り処理の途中で役職がリセットされても呼応するように、元の派閥IDを記憶しておきます！
         const leaderOriginalFactionId = rebellionLeader.factionId;
-
+        
         // --- ★ここから：寝返り先を探す処理 ---
         let targetClanId = null;
         let targetDaimyo = null;
         let bestScore = -1;
 
+        // ★追加：もし強制的な寝返り先（forceTargetClanId）が指定されていたら、無条件でそこに決めます！
+        if (forceTargetClanId) {
+            targetClanId = forceTargetClanId;
+            targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+        }
         // ★追加：独立志向(indep)でなければ、寝返り先を探します
-        if (intention !== 'indep') {
+        else if (intention !== 'indep') {
             // 相性の計算基準を rebellionLeader（神輿になる人物）に変更
             const oldAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, oldDaimyo.affinity);
 
@@ -234,10 +239,11 @@ class IndependenceSystem {
         let isDefection = false;
         let newClanId;
         let newClanName;
-
+        
         // ★ここから追加：寝返り先が決まったら、プレイヤーかどうかを確認します！
         if (targetClanId) {
-            if (targetClanId === this.game.playerClanId) {
+            // ★変更：強制寝返り（総取り等）の場合は、面会イベントを省略して無条件で受け入れます！
+            if (targetClanId === this.game.playerClanId && !forceTargetClanId) {
                 // プレイヤー勢力なら面会イベントを呼び出します
                 const isAccepted = await this.askPlayerForDefection(rebellionLeader, oldClanId);
                 // もし面会で「断る」を選んだら、寝返りは諦めて独立ルートに変更します
@@ -640,17 +646,27 @@ class IndependenceSystem {
                 busho.loyalty = this.calcNewLoyalty(busho, newDaimyo);
                 joiners.push(busho);
             } else {
-                if (escapeCastles.length > 0 && busho.duty >= 30) {
-                    if ((busho.strength + busho.intelligence) * (Math.random() + 0.5) > (newDaimyo.leadership + newDaimyo.intelligence) * 0.8) {
-                        const target = escapeCastles[Math.floor(Math.random() * escapeCastles.length)];
-                        // ★新しいお引越しセンターの魔法を使います！
-                        this.game.affiliationSystem.moveCastle(busho, target.id);
-                        this.game.updateCastleLord(target);
+                // ★反対派（寝返り・独立に追随しない場合）
+                if (busho.duty >= 30) {
+                    // 義理が高い武将の場合
+                    if (escapeCastles.length > 0) {
+                        // 逃げる城がある場合は脱出判定
+                        if ((busho.strength + busho.intelligence) * (Math.random() + 0.5) > (newDaimyo.leadership + newDaimyo.intelligence) * 0.8) {
+                            const target = escapeCastles[Math.floor(Math.random() * escapeCastles.length)];
+                            // ★新しいお引越しセンターの魔法を使います！
+                            this.game.affiliationSystem.moveCastle(busho, target.id);
+                            this.game.updateCastleLord(target);
+                        } else {
+                            castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
+                            busho.castleId = 0; captives.push(busho);
+                        }
                     } else {
-                        castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
-                        busho.castleId = 0; captives.push(busho);
+                        // ★変更：逃げる城がない場合は、潔く野に下る（浪人になる）
+                        this.game.affiliationSystem.becomeRonin(busho);
+                        this.game.ui.log(`  -> ${busho.name}は新体制に従わず、野に下りました。`);
                     }
                 } else {
+                    // 義理が低い場合は、逃げる城があってもなくても消極的合流（節操なく従う）
                     // ★大名家が変わるので功績半分！
                     if (busho.clan !== 0 && busho.clan !== newClanId) {
                         busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);

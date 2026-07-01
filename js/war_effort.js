@@ -321,6 +321,10 @@ Object.assign(WarManager.prototype, {
             const defProvData = this.game.provinces.find(p => p.id === defCastle.provinceId);
             const defDaimyoName = (defClanData && defClanData.name) ? defClanData.name : (defCastle.isKunishu ? defCastle.name : (defProvData ? defProvData.province : "中立"));
             
+            // ★追加：大名の居城かどうかを判定して記憶します
+            const defDaimyo = this.game.bushos.find(b => b.clan === defClan && b.isDaimyo);
+            const isDaimyoCastle = (defDaimyo && defDaimyo.castleId === defCastle.id);
+
             // ★ここから追加：お城に「攻撃された記憶」をメモ書きします！
             // ただし、防衛側が諸勢力（鎮圧戦）の場合は、お城の奪い合いではないのでメモしません！
             if (!defCastle.isKunishu) {
@@ -511,7 +515,8 @@ Object.assign(WarManager.prototype, {
                 defender: defCastle, atkBushos: atkBushos, defBusho: defBusho, 
                 turn: 'attacker', isPlayerInvolved: isPlayerInvolved, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false,
                 reinforcement: reinforcementData, selfReinforcement: selfReinforcementData,
-                isKunishuSubjugation: defCastle.isKunishu === true && !atkCastle.isKunishu // 防衛側が諸勢力で、攻撃側が諸勢力(蜂起)でないなら鎮圧戦！
+                isKunishuSubjugation: defCastle.isKunishu === true && !atkCastle.isKunishu, // 防衛側が諸勢力で、攻撃側が諸勢力(蜂起)でないなら鎮圧戦！
+                isDaimyoCastle: isDaimyoCastle // ★大名の居城フラグを追加
             };
 
             // ★追加：戦闘準備が整ったこのタイミングで「戦闘前」の歴史イベントをチェックします
@@ -1071,6 +1076,11 @@ Object.assign(WarManager.prototype, {
             s.oldDefClanId = s.defender.ownerClan; 
             s.extinctionNotified = false; // フラグの初期化
 
+            // ★追加：大名の居城が攻め落とされたかのフラグを立てます（撤退による明け渡しも含む）
+            if (attackerWon && !s.attacker.isKunishu && s.attacker.ownerClan !== 0 && s.oldDefClanId !== 0) {
+                s.isDaimyoCastleFallen = s.isDaimyoCastle;
+            }
+
             // ==========================================
             // ★勝敗決定前の「戦域点滅」ギミック
             // ==========================================
@@ -1147,7 +1157,7 @@ Object.assign(WarManager.prototype, {
                         
                         // ★変更：大名がいたら〜の古い処理を消して、新しいフェーズ管理の魔法にバトンタッチします！
                         this.startPrisonerPhase();
-                        
+                    
                     } else {
                         // AIが勝った場合は自動で処理します
                         await this.autoResolvePrisoners(this.pendingPrisoners, winnerClan);
@@ -1155,6 +1165,7 @@ Object.assign(WarManager.prototype, {
                         
                         // ==========================================
                         // ★AIの場合は、そのまま滅亡チェックとターン終了へ進みます！
+                        await this.checkTotalTakeover(s); // ★総取りシステムをチェック！
                         await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, 'no_castle');
                         if (window.GameApp) window.GameApp.updateAllClanPrestige(); // 威信を更新
                         this.game.finishTurn();
@@ -1163,6 +1174,7 @@ Object.assign(WarManager.prototype, {
                 } else {
                     // ==========================================
                     // ★捕虜がいなかった場合も、そのまま滅亡チェックとターン終了へ進みます！
+                    await this.checkTotalTakeover(s); // ★総取りシステムをチェック！
                     await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, 'no_castle');
                     if (window.GameApp) window.GameApp.updateAllClanPrestige(); // 威信を更新
                     this.game.finishTurn();
@@ -2336,10 +2348,13 @@ Object.assign(WarManager.prototype, {
                 this.game.ui.log(`(捕虜となっていた ${releasedNames.join('、')} を解放しました)`);
             }
         }
-
+        
         // リストを綺麗にお掃除します
         this.pendingPrisoners = [];
         this.pendingKills = [];
+
+        // ★追加：戦後処理が終わったので、総取りシステムが発動するかチェックします！
+        await this.checkTotalTakeover(this.state);
 
         // 全て終わったので滅亡チェックをしてターンを終了します
         await this.game.lifeSystem.checkClanExtinction(this.state.oldDefClanId, 'no_castle');
@@ -3024,5 +3039,124 @@ Object.assign(WarManager.prototype, {
         }
         
         return hireProb;
+    },
+    
+    // ==========================================
+    // ★ここから追加：総取りシステムの魔法！
+    // ==========================================
+    async checkTotalTakeover(s) {
+        // 大名の居城が落ちていなければ何もしません
+        if (!s || !s.isDaimyoCastleFallen) return; 
+
+        const atkClanId = s.attacker.ownerClan;
+        const defClanId = s.oldDefClanId;
+        
+        if (atkClanId === 0 || defClanId === 0) return;
+
+        // ★追加：すでに拠点が0個（つまり最後の1拠点が落とされた）場合は、総取りを起こさずに通常の滅亡処理へ進みます！
+        const defCastles = this.game.castles.filter(c => c.ownerClan === defClanId);
+        if (defCastles.length === 0) return; 
+
+        const atkClan = this.game.clans.find(c => c.id === atkClanId);
+        const defClan = this.game.clans.find(c => c.id === defClanId);
+        
+        if (!atkClan || !defClan) return;
+        
+        // 威信が3倍以上かチェック！
+        const atkPrestige = atkClan.daimyoPrestige || 0;
+        const defPrestige = defClan.daimyoPrestige || 0;
+        if (atkPrestige < defPrestige * 3) return;
+        
+        // 条件をクリアしたので、総取りシステムを発動します！
+        await this.executeTotalTakeover(atkClanId, defClanId, defCastles);
+    },
+    
+    async executeTotalTakeover(atkClanId, defClanId, defCastles) {
+        const atkClan = this.game.clans.find(c => c.id === atkClanId);
+        const defClan = this.game.clans.find(c => c.id === defClanId);
+        
+        const msg = `【総取り】\n大名の居城陥落と、${atkClan.name}との圧倒的な威信差により、\n${defClan.name}の各地で動揺が広がっています！`;
+        this.game.ui.log(msg.replace(/\n/g, ''));
+        
+        // プレイヤーが関わっていなくても、大きなイベントなのでダイアログでお知らせします
+        const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+        if (this.state.isPlayerInvolved || !skipAnim) {
+            await this.game.ui.showDialogAsync(msg);
+        }
+
+        const defBushos = this.game.bushos.filter(b => b.clan === defClanId && b.status === 'active');
+        const oldDaimyo = defBushos.find(b => b.isDaimyo) || defBushos[0];
+
+        // 1. 落とされた側の全武将の忠誠度を30下げます（大名以外）
+        defBushos.forEach(b => {
+            if (b.id !== oldDaimyo.id) {
+                b.loyalty = Math.max(0, b.loyalty - 30);
+            }
+        });
+        
+        const indepSys = this.game.independenceSystem || new IndependenceSystem(this.game);
+        
+        const I = window.WarParams.Independence || {};
+        const thresholdBase = I.ThresholdBase || 25;
+        const dutyDiv = I.ThresholdDutyDiv || 2;
+        const ambDiv = I.ThresholdAmbitionDiv || 5;
+        const probLoyalty = I.ProbLoyaltyFactor || 1;
+        const probAffinity = I.ProbAffinityFactor || 0.5;
+        
+        // 2. 先に各城の城主たちの独立・寝返り判定を行います
+        for (const castle of defCastles) {
+            // ★追加：連鎖寝返りなどで、すでにこのお城の持ち主が変わっていたらスキップします！
+            if (castle.ownerClan !== defClanId) continue;
+
+            if (castle.castellanId === 0) continue; 
+            const castellan = this.game.getBusho(castle.castellanId);
+            
+            // ★大名はまだ大名のままなので、ここで確実にスキップされて巻き込まれません！
+            if (!castellan || castellan.isDaimyo) continue;
+            
+            // 独立の確率計算
+            const threshold = thresholdBase + ((50 - castellan.duty) / dutyDiv) + ((castellan.ambition - 50) / ambDiv);
+            let isIndependent = false;
+            
+            // 忠誠度が下がった状態での独立判定を行います
+            if (castellan.loyalty <= threshold) {
+                const daimyoBonus = indepSys.calcDaimyoPowerBonus(oldDaimyo);
+                const affinityDiff = GameSystem.calcAffinityDiff(castellan.affinity, oldDaimyo.affinity);
+                
+                let prob = ((threshold - castellan.loyalty) * probLoyalty) + (affinityDiff * probAffinity) - (daimyoBonus * 2);
+                
+                const isFamily = castellan.familyIds.some(id => oldDaimyo.familyIds.includes(id));
+                if (isFamily) {
+                    prob = prob * 0.7; // 一門は少し独立しにくい
+                }
+                
+                // サイコロを振って成功したら独立！
+                if (prob > 0 && Math.random() * 1000 < prob) {
+                    isIndependent = true;
+                    // 独立イベントの実行（indep を強制します）
+                    await indepSys.planCoupDetatOrRebellion(castle, castellan, oldDaimyo, 'indep');
+                }
+            }
+            
+            // 独立しなかった場合は、強制的に「落とした側の大名（atkClanId）」へ寝返ります！
+            if (!isIndependent) {
+                await indepSys.executeRebellion(castle, castellan, oldDaimyo, 'defect', atkClanId);
+            }
+        }
+
+        // 3. ★変更：すべての処理が終わった一番最後に、大名の心を折って浪人にします！
+        if (oldDaimyo && oldDaimyo.status !== 'dead') {
+            const daimyoNameStr = oldDaimyo.name.replace(/\|/g, '');
+            const roninMsg = `【下野】${daimyoNameStr}は居城を失ったショックで野に下りました。`;
+            this.game.ui.log(roninMsg);
+            
+            if (this.state.isPlayerInvolved || !skipAnim) {
+                await this.game.ui.showDialogAsync(roninMsg);
+            }
+            
+            // 大名バッジを外して、お引越しセンターに頼んで確実に浪人にします
+            oldDaimyo.isDaimyo = false;
+            this.game.affiliationSystem.becomeRonin(oldDaimyo);
+        }
     }
 });
