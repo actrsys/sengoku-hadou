@@ -403,13 +403,25 @@ class IndependenceSystem {
         // ★メッセージの出し分け
         if (isProxyRebellion) {
             if (isDefection) {
-                msg = `${oldClanName}の${castellanNameStr}が${leaderNameStr}を唆して${newClanName}に寝返りました！`;
+                if (forceTargetClanId) {
+                    // 総取りなどによる強制合流の場合（神輿パターンの時）
+                    msg = `${castellanNameStr}が${leaderNameStr}を説き伏せ、${newClanName}に臣従しました！`;
+                } else {
+                    // 通常の自発的な寝返りの場合
+                    msg = `${oldClanName}の${castellanNameStr}が${leaderNameStr}を唆して${newClanName}に寝返りました！`;
+                }
             } else {
                 msg = `${oldClanName}の${castellanNameStr}が${leaderNameStr}を大名として擁立し、独立を宣言しました！`;
             }
         } else {
             if (isDefection) {
-                msg = `${oldClanName}の${leaderNameStr}が、${castle.name}ごと${newClanName}に寝返りました！`;
+                if (forceTargetClanId) {
+                    // 総取りなどによる強制合流の場合
+                    msg = `${castle.name}の${leaderNameStr}は${newClanName}に臣従しました！`;
+                } else {
+                    // 通常の自発的な寝返りの場合
+                    msg = `${oldClanName}の${leaderNameStr}が、${castle.name}ごと${newClanName}に寝返りました！`;
+                }
             } else {
                 msg = `${oldClanName}の${leaderNameStr}が、${castle.name}にて独立を宣言しました！`;
             }
