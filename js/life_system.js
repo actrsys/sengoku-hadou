@@ -1471,12 +1471,15 @@ class LifeSystem {
             // ★追加ここまで
 
             clan.extinctionNotified = true; // 二度と呼ばれないように印をつけます
-
+            
             const displayClanName = clan.name.endsWith('家') ? clan.name : clan.name + '家';
             
             let extMsg = "";
             if (reason === 'no_heir') {
                 extMsg = `当主が死亡し、後継ぎがいないため\n${displayClanName}は滅亡しました。`;
+            } else if (reason === 'total_takeover') {
+                // ★追加：総取り発動時の専用メッセージです！
+                extMsg = `居城を失い、${displayClanName}は滅亡しました。`;
             } else {
                 extMsg = `拠点を全て失い、${displayClanName}は滅亡しました。`;
             }

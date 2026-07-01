@@ -1166,7 +1166,8 @@ Object.assign(WarManager.prototype, {
                         // ==========================================
                         // ★AIの場合は、そのまま滅亡チェックとターン終了へ進みます！
                         await this.checkTotalTakeover(s); // ★総取りシステムをチェック！
-                        await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, 'no_castle');
+                        const extReason1 = s.isTotalTakeoverExecuted ? 'total_takeover' : 'no_castle';
+                        await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason1);
                         if (window.GameApp) window.GameApp.updateAllClanPrestige(); // 威信を更新
                         this.game.finishTurn();
                         // ==========================================
@@ -1175,7 +1176,8 @@ Object.assign(WarManager.prototype, {
                     // ==========================================
                     // ★捕虜がいなかった場合も、そのまま滅亡チェックとターン終了へ進みます！
                     await this.checkTotalTakeover(s); // ★総取りシステムをチェック！
-                    await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, 'no_castle');
+                    const extReason2 = s.isTotalTakeoverExecuted ? 'total_takeover' : 'no_castle';
+                    await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason2);
                     if (window.GameApp) window.GameApp.updateAllClanPrestige(); // 威信を更新
                     this.game.finishTurn();
                     // ==========================================
@@ -2352,12 +2354,13 @@ Object.assign(WarManager.prototype, {
         // リストを綺麗にお掃除します
         this.pendingPrisoners = [];
         this.pendingKills = [];
-
+        
         // ★追加：戦後処理が終わったので、総取りシステムが発動するかチェックします！
         await this.checkTotalTakeover(this.state);
 
         // 全て終わったので滅亡チェックをしてターンを終了します
-        await this.game.lifeSystem.checkClanExtinction(this.state.oldDefClanId, 'no_castle');
+        const extReason = this.state.isTotalTakeoverExecuted ? 'total_takeover' : 'no_castle';
+        await this.game.lifeSystem.checkClanExtinction(this.state.oldDefClanId, extReason);
         if (window.GameApp) window.GameApp.updateAllClanPrestige();
         this.game.finishTurn();
     },
@@ -3068,14 +3071,15 @@ Object.assign(WarManager.prototype, {
         if (atkPrestige < defPrestige * 3) return;
         
         // 条件をクリアしたので、総取りシステムを発動します！
+        s.isTotalTakeoverExecuted = true; // ★追加：総取りが発動した目印をセットします
         await this.executeTotalTakeover(atkClanId, defClanId, defCastles);
     },
-    
+
     async executeTotalTakeover(atkClanId, defClanId, defCastles) {
         const atkClan = this.game.clans.find(c => c.id === atkClanId);
         const defClan = this.game.clans.find(c => c.id === defClanId);
         
-        const msg = `【総取り】\n大名の居城陥落と、${atkClan.name}との圧倒的な威信差により、\n${defClan.name}の各地で動揺が広がっています！`;
+        const msg = `${defClan.name}の居城が陥落しました。`;
         this.game.ui.log(msg.replace(/\n/g, ''));
         
         // プレイヤーが関わっていなくても、大きなイベントなのでダイアログでお知らせします
@@ -3144,16 +3148,9 @@ Object.assign(WarManager.prototype, {
             }
         }
 
-        // 3. ★変更：すべての処理が終わった一番最後に、大名の心を折って浪人にします！
+        // 3. ★変更：すべての処理が終わった一番最後に、大名を裏で浪人にします！
+        // (ダイアログやログは直後の滅亡判定システムに任せるため無言で行います)
         if (oldDaimyo && oldDaimyo.status !== 'dead') {
-            const daimyoNameStr = oldDaimyo.name.replace(/\|/g, '');
-            const roninMsg = `【下野】${daimyoNameStr}は居城を失ったショックで野に下りました。`;
-            this.game.ui.log(roninMsg);
-            
-            if (this.state.isPlayerInvolved || !skipAnim) {
-                await this.game.ui.showDialogAsync(roninMsg);
-            }
-            
             // 大名バッジを外して、お引越しセンターに頼んで確実に浪人にします
             oldDaimyo.isDaimyo = false;
             this.game.affiliationSystem.becomeRonin(oldDaimyo);
