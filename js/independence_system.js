@@ -405,7 +405,7 @@ class IndependenceSystem {
             if (isDefection) {
                 if (forceTargetClanId) {
                     // 総取りなどによる強制合流の場合（神輿パターンの時）
-                    msg = `${castellanNameStr}が${leaderNameStr}を説き伏せ、${newClanName}に臣従しました！`;
+                    msg = `${castle.name}の${leaderNameStr}は${newClanName}に臣従しました！`;
                 } else {
                     // 通常の自発的な寝返りの場合
                     msg = `${oldClanName}の${castellanNameStr}が${leaderNameStr}を唆して${newClanName}に寝返りました！`;
