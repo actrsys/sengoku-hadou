@@ -660,8 +660,12 @@ class AIEngine {
             if (target.isKunishuTarget) {
                 // ★諸勢力に対する攻撃確率の計算
                 const kunishu = target.kunishu;
+
+                // ★追加：商人は攻撃対象から除外します
+                if (kunishu.ideology === '商人') return;
+
                 // ★修正：諸勢力は兵力が少ないため、計算上は「1.1倍」にして大名家の城と同じ難易度として評価します！
-                const enemyForce = (kunishu.soldiers + kunishu.defense) * 1.1; 
+                const enemyForce = (kunishu.soldiers + kunishu.defense) * 1.1;
                 
                 let myReinfPower = 0;
                 // 自軍からの援軍を見積もる
@@ -1456,9 +1460,12 @@ class AIEngine {
             });
         }
         const isSrcHeavySnow = heavySnowProvIds.has(castle.provinceId);
-
+        
         // ③ 決められた回数だけ、行動を繰り返します！
         for (let step = 0; step < maxActions; step++) {
+            // ★毎回、AIが安全に使えるお金（給金と余裕分を引いた額）を計算します！
+            const availableGold = GameSystem.calcAvailableGoldForAI(castle, this.game);
+
             // まだ動ける武将を再確認します
             availableBushos = this.game.getCastleBushos(castle.id).filter(b => 
                 !b.isActionDone && b.clan === castle.ownerClan && b.status === 'active'
@@ -1532,13 +1539,13 @@ class AIEngine {
                     isMainBase = true; // 大名居城なら特定の城のシールを貼ります
                 }
             }
-
+            
             // ★追加：特定の城ならいつでも許可し、それ以外のお城では「20%の確率（サイコロ）」で特別に許可します！
             if (isMainBase || Math.random() < 0.2) {
                 canBuyEq = true;
             }
 
-            if (canBuyEq && castle.gold >= 500 && tradeCount < 5) {
+            if (canBuyEq && availableGold >= 500 && tradeCount < 5) {
                 // ① 自領で「道が繋がっている範囲」のお城にある、軍馬・鉄砲・兵士の合計を数えます（飛び地対策）
                 // ★さっき作ったリストを使って、パパッと数えちゃいます！
                 let totalHorses = 0;
@@ -1620,13 +1627,13 @@ class AIEngine {
                     actions.push({ type: 'buy_horse', stat: 'politics', score: horseScore, cost: 500 });
                 }
             }
-
+            
             // ★追加：朝廷への貢物（金が5000以上で余裕がある時、たまに行います）
-            if (castle.gold >= 5000) {
+            if (availableGold >= 5000) {
                 let tributeGold = 500;
-                if (castle.gold >= 10000) {
+                if (availableGold >= 10000) {
                     tributeGold = 1500;
-                } else if (castle.gold >= 7500) {
+                } else if (availableGold >= 7500) {
                     tributeGold = 1000;
                 }
                 // たまに行うように、鉄砲の購入と同じ15点にしておきます。外交が得意な人を向かわせます。
@@ -1658,9 +1665,9 @@ class AIEngine {
                 
                 // ★変更：およそ1人集めるのにかかるお金（単価）を、GameSystemに計算してもらいます！
                 const unitPrice = GameSystem.calcDraftUnitPrice(castellan, castle.peoplesLoyalty, castle.population);
-
+                
                 // ===== 余力計算 =====
-                const surplusGold = Math.max(0, castle.gold - targetGold);
+                const surplusGold = Math.max(0, availableGold - targetGold);
                 const surplusRice = Math.max(0, castle.rice - targetRice);
 
                 // ===== 雇用可能数 =====
@@ -1706,12 +1713,12 @@ class AIEngine {
                 // 変更：そのまま掛け算するとすぐに点数が下がるので、ルート（Math.sqrt）の魔法で
                 // 減り方を緩やかにします。これで目標の9割近くまで積極的に集めるようになります！
                 let scoreDraft = 150 * Math.sqrt(shortRatio);
-
+                
                 // ===== 安全制御 =====
                 if (castle.rice < safeRice) {
                     scoreDraft = 0; // 兵糧が危ないならやめる
                 }
-                if (castle.gold < targetGold) {
+                if (availableGold < targetGold) {
                     scoreDraft = 0; // お金が危ないならやめる
                 }
                 
@@ -2119,7 +2126,7 @@ class AIEngine {
                     }
                     
                     // ★追加：お城の資金が「1000」未満で余裕がない時は、自分の生活を優先して親善の優先度を大幅に下げます！
-                    if (castle.gold < 1000) {
+                    if (availableGold < 1000) {
                         score = Math.floor(score / 4); // スコアを4分の1にします
                     }
                     
@@ -2181,8 +2188,8 @@ class AIEngine {
                     }
                 }
             }
-
-            if (rewardTargets.length > 0 && castle.gold >= 100) {
+            
+            if (rewardTargets.length > 0 && availableGold >= 100) {
                 // ★修正：一番忠誠度が低い武将に合わせて、優先度スコア（やりたさ）を計算します！
                 // 忠誠95なら1点、60以下なら40点になります。
                 let rewardScore = 15; // 承認欲求だけで選ばれた時などの基本点です
@@ -2318,7 +2325,7 @@ class AIEngine {
                             actions.push({ type: 'rumor', stat: 'intelligence', score: finalScore, cost: 0, targetId: targetBusho.castleId, targetBushoId: targetBusho.id });
                             
                             // 引抜は、宿敵がいない場合のみ実行します
-                            if (!hasNemesis && castle.gold >= 100) {
+                            if (!hasNemesis && availableGold >= 100) {
                                 actions.push({ type: 'headhunt', stat: 'intelligence', score: finalScore, cost: 100, targetId: targetBusho.castleId, targetBushoId: targetBusho.id, gold: 100 });
                             }
                         });
@@ -2360,7 +2367,7 @@ class AIEngine {
                     });
                     const targetBusho = action.targets[0];
                     
-                    if (castle.gold >= 100) {
+                    if (availableGold >= 100) {
                         castle.gold -= 100;
                         // 褒美の効果をプレイヤーと同じように計算（効果は200相当で据え置き）
                         const effect = GameSystem.calcRewardEffect(200, daimyo, targetBusho);
@@ -2388,9 +2395,9 @@ class AIEngine {
                 const bestBushos = availableBushos.sort((a, b) => b[action.stat] - a[action.stat]);
                 if (bestBushos.length === 0) continue; // 基準を満たす人がいなければ、この行動は諦めます
                 const doer = bestBushos[0];
-
+                
                 // 実行処理
-                if (action.type === 'tribute' && castle.gold >= action.cost) {
+                if (action.type === 'tribute' && availableGold >= action.cost) {
                     castle.gold -= action.cost;
                     
                     // 朝廷への貢献度をアップさせます
@@ -2410,7 +2417,7 @@ class AIEngine {
                     actionDoneInThisStep = true; 
                     break;
                 }
-                if (action.type === 'kunishu_goodwill' && castle.gold >= action.cost) {
+                if (action.type === 'kunishu_goodwill' && availableGold >= action.cost) {
                     castle.gold -= action.cost;
                     const kunishu = action.targetKunishu;
                     // 正しい外交の専門部署（diplomacyManager）に計算をお願いするように直します
@@ -2509,7 +2516,7 @@ class AIEngine {
                     if (!keepAction) doer.isActionDone = true; 
                     actionDoneInThisStep = true; break;
                 }
-                if (action.type === 'headhunt' && castle.gold >= action.cost) {
+                if (action.type === 'headhunt' && availableGold >= action.cost) {
                     castle.gold -= action.cost;
                     const targetBusho = this.game.getBusho(action.targetBushoId);
                     
@@ -2532,7 +2539,7 @@ class AIEngine {
                     actionDoneInThisStep = true; break;
                 }
                 
-                if (action.type === 'repair' && castle.gold >= 200) {
+                if (action.type === 'repair' && availableGold >= 200) {
                     castle.gold -= 200;
                     const val = GameSystem.calcRepair(doer, 1.0, true);
                     const oldVal = castle.defense;
@@ -2559,7 +2566,7 @@ class AIEngine {
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
                 // ★改善：実行する時も、対象になるお城がある時だけ行います！
-                if (action.type === 'draft' && castle.gold >= action.cost) {
+                if (action.type === 'draft' && availableGold >= action.cost) {
                     // ここでもう一度、徴兵できるお城のリストと重さを計算します
                     const draftableCastles = reachableMyCastles.filter(c => c.population >= 3000);
                     if (draftableCastles.length === 0) continue;
@@ -2669,7 +2676,7 @@ class AIEngine {
                     
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
-                if (action.type === 'farm' && castle.gold >= 200) {
+                if (action.type === 'farm' && availableGold >= 200) {
                     castle.gold -= 200;
                     const val = GameSystem.calcDevelopment(doer, 1.0, true);
                     const oldVal = castle.kokudaka;
@@ -2681,7 +2688,7 @@ class AIEngine {
                     
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
-                if (action.type === 'commerce' && castle.gold >= 200) {
+                if (action.type === 'commerce' && availableGold >= 200) {
                     castle.gold -= 200;
                     const val = GameSystem.calcDevelopment(doer, 1.0, true);
                     const oldVal = castle.commerce;
@@ -2767,7 +2774,7 @@ class AIEngine {
                     const extendedShortage = Math.max(0, buyTarget - castle.rice);
                     
                     // 欲しい分と、お金で買える分の、少ない方にします
-                    let buyAmount = Math.floor(Math.min(extendedShortage, castle.gold / rate, castle.tradeLimit || 0));
+                    let buyAmount = Math.floor(Math.min(extendedShortage, availableGold / rate, castle.tradeLimit || 0));
                     
                     // ちょい買い防止
                     const minRice = Math.floor(baseSoldiers * 0.3);
@@ -2803,11 +2810,11 @@ class AIEngine {
                     for (const task of action.tasks) {
                         const targetCastle = this.game.getCastle(task.targetId);
                         if (!targetCastle) continue; // お城がなくなっていたら次へ
-
+                        
                         // ① 徴兵用のお金のお使い
                         if (task.type === 'draft_gold') {
                             // ★変更：実行直前にも、自分の目標額以上の余裕があるか最終チェックします
-                            if (castle.gold >= Math.floor(baseSoldiers * 1.5) + 500 && targetCastle.gold + 500 <= 99999) {
+                            if (availableGold >= Math.floor(baseSoldiers * 1.5) + 500 && targetCastle.gold + 500 <= 99999) {
                                 castle.gold -= 500;
                                 targetCastle.gold += 500;
                             }
@@ -2835,12 +2842,12 @@ class AIEngine {
                                 targetCastle.soldiers += 300;
                                 targetCastle.rice += 500;
                             }
-                        } 
+                        }
                         // ③ 普通の金・兵士のお使い
                         else if (task.type === 'normal_gold_soldier') {
                             // ★変更：実行直前にも、兵士と金の余裕を最終チェックします
-                            if (castle.gold >= Math.floor(baseSoldiers * 1.5) + 500 && castle.soldiers >= 2500 && targetCastle.gold + 500 <= 99999 && targetCastle.soldiers + 500 <= 99999) {
-                                castle.gold -= 500; 
+                            if (availableGold >= Math.floor(baseSoldiers * 1.5) + 500 && castle.soldiers >= 2500 && targetCastle.gold + 500 <= 99999 && targetCastle.soldiers + 500 <= 99999) {
+                                castle.gold -= 500;
                                 castle.soldiers -= 500;
                                 
                                 const sendHorses = Math.min(castle.horses || 0, 500, 99999 - (targetCastle.horses || 0));
@@ -2944,11 +2951,14 @@ class AIEngine {
             // ★追加：直前に関係値が100になっていたら、お金の無駄になるのでキャンセルします！
             const currentRel = this.game.getRelation(castle.ownerClan, targetClanId);
             if (currentRel && currentRel.sentiment >= 100) return;
+            
+            // ★追加：AIが安全に使えるお金（給金と余裕分を引いた額）を計算します！
+            const availableGold = GameSystem.calcAvailableGoldForAI(castle, this.game);
 
             // 使うお金が、お城の貯金箱の5分の1（20%）より多い時は、高すぎるのでキャンセルします！
-            if (targetData.gold > castle.gold / 5) return;
+            if (targetData.gold > availableGold / 5) return;
 
-            if (castle.gold >= targetData.gold) {
+            if (availableGold >= targetData.gold) {
                 if (Number(targetClanId) === Number(this.game.playerClanId)) {
                     this.game.diplomacyManager.proposeDiplomacyToPlayer(castellan, targetClanId, 'goodwill', targetData.gold, () => {
                         castellan.isActionDone = true;
@@ -2983,9 +2993,9 @@ class AIEngine {
                  // AI同士で通常和睦を行う場合
                  this.game.diplomacyManager.executeDiplomacy(castellan.id, targetCastleId, 'truce');
                  castellan.isActionDone = true;
-             }
+             }// 差し替え後
         } else if (targetData.action === 'court_truce') {
-             if (castle.gold >= targetData.gold) {
+             if (availableGold >= targetData.gold) {
                  this.game.diplomacyManager.executeDiplomacy(castellan.id, targetCastleId, 'court_truce', targetData.gold);
                  castellan.isActionDone = true;
              }

@@ -990,6 +990,49 @@ class GameSystem {
         }
         return { cost, rateStr };
     }
+
+    // ==========================================
+    // ★ここから追加：AIがお金を使う時の「給金計算」と「予算管理」の一元化魔法！
+    // ==========================================
+    // ① 月の基本収入（港ボーナス込み）を予測します
+    static calcExpectedGoldIncome(castle, game) {
+        let income = this.calcBaseGoldIncome(castle);
+        const portCastleIds = [2, 33, 72, 74, 76, 148, 155, 169, 174];
+        if (portCastleIds.includes(castle.id) && game) {
+            const clanCastles = game.castles.filter(c => c.ownerClan === castle.ownerClan);
+            const totalClanPopulation = clanCastles.reduce((sum, c) => sum + c.population, 0);
+            income += Math.floor((castle.population / 500) + (castle.peoplesLoyalty / 2) + (totalClanPopulation / 1000));
+        }
+        if (castle.statusEffects && castle.statusEffects.includes('一揆')) {
+            income = 0;
+        }
+        return income;
+    }
+
+    // ② 城にいる武将全員の「来月の給金合計」を計算します
+    static calcCastleSalary(castle, game) {
+        if (!game) return 0;
+        const bushos = game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && b.status === 'active');
+        const daimyo = game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
+        let consumeGold = 0;
+        bushos.forEach(b => {
+            consumeGold += b.getSalary(daimyo);
+        });
+        return consumeGold;
+    }
+
+    // ③ AIが自由に使っていい「利用可能なお金（予算）」を計算します
+    static calcAvailableGoldForAI(castle, game) {
+        const income = this.calcExpectedGoldIncome(castle, game);
+        const salary = this.calcCastleSalary(castle, game);
+        
+        // (支出 - 収入) に 100 の余裕を足します。
+        // もし収入の方が多くてマイナスになっても、念のため最低 100 は手元に残します！
+        const requiredSafeGold = Math.max(100, (salary - income) + 100);
+        
+        // 今の所持金から、残すべき安全なお金を引いた額が「自由に使えるお金」です
+        return Math.max(0, castle.gold - requiredSafeGold);
+    }
 }
 
 /* ==========================================================================
