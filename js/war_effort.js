@@ -3107,6 +3107,37 @@ Object.assign(WarManager.prototype, {
         const probLoyalty = I.ProbLoyaltyFactor || 1;
         const probAffinity = I.ProbAffinityFactor || 0.5;
         
+        // ★追加：各城の判定順序を「派閥主 ＞ 国主 ＞ 功績」の順に並び替えます！
+        defCastles.sort((castleA, castleB) => {
+            const bushoA = this.game.getBusho(castleA.castellanId);
+            const bushoB = this.game.getBusho(castleB.castellanId);
+
+            // 城主がいない、または大名自身の場合は判定から外れるので一番後ろに送ります
+            const isValidA = bushoA && !bushoA.isDaimyo ? 1 : 0;
+            const isValidB = bushoB && !bushoB.isDaimyo ? 1 : 0;
+            if (isValidA !== isValidB) return isValidB - isValidA;
+            if (isValidA === 0) return 0; // どちらも無効ならそのまま
+
+            // 1. 派閥主を優先
+            const aIsFactionLeader = bushoA.isFactionLeader ? 1 : 0;
+            const bIsFactionLeader = bushoB.isFactionLeader ? 1 : 0;
+            if (aIsFactionLeader !== bIsFactionLeader) {
+                return bIsFactionLeader - aIsFactionLeader;
+            }
+
+            // 2. 国主を優先
+            const aIsCommander = bushoA.isCommander ? 1 : 0;
+            const bIsCommander = bushoB.isCommander ? 1 : 0;
+            if (aIsCommander !== bIsCommander) {
+                return bIsCommander - aIsCommander;
+            }
+
+            // 3. 功績が高い順
+            const achieveA = bushoA.achievementTotal || 0;
+            const achieveB = bushoB.achievementTotal || 0;
+            return achieveB - achieveA;
+        });
+
         // 2. 先に各城の城主たちの独立・寝返り判定を行います
         for (const castle of defCastles) {
             // ★追加：連鎖寝返りなどで、すでにこのお城の持ち主が変わっていたらスキップします！
