@@ -3164,6 +3164,9 @@ Object.assign(WarManager.prototype, {
                 if (isFamily) {
                     prob = prob * 0.7; // 一門は少し独立しにくい
                 }
+
+                // 総取りの時だけ独立の確率を10倍にします
+                prob = prob * 10;
                 
                 // サイコロを振って成功したら独立！
                 if (prob > 0 && Math.random() * 1000 < prob) {
