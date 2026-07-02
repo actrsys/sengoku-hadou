@@ -2396,7 +2396,23 @@ class AIEngine {
                 if (availableBushos.length === 0) continue; // 動ける武将がいなければパスします
 
                 // その行動に一番向いている武将を探します（一番能力が高い人が実行します）
-                const bestBushos = availableBushos.sort((a, b) => b[action.stat] - a[action.stat]);
+                const bestBushos = availableBushos.sort((a, b) => {
+                    // ★追加：調略の場合は、専門部署が用意した「総合スコア」を使って比べっこします！
+                    if (action.type === 'sabotage') {
+                        return StrategySystem.calcSabotageScore(b) - StrategySystem.calcSabotageScore(a);
+                    }
+                    if (action.type === 'incite') {
+                        return StrategySystem.calcInciteScore(b) - StrategySystem.calcInciteScore(a);
+                    }
+                    if (action.type === 'rumor') {
+                        return StrategySystem.calcRumorScore(b) - StrategySystem.calcRumorScore(a);
+                    }
+                    if (action.type === 'headhunt') {
+                        return StrategySystem.calcHeadhuntScore(b) - StrategySystem.calcHeadhuntScore(a);
+                    }
+                    // 調略以外の普通のお仕事は、今まで通り1つの能力（stat）で比べっこします
+                    return b[action.stat] - a[action.stat];
+                });
                 if (bestBushos.length === 0) continue; // 基準を満たす人がいなければ、この行動は諦めます
                 const doer = bestBushos[0];
                 
