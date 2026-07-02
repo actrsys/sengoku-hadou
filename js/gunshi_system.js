@@ -145,18 +145,18 @@ class GunshiSystem {
             let probIsHigh = false;
             let probIsLow = false;
 
+            // ★調略コマンド（離間計・破壊工作・民心撹乱）の場合は、成功率と効果量の組み合わせで自然なつなぎ言葉にします
             if (perceivedProb > 0.95) { probMsg = "まず接触できるでしょう"; probIsHigh = true; }
             else if (perceivedProb > 0.7) { probMsg = "おそらく接触できるでしょう"; probIsHigh = true; }
             else if (perceivedProb > 0.4) { probMsg = "接触できるかは五分五分といったところです"; }
             else if (perceivedProb > 0.15) { probMsg = "接触は難しいでしょう"; probIsLow = true; }
             else { probMsg = "まず接触は不可能でしょう"; probIsLow = true; }
 
-            // ★調略コマンド（離間計・破壊工作・民心撹乱）の場合は、成功率と効果量の組み合わせで自然なつなぎ言葉にします
             if (action.type === 'sabotage' || action.type === 'incite') {
-                if (perceivedProb > 0.95) { probMsg = "まず潜り込めるでしょう"; probIsHigh = true; }
-                else if (perceivedProb > 0.7) { probMsg = "おそらく潜入できるでしょう"; probIsHigh = true; }
-                else if (perceivedProb > 0.4) { probMsg = "潜入できるかは五分五分といったところです"; }
-                else if (perceivedProb > 0.15) { probMsg = "警戒が厳しく、潜入は難しいでしょう"; probIsLow = true; }
+                if (perceivedProb > 0.95) { probMsg = "まず失敗はしないでしょう"; probIsHigh = true; }
+                else if (perceivedProb > 0.7) { probMsg = "おそらく潜り込ませられるでしょう"; probIsHigh = true; }
+                else if (perceivedProb > 0.4) { probMsg = "潜り込ませられるかは五分五分といったところです"; }
+                else if (perceivedProb > 0.15) { probMsg = "警戒が厳しく、潜り込ませるのは難しいでしょう"; probIsLow = true; }
                 else { probMsg = "まず潜入は不可能でしょう"; probIsLow = true; }
             }
 
@@ -169,41 +169,39 @@ class GunshiSystem {
 
             // コマンドごとにダメージのセリフを変えます
             if (action.type === 'rumor') {
-                if (perceivedDamage >= 20) { damageMsg = "相手に大きな疑心を植え付けられることかと存じます。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 10) { damageMsg = "今の待遇に疑問を持たせられるやもしれません。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 5) { damageMsg = "大きな効果は見込めないやもしれません。"; damageIsHigh = false; }
+                if (perceivedDamage >= 20) { damageMsg = "相手に大きな疑心を植え付けられることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 10) { damageMsg = "今の待遇に疑問を持たせられることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 5) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
                 else { damageMsg = "かの者の信頼が揺らぐ事はないかと存じます。"; damageIsHigh = false; }
             } else if (action.type === 'sabotage') {
-                if (perceivedDamage >= 15) { damageMsg = "城の防備を大きく破壊できることかと存じます。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 8) { damageMsg = "城の防備をそれなりに削れるやもしれません。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 3) { damageMsg = "大きな効果は見込めないやもしれません。"; damageIsHigh = false; }
-                else { damageMsg = "ほとんど損害を与えられないかと存じます。"; damageIsHigh = false; }
+                if (perceivedDamage >= 15) { damageMsg = "城の防備を大きく破壊できることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 8) { damageMsg = "城の防備をそれなりに削れることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 3) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
+                else { damageMsg = "ほとんど影響は無いかと存じます。"; damageIsHigh = false; }
             } else if (action.type === 'incite') {
-                if (perceivedDamage >= 10) { damageMsg = "領民の心を大きく引き離せることかと存じます。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 5) { damageMsg = "それなりに領民の動揺を誘えるやもしれません。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 2) { damageMsg = "大きな効果は見込めないやもしれません。"; damageIsHigh = false; }
+                if (perceivedDamage >= 10) { damageMsg = "領民の心を大きく引き離せることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 5) { damageMsg = "それなりに領民の動揺を誘えることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 2) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
                 else { damageMsg = "領民たちが惑わされる事はないかと存じます。"; damageIsHigh = false; }
             }
-
+            
             // 成功率と効果量の高低で、言い回しを変えます
-            let successKari = (action.type === 'rumor') ? "会え" : "潜り込め";
-            let successKari2 = (action.type === 'rumor') ? "会えた" : "潜り込めた";
-            let successKari3 = (action.type === 'rumor') ? "会えた" : "潜り込めた";
+            let successKari = (action.type === 'rumor') ? "面会" : "潜入";
 
             if (probIsHigh && damageIsHigh) {
                 return `${probMsg}。${damageMsg}`;
             } else if (probIsHigh && !damageIsHigh) {
                 return `${probMsg}が、${damageMsg}`;
             } else if (probIsLow && damageIsHigh) {
-                return `${probMsg}。ただ、${successKari}さえすれば${damageMsg}`;
+                return `${probMsg}。ただ、${successKari}さえ叶えば${damageMsg}`;
             } else if (probIsLow && !damageIsHigh) {
-                return `${probMsg}。万が一${successKari2}としても、${damageMsg}`;
+                return `${probMsg}。万が一${successKari}が叶ったところで、${damageMsg}`;
             } else {
                 // 五分五分の場合
                 if (damageIsHigh) {
                     return `${probMsg}が、成功の暁には${damageMsg}`;
                 } else {
-                    return `${probMsg}。仮に${successKari3}としても、${damageMsg}`;
+                    return `${probMsg}。仮に${successKari}が叶ったところで、${damageMsg}`;
                 }
             }
         }
