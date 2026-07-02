@@ -464,9 +464,9 @@ class LifeSystem {
         
         for (const b of flagTargetBushos) {
             // ★追加：討死武将が本来の寿命を過ぎているかチェックして、確率を変えます
-            let deathProb = 0.30; // 基本は30%の確率です
+            let deathProb = 0.20; // 基本は20%の確率です
             if (b.isKilledInBattle && currentYear >= b.originalEndYear) {
-                deathProb = 1.0; // 条件に当てはまれば、100%（確実に）死亡するようにします
+                deathProb = 0.95; // 条件に当てはまれば、95%の確率で死亡するようにします
             }
 
             // 指定された確率で死亡します

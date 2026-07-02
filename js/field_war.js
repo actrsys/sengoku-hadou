@@ -2678,7 +2678,8 @@ class FieldWarManager {
         // ==========================================
 
         // ★追加：武将の死亡フラグ判定（野戦での負傷による死亡フラグ）
-        const checkDeathFlag = (targetUnit, attackerTroopType, isDestroyed) => {
+        // 攻撃側の兵力も計算に使うため、部隊データ(attackerUnit)を丸ごと受け取るように変更しました
+        const checkDeathFlag = (targetUnit, attackerUnit, isDestroyed) => {
             // 武将のIDがない場合や、ゲームデータが見つからない場合はストップします
             if (!targetUnit.bushoId || !this.game) return;
             const targetBusho = this.game.getBusho(targetUnit.bushoId);
@@ -2690,30 +2691,49 @@ class FieldWarManager {
                 multiplier = 3; // 条件に当てはまれば確率を3倍にします
             }
 
+            let prob = 0;
             if (isDestroyed) {
-                // 兵士が0にされた（壊滅した）時は、基本10%の確率でフラグが立ちます
-                if (Math.random() < 0.10 * multiplier) targetBusho.deathFlag = true;
+                // 兵士が0にされた（壊滅した）時は、基本5%
+                prob = 0.05;
             } else {
-                // 壊滅していない時は、攻撃してきた兵科によってフラグが立つ確率が変わります
-                let prob = 0;
-                if (attackerTroopType === 'teppo') prob = 0.01; // 鉄砲は1%
-                else if (attackerTroopType === 'kiba') prob = 0.005; // 騎馬は0.5%
-                else if (attackerTroopType === 'ashigaru') prob = 0.001; // 足軽は0.1%
+                // 壊滅していない時は、攻撃してきた兵科によって変わります
+                if (attackerUnit.troopType === 'teppo') prob = 0.01; // 鉄砲は1%
+                else if (attackerUnit.troopType === 'kiba') prob = 0.0015; // 騎馬は0.15%
+                else if (attackerUnit.troopType === 'ashigaru') prob = 0.001; // 足軽は0.1%
+            }
+
+            // 基本の確率がある場合だけ、計算を続けます
+            if (prob > 0) {
+                // 1. 武力軽減率の計算（1 + 武力 / 400）
+                const targetStrength = targetBusho.strength || 0;
+                const strengthReduction = 1 + (targetStrength / 400);
+
+                // 2. 兵数軽減率の計算
+                // 兵数が一時的にマイナスになってルート計算がエラーにならないよう、最低でも0にする魔法をかけます
+                const targetSoldiers = Math.max(0, targetUnit.soldiers);
+                const attackerSoldiers = Math.max(0, attackerUnit.soldiers);
+                
+                const troopReduction = (100 + Math.sqrt(targetSoldiers)) / (100 + Math.sqrt(attackerSoldiers));
+
+                // 3. 最終的な確率の計算（基本確率 / 武力軽減率 / 兵数軽減率）
+                const finalProb = (prob * multiplier) / strengthReduction / troopReduction;
 
                 // 確率のサイコロを振って、当たったらフラグを立てます
-                if (prob > 0 && Math.random() < prob * multiplier) {
+                if (Math.random() < finalProb) {
                     targetBusho.deathFlag = true;
                 }
             }
         };
 
         // 守備側が攻撃を受けた時の判定
+        // 部隊データを丸ごと渡すように変更しました
         if (dmgToDef > 0) {
-            checkDeathFlag(defender, attacker.troopType, defender.soldiers <= 0);
+            checkDeathFlag(defender, attacker, defender.soldiers <= 0);
         }
         // 攻撃側が反撃を受けた時の判定
+        // 部隊データを丸ごと渡すように変更しました
         if (dmgToAtk > 0) {
-            checkDeathFlag(attacker, defender.troopType, attacker.soldiers <= 0);
+            checkDeathFlag(attacker, defender, attacker.soldiers <= 0);
         }
 
         // 野戦での被害を負傷兵の箱（deadSoldiers）に記録します
