@@ -854,6 +854,10 @@ class LifeSystem {
             });
 
             allCandidates.sort((a, b) => {
+                // ★追加：隠居している武将は優先度を一番低く（後回しに）します！
+                if (a.isRetired && !b.isRetired) return 1;
+                if (!a.isRetired && b.isRetired) return -1;
+
                 // 一門（親戚）を優先します
                 if (a._isRelative && !b._isRelative) return -1;
                 if (!a._isRelative && b._isRelative) return 1;
@@ -1065,6 +1069,10 @@ class LifeSystem {
             });
 
             allCandidates.sort((a, b) => {
+                // ★追加：隠居している武将は優先度を一番低く（後回しに）します！
+                if (a.isRetired && !b.isRetired) return 1;
+                if (!a.isRetired && b.isRetired) return -1;
+
                 if (a._isRelative && !b._isRelative) return -1;
                 if (!a._isRelative && b._isRelative) return 1;
                 if (a._isRelative && b._isRelative) {
