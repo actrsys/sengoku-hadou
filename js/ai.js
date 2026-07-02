@@ -2999,6 +2999,7 @@ class AIEngine {
                  castellan.isActionDone = true;
              }// 差し替え後
         } else if (targetData.action === 'court_truce') {
+             const availableGold = GameSystem.calcAvailableGoldForAI(castle, this.game);
              if (availableGold >= targetData.gold) {
                  this.game.diplomacyManager.executeDiplomacy(castellan.id, targetCastleId, 'court_truce', targetData.gold);
                  castellan.isActionDone = true;
