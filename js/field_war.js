@@ -2732,16 +2732,20 @@ class FieldWarManager {
 
             // 基本の確率がある場合だけ、計算を続けます
             if (prob > 0) {
-                // 1. 武力軽減率の計算（1 + 武力 / 400）
+                // 1. 武力軽減率の計算（1 + 武力 / 200）
                 const targetStrength = targetBusho.strength || 0;
-                const strengthReduction = 1 + (targetStrength / 400);
+                const strengthReduction = 1 + (targetStrength / 200);
 
                 // 2. 兵数軽減率の計算
                 // 兵数が一時的にマイナスになってルート計算がエラーにならないよう、最低でも0にする魔法をかけます
                 const targetSoldiers = Math.max(0, targetUnit.soldiers);
                 const attackerSoldiers = Math.max(0, attackerUnit.soldiers);
                 
-                const troopReduction = (100 + Math.sqrt(targetSoldiers)) / (100 + Math.sqrt(attackerSoldiers));
+                // ★修正：壊滅した時は兵数による軽減を行わないようにします
+                let troopReduction = 1; // 1なら割り算をしても最終的な確率は変わりません
+                if (!isDestroyed) {
+                    troopReduction = (100 + Math.sqrt(targetSoldiers)) / (100 + Math.sqrt(attackerSoldiers));
+                }
 
                 // 3. 最終的な確率の計算（基本確率 / 武力軽減率 / 兵数軽減率）
                 const finalProb = (prob * multiplier) / strengthReduction / troopReduction;
