@@ -3179,6 +3179,20 @@ Object.assign(WarManager.prototype, {
             }
         }
 
+        // ★追加：独立・寝返り判定の後、滅亡処理の前に、残った拠点もすべて攻撃側の所有にします！
+        for (const castle of defCastles) {
+            if (castle.ownerClan === defClanId) {
+                this.game.castleManager.changeOwner(castle, atkClanId, false, 0);
+                castle.castellanId = 0; // 強制接収した城の城主は不在にします
+                // 城主情報を更新
+                if (this.game.affiliationSystem && typeof this.game.affiliationSystem.updateCastleLord === 'function') {
+                    this.game.affiliationSystem.updateCastleLord(castle);
+                } else if (typeof this.game.updateCastleLord === 'function') {
+                    this.game.updateCastleLord(castle);
+                }
+            }
+        }
+
         // 3. ★変更：すべての処理が終わった一番最後に、大名を裏で浪人にします！
         // (ダイアログやログは直後の滅亡判定システムに任せるため無言で行います)
         if (oldDaimyo && oldDaimyo.status !== 'dead') {
