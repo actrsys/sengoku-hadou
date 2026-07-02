@@ -158,7 +158,7 @@ class GunshiSystem {
             let damageMsg = "";
             let damageIsHigh = false;
 
-            if (perceivedDamage >= 20) { damageMsg = "相手に大きな疑心を植え付けられることかと。"; damageIsHigh = true; }
+            if (perceivedDamage >= 20) { damageMsg = "相手に大きな疑心を植え付けられることかと存じます。"; damageIsHigh = true; }
             else if (perceivedDamage >= 10) { damageMsg = "今の待遇に疑問を持たせられるやもしれません。"; damageIsHigh = true; }
             else if (perceivedDamage >= 5) { damageMsg = "大きな効果は見込めないやもしれません。"; damageIsHigh = false; }
             else { damageMsg = "かの者の信頼が揺らぐ事はないかと存じます。"; damageIsHigh = false; }
@@ -169,13 +169,13 @@ class GunshiSystem {
             } else if (probIsHigh && !damageIsHigh) {
                 return `${probMsg}が、${damageMsg}`;
             } else if (probIsLow && damageIsHigh) {
-                return `${probMsg}が、会えさえすれば${damageMsg}`;
+                return `${probMsg}。ただ、会えさえすれば${damageMsg}`;
             } else if (probIsLow && !damageIsHigh) {
-                return `${probMsg}。仮に会えたとしても、${damageMsg}`;
+                return `${probMsg}。万が一会えたとしても、${damageMsg}`;
             } else {
                 // 五分五分の場合
                 if (damageIsHigh) {
-                    return `${probMsg}が、会えさえすれば${damageMsg}`;
+                    return `${probMsg}が、成功の暁には${damageMsg}`;
                 } else {
                     return `${probMsg}。仮に会えたとしても、${damageMsg}`;
                 }
