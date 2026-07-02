@@ -1871,21 +1871,46 @@ class FieldWarManager {
             }
         });
 
+        // ★追加：撤退済みリストの中に総大将がいるかチェックします
+        let atkGeneralRetreated = false, defGeneralRetreated = false;
+        if (this.retreatedUnits) {
+            this.retreatedUnits.forEach(u => {
+                if (u.isGeneral) {
+                    if (u.isAttacker) atkGeneralRetreated = true;
+                    else defGeneralRetreated = true;
+                }
+            });
+        }
+
         const isAtkPlayer = (Number(this.warState.attacker.ownerClan) === Number(this.game.playerClanId));
         const isDefPlayer = (Number(this.warState.defender.ownerClan) === Number(this.game.playerClanId));
         const enemyName = isAtkPlayer ? this.warState.defender.name + "軍" : (isDefPlayer ? this.warState.attacker.name + "軍" : "敵軍");
 
         if (!atkAlive || !atkGeneralAlive) {
-            if (isAtkPlayer) this.log(`総大将が撃破され、我が軍は敗北しました……`);
-            else if (isDefPlayer) this.log(`敵の総大将を撃破しました！`);
-            else this.log(`攻撃軍の総大将が敗走した！`);
+            // ★追加：総大将が撤退（負傷）していた場合は専用のメッセージを出します
+            if (atkGeneralRetreated) {
+                if (isAtkPlayer) this.log(`総大将が戦線から離脱し、我が軍は敗走しました……`);
+                else if (isDefPlayer) this.log(`敵の総大将が戦線から離脱しました！`);
+                else this.log(`攻撃軍の総大将が戦線から離脱した！`);
+            } else {
+                if (isAtkPlayer) this.log(`総大将が撃破され、我が軍は敗北しました……`);
+                else if (isDefPlayer) this.log(`敵の総大将を撃破しました！`);
+                else this.log(`攻撃軍の総大将が敗走した！`);
+            }
             this.endFieldWar('attacker_lose');
             return true;
         }
         if (!defAlive || !defGeneralAlive) {
-            if (isAtkPlayer) this.log(`敵の総大将を撃破しました！`);
-            else if (isDefPlayer) this.log(`総大将が撃破され、我が軍は敗北しました……`);
-            else this.log(`守備軍の総大将が敗走した！`);
+            // ★追加：総大将が撤退（負傷）していた場合は専用のメッセージを出します
+            if (defGeneralRetreated) {
+                if (isAtkPlayer) this.log(`敵の総大将が戦線から離脱しました！`);
+                else if (isDefPlayer) this.log(`総大将が戦線から離脱し、我が軍は敗走しました……`);
+                else this.log(`守備軍の総大将が戦線から離脱した！`);
+            } else {
+                if (isAtkPlayer) this.log(`敵の総大将を撃破しました！`);
+                else if (isDefPlayer) this.log(`総大将が撃破され、我が軍は敗北しました……`);
+                else this.log(`守備軍の総大将が敗走した！`);
+            }
             this.endFieldWar('attacker_win');
             return true;
         }
@@ -2685,6 +2710,9 @@ class FieldWarManager {
             const targetBusho = this.game.getBusho(targetUnit.bushoId);
             if (!targetBusho) return;
 
+            // ★追加：既に死亡フラグが立っている武将に対しては再度判定しないようにガードします
+            if (targetBusho.deathFlag) return;
+
             // ★追加：討死武将が「本来の寿命」を過ぎて生き延びているかチェックします
             let multiplier = 1; // 基本は1倍（そのまま）です
             if (targetBusho.isKilledInBattle && this.game.year >= targetBusho.originalEndYear) {
@@ -2721,6 +2749,7 @@ class FieldWarManager {
                 // 確率のサイコロを振って、当たったらフラグを立てます
                 if (Math.random() < finalProb) {
                     targetBusho.deathFlag = true;
+                    targetUnit.isWounded = true; // ★追加：撤退させるための目印をつけます
                 }
             }
         };
@@ -2801,7 +2830,21 @@ class FieldWarManager {
             }
         }
 
-        if (defender.soldiers <= 0) {
+        if (defender.isWounded) {
+            // ★追加：負傷した部隊の撤退処理
+            this.log(`【負傷】${defender.name}が負傷しました！ 部隊は戦場から離脱します！`);
+            this.units = this.units.filter(u => u.id !== defender.id);
+            
+            // マップ上にアイコンが残っていたら隠します
+            const el = document.getElementById(`fw-unit-el-${defender.id}`);
+            if (el) el.style.display = 'none';
+
+            // 兵士が残っている場合は撤退済みリストに入れる（戦後に兵士を回収させるため）
+            if (defender.soldiers > 0) {
+                if (!this.retreatedUnits) this.retreatedUnits = [];
+                this.retreatedUnits.push(defender);
+            }
+        } else if (defender.soldiers <= 0) {
             this.log(`${defender.name}隊が壊滅した！`);
             this.units = this.units.filter(u => u.id !== defender.id);
             
@@ -2817,14 +2860,29 @@ class FieldWarManager {
             const winPrefix = attacker.isAttacker ? 'atk_' : 'def_';
             for (let key in this.groupStats) {
                 if (key.startsWith(winPrefix) && this.groupStats[key]) {
-                    let rise = (key === attacker.groupId) ? 3 : 1;
+                    let rise = (key === defender.groupId) ? 3 : 1;
                     this.groupStats[key].morale = Math.min(120, this.groupStats[key].morale + rise);
                 }
             }
             this.log(`部隊の壊滅により、${defender.name}隊が所属する軍の士気が大きく下がり、友軍の士気も下がった！`);
             this.log(`${attacker.name}隊が所属する軍の士気が大きく上がり、友軍の士気も上がった！`);
         }
-        if (attacker.soldiers <= 0) {
+
+        if (attacker.isWounded) {
+            // 負傷した部隊の撤退処理
+            this.log(`${attacker.name}が負傷しました！　部隊は戦場から離脱します！`);
+            this.units = this.units.filter(u => u.id !== attacker.id);
+            
+            // マップ上にアイコンが残っていたら隠します
+            const el = document.getElementById(`fw-unit-el-${attacker.id}`);
+            if (el) el.style.display = 'none';
+
+            // 兵士が残っている場合は撤退済みリストに入れる（戦後に兵士を回収させるため）
+            if (attacker.soldiers > 0) {
+                if (!this.retreatedUnits) this.retreatedUnits = [];
+                this.retreatedUnits.push(attacker);
+            }
+        } else if (attacker.soldiers <= 0) {
             this.log(`${attacker.name}隊が壊滅した！`);
             this.units = this.units.filter(u => u.id !== attacker.id);
             
