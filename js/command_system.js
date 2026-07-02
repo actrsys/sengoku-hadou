@@ -1299,8 +1299,8 @@ class CommandSystem {
                     const castle = this.game.getCastle(k.castleId);
                     // 自分の城にいること
                     if (!castle || Number(castle.ownerClan) !== myClanId) return false;
-                    // 宗教ではないこと
-                    if (k.ideology === '宗教') return false;
+                    // 宗教、商人ではないこと
+                    if (k.ideology === '宗教' || k.ideology === '商人') return false;
                     // 友好度95以上
                     if (k.getRelation(myClanId) < 95) return false;
                     // 兵士数が自軍威信の半分以下
@@ -1312,7 +1312,8 @@ class CommandSystem {
 
             // ★追加: 鎮圧コマンド専用！自分の城か、隣の城だけを選べるようにします
             case 'kunishu_subjugate_valid': {
-                const activeKunishus = this.game.kunishuSystem.getAliveKunishus();
+                // 商人以外の生きている諸勢力を取得します
+                const activeKunishus = this.game.kunishuSystem.getAliveKunishus().filter(k => k.ideology !== '商人');
                 // まず諸勢力がいる城を全部集めます（Numberで数字に揃えます）
                 const allKunishuCastleIds = [...new Set(activeKunishus.map(k => Number(k.castleId)))];
                 
@@ -1628,7 +1629,8 @@ class CommandSystem {
         if (actionType === 'rumor_doer') {
             // ★専門部署である StrategySystem の計算魔法を呼びます！
             const trueProb = this.game.strategySystem.getRumorProb(firstId, extraData.targetBushoId);
-            this.showAdviceAndExecute('rumor', () => this.game.strategySystem.executeRumor(firstId, targetId, extraData.targetBushoId), { trueProb: trueProb });
+            const expectedDamage = this.game.strategySystem.getRumorExpectedDamage(firstId, extraData.targetBushoId);
+            this.showAdviceAndExecute('rumor', () => this.game.strategySystem.executeRumor(firstId, targetId, extraData.targetBushoId), { trueProb: trueProb, expectedDamage: expectedDamage });
             return;
         }
 
@@ -2636,11 +2638,14 @@ class CommandSystem {
                 const myPrestige = myClan ? myClan.daimyoPrestige : 0;
                 
                 kunishus = kunishus.filter(k => {
-                    if (k.ideology === '宗教') return false;
+                    if (k.ideology === '宗教' || k.ideology === '商人') return false;
                     if (k.getRelation(myClanId) < 95) return false;
                     if (k.soldiers > myPrestige / 2) return false;
                     return true;
                 });
+            } else if (mode === 'kunishu_subjugate') {
+                // 鎮圧の場合も商人は対象外にします
+                kunishus = kunishus.filter(k => k.ideology !== '商人');
             }
 
             if (kunishus.length === 0) {

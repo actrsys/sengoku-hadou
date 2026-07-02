@@ -129,17 +129,60 @@ class GunshiSystem {
         const noise = (GameSystem.seededRandom(seed) - 0.5) * 2;
         let perceivedProb = trueProb + noise * maxError;
         perceivedProb = Math.max(0.0, Math.min(1.0, perceivedProb));
-
+        
         // ★追加：従属願と和睦の場合は、確率によって言うことを切り替えます！
         if (action.type === 'subordinate' || action.type === 'truce') {
             if (perceivedProb > 0.95) return "必ずや受け入れられるでしょう。無条件で話がまとまるはずです！"; 
-            if (perceivedProb > 0.7) return "おそらく上手くいくでしょう。ただ、何かしらの見返りを要求される可能性があります。"; 
-            if (perceivedProb > 0.4) return "五分五分といったところです。厳しい条件を要求されるかもしれません。"; 
-            if (perceivedProb > 0.15) return "厳しい交渉になるでしょう。法外な条件を出される恐れがあります。"; 
-            return "おやめください。今の状況では到底受け入れられないでしょう。"; 
+            if (perceivedProb > 0.7) return "おそらく上手くいくでしょう。何かしら要求されるでしょうが、話はまとまるはずです。"; 
+            if (perceivedProb > 0.4) return "五分五分といったところです。何かしらの条件を要求される可能性が高いでしょう。"; 
+            if (perceivedProb > 0.15) return "厳しい交渉になるでしょう。。"; 
+            return "おやめください。条件を提示するまでもなく、門前払いされるでしょう。"; 
         }
 
-        if (perceivedProb > 0.95) return "必ずや成功するでしょう。好機です！"; 
+        // ★離間計の場合は、成功率と効果量の組み合わせで自然なつなぎ言葉にします
+        if (action.type === 'rumor') {
+            let probMsg = "";
+            let probIsHigh = false;
+            let probIsLow = false;
+
+            if (perceivedProb > 0.95) { probMsg = "まず接触できるでしょう"; probIsHigh = true; }
+            else if (perceivedProb > 0.7) { probMsg = "おそらく接触できるでしょう"; probIsHigh = true; }
+            else if (perceivedProb > 0.4) { probMsg = "接触できるかは五分五分といったところです"; }
+            else if (perceivedProb > 0.15) { probMsg = "接触は難しいでしょう"; probIsLow = true; }
+            else { probMsg = "まず接触は不可能でしょう"; probIsLow = true; }
+
+            let perceivedDamage = action.expectedDamage || 0;
+            // 予測ダメージにも少しノイズ（軍師の勘違い）を加えます
+            perceivedDamage = Math.max(1, Math.floor(perceivedDamage + (noise * 5 * maxError)));
+            
+            let damageMsg = "";
+            let damageIsHigh = false;
+
+            if (perceivedDamage >= 20) { damageMsg = "相手に大きな疑心を植え付けられることかと。"; damageIsHigh = true; }
+            else if (perceivedDamage >= 10) { damageMsg = "今の待遇に疑問を持たせられるやもしれません。"; damageIsHigh = true; }
+            else if (perceivedDamage >= 5) { damageMsg = "大きな効果は見込めないやもしれません。"; damageIsHigh = false; }
+            else { damageMsg = "かの者の信頼が揺らぐ事はないかと存じます。"; damageIsHigh = false; }
+
+            // 成功率と効果量の高低で、言い回しを変えます
+            if (probIsHigh && damageIsHigh) {
+                return `${probMsg}。${damageMsg}`;
+            } else if (probIsHigh && !damageIsHigh) {
+                return `${probMsg}が、${damageMsg}`;
+            } else if (probIsLow && damageIsHigh) {
+                return `${probMsg}が、会えさえすれば${damageMsg}`;
+            } else if (probIsLow && !damageIsHigh) {
+                return `${probMsg}。仮に会えたとしても、${damageMsg}`;
+            } else {
+                // 五分五分の場合
+                if (damageIsHigh) {
+                    return `${probMsg}が、会えさえすれば${damageMsg}`;
+                } else {
+                    return `${probMsg}。仮に会えたとしても、${damageMsg}`;
+                }
+            }
+        }
+
+        if (perceivedProb > 0.95) return "必ずや成功するでしょう。好機です！";
         if (perceivedProb > 0.7) return "おそらく上手くいくでしょう。"; 
         if (perceivedProb > 0.4) return "五分五分といったところです。油断めさるな。"; 
         if (perceivedProb > 0.15) return "厳しい結果になるかもしれません。"; 

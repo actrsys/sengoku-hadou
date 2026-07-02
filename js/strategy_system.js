@@ -36,7 +36,10 @@ class StrategySystem {
 
     // --- 離間計 ---
     static calcRumorScore(busho) {
-        return (busho.intelligence * 0.7) + (busho.strength * 0.3);
+        // ソート用に新仕様に合わせたスコアを計算します
+        const strMod = (busho.strength + (Math.sqrt(busho.loyalty) * 2)) / 150;
+        const intMod = (busho.intelligence + (Math.sqrt(busho.loyalty) * 2)) / 10;
+        return strMod * intMod;
     }
 
     // --- 引抜 ---
@@ -87,22 +90,54 @@ class StrategySystem {
         return Math.max(0.01, Math.min(0.99, prob));
     }
 
+    // ==========================================
+    // ★離間計の補正計算（共通）
+    // ==========================================
+    getRumorModifiers(doer, target) {
+        const defMod = (target.intelligence / 120) + 0.75;
+        const dutyMod = (target.duty / 120) + 0.75;
+        const loyaltyMod = (target.loyalty / 120) + 0.75;
+        
+        const affinityDiff = typeof GameSystem !== 'undefined' ? GameSystem.calcAffinityDiff(doer.affinity, target.affinity) : 25;
+        const affinityMod = 0.875 + (affinityDiff / 200);
+
+        const officerStatus = this.checkOfficerStatus(target);
+        let positionMod = 1.0;
+        if (officerStatus === 3) positionMod = 0.7;
+        else if (officerStatus === 2) positionMod = 0.8;
+        else if (officerStatus === 1) positionMod = 0.9;
+
+        return {
+            def: defMod,
+            duty: dutyMod,
+            loyalty: loyaltyMod,
+            affinity: affinityMod,
+            position: positionMod
+        };
+    }
+
     getRumorProb(doerId, targetBushoId) {
-        const busho = this.game.getBusho(doerId);
-        const targetBusho = this.game.getBusho(targetBushoId);
+        const doer = this.game.getBusho(doerId);
+        const target = this.game.getBusho(targetBushoId);
         
-        // ★共通処理から基礎スコアを呼び出す
-        const score = StrategySystem.calcRumorScore(busho); 
-        const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
-        let prob = Math.min(1.0, score / (defScore + window.MainParams.Strategy.RumorFactor)) * 0.5;
+        const mods = this.getRumorModifiers(doer, target);
+        const doerStrengthMod = (doer.strength + (Math.sqrt(doer.loyalty) * 2)) / 150;
         
-        // ★修正：対象のステータスに合わせてペナルティを適用します
-        const officerStatus = this.checkOfficerStatus(targetBusho);
-        if (officerStatus === 3) prob -= 0.30;
-        else if (officerStatus === 2) prob -= 0.20;
-        else if (officerStatus === 1) prob -= 0.10;
+        const prob = (doerStrengthMod / mods.def / mods.duty / mods.loyalty / mods.affinity) * mods.position;
         
-        return Math.max(0, prob);
+        return Math.max(0.01, Math.min(0.99, prob));
+    }
+
+    getRumorExpectedDamage(doerId, targetBushoId) {
+        const doer = this.game.getBusho(doerId);
+        const target = this.game.getBusho(targetBushoId);
+        
+        const mods = this.getRumorModifiers(doer, target);
+        const doerIntMod = (doer.intelligence + (Math.sqrt(doer.loyalty) * 2)) / 10;
+        
+        const damage = (doerIntMod / mods.def / mods.duty / mods.loyalty / mods.affinity) * mods.position;
+        
+        return Math.max(1, Math.floor(damage));
     }
 
     getHeadhuntProb(doerId, targetBushoId, gold) {
@@ -124,7 +159,7 @@ class StrategySystem {
         const doerBonus = (50 - affDoer) * S.AffinityDoerWeight; 
         const totalOffense = offense + newBonus + doerBonus;
         const totalDefense = defense + lordBonus;
-        let successRate = (totalOffense / totalDefense) * 0.25; 
+        let successRate = (totalOffense / totalDefense) * 0.5; // 最後の0.5は武将引抜の成功率調整用
         
         // ★修正：対象のステータスに合わせてペナルティを適用します
         const officerStatus = this.checkOfficerStatus(target);
@@ -210,7 +245,8 @@ class StrategySystem {
         if (isExecute) this.addStrategyExperience(busho, success);
 
         if(!success) return { success: false, val: 0 }; 
-        return { success: true, val: Math.floor((20 + Math.random()*20) / 4) }; 
+        const damage = this.getRumorExpectedDamage(doerId, targetBushoId);
+        return { success: true, val: damage }; 
     }
     
     calcHeadhunt(doerId, targetBushoId, gold, isExecute = false) {
