@@ -180,7 +180,22 @@ class StrategySystem {
         
         return Math.max(0, Math.min(1.0, successRate));
     }
+    
+    // ★追加: 破壊工作の予測ダメージを計算する魔法
+    getSabotageExpectedDamage(doerId, targetId) {
+        const busho = this.game.getBusho(doerId);
+        return Math.max(1, Math.floor(StrategySystem.getSabotageDamageBase(busho)));
+    }
 
+    // ★追加: 民心撹乱（扇動）の予測ダメージを計算する魔法
+    getInciteExpectedDamage(doerId, targetId) {
+        const busho = this.game.getBusho(doerId);
+        const targetCastle = this.game.getCastle(targetId);
+        const intBonus = StrategySystem.getInciteDamageBase(busho);
+        const loyaltyBonus = (targetCastle.peoplesLoyalty / 120) + 0.9;
+        return Math.max(1, Math.floor(intBonus / loyaltyBonus));
+    }
+    
     // ★追加: 破壊工作の確率を計算する魔法
     getSabotageProb(doerId, targetId) {
         const busho = this.game.getBusho(doerId);

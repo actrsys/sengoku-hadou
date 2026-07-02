@@ -139,8 +139,8 @@ class GunshiSystem {
             return "おやめください。条件を提示するまでもなく、門前払いされるでしょう。"; 
         }
 
-        // ★離間計の場合は、成功率と効果量の組み合わせで自然なつなぎ言葉にします
-        if (action.type === 'rumor') {
+        // ★調略コマンド（離間計・破壊工作・民心撹乱）の場合は、成功率と効果量の組み合わせで自然なつなぎ言葉にします
+        if (action.type === 'rumor' || action.type === 'sabotage' || action.type === 'incite') {
             let probMsg = "";
             let probIsHigh = false;
             let probIsLow = false;
@@ -151,6 +151,15 @@ class GunshiSystem {
             else if (perceivedProb > 0.15) { probMsg = "接触は難しいでしょう"; probIsLow = true; }
             else { probMsg = "まず接触は不可能でしょう"; probIsLow = true; }
 
+            // ★調略コマンド（離間計・破壊工作・民心撹乱）の場合は、成功率と効果量の組み合わせで自然なつなぎ言葉にします
+            if (action.type === 'sabotage' || action.type === 'incite') {
+                if (perceivedProb > 0.95) { probMsg = "まず潜り込めるでしょう"; probIsHigh = true; }
+                else if (perceivedProb > 0.7) { probMsg = "おそらく潜入できるでしょう"; probIsHigh = true; }
+                else if (perceivedProb > 0.4) { probMsg = "潜入できるかは五分五分といったところです"; }
+                else if (perceivedProb > 0.15) { probMsg = "警戒が厳しく、潜入は難しいでしょう"; probIsLow = true; }
+                else { probMsg = "まず潜入は不可能でしょう"; probIsLow = true; }
+            }
+
             let perceivedDamage = action.expectedDamage || 0;
             // 予測ダメージにも少しノイズ（軍師の勘違い）を加えます
             perceivedDamage = Math.max(1, Math.floor(perceivedDamage + (noise * 5 * maxError)));
@@ -158,26 +167,43 @@ class GunshiSystem {
             let damageMsg = "";
             let damageIsHigh = false;
 
-            if (perceivedDamage >= 20) { damageMsg = "相手に大きな疑心を植え付けられることかと存じます。"; damageIsHigh = true; }
-            else if (perceivedDamage >= 10) { damageMsg = "今の待遇に疑問を持たせられるやもしれません。"; damageIsHigh = true; }
-            else if (perceivedDamage >= 5) { damageMsg = "大きな効果は見込めないやもしれません。"; damageIsHigh = false; }
-            else { damageMsg = "かの者の信頼が揺らぐ事はないかと存じます。"; damageIsHigh = false; }
+            // コマンドごとにダメージのセリフを変えます
+            if (action.type === 'rumor') {
+                if (perceivedDamage >= 20) { damageMsg = "相手に大きな疑心を植え付けられることかと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 10) { damageMsg = "今の待遇に疑問を持たせられるやもしれません。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 5) { damageMsg = "大きな効果は見込めないやもしれません。"; damageIsHigh = false; }
+                else { damageMsg = "かの者の信頼が揺らぐ事はないかと存じます。"; damageIsHigh = false; }
+            } else if (action.type === 'sabotage') {
+                if (perceivedDamage >= 15) { damageMsg = "城の防備を大きく破壊できることかと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 8) { damageMsg = "城の防備をそれなりに削れるやもしれません。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 3) { damageMsg = "大きな効果は見込めないやもしれません。"; damageIsHigh = false; }
+                else { damageMsg = "ほとんど損害を与えられないかと存じます。"; damageIsHigh = false; }
+            } else if (action.type === 'incite') {
+                if (perceivedDamage >= 10) { damageMsg = "領民の心を大きく引き離せることかと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 5) { damageMsg = "それなりに領民の動揺を誘えるやもしれません。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 2) { damageMsg = "大きな効果は見込めないやもしれません。"; damageIsHigh = false; }
+                else { damageMsg = "領民たちが惑わされる事はないかと存じます。"; damageIsHigh = false; }
+            }
 
             // 成功率と効果量の高低で、言い回しを変えます
+            let successKari = (action.type === 'rumor') ? "会え" : "潜り込め";
+            let successKari2 = (action.type === 'rumor') ? "会えた" : "潜り込めた";
+            let successKari3 = (action.type === 'rumor') ? "会えた" : "潜り込めた";
+
             if (probIsHigh && damageIsHigh) {
                 return `${probMsg}。${damageMsg}`;
             } else if (probIsHigh && !damageIsHigh) {
                 return `${probMsg}が、${damageMsg}`;
             } else if (probIsLow && damageIsHigh) {
-                return `${probMsg}。ただ、会えさえすれば${damageMsg}`;
+                return `${probMsg}。ただ、${successKari}さえすれば${damageMsg}`;
             } else if (probIsLow && !damageIsHigh) {
-                return `${probMsg}。万が一会えたとしても、${damageMsg}`;
+                return `${probMsg}。万が一${successKari2}としても、${damageMsg}`;
             } else {
                 // 五分五分の場合
                 if (damageIsHigh) {
                     return `${probMsg}が、成功の暁には${damageMsg}`;
                 } else {
-                    return `${probMsg}。仮に会えたとしても、${damageMsg}`;
+                    return `${probMsg}。仮に${successKari3}としても、${damageMsg}`;
                 }
             }
         }

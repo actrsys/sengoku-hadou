@@ -1790,13 +1790,15 @@ class CommandSystem {
         if (actionType === 'incite_doer') {
              // ★専門部署である StrategySystem の計算魔法を呼びます！
              const trueProb = this.game.strategySystem.getInciteProb(firstId, targetId);
-             this.showAdviceAndExecute('incite', () => this.game.strategySystem.executeIncite(firstId, targetId), { trueProb: trueProb });
+             const expectedDamage = this.game.strategySystem.getInciteExpectedDamage(firstId, targetId);
+             this.showAdviceAndExecute('incite', () => this.game.strategySystem.executeIncite(firstId, targetId), { trueProb: trueProb, expectedDamage: expectedDamage });
              return;
         }
 
         if (actionType === 'sabotage_doer') {
              const trueProb = this.game.strategySystem.getSabotageProb(firstId, targetId);
-             this.showAdviceAndExecute('sabotage', () => this.game.strategySystem.executeSabotage(firstId, targetId), { trueProb: trueProb });
+             const expectedDamage = this.game.strategySystem.getSabotageExpectedDamage(firstId, targetId);
+             this.showAdviceAndExecute('sabotage', () => this.game.strategySystem.executeSabotage(firstId, targetId), { trueProb: trueProb, expectedDamage: expectedDamage });
              return;
         }
 
