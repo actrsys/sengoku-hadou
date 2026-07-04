@@ -889,9 +889,9 @@ class CommandSystem {
                 if (actionType === 'war_deploy') {
                     infoHtml = `<div>出陣武将を選択してください（最大5名まで）</div>`;
                 }
-            } else if (['farm','commerce'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回500)</div>`; }
-            else if (['charity'].includes(actionType)) { infoHtml = `<div>金: ${c.gold}, 米: ${c.rice} (1回300)</div>`; }
-            else if (['repair'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回300)</div>`; }
+            } else if (['farm','commerce'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回200)</div>`; }
+            else if (['charity'].includes(actionType)) { infoHtml = `<div>金: ${c.gold}, 米: ${c.rice} (1回200)</div>`; }
+            else if (['repair'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回200)</div>`; }
             else if (['draft'].includes(actionType)) { infoHtml = `<div>民忠: ${c.peoplesLoyalty}</div>`; }
             else if (['training','soldier_charity'].includes(actionType)) { infoHtml = `<div>状態: 訓練${c.training}/士気${c.morale}</div>`; }
             else if (actionType === 'war_deploy' || actionType === 'kunishu_subjugate_deploy') { infoHtml = `<div>出陣武将を選択してください（最大5名まで）</div>`; }
@@ -3133,7 +3133,8 @@ class CommandSystem {
             isSuccess = true;
         } else if (!isHeavySnow) {
             // ★修正：確率計算とサイコロは、外交の専門部署にお任せします！
-            const prob = this.game.diplomacyManager.getReinforcementAcceptProb(myClanId, helperClanId, enemyClanId, gold, false, atkTotalSoldiers, defTotalSoldiers);
+            // ★お願いするお城のID（helperCastle.id）も渡してあげます！
+            const prob = this.game.diplomacyManager.getReinforcementAcceptProb(myClanId, helperClanId, enemyClanId, gold, false, atkTotalSoldiers, defTotalSoldiers, helperCastle.id);
             isSuccess = (Math.random() * 100 < prob);
         }
 
@@ -3251,11 +3252,18 @@ class CommandSystem {
         const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
         if (!targetBusho || !daimyo) return;
 
+        // ① 子供側に養父（大名）のIDをセットします
         targetBusho.adoptiveFatherId = daimyo.id;
-        if (!daimyo.adoptedSonIds.includes(targetBusho.id)) {
-            daimyo.adoptedSonIds.push(targetBusho.id);
+        
+        // ② お互いの「元々の一門リスト」に直接IDを書き込んで、強固な親戚関係を作ります
+        if (!targetBusho.baseFamilyIds.includes(daimyo.id)) {
+            targetBusho.baseFamilyIds.push(daimyo.id);
+        }
+        if (!daimyo.baseFamilyIds.includes(targetBusho.id)) {
+            daimyo.baseFamilyIds.push(targetBusho.id);
         }
 
+        // ③ 最新の一門状態に更新します
         daimyo.updateFamilyIds(this.game.princesses);
         targetBusho.updateFamilyIds(this.game.princesses);
 
@@ -3265,7 +3273,7 @@ class CommandSystem {
     }
 
     // ★追加：所領分配の実行
-    executeAllotFief(legionNo, targetLegionId, selectedCastleIds, candidateCastles) {
+    executeAllotFief(legionNo, selectedCastleIds, candidateCastles) {
         let count = 0;
         
         const legion = this.game.legions ? this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === Number(legionNo)) : null;
