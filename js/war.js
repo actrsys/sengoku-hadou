@@ -8,6 +8,7 @@ window.WarParams = {
         DraftBase: 50, DraftStatBonus: 1.5, DraftPopBonusFactor: 0.00005, DraftFluctuation: 0.15,
         BaseTraining: 0, TrainingLdrEffect: 0.3, TrainingStrEffect: 0.2, TrainingFluctuation: 0.15,
         BaseMorale: 0, MoraleLdrEffect: 0.2, MoraleCharmEffect: 0.2, MoraleFluctuation: 0.2,
+        MaxMoraleBase: 120, MaxMoraleCharity: 100,
         WarMaxRounds: 15, DamageSoldierPower: 0.05, WallDefenseEffect: 0.5, DamageFluctuation: 0.2
     },
     War: {
@@ -1060,7 +1061,8 @@ class WarManager {
             
             let activeArmyObj = getArmyObj(s.turn);
             if (activeArmyObj) {
-                activeArmyObj.morale = Math.min(100, (activeArmyObj.morale ?? 50) + moraleUp);
+                const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
+                activeArmyObj.morale = Math.min(maxMorale, (activeArmyObj.morale ?? 50) + moraleUp);
             }
 
             // ★今回追加：守備側が鼓舞を行った時、火計をくらった記憶（警戒フラグ）をリセットします！
@@ -1487,7 +1489,8 @@ class WarManager {
             if (moraleDiffs[role] !== 0) {
                 let armyObj = getArmyObj(role);
                 if (armyObj) {
-                    armyObj.morale = Math.max(0, Math.min(100, (armyObj.morale ?? 50) + moraleDiffs[role]));
+                    const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
+                    armyObj.morale = Math.max(0, Math.min(maxMorale, (armyObj.morale ?? 50) + moraleDiffs[role]));
                 }
             }
         }

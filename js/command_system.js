@@ -148,7 +148,7 @@ const CAN_EXECUTE_RULES = {
         return true;
     },
     canSoldierCharity: (game, castle) => {
-        const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMorale) ? window.WarParams.Military.MaxMorale : 100;
+        const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleCharity) ? window.WarParams.Military.MaxMoraleCharity : 100;
         if (castle.morale >= maxMorale) return false;
         if (castle.soldiers <= 0) return false;
         return true;
@@ -2109,7 +2109,7 @@ class CommandSystem {
 
                     // こちらも「その城の兵士数」を渡します
                     const val = GameSystem.calcSoldierCharity(busho, castle.soldiers, bonusRate, true); 
-                    const maxMorale = window.WarParams.Military.MaxMorale || 100;
+                    const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleCharity) ? window.WarParams.Military.MaxMoraleCharity : 100;
                     const oldVal = castle.morale;
                     castle.morale = Math.min(maxMorale, castle.morale + val); 
                     const actualVal = castle.morale - oldVal;

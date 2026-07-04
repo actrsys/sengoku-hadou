@@ -1818,7 +1818,8 @@ Object.assign(WarManager.prototype, {
                 }
                 // ★書き足しここまで
 
-                s.attacker.training = Math.min(120, s.attacker.training + (window.WarParams.War.WinStatIncrease || 5)); s.attacker.morale = Math.min(120, s.attacker.morale + (window.WarParams.War.WinStatIncrease || 5)); 
+                const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
+                s.attacker.training = Math.min(120, s.attacker.training + (window.WarParams.War.WinStatIncrease || 5)); s.attacker.morale = Math.min(maxMorale, s.attacker.morale + (window.WarParams.War.WinStatIncrease || 5));
                 
                 const maxCharm = Math.max(...s.atkBushos.map(b => b.charm));
                 const subCharm = s.atkBushos.reduce((acc, b) => acc + b.charm, 0) - maxCharm;

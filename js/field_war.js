@@ -2807,11 +2807,12 @@ class FieldWarManager {
             let atkMoraleChange = Math.round(ratio * 3); 
             
             if (atkMoraleChange !== 0) {
+                const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
                 if (this.groupStats[attacker.groupId]) {
-                    this.groupStats[attacker.groupId].morale = Math.max(0, Math.min(120, this.groupStats[attacker.groupId].morale + atkMoraleChange));
+                    this.groupStats[attacker.groupId].morale = Math.max(0, Math.min(maxMorale, this.groupStats[attacker.groupId].morale + atkMoraleChange));
                 }
                 if (this.groupStats[defender.groupId]) {
-                    this.groupStats[defender.groupId].morale = Math.max(0, Math.min(120, this.groupStats[defender.groupId].morale - atkMoraleChange));
+                    this.groupStats[defender.groupId].morale = Math.max(0, Math.min(maxMorale, this.groupStats[defender.groupId].morale - atkMoraleChange));
                 }
             }
         }
@@ -2835,8 +2836,8 @@ class FieldWarManager {
         }
 
         if (defender.isWounded) {
-            // ★追加：負傷した部隊の撤退処理
-            this.log(`【負傷】${defender.name}が負傷しました！ 部隊は戦場から離脱します！`);
+            // ★負傷した部隊の撤退処理
+            this.log(`${defender.name}が負傷しました！　${defender.name}隊は戦場から離脱します！`);
             this.units = this.units.filter(u => u.id !== defender.id);
             
             // マップ上にアイコンが残っていたら隠します
@@ -2865,7 +2866,8 @@ class FieldWarManager {
             for (let key in this.groupStats) {
                 if (key.startsWith(winPrefix) && this.groupStats[key]) {
                     let rise = (key === defender.groupId) ? 3 : 1;
-                    this.groupStats[key].morale = Math.min(120, this.groupStats[key].morale + rise);
+                    const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
+                    this.groupStats[key].morale = Math.min(maxMorale, this.groupStats[key].morale + rise);
                 }
             }
             this.log(`部隊の壊滅により、${defender.name}隊が所属する軍の士気が大きく下がり、友軍の士気も下がった！`);
@@ -2874,7 +2876,7 @@ class FieldWarManager {
 
         if (attacker.isWounded) {
             // 負傷した部隊の撤退処理
-            this.log(`${attacker.name}が負傷しました！　部隊は戦場から離脱します！`);
+            this.log(`${attacker.name}が負傷しました！　${attacker.name}隊は戦場から離脱します！`);
             this.units = this.units.filter(u => u.id !== attacker.id);
             
             // マップ上にアイコンが残っていたら隠します
@@ -2903,7 +2905,8 @@ class FieldWarManager {
             for (let key in this.groupStats) {
                 if (key.startsWith(winPrefix) && this.groupStats[key]) {
                     let rise = (key === defender.groupId) ? 3 : 1;
-                    this.groupStats[key].morale = Math.min(120, this.groupStats[key].morale + rise);
+                    const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
+                    this.groupStats[key].morale = Math.min(maxMorale, this.groupStats[key].morale + rise);
                 }
             }
             this.log(`部隊の壊滅により、${attacker.name}隊が所属する軍の士気が大きく下がり、友軍の士気も下がった！`);
