@@ -507,7 +507,6 @@ class Busho {
 
         // 派閥・システム関連パラメータの初期化
         this.achievementTotal = Number(this.achievementTotal || 0); // 功績累計
-        this.achievementTotal = Number(this.achievementTotal || 0); // 功績累計
         this.recognitionNeed = Number(this.recognitionNeed || 0);   // 承認欲求
         this.factionId = Number(this.factionId || 0);               // 派閥ID
         
@@ -701,7 +700,6 @@ class Princess {
         
         this.originalClanId = Number(this.originalClanId || 0); // 生まれた大名家のID
         
-        // ★修正：お父事もお母さんも、すべて「real」が付いた名前に統一します！
         this.realFatherId = Number(data.realFatherId || data.fatherId || 0); 
         this.realMotherId = Number(data.realMotherId || data.motherId || 0);
         this.adoptiveFatherId = Number(data.adoptiveFatherId || 0);

@@ -2748,8 +2748,6 @@ Object.assign(WarManager.prototype, {
     },
     
     executeDefSelfReinforcementAuto(helperCastle, defCastle, onComplete) {
-        const myClanId = helperCastle.ownerClan;
-        
         let reinfSoldiers = Math.floor(helperCastle.soldiers * 0.5);
         if (reinfSoldiers < 500) reinfSoldiers = 500;
         if (reinfSoldiers > helperCastle.soldiers) reinfSoldiers = helperCastle.soldiers;
