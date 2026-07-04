@@ -22,16 +22,13 @@ window.MainParams = {
     StartYear: 1560, StartMonth: 4,
     System: { UseRandomNames: true },
     Economy: {
-        IncomeGoldRate: 1,IncomeRiceRate: 10.0, IncomeFluctuation: 0.15,
-        ConsumeRicePerSoldier: 0.03, ConsumeGoldPerBusho: 10,
-        BaseDevelopment: 10, PoliticsEffect: 0.6, DevelopFluctuation: 0.15,
-        BaseRepair: 20, RepairEffect: 0.6, RepairFluctuation: 0.15,
-        BaseCharity: 10, CharmEffect: 0.4, CharityFluctuation: 0.15,
+        IncomeGoldRate: 1, IncomeFluctuation: 0.15,
+        ConsumeRicePerSoldier: 0.03,
         TradeRateMin: 0.7, TradeRateMax: 1.8, TradeFluctuation: 0.3,
-        PriceAmmo: 1, PriceHorse: 2, PriceGun: 5
+        PriceAmmo: 1
     },
     Strategy: {
-        InvestigateDifficulty: 50, InciteFactor: 150, RumorFactor: 50, SchemeSuccessRate: 0.25, EmploymentDiff: 1.5,
+        InvestigateDifficulty: 50, EmploymentDiff: 1.5,
         HeadhuntBaseDiff: 50, HeadhuntGoldEffect: 0.01, HeadhuntGoldMaxEffect: 15,
         HeadhuntIntWeight: 0.8, HeadhuntLoyaltyWeight: 1.0, HeadhuntDutyWeight: 0.8,
         RewardBaseEffect: 10, RewardGoldFactor: 0.1, RewardDistancePenalty: 0.2,
