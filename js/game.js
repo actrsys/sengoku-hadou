@@ -54,7 +54,6 @@ class DataManager {
         }
         const path = `./data/scenarios/${folderName}/`;
         try {
-            await this.loadParameters("./data/parameter.csv");
             if (window.MainParams.System.UseRandomNames) {
                 // ★ここから追加：generic_princess.csv を読み込む魔法です！
                 try {
@@ -106,44 +105,7 @@ class DataManager {
             throw error;
         }
     }
-    static async loadParameters(url) {
-        try {
-            const text = await this.fetchText(url);
-            const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-            for (let i = 1; i < lines.length; i++) {
-                const parts = lines[i].split(',');
-                if (parts.length < 2) continue;
-                const key = parts[0].trim();
-                let val = parts[1].trim();
-                if (val.toLowerCase() === 'true') val = true;
-                else if (val.toLowerCase() === 'false') val = false;
-                else if (!isNaN(Number(val))) val = Number(val);
-                this.setSettingValue(key, val);
-            }
-        } catch (e) { console.warn("parameter.csv default"); }
-    }
-    static setSettingValue(keyPath, value) {
-        const keys = keyPath.split('.');
-        const category = keys[0];
-        
-        let targetObj = null;
-        if (category === "Military" || category === "War") {
-            if (window.WarParams) targetObj = window.WarParams;
-        } else if (category === "AI") {
-            if (window.AIParams) targetObj = window.AIParams;
-        } else {
-            targetObj = window.MainParams;
-        }
-
-        if (!targetObj) return;
-
-        let current = targetObj;
-        for (let i = 0; i < keys.length - 1; i++) {
-            if (!current[keys[i]]) current[keys[i]] = {};
-            current = current[keys[i]];
-        }
-        current[keys[keys.length - 1]] = value;
-    }
+    
     static async fetchText(url) {
         // ★ここから追加した魔法です！
         // 「Date.now()」を使って、今この瞬間の「時間」の数字を作ります。
@@ -2501,7 +2463,6 @@ class GameManager {
                     this.clans = d.clans.map(c => new Clan(c));
                 } else {
                     const scenario = SCENARIOS[0]; 
-                    await DataManager.loadParameters("./data/parameter.csv");
                     const data = await DataManager.loadAll(scenario.folder);
                     this.clans = data.clans;
                 }
@@ -2688,7 +2649,6 @@ class GameManager {
                 this.clans = d.clans.map(c => new Clan(c));
             } else {
                 const scenario = SCENARIOS[0]; 
-                await DataManager.loadParameters("./data/parameter.csv");
                 const data = await DataManager.loadAll(scenario.folder);
                 this.clans = data.clans;
             }
