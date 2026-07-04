@@ -190,7 +190,8 @@ class Castle {
         this.maxTraining = Number(data.maxTraining !== undefined ? data.maxTraining : 100);
 
         this.morale = Number(this.morale || 0);
-        this.maxMorale = Number(data.maxMorale !== undefined ? data.maxMorale : 100);
+        const defaultMaxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
+        this.maxMorale = Number(data.maxMorale !== undefined ? data.maxMorale : defaultMaxMorale);
         
         this.kokudaka = Number(this.kokudaka || 0);
         this.maxKokudaka = Number(data.maxKokudaka !== undefined ? data.maxKokudaka : this.kokudaka);

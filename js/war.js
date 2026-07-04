@@ -5,9 +5,6 @@
 
 window.WarParams = {
     Military: {
-        DraftBase: 50, DraftStatBonus: 1.5, DraftPopBonusFactor: 0.00005, DraftFluctuation: 0.15,
-        BaseTraining: 0, TrainingLdrEffect: 0.3, TrainingStrEffect: 0.2, TrainingFluctuation: 0.15,
-        BaseMorale: 0, MoraleLdrEffect: 0.2, MoraleCharmEffect: 0.2, MoraleFluctuation: 0.2,
         MaxMoraleBase: 120, MaxMoraleCharity: 100,
         WarMaxRounds: 15, DamageSoldierPower: 0.05, WallDefenseEffect: 0.5, DamageFluctuation: 0.2
     },
@@ -15,17 +12,16 @@ window.WarParams = {
         ChargeMultiplier: 1.5, ChargeRisk: 1.8, ChargeSoldierDmgRate: 1.0, ChargeWallDmgRate: 0.1,
         BowMultiplier: 0.6, BowRisk: 0.5,
         SiegeMultiplier: 1.0, SiegeWallRate: 0.5, SiegeRisk: 10.0,
-        DefChargeMultiplier: 1.2, DefChargeRisk: 2.0, DefBowMultiplier: 0.5, RojoDamageReduction: 0.7,
+        DefChargeMultiplier: 1.2, DefChargeRisk: 2.0, DefBowMultiplier: 0.5,
         CounterAtkPowerFactor: 0.05,
         FireSuccessBase: 0.25, FireDamageFactor: 0.8,
-        ShortWarTurnLimit: 5, BaseRecoveryRate: 0.2, RetreatRecoveryRate: 0.3, RetreatCaptureRate: 0.1, DaimyoCaptureReduction: 0.3,
+        ShortWarTurnLimit: 5, BaseRecoveryRate: 0.2, RetreatRecoveryRate: 0.3, DaimyoCaptureReduction: 0.3,
         RetreatResourceLossFactor: 0.2, LootingBaseRate: 0.3, LootingCharmFactor: 0.002, DaimyoCharmWeight: 0.1,
-        RiceConsumptionAtk: 0.05, RiceConsumptionDef: 0.05,
+        RiceConsumptionAtk: 0.05,
         BaseStat: 30, SubGeneralFactor: 0.2, MinDamage: 50,
         StatsLdrWeight: 1.2, StatsStrWeight: 0.3, StatsIntWeight: 0.5,
-        MoraleBase: 50, LoyaltyDamageFactor: 500,
-        AttackLoyaltyDecay: 50, AttackPopDecay: 500, WinStatIncrease: 5,
-        CaptureChanceBase: 0.7, CaptureStrFactor: 0.002, PrisonerRecruitThreshold: 60
+        MoraleBase: 50, WinStatIncrease: 5,
+        CaptureChanceBase: 0.7, CaptureStrFactor: 0.002
     }
 };
 
