@@ -648,13 +648,17 @@ class GameSystem {
         if (!c) return false;
         
         if (itemType === 'horse') {
+            // 日野江城(ID157)
             if (c.id === 157) return true;
+            // 常陸国(ID15)、淡路国(ID36)、肥後国(ID61)、日向国(ID62)、薩摩国(ID63)、大隅国(ID64)、対馬国(ID68)
             if ([15, 36, 61, 62, 63, 64, 68].includes(c.provinceId)) return true; 
             if (window.GameApp && window.GameApp.provinces) {
                 const prov = window.GameApp.provinces.find(p => p.id === c.provinceId);
+                // 東北地方(ID1)、甲信地方(ID3)
                 if (prov && (prov.regionId === 1 || prov.regionId === 3)) return true;
             }
         } else if (itemType === 'gun') {
+            // 石山御坊(ID33)、雑賀城(ID42)、赤尾木城(ID185)、今浜城(ID186)
             if ([33, 42, 185, 186].includes(c.id)) return true;
         }
         return false;
