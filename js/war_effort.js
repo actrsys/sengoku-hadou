@@ -2087,7 +2087,11 @@ Object.assign(WarManager.prototype, {
             // 処断時
             this.game.ui.showDialog(`「斯様な所で果てようとは……ぐふっ」`, false, async () => {
                 this.registerNemesisForExecuted(prisoner, this.game.playerClanId);
-                await this.game.lifeSystem.executeDeath(prisoner);
+                
+                // ★追加：総取りが発生する場合は家督相続をスキップします
+                const skipSuccession = this.isTotalTakeoverPending();
+                await this.game.lifeSystem.executeDeath(prisoner, { skipDaimyoSuccession: skipSuccession });
+                
                 this.game.ui.showDialog(`${prisoner.name}を処断しました。`, false, nextStep);
             }, null, {
                 leftFace: prisoner.faceIcon,
@@ -2313,9 +2317,10 @@ Object.assign(WarManager.prototype, {
     async finishPrisonerPhase() {
         // 予定通りに処断を実行します
         if (this.pendingKills && this.pendingKills.length > 0) {
+            const skipSuccession = this.isTotalTakeoverPending(); // ★追加：総取りの事前確認
             for (let p of this.pendingKills) {
                 this.registerNemesisForExecuted(p, this.game.playerClanId);
-                await this.game.lifeSystem.executeDeath(p);
+                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: skipSuccession });
             }
         }
         
@@ -2383,14 +2388,14 @@ Object.assign(WarManager.prototype, {
             // ★討死フラグがあり、本来の寿命を過ぎている武将は必ず処断します！
             if (p.isKilledInBattle && this.game.year >= p.originalEndYear) {
                 this.registerNemesisForExecuted(p, winnerClanId);
-                await this.game.lifeSystem.executeDeath(p); 
+                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: this.isTotalTakeoverPending() });
                 continue; 
             }
 
             // ★変更：fe_system.js の魔法にお任せします！
             if (p.isDaimyo && !isExtinct) { 
                 this.registerNemesisForExecuted(p, winnerClanId);
-                await this.game.lifeSystem.executeDeath(p); 
+                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: this.isTotalTakeoverPending() });
                 continue; 
             }
             
@@ -2452,7 +2457,7 @@ Object.assign(WarManager.prototype, {
                 // ==========================================
                 // ★処断される場合も、life_system.js の魔法にお任せします！
                 this.registerNemesisForExecuted(p, winnerClanId);
-                await this.game.lifeSystem.executeDeath(p);
+                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: this.isTotalTakeoverPending() });
                 // ==========================================
             } else {
                 // ★大名が解放される場合、滅亡していたら看板を下ろします
@@ -3046,28 +3051,38 @@ Object.assign(WarManager.prototype, {
     // ==========================================
     // ★ここから追加：総取りシステムの魔法！
     // ==========================================
-    async checkTotalTakeover(s) {
-        // 大名の居城が落ちていなければ何もしません
-        if (!s || !s.isDaimyoCastleFallen) return; 
+    
+    // これから総取りが発生するかどうかを事前確認する魔法
+    isTotalTakeoverPending() {
+        const s = this.state;
+        if (!s || !s.isDaimyoCastleFallen) return false; 
 
         const atkClanId = s.attacker.ownerClan;
         const defClanId = s.oldDefClanId;
         
-        if (atkClanId === 0 || defClanId === 0) return;
+        if (atkClanId === 0 || defClanId === 0) return false;
 
-        // ★追加：すでに拠点が0個（つまり最後の1拠点が落とされた）場合は、総取りを起こさずに通常の滅亡処理へ進みます！
         const defCastles = this.game.castles.filter(c => c.ownerClan === defClanId);
-        if (defCastles.length === 0) return; 
+        if (defCastles.length === 0) return false; 
 
         const atkClan = this.game.clans.find(c => c.id === atkClanId);
         const defClan = this.game.clans.find(c => c.id === defClanId);
         
-        if (!atkClan || !defClan) return;
+        if (!atkClan || !defClan) return false;
         
-        // 威信が3倍以上かチェック！
         const atkPrestige = atkClan.daimyoPrestige || 0;
         const defPrestige = defClan.daimyoPrestige || 0;
-        if (atkPrestige < defPrestige * 3) return;
+        
+        return atkPrestige >= defPrestige * 3;
+    },
+
+    async checkTotalTakeover(s) {
+        // ★修正：総取り条件を満たすか、共通の魔法で確認します！
+        if (!this.isTotalTakeoverPending()) return;
+
+        const atkClanId = s.attacker.ownerClan;
+        const defClanId = s.oldDefClanId;
+        const defCastles = this.game.castles.filter(c => c.ownerClan === defClanId);
         
         // 条件をクリアしたので、総取りシステムを発動します！
         s.isTotalTakeoverExecuted = true; // ★追加：総取りが発動した目印をセットします
