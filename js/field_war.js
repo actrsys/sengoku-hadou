@@ -899,11 +899,16 @@ class FieldWarManager {
         // 時間帯に合わせて画面の色を変える魔法をかけます
         const mainArea = document.getElementById('fw-main-area');
         if (mainArea) {
-            mainArea.classList.remove('is-evening', 'is-night');
+            mainArea.classList.remove('is-evening', 'is-night', 'is-sea-battle');
             if (this.isEveningTurn()) {
                 mainArea.classList.add('is-evening');
             } else if (this.isNightTurn()) {
                 mainArea.classList.add('is-night');
+            }
+            
+            // ★追加：海戦の時は背景を海の色にする魔法
+            if (this.warState && this.warState.isSeaBattle) {
+                mainArea.classList.add('is-sea-battle');
             }
         }
     }

@@ -1977,6 +1977,7 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
 
 .fw-top-bar { height: 30px; background: #000; color: #fff; display: flex; align-items: center; padding: 0 10px; font-size: 0.9rem; font-weight: bold; gap: 20px; flex-shrink: 0; }
 .fw-main-area { flex: 1; position: relative; overflow: hidden; background: #81c784; }
+.fw-main-area.is-sea-battle { background: #2ab6f6; } /* ★追加：海戦時は海の色（#2ab6f6）にする魔法 */
 
 /* ★追加：スクロールバーを消して、ドラッグの手のマークにする魔法 */
 .fw-map-scroll { width: 100%; height: 100%; overflow: auto; display: block; scrollbar-width: none; -ms-overflow-style: none; cursor: grab; }
