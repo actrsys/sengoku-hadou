@@ -35,7 +35,18 @@ class HexMapGenerator {
 
         // ★追加: 海戦の場合は専用の海戦マップを返します！
         if (isSeaBattle) {
-            return this._generateSeaMap(cols, rows, totalHexes);
+            let seaMapData = this._generateSeaMap(cols, rows, totalHexes);
+            
+            // ★海戦マップの場合は、海マスを川に変換してマークを付けます！
+            for (let y = 0; y < seaMapData.rows; y++) {
+                for (let x = 0; x < seaMapData.cols; x++) {
+                    if (seaMapData.grid[y][x].terrain === 'sea') {
+                        seaMapData.grid[y][x].terrain = 'river';
+                        seaMapData.grid[y][x].isSea = true;
+                    }
+                }
+            }
+            return seaMapData;
         }
 
         // 2. 地形の割合（ノルマ）を決める
