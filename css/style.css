@@ -2025,23 +2025,11 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
 .hex-sea { 
     background-color: #2ab6f6 !important; 
     background-image: 
-        /* キラキラ星 A（縦線） */
-        linear-gradient(90deg, transparent 22px, rgba(255, 255, 255, 0.9) 22px, rgba(255, 255, 255, 0.9) 26px, transparent 26px),
-        /* キラキラ星 A（横線） */
-        linear-gradient(0deg, transparent 22px, rgba(255, 255, 255, 0.9) 22px, rgba(255, 255, 255, 0.9) 26px, transparent 26px),
-        /* キラキラ星 B（縦線 - 位置違いで小さめ） */
-        linear-gradient(90deg, transparent 30px, rgba(255, 255, 255, 0.7) 30px, rgba(255, 255, 255, 0.7) 32px, transparent 32px),
-        /* キラキラ星 B（横線 - 位置違いで小さめ） */
-        linear-gradient(0deg, transparent 14px, rgba(255, 255, 255, 0.7) 14px, rgba(255, 255, 255, 0.7) 16px, transparent 16px),
         /* ドット波の網目 1（七宝柄風の丸みのある網） */
         radial-gradient(circle at 8px 8px, transparent 5px, rgba(255, 255, 255, 0.45) 5px, rgba(255, 255, 255, 0.45) 7px, transparent 7px),
         /* ドット波の網目 2（交差部分） */
         radial-gradient(circle at 0px 0px, transparent 5px, rgba(255, 255, 255, 0.45) 5px, rgba(255, 255, 255, 0.45) 7px, transparent 7px) !important;
     background-size: 
-        48px 48px, /* 星A 縦 */
-        48px 48px, /* 星A 横 */
-        64px 64px, /* 星B 縦 */
-        64px 64px, /* 星B 横 */
         16px 16px, /* 波網目 1 */
         16px 16px  /* 波網目 2 */
         !important;
@@ -2053,26 +2041,18 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
 @keyframes sea-pixel-anim {
     0% {
         background-position: 
-            0px 0px, 0px 0px,       /* 星A */
-            0px 0px, 0px 0px,       /* 星B */
             0px 0px, 0px 0px;       /* 波網目 */
     }
     33.33% {
         background-position: 
-            16px 24px, 16px 24px,   /* 星Aが大きく移動してチカチカ感を出す */
-            -16px 8px, -16px 8px,   /* 星Bも移動 */
             2px 0px, 2px 0px;       /* 波網目は少しだけ横に揺れる */
     }
     66.66% {
         background-position: 
-            32px 8px, 32px 8px,     /* 星A移動 */
-            8px -16px, 8px -16px,   /* 星B移動 */
             0px 2px, 0px 2px;       /* 波網目は少しだけ縦に揺れる */
     }
     100% {
         background-position: 
-            0px 0px, 0px 0px, 
-            0px 0px, 0px 0px, 
             0px 0px, 0px 0px;
     }
 }
