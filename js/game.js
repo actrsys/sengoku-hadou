@@ -1833,6 +1833,29 @@ class GameManager {
             // 人口が増える場合だけ、調べた倍率（120%〜20%）をかけ算してあげるよ
             if (growth > 0) {
                 growth = Math.floor(growth * neighborMultiplier);
+
+                // ★追加・移動：人口が石高に対して少ない場合、人口の増加量をアップします！（過疎地ボーナス）
+                // エラーを防ぐため、石高は最低でも「1」として計算します
+                const popKokuRatio = c.population / Math.max(1, c.kokudaka);
+                let popLowBonus = 1.0; // 基本は1.0倍（そのまま）です
+
+                // ① 人口が石高以下の時（1倍以下）
+                if (popKokuRatio <= 1) {
+                    popLowBonus = 3.0; // 3倍にします
+                } 
+                // ② 人口が石高の5倍以下の時
+                else if (popKokuRatio <= 5) {
+                    // 1倍〜5倍の間で、3.0倍から1.5倍まで滑らかに減らしていきます
+                    popLowBonus = 3.0 - ((popKokuRatio - 1) / 4) * 1.5;
+                } 
+                // ③ 人口が石高の10倍以下の時
+                else if (popKokuRatio <= 10) {
+                    // 5倍〜10倍の間で、1.5倍から1.0倍まで滑らかに減らしていきます
+                    popLowBonus = 1.5 - ((popKokuRatio - 5) / 5) * 0.5;
+                }
+
+                // 最後に、計算したボーナス倍率を掛け算します
+                growth = Math.floor(growth * popLowBonus);
             }
             // ==========================================
 
@@ -1900,29 +1923,6 @@ class GameManager {
                 // さっき調べた倍率を、兵士が増える数にもかけ算します
                 if (soldierGrowth > 0) {
                     soldierGrowth = Math.floor(soldierGrowth * neighborMultiplier);
-
-                    // 人口が石高に対して少ない場合、増加量をアップします！
-                    // エラーを防ぐため、石高は最低でも「1」として計算します
-                    const popKokuRatio = c.population / Math.max(1, c.kokudaka);
-                    let popLowBonus = 1.0; // 基本は1.0倍（そのまま）です
-
-                    // ① 人口が石高以下の時（1倍以下）
-                    if (popKokuRatio <= 1) {
-                        popLowBonus = 3.0; // 3倍にします
-                    } 
-                    // ② 人口が石高の5倍以下の時
-                    else if (popKokuRatio <= 5) {
-                        // 1倍〜5倍の間で、3.0倍から1.5倍まで滑らかに減らしていきます
-                        popLowBonus = 3.0 - ((popKokuRatio - 1) / 4) * 1.5;
-                    } 
-                    // ③ 人口が石高の10倍以下の時
-                    else if (popKokuRatio <= 10) {
-                        // 5倍〜10倍の間で、1.5倍から1.0倍まで滑らかに減らしていきます
-                        popLowBonus = 1.5 - ((popKokuRatio - 5) / 5) * 0.5;
-                    }
-
-                    // 最後に、計算したボーナス倍率を掛け算します
-                    soldierGrowth = Math.floor(soldierGrowth * popLowBonus);
                 }
                 // ==========================================
 
