@@ -1074,6 +1074,11 @@ class FieldWarManager {
                 // ★追加: 地形に合わせてCSSのクラスを追加（色を塗る指示）
                 if (this.grid && this.grid[row] && this.grid[row][x]) {
                     hex.classList.add(`hex-${this.grid[row][x].terrain}`);
+                    
+                    // ★追加：マーキング（海フラグ）がある場合は、後で見た目を変えられるように専用のクラスも付けます
+                    if (this.grid[row][x].isSea) {
+                        hex.classList.add('hex-sea');
+                    }
                 }
                 
                 hex.style.left = `${x * (this.hexW * 0.75)}px`;

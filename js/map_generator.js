@@ -73,8 +73,17 @@ class HexMapGenerator {
         this._ensureConnectivity(map, cols, rows);
 
         // 6. 森を生成する（塊になるように配置）
-        // ★修正: 森のサイズを 1〜5 マスに変更し、単独（1マス）でも発生するようにしました！
         this._generateClusters(map, cols, rows, 'forest', targetForest, 1, 5);
+        
+        // 「海」マスを「海マーク(isSea: true)が付いた川」に変換します！
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                if (map[y][x].terrain === 'sea') {
+                    map[y][x].terrain = 'river';
+                    map[y][x].isSea = true; // あとで見た目を変えるためのマーキング
+                }
+            }
+        }
 
         // 完成したマップのデータを返します！
         return {
