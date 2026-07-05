@@ -286,9 +286,7 @@ class DataManager {
                 }
             }
         });
-
-        // ★削除：ここにあった FamilyLinker.linkAdoptiveRelations(bushos); を消しました
-
+        
         // ★ここから軍団の初期設定です！
         legions.forEach(legion => {
             // 軍団長に就任する武将を探します

@@ -105,7 +105,7 @@ class AIOperationManager {
         this.validateAllOperations();
 
         for (const clan of this.game.clans) {
-            if (clan.id === 0) continue; // ★変更：プレイヤー大名家でも一旦スキップせずに中に入ります！
+            if (clan.id === 0 || clan.isDestroyed) continue; // ★滅亡した勢力はスキップします！
 
             const isPlayerClan = (clan.id === this.game.playerClanId);
 
