@@ -695,14 +695,29 @@ class UISliderManager {
                 // ★追加：兵種ボタンの無効化（余っている軍馬や鉄砲がない場合は押せなくします）
                 const btnKiba = document.getElementById(`troop-type-group-${d.id}`)?.querySelector('[data-type="kiba"]');
                 const btnTeppo = document.getElementById(`troop-type-group-${d.id}`)?.querySelector('[data-type="teppo"]');
+                
+                // ★今回追加：海戦かどうかを調べます！
+                const isSeaBattle = this.game.warManager && this.game.warManager.state && this.game.warManager.state.isSeaBattle;
+
                 if (btnKiba) {
                     const availHorses = totalHorses - (usedHorses - (d.type === 'kiba' ? d.count : 0));
-                    if (availHorses <= 0 && d.type !== 'kiba') {
+                    
+                    if (isSeaBattle) {
+                        // ★海戦なら強制的にボタンを押せなくして、暗くします！
                         btnKiba.disabled = true;
                         btnKiba.classList.add('disabled');
+                        btnKiba.style.opacity = '0.5';
+                        btnKiba.title = "海戦では騎馬隊を編成できません";
+                    } else if (availHorses <= 0 && d.type !== 'kiba') {
+                        btnKiba.disabled = true;
+                        btnKiba.classList.add('disabled');
+                        btnKiba.style.opacity = '';
+                        btnKiba.title = "";
                     } else {
                         btnKiba.disabled = false;
                         btnKiba.classList.remove('disabled');
+                        btnKiba.style.opacity = '';
+                        btnKiba.title = "";
                     }
                 }
                 if (btnTeppo) {

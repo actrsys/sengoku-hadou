@@ -172,6 +172,11 @@ Object.assign(WarManager.prototype, {
         if (!bushos || bushos.length === 0) return [];
         if (bushos.length === 1) return [{ busho: bushos[0], soldiers: totalSoldiers, troopType: 'ashigaru' }];
         
+        // ★追加：海戦の時は、軍馬を「0頭」として扱って騎馬隊を作らせないようにします！
+        const isSeaBattle = this.state && this.state.isSeaBattle;
+        let availableHorses = isSeaBattle ? 0 : totalHorses;
+        let availableGuns = totalGuns;
+
         const N = bushos.length;
         // 総大将は他部隊の1.3倍の兵力にする
         const ratioSum = 1.3 + (N - 1) * 1.0;
@@ -195,8 +200,7 @@ Object.assign(WarManager.prototype, {
         assignments[0].req += (totalSoldiers - totalReq);
         assignments[0].soldiers = assignments[0].req;
 
-        let availableHorses = totalHorses;
-        let availableGuns = totalGuns;
+        // ★修正：上で作った availableHorses と availableGuns をそのまま使います
         let poolSoldiers = 0; // 余った兵士を貯めるプール
         
         const maxTeppoCount = Math.floor(N / 2);

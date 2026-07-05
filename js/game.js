@@ -770,19 +770,18 @@ class GameSystem {
         return false;
     }
     
-    // ★ここから追加：最短ルートの中に海路が含まれているかを調べる魔法です！
+    // ★ここから追加：最短ルートの中で「最後の一歩（攻撃先への道）」が海路かどうかを調べる魔法です！
     static isSeaRoute(game, startCastle, targetCastle, movingClanId) {
         if (!startCastle || !targetCastle) return false;
         if (startCastle.id === targetCastle.id) return false;
 
         const visited = new Set();
-        const queue = [{ castle: startCastle, path: [startCastle] }];
+        const queue = [{ castle: startCastle }];
         visited.add(startCastle.id);
 
         while (queue.length > 0) {
             const currentData = queue.shift();
             const current = currentData.castle;
-            const currentPath = currentData.path;
 
             const neighbors = [];
             if (current.adjacentCastleIds) {
@@ -794,16 +793,11 @@ class GameSystem {
             
             for (const next of neighbors) {
                 if (next.id === targetCastle.id) {
-                    // 目標に到着した！ この最短ルートの経路に海路が含まれているかチェックします
-                    const finalPath = [...currentPath, next];
-                    for (let i = 0; i < finalPath.length - 1; i++) {
-                        const c1 = finalPath[i];
-                        const c2 = finalPath[i+1];
-                        if (c1.seaRouteIds && c1.seaRouteIds.includes(c2.id)) {
-                            return true; // 海路が含まれていたら海戦！
-                        }
+                    // 目標に到着した！ この最短ルートの「最後の一歩」が海路かどうかをチェックします
+                    if (current.seaRouteIds && current.seaRouteIds.includes(next.id)) {
+                        return true; // 最後が海路なら海戦！
                     }
-                    return false; // 海路が含まれていなければ陸戦！
+                    return false; // 最後が陸路なら陸戦！
                 }
                 
                 if (!visited.has(next.id)) {
@@ -820,7 +814,7 @@ class GameSystem {
                     
                     if (canPass) {
                         visited.add(next.id);
-                        queue.push({ castle: next, path: [...currentPath, next] });
+                        queue.push({ castle: next });
                     }
                 }
             }
