@@ -37,7 +37,7 @@ class HexMapGenerator {
         if (isSeaBattle) {
             let seaMapData = this._generateSeaMap(cols, rows, totalHexes);
             
-            // ★海戦マップの場合は、海マスを川に変換してマークを付けます！
+            // 海戦マップの時だけ、ここで「海」を「海マーク付きの川」に変換します！
             for (let y = 0; y < seaMapData.rows; y++) {
                 for (let x = 0; x < seaMapData.cols; x++) {
                     if (seaMapData.grid[y][x].terrain === 'sea') {
@@ -86,16 +86,6 @@ class HexMapGenerator {
         // 6. 森を生成する（塊になるように配置）
         this._generateClusters(map, cols, rows, 'forest', targetForest, 1, 5);
         
-        // 「海」マスを「海マーク(isSea: true)が付いた川」に変換します！
-        for (let y = 0; y < rows; y++) {
-            for (let x = 0; x < cols; x++) {
-                if (map[y][x].terrain === 'sea') {
-                    map[y][x].terrain = 'river';
-                    map[y][x].isSea = true; // あとで見た目を変えるためのマーキング
-                }
-            }
-        }
-
         // 完成したマップのデータを返します！
         return {
             cols: cols,
