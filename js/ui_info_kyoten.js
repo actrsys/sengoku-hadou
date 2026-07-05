@@ -72,6 +72,16 @@ Object.assign(UIInfoManager.prototype, {
         let totalGoldIncome = GameSystem.calcBaseGoldIncome(castle);
         let totalRiceIncome = GameSystem.calcBaseRiceIncome(castle);
 
+        // ★追加：拠点の特徴（港・馬・鉄砲）を判定してマークを作ります
+        const isPort = GameSystem.isPortCastle(castle); // 一元化された港の判定を使います
+        const isHorse = GameSystem.isProdCastle(castle, 'horse');
+        const isGun = GameSystem.isProdCastle(castle, 'gun');
+
+        let marksHtml = "";
+        if (isPort) marksHtml += `<span class="status-mark" style="padding: 4px 8px; background-color: #0288d1;">港</span>`;
+        if (isHorse) marksHtml += `<span class="status-mark" style="padding: 4px 8px; background-color: #f57c00;">馬産地</span>`;
+        if (isGun) marksHtml += `<span class="status-mark" style="padding: 4px 8px; background-color: #5d4037;">鉄砲産地</span>`;
+
         let faceHtml = "";
         if (castellan && castellan.faceIcon) {
             faceHtml = `<img src="data/images/faceicons/${castellan.faceIcon}" class="daimyo-detail-face" onerror="this.style.display='none'">`;
@@ -134,9 +144,14 @@ Object.assign(UIInfoManager.prototype, {
                             </div>
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
-                        <button class="daimyo-detail-action-btn" id="castle-busho-btn" ${bushoCount === 0 ? 'disabled' : ''}>武将</button>
-                        <button class="daimyo-detail-action-btn" id="castle-kunishu-btn" ${kunishuCount === 0 ? 'disabled' : ''}>諸勢力</button>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 15px;">
+                        <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                            ${marksHtml}
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="daimyo-detail-action-btn" id="castle-busho-btn" ${bushoCount === 0 ? 'disabled' : ''}>武将</button>
+                            <button class="daimyo-detail-action-btn" id="castle-kunishu-btn" ${kunishuCount === 0 ? 'disabled' : ''}>諸勢力</button>
+                        </div>
                     </div>
                 </div>
             `;

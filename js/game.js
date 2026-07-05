@@ -659,7 +659,16 @@ class GameSystem {
         }
         return false;
     }
-
+    
+    // そのお城が港かどうかを判定する魔法です
+    static isPortCastle(c) {
+        if (!c) return false;
+        // 港となる拠点のIDを、ここ一箇所だけで管理します
+        //春日山城(ID2)、石山御坊(ID33)、松波城(ID72)、尾山御坊(ID74)、北庄城(ID76)、立花山城(ID148)、平戸城(ID155)、内城(ID169)、厳原城(ID174)、安濃津城(予定)、土崎港(予定)、十三湊(予定)
+        const portCastleIds = [2, 33, 72, 74, 76, 148, 155, 169, 174];
+        return portCastleIds.includes(c.id);
+    }
+    
     // 画面の相場表示に使う「小数点まで正確な1個の単価」を出す魔法
     static calcBuyEquipUnitPrice(daimyo, castellan, itemType) {
         const eff = this.calcBuyEquipEfficiency(daimyo, castellan, itemType);
@@ -1014,8 +1023,8 @@ class GameSystem {
     // ① 月の基本収入（港ボーナス込み）を予測します
     static calcExpectedGoldIncome(castle, game) {
         let income = this.calcBaseGoldIncome(castle);
-        const portCastleIds = [2, 33, 72, 74, 76, 148, 155, 169, 174];
-        if (portCastleIds.includes(castle.id) && game) {
+        // 新しく作った港の判定窓口を通します
+        if (this.isPortCastle(castle) && game) {
             const clanCastles = game.castles.filter(c => c.ownerClan === castle.ownerClan);
             const totalClanPopulation = clanCastles.reduce((sum, c) => sum + c.population, 0);
             income += Math.floor((castle.population / 500) + (castle.peoplesLoyalty / 2) + (totalClanPopulation / 1000));
@@ -1742,10 +1751,9 @@ class GameManager {
             if (this.month === 3) income += income * 3;
 
             // ★ここから追加：港拠点の交易収入ボーナス！
-            //春日山城(ID2)、石山御坊(ID33)、松波城(ID72)、尾山御坊(ID74)、北庄城(ID76)、立花山城(ID148)、平戸城(ID155)、内城(ID169)、厳原城(ID174)、安濃津城(予定)、土崎港(予定)、十三湊(予定)
-            const portCastleIds = [2, 33, 72, 74, 76, 148, 155, 169, 174]; // 港拠点のIDリスト
             let portBonus = 0;
-            if (portCastleIds.includes(c.id)) {
+            // 新しく作った港の判定窓口を通します
+            if (GameSystem.isPortCastle(c)) {
                 // 同じ勢力が持っているすべてのお城の総人口を計算します
                 const clanCastles = this.castles.filter(castle => castle.ownerClan === c.ownerClan);
                 const totalClanPopulation = clanCastles.reduce((sum, castle) => sum + castle.population, 0);
