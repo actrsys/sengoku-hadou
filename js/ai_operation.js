@@ -281,13 +281,8 @@ class AIOperationManager {
         clan.currentDiplomacyTarget = null;
 
         const myClanId = clan.id;
-        
-        // 大名（当主）となる武将を探します
-        const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo);
-        // ★！テスト用！！ もし大名が見つからない場合は、エラーを防ぐためにこの月の外交思考をスキップします
-        if (!myDaimyo) return;
-
         const myPower = this.game.aiEngine.getClanPrestige(myClanId);
+        const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo) || { duty: 50, intelligence: 50 };
         const smartness = this.game.aiEngine.getAISmartness(myDaimyo.intelligence);
 
         // 周りのお城を探します
