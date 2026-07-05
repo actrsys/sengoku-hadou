@@ -10,7 +10,8 @@ class HexMapGenerator {
             plain: { id: 'plain', cost: 1, name: '平地' },
             forest: { id: 'forest', cost: 2, name: '森' },
             river: { id: 'river', cost: 3, name: '川' },
-            mountain: { id: 'mountain', cost: 3, name: '山' }
+            mountain: { id: 'mountain', cost: 3, name: '山' },
+            sea: { id: 'sea', cost: 3, name: '海' } // ★追加: 川と同じ効果の海
         };
     }
 
@@ -21,10 +22,21 @@ class HexMapGenerator {
 
     // マップを作るメインの魔法
     generate() {
+        // ★追加: 海戦フラグをゲームの記憶から読み取ります！
+        let isSeaBattle = false;
+        if (window.GameApp && window.GameApp.warManager && window.GameApp.warManager.state) {
+            isSeaBattle = window.GameApp.warManager.state.isSeaBattle === true;
+        }
+
         // 1. マップの広さをランダムに決める（横16〜22、縦10〜16）
         const cols = this.rand(16, 26);
         const rows = this.rand(10, 20);
         const totalHexes = cols * rows;
+
+        // ★追加: 海戦の場合は専用の海戦マップを返します！
+        if (isSeaBattle) {
+            return this._generateSeaMap(cols, rows, totalHexes);
+        }
 
         // 2. 地形の割合（ノルマ）を決める
         // 平地は最低40%。ここでは「40%〜80%」を平地にします。
@@ -70,6 +82,78 @@ class HexMapGenerator {
             rows: rows,
             grid: map
         };
+    }
+
+    // ★追加：海を中心としたマップを作る魔法
+    _generateSeaMap(cols, rows, totalHexes) {
+        // 7〜10割が海
+        const seaPercent = this.rand(70, 100);
+        const seaTargetCount = Math.floor(totalHexes * (seaPercent / 100));
+
+        // 残りが平地とたまに森
+        const remainHexes = totalHexes - seaTargetCount;
+        
+        // 平地ベースに森を少しだけ（10%〜30%くらい）
+        const forestPercent = this.rand(10, 30);
+        const forestTargetCount = Math.floor(remainHexes * (forestPercent / 100));
+
+        // 1. まず全てを海で埋める
+        let map = [];
+        for (let y = 0; y < rows; y++) {
+            let row = [];
+            for (let x = 0; x < cols; x++) {
+                row.push({ x: x, y: y, terrain: 'sea' });
+            }
+            map.push(row);
+        }
+
+        // 2. 陸地（平地）の塊を作る
+        this._generateClustersOn(map, cols, rows, 'plain', remainHexes, 3, 8, 'sea');
+
+        // 3. 陸地（平地）の上に森の塊を作る
+        this._generateClustersOn(map, cols, rows, 'forest', forestTargetCount, 1, 3, 'plain');
+
+        return {
+            cols: cols,
+            rows: rows,
+            grid: map
+        };
+    }
+
+    // ★追加：特定の地形（baseTerrain）の上に塊を作る魔法
+    _generateClustersOn(map, cols, rows, terrainType, targetCount, minSize, maxSize, baseTerrain) {
+        let currentCount = 0;
+        let attempts = 0;
+
+        while (currentCount < targetCount && attempts < 1000) {
+            attempts++;
+            let startX = this.rand(0, cols - 1);
+            let startY = this.rand(0, rows - 1);
+
+            if (map[startY][startX].terrain !== baseTerrain) continue;
+
+            let clusterSize = this.rand(minSize, maxSize);
+            let queue = [{ x: startX, y: startY }];
+            let clustered = 0;
+
+            while (queue.length > 0 && clustered < clusterSize && currentCount < targetCount) {
+                let idx = this.rand(0, queue.length - 1);
+                let pos = queue.splice(idx, 1)[0];
+
+                if (map[pos.y][pos.x].terrain === baseTerrain) {
+                    map[pos.y][pos.x].terrain = terrainType;
+                    currentCount++;
+                    clustered++;
+
+                    let neighbors = this._getNeighbors(pos.x, pos.y, cols, rows);
+                    for (let n of neighbors) {
+                        if (map[n.y][n.x].terrain === baseTerrain) {
+                            queue.push(n);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // 川を作る魔法（上から下へ、クネクネと線を引きます）

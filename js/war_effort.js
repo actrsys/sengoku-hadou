@@ -325,6 +325,12 @@ Object.assign(WarManager.prototype, {
             const defDaimyo = this.game.bushos.find(b => b.clan === defClan && b.isDaimyo);
             const isDaimyoCastle = (defDaimyo && defDaimyo.castleId === defCastle.id);
 
+            // ★追加：最短ルートが海路を通るか（海戦か）どうかを判定して記憶します
+            let isSeaBattle = false;
+            if (typeof GameSystem.isSeaRoute === 'function') {
+                isSeaBattle = GameSystem.isSeaRoute(this.game, atkCastle, defCastle, atkClan);
+            }
+
             // ★ここから追加：お城に「攻撃された記憶」をメモ書きします！
             // ただし、防衛側が諸勢力（鎮圧戦）の場合は、お城の奪い合いではないのでメモしません！
             if (!defCastle.isKunishu) {
@@ -516,7 +522,8 @@ Object.assign(WarManager.prototype, {
                 turn: 'attacker', isPlayerInvolved: isPlayerInvolved, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false,
                 reinforcement: reinforcementData, selfReinforcement: selfReinforcementData,
                 isKunishuSubjugation: defCastle.isKunishu === true && !atkCastle.isKunishu, // 防衛側が諸勢力で、攻撃側が諸勢力(蜂起)でないなら鎮圧戦！
-                isDaimyoCastle: isDaimyoCastle // ★大名の居城フラグを追加
+                isDaimyoCastle: isDaimyoCastle, // ★大名の居城フラグを追加
+                isSeaBattle: isSeaBattle // ★海戦フラグを追加
             };
 
             // ★追加：戦闘準備が整ったこのタイミングで「戦闘前」の歴史イベントをチェックします

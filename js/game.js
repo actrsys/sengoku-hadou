@@ -757,6 +757,64 @@ class GameSystem {
         return false;
     }
     
+    // ★ここから追加：最短ルートの中に海路が含まれているかを調べる魔法です！
+    static isSeaRoute(game, startCastle, targetCastle, movingClanId) {
+        if (!startCastle || !targetCastle) return false;
+        if (startCastle.id === targetCastle.id) return false;
+
+        const visited = new Set();
+        const queue = [{ castle: startCastle, path: [startCastle] }];
+        visited.add(startCastle.id);
+
+        while (queue.length > 0) {
+            const currentData = queue.shift();
+            const current = currentData.castle;
+            const currentPath = currentData.path;
+
+            const neighbors = [];
+            if (current.adjacentCastleIds) {
+                current.adjacentCastleIds.forEach(adjId => {
+                    const c = game.getCastle(adjId);
+                    if (c) neighbors.push(c);
+                });
+            }
+            
+            for (const next of neighbors) {
+                if (next.id === targetCastle.id) {
+                    // 目標に到着した！ この最短ルートの経路に海路が含まれているかチェックします
+                    const finalPath = [...currentPath, next];
+                    for (let i = 0; i < finalPath.length - 1; i++) {
+                        const c1 = finalPath[i];
+                        const c2 = finalPath[i+1];
+                        if (c1.seaRouteIds && c1.seaRouteIds.includes(c2.id)) {
+                            return true; // 海路が含まれていたら海戦！
+                        }
+                    }
+                    return false; // 海路が含まれていなければ陸戦！
+                }
+                
+                if (!visited.has(next.id)) {
+                    let canPass = false;
+                    
+                    if (Number(next.ownerClan) === Number(movingClanId)) {
+                        canPass = true;
+                    } else if (next.ownerClan !== 0) {
+                        const rel = game.getRelation(movingClanId, next.ownerClan);
+                        if (rel && ['同盟', '支配', '従属'].includes(rel.status)) {
+                            canPass = true;
+                        }
+                    }
+                    
+                    if (canPass) {
+                        visited.add(next.id);
+                        queue.push({ castle: next, path: [...currentPath, next] });
+                    }
+                }
+            }
+        }
+        return false;
+    }
+    
     static calcInvestigate(bushos, targetCastle) {
         if (!bushos || bushos.length === 0) return { success: false, accuracy: 0 };
         
