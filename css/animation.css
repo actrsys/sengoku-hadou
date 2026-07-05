@@ -209,26 +209,34 @@
    野戦の時間帯（夕方・夜）アニメーション
    ========================================= */
 /* 夕方の表現：以前より明るく、でも晴れよりは少し暗くします */
-#fw-main-area.is-evening #fw-map {
+#fw-main-area.is-evening:not(.is-sea-battle) #fw-map {
     background-color: #4a3b2c !important; /* タイルの隙間を夕方の影色に */
+}
+#fw-main-area.is-evening #fw-map {
     filter: sepia(0.2) saturate(1.1) hue-rotate(-10deg) brightness(0.9);
 }
 
 /* 夜の表現：夕方をベースに、さらに暗くしてほんのり青みを足します（色反転はしません） */
-#fw-main-area.is-night #fw-map {
+#fw-main-area.is-night:not(.is-sea-battle) #fw-map {
     background-color: #121820 !important; /* タイルの隙間を青黒い暗闇色に */
+}
+#fw-main-area.is-night #fw-map {
     filter: sepia(0.2) saturate(0.9) hue-rotate(10deg) brightness(0.55);
 }
 
 /* 夕方で雨の時の表現：夕方の色を残しつつ、少しだけ明るさを上げました */
-#fw-main-area.is-evening.is-raining #fw-map {
+#fw-main-area.is-evening.is-raining:not(.is-sea-battle) #fw-map {
     background-color: #3d3329 !important;
+}
+#fw-main-area.is-evening.is-raining #fw-map {
     filter: sepia(0.2) saturate(1.0) hue-rotate(-10deg) brightness(0.82);
 }
 
 /* 夜で雨の時の表現：夜の青黒さを維持しつつ、部隊が見える明るさまで上げました */
-#fw-main-area.is-night.is-raining #fw-map {
+#fw-main-area.is-night.is-raining:not(.is-sea-battle) #fw-map {
     background-color: #0c1015 !important;
+}
+#fw-main-area.is-night.is-raining #fw-map {
     filter: sepia(0.1) saturate(0.8) hue-rotate(10deg) brightness(0.55);
 }
 
@@ -250,8 +258,10 @@
 }
 
 /* ★大雪の時のマップ：タイルの隙間を雪の積もった色にして、マップ全体をうっすら白くします */
-#fw-main-area.is-heavy-snow #fw-map, #war-visual-area.is-heavy-snow {
+#fw-main-area.is-heavy-snow:not(.is-sea-battle) #fw-map, #war-visual-area.is-heavy-snow {
     background-color: #d1d8df !important; /* 雪が積もったような白っぽい青みグレー */
+}
+#fw-main-area.is-heavy-snow #fw-map, #war-visual-area.is-heavy-snow {
     filter: brightness(1.15) contrast(0.9); /* 全体を白っぽく、少しぼんやりさせます */
 }
 
@@ -276,13 +286,17 @@
 }
 
 /* 夕方で大雪の時の表現：少し夕焼けのオレンジを混ぜます */
-#fw-main-area.is-evening.is-heavy-snow #fw-map {
+#fw-main-area.is-evening.is-heavy-snow:not(.is-sea-battle) #fw-map {
     background-color: #c9bcae !important;
+}
+#fw-main-area.is-evening.is-heavy-snow #fw-map {
     filter: sepia(0.2) saturate(1.1) hue-rotate(-10deg) brightness(1.0);
 }
 
 /* 夜で大雪の時の表現：夜の青黒さに雪の白さを少し混ぜます */
-#fw-main-area.is-night.is-heavy-snow #fw-map {
+#fw-main-area.is-night.is-heavy-snow:not(.is-sea-battle) #fw-map {
     background-color: #2a3542 !important;
+}
+#fw-main-area.is-night.is-heavy-snow #fw-map {
     filter: sepia(0.1) saturate(0.8) hue-rotate(10deg) brightness(0.7);
 }
