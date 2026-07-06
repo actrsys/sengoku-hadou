@@ -1044,8 +1044,25 @@ class FieldWarManager {
             if (dist > maxRange) return false; 
             if (!this.isFrontDirection(attacker.direction, targetDir)) return false; // 前方3方向のみ
             return true;
+        } else if (attacker.troopType === 'ashigaru') {
+            // ★追加: 足軽は射程2。距離2への攻撃は弓射とします。
+            let maxRange = 2;
+            
+            // 鉄砲と同じく、雨・雪の時は弓が使いにくいため遠距離不可（射程1）
+            if (this.weather === 'rain' || this.weather === 'snow') {
+                maxRange = 1;
+            }
+            
+            // 鉄砲と同じく、移動後は弓を構えられないため遠距離不可（射程1）
+            if (attacker.hasMoved && dist > 1) {
+                return false;
+            }
+
+            if (dist > maxRange) return false; 
+            if (!this.isFrontDirection(attacker.direction, targetDir)) return false; // 前方3方向のみ
+            return true;
         } else {
-            if (dist !== 1) return false; // 足軽・騎馬は射程1
+            if (dist !== 1) return false; // 騎馬は射程1
             if (!this.isFrontDirection(attacker.direction, targetDir)) return false; // 前方3方向のみ
             return true;
         }
@@ -2524,16 +2541,18 @@ class FieldWarManager {
         let defFactionBonus = calcFactionBonus(defender);
         defFinalAtk += defFactionBonus.atk;
         defFinalDef += defFactionBonus.def;
-
+        
         // 3. 向きによる補正の判定
+        const atkDist = this.getDistance(attacker.x, attacker.y, defender.x, defender.y); // ★追加: 攻撃時の距離を計算して覚えておきます
         let atkDirIndex = this.getDirection(attacker.x, attacker.y, defender.x, defender.y);
         let defDirIndex = defender.direction;
         let oppositeAtkDir = (atkDirIndex + 3) % 6;
         let defToAtkDiff = Math.abs(defDirIndex - oppositeAtkDir);
         defToAtkDiff = Math.min(defToAtkDiff, 6 - defToAtkDiff); 
 
-        if (attacker.troopType === 'teppo') {
-            defToAtkDiff = 0; // 鉄砲は常に正面扱い
+        // ★修正: 鉄砲、または足軽の遠距離(弓射)の場合は常に正面扱いとします
+        if (attacker.troopType === 'teppo' || (attacker.troopType === 'ashigaru' && atkDist > 1)) {
+            defToAtkDiff = 0; 
         }
 
         // ターン数から夜かどうかを判定します
@@ -2549,7 +2568,7 @@ class FieldWarManager {
         // 防御側のステータスに向き補正を適用
         defFinalDef = defFinalDef * dirMult;
         defFinalAtk = defFinalAtk * (dirMult * 0.5);
-
+        
         // 4. 兵科による攻撃力のボーナス計算
         let atkToDefDiff = Math.abs(attacker.direction - atkDirIndex);
         atkToDefDiff = Math.min(atkToDefDiff, 6 - atkToDefDiff);
@@ -2559,8 +2578,7 @@ class FieldWarManager {
             if (atkToDefDiff === 0) atkWeaponMult = 1.3; // 正面から突撃
             else if (atkToDefDiff === 1) atkWeaponMult = 1.2; // 前斜めから突撃
         } else if (attacker.troopType === 'teppo') {
-            let dist = this.getDistance(attacker.x, attacker.y, defender.x, defender.y);
-            if (dist === 1) {
+            if (atkDist === 1) {
                 atkWeaponMult = 0.3; // 隣接時は威力が落ちる
             } else {
                 atkWeaponMult = 1.5; // 遠距離なら威力が上がる
@@ -2568,6 +2586,14 @@ class FieldWarManager {
                 // ★追加: 夜の場合は遠距離ダメージが半分になります
                 if (isNight) {
                     atkWeaponMult *= 0.5;
+                }
+            }
+        } else if (attacker.troopType === 'ashigaru') {
+            // ★追加: 足軽の遠距離(弓射)の威力を調整します
+            if (atkDist > 1) {
+                atkWeaponMult = 0.2; // 攻撃力が5分の1になります
+                if (isNight) {
+                    atkWeaponMult *= 0.5; // 鉄砲と同じく夜は遠距離ダメージが半分になります
                 }
             }
         }
@@ -2598,10 +2624,11 @@ class FieldWarManager {
         // 7. 与ダメージ計算
         let dmgRatio = (atkFinalAtk + defFinalDef) > 0 ? (atkFinalAtk / (atkFinalAtk + defFinalDef)) : 0;
         let dmgToDef = Math.floor(atkFinalAtk * dmgRatio);
-
+        
         // 8. 連携攻撃によるダメージアップ（サポート部隊1つにつき10%アップ）
         let supportCount = 0;
-        if (attacker.troopType !== 'teppo') {
+        // ★修正: 鉄砲、および足軽の遠距離(弓射)の場合は連携攻撃が発生しないようにします
+        if (attacker.troopType !== 'teppo' && !(attacker.troopType === 'ashigaru' && atkDist > 1)) {
             this.units.forEach(u => {
                 // 自分以外、同じ陣営、鉄砲隊ではない味方を探します
                 if (u.id !== attacker.id && u.isAttacker === attacker.isAttacker && u.troopType !== 'teppo') {
@@ -2623,8 +2650,7 @@ class FieldWarManager {
 
         // 9. 反撃ダメージ計算
         let dmgToAtk = 0;
-        const dist = this.getDistance(attacker.x, attacker.y, defender.x, defender.y);
-        if (dist === 1) { // 反撃は距離1のときのみ
+        if (atkDist === 1) { // 反撃は距離1のときのみ
             let counterRatio = (atkFinalAtk + defFinalDef) > 0 ? (defFinalDef / (atkFinalAtk + defFinalDef)) : 0;
             dmgToAtk = Math.floor(defFinalAtk * 0.5 * counterRatio);
         }
@@ -2795,6 +2821,7 @@ class FieldWarManager {
         let atkWeapon = "攻撃";
         if (attacker.troopType === 'teppo') atkWeapon = "射撃";
         else if (attacker.troopType === 'kiba') atkWeapon = "突撃";
+        else if (attacker.troopType === 'ashigaru' && atkDist > 1) atkWeapon = "弓射"; // ★追加: 遠距離の場合は弓射になります
 
         let counterMsg = (dmgToAtk > 0) ? ` 反撃で${dmgToAtk}の被害！` : ``;
 
