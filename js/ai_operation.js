@@ -995,99 +995,102 @@ class AIOperationManager {
                 if (!this.grandObjectives) this.grandObjectives = {};
                 if (!this.grandObjectives[clanId]) this.grandObjectives[clanId] = {};
                 
-                const targetCastle = this.game.getCastle(firstTarget.targetId);
-                if (targetCastle) {
-                    const myTotalSoldiers = this.game.getClanTotalSoldiers(clanId);
-                    const targetClanId = targetCastle.ownerClan;
-                    const targetProvId = targetCastle.provinceId;
-                    
-                    // 初期値を '拠点攻略' から null に変更します
-                    let objectiveType = null; 
+                // ★今回追加：すでに大目標が存在している場合は、上書きせずにそのまま維持します！
+                if (!this.grandObjectives[clanId][legionId]) {
+                    const targetCastle = this.game.getCastle(firstTarget.targetId);
+                    if (targetCastle) {
+                        const myTotalSoldiers = this.game.getClanTotalSoldiers(clanId);
+                        const targetClanId = targetCastle.ownerClan;
+                        const targetProvId = targetCastle.provinceId;
+                        
+                        // 初期値を '拠点攻略' から null に変更します
+                        let objectiveType = null; 
 
-                    // 攻撃先が空き拠点(IDが0)や諸勢力でない場合
-                    if (targetClanId !== 0 && !firstTarget.isKunishuTarget) {
-                        const targetClanTotalSoldiers = this.game.getClanTotalSoldiers(targetClanId);
-                        if (myTotalSoldiers > targetClanTotalSoldiers) {
-                            objectiveType = '大名攻略';
-                        }
-                    }
-
-                    // 大名攻略にならなかった場合、国攻略の判定
-                    // !objectiveType（nullの時）だけ計算を行います
-                    if (!objectiveType && !firstTarget.isKunishuTarget && targetProvId > 0) {
-                        let enemyProvSoldiers = 0;
-                        this.game.castles.forEach(c => {
-                            if (c.provinceId === targetProvId && c.ownerClan !== clanId) {
-                                const rel = this.game.getRelation(clanId, c.ownerClan);
-                                if (!rel || !['同盟', '支配', '従属', '友好'].includes(rel.status)) {
-                                    enemyProvSoldiers += c.soldiers;
-                                }
-                            }
-                        });
-
-                        if (myTotalSoldiers > enemyProvSoldiers) {
-                            objectiveType = '国攻略';
-                        }
-                    }
-
-                    // ★今回追加：国攻略にもならなかった場合、反攻作戦の判定
-                    if (!objectiveType && !firstTarget.isKunishuTarget) {
-                        if (this.historyOwnedCastles && this.historyOwnedCastles[clanId]) {
-                            const history = this.historyOwnedCastles[clanId];
-                            const pastOwnedSet = new Set();
-                            history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
-                            
-                            // 攻めようとしている相手の城が、過去に持っていた城なら反攻作戦にします
-                            if (pastOwnedSet.has(firstTarget.targetId)) {
-                                objectiveType = '反攻作戦';
+                        // 攻撃先が空き拠点(IDが0)や諸勢力でない場合
+                        if (targetClanId !== 0 && !firstTarget.isKunishuTarget) {
+                            const targetClanTotalSoldiers = this.game.getClanTotalSoldiers(targetClanId);
+                            if (myTotalSoldiers > targetClanTotalSoldiers) {
+                                objectiveType = '大名攻略';
                             }
                         }
-                    }
 
-                    // ★objectiveTypeがセットされている時だけ、大目標を記録します
-                    if (objectiveType) {
-                        let initialTargetCount = 0;
-                        if (objectiveType === '大名攻略') {
-                            initialTargetCount = this.game.castles.filter(c => c.ownerClan === targetClanId).length;
-                        } else if (objectiveType === '国攻略') {
-                            initialTargetCount = this.game.castles.filter(c => {
+                        // 大名攻略にならなかった場合、国攻略の判定
+                        // !objectiveType（nullの時）だけ計算を行います
+                        if (!objectiveType && !firstTarget.isKunishuTarget && targetProvId > 0) {
+                            let enemyProvSoldiers = 0;
+                            this.game.castles.forEach(c => {
                                 if (c.provinceId === targetProvId && c.ownerClan !== clanId) {
                                     const rel = this.game.getRelation(clanId, c.ownerClan);
-                                    return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                                    if (!rel || !['同盟', '支配', '従属', '友好'].includes(rel.status)) {
+                                        enemyProvSoldiers += c.soldiers;
+                                    }
                                 }
-                                return false;
-                            }).length;
-                        } else if (objectiveType === '反攻作戦') {
-                            // ★今回追加：反攻作戦の時の初期ターゲット数（取り返すべき拠点数）を計算します
-                            const history = this.historyOwnedCastles[clanId];
-                            const currentMyCastles = new Set(this.game.castles.filter(c => c.ownerClan === clanId).map(c => c.id));
-                            const pastOwnedSet = new Set();
-                            history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
-                            
-                            for (const cid of pastOwnedSet) {
-                                if (!currentMyCastles.has(cid)) {
-                                    const c = this.game.getCastle(cid);
-                                    if (c) {
+                            });
+
+                            if (myTotalSoldiers > enemyProvSoldiers) {
+                                objectiveType = '国攻略';
+                            }
+                        }
+
+                        // ★今回追加：国攻略にもならなかった場合、反攻作戦の判定
+                        if (!objectiveType && !firstTarget.isKunishuTarget) {
+                            if (this.historyOwnedCastles && this.historyOwnedCastles[clanId]) {
+                                const history = this.historyOwnedCastles[clanId];
+                                const pastOwnedSet = new Set();
+                                history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
+                                
+                                // 攻めようとしている相手の城が、過去に持っていた城なら反攻作戦にします
+                                if (pastOwnedSet.has(firstTarget.targetId)) {
+                                    objectiveType = '反攻作戦';
+                                }
+                            }
+                        }
+
+                        // ★objectiveTypeがセットされている時だけ、大目標を記録します
+                        if (objectiveType) {
+                            let initialTargetCount = 0;
+                            if (objectiveType === '大名攻略') {
+                                initialTargetCount = this.game.castles.filter(c => c.ownerClan === targetClanId).length;
+                            } else if (objectiveType === '国攻略') {
+                                initialTargetCount = this.game.castles.filter(c => {
+                                    if (c.provinceId === targetProvId && c.ownerClan !== clanId) {
                                         const rel = this.game.getRelation(clanId, c.ownerClan);
-                                        // 友好勢力でなければ、取り返す拠点としてカウント
-                                        if (!rel || !['同盟', '支配', '従属', '友好'].includes(rel.status)) {
-                                            initialTargetCount++;
+                                        return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                                    }
+                                    return false;
+                                }).length;
+                            } else if (objectiveType === '反攻作戦') {
+                                // ★今回追加：反攻作戦の時の初期ターゲット数（取り返すべき拠点数）を計算します
+                                const history = this.historyOwnedCastles[clanId];
+                                const currentMyCastles = new Set(this.game.castles.filter(c => c.ownerClan === clanId).map(c => c.id));
+                                const pastOwnedSet = new Set();
+                                history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
+                                
+                                for (const cid of pastOwnedSet) {
+                                    if (!currentMyCastles.has(cid)) {
+                                        const c = this.game.getCastle(cid);
+                                        if (c) {
+                                            const rel = this.game.getRelation(clanId, c.ownerClan);
+                                            // 友好勢力でなければ、取り返す拠点としてカウント
+                                            if (!rel || !['同盟', '支配', '従属', '友好'].includes(rel.status)) {
+                                                initialTargetCount++;
+                                            }
                                         }
                                     }
                                 }
                             }
+                            
+                            const myCastleCount = this.game.castles.filter(c => c.ownerClan === clanId).length;
+                            
+                            this.grandObjectives[clanId][legionId] = {
+                                type: objectiveType,
+                                targetClanId: targetClanId,
+                                targetProvId: targetProvId,
+                                turnCount: 24, // 24ターン（2年間）待機
+                                historyTargetCount: [initialTargetCount], // 過去24回分を毎月覚える箱
+                                prevMyCastleCount: myCastleCount // 前月分の自拠点数
+                            };
                         }
-                        
-                        const myCastleCount = this.game.castles.filter(c => c.ownerClan === clanId).length;
-                        
-                        this.grandObjectives[clanId][legionId] = {
-                            type: objectiveType,
-                            targetClanId: targetClanId,
-                            targetProvId: targetProvId,
-                            turnCount: 24, // 24ターン（2年間）待機
-                            historyTargetCount: [initialTargetCount], // 過去24回分を毎月覚える箱
-                            prevMyCastleCount: myCastleCount // 前月分の自拠点数
-                        };
                     }
                 }
                 
