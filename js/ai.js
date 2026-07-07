@@ -1146,6 +1146,19 @@ class AIEngine {
                     isStolenTarget = true; // 上限を広げるための印をつけておきます
                 }
             }
+
+            // 7. ★追加：「取った拠点を同じ勢力に取り返された」泥沼拠点の執着緩和！
+            if (target.ownerClan !== 0 && pastOwnedSet.has(target.id)) {
+                // 今の持ち主（相手）の「過去の所持記憶」を調べます
+                if (this.game.aiOperationManager && this.game.aiOperationManager.historyOwnedCastles && this.game.aiOperationManager.historyOwnedCastles[target.ownerClan]) {
+                    const targetHistory = this.game.aiOperationManager.historyOwnedCastles[target.ownerClan];
+                    // 相手の記憶にもこのお城がある（＝お互いに奪い合ったことがある）場合
+                    const isMutual = targetHistory.some(list => list.includes(target.id));
+                    if (isMutual) {
+                        prob -= 15; // お互いに過去、所持していた事のある拠点に対してスコアを減らします
+                    }
+                }
+            }
             
             // ★国や地方を統一するための執着ボーナス！
             // もしターゲットの城がある国が、自分が持っているけどまだ統一していない国だったら
