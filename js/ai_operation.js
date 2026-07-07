@@ -642,12 +642,40 @@ class AIOperationManager {
                 
                 // 点数がついたら、とりあえず候補の箱に入れておきます
                 if (decision && decision.score > 0) {
+                    let finalScore = decision.score;
+
+                    // ★ここから追加：大目標に合致する目標なら、スコアを大幅にアップ（ただし絶対ではない程度）
+                    const myGrandObj = (this.grandObjectives && this.grandObjectives[clanId] && this.grandObjectives[clanId][legionId]) 
+                                        ? this.grandObjectives[clanId][legionId] : null;
+
+                    if (myGrandObj) {
+                        let isTargetMatch = false;
+                        if (!decision.target.isKunishuTarget) {
+                            if (myGrandObj.type === '大名攻略' && decision.target.ownerClan === myGrandObj.targetClanId) {
+                                isTargetMatch = true;
+                            } else if (myGrandObj.type === '国攻略' && decision.target.provinceId === myGrandObj.targetProvId) {
+                                isTargetMatch = true;
+                            }
+                        } else {
+                            // 諸勢力の場合、お城の国（provinceId）で判定します
+                            if (myGrandObj.type === '国攻略' && myCastle.provinceId === myGrandObj.targetProvId) {
+                                isTargetMatch = true;
+                            }
+                        }
+
+                        if (isTargetMatch) {
+                            // 100%ではない絶妙なバランスでスコアを引き上げます（+40点）
+                            finalScore += 40;
+                        }
+                    }
+                    // ★ここまで追加
+
                     operationCandidates.push({
                         castleId: myCastle.id,
                         target: decision.target,
                         sendSoldiers: decision.sendSoldiers,
                         sendRice: decision.sendRice,
-                        score: decision.score
+                        score: finalScore
                     });
                 }
             }
