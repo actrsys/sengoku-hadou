@@ -678,6 +678,8 @@ class GameSystem {
         let unitPrice = basePrice / (1 + eff / 10);
         
         let hasProdCastle = false;
+        let hasVassalProdCastle = false; // ★追加：支配している勢力が産地を持っているか
+        const myClanId = daimyo ? daimyo.clan : (castellan ? castellan.clan : 0);
         
         if (daimyo && window.GameApp && window.GameApp.castles) {
             hasProdCastle = window.GameApp.castles.some(c => c.ownerClan === daimyo.clan && this.isProdCastle(c, itemType));
@@ -689,9 +691,29 @@ class GameSystem {
             hasProdCastle = [33, 42, 185, 186].includes(castellan.castleId);
         }
         
+        // ★追加：自分が産地を持っていなければ、支配している勢力が産地を持っているか探します
+        if (!hasProdCastle && myClanId > 0 && window.GameApp && window.GameApp.clans && window.GameApp.castles) {
+            const clans = window.GameApp.clans.filter(c => c.id !== 0 && c.id !== myClanId && !c.isDestroyed);
+            for (let otherClan of clans) {
+                const rel = window.GameApp.getRelation(myClanId, otherClan.id);
+                // 自分から見て相手を「支配」している場合
+                if (rel && rel.status === '支配') {
+                    // その支配勢力が産地を持っているかチェック
+                    const vassalHasProd = window.GameApp.castles.some(c => c.ownerClan === otherClan.id && this.isProdCastle(c, itemType));
+                    if (vassalHasProd) {
+                        hasVassalProdCastle = true;
+                        break; // 1つでも見つかればOK
+                    }
+                }
+            }
+        }
+        
         // 産地を持っていたら単価を半額にします！
         if (hasProdCastle) {
             unitPrice = unitPrice / 2;
+        } else if (hasVassalProdCastle) {
+            // ★追加：支配している勢力が産地を持っていたら単価を4分の3にします！
+            unitPrice = unitPrice * 0.75;
         }
         
         return unitPrice;
