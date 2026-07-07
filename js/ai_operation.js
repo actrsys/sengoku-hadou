@@ -102,7 +102,9 @@ class AIOperationManager {
 
                 // 不正が見つかったら、作戦を白紙に戻して安全に立て直させます
                 if (isInvalid) {
-                    console.warn(`【AI自己診断】大名家[${clanId}]軍団[${legionId}]の不正な作戦データ(${op ? op.type : '不明'})を検知したため、破棄しました。`);
+                    // ★変更：大名家名や軍団長名を取得して表示します
+                    const logInfo = this.getOperationLogInfo(clanId, legionId);
+                    console.warn(`【AI自己診断】${logInfo.clanName} (軍団長: ${logInfo.commanderName}) の不正な作戦データ(${op ? op.type : '不明'})を検知したため、破棄しました。`);
                     delete this.operations[clanId][legionId];
                 }
             }
@@ -742,7 +744,9 @@ class AIOperationManager {
                     maxTurns: duration,
                     status: '実行中'
                 };
-                console.log(`大名家[${clanId}]軍団[${legionId}]が【外交作戦】を立案しました！(隣接敵対: ${enemyCount}勢力, 期間: ${duration}ヶ月, 調略目標: ${sabotageTargets.length}件)`);
+                // ★変更：大名家名や軍団長名、大目標を取得してコンソールに出力します
+                const logInfo = this.getOperationLogInfo(clanId, legionId);
+                console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) が【外交作戦】を立案しました！(大目標: ${logInfo.grandObjStr}, 隣接敵対: ${enemyCount}勢力, 期間: ${duration}ヶ月, 調略目標: ${sabotageTargets.length}件)`);
                 return; // 外交作戦が決まったら、今回の作戦会議はこれでおしまいです
             }
         }
@@ -961,7 +965,20 @@ class AIOperationManager {
                 }
                 // ★ここまで追加
 
-                console.log(`大名家[${clanId}]軍団[${legionId}]が【攻撃作戦】を立案しました！(目標数: ${attackTargets.length}, 第一出撃元: ${firstTarget.stagingBase}, 準備: ${firstTarget.turnsRemaining}ヶ月)`);
+                // ★変更：大名家名や軍団長名、大目標、具体的な攻撃先や出撃元の名前を取得して出力します
+                const logInfo = this.getOperationLogInfo(clanId, legionId);
+                let targetName = "不明な目標";
+                if (firstTarget.isKunishuTarget) {
+                    const kunishu = this.game.kunishuSystem.getKunishu(firstTarget.targetId);
+                    targetName = kunishu ? kunishu.getName(this.game) : "不明な諸勢力";
+                } else {
+                    const tCastle = this.game.getCastle(firstTarget.targetId);
+                    targetName = tCastle ? tCastle.name : "不明な拠点";
+                }
+                const stagingCastle = this.game.getCastle(firstTarget.stagingBase);
+                const stagingName = stagingCastle ? stagingCastle.name : "不明な拠点";
+
+                console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) が ${targetName} への【攻撃作戦】を立案しました！(大目標: ${logInfo.grandObjStr}, 第一出撃元: ${stagingName}, 準備: ${firstTarget.turnsRemaining}ヶ月)`);
                 return;
             }
         }
@@ -984,16 +1001,20 @@ class AIOperationManager {
             maxTurns: 1,
             status: '準備中'
         };
-        console.log(`大名家[${clanId}]軍団[${legionId}]は今月、【内政作戦】を行います。(調略目標: ${sabotageTargets.length}件)`);
+        // ★変更：大名家名や軍団長名、大目標を取得して出力します
+        const logInfo = this.getOperationLogInfo(clanId, legionId);
+        console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) は今月、【内政作戦】を行います。(大目標: ${logInfo.grandObjStr}, 調略目標: ${sabotageTargets.length}件)`);
     }
 
     async updateOperation(clanId, legionId) {
         const op = this.operations[clanId][legionId];
+        // ★変更：大名家名や軍団長名、大目標を最初に取得しておきます
+        const logInfo = this.getOperationLogInfo(clanId, legionId);
 
         // 1. 期限切れのチェック
         op.maxTurns--;
         if (op.maxTurns <= 0) {
-            console.log(`大名家[${clanId}]軍団[${legionId}]の作戦【${op.type}】は期限切れで中止されました。`);
+            console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) の作戦【${op.type}】は期限切れで中止されました。(大目標: ${logInfo.grandObjStr})`);
             delete this.operations[clanId][legionId];
             await this.generateOperation(clanId, legionId);
             return;
@@ -1007,11 +1028,56 @@ class AIOperationManager {
             op.turnsRemaining--;
             if (op.turnsRemaining <= 0) {
                 op.status = '実行中';
-                console.log(`大名家[${clanId}]軍団[${legionId}]の作戦【${op.type}】の準備が完了し、実行フェーズに入りました！`);
+                console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) の作戦【${op.type}】の準備が完了し、実行フェーズに入りました！`);
             } else if (op.type === '攻撃') {
+                // ★追加：作戦の具体的な目標拠点や出撃元の名前を取得します
+                let targetName = "不明な目標";
+                if (op.isKunishuTarget) {
+                    const kunishu = this.game.kunishuSystem.getKunishu(op.targetId);
+                    targetName = kunishu ? kunishu.getName(this.game) : "不明な諸勢力";
+                } else {
+                    const tCastle = this.game.getCastle(op.targetId);
+                    targetName = tCastle ? tCastle.name : "不明な拠点";
+                }
+                const stagingCastle = this.game.getCastle(op.stagingBase);
+                const stagingName = stagingCastle ? stagingCastle.name : "不明な拠点";
+
                 // ★追加：まだ準備中の場合（カウントダウンが0より大きい時）にログを出します
-                console.log(`大名家[${clanId}]軍団[${legionId}]は【攻撃作戦】を準備中です。(出撃元: ${op.stagingBase}, 残り準備期間: ${op.turnsRemaining}ヶ月)`);
+                console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) は ${targetName} への【攻撃作戦】を準備中です。(大目標: ${logInfo.grandObjStr}, 出撃元: ${stagingName}, 残り準備期間: ${op.turnsRemaining}ヶ月)`);
             }
         }
     }
+    
+    // ★追加：コンソール表示用に大名家名、軍団長名、大目標をまとめて取得する魔法です！
+    getOperationLogInfo(clanId, legionId) {
+        const clan = this.game.clans.find(c => c.id === clanId);
+        const clanName = clan ? clan.name : "不明な大名家";
+
+        let commanderName = "不明";
+        if (legionId === 0) {
+            const daimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo);
+            commanderName = daimyo ? daimyo.name : "大名直轄";
+        } else {
+            const legion = this.game.legions ? this.game.legions.find(l => l.clanId === clanId && l.legionNo === legionId) : null;
+            if (legion && legion.commanderId) {
+                const commander = this.game.getBusho(legion.commanderId);
+                commanderName = commander ? commander.name : "不明";
+            }
+        }
+
+        let grandObjStr = "なし";
+        if (this.grandObjectives && this.grandObjectives[clanId] && this.grandObjectives[clanId][legionId]) {
+            const obj = this.grandObjectives[clanId][legionId];
+            if (obj.type === '大名攻略') {
+                const targetClan = this.game.clans.find(c => c.id === obj.targetClanId);
+                grandObjStr = targetClan ? `【${targetClan.name}の攻略】` : "【不明な大名の攻略】";
+            } else if (obj.type === '国攻略') {
+                const targetProv = this.game.provinces.find(p => p.id === obj.targetProvId);
+                grandObjStr = targetProv ? `【${targetProv.province}の統一】` : "【不明な国の攻略】";
+            }
+        }
+
+        return { clanName, commanderName, grandObjStr };
+    }
+    
 }
