@@ -524,6 +524,24 @@ class AIEngine {
         }
 
         // =========================================================================
+        // ★新規追加：過去の記憶から「奪われた拠点（失地）」を洗い出し、勢力ごとに数を数えます！
+        const pastOwnedSet = new Set();
+        if (this.game.aiOperationManager && this.game.aiOperationManager.historyOwnedCastles && this.game.aiOperationManager.historyOwnedCastles[myClanId]) {
+            const history = this.game.aiOperationManager.historyOwnedCastles[myClanId];
+            history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
+        }
+
+        // 過去に自分のもので、今は他の大名家に奪われている拠点をカウントします
+        const stolenCountsByClan = {};
+        pastOwnedSet.forEach(cid => {
+            const c = this.game.getCastle(cid);
+            if (c && c.ownerClan !== myClanId && c.ownerClan !== 0) {
+                stolenCountsByClan[c.ownerClan] = (stolenCountsByClan[c.ownerClan] || 0) + 1;
+            }
+        });
+        // =========================================================================
+
+        // =========================================================================
         // ★新規追加：周囲の敵対大名をすべて調べて、それぞれの警戒度を計算します！
 
         // ★ここから追加：自分が持っている「国」と「地方」が、統一されているか調べる魔法！
@@ -1116,6 +1134,18 @@ class AIEngine {
                 prob += 10; // 宿敵には容赦しません！
                 isNemesisDaimyo = true; // 上限を広げるための印をつけておきます
             }
+
+            // 6. ★追加：敵対勢力が自分の拠点を「２つ以上」奪っている場合の強い執着！
+            let isStolenTarget = false;
+            if (target.ownerClan !== 0 && stolenCountsByClan[target.ownerClan] >= 2) {
+                prob += 10; // 憎き相手への攻撃確率を底上げします！
+                
+                // さらに、その城自体が取り返すべき「元・自領」なら、全力で狙いに行きます！
+                if (pastOwnedSet.has(target.id)) {
+                    prob += 20; 
+                    isStolenTarget = true; // 上限を広げるための印をつけておきます
+                }
+            }
             
             // ★国や地方を統一するための執着ボーナス！
             // もしターゲットの城がある国が、自分が持っているけどまだ統一していない国だったら
@@ -1169,6 +1199,9 @@ class AIEngine {
             }
             if (jorakuTargets.has(target.id)) {
                 maxProb += 30; // 上洛ルートの場合は上限を大きく広げます！
+            }
+            if (isStolenTarget) {
+                maxProb += 20; // 失地回復の場合は、上限を大きく広げて目標に選ばれやすくします！
             }
             
             // 最大値の適用
