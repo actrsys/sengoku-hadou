@@ -248,6 +248,43 @@ class AIOperationManager {
                                     shouldCancel = true;
                                 }
                             }
+                        } else if (!shouldCancel && grandObj.type === '反攻作戦') {
+                            // ★今回追加：反攻作戦で、取り返す対象の拠点へ道が繋がっているか調べる魔法です
+                            const history = this.historyOwnedCastles[clan.id] || [];
+                            const pastOwnedSet = new Set();
+                            history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
+                            
+                            // 自分の軍団のお城リストと、大名家全体のお城のIDリストを用意します
+                            const myCastles = this.game.castles.filter(c => c.ownerClan === clan.id && c.legionId === legionId);
+                            const currentMyCastleIds = new Set(this.game.castles.filter(c => c.ownerClan === clan.id).map(c => c.id));
+                            
+                            let hasRoute = false;
+                            
+                            for (const cid of pastOwnedSet) {
+                                // 今は自分のものではない場合
+                                if (!currentMyCastleIds.has(cid)) {
+                                    const tgtC = this.game.getCastle(cid);
+                                    if (tgtC) {
+                                        const rel = this.game.getRelation(clan.id, tgtC.ownerClan);
+                                        // 友好勢力でなければ、取り返す拠点候補
+                                        if (!rel || !['同盟', '支配', '従属', '友好'].includes(rel.status)) {
+                                            // その拠点へ、自軍団のどのお城からか行けるかチェックします
+                                            for (const myC of myCastles) {
+                                                if (GameSystem.isReachable(this.game, myC, tgtC, clan.id)) {
+                                                    hasRoute = true;
+                                                    break;
+                                                }
+                                            }
+                                            if (hasRoute) break; // 1つでも行けるルートが見つかればOKです！
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // どの取り返す拠点へも道が繋がっていなければ、作戦を諦めて消去します
+                            if (!hasRoute) {
+                                shouldCancel = true;
+                            }
                         }
 
                         if (shouldCancel) {
