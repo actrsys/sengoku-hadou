@@ -646,14 +646,14 @@ class GameSystem {
         if (!c) return false;
         
         if (itemType === 'horse') {
-            // 日野江城(ID157)
-            if (c.id === 157) return true;
+            // 岩村城(4)、黒川城(61)、塩生城(62)、日野江城(157)、蠣崎城(191)、八戸城(193)、三戸城(194)、花輪館(196)、白石城(206)、三春城(211)、須賀川城(212)、杉目城(214)、二本松城(215)、猪苗代城(216)
+            if ([4, 61, 62, 157, 191, 193, 194, 196, 206, 211, 212, 214, 215, 216].includes(c.id)) return true;
             // 常陸国(ID15)、淡路国(ID36)、肥後国(ID61)、日向国(ID62)、薩摩国(ID63)、大隅国(ID64)、対馬国(ID68)
             if ([15, 36, 61, 62, 63, 64, 68].includes(c.provinceId)) return true; 
             if (window.GameApp && window.GameApp.provinces) {
                 const prov = window.GameApp.provinces.find(p => p.id === c.provinceId);
-                // 東北地方(ID1)、甲信地方(ID3)
-                if (prov && (prov.regionId === 1 || prov.regionId === 3)) return true;
+                // 甲信地方(ID3)
+                if (prov && prov.regionId === 3) return true;
             }
         } else if (itemType === 'gun') {
             // 石山御坊(ID33)、雑賀城(ID42)、赤尾木城(ID185)、今浜城(ID186)
