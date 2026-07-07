@@ -1670,6 +1670,9 @@ class AIEngine {
                 if (totalHorses >= totalSoldiers) horseScore = 0;
                 if (totalGuns >= totalSoldiers) gunScore = 0;
 
+                // ★追加：AIも1542年以前は鉄砲を買えないようにスコアを0にします！
+                if (this.game.year <= 1542) gunScore = 0;
+
                 if (gunScore >= 5) {
                     actions.push({ type: 'buy_gun', stat: 'politics', score: gunScore, cost: 500 });
                 }

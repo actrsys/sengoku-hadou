@@ -244,6 +244,9 @@ const CAN_EXECUTE_RULES = {
         return castle.gold >= cost;
     },
     canBuyGuns: (game, castle) => {
+        // ★追加：1542年以前は鉄砲伝来前なので買えません！
+        if (game.year <= 1542) return false;
+        
         const daimyo = game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
         const castellan = game.getBusho(castle.castellanId);
         const cost = GameSystem.calcBuyGunCost(1, daimyo, castellan);

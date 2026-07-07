@@ -674,7 +674,28 @@ class GameSystem {
     // 画面の相場表示に使う「小数点まで正確な1個の単価」を出す魔法
     static calcBuyEquipUnitPrice(daimyo, castellan, itemType) {
         const eff = this.calcBuyEquipEfficiency(daimyo, castellan, itemType);
-        const basePrice = itemType === 'horse' ? 2 : 5;
+        let basePrice = itemType === 'horse' ? 2 : 5;
+        
+        // ★ここから追加：鉄砲伝来による価格変動（1543年：50倍 → 1553年：40倍 → 1573年：1倍）
+        if (itemType === 'gun' && window.GameApp) {
+            const y = window.GameApp.year;
+            const m = window.GameApp.month;
+            if (y >= 1543 && y < 1553) {
+                // 10年間（120ヶ月）かけて50倍から40倍に緩やかに下がります
+                const monthsPassed = (y - 1543) * 12 + (m - 1);
+                basePrice *= (50.0 - (10.0 * (monthsPassed / 120)));
+            } else if (y >= 1553 && y < 1573) {
+                // 20年間（240ヶ月）かけて40倍から1倍にどんどん下がります
+                const monthsPassed = (y - 1553) * 12 + (m - 1);
+                basePrice *= (40.0 - (39.0 * (monthsPassed / 240)));
+            } else if (y <= 1542) {
+                // 1542年以前は買えませんが、念のためとんでもなく高い値段にしておきます
+                basePrice *= 9999; 
+            }
+            // 1573年以降は変動なし（1倍）のままになります
+        }
+        // ★ここまで追加
+
         let unitPrice = basePrice / (1 + eff / 10);
         
         let hasProdCastle = false;
@@ -708,12 +729,31 @@ class GameSystem {
             }
         }
         
-        // 産地を持っていたら単価を半額にします！
+        // ★ここから今回追加：産地による割引効果の計算
+        let prodDiscount = 0.5; // 自領産地の基本割引率（0.5 ＝ 50%オフ ＝ 単価1/2）
+        let vassalProdDiscount = 0.25; // 従属産地の基本割引率（0.25 ＝ 25%オフ ＝ 単価3/4）
+
+        if (itemType === 'gun' && window.GameApp) {
+            const y = window.GameApp.year;
+            const m = window.GameApp.month;
+            if (y >= 1543 && y < 1563) {
+                // 1543年〜1563年の20年間（240ヶ月）で、割引率が0.2（20%オフ＝単価4/5）から0.5（50%オフ＝単価1/2）へ徐々に増えます
+                const monthsPassed = (y - 1543) * 12 + (m - 1);
+                prodDiscount = 0.2 + (0.3 * (monthsPassed / 240));
+                // 従属勢力はその半分の恩恵とします（0.1 → 0.25 へ徐々に増える）
+                vassalProdDiscount = prodDiscount / 2;
+            } else if (y <= 1542) {
+                // 1542年以前はそもそも鉄砲がないので割引なし
+                prodDiscount = 0;
+                vassalProdDiscount = 0;
+            }
+        }
+
+        // 産地を持っていたら単価を割引します！
         if (hasProdCastle) {
-            unitPrice = unitPrice / 2;
+            unitPrice = unitPrice * (1.0 - prodDiscount);
         } else if (hasVassalProdCastle) {
-            // ★追加：支配している勢力が産地を持っていたら単価を4分の3にします！
-            unitPrice = unitPrice * 0.75;
+            unitPrice = unitPrice * (1.0 - vassalProdDiscount);
         }
         
         return unitPrice;
