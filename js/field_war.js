@@ -2753,11 +2753,11 @@ class FieldWarManager {
 
             let prob = 0;
             if (isDestroyed) {
-                // 兵士が0にされた（壊滅した）時は、基本5%
-                prob = 0.05;
+                // 兵士が0にされた（壊滅した）時は、基本3%
+                prob = 0.03;
             } else {
                 // 壊滅していない時は、攻撃してきた兵科によって変わります
-                if (attackerUnit.troopType === 'teppo') prob = 0.01; // 鉄砲は1%
+                if (attackerUnit.troopType === 'teppo') prob = 0.005; // 鉄砲は0.5%
                 else if (attackerUnit.troopType === 'kiba') prob = 0.0015; // 騎馬は0.15%
                 else if (attackerUnit.troopType === 'ashigaru') prob = 0.001; // 足軽は0.1%
             }
