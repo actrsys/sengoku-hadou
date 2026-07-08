@@ -2571,8 +2571,8 @@ class FieldWarManager {
         
         let atkWeaponMult = 1.0;
         if (attacker.troopType === 'kiba') {
-            if (atkToDefDiff === 0) atkWeaponMult = 1.3; // 正面から突撃
-            else if (atkToDefDiff === 1) atkWeaponMult = 1.2; // 前斜めから突撃
+            if (atkToDefDiff === 0) atkWeaponMult = 1.3; // 正面への突撃
+            else if (atkToDefDiff === 1) atkWeaponMult = 1.2; // 前斜めへの突撃
         } else if (attacker.troopType === 'teppo') {
             if (atkDist === 1) {
                 atkWeaponMult = 0.3; // 隣接時は威力が落ちる
