@@ -1049,15 +1049,11 @@ class FieldWarManager {
             let maxRange = 2;
             
             // 鉄砲と同じく、雨・雪の時は弓が使いにくいため遠距離不可（射程1）
+            // ★重要 足軽の弓射は鉄砲と違い、移動後でも攻撃可能とします
             if (this.weather === 'rain' || this.weather === 'snow') {
                 maxRange = 1;
             }
             
-            // 鉄砲と同じく、移動後は弓を構えられないため遠距離不可（射程1）
-            if (attacker.hasMoved && dist > 1) {
-                return false;
-            }
-
             if (dist > maxRange) return false; 
             if (!this.isFrontDirection(attacker.direction, targetDir)) return false; // 前方3方向のみ
             return true;
