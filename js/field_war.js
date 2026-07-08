@@ -2572,7 +2572,7 @@ class FieldWarManager {
         // 4. 兵科による攻撃力のボーナス計算
         let atkToDefDiff = Math.abs(attacker.direction - atkDirIndex);
         atkToDefDiff = Math.min(atkToDefDiff, 6 - atkToDefDiff);
-
+        
         let atkWeaponMult = 1.0;
         if (attacker.troopType === 'kiba') {
             if (atkToDefDiff === 0) atkWeaponMult = 1.3; // 正面から突撃
@@ -2588,15 +2588,7 @@ class FieldWarManager {
                     atkWeaponMult *= 0.5;
                 }
             }
-        } else if (attacker.troopType === 'ashigaru') {
-            // ★追加: 足軽の遠距離(弓射)の威力を調整します
-            if (atkDist > 1) {
-                atkWeaponMult = 0.2; // 攻撃力が5分の1になります
-                if (isNight) {
-                    atkWeaponMult *= 0.5; // 鉄砲と同じく夜は遠距離ダメージが半分になります
-                }
-            }
-        }
+        } 
         atkFinalAtk = atkFinalAtk * atkWeaponMult;
 
         // 5. 兵科による防御力のペナルティ計算（打たれ弱さ）
@@ -2620,11 +2612,19 @@ class FieldWarManager {
             terrainMult = (this.weather === 'rain' || this.weather === 'snow') ? 0.5 : 0.7;
         }
         defFinalDef = defFinalDef * terrainMult;
-
+        
         // 7. 与ダメージ計算
         let dmgRatio = (atkFinalAtk + defFinalDef) > 0 ? (atkFinalAtk / (atkFinalAtk + defFinalDef)) : 0;
         let dmgToDef = Math.floor(atkFinalAtk * dmgRatio);
         
+        // ★弓射では算出された最終ダメージを5分の1にカットします
+        if (attacker.troopType === 'ashigaru' && atkDist > 1) {
+            dmgToDef = Math.floor(dmgToDef * 0.2);
+            if (isNight) {
+                dmgToDef = Math.floor(dmgToDef * 0.5); // 夜はさらに半分
+            }
+        }
+
         // 8. 連携攻撃によるダメージアップ（サポート部隊1つにつき10%アップ）
         let supportCount = 0;
         // ★修正: 鉄砲、および足軽の遠距離(弓射)の場合は連携攻撃が発生しないようにします
