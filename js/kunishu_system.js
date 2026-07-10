@@ -227,14 +227,14 @@ class KunishuSystem {
                 // 小数点以下1桁まで残すためのおまじないです（例：1.2）
                 change = Math.round(change * 10) / 10;
                 
-                const currentRel = kunishu.getRelation(castle.ownerClan);
+                const currentRel = kunishu.getRelation(myCastle.ownerClan);
                 
                 // ★追加：友好度が70以上で、かつ減少しようとしている時は、減少をストップする魔法！
                 if (currentRel >= 70 && change < 0) {
                     change = 0;
                 }
                 
-                kunishu.setRelation(castle.ownerClan, currentRel + change);
+                kunishu.setRelation(myCastle.ownerClan, currentRel + change);
             }
         }
     }
