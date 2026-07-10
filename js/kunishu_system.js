@@ -70,8 +70,7 @@ class KunishuSystem {
             }
         });
     }
-    // ★追加ここまで！
-
+    
     getKunishu(id) {
         return this.kunishus.find(k => k.id === id);
     }
@@ -133,22 +132,22 @@ class KunishuSystem {
         const activeKunishus = this.getAliveKunishus();
         
         for (const kunishu of activeKunishus) {
-            // 1. 兵力と防御力の自動回復 (最大値の５％)
+            // 1. 兵力と防御力の自動回復 (最大値の２．５％)
             if (kunishu.soldiers < kunishu.maxSoldiers) {
-                kunishu.soldiers = Math.min(kunishu.maxSoldiers, kunishu.soldiers + Math.floor(kunishu.maxSoldiers * 0.05));
+                kunishu.soldiers = Math.min(kunishu.maxSoldiers, kunishu.soldiers + Math.floor(kunishu.maxSoldiers * 0.025));
             }
             if (kunishu.defense < kunishu.maxDefense) {
-                kunishu.defense = Math.min(kunishu.maxDefense, kunishu.defense + Math.floor(kunishu.maxDefense * 0.05));
+                kunishu.defense = Math.min(kunishu.maxDefense, kunishu.defense + Math.floor(kunishu.maxDefense * 0.025));
             }
-            // ★追加: 馬と鉄砲の自動回復（兵士と同じく最大値の５％）
+            // 馬と鉄砲の自動回復（兵士と同じく最大値の２．５％）
             if (kunishu.horses < kunishu.maxHorses) {
-                kunishu.horses = Math.min(kunishu.maxHorses, kunishu.horses + Math.floor(kunishu.maxHorses * 0.05));
+                kunishu.horses = Math.min(kunishu.maxHorses, kunishu.horses + Math.floor(kunishu.maxHorses * 0.025));
             }
             if (kunishu.guns < kunishu.maxGuns) {
-                kunishu.guns = Math.min(kunishu.maxGuns, kunishu.guns + Math.floor(kunishu.maxGuns * 0.05));
+                kunishu.guns = Math.min(kunishu.maxGuns, kunishu.guns + Math.floor(kunishu.maxGuns * 0.025));
             }
 
-            // ★今回追加: 訓練度と士気の自然変動（毎月1ずつデフォルト値に近づく）
+            // 訓練度と士気の自然変動（毎月1ずつデフォルト値に近づく）
             if (kunishu.training < kunishu.defaultTraining) {
                 kunishu.training += 1;
             } else if (kunishu.training > kunishu.defaultTraining) {
