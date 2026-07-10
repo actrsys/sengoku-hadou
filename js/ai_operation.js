@@ -920,22 +920,56 @@ class AIOperationManager {
                     prepTurns = Math.round(((ratio - 0.25) / 1.05) * 6);
                 }
                 
-                // ★雪国かどうかを判定して「越冬」の準備をします
+                // ★雪国かどうかを判定するための準備をします
                 // 陸奥、出羽、越後、越中、越前、加賀、能登、若狭、信濃、上野、下野、飛騨、佐渡、蝦夷
                 const snowProvs = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 28, 65, 67];
                 const myCastle = this.game.getCastle(cand.castleId);
                 const targetProvId = cand.target.isKunishuTarget ? myCastle.provinceId : cand.target.provinceId;
-                
                 const isSnowArea = snowProvs.includes(myCastle.provinceId) || snowProvs.includes(targetProvId);
                 
-                if (isSnowArea) {
-                    let execMonth = (this.game.month + prepTurns) % 12;
-                    if (execMonth === 0) execMonth = 12;
+                // ★ここから変更：「他の軍団との目標・タイミング被り」と「雪の期間」を両方チェックして調整する魔法！
+                let isAdjusting = true;
+                
+                // 調整が必要なくなる（isAdjusting が false になる）まで、何度も繰り返しチェックします
+                while (isAdjusting) {
+                    isAdjusting = false; // 一旦「調整は不要」としておきます
                     
-                    while (execMonth === 12 || execMonth === 1 || execMonth === 2) {
-                        prepTurns++;
-                        execMonth = (this.game.month + prepTurns) % 12;
+                    // 1. まず、雪の期間（12, 1, 2月）にぶつからないかチェックして、ぶつかるならズラします
+                    if (isSnowArea) {
+                        let execMonth = (this.game.month + prepTurns) % 12;
                         if (execMonth === 0) execMonth = 12;
+                        
+                        while (execMonth === 12 || execMonth === 1 || execMonth === 2) {
+                            prepTurns++; // 出撃を1ヶ月遅らせます
+                            execMonth = (this.game.month + prepTurns) % 12;
+                            if (execMonth === 0) execMonth = 12;
+                            
+                            // 月をズラしたので、他の軍団とタイミングが被ってしまったかもしれません。
+                            // もう一度チェックをやり直すために、調整中フラグを立てます。
+                            isAdjusting = true; 
+                        }
+                    }
+
+                    // 2. 次に、同じ大名家の「他の軍団」が、同じ目標に同じタイミングで攻めようとしていないかチェックします
+                    if (this.operations[clanId]) {
+                        for (const otherLegionIdStr in this.operations[clanId]) {
+                            const otherLegionId = Number(otherLegionIdStr);
+                            
+                            // 自分以外の軍団の作戦だけを見ます
+                            if (otherLegionId !== legionId) {
+                                const otherOp = this.operations[clanId][otherLegionId];
+                                
+                                // もし「攻撃」作戦で、目標が全く同じで、出撃するタイミング（残り準備期間）も同じだったら
+                                if (otherOp && otherOp.type === '攻撃' && otherOp.targetId === targetId && otherOp.isKunishuTarget === isKunishuTarget && otherOp.turnsRemaining === prepTurns) {
+                                    prepTurns++; // 渋滞を避けるために、出撃を1ヶ月遅らせます
+                                    
+                                    // 月をズラしたので、今度は雪の期間にぶつかってしまったかもしれません。
+                                    // もう一度雪のチェックからやり直すために、調整中フラグを立ててループを最初からやり直します。
+                                    isAdjusting = true; 
+                                    break; 
+                                }
+                            }
+                        }
                     }
                 }
                 
