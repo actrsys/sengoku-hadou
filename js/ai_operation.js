@@ -211,12 +211,20 @@ class AIOperationManager {
                                     }
                                 }
                             }
+                        } else if (grandObj.type === '国内平定') {
+                            // ★追加：国内平定の場合、自軍団の管轄内（自分の城）にいる敵対諸勢力の数を数えます
+                            const myCastles = this.game.castles.filter(c => c.ownerClan === clan.id && c.legionId === legionId);
+                            myCastles.forEach(myC => {
+                                // ★修正：商人は攻撃対象にならないので、ターゲットから除外します！
+                                const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(myC.id).filter(k => k.getRelation(clan.id) <= 30 && k.ideology !== '商人');
+                                currentTargetCount += kunishusInCastle.length;
+                            });
                         }
 
                         let shouldCancel = false;
 
                         // ターゲット拠点が0になったら達成として消去
-                        if (currentTargetCount === 0 && (grandObj.type === '大名攻略' || grandObj.type === '国攻略' || grandObj.type === '反攻作戦')) {
+                        if (currentTargetCount === 0 && (grandObj.type === '大名攻略' || grandObj.type === '国攻略' || grandObj.type === '反攻作戦' || grandObj.type === '国内平定')) {
                             shouldCancel = true;
                         }
 
@@ -757,6 +765,9 @@ class AIOperationManager {
                                 if (pastOwnedSet.has(decision.target.id)) {
                                     isTargetMatch = true;
                                 }
+                            } else if (myGrandObj.type === '国内平定') {
+                                // ★追加：国内平定が目標なら、諸勢力への攻撃はすべて対象！
+                                isTargetMatch = true;
                             }
                         }
 
@@ -1046,6 +1057,11 @@ class AIOperationManager {
                             }
                         }
 
+                        // ★追加：諸勢力への攻撃作戦になった場合は、「国内平定」を大目標に設定します！
+                        if (!objectiveType && firstTarget.isKunishuTarget) {
+                            objectiveType = '国内平定';
+                        }
+
                         // ★objectiveTypeがセットされている時だけ、大目標を記録します
                         if (objectiveType) {
                             let initialTargetCount = 0;
@@ -1078,6 +1094,14 @@ class AIOperationManager {
                                         }
                                     }
                                 }
+                            } else if (objectiveType === '国内平定') {
+                                // ★追加：初期ターゲット数として、自軍団内の敵対諸勢力の数をカウントします
+                                const myCastles = this.game.castles.filter(c => c.ownerClan === clanId && c.legionId === legionId);
+                                myCastles.forEach(myC => {
+                                    // ★修正：商人は攻撃対象にならないので、ターゲットから除外します！
+                                    const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(myC.id).filter(k => k.getRelation(clanId) <= 30 && k.ideology !== '商人');
+                                    initialTargetCount += kunishusInCastle.length;
+                                });
                             }
                             
                             const myCastleCount = this.game.castles.filter(c => c.ownerClan === clanId).length;
@@ -1206,6 +1230,9 @@ class AIOperationManager {
             } else if (obj.type === '反攻作戦') {
                 // ★今回追加：反攻作戦の時の表示です
                 grandObjStr = "【反攻作戦(失地回復)】";
+            } else if (obj.type === '国内平定') {
+                // ★追加：国内平定の時の表示です
+                grandObjStr = "【国内平定(諸勢力鎮圧)】";
             }
         }
 

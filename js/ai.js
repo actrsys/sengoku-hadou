@@ -408,6 +408,10 @@ class AIEngine {
         const myClanCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
         const myTotalPower = this.getClanPrestige(myClanId);
 
+        // ★追加：自分の軍団が抱えている「大目標」を調べます！
+        const myGrandObj = (this.game.aiOperationManager && this.game.aiOperationManager.grandObjectives && this.game.aiOperationManager.grandObjectives[myClanId] && this.game.aiOperationManager.grandObjectives[myClanId][myCastle.legionId]) 
+                            ? this.game.aiOperationManager.grandObjectives[myClanId][myCastle.legionId] : null;
+
         // =========================================================================
         // ★新規追加：上洛ルート検索（将軍候補がいる場合）
         const jorakuTargets = new Set();
@@ -736,8 +740,15 @@ class AIEngine {
                     prob += 15;
                 }
 
-                // 最大値の適用 (諸勢力相手は最大40)
-                prob = Math.min(prob, 40);
+                // ★追加：国内平定が大目標の時は、最優先で諸勢力を鎮圧します！
+                let maxProb = 40;
+                if (myGrandObj && myGrandObj.type === '国内平定') {
+                    prob += 40; 
+                    maxProb += 40; // 上限を広げて大名城より優先させます
+                }
+
+                // 最大値の適用 (諸勢力相手は通常最大40)
+                prob = Math.min(prob, maxProb);
 
                 if (prob > 0) prob = prob * 0.9;
                 prob = Math.max(0, prob);
