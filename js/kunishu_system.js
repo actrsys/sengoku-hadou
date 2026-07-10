@@ -175,16 +175,43 @@ class KunishuSystem {
         // 2. 城の所有者（大名）に対するアクション
         // ★変更：forEach をやめて、順番待ちができる for...of に変えます
         for (const kunishu of survivingKunishus) {
-            const castle = this.game.getCastle(kunishu.castleId);
-            if (!castle || castle.ownerClan === 0) continue; // ★変更：return を continue にします
+            const myCastle = this.game.getCastle(kunishu.castleId);
+            
+            // ★ここをごっそり変更：商人勢力の場合は、拠点支配にかかわらずアクションの判定をします！
+            if (kunishu.ideology === '商人') {
+                for (const targetClanId in kunishu.daimyoRelations) {
+                    const clanIdNum = Number(targetClanId);
+                    if (clanIdNum === 0) continue;
 
-            // 毎月末、最大10%の確率で発動
-            if (Math.random() < 0.10) {
-                await this.executeActionToLord(kunishu, castle); // ★追加：await を付けます
+                    const rel = kunishu.daimyoRelations[clanIdNum];
+                    // 友好度が70以上（献上してくれるライン）の場合のみ
+                    if (rel && rel.sentiment >= 70) {
+                        // その大名のいる「居城」を探して、そこにお届け物をします
+                        const daimyo = this.game.bushos.find(b => b.clan === clanIdNum && b.isDaimyo);
+                        if (daimyo && daimyo.castleId) {
+                            const targetCastle = this.game.getCastle(daimyo.castleId);
+                            // お城が見つかって、毎月10%の確率に当たったらアクション！
+                            if (targetCastle && Math.random() < 0.10) {
+                                await this.executeActionToLord(kunishu, targetCastle);
+                            }
+                        }
+                    }
+                }
+            } else {
+                // 商人以外の通常の諸勢力は、今まで通り「自分がいるお城の支配者」にだけアクションします
+                if (myCastle && myCastle.ownerClan !== 0) {
+                    // 毎月末、最大10%の確率で発動
+                    if (Math.random() < 0.10) {
+                        await this.executeActionToLord(kunishu, myCastle);
+                    }
+                }
             }
             
+            // もし自分のいる城が空き家（所有者なし）なら、自然変動は起きないので次の諸勢力へ
+            if (!myCastle || myCastle.ownerClan === 0) continue;
+            
             // 毎ターン、相性による友好度の自然変動
-            const castellan = this.game.getBusho(castle.castellanId);
+            const castellan = this.game.getBusho(myCastle.castellanId);
             // ★ここを変更：商人はビジネスライクなので、城主との相性で勝手に友好度が変動することはありません！
             if (castellan && kunishu.ideology !== '商人') {
                 const affinityDiff = this.calcIdeologyAffinity(kunishu, castellan);
@@ -544,7 +571,6 @@ class KunishuSystem {
                             const clanData = this.game.clans.find(c => c.id === targetClanId);
                             const clanName = clanData ? clanData.name : "";
                             
-                            // ★あや瀨さんが作成したテキストを適用します！
                             let targetStr = clanName + "に";
                             if (targetClanId === this.game.playerClanId) {
                                 targetStr = "当家に";
