@@ -605,6 +605,30 @@ class GameSystem {
     }
     
     // ==========================================
+    // ★追加：商人系諸勢力による割引率（お得度）を計算する魔法
+    // ==========================================
+    static getMerchantDiscount(clanId) {
+        if (!window.GameApp || !window.GameApp.kunishuSystem) return 0;
+        let maxDiscount = 0;
+        const kunishus = window.GameApp.kunishuSystem.getAliveKunishus();
+        
+        for (let k of kunishus) {
+            if (k.ideology === '商人') {
+                const rel = k.getRelation(clanId);
+                // 友好度60以上の時だけ割引してくれます
+                if (rel >= 60) {
+                    // 友好度4につき1%（0.01）割引します
+                    const discount = Math.floor((rel - 60) / 4) * 0.01;
+                    // 複数の商人と仲が良くても、一番高い割引率1つだけを適用します
+                    if (discount > maxDiscount) maxDiscount = discount;
+                }
+            }
+        }
+        // 最大でも10%（0.10）までにストップをかけます
+        return Math.min(0.10, maxDiscount); 
+    }
+    
+    // ==========================================
     // ★追加：徴兵時に民忠と人口を減らす処理を一元化する魔法
     // ==========================================
     static applyDraftPenalty(castle, soldiers) {
@@ -732,6 +756,7 @@ class GameSystem {
         // ★ここから今回追加：産地による割引効果の計算
         let prodDiscount = 0.5; // 自領産地の基本割引率（0.5 ＝ 50%オフ ＝ 単価1/2）
         let vassalProdDiscount = 0.25; // 従属産地の基本割引率（0.25 ＝ 25%オフ ＝ 単価3/4）
+        let baseDiscountRate = 1.0; // ★追加：年代による効果の出にくさを表す倍率
 
         if (itemType === 'gun' && window.GameApp) {
             const y = window.GameApp.year;
@@ -742,18 +767,56 @@ class GameSystem {
                 prodDiscount = 0.2 + (0.3 * (monthsPassed / 240));
                 // 従属勢力はその半分の恩恵とします（0.1 → 0.25 へ徐々に増える）
                 vassalProdDiscount = prodDiscount / 2;
+                // 本来の50%割引に対して、今どれくらいの倍率で効果が出ているかを計算します
+                baseDiscountRate = prodDiscount / 0.5;
             } else if (y <= 1542) {
                 // 1542年以前はそもそも鉄砲がないので割引なし
                 prodDiscount = 0;
                 vassalProdDiscount = 0;
+                baseDiscountRate = 0;
             }
         }
 
-        // 産地を持っていたら単価を割引します！
-        if (hasProdCastle) {
-            unitPrice = unitPrice * (1.0 - prodDiscount);
-        } else if (hasVassalProdCastle) {
-            unitPrice = unitPrice * (1.0 - vassalProdDiscount);
+        // ★追加：産地諸勢力による割引の計算
+        let kunishuProdDiscount = 0;
+        if (myClanId > 0 && window.GameApp && window.GameApp.kunishuSystem && window.GameApp.castles) {
+            const kunishus = window.GameApp.kunishuSystem.getAliveKunishus();
+            for (let k of kunishus) {
+                const castle = window.GameApp.castles.find(c => c.id === k.castleId);
+                // その諸勢力がいる城が、馬や鉄砲の産地かどうかチェック
+                if (this.isProdCastle(castle, itemType)) {
+                    const rel = k.getRelation(myClanId);
+                    if (rel >= 60) {
+                        // 友好度60以上の時、友好度2につき1%（0.01）割引します
+                        let discount = Math.floor((rel - 60) / 2) * 0.01;
+                        discount = Math.min(0.20, discount); // 最大20%まで
+                        // 鉄砲伝来初期などの「効果の出にくさ（年代減少）」を諸勢力にも適用します
+                        discount = discount * baseDiscountRate;
+                        
+                        if (discount > kunishuProdDiscount) {
+                            kunishuProdDiscount = discount;
+                        }
+                    }
+                }
+            }
+        }
+
+        // ★変更：自領、従属、諸勢力の中で一番「割引率の高いもの」を優先します！
+        let finalProdDiscount = 0;
+        if (hasProdCastle) finalProdDiscount = prodDiscount;
+        if (hasVassalProdCastle && vassalProdDiscount > finalProdDiscount) finalProdDiscount = vassalProdDiscount;
+        if (kunishuProdDiscount > finalProdDiscount) finalProdDiscount = kunishuProdDiscount;
+
+        // 産地割引を単価に適用します
+        unitPrice = unitPrice * (1.0 - finalProdDiscount);
+        
+        // ★追加：商人系諸勢力による割引の計算（産地割引とさらに重複します！）
+        if (myClanId > 0) {
+            const merchantDiscount = this.getMerchantDiscount(myClanId);
+            if (merchantDiscount > 0) {
+                // 商人と仲が良いと、さらに単価が安くなります！
+                unitPrice = unitPrice * (1.0 - merchantDiscount);
+            }
         }
         
         return unitPrice;
@@ -996,12 +1059,19 @@ class GameSystem {
     // ★追加：取引の「実際に可能な最大数」を計算する一元化窓口
     // ==========================================
     static calcMaxTradeAmount(type, castle, daimyo, castellan, provinces) {
+        // ★追加：商人割引を計算します
+        const myClanId = castle ? castle.ownerClan : 0;
+        const merchantDiscount = this.getMerchantDiscount(myClanId);
+
         if (type === 'buy_rice') {
             let rate = 1.0;
             if (castle && provinces) {
                 const province = provinces.find(p => p.id === castle.provinceId);
                 if (province && province.marketRate !== undefined) rate = province.marketRate;
             }
+            // ★追加：買う時は相場が安くなってお得になります！
+            rate = rate * (1.0 - merchantDiscount);
+            
             let maxBuy = Math.floor(castle.gold / rate);
             while (maxBuy > 0 && Math.ceil(maxBuy * rate) > castle.gold) {
                 maxBuy--;
@@ -1014,6 +1084,9 @@ class GameSystem {
                 const province = provinces.find(p => p.id === castle.provinceId);
                 if (province && province.marketRate !== undefined) rate = province.marketRate;
             }
+            // ★追加：売る時は相場が高くなってお得になります！
+            rate = rate * (1.0 + merchantDiscount);
+            
             const maxSellByGold = Math.floor((99999 - castle.gold) / rate);
             return Math.min(castle.rice, maxSellByGold, castle.tradeLimit || 0);
         }
@@ -1045,12 +1118,19 @@ class GameSystem {
     static calcTradeCostAndRate(type, amount, castle, daimyo, castellan, provinces) {
         let cost = 0;
         let rateStr = "0.0";
+        // ★追加：商人割引を計算します
+        const myClanId = castle ? castle.ownerClan : 0;
+        const merchantDiscount = this.getMerchantDiscount(myClanId);
+
         if (type === 'buy_rice') {
             let rate = 1.0;
             if (castle && provinces) {
                 const province = provinces.find(p => p.id === castle.provinceId);
                 if (province && province.marketRate !== undefined) rate = province.marketRate;
             }
+            // ★追加：買う時は相場が安くなってお得になります！
+            rate = rate * (1.0 - merchantDiscount);
+            
             cost = Math.ceil(amount * rate);
             rateStr = (10 * rate).toFixed(1);
         } else if (type === 'sell_rice') {
@@ -1059,6 +1139,9 @@ class GameSystem {
                 const province = provinces.find(p => p.id === castle.provinceId);
                 if (province && province.marketRate !== undefined) rate = province.marketRate;
             }
+            // ★追加：売る時は相場が高くなってお得になります！
+            rate = rate * (1.0 + merchantDiscount);
+            
             cost = Math.floor(amount * rate); // 売却の場合は利益
             rateStr = (10 * rate).toFixed(1);
         } else if (type === 'buy_ammo') {

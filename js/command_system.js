@@ -2353,9 +2353,17 @@ class CommandSystem {
             if (province && province.marketRate !== undefined) rate = province.marketRate;
         }
         
+        // ★追加：商人割引を呼び出します！
+        let merchantDiscount = 0;
+        if (typeof GameSystem.getMerchantDiscount === 'function') {
+            merchantDiscount = GameSystem.getMerchantDiscount(castle.ownerClan);
+        }
+
         if(type === 'buy_rice') {
+            // ★追加：買う時は相場が安くなってお得になります
+            const buyRate = rate * (1.0 - merchantDiscount);
             // ★修正：端数切り捨てだと無料で買える場合があるので、切り上げ（Math.ceil）にして最低1金はかかるようにします！
-            const cost = Math.max(1, Math.ceil(amount * rate));
+            const cost = Math.max(1, Math.ceil(amount * buyRate));
             if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
             // ★追加: 買うと上限を超えるならストップ
             if(castle.rice + amount > 99999) { this.game.ui.showDialog("これ以上兵糧は買えません", false); return; }
@@ -2364,8 +2372,10 @@ class CommandSystem {
             castle.tradeLimit -= amount;
             this.game.ui.showResultModal(`兵糧${amount}を購入しました\n(金-${cost})`); 
         } else if (type === 'sell_rice') { 
+            // ★追加：売る時は相場が高くなってお得になります
+            const sellRate = rate * (1.0 + merchantDiscount);
             if(castle.rice < amount) { this.game.ui.showDialog("兵糧不足", false); return; } 
-            const gain = Math.floor(amount * rate); 
+            const gain = Math.floor(amount * sellRate); 
             // ★追加: 売ると金が上限を超えるならストップ
             if(castle.gold + gain > 99999) { this.game.ui.showDialog("これ以上兵糧は売れません", false); return; }
             if(amount > (castle.tradeLimit || 0)) { this.game.ui.showDialog("取引上限を超えています", false); return; }
