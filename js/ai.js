@@ -2158,7 +2158,7 @@ class AIEngine {
                 }
             }
             
-            // ★追加 11. 登用（浪人がいる場合、やや優先度を上げる）
+            // ★11. 登用（浪人がいる場合、やや優先度を上げる）
             const ronins = this.game.getCastleBushos(castle.id).filter(b => b.status === 'ronin');
             if (ronins.length > 0) {
                 // 優先度をやや上げて15点にします（上げすぎず、ちょっとすぎないバランス）
@@ -2166,13 +2166,17 @@ class AIEngine {
             }
 
             // ★追加: 領内の諸勢力への親善（友好度90未満の場合に検討）
-            // ★さらに追加：城が「委任」されていない（直轄）時だけ、親善を考えます！
+            // ★城が「委任」されている時だけ、親善を考えます！
             if (!castle.isDelegated) {
+                // ★大目標が「国内平定」かどうかを確認する準備をします
+                const myGrandObj = (this.game.aiOperationManager && this.game.aiOperationManager.grandObjectives && this.game.aiOperationManager.grandObjectives[castle.ownerClan] && this.game.aiOperationManager.grandObjectives[castle.ownerClan][castle.legionId]) 
+                                    ? this.game.aiOperationManager.grandObjectives[castle.ownerClan][castle.legionId] : null;
+
                 const myKunishus = this.game.kunishuSystem.getKunishusInCastle(castle.id).filter(k => k.getRelation(castle.ownerClan) < 90);
                 myKunishus.forEach(k => {
                     const relation = k.getRelation(castle.ownerClan);
                     
-                    // ★修正: 友好度0で最大40点、90で0点になるように計算します
+                    // ★友好度0で最大40点、90で0点になるように計算します
                     let score = Math.floor(40 * (90 - relation) / 90);
                     
                     // ★ここから追加：城主と諸勢力の頭領の「相性」を比べて、仲が悪いほど親善をやりにくくする魔法！
@@ -2188,8 +2192,13 @@ class AIEngine {
                         // 4. スコアから引きます（マイナスにならないように、最低でも0にします）
                         score = Math.max(0, score - penalty);
                     }
+
+                    // ★大目標が「国内平定」の時は、親善の優先度を少しだけ（15点）アップさせます！
+                    if (myGrandObj && myGrandObj.type === '国内平定') {
+                        score += 15;
+                    }
                     
-                    // ★追加：お城の資金が「1000」未満で余裕がない時は、自分の生活を優先して親善の優先度を大幅に下げます！
+                    // ★お城の資金が「1000」未満で余裕がない時は、自分の生活を優先して親善の優先度を大幅に下げます！
                     if (availableGold < 1000) {
                         score = Math.floor(score / 4); // スコアを4分の1にします
                     }
@@ -2201,9 +2210,9 @@ class AIEngine {
                 });
             }
 
-            // ★追加 12. 褒美（承認欲求がたまっている、または忠誠度が低い武将がいる場合）
+            // ★12. 褒美（承認欲求がたまっている、または忠誠度が低い武将がいる場合）
             let rewardTargets = [];
-            // ★追加：選ばれた人の中で「一番低い忠誠度」を覚えておく箱です！
+            // ★選ばれた人の中で「一番低い忠誠度」を覚えておく箱です！
             let minLoyaltyForReward = 100;
             
             const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && b.status === 'active');
@@ -2267,7 +2276,7 @@ class AIEngine {
                 actions.push({ type: 'reward', stat: 'none', score: rewardScore, cost: 100, targets: rewardTargets });
             }
             
-            // ★追加 13. 調略（スコアは一律低めに設定）
+            // ★13. 調略（スコアは一律低めに設定）
             // 作戦（myOp）で決められた「調略目標（sabotageTargets）」に対して工作を行います！
             if (myOp && myOp.sabotageTargets && myOp.sabotageTargets.length > 0) {
                 // 第一目標から順番にチェックして、有効な目標が見つかるまで繰り上げます
