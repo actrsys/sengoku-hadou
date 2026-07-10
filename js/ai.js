@@ -408,7 +408,7 @@ class AIEngine {
         const myClanCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
         const myTotalPower = this.getClanPrestige(myClanId);
 
-        // ★追加：自分の軍団が抱えている「大目標」を調べます！
+        // ★追加：自分の軍団が抱えている「方針」を調べます！
         const myGrandObj = (this.game.aiOperationManager && this.game.aiOperationManager.grandObjectives && this.game.aiOperationManager.grandObjectives[myClanId] && this.game.aiOperationManager.grandObjectives[myClanId][myCastle.legionId]) 
                             ? this.game.aiOperationManager.grandObjectives[myClanId][myCastle.legionId] : null;
 
@@ -740,7 +740,7 @@ class AIEngine {
                     prob += 15;
                 }
 
-                // ★追加：国内平定が大目標の時は、最優先で諸勢力を鎮圧します！
+                // ★追加：国内平定が方針の時は、最優先で諸勢力を鎮圧します！
                 let maxProb = 40;
                 if (myGrandObj && myGrandObj.type === '国内平定') {
                     prob += 40; 
@@ -2165,10 +2165,10 @@ class AIEngine {
                 actions.push({ type: 'employ', stat: 'charm', score: 15, cost: 0, targetRonin: ronins[0] });
             }
 
-            // ★追加: 領内の諸勢力への親善（友好度90未満の場合に検討）
+            // ★領内の諸勢力への親善（友好度90未満の場合に検討）
             // ★プレイヤー勢力は（直轄・委任に関わらず）絶対に勝手に親善を行わず、敵AIのみ実行するようにします！
             if (Number(castle.ownerClan) !== Number(this.game.playerClanId)) {
-                // ★大目標が「国内平定」かどうかを確認する準備をします
+                // ★方針が「国内平定」かどうかを確認する準備をします
                 const myGrandObj = (this.game.aiOperationManager && this.game.aiOperationManager.grandObjectives && this.game.aiOperationManager.grandObjectives[castle.ownerClan] && this.game.aiOperationManager.grandObjectives[castle.ownerClan][castle.legionId]) 
                                     ? this.game.aiOperationManager.grandObjectives[castle.ownerClan][castle.legionId] : null;
 
@@ -2193,7 +2193,7 @@ class AIEngine {
                         score = Math.max(0, score - penalty);
                     }
 
-                    // ★大目標が「国内平定」の時は、親善の優先度を少しだけ（15点）アップさせます！
+                    // ★方針が「国内平定」の時は、親善の優先度を少しだけ（15点）アップさせます！
                     if (myGrandObj && myGrandObj.type === '国内平定') {
                         score += 15;
                     }

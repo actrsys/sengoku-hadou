@@ -9,7 +9,7 @@ class AIOperationManager {
         this.operations = {};
         // ★追加：徴兵用のお城を記憶しておく箱です
         this.draftBases = {}; 
-        // ★追加：各大名の各軍団に作戦の大目標を持たせるための箱です
+        // ★追加：各大名の各軍団に作戦の方針を持たせるための箱です
         this.grandObjectives = {};
         // ★今回追加：各大名家の過去60ヶ月分の所持拠点を記憶する箱です
         this.historyOwnedCastles = {};
@@ -19,7 +19,7 @@ class AIOperationManager {
         return {
             operations: this.operations,
             draftBases: this.draftBases, // ★追加：セーブデータに残します
-            grandObjectives: this.grandObjectives, // ★追加：大目標もセーブに残します
+            grandObjectives: this.grandObjectives, // ★追加：方針もセーブに残します
             historyOwnedCastles: this.historyOwnedCastles // ★今回追加：過去の所持拠点もセーブに残します
         };
     }
@@ -48,7 +48,7 @@ class AIOperationManager {
                     }
                 }
             }
-            // ★追加：大目標の復元
+            // ★追加：方針の復元
             if (data.grandObjectives) {
                 this.grandObjectives = data.grandObjectives;
             }
@@ -165,7 +165,7 @@ class AIOperationManager {
                 // ★追加：プレイヤー大名家で、かつ直轄（ID0）の場合は、勝手に作戦を立てないようにスキップします！
                 if (isPlayerClan && legionId === 0) continue;
 
-                // ★ここから追加：大目標のカウントと成果チェック
+                // ★ここから追加：方針のカウントと成果チェック
                 if (!this.grandObjectives) this.grandObjectives = {};
                 if (!this.grandObjectives[clan.id]) this.grandObjectives[clan.id] = {};
                 
@@ -173,7 +173,7 @@ class AIOperationManager {
                 if (grandObj) {
                     const currentMyCastleCount = this.game.castles.filter(c => c.ownerClan === clan.id).length;
                     
-                    // 前月よりも自拠点の数が減っていたら大目標を消去して再考
+                    // 前月よりも自拠点の数が減っていたら方針を消去して再考
                     if (currentMyCastleCount < grandObj.prevMyCastleCount) {
                         delete this.grandObjectives[clan.id][legionId];
                     } else {
@@ -733,7 +733,7 @@ class AIOperationManager {
                 if (decision && decision.score > 0) {
                     let finalScore = decision.score;
 
-                    // ★ここから追加：大目標に合致する目標なら、スコアを大幅にアップ（ただし絶対ではない程度）
+                    // ★ここから追加：方針に合致する目標なら、スコアを大幅にアップ（ただし絶対ではない程度）
                     const myGrandObj = (this.grandObjectives && this.grandObjectives[clanId] && this.grandObjectives[clanId][legionId]) 
                                         ? this.grandObjectives[clanId][legionId] : null;
 
@@ -849,9 +849,9 @@ class AIOperationManager {
                     maxTurns: duration,
                     status: '実行中'
                 };
-                // ★変更：大名家名や軍団長名、大目標を取得してコンソールに出力します
+                // ★変更：大名家名や軍団長名、方針を取得してコンソールに出力します
                 const logInfo = this.getOperationLogInfo(clanId, legionId);
-                console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) が【外交作戦】を立案しました！(大目標: ${logInfo.grandObjStr}, 隣接敵対: ${enemyCount}勢力, 期間: ${duration}ヶ月, 調略目標: ${sabotageTargets.length}件)`);
+                console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) が【外交作戦】を立案しました！(方針: ${logInfo.grandObjStr}, 隣接敵対: ${enemyCount}勢力, 期間: ${duration}ヶ月, 調略目標: ${sabotageTargets.length}件)`);
                 return; // 外交作戦が決まったら、今回の作戦会議はこれでおしまいです
             }
         }
@@ -1002,11 +1002,11 @@ class AIOperationManager {
                     sabotageTargets: sabotageTargets
                 };
 
-                // ★ここから追加：攻撃作戦が決まった時に、大目標を決定します！
+                // ★ここから追加：攻撃作戦が決まった時に、方針を決定します！
                 if (!this.grandObjectives) this.grandObjectives = {};
                 if (!this.grandObjectives[clanId]) this.grandObjectives[clanId] = {};
                 
-                // ★今回追加：すでに大目標が存在している場合は、上書きせずにそのまま維持します！
+                // ★今回追加：すでに方針が存在している場合は、上書きせずにそのまま維持します！
                 if (!this.grandObjectives[clanId][legionId]) {
                     const targetCastle = this.game.getCastle(firstTarget.targetId);
                     if (targetCastle) {
@@ -1057,12 +1057,12 @@ class AIOperationManager {
                             }
                         }
 
-                        // ★追加：諸勢力への攻撃作戦になった場合は、「国内平定」を大目標に設定します！
+                        // ★追加：諸勢力への攻撃作戦になった場合は、「国内平定」を方針に設定します！
                         if (!objectiveType && firstTarget.isKunishuTarget) {
                             objectiveType = '国内平定';
                         }
 
-                        // ★objectiveTypeがセットされている時だけ、大目標を記録します
+                        // ★objectiveTypeがセットされている時だけ、方針を記録します
                         if (objectiveType) {
                             let initialTargetCount = 0;
                             if (objectiveType === '大名攻略') {
@@ -1118,7 +1118,7 @@ class AIOperationManager {
                     }
                 }
                 
-                // ★変更：大名家名や軍団長名、大目標、具体的な攻撃先や出撃元の名前を取得して出力します
+                // ★変更：大名家名や軍団長名、方針、具体的な攻撃先や出撃元の名前を取得して出力します
                 const logInfo = this.getOperationLogInfo(clanId, legionId);
                 let targetName = "不明な目標";
                 if (firstTarget.isKunishuTarget) {
@@ -1131,7 +1131,7 @@ class AIOperationManager {
                 const stagingCastle = this.game.getCastle(firstTarget.stagingBase);
                 const stagingName = stagingCastle ? stagingCastle.name : "不明な拠点";
 
-                console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) が ${targetName} への【攻撃作戦】を立案しました！(大目標: ${logInfo.grandObjStr}, 第一出撃元: ${stagingName}, 準備: ${firstTarget.turnsRemaining}ヶ月)`);
+                console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) が ${targetName} への【攻撃作戦】を立案しました！(方針: ${logInfo.grandObjStr}, 第一出撃元: ${stagingName}, 準備: ${firstTarget.turnsRemaining}ヶ月)`);
                 return;
             }
         }
@@ -1154,20 +1154,20 @@ class AIOperationManager {
             maxTurns: 1,
             status: '準備中'
         };
-        // ★変更：大名家名や軍団長名、大目標を取得して出力します
+        // ★変更：大名家名や軍団長名、方針を取得して出力します
         const logInfo = this.getOperationLogInfo(clanId, legionId);
-        console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) は今月、【内政作戦】を行います。(大目標: ${logInfo.grandObjStr}, 調略目標: ${sabotageTargets.length}件)`);
+        console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) は今月、【内政作戦】を行います。(方針: ${logInfo.grandObjStr}, 調略目標: ${sabotageTargets.length}件)`);
     }
 
     async updateOperation(clanId, legionId) {
         const op = this.operations[clanId][legionId];
-        // ★変更：大名家名や軍団長名、大目標を最初に取得しておきます
+        // ★変更：大名家名や軍団長名、方針を最初に取得しておきます
         const logInfo = this.getOperationLogInfo(clanId, legionId);
 
         // 1. 期限切れのチェック
         op.maxTurns--;
         if (op.maxTurns <= 0) {
-            console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) の作戦【${op.type}】は期限切れで中止されました。(大目標: ${logInfo.grandObjStr})`);
+            console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) の作戦【${op.type}】は期限切れで中止されました。(方針: ${logInfo.grandObjStr})`);
             delete this.operations[clanId][legionId];
             await this.generateOperation(clanId, legionId);
             return;
@@ -1196,12 +1196,12 @@ class AIOperationManager {
                 const stagingName = stagingCastle ? stagingCastle.name : "不明な拠点";
 
                 // ★追加：まだ準備中の場合（カウントダウンが0より大きい時）にログを出します
-                console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) は ${targetName} への【攻撃作戦】を準備中です。(大目標: ${logInfo.grandObjStr}, 出撃元: ${stagingName}, 残り準備期間: ${op.turnsRemaining}ヶ月)`);
+                console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) は ${targetName} への【攻撃作戦】を準備中です。(方針: ${logInfo.grandObjStr}, 出撃元: ${stagingName}, 残り準備期間: ${op.turnsRemaining}ヶ月)`);
             }
         }
     }
     
-    // ★追加：コンソール表示用に大名家名、軍団長名、大目標をまとめて取得する魔法です！
+    // ★追加：コンソール表示用に大名家名、軍団長名、方針をまとめて取得する魔法です！
     getOperationLogInfo(clanId, legionId) {
         const clan = this.game.clans.find(c => c.id === clanId);
         const clanName = clan ? clan.name : "不明な大名家";
