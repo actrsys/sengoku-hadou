@@ -710,18 +710,25 @@ class AIOperationManager {
             });
 
             // 諸勢力も敵のリストに入れます
+            // ★繋がっている自領のお城すべてにいる諸勢力を探します！
             if (!myCastle.isDelegated) {
-                const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(myCastle.id).filter(k => k.getRelation(clanId) <= 30);
-                kunishusInCastle.forEach(k => {
-                    validEnemies.push({
-                        isKunishuTarget: true,
-                        kunishu: k,
-                        id: myCastle.id, // お城のID
-                        ownerClan: -1,
-                        soldiers: k.soldiers,
-                        defense: k.defense,
-                        name: k.getName(this.game)
-                    });
+                visited.forEach(visitedCastleId => {
+                    const vCastle = this.game.getCastle(visitedCastleId);
+                    if (vCastle) {
+                        const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(vCastle.id).filter(k => k.getRelation(clanId) <= 30);
+                        kunishusInCastle.forEach(k => {
+                            validEnemies.push({
+                                isKunishuTarget: true,
+                                kunishu: k,
+                                id: vCastle.id, // ★その諸勢力がいるお城のID
+                                ownerClan: -1,
+                                soldiers: k.soldiers,
+                                defense: k.defense,
+                                name: k.getName(this.game),
+                                provinceId: vCastle.provinceId // ★追加：AIの雪判定などで使うために国のIDも入れます
+                            });
+                        });
+                    }
                 });
             }
 
@@ -924,7 +931,7 @@ class AIOperationManager {
                 // 陸奥、出羽、越後、越中、越前、加賀、能登、若狭、信濃、上野、下野、飛騨、佐渡、蝦夷
                 const snowProvs = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 28, 65, 67];
                 const myCastle = this.game.getCastle(cand.castleId);
-                const targetProvId = cand.target.isKunishuTarget ? myCastle.provinceId : cand.target.provinceId;
+                const targetProvId = cand.target.provinceId; // ★諸勢力も別のお城にいる可能性があるので、ターゲットの国のIDをそのまま使います
                 const isSnowArea = snowProvs.includes(myCastle.provinceId) || snowProvs.includes(targetProvId);
                 
                 // ★ここから変更：「他の軍団との目標・タイミング被り」と「雪の期間」を両方チェックして調整する魔法！

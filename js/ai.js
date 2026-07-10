@@ -114,21 +114,24 @@ class AIEngine {
                     // ★追加：出陣する前に、道が繋がっているか、まだ「敵」かどうかの最終チェックをします！
                     let canReach = false;
                     let isStillEnemy = false; // ★追加：まだ敵のままかどうかの印です
-                    let targetProvId = castle.provinceId; // 諸勢力なら同じ国
+                    let targetProvId = castle.provinceId; // ★この時点では出撃元の国を仮置きしておきます
                     
                     if (myOperation.isKunishuTarget) {
-                        // 諸勢力は自分のお城のすぐそばなので、道はいつでも繋がっています！
-                        canReach = true;
-                        
                         if (myOperation.isEventOperation) {
+                            canReach = true;
                             isStillEnemy = true;
                         } else {
                             // 諸勢力がまだ生きているか、仲良しになっていないか（友好度30以下）をチェックします
                             const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
                             if (targetKunishu && !targetKunishu.isDestroyed && targetKunishu.getRelation(castle.ownerClan) <= 30) {
-                                // ★追加：その諸勢力が、今もこのお城（出撃する自分の城）にいるか確認します！
-                                if (targetKunishu.castleId === castle.id) {
-                                    isStillEnemy = true;
+                                isStillEnemy = true;
+                                
+                                // ★追加：ターゲットの諸勢力がいるお城のデータを探して、道が繋がっているか確認します！
+                                const targetCastle = this.game.getCastle(targetKunishu.castleId);
+                                if (targetCastle) {
+                                    targetProvId = targetCastle.provinceId; // 目的地のお城の国をセットします
+                                    // 自領の別のお城にいるかもしれないので、道が繋がっているか確認します
+                                    canReach = GameSystem.isReachable(this.game, castle, targetCastle, castle.ownerClan);
                                 }
                             }
                         }
@@ -671,12 +674,8 @@ class AIEngine {
 
         enemies.forEach(target => {
             // ★目的地が大雪か調べます！
-            let isTgtHeavySnow = false;
-            if (target.isKunishuTarget) {
-                isTgtHeavySnow = isSrcHeavySnow; // 諸勢力は自分の城の周辺なので同じ天気です
-            } else {
-                isTgtHeavySnow = heavySnowProvIds.has(target.provinceId);
-            }
+            // ★諸勢力も自領の別のお城にいるかもしれないので、ターゲットの国の天気を見ます
+            const isTgtHeavySnow = heavySnowProvIds.has(target.provinceId);
 
             // ★大雪の時は、絶対にこの目標を攻めません（次の目標の計算へスキップします）
             if (isSrcHeavySnow || isTgtHeavySnow) {
