@@ -773,7 +773,7 @@ class KunishuSystem {
         // ==========================================
         // ★蜂起(executeUprising)と同じように、startWarに合流させます！
         // ==========================================
-        let isWarReallyFinconst currentRel = kunishu.getRelation(castle.ownerClan);ished = false;
+        let isWarReallyFinished = false;
         const originalCloseWar = this.game.warManager.closeWar;
         
         // closeWarが呼ばれたら、終わったよと報告させます
