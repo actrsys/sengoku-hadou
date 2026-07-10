@@ -721,6 +721,9 @@ class AIEngine {
                 const relVal = kunishu.getRelation(myCastle.ownerClan);
                 prob += (30 - relVal); // 最大+30
 
+                // ★追加：諸勢力は関係30以下で攻撃対象になるため、「敵対している」ことへの基本ボーナスをあげます！
+                prob += 15;
+
                 // 性格補正
                 const getPersonalityBonus = (p) => {
                     if (p === 'aggressive') return 5;
@@ -735,19 +738,34 @@ class AIEngine {
                 const diffMulti = diff === 'hard' ? 1.2 : diff === 'easy' ? 0.7 : 1.0;
                 prob *= diffMulti;
 
-                // ★追加：過去に自領を攻撃してきた諸勢力への反撃！
+                // ★過去に自領を攻撃してきた諸勢力への反撃！
                 if (pastAttackerKunishus.has(kunishu.id)) {
                     prob += 15;
                 }
 
-                // ★追加：国内平定が方針の時は、最優先で諸勢力を鎮圧します！
-                let maxProb = 40;
+                // ★自領内にいる敵対諸勢力（関係30以下で商人以外）の数を数えて、
+                // その数 × 5点 分だけスコアを上乗せします！
+                let totalHostileKunishus = 0;
+                myClanCastles.forEach(c => {
+                    const ks = this.game.kunishuSystem.getKunishusInCastle(c.id);
+                    if (ks) {
+                        ks.forEach(k => {
+                            if (k.getRelation(myClanId) <= 30 && k.ideology !== '商人') {
+                                totalHostileKunishus++;
+                            }
+                        });
+                    }
+                });
+                prob += (totalHostileKunishus * 5); // 領内に敵対している諸勢力が多いほど優先度が上がります
+
+                // ★国内平定が方針の時は、最優先で諸勢力を鎮圧します！
+                let maxProb = 55;
                 if (myGrandObj && myGrandObj.type === '国内平定') {
                     prob += 40; 
-                    maxProb += 40; // 上限を広げて大名城より優先させます
+                    maxProb += 40;
                 }
 
-                // 最大値の適用 (諸勢力相手は通常最大40)
+                // 最大値の適用 (諸勢力相手は通常最大55)
                 prob = Math.min(prob, maxProb);
 
                 if (prob > 0) prob = prob * 0.9;
