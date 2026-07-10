@@ -2166,8 +2166,8 @@ class AIEngine {
             }
 
             // ★追加: 領内の諸勢力への親善（友好度90未満の場合に検討）
-            // ★城が「委任」されている時だけ、親善を考えます！
-            if (!castle.isDelegated) {
+            // ★プレイヤー勢力は（直轄・委任に関わらず）絶対に勝手に親善を行わず、敵AIのみ実行するようにします！
+            if (Number(castle.ownerClan) !== Number(this.game.playerClanId)) {
                 // ★大目標が「国内平定」かどうかを確認する準備をします
                 const myGrandObj = (this.game.aiOperationManager && this.game.aiOperationManager.grandObjectives && this.game.aiOperationManager.grandObjectives[castle.ownerClan] && this.game.aiOperationManager.grandObjectives[castle.ownerClan][castle.legionId]) 
                                     ? this.game.aiOperationManager.grandObjectives[castle.ownerClan][castle.legionId] : null;
