@@ -227,14 +227,14 @@ class KunishuSystem {
                 // 小数点以下1桁まで残すためのおまじないです（例：1.2）
                 change = Math.round(change * 10) / 10;
                 
-                const currentRel = kunishu.getRelation(myCastle.ownerClan);
+                const currentRel = kunishu.getRelation(castle.ownerClan);
                 
                 // ★追加：友好度が70以上で、かつ減少しようとしている時は、減少をストップする魔法！
                 if (currentRel >= 70 && change < 0) {
                     change = 0;
                 }
                 
-                kunishu.setRelation(myCastle.ownerClan, currentRel + change);
+                kunishu.setRelation(castle.ownerClan, currentRel + change);
             }
         }
     }
@@ -763,29 +763,6 @@ class KunishuSystem {
         
         // startWarの中で減らす処理が行われるため、ここで兵士や物資を減らす手動処理を消去しました（二重減り防止）
 
-        // 諸勢力側の準備（一時的なダミーの城と軍団を作ります）
-        const kunishuName = kunishu.getName(this.game);
-        const leader = this.game.getBusho(kunishu.leaderId);
-        // この戦い限定の「守備側データ」を作成
-        const dummyDefender = {
-            id: targetCastleId,
-            name: kunishuName, 
-            ownerClan: -1,
-            soldiers: kunishu.soldiers,
-            defense: kunishu.defense,
-            maxDefense: kunishu.maxDefense,
-            training: kunishu.training, 
-            morale: kunishu.morale,     
-            horses: kunishu.horses || 0, // ★追加：防衛側の軍馬
-            guns: kunishu.guns || 0,     // ★追加：防衛側の鉄砲
-            rice: Math.floor(kunishu.soldiers * 1.5), 
-            isKunishu: true,
-            kunishuId: kunishu.id,
-            peoplesLoyalty: 100, 
-            population: 1000,
-            samuraiIds: [] 
-        };
-
         let currentRel = kunishu.getRelation(atkCastle.ownerClan);
         let nextRel = currentRel;
         if (currentRel >= 60) nextRel = 30;
@@ -794,7 +771,7 @@ class KunishuSystem {
         kunishu.setRelation(atkCastle.ownerClan, nextRel);
 
         // ==========================================
-        // ★ここから修正！：蜂起(executeUprising)と同じように、startWarに合流させます！
+        // ★蜂起(executeUprising)と同じように、startWarに合流させます！
         // ==========================================
         let isWarReallyFinished = false;
         const originalCloseWar = this.game.warManager.closeWar;
@@ -805,8 +782,33 @@ class KunishuSystem {
             isWarReallyFinished = true;  
         };
 
-        // startWarに攻撃側の援軍データも渡してスタートします！
-        this.game.warManager.startWar(atkCastle, dummyDefender, atkBushos, sendSoldiers, sendRice, sendHorses, sendGuns, reinforcementData, selfReinforcementData); 
+        // ★直接startWarを呼ぶのではなく、command_systemの共通の魔法にお任せします！
+        if (this.game.commandSystem && typeof this.game.commandSystem.checkReinforcementAndStartWar === 'function') {
+            const extraData = { isKunishu: true, kunishuId: kunishu.id };
+            this.game.commandSystem.checkReinforcementAndStartWar(atkCastle, targetCastleId, atkBushos, sendSoldiers, sendRice, sendHorses, sendGuns, extraData);
+        } else {
+            // (万が一の時のフォールバック処理)
+            const kunishuName = kunishu.getName(this.game);
+            const dummyDefender = {
+                id: targetCastleId,
+                name: kunishuName, 
+                ownerClan: -1,
+                soldiers: kunishu.soldiers,
+                defense: kunishu.defense,
+                maxDefense: kunishu.maxDefense,
+                training: kunishu.training, 
+                morale: kunishu.morale,     
+                horses: kunishu.horses || 0,
+                guns: kunishu.guns || 0,    
+                rice: Math.floor(kunishu.soldiers * 1.5), 
+                isKunishu: true,
+                kunishuId: kunishu.id,
+                peoplesLoyalty: 100, 
+                population: 1000,
+                samuraiIds: [] 
+            };
+            this.game.warManager.startWar(atkCastle, dummyDefender, atkBushos, sendSoldiers, sendRice, sendHorses, sendGuns, reinforcementData, selfReinforcementData); 
+        }
         
         // 戦争とメッセージ表示が完全に終わるまで待ちます
         let failSafeCounter = 0; 
