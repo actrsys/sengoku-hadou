@@ -2604,18 +2604,30 @@ class FieldWarManager {
         }
         defFinalDef = defFinalDef * defWeaponMult;
 
-        // 6. 地形による防御力の補正
-        let row = Math.floor(defender.y / 2);
-        let terrain = (this.grid && this.grid[row] && this.grid[row][defender.x]) ? this.grid[row][defender.x].terrain : 'plain';
+        // 6. 地形による防御力と攻撃力の補正
+        // 守備側の地形補正（防御力）
+        let defRow = Math.floor(defender.y / 2);
+        let defTerrain = (this.grid && this.grid[defRow] && this.grid[defRow][defender.x]) ? this.grid[defRow][defender.x].terrain : 'plain';
         
-        let terrainMult = 1.0;
-        if (terrain === 'forest') terrainMult = 1.15;      // 森は防御力アップ
-        else if (terrain === 'mountain') terrainMult = 1.3; // 山はさらに防御力アップ
-        else if (terrain === 'river') {
-            // ★追加: 雨や雪の時は川での防御力のマイナス補正がより厳しくなります
-            terrainMult = (this.weather === 'rain' || this.weather === 'snow') ? 0.5 : 0.7;
+        let defTerrainMult = 1.0;
+        if (defTerrain === 'forest') defTerrainMult = 1.15;      // 森は防御力アップ
+        else if (defTerrain === 'mountain') defTerrainMult = 1.3; // 山はさらに防御力アップ
+        else if (defTerrain === 'river' || (this.grid && this.grid[defRow] && this.grid[defRow][defender.x].isSea)) {
+            // ★川（海）での防御力のマイナス補正（雨や雪の時はさらに厳しく）
+            defTerrainMult = (this.weather === 'rain' || this.weather === 'snow') ? 0.5 : 0.7;
         }
-        defFinalDef = defFinalDef * terrainMult;
+        defFinalDef = defFinalDef * defTerrainMult;
+
+        // ★攻撃側の地形補正（攻撃力）
+        let atkRow = Math.floor(attacker.y / 2);
+        let atkTerrain = (this.grid && this.grid[atkRow] && this.grid[atkRow][attacker.x]) ? this.grid[atkRow][attacker.x].terrain : 'plain';
+        
+        let atkTerrainMult = 1.0;
+        if (atkTerrain === 'river' || (this.grid && this.grid[atkRow] && this.grid[atkRow][attacker.x].isSea)) {
+            // ★足場が悪い川（海）からの攻撃は威力が落ちる（雨や雪の時はさらに厳しく）
+            atkTerrainMult = (this.weather === 'rain' || this.weather === 'snow') ? 0.5 : 0.7;
+        }
+        atkFinalAtk = atkFinalAtk * atkTerrainMult;
         
         // 7. 与ダメージ計算
         let dmgRatio = (atkFinalAtk + defFinalDef) > 0 ? (atkFinalAtk / (atkFinalAtk + defFinalDef)) : 0;
