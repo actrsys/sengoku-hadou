@@ -1235,7 +1235,6 @@ class FieldWarManager {
             if (u.isGeneral) {
                 uEl.classList.add('general'); // 総大将なら白枠の設計図を追加
             }
-            // ★ここまで差し替え
             
             uEl.style.width = `${iconSize}px`; 
             uEl.style.height = `${iconSize}px`; 
@@ -2419,14 +2418,23 @@ class FieldWarManager {
         let defAbilityAtk = defender.stats.ldr * 1.5 + defender.stats.str;
         let defAbilityDef = defender.stats.ldr * 1.5 + defender.stats.int;
 
-        // 今までの計算に加えて、「武将の強さ × 兵力の平方根 ÷ 100」という大軍ボーナスを足します
-        let atkBaseAtk = Math.sqrt(atkS) + atkAbilityAtk * (atkS / (atkS + 150)) + (atkAbilityAtk * Math.sqrt(atkS) / 100);
-        let atkBaseDef = Math.sqrt(atkS) + atkAbilityDef * (atkS / (atkS + 150)) + (atkAbilityDef * Math.sqrt(atkS) / 100);
-        
-        let defBaseAtk = Math.sqrt(defS) + defAbilityAtk * (defS / (defS + 150)) + (defAbilityAtk * Math.sqrt(defS) / 100);
-        let defBaseDef = Math.sqrt(defS) + defAbilityDef * (defS / (defS + 150)) + (defAbilityDef * Math.sqrt(defS) / 100);
+        // ★攻撃側の総大将と、守備側の総大将をそれぞれ探して、統率の倍率を計算します
+        const atkSideGeneral = this.units.find(u => u.isAttacker === attacker.isAttacker && u.isGeneral);
+        const atkSideGenLdr = atkSideGeneral ? atkSideGeneral.stats.ldr : 50; // 万が一見つからない場合は50とします
+        const atkSideMultiplier = (atkSideGenLdr / 800) + 1;
 
-        // ★追加：大雪拠点戦の常時ペナルティ（基本攻防力が10%ダウン）
+        const defSideGeneral = this.units.find(u => u.isAttacker === defender.isAttacker && u.isGeneral);
+        const defSideGenLdr = defSideGeneral ? defSideGeneral.stats.ldr : 50;
+        const defSideMultiplier = (defSideGenLdr / 800) + 1;
+
+        // 「武将の強さ × 兵力の平方根 ÷ 100」という大軍ボーナスを足し、最後に総大将の倍率を掛けます
+        let atkBaseAtk = (Math.sqrt(atkS) + atkAbilityAtk * (atkS / (atkS + 150)) + (atkAbilityAtk * Math.sqrt(atkS) / 100)) * atkSideMultiplier;
+        let atkBaseDef = (Math.sqrt(atkS) + atkAbilityDef * (atkS / (atkS + 150)) + (atkAbilityDef * Math.sqrt(atkS) / 100)) * atkSideMultiplier;
+        
+        let defBaseAtk = (Math.sqrt(defS) + defAbilityAtk * (defS / (defS + 150)) + (defAbilityAtk * Math.sqrt(defS) / 100)) * defSideMultiplier;
+        let defBaseDef = (Math.sqrt(defS) + defAbilityDef * (defS / (defS + 150)) + (defAbilityDef * Math.sqrt(defS) / 100)) * defSideMultiplier;
+
+        // ★大雪拠点戦の常時ペナルティ（基本攻防力が10%ダウン）
         if (this.isHeavySnowBattle) {
             atkBaseAtk *= 0.9;
             atkBaseDef *= 0.9;
@@ -2434,7 +2442,7 @@ class FieldWarManager {
             defBaseDef *= 0.9;
         }
 
-        // ★追加: 雨または雪の時はすべての部隊の基礎防御力が10%ダウンします
+        // ★雨または雪の時はすべての部隊の基礎防御力が10%ダウンします
         if (this.weather === 'rain' || this.weather === 'snow') {
             atkBaseDef = atkBaseDef * 0.9;
             defBaseDef = defBaseDef * 0.9;
@@ -2447,7 +2455,7 @@ class FieldWarManager {
         let defFinalAtk = defBaseAtk * (1 + (defMorale * 1.5 + defTraining) / 1000);
         let defFinalDef = defBaseDef * (1 + (defMorale + defTraining * 1.5) / 1000);
 
-        // ★追加：リーダーの居城によるホーム補正を計算する魔法！
+        // ★リーダーの居城によるホーム補正を計算する魔法！
         const getHomeBonusMult = (unit) => {
             let activeCastle = null;
             if (unit.groupId === 'atk_main') activeCastle = this.warState.sourceCastle;
