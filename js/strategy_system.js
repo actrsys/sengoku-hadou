@@ -41,10 +41,21 @@ class StrategySystem {
         const intMod = (busho.intelligence + (Math.sqrt(busho.loyalty) * 2)) / 10;
         return strMod * intMod;
     }
-
+    
     // --- 引抜 ---
     static calcHeadhuntScore(busho) {
         return (busho.intelligence * 0.8) + (busho.charm * 0.2) + (busho.loyalty * 0.1);
+    }
+
+    // --- 駆虎呑狼 ---
+    static getKukoProbBase(busho) {
+        return (busho.intelligence + (Math.sqrt(busho.loyalty) * 2)) / 180;
+    }
+    static getKukoDamageBase(busho) {
+        return (busho.diplomacy + (Math.sqrt(busho.loyalty) * 2)) / 12;
+    }
+    static calcKukoScore(busho) {
+        return StrategySystem.getKukoProbBase(busho) * StrategySystem.getKukoDamageBase(busho);
     }
     
     // ★追加：対象が役職者本人か、役職持ちの一門か、ただの一門かなどを判定する魔法です（一元化）
@@ -73,10 +84,94 @@ class StrategySystem {
 
         return 0; // レベル0: どれにも当てはまらない
     }
-
+    
     // ==========================================
     // ★調略コマンドの計算処理（game.jsからのお引っ越し）
     // ==========================================
+    
+    getLeaderOrGunshiInt(clanId) {
+        const daimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo);
+        const gunshi = this.game.bushos.find(b => b.clan === clanId && b.isGunshi);
+        const intDaimyo = daimyo ? daimyo.intelligence : 50;
+        const intGunshi = gunshi ? gunshi.intelligence : 0;
+        return Math.max(intDaimyo, intGunshi); // 高い方を返します
+    }
+
+    getKukoModifiers(clanAId, clanBId) {
+        const daimyoA = this.game.bushos.find(b => b.clan === clanAId && b.isDaimyo) || { affinity: 50 };
+        const daimyoB = this.game.bushos.find(b => b.clan === clanBId && b.isDaimyo) || { affinity: 50 };
+        const affinityDiff = typeof GameSystem !== 'undefined' ? GameSystem.calcAffinityDiff(daimyoA.affinity, daimyoB.affinity) : 25;
+        
+        const defAInt = this.getLeaderOrGunshiInt(clanAId);
+        const defBInt = this.getLeaderOrGunshiInt(clanBId);
+        const defMod = ((defAInt + defBInt) / 150) + 0.75;
+
+        const affMod = 0.84375 + (affinityDiff / 160);
+        
+        const relation = this.game.getRelation(clanAId, clanBId) || { status: '普通', sentiment: 50 };
+        const sentMod = (relation.sentiment / 200) + 0.75;
+        
+        let relMod = 1.0;
+        if (relation.status === '敵対') relMod = 1.1;
+        else if (relation.status === '和睦') relMod = 0;
+        else if (['同盟', '支配', '従属'].includes(relation.status)) relMod = 0.7;
+        
+        let isAdjacent = false;
+        const castlesA = this.game.castles.filter(c => c.ownerClan === clanAId);
+        const castlesB = this.game.castles.filter(c => c.ownerClan === clanBId);
+        for (const ca of castlesA) {
+            for (const cb of castlesB) {
+                // 隣接しているか調べます
+                if (typeof GameSystem !== 'undefined' && GameSystem.isAdjacent) {
+                    if (GameSystem.isAdjacent(ca, cb)) {
+                        isAdjacent = true;
+                        break;
+                    }
+                } else if (ca.adjacentCastleIds && ca.adjacentCastleIds.includes(cb.id)) {
+                    isAdjacent = true;
+                    break;
+                }
+            }
+            if (isAdjacent) break;
+        }
+        
+        const isTensionZero = (relation.sentiment === 0);
+        const specialEffect = isTensionZero && isAdjacent;
+
+        return { defMod, affMod, sentMod, relMod, specialEffect };
+    }
+
+    getKukoProb(doerId, clanAId, clanBId) {
+        const busho = this.game.getBusho(doerId);
+        const mods = this.getKukoModifiers(clanAId, clanBId);
+        const doerIntMod = StrategySystem.getKukoProbBase(busho);
+        
+        let prob = (doerIntMod / mods.defMod) * (mods.affMod / mods.sentMod) * mods.relMod;
+        if (mods.specialEffect) prob -= 0.5; // 友好度0で隣接している場合のペナルティ
+        
+        return Math.max(0.01, Math.min(0.99, prob));
+    }
+
+    getKukoExpectedDamage(doerId, clanAId, clanBId) {
+        const busho = this.game.getBusho(doerId);
+        const mods = this.getKukoModifiers(clanAId, clanBId);
+        const doerDipMod = StrategySystem.getKukoDamageBase(busho);
+        
+        const damage = (doerDipMod / mods.defMod) * (mods.affMod / mods.sentMod) * mods.relMod;
+        return Math.max(1, Math.floor(damage));
+    }
+
+    calcKuko(doerId, clanAId, clanBId, isExecute = false) { 
+        const busho = this.game.getBusho(doerId);
+        const prob = this.getKukoProb(doerId, clanAId, clanBId);
+        let success = Math.random() < prob;
+
+        if (isExecute) this.addStrategyExperience(busho, success);
+
+        if(!success) return { success: false, val: 0 }; 
+        const damage = this.getKukoExpectedDamage(doerId, clanAId, clanBId);
+        return { success: true, val: damage }; 
+    }
     
     getInciteProb(doerId, targetId) {
         const busho = this.game.getBusho(doerId);
@@ -311,8 +406,8 @@ class StrategySystem {
         const bestStr = bestStats.bestStr;
         const bestInt = bestStats.bestInt;
         const soldiers = targetCastle.soldiers;
-
-        if (actionType === 'incite' || actionType === 'rumor') {
+        
+        if (actionType === 'incite' || actionType === 'rumor' || actionType === 'kuko') {
             const numerator = Math.sqrt(30 + (doer.strength * 1.5) + doer.intelligence);
             const denominator = Math.sqrt(bestStr + (bestInt * 1.5));
             const safeDenominator = denominator > 0 ? denominator : 1; 
@@ -360,6 +455,8 @@ class StrategySystem {
                     msg1 = `${targetBushoName}が${doerClanName}の手の者と面会していたようです`;
                 } else if (actionType === 'headhunt') {
                     msg1 = `${targetBushoName}が${doerClanName}から寝返りの誘いを受けているようです`;
+                } else if (actionType === 'kuko') {
+                    msg1 = `${doerClanName}の使者が${targetCastle.name}に滞在していたようです`;
                 }
                 
                 if (msg1) {
@@ -559,4 +656,69 @@ class StrategySystem {
     
     // 破壊工作を実行する魔法
     executeSabotage(doerId, targetId) { this.executeBasicStrategy('sabotage', doerId, targetId); }
+
+    // 駆虎呑狼を実行する魔法
+    executeKuko(doerId, clanAId, clanBId) {
+        const doer = this.game.getBusho(doerId);
+        const clanA = this.game.clans.find(c => c.id === clanAId);
+        const clanB = this.game.clans.find(c => c.id === clanBId);
+        
+        const result = this.calcKuko(doerId, clanAId, clanBId, true);
+        
+        // ターゲットAの居城で隠密判定を行います
+        const targetCastleA = this.game.castles.find(c => c.ownerClan === clanAId && c.id === this.game.bushos.find(b=>b.clan===clanAId && b.isDaimyo)?.castleId);
+        let covertMsg = "";
+        if (targetCastleA) {
+            covertMsg = this.handleCovertAction(doerId, targetCastleA.id, result.success, 'kuko', false, null);
+        }
+
+        if (result.success) {
+            this.game.diplomacyManager.updateSentiment(clanAId, clanBId, -result.val);
+            
+            const mods = this.getKukoModifiers(clanAId, clanBId);
+            let specialMsg = "";
+            
+            // 友好度0かつ隣接している場合の「大目標強制上書き」の魔法です！
+            if (mods.specialEffect) {
+                if (this.game.aiOperationManager) {
+                    const updateGrandObj = (myClanId, targetId) => {
+                        if (!this.game.aiOperationManager.grandObjectives) this.game.aiOperationManager.grandObjectives = {};
+                        if (!this.game.aiOperationManager.grandObjectives[myClanId]) this.game.aiOperationManager.grandObjectives[myClanId] = {};
+                        
+                        const myCastleCount = this.game.castles.filter(c => c.ownerClan === myClanId).length;
+                        const targetCastleCount = this.game.castles.filter(c => c.ownerClan === targetId).length;
+                        
+                        const legions = [0]; // 0は直轄です
+                        if (this.game.legions) {
+                            this.game.legions.filter(l => l.clanId === myClanId && l.commanderId > 0).forEach(l => legions.push(l.legionNo));
+                        }
+                        
+                        // 直轄とすべての軍団の方針を強制的に書き換えます
+                        for (const legionNo of legions) {
+                            this.game.aiOperationManager.grandObjectives[myClanId][legionNo] = {
+                                type: '大名攻略',
+                                targetClanId: targetId,
+                                turnCount: 24,
+                                historyTargetCount: [targetCastleCount],
+                                prevMyCastleCount: myCastleCount
+                            };
+                        }
+                    };
+                    updateGrandObj(clanAId, clanBId);
+                    updateGrandObj(clanBId, clanAId);
+                    specialMsg = `\nさらに、両勢力は互いを不倶戴天の敵とみなし、討伐を大目標に掲げました！`;
+                }
+            }
+
+            this.applyCommonSuccessEffect(doer, true);
+            this.game.ui.showResultModal(`${doer.name}の駆虎呑狼が成功！\n${clanA.name}と${clanB.name}の友好度が${result.val}低下しました${specialMsg}${covertMsg}`);
+        } else {
+            this.applyCommonSuccessEffect(doer, false);
+            this.game.ui.showResultModal(`${doer.name}の駆虎呑狼は失敗しました${covertMsg}`);
+        }
+        
+        doer.isActionDone = true; 
+        this.game.ui.updatePanelHeader(); 
+        this.game.ui.renderCommandMenu(); 
+    }
 }

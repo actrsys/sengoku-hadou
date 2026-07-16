@@ -138,26 +138,25 @@ class GunshiSystem {
             if (perceivedProb > 0.15) return "厳しい交渉になるでしょう。。"; 
             return "おやめください。条件を提示するまでもなく、門前払いされるでしょう。"; 
         }
-
+        
         // ★調略コマンド（離間計・破壊工作・民心撹乱）の場合は、成功率と効果量の組み合わせで自然なつなぎ言葉にします
-        if (action.type === 'rumor' || action.type === 'sabotage' || action.type === 'incite') {
+        if (action.type === 'rumor' || action.type === 'sabotage' || action.type === 'incite' || action.type === 'kuko') {
             let probMsg = "";
             let probIsHigh = false;
             let probIsLow = false;
-
-            // ★調略コマンド（離間計・破壊工作・民心撹乱）の場合は、成功率と効果量の組み合わせで自然なつなぎ言葉にします
+            
             if (perceivedProb > 0.95) { probMsg = "まず接触できるでしょう"; probIsHigh = true; }
             else if (perceivedProb > 0.7) { probMsg = "おそらく接触できるでしょう"; probIsHigh = true; }
             else if (perceivedProb > 0.4) { probMsg = "接触できるかは五分五分といったところです"; }
             else if (perceivedProb > 0.15) { probMsg = "接触は難しいでしょう"; probIsLow = true; }
             else { probMsg = "まず接触は不可能でしょう"; probIsLow = true; }
-
-            if (action.type === 'sabotage' || action.type === 'incite') {
+            
+            if (action.type === 'sabotage' || action.type === 'incite' || action.type === 'kuko') {
                 if (perceivedProb > 0.95) { probMsg = "まず失敗はしないでしょう"; probIsHigh = true; }
                 else if (perceivedProb > 0.7) { probMsg = "おそらく潜り込ませられるでしょう"; probIsHigh = true; }
                 else if (perceivedProb > 0.4) { probMsg = "潜り込ませられるかは五分五分といったところです"; }
                 else if (perceivedProb > 0.15) { probMsg = "警戒が厳しく、潜り込ませるのは難しいでしょう"; probIsLow = true; }
-                else { probMsg = "まず潜入は不可能でしょう"; probIsLow = true; }
+                else { probMsg = "まず潜り込ませるのは不可能でしょう"; probIsLow = true; }
             }
 
             let perceivedDamage = action.expectedDamage || 0;
@@ -183,6 +182,11 @@ class GunshiSystem {
                 else if (perceivedDamage >= 5) { damageMsg = "それなりに領民の動揺を誘えることと存じます。"; damageIsHigh = true; }
                 else if (perceivedDamage >= 2) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
                 else { damageMsg = "領民たちが惑わされる事はないかと存じます。"; damageIsHigh = false; }
+            } else if (action.type === 'kuko') {
+                if (perceivedDamage >= 20) { damageMsg = "両家の間に修復困難な亀裂を生じさせられることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 10) { damageMsg = "両家の関係を悪化させられることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 5) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
+                else { damageMsg = "両家の関係が揺らぐ事はないかと存じます。"; damageIsHigh = false; }
             }
             
             // 成功率と効果量の高低で、言い回しを変えます
