@@ -168,24 +168,24 @@ class GunshiSystem {
 
             // コマンドごとにダメージのセリフを変えます
             if (action.type === 'rumor') {
-                if (perceivedDamage >= 20) { damageMsg = "相手に大きな疑心を植え付けられることと存じます。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 10) { damageMsg = "今の待遇に疑問を持たせられることと存じます。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 5) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
+                if (perceivedDamage >= 9) { damageMsg = "相手に大きな疑心を植え付けられることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 6) { damageMsg = "今の待遇に疑問を持たせられることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 3) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
                 else { damageMsg = "かの者の信頼が揺らぐ事はないかと存じます。"; damageIsHigh = false; }
             } else if (action.type === 'sabotage') {
-                if (perceivedDamage >= 15) { damageMsg = "城の防備を大きく破壊できることと存じます。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 8) { damageMsg = "城の防備をそれなりに削れることと存じます。"; damageIsHigh = true; }
+                if (perceivedDamage >= 9) { damageMsg = "城の防備を大きく破壊できることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 6) { damageMsg = "城の防備をそれなりに削れることと存じます。"; damageIsHigh = true; }
                 else if (perceivedDamage >= 3) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
                 else { damageMsg = "ほとんど影響は無いかと存じます。"; damageIsHigh = false; }
             } else if (action.type === 'incite') {
-                if (perceivedDamage >= 10) { damageMsg = "領民の心を大きく引き離せることと存じます。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 5) { damageMsg = "それなりに領民の動揺を誘えることと存じます。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 2) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
+                if (perceivedDamage >= 9) { damageMsg = "領民の心を大きく引き離せることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 6) { damageMsg = "それなりに領民の動揺を誘えることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 3) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
                 else { damageMsg = "領民たちが惑わされる事はないかと存じます。"; damageIsHigh = false; }
             } else if (action.type === 'kuko') {
-                if (perceivedDamage >= 20) { damageMsg = "両家の間に修復困難な亀裂を生じさせられることと存じます。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 10) { damageMsg = "両家の関係を悪化させられることと存じます。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 5) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
+                if (perceivedDamage >= 9) { damageMsg = "両家の間に亀裂を生じさせられることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 6) { damageMsg = "両家の関係を悪化させられることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 3) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
                 else { damageMsg = "両家の関係が揺らぐ事はないかと存じます。"; damageIsHigh = false; }
             }
             
