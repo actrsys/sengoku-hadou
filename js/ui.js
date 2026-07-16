@@ -454,9 +454,42 @@ class UIManager {
                 modal.appendChild(footer);
             }
         });
-        // ★追加ここまで
-    } 
-    
+    }
+
+    // ==========================================
+    // ★ここから追加：背景の更新をストップして超軽量化する魔法！
+    // ==========================================
+    pauseBackgroundUpdates() {
+        this.isBackgroundPaused = true;
+        document.body.classList.add('background-paused');
+        
+        // もし情報パネルのマーク切り替えタイマーが動いていたら、無駄なので止めます
+        if (this._statusCarouselTimer) {
+            clearInterval(this._statusCarouselTimer);
+            this._statusCarouselTimer = null;
+        }
+    }
+
+    resumeBackgroundUpdates() {
+        this.isBackgroundPaused = false;
+        document.body.classList.remove('background-paused');
+        
+        // まだゲームが始まっていない時（タイトル画面など）はここで終わります
+        if (!this.game || this.game.phase === 'title') return;
+
+        // 止めていた間に「お城の兵士数」や「勢力の色」が変わったかもしれないので、
+        // 再開のタイミングで一気に最新の状態に書き換えます！
+        const activeCastle = this.currentCastle || (this.game ? this.game.getCurrentTurnCastle() : null);
+        if (activeCastle) {
+            this.updateInfoPanel(activeCastle);
+        }
+        if (typeof this.updateCastleGlows === 'function') this.updateCastleGlows();
+        if (typeof this.updateClanColors === 'function') this.updateClanColors();
+        if (typeof this.updateSnowOverlay === 'function') this.updateSnowOverlay();
+        if (typeof this.updateKeepHighlight === 'function') this.updateKeepHighlight();
+    }
+    // ==========================================
+
     hideAIGuardTemporarily() {
         const aiGuard = document.getElementById('ai-guard');
         // ★変更：壁そのものを消すのではなく、文字だけを透明にして壁を残します！
@@ -1110,6 +1143,11 @@ class UIManager {
     }
 
     forceResetModals() {
+        // ★ここを書き足し：強制リセットの時は、背景ストップも確実に解除しておきます！
+        if (this.isBackgroundPaused) {
+            this.resumeBackgroundUpdates();
+        }
+
         const modals = document.querySelectorAll('.modal');
         modals.forEach(m => {
             m.classList.add('hidden');
@@ -1223,6 +1261,10 @@ class UIManager {
 
     showResultModal(msg, onClose = null, customFooterHtml = null) { 
         this.hideAIGuardTemporarily(); 
+
+        // ★ここを書き足し：結果画面を開いている間も背景をストップします！
+        this.pauseBackgroundUpdates();
+        
         if (this.resultBody) {
             this.resultBody.innerHTML = msg.replace(/\n/g, '<br>');
             // ここがリストを一番上に戻す魔法です！
@@ -1245,6 +1287,9 @@ class UIManager {
         if (this.resultModal) this.resultModal.classList.add('hidden'); 
         this.restoreAIGuard(); 
         
+        // ★ここを書き足し：結果画面を閉じたら背景を再開します！
+        this.resumeBackgroundUpdates();
+
         // ★追加：結果画面を閉じた時に、鳴っているSEを0.1秒でスッと消す魔法です！
         if (window.AudioManager && typeof window.AudioManager.fadeOutSe === 'function') {
             window.AudioManager.fadeOutSe(0.1);
@@ -1418,6 +1463,9 @@ class UIManager {
     }
 
     updateInfoPanel(castle) {
+        // ★ここを書き足し：背景ストップ中は、重たい画面の書き換えをサボります！
+        if (this.isBackgroundPaused) return;
+
         if (!castle) return;
         if (this.game.phase === 'daimyo_select') return;
         
