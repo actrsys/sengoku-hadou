@@ -655,7 +655,7 @@ class Busho {
     }
 
     // ★奥さんが増えたり減ったりした時に、一門リストを作り直す機能
-    // 修正：お母さんの実家を引き継ぐために、引数に「姫の名簿」を追加しました
+    // 修正：お母さんの実家を引き継ぐために、引数に "姫の名簿" を追加しました
     updateFamilyIds(bushos = [], princesses = []) {
         // ★安全対策：他のシステムから呼ばれた時に名簿がなければ、ゲーム本体から借ります！
         if (bushos.length === 0 && window.GameApp) bushos = window.GameApp.bushos;
@@ -697,6 +697,28 @@ class Busho {
                         this.familyIds.push(fId);
                     }
                 });
+            }
+        });
+
+        // ★今回追加：自分の娘（実の娘、または養女）や、実姉妹の「お婿さん（夫）」を、自分の一門（familyIds）として迎え入れます！
+        // これにより、お婿さんが自勢力にいる場合、優先的に大名の後継ぎになれる（直系として機能する）ようになります！
+        princesses.forEach(p => {
+            // 1. 自分の娘（実娘・養女）がお嫁にいっている場合
+            const isMyDaughter = (p.realFatherId === this.id || p.adoptiveFatherId === this.id);
+            if (isMyDaughter && p.status === 'married' && p.husbandId > 0) {
+                if (!this.familyIds.includes(p.husbandId)) {
+                    this.familyIds.push(p.husbandId);
+                }
+            }
+
+            // 2. 自分の姉妹がお嫁にいっている場合
+            // （実父が同じお姫様で、自分自身とは異なるIDの場合）
+            if (this.realFatherId > 0 && this.realFatherId === p.realFatherId && p.id !== this.id) {
+                if (p.status === 'married' && p.husbandId > 0) {
+                    if (!this.familyIds.includes(p.husbandId)) {
+                        this.familyIds.push(p.husbandId);
+                    }
+                }
             }
         });
     }
@@ -934,9 +956,22 @@ class Province {
 
 // ★全員のデータが揃った後に、親と子の一門リストをガッチャンコする魔法
 class FamilyLinker {
+    // ★今回追加：ゲーム全体の一門関係を、正しい順番で一気に完成させる司令塔（窓口）です！
+    static rebuildAllFamilyIds(bushos, princesses = []) {
+        // 1. まずは男系（実父・養父）の絶対的な繋がりである「金庫（baseFamilyIds）」を完成させます
+        this.linkAdoptiveRelations(bushos, princesses);
+        
+        // 2. 次に、姫の個人の繋がり（母方の実家や、夫の繋がり）を個別にコピーさせます
+        princesses.forEach(p => p.updateFamilyIds(bushos, princesses));
+        
+        // 3. 最後に、武将の個人の繋がり（母方の実家、妻の実家、娘婿や義弟）をコピーさせます
+        // ※武将が娘婿を認識するためには「姫のデータが完成している」必要があるので、一番最後に実行します！
+        bushos.forEach(b => b.updateFamilyIds(bushos, princesses));
+    }
+
     static linkAdoptiveRelations(bushos, princesses = []) {
         const allPeople = [...bushos, ...princesses];
-
+        
         allPeople.forEach(b => {
             // ★家と家が完全に混ざらないように、「実父」と「養父」の男系の繋がりだけで金庫を作ります！
             // （実母の繋がりは後で個人のリストにだけ一方通行でコピーさせます）

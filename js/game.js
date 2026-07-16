@@ -150,18 +150,12 @@ class DataManager {
     static joinData(clans, castles, bushos, princesses = [], legions = []) {
         const startYear = window.MainParams.StartYear; // 今のシナリオの開始年（例：1560年）
         
-        // ★姫や武将が情報をやり取りする前に、一番最初に全武将の血縁（金庫）を完成させます！
-        // 姫の名簿も一緒に渡して、子を通じた両家の繋がりも維持できるようにします！
-        FamilyLinker.linkAdoptiveRelations(bushos, princesses);
-
-        // ★武将が一門情報を取得する前に、先に姫の一門情報（父親のデータ）を完成させておきます！
+        // ★武将と同じように、ダミー用（startYearが9999）の姫や、
+        // 開始年よりも前に寿命を迎えている（昔に亡くなっている）姫を死亡扱いにします！
         princesses.forEach(p => {
-            // ★武将と同じように、ダミー用（startYearが9999）の姫を自動で死亡（非登場）扱いにする魔法です！
-            // さらに、開始年よりも前に寿命を迎えている（昔に亡くなっている）姫も死亡扱いにします！
             if (p.startYear === 9999 || p.endYear < startYear) {
                 p.status = 'dead';
             }
-            p.updateFamilyIds(bushos, princesses); // ★武将と姫の両方を渡します
         });
 
         castles.forEach(c => c.samuraiIds = []);
@@ -276,9 +270,6 @@ class DataManager {
                 const c = castles.find(castle => Number(castle.id) === Number(b.castleId));
                 if(c) c.samuraiIds.push(b.id);
             }
-
-            // ★今回追加：ゲーム開始の瞬間に、姫の名簿を使って「武将の一門関係（血の繋がり）」を繋ぎます！
-            b.updateFamilyIds(bushos, princesses); // ★武将と姫の両方を渡します
             
             // ★今回追加：軍師の設定
             if (b.clan !== 0) {
@@ -304,16 +295,14 @@ class DataManager {
         // 2. 亡くなっている武将の妻から、夫の記録を消して「未婚（未亡人）」に戻します
         bushos.forEach(b => {
             if (b.status === 'dead' && b.wifeIds && b.wifeIds.length > 0) {
-                b.wifeIds.forEach(wId => {
-                    const wife = princesses.find(p => p.id === wId);
-                    if (wife && wife.husbandId === b.id) {
-                        wife.husbandId = 0;
-                        wife.status = 'unmarried'; // 未亡人として未婚に戻します
-                    }
-                });
+                // ... 中略 ...
                 b.wifeIds = []; // 亡くなった武将の奥さんリストも空っぽにします
             }
         });
+
+        // ★今回追加：すべての武将と姫の初期設定、および亡くなった配偶者のお掃除が終わった【一番最後】に、
+        // まとめて一門関係（金庫の繋がり、娘婿、母方の実家など）を完璧な順番で構築します！
+        FamilyLinker.rebuildAllFamilyIds(bushos, princesses);
 
         // ★ここから軍団の初期設定です！
         legions.forEach(legion => {
@@ -2674,9 +2663,8 @@ class GameManager {
                 // ★今回追加：セーブデータから軍団の名簿を元通りに復元します
                 this.legions = (d.legions || []).map(l => new Legion(l));
                 
-                // ★追加：ロード時に一門情報を再構築します
-                this.princesses.forEach(p => p.updateFamilyIds(this.bushos, this.princesses));
-                this.bushos.forEach(b => b.updateFamilyIds(this.bushos, this.princesses));
+                // ★追加：ロード時に一門情報をまとめて再構築します
+                FamilyLinker.rebuildAllFamilyIds(this.bushos, this.princesses);
 
                 // ★ここを書き足し！：古いデータでシールが剥がれている場合のために、名簿を見て貼り直します！
                 this.legions.forEach(legion => {
@@ -2865,8 +2853,8 @@ class GameManager {
             this.provinces = (d.provinces || []).map(p => new Province(p));
             this.legions = (d.legions || []).map(l => new Legion(l));
             
-            this.princesses.forEach(p => p.updateFamilyIds(this.bushos, this.princesses));
-            this.bushos.forEach(b => b.updateFamilyIds(this.bushos, this.princesses));
+            // ロード時に一門情報をまとめて再構築します
+            FamilyLinker.rebuildAllFamilyIds(this.bushos, this.princesses);
 
             this.legions.forEach(legion => {
                 const commander = this.bushos.find(b => b.id === legion.commanderId);
@@ -3029,6 +3017,3 @@ async function loadFromDB(key) {
         request.onerror = () => reject(request.error);
     });
 }
-// ==========================================
-// ★ここまで追加
-// ==========================================
