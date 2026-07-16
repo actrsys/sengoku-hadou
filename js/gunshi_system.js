@@ -183,9 +183,9 @@ class GunshiSystem {
                 else if (perceivedDamage >= 3) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
                 else { damageMsg = "領民たちが惑わされる事はないかと存じます。"; damageIsHigh = false; }
             } else if (action.type === 'kuko') {
-                if (perceivedDamage >= 9) { damageMsg = "両家の間に亀裂を生じさせられることと存じます。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 6) { damageMsg = "両家の関係を悪化させられることと存じます。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 3) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
+                if (perceivedDamage >= 6) { damageMsg = "両家の間に亀裂を生じさせられることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 4) { damageMsg = "両家の関係を悪化させられることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 2) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
                 else { damageMsg = "両家の関係が揺らぐ事はないかと存じます。"; damageIsHigh = false; }
             }
             
