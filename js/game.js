@@ -150,12 +150,13 @@ class DataManager {
     static joinData(clans, castles, bushos, princesses = [], legions = []) {
         const startYear = window.MainParams.StartYear; // 今のシナリオの開始年（例：1560年）
         
-        // ★追加：姫や武将が情報をやり取りする前に、一番最初に全武将の血縁（金庫）を完成させます！
-        FamilyLinker.linkAdoptiveRelations(bushos);
+        // ★姫や武将が情報をやり取りする前に、一番最初に全武将の血縁（金庫）を完成させます！
+        // 姫の名簿も一緒に渡して、子を通じた両家の繋がりも維持できるようにします！
+        FamilyLinker.linkAdoptiveRelations(bushos, princesses);
 
-        // ★修正：武将が一門情報を取得する前に、先に姫の一門情報（父親のデータ）を完成させておきます！
+        // ★武将が一門情報を取得する前に、先に姫の一門情報（父親のデータ）を完成させておきます！
         princesses.forEach(p => {
-            // ★追加：武将と同じように、ダミー用（startYearが9999）の姫を自動で死亡（非登場）扱いにする魔法です！
+            // ★武将と同じように、ダミー用（startYearが9999）の姫を自動で死亡（非登場）扱いにする魔法です！
             // さらに、開始年よりも前に寿命を迎えている（昔に亡くなっている）姫も死亡扱いにします！
             if (p.startYear === 9999 || p.endYear < startYear) {
                 p.status = 'dead';

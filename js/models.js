@@ -908,9 +908,9 @@ class Province {
     }
 }
 
-// ★ここから追加：全員のデータが揃った後に、親と子の一門リストをガッチャンコする魔法
+// ★全員のデータが揃った後に、親と子の一門リストをガッチャンコする魔法
 class FamilyLinker {
-    static linkAdoptiveRelations(bushos) {
+    static linkAdoptiveRelations(bushos, princesses = []) {
         bushos.forEach(b => {
             const parentIds = [b.realFatherId, b.realMotherId, b.adoptiveFatherId];
             parentIds.forEach(pId => {
@@ -919,8 +919,16 @@ class FamilyLinker {
                     if (!b.baseFamilyIds.includes(pId)) {
                         b.baseFamilyIds.push(pId);
                     }
-                    const parent = bushos.find(parentBusho => parentBusho.id === pId);
-                    if (parent) {
+                    // 武将の名簿から親を探します
+                    let parent = bushos.find(parentBusho => parentBusho.id === pId);
+                    
+                    // ★追加：武将の名簿にいなければ、姫の名簿からも親を探します！
+                    if (!parent) {
+                        parent = princesses.find(p => p.id === pId);
+                    }
+
+                    if (parent && parent.baseFamilyIds) {
+                        // 親の金庫にも自分の番号を入れます
                         if (!parent.baseFamilyIds.includes(b.id)) {
                             parent.baseFamilyIds.push(b.id);
                         }
@@ -932,13 +940,16 @@ class FamilyLinker {
         let changed = true;
         while (changed) {
             changed = false;
-            bushos.forEach(b => {
-                let currentFamilySet = new Set([...b.baseFamilyIds]);
+            // ★武将と姫、両方の名簿を合わせた「全員の名簿」を作って親戚を探します！
+            const allPeople = [...bushos, ...princesses];
+            
+            allPeople.forEach(person => {
+                let currentFamilySet = new Set([...person.baseFamilyIds]);
                 let originalSize = currentFamilySet.size;
 
-                b.baseFamilyIds.forEach(fId => {
-                    const relative = bushos.find(r => r.id === fId);
-                    if (relative) {
+                person.baseFamilyIds.forEach(fId => {
+                    const relative = allPeople.find(r => r.id === fId);
+                    if (relative && relative.baseFamilyIds) {
                         relative.baseFamilyIds.forEach(id => {
                             currentFamilySet.add(id);
                         });
@@ -946,7 +957,7 @@ class FamilyLinker {
                 });
 
                 if (currentFamilySet.size > originalSize) {
-                    b.baseFamilyIds = Array.from(currentFamilySet);
+                    person.baseFamilyIds = Array.from(currentFamilySet);
                     changed = true;
                 }
             });
