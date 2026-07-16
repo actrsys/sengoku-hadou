@@ -693,9 +693,8 @@ Object.assign(UIManager.prototype, {
         keepBlinkOverlay.style.top = '0px';
         keepBlinkOverlay.style.pointerEvents = 'none'; 
         keepBlinkOverlay.style.zIndex = '3'; 
-        keepBlinkOverlay.classList.add('anim-map-glow'); 
+        keepBlinkOverlay.classList.add('anim-map-glow-fast'); 
         this.mapEl.appendChild(keepBlinkOverlay);
-        // ★追加ここまで
 
         // ==========================================
         // ★今回追加：大雪を表現するための水玉キャンバスを敷きます！
