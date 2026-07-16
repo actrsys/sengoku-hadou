@@ -1362,7 +1362,7 @@ class UIInfoManager {
 
         listContainer.innerHTML = `<div class="list-inner-wrapper" style="${wrapperStyle}">${initialHtmlParts.join('')}</div>`;
 
-        // ★新しい魔法：「文字数」を数えて、文字数が多い場合だけ文字を小さくします
+        // ★「文字数」を数えて、文字数が多い場合だけ文字を小さくします
         const adjustTextFit = (startIndex, endIndex) => {
             const listInner = listContainer.querySelector('.list-inner-wrapper');
             if (!listInner) return;
@@ -1388,7 +1388,6 @@ class UIInfoManager {
                         // ゲージやアイコンなどの複雑な要素がある場合はスキップします
                         if (cell.querySelector('.bar-bg') || cell.querySelector('.bar-bg-busho') || cell.querySelector('input') || cell.querySelector('img')) continue;
                         
-                        // ★ここが新しいルールです：実際のピクセルではなく「文字数」を数えます
                         const textLen = cell.textContent.trim().length;
                         
                         // 4文字を超える場合（5文字以上）のみ縮小します
