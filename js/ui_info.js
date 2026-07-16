@@ -1393,8 +1393,8 @@ class UIInfoManager {
                         
                         // 4文字を超える場合（5文字以上）のみ縮小します
                         if (textLen > 4) {
-                            // 5文字なら0.85倍、6文字なら0.70倍...と計算し、最小でも0.6倍でストップさせます
-                            const scale = Math.max(0.6, 1.0 - ((textLen - 4) * 0.15));
+                            // 5文字なら0.9倍、6文字なら0.8倍...と計算し、最小でも0.6倍でストップさせます
+                            const scale = Math.max(0.6, 1.0 - ((textLen - 4) * 0.1));
                             cell.style.fontSize = `calc(100% * ${scale})`;
                         }
                     }
