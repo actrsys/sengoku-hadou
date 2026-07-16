@@ -147,6 +147,12 @@
     animation: glow-pulse 1.5s infinite alternate ease-in-out;
 }
 
+/* ★「速い点滅」の専用ルールです */
+.anim-map-glow-fast {
+    /* 0.5秒かけて、速く点滅させます */
+    animation: glow-pulse 0.5s infinite alternate ease-in-out;
+}
+
 @keyframes glow-pulse {
     0%   { opacity: 0.4; } /* 最初は少し薄く */
     100% { opacity: 1.0; } /* 最後はくっきり見えるように */
