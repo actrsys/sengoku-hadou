@@ -1362,18 +1362,19 @@ class UIInfoManager {
 
         listContainer.innerHTML = `<div class="list-inner-wrapper" style="${wrapperStyle}">${initialHtmlParts.join('')}</div>`;
 
-        // ★新しい魔法：リストが画面に出た直後に、実際の「枠の幅」と「文字の幅」を測って調整します
+        // ★新しい魔法：「文字数」を数えて、文字数が多い場合だけ文字を小さくします
         const adjustTextFit = (startIndex, endIndex) => {
             const listInner = listContainer.querySelector('.list-inner-wrapper');
             if (!listInner) return;
             const itemEls = listInner.querySelectorAll('.select-item');
+            
             for (let i = startIndex; i < endIndex; i++) {
                 if (itemEls[i]) {
                     const cells = itemEls[i].children;
                     for (let j = 0; j < cells.length; j++) {
                         const cell = cells[j];
                         
-                        // ★軽量化：名前の列など、実際に文字が長くなりやすい列だけを測るようにして、スマホでの処理落ち（リフロー）を激減させます！
+                        // 名前の列だけを対象にします
                         const isNameCol = cell.classList.contains('col-name') || 
                                           cell.classList.contains('col-daimyo-name') || 
                                           cell.classList.contains('col-kunishu-name') || 
@@ -1381,16 +1382,19 @@ class UIInfoManager {
                                           cell.classList.contains('col-princess-name') ||
                                           cell.classList.contains('col-castle-name') ||
                                           cell.classList.contains('col-leader-name');
-                        if (!isNameCol) continue; // 名前の列以外は計算をスキップします
                         
-                        // ゲージやアイコンなどの複雑な要素はスキップします
+                        if (!isNameCol) continue;
+                        
+                        // ゲージやアイコンなどの複雑な要素がある場合はスキップします
                         if (cell.querySelector('.bar-bg') || cell.querySelector('.bar-bg-busho') || cell.querySelector('input') || cell.querySelector('img')) continue;
                         
-                        // はみ出しているかチェック（scrollWidth が clientWidth より大きければはみ出しています）
-                        if (cell.scrollWidth > cell.clientWidth && cell.clientWidth > 0) {
-                            // はみ出している割合を計算して、ギリギリ収まるサイズに縮めます（少しだけ余裕を持たせます）
-                            const ratio = cell.clientWidth / cell.scrollWidth;
-                            const scale = Math.max(0.6, ratio * 0.95); // 限界まで小さくなっても読めるように0.6倍でストップさせます
+                        // ★ここが新しいルールです：実際のピクセルではなく「文字数」を数えます
+                        const textLen = cell.textContent.trim().length;
+                        
+                        // 4文字を超える場合（5文字以上）のみ縮小します
+                        if (textLen > 4) {
+                            // 5文字なら0.85倍、6文字なら0.70倍...と計算し、最小でも0.6倍でストップさせます
+                            const scale = Math.max(0.6, 1.0 - ((textLen - 4) * 0.15));
                             cell.style.fontSize = `calc(100% * ${scale})`;
                         }
                     }
