@@ -173,9 +173,9 @@ class GunshiSystem {
                 else if (perceivedDamage >= 3) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
                 else { damageMsg = "かの者の信頼が揺らぐ事はないかと存じます。"; damageIsHigh = false; }
             } else if (action.type === 'sabotage') {
-                if (perceivedDamage >= 9) { damageMsg = "城の防備を大きく破壊できることと存じます。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 6) { damageMsg = "城の防備をそれなりに削れることと存じます。"; damageIsHigh = true; }
-                else if (perceivedDamage >= 3) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
+                if (perceivedDamage >= 12) { damageMsg = "城の防備を大きく破壊できることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 8) { damageMsg = "城の防備をそれなりに削れることと存じます。"; damageIsHigh = true; }
+                else if (perceivedDamage >= 4) { damageMsg = "大きな効果は見込めないかと存じます。"; damageIsHigh = false; }
                 else { damageMsg = "ほとんど影響は無いかと存じます。"; damageIsHigh = false; }
             } else if (action.type === 'incite') {
                 if (perceivedDamage >= 9) { damageMsg = "領民の心を大きく引き離せることと存じます。"; damageIsHigh = true; }
