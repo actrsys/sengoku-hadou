@@ -47,18 +47,42 @@ class CustomScrollbar {
 
         // 行の高さ（1行分）を自動で計算してズレをなくす魔法の計算式です
         const getScrollStep = () => {
-            if (this.list.children.length > 0) {
-                const item = this.list.children[0];
-                const style = window.getComputedStyle(this.list);
-                const gap = parseFloat(style.rowGap) || parseFloat(style.gap) || 0;
-                return item.offsetHeight + gap; // 1行の高さ＋隙間
+            // ★修正：ui_info.jsで作られる「実際の1行（.select-item）」を直接探し出して測ります
+            const item = this.list.querySelector('.select-item');
+            
+            if (item) {
+                // その行を囲んでいる親要素（list-inner-wrapper）の隙間設定も取得します
+                const parentStyle = window.getComputedStyle(item.parentElement);
+                const gap = parseFloat(parentStyle.rowGap) || parseFloat(parentStyle.gap) || 0;
+                
+                let step = item.offsetHeight + gap;
+                
+                // 安全装置：もし測った高さがおかしい場合は、ui_info.jsの基本値(40)に合わせます
+                if (step <= 0 || step > this.list.clientHeight) {
+                    step = 40;
+                }
+                return step;
             }
-            return 36;
+            return 40; // 要素が何もない時の安全な基本値です
         };
 
         // ボタンのクリックイベント（計算した1行分をスクロールします）
-        this.btnUp.addEventListener('click', () => this.list.scrollBy({ top: -getScrollStep(), behavior: 'smooth' }));
-        this.btnDown.addEventListener('click', () => this.list.scrollBy({ top: getScrollStep(), behavior: 'smooth' }));
+        this.btnUp.addEventListener('click', () => {
+            if (typeof this.list.scrollBy === 'function') {
+                this.list.scrollBy({ top: -getScrollStep(), behavior: 'smooth' });
+            } else {
+                // 古いブラウザなどで scrollBy が使えない場合の安全装置です
+                this.list.scrollTop -= getScrollStep();
+            }
+        });
+        this.btnDown.addEventListener('click', () => {
+            if (typeof this.list.scrollBy === 'function') {
+                this.list.scrollBy({ top: getScrollStep(), behavior: 'smooth' });
+            } else {
+                // 古いブラウザなどで scrollBy が使えない場合の安全装置です
+                this.list.scrollTop += getScrollStep();
+            }
+        });
         
         // スマホ版（モバイル）かPC版かを自動で見分ける設定です
         this.isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
