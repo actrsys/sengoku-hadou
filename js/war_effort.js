@@ -675,42 +675,48 @@ Object.assign(WarManager.prototype, {
                         console.log("【AI防衛判断フェーズ開始】");
                         console.log(`性格: ${isAggressive ? "好戦的" : "慎重"}, 自軍合計見積: ${perceivedTotalDefSoldiers}, 敵軍合計見積: ${perceivedTotalAtkSoldiers}, 兵糧見積: ${perceivedDefRice}, 必要兵糧: ${perceivedDefSoldiers * (isAggressive ? 1.5 : 1.2)}, 城防御見積: ${perceivedDefDefense}`);
 
-                        // 判定条件
+                        // 野戦・籠城の判定条件
                         let shouldIntercept = false;
                         let reason = "";
                         
-                        // ★追加：諸勢力（国衆）の場合は、大名の城と比べて防御力が低いので、判定の基準値を半分（0.5倍）にします！
+                        // ★諸勢力（国衆）の場合は、大名の城と比べて防御力が低いので、判定の基準値を半分（0.5倍）にします！
                         const defenseThresholdRate = defCastle.isKunishu ? 0.5 : 1.0;
                         
-                        // ★追加：イベントによる強制迎撃命令がある場合は絶対に従います！
+                        // ★海戦の場合は、水際で敵を迎え撃つために野戦に出るハードルを下げます！
+                        // 好戦的な性格：通常は敵の1.2倍の兵力が必要 → 海戦なら1.0倍
+                        // 慎重な性格 ：通常は敵の1.5倍の兵力が必要 → 海戦なら1.3倍
+                        const aggressiveThreshold = this.state.isSeaBattle ? 1.0 : 1.2;
+                        const cautiousThreshold = this.state.isSeaBattle ? 1.3 : 1.5;
+                        
+                        // ★イベントによる強制迎撃命令がある場合は絶対に従います！
                         if (this.state.forceIntercept) {
                             shouldIntercept = true;
                             reason = "イベントによる強制出陣（野戦）";
                         } else if (isAggressive) {
-                            if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * 1.2) {
+                            if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * aggressiveThreshold) {
                                 shouldIntercept = true;
-                                reason = "自軍の兵力が敵より十分に多いから（野戦）";
+                                reason = this.state.isSeaBattle ? "水際迎撃の好機だから（海戦）" : "自軍の兵力が敵より十分に多いから（野戦）";
                             } else if (!defCastle.isKunishu && perceivedDefRice < perceivedDefSoldiers * 1.5) {
-                                // ★修正：諸勢力は兵糧を無から生み出す設定なので、兵糧不足を理由に野戦には出ません！
+                                // ★諸勢力は兵糧を無から生み出す設定なので、兵糧不足を理由に野戦には出ません！
                                 shouldIntercept = true;
                                 reason = "兵糧が足りないから（野戦）";
                             } else if (perceivedDefDefense < 300 * defenseThresholdRate) {
-                                // ★修正：諸勢力の場合は基準を半分（150）にして判断します！
+                                // ★諸勢力の場合は基準を半分（150）にして判断します！
                                 shouldIntercept = true;
                                 reason = "城の防御が低いから（野戦）";
                             } else {
                                 reason = "籠城できる条件が揃っているから（籠城）";
                             }
                         } else {
-                            if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * 1.5) {
+                            if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * cautiousThreshold) {
                                 shouldIntercept = true;
-                                reason = "自軍の兵力が敵より圧倒的に多いから（野戦）";
+                                reason = this.state.isSeaBattle ? "水際迎撃の好機だから（海戦）" : "自軍の兵力が敵より圧倒的に多いから（野戦）";
                             } else if (!defCastle.isKunishu && perceivedDefRice < perceivedDefSoldiers * 1.2) {
-                                // ★修正：諸勢力は兵糧を無から生み出す設定なので、兵糧不足を理由に野戦には出ません！
+                                // ★諸勢力は兵糧を無から生み出す設定なので、兵糧不足を理由に野戦には出ません！
                                 shouldIntercept = true;
                                 reason = "兵糧が足りないから（野戦）";
                             } else if (perceivedDefDefense < 400 * defenseThresholdRate) {
-                                // ★修正：諸勢力の場合は基準を半分（200）にして判断します！
+                                // ★諸勢力の場合は基準を半分（200）にして判断します！
                                 shouldIntercept = true;
                                 reason = "城の防御が低いから（野戦）";
                             } else {
