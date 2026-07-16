@@ -156,7 +156,8 @@ class DataManager {
         // ★修正：武将が一門情報を取得する前に、先に姫の一門情報（父親のデータ）を完成させておきます！
         princesses.forEach(p => {
             // ★追加：武将と同じように、ダミー用（startYearが9999）の姫を自動で死亡（非登場）扱いにする魔法です！
-            if (p.startYear === 9999) {
+            // さらに、開始年よりも前に寿命を迎えている（昔に亡くなっている）姫も死亡扱いにします！
+            if (p.startYear === 9999 || p.endYear < startYear) {
                 p.status = 'dead';
             }
             p.updateFamilyIds(bushos);
@@ -287,6 +288,32 @@ class DataManager {
             }
         });
         
+        // ★追加：ゲーム開始時点で亡くなっている武将や姫の「配偶者のつながり」を綺麗にお掃除します！
+        // 1. 亡くなっている姫の夫から、妻の記録を消します
+        princesses.forEach(p => {
+            if (p.status === 'dead' && p.husbandId > 0) {
+                const husband = bushos.find(b => b.id === p.husbandId);
+                if (husband && husband.wifeIds) {
+                    husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
+                }
+                p.husbandId = 0;
+            }
+        });
+
+        // 2. 亡くなっている武将の妻から、夫の記録を消して「未婚（未亡人）」に戻します
+        bushos.forEach(b => {
+            if (b.status === 'dead' && b.wifeIds && b.wifeIds.length > 0) {
+                b.wifeIds.forEach(wId => {
+                    const wife = princesses.find(p => p.id === wId);
+                    if (wife && wife.husbandId === b.id) {
+                        wife.husbandId = 0;
+                        wife.status = 'unmarried'; // 未亡人として未婚に戻します
+                    }
+                });
+                b.wifeIds = []; // 亡くなった武将の奥さんリストも空っぽにします
+            }
+        });
+
         // ★ここから軍団の初期設定です！
         legions.forEach(legion => {
             // 軍団長に就任する武将を探します
