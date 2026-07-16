@@ -671,6 +671,32 @@ Object.assign(UIManager.prototype, {
         overlay.classList.add('anim-map-glow'); // ぼわーっと光るアニメーションの準備
         this.mapEl.appendChild(overlay);
         
+        // ★ここから追加：ホバーで光らせる画用紙と、キープして光らせる画用紙を追加します！
+        const hoverBlinkOverlay = document.createElement('canvas');
+        hoverBlinkOverlay.id = 'hover-blink-overlay';
+        hoverBlinkOverlay.width = mapW;
+        hoverBlinkOverlay.height = mapH;
+        hoverBlinkOverlay.style.position = 'absolute';
+        hoverBlinkOverlay.style.left = '0px';
+        hoverBlinkOverlay.style.top = '0px';
+        hoverBlinkOverlay.style.pointerEvents = 'none'; 
+        hoverBlinkOverlay.style.zIndex = '3'; 
+        hoverBlinkOverlay.classList.add('anim-map-glow'); 
+        this.mapEl.appendChild(hoverBlinkOverlay);
+
+        const keepBlinkOverlay = document.createElement('canvas');
+        keepBlinkOverlay.id = 'keep-blink-overlay';
+        keepBlinkOverlay.width = mapW;
+        keepBlinkOverlay.height = mapH;
+        keepBlinkOverlay.style.position = 'absolute';
+        keepBlinkOverlay.style.left = '0px';
+        keepBlinkOverlay.style.top = '0px';
+        keepBlinkOverlay.style.pointerEvents = 'none'; 
+        keepBlinkOverlay.style.zIndex = '3'; 
+        keepBlinkOverlay.classList.add('anim-map-glow'); 
+        this.mapEl.appendChild(keepBlinkOverlay);
+        // ★追加ここまで
+
         // ==========================================
         // ★今回追加：大雪を表現するための水玉キャンバスを敷きます！
         // ==========================================
@@ -970,6 +996,12 @@ Object.assign(UIManager.prototype, {
                 else if (containerRect.right - cx < 200) { 
                     el.classList.add('tooltip-right');
                 }
+
+                // ★追加：カーソルを合わせた城の勢力の領土を光らせます！
+                const clanId = parseInt(c.ownerClan, 10);
+                if (clanId !== 0) {
+                    this.drawClanHighlight('hover-blink-overlay', clanId, {r: 255, g: 255, b: 255}, 120);
+                }
             };
 
             el.onmouseleave = () => {
@@ -977,6 +1009,9 @@ Object.assign(UIManager.prototype, {
                 if (!document.body.classList.contains('is-pc')) return;
 
                 el.classList.remove('tooltip-bottom', 'tooltip-left', 'tooltip-right');
+
+                // ★追加：光らせていた領土を消します！
+                this.clearClanHighlight('hover-blink-overlay');
             };
             
             this.mapEl.appendChild(el);
@@ -993,6 +1028,9 @@ Object.assign(UIManager.prototype, {
         this.updateCastleGlows();
         this.updateSnowOverlay(); // ★大雪の表示を更新します！
         this.updateClanColors(); // ★勢力の色で地図を塗る魔法を実行します！
+
+        // ★追加：駆虎呑狼などで、キープして光らせる魔法を実行します！
+        this.updateKeepHighlight();
 
         // ==========================================
         // ★大名選択モードの見た目とボタンを切り替える魔法です！
@@ -1197,6 +1235,16 @@ Object.assign(UIManager.prototype, {
                 } else if (this.game.selectionMode) {
                     this.game.commandSystem.resolveMapSelection(l.castle); // 外交などの魔法を発動！
                 }
+            };
+
+            // ★追加：名前シールにカーソルを合わせた時も、領土を光らせます！
+            el.onmouseenter = () => {
+                if (!document.body.classList.contains('is-pc')) return;
+                this.drawClanHighlight('hover-blink-overlay', l.clanId, {r: 255, g: 255, b: 255}, 120);
+            };
+            el.onmouseleave = () => {
+                if (!document.body.classList.contains('is-pc')) return;
+                this.clearClanHighlight('hover-blink-overlay');
             };
             // ★追加ここまで！
 
@@ -1791,6 +1839,66 @@ Object.assign(UIManager.prototype, {
         
         // ★ここで描いた勢力の色（写真）を丸ごと記憶します！
         this.lastClanColorsImageData = outputData;
+    },
+
+    // ==========================================
+    // ★新魔法：特定の勢力の領土（色がついているところ）だけを光らせる魔法です！
+    // ==========================================
+    drawClanHighlight(canvasId, clanId, colorRGB = {r: 255, g: 255, b: 255}, alpha = 100) {
+        const overlay = document.getElementById(canvasId);
+        // pixelCastleMap がまだ無い時（最初のロードの瞬間など）や、中立の時はストップします
+        if (!overlay || !this.pixelCastleMap || clanId === 0) return;
+        
+        const ctx = overlay.getContext('2d');
+        const width = overlay.width;
+        const height = overlay.height;
+        
+        // まずは前の光を消して綺麗にします
+        ctx.clearRect(0, 0, width, height);
+
+        // その勢力のお城の「出席番号」をすべて集めます
+        const targetCastleIds = this.game.castles.filter(c => c.ownerClan === clanId).map(c => c.id);
+        const targetIdsSet = new Set(targetCastleIds);
+        
+        // お城がない（滅亡しているなど）なら何もしません
+        if (targetIdsSet.size === 0) return;
+
+        // 新しく光らせるための透明な絵の具セットを作ります
+        const outputData = ctx.createImageData(width, height);
+        
+        // 全部ピクセルを調べて、対象のお城の領土だったら色を塗ります！
+        for (let i = 0; i < this.pixelCastleMap.length; i++) {
+            if (targetIdsSet.has(this.pixelCastleMap[i])) {
+                const idx = i * 4;
+                outputData.data[idx] = colorRGB.r;
+                outputData.data[idx+1] = colorRGB.g;
+                outputData.data[idx+2] = colorRGB.b;
+                outputData.data[idx+3] = alpha; 
+            }
+        }
+        
+        // 完成した光を画用紙にドーンと乗せます！
+        ctx.putImageData(outputData, 0, 0);
+    },
+    
+    // 光をサッと消す魔法
+    clearClanHighlight(canvasId) {
+        const overlay = document.getElementById(canvasId);
+        if (!overlay) return;
+        const ctx = overlay.getContext('2d');
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+    },
+
+    // 駆虎呑狼の計などで、1つ目の勢力をキープして光らせる魔法
+    updateKeepHighlight() {
+        // もし駆虎呑狼の「2つ目の勢力選択中」で、1つ目の勢力が記録されていれば…
+        if (this.game.selectionMode === 'kuko_target_b' && this.game.tempKukoData && this.game.tempKukoData.clanAId) {
+            // 標的であることを分かりやすくするため、少し赤みがかった色で光らせます
+            this.drawClanHighlight('keep-blink-overlay', this.game.tempKukoData.clanAId, {r: 255, g: 150, b: 150}, 140);
+        } else {
+            // それ以外の時はキープ用キャンバスを綺麗にします
+            this.clearClanHighlight('keep-blink-overlay');
+        }
     },
 
     // ==========================================
