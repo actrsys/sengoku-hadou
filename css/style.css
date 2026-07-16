@@ -2949,3 +2949,19 @@ body:not(.is-pc) .interview-dialog-modal .modal-footer {
     padding: 8px 12px;
     font-size: 1rem;
 }
+
+/* ==========================================
+   ★ リストなどのウインドウを開いている間、背景をストップして軽くする魔法
+   ========================================== */
+body.background-paused .anim-map-glow,
+body.background-paused .anim-map-glow-fast,
+body.background-paused .status-marks-carousel,
+body.background-paused .kunishu-icon-img,
+body.background-paused #clan-color-overlay,
+body.background-paused #snow-overlay {
+    animation-play-state: paused !important;
+}
+
+body.background-paused #map-container {
+    pointer-events: none; /* マップのクリック反応なども無効化して無駄な計算を省きます */
+}
