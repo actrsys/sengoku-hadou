@@ -640,7 +640,7 @@ class StrategySystem {
             }
         } else {
             let actionName = actionType === 'sabotage' ? '破壊工作' : actionType === 'incite' ? '扇動' : '離間計';
-            this.game.ui.showResultModal(`${doer.name}の${actionName}は失敗しました${covertMsg}`); 
+            this.game.ui.showResultModal(`${doer.name}の${actionName}は失敗しました……${covertMsg}`); 
         } 
         
         doer.isActionDone = true; 
@@ -677,6 +677,7 @@ class StrategySystem {
             
             const mods = this.getKukoModifiers(clanAId, clanBId);
             let specialMsg = "";
+            let baseMsg = `${clanA.name}と${clanB.name}の関係が悪化しました`;
             
             // 友好度0かつ隣接している場合の「大目標強制上書き」の魔法です！
             if (mods.specialEffect) {
@@ -706,15 +707,16 @@ class StrategySystem {
                     };
                     updateGrandObj(clanAId, clanBId);
                     updateGrandObj(clanBId, clanAId);
-                    specialMsg = `\nさらに、両勢力は互いを不倶戴天の敵とみなし、討伐を大目標に掲げました！`;
+                    specialMsg = `両勢力は互いを不倶戴天の敵とみなし、軍を起こしました！`;
+                    baseMsg = "";
                 }
             }
 
             this.applyCommonSuccessEffect(doer, true);
-            this.game.ui.showResultModal(`${doer.name}の駆虎呑狼が成功！\n${clanA.name}と${clanB.name}の友好度が${result.val}低下しました${specialMsg}${covertMsg}`);
+            this.game.ui.showResultModal(`${doer.name}の駆虎呑狼の計が成功！　${baseMsg}${specialMsg}${covertMsg}`);
         } else {
             this.applyCommonSuccessEffect(doer, false);
-            this.game.ui.showResultModal(`${doer.name}の駆虎呑狼は失敗しました${covertMsg}`);
+            this.game.ui.showResultModal(`${doer.name}の駆虎呑狼の計は失敗しました……${covertMsg}`);
         }
         
         doer.isActionDone = true; 
