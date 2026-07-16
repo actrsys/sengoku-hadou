@@ -468,8 +468,8 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* スマホ用自作スクロールバーのための設定 */
 .scroll-wrapper { 
     position: relative; 
-    flex: 0 0 auto; 
-    height: calc(40px * 9 + 28px);
+    flex: 0 0 auto;
+    height: calc(40px * 9 + 4px);
     width: 100%; display: flex; overflow: hidden; 
     border: 2px solid #d4af37;
     border-radius: 4px; 
@@ -2298,7 +2298,7 @@ body.is-pc {
     .cmd-btn { padding: 8px 8px; font-size: 1.2rem; height: auto; }
 
     /* PCリストレイアウト */
-    .scroll-wrapper { height: calc(44px * 9 + 28px); max-height: none; flex: 0 0 auto; }
+    .scroll-wrapper { height: calc(44px * 9 + 4px); max-height: none; flex: 0 0 auto; }
     .scroll-wrapper.no-custom-scrollbar { height: auto !important; }
     .list-container { scroll-padding-top: 44px; }
     .list-header, .select-item { grid-template-columns: var(--grid-cols-pc, 45px 100px 60px repeat(6, 1fr)); font-size: 0.85rem; height: 44px; }
