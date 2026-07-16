@@ -45,13 +45,31 @@ class CustomScrollbar {
         this.btnDown.className = 'custom-scrollbar-btn down';
         this.wrapper.appendChild(this.btnDown);
 
-        // ボタンのクリックイベント（１行分スクロール）
-        this.btnUp.addEventListener('click', () => this.list.scrollBy({ top: -36, behavior: 'smooth' }));
-        this.btnDown.addEventListener('click', () => this.list.scrollBy({ top: 36, behavior: 'smooth' }));
+        // 行の高さ（1行分）を自動で計算してズレをなくす魔法の計算式です
+        const getScrollStep = () => {
+            if (this.list.children.length > 0) {
+                const item = this.list.children[0];
+                const style = window.getComputedStyle(this.list);
+                const gap = parseFloat(style.rowGap) || parseFloat(style.gap) || 0;
+                return item.offsetHeight + gap; // 1行の高さ＋隙間
+            }
+            return 36;
+        };
+
+        // ボタンのクリックイベント（計算した1行分をスクロールします）
+        this.btnUp.addEventListener('click', () => this.list.scrollBy({ top: -getScrollStep(), behavior: 'smooth' }));
+        this.btnDown.addEventListener('click', () => this.list.scrollBy({ top: getScrollStep(), behavior: 'smooth' }));
         
-        this.isDraggingY = false;
-        this.startY = 0;
-        this.startScrollTop = 0;
+        // スマホ版（モバイル）かPC版かを自動で見分ける設定です
+        this.isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        this.isLocked = false;
+
+        // PC版の時だけ、マウスでバーを掴んで引っ張る（ドラッグする）ための準備をします
+        if (!this.isMobile) {
+            this.isDraggingY = false;
+            this.startY = 0;
+            this.startScrollTop = 0;
+        }
         
         this.initEvents();
     }
@@ -63,12 +81,24 @@ class CustomScrollbar {
 
         // --- 縦のバーの更新 ---
         const trackHeight = this.trackY.clientHeight || listHeight;
+        
+        // スマホ版の時だけバーを触れなく（見るだけ）し、PC版では掴めるようにします
+        if (this.isMobile) {
+            this.trackY.style.pointerEvents = 'none';
+            this.thumbY.style.pointerEvents = 'none';
+        } else {
+            this.trackY.style.pointerEvents = 'auto';
+            this.thumbY.style.pointerEvents = 'auto';
+        }
+        
         if (scrollHeight <= listHeight) {
             this.thumbY.style.height = '100%';
             this.thumbY.style.top = '0px';
-            this.thumbY.style.pointerEvents = 'none';
+            // PC版でスクロールが不要な状態の時は掴めないようにします
+            if (!this.isMobile) {
+                this.thumbY.style.pointerEvents = 'none';
+            }
         } else {
-            this.thumbY.style.pointerEvents = 'auto';
             let thumbHeight = Math.max(40, (listHeight / scrollHeight) * trackHeight);
             this.thumbY.style.height = `${thumbHeight}px`;
             const maxScrollTop = scrollHeight - listHeight;
@@ -86,72 +116,86 @@ class CustomScrollbar {
     
     initEvents() {
         this.onListScroll = () => {
-            if (!this.isDraggingY) {
-                // ★軽量化：スクロール時の計算に少しだけ休憩（アニメーションフレーム）を挟み、スマホでのカクつきを防ぎます！
-                if (!this._scrollTicking) {
-                    requestAnimationFrame(() => {
-                        this.update();
-                        this._scrollTicking = false;
-                    });
-                    this._scrollTicking = true;
-                }
+            // ★軽量化：スクロール時の計算に少しだけ休憩（アニメーションフレーム）を挟み、スマホでのカクつきを防ぎます！
+            if (!this._scrollTicking) {
+                requestAnimationFrame(() => {
+                    this.update();
+                    this._scrollTicking = false;
+                });
+                this._scrollTicking = true;
             }
         };
 
-        // 縦つまみのドラッグ操作
-        this.onStartY = (e) => {
-            this.isDraggingY = true;
-            this.thumbY.classList.add('dragging');
-            this.startY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
-            this.startScrollTop = this.list.scrollTop;
-            if (e.cancelable) e.preventDefault();
-        };
-        
-        this.onMoveY = (e) => {
-            if (!this.isDraggingY) return;
-            const currentY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
-            const deltaY = currentY - this.startY;
-            
-            const listHeight = this.list.clientHeight;
-            const scrollHeight = this.list.scrollHeight;
-            const trackHeight = this.trackY.clientHeight || listHeight; 
-            const thumbHeight = parseFloat(this.thumbY.style.height);
-            
-            const maxScrollTop = scrollHeight - listHeight;
-            const maxThumbTop = trackHeight - thumbHeight; 
-            
-            const scrollRatio = deltaY / maxThumbTop;
-            this.list.scrollTop = this.startScrollTop + (scrollRatio * maxScrollTop);
-            
-            this.update();
-            if (e.cancelable) e.preventDefault();
-        };
-        
-        this.onEnd = () => {
-            this.isDraggingY = false;
-            this.thumbY.classList.remove('dragging');
-        };
+        // スマホ（モバイルデバイス）用の指スワイプ制御の処理です
+        if (this.isMobile) {
+            this.onListTouchMove = (e) => {
+                const globalLoading = document.getElementById('global-loading-screen');
+                const aiGuard = document.getElementById('ai-guard');
+                const warAiGuard = document.getElementById('war-ai-guard');
+                
+                const isGlobalLoading = globalLoading && !globalLoading.classList.contains('hidden');
+                const isAIGuard = aiGuard && !aiGuard.classList.contains('hidden');
+                const isWarAiGuard = warAiGuard && !warAiGuard.classList.contains('hidden');
 
-        this.onDocTouchMove = (e) => {
-            if (this.isDraggingY) this.onMoveY(e);
-        };
+                if (isGlobalLoading || isAIGuard || isWarAiGuard || this.isLocked) {
+                    if (e.cancelable) e.preventDefault();
+                }
+            };
+        }
 
-        this.onDocMouseMove = (e) => {
-            if (this.isDraggingY) this.onMoveY(e);
-        };
+        // PC用のマウスドラッグ（バーを掴んでスクロールさせる処理）です
+        if (!this.isMobile) {
+            this.onStartY = (e) => {
+                this.isDraggingY = true;
+                this.thumbY.classList.add('dragging');
+                this.startY = e.clientY;
+                this.startScrollTop = this.list.scrollTop;
+            };
+            
+            this.onMoveY = (e) => {
+                if (!this.isDraggingY) return;
+                const currentY = e.clientY;
+                const deltaY = currentY - this.startY;
+                
+                const listHeight = this.list.clientHeight;
+                const scrollHeight = this.list.scrollHeight;
+                const trackHeight = this.trackY.clientHeight || listHeight; 
+                const thumbHeight = parseFloat(this.thumbY.style.height);
+                
+                const maxScrollTop = scrollHeight - listHeight;
+                const maxThumbTop = trackHeight - thumbHeight; 
+                
+                const scrollRatio = deltaY / maxThumbTop;
+                this.list.scrollTop = this.startScrollTop + (scrollRatio * maxScrollTop);
+                
+                this.update();
+            };
+            
+            this.onEnd = () => {
+                this.isDraggingY = false;
+                this.thumbY.classList.remove('dragging');
+            };
+
+            this.onDocMouseMove = (e) => {
+                if (this.isDraggingY) this.onMoveY(e);
+            };
+        }
         
         this.onWindowResize = () => this.update();
 
         // ここから実際にイベントを取り付けます
         this.list.addEventListener('scroll', this.onListScroll);
         
-        this.thumbY.addEventListener('touchstart', this.onStartY, { passive: false });
-        this.thumbY.addEventListener('mousedown', this.onStartY);
-
-        document.addEventListener('touchmove', this.onDocTouchMove, { passive: false });
-        document.addEventListener('mousemove', this.onDocMouseMove);
-        document.addEventListener('touchend', this.onEnd);
-        document.addEventListener('mouseup', this.onEnd);
+        if (this.isMobile) {
+            // スマホ版：指でのスワイプのみ監視します
+            this.list.addEventListener('touchmove', this.onListTouchMove, { passive: false });
+        } else {
+            // PC版：マウス操作（クリックやドラッグ）のみ監視します
+            this.thumbY.addEventListener('mousedown', this.onStartY);
+            document.addEventListener('mousemove', this.onDocMouseMove);
+            document.addEventListener('mouseup', this.onEnd);
+        }
+        
         window.addEventListener('resize', this.onWindowResize);
     }
 
@@ -165,17 +209,23 @@ class CustomScrollbar {
         
         if (this.onListScroll) this.list.removeEventListener('scroll', this.onListScroll);
         
-        if (this.onStartY) {
-            this.thumbY.removeEventListener('touchstart', this.onStartY);
-            this.thumbY.removeEventListener('mousedown', this.onStartY);
+        // スマホ版とPC版でそれぞれ取り付けたイベントを、綺麗にお片付け（解除）します
+        if (this.isMobile) {
+            if (this.onListTouchMove) {
+                this.list.removeEventListener('touchmove', this.onListTouchMove);
+            }
+        } else {
+            if (this.thumbY && this.onStartY) {
+                this.thumbY.removeEventListener('mousedown', this.onStartY);
+            }
+            if (this.onDocMouseMove) {
+                document.removeEventListener('mousemove', this.onDocMouseMove);
+            }
+            if (this.onEnd) {
+                document.removeEventListener('mouseup', this.onEnd);
+            }
         }
 
-        if (this.onDocTouchMove) document.removeEventListener('touchmove', this.onDocTouchMove);
-        if (this.onDocMouseMove) document.removeEventListener('mousemove', this.onDocMouseMove);
-        if (this.onEnd) {
-            document.removeEventListener('touchend', this.onEnd);
-            document.removeEventListener('mouseup', this.onEnd);
-        }
         if (this.onWindowResize) window.removeEventListener('resize', this.onWindowResize);
     }
 }
