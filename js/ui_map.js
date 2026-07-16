@@ -1893,11 +1893,24 @@ Object.assign(UIManager.prototype, {
     updateKeepHighlight() {
         // もし駆虎呑狼の「2つ目の勢力選択中」で、1つ目の勢力が記録されていれば…
         if (this.game.selectionMode === 'kuko_target_b' && this.game.tempKukoData && this.game.tempKukoData.clanAId) {
-            // 標的であることを分かりやすくするため、少し赤みがかった色で光らせます
-            this.drawClanHighlight('keep-blink-overlay', this.game.tempKukoData.clanAId, {r: 255, g: 150, b: 150}, 140);
+            // ★変更１：色を「黄色」にして光らせます！
+            this.drawClanHighlight('keep-blink-overlay', this.game.tempKukoData.clanAId, {r: 255, g: 255, b: 0}, 160);
+            
+            // ★変更２：内側から外側へ拡散するような、ぼやける光のエフェクト（フィルター）をかけます！
+            const keepOverlay = document.getElementById('keep-blink-overlay');
+            if (keepOverlay) {
+                // ドロップシャドウ（外側に漏れる光）と、ブラー（全体のぼやけ）を組み合わせます
+                keepOverlay.style.filter = 'drop-shadow(0px 0px 15px rgba(255, 255, 0, 1)) blur(3px)';
+            }
         } else {
             // それ以外の時はキープ用キャンバスを綺麗にします
             this.clearClanHighlight('keep-blink-overlay');
+
+            // ★変更３：魔法を使い終わったら、光のエフェクトも忘れずにリセットしておきます！
+            const keepOverlay = document.getElementById('keep-blink-overlay');
+            if (keepOverlay) {
+                keepOverlay.style.filter = 'none';
+            }
         }
     },
 
