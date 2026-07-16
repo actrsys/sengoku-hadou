@@ -1636,15 +1636,24 @@ class UIManager {
             this.mobileBottomInfo.innerHTML = ``; 
         }
     }
-
+    
     showControlPanel(castle) { 
         this.currentCastle = castle; 
         
-        // ★修正：敵のターン中（AIターン）に援軍のために自城をクリックした時、
+        // ★敵のターン中（AIターン）に援軍のために自城をクリックした時、
         // AIフラグが勝手に消し飛んでしまわないように守ります！
         if (Number(castle.ownerClan) === Number(this.game.playerClanId)) {
             if (!this.game.selectionMode && !this.game.isProcessingAI) {
                 this.game.isProcessingAI = false;
+            }
+        }
+        
+        // ★AIのターン進行中は、重たい画面更新（DOM操作）をスキップして超軽量化します！
+        if (this.game.isProcessingAI) {
+            // 外交や援軍などの特別な選択中でない限り、画面をいちいち書き換えるのを防ぎます
+            if (!this.game.selectionMode && Number(castle.ownerClan) !== Number(this.game.playerClanId)) {
+                this.clearCommandMenu();
+                return; // ここで処理を止めて、情報パネルや光（Glow）の更新をスキップします！
             }
         }
         

@@ -2258,7 +2258,6 @@ class GameManager {
             // ★ここを書き足し：行動済みの城をスキップする時も、一瞬だけ数字を進めます！
             if (this.isProcessingAI && this.ui) {
                 this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
-                this.ui.showControlPanel(castle); // ★追加：スキップ時も城の情報をババッと切り替えます！
             }
             // ★追加：スマホがパンクしないように、ここでほんの一瞬だけ「息継ぎ（お休み）」をさせます！
             setTimeout(() => {
@@ -2266,13 +2265,12 @@ class GameManager {
             }, 0);
             return;
         }
-
+        
         if(!castle || castle.ownerClan === 0 || !this.clans.find(c => Number(c.id) === Number(castle.ownerClan))) { 
             console.log(`空き城またはデータのない城をスキップしました。`);
             // ★ここを書き足し：空城をスキップする時も、一瞬だけ数字を進めます！
             if (this.isProcessingAI && this.ui) {
                 this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
-                this.ui.showControlPanel(castle); // ★追加：スキップ時も城の情報をババッと切り替えます！
             }
             this.currentIndex++; 
             // ★追加：空き城を連続で飛ばす時も、スマホがパンクしないように一瞬「息継ぎ」をさせます！
@@ -2308,8 +2306,7 @@ class GameManager {
             this.finishTurn();
             return;
         }
-
-        // ★超軽量化：AIのターン中はマップの再描画をストップします！
+        
         // プレイヤーの直轄城（手動操作）の時だけマップを綺麗に描き直すようにしました。
         if (isPlayerCastle && !castle.isDelegated) {
             this.ui.renderMap();
@@ -2328,7 +2325,8 @@ class GameManager {
                 }
                 
                 this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
-                this.ui.showControlPanel(castle);
+                // ただし、UIに現在の城だけは認識させておきます。
+                if (this.ui) this.ui.currentCastle = castle;
                 
                 const delay = isImportant ? 30 : 30;
 
@@ -2370,8 +2368,9 @@ class GameManager {
             
             // 進捗を表示
             this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
-            // パネルに情報を表示
-            this.ui.showControlPanel(castle);
+            
+            // UI側に現在の城だけをこっそり教えておきます。
+            if (this.ui) this.ui.currentCastle = castle;
             
             const delay = isImportant ? 30 : 30;
 
