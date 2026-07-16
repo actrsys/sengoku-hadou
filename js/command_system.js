@@ -3275,10 +3275,9 @@ class CommandSystem {
         if (!daimyo.baseFamilyIds.includes(targetBusho.id)) {
             daimyo.baseFamilyIds.push(targetBusho.id);
         }
-
-        // ③ 最新の一門状態に更新します
-        daimyo.updateFamilyIds(this.game.princesses);
-        targetBusho.updateFamilyIds(this.game.princesses);
+        
+        // ③ ゲーム全体の一門状態を最新に更新します！
+        FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
 
         this.game.ui.showResultModal(`${targetBusho.name} を養子として迎え入れました。以降、${targetBusho.name} は当家の一門武将となります。`);
         this.game.ui.updatePanelHeader();
@@ -3325,8 +3324,8 @@ class CommandSystem {
             busho.wifeIds.push(princess.id);
         }
 
-        princess.updateFamilyIds(this.game.bushos);
-        busho.updateFamilyIds(this.game.princesses);
+        // ★ゲーム全体の一門状態を最新に更新します！
+        FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
 
         busho.loyalty = 100;
 

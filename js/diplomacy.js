@@ -1163,7 +1163,7 @@ class DiplomacyManager {
                                     className: 'btn-danger',
                                     onClick: () => {
                                         this.game.ui.showDialog(
-                                            `「私の怨念は必ずや貴方様を取り殺します。きっと非業の最期を遂げることでしょう。」`,
+                                            `「私の怨恨は悪鬼となり、数年ならずして家名断絶せしむことでしょう」`,
                                             false,
                                             () => {
                                                 this.game.ui.showDialog(
@@ -1306,7 +1306,9 @@ class DiplomacyManager {
                     }
                     if (!busho.wifeIds) busho.wifeIds = [];
                     if (!busho.wifeIds.includes(princess.id)) busho.wifeIds.push(princess.id);
-                    busho.updateFamilyIds(this.game.princesses);
+                    
+                    // ★ゲーム全体の一門状態を最新に更新します！
+                    FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
                     
                     const relA = this.getDiplomacyData(doer.clan, targetClanId);
                     const relB = this.getDiplomacyData(targetClanId, doer.clan);
@@ -1405,7 +1407,9 @@ class DiplomacyManager {
                     }
                     if (!busho.wifeIds) busho.wifeIds = [];
                     if (!busho.wifeIds.includes(princess.id)) busho.wifeIds.push(princess.id);
-                    busho.updateFamilyIds(this.game.princesses);
+                    
+                    // ★ゲーム全体の一門状態を最新に更新します！
+                    FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
                     
                     if (relationA) relationA.isMarriage = true;
                     if (relationB) relationB.isMarriage = true;
@@ -1887,7 +1891,9 @@ class DiplomacyManager {
                 targetBusho.wifeIds.push(princessId);    // 側室なのでリストの末尾に並ばせます
             }
         }
-        targetBusho.updateFamilyIds(this.game.princesses);
+        
+        // ★ゲーム全体の一門状態を最新に更新します！
+        FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
 
         this.changeStatus(this.game.playerClanId, targetClanId, '同盟');
         
@@ -2266,7 +2272,9 @@ class DiplomacyManager {
                         doerClan.princessIds = doerClan.princessIds.filter(id => id !== princess.id);
                         if (!busho.wifeIds) busho.wifeIds = [];
                         if (!busho.wifeIds.includes(princess.id)) busho.wifeIds.push(princess.id);
-                        busho.updateFamilyIds(this.game.princesses);
+                        
+                        // ★ゲーム全体の一門状態を最新に更新します！
+                        FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
                         
                         // 同盟にはせず、婚姻フラグだけを立てる
                         if (relationA) relationA.isMarriage = true;
