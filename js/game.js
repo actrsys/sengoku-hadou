@@ -161,7 +161,7 @@ class DataManager {
             if (p.startYear === 9999 || p.endYear < startYear) {
                 p.status = 'dead';
             }
-            p.updateFamilyIds(bushos);
+            p.updateFamilyIds(bushos, princesses); // ★武将と姫の両方を渡します
         });
 
         castles.forEach(c => c.samuraiIds = []);
@@ -278,7 +278,7 @@ class DataManager {
             }
 
             // ★今回追加：ゲーム開始の瞬間に、姫の名簿を使って「武将の一門関係（血の繋がり）」を繋ぎます！
-            b.updateFamilyIds(princesses);
+            b.updateFamilyIds(bushos, princesses); // ★武将と姫の両方を渡します
             
             // ★今回追加：軍師の設定
             if (b.clan !== 0) {
@@ -2674,8 +2674,9 @@ class GameManager {
                 // ★今回追加：セーブデータから軍団の名簿を元通りに復元します
                 this.legions = (d.legions || []).map(l => new Legion(l));
                 
-                // ★追加：ロード時に姫の一門情報を再構築します
-                this.princesses.forEach(p => p.updateFamilyIds(this.bushos));
+                // ★追加：ロード時に一門情報を再構築します
+                this.princesses.forEach(p => p.updateFamilyIds(this.bushos, this.princesses));
+                this.bushos.forEach(b => b.updateFamilyIds(this.bushos, this.princesses));
 
                 // ★ここを書き足し！：古いデータでシールが剥がれている場合のために、名簿を見て貼り直します！
                 this.legions.forEach(legion => {
@@ -2864,7 +2865,8 @@ class GameManager {
             this.provinces = (d.provinces || []).map(p => new Province(p));
             this.legions = (d.legions || []).map(l => new Legion(l));
             
-            this.princesses.forEach(p => p.updateFamilyIds(this.bushos));
+            this.princesses.forEach(p => p.updateFamilyIds(this.bushos, this.princesses));
+            this.bushos.forEach(b => b.updateFamilyIds(this.bushos, this.princesses));
 
             this.legions.forEach(legion => {
                 const commander = this.bushos.find(b => b.id === legion.commanderId);
