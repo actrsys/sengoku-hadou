@@ -18,6 +18,11 @@ class UIInfoManager {
         this.currentModalInfo = null;
         if (this.ui && this.ui.selectorModal) this.ui.selectorModal.classList.add('hidden');
         
+        // ★ここを書き足し：リストを完全に閉じる時に、背景の更新を再開させます！
+        if (this.ui && typeof this.ui.resumeBackgroundUpdates === 'function') {
+            this.ui.resumeBackgroundUpdates();
+        }
+        
         // 武将一覧などで使う状態のリセット
         this.bushoCurrentTab = 'stats';
         this.bushoCurrentScope = 'clan';
@@ -186,6 +191,11 @@ class UIInfoManager {
     pushModal(pageType, renderArgs) {
         if (!this.modalHistory) this.modalHistory = [];
         
+        // ★ここを書き足し：新しい画面（リストなど）を開く時に、背景の更新をストップします！
+        if (this.ui && typeof this.ui.pauseBackgroundUpdates === 'function') {
+            this.ui.pauseBackgroundUpdates();
+        }
+
         if (this.currentModalInfo) {
             // 今開いている画面のスクロール位置をメモしておきます
             const listEl = document.getElementById('selector-list');

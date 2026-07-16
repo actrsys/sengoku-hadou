@@ -1252,6 +1252,7 @@ Object.assign(UIManager.prototype, {
     },
     
     updateCastleGlows() {
+        if (this.isBackgroundPaused) return;
         if (!this.mapEl) return;
         
         // ★ 修正：大名選択画面では、選んだ大名の城だけを青く光らせます
@@ -1396,6 +1397,7 @@ Object.assign(UIManager.prototype, {
     // ★大雪の国のマップ上に、白い水玉模様を描く魔法です！
     // ==========================================
     updateSnowOverlay() {
+        if (this.isBackgroundPaused) return;
         const overlay = document.getElementById('snow-overlay');
         if (!overlay) return;
 
@@ -1502,6 +1504,7 @@ Object.assign(UIManager.prototype, {
     // ★新魔法：国を勢力の色で塗りつぶす魔法です！
     // ==========================================
     updateClanColors() {
+        if (this.isBackgroundPaused) return;
         const overlay = document.getElementById('clan-color-overlay');
         if (!overlay) return;
 
@@ -1897,6 +1900,7 @@ Object.assign(UIManager.prototype, {
 
     // 駆虎呑狼の計などで、1つ目の勢力をキープして光らせる魔法
     updateKeepHighlight() {
+        if (this.isBackgroundPaused) return;
         // もし駆虎呑狼の「2つ目の勢力選択中」で、1つ目の勢力が記録されていれば…
         if (this.game.selectionMode === 'kuko_target_b' && this.game.tempKukoData && this.game.tempKukoData.clanAId) {
             // ★色を「黄色」にして光らせます！
