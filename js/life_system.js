@@ -696,8 +696,9 @@ class LifeSystem {
                         }
                     }
                     
-                    // ★追加：夫が死亡したので、夫の一門から外れるようリストを更新します
-                    princess.updateFamilyIds(this.game.bushos);
+                    // ★修正：夫が死亡したので、司令塔を使って姫本人や、
+                    // 婿を失ったお父さん（大名）の親戚リストもまとめて最新に更新します！
+                    FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
                 }
             }
             busho.wifeIds = []; // リストを空にします
@@ -1680,8 +1681,8 @@ class LifeSystem {
         // 完成したデータを正式な「姫クラス」にして、ゲーム本体の名簿に登録します
         const princess = new Princess(princessData);
         
-        // ★追加：父親の一門を引き継ぐためリストを更新します
-        princess.updateFamilyIds(this.game.bushos);
+        // ★修正：司令塔を使って、新しく生まれた姫の親戚リストを正しく繋ぎ合わせます！
+        FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
         
         this.game.princesses.push(princess);
 
