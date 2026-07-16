@@ -1855,6 +1855,9 @@ Object.assign(UIManager.prototype, {
         // まずは前の光を消して綺麗にします
         ctx.clearRect(0, 0, width, height);
 
+        // ★追加：色に合わせて、外側にぼやっと広がる光のフィルター（魔法）をかけます！
+        overlay.style.filter = `drop-shadow(0px 0px 15px rgba(${colorRGB.r}, ${colorRGB.g}, ${colorRGB.b}, 1)) blur(3px)`;
+
         // その勢力のお城の「出席番号」をすべて集めます
         const targetCastleIds = this.game.castles.filter(c => c.ownerClan === clanId).map(c => c.id);
         const targetIdsSet = new Set(targetCastleIds);
@@ -1884,6 +1887,10 @@ Object.assign(UIManager.prototype, {
     clearClanHighlight(canvasId) {
         const overlay = document.getElementById(canvasId);
         if (!overlay) return;
+        
+        // ★追加：光のフィルター効果も忘れずにリセット（消去）します！
+        overlay.style.filter = 'none';
+        
         const ctx = overlay.getContext('2d');
         ctx.clearRect(0, 0, overlay.width, overlay.height);
     },
@@ -1892,24 +1899,13 @@ Object.assign(UIManager.prototype, {
     updateKeepHighlight() {
         // もし駆虎呑狼の「2つ目の勢力選択中」で、1つ目の勢力が記録されていれば…
         if (this.game.selectionMode === 'kuko_target_b' && this.game.tempKukoData && this.game.tempKukoData.clanAId) {
-            // ★変更１：色を「黄色」にして光らせます！
+            // ★色を「黄色」にして光らせます！
+            // （ぼやける光の魔法は drawClanHighlight の中で自動的にかかるようになりました！）
             this.drawClanHighlight('keep-blink-overlay', this.game.tempKukoData.clanAId, {r: 255, g: 255, b: 0}, 160);
-            
-            // ★変更２：内側から外側へ拡散するような、ぼやける光のエフェクト（フィルター）をかけます！
-            const keepOverlay = document.getElementById('keep-blink-overlay');
-            if (keepOverlay) {
-                // ドロップシャドウ（外側に漏れる光）と、ブラー（全体のぼやけ）を組み合わせます
-                keepOverlay.style.filter = 'drop-shadow(0px 0px 15px rgba(255, 255, 0, 1)) blur(3px)';
-            }
         } else {
             // それ以外の時はキープ用キャンバスを綺麗にします
+            // （フィルターの解除も clearClanHighlight の中で自動的に行われます！）
             this.clearClanHighlight('keep-blink-overlay');
-
-            // ★変更３：魔法を使い終わったら、光のエフェクトも忘れずにリセットしておきます！
-            const keepOverlay = document.getElementById('keep-blink-overlay');
-            if (keepOverlay) {
-                keepOverlay.style.filter = 'none';
-            }
         }
     },
 
@@ -2005,10 +2001,10 @@ Object.assign(UIManager.prototype, {
             const outputDataA = ctx.createImageData(width, height);
             const outputDataB = ctx.createImageData(width, height);
             
-            if (this.pixelCastleMap) {
-                const colorA_RGB = colorA || { r: 255, g: 255, b: 255 };
-                const colorB_RGB = colorB || { r: 255, g: 255, b: 255 };
+            const colorA_RGB = colorA || { r: 255, g: 255, b: 255 };
+            const colorB_RGB = colorB || { r: 255, g: 255, b: 255 };
 
+            if (this.pixelCastleMap) {
                 const targetPixels = new Uint8Array(width * height);
 
                 const targetIdsArray = Array.isArray(castleIdOrIds) ? castleIdOrIds : [castleIdOrIds];
@@ -2073,6 +2069,8 @@ Object.assign(UIManager.prototype, {
             const animate = (currentTime) => {
                 if (currentTime - startTime > durationMs) {
                     ctx.clearRect(0, 0, width, height);
+                    // ★終わったらフィルター（ぼやっと光る効果）をリセットします！
+                    overlay.style.filter = 'none';
                     this.hideMapGuard(); 
                     resolve();
                     return;
@@ -2082,6 +2080,14 @@ Object.assign(UIManager.prototype, {
                     isA = !isA;
                     lastSwitchTime = currentTime;
                     ctx.clearRect(0, 0, width, height);
+                    
+                    // ★追加：点滅する色に合わせて、ぼやっと広がるフィルターの色も変えます！
+                    if (isA) {
+                        overlay.style.filter = `drop-shadow(0px 0px 15px rgba(${colorA_RGB.r}, ${colorA_RGB.g}, ${colorA_RGB.b}, 1)) blur(3px)`;
+                    } else {
+                        overlay.style.filter = `drop-shadow(0px 0px 15px rgba(${colorB_RGB.r}, ${colorB_RGB.g}, ${colorB_RGB.b}, 1)) blur(3px)`;
+                    }
+
                     // ★重たい作業をやめて、用意したスタンプをポンッと押すだけにします！
                     ctx.drawImage(isA ? tempCanvasA : tempCanvasB, 0, 0);
                 }
@@ -2089,14 +2095,15 @@ Object.assign(UIManager.prototype, {
                 requestAnimationFrame(animate);
             };
             
-            // ★最初の1回目もスタンプを押します！
+            // ★最初の1回目もスタンプとフィルターをセットします！
+            overlay.style.filter = `drop-shadow(0px 0px 15px rgba(${colorA_RGB.r}, ${colorA_RGB.g}, ${colorA_RGB.b}, 1)) blur(3px)`;
             ctx.drawImage(tempCanvasA, 0, 0);
             requestAnimationFrame(animate);
         });
     },
 
     // ==========================================
-    // ★ここから追加：城が落ちた時の、障壁がフワッと立ち上って白く光る魔法！
+    // ★城が落ちた時の、フワッと白く光る魔法！
     // ==========================================
     playCaptureEffect(castleIdOrIds, onHalfway) {
         return new Promise(resolve => {
@@ -2164,6 +2171,9 @@ Object.assign(UIManager.prototype, {
             tempCtx.putImageData(baseImgData, 0, 0);
             // ★新しい魔法ここまで！
             
+            // ★追加：城が落ちる時は白い光なので、白いぼやっとしたフィルターをかけます！
+            overlay.style.filter = 'drop-shadow(0px 0px 15px rgba(255, 255, 255, 1)) blur(3px)';
+            
             let startTime = performance.now();
             const durationRise = 800;
             const durationFlash = 600;
@@ -2197,6 +2207,8 @@ Object.assign(UIManager.prototype, {
                     requestAnimationFrame(animate);
                 } else {
                     ctx.clearRect(0, 0, width, height);
+                    // ★終わったらフィルターを忘れずにリセットします！
+                    overlay.style.filter = 'none';
                     this.hideMapGuard();
                     resolve();
                 }
