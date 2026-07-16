@@ -1168,13 +1168,19 @@ class CommandSystem {
             return [];
         }
 
-        const spec = COMMAND_SPECS[type];
-        if (!spec || !spec.targetType) return [];
+        let targetType = '';
+        if (type === 'kuko_target_b') {
+            targetType = 'kuko_target_b';
+        } else {
+            const spec = COMMAND_SPECS[type];
+            if (!spec || !spec.targetType) return [];
+            targetType = spec.targetType;
+        }
 
         const c = this.game.getCurrentTurnCastle();
         const playerClanId = Number(this.game.playerClanId);
         
-        switch (spec.targetType) {
+        switch (targetType) {
             case 'enemy_valid': {
                 // warManagerからの基本リストを取得
                 const baseTargets = this.game.warManager.getValidWarTargets(c);
@@ -1593,10 +1599,12 @@ class CommandSystem {
         }
 
         if (actionType === 'kuko_doer') {
-            const clanAId = this.game.getCastle(targetId).ownerClan;
-            // 勢力Aと担当武将の情報を一時的に覚えさせておき、もう一度マップ選択を開きます
-            this.game.tempKukoData = { doerId: firstId, clanAId: clanAId };
-            this.enterMapSelection('kuko_target_b');
+            const data = this.game.tempKukoData;
+            this.game.tempKukoData = null; 
+            
+            const trueProb = this.game.strategySystem.getKukoProb(firstId, data.clanAId, data.clanBId);
+            const expectedDamage = this.game.strategySystem.getKukoExpectedDamage(firstId, data.clanAId, data.clanBId);
+            this.showAdviceAndExecute('kuko', () => this.game.strategySystem.executeKuko(firstId, data.clanAId, data.clanBId), { trueProb: trueProb, expectedDamage: expectedDamage });
             return;
         }
 
@@ -2725,14 +2733,9 @@ class CommandSystem {
         }
         
         if (mode === 'kuko_target_b') {
-            const clanBId = targetCastle.ownerClan;
-            const data = this.game.tempKukoData;
-            this.game.tempKukoData = null; // 使い終わったらお掃除します
-            this.game.ui.cancelMapSelection();
-            
-            const trueProb = this.game.strategySystem.getKukoProb(data.doerId, data.clanAId, clanBId);
-            const expectedDamage = this.game.strategySystem.getKukoExpectedDamage(data.doerId, data.clanAId, clanBId);
-            this.showAdviceAndExecute('kuko', () => this.game.strategySystem.executeKuko(data.doerId, data.clanAId, clanBId), { trueProb: trueProb, expectedDamage: expectedDamage });
+            this.game.tempKukoData.clanBId = targetCastle.ownerClan;
+            const currentCastleId = this.game.getCurrentTurnCastle().id;
+            this.game.ui.openBushoSelector('kuko_doer', currentCastleId, null, onBackToMap);
             return;
         }
 
@@ -2753,7 +2756,8 @@ class CommandSystem {
         } else if (mode === 'headhunt' || mode === 'headhunt_select_castle') {
             this.game.ui.openBushoSelector('headhunt_target', targetCastle.id, null, onBackToMap);
         } else if (mode === 'kuko') {
-            this.game.ui.openBushoSelector('kuko_doer', targetCastle.id, null, onBackToMap);
+            this.game.tempKukoData = { clanAId: targetCastle.ownerClan };
+            this.enterMapSelection('kuko_target_b');
         } else if (mode === 'goodwill') {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'goodwill' }, onBackToMap);
         } else if (mode === 'alliance') {
