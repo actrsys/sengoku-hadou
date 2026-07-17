@@ -125,7 +125,7 @@ Object.assign(UIInfoManager.prototype, {
             let overBarHtml = overPercent > 0 ? `<div class="bar-fill-busho-over" style="width:${overPercent}%;"></div>` : "";
             let fillClass = overPercent > 0 ? "bar-fill-busho over-connected" : "bar-fill-busho";
 
-            // ★追加：経験値の計算（魅力など経験値がないものは空っぽにします）
+            // ★経験値の計算
             let expKey = "";
             if (statKey === 'leadership') expKey = 'expLeadership';
             else if (statKey === 'strength') expKey = 'expStrength';
@@ -134,30 +134,45 @@ Object.assign(UIInfoManager.prototype, {
             else if (statKey === 'intelligence') expKey = 'expIntelligence';
             
             let expPercent = 0;
+            let isMaxExp = false; // ★カンストしているかの印
+            
             if (expKey && typeof busho[expKey] === 'number') {
-                // 100で1ポイントなので、100で割った余りが現在のゲージ（%）になります
-                expPercent = busho[expKey] % 100;
+                const baseVal = busho['_' + statKey] || 0;
+                const maxExp = baseVal < 90 ? 3000 : 2000;
+                const currentExp = busho[expKey];
+                
+                if (currentExp >= maxExp) {
+                    expPercent = 100;
+                    isMaxExp = true; 
+                } else {
+                    expPercent = currentExp % 100;
+                }
             }
 
-            // 経験値がある時だけ、下にくっつく極細の白いゲージを作ります
+            // 経験値がある時だけ、下にくっつく極細のゲージを作ります
             let expBarHtml = "";
-            let mainBarRadius = "3px"; // デフォルトの角丸
+            let mainBarRadius = "3px"; 
             if (expKey) {
-                mainBarRadius = "3px 3px 0 0"; // 下にゲージがくっつくので、上のゲージの下側の角丸をなくします
+                mainBarRadius = "3px 3px 0 0"; 
+                
+                const expColor = isMaxExp ? "linear-gradient(to right, #ffd700, #ffeb3b)" : "#ffffff";
+                const expGlow = isMaxExp ? "0 0 4px #ffd700" : "0 0 2px #fff";
+
+                // ★修正：経験値ゲージも高さが潰れないように「flex: none;」を追加
                 expBarHtml = `
-                    <div style="width: 100%; height: 3px; background: rgba(0,0,0,0.8); border: 1px solid rgba(212, 175, 55, 0.5); border-top: none; border-radius: 0 0 3px 3px; box-sizing: border-box; overflow: hidden; display: flex;">
-                        <div style="width: ${expPercent}%; height: 100%; background: #ffffff; box-shadow: 0 0 2px #fff;"></div>
+                    <div style="flex: none; width: 100%; height: 3px; background: rgba(0,0,0,0.8); border: 1px solid rgba(212, 175, 55, 0.5); border-top: none; border-radius: 0 0 3px 3px; box-sizing: border-box; overflow: hidden; display: flex;">
+                        <div style="width: ${expPercent}%; height: 100%; background: ${expColor}; box-shadow: ${expGlow};"></div>
                     </div>
                 `;
             }
 
-            // ★もともと1つだったゲージを、外側にもう1つ枠（div）を作って縦に並べる魔法です
+            // ★修正：能力値ゲージに「flex: none; width: 100%; height: 10px; max-width: none;」を直接指定して、潰れるのを完全に防ぎます
             return `
                 <div class="daimyo-detail-stat-box" style="padding-right: 5px;">
                     <span class="daimyo-detail-label">${label}</span>
                     <span class="daimyo-detail-value" style="display:flex; align-items:center; flex:1; justify-content: flex-end;">
-                        <div style="flex: 1; max-width: 80px; margin-right: 8px; display: flex; flex-direction: column;">
-                            <div class="bar-bg-busho" style="max-width: 100%; margin-right: 0; border-radius: ${mainBarRadius};">
+                        <div style="flex: 1; max-width: 80px; margin-right: 8px; display: flex; flex-direction: column; justify-content: center;">
+                            <div class="bar-bg-busho" style="flex: none; width: 100%; height: 10px; max-width: none; margin-right: 0; border-radius: ${mainBarRadius};">
                                 <div class="${fillClass}" style="width:${basePercent}%;"></div>
                                 ${overBarHtml}
                             </div>
