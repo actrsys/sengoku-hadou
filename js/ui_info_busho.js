@@ -165,7 +165,7 @@ Object.assign(UIInfoManager.prototype, {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = `
-                <div class="daimyo-detail-container" style="padding: 10px;">
+                <div class="daimyo-detail-container" style="padding: 10px; min-height: 100%;">
                     <div class="daimyo-detail-header pc-only" style="margin-bottom: 10px;">
                         <div style="display:flex; flex-direction:column;">
                             <span style="font-size:0.8rem; color:#ccc; margin-bottom:2px;">${yomiStr}</span>
@@ -217,7 +217,7 @@ Object.assign(UIInfoManager.prototype, {
                             </div>
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: auto; padding-top: 15px;">
                         <button class="daimyo-detail-action-btn" id="busho-wife-btn" ${(Array.isArray(busho.wifeIds) && busho.wifeIds.length > 0) ? '' : 'disabled'}>配偶者</button>
                     </div>
                 </div>
