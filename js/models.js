@@ -611,8 +611,35 @@ class Busho {
     set politics(val) { this._politics = val; }
     set diplomacy(val) { this._diplomacy = val; }
     set intelligence(val) { this._intelligence = val; }
+    
     // ==========================================
+    // ★経験値の進行度やカンスト状態を計算する魔法
+    // ==========================================
+    getExpInfo(statKey) {
+        let expKey = "";
+        if (statKey === 'leadership') expKey = 'expLeadership';
+        else if (statKey === 'strength') expKey = 'expStrength';
+        else if (statKey === 'politics') expKey = 'expPolitics';
+        else if (statKey === 'diplomacy') expKey = 'expDiplomacy';
+        else if (statKey === 'intelligence') expKey = 'expIntelligence';
 
+        // 経験値がない能力（魅力など）の場合は空っぽを返します
+        if (!expKey || typeof this[expKey] !== 'number') {
+            return null; 
+        }
+
+        const baseVal = this['_' + statKey] || 0;
+        const maxExp = baseVal < 90 ? 3000 : 2000;
+        const currentExp = this[expKey];
+
+        if (currentExp >= maxExp) {
+            return { percent: 100, isMax: true };
+        } else {
+            return { percent: currentExp % 100, isMax: false };
+        }
+    }
+    // ==========================================
+    
     // UI表示用メソッド
     getRankName() {
         if (this.status === 'unborn') {

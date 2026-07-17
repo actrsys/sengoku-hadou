@@ -125,38 +125,17 @@ Object.assign(UIInfoManager.prototype, {
             let overBarHtml = overPercent > 0 ? `<div class="bar-fill-busho-over" style="width:${overPercent}%;"></div>` : "";
             let fillClass = overPercent > 0 ? "bar-fill-busho over-connected" : "bar-fill-busho";
 
-            let expKey = "";
-            if (statKey === 'leadership') expKey = 'expLeadership';
-            else if (statKey === 'strength') expKey = 'expStrength';
-            else if (statKey === 'politics') expKey = 'expPolitics';
-            else if (statKey === 'diplomacy') expKey = 'expDiplomacy';
-            else if (statKey === 'intelligence') expKey = 'expIntelligence';
-            
-            let expPercent = 0;
-            let isMaxExp = false;
-            
-            if (expKey && typeof busho[expKey] === 'number') {
-                const baseVal = busho['_' + statKey] || 0;
-                const maxExp = baseVal < 90 ? 3000 : 2000;
-                const currentExp = busho[expKey];
-                
-                if (currentExp >= maxExp) {
-                    expPercent = 100;
-                    isMaxExp = true; 
-                } else {
-                    expPercent = currentExp % 100;
-                }
-            }
+            // ★経験値の計算はもうここでは行わず、モデル(Bushoクラス)から結果だけをもらいます！
+            const expInfo = typeof busho.getExpInfo === 'function' ? busho.getExpInfo(statKey) : null;
 
             let expBarHtml = "";
             let mainBarClass = "bar-bg-busho";
-            if (expKey) {
+            if (expInfo) {
                 // 経験値がある場合は、下の角丸を消すためのクラスを追加します
                 mainBarClass += " has-exp";
-                // CSSのクラス名だけを呼ぶようにして、中身をスッキリさせました
                 expBarHtml = `
                     <div class="exp-bar-bg">
-                        <div class="exp-bar-fill ${isMaxExp ? 'is-max' : ''}" style="width: ${expPercent}%;"></div>
+                        <div class="exp-bar-fill ${expInfo.isMax ? 'is-max' : ''}" style="width: ${expInfo.percent}%;"></div>
                     </div>
                 `;
             }
