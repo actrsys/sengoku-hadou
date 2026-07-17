@@ -641,10 +641,11 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .history-list-item:nth-child(even) { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
 .history-list-item:last-child { border-bottom: none; }
 
-/* ★追加：履歴画面の全体高さを、行数や空っぽに関係なく固定する魔法 */
+/* ★追加：履歴画面やリスト画面の全体高さを、行数や空っぽに関係なく固定する魔法 */
 .modal-content:has(.history-list-item),
-.modal-content:has(.history-empty-msg) {
-    min-height: 60vh;
+.modal-content:has(.history-empty-msg),
+.modal-content:has(.list-container) {
+    height: 100%;
 }
 
 .select-item.history-list-item {
