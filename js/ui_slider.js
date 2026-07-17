@@ -870,6 +870,11 @@ class UISliderManager {
 
         updateRemain();
 
+        // ★リストを作り終わったこの瞬間に、スクロールバーを整えるよう直接命令します！
+        if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
+            this.ui.updateCustomScrollbars();
+        }
+
         confirmBtn.onclick = () => {
             let sum = 0;
             const finalAssignments = [];
