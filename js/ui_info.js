@@ -1418,8 +1418,17 @@ class UIInfoManager {
                 if (targetItem) {
                     const index = parseInt(targetItem.getAttribute('data-action-index'));
                     if (config.items && config.items[index] && typeof config.items[index].onClick === 'function') {
+                        // ★修正：大枠の監視を使うと「枠」がクリックされたことになってしまうので、
+                        // 該当の「行」がクリックされたと錯覚させる「身代わりのイベント（Proxy）」を作って渡します！
+                        const pseudoEvent = new Proxy(e, {
+                            get: function(target, prop) {
+                                if (prop === 'currentTarget') return targetItem;
+                                const value = target[prop];
+                                return typeof value === 'function' ? value.bind(target) : value;
+                            }
+                        });
                         // 見つかったら、その行に設定されているクリックの魔法を実行します
-                        config.items[index].onClick(e);
+                        config.items[index].onClick(pseudoEvent);
                     }
                 }
             });
