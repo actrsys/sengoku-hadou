@@ -348,12 +348,12 @@ class UIManager {
             // ★ロボットが自分の作業（文字を包んだり小さくしたり）に反応しないよう、一旦見張りを止めます！
             textObserver.disconnect();
 
+            // ★リストの中の文字は ui_info.js の専用魔法で圧縮するので、ロボットの監視対象から外します！
             const targetSelectors = [
                 '#war-atk-name', '#war-def-name', 
                 '.sp-clan',                       
                 '.daimyo-detail-name',            
-                '.daimyo-confirm-info h3',        
-                '.col-daimyo-name', '.col-clan'   
+                '.daimyo-confirm-info h3'
             ];
 
             const targets = document.querySelectorAll(targetSelectors.join(', '));
