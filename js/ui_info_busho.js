@@ -111,7 +111,7 @@ Object.assign(UIInfoManager.prototype, {
         const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
         let acc = null;
         if (busho.clan !== this.game.playerClanId && busho.clan !== 0 && castle) acc = castle.investigatedAccuracy;
-
+        
         const getStatRow = (statKey, label) => {
             const gradeHtml = GameSystem.getDisplayStatHTML(busho, statKey, gunshi, acc, this.game.playerClanId, myDaimyo);
             let perceived = GameSystem.getPerceivedStatValue(busho, statKey, gunshi, acc, this.game.playerClanId, myDaimyo);
@@ -125,7 +125,6 @@ Object.assign(UIInfoManager.prototype, {
             let overBarHtml = overPercent > 0 ? `<div class="bar-fill-busho-over" style="width:${overPercent}%;"></div>` : "";
             let fillClass = overPercent > 0 ? "bar-fill-busho over-connected" : "bar-fill-busho";
 
-            // ★経験値の計算
             let expKey = "";
             if (statKey === 'leadership') expKey = 'expLeadership';
             else if (statKey === 'strength') expKey = 'expStrength';
@@ -134,7 +133,7 @@ Object.assign(UIInfoManager.prototype, {
             else if (statKey === 'intelligence') expKey = 'expIntelligence';
             
             let expPercent = 0;
-            let isMaxExp = false; // ★カンストしているかの印
+            let isMaxExp = false;
             
             if (expKey && typeof busho[expKey] === 'number') {
                 const baseVal = busho['_' + statKey] || 0;
@@ -149,30 +148,25 @@ Object.assign(UIInfoManager.prototype, {
                 }
             }
 
-            // 経験値がある時だけ、下にくっつく極細のゲージを作ります
             let expBarHtml = "";
-            let mainBarRadius = "3px"; 
+            let mainBarClass = "bar-bg-busho";
             if (expKey) {
-                mainBarRadius = "3px 3px 0 0"; 
-                
-                const expColor = isMaxExp ? "linear-gradient(to right, #ffd700, #ffeb3b)" : "#ffffff";
-                const expGlow = isMaxExp ? "0 0 4px #ffd700" : "0 0 2px #fff";
-
-                // ★修正：経験値ゲージも高さが潰れないように「flex: none;」を追加
+                // 経験値がある場合は、下の角丸を消すためのクラスを追加します
+                mainBarClass += " has-exp";
+                // CSSのクラス名だけを呼ぶようにして、中身をスッキリさせました
                 expBarHtml = `
-                    <div style="flex: none; width: 100%; height: 3px; background: rgba(0,0,0,0.8); border: 1px solid rgba(212, 175, 55, 0.5); border-top: none; border-radius: 0 0 3px 3px; box-sizing: border-box; overflow: hidden; display: flex;">
-                        <div style="width: ${expPercent}%; height: 100%; background: ${expColor}; box-shadow: ${expGlow};"></div>
+                    <div class="exp-bar-bg">
+                        <div class="exp-bar-fill ${isMaxExp ? 'is-max' : ''}" style="width: ${expPercent}%;"></div>
                     </div>
                 `;
             }
 
-            // ★修正：能力値ゲージに「flex: none; width: 100%; height: 10px; max-width: none;」を直接指定して、潰れるのを完全に防ぎます
             return `
                 <div class="daimyo-detail-stat-box" style="padding-right: 5px;">
                     <span class="daimyo-detail-label">${label}</span>
                     <span class="daimyo-detail-value" style="display:flex; align-items:center; flex:1; justify-content: flex-end;">
-                        <div style="flex: 1; max-width: 80px; margin-right: 8px; display: flex; flex-direction: column; justify-content: center;">
-                            <div class="bar-bg-busho" style="flex: none; width: 100%; height: 10px; max-width: none; margin-right: 0; border-radius: ${mainBarRadius};">
+                        <div class="busho-stat-bar-wrapper">
+                            <div class="${mainBarClass}">
                                 <div class="${fillClass}" style="width:${basePercent}%;"></div>
                                 ${overBarHtml}
                             </div>
