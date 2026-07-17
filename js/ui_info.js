@@ -641,7 +641,7 @@ class UIInfoManager {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = `
-                <div class="daimyo-detail-container" style="padding: 10px;">
+                <div class="daimyo-detail-container" style="padding: 10px; min-height: 100%;">
                     <div class="daimyo-detail-header pc-only">
                         <div class="daimyo-detail-name">${clan.name}</div>
                         <div class="daimyo-detail-ideology ${ideologyClass}">${ideology}</div>
@@ -682,7 +682,7 @@ class UIInfoManager {
                             </div>
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: auto; padding-top: 15px;">
                         <button class="daimyo-detail-action-btn" id="temp-kyoten-btn" ${castlesCount === 0 ? 'disabled' : ''}>拠点</button>
                         <button class="daimyo-detail-action-btn" id="temp-busho-btn" ${bushosCount === 0 ? 'disabled' : ''}>武将</button>
                         <button class="daimyo-detail-action-btn" id="temp-hime-btn" ${princessCount === 0 ? 'disabled' : ''}>姫</button>
@@ -2079,7 +2079,7 @@ class UIInfoManager {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = `
-                <div class="daimyo-detail-container" style="padding: 10px;">
+                <div class="daimyo-detail-container" style="padding: 10px; min-height: 100%;">
                     <div class="daimyo-detail-header pc-only">
                         <div class="daimyo-detail-name">${kunishuName}</div>
                         <div class="daimyo-detail-ideology ${ideologyClass}">${ideology}</div>
@@ -2115,7 +2115,7 @@ class UIInfoManager {
                             </div>
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: auto; padding-top: 15px;">
                         <button class="daimyo-detail-action-btn" id="temp-kunishu-busho-btn">武将</button>
                         <button class="daimyo-detail-action-btn" id="temp-kunishu-diplo-btn">外交</button>
                     </div>
