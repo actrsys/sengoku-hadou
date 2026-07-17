@@ -340,31 +340,6 @@ class UIManager {
                 }, 200); 
             }
         });
-
-        // ==========================================
-        // ★ここから追加：リストの変化をずっと見張る自動ロボット！
-        // ==========================================
-        const observer = new MutationObserver((mutations) => {
-            let needsUpdate = false;
-            mutations.forEach(mutation => {
-                // 中身が増えたり減ったりした時、または画面が表示された（classが変わった）時
-                if (mutation.type === 'childList' || (mutation.type === 'attributes' && mutation.attributeName === 'class')) {
-                    needsUpdate = true;
-                }
-            });
-            if (needsUpdate) {
-                // 変化があったら、スクロールバーを付ける魔法を呼びます
-                this.updateCustomScrollbars();
-            }
-        });
-        
-        // 画面全体の変化を見張るようにロボットにお願いします
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['class']
-        });
         
         // ==========================================
         // ★ここから追加：長い名前を自動で見つけてギュッと縮める「文字圧縮ロボット」（レイアウト崩れ完全解決版）

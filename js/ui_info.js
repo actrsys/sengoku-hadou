@@ -1439,14 +1439,12 @@ class UIInfoManager {
             });
         }
 
-        if (window.CustomScrollbar) {
-            if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-        }
-
         listContainer.style.display = 'block';
         listContainer.scrollTop = config.scrollPos || 0;
-        if (this.ui.bushoScrollbar) {
-            this.ui.bushoScrollbar.update();
+
+        // ★軽量化の魔法：見張りロボットをクビにして、「リストを作ったこの瞬間」に直接スクロールバーを整えるよう命令します！
+        if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
+            this.ui.updateCustomScrollbars();
         }
 
         if (totalItems > initialLimit) {
@@ -1469,7 +1467,10 @@ class UIInfoManager {
                 attachEvents(currentIndex, endLimit);
                 currentIndex = endLimit;
 
-                if (this.ui.bushoScrollbar) this.ui.bushoScrollbar.update();
+                // ★ここでも、追加で描画した瞬間に直接命令します！
+                if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
+                    this.ui.updateCustomScrollbars();
+                }
 
                 if (currentIndex < totalItems) {
                     requestAnimationFrame(renderNextChunk);
