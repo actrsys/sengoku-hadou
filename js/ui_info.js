@@ -1442,10 +1442,12 @@ class UIInfoManager {
         listContainer.style.display = 'block';
         listContainer.scrollTop = config.scrollPos || 0;
 
-        // ★軽量化の魔法：見張りロボットをクビにして、「リストを作ったこの瞬間」に直接スクロールバーを整えるよう命令します！
-        if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
-            this.ui.updateCustomScrollbars();
-        }
+        // ★修正：ボタンが出現して画面の高さが確定するのを「ほんの一瞬（10ミリ秒）」だけ待ってからスクロールバーを呼び出します！
+        setTimeout(() => {
+            if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
+                this.ui.updateCustomScrollbars();
+            }
+        }, 10);
 
         if (totalItems > initialLimit) {
             let currentIndex = initialLimit;
@@ -1467,10 +1469,12 @@ class UIInfoManager {
                 attachEvents(currentIndex, endLimit);
                 currentIndex = endLimit;
 
-                // ★ここでも、追加で描画した瞬間に直接命令します！
-                if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
-                    this.ui.updateCustomScrollbars();
-                }
+                // ★ここでも、追加した後に一瞬待ってから長さを合わせます！
+                setTimeout(() => {
+                    if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
+                        this.ui.updateCustomScrollbars();
+                    }
+                }, 10);
 
                 if (currentIndex < totalItems) {
                     requestAnimationFrame(renderNextChunk);

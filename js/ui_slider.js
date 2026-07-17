@@ -870,10 +870,12 @@ class UISliderManager {
 
         updateRemain();
 
-        // ★リストを作り終わったこの瞬間に、スクロールバーを整えるよう直接命令します！
-        if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
-            this.ui.updateCustomScrollbars();
-        }
+        // ★軽量化＆修正：画面の高さが確定するのを一瞬待ってからスクロールバーを呼び出します！
+        setTimeout(() => {
+            if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
+                this.ui.updateCustomScrollbars();
+            }
+        }, 10);
 
         confirmBtn.onclick = () => {
             let sum = 0;

@@ -16,7 +16,9 @@ class CustomScrollbar {
             // リストの大きさの情報を、外枠にも引き継いでおきます
             this.wrapper.style.flex = this.list.style.flex || '1';
             this.wrapper.style.maxHeight = this.list.style.maxHeight;
-            this.wrapper.style.minHeight = this.list.style.minHeight;
+            // ★フレックスボックス内で要素がはみ出さない（押し出されない）ための絶対的なおまじないです！
+            this.wrapper.style.minHeight = this.list.style.minHeight || '0';
+            this.wrapper.style.overflow = 'hidden';
             this.wrapper.style.height = this.list.style.height;
             
             if (this.list.parentNode) {
