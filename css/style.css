@@ -468,8 +468,9 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* スマホ用自作スクロールバーのための設定 */
 .scroll-wrapper { 
     position: relative; 
-    flex: 0 0 auto;
-    height: calc(40px * 9 + 4px);
+    flex: 1; /* ★ 0 0 auto から 1 に変更：画面の空きスペースに合わせて縮むようにします */
+    min-height: 0; /* ★ 必須：枠が押し出されるのを防ぎます */
+    height: auto; /* ★ 固定サイズ(calc)をやめて自動調整にします */
     width: 100%; display: flex; overflow: hidden; 
     border: 2px solid #d4af37;
     border-radius: 4px; 
@@ -2298,7 +2299,7 @@ body.is-pc {
     .cmd-btn { padding: 8px 8px; font-size: 1.2rem; height: auto; }
 
     /* PCリストレイアウト */
-    .scroll-wrapper { height: calc(44px * 9 + 4px); max-height: none; flex: 0 0 auto; }
+    .scroll-wrapper { height: auto; max-height: none; flex: 1; min-height: 0; }
     .scroll-wrapper.no-custom-scrollbar { height: auto !important; }
     .list-container { scroll-padding-top: 44px; }
     .list-header, .select-item { grid-template-columns: var(--grid-cols-pc, 45px 100px 60px repeat(6, 1fr)); font-size: 0.85rem; height: 44px; }
