@@ -125,14 +125,12 @@ Object.assign(UIInfoManager.prototype, {
             let overBarHtml = overPercent > 0 ? `<div class="bar-fill-busho-over" style="width:${overPercent}%;"></div>` : "";
             let fillClass = overPercent > 0 ? "bar-fill-busho over-connected" : "bar-fill-busho";
 
-            // ★経験値の計算はもうここでは行わず、モデル(Bushoクラス)から結果だけをもらいます！
             const expInfo = typeof busho.getExpInfo === 'function' ? busho.getExpInfo(statKey) : null;
 
             let expBarHtml = "";
             let mainBarClass = "bar-bg-busho";
             if (expInfo) {
-                // 経験値がある場合は、下の角丸を消すためのクラスを追加します
-                mainBarClass += " has-exp";
+                // ★修正：不要になった「mainBarClass += " has-exp";」の行をお掃除して消し去りました！
                 expBarHtml = `
                     <div class="exp-bar-bg">
                         <div class="exp-bar-fill ${expInfo.isMax ? 'is-max' : ''}" style="width: ${expInfo.percent}%;"></div>
