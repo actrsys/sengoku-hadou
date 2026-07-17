@@ -130,11 +130,15 @@ Object.assign(UIInfoManager.prototype, {
             let expBarHtml = "";
             let mainBarClass = "bar-bg-busho";
             if (expInfo) {
-                // ★修正：不要になった「mainBarClass += " has-exp";」の行をお掃除して消し去りました！
                 expBarHtml = `
                     <div class="exp-bar-bg">
                         <div class="exp-bar-fill ${expInfo.isMax ? 'is-max' : ''}" style="width: ${expInfo.percent}%;"></div>
                     </div>
+                `;
+            } else {
+                // ★追加：魅力など経験値がない場合でも、高さのズレを防ぐために「見えないダミー」を置きます
+                expBarHtml = `
+                    <div class="exp-bar-bg" style="visibility: hidden;"></div>
                 `;
             }
 
