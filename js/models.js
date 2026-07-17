@@ -567,43 +567,39 @@ class Busho {
     }
 
     // ==========================================
-    // ★ここから追加：能力値の「自動計算」の魔法（ゲッター・セッター）です！
-    // 誰かが「leadershipはいくつ？」と聞いた時に、秘密の箱の数字と経験値を足して答えます。
-    get leadership() {
-        if (this._leadership < 90) {
-            return Math.min(110, this._leadership + Math.min(30, Math.floor(this.expLeadership / 100)));
-        } else {
-            return Math.min(120, this._leadership + Math.min(20, Math.floor(this.expLeadership / 100)));
-        }
+    // ★能力値と経験値の成長ルールを「1箇所にまとめる」司令塔の魔法
+    // ==========================================
+    _getMaxBonus(baseVal) {
+        // 基礎値が90未満なら最大+30、90以上なら最大+20 というルールをここにまとめます！
+        // 将来ルールを変えたい時は、ここだけを書き換えればOKです。
+        return baseVal < 90 ? 30 : 20;
     }
-    get strength() {
-        if (this._strength < 90) {
-            return Math.min(110, this._strength + Math.min(30, Math.floor(this.expStrength / 100)));
-        } else {
-            return Math.min(120, this._strength + Math.min(20, Math.floor(this.expStrength / 100)));
-        }
+
+    _calculateStat(statKey, expKey) {
+        const baseVal = this['_' + statKey] || 0;
+        const currentExp = this[expKey] || 0;
+        
+        // 司令塔から「最大でどれくらい上がるか」のルールを聞き出します
+        const maxBonus = this._getMaxBonus(baseVal);
+        
+        // 実際の成長量（経験値を100で割った数。ただし最大値は超えないようにします）
+        const bonus = Math.min(maxBonus, Math.floor(currentExp / 100));
+        
+        // 能力値の限界値（基礎値100なら最大120など）
+        const maxLimit = baseVal < 90 ? 110 : 120;
+        
+        return Math.min(maxLimit, baseVal + bonus);
     }
-    get politics() {
-        if (this._politics < 90) {
-            return Math.min(110, this._politics + Math.min(30, Math.floor(this.expPolitics / 100)));
-        } else {
-            return Math.min(120, this._politics + Math.min(20, Math.floor(this.expPolitics / 100)));
-        }
-    }
-    get diplomacy() {
-        if (this._diplomacy < 90) {
-            return Math.min(110, this._diplomacy + Math.min(30, Math.floor(this.expDiplomacy / 100)));
-        } else {
-            return Math.min(120, this._diplomacy + Math.min(20, Math.floor(this.expDiplomacy / 100)));
-        }
-    }
-    get intelligence() {
-        if (this._intelligence < 90) {
-            return Math.min(110, this._intelligence + Math.min(30, Math.floor(this.expIntelligence / 100)));
-        } else {
-            return Math.min(120, this._intelligence + Math.min(20, Math.floor(this.expIntelligence / 100)));
-        }
-    }
+
+    // ==========================================
+    // ★能力値の自動計算（ゲッター・セッター）
+    // 誰かが「leadershipはいくつ？」と聞いた時は、計算用の魔法を呼び出すだけで済ませます。
+    // ==========================================
+    get leadership() { return this._calculateStat('leadership', 'expLeadership'); }
+    get strength() { return this._calculateStat('strength', 'expStrength'); }
+    get politics() { return this._calculateStat('politics', 'expPolitics'); }
+    get diplomacy() { return this._calculateStat('diplomacy', 'expDiplomacy'); }
+    get intelligence() { return this._calculateStat('intelligence', 'expIntelligence'); }
 
     // 逆に、年齢の変化などで「leadershipを80にして！」と命令された時は、秘密の箱だけにその数字をしまいます。
     set leadership(val) { this._leadership = val; }
@@ -611,17 +607,20 @@ class Busho {
     set politics(val) { this._politics = val; }
     set diplomacy(val) { this._diplomacy = val; }
     set intelligence(val) { this._intelligence = val; }
-    
+
     // ==========================================
     // ★経験値の進行度やカンスト状態を計算する魔法
+    // これも司令塔のルール（_getMaxBonus）を使って計算します。
     // ==========================================
     getExpInfo(statKey) {
-        let expKey = "";
-        if (statKey === 'leadership') expKey = 'expLeadership';
-        else if (statKey === 'strength') expKey = 'expStrength';
-        else if (statKey === 'politics') expKey = 'expPolitics';
-        else if (statKey === 'diplomacy') expKey = 'expDiplomacy';
-        else if (statKey === 'intelligence') expKey = 'expIntelligence';
+        const expKeys = {
+            'leadership': 'expLeadership',
+            'strength': 'expStrength',
+            'politics': 'expPolitics',
+            'diplomacy': 'expDiplomacy',
+            'intelligence': 'expIntelligence'
+        };
+        const expKey = expKeys[statKey];
 
         // 経験値がない能力（魅力など）の場合は空っぽを返します
         if (!expKey || typeof this[expKey] !== 'number') {
@@ -629,7 +628,9 @@ class Busho {
         }
 
         const baseVal = this['_' + statKey] || 0;
-        const maxExp = baseVal < 90 ? 3000 : 2000;
+        
+        // ★司令塔から「最大＋いくつ？」を聞き出して、それを100倍して最大経験値（3000など）を割り出します！
+        const maxExp = this._getMaxBonus(baseVal) * 100;
         const currentExp = this[expKey];
 
         if (currentExp >= maxExp) {
