@@ -1402,23 +1402,28 @@ class UIInfoManager {
         };
 
         const attachEvents = (startIndex, endIndex) => {
-            if (config.items) {
-                const actionElements = listContainer.querySelectorAll('[data-action-index]');
-                actionElements.forEach(el => {
-                    if (el.dataset.eventAttached) return;
-                    const index = parseInt(el.getAttribute('data-action-index'));
-                    if (index >= startIndex && index < endIndex && config.items[index] && typeof config.items[index].onClick === 'function') {
-                        el.addEventListener('click', config.items[index].onClick);
-                        el.dataset.eventAttached = "true";
-                    }
-                });
-            }
-            
             // ★イベントを付けた直後（画面に文字が描画された直後）にサイズ調整の魔法を発動します！
             requestAnimationFrame(() => {
                 adjustTextFit(startIndex, endIndex);
             });
         };
+
+        // ★一つ一つの行にクリックの監視をつけるのではなく、リストの大元に1つだけ監視をつけます！（イベントデリゲーション）
+        const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
+        if (innerWrapper && !innerWrapper.dataset.eventDelegated) {
+            innerWrapper.dataset.eventDelegated = "true";
+            innerWrapper.addEventListener('click', (e) => {
+                // クリックされた場所の親要素を辿って、「data-action-index」を持っている行を探します
+                const targetItem = e.target.closest('[data-action-index]');
+                if (targetItem) {
+                    const index = parseInt(targetItem.getAttribute('data-action-index'));
+                    if (config.items && config.items[index] && typeof config.items[index].onClick === 'function') {
+                        // 見つかったら、その行に設定されているクリックの魔法を実行します
+                        config.items[index].onClick(e);
+                    }
+                }
+            });
+        }
 
         attachEvents(0, initialLimit);
 
