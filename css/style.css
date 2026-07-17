@@ -1606,10 +1606,18 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
     box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
 }
 
-.bar-bg-busho {
+/* ★追加：能力値と経験値を縦に並べるための外枠 */
+.busho-stat-bar-wrapper {
     flex: 1;
     max-width: 80px;
     margin-right: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.bar-bg-busho {
+    width: 100%;
     height: 10px;
     /* ゲージの背景：灰色のグラデーション */
     background: linear-gradient(to bottom, #1a1a1a 0%, #3a3a3a 50%, #1a1a1a 100%);
@@ -1619,6 +1627,11 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
     position: relative;
     overflow: visible;
     box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);
+}
+
+/* ★追加：下に経験値ゲージがくっつく時は、下の角丸を消す */
+.bar-bg-busho.has-exp {
+    border-radius: 3px 3px 0 0;
 }
 
 .bar-fill-busho {
@@ -1646,6 +1659,33 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
     background-clip: padding-box;
     box-shadow: 0 0 6px rgba(255, 255, 240, 0.6);
     box-sizing: border-box;
+}
+
+/* ★追加：経験値ゲージの背景・枠組み */
+.exp-bar-bg {
+    width: 100%;
+    height: 3px;
+    background: rgba(0,0,0,0.8);
+    border: 1px solid rgba(212, 175, 55, 0.5);
+    border-top: none;
+    border-radius: 0 0 3px 3px;
+    box-sizing: border-box;
+    overflow: hidden;
+    display: flex;
+}
+
+/* ★追加：経験値ゲージの中身（白いバー） */
+.exp-bar-fill {
+    height: 100%;
+    background: #ffffff;
+    box-shadow: 0 0 2px #fff;
+    transition: width 0.3s ease;
+}
+
+/* ★追加：カンスト時の経験値ゲージ（金色） */
+.exp-bar-fill.is-max {
+    background: linear-gradient(to right, #ffd700, #ffeb3b);
+    box-shadow: 0 0 4px #ffd700;
 }
 
 /* =========================================================
