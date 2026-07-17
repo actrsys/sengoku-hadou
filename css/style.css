@@ -1614,7 +1614,7 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 2px; /* ★追加：2つのゲージの間に少しだけ隙間を開けます */
+    /* gapを削除し、隙間をなくしました */
 }
 
 .bar-bg-busho {
@@ -1624,10 +1624,11 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
     background: linear-gradient(to bottom, #1a1a1a 0%, #3a3a3a 50%, #1a1a1a 100%);
     /* ゲージの枠：威信や感情値と同じ金色の半透明枠 */
     border: 1px solid rgba(212, 175, 55, 0.5);
-    border-radius: 3px; /* ★常に四隅が丸くなります */
+    border-radius: 3px; /* 基本は両方丸める */
     position: relative;
     overflow: visible;
     box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);
+    z-index: 2; /* 下のゲージが食い込んできた時に、上の枠線を優先させます */
 }
 
 .bar-fill-busho {
@@ -1660,13 +1661,15 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
 /* ★追加：経験値ゲージの背景・枠組み */
 .exp-bar-bg {
     width: 100%;
-    height: 4px; /* ★上下の枠線が戻るので、見栄えを良くするために1pxだけ高さを足します */
+    height: 4px; 
     background: rgba(0,0,0,0.8);
     border: 1px solid rgba(212, 175, 55, 0.5);
-    border-radius: 3px; /* ★四隅すべてを丸めます */
+    border-radius: 3px; /* 基本は両方丸める */
     box-sizing: border-box;
     overflow: hidden;
     display: flex;
+    margin-top: -1px; /* ★上に1px食い込ませて隙間なくくっつけます */
+    z-index: 1;
 }
 
 /* ★追加：経験値ゲージの中身（白いバー） */
