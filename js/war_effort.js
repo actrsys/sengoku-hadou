@@ -1306,9 +1306,6 @@ Object.assign(WarManager.prototype, {
                         if (isWin) {
                             kunishu.setRelation(myClanId, kunishu.getRelation(myClanId) + 5);
                             if (s.isPlayerInvolved) this.game.ui.log(`(援軍が勝利に貢献し、${kunishu.getName(this.game)}との友好度が上がりました)`);
-                        } else {
-                            kunishu.setRelation(myClanId, kunishu.getRelation(myClanId) - 5);
-                            if (s.isPlayerInvolved) this.game.ui.log(`(敗北/撤退により、${kunishu.getName(this.game)}との友好度が下がりました)`);
                         }
                     }
                 } else {
@@ -1344,9 +1341,6 @@ Object.assign(WarManager.prototype, {
                             if (isWin) {
                                 this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, 5);
                                 if (s.isPlayerInvolved) this.game.ui.log(`(援軍が勝利に貢献し、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が上がりました)`);
-                            } else {
-                                this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -5);
-                                if (s.isPlayerInvolved) this.game.ui.log(`(敗北/撤退により、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が下がりました)`);
                             }
                         }
                     }
@@ -1393,10 +1387,6 @@ Object.assign(WarManager.prototype, {
                                 b.castleId = kunishu.castleId; 
                                 b.isCastellan = false;
                             });
-                            const myClanId = isAttackerData ? s.sourceCastle.ownerClan : s.defender.ownerClan;
-                            const kRel = kunishu.getRelation(myClanId);
-                            kunishu.setRelation(myClanId, kRel - 5);
-                            if (s.isPlayerInvolved) this.game.ui.log(`(援軍が撤退し、${kunishu.getName(this.game)}との友好度が下がりました)`);
                         }
                     } else {
                         const helperCastle = this.game.getCastle(reinf.castle.id); 
@@ -1411,13 +1401,6 @@ Object.assign(WarManager.prototype, {
                                 if (!helperCastle.samuraiIds.includes(b.id)) helperCastle.samuraiIds.push(b.id);
                             });
                             this.game.updateCastleLord(helperCastle);
-
-                            if (!reinf.isSelf) {
-                                const myClanId = isAttackerData ? s.sourceCastle.ownerClan : s.defender.ownerClan;
-                                const helperClanId = helperCastle.ownerClan;
-                                this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -5);
-                                if (s.isPlayerInvolved) this.game.ui.log(`(援軍が撤退し、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が下がりました)`);
-                            }
                         }
                     }
                     
@@ -1431,7 +1414,6 @@ Object.assign(WarManager.prototype, {
                     }
                 });
             }
-            // ★追加ここまで
             
             // ★敵の援軍に参加した大名との友好度を「５」下げる魔法！
             if (this.game.diplomacyManager) {
