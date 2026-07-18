@@ -545,6 +545,10 @@ class Busho {
         this.status = this.status || 'active';
         this.isActionDone = this.isActionDone === true;
 
+        // ★女性かどうか、子供ができないかどうかを覚えるための箱です
+        this.female = data.female === true;
+        this.childless = data.childless === true;
+
         // ★追加：今月面談を行ったかどうかを覚える専用の枠です
         this.isInterviewed = data.isInterviewed === true;
 

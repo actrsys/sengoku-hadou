@@ -1702,11 +1702,6 @@ class LifeSystem {
     distributeInitialPrincesses() {
         const currentYear = this.game.year;
         
-        // ★例外リスト：ランダムな姫が絶対に誕生しない武将のID（出席番号）です
-        // 1001001=上杉謙信、1053024=立花誾千代
-        // （追加する時は、カンマ区切りで数字を足していくだけでOKです！）
-        const excludedIds = [1001001, 1053024];
-        
         this.game.clans.forEach(clan => {
             if (clan.id === 0) return; // 空き家（中立）は無視します
 
@@ -1715,21 +1710,24 @@ class LifeSystem {
             
             // 史実の姫が誰もいない大名家にだけ、ランダムな姫を登場させます
             if (existingPrincesses.length === 0) {
+                // 大名のデータを取得します
+                const leader = this.game.getBusho(clan.leaderId);
+                
                 // ★大名の姫の登場判定（50%の確率）
-                if (!excludedIds.includes(Number(clan.leaderId))) {
+                // 女性（female）や子供なし（childless）のシールが貼られていないかチェックします
+                if (leader && !leader.female && !leader.childless) {
                     if (Math.random() < 0.5) {
                         this.createRandomPrincess(clan.id, currentYear, true, clan.leaderId);
                     }
                 }
 
                 // ★追加：一門武将の姫の登場判定（大名とは別枠で、半分の25%の確率）
-                const leader = this.game.getBusho(clan.leaderId);
                 if (leader) {
                     const familyBushos = this.game.bushos.filter(b => 
                         b.clan === clan.id && 
                         b.status === 'active' && 
                         b.id !== leader.id && 
-                        !excludedIds.includes(b.id) &&
+                        !b.female && !b.childless &&
                         leader.familyIds.some(fId => b.familyIds.includes(fId))
                     );
 
@@ -1747,10 +1745,6 @@ class LifeSystem {
     // ③ 毎年1月にランダムで新しい姫を登場させる機能です
     async checkRandomPrincessAppearance() {
         const currentYear = this.game.year;
-        
-        // ★例外リスト：ランダムな姫が絶対に誕生しない武将のID（出席番号）です
-        // （上と同じリストです。後で追加する時はこちらも一緒に足してください）
-        const excludedIds = [1001001, 1053024];
 
         for (const clan of this.game.clans) {
             if (clan.id === 0) continue;
@@ -1764,8 +1758,12 @@ class LifeSystem {
             if (currentPrincesses.length === 0) prob = 0.20;
             else if (currentPrincesses.length === 1) prob = 0.10;
 
+            // 大名のデータを取得します
+            const leader = this.game.getBusho(clan.leaderId);
+
             // ★変更：大名の姫の誕生判定
-            if (!excludedIds.includes(Number(clan.leaderId))) {
+            // 女性（female）や子供なし（childless）のシールが貼られていないかチェックします
+            if (leader && !leader.female && !leader.childless) {
                 if (Math.random() < prob) {
                     const newPrincess = this.createRandomPrincess(clan.id, currentYear, false, clan.leaderId);
                     
@@ -1782,14 +1780,13 @@ class LifeSystem {
             }
 
             // ★追加：一門武将の姫の誕生判定（大名の姫とは別枠で、確率を半分にして判定します）
-            const leader = this.game.getBusho(clan.leaderId);
             if (leader) {
-                // 生きている同じ家の一門武将（大名本人と例外リストを除く）を探します
+                // 生きている同じ家の一門武将（大名本人と女性・子供なしの武将を除く）を探します
                 const familyBushos = this.game.bushos.filter(b => 
                     b.clan === clan.id && 
                     b.status === 'active' && 
                     b.id !== leader.id && 
-                    !excludedIds.includes(b.id) &&
+                    !b.female && !b.childless &&
                     leader.familyIds.some(fId => b.familyIds.includes(fId))
                 );
 
