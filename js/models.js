@@ -753,6 +753,15 @@ class Busho {
                 }
             }
         });
+
+        // ★自分の一門の女性（娘や姉妹など）から生まれた子供（孫や甥っ子）を、自分の親戚として迎え入れます！
+        allPeople.forEach(person => {
+            if (person.realMotherId > 0 && this.baseFamilyIds.includes(person.realMotherId)) {
+                if (!this.familyIds.includes(person.id)) {
+                    this.familyIds.push(person.id);
+                }
+            }
+        });
     }
 }
 
@@ -844,6 +853,15 @@ class Princess {
                 });
             }
         }
+
+        // 自分の一門の女性（娘や姉妹など）から生まれた子供（孫や甥っ子）を、自分の親戚として迎え入れます！
+        allPeople.forEach(person => {
+            if (person.realMotherId > 0 && this.baseFamilyIds.includes(person.realMotherId)) {
+                if (!this.familyIds.includes(person.id)) {
+                    this.familyIds.push(person.id);
+                }
+            }
+        });
     }
 }
 
