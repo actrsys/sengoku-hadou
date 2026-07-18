@@ -1134,46 +1134,19 @@ window.GameEvents.push({
             game.clans.forEach(targetClan => {
                 if (targetClan.id === 0 || targetClan.id === clan.id) return;
                 
-                const rel = game.getRelation(clan.id, targetClan.id);
-                // 関係が「友好」「同盟」「支配」「従属」のいずれかの場合のみ
-                if (rel && ['友好', '同盟', '支配', '従属'].includes(rel.status)) {
-                    const sentiment = rel.sentiment;
-                    const targetCastles = game.castles.filter(c => c.ownerClan === targetClan.id);
+                // ★ GameSystemにまとめた計算式を呼び出します！
+                let targetIncome = GameSystem.calcTradeIncomeWithTarget(clan.id, targetClan.id, game);
+                
+                // 収入が発生し、かつプレイヤーが関係している場合だけログのメモを残します
+                if (targetIncome > 0) {
+                    totalTradeIncome += targetIncome;
                     
-                    let targetIncome = 0;
-                    
-                    // 相手の城を一つずつ見て、自分の城と繋がっているか（隣接しているか）チェックします
-                    targetCastles.forEach(tc => {
-                        let isAdjacentToMe = false;
-                        for (let mc of myCastles) {
-                            if (GameSystem.isAdjacent(mc, tc)) {
-                                isAdjacentToMe = true;
-                                break;
-                            }
-                        }
-                        
-                        // まずは基本の収入量（√人口 * (関係値 / 200)）を計算します
-                        const baseIncome = Math.sqrt(tc.population) * (sentiment / 200);
-
-                        // 繋がっていればそのまま、繋がっていなければ３分の１にして収入に足し合わせます
-                        if (isAdjacentToMe) {
-                            targetIncome += Math.floor(baseIncome);
-                        } else {
-                            targetIncome += Math.floor(baseIncome / 3);
-                        }
-                    });
-                    
-                    // 収入が発生し、かつプレイヤーが関係している場合だけログのメモを残します
-                    if (targetIncome > 0) {
-                        totalTradeIncome += targetIncome;
-                        
-                        if (clan.id === game.playerClanId) {
-                            // 自分が得た収入の場合
-                            logMessages.push(`【交易】${targetClan.name}との往来により、金${targetIncome} の収入を得ました`);
-                        } else if (targetClan.id === game.playerClanId) {
-                            // 相手が自分（プレイヤー）の領地のおかげで収入を得た場合
-                            logMessages.push(`【交易】${clan.name}が当家との往来により、金${targetIncome} の利益を得ました`);
-                        }
+                    if (clan.id === game.playerClanId) {
+                        // 自分が得た収入の場合
+                        logMessages.push(`【交易】${targetClan.name}との往来により、金${targetIncome} の収入を得ました`);
+                    } else if (targetClan.id === game.playerClanId) {
+                        // 相手が自分（プレイヤー）の領地のおかげで収入を得た場合
+                        logMessages.push(`【交易】${clan.name}が当家との往来により、金${targetIncome} の利益を得ました`);
                     }
                 }
             });

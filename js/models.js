@@ -27,6 +27,10 @@ class Clan {
         // 大名の戦力（威信）を覚えておく箱です
         this.daimyoPrestige = Number(data.daimyoPrestige || 0);
 
+        // ★追加：毎月の収入（月収入）と年収穫を覚える箱
+        this.goldIncome = Number(data.goldIncome || 0);
+        this.riceIncome = Number(data.riceIncome || 0);
+
         // ★朝廷への貢献度を覚えておく箱です（上限は99999にします）
         this.courtContribution = Number(data.courtContribution || 0);
         

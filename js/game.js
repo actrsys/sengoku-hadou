@@ -1179,14 +1179,67 @@ class GameSystem {
     // ★ここから追加：AIがお金を使う時の「給金計算」と「予算管理」の一元化魔法！
     // ==========================================
     // ① 月の基本収入（港ボーナス込み）を予測します
-    static calcExpectedGoldIncome(castle, game) {
-        let income = this.calcBaseGoldIncome(castle);
-        // 新しく作った港の判定窓口を通します
+    // ★追加：港ボーナスの計算を一箇所にまとめます
+    static calcPortBonus(castle, game) {
+        let portBonus = 0;
         if (this.isPortCastle(castle) && game) {
             const clanCastles = game.castles.filter(c => c.ownerClan === castle.ownerClan);
             const totalClanPopulation = clanCastles.reduce((sum, c) => sum + c.population, 0);
-            income += Math.floor((castle.population / 500) + (castle.peoplesLoyalty / 2) + (totalClanPopulation / 1000));
+            portBonus = Math.floor((castle.population / 500) + (castle.peoplesLoyalty / 2) + (totalClanPopulation / 1000));
         }
+        return portBonus;
+    }
+
+    // ★追加：特定の勢力との交易収入を計算します
+    static calcTradeIncomeWithTarget(clanId, targetClanId, game) {
+        const clan = game.clans.find(c => c.id === clanId);
+        const targetClan = game.clans.find(c => c.id === targetClanId);
+        if (!clan || !targetClan) return 0;
+        
+        const rel = game.getRelation(clanId, targetClanId);
+        if (!rel || !['友好', '同盟', '支配', '従属'].includes(rel.status)) return 0;
+        
+        const myCastles = game.castles.filter(c => c.ownerClan === clanId);
+        const targetCastles = game.castles.filter(c => c.ownerClan === targetClanId);
+        if (myCastles.length === 0 || targetCastles.length === 0) return 0;
+        
+        let targetIncome = 0;
+        const sentiment = rel.sentiment;
+        
+        targetCastles.forEach(tc => {
+            let isAdjacentToMe = false;
+            for (let mc of myCastles) {
+                if (this.isAdjacent(mc, tc)) {
+                    isAdjacentToMe = true;
+                    break;
+                }
+            }
+            const baseIncome = Math.sqrt(tc.population) * (sentiment / 200);
+            if (isAdjacentToMe) {
+                targetIncome += Math.floor(baseIncome);
+            } else {
+                targetIncome += Math.floor(baseIncome / 3);
+            }
+        });
+        return targetIncome;
+    }
+
+    // ★追加：勢力全体の交易収入を合計します
+    static calcClanTradeIncome(clanId, game) {
+        let total = 0;
+        game.clans.forEach(targetClan => {
+            if (targetClan.id !== 0 && targetClan.id !== clanId && !targetClan.isDestroyed) {
+                total += this.calcTradeIncomeWithTarget(clanId, targetClan.id, game);
+            }
+        });
+        return total;
+    }
+
+    static calcExpectedGoldIncome(castle, game) {
+        let income = this.calcBaseGoldIncome(castle);
+        // ★ 新しく作った港ボーナスの計算式を呼び出します
+        income += this.calcPortBonus(castle, game);
+        
         if (castle.statusEffects && castle.statusEffects.includes('一揆')) {
             income = 0;
         }
@@ -1566,13 +1619,30 @@ class GameManager {
             if (clan.id === 0 || clan.isDestroyed) return;
             const castles = this.castles.filter(c => c.ownerClan === clan.id);
             let pop = 0, sol = 0, koku = 0, gold = 0, rice = 0;
+            
+            // ★追加：収入の計算もここで一括で行います！
+            let goldIncome = 0;
+            let riceIncome = 0;
+
             castles.forEach(c => { 
                 pop += c.population; 
                 sol += c.soldiers; 
                 koku += c.kokudaka; 
                 gold += c.gold; 
                 rice += c.rice; 
+                
+                // ★拠点の月収入（港ボーナス・一揆マイナス込み）を足します
+                goldIncome += GameSystem.calcExpectedGoldIncome(c, this);
+                // ★拠点の年収穫を足します
+                riceIncome += GameSystem.calcBaseRiceIncome(c);
             });
+            
+            // ★外交（交易）収入を足します
+            goldIncome += GameSystem.calcClanTradeIncome(clan.id, this);
+            
+            // ★計算結果を勢力のデータに保存して、表示側で読むだけにします
+            clan.goldIncome = goldIncome;
+            clan.riceIncome = riceIncome;
             
             // まずは今まで通り、兵士やお金から「基本の威信」を計算します
             const basePrestige = Math.floor(pop / 200) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 150) + Math.floor(rice / 300);
@@ -1908,17 +1978,9 @@ class GameManager {
             income = GameSystem.applyVariance(income, window.MainParams.Economy.IncomeFluctuation);
             if (this.month === 3) income += income * 3;
 
-            // ★ここから追加：港拠点の交易収入ボーナス！
-            let portBonus = 0;
-            // 新しく作った港の判定窓口を通します
-            if (GameSystem.isPortCastle(c)) {
-                // 同じ勢力が持っているすべてのお城の総人口を計算します
-                const clanCastles = this.castles.filter(castle => castle.ownerClan === c.ownerClan);
-                const totalClanPopulation = clanCastles.reduce((sum, castle) => sum + castle.population, 0);
-                
-                // ボーナスの計算式です
-                portBonus = Math.floor((c.population / 500) + (c.peoplesLoyalty / 2) + (totalClanPopulation / 1000));
-            }
+            // ★ 新しくまとめた港ボーナスの計算式を呼び出します
+            let portBonus = GameSystem.calcPortBonus(c, this);
+            
             // 3月の3倍ボーナスの後に足し算をするので、このボーナスは3倍にはなりません
             income += portBonus;
             

@@ -309,7 +309,6 @@ class UIInfoManager {
             
             let totalSoldiers = 0, totalHorses = 0, totalGuns = 0;
             let totalKokudaka = 0, totalCommerce = 0, totalGold = 0, totalRice = 0;
-            let totalGoldIncome = 0, totalRiceIncome = 0;
             
             const clanCastles = this.game.castles.filter(c => c.ownerClan === clan.id);
             const castlesCount = clanCastles.length;
@@ -322,9 +321,11 @@ class UIInfoManager {
                 totalCommerce += c.commerce || 0;
                 totalGold += c.gold || 0;
                 totalRice += c.rice || 0;
-                totalGoldIncome += GameSystem.calcBaseGoldIncome(c);
-                totalRiceIncome += GameSystem.calcBaseRiceIncome(c);
             });
+
+            // ★表示側で計算は行わず、勢力データに保存されている値を読むだけにします
+            let totalGoldIncome = clan.goldIncome || 0;
+            let totalRiceIncome = clan.riceIncome || 0;
             
             const bushosCount = this.game.bushos.filter(b => b.clan === clan.id && b.status === 'active').length;
             const princessCount = clan.princessIds ? clan.princessIds.length : 0;
@@ -622,12 +623,15 @@ class UIInfoManager {
         
         const princessCount = clan.princessIds ? clan.princessIds.length : 0;
         
-        let totalGold = 0, totalRice = 0, totalSoldiers = 0, totalHorses = 0, totalGuns = 0, totalGoldIncome = 0, totalRiceIncome = 0;
+        let totalGold = 0, totalRice = 0, totalSoldiers = 0, totalHorses = 0, totalGuns = 0;
         clanCastles.forEach(c => {
             totalGold += c.gold || 0; totalRice += c.rice || 0; totalSoldiers += c.soldiers || 0;
             totalHorses += c.horses || 0; totalGuns += c.guns || 0;
-            totalGoldIncome += GameSystem.calcBaseGoldIncome(c); totalRiceIncome += GameSystem.calcBaseRiceIncome(c);
         });
+
+        // ★表示側で計算は行わず、勢力データに保存されている値を読むだけにします
+        let totalGoldIncome = clan.goldIncome || 0;
+        let totalRiceIncome = clan.riceIncome || 0;
 
         let ideology = "中道", ideologyClass = "ideology-chudo"; 
         if (leader) {
