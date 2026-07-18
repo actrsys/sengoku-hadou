@@ -1152,11 +1152,14 @@ window.GameEvents.push({
                             }
                         }
                         
-                        // 繋がっていれば（飛び地でなければ）、その城の人口から収入を計算します
+                        // まずは基本の収入量（√人口 * (関係値 / 200)）を計算します
+                        const baseIncome = Math.sqrt(tc.population) * (sentiment / 200);
+
+                        // 繋がっていればそのまま、繋がっていなければ３分の１にして収入に足し合わせます
                         if (isAdjacentToMe) {
-                            // 収入量 = √人口 * (関係値 / 200)
-                            const income = Math.floor(Math.sqrt(tc.population) * (sentiment / 200));
-                            targetIncome += income;
+                            targetIncome += Math.floor(baseIncome);
+                        } else {
+                            targetIncome += Math.floor(baseIncome / 3);
                         }
                     });
                     
