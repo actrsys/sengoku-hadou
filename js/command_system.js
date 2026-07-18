@@ -435,7 +435,7 @@ const COMMAND_SPECS = {
         startMode: 'busho_select_special', subType: 'arrange_marriage_busho',
         sortKey: 'leadership',
         msg: "姫を嫁がせる武将を選択してください",
-        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasUnmarriedPrincess(game) && CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyo(game)
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasUnmarriedPrincess(game) && game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo && !b.female)
     },
     'employ': {
         label: "登用", category: 'PERSONNEL', 
@@ -774,7 +774,7 @@ class CommandSystem {
             infoHtml = "<div>面談する武将を選択してください</div>"; 
         }
         else if (actionType === 'arrange_marriage_busho') { 
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active' && !b.isDaimyo); 
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active' && !b.isDaimyo && !b.female); 
             infoHtml = "<div>姫を嫁がせる武将を選択してください</div>"; 
             if (extraData) extraData.allowDone = true;
         }
@@ -801,7 +801,7 @@ class CommandSystem {
             const targetLeader = this.game.getBusho(targetLeaderId);
             
             bushos = this.game.bushos.filter(b => {
-                if (b.clan !== targetClanId || b.status !== 'active') return false;
+                if (b.clan !== targetClanId || b.status !== 'active' || b.female) return false;
                 // 大名本人か、直接の血縁（お互いのリストに直接IDが含まれている）かをチェックします
                 const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                 const lFamily = Array.isArray(targetLeader.familyIds) ? targetLeader.familyIds : [];

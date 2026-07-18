@@ -1724,7 +1724,7 @@ class DiplomacyManager {
         }
 
         if (availablePrincess) {
-            const domBushos = this.game.bushos.filter(b => b.clan === dominantClanId && b.status === 'active');
+            const domBushos = this.game.bushos.filter(b => b.clan === dominantClanId && b.status === 'active' && !b.female);
             const domDaimyo = this.game.bushos.find(b => b.clan === dominantClanId && b.isDaimyo);
             
             domBushos.sort((a, b) => {
@@ -2209,7 +2209,7 @@ class DiplomacyManager {
                     }
                 }
                 if (availablePrincess) {
-                    const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && b.status === 'active');
+                    const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && b.status === 'active' && !b.female);
                     if (tgtBushos.length > 0) {
                         const targetBusho = tgtBushos.find(b => !b.wifeIds || b.wifeIds.length === 0) || tgtBushos[0];
                         options.push({ type: 'marriage', princess: availablePrincess, busho: targetBusho });
@@ -2987,7 +2987,7 @@ class DiplomacyManager {
                 for (let pId of reqClan.princessIds) {
                     const p = this.game.princesses.find(pr => pr.id === pId && pr.status === 'unmarried' && pr.id >= 90000);
                     if (p) {
-                        const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && b.status === 'active' && (!b.wifeIds || b.wifeIds.length === 0));
+                        const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && b.status === 'active' && (!b.wifeIds || b.wifeIds.length === 0) && !b.female);
                         if (tgtBushos.length > 0) {
                             options.push({ type: 'marriage', princess: p, busho: tgtBushos[0] });
                         }
@@ -3067,7 +3067,7 @@ class DiplomacyManager {
         }
 
         if (availablePrincess) {
-            const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && b.status === 'active');
+            const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && b.status === 'active' && !b.female);
             const tgtDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
             
             tgtBushos.sort((a, b) => {
