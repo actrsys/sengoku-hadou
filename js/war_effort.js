@@ -7,14 +7,23 @@
 // Object.assign を使って、WarManager に魔法をくっつけます！
 Object.assign(WarManager.prototype, {
 
-    // ★追加：大名が他軍団の城に逃げ込んだ時に、元の軍団を解散させる共通の魔法です！
+    // ★追加：大名や国主が他軍団の城に逃げ込んだ時に、軍団を解散させる共通の魔法です！
     handleDaimyoEscape(busho, targetCastle) {
         if (busho.isDaimyo && Number(targetCastle.legionId) !== 0) {
+            // 大名が他軍団に逃げ込んだ場合は、逃げ込んだ先の軍団を解散して直轄にする
             if (this.game.castleManager && this.game.castleManager.disbandLegion) {
                 this.game.castleManager.disbandLegion(targetCastle.legionId);
             }
             targetCastle.legionId = 0;
             targetCastle.isDelegated = false;
+        } else if (busho.isCommander) {
+            // 国主が「自分の軍団以外」の城に逃げ込んだ場合は、自分の元の軍団を解散する（解任）
+            const myLegion = this.game.legions ? this.game.legions.find(l => Number(l.commanderId) === Number(busho.id)) : null;
+            if (myLegion && Number(targetCastle.legionId) !== Number(myLegion.legionNo)) {
+                if (this.game.castleManager && this.game.castleManager.disbandLegion) {
+                    this.game.castleManager.disbandLegion(myLegion.id);
+                }
+            }
         }
     },
 
