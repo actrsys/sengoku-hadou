@@ -2586,22 +2586,96 @@ class GameManager {
     }
     
     changeLeader(clanId, newLeaderId) { 
-        this.bushos.filter(b => b.clan === clanId).forEach(b => b.isDaimyo = false); 
-        const newLeader = this.getBusho(newLeaderId); 
-        if(newLeader) { 
-            newLeader.isDaimyo = true; 
-            newLeader.loyalty = 100; // ★新しく大名になったら、忠誠度を100にします！
-            this.clans.find(c => c.id === clanId).leaderId = newLeaderId; 
-            
-            // ★追加：新しい大名が住んでいるお城を直轄（軍団ID: 0）に戻します
-            const daimyoCastle = this.getCastle(newLeader.castleId);
-            if (daimyoCastle) {
-                daimyoCastle.legionId = 0;
-            }
-        } 
-        this.updateAllCastlesLords();
+            this.bushos.filter(b => b.clan === clanId).forEach(b => b.isDaimyo = false); 
+            const newLeader = this.getBusho(newLeaderId); 
+            if(newLeader) { 
+                newLeader.isDaimyo = true; 
+                newLeader.loyalty = 100;
+                this.clans.find(c => c.id === clanId).leaderId = newLeaderId; 
+                
+                const daimyoCastle = this.getCastle(newLeader.castleId);
+                if (daimyoCastle) {
+                    daimyoCastle.legionId = 0;
+                }
+            } 
+            this.updateAllCastlesLords();
+        }
     }
-    
+
+    // ==========================================
+    // ★ セーブデータ暗号化・復号ヘルパー
+    // ==========================================
+    Object.assign(GameManager.prototype, {
+        _getEncryptionKey: async function() {
+            const encoder = new TextEncoder();
+            const keyMaterial = await crypto.subtle.importKey(
+                "raw",
+                encoder.encode("sengoku-hado-secret-key-2026"),
+                { name: "PBKDF2" },
+                false,
+                ["deriveKey"]
+            );
+            return crypto.subtle.deriveKey(
+                { name: "PBKDF2", salt: encoder.encode("sengoku-salt"), iterations: 100000, hash: "SHA-256" },
+                keyMaterial,
+                { name: "AES-GCM", length: 256 },
+                false,
+                ["encrypt", "decrypt"]
+            );
+        },
+
+        async _encryptSaveData(dataObj) {
+            const jsonStr = JSON.stringify(dataObj);
+            const encoder = new TextEncoder();
+            let uint8 = encoder.encode(jsonStr);
+            
+            if (typeof pako !== 'undefined') {
+                uint8 = pako.deflate(uint8);
+            }
+            
+            const key = await this._getEncryptionKey();
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            
+            const encrypted = await crypto.subtle.encrypt(
+                { name: "AES-GCM", iv: iv },
+                key,
+                uint8
+            );
+            
+            const result = new Uint8Array(iv.length + encrypted.byteLength);
+            result.set(iv, 0);
+            result.set(new Uint8Array(encrypted), iv.length);
+            return result;
+        },
+
+        async _decryptSaveData(encryptedUint8) {
+            if (!encryptedUint8 || encryptedUint8.length < 12) {
+                throw new Error("無効なセーブデータです");
+            }
+            
+            const iv = encryptedUint8.slice(0, 12);
+            const cipherText = encryptedUint8.slice(12);
+            
+            const key = await this._getEncryptionKey();
+            
+            const decrypted = await crypto.subtle.decrypt(
+                { name: "AES-GCM", iv: iv },
+                key,
+                cipherText
+            );
+            
+            let uint8 = new Uint8Array(decrypted);
+            
+            if (typeof pako !== 'undefined') {
+                uint8 = pako.inflate(uint8);
+            }
+            
+            const decoder = new TextDecoder();
+            const jsonStr = decoder.decode(uint8);
+            return JSON.parse(jsonStr);
+        }
+    });
+
     // ==========================================
     // ★ここから整理整頓！：セーブとロードの「共通の魔法（まとめ）」です
     // ==========================================
@@ -2885,86 +2959,6 @@ class GameManager {
         });
     }
 }
-
-// ==========================================
-// ★ セーブデータ暗号化・復号ヘルパー
-// ==========================================
-GameManager.prototype = Object.assign(GameManager.prototype, {
-    // 固定鍵（本番では環境変数やユーザーパスワードから派生させることを推奨）
-    _getEncryptionKey: async function() {
-        const encoder = new TextEncoder();
-        const keyMaterial = await crypto.subtle.importKey(
-            "raw",
-            encoder.encode("sengoku-hado-secret-key-2026"), // ← ここを強力な秘密鍵に変更推奨
-            { name: "PBKDF2" },
-            false,
-            ["deriveKey"]
-        );
-        return crypto.subtle.deriveKey(
-            { name: "PBKDF2", salt: encoder.encode("sengoku-salt"), iterations: 100000, hash: "SHA-256" },
-            keyMaterial,
-            { name: "AES-GCM", length: 256 },
-            false,
-            ["encrypt", "decrypt"]
-        );
-    },
-
-    // データ → 圧縮 → 暗号化 → Uint8Array
-    async _encryptSaveData(dataObj) {
-        const jsonStr = JSON.stringify(dataObj);
-        const encoder = new TextEncoder();
-        let uint8 = encoder.encode(jsonStr);
-        
-        // 圧縮 (pako)
-        if (typeof pako !== 'undefined') {
-            uint8 = pako.deflate(uint8);
-        }
-        
-        const key = await this._getEncryptionKey();
-        const iv = crypto.getRandomValues(new Uint8Array(12)); // AES-GCM用IV
-        
-        const encrypted = await crypto.subtle.encrypt(
-            { name: "AES-GCM", iv: iv },
-            key,
-            uint8
-        );
-        
-        // IV + 暗号文を結合
-        const result = new Uint8Array(iv.length + encrypted.byteLength);
-        result.set(iv, 0);
-        result.set(new Uint8Array(encrypted), iv.length);
-        return result;
-    },
-
-    // 暗号化Uint8Array → 復号 → 解凍 → JSON
-    async _decryptSaveData(encryptedUint8) {
-        if (!encryptedUint8 || encryptedUint8.length < 12) {
-            throw new Error("無効なセーブデータです");
-        }
-        
-        const iv = encryptedUint8.slice(0, 12);
-        const cipherText = encryptedUint8.slice(12);
-        
-        const key = await this._getEncryptionKey();
-        
-        const decrypted = await crypto.subtle.decrypt(
-            { name: "AES-GCM", iv: iv },
-            key,
-            cipherText
-        );
-        
-        let uint8 = new Uint8Array(decrypted);
-        
-        // 解凍
-        if (typeof pako !== 'undefined') {
-            uint8 = pako.inflate(uint8);
-        }
-        
-        const decoder = new TextDecoder();
-        const jsonStr = decoder.decode(uint8);
-        return JSON.parse(jsonStr);
-    }
-});
 
 window.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('contextmenu', (e) => {
