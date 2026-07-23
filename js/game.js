@@ -2927,3 +2927,52 @@ async function loadFromDB(key) {
         request.onerror = () => reject(request.error);
     });
 }
+
+// ==========================================
+// セーブデータの暗号化・復号（Web Crypto API）
+// ==========================================
+const SAVE_ENCRYPTION_KEY = 'SengokuHadoSecretKey2026';
+
+async function getSaveCryptoKey() {
+    const enc = new TextEncoder();
+    const keyData = enc.encode(SAVE_ENCRYPTION_KEY.padEnd(32, '0').slice(0, 32));
+    return await crypto.subtle.importKey(
+        'raw',
+        keyData,
+        { name: 'AES-GCM' },
+        false,
+        ['encrypt', 'decrypt']
+    );
+}
+
+async function encryptSaveData(obj) {
+    const jsonStr = JSON.stringify(obj);
+    const enc = new TextEncoder();
+    const encodedData = enc.encode(jsonStr);
+    const key = await getSaveCryptoKey();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encryptedContent = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: iv },
+        key,
+        encodedData
+    );
+    const combined = new Uint8Array(iv.byteLength + encryptedContent.byteLength);
+    combined.set(iv, 0);
+    combined.set(new Uint8Array(encryptedContent), iv.byteLength);
+    return combined;
+}
+
+async function decryptSaveData(binaryData) {
+    const uint8Data = new Uint8Array(binaryData);
+    const iv = uint8Data.slice(0, 12);
+    const data = uint8Data.slice(12);
+    const key = await getSaveCryptoKey();
+    const decryptedContent = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: iv },
+        key,
+        data
+    );
+    const dec = new TextDecoder();
+    const jsonStr = dec.decode(decryptedContent);
+    return JSON.parse(jsonStr);
+}
