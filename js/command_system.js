@@ -1517,8 +1517,8 @@ class CommandSystem {
         list.innerHTML = '<div style="text-align:center; margin: 20px;">データを確認中...</div>';
         modal.classList.remove('hidden');
 
-        // リストの中身を空っぽにして作り直します
-        list.innerHTML = '';
+        // ★追加：ボタンを1個ずつ画面に出すとガタガタ動いてしまうので、一旦貯めておくための「見えない箱」を用意します
+        const fragment = document.createDocumentFragment();
 
         // 1から5までのスロットボタンを作ります（数を増やしたい場合は i <= 5 の数字を変えてください）
         for (let i = 1; i <= 5; i++) {
@@ -1621,9 +1621,13 @@ class CommandSystem {
                 }
             };
             
-            // 作ったボタンをリストに追加します
-            list.appendChild(btn);
+            // ★変更：作ったボタンを直接画面に追加せず、一旦「見えない箱」に保管します
+            fragment.appendChild(btn);
         }
+
+        // ★追加：すべてのボタンの準備が終わったら、リストの「データを確認中」の文字を消して、一気にボタンを投下します！
+        list.innerHTML = '';
+        list.appendChild(fragment);
     }
     
     handleBushoSelection(actionType, selectedIds, targetId, extraData) {
