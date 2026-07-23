@@ -796,8 +796,12 @@ class UIManager {
         const isEventMode = dialog.customOpts && dialog.customOpts.isEvent;
         // ★追加：顔画像や名前が設定されていて、誰かが喋っているかどうかの判定
         const isSpeaking = !!(leftFace || leftName || rightFace || rightName);
-        // イベントモード、または誰かが喋っている場合は下側に表示します
-        const isBottomMessage = isEventMode || isSpeaking;
+        
+        // ★修正：面談画面は専用のデザインなので、イベント用のレイアウトには巻き込まないようにします！
+        const isInterview = dialog.customOpts && dialog.customOpts.isInterview;
+        
+        // イベントモード、または誰かが喋っている場合は下側に表示します（面談を除く）
+        const isBottomMessage = !isInterview && (isEventMode || isSpeaking);
         
         const hasCustomChoices = dialog.customOpts && dialog.customOpts.choices && dialog.customOpts.choices.length > 0;
         // はい/いいえ等の確認ダイアログも含めて選択肢があるかどうかの判定
