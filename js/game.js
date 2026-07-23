@@ -2769,15 +2769,49 @@ class GameManager {
     }
 
     // ==========================================
-    // 実行部分（とてもシンプルになりました！）
+    // セーブ実行部分
     // ==========================================
+
+    // ★追加：セーブデータをバイナリにして暗号化する魔法
+    _encryptData(obj) {
+        // 1. まずはデータを文字にします
+        const jsonStr = JSON.stringify(obj);
+        // 2. 文字をバイナリ（数字の配列）に変換します
+        const encoder = new TextEncoder();
+        const uint8 = encoder.encode(jsonStr);
+        // 3. パスワードを決めて、データを混ぜ合わせます（暗号化）
+        const key = "SengokuHadoKey";
+        for (let i = 0; i < uint8.length; i++) {
+            uint8[i] ^= key.charCodeAt(i % key.length);
+        }
+        return uint8; // 暗号化されたバイナリデータを返します
+    }
+
+    // ★追加：暗号化されたバイナリデータを元に戻す魔法
+    _decryptData(uint8) {
+        const key = "SengokuHadoKey";
+        const decrypted = new Uint8Array(uint8.length);
+        // 1. パスワードを使って、混ぜ合わさったデータを元に戻します（復号化）
+        for (let i = 0; i < uint8.length; i++) {
+            decrypted[i] = uint8[i] ^ key.charCodeAt(i % key.length);
+        }
+        // 2. バイナリを文字に戻して、ゲーム用のデータに変換します
+        const decoder = new TextDecoder();
+        const jsonStr = decoder.decode(decrypted);
+        return JSON.parse(jsonStr);
+    }
 
     // ファイルへセーブ
     saveGameToFile() { 
         const data = this._createSaveDataObj();
-        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
+        const encryptedData = this._encryptData(data); // ★暗号化します
+        const blob = new Blob([encryptedData], {type: 'application/octet-stream'}); // ★バイナリデータとして保存します
         const url = URL.createObjectURL(blob); 
-        const a = document.createElement('a'); a.href = url; a.download = `sengoku_save_${this.year}_${this.month}.json`; a.click(); URL.revokeObjectURL(url); 
+        const a = document.createElement('a'); 
+        a.href = url; 
+        a.download = `sengoku_save_${this.year}_${this.month}.sav`; // ★拡張子を.savに変更します
+        a.click(); 
+        URL.revokeObjectURL(url); 
     }
     
     // ファイルからロード
@@ -2788,21 +2822,23 @@ class GameManager {
         const reader = new FileReader(); 
         reader.onload = async (evt) => {
             try { 
-                const d = JSON.parse(evt.target.result); 
+                const uint8 = new Uint8Array(evt.target.result); // ★バイナリデータとして受け取ります
+                const d = this._decryptData(uint8); // ★復号化します
                 await this._restoreSaveDataObj(d);
             } catch(err) { 
                 console.error(err); 
-                alert("セーブデータの読み込みに失敗しました。データが壊れている可能性があります。"); 
+                alert("セーブデータの読み込みに失敗しました。データが壊れているか、形式が異なります。"); 
             } 
         }; 
-        reader.readAsText(file); 
+        reader.readAsArrayBuffer(file); // ★テキストではなくバイナリとして読み込む魔法に変更します
     }
     
     // スロットへセーブ (IndexedDB)
     async saveGameToLocal(slotNo = 1) { 
         const data = this._createSaveDataObj();
+        const encryptedData = this._encryptData(data); // ★暗号化します
         try {
-            await saveToDB("sengoku_save_slot" + slotNo, data);
+            await saveToDB("sengoku_save_slot" + slotNo, encryptedData);
             if (this.ui) this.ui.showDialog(`スロット ${slotNo} にセーブが完了しました。`, false);
         } catch (e) {
             console.error("セーブエラーの詳細:", e);
@@ -2812,19 +2848,26 @@ class GameManager {
 
     // スロットからロード (IndexedDB)
     async loadGameFromLocal(slotNo = 1) { 
-        let d = null;
+        let rawData = null;
         try {
-            d = await loadFromDB("sengoku_save_slot" + slotNo);
+            rawData = await loadFromDB("sengoku_save_slot" + slotNo);
         } catch (e) {
             console.error("ロードエラー:", e);
         }
 
-        if (!d) {
+        if (!rawData) {
             alert(`スロット ${slotNo} にはセーブデータがありません。`);
             return;
         }
 
         try {
+            let d;
+            // ★以前の暗号化されていないデータも読み込めるようにする思いやりです
+            if (rawData instanceof Uint8Array) {
+                d = this._decryptData(rawData); // ★復号化します
+            } else {
+                d = rawData;
+            }
             await this._restoreSaveDataObj(d);
         } catch(err) { 
             console.error(err); 

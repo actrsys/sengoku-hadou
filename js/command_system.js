@@ -1542,7 +1542,17 @@ class CommandSystem {
             Promise.all([
                 loadFromDB("sengoku_save_slot" + i),
                 new Promise(resolve => setTimeout(resolve, 300)) // ★ここで0.3秒待機させます
-            ]).then(([d]) => {
+            ]).then(([rawD]) => {
+                let d = rawD;
+                // ★追加：暗号化されたバイナリデータ(Uint8Array)だった場合は復号化して中身を見ます
+                if (d instanceof Uint8Array && this.game && typeof this.game._decryptData === 'function') {
+                    try {
+                        d = this.game._decryptData(d);
+                    } catch(err) {
+                        d = null; // 復号に失敗したらエラーにする
+                    }
+                }
+
                 let hasData = false;
                 let dateStr = "";
                 let clanStr = ""; 
