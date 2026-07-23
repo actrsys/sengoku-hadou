@@ -2773,17 +2773,11 @@ class GameManager {
     // ==========================================
 
     // ファイルへセーブ
-    async saveGameToFile() { 
+    saveGameToFile() { 
         const data = this._createSaveDataObj();
-        try {
-            const encryptedBinary = await encryptSaveData(data);
-            const blob = new Blob([encryptedBinary], {type: 'application/octet-stream'}); 
-            const url = URL.createObjectURL(blob); 
-            const a = document.createElement('a'); a.href = url; a.download = `sengoku_save_${this.year}_${this.month}.bin`; a.click(); URL.revokeObjectURL(url); 
-        } catch (e) {
-            console.error("ファイル出力エラー:", e);
-            alert("ファイルの保存に失敗しました。");
-        }
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
+        const url = URL.createObjectURL(blob); 
+        const a = document.createElement('a'); a.href = url; a.download = `sengoku_save_${this.year}_${this.month}.json`; a.click(); URL.revokeObjectURL(url); 
     }
     
     // ファイルからロード
@@ -2794,22 +2788,21 @@ class GameManager {
         const reader = new FileReader(); 
         reader.onload = async (evt) => {
             try { 
-                const d = await decryptSaveData(evt.target.result); 
+                const d = JSON.parse(evt.target.result); 
                 await this._restoreSaveDataObj(d);
             } catch(err) { 
                 console.error(err); 
                 alert("セーブデータの読み込みに失敗しました。データが壊れている可能性があります。"); 
             } 
         }; 
-        reader.readAsArrayBuffer(file); 
+        reader.readAsText(file); 
     }
     
     // スロットへセーブ (IndexedDB)
     async saveGameToLocal(slotNo = 1) { 
         const data = this._createSaveDataObj();
         try {
-            const encryptedBinary = await encryptSaveData(data);
-            await saveToDB("sengoku_save_slot" + slotNo, encryptedBinary);
+            await saveToDB("sengoku_save_slot" + slotNo, data);
             if (this.ui) this.ui.showDialog(`スロット ${slotNo} にセーブが完了しました。`, false);
         } catch (e) {
             console.error("セーブエラーの詳細:", e);
@@ -2819,20 +2812,19 @@ class GameManager {
 
     // スロットからロード (IndexedDB)
     async loadGameFromLocal(slotNo = 1) { 
-        let binaryData = null;
+        let d = null;
         try {
-            binaryData = await loadFromDB("sengoku_save_slot" + slotNo);
+            d = await loadFromDB("sengoku_save_slot" + slotNo);
         } catch (e) {
             console.error("ロードエラー:", e);
         }
 
-        if (!binaryData) {
+        if (!d) {
             alert(`スロット ${slotNo} にはセーブデータがありません。`);
             return;
         }
 
         try {
-            const d = await decryptSaveData(binaryData);
             await this._restoreSaveDataObj(d);
         } catch(err) { 
             console.error(err); 
@@ -2926,53 +2918,4 @@ async function loadFromDB(key) {
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
     });
-}
-
-// ==========================================
-// セーブデータの暗号化・復号（Web Crypto API）
-// ==========================================
-const SAVE_ENCRYPTION_KEY = 'SengokuHadoSecretKey2026';
-
-async function getSaveCryptoKey() {
-    const enc = new TextEncoder();
-    const keyData = enc.encode(SAVE_ENCRYPTION_KEY.padEnd(32, '0').slice(0, 32));
-    return await crypto.subtle.importKey(
-        'raw',
-        keyData,
-        { name: 'AES-GCM' },
-        false,
-        ['encrypt', 'decrypt']
-    );
-}
-
-async function encryptSaveData(obj) {
-    const jsonStr = JSON.stringify(obj);
-    const enc = new TextEncoder();
-    const encodedData = enc.encode(jsonStr);
-    const key = await getSaveCryptoKey();
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const encryptedContent = await crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv: iv },
-        key,
-        encodedData
-    );
-    const combined = new Uint8Array(iv.byteLength + encryptedContent.byteLength);
-    combined.set(iv, 0);
-    combined.set(new Uint8Array(encryptedContent), iv.byteLength);
-    return combined;
-}
-
-async function decryptSaveData(binaryData) {
-    const uint8Data = new Uint8Array(binaryData);
-    const iv = uint8Data.slice(0, 12);
-    const data = uint8Data.slice(12);
-    const key = await getSaveCryptoKey();
-    const decryptedContent = await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv: iv },
-        key,
-        data
-    );
-    const dec = new TextDecoder();
-    const jsonStr = dec.decode(decryptedContent);
-    return JSON.parse(jsonStr);
 }
