@@ -994,11 +994,32 @@ class UIManager {
     }
 
     initContextMenu() {
-        // 右クリックや長押しのメニューはバグの温床になるので、まるごと封印しました！
         this.contextMenu = document.getElementById('custom-context-menu');
 
-        // ★共通化：右クリックやスマホの長押しで実行する中身をひとまとめにします
+        // ★右クリックやスマホの長押しで実行する中身をひとまとめにします
         const executeContextMenuAction = (e) => {
+            // ==========================================
+            // ★PC版のみ「閉じる」「戻る」「いいえ」を右クリックで押せる魔法！
+            // ==========================================
+            if (document.body.classList.contains('is-pc')) {
+                const buttons = Array.from(document.querySelectorAll('button'));
+                const targetTexts = ['閉じる', '戻る', 'いいえ'];
+                // 一番手前にあるボタンを見つけるために、リストを逆順にしてから探します
+                const cancelBtn = buttons.reverse().find(btn => 
+                    targetTexts.includes(btn.textContent.trim()) && 
+                    btn.offsetParent !== null && // 画面に表示されているか
+                    !btn.closest('.hidden') &&   // 親の枠ごと隠されていないか
+                    !btn.disabled                // 押せない状態になっていないか
+                );
+
+                if (cancelBtn) {
+                    if (e && e.preventDefault) e.preventDefault();
+                    cancelBtn.click();
+                    return; // ボタンを押したら、これより下の処理（命令終了など）はストップします！
+                }
+            }
+            // ==========================================
+
             // ★追加：野戦や攻城戦中は右クリックで「命令終了」を誤爆させないようにガードします！
             if (this.game) {
                 if (this.game.fieldWarManager && this.game.fieldWarManager.active) {
