@@ -2693,6 +2693,11 @@ class GameManager {
                 this.playerClanId = d.playerClanId || 1;
                 this.marketRate = d.marketRate !== undefined ? d.marketRate : 1.0;
                 
+                // ★追加：セーブデータからシナリオ情報を復元します！
+                this.scenarioFolder = d.scenarioFolder || "";
+                this.scenarioName = d.scenarioName || "不明なシナリオ";
+                this.scenarioNo = d.scenarioNo || "";
+                
                 // ★マップの大きさをセーブデータから復元します
                 this.mapWidth = d.mapWidth;
                 this.mapHeight = d.mapHeight;
@@ -2892,6 +2897,12 @@ class GameManager {
             this.gameStartMonth = d.gameStartMonth || window.MainParams.StartMonth;
             this.playerClanId = d.playerClanId || 1;
             this.marketRate = d.marketRate !== undefined ? d.marketRate : 1.0;
+            
+            // ★追加：セーブデータからシナリオ情報を復元します！
+            this.scenarioFolder = d.scenarioFolder || "";
+            this.scenarioName = d.scenarioName || "不明なシナリオ";
+            this.scenarioNo = d.scenarioNo || "";
+            
             this.mapWidth = d.mapWidth;
             this.mapHeight = d.mapHeight;
             this.aiOperationManager.load(d.aiOperations);
