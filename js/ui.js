@@ -846,15 +846,17 @@ class UIManager {
                     if (document.body.classList.contains('is-pc')) {
                         footer.style.width = '80%';
                         footer.style.maxWidth = '600px';
-                        footer.style.flexDirection = 'row'; // ★PC版は横並びをキープ
+                        footer.style.flexDirection = 'row'; // ★PC版は横並び
                         footer.style.gap = '10px';
                     } else {
                         footer.style.width = '100%';
                         footer.style.maxWidth = '100%';
-                        // ★ここを追加：スマホ版で、面談の時だけ縦に並べる魔法！
+                        // ★スマホ版で、面談の時だけ縦に並べる魔法！
                         if (dialog.customOpts && dialog.customOpts.isInterview) {
                             footer.style.flexDirection = 'column';
                             footer.style.gap = '12px';
+                            // ★面談の時だけ、メッセージ枠との隙間を少し上に広げて余裕を持たせます！
+                            footer.style.setProperty('margin-bottom', '30px', 'important');
                         } else {
                             footer.style.flexDirection = 'row';
                             footer.style.gap = '10px';
