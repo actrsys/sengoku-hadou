@@ -606,7 +606,7 @@ class UIManager {
 
         this.isDialogShowing = true;
         const dialog = this.dialogQueue.shift(); 
-
+        
         const modal = document.getElementById('dialog-modal');
         // ★ここから書き足し：前回の画面で使った特別な配置（真ん中寄せなど）を、一度きれいにリセットしてお掃除します！
         if (modal) {
@@ -622,11 +622,12 @@ class UIManager {
                 footer.style.zIndex = '';
                 footer.style.width = '';
                 footer.style.maxWidth = '';
-                footer.style.paddingLeft = '';
-                footer.style.paddingRight = '';
+                // ★追加：余白と文字揃えも綺麗にお掃除します
+                footer.style.padding = '';
+                footer.style.margin = '';
+                footer.style.justifyContent = '';
             }
         }
-        // ★書き足すのはここまで！
 
         const msgEl = document.getElementById('dialog-message');
         const leftFaceEl = document.getElementById('dialog-left-face');
@@ -797,7 +798,7 @@ class UIManager {
             modal.style.display = 'flex';
             modal.style.flexDirection = 'column';
             modal.style.justifyContent = 'flex-end';
-
+            
             if (hasChoices) {
                 // 選択肢がある場合
                 modal.classList.add('event-choices-active');
@@ -811,14 +812,17 @@ class UIManager {
                     footer.style.transform = 'translate(-50%, -50%)';
                     footer.style.zIndex = '1000';
                     
+                    // ★追加：右下へのズレを直すため、余白を0にして中央揃えを強制します！
+                    footer.style.margin = '0';
+                    footer.style.padding = '0';
+                    footer.style.justifyContent = 'center';
+                    
                     if (document.body.classList.contains('is-pc')) {
                         footer.style.width = '80%';
                         footer.style.maxWidth = '600px';
                     } else {
                         footer.style.width = '100%';
                         footer.style.maxWidth = '100%';
-                        footer.style.paddingLeft = '0';
-                        footer.style.paddingRight = '0';
                     }
                 }
             } else {
