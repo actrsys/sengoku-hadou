@@ -905,8 +905,8 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     justify-content: center;
     width: 100%;
     
-    /* ★ここを変更：縦幅を親の枠に合わせて自動で伸縮（縮むのを許可）する魔法です */
-    flex: 1 1 auto; 
+    /* ★縦幅を中身の量に関係なく、5つのボタンで「均等に」割り振る魔法です */
+    flex: 1 1 0%; 
     min-height: 50px; /* 限界まで縮んでも、文字が潰れない最低限の高さは守ります */
     
     box-sizing: border-box; 
