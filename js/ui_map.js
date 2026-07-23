@@ -1048,9 +1048,16 @@ Object.assign(UIManager.prototype, {
                 if (backToScenarioBtn) {
                     backToScenarioBtn.classList.remove('hidden');
                     backToScenarioBtn.onclick = () => {
-                        // ★修正：二重に鳴るのを防ぐため、ここでの音の魔法を消します
+                        // 二重に鳴るのを防ぐため、ここでの音の魔法を消します
                         document.body.classList.remove('daimyo-select-mode');
                         backToScenarioBtn.classList.add('hidden');
+
+                        // 裏に残っているマップの画面（app）をしっかり隠します！
+                        const appContainer = document.getElementById('app');
+                        if (appContainer) {
+                            appContainer.classList.add('hidden');
+                        }
+                        
                         this.returnToTitle(); 
                         if (window.GameApp) window.GameApp.startNewGame();
                     };
