@@ -1154,7 +1154,7 @@ class DiplomacyManager {
                                                 processPrincesses(index + 1);
                                             },
                                             null,
-                                            { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name, isEvent: true }
+                                            { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name }
                                         );
                                     }
                                 },
@@ -1180,7 +1180,7 @@ class DiplomacyManager {
                                                 );
                                             },
                                             null,
-                                            { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name, isEvent: true }
+                                            { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name }
                                         );
                                     }
                                 },
@@ -1207,7 +1207,7 @@ class DiplomacyManager {
                                                 );
                                             },
                                             null,
-                                            { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name, isEvent: true }
+                                            { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name }
                                         );
                                     }
                                 }
@@ -2121,12 +2121,10 @@ class DiplomacyManager {
 
             this.game.ui.showDialog(msg1, false, () => {
                 this.game.ui.showDialog(msg2, false, doReject, null, {
-                    leftFace: doer.faceIcon, leftName: doerNameStr,
-                    isEvent: true
+                    leftFace: doer.faceIcon, leftName: doerNameStr
                 });
             }, null, {
-                leftFace: myDaimyoFace, leftName: myDaimyoNameStr,
-                isEvent: true
+                leftFace: myDaimyoFace, leftName: myDaimyoNameStr
             });
         };
 
@@ -2177,12 +2175,10 @@ class DiplomacyManager {
             if (msg1 && msg2) {
                 this.game.ui.showDialog(msg1, false, () => {
                     this.game.ui.showDialog(msg2, false, doAccept, null, {
-                        leftFace: doer.faceIcon, leftName: doerNameStr,
-                        isEvent: true
+                        leftFace: doer.faceIcon, leftName: doerNameStr
                     });
                 }, null, {
-                    leftFace: myDaimyoFace, leftName: myDaimyoNameStr,
-                    isEvent: true
+                    leftFace: myDaimyoFace, leftName: myDaimyoNameStr
                 });
             } else {
                 doAccept();
@@ -2314,7 +2310,6 @@ class DiplomacyManager {
 
                 this.game.ui.showDialog(conditionText, false, null, null, {
                     leftFace: doer.faceIcon, leftName: doerNameStr,
-                    isEvent: true,
                     choices: [
                         { label: '承諾する', className: 'btn-primary', onClick: onConditionAccept },
                         { label: '断る', className: 'btn-secondary', onClick: onConditionReject }
@@ -2327,7 +2322,7 @@ class DiplomacyManager {
                     this.game.ui.showResultModal(`条件が折り合わず、${doerClan.name} の使者は帰っていきました。`, () => {
                         if (onComplete) setTimeout(onComplete, 100);
                     });
-                }, null, { leftFace: doer.faceIcon, leftName: doerNameStr, isEvent: true });
+                }, null, { leftFace: doer.faceIcon, leftName: doerNameStr });
             }
         };
 
@@ -2422,17 +2417,14 @@ class DiplomacyManager {
                             },
                             null,
                             {
-                                leftFace: doer.faceIcon, leftName: doerNameStr,
-                                isEvent: true
+                                leftFace: doer.faceIcon, leftName: doerNameStr
                             }
                         );
                     }, null, {
-                        leftFace: myDaimyoFace, leftName: myDaimyoNameStr,
-                        isEvent: true
+                        leftFace: myDaimyoFace, leftName: myDaimyoNameStr
                     });
                 }, null, {
-                    leftFace: doer.faceIcon, leftName: doerNameStr,
-                    isEvent: true
+                    leftFace: doer.faceIcon, leftName: doerNameStr
                 });
             },
             () => {
