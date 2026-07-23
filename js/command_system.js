@@ -1523,29 +1523,50 @@ class CommandSystem {
         // 1から5までのスロットボタンを作ります（数を増やしたい場合は i <= 5 の数字を変えてください）
         for (let i = 1; i <= 5; i++) {
             const btn = document.createElement('button');
-            btn.className = 'btn-primary';
-            btn.style.width = '100%';
-            btn.style.marginBottom = '10px';
             
             // 倉庫（IndexedDB）の中身をチェックして、何年のデータか調べます
             let hasData = false;
-            let dateStr = "空きデータ";
+            let dateStr = "";
+            let clanStr = ""; // ★新しく勢力名を入れる箱を用意します
             try {
                 // game.jsで追加した loadFromDB を呼び出します
                 const d = await loadFromDB("sengoku_save_slot" + i);
                 if (d && d.year) {
                     hasData = true;
                     dateStr = `${d.year}年 ${d.month}月`;
+                    // セーブデータの中から、プレイヤーの勢力名を探し出します
+                    if (d.clans && d.playerClanId) {
+                        const playerClan = d.clans.find(c => c.id === d.playerClanId);
+                        if (playerClan) clanStr = playerClan.name;
+                    }
                 }
             } catch(e) {}
 
-            btn.innerText = `スロット ${i} : ${dateStr}`;
-
-            // ロード画面のとき、空きデータならボタンを押せないようにします
-            if (mode === 'load' && !hasData) {
-                btn.className = 'btn-secondary';
-                btn.disabled = true;
-                btn.style.opacity = '0.5';
+            // ★ここから新しいボタンの形を組み立てます
+            if (hasData) {
+                // データがある時のボタンの魔法
+                btn.className = 'saveload-slot-btn';
+                btn.innerHTML = `
+                    <div class="saveload-slot-title">スロット ${i}</div>
+                    <div class="saveload-slot-info">
+                        <span>${dateStr}</span>
+                        <span>${clanStr}</span>
+                    </div>
+                `;
+            } else {
+                // 空っぽの時のボタンの魔法
+                btn.className = 'saveload-slot-btn empty-slot';
+                btn.innerHTML = `
+                    <div class="saveload-slot-title" style="color: inherit; text-shadow: none;">スロット ${i}</div>
+                    <div class="saveload-slot-info">NO DATA</div>
+                `;
+                
+                // ロード画面のとき、空きデータならボタンを押せないようにします
+                if (mode === 'load') {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                    btn.style.cursor = 'default';
+                }
             }
 
             // ボタンを押した時の動きを設定します
