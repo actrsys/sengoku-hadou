@@ -608,7 +608,7 @@ class UIManager {
         const dialog = this.dialogQueue.shift(); 
         
         const modal = document.getElementById('dialog-modal');
-        // ★ここから書き足し：前回の画面で使った特別な配置（真ん中寄せなど）を、一度きれいにリセットしてお掃除します！
+        // 前回の画面で使った特別な配置（真ん中寄せなど）を、一度きれいにリセットしてお掃除します！
         if (modal) {
             modal.style.display = '';
             modal.style.flexDirection = '';
@@ -617,12 +617,12 @@ class UIManager {
             if (footer) {
                 footer.style.position = '';
                 footer.style.top = '';
+                footer.style.bottom = '';
                 footer.style.left = '';
                 footer.style.transform = '';
                 footer.style.zIndex = '';
                 footer.style.width = '';
                 footer.style.maxWidth = '';
-                // ★追加：余白と文字揃えも綺麗にお掃除します
                 footer.style.padding = '';
                 footer.style.margin = '';
                 footer.style.justifyContent = '';
@@ -743,7 +743,7 @@ class UIManager {
             
             executeNext();
         };
-
+        
         // ★修正：okBtnが見つからなくても、安全にフッター（ボタンの置き場）を見つける魔法です！
         let footer = null;
         if (okBtn) {
@@ -754,11 +754,11 @@ class UIManager {
 
         const modalContent = modal.querySelector('.modal-content');
 
-        // 前回のイベント設定が残っていたら一旦消しておきます
+        // ★追加：前回のイベント設定が残っていたら、画面全体と枠内の両方から綺麗に消しておきます
+        modal.removeEventListener('click', this._currentEventClickHandler);
+        modal.style.cursor = '';
         if (modalContent) {
-            if (this._currentEventClickHandler) {
-                modalContent.removeEventListener('click', this._currentEventClickHandler);
-            }
+            modalContent.removeEventListener('click', this._currentEventClickHandler);
             modalContent.style.cursor = '';
         }
 
@@ -768,18 +768,22 @@ class UIManager {
         // イベントモード専用のクリック操作
         this._currentEventClickHandler = (e) => {
             if (e.target.closest('button')) return;
-            if (e.target === modal) return;
+            // ★変更：外側（黒背景）をクリックした時も進めるように、ガードを削除しました！
             e.stopPropagation();
             if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-            const content = modal.querySelector('.modal-content');
-            if (content) {
-                content.removeEventListener('click', this._currentEventClickHandler);
-                content.style.cursor = '';
+            
+            // 一度進めたら、連続で押されないようにクリック機能を外しておきます
+            modal.removeEventListener('click', this._currentEventClickHandler);
+            modal.style.cursor = '';
+            if (modalContent) {
+                modalContent.removeEventListener('click', this._currentEventClickHandler);
+                modalContent.style.cursor = '';
             }
+            
             // 擬似的に「決定」の動作をさせます（引数なしのonOkを呼び出します）
             cleanupAndNext(dialog.onOk);
         };
-        
+
         const isEventMode = dialog.customOpts && dialog.customOpts.isEvent;
         // ★追加：顔画像や名前が設定されていて、誰かが喋っているかどうかの判定
         const isSpeaking = !!(leftFace || leftName || rightFace || rightName);
@@ -798,22 +802,23 @@ class UIManager {
             modal.style.display = 'flex';
             modal.style.flexDirection = 'column';
             modal.style.justifyContent = 'flex-end';
-            
+
             if (hasChoices) {
                 // 選択肢がある場合
                 modal.classList.add('event-choices-active');
 
                 if (footer) {
                     footer.classList.remove('hidden');
-                    // ボタンを画面中央に固定
-                    footer.style.position = 'fixed';
-                    footer.style.top = '50%';
+                    // ★変更：ボタンを「画面中央(fixed)」ではなく、「メッセージ枠のすぐ上(absolute)」に配置します
+                    footer.style.position = 'absolute';
+                    footer.style.top = 'auto';
+                    footer.style.bottom = '100%'; /* 親（メッセージ枠）の一番上に合わせます */
                     footer.style.left = '50%';
-                    footer.style.transform = 'translate(-50%, -50%)';
+                    footer.style.transform = 'translateX(-50%)';
                     footer.style.zIndex = '1000';
                     
-                    // ★追加：右下へのズレを直すため、余白を0にして中央揃えを強制します！
-                    footer.style.margin = '0';
+                    // 下側に少し隙間（15px）を空けて、メッセージウィンドウに重ならないようにします
+                    footer.style.margin = '0 0 15px 0';
                     footer.style.padding = '0';
                     footer.style.justifyContent = 'center';
                     
@@ -830,9 +835,12 @@ class UIManager {
                 modal.classList.remove('event-choices-active');
                 if (footer) footer.classList.add('hidden');
 
+                // ★変更：画面のどこ（黒背景でも枠内でも）をタッチしても進めるようにします
+                modal.style.cursor = 'pointer';
+                modal.addEventListener('click', this._currentEventClickHandler);
+                
                 if (modalContent) {
                     modalContent.style.cursor = 'pointer';
-                    modalContent.addEventListener('click', this._currentEventClickHandler);
                 }
             }
         } else {
