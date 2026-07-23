@@ -1527,13 +1527,37 @@ class CommandSystem {
             // 倉庫（IndexedDB）の中身をチェックして、何年のデータか調べます
             let hasData = false;
             let dateStr = "";
-            let clanStr = ""; // ★新しく勢力名を入れる箱を用意します
+            let clanStr = ""; // 勢力名
+            let scenarioStr = ""; // シナリオ名
+            let saveTimeStr = "----/--/-- --:--"; // 保存時刻
+            let passedYearsStr = ""; // 経過年数
             try {
                 // game.jsで追加した loadFromDB を呼び出します
                 const d = await loadFromDB("sengoku_save_slot" + i);
                 if (d && d.year) {
                     hasData = true;
                     dateStr = `${d.year}年 ${d.month}月`;
+                    
+                    // シナリオ名の復元
+                    if (d.scenarioName) {
+                        scenarioStr = (d.scenarioNo ? d.scenarioNo + "：" : "") + d.scenarioName;
+                    } else {
+                        scenarioStr = "不明なシナリオ";
+                    }
+
+                    // 保存時刻の復元
+                    if (d.saveTime) {
+                        saveTimeStr = d.saveTime;
+                    }
+
+                    // 経過年数の算出
+                    if (d.gameStartYear) {
+                        const passedYears = d.year - d.gameStartYear;
+                        passedYearsStr = `経過: ${passedYears}年`;
+                    } else {
+                        passedYearsStr = "経過: 0年";
+                    }
+
                     // セーブデータの中から、プレイヤーの勢力名を探し出します
                     if (d.clans && d.playerClanId) {
                         const playerClan = d.clans.find(c => c.id === d.playerClanId);
@@ -1544,21 +1568,32 @@ class CommandSystem {
 
             // ★ここから新しいボタンの形を組み立てます
             if (hasData) {
-                // データがある時のボタンの魔法
+                // データがある時のボタンの魔法（フレックスボックスでレイアウトを整えます）
                 btn.className = 'saveload-slot-btn';
                 btn.innerHTML = `
-                    <div class="saveload-slot-title">スロット ${i}</div>
-                    <div class="saveload-slot-info">
-                        <span>${dateStr}</span>
-                        <span>${clanStr}</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
+                        <div class="saveload-slot-title" style="margin: 0;">スロット ${i}</div>
+                        <div style="font-size: 0.8rem; color: #b0bec5; font-family: monospace;">${saveTimeStr}</div>
+                    </div>
+                    <div class="saveload-slot-info" style="flex-direction: column; gap: 4px; width: 100%;">
+                        <div style="font-size: 0.85rem; color: #cfd8dc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left;">${scenarioStr}</div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%;">
+                            <span style="font-size: 1.3rem; font-weight: bold; color: #ffd54f; text-shadow: 1px 1px 0 #000, 2px 2px 5px rgba(0,0,0,0.8);">${clanStr}</span>
+                            <span style="font-size: 1rem; color: #fff;">${dateStr} <span style="font-size: 0.8rem; color: #b0bec5;">(${passedYearsStr})</span></span>
+                        </div>
                     </div>
                 `;
             } else {
                 // 空っぽの時のボタンの魔法
                 btn.className = 'saveload-slot-btn empty-slot';
                 btn.innerHTML = `
-                    <div class="saveload-slot-title" style="color: inherit; text-shadow: none;">スロット ${i}</div>
-                    <div class="saveload-slot-info">NO DATA</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
+                        <div class="saveload-slot-title" style="color: inherit; text-shadow: none; margin: 0;">スロット ${i}</div>
+                        <div style="font-size: 0.8rem; color: #78909c; font-family: monospace;">----/--/-- --:--</div>
+                    </div>
+                    <div class="saveload-slot-info" style="flex-direction: column; justify-content: center; align-items: center; width: 100%; gap: 4px; height: 42px;">
+                        <div>NO DATA</div>
+                    </div>
                 `;
                 
                 // ロード画面のとき、空きデータならボタンを押せないようにします

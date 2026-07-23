@@ -2608,13 +2608,28 @@ class GameManager {
     }
     
     saveGameToFile() { 
+        // ★追加：シナリオ情報と保存時刻を記録
+        let scenarioIndex = SCENARIOS.findIndex(s => s.folder === this.scenarioFolder);
+        let scenarioName = "不明なシナリオ";
+        let scenarioNo = "";
+        if (scenarioIndex !== -1) {
+            scenarioName = SCENARIOS[scenarioIndex].name;
+            scenarioNo = `シナリオ${scenarioIndex + 1}`;
+        }
+        const now = new Date();
+        const saveTime = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
         const data = { 
             year: this.year, 
             month: this.month, 
             gameStartYear: this.gameStartYear || window.MainParams.StartYear,
             gameStartMonth: this.gameStartMonth || window.MainParams.StartMonth,
+            scenarioFolder: this.scenarioFolder,
+            scenarioName: scenarioName,
+            scenarioNo: scenarioNo,
+            saveTime: saveTime,
             marketRate: this.marketRate,
-            castles: this.castles, 
+            castles: this.castles,
             bushos: this.bushos, 
             clans: this.clans,
             princesses: this.princesses, // ★姫の名簿もセーブデータに書き込みます
