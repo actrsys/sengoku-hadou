@@ -15,7 +15,7 @@ window.EventTextManager = {
                 await game.ui.showDialogAsync(item.msg, false, 0, { isEvent: true });
             } else if (item.type === 'dialog') {
                 // 顔画像や名前をつけて、会話として表示します
-                const opts = { isEvent: true };
+                const opts = {};
                 
                 if (item.leftName) opts.leftName = item.leftName;
                 // もし顔が指定されていればそれを使用し、指定がなくて名前が「小姓」なら自動でセットします
