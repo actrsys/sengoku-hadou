@@ -797,11 +797,8 @@ class UIManager {
         // ★追加：顔画像や名前が設定されていて、誰かが喋っているかどうかの判定
         const isSpeaking = !!(leftFace || leftName || rightFace || rightName);
         
-        // ★修正：面談画面は専用のデザインなので、イベント用のレイアウトには巻き込まないようにします！
-        const isInterview = dialog.customOpts && dialog.customOpts.isInterview;
-        
-        // イベントモード、または誰かが喋っている場合は下側に表示します（面談を除く）
-        const isBottomMessage = !isInterview && (isEventMode || isSpeaking);
+        // ★修正の取り消し：やっぱり面談画面もメッセージは下側に配置します！
+        const isBottomMessage = isEventMode || isSpeaking;
         
         const hasCustomChoices = dialog.customOpts && dialog.customOpts.choices && dialog.customOpts.choices.length > 0;
         // はい/いいえ等の確認ダイアログも含めて選択肢があるかどうかの判定
@@ -849,15 +846,29 @@ class UIManager {
                     if (document.body.classList.contains('is-pc')) {
                         footer.style.width = '80%';
                         footer.style.maxWidth = '600px';
+                        footer.style.flexDirection = 'row'; // ★PC版は横並びをキープ
+                        footer.style.gap = '10px';
                     } else {
                         footer.style.width = '100%';
                         footer.style.maxWidth = '100%';
+                        // ★ここを追加：スマホ版で、面談の時だけ縦に並べる魔法！
+                        if (dialog.customOpts && dialog.customOpts.isInterview) {
+                            footer.style.flexDirection = 'column';
+                            footer.style.gap = '12px';
+                        } else {
+                            footer.style.flexDirection = 'row';
+                            footer.style.gap = '10px';
+                        }
                     }
                 }
             } else {
                 // 選択肢がなく、閉じるだけの場合：ボタンを隠して画面クリックで進行
                 modal.classList.remove('event-choices-active');
-                if (footer) footer.classList.add('hidden');
+                if (footer) {
+                    footer.classList.add('hidden');
+                    footer.style.flexDirection = ''; // お掃除
+                    footer.style.gap = '';
+                }
 
                 // ★変更：画面のどこ（黒背景でも枠内でも）をタッチしても進めるようにします
                 modal.style.cursor = 'pointer';
@@ -871,6 +882,11 @@ class UIManager {
             // 下側配置ではない通常のダイアログ
             modal.classList.remove('event-dialog-modal');
             modal.classList.remove('event-choices-active');
+            
+            if (footer) {
+                footer.style.flexDirection = ''; // お掃除
+                footer.style.gap = '';
+            }
 
             if (dialog.customOpts && dialog.customOpts.isInterview) {
                 modal.classList.add('interview-dialog-modal');
