@@ -778,34 +778,43 @@ class UIManager {
             // 擬似的に「決定」の動作をさせます（引数なしのonOkを呼び出します）
             cleanupAndNext(dialog.onOk);
         };
-
-        const isEventMode = dialog.customOpts && dialog.customOpts.isEvent;
         
-        if (dialog.customOpts && dialog.customOpts.choices) {
-            // 選択肢がある場合：指定された数だけボタンを並べます
-            if (isEventMode) {
-                modal.classList.add('event-dialog-modal');
+        const isEventMode = dialog.customOpts && dialog.customOpts.isEvent;
+        // ★追加：顔画像や名前が設定されていて、誰かが喋っているかどうかの判定
+        const isSpeaking = !!(leftFace || leftName || rightFace || rightName);
+        // イベントモード、または誰かが喋っている場合は下側に表示します
+        const isBottomMessage = isEventMode || isSpeaking;
+        
+        const hasCustomChoices = dialog.customOpts && dialog.customOpts.choices && dialog.customOpts.choices.length > 0;
+        // はい/いいえ等の確認ダイアログも含めて選択肢があるかどうかの判定
+        const hasChoices = hasCustomChoices || dialog.isConfirm;
+
+        if (isBottomMessage) {
+            modal.classList.add('event-dialog-modal');
+            modal.classList.remove('interview-dialog-modal');
+
+            // メッセージを画面の一番下に配置
+            modal.style.display = 'flex';
+            modal.style.flexDirection = 'column';
+            modal.style.justifyContent = 'flex-end';
+
+            if (hasChoices) {
+                // 選択肢がある場合
                 modal.classList.add('event-choices-active');
 
-                // ★ここから書き足し：メッセージを画面の一番下に配置し、ボタンだけを画面の真ん中に浮かせる魔法です！
-                modal.style.display = 'flex';
-                modal.style.flexDirection = 'column';
-                modal.style.justifyContent = 'flex-end'; // これで文章が下側に固定されます
-
                 if (footer) {
-                    // ボタンが入っている箱（footer）を、画面の高さ50%・幅50%の地点（中央）に固定します
+                    footer.classList.remove('hidden');
+                    // ボタンを画面中央に固定
                     footer.style.position = 'fixed';
                     footer.style.top = '50%';
                     footer.style.left = '50%';
-                    footer.style.transform = 'translate(-50%, -50%)'; // 自分の大きさ分だけ戻して、ピッタリ真ん中に合わせます
-                    footer.style.zIndex = '1000'; // 他のものより手前に表示します
+                    footer.style.transform = 'translate(-50%, -50%)';
+                    footer.style.zIndex = '1000';
                     
-                    // ★ここを修正：スマホ版かPC版かで横幅の広げ方を変えます！
                     if (document.body.classList.contains('is-pc')) {
                         footer.style.width = '80%';
                         footer.style.maxWidth = '600px';
                     } else {
-                        // スマホ版の時は、横幅をいっぱいに広げて左右の隙間をなくします
                         footer.style.width = '100%';
                         footer.style.maxWidth = '100%';
                         footer.style.paddingLeft = '0';
@@ -813,37 +822,48 @@ class UIManager {
                     }
                 }
             } else {
-                modal.classList.remove('event-dialog-modal');
-                
-                // ★追加：和睦など、通常の選択肢ダイアログでも縦並びになるように設定します
-                modal.style.display = 'flex';
-                modal.style.flexDirection = 'column';
-                modal.style.justifyContent = 'center';
-                
-                if (footer) {
-                    footer.style.justifyContent = 'center';
+                // 選択肢がなく、閉じるだけの場合：ボタンを隠して画面クリックで進行
+                modal.classList.remove('event-choices-active');
+                if (footer) footer.classList.add('hidden');
+
+                if (modalContent) {
+                    modalContent.style.cursor = 'pointer';
+                    modalContent.addEventListener('click', this._currentEventClickHandler);
                 }
             }
+        } else {
+            // 下側配置ではない通常のダイアログ
+            modal.classList.remove('event-dialog-modal');
+            modal.classList.remove('event-choices-active');
 
-            if (dialog.customOpts.isInterview) {
+            if (dialog.customOpts && dialog.customOpts.isInterview) {
                 modal.classList.add('interview-dialog-modal');
-                if (footer) {
-                    footer.classList.remove('right');
-                    footer.style.justifyContent = '';
-                }
             } else {
                 modal.classList.remove('interview-dialog-modal');
             }
 
+            modal.style.display = 'flex';
+            modal.style.flexDirection = 'column';
+            modal.style.justifyContent = 'center'; // 通常時は画面の中央付近にまとめます
+
             if (footer) {
                 footer.classList.remove('hidden');
+                footer.style.justifyContent = 'center';
+                if (dialog.customOpts && dialog.customOpts.isInterview) {
+                    footer.classList.remove('right');
+                    footer.style.justifyContent = '';
+                }
+            }
+        }
 
+        // --- ボタンの生成 ---
+        if (hasCustomChoices) {
+            if (footer) {
                 dialog.customOpts.choices.forEach((choice, index) => {
                     const btn = document.createElement('button');
-                    // ★追加：最初の選択肢を「okBtn」として扱えるようにお名前シールを貼ります
+                    // 最初の選択肢を「okBtn」として扱えるようにお名前シールを貼ります
                     if (index === 0) btn.id = 'dialog-btn-ok';
 
-                    // 3色ボタン（btn-primary, btn-danger, btn-secondary）を適用できるようにします
                     if (dialog.customOpts.isInterview) {
                         btn.className = 'interview-choice-btn';
                     } else {
@@ -851,10 +871,9 @@ class UIManager {
                     }
                     btn.textContent = choice.label;
                     
-                    // ★追加：ボタンを押せない状態（disabled）にする指示を読み取ります！
                     if (choice.disabled) {
                         btn.disabled = true;
-                        btn.classList.add('disabled'); // 見た目もグレーアウトさせます
+                        btn.classList.add('disabled');
                     }
 
                     btn.onclick = (e) => {
@@ -869,52 +888,27 @@ class UIManager {
                     footer.appendChild(btn);
                 });
             }
-        } else if (isEventMode) {
-            // 選択肢のないイベント：フッターを隠して画面クリックで進行
-            modal.classList.add('event-dialog-modal');
-            modal.classList.remove('interview-dialog-modal');
-            if (footer) footer.classList.add('hidden');
-
-            // ★ここを書き足し：選択肢がない時も、文章が下側にくるようにします
-            modal.style.display = 'flex';
-            modal.style.flexDirection = 'column';
-            modal.style.justifyContent = 'flex-end';
-
-            if (modalContent) {
-                modalContent.style.cursor = 'pointer';
-                modalContent.addEventListener('click', this._currentEventClickHandler);
-            }
-        } else {
-            // 通常のダイアログ：はい/いいえ、または閉じる
-            modal.classList.remove('event-dialog-modal');
-            modal.classList.remove('interview-dialog-modal');
-
-            // ★ここを修正：通常のダイアログでも、必ず縦並び（文章の下にボタン）になるように設定します
-            modal.style.display = 'flex';
-            modal.style.flexDirection = 'column';
-            modal.style.justifyContent = 'center'; // 通常時は画面の中央付近にまとめます
-
+        } else if (!isBottomMessage || hasChoices) {
+            // 通常の確認(isConfirm)か、通常の閉じるダイアログでボタンを表示する場合
             if (footer) {
-                footer.classList.remove('hidden');
-                footer.style.justifyContent = 'center';
-
                 if (dialog.isConfirm) {
                     const okB = document.createElement('button');
-                    okB.id = 'dialog-btn-ok'; // ★追加：次回のためにお名前シールを貼っておきます
+                    okB.id = 'dialog-btn-ok'; 
                     okB.className = dialog.customOpts?.okClass || 'btn-primary';
                     okB.textContent = dialog.customOpts?.okText || 'はい';
                     okB.onclick = () => cleanupAndNext(dialog.onOk);
                     footer.appendChild(okB);
 
                     const canB = document.createElement('button');
-                    canB.id = 'dialog-btn-cancel'; // ★追加：次回のためにお名前シールを貼っておきます
+                    canB.id = 'dialog-btn-cancel'; 
                     canB.className = dialog.customOpts?.cancelClass || 'btn-secondary';
                     canB.textContent = dialog.customOpts?.cancelText || 'いいえ';
                     canB.onclick = () => cleanupAndNext(dialog.onCancel);
                     footer.appendChild(canB);
-                } else {
+                } else if (!isBottomMessage) {
+                    // 通常の閉じるボタン
                     const closeB = document.createElement('button');
-                    closeB.id = 'dialog-btn-ok'; // ★追加：単なるメッセージでも「okBtn」として扱います
+                    closeB.id = 'dialog-btn-ok'; 
                     closeB.className = dialog.customOpts?.okClass || 'btn-secondary';
                     closeB.textContent = dialog.customOpts?.okText || '閉じる';
                     closeB.onclick = () => cleanupAndNext(dialog.onOk);
