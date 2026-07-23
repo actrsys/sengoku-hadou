@@ -904,19 +904,22 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     align-items: flex-start;
     justify-content: center;
     width: 100%;
-    box-sizing: border-box; /* 枠線や余白を含めてサイズを固定する魔法です */
-    padding: 10px 15px;
-    margin-bottom: 8px; /* ボタン同士がくっつきすぎないように隙間をあけます */
-    background: linear-gradient(to right, #2c3e50 0%, #34495e 100%); /* 落ち着いた青みのあるグレー */
+    
+    /* ★ここを変更：縦幅を親の枠に合わせて自動で伸縮（縮むのを許可）する魔法です */
+    flex: 1 1 auto; 
+    min-height: 50px; /* 限界まで縮んでも、文字が潰れない最低限の高さは守ります */
+    
+    box-sizing: border-box; 
+    padding: 8px 15px; /* 上下の余白を少しだけ減らしてスリムにします */
+    margin-bottom: 8px; 
+    background: linear-gradient(to right, #2c3e50 0%, #34495e 100%); 
     border: 2px solid #546e7a;
     border-radius: 6px;
     color: #eceff1;
     cursor: pointer;
     font-family: inherit;
     text-align: left;
-    /* 色や影の変化だけをゆっくりアニメーションさせます */
     transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
-    /* ★重要：アクションによって縦横幅が変わらないように、変形を完全に禁止します */
     transform: none !important;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.5);
 }
@@ -926,28 +929,27 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     margin-bottom: 0;
 }
 
-/* マウスを乗せた時の動き（明るくして浮き上がらせる） */
+/* マウスを乗せた時の動き */
 .saveload-slot-btn:hover {
     background: linear-gradient(to right, #34495e 0%, #455a64 100%);
     border-color: #90a4ae;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 6px rgba(0,0,0,0.6);
 }
 
-/* クリックして押し込んだ時の動き（暗くして凹ませるが、サイズや位置は絶対に変えない） */
+/* クリックして押し込んだ時の動き */
 .saveload-slot-btn:active {
     background: linear-gradient(to right, #1a252f 0%, #22313f 100%);
     border-color: #455a64;
-    /* 内側に強い影をつけて、凹んだように見せます */
     box-shadow: inset 0 2px 5px rgba(0,0,0,0.8), 0 1px 2px rgba(0,0,0,0.3);
-    transition: none; /* 押した瞬間はすぐに反応させます */
+    transition: none; 
 }
 
-/* まだセーブデータがない「空きスロット」用のスタイル */
+/* 空きスロット用のスタイル */
 .saveload-slot-btn.empty-slot {
     background: rgba(0, 0, 0, 0.3);
-    border: 2px dashed #546e7a; /* 点線にして空きっぽさを出します */
+    border: 2px dashed #546e7a; 
     color: #78909c;
-    align-items: center; /* 「空きスロット」の文字を真ん中に寄せます */
+    align-items: center; 
     box-shadow: none;
 }
 .saveload-slot-btn.empty-slot:hover {
@@ -961,21 +963,45 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     color: #78909c;
 }
 
-/* ボタンの中に入れる文字の装飾（上段のタイトル） */
+/* 文字の装飾（上段のタイトル） */
 .saveload-slot-title {
     font-size: 1.1rem;
     font-weight: bold;
-    color: #ffd54f; /* 豪華な金色 */
-    margin-bottom: 4px;
+    color: #ffd54f; 
+    margin-bottom: 2px; /* ★ここの隙間も少し詰めます */
     text-shadow: 1px 1px 0 #000;
 }
 
-/* ボタンの中に入れる文字の装飾（下段の年月や勢力名など） */
+/* 文字の装飾（下段の年月や勢力名など） */
 .saveload-slot-info {
     font-size: 0.9rem;
     color: #cfd8dc;
     display: flex;
-    gap: 15px; /* 年月と勢力名の間に少し隙間をあけます */
+    gap: 15px; 
+}
+
+/* =========================================================
+   ★ここから追加：スマホ版でスクロールを出さないための魔法
+   ========================================================= */
+body:not(.is-pc) #saveload-list {
+    display: flex;
+    flex-direction: column;
+    /* 箱の高さを画面の限界ピッタリに合わせます */
+    height: 100%; 
+    max-height: none !important;
+}
+
+body:not(.is-pc) .saveload-slot-btn {
+    margin-bottom: 5px; /* ボタン同士の隙間をギリギリまで詰めます */
+    padding: 4px 10px;  /* 内側の余白も詰めて、高さを抑えます */
+}
+
+/* スマホ版だと文字が大きすぎてはみ出るかもしれないので、少し縮めます */
+body:not(.is-pc) .saveload-slot-title {
+    font-size: 1rem;
+}
+body:not(.is-pc) .saveload-slot-info {
+    font-size: 0.85rem;
 }
 
 /* =========================================================
