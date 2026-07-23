@@ -980,28 +980,27 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     gap: 15px; 
 }
 
-/* =========================================================
-   ★ここから追加：スマホ版でスクロールを出さないための魔法
-   ========================================================= */
-body:not(.is-pc) #saveload-list {
+#saveload-list {
     display: flex;
     flex-direction: column;
+    flex: 1; /* ★追加：親の枠に合わせて伸び縮みさせます */
+    min-height: 0; /* ★追加：限界を超えて枠が伸びるのを防ぎます */
     /* 箱の高さを画面の限界ピッタリに合わせます */
     height: 100%; 
     max-height: none !important;
 }
 
-body:not(.is-pc) .saveload-slot-btn {
-    margin-bottom: 5px; /* ボタン同士の隙間をギリギリまで詰めます */
-    padding: 4px 10px;  /* 内側の余白も詰めて、高さを抑えます */
+.saveload-slot-btn {
+    margin-bottom: 5px !important; /* ボタン同士の隙間をギリギリまで詰めます */
+    padding: 4px 10px !important;  /* 内側の余白も詰めて、高さを抑えます */
 }
 
-/* スマホ版だと文字が大きすぎてはみ出るかもしれないので、少し縮めます */
-body:not(.is-pc) .saveload-slot-title {
-    font-size: 1rem;
+/* 文字が大きすぎてはみ出るのを防ぐため、少し縮めます */
+.saveload-slot-title {
+    font-size: 1rem !important;
 }
-body:not(.is-pc) .saveload-slot-info {
-    font-size: 0.85rem;
+.saveload-slot-info {
+    font-size: 0.85rem !important;
 }
 
 /* =========================================================
