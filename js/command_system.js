@@ -1538,8 +1538,11 @@ class CommandSystem {
 
         // ★変更：画面を表示したあと、裏側で並行してセーブデータを読み込みます
         for (let i = 1; i <= 5; i++) {
-            // awaitではなくthenを使うことで、5つのスロットを同時に読み込みます
-            loadFromDB("sengoku_save_slot" + i).then(d => {
+            // 読み込みが一瞬で終わった時のちらつきを防ぐため、データの読み込みと「あえて少し待つ（例：300ミリ秒）」を両方待ちます
+            Promise.all([
+                loadFromDB("sengoku_save_slot" + i),
+                new Promise(resolve => setTimeout(resolve, 300)) // ★ここで0.3秒待機させます
+            ]).then(([d]) => {
                 let hasData = false;
                 let dateStr = "";
                 let clanStr = ""; 
