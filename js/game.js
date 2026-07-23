@@ -2773,11 +2773,17 @@ class GameManager {
     // ==========================================
 
     // ファイルへセーブ
-    saveGameToFile() { 
+    async saveGameToFile() { 
         const data = this._createSaveDataObj();
-        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
-        const url = URL.createObjectURL(blob); 
-        const a = document.createElement('a'); a.href = url; a.download = `sengoku_save_${this.year}_${this.month}.json`; a.click(); URL.revokeObjectURL(url); 
+        try {
+            const encryptedBinary = await encryptSaveData(data);
+            const blob = new Blob([encryptedBinary], {type: 'application/octet-stream'}); 
+            const url = URL.createObjectURL(blob); 
+            const a = document.createElement('a'); a.href = url; a.download = `sengoku_save_${this.year}_${this.month}.bin`; a.click(); URL.revokeObjectURL(url); 
+        } catch (e) {
+            console.error("ファイル出力エラー:", e);
+            alert("ファイルの保存に失敗しました。");
+        }
     }
     
     // ファイルからロード
@@ -2788,21 +2794,22 @@ class GameManager {
         const reader = new FileReader(); 
         reader.onload = async (evt) => {
             try { 
-                const d = JSON.parse(evt.target.result); 
+                const d = await decryptSaveData(evt.target.result); 
                 await this._restoreSaveDataObj(d);
             } catch(err) { 
                 console.error(err); 
                 alert("セーブデータの読み込みに失敗しました。データが壊れている可能性があります。"); 
             } 
         }; 
-        reader.readAsText(file); 
+        reader.readAsArrayBuffer(file); 
     }
     
     // スロットへセーブ (IndexedDB)
     async saveGameToLocal(slotNo = 1) { 
         const data = this._createSaveDataObj();
         try {
-            await saveToDB("sengoku_save_slot" + slotNo, data);
+            const encryptedBinary = await encryptSaveData(data);
+            await saveToDB("sengoku_save_slot" + slotNo, encryptedBinary);
             if (this.ui) this.ui.showDialog(`スロット ${slotNo} にセーブが完了しました。`, false);
         } catch (e) {
             console.error("セーブエラーの詳細:", e);
@@ -2812,19 +2819,20 @@ class GameManager {
 
     // スロットからロード (IndexedDB)
     async loadGameFromLocal(slotNo = 1) { 
-        let d = null;
+        let binaryData = null;
         try {
-            d = await loadFromDB("sengoku_save_slot" + slotNo);
+            binaryData = await loadFromDB("sengoku_save_slot" + slotNo);
         } catch (e) {
             console.error("ロードエラー:", e);
         }
 
-        if (!d) {
+        if (!binaryData) {
             alert(`スロット ${slotNo} にはセーブデータがありません。`);
             return;
         }
 
         try {
+            const d = await decryptSaveData(binaryData);
             await this._restoreSaveDataObj(d);
         } catch(err) { 
             console.error(err); 
