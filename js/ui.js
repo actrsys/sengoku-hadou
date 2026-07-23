@@ -753,7 +753,9 @@ class UIManager {
         }
 
         const modalContent = modal.querySelector('.modal-content');
-
+        if (modalContent) {
+            modalContent.style.position = ''; // ★この1行をお掃除部分に追加
+        }
         // ★追加：前回のイベント設定が残っていたら、画面全体と枠内の両方から綺麗に消しておきます
         modal.removeEventListener('click', this._currentEventClickHandler);
         modal.style.cursor = '';
@@ -802,32 +804,34 @@ class UIManager {
             modal.style.display = 'flex';
             modal.style.flexDirection = 'column';
             modal.style.justifyContent = 'flex-end';
-
+            
             if (hasChoices) {
                 // 選択肢がある場合
                 modal.classList.add('event-choices-active');
 
                 if (footer) {
                     footer.classList.remove('hidden');
-                    // ★変更：ボタンを「画面中央(fixed)」ではなく、「メッセージ枠のすぐ上(absolute)」に配置します
+                    
+                    // ★変更：ボタンをメッセージ枠（modal-content）のすぐ上に配置するための設定
+                    // modal-content（メッセージ枠）を基準にするため、footerの親を絶対配置にします
+                    if (modalContent) {
+                        modalContent.style.position = 'relative'; // 基準点にする
+                    }
+                    
                     footer.style.position = 'absolute';
                     footer.style.top = 'auto';
-                    footer.style.bottom = '100%'; /* 親（メッセージ枠）の一番上に合わせます */
+                    footer.style.bottom = 'calc(100% + 15px)'; /* メッセージ枠の上端から15px上の位置 */
                     footer.style.left = '50%';
                     footer.style.transform = 'translateX(-50%)';
                     footer.style.zIndex = '1000';
-                    
-                    // 下側に少し隙間（15px）を空けて、メッセージウィンドウに重ならないようにします
-                    footer.style.margin = '0 0 15px 0';
+                    footer.style.margin = '0';
                     footer.style.padding = '0';
                     footer.style.justifyContent = 'center';
                     
                     if (document.body.classList.contains('is-pc')) {
-                        footer.style.width = '80%';
-                        footer.style.maxWidth = '600px';
+                        footer.style.width = '100%'; /* 基準がメッセージ枠になったので100%でOK */
                     } else {
-                        footer.style.width = '100%';
-                        footer.style.maxWidth = '100%';
+                        footer.style.width = '100vw'; /* スマホの場合は画面いっぱいに広げる */
                     }
                 }
             } else {
