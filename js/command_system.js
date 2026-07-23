@@ -1504,7 +1504,7 @@ class CommandSystem {
     // ==========================================
     // ★セーブ・ロードのスロット選択画面を作る魔法
     // ==========================================
-    showSaveLoadModal(mode) {
+    async showSaveLoadModal(mode) {
         // 先ほど index.html に追加した画面の部品を探します
         const modal = document.getElementById('saveload-modal');
         const title = document.getElementById('saveload-title');
@@ -1513,126 +1513,121 @@ class CommandSystem {
         // セーブかロードかで、タイトルの文字を変えます
         title.innerText = mode === 'save' ? 'セーブするスロットを選択' : 'ロードするスロットを選択';
         
-        // リストを一旦空にします
-        list.innerHTML = '';
+        // 読み込み中の文字を一旦出しておいて、画面を表示します
+        list.innerHTML = '<div style="text-align:center; margin: 20px;">データを確認中...</div>';
+        modal.classList.remove('hidden');
 
-        // まず、枠組みと「データを確認中」という仮のボタンを画面にすぐ出します
+        // ★追加：ボタンを1個ずつ画面に出すとガタガタ動いてしまうので、一旦貯めておくための「見えない箱」を用意します
+        const fragment = document.createDocumentFragment();
+
+        // 1から5までのスロットボタンを作ります（数を増やしたい場合は i <= 5 の数字を変えてください）
         for (let i = 1; i <= 5; i++) {
             const btn = document.createElement('button');
-            btn.className = 'saveload-slot-btn';
-            btn.innerHTML = `<div style="text-align:center; width: 100%; margin: 10px;">スロット ${i} のデータを確認中...</div>`;
-            btn.disabled = true; // 読み込み中は押せないようにします
-            list.appendChild(btn);
-
-            // 非同期で個別にデータを読み込み、終わったスロットから表示を切り替えます
-            (async () => {
-                let hasData = false;
-                let dateStr = "";
-                let clanStr = ""; 
-                let scenarioStr = ""; 
-                let saveTimeStr = "----/--/-- --:--"; 
-                let passedYearsStr = ""; 
-                try {
-                    // game.jsで追加した loadFromDB を呼び出します
-                    const d = await loadFromDB("sengoku_save_slot" + i);
+            
+            // 倉庫（IndexedDB）の中身をチェックして、何年のデータか調べます
+            let hasData = false;
+            let dateStr = "";
+            let clanStr = ""; // 勢力名
+            let scenarioStr = ""; // シナリオ名
+            let saveTimeStr = "----/--/-- --:--"; // 保存時刻
+            let passedYearsStr = ""; // 経過年数
+            try {
+                // game.jsで追加した loadFromDB を呼び出します
+                const d = await loadFromDB("sengoku_save_slot" + i);
+                if (d && d.year) {
+                    hasData = true;
+                    dateStr = `${d.year}年 ${d.month}月`;
                     
-                    // ★追加：一瞬すぎると不自然なので、意図的に少しだけ（400ミリ秒）待つ魔法をかけます
-                    await new Promise(resolve => setTimeout(resolve, 400));
-
-                    if (d && d.year) {
-                        hasData = true;
-                        dateStr = `${d.year}年 ${d.month}月`;
-                        
-                        // シナリオ名の復元
-                        if (d.scenarioName) {
-                            scenarioStr = (d.scenarioNo ? d.scenarioNo + "：" : "") + d.scenarioName;
-                        } else {
-                            scenarioStr = "不明なシナリオ";
-                        }
-
-                        // 保存時刻の復元
-                        if (d.saveTime) {
-                            saveTimeStr = d.saveTime;
-                        }
-
-                        // 経過年数の算出
-                        if (d.gameStartYear) {
-                            const passedYears = d.year - d.gameStartYear;
-                            passedYearsStr = `経過: ${passedYears}年`;
-                        } else {
-                            passedYearsStr = "経過: 0年";
-                        }
-
-                        // セーブデータの中から、プレイヤーの勢力名を探し出します
-                        if (d.clans && d.playerClanId) {
-                            const playerClan = d.clans.find(c => c.id === d.playerClanId);
-                            if (playerClan) clanStr = playerClan.name;
-                        }
-                    }
-                } catch(e) {}
-
-                // ★データ読み込みが完了したら、ボタンの形を組み立て直します
-                if (hasData) {
-                    // データがある時のボタンの魔法
-                    btn.className = 'saveload-slot-btn';
-                    btn.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
-                            <div class="saveload-slot-title" style="margin: 0;">スロット ${i}</div>
-                            <div style="font-size: 0.8rem; color: #b0bec5; font-family: monospace;">${saveTimeStr}</div>
-                        </div>
-                        <div class="saveload-slot-info" style="flex-direction: column; gap: 4px; width: 100%;">
-                            <div style="font-size: 0.85rem; color: #cfd8dc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left;">${scenarioStr}</div>
-                            <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%;">
-                                <span style="font-size: 1.3rem; font-weight: bold; color: #ffd54f; text-shadow: 1px 1px 0 #000, 2px 2px 5px rgba(0,0,0,0.8);">${clanStr}</span>
-                                <span style="font-size: 1rem; color: #fff;">${dateStr} <span style="font-size: 0.8rem; color: #b0bec5;">(${passedYearsStr})</span></span>
-                            </div>
-                        </div>
-                    `;
-                    btn.disabled = false; // 押せるようにする
-                } else {
-                    // 空っぽの時のボタンの魔法
-                    btn.className = 'saveload-slot-btn empty-slot';
-                    btn.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
-                            <div class="saveload-slot-title" style="color: inherit; text-shadow: none; margin: 0;">スロット ${i}</div>
-                            <div style="font-size: 0.8rem; color: #78909c; font-family: monospace;">----/--/-- --:--</div>
-                        </div>
-                        <div class="saveload-slot-info" style="flex-direction: column; justify-content: center; align-items: center; width: 100%; gap: 4px; height: 42px;">
-                            <div>NO DATA</div>
-                        </div>
-                    `;
-                    
-                    // ロード画面のとき、空きデータならボタンを押せないようにします
-                    if (mode === 'load') {
-                        btn.disabled = true;
-                        btn.style.opacity = '0.5';
-                        btn.style.cursor = 'default';
+                    // シナリオ名の復元
+                    if (d.scenarioName) {
+                        scenarioStr = (d.scenarioNo ? d.scenarioNo + "：" : "") + d.scenarioName;
                     } else {
-                        btn.disabled = false; // セーブなら押せるようにする
+                        scenarioStr = "不明なシナリオ";
+                    }
+
+                    // 保存時刻の復元
+                    if (d.saveTime) {
+                        saveTimeStr = d.saveTime;
+                    }
+
+                    // 経過年数の算出
+                    if (d.gameStartYear) {
+                        const passedYears = d.year - d.gameStartYear;
+                        passedYearsStr = `経過: ${passedYears}年`;
+                    } else {
+                        passedYearsStr = "経過: 0年";
+                    }
+
+                    // セーブデータの中から、プレイヤーの勢力名を探し出します
+                    if (d.clans && d.playerClanId) {
+                        const playerClan = d.clans.find(c => c.id === d.playerClanId);
+                        if (playerClan) clanStr = playerClan.name;
                     }
                 }
+            } catch(e) {}
 
-                // ボタンを押した時の動きを設定します
-                btn.onclick = () => {
-                    // まず選択画面を閉じます
-                    modal.classList.add('hidden');
-                    
-                    // 確認画面を出して、OKならIndexedDBへセーブ・ロードを実行します
-                    if (mode === 'save') {
-                        this.game.ui.showDialog(`スロット ${i} に現在の状態をセーブ（上書き）しますか？`, true, () => {
-                            this.game.saveGameToLocal(i);
-                        }, null, { okText: 'セーブする', okClass: 'btn-primary', cancelText: 'やめる' });
-                    } else {
-                        this.game.ui.showDialog(`スロット ${i} のデータをロードしますか？\n（現在の進行状況は失われます）`, true, () => {
-                            this.game.loadGameFromLocal(i);
-                        }, null, { okText: 'ロードする', okClass: 'btn-danger', cancelText: 'やめる' });
-                    }
-                };
-            })();
+            // ★ここから新しいボタンの形を組み立てます
+            if (hasData) {
+                // データがある時のボタンの魔法（フレックスボックスでレイアウトを整えます）
+                btn.className = 'saveload-slot-btn';
+                btn.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
+                        <div class="saveload-slot-title" style="margin: 0;">スロット ${i}</div>
+                        <div style="font-size: 0.8rem; color: #b0bec5; font-family: monospace;">${saveTimeStr}</div>
+                    </div>
+                    <div class="saveload-slot-info" style="flex-direction: column; gap: 4px; width: 100%;">
+                        <div style="font-size: 0.85rem; color: #cfd8dc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left;">${scenarioStr}</div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%;">
+                            <span style="font-size: 1.3rem; font-weight: bold; color: #ffd54f; text-shadow: 1px 1px 0 #000, 2px 2px 5px rgba(0,0,0,0.8);">${clanStr}</span>
+                            <span style="font-size: 1rem; color: #fff;">${dateStr} <span style="font-size: 0.8rem; color: #b0bec5;">(${passedYearsStr})</span></span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // 空っぽの時のボタンの魔法
+                btn.className = 'saveload-slot-btn empty-slot';
+                btn.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
+                        <div class="saveload-slot-title" style="color: inherit; text-shadow: none; margin: 0;">スロット ${i}</div>
+                        <div style="font-size: 0.8rem; color: #78909c; font-family: monospace;">----/--/-- --:--</div>
+                    </div>
+                    <div class="saveload-slot-info" style="flex-direction: column; justify-content: center; align-items: center; width: 100%; gap: 4px; height: 42px;">
+                        <div>NO DATA</div>
+                    </div>
+                `;
+                
+                // ロード画面のとき、空きデータならボタンを押せないようにします
+                if (mode === 'load') {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                    btn.style.cursor = 'default';
+                }
+            }
+
+            // ボタンを押した時の動きを設定します
+            btn.onclick = () => {
+                // まず選択画面を閉じます
+                modal.classList.add('hidden');
+                
+                // 確認画面を出して、OKならIndexedDBへセーブ・ロードを実行します
+                if (mode === 'save') {
+                    this.game.ui.showDialog(`スロット ${i} に現在の状態をセーブ（上書き）しますか？`, true, () => {
+                        this.game.saveGameToLocal(i);
+                    }, null, { okText: 'セーブする', okClass: 'btn-primary', cancelText: 'やめる' });
+                } else {
+                    this.game.ui.showDialog(`スロット ${i} のデータをロードしますか？\n（現在の進行状況は失われます）`, true, () => {
+                        this.game.loadGameFromLocal(i);
+                    }, null, { okText: 'ロードする', okClass: 'btn-danger', cancelText: 'やめる' });
+                }
+            };
+            
+            // ★変更：作ったボタンを直接画面に追加せず、一旦「見えない箱」に保管します
+            fragment.appendChild(btn);
         }
 
-        // 枠組みができた時点で、すぐに画面を表示します！
-        modal.classList.remove('hidden');
+        // ★追加：すべてのボタンの準備が終わったら、リストの「データを確認中」の文字を消して、一気にボタンを投下します！
+        list.innerHTML = '';
+        list.appendChild(fragment);
     }
     
     handleBushoSelection(actionType, selectedIds, targetId, extraData) {
