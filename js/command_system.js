@@ -1535,6 +1535,10 @@ class CommandSystem {
                 try {
                     // game.jsで追加した loadFromDB を呼び出します
                     const d = await loadFromDB("sengoku_save_slot" + i);
+                    
+                    // ★追加：一瞬すぎると不自然なので、意図的に少しだけ（400ミリ秒）待つ魔法をかけます
+                    await new Promise(resolve => setTimeout(resolve, 400));
+
                     if (d && d.year) {
                         hasData = true;
                         dateStr = `${d.year}年 ${d.month}月`;
