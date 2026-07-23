@@ -627,6 +627,12 @@ class UIManager {
                 footer.style.margin = '';
                 footer.style.justifyContent = '';
                 footer.style.order = '';
+                footer.style.removeProperty('margin-top');
+                footer.style.removeProperty('margin-bottom');
+            }
+            const modalContent = modal.querySelector('.modal-content');
+            if (modalContent) {
+                modalContent.style.removeProperty('margin-top');
             }
         }
 
@@ -815,11 +821,19 @@ class UIManager {
                     
                     // ★変更：メッセージ枠の「すぐ上」に配置する魔法
                     // 親要素(modal)が縦並びのリストになっているので、順番(order)を入れ替えるだけで上にきます！
-                    footer.style.order = '-1'; 
-                    footer.style.marginBottom = '15px'; // メッセージ枠との隙間を少し開けます
-                    
-                    // 画面外に飛ばしてしまっていた絶対配置（absolute）の魔法を解除します
                     footer.style.position = 'relative'; 
+                    footer.style.order = '-1'; 
+                    
+                    // ★最上部に飛んでしまう原因だった「上の空きスペース（margin-top: auto）」を、
+                    // 強力な魔法(!important)で上書きし、メッセージ枠から奪い取ってボタン（footer）の上に作らせます！
+                    footer.style.setProperty('margin-top', 'auto', 'important');
+                    footer.style.setProperty('margin-bottom', '15px', 'important'); // メッセージ枠との隙間
+                    
+                    if (modalContent) {
+                        // メッセージ枠の上の空きスペースを消して、ボタンのすぐ下にくっつけます
+                        modalContent.style.setProperty('margin-top', '0', 'important');
+                    }
+                    
                     footer.style.top = '';
                     footer.style.bottom = '';
                     footer.style.left = '';
