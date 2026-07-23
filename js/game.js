@@ -2775,9 +2775,14 @@ class GameManager {
     // ファイルへセーブ
     saveGameToFile() { 
         const data = this._createSaveDataObj();
-        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
+        const encryptedData = encryptSaveData(data);
+        const blob = new Blob([encryptedData], {type: 'application/octet-stream'}); 
         const url = URL.createObjectURL(blob); 
-        const a = document.createElement('a'); a.href = url; a.download = `sengoku_save_${this.year}_${this.month}.json`; a.click(); URL.revokeObjectURL(url); 
+        const a = document.createElement('a'); 
+        a.href = url; 
+        a.download = `sengoku_save_${this.year}_${this.month}.bin`; 
+        a.click(); 
+        URL.revokeObjectURL(url); 
     }
     
     // ファイルからロード
@@ -2788,21 +2793,30 @@ class GameManager {
         const reader = new FileReader(); 
         reader.onload = async (evt) => {
             try { 
-                const d = JSON.parse(evt.target.result); 
+                const uint8Array = new Uint8Array(evt.target.result);
+                let d;
+                // 古い非暗号化JSON(先頭が'{' = 123)との互換性を保つ
+                if (uint8Array[0] === 123) {
+                    const decoder = new TextDecoder();
+                    d = JSON.parse(decoder.decode(uint8Array));
+                } else {
+                    d = decryptSaveData(uint8Array);
+                }
                 await this._restoreSaveDataObj(d);
             } catch(err) { 
                 console.error(err); 
                 alert("セーブデータの読み込みに失敗しました。データが壊れている可能性があります。"); 
             } 
         }; 
-        reader.readAsText(file); 
+        reader.readAsArrayBuffer(file); 
     }
     
     // スロットへセーブ (IndexedDB)
     async saveGameToLocal(slotNo = 1) { 
         const data = this._createSaveDataObj();
         try {
-            await saveToDB("sengoku_save_slot" + slotNo, data);
+            const encryptedData = encryptSaveData(data);
+            await saveToDB("sengoku_save_slot" + slotNo, encryptedData);
             if (this.ui) this.ui.showDialog(`スロット ${slotNo} にセーブが完了しました。`, false);
         } catch (e) {
             console.error("セーブエラーの詳細:", e);
@@ -2814,7 +2828,20 @@ class GameManager {
     async loadGameFromLocal(slotNo = 1) { 
         let d = null;
         try {
-            d = await loadFromDB("sengoku_save_slot" + slotNo);
+            const loadedData = await loadFromDB("sengoku_save_slot" + slotNo);
+            if (loadedData) {
+                if (loadedData instanceof Uint8Array || loadedData instanceof ArrayBuffer) {
+                    const uint8Array = loadedData instanceof Uint8Array ? loadedData : new Uint8Array(loadedData);
+                    if (uint8Array[0] === 123) {
+                        const decoder = new TextDecoder();
+                        d = JSON.parse(decoder.decode(uint8Array));
+                    } else {
+                        d = decryptSaveData(uint8Array);
+                    }
+                } else {
+                    d = loadedData;
+                }
+            }
         } catch (e) {
             console.error("ロードエラー:", e);
         }
@@ -2918,4 +2945,33 @@ async function loadFromDB(key) {
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
     });
+}
+
+// ==========================================
+// セーブデータのバイナリ化・暗号化処理
+// ==========================================
+const SAVE_ENCRYPTION_KEY = "SengokuHadoSecretKey";
+
+function encryptSaveData(dataObj) {
+    const jsonStr = JSON.stringify(dataObj);
+    const encoder = new TextEncoder();
+    const uint8Array = encoder.encode(jsonStr);
+    
+    // シンプルなXOR暗号化によるバイナリデータの難読化
+    for (let i = 0; i < uint8Array.length; i++) {
+        uint8Array[i] ^= SAVE_ENCRYPTION_KEY.charCodeAt(i % SAVE_ENCRYPTION_KEY.length);
+    }
+    return uint8Array;
+}
+
+function decryptSaveData(uint8Array) {
+    // XOR復号化 (暗号化と同じ処理)
+    const decryptedArray = new Uint8Array(uint8Array.length);
+    for (let i = 0; i < uint8Array.length; i++) {
+        decryptedArray[i] = uint8Array[i] ^ SAVE_ENCRYPTION_KEY.charCodeAt(i % SAVE_ENCRYPTION_KEY.length);
+    }
+    
+    const decoder = new TextDecoder();
+    const jsonStr = decoder.decode(decryptedArray);
+    return JSON.parse(jsonStr);
 }
