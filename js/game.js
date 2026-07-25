@@ -2664,7 +2664,8 @@ class GameManager {
         this.isProcessingAI = false; 
         this.isWatchMode = false; 
         this.originalPlayerClanId = null; 
-        this.hasAutoSavedThisMonth = false;
+        // ロードした直後は無意味なオートセーブが走らないよう、すでに「セーブ済み」の印をつけておきます！
+        this.hasAutoSavedThisMonth = true;
         if (this.aiTimer) { clearTimeout(this.aiTimer); this.aiTimer = null; }
         this.selectionMode = null;
         this.validTargets = [];
