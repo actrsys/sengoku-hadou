@@ -3031,6 +3031,11 @@ body:not(.is-pc) .interview-dialog-modal .modal-footer {
     margin: 20px 0;
     text-align: left;
 }
+
+/* スマホ版では項目の間の縦幅を狭くする */
+body:not(.is-pc) .setting-row {
+    margin: 8px 0;
+}
 .setting-row .slider-row-label {
     display: block;
     margin-bottom: 8px;
