@@ -1326,6 +1326,7 @@ class GameManager {
         // ★ 面談システムを呼び出します！
         this.interviewSystem = new InterviewSystem(this);
         
+        this.hasAutoSavedThisMonth = false; // ★追加：その月にオートセーブしたかどうかを覚えておく箱です
         this.phase = 'title';
     }
     
@@ -1346,7 +1347,8 @@ class GameManager {
         // ★前回のゲームの記憶やフラグを綺麗にお掃除します！
         this.isProcessingAI = false; // AI思考中フラグを解除！
         this.isWatchMode = false; // ★追加：観戦モードも解除！
-        this.originalPlayerClanId = null; // ★追加
+        this.originalPlayerClanId = null;
+        this.hasAutoSavedThisMonth = false;
         if (this.aiTimer) {
             clearTimeout(this.aiTimer);
             this.aiTimer = null;
@@ -1793,6 +1795,8 @@ class GameManager {
     }
     
     async startMonth() { 
+        this.hasAutoSavedThisMonth = false; // ★月が替わったので、オートセーブ済みの印を消します
+
         // ★追加：月初の処理が始まったら、ユーザーが勝手に操作できないように膜（ガード）を張ります！
         this.isProcessingAI = true;
         if (this.ui && this.ui.aiGuard) {
@@ -2400,9 +2404,16 @@ class GameManager {
             } else {
                 // 直轄（今まで通りプレイヤーが動かす）の場合
                 this.isProcessingAI = false; 
+
+                // ★毎月一番最初の自分のターンで、裏側でオートセーブを走らせます！
+                if (!this.hasAutoSavedThisMonth && window.GameConfig && window.GameConfig.autoSave) {
+                    this.hasAutoSavedThisMonth = true;
+                    this.executeAutoSave();
+                }
+
                 if(this.ui.aiGuard) this.ui.aiGuard.classList.add('hidden'); 
 
-                this.ui.renderMap(); 
+                this.ui.renderMap();
                 this.ui.scrollToActiveCastle(castle);
                 
                 this.ui.showTurnStartDialog(castle, () => {
@@ -2653,6 +2664,7 @@ class GameManager {
         this.isProcessingAI = false; 
         this.isWatchMode = false; 
         this.originalPlayerClanId = null; 
+        this.hasAutoSavedThisMonth = false;
         if (this.aiTimer) { clearTimeout(this.aiTimer); this.aiTimer = null; }
         this.selectionMode = null;
         this.validTargets = [];
@@ -2857,13 +2869,13 @@ class GameManager {
     }
 
     // スロットからロード (IndexedDB)
-    async loadGameFromLocal(slotNo = 1) { 
+    async loadGameFromLocal(slotNo = 1, prefix = "sengoku_save_slot") { 
         // ★追加：ロードが始まった瞬間にロード画面で蓋をします！
         if (this.ui) this.ui.showLoadingScreen();
 
         let rawData = null;
         try {
-            rawData = await loadFromDB("sengoku_save_slot" + slotNo);
+            rawData = await loadFromDB(prefix + slotNo);
         } catch (e) {
             console.error("ロードエラー:", e);
         }
@@ -2890,6 +2902,28 @@ class GameManager {
         } 
     }
 
+    // ★追加：オートセーブを裏で実行する魔法
+    async executeAutoSave() {
+        try {
+            // スロットの番号（1～5）を覚えておくための箱から数字を取り出します（最初は1から）
+            let autoSaveIndex = parseInt(localStorage.getItem('autoSaveIndex')) || 1;
+            
+            const data = this._createSaveDataObj();
+            const encryptedData = this._encryptData(data);
+            
+            // オートセーブ専用の「sengoku_autosave_slot〇」にセーブを書き込みます
+            await saveToDB("sengoku_autosave_slot" + autoSaveIndex, encryptedData);
+            
+            // 次にセーブするスロットの番号を1つ進めます（5の次は1に戻します）
+            autoSaveIndex++;
+            if (autoSaveIndex > 5) autoSaveIndex = 1;
+            localStorage.setItem('autoSaveIndex', autoSaveIndex);
+            
+        } catch (e) {
+            console.error("オートセーブに失敗しました:", e);
+        }
+    }
+
     // ★追加：最新のセーブデータを自動で見つけて読み込む魔法 (続きから)
     async continueGame() {
         // ★追加：探している間に操作されないようにロード画面で蓋をします！
@@ -2897,40 +2931,50 @@ class GameManager {
 
         let latestSlot = -1;
         let latestTime = 0;
+        let latestPrefix = "";
 
-        for (let i = 1; i <= 5; i++) {
-            try {
-                const rawData = await loadFromDB("sengoku_save_slot" + i);
-                if (rawData) {
-                    let d = rawData;
-                    // 暗号化されたデータなら一度開いて中身を見ます
-                    if (d instanceof Uint8Array) {
-                        try {
-                            d = this._decryptData(d);
-                        } catch(err) {
-                            d = null;
+        // 手動セーブとオートセーブ、両方のお部屋を探しに行きます
+        const prefixes = ["sengoku_save_slot", "sengoku_autosave_slot"];
+
+        for (const prefix of prefixes) {
+            for (let i = 1; i <= 5; i++) {
+                try {
+                    const rawData = await loadFromDB(prefix + i);
+                    if (rawData) {
+                        let d = rawData;
+                        // 暗号化されたデータなら一度開いて中身を見ます
+                        if (d instanceof Uint8Array) {
+                            try {
+                                d = this._decryptData(d);
+                            } catch(err) {
+                                d = null;
+                            }
+                        }
+                        // セーブした時間（saveTime）を見て、一番新しいものを探します
+                        if (d && d.saveTime) {
+                            const time = new Date(d.saveTime).getTime();
+                            if (time > latestTime) {
+                                latestTime = time;
+                                latestSlot = i;
+                                latestPrefix = prefix;
+                            }
+                        } else if (d) {
+                            // 時間が記録されていなければ、とりあえず見つけたスロットをメモします
+                            if (latestSlot === -1) {
+                                latestSlot = i;
+                                latestPrefix = prefix;
+                            }
                         }
                     }
-                    // セーブした時間（saveTime）を見て、一番新しいものを探します
-                    if (d && d.saveTime) {
-                        const time = new Date(d.saveTime).getTime();
-                        if (time > latestTime) {
-                            latestTime = time;
-                            latestSlot = i;
-                        }
-                    } else if (d) {
-                        // 時間が記録されていなければ、とりあえず見つけたスロットをメモします
-                        if (latestSlot === -1) latestSlot = i;
-                    }
+                } catch (e) {
+                    console.error("セーブデータ取得エラー:", e);
                 }
-            } catch (e) {
-                console.error("セーブデータ取得エラー:", e);
             }
         }
 
         // 一番新しいデータが見つかったら、それを読み込みます！
         if (latestSlot !== -1) {
-            this.loadGameFromLocal(latestSlot);
+            this.loadGameFromLocal(latestSlot, latestPrefix);
         } else {
             alert("セーブデータが見つかりません。");
             if (this.ui) this.ui.hideLoadingScreen(); // ★データがなくてやめる時は蓋を開けます

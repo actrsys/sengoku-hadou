@@ -62,11 +62,14 @@ document.addEventListener("DOMContentLoaded", () => {
         } else if (type === 'historical') {
             window.GameConfig.historicalEvent = isTrue;
             localStorage.setItem('historicalEvent', isTrue ? 'true' : 'false');
+        } else if (type === 'autosave') {
+            window.GameConfig.autoSave = isTrue;
+            localStorage.setItem('autoSave', isTrue ? 'true' : 'false');
         }
     };
 
     // 各ボタンに「クリックされたらこの魔法を使ってね」というお約束をします
-    ['notify', 'historical'].forEach(type => {
+    ['notify', 'historical', 'autosave'].forEach(type => {
         const btnTrue = document.getElementById(`btn-${type}-true`);
         const btnFalse = document.getElementById(`btn-${type}-false`);
         
@@ -92,6 +95,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const isHistorical = savedHistorical !== 'false';
     window.GameConfig.historicalEvent = isHistorical;
     updateToggleSetting('historical', isHistorical);
+
+    // オートセーブの記憶を読み出します
+    const savedAutoSave = localStorage.getItem('autoSave');
+    const isAutoSave = savedAutoSave !== 'false'; // デフォルトは「する(true)」にします
+    window.GameConfig.autoSave = isAutoSave;
+    updateToggleSetting('autosave', isAutoSave);
 
     // =========================================
     // 4. 「閉じる」ボタンの処理

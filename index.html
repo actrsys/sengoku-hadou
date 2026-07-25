@@ -481,6 +481,13 @@
                 </div>
 
                 <div class="setting-row">
+                    <label class="slider-row-label">オートセーブ</label>
+                    <div class="setting-toggle-group">
+                        <button type="button" class="troop-type-btn" id="btn-autosave-true">する</button>
+                        <button type="button" class="troop-type-btn" id="btn-autosave-false">しない</button>
+                    </div>
+                </div>
+                <div class="setting-row">
                     <label class="slider-row-label">他家戦争の通知</label>
                     <div class="setting-toggle-group">
                         <button type="button" class="troop-type-btn" id="btn-notify-true">通知する</button>
@@ -496,6 +503,7 @@
                     </div>
                 </div>
 
+
                 <div class="modal-footer" style="justify-content: center;">
                     <button id="settings-close-btn" class="btn-secondary">閉じる</button>
                 </div>
@@ -507,8 +515,12 @@
                 <h3 id="saveload-title">セーブ / ロード</h3>
                 <div id="saveload-list" class="list-container" style="max-height: 60vh; overflow-y: auto;">
                     </div>
-                <div class="modal-footer" style="justify-content: center; margin-top: 15px;">
+                <div class="modal-footer" style="justify-content: center; margin-top: 15px; position: relative;">
                     <button class="btn-secondary" onclick="document.getElementById('saveload-modal').classList.add('hidden')">閉じる</button>
+                    <div id="saveload-tabs" class="hidden" style="position: absolute; right: 0; bottom: 0; display: flex; gap: 5px;">
+                        <button id="saveload-tab-manual" class="btn-primary btn-small">手動</button>
+                        <button id="saveload-tab-auto" class="btn-secondary btn-small">オート</button>
+                    </div>
                 </div>
             </div>
         </div>
