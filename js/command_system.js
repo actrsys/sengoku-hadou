@@ -1635,9 +1635,15 @@ class CommandSystem {
                             this.game.saveGameToLocal(i);
                         }, null, { okText: 'セーブする', okClass: 'btn-primary', cancelText: 'やめる' });
                     } else {
-                        this.game.ui.showDialog(`スロット ${i} のデータをロードしますか？\n（現在の進行状況は失われます）`, true, () => {
+                        // ★変更：タイトル画面からの場合は、確認なしで即ロードします！
+                        if (this.game.phase === 'title') {
                             this.game.loadGameFromLocal(i);
-                        }, null, { okText: 'ロードする', okClass: 'btn-danger', cancelText: 'やめる' });
+                        } else {
+                            // ゲームプレイ中の場合は、今のデータが消えるので確認を出します
+                            this.game.ui.showDialog(`スロット ${i} のデータをロードしますか？\n（現在の進行状況は失われます）`, true, () => {
+                                this.game.loadGameFromLocal(i);
+                            }, null, { okText: 'ロードする', okClass: 'btn-danger', cancelText: 'やめる' });
+                        }
                     }
                 };
             }).catch(e => {
