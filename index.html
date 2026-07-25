@@ -514,10 +514,10 @@
             <div class="modal-content modal-small">
                 <h3 id="saveload-title">セーブ / ロード</h3>
                 
-                <!-- ★変更：タブをリストのすぐ上に配置し、右寄せにします -->
-                <div id="saveload-tabs" class="hidden" style="display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 10px;">
-                    <button id="saveload-tab-manual" class="btn-primary btn-small" style="padding: 4px 15px; font-size: 0.95rem;">手動</button>
-                    <button id="saveload-tab-auto" class="btn-secondary btn-small" style="padding: 4px 15px; font-size: 0.95rem;">オート</button>
+                <!-- ★変更：設定画面と同じ和風の切り替えボタン（トグルボタン）の見た目にします -->
+                <div id="saveload-tabs" class="hidden setting-toggle-group" style="margin-bottom: 10px;">
+                    <button type="button" id="saveload-tab-manual" class="troop-type-btn active" disabled>手動データ</button>
+                    <button type="button" id="saveload-tab-auto" class="troop-type-btn">オートセーブ</button>
                 </div>
                 
                 <div id="saveload-list" class="list-container" style="max-height: 60vh; overflow-y: auto;">

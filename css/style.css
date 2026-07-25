@@ -1299,6 +1299,15 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 3px 8px rgba(0,0,0,0.8);
 }
 
+/* 選ばれている(active)時は、押せなくても(disabled)暗くならず光ったままにする魔法 */
+.troop-type-btn.active:disabled {
+    filter: none;
+    color: #ffffff;
+    border-color: #fce8a1 #d4af37 #a88a2c #d4af37;
+    box-shadow: 0 0 8px rgba(212, 175, 55, 0.6), inset 0 1px 3px rgba(0,0,0,0.3);
+    cursor: default;
+}
+
 .qty-control input[type="range"] {
     flex: 1;
     min-width: 0; /* ★追加：スライダーが右側にはみ出さないように、限界まで縮むことを許可します */

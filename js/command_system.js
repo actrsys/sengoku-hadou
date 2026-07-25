@@ -1521,9 +1521,15 @@ class CommandSystem {
         if (tabs) {
             if (mode === 'load') {
                 tabs.classList.remove('hidden');
-                // 開いた時は必ず「手動」ボタンを光らせます
-                document.getElementById('saveload-tab-manual').className = 'btn-primary btn-small';
-                document.getElementById('saveload-tab-auto').className = 'btn-secondary btn-small';
+                // 開いた時は必ず「手動」ボタンを光らせて、押せないようにします
+                const btnM = document.getElementById('saveload-tab-manual');
+                const btnA = document.getElementById('saveload-tab-auto');
+                if(btnM && btnA) {
+                    btnM.classList.add('active');
+                    btnM.disabled = true;
+                    btnA.classList.remove('active');
+                    btnA.disabled = false;
+                }
             } else {
                 tabs.classList.add('hidden');
             }
@@ -1691,18 +1697,24 @@ class CommandSystem {
             const btnAuto = document.getElementById('saveload-tab-auto');
             
             btnManual.onclick = () => {
-                if (currentPrefix === 'sengoku_save_slot') return; // すでに手動なら何もしません
+                if (currentPrefix === 'sengoku_save_slot') return;
                 currentPrefix = 'sengoku_save_slot';
-                btnManual.className = 'btn-primary btn-small';     // 手動ボタンを光らせます
-                btnAuto.className = 'btn-secondary btn-small';     // オートボタンを暗くします
+                // 押された手動ボタンを光らせて押せなくし、オートボタンを押せるように戻します
+                btnManual.classList.add('active');
+                btnManual.disabled = true;
+                btnAuto.classList.remove('active');
+                btnAuto.disabled = false;
                 renderSlots(currentPrefix);
             };
             
             btnAuto.onclick = () => {
-                if (currentPrefix === 'sengoku_autosave_slot') return; // すでにオートなら何もしません
+                if (currentPrefix === 'sengoku_autosave_slot') return;
                 currentPrefix = 'sengoku_autosave_slot';
-                btnManual.className = 'btn-secondary btn-small';   // 手動ボタンを暗くします
-                btnAuto.className = 'btn-primary btn-small';       // オートボタンを光らせます
+                // 押されたオートボタンを光らせて押せなくし、手動ボタンを押せるように戻します
+                btnManual.classList.remove('active');
+                btnManual.disabled = false;
+                btnAuto.classList.add('active');
+                btnAuto.disabled = true;
                 renderSlots(currentPrefix);
             };
         }
