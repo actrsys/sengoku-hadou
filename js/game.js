@@ -2842,6 +2842,13 @@ class GameManager {
         const encryptedData = this._encryptData(data); // ★暗号化します
         try {
             await saveToDB("sengoku_save_slot" + slotNo, encryptedData);
+            this.hasSaveData = true; // ★追加：セーブしたので「データあり」の印をつけます
+            
+            // ★追加：もしメニューが開いていたら、ロードボタンを押せるように画面を更新します
+            if (this.ui && typeof this.ui.renderCommandMenu === 'function') {
+                this.ui.renderCommandMenu();
+            }
+
             if (this.ui) this.ui.showDialog(`スロット ${slotNo} にセーブが完了しました。`, false);
         } catch (e) {
             console.error("セーブエラーの詳細:", e);

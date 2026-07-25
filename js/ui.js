@@ -1211,6 +1211,9 @@ class UIManager {
                 }
             }
         }
+        
+        // ★追加：ゲーム本体にセーブデータがあるかないかの印を付けておきます
+        if (this.game) this.game.hasSaveData = hasData;
 
         // データがない場合はボタンを押せなくして、少し透明（半透明）にします
         if (!hasData) {

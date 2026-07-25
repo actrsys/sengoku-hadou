@@ -664,7 +664,10 @@ const COMMAND_SPECS = {
     'history': { label: "履歴", category: 'SYSTEM', isSystem: true, action: 'history' },
     'settings': { label: "設定", category: 'SYSTEM', isSystem: true, action: 'settings' },
     'save': { label: "セーブ", category: 'SYSTEM', isSystem: true, action: 'save' },
-    'load': { label: "ロード", category: 'SYSTEM', isSystem: true, action: 'load' },
+    'load': { 
+        label: "ロード", category: 'SYSTEM', isSystem: true, action: 'load',
+        canExecute: (game) => game.hasSaveData === true
+    },
     'watch': { label: "観戦する", category: 'SYSTEM', isSystem: true, action: 'watch' },
     'title': { label: "タイトルへ", category: 'SYSTEM', isSystem: true, action: 'title' }
 };
