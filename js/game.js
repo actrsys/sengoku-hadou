@@ -2874,6 +2874,49 @@ class GameManager {
             alert("セーブデータの読み込みに失敗しました。データが壊れている可能性があります。"); 
         } 
     }
+
+    // ★追加：最新のセーブデータを自動で見つけて読み込む魔法 (続きから)
+    async continueGame() {
+        let latestSlot = -1;
+        let latestTime = 0;
+
+        for (let i = 1; i <= 5; i++) {
+            try {
+                const rawData = await loadFromDB("sengoku_save_slot" + i);
+                if (rawData) {
+                    let d = rawData;
+                    // 暗号化されたデータなら一度開いて中身を見ます
+                    if (d instanceof Uint8Array) {
+                        try {
+                            d = this._decryptData(d);
+                        } catch(err) {
+                            d = null;
+                        }
+                    }
+                    // セーブした時間（saveTime）を見て、一番新しいものを探します
+                    if (d && d.saveTime) {
+                        const time = new Date(d.saveTime).getTime();
+                        if (time > latestTime) {
+                            latestTime = time;
+                            latestSlot = i;
+                        }
+                    } else if (d) {
+                        // 時間が記録されていなければ、とりあえず見つけたスロットをメモします
+                        if (latestSlot === -1) latestSlot = i;
+                    }
+                }
+            } catch (e) {
+                console.error("セーブデータ取得エラー:", e);
+            }
+        }
+
+        // 一番新しいデータが見つかったら、それを読み込みます！
+        if (latestSlot !== -1) {
+            this.loadGameFromLocal(latestSlot);
+        } else {
+            alert("セーブデータが見つかりません。");
+        }
+    }
     
     // ==========================================
     // 観戦モードの切り替え

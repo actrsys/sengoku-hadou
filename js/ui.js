@@ -186,6 +186,9 @@ class UIManager {
                 // 全員の準備が整うのを待ちます
                 await Promise.all(promises);
 
+                // セーブデータがあるかチェックしてボタンを制御します
+                await this.checkSaveDataForTitle();
+
                 // 準備が終わったら、メッセージを隠してメニューボタンを出します！
                 tapMessage.classList.add('hidden');
                 menuButtons.classList.remove('hidden');
@@ -1183,6 +1186,56 @@ class UIManager {
     hideLoadingScreen() {
         if (this.globalLoadingScreen) {
             this.globalLoadingScreen.classList.add('hidden');
+        }
+    }
+
+    // ★追加：タイトル画面でセーブデータがあるかチェックする魔法
+    async checkSaveDataForTitle() {
+        const continueBtn = document.getElementById('continue-btn');
+        const loadBtn = document.getElementById('load-btn');
+        if (!continueBtn && !loadBtn) return;
+
+        let hasData = false;
+        
+        // データベースから読み込む機能が使えるか確認します
+        if (typeof loadFromDB === 'function') {
+            for (let i = 1; i <= 5; i++) {
+                try {
+                    const rawData = await loadFromDB("sengoku_save_slot" + i);
+                    if (rawData) {
+                        hasData = true;
+                        break; // 1つでもデータが見つかればOKです
+                    }
+                } catch (e) {
+                    console.error("セーブデータ確認エラー:", e);
+                }
+            }
+        }
+
+        // データがない場合はボタンを押せなくして、少し透明（半透明）にします
+        if (!hasData) {
+            if (continueBtn) {
+                continueBtn.disabled = true;
+                continueBtn.style.opacity = '0.5';
+                continueBtn.style.cursor = 'not-allowed';
+            }
+            if (loadBtn) {
+                loadBtn.disabled = true;
+                loadBtn.style.opacity = '0.5';
+                loadBtn.style.cursor = 'not-allowed';
+            }
+        } else {
+            // データがある場合は普通に押せるように戻します
+            if (continueBtn) {
+                continueBtn.disabled = false;
+                continueBtn.style.opacity = '1';
+                continueBtn.style.cursor = 'pointer';
+            }
+            if (loadBtn) {
+                loadBtn.disabled = false;
+                loadBtn.style.opacity = '1';
+                loadBtn.style.cursor = 'pointer';
+            }
         }
     }
 

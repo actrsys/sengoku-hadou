@@ -24,8 +24,10 @@
                 <h1 class="game-title">戦国覇道</h1>
                 <div class="title-menu">
                     <div id="menu-buttons" class="hidden">
+                        <button id="continue-btn" class="title-btn" onclick="window.GameApp.continueGame()">続きから</button>
+                        <button id="load-btn" class="title-btn" onclick="window.GameApp.commandSystem.executeSystemCommand('load')">ロード</button>
                         <button id="start-btn" class="title-btn" onclick="window.GameApp.startNewGame()">はじめから</button>
-                        <button class="title-btn" onclick="window.GameApp.loadGameFromLocal(1)">続きから</button>
+                        <button id="settings-btn" class="title-btn" onclick="window.GameApp.commandSystem.executeSystemCommand('settings')">設定</button>
                     </div>
 
                     <div id="tap-to-proceed" class="title-tap-message">
