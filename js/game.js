@@ -2764,6 +2764,9 @@ class GameManager {
             window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
         }
 
+        // ★追加：画面の準備が整ったので、ここでロード画面を隠します
+        if (this.ui) this.ui.hideLoadingScreen();
+
         await this.ui.showCutin(`ロード完了: ${this.year}年 ${this.month}月`);
         this.processTurn();
     }
@@ -2848,6 +2851,9 @@ class GameManager {
 
     // スロットからロード (IndexedDB)
     async loadGameFromLocal(slotNo = 1) { 
+        // ★追加：ロードが始まった瞬間にロード画面で蓋をします！
+        if (this.ui) this.ui.showLoadingScreen();
+
         let rawData = null;
         try {
             rawData = await loadFromDB("sengoku_save_slot" + slotNo);
@@ -2857,6 +2863,7 @@ class GameManager {
 
         if (!rawData) {
             alert(`スロット ${slotNo} にはセーブデータがありません。`);
+            if (this.ui) this.ui.hideLoadingScreen(); // ★エラーで止まる時は蓋を開けます
             return;
         }
 
@@ -2872,11 +2879,15 @@ class GameManager {
         } catch(err) { 
             console.error(err); 
             alert("セーブデータの読み込みに失敗しました。データが壊れている可能性があります。"); 
+            if (this.ui) this.ui.hideLoadingScreen(); // ★エラーの時も蓋を開けます
         } 
     }
 
     // ★追加：最新のセーブデータを自動で見つけて読み込む魔法 (続きから)
     async continueGame() {
+        // ★追加：探している間に操作されないようにロード画面で蓋をします！
+        if (this.ui) this.ui.showLoadingScreen();
+
         let latestSlot = -1;
         let latestTime = 0;
 
@@ -2915,6 +2926,7 @@ class GameManager {
             this.loadGameFromLocal(latestSlot);
         } else {
             alert("セーブデータが見つかりません。");
+            if (this.ui) this.ui.hideLoadingScreen(); // ★データがなくてやめる時は蓋を開けます
         }
     }
     

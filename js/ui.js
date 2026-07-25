@@ -1526,6 +1526,10 @@ class UIManager {
         await new Promise(resolve => setTimeout(resolve, 50));
 
         this.forceResetModals();
+
+        // ★ここを追加：ゲームのステータスを「タイトル画面」に戻す魔法！
+        if (this.game) this.game.phase = 'title';
+
         const ts = document.getElementById('title-screen');
         if(ts) ts.classList.remove('hidden'); 
         
@@ -1537,6 +1541,10 @@ class UIManager {
 
         // ★追加：お掃除が終わってタイトル画面が出たら、少し待ってからロード画面を隠します
         await new Promise(resolve => setTimeout(resolve, 100));
+
+        // ★ここを追加：タイトルに戻った時にもセーブデータがあるかチェックしてボタンを更新します
+        await this.checkSaveDataForTitle();
+
         this.hideLoadingScreen();
     }
     
