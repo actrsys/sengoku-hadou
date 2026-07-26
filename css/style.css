@@ -1015,12 +1015,38 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     padding: 4px 10px !important;  /* 内側の余白も詰めて、高さを抑えます */
 }
 
-/* 文字が大きすぎてはみ出るのを防ぐため、少し縮めます */
+/* 文字が大きすぎてはみ出るのを防ぐため、少し縮めます（PC版ベース） */
 .saveload-slot-title {
     font-size: 1rem !important;
 }
 .saveload-slot-info {
     font-size: 0.85rem !important;
+}
+
+/* ★追加：スマホ版に限り、スロット内の文字サイズを全体的に約0.8倍に小さくする魔法 */
+body:not(.is-pc) .saveload-slot-title {
+    font-size: 0.8rem !important; /* スロット1などのタイトル */
+}
+body:not(.is-pc) .saveload-slot-btn > div:first-child > div:last-child {
+    font-size: 0.65rem !important; /* 右上の日付など */
+}
+body:not(.is-pc) .saveload-slot-info {
+    font-size: 0.7rem !important; /* NO DATAや読み込み中など */
+}
+body:not(.is-pc) .saveload-slot-info > div:first-child {
+    font-size: 0.7rem !important; /* シナリオ名 */
+}
+body:not(.is-pc) .saveload-slot-info > div:last-child > span:first-child {
+    font-size: 1.05rem !important; /* 大名家名 (元の1.3remの約0.8倍) */
+}
+body:not(.is-pc) .saveload-slot-info > div:last-child > span:last-child {
+    font-size: 0.8rem !important; /* 年月 (元の1remの約0.8倍) */
+}
+body:not(.is-pc) .saveload-slot-info > div:last-child > span:last-child > span {
+    font-size: 0.65rem !important; /* 経過年 (元の0.8remの約0.8倍) */
+}
+body:not(.is-pc) .saveload-slot-btn > div:first-child > div:last-child > span {
+    font-size: 0.65rem !important; /* 最新！マーク */
 }
 
 /* =========================================================
