@@ -146,7 +146,14 @@ Object.assign(UIInfoManager.prototype, {
         const labelStyle = `color: #ffd54f; font-size: ${fSizeStatLabel}; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: left;`;
         const valueStyle = `color: #fff; font-size: ${fSizeStatValue}; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: right; font-variant-numeric: tabular-nums;`;
         
-        const makeRow = (label, value) => `<div style="${statBoxStyle}"><span style="${labelStyle}">${label}</span><span style="${valueStyle}">${value}</span></div>`;
+        const makeRow = (label, value) => {
+            let extraLabelStyle = "";
+            // スマホ版のみ、3文字以上の項目名（月支出など）は横幅をきゅっと詰めます
+            if (!isPc && label.length >= 3) {
+                extraLabelStyle = " letter-spacing: -1px; transform: scaleX(0.9); transform-origin: left center; display: inline-block;";
+            }
+            return `<div style="${statBoxStyle}"><span style="${labelStyle}${extraLabelStyle}">${label}</span><span style="${valueStyle}">${value}</span></div>`;
+        };
         const makeEmptyRow = () => `<div style="${statBoxStyle}; visibility: hidden;"><span>&nbsp;</span><span>&nbsp;</span></div>`;
 
         if (listContainer) {
