@@ -1630,8 +1630,8 @@ class CommandSystem {
             // ★追加：手動とオートの両方を含めた、ゲーム全体で一番新しい時間を決定します
             const globalLatestTime = Math.max(currentTabLatestTime, otherLatestTime);
             
-            // ★追加：古いデータなどで時間が全く同じだった場合、1つだけを最新にするための印
-            let foundTabLatest = false;
+            // ★追加：古いデータなどで時間が全く同じだった場合、全体で1つだけを最新にするための印
+            let foundGlobalLatest = false;
 
             // 3. オートセーブの時だけ、古い順（時間が小さい順）に並べ替えます
             if (prefix === 'sengoku_autosave_slot') {
@@ -1681,30 +1681,22 @@ class CommandSystem {
                         if (playerClan) clanStr = playerClan.name;
                     }
                 }
-
+                
                 // 見た目上の名前（手動ならスロット番号そのまま、オートなら並べ替えた順番）
                 const displayTitle = prefix === 'sengoku_autosave_slot' ? `オート ${displayIndex}` : `スロット ${i}`; 
 
-                // ★追加：このスロットが最新かどうかを判定します
-                let isTabLatest = (hasData && slotInfo.time === currentTabLatestTime && currentTabLatestTime > 0);
+                // ★変更：全体で一番新しいデータかどうかだけを判定します
                 let isGlobalLatest = (hasData && slotInfo.time === globalLatestTime && globalLatestTime > 0);
 
                 // ★古いデータで時間が被っていた場合のストッパー
-                if (isTabLatest) {
-                    if (foundTabLatest) {
-                        isTabLatest = false;
+                if (isGlobalLatest) {
+                    if (foundGlobalLatest) {
                         isGlobalLatest = false;
                     } else {
-                        foundTabLatest = true;
+                        foundGlobalLatest = true;
                     }
                 }
 
-                let extraBtnStyle = "";
-                if (isTabLatest) {
-                    // タブ内で最新のスロットの色を少しだけ目立たせます（ほんのり暖色系のグラデーションと金枠）
-                    extraBtnStyle = "background: linear-gradient(to right, #383125 0%, #473e31 100%); border-color: #a88a2c;";
-                }
-                
                 let latestMarkHtml = "";
                 if (isGlobalLatest) {
                     // 全体で一番新しいデータには「最新!」の文字をつけます
@@ -1712,8 +1704,8 @@ class CommandSystem {
                 }
 
                 if (hasData) {
-                    btn.className = 'saveload-slot-btn';
-                    if (extraBtnStyle) btn.style.cssText = extraBtnStyle;
+                    // ★変更：最新スロットには専用のクラス（印）を追加してCSSでお化粧します
+                    btn.className = 'saveload-slot-btn' + (isGlobalLatest ? ' global-latest-slot' : '');
                     btn.disabled = false; 
                     btn.innerHTML = `
                         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
