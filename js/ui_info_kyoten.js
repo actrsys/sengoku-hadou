@@ -96,11 +96,11 @@ Object.assign(UIInfoManager.prototype, {
         const fSizeLordLabel = isPc ? "1.05rem" : "0.95rem";
         const fSizeLegionInfo = isPc ? "0.9rem" : "0.8rem";
         const fSizeStatLabel = isPc ? "0.85rem" : "0.75rem";
-        const fSizeStatValue = isPc ? "0.95rem" : "0.85rem";
+        const fSizeStatValue = isPc ? "0.85rem" : "0.75rem";
         const fSizeMark = isPc ? "0.85rem" : "0.75rem";
 
         // 3つの列の隙間（スマホ版は横の隙間を半分にします）
-        const gridGap = isPc ? "8px 12px" : "8px 6px";
+        const gridGap = isPc ? "8px 6px" : "8px 3px";
 
         let marksHtml = "";
         if (isPort) marksHtml += `<span class="status-mark" style="font-size: ${fSizeMark}; padding: 4px 8px; background-color: #0288d1;">港</span>`;

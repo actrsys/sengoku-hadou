@@ -666,9 +666,9 @@ class UIInfoManager {
         const fSizeCastleName = isPc ? "1.4rem" : "1.25rem";
         const fSizeLordLabel = isPc ? "1.05rem" : "0.95rem";
         const fSizeStatLabel = isPc ? "0.85rem" : "0.75rem";
-        const fSizeStatValue = isPc ? "0.95rem" : "0.85rem";
+        const fSizeStatValue = isPc ? "0.85rem" : "0.75rem";
 
-        const gridGap = isPc ? "8px 12px" : "8px 6px";
+        const gridGap = isPc ? "8px 6px" : "8px 3px";
         const faceStyle = "width: 100%; max-width: 90px; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0;";
 
         const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 4px;";
