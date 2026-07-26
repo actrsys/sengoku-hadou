@@ -1566,13 +1566,36 @@ class CommandSystem {
                 );
             }
             
+            // ★追加：もう片方のタブのデータも裏で読み込んでおきます
+            const otherPrefix = prefix === 'sengoku_save_slot' ? 'sengoku_autosave_slot' : 'sengoku_save_slot';
+            const otherLoadPromises = [];
+            for (let i = 1; i <= 5; i++) {
+                otherLoadPromises.push(loadFromDB(otherPrefix + i).catch(() => null));
+            }
+            
             // 全てのデータの読み込みと、最低300ms待つのを同時にやります
-            const [slotDataList] = await Promise.all([
+            const [slotDataList, otherRawDataList] = await Promise.all([
                 Promise.all(loadPromises),
+                Promise.all(otherLoadPromises),
                 new Promise(resolve => setTimeout(resolve, 300))
             ]);
 
+            // ★追加：もう片方のタブの中で一番新しい時間を探しておきます
+            let otherLatestTime = 0;
+            otherRawDataList.forEach(rawD => {
+                let d = rawD;
+                if (d instanceof Uint8Array && this.game && typeof this.game._decryptData === 'function') {
+                    try { d = this.game._decryptData(d); } catch(err) { d = null; }
+                }
+                if (d && d.saveTime) {
+                    const time = new Date(d.saveTime).getTime();
+                    if (time > otherLatestTime) otherLatestTime = time;
+                }
+            });
+
             // 2. データを解読して、並べ替え用の情報を整理します
+            let currentTabLatestTime = 0; // ★追加：このタブの中で一番新しい時間を記録します
+            
             const processedSlots = slotDataList.map(item => {
                 let d = item.rawD;
                 if (d instanceof Uint8Array && this.game && typeof this.game._decryptData === 'function') {
@@ -1587,6 +1610,8 @@ class CommandSystem {
                 let time = Infinity; 
                 if (d && d.saveTime) {
                     time = new Date(d.saveTime).getTime();
+                    // ★追加：一番新しい時間を更新します
+                    if (time > currentTabLatestTime) currentTabLatestTime = time;
                 }
 
                 return {
@@ -1596,6 +1621,9 @@ class CommandSystem {
                     hasData: !!(d && d.year)
                 };
             });
+            
+            // ★追加：手動とオートの両方を含めた、ゲーム全体で一番新しい時間を決定します
+            const globalLatestTime = Math.max(currentTabLatestTime, otherLatestTime);
 
             // 3. オートセーブの時だけ、古い順（時間が小さい順）に並べ替えます
             if (prefix === 'sengoku_autosave_slot') {
@@ -1649,13 +1677,30 @@ class CommandSystem {
                 // 見た目上の名前（手動ならスロット番号そのまま、オートなら並べ替えた順番）
                 const displayTitle = prefix === 'sengoku_autosave_slot' ? `オート ${displayIndex}` : `スロット ${i}`; 
 
+                // ★追加：このスロットが最新かどうかを判定します
+                const isTabLatest = (hasData && slotInfo.time === currentTabLatestTime && currentTabLatestTime > 0);
+                const isGlobalLatest = (hasData && slotInfo.time === globalLatestTime && globalLatestTime > 0);
+
+                let extraBtnStyle = "";
+                if (isTabLatest) {
+                    // タブ内で最新のスロットの色を少しだけ目立たせます（ほんのり暖色系のグラデーションと金枠）
+                    extraBtnStyle = "background: linear-gradient(to right, #383125 0%, #473e31 100%); border-color: #a88a2c;";
+                }
+                
+                let latestMarkHtml = "";
+                if (isGlobalLatest) {
+                    // 全体で一番新しいデータには「最新！」の文字をつけます
+                    latestMarkHtml = `<span style="color: #ff8a80; font-weight: bold; margin-right: 8px; text-shadow: 1px 1px 0 #000;">最新！</span>`;
+                }
+
                 if (hasData) {
                     btn.className = 'saveload-slot-btn';
+                    if (extraBtnStyle) btn.style.cssText = extraBtnStyle; // ★追加
                     btn.disabled = false; 
                     btn.innerHTML = `
                         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
                             <div class="saveload-slot-title" style="margin: 0;">${displayTitle}</div>
-                            <div style="font-size: 0.8rem; color: #b0bec5; font-family: monospace;">${saveTimeStr}</div>
+                            <div style="font-size: 0.8rem; color: #b0bec5; font-family: monospace; display: flex; align-items: center;">${latestMarkHtml}${saveTimeStr}</div>
                         </div>
                         <div class="saveload-slot-info" style="flex-direction: column; gap: 4px; width: 100%; flex: 1; justify-content: center;">
                             <div style="font-size: 0.85rem; color: #cfd8dc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left;">${scenarioStr}</div>
