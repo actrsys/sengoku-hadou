@@ -659,14 +659,14 @@ class UIInfoManager {
 
         let faceSrc = leader && leader.faceIcon ? `data/images/faceicons/${leader.faceIcon}` : "data/images/faceicons/unknown_face.webp";
 
-        // ★ここから追加：スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！（拠点詳細のものを流用）
+        // スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！（拠点詳細のものを流用）
         const isPc = document.body.classList.contains('is-pc');
 
         const fSizeCastleYomi = isPc ? "0.75rem" : "0.65rem";
         const fSizeCastleName = isPc ? "1.4rem" : "1.25rem";
         const fSizeLordLabel = isPc ? "1.05rem" : "0.95rem";
-        const fSizeStatLabel = isPc ? "0.85rem" : "0.75rem";
-        const fSizeStatValue = isPc ? "0.85rem" : "0.75rem";
+        const fSizeStatLabel = isPc ? "0.85rem" : "0.70rem";
+        const fSizeStatValue = isPc ? "0.85rem" : "0.70rem";
 
         const gridGap = isPc ? "8px 6px" : "8px 3px";
         const faceStyle = "width: 100%; max-width: 90px; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0;";

@@ -85,18 +85,18 @@ Object.assign(UIInfoManager.prototype, {
         const isHorse = GameSystem.isProdCastle(castle, 'horse');
         const isGun = GameSystem.isProdCastle(castle, 'gun');
 
-        // ★ここから追加：スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！
+        // スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！
         const isPc = document.body.classList.contains('is-pc');
 
-        // 文字サイズ（スマホ版はPC版の約0.9倍にします）
+        // 文字サイズ（スマホ版はPC版の約0.9倍より小さくします）
         const fSizeProvYomi = isPc ? "0.75rem" : "0.65rem";
         const fSizeProvName = isPc ? "1.4rem" : "1.25rem";
         const fSizeCastleYomi = isPc ? "0.75rem" : "0.65rem";
         const fSizeCastleName = isPc ? "1.4rem" : "1.25rem";
         const fSizeLordLabel = isPc ? "1.05rem" : "0.95rem";
         const fSizeLegionInfo = isPc ? "0.9rem" : "0.8rem";
-        const fSizeStatLabel = isPc ? "0.85rem" : "0.75rem";
-        const fSizeStatValue = isPc ? "0.85rem" : "0.75rem";
+        const fSizeStatLabel = isPc ? "0.85rem" : "0.70rem";
+        const fSizeStatValue = isPc ? "0.85rem" : "0.70rem";
         const fSizeMark = isPc ? "0.85rem" : "0.75rem";
 
         // 3つの列の隙間（スマホ版は横の隙間を半分にします）
