@@ -2151,19 +2151,24 @@ class UIInfoManager {
         const leaderName = leader ? leader.name.replace('|', '') : "不明";
         let baseCastleName = "不明";
         let provinceName = "不明";
+        let provinceYomi = "";
         if (kunishu.castleId) {
             const baseCastle = this.game.castles.find(c => c.id === kunishu.castleId);
             if (baseCastle) {
                 baseCastleName = baseCastle.name;
                 if (this.game.provinces) {
                     const province = this.game.provinces.find(p => p.id === baseCastle.provinceId);
-                    if (province) provinceName = province.province;
+                    if (province) {
+                        provinceName = province.province;
+                        provinceYomi = province.provinceYomi || "";
+                    }
                 }
             }
         }
 
         const bushosCount = this.game.kunishuSystem.getKunishuMembers(kunishuId).length;
         const kunishuName = kunishu.getName(this.game);
+        const kunishuYomi = kunishu.yomi || "";
         const ideology = kunishu.ideology || "地縁";
 
         // 諸勢力のイデオロギーカラー（大名家のCSSを流用します）
@@ -2171,51 +2176,100 @@ class UIInfoManager {
         if (ideology === '宗教') ideologyClass = "ideology-hoshu"; 
         else if (ideology === '傭兵') ideologyClass = "ideology-kakushin";
 
+        const ideologyHtml = `<div class="daimyo-detail-ideology ${ideologyClass}" style="display: inline-block; margin-top: 4px;">${ideology}</div>`;
+
         let faceSrc = leader && leader.faceIcon ? `data/images/faceicons/${leader.faceIcon}` : "data/images/faceicons/unknown_face.webp";
+
+        // スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！
+        const isPc = document.body.classList.contains('is-pc');
+
+        const fSizeProvYomi = isPc ? "0.75rem" : "0.65rem";
+        const fSizeProvName = isPc ? "1.4rem" : "1.25rem";
+        const fSizeKunishuYomi = isPc ? "0.75rem" : "0.65rem";
+        const fSizeKunishuName = isPc ? "1.4rem" : "1.25rem";
+        const fSizeLordLabel = isPc ? "1.05rem" : "0.95rem";
+        const fSizeStatLabel = isPc ? "0.85rem" : "0.70rem";
+        const fSizeStatValue = isPc ? "0.85rem" : "0.70rem";
+
+        const gridGap = isPc ? "8px 6px" : "8px 3px";
+        const faceStyle = "width: 100%; max-width: 90px; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0;";
+
+        const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 4px;";
+        const statBoxStyle = "background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 2px 6px; display: flex; justify-content: space-between; align-items: center;";
+        const labelStyle = `color: #ffd54f; font-size: ${fSizeStatLabel}; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: left;`;
+        const valueStyle = `color: #fff; font-size: ${fSizeStatValue}; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: right; font-variant-numeric: tabular-nums;`;
+        
+        const makeRow = (label, value) => {
+            let extraLabelStyle = "";
+            // スマホ版のみ、3文字以上の項目名（月支出など）は横幅をきゅっと詰めます
+            if (!isPc && label.length >= 3) {
+                extraLabelStyle = " letter-spacing: -1px; transform: scaleX(0.9); transform-origin: left center; display: inline-block;";
+            }
+            return `<div style="${statBoxStyle}"><span style="${labelStyle}${extraLabelStyle}">${label}</span><span style="${valueStyle}">${value}</span></div>`;
+        };
+        const makeEmptyRow = () => `<div style="${statBoxStyle}; visibility: hidden;"><span>&nbsp;</span><span>&nbsp;</span></div>`;
 
         if (listContainer) {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = `
-                <div class="daimyo-detail-container" style="padding: 10px; min-height: 100%;">
-                    <div class="daimyo-detail-header pc-only">
-                        <div class="daimyo-detail-name">${kunishuName}</div>
-                        <div class="daimyo-detail-ideology ${ideologyClass}">${ideology}</div>
-                    </div>
-                    <div class="daimyo-detail-body">
-                        <div class="daimyo-detail-left">
-                            <img src="${faceSrc}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_face.webp'">
-                            <div class="daimyo-detail-header sp-only">
-                                <div class="daimyo-detail-name">${kunishuName}</div>
-                                <div class="daimyo-detail-ideology ${ideologyClass}">${ideology}</div>
-                            </div>
+                <div class="kyoten-detail-wrapper" style="padding: 8px 10px; min-height: 100%; display: flex; flex-direction: column; box-sizing: border-box;">
+                    
+                    <!-- 【ヘッダー部】 左上に顔グラ、右にテキスト情報 -->
+                    <div style="display: flex; align-items: flex-start; gap: 15px; margin-bottom: 10px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 8px;">
+                        <div style="flex-shrink: 0; width: 90px;">
+                            <img src="${faceSrc}" style="${faceStyle}" onerror="this.src='data/images/faceicons/unknown_face.webp'">
                         </div>
-                        <div class="daimyo-detail-right">
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">頭領</span><span class="daimyo-detail-value">${leaderName}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">武将</span><span class="daimyo-detail-value">${bushosCount}</span></div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                            <!-- 国名＆諸勢力名 -->
+                            <div style="display: flex; align-items: flex-end; gap: 15px;">
+                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                                    <span style="font-size: ${fSizeProvYomi}; color: #ccc; min-height: 1em;">${provinceYomi}</span>
+                                    <span style="font-size: ${fSizeProvName}; font-weight: bold; color: #fff; line-height: 1;">${provinceName}</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                                    <span style="font-size: ${fSizeKunishuYomi}; color: #ccc; min-height: 1em;">${kunishuYomi}</span>
+                                    <span style="font-size: ${fSizeKunishuName}; font-weight: bold; color: #fff; line-height: 1;">${kunishuName}</span>
+                                </div>
                             </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">勢力圏</span><span class="daimyo-detail-value">${baseCastleName}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">国</span><span class="daimyo-detail-value">${provinceName}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵士</span><span class="daimyo-detail-value">${kunishu.soldiers}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">防御</span><span class="daimyo-detail-value">${kunishu.defense}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">訓練</span><span class="daimyo-detail-value">${kunishu.training}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">軍馬</span><span class="daimyo-detail-value">${kunishu.horses || 0}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">士気</span><span class="daimyo-detail-value">${kunishu.morale}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉄砲</span><span class="daimyo-detail-value">${kunishu.guns || 0}</span></div>
+                            <!-- 頭領＆イデオロギー -->
+                            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+                                <div style="font-size: ${fSizeLordLabel}; color: #ffd54f;">頭領 <span style="color: #fff; font-weight: bold;">${leaderName}</span></div>
+                                ${ideologyHtml}
                             </div>
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: auto; padding-top: 15px;">
-                        <button class="daimyo-detail-action-btn" id="temp-kunishu-busho-btn">武将</button>
-                        <button class="daimyo-detail-action-btn" id="temp-kunishu-diplo-btn">外交</button>
+
+                    <!-- 【ステータス部：上段】 -->
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap}; margin-bottom: 8px;">
+                        <!-- 左列：武将・勢力圏・空箱 -->
+                        <div style="${groupWrapStyle}">
+                            ${makeRow('武将', bushosCount)}
+                            ${makeRow('勢力圏', baseCastleName)}
+                            ${makeEmptyRow()}
+                        </div>
+                        
+                        <!-- 中央列：兵士・訓練・士気 -->
+                        <div style="${groupWrapStyle}">
+                            ${makeRow('兵士', kunishu.soldiers)}
+                            ${makeRow('訓練', kunishu.training)}
+                            ${makeRow('士気', kunishu.morale)}
+                        </div>
+
+                        <!-- 右列：軍馬・鉄砲・防御 -->
+                        <div style="${groupWrapStyle}">
+                            ${makeRow('軍馬', kunishu.horses || 0)}
+                            ${makeRow('鉄砲', kunishu.guns || 0)}
+                            ${makeRow('防御', kunishu.defense)}
+                        </div>
+                    </div>
+
+                    <!-- フッター（アクションボタン） -->
+                    <div style="display: flex; justify-content: flex-end; align-items: flex-end; margin-top: auto; padding-top: 5px;">
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
+                            <button class="daimyo-detail-action-btn" id="temp-kunishu-busho-btn">武将</button>
+                            <button class="daimyo-detail-action-btn" id="temp-kunishu-diplo-btn">外交</button>
+                        </div>
                     </div>
                 </div>
             `;
