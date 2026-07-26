@@ -85,12 +85,29 @@ Object.assign(UIInfoManager.prototype, {
         const isHorse = GameSystem.isProdCastle(castle, 'horse');
         const isGun = GameSystem.isProdCastle(castle, 'gun');
 
-        let marksHtml = "";
-        if (isPort) marksHtml += `<span class="status-mark" style="padding: 4px 8px; background-color: #0288d1;">港</span>`;
-        if (isHorse) marksHtml += `<span class="status-mark" style="padding: 4px 8px; background-color: #f57c00;">馬産地</span>`;
-        if (isGun) marksHtml += `<span class="status-mark" style="padding: 4px 8px; background-color: #5d4037;">鉄砲産地</span>`;
+        // ★ここから追加：スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！
+        const isPc = document.body.classList.contains('is-pc');
 
-        // 顔画像
+        // 文字サイズ（スマホ版はPC版の約0.9倍にします）
+        const fSizeProvYomi = isPc ? "0.75rem" : "0.65rem";
+        const fSizeProvName = isPc ? "1.4rem" : "1.25rem";
+        const fSizeCastleYomi = isPc ? "0.75rem" : "0.65rem";
+        const fSizeCastleName = isPc ? "1.4rem" : "1.25rem";
+        const fSizeLordLabel = isPc ? "1.05rem" : "0.95rem";
+        const fSizeLegionInfo = isPc ? "0.9rem" : "0.8rem";
+        const fSizeStatLabel = isPc ? "0.85rem" : "0.75rem";
+        const fSizeStatValue = isPc ? "0.95rem" : "0.85rem";
+        const fSizeMark = isPc ? "0.85rem" : "0.75rem";
+
+        // 3つの列の隙間（スマホ版は横の隙間を半分にします）
+        const gridGap = isPc ? "8px 12px" : "8px 6px";
+
+        let marksHtml = "";
+        if (isPort) marksHtml += `<span class="status-mark" style="font-size: ${fSizeMark}; padding: 4px 8px; background-color: #0288d1;">港</span>`;
+        if (isHorse) marksHtml += `<span class="status-mark" style="font-size: ${fSizeMark}; padding: 4px 8px; background-color: #f57c00;">馬産地</span>`;
+        if (isGun) marksHtml += `<span class="status-mark" style="font-size: ${fSizeMark}; padding: 4px 8px; background-color: #5d4037;">鉄砲産地</span>`;
+
+        // 顔画像（ここはそのままの大きさを維持します）
         const faceStyle = "width: 100%; max-width: 90px; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0;";
         let faceHtml = "";
         if (castellan && castellan.faceIcon) {
@@ -122,11 +139,12 @@ Object.assign(UIInfoManager.prototype, {
             legionInfoStr = `無所属`;
         }
 
-        // --- 二重背景・ステータス行の生成魔法（高さを抑えるためのスリム化） ---
+        // --- 二重背景・ステータス行の生成魔法（文字サイズを上で決めたものに置き換えます） ---
         const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 4px;";
         const statBoxStyle = "background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 2px 6px; display: flex; justify-content: space-between; align-items: center;";
-        const labelStyle = "color: #ffd54f; font-size: 0.85rem; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: left;";
-        const valueStyle = "color: #fff; font-size: 0.95rem; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: right; font-variant-numeric: tabular-nums;";
+        
+        const labelStyle = `color: #ffd54f; font-size: ${fSizeStatLabel}; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: left;`;
+        const valueStyle = `color: #fff; font-size: ${fSizeStatValue}; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: right; font-variant-numeric: tabular-nums;`;
         
         const makeRow = (label, value) => `<div style="${statBoxStyle}"><span style="${labelStyle}">${label}</span><span style="${valueStyle}">${value}</span></div>`;
         const makeEmptyRow = () => `<div style="${statBoxStyle}; visibility: hidden;"><span>&nbsp;</span><span>&nbsp;</span></div>`;
@@ -146,24 +164,24 @@ Object.assign(UIInfoManager.prototype, {
                             <!-- 国名＆拠点名 -->
                             <div style="display: flex; align-items: flex-end; gap: 15px;">
                                 <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                                    <span style="font-size: 0.75rem; color: #ccc; min-height: 1em;">${provinceYomi}</span>
-                                    <span style="font-size: 1.4rem; font-weight: bold; color: #fff; line-height: 1;">${provinceName}</span>
+                                    <span style="font-size: ${fSizeProvYomi}; color: #ccc; min-height: 1em;">${provinceYomi}</span>
+                                    <span style="font-size: ${fSizeProvName}; font-weight: bold; color: #fff; line-height: 1;">${provinceName}</span>
                                 </div>
                                 <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                                    <span style="font-size: 0.75rem; color: #ccc; min-height: 1em;">${yomiStr}</span>
-                                    <span style="font-size: 1.4rem; font-weight: bold; color: #fff; line-height: 1;">${castle.name}</span>
+                                    <span style="font-size: ${fSizeCastleYomi}; color: #ccc; min-height: 1em;">${yomiStr}</span>
+                                    <span style="font-size: ${fSizeCastleName}; font-weight: bold; color: #fff; line-height: 1;">${castle.name}</span>
                                 </div>
                             </div>
                             <!-- 城主＆直轄/国主 -->
                             <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
-                                <div style="font-size: 1.05rem; color: #ffd54f;">城主 <span style="color: #fff; font-weight: bold;">${castellanName}</span></div>
-                                <div style="font-size: 0.9rem; color: #ccc;">${legionInfoStr}</div>
+                                <div style="font-size: ${fSizeLordLabel}; color: #ffd54f;">城主 <span style="color: #fff; font-weight: bold;">${castellanName}</span></div>
+                                <div style="font-size: ${fSizeLegionInfo}; color: #ccc;">${legionInfoStr}</div>
                             </div>
                         </div>
                     </div>
 
                     <!-- 【ステータス部：上段】 -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 12px; margin-bottom: 8px;">
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap}; margin-bottom: 8px;">
                         <!-- 左列：武将・浪人・空箱 -->
                         <div style="${groupWrapStyle}">
                             ${makeRow('武将', activeBushoCount)}
@@ -187,7 +205,7 @@ Object.assign(UIInfoManager.prototype, {
                     </div>
 
                     <!-- 【ステータス部：下段】 -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 12px; margin-bottom: 10px;">
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap}; margin-bottom: 10px;">
                         
                         <!-- 左列：金・兵糧 ＋ 独立した人口 -->
                         <div style="display: flex; flex-direction: column; gap: 6px;">
