@@ -2408,10 +2408,13 @@ class GameManager {
                 // ★毎月一番最初の自分のターンで、裏側でオートセーブを走らせます！
                 if (!this.hasAutoSavedThisMonth && window.GameConfig && window.GameConfig.autoSave) {
                     this.hasAutoSavedThisMonth = true;
-                    this.executeAutoSave();
+                    // ★ゲーム開始直後の最初の月は、意味がないのでオートセーブをスキップします！
+                    if (this.year !== this.gameStartYear || this.month !== this.gameStartMonth) {
+                        this.executeAutoSave();
+                    }
                 }
 
-                if(this.ui.aiGuard) this.ui.aiGuard.classList.add('hidden'); 
+                if(this.ui.aiGuard) this.ui.aiGuard.classList.add('hidden');
 
                 this.ui.renderMap();
                 this.ui.scrollToActiveCastle(castle);
