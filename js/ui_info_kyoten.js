@@ -58,7 +58,18 @@ Object.assign(UIInfoManager.prototype, {
         const kunishus = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishusInCastle(castle.id) : [];
         const kunishuCount = kunishus.length;
 
-        // 武将の人数カウント
+        // ★ メイン画面と全く同じ仕様での「武将」と「浪人」のカウント
+        let activeBushoCount = 0;
+        if (castle.ownerClan !== 0 && this.game && this.game.bushos) {
+            activeBushoCount = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === castle.ownerClan && b.status === 'active').length;
+        }
+
+        let roninCount = 0;
+        if (this.game && this.game.bushos) {
+            roninCount = this.game.bushos.filter(b => b.castleId === castle.id && b.status === 'ronin').length;
+        }
+
+        // ボタン活性化チェック用（武将＋浪人）
         const targetBushos = this.game.bushos.filter(b => {
             if (b.castleId !== castle.id) return false;
             if (b.status === 'ronin') return true;
@@ -111,11 +122,9 @@ Object.assign(UIInfoManager.prototype, {
             legionInfoStr = `無所属`;
         }
 
-        // --- 二重背景・ステータス行の生成魔法 ---
-        // グループを囲う外枠
-        const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 4px;";
-        // 項目個別の背景枠
-        const statBoxStyle = "background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 4px 8px; display: flex; justify-content: space-between; align-items: center;";
+        // --- 二重背景・ステータス行の生成魔法（高さを抑えるためのスリム化） ---
+        const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 4px;";
+        const statBoxStyle = "background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 2px 6px; display: flex; justify-content: space-between; align-items: center;";
         const labelStyle = "color: #ffd54f; font-size: 0.85rem; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: left;";
         const valueStyle = "color: #fff; font-size: 0.95rem; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: right; font-variant-numeric: tabular-nums;";
         
@@ -126,39 +135,39 @@ Object.assign(UIInfoManager.prototype, {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = `
-                <div class="kyoten-detail-wrapper" style="padding: 10px; min-height: 100%; display: flex; flex-direction: column;">
+                <div class="kyoten-detail-wrapper" style="padding: 8px 10px; min-height: 100%; display: flex; flex-direction: column; box-sizing: border-box;">
                     
                     <!-- 【ヘッダー部】 左上に顔グラ、右にテキスト情報 -->
-                    <div style="display: flex; align-items: flex-start; gap: 15px; margin-bottom: 15px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 10px;">
+                    <div style="display: flex; align-items: flex-start; gap: 15px; margin-bottom: 10px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 8px;">
                         <div style="flex-shrink: 0; width: 90px;">
                             ${faceHtml}
                         </div>
-                        <div style="display: flex; flex-direction: column; gap: 10px; flex: 1;">
+                        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
                             <!-- 国名＆拠点名 -->
-                            <div style="display: flex; align-items: flex-end; gap: 20px;">
+                            <div style="display: flex; align-items: flex-end; gap: 15px;">
                                 <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                                    <span style="font-size: 0.8rem; color: #ccc; min-height: 1em;">${provinceYomi}</span>
-                                    <span style="font-size: 1.5rem; font-weight: bold; color: #fff; line-height: 1;">${provinceName}</span>
+                                    <span style="font-size: 0.75rem; color: #ccc; min-height: 1em;">${provinceYomi}</span>
+                                    <span style="font-size: 1.4rem; font-weight: bold; color: #fff; line-height: 1;">${provinceName}</span>
                                 </div>
                                 <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                                    <span style="font-size: 0.8rem; color: #ccc; min-height: 1em;">${yomiStr}</span>
-                                    <span style="font-size: 1.5rem; font-weight: bold; color: #fff; line-height: 1;">${castle.name}</span>
+                                    <span style="font-size: 0.75rem; color: #ccc; min-height: 1em;">${yomiStr}</span>
+                                    <span style="font-size: 1.4rem; font-weight: bold; color: #fff; line-height: 1;">${castle.name}</span>
                                 </div>
                             </div>
                             <!-- 城主＆直轄/国主 -->
-                            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px;">
-                                <div style="font-size: 1.1rem; color: #ffd54f;">城主 <span style="color: #fff; font-weight: bold;">${castellanName}</span></div>
-                                <div style="font-size: 0.95rem; color: #ccc;">${legionInfoStr}</div>
+                            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+                                <div style="font-size: 1.05rem; color: #ffd54f;">城主 <span style="color: #fff; font-weight: bold;">${castellanName}</span></div>
+                                <div style="font-size: 0.9rem; color: #ccc;">${legionInfoStr}</div>
                             </div>
                         </div>
                     </div>
 
                     <!-- 【ステータス部：上段】 -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 15px; margin-bottom: 10px;">
-                        <!-- 左列：顔グラ跡地の見えない箱（高さをピッタリ合わせます） -->
-                        <div style="${groupWrapStyle}; visibility: hidden;">
-                            ${makeEmptyRow()}
-                            ${makeEmptyRow()}
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 12px; margin-bottom: 8px;">
+                        <!-- 左列：武将・浪人・空箱 -->
+                        <div style="${groupWrapStyle}">
+                            ${makeRow('武将', activeBushoCount)}
+                            ${makeRow('浪人', roninCount)}
                             ${makeEmptyRow()}
                         </div>
                         
@@ -178,10 +187,10 @@ Object.assign(UIInfoManager.prototype, {
                     </div>
 
                     <!-- 【ステータス部：下段】 -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 15px; margin-bottom: 15px;">
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 12px; margin-bottom: 10px;">
                         
                         <!-- 左列：金・兵糧 ＋ 独立した人口 -->
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
                             <div style="${groupWrapStyle}">
                                 ${makeRow('金', castle.gold)}
                                 ${makeRow('兵糧', castle.rice)}
@@ -192,7 +201,7 @@ Object.assign(UIInfoManager.prototype, {
                         </div>
 
                         <!-- 中央列：月収入・年収穫 ＋ 見えない箱 -->
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
                             <div style="${groupWrapStyle}">
                                 ${makeRow('月収入', totalGoldIncome)}
                                 ${makeRow('年収穫', totalRiceIncome)}
@@ -203,7 +212,7 @@ Object.assign(UIInfoManager.prototype, {
                         </div>
 
                         <!-- 右列：軍馬・鉄砲 ＋ 独立した兵士 -->
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
                             <div style="${groupWrapStyle}">
                                 ${makeRow('軍馬', castle.horses || 0)}
                                 ${makeRow('鉄砲', castle.guns || 0)}
