@@ -1538,8 +1538,8 @@ class CommandSystem {
         // リストの中身を作る魔法を、タブで切り替えるために別にしてまとめます
         const renderSlots = async (prefix) => {
             list.innerHTML = '';
-            const slotButtons = [];
             
+            // 画面をカクカクさせないために、先に「読み込み中...」の枠を5つ出しておきます
             for (let i = 1; i <= 5; i++) {
                 const btn = document.createElement('button');
                 btn.className = 'saveload-slot-btn empty-slot';
@@ -1554,116 +1554,118 @@ class CommandSystem {
                     </div>
                 `;
                 list.appendChild(btn);
-                slotButtons.push(btn); 
             }
 
+            // 1. まず全てのデータを並列で読み込みます
+            const loadPromises = [];
             for (let i = 1; i <= 5; i++) {
-                Promise.all([
-                    loadFromDB(prefix + i), // ★追加：指定されたお部屋（手動かオートか）から読み込みます
-                    new Promise(resolve => setTimeout(resolve, 300))
-                ]).then(([rawD]) => {
-                    let d = rawD;
-                    if (d instanceof Uint8Array && this.game && typeof this.game._decryptData === 'function') {
-                        try {
-                            d = this.game._decryptData(d);
-                        } catch(err) {
-                            d = null; 
-                        }
+                loadPromises.push(
+                    loadFromDB(prefix + i)
+                        .then(rawD => ({ originalSlotNo: i, rawD: rawD }))
+                        .catch(() => ({ originalSlotNo: i, rawD: null }))
+                );
+            }
+            
+            // 全てのデータの読み込みと、最低300ms待つのを同時にやります
+            const [slotDataList] = await Promise.all([
+                Promise.all(loadPromises),
+                new Promise(resolve => setTimeout(resolve, 300))
+            ]);
+
+            // 2. データを解読して、並べ替え用の情報を整理します
+            const processedSlots = slotDataList.map(item => {
+                let d = item.rawD;
+                if (d instanceof Uint8Array && this.game && typeof this.game._decryptData === 'function') {
+                    try {
+                        d = this.game._decryptData(d);
+                    } catch(err) {
+                        d = null; 
                     }
+                }
+                
+                // データがないものは一番下に回すため、無限大にしておきます
+                let time = Infinity; 
+                if (d && d.saveTime) {
+                    time = new Date(d.saveTime).getTime();
+                }
 
-                    let hasData = false;
-                    let dateStr = "";
-                    let clanStr = ""; 
-                    let scenarioStr = ""; 
-                    let saveTimeStr = "----/--/-- --:--"; 
-                    let passedYearsStr = ""; 
+                return {
+                    originalSlotNo: item.originalSlotNo,
+                    data: d,
+                    time: time,
+                    hasData: !!(d && d.year)
+                };
+            });
 
-                    if (d && d.year) {
-                        hasData = true;
-                        dateStr = `${d.year}年 ${d.month}月`;
-                        
-                        if (d.scenarioName) {
-                            scenarioStr = (d.scenarioNo ? d.scenarioNo + "：" : "") + d.scenarioName;
-                        } else {
-                            scenarioStr = "不明なシナリオ";
-                        }
+            // 3. オートセーブの時だけ、古い順（時間が小さい順）に並べ替えます
+            if (prefix === 'sengoku_autosave_slot') {
+                processedSlots.sort((a, b) => a.time - b.time);
+            }
 
-                        if (d.saveTime) {
-                            saveTimeStr = d.saveTime;
-                        }
+            // 一度「読み込み中」のリストを空っぽにして、完成したものを入れ直します
+            list.innerHTML = '';
 
-                        if (d.gameStartYear) {
-                            const passedYears = d.year - d.gameStartYear;
-                            passedYearsStr = `経過: ${passedYears}年`;
-                        } else {
-                            passedYearsStr = "経過: 0年";
-                        }
+            // 4. 並べ替えた順番で、画面にボタンを作っていきます
+            processedSlots.forEach((slotInfo, index) => {
+                const i = slotInfo.originalSlotNo; 
+                const displayIndex = index + 1;
+                const d = slotInfo.data;
+                const hasData = slotInfo.hasData;
 
-                        if (d.clans && d.playerClanId) {
-                            const playerClan = d.clans.find(c => c.id === d.playerClanId);
-                            if (playerClan) clanStr = playerClan.name;
-                        }
-                    }
+                const btn = document.createElement('button');
+                
+                let dateStr = "";
+                let clanStr = ""; 
+                let scenarioStr = ""; 
+                let saveTimeStr = "----/--/-- --:--"; 
+                let passedYearsStr = ""; 
 
-                    const btn = slotButtons[i - 1];
-                    const displayTitle = prefix === 'sengoku_autosave_slot' ? `オート ${i}` : `スロット ${i}`; // ★追加：オートの時は名前に「オート」と付けます
-
-                    if (hasData) {
-                        btn.className = 'saveload-slot-btn';
-                        btn.disabled = false; 
-                        btn.innerHTML = `
-                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
-                                <div class="saveload-slot-title" style="margin: 0;">${displayTitle}</div>
-                                <div style="font-size: 0.8rem; color: #b0bec5; font-family: monospace;">${saveTimeStr}</div>
-                            </div>
-                            <div class="saveload-slot-info" style="flex-direction: column; gap: 4px; width: 100%; flex: 1; justify-content: center;">
-                                <div style="font-size: 0.85rem; color: #cfd8dc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left;">${scenarioStr}</div>
-                                <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%;">
-                                    <span style="font-size: 1.3rem; font-weight: bold; color: #ffd54f; text-shadow: 1px 1px 0 #000, 2px 2px 5px rgba(0,0,0,0.8);">${clanStr}</span>
-                                    <span style="font-size: 1rem; color: #fff;">${dateStr} <span style="font-size: 0.8rem; color: #b0bec5;">(${passedYearsStr})</span></span>
-                                </div>
-                            </div>
-                        `;
+                if (hasData) {
+                    dateStr = `${d.year}年 ${d.month}月`;
+                    
+                    if (d.scenarioName) {
+                        scenarioStr = (d.scenarioNo ? d.scenarioNo + "：" : "") + d.scenarioName;
                     } else {
-                        btn.className = 'saveload-slot-btn empty-slot';
-                        btn.innerHTML = `
-                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
-                                <div class="saveload-slot-title" style="color: inherit; text-shadow: none; margin: 0;">${displayTitle}</div>
-                                <div style="font-size: 0.8rem; color: #78909c; font-family: monospace;">----/--/-- --:--</div>
-                            </div>
-                            <div class="saveload-slot-info" style="flex-direction: column; justify-content: center; align-items: center; width: 100%; gap: 4px; flex: 1;">
-                                <div>NO DATA</div>
-                            </div>
-                        `;
-                        
-                        if (mode === 'load') {
-                            btn.disabled = true;
-                            btn.style.opacity = '0.5';
-                            btn.style.cursor = 'default';
-                        } else {
-                            btn.disabled = false;
-                        }
+                        scenarioStr = "不明なシナリオ";
                     }
 
-                    btn.onclick = () => {
-                        modal.classList.add('hidden');
-                        if (mode === 'save') {
-                            this.game.ui.showDialog(`スロット ${i} に現在の状態をセーブ（上書き）しますか？`, true, () => {
-                                this.game.saveGameToLocal(i);
-                            }, null, { okText: 'セーブする', okClass: 'btn-primary', cancelText: 'やめる' });
-                        } else {
-                            if (this.game.phase === 'title') {
-                                this.game.loadGameFromLocal(i, prefix); // ★追加：どのお部屋からロードするか伝えます
-                            } else {
-                                this.game.ui.showDialog(`${displayTitle} のデータをロードしますか？\n（現在の進行状況は失われます）`, true, () => {
-                                    this.game.loadGameFromLocal(i, prefix); // ★追加：どのお部屋からロードするか伝えます
-                                }, null, { okText: 'ロードする', okClass: 'btn-danger', cancelText: 'やめる' });
-                            }
-                        }
-                    };
-                }).catch(e => {
-                    const btn = slotButtons[i - 1];
-                    const displayTitle = prefix === 'sengoku_autosave_slot' ? `オート ${i}` : `スロット ${i}`;
+                    if (d.saveTime) {
+                        saveTimeStr = d.saveTime;
+                    }
+
+                    if (d.gameStartYear) {
+                        const passedYears = d.year - d.gameStartYear;
+                        passedYearsStr = `経過: ${passedYears}年`;
+                    } else {
+                        passedYearsStr = "経過: 0年";
+                    }
+
+                    if (d.clans && d.playerClanId) {
+                        const playerClan = d.clans.find(c => c.id === d.playerClanId);
+                        if (playerClan) clanStr = playerClan.name;
+                    }
+                }
+
+                // 見た目上の名前（手動ならスロット番号そのまま、オートなら並べ替えた順番）
+                const displayTitle = prefix === 'sengoku_autosave_slot' ? `オート ${displayIndex}` : `スロット ${i}`; 
+
+                if (hasData) {
+                    btn.className = 'saveload-slot-btn';
+                    btn.disabled = false; 
+                    btn.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
+                            <div class="saveload-slot-title" style="margin: 0;">${displayTitle}</div>
+                            <div style="font-size: 0.8rem; color: #b0bec5; font-family: monospace;">${saveTimeStr}</div>
+                        </div>
+                        <div class="saveload-slot-info" style="flex-direction: column; gap: 4px; width: 100%; flex: 1; justify-content: center;">
+                            <div style="font-size: 0.85rem; color: #cfd8dc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left;">${scenarioStr}</div>
+                            <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%;">
+                                <span style="font-size: 1.3rem; font-weight: bold; color: #ffd54f; text-shadow: 1px 1px 0 #000, 2px 2px 5px rgba(0,0,0,0.8);">${clanStr}</span>
+                                <span style="font-size: 1rem; color: #fff;">${dateStr} <span style="font-size: 0.8rem; color: #b0bec5;">(${passedYearsStr})</span></span>
+                            </div>
+                        </div>
+                    `;
+                } else {
                     btn.className = 'saveload-slot-btn empty-slot';
                     btn.innerHTML = `
                         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
@@ -1674,21 +1676,37 @@ class CommandSystem {
                             <div>NO DATA</div>
                         </div>
                     `;
+                    
                     if (mode === 'load') {
                         btn.disabled = true;
                         btn.style.opacity = '0.5';
                         btn.style.cursor = 'default';
                     } else {
                         btn.disabled = false;
-                        btn.onclick = () => {
-                            modal.classList.add('hidden');
-                            this.game.ui.showDialog(`スロット ${i} に現在の状態をセーブ（上書き）しますか？`, true, () => {
-                                this.game.saveGameToLocal(i);
-                            }, null, { okText: 'セーブする', okClass: 'btn-primary', cancelText: 'やめる' });
-                        };
                     }
-                });
-            }
+                }
+
+                btn.onclick = () => {
+                    const modal = document.getElementById('saveload-modal');
+                    if (modal) modal.classList.add('hidden');
+                    
+                    if (mode === 'save') {
+                        this.game.ui.showDialog(`スロット ${i} に現在の状態をセーブ（上書き）しますか？`, true, () => {
+                            this.game.saveGameToLocal(i);
+                        }, null, { okText: 'セーブする', okClass: 'btn-primary', cancelText: 'やめる' });
+                    } else {
+                        if (this.game.phase === 'title') {
+                            this.game.loadGameFromLocal(i, prefix); 
+                        } else {
+                            this.game.ui.showDialog(`${displayTitle} のデータをロードしますか？\n（現在の進行状況は失われます）`, true, () => {
+                                this.game.loadGameFromLocal(i, prefix); 
+                            }, null, { okText: 'ロードする', okClass: 'btn-danger', cancelText: 'やめる' });
+                        }
+                    }
+                };
+
+                list.appendChild(btn);
+            });
         };
 
         // ★追加：タブのボタンを押した時の動きを登録します
