@@ -46,9 +46,13 @@ Object.assign(UIInfoManager.prototype, {
         const castellanName = castellan ? castellan.name : "なし";
 
         let provinceName = "不明";
+        let provinceYomi = "";
         if (this.game.provinces) {
             const province = this.game.provinces.find(p => p.id === castle.provinceId);
-            if (province) provinceName = province.province;
+            if (province) {
+                provinceName = province.province;
+                provinceYomi = province.provinceYomi || "";
+            }
         }
 
         const kunishus = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishusInCastle(castle.id) : [];
@@ -56,15 +60,9 @@ Object.assign(UIInfoManager.prototype, {
 
         // ★ 武将の人数も数えておきます
         const targetBushos = this.game.bushos.filter(b => {
-            // まずは、その城にいるかどうかをチェックします
             if (b.castleId !== castle.id) return false;
-            
-            // 浪人なら無条件でリストに入れます
             if (b.status === 'ronin') return true;
-            
-            // 城に持ち主（勢力）がいる場合は、その勢力の武将もリストに入れます
             if (castle.ownerClan > 0 && b.status === 'active' && b.clan === castle.ownerClan) return true;
-            
             return false;
         });
         const bushoCount = targetBushos.length;
@@ -72,8 +70,7 @@ Object.assign(UIInfoManager.prototype, {
         let totalGoldIncome = GameSystem.calcBaseGoldIncome(castle);
         let totalRiceIncome = GameSystem.calcBaseRiceIncome(castle);
 
-        // ★追加：拠点の特徴（港・馬・鉄砲）を判定してマークを作ります
-        const isPort = GameSystem.isPortCastle(castle); // 一元化された港の判定を使います
+        const isPort = GameSystem.isPortCastle(castle);
         const isHorse = GameSystem.isProdCastle(castle, 'horse');
         const isGun = GameSystem.isProdCastle(castle, 'gun');
 
@@ -82,69 +79,94 @@ Object.assign(UIInfoManager.prototype, {
         if (isHorse) marksHtml += `<span class="status-mark" style="padding: 4px 8px; background-color: #f57c00;">馬産地</span>`;
         if (isGun) marksHtml += `<span class="status-mark" style="padding: 4px 8px; background-color: #5d4037;">鉄砲産地</span>`;
 
+        // 顔画像の大きさを自動でピッタリ合わせる魔法です
+        const faceStyle = "width: 100%; max-width: 80px; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0 auto;";
         let faceHtml = "";
         if (castellan && castellan.faceIcon) {
-            faceHtml = `<img src="data/images/faceicons/${castellan.faceIcon}" class="daimyo-detail-face" onerror="this.style.display='none'">`;
+            faceHtml = `<img src="data/images/faceicons/${castellan.faceIcon}" style="${faceStyle}" onerror="this.style.display='none'">`;
         } else {
-            faceHtml = `<div class="sp-face-wrapper daimyo-detail-face" style="display: flex; box-sizing: border-box;"></div>`;
+            faceHtml = `<div style="${faceStyle}"></div>`;
         }
 
         const yomiStr = castle.yomi ? castle.yomi : "";
+
+        // 軍団情報の文字列を生成
+        let legionInfoStr = "";
+        if (castle.ownerClan > 0) {
+            if (castle.legionId === 0) {
+                legionInfoStr = `${clanName} 直轄領`;
+            } else {
+                if (this.game.legions) {
+                    const legion = this.game.legions.find(l => Number(l.legionNo) === Number(castle.legionId) && Number(l.clanId) === Number(castle.ownerClan));
+                    if (legion && legion.commanderId > 0) {
+                        const commander = this.game.getBusho(legion.commanderId);
+                        if (commander) {
+                            legionInfoStr = `${clanName} （${commander.name} 領）`;
+                        }
+                    }
+                }
+                if (!legionInfoStr) legionInfoStr = `第${castle.legionId}軍団 領`;
+            }
+        } else {
+            legionInfoStr = `無所属`;
+        }
 
         if (listContainer) {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = `
-                <div class="daimyo-detail-container" style="padding: 10px; min-height: 100%;">
-                    <div class="daimyo-detail-header pc-only" style="margin-bottom: 10px;">
-                        <div style="display:flex; flex-direction:column;">
-                            <span style="font-size:0.8rem; color:#ccc; margin-bottom:2px;">${yomiStr}</span>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <div class="daimyo-detail-name" style="font-size: 1.5rem;">${castle.name}</div>
-                            </div>
+                <div class="kyoten-detail-wrapper" style="padding: 10px; min-height: 100%; display: flex; flex-direction: column;">
+                    
+                    <!-- ①国名＆拠点名 -->
+                    <div style="display: flex; align-items: flex-end; gap: 15px; margin-bottom: 10px;">
+                        <div style="display: flex; flex-direction: column;">
+                            <span style="font-size: 0.8rem; color: #ccc; min-height: 1em;">${provinceYomi}</span>
+                            <span style="font-size: 1.1rem; color: #ccc;">${provinceName}</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column;">
+                            <span style="font-size: 0.8rem; color: #ccc; min-height: 1em;">${yomiStr}</span>
+                            <span style="font-size: 1.5rem; font-weight: bold; color: #fff; line-height: 1;">${castle.name}</span>
                         </div>
                     </div>
-                    <div class="daimyo-detail-body">
-                        <div class="daimyo-detail-left">
+
+                    <!-- ②城主＆直轄/国主 -->
+                    <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 15px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 8px;">
+                        <div style="font-size: 1.1rem; color: #ffd54f;">城主 <span style="color: #fff;">${castellanName}</span></div>
+                        <div style="font-size: 0.95rem; color: #ccc;">${legionInfoStr}</div>
+                    </div>
+
+                    <!-- ③顔グラから防御までの塊 -->
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 15px; margin-bottom: 15px;">
+                        <div style="grid-row: span 3; display: flex; justify-content: center; align-items: center;">
                             ${faceHtml}
-                            <div class="daimyo-detail-header sp-only" style="flex-direction:column; align-items:flex-start; gap:2px; margin-bottom: 0; justify-content: center;">
-                                <span style="font-size:0.75rem; color:#ccc;">${yomiStr}</span>
-                                <div style="display:flex; align-items:center; gap:5px;">
-                                    <div class="daimyo-detail-name" style="font-size:1.3rem;">${castle.name}</div>
-                                </div>
-                            </div>
                         </div>
-                        <div class="daimyo-detail-right">
-                            <div class="daimyo-detail-row daimyo-detail-3col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">勢力</span><span class="daimyo-detail-value">${clanName}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">所属</span><span class="daimyo-detail-value">${provinceName}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">城主</span><span class="daimyo-detail-value">${castellanName}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-3col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">石高</span><span class="daimyo-detail-value">${castle.kokudaka}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉱山</span><span class="daimyo-detail-value">${castle.commerce}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">民忠</span><span class="daimyo-detail-value">${castle.peoplesLoyalty}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵士</span><span class="daimyo-detail-value">${castle.soldiers}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">人口</span><span class="daimyo-detail-value">${castle.population}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">金</span><span class="daimyo-detail-value">${castle.gold}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">月収入</span><span class="daimyo-detail-value">${totalGoldIncome}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵糧</span><span class="daimyo-detail-value">${castle.rice}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">年収穫</span><span class="daimyo-detail-value">${totalRiceIncome}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-3col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">防御</span><span class="daimyo-detail-value">${castle.defense}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">軍馬</span><span class="daimyo-detail-value">${castle.horses || 0}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉄砲</span><span class="daimyo-detail-value">${castle.guns || 0}</span></div>
-                            </div>
-                        </div>
+                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">石高</span><span class="daimyo-detail-value">${castle.kokudaka}</span></div>
+                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">訓練</span><span class="daimyo-detail-value">${castle.training}</span></div>
+
+                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉱山</span><span class="daimyo-detail-value">${castle.commerce}</span></div>
+                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">士気</span><span class="daimyo-detail-value">${castle.morale}</span></div>
+
+                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">民忠</span><span class="daimyo-detail-value">${castle.peoplesLoyalty}</span></div>
+                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">防御</span><span class="daimyo-detail-value">${castle.defense}</span></div>
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 15px;">
+
+                    <!-- ④人口から鉄砲までの塊 -->
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 15px; margin-bottom: 15px;">
+                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">人口</span><span class="daimyo-detail-value">${castle.population}</span></div>
+                        <div style="visibility: hidden;"></div>
+                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵士</span><span class="daimyo-detail-value">${castle.soldiers}</span></div>
+
+                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">金</span><span class="daimyo-detail-value">${castle.gold}</span></div>
+                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">月収入</span><span class="daimyo-detail-value">${totalGoldIncome}</span></div>
+                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">軍馬</span><span class="daimyo-detail-value">${castle.horses || 0}</span></div>
+
+                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵糧</span><span class="daimyo-detail-value">${castle.rice}</span></div>
+                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">年収穫</span><span class="daimyo-detail-value">${totalRiceIncome}</span></div>
+                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉄砲</span><span class="daimyo-detail-value">${castle.guns || 0}</span></div>
+                    </div>
+
+                    <!-- フッター（武将/諸勢力） -->
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 5px;">
                         <div style="display: flex; gap: 5px; flex-wrap: wrap;">
                             ${marksHtml}
                         </div>
