@@ -58,7 +58,7 @@ Object.assign(UIInfoManager.prototype, {
         const kunishus = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishusInCastle(castle.id) : [];
         const kunishuCount = kunishus.length;
 
-        // ★ 武将の人数も数えておきます
+        // 武将の人数カウント
         const targetBushos = this.game.bushos.filter(b => {
             if (b.castleId !== castle.id) return false;
             if (b.status === 'ronin') return true;
@@ -79,8 +79,8 @@ Object.assign(UIInfoManager.prototype, {
         if (isHorse) marksHtml += `<span class="status-mark" style="padding: 4px 8px; background-color: #f57c00;">馬産地</span>`;
         if (isGun) marksHtml += `<span class="status-mark" style="padding: 4px 8px; background-color: #5d4037;">鉄砲産地</span>`;
 
-        // 顔画像の大きさを自動でピッタリ合わせる魔法です
-        const faceStyle = "width: 100%; max-width: 80px; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0 auto;";
+        // 顔画像（左寄せ）
+        const faceStyle = "width: 100%; max-width: 90px; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0;";
         let faceHtml = "";
         if (castellan && castellan.faceIcon) {
             faceHtml = `<img src="data/images/faceicons/${castellan.faceIcon}" style="${faceStyle}" onerror="this.style.display='none'">`;
@@ -111,58 +111,79 @@ Object.assign(UIInfoManager.prototype, {
             legionInfoStr = `無所属`;
         }
 
+        // --- ステータスのグループ化（囲み枠）用スタイル ---
+        const groupStyle = "background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 6px; box-shadow: inset 0 0 5px rgba(0,0,0,0.5);";
+        const rowStyle = "display: flex; justify-content: space-between; align-items: center;";
+        const labelStyle = "color: #ffd54f; font-size: 0.85rem; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: left;";
+        const valueStyle = "color: #fff; font-size: 0.95rem; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: right; font-variant-numeric: tabular-nums;";
+        
+        // パラメータを1行分作る魔法
+        const makeRow = (label, value) => `<div style="${rowStyle}"><span style="${labelStyle}">${label}</span><span style="${valueStyle}">${value}</span></div>`;
+        // 空白の行（月収入の上などに入れる用）
+        const emptyRow = `<div style="${rowStyle}; min-height: 1.3rem;"></div>`;
+
         if (listContainer) {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = `
                 <div class="kyoten-detail-wrapper" style="padding: 10px; min-height: 100%; display: flex; flex-direction: column;">
                     
-                    <!-- ①国名＆拠点名 -->
-                    <div style="display: flex; align-items: flex-end; gap: 15px; margin-bottom: 10px;">
-                        <div style="display: flex; flex-direction: column;">
+                    <!-- ①国名＆拠点名（文字サイズ統一・左寄せ） -->
+                    <div style="display: flex; align-items: flex-end; gap: 20px; margin-bottom: 15px;">
+                        <div style="display: flex; flex-direction: column; align-items: flex-start;">
                             <span style="font-size: 0.8rem; color: #ccc; min-height: 1em;">${provinceYomi}</span>
-                            <span style="font-size: 1.1rem; color: #ccc;">${provinceName}</span>
+                            <span style="font-size: 1.5rem; font-weight: bold; color: #fff; line-height: 1;">${provinceName}</span>
                         </div>
-                        <div style="display: flex; flex-direction: column;">
+                        <div style="display: flex; flex-direction: column; align-items: flex-start;">
                             <span style="font-size: 0.8rem; color: #ccc; min-height: 1em;">${yomiStr}</span>
                             <span style="font-size: 1.5rem; font-weight: bold; color: #fff; line-height: 1;">${castle.name}</span>
                         </div>
                     </div>
 
-                    <!-- ②城主＆直轄/国主 -->
-                    <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 15px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 8px;">
-                        <div style="font-size: 1.1rem; color: #ffd54f;">城主 <span style="color: #fff;">${castellanName}</span></div>
+                    <!-- ②城主＆直轄/国主（左寄せ） -->
+                    <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 15px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 10px;">
+                        <div style="font-size: 1.1rem; color: #ffd54f;">城主 <span style="color: #fff; font-weight: bold;">${castellanName}</span></div>
                         <div style="font-size: 0.95rem; color: #ccc;">${legionInfoStr}</div>
                     </div>
 
                     <!-- ③顔グラから防御までの塊 -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 15px; margin-bottom: 15px;">
-                        <div style="grid-row: span 3; display: flex; justify-content: center; align-items: center;">
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 15px; margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: flex-start; align-items: flex-start;">
                             ${faceHtml}
                         </div>
-                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">石高</span><span class="daimyo-detail-value">${castle.kokudaka}</span></div>
-                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">訓練</span><span class="daimyo-detail-value">${castle.training}</span></div>
+                        
+                        <div style="${groupStyle}">
+                            ${makeRow('石高', castle.kokudaka)}
+                            ${makeRow('鉱山', castle.commerce)}
+                            ${makeRow('民忠', castle.peoplesLoyalty)}
+                        </div>
 
-                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉱山</span><span class="daimyo-detail-value">${castle.commerce}</span></div>
-                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">士気</span><span class="daimyo-detail-value">${castle.morale}</span></div>
-
-                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">民忠</span><span class="daimyo-detail-value">${castle.peoplesLoyalty}</span></div>
-                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">防御</span><span class="daimyo-detail-value">${castle.defense}</span></div>
+                        <div style="${groupStyle}">
+                            ${makeRow('訓練', castle.training)}
+                            ${makeRow('士気', castle.morale)}
+                            ${makeRow('防御', castle.defense)}
+                        </div>
                     </div>
 
                     <!-- ④人口から鉄砲までの塊 -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 15px; margin-bottom: 15px;">
-                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">人口</span><span class="daimyo-detail-value">${castle.population}</span></div>
-                        <div style="visibility: hidden;"></div>
-                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵士</span><span class="daimyo-detail-value">${castle.soldiers}</span></div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 15px; margin-bottom: 15px;">
+                        <div style="${groupStyle}">
+                            ${makeRow('人口', castle.population)}
+                            ${makeRow('金', castle.gold)}
+                            ${makeRow('兵糧', castle.rice)}
+                        </div>
 
-                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">金</span><span class="daimyo-detail-value">${castle.gold}</span></div>
-                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">月収入</span><span class="daimyo-detail-value">${totalGoldIncome}</span></div>
-                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">軍馬</span><span class="daimyo-detail-value">${castle.horses || 0}</span></div>
+                        <div style="${groupStyle}">
+                            ${emptyRow}
+                            ${makeRow('月収入', totalGoldIncome)}
+                            ${makeRow('年収穫', totalRiceIncome)}
+                        </div>
 
-                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵糧</span><span class="daimyo-detail-value">${castle.rice}</span></div>
-                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">年収穫</span><span class="daimyo-detail-value">${totalRiceIncome}</span></div>
-                        <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉄砲</span><span class="daimyo-detail-value">${castle.guns || 0}</span></div>
+                        <div style="${groupStyle}">
+                            ${makeRow('兵士', castle.soldiers)}
+                            ${makeRow('軍馬', castle.horses || 0)}
+                            ${makeRow('鉄砲', castle.guns || 0)}
+                        </div>
                     </div>
 
                     <!-- フッター（武将/諸勢力） -->
