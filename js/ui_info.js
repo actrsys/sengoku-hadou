@@ -2242,10 +2242,10 @@ class UIInfoManager {
 
                     <!-- 【ステータス部：上段】 -->
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap}; margin-bottom: 8px;">
-                        <!-- 左列：武将・勢力圏・空箱 -->
+                        <!-- 左列：武将・所在・空箱 -->
                         <div style="${groupWrapStyle}">
                             ${makeRow('武将', bushosCount)}
-                            ${makeRow('勢力圏', baseCastleName)}
+                            ${makeRow('所在', baseCastleName)}
                             ${makeEmptyRow()}
                         </div>
                         
