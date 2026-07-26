@@ -758,10 +758,10 @@ class UIInfoManager {
                             </div>
                         </div>
 
-                        <!-- 右列：月消費・米消費 ＋ 独立した兵士 -->
+                        <!-- 右列：月支出・米消費 ＋ 独立した兵士 -->
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                             <div style="${groupWrapStyle}">
-                                ${makeRow('月消費', totalGoldConsume)}
+                                ${makeRow('月支出', totalGoldConsume)}
                                 ${makeRow('米消費', consumeRiceYear)}
                             </div>
                             <div style="${groupWrapStyle}">
