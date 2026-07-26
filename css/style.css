@@ -944,6 +944,26 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     transition: none; 
 }
 
+/* ★追加：全体で一番新しい（最新）スロット専用の装飾 */
+.saveload-slot-btn.global-latest-slot {
+    background: linear-gradient(to right, #383125 0%, #473e31 100%);
+    border-color: #a88a2c;
+}
+
+/* ★追加：最新スロットの上にマウスを乗せた時（ホバー時）の少し明るくなる装飾 */
+.saveload-slot-btn.global-latest-slot:hover {
+    background: linear-gradient(to right, #4a4131 0%, #594d3d 100%);
+    border-color: #ffd54f;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 6px rgba(0,0,0,0.6), 0 0 8px rgba(212, 175, 55, 0.4);
+}
+
+/* ★追加：最新スロットをクリックして押し込んだ時の装飾 */
+.saveload-slot-btn.global-latest-slot:active {
+    background: linear-gradient(to right, #2b251c 0%, #362f23 100%);
+    border-color: #a88a2c;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.8), 0 1px 2px rgba(0,0,0,0.3);
+}
+
 /* 空きスロット用のスタイル */
 .saveload-slot-btn.empty-slot {
     background: rgba(0, 0, 0, 0.3);
