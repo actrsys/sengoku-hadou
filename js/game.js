@@ -2644,6 +2644,7 @@ class GameManager {
             scenarioName: scenarioName,
             scenarioNo: scenarioNo,
             saveTime: saveTime,
+            saveTimestamp: now.getTime(), // 被りを防ぐためミリ秒単位の正確な時間を記録します
             castles: this.castles,
             bushos: this.bushos,
             clans: this.clans,
@@ -2954,17 +2955,15 @@ class GameManager {
                                 d = null;
                             }
                         }
-                        // セーブした時間（saveTime）を見て、一番新しいものを探します
-                        if (d && d.saveTime) {
-                            const time = new Date(d.saveTime).getTime();
+                        // ★セーブした時間をミリ秒優先で見て、一番新しいものを探します
+                        if (d) {
+                            const time = d.saveTimestamp || (d.saveTime ? new Date(d.saveTime).getTime() : 0);
                             if (time > latestTime) {
                                 latestTime = time;
                                 latestSlot = i;
                                 latestPrefix = prefix;
-                            }
-                        } else if (d) {
-                            // 時間が記録されていなければ、とりあえず見つけたスロットをメモします
-                            if (latestSlot === -1) {
+                            } else if (latestSlot === -1) {
+                                // 時間が記録されていなければ、とりあえず見つけたスロットをメモします
                                 latestSlot = i;
                                 latestPrefix = prefix;
                             }

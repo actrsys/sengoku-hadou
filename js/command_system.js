@@ -1587,8 +1587,9 @@ class CommandSystem {
                 if (d instanceof Uint8Array && this.game && typeof this.game._decryptData === 'function') {
                     try { d = this.game._decryptData(d); } catch(err) { d = null; }
                 }
-                if (d && d.saveTime) {
-                    const time = new Date(d.saveTime).getTime();
+                if (d) {
+                    // ★修正：ミリ秒単位の記録があればそれを使い、なければ文字列から計算します
+                    const time = d.saveTimestamp || (d.saveTime ? new Date(d.saveTime).getTime() : 0);
                     if (time > otherLatestTime) otherLatestTime = time;
                 }
             });
@@ -1608,10 +1609,14 @@ class CommandSystem {
                 
                 // データがないものは一番下に回すため、無限大にしておきます
                 let time = Infinity; 
-                if (d && d.saveTime) {
-                    time = new Date(d.saveTime).getTime();
-                    // ★追加：一番新しい時間を更新します
-                    if (time > currentTabLatestTime) currentTabLatestTime = time;
+                if (d) {
+                    // ★修正：ミリ秒単位の記録があればそれを優先します
+                    time = d.saveTimestamp || (d.saveTime ? new Date(d.saveTime).getTime() : 0);
+                    if (time > 0 && time !== Infinity) {
+                        if (time > currentTabLatestTime) currentTabLatestTime = time;
+                    } else {
+                        time = Infinity;
+                    }
                 }
 
                 return {
@@ -1624,6 +1629,9 @@ class CommandSystem {
             
             // ★追加：手動とオートの両方を含めた、ゲーム全体で一番新しい時間を決定します
             const globalLatestTime = Math.max(currentTabLatestTime, otherLatestTime);
+            
+            // ★追加：古いデータなどで時間が全く同じだった場合、1つだけを最新にするための印
+            let foundTabLatest = false;
 
             // 3. オートセーブの時だけ、古い順（時間が小さい順）に並べ替えます
             if (prefix === 'sengoku_autosave_slot') {
@@ -1678,8 +1686,18 @@ class CommandSystem {
                 const displayTitle = prefix === 'sengoku_autosave_slot' ? `オート ${displayIndex}` : `スロット ${i}`; 
 
                 // ★追加：このスロットが最新かどうかを判定します
-                const isTabLatest = (hasData && slotInfo.time === currentTabLatestTime && currentTabLatestTime > 0);
-                const isGlobalLatest = (hasData && slotInfo.time === globalLatestTime && globalLatestTime > 0);
+                let isTabLatest = (hasData && slotInfo.time === currentTabLatestTime && currentTabLatestTime > 0);
+                let isGlobalLatest = (hasData && slotInfo.time === globalLatestTime && globalLatestTime > 0);
+
+                // ★古いデータで時間が被っていた場合のストッパー
+                if (isTabLatest) {
+                    if (foundTabLatest) {
+                        isTabLatest = false;
+                        isGlobalLatest = false;
+                    } else {
+                        foundTabLatest = true;
+                    }
+                }
 
                 let extraBtnStyle = "";
                 if (isTabLatest) {
@@ -1689,13 +1707,13 @@ class CommandSystem {
                 
                 let latestMarkHtml = "";
                 if (isGlobalLatest) {
-                    // 全体で一番新しいデータには「最新！」の文字をつけます
-                    latestMarkHtml = `<span style="color: #ff8a80; font-weight: bold; margin-right: 8px; text-shadow: 1px 1px 0 #000;">最新！</span>`;
+                    // 全体で一番新しいデータには「最新!」の文字をつけます
+                    latestMarkHtml = `<span style="color: #ff8a80; font-weight: bold; margin-right: 8px; text-shadow: 1px 1px 0 #000;">最新!</span>`;
                 }
 
                 if (hasData) {
                     btn.className = 'saveload-slot-btn';
-                    if (extraBtnStyle) btn.style.cssText = extraBtnStyle; // ★追加
+                    if (extraBtnStyle) btn.style.cssText = extraBtnStyle;
                     btn.disabled = false; 
                     btn.innerHTML = `
                         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
