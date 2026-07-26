@@ -79,7 +79,7 @@ Object.assign(UIInfoManager.prototype, {
         if (isHorse) marksHtml += `<span class="status-mark" style="padding: 4px 8px; background-color: #f57c00;">馬産地</span>`;
         if (isGun) marksHtml += `<span class="status-mark" style="padding: 4px 8px; background-color: #5d4037;">鉄砲産地</span>`;
 
-        // 顔画像（左寄せ）
+        // 顔画像
         const faceStyle = "width: 100%; max-width: 90px; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0;";
         let faceHtml = "";
         if (castellan && castellan.faceIcon) {
@@ -90,7 +90,7 @@ Object.assign(UIInfoManager.prototype, {
 
         const yomiStr = castle.yomi ? castle.yomi : "";
 
-        // 軍団情報の文字列を生成
+        // 軍団情報の文字列を生成（括弧を削除）
         let legionInfoStr = "";
         if (castle.ownerClan > 0) {
             if (castle.legionId === 0) {
@@ -101,7 +101,7 @@ Object.assign(UIInfoManager.prototype, {
                     if (legion && legion.commanderId > 0) {
                         const commander = this.game.getBusho(legion.commanderId);
                         if (commander) {
-                            legionInfoStr = `${clanName} （${commander.name} 領）`;
+                            legionInfoStr = `${clanName} ${commander.name} 領`;
                         }
                     }
                 }
@@ -111,16 +111,16 @@ Object.assign(UIInfoManager.prototype, {
             legionInfoStr = `無所属`;
         }
 
-        // --- ステータスのグループ化（囲み枠）用スタイル ---
-        const groupStyle = "background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 6px; box-shadow: inset 0 0 5px rgba(0,0,0,0.5);";
-        const rowStyle = "display: flex; justify-content: space-between; align-items: center;";
+        // --- 二重背景・ステータス行の生成魔法 ---
+        // グループを囲う外枠
+        const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 4px;";
+        // 項目個別の背景枠
+        const statBoxStyle = "background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 4px 8px; display: flex; justify-content: space-between; align-items: center;";
         const labelStyle = "color: #ffd54f; font-size: 0.85rem; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: left;";
         const valueStyle = "color: #fff; font-size: 0.95rem; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: right; font-variant-numeric: tabular-nums;";
         
-        // パラメータを1行分作る魔法
-        const makeRow = (label, value) => `<div style="${rowStyle}"><span style="${labelStyle}">${label}</span><span style="${valueStyle}">${value}</span></div>`;
-        // 空白の行（月収入の上などに入れる用）
-        const emptyRow = `<div style="${rowStyle}; min-height: 1.3rem;"></div>`;
+        const makeRow = (label, value) => `<div style="${statBoxStyle}"><span style="${labelStyle}">${label}</span><span style="${valueStyle}">${value}</span></div>`;
+        const makeEmptyRow = () => `<div style="${statBoxStyle}; visibility: hidden;"><span>&nbsp;</span><span>&nbsp;</span></div>`;
 
         if (listContainer) {
             listContainer.className = 'list-container hide-native-scroll';
@@ -128,61 +128,89 @@ Object.assign(UIInfoManager.prototype, {
             listContainer.innerHTML = `
                 <div class="kyoten-detail-wrapper" style="padding: 10px; min-height: 100%; display: flex; flex-direction: column;">
                     
-                    <!-- ①国名＆拠点名（文字サイズ統一・左寄せ） -->
-                    <div style="display: flex; align-items: flex-end; gap: 20px; margin-bottom: 15px;">
-                        <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                            <span style="font-size: 0.8rem; color: #ccc; min-height: 1em;">${provinceYomi}</span>
-                            <span style="font-size: 1.5rem; font-weight: bold; color: #fff; line-height: 1;">${provinceName}</span>
-                        </div>
-                        <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                            <span style="font-size: 0.8rem; color: #ccc; min-height: 1em;">${yomiStr}</span>
-                            <span style="font-size: 1.5rem; font-weight: bold; color: #fff; line-height: 1;">${castle.name}</span>
-                        </div>
-                    </div>
-
-                    <!-- ②城主＆直轄/国主（左寄せ） -->
-                    <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 15px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 10px;">
-                        <div style="font-size: 1.1rem; color: #ffd54f;">城主 <span style="color: #fff; font-weight: bold;">${castellanName}</span></div>
-                        <div style="font-size: 0.95rem; color: #ccc;">${legionInfoStr}</div>
-                    </div>
-
-                    <!-- ③顔グラから防御までの塊 -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 15px; margin-bottom: 10px;">
-                        <div style="display: flex; justify-content: flex-start; align-items: flex-start;">
+                    <!-- 【ヘッダー部】 左上に顔グラ、右にテキスト情報 -->
+                    <div style="display: flex; align-items: flex-start; gap: 15px; margin-bottom: 15px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 10px;">
+                        <div style="flex-shrink: 0; width: 90px;">
                             ${faceHtml}
                         </div>
+                        <div style="display: flex; flex-direction: column; gap: 10px; flex: 1;">
+                            <!-- 国名＆拠点名 -->
+                            <div style="display: flex; align-items: flex-end; gap: 20px;">
+                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                                    <span style="font-size: 0.8rem; color: #ccc; min-height: 1em;">${provinceYomi}</span>
+                                    <span style="font-size: 1.5rem; font-weight: bold; color: #fff; line-height: 1;">${provinceName}</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                                    <span style="font-size: 0.8rem; color: #ccc; min-height: 1em;">${yomiStr}</span>
+                                    <span style="font-size: 1.5rem; font-weight: bold; color: #fff; line-height: 1;">${castle.name}</span>
+                                </div>
+                            </div>
+                            <!-- 城主＆直轄/国主 -->
+                            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px;">
+                                <div style="font-size: 1.1rem; color: #ffd54f;">城主 <span style="color: #fff; font-weight: bold;">${castellanName}</span></div>
+                                <div style="font-size: 0.95rem; color: #ccc;">${legionInfoStr}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 【ステータス部：上段】 -->
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 15px; margin-bottom: 10px;">
+                        <!-- 左列：顔グラ跡地の見えない箱（高さをピッタリ合わせます） -->
+                        <div style="${groupWrapStyle}; visibility: hidden;">
+                            ${makeEmptyRow()}
+                            ${makeEmptyRow()}
+                            ${makeEmptyRow()}
+                        </div>
                         
-                        <div style="${groupStyle}">
+                        <!-- 中央列：石高・鉱山・民忠 -->
+                        <div style="${groupWrapStyle}">
                             ${makeRow('石高', castle.kokudaka)}
                             ${makeRow('鉱山', castle.commerce)}
                             ${makeRow('民忠', castle.peoplesLoyalty)}
                         </div>
 
-                        <div style="${groupStyle}">
+                        <!-- 右列：訓練・士気・防御 -->
+                        <div style="${groupWrapStyle}">
                             ${makeRow('訓練', castle.training)}
                             ${makeRow('士気', castle.morale)}
                             ${makeRow('防御', castle.defense)}
                         </div>
                     </div>
 
-                    <!-- ④人口から鉄砲までの塊 -->
+                    <!-- 【ステータス部：下段】 -->
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 15px; margin-bottom: 15px;">
-                        <div style="${groupStyle}">
-                            ${makeRow('人口', castle.population)}
-                            ${makeRow('金', castle.gold)}
-                            ${makeRow('兵糧', castle.rice)}
+                        
+                        <!-- 左列：金・兵糧 ＋ 独立した人口 -->
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <div style="${groupWrapStyle}">
+                                ${makeRow('金', castle.gold)}
+                                ${makeRow('兵糧', castle.rice)}
+                            </div>
+                            <div style="${groupWrapStyle}">
+                                ${makeRow('人口', castle.population)}
+                            </div>
                         </div>
 
-                        <div style="${groupStyle}">
-                            ${emptyRow}
-                            ${makeRow('月収入', totalGoldIncome)}
-                            ${makeRow('年収穫', totalRiceIncome)}
+                        <!-- 中央列：月収入・年収穫 ＋ 見えない箱 -->
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <div style="${groupWrapStyle}">
+                                ${makeRow('月収入', totalGoldIncome)}
+                                ${makeRow('年収穫', totalRiceIncome)}
+                            </div>
+                            <div style="${groupWrapStyle}; visibility: hidden;">
+                                ${makeEmptyRow()}
+                            </div>
                         </div>
 
-                        <div style="${groupStyle}">
-                            ${makeRow('兵士', castle.soldiers)}
-                            ${makeRow('軍馬', castle.horses || 0)}
-                            ${makeRow('鉄砲', castle.guns || 0)}
+                        <!-- 右列：軍馬・鉄砲 ＋ 独立した兵士 -->
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <div style="${groupWrapStyle}">
+                                ${makeRow('軍馬', castle.horses || 0)}
+                                ${makeRow('鉄砲', castle.guns || 0)}
+                            </div>
+                            <div style="${groupWrapStyle}">
+                                ${makeRow('兵士', castle.soldiers)}
+                            </div>
                         </div>
                     </div>
 
