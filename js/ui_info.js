@@ -624,14 +624,32 @@ class UIInfoManager {
         const princessCount = clan.princessIds ? clan.princessIds.length : 0;
         
         let totalGold = 0, totalRice = 0, totalSoldiers = 0, totalHorses = 0, totalGuns = 0;
+        let totalPopulation = 0, totalKokudaka = 0, totalCommerce = 0;
+        let roninCount = 0;
+
         clanCastles.forEach(c => {
-            totalGold += c.gold || 0; totalRice += c.rice || 0; totalSoldiers += c.soldiers || 0;
-            totalHorses += c.horses || 0; totalGuns += c.guns || 0;
+            totalGold += c.gold || 0; 
+            totalRice += c.rice || 0; 
+            totalSoldiers += c.soldiers || 0;
+            totalHorses += c.horses || 0; 
+            totalGuns += c.guns || 0;
+            totalPopulation += c.population || 0;
+            totalKokudaka += c.kokudaka || 0;
+            totalCommerce += c.commerce || 0;
+            roninCount += this.game.bushos.filter(b => b.castleId === c.id && b.status === 'ronin').length;
         });
 
         // ★表示側で計算は行わず、勢力データに保存されている値を読むだけにします
         let totalGoldIncome = clan.goldIncome || 0;
         let totalRiceIncome = clan.riceIncome || 0;
+
+        let totalGoldConsume = 0;
+        if (leader) {
+            clanBushos.forEach(b => {
+                totalGoldConsume += b.getSalary(leader);
+            });
+        }
+        let consumeRiceYear = Math.floor(totalSoldiers * window.MainParams.Economy.ConsumeRicePerSoldier) * 12;
 
         let ideology = "中道", ideologyClass = "ideology-chudo"; 
         if (leader) {
@@ -641,57 +659,126 @@ class UIInfoManager {
 
         let faceSrc = leader && leader.faceIcon ? `data/images/faceicons/${leader.faceIcon}` : "data/images/faceicons/unknown_face.webp";
 
+        // ★ここから追加：スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！（拠点詳細のものを流用）
+        const isPc = document.body.classList.contains('is-pc');
+
+        const fSizeCastleYomi = isPc ? "0.75rem" : "0.65rem";
+        const fSizeCastleName = isPc ? "1.4rem" : "1.25rem";
+        const fSizeLordLabel = isPc ? "1.05rem" : "0.95rem";
+        const fSizeStatLabel = isPc ? "0.85rem" : "0.75rem";
+        const fSizeStatValue = isPc ? "0.95rem" : "0.85rem";
+
+        const gridGap = isPc ? "8px 12px" : "8px 6px";
+        const faceStyle = "width: 100%; max-width: 90px; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0;";
+
+        const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 4px;";
+        const statBoxStyle = "background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 2px 6px; display: flex; justify-content: space-between; align-items: center;";
+        const labelStyle = `color: #ffd54f; font-size: ${fSizeStatLabel}; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: left;`;
+        const valueStyle = `color: #fff; font-size: ${fSizeStatValue}; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: right; font-variant-numeric: tabular-nums;`;
+
+        const makeRow = (label, value) => `<div style="${statBoxStyle}"><span style="${labelStyle}">${label}</span><span style="${valueStyle}">${value}</span></div>`;
+        const makeEmptyRow = () => `<div style="${statBoxStyle}; visibility: hidden;"><span>&nbsp;</span><span>&nbsp;</span></div>`;
+
+        const clanYomi = clan.yomi || "";
+        const ideologyHtml = `<div class="daimyo-detail-ideology ${ideologyClass}" style="display: inline-block; margin-top: 4px;">${ideology}</div>`;
+
         if (listContainer) {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = `
-                <div class="daimyo-detail-container" style="padding: 10px; min-height: 100%;">
-                    <div class="daimyo-detail-header pc-only">
-                        <div class="daimyo-detail-name">${clan.name}</div>
-                        <div class="daimyo-detail-ideology ${ideologyClass}">${ideology}</div>
-                    </div>
-                    <div class="daimyo-detail-body">
-                        <div class="daimyo-detail-left">
-                            <img src="${faceSrc}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_face.webp'">
-                            <div class="daimyo-detail-header sp-only">
-                                <div class="daimyo-detail-name">${clan.name}</div>
-                                <div class="daimyo-detail-ideology ${ideologyClass}">${ideology}</div>
-                            </div>
+                <div class="kyoten-detail-wrapper" style="padding: 8px 10px; min-height: 100%; display: flex; flex-direction: column; box-sizing: border-box;">
+                    
+                    <!-- 【ヘッダー部】 左上に顔グラ、右にテキスト情報 -->
+                    <div style="display: flex; align-items: flex-start; gap: 15px; margin-bottom: 10px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 8px;">
+                        <div style="flex-shrink: 0; width: 90px;">
+                            <img src="${faceSrc}" style="${faceStyle}" onerror="this.src='data/images/faceicons/unknown_face.webp'">
                         </div>
-                        <div class="daimyo-detail-right">
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">大名</span><span class="daimyo-detail-value">${leaderName}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">本拠地</span><span class="daimyo-detail-value">${baseCastleName}</span></div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                            <!-- 勢力名 -->
+                            <div style="display: flex; align-items: flex-end; gap: 15px;">
+                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                                    <span style="font-size: ${fSizeCastleYomi}; color: #ccc; min-height: 1em;">${clanYomi}</span>
+                                    <span style="font-size: ${fSizeCastleName}; font-weight: bold; color: #fff; line-height: 1;">${clan.name}</span>
+                                </div>
                             </div>
-                            <div class="daimyo-detail-row daimyo-detail-3col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">拠点</span><span class="daimyo-detail-value">${castlesCount}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">武将</span><span class="daimyo-detail-value">${bushosCount}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">姫</span><span class="daimyo-detail-value">${princessCount}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">金</span><span class="daimyo-detail-value">${totalGold}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵士</span><span class="daimyo-detail-value">${totalSoldiers}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">月収入</span><span class="daimyo-detail-value">${totalGoldIncome}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">軍馬</span><span class="daimyo-detail-value">${totalHorses}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵糧</span><span class="daimyo-detail-value">${totalRice}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉄砲</span><span class="daimyo-detail-value">${totalGuns}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">年収穫</span><span class="daimyo-detail-value">${totalRiceIncome}</span></div>
-                                <div class="daimyo-detail-stat-box" style="visibility: hidden;"></div>
+                            <!-- 大名＆イデオロギー -->
+                            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+                                <div style="font-size: ${fSizeLordLabel}; color: #ffd54f;">大名 <span style="color: #fff; font-weight: bold;">${leaderName}</span></div>
+                                ${ideologyHtml}
                             </div>
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: auto; padding-top: 15px;">
-                        <button class="daimyo-detail-action-btn" id="temp-kyoten-btn" ${castlesCount === 0 ? 'disabled' : ''}>拠点</button>
-                        <button class="daimyo-detail-action-btn" id="temp-busho-btn" ${bushosCount === 0 ? 'disabled' : ''}>武将</button>
-                        <button class="daimyo-detail-action-btn" id="temp-hime-btn" ${princessCount === 0 ? 'disabled' : ''}>姫</button>
-                        <button class="daimyo-detail-action-btn" id="temp-faction-btn" ${!hasFaction ? 'disabled' : ''}>派閥</button>
-                        <button class="daimyo-detail-action-btn" id="temp-diplo-btn">外交</button>
+
+                    <!-- 【ステータス部：上段】 -->
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap}; margin-bottom: 8px;">
+                        <!-- 左列：武将・姫・浪人 -->
+                        <div style="${groupWrapStyle}">
+                            ${makeRow('武将', bushosCount)}
+                            ${makeRow('姫', princessCount)}
+                            ${makeRow('浪人', roninCount)}
+                        </div>
+                        
+                        <!-- 中央列：拠点・石高・鉱山 -->
+                        <div style="${groupWrapStyle}">
+                            ${makeRow('拠点', castlesCount)}
+                            ${makeRow('石高', totalKokudaka)}
+                            ${makeRow('鉱山', totalCommerce)}
+                        </div>
+
+                        <!-- 右列：軍馬・鉄砲・空箱 -->
+                        <div style="${groupWrapStyle}">
+                            ${makeRow('軍馬', totalHorses)}
+                            ${makeRow('鉄砲', totalGuns)}
+                            ${makeEmptyRow()}
+                        </div>
+                    </div>
+
+                    <!-- 【ステータス部：下段】 -->
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap}; margin-bottom: 10px;">
+                        
+                        <!-- 左列：金・兵糧 ＋ 独立した人口 -->
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div style="${groupWrapStyle}">
+                                ${makeRow('金', totalGold)}
+                                ${makeRow('兵糧', totalRice)}
+                            </div>
+                            <div style="${groupWrapStyle}">
+                                ${makeRow('人口', totalPopulation)}
+                            </div>
+                        </div>
+
+                        <!-- 中央列：月収入・年収穫 ＋ 見えない箱 -->
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div style="${groupWrapStyle}">
+                                ${makeRow('月収入', totalGoldIncome)}
+                                ${makeRow('年収穫', totalRiceIncome)}
+                            </div>
+                            <div style="${groupWrapStyle}; visibility: hidden;">
+                                ${makeEmptyRow()}
+                            </div>
+                        </div>
+
+                        <!-- 右列：月消費・米消費 ＋ 独立した兵士 -->
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div style="${groupWrapStyle}">
+                                ${makeRow('月消費', totalGoldConsume)}
+                                ${makeRow('米消費', consumeRiceYear)}
+                            </div>
+                            <div style="${groupWrapStyle}">
+                                ${makeRow('兵士', totalSoldiers)}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- フッター（アクションボタン） -->
+                    <div style="display: flex; justify-content: flex-end; align-items: flex-end; margin-top: auto; padding-top: 5px;">
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
+                            <button class="daimyo-detail-action-btn" id="temp-kyoten-btn" ${castlesCount === 0 ? 'disabled' : ''}>拠点</button>
+                            <button class="daimyo-detail-action-btn" id="temp-busho-btn" ${bushosCount === 0 ? 'disabled' : ''}>武将</button>
+                            <button class="daimyo-detail-action-btn" id="temp-hime-btn" ${princessCount === 0 ? 'disabled' : ''}>姫</button>
+                            <button class="daimyo-detail-action-btn" id="temp-faction-btn" ${!hasFaction ? 'disabled' : ''}>派閥</button>
+                            <button class="daimyo-detail-action-btn" id="temp-diplo-btn">外交</button>
+                        </div>
                     </div>
                 </div>
             `;
