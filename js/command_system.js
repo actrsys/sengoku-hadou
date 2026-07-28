@@ -35,7 +35,7 @@ const COMMAND_MENU_STRUCTURE = [
             'employ',
             'interview',
             { label: "任命", items: ['appoint_gunshi', 'appoint'] },
-            { label: "賞罰", items: ['reward', 'banish'] },
+            { label: "賞罰", items: ['reward', 'reward_all', 'banish'] },
             { label: "縁組", items: ['arrange_marriage', 'adopt_son'] },
             'succession'
         ]
@@ -420,7 +420,13 @@ const COMMAND_SPECS = {
         msg: "金: 100 (1人あたり)\n褒美を与えます",
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyo(game)
     },
-    'interview': { 
+    'reward_all': { 
+        label: "一括褒美", category: 'PERSONNEL', 
+        costGold: 3000, costRice: 0, 
+        isSystem: true, action: 'reward_all',
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyo(game) && castle.gold >= 3000
+    },
+    'interview': {
         label: "面談", category: 'PERSONNEL', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: false, 
@@ -1456,7 +1462,12 @@ class CommandSystem {
                 // セーブ画面（スロット選択）を開きます
                 this.showSaveLoadModal('save');
                 break;
-            case 'load': 
+            case 'reward_all':
+                this.game.ui.showDialog("金3000を支払い、家臣全員に褒美を与えます。　よろしいですか？", true, () => {
+                    this.executeRewardAll();
+                }, null, { okText: '実行', cancelText: 'やめる' });
+                break;
+            case 'load':
                 // ロード画面（スロット選択）を開きます
                 this.showSaveLoadModal('load');
                 break;
@@ -2512,13 +2523,63 @@ class CommandSystem {
             this.game.ui.showResultModal(`${count}名に褒美（金${count * spec.costGold}）を与えました`);
             this.game.ui.log(`${count}名に褒美を実行 (合計効果:${totalEffect})`);
         } else {
-            this.game.ui.showDialog("金が足りないため、褒美を与えられませんでした。", false);
+            this.game.ui.showDialog("金が足りないため実行できませんでした。", false);
         }
 
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
     }
     
+    executeRewardAll() {
+        const castle = this.game.getCurrentTurnCastle();
+        if (castle.gold < 3000) {
+            this.game.ui.showDialog("金が足りないため実行できませんでした。", false);
+            return;
+        }
+
+        const daimyo = this.game.bushos.find(b => b.id === this.game.clans.find(c => c.id === this.game.playerClanId).leaderId);
+        
+        // 褒美の対象となる武将を集める
+        const targets = this.game.bushos.filter(b => 
+            b.clan === this.game.playerClanId && 
+            b.status === 'active' && 
+            !b.isDaimyo
+        );
+
+        if (targets.length === 0) {
+            this.game.ui.showDialog("褒美を与える武将がいません。", false);
+            return;
+        }
+
+        // 金を3000消費
+        castle.gold -= 3000;
+        
+        let count = 0;
+        let totalEffect = 0;
+
+        // 全員にそれぞれ2回ずつ効果を適用する
+        targets.forEach(target => {
+            const effect1 = GameSystem.calcRewardEffect(200, daimyo, target);
+            const effect2 = GameSystem.calcRewardEffect(200, daimyo, target);
+            const effect = effect1 + effect2;
+
+            this.game.factionSystem.updateRecognition(target, -effect * 2 - 10); // 2回分で -10
+
+            const loyaltyUp1 = Math.floor(Math.random() * 3) + 1;
+            const loyaltyUp2 = Math.floor(Math.random() * 3) + 1;
+            target.loyalty = Math.min(100, target.loyalty + loyaltyUp1 + loyaltyUp2);
+
+            count++;
+            totalEffect += effect;
+        });
+
+        this.game.ui.showResultModal(`金3000を消費し、${count}名に一括褒美を与えました`);
+        this.game.ui.log(`${count}名に一括褒美を実行 (合計効果:${totalEffect})`);
+
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
+    }
+
     executeTransport(bushoIds, targetId, vals) {
         const c = this.game.getCurrentTurnCastle(); const t = this.game.getCastle(targetId);
         
