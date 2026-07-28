@@ -616,6 +616,9 @@ class LifeSystem {
     async executeDeath(busho, context = {}) { // ★修正：イベントの指示（context）を受け取れるようにします
         busho.status = 'dead'; // ステータスを「死亡」にします
         
+        // ★追加：自分が死んだ年より後に生まれる予定だった子供（実父としている武将・姫）を連鎖的に死亡させます
+        this.cascadeDeathToUnbornChildren(busho.id, this.game.year);
+        
         // ★ここから追加：夫が死亡したことによる姫の帰還処理と婚姻同盟の解消
         if (busho.wifeIds && busho.wifeIds.length > 0) {
             for (const wifeId of busho.wifeIds) {
@@ -1851,6 +1854,90 @@ class LifeSystem {
                     }
                 }
             }
+        }
+    }
+
+    // ==========================================
+    // ★ここから追加：死亡した武将の未誕生の子供を連鎖的に死亡させる魔法です！
+    // ==========================================
+    cascadeDeathToUnbornChildren(deadBushoId, currentYear) {
+        // ★追加：親が生きているか（またはダミー親か）を判定する便利なお道具
+        const isParentAlive = (parentId) => {
+            if (!parentId || parentId === 0) return false;
+            
+            // まずは武将の名簿から探します
+            let parent = this.game.getBusho(parentId);
+            // 見つからなければ、姫の名簿から探します
+            if (!parent) {
+                parent = this.game.princesses.find(p => p.id === parentId);
+            }
+            
+            if (!parent) return false; // どちらにもいなければ死んでいるのと同じ扱いにします
+            
+            // startYearが9999のダミー親なら「生きている」とみなします
+            if (parent.startYear === 9999) return true;
+            
+            // statusがdeadでなければ生きています
+            if (parent.status !== 'dead') return true;
+            
+            return false;
+        };
+
+        // 武将や姫の子供に対する共通の死亡判定処理
+        const processChild = (child, isPrincess) => {
+            // 最初から死亡扱い（startYearが9999）の子供は除外します
+            if (child.startYear === 9999) return;
+            // すでに死亡している子供も除外します
+            if (child.status === 'dead') return;
+            
+            // 子供の誕生年が、親の死亡した年より後（未来）かどうかチェックします
+            if (child.birthYear > currentYear) {
+                // もう一方の親（今回死んでいない方の親）を探します
+                let otherParentId = 0;
+                if (child.realFatherId === deadBushoId) {
+                    otherParentId = child.realMotherId;
+                } else if (child.realMotherId === deadBushoId) {
+                    otherParentId = child.realFatherId;
+                }
+                
+                // もう一方の親が設定されている場合、その親が生きているかチェックします
+                if (otherParentId > 0) {
+                    // 片方の親が生きている（またはダミー親）なら、この子供は生き残り（登場OK）ます！
+                    if (isParentAlive(otherParentId)) {
+                        return;
+                    }
+                }
+                
+                // どちらの親も死んでいる（または片親しかおらず死んだ）場合は、子供も死亡扱いにします
+                child.status = 'dead';
+                if (!isPrincess) {
+                    child.isDaimyo = false;
+                    child.isCastellan = false;
+                    child.isCommander = false;
+                    child.isGunshi = false;
+                    child.clan = 0;
+                    child.castleId = 0;
+                    child.belongKunishuId = 0;
+                } else {
+                    child.currentClanId = 0;
+                    child.husbandId = 0;
+                }
+                
+                // 死亡した子供にさらに子供（孫）が設定されていたら、連鎖的に処理します！
+                this.cascadeDeathToUnbornChildren(child.id, currentYear);
+            }
+        };
+
+        // 実父または実母が今回死んだ武将（deadBushoId）である武将を探して処理します
+        const children = this.game.bushos.filter(b => b.realFatherId === deadBushoId || b.realMotherId === deadBushoId);
+        for (const child of children) {
+            processChild(child, false);
+        }
+
+        // 姫についても同じように探して処理します
+        const princessChildren = this.game.princesses.filter(p => p.realFatherId === deadBushoId || p.realMotherId === deadBushoId);
+        for (const pChild of princessChildren) {
+            processChild(pChild, true);
         }
     }
 }
