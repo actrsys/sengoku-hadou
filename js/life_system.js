@@ -226,42 +226,86 @@ class LifeSystem {
                     targetCastle.samuraiIds.push(b.id);
                 }
             } else if ((b.belongKunishuId || 0) > 0) {
-                // ★追加：登場前:諸勢力 の場合
-                b.status = 'active';
-                const targetCastle = this.game.getCastle(b.castleId);
-                if (targetCastle) {
-                    targetCastle.samuraiIds.push(b.id);
-                }
+                // 諸勢力データの取得と生存チェック
+                const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId) : null;
+                const isKunishuAlive = kunishu && !kunishu.isDestroyed;
 
-                // ★ここから追加：もし今の頭領が「モブ頭領」なら、新しく登場した武将と交代してモブ頭領を消します！
-                if (this.game.kunishuSystem) {
-                    const kunishu = this.game.kunishuSystem.getKunishu(b.belongKunishuId);
-                    if (kunishu) {
-                        const currentLeader = this.game.getBusho(kunishu.leaderId);
+                if (isKunishuAlive) {
+                    // ★ 諸勢力が健在な場合：そのまま加入
+                    b.status = 'active';
+                    const targetCastle = this.game.getCastle(b.castleId);
+                    if (targetCastle) {
+                        targetCastle.samuraiIds.push(b.id);
+                    }
+
+                    // もし今の頭領が「モブ頭領」なら、新しく登場した武将と交代してモブ頭領を消します
+                    const currentLeader = this.game.getBusho(kunishu.leaderId);
+                    if (currentLeader && currentLeader.isAutoLeader) {
+                        kunishu.leaderId = b.id;
+                        currentLeader.status = 'dead';
+                        if (targetCastle) {
+                            targetCastle.samuraiIds = targetCastle.samuraiIds.filter(id => id !== currentLeader.id);
+                        }
                         
-                        // 今の頭領が自動生成された（isAutoLeaderシールが貼ってある）モブ頭領の場合
-                        if (currentLeader && currentLeader.isAutoLeader) {
-                            // 1. 新しく登場した武将を、諸勢力の新しい頭領に任命します
-                            kunishu.leaderId = b.id;
-                            
-                            // 2. モブ頭領を消去（死亡扱いにしてお城の名簿から消す）します
-                            currentLeader.status = 'dead';
-                            if (targetCastle) {
-                                targetCastle.samuraiIds = targetCastle.samuraiIds.filter(id => id !== currentLeader.id);
+                        const bushoName = b.name.replace('|', '');
+                        const kunishuName = kunishu.getName(this.game);
+                        const msg = `${bushoName}が${kunishuName}の頭領に就任しました。`;
+                        
+                        this.game.ui.log(`【頭領交代】${msg}`);
+                        await this.game.ui.showDialogAsync(msg, false, 0);
+                    }
+                } else {
+                    // ★ 諸勢力が壊滅している場合：一門を頼るか浪人になる
+                    b.belongKunishuId = 0; // 諸勢力所属を解除
+
+                    // 活動中の一門武将がいるかチェック
+                    const activeRelatives = this.game.bushos.filter(other => 
+                        other.status === 'active' &&
+                        other.id !== b.id &&
+                        b.familyIds.some(fId => other.familyIds.includes(fId))
+                    );
+
+                    if (activeRelatives.length > 0) {
+                        // 一門がいる場合：一番相性や年齢の近い一門を頼って大名家に仕官
+                        activeRelatives.sort((x, y) => {
+                            const diffAffinityX = GameSystem.calcAffinityDiff(b.affinity || 0, x.affinity || 0);
+                            const diffAffinityY = GameSystem.calcAffinityDiff(b.affinity || 0, y.affinity || 0);
+                            if (diffAffinityX !== diffAffinityY) {
+                                return diffAffinityX - diffAffinityY;
                             }
-                            
-                            // 3. お知らせのメッセージを作って画面に出します
-                            const bushoName = b.name.replace('|', '');
-                            const kunishuName = kunishu.getName(this.game);
-                            const msg = `${bushoName}が${kunishuName}の頭領に就任しました。`;
-                            
-                            // 履歴に残して、ダイアログを画面に表示します
-                            this.game.ui.log(`【頭領交代】${msg}`);
+                            const diffAgeX = Math.abs((b.birthYear || 1500) - (x.birthYear || 1500));
+                            const diffAgeY = Math.abs((b.birthYear || 1500) - (y.birthYear || 1500));
+                            return diffAgeX - diffAgeY;
+                        });
+
+                        const targetRelative = activeRelatives[0];
+                        b.status = 'active';
+                        b.clan = targetRelative.clan;
+                        b.castleId = targetRelative.castleId;
+
+                        const targetCastle = this.game.getCastle(b.castleId);
+                        if (targetCastle) {
+                            targetCastle.samuraiIds.push(b.id);
+                        }
+
+                        // プレイヤーの大名家に仕官した場合のお知らせ表示
+                        if (b.clan === this.game.playerClanId) {
+                            const nameStr = b.name.replace('|', '');
+                            const msg = `${nameStr}が元服し、当家に加わりました！`;
+                            this.game.ui.log(msg);
                             await this.game.ui.showDialogAsync(msg, false, 0);
+                        }
+                    } else {
+                        // 一門がいない場合：浪人として登場
+                        b.status = 'ronin';
+                        b.clan = 0;
+                        b.loyalty = 50;
+                        const targetCastle = this.game.getCastle(b.castleId);
+                        if (targetCastle) {
+                            targetCastle.samuraiIds.push(b.id);
                         }
                     }
                 }
-                // ★追加ここまで
 
             } else {
                 // 登場前:仕官 の場合
