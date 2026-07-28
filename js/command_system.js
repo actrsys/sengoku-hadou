@@ -685,13 +685,27 @@ const numberNames = ["", "第一席", "第二席", "第三席", "第四席", "�
     COMMAND_SPECS['dismiss_legion_leader_' + n] = { label: numberNames[n], category: 'LEGION', isSystem: true, action: 'dismiss_legion_leader_' + n, canExecute: (game, castle) => CAN_EXECUTE_RULES.canDismissLegion(game, n) };
     COMMAND_SPECS['allot_fief_' + n] = { label: numberNames[n], category: 'LEGION', isSystem: true, action: 'allot_fief_' + n, canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, n) };
 });
-// ★ここまで
 
 class CommandSystem {
     constructor(game) {
         this.game = game;
     }
     
+    // ==========================================
+    // ★追加：金や兵糧が足りているかチェックして、足りなければメッセージを出す共通の魔法です
+    // ==========================================
+    checkResource(castle, needGold = 0, needRice = 0) {
+        if (needGold > 0 && castle.gold < needGold) {
+            this.game.ui.showDialog(`資金が足りないため実行できませんでした。`, false);
+            return false;
+        }
+        if (needRice > 0 && castle.rice < needRice) {
+            this.game.ui.showDialog(`兵糧が足りないため実行できませんでした。`, false);
+            return false;
+        }
+        return true;
+    }
+
     // ==========================================
     // ★ここから追加：武将を選ぶ時の「誰を出すか」「どう並べるか」のルールをまとめた魔法
     // ==========================================
@@ -1463,7 +1477,7 @@ class CommandSystem {
                 this.showSaveLoadModal('save');
                 break;
             case 'reward_all':
-                this.game.ui.showDialog("金3000を支払い、家臣全員に褒美を与えます。　よろしいですか？", true, () => {
+                this.game.ui.showDialog("金3000を支払い、家臣全員に褒美を与えます。よろしいですか？", true, () => {
                     this.executeRewardAll();
                 }, null, { okText: '実行', cancelText: 'やめる' });
                 break;
@@ -2493,6 +2507,9 @@ class CommandSystem {
         const daimyo = this.game.bushos.find(b => b.id === this.game.clans.find(c => c.id === this.game.playerClanId).leaderId);
         const spec = COMMAND_SPECS['reward'];
         
+        // ★追加：実行前に1人分の褒美すら払えない場合は、共通魔法で弾きます
+        if (!this.checkResource(castle, spec.costGold, 0)) return;
+
         let count = 0;
         let totalEffect = 0;
 
@@ -2519,11 +2536,8 @@ class CommandSystem {
 
         if (count > 0) {
             const lastBusho = this.game.getBusho(bushoIds[bushoIds.length - 1]);
-            // ★変更：メッセージに「忠誠が上がった」ことも書き足しました
             this.game.ui.showResultModal(`${count}名に褒美（金${count * spec.costGold}）を与えました`);
             this.game.ui.log(`${count}名に褒美を実行 (合計効果:${totalEffect})`);
-        } else {
-            this.game.ui.showDialog("金が足りないため実行できませんでした。", false);
         }
 
         this.game.ui.updatePanelHeader();
@@ -2532,10 +2546,8 @@ class CommandSystem {
     
     executeRewardAll() {
         const castle = this.game.getCurrentTurnCastle();
-        if (castle.gold < 3000) {
-            this.game.ui.showDialog("金が足りないため実行できませんでした。", false);
-            return;
-        }
+        // ★変更：共通魔法でチェックします
+        if (!this.checkResource(castle, 3000, 0)) return;
 
         const daimyo = this.game.bushos.find(b => b.id === this.game.clans.find(c => c.id === this.game.playerClanId).leaderId);
         
@@ -2573,7 +2585,7 @@ class CommandSystem {
             totalEffect += effect;
         });
 
-        this.game.ui.showResultModal(`金3000を消費し、${count}名に一括褒美を与えました`);
+        this.game.ui.showResultModal(`${count}名の家臣に褒美を与えました`);
         this.game.ui.log(`${count}名に一括褒美を実行 (合計効果:${totalEffect})`);
 
         this.game.ui.updatePanelHeader();
@@ -2676,14 +2688,14 @@ class CommandSystem {
     
     executeTrade(type, amount) {
         const castle = this.game.getCurrentTurnCastle(); 
-        // ★ごっそり書き換え！：日本共通の相場ではなく、今いる国の相場を見に行きます！
+        // ★今いる国の相場を見に行きます！
         let rate = 1.0;
         if (castle && this.game.provinces) {
             const province = this.game.provinces.find(p => p.id === castle.provinceId);
             if (province && province.marketRate !== undefined) rate = province.marketRate;
         }
         
-        // ★追加：商人割引を呼び出します！
+        // ★商人割引を呼び出します！
         let merchantDiscount = 0;
         if (typeof GameSystem.getMerchantDiscount === 'function') {
             merchantDiscount = GameSystem.getMerchantDiscount(castle.ownerClan);
@@ -2694,7 +2706,8 @@ class CommandSystem {
             const buyRate = rate * (1.0 - merchantDiscount);
             // ★修正：端数切り捨てだと無料で買える場合があるので、切り上げ（Math.ceil）にして最低1金はかかるようにします！
             const cost = Math.max(1, Math.ceil(amount * buyRate));
-            if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
+            // ★変更：共通魔法でチェックします
+            if(!this.checkResource(castle, cost, 0)) return;
             // ★追加: 買うと上限を超えるならストップ
             if(castle.rice + amount > 99999) { this.game.ui.showDialog("これ以上兵糧は買えません", false); return; }
             if(amount > (castle.tradeLimit || 0)) { this.game.ui.showDialog("取引上限を超えています", false); return; }
@@ -2704,7 +2717,8 @@ class CommandSystem {
         } else if (type === 'sell_rice') { 
             // ★追加：売る時は相場が高くなってお得になります
             const sellRate = rate * (1.0 + merchantDiscount);
-            if(castle.rice < amount) { this.game.ui.showDialog("兵糧不足", false); return; } 
+            // ★変更：共通魔法でチェックします
+            if(!this.checkResource(castle, 0, amount)) return;
             const gain = Math.floor(amount * sellRate); 
             // ★追加: 売ると金が上限を超えるならストップ
             if(castle.gold + gain > 99999) { this.game.ui.showDialog("これ以上兵糧は売れません", false); return; }
@@ -2716,7 +2730,8 @@ class CommandSystem {
             // ★相場を消して、固定金額にします
             const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
             const cost = price * amount;
-            if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
+            // ★変更：共通魔法でチェックします
+            if(!this.checkResource(castle, cost, 0)) return;
             // ★追加: 矢弾のストッパー
             if((castle.ammo || 0) + amount > 99999) { this.game.ui.showDialog("これ以上矢弾は買えません", false); return; }
             castle.gold -= cost; castle.ammo = (castle.ammo || 0) + amount; 
@@ -2725,7 +2740,8 @@ class CommandSystem {
             const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
             const castellan = this.game.getBusho(castle.castellanId);
             const cost = GameSystem.calcBuyHorseCost(amount, daimyo, castellan);
-            if(castle.gold < cost) { this.game.ui.showDialog(`資金不足です。(必要: ${cost}金)`, false); return; } 
+            // ★変更：共通魔法でチェックします
+            if(!this.checkResource(castle, cost, 0)) return;
             // ★追加: 軍馬のストッパー
             if((castle.horses || 0) + amount > 99999) { this.game.ui.showDialog("これ以上軍馬は買えません", false); return; }
             castle.gold -= cost; castle.horses = (castle.horses || 0) + amount; 
@@ -2734,7 +2750,8 @@ class CommandSystem {
             const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
             const castellan = this.game.getBusho(castle.castellanId);
             const cost = GameSystem.calcBuyGunCost(amount, daimyo, castellan);
-            if(castle.gold < cost) { this.game.ui.showDialog(`資金不足です。(必要: ${cost}金)`, false); return; } 
+            // ★変更：共通魔法でチェックします
+            if(!this.checkResource(castle, cost, 0)) return;
             // ★追加: 鉄砲のストッパー
             if((castle.guns || 0) + amount > 99999) { this.game.ui.showDialog("これ以上鉄砲は買えません", false); return; }
             castle.gold -= cost; castle.guns = (castle.guns || 0) + amount; 
@@ -2753,7 +2770,8 @@ class CommandSystem {
         // ★変更：お城の人口（castle.population）も渡して、正しい金額を計算させます
         const costGold = GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty, castle.population);
         
-        if(castle.gold < costGold) { this.game.ui.showDialog(`資金不足です。(必要: ${costGold}金)`, false); return; } 
+        // ★変更：共通魔法でチェックします
+        if(!this.checkResource(castle, costGold, 0)) return;
         
         // ★ 人口以上の徴兵ができないようにストップをかけます
         if (castle.population < soldiers) { 
@@ -2800,12 +2818,10 @@ class CommandSystem {
         
         const totalCostRice = spec.costRice * bushoIds.length;
         
-        if (castle.rice < totalCostRice) { 
-            this.game.ui.showDialog("物資不足", false); 
-            return; 
-        } 
+        // ★変更：共通魔法でチェックします
+        if (!this.checkResource(castle, 0, totalCostRice)) return;
         
-        castle.rice -= totalCostRice; 
+        castle.rice -= totalCostRice;
        
         let totalVal = 0;
         let count = 0;
@@ -3708,7 +3724,7 @@ class CommandSystem {
         
         const commanderName = commander ? commander.name : "不明";
 
-        this.game.ui.showResultModal(`${commanderName} を ${legionName} の国主から解任しました。\n所属していた ${count} 件の拠点はすべて直轄領に変更されました。`);
+        this.game.ui.showResultModal(`${commanderName} を ${legionName} の国主から解任しました。所属していた ${count} 件の拠点はすべて直轄領に変更されました。`);
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
         this.game.ui.renderMap();
