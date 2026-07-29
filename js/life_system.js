@@ -1861,6 +1861,11 @@ class LifeSystem {
     // ★ここから追加：死亡した武将の未誕生の子供を連鎖的に死亡させる魔法です！
     // ==========================================
     cascadeDeathToUnbornChildren(deadBushoId, currentYear) {
+        // ★安全装置：IDが0や空っぽだった場合、親なし武将を全員巻き込む事故を防ぐために処理をストップします！
+        if (!deadBushoId || deadBushoId === 0) {
+            return;
+        }
+
         // ★追加：親が生きているか（またはダミー親か）を判定する便利なお道具
         const isParentAlive = (parentId) => {
             if (!parentId || parentId === 0) return false;
