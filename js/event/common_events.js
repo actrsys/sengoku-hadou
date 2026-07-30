@@ -522,14 +522,15 @@ window.GameEvents.push({
             badAffected.forEach(pId => addStatus(pId, 'badHarvest'));
 
             // ★ここから追加：日本中の米相場を動かします！
+            const baseRate = window.MainParams.Economy.TradeRateBase || 5.0;
             game.provinces.forEach(prov => {
                 if (prov && prov.marketRate !== undefined) {
-                    // もしこの国が「凶作（badAffected）」に入っていたら 5.0 アップ！
+                    // もしこの国が「凶作（badAffected）」に入っていたら基本相場の0.5倍アップ！
                     if (badAffected.has(prov.id)) {
-                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 5.0);
+                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + (baseRate * 0.5));
                     } else {
-                        // 凶作じゃない他の国も、影響を受けて 2.5 アップ！
-                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 2.5);
+                        // 凶作じゃない他の国も、影響を受けて基本相場の0.25倍アップ！
+                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + (baseRate * 0.25));
                     }
                 }
             });
@@ -611,14 +612,15 @@ window.GameEvents.push({
             goodAffected.forEach(pId => addStatus(pId, 'goodHarvest'));
 
             // ★ここから追加：日本中の米相場を動かします！
+            const baseRate = window.MainParams.Economy.TradeRateBase || 5.0;
             game.provinces.forEach(prov => {
                 if (prov && prov.marketRate !== undefined) {
-                    // もしこの国が「豊作（goodAffected）」に入っていたら 5.0 ダウン！
+                    // もしこの国が「豊作（goodAffected）」に入っていたら基本相場の0.5倍ダウン！
                     if (goodAffected.has(prov.id)) {
-                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - 5.0);
+                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - (baseRate * 0.5));
                     } else {
-                        // 豊作じゃない他の国も、影響を受けて 2.0 ダウン！
-                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - 2.0);
+                        // 豊作じゃない他の国も、影響を受けて基本相場の0.2倍ダウン！
+                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - (baseRate * 0.2));
                     }
                 }
             });
@@ -1065,10 +1067,12 @@ window.GameEvents.push({
         if (snowProvIds.size === 0) return;
 
         // ③-1 まずは雪が降っている国の米相場をジワジワと上げます！
+        const baseRate = window.MainParams.Economy.TradeRateBase || 5.0;
         snowProvIds.forEach(pId => {
             const prov = game.provinces.find(p => p.id === pId);
             if (prov && prov.marketRate !== undefined) {
-                prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 1.0); // ★0.1から1.0にしました
+                // 基本相場の0.1倍（1割）ずつ相場を上げます！
+                prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + (baseRate * 0.1)); 
             }
         });
 

@@ -24,7 +24,8 @@ window.MainParams = {
     Economy: {
         IncomeGoldRate: 1, IncomeFluctuation: 0.15,
         ConsumeRicePerSoldier: 0.03,
-        TradeRateMin: 7.5, TradeRateMax: 12.5, TradeFluctuation: 1.0,
+        TradeRateBase: 5.0,
+        TradeRateMin: 3.75, TradeRateMax: 6.25, TradeFluctuation: 0.5,
         PriceAmmo: 1
     },
     Strategy: {
@@ -1086,7 +1087,7 @@ class GameSystem {
     // ★追加：米の相場計算を根本的に一元化する魔法群
     // ==========================================
     static getBaseRiceRate(castle, provinces) {
-        let rate = 10.0;
+        let rate = window.MainParams.Economy.TradeRateBase || 5.0;
         if (castle && provinces) {
             const province = provinces.find(p => p.id === castle.provinceId);
             if (province && province.marketRate !== undefined) rate = province.marketRate;
@@ -1409,9 +1410,9 @@ class GameManager {
             // ★今回追加：ゲーム本体に、地方の名簿も持たせます！
             this.provinces = data.provinces || [];
             
-            // ★相場をゲーム開始時に全員「10.0」にリセットします！
+            // ★相場をゲーム開始時に基本相場（TradeRateBase）にリセットします！
             this.provinces.forEach(p => {
-                p.marketRate = 10.0;
+                p.marketRate = window.MainParams.Economy.TradeRateBase;
             });
             
             // ★今回追加：新しいゲームを始める時は、読み込んだ軍団の名簿をしっかり受け取ります！
@@ -1844,18 +1845,20 @@ class GameManager {
         if (this.gunshiSystem) this.gunshiSystem.onStartMonth();
         
         // ★ごっそり差し替え！：相場の変動を「国（province）ごと」に計算するようにします！
-        const fluc = window.MainParams.Economy.TradeFluctuation; // 動く幅（0.3）
+        const fluc = window.MainParams.Economy.TradeFluctuation; 
+        const baseRate = window.MainParams.Economy.TradeRateBase || 5.0; // ★基本相場を読み込みます
         
         // 季節の風（季節の動きは日本全国共通です！）
         let seasonForce = 0;
         if (this.month === 9) {
             // 9月は収穫の秋！お米が市場に溢れるので、相場が一気に下がります（安くなる）
-            // ★基準が10.0になったので、下がる幅も5.0〜10.0に大きくします
-            let randomDown = (Math.floor(Math.random() * 51) / 10) + 5.0;
+            // 基本相場の0.5倍〜1.0倍の幅でランダムに下がります
+            let randomDown = (baseRate * 0.5) + (Math.random() * (baseRate * 0.5));
             seasonForce = -randomDown;
         } else {
             // それ以外の月は、だんだんお米が減っていくので、毎月少しずつ相場が上がります（高くなる）
-            seasonForce = 0.5; // ★0.05を10倍にしました
+            // 基本相場の0.05倍ずつ上がります
+            seasonForce = baseRate * 0.05; 
         }
 
         // ==========================================
@@ -1885,7 +1888,7 @@ class GameManager {
         this.provinces.forEach(p => {
             // 国ごとのサイコロと、ゴムの力
             const change = (Math.random() * (fluc * 2)) - fluc;
-            const rubberForce = (10.0 - p.marketRate) * 0.1; // ★基準を10.0に変更しました
+            const rubberForce = (baseRate - p.marketRate) * 0.1; // ★基本相場を基準に引っ張ります
             
             // ★お隣さんから引っ張られる力！
             let neighborForce = 0;
