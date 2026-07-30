@@ -143,7 +143,7 @@ window.EventAction = {
 };
 
 // ==========================================
-// ★ 桶狭間の戦い（予備）：松平元康 岡崎城主就任（裏イベント）
+// ★ 桶狭間の戦い（予備）：徳川家康 岡崎城主就任（裏イベント）
 // ==========================================
 window.GameEvents.push({
     id: "historical_motoyasu_okazaki",
@@ -152,30 +152,30 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         // ① まず、主要な登場人物の確認をします
-        // 今川義元（ID: 1004001）が大名として存在するか
-        const yoshimoto = window.EventCheck.getDaimyo(game, 1004001);
+        // 今川義元（ID: 1004009）が大名として存在するか
+        const yoshimoto = window.EventCheck.getDaimyo(game, 1004009);
         if (!yoshimoto) return false;
 
-        // 織田信長（ID: 1006001）が大名として存在するか
-        const nobunaga = window.EventCheck.getDaimyo(game, 1006001);
+        // 織田信長（ID: 1006006）が大名として存在するか
+        const nobunaga = window.EventCheck.getDaimyo(game, 1006006);
         if (!nobunaga) return false;
 
         // ② プレイヤーが今川家を担当している場合は、勝手な移動を防ぐためここで止めます
         const imagawaClanId = yoshimoto.clan;
         if (game.playerClanId === imagawaClanId) return false;
 
-        // ③ 松平元康（ID: 1004004）の存在と、今の立場を確認します
-        const motoyasu = game.getBusho(1004004);
+        // ③ 徳川家康（ID: 1301006）の存在と、今の立場を確認します
+        const motoyasu = game.getBusho(1301006);
         if (!motoyasu) return false; // 存在しない場合はストップ
 
-        // 元康が「義元の今川家」に所属しているか
+        // 家康が「義元の今川家」に所属しているか
         if (motoyasu.clan !== imagawaClanId) return false;
 
-        // 元康がすでに「大名（独立した殿様）」や「国主」になっていないか
+        // 家康がすでに「大名（独立した殿様）」や「国主」になっていないか
         if (motoyasu.isDaimyo || motoyasu.isCommander) return false;
 
         // ④ 目的のお城（岡崎城：ID48）の状態を確認します
-        // ※元康がすでに城主であっても、国主への昇格を行うためストップせずに進めます
+        // ※家康がすでに城主であっても、国主への昇格を行うためストップせずに進めます
         const okazakiCastle = game.getCastle(48);
         if (!okazakiCastle) return false;
 
@@ -202,7 +202,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        const motoyasu = game.getBusho(1004004);
+        const motoyasu = game.getBusho(1301006);
         const okazakiCastle = game.getCastle(48);
 
         // 万が一データが見つからなかった時のための安全装置です
@@ -258,18 +258,18 @@ window.GameEvents.push({
             }
         }
 
-        // 1. 松平元康の功績が699以下なら、強制的に700に引き上げます
+        // 1. 徳川家康の功績が699以下なら、強制的に700に引き上げます
         if ((motoyasu.achievementTotal || 0) <= 699) {
             motoyasu.achievementTotal = 700;
         }
         
-        // 2. 元康が別のお城にいる場合、安全に岡崎城へお引越しさせます
+        // 2. 家康が別のお城にいる場合、安全に岡崎城へお引越しさせます
         window.EventAction.moveBusho(game, motoyasu, 48);
 
-        // 3. 岡崎城にいる他の武将の城主バッジを外し、元康を新しい城主にします
+        // 3. 岡崎城にいる他の武将の城主バッジを外し、家康を新しい城主にします
         window.EventAction.appointCastellan(game, motoyasu, okazakiCastle);
 
-        // ★追加：今川家の国主（軍団1～8）に空きがあるなら、元康を国主にする処理
+        // ★追加：今川家の国主（軍団1～8）に空きがあるなら、家康を国主にする処理
         if (game.legions) {
             const clanLegions = game.legions.filter(l => l.clanId === motoyasu.clan);
             const activeNos = clanLegions.filter(l => l.commanderId > 0).map(l => l.legionNo);
@@ -339,25 +339,25 @@ window.GameEvents.push({
         if (game.month !== 5 && game.month !== 6 && game.month !== 7) return false;
 
         // ② 登場人物たちの存在や状況を確認します
-        // 太原崇孚（雪斎）（ID: 1004057）が死亡しているか確認します（生きていたらストップ）
-        if (!window.EventCheck.isDead(game, 1004057)) return false;
+        // 太原崇孚（雪斎）（ID: 1004056）が死亡しているか確認します（生きていたらストップ）
+        if (!window.EventCheck.isDead(game, 1004056)) return false;
         
-        // 今川義元（ID: 1004001）が大名として存在するか確認します
-        const yoshimoto = window.EventCheck.getDaimyo(game, 1004001);
+        // 今川義元（ID: 1004009）が大名として存在するか確認します
+        const yoshimoto = window.EventCheck.getDaimyo(game, 1004009);
         if (!yoshimoto) return false;
         
         // 今川義元が駿府城（ID: 13）にいるか確認します
         if (yoshimoto.castleId !== 13) return false;
         
-        // 織田信長（ID: 1006001）が大名として存在するか確認します
-        const nobunaga = window.EventCheck.getDaimyo(game, 1006001);
+        // 織田信長（ID: 1006006）が大名として存在するか確認します
+        const nobunaga = window.EventCheck.getDaimyo(game, 1006006);
         if (!nobunaga) return false;
         
         // 織田信長が清洲城（ID: 7）にいるか確認します
         if (nobunaga.castleId !== 7) return false;
 
-        // 松平元康（ID: 1004004）が城主として存在するか確認します
-        const motoyasu = game.getBusho(1004004);
+        // 徳川家康（ID: 1301006）が城主として存在するか確認します
+        const motoyasu = game.getBusho(1301006);
         if (!motoyasu || !motoyasu.isCastellan) return false;
 
         // ③ 勢力同士の外交関係を確認します
@@ -398,8 +398,8 @@ window.GameEvents.push({
         const odaBushosCount = game.bushos.filter(b => b.clan === odaClanId && b.status === 'active' && b.id !== nobunaga.id).length;
         if (odaBushosCount < 5) return false;
 
-        // 今川家には義元と元康以外に「1人」の武将が必要です
-        const imagawaBushosCount = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && b.id !== yoshimoto.id && b.id !== 1004004).length;
+        // 今川家には義元と家康以外に「1人」の武将が必要です
+        const imagawaBushosCount = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && b.id !== yoshimoto.id && b.id !== 1301006).length;
         if (imagawaBushosCount < 1) return false;
         
         // すべての条件をクリアしたら、イベントを発生させます！
@@ -407,9 +407,9 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        const yoshimoto = game.getBusho(1004001);
+        const yoshimoto = game.getBusho(1004009);
         const imagawaClanId = yoshimoto.clan;
-        const nobunaga = game.getBusho(1006001);
+        const nobunaga = game.getBusho(1006006);
 
         const imagawaClan = game.clans.find(c => c.id === imagawaClanId);
         const odaClan = game.clans.find(c => c.id === nobunaga.clan);
@@ -439,8 +439,8 @@ window.GameEvents.push({
         if (!shinzanD) shinzanD = [...odaBushos].sort((a, b) => (b.intelligence || 0) - (a.intelligence || 0))[0];
         odaBushos = odaBushos.filter(b => b.id !== (shinzanD ? shinzanD.id : 0));
 
-        // 新参E（毛利良勝）: ID1006020、いなければ貢献度100以下で武勇最高、いなければ武勇最高
-        let mouri = odaBushos.find(b => b.id === 1006020);
+        // 新参E（毛利良勝）: ID1006169、いなければ貢献度100以下で武勇最高、いなければ武勇最高
+        let mouri = odaBushos.find(b => b.id === 1006169);
         if (!mouri) {
             mouri = odaBushos.filter(b => b.achievementTotal <= 100).sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
             if (!mouri) mouri = [...odaBushos].sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
@@ -448,7 +448,7 @@ window.GameEvents.push({
 
         // 今川家重臣Fの選出
         let juushinF = null;
-        let imagawaBushosForF = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && b.id !== yoshimoto.id && b.id !== 1004004);
+        let imagawaBushosForF = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && b.id !== yoshimoto.id && b.id !== 1301006);
 
         // 1. 今川家所属の軍師
         juushinF = imagawaBushosForF.find(b => b.isGunshi);
@@ -627,7 +627,7 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 松平元康（徳川家康） 独立イベント
+// ★ 徳川家康（徳川家康） 独立イベント
 // ==========================================
 window.GameEvents.push({
     id: "historical_ieyasu_independence",
@@ -635,21 +635,21 @@ window.GameEvents.push({
     isOneTime: true,
     
     checkCondition: function(game) {
-        // 1. 今川義元（ID: 1004001）が死亡しているか確認します
-        if (!window.EventCheck.isDead(game, 1004001)) return false;
+        // 1. 今川義元（ID: 1004009）が死亡しているか確認します
+        if (!window.EventCheck.isDead(game, 1004009)) return false;
         
-        // 2. 今川氏真（ID: 1004011）が大名であるか確認します
-        const ujizane = window.EventCheck.getDaimyo(game, 1004011);
+        // 2. 今川氏真（ID: 1004010）が大名であるか確認します
+        const ujizane = window.EventCheck.getDaimyo(game, 1004010);
         if (!ujizane) return false;
 
-        // 3. 松平元康（ID: 1004004）が存在し、大名ではないことを確認します
-        const motoyasu = game.getBusho(1004004);
+        // 3. 徳川家康（ID: 1301006）が存在し、大名ではないことを確認します
+        const motoyasu = game.getBusho(1301006);
         if (!motoyasu || motoyasu.isDaimyo) return false;
 
-        // 4. 松平元康が氏真と同じ今川家に所属し、城主であるか確認します
+        // 4. 徳川家康が氏真と同じ今川家に所属し、城主であるか確認します
         if (motoyasu.clan !== ujizane.clan || !motoyasu.isCastellan) return false;
 
-        // 5. 松平元康が派閥主であるか確認します
+        // 5. 徳川家康が派閥主であるか確認します
         if (!motoyasu.isFactionLeader) return false;
 
         // 全ての条件を満たしたらイベント発生！
@@ -657,8 +657,8 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        const ujizane = game.getBusho(1004011);
-        const motoyasu = game.getBusho(1004004);
+        const ujizane = game.getBusho(1004010);
+        const motoyasu = game.getBusho(1301006);
         const castle = game.getCastle(motoyasu.castleId);
 
         if (!castle) return;
@@ -683,7 +683,7 @@ window.GameEvents.push({
                 
             }
 
-            // ★追加：独立した松平元康の大名家に所属する武将と城のボーナス処理
+            // ★追加：独立した徳川家康の大名家に所属する武将と城のボーナス処理
             if (motoyasu.clan > 0) {
                 // 武将の忠誠度を+10（最大100まで）
                 const matsudairaBushos = game.bushos.filter(b => b.clan === motoyasu.clan && b.status === 'active');
@@ -697,9 +697,9 @@ window.GameEvents.push({
                     // 民忠を上限にする処理はそのまま残します
                     c.peoplesLoyalty = c.maxPeoplesLoyalty || 100;
 
-                    // 元康の居城かどうかで処理を分けます
+                    // 家康の居城かどうかで処理を分けます
                     if (c.id === motoyasu.castleId) {
-                        // 【元康の居城の場合】
+                        // 【家康の居城の場合】
                         // 兵士数が3000未満なら3000に、3000以上なら+500します（上限は99999）
                         if ((c.soldiers || 0) < 3000) {
                             c.soldiers = 3000;
@@ -709,7 +709,7 @@ window.GameEvents.push({
                         // 人口を5000増やします（上限は99万9999）
                         c.population = Math.min(999999, (c.population || 0) + 5000);
                     } else {
-                        // 【元康の居城以外の拠点の場合】
+                        // 【家康の居城以外の拠点の場合】
                         // 兵士数が2000未満なら2000に、2000以上なら+500します（上限は99999）
                         if ((c.soldiers || 0) < 2000) {
                             c.soldiers = 2000;
@@ -734,39 +734,39 @@ window.GameEvents.push({
     isOneTime: true,             // 一度きりの歴史イベントです
     
     checkCondition: function(game) {
-        // 今川義元（ID: 1004001）が死亡しているかを確認します
-        if (!window.EventCheck.isDead(game, 1004001)) return false;
+        // 今川義元（ID: 1004009）が死亡しているかを確認します
+        if (!window.EventCheck.isDead(game, 1004009)) return false;
 
-        // 織田信長、松平元康、今川氏真 がそれぞれ大名であるか確認します
-        const nobunaga = window.EventCheck.getDaimyo(game, 1006001);
-        const motoyasu = window.EventCheck.getDaimyo(game, 1004004);
-        const ujizane = window.EventCheck.getDaimyo(game, 1004011);
+        // 織田信長、徳川家康、今川氏真 がそれぞれ大名であるか確認します
+        const nobunaga = window.EventCheck.getDaimyo(game, 1006006);
+        const motoyasu = window.EventCheck.getDaimyo(game, 1301006);
+        const ujizane = window.EventCheck.getDaimyo(game, 1004010);
         if (!nobunaga || !motoyasu || !ujizane) return false;
 
-        // 一色義龍 または 龍興 が大名であるか確認します
-        const isshikiDaimyo = window.EventCheck.getDaimyo(game, [1005001, 1005011]);
+        // 斎藤義龍 または 龍興 が大名であるか確認します
+        const isshikiDaimyo = window.EventCheck.getDaimyo(game, [1005003, 1005004]);
         if (!isshikiDaimyo) return false;
 
-        // 織田家と斎藤家（一色家）の関係が敵対であるか確認します
+        // 織田家と斎藤家（斎藤家）の関係が敵対であるか確認します
         const relOdaIsshiki = game.diplomacyManager.getRelation(nobunaga.clan, isshikiDaimyo.clan);
         if (!relOdaIsshiki || relOdaIsshiki.status !== '敵対') return false;
 
-        // 松平家と今川家の関係が敵対であるか確認します
+        // 徳川家と今川家の関係が敵対であるか確認します
         const relMatsudairaImagawa = game.diplomacyManager.getRelation(motoyasu.clan, ujizane.clan);
         if (!relMatsudairaImagawa || relMatsudairaImagawa.status !== '敵対') return false;
 
-        // 織田家と松平家の関係が「敵対」「普通」「友好」のいずれかであるか確認します
+        // 織田家と徳川家の関係が「敵対」「普通」「友好」のいずれかであるか確認します
         const rel = game.diplomacyManager.getRelation(nobunaga.clan, motoyasu.clan);
         if (!rel || (rel.status !== '敵対' && rel.status !== '普通' && rel.status !== '友好')) return false;
 
-        // 織田家と松平家の領地（お城同士の道）が隣接しているか確認します
+        // 織田家と徳川家の領地（お城同士の道）が隣接しているか確認します
         if (!window.EventCheck.areClansAdjacent(game, nobunaga.clan, motoyasu.clan)) return false;
 
         // ★尾張国（地方ID: 23）のすべての城を織田家が所有しているか確認します
         if (!window.EventCheck.ownsAllCastlesInProvince(game, nobunaga.clan, 23)) return false;
 
         // ★追加：イベントの配役に必要な人数の武将が揃っているか確認します
-        // 松平家には元康以外に「2人」の武将が必要です
+        // 徳川家には家康以外に「2人」の武将が必要です
         const matsuBushosCount = game.bushos.filter(b => b.clan === motoyasu.clan && b.id !== motoyasu.id && b.status === 'active').length;
         if (matsuBushosCount < 2) return false;
 
@@ -789,14 +789,14 @@ window.GameEvents.push({
             window.AudioManager.playBGM("06_Snowy Sacred Approach.ogg");
         }
 
-        const nobunaga = game.getBusho(1006001);
-        const motoyasu = game.getBusho(1004004);
+        const nobunaga = game.getBusho(1006006);
+        const motoyasu = game.getBusho(1301006);
         
         const odaClan = game.clans.find(c => c.id === nobunaga.clan);
         const matsudairaClan = game.clans.find(c => c.id === motoyasu.clan);
         
-        // 今川氏真(1004011)の大名家名を取得します
-        const ujizane = game.getBusho(1004011);
+        // 今川氏真(1004010)の大名家名を取得します
+        const ujizane = game.getBusho(1004010);
         let imagawaClanName = "今川家";
         let imagawaFamilyName = "今川";
         if (ujizane && ujizane.clan > 0) {
@@ -805,16 +805,16 @@ window.GameEvents.push({
             if (ujizane.familyName) imagawaFamilyName = ujizane.familyName;
         }
 
-        // --- ここから松平家の配役を選出します ---
-        // まず、松平家に所属していて、元康以外の活動中の武将を全員集めます
+        // --- ここから徳川家の配役を選出します ---
+        // まず、徳川家に所属していて、家康以外の活動中の武将を全員集めます
         let matsuBushos = game.bushos.filter(b => b.clan === motoyasu.clan && b.id !== motoyasu.id && b.status === 'active');
         
-        // 松平家臣A：統率がもっとも高い武将
+        // 徳川家臣A：統率がもっとも高い武将
         let kashinA = matsuBushos.sort((a, b) => (b.leadership || 0) - (a.leadership || 0))[0];
         // 選ばれた家臣Aを次のオーディション候補から外します
         matsuBushos = matsuBushos.filter(b => b.id !== (kashinA ? kashinA.id : 0));
         
-        // 松平家臣B：残りの武将の中で、智謀がもっとも高い武将
+        // 徳川家臣B：残りの武将の中で、智謀がもっとも高い武将
         let kashinB = matsuBushos.sort((a, b) => (b.intelligence || 0) - (a.intelligence || 0))[0];
 
         // --- ここから織田家の配役を選出します ---
@@ -842,8 +842,8 @@ window.GameEvents.push({
         // イベントテキストの台本に渡す変数をひとまとめにします
         const args = {
             motoyasuName: motoyasu.name.replace('|', ''),
-            motoyasuGivenName: motoyasu.givenName || "元康",
-            matsudairaFamilyName: motoyasu.familyName || "松平",
+            motoyasuGivenName: motoyasu.givenName || "家康",
+            matsudairaFamilyName: motoyasu.familyName || "徳川",
             motoyasuFace: motoyasu.faceIcon || "unknown_face.webp",
             
             imagawaClanName: imagawaClanName,
@@ -855,7 +855,7 @@ window.GameEvents.push({
             nobunagaFace: nobunaga.faceIcon || "unknown_face.webp",
             
             odaClanName: odaClan ? odaClan.name : "織田家",
-            matsudairaClanName: matsudairaClan ? matsudairaClan.name : "松平家",
+            matsudairaClanName: matsudairaClan ? matsudairaClan.name : "徳川家",
             
             kashinAName: kashinA ? kashinA.name.replace('|', '') : "小姓",
             kashinAGivenName: kashinA ? (kashinA.givenName || kashinA.name.replace('|', '')) : "小姓",
@@ -882,7 +882,7 @@ window.GameEvents.push({
             await window.EventTextManager.playSequence(game, window.EventTextManager.kiyosu_alliance_part1(args));
         }
 
-        // ★今回追加：松平プレイヤー専用の使者派遣選択肢
+        // ★今回追加：徳川プレイヤー専用の使者派遣選択肢
         let isSendEnvoy = true;
         if (game.playerClanId === motoyasu.clan) {
             await new Promise(resolve => {
@@ -1009,15 +1009,15 @@ window.GameEvents.push({
     isOneTime: true,
     
     checkCondition: function(game) {
-        // 1. 織田信長（ID: 1006001）が大名であるか確認します
-        const nobunaga = window.EventCheck.getDaimyo(game, 1006001);
+        // 1. 織田信長（ID: 1006006）が大名であるか確認します
+        const nobunaga = window.EventCheck.getDaimyo(game, 1006006);
         if (!nobunaga) return false;
 
-        // 2. 一色龍興（ID: 1005011）が大名であるか確認します
-        const tatsuoki = window.EventCheck.getDaimyo(game, 1005011);
+        // 2. 斎藤龍興（ID: 1005004）が大名であるか確認します
+        const tatsuoki = window.EventCheck.getDaimyo(game, 1005004);
         if (!tatsuoki) return false;
 
-        // 3. 織田家と一色家が敵対しているか確認します
+        // 3. 織田家と斎藤家が敵対しているか確認します
         if (game.diplomacyManager) {
             const rel = game.diplomacyManager.getRelation(nobunaga.clan, tatsuoki.clan);
             if (!rel || rel.status !== '敵対') return false;
@@ -1028,8 +1028,8 @@ window.GameEvents.push({
         // 4. 尾張国（地方ID: 23）のすべての城を織田家が所有しているか確認します
         if (!window.EventCheck.ownsAllCastlesInProvince(game, nobunaga.clan, 23)) return false;
 
-        // 5. 織田信清（ID: 1006078）が存在し、大名ではなく、織田家に所属しているか確認します
-        const nobukiyo = game.getBusho(1006078);
+        // 5. 織田信清（ID: 1006023）が存在し、大名ではなく、織田家に所属しているか確認します
+        const nobukiyo = game.getBusho(1006023);
         if (!nobukiyo || nobukiyo.isDaimyo || nobukiyo.clan !== nobunaga.clan) return false;
 
         // 6. 織田信清が国主であり、かつ犬山城（ID: 73）の城主であるか確認します
@@ -1040,8 +1040,8 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        const nobunaga = game.getBusho(1006001);
-        const nobukiyo = game.getBusho(1006078);
+        const nobunaga = game.getBusho(1006006);
+        const nobukiyo = game.getBusho(1006023);
         const inuyamaCastle = game.getCastle(73);
 
         // 万が一データが見つからなかった時のための安全装置です
@@ -1064,23 +1064,23 @@ window.GameEvents.push({
     isOneTime: true,             
     
     checkCondition: function(game) {
-        // 1. 浅井久政（ID: 1015001）が存在し、大名であるか確認します
-        const hisamasa = window.EventCheck.getDaimyo(game, 1015001);
+        // 1. 浅井久政（ID: 1015004）が存在し、大名であるか確認します
+        const hisamasa = window.EventCheck.getDaimyo(game, 1015004);
         if (!hisamasa) return false;
 
         // 2. プレイヤーが浅井家の担当ではないか確認します
         if (game.playerClanId === hisamasa.clan) return false;
 
-        // 3. 浅井長政（ID: 1015002）が存在し、久政と同じ勢力に所属しているか確認します
-        const nagamasa = game.getBusho(1015002);
+        // 3. 浅井長政（ID: 1015005）が存在し、久政と同じ勢力に所属しているか確認します
+        const nagamasa = game.getBusho(1015005);
         if (!nagamasa || nagamasa.status !== 'active' || nagamasa.clan !== hisamasa.clan) return false;
 
         // 4. 浅井長政が16歳以上か確認します
         const currentYear = game.year;
         if (currentYear - nagamasa.birthYear < 16) return false;
 
-        // 5. 六角義賢（ID: 1018001）または六角義治（ID: 1018002）が大名であるか確認します
-        const rokkakuDaimyo = window.EventCheck.getDaimyo(game, [1018001, 1018002]);
+        // 5. 六角義賢（ID: 1018003）または六角義治（ID: 1018004）が大名であるか確認します
+        const rokkakuDaimyo = window.EventCheck.getDaimyo(game, [1018003, 1018004]);
         if (!rokkakuDaimyo) return false;
 
         // 6. 浅井家と六角家が敵対関係にあるか確認します
@@ -1096,8 +1096,8 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        const oldDaimyo = game.getBusho(1015001);
-        const successor = game.getBusho(1015002);
+        const oldDaimyo = game.getBusho(1015004);
+        const successor = game.getBusho(1015005);
         const clanId = oldDaimyo.clan;
         const messages = [];
 
@@ -1193,12 +1193,12 @@ window.GameEvents.push({
     isOneTime: true,             // 一度発生したら二度と起きません
     
     checkCondition: function(game) {
-        // 1. 織田信長（ID: 1006001）が大名であるか確認します
-        const nobunaga = window.EventCheck.getDaimyo(game, 1006001);
+        // 1. 織田信長（ID: 1006006）が大名であるか確認します
+        const nobunaga = window.EventCheck.getDaimyo(game, 1006006);
         if (!nobunaga) return false;
         
-        // 3. 浅井長政（ID: 1015002）が大名であるか確認します
-        const nagamasa = window.EventCheck.getDaimyo(game, 1015002);
+        // 3. 浅井長政（ID: 1015005）が大名であるか確認します
+        const nagamasa = window.EventCheck.getDaimyo(game, 1015005);
         if (!nagamasa) return false;
 
         // 4. 浅井長政にまだ配偶者（奥さん）がいないことを確認します
@@ -1219,8 +1219,8 @@ window.GameEvents.push({
         const candidate = game.bushos.find(b => b.clan === nobunaga.clan && b.courtRankIds && (b.courtRankIds.includes(80) || b.courtRankIds.includes(1)));
         if (!candidate) return false;
 
-        // 9. 六角義賢（ID: 1018001）または六角義治（ID: 1018002）が大名であるか確認します
-        const rokkakuDaimyo = window.EventCheck.getDaimyo(game, [1018001, 1018002]);
+        // 9. 六角義賢（ID: 1018003）または六角義治（ID: 1018004）が大名であるか確認します
+        const rokkakuDaimyo = window.EventCheck.getDaimyo(game, [1018003, 1018004]);
         if (!rokkakuDaimyo) return false;
 
         // 10. 浅井家と六角家が敵対関係にあるか確認します
@@ -1244,8 +1244,8 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        const nobunaga = game.getBusho(1006001);
-        const nagamasa = game.getBusho(1015002);
+        const nobunaga = game.getBusho(1006006);
+        const nagamasa = game.getBusho(1015005);
         const oichiId = 2;
 
         // 万が一姫のデータ集（game.princesses）が未定義だった時のエラーを防ぎます
@@ -1325,8 +1325,8 @@ window.GameEvents.push({
         if (!context || !context.deadBusho) return false;
         const deadBusho = context.deadBusho;
 
-        // 2. 死亡したのが遠山景任（ID: 1012001）であるか確認します
-        if (deadBusho.id !== 1012001) return false;
+        // 2. 死亡したのが遠山景任（ID: 1012007）であるか確認します
+        if (deadBusho.id !== 1012007) return false;
 
         // 3. プレイヤーが遠山家を担当している場合はイベントを起こしません
         if (game.playerClanId === deadBusho.clan) return false;
@@ -1334,8 +1334,8 @@ window.GameEvents.push({
         // 4. 遠山景任が大名であるか確認します
         if (!deadBusho.isDaimyo || deadBusho.clan === 0) return false;
 
-        // 5. 織田信長（ID: 1006001）が大名であるか確認します
-        const nobunaga = window.EventCheck.getDaimyo(game, 1006001);
+        // 5. 織田信長（ID: 1006006）が大名であるか確認します
+        const nobunaga = window.EventCheck.getDaimyo(game, 1006006);
         if (!nobunaga) return false;
 
         // 6. 遠山家が織田家に「従属」しているか確認します
@@ -1343,8 +1343,8 @@ window.GameEvents.push({
         const rel = game.diplomacyManager.getRelation(deadBusho.clan, nobunaga.clan);
         if (!rel || rel.status !== '従属') return false;
 
-        // 7. 織田勝長（ID: 1006092）が存在し、織田信長勢力に所属しているか（生まれていて未登場の場合も含む）確認します
-        const katsunaga = game.getBusho(1006092);
+        // 7. 織田勝長（ID: 1006013）が存在し、織田信長勢力に所属しているか（生まれていて未登場の場合も含む）確認します
+        const katsunaga = game.getBusho(1006013);
         if (!katsunaga || katsunaga.status === 'dead' || katsunaga.status === 'not_born') return false;
         
         // 勝長が「生まれているが未登場（unborn）」で、出生前フラグが立っている場合はダメ
@@ -1369,8 +1369,8 @@ window.GameEvents.push({
     
     execute: async function(game, context) {
         const deadBusho = context.deadBusho;
-        const nobunaga = game.getBusho(1006001);
-        const katsunaga = game.getBusho(1006092);
+        const nobunaga = game.getBusho(1006006);
+        const katsunaga = game.getBusho(1006013);
         
         const toyamaClanId = deadBusho.clan;
         const odaClanId = nobunaga.clan;
@@ -1493,8 +1493,8 @@ window.GameEvents.push({
     isOneTime: true,             // このイベントは一度発生したら二度と起きません
     
     checkCondition: function(game) {
-        // 1. 織田信長（ID: 1006001）が存在し、大名であるか確認します
-        const nobunaga = window.EventCheck.getDaimyo(game, 1006001);
+        // 1. 織田信長（ID: 1006006）が存在し、大名であるか確認します
+        const nobunaga = window.EventCheck.getDaimyo(game, 1006006);
         if (!nobunaga) return false;
 
         // 2. 織田信長の勢力が、稲葉山城（ID: 3）を所有しているか確認します
@@ -1537,7 +1537,7 @@ window.GameEvents.push({
     
     execute: async function(game) {
         // ここからが、イベントが起きた時に実際に実行される処理（結果）です
-        const nobunaga = game.getBusho(1006001);
+        const nobunaga = game.getBusho(1006006);
         const inabayama = game.getCastle(3);
         const kiyosu = game.getCastle(7); // ★追加：清洲城のデータも準備します
         const odaClanId = nobunaga.clan;
@@ -1623,17 +1623,17 @@ window.GameEvents.push({
     isOneTime: true,             // このイベントは一度発生したら二度と起きません
     
     checkCondition: function(game) {
-        // 1. 松平元康（ID: 1004004）が存在し、大名であるか確認します
-        const motoyasu = window.EventCheck.getDaimyo(game, 1004004);
+        // 1. 徳川家康（ID: 1301006）が存在し、大名であるか確認します
+        const motoyasu = window.EventCheck.getDaimyo(game, 1301006);
         if (!motoyasu) return false;
 
         const matsudairaClanId = motoyasu.clan;
 
-        // 2. 松平元康勢力が岡崎城（ID: 48）を所有しているか確認します
+        // 2. 徳川家康勢力が岡崎城（ID: 48）を所有しているか確認します
         const okazaki = game.getCastle(48);
         if (!okazaki || okazaki.ownerClan !== matsudairaClanId) return false;
 
-        // 3. 遠江国（地方ID: 21）のすべての城を、松平元康勢力が所有しているか確認します
+        // 3. 遠江国（地方ID: 21）のすべての城を、徳川家康勢力が所有しているか確認します
         if (!window.EventCheck.ownsAllCastlesInProvince(game, matsudairaClanId, 21)) return false;
 
         // 4. 曳馬城（ID: 12）を取得し、すでに名前が「浜松城」になっていないか確認します
@@ -1646,7 +1646,7 @@ window.GameEvents.push({
     
     execute: async function(game) {
         // ここからが、イベントが起きた時に実際に実行される処理です
-        const motoyasu = game.getBusho(1004004);
+        const motoyasu = game.getBusho(1301006);
         const hikuma = game.getCastle(12);
         const okazaki = game.getCastle(48);
         const matsudairaClanId = motoyasu.clan;
@@ -1698,7 +1698,7 @@ window.GameEvents.push({
         // ⑦ プレイヤーが担当していない（AIが操作している）場合のみ、特別な整理を行います
         if (game.playerClanId !== matsudairaClanId) {
             
-            // もし浜松城が直轄（軍団ID: 0）以外だった場合、松平家のすべての軍団を解散させます
+            // もし浜松城が直轄（軍団ID: 0）以外だった場合、徳川家のすべての軍団を解散させます
             if (hikuma.legionId !== 0) {
                 if (game.legions && game.castleManager) {
                     const matsudairaLegions = game.legions.filter(l => l.clanId === matsudairaClanId && l.commanderId > 0);
@@ -1708,7 +1708,7 @@ window.GameEvents.push({
                 }
             }
             
-            // もし松平元康本人が浜松城にいない場合、浜松城に強制的にお引越しさせて城主にします
+            // もし徳川家康本人が浜松城にいない場合、浜松城に強制的にお引越しさせて城主にします
             if (motoyasu.castleId !== 12) {
                 window.EventAction.moveBusho(game, motoyasu, 12);
                 window.EventAction.appointCastellan(game, motoyasu, hikuma);
@@ -1723,6 +1723,34 @@ window.GameEvents.push({
 });
 
 // ==========================================
+// ★ 三好義興の死による長慶の寿命減少（裏イベント）
+// ==========================================
+window.GameEvents.push({
+    id: "historical_yoshioki_death",
+    timing: "startMonth_before", // 毎月の初めにこっそりチェックします
+    isOneTime: true,             // 一度発生したら二度と起きません
+    
+    checkCondition: function(game) {
+        // 1. 三好長慶（ID: 1020005）が生きているか確認します
+        if (!window.EventCheck.isAlive(game, 1020005)) return false;
+
+        // 2. 三好義興（ID: 1020006）が亡くなっているか確認します
+        if (!window.EventCheck.isDead(game, 1020006)) return false;
+
+        // 条件をクリアしたらイベント発生の合図を出します
+        return true;
+    },
+    
+    execute: async function(game) {
+        const nagayoshi = game.getBusho(1020005);
+        if (nagayoshi) {
+            // 長慶の寿命（没年）を3年減らします
+            nagayoshi.endYear -= 3;
+        }
+    }
+});
+
+// ==========================================
 // ★ 三好実休の死による長慶の寿命減少（裏イベント）
 // ==========================================
 window.GameEvents.push({
@@ -1731,18 +1759,18 @@ window.GameEvents.push({
     isOneTime: true,             // 一度発生したら二度と起きません
     
     checkCondition: function(game) {
-        // 1. 三好長慶（ID: 1020001）が生きているか確認します
-        if (!window.EventCheck.isAlive(game, 1020001)) return false;
+        // 1. 三好長慶（ID: 1020005）が生きているか確認します
+        if (!window.EventCheck.isAlive(game, 1020005)) return false;
 
-        // 2. 三好実休（ID: 1020002）が亡くなっているか確認します
-        if (!window.EventCheck.isDead(game, 1020002)) return false;
+        // 2. 三好実休（ID: 1020008）が亡くなっているか確認します
+        if (!window.EventCheck.isDead(game, 1020008)) return false;
 
         // 条件をクリアしたらイベント発生の合図を出します
         return true;
     },
     
     execute: async function(game) {
-        const nagayoshi = game.getBusho(1020001);
+        const nagayoshi = game.getBusho(1020005);
         if (nagayoshi) {
             // 長慶の寿命（没年）を3年減らします
             nagayoshi.endYear -= 3;
@@ -1759,18 +1787,18 @@ window.GameEvents.push({
     isOneTime: true,             // 一度発生したら二度と起きません
     
     checkCondition: function(game) {
-        // 1. 三好長慶（ID: 1020001）が生きているか確認します
-        if (!window.EventCheck.isAlive(game, 1020001)) return false;
+        // 1. 三好長慶（ID: 1020005）が生きているか確認します
+        if (!window.EventCheck.isAlive(game, 1020005)) return false;
 
-        // 2. 十河一存（ID: 1020004）が亡くなっているか確認します
-        if (!window.EventCheck.isDead(game, 1020004)) return false;
+        // 2. 十河一存（ID: 1020013）が亡くなっているか確認します
+        if (!window.EventCheck.isDead(game, 1020013)) return false;
 
         // 条件をクリアしたらイベント発生の合図を出します
         return true;
     },
     
     execute: async function(game) {
-        const nagayoshi = game.getBusho(1020001);
+        const nagayoshi = game.getBusho(1020005);
         if (nagayoshi) {
             // 長慶の寿命（没年）を3年減らします
             nagayoshi.endYear -= 3;
@@ -1787,46 +1815,18 @@ window.GameEvents.push({
     isOneTime: true,             // 一度発生したら二度と起きません
     
     checkCondition: function(game) {
-        // 1. 三好長慶（ID: 1020001）が生きているか確認します
-        if (!window.EventCheck.isAlive(game, 1020001)) return false;
+        // 1. 三好長慶（ID: 1020005）が生きているか確認します
+        if (!window.EventCheck.isAlive(game, 1020005)) return false;
 
-        // 2. 安宅冬康（ID: 1020021）が亡くなっているか確認します
-        if (!window.EventCheck.isDead(game, 1020021)) return false;
-
-        // 条件をクリアしたらイベント発生の合図を出します
-        return true;
-    },
-    
-    execute: async function(game) {
-        const nagayoshi = game.getBusho(1020001);
-        if (nagayoshi) {
-            // 長慶の寿命（没年）を3年減らします
-            nagayoshi.endYear -= 3;
-        }
-    }
-});
-
-// ==========================================
-// ★ 三好義興の死による長慶の寿命減少（裏イベント）
-// ==========================================
-window.GameEvents.push({
-    id: "historical_yoshioki_death",
-    timing: "startMonth_before", // 毎月の初めにこっそりチェックします
-    isOneTime: true,             // 一度発生したら二度と起きません
-    
-    checkCondition: function(game) {
-        // 1. 三好長慶（ID: 1020001）が生きているか確認します
-        if (!window.EventCheck.isAlive(game, 1020001)) return false;
-
-        // 2. 三好義興（ID: 1020009）が亡くなっているか確認します
-        if (!window.EventCheck.isDead(game, 1020009)) return false;
+        // 2. 安宅冬康（ID: 1020011）が亡くなっているか確認します
+        if (!window.EventCheck.isDead(game, 1020011)) return false;
 
         // 条件をクリアしたらイベント発生の合図を出します
         return true;
     },
     
     execute: async function(game) {
-        const nagayoshi = game.getBusho(1020001);
+        const nagayoshi = game.getBusho(1020005);
         if (nagayoshi) {
             // 長慶の寿命（没年）を3年減らします
             nagayoshi.endYear -= 3;
@@ -1843,18 +1843,18 @@ window.GameEvents.push({
     isOneTime: true,             // 一度きりの歴史イベントです
     
     checkCondition: function(game) {
-        // 1. 三好長慶（ID: 1020001）が死亡しているか確認します
-        const nagayoshi = game.getBusho(1020001);
+        // 1. 三好長慶（ID: 1020005）が死亡しているか確認します
+        const nagayoshi = game.getBusho(1020005);
         if (nagayoshi && nagayoshi.status !== 'dead') return false;
 
-        // 2. 三好義継（ID: 1020033）が大名として存在するか確認します
-        const yoshitsugu = window.EventCheck.getDaimyo(game, 1020033);
+        // 2. 三好義継（ID: 1020014）が大名として存在するか確認します
+        const yoshitsugu = window.EventCheck.getDaimyo(game, 1020014);
         if (!yoshitsugu) return false;
         
         const miyoshiClanId = yoshitsugu.clan;
 
-        // 3. 三好家に特定の３名（三好長逸、三好政生、岩成友通）が所属しているか確認します
-        const requiredMembers = [1020006, 1020007, 1020008];
+        // 3. 三好家に特定の３名（三好長逸、三好政勝、石成友通）が所属しているか確認します
+        const requiredMembers = [1020021, 1020024, 1020029];
         for (let id of requiredMembers) {
             const member = game.getBusho(id);
             // 死んでいる、生まれていない、浪人、または三好家以外にいる場合はイベントが起きません
@@ -1863,8 +1863,8 @@ window.GameEvents.push({
             }
         }
 
-        // 4. 足利義輝（ID: 1017001）が生存しており、大名であるか確認します
-        const yoshiteru = window.EventCheck.getDaimyo(game, 1017001);
+        // 4. 足利義輝（ID: 1017003）が生存しており、大名であるか確認します
+        const yoshiteru = window.EventCheck.getDaimyo(game, 1017003);
         if (!yoshiteru) return false;
         
         const ashikagaClanId = yoshiteru.clan;
@@ -1880,8 +1880,8 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        const yoshiteru = game.getBusho(1017001);
-        const yoshitsugu = game.getBusho(1020033);
+        const yoshiteru = game.getBusho(1017003);
+        const yoshitsugu = game.getBusho(1020014);
         const ashikagaClanId = yoshiteru.clan;
         const miyoshiClanId = yoshitsugu.clan;
 
@@ -1976,7 +1976,7 @@ window.GameEvents.push({
     
     // お供の武将IDリストを「このイベントの持ち物」としてここに1箇所だけ書きます！
     // 和田惟政、細川藤孝、明智光秀、明智秀満、溝尾茂朝
-    retainerIds: [1017002, 1017003, 1900001, 1900002, 1900003],
+    retainerIds: [1017035, 1017029, 1201003, 1201006, 1201021],
     
     checkCondition: function(game, context) {
         // 将軍死亡の情報が届いていなければ無視します
@@ -2021,11 +2021,11 @@ window.GameEvents.push({
 
         let targetClan = null;
 
-        // ② 織田信長（1006001）の勢力判定
-        const nobunaga = game.getBusho(1006001);
+        // ② 織田信長（1006006）の勢力判定
+        const nobunaga = game.getBusho(1006006);
         if (nobunaga && nobunaga.isDaimyo && nobunaga.clan !== 0 && nobunaga.clan !== killerClanId) {
-            // 条件１：今川義元（1004001）が死亡しているかチェックします
-            const yoshimoto = game.getBusho(1004001);
+            // 条件１：今川義元（1004009）が死亡しているかチェックします
+            const yoshimoto = game.getBusho(1004009);
             const isYoshimotoDead = yoshimoto && yoshimoto.status === 'dead';
 
             // 条件２：尾張国（地方ID: 23）のすべての城を所有しているかチェックします
@@ -2554,8 +2554,8 @@ window.GameEvents.push({
         });
 
         // ★追加：将軍家と他勢力との友好度アップ処理
-        // 三好長逸（ID: 1020006）の大名家を探します
-        const nagayasu = game.getBusho(1020006);
+        // 三好長逸（ID: 1020021）の大名家を探します
+        const nagayasu = game.getBusho(1020021);
         let nagayasuClanId = 0;
         if (nagayasu && nagayasu.isDaimyo && nagayasu.clan !== 0) {
             nagayasuClanId = nagayasu.clan;
@@ -2619,18 +2619,18 @@ window.GameEvents.push({
     isOneTime: true,
     
     checkCondition: function(game) {
-        // 1. 三好長慶（ID: 1020001）が死亡しているか確認します
-        if (!window.EventCheck.isDead(game, 1020001)) return false;
+        // 1. 三好長慶（ID: 1020005）が死亡しているか確認します
+        if (!window.EventCheck.isDead(game, 1020005)) return false;
         
-        // 2. 三好義継（ID: 1020033）が大名であるか確認します
-        const yoshitsugu = window.EventCheck.getDaimyo(game, 1020033);
+        // 2. 三好義継（ID: 1020014）が大名であるか確認します
+        const yoshitsugu = window.EventCheck.getDaimyo(game, 1020014);
         if (!yoshitsugu) return false;
 
-        // 3. 松永長頼（ID: 1901002）が死亡しているか確認します
-        if (!window.EventCheck.isDead(game, 1901002)) return false;
+        // 3. 松永長頼（ID: 1202004）が死亡しているか確認します
+        if (!window.EventCheck.isDead(game, 1202004)) return false;
 
-        // 4. 松永久秀（ID: 1901001）が存在し、大名ではないことを確認します
-        const hisahide = game.getBusho(1901001);
+        // 4. 松永久秀（ID: 1202002）が存在し、大名ではないことを確認します
+        const hisahide = game.getBusho(1202002);
         if (!hisahide || hisahide.isDaimyo) return false;
 
         // 5. 松永久秀が義継と同じ三好家に所属し、城主であるか確認します
@@ -2641,8 +2641,8 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        const yoshitsugu = game.getBusho(1020033);
-        const hisahide = game.getBusho(1901001);
+        const yoshitsugu = game.getBusho(1020014);
+        const hisahide = game.getBusho(1202002);
         const castle = game.getCastle(hisahide.castleId);
 
         if (!castle) return;
@@ -2664,19 +2664,19 @@ window.GameEvents.push({
     isOneTime: true,             // 一度きりの歴史イベントです
     
     checkCondition: function(game) {
-        // 1. 三好長慶（ID: 1020001）が死亡しているか確認します
-        if (!window.EventCheck.isDead(game, 1020001)) return false;
+        // 1. 三好長慶（ID: 1020005）が死亡しているか確認します
+        if (!window.EventCheck.isDead(game, 1020005)) return false;
         
-        // 2. 三好義継（ID: 1020033）が大名であるか確認します
-        const yoshitsugu = window.EventCheck.getDaimyo(game, 1020033);
+        // 2. 三好義継（ID: 1020014）が大名であるか確認します
+        const yoshitsugu = window.EventCheck.getDaimyo(game, 1020014);
         if (!yoshitsugu) return false;
 
-        // 3. 松永久秀（ID: 1901001）が大名であるか確認します
-        const hisahide = window.EventCheck.getDaimyo(game, 1901001);
+        // 3. 松永久秀（ID: 1202002）が大名であるか確認します
+        const hisahide = window.EventCheck.getDaimyo(game, 1202002);
         if (!hisahide) return false;
 
-        // 4. 三好家に三好三人衆（長逸、政生、岩成友通）が所属しているか確認します
-        const trioIds = [1020006, 1020007, 1020008];
+        // 4. 三好家に三好三人衆（長逸、政勝、石成友通）が所属しているか確認します
+        const trioIds = [1020021, 1020024, 1020029];
         const miyoshiClanId = yoshitsugu.clan;
         for (let id of trioIds) {
             const member = game.getBusho(id);
@@ -2694,9 +2694,9 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        const yoshitsugu = game.getBusho(1020033);
-        const hisahide = game.getBusho(1901001);
-        const nagayasu = game.getBusho(1020006);
+        const yoshitsugu = game.getBusho(1020014);
+        const hisahide = game.getBusho(1202002);
+        const nagayasu = game.getBusho(1020021);
         const miyoshiClanId = yoshitsugu.clan;
 
         // ① 三好長逸を新しい大名（殿様）にします
@@ -2735,11 +2735,11 @@ window.GameEvents.push({
         });
 
         // 対象以外の武将の忠誠度を減らします
-        const trioList = [1020006, 1020007, 1020008]; // 三好三人衆の出席番号リスト
+        const trioList = [1020021, 1020024, 1020029]; // 三好三人衆の出席番号リスト
         const miyoshiBushos = game.bushos.filter(b => b.clan === miyoshiClanId && b.status === 'active');
         miyoshiBushos.forEach(b => {
-            // 三好三人衆ではなく、かつ、池田・荒木関連（1902001～1902999）でもない場合
-            if (!trioList.includes(b.id) && !(b.id >= 1902001 && b.id <= 1902999)) {
+            // 三好三人衆ではなく、かつ、池田・荒木関連（1203000～1203999）でもない場合
+            if (!trioList.includes(b.id) && !(b.id >= 1203000 && b.id <= 1203999)) {
                 b.loyalty = Math.max(0, (b.loyalty || 0) - 10); // 忠誠度を10下げます（0より下にはならないようにします）
             }
         });
@@ -2786,20 +2786,20 @@ window.GameEvents.push({
             return false; // どちらもいなければイベントは起きません
         }
         
-        // 2. 三好長逸（ID: 1020006）が大名であるか確認します
-        const nagayasu = window.EventCheck.getDaimyo(game, 1020006);
+        // 2. 三好長逸（ID: 1020021）が大名であるか確認します
+        const nagayasu = window.EventCheck.getDaimyo(game, 1020021);
         if (!nagayasu) return false;
 
-        // 3. 松永久秀（ID: 1901001）が大名であるか確認します
-        const hisahide = window.EventCheck.getDaimyo(game, 1901001);
+        // 3. 松永久秀（ID: 1202002）が大名であるか確認します
+        const hisahide = window.EventCheck.getDaimyo(game, 1202002);
         if (!hisahide) return false;
         const matsunagaClanId = hisahide.clan;
 
         // ストッパー：松永家がすでに将軍を擁立している家だった場合は中止します
         if (matsunagaClanId === sponsorClanId || (shogunClanId !== 0 && matsunagaClanId === shogunClanId)) return false;
 
-        // 4. 三好義継（ID: 1020033）が松永家に所属しているか確認します
-        const yoshitsugu = game.getBusho(1020033);
+        // 4. 三好義継（ID: 1020014）が松永家に所属しているか確認します
+        const yoshitsugu = game.getBusho(1020014);
         if (!yoshitsugu || yoshitsugu.clan !== matsunagaClanId) return false;
 
         // 5. 将軍擁立勢力または将軍家の領地と、松永家の領地が隣接しているか確認します
@@ -2838,7 +2838,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        const hisahide = game.getBusho(1901001);
+        const hisahide = game.getBusho(1202002);
         const matsunagaClanId = hisahide.clan;
         const matsunagaClan = game.clans.find(c => c.id === matsunagaClanId);
         
@@ -2970,16 +2970,16 @@ window.GameEvents.push({
     isOneTime: true,             
     
     checkCondition: function(game) {
-        // 1. 池田長正（ID: 1902001）が死亡しているか確認します
-        const nagamasa = game.getBusho(1902001);
+        // 1. 池田長正（ID: 1203002）が死亡しているか確認します
+        const nagamasa = game.getBusho(1203002);
         if (nagamasa && nagamasa.status !== 'dead') return false;
         
-        // 2. 三好長逸（ID: 1020006）が大名であるか確認します
-        const nagayasu = window.EventCheck.getDaimyo(game, 1020006);
+        // 2. 三好長逸（ID: 1020021）が大名であるか確認します
+        const nagayasu = window.EventCheck.getDaimyo(game, 1020021);
         if (!nagayasu) return false;
         
-        // 3. 池田知正（ID: 1902003）が存在し、三好長逸の家に所属する城主または国主であるか確認します
-        const tomomasa = game.getBusho(1902003);
+        // 3. 池田知正（ID: 1203004）が存在し、三好長逸の家に所属する城主または国主であるか確認します
+        const tomomasa = game.getBusho(1203004);
         if (!tomomasa || tomomasa.clan !== nagayasu.clan) return false;
         if (!tomomasa.isCastellan && !tomomasa.isCommander) return false;
 
@@ -2997,8 +2997,8 @@ window.GameEvents.push({
         }
         if (!isItamiInvolved) return false;
 
-        // 5. 荒木村重（ID: 1902004）が存在し、三好家に所属しているか確認します
-        const murashige = game.getBusho(1902004);
+        // 5. 荒木村重（ID: 1203006）が存在し、三好家に所属しているか確認します
+        const murashige = game.getBusho(1203006);
         if (!murashige || murashige.clan !== nagayasu.clan) return false;
 
         // 6. 荒木村重が池田知正と同じ場所にいるか確認します
@@ -3014,8 +3014,8 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        const tomomasa = game.getBusho(1902003);
-        const murashige = game.getBusho(1902004);
+        const tomomasa = game.getBusho(1203004);
+        const murashige = game.getBusho(1203006);
         const itamiCastle = game.getCastle(51);
 
         if (!tomomasa || !murashige || !itamiCastle) return;
@@ -3119,16 +3119,16 @@ window.GameEvents.push({
             return false; // どちらもいなければイベントは起きません
         }
 
-        // 2. 三好長逸（ID: 1020006）が大名であるか確認します
-        const nagayasu = game.getBusho(1020006);
+        // 2. 三好長逸（ID: 1020021）が大名であるか確認します
+        const nagayasu = game.getBusho(1020021);
         if (!nagayasu || !nagayasu.isDaimyo) return false;
         const miyoshiClanId = nagayasu.clan;
 
         // ストッパー：三好家自身が将軍を擁立している家だった場合は中止します
         if (miyoshiClanId === sponsorClanId || (shogunClanId !== 0 && miyoshiClanId === shogunClanId)) return false;
 
-        // 3. 荒木村重（ID: 1902004）が、三好家の城主または国主であるか確認します
-        const murashige = game.getBusho(1902004);
+        // 3. 荒木村重（ID: 1203006）が、三好家の城主または国主であるか確認します
+        const murashige = game.getBusho(1203006);
         let targetLord = null;
         let mainCastle = null;
 
@@ -3157,8 +3157,8 @@ window.GameEvents.push({
         const rel = game.diplomacyManager ? game.diplomacyManager.getRelation(sponsorClanId, miyoshiClanId) : null;
         if (!rel || rel.status !== '敵対') return false;
 
-        // 5. 松永久秀（ID: 1901001）が将軍擁立勢力に所属しているか確認します
-        const hisahide = game.getBusho(1901001);
+        // 5. 松永久秀（ID: 1202002）が将軍擁立勢力に所属しているか確認します
+        const hisahide = game.getBusho(1202002);
         if (!hisahide || hisahide.clan !== sponsorClanId) return false;
 
         // 6. 対象の城のいずれかが、将軍擁立勢力または将軍家の城が隣接しているか確認します
@@ -3207,10 +3207,10 @@ window.GameEvents.push({
         }
         
         const sponsorClan = game.clans.find(c => c.id === sponsorClanId);
-        const nagayasu = game.getBusho(1020006);
+        const nagayasu = game.getBusho(1020021);
         const miyoshiClanId = nagayasu.clan;
 
-        const murashige = game.getBusho(1902004);
+        const murashige = game.getBusho(1203006);
         let targetLord = null;
         let mainCastle = null;
 
@@ -3247,8 +3247,8 @@ window.GameEvents.push({
             originalCastellans[c.id] = c.castellanId;
         });
 
-        // ① 三好家所属でIDが1902001～1902999の武将を全員集めます
-        const targetBushos = game.bushos.filter(b => b.clan === miyoshiClanId && b.status === 'active' && b.id >= 1902001 && b.id <= 1902999);
+        // ① 三好家所属でIDが1203000～1203999の武将を全員集めます
+        const targetBushos = game.bushos.filter(b => b.clan === miyoshiClanId && b.status === 'active' && b.id >= 1203000 && b.id <= 1203999);
         
         // その人たちのうち、対象の城以外にいる人を本城（mainCastle）に集めます
         targetBushos.forEach(busho => {
@@ -3264,7 +3264,7 @@ window.GameEvents.push({
             const residents = game.bushos.filter(b => b.castleId === castle.id && b.status === 'active');
             residents.forEach(busho => {
                 // IDの範囲外の人がいれば、お引越しさせます
-                if (busho.id < 1902001 || busho.id > 1902999) {
+                if (busho.id < 1203000 || busho.id > 1203999) {
                     busho.isCastellan = false; // 城を追い出されるので城主バッジは外れます
                     busho.isCommander = false;
                     window.EventAction.moveBusho(game, busho, nagayasu.castleId);
@@ -3330,7 +3330,7 @@ window.GameEvents.push({
             }
 
             // 元の城主が降伏組なら、そのまま城主に復帰させます
-            if (newCastellan && newCastellan.id >= 1902001 && newCastellan.id <= 1902999 && newCastellan.castleId === castle.id) {
+            if (newCastellan && newCastellan.id >= 1203000 && newCastellan.id <= 1203999 && newCastellan.castleId === castle.id) {
                 newCastellan.isCastellan = true;
                 castle.castellanId = newCastellan.id;
                 // もし村重が伊丹城以外の城主になった場合は、そのお城を記録しておきます
@@ -3418,8 +3418,8 @@ window.GameEvents.push({
     isOneTime: true,             
     
     checkCondition: function(game) {
-        // 1. 畠山家の対象大名（高政、政頼、政尚）のいずれかが大名であるか確認します
-        const hatakeyamaDaimyo = window.EventCheck.getDaimyo(game, [1041001, 1041002, 1041003]);
+        // 1. 畠山家の対象大名（高政、政尚、秋高）のいずれかが大名であるか確認します
+        const hatakeyamaDaimyo = window.EventCheck.getDaimyo(game, [1041012, 1041013, 1041016]);
         if (!hatakeyamaDaimyo) return false;
         
         const hatakeyamaClanId = hatakeyamaDaimyo.clan;
@@ -3493,7 +3493,7 @@ window.GameEvents.push({
     
     execute: async function(game) {
         // 対象の畠山大名をもう一度特定します
-        const hatakeyamaDaimyo = window.EventCheck.getDaimyo(game, [1041001, 1041002, 1041003]);
+        const hatakeyamaDaimyo = window.EventCheck.getDaimyo(game, [1041012, 1041013, 1041016]);
         if (!hatakeyamaDaimyo) return;
 
         const hatakeyamaClanId = hatakeyamaDaimyo.clan;
@@ -3566,15 +3566,15 @@ window.GameEvents.push({
         // １．1561年以降であるか確認します
         if (game.year < 1561) return false;
         
-        // ２．最上義守（ID: 1089001）が存在し、大名であるか確認します
-        const yoshimori = window.EventCheck.getDaimyo(game, 1089001);
+        // ２．最上義守（ID: 1089011）が存在し、大名であるか確認します
+        const yoshimori = window.EventCheck.getDaimyo(game, 1089011);
         if (!yoshimori) return false;
 
         // ３．プレイヤーが最上家（義守の勢力）の担当ではないか確認します
         if (game.playerClanId === yoshimori.clan) return false;
 
-        // ４．最上義光（ID: 1089002）が存在し、義守と同じ勢力に所属しているか確認します
-        const yoshiaki = game.getBusho(1089002);
+        // ４．最上義光（ID: 1089012）が存在し、義守と同じ勢力に所属しているか確認します
+        const yoshiaki = game.getBusho(1089012);
         if (!yoshiaki || yoshiaki.status !== 'active' || yoshiaki.clan !== yoshimori.clan) return false;
 
         // すべての条件をクリアしたらイベント発生の合図を出します！
@@ -3582,8 +3582,8 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        const oldDaimyo = game.getBusho(1089001);
-        const successor = game.getBusho(1089002);
+        const oldDaimyo = game.getBusho(1089011);
+        const successor = game.getBusho(1089012);
         const clanId = oldDaimyo.clan;
         const messages = [];
 
@@ -3697,12 +3697,12 @@ window.GameEvents.push({
         // 1. 1569年以降であるか確認します
         if (game.year < 1569) return false;
         
-        // 2. 浦上宗景（ID: 1044001）が存在し、大名であるか確認します
-        const munekage = window.EventCheck.getDaimyo(game, 1044001);
+        // 2. 浦上宗景（ID: 1044005）が存在し、大名であるか確認します
+        const munekage = window.EventCheck.getDaimyo(game, 1044005);
         if (!munekage) return false;
 
-        // 3. 宇喜多直家（ID: 1044004）が存在し、大名ではないことを確認します
-        const naoie = game.getBusho(1044004);
+        // 3. 宇喜多直家（ID: 1210003）が存在し、大名ではないことを確認します
+        const naoie = game.getBusho(1210003);
         if (!naoie || naoie.isDaimyo) return false;
 
         // 4. 宇喜多直家が浦上宗景と同じ勢力に所属し、国主であるか確認します
@@ -3713,8 +3713,8 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        const munekage = game.getBusho(1044001);
-        const naoie = game.getBusho(1044004);
+        const munekage = game.getBusho(1044005);
+        const naoie = game.getBusho(1210003);
         const castle = game.getCastle(naoie.castleId);
 
         if (!castle) return;
