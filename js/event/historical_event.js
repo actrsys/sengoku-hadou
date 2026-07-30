@@ -592,22 +592,48 @@ window.GameEvents.push({
                 await window.EventTextManager.playSequence(game, window.EventTextManager.okehazama_attack(args));
             }
 
-            // ① 織田家の武将の討死処理
-            // 本来の寿命（originalEndYear）が1560年以前で、討死フラグ（isKilledInBattle）がある活動中の武将を探します
-            const deadOdaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.status === 'active' && b.originalEndYear <= 1560 && b.isKilledInBattle);
-            for (const busho of deadOdaBushos) {
-                if (game.lifeSystem) {
-                    // 通常の死亡メッセージが連続で出ないように、skipNormalMessageの印をつけます
-                    await game.lifeSystem.executeDeath(busho, { skipNormalMessage: true });
-                }
-            }
+            // ★追加：プレイヤーが織田家か今川家を担当しているか確認します
+            const isPlayerInvolved = (game.playerClanId === nobunaga.clan || game.playerClanId === imagawaClanId);
 
-            // ② 今川家の武将の討死処理
-            // 義元本人は最後に専用の処理をするため除外します
-            const deadImagawaBushos = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && b.originalEndYear <= 1560 && b.isKilledInBattle && b.id !== yoshimoto.id);
-            for (const busho of deadImagawaBushos) {
-                if (game.lifeSystem) {
-                    await game.lifeSystem.executeDeath(busho, { skipNormalMessage: true });
+            // ★追加：武将のデータから「姓＋家」の形を作ります
+            const odaFamilyName = nobunaga.familyName || nobunaga.name.split('|')[0] || "織田";
+            const imagawaFamilyName = yoshimoto.familyName || yoshimoto.name.split('|')[0] || "今川";
+            const odaName = `${odaFamilyName}家`;
+            const imagawaName = `${imagawaFamilyName}家`;
+
+            // ① 両家の武将の討死処理（使いまわし版）
+            // 織田家と今川家で「違う部分」だけをリストにまとめます
+            const targetClans = [
+                { clanId: nobunaga.clan, clanName: odaName, excludeId: 0 },               // 織田家（除外する人はいないので0）
+                { clanId: imagawaClanId, clanName: imagawaName, excludeId: yoshimoto.id } // 今川家（義元本人は除外）
+            ];
+
+            // リストの中身（織田家→今川家）の順番で、同じ処理を繰り返します
+            for (const target of targetClans) {
+                // 本来の寿命（originalEndYear）が1560年以前で、討死フラグがあり、除外IDではない活動中の武将を探します
+                const deadBushos = game.bushos.filter(b => 
+                    b.clan === target.clanId && 
+                    b.status === 'active' && 
+                    b.originalEndYear <= 1560 && 
+                    b.isKilledInBattle && 
+                    b.id !== target.excludeId
+                );
+
+                for (const busho of deadBushos) {
+                    if (game.lifeSystem) {
+                        // 通常の死亡メッセージを止めて、イベント専用のメッセージを出します
+                        await game.lifeSystem.executeDeath(busho, { skipNormalMessage: true });
+                    }
+                    // プレイヤーが関係している場合のみ、一人ずつメッセージを出します
+                    if (isPlayerInvolved) {
+                        const bushoName = busho.name.replace('|', '');
+                        // 自分がその勢力なら「当家」、違うならリストに登録した「〇〇家」を表示させます
+                        const prefix = (game.playerClanId === target.clanId) ? "当家" : target.clanName;
+                        const msg = `${prefix}の${bushoName}が討死しました。`;
+                        
+                        game.ui.log(msg); // ログにも残します
+                        await game.ui.showDialogAsync(msg, false, 0); // 画面に出して「OK」を押すまで待ちます
+                    }
                 }
             }
 
