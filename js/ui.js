@@ -953,14 +953,26 @@ class UIManager {
                     okB.id = 'dialog-btn-ok'; 
                     okB.className = dialog.customOpts?.okClass || 'btn-primary';
                     okB.textContent = dialog.customOpts?.okText || 'はい';
-                    okB.onclick = () => cleanupAndNext(dialog.onOk);
+                    okB.onclick = (e) => {
+                        e.stopPropagation();
+                        if (modal.classList.contains('event-dialog-modal') && window.AudioManager) {
+                            window.AudioManager.playSE('decision.ogg');
+                        }
+                        cleanupAndNext(dialog.onOk);
+                    };
                     footer.appendChild(okB);
 
                     const canB = document.createElement('button');
                     canB.id = 'dialog-btn-cancel'; 
                     canB.className = dialog.customOpts?.cancelClass || 'btn-secondary';
                     canB.textContent = dialog.customOpts?.cancelText || 'いいえ';
-                    canB.onclick = () => cleanupAndNext(dialog.onCancel);
+                    canB.onclick = (e) => {
+                        e.stopPropagation();
+                        if (modal.classList.contains('event-dialog-modal') && window.AudioManager) {
+                            window.AudioManager.playSE('cancel.ogg');
+                        }
+                        cleanupAndNext(dialog.onCancel);
+                    };
                     footer.appendChild(canB);
                 } else if (!isBottomMessage) {
                     // 通常の閉じるボタン
@@ -968,7 +980,10 @@ class UIManager {
                     closeB.id = 'dialog-btn-ok'; 
                     closeB.className = dialog.customOpts?.okClass || 'btn-secondary';
                     closeB.textContent = dialog.customOpts?.okText || '閉じる';
-                    closeB.onclick = () => cleanupAndNext(dialog.onOk);
+                    closeB.onclick = (e) => {
+                        e.stopPropagation();
+                        cleanupAndNext(dialog.onOk);
+                    };
                     footer.appendChild(closeB);
                 }
             }
