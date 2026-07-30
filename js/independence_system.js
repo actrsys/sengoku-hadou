@@ -829,15 +829,8 @@ class IndependenceSystem {
             for (const change of changes) {
                 const parts = change.split(':');
                 if (parts.length === 3 && parts[0].trim() === 'daimyo') {
-                    const newNameParts = parts[1].trim().split('|');
-                    busho.familyName = newNameParts[0] === "0" ? busho.familyName : (newNameParts[0] || "");
-                    busho.givenName = newNameParts[1] === "0" ? busho.givenName : (newNameParts[1] || "");
-                    busho.name = busho.familyName + busho.givenName;
-
-                    const newYomiParts = parts[2].trim().split('|');
-                    busho.familyYomi = newYomiParts[0] === "0" ? busho.familyYomi : (newYomiParts[0] || "");
-                    busho.givenYomi = newYomiParts[1] === "0" ? busho.givenYomi : (newYomiParts[1] || "");
-                    busho.yomi = busho.familyYomi + busho.givenYomi;
+                    // ★修正：新しく作った共通の改名魔法を呼び出します！
+                    busho.applyNameChangeData(parts[1].trim(), parts[2].trim());
 
                     newNameStr = busho.name.replace(/\|/g, '');
                     isNameChanged = true;

@@ -165,10 +165,8 @@ class DataManager {
             if (b.nameChange) {
                 const changes = b.nameChange.split('/');
                 let latestYear = -1;
-                let latestFamilyName = "";
-                let latestGivenName = "";
-                let latestFamilyYomi = "";
-                let latestGivenYomi = "";
+                let latestNameData = "";
+                let latestYomiData = "";
 
                 for (const change of changes) {
                     const parts = change.split(':');
@@ -178,28 +176,17 @@ class DataManager {
                         if (targetYear <= startYear && targetYear > latestYear) {
                             latestYear = targetYear;
                             
-                            // 新しい名前を「|」で姓と名に分けます
-                            const newNameParts = parts[1].trim().split('|');
-                            latestFamilyName = newNameParts[0] === "0" ? (latestFamilyName || b.familyName) : (newNameParts[0] || ""); 
-                            latestGivenName = newNameParts[1] === "0" ? (latestGivenName || b.givenName) : (newNameParts[1] || "");  
-                            
-                            // 新しい読み仮名も「|」で姓と名に分けます
-                            const newYomiParts = parts[2].trim().split('|');
-                            latestFamilyYomi = newYomiParts[0] === "0" ? (latestFamilyYomi || b.familyYomi) : (newYomiParts[0] || ""); 
-                            latestGivenYomi = newYomiParts[1] === "0" ? (latestGivenYomi || b.givenYomi) : (newYomiParts[1] || "");  
+                            // ★修正：見つかった文字をメモしておくだけにします
+                            latestNameData = parts[1].trim();
+                            latestYomiData = parts[2].trim();
                         }
                     }
                 }
 
                 // もし改名データが見つかったら、最初からその名前と読み仮名にしておきます！
                 if (latestYear !== -1) {
-                    b.familyName = latestFamilyName;
-                    b.givenName = latestGivenName;
-                    b.name = latestFamilyName + latestGivenName;
-                    
-                    b.familyYomi = latestFamilyYomi;
-                    b.givenYomi = latestGivenYomi;
-                    b.yomi = latestFamilyYomi + latestGivenYomi;
+                    // ★修正：新しく作った共通の改名魔法を呼び出します！
+                    b.applyNameChangeData(latestNameData, latestYomiData);
                 }
             }
             
@@ -231,15 +218,8 @@ class DataManager {
                             for (const change of changes) {
                                 const parts = change.split(':');
                                 if (parts.length === 3 && parts[0].trim() === 'daimyo') {
-                                    const newNameParts = parts[1].trim().split('|');
-                                    b.familyName = newNameParts[0] === "0" ? b.familyName : (newNameParts[0] || ""); 
-                                    b.givenName = newNameParts[1] === "0" ? b.givenName : (newNameParts[1] || "");  
-                                    b.name = b.familyName + b.givenName;
-                                    
-                                    const newYomiParts = parts[2].trim().split('|');
-                                    b.familyYomi = newYomiParts[0] === "0" ? b.familyYomi : (newYomiParts[0] || ""); 
-                                    b.givenYomi = newYomiParts[1] === "0" ? b.givenYomi : (newYomiParts[1] || "");  
-                                    b.yomi = b.familyYomi + b.givenYomi;
+                                    // ★修正：新しく作った共通の改名魔法を呼び出します！
+                                    b.applyNameChangeData(parts[1].trim(), parts[2].trim());
                                 }
                             }
                         }

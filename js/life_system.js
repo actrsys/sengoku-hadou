@@ -120,34 +120,18 @@ class LifeSystem {
                 if (parts.length === 3) {
                     const targetYear = Number(parts[0].trim());
                     
-                    // 今の年と「同じ」、または「昔」のデータなら名前を更新します！
-                    if (targetYear <= currentYear) {
-                        // 新しい名前を「|」で姓と名に分けます
-                        const newNameParts = parts[1].trim().split('|');
-                        const newFamilyName = newNameParts[0] === "0" ? b.familyName : (newNameParts[0] || ""); // 新しい姓（0ならそのまま）
-                        const newGivenName = newNameParts[1] === "0" ? b.givenName : (newNameParts[1] || "");  // 新しい名（0ならそのまま）
-                        
-                        // 新しい読み仮名も「|」で姓と名に分けます
-                        const newYomiParts = parts[2].trim().split('|');
-                        const newFamilyYomi = newYomiParts[0] === "0" ? b.familyYomi : (newYomiParts[0] || ""); // 新しい姓の読み（0ならそのまま）
-                        const newGivenYomi = newYomiParts[1] === "0" ? b.givenYomi : (newYomiParts[1] || "");  // 新しい名の読み（0ならそのまま）
-                        
+                    // ★修正：今の年と「ピッタリ同じ」データだけ名前を更新するようにします！（これで重さが解消されます！）
+                    if (targetYear === currentYear) {
                         const oldName = b.name; // 今の名前をメモしておきます
-                        const newName = newFamilyName + newGivenName; // 新しいフルネーム
-                        const newYomi = newFamilyYomi + newGivenYomi; // 新しいフルネームの読み
-
-                        // 名前と読み仮名のデータを書き換えます！
-                        b.familyName = newFamilyName;
-                        b.givenName = newGivenName;
-                        b.name = newName;
                         
-                        b.familyYomi = newFamilyYomi;
-                        b.givenYomi = newGivenYomi;
-                        b.yomi = newYomi;
+                        // ★修正：新しく作った共通の改名魔法を呼び出します！
+                        b.applyNameChangeData(parts[1].trim(), parts[2].trim());
+                        
+                        const newName = b.name; // 新しいフルネーム
 
-                        // ★お知らせを出すのは、改名する年が「ピッタリ今の年」の時だけにします！
+                        // ★お知らせを出します！
                         // すでにゲームに登場して生きている武将（activeかronin）なら、お知らせを出します
-                        if (targetYear === currentYear && (b.status === 'active' || b.status === 'ronin')) {
+                        if (b.status === 'active' || b.status === 'ronin') {
                             // 前の名前と違う時だけメッセージを出します
                             if (oldName !== newName) {
                                 // 大名家に所属していたら「〇〇家の」と付けます
@@ -1007,15 +991,8 @@ class LifeSystem {
                     if (parts.length === 3 && parts[0].trim() === 'daimyo') {
                         const oldNameStr = successor.name.replace('|', '');
                         
-                        const newNameParts = parts[1].trim().split('|');
-                        successor.familyName = newNameParts[0] === "0" ? successor.familyName : (newNameParts[0] || "");
-                        successor.givenName = newNameParts[1] === "0" ? successor.givenName : (newNameParts[1] || "");
-                        successor.name = successor.familyName + successor.givenName;
-
-                        const newYomiParts = parts[2].trim().split('|');
-                        successor.familyYomi = newYomiParts[0] === "0" ? successor.familyYomi : (newYomiParts[0] || "");
-                        successor.givenYomi = newYomiParts[1] === "0" ? successor.givenYomi : (newYomiParts[1] || "");
-                        successor.yomi = successor.familyYomi + successor.givenYomi;
+                        // ★修正：新しく作った共通の改名魔法を呼び出します！
+                        successor.applyNameChangeData(parts[1].trim(), parts[2].trim());
 
                         const newNameStr = successor.name.replace('|', '');
                         messages.push(`家督を継ぐにあたり、${oldNameStr}は\n「${newNameStr}」と名を改めました。`);
@@ -1413,14 +1390,10 @@ class LifeSystem {
                 const parts = change.split(':');
                 if (parts.length === 3 && parts[0].trim() === 'daimyo') {
                     const oldNameStr = successor.name.replace('|', '');
-                    const newNameParts = parts[1].trim().split('|');
-                    successor.familyName = newNameParts[0] === "0" ? successor.familyName : (newNameParts[0] || "");
-                    successor.givenName = newNameParts[1] === "0" ? successor.givenName : (newNameParts[1] || "");
-                    successor.name = successor.familyName + successor.givenName;
-                    const newYomiParts = parts[2].trim().split('|');
-                    successor.familyYomi = newYomiParts[0] === "0" ? successor.familyYomi : (newYomiParts[0] || "");
-                    successor.givenYomi = newYomiParts[1] === "0" ? successor.givenYomi : (newYomiParts[1] || "");
-                    successor.yomi = successor.familyYomi + successor.givenYomi;
+                    
+                    // ★修正：新しく作った共通の改名魔法を呼び出します！
+                    successor.applyNameChangeData(parts[1].trim(), parts[2].trim());
+                    
                     const newNameStr = successor.name.replace('|', '');
                     messages.push(`家督を継ぐにあたり、${oldNameStr}は\n「${newNameStr}」と名を改めました。`);
                 }

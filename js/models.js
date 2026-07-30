@@ -767,6 +767,25 @@ class Busho {
             }
         });
     }
+    
+    // ==========================================
+    // ★新しく追加：名前と読み仮名を一箇所で書き換える共通の魔法
+    // ==========================================
+    applyNameChangeData(nameData, yomiData) {
+        if (nameData) {
+            const newNameParts = nameData.split('|');
+            this.familyName = newNameParts[0] === "0" ? this.familyName : (newNameParts[0] || "");
+            this.givenName = newNameParts[1] === "0" ? this.givenName : (newNameParts[1] || "");
+            this.name = this.familyName + this.givenName;
+        }
+        
+        if (yomiData) {
+            const newYomiParts = yomiData.split('|');
+            this.familyYomi = newYomiParts[0] === "0" ? this.familyYomi : (newYomiParts[0] || "");
+            this.givenYomi = newYomiParts[1] === "0" ? this.givenYomi : (newYomiParts[1] || "");
+            this.yomi = this.familyYomi + this.givenYomi;
+        }
+    }
 }
 
 // ★姫クラス
