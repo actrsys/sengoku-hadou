@@ -580,17 +580,12 @@ class GameSystem {
         // 以前の計算式
         // const baseRice = (castle.kokudaka + castle.peoplesLoyalty) * (Math.sqrt(castle.peoplesLoyalty) + 2);
 
-        // 新しい計算式：(石高 * 2.5) * √民忠
+        // 新しい計算式：現在石高 × 現在民忠 / 10
         // エラー防止のため、民忠がマイナスになった場合は0として計算する安全対策を入れています
         const safeLoyalty = Math.max(0, castle.peoplesLoyalty);
-        const baseRice = (castle.kokudaka * 2.5) * Math.sqrt(safeLoyalty);
+        const baseRice = castle.kokudaka * safeLoyalty / 10;
         
         return Math.floor(baseRice);
-    }
-    
-    // ★追加：徴兵の武将能力部分の計算（リストの並び替えなどにも使います）
-    static calcDraftBushoScore(busho) {
-        return (busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2);
     }
 
     // ★追加：徴兵の「効率」を計算します（ここが複数ファイルで使われる大元の式です）
