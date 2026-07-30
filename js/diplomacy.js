@@ -2925,6 +2925,9 @@ class DiplomacyManager {
                     // ★追加：敵対陣営として参加確定している諸勢力は呼べない
                     if (hostileKunishus.has(Number(k.id))) return;
 
+                    // ★今回追加：商人勢力は戦わないので援軍として呼べないようにガードします！
+                    if (k.ideology === '商人') return;
+
                     const enemyKunishuRel = isTargetKunishu ? 0 : k.getRelation(actualEnemyClanId);
                     // ★関係条件（友好度）を撤廃。兵力と敵との関係のみチェック
                     const canRequest = isTargetKunishu ? 
