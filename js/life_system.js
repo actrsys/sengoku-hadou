@@ -26,6 +26,10 @@ class LifeSystem {
             await this.checkBirth();
             await this.checkNameChange();
             
+            // ★ここから追加：ダイアログを閉じた直後に重い処理が走って固まるのを防ぐため、一瞬だけ息継ぎ（お休み）をさせます！
+            await new Promise(resolve => setTimeout(resolve, 50));
+            // ★追加ここまで！
+
             // ★追加：毎年1月に、ランダムで新しい姫が登場するかチェックします！
             await this.checkRandomPrincessAppearance();
 
@@ -107,6 +111,7 @@ class LifeSystem {
     // ★ 改名のチェック（毎年1月に行います）
     async checkNameChange() {
         const currentYear = this.game.year;
+        let isDaimyoChanged = false; // ★追加：大名家が改名したかどうかをメモする旗
 
         // 武将全員をチェックします（まだ登場していない人や亡くなった人も、内部的に名前は変えておきます）
         for (const b of this.game.bushos) {
@@ -156,11 +161,16 @@ class LifeSystem {
                                             clan.yomi = newClanYomi; 
                                             
                                             clanMsg = `当主の改名により、${oldClanName}は今後「${clan.name}」となります。`;
+                                            isDaimyoChanged = true; // ★追加：大名家が改名したので旗を立てます！
                                         }
                                     }
                                 }
-
+                                
                                 // ==========================================
+                                // ★ここから追加：名前が変わって画面がパニック（フリーズ）になるのを防ぐため、
+                                // メッセージを出す前に一瞬だけ息継ぎ（お休み）をさせます！
+                                await new Promise(resolve => setTimeout(resolve, 50));
+
                                 // ★すべての裏処理が終わってから、メッセージを出して待ちます！
                                 this.game.ui.log(msg);
                                 if (b.clan === this.game.playerClanId || b.isDaimyo) {
@@ -176,6 +186,21 @@ class LifeSystem {
                         }
                     }
                 }
+            }
+        }
+
+        // ★追加：すべての武将のチェックが終わった後、大名が改名していたら1回だけ情報を最新にします！
+        if (isDaimyoChanged) {
+            // 同名被りの回避を行い、家名を確定させます
+            if (this.game.updateClanDisplayNames) {
+                this.game.updateClanDisplayNames();
+            }
+            // 確定した情報でマップやパネルを描き直します
+            if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+                this.game.ui.renderMap();
+            }
+            if (this.game.ui && typeof this.game.ui.updatePanelHeader === 'function') {
+                this.game.ui.updatePanelHeader();
             }
         }
     }
