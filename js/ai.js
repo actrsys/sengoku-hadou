@@ -1929,7 +1929,8 @@ class AIEngine {
             sellScore *= (1 + goldShortageRate);
             
             // お米が高く売れる時はスコアをアップ、安い時はダウンさせます！
-            sellScore *= (baseRiceRate / 10.0); // ★変更：一元化されたベースレートを使用します
+            const standardRate = window.MainParams.Economy.TradeRateBase || 5.0;
+            sellScore *= (baseRiceRate / standardRate); // ★変更：ゲームの基本相場を基準に計算します
             
             // 安全ラインを下回っていたら、絶対に売りません
             if (castle.rice <= sellSafeRice) {
