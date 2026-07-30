@@ -390,6 +390,19 @@ Object.assign(UIInfoManager.prototype, {
     _renderBushoSelector(actionType, targetId, extraData, onBack, scrollPos = 0) {
         this.ui.hideAIGuardTemporarily(); 
         
+        // ==========================================
+        // ★高速化：ソートや表示のループに入る前に、早見表を一気に作ります！
+        // ==========================================
+        const clanMap = new Map();
+        if (this.game.clans) this.game.clans.forEach(c => clanMap.set(c.id, c));
+        
+        const castleMap = new Map();
+        if (this.game.castles) this.game.castles.forEach(c => castleMap.set(c.id, c));
+        
+        const bushoMap = new Map();
+        if (this.game.bushos) this.game.bushos.forEach(b => bushoMap.set(b.id, b));
+        // ==========================================
+        
         const isViewMode = (actionType === 'view_only' || actionType === 'all_busho_list');
         
         // ★追加：行動を消費しないコマンドかどうかを判定します
@@ -453,7 +466,7 @@ Object.assign(UIInfoManager.prototype, {
         let targetCastle = null;
         if (['rumor_target_busho','headhunt_target','view_only'].includes(actionType)) {
              isEnemyTarget = true;
-             targetCastle = this.game.getCastle(targetId);
+             targetCastle = castleMap.get(targetId); // ★高速化
         }
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
         const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
@@ -494,7 +507,7 @@ Object.assign(UIInfoManager.prototype, {
         }
 
         const getSortRankAll = (b) => {
-            const isGunshi = b.isGunshi || (b.clan > 0 && this.game.clans.find(c => c.id === b.clan)?.gunshiId === b.id);
+            const isGunshi = b.isGunshi || (b.clan > 0 && clanMap.get(b.clan)?.gunshiId === b.id); // ★高速化
             const isCommander = window.GameApp && window.GameApp.legions && window.GameApp.legions.some(l => l.commanderId === b.id);
             if (b.clan === this.game.playerClanId) return b.isDaimyo ? 10000 : (b.isRetired ? 9750 : (isCommander ? 9500 : (b.isCastellan ? 9000 : (isGunshi ? 8500 : 8000))));
             if (b.clan > 0) return 5000 - b.clan * 10 + (b.isDaimyo ? 4 : (b.isRetired ? 3.8 : (isCommander ? 3.5 : (b.isCastellan ? 3 : (isGunshi ? 2 : 1)))));
@@ -503,7 +516,7 @@ Object.assign(UIInfoManager.prototype, {
             return 0;
         };
         const getSortRankClan = (b) => {
-            const isGunshi = b.isGunshi || (b.clan > 0 && this.game.clans.find(c => c.id === b.clan)?.gunshiId === b.id);
+            const isGunshi = b.isGunshi || (b.clan > 0 && clanMap.get(b.clan)?.gunshiId === b.id); // ★高速化
             const isCommander = window.GameApp && window.GameApp.legions && window.GameApp.legions.some(l => l.commanderId === b.id);
             if (b.isDaimyo) return 8;
             if (b.isRetired) return 7.5;
@@ -557,7 +570,7 @@ Object.assign(UIInfoManager.prototype, {
                                 const kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
                                 return { yomi: kunishu ? (kunishu.yomi || kunishu.name || "") : "んんん", name: kunishu ? (kunishu.name || "") : "んんん" };
                             } else if (busho.clan > 0) {
-                                const clan = this.game.clans.find(c => c.id === busho.clan);
+                                const clan = clanMap.get(busho.clan); // ★高速化
                                 return { yomi: clan ? (clan.yomi || clan.name || "") : "んんん", name: clan ? (clan.name || "") : "んんん" };
                             }
                             return { yomi: "んんん", name: "んんん" };
@@ -568,7 +581,7 @@ Object.assign(UIInfoManager.prototype, {
                         return cmp;
                     } else if (this.bushoCurrentSortKey === 'castle') {
                         const getCastleInfo = (busho) => {
-                            const castle = this.game.getCastle(busho.castleId);
+                            const castle = castleMap.get(busho.castleId); // ★高速化
                             return { yomi: castle ? (castle.yomi || castle.name || "") : "んんん", name: castle ? (castle.name || "") : "んんん" };
                         };
                         const infoA = getCastleInfo(a); const infoB = getCastleInfo(b);
@@ -595,8 +608,8 @@ Object.assign(UIInfoManager.prototype, {
                     } else if (this.bushoCurrentSortKey === 'family') {
                         const checkFamily = (busho) => {
                             if (busho.clan > 0) {
-                                const clan = this.game.clans.find(c => c.id === busho.clan);
-                                const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
+                                const clan = clanMap.get(busho.clan); // ★高速化
+                                const daimyo = clan ? bushoMap.get(clan.leaderId) : null; // ★高速化
                                 if (daimyo && (busho.id === daimyo.id || busho.isDaimyo)) return 1;
                                 if (daimyo) {
                                     const bFam = Array.isArray(busho.familyIds) ? busho.familyIds : [];
@@ -608,13 +621,13 @@ Object.assign(UIInfoManager.prototype, {
                         };
                         valA = checkFamily(a); valB = checkFamily(b);
                     } else if (this.bushoCurrentSortKey === 'salary') {
-                        const daimyoA = a.clan > 0 ? this.game.getBusho(this.game.clans.find(c=>c.id===a.clan)?.leaderId) : null;
-                        const daimyoB = b.clan > 0 ? this.game.getBusho(this.game.clans.find(c=>c.id===b.clan)?.leaderId) : null;
+                        const daimyoA = a.clan > 0 ? bushoMap.get(clanMap.get(a.clan)?.leaderId) : null; // ★高速化
+                        const daimyoB = b.clan > 0 ? bushoMap.get(clanMap.get(b.clan)?.leaderId) : null; // ★高速化
                         valA = a.clan > 0 && !a.isDaimyo && a.status !== 'ronin' ? a.getSalary(daimyoA) : 0;
                         valB = b.clan > 0 && !b.isDaimyo && b.status !== 'ronin' ? b.getSalary(daimyoB) : 0;
                     } else {
                         const getAccForSort = (busho) => {
-                            const c = this.game.getCastle(busho.castleId);
+                            const c = castleMap.get(busho.castleId); // ★高速化
                             if (c && c.investigatedUntil >= this.game.getCurrentTurnId()) return c.investigatedAccuracy;
                             return acc;
                         };
@@ -767,7 +780,7 @@ Object.assign(UIInfoManager.prototype, {
             const isSelected = (this.commonSelectedIds || []).includes(b.id);
             
             let currentAcc = null;
-            const bCastle = this.game.getCastle(b.castleId);
+            const bCastle = castleMap.get(b.castleId); // ★高速化
             if (bCastle && bCastle.investigatedUntil >= this.game.getCurrentTurnId()) {
                 currentAcc = bCastle.investigatedAccuracy;
             } else if (isEnemyTarget && targetCastle) {
@@ -798,9 +811,9 @@ Object.assign(UIInfoManager.prototype, {
                     const kunishu = this.game.kunishuSystem.getKunishu(b.belongKunishuId);
                     forceName = kunishu ? kunishu.getName(this.game) : "諸勢力";
                 } else if (b.clan > 0) {
-                    const clan = this.game.clans.find(c => c.id === b.clan);
+                    const clan = clanMap.get(b.clan); // ★高速化
                     forceName = clan ? clan.name : "大名家";
-                    const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
+                    const daimyo = clan ? bushoMap.get(clan.leaderId) : null; // ★高速化
                     if (daimyo && (b.id === daimyo.id || b.isDaimyo)) { familyMark = "◯"; }
                     else if (daimyo) {
                         const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
@@ -812,8 +825,8 @@ Object.assign(UIInfoManager.prototype, {
                 const age = b.isAutoLeader ? "" : (this.game.year - b.birthYear + 1);
                 let salary = "";
                 if (b.clan > 0 && !b.isDaimyo && b.status !== 'ronin') {
-                    const clan = this.game.clans.find(c => c.id === b.clan);
-                    const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
+                    const clan = clanMap.get(b.clan); // ★高速化
+                    const daimyo = clan ? bushoMap.get(clan.leaderId) : null; // ★高速化
                     salary = b.getSalary(daimyo);
                     if (salary === 0) salary = "";
                 }

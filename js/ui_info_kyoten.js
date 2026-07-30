@@ -304,6 +304,43 @@ Object.assign(UIInfoManager.prototype, {
     _renderKyotenList(clanId, isSelectMode = false, selectData = null, scrollPos = 0) {
         this.kyotenTargetClanId = clanId !== null ? clanId : this.game.playerClanId;
         
+        // ==========================================
+        // ★高速化：ソートや表示のループに入る前に、早見表を一気に作ります！
+        // ==========================================
+        const clanMap = new Map();
+        if (this.game.clans) this.game.clans.forEach(c => clanMap.set(c.id, c));
+        
+        const bushoMap = new Map();
+        if (this.game.bushos) this.game.bushos.forEach(b => bushoMap.set(b.id, b));
+        
+        const provinceMap = new Map();
+        if (this.game.provinces) this.game.provinces.forEach(p => provinceMap.set(p.id, p));
+
+        // ★超高速化：お城ごとの「武将の数」と「毎月の給料合計」を、事前に1回の計算で済ませて箱に入れておきます！
+        // （今まで：表示や並べ替えのたびに、毎回4000人の武将リストからお城の住人を探して計算していたので激重でした）
+        const castleBushoStatsMap = new Map();
+        if (this.game.bushos) {
+            this.game.bushos.forEach(b => {
+                if (b.status === 'active' && b.clan > 0) {
+                    if (!castleBushoStatsMap.has(b.castleId)) {
+                        castleBushoStatsMap.set(b.castleId, { count: 0, salary: 0 });
+                    }
+                    const stats = castleBushoStatsMap.get(b.castleId);
+                    stats.count++;
+                    
+                    // 給料の計算もここで一緒にやってしまいます
+                    const clan = clanMap.get(b.clan);
+                    if (clan && clan.leaderId) {
+                        const daimyo = bushoMap.get(clan.leaderId);
+                        if (daimyo) {
+                            stats.salary += b.getSalary(daimyo);
+                        }
+                    }
+                }
+            });
+        }
+        // ==========================================
+
         if (!this.currentKyotenTab) this.currentKyotenTab = 'status';
         if (!this.currentKyotenScope) this.currentKyotenScope = 'clan';
         
@@ -371,23 +408,19 @@ Object.assign(UIInfoManager.prototype, {
                 displayCastles.sort((a, b) => {
                     let valA = 0, valB = 0;
 
-                    const getClanYomi = (c) => { const cd = this.game.clans.find(cd => cd.id === c.ownerClan); return cd ? (cd.yomi || cd.name) : "んんん"; };
-                    const getClanName = (c) => { const cd = this.game.clans.find(cd => cd.id === c.ownerClan); return cd ? cd.name : ""; };
-                    const getCastellanYomi = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? (cb.yomi || cb.name) : "んんん"; };
-                    const getCastellanName = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? cb.name : ""; };
-                    const getProvinceYomi = (c) => { const p = this.game.provinces && this.game.provinces.find(p => p.id === c.provinceId); return p ? (p.provinceYomi || p.province) : "んんん"; };
-                    const getProvinceName = (c) => { const p = this.game.provinces && this.game.provinces.find(p => p.id === c.provinceId); return p ? p.province : ""; };
-                    const getBushoCount = (c) => c.ownerClan > 0 ? this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active' && b.clan === c.ownerClan).length : 0;
-
+                    // ★高速化：早見表から一瞬で引き出します！
+                    const getClanYomi = (c) => { const cd = clanMap.get(c.ownerClan); return cd ? (cd.yomi || cd.name) : "んんん"; };
+                    const getClanName = (c) => { const cd = clanMap.get(c.ownerClan); return cd ? cd.name : ""; };
+                    const getCastellanYomi = (c) => { const cb = bushoMap.get(c.castellanId); return cb ? (cb.yomi || cb.name) : "んんん"; };
+                    const getCastellanName = (c) => { const cb = bushoMap.get(c.castellanId); return cb ? cb.name : ""; };
+                    const getProvinceYomi = (c) => { const p = provinceMap.get(c.provinceId); return p ? (p.provinceYomi || p.province) : "んんん"; };
+                    const getProvinceName = (c) => { const p = provinceMap.get(c.provinceId); return p ? p.province : ""; };
+                    
+                    // ★超高速化：事前に作った早見表（castleBushoStatsMap）から数や費用を取り出します！
+                    const getBushoCount = (c) => { const stats = castleBushoStatsMap.get(c.id); return (c.ownerClan > 0 && stats) ? stats.count : 0; };
+                    const getGoldConsume = (c) => { const stats = castleBushoStatsMap.get(c.id); return (c.ownerClan > 0 && stats) ? stats.salary : 0; };
+                    
                     const getGoldIncome = (c) => GameSystem.calcBaseGoldIncome(c);
-                    const getGoldConsume = (c) => {
-                        let consume = 0;
-                        const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
-                        if (daimyo) {
-                            this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active').forEach(b => consume += b.getSalary(daimyo));
-                        }
-                        return consume;
-                    };
                     const getRiceIncome = (c) => GameSystem.calcBaseRiceIncome(c);
                     const getRiceConsume = (c) => Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier) * 12;
 
@@ -477,33 +510,25 @@ Object.assign(UIInfoManager.prototype, {
         let items = [];
         
         displayCastles.forEach(c => {
-            const clanData = this.game.clans.find(cd => cd.id === c.ownerClan);
+            // ★高速化：ループ内でも早見表を使います
+            const clanData = clanMap.get(c.ownerClan);
             const clanName = clanData ? clanData.name : "";
-            const castellan = this.game.getBusho(c.castellanId);
+            const castellan = bushoMap.get(c.castellanId);
             const castellanName = castellan ? castellan.name : "";
             
             let provinceName = "";
-            if (this.game.provinces) {
-                const province = this.game.provinces.find(p => p.id === c.provinceId);
-                if (province) provinceName = province.province;
-            }
+            const province = provinceMap.get(c.provinceId);
+            if (province) provinceName = province.province;
             
-            const castleBushos = c.ownerClan > 0 ? this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active' && b.clan === c.ownerClan) : [];
-            const bushosCount = castleBushos.length;
+            const stats = castleBushoStatsMap.get(c.id);
+            const bushosCount = (c.ownerClan > 0 && stats) ? stats.count : 0;
+            const consumeGold = (c.ownerClan > 0 && stats) ? stats.salary : 0;
             
             let riceIncome = GameSystem.calcBaseRiceIncome(c);
             let goldIncome = GameSystem.calcBaseGoldIncome(c);
 
             let consumeRice = Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier);
             let consumeRiceYear = consumeRice * 12; 
-            
-            let consumeGold = 0;
-            const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
-            if (daimyo) {
-                castleBushos.forEach(b => {
-                    consumeGold += b.getSalary(daimyo);
-                });
-            }
             
             let cells = [];
             if (this.currentKyotenTab === 'status') {
