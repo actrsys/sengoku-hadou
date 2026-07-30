@@ -576,13 +576,11 @@ class GameSystem {
     static calcBaseRiceIncome(castle) {
         // 以前の計算式
         // const baseRice = (castle.kokudaka + castle.peoplesLoyalty) * (Math.sqrt(castle.peoplesLoyalty) + 2);
-        
-        // 民忠と石高が最低でも「1」になるように安全対策をします
-        const safeLoyalty = Math.max(1, castle.peoplesLoyalty);
-        const safeKokudaka = Math.max(1, castle.kokudaka);
-        
-        // 新しい計算式：((石高 * 2.5) ＋ (民忠 * 2)) * (√民忠 * ∛石高)
-        const baseRice = ((castle.kokudaka * 2.5) + (castle.peoplesLoyalty * 2)) * (Math.sqrt(safeLoyalty) * Math.cbrt(safeKokudaka));
+
+        // 新しい計算式：(石高 * 2.5) * √民忠
+        // エラー防止のため、民忠がマイナスになった場合は0として計算する安全対策を入れています
+        const safeLoyalty = Math.max(0, castle.peoplesLoyalty);
+        const baseRice = (castle.kokudaka * 2.5) * Math.sqrt(safeLoyalty);
         
         return Math.floor(baseRice);
     }
