@@ -2710,9 +2710,9 @@ class CommandSystem {
             if(!this.checkResource(castle, cost, 0)) return;
             // ★追加: 買うと上限を超えるならストップ
             if(castle.rice + amount > 99999) { this.game.ui.showDialog("これ以上兵糧は買えません", false); return; }
-            if(amount > (castle.tradeLimit || 0)) { this.game.ui.showDialog("取引上限を超えています", false); return; }
+            if(cost > (castle.tradeLimit || 0)) { this.game.ui.showDialog("取引上限を超えています", false); return; }
             castle.gold -= cost; castle.rice += amount; 
-            castle.tradeLimit -= amount;
+            castle.tradeLimit -= cost;
             this.game.ui.showResultModal(`兵糧${amount}を購入しました\n(金-${cost})`); 
         } else if (type === 'sell_rice') { 
             // ★追加：売る時は相場が高くなってお得になります
@@ -2722,9 +2722,9 @@ class CommandSystem {
             const gain = Math.floor(amount * sellRate); 
             // ★追加: 売ると金が上限を超えるならストップ
             if(castle.gold + gain > 99999) { this.game.ui.showDialog("これ以上兵糧は売れません", false); return; }
-            if(amount > (castle.tradeLimit || 0)) { this.game.ui.showDialog("取引上限を超えています", false); return; }
+            if(gain > (castle.tradeLimit || 0)) { this.game.ui.showDialog("取引上限を超えています", false); return; }
             castle.rice -= amount; castle.gold += gain; 
-            castle.tradeLimit -= amount;
+            castle.tradeLimit -= gain;
             this.game.ui.showResultModal(`兵糧${amount}を売却しました\n(金+${gain})`); 
         } else if (type === 'buy_ammo') {
             // ★相場を消して、固定金額にします

@@ -1102,11 +1102,13 @@ class GameSystem {
             // 実際の計算用レート（米100に対する金）に変換します
             const actualRate = rate / 100;
             
-            let maxBuy = Math.floor(castle.gold / actualRate);
-            while (maxBuy > 0 && Math.ceil(maxBuy * actualRate) > castle.gold) {
+            // 所持金と取引上限（金）の小さい方を上限とします
+            const maxGold = Math.min(castle.gold, castle.tradeLimit || 0);
+            let maxBuy = Math.floor(maxGold / actualRate);
+            while (maxBuy > 0 && Math.ceil(maxBuy * actualRate) > maxGold) {
                 maxBuy--;
             }
-            return Math.min(maxBuy, 99999 - castle.rice, castle.tradeLimit || 0);
+            return Math.min(maxBuy, 99999 - castle.rice);
         }
         else if (type === 'sell_rice') {
             let rate = 10.0; // 基準を10.0に変更します
@@ -1120,8 +1122,10 @@ class GameSystem {
             // 実際の計算用レート（米100に対する金）に変換します
             const actualRate = rate / 100;
             
-            const maxSellByGold = Math.floor((99999 - castle.gold) / actualRate);
-            return Math.min(castle.rice, maxSellByGold, castle.tradeLimit || 0);
+            // 金の所持上限までの空きと取引上限（金）の小さい方を上限とします
+            const maxGain = Math.min(99999 - castle.gold, castle.tradeLimit || 0);
+            const maxSellByGold = Math.floor(maxGain / actualRate);
+            return Math.min(castle.rice, maxSellByGold);
         }
         else if (type === 'buy_ammo') {
             const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
