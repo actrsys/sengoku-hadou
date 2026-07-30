@@ -348,11 +348,11 @@ window.GameEvents.push({
                 if (prov && prov.marketRate !== undefined) {
                     // 台風の被害を受けた国かどうか調べます
                     if (damagedProvinceMap.has(prov.id)) {
-                        // 被害を受けた国は 0.3 アップします！
-                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 0.3);
+                        // 被害を受けた国は 3.0 アップします！
+                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 3.0);
                     } else {
-                        // 被害を受けていない他の国も、影響で 0.1 アップします！
-                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 0.1);
+                        // 被害を受けていない他の国も、影響で 1.0 アップします！
+                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 1.0);
                     }
                 }
             });

@@ -24,7 +24,7 @@ window.MainParams = {
     Economy: {
         IncomeGoldRate: 1, IncomeFluctuation: 0.15,
         ConsumeRicePerSoldier: 0.03,
-        TradeRateMin: 0.7, TradeRateMax: 1.8, TradeFluctuation: 0.3,
+        TradeRateMin: 7.5, TradeRateMax: 12.5, TradeFluctuation: 1.0,
         PriceAmmo: 1
     },
     Strategy: {
@@ -574,7 +574,16 @@ class GameSystem {
     }
     
     static calcBaseRiceIncome(castle) {
-        const baseRice = (castle.kokudaka + castle.peoplesLoyalty) * (Math.sqrt(castle.peoplesLoyalty) + 2);
+        // 以前の計算式
+        // const baseRice = (castle.kokudaka + castle.peoplesLoyalty) * (Math.sqrt(castle.peoplesLoyalty) + 2);
+        
+        // 民忠と石高が最低でも「1」になるように安全対策をします
+        const safeLoyalty = Math.max(1, castle.peoplesLoyalty);
+        const safeKokudaka = Math.max(1, castle.kokudaka);
+        
+        // 新しい計算式：((石高 * 2.5) ＋ (民忠 * 2)) * (√民忠 * ∛石高)
+        const baseRice = ((castle.kokudaka * 2.5) + (castle.peoplesLoyalty * 2)) * (Math.sqrt(safeLoyalty) * Math.cbrt(safeKokudaka));
+        
         return Math.floor(baseRice);
     }
     
@@ -1081,7 +1090,7 @@ class GameSystem {
         const merchantDiscount = this.getMerchantDiscount(myClanId);
 
         if (type === 'buy_rice') {
-            let rate = 1.0;
+            let rate = 10.0; // 基準を10.0に変更します
             if (castle && provinces) {
                 const province = provinces.find(p => p.id === castle.provinceId);
                 if (province && province.marketRate !== undefined) rate = province.marketRate;
@@ -1089,14 +1098,17 @@ class GameSystem {
             // ★追加：買う時は相場が安くなってお得になります！
             rate = rate * (1.0 - merchantDiscount);
             
-            let maxBuy = Math.floor(castle.gold / rate);
-            while (maxBuy > 0 && Math.ceil(maxBuy * rate) > castle.gold) {
+            // 実際の計算用レート（米100に対する金）に変換します
+            const actualRate = rate / 100;
+            
+            let maxBuy = Math.floor(castle.gold / actualRate);
+            while (maxBuy > 0 && Math.ceil(maxBuy * actualRate) > castle.gold) {
                 maxBuy--;
             }
             return Math.min(maxBuy, 99999 - castle.rice, castle.tradeLimit || 0);
         }
         else if (type === 'sell_rice') {
-            let rate = 1.0;
+            let rate = 10.0; // 基準を10.0に変更します
             if (castle && provinces) {
                 const province = provinces.find(p => p.id === castle.provinceId);
                 if (province && province.marketRate !== undefined) rate = province.marketRate;
@@ -1104,7 +1116,10 @@ class GameSystem {
             // ★追加：売る時は相場が高くなってお得になります！
             rate = rate * (1.0 + merchantDiscount);
             
-            const maxSellByGold = Math.floor((99999 - castle.gold) / rate);
+            // 実際の計算用レート（米100に対する金）に変換します
+            const actualRate = rate / 100;
+            
+            const maxSellByGold = Math.floor((99999 - castle.gold) / actualRate);
             return Math.min(castle.rice, maxSellByGold, castle.tradeLimit || 0);
         }
         else if (type === 'buy_ammo') {
@@ -1140,7 +1155,7 @@ class GameSystem {
         const merchantDiscount = this.getMerchantDiscount(myClanId);
 
         if (type === 'buy_rice') {
-            let rate = 1.0;
+            let rate = 10.0; // 基準を10.0に変更します
             if (castle && provinces) {
                 const province = provinces.find(p => p.id === castle.provinceId);
                 if (province && province.marketRate !== undefined) rate = province.marketRate;
@@ -1148,10 +1163,13 @@ class GameSystem {
             // ★追加：買う時は相場が安くなってお得になります！
             rate = rate * (1.0 - merchantDiscount);
             
-            cost = Math.ceil(amount * rate);
-            rateStr = (10 * rate).toFixed(1);
+            // 実際の計算用レート（米100に対する金）に変換します
+            const actualRate = rate / 100;
+            
+            cost = Math.ceil(amount * actualRate);
+            rateStr = rate.toFixed(1); // そのまま7.5等を表示させます
         } else if (type === 'sell_rice') {
-            let rate = 1.0;
+            let rate = 10.0; // 基準を10.0に変更します
             if (castle && provinces) {
                 const province = provinces.find(p => p.id === castle.provinceId);
                 if (province && province.marketRate !== undefined) rate = province.marketRate;
@@ -1159,8 +1177,11 @@ class GameSystem {
             // ★追加：売る時は相場が高くなってお得になります！
             rate = rate * (1.0 + merchantDiscount);
             
-            cost = Math.floor(amount * rate); // 売却の場合は利益
-            rateStr = (10 * rate).toFixed(1);
+            // 実際の計算用レート（米100に対する金）に変換します
+            const actualRate = rate / 100;
+            
+            cost = Math.floor(amount * actualRate); // 売却の場合は利益
+            rateStr = rate.toFixed(1); // そのまま7.5等を表示させます
         } else if (type === 'buy_ammo') {
             const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
             cost = price * amount;
@@ -1399,6 +1420,11 @@ class GameManager {
             this.princesses = data.princesses || []; 
             // ★今回追加：ゲーム本体に、地方の名簿も持たせます！
             this.provinces = data.provinces || [];
+            
+            // ★相場をゲーム開始時に全員「10.0」にリセットします！
+            this.provinces.forEach(p => {
+                p.marketRate = 10.0;
+            });
             
             // ★今回追加：新しいゲームを始める時は、読み込んだ軍団の名簿をしっかり受け取ります！
             this.legions = data.legions || [];
@@ -1836,11 +1862,12 @@ class GameManager {
         let seasonForce = 0;
         if (this.month === 9) {
             // 9月は収穫の秋！お米が市場に溢れるので、相場が一気に下がります（安くなる）
-            let randomDown = (Math.floor(Math.random() * 51) / 100) + 0.5;
+            // ★基準が10.0になったので、下がる幅も5.0〜10.0に大きくします
+            let randomDown = (Math.floor(Math.random() * 51) / 10) + 5.0;
             seasonForce = -randomDown;
         } else {
             // それ以外の月は、だんだんお米が減っていくので、毎月少しずつ相場が上がります（高くなる）
-            seasonForce = 0.05;
+            seasonForce = 0.5; // ★0.05を10倍にしました
         }
 
         // ==========================================
@@ -1870,7 +1897,7 @@ class GameManager {
         this.provinces.forEach(p => {
             // 国ごとのサイコロと、ゴムの力
             const change = (Math.random() * (fluc * 2)) - fluc;
-            const rubberForce = (1.0 - p.marketRate) * 0.1;
+            const rubberForce = (10.0 - p.marketRate) * 0.1; // ★基準を10.0に変更しました
             
             // ★お隣さんから引っ張られる力！
             let neighborForce = 0;

@@ -524,12 +524,12 @@ window.GameEvents.push({
             // ★ここから追加：日本中の米相場を動かします！
             game.provinces.forEach(prov => {
                 if (prov && prov.marketRate !== undefined) {
-                    // もしこの国が「凶作（badAffected）」に入っていたら 1.0 アップ！
+                    // もしこの国が「凶作（badAffected）」に入っていたら 5.0 アップ！
                     if (badAffected.has(prov.id)) {
-                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 1.0);
+                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 5.0);
                     } else {
-                        // 凶作じゃない他の国も、影響を受けて 0.5 アップ！
-                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 0.5);
+                        // 凶作じゃない他の国も、影響を受けて 2.5 アップ！
+                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 2.5);
                     }
                 }
             });
@@ -613,12 +613,12 @@ window.GameEvents.push({
             // ★ここから追加：日本中の米相場を動かします！
             game.provinces.forEach(prov => {
                 if (prov && prov.marketRate !== undefined) {
-                    // もしこの国が「豊作（goodAffected）」に入っていたら 0.8 ダウン！
+                    // もしこの国が「豊作（goodAffected）」に入っていたら 5.0 ダウン！
                     if (goodAffected.has(prov.id)) {
-                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - 0.8);
+                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - 5.0);
                     } else {
-                        // 豊作じゃない他の国も、影響を受けて 0.2 ダウン！
-                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - 0.2);
+                        // 豊作じゃない他の国も、影響を受けて 2.0 ダウン！
+                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - 2.0);
                     }
                 }
             });
@@ -1068,7 +1068,7 @@ window.GameEvents.push({
         snowProvIds.forEach(pId => {
             const prov = game.provinces.find(p => p.id === pId);
             if (prov && prov.marketRate !== undefined) {
-                prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 0.1);
+                prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 1.0); // ★0.1から1.0にしました
             }
         });
 
