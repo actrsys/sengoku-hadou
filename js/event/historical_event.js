@@ -660,6 +660,41 @@ window.GameEvents.push({
             if (window.EventTextManager && window.EventTextManager.okehazama_defend) {
                 await window.EventTextManager.playSequence(game, window.EventTextManager.okehazama_defend(args));
             }
+            
+            // ★追加：今川家のすべての軍団の攻略目標を織田家に設定します
+            if (game.aiOperationManager) {
+                // AIの作戦管理システムに目標を書き込む準備をします
+                if (!game.aiOperationManager.grandObjectives) {
+                    game.aiOperationManager.grandObjectives = {};
+                }
+                if (!game.aiOperationManager.grandObjectives[imagawaClanId]) {
+                    game.aiOperationManager.grandObjectives[imagawaClanId] = {};
+                }
+
+                // 今川家が現在持っているお城をすべて調べます
+                const imagawaCastles = game.castles.filter(c => c.ownerClan === imagawaClanId);
+                const myCastleCount = imagawaCastles.length;
+                
+                // 織田家のお城の数（初期の目標数）を数えておきます
+                const odaClanId = nobunaga.clan;
+                const odaCastleCount = game.castles.filter(c => c.ownerClan === odaClanId).length;
+
+                // 今川家のお城のデータから、現在存在している軍団の番号（0の直轄や1～8の軍団）を重複なく集めます
+                const legionIds = [...new Set(imagawaCastles.map(c => Number(c.legionId || 0)))];
+
+                // 見つかったすべての軍団に、織田家を目標とする方針（大名攻略）を持たせます
+                for (const legionId of legionIds) {
+                    game.aiOperationManager.grandObjectives[imagawaClanId][legionId] = {
+                        type: '大名攻略',
+                        targetClanId: odaClanId,
+                        targetProvId: 0,
+                        turnCount: 24, // 24ターン（2年間）諦めずに狙い続けるようにします
+                        historyTargetCount: [odaCastleCount], // 目標の初期数を記憶させます
+                        prevMyCastleCount: myCastleCount // 自分の拠点数を記憶させます
+                    };
+                }
+            }
+
             // 籠城ルートはここでイベントが終わり、義元も生き残ります
         }
 
