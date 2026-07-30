@@ -899,6 +899,8 @@ class LifeSystem {
                 b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
                 b._affinityDiff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
                 b._baseScore = b.leadership + b.intelligence;
+                // ★追加：亡くなった大名を「実父」または「養父」として持っているか（実子・養子であるか）の印をつけます
+                b._isDirectSon = (b.realFatherId === daimyo.id || b.adoptiveFatherId === daimyo.id);
             });
 
             allCandidates.sort((a, b) => {
@@ -914,6 +916,10 @@ class LifeSystem {
                 if (a._isRelative && b._isRelative) {
                     if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
                     
+                    // ★追加：相性の差が同じなら、亡くなった大名の実子や養子を優先します！
+                    if (a._isDirectSon && !b._isDirectSon) return -1;
+                    if (!a._isDirectSon && b._isDirectSon) return 1;
+
                     const aIsYounger = a.birthYear > daimyo.birthYear;
                     const bIsYounger = b.birthYear > daimyo.birthYear;
                     if (aIsYounger && !bIsYounger) return -1;
@@ -1114,6 +1120,8 @@ class LifeSystem {
                 b._isRelative = commander.familyIds.some(fId => b.familyIds.includes(fId));
                 b._affinityDiff = Math.abs((commander.affinity || 0) - (b.affinity || 0));
                 b._baseScore = b.leadership + b.intelligence;
+                // ★追加：亡くなった国主を「実父」または「養父」として持っているか（実子・養子であるか）の印をつけます
+                b._isDirectSon = (b.realFatherId === commander.id || b.adoptiveFatherId === commander.id);
             });
 
             allCandidates.sort((a, b) => {
@@ -1125,6 +1133,10 @@ class LifeSystem {
                 if (!a._isRelative && b._isRelative) return 1;
                 if (a._isRelative && b._isRelative) {
                     if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
+                    
+                    // ★追加：相性の差が同じなら、亡くなった国主の実子や養子を優先します！
+                    if (a._isDirectSon && !b._isDirectSon) return -1;
+                    if (!a._isDirectSon && b._isDirectSon) return 1;
                 }
                 return b._baseScore - a._baseScore;
             });
