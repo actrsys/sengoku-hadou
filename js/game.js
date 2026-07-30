@@ -150,6 +150,23 @@ class DataManager {
     static joinData(clans, castles, bushos, princesses = [], legions = []) {
         const startYear = window.MainParams.StartYear; // 今のシナリオの開始年（例：1560年）
         
+        // ★高速化：お城や大名家などをIDから一瞬で探せる「早見表（Map）」を作っておきます！
+        const clanMap = new Map();
+        clans.forEach(c => clanMap.set(Number(c.id), c));
+        
+        const castleMap = new Map();
+        castles.forEach(c => castleMap.set(Number(c.id), c));
+
+        const bushoMap = new Map();
+        bushos.forEach(b => bushoMap.set(Number(b.id), b));
+
+        // ★大名（leaderId）や城主（castellanId）から逆引きできる専用の早見表も作ります
+        const clanLeaderMap = new Map();
+        clans.forEach(c => clanLeaderMap.set(Number(c.leaderId), c));
+
+        const castellanMap = new Map();
+        castles.forEach(c => castellanMap.set(Number(c.castellanId), c));
+
         // ★武将と同じように、ダミー用（startYearが9999）の姫や、
         // 開始年よりも前に寿命を迎えている（昔に亡くなっている）姫を死亡扱いにします！
         princesses.forEach(p => {
@@ -207,7 +224,8 @@ class DataManager {
                 // まだ登場していないので、お城の中には入れません！
             } else {
                     // 既に登場している武将は、いつも通りの準備をします
-                    const clan = clans.find(cl => Number(cl.leaderId) === Number(b.id));
+                    // ★高速化：早見表（clanLeaderMap）を使って大名をパッと探します！
+                    const clan = clanLeaderMap.get(Number(b.id));
                     if (clan) {
                         b.isDaimyo = true;
                         b.loyalty = 100; // ★大名は自分の家なので、忠誠度は絶対に100にします！
@@ -236,7 +254,8 @@ class DataManager {
                         clan.name = b.familyName + "家";
                         clan.baseName = clan.name; // ★元々の名前の箱にも入れておきます！
                     }
-                    const castleAsCastellan = castles.find(cs => Number(cs.castellanId) === Number(b.id));
+                    // ★高速化：早見表（castellanMap）を使って城主をパッと探します！
+                    const castleAsCastellan = castellanMap.get(Number(b.id));
                 if (castleAsCastellan) b.isCastellan = true;
                 
                 if (b.clan === 0 && (b.belongKunishuId || 0) === 0) {
@@ -247,13 +266,15 @@ class DataManager {
                 }
                 
                 // お城の中に武将を入れてあげます
-                const c = castles.find(castle => Number(castle.id) === Number(b.castleId));
+                // ★高速化：早見表（castleMap）からお城をパッと探します！
+                const c = castleMap.get(Number(b.castleId));
                 if(c) c.samuraiIds.push(b.id);
             }
             
             // ★今回追加：軍師の設定
             if (b.clan !== 0) {
-                const clan = clans.find(cl => cl.id === b.clan);
+                // ★高速化：早見表（clanMap）から大名家をパッと探します！
+                const clan = clanMap.get(Number(b.clan));
                 if (clan && Number(clan.gunshiId) === Number(b.id)) {
                     b.isGunshi = true;
                 }
@@ -264,7 +285,8 @@ class DataManager {
         // 1. 亡くなっている姫の夫から、妻の記録を消します
         princesses.forEach(p => {
             if (p.status === 'dead' && p.husbandId > 0) {
-                const husband = bushos.find(b => b.id === p.husbandId);
+                // ★高速化：早見表から旦那さんをパッと探します！
+                const husband = bushoMap.get(Number(p.husbandId));
                 if (husband && husband.wifeIds) {
                     husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
                 }
@@ -275,7 +297,6 @@ class DataManager {
         // 2. 亡くなっている武将の妻から、夫の記録を消して「未婚（未亡人）」に戻します
         bushos.forEach(b => {
             if (b.status === 'dead' && b.wifeIds && b.wifeIds.length > 0) {
-                // ... 中略 ...
                 b.wifeIds = []; // 亡くなった武将の奥さんリストも空っぽにします
             }
         });
@@ -287,13 +308,15 @@ class DataManager {
         // ★ここから軍団の初期設定です！
         legions.forEach(legion => {
             // 軍団長に就任する武将を探します
-            const commander = bushos.find(b => b.id === legion.commanderId);
+            // ★高速化：早見表から軍団長をパッと探します！
+            const commander = bushoMap.get(Number(legion.commanderId));
             if (commander) {
                 // ★ここを書き足し！：軍団長（国主）のシールをしっかり貼ります！
                 commander.isCommander = true;
 
                 // ★修正：武将本人ではなく、その武将がいる「お城」に軍団番号を書き込みます
-                const castle = castles.find(c => c.id === commander.castleId);
+                // ★高速化：早見表からお城をパッと探します！
+                const castle = castleMap.get(Number(commander.castleId));
                 if (castle) {
                     castle.legionId = legion.legionNo;
                 }

@@ -691,11 +691,18 @@ class Busho {
     }
 
     // ★奥さんが増えたり減ったりした時に、一門リストを作り直す機能
-    // 修正：お母さんの実家を引き継ぐために、引数に "姫の名簿" を追加しました
-    updateFamilyIds(bushos = [], princesses = []) {
+    // ★高速化のため、早見表（allPeopleMap）を引数に追加しました！
+    updateFamilyIds(bushos = [], princesses = [], allPeopleMap = null) {
         // ★安全対策：他のシステムから呼ばれた時に名簿がなければ、ゲーム本体から借ります！
         if (bushos.length === 0 && window.GameApp) bushos = window.GameApp.bushos;
         if (princesses.length === 0 && window.GameApp) princesses = window.GameApp.princesses;
+
+        // もし早見表が渡されていなければ、ここで作ります（安全対策）
+        if (!allPeopleMap) {
+            allPeopleMap = new Map();
+            bushos.forEach(b => allPeopleMap.set(b.id, b));
+            princesses.forEach(p => allPeopleMap.set(p.id, p));
+        }
 
         // まずは普段使う用のリストに、金庫（baseFamilyIds）の中身を丸写しします
         this.familyIds = [...this.baseFamilyIds];
@@ -708,11 +715,10 @@ class Busho {
             }
         });
 
-        const allPeople = [...bushos, ...princesses];
-
         // ★今回追加：実母の親戚（一門）を、自分にだけ「一方通行」でコピーします！
         if (this.realMotherId > 0) {
-            const mother = allPeople.find(p => p.id === this.realMotherId);
+            // ★高速化：早見表からお母さんをパッと探します
+            const mother = allPeopleMap.get(this.realMotherId);
             if (mother && mother.baseFamilyIds) {
                 mother.baseFamilyIds.forEach(fId => {
                     if (!this.familyIds.includes(fId)) {
@@ -724,8 +730,8 @@ class Busho {
 
         // 次に、自分の奥さんリスト（ID）を順番に見ていきます
         this.wifeIds.forEach(wId => {
-            // 姫の名簿から、奥さんのデータを探します
-            const wifeData = princesses.find(p => p.id === wId);
+            // ★高速化：早見表から奥さんをパッと探します
+            const wifeData = allPeopleMap.get(wId);
             if (wifeData && wifeData.baseFamilyIds) {
                 // 奥さんが持っている「一門リスト」を一方通行でコピーします！
                 wifeData.baseFamilyIds.forEach(fId => {
@@ -759,6 +765,7 @@ class Busho {
         });
 
         // ★自分の一門の女性（娘や姉妹など）から生まれた子供（孫や甥っ子）を、自分の親戚として迎え入れます！
+        const allPeople = [...bushos, ...princesses];
         allPeople.forEach(person => {
             if (person.realMotherId > 0 && this.baseFamilyIds.includes(person.realMotherId)) {
                 if (!this.familyIds.includes(person.id)) {
@@ -835,10 +842,18 @@ class Princess {
     }
 
     // ★追加：父親や夫の一門を反映させる機能
-    updateFamilyIds(bushos = [], princesses = []) {
+    // ★高速化のため、早見表（allPeopleMap）を引数に追加しました！
+    updateFamilyIds(bushos = [], princesses = [], allPeopleMap = null) {
         // ★安全対策
         if (bushos.length === 0 && window.GameApp) bushos = window.GameApp.bushos;
         if (princesses.length === 0 && window.GameApp) princesses = window.GameApp.princesses;
+
+        // もし早見表が渡されていなければ、ここで作ります（安全対策）
+        if (!allPeopleMap) {
+            allPeopleMap = new Map();
+            bushos.forEach(b => allPeopleMap.set(b.id, b));
+            princesses.forEach(p => allPeopleMap.set(p.id, p));
+        }
 
         this.familyIds = [...this.baseFamilyIds];
 
@@ -851,11 +866,10 @@ class Princess {
             }
         });
 
-        const allPeople = [...bushos, ...princesses];
-
         // ★今回追加：実母の親戚（一門）を、自分にだけ「一方通行」でコピーします！
         if (this.realMotherId > 0) {
-            const mother = allPeople.find(p => p.id === this.realMotherId);
+            // ★高速化：早見表からお母さんをパッと探します
+            const mother = allPeopleMap.get(this.realMotherId);
             if (mother && mother.baseFamilyIds) {
                 mother.baseFamilyIds.forEach(fId => {
                     if (!this.familyIds.includes(fId)) {
@@ -867,7 +881,8 @@ class Princess {
 
         // 夫の一門を追加（夫がいる間だけ追加する）
         if (this.husbandId > 0) {
-            const husband = bushos.find(b => b.id === this.husbandId);
+            // ★高速化：早見表から旦那さんをパッと探します
+            const husband = allPeopleMap.get(this.husbandId);
             if (husband && husband.baseFamilyIds) {
                 husband.baseFamilyIds.forEach(fId => {
                     if (!this.familyIds.includes(fId)) {
@@ -878,6 +893,7 @@ class Princess {
         }
 
         // 自分の一門の女性（娘や姉妹など）から生まれた子供（孫や甥っ子）を、自分の親戚として迎え入れます！
+        const allPeople = [...bushos, ...princesses];
         allPeople.forEach(person => {
             if (person.realMotherId > 0 && this.baseFamilyIds.includes(person.realMotherId)) {
                 if (!this.familyIds.includes(person.id)) {
@@ -1034,18 +1050,23 @@ class Province {
 class FamilyLinker {
     // ★今回追加：ゲーム全体の一門関係を、正しい順番で一気に完成させる司令塔（窓口）です！
     static rebuildAllFamilyIds(bushos, princesses = []) {
+        // ★高速化：全員がパッと見つかる「出席番号付きの早見表」を最初に作ります！
+        const allPeopleMap = new Map();
+        bushos.forEach(b => allPeopleMap.set(b.id, b));
+        princesses.forEach(p => allPeopleMap.set(p.id, p));
+
         // 1. まずは男系（実父・養父）の絶対的な繋がりである「金庫（baseFamilyIds）」を完成させます
-        this.linkAdoptiveRelations(bushos, princesses);
+        this.linkAdoptiveRelations(bushos, princesses, allPeopleMap);
         
         // 2. 次に、姫の個人の繋がり（母方の実家や、夫の繋がり）を個別にコピーさせます
-        princesses.forEach(p => p.updateFamilyIds(bushos, princesses));
+        princesses.forEach(p => p.updateFamilyIds(bushos, princesses, allPeopleMap));
         
         // 3. 最後に、武将の個人の繋がり（母方の実家、妻の実家、娘婿や義弟）をコピーさせます
         // ※武将が娘婿を認識するためには「姫のデータが完成している」必要があるので、一番最後に実行します！
-        bushos.forEach(b => b.updateFamilyIds(bushos, princesses));
+        bushos.forEach(b => b.updateFamilyIds(bushos, princesses, allPeopleMap));
     }
 
-    static linkAdoptiveRelations(bushos, princesses = []) {
+    static linkAdoptiveRelations(bushos, princesses, allPeopleMap) {
         const allPeople = [...bushos, ...princesses];
         
         allPeople.forEach(b => {
@@ -1058,8 +1079,8 @@ class FamilyLinker {
                     if (!b.baseFamilyIds.includes(pId)) {
                         b.baseFamilyIds.push(pId);
                     }
-                    // 全員の名簿から親を探します
-                    let parent = allPeople.find(p => p.id === pId);
+                    // ★高速化：早見表から親をパッと探します
+                    let parent = allPeopleMap.get(pId);
 
                     if (parent && parent.baseFamilyIds) {
                         // 親の金庫にも自分の番号を入れます
@@ -1080,7 +1101,8 @@ class FamilyLinker {
                 let originalSize = currentFamilySet.size;
 
                 person.baseFamilyIds.forEach(fId => {
-                    const relative = allPeople.find(r => r.id === fId);
+                    // ★高速化：早見表から親戚をパッと探します
+                    const relative = allPeopleMap.get(fId);
                     if (relative && relative.baseFamilyIds) {
                         relative.baseFamilyIds.forEach(id => {
                             currentFamilySet.add(id);
