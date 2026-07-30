@@ -99,10 +99,10 @@ window.EventTextManager = {
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「おぬし自ら来るとはのう。よう来た、竹千代」` },
             { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「お懐かしゅうございまする、吉法師様。いえ、${args.nobunagaTitle}様」` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「はっはっは！\nわしとそなたの仲ではないか。吉法師で構わぬわい」` },
-            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「はっ、吉法師様。まこと、懐かしゅうござりまする」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「はっ。吉法師様。まこと、懐かしゅうござりまする」` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「うむ、息災で何よりである」` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「して……おぬしがここへ来たとなれば、${args.imagawaFamilyName}とは袂を分かつ心づもりであるな？」` },
-            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「はっ、ご明察にござる。${args.matsudairaFamilyName}家が生き残る道はこれしかござらぬ。どうか我らと結んでいただきたく」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「はっ。ご明察にござる。${args.matsudairaFamilyName}家が生き残る道はこれしかござらぬ。どうか我らと結んでいただきたく」` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「……ふっ、敵地に堂々と乗り込むおぬしの豪胆さには参ったわい」` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「あいわかった。今日より我らは盟友じゃ」` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「西はわし。東はおぬしじゃ。それで良かろう？」` },
@@ -118,7 +118,7 @@ window.EventTextManager = {
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「追い返せ」` },
             { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「へ……？　よろしいのですか？」` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「我らと結びたいと申すのであろう。構わぬ、追っ払え」` },
-            { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「はっ、ははっ！」` }
+            { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「は、ははーっ！」` }
         ];
     },
     
@@ -152,7 +152,7 @@ window.EventTextManager = {
     okehazama_imagawa_attack: function(args) {
         return [
             { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「ふん！　${args.nobunagaGivenName}なにするものぞ！　${args.nobunagaFamilyName}軍など稚児に等しい……わし自ら一捻りにしてくれよう！」` },
-            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「はっ、出過ぎた真似を申しました」` },
+            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「はっ。出過ぎた真似を申しました」` },
             { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「出陣じゃ！　支度をいたせ！」` },
             { type: 'log', msg: `こうして${args.yoshimotoName}は大軍をもって${args.owariProvinceName}への侵攻を開始したのであった。` }
         ];
@@ -171,7 +171,7 @@ window.EventTextManager = {
         return [
             { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「……あいわかった。おぬしがそこまで申すのであれば、此度の出陣は取りやめとする」` },
             { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「しかし、いずれ必ず${args.owariProvinceName}は取る！　心して備えよ！」` },
-            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「ははーっ！」` }
+            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「はっ。御意にございまする」` }
         ];
     },
     okehazama_attack: function(args) {
@@ -181,7 +181,7 @@ window.EventTextManager = {
             { type: 'log', msg: `${args.nobunagaGivenName}は小姓の鼓の音に合わせて舞いはじめた。` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「人間五十年、下天の内をくらぶれば、夢幻のごとくなり。一度生を得て、滅せぬ者のあるべきか……」` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「出陣じゃ、具足をもて！」` },
-            { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「はっ、お供いたしまする！」` },
+            { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「はっ。お供いたしまする！」` },
             { type: 'dialog', leftName: args.juushinBName, leftFace: args.juushinBFace, msg: `「ははっ！」` },
             { type: 'log', msg: `国境での迎撃を採用した${args.nobunagaGivenName}は、軍勢を率いて出陣した。` },
             { type: 'log', msg: `その頃、${args.yoshimotoFamilyName}軍が${args.nobunagaFamilyName}方の丸根砦、鷲津城を陥落せしめたとの知らせが${args.nobunagaGivenName}に届く。` },
@@ -204,10 +204,11 @@ window.EventTextManager = {
     okehazama_defend: function(args) {
         return [
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「……籠城じゃ。あれほどの大軍相手に打って出るなど真の勇者ではない。それは匹夫の勇じゃ」` },
-            { type: 'dialog', leftName: args.juushinAName, leftFace: args.juushinAFace, msg: `「はっ、左様にございまする」` },
+            { type: 'dialog', leftName: args.juushinAName, leftFace: args.juushinAFace, msg: `「はっ。左様にございまする」` },
             { type: 'dialog', leftName: args.juushinBName, leftFace: args.juushinBFace, msg: `「むむむ……しかしそれでは万に一つも勝ち目はありませぬぞ」` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「もう決めた事じゃ。各々籠城の支度に取り掛かるがよい」` },
-            { type: 'dialog', leftName: args.juushinBName, leftFace: args.juushinBFace, msg: `「ははっ！」` }
+            { type: 'dialog', leftName: args.juushinAName, leftFace: args.juushinAFace, msg: `「ははっ！」」` },
+            { type: 'dialog', leftName: args.juushinBName, leftFace: args.juushinBFace, msg: `「……はっ！」` }
         ];
     }
     
