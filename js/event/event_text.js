@@ -205,9 +205,9 @@ window.EventTextManager = {
         return [
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「……籠城じゃ。あれほどの大軍相手に打って出るなど真の勇者ではない。それは匹夫の勇じゃ」` },
             { type: 'dialog', leftName: args.juushinAName, leftFace: args.juushinAFace, msg: `「はっ、左様にございまする」` },
-            { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「むむむ……しかしそれでは万に一つも勝ち目はありませぬぞ」` },
+            { type: 'dialog', leftName: args.juushinBName, leftFace: args.juushinBFace, msg: `「むむむ……しかしそれでは万に一つも勝ち目はありませぬぞ」` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「もう決めた事じゃ。各々籠城の支度に取り掛かるがよい」` },
-            { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「ははっ！」` }
+            { type: 'dialog', leftName: args.juushinBName, leftFace: args.juushinBFace, msg: `「ははっ！」` }
         ];
     }
     
