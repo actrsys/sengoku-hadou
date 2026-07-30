@@ -592,7 +592,26 @@ window.GameEvents.push({
                 await window.EventTextManager.playSequence(game, window.EventTextManager.okehazama_attack(args));
             }
 
-            // 義元の討死処理を行います
+            // ① 織田家の武将の討死処理
+            // 本来の寿命（originalEndYear）が1560年以前で、討死フラグ（isKilledInBattle）がある活動中の武将を探します
+            const deadOdaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.status === 'active' && b.originalEndYear <= 1560 && b.isKilledInBattle);
+            for (const busho of deadOdaBushos) {
+                if (game.lifeSystem) {
+                    // 通常の死亡メッセージが連続で出ないように、skipNormalMessageの印をつけます
+                    await game.lifeSystem.executeDeath(busho, { skipNormalMessage: true });
+                }
+            }
+
+            // ② 今川家の武将の討死処理
+            // 義元本人は最後に専用の処理をするため除外します
+            const deadImagawaBushos = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && b.originalEndYear <= 1560 && b.isKilledInBattle && b.id !== yoshimoto.id);
+            for (const busho of deadImagawaBushos) {
+                if (game.lifeSystem) {
+                    await game.lifeSystem.executeDeath(busho, { skipNormalMessage: true });
+                }
+            }
+
+            // ③ 義元の討死処理を行います
             // 死亡システムに全てお任せして、後継ぎの決定なども自動で行ってもらいます
             if (game.lifeSystem) {
                 await game.lifeSystem.executeDeath(yoshimoto);
