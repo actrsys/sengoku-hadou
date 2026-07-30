@@ -588,6 +588,11 @@ class GameSystem {
         return Math.floor(baseRice);
     }
 
+    // ★追加：徴兵の武将能力部分の計算（リストの並び替えなどにも使います）
+    static calcDraftBushoScore(busho) {
+        return (busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2);
+    }
+
     // ★追加：徴兵の「効率」を計算します（ここが複数ファイルで使われる大元の式です）
     // （他のファイルから人口が送られてこなかった時の保険として、デフォルトを20000にしています）
     static calcDraftEfficiency(busho, peoplesLoyalty, population = 20000) {
