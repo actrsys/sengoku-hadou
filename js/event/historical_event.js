@@ -364,12 +364,33 @@ window.GameEvents.push({
         const imagawaClanId = yoshimoto.clan;
         const odaClanId = nobunaga.clan;
         
-        // 織田家と今川家の関係が、同盟・従属・支配・友好ではないことを確認します
+        // 武田信玄（ID: 1002002）と北条氏康（ID: 1003003）が大名として存在するか確認します
+        const shingen = window.EventCheck.getDaimyo(game, 1002002);
+        const ujiyasu = window.EventCheck.getDaimyo(game, 1003003);
+        if (!shingen || !ujiyasu) return false;
+
+        // 各勢力間の外交関係を確認します
         if (game.diplomacyManager) {
+            // 織田家と今川家の関係が、同盟・従属・支配・友好・和睦ではないことを確認します
             const rel = game.diplomacyManager.getRelation(odaClanId, imagawaClanId);
-            if (rel && ['同盟', '従属', '支配', '友好'].includes(rel.status)) {
+            if (rel && ['同盟', '従属', '支配', '友好', '和睦'].includes(rel.status)) {
                 return false; // もし対象の関係だったら、ここでイベントをストップします
             }
+
+            const shingenClanId = shingen.clan;
+            const ujiyasuClanId = ujiyasu.clan;
+            
+            // 今川家と武田家の関係が同盟か確認します
+            const relImagawaShingen = game.diplomacyManager.getRelation(imagawaClanId, shingenClanId);
+            if (!relImagawaShingen || relImagawaShingen.status !== '同盟') return false;
+
+            // 今川家と北条家の関係が同盟か確認します
+            const relImagawaUjiyasu = game.diplomacyManager.getRelation(imagawaClanId, ujiyasuClanId);
+            if (!relImagawaUjiyasu || relImagawaUjiyasu.status !== '同盟') return false;
+
+            // 武田家と北条家の関係が同盟か確認します
+            const relShingenUjiyasu = game.diplomacyManager.getRelation(shingenClanId, ujiyasuClanId);
+            if (!relShingenUjiyasu || relShingenUjiyasu.status !== '同盟') return false;
         }
 
         // ④ 指定のお城をすべて持っているか確認します（少し手間のかかる確認です）
