@@ -1083,26 +1083,42 @@ class GameSystem {
     }
 
     // ==========================================
+    // ★追加：米の相場計算を根本的に一元化する魔法群
+    // ==========================================
+    static getBaseRiceRate(castle, provinces) {
+        let rate = 10.0;
+        if (castle && provinces) {
+            const province = provinces.find(p => p.id === castle.provinceId);
+            if (province && province.marketRate !== undefined) rate = province.marketRate;
+        }
+        return rate;
+    }
+
+    static getRiceActualRate(type, castle, provinces) {
+        const baseRate = this.getBaseRiceRate(castle, provinces);
+        const myClanId = castle ? castle.ownerClan : 0;
+        const merchantDiscount = this.getMerchantDiscount(myClanId);
+        
+        let displayRate = baseRate;
+        if (type === 'buy_rice') {
+            displayRate = baseRate * (1.0 - merchantDiscount);
+        } else if (type === 'sell_rice') {
+            displayRate = baseRate * (1.0 + merchantDiscount);
+        }
+        
+        return {
+            actualRate: displayRate / 100, // ★÷100の計算をここで完全に一元化！
+            displayRateStr: displayRate.toFixed(1) // 画面表示用の文字
+        };
+    }
+
+    // ==========================================
     // ★追加：取引の「実際に可能な最大数」を計算する一元化窓口
     // ==========================================
     static calcMaxTradeAmount(type, castle, daimyo, castellan, provinces) {
-        // ★追加：商人割引を計算します
-        const myClanId = castle ? castle.ownerClan : 0;
-        const merchantDiscount = this.getMerchantDiscount(myClanId);
-
         if (type === 'buy_rice') {
-            let rate = 10.0; // 基準を10.0に変更します
-            if (castle && provinces) {
-                const province = provinces.find(p => p.id === castle.provinceId);
-                if (province && province.marketRate !== undefined) rate = province.marketRate;
-            }
-            // ★追加：買う時は相場が安くなってお得になります！
-            rate = rate * (1.0 - merchantDiscount);
-            
-            // 実際の計算用レート（米100に対する金）に変換します
-            const actualRate = rate / 100;
-            
-            // 所持金と取引上限（金）の小さい方を上限とします
+            const rateInfo = this.getRiceActualRate('buy_rice', castle, provinces);
+            const actualRate = rateInfo.actualRate;
             const maxGold = Math.min(castle.gold, castle.tradeLimit || 0);
             let maxBuy = Math.floor(maxGold / actualRate);
             while (maxBuy > 0 && Math.ceil(maxBuy * actualRate) > maxGold) {
@@ -1111,18 +1127,8 @@ class GameSystem {
             return Math.min(maxBuy, 99999 - castle.rice);
         }
         else if (type === 'sell_rice') {
-            let rate = 10.0; // 基準を10.0に変更します
-            if (castle && provinces) {
-                const province = provinces.find(p => p.id === castle.provinceId);
-                if (province && province.marketRate !== undefined) rate = province.marketRate;
-            }
-            // ★追加：売る時は相場が高くなってお得になります！
-            rate = rate * (1.0 + merchantDiscount);
-            
-            // 実際の計算用レート（米100に対する金）に変換します
-            const actualRate = rate / 100;
-            
-            // 金の所持上限までの空きと取引上限（金）の小さい方を上限とします
+            const rateInfo = this.getRiceActualRate('sell_rice', castle, provinces);
+            const actualRate = rateInfo.actualRate;
             const maxGain = Math.min(99999 - castle.gold, castle.tradeLimit || 0);
             const maxSellByGold = Math.floor(maxGain / actualRate);
             return Math.min(castle.rice, maxSellByGold);
@@ -1155,38 +1161,15 @@ class GameSystem {
     static calcTradeCostAndRate(type, amount, castle, daimyo, castellan, provinces) {
         let cost = 0;
         let rateStr = "0.0";
-        // ★追加：商人割引を計算します
-        const myClanId = castle ? castle.ownerClan : 0;
-        const merchantDiscount = this.getMerchantDiscount(myClanId);
 
         if (type === 'buy_rice') {
-            let rate = 10.0; // 基準を10.0に変更します
-            if (castle && provinces) {
-                const province = provinces.find(p => p.id === castle.provinceId);
-                if (province && province.marketRate !== undefined) rate = province.marketRate;
-            }
-            // ★追加：買う時は相場が安くなってお得になります！
-            rate = rate * (1.0 - merchantDiscount);
-            
-            // 実際の計算用レート（米100に対する金）に変換します
-            const actualRate = rate / 100;
-            
-            cost = Math.ceil(amount * actualRate);
-            rateStr = rate.toFixed(1); // そのまま7.5等を表示させます
+            const rateInfo = this.getRiceActualRate('buy_rice', castle, provinces);
+            cost = Math.ceil(amount * rateInfo.actualRate);
+            rateStr = rateInfo.displayRateStr;
         } else if (type === 'sell_rice') {
-            let rate = 10.0; // 基準を10.0に変更します
-            if (castle && provinces) {
-                const province = provinces.find(p => p.id === castle.provinceId);
-                if (province && province.marketRate !== undefined) rate = province.marketRate;
-            }
-            // ★追加：売る時は相場が高くなってお得になります！
-            rate = rate * (1.0 + merchantDiscount);
-            
-            // 実際の計算用レート（米100に対する金）に変換します
-            const actualRate = rate / 100;
-            
-            cost = Math.floor(amount * actualRate); // 売却の場合は利益
-            rateStr = rate.toFixed(1); // そのまま7.5等を表示させます
+            const rateInfo = this.getRiceActualRate('sell_rice', castle, provinces);
+            cost = Math.floor(amount * rateInfo.actualRate); // 売却の場合は利益
+            rateStr = rateInfo.displayRateStr;
         } else if (type === 'buy_ammo') {
             const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
             cost = price * amount;

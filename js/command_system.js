@@ -226,13 +226,8 @@ const CAN_EXECUTE_RULES = {
     },
     // --- 軍事取引 ---
     canBuyRice: (game, castle) => {
-        let rate = 1.0;
-        if (castle && game.provinces) {
-            const province = game.provinces.find(p => p.id === castle.provinceId);
-            if (province && province.marketRate !== undefined) rate = province.marketRate;
-        }
-        const minCost = Math.floor(1 * rate);
-        return castle.gold >= (minCost > 0 ? minCost : 1) && (castle.tradeLimit || 0) > 0;
+        // ★一元化されたため、単価の事前計算は削除し、シンプルに金1以上かつ取引枠があるかで判定します
+        return castle.gold >= 1 && (castle.tradeLimit || 0) > 0;
     },
     canSellRice: (game, castle) => {
         return castle.rice >= 1 && (castle.tradeLimit || 0) > 0;
@@ -2688,74 +2683,46 @@ class CommandSystem {
     
     executeTrade(type, amount) {
         const castle = this.game.getCurrentTurnCastle(); 
-        // ★今いる国の相場を見に行きます！
-        let rate = 1.0;
-        if (castle && this.game.provinces) {
-            const province = this.game.provinces.find(p => p.id === castle.provinceId);
-            if (province && province.marketRate !== undefined) rate = province.marketRate;
-        }
-        
-        // ★商人割引を呼び出します！
-        let merchantDiscount = 0;
-        if (typeof GameSystem.getMerchantDiscount === 'function') {
-            merchantDiscount = GameSystem.getMerchantDiscount(castle.ownerClan);
-        }
+        const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
+        const castellan = this.game.getBusho(castle.castellanId);
+
+        // ★一元化された共通魔法を呼び出して、必要な費用（または利益）を一発で計算します！
+        const tradeData = GameSystem.calcTradeCostAndRate(type, amount, castle, daimyo, castellan, this.game.provinces);
+        const costOrGain = tradeData.cost;
 
         if(type === 'buy_rice') {
-            // ★追加：買う時は相場が安くなってお得になります
-            const buyRate = rate * (1.0 - merchantDiscount);
-            // ★修正：端数切り捨てだと無料で買える場合があるので、切り上げ（Math.ceil）にして最低1金はかかるようにします！
-            const cost = Math.max(1, Math.ceil(amount * buyRate));
             // ★変更：共通魔法でチェックします
-            if(!this.checkResource(castle, cost, 0)) return;
+            if(!this.checkResource(castle, costOrGain, 0)) return;
             // ★追加: 買うと上限を超えるならストップ
             if(castle.rice + amount > 99999) { this.game.ui.showDialog("これ以上兵糧は買えません", false); return; }
-            if(cost > (castle.tradeLimit || 0)) { this.game.ui.showDialog("取引上限を超えています", false); return; }
-            castle.gold -= cost; castle.rice += amount; 
-            castle.tradeLimit -= cost;
-            this.game.ui.showResultModal(`兵糧${amount}を購入しました\n(金-${cost})`); 
+            if(costOrGain > (castle.tradeLimit || 0)) { this.game.ui.showDialog("取引上限を超えています", false); return; }
+            castle.gold -= costOrGain; castle.rice += amount; 
+            castle.tradeLimit -= costOrGain;
+            this.game.ui.showResultModal(`兵糧${amount}を購入しました\n(金-${costOrGain})`); 
         } else if (type === 'sell_rice') { 
-            // ★追加：売る時は相場が高くなってお得になります
-            const sellRate = rate * (1.0 + merchantDiscount);
-            // ★変更：共通魔法でチェックします
+            // ★変更：売却なのでお金が足りるかのチェックはなし
             if(!this.checkResource(castle, 0, amount)) return;
-            const gain = Math.floor(amount * sellRate); 
             // ★追加: 売ると金が上限を超えるならストップ
-            if(castle.gold + gain > 99999) { this.game.ui.showDialog("これ以上兵糧は売れません", false); return; }
-            if(gain > (castle.tradeLimit || 0)) { this.game.ui.showDialog("取引上限を超えています", false); return; }
-            castle.rice -= amount; castle.gold += gain; 
-            castle.tradeLimit -= gain;
-            this.game.ui.showResultModal(`兵糧${amount}を売却しました\n(金+${gain})`); 
+            if(castle.gold + costOrGain > 99999) { this.game.ui.showDialog("これ以上兵糧は売れません", false); return; }
+            if(costOrGain > (castle.tradeLimit || 0)) { this.game.ui.showDialog("取引上限を超えています", false); return; }
+            castle.rice -= amount; castle.gold += costOrGain; 
+            castle.tradeLimit -= costOrGain;
+            this.game.ui.showResultModal(`兵糧${amount}を売却しました\n(金+${costOrGain})`); 
         } else if (type === 'buy_ammo') {
-            // ★相場を消して、固定金額にします
-            const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
-            const cost = price * amount;
-            // ★変更：共通魔法でチェックします
-            if(!this.checkResource(castle, cost, 0)) return;
-            // ★追加: 矢弾のストッパー
+            if(!this.checkResource(castle, costOrGain, 0)) return;
             if((castle.ammo || 0) + amount > 99999) { this.game.ui.showDialog("これ以上矢弾は買えません", false); return; }
-            castle.gold -= cost; castle.ammo = (castle.ammo || 0) + amount; 
-            this.game.ui.showResultModal(`矢弾${amount}を購入しました\n(金-${cost})`); 
+            castle.gold -= costOrGain; castle.ammo = (castle.ammo || 0) + amount; 
+            this.game.ui.showResultModal(`矢弾${amount}を購入しました\n(金-${costOrGain})`); 
         } else if (type === 'buy_horses') {
-            const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
-            const castellan = this.game.getBusho(castle.castellanId);
-            const cost = GameSystem.calcBuyHorseCost(amount, daimyo, castellan);
-            // ★変更：共通魔法でチェックします
-            if(!this.checkResource(castle, cost, 0)) return;
-            // ★追加: 軍馬のストッパー
+            if(!this.checkResource(castle, costOrGain, 0)) return;
             if((castle.horses || 0) + amount > 99999) { this.game.ui.showDialog("これ以上軍馬は買えません", false); return; }
-            castle.gold -= cost; castle.horses = (castle.horses || 0) + amount; 
-            this.game.ui.showResultModal(`軍馬${amount}を購入しました\n(金-${cost})`); 
+            castle.gold -= costOrGain; castle.horses = (castle.horses || 0) + amount; 
+            this.game.ui.showResultModal(`軍馬${amount}を購入しました\n(金-${costOrGain})`); 
         } else if (type === 'buy_guns') {
-            const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
-            const castellan = this.game.getBusho(castle.castellanId);
-            const cost = GameSystem.calcBuyGunCost(amount, daimyo, castellan);
-            // ★変更：共通魔法でチェックします
-            if(!this.checkResource(castle, cost, 0)) return;
-            // ★追加: 鉄砲のストッパー
+            if(!this.checkResource(castle, costOrGain, 0)) return;
             if((castle.guns || 0) + amount > 99999) { this.game.ui.showDialog("これ以上鉄砲は買えません", false); return; }
-            castle.gold -= cost; castle.guns = (castle.guns || 0) + amount; 
-            this.game.ui.showResultModal(`鉄砲${amount}を購入しました\n(金-${cost})`); 
+            castle.gold -= costOrGain; castle.guns = (castle.guns || 0) + amount; 
+            this.game.ui.showResultModal(`鉄砲${amount}を購入しました\n(金-${costOrGain})`); 
         }
         
         this.game.ui.updatePanelHeader(); 

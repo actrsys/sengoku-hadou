@@ -1521,21 +1521,10 @@ class AIEngine {
         // ★追加：行動回数消費なしの特別調略を行ったかのフラグ
         let hasBonusSabotageUsed = false;
 
-        // ★高速化：今の国の兵糧の単価（相場）をループの「外」で１回だけ調べておきます！
-        let riceRate = 10.0; // ★変更：基準を10.0に変更
-        if (this.game.provinces) {
-            const province = this.game.provinces.find(p => p.id === castle.provinceId);
-            if (province && province.marketRate !== undefined) riceRate = province.marketRate;
-        }
-        
-        // ★追加：商人割引の確認
-        let merchantDiscount = 0;
-        if (typeof GameSystem.getMerchantDiscount === 'function') {
-            merchantDiscount = GameSystem.getMerchantDiscount(castle.ownerClan);
-        }
-
-        const sellActualRate = (riceRate * (1.0 + merchantDiscount)) / 100;
-        const buyActualRate  = (riceRate * (1.0 - merchantDiscount)) / 100;
+        // ★高速化：今の国の兵糧の単価（相場）を一元化された魔法で取得します！
+        const baseRiceRate = GameSystem.getBaseRiceRate(castle, this.game.provinces);
+        const sellActualRate = GameSystem.getRiceActualRate('sell_rice', castle, this.game.provinces).actualRate;
+        const buyActualRate  = GameSystem.getRiceActualRate('buy_rice', castle, this.game.provinces).actualRate;
 
         // ★追加：大雪が降っている国（provinceId）のリストを作ります！
         const heavySnowProvIds = new Set();
@@ -1940,7 +1929,7 @@ class AIEngine {
             sellScore *= (1 + goldShortageRate);
             
             // お米が高く売れる時はスコアをアップ、安い時はダウンさせます！
-            sellScore *= (riceRate / 10.0); // ★変更：基準10.0に合わせて調整
+            sellScore *= (baseRiceRate / 10.0); // ★変更：一元化されたベースレートを使用します
             
             // 安全ラインを下回っていたら、絶対に売りません
             if (castle.rice <= sellSafeRice) {
