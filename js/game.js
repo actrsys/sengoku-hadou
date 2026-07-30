@@ -62,7 +62,7 @@ class DataManager {
             const [clansText, castlesText, bushosText, kunishusText, courtRanksText, princessesText, provincesText, legionsText] = await Promise.all([                
                 this.fetchText(path + "clans.csv"),                
                 this.fetchText(path + "castles.csv"),                
-                this.fetchCompressed(path + "warriors.bin"), // ★ここを fetchText から fetchCompressed にし、.bin に変更！
+                this.fetchCompressed(path + "warriors.bin").catch(() => this.fetchText(path + "warriors.csv")), // ★ .binがない場合は .csv を読み込む魔法です！
                 this.fetchText(path + "kunishuClan.csv").catch(() => ""),
                 this.fetchText("./data/imperialCourtRank.csv").catch(() => ""),
                 this.fetchText(path + "princess.csv").catch(() => ""), 
