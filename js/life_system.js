@@ -129,56 +129,49 @@ class LifeSystem {
                         
                         const newName = b.name; // 新しいフルネーム
 
-                        // ★お知らせを出します！
-                        // すでにゲームに登場して生きている武将（activeかronin）なら、お知らせを出します
+                        // ★お知らせを出す準備をします
                         if (b.status === 'active' || b.status === 'ronin') {
-                            // 前の名前と違う時だけメッセージを出します
                             if (oldName !== newName) {
-                                // 大名家に所属していたら「〇〇家の」と付けます
                                 let prefix = "";
                                 if (b.clan !== 0) {
                                     const currentClan = this.game.clans.find(c => c.id === b.clan);
-                                    if (currentClan) {
-                                        prefix = `${currentClan.name}の`;
-                                    }
+                                    if (currentClan) prefix = `${currentClan.name}の`;
                                 }
                                 
-                                // ==========================================
-                                // ★ここが新しい魔法！：リストに溜め込まず、ここで直接画面に出します！
                                 const msg = `${prefix}${oldName}は「${newName}」に改名しました。`;
-                                this.game.ui.log(msg); // 履歴に残します
+                                let clanMsg = "";
                                 
-                                // ★ここで「await（待て）」の魔法を使います！
-                                // 自勢力の武将か、大名の場合のみ画面にメッセージ（ダイアログ）を出します。
-                                // それ以外の武将は履歴（ログ）に残すだけにします。
-                                if (b.clan === this.game.playerClanId || b.isDaimyo) {
-                                    await this.game.ui.showDialogAsync(msg); 
-                                }
-                                
-                                // もし大名だったら、大名家の名前も新しくします
+                                // ★先に大名家の名前を新しくする処理を終わらせます！
+                                // （先ほど消してしまった変数ではなく、新しい共通の b.familyName を使います）
                                 if (b.isDaimyo && b.clan !== 0) {
                                     const clan = this.game.clans.find(c => c.id === b.clan);
                                     if (clan) {
                                         const oldClanName = clan.name;
-                                        const newBaseName = `${newFamilyName}家`;
-                                        const newClanYomi = newFamilyYomi ? `${newFamilyYomi}け` : ""; // ★読み仮名も作ります
+                                        const newBaseName = `${b.familyName}家`;
+                                        const newClanYomi = b.familyYomi ? `${b.familyYomi}け` : "";
                                         
-                                        // ★修正：大名家の名前が本当に変わる時だけ、お知らせを出します！
-                                        // 今の家名ではなく、本来の家名（baseName）と比べて判定します。
                                         if (clan.baseName !== newBaseName) {
-                                            clan.baseName = newBaseName; // ★本来の家名も更新しておきます
+                                            clan.baseName = newBaseName; 
                                             clan.name = newBaseName;
-                                            clan.yomi = newClanYomi; // ★読み仮名も新しく書き換えます
+                                            clan.yomi = newClanYomi; 
                                             
-                                            // ==========================================
-                                            // ★大名家の名前が変わった時も、新しくメッセージを作って1回ずつ待ちます！
-                                            const clanMsg = `当主の改名により、${oldClanName}は今後「${clan.name}」となります。`;
-                                            this.game.ui.log(clanMsg);
-                                            await this.game.ui.showDialogAsync(clanMsg);
-                                            // ==========================================
+                                            clanMsg = `当主の改名により、${oldClanName}は今後「${clan.name}」となります。`;
                                         }
                                     }
                                 }
+
+                                // ==========================================
+                                // ★すべての裏処理が終わってから、メッセージを出して待ちます！
+                                this.game.ui.log(msg);
+                                if (b.clan === this.game.playerClanId || b.isDaimyo) {
+                                    await this.game.ui.showDialogAsync(msg); 
+                                }
+                                
+                                if (clanMsg !== "") {
+                                    this.game.ui.log(clanMsg);
+                                    await this.game.ui.showDialogAsync(clanMsg);
+                                }
+                                // ==========================================
                             }
                         }
                     }
@@ -1033,13 +1026,13 @@ class LifeSystem {
             // ★一番最初に出すメインの死亡メッセージをリストの先頭に追加します
             messages.unshift(mainMsg);
 
+            // ★追加：メッセージを出す「前」に、死んだ大名のマークを外す処理を終わらせます
+            daimyo.isDaimyo = false;
+
             // ★順番に1つずつダイアログを出して、クリックされるまで待ちます！
             for (const msg of messages) {
                 await this.game.ui.showDialogAsync(msg, false, 0);
             }
-            
-            // ★後継ぎにバトンタッチしたので、死んだ大名のマークを外します
-            daimyo.isDaimyo = false;
 
         } else {
             // ★誰もいなかったら、新しく作った滅亡チェックの魔法にバトンタッチします！
@@ -1528,12 +1521,11 @@ class LifeSystem {
             // 履歴にメッセージを残します
             this.game.ui.log(extMsg);
             
-            // 画面にメッセージを出して、プレイヤーが押すまで待ちます
-            await this.game.ui.showDialogAsync(extMsg, false, 0);
+            // ==========================================
+            // ★修正：メッセージを出す「前」に、武将や城の処理を終わらせます！
 
             // もし残っている武将がいたら、全員「浪人」にします
             this.game.bushos.filter(b => b.clan === clanId && b.status === 'active').forEach(b => {
-                // 大名家の武将が浪人になるので功績を半分にします
                 if ((b.belongKunishuId || 0) === 0) {
                     b.achievementTotal = Math.floor((b.achievementTotal || 0) / 2);
                 }
@@ -1548,13 +1540,18 @@ class LifeSystem {
                     if (l.status === 'unborn' || l.status === 'dead') return;
                     this.game.affiliationSystem.becomeRonin(l);
                 });
-                this.game.updateCastleLord(c); // 城主情報をリセット
+                this.game.updateCastleLord(c); 
             });
 
-            // ★追加：大名家が滅亡してお城が空っぽになったので、マップをすぐに描き直します！
+            clan.isDestroyed = true; 
+
             if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
                 this.game.ui.renderMap();
             }
+
+            // ★すべての裏処理が終わってから、画面にメッセージを出して待ちます！
+            await this.game.ui.showDialogAsync(extMsg, false, 0);
+            // ==========================================
 
             // もしプレイヤーの大名家が滅亡してしまったら…ゲームオーバーです！
             if (clanId === this.game.playerClanId) {
