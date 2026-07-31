@@ -24,8 +24,8 @@ window.MainParams = {
     Economy: {
         IncomeGoldRate: 1, IncomeFluctuation: 0.15,
         ConsumeRicePerSoldier: 0.03,
-        TradeRateBase: 5.0,
-        TradeRateMin: 3.75, TradeRateMax: 6.25, TradeFluctuation: 0.5,
+        TradeRateBase: 3.0,
+        TradeRateMin: 2.3, TradeRateMax: 3.7, TradeFluctuation: 0.5,
         PriceAmmo: 1
     },
     Strategy: {
