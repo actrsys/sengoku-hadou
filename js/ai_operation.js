@@ -581,7 +581,8 @@ class AIOperationManager {
         const currentM = Number(this.game.month);
         const elapsedTurns = ((currentY - startY) * 12) + (currentM - startM);
         
-        if (isNaN(elapsedTurns) || elapsedTurns < 3) {
+        // ★修正：ゲーム開始3ヶ月間の攻撃作戦禁止期間を削除し、開幕から作戦を立てるようにします
+        if (isNaN(elapsedTurns)) {
             this.setInternalOperation(clanId, legionId);
             return;
         }
@@ -921,10 +922,10 @@ class AIOperationManager {
                 if (ratio <= 0.25) {
                     prepTurns = 0; // 敵が1/4以下なら0ヶ月（すぐに実行）
                 } else if (ratio >= 1.3) {
-                    prepTurns = 6; // 敵が1.3倍以上なら6ヶ月
+                    prepTurns = 4; // ★敵が1.3倍以上の時の最大準備期間4ヶ月
                 } else {
-                    // その間なら、なめらかに0〜6ヶ月の間で計算します
-                    prepTurns = Math.round(((ratio - 0.25) / 1.05) * 6);
+                    // ★\なめらかに0〜4ヶ月の間で計算します
+                    prepTurns = Math.round(((ratio - 0.25) / 1.05) * 4);
                 }
                 
                 // ★雪国かどうかを判定するための準備をします
