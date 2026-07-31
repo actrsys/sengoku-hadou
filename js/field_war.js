@@ -1358,9 +1358,21 @@ class FieldWarManager {
 
         // ★追加: 騎馬の地形ペナルティ
         if (unit && unit.troopType === 'kiba') {
-            if (terrain === 'mountain') return 999; // 山は通行不可！
+            if (terrain === 'mountain') {
+                if (!SkillManager.canKibaEnterMountain(unit, this.game)) {
+                    return 999; // 踏破がなければ山は通行不可！
+                }
+                // 踏破があれば足軽と同じコスト(3)で入れるので加算はしません
+            }
             if (terrain === 'forest') baseCost += 1; // 森はコスト+1
             if (terrain === 'river') baseCost += 1;  // 川もコスト+1
+        }
+
+        // ★追加: 海の移動コスト軽減 (操船)
+        let isSea = (this.grid && this.grid[row] && this.grid[row][x]) ? this.grid[row][x].isSea : false;
+        if (isSea) {
+            let reduction = SkillManager.getMaritimeMoveCostReduction(unit, allies, this.game);
+            baseCost = Math.max(1, baseCost - reduction); // 最低コスト1は守ります
         }
 
         let zocCost = 1;
@@ -1457,6 +1469,7 @@ class FieldWarManager {
                     
                     // ★追加: ターゲットマスの計算にも騎馬ペナルティを含めます
                     if (unit.troopType === 'kiba') {
+                        if (terrain === 'mountain' && !SkillManager.canKibaEnterMountain(unit, this.game)) c = 999;
                         if (terrain === 'forest') c += 1;
                         if (terrain === 'river') c += 1;
                     }
@@ -1581,7 +1594,12 @@ class FieldWarManager {
             // 雨、雪、夜の判定をして行動力を減らします（最低1は確保します）
             let penalty = 0;
             
-            if (this.weather === 'rain' || this.weather === 'snow') penalty += 1;
+            if (this.weather === 'rain' || this.weather === 'snow') {
+                // ★追加: 悪天巧者スキルの確認
+                if (!SkillManager.isWeatherPenaltyIgnored(u, this.game)) {
+                    penalty += 1;
+                }
+            }
             if (this.isNightTurn()) penalty += 1;
 
             // ★追加: 大雪拠点戦の場合はさらに常時ペナルティ
@@ -2608,13 +2626,22 @@ class FieldWarManager {
         // 守備側の地形補正（防御力）
         let defRow = Math.floor(defender.y / 2);
         let defTerrain = (this.grid && this.grid[defRow] && this.grid[defRow][defender.x]) ? this.grid[defRow][defender.x].terrain : 'plain';
+        let defIsSea = (this.grid && this.grid[defRow] && this.grid[defRow][defender.x]) ? this.grid[defRow][defender.x].isSea : false;
         
         let defTerrainMult = 1.0;
         if (defTerrain === 'forest') defTerrainMult = 1.15;      // 森は防御力アップ
         else if (defTerrain === 'mountain') defTerrainMult = 1.3; // 山はさらに防御力アップ
-        else if (defTerrain === 'river' || (this.grid && this.grid[defRow] && this.grid[defRow][defender.x].isSea)) {
+        else if (defTerrain === 'river' || defIsSea) {
             // ★川（海）での防御力のマイナス補正（雨や雪の時はさらに厳しく）
-            defTerrainMult = (this.weather === 'rain' || this.weather === 'snow') ? 0.5 : 0.7;
+            let baseMult = (this.weather === 'rain' || this.weather === 'snow') ? 0.5 : 0.7;
+            
+            // ★追加: 操船による海の防御ペナルティ軽減
+            if (defIsSea) {
+                const defAllies = this.units.filter(u => u.isAttacker === defender.isAttacker);
+                baseMult = SkillManager.calcMaritimeDefenseModifier(defender, defAllies, baseMult, this.game);
+            }
+            
+            defTerrainMult = baseMult;
         }
         defFinalDef = defFinalDef * defTerrainMult;
 
@@ -2628,6 +2655,14 @@ class FieldWarManager {
             atkTerrainMult = (this.weather === 'rain' || this.weather === 'snow') ? 0.5 : 0.7;
         }
         atkFinalAtk = atkFinalAtk * atkTerrainMult;
+        
+        // ★追加: 適正によるダメージ増加
+        let isRangedAttack = false;
+        if (attacker.troopType === 'teppo' || (attacker.troopType === 'ashigaru' && atkDist > 1)) {
+            isRangedAttack = true;
+        }
+        let aptitudeDmgMult = SkillManager.calcAptitudeDamageModifier(attacker, isRangedAttack, this.game);
+        atkFinalAtk = atkFinalAtk * aptitudeDmgMult;
         
         // 7. 与ダメージ計算
         let dmgRatio = (atkFinalAtk + defFinalDef) > 0 ? (atkFinalAtk / (atkFinalAtk + defFinalDef)) : 0;
@@ -2668,7 +2703,12 @@ class FieldWarManager {
         let dmgToAtk = 0;
         if (atkDist === 1) { // 反撃は距離1のときのみ
             let counterRatio = (atkFinalAtk + defFinalDef) > 0 ? (defFinalDef / (atkFinalAtk + defFinalDef)) : 0;
-            dmgToAtk = Math.floor(defFinalAtk * 0.5 * counterRatio);
+            
+            // ★追加: 守備側（反撃側）の適正によるダメージ増加
+            // 反撃は常に近接攻撃（距離1）として扱います
+            let defAptitudeMult = SkillManager.calcAptitudeDamageModifier(defender, false, this.game);
+            
+            dmgToAtk = Math.floor(defFinalAtk * defAptitudeMult * 0.5 * counterRatio);
         }
 
         // ★追加: プレイヤーがいないAI同士の戦いなら、ダメージを約3分の2（0.666）に減らします！

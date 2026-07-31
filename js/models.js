@@ -341,6 +341,14 @@ class Busho {
         this.aptAshigaru = data.aptAshigaru || 'E'; // 足軽適性
         this.aptKiba = data.aptKiba || 'E';         // 騎馬適性
         this.aptTeppo = data.aptTeppo || 'E';       // 鉄砲適性
+        this.aptYumi = data.aptYumi || 'E';         // 弓術適性
+        this.aptBugei = data.aptBugei || 'E';       // 武芸適性
+        this.aptNinjutsu = data.aptNinjutsu || 'E'; // 忍術適性
+        this.aptMaritime = data.aptMaritime || 'E'; // 操船適性
+        
+        // ★【ここから書き足し：技能】
+        // 複数持てるようにそのまま文字列で保管します。空っぽなら空文字にします
+        this.skill = data.skill || "";
 
         // ★【ここから書き足し：官位】
         if (data.courtRankIds && Array.isArray(data.courtRankIds)) {
