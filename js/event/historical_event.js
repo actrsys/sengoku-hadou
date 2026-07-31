@@ -664,6 +664,12 @@ window.GameEvents.push({
                 await game.lifeSystem.executeDeath(yoshimoto);
             }
 
+            // ★義元死亡後、今川勢力に所属する松平系（1301000～1301999）以外の武将の忠誠度を30回復します※難易度とイベントの進行ための調整用
+            const imagawaRemainingBushos = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && !(b.id >= 1301000 && b.id <= 1301999));
+            imagawaRemainingBushos.forEach(b => {
+                b.loyalty = Math.min(100, (b.loyalty || 0) + 30);
+            });
+
             // 織田家に勝利のボーナス（忠誠と民忠アップ）を与えます
             if (nobunaga && nobunaga.clan > 0) {
                 const odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.status === 'active');
@@ -728,7 +734,7 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 徳川家康（徳川家康） 独立イベント
+// ★ 徳川家康 独立イベント
 // ==========================================
 window.GameEvents.push({
     id: "historical_ieyasu_independence",
@@ -764,25 +770,16 @@ window.GameEvents.push({
 
         if (!castle) return;
 
+        // ★独立させる直前に、松平系（ID: 1301000～1301999）の武将の忠誠度を10下げます
+        const matsudairaBushosBefore = game.bushos.filter(b => b.clan === ujizane.clan && b.status === 'active' && b.id >= 1301000 && b.id <= 1301999);
+        matsudairaBushosBefore.forEach(b => {
+            b.loyalty = Math.max(0, (b.loyalty || 0) - 10);
+        });
+
         // 独立システムを呼び出して、強制的に独立を実行します
         if (game.independenceSystem) {
             // 第4引数に 'indep' を渡すことで、乗っ取りや寝返りではなく、純粋な「独立」として処理させます
             await game.independenceSystem.executeRebellion(castle, motoyasu, ujizane, 'indep');
-            
-            // 独立が起こったあと、元々の大名家（今川家）に残った武将の下がりすぎた忠誠度を調整の為25回復させます
-            const oldClanId = ujizane.clan;
-            // 氏真がちゃんと大名家に所属しているか確認します
-            if (oldClanId > 0) {
-                // 同じ大名家に所属していて、まだ活動中（生きている）武将を全員集めます
-                const remainingBushos = game.bushos.filter(b => b.clan === oldClanId && b.status === 'active');
-                
-                // 集めた武将たち全員に、順番に忠誠度を回復する魔法をかけます
-                remainingBushos.forEach(b => {
-                    // 現在の忠誠度に25を足します（ただし、最大100までに制限します）
-                    b.loyalty = Math.min(100, (b.loyalty || 0) + 25);
-                });
-                
-            }
 
             // ★追加：独立した徳川家康の大名家に所属する武将と城のボーナス処理
             if (motoyasu.clan > 0) {
@@ -801,24 +798,24 @@ window.GameEvents.push({
                     // 家康の居城かどうかで処理を分けます
                     if (c.id === motoyasu.castleId) {
                         // 【家康の居城の場合】
+                        // 兵士数が4000未満なら4000に、4000以上なら+500します（上限は99999）
+                        if ((c.soldiers || 0) < 4000) {
+                            c.soldiers = 4000;
+                        } else {
+                            c.soldiers = Math.min(99999, (c.soldiers || 0) + 500);
+                        }
+                        // 人口を7000増やします（上限は99万9999）
+                        c.population = Math.min(999999, (c.population || 0) + 7000);
+                    } else {
+                        // 【家康の居城以外の拠点の場合】
                         // 兵士数が3000未満なら3000に、3000以上なら+500します（上限は99999）
                         if ((c.soldiers || 0) < 3000) {
                             c.soldiers = 3000;
                         } else {
                             c.soldiers = Math.min(99999, (c.soldiers || 0) + 500);
                         }
-                        // 人口を5000増やします（上限は99万9999）
-                        c.population = Math.min(999999, (c.population || 0) + 5000);
-                    } else {
-                        // 【家康の居城以外の拠点の場合】
-                        // 兵士数が2000未満なら2000に、2000以上なら+500します（上限は99999）
-                        if ((c.soldiers || 0) < 2000) {
-                            c.soldiers = 2000;
-                        } else {
-                            c.soldiers = Math.min(99999, (c.soldiers || 0) + 500);
-                        }
-                        // 人口を2000増やします（上限は99万9999）
-                        c.population = Math.min(999999, (c.population || 0) + 2000);
+                        // 人口を3000増やします（上限は99万9999）
+                        c.population = Math.min(999999, (c.population || 0) + 3000);
                     }
                 });
             }
