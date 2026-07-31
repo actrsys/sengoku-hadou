@@ -396,9 +396,9 @@ class UIInfoManager {
                         valB = b.id === this.game.playerClanId ? 999 : b.friendScore;
                         break;
                     case 'relation':
-                        const relationRank = { "自家": 0, "婚姻": 1, "同盟": 2, "支配": 3, "従属": 4, "友好": 5, "普通": 6, "敵対": 7 };
-                        valA = relationRank[a.friendStatus] !== undefined ? relationRank[a.friendStatus] : 6;
-                        valB = relationRank[b.friendStatus] !== undefined ? relationRank[b.friendStatus] : 6;
+                        const relationRank = { "自家": 0, "婚姻": 1, "同盟": 2, "支配": 3, "従属": 4, "友好": 5, "和睦": 6, "普通": 7, "敵対": 8 };
+                        valA = relationRank[a.friendStatus] !== undefined ? relationRank[a.friendStatus] : 7;
+                        valB = relationRank[b.friendStatus] !== undefined ? relationRank[b.friendStatus] : 7;
                         break;
                 }
 
