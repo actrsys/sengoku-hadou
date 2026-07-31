@@ -664,6 +664,13 @@ window.GameEvents.push({
                 await game.lifeSystem.executeDeath(yoshimoto);
             }
 
+            // ★追加：義元死亡後、今川勢力に所属するすべての拠点の兵力を0.7倍、人口を0.8倍にします（小数点は切り捨てます）
+            const imagawaCastles = game.castles.filter(c => c.ownerClan === imagawaClanId);
+            imagawaCastles.forEach(c => {
+                c.soldiers = Math.floor((c.soldiers || 0) * 0.7);
+                c.population = Math.floor((c.population || 0) * 0.8);
+            });
+
             // ★義元死亡後、今川勢力に所属する松平系（1301000～1301999）以外の武将の忠誠度を30回復します※難易度とイベントの進行ための調整用
             const imagawaRemainingBushos = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && !(b.id >= 1301000 && b.id <= 1301999));
             imagawaRemainingBushos.forEach(b => {
