@@ -213,25 +213,28 @@ Object.assign(UIInfoManager.prototype, {
                     </div>
                 `;
             } else {
-                // ★追加：魅力など経験値がない場合でも、高さのズレを防ぐために「見えないダミー」を置きます
                 expBarHtml = `
                     <div class="exp-bar-bg" style="visibility: hidden;"></div>
                 `;
             }
 
+            // ★修正：レイアウトを「項目名」「アルファベット」「ゲージ」の順にして左寄せにします
+            // スマホとPCで幅のバランスを整えます
+            const isPc = document.body.classList.contains('is-pc');
+            const labelWidth = isPc ? "40px" : "30px";
+            const gradeWidth = isPc ? "35px" : "25px";
+
             return `
-                <div class="daimyo-detail-stat-box" style="padding-right: 5px;">
-                    <span class="daimyo-detail-label">${label}</span>
-                    <span class="daimyo-detail-value" style="display:flex; align-items:center; flex:1; justify-content: flex-end;">
-                        <div class="busho-stat-bar-wrapper">
-                            <div class="${mainBarClass}">
-                                <div class="${fillClass}" style="width:${basePercent}%;"></div>
-                                ${overBarHtml}
-                            </div>
-                            ${expBarHtml}
+                <div class="daimyo-detail-stat-box" style="justify-content: flex-start; padding-right: 5px;">
+                    <span class="daimyo-detail-label" style="width: ${labelWidth}; min-width: ${labelWidth}; margin-right: 5px; text-align: left;">${label}</span>
+                    <span style="width: ${gradeWidth}; text-align: left; font-weight: bold; display: flex; align-items: center;">${gradeHtml}</span>
+                    <div class="busho-stat-bar-wrapper" style="flex: 1; margin-right: 0; max-width: none; margin-left: 5px;">
+                        <div class="${mainBarClass}">
+                            <div class="${fillClass}" style="width:${basePercent}%;"></div>
+                            ${overBarHtml}
                         </div>
-                        <div style="width: 30px; text-align: center; font-weight: bold;">${gradeHtml}</div>
-                    </span>
+                        ${expBarHtml}
+                    </div>
                 </div>
             `;
         };
@@ -244,7 +247,7 @@ Object.assign(UIInfoManager.prototype, {
         const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 4px;";
 
         let rightContentHtml = '';
-
+        
         const makeRow = (label, value) => {
             let extraLabelStyle = "";
             if (!isPc && label.length >= 3) {
@@ -255,7 +258,7 @@ Object.assign(UIInfoManager.prototype, {
 
         if (this.bushoDetailCurrentTab === 'status') {
             const statHtml = `
-                <div style="${groupWrapStyle} flex: 1.2;">
+                <div style="${groupWrapStyle} flex: 1; min-width: 0;">
                     ${getStatRow('leadership', '統率')}
                     ${getStatRow('strength', '武勇')}
                     ${getStatRow('politics', '内政')}
@@ -266,7 +269,7 @@ Object.assign(UIInfoManager.prototype, {
             `;
 
             const infoHtml = `
-                <div style="display: flex; flex-direction: column; gap: ${rowGap}; flex: 1;">
+                <div style="display: flex; flex-direction: column; gap: ${rowGap}; flex: 1; min-width: 0;">
                     <div style="${groupWrapStyle}">
                         ${makeRow('所在', castleName)}
                         ${makeRow('主君', lordName)}
@@ -281,7 +284,7 @@ Object.assign(UIInfoManager.prototype, {
             `;
 
             rightContentHtml = `
-                <div style="display: flex; flex-direction: ${isPc ? 'row' : 'column'}; gap: ${rowGap}; width: 100%;">
+                <div style="display: flex; flex-direction: row; gap: ${rowGap}; width: 100%;">
                     ${statHtml}
                     ${infoHtml}
                 </div>
