@@ -255,13 +255,22 @@ Object.assign(UIInfoManager.prototype, {
                 { label: '操船', val: busho.aptMaritime }
             ];
             
+            // ★変更：PC版は2列、スマホ版は3列で表示するように切り替えます
+            const colCount = isPc ? 2 : 3;
+            const rowClass = isPc ? "daimyo-detail-2col" : "daimyo-detail-3col";
+            
             let aptHtml = '';
-            for(let i = 0; i < aptitudes.length; i += 2) {
-                let col1 = aptitudes[i];
-                let col2 = aptitudes[i+1];
-                let col1Html = `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">${col1.label}</span><span class="daimyo-detail-value">${getAptGradeHtml(col1.val)}</span></div>`;
-                let col2Html = col2 ? `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">${col2.label}</span><span class="daimyo-detail-value">${getAptGradeHtml(col2.val)}</span></div>` : `<div class="daimyo-detail-stat-box" style="visibility: hidden;"></div>`;
-                aptHtml += `<div class="daimyo-detail-row daimyo-detail-2col">${col1Html}${col2Html}</div>`;
+            for(let i = 0; i < aptitudes.length; i += colCount) {
+                let rowInnerHtml = '';
+                for(let j = 0; j < colCount; j++) {
+                    let apt = aptitudes[i + j];
+                    if (apt) {
+                        rowInnerHtml += `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">${apt.label}</span><span class="daimyo-detail-value">${getAptGradeHtml(apt.val)}</span></div>`;
+                    } else {
+                        rowInnerHtml += `<div class="daimyo-detail-stat-box" style="visibility: hidden;"></div>`;
+                    }
+                }
+                aptHtml += `<div class="daimyo-detail-row ${rowClass}">${rowInnerHtml}</div>`;
             }
 
             // 技能は「,」や「|」で区切られているかもしれないので、分けて最大3つ取り出します
