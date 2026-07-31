@@ -66,18 +66,19 @@ class SkillManager {
         let lvl = 0;
         let reductionPct = 0; // 軽減率（％）
         
-        if (defender.troopType === 'ashigaru') {
-            // 足軽の場合、受ける攻撃が遠距離なら弓術、近接なら足軽のレベルを取得します
+        // ★修正：自分の兵科は関係なく、「攻撃してきた相手の兵科」を見て対処法（適性）を引っ張り出します！
+        if (attacker.troopType === 'ashigaru') {
+            // 相手が足軽の場合、遠距離攻撃（弓）なら弓術、近接攻撃なら足軽のレベルで対処します
             lvl = this.getAptitudeLevel(isRanged ? busho.aptYumi : busho.aptAshigaru);
-            reductionPct = lvl * 2; // 足軽と弓術はLv × 2%軽減
-        } else if (defender.troopType === 'kiba' && attacker.troopType === 'kiba') {
-            // 騎馬隊で、相手も騎馬隊の時だけ馬術を取得します
+            reductionPct = lvl * 2; // 足軽・弓からの攻撃はLv × 2%軽減
+        } else if (attacker.troopType === 'kiba') {
+            // 相手が騎馬隊の時は、馬術のレベルで対処します
             lvl = this.getAptitudeLevel(busho.aptKiba);
-            reductionPct = lvl * 1; // 馬術はLv × 1%軽減
-        } else if (defender.troopType === 'teppo' && attacker.troopType === 'teppo') {
-            // 鉄砲隊で、相手も鉄砲隊の時だけ砲術を取得します
+            reductionPct = lvl * 1; // 騎馬からの攻撃はLv × 1%軽減
+        } else if (attacker.troopType === 'teppo') {
+            // 相手が鉄砲隊の時は、砲術のレベルで対処します
             lvl = this.getAptitudeLevel(busho.aptTeppo);
-            reductionPct = lvl * 1; // 砲術はLv × 1%軽減
+            reductionPct = lvl * 1; // 鉄砲からの攻撃はLv × 1%軽減
         }
         
         // ★適性がE（レベル0）の場合は、ここですぐに計算を打ち切って1.0倍を返します！
