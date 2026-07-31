@@ -587,6 +587,11 @@ class WarManager {
         let horseBonus = horseRatio * 20;
         let gunBonus = gunRatio * 20;
 
+        // ★追加：雨や雪などの悪天候時は鉄砲が使えないため、AIの作戦選びでもボーナスを無しにします！
+        if (s.isRaining) {
+            gunBonus = 0;
+        }
+
         let totalAtkSoldiers = s.attacker.soldiers + (s.selfReinforcement ? s.selfReinforcement.soldiers : 0) + (s.reinforcement ? s.reinforcement.soldiers : 0);
         let totalDefSoldiers = s.defender.soldiers + (s.defSelfReinforcement ? s.defSelfReinforcement.soldiers : 0) + (s.defReinforcement ? s.defReinforcement.soldiers : 0);
 
