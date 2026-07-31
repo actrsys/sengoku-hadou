@@ -34,7 +34,7 @@ Object.assign(UIInfoManager.prototype, {
             tabsEl.innerHTML = `
                 <div style="display: flex; gap: 5px;">
                     <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'status' ? 'active' : ''}" id="busho-detail-tab-status">基本</button>
-                    <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'aptitude' ? 'active' : ''}" id="busho-detail-tab-aptitude">適性・技能</button>
+                    <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'aptitude' ? 'active' : ''}" id="busho-detail-tab-aptitude">技能</button>
                 </div>
             `;
             
@@ -199,6 +199,11 @@ Object.assign(UIInfoManager.prototype, {
         };
 
         const yomiStr = busho.yomi ? busho.yomi : "";
+        
+        // ★追加：スマホ版かどうかで縦の隙間（行間）を変える準備をします
+        const isPc = document.body.classList.contains('is-pc');
+        const rowGap = isPc ? "6px" : "3px"; // ★スマホ版はきゅっと詰めます
+        const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 4px;";
 
         let rightContentHtml = '';
 
@@ -268,16 +273,15 @@ Object.assign(UIInfoManager.prototype, {
             let skillHtml = '';
             for(let i = 0; i < 3; i++) {
                 let skillName = skills[i] || "&nbsp;";
-                skillHtml += `<div class="daimyo-detail-stat-box" style="margin-bottom: 6px;"><span class="daimyo-detail-label">技能${i+1}</span><span class="daimyo-detail-value">${skillName}</span></div>`;
+                // margin-bottomを削除してgroupWrapStyle（親の箱の余白設定）に任せます
+                skillHtml += `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">技能${i+1}</span><span class="daimyo-detail-value">${skillName}</span></div>`;
             }
 
             rightContentHtml = `
-                <div style="margin-bottom: 10px;">
-                    <div style="font-size: 0.95rem; color: #ffd54f; margin-bottom: 5px; border-bottom: 1px solid rgba(212, 175, 55, 0.3);">適性</div>
+                <div style="${groupWrapStyle} margin-bottom: 6px;">
                     ${aptHtml}
                 </div>
-                <div>
-                    <div style="font-size: 0.95rem; color: #ffd54f; margin-bottom: 5px; border-bottom: 1px solid rgba(212, 175, 55, 0.3);">技能</div>
+                <div style="${groupWrapStyle}">
                     ${skillHtml}
                 </div>
             `;
@@ -308,7 +312,7 @@ Object.assign(UIInfoManager.prototype, {
                                 </div>
                             </div>
                         </div>
-                        <div class="daimyo-detail-right">
+                        <div class="daimyo-detail-right" style="gap: ${rowGap};">
                             ${rightContentHtml}
                         </div>
                     </div>
