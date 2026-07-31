@@ -145,6 +145,44 @@ Object.assign(UIInfoManager.prototype, {
         }
 
         let factionNameStr = busho.factionName || "";
+        if (factionNameStr !== "" && busho.isFactionLeader) {
+            factionNameStr += " 筆頭";
+        }
+
+        let lordName = "なし";
+        if (busho.isDaimyo) {
+            lordName = "なし";
+        } else if (busho.status === 'ronin') {
+            lordName = "なし";
+        } else if (busho.belongKunishuId > 0) {
+            let kunishu = null;
+            if (this.game.kunishuSystem && typeof this.game.kunishuSystem.getKunishu === 'function') kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
+            else if (this.game.kunishus) kunishu = this.game.kunishus.find(k => k.id === busho.belongKunishuId);
+            
+            if (kunishu && kunishu.leaderId !== busho.id) {
+                const leader = this.game.getBusho(kunishu.leaderId);
+                lordName = leader ? leader.name : "不明";
+            }
+        } else if (busho.clan > 0) {
+            if (castle && castle.legionId > 0) {
+                let legion = null;
+                if (this.game.legions) {
+                    legion = this.game.legions.find(l => Number(l.legionNo) === Number(castle.legionId) && Number(l.clanId) === Number(busho.clan));
+                }
+                if (legion && legion.commanderId > 0 && legion.commanderId !== busho.id) {
+                    const commander = this.game.getBusho(legion.commanderId);
+                    lordName = commander ? commander.name : "不明";
+                } else {
+                    const clan = this.game.clans.find(c => c.id === busho.clan);
+                    const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
+                    lordName = daimyo ? daimyo.name : "なし";
+                }
+            } else {
+                const clan = this.game.clans.find(c => c.id === busho.clan);
+                const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
+                lordName = daimyo ? daimyo.name : "なし";
+            }
+        }
 
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
         const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
@@ -207,35 +245,45 @@ Object.assign(UIInfoManager.prototype, {
 
         let rightContentHtml = '';
 
+        const makeRow = (label, value) => {
+            let extraLabelStyle = "";
+            if (!isPc && label.length >= 3) {
+                extraLabelStyle = " letter-spacing: -1px; transform: scaleX(0.9); transform-origin: left center; display: inline-block;";
+            }
+            return `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label" style="${extraLabelStyle}">${label}</span><span class="daimyo-detail-value">${value}</span></div>`;
+        };
+
         if (this.bushoDetailCurrentTab === 'status') {
-            rightContentHtml = `
-                <div class="daimyo-detail-row daimyo-detail-2col">
-                    <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">勢力</span><span class="daimyo-detail-value">${affiliationName}</span></div>
-                    <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">所在</span><span class="daimyo-detail-value">${castleName}</span></div>
-                </div>
-                <div class="daimyo-detail-row daimyo-detail-2col">
-                    <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">身分</span><span class="daimyo-detail-value">${busho.getRankName()}</span></div>
-                    <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">年齢</span><span class="daimyo-detail-value">${ageStr !== "" ? ageStr : "&nbsp;"}</span></div>
-                </div>
-                <div class="daimyo-detail-row daimyo-detail-2col">
+            const statHtml = `
+                <div style="${groupWrapStyle} flex: 1.2;">
                     ${getStatRow('leadership', '統率')}
                     ${getStatRow('strength', '武勇')}
-                </div>
-                <div class="daimyo-detail-row daimyo-detail-2col">
                     ${getStatRow('politics', '内政')}
                     ${getStatRow('diplomacy', '外交')}
-                </div>
-                <div class="daimyo-detail-row daimyo-detail-2col">
                     ${getStatRow('intelligence', '智謀')}
                     ${getStatRow('charm', '魅力')}
                 </div>
-                <div class="daimyo-detail-row daimyo-detail-2col">
-                    <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">俸禄</span><span class="daimyo-detail-value">${salary !== "" ? salary : "&nbsp;"}</span></div>
-                    <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">一門</span><span class="daimyo-detail-value">${isFamily ? "◯" : "&nbsp;"}</span></div>
+            `;
+
+            const infoHtml = `
+                <div style="display: flex; flex-direction: column; gap: ${rowGap}; flex: 1;">
+                    <div style="${groupWrapStyle}">
+                        ${makeRow('所在', castleName)}
+                        ${makeRow('主君', lordName)}
+                    </div>
+                    <div style="${groupWrapStyle}">
+                        ${makeRow('年齢', ageStr !== "" ? ageStr : "&nbsp;")}
+                        ${makeRow('俸禄', salary !== "" ? salary : "&nbsp;")}
+                        ${makeRow('一門', isFamily ? "◯" : "&nbsp;")}
+                        ${makeRow('派閥', factionNameStr !== "" ? factionNameStr : "&nbsp;")}
+                    </div>
                 </div>
-                <div class="daimyo-detail-row daimyo-detail-2col">
-                    <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">派閥</span><span class="daimyo-detail-value">${factionNameStr !== "" ? factionNameStr : "&nbsp;"}</span></div>
-                    <div class="daimyo-detail-stat-box" style="visibility: hidden;"></div>
+            `;
+
+            rightContentHtml = `
+                <div style="display: flex; flex-direction: ${isPc ? 'row' : 'column'}; gap: ${rowGap}; width: 100%;">
+                    ${statHtml}
+                    ${infoHtml}
                 </div>
             `;
         } else if (this.bushoDetailCurrentTab === 'aptitude') {
@@ -308,6 +356,10 @@ Object.assign(UIInfoManager.prototype, {
                                 <div class="daimyo-detail-name" style="font-size: 1.5rem;">${busho.name}</div>
                                 ${rankName}
                             </div>
+                            <div style="display:flex; align-items:center; gap:10px; margin-top: 4px; font-size: 0.95rem; color: #ccc;">
+                                <span>${affiliationName}</span>
+                                <span>${busho.getRankName()}</span>
+                            </div>
                         </div>
                     </div>
                     <div class="daimyo-detail-body">
@@ -318,6 +370,10 @@ Object.assign(UIInfoManager.prototype, {
                                 <div style="display:flex; align-items:center; gap:5px;">
                                     <div class="daimyo-detail-name" style="font-size:1.3rem;">${busho.name}</div>
                                     ${rankName}
+                                </div>
+                                <div style="display:flex; align-items:center; gap:8px; margin-top: 2px; font-size: 0.85rem; color: #ccc;">
+                                    <span>${affiliationName}</span>
+                                    <span>${busho.getRankName()}</span>
                                 </div>
                             </div>
                         </div>
