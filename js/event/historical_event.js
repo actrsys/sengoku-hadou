@@ -664,12 +664,28 @@ window.GameEvents.push({
                 await game.lifeSystem.executeDeath(yoshimoto);
             }
 
-            // ★追加：義元死亡後、今川勢力に所属するすべての拠点の兵力を0.7倍、人口を0.8倍にします（小数点は切り捨てます）
+            // ★追加：義元死亡後、今川勢力の拠点の兵力と人口を減らし、その「減った数」をメモしておきます
+            let totalLostSoldiers = 0; // 減った兵士の合計を入れる箱です
+            let totalLostPopulation = 0; // 減った人口の合計を入れる箱です
+
             const imagawaCastles = game.castles.filter(c => c.ownerClan === imagawaClanId);
             imagawaCastles.forEach(c => {
-                c.soldiers = Math.floor((c.soldiers || 0) * 0.7);
-                c.population = Math.floor((c.population || 0) * 0.8);
+                // 減らす前の「元の数」を覚えておきます
+                const oldSoldiers = c.soldiers || 0;
+                const oldPopulation = c.population || 0;
+                
+                // 兵力を0.7倍、人口を0.8倍にします（小数点は切り捨てます）
+                c.soldiers = Math.floor(oldSoldiers * 0.7);
+                c.population = Math.floor(oldPopulation * 0.8);
+                
+                // 元の数から今の数を引いて「減った数」を計算し、合計の箱に足していきます
+                totalLostSoldiers += (oldSoldiers - c.soldiers);
+                totalLostPopulation += (oldPopulation - c.population);
             });
+
+            // 減った数の「半分」のボーナスを計算しておきます
+            const bonusSoldiers = Math.floor(totalLostSoldiers / 2);
+            const bonusPopulation = Math.floor(totalLostPopulation / 2);
 
             // ★義元死亡後、今川勢力に所属する松平系（1301000～1301999）以外の武将の忠誠度を30回復します※難易度調整とイベントの進行ための調整用
             const imagawaRemainingBushos = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && !(b.id >= 1301000 && b.id <= 1301999));
@@ -677,15 +693,30 @@ window.GameEvents.push({
                 b.loyalty = Math.min(100, (b.loyalty || 0) + 30);
             });
 
-            // 織田家に勝利のボーナス（忠誠と民忠アップ）を与えます
+            // 織田家に勝利のボーナス（忠誠と民忠アップ、そして今川から減った分の半分の兵士・人口）を与えます
             if (nobunaga && nobunaga.clan > 0) {
                 const odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.status === 'active');
                 odaBushos.forEach(b => {
                     b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
                 });
+
                 const odaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
+                
+                // 織田家のお城の数で割り算をして、「１つのお城に均等に配る数」を計算します
+                let soldiersPerCastle = 0;
+                let populationPerCastle = 0;
+                if (odaCastles.length > 0) {
+                    soldiersPerCastle = Math.floor(bonusSoldiers / odaCastles.length);
+                    populationPerCastle = Math.floor(bonusPopulation / odaCastles.length);
+                }
+
                 odaCastles.forEach(c => {
                     c.peoplesLoyalty = 100;
+                    
+                    // それぞれのお城に、均等に分けた兵士と人口を足してあげます！
+                    // 上限（兵士は99,999、人口は999,999）を超えないようにストッパーもかけておきます
+                    c.soldiers = Math.min(99999, (c.soldiers || 0) + soldiersPerCastle);
+                    c.population = Math.min(999999, (c.population || 0) + populationPerCastle);
                 });
             }
 
@@ -2745,12 +2776,19 @@ window.GameEvents.push({
         return true;
     },
     
+    // 松永久秀の独立を発火します。引数を渡して処理自体はindependence_systemで行います。
     execute: async function(game) {
         const yoshitsugu = game.getBusho(1020014);
         const hisahide = game.getBusho(1202002);
         const castle = game.getCastle(hisahide.castleId);
 
         if (!castle) return;
+
+        // ★独立させる直前に、三好家に所属する松永系（1202000～1202999）の武将の忠誠度を15下げます
+        const matsunagaBushosBefore = game.bushos.filter(b => b.clan === yoshitsugu.clan && b.status === 'active' && b.id >= 1202000 && b.id <= 1202999);
+        matsunagaBushosBefore.forEach(b => {
+            b.loyalty = Math.max(0, (b.loyalty || 0) - 15);
+        });
 
         // 独立システムを呼び出して、強制的に独立を実行します
         if (game.independenceSystem) {
@@ -3817,6 +3855,7 @@ window.GameEvents.push({
         return true;
     },
     
+    // 宇喜多直家の謀反を発火します。引数を渡して処理自体はindependence_systemで行います。
     execute: async function(game) {
         const munekage = game.getBusho(1044005);
         const naoie = game.getBusho(1210003);
@@ -3824,7 +3863,12 @@ window.GameEvents.push({
 
         if (!castle) return;
 
-        // ★新しく作った強制発火の魔法を呼び出します
+        // ★謀反を起こす直前に、浦上家に所属する宇喜多系（1210000～1210999）の武将の忠誠度を15下げます
+        const ukitaBushos = game.bushos.filter(b => b.clan === munekage.clan && b.status === 'active' && b.id >= 1210000 && b.id <= 1210999);
+        ukitaBushos.forEach(b => {
+            b.loyalty = Math.max(0, (b.loyalty || 0) - 15);
+        });
+
         // 第4引数に 'coup' を渡すことで、「謀反」として処理させます
         // ※ 'indep' にすれば独立、'defect' にすれば寝返りとして使えます
         if (game.independenceSystem && typeof game.independenceSystem.forceAction === 'function') {
