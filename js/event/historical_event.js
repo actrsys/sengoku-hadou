@@ -720,6 +720,18 @@ window.GameEvents.push({
                 });
             }
 
+            // 今川勢力と武田信玄勢力の友好度が21以上なら20にする処理
+            const shingen = game.getBusho(1002002); // 武田信玄のデータを取得します
+            if (shingen && shingen.clan > 0 && game.diplomacyManager) {
+                const shingenClanId = shingen.clan;
+                const rel = game.diplomacyManager.getRelation(imagawaClanId, shingenClanId);
+                if (rel && rel.sentiment >= 21) {
+                    // 現在の友好度との差分を計算して、ちょうど20になるようにマイナスします
+                    const delta = 20 - rel.sentiment;
+                    game.diplomacyManager.updateSentiment(imagawaClanId, shingenClanId, delta);
+                }
+            }
+
         } else {
             // 【籠城ルート】
             if (window.EventTextManager && window.EventTextManager.okehazama_defend) {
@@ -856,6 +868,18 @@ window.GameEvents.push({
                         c.population = Math.min(999999, (c.population || 0) + 3000);
                     }
                 });
+                
+                // 家康勢力と武田信玄勢力の友好度が49以下なら50にする処理
+                const shingen = game.getBusho(1002002); // 武田信玄のデータを取得します
+                if (shingen && shingen.clan > 0 && game.diplomacyManager) {
+                    const shingenClanId = shingen.clan;
+                    const rel = game.diplomacyManager.getRelation(motoyasu.clan, shingenClanId);
+                    if (rel && rel.sentiment <= 49) {
+                        // 現在の友好度との差分を計算して、ちょうど50になるようにプラスします
+                        const delta = 50 - rel.sentiment;
+                        game.diplomacyManager.updateSentiment(motoyasu.clan, shingenClanId, delta);
+                    }
+                }
             }
         }
     }
