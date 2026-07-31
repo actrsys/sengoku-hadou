@@ -1,9 +1,9 @@
 /**
  * skill_manager.js
- * 適正と技能の効果を計算・管理する司令塔のクラスです。
+ * 適性と技能の効果を計算・管理する司令塔のクラスです。
  */
 class SkillManager {
-    // アルファベットの適正ランク（S～E）を、計算用の数字（5～0）に変換する魔法です。
+    // アルファベットの適性ランク（S～E）を、計算用の数字（5～0）に変換する魔法です。
     static getAptitudeLevel(rank) {
         switch(rank) {
             case 'S': return 5;
@@ -26,7 +26,7 @@ class SkillManager {
     }
 
     // ==========================================
-    // 適正による効果の計算
+    // 適性による効果の計算
     // ==========================================
 
     // 与えるダメージの増加倍率を計算します
@@ -35,23 +35,27 @@ class SkillManager {
         if (!busho) return 1.0; // 武将データがなければ1.0倍（そのまま）
         
         let lvl = 0;
-
+        let baseBonus = 0; // 基本のボーナス（5% または 3%）を入れる専用の箱を用意します
+        
         if (unit.troopType === 'ashigaru') {
             // 足軽の場合、遠距離なら弓術、近接なら足軽のレベルを取得します
             lvl = this.getAptitudeLevel(isRanged ? busho.aptYumi : busho.aptAshigaru);
+            baseBonus = 0.05; // 足軽と弓術は基本ボーナス5%
         } else if (unit.troopType === 'kiba') {
             // 騎馬隊の時は馬術を取得します
             lvl = this.getAptitudeLevel(busho.aptKiba);
+            baseBonus = 0.03; // 馬術は基本ボーナス3%
         } else if (unit.troopType === 'teppo' && isRanged) {
             // 鉄砲隊で遠距離の時だけ砲術を取得します
             lvl = this.getAptitudeLevel(busho.aptTeppo);
+            baseBonus = 0.03; // 砲術は基本ボーナス3%
         }
         
-        // ★適正がE（レベル0）の場合は、ここですぐに計算を打ち切って1.0倍を返します！
+        // ★適性がE（レベル0）の場合は、ここですぐに計算を打ち切って1.0倍を返します！
         if (lvl === 0) return 1.0;
         
-        // レベル×5を100で割って倍率に直します（例：Lv3なら 1.0 + 0.15 = 1.15倍）
-        return 1.0 + (lvl * 5 / 100);
+        // レベル × 3% (0.03) に、先ほど決めた基本ボーナス（5%または3%）を足して倍率に直します
+        return 1.0 + (lvl * 0.03) + baseBonus;
     }
 
     // 味方の艦隊効果を含めた、最終的な「操船レベル」を計算します
