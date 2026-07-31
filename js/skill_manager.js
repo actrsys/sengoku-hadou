@@ -58,6 +58,35 @@ class SkillManager {
         return 1.0 + (lvl * 0.03) + baseBonus;
     }
 
+    // ★追加：受けるダメージの軽減倍率を計算します
+    static calcAptitudeDefenseModifier(defender, attacker, isRanged, game) {
+        const busho = game.getBusho(defender.bushoId);
+        if (!busho) return 1.0; // 武将データがなければ1.0倍（そのまま）
+        
+        let lvl = 0;
+        let reductionPct = 0; // 軽減率（％）
+        
+        if (defender.troopType === 'ashigaru') {
+            // 足軽の場合、受ける攻撃が遠距離なら弓術、近接なら足軽のレベルを取得します
+            lvl = this.getAptitudeLevel(isRanged ? busho.aptYumi : busho.aptAshigaru);
+            reductionPct = lvl * 2; // 足軽と弓術はLv × 2%軽減
+        } else if (defender.troopType === 'kiba' && attacker.troopType === 'kiba') {
+            // 騎馬隊で、相手も騎馬隊の時だけ馬術を取得します
+            lvl = this.getAptitudeLevel(busho.aptKiba);
+            reductionPct = lvl * 1; // 馬術はLv × 1%軽減
+        } else if (defender.troopType === 'teppo' && attacker.troopType === 'teppo') {
+            // 鉄砲隊で、相手も鉄砲隊の時だけ砲術を取得します
+            lvl = this.getAptitudeLevel(busho.aptTeppo);
+            reductionPct = lvl * 1; // 砲術はLv × 1%軽減
+        }
+        
+        // ★適性がE（レベル0）の場合は、ここですぐに計算を打ち切って1.0倍を返します！
+        if (lvl === 0) return 1.0;
+        
+        // 軽減率（％）を倍率に直して返します（例：4%軽減なら 0.96 倍）
+        return 1.0 - (reductionPct / 100);
+    }
+
     // 味方の艦隊効果を含めた、最終的な「操船レベル」を計算します
     static getMaritimeLevel(unit, allies, game) {
         const busho = game.getBusho(unit.bushoId);

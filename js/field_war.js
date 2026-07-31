@@ -2656,15 +2656,13 @@ class FieldWarManager {
         }
         atkFinalAtk = atkFinalAtk * atkTerrainMult;
         
-        // ★追加: 適正によるダメージ増加
+        // ★追加: 遠距離攻撃かどうかの判定
         let isRangedAttack = false;
         if (attacker.troopType === 'teppo' || (attacker.troopType === 'ashigaru' && atkDist > 1)) {
             isRangedAttack = true;
         }
-        let aptitudeDmgMult = SkillManager.calcAptitudeDamageModifier(attacker, isRangedAttack, this.game);
-        atkFinalAtk = atkFinalAtk * aptitudeDmgMult;
         
-        // 7. 与ダメージ計算
+        // 7. 与ダメージ計算（基礎）
         let dmgRatio = (atkFinalAtk + defFinalDef) > 0 ? (atkFinalAtk / (atkFinalAtk + defFinalDef)) : 0;
         let dmgToDef = Math.floor(atkFinalAtk * dmgRatio);
         
@@ -2699,16 +2697,34 @@ class FieldWarManager {
             dmgToDef = Math.floor(dmgToDef * (1 + (0.1 * supportCount)));
         }
 
-        // 9. 反撃ダメージ計算
+        // 9. 反撃ダメージ計算（基礎）
         let dmgToAtk = 0;
         if (atkDist === 1) { // 反撃は距離1のときのみ
             let counterRatio = (atkFinalAtk + defFinalDef) > 0 ? (defFinalDef / (atkFinalAtk + defFinalDef)) : 0;
-            
-            // ★追加: 守備側（反撃側）の適正によるダメージ増加
+            dmgToAtk = Math.floor(defFinalAtk * 0.5 * counterRatio);
+        }
+
+        // ==========================================
+        // ★追加: 適性による最終ダメージの増加・軽減処理
+        // ==========================================
+        // 増加系の計算を先に行います
+        let aptitudeAtkMult = SkillManager.calcAptitudeDamageModifier(attacker, isRangedAttack, this.game);
+        dmgToDef = Math.floor(dmgToDef * aptitudeAtkMult);
+        
+        if (atkDist === 1) {
             // 反撃は常に近接攻撃（距離1）として扱います
-            let defAptitudeMult = SkillManager.calcAptitudeDamageModifier(defender, false, this.game);
-            
-            dmgToAtk = Math.floor(defFinalAtk * defAptitudeMult * 0.5 * counterRatio);
+            let aptitudeDefCounterMult = SkillManager.calcAptitudeDamageModifier(defender, false, this.game);
+            dmgToAtk = Math.floor(dmgToAtk * aptitudeDefCounterMult);
+        }
+
+        // 軽減系の計算（増加の後に計算します）
+        let aptitudeDefReduceMult = SkillManager.calcAptitudeDefenseModifier(defender, attacker, isRangedAttack, this.game);
+        dmgToDef = Math.floor(dmgToDef * aptitudeDefReduceMult);
+        
+        if (atkDist === 1) {
+            // 攻撃側が受ける反撃ダメージの軽減処理
+            let aptitudeAtkReduceMult = SkillManager.calcAptitudeDefenseModifier(attacker, defender, false, this.game);
+            dmgToAtk = Math.floor(dmgToAtk * aptitudeAtkReduceMult);
         }
 
         // ★追加: プレイヤーがいないAI同士の戦いなら、ダメージを約3分の2（0.666）に減らします！
