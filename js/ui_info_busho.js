@@ -197,16 +197,10 @@ Object.assign(UIInfoManager.prototype, {
             let percent = perceived !== null ? Math.max(0, perceived) : 0;
             if(perceived === null) percent = 0; 
 
-            // ★修正：限界突破の最大値(120)を枠の幅(100%)として計算し、枠内に収めます
-            const MAX_STAT = 120;
-            let basePercent = (Math.min(100, percent) / MAX_STAT) * 100;
-            let overPercent = percent > 100 ? ((percent - 100) / MAX_STAT) * 100 : 0;
-            
-            // 金色の限界突破ゲージが枠からはみ出ないようにインラインで調整します
-            let overLeft = (100 / MAX_STAT) * 100;
-            let overBarHtml = overPercent > 0 
-                ? `<div class="bar-fill-busho-over" style="left: ${overLeft}%; width:${overPercent}%; top: 0; height: 100%; border: none; border-radius: 0 2px 2px 0;"></div>` 
-                : "";
+            // ★修正：計算式は元の「100を基準」に戻します
+            let basePercent = Math.min(100, percent);
+            let overPercent = percent > 100 ? percent - 100 : 0;
+            let overBarHtml = overPercent > 0 ? `<div class="bar-fill-busho-over" style="width:${overPercent}%;"></div>` : "";
             let fillClass = overPercent > 0 ? "bar-fill-busho over-connected" : "bar-fill-busho";
 
             const expInfo = typeof busho.getExpInfo === 'function' ? busho.getExpInfo(statKey) : null;
@@ -214,14 +208,15 @@ Object.assign(UIInfoManager.prototype, {
             let expBarHtml = "";
             let mainBarClass = "bar-bg-busho";
             if (expInfo) {
+                // ★追加：外枠全体の幅を120としたとき、基準となる100の幅(約83.3%)を指定します
                 expBarHtml = `
-                    <div class="exp-bar-bg">
+                    <div class="exp-bar-bg" style="width: calc(100% * 100 / 120);">
                         <div class="exp-bar-fill ${expInfo.isMax ? 'is-max' : ''}" style="width: ${expInfo.percent}%;"></div>
                     </div>
                 `;
             } else {
                 expBarHtml = `
-                    <div class="exp-bar-bg" style="visibility: hidden;"></div>
+                    <div class="exp-bar-bg" style="visibility: hidden; width: calc(100% * 100 / 120);"></div>
                 `;
             }
 
@@ -234,7 +229,8 @@ Object.assign(UIInfoManager.prototype, {
                     <span class="daimyo-detail-label" style="width: ${labelWidth}; min-width: ${labelWidth}; margin-right: 5px; text-align: left;">${label}</span>
                     <span style="width: ${gradeWidth}; text-align: left; font-weight: bold; display: flex; align-items: center;">${gradeHtml}</span>
                     <div class="busho-stat-bar-wrapper" style="flex: 1; margin-right: 0; max-width: none; margin-left: 5px;">
-                        <div class="${mainBarClass}">
+                        <!-- ★追加：ここにも基準幅(100/120)を指定し、右側に限界突破用のはみ出しスペースを確保します -->
+                        <div class="${mainBarClass}" style="width: calc(100% * 100 / 120);">
                             <div class="${fillClass}" style="width:${basePercent}%;"></div>
                             ${overBarHtml}
                         </div>
