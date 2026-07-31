@@ -735,25 +735,24 @@ class GameSystem {
         const eff = this.calcBuyEquipEfficiency(daimyo, castellan, itemType);
         let basePrice = itemType === 'horse' ? 2 : 5;
         
-        // ★ここから追加：鉄砲伝来による価格変動（1543年：50倍 → 1553年：40倍 → 1573年：1倍）
+        // ★ここから追加：鉄砲伝来による価格変動（1543年：20倍 → 1553年：15倍 → 1573年：1倍）
         if (itemType === 'gun' && window.GameApp) {
             const y = window.GameApp.year;
             const m = window.GameApp.month;
             if (y >= 1543 && y < 1553) {
-                // 10年間（120ヶ月）かけて50倍から40倍に緩やかに下がります
+                // 10年間（120ヶ月）かけて20倍から15倍に緩やかに下がります
                 const monthsPassed = (y - 1543) * 12 + (m - 1);
-                basePrice *= (50.0 - (10.0 * (monthsPassed / 120)));
+                basePrice *= (20.0 - (5.0 * (monthsPassed / 120)));
             } else if (y >= 1553 && y < 1573) {
-                // 20年間（240ヶ月）かけて40倍から1倍にどんどん下がります
+                // 20年間（240ヶ月）かけて15倍から1倍にどんどん下がります
                 const monthsPassed = (y - 1553) * 12 + (m - 1);
-                basePrice *= (40.0 - (39.0 * (monthsPassed / 240)));
+                basePrice *= (15.0 - (14.0 * (monthsPassed / 240)));
             } else if (y <= 1542) {
                 // 1542年以前は買えませんが、念のためとんでもなく高い値段にしておきます
                 basePrice *= 9999; 
             }
             // 1573年以降は変動なし（1倍）のままになります
         }
-        // ★ここまで追加
 
         let unitPrice = basePrice / (1 + eff / 10);
         
