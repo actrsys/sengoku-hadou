@@ -1720,7 +1720,7 @@ class GameManager {
         // ★追加：ただし、同じ国に同名の勢力がいる場合は、最初から城名をつけるようにします！
         Object.values(clanGroups).forEach(group => {
             if (group.length > 1) {
-                // 同じ名前の勢力同士を、大名の威信（daimyoPrestige）が高い順に並べ替えます
+                // まずは今まで通り、大名の威信（daimyoPrestige）が高い順に並べ替えます
                 group.sort((a, b) => b.daimyoPrestige - a.daimyoPrestige);
 
                 // 各勢力がいる地方（国）をリストアップしておきます
@@ -1734,6 +1734,33 @@ class GameManager {
                         }
                     }
                 });
+
+                // ★改修：同じ国に同名の勢力がいて「城名」での判別が必要になる場合のみ、
+                // 居城名と家名が一致する勢力を探し出して、特例として一番上（本筋）に移動させます！
+                const matchingClanIndex = group.findIndex(clan => {
+                    const myProvId = clanProvinces[clan.id];
+                    // 同じ国に別の同名勢力がいるかチェック
+                    const hasSameProvClan = group.some(otherClan => otherClan.id !== clan.id && clanProvinces[otherClan.id] === myProvId);
+                    
+                    if (hasSameProvClan) {
+                        const leader = this.getBusho(clan.leaderId);
+                        if (leader) {
+                            const castle = this.getCastle(leader.castleId);
+                            if (castle && castle.name) {
+                                const castleBase = castle.name.replace(/(城|館|御所|御坊)$/, "");
+                                const clanBase = clan.baseName.replace(/家$/, "");
+                                if (castleBase === clanBase) return true;
+                            }
+                        }
+                    }
+                    return false;
+                });
+
+                // 一致する家が見つかった場合（かつ、すでに威信トップではない場合）、先頭に移動させます
+                if (matchingClanIndex > 0) {
+                    const matchClan = group.splice(matchingClanIndex, 1)[0];
+                    group.unshift(matchClan);
+                }
 
                 // 威信トップ（[0]）には何もつけず、2位以下（[1]以降）にだけ名前をつけます
                 for (let i = 1; i < group.length; i++) {
