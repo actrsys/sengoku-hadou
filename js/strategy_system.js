@@ -181,7 +181,13 @@ class StrategySystem {
         const strBonus = StrategySystem.getInciteProbBase(busho);
         const loyaltyBonus = (targetCastle.peoplesLoyalty / 120) + 0.9;
         
-        const prob = strBonus / loyaltyBonus;
+        let prob = strBonus / loyaltyBonus;
+        
+        // ★追加：忍術適性による確率ボーナス
+        if (typeof SkillManager !== 'undefined') {
+            prob += SkillManager.calcNinjutsuProbBonus(busho);
+        }
+        
         return Math.max(0.01, Math.min(0.99, prob));
     }
 
@@ -279,7 +285,12 @@ class StrategySystem {
     // ★追加: 破壊工作の予測ダメージを計算する魔法
     getSabotageExpectedDamage(doerId, targetId) {
         const busho = this.game.getBusho(doerId);
-        return Math.max(1, Math.floor(StrategySystem.getSabotageDamageBase(busho)));
+        let damage = Math.max(1, Math.floor(StrategySystem.getSabotageDamageBase(busho)));
+        // ★追加：忍術適性によるダメージボーナス
+        if (typeof SkillManager !== 'undefined') {
+            damage += SkillManager.calcNinjutsuSabotageBonus(busho);
+        }
+        return damage;
     }
 
     // ★追加: 民心撹乱（扇動）の予測ダメージを計算する魔法
@@ -288,7 +299,12 @@ class StrategySystem {
         const targetCastle = this.game.getCastle(targetId);
         const intBonus = StrategySystem.getInciteDamageBase(busho);
         const loyaltyBonus = (targetCastle.peoplesLoyalty / 120) + 0.9;
-        return Math.max(1, Math.floor(intBonus / loyaltyBonus));
+        let damage = Math.max(1, Math.floor(intBonus / loyaltyBonus));
+        // ★追加：忍術適性によるダメージボーナス
+        if (typeof SkillManager !== 'undefined') {
+            damage += SkillManager.calcNinjutsuInciteBonus(busho);
+        }
+        return damage;
     }
     
     // ★追加: 破壊工作の確率を計算する魔法
@@ -296,7 +312,12 @@ class StrategySystem {
         const busho = this.game.getBusho(doerId);
 
         // ★共通処理から基礎確率を呼び出す
-        const prob = StrategySystem.getSabotageProbBase(busho);
+        let prob = StrategySystem.getSabotageProbBase(busho);
+        
+        // ★追加：忍術適性による確率ボーナス
+        if (typeof SkillManager !== 'undefined') {
+            prob += SkillManager.calcNinjutsuProbBonus(busho);
+        }
         
         return Math.max(0.01, Math.min(0.99, prob));
     }
@@ -324,7 +345,11 @@ class StrategySystem {
         if(!success) return { success: false, val: 0 }; 
         
         // ★共通処理から基礎ダメージを呼び出す
-        const damage = Math.max(1, Math.floor(StrategySystem.getSabotageDamageBase(busho)));
+        let damage = Math.max(1, Math.floor(StrategySystem.getSabotageDamageBase(busho)));
+        // ★追加：忍術適性によるダメージボーナス
+        if (typeof SkillManager !== 'undefined') {
+            damage += SkillManager.calcNinjutsuSabotageBonus(busho);
+        }
         return { success: true, val: damage }; 
     }
     
@@ -342,7 +367,11 @@ class StrategySystem {
         // ★共通処理から基礎ダメージを呼び出す
         const intBonus = StrategySystem.getInciteDamageBase(busho);
         const loyaltyBonus = (targetCastle.peoplesLoyalty / 120) + 0.9;
-        const damage = Math.max(1, Math.floor(intBonus / loyaltyBonus));
+        let damage = Math.max(1, Math.floor(intBonus / loyaltyBonus));
+        // ★追加：忍術適性によるダメージボーナス
+        if (typeof SkillManager !== 'undefined') {
+            damage += SkillManager.calcNinjutsuInciteBonus(busho);
+        }
         return { success: true, val: damage }; 
     }
     

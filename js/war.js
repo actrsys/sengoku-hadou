@@ -77,7 +77,16 @@ class WarSystem {
     }
 
     static calcFire(atkBusho, defBusho) {
-        if (Math.random() > (atkBusho.intelligence / ((defBusho ? defBusho.intelligence : 30) + 10)) * window.WarParams.War.FireSuccessBase) return { success: false, damage: 0 }; 
+        let prob = (atkBusho.intelligence / ((defBusho ? defBusho.intelligence : 30) + 10)) * window.WarParams.War.FireSuccessBase;
+        // ★追加：忍術適性による火計成功率ボーナス
+        if (typeof SkillManager !== 'undefined') {
+            prob += SkillManager.calcNinjutsuFireProbBonus(atkBusho);
+        }
+        
+        // ★追加：最後に確率がマイナスにならないよう（最低1%～最高99%）にガードをかけます
+        prob = Math.max(0.01, Math.min(0.99, prob));
+
+        if (Math.random() > prob) return { success: false, damage: 0 }; 
         return { success: true, damage: Math.floor(atkBusho.intelligence * window.WarParams.War.FireDamageFactor * (Math.random() + 0.5)) }; 
     }
 
@@ -1177,6 +1186,16 @@ class WarManager {
             
             // 計算したペナルティ分を引き算します
             successRate -= fireWeatherPenaltyRate;
+            
+            // ★追加：忍術適性による火計成功率ボーナス（攻撃側のみ）
+            if (isAtkTurnGroup && typeof SkillManager !== 'undefined') {
+                let ninjutsuBonus = 0;
+                activeBushos.forEach(b => {
+                    let bonus = SkillManager.calcNinjutsuFireProbBonus(b);
+                    if (bonus > ninjutsuBonus) ninjutsuBonus = bonus;
+                });
+                successRate += ninjutsuBonus;
+            }
             
             successRate = Math.max(0, Math.min(0.99, successRate));
             

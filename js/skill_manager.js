@@ -140,7 +140,55 @@ class SkillManager {
         if (lvl >= 2) return 1; // Lv2以上で1軽減
         return 0; // それ以外は軽減なし
     }
+    
+    // ==========================================
+    // 忍術適性による効果
+    // ==========================================
 
+    // 忍術のレベルを取得する魔法です
+    static getNinjutsuLevel(busho) {
+        if (!busho || !busho.aptNinjutsu) return 0;
+        return this.getAptitudeLevel(busho.aptNinjutsu);
+    }
+
+    // ＜忍術Lv1～5＞ 破壊工作・民心撹乱を実行時、最終成功率をLv×2％＋2％アップする魔法です
+    static calcNinjutsuProbBonus(busho) {
+        let lvl = this.getNinjutsuLevel(busho);
+        if (lvl === 0) return 0;
+        return (lvl * 0.02) + 0.02; 
+    }
+
+    // 破壊工作を実行時、最終効果にLv1につき＋１する魔法です
+    static calcNinjutsuSabotageBonus(busho) {
+        return this.getNinjutsuLevel(busho);
+    }
+
+    // 民心撹乱を実行時、最終効果にLv2につき＋１（切り捨て）する魔法です
+    static calcNinjutsuInciteBonus(busho) {
+        return Math.floor(this.getNinjutsuLevel(busho) / 2);
+    }
+
+    // 野戦で足軽隊の時、山岳・森・川地形に侵入するための必要行動力を１軽減する魔法です
+    static getNinjutsuMoveCostReduction(unit, terrain, isSea, game) {
+        // 足軽隊以外、または海の場合は軽減できません
+        if (unit.troopType !== 'ashigaru') return 0;
+        if (isSea) return 0;
+        
+        const busho = game.getBusho(unit.bushoId);
+        let lvl = this.getNinjutsuLevel(busho);
+        if (lvl > 0) {
+            if (terrain === 'mountain' || terrain === 'forest' || terrain === 'river') {
+                return 1; // コストを1軽減します
+            }
+        }
+        return 0;
+    }
+
+    // 攻城戦で攻撃側の時、火計最終成功率をLv1につき＋３％する魔法です
+    static calcNinjutsuFireProbBonus(busho) {
+        return this.getNinjutsuLevel(busho) * 0.03;
+    }
+    
     // ==========================================
     // 技能による効果の判定
     // ==========================================

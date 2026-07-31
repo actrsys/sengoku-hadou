@@ -1368,11 +1368,24 @@ class FieldWarManager {
             if (terrain === 'river') baseCost += 1;  // 川もコスト+1
         }
 
-        // ★追加: 海の移動コスト軽減 (操船)
+        // ★追加: 海の判定
         let isSea = (this.grid && this.grid[row] && this.grid[row][x]) ? this.grid[row][x].isSea : false;
+
+        // ★追加: 忍術適性による移動コスト軽減（足軽限定、山岳・森・川のみ）
+        let ninjutsuReduction = 0;
+        if (typeof SkillManager !== 'undefined') {
+            ninjutsuReduction = SkillManager.getNinjutsuMoveCostReduction(unit, terrain, isSea, this.game);
+        }
+
+        // ★追加: 海の移動コスト軽減 (操船)
         if (isSea) {
             let reduction = SkillManager.getMaritimeMoveCostReduction(unit, allies, this.game);
             baseCost = Math.max(1, baseCost - reduction); // 最低コスト1は守ります
+        }
+
+        // 忍術の移動コスト軽減の適用
+        if (ninjutsuReduction > 0) {
+            baseCost = Math.max(1, baseCost - ninjutsuReduction); // 最低コスト1は守ります
         }
 
         let zocCost = 1;
