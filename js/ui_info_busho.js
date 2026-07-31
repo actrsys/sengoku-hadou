@@ -161,6 +161,99 @@ Object.assign(UIInfoManager.prototype, {
 
         const yomiStr = busho.yomi ? busho.yomi : "";
 
+        // ★追加：タブの状態に合わせて表示する内容を切り替える準備をします
+        if (!this.bushoDetailCurrentTab) this.bushoDetailCurrentTab = 'status';
+        
+        let tabsHtml = `
+            <div class="busho-tabs" style="margin-bottom: 10px; padding-left: 0;">
+                <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'status' ? 'active' : ''}" id="busho-detail-tab-status">基本</button>
+                <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'aptitude' ? 'active' : ''}" id="busho-detail-tab-aptitude">適性・技能</button>
+            </div>
+        `;
+
+        let rightContentHtml = '';
+
+        if (this.bushoDetailCurrentTab === 'status') {
+            rightContentHtml = `
+                <div class="daimyo-detail-row daimyo-detail-2col">
+                    <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">勢力</span><span class="daimyo-detail-value">${affiliationName}</span></div>
+                    <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">所在</span><span class="daimyo-detail-value">${castleName}</span></div>
+                </div>
+                <div class="daimyo-detail-row daimyo-detail-2col">
+                    <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">身分</span><span class="daimyo-detail-value">${busho.getRankName()}</span></div>
+                    <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">年齢</span><span class="daimyo-detail-value">${ageStr !== "" ? ageStr : "&nbsp;"}</span></div>
+                </div>
+                <div class="daimyo-detail-row daimyo-detail-2col">
+                    ${getStatRow('leadership', '統率')}
+                    ${getStatRow('strength', '武勇')}
+                </div>
+                <div class="daimyo-detail-row daimyo-detail-2col">
+                    ${getStatRow('politics', '内政')}
+                    ${getStatRow('diplomacy', '外交')}
+                </div>
+                <div class="daimyo-detail-row daimyo-detail-2col">
+                    ${getStatRow('intelligence', '智謀')}
+                    ${getStatRow('charm', '魅力')}
+                </div>
+                <div class="daimyo-detail-row daimyo-detail-2col">
+                    <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">俸禄</span><span class="daimyo-detail-value">${salary !== "" ? salary : "&nbsp;"}</span></div>
+                    <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">一門</span><span class="daimyo-detail-value">${isFamily ? "◯" : "&nbsp;"}</span></div>
+                </div>
+                <div class="daimyo-detail-row daimyo-detail-2col">
+                    <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">派閥</span><span class="daimyo-detail-value">${factionNameStr !== "" ? factionNameStr : "&nbsp;"}</span></div>
+                    <div class="daimyo-detail-stat-box" style="visibility: hidden;"></div>
+                </div>
+            `;
+        } else if (this.bushoDetailCurrentTab === 'aptitude') {
+            // 適性のランク表示を綺麗にする魔法
+            const getAptGradeHtml = (val) => {
+                const lowVal = val ? val.toLowerCase() : 'e';
+                return `<div class="grade-container rank-${lowVal}"><span class="grade-main">${val}</span></div>`;
+            };
+
+            const aptitudes = [
+                { label: '足軽', val: busho.aptAshigaru },
+                { label: '騎馬', val: busho.aptKiba },
+                { label: '鉄砲', val: busho.aptTeppo },
+                { label: '弓術', val: busho.aptYumi },
+                { label: '武芸', val: busho.aptBugei },
+                { label: '忍術', val: busho.aptNinjutsu },
+                { label: '操船', val: busho.aptMaritime }
+            ];
+            
+            let aptHtml = '';
+            for(let i = 0; i < aptitudes.length; i += 2) {
+                let col1 = aptitudes[i];
+                let col2 = aptitudes[i+1];
+                let col1Html = `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">${col1.label}</span><span class="daimyo-detail-value">${getAptGradeHtml(col1.val)}</span></div>`;
+                let col2Html = col2 ? `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">${col2.label}</span><span class="daimyo-detail-value">${getAptGradeHtml(col2.val)}</span></div>` : `<div class="daimyo-detail-stat-box" style="visibility: hidden;"></div>`;
+                aptHtml += `<div class="daimyo-detail-row daimyo-detail-2col">${col1Html}${col2Html}</div>`;
+            }
+
+            // 技能は「,」や「|」で区切られているかもしれないので、分けて最大3つ取り出します
+            let skills = [];
+            if (busho.skill) {
+                skills = busho.skill.split(/[|,]/).map(s => s.trim()).filter(s => s);
+            }
+            
+            let skillHtml = '';
+            for(let i = 0; i < 3; i++) {
+                let skillName = skills[i] || "&nbsp;";
+                skillHtml += `<div class="daimyo-detail-stat-box" style="margin-bottom: 6px;"><span class="daimyo-detail-label">技能${i+1}</span><span class="daimyo-detail-value">${skillName}</span></div>`;
+            }
+
+            rightContentHtml = `
+                <div style="margin-bottom: 10px;">
+                    <div style="font-size: 0.95rem; color: #ffd54f; margin-bottom: 5px; border-bottom: 1px solid rgba(212, 175, 55, 0.3);">適性</div>
+                    ${aptHtml}
+                </div>
+                <div>
+                    <div style="font-size: 0.95rem; color: #ffd54f; margin-bottom: 5px; border-bottom: 1px solid rgba(212, 175, 55, 0.3);">技能</div>
+                    ${skillHtml}
+                </div>
+            `;
+        }
+
         if (listContainer) {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
@@ -187,34 +280,8 @@ Object.assign(UIInfoManager.prototype, {
                             </div>
                         </div>
                         <div class="daimyo-detail-right">
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">勢力</span><span class="daimyo-detail-value">${affiliationName}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">所在</span><span class="daimyo-detail-value">${castleName}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">身分</span><span class="daimyo-detail-value">${busho.getRankName()}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">年齢</span><span class="daimyo-detail-value">${ageStr !== "" ? ageStr : "&nbsp;"}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                ${getStatRow('leadership', '統率')}
-                                ${getStatRow('strength', '武勇')}
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                ${getStatRow('politics', '内政')}
-                                ${getStatRow('diplomacy', '外交')}
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                ${getStatRow('intelligence', '智謀')}
-                                ${getStatRow('charm', '魅力')}
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">俸禄</span><span class="daimyo-detail-value">${salary !== "" ? salary : "&nbsp;"}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">一門</span><span class="daimyo-detail-value">${isFamily ? "◯" : "&nbsp;"}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">派閥</span><span class="daimyo-detail-value">${factionNameStr !== "" ? factionNameStr : "&nbsp;"}</span></div>
-                                <div class="daimyo-detail-stat-box" style="visibility: hidden;"></div>
-                            </div>
+                            ${tabsHtml}
+                            ${rightContentHtml}
                         </div>
                     </div>
                     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: auto; padding-top: 15px;">
@@ -229,6 +296,26 @@ Object.assign(UIInfoManager.prototype, {
                     e.stopPropagation();
                     if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                     this.pushModal('princess_list', [false, busho.id, 'view_busho_wife']);
+                };
+            }
+            
+            // ★追加：タブをクリックした時の動きを登録します
+            const tabStatus = document.getElementById('busho-detail-tab-status');
+            const tabAptitude = document.getElementById('busho-detail-tab-aptitude');
+            if (tabStatus) {
+                tabStatus.onclick = (e) => {
+                    e.stopPropagation();
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    this.bushoDetailCurrentTab = 'status';
+                    this._renderBushoDetail(busho, listContainer.scrollTop);
+                };
+            }
+            if (tabAptitude) {
+                tabAptitude.onclick = (e) => {
+                    e.stopPropagation();
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    this.bushoDetailCurrentTab = 'aptitude';
+                    this._renderBushoDetail(busho, listContainer.scrollTop);
                 };
             }
 
