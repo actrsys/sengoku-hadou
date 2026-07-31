@@ -671,7 +671,7 @@ window.GameEvents.push({
                 c.population = Math.floor((c.population || 0) * 0.8);
             });
 
-            // ★義元死亡後、今川勢力に所属する松平系（1301000～1301999）以外の武将の忠誠度を30回復します※難易度とイベントの進行ための調整用
+            // ★義元死亡後、今川勢力に所属する松平系（1301000～1301999）以外の武将の忠誠度を30回復します※難易度調整とイベントの進行ための調整用
             const imagawaRemainingBushos = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && !(b.id >= 1301000 && b.id <= 1301999));
             imagawaRemainingBushos.forEach(b => {
                 b.loyalty = Math.min(100, (b.loyalty || 0) + 30);
