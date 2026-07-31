@@ -18,10 +18,49 @@ Object.assign(UIInfoManager.prototype, {
         const confirmBtn = document.getElementById('selector-confirm-btn');
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
 
+        if (!this.bushoDetailCurrentTab) this.bushoDetailCurrentTab = 'status';
+
         modal.classList.remove('hidden');
         if (title) title.textContent = "武将情報";
         if (contextEl) contextEl.classList.add('hidden');
-        if (tabsEl) tabsEl.classList.add('hidden');
+        
+        // ★修正：武将詳細では本来のタブ領域（枠の上）を使います
+        if (tabsEl) {
+            tabsEl.classList.remove('hidden');
+            // リスト画面と同じ見た目にするためのスタイル
+            tabsEl.style.justifyContent = 'flex-start';
+            tabsEl.style.paddingLeft = '10px';
+            tabsEl.style.alignItems = 'flex-end';
+            tabsEl.innerHTML = `
+                <div style="display: flex; gap: 5px;">
+                    <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'status' ? 'active' : ''}" id="busho-detail-tab-status">基本</button>
+                    <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'aptitude' ? 'active' : ''}" id="busho-detail-tab-aptitude">適性・技能</button>
+                </div>
+            `;
+            
+            // タブをクリックした時の処理もここで登録します
+            setTimeout(() => {
+                const tabStatus = document.getElementById('busho-detail-tab-status');
+                const tabAptitude = document.getElementById('busho-detail-tab-aptitude');
+                if (tabStatus) {
+                    tabStatus.onclick = (e) => {
+                        e.stopPropagation();
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                        this.bushoDetailCurrentTab = 'status';
+                        this._renderBushoDetail(busho, listContainer.scrollTop);
+                    };
+                }
+                if (tabAptitude) {
+                    tabAptitude.onclick = (e) => {
+                        e.stopPropagation();
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                        this.bushoDetailCurrentTab = 'aptitude';
+                        this._renderBushoDetail(busho, listContainer.scrollTop);
+                    };
+                }
+            }, 0);
+        }
+        
         if (confirmBtn) confirmBtn.classList.add('hidden');
 
         if(backBtn) {
@@ -161,16 +200,6 @@ Object.assign(UIInfoManager.prototype, {
 
         const yomiStr = busho.yomi ? busho.yomi : "";
 
-        // ★追加：タブの状態に合わせて表示する内容を切り替える準備をします
-        if (!this.bushoDetailCurrentTab) this.bushoDetailCurrentTab = 'status';
-        
-        let tabsHtml = `
-            <div class="busho-tabs" style="margin-bottom: 10px; padding-left: 0;">
-                <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'status' ? 'active' : ''}" id="busho-detail-tab-status">基本</button>
-                <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'aptitude' ? 'active' : ''}" id="busho-detail-tab-aptitude">適性・技能</button>
-            </div>
-        `;
-
         let rightContentHtml = '';
 
         if (this.bushoDetailCurrentTab === 'status') {
@@ -280,7 +309,6 @@ Object.assign(UIInfoManager.prototype, {
                             </div>
                         </div>
                         <div class="daimyo-detail-right">
-                            ${tabsHtml}
                             ${rightContentHtml}
                         </div>
                     </div>
@@ -296,26 +324,6 @@ Object.assign(UIInfoManager.prototype, {
                     e.stopPropagation();
                     if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                     this.pushModal('princess_list', [false, busho.id, 'view_busho_wife']);
-                };
-            }
-            
-            // ★追加：タブをクリックした時の動きを登録します
-            const tabStatus = document.getElementById('busho-detail-tab-status');
-            const tabAptitude = document.getElementById('busho-detail-tab-aptitude');
-            if (tabStatus) {
-                tabStatus.onclick = (e) => {
-                    e.stopPropagation();
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    this.bushoDetailCurrentTab = 'status';
-                    this._renderBushoDetail(busho, listContainer.scrollTop);
-                };
-            }
-            if (tabAptitude) {
-                tabAptitude.onclick = (e) => {
-                    e.stopPropagation();
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    this.bushoDetailCurrentTab = 'aptitude';
-                    this._renderBushoDetail(busho, listContainer.scrollTop);
                 };
             }
 
