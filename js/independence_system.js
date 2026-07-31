@@ -1178,7 +1178,12 @@ class IndependenceSystem {
                 // ==========================================
                 // ★ダミーで作った「新大名家」を解体し「旧大名家」に統合します！
                 // ==========================================
-                if (!isDefection) {
+                // 自動でダミー勢力（反乱リーダーが当主になっている別の勢力）を探し出します
+                const dummyClan = this.game.clans.find(c => c.leaderId === rebellionLeader.id && c.id !== oldClanId && !c.isDestroyed);
+                
+                if (dummyClan) {
+                    const newClanId = dummyClan.id;
+                    
                     // 1. フライングで新勢力(newClanId)に変更された城を、全て旧勢力(oldClanId)に戻します
                     this.game.castles.forEach(c => {
                         if (c.ownerClan === newClanId) {
@@ -1194,10 +1199,7 @@ class IndependenceSystem {
                     });
 
                     // 3. システムに誤って登録されたダミーの「新勢力」を消去（滅亡扱い）します
-                    const dummyClan = this.game.clans.find(c => c.id === newClanId);
-                    if (dummyClan) {
-                        dummyClan.isDestroyed = true;
-                    }
+                    dummyClan.isDestroyed = true;
                 }
                 // ==========================================
 
