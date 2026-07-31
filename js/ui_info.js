@@ -37,6 +37,8 @@ class UIInfoManager {
         
         // 外交リストのタブ状態リセット
         this.diploCurrentTab = 'daimyo';
+        this.diploCurrentSortKey = null;
+        this.isDiploSortAsc = false;
         
         // 勢力一覧で使う状態のリセット
         this.daimyoCurrentTab = 'status';
@@ -478,8 +480,7 @@ class UIInfoManager {
             if (this.daimyoCurrentTab === 'status') {
                 let statusClass = "text-white";
                 if (d.friendStatus === '敵対') statusClass = 'text-red';
-                else if (d.friendStatus === '友好') statusClass = 'text-green';
-                else if (['同盟', '支配', '従属', '婚姻'].includes(d.friendStatus)) statusClass = 'text-green';
+                else if (['同盟', '支配', '従属', '婚姻', '和睦', '友好'].includes(d.friendStatus)) statusClass = 'text-green';
                 else if (d.friendStatus === '自家') statusClass = 'text-orange';
 
                 const powerBarHtml = this._createBarHtml((d.power / maxPower) * 100, 'power');
@@ -888,14 +889,39 @@ class UIInfoManager {
             }
         }
 
-        relations.sort((a,b) => b.sentiment - a.sentiment);
-        
+        if (this.diploCurrentSortKey) {
+            relations = this._prepareStableSortBase('diplomacy', relations, this.diploCurrentSortKey);
+            relations.sort((a, b) => {
+                let valA, valB;
+                switch(this.diploCurrentSortKey) {
+                    case 'name': valA = a.name; valB = b.name; break;
+                    case 'sentiment': valA = a.sentiment; valB = b.sentiment; break;
+                    case 'status':
+                        const relationRank = { "自家": 0, "婚姻": 1, "同盟": 2, "支配": 3, "従属": 4, "友好": 5, "和睦": 6, "普通": 7, "敵対": 8 };
+                        valA = relationRank[a.status] !== undefined ? relationRank[a.status] : 7;
+                        valB = relationRank[b.status] !== undefined ? relationRank[b.status] : 7;
+                        break;
+                    case 'period': valA = a.trucePeriod || 0; valB = b.trucePeriod || 0; break;
+                }
+
+                let fallbackCmp = 0;
+                if (this.diploCurrentSortKey === 'name') {
+                    fallbackCmp = this.isDiploSortAsc ? a.name.localeCompare(b.name, 'ja') : b.name.localeCompare(a.name, 'ja');
+                }
+                
+                return this._compareForSort(valA, valB, this.isDiploSortAsc, fallbackCmp);
+            });
+            this._saveStableSortResult('diplomacy', relations);
+        } else {
+            relations.sort((a, b) => b.sentiment - a.sentiment);
+            this._saveStableSortResult('diplomacy', null);
+        }
+
         let items = [];
         relations.forEach(r => {
             let statusClass = "text-white";
             if (r.status === '敵対') statusClass = 'text-red';
-            else if (r.status === '友好') statusClass = 'text-white';
-            else if (['同盟', '支配', '従属', '婚姻'].includes(r.status)) statusClass = 'text-green';
+            else if (['同盟', '支配', '従属', '婚姻', '和睦', '友好'].includes(r.status)) statusClass = 'text-green';
 
             const friendBarHtml = this._createBarHtml(r.sentiment, 'friend');
 
@@ -916,12 +942,14 @@ class UIInfoManager {
             });
         });
 
+        const getSortMark = (key) => this._getCommonSortMark(this.diploCurrentSortKey, this.isDiploSortAsc, key);
+
         // カスタムの列幅を指定するためのヘッダーを作ります
         const customHeaderCols = [
-            '<span style="padding-left:5px; justify-content:flex-start;">勢力名</span>',
-            '<span>友好度</span>',
-            '<span>関係</span>',
-            '<span class="col-period">期間</span>',
+            `<span style="padding-left:5px; justify-content:flex-start;" data-sort="name">勢力名${getSortMark('name')}</span>`,
+            `<span data-sort="sentiment">友好度${getSortMark('sentiment')}</span>`,
+            `<span data-sort="status">関係${getSortMark('status')}</span>`,
+            `<span class="col-period" data-sort="period">期間${getSortMark('period')}</span>`,
             '<span></span>'
         ];
 
@@ -929,8 +957,8 @@ class UIInfoManager {
             title: `${name} 外交関係`,
             tabsHtml: tabsHtml,
             headers: customHeaderCols,
-            headerClass: "",
-            itemClass: "",
+            headerClass: "sortable-header diplo-list-header",
+            itemClass: "diplo-list-item",
             listClass: "diplo-list-container",
             items: items,
             scrollPos: scrollPos,
@@ -939,6 +967,15 @@ class UIInfoManager {
             onBack: onClose,
             onTabClick: (tabKey) => {
                 this.diploCurrentTab = tabKey;
+                const listEl = document.getElementById('selector-list');
+                const scroll = listEl ? listEl.scrollTop : 0;
+                this._renderDiplomacyList(id, name, type, onClose, scroll);
+            },
+            onSortClick: (sortKey) => {
+                const defaultAscKeys = ['name', 'status'];
+                const newState = this._toggleSortState(this.diploCurrentSortKey, this.isDiploSortAsc, sortKey, defaultAscKeys);
+                this.diploCurrentSortKey = newState.key;
+                this.isDiploSortAsc = newState.isAsc;
                 const listEl = document.getElementById('selector-list');
                 const scroll = listEl ? listEl.scrollTop : 0;
                 this._renderDiplomacyList(id, name, type, onClose, scroll);
@@ -2540,8 +2577,7 @@ class UIInfoManager {
                     relVal = rel.sentiment;
                     relStatus = rel.displayStatus || rel.status;
                     if (relStatus === '敵対') statusClass = 'text-red';
-                    else if (relStatus === '友好') statusClass = 'text-green';
-                    else if (['同盟', '支配', '従属', '婚姻'].includes(relStatus)) statusClass = 'text-green';
+                    else if (['同盟', '支配', '従属', '婚姻', '和睦', '友好'].includes(relStatus)) statusClass = 'text-green';
                 }
             }
             const friendBarHtml = this._createBarHtml(relVal, 'friend');
