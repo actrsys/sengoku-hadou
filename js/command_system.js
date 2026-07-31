@@ -294,34 +294,34 @@ const COMMAND_SPECS = {
     // --- 内政 (DEVELOP) ---
     'farm': { 
         label: "石高開発", category: 'DEVELOP', 
-        costGold: 200, costRice: 0, 
+        get costGold() { return window.MainParams.CommandCost.Farm; }, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'politics',
-        msg: "金: 200 (1回あたり)",
+        get msg() { return `金: ${window.MainParams.CommandCost.Farm} (1回あたり)`; },
         canExecute: (game, castle) => castle.kokudaka < castle.maxKokudaka
     },
     'commerce': { 
         label: "鉱山開発", category: 'DEVELOP', 
-        costGold: 200, costRice: 0, 
+        get costGold() { return window.MainParams.CommandCost.Commerce; }, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'politics',
-        msg: "金: 200 (1回あたり)",
+        get msg() { return `金: ${window.MainParams.CommandCost.Commerce} (1回あたり)`; },
         canExecute: (game, castle) => castle.commerce < castle.maxCommerce
     },
     'repair': { 
         label: "城壁修復", category: 'DEVELOP', 
-        costGold: 200, costRice: 0, 
+        get costGold() { return window.MainParams.CommandCost.Repair; }, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'politics',
-        msg: "金: 200 (1回あたり)",
+        get msg() { return `金: ${window.MainParams.CommandCost.Repair} (1回あたり)`; },
         canExecute: (game, castle) => castle.defense < castle.maxDefense
     },
     'charity': { 
         label: "民施し", category: 'DEVELOP', 
-        costGold: 0, costRice: 200, 
+        costGold: 0, get costRice() { return window.MainParams.CommandCost.Charity; }, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'charm',
-        msg: "米: 200 (1回あたり)",
+        get msg() { return `米: ${window.MainParams.CommandCost.Charity} (1回あたり)`; },
         canExecute: (game, castle) => castle.peoplesLoyalty < castle.maxPeoplesLoyalty
     },
     
@@ -921,9 +921,10 @@ class CommandSystem {
                 if (actionType === 'war_deploy') {
                     infoHtml = `<div>出陣武将を選択してください（最大5名まで）</div>`;
                 }
-            } else if (['farm','commerce'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回200)</div>`; }
-            else if (['charity'].includes(actionType)) { infoHtml = `<div>金: ${c.gold}, 米: ${c.rice} (1回200)</div>`; }
-            else if (['repair'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回200)</div>`; }
+            } else if (['farm'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回${window.MainParams.CommandCost.Farm})</div>`; }
+            else if (['commerce'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回${window.MainParams.CommandCost.Commerce})</div>`; }
+            else if (['charity'].includes(actionType)) { infoHtml = `<div>金: ${c.gold}, 米: ${c.rice} (1回${window.MainParams.CommandCost.Charity})</div>`; }
+            else if (['repair'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回${window.MainParams.CommandCost.Repair})</div>`; }
             else if (['draft'].includes(actionType)) { infoHtml = `<div>民忠: ${c.peoplesLoyalty}</div>`; }
             else if (['training','soldier_charity'].includes(actionType)) { infoHtml = `<div>状態: 訓練${c.training}/士気${c.morale}</div>`; }
             else if (actionType === 'war_deploy' || actionType === 'kunishu_subjugate_deploy') { infoHtml = `<div>出陣武将を選択してください（最大5名まで）</div>`; }

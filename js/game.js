@@ -28,6 +28,13 @@ window.MainParams = {
         TradeRateMin: 2.3, TradeRateMax: 3.7, TradeFluctuation: 0.5,
         PriceAmmo: 1
     },
+    // ★ここを追加：内政コマンドの費用をここで一括管理します！
+    CommandCost: {
+        Farm: 100,     // 石高開発の費用（金）
+        Commerce: 100, // 鉱山開発の費用（金）
+        Repair: 100,   // 城壁修復の費用（金）
+        Charity: 200   // 民施しの費用（米）
+    },
     Strategy: {
         InvestigateDifficulty: 50, EmploymentDiff: 1.5,
         HeadhuntBaseDiff: 50, HeadhuntGoldEffect: 0.01, HeadhuntGoldMaxEffect: 15,

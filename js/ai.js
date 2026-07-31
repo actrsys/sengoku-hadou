@@ -264,9 +264,9 @@ class AIEngine {
             // ★追加：外交や戦争を考えるよりも先に、城防御上げや民忠上げを優先します！
             let emergencyActionDone = false;
             // ★修正：思い込みステータスで緊急事態かどうかを判断させます
-            if (perceivedDefenseEmg <= castle.maxDefense / 4 && castle.gold >= 200) {
+            if (perceivedDefenseEmg <= castle.maxDefense / 4 && castle.gold >= window.MainParams.CommandCost.Repair) {
                 // 城壁修復
-                castle.gold -= 200;
+                castle.gold -= window.MainParams.CommandCost.Repair;
                 const val = GameSystem.calcRepair(castellan, 1.0, true);
                 const oldVal = castle.defense;
                 castle.defense = Math.min(castle.maxDefense, castle.defense + val);
@@ -277,9 +277,9 @@ class AIEngine {
                 
                 castellan.isActionDone = true;
                 emergencyActionDone = true;
-            } else if (perceivedLoyaltyEmg <= 70 && castle.rice >= 200) {
+            } else if (perceivedLoyaltyEmg <= 70 && castle.rice >= window.MainParams.CommandCost.Charity) {
                 // 施し
-                castle.rice -= 200;
+                castle.rice -= window.MainParams.CommandCost.Charity;
                 const val = GameSystem.calcCharity(castellan, 1.0, true);
                 
                 castle.peoplesLoyalty = Math.min(100, castle.peoplesLoyalty + val);
@@ -1585,7 +1585,7 @@ class AIEngine {
                 const defRatio = 1000 / Math.max(1, castle.maxDefense);
                 score = Math.floor(score * defRatio);
                 
-                actions.push({ type: 'repair', stat: 'politics', score: score, cost: 200 });
+                actions.push({ type: 'repair', stat: 'politics', score: score, cost: window.MainParams.CommandCost.Repair });
             }
 
             // 2. 施し（目標の最大値未満なら優先！）
@@ -1598,7 +1598,7 @@ class AIEngine {
                     // ★修正：固定の100ではなく、目標値からどれだけ足りないかでスコアを出します
                     score = (targetMaxLoyalty - perceivedLoyalty) * 2;
                 }
-                actions.push({ type: 'charity', stat: 'charm', score: score, cost: 200 }); 
+                actions.push({ type: 'charity', stat: 'charm', score: score, cost: window.MainParams.CommandCost.Charity }); 
             }
 
             // ★変更：鉄砲と軍馬の購入（大名の革新性、自家の装備比率、城の兵士数を元に点数を作ります）
@@ -1844,7 +1844,7 @@ class AIEngine {
                     score += 20 * Math.min(1.0, ((soldierToHarvestRatio - 0.8) * 2.0)); // 最大で+20点アップ
                 }
                 
-                actions.push({ type: 'farm', stat: 'politics', score: score, cost: 200 });
+                actions.push({ type: 'farm', stat: 'politics', score: score, cost: window.MainParams.CommandCost.Farm });
             }
 
             // 7. 鉱山開発
@@ -1870,7 +1870,7 @@ class AIEngine {
                     }
                 }
                 
-                actions.push({ type: 'commerce', stat: 'politics', score: score, cost: 200 });
+                actions.push({ type: 'commerce', stat: 'politics', score: score, cost: window.MainParams.CommandCost.Commerce });
             }
 
             // --- 性格による点数の調整 ---
@@ -2644,8 +2644,8 @@ class AIEngine {
                     actionDoneInThisStep = true; break;
                 }
                 
-                if (action.type === 'repair' && availableGold >= 200) {
-                    castle.gold -= 200;
+                if (action.type === 'repair' && availableGold >= window.MainParams.CommandCost.Repair) {
+                    castle.gold -= window.MainParams.CommandCost.Repair;
                     const val = GameSystem.calcRepair(doer, 1.0, true);
                     const oldVal = castle.defense;
                     castle.defense = Math.min(castle.maxDefense, castle.defense + val);
@@ -2657,8 +2657,8 @@ class AIEngine {
                     
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
-                if (action.type === 'charity' && castle.rice >= 200) {
-                    castle.rice -= 200;
+                if (action.type === 'charity' && castle.rice >= window.MainParams.CommandCost.Charity) {
+                    castle.rice -= window.MainParams.CommandCost.Charity;
                     
                     const val = GameSystem.calcCharity(doer, 1.0, true);
                     
@@ -2781,8 +2781,8 @@ class AIEngine {
                     
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
-                if (action.type === 'farm' && availableGold >= 200) {
-                    castle.gold -= 200;
+                if (action.type === 'farm' && availableGold >= window.MainParams.CommandCost.Farm) {
+                    castle.gold -= window.MainParams.CommandCost.Farm;
                     const val = GameSystem.calcDevelopment(doer, 1.0, true);
                     const oldVal = castle.kokudaka;
                     castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + val);
@@ -2793,8 +2793,8 @@ class AIEngine {
                     
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
-                if (action.type === 'commerce' && availableGold >= 200) {
-                    castle.gold -= 200;
+                if (action.type === 'commerce' && availableGold >= window.MainParams.CommandCost.Commerce) {
+                    castle.gold -= window.MainParams.CommandCost.Commerce;
                     const val = GameSystem.calcDevelopment(doer, 1.0, true);
                     const oldVal = castle.commerce;
                     castle.commerce = Math.min(castle.maxCommerce, castle.commerce + val);
