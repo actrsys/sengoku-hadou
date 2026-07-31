@@ -3203,7 +3203,7 @@ Object.assign(WarManager.prototype, {
                 await indepSys.executeRebellion(castle, castellan, oldDaimyo, 'defect', atkClanId);
             }
         }
-
+        
         // ★追加：独立・寝返り判定の後、滅亡処理の前に、残った拠点もすべて攻撃側の所有にします！
         for (const castle of defCastles) {
             if (castle.ownerClan === defClanId) {
@@ -3217,6 +3217,13 @@ Object.assign(WarManager.prototype, {
                 }
             }
         }
+
+        // ==========================================
+        // ★追加：城の持ち主が一気に変わったので、地図の色を更新します！
+        if (this.game.ui && typeof this.game.ui.updateClanColors === 'function') {
+            this.game.ui.updateClanColors();
+        }
+        // ==========================================
 
         // 3. ★変更：すべての処理が終わった一番最後に、大名を裏で浪人にします！
         // (ダイアログやログは直後の滅亡判定システムに任せるため無言で行います)
