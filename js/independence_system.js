@@ -1174,7 +1174,33 @@ class IndependenceSystem {
                 // ★安全装置：反乱リーダーが新しい大名になるため、軍団長バッジや派閥などの過去の役職を綺麗にリセットします！
                 this.game.affiliationSystem.resetFactionData(rebellionLeader);
                 rebellionLeader.isDaimyo = true;
-                
+
+                // ==========================================
+                // ★ダミーで作った「新大名家」を解体し「旧大名家」に統合します！
+                // ==========================================
+                if (!isDefection) {
+                    // 1. フライングで新勢力(newClanId)に変更された城を、全て旧勢力(oldClanId)に戻します
+                    this.game.castles.forEach(c => {
+                        if (c.ownerClan === newClanId) {
+                            c.ownerClan = oldClanId;
+                        }
+                    });
+                    
+                    // 2. 同じく新勢力に変更された武将たちも、全て旧勢力に戻します
+                    this.game.bushos.forEach(b => {
+                        if (b.clan === newClanId) {
+                            b.clan = oldClanId;
+                        }
+                    });
+
+                    // 3. システムに誤って登録されたダミーの「新勢力」を消去（滅亡扱い）します
+                    const dummyClan = this.game.clans.find(c => c.id === newClanId);
+                    if (dummyClan) {
+                        dummyClan.isDestroyed = true;
+                    }
+                }
+                // ==========================================
+
                 // ★追加：新しい大名が住んでいるお城のおまかせ（委任）を解除します
                 const daimyoCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
                 if (daimyoCastle) {
