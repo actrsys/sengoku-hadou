@@ -555,7 +555,13 @@ class GameSystem {
         }
         const safeSoldiers = Math.max(1, soldiers); // 兵士0の時は計算エラーを防ぐため1として扱います
         const val = (((busho.leadership * 1.5) + busho.strength + (Math.sqrt(busho.loyalty) * 2)) / (Math.sqrt(safeSoldiers) * 0.5)) * bonusRate;
-        return Math.max(1, Math.round(val)); 
+        
+        let finalVal = Math.max(1, Math.round(val)); 
+        // ★追加：武芸適性による訓練効果アップ
+        if (typeof SkillManager !== 'undefined') {
+            finalVal += SkillManager.calcBugeiTrainingBonus(busho);
+        }
+        return finalVal;
     }
     static calcSoldierCharity(busho, soldiers, bonusRate = 1.0, isExecute = false) { 
         if (isExecute) {

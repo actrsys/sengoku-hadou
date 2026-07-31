@@ -186,6 +186,8 @@ class StrategySystem {
         // ★追加：忍術適性による確率ボーナス
         if (typeof SkillManager !== 'undefined') {
             prob += SkillManager.calcNinjutsuProbBonus(busho);
+            // ★追加：武芸適性による防諜効果（成功率マイナス）
+            prob -= SkillManager.calcBugeiCounterIntelligenceBonus(targetId, this.game);
         }
         
         return Math.max(0.01, Math.min(0.99, prob));
@@ -224,8 +226,13 @@ class StrategySystem {
         const mods = this.getRumorModifiers(doer, target);
         const doerStrengthMod = (doer.strength + (Math.sqrt(doer.loyalty) * 2)) / 150;
         
-        const prob = (doerStrengthMod / mods.def / mods.duty / mods.loyalty / mods.affinity) * mods.position;
+        let prob = (doerStrengthMod / mods.def / mods.duty / mods.loyalty / mods.affinity) * mods.position;
         
+        // ★追加：対象のいる城の武芸適性による防諜効果（成功率マイナス）
+        if (typeof SkillManager !== 'undefined') {
+            prob -= SkillManager.calcBugeiCounterIntelligenceBonus(target.castleId, this.game);
+        }
+
         return Math.max(0.01, Math.min(0.99, prob));
     }
 
@@ -262,6 +269,11 @@ class StrategySystem {
         const totalDefense = defense + lordBonus;
         let successRate = (totalOffense / totalDefense) * 0.5; // 最後の0.5は武将引抜の成功率調整用
         
+        // ★追加：対象のいる城の武芸適性による防諜効果（成功率マイナス）
+        if (typeof SkillManager !== 'undefined') {
+            successRate -= SkillManager.calcBugeiCounterIntelligenceBonus(target.castleId, this.game);
+        }
+
         // ★修正：対象のステータスに合わせてペナルティを適用します
         const officerStatus = this.checkOfficerStatus(target);
         if (officerStatus === 3) successRate -= 0.30;
@@ -317,6 +329,8 @@ class StrategySystem {
         // ★追加：忍術適性による確率ボーナス
         if (typeof SkillManager !== 'undefined') {
             prob += SkillManager.calcNinjutsuProbBonus(busho);
+            // ★追加：武芸適性による防諜効果（成功率マイナス）
+            prob -= SkillManager.calcBugeiCounterIntelligenceBonus(targetId, this.game);
         }
         
         return Math.max(0.01, Math.min(0.99, prob));

@@ -78,9 +78,13 @@ class WarSystem {
 
     static calcFire(atkBusho, defBusho) {
         let prob = (atkBusho.intelligence / ((defBusho ? defBusho.intelligence : 30) + 10)) * window.WarParams.War.FireSuccessBase;
-        // ★追加：忍術適性による火計成功率ボーナス
+        // ★追加：忍術・武芸適性による火計成功率ボーナス＆防御
         if (typeof SkillManager !== 'undefined') {
             prob += SkillManager.calcNinjutsuFireProbBonus(atkBusho);
+            // ★追加：守備側武将の武芸適性による火計成功率マイナス
+            if (defBusho) {
+                prob -= SkillManager.calcBugeiFireDefenseBonus(defBusho);
+            }
         }
         
         // ★追加：最後に確率がマイナスにならないよう（最低1%～最高99%）にガードをかけます

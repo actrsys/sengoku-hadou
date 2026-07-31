@@ -142,6 +142,52 @@ class SkillManager {
     }
     
     // ==========================================
+    // 武芸適性による効果
+    // ==========================================
+
+    // 武芸適性のレベルを取得する魔法です
+    static getBugeiLevel(busho) {
+        if (!busho || !busho.aptBugei) return 0;
+        return this.getAptitudeLevel(busho.aptBugei);
+    }
+
+    // ＜防諜効果＞ 拠点の武将の武芸レベルを合計して、調略の成功率を下げる（最大20％）
+    static calcBugeiCounterIntelligenceBonus(castleId, game) {
+        if (!game || !castleId) return 0;
+        // お城で活動中の武将全員を集めます
+        const bushos = game.getCastleBushos(castleId).filter(b => b.status === 'active');
+        let totalLvl = 0;
+        bushos.forEach(b => {
+            totalLvl += this.getBugeiLevel(b);
+        });
+        // 1レベルにつき2%（0.02）マイナスします
+        let bonus = totalLvl * 0.02;
+        // 最大で20%（0.20）までに制限して返します
+        return Math.min(0.20, bonus); 
+    }
+
+    // ＜訓練効果アップ＞ 訓練実行時、Lv2以上で+1、Lv4以上でさらに+1（合計+2）
+    static calcBugeiTrainingBonus(busho) {
+        let lvl = this.getBugeiLevel(busho);
+        if (lvl >= 4) return 2; // Lv4, 5なら+2
+        if (lvl >= 2) return 1; // Lv2, 3なら+1
+        return 0;               // Lv0, 1なら+0
+    }
+
+    // ＜野戦死亡率軽減＞ 野戦でLv1につき、死亡フラグ付与率を10%軽減
+    static calcBugeiDeathProbReduction(busho) {
+        let lvl = this.getBugeiLevel(busho);
+        // Lv1なら0.9倍(10%減)、Lv2なら0.8倍(20%減)になるように計算します
+        return 1.0 - (lvl * 0.10);
+    }
+
+    // ＜攻城戦の火計防御＞ 守備側で火計を受ける時、Lv1につき2%マイナス
+    static calcBugeiFireDefenseBonus(busho) {
+        let lvl = this.getBugeiLevel(busho);
+        return lvl * 0.02;
+    }
+    
+    // ==========================================
     // 忍術適性による効果
     // ==========================================
 
