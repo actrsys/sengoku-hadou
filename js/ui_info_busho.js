@@ -197,9 +197,16 @@ Object.assign(UIInfoManager.prototype, {
             let percent = perceived !== null ? Math.max(0, perceived) : 0;
             if(perceived === null) percent = 0; 
 
-            let basePercent = Math.min(100, percent);
-            let overPercent = percent > 100 ? percent - 100 : 0;
-            let overBarHtml = overPercent > 0 ? `<div class="bar-fill-busho-over" style="width:${overPercent}%;"></div>` : "";
+            // ★修正：限界突破の最大値(120)を枠の幅(100%)として計算し、枠内に収めます
+            const MAX_STAT = 120;
+            let basePercent = (Math.min(100, percent) / MAX_STAT) * 100;
+            let overPercent = percent > 100 ? ((percent - 100) / MAX_STAT) * 100 : 0;
+            
+            // 金色の限界突破ゲージが枠からはみ出ないようにインラインで調整します
+            let overLeft = (100 / MAX_STAT) * 100;
+            let overBarHtml = overPercent > 0 
+                ? `<div class="bar-fill-busho-over" style="left: ${overLeft}%; width:${overPercent}%; top: 0; height: 100%; border: none; border-radius: 0 2px 2px 0;"></div>` 
+                : "";
             let fillClass = overPercent > 0 ? "bar-fill-busho over-connected" : "bar-fill-busho";
 
             const expInfo = typeof busho.getExpInfo === 'function' ? busho.getExpInfo(statKey) : null;
@@ -218,8 +225,6 @@ Object.assign(UIInfoManager.prototype, {
                 `;
             }
 
-            // ★修正：レイアウトを「項目名」「アルファベット」「ゲージ」の順にして左寄せにします
-            // スマホとPCで幅のバランスを整えます
             const isPc = document.body.classList.contains('is-pc');
             const labelWidth = isPc ? "40px" : "30px";
             const gradeWidth = isPc ? "35px" : "25px";
