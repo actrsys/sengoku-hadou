@@ -967,7 +967,28 @@ class DiplomacyManager {
             dominantClan.currentDiplomacyTarget.gold = 300;
         }
     }
-
+    
+    /**
+     * ★新設：外交の結果表示と、それに伴う画面の更新をひとまとめに行う魔法です！
+     */
+    showDiplomacyResult(doerClanId, isPlayerInvolved, msg, logMsg = "", aiMsg = "", onClose = null) {
+        if (isPlayerInvolved) {
+            if (logMsg !== "") this.game.ui.log(logMsg);
+            if (doerClanId === this.game.playerClanId) {
+                this.game.ui.updatePanelHeader();
+                this.game.ui.renderCommandMenu();
+                this.game.ui.renderMap();
+            }
+            this.game.ui.showResultModal(msg, onClose);
+        } else if (aiMsg !== "") {
+            this.game.ui.showDialog(aiMsg, false, onClose);
+            this.game.ui.log(aiMsg);
+        } else {
+            // メッセージが無い場合も、閉じられた後の処理だけはちゃんと引き継ぎます
+            if (onClose) onClose();
+        }
+    }
+    
     /**
      * 外交コマンドを実行する魔法です
      */
@@ -1254,21 +1275,11 @@ class DiplomacyManager {
                     processPrincesses(index + 1);
                 }
             };
-
+            
             doer.isActionDone = true;
-            if (isPlayerInvolved) {
-                if (logMsg !== "") this.game.ui.log(logMsg);
-                if (doer.clan === this.game.playerClanId) {
-                    this.game.ui.updatePanelHeader();
-                    this.game.ui.renderCommandMenu();
-                    this.game.ui.renderMap();
-                }
-                this.game.ui.showResultModal(msg, () => {
-                    processPrincesses(0); 
-                });
-            } else {
-                processPrincesses(0);
-            }
+            this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, logMsg, "", () => {
+                processPrincesses(0); 
+            });
             return;
             
         } else if (type === 'subordinate') {
@@ -1331,31 +1342,17 @@ class DiplomacyManager {
                 this.game.factionSystem.updateRecognition(doer, 30);
 
                 doer.isActionDone = true;
-                if (isPlayerInvolved) {
-                    this.game.ui.showResultModal(msg);
-                    if (logMsg !== "") this.game.ui.log(logMsg);
-                    if (doer.clan === this.game.playerClanId) {
-                        this.game.ui.updatePanelHeader();
-                        this.game.ui.renderCommandMenu();
-                        this.game.ui.renderMap();
-                    }
-                }
+                this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, logMsg, aiMsg);
             };
-
+            
             const handleFailure = () => {
                 this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.DOMINATE_FAILURE);
                 msg = `条件が折り合わず、${this.game.clans.find(c => c.id === targetClanId).name} への従属を断念しました。`;
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
+                
                 doer.isActionDone = true;
-                if (isPlayerInvolved) {
-                    this.game.ui.showResultModal(msg);
-                    if (doer.clan === this.game.playerClanId) {
-                        this.game.ui.updatePanelHeader();
-                        this.game.ui.renderCommandMenu();
-                        this.game.ui.renderMap();
-                    }
-                }
+                this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg);
             };
             
             if (isSuccess) {
@@ -1422,7 +1419,7 @@ class DiplomacyManager {
                     this.applyCastleCessionData(conditionData.castle.id, doer.clan, targetClanId);
                     conditionMsg = `\n${conditionData.castle.name} を割譲しました。`;
                 }
-
+                
                 msg = `${this.game.clans.find(c => c.id === targetClanId).name} との和睦が成立しました！${conditionMsg}`;
                 if (!isPlayerInvolved) aiMsg = `${doerClanName} と ${targetClanName} が和睦しました。`;
                 else logMsg = `${doerClanName}が${targetClanName}と和睦しました`;
@@ -1431,31 +1428,17 @@ class DiplomacyManager {
                 this.game.factionSystem.updateRecognition(doer, 30);
 
                 doer.isActionDone = true;
-                if (isPlayerInvolved) {
-                    this.game.ui.showResultModal(msg);
-                    if (logMsg !== "") this.game.ui.log(logMsg);
-                    if (doer.clan === this.game.playerClanId) {
-                        this.game.ui.updatePanelHeader();
-                        this.game.ui.renderCommandMenu();
-                        this.game.ui.renderMap();
-                    }
-                }
+                this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, logMsg, aiMsg);
             };
-
+            
             const handleFailure = () => {
                 this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
                 msg = `条件が折り合わず、${this.game.clans.find(c => c.id === targetClanId).name} との和睦は決裂しました。`;
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
+                
                 doer.isActionDone = true;
-                if (isPlayerInvolved) {
-                    this.game.ui.showResultModal(msg);
-                    if (doer.clan === this.game.playerClanId) {
-                        this.game.ui.updatePanelHeader();
-                        this.game.ui.renderCommandMenu();
-                        this.game.ui.renderMap();
-                    }
-                }
+                this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg);
             };
             
             if (isSuccess) {
@@ -1511,19 +1494,9 @@ class DiplomacyManager {
                 msg = `朝廷の介入により、当家は ${doerClanName} と和睦することになりました……`;
             }
         }
+        
         doer.isActionDone = true;
-        if (isPlayerInvolved) {
-            this.game.ui.showResultModal(msg);
-            if (logMsg !== "") this.game.ui.log(logMsg);
-            if (doer.clan === this.game.playerClanId) {
-                this.game.ui.updatePanelHeader();
-                this.game.ui.renderCommandMenu();
-                this.game.ui.renderMap();
-            }
-        } else if (aiMsg !== "") {
-            this.game.ui.showDialog(aiMsg, false);
-            this.game.ui.log(aiMsg);
-        }
+        this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, logMsg, aiMsg);
     }
     
     /**
@@ -1947,24 +1920,18 @@ class DiplomacyManager {
             this.game.factionSystem.updateRecognition(doer, 30);
 
             const doerClan = this.game.clans.find(c => c.id === doer.clan);
-            this.game.ui.log(`${doerClan.name}が${targetClan.name}と婚姻同盟を締結しました`);
+            const msg = `${targetClan.name} と婚姻同盟を締結しました！\n${princess.name} は ${targetBusho.name} の正室として迎えられました。`;
+            const logMsg = `${doerClan.name}が${targetClan.name}と婚姻同盟を締結しました`;
 
-            this.game.ui.showResultModal(`${targetClan.name} と婚姻同盟を締結しました！\n${princess.name} は ${targetBusho.name} の正室として迎えられました。`, () => {
-                this.game.ui.updatePanelHeader();
-                this.game.ui.renderCommandMenu();
-                this.game.ui.renderMap();
-            });
+            this.showDiplomacyResult(doer.clan, true, msg, logMsg);
         } else {
             this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
             doer.isActionDone = true;
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
 
-            this.game.ui.showResultModal(`${targetClan.name} との婚姻同盟の締結に失敗しました……`, () => {
-                this.game.ui.updatePanelHeader();
-                this.game.ui.renderCommandMenu();
-                this.game.ui.renderMap();
-            });
+            const msg = `${targetClan.name} との婚姻同盟の締結に失敗しました……`;
+            this.showDiplomacyResult(doer.clan, true, msg);
         }
     }
 
@@ -2021,12 +1988,9 @@ class DiplomacyManager {
         
         const msg = `当家は ${targetClan.name} に臣従しました。これより ${targetClan.name} として天下統一を目指します！`;
         
-        this.game.ui.showResultModal(msg, () => {
-            // 新しい大名家の情報に合わせて画面を綺麗に描き直します
-            this.game.ui.updatePanelHeader();
-            this.game.ui.renderCommandMenu();
-            this.game.ui.renderMap();
-        });
+        // ★臣従の場合は、自分の操作担当(playerClanId)が相手の大名家(targetClanId)に切り替わっているので注意！
+        // 画面を更新させるために、実行者として targetClanId を渡します。
+        this.showDiplomacyResult(targetClanId, true, msg);
     }
 
     /**
