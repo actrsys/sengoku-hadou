@@ -1226,8 +1226,14 @@ class LifeSystem {
     // ★変更：4つ目の枠に「isSuccession（生前退位かどうか）」の目印を受け取れるようにしました
     applyDaimyoChangeEffects(oldDaimyo, successor, messages, isSuccession = false) {
         // ★当主交代があったら、今まで進めていた作戦（攻撃準備など）を一旦キャンセルして白紙に戻します！
-        if (this.game.aiOperationManager && this.game.aiOperationManager.operations[oldDaimyo.clan]) {
-            delete this.game.aiOperationManager.operations[oldDaimyo.clan];
+        if (this.game.aiOperationManager) {
+            if (this.game.aiOperationManager.operations[oldDaimyo.clan]) {
+                delete this.game.aiOperationManager.operations[oldDaimyo.clan];
+            }
+            // ★追加：長期的な「大目標（方針）」も白紙に戻して、新当主で考え直させます！
+            if (this.game.aiOperationManager.grandObjectives && this.game.aiOperationManager.grandObjectives[oldDaimyo.clan]) {
+                delete this.game.aiOperationManager.grandObjectives[oldDaimyo.clan];
+            }
         }
         
         // ★新旧大名の能力比較と、忠誠・民忠への影響！
@@ -1548,6 +1554,16 @@ class LifeSystem {
             
             // ==========================================
             // ★修正：メッセージを出す「前」に、武将や城の処理を終わらせます！
+
+            // ★追加：滅亡した大名家の作戦や大目標のデータが残らないように綺麗にお掃除します！
+            if (this.game.aiOperationManager) {
+                if (this.game.aiOperationManager.operations[clanId]) {
+                    delete this.game.aiOperationManager.operations[clanId];
+                }
+                if (this.game.aiOperationManager.grandObjectives && this.game.aiOperationManager.grandObjectives[clanId]) {
+                    delete this.game.aiOperationManager.grandObjectives[clanId];
+                }
+            }
 
             // もし残っている武将がいたら、全員「浪人」にします
             this.game.bushos.filter(b => b.clan === clanId && b.status === 'active').forEach(b => {
