@@ -340,7 +340,20 @@ Object.assign(UIInfoManager.prototype, {
                     let index = i + j;
                     if (index < 3) {
                         let skillName = skills[index] || "&nbsp;";
-                        rowInnerHtml += `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">技能${index + 1}</span><span class="daimyo-detail-value">${skillName}</span></div>`;
+
+                        // ★ここから追加：技能がある箱だけクリックできるようにクラスや情報を付けます
+                        let clickClass = "";
+                        let dataAttr = "";
+                        let cursorStyle = "";
+                        if (skills[index]) {
+                            clickClass = "skill-box-clickable";
+                            dataAttr = `data-skill-name="${skills[index]}"`;
+                            cursorStyle = "cursor: pointer;";
+                        }
+                        
+                        rowInnerHtml += `<div class="daimyo-detail-stat-box ${clickClass}" ${dataAttr} style="${cursorStyle}"><span class="daimyo-detail-label">技能${index + 1}</span><span class="daimyo-detail-value">${skillName}</span></div>`;
+                        // ★ここまで追加
+
                     } else {
                         // 4つ目の枠（空白）は形を綺麗に整えるために透明にして置いておきます
                         rowInnerHtml += `<div class="daimyo-detail-stat-box" style="visibility: hidden;"></div>`;
@@ -350,10 +363,15 @@ Object.assign(UIInfoManager.prototype, {
             }
 
             // ★変更：基本タブと同じように flex と gap を使って隙間のサイズを統一し、高さを揃えます
+            // （説明エリアを隠し味として最初から忍ばせておきます）
             rightContentHtml = `
                 <div style="display: flex; flex-direction: column; gap: ${rowGap}; width: 100%;">
-                    <div style="${groupWrapStyle}">
+                    <div id="busho-aptitude-area" style="${groupWrapStyle} flex: 1;">
                         ${aptHtml}
+                    </div>
+                    <div id="busho-skill-desc-area" style="${groupWrapStyle} display: none; flex: 1; min-height: 120px;">
+                        <div id="busho-skill-desc-text" style="padding: 5px 8px; font-size: 0.95rem; line-height: 1.5; color: #fff; text-shadow: 1px 1px 1px #000; text-align: left; height: 100%; box-sizing: border-box; overflow-y: auto;">
+                        </div>
                     </div>
                     <div style="${groupWrapStyle}">
                         ${skillHtml}
@@ -415,6 +433,48 @@ Object.assign(UIInfoManager.prototype, {
             }
 
             listContainer.scrollTop = scrollPos;
+
+            // ★技能の箱をクリックした時に説明を出す魔法
+            if (this.bushoDetailCurrentTab === 'aptitude') {
+                const aptArea = document.getElementById('busho-aptitude-area');
+                const descArea = document.getElementById('busho-skill-desc-area');
+                const descText = document.getElementById('busho-skill-desc-text');
+                const skillBoxes = document.querySelectorAll('.skill-box-clickable');
+                const detailContainer = listContainer.querySelector('.daimyo-detail-container');
+
+                if (detailContainer && aptArea && descArea) {
+                    // 技能の箱以外をクリックしたら、適性表示にサッと戻します
+                    detailContainer.addEventListener('click', (e) => {
+                        if (!e.target.closest('.skill-box-clickable')) {
+                            aptArea.style.display = 'flex'; 
+                            descArea.style.display = 'none';
+                        }
+                    });
+                }
+
+                if (skillBoxes.length > 0 && aptArea && descArea && descText) {
+                    skillBoxes.forEach(box => {
+                        box.addEventListener('click', (e) => {
+                            e.stopPropagation(); // 画面全体をクリックしたことにならないようにガードします
+                            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                            const skillName = box.dataset.skillName;
+                            if (skillName) {
+                                // 専門家（SkillManager）に技能の説明を聞きます
+                                let desc = window.SkillManager ? window.SkillManager.getSkillDescription(skillName) : "";
+                                if (!desc) desc = "詳細不明。";
+                                
+                                // 説明文をセットして、瞬時に表示を切り替えます
+                                descText.innerHTML = `
+                                    <div style="color:#ffd54f; font-weight:bold; margin-bottom:5px; border-bottom:1px solid rgba(212,175,55,0.5); padding-bottom:3px;">【${skillName}】</div>
+                                    <div style="color:#eee; font-size:0.85rem;">${desc}</div>
+                                `;
+                                aptArea.style.display = 'none';
+                                descArea.style.display = 'flex';
+                            }
+                        });
+                    });
+                }
+            }
         }
     },
     
