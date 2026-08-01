@@ -2792,23 +2792,13 @@ class FieldWarManager {
         }
 
         // ==========================================
-        // ★追加: 傾奇者の判定
+        // ★変更: 傾奇者の判定（スキルマネージャーに一元管理させます）
         // ==========================================
-        const checkKabukimono = (unit) => {
-            if (SkillManager.isKabukimono(unit, this.game) && (unit.troopType === 'ashigaru' || unit.troopType === 'kiba') && unit.soldiers <= 1000) {
-                let allyTotal = 0;
-                let enemyTotal = 0;
-                this.units.forEach(u => {
-                    if (u.isAttacker === unit.isAttacker) allyTotal += u.soldiers;
-                    else enemyTotal += u.soldiers;
-                });
-                return allyTotal <= enemyTotal;
-            }
-            return false;
-        };
+        let atkKabukiResult = typeof SkillManager !== 'undefined' ? SkillManager.getKabukimonoResult(attacker, this.units, this.game, atkDist === 1) : { isActive: false, atkMult: 1.0, defMult: 1.0 };
+        let defKabukiResult = typeof SkillManager !== 'undefined' ? SkillManager.getKabukimonoResult(defender, this.units, this.game, atkDist === 1) : { isActive: false, atkMult: 1.0, defMult: 1.0 };
 
-        let isAtkKabukimono = checkKabukimono(attacker);
-        let isDefKabukimono = checkKabukimono(defender);
+        let isAtkKabukimono = atkKabukiResult.isActive;
+        let isDefKabukimono = defKabukiResult.isActive;
 
         // ==========================================
         // ★追加: 適性とスキルによる最終ダメージの増加・軽減処理
@@ -2850,7 +2840,7 @@ class FieldWarManager {
 
         // 軽減系の計算（傾奇者の軽減もここで一緒に計算します）
         let aptitudeDefReduceMult = SkillManager.calcAptitudeDefenseModifier(defender, attacker, isRangedAttack, this.game);
-        let defKabukiMod = isDefKabukimono ? 0.3 : 1.0;
+        let defKabukiMod = defKabukiResult.defMult;
         
         // ★制限：軽減系はすべて重ねても元の10%未満にならないようにガードします！
         let totalDefReduceMod = aptitudeDefReduceMult * defSkillDefMod * defKabukiMod;
@@ -2859,7 +2849,7 @@ class FieldWarManager {
         
         if (atkDist === 1) {
             let aptitudeAtkReduceMult = SkillManager.calcAptitudeDefenseModifier(attacker, defender, false, this.game);
-            let atkKabukiMod = isAtkKabukimono ? 0.3 : 1.0;
+            let atkKabukiMod = atkKabukiResult.defMult;
             
             // ★制限：反撃の軽減にもガードをかけます
             let totalAtkReduceMod = aptitudeAtkReduceMult * atkSkillDefMod * atkKabukiMod;
@@ -2878,11 +2868,11 @@ class FieldWarManager {
             dmgToAtk = Math.floor(dmgToAtk * defCritResult.finalDmgMult);
         }
 
-        if (isAtkKabukimono && atkDist === 1) {
-            dmgToDef = Math.floor(dmgToDef * 3); // 隣接戦闘時に与える最終ダメージ3倍
+        if (isAtkKabukimono) {
+            dmgToDef = Math.floor(dmgToDef * atkKabukiResult.atkMult); // 傾奇者による与ダメージ増幅
         }
-        if (isDefKabukimono && atkDist === 1) {
-            dmgToAtk = Math.floor(dmgToAtk * 3); // 守備側からの反撃（隣接時）
+        if (isDefKabukimono) {
+            dmgToAtk = Math.floor(dmgToAtk * defKabukiResult.atkMult); // 傾奇者による反撃ダメージ増幅
         }
 
         // ★追加: プレイヤーがいないAI同士の戦いなら、ダメージを約3分の2（0.666）に減らします！

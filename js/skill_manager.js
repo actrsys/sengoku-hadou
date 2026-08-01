@@ -37,10 +37,72 @@ const APTITUDE_NAMES = {
     MARITIME: "操船"
 };
 
+// 適性の説明文（表示用）
+const APTITUDE_DESCRIPTIONS = {
+    // 足軽
+    [APTITUDE_NAMES.ASHIGARU]: "足軽・近接戦闘時の与ダメージ上昇と被ダメージ軽減に影響する。レベルが高いほど効果が大きい。",
+    // 馬術
+    [APTITUDE_NAMES.KIBA]: "騎馬隊の与ダメージ上昇と被ダメージ軽減に影響する。レベルが高いほど効果が大きい。",
+    // 弓術
+    [APTITUDE_NAMES.YUMI]: "弓による遠距離攻撃時の与ダメージ上昇と被ダメージ軽減に影響する。レベルが高いほど効果が大きい。",
+    // 砲術
+    [APTITUDE_NAMES.TEPPO]: "鉄砲による遠距離攻撃時の与ダメージ上昇と被ダメージ軽減に影響する。レベルが高いほど効果が大きい。",
+    // 武芸
+    [APTITUDE_NAMES.BUGEI]: "拠点の防諜成功率低下、訓練効果上昇、野戦死亡率軽減、火計防御に影響する。",
+    // 忍術
+    [APTITUDE_NAMES.NINJUTSU]: "破壊工作・扇動の成功率と効果上昇、山岳・森・川の移動コスト軽減、火計成功率上昇に影響する。",
+    // 操船
+    [APTITUDE_NAMES.MARITIME]: "海戦時の被ダメージ軽減と海進入時の移動コスト軽減に影響する。艦隊内最高レベルからの補正も受ける。"
+};
+
+// 技能の説明文（表示用）
+const SKILL_DESCRIPTIONS = {
+    // 踏破
+    [SKILL_NAMES.MOUNTAIN]: "騎馬隊で山岳地形に進入可能になる。",
+    // 退き巧者
+    [SKILL_NAMES.RETREAT]: "撤退時の損害を軽減する。",
+    // 猛将
+    [SKILL_NAMES.MOUSHO]: "野戦で一定確率でクリティカルが発生するようになる。",
+    // 鬼
+    [SKILL_NAMES.ONI]: "野戦で一定確率でクリティカルが発生するようになり、さらにクリティカルダメージが1.5倍になる。",
+    // 悪天巧者
+    [SKILL_NAMES.WEATHER]: "悪天候によるペナルティを無視する。",
+    // 朱槍
+    [SKILL_NAMES.SHUYARI]: "野戦で隣接戦闘時に与ダメージが10%上昇する。",
+    // 赤備え
+    [SKILL_NAMES.AKAZONAE]: "被ダメージを10%軽減し、士気低下を無効化する。",
+    // 医術
+    [SKILL_NAMES.IJUTSU]: "同じ城にいる味方の戦死確率と災害による人口被害を半減させる。",
+    // 傾奇者
+    [SKILL_NAMES.KABUKIMONO]: "自軍が追い詰められている時、足軽隊・騎馬隊の与ダメージを激増させ、被ダメージを激減する。",
+    // 天下布武
+    [SKILL_NAMES.TENKA_FUBU]: "悪天巧者・踏破・退き巧者の効果をすべて持つ。",
+    // 越後の龍
+    [SKILL_NAMES.ECHIGO_NO_RYU]: "自部隊の与ダメージを20%上昇させ、被ダメージを10%軽減する。",
+    // 甲斐の虎
+    [SKILL_NAMES.KAI_NO_TORA]: "所属勢力の部隊全ての与ダメージを5%上昇させ、被ダメージを10%軽減する。",
+    // 三河の鹿
+    [SKILL_NAMES.MIKAWA_NO_SHIKA]: "自部隊の被ダメージを30%軽減する。",
+    // 人たらし
+    [SKILL_NAMES.HITOTARASHI]: "派閥を形成しやすくなる。さらに登用成功率に+15%、引抜成功率に+2%のボーナスを与える。",
+    // 狙撃
+    [SKILL_NAMES.SOGEKI]: "鉄砲による遠距離攻撃時に一定確率でクリティカルが発生するようになる。",
+    // 表裏比興
+    [SKILL_NAMES.HYORIHIKYO]: "親善成功率を上げ、断交時のペナルティを軽減する。主家からの援軍要請を拒否できる。"
+};
+
 class SkillManager {
     // 外部のファイルからもこの名前リストを見れるようにする窓口です
     static get SKILLS() { return SKILL_NAMES; }
     static get APTITUDES() { return APTITUDE_NAMES; }
+    
+    static getSkillDescription(skillName) {
+        return SKILL_DESCRIPTIONS[skillName] || "";
+    }
+    
+    static getAptitudeDescription(aptitudeName) {
+        return APTITUDE_DESCRIPTIONS[aptitudeName] || "";
+    }
 
     // アルファベットの適性ランク（S～E）を、計算用の数字（5～0）に変換する魔法です。
     static getAptitudeLevel(rank) {
@@ -407,6 +469,44 @@ class SkillManager {
     // 「傾奇者」を持っているか
     static isKabukimono(unit, game) {
         return this.hasSkill(unit, SKILL_NAMES.KABUKIMONO, game);
+    }
+
+    // ==========================================
+    // ★追加：傾奇者の効果（ダメージ計算）を一元管理する魔法
+    // ==========================================
+    static getKabukimonoResult(unit, allUnits, game, isAdjacent) {
+        // 基本の倍率（何もない時は1倍）の箱を用意します
+        let result = { isActive: false, atkMult: 1.0, defMult: 1.0 };
+
+        // そもそも傾奇者のスキルを持っていなければ、ここでストップします
+        if (!this.isKabukimono(unit, game)) return result;
+
+        // 足軽隊か騎馬隊で、兵士数が1000人以下の時だけ発動のチャンスです
+        if ((unit.troopType === 'ashigaru' || unit.troopType === 'kiba') && unit.soldiers <= 1000) {
+            let allyTotal = 0;
+            let enemyTotal = 0;
+            
+            // 戦場にいるすべての部隊から、味方と敵の数を数えます
+            if (allUnits && Array.isArray(allUnits)) {
+                allUnits.forEach(u => {
+                    if (u.isAttacker === unit.isAttacker) allyTotal += u.soldiers;
+                    else enemyTotal += u.soldiers;
+                });
+            }
+            
+            // 味方の総兵数が敵の総兵数以下（追い詰められている）なら発動します！
+            if (allyTotal <= enemyTotal) {
+                result.isActive = true;
+                result.defMult = 0.3; // 被ダメージを激減（0.3倍）します
+                
+                // 与えるダメージが激増（3倍）するのは、隣接戦闘（距離1）の時だけです
+                if (isAdjacent) {
+                    result.atkMult = 3.0;
+                }
+            }
+        }
+        
+        return result;
     }
 
     // ==========================================
