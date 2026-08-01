@@ -165,6 +165,20 @@ class AIOperationManager {
                 // ★追加：プレイヤー大名家で、かつ直轄（ID0）の場合は、勝手に作戦を立てないようにスキップします！
                 if (isPlayerClan && legionId === 0) continue;
 
+                // ★変更：新しく一元化した共通魔法を使って、自軍団の領土から直接攻撃できる敵拠点のリストを作ります！
+                const reachableEnemyCastleIds = new Set();
+                const myLegionCastles = this.game.castles.filter(c => c.ownerClan === clan.id && c.legionId === legionId);
+                const visitedForRoute = new Set();
+                
+                myLegionCastles.forEach(myC => {
+                    if (!visitedForRoute.has(myC.id)) {
+                        // isLegionOnlyを「true」にして、自軍団のみに絞ります
+                        const territory = GameSystem.getReachableTerritory(this.game, myC, true);
+                        territory.myCastles.forEach(c => visitedForRoute.add(c.id));
+                        territory.enemyCastles.forEach(c => reachableEnemyCastleIds.add(c.id));
+                    }
+                });
+
                 // ★ここから追加：方針のカウントと成果チェック
                 if (!this.grandObjectives) this.grandObjectives = {};
                 if (!this.grandObjectives[clan.id]) this.grandObjectives[clan.id] = {};
@@ -235,35 +249,49 @@ class AIOperationManager {
                             if (rel && ['同盟', '支配', '従属', '友好'].includes(rel.status)) {
                                 shouldCancel = true;
                             } else {
-                                // 道が繋がっているか調べる
-                                const myCastles = this.game.castles.filter(c => c.ownerClan === clan.id && c.legionId === legionId);
+                                // ★変更：GameSystem.isReachableを使わず、自領から直接攻撃できるか判定します
                                 const targetCastles = this.game.castles.filter(c => c.ownerClan === targetClanId);
                                 
                                 let hasRoute = false;
-                                for (const myC of myCastles) {
-                                    for (const tgtC of targetCastles) {
-                                        // GameSystemのisReachableで経路があるか判定
-                                        if (GameSystem.isReachable(this.game, myC, tgtC, clan.id)) {
-                                            hasRoute = true;
-                                            break;
-                                        }
+                                for (const tgtC of targetCastles) {
+                                    if (reachableEnemyCastleIds.has(tgtC.id)) {
+                                        hasRoute = true;
+                                        break;
                                     }
-                                    if (hasRoute) break;
                                 }
                                 
-                                // 自軍団のどの拠点からも、相手のどの拠点へも道が繋がっていなければ消去
+                                // どの拠点へも道が繋がっていなければ消去
                                 if (!hasRoute) {
                                     shouldCancel = true;
                                 }
                             }
+                        } else if (!shouldCancel && grandObj.type === '国攻略') {
+                            // ★追加：国攻略の場合も、目標の国へ直接攻撃できる道があるかチェックします！
+                            let hasRoute = false;
+                            const targetCastles = this.game.castles.filter(c => {
+                                if (c.provinceId === grandObj.targetProvId && c.ownerClan !== clan.id) {
+                                    const rel = this.game.getRelation(clan.id, c.ownerClan);
+                                    return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                                }
+                                return false;
+                            });
+                            
+                            for (const tgtC of targetCastles) {
+                                if (reachableEnemyCastleIds.has(tgtC.id)) {
+                                    hasRoute = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (!hasRoute) {
+                                shouldCancel = true;
+                            }
                         } else if (!shouldCancel && grandObj.type === '反攻作戦') {
-                            // ★今回追加：反攻作戦で、取り返す対象の拠点へ道が繋がっているか調べる魔法です
+                            // ★変更：反攻作戦でも、同盟国を挟まずに直接攻撃できるか判定します
                             const history = this.historyOwnedCastles[clan.id] || [];
                             const pastOwnedSet = new Set();
                             history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
                             
-                            // 自分の軍団のお城リストと、大名家全体のお城のIDリストを用意します
-                            const myCastles = this.game.castles.filter(c => c.ownerClan === clan.id && c.legionId === legionId);
                             const currentMyCastleIds = new Set(this.game.castles.filter(c => c.ownerClan === clan.id).map(c => c.id));
                             
                             let hasRoute = false;
@@ -276,14 +304,11 @@ class AIOperationManager {
                                         const rel = this.game.getRelation(clan.id, tgtC.ownerClan);
                                         // 友好勢力でなければ、取り返す拠点候補
                                         if (!rel || !['同盟', '支配', '従属', '友好'].includes(rel.status)) {
-                                            // その拠点へ、自軍団のどのお城からか行けるかチェックします
-                                            for (const myC of myCastles) {
-                                                if (GameSystem.isReachable(this.game, myC, tgtC, clan.id)) {
-                                                    hasRoute = true;
-                                                    break;
-                                                }
+                                            // その拠点へ直接攻撃できるかチェックします
+                                            if (reachableEnemyCastleIds.has(tgtC.id)) {
+                                                hasRoute = true;
+                                                break;
                                             }
-                                            if (hasRoute) break; // 1つでも行けるルートが見つかればOKです！
                                         }
                                     }
                                 }

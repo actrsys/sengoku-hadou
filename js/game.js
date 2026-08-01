@@ -933,7 +933,54 @@ class GameSystem {
         return false;
     }
     
-    // ★ここから追加：最短ルートの中で「最後の一歩（攻撃先への道）」が海路かどうかを調べる魔法です！
+    // ==========================================
+    // ★追加：起点となるお城から、「自領（または自軍団）」だけを通って辿り着けるお城のリストと、その外側（隣接する敵城など）のリストをまとめて取得する一元化魔法です！
+    // ==========================================
+    static getReachableTerritory(game, startCastle, isLegionOnly = false) {
+        const myCastles = new Set();
+        const enemyCastles = new Set();
+        
+        // ★起点のお城が存在しないなどのエラーを防ぎます
+        if (!startCastle) return { myCastles: [], enemyCastles: [] };
+        
+        const clanId = startCastle.ownerClan;
+        const legionId = startCastle.legionId;
+        const queue = [startCastle];
+        myCastles.add(startCastle.id);
+        
+        while (queue.length > 0) {
+            const current = queue.shift();
+            
+            if (current.adjacentCastleIds) {
+                current.adjacentCastleIds.forEach(adjId => {
+                    const adjCastle = game.getCastle(adjId);
+                    if (adjCastle) {
+                        // 自領かどうかの判定（isLegionOnlyがtrueなら軍団も一致するか見ます）
+                        const isMyTerritory = (adjCastle.ownerClan === clanId) && (!isLegionOnly || adjCastle.legionId === legionId);
+                        
+                        if (isMyTerritory) {
+                            // 自領ならさらに奥へ進むためにキューに入れます
+                            if (!myCastles.has(adjId)) {
+                                myCastles.add(adjId);
+                                queue.push(adjCastle);
+                            }
+                        } else {
+                            // 自領以外は境界線（直接攻撃できるターゲット）としてメモします
+                            enemyCastles.add(adjId);
+                        }
+                    }
+                });
+            }
+        }
+        
+        // お城のデータそのもののリストに変換して返します
+        return { 
+            myCastles: Array.from(myCastles).map(id => game.getCastle(id)), 
+            enemyCastles: Array.from(enemyCastles).map(id => game.getCastle(id)) 
+        };
+    }
+    
+    // ★最短ルートの中で「最後の一歩（攻撃先への道）」が海路かどうかを調べる魔法です！
     static isSeaRoute(game, startCastle, targetCastle, movingClanId) {
         if (!startCastle || !targetCastle) return false;
         if (startCastle.id === targetCastle.id) return false;
