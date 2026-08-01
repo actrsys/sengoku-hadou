@@ -88,6 +88,95 @@ class SkillManager {
         return 1.0 - (reductionPct / 100);
     }
 
+    // ==========================================
+    // ★追加：攻城戦での適性による与ダメージアップの魔法
+    // ==========================================
+    static calcSiegeAptitudeDamageModifier(busho, soldiers, horses, guns, actionType) {
+        if (!busho) return 1.0;
+        
+        let modifier = 1.0;
+        let safeSoldiers = Math.max(1, soldiers);
+        let horseRatio = horses / safeSoldiers;
+        let gunRatio = guns / safeSoldiers;
+        
+        if (actionType === 'charge' || actionType === 'def_charge' || actionType === 'siege') {
+            // 足軽適性：軍馬・鉄砲の割合が5割未満
+            if (horseRatio < 0.5 && gunRatio < 0.5) {
+                let lvl = this.getAptitudeLevel(busho.aptAshigaru);
+                if (lvl > 0) {
+                    modifier += (lvl * 0.03) + 0.05;
+                }
+            }
+            // 馬術適性：軍馬の割合が5割以上
+            if (horseRatio >= 0.5) {
+                let lvl = this.getAptitudeLevel(busho.aptKiba);
+                if (lvl > 0) {
+                    modifier += (lvl * 0.03) + 0.05;
+                }
+            }
+        } else if (actionType === 'bow' || actionType === 'def_bow') {
+            // 弓術適性：条件なし（斉射時）砲術と重複
+            let yumiLvl = this.getAptitudeLevel(busho.aptYumi);
+            if (yumiLvl > 0) {
+                modifier += (yumiLvl * 0.01) + 0.03;
+            }
+            // 砲術適性：鉄砲の割合が5割以上
+            if (gunRatio >= 0.5) {
+                let teppoLvl = this.getAptitudeLevel(busho.aptTeppo);
+                if (teppoLvl > 0) {
+                    modifier += (teppoLvl * 0.02) + 0.05;
+                }
+            }
+        }
+        
+        return modifier;
+    }
+
+    // ==========================================
+    // ★追加：攻城戦での適性による被ダメージ軽減の魔法
+    // ==========================================
+    static calcSiegeAptitudeDefenseModifier(busho, attackerSoldiers, attackerHorses, attackerGuns, attackActionType) {
+        if (!busho) return 1.0;
+        
+        let reductionPct = 0;
+        let safeSoldiers = Math.max(1, attackerSoldiers);
+        let horseRatio = attackerHorses / safeSoldiers;
+        let gunRatio = attackerGuns / safeSoldiers;
+        
+        if (attackActionType === 'charge' || attackActionType === 'def_charge' || attackActionType === 'siege') {
+            // 足軽適性：攻撃側の軍馬・鉄砲の割合が5割未満
+            if (horseRatio < 0.5 && gunRatio < 0.5) {
+                let lvl = this.getAptitudeLevel(busho.aptAshigaru);
+                if (lvl > 0) {
+                    reductionPct += lvl * 2;
+                }
+            }
+            // 馬術適性：攻撃側の軍馬の割合が5割以上
+            if (horseRatio >= 0.5) {
+                let lvl = this.getAptitudeLevel(busho.aptKiba);
+                if (lvl > 0) {
+                    reductionPct += lvl * 1;
+                }
+            }
+        } else if (attackActionType === 'bow' || attackActionType === 'def_bow') {
+            // 弓術適性：条件なし（斉射を受ける時）砲術と重複
+            let yumiLvl = this.getAptitudeLevel(busho.aptYumi);
+            if (yumiLvl > 0) {
+                reductionPct += yumiLvl * 0.5;
+            }
+            // 砲術適性：攻撃側の鉄砲の割合が5割以上
+            if (gunRatio >= 0.5) {
+                let teppoLvl = this.getAptitudeLevel(busho.aptTeppo);
+                if (teppoLvl > 0) {
+                    reductionPct += teppoLvl * 1;
+                }
+            }
+        }
+        
+        if (reductionPct === 0) return 1.0;
+        return Math.max(0, 1.0 - (reductionPct / 100)); // 軽減率を倍率に変換（マイナス防止）
+    }
+
     // 味方の艦隊効果を含めた、最終的な「操船レベル」を計算します
     static getMaritimeLevel(unit, allies, game) {
         const busho = game.getBusho(unit.bushoId);

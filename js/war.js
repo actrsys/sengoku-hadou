@@ -1421,6 +1421,18 @@ class WarManager {
 
         let distAtkPower = (activeAtkPower * multiplier) / Math.max(1, targetList.length);
         
+        // ★追加：アクティブ部隊の攻城戦適性による与ダメージ増加倍率
+        let activeAtkMod = 1.0;
+        if (typeof SkillManager !== 'undefined' && activeArmyObjForEquip) {
+            activeAtkMod = SkillManager.calcSiegeAptitudeDamageModifier(
+                activeBushos[0],
+                activeSoldiers,
+                activeArmyObjForEquip.horses || 0,
+                activeArmyObjForEquip.guns || 0,
+                type
+            );
+        }
+
         targetList.forEach(t => {
             let castleMod = isAtkTurnGroup ? (1.5 + (s.defender.defense / 1000)) : 1.0;
             let isRojo = (!isAtkTurnGroup && s.plannedActions[t.role] && s.plannedActions[t.role].type === 'def_attack');
@@ -1430,6 +1442,21 @@ class WarManager {
 
             let dmgRatio = distAtkPower / (distAtkPower + targetDefPower * castleMod);
             let dmg = distAtkPower * dmgRatio * rojoMod;
+
+            // ★追加：ターゲット部隊の攻城戦適性による被ダメージ軽減倍率
+            let targetDefMod = 1.0;
+            if (typeof SkillManager !== 'undefined' && activeArmyObjForEquip) {
+                targetDefMod = SkillManager.calcSiegeAptitudeDefenseModifier(
+                    t.bushos[0],
+                    activeSoldiers,
+                    activeArmyObjForEquip.horses || 0,
+                    activeArmyObjForEquip.guns || 0,
+                    type
+                );
+            }
+            
+            // 最終ダメージに適性倍率を適用します
+            dmg = dmg * activeAtkMod * targetDefMod;
 
             let counterRatio = (targetDefPower * castleMod) / (distAtkPower + targetDefPower * castleMod);
             let counter = (t.atkPower * defMultiplier) * 0.5 * counterRisk * counterRatio;
