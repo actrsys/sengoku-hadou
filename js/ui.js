@@ -3345,7 +3345,7 @@ class UIManager {
             el = document.createElement('div');
             el.id = 'ai-war-thinking';
             el.innerText = '戦争思考中...';
-            el.style.cssText = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5500; color: #ffffff; font-family: 'Arial Black', sans-serif; font-size: 2rem; font-weight: bold; text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 5px rgba(0,0,0,0.8); pointer-events: none; animation: blink-loading 1.5s infinite;";
+            el.style.cssText = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5500; color: #ffffff; font-size: 2rem; font-weight: bold; text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 5px rgba(0,0,0,0.8); pointer-events: none; animation: blink-loading 1.5s infinite;";
             const gameScreen = document.getElementById('game-screen');
             if (gameScreen) gameScreen.appendChild(el);
         }
