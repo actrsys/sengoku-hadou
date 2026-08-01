@@ -528,13 +528,17 @@ class UIManager {
     restoreAIGuard() {
         if (this.guardHiddenCount > 0) {
             this.guardHiddenCount--;
-            if (this.guardHiddenCount === 0 && this.game && this.game.isProcessingAI) {
-                // マップで援軍の城を選んでいる最中は、絶対に膜を復活させない魔法！
-                if (!this.game.selectionMode) {
-                    const aiGuard = document.getElementById('ai-guard');
-                    if (aiGuard) {
-                        aiGuard.classList.remove('hidden');
-                        aiGuard.style.opacity = '1'; // 透明にする魔法を解いて、文字を見えるように戻します！
+            if (this.guardHiddenCount === 0) {
+                const aiGuard = document.getElementById('ai-guard');
+                if (aiGuard) {
+                    // ★修正：プレイヤーのターン中など、すぐに表示しない場合でも透明化の魔法だけは確実に解いておきます！
+                    aiGuard.style.opacity = '1';
+                    
+                    if (this.game && this.game.isProcessingAI) {
+                        // マップで援軍の城を選んでいる最中は、絶対に膜を復活させない魔法！
+                        if (!this.game.selectionMode) {
+                            aiGuard.classList.remove('hidden');
+                        }
                     }
                 }
             }
