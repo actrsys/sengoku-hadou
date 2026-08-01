@@ -8,12 +8,14 @@
 // あとで名前を変更したい時は、右側の文字（"悪天巧者"など）を書き換えるだけで全てに反映されます。
 // ==========================================
 const SKILL_NAMES = {
-    WEATHER: "悪天巧者",
     MOUNTAIN: "踏破",
     RETREAT: "退き巧者",
-    KABUKIMONO: "傾奇者",
     MOUSHO: "猛将",
     ONI: "鬼",
+    SHUYARI: "朱槍",
+    AKAZONAE: "赤備え",
+    WEATHER: "悪天巧者",
+    KABUKIMONO: "傾奇者",
     TENKA_FUBU: "天下布武",
     ECHIGO_NO_RYU: "越後の龍",
     KAI_NO_TORA: "甲斐の虎",
@@ -442,7 +444,7 @@ class SkillManager {
     // ★追加：野戦・攻城戦でのスキルによる最終ダメージ増減の魔法
     // ==========================================
     // 与ダメージ増加倍率を計算します
-    static calcSkillDamageModifier(bushos, clanId, kunishuId, allAlliedBushosList) {
+    static calcSkillDamageModifier(bushos, clanId, kunishuId, allAlliedBushosList, isFieldWarAdjacent = false) {
         if (!bushos || bushos.length === 0) return 1.0;
         let modifier = 0; // 追加分
         
@@ -459,6 +461,12 @@ class SkillManager {
             return false;
         });
         if (hasKaiInAlly) modifier += 0.05; // 5%アップ
+
+        // ★追加：自部隊に朱槍がいて、かつ野戦で隣接戦闘の場合
+        if (isFieldWarAdjacent) {
+            let hasShuyari = bushos.some(b => b && b.skill && b.skill.includes(SKILL_NAMES.SHUYARI));
+            if (hasShuyari) modifier += 0.10; // 10%アップ
+        }
 
         return 1.0 + modifier;
     }
@@ -490,7 +498,11 @@ class SkillManager {
             reducePct += 30;
         }
 
+        // ★追加：自部隊に赤備えがいるか
+        if (bushos.some(b => b && b.skill && b.skill.includes(SKILL_NAMES.AKAZONAE))) {
+            reducePct += 10;
+        }
+
         // 軽減率（％）を倍率に直して返します（下限の制限は戦場の計算時に行います）
         return 1.0 - (reducePct / 100);
     }
-}

@@ -1851,7 +1851,11 @@ class WarManager {
                 if (s.isHeavySnow) moraleDrop += 1; 
                 if (s.weather === 'rain' || s.weather === 'snow') moraleDrop += 1; 
                 
-                s.attacker.morale = Math.max(0, (s.attacker.morale ?? 50) - moraleDrop);
+                // ★追加：赤備えを持っていれば攻撃本隊の士気は下がりません
+                let isAtkAkazonae = typeof SkillManager !== 'undefined' && s.atkBushos && s.atkBushos.some(b => SkillManager.hasSkill(b, SkillManager.SKILLS.AKAZONAE, this.game));
+                if (!isAtkAkazonae) {
+                    s.attacker.morale = Math.max(0, (s.attacker.morale ?? 50) - moraleDrop);
+                }
 
                 // ★追加：大雪の兵力低下時にも、割合に合わせて馬と鉄砲を減らします！
                 if (s.isHeavySnow) {
@@ -1871,7 +1875,11 @@ class WarManager {
 
                 if (s.selfReinforcement) {
                     s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * atkRiceRate));
-                    s.selfReinforcement.morale = Math.max(0, (s.selfReinforcement.morale ?? 50) - moraleDrop);
+                    // ★追加：応援軍も赤備えを持っていれば士気低下を無効化
+                    let isSelfAkazonae = typeof SkillManager !== 'undefined' && s.selfReinforcement.bushos && s.selfReinforcement.bushos.some(b => SkillManager.hasSkill(b, SkillManager.SKILLS.AKAZONAE, this.game));
+                    if (!isSelfAkazonae) {
+                        s.selfReinforcement.morale = Math.max(0, (s.selfReinforcement.morale ?? 50) - moraleDrop);
+                    }
                     if (s.isHeavySnow) {
                         let snowDmg = Math.floor(s.selfReinforcement.soldiers * 0.04);
                         if (snowDmg > 0) {
@@ -1889,7 +1897,11 @@ class WarManager {
                 }
                 if (s.reinforcement) {
                     s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * atkRiceRate));
-                    s.reinforcement.morale = Math.max(0, (s.reinforcement.morale ?? 50) - moraleDrop);
+                    // ★追加：友軍も赤備えを持っていれば士気低下を無効化
+                    let isAllyAkazonae = typeof SkillManager !== 'undefined' && s.reinforcement.bushos && s.reinforcement.bushos.some(b => SkillManager.hasSkill(b, SkillManager.SKILLS.AKAZONAE, this.game));
+                    if (!isAllyAkazonae) {
+                        s.reinforcement.morale = Math.max(0, (s.reinforcement.morale ?? 50) - moraleDrop);
+                    }
                     if (s.isHeavySnow) {
                         let snowDmg = Math.floor(s.reinforcement.soldiers * 0.04);
                         if (snowDmg > 0) {

@@ -1829,6 +1829,19 @@ class FieldWarManager {
 
         for (let key in groupSoldiers) {
             if (this.groupStats[key] && this.groupStats[key].morale > 0) {
+                // ★追加: 赤備えスキルによる士気低下無効化チェック
+                let hasAkazonae = false;
+                if (typeof SkillManager !== 'undefined') {
+                    this.units.forEach(u => {
+                        if (u.groupId === key && SkillManager.hasSkill(u, SkillManager.SKILLS.AKAZONAE, this.game)) {
+                            hasAkazonae = true;
+                        }
+                    });
+                }
+                
+                // 赤備えがいる軍は天候による士気低下が無効になります
+                if (hasAkazonae) continue; 
+
                 let soldiers = groupSoldiers[key];
                 let penalty = 0;
                 
@@ -2812,8 +2825,11 @@ class FieldWarManager {
         let atkSkillDefMod = 1.0, defSkillDefMod = 1.0;
 
         if (typeof SkillManager !== 'undefined') {
-            atkSkillAtkMod = SkillManager.calcSkillDamageModifier([atkBushoObj], atkClanId, atkKunishuId, activeAllBushos_FW);
-            defSkillAtkMod = SkillManager.calcSkillDamageModifier([defBushoObj], defClanId, defKunishuId, targetAllBushos_FW);
+            // ★修正: 野戦で隣接戦闘（距離1）かどうかを判定して朱槍の効果を計算させます
+            let isAdjacent = (atkDist === 1);
+            
+            atkSkillAtkMod = SkillManager.calcSkillDamageModifier([atkBushoObj], atkClanId, atkKunishuId, activeAllBushos_FW, isAdjacent);
+            defSkillAtkMod = SkillManager.calcSkillDamageModifier([defBushoObj], defClanId, defKunishuId, targetAllBushos_FW, isAdjacent);
             
             atkSkillDefMod = SkillManager.calcSkillDefenseModifier([atkBushoObj], atkClanId, atkKunishuId, activeAllBushos_FW);
             defSkillDefMod = SkillManager.calcSkillDefenseModifier([defBushoObj], defClanId, defKunishuId, targetAllBushos_FW);
