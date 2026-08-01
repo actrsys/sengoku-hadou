@@ -2,7 +2,39 @@
  * skill_manager.js
  * 適性と技能の効果を計算・管理する司令塔のクラスです。
  */
+
+// ==========================================
+// ★追加：技能（スキル）や適性の名前をここでまとめて管理します！
+// あとで名前を変更したい時は、右側の文字（"悪天巧者"など）を書き換えるだけで全てに反映されます。
+// ==========================================
+const SKILL_NAMES = {
+    WEATHER: "悪天巧者",
+    MOUNTAIN: "踏破",
+    RETREAT: "退き巧者",
+    KABUKIMONO: "傾奇者",
+    MOUSHO: "猛将",
+    ONI: "鬼",
+    TENKA_FUBU: "天下布武",
+    ECHIGO_NO_RYU: "越後の龍",
+    KAI_NO_TORA: "甲斐の虎",
+    MIKAWA_NO_SHIKA: "三河の鹿"
+};
+
+const APTITUDE_NAMES = {
+    ASHIGARU: "足軽",
+    KIBA: "騎馬",
+    YUMI: "弓術",
+    TEPPO: "砲術",
+    BUGEI: "武芸",
+    NINJUTSU: "忍術",
+    MARITIME: "操船"
+};
+
 class SkillManager {
+    // 外部のファイルからもこの名前リストを見れるようにする窓口です
+    static get SKILLS() { return SKILL_NAMES; }
+    static get APTITUDES() { return APTITUDE_NAMES; }
+
     // アルファベットの適性ランク（S～E）を、計算用の数字（5～0）に変換する魔法です。
     static getAptitudeLevel(rank) {
         switch(rank) {
@@ -16,8 +48,14 @@ class SkillManager {
     }
 
     // 武将が指定した「技能」を持っているか確認する魔法です。
-    static hasSkill(unit, skillName, game) {
-        const busho = game.getBusho(unit.bushoId);
+    // ★部隊データだけでなく、武将データそのものが渡されても判定できるように強化しました！
+    static hasSkill(unitOrBusho, skillName, game) {
+        let busho = null;
+        if (unitOrBusho.bushoId) {
+            busho = game.getBusho(unitOrBusho.bushoId);
+        } else if (unitOrBusho.id && unitOrBusho.skill !== undefined) {
+            busho = unitOrBusho;
+        }
         if (!busho || !busho.skill) return false;
         
         // 「医術|傾奇者」のようになっている文字を「|」で切り分けて、リストにして確認します
@@ -344,18 +382,115 @@ class SkillManager {
     // 技能による効果の判定
     // ==========================================
 
-    // 「悪天巧者」を持っているか（悪天候の行動力ペナルティを無視できるか）
+    // 「悪天巧者」を持っているか（天下布武も兼ねる）
     static isWeatherPenaltyIgnored(unit, game) {
-        return this.hasSkill(unit, "悪天巧者", game);
+        return this.hasSkill(unit, SKILL_NAMES.WEATHER, game) || this.hasSkill(unit, SKILL_NAMES.TENKA_FUBU, game);
     }
 
-    // 「踏破」を持っているか（騎馬隊でも山岳に進入できるか）
+    // 「踏破」を持っているか（天下布武も兼ねる）
     static canKibaEnterMountain(unit, game) {
-        return this.hasSkill(unit, "踏破", game);
+        return this.hasSkill(unit, SKILL_NAMES.MOUNTAIN, game) || this.hasSkill(unit, SKILL_NAMES.TENKA_FUBU, game);
     }
 
-    // ★追加: 「退き巧者」を持っているか
+    // 「退き巧者」を持っているか（天下布武も兼ねる）
     static isRetreatMaster(unit, game) {
-        return this.hasSkill(unit, "退き巧者", game);
+        return this.hasSkill(unit, SKILL_NAMES.RETREAT, game) || this.hasSkill(unit, SKILL_NAMES.TENKA_FUBU, game);
+    }
+
+    // 「傾奇者」を持っているか
+    static isKabukimono(unit, game) {
+        return this.hasSkill(unit, SKILL_NAMES.KABUKIMONO, game);
+    }
+
+    // ==========================================
+    // ★追加・変更：クリティカル機能の一元管理
+    // ==========================================
+    // 野戦用のクリティカル判定。発生したら効果の倍率をまとめて返します。
+    static getCriticalResult(unit, game) {
+        let hasOni = this.hasSkill(unit, SKILL_NAMES.ONI, game);
+        let hasTenka = this.hasSkill(unit, SKILL_NAMES.TENKA_FUBU, game);
+        let hasEchigo = this.hasSkill(unit, SKILL_NAMES.ECHIGO_NO_RYU, game);
+        let hasKai = this.hasSkill(unit, SKILL_NAMES.KAI_NO_TORA, game);
+        let hasMikawa = this.hasSkill(unit, SKILL_NAMES.MIKAWA_NO_SHIKA, game);
+        let hasMousho = this.hasSkill(unit, SKILL_NAMES.MOUSHO, game);
+
+        // クリティカル系のスキルを持っていなければここでストップ
+        if (!(hasOni || hasTenka || hasEchigo || hasKai || hasMikawa || hasMousho)) {
+            return { isCritical: false, atkMult: 1.0, defMult: 1.0, finalDmgMult: 1.0, skillName: "" };
+        }
+
+        // 1/12の確率でクリティカル発生！
+        if (Math.random() < 1/12) {
+            let skillName = "";
+            let finalDmgMult = 1.0;
+            // メッセージ表示用と、鬼の特別補正（最終ダメージ1.5倍）を振り分けます
+            if (hasOni) { skillName = SKILL_NAMES.ONI; finalDmgMult = 1.5; }
+            else if (hasTenka) { skillName = SKILL_NAMES.TENKA_FUBU; }
+            else if (hasEchigo) { skillName = SKILL_NAMES.ECHIGO_NO_RYU; }
+            else if (hasKai) { skillName = SKILL_NAMES.KAI_NO_TORA; }
+            else if (hasMikawa) { skillName = SKILL_NAMES.MIKAWA_NO_SHIKA; }
+            else if (hasMousho) { skillName = SKILL_NAMES.MOUSHO; }
+
+            // 攻撃力2倍、防御力1/4（0.25倍）の効果をまとめて返します
+            return { isCritical: true, atkMult: 2.0, defMult: 0.25, finalDmgMult: finalDmgMult, skillName: skillName };
+        }
+
+        return { isCritical: false, atkMult: 1.0, defMult: 1.0, finalDmgMult: 1.0, skillName: "" };
+    }
+
+    // ==========================================
+    // ★追加：野戦・攻城戦でのスキルによる最終ダメージ増減の魔法
+    // ==========================================
+    // 与ダメージ増加倍率を計算します
+    static calcSkillDamageModifier(bushos, clanId, kunishuId, allAlliedBushosList) {
+        if (!bushos || bushos.length === 0) return 1.0;
+        let modifier = 0; // 追加分
+        
+        // 自部隊に越後の龍がいるか
+        let hasEchigo = bushos.some(b => b.skill && b.skill.includes(SKILL_NAMES.ECHIGO_NO_RYU));
+        if (hasEchigo) modifier += 0.20; // 20%アップ
+
+        // 同一勢力内に甲斐の虎がいるか
+        let hasKaiInAlly = allAlliedBushosList.some(b => {
+            if (b.skill && b.skill.includes(SKILL_NAMES.KAI_NO_TORA)) {
+                if (kunishuId > 0 && b.belongKunishuId === kunishuId) return true;
+                if (clanId > 0 && b.clan === clanId && b.belongKunishuId === 0) return true;
+            }
+            return false;
+        });
+        if (hasKaiInAlly) modifier += 0.05; // 5%アップ
+
+        return 1.0 + modifier;
+    }
+
+    // 被ダメージ軽減倍率を計算します
+    static calcSkillDefenseModifier(bushos, clanId, kunishuId, allAlliedBushosList) {
+        if (!bushos || bushos.length === 0) return 1.0;
+        let reducePct = 0; // 軽減率(%)
+        
+        // 自部隊に越後の龍がいるか
+        if (bushos.some(b => b.skill && b.skill.includes(SKILL_NAMES.ECHIGO_NO_RYU))) {
+            reducePct += 10;
+        }
+
+        // 同一勢力内に甲斐の虎がいるか
+        let hasKaiInAlly = allAlliedBushosList.some(b => {
+            if (b.skill && b.skill.includes(SKILL_NAMES.KAI_NO_TORA)) {
+                if (kunishuId > 0 && b.belongKunishuId === kunishuId) return true;
+                if (clanId > 0 && b.clan === clanId && b.belongKunishuId === 0) return true;
+            }
+            return false;
+        });
+        if (hasKaiInAlly) {
+            reducePct += 10;
+        }
+
+        // 自部隊に三河の鹿がいるか
+        if (bushos.some(b => b.skill && b.skill.includes(SKILL_NAMES.MIKAWA_NO_SHIKA))) {
+            reducePct += 30;
+        }
+
+        // 軽減率（％）を倍率に直して返します（下限の制限は戦場の計算時に行います）
+        return 1.0 - (reducePct / 100);
     }
 }

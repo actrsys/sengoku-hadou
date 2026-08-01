@@ -2706,27 +2706,21 @@ class FieldWarManager {
         }
 
         // ==========================================
-        // ★追加: 猛将・鬼の判定（攻撃時）
+        // ★追加・変更: クリティカル機能の一元管理
         // ==========================================
-        let isAtkCritical = false;
-        let isAtkOni = false;
-        if (SkillManager.hasSkill(attacker, "鬼", this.game)) {
-            if (Math.random() < 1/12) {
-                isAtkCritical = true;
-                isAtkOni = true;
-            }
-        } else if (SkillManager.hasSkill(attacker, "猛将", this.game)) {
-            if (Math.random() < 1/12) {
-                isAtkCritical = true;
-            }
-        }
+        // スキルマネージャーにまとめて判定してもらいます
+        let atkCritResult = SkillManager.getCriticalResult(attacker, this.game);
+        let defCritResult = SkillManager.getCriticalResult(defender, this.game);
+
+        let isAtkCritical = atkCritResult.isCritical;
+        let isDefCritical = defCritResult.isCritical;
 
         let atkFinalAtkCurrent = atkFinalAtk;
         let defFinalDefCurrent = defFinalDef;
 
         if (isAtkCritical) {
-            atkFinalAtkCurrent *= 2;
-            defFinalDefCurrent *= 0.25;
+            atkFinalAtkCurrent *= atkCritResult.atkMult;
+            defFinalDefCurrent *= atkCritResult.defMult;
         }
         
         // 7. 与ダメージ計算（基礎）
@@ -2766,28 +2760,14 @@ class FieldWarManager {
 
         // 9. 反撃ダメージ計算（基礎）
         let dmgToAtk = 0;
-        let isDefCritical = false;
-        let isDefOni = false;
 
         if (atkDist === 1) { // 反撃は距離1のときのみ
             let defFinalAtkCounter = defFinalAtk;
             let atkFinalDefCounter = atkFinalDef;
 
-            // ★追加: 猛将・鬼の判定（反撃時）
-            if (SkillManager.hasSkill(defender, "鬼", this.game)) {
-                if (Math.random() < 1/12) {
-                    isDefCritical = true;
-                    isDefOni = true;
-                }
-            } else if (SkillManager.hasSkill(defender, "猛将", this.game)) {
-                if (Math.random() < 1/12) {
-                    isDefCritical = true;
-                }
-            }
-
             if (isDefCritical) {
-                defFinalAtkCounter *= 2;
-                atkFinalDefCounter *= 0.25;
+                defFinalAtkCounter *= defCritResult.atkMult;
+                atkFinalDefCounter *= defCritResult.defMult;
             }
 
             let counterRatio = (defFinalAtkCounter + atkFinalDefCounter) > 0 ? (atkFinalDefCounter / (defFinalAtkCounter + atkFinalDefCounter)) : 0;
@@ -2798,7 +2778,7 @@ class FieldWarManager {
         // ★追加: 傾奇者の判定
         // ==========================================
         const checkKabukimono = (unit) => {
-            if (SkillManager.hasSkill(unit, "傾奇者", this.game) && (unit.troopType === 'ashigaru' || unit.troopType === 'kiba') && unit.soldiers <= 1000) {
+            if (SkillManager.isKabukimono(unit, this.game) && (unit.troopType === 'ashigaru' || unit.troopType === 'kiba') && unit.soldiers <= 1000) {
                 let allyTotal = 0;
                 let enemyTotal = 0;
                 this.units.forEach(u => {
@@ -2814,49 +2794,75 @@ class FieldWarManager {
         let isDefKabukimono = checkKabukimono(defender);
 
         // ==========================================
-        // ★追加: 適性による最終ダメージの増加・軽減処理
+        // ★追加: 適性とスキルによる最終ダメージの増加・軽減処理
         // ==========================================
+        // 甲斐の虎などの判定用に、戦場にいる全味方武将をリストアップします
+        let activeAllBushos_FW = this.units.filter(u => u.isAttacker === attacker.isAttacker).map(u => this.game.getBusho(u.bushoId)).filter(b => b);
+        let targetAllBushos_FW = this.units.filter(u => u.isAttacker === defender.isAttacker).map(u => this.game.getBusho(u.bushoId)).filter(b => b);
+
+        let atkBushoObj = this.game.getBusho(attacker.bushoId);
+        let defBushoObj = this.game.getBusho(defender.bushoId);
+
+        let atkClanId = atkBushoObj ? atkBushoObj.clan : 0;
+        let atkKunishuId = attacker.kunishuId || (atkBushoObj ? atkBushoObj.belongKunishuId : 0);
+        let defClanId = defBushoObj ? defBushoObj.clan : 0;
+        let defKunishuId = defender.kunishuId || (defBushoObj ? defBushoObj.belongKunishuId : 0);
+
+        let atkSkillAtkMod = 1.0, defSkillAtkMod = 1.0;
+        let atkSkillDefMod = 1.0, defSkillDefMod = 1.0;
+
+        if (typeof SkillManager !== 'undefined') {
+            atkSkillAtkMod = SkillManager.calcSkillDamageModifier([atkBushoObj], atkClanId, atkKunishuId, activeAllBushos_FW);
+            defSkillAtkMod = SkillManager.calcSkillDamageModifier([defBushoObj], defClanId, defKunishuId, targetAllBushos_FW);
+            
+            atkSkillDefMod = SkillManager.calcSkillDefenseModifier([atkBushoObj], atkClanId, atkKunishuId, activeAllBushos_FW);
+            defSkillDefMod = SkillManager.calcSkillDefenseModifier([defBushoObj], defClanId, defKunishuId, targetAllBushos_FW);
+        }
+
         // 増加系の計算を先に行います
         let aptitudeAtkMult = SkillManager.calcAptitudeDamageModifier(attacker, isRangedAttack, this.game);
-        dmgToDef = Math.floor(dmgToDef * aptitudeAtkMult);
+        dmgToDef = Math.floor(dmgToDef * aptitudeAtkMult * atkSkillAtkMod);
         
         if (atkDist === 1) {
-            // 反撃は常に近接攻撃（距離1）として扱います
             let aptitudeDefCounterMult = SkillManager.calcAptitudeDamageModifier(defender, false, this.game);
-            dmgToAtk = Math.floor(dmgToAtk * aptitudeDefCounterMult);
+            dmgToAtk = Math.floor(dmgToAtk * aptitudeDefCounterMult * defSkillAtkMod);
         }
 
-        // 軽減系の計算（増加の後に計算します）
+        // 軽減系の計算（傾奇者の軽減もここで一緒に計算します）
         let aptitudeDefReduceMult = SkillManager.calcAptitudeDefenseModifier(defender, attacker, isRangedAttack, this.game);
-        dmgToDef = Math.floor(dmgToDef * aptitudeDefReduceMult);
+        let defKabukiMod = isDefKabukimono ? 0.3 : 1.0;
+        
+        // ★制限：軽減系はすべて重ねても元の10%未満にならないようにガードします！
+        let totalDefReduceMod = aptitudeDefReduceMult * defSkillDefMod * defKabukiMod;
+        totalDefReduceMod = Math.max(0.10, totalDefReduceMod);
+        dmgToDef = Math.floor(dmgToDef * totalDefReduceMod);
         
         if (atkDist === 1) {
-            // 攻撃側が受ける反撃ダメージの軽減処理
             let aptitudeAtkReduceMult = SkillManager.calcAptitudeDefenseModifier(attacker, defender, false, this.game);
-            dmgToAtk = Math.floor(dmgToAtk * aptitudeAtkReduceMult);
+            let atkKabukiMod = isAtkKabukimono ? 0.3 : 1.0;
+            
+            // ★制限：反撃の軽減にもガードをかけます
+            let totalAtkReduceMod = aptitudeAtkReduceMult * atkSkillDefMod * atkKabukiMod;
+            totalAtkReduceMod = Math.max(0.10, totalAtkReduceMod);
+            dmgToAtk = Math.floor(dmgToAtk * totalAtkReduceMod);
         }
 
         // ==========================================
-        // ★追加: 猛将・鬼・傾奇者の最終ダメージ計算
+        // ★追加: 複合スキルや傾奇者の最終ダメージ計算（増加分）
         // ==========================================
-        if (isAtkOni) {
-            dmgToDef = Math.floor(dmgToDef * 1.5);
+        // 鬼（1.5倍）などの特別補正がある場合は適用します
+        if (isAtkCritical) {
+            dmgToDef = Math.floor(dmgToDef * atkCritResult.finalDmgMult);
         }
-        if (isAtkKabukimono) {
-            if (atkDist === 1) { // 隣接戦闘時に与える最終ダメージ3倍
-                dmgToDef = Math.floor(dmgToDef * 3);
-            }
-            dmgToAtk = Math.floor(dmgToAtk * 0.3); // 受ける最終被ダメージ70%軽減
+        if (atkDist === 1 && isDefCritical) {
+            dmgToAtk = Math.floor(dmgToAtk * defCritResult.finalDmgMult);
         }
 
-        if (atkDist === 1 && isDefOni) {
-            dmgToAtk = Math.floor(dmgToAtk * 1.5);
+        if (isAtkKabukimono && atkDist === 1) {
+            dmgToDef = Math.floor(dmgToDef * 3); // 隣接戦闘時に与える最終ダメージ3倍
         }
-        if (isDefKabukimono) {
-            dmgToDef = Math.floor(dmgToDef * 0.3); // 受ける最終被ダメージ70%軽減
-            if (atkDist === 1) { // 守備側からの反撃（隣接時）
-                dmgToAtk = Math.floor(dmgToAtk * 3); // 与える反撃ダメージ3倍
-            }
+        if (isDefKabukimono && atkDist === 1) {
+            dmgToAtk = Math.floor(dmgToAtk * 3); // 守備側からの反撃（隣接時）
         }
 
         // ★追加: プレイヤーがいないAI同士の戦いなら、ダメージを約3分の2（0.666）に減らします！
@@ -3034,14 +3040,26 @@ class FieldWarManager {
 
         let counterMsg = (dmgToAtk > 0) ? ` 反撃で${dmgToAtk}の被害！` : ``;
 
-        // ★追加: ログの先頭に付けるカッコいい名前
+        // ★追加: ログの先頭に付けるカッコいい名前（スキル名に動的対応）
         let atkPrefix = "";
         if (isAtkKabukimono) atkPrefix += "【傾奇者】";
-        if (isAtkCritical) atkPrefix += "【会心】";
+        if (isAtkCritical) {
+            if (atkCritResult.skillName) {
+                atkPrefix += `【${atkCritResult.skillName}】`;
+            } else {
+                atkPrefix += "【会心】";
+            }
+        }
         
         let defPrefix = "";
         if (isDefKabukimono) defPrefix += "【傾奇者】";
-        if (isDefCritical) defPrefix += "【会心(反撃)】";
+        if (isDefCritical) {
+            if (defCritResult.skillName) {
+                defPrefix += `【${defCritResult.skillName}(反撃)】`;
+            } else {
+                defPrefix += "【会心(反撃)】";
+            }
+        }
 
         this.log(`${atkPrefix}${attacker.name}隊の${atkWeapon}！${dirMsg} 敵に${dmgToDef}の損害！${counterMsg ? defPrefix + counterMsg : ""}`);
         

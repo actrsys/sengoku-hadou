@@ -1375,15 +1375,31 @@ class WarManager {
             activeAtkPower = activeAtkPower * 0.9;
         }
         
+        // ★追加：同陣営の全武将リスト（甲斐の虎などの判定用）をここで集めておきます！
+        let activeAllBushos = [];
+        let targetAllBushos = [];
+        const activeRoles = isAtkTurnGroup ? ['attacker', 'attacker_self_reinf', 'attacker_ally_reinf'] : ['defender', 'defender_self_reinf', 'defender_ally_reinf'];
+        const targetRoles = isAtkTurnGroup ? ['defender', 'defender_self_reinf', 'defender_ally_reinf'] : ['attacker', 'attacker_self_reinf', 'attacker_ally_reinf'];
+
+        activeRoles.forEach(role => {
+            let armyData = this.getArmyData(role);
+            if (armyData.soldiers > 0 && armyData.bushos) activeAllBushos.push(...armyData.bushos);
+        });
+        targetRoles.forEach(role => {
+            let armyData = this.getArmyData(role);
+            if (armyData.soldiers > 0 && armyData.bushos) targetAllBushos.push(...armyData.bushos);
+        });
+
         let targetList = [];
         if (isAtkTurnGroup) {
-            if (s.defender.soldiers > 0) targetList.push({ bushos: [s.defBusho], soldiers: s.defender.soldiers, morale: s.defender.morale ?? 50, training: s.defender.training ?? 50, role: 'defender', isDefendingCastle: true });
-            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) targetList.push({ bushos: s.defSelfReinforcement.bushos, soldiers: s.defSelfReinforcement.soldiers, morale: s.defSelfReinforcement.morale ?? 50, training: s.defSelfReinforcement.training ?? 50, role: 'defender_self_reinf', isDefendingCastle: false });
-            if (s.defReinforcement && s.defReinforcement.soldiers > 0) targetList.push({ bushos: s.defReinforcement.bushos, soldiers: s.defReinforcement.soldiers, morale: s.defReinforcement.morale ?? 50, training: s.defReinforcement.training ?? 50, role: 'defender_ally_reinf', isDefendingCastle: false });
+            // ★後で判定しやすくするために、大元の部隊データ（army）も一緒にメモしておきます
+            if (s.defender.soldiers > 0) targetList.push({ bushos: [s.defBusho], soldiers: s.defender.soldiers, morale: s.defender.morale ?? 50, training: s.defender.training ?? 50, role: 'defender', isDefendingCastle: true, army: s.defender });
+            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) targetList.push({ bushos: s.defSelfReinforcement.bushos, soldiers: s.defSelfReinforcement.soldiers, morale: s.defSelfReinforcement.morale ?? 50, training: s.defSelfReinforcement.training ?? 50, role: 'defender_self_reinf', isDefendingCastle: false, army: s.defSelfReinforcement });
+            if (s.defReinforcement && s.defReinforcement.soldiers > 0) targetList.push({ bushos: s.defReinforcement.bushos, soldiers: s.defReinforcement.soldiers, morale: s.defReinforcement.morale ?? 50, training: s.defReinforcement.training ?? 50, role: 'defender_ally_reinf', isDefendingCastle: false, army: s.defReinforcement });
         } else {
-            if (s.attacker.soldiers > 0) targetList.push({ bushos: s.atkBushos, soldiers: s.attacker.soldiers, morale: s.attacker.morale ?? 50, training: s.attacker.training ?? 50, role: 'attacker', isDefendingCastle: false });
-            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) targetList.push({ bushos: s.selfReinforcement.bushos, soldiers: s.selfReinforcement.soldiers, morale: s.selfReinforcement.morale ?? 50, training: s.selfReinforcement.training ?? 50, role: 'attacker_self_reinf', isDefendingCastle: false });
-            if (s.reinforcement && s.reinforcement.soldiers > 0) targetList.push({ bushos: s.reinforcement.bushos, soldiers: s.reinforcement.soldiers, morale: s.reinforcement.morale ?? 50, training: s.reinforcement.training ?? 50, role: 'attacker_ally_reinf', isDefendingCastle: false });
+            if (s.attacker.soldiers > 0) targetList.push({ bushos: s.atkBushos, soldiers: s.attacker.soldiers, morale: s.attacker.morale ?? 50, training: s.attacker.training ?? 50, role: 'attacker', isDefendingCastle: false, army: s.attacker });
+            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) targetList.push({ bushos: s.selfReinforcement.bushos, soldiers: s.selfReinforcement.soldiers, morale: s.selfReinforcement.morale ?? 50, training: s.selfReinforcement.training ?? 50, role: 'attacker_self_reinf', isDefendingCastle: false, army: s.selfReinforcement });
+            if (s.reinforcement && s.reinforcement.soldiers > 0) targetList.push({ bushos: s.reinforcement.bushos, soldiers: s.reinforcement.soldiers, morale: s.reinforcement.morale ?? 50, training: s.reinforcement.training ?? 50, role: 'attacker_ally_reinf', isDefendingCastle: false, army: s.reinforcement });
         }
         targetList.forEach(t => {
             let pObj = calcArmyPower(t.bushos, t.soldiers, t.morale, t.training, t.isDefendingCastle);
@@ -1430,7 +1446,7 @@ class WarManager {
 
         let distAtkPower = (activeAtkPower * multiplier) / Math.max(1, targetList.length);
         
-        // ★追加：アクティブ部隊の攻城戦適性による与ダメージ増加倍率
+        // アクティブ部隊の攻城戦適性による与ダメージ増加倍率
         let activeAtkMod = 1.0;
         if (typeof SkillManager !== 'undefined' && activeArmyObjForEquip) {
             activeAtkMod = SkillManager.calcSiegeAptitudeDamageModifier(
@@ -1440,6 +1456,14 @@ class WarManager {
                 activeArmyObjForEquip.guns || 0,
                 type
             );
+        }
+        
+        // ★追加：アクティブ部隊のスキルによる与ダメアップ
+        let activeSkillAtkMod = 1.0;
+        if (typeof SkillManager !== 'undefined' && activeArmyObjForEquip) {
+            let clanId = activeArmyObjForEquip.ownerClan || (activeBushos[0] ? activeBushos[0].clan : 0);
+            let kunishuId = activeArmyObjForEquip.kunishuId || (activeBushos[0] ? activeBushos[0].belongKunishuId : 0);
+            activeSkillAtkMod = SkillManager.calcSkillDamageModifier(activeBushos, clanId, kunishuId, activeAllBushos);
         }
 
         targetList.forEach(t => {
@@ -1452,7 +1476,7 @@ class WarManager {
             let dmgRatio = distAtkPower / (distAtkPower + targetDefPower * castleMod);
             let dmg = distAtkPower * dmgRatio * rojoMod;
 
-            // ★追加：ターゲット部隊の攻城戦適性による被ダメージ軽減倍率
+            // ターゲット部隊の攻城戦適性による被ダメージ軽減倍率
             let targetDefMod = 1.0;
             if (typeof SkillManager !== 'undefined' && activeArmyObjForEquip) {
                 targetDefMod = SkillManager.calcSiegeAptitudeDefenseModifier(
@@ -1464,15 +1488,44 @@ class WarManager {
                 );
             }
             
-            // 最終ダメージに適性倍率を適用します
-            dmg = dmg * activeAtkMod * targetDefMod;
+            // ★追加：ターゲット部隊のスキルによる被ダメ軽減
+            let targetSkillDefMod = 1.0;
+            if (typeof SkillManager !== 'undefined') {
+                let clanId = (t.army && t.army.ownerClan) ? t.army.ownerClan : (t.bushos[0] ? t.bushos[0].clan : 0);
+                let kunishuId = (t.army && t.army.kunishuId) ? t.army.kunishuId : (t.bushos[0] ? t.bushos[0].belongKunishuId : 0);
+                targetSkillDefMod = SkillManager.calcSkillDefenseModifier(t.bushos, clanId, kunishuId, targetAllBushos);
+            }
+
+            // ★制限：被ダメージ軽減は、適性とスキルを合わせても元の10%未満にならないようにガードします！
+            let totalDefMod = targetDefMod * targetSkillDefMod;
+            totalDefMod = Math.max(0.10, totalDefMod);
+
+            // 最終ダメージに増加と軽減を適用します
+            dmg = dmg * (activeAtkMod * activeSkillAtkMod) * totalDefMod;
 
             let counterRatio = (targetDefPower * castleMod) / (distAtkPower + targetDefPower * castleMod);
             let counter = (t.atkPower * defMultiplier) * 0.5 * counterRisk * counterRatio;
+            
+            // ★反撃に対するスキル適用
+            let counterSkillAtkMod = 1.0;
+            let activeSkillDefMod = 1.0;
+            if (typeof SkillManager !== 'undefined') {
+                let clanIdT = (t.army && t.army.ownerClan) ? t.army.ownerClan : (t.bushos[0] ? t.bushos[0].clan : 0);
+                let kunishuIdT = (t.army && t.army.kunishuId) ? t.army.kunishuId : (t.bushos[0] ? t.bushos[0].belongKunishuId : 0);
+                counterSkillAtkMod = SkillManager.calcSkillDamageModifier(t.bushos, clanIdT, kunishuIdT, targetAllBushos);
+
+                let clanIdA = activeArmyObjForEquip ? (activeArmyObjForEquip.ownerClan || (activeBushos[0] ? activeBushos[0].clan : 0)) : 0;
+                let kunishuIdA = activeArmyObjForEquip ? (activeArmyObjForEquip.kunishuId || (activeBushos[0] ? activeBushos[0].belongKunishuId : 0)) : 0;
+                activeSkillDefMod = SkillManager.calcSkillDefenseModifier(activeBushos, clanIdA, kunishuIdA, activeAllBushos);
+            }
+
+            // ★反撃の軽減にもガードをかけます
+            let totalCounterDefMod = Math.max(0.10, activeSkillDefMod);
+            counter = counter * counterSkillAtkMod * totalCounterDefMod;
 
             totalSoldierDmg += dmg;
             totalCounterDmg += counter;
-            counterDmgDetails[t.role] = counter; // ★追加：この部隊の反撃パワーをメモします！
+            counterDmgDetails[t.role] = counter;
         });
 
         let calculatedSoldierDmg = Math.floor(totalSoldierDmg);
