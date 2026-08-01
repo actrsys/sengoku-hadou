@@ -18,6 +18,8 @@ class EndingSystem {
             
             // 天下統一のメッセージ
             const clearMessage = "長きにわたる戦乱の世は終わりを告げた。\n\n我が大名家は日ノ本を統一し、\n天下に太平の世をもたらしたのである。\n\n――戦国覇道、ここに完結。";
+            
+            // 3つ目の「true」が、スタッフロールを流す（天下統一）という合図です
             await this.playEndingSequence("天下統一", clearMessage, true);
         }
     }
@@ -31,6 +33,8 @@ class EndingSystem {
             }
             
             const overMessage = reasonMsg + "\n\n野望は潰え、歴史の波に飲まれていった。\n\n――ここに、一つの物語が幕を閉じる。";
+            
+            // 3つ目の「false」が、スタッフロールを流さない（滅亡）という合図です
             await this.playEndingSequence("無念", overMessage, false);
         }
     }
@@ -77,61 +81,65 @@ class EndingSystem {
         // 文字が完全に消えるのを待ちます
         await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // 4. スタッフロールの準備と開始
-        // ここを書き換えることで、スタッフ名や役職を自由に増やしたり減らしたりできます
-        const staffData = [
-            { role: "企画・ゲームデザイン", name: "あや瀨" },
-            { role: "メインプログラマー", name: "あや瀨" },
-            { role: "シナリオ・テキスト", name: "あや瀨" },
-            { role: "テストプレイ・デバッグ", name: "あや瀨" },
-            { role: "Special Thanks", name: "日ノ本を駆け抜けたすべての武将たち" },
-            { role: "", name: "Thank you for playing!" }
-        ];
+        // ★ 4. 天下統一（クリア）の時だけ、スタッフロールを流します！
+        if (isClear) {
+            const staffData = [
+                { role: "企画・ゲームデザイン", name: "あや瀨" },
+                { role: "メインプログラマー", name: "あや瀨" },
+                { role: "シナリオ・テキスト", name: "あや瀨" },
+                { role: "テストプレイ・デバッグ", name: "あや瀨" },
+                { role: "Special Thanks", name: "日ノ本を駆け抜けたすべての武将たち" },
+                { role: "", name: "Thank you for playing!" }
+            ];
 
-        let staffHtml = "";
-        staffData.forEach(item => {
-            if (item.role) {
-                staffHtml += `<div class="staff-role">${item.role}</div>`;
-            }
-            staffHtml += `<div class="staff-name">${item.name}</div>`;
-        });
-        
-        // スタッフロールの最後に余白を作って、文字が画面外に消え切るようにします
-        staffHtml += `<div style="height: 60vh;"></div>`;
-        staffRollContent.innerHTML = staffHtml;
+            let staffHtml = "";
+            staffData.forEach(item => {
+                if (item.role) {
+                    staffHtml += `<div class="staff-role">${item.role}</div>`;
+                }
+                staffHtml += `<div class="staff-name">${item.name}</div>`;
+            });
+            
+            // スタッフロールの最後に余白を作って、文字が画面外に消え切るようにします
+            staffHtml += `<div style="height: 60vh;"></div>`;
+            staffRollContent.innerHTML = staffHtml;
 
-        // 下から上へ移動させるアニメーションの設定
-        const rollDuration = 18; // スタッフロールが下から上へ流れ切るまでの時間（秒）
-        staffRollContainer.style.transition = `transform ${rollDuration}s linear`;
-        
-        // 画面外（下）にセット
-        staffRollContainer.style.transform = `translateY(0)`;
-        
-        await new Promise(resolve => setTimeout(resolve, 500)); // スクロール開始前の少しの溜め
-        
-        // 上に向かって移動させます
-        const moveDistance = staffRollContent.offsetHeight + staffRollContainer.offsetHeight;
-        staffRollContainer.style.transform = `translateY(-${moveDistance}px)`;
+            // 下から上へ移動させるアニメーションの設定
+            const rollDuration = 18; // スタッフロールが下から上へ流れ切るまでの時間（秒）
+            staffRollContainer.style.transition = `transform ${rollDuration}s linear`;
+            
+            // 画面外（下）にセット
+            staffRollContainer.style.transform = `translateY(0)`;
+            
+            await new Promise(resolve => setTimeout(resolve, 500)); // スクロール開始前の少しの溜め
+            
+            // 上に向かって移動させます
+            const moveDistance = staffRollContent.offsetHeight + staffRollContainer.offsetHeight;
+            staffRollContainer.style.transform = `translateY(-${moveDistance}px)`;
 
-        // スクロールが完全に終わるまで待機します
-        await new Promise(resolve => setTimeout(resolve, rollDuration * 1000));
+            // スクロールが完全に終わるまで待機します
+            await new Promise(resolve => setTimeout(resolve, rollDuration * 1000));
+            
+            // 文字が流れ終わった後、少し余韻を残します
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        } else {
+            // ★ ゲームオーバーの時はスタッフロールを飛ばして、少しだけ間を空けます
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
 
-        // 5. 少し余韻を残して、画面を暗くしたままタイトルへ戻ります
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // 5. 画面が「真っ暗な状態のまま」、裏側をタイトル画面に切り替えます！
+        this.game.ui.returnToTitle();
 
-        // アニメーションの状態をリセットして、タイトルに戻る準備をします
-        endingScreen.classList.remove('show');
-        titleEl.classList.remove('show');
-        msgEl.classList.remove('show');
+        // アニメーションの状態や文字をリセットしておきます
         staffRollContainer.style.transition = 'none';
         staffRollContainer.style.transform = 'translateY(0)';
         
-        // 暗転が明けるのを待ってから hidden に戻します
+        // 6. 裏側がタイトル画面になった状態で、ゆっくり暗転を解除します（フェードアウト）
+        endingScreen.classList.remove('show');
+        
+        // 完全に明るくなるまで待ってから、エンディングの箱を片付けます
         await new Promise(resolve => setTimeout(resolve, 2000));
         endingScreen.classList.add('hidden');
-        
-        // 最後にタイトル画面へ戻ります
-        this.game.ui.returnToTitle();
     }
 
     // ★毎月の終わりなどに呼ばれる、クリア・ゲームオーバーの総合チェックです
