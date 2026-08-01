@@ -1508,7 +1508,7 @@ class FieldWarManager {
                 }
             }
             // 探索が長引きすぎたら諦める（フリーズ防止）
-            if(Object.keys(closedList).length > 200) return null;
+            if(Object.keys(closedList).length > 400) return null;
         }
         return null; // 道が見つからなかった
     }
@@ -3403,13 +3403,20 @@ class FieldWarManager {
                 if (d < allyMinDistToTarget) allyMinDistToTarget = d;
             });
 
-            // ★追加: 自軍の総大将を探しておく（守備側のロジックで使います）
+            // ★追加: 自軍の総大将を探しておく
             let myGeneral = allies.find(a => a.isGeneral);
             if (unit.isGeneral) myGeneral = unit;
 
             // ★追加：守備側で、敵がまだ遠い場合、2～3ターンで到達できそうな「良い陣地（山や森）」を探します！
             let idealCampHex = null;
-            if (!unit.isAttacker && distToTarget >= 3 && !isFleeing) {
+            // ★修正：援軍が総大将から離れすぎている場合は陣地探しよりも合流を優先させる
+            let shouldSearchCamp = !unit.isAttacker && distToTarget >= 3 && !isFleeing;
+            if (shouldSearchCamp && unit.isReinforcement && myGeneral) {
+                let dToGenStart = this.getDistance(unit.x, unit.y, myGeneral.x, myGeneral.y);
+                if (dToGenStart > 5) shouldSearchCamp = false;
+            }
+
+            if (shouldSearchCamp) {
                 let bestCampScore = -Infinity;
                 // 自分の周り5マス（2～3ターンで届く範囲）を見渡します
                 for (let cx = Math.max(0, unit.x - 5); cx <= Math.min(this.cols - 1, unit.x + 5); cx++) {
@@ -3476,16 +3483,20 @@ class FieldWarManager {
 
                 // ★追加：意味もなくウロウロするのを防ぐため、今いる場所（動かない）にボーナスをあげます
                 if (nx === unit.x && ny === unit.y) {
-                    score += 15;
+                    score += 5; // ★修正：進行の妨げにならないよう15から5へ減らします
                 }
 
                 // ★追加: 最終的に止まるマスの「地形」を見てスコアを調整します
                 let row_t = Math.floor(ny / 2);
                 let terrain_t = (this.grid && this.grid[row_t] && this.grid[row_t][nx]) ? this.grid[row_t][nx].terrain : 'plain';
                 
+                let dToGenForTerrain = myGeneral ? this.getDistance(unit.x, unit.y, myGeneral.x, myGeneral.y) : 0;
+                let isFarFromGen = (!unit.isGeneral && dToGenForTerrain > 4);
+
                 if (terrain_t === 'river') {
                     score -= 20; // 川の上で止まると被ダメージが増えるので極力避ける！
-                    if (!unit.isAttacker) score -= 30; // ★追加：守備側はさらに川を嫌がる！
+                    // ★修正：守備側はさらに川を嫌がるが、総大将から遠く離れて合流を急いでいる時は例外とする
+                    if (!unit.isAttacker && !isFarFromGen) score -= 30; 
                 } else if (terrain_t === 'mountain') {
                     score += 15; // 山は防御力が上がるので、陣取るには良い場所！
                     if (!unit.isAttacker) score += 40; // ★守備側なら山はさらに大好き！
@@ -3646,13 +3657,15 @@ class FieldWarManager {
                         });
                     }
 
-                    // ★追加: 守備側で総大将ではない場合、総大将の近く（1〜3マス）に陣取る
-                    if (!unit.isAttacker && !unit.isGeneral && myGeneral) {
+                    // ★修正: 守備側・攻撃側問わず、総大将ではない場合、総大将の近くに陣取る（合流を促す）
+                    if (!unit.isGeneral && myGeneral) {
                         let dToGen = this.getDistance(nx, ny, myGeneral.x, myGeneral.y);
                         if (dToGen >= 1 && dToGen <= 3) {
-                            score += 50; // 総大将の近くは安心
+                            score += 30; // 総大将の近くは安心
                         } else if (dToGen > 3) {
-                            score -= (dToGen - 3) * 10; // 離れると不安になるので減点
+                            // 離れると不安になるので減点（援軍は強く合流を促す）
+                            let genPenalty = unit.isReinforcement ? 20 : 10;
+                            score -= (dToGen - 3) * genPenalty; 
                         }
                     }
 
