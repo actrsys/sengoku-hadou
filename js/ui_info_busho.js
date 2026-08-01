@@ -362,6 +362,17 @@ Object.assign(UIInfoManager.prototype, {
                 skillHtml += `<div class="daimyo-detail-row daimyo-detail-2col">${rowInnerHtml}</div>`;
             }
 
+            // ★追加：説明エリアの高さを適性エリア（4行分）とぴったり同じにするための、見えないダミーの箱を作ります
+            let dummyHtml = '';
+            for (let i = 0; i < 4; i++) {
+                dummyHtml += `
+                    <div class="daimyo-detail-row daimyo-detail-2col">
+                        <div class="daimyo-detail-stat-box" style="visibility: hidden;">
+                            <span class="daimyo-detail-label">ダミー</span><span class="daimyo-detail-value">A</span>
+                        </div>
+                    </div>`;
+            }
+
             // ★変更：基本タブと同じように flex と gap を使って隙間のサイズを統一し、高さを揃えます
             // （説明エリアを隠し味として最初から忍ばせておきます）
             rightContentHtml = `
@@ -369,8 +380,13 @@ Object.assign(UIInfoManager.prototype, {
                     <div id="busho-aptitude-area" style="${groupWrapStyle} flex: 1;">
                         ${aptHtml}
                     </div>
-                    <div id="busho-skill-desc-area" style="${groupWrapStyle} display: none; flex: 1; min-height: 120px;">
-                        <div id="busho-skill-desc-text" style="padding: 5px 8px; font-size: 0.95rem; line-height: 1.5; color: #fff; text-shadow: 1px 1px 1px #000; text-align: left; height: 100%; box-sizing: border-box; overflow-y: auto;">
+                    <div id="busho-skill-desc-area" style="${groupWrapStyle} display: none; flex: 1; position: relative;">
+                        <!-- ★ここがダミーの箱を置く場所です（透明にして高さだけ確保します） -->
+                        <div style="pointer-events: none; display: flex; flex-direction: column; gap: ${rowGap};">
+                            ${dummyHtml}
+                        </div>
+                        <!-- ★実際のテキストはその上に被せるようにして配置します -->
+                        <div id="busho-skill-desc-text" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 5px 8px; font-size: 0.95rem; line-height: 1.5; color: #fff; text-shadow: 1px 1px 1px #000; text-align: left; box-sizing: border-box; overflow-y: auto;">
                         </div>
                     </div>
                     <div style="${groupWrapStyle}">
@@ -460,7 +476,8 @@ Object.assign(UIInfoManager.prototype, {
                             const skillName = box.dataset.skillName;
                             if (skillName) {
                                 // 専門家（SkillManager）に技能の説明を聞きます
-                                let desc = window.SkillManager ? window.SkillManager.getSkillDescription(skillName) : "";
+                                // ★修正：classはwindowに紐付かないので直接呼び出します
+                                let desc = typeof SkillManager !== 'undefined' ? SkillManager.getSkillDescription(skillName) : "";
                                 if (!desc) desc = "詳細不明。";
                                 
                                 // 説明文をセットして、瞬時に表示を切り替えます
