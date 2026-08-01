@@ -17,7 +17,7 @@ class EndingSystem {
             }
             
             // 天下統一のメッセージ
-            const clearMessage = "長きにわたる戦乱の世は終わりを告げた。\n\n我が大名家は日ノ本を統一し、\n天下に太平の世をもたらしたのである。\n\n――戦国覇道、ここに完結。";
+            const clearMessage = "長きにわたる戦乱の世は終わりを告げた。\n\n日ノ本は統一され、\n天下に太平の世がもたらされた。\n\n覇道は、ここに終わりを告げる――";
             
             // 3つ目の「true」が、スタッフロールを流す（天下統一）という合図です
             await this.playEndingSequence("天下統一", clearMessage, true);
@@ -32,7 +32,7 @@ class EndingSystem {
                 window.AudioManager.stopBgm();
             }
             
-            const overMessage = reasonMsg + "\n\n野望は潰え、歴史の波に飲まれていった。\n\n――ここに、一つの物語が幕を閉じる。";
+            const overMessage = reasonMsg + "\n\n野望は潰え、歴史の波に飲まれた。\n\nここに、ひとつの物語が幕を閉じた……";
             
             // 3つ目の「false」が、スタッフロールを流さない（滅亡）という合図です
             await this.playEndingSequence("無念", overMessage, false);
