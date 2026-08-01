@@ -59,9 +59,9 @@ const APTITUDE_DESCRIPTIONS = {
 // 技能の説明文（表示用）
 const SKILL_DESCRIPTIONS = {
     // 踏破
-    [SKILL_NAMES.MOUNTAIN]: "＜野戦＞\n騎馬隊で山岳地形へ侵入可能になる。",
+    [SKILL_NAMES.MOUNTAIN]: "①騎馬隊で山岳地形へ侵入可能になる。",
     // 退き巧者
-    [SKILL_NAMES.RETREAT]: "＜共通＞\n撤退時の負傷兵の回復率が上昇する。\n\n＜野戦＞\n敵部隊と隣接している状態から離脱しやすくなり、側面・背面から受ける被ダメージを軽減する。",
+    [SKILL_NAMES.RETREAT]: "①撤退時の負傷兵の回復率が上昇する。\n②（野戦）敵部隊と隣接している状態から離脱しやすくなり、側面・背面から受ける被ダメージを軽減する。",
     // 猛将
     [SKILL_NAMES.MOUSHO]: "野戦で一定確率でクリティカルが発生するようになる。",
     // 鬼
