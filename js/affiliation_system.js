@@ -178,9 +178,6 @@ class AffiliationSystem {
         // 4. お城から出ます
         this.leaveCastle(busho);
         
-        // ★大名家が滅亡したかどうかのチェック（元いた大名家の城が0個なら滅亡と判断します）
-        const isClanDestroyed = (oldClanId !== 0) && (this.game.castles.filter(c => c.ownerClan === oldClanId).length === 0);
-        
         // ★追加：大名家が滅亡したわけではない場合（追放や出奔）、元主君を宿敵として記録します
         if (oldClanId !== 0 && !isClanDestroyed) {
             const daimyo = this.game.bushos.find(b => b.clan === oldClanId && b.isDaimyo);
