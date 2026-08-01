@@ -485,7 +485,7 @@ class UIManager {
         if (!this.aiGuard) return;
         // ぐるぐる回るアイコンと一緒に、「思考中... (今の数/全部の数)」と表示します
         // 縦に並んでしまうのを防ぐため、文字と数字全体をさらに <div> で包んでひとまとめにします！
-        this.aiGuard.innerHTML = `<div class="loading-spinner"></div><div>思考中... (<span style="display:inline-block; width:1.8em; text-align:right; font-variant-numeric: tabular-nums;">${current}</span> / <span style="display:inline-block; width:1.8em; text-align:left; font-variant-numeric: tabular-nums;">${total}</span>)</div>`;
+        this.aiGuard.innerHTML = `<div class="loading-spinner"></div><div>思考中... (<span style="display:inline-block; width:2.2em; text-align:right; font-variant-numeric: tabular-nums;">${current}</span> / <span style="display:inline-block; width:2.2em; text-align:left; font-variant-numeric: tabular-nums;">${total}</span>)</div>`;
     }
 
     async waitForDialogs() {
@@ -3346,7 +3346,8 @@ class UIManager {
             el = document.createElement('div');
             el.id = 'ai-war-thinking';
             el.innerText = '戦争思考中...';
-            el.style.cssText = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5500; color: #ffffff; font-size: 2rem; font-weight: bold; text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 5px rgba(0,0,0,0.8); pointer-events: none; animation: blink-loading 1.5s infinite;";
+            // ★ 文字サイズ（1.5rem）や影の設定を通常の思考中と統一しつつ、チカチカ点滅のアニメーション（blink-loading）を残しています！
+            el.style.cssText = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5500; color: #ffffff; font-size: 1.5rem; font-weight: bold; text-shadow: 2px 2px 4px #000, -2px -2px 4px #000, 2px -2px 4px #000, -2px 2px 4px #000; pointer-events: none; animation: blink-loading 1.5s infinite;";
             const gameScreen = document.getElementById('game-screen');
             if (gameScreen) gameScreen.appendChild(el);
         }
