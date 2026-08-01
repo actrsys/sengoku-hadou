@@ -1246,20 +1246,12 @@ Object.assign(WarManager.prototype, {
                 defSurviveRate = Math.max(0, totalCurrentDef) / Math.max(1, siegeStartDef);
             }
 
-            // ★追加：メイン軍だけの「攻城戦での死者」を割り出します（全軍の生存率を当てはめます）
-            const siegeLossAtkMain = currentAtkMain - Math.floor(currentAtkMain * atkSurviveRate);
-            const siegeLossDefMain = currentDefMain - Math.floor(currentDefMain * defSurviveRate);
-
-            // ★追加：攻城戦を生き残った軍馬と鉄砲の計算（死んだ兵士の割合から、装備していた分だけを減らします）
-            const atkHorseEquipRate = Math.min(1.0, (s.attacker.horses || 0) / Math.max(1, currentAtkMain));
-            const atkGunEquipRate = Math.min(1.0, (s.attacker.guns || 0) / Math.max(1, currentAtkMain));
-            const attackerSurvivedHorses = Math.max(0, (s.attacker.horses || 0) - Math.floor(siegeLossAtkMain * atkHorseEquipRate));
-            const attackerSurvivedGuns = Math.max(0, (s.attacker.guns || 0) - Math.floor(siegeLossAtkMain * atkGunEquipRate));
-
-            const defHorseEquipRate = Math.min(1.0, (s.defender.horses || 0) / Math.max(1, currentDefMain));
-            const defGunEquipRate = Math.min(1.0, (s.defender.guns || 0) / Math.max(1, currentDefMain));
-            const defenderSurvivedHorses = Math.max(0, (s.defender.horses || 0) - Math.floor(siegeLossDefMain * defHorseEquipRate));
-            const defenderSurvivedGuns = Math.max(0, (s.defender.guns || 0) - Math.floor(siegeLossDefMain * defGunEquipRate));
+            // ★変更：リアルタイムで減らした最新の馬と鉄砲の数をそのまま使うようにし、
+            // 今まで使っていた「逆算して二重に減らしてしまう魔法」を撤去しました！
+            const attackerSurvivedHorses = s.attacker.horses || 0;
+            const attackerSurvivedGuns = s.attacker.guns || 0;
+            const defenderSurvivedHorses = s.defender.horses || 0;
+            const defenderSurvivedGuns = s.defender.guns || 0;
 
             // 3. 吸い込み防止の箱と、回復率の設定
             let atkReinfTotalLoss = 0;
@@ -1294,11 +1286,9 @@ Object.assign(WarManager.prototype, {
                 const recovered = Math.floor(totalLoss * (isAttackerData ? baseRecoveryRate : defRecoveryRate));
                 const finalReturnSoldiers = surviveSoldiers + recovered;
                 
-                // ★修正：軍馬と鉄砲の帰還数（死んだ兵士の割合から、装備していた分だけを減らします）
-                const horseEquipRate = Math.min(1.0, (reinf.horses || 0) / Math.max(1, reinf.soldiers));
-                const gunEquipRate = Math.min(1.0, (reinf.guns || 0) / Math.max(1, reinf.soldiers));
-                const returnHorses = Math.max(0, (reinf.horses || 0) - Math.floor(siegeLoss * horseEquipRate));
-                const returnGuns = Math.max(0, (reinf.guns || 0) - Math.floor(siegeLoss * gunEquipRate));
+                // ★修正：軍馬と鉄砲は、すでにリアルタイムで減らされた「今の数」をそのまま使います！
+                const returnHorses = reinf.horses || 0;
+                const returnGuns = reinf.guns || 0;
 
                 // 諸勢力の場合
                 if (reinf.isKunishuForce) {

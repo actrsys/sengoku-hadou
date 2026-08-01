@@ -297,7 +297,6 @@ class WarManager {
         let targetArmies = [];
         const W = window.WarParams.War;
         
-        // ★ここを追加！：作戦メモの準備（安全装置）
         s.plannedActions = s.plannedActions || {};
         
         // 生きている部隊だけをリストアップし、「役割（role）」の名前も一緒に覚えます！
@@ -312,8 +311,26 @@ class WarManager {
         }
 
         let actualTotalDmg = 0;
-        let damageDetails = {}; // ★追加：誰がどれくらいダメージを受けたかを細かく記録する箱です！
+        let damageDetails = {}; 
         
+        // ★今回追加：兵士が減る時に、馬や鉄砲も一緒に減らす専用の内部魔法です！
+        const applyDamageToArmy = (army, role, dmgToTake) => {
+            let S_old = army.soldiers;
+            let H_old = army.horses || 0;
+            let G_old = army.guns || 0;
+            
+            // ここで余剰分を守るバリア（Math.min(1.0, ...)）を張ります
+            let horseEquipRate = Math.min(1.0, H_old / Math.max(1, S_old));
+            let gunEquipRate = Math.min(1.0, G_old / Math.max(1, S_old));
+            
+            army.soldiers -= dmgToTake;
+            army.horses = Math.max(0, H_old - Math.floor(dmgToTake * horseEquipRate));
+            army.guns = Math.max(0, G_old - Math.floor(dmgToTake * gunEquipRate));
+            
+            actualTotalDmg += dmgToTake;
+            damageDetails[role] += dmgToTake;
+        };
+
         if (targetArmies.length > 0) {
             // 割り勘の基本ダメージ
             let dmgPerArmy = Math.floor(totalDamage / targetArmies.length);
@@ -322,21 +339,15 @@ class WarManager {
             targetArmies.forEach(target => {
                 let army = target.army;
                 let role = target.role;
-                damageDetails[role] = 0; // まずは0で初期化します
+                damageDetails[role] = 0; 
                 
-                // 新しい計算式ですでに籠城の半減は終わっているので、ここではそのままダメージを受けます！
                 let finalDmg = dmgPerArmy;
 
                 if (army.soldiers >= finalDmg) {
-                    army.soldiers -= finalDmg;
-                    actualTotalDmg += finalDmg;
-                    damageDetails[role] += finalDmg; // 記録します
+                    applyDamageToArmy(army, role, finalDmg);
                 } else {
                     let took = army.soldiers;
-                    army.soldiers = 0;
-                    actualTotalDmg += took;
-                    damageDetails[role] += took; // 記録します
-                    // 受けきれずにあふれたダメージを未割当に追加（計算用に元の分配量から引きます）
+                    applyDamageToArmy(army, role, took);
                     unassignedDmg += (dmgPerArmy - took); 
                 }
             });
@@ -356,20 +367,15 @@ class WarManager {
                     let role = target.role;
                     
                     let sliceToApply = Math.min(dmgSlice, unassignedDmg);
-                    // 余りのダメージも、計算済みなのでそのまま受けます！
                     let finalSlice = sliceToApply;
                     
                     if (army.soldiers >= finalSlice) {
-                        army.soldiers -= finalSlice;
-                        actualTotalDmg += finalSlice;
-                        damageDetails[role] += finalSlice; // 記録します
-                        unassignedDmg -= sliceToApply; // 軽減前のもとの値を引いて消費したことにする
+                        applyDamageToArmy(army, role, finalSlice);
+                        unassignedDmg -= sliceToApply; 
                     } else {
                         let took = army.soldiers;
-                        army.soldiers = 0;
-                        actualTotalDmg += took;
-                        damageDetails[role] += took; // 記録します
-                        unassignedDmg -= sliceToApply; // 軽減前のもとの値を引いて消費したことにする
+                        applyDamageToArmy(army, role, took);
+                        unassignedDmg -= sliceToApply; 
                         newlyDead = true;
                     }
                 });
@@ -382,7 +388,6 @@ class WarManager {
         if (isTargetDefSide) s.deadSoldiers.defender += actualTotalDmg;
         else s.deadSoldiers.attacker += actualTotalDmg;
 
-        // ★変更：合計ダメージと、それぞれの部隊の内訳をセットで返します！
         return { total: actualTotalDmg, details: damageDetails };
     }
     
@@ -867,9 +872,7 @@ class WarManager {
         };
 
         const executeNext = () => {
-             // ★修正：メッセージを読み終わった後、防御が0になっていたら「残りの予定を全て消し飛ばして」すぐに勝敗をつける魔法です
              const doNext = () => {
-                 // ★追加：プレイヤーが操作する部隊がいなくなったかチェックし、いなければAI攻城戦へ移行（画面を隠す）
                  if (s.isPlayerInvolved) {
                      let stillInvolved = false;
                      const checkRoles = [
@@ -890,7 +893,6 @@ class WarManager {
                          if (this.game && this.game.ui && typeof this.game.ui.setWarModalVisible === 'function') {
                              this.game.ui.setWarModalVisible(false);
                          }
-                         // ★追加: プレイヤーの部隊がいなくなった瞬間に、BGMを平時に戻す！
                          if (window.AudioManager) {
                              window.AudioManager.restoreMemorizedBgm();
                          }
@@ -898,7 +900,6 @@ class WarManager {
                  }
 
                  if (s.defender.defense <= 0) {
-                     // ★追加：城壁が壊れて落ちた場合、少しだけ城壁（防御力）を修復してあげます！
                      s.defender.defense += 150;
                      this.endWar(true);
                  } else if (s.defender.morale <= 0) {
@@ -910,7 +911,7 @@ class WarManager {
                  } else if (s.attacker.soldiers <= 0) {
                      this.endWar(false);
                  } else {
-                     this.advanceWarTurn(); // まだ生きていれば次の部隊の行動へ進みます
+                     this.advanceWarTurn();
                  }
              };
 
@@ -923,7 +924,6 @@ class WarManager {
              }
         };
 
-        // 今の各部隊の「最新の兵士数」と「城の防御力」を調べる魔法です
         const getCurrentStats = () => {
             return {
                 defSoldiers: s.defender.soldiers,
@@ -933,17 +933,28 @@ class WarManager {
                 atkSelfSoldiers: s.selfReinforcement ? s.selfReinforcement.soldiers : 0,
                 atkAllySoldiers: s.reinforcement ? s.reinforcement.soldiers : 0,
                 wallDefense: s.defender.defense,
-                // ★今回追加：兵士数と一緒に「士気」の最新データも画面（UI）に送ります！
                 defMorale: s.defender.morale,
                 defSelfMorale: s.defSelfReinforcement ? s.defSelfReinforcement.morale : 0,
                 defAllyMorale: s.defReinforcement ? s.defReinforcement.morale : 0,
                 atkMorale: s.attacker.morale,
                 atkSelfMorale: s.selfReinforcement ? s.selfReinforcement.morale : 0,
-                atkAllyMorale: s.reinforcement ? s.reinforcement.morale : 0
+                atkAllyMorale: s.reinforcement ? s.reinforcement.morale : 0,
+                // ★今回追加：馬と鉄砲の最新データも画面（UI）に送ります！
+                defHorses: s.defender.horses || 0,
+                defGuns: s.defender.guns || 0,
+                atkHorses: s.attacker.horses || 0,
+                atkGuns: s.attacker.guns || 0,
+                defSelfHorses: s.defSelfReinforcement ? s.defSelfReinforcement.horses || 0 : 0,
+                defSelfGuns: s.defSelfReinforcement ? s.defSelfReinforcement.guns || 0 : 0,
+                defAllyHorses: s.defReinforcement ? s.defReinforcement.horses || 0 : 0,
+                defAllyGuns: s.defReinforcement ? s.defReinforcement.guns || 0 : 0,
+                atkSelfHorses: s.selfReinforcement ? s.selfReinforcement.horses || 0 : 0,
+                atkSelfGuns: s.selfReinforcement ? s.selfReinforcement.guns || 0 : 0,
+                atkAllyHorses: s.reinforcement ? s.reinforcement.horses || 0 : 0,
+                atkAllyGuns: s.reinforcement ? s.reinforcement.guns || 0 : 0
             };
         };
 
-        // ★追加：どちらかが負けた時に、わかりやすい専用のメッセージを差し込む魔法です
         const checkDefeatAndPushMsg = () => {
             if (s.defender.defense <= 0) {
                 pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">城の防御が０になった！<br>城は陥落した！</span>`, log: `城防御が0になり、陥落した！` });
@@ -954,12 +965,10 @@ class WarManager {
             } else if (s.attacker.morale <= 0) {
                 pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">攻撃本隊の士気が崩壊した！<br>攻撃軍は退却した！</span>`, log: `攻撃本隊の士気が0になり、退却した！` });
             } else if (s.attacker.soldiers <= 0) {
-                // ★修正：攻撃本隊が全滅した時のメッセージも赤色（#d32f2f）に統一！
-                // 赤色にすることで自動でページが進まなくなり、しっかり結果を確認できるようになります。
                 pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">攻撃本隊が全滅した！<br>守備軍が防ぎ切った！</span>`, log: `攻撃本隊が全滅し、退却した！` });
             }
         };
-
+        
         const getArmyObj = (role) => {
             return this.getArmyData(role).army;
         };
@@ -1782,22 +1791,29 @@ class WarManager {
                 }
             } else {
                 // 全員の行動が終わったら、兵糧を消費します
-                // ★追加：大雪時は攻撃側の兵糧消費が倍（0.1）になります
                 let atkRiceRate = s.isHeavySnow ? 0.10 : 0.05;
                 s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * atkRiceRate));
                 
-                // ★今回追加：毎ターンの終了時（ラウンドの終わり）に、攻撃側の士気を下げます
                 let moraleDrop = 1;
-                if (s.isHeavySnow) moraleDrop += 1; // 大雪ペナルティ
-                if (s.weather === 'rain' || s.weather === 'snow') moraleDrop += 1; // 悪天候ペナルティ
+                if (s.isHeavySnow) moraleDrop += 1; 
+                if (s.weather === 'rain' || s.weather === 'snow') moraleDrop += 1; 
                 
                 s.attacker.morale = Math.max(0, (s.attacker.morale ?? 50) - moraleDrop);
 
-                // ★追加：大雪の時、攻撃側の兵士が毎ターン4%減少
+                // ★追加：大雪の兵力低下時にも、割合に合わせて馬と鉄砲を減らします！
                 if (s.isHeavySnow) {
                     let snowDmg = Math.floor(s.attacker.soldiers * 0.04);
-                    s.attacker.soldiers = Math.max(0, s.attacker.soldiers - snowDmg);
-                    if (snowDmg > 0 && s.isPlayerInvolved) this.game.ui.addWarDetailLog(`【大雪】猛吹雪の中での攻城戦により、攻撃本隊は${snowDmg}の兵を失った。`);
+                    if (snowDmg > 0) {
+                        let S_old = s.attacker.soldiers;
+                        let H_old = s.attacker.horses || 0;
+                        let G_old = s.attacker.guns || 0;
+                        let horseEquipRate = Math.min(1.0, H_old / Math.max(1, S_old));
+                        let gunEquipRate = Math.min(1.0, G_old / Math.max(1, S_old));
+                        s.attacker.soldiers = Math.max(0, s.attacker.soldiers - snowDmg);
+                        s.attacker.horses = Math.max(0, H_old - Math.floor(snowDmg * horseEquipRate));
+                        s.attacker.guns = Math.max(0, G_old - Math.floor(snowDmg * gunEquipRate));
+                        if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`【大雪】猛吹雪の中での攻城戦により、攻撃本隊は${snowDmg}の兵を失った。`);
+                    }
                 }
 
                 if (s.selfReinforcement) {
@@ -1805,8 +1821,17 @@ class WarManager {
                     s.selfReinforcement.morale = Math.max(0, (s.selfReinforcement.morale ?? 50) - moraleDrop);
                     if (s.isHeavySnow) {
                         let snowDmg = Math.floor(s.selfReinforcement.soldiers * 0.04);
-                        s.selfReinforcement.soldiers = Math.max(0, s.selfReinforcement.soldiers - snowDmg);
-                        if (snowDmg > 0 && s.isPlayerInvolved) this.game.ui.addWarDetailLog(`【大雪】猛吹雪により、攻撃側応援軍は${snowDmg}の兵を失った。`);
+                        if (snowDmg > 0) {
+                            let S_old = s.selfReinforcement.soldiers;
+                            let H_old = s.selfReinforcement.horses || 0;
+                            let G_old = s.selfReinforcement.guns || 0;
+                            let horseEquipRate = Math.min(1.0, H_old / Math.max(1, S_old));
+                            let gunEquipRate = Math.min(1.0, G_old / Math.max(1, S_old));
+                            s.selfReinforcement.soldiers = Math.max(0, s.selfReinforcement.soldiers - snowDmg);
+                            s.selfReinforcement.horses = Math.max(0, H_old - Math.floor(snowDmg * horseEquipRate));
+                            s.selfReinforcement.guns = Math.max(0, G_old - Math.floor(snowDmg * gunEquipRate));
+                            if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`【大雪】猛吹雪により、攻撃側応援軍は${snowDmg}の兵を失った。`);
+                        }
                     }
                 }
                 if (s.reinforcement) {
@@ -1814,17 +1839,24 @@ class WarManager {
                     s.reinforcement.morale = Math.max(0, (s.reinforcement.morale ?? 50) - moraleDrop);
                     if (s.isHeavySnow) {
                         let snowDmg = Math.floor(s.reinforcement.soldiers * 0.04);
-                        s.reinforcement.soldiers = Math.max(0, s.reinforcement.soldiers - snowDmg);
-                        if (snowDmg > 0 && s.isPlayerInvolved) this.game.ui.addWarDetailLog(`【大雪】猛吹雪により、攻撃側友軍は${snowDmg}の兵を失った。`);
+                        if (snowDmg > 0) {
+                            let S_old = s.reinforcement.soldiers;
+                            let H_old = s.reinforcement.horses || 0;
+                            let G_old = s.reinforcement.guns || 0;
+                            let horseEquipRate = Math.min(1.0, H_old / Math.max(1, S_old));
+                            let gunEquipRate = Math.min(1.0, G_old / Math.max(1, S_old));
+                            s.reinforcement.soldiers = Math.max(0, s.reinforcement.soldiers - snowDmg);
+                            s.reinforcement.horses = Math.max(0, H_old - Math.floor(snowDmg * horseEquipRate));
+                            s.reinforcement.guns = Math.max(0, G_old - Math.floor(snowDmg * gunEquipRate));
+                            if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`【大雪】猛吹雪により、攻撃側友軍は${snowDmg}の兵を失った。`);
+                        }
                     }
                 }
 
-                // 守備側は今まで通り（0.05固定）
                 s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * 0.05));
                 if (s.defSelfReinforcement) s.defSelfReinforcement.rice = Math.max(0, s.defSelfReinforcement.rice - Math.floor(s.defSelfReinforcement.soldiers * 0.05));
                 if (s.defReinforcement) s.defReinforcement.rice = Math.max(0, s.defReinforcement.rice - Math.floor(s.defReinforcement.soldiers * 0.05));
 
-                // ラウンドを1つ進めます
                 s.phase = 'init';
                 s.round++;
                 if(s.round > window.WarParams.Military.WarMaxRounds) { this.endWar(false); return; } 
