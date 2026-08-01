@@ -25,7 +25,7 @@ class EndingSystem {
     }
 
     // ★ゲームオーバー（自勢力滅亡）の処理です
-    async processGameOver(reasonMsg = "我が大名家は滅亡しました……") {
+    async processGameOver(reasonMsg = "人間五十年――") {
         if (this.game.ui) {
             // これまでのBGMを止めます
             if (window.AudioManager && typeof window.AudioManager.stopBgm === 'function') {
@@ -156,7 +156,7 @@ class EndingSystem {
         } 
         // 観戦モードではなく、かつプレイヤーが生き残っていなければ「滅亡」です…
         else if (!this.game.isWatchMode && !playerAlive) {
-            await this.processGameOver("人間五十年――");
+            await this.processGameOver("我が大名家は滅亡しました……");
             return true; // エンディングを迎えたという合図を返します
         }
         
