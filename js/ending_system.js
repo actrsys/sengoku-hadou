@@ -17,7 +17,7 @@ class EndingSystem {
             }
             
             // 天下統一のメッセージ
-            const clearMessage = "長きにわたる戦乱の世は終わりを告げた。\n\n日ノ本は統一され、\n天下に太平の世がもたらされた。\n\n覇道は、ここに終わりを告げる――";
+            const clearMessage = "長きにわたる戦乱の世は終わり、\nついに日ノ本は統一された。\n\n太平の世が訪れたのである。\n\nここに、覇道は終わりを告げた――";
             
             // 3つ目の「true」が、スタッフロールを流す（天下統一）という合図です
             await this.playEndingSequence("天下統一", clearMessage, true);
@@ -35,7 +35,7 @@ class EndingSystem {
             const overMessage = reasonMsg + "\n\n野望は潰え、歴史の波に飲まれた。\n\nここに、ひとつの物語が幕を閉じた……";
             
             // 3つ目の「false」が、スタッフロールを流さない（滅亡）という合図です
-            await this.playEndingSequence("無念", overMessage, false);
+            await this.playEndingSequence("終焉", overMessage, false);
         }
     }
 
@@ -156,7 +156,7 @@ class EndingSystem {
         } 
         // 観戦モードではなく、かつプレイヤーが生き残っていなければ「滅亡」です…
         else if (!this.game.isWatchMode && !playerAlive) {
-            await this.processGameOver("我が大名家は滅亡しました……");
+            await this.processGameOver("人間五十年――");
             return true; // エンディングを迎えたという合図を返します
         }
         
