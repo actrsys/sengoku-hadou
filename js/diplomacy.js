@@ -2885,9 +2885,18 @@ class DiplomacyManager {
                         
                         // 敵と仲良し過ぎないかチェック（戦争相手と同盟・支配・従属等ではないか）
                         if (!isEnemyAlly && !isEnemyMaxGoodwill && (!enemyRel || !this.isNonAggression(enemyRel.status))) {
-                            // 対象のお城が繋がっているかチェック
-                            const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
-                            // 自軍側が応援を呼ぶ時は、対象と隣接していればOK
+                            
+                            // ★自分と「同盟・支配・従属」関係にあるかをチェックします！
+                            const myRel = this.getRelation(Number(myClanId), cOwnerClanId);
+                            const isMyAllyOrVassal = myRel && ['同盟', '支配', '従属'].includes(myRel.status);
+                            
+                            // ★同盟・支配・従属関係であれば、自勢力を通って繋がる拠点（攻撃先と隣接していなくても）を援軍として呼べるようにします！
+                            let isConnected = false;
+                            if (isMyAllyOrVassal) {
+                                isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
+                            }
+                            
+                            // 自軍側が応援を呼ぶ時は、対象と直接隣接していればOK（敵の敵は味方として）
                             const isNextToEnemy = !isDefending && ((c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle));
                             
                             if (isConnected || isNextToEnemy) {
