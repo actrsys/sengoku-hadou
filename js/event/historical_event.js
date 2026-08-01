@@ -1235,9 +1235,8 @@ window.GameEvents.push({
         const nagamasa = game.getBusho(1015005);
         if (!nagamasa || nagamasa.status !== 'active' || nagamasa.clan !== hisamasa.clan) return false;
 
-        // 4. 浅井長政が16歳以上か確認します
-        const currentYear = game.year;
-        if (currentYear - nagamasa.birthYear < 16) return false;
+        // 4. 1561年以降であるか確認します
+        if (game.year < 1561) return false;
 
         // 5. 六角義賢（ID: 1018003）または六角義治（ID: 1018004）が大名であるか確認します
         const rokkakuDaimyo = window.EventCheck.getDaimyo(game, [1018003, 1018004]);
@@ -3897,6 +3896,122 @@ window.GameEvents.push({
         // ※ 'indep' にすれば独立、'defect' にすれば寝返りとして使えます
         if (game.independenceSystem && typeof game.independenceSystem.forceAction === 'function') {
             await game.independenceSystem.forceAction(castle, naoie, munekage, 'coup');
+        }
+    }
+    
+    // ==========================================
+// ★ 北畠具房 家督相続イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_kitabatake_succession",
+    timing: "startMonth_before", 
+    isOneTime: true,             
+    
+    checkCondition: function(game) {
+        // 1. 1563年以降であるか確認します
+        if (game.year < 1563) return false;
+
+        // 2. 北畠具教（ID: 1024004）が存在し、大名であるか確認します
+        const tomonori = window.EventCheck.getDaimyo(game, 1024004);
+        if (!tomonori) return false;
+
+        // 3. プレイヤーが北畠家（具教の勢力）の担当ではないか確認します
+        if (game.playerClanId === tomonori.clan) return false;
+
+        // 4. 北畠具房（ID: 1024005）が存在し、具教と同じ勢力に所属しているか確認します
+        const tomofusa = game.getBusho(1024005);
+        if (!tomofusa || tomofusa.status !== 'active' || tomofusa.clan !== tomonori.clan) return false;
+
+        // すべての条件をクリアしたらイベント発生です！
+        return true;
+    },
+    
+    execute: async function(game) {
+        const oldDaimyo = game.getBusho(1024004);
+        const successor = game.getBusho(1024005);
+        const clanId = oldDaimyo.clan;
+        const messages = [];
+
+        // ① 功績の譲渡
+        const meritTransfer = Math.floor((oldDaimyo.achievementTotal || 0) / 3);
+        successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
+        oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
+
+        // ② 具教から大名のバッジを外し、隠居状態にします
+        oldDaimyo.isDaimyo = false;
+        oldDaimyo.isRetired = true;
+        
+        // ③ もし具房が具教と違うお城にいたら、具教のいるお城へ呼び寄せます
+        window.EventAction.moveBusho(game, successor, oldDaimyo.castleId);
+
+        // ④ 具房を新しい大名に任命します（城主任命は後で行います）
+        successor.isDaimyo = true;
+        if (successor.isGunshi) {
+            successor.isGunshi = false; // もし軍師だったらバッジを外します
+        }
+
+        // ⑤ お城の城主データを具房に書き換えます
+        const targetCastle = game.getCastle(successor.castleId);
+        window.EventAction.appointCastellan(game, successor, targetCastle);
+
+        // ⑥ 改名の魔法（大名になった時に名前が変わる設定があれば適用します）
+        if (successor.nameChange && successor.nameChange.includes('daimyo:')) {
+            const changes = successor.nameChange.split('/');
+            for (const change of changes) {
+                const parts = change.split(':');
+                if (parts.length === 3 && parts[0].trim() === 'daimyo') {
+                    const oldNameStr = successor.name.replace('|', '');
+                    const newNameParts = parts[1].trim().split('|');
+                    successor.familyName = newNameParts[0] || "";
+                    successor.givenName = newNameParts[1] || "";
+                    successor.name = successor.familyName + successor.givenName;
+                    const newYomiParts = parts[2].trim().split('|');
+                    successor.familyYomi = newYomiParts[0] || "";
+                    successor.givenYomi = newYomiParts[1] || "";
+                    successor.yomi = successor.familyYomi + successor.givenYomi;
+                    const newNameStr = successor.name.replace('|', '');
+                    messages.push(`家督を継ぐにあたり、${oldNameStr}は\n「${newNameStr}」と名を改めました。`);
+                }
+            }
+        }
+
+        // ⑦ 顔変更の魔法（大名になった時の顔画像があれば適用します）
+        if (successor.faceChange && successor.faceChange.startsWith('daimyo:')) {
+            const newFace = successor.faceChange.split(':')[1].trim();
+            if (newFace) {
+                successor.faceIcon = newFace;
+            }
+        }
+
+        // ⑧ 大名家のリーダーを具房に設定します
+        game.changeLeader(clanId, successor.id);
+
+        // ⑨ 旧大名の城の城主情報を更新します
+        if (oldDaimyo.castleId) {
+            const oldCastle = game.getCastle(oldDaimyo.castleId);
+            if (oldCastle && game.affiliationSystem) {
+                game.affiliationSystem.updateCastleLord(oldCastle);
+            }
+        }
+
+        // ⑩ 当主交代の共通の魔法を呼び出します
+        if (game.lifeSystem) {
+            game.lifeSystem.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
+        }
+
+        // ⑪ メッセージを画面に出してお知らせします
+        const clan = game.clans.find(c => c.id === clanId);
+        const clanName = clan ? clan.name : "北畠家";
+        const tomonoriName = oldDaimyo.name.replace('|', '');
+        const tomofusaName = successor.name.replace('|', '');
+
+        const mainMsg = `${clanName}の${tomonoriName}が隠居し、\n${tomofusaName}が新たな当主として家督を継ぎました！`;
+        
+        game.ui.log(`【イベント】北畠家家督相続：${mainMsg}`);
+        messages.unshift(mainMsg);
+
+        for (const msg of messages) {
+            await game.ui.showDialogAsync(msg, false, 0);
         }
     }
 });
