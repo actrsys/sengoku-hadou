@@ -484,8 +484,8 @@ class UIManager {
     updateAIProgress(current, total) {
         if (!this.aiGuard) return;
         // ぐるぐる回るアイコンと一緒に、「思考中... (今の数/全部の数)」と表示します
-        // 数字の桁数が変わってもガタガタしないように、左右に3桁分の幅を持たせた見えない箱を用意します！
-        this.aiGuard.innerHTML = `<div class="loading-spinner"></div>思考中... (<span style="display:inline-block; width:3em; text-align:right; font-variant-numeric: tabular-nums;">${current}</span> / <span style="display:inline-block; width:3em; text-align:left; font-variant-numeric: tabular-nums;">${total}</span>)`;
+        // 縦に並んでしまうのを防ぐため、文字と数字全体をさらに <div> で包んでひとまとめにします！
+        this.aiGuard.innerHTML = `<div class="loading-spinner"></div><div>思考中... (<span style="display:inline-block; width:3em; text-align:right; font-variant-numeric: tabular-nums;">${current}</span> / <span style="display:inline-block; width:3em; text-align:left; font-variant-numeric: tabular-nums;">${total}</span>)</div>`;
     }
 
     async waitForDialogs() {
