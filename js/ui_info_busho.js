@@ -332,13 +332,23 @@ Object.assign(UIInfoManager.prototype, {
                 skills = busho.skill.split(/[|,]/).map(s => s.trim()).filter(s => s);
             }
             
+            // ★変更：技能を適性と同じように横に2つ並べてから改行するようにします
             let skillHtml = '';
-            for(let i = 0; i < 3; i++) {
-                let skillName = skills[i] || "&nbsp;";
-                // margin-bottomを削除してgroupWrapStyle（親の箱の余白設定）に任せます
-                skillHtml += `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">技能${i+1}</span><span class="daimyo-detail-value">${skillName}</span></div>`;
+            for (let i = 0; i < 3; i += 2) {
+                let rowInnerHtml = '';
+                for (let j = 0; j < 2; j++) {
+                    let index = i + j;
+                    if (index < 3) {
+                        let skillName = skills[index] || "&nbsp;";
+                        rowInnerHtml += `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">技能${index + 1}</span><span class="daimyo-detail-value">${skillName}</span></div>`;
+                    } else {
+                        // 4つ目の枠（空白）は形を綺麗に整えるために透明にして置いておきます
+                        rowInnerHtml += `<div class="daimyo-detail-stat-box" style="visibility: hidden;"></div>`;
+                    }
+                }
+                skillHtml += `<div class="daimyo-detail-row daimyo-detail-2col">${rowInnerHtml}</div>`;
             }
-
+            
             rightContentHtml = `
                 <div style="${groupWrapStyle} margin-bottom: 6px;">
                     ${aptHtml}
