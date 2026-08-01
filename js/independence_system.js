@@ -272,9 +272,10 @@ class IndependenceSystem {
             newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
             const newColor = this.generateDistinctColor(castle);
             
-            // ★共通の魔法を呼び出して、大名就任時の改名と顔変更を行います！
-            // この「rebellionLeader._nameChangeInfo」という箱に、変更前と変更後の名前が入ります。
-            rebellionLeader._nameChangeInfo = this.applyDaimyoNameChange(rebellionLeader);
+            // ★ライフシステムの一元管理魔法を呼び出して、大名就任時の改名と顔変更を行います！
+            if (this.game.lifeSystem) {
+                rebellionLeader._nameChangeInfo = this.game.lifeSystem.applyDaimyoNameAndFaceChange(rebellionLeader);
+            }
 
             // ★新大名家の名前は神輿の人物ベース（改名後なら新しい名前が使われます）
             const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name; 
@@ -815,41 +816,6 @@ class IndependenceSystem {
     }
     
     /**
-     * ★新しく追加：大名就任時の改名と顔変更をまとめて行う共通の魔法です！
-     * 実行後、改名したかどうかの結果と、変更前・変更後の名前をセットで返します。
-     */
-    applyDaimyoNameChange(busho) {
-        let oldNameStr = busho.name.replace(/\|/g, '');
-        let newNameStr = "";
-        let isNameChanged = false;
-
-        // 改名のチェック
-        if (busho.nameChange && busho.nameChange.includes('daimyo:')) {
-            const changes = busho.nameChange.split('/');
-            for (const change of changes) {
-                const parts = change.split(':');
-                if (parts.length === 3 && parts[0].trim() === 'daimyo') {
-                    // ★修正：新しく作った共通の改名魔法を呼び出します！
-                    busho.applyNameChangeData(parts[1].trim(), parts[2].trim());
-
-                    newNameStr = busho.name.replace(/\|/g, '');
-                    isNameChanged = true;
-                }
-            }
-        }
-
-        // 顔変更のチェック
-        if (busho.faceChange && busho.faceChange.startsWith('daimyo:')) {
-            const newFace = busho.faceChange.split(':')[1].trim();
-            if (newFace) {
-                busho.faceIcon = newFace;
-            }
-        }
-
-        return { isNameChanged, oldNameStr, newNameStr };
-    }
-
-    /**
      * ★追加：イベント等で特定の行動（'indep': 独立, 'defect': 寝返り, 'coup': 謀反）を強制的に起こす魔法
      */
     async forceAction(castle, castellan, oldDaimyo, forceActionType) {
@@ -1209,8 +1175,10 @@ class IndependenceSystem {
                     daimyoCastle.isDelegated = false;
                 }
 
-                // ★共通の魔法を呼び出して、大名就任時の改名と顔変更を行います！
-                rebellionLeader._nameChangeInfo = this.applyDaimyoNameChange(rebellionLeader);
+                // ★ライフシステムの一元管理魔法を呼び出して、大名就任時の改名と顔変更を行います！
+                if (this.game.lifeSystem) {
+                    rebellionLeader._nameChangeInfo = this.game.lifeSystem.applyDaimyoNameAndFaceChange(rebellionLeader);
+                }
 
                 // 勢力名を変更
                 const clan = this.game.clans.find(c => c.id === oldClanId);

@@ -103,10 +103,58 @@ class LifeSystem {
             b.intelligence = Math.max(1, b.baseIntelligence - penaltyYoung - penaltyOldInt);
         }
     }
+    
+    // ==========================================
+    // ★大名就任時の「改名」と「顔変更」を一元管理する魔法！
+    // ==========================================
+    applyDaimyoNameAndFaceChange(busho, messages = null) {
+        let isNameChanged = false;
+        let oldNameStr = busho.name.replace(/\|/g, '');
+        let newNameStr = "";
 
-    // ==========================================
-    // ★↓↓ここから下を、まるごと書き足します！↓↓★
-    // ==========================================
+        // 1. 改名のチェック
+        if (busho.nameChange && busho.nameChange.includes('daimyo:')) {
+            const changes = busho.nameChange.split('/');
+            for (const change of changes) {
+                const parts = change.split(':');
+                if (parts.length === 3 && parts[0].trim() === 'daimyo') {
+                    // ★Bushoクラスの共通魔法で名前を書き換えます
+                    if (typeof busho.applyNameChangeData === 'function') {
+                        busho.applyNameChangeData(parts[1].trim(), parts[2].trim());
+                    } else {
+                        // 万が一見つからなかった場合の予備の処理
+                        const newNameParts = parts[1].trim().split('|');
+                        busho.familyName = newNameParts[0] || "";
+                        busho.givenName = newNameParts[1] || "";
+                        busho.name = busho.familyName + busho.givenName;
+                        
+                        const newYomiParts = parts[2].trim().split('|');
+                        busho.familyYomi = newYomiParts[0] || "";
+                        busho.givenYomi = newYomiParts[1] || "";
+                        busho.yomi = busho.familyYomi + busho.givenYomi;
+                    }
+                    
+                    newNameStr = busho.name.replace(/\|/g, '');
+                    isNameChanged = true;
+
+                    // メッセージのリストが渡されていたら、お知らせを追加します
+                    if (messages) {
+                        messages.push(`家督を継ぐにあたり、${oldNameStr}は\n「${newNameStr}」と名を改めました。`);
+                    }
+                }
+            }
+        }
+
+        // 2. 顔変更のチェック
+        if (busho.faceChange && busho.faceChange.startsWith('daimyo:')) {
+            const newFace = busho.faceChange.split(':')[1].trim();
+            if (newFace) {
+                busho.faceIcon = newFace;
+            }
+        }
+
+        return { isNameChanged, oldNameStr, newNameStr };
+    }
     
     // ★ 改名のチェック（毎年1月に行います）
     async checkNameChange() {
@@ -205,10 +253,6 @@ class LifeSystem {
         }
     }
     
-    // ==========================================
-    // ★↑↑書き足すのはここまで！↑↑★
-    // ==========================================
-
     // ★ 登場のチェック（毎年1月に行います）
     async checkBirth() {
         const currentYear = this.game.year;
@@ -1006,30 +1050,8 @@ class LifeSystem {
                 if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
             }
 
-            // ★ここから追加：大名になった瞬間に「daimyo:」の改名データがあれば改名する魔法！
-            if (successor.nameChange && successor.nameChange.includes('daimyo:')) {
-                const changes = successor.nameChange.split('/');
-                for (const change of changes) {
-                    const parts = change.split(':');
-                    if (parts.length === 3 && parts[0].trim() === 'daimyo') {
-                        const oldNameStr = successor.name.replace('|', '');
-                        
-                        // ★修正：新しく作った共通の改名魔法を呼び出します！
-                        successor.applyNameChangeData(parts[1].trim(), parts[2].trim());
-
-                        const newNameStr = successor.name.replace('|', '');
-                        messages.push(`家督を継ぐにあたり、${oldNameStr}は\n「${newNameStr}」と名を改めました。`);
-                    }
-                }
-            }
-
-            // ★大名になった瞬間に「daimyo:」の顔変更データがあれば顔を変える魔法！
-            if (successor.faceChange && successor.faceChange.startsWith('daimyo:')) {
-                const newFace = successor.faceChange.split(':')[1].trim();
-                if (newFace) {
-                    successor.faceIcon = newFace;
-                }
-            }
+            // ★ライフシステムの一元管理魔法を使って、大名就任時の改名と顔変更を行います！
+            this.applyDaimyoNameAndFaceChange(successor, messages);
 
             this.game.changeLeader(daimyo.clan, successor.id);
             
@@ -1412,30 +1434,8 @@ class LifeSystem {
             targetCastle.castellanId = successor.id;
         }
 
-        // ★大名になった瞬間に「daimyo:」の改名データがあれば改名する魔法！
-        if (successor.nameChange && successor.nameChange.includes('daimyo:')) {
-            const changes = successor.nameChange.split('/');
-            for (const change of changes) {
-                const parts = change.split(':');
-                if (parts.length === 3 && parts[0].trim() === 'daimyo') {
-                    const oldNameStr = successor.name.replace('|', '');
-                    
-                    // ★修正：新しく作った共通の改名魔法を呼び出します！
-                    successor.applyNameChangeData(parts[1].trim(), parts[2].trim());
-                    
-                    const newNameStr = successor.name.replace('|', '');
-                    messages.push(`家督を継ぐにあたり、${oldNameStr}は\n「${newNameStr}」と名を改めました。`);
-                }
-            }
-        }
-
-        // 大名になった瞬間に「daimyo:」の顔変更データがあれば顔を変える魔法！
-        if (successor.faceChange && successor.faceChange.startsWith('daimyo:')) {
-            const newFace = successor.faceChange.split(':')[1].trim();
-            if (newFace) {
-                successor.faceIcon = newFace;
-            }
-        }
+        // ★ライフシステムの一元管理魔法を使って、大名就任時の改名と顔変更を行います！
+        this.applyDaimyoNameAndFaceChange(successor, messages);
 
         // ★先代が征夷大将軍（ID1）を持っていれば、後継ぎに「左馬頭（ID80）」を与える魔法！
         if (oldDaimyo.courtRankIds && oldDaimyo.courtRankIds.includes(1)) {

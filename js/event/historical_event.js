@@ -1282,33 +1282,9 @@ window.GameEvents.push({
         const targetCastle = game.getCastle(successor.castleId);
         window.EventAction.appointCastellan(game, successor, targetCastle);
 
-        // ⑥ 改名の魔法（大名になった時に名前が変わる設定があれば適用します）
-        if (successor.nameChange && successor.nameChange.includes('daimyo:')) {
-            const changes = successor.nameChange.split('/');
-            for (const change of changes) {
-                const parts = change.split(':');
-                if (parts.length === 3 && parts[0].trim() === 'daimyo') {
-                    const oldNameStr = successor.name.replace('|', '');
-                    const newNameParts = parts[1].trim().split('|');
-                    successor.familyName = newNameParts[0] || "";
-                    successor.givenName = newNameParts[1] || "";
-                    successor.name = successor.familyName + successor.givenName;
-                    const newYomiParts = parts[2].trim().split('|');
-                    successor.familyYomi = newYomiParts[0] || "";
-                    successor.givenYomi = newYomiParts[1] || "";
-                    successor.yomi = successor.familyYomi + successor.givenYomi;
-                    const newNameStr = successor.name.replace('|', '');
-                    messages.push(`家督を継ぐにあたり、${oldNameStr}は\n「${newNameStr}」と名を改めました。`);
-                }
-            }
-        }
-
-        // ⑦ 顔変更の魔法（大名になった時の顔画像があれば適用します）
-        if (successor.faceChange && successor.faceChange.startsWith('daimyo:')) {
-            const newFace = successor.faceChange.split(':')[1].trim();
-            if (newFace) {
-                successor.faceIcon = newFace;
-            }
+        // ⑥ ライフシステムの一元管理魔法を使って、大名就任時の改名と顔変更を行います！
+        if (game.lifeSystem) {
+            game.lifeSystem.applyDaimyoNameAndFaceChange(successor, messages);
         }
 
         // ⑧ 大名家のリーダーを長政に設定します
@@ -2244,32 +2220,10 @@ window.GameEvents.push({
         if (!targetDaimyo) return;
         const targetCastleId = targetDaimyo.castleId;
 
-        // 【将軍候補の改名処理】
-        // 「daimyo:」の改名予定を持っていれば、その名前に改名します
-        if (candidate.nameChange && candidate.nameChange.includes('daimyo:')) {
-            const changes = candidate.nameChange.split('/');
-            for (const change of changes) {
-                const parts = change.split(':');
-                if (parts.length === 3 && parts[0].trim() === 'daimyo') {
-                    const newNameParts = parts[1].trim().split('|');
-                    candidate.familyName = newNameParts[0] || ""; 
-                    candidate.givenName = newNameParts[1] || "";  
-                    candidate.name = candidate.familyName + candidate.givenName;
-                    
-                    const newYomiParts = parts[2].trim().split('|');
-                    candidate.familyYomi = newYomiParts[0] || ""; 
-                    candidate.givenYomi = newYomiParts[1] || "";  
-                    candidate.yomi = candidate.familyYomi + candidate.givenYomi;
-                }
-            }
-        }
-
-        // 庇護された時に大名用の顔画像があれば差し替えます！
-        if (candidate.faceChange && candidate.faceChange.startsWith('daimyo:')) {
-            const newFace = candidate.faceChange.split(':')[1].trim();
-            if (newFace) {
-                candidate.faceIcon = newFace;
-            }
+        // 【将軍候補の改名と顔変更処理】
+        // ライフシステムの一元管理魔法を呼び出します！
+        if (game.lifeSystem) {
+            game.lifeSystem.applyDaimyoNameAndFaceChange(candidate);
         }
 
         // 将軍候補を新しい大名家に移動させます
@@ -3789,32 +3743,9 @@ window.GameEvents.push({
         // 通常の改名メッセージの形でお知らせの文章を作ります
         messages.push(`${oldNameStr}は出家して「${newNameStr}」と号しました。`);
 
-        // ⑦ 義光の改名・顔変更の魔法（大名になった時に名前や顔が変わる設定があれば適用します）
-        if (successor.nameChange && successor.nameChange.includes('daimyo:')) {
-            const changes = successor.nameChange.split('/');
-            for (const change of changes) {
-                const parts = change.split(':');
-                if (parts.length === 3 && parts[0].trim() === 'daimyo') {
-                    const sucOldNameStr = successor.name.replace('|', '');
-                    const newNameParts = parts[1].trim().split('|');
-                    successor.familyName = newNameParts[0] || "";
-                    successor.givenName = newNameParts[1] || "";
-                    successor.name = successor.familyName + successor.givenName;
-                    const newYomiParts = parts[2].trim().split('|');
-                    successor.familyYomi = newYomiParts[0] || "";
-                    successor.givenYomi = newYomiParts[1] || "";
-                    successor.yomi = successor.familyYomi + successor.givenYomi;
-                    const sucNewNameStr = successor.name.replace('|', '');
-                    messages.push(`家督を継ぐにあたり、${sucOldNameStr}は\n「${sucNewNameStr}」と名を改めました。`);
-                }
-            }
-        }
-
-        if (successor.faceChange && successor.faceChange.startsWith('daimyo:')) {
-            const newFace = successor.faceChange.split(':')[1].trim();
-            if (newFace) {
-                successor.faceIcon = newFace;
-            }
+        // ⑦ ライフシステムの一元管理魔法を使って、大名就任時の改名と顔変更を行います！
+        if (game.lifeSystem) {
+            game.lifeSystem.applyDaimyoNameAndFaceChange(successor, messages);
         }
 
         // ⑧ 大名家のリーダーを義光に設定します
@@ -3954,33 +3885,9 @@ window.GameEvents.push({
         const targetCastle = game.getCastle(successor.castleId);
         window.EventAction.appointCastellan(game, successor, targetCastle);
 
-        // ⑥ 改名の魔法（大名になった時に名前が変わる設定があれば適用します）
-        if (successor.nameChange && successor.nameChange.includes('daimyo:')) {
-            const changes = successor.nameChange.split('/');
-            for (const change of changes) {
-                const parts = change.split(':');
-                if (parts.length === 3 && parts[0].trim() === 'daimyo') {
-                    const oldNameStr = successor.name.replace('|', '');
-                    const newNameParts = parts[1].trim().split('|');
-                    successor.familyName = newNameParts[0] || "";
-                    successor.givenName = newNameParts[1] || "";
-                    successor.name = successor.familyName + successor.givenName;
-                    const newYomiParts = parts[2].trim().split('|');
-                    successor.familyYomi = newYomiParts[0] || "";
-                    successor.givenYomi = newYomiParts[1] || "";
-                    successor.yomi = successor.familyYomi + successor.givenYomi;
-                    const newNameStr = successor.name.replace('|', '');
-                    messages.push(`家督を継ぐにあたり、${oldNameStr}は\n「${newNameStr}」と名を改めました。`);
-                }
-            }
-        }
-
-        // ⑦ 顔変更の魔法（大名になった時の顔画像があれば適用します）
-        if (successor.faceChange && successor.faceChange.startsWith('daimyo:')) {
-            const newFace = successor.faceChange.split(':')[1].trim();
-            if (newFace) {
-                successor.faceIcon = newFace;
-            }
+        // ⑥ ライフシステムの一元管理魔法を使って、大名就任時の改名と顔変更を行います！
+        if (game.lifeSystem) {
+            game.lifeSystem.applyDaimyoNameAndFaceChange(successor, messages);
         }
 
         // ⑧ 大名家のリーダーを具房に設定します
