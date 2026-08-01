@@ -486,7 +486,7 @@ class UIManager {
         // ぐるぐる回るアイコンと一緒に、「思考中... (今の数/全部の数)」と表示します
         // 縦に並んでしまうのを防ぐため、文字と数字全体をさらに <div> で包んでひとまとめにします！
         // ★修正：数字ごとの幅の違いによるブレを完全に防ぐため、ここだけ幅が均等なフォント（Arialなど）を指定します！
-        this.aiGuard.innerHTML = `<div class="loading-spinner"></div><div>思考中... (<span style="display:inline-block; width:1.6em; text-align:right; font-family: Arial, sans-serif; font-variant-numeric: tabular-nums;">${current}</span> / <span style="display:inline-block; width:1.6em; text-align:left; font-family: Arial, sans-serif; font-variant-numeric: tabular-nums;">${total}</span>)</div>`;
+        this.aiGuard.innerHTML = `<div class="loading-spinner"></div><div>思考中... (<span style="display:inline-block; width:1.7em; text-align:right; font-family: Arial, sans-serif; font-variant-numeric: tabular-nums;">${current}</span> / <span style="display:inline-block; width:1.7em; text-align:left; font-family: Arial, sans-serif; font-variant-numeric: tabular-nums;">${total}</span>)</div>`;
     }
 
     async waitForDialogs() {
