@@ -192,12 +192,17 @@ class FactionSystem {
 
             // リーダー候補選出
             // 条件: 功績500以上 かつ 方針がhermit(隠遁者)ではない かつ 隠居ではない
-            const candidates = members.filter(b => 
-                !b.isDaimyo && 
-                !b.isRetired && 
-                b.achievementTotal >= achieveLeader && 
-                b.personality !== 'hermit'
-            );
+            const candidates = members.filter(b => {
+                let ach = b.achievementTotal || 0;
+                // ★追加：スキルマネージャーから派閥用の功績ボーナスを受け取ります
+                if (typeof SkillManager !== 'undefined') {
+                    ach += SkillManager.calcFactionAchievementBonus(b, this.game);
+                }
+                return !b.isDaimyo && 
+                       !b.isRetired && 
+                       ach >= achieveLeader && 
+                       b.personality !== 'hermit';
+            });
 
             // 資格を満たす武将が2名以上いない場合は派閥なし
             if (candidates.length < 2) return;
@@ -259,7 +264,12 @@ class FactionSystem {
                 const charmBonus = Math.floor((50 - (Number(leader.charm) || 0)) * 0.1);
                 
                 // 功績500を超えた分を「merit（はみ出し功績）」として覚えます
-                const merit = Math.max(0, (Number(leader.achievementTotal) || 0) - 500);
+                let leaderAchievement = Number(leader.achievementTotal) || 0;
+                // ★追加：スキルマネージャーから派閥用の功績ボーナスを受け取ります
+                if (typeof SkillManager !== 'undefined') {
+                    leaderAchievement += SkillManager.calcFactionAchievementBonus(leader, this.game);
+                }
+                const merit = Math.max(0, leaderAchievement - 500);
 
                 // 「3乗根（Math.cbrt）」の魔法を使って、点数が上がるごとに必要な功績がどんどん増えるようにします！
                 // 最後に 1.85 をかけることで、功績1万のときに「約40点」に収まるように調整しています。

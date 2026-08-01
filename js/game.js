@@ -1055,7 +1055,13 @@ class GameSystem {
             }
         }
         
-        return prob;
+        // ★追加：スキルマネージャーから登用の成功率ボーナスを受け取ります
+        if (typeof SkillManager !== 'undefined') {
+            prob += SkillManager.calcEmployProbBonus(recruiter, window.GameApp);
+        }
+        
+        // 確率が0より小さくなったり1.0（100%）を超えないように制限して返します
+        return Math.max(0, Math.min(1.0, prob));
     }
 
     static calcAffinityDiff(a, b) { const diff = Math.abs(a - b); return Math.min(diff, 100 - diff); }

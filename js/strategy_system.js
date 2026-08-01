@@ -291,6 +291,11 @@ class StrategySystem {
             }
         }
         
+        // ★追加：スキルマネージャーから引抜の成功率ボーナスを受け取ります
+        if (typeof SkillManager !== 'undefined') {
+            successRate += SkillManager.calcHeadhuntProbBonus(doer, this.game);
+        }
+
         return Math.max(0, Math.min(1.0, successRate));
     }
     

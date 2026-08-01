@@ -19,7 +19,8 @@ const SKILL_NAMES = {
     TENKA_FUBU: "天下布武",
     ECHIGO_NO_RYU: "越後の龍",
     KAI_NO_TORA: "甲斐の虎",
-    MIKAWA_NO_SHIKA: "三河の鹿"
+    MIKAWA_NO_SHIKA: "三河の鹿",
+    HITOTARASHI: "人たらし"
 };
 
 const APTITUDE_NAMES = {
@@ -505,5 +506,37 @@ class SkillManager {
 
         // 軽減率（％）を倍率に直して返します（下限の制限は戦場の計算時に行います）
         return 1.0 - (reducePct / 100);
+    }
+    
+    // ==========================================
+    // ★追加：人事・調略・派閥などのスキルボーナス一元管理
+    // ==========================================
+
+    // ＜派閥ボーナス＞ リーダー選出時や派閥スコア計算時に「功績」に加算されるボーナス
+    static calcFactionAchievementBonus(busho, game) {
+        let bonus = 0;
+        if (this.hasSkill(busho, SKILL_NAMES.HITOTARASHI, game)) {
+            bonus += 200;
+        }
+        // 将来、新しいスキルができたらここに書き足せます
+        return bonus;
+    }
+
+    // ＜登用ボーナス＞ 登用実行時、最終成功率に加算されるボーナス
+    static calcEmployProbBonus(busho, game) {
+        let probBonus = 0;
+        if (this.hasSkill(busho, SKILL_NAMES.HITOTARASHI, game)) {
+            probBonus += 0.15; // 15%プラス
+        }
+        return probBonus;
+    }
+
+    // ＜引抜ボーナス＞ 武将引抜実行時、最終成功率に加算されるボーナス
+    static calcHeadhuntProbBonus(busho, game) {
+        let probBonus = 0;
+        if (this.hasSkill(busho, SKILL_NAMES.HITOTARASHI, game)) {
+            probBonus += 0.02; // 2%プラス
+        }
+        return probBonus;
     }
 }
