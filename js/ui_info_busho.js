@@ -308,9 +308,9 @@ Object.assign(UIInfoManager.prototype, {
                 { label: '操船', val: busho.aptMaritime }
             ];
             
-            // ★変更：PC版は2列、スマホ版は3列で表示するように切り替えます
-            const colCount = isPc ? 2 : 3;
-            const rowClass = isPc ? "daimyo-detail-2col" : "daimyo-detail-3col";
+            // ★変更：基本タブ（6行）と高さを揃えるため、スマホ版でも2列表示に統一します
+            const colCount = 2;
+            const rowClass = "daimyo-detail-2col";
             
             let aptHtml = '';
             for(let i = 0; i < aptitudes.length; i += colCount) {
@@ -348,13 +348,16 @@ Object.assign(UIInfoManager.prototype, {
                 }
                 skillHtml += `<div class="daimyo-detail-row daimyo-detail-2col">${rowInnerHtml}</div>`;
             }
-            
+
+            // ★変更：基本タブと同じように flex と gap を使って隙間のサイズを統一し、高さを揃えます
             rightContentHtml = `
-                <div style="${groupWrapStyle} margin-bottom: 6px;">
-                    ${aptHtml}
-                </div>
-                <div style="${groupWrapStyle}">
-                    ${skillHtml}
+                <div style="display: flex; flex-direction: column; gap: ${rowGap}; width: 100%;">
+                    <div style="${groupWrapStyle}">
+                        ${aptHtml}
+                    </div>
+                    <div style="${groupWrapStyle}">
+                        ${skillHtml}
+                    </div>
                 </div>
             `;
         }
