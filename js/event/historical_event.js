@@ -3829,8 +3829,9 @@ window.GameEvents.push({
             await game.independenceSystem.forceAction(castle, naoie, munekage, 'coup');
         }
     }
-    
-    // ==========================================
+});
+
+// ==========================================
 // ★ 北畠具房 家督相続イベント
 // ==========================================
 window.GameEvents.push({
