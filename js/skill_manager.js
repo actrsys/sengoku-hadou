@@ -69,7 +69,7 @@ const SKILL_DESCRIPTIONS = {
     // 悪天巧者
     [SKILL_NAMES.WEATHER]: "①悪天候時に受ける行動力のペナルティを無効化する。（野戦）\n②悪天候時に受けるダメージ補正のペナルティを無効化する。（野戦／攻城戦）",
     // 朱槍
-    [SKILL_NAMES.SHUYARI]: "①隣接戦闘時に与えるダメージが１０％上昇する。（野戦）",
+    [SKILL_NAMES.SHUYARI]: "①隣接戦闘時に与えるダメージが１０％上昇する。（野戦）\n②隣接戦闘時に一定確率でクリティカルが発生するようになる。（野戦：足軽・騎馬）",
     // 赤備え
     [SKILL_NAMES.AKAZONAE]: "①自部隊が受ける被ダメージが１０％減少する。（野戦／攻城戦）\n②ターン経過による士気の低下を無効化する。（野戦／攻城戦）",
     // 医術
@@ -566,51 +566,61 @@ class SkillManager {
     // ★追加・変更：クリティカル機能の一元管理
     // ==========================================
     // 野戦用のクリティカル判定。発生したら効果の倍率をまとめて返します。
-    static getCriticalResult(unit, game, isRangedTeppo = false) {
-        let hasOni = this.hasSkill(unit, SKILL_NAMES.ONI, game);
-        let hasTenka = this.hasSkill(unit, SKILL_NAMES.TENKA_FUBU, game);
-        let hasEchigo = this.hasSkill(unit, SKILL_NAMES.ECHIGO_NO_RYU, game);
-        let hasKai = this.hasSkill(unit, SKILL_NAMES.KAI_NO_TORA, game);
-        let hasMikawa = this.hasSkill(unit, SKILL_NAMES.MIKAWA_NO_SHIKA, game);
-        let hasMousho = this.hasSkill(unit, SKILL_NAMES.MOUSHO, game);
-        let hasSogeki = this.hasSkill(unit, SKILL_NAMES.SOGEKI, game);
+    static getCriticalResult(unit, game, isRangedTeppo = false, isAdjacent = false) {
+        let critCandidates = [];
 
-        let canSogeki = hasSogeki && isRangedTeppo;
-        let hasNormalCrit = hasOni || hasTenka || hasEchigo || hasKai || hasMikawa || hasMousho;
+        // 持っているスキルをすべてチェックして、クリティカルの「候補リスト」を作ります
+        if (this.hasSkill(unit, SKILL_NAMES.ONI, game)) {
+            critCandidates.push({ name: SKILL_NAMES.ONI, prob: 1/12, mult: 1.5 });
+        }
+        if (isRangedTeppo && this.hasSkill(unit, SKILL_NAMES.SOGEKI, game)) {
+            critCandidates.push({ name: SKILL_NAMES.SOGEKI, prob: 1/8, mult: 1.0 });
+        }
+        // ★追加: 朱槍によるクリティカル（足軽・騎馬で隣接戦闘時）
+        if (isAdjacent && (unit.troopType === 'ashigaru' || unit.troopType === 'kiba') && this.hasSkill(unit, SKILL_NAMES.SHUYARI, game)) {
+            critCandidates.push({ name: SKILL_NAMES.SHUYARI, prob: 1/12, mult: 1.0 });
+        }
+        if (this.hasSkill(unit, SKILL_NAMES.TENKA_FUBU, game)) {
+            critCandidates.push({ name: SKILL_NAMES.TENKA_FUBU, prob: 1/12, mult: 1.0 });
+        }
+        if (this.hasSkill(unit, SKILL_NAMES.ECHIGO_NO_RYU, game)) {
+            critCandidates.push({ name: SKILL_NAMES.ECHIGO_NO_RYU, prob: 1/12, mult: 1.0 });
+        }
+        if (this.hasSkill(unit, SKILL_NAMES.KAI_NO_TORA, game)) {
+            critCandidates.push({ name: SKILL_NAMES.KAI_NO_TORA, prob: 1/12, mult: 1.0 });
+        }
+        if (this.hasSkill(unit, SKILL_NAMES.MIKAWA_NO_SHIKA, game)) {
+            critCandidates.push({ name: SKILL_NAMES.MIKAWA_NO_SHIKA, prob: 1/12, mult: 1.0 });
+        }
+        if (this.hasSkill(unit, SKILL_NAMES.MOUSHO, game)) {
+            critCandidates.push({ name: SKILL_NAMES.MOUSHO, prob: 1/12, mult: 1.0 });
+        }
 
-        // クリティカル系のスキルを持っていなければここでストップします
-        if (!canSogeki && !hasNormalCrit) {
+        // クリティカル系のスキルを持っていなければ（候補がなければ）ここでストップします
+        if (critCandidates.length === 0) {
             return { isCritical: false, atkMult: 1.0, defMult: 1.0, finalDmgMult: 1.0, skillName: "" };
         }
 
-        // ★追加：発生率の決定（複数の条件を満たしている場合は一番高い確率を優先します）
-        let critProb = canSogeki ? (1/8) : (1/12);
+        // ★追加: 複数のスキルが重複した場合、最も高い確率と最も高い倍率を抽出します
+        let maxProb = 0;
+        let maxMult = 1.0;
+        let bestSkillName = ""; 
 
-        // サイコロは1回だけ振ります
-        if (Math.random() < critProb) {
-            let skillName = "";
-            let finalDmgMult = 1.0;
-            
-            // ★追加：効果と名前の優先順位
-            // せっかくの「鬼」の1.5倍効果が消えないように、効果や名前は強力なものを優先して判定します
-            if (hasOni) { 
-                skillName = SKILL_NAMES.ONI; finalDmgMult = 1.5; 
-            } else if (canSogeki) { 
-                skillName = SKILL_NAMES.SOGEKI; 
-            } else if (hasTenka) { 
-                skillName = SKILL_NAMES.TENKA_FUBU; 
-            } else if (hasEchigo) { 
-                skillName = SKILL_NAMES.ECHIGO_NO_RYU; 
-            } else if (hasKai) { 
-                skillName = SKILL_NAMES.KAI_NO_TORA; 
-            } else if (hasMikawa) { 
-                skillName = SKILL_NAMES.MIKAWA_NO_SHIKA; 
-            } else if (hasMousho) { 
-                skillName = SKILL_NAMES.MOUSHO; 
-            }
+        critCandidates.forEach(cand => {
+            if (cand.prob > maxProb) maxProb = cand.prob;
+            if (cand.mult > maxMult) maxMult = cand.mult;
+        });
 
-            // 攻撃力2倍、防御力1/4（0.25倍）の効果をまとめて返します
-            return { isCritical: true, atkMult: 2.0, defMult: 0.25, finalDmgMult: finalDmgMult, skillName: skillName };
+        // ログに表示する「名前」を決めます（倍率が一番高いもの ＞ 確率が一番高いもの の順で優先します）
+        let bestCand = critCandidates.find(c => c.mult === maxMult && c.prob === maxProb);
+        if (!bestCand) bestCand = critCandidates.find(c => c.mult === maxMult);
+        if (!bestCand) bestCand = critCandidates.find(c => c.prob === maxProb);
+        if (bestCand) bestSkillName = bestCand.name;
+
+        // サイコロは1回だけ、抽出した「最も高い確率」で振ります
+        if (Math.random() < maxProb) {
+            // 攻撃力2倍、防御力1/4（0.25倍）をベースに、抽出した「最も高い倍率」を乗せて返します
+            return { isCritical: true, atkMult: 2.0, defMult: 0.25, finalDmgMult: maxMult, skillName: bestSkillName };
         }
 
         return { isCritical: false, atkMult: 1.0, defMult: 1.0, finalDmgMult: 1.0, skillName: "" };
