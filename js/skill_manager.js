@@ -67,7 +67,7 @@ const SKILL_DESCRIPTIONS = {
     // 鬼
     [SKILL_NAMES.ONI]: "①一定確率でクリティカルが発生するようになる。（野戦）\n②クリティカル発生時に与えるダメージが１．５倍になる。（野戦）",
     // 悪天巧者
-    [SKILL_NAMES.WEATHER]: "①悪天候時に受ける行動力のペナルティを無効化する。（野戦）",
+    [SKILL_NAMES.WEATHER]: "①悪天候時に受ける行動力のペナルティを無効化する。（野戦）\n②悪天候時に受けるダメージ補正のペナルティを無効化する。（野戦／攻城戦）",
     // 朱槍
     [SKILL_NAMES.SHUYARI]: "①隣接戦闘時に与えるダメージが１０％上昇する。（野戦）",
     // 赤備え
@@ -457,6 +457,56 @@ class SkillManager {
     // 「悪天巧者」を持っているか（天下布武も兼ねる）
     static isWeatherPenaltyIgnored(unit, game) {
         return this.hasSkill(unit, SKILL_NAMES.WEATHER, game) || this.hasSkill(unit, SKILL_NAMES.TENKA_FUBU, game);
+    }
+
+    // ==========================================
+    // ★追加：天候・地形ペナルティの一元管理
+    // ==========================================
+    static isWeatherPenaltyIgnoredForArmy(bushos, game) {
+        if (!bushos || bushos.length === 0) return false;
+        return bushos.some(b => this.isWeatherPenaltyIgnored(b, game));
+    }
+
+    // 攻城戦：天候による攻撃側部隊の基本攻撃力ペナルティ倍率
+    static calcSiegeWeatherAtkModifier(bushos, isRaining, isHeavySnow, game) {
+        if (this.isWeatherPenaltyIgnoredForArmy(bushos, game)) return 1.0;
+        let modifier = 1.0;
+        if (isRaining) modifier *= 0.9;
+        if (isHeavySnow) modifier *= 0.9;
+        return modifier;
+    }
+
+    // 攻城戦：天候によるターゲットの基本防御力・反撃力ペナルティ倍率
+    static calcSiegeWeatherTargetModifier(bushos, isHeavySnow, isAttacker, game) {
+        if (!isAttacker) return 1.0; 
+        if (this.isWeatherPenaltyIgnoredForArmy(bushos, game)) return 1.0;
+        if (isHeavySnow) return 0.9;
+        return 1.0;
+    }
+
+    // 野戦：天候による基本攻撃力のペナルティ倍率
+    static calcFieldWeatherAtkModifier(unit, isHeavySnowBattle, game) {
+        if (this.isWeatherPenaltyIgnored(unit, game)) return 1.0;
+        let modifier = 1.0;
+        if (isHeavySnowBattle) modifier *= 0.9;
+        return modifier;
+    }
+
+    // 野戦：天候による基本防御力のペナルティ倍率
+    static calcFieldWeatherDefModifier(unit, isHeavySnowBattle, isRainingOrSnowing, game) {
+        if (this.isWeatherPenaltyIgnored(unit, game)) return 1.0;
+        let modifier = 1.0;
+        if (isHeavySnowBattle) modifier *= 0.9;
+        if (isRainingOrSnowing) modifier *= 0.9;
+        return modifier;
+    }
+
+    // 野戦：川や海での地形ペナルティ倍率（天候影響含む）
+    static calcFieldWaterTerrainModifier(unit, isRainingOrSnowing, game) {
+        if (isRainingOrSnowing && !this.isWeatherPenaltyIgnored(unit, game)) {
+            return 0.5; // 悪天候時は0.5
+        }
+        return 0.7; // 通常は0.7
     }
 
     // 「踏破」を持っているか（天下布武も兼ねる）

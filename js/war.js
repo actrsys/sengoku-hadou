@@ -1362,18 +1362,16 @@ class WarManager {
             activeAtkPower = activeAtkPower + equipBonusValue;
         }
 
-        // ★追加：雨の時、攻撃側の基礎攻撃力が10%ダウンします（0.9倍になります）！
-        if (s.isRaining && isAtkTurnGroup) {
-            activeAtkPower = activeAtkPower * 0.9;
+        // ★追加：雨や大雪の時、攻撃側の基礎攻撃力がダウンします（悪天巧者で無効化）！
+        if (isAtkTurnGroup && typeof SkillManager !== 'undefined') {
+            activeAtkPower = activeAtkPower * SkillManager.calcSiegeWeatherAtkModifier(activeBushos, s.isRaining, s.isHeavySnow, this.game);
+        } else if (isAtkTurnGroup) {
+            if (s.isRaining) activeAtkPower *= 0.9;
+            if (s.isHeavySnow) activeAtkPower *= 0.9;
         }
 
         // ★ホーム補正を攻撃力に乗せます！
         activeAtkPower = activeAtkPower * getHomeBonusMult(s.turn);
-
-        // ★追加：大雪の時、攻撃側の基礎攻撃力が10%ダウン！
-        if (s.isHeavySnow && isAtkTurnGroup) {
-            activeAtkPower = activeAtkPower * 0.9;
-        }
         
         // ★追加：同陣営の全武将リスト（甲斐の虎などの判定用）をここで集めておきます！
         let activeAllBushos = [];
@@ -1407,10 +1405,16 @@ class WarManager {
             // ★反撃パワーにもホーム補正を乗せます！
             t.atkPower = pObj.atkPower * getHomeBonusMult(t.role); 
 
-            // ★追加：大雪の時、攻撃側は基礎防御力と反撃力が10%ダウン！
-            if (s.isHeavySnow && t.role.startsWith('attacker')) {
-                t.defPower = t.defPower * 0.9;
-                t.atkPower = t.atkPower * 0.9;
+            // ★追加：大雪の時、攻撃側は基礎防御力と反撃力がダウン！（悪天巧者で無効化）
+            if (t.role.startsWith('attacker')) {
+                let weatherTargetMod = 1.0;
+                if (typeof SkillManager !== 'undefined') {
+                    weatherTargetMod = SkillManager.calcSiegeWeatherTargetModifier(t.bushos, s.isHeavySnow, true, this.game);
+                } else if (s.isHeavySnow) {
+                    weatherTargetMod = 0.9;
+                }
+                t.defPower = t.defPower * weatherTargetMod;
+                t.atkPower = t.atkPower * weatherTargetMod;
             }
         });
 

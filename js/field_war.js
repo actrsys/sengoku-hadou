@@ -2505,19 +2505,31 @@ class FieldWarManager {
         let defBaseAtk = (Math.sqrt(defS) + defAbilityAtk * (defS / (defS + 150)) + (defAbilityAtk * Math.sqrt(defS) / 100)) * defSideMultiplier;
         let defBaseDef = (Math.sqrt(defS) + defAbilityDef * (defS / (defS + 150)) + (defAbilityDef * Math.sqrt(defS) / 100)) * defSideMultiplier;
 
-        // ★大雪拠点戦の常時ペナルティ（基本攻防力が10%ダウン）
-        if (this.isHeavySnowBattle) {
-            atkBaseAtk *= 0.9;
-            atkBaseDef *= 0.9;
-            defBaseAtk *= 0.9;
-            defBaseDef *= 0.9;
+        // ★大雪拠点戦の常時ペナルティと雨雪の防御ペナルティ（悪天巧者で無効化）
+        let isRainingOrSnowing = (this.weather === 'rain' || this.weather === 'snow');
+        
+        let atkWeatherAtkMod = 1.0, atkWeatherDefMod = 1.0;
+        let defWeatherAtkMod = 1.0, defWeatherDefMod = 1.0;
+        
+        if (typeof SkillManager !== 'undefined') {
+            atkWeatherAtkMod = SkillManager.calcFieldWeatherAtkModifier(attacker, this.isHeavySnowBattle, this.game);
+            atkWeatherDefMod = SkillManager.calcFieldWeatherDefModifier(attacker, this.isHeavySnowBattle, isRainingOrSnowing, this.game);
+            defWeatherAtkMod = SkillManager.calcFieldWeatherAtkModifier(defender, this.isHeavySnowBattle, this.game);
+            defWeatherDefMod = SkillManager.calcFieldWeatherDefModifier(defender, this.isHeavySnowBattle, isRainingOrSnowing, this.game);
+        } else {
+            if (this.isHeavySnowBattle) {
+                atkWeatherAtkMod *= 0.9; atkWeatherDefMod *= 0.9;
+                defWeatherAtkMod *= 0.9; defWeatherDefMod *= 0.9;
+            }
+            if (isRainingOrSnowing) {
+                atkWeatherDefMod *= 0.9; defWeatherDefMod *= 0.9;
+            }
         }
-
-        // ★雨または雪の時はすべての部隊の基礎防御力が10%ダウンします
-        if (this.weather === 'rain' || this.weather === 'snow') {
-            atkBaseDef = atkBaseDef * 0.9;
-            defBaseDef = defBaseDef * 0.9;
-        }
+        
+        atkBaseAtk *= atkWeatherAtkMod;
+        atkBaseDef *= atkWeatherDefMod;
+        defBaseAtk *= defWeatherAtkMod;
+        defBaseDef *= defWeatherDefMod;
 
         // 2. 最終攻撃力・最終防御力の計算（士気・訓練による補正）
         let atkFinalAtk = atkBaseAtk * (1 + (atkMorale * 1.5 + atkTraining) / 1000);
@@ -2688,11 +2700,16 @@ class FieldWarManager {
         if (defTerrain === 'forest') defTerrainMult = 1.15;      // 森は防御力アップ
         else if (defTerrain === 'mountain') defTerrainMult = 1.3; // 山はさらに防御力アップ
         else if (defTerrain === 'river' || defIsSea) {
-            // ★川（海）での防御力のマイナス補正（雨や雪の時はさらに厳しく）
-            let baseMult = (this.weather === 'rain' || this.weather === 'snow') ? 0.5 : 0.7;
+            // ★川（海）での防御力のマイナス補正（雨や雪の時はさらに厳しく、悪天巧者で軽減）
+            let baseMult = 0.7;
+            if (typeof SkillManager !== 'undefined') {
+                baseMult = SkillManager.calcFieldWaterTerrainModifier(defender, isRainingOrSnowing, this.game);
+            } else {
+                baseMult = isRainingOrSnowing ? 0.5 : 0.7;
+            }
             
             // ★追加: 操船による海の防御ペナルティ軽減
-            if (defIsSea) {
+            if (defIsSea && typeof SkillManager !== 'undefined') {
                 const defAllies = this.units.filter(u => u.isAttacker === defender.isAttacker);
                 baseMult = SkillManager.calcMaritimeDefenseModifier(defender, defAllies, baseMult, this.game);
             }
@@ -2707,8 +2724,12 @@ class FieldWarManager {
         
         let atkTerrainMult = 1.0;
         if (atkTerrain === 'river' || (this.grid && this.grid[atkRow] && this.grid[atkRow][attacker.x].isSea)) {
-            // ★足場が悪い川（海）からの攻撃は威力が落ちる（雨や雪の時はさらに厳しく）
-            atkTerrainMult = (this.weather === 'rain' || this.weather === 'snow') ? 0.5 : 0.7;
+            // ★足場が悪い川（海）からの攻撃は威力が落ちる（雨や雪の時はさらに厳しく、悪天巧者で軽減）
+            if (typeof SkillManager !== 'undefined') {
+                atkTerrainMult = SkillManager.calcFieldWaterTerrainModifier(attacker, isRainingOrSnowing, this.game);
+            } else {
+                atkTerrainMult = isRainingOrSnowing ? 0.5 : 0.7;
+            }
         }
         atkFinalAtk = atkFinalAtk * atkTerrainMult;
         
