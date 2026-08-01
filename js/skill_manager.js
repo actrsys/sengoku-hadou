@@ -506,3 +506,4 @@ class SkillManager {
         // 軽減率（％）を倍率に直して返します（下限の制限は戦場の計算時に行います）
         return 1.0 - (reducePct / 100);
     }
+}
