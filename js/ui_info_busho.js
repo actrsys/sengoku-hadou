@@ -246,7 +246,8 @@ Object.assign(UIInfoManager.prototype, {
         // ★追加：スマホ版かどうかで縦の隙間（行間）を変える準備をします
         const isPc = document.body.classList.contains('is-pc');
         const rowGap = isPc ? "6px" : "3px"; // ★スマホ版はきゅっと詰めます
-        const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 4px;";
+        const groupGap = "4px"; // ★グループ内の行間。適性⇔技能説明のダミーと共有して高さを一致させます
+        const groupWrapStyle = `background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: ${groupGap};`;
 
         let rightContentHtml = '';
         
@@ -372,7 +373,7 @@ Object.assign(UIInfoManager.prototype, {
                     <div id="busho-skill-desc-area" style="${groupWrapStyle} display: none; flex: 1; position: relative;">
                         <!-- ★ここがダミーの箱を置く場所です（透明にして高さだけ確保します） -->
                         <!-- ★修正：手作りのダミーではなく、適性リストのHTML(aptHtml)をそのまま透明にして再利用することで、1ピクセルの狂いもなく高さを一致させます！ -->
-                        <div style="visibility: hidden; pointer-events: none; display: flex; flex-direction: column; gap: ${rowGap};">
+                        <div style="visibility: hidden; pointer-events: none; display: flex; flex-direction: column; gap: ${groupGap};">
                             ${aptHtml}
                         </div>
                         <!-- ★実際のテキストはその上に被せるようにして配置します -->
