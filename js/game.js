@@ -2526,9 +2526,13 @@ class GameManager {
         if (this.warManager && this.warManager.state && this.warManager.state.active) return; 
         if (this.selectionMode != null) return;
         
+        if (this.ui && typeof this.ui.hideAIWarThinking === 'function') {
+            this.ui.hideAIWarThinking();
+        }
+
         if (this.aiTimer) { clearTimeout(this.aiTimer); this.aiTimer = null; }
 
-        this.selectionMode = null; 
+        this.selectionMode = null;
 
         // ★ここから追加：ターン終了時、必ずコマンドの階層を初期化して非表示にします！
         if (this.ui && typeof this.ui.clearCommandMenu === 'function') {

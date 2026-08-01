@@ -420,6 +420,10 @@ Object.assign(WarManager.prototype, {
                     
                     // ★追加：点滅が終わったらバリアを外します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard();
+                } else {
+                    if (this.game.ui && typeof this.game.ui.showAIWarThinking === 'function') {
+                        this.game.ui.showAIWarThinking();
+                    }
                 }
             } else {
                 if (defCastle.isKunishu) {
@@ -991,6 +995,10 @@ Object.assign(WarManager.prototype, {
             if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true); 
 
             this.game.ui.restoreAIGuardText(true);
+            
+            if (this.game.ui && typeof this.game.ui.hideAIWarThinking === 'function') {
+                this.game.ui.hideAIWarThinking();
+            }
 
             this.state.active = false; 
             this.game.finishTurn(); 
@@ -1179,6 +1187,10 @@ Object.assign(WarManager.prototype, {
 
                 // 一元管理の魔法で透明化を完全に解除します！
                 this.game.ui.restoreAIGuardText(true);
+                
+                if (this.game.ui && typeof this.game.ui.hideAIWarThinking === 'function') {
+                    this.game.ui.hideAIWarThinking();
+                }
                 
                 // ★追加：籠城戦（攻城戦）の「戦闘終了後」の合図を出します
                 if (this.game.eventManager) {
@@ -1972,6 +1984,10 @@ Object.assign(WarManager.prototype, {
 
             this.game.ui.restoreAIGuardText(true);
 
+            if (this.game.ui && typeof this.game.ui.hideAIWarThinking === 'function') {
+                this.game.ui.hideAIWarThinking();
+            }
+
             if (this.state.isPlayerInvolved) this.game.ui.showDialog("合戦処理中にエラーが発生しましたが、ゲームを継続します。", false, () => { this.game.finishTurn(); });
             else this.game.finishTurn();
         }
@@ -2541,6 +2557,10 @@ Object.assign(WarManager.prototype, {
 
         // 一元管理の魔法で透明化を完全に解除します！
         this.game.ui.restoreAIGuardText(true);
+
+        if (this.game.ui && typeof this.game.ui.hideAIWarThinking === 'function') {
+            this.game.ui.hideAIWarThinking();
+        }
 
         // ★諸勢力との戦いが終わった時も平時のBGMに戻す！
         if (window.AudioManager && this.state.isPlayerInvolved) {
