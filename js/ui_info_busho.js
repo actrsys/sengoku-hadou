@@ -365,6 +365,9 @@ Object.assign(UIInfoManager.prototype, {
 
             // ★変更：基本タブと同じように flex と gap を使って隙間のサイズを統一し、高さを揃えます
             // （説明エリアを隠し味として最初から忍ばせておきます）
+            // ★追加：スマホ版なら文字を小さく（0.75remに）します
+            const descTextFontSize = isPc ? "0.95rem" : "0.75rem";
+            
             rightContentHtml = `
                 <div style="display: flex; flex-direction: column; gap: ${rowGap}; width: 100%;">
                     <div id="busho-aptitude-area" style="${groupWrapStyle} flex: 1;">
@@ -377,7 +380,7 @@ Object.assign(UIInfoManager.prototype, {
                             ${aptHtml}
                         </div>
                         <!-- ★実際のテキストはその上に被せるようにして配置します -->
-                        <div id="busho-skill-desc-text" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 5px 8px; font-size: 0.95rem; line-height: 1.5; color: #fff; text-shadow: 1px 1px 1px #000; text-align: left; box-sizing: border-box; overflow-y: auto;">
+                        <div id="busho-skill-desc-text" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 5px 8px; font-size: ${descTextFontSize}; line-height: 1.5; color: #fff; text-shadow: 1px 1px 1px #000; text-align: left; box-sizing: border-box; overflow-y: auto;">
                         </div>
                     </div>
                     <div style="${groupWrapStyle}">
@@ -471,10 +474,13 @@ Object.assign(UIInfoManager.prototype, {
                                 let desc = typeof SkillManager !== 'undefined' ? SkillManager.getSkillDescription(skillName) : "";
                                 if (!desc) desc = "詳細不明。";
                                 
+                                // ★追加：スマホ版なら文字を小さく（約0.70remに）します
+                                const innerDescFontSize = isPc ? "0.85rem" : "0.70rem";
+                                
                                 // 説明文をセットして、瞬時に表示を切り替えます
                                 descText.innerHTML = `
                                     <div style="color:#ffd54f; font-weight:bold; margin-bottom:5px; border-bottom:1px solid rgba(212,175,55,0.5); padding-bottom:3px;">【${skillName}】</div>
-                                    <div style="color:#eee; font-size:0.85rem; white-space: pre-line;">${desc}</div>
+                                    <div style="color:#eee; font-size:${innerDescFontSize}; white-space: pre-line;">${desc}</div>
                                 `;
                                 aptArea.style.display = 'none';
                                 descArea.style.display = 'flex';
