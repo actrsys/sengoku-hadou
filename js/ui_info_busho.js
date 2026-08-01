@@ -362,17 +362,6 @@ Object.assign(UIInfoManager.prototype, {
                 skillHtml += `<div class="daimyo-detail-row daimyo-detail-2col">${rowInnerHtml}</div>`;
             }
 
-            // ★追加：説明エリアの高さを適性エリア（4行分）とぴったり同じにするための、見えないダミーの箱を作ります
-            let dummyHtml = '';
-            for (let i = 0; i < 4; i++) {
-                dummyHtml += `
-                    <div class="daimyo-detail-row daimyo-detail-2col">
-                        <div class="daimyo-detail-stat-box" style="visibility: hidden;">
-                            <span class="daimyo-detail-label">ダミー</span><span class="daimyo-detail-value">A</span>
-                        </div>
-                    </div>`;
-            }
-
             // ★変更：基本タブと同じように flex と gap を使って隙間のサイズを統一し、高さを揃えます
             // （説明エリアを隠し味として最初から忍ばせておきます）
             rightContentHtml = `
@@ -382,8 +371,9 @@ Object.assign(UIInfoManager.prototype, {
                     </div>
                     <div id="busho-skill-desc-area" style="${groupWrapStyle} display: none; flex: 1; position: relative;">
                         <!-- ★ここがダミーの箱を置く場所です（透明にして高さだけ確保します） -->
-                        <div style="pointer-events: none; display: flex; flex-direction: column; gap: ${rowGap};">
-                            ${dummyHtml}
+                        <!-- ★修正：手作りのダミーではなく、適性リストのHTML(aptHtml)をそのまま透明にして再利用することで、1ピクセルの狂いもなく高さを一致させます！ -->
+                        <div style="visibility: hidden; pointer-events: none; display: flex; flex-direction: column; gap: ${rowGap};">
+                            ${aptHtml}
                         </div>
                         <!-- ★実際のテキストはその上に被せるようにして配置します -->
                         <div id="busho-skill-desc-text" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 5px 8px; font-size: 0.95rem; line-height: 1.5; color: #fff; text-shadow: 1px 1px 1px #000; text-align: left; box-sizing: border-box; overflow-y: auto;">
