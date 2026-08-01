@@ -1055,11 +1055,17 @@ body:not(.is-pc) .saveload-slot-btn > div:first-child > div:last-child > span {
 .modal { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 6000; display: flex; justify-content: center; align-items: center; opacity: 1; padding: env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 60px) env(safe-area-inset-left); box-sizing: border-box; }
 .modal.hidden { opacity: 0; pointer-events: none; display: none !important;}
 
-/* モーダル（小窓）の重なり順（z-index）の統一リスト */
+/* モーダル（小窓）の重なり順（z-index）の統一リスト（根本解決版） */
+
+/* 【土台となる大画面層】（標準の6000より低くすることで、どんな小窓も必ず上にくるようにします） */
+#scenario-modal, #war-modal, #field-war-modal, #daimyo-confirm-modal { z-index: 5000; }
+
+/* 【確認・操作・情報層】（標準の6000〜8000台） */
 #intercept-confirm-modal { z-index: 6000; }
 #quantity-modal { z-index: 6500; }
 #settings-modal { z-index: 7000; }
-#result-modal { z-index: 8000; }
+#retreat-modal { z-index: 8000; }
+#unit-divide-modal { z-index: 8010; }
 #daimyo-list-modal { z-index: 8100; }
 #daimyo-detail-modal { z-index: 8150; }
 #faction-list-modal { z-index: 8160; }
@@ -1067,7 +1073,12 @@ body:not(.is-pc) .saveload-slot-btn > div:first-child > div:last-child > span {
 #selector-modal { z-index: 8200; }
 #busho-detail-modal { z-index: 8300; }
 #diplo-list-modal { z-index: 8400; }
-#dialog-modal { z-index: 9500 !important; }
+#gunshi-modal { z-index: 8500; }
+
+/* 【システム・最前面ダイアログ層】（絶対に見えなければならないもの） */
+#saveload-modal { z-index: 9500; }
+#result-modal { z-index: 9600; }
+#dialog-modal { z-index: 9900 !important; }
 
 .modal .modal-content { background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); border: 2px solid #d4af37; color: #fff; padding: 10px; border-radius: 8px; width: 95%; max-width: 800px; max-height: calc(95% - 60px); display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative; overflow-y: auto !important; overflow-x: hidden !important; overscroll-behavior: none; box-sizing: border-box; text-align: center; }
 .modal .modal-content h3 { margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid rgba(212, 175, 55, 0.5); padding-bottom: 10px; color: #ffd54f; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: left; }
