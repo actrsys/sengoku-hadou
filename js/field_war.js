@@ -2722,8 +2722,12 @@ class FieldWarManager {
         // ★追加・変更: クリティカル機能の一元管理
         // ==========================================
         // スキルマネージャーにまとめて判定してもらいます
-        let atkCritResult = SkillManager.getCriticalResult(attacker, this.game);
-        let defCritResult = SkillManager.getCriticalResult(defender, this.game);
+        // ★追加: 狙撃用に遠距離鉄砲かどうかのフラグを渡します
+        let isAtkRangedTeppo = (attacker.troopType === 'teppo' && atkDist > 1);
+        let isDefRangedTeppo = false; // 反撃は距離1のみなので遠距離にはならない
+
+        let atkCritResult = SkillManager.getCriticalResult(attacker, this.game, isAtkRangedTeppo);
+        let defCritResult = SkillManager.getCriticalResult(defender, this.game, isDefRangedTeppo);
 
         let isAtkCritical = atkCritResult.isCritical;
         let isDefCritical = defCritResult.isCritical;

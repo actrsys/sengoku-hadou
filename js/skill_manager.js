@@ -22,7 +22,9 @@ const SKILL_NAMES = {
     ECHIGO_NO_RYU: "越後の龍",
     KAI_NO_TORA: "甲斐の虎",
     MIKAWA_NO_SHIKA: "三河の鹿",
-    HITOTARASHI: "人たらし"
+    HITOTARASHI: "人たらし",
+    SOGEKI: "狙撃",
+    HYORIHIKYO: "表裏比興"
 };
 
 const APTITUDE_NAMES = {
@@ -411,30 +413,48 @@ class SkillManager {
     // ★追加・変更：クリティカル機能の一元管理
     // ==========================================
     // 野戦用のクリティカル判定。発生したら効果の倍率をまとめて返します。
-    static getCriticalResult(unit, game) {
+    static getCriticalResult(unit, game, isRangedTeppo = false) {
         let hasOni = this.hasSkill(unit, SKILL_NAMES.ONI, game);
         let hasTenka = this.hasSkill(unit, SKILL_NAMES.TENKA_FUBU, game);
         let hasEchigo = this.hasSkill(unit, SKILL_NAMES.ECHIGO_NO_RYU, game);
         let hasKai = this.hasSkill(unit, SKILL_NAMES.KAI_NO_TORA, game);
         let hasMikawa = this.hasSkill(unit, SKILL_NAMES.MIKAWA_NO_SHIKA, game);
         let hasMousho = this.hasSkill(unit, SKILL_NAMES.MOUSHO, game);
+        let hasSogeki = this.hasSkill(unit, SKILL_NAMES.SOGEKI, game);
 
-        // クリティカル系のスキルを持っていなければここでストップ
-        if (!(hasOni || hasTenka || hasEchigo || hasKai || hasMikawa || hasMousho)) {
+        let canSogeki = hasSogeki && isRangedTeppo;
+        let hasNormalCrit = hasOni || hasTenka || hasEchigo || hasKai || hasMikawa || hasMousho;
+
+        // クリティカル系のスキルを持っていなければここでストップします
+        if (!canSogeki && !hasNormalCrit) {
             return { isCritical: false, atkMult: 1.0, defMult: 1.0, finalDmgMult: 1.0, skillName: "" };
         }
 
-        // 1/12の確率でクリティカル発生！
-        if (Math.random() < 1/12) {
+        // ★追加：発生率の決定（複数の条件を満たしている場合は一番高い確率を優先します）
+        let critProb = canSogeki ? (1/8) : (1/12);
+
+        // サイコロは1回だけ振ります
+        if (Math.random() < critProb) {
             let skillName = "";
             let finalDmgMult = 1.0;
-            // メッセージ表示用と、鬼の特別補正（最終ダメージ1.5倍）を振り分けます
-            if (hasOni) { skillName = SKILL_NAMES.ONI; finalDmgMult = 1.5; }
-            else if (hasTenka) { skillName = SKILL_NAMES.TENKA_FUBU; }
-            else if (hasEchigo) { skillName = SKILL_NAMES.ECHIGO_NO_RYU; }
-            else if (hasKai) { skillName = SKILL_NAMES.KAI_NO_TORA; }
-            else if (hasMikawa) { skillName = SKILL_NAMES.MIKAWA_NO_SHIKA; }
-            else if (hasMousho) { skillName = SKILL_NAMES.MOUSHO; }
+            
+            // ★追加：効果と名前の優先順位
+            // せっかくの「鬼」の1.5倍効果が消えないように、効果や名前は強力なものを優先して判定します
+            if (hasOni) { 
+                skillName = SKILL_NAMES.ONI; finalDmgMult = 1.5; 
+            } else if (canSogeki) { 
+                skillName = SKILL_NAMES.SOGEKI; 
+            } else if (hasTenka) { 
+                skillName = SKILL_NAMES.TENKA_FUBU; 
+            } else if (hasEchigo) { 
+                skillName = SKILL_NAMES.ECHIGO_NO_RYU; 
+            } else if (hasKai) { 
+                skillName = SKILL_NAMES.KAI_NO_TORA; 
+            } else if (hasMikawa) { 
+                skillName = SKILL_NAMES.MIKAWA_NO_SHIKA; 
+            } else if (hasMousho) { 
+                skillName = SKILL_NAMES.MOUSHO; 
+            }
 
             // 攻撃力2倍、防御力1/4（0.25倍）の効果をまとめて返します
             return { isCritical: true, atkMult: 2.0, defMult: 0.25, finalDmgMult: finalDmgMult, skillName: skillName };
@@ -583,5 +603,45 @@ class SkillManager {
 
         // 💡 今後「治水」や「防災」などの新しいスキルを追加したい時は、ここに書き足すだけでOKです！
         return modifier;
+    }
+    
+    // ＜親善ボーナス＞ 表裏比興による親善の最終成功率アップ
+    static calcGoodwillProbBonus(busho, game) {
+        let probBonus = 0;
+        if (this.hasSkill(busho, SKILL_NAMES.HYORIHIKYO, game)) {
+            probBonus += 15; // 15%プラス
+        }
+        return probBonus;
+    }
+
+    // ＜断交ペナルティ軽減＞ 表裏比興による断交時のマイナス効果の軽減
+    static getBreakAlliancePenaltyModifiers(doerBusho, doerClanId, game) {
+        let hasSkill = false;
+        // 外交の使者（実行者）が持っているかチェック
+        if (doerBusho && this.hasSkill(doerBusho, SKILL_NAMES.HYORIHIKYO, game)) {
+            hasSkill = true;
+        } else {
+            // 大名自身が持っているかチェック
+            const daimyo = game.bushos.find(b => b.clan === doerClanId && b.isDaimyo);
+            if (daimyo && this.hasSkill(daimyo, SKILL_NAMES.HYORIHIKYO, game)) {
+                hasSkill = true;
+            }
+        }
+
+        if (hasSkill) {
+            // 相手との友好度低下を0.5倍(50%軽減)、他勢力からの悪化を0倍(無効)、忠誠低下を無効にする指示を返します
+            return { targetDropMult: 0.5, globalDropMult: 0.0, preventLoyaltyDrop: true };
+        }
+        // スキルがなければ通常のまま（1倍、無効化なし）とします
+        return { targetDropMult: 1.0, globalDropMult: 1.0, preventLoyaltyDrop: false };
+    }
+
+    // ＜援軍要請の拒否＞ 表裏比興により主家からの援軍を断れるかどうかの判定
+    static canDeclineBossReinforcement(clanId, game) {
+        const daimyo = game.bushos.find(b => b.clan === clanId && b.isDaimyo);
+        if (daimyo && this.hasSkill(daimyo, SKILL_NAMES.HYORIHIKYO, game)) {
+            return true;
+        }
+        return false;
     }
 }

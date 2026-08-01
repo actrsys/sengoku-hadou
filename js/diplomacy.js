@@ -328,6 +328,11 @@ class DiplomacyManager {
             // ★追加：持参した金による確率アップ（15金につき0.1%アップ。1500金で最大10%アップします）
             acceptProb += (gold / 15) * 0.1;
             
+            // ★追加: 表裏比興による親善ボーナス（スキルマネージャーに問い合わせます）
+            if (typeof SkillManager !== 'undefined') {
+                acceptProb += SkillManager.calcGoodwillProbBonus(doer, this.game);
+            }
+            
             // ★友好・同盟・支配・従属のいずれかの関係なら最終的な確率に+50%、和睦は+30%します
             if (['友好', '同盟', '支配', '従属'].includes(relation.status)) {
                 acceptProb += 50;
@@ -465,7 +470,16 @@ class DiplomacyManager {
         // ★ 大名家で、相手を「支配」しているなら100%（諸勢力は支配がないのでチェック不要）
         if (!isKunishu) {
             const myToHelperRel = this.getRelation(myClanId, helperForceId);
-            if (myToHelperRel && myToHelperRel.status === '支配') return 100;
+            if (myToHelperRel && myToHelperRel.status === '支配') {
+                let canDecline = false;
+                if (typeof SkillManager !== 'undefined') {
+                    canDecline = SkillManager.canDeclineBossReinforcement(helperForceId, this.game);
+                }
+                // 相手が表裏比興を持っていない場合は、これまで通り100%強制参加
+                if (!canDecline) {
+                    return 100;
+                }
+            }
         }
 
         let sentiment = 50;
@@ -609,7 +623,7 @@ class DiplomacyManager {
     /**
      * 同盟や従属を破棄した時のペナルティを計算して適用します
      */
-    applyBreakAlliancePenalty(doerClanId, targetClanId) {
+    applyBreakAlliancePenalty(doerClanId, targetClanId, doerBusho = null) {
         const relation = this.getRelation(doerClanId, targetClanId);
         const oldStatus = relation.status;
         const oldSentiment = relation.sentiment;
@@ -630,6 +644,16 @@ class DiplomacyManager {
             isBreakDomination = true; 
         }
 
+        // ★追加: 表裏比興によるペナルティ軽減処理
+        let mods = { targetDropMult: 1.0, globalDropMult: 1.0, preventLoyaltyDrop: false };
+        if (typeof SkillManager !== 'undefined') {
+            mods = SkillManager.getBreakAlliancePenaltyModifiers(doerBusho, doerClanId, this.game);
+        }
+
+        // スキルの効果に合わせて数値を増減させます
+        targetDrop = Math.floor(targetDrop * mods.targetDropMult);
+        globalDrop = Math.floor(globalDrop * mods.globalDropMult);
+
         this.updateSentiment(doerClanId, targetClanId, targetDrop);
 
         const newRel = this.getRelation(doerClanId, targetClanId);
@@ -646,14 +670,15 @@ class DiplomacyManager {
             });
         }
 
-        if (isBreakDomination) {
+        // 忠誠低下を防ぐ効果がなければ、そのまま低下させます
+        if (isBreakDomination && !mods.preventLoyaltyDrop) {
             this.game.bushos.forEach(busho => {
                 if (busho.clan === doerClanId && busho.status === 'active' && !busho.isDaimyo) {
                     busho.loyalty = Math.max(0, busho.loyalty - 5); 
                 }
             });
         }
-
+        
         // ★人質・姫の「処遇待ちリスト」を作成します
         let atMercyPrincesses = []; 
         let capturedHostages = [];   
@@ -1080,7 +1105,7 @@ class DiplomacyManager {
             }
 
         } else if (type === 'break_alliance') {
-            const result = this.applyBreakAlliancePenalty(doer.clan, targetClanId);
+            const result = this.applyBreakAlliancePenalty(doer.clan, targetClanId, doer);
             this.calcDiplomacyExp(doer, type, true, true);
 
             msg = `${result.oldStatus}関係を破棄しました`;

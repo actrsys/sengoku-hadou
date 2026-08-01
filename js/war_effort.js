@@ -83,13 +83,25 @@ Object.assign(WarManager.prototype, {
         // 1. プレイヤーに援軍の要請が来た時のメッセージ
         showRequest: (game, myClanName, targetInfoStr, gold, isBoss, isAttack, onAccept, onDecline) => {
             const typeStr = isAttack ? "攻撃の" : "守備側の";
-            if (isBoss) {
+            
+            // ★追加: 大名が表裏比興を持っているか確認します
+            let canDeclineBoss = false;
+            if (typeof SkillManager !== 'undefined') {
+                canDeclineBoss = SkillManager.canDeclineBossReinforcement(game.playerClanId, game);
+            }
+
+            if (isBoss && !canDeclineBoss) {
                 const bossMsg = isAttack 
                     ? `主家である ${myClanName} が\n${targetInfoStr}侵攻します。\n当家は従属しているため直ちに出陣します！`
                     : `主家である ${myClanName} から${typeStr}援軍要請が届きました。\n当家は従属しているため直ちに出陣します！`;
                 game.ui.showDialog(bossMsg, false, onAccept);
             } else {
-                game.ui.showDialog(`${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。(持参金: ${gold})\n援軍を派遣しますか？`, true, onAccept, onDecline);
+                let dialogMsg = `${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。(持参金: ${gold})\n援軍を派遣しますか？`;
+                // スキルを持っている場合は専用のメッセージになります
+                if (isBoss && canDeclineBoss) {
+                    dialogMsg = `主家である ${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。\n「表裏比興」の才をもって、これを断ることも可能です。派遣しますか？`;
+                }
+                game.ui.showDialog(dialogMsg, true, onAccept, onDecline);
             }
         },
         
@@ -1269,7 +1281,8 @@ Object.assign(WarManager.prototype, {
                         let bushoObj = b.skill !== undefined ? b : (this.game && this.game.getBusho ? this.game.getBusho(b.id || b) : null);
                         if (bushoObj && bushoObj.skill) {
                             const skills = bushoObj.skill.split('|').map(sk => sk.trim());
-                            if (skills.includes("退き巧者")) {
+                            // ★修正：SkillManagerで管理している名前の箱を見に行きます
+                            if (typeof SkillManager !== 'undefined' && skills.includes(SkillManager.SKILLS.RETREAT)) {
                                 hasRetreatMaster = true;
                                 break;
                             }
@@ -2950,9 +2963,16 @@ Object.assign(WarManager.prototype, {
     },
 
     _promptPlayerDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete, isBoss) {
+        let hideCancel = isBoss;
+        // ★追加: スキルを持っていればキャンセルボタン（×ボタン）を隠さないようにします
+        if (isBoss && typeof SkillManager !== 'undefined') {
+            if (SkillManager.canDeclineBossReinforcement(this.game.playerClanId, this.game)) {
+                hideCancel = false;
+            }
+        }
         const promptBusho = () => {
             this.game.ui.openBushoSelector('def_reinf_deploy', helperCastle.id, {
-                hideCancel: isBoss,
+                hideCancel: hideCancel,
                 onConfirm: (selectedBushoIds) => promptQuantity(selectedBushoIds.map(id => this.game.getBusho(id))),
                 onCancel: () => this.game.ui.showDialog("援軍の派遣を取りやめました。", false, onComplete)
             });
