@@ -53,6 +53,10 @@ class EndingSystem {
             return;
         }
 
+        // ★追加：ロード画面よりも絶対に手前に来るように、限界突破の数値をセットします！
+        // （ロード画面が手前に出てきてしまう不具合を防ぐためです）
+        endingScreen.style.zIndex = '99999';
+
         // 1. 画面をゆっくり暗転させます（フェードイン）
         endingScreen.classList.remove('hidden');
         // 一瞬だけ待つことで、CSSの「2秒かけて暗くする魔法」を確実に発動させます
@@ -134,7 +138,11 @@ class EndingSystem {
         staffRollContainer.style.transition = 'none';
         staffRollContainer.style.transform = 'translateY(0)';
         
-        // 6. 裏側がタイトル画面になった状態で、ゆっくり暗転を解除します（フェードアウト）
+        // ★追加：裏側でタイトル画面の準備（ロード画面の表示・非表示など）が完全に終わって落ち着くまで、真っ暗なまま長めに待ちます（2.5秒）
+        // こうすることで、裏でごちゃごちゃ動いている様子を真っ暗なフタで完全に隠し切ることができます。
+        await new Promise(resolve => setTimeout(resolve, 2500));
+        
+        // 6. 裏側が完全にタイトル画面になった状態で、ゆっくり暗転を解除します（フェードアウト）
         endingScreen.classList.remove('show');
         
         // 完全に明るくなるまで待ってから、エンディングの箱を片付けます
