@@ -515,6 +515,11 @@ class LifeSystem {
                 deathProb = 0.95; // 条件に当てはまれば、95%の確率で死亡するようにします
             }
 
+            // ★追加：スキルマネージャーに「スキルによる死亡確率の倍率」を聞いて計算します
+            if (typeof SkillManager !== 'undefined') {
+                deathProb *= SkillManager.calcDeathProbModifier(b, this.game);
+            }
+
             // 指定された確率で死亡します
             if (Math.random() < deathProb) {
                 const wasUnborn = (b.status === 'unborn');

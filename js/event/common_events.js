@@ -722,7 +722,13 @@ window.GameEvents.push({
                 c.soldiers = Math.max(0, Math.floor(c.soldiers * (1.0 - solDropRate)));
                 
                 // 人口が 1% ～ 10% ランダムで減ります！
-                const popDropRate = 0.01 + (Math.random() * 0.09);
+                let popDropRate = 0.01 + (Math.random() * 0.09);
+                
+                // ★追加：スキルマネージャーに「スキルによる災害被害の倍率」を聞いて計算します
+                if (typeof SkillManager !== 'undefined') {
+                    popDropRate *= SkillManager.calcDisasterDamageModifier(c, game);
+                }
+                
                 c.population = Math.max(0, Math.floor(c.population * (1.0 - popDropRate)));
                 
                 // ★追加：兵士と人口の減少割合（％）を足し算して、民忠のダウン量を決めます！
@@ -782,7 +788,13 @@ window.GameEvents.push({
                 c.soldiers = Math.max(0, Math.floor(c.soldiers * (1.0 - solDropRate)));
                 
                 // 人口が 10% ～ 20% ランダムで減ります
-                const popDropRate = 0.10 + (Math.random() * 0.10);
+                let popDropRate = 0.10 + (Math.random() * 0.10);
+                
+                // ★追加：スキルマネージャーに「スキルによる災害被害の倍率」を聞いて計算します
+                if (typeof SkillManager !== 'undefined') {
+                    popDropRate *= SkillManager.calcDisasterDamageModifier(c, game);
+                }
+                
                 c.population = Math.max(0, Math.floor(c.population * (1.0 - popDropRate)));
                 
                 // 兵士と人口の減少割合（％）を足し算して、民忠をガクッと下げます
@@ -918,7 +930,13 @@ window.GameEvents.push({
                 c.soldiers = Math.max(0, Math.floor(c.soldiers * (1.0 - solDropRate)));
                 
                 // 人口が規模に応じて減ります（規模1で約0.1〜0.5%、規模10で約1〜5%）
-                const popDropRate = ((0.001 + Math.random() * 0.004) * m) * (1.0 - defenseCutRate);
+                let popDropRate = ((0.001 + Math.random() * 0.004) * m) * (1.0 - defenseCutRate);
+                
+                // ★追加：スキルマネージャーに「スキルによる災害被害の倍率」を聞いて計算します
+                if (typeof SkillManager !== 'undefined') {
+                    popDropRate *= SkillManager.calcDisasterDamageModifier(c, game);
+                }
+                
                 c.population = Math.max(0, Math.floor(c.population * (1.0 - popDropRate)));
                 
                 // 石高が規模に応じて減ります（規模1で約1〜3%、規模10で約10〜30%）
@@ -1095,7 +1113,13 @@ window.GameEvents.push({
                 
                 // 人口が 0.01% ～ 0.05% ランダムで減ります
                 // （0.01% は小数にすると 0.0001 になります）
-                const popDropRate = 0.0001 + (Math.random() * 0.0004);
+                let popDropRate = 0.0001 + (Math.random() * 0.0004);
+                
+                // ★追加：スキルマネージャーに「スキルによる災害被害の倍率」を聞いて計算します
+                if (typeof SkillManager !== 'undefined') {
+                    popDropRate *= SkillManager.calcDisasterDamageModifier(c, game);
+                }
+                
                 c.population = Math.max(0, Math.floor(c.population * (1.0 - popDropRate)));
                 
                 // 民忠が 1 ～ 5 ランダムで下がります

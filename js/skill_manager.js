@@ -1,6 +1,7 @@
 /**
  * skill_manager.js
  * 適性と技能の効果を計算・管理する司令塔のクラスです。
+ * 適性や技能を持っているやスキルの効果量の計算などは必ずここで一元管理して行います。
  */
 
 // ==========================================
@@ -12,9 +13,10 @@ const SKILL_NAMES = {
     RETREAT: "退き巧者",
     MOUSHO: "猛将",
     ONI: "鬼",
+    WEATHER: "悪天巧者",
     SHUYARI: "朱槍",
     AKAZONAE: "赤備え",
-    WEATHER: "悪天巧者",
+    IJUTSU: "医術",
     KABUKIMONO: "傾奇者",
     TENKA_FUBU: "天下布武",
     ECHIGO_NO_RYU: "越後の龍",
@@ -531,12 +533,55 @@ class SkillManager {
         return probBonus;
     }
 
-    // ＜引抜ボーナス＞ 武将引抜実行時、最終成功率に加算されるボーナス
+   // ＜引抜ボーナス＞ 武将引抜実行時、最終成功率に加算されるボーナス
     static calcHeadhuntProbBonus(busho, game) {
         let probBonus = 0;
         if (this.hasSkill(busho, SKILL_NAMES.HITOTARASHI, game)) {
             probBonus += 0.02; // 2%プラス
         }
         return probBonus;
+    }
+
+    // ==========================================
+    // ★追加：寿命や災害などの特殊なスキルボーナスを一元管理する窓口
+    // ==========================================
+
+    // ＜寿命・討死＞ 武将の死亡確率への倍率を計算します
+    static calcDeathProbModifier(busho, game) {
+        let modifier = 1.0; // 基本は1.0倍（そのまま）です
+        
+        // 所属がない、またはお城にいない場合はそのまま返します
+        if (!busho || busho.clan === 0 || busho.castleId === 0) return modifier;
+
+        // 同じお城にいる味方の武将を集めます
+        const sameCastleBushos = game.getCastleBushos(busho.castleId).filter(other => other.status === 'active' && other.clan === busho.clan);
+
+        // 「医術」を持っている武将がいれば確率を半分（0.5倍）にします
+        const hasIjutsu = sameCastleBushos.some(other => this.hasSkill(other, SKILL_NAMES.IJUTSU, game));
+        if (hasIjutsu) {
+            modifier *= 0.5;
+        }
+
+        // 💡 今後「長寿」などの新しいスキルを追加したい時は、ここに書き足すだけでOKです！
+        return modifier;
+    }
+
+    // ＜災害被害＞ 拠点に対する災害（飢饉、疫病、地震、大雪、台風）の被害軽減倍率を計算します
+    static calcDisasterDamageModifier(castle, game) {
+        let modifier = 1.0; // 基本は1.0倍（そのまま）です
+        
+        if (!castle || castle.ownerClan === 0) return modifier;
+
+        // そのお城にいる味方の武将を集めます
+        const bushos = game.getCastleBushos(castle.id).filter(b => b.status === 'active' && b.clan === castle.ownerClan);
+
+        // 「医術」を持っている武将がいれば被害を半分（0.5倍）にします
+        const hasIjutsu = bushos.some(b => this.hasSkill(b, SKILL_NAMES.IJUTSU, game));
+        if (hasIjutsu) {
+            modifier *= 0.5;
+        }
+
+        // 💡 今後「治水」や「防災」などの新しいスキルを追加したい時は、ここに書き足すだけでOKです！
+        return modifier;
     }
 }

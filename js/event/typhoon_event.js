@@ -376,7 +376,13 @@ window.GameEvents.push({
                     const solDropRate = ((finalScale - 5) * 0.04) * (1.0 - defenseCutRate);
                     castle.soldiers = Math.floor(castle.soldiers * (1.0 - solDropRate));
                     
-                    const popDropRate = ((finalScale - 5) * 0.02) * (1.0 - defenseCutRate);
+                    let popDropRate = ((finalScale - 5) * 0.02) * (1.0 - defenseCutRate);
+                    
+                    // ★追加：スキルマネージャーに「スキルによる災害被害の倍率」を聞いて計算します
+                    if (typeof SkillManager !== 'undefined') {
+                        popDropRate *= SkillManager.calcDisasterDamageModifier(castle, game);
+                    }
+                    
                     castle.population = Math.floor(castle.population * (1.0 - popDropRate));
                 }
 
