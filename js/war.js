@@ -1434,7 +1434,7 @@ class WarManager {
         let activeAtkMod = 1.0;
         if (typeof SkillManager !== 'undefined' && activeArmyObjForEquip) {
             activeAtkMod = SkillManager.calcSiegeAptitudeDamageModifier(
-                activeBushos[0],
+                activeBushos,
                 activeSoldiers,
                 activeArmyObjForEquip.horses || 0,
                 activeArmyObjForEquip.guns || 0,
@@ -1456,7 +1456,7 @@ class WarManager {
             let targetDefMod = 1.0;
             if (typeof SkillManager !== 'undefined' && activeArmyObjForEquip) {
                 targetDefMod = SkillManager.calcSiegeAptitudeDefenseModifier(
-                    t.bushos[0],
+                    t.bushos,
                     activeSoldiers,
                     activeArmyObjForEquip.horses || 0,
                     activeArmyObjForEquip.guns || 0,

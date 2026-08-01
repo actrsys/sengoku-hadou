@@ -91,38 +91,48 @@ class SkillManager {
     // ==========================================
     // ★追加：攻城戦での適性による与ダメージアップの魔法
     // ==========================================
-    static calcSiegeAptitudeDamageModifier(busho, soldiers, horses, guns, actionType) {
-        if (!busho) return 1.0;
+    static calcSiegeAptitudeDamageModifier(bushos, soldiers, horses, guns, actionType) {
+        if (!bushos || bushos.length === 0) return 1.0;
         
         let modifier = 1.0;
         let safeSoldiers = Math.max(1, soldiers);
         let horseRatio = horses / safeSoldiers;
         let gunRatio = guns / safeSoldiers;
         
+        let maxAshigaruLvl = 0;
+        let maxKibaLvl = 0;
+        let maxYumiLvl = 0;
+        let maxTeppoLvl = 0;
+
+        bushos.forEach(b => {
+            if (b) {
+                maxAshigaruLvl = Math.max(maxAshigaruLvl, this.getAptitudeLevel(b.aptAshigaru));
+                maxKibaLvl = Math.max(maxKibaLvl, this.getAptitudeLevel(b.aptKiba));
+                maxYumiLvl = Math.max(maxYumiLvl, this.getAptitudeLevel(b.aptYumi));
+                maxTeppoLvl = Math.max(maxTeppoLvl, this.getAptitudeLevel(b.aptTeppo));
+            }
+        });
+
         if (actionType === 'charge' || actionType === 'def_charge' || actionType === 'siege') {
             // 足軽適性：条件なし（突撃・破壊時）馬術と重複
-            let ashigaruLvl = this.getAptitudeLevel(busho.aptAshigaru);
-            if (ashigaruLvl > 0) {
-                modifier += (ashigaruLvl * 0.01) + 0.03;
+            if (maxAshigaruLvl > 0) {
+                modifier += (maxAshigaruLvl * 0.01) + 0.03;
             }
             // 馬術適性：軍馬の割合が5割以上
             if (horseRatio >= 0.5) {
-                let kibaLvl = this.getAptitudeLevel(busho.aptKiba);
-                if (kibaLvl > 0) {
-                    modifier += (kibaLvl * 0.03) + 0.05;
+                if (maxKibaLvl > 0) {
+                    modifier += (maxKibaLvl * 0.03) + 0.05;
                 }
             }
         } else if (actionType === 'bow' || actionType === 'def_bow') {
             // 弓術適性：条件なし（斉射時）砲術と重複
-            let yumiLvl = this.getAptitudeLevel(busho.aptYumi);
-            if (yumiLvl > 0) {
-                modifier += (yumiLvl * 0.01) + 0.03;
+            if (maxYumiLvl > 0) {
+                modifier += (maxYumiLvl * 0.01) + 0.03;
             }
             // 砲術適性：鉄砲の割合が5割以上
             if (gunRatio >= 0.5) {
-                let teppoLvl = this.getAptitudeLevel(busho.aptTeppo);
-                if (teppoLvl > 0) {
-                    modifier += (teppoLvl * 0.02) + 0.05;
+                if (maxTeppoLvl > 0) {
+                    modifier += (maxTeppoLvl * 0.02) + 0.05;
                 }
             }
         }
@@ -133,38 +143,48 @@ class SkillManager {
     // ==========================================
     // ★追加：攻城戦での適性による被ダメージ軽減の魔法
     // ==========================================
-    static calcSiegeAptitudeDefenseModifier(busho, attackerSoldiers, attackerHorses, attackerGuns, attackActionType) {
-        if (!busho) return 1.0;
+    static calcSiegeAptitudeDefenseModifier(bushos, attackerSoldiers, attackerHorses, attackerGuns, attackActionType) {
+        if (!bushos || bushos.length === 0) return 1.0;
         
         let reductionPct = 0;
         let safeSoldiers = Math.max(1, attackerSoldiers);
         let horseRatio = attackerHorses / safeSoldiers;
         let gunRatio = attackerGuns / safeSoldiers;
+
+        let maxAshigaruLvl = 0;
+        let maxKibaLvl = 0;
+        let maxYumiLvl = 0;
+        let maxTeppoLvl = 0;
+
+        bushos.forEach(b => {
+            if (b) {
+                maxAshigaruLvl = Math.max(maxAshigaruLvl, this.getAptitudeLevel(b.aptAshigaru));
+                maxKibaLvl = Math.max(maxKibaLvl, this.getAptitudeLevel(b.aptKiba));
+                maxYumiLvl = Math.max(maxYumiLvl, this.getAptitudeLevel(b.aptYumi));
+                maxTeppoLvl = Math.max(maxTeppoLvl, this.getAptitudeLevel(b.aptTeppo));
+            }
+        });
         
         if (attackActionType === 'charge' || attackActionType === 'def_charge' || attackActionType === 'siege') {
             // 足軽適性：条件なし（突撃・破壊を受ける時）馬術と重複
-            let ashigaruLvl = this.getAptitudeLevel(busho.aptAshigaru);
-            if (ashigaruLvl > 0) {
-                reductionPct += ashigaruLvl * 0.5;
+            if (maxAshigaruLvl > 0) {
+                reductionPct += maxAshigaruLvl * 0.5;
             }
             // 馬術適性：攻撃側の軍馬の割合が5割以上
             if (horseRatio >= 0.5) {
-                let kibaLvl = this.getAptitudeLevel(busho.aptKiba);
-                if (kibaLvl > 0) {
-                    reductionPct += kibaLvl * 1;
+                if (maxKibaLvl > 0) {
+                    reductionPct += maxKibaLvl * 1;
                 }
             }
         } else if (attackActionType === 'bow' || attackActionType === 'def_bow') {
             // 弓術適性：条件なし（斉射を受ける時）砲術と重複
-            let yumiLvl = this.getAptitudeLevel(busho.aptYumi);
-            if (yumiLvl > 0) {
-                reductionPct += yumiLvl * 0.5;
+            if (maxYumiLvl > 0) {
+                reductionPct += maxYumiLvl * 0.5;
             }
             // 砲術適性：攻撃側の鉄砲の割合が5割以上
             if (gunRatio >= 0.5) {
-                let teppoLvl = this.getAptitudeLevel(busho.aptTeppo);
-                if (teppoLvl > 0) {
-                    reductionPct += teppoLvl * 1;
+                if (maxTeppoLvl > 0) {
+                    reductionPct += maxTeppoLvl * 1;
                 }
             }
         }
