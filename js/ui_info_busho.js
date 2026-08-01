@@ -6,6 +6,7 @@
 Object.assign(UIInfoManager.prototype, {
 
     showBushoDetailModal(busho) {
+        this.bushoDetailCurrentTab = 'status';
         this.pushModal('busho_detail', [busho]);
     },
     
