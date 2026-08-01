@@ -474,7 +474,7 @@ Object.assign(UIInfoManager.prototype, {
                                 // 説明文をセットして、瞬時に表示を切り替えます
                                 descText.innerHTML = `
                                     <div style="color:#ffd54f; font-weight:bold; margin-bottom:5px; border-bottom:1px solid rgba(212,175,55,0.5); padding-bottom:3px;">【${skillName}】</div>
-                                    <div style="color:#eee; font-size:0.85rem;">${desc}</div>
+                                    <div style="color:#eee; font-size:0.85rem; white-space: pre-line;">${desc}</div>
                                 `;
                                 aptArea.style.display = 'none';
                                 descArea.style.display = 'flex';
