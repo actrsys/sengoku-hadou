@@ -3150,3 +3150,96 @@ body.background-paused #snow-overlay {
 body.background-paused #map-container {
     pointer-events: none; /* マップのクリック反応なども無効化して無駄な計算を省きます */
 }
+
+/* =========================================================
+   エンディング・ゲームオーバー画面
+   ========================================================= */
+#ending-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    z-index: 9000; /* 各種ウィンドウよりも確実に一番手前に出します */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    opacity: 0;
+    transition: opacity 2s ease-in-out; /* 2秒かけてゆっくり暗転させる魔法です */
+    pointer-events: none;
+    overflow: hidden;
+}
+
+#ending-screen.show {
+    opacity: 1;
+    pointer-events: auto; /* 暗転中は他の操作ができないようにします */
+}
+
+#ending-content {
+    width: 80%;
+    max-width: 800px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+
+#ending-title {
+    font-size: 3rem;
+    color: #d4af37;
+    margin-top: 20%;
+    text-shadow: 2px 2px 4px #000;
+    opacity: 0;
+    transition: opacity 1.5s ease-in-out;
+}
+
+#ending-title.show {
+    opacity: 1;
+}
+
+#ending-message {
+    font-size: 1.5rem;
+    line-height: 2;
+    text-align: center;
+    margin-top: 20px;
+    white-space: pre-wrap;
+    opacity: 0;
+    transition: opacity 1.5s ease-in-out;
+}
+
+#ending-message.show {
+    opacity: 1;
+}
+
+#staff-roll-container {
+    position: absolute;
+    top: 100%; /* 画面の一番下に隠しておきます */
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+#staff-roll-content {
+    text-align: center;
+    width: 100%;
+}
+
+.staff-role {
+    font-size: 1.2rem;
+    color: #ffd54f;
+    margin-top: 60px;
+    margin-bottom: 8px;
+    font-weight: normal;
+}
+
+.staff-name {
+    font-size: 1.8rem;
+    font-weight: bold;
+    margin-bottom: 20px;
+}
