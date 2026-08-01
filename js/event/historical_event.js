@@ -720,7 +720,7 @@ window.GameEvents.push({
                 });
             }
 
-            // 今川勢力と武田信玄勢力の友好度が21以上なら20にする処理
+            // 徳川家康今川勢力と武田信玄勢力の友好度が21以上なら20にする処理
             const shingen = game.getBusho(1002002); // 武田信玄のデータを取得します
             if (shingen && shingen.clan > 0 && game.diplomacyManager) {
                 const shingenClanId = shingen.clan;
@@ -848,24 +848,24 @@ window.GameEvents.push({
                     // 家康の居城かどうかで処理を分けます
                     if (c.id === motoyasu.castleId) {
                         // 【家康の居城の場合】
+                        // 兵士数が5000未満なら5000に、5000以上なら+1000します（上限は99999）
+                        if ((c.soldiers || 0) < 5000) {
+                            c.soldiers = 5000;
+                        } else {
+                            c.soldiers = Math.min(99999, (c.soldiers || 0) + 1000);
+                        }
+                        // 人口を8000増やします（上限は99万9999）
+                        c.population = Math.min(999999, (c.population || 0) + 8000);
+                    } else {
+                        // 【家康の居城以外の拠点の場合】
                         // 兵士数が4000未満なら4000に、4000以上なら+500します（上限は99999）
                         if ((c.soldiers || 0) < 4000) {
                             c.soldiers = 4000;
                         } else {
                             c.soldiers = Math.min(99999, (c.soldiers || 0) + 500);
                         }
-                        // 人口を7000増やします（上限は99万9999）
-                        c.population = Math.min(999999, (c.population || 0) + 7000);
-                    } else {
-                        // 【家康の居城以外の拠点の場合】
-                        // 兵士数が3000未満なら3000に、3000以上なら+500します（上限は99999）
-                        if ((c.soldiers || 0) < 3000) {
-                            c.soldiers = 3000;
-                        } else {
-                            c.soldiers = Math.min(99999, (c.soldiers || 0) + 500);
-                        }
-                        // 人口を3000増やします（上限は99万9999）
-                        c.population = Math.min(999999, (c.population || 0) + 3000);
+                        // 人口を5000増やします（上限は99万9999）
+                        c.population = Math.min(999999, (c.population || 0) + 5000);
                     }
                 });
                 
