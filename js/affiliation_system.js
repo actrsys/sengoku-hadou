@@ -334,7 +334,7 @@ class AffiliationSystem {
         this.leaveCastle(busho);
         this.enterCastle(busho, newKunishu.castleId);
         
-        this.game.ui.log(`【${survivalInfo.skillName}】${busho.name}は滅亡を逃れ、${this.game.getCastle(newKunishu.castleId).name}にて「${newKunishu.name}」を名乗り抗戦を続けます！`);
+        this.game.ui.log(`【${survivalInfo.skillName}】${busho.name}は滅亡を逃れ、${this.game.getCastle(newKunishu.castleId).name}周辺に潜伏し抗戦を続けるようです。`);
 
         // すでに浪人化された旧家臣を回収する
         this.game.bushos.forEach(b => {
