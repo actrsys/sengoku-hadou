@@ -1126,7 +1126,7 @@ class GameSystem {
         }
         
         return {
-            actualRate: displayRate / 100, // ★÷100の計算をここで完全に一元化！
+            actualRate: displayRate / 10, // ★÷10の計算をここで完全に一元化
             displayRateStr: displayRate.toFixed(1) // 画面表示用の文字
         };
     }
