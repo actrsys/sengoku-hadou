@@ -1604,10 +1604,10 @@ class LifeSystem {
                 // 滅亡状態の印をつけます
                 clan.isDestroyed = true;
                 return new Promise(resolve => {
-                    setTimeout(() => {
-                        this.game.ui.showDialog("全拠点を失いました。我が大名家は滅亡しました……", false, () => {
-                            this.game.ui.returnToTitle(); // タイトル画面に戻ります
-                        });
+                    setTimeout(async () => {
+                        // ★修正：ゲームオーバーの処理を EndingSystem に任せます！
+                        await this.game.endingSystem.processGameOver("全拠点を失いました。我が大名家は滅亡しました……");
+                        resolve();
                     }, 1000);
                 });
             } else {

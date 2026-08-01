@@ -1353,6 +1353,8 @@ class GameManager {
         this.castleManager = new CastleManager(this);
         // ★ 面談システムを呼び出します！
         this.interviewSystem = new InterviewSystem(this);
+        // ★ エンディング（クリア・ゲームオーバー）を管理するシステムを呼び出します！
+        this.endingSystem = new EndingSystem(this);
         
         this.hasAutoSavedThisMonth = false; // ★追加：その月にオートセーブしたかどうかを覚えておく箱です
         this.phase = 'title';
@@ -2628,19 +2630,10 @@ class GameManager {
         // ★ここから追加：月末のタイミングで大名家の表示名を更新して同名被りを防ぎます！
         this.updateClanDisplayNames();
         
-        // ★修正：城の数ではなく、滅亡フラグを見て生き残っている勢力を数えます
-        const aliveClans = this.clans.filter(c => c.id !== 0 && !c.isDestroyed);
-        const playerAlive = aliveClans.some(c => c.id === this.playerClanId);
-        
-        if (aliveClans.length === 1 && playerAlive) {
-            this.ui.showDialog("天下統一！", false, () => {
-                this.ui.returnToTitle(); 
-            });
-        } else if (!this.isWatchMode && !playerAlive) {
-            this.ui.showDialog("我が大名家は滅亡しました……", false, () => {
-                this.ui.returnToTitle(); 
-            });
-        } else {
+        // ★修正：クリアとゲームオーバーの判定を EndingSystem (エンディング係) に任せます！
+        const isEnding = await this.endingSystem.checkEnding();
+        if (!isEnding) {
+            // エンディングでなければ次の月へ進みます
             this.startMonth(); 
         }
     }
