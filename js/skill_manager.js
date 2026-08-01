@@ -24,7 +24,8 @@ const SKILL_NAMES = {
     MIKAWA_NO_SHIKA: "三河の鹿",
     HITOTARASHI: "人たらし",
     SOGEKI: "狙撃",
-    HYORIHIKYO: "表裏比興"
+    HYORIHIKYO: "表裏比興",
+    PHOENIX: "常陸の不死鳥"
 };
 
 const APTITUDE_NAMES = {
@@ -48,7 +49,7 @@ const APTITUDE_DESCRIPTIONS = {
     // 砲術
     [APTITUDE_NAMES.TEPPO]: "鉄砲による遠距離攻撃時の与ダメージ上昇と被ダメージ軽減に影響する。レベルが高いほど効果が大きい。",
     // 武芸
-    [APTITUDE_NAMES.BUGEI]: "拠点の防諜成功率低下、訓練効果上昇、野戦死亡率軽減、火計防御に影響する。",
+    [APTITUDE_NAMES.BUGEI]: "拠点の防諜成功率低下、訓練効果上昇、戦死率軽減、火計防御に影響する。",
     // 忍術
     [APTITUDE_NAMES.NINJUTSU]: "破壊工作・扇動の成功率と効果上昇、山岳・森・川の移動コスト軽減、火計成功率上昇に影響する。",
     // 操船
@@ -88,7 +89,9 @@ const SKILL_DESCRIPTIONS = {
     // 狙撃
     [SKILL_NAMES.SOGEKI]: "鉄砲による遠距離攻撃時に一定確率でクリティカルが発生するようになる。",
     // 表裏比興
-    [SKILL_NAMES.HYORIHIKYO]: "親善成功率を上げ、断交時のペナルティを軽減する。主家からの援軍要請を拒否できる。"
+    [SKILL_NAMES.HYORIHIKYO]: "親善成功率を上げ、断交時のペナルティを軽減する。主家からの援軍要請を拒否できる。",
+    // 常陸の不死鳥
+    [SKILL_NAMES.PHOENIX]: "戦死せず、落城して滅亡する際に諸勢力として生き残り、空白地で再び大名として旗揚げする。"
 };
 
 class SkillManager {
@@ -743,5 +746,60 @@ class SkillManager {
             return true;
         }
         return false;
+    }
+
+    // ==========================================
+    // ★追加：各システムから呼ばれる、状態変化系スキルの判定窓口
+    // ==========================================
+
+    // ＜野戦死亡率の最終倍率（武芸やスキルを含む）＞
+    static calcFieldDeathProbModifier(busho, game) {
+        let modifier = 1.0;
+        // 武芸適性による軽減
+        modifier *= this.calcBugeiDeathProbReduction(busho);
+
+        // 常陸の不死鳥による回避（確率を0倍にする）
+        if (this.hasSkill(busho, SKILL_NAMES.PHOENIX, game)) {
+            modifier = 0;
+        }
+        
+        return modifier;
+    }
+
+    // ＜滅亡時の生存（諸勢力化）判定と、結成時の設定値渡し＞
+    static getExtinctionSurvivalInfo(busho, game) {
+        if (this.hasSkill(busho, SKILL_NAMES.PHOENIX, game)) {
+            return {
+                isSurvive: true,
+                maxSoldiers: 3000,
+                soldiers: 3000,
+                training: 70,
+                defaultTraining: 70,
+                morale: 70,
+                defaultMorale: 70,
+                maxHorses: 1000,
+                horses: 0,
+                maxGuns: 0,
+                guns: 0,
+                defense: 500,
+                maxDefense: 500,
+                ideology: '地縁',
+                skillName: SKILL_NAMES.PHOENIX
+            };
+        }
+        // 今後別のスキルが追加されたら、ここに `else if` で足していけます
+        return null;
+    }
+
+    // ＜諸勢力の旗揚げ判定＞
+    static canKunishuRise(leader, castle, game) {
+        if (!leader || !castle || castle.ownerClan !== 0) return { canRise: false };
+        if (this.hasSkill(leader, SKILL_NAMES.PHOENIX, game)) {
+            return {
+                canRise: true,
+                skillName: SKILL_NAMES.PHOENIX
+            };
+        }
+        return { canRise: false };
     }
 }

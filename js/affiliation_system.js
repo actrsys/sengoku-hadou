@@ -111,6 +111,32 @@ class AffiliationSystem {
 
         const oldClanId = busho.clan;
 
+        // ★後で「元々の家臣」と判定できるように、所属をメモしておきます
+        busho._lastClanId = oldClanId;
+
+        // ★大名家が滅亡したかどうかのチェック（元いた大名家の城が0個なら滅亡と判断します）
+        const isClanDestroyed = (oldClanId !== 0) && (this.game.castles.filter(c => c.ownerClan === oldClanId).length === 0);
+        
+        // ★変更：スキルマネージャーに滅亡時の生存（諸勢力化）スキルがないか聞きに行きます
+        if (isClanDestroyed && typeof SkillManager !== 'undefined') {
+            const survivalInfo = SkillManager.getExtinctionSurvivalInfo(busho, this.game);
+            
+            // 自分が生存スキルを持っている場合、スキルマネージャーからの情報をもとに諸勢力を結成する
+            if (survivalInfo && survivalInfo.isSurvive) {
+                this._createSurvivalKunishu(busho, oldClanId, survivalInfo);
+                return; // 浪人にはならずに終了
+            }
+            
+            // 自分が持っていなくても、すでに生存スキルによる諸勢力が結成されていればそこに合流する
+            if (this.game && this.game.kunishuSystem) {
+                const survivalKunishu = this.game.kunishuSystem.kunishus.find(k => k._survivalClanId === oldClanId && !k.isDestroyed);
+                if (survivalKunishu) {
+                    this._joinSurvivalKunishu(busho, survivalKunishu);
+                    return; // 浪人にはならずに終了
+                }
+            }
+        }
+
         // 1. 大名家を抜けるので、功績を半分にします！
         if (oldClanId !== 0) {
             busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
@@ -235,6 +261,102 @@ class AffiliationSystem {
             this.game.ui.renderMap();
             this.game.ui.updatePanelHeader();
         }
+    }
+
+    // ★追加：スキルマネージャーの情報をもとに諸勢力を結成
+    _createSurvivalKunishu(busho, oldClanId, survivalInfo) {
+        // 大名家を抜ける処理
+        busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
+        this.resetFactionData(busho);
+        
+        busho.clan = 0;
+        busho.status = 'active';
+        busho.isCastellan = false;
+        busho.isDaimyo = false;
+        busho.isGunshi = false;
+        busho.isCommander = false;
+        
+        let maxId = 0;
+        this.game.kunishuSystem.kunishus.forEach(k => { if(k.id > maxId) maxId = k.id; });
+        const newKunishuId = maxId + 1;
+        
+        let familyName = busho.familyName || busho.name.split('|')[0] || busho.name;
+        let familyYomi = busho.familyYomi || busho.yomi.split('|')[0] || busho.yomi;
+        
+        // スキルマネージャーから渡された数値をそのままセットします
+        const newKunishu = new Kunishu({
+            id: newKunishuId,
+            name: familyName + "家",
+            yomi: familyYomi + "け",
+            castleId: busho.castleId,
+            leaderId: busho.id,
+            maxSoldiers: survivalInfo.maxSoldiers,
+            soldiers: survivalInfo.soldiers,
+            training: survivalInfo.training,
+            defaultTraining: survivalInfo.defaultTraining,
+            morale: survivalInfo.morale,
+            defaultMorale: survivalInfo.defaultMorale,
+            horses: survivalInfo.horses,
+            maxHorses: survivalInfo.maxHorses,
+            guns: survivalInfo.guns,
+            maxGuns: survivalInfo.maxGuns,
+            defense: survivalInfo.defense,
+            maxDefense: survivalInfo.maxDefense,
+            ideology: survivalInfo.ideology
+        });
+        newKunishu._survivalClanId = oldClanId; // 残党である目印
+        
+        this.game.kunishuSystem.kunishus.push(newKunishu);
+        busho.belongKunishuId = newKunishuId;
+        
+        // 姫の処理
+        if (busho.wifeIds && busho.wifeIds.length > 0 && this.game && this.game.princesses) {
+            busho.wifeIds.forEach(wId => {
+                const wife = this.game.princesses.find(p => p.id === wId);
+                if (wife) wife.currentClanId = 0;
+            });
+        }
+        
+        // 最後にいた拠点に入る
+        this.leaveCastle(busho);
+        this.enterCastle(busho, newKunishu.castleId);
+        
+        this.game.ui.log(`【${survivalInfo.skillName}】${busho.name}は滅亡を逃れ、${this.game.getCastle(newKunishu.castleId).name}にて「${newKunishu.name}」を名乗り抗戦を続けます！`);
+
+        // すでに浪人化された旧家臣を回収する
+        this.game.bushos.forEach(b => {
+            if (b.status === 'ronin' && b._lastClanId === oldClanId && b.id !== busho.id) {
+                this._joinSurvivalKunishu(b, newKunishu);
+            }
+        });
+
+        if (this.game && this.game.factionSystem) this.game.factionSystem.updateFactions();
+        if (this.game && this.game.ui) {
+            this.game.ui.renderMap();
+            this.game.ui.updatePanelHeader();
+        }
+    }
+
+    // ★追加：旧家臣が生存スキルの諸勢力に合流する処理
+    _joinSurvivalKunishu(busho, kunishu) {
+        this.resetFactionData(busho);
+        busho.clan = 0;
+        busho.status = 'active';
+        busho.isCastellan = false;
+        busho.isDaimyo = false;
+        busho.isGunshi = false;
+        busho.isCommander = false;
+        busho.belongKunishuId = kunishu.id;
+        
+        if (busho.wifeIds && busho.wifeIds.length > 0 && this.game && this.game.princesses) {
+            busho.wifeIds.forEach(wId => {
+                const wife = this.game.princesses.find(p => p.id === wId);
+                if (wife) wife.currentClanId = 0;
+            });
+        }
+
+        this.leaveCastle(busho);
+        this.enterCastle(busho, kunishu.castleId);
     }
 
     /**

@@ -3006,9 +3006,9 @@ class FieldWarManager {
                 // 3. 最終的な確率の計算（基本確率 / 武力軽減率 / 兵数軽減率）
                 let finalProb = (prob * multiplier) / strengthReduction / troopReduction;
 
-                // ★追加：武芸適性による死亡フラグ付与率の軽減（例：Lv1なら10%減って0.9倍になる）
+                // ★変更：スキルマネージャーに野戦死亡率の最終倍率（武芸や不死鳥スキルなど）を聞きにいきます
                 if (typeof SkillManager !== 'undefined') {
-                    finalProb *= SkillManager.calcBugeiDeathProbReduction(targetBusho);
+                    finalProb *= SkillManager.calcFieldDeathProbModifier(targetBusho, this.game);
                 }
 
                 // 確率のサイコロを振って、当たったらフラグを立てます

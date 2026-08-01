@@ -166,6 +166,18 @@ class KunishuSystem {
 
             // 組織の壊滅チェック（★変更：awaitを付けてダイアログを待ちます）
             await this.checkDestroyed(kunishu);
+
+            // ★変更：スキルマネージャーに旗揚げ（大名復帰）できるスキルを持っていないか聞きに行きます
+            if (!kunishu.isDestroyed && typeof SkillManager !== 'undefined') {
+                const leader = this.game.getBusho(kunishu.leaderId);
+                const myCastle = this.game.getCastle(kunishu.castleId);
+                const riseInfo = SkillManager.canKunishuRise(leader, myCastle, this.game);
+                
+                if (riseInfo && riseInfo.canRise) {
+                    await this.executeIndependentRise(kunishu, leader, myCastle, riseInfo.skillName);
+                    continue; // 旗揚げしたので、これ以降の諸勢力アクションはスキップ
+                }
+            }
         }
 
         // 壊滅していないものを再度取得
@@ -664,6 +676,74 @@ class KunishuSystem {
                 await this.game.ui.showDialogAsync(mainMsg, false, 0);
             }
         }
+    }
+
+    // ★追加：スキルによる大名勢力としての旗揚げ（一元化処理）
+    async executeIndependentRise(kunishu, leader, castle, skillName) {
+        let newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
+        const indepSys = this.game.independenceSystem;
+        const newColor = indepSys ? indepSys.generateDistinctColor(castle) : "#ff0000";
+
+        if (indepSys) {
+            leader._nameChangeInfo = indepSys.applyDaimyoNameChange(leader);
+        }
+
+        const familyName = leader.familyName || leader.name.split('|')[0] || leader.name;
+        const newClanName = `${familyName}家`;
+        const familyYomi = leader.familyYomi || leader.yomi.split('|')[0] || leader.yomi;
+        const newClanYomi = familyYomi ? `${familyYomi}け` : "";
+
+        const newClan = new Clan({
+            id: newClanId, name: newClanName, yomi: newClanYomi, color: newColor, leaderId: leader.id
+        });
+
+        this.game.clans.forEach(otherClan => {
+            if (otherClan.id === 0) return;
+            newClan.diplomacyValue[otherClan.id] = { status: '普通', sentiment: 50, trucePeriod: 0, isMarriage: false };
+            if (!otherClan.diplomacyValue) otherClan.diplomacyValue = {};
+            otherClan.diplomacyValue[newClanId] = { status: '普通', sentiment: 50, trucePeriod: 0, isMarriage: false };
+        });
+        
+        this.game.clans.push(newClan);
+
+        this.game.castleManager.changeOwner(castle, newClanId, true); 
+        
+        castle.soldiers = Math.min(99999, castle.soldiers + kunishu.soldiers);
+        castle.horses = Math.min(99999, (castle.horses || 0) + (kunishu.horses || 0));
+        castle.guns = Math.min(99999, (castle.guns || 0) + (kunishu.guns || 0));
+
+        const members = this.getKunishuMembers(kunishu.id);
+        members.forEach(b => {
+            b.belongKunishuId = 0;
+            // joinClanを使うと仕官時の忠誠度再計算が行われる
+            this.game.affiliationSystem.joinClan(b, newClanId, castle.id);
+        });
+
+        leader.isDaimyo = true;
+        leader.isCastellan = false;
+        leader.loyalty = 100;
+        this.game.updateCastleLord(castle);
+
+        kunishu.isDestroyed = true;
+        kunishu.soldiers = 0;
+
+        const info = leader._nameChangeInfo;
+        const leaderNameStr = (info && info.isNameChanged) ? info.oldNameStr : leader.name.replace(/\|/g, '');
+
+        const msg = `${kunishu.getName(this.game)}の${leaderNameStr}が${castle.name}を乗っ取り、大名として再び旗揚げしました！`;
+        this.game.ui.log(msg);
+        await this.game.ui.showDialogAsync(msg);
+
+        if (info && info.isNameChanged) {
+            const nameChangeMsg = `大名となるにあたり、${info.oldNameStr}は「${info.newNameStr}」と名を改めました。`;
+            this.game.ui.log(nameChangeMsg);
+            await this.game.ui.showDialogAsync(nameChangeMsg);
+        }
+
+        if (this.game.ui && typeof this.game.ui.updateClanColors === 'function') {
+            this.game.ui.updateClanColors();
+        }
+        if (window.GameApp) window.GameApp.updateAllClanPrestige();
     }
 
     // ==========================================
