@@ -447,12 +447,12 @@ class SkillManager {
         let modifier = 0; // 追加分
         
         // 自部隊に越後の龍がいるか
-        let hasEchigo = bushos.some(b => b.skill && b.skill.includes(SKILL_NAMES.ECHIGO_NO_RYU));
+        let hasEchigo = bushos.some(b => b && b.skill && b.skill.includes(SKILL_NAMES.ECHIGO_NO_RYU));
         if (hasEchigo) modifier += 0.20; // 20%アップ
 
         // 同一勢力内に甲斐の虎がいるか
         let hasKaiInAlly = allAlliedBushosList.some(b => {
-            if (b.skill && b.skill.includes(SKILL_NAMES.KAI_NO_TORA)) {
+            if (b && b.skill && b.skill.includes(SKILL_NAMES.KAI_NO_TORA)) {
                 if (kunishuId > 0 && b.belongKunishuId === kunishuId) return true;
                 if (clanId > 0 && b.clan === clanId && b.belongKunishuId === 0) return true;
             }
@@ -469,13 +469,13 @@ class SkillManager {
         let reducePct = 0; // 軽減率(%)
         
         // 自部隊に越後の龍がいるか
-        if (bushos.some(b => b.skill && b.skill.includes(SKILL_NAMES.ECHIGO_NO_RYU))) {
+        if (bushos.some(b => b && b.skill && b.skill.includes(SKILL_NAMES.ECHIGO_NO_RYU))) {
             reducePct += 10;
         }
 
         // 同一勢力内に甲斐の虎がいるか
         let hasKaiInAlly = allAlliedBushosList.some(b => {
-            if (b.skill && b.skill.includes(SKILL_NAMES.KAI_NO_TORA)) {
+            if (b && b.skill && b.skill.includes(SKILL_NAMES.KAI_NO_TORA)) {
                 if (kunishuId > 0 && b.belongKunishuId === kunishuId) return true;
                 if (clanId > 0 && b.clan === clanId && b.belongKunishuId === 0) return true;
             }
@@ -486,7 +486,7 @@ class SkillManager {
         }
 
         // 自部隊に三河の鹿がいるか
-        if (bushos.some(b => b.skill && b.skill.includes(SKILL_NAMES.MIKAWA_NO_SHIKA))) {
+        if (bushos.some(b => b && b.skill && b.skill.includes(SKILL_NAMES.MIKAWA_NO_SHIKA))) {
             reducePct += 30;
         }
 
