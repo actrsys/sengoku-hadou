@@ -302,6 +302,22 @@ class AffiliationSystem {
             ideology: survivalInfo.ideology
         });
         newKunishu._survivalClanId = oldClanId; // 残党である目印
+
+        // ★追加：自分たちを滅ぼした勢力を探して、関係値を0（敵対）にします
+        const myCastle = this.game.getCastle(busho.castleId);
+        let enemyClanId = 0;
+        if (myCastle && myCastle.lastAttackerClanId > 0 && !myCastle.lastAttackerIsKunishu) {
+            // 最後に攻撃してきたのが大名家なら、それを敵とみなします
+            enemyClanId = myCastle.lastAttackerClanId;
+        } else if (myCastle && myCastle.ownerClan > 0 && myCastle.ownerClan !== oldClanId) {
+            // 万が一記録が取れなかった時の保険として、今お城を奪っている大名家を敵とみなします
+            enemyClanId = myCastle.ownerClan;
+        }
+        
+        // 敵が見つかったら、関係値を0にして箱にしまいます
+        if (enemyClanId > 0) {
+            newKunishu.setRelation(enemyClanId, 0);
+        }
         
         this.game.kunishuSystem.kunishus.push(newKunishu);
         busho.belongKunishuId = newKunishuId;
