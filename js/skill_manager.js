@@ -100,18 +100,16 @@ class SkillManager {
         let gunRatio = guns / safeSoldiers;
         
         if (actionType === 'charge' || actionType === 'def_charge' || actionType === 'siege') {
-            // 足軽適性：軍馬・鉄砲の割合が5割未満
-            if (horseRatio < 0.5 && gunRatio < 0.5) {
-                let lvl = this.getAptitudeLevel(busho.aptAshigaru);
-                if (lvl > 0) {
-                    modifier += (lvl * 0.03) + 0.05;
-                }
+            // 足軽適性：条件なし（突撃・破壊時）馬術と重複
+            let ashigaruLvl = this.getAptitudeLevel(busho.aptAshigaru);
+            if (ashigaruLvl > 0) {
+                modifier += (ashigaruLvl * 0.01) + 0.03;
             }
             // 馬術適性：軍馬の割合が5割以上
             if (horseRatio >= 0.5) {
-                let lvl = this.getAptitudeLevel(busho.aptKiba);
-                if (lvl > 0) {
-                    modifier += (lvl * 0.03) + 0.05;
+                let kibaLvl = this.getAptitudeLevel(busho.aptKiba);
+                if (kibaLvl > 0) {
+                    modifier += (kibaLvl * 0.03) + 0.05;
                 }
             }
         } else if (actionType === 'bow' || actionType === 'def_bow') {
@@ -144,18 +142,16 @@ class SkillManager {
         let gunRatio = attackerGuns / safeSoldiers;
         
         if (attackActionType === 'charge' || attackActionType === 'def_charge' || attackActionType === 'siege') {
-            // 足軽適性：攻撃側の軍馬・鉄砲の割合が5割未満
-            if (horseRatio < 0.5 && gunRatio < 0.5) {
-                let lvl = this.getAptitudeLevel(busho.aptAshigaru);
-                if (lvl > 0) {
-                    reductionPct += lvl * 2;
-                }
+            // 足軽適性：条件なし（突撃・破壊を受ける時）馬術と重複
+            let ashigaruLvl = this.getAptitudeLevel(busho.aptAshigaru);
+            if (ashigaruLvl > 0) {
+                reductionPct += ashigaruLvl * 0.5;
             }
             // 馬術適性：攻撃側の軍馬の割合が5割以上
             if (horseRatio >= 0.5) {
-                let lvl = this.getAptitudeLevel(busho.aptKiba);
-                if (lvl > 0) {
-                    reductionPct += lvl * 1;
+                let kibaLvl = this.getAptitudeLevel(busho.aptKiba);
+                if (kibaLvl > 0) {
+                    reductionPct += kibaLvl * 1;
                 }
             }
         } else if (attackActionType === 'bow' || attackActionType === 'def_bow') {
