@@ -118,7 +118,8 @@ class AffiliationSystem {
         const isClanDestroyed = (oldClanId !== 0) && (this.game.castles.filter(c => c.ownerClan === oldClanId).length === 0);
         
         // ★変更：スキルマネージャーに滅亡時の生存（諸勢力化）スキルがないか聞きに行きます
-        if (isClanDestroyed && typeof SkillManager !== 'undefined') {
+        // （プレイヤー大名の場合はこの魔法は使わずに通常のゲームオーバーへ進ませます！）
+        if (isClanDestroyed && oldClanId !== this.game.playerClanId && typeof SkillManager !== 'undefined') {
             const survivalInfo = SkillManager.getExtinctionSurvivalInfo(busho, this.game);
             
             // 自分が生存スキルを持っている場合、スキルマネージャーからの情報をもとに諸勢力を結成する
