@@ -353,4 +353,9 @@ class SkillManager {
     static canKibaEnterMountain(unit, game) {
         return this.hasSkill(unit, "踏破", game);
     }
+
+    // ★追加: 「退き巧者」を持っているか
+    static isRetreatMaster(unit, game) {
+        return this.hasSkill(unit, "退き巧者", game);
+    }
 }

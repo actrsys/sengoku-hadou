@@ -1389,8 +1389,14 @@ class FieldWarManager {
         }
 
         let zocCost = 1;
-        if (isFirstStep && startDist === 1) zocCost = 4;
-        else if (minEnemyDist <= 2) zocCost = 2;
+        if (isFirstStep && startDist === 1) {
+            // ★追加: 退き巧者を持っていなければ離脱ペナルティをかける
+            if (!SkillManager.isRetreatMaster(unit, this.game)) {
+                zocCost = 4;
+            }
+        } else if (minEnemyDist <= 2) {
+            zocCost = 2;
+        }
 
         return Math.max(baseCost, zocCost);
     }
@@ -1868,6 +1874,27 @@ class FieldWarManager {
 
     // ★追加: 個別部隊の撤退処理
     retreatUnit(unit) {
+        // ★追加: 退き巧者の野戦個別撤退時のボーナス回復処理
+        if (SkillManager.isRetreatMaster(unit, this.game)) {
+            let loss = unit.initialSoldiers - unit.soldiers;
+            if (loss > 0) {
+                // 野戦での個別撤退なので、差分の30%をその場で回復させておきます
+                let bonusRecovery = Math.floor(loss * 0.3);
+                if (bonusRecovery > 0) {
+                    unit.soldiers += bonusRecovery;
+                    this.log(`【退き巧者】${unit.name}隊は被害を最小限に抑えて離脱した！（兵士が${bonusRecovery}回復）`);
+                    // 大元の deadSoldiers から引いて、攻城戦終了時と二重に回復しないようにします
+                    if (this.warState && this.warState.deadSoldiers) {
+                        if (unit.isAttacker) {
+                            this.warState.deadSoldiers.attacker = Math.max(0, this.warState.deadSoldiers.attacker - bonusRecovery);
+                        } else {
+                            this.warState.deadSoldiers.defender = Math.max(0, this.warState.deadSoldiers.defender - bonusRecovery);
+                        }
+                    }
+                }
+            }
+        }
+
         // 撤退済みリストに追加（終了時に兵士数を回収するため）
         if (!this.retreatedUnits) this.retreatedUnits = [];
         this.retreatedUnits.push(unit);
@@ -2594,10 +2621,13 @@ class FieldWarManager {
         const isNight = this.isNightTurn(); // ★修正：共通の仕組みから答えをもらいます
 
         let dirMult = 1.0;
-        if (defToAtkDiff === 3) {
-            dirMult = isNight ? 0.3 : 0.5; // 背後（夜は奇襲への対応が遅れ被害増大）
-        } else if (defToAtkDiff === 2) {
-            dirMult = isNight ? 0.5 : 0.8; // 側面（夜は視界不良で被害増大）
+        // ★追加: 守備側が「退き巧者」を持っていれば、側面・背後からのダメージ補正を無効化
+        if (!SkillManager.isRetreatMaster(defender, this.game)) {
+            if (defToAtkDiff === 3) {
+                dirMult = isNight ? 0.3 : 0.5; // 背後（夜は奇襲への対応が遅れ被害増大）
+            } else if (defToAtkDiff === 2) {
+                dirMult = isNight ? 0.5 : 0.8; // 側面（夜は視界不良で被害増大）
+            }
         }
 
         // 防御側のステータスに向き補正を適用
@@ -2674,10 +2704,34 @@ class FieldWarManager {
         if (attacker.troopType === 'teppo' || (attacker.troopType === 'ashigaru' && atkDist > 1)) {
             isRangedAttack = true;
         }
+
+        // ==========================================
+        // ★追加: 猛将・鬼の判定（攻撃時）
+        // ==========================================
+        let isAtkCritical = false;
+        let isAtkOni = false;
+        if (SkillManager.hasSkill(attacker, "鬼", this.game)) {
+            if (Math.random() < 1/12) {
+                isAtkCritical = true;
+                isAtkOni = true;
+            }
+        } else if (SkillManager.hasSkill(attacker, "猛将", this.game)) {
+            if (Math.random() < 1/12) {
+                isAtkCritical = true;
+            }
+        }
+
+        let atkFinalAtkCurrent = atkFinalAtk;
+        let defFinalDefCurrent = defFinalDef;
+
+        if (isAtkCritical) {
+            atkFinalAtkCurrent *= 2;
+            defFinalDefCurrent *= 0.25;
+        }
         
         // 7. 与ダメージ計算（基礎）
-        let dmgRatio = (atkFinalAtk + defFinalDef) > 0 ? (atkFinalAtk / (atkFinalAtk + defFinalDef)) : 0;
-        let dmgToDef = Math.floor(atkFinalAtk * dmgRatio);
+        let dmgRatio = (atkFinalAtkCurrent + defFinalDefCurrent) > 0 ? (atkFinalAtkCurrent / (atkFinalAtkCurrent + defFinalDefCurrent)) : 0;
+        let dmgToDef = Math.floor(atkFinalAtkCurrent * dmgRatio);
         
         // ★弓射では算出された最終ダメージを5分の1にカットします
         if (attacker.troopType === 'ashigaru' && atkDist > 1) {
@@ -2712,10 +2766,52 @@ class FieldWarManager {
 
         // 9. 反撃ダメージ計算（基礎）
         let dmgToAtk = 0;
+        let isDefCritical = false;
+        let isDefOni = false;
+
         if (atkDist === 1) { // 反撃は距離1のときのみ
-            let counterRatio = (atkFinalAtk + defFinalDef) > 0 ? (defFinalDef / (atkFinalAtk + defFinalDef)) : 0;
-            dmgToAtk = Math.floor(defFinalAtk * 0.5 * counterRatio);
+            let defFinalAtkCounter = defFinalAtk;
+            let atkFinalDefCounter = atkFinalDef;
+
+            // ★追加: 猛将・鬼の判定（反撃時）
+            if (SkillManager.hasSkill(defender, "鬼", this.game)) {
+                if (Math.random() < 1/12) {
+                    isDefCritical = true;
+                    isDefOni = true;
+                }
+            } else if (SkillManager.hasSkill(defender, "猛将", this.game)) {
+                if (Math.random() < 1/12) {
+                    isDefCritical = true;
+                }
+            }
+
+            if (isDefCritical) {
+                defFinalAtkCounter *= 2;
+                atkFinalDefCounter *= 0.25;
+            }
+
+            let counterRatio = (defFinalAtkCounter + atkFinalDefCounter) > 0 ? (atkFinalDefCounter / (defFinalAtkCounter + atkFinalDefCounter)) : 0;
+            dmgToAtk = Math.floor(defFinalAtkCounter * 0.5 * counterRatio);
         }
+
+        // ==========================================
+        // ★追加: 傾奇者の判定
+        // ==========================================
+        const checkKabukimono = (unit) => {
+            if (SkillManager.hasSkill(unit, "傾奇者", this.game) && (unit.troopType === 'ashigaru' || unit.troopType === 'kiba') && unit.soldiers <= 1000) {
+                let allyTotal = 0;
+                let enemyTotal = 0;
+                this.units.forEach(u => {
+                    if (u.isAttacker === unit.isAttacker) allyTotal += u.soldiers;
+                    else enemyTotal += u.soldiers;
+                });
+                return allyTotal <= enemyTotal;
+            }
+            return false;
+        };
+
+        let isAtkKabukimono = checkKabukimono(attacker);
+        let isDefKabukimono = checkKabukimono(defender);
 
         // ==========================================
         // ★追加: 適性による最終ダメージの増加・軽減処理
@@ -2738,6 +2834,29 @@ class FieldWarManager {
             // 攻撃側が受ける反撃ダメージの軽減処理
             let aptitudeAtkReduceMult = SkillManager.calcAptitudeDefenseModifier(attacker, defender, false, this.game);
             dmgToAtk = Math.floor(dmgToAtk * aptitudeAtkReduceMult);
+        }
+
+        // ==========================================
+        // ★追加: 猛将・鬼・傾奇者の最終ダメージ計算
+        // ==========================================
+        if (isAtkOni) {
+            dmgToDef = Math.floor(dmgToDef * 1.5);
+        }
+        if (isAtkKabukimono) {
+            if (atkDist === 1) { // 隣接戦闘時に与える最終ダメージ3倍
+                dmgToDef = Math.floor(dmgToDef * 3);
+            }
+            dmgToAtk = Math.floor(dmgToAtk * 0.3); // 受ける最終被ダメージ70%軽減
+        }
+
+        if (atkDist === 1 && isDefOni) {
+            dmgToAtk = Math.floor(dmgToAtk * 1.5);
+        }
+        if (isDefKabukimono) {
+            dmgToDef = Math.floor(dmgToDef * 0.3); // 受ける最終被ダメージ70%軽減
+            if (atkDist === 1) { // 守備側からの反撃（隣接時）
+                dmgToAtk = Math.floor(dmgToAtk * 3); // 与える反撃ダメージ3倍
+            }
         }
 
         // ★追加: プレイヤーがいないAI同士の戦いなら、ダメージを約3分の2（0.666）に減らします！
@@ -2915,7 +3034,16 @@ class FieldWarManager {
 
         let counterMsg = (dmgToAtk > 0) ? ` 反撃で${dmgToAtk}の被害！` : ``;
 
-        this.log(`${attacker.name}隊の${atkWeapon}！${dirMsg} 敵に${dmgToDef}の損害！${counterMsg}`);
+        // ★追加: ログの先頭に付けるカッコいい名前
+        let atkPrefix = "";
+        if (isAtkKabukimono) atkPrefix += "【傾奇者】";
+        if (isAtkCritical) atkPrefix += "【会心】";
+        
+        let defPrefix = "";
+        if (isDefKabukimono) defPrefix += "【傾奇者】";
+        if (isDefCritical) defPrefix += "【会心(反撃)】";
+
+        this.log(`${atkPrefix}${attacker.name}隊の${atkWeapon}！${dirMsg} 敵に${dmgToDef}の損害！${counterMsg ? defPrefix + counterMsg : ""}`);
         
         // ★追加：戦闘を行った部隊の所属する軍の訓練度を上昇（上限100）
         if (this.groupStats[attacker.groupId]) {

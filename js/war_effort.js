@@ -1256,10 +1256,31 @@ Object.assign(WarManager.prototype, {
             // 3. 吸い込み防止の箱と、回復率の設定
             let atkReinfTotalLoss = 0;
             let defReinfTotalLoss = 0;
-            const isShortWarForRecovery = s.round < window.WarParams.War.ShortWarTurnLimit;
             const baseRecoveryRate = window.WarParams.War.BaseRecoveryRate || 0.2;
-            const retreatRecoveryRate = window.WarParams.War.RetreatRecoveryRate || 0.2;
-            const defRecoveryRate = (isRetreat && isShortWarForRecovery) ? retreatRecoveryRate : baseRecoveryRate;
+            const retreatRecoveryRate = window.WarParams.War.RetreatRecoveryRate || 0.3;
+
+            // ★追加: グループ内に「退き巧者」がいるかを確認して回復率を決める魔法
+            const getGroupRecoveryRate = (bushos, isRetreatingTeam) => {
+                let rate = isRetreatingTeam ? retreatRecoveryRate : baseRecoveryRate;
+                if (isRetreatingTeam && bushos) {
+                    let hasRetreatMaster = false;
+                    for (let b of bushos) {
+                        if (!b) continue;
+                        let bushoObj = b.skill !== undefined ? b : (this.game && this.game.getBusho ? this.game.getBusho(b.id || b) : null);
+                        if (bushoObj && bushoObj.skill) {
+                            const skills = bushoObj.skill.split('|').map(sk => sk.trim());
+                            if (skills.includes("退き巧者")) {
+                                hasRetreatMaster = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (hasRetreatMaster) {
+                        rate = retreatRecoveryRate * 2; // 退き巧者なら倍（60%）にします！
+                    }
+                }
+                return rate;
+            };
 
             // 4. 援軍部隊を元の城に帰還させるお帰り魔法
             const returnReinforcement = (reinf, isAttackerData) => {
@@ -1282,8 +1303,12 @@ Object.assign(WarManager.prototype, {
                 if (isAttackerData) atkReinfTotalLoss += totalLoss;
                 else defReinfTotalLoss += totalLoss;
                 
+                // ★追加: 自分が撤退する側のチームかどうかを判定します
+                let isThisGroupRetreating = (isRetreat && ((isAttackerData && !attackerWon) || (!isAttackerData && attackerWon)));
+                let recRate = getGroupRecoveryRate(reinf.bushos, isThisGroupRetreating);
+
                 // 負傷兵の一部が回復して、一緒に帰ります！
-                const recovered = Math.floor(totalLoss * (isAttackerData ? baseRecoveryRate : defRecoveryRate));
+                const recovered = Math.floor(totalLoss * recRate);
                 const finalReturnSoldiers = surviveSoldiers + recovered;
                 
                 // ★修正：軍馬と鉄砲は、すでにリアルタイムで減らされた「今の数」をそのまま使います！
@@ -1369,7 +1394,11 @@ Object.assign(WarManager.prototype, {
                     
                     // 野戦で減った数（メモ用紙）から、回復する負傷兵を計算します！
                     const fieldLoss = reinf.fieldLoss || 0;
-                    const recovered = Math.floor(fieldLoss * (isAttackerData ? baseRecoveryRate : defRecoveryRate));
+                    
+                    // ★追加: 個別に撤退しているので、ここは確実に撤退時の回復率計算を使います！
+                    let recRate = getGroupRecoveryRate(reinf.bushos, true);
+                    
+                    const recovered = Math.floor(fieldLoss * recRate);
                     const finalReturnSoldiers = reinf.soldiers + recovered;
                     
                     // 吸い込み防止のメモ用紙にも、この負傷兵を記録しておきます
@@ -1629,7 +1658,11 @@ Object.assign(WarManager.prototype, {
             const realAtkDead = Math.max(0, s.deadSoldiers.attacker - atkReinfTotalLoss);
             const realDefDead = Math.max(0, s.deadSoldiers.defender - defReinfTotalLoss);
             
-            const attackerRecovered = Math.floor(realAtkDead * baseRecoveryRate);
+            // ★追加：メイン部隊の回復率を退き巧者の有無を含めて取得します！
+            let atkMainRecRate = getGroupRecoveryRate(s.atkBushos, isRetreat && !attackerWon);
+            let defMainRecRate = getGroupRecoveryRate(s.defBusho ? [s.defBusho] : [], isRetreat && attackerWon);
+
+            const attackerRecovered = Math.floor(realAtkDead * atkMainRecRate);
             const totalAtkSurvivors = s.attacker.soldiers + attackerRecovered;
 
             if (s.attacker.rice > 0) {
@@ -1651,14 +1684,15 @@ Object.assign(WarManager.prototype, {
             if (isRetreat && retreatTargetId) {
                 const targetC = this.game.getCastle(retreatTargetId);
                 if (targetC) {
-                    const recovered = Math.floor(realDefDead * defRecoveryRate);
+                    // ★追加: 守備側の撤退時なので、先ほど計算した defMainRecRate を使います！
+                    const recovered = Math.floor(realDefDead * defMainRecRate);
                     // ★追加：撤退先での兵士合流にストッパー！
                     targetC.soldiers = Math.min(99999, targetC.soldiers + s.defender.soldiers + recovered);
                     if (s.isPlayerInvolved && recovered > 0) this.game.ui.log(`(撤退先にて負傷兵 ${recovered}名 が復帰)`);
                 }
             } else if (!isRetreat && attackerWon) {
                 const survivors = Math.max(0, s.defender.soldiers);
-                const recovered = Math.floor(realDefDead * baseRecoveryRate);
+                const recovered = Math.floor(realDefDead * baseRecoveryRate); // 守備側は全滅（非撤退）なので基本の回復率を使います
                 const totalAbsorbed = survivors + recovered;
 
                 // ★追加：攻め込んだ元気な兵士と、城に残っていた兵士の士気と訓練をまぜまぜします！
@@ -1707,7 +1741,7 @@ Object.assign(WarManager.prototype, {
                     srcC.guns = Math.min(99999, (srcC.guns || 0) + attackerSurvivedGuns);
                 }
                 
-                const recovered = Math.floor(realDefDead * baseRecoveryRate);
+                const recovered = Math.floor(realDefDead * baseRecoveryRate); // 守備側は防衛成功（非撤退）なので基本の回復率を使います
                 s.defender.soldiers = Math.min(99999, s.defender.soldiers + recovered);
                 s.defender.horses = defenderSurvivedHorses;
                 s.defender.guns = defenderSurvivedGuns;
