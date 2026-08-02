@@ -2010,12 +2010,13 @@ class FieldWarManager {
                 if (isAtkPlayer) endMessage = `敵の総大将が戦線から離脱しました！`;
                 else if (isDefPlayer) endMessage = `総大将が戦線から離脱し、我が軍は敗走しました……`;
                 else endMessage = `守備軍の総大将が戦線から離脱した！`;
+                endResult = 'attacker_win';
             } else {
-                if (isAtkPlayer) endMessage = `敵の総大将を撃破しました！`;
-                else if (isDefPlayer) endMessage = `総大将が撃破され、我が軍は敗北しました……`;
-                else endMessage = `守備軍の総大将が敗走した！`;
+                if (isAtkPlayer) endMessage = `敵の総大将を撃破しました！（そのまま城を制圧します）`;
+                else if (isDefPlayer) endMessage = `総大将が撃破され、我が軍は敗北しました……（城も陥落します）`;
+                else endMessage = `守備軍の総大将が敗走した！（城はそのまま陥落する）`;
+                endResult = 'attacker_win_fatal';
             }
-            endResult = 'attacker_win';
         }
         else {
             let atkTotalRice = 0, defTotalRice = 0;
@@ -2032,10 +2033,10 @@ class FieldWarManager {
                 endResult = 'attacker_lose';
             }
             else if (defTotalRice <= 0) {
-                if (isAtkPlayer) endMessage = `${enemyName}の兵糧が尽き、城へ敗走していきました！`;
-                else if (isDefPlayer) endMessage = `兵糧が底を突き、戦線を維持できません……`;
-                else endMessage = `兵糧が尽き、守備軍は城へ敗走した！`;
-                endResult = 'attacker_win';
+                if (isAtkPlayer) endMessage = `${enemyName}は兵糧が尽き、散り散りに敗走していきました！`;
+                else if (isDefPlayer) endMessage = `兵糧が底を突き、戦線を維持できません。城を放棄し敗走します……`;
+                else endMessage = `兵糧が尽き、守備軍は城を放棄して敗走した！`;
+                endResult = 'attacker_win_fatal';
             }
             else if (this.turnCount > this.maxTurns) {
                 if (isAtkPlayer) endMessage = `これ以上の野戦は不利と判断し撤退します……`;

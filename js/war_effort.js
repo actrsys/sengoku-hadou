@@ -1020,7 +1020,14 @@ Object.assign(WarManager.prototype, {
                             defCastle.rice += this.state.defFieldRice; 
                             defCastle.horses = (defCastle.horses || 0) + (this.state.defender.fieldHorses || 0);
                             defCastle.guns = (defCastle.guns || 0) + (this.state.defender.fieldGuns || 0);
-                            if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') {
+                            
+                            if (resultType === 'attacker_win_fatal') {
+                                // ★修正：兵糧切れなどで降伏した場合、生き残った兵士を吸収できるように「soldiers = 0」にするのをやめました！
+                                if (this.game.ui && this.state.isPlayerInvolved) {
+                                    this.game.ui.log("野戦での敗北により、城はそのまま陥落しました！");
+                                }
+                                this.endWar(true);
+                            } else if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') {
                                 await showSiegeMessage();
 
                                 // ★追加：野戦から籠城戦に移る時の「戦争開始前」と「戦闘開始後」の合図を出します
