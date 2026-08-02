@@ -1598,12 +1598,12 @@ Object.assign(WarManager.prototype, {
                     srcC.guns = Math.min(99999, (srcC.guns || 0) + (s.attacker.guns || 0));
                 }
                 
-                if (s.isPlayerInvolved) {
+                if (s.isPlayerInvolved || isAtkPlayer || isDefPlayer) {
                     // ★修正：結果画面を出す「前」に合戦画面を消さないと、結果のボタンが押せなくなってしまいます！
                     this.game.ui.setWarModalVisible(false);
                     // ★追加：ダイアログを出す前にバリアを解除します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
-                    if (attackerWon) {
+                    if (attackerWon && isAtkPlayer) {
                         if (window.AudioManager) {
                             // ★修正：フェードアウトさせると音量が0になって戻らなくなるので、ピタッと止める魔法にします！
                             if (typeof window.AudioManager.stopBgm === 'function') {
@@ -1645,7 +1645,7 @@ Object.assign(WarManager.prototype, {
                     // ★追加：色が中立に変わったので、メッセージの前に地図を更新します！
                     // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
                     const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
-                    if (typeof this.game.ui.playCaptureEffect === 'function' && (s.isPlayerInvolved || !skipAnim)) {
+                    if (typeof this.game.ui.playCaptureEffect === 'function' && (s.isPlayerInvolved || isAtkPlayer || isDefPlayer || !skipAnim)) {
                         // 画面が真っ白になった瞬間に色を塗り替えるお願いを渡します
                         await this.game.ui.playCaptureEffect(targetC.id, () => {
                             this.game.ui.updateClanColors();
@@ -1710,7 +1710,7 @@ Object.assign(WarManager.prototype, {
                     }
                 }
                 
-                if (s.isPlayerInvolved) {
+                if (s.isPlayerInvolved || isAtkPlayer || isDefPlayer) {
                     // ★修正：結果画面を出す前に合戦画面を消します
                     this.game.ui.setWarModalVisible(false);
                     // ★追加：ダイアログを出す前にバリアを解除します！
@@ -1847,7 +1847,7 @@ Object.assign(WarManager.prototype, {
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
                 // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
                 const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
-                if (typeof this.game.ui.playCaptureEffect === 'function' && (s.isPlayerInvolved || !skipAnim)) {
+                if (typeof this.game.ui.playCaptureEffect === 'function' && (s.isPlayerInvolved || isAtkPlayer || isDefPlayer || !skipAnim)) {
                     await this.game.ui.playCaptureEffect(s.defender.id, () => {
                         this.game.ui.updateClanColors();
                     });
@@ -1883,21 +1883,16 @@ Object.assign(WarManager.prototype, {
                 const atkArmyName1 = s.attacker.isKunishu ? s.attacker.name : (atkClanData1 ? atkClanData1.getArmyName() : "敵軍");
                 this.game.ui.log(`【合戦結果】守備軍の撤退により、${atkArmyName1}が${s.defender.name}を占領しました。`);
                 
-                if (s.isPlayerInvolved) {
-                    const pid = Number(this.game.playerClanId);
-                    const isAtkMain = (Number(s.attacker.ownerClan) === pid);
-                    const isAtkAlly = (s.reinforcement && Number(s.reinforcement.castle.ownerClan) === pid) || 
-                                      (s.selfReinforcement && Number(s.selfReinforcement.castle.ownerClan) === pid) ||
-                                      (s.retreatedReinforcements && s.retreatedReinforcements.some(r => r.isAttackerData && r.data.castle && Number(r.data.castle.ownerClan) === pid));
-                    const isAtkSide = isAtkMain || isAtkAlly;
-                    
+                if (s.isPlayerInvolved || isAtkPlayer || isDefPlayer) {
                     // ★追加：ダイアログを出す前にバリアを解除します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 
-                    if (isAtkSide) {
+                    if (isAtkPlayer) {
                         this.game.ui.showDialog(`敵軍は城を捨てて敗走しました！\n${s.defender.name}を占領します！`, false, finishWarProcess);
+                    } else if (isDefPlayer) {
+                        this.game.ui.showDialog(`撤退しました。\n${s.defender.name}を制圧されました……`, false, finishWarProcess);
                     } else {
-                        this.game.ui.showDialog(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, false, finishWarProcess);
+                        this.game.ui.showDialog(`守備軍が撤退し、${s.defender.name}が占領されました。`, false, finishWarProcess);
                     }
                 } else {
                     // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
@@ -1909,6 +1904,126 @@ Object.assign(WarManager.prototype, {
                     }
                     finishWarProcess();
                 }
+                return;
+            }
+                
+            let resultMsg = "";
+            if (attackerWon) {
+                // ★ここから書き足し：城側が負けた・撤退した時の追加減少
+                if (!s.defender.isKunishu && !s.isKunishuSubjugation && !s.attacker.isKunishu) {
+                    // 民忠をさらに現在の2割減らす
+                    const dropLoyaltyEnd = Math.floor(s.defender.peoplesLoyalty * 0.2);
+                    s.defender.peoplesLoyalty = Math.max(0, s.defender.peoplesLoyalty - dropLoyaltyEnd);
+
+                    // 人口を制圧時点の攻撃側の兵士数の2割減らす
+                    const dropPopulationEnd = Math.floor(s.attacker.soldiers * 0.2);
+                    s.defender.population = Math.max(0, s.defender.population - dropPopulationEnd);
+                }
+                // ★書き足しここまで
+
+                const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
+                s.attacker.training = Math.min(120, s.attacker.training + (window.WarParams.War.WinStatIncrease || 5)); s.attacker.morale = Math.min(maxMorale, s.attacker.morale + (window.WarParams.War.WinStatIncrease || 5));
+                
+                const maxCharm = Math.max(...s.atkBushos.map(b => b.charm));
+                const subCharm = s.atkBushos.reduce((acc, b) => acc + b.charm, 0) - maxCharm;
+                const daimyo = this.game.bushos.find(b => b.clan === s.attacker.ownerClan && b.isDaimyo) || {charm: 50};
+                const charmScore = maxCharm + (subCharm * 0.1) + (daimyo.charm * window.WarParams.War.DaimyoCharmWeight);
+                let lossRate = Math.max(0, window.WarParams.War.LootingBaseRate - (charmScore * window.WarParams.War.LootingCharmFactor)); 
+                if (lossRate > 0) {
+                    const lostGold = Math.floor(s.defender.gold * lossRate); const lostRice = Math.floor(s.defender.rice * lossRate);
+                    s.defender.gold -= lostGold; s.defender.rice -= lostRice;
+                    if (s.isPlayerInvolved) this.game.ui.log(`(敵兵の持ち逃げにより 金${lostGold}, 米${lostRice} が失われた)`);
+                }
+                
+                // ★城の管理システムにお任せします！
+                const newLegionId = s.sourceCastle ? (s.sourceCastle.legionId || 0) : 0;
+                this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan, false, newLegionId);
+
+                // ★追加：色が更新されたので、メッセージの前に地図を更新します！
+                // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
+                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                if (typeof this.game.ui.playCaptureEffect === 'function' && (s.isPlayerInvolved || isAtkPlayer || isDefPlayer || !skipAnim)) {
+                    await this.game.ui.playCaptureEffect(s.defender.id, () => {
+                        this.game.ui.updateClanColors();
+                    });
+                } else {
+                    this.game.ui.updateClanColors();
+                }
+
+                s.defender.immunityUntil = this.game.getCurrentTurnId() + 1;
+                
+                const srcC = this.game.getCastle(s.sourceCastle.id);
+                s.atkBushos.forEach((b) => { 
+                    this.game.factionSystem.handleMove(b, s.sourceCastle.id, s.defender.id); 
+                    // ★新しいお引越しセンターの魔法を使います！
+                    this.game.affiliationSystem.moveCastle(b, s.defender.id);
+                });
+
+                // ★追加：部隊の総大将（リストの先頭の武将）を新城主に仮任命します！
+                if (s.atkBushos.length > 0) {
+                    s.atkBushos[0].isCastellan = true;
+                    s.defender.castellanId = s.atkBushos[0].id;
+                }
+                
+                if (isAtkPlayer) resultMsg = `${s.defender.name}を制圧しました！`;
+                else if (isDefPlayer) resultMsg = `${s.defender.name}を制圧されました……`;
+                else resultMsg = `${s.defender.name}が制圧されました！\n勝者: ${s.attacker.name}`;
+                // ★書き足し２：攻撃側が勝利して制圧した時の履歴ログ
+                const atkClanData2 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+                const atkArmyName2 = s.attacker.isKunishu ? s.attacker.name : (atkClanData2 ? atkClanData2.getArmyName() : "敵軍");
+                this.game.ui.log(`【合戦結果】${atkArmyName2}が${s.defender.name}を制圧しました。`);
+            } else {
+                s.defender.immunityUntil = this.game.getCurrentTurnId(); 
+                if (isAtkPlayer) resultMsg = isRetreat ? `${s.defender.name}からの撤退を決定しました……` : `${s.defender.name}を落としきることができませんでした……`;
+                else if (isDefPlayer) resultMsg = isRetreat ? `${enemyName}は攻略を諦め、撤退していきました！` : `${s.defender.name}を守り抜きました！`;
+                else resultMsg = isRetreat ? `${s.defender.name}から撤退しました……` : `${s.defender.name}を守り抜きました！\n敗者: ${s.attacker.name}`;
+                // ★書き足し３：攻撃側が負けた（または撤退した）時の履歴ログ
+                const defClanData = this.game.clans.find(c => c.id === s.defender.ownerClan);
+                const defArmyName = s.defender.isKunishu ? s.defender.name : (defClanData ? defClanData.getArmyName() : "守備軍");
+                if (isRetreat) {
+                     const atkClanData3 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+                     const atkArmyName3 = s.attacker.isKunishu ? s.attacker.name : (atkClanData3 ? atkClanData3.getArmyName() : "攻撃軍");
+                     this.game.ui.log(`【合戦結果】${atkArmyName3}は${s.defender.name}の攻略を諦め、撤退しました。`);
+                } else {
+                     this.game.ui.log(`【合戦結果】${defArmyName}が${s.defender.name}の防衛に成功しました。`);
+                }
+            } 
+
+            // ★追加：合戦が終わったら、勝敗に関わらず両方のお城の城主を再確認します！
+            // 討ち死にや大名の移動などで、城主が不在になっている場合があるためです
+            if (s.sourceCastle) {
+                this.game.affiliationSystem.updateCastleLord(s.sourceCastle);
+            }
+            if (s.defender) {
+                this.game.affiliationSystem.updateCastleLord(s.defender);
+            }
+            
+            if (s.isPlayerInvolved || isAtkPlayer || isDefPlayer) {
+                // ★追加：ダイアログを出す前にバリアを解除します！
+                if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+
+                if (attackerWon && !isRetreat && isAtkPlayer) {
+                    if (window.AudioManager) {
+                        // ★修正：フェードアウトさせると音量が0になって戻らなくなるので、ピタッと止める魔法にします！
+                        if (typeof window.AudioManager.stopBgm === 'function') {
+                            window.AudioManager.stopBgm();
+                        }
+                        window.AudioManager.playSE('victory.ogg');
+                    }
+                }
+                
+                this.game.ui.showDialog(resultMsg, false, finishWarProcess);
+            }
+            else {
+                // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
+                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                if (aiResultMsg && !skipAnim) {
+                    // ★追加：ダイアログを出す前にバリアを解除します！
+                    if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+                    await this.game.ui.showDialogAsync(aiResultMsg);
+                }
+                finishWarProcess();
+            }
                 return;
             }
                 
