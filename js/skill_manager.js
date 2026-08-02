@@ -20,6 +20,8 @@ const SKILL_NAMES = {
     ECHIGO_NO_RYU: "越後の龍",
     MIKAWA_NO_SHIKA: "三河の鹿",
     JOSHU_NO_OHAN: "上州の黄斑",
+    RAIJIN: "雷神",
+    CHINZEI_ICHI: "鎮西一",
     
     // 移動・環境系
     MOUNTAIN: "踏破",
@@ -90,6 +92,10 @@ const SKILL_DESCRIPTIONS = {
     [SKILL_NAMES.MIKAWA_NO_SHIKA]: "①自部隊が受けるダメージが３０％減少する。（野戦／攻城戦）",
     // 上州の黄斑
     [SKILL_NAMES.JOSHU_NO_OHAN]: "①自身が守備側で参戦している時、全ての味方部隊は与えるダメージが１０％上昇し、受けるダメージが２０％減少する。（攻城戦）\n②大名勢力に所属している時、毎月の開始時に、自身の所属拠点の防御力が５上昇する。",
+    // 雷神
+    [SKILL_NAMES.RAIJIN]: "①これ１つで鬼と悪天巧者を併せ持つ。\n②自部隊と戦闘する相手部隊のクリティカル発生を無効化する。（野戦）",
+    // 鎮西一
+    [SKILL_NAMES.CHINZEI_ICHI]: "①自軍が追い詰められている時、自部隊は与えるダメージが１０％上昇し、受けるダメージが１０％減少する。（野戦／攻城戦）\n②自部隊は高確率でクリティカルが発生するようになる。（野戦）",    
     
     // ----- 移動・環境系 -----
     // 踏破
@@ -504,9 +510,9 @@ class SkillManager {
     // 技能による効果の判定
     // ==========================================
 
-    // 「悪天巧者」を持っているか（天下布武も兼ねる）
+    // 「悪天巧者」を持っているか（天下布武、雷神も兼ねる）
     static isWeatherPenaltyIgnored(unit, game) {
-        return this.hasSkill(unit, SKILL_NAMES.WEATHER, game) || this.hasSkill(unit, SKILL_NAMES.TENKA_FUBU, game);
+        return this.hasSkill(unit, SKILL_NAMES.WEATHER, game) || this.hasSkill(unit, SKILL_NAMES.TENKA_FUBU, game) || this.hasSkill(unit, SKILL_NAMES.RAIJIN, game);
     }
 
     // ==========================================
@@ -575,40 +581,71 @@ class SkillManager {
     }
 
     // ==========================================
-    // ★追加：傾奇者の効果（ダメージ計算）を一元管理する魔法
+    // ★追加：劣勢時に発動するスキル（傾奇者・鎮西一）の効果を一元管理する魔法
     // ==========================================
-    static getKabukimonoResult(unit, allUnits, game, isAdjacent) {
+    static getUnderdogSkillModifiers(unit, allUnits, game, isAdjacent) {
         // 基本の倍率（何もない時は1倍）の箱を用意します
-        let result = { isActive: false, atkMult: 1.0, defMult: 1.0 };
+        let result = { atkMult: 1.0, defMult: 1.0, isKabukimono: false, isChinzei: false };
 
-        // そもそも傾奇者のスキルを持っていなければ、ここでストップします
-        if (!this.isKabukimono(unit, game)) return result;
+        let hasKabukimono = this.isKabukimono(unit, game);
+        let hasChinzei = this.hasSkill(unit, SKILL_NAMES.CHINZEI_ICHI, game);
 
-        // 足軽隊か騎馬隊で、兵士数が1000人以下の時だけ発動のチャンスです
-        if ((unit.troopType === 'ashigaru' || unit.troopType === 'kiba') && unit.soldiers <= 1000) {
-            let allyTotal = 0;
-            let enemyTotal = 0;
-            
-            // 戦場にいるすべての部隊から、味方と敵の数を数えます
-            if (allUnits && Array.isArray(allUnits)) {
-                allUnits.forEach(u => {
-                    if (u.isAttacker === unit.isAttacker) allyTotal += u.soldiers;
-                    else enemyTotal += u.soldiers;
-                });
-            }
-            
-            // 味方の総兵数が敵の総兵数以下（追い詰められている）なら発動します！
-            if (allyTotal <= enemyTotal) {
-                result.isActive = true;
-                result.defMult = 0.3; // 被ダメージを激減（0.3倍）します
-                
-                // 与えるダメージが激増（3倍）するのは、隣接戦闘（距離1）の時だけです
-                if (isAdjacent) {
-                    result.atkMult = 3.0;
+        // どちらも持っていなければ、ここでストップします
+        if (!hasKabukimono && !hasChinzei) return result;
+
+        let allyTotal = 0;
+        let enemyTotal = 0;
+        
+        // 戦場にいるすべての部隊から、味方と敵の総兵数を数えます
+        if (allUnits && Array.isArray(allUnits)) {
+            allUnits.forEach(u => {
+                if (u.isAttacker === unit.isAttacker) allyTotal += u.soldiers;
+                else enemyTotal += u.soldiers;
+            });
+        }
+
+        // 傾奇者の効果
+        if (hasKabukimono) {
+            // 足軽隊か騎馬隊で、兵士数が1000人以下の時だけ発動のチャンスです
+            if ((unit.troopType === 'ashigaru' || unit.troopType === 'kiba') && unit.soldiers <= 1000) {
+                // 味方の総兵数が敵の総兵数以下（追い詰められている）なら発動します！
+                if (allyTotal <= enemyTotal) {
+                    result.isKabukimono = true;
+                    result.defMult *= 0.3; // 被ダメージを激減（0.3倍）します
+                    
+                    // 与えるダメージが激増（3倍）するのは、隣接戦闘（距離1）の時だけです
+                    if (isAdjacent) {
+                        result.atkMult *= 3.0;
+                    }
                 }
             }
         }
+
+        // 鎮西一の効果
+        if (hasChinzei) {
+            // 味方の総兵数が敵の総兵数未満の時
+            if (allyTotal < enemyTotal) {
+                result.isChinzei = true;
+                result.atkMult *= 1.10; // 与ダメージ10%上昇
+                result.defMult *= 0.90; // 被ダメージ10%軽減
+            }
+        }
         
+        return result;
+    }
+
+    // 攻城戦での劣勢スキル（鎮西一など）判定用
+    static calcSiegeUnderdogModifiers(bushos, myTotalSoldiers, enemyTotalSoldiers, game) {
+        let result = { atkMult: 1.0, defMult: 1.0 };
+        if (!bushos || bushos.length === 0) return result;
+        
+        let hasChinzei = bushos.some(b => b && this.hasSkill(b, SKILL_NAMES.CHINZEI_ICHI, game));
+        
+        // 味方陣営の総兵数が敵陣営の総兵数未満の時に発動
+        if (hasChinzei && myTotalSoldiers < enemyTotalSoldiers) {
+            result.atkMult *= 1.10;
+            result.defMult *= 0.90;
+        }
         return result;
     }
 
@@ -616,12 +653,21 @@ class SkillManager {
     // ★追加・変更：クリティカル機能の一元管理
     // ==========================================
     // 野戦用のクリティカル判定。発生したら効果の倍率をまとめて返します。
-    static getCriticalResult(unit, game, isRangedTeppo = false, isAdjacent = false) {
+    static getCriticalResult(unit, targetUnit, game, isRangedTeppo = false, isAdjacent = false) {
+        // ★追加：相手がクリティカル無効化スキル（奥羽の驍将や雷神）を持っていれば、最初から発生しません！
+        if (targetUnit && this.canInvalidateEnemyCritical(targetUnit, game)) {
+            return { isCritical: false, atkMult: 1.0, defMult: 1.0, finalDmgMult: 1.0, skillName: "" };
+        }
+
         let critCandidates = [];
 
         // 持っているスキルをすべてチェックして、クリティカルの「候補リスト」を作ります
-        if (this.hasSkill(unit, SKILL_NAMES.ONI, game)) {
-            critCandidates.push({ name: SKILL_NAMES.ONI, prob: 1/12, mult: 1.5 });
+        if (this.hasSkill(unit, SKILL_NAMES.ONI, game) || this.hasSkill(unit, SKILL_NAMES.RAIJIN, game)) {
+            let nameToUse = this.hasSkill(unit, SKILL_NAMES.RAIJIN, game) ? SKILL_NAMES.RAIJIN : SKILL_NAMES.ONI;
+            critCandidates.push({ name: nameToUse, prob: 1/12, mult: 1.5 });
+        }
+        if (this.hasSkill(unit, SKILL_NAMES.CHINZEI_ICHI, game)) {
+            critCandidates.push({ name: SKILL_NAMES.CHINZEI_ICHI, prob: 1/6, mult: 1.0 });
         }
         if (isRangedTeppo && this.hasSkill(unit, SKILL_NAMES.SOGEKI, game)) {
             critCandidates.push({ name: SKILL_NAMES.SOGEKI, prob: 1/8, mult: 1.0 });
@@ -1097,8 +1143,8 @@ class SkillManager {
         return bonus;
     }
 
-    // ＜敵クリティカル無効化＞ 野戦で相手のクリティカルを無効化する
+    // ＜敵クリティカル無効化＞ 野野戦で相手のクリティカルを無効化する
     static canInvalidateEnemyCritical(unit, game) {
-        return this.hasSkill(unit, SKILL_NAMES.OU_NO_GYOSHO, game);
+        return this.hasSkill(unit, SKILL_NAMES.OU_NO_GYOSHO, game) || this.hasSkill(unit, SKILL_NAMES.RAIJIN, game);
     }
 }

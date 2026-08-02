@@ -2748,8 +2748,9 @@ class FieldWarManager {
         let isDefRangedTeppo = false; // 反撃は距離1のみなので遠距離にはならない
         let isAdjacent = (atkDist === 1); // ★追加
 
-        let atkCritResult = SkillManager.getCriticalResult(attacker, this.game, isAtkRangedTeppo, isAdjacent);
-        let defCritResult = SkillManager.getCriticalResult(defender, this.game, isDefRangedTeppo, true); // 反撃時は必ず隣接なのでtrueを渡します
+        // ★修正：相手（ターゲット）の情報も渡して、無効化されるかどうかもマネージャーの中で判断させます！
+        let atkCritResult = SkillManager.getCriticalResult(attacker, defender, this.game, isAtkRangedTeppo, isAdjacent);
+        let defCritResult = SkillManager.getCriticalResult(defender, attacker, this.game, isDefRangedTeppo, true); // 反撃時は必ず隣接なのでtrueを渡します
 
         let isAtkCritical = atkCritResult.isCritical;
         let isDefCritical = defCritResult.isCritical;
@@ -2814,13 +2815,15 @@ class FieldWarManager {
         }
 
         // ==========================================
-        // ★変更: 傾奇者の判定（スキルマネージャーに一元管理させます）
+        // ★変更: 傾奇者と鎮西一の判定（スキルマネージャーに一元管理させます）
         // ==========================================
-        let atkKabukiResult = typeof SkillManager !== 'undefined' ? SkillManager.getKabukimonoResult(attacker, this.units, this.game, atkDist === 1) : { isActive: false, atkMult: 1.0, defMult: 1.0 };
-        let defKabukiResult = typeof SkillManager !== 'undefined' ? SkillManager.getKabukimonoResult(defender, this.units, this.game, atkDist === 1) : { isActive: false, atkMult: 1.0, defMult: 1.0 };
+        let atkUnderdogResult = typeof SkillManager !== 'undefined' ? SkillManager.getUnderdogSkillModifiers(attacker, this.units, this.game, atkDist === 1) : { atkMult: 1.0, defMult: 1.0, isKabukimono: false, isChinzei: false };
+        let defUnderdogResult = typeof SkillManager !== 'undefined' ? SkillManager.getUnderdogSkillModifiers(defender, this.units, this.game, atkDist === 1) : { atkMult: 1.0, defMult: 1.0, isKabukimono: false, isChinzei: false };
 
-        let isAtkKabukimono = atkKabukiResult.isActive;
-        let isDefKabukimono = defKabukiResult.isActive;
+        let isAtkKabukimono = atkUnderdogResult.isKabukimono;
+        let isDefKabukimono = defUnderdogResult.isKabukimono;
+        let isAtkChinzei = atkUnderdogResult.isChinzei;
+        let isDefChinzei = defUnderdogResult.isChinzei;
 
         // ==========================================
         // ★追加: 適性とスキルによる最終ダメージの増加・軽減処理
@@ -2860,28 +2863,30 @@ class FieldWarManager {
             dmgToAtk = Math.floor(dmgToAtk * aptitudeDefCounterMult * defSkillAtkMod);
         }
 
-        // 軽減系の計算（傾奇者の軽減もここで一緒に計算します）
+        // 軽減系の計算（傾奇者や鎮西一の軽減もここで一緒に計算します）
         let aptitudeDefReduceMult = SkillManager.calcAptitudeDefenseModifier(defender, attacker, isRangedAttack, this.game);
-        let defKabukiMod = defKabukiResult.defMult;
+        let defUnderdogMod = defUnderdogResult.defMult;
         
         // ★制限：軽減系はすべて重ねても元の10%未満にならないようにガードします！
-        let totalDefReduceMod = aptitudeDefReduceMult * defSkillDefMod * defKabukiMod;
+        let totalDefReduceMod = aptitudeDefReduceMult * defSkillDefMod * defUnderdogMod;
         totalDefReduceMod = Math.max(0.10, totalDefReduceMod);
         dmgToDef = Math.floor(dmgToDef * totalDefReduceMod);
         
         if (atkDist === 1) {
             let aptitudeAtkReduceMult = SkillManager.calcAptitudeDefenseModifier(attacker, defender, false, this.game);
-            let atkKabukiMod = atkKabukiResult.defMult;
+            let atkUnderdogMod = atkUnderdogResult.defMult;
             
             // ★制限：反撃の軽減にもガードをかけます
-            let totalAtkReduceMod = aptitudeAtkReduceMult * atkSkillDefMod * atkKabukiMod;
+            let totalAtkReduceMod = aptitudeAtkReduceMult * atkSkillDefMod * atkUnderdogMod;
             totalAtkReduceMod = Math.max(0.10, totalAtkReduceMod);
             dmgToAtk = Math.floor(dmgToAtk * totalAtkReduceMod);
         }
 
         // ==========================================
-        // ★追加: 複合スキルや傾奇者の最終ダメージ計算（増加分）
+        // ★追加: 複合スキルや傾奇者・鎮西一の最終ダメージ計算（増加分）
         // ==========================================
+        // （※クリティカルの無効化処理はスキルマネージャーの中で行われるようになったので、ここでは聞いて結果を受け取るだけです！）
+
         // 鬼（1.5倍）などの特別補正がある場合は適用します
         if (isAtkCritical) {
             dmgToDef = Math.floor(dmgToDef * atkCritResult.finalDmgMult);
@@ -2890,12 +2895,8 @@ class FieldWarManager {
             dmgToAtk = Math.floor(dmgToAtk * defCritResult.finalDmgMult);
         }
 
-        if (isAtkKabukimono) {
-            dmgToDef = Math.floor(dmgToDef * atkKabukiResult.atkMult); // 傾奇者による与ダメージ増幅
-        }
-        if (isDefKabukimono) {
-            dmgToAtk = Math.floor(dmgToAtk * defKabukiResult.atkMult); // 傾奇者による反撃ダメージ増幅
-        }
+        dmgToDef = Math.floor(dmgToDef * atkUnderdogResult.atkMult); // 傾奇者・鎮西一による与ダメージ増幅
+        dmgToAtk = Math.floor(dmgToAtk * defUnderdogResult.atkMult); // 傾奇者・鎮西一による反撃ダメージ増幅
 
         // ★プレイヤーがいないAI同士の戦いなら、ダメージを抑制します！
         if (!isPlayerInvolved) {
@@ -3076,6 +3077,8 @@ class FieldWarManager {
         // ★追加: ログの先頭に付けるカッコいい名前（スキル名に動的対応）
         let atkPrefix = "";
         if (isAtkKabukimono) atkPrefix += "【傾奇者】";
+        else if (isAtkChinzei) atkPrefix += "【鎮西一】";
+        
         if (isAtkCritical) {
             if (atkCritResult.skillName) {
                 atkPrefix += `【${atkCritResult.skillName}】`;
@@ -3086,6 +3089,8 @@ class FieldWarManager {
         
         let defPrefix = "";
         if (isDefKabukimono) defPrefix += "【傾奇者】";
+        else if (isDefChinzei) defPrefix += "【鎮西一】";
+        
         if (isDefCritical) {
             if (defCritResult.skillName) {
                 defPrefix += `【${defCritResult.skillName}(反撃)】`;

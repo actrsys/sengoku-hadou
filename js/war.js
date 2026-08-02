@@ -1566,6 +1566,17 @@ class WarManager {
 
         let distAtkPower = (activeAtkPower * multiplier) / Math.max(1, targetList.length);
         
+        // ★追加：劣勢スキル（鎮西一など）による補正
+        let totalAtkSoldiersForSiege = s.attacker.soldiers + (s.selfReinforcement ? s.selfReinforcement.soldiers : 0) + (s.reinforcement ? s.reinforcement.soldiers : 0);
+        let totalDefSoldiersForSiege = s.defender.soldiers + (s.defSelfReinforcement ? s.defSelfReinforcement.soldiers : 0) + (s.defReinforcement ? s.defReinforcement.soldiers : 0);
+
+        let activeUnderdogResult = { atkMult: 1.0, defMult: 1.0 };
+        if (typeof SkillManager !== 'undefined') {
+            let myTotal = isAtkTurnGroup ? totalAtkSoldiersForSiege : totalDefSoldiersForSiege;
+            let enemyTotal = isAtkTurnGroup ? totalDefSoldiersForSiege : totalAtkSoldiersForSiege;
+            activeUnderdogResult = SkillManager.calcSiegeUnderdogModifiers(activeBushos, myTotal, enemyTotal, this.game);
+        }
+
         // アクティブ部隊の攻城戦適性による与ダメージ増加倍率
         let activeAtkMod = 1.0;
         if (typeof SkillManager !== 'undefined' && activeArmyObjForEquip) {
@@ -1616,12 +1627,20 @@ class WarManager {
                 targetSkillDefMod = SkillManager.calcSkillDefenseModifier(t.bushos, clanId, kunishuId, targetAllBushos, false, isAtkTurnGroup);
             }
 
+            // ★追加：ターゲット部隊の劣勢スキル（鎮西一など）による補正
+            let targetUnderdogResult = { atkMult: 1.0, defMult: 1.0 };
+            if (typeof SkillManager !== 'undefined') {
+                let myTotal = isAtkTurnGroup ? totalDefSoldiersForSiege : totalAtkSoldiersForSiege;
+                let enemyTotal = isAtkTurnGroup ? totalAtkSoldiersForSiege : totalDefSoldiersForSiege;
+                targetUnderdogResult = SkillManager.calcSiegeUnderdogModifiers(t.bushos, myTotal, enemyTotal, this.game);
+            }
+
             // ★制限：被ダメージ軽減は、適性とスキルを合わせても元の10%未満にならないようにガードします！
-            let totalDefMod = targetDefMod * targetSkillDefMod;
+            let totalDefMod = targetDefMod * targetSkillDefMod * targetUnderdogResult.defMult;
             totalDefMod = Math.max(0.10, totalDefMod);
 
             // 最終ダメージに増加と軽減を適用します
-            dmg = dmg * (activeAtkMod * activeSkillAtkMod) * totalDefMod;
+            dmg = dmg * (activeAtkMod * activeSkillAtkMod * activeUnderdogResult.atkMult) * totalDefMod;
 
             let counterRatio = (targetDefPower * castleMod) / (distAtkPower + targetDefPower * castleMod);
             let counter = (t.atkPower * defMultiplier) * 0.5 * counterRisk * counterRatio;
@@ -1640,8 +1659,9 @@ class WarManager {
             }
 
             // ★反撃の軽減にもガードをかけます
-            let totalCounterDefMod = Math.max(0.10, activeSkillDefMod);
-            counter = counter * counterSkillAtkMod * totalCounterDefMod;
+            let totalCounterDefMod = activeSkillDefMod * activeUnderdogResult.defMult;
+            totalCounterDefMod = Math.max(0.10, totalCounterDefMod);
+            counter = counter * (counterSkillAtkMod * targetUnderdogResult.atkMult) * totalCounterDefMod;
 
             totalSoldierDmg += dmg;
             totalCounterDmg += counter;
