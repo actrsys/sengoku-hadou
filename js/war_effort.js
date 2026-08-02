@@ -7,6 +7,19 @@
 // Object.assign を使って、WarManager に魔法をくっつけます！
 Object.assign(WarManager.prototype, {
 
+    // ★追加：通知やアニメーションを表示するかどうかを判定する一元管理の魔法
+    canShowNotify(isPlayerFactionInvolved, isPlayerInvolved = false) {
+        // プレイヤー自身が操作・関与している戦闘なら、絶対に表示します！
+        if (isPlayerInvolved) return true;
+        
+        // AI戦争の通知設定がオフで、かつプレイヤーの勢力が一切関わっていなければ非表示（false）にします
+        const isNotifyOff = window.GameConfig && window.GameConfig.aiWarNotify === false;
+        if (isNotifyOff && !isPlayerFactionInvolved) return false;
+        
+        // それ以外（通知オン、またはプレイヤーの勢力が関わっている）なら表示します
+        return true;
+    },
+    
     // ★追加：大名や国主が他軍団の城に逃げ込んだ時に、軍団を解散させる共通の魔法です！
     handleDaimyoEscape(busho, targetCastle) {
         if (busho.isDaimyo && Number(targetCastle.legionId) !== 0) {
@@ -399,9 +412,7 @@ Object.assign(WarManager.prototype, {
             
             this.game.ui.log(startMsg.replace('\n', ''));
             if (!isPlayerInvolved) {
-                // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
-                const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !isPlayerFactionInvolved;
-                if (!skipAnim) {
+                if (this.canShowNotify(isPlayerFactionInvolved, isPlayerInvolved)) {
                     // ★追加：メッセージが出ると同時に、最初の刀の音を鳴らします
                     if (window.AudioManager) {
                         window.AudioManager.playSE('katana001.ogg');
@@ -521,9 +532,7 @@ Object.assign(WarManager.prototype, {
                     
                     this.game.ui.log(`【${reinfType}】${hC.name}の${leaderName}が攻撃側の援軍として参戦しました。`);
                     
-                    // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
-                    const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !isPlayerFactionInvolved;
-                    if (isPlayerInvolved || !skipAnim) {
+                    if (this.canShowNotify(isPlayerFactionInvolved, isPlayerInvolved)) {
                         await this.game.ui.showDialogAsync(msg);
                     }
                 }
@@ -614,9 +623,7 @@ Object.assign(WarManager.prototype, {
                             
                             this.game.ui.log(`【${reinfType}】${reinfData.castle.name}の${leaderName}が守備側の援軍として参戦しました。`);
                             
-                            // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
-                            const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !isPlayerFactionInvolved;
-                            if (this.state.isPlayerInvolved || !skipAnim) {
+                            if (this.canShowNotify(isPlayerFactionInvolved, this.state.isPlayerInvolved)) {
                                 await this.game.ui.showDialogAsync(msg);
                             }
                         }
@@ -930,10 +937,9 @@ Object.assign(WarManager.prototype, {
                                 }
                                 
                                 this.game.ui.log(interceptMsg.replace('\n', ''));
-                                // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
-                                const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !isPlayerFactionInvolved;
+                                
                                 if (!isPlayerInvolved) {
-                                    if (!skipAnim) {
+                                    if (this.canShowNotify(isPlayerFactionInvolved, isPlayerInvolved)) {
                                         await this.game.ui.showDialogAsync(interceptMsg);
                                     }
                                 } else {
@@ -985,10 +991,9 @@ Object.assign(WarManager.prototype, {
                 }
                 
                 this.game.ui.log(siegeMsg.replace('\n', ''));
-                // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
-                const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !isPlayerFactionInvolved;
+                
                 if (!isPlayerInvolved) {
-                    if (!skipAnim) {
+                    if (this.canShowNotify(isPlayerFactionInvolved, isPlayerInvolved)) {
                         await this.game.ui.showDialogAsync(siegeMsg);
                     }
                 } else {
@@ -1238,9 +1243,7 @@ Object.assign(WarManager.prototype, {
             }
             
             // 勝敗が決まる前に、戦場となった城の領土を2秒間点滅させる（この間は操作不可）
-            // ★変更：プレイヤー勢力が関わっている場合は、通知オフでも点滅をスキップしません！
-            const skipAnimBlink = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
-            if (s.isPlayerInvolved || !skipAnimBlink) {
+            if (this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                 await this.game.ui.playBattleBlink(s.defender.id, atkColor, defColor, 2000);
             }
             
@@ -1652,9 +1655,7 @@ Object.assign(WarManager.prototype, {
                     });
                 } else {
                     // ★修正：戦闘画面は飛ばしますが、結果のメッセージは表示してタップを待ちます！
-                    // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
-                    const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
-                    if (!skipAnim) {
+                    if (this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                         // ★追加：ダイアログを出す前にバリアを解除します！
                         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                         await this.game.ui.showDialogAsync(resultMsg);
@@ -1680,9 +1681,7 @@ Object.assign(WarManager.prototype, {
 
                     // ★追加：色が中立に変わったので、メッセージの前に地図を更新します！
                     // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
-                    // ★変更：プレイヤー勢力が関わっている場合はエフェクトをスキップしません！
-                    const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
-                    if (typeof this.game.ui.playCaptureEffect === 'function' && (s.isPlayerInvolved || !skipAnim)) {
+                    if (typeof this.game.ui.playCaptureEffect === 'function' && this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                         // 画面が真っ白になった瞬間に色を塗り替えるお願いを渡します
                         await this.game.ui.playCaptureEffect(targetC.id, () => {
                             this.game.ui.updateClanColors();
@@ -1757,9 +1756,7 @@ Object.assign(WarManager.prototype, {
                     });
                 } else {
                     // ★追加：AIの城で反乱が起きた時も、専用のメッセージを出してタップを待ちます！
-                    // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
-                    const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
-                    if (!skipAnim) {
+                    if (this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                         // ★追加：ダイアログを出す前にバリアを解除します！
                         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                         await this.game.ui.showDialogAsync(resultMsg);
@@ -1884,9 +1881,7 @@ Object.assign(WarManager.prototype, {
 
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
                 // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
-                // ★変更：プレイヤー勢力が関わっている場合はエフェクトをスキップしません！
-                const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
-                if (typeof this.game.ui.playCaptureEffect === 'function' && (s.isPlayerInvolved || !skipAnim)) {
+                if (typeof this.game.ui.playCaptureEffect === 'function' && this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                     await this.game.ui.playCaptureEffect(s.defender.id, () => {
                         this.game.ui.updateClanColors();
                     });
@@ -1940,9 +1935,7 @@ Object.assign(WarManager.prototype, {
                     }
                 } else {
                     // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
-                    // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
-                    const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
-                    if (aiResultMsg && !skipAnim) {
+                    if (aiResultMsg && this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                         // ★追加：ダイアログを出す前にバリアを解除します！
                         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                         await this.game.ui.showDialogAsync(aiResultMsg);
@@ -1989,9 +1982,7 @@ Object.assign(WarManager.prototype, {
 
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
                 // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
-                // ★変更：プレイヤー勢力が関わっている場合はエフェクトをスキップしません！
-                const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
-                if (typeof this.game.ui.playCaptureEffect === 'function' && (s.isPlayerInvolved || !skipAnim)) {
+                if (typeof this.game.ui.playCaptureEffect === 'function' && this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                     await this.game.ui.playCaptureEffect(s.defender.id, () => {
                         this.game.ui.updateClanColors();
                     });
@@ -2065,9 +2056,7 @@ Object.assign(WarManager.prototype, {
             }
             else {
                 // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
-                // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
-                const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
-                if (aiResultMsg && !skipAnim) {
+                if (aiResultMsg && this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                     // ★追加：ダイアログを出す前にバリアを解除します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                     await this.game.ui.showDialogAsync(aiResultMsg);
@@ -3265,8 +3254,7 @@ Object.assign(WarManager.prototype, {
         this.game.ui.log(msg.replace(/\n/g, ''));
         
         // プレイヤーが関わっていなくても、大きなイベントなのでダイアログでお知らせします
-        const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
-        if (this.state.isPlayerInvolved || !skipAnim) {
+        if (this.canShowNotify(this.state.isPlayerFactionInvolved, this.state.isPlayerInvolved)) {
             await this.game.ui.showDialogAsync(msg);
         }
 
