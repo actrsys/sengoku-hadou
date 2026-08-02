@@ -95,7 +95,7 @@ const SKILL_DESCRIPTIONS = {
     // 雷神
     [SKILL_NAMES.RAIJIN]: "①鬼と悪天巧者を併せ持つ。\n②自部隊と戦闘する相手部隊のクリティカル発生を無効化する。（野戦）",
     // 鎮西一
-    [SKILL_NAMES.CHINZEI_ICHI]: "①自軍が追い詰められている時、自部隊は与えるダメージが１０％上昇し、受けるダメージが１０％減少する。（野戦／攻城戦）\n②自部隊は高確率でクリティカルが発生するようになる。（野戦）",    
+    [SKILL_NAMES.CHINZEI_ICHI]: "①自軍が追い詰められている時、自部隊は与えるダメージが１０％上昇し、受けるダメージが１０％減少する。（野戦／攻城戦）\n②自部隊は高確率でクリティカルが発生するようになる。（野戦）",
     
     // ----- 移動・環境系 -----
     // 踏破
@@ -122,7 +122,7 @@ const SKILL_DESCRIPTIONS = {
     [SKILL_NAMES.IJUTSU]: "①同じ拠点にいる武将の戦没確率が減少する。\n②災害によって拠点が受ける人口ダメージが減少する。",
     // 人たらし
     [SKILL_NAMES.HITOTARASHI]: "①自身が登用の担当者である時、登用の成功率が１５％上昇する。\n②自身が武将引抜の担当者である時、武将引抜の成功率が２％上昇する。\n③派閥を形成しやすくなる。",
-    // 常陸の不死鳥
+    // 常陸の不死鳥※実質NPC専用スキル
     [SKILL_NAMES.PHOENIX]: "①戦没しなくなる。\n②大名として滅亡した時、諸勢力となる。\n③諸勢力の頭領である時、空白地を奪って大名となる。"
 };
 
@@ -1040,6 +1040,43 @@ class SkillManager {
         return { canRise: false };
     }
     
+    // ==========================================
+    // ★追加：AIの野戦・籠城判断のためのスキル評価
+    // ==========================================
+    // 守備側に野戦向けの技能を持つ武将がいるか判定します
+    static hasFieldWarAdvantageSkill(bushos, game) {
+        if (!bushos || bushos.length === 0) return false;
+        
+        // 野戦で特に輝くスキル群
+        const fieldSkills = [
+            SKILL_NAMES.MOUSHO,
+            SKILL_NAMES.ONI,
+            SKILL_NAMES.SHUYARI,
+            SKILL_NAMES.KABUKIMONO,
+            SKILL_NAMES.CHINZEI_ICHI,
+            SKILL_NAMES.RETREAT,
+            SKILL_NAMES.TENKA_FUBU,
+            SKILL_NAMES.RAIJIN,
+            SKILL_NAMES.OU_NO_GYOSHO
+        ];
+        
+        return bushos.some(b => b && fieldSkills.some(skill => this.hasSkill(b, skill, game)));
+    }
+
+    // 守備側に攻城戦（籠城）で特に輝く技能を持つ武将がいるか判定します
+    static hasSiegeDefenseAdvantageSkill(bushos, game) {
+        if (!bushos || bushos.length === 0) return false;
+        
+        // 籠城戦（守備）で特に輝くスキル群
+        const siegeSkills = [
+            SKILL_NAMES.JOSHU_NO_OHAN,
+            SKILL_NAMES.BOSHIN, 
+            SKILL_NAMES.AKAZONAE 
+        ];
+        
+        return bushos.some(b => b && siegeSkills.some(skill => this.hasSkill(b, skill, game)));
+    }
+
     // ==========================================
     // ★追加：AIの行動バリエーション拡張を一元管理する窓口
     // ==========================================

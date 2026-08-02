@@ -731,8 +731,10 @@ Object.assign(WarManager.prototype, {
 
                         console.log("【AI防衛判断フェーズ開始】");
                         console.log(`性格: ${isAggressive ? "好戦的" : "慎重"}, 自軍合計見積: ${perceivedTotalDefSoldiers}, 敵軍合計見積: ${perceivedTotalAtkSoldiers}, 兵糧見積: ${perceivedDefRice}, 必要兵糧: ${perceivedDefSoldiers * (isAggressive ? 1.5 : 1.2)}, 城防御見積: ${perceivedDefDefense}`);
-
+                        
+                        // ==========================================
                         // 野戦・籠城の判定条件
+                        // ==========================================
                         let shouldIntercept = false;
                         let reason = "";
                         
@@ -742,42 +744,63 @@ Object.assign(WarManager.prototype, {
                         // ★海戦の場合は、水際で敵を迎え撃つために野戦に出るハードルを下げます！
                         // 好戦的な性格：通常は敵の1.2倍の兵力が必要 → 海戦なら1.0倍
                         // 慎重な性格 ：通常は敵の1.5倍の兵力が必要 → 海戦なら1.3倍
-                        const aggressiveThreshold = this.state.isSeaBattle ? 1.0 : 1.2;
-                        const cautiousThreshold = this.state.isSeaBattle ? 1.3 : 1.5;
-                        
+                        let aggressiveThreshold = this.state.isSeaBattle ? 1.0 : 1.2;
+                        let cautiousThreshold = this.state.isSeaBattle ? 1.3 : 1.5;
+
+                        // ★追加：スキルマネージャーに問い合わせて、野戦や籠城に向いたスキルがあるか確認します！
+                        let hasFieldAdvantage = false;
+                        let hasSiegeAdvantage = false;
+                        if (typeof SkillManager !== 'undefined' && typeof SkillManager.hasFieldWarAdvantageSkill === 'function') {
+                            hasFieldAdvantage = SkillManager.hasFieldWarAdvantageSkill(availableDefBushos, this.game);
+                            hasSiegeAdvantage = SkillManager.hasSiegeDefenseAdvantageSkill(availableDefBushos, this.game);
+                        }
+
+                        // スキルによる閾値の調整
+                        if (hasFieldAdvantage && !hasSiegeAdvantage) {
+                            // 野戦が得意なら、少し不利（兵力が少なく）ても打って出る！
+                            aggressiveThreshold -= 0.3; 
+                            cautiousThreshold -= 0.3;   
+                        } else if (hasSiegeAdvantage && !hasFieldAdvantage) {
+                            // 籠城が得意なら、かなり有利になるまで城に引きこもる！
+                            aggressiveThreshold += 0.5; 
+                            cautiousThreshold += 0.5;   
+                        }
+
+                        const riceThreshold = isAggressive ? 1.5 : 1.2;
+                        const defThreshold = isAggressive ? 300 : 400;
+                        const currentThreshold = isAggressive ? aggressiveThreshold : cautiousThreshold;
+
                         // ★イベントによる強制迎撃命令がある場合は絶対に従います！
                         if (this.state.forceIntercept) {
                             shouldIntercept = true;
                             reason = "イベントによる強制出陣（野戦）";
-                        } else if (isAggressive) {
-                            if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * aggressiveThreshold) {
+                        } 
+                        // ★切羽詰まっている条件を先に判定します（そうしないとまずい場合）
+                        else if (!defCastle.isKunishu && perceivedDefRice < perceivedDefSoldiers * riceThreshold) {
+                            // ★諸勢力は兵糧を無から生み出す設定なので、兵糧不足を理由に野戦には出ません！
+                            shouldIntercept = true;
+                            reason = "兵糧が足りないから（野戦）";
+                        } 
+                        else if (perceivedDefDefense < defThreshold * defenseThresholdRate) {
+                            // ★諸勢力の場合は基準を半分にして判断します！
+                            shouldIntercept = true;
+                            reason = "城の防御が低いから（野戦）";
+                        } 
+                        // ★切羽詰まっていない場合の判断（ここでスキルや戦力比を活かします）
+                        else {
+                            if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * currentThreshold) {
                                 shouldIntercept = true;
-                                reason = this.state.isSeaBattle ? "水際迎撃の好機だから（海戦）" : "自軍の兵力が敵より十分に多いから（野戦）";
-                            } else if (!defCastle.isKunishu && perceivedDefRice < perceivedDefSoldiers * 1.5) {
-                                // ★諸勢力は兵糧を無から生み出す設定なので、兵糧不足を理由に野戦には出ません！
-                                shouldIntercept = true;
-                                reason = "兵糧が足りないから（野戦）";
-                            } else if (perceivedDefDefense < 300 * defenseThresholdRate) {
-                                // ★諸勢力の場合は基準を半分（150）にして判断します！
-                                shouldIntercept = true;
-                                reason = "城の防御が低いから（野戦）";
+                                if (hasFieldAdvantage && !hasSiegeAdvantage) {
+                                    reason = "野戦に長けた武将がおり、戦力も整っているから（野戦）";
+                                } else {
+                                    reason = this.state.isSeaBattle ? "水際迎撃の好機だから（海戦）" : "自軍の兵力が敵より十分に多いから（野戦）";
+                                }
                             } else {
-                                reason = "籠城できる条件が揃っているから（籠城）";
-                            }
-                        } else {
-                            if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * cautiousThreshold) {
-                                shouldIntercept = true;
-                                reason = this.state.isSeaBattle ? "水際迎撃の好機だから（海戦）" : "自軍の兵力が敵より圧倒的に多いから（野戦）";
-                            } else if (!defCastle.isKunishu && perceivedDefRice < perceivedDefSoldiers * 1.2) {
-                                // ★諸勢力は兵糧を無から生み出す設定なので、兵糧不足を理由に野戦には出ません！
-                                shouldIntercept = true;
-                                reason = "兵糧が足りないから（野戦）";
-                            } else if (perceivedDefDefense < 400 * defenseThresholdRate) {
-                                // ★諸勢力の場合は基準を半分（200）にして判断します！
-                                shouldIntercept = true;
-                                reason = "城の防御が低いから（野戦）";
-                            } else {
-                                reason = "籠城できる条件が揃っているから（籠城）";
+                                if (hasSiegeAdvantage && !hasFieldAdvantage) {
+                                    reason = "籠城戦に長けた武将がおり、防御の備えも十分だから（籠城）";
+                                } else {
+                                    reason = "籠城できる条件が揃っているから（籠城）";
+                                }
                             }
                         }
 
