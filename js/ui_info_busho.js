@@ -365,8 +365,8 @@ Object.assign(UIInfoManager.prototype, {
 
             // ★変更：基本タブと同じように flex と gap を使って隙間のサイズを統一し、高さを揃えます
             // （説明エリアを隠し味として最初から忍ばせておきます）
-            // ★追加：スマホ版なら文字を小さく（0.70remに）します
-            const descTextFontSize = isPc ? "0.95rem" : "0.70rem";
+            // ★追加：スマホ版なら文字を小さく（0.68remに）します
+            const descTextFontSize = isPc ? "0.95rem" : "0.68rem";
             
             rightContentHtml = `
                 <div style="display: flex; flex-direction: column; gap: ${rowGap}; width: 100%;">
@@ -474,8 +474,8 @@ Object.assign(UIInfoManager.prototype, {
                                 let desc = typeof SkillManager !== 'undefined' ? SkillManager.getSkillDescription(skillName) : "";
                                 if (!desc) desc = "詳細不明。";
                                 
-                                // ★追加：スマホ版なら文字を小さく（約0.65remに）します
-                                const innerDescFontSize = isPc ? "0.85rem" : "0.65rem";
+                                // ★追加：スマホ版なら文字を小さく（約0.64remに）します
+                                const innerDescFontSize = isPc ? "0.85rem" : "0.64rem";
                                 
                                 // 説明文をセットして、瞬時に表示を切り替えます
                                 descText.innerHTML = `
