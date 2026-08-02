@@ -848,9 +848,9 @@ class UISliderManager {
             const btnHalf = div.querySelector(`#div-btn-half-${b.id}`);
             const btnMax = div.querySelector(`#div-btn-max-${b.id}`);
             
-            btnMin.onclick = () => { if (window.AudioManager) window.AudioManager.playSE('choice.ogg'); onInput(1); };
-            btnHalf.onclick = () => { if (window.AudioManager) window.AudioManager.playSE('choice.ogg'); onInput(0, 'half'); };
-            btnMax.onclick = () => { if (window.AudioManager) window.AudioManager.playSE('choice.ogg'); onInput(0, 'max'); };
+            btnMin.onclick = () => { onInput(1); };
+            btnHalf.onclick = () => { onInput(0, 'half'); };
+            btnMax.onclick = () => { onInput(0, 'max'); };
             num.onblur = (e) => {
                 if(e.target.value === "" || isNaN(parseInt(e.target.value))) {
                     onInput(1);
