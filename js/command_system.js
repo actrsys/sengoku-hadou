@@ -3077,11 +3077,11 @@ class CommandSystem {
         } else if (mode === 'sabotage') {
             this.game.ui.openBushoSelector('sabotage_doer', targetCastle.id, null, onBackToMap);
         } else if (mode === 'rumor') {
-            this.game.ui.openBushoSelector('rumor_target_busho', targetCastle.id, null, onBackToMap);
+            this.game.ui.openBushoSelector('rumor_target_busho', targetCastle.id, { allowDone: true }, onBackToMap);
         } else if (mode === 'headhunt' || mode === 'headhunt_select_castle') {
-            this.game.ui.openBushoSelector('headhunt_target', targetCastle.id, null, onBackToMap);
+            this.game.ui.openBushoSelector('headhunt_target', targetCastle.id, { allowDone: true }, onBackToMap);
         } else if (mode === 'assassinate') {
-            this.game.ui.openBushoSelector('assassinate_target', targetCastle.id, null, onBackToMap);
+            this.game.ui.openBushoSelector('assassinate_target', targetCastle.id, { allowDone: true }, onBackToMap);
         } else if (mode === 'kuko') {
             this.game.tempKukoData = { clanAId: targetCastle.ownerClan };
             this.enterMapSelection('kuko_target_b');
