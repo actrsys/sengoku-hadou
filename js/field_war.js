@@ -2463,6 +2463,9 @@ class FieldWarManager {
     }
 
     async executeAttack(attacker, defender) {
+        // ★追加：クリック連打によるバグを防ぐため、一番最初にシールドを展開して他の操作をブロックします！
+        this.state = 'ANIMATING';
+
         // ★追加：プレイヤーが参加している戦闘かどうかを一番最初に判定します
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         
@@ -2913,8 +2916,7 @@ class FieldWarManager {
         // ★ここからアニメーションの魔法です！
         // ==========================================
         if (isPlayerInvolved) {
-            this.state = 'ANIMATING'; // ★他の操作をブロックするシールドを展開します！
-
+        
             const atkEl = document.getElementById(`fw-unit-el-${attacker.id}`);
             const defEl = document.getElementById(`fw-unit-el-${defender.id}`);
 
