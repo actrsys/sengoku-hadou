@@ -3923,3 +3923,96 @@ window.GameEvents.push({
         }
     }
 });
+
+// ==========================================
+// ★ 伊達輝宗 家督相続イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_idate_succession",
+    timing: "startMonth_before", 
+    isOneTime: true,             
+    
+    checkCondition: function(game) {
+        // 1. 1565年以降であるか確認します
+        if (game.year < 1565) return false;
+
+        // 2. 伊達晴宗（ID: 1074004）が存在し、大名であるか確認します
+        const harumune = window.EventCheck.getDaimyo(game, 1074004);
+        if (!harumune) return false;
+
+        // 3. プレイヤーが伊達家（晴宗の勢力）の担当ではないか確認します
+        if (game.playerClanId === harumune.clan) return false;
+
+        // 4. 伊達輝宗（ID: 1074008）が存在し、晴宗と同じ勢力に所属しているか確認します
+        const terumune = game.getBusho(1074008);
+        if (!terumune || terumune.status !== 'active' || terumune.clan !== harumune.clan) return false;
+
+        // すべての条件をクリアしたらイベント発生です！
+        return true;
+    },
+    
+    execute: async function(game) {
+        const oldDaimyo = game.getBusho(1074004);
+        const successor = game.getBusho(1074008);
+        const clanId = oldDaimyo.clan;
+        const messages = [];
+
+        // ① 功績の譲渡
+        const meritTransfer = Math.floor((oldDaimyo.achievementTotal || 0) / 3);
+        successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
+        oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
+
+        // ② 晴宗から大名のバッジを外し、隠居状態にします
+        oldDaimyo.isDaimyo = false;
+        oldDaimyo.isRetired = true;
+        
+        // ③ もし輝宗が晴宗と違うお城にいたら、晴宗のいるお城へ呼び寄せます
+        window.EventAction.moveBusho(game, successor, oldDaimyo.castleId);
+
+        // ④ 輝宗を新しい大名に任命します（城主任命は後で行います）
+        successor.isDaimyo = true;
+        if (successor.isGunshi) {
+            successor.isGunshi = false; // もし軍師だったらバッジを外します
+        }
+
+        // ⑤ お城の城主データを輝宗に書き換えます
+        const targetCastle = game.getCastle(successor.castleId);
+        window.EventAction.appointCastellan(game, successor, targetCastle);
+
+        // ⑥ ライフシステムの一元管理魔法を使って、大名就任時の改名と顔変更を行います！
+        if (game.lifeSystem) {
+            game.lifeSystem.applyDaimyoNameAndFaceChange(successor, messages);
+        }
+
+        // ⑧ 大名家のリーダーを輝宗に設定します
+        game.changeLeader(clanId, successor.id);
+
+        // ⑨ 旧大名の城の城主情報を更新します
+        if (oldDaimyo.castleId) {
+            const oldCastle = game.getCastle(oldDaimyo.castleId);
+            if (oldCastle && game.affiliationSystem) {
+                game.affiliationSystem.updateCastleLord(oldCastle);
+            }
+        }
+
+        // ⑩ 当主交代の共通の魔法を呼び出します
+        if (game.lifeSystem) {
+            game.lifeSystem.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
+        }
+
+        // ⑪ メッセージを画面に出してお知らせします
+        const clan = game.clans.find(c => c.id === clanId);
+        const clanName = clan ? clan.name : "北畠家";
+        const harumuneName = oldDaimyo.name.replace('|', '');
+        const terumuneName = successor.name.replace('|', '');
+
+        const mainMsg = `${clanName}の${harumuneName}が隠居し、\n${terumuneName}が新たな当主として家督を継ぎました！`;
+        
+        game.ui.log(`【イベント】伊達家家督相続：${mainMsg}`);
+        messages.unshift(mainMsg);
+
+        for (const msg of messages) {
+            await game.ui.showDialogAsync(msg, false, 0);
+        }
+    }
+});
