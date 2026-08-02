@@ -113,7 +113,8 @@ Object.assign(WarManager.prototype, {
         
         // 3. 相手が援軍を承諾してくれた時のメッセージ
         showAcceptance: (game, nameStr, isKunishu, isDelegated, isEnemy, onComplete, isPlayerRequest = true) => {
-            const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+            // ★変更：プレイヤー勢力が関わる通知なので、通知オフでもスキップしません！
+            const skipAnim = false;
             
             if (isEnemy) {
                 game.ui.showDialog(`${nameStr}が敵の援軍として参戦しました！`, false, onComplete);
@@ -338,6 +339,11 @@ Object.assign(WarManager.prototype, {
             const atkClan = Number(atkCastle.ownerClan !== undefined ? atkCastle.ownerClan : (atkCastle.isKunishu ? -1 : 0));
             const defClan = Number(defCastle.ownerClan || 0);
 
+            // ★追加：プレイヤー勢力（委任軍団や援軍含む）が関わっているかどうかを判定します
+            let isPlayerFactionInvolved = (atkClan === pid) || (defClan === pid);
+            if (reinforcementData && reinforcementData.castle.ownerClan === pid) isPlayerFactionInvolved = true;
+            if (selfReinforcementData && selfReinforcementData.castle.ownerClan === pid) isPlayerFactionInvolved = true;
+
             let isPlayerInvolved = false;
             if (atkClan === pid && !atkCastle.isDelegated && !atkCastle.isKunishu) isPlayerInvolved = true;
             // ★修正：諸勢力が反乱を起こした際も、自軍が防衛側であればプレイヤーが操作できるようにします
@@ -393,7 +399,8 @@ Object.assign(WarManager.prototype, {
             
             this.game.ui.log(startMsg.replace('\n', ''));
             if (!isPlayerInvolved) {
-                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
+                const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !isPlayerFactionInvolved;
                 if (!skipAnim) {
                     // ★追加：メッセージが出ると同時に、最初の刀の音を鳴らします
                     if (window.AudioManager) {
@@ -514,7 +521,8 @@ Object.assign(WarManager.prototype, {
                     
                     this.game.ui.log(`【${reinfType}】${hC.name}の${leaderName}が攻撃側の援軍として参戦しました。`);
                     
-                    const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                    // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
+                    const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !isPlayerFactionInvolved;
                     if (isPlayerInvolved || !skipAnim) {
                         await this.game.ui.showDialogAsync(msg);
                     }
@@ -563,7 +571,8 @@ Object.assign(WarManager.prototype, {
                 reinforcement: reinforcementData, selfReinforcement: selfReinforcementData,
                 isKunishuSubjugation: defCastle.isKunishu === true && !atkCastle.isKunishu, // 防衛側が諸勢力で、攻撃側が諸勢力(蜂起)でないなら鎮圧戦！
                 isDaimyoCastle: isDaimyoCastle, // ★大名の居城フラグを追加
-                isSeaBattle: isSeaBattle // ★海戦フラグを追加
+                isSeaBattle: isSeaBattle, // ★海戦フラグを追加
+                isPlayerFactionInvolved: isPlayerFactionInvolved // ★追加
             };
 
             // ★追加：戦闘準備が整ったこのタイミングで「戦闘前」の歴史イベントをチェックします
@@ -576,6 +585,16 @@ Object.assign(WarManager.prototype, {
                 const startAllyReinforcement = () => {
                     this.checkDefenderReinforcement(defCastle, atkClan, async () => {
                     
+                    // ★追加：守備側の援軍にプレイヤー勢力が含まれる場合はフラグを更新します！
+                    if (this.state.defSelfReinforcement && this.state.defSelfReinforcement.castle.ownerClan === pid) {
+                        isPlayerFactionInvolved = true;
+                        this.state.isPlayerFactionInvolved = true;
+                    }
+                    if (this.state.defReinforcement && this.state.defReinforcement.castle.ownerClan === pid) {
+                        isPlayerFactionInvolved = true;
+                        this.state.isPlayerFactionInvolved = true;
+                    }
+
                     // ★追加：守備側の援軍に「プレイヤーが操作できる部隊（直轄領）」が含まれている場合は、強制的に手動戦闘（画面表示）にします！
                     if (this.state.defSelfReinforcement && this.state.defSelfReinforcement.castle.ownerClan === pid && !this.state.defSelfReinforcement.castle.isDelegated && !this.state.defSelfReinforcement.isKunishuForce) {
                         this.state.isPlayerInvolved = true;
@@ -595,7 +614,8 @@ Object.assign(WarManager.prototype, {
                             
                             this.game.ui.log(`【${reinfType}】${reinfData.castle.name}の${leaderName}が守備側の援軍として参戦しました。`);
                             
-                            const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                            // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
+                            const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !isPlayerFactionInvolved;
                             if (this.state.isPlayerInvolved || !skipAnim) {
                                 await this.game.ui.showDialogAsync(msg);
                             }
@@ -910,7 +930,8 @@ Object.assign(WarManager.prototype, {
                                 }
                                 
                                 this.game.ui.log(interceptMsg.replace('\n', ''));
-                                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                                // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
+                                const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !isPlayerFactionInvolved;
                                 if (!isPlayerInvolved) {
                                     if (!skipAnim) {
                                         await this.game.ui.showDialogAsync(interceptMsg);
@@ -964,7 +985,8 @@ Object.assign(WarManager.prototype, {
                 }
                 
                 this.game.ui.log(siegeMsg.replace('\n', ''));
-                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
+                const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !isPlayerFactionInvolved;
                 if (!isPlayerInvolved) {
                     if (!skipAnim) {
                         await this.game.ui.showDialogAsync(siegeMsg);
@@ -1184,6 +1206,18 @@ Object.assign(WarManager.prototype, {
             s.oldDefClanId = s.defender.ownerClan; 
             s.extinctionNotified = false; // フラグの初期化
 
+            // ★追加：プレイヤー勢力が関わっているかどうかのフラグを用意します！
+            const pid = Number(this.game.playerClanId);
+            const isAtkPlayer = (Number(s.attacker.ownerClan) === pid) || 
+                                (s.reinforcement && Number(s.reinforcement.castle.ownerClan) === pid) || 
+                                (s.selfReinforcement && Number(s.selfReinforcement.castle.ownerClan) === pid) ||
+                                (s.retreatedReinforcements && s.retreatedReinforcements.some(r => r.isAttackerData && r.data.castle && Number(r.data.castle.ownerClan) === pid));
+            const isDefPlayer = (Number(s.oldDefClanId) === pid) || 
+                                (s.defReinforcement && Number(s.defReinforcement.castle.ownerClan) === pid) || 
+                                (s.defSelfReinforcement && Number(s.defSelfReinforcement.castle.ownerClan) === pid) ||
+                                (s.retreatedReinforcements && s.retreatedReinforcements.some(r => !r.isAttackerData && r.data.castle && Number(r.data.castle.ownerClan) === pid));
+            s.isPlayerFactionInvolved = isAtkPlayer || isDefPlayer;
+
             // ★追加：大名の居城が攻め落とされたかのフラグを立てます（撤退による明け渡しも含む）
             if (attackerWon && !s.attacker.isKunishu && s.attacker.ownerClan !== 0 && s.oldDefClanId !== 0) {
                 s.isDaimyoCastleFallen = s.isDaimyoCastle;
@@ -1204,7 +1238,8 @@ Object.assign(WarManager.prototype, {
             }
             
             // 勝敗が決まる前に、戦場となった城の領土を2秒間点滅させる（この間は操作不可）
-            const skipAnimBlink = window.GameConfig && window.GameConfig.aiWarNotify === false;
+            // ★変更：プレイヤー勢力が関わっている場合は、通知オフでも点滅をスキップしません！
+            const skipAnimBlink = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
             if (s.isPlayerInvolved || !skipAnimBlink) {
                 await this.game.ui.playBattleBlink(s.defender.id, atkColor, defColor, 2000);
             }
@@ -1617,7 +1652,8 @@ Object.assign(WarManager.prototype, {
                     });
                 } else {
                     // ★修正：戦闘画面は飛ばしますが、結果のメッセージは表示してタップを待ちます！
-                    const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                    // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
+                    const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
                     if (!skipAnim) {
                         // ★追加：ダイアログを出す前にバリアを解除します！
                         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
@@ -1720,7 +1756,8 @@ Object.assign(WarManager.prototype, {
                     });
                 } else {
                     // ★追加：AIの城で反乱が起きた時も、専用のメッセージを出してタップを待ちます！
-                    const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                    // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
+                    const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
                     if (!skipAnim) {
                         // ★追加：ダイアログを出す前にバリアを解除します！
                         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
@@ -1901,7 +1938,8 @@ Object.assign(WarManager.prototype, {
                     }
                 } else {
                     // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
-                    const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                    // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
+                    const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
                     if (aiResultMsg && !skipAnim) {
                         // ★追加：ダイアログを出す前にバリアを解除します！
                         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
@@ -1913,15 +1951,7 @@ Object.assign(WarManager.prototype, {
             }
                 
             let resultMsg = "";
-            const pid = Number(this.game.playerClanId);
-            const isAtkPlayer = (Number(s.attacker.ownerClan) === pid) || 
-                                (s.reinforcement && Number(s.reinforcement.castle.ownerClan) === pid) || 
-                                (s.selfReinforcement && Number(s.selfReinforcement.castle.ownerClan) === pid) ||
-                                (s.retreatedReinforcements && s.retreatedReinforcements.some(r => r.isAttackerData && r.data.castle && Number(r.data.castle.ownerClan) === pid));
-            const isDefPlayer = (Number(s.oldDefClanId) === pid) || 
-                                (s.defReinforcement && Number(s.defReinforcement.castle.ownerClan) === pid) || 
-                                (s.defSelfReinforcement && Number(s.defSelfReinforcement.castle.ownerClan) === pid) ||
-                                (s.retreatedReinforcements && s.retreatedReinforcements.some(r => !r.isAttackerData && r.data.castle && Number(r.data.castle.ownerClan) === pid));
+            // pid, isAtkPlayer, isDefPlayer の定義は上部に移動したため、ここでは敵の名前だけ決めます
             const enemyName = isAtkPlayer ? (this.game.clans.find(c => c.id === s.oldDefClanId)?.getArmyName() || "敵軍") : s.attacker.name;
 
             if (attackerWon) {
@@ -2032,7 +2062,8 @@ Object.assign(WarManager.prototype, {
             }
             else {
                 // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
-                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                // ★変更：プレイヤー勢力が関わっている場合は、通知オフでもスキップしません！
+                const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
                 if (aiResultMsg && !skipAnim) {
                     // ★追加：ダイアログを出す前にバリアを解除します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
