@@ -1084,11 +1084,11 @@ Object.assign(UIManager.prototype, {
             'atk_self_reinforcement', 'atk_ally_reinforcement',
             'def_self_reinforcement', 'def_ally_reinforcement',
             'investigate', 'info_investigate', 'investigation', // 調査コマンド用
-            'incite', 'rumor', 'headhunt', 'headhunt_select_castle', 'sabotage' // 調略コマンド用
+            'incite', 'rumor', 'headhunt', 'headhunt_select_castle', 'sabotage', 'assassinate' // 計略コマンド用
         ];
         if (hiddenModes.includes(this.game.selectionMode)) return;
 
-        // ★ここから追加：外交や調略以外の「自国の城しか選ばないコマンド（輸送など）」の時は名前シールを出さない魔法！
+        // ★ここから追加：外交や計略以外の「自国の城しか選ばないコマンド（輸送など）」の時は名前シールを出さない魔法！
         if (this.game.selectionMode) {
             // 選べる城の中に、自分の勢力以外の城があるかチェックします
             const hasOtherClanTarget = this.game.validTargets.some(castleId => {

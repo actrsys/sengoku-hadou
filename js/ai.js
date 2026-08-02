@@ -1518,7 +1518,7 @@ class AIEngine {
         // ★追加：取引の回数を数えるカウンター
         let tradeCount = 0;
         
-        // ★追加：行動回数消費なしの特別調略を行ったかのフラグ
+        // ★追加：行動回数消費なしの特別計略を行ったかのフラグ
         let hasBonusSabotageUsed = false;
 
         // ★高速化：今の国の兵糧の単価（相場）を一元化された魔法で取得します！
@@ -2292,8 +2292,8 @@ class AIEngine {
                 actions.push({ type: 'reward', stat: 'none', score: rewardScore, cost: 100, targets: rewardTargets });
             }
             
-            // ★13. 調略（スコアは一律低めに設定）
-            // 作戦（myOp）で決められた「調略目標（sabotageTargets）」に対して工作を行います！
+            // ★13. 計略（スコアは一律低めに設定）
+            // 作戦（myOp）で決められた「計略目標（sabotageTargets）」に対して工作を行います！
             if (myOp && myOp.sabotageTargets && myOp.sabotageTargets.length > 0) {
                 // 第一目標から順番にチェックして、有効な目標が見つかるまで繰り上げます
                 while (myOp.sabotageTargets.length > 0) {
@@ -2482,7 +2482,7 @@ class AIEngine {
 
                 // その行動に一番向いている武将を探します（一番能力が高い人が実行します）
                 const bestBushos = availableBushos.sort((a, b) => {
-                    // ★追加：調略の場合は、専門部署が用意した「総合スコア」を使って比べっこします！
+                    // ★追加：計略の場合は、専門部署が用意した「総合スコア」を使って比べっこします！
                     if (action.type === 'sabotage') {
                         return StrategySystem.calcSabotageScore(b) - StrategySystem.calcSabotageScore(a);
                     }
@@ -2495,7 +2495,7 @@ class AIEngine {
                     if (action.type === 'headhunt') {
                         return StrategySystem.calcHeadhuntScore(b) - StrategySystem.calcHeadhuntScore(a);
                     }
-                    // 調略以外の普通のお仕事は、今まで通り1つの能力（stat）で比べっこします
+                    // 計略以外の普通のお仕事は、今まで通り1つの能力（stat）で比べっこします
                     return b[action.stat] - a[action.stat];
                 });
                 if (bestBushos.length === 0) continue; // 基準を満たす人がいなければ、この行動は諦めます

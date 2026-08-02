@@ -148,7 +148,7 @@ class GunshiSystem {
             return "おやめください。失敗する未来しか見えませぬ。"; 
         }
         
-        // ★調略コマンド（離間計・破壊工作・民心撹乱）の場合は、成功率と効果量の組み合わせで自然なつなぎ言葉にします
+        // ★計略コマンド（離間計・破壊工作・民心撹乱）の場合は、成功率と効果量の組み合わせで自然なつなぎ言葉にします
         if (action.type === 'rumor' || action.type === 'sabotage' || action.type === 'incite' || action.type === 'kuko') {
             let probMsg = "";
             let probIsHigh = false;
