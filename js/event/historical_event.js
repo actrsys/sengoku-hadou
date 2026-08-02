@@ -3891,10 +3891,10 @@ window.GameEvents.push({
             game.lifeSystem.applyDaimyoNameAndFaceChange(successor, messages);
         }
 
-        // ⑧ 大名家のリーダーを具房に設定します
+        // ⑦ 大名家のリーダーを具房に設定します
         game.changeLeader(clanId, successor.id);
 
-        // ⑨ 旧大名の城の城主情報を更新します
+        // ⑧ 旧大名の城の城主情報を更新します
         if (oldDaimyo.castleId) {
             const oldCastle = game.getCastle(oldDaimyo.castleId);
             if (oldCastle && game.affiliationSystem) {
@@ -3902,12 +3902,12 @@ window.GameEvents.push({
             }
         }
 
-        // ⑩ 当主交代の共通の魔法を呼び出します
+        // ⑨ 当主交代の共通の魔法を呼び出します
         if (game.lifeSystem) {
             game.lifeSystem.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
         }
 
-        // ⑪ メッセージを画面に出してお知らせします
+        // ⑩ メッセージを画面に出してお知らせします
         const clan = game.clans.find(c => c.id === clanId);
         const clanName = clan ? clan.name : "北畠家";
         const tomonoriName = oldDaimyo.name.replace('|', '');
@@ -3984,10 +3984,10 @@ window.GameEvents.push({
             game.lifeSystem.applyDaimyoNameAndFaceChange(successor, messages);
         }
 
-        // ⑧ 大名家のリーダーを輝宗に設定します
+        // ⑦ 大名家のリーダーを輝宗に設定します
         game.changeLeader(clanId, successor.id);
 
-        // ⑨ 旧大名の城の城主情報を更新します
+        // ⑧ 旧大名の城の城主情報を更新します
         if (oldDaimyo.castleId) {
             const oldCastle = game.getCastle(oldDaimyo.castleId);
             if (oldCastle && game.affiliationSystem) {
@@ -3995,14 +3995,14 @@ window.GameEvents.push({
             }
         }
 
-        // ⑩ 当主交代の共通の魔法を呼び出します
+        // ⑨ 当主交代の共通の魔法を呼び出します
         if (game.lifeSystem) {
             game.lifeSystem.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
         }
 
-        // ⑪ メッセージを画面に出してお知らせします
+        // ⑩ メッセージを画面に出してお知らせします
         const clan = game.clans.find(c => c.id === clanId);
-        const clanName = clan ? clan.name : "北畠家";
+        const clanName = clan ? clan.name : "伊達家";
         const harumuneName = oldDaimyo.name.replace('|', '');
         const terumuneName = successor.name.replace('|', '');
 
