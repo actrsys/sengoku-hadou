@@ -1797,9 +1797,9 @@ window.GameEvents.push({
         hikuma.name = "浜松城";
         hikuma.yomi = "はままつじょう";
 
-        // ②防御力と石高の最大値（器の大きさ）をそれぞれ500大きくします
-        hikuma.maxDefense = hikuma.maxDefense + 500;
-        hikuma.maxKokudaka = Math.min(99999, hikuma.maxKokudaka + 500);
+        // ②防御力と石高の最大値（器の大きさ）をそれぞれ1000・1000大きくします
+        hikuma.maxDefense = hikuma.maxDefense + 1000;
+        hikuma.maxKokudaka = Math.min(99999, hikuma.maxKokudaka + 1000);
 
         // ③ 浜松城の防御力と民忠を、上限（最大値）まで回復させます
         hikuma.defense = hikuma.maxDefense;
