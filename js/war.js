@@ -621,8 +621,28 @@ class WarManager {
             if (s.attacker.morale <= 0) { this.endWar(false); return; }
             if (s.attacker.soldiers <= 0) { this.endWar(false); return; } 
             
-            if (s.attacker.rice <= 0) { if(s.isPlayerInvolved) this.game.ui.log("攻撃軍の兵糧が尽きました！"); this.endWar(false); return; }
-            if (s.defender.rice <= 0) { if(s.isPlayerInvolved) this.game.ui.log("守備軍の兵糧が尽きました！"); this.endWar(true); return; }
+            if (s.attacker.rice <= 0) { 
+                if (s.isPlayerInvolved && this.game.ui) {
+                    this.game.ui.log("攻撃軍の兵糧が尽きました！");
+                    this.game.ui.showDialog("攻撃軍の兵糧が尽きました！\n攻撃軍は撤退します。", false, () => {
+                        this.endWar(false);
+                    });
+                } else {
+                    this.endWar(false); 
+                }
+                return; 
+            }
+            if (s.defender.rice <= 0) { 
+                if (s.isPlayerInvolved && this.game.ui) {
+                    this.game.ui.log("守備軍の兵糧が尽きました！");
+                    this.game.ui.showDialog("守備軍の兵糧が尽きました！\nこれ以上の籠城は不可能です……。", false, () => {
+                        this.endWar(true);
+                    });
+                } else {
+                    this.endWar(true); 
+                }
+                return; 
+            }
 
             // みんなが作戦（コマンド）を決める順番のリストを作ります
             // ★野戦などで兵士が0になって全滅した援軍には、作戦を聞かないようにガードを追加しました！
@@ -2065,7 +2085,22 @@ class WarManager {
 
                 s.phase = 'init';
                 s.round++;
-                if(s.round > window.WarParams.Military.WarMaxRounds) { this.endWar(false); return; } 
+                if (s.round > window.WarParams.Military.WarMaxRounds) { 
+                    if (s.isPlayerInvolved && this.game.ui) {
+                        const isAtkPlayer = (Number(s.attacker.ownerClan) === Number(this.game.playerClanId));
+                        const isDefPlayer = (Number(s.defender.ownerClan) === Number(this.game.playerClanId));
+                        let msg = "決着がつかず、攻撃軍は撤退しました。";
+                        if (isAtkPlayer) msg = "攻城戦が長引き、我が軍は撤退を余儀なくされました……";
+                        else if (isDefPlayer) msg = "城の防衛に成功しました！ 敵軍は撤退していきました。";
+                        
+                        this.game.ui.showDialog(msg, false, () => {
+                            this.endWar(false);
+                        });
+                    } else {
+                        this.endWar(false); 
+                    }
+                    return; 
+                } 
                 this.processWarRound();
             }
         }

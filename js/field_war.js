@@ -1989,64 +1989,77 @@ class FieldWarManager {
         const isDefPlayer = (Number(this.warState.defender.ownerClan) === Number(this.game.playerClanId));
         const enemyName = isAtkPlayer ? this.warState.defender.name + "軍" : (isDefPlayer ? this.warState.attacker.name + "軍" : "敵軍");
 
+        // ★修正: 結果とメッセージを一時的に保存する箱を作ります
+        let endResult = null;
+        let endMessage = "";
+
         if (!atkAlive || !atkGeneralAlive) {
-            // ★追加：総大将が撤退（負傷）していた場合は専用のメッセージを出します
             if (atkGeneralRetreated) {
-                if (isAtkPlayer) this.log(`総大将が戦線から離脱し、我が軍は敗走しました……`);
-                else if (isDefPlayer) this.log(`敵の総大将が戦線から離脱しました！`);
-                else this.log(`攻撃軍の総大将が戦線から離脱した！`);
+                if (isAtkPlayer) endMessage = `総大将が戦線から離脱し、我が軍は敗走しました……`;
+                else if (isDefPlayer) endMessage = `敵の総大将が戦線から離脱しました！`;
+                else endMessage = `攻撃軍の総大将が戦線から離脱した！`;
             } else {
-                if (isAtkPlayer) this.log(`総大将が撃破され、我が軍は敗北しました……`);
-                else if (isDefPlayer) this.log(`敵の総大将を撃破しました！`);
-                else this.log(`攻撃軍の総大将が敗走した！`);
+                if (isAtkPlayer) endMessage = `総大将が撃破され、我が軍は敗北しました……`;
+                else if (isDefPlayer) endMessage = `敵の総大将を撃破しました！`;
+                else endMessage = `攻撃軍の総大将が敗走した！`;
             }
-            this.endFieldWar('attacker_lose');
-            return true;
+            endResult = 'attacker_lose';
         }
-        if (!defAlive || !defGeneralAlive) {
-            // ★追加：総大将が撤退（負傷）していた場合は専用のメッセージを出します
+        else if (!defAlive || !defGeneralAlive) {
             if (defGeneralRetreated) {
-                if (isAtkPlayer) this.log(`敵の総大将が戦線から離脱しました！`);
-                else if (isDefPlayer) this.log(`総大将が戦線から離脱し、我が軍は敗走しました……`);
-                else this.log(`守備軍の総大将が戦線から離脱した！`);
+                if (isAtkPlayer) endMessage = `敵の総大将が戦線から離脱しました！`;
+                else if (isDefPlayer) endMessage = `総大将が戦線から離脱し、我が軍は敗走しました……`;
+                else endMessage = `守備軍の総大将が戦線から離脱した！`;
             } else {
-                if (isAtkPlayer) this.log(`敵の総大将を撃破しました！`);
-                else if (isDefPlayer) this.log(`総大将が撃破され、我が軍は敗北しました……`);
-                else this.log(`守備軍の総大将が敗走した！`);
+                if (isAtkPlayer) endMessage = `敵の総大将を撃破しました！`;
+                else if (isDefPlayer) endMessage = `総大将が撃破され、我が軍は敗北しました……`;
+                else endMessage = `守備軍の総大将が敗走した！`;
             }
-            this.endFieldWar('attacker_win');
-            return true;
+            endResult = 'attacker_win';
         }
-        
-        let atkTotalRice = 0, defTotalRice = 0;
-        for (let key in this.groupStats) {
-            if (!this.groupStats[key]) continue;
-            if (key.startsWith('atk_')) atkTotalRice += this.groupStats[key].rice;
-            else if (key.startsWith('def_')) defTotalRice += this.groupStats[key].rice;
+        else {
+            let atkTotalRice = 0, defTotalRice = 0;
+            for (let key in this.groupStats) {
+                if (!this.groupStats[key]) continue;
+                if (key.startsWith('atk_')) atkTotalRice += this.groupStats[key].rice;
+                else if (key.startsWith('def_')) defTotalRice += this.groupStats[key].rice;
+            }
+
+            if (atkTotalRice <= 0) {
+                if (isAtkPlayer) endMessage = `兵糧が尽き、これ以上の行軍は不可能です……`;
+                else if (isDefPlayer) endMessage = `${enemyName}は兵糧が尽き、撤退していきました！`;
+                else endMessage = `兵糧が尽き、攻撃軍は撤退を余儀なくされた！`;
+                endResult = 'attacker_lose';
+            }
+            else if (defTotalRice <= 0) {
+                if (isAtkPlayer) endMessage = `${enemyName}の兵糧が尽き、城へ敗走していきました！`;
+                else if (isDefPlayer) endMessage = `兵糧が底を突き、戦線を維持できません……`;
+                else endMessage = `兵糧が尽き、守備軍は城へ敗走した！`;
+                endResult = 'attacker_win';
+            }
+            else if (this.turnCount > this.maxTurns) {
+                if (isAtkPlayer) endMessage = `これ以上の野戦は不利と判断し撤退します……`;
+                else if (isDefPlayer) endMessage = `${enemyName}は攻めきれずに撤退していきました！`;
+                else endMessage = `野戦では決着がつかず、攻撃軍は撤退を余儀なくされた！`;
+                endResult = 'attacker_retreat';
+            }
         }
 
-        if (atkTotalRice <= 0) {
-            if (isAtkPlayer) this.log(`兵糧が尽き、これ以上の行軍は不可能です……`);
-            else if (isDefPlayer) this.log(`${enemyName}は兵糧が尽き、撤退していきました！`);
-            else this.log(`兵糧が尽き、攻撃軍は撤退を余儀なくされた！`);
-            this.endFieldWar('attacker_lose');
-            return true;
-        }
-        if (defTotalRice <= 0) {
-            if (isAtkPlayer) this.log(`${enemyName}の兵糧が尽き、城へ敗走していきました！`);
-            else if (isDefPlayer) this.log(`兵糧が底を突き、戦線を維持できません……`);
-            else this.log(`兵糧が尽き、守備軍は城へ敗走した！`);
-            this.endFieldWar('attacker_win');
+        // 終了条件を満たしている場合
+        if (endResult) {
+            this.log(endMessage);
+            
+            if (isPlayerInvolved && this.game && this.game.ui) {
+                // ★修正: プレイヤーが参加している場合はダイアログを出してから終了処理へ進みます！
+                this.game.ui.showDialog(endMessage, false, () => {
+                    this.endFieldWar(endResult);
+                });
+            } else {
+                this.endFieldWar(endResult);
+            }
             return true;
         }
         
-        if (this.turnCount > this.maxTurns) {
-            if (isAtkPlayer) this.log(`これ以上の野戦は不利と判断し撤退します……`);
-            else if (isDefPlayer) this.log(`${enemyName}は攻めきれずに撤退していきました！`);
-            else this.log(`野戦では決着がつかず、攻撃軍は撤退を余儀なくされた！`);
-            this.endFieldWar('attacker_retreat');
-            return true;
-        }
         return false;
     }
     
