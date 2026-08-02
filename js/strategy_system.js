@@ -192,11 +192,9 @@ class StrategySystem {
         
         let prob = strBonus / loyaltyBonus;
         
-        // ★追加：忍術適性による確率ボーナス
+        // ★修正：スキルの一元管理魔法を呼び出して確率を増減させます！
         if (typeof SkillManager !== 'undefined') {
-            prob += SkillManager.calcNinjutsuProbBonus(busho);
-            // ★追加：武芸適性による防諜効果（成功率マイナス）
-            prob -= SkillManager.calcBugeiCounterIntelligenceBonus(targetId, this.game);
+            prob += SkillManager.calcStrategyProbModifier('incite', busho, targetId, 0, this.game);
         }
         
         return Math.max(0.01, Math.min(0.99, prob));
@@ -237,9 +235,9 @@ class StrategySystem {
         
         let prob = (doerStrengthMod / mods.def / mods.duty / mods.loyalty / mods.affinity) * mods.position;
         
-        // ★追加：対象のいる城の武芸適性による防諜効果（成功率マイナス）
+        // ★修正：スキルの一元管理魔法を呼び出して確率を増減させます！
         if (typeof SkillManager !== 'undefined') {
-            prob -= SkillManager.calcBugeiCounterIntelligenceBonus(target.castleId, this.game);
+            prob += SkillManager.calcStrategyProbModifier('rumor', doer, target.castleId, target.clan, this.game);
         }
 
         return Math.max(0.01, Math.min(0.99, prob));
@@ -277,11 +275,6 @@ class StrategySystem {
         const totalOffense = offense + newBonus + doerBonus;
         const totalDefense = defense + lordBonus;
         let successRate = (totalOffense / totalDefense) * 0.5; // 最後の0.5は武将引抜の成功率調整用
-        
-        // ★追加：対象のいる城の武芸適性による防諜効果（成功率マイナス）
-        if (typeof SkillManager !== 'undefined') {
-            successRate -= SkillManager.calcBugeiCounterIntelligenceBonus(target.castleId, this.game);
-        }
 
         // ★修正：対象のステータスに合わせてペナルティを適用します
         const officerStatus = this.checkOfficerStatus(target);
@@ -300,9 +293,9 @@ class StrategySystem {
             }
         }
         
-        // ★追加：スキルマネージャーから引抜の成功率ボーナスを受け取ります
+        // ★修正：スキルの一元管理魔法を呼び出して確率を増減させます！
         if (typeof SkillManager !== 'undefined') {
-            successRate += SkillManager.calcHeadhuntProbBonus(doer, this.game);
+            successRate += SkillManager.calcStrategyProbModifier('headhunt', doer, target.castleId, target.clan, this.game);
         }
 
         return Math.max(0, Math.min(1.0, successRate));
@@ -315,15 +308,9 @@ class StrategySystem {
         
         let prob = doer.intelligence / 1000; // 基本成功率は担当者の智謀/10(%)
 
+        // ★修正：スキルの一元管理魔法を呼び出して確率を増減させます！
         if (typeof SkillManager !== 'undefined') {
-            // 担当者の忍術スキルLv×２％成功率がアップ。
-            prob += SkillManager.getNinjutsuLevel(doer) * 0.02;
-            
-            // 自勢力に忍術持ちがいるとき、いる場所にかかわらずLv１につき暗殺成功率を１％下げる
-            prob -= SkillManager.calcNinjutsuAssassinateDefense(target.clan, this.game);
-            
-            // 武芸持ちがいる拠点に対する、暗殺の成功率をLv１につき２％ダウン
-            prob -= SkillManager.calcBugeiAssassinateDefense(target.castleId, this.game);
+            prob += SkillManager.calcStrategyProbModifier('assassinate', doer, target.castleId, target.clan, this.game);
         }
 
         // 暗殺対象の拠点の兵士数１０名につき成功率０．２％ダウン。
@@ -332,9 +319,9 @@ class StrategySystem {
             prob -= (Math.floor(soldiers / 10) * 0.002);
         }
 
-        // 暗殺対象の拠点にいる、相手と同じ勢力の武将１人につき成功率が６％ダウン。
+        // 暗殺対象の拠点にいる、相手と同じ勢力の武将１人につき成功率が６％ダウン。（※暗殺対象本人は含めません）
         if (targetCastle) {
-            const sameClanBushos = this.game.getCastleBushos(targetCastle.id).filter(b => b.clan === target.clan && b.status === 'active');
+            const sameClanBushos = this.game.getCastleBushos(targetCastle.id).filter(b => b.clan === target.clan && b.status === 'active' && b.id !== target.id);
             prob -= (sameClanBushos.length * 0.06);
         }
 
@@ -356,10 +343,12 @@ class StrategySystem {
     getSabotageExpectedDamage(doerId, targetId) {
         const busho = this.game.getBusho(doerId);
         let damage = Math.max(1, Math.floor(StrategySystem.getSabotageDamageBase(busho)));
-        // ★追加：忍術適性によるダメージボーナス
+        
+        // ★修正：スキルの一元管理魔法を呼び出してダメージを増やします！
         if (typeof SkillManager !== 'undefined') {
-            damage += SkillManager.calcNinjutsuSabotageBonus(busho);
+            damage += SkillManager.calcStrategyDamageModifier('sabotage', busho);
         }
+        
         return damage;
     }
 
@@ -370,10 +359,12 @@ class StrategySystem {
         const intBonus = StrategySystem.getInciteDamageBase(busho);
         const loyaltyBonus = (targetCastle.peoplesLoyalty / 120) + 0.9;
         let damage = Math.max(1, Math.floor(intBonus / loyaltyBonus));
-        // ★追加：忍術適性によるダメージボーナス
+        
+        // ★修正：スキルの一元管理魔法を呼び出してダメージを増やします！
         if (typeof SkillManager !== 'undefined') {
-            damage += SkillManager.calcNinjutsuInciteBonus(busho);
+            damage += SkillManager.calcStrategyDamageModifier('incite', busho);
         }
+        
         return damage;
     }
     
@@ -384,11 +375,9 @@ class StrategySystem {
         // ★共通処理から基礎確率を呼び出す
         let prob = StrategySystem.getSabotageProbBase(busho);
         
-        // ★追加：忍術適性による確率ボーナス
+        // ★修正：スキルの一元管理魔法を呼び出して確率を増減させます！
         if (typeof SkillManager !== 'undefined') {
-            prob += SkillManager.calcNinjutsuProbBonus(busho);
-            // ★追加：武芸適性による防諜効果（成功率マイナス）
-            prob -= SkillManager.calcBugeiCounterIntelligenceBonus(targetId, this.game);
+            prob += SkillManager.calcStrategyProbModifier('sabotage', busho, targetId, 0, this.game);
         }
         
         return Math.max(0.01, Math.min(0.99, prob));
@@ -416,18 +405,15 @@ class StrategySystem {
         
         if(!success) return { success: false, val: 0 }; 
         
-        // ★共通処理から基礎ダメージを呼び出す
-        let damage = Math.max(1, Math.floor(StrategySystem.getSabotageDamageBase(busho)));
-        // ★追加：忍術適性によるダメージボーナス
-        if (typeof SkillManager !== 'undefined') {
-            damage += SkillManager.calcNinjutsuSabotageBonus(busho);
-        }
+        // ★修正：さっき整えた「予測ダメージを計算する魔法」をそのまま呼び出して使います！
+        // こうすることで二重に計算する手間が省けます
+        let damage = this.getSabotageExpectedDamage(doerId, targetId);
+
         return { success: true, val: damage }; 
     }
     
     calcIncite(doerId, targetId, isExecute = false) { 
         const busho = this.game.getBusho(doerId);
-        const targetCastle = this.game.getCastle(targetId);
         
         const prob = this.getInciteProb(doerId, targetId);
         const success = Math.random() < prob; 
@@ -436,14 +422,9 @@ class StrategySystem {
         
         if(!success) return { success: false, val: 0 }; 
         
-        // ★共通処理から基礎ダメージを呼び出す
-        const intBonus = StrategySystem.getInciteDamageBase(busho);
-        const loyaltyBonus = (targetCastle.peoplesLoyalty / 120) + 0.9;
-        let damage = Math.max(1, Math.floor(intBonus / loyaltyBonus));
-        // ★追加：忍術適性によるダメージボーナス
-        if (typeof SkillManager !== 'undefined') {
-            damage += SkillManager.calcNinjutsuInciteBonus(busho);
-        }
+        // ★修正：こちらも予測ダメージを計算する魔法をそのまま呼び出します！
+        let damage = this.getInciteExpectedDamage(doerId, targetId);
+
         return { success: true, val: damage }; 
     }
     
@@ -685,25 +666,23 @@ class StrategySystem {
         // ★ 一元化した処理を呼び出します
         const captiveMsgs = this.applyHeadhuntEffect(doer, target, castle, isSuccess);
         
+        let msg = "";
         if (isSuccess) {
             if (target.isCastellan) {
-                let msg = `${doer.name}の引抜工作が成功！\n${target.name}が【${oldCastleName}】ごと我が軍に寝返りました！`;
+                msg = `${doer.name}の引抜工作が成功！\n${target.name}が【${oldCastleName}】ごと我が軍に寝返りました！`;
                 if (captiveMsgs && captiveMsgs.length > 0) {
                     msg += '\n\n' + captiveMsgs.join('\n');
                 }
                 msg += covertMsg;
-                this.game.ui.showResultModal(msg);
             } else {
-                this.game.ui.showResultModal(`${doer.name}の引抜工作が成功！\n${target.name}が我が軍に加わりました！${covertMsg}`);
+                msg = `${doer.name}の引抜工作が成功！\n${target.name}が我が軍に加わりました！${covertMsg}`;
             }
         } else {
-            this.game.ui.showResultModal(`${doer.name}の引抜工作は失敗しました……\n${target.name}は応じませんでした${covertMsg}`);
+            msg = `${doer.name}の引抜工作は失敗しました……\n${target.name}は応じませんでした${covertMsg}`;
         }
         
         doer.isActionDone = true; 
-        this.game.ui.updatePanelHeader(); 
-        this.game.ui.renderCommandMenu();
-        this.game.ui.renderMap();
+        this.game.commandSystem.finishCommand(msg, true);
     }
 
     // 暗殺を実行する魔法
@@ -717,6 +696,7 @@ class StrategySystem {
         let isSuccess = this.calcAssassinate(doerId, targetBushoId, true);
         const covertMsg = this.handleCovertAction(doerId, target.castleId, isSuccess, 'assassinate', false, target.id);
         
+        let msg = "";
         if (isSuccess) {
             // 暗殺成功時の処理
             if (this.game.lifeSystem && typeof this.game.lifeSystem.processDeath === 'function') {
@@ -737,18 +717,16 @@ class StrategySystem {
             doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(maxStat * 0.5);
             if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 30);
             
-            this.game.ui.showResultModal(`${doer.name}の暗殺が成功！\n${target.name}を討ち取りました！${covertMsg}`);
+            msg = `${doer.name}の暗殺が成功！\n${target.name}を討ち取りました！${covertMsg}`;
         } else {
             doer.achievementTotal = (doer.achievementTotal || 0) + 5;
             if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
             
-            this.game.ui.showResultModal(`${doer.name}の暗殺は失敗しました……\n${target.name}の警護が固く、手出しできませんでした。${covertMsg}`);
+            msg = `${doer.name}の暗殺は失敗しました……\n${target.name}の警護が固く、手出しできませんでした。${covertMsg}`;
         }
         
         doer.isActionDone = true; 
-        this.game.ui.updatePanelHeader(); 
-        this.game.ui.renderCommandMenu();
-        this.game.ui.renderMap();
+        this.game.commandSystem.finishCommand(msg, true);
     }
 
     // ★統合: 破壊工作・扇動・離間計の実行処理
@@ -773,7 +751,8 @@ class StrategySystem {
         else if (actionType === 'rumor') oldVal = targetObj.loyalty;
 
         this.applyStrategyEffect(actionType, doer, targetObj, result);
-
+        
+        let msg = "";
         if (result.success) {
             let actualDrop = oldVal - (actionType === 'sabotage' ? targetObj.defense : actionType === 'incite' ? targetObj.peoplesLoyalty : targetObj.loyalty);
             let actionName = actionType === 'sabotage' ? '破壊工作' : actionType === 'incite' ? '扇動' : '離間計';
@@ -781,18 +760,17 @@ class StrategySystem {
             
             // 離間計の場合、数値の低下は表示せず低下した事実のみを伝えていた元の仕様に合わせる
             if (actionType === 'rumor') {
-                this.game.ui.showResultModal(`${doer.name}の${actionName}が成功！\n${targetObj.name}の${statName}が低下しました${covertMsg}`);
+                msg = `${doer.name}の${actionName}が成功！\n${targetObj.name}の${statName}が低下しました${covertMsg}`;
             } else {
-                this.game.ui.showResultModal(`${doer.name}の${actionName}が成功！\n${targetObj.name}の${statName}が${actualDrop}低下しました${covertMsg}`);
+                msg = `${doer.name}の${actionName}が成功！\n${targetObj.name}の${statName}が${actualDrop}低下しました${covertMsg}`;
             }
         } else {
             let actionName = actionType === 'sabotage' ? '破壊工作' : actionType === 'incite' ? '扇動' : '離間計';
-            this.game.ui.showResultModal(`${doer.name}の${actionName}は失敗しました……${covertMsg}`); 
-        } 
+            msg = `${doer.name}の${actionName}は失敗しました……${covertMsg}`; 
+        }
         
         doer.isActionDone = true; 
-        this.game.ui.updatePanelHeader(); 
-        this.game.ui.renderCommandMenu(); 
+        this.game.commandSystem.finishCommand(msg); 
     }
 
     // 扇動を実行する魔法
@@ -818,7 +796,8 @@ class StrategySystem {
         if (targetCastleA) {
             covertMsg = this.handleCovertAction(doerId, targetCastleA.id, result.success, 'kuko', false, null);
         }
-
+        
+        let msg = "";
         if (result.success) {
             this.game.diplomacyManager.updateSentiment(clanAId, clanBId, -result.val);
             
@@ -860,14 +839,13 @@ class StrategySystem {
             }
 
             this.applyCommonSuccessEffect(doer, true);
-            this.game.ui.showResultModal(`${doer.name}の駆虎呑狼の計が成功！　${baseMsg}${specialMsg}${covertMsg}`);
+            msg = `${doer.name}の駆虎呑狼の計が成功！ ${baseMsg}${specialMsg}${covertMsg}`;
         } else {
             this.applyCommonSuccessEffect(doer, false);
-            this.game.ui.showResultModal(`${doer.name}の駆虎呑狼の計は失敗しました……${covertMsg}`);
+            msg = `${doer.name}の駆虎呑狼の計は失敗しました……${covertMsg}`;
         }
         
         doer.isActionDone = true; 
-        this.game.ui.updatePanelHeader(); 
-        this.game.ui.renderCommandMenu(); 
+        this.game.commandSystem.finishCommand(msg); 
     }
 }

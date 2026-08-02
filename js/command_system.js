@@ -708,6 +708,32 @@ class CommandSystem {
         return true;
     }
 
+    /**
+     * コマンド実行後のUI更新とメッセージ表示を一元管理する魔法です
+     * マップの更新を先に行い、画面表示を最新にしてから結果メッセージを出します。
+     * @param {string} msg - 結果画面に表示するメッセージ（不要な場合は null）
+     * @param {boolean} needsMapUpdate - マップの再描画が必要かどうか
+     * @param {string} logMsg - 履歴に残すログメッセージ（不要な場合は null）
+     */
+    finishCommand(msg, needsMapUpdate = false, logMsg = null) {
+        // 1. まず画面の表示を最新の状態に更新します
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
+        if (needsMapUpdate) {
+            this.game.ui.renderMap();
+        }
+        
+        // 2. ログを残します
+        if (logMsg) {
+            this.game.ui.log(logMsg);
+        }
+        
+        // 3. 全ての更新が終わってから、最後にメッセージを表示して背景をストップさせます！
+        if (msg) {
+            this.game.ui.showResultModal(msg);
+        }
+    }
+
     // ==========================================
     // ★ここから追加：武将を選ぶ時の「誰を出すか」「どう並べるか」のルールをまとめた魔法
     // ==========================================
@@ -2309,6 +2335,7 @@ class CommandSystem {
         const execBushos = bushoIds.map(id => this.game.getBusho(id)).filter(b => b);
         const bonusRate = GameSystem.calcFactionBonusRate(execBushos);
         
+        // 差し替え後
         if (type === 'appoint' || type === 'appoint_gunshi') {
             const bushos = this.game.getBusho(bushoIds[0]);
             if (type === 'appoint') { 
@@ -2318,14 +2345,13 @@ class CommandSystem {
                 if (bushos.isGunshi) {
                     bushos.isGunshi = false;
                 }
-                this.game.ui.showResultModal(`${bushos.name}を城主に任命しました`); 
+                this.finishCommand(`${bushos.name}を城主に任命しました`); 
             }
             if (type === 'appoint_gunshi') { 
                 const oldGunshi = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isGunshi); if (oldGunshi) oldGunshi.isGunshi = false; 
                 bushos.isGunshi = true; 
-                this.game.ui.showResultModal(`${bushos.name}を軍師に任命しました`); 
+                this.finishCommand(`${bushos.name}を軍師に任命しました`); 
             }
-            this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu(); 
             return;
         }
 
@@ -2366,9 +2392,7 @@ class CommandSystem {
                 
                 this.game.affiliationSystem.becomeRonin(busho, 'banish');
 
-                this.game.ui.showResultModal(`${busho.name}を追放しました`);
-                this.game.ui.updatePanelHeader(); 
-                this.game.ui.renderCommandMenu(); 
+                this.finishCommand(`${busho.name}を追放しました`);
             });
             return; 
         }
@@ -2450,7 +2474,9 @@ class CommandSystem {
             }
             busho.isActionDone = true;
         });
-
+        
+        let resultMsg = null;
+        let logMsg = null;
         if (count > 0 && actionName !== "移動") { 
             let detail = "";
             if (actionName === "石高開発") detail = `(現在: ${castle.kokudaka}/${castle.maxKokudaka})`;
@@ -2465,11 +2491,20 @@ class CommandSystem {
                 detail = `(現在: ${castle.morale}/${maxMorale})`;
             }
             
-            this.game.ui.showResultModal(`${count}名で${actionName}を行いました\n効果: +${totalVal} ${detail}`); 
+            resultMsg = `${count}名で${actionName}を行いました\n効果: +${totalVal} ${detail}`;
+            logMsg = `${actionName}を実行 (効果:${totalVal})`;
         }
-        else if (actionName === "移動") { const targetName = this.game.getCastle(targetId).name; this.game.ui.showResultModal(`${count}名が${targetName}へ移動しました`); }
-        this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
-        this.game.ui.log(`${actionName}を実行 (効果:${totalVal})`);
+        else if (actionName === "移動") { 
+            const targetName = this.game.getCastle(targetId).name; 
+            resultMsg = `${count}名が${targetName}へ移動しました`; 
+            logMsg = `${actionName}を実行`;
+        }
+        
+        if (resultMsg || logMsg) {
+            this.finishCommand(resultMsg, false, logMsg);
+        } else {
+            this.finishCommand(null);
+        }
     }
 
     executeInvestigate(bushoIds, targetId) {
@@ -2492,8 +2527,7 @@ class CommandSystem {
             });
         }
         bushos.forEach(b => b.isActionDone = true);
-        this.game.ui.showResultModal(msg); this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu(); this.game.ui.renderMap();
-        this.game.ui.log(`調査実行: ${target.name} (${result.success ? '成功' : '失敗'})`);
+        this.finishCommand(msg, true, `調査実行: ${target.name} (${result.success ? '成功' : '失敗'})`);
     }
 
     executeEmploy(doerId, targetId) { 
@@ -2524,8 +2558,9 @@ class CommandSystem {
             msg = `${target.name}は登用に応じませんでした……`; 
             doer.achievementTotal += 5; 
             this.game.factionSystem.updateRecognition(doer, 10); 
-        } 
-        doer.isActionDone = true; this.game.ui.showResultModal(msg); this.game.ui.renderCommandMenu(); 
+        }
+        doer.isActionDone = true; 
+        this.finishCommand(msg); 
     }
     
     executeReward(bushoIds) {
@@ -2559,15 +2594,15 @@ class CommandSystem {
             count++;
             totalEffect += effect;
         });
-
+        
+        let msg = null;
+        let logMsg = null;
         if (count > 0) {
-            const lastBusho = this.game.getBusho(bushoIds[bushoIds.length - 1]);
-            this.game.ui.showResultModal(`${count}名に褒美（金${count * spec.costGold}）を与えました`);
-            this.game.ui.log(`${count}名に褒美を実行 (合計効果:${totalEffect})`);
+            msg = `${count}名に褒美（金${count * spec.costGold}）を与えました`;
+            logMsg = `${count}名に褒美を実行 (合計効果:${totalEffect})`;
         }
 
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
+        this.finishCommand(msg, false, logMsg);
     }
     
     executeRewardAll() {
@@ -2610,12 +2645,8 @@ class CommandSystem {
             count++;
             totalEffect += effect;
         });
-
-        this.game.ui.showResultModal(`${count}名の家臣に褒美を与えました`);
-        this.game.ui.log(`${count}名に一括褒美を実行 (合計効果:${totalEffect})`);
-
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
+        
+        this.finishCommand(`${count}名の家臣に褒美を与えました`, false, `${count}名に一括褒美を実行 (合計効果:${totalEffect})`);
     }
 
     executeTransport(bushoIds, targetId, vals) {
@@ -2659,7 +2690,7 @@ class CommandSystem {
             b.isActionDone = true;
         });
         
-        this.game.ui.showResultModal(`${this.game.getBusho(bushoIds[0]).name}が${t.name}へ物資を輸送しました`); this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
+        this.finishCommand(`${this.game.getBusho(bushoIds[0]).name}が${t.name}へ物資を輸送しました`);
     }
     
     executeAppointGunshi(bushoId) {
@@ -2669,9 +2700,7 @@ class CommandSystem {
         busho.isGunshi = true;
         // ★ここから追加！：軍師に任命された時に、この軍師専用の「秘密の番号（タネ）」を作ります！
         busho.gunshiSeed = Math.floor(Math.random() * 10000);
-        this.game.ui.showResultModal(`${busho.name}を軍師に任命しました`);
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
+        this.finishCommand(`${busho.name}を軍師に任命しました`);
     }
 
     executeAppointLegionLeader(bushoId, legionNo, castleId) {
@@ -2706,10 +2735,7 @@ class CommandSystem {
         
         const displayMessage = `${busho.name} を「${legionName}」の国主に任命し、\n${castle.name} を本拠としました`;
         
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
-        this.game.ui.renderMap();
-        this.game.ui.showResultModal(displayMessage);
+        this.finishCommand(displayMessage, true);
     }
     
     executeTrade(type, amount) {
@@ -2720,7 +2746,8 @@ class CommandSystem {
         // ★一元化された共通魔法を呼び出して、必要な費用（または利益）を一発で計算します！
         const tradeData = GameSystem.calcTradeCostAndRate(type, amount, castle, daimyo, castellan, this.game.provinces);
         const costOrGain = tradeData.cost;
-
+        
+        let msg = null;
         if(type === 'buy_rice') {
             // ★変更：共通魔法でチェックします
             if(!this.checkResource(castle, costOrGain, 0)) return;
@@ -2729,7 +2756,7 @@ class CommandSystem {
             if(costOrGain > (castle.tradeLimit || 0)) { this.game.ui.showDialog("取引上限を超えています", false); return; }
             castle.gold -= costOrGain; castle.rice += amount; 
             castle.tradeLimit -= costOrGain;
-            this.game.ui.showResultModal(`兵糧${amount}を購入しました\n(金-${costOrGain})`); 
+            msg = `兵糧${amount}を購入しました\n(金-${costOrGain})`; 
         } else if (type === 'sell_rice') { 
             // ★変更：売却なのでお金が足りるかのチェックはなし
             if(!this.checkResource(castle, 0, amount)) return;
@@ -2738,26 +2765,25 @@ class CommandSystem {
             if(costOrGain > (castle.tradeLimit || 0)) { this.game.ui.showDialog("取引上限を超えています", false); return; }
             castle.rice -= amount; castle.gold += costOrGain; 
             castle.tradeLimit -= costOrGain;
-            this.game.ui.showResultModal(`兵糧${amount}を売却しました\n(金+${costOrGain})`); 
+            msg = `兵糧${amount}を売却しました\n(金+${costOrGain})`; 
         } else if (type === 'buy_ammo') {
             if(!this.checkResource(castle, costOrGain, 0)) return;
             if((castle.ammo || 0) + amount > 99999) { this.game.ui.showDialog("これ以上矢弾は買えません", false); return; }
             castle.gold -= costOrGain; castle.ammo = (castle.ammo || 0) + amount; 
-            this.game.ui.showResultModal(`矢弾${amount}を購入しました\n(金-${costOrGain})`); 
+            msg = `矢弾${amount}を購入しました\n(金-${costOrGain})`; 
         } else if (type === 'buy_horses') {
             if(!this.checkResource(castle, costOrGain, 0)) return;
             if((castle.horses || 0) + amount > 99999) { this.game.ui.showDialog("これ以上軍馬は買えません", false); return; }
             castle.gold -= costOrGain; castle.horses = (castle.horses || 0) + amount; 
-            this.game.ui.showResultModal(`軍馬${amount}を購入しました\n(金-${costOrGain})`); 
+            msg = `軍馬${amount}を購入しました\n(金-${costOrGain})`; 
         } else if (type === 'buy_guns') {
             if(!this.checkResource(castle, costOrGain, 0)) return;
             if((castle.guns || 0) + amount > 99999) { this.game.ui.showDialog("これ以上鉄砲は買えません", false); return; }
             castle.gold -= costOrGain; castle.guns = (castle.guns || 0) + amount; 
-            this.game.ui.showResultModal(`鉄砲${amount}を購入しました\n(金-${costOrGain})`); 
+            msg = `鉄砲${amount}を購入しました\n(金-${costOrGain})`; 
         }
         
-        this.game.ui.updatePanelHeader(); 
-        this.game.ui.renderCommandMenu();
+        this.finishCommand(msg);
     }
 
     executeDraft(bushoIds, soldiers) { 
@@ -2806,8 +2832,7 @@ class CommandSystem {
         this.game.factionSystem.updateRecognition(busho, 10);
         
         // ★ 結果のメッセージに、人口と民忠が減ったことも書き足しておきます
-        this.game.ui.showResultModal(`${busho.name}が徴兵を行いました\n兵士+${soldiers}\n(人口-${soldiers} / 民忠-${loyaltyPenalty})`); 
-        this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
+        this.finishCommand(`${busho.name}が徴兵を行いました\n兵士+${soldiers}\n(人口-${soldiers} / 民忠-${loyaltyPenalty})`);
     }
     
     executeCharity(bushoIds) { 
@@ -2847,10 +2872,7 @@ class CommandSystem {
         castle.peoplesLoyalty = Math.min(maxLoyalty, castle.peoplesLoyalty + totalVal); 
         const actualIncrease = castle.peoplesLoyalty - oldLoyalty;
         
-        this.game.ui.showResultModal(`${count}名で施しを行いました\n民忠+${actualIncrease}`); 
-        this.game.ui.updatePanelHeader(); 
-        this.game.ui.renderCommandMenu();
-        this.game.ui.log(`${count}名で施しを実行 (効果:${actualIncrease})`);
+        this.finishCommand(`${count}名で施しを行いました\n民忠+${actualIncrease}`, false, `${count}名で施しを実行 (効果:${actualIncrease})`);
     }
 
     enterMapSelection(mode) {
@@ -3638,9 +3660,7 @@ class CommandSystem {
         // ③ ゲーム全体の一門状態を最新に更新します！
         FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
 
-        this.game.ui.showResultModal(`${targetBusho.name} を養子として迎え入れました。以降、${targetBusho.name} は当家の一門武将となります。`);
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
+        this.finishCommand(`${targetBusho.name} を養子として迎え入れました。以降、${targetBusho.name} は当家の一門武将となります。`);
     }
 
     // ★追加：所領分配の実行
@@ -3669,12 +3689,9 @@ class CommandSystem {
         const numberNames = ["直轄", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
         const legionName = numberNames[legionNo] || `第${legionNo}席`;
         
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
-        this.game.ui.renderMap();
-        this.game.ui.showResultModal(`${legionName}の所領分配を完了しました。\n${count}件の拠点の所属が変更されました。`);
+        this.finishCommand(`${legionName}の所領分配を完了しました。\n${count}件の拠点の所属が変更されました。`, true);
     }
-
+    
     executeArrangeMarriage(busho, princess) {
         princess.husbandId = busho.id;
         princess.status = 'married';
@@ -3688,9 +3705,7 @@ class CommandSystem {
 
         busho.loyalty = 100;
 
-        this.game.ui.showResultModal(`${busho.name} と ${princess.name} の祝言が執り行われました。新たな縁によって、当家の結束はより一層強固なものとなりました。`);
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
+        this.finishCommand(`${busho.name} と ${princess.name} の祝言が執り行われました。新たな縁によって、当家の結束はより一層強固なものとなりました。`);
     }
 
     // ★追加：国主解任の実行
@@ -3712,22 +3727,19 @@ class CommandSystem {
                 count++;
             }
         });
-
+        
         // 軍団の作戦などを破棄
         legion.commanderId = 0;
         legion.objective = null;
         legion.status = 'wait';
         legion.targetId = 0;
         legion.route = [];
-
+        
         const numberNames = ["", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
         const legionName = numberNames[legionNo] || `第${legionNo}席`;
         
         const commanderName = commander ? commander.name : "不明";
 
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
-        this.game.ui.renderMap();
-        this.game.ui.showResultModal(`${commanderName} を ${legionName} の国主から解任しました。所属していた ${count} 件の拠点はすべて直轄領に変更されました。`);
+        this.finishCommand(`${commanderName} を ${legionName} の国主から解任しました。所属していた ${count} 件の拠点はすべて直轄領に変更されました。`, true);
     }
 }

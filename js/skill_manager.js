@@ -886,4 +886,48 @@ class SkillManager {
         }
         return { canRise: false };
     }
+    
+    // ==========================================
+    // ★追加：調略コマンドのスキル補正を一元管理する共通窓口
+    // ==========================================
+    // 成功率のスキル補正をまとめて計算します
+    static calcStrategyProbModifier(actionType, doer, targetCastleId, targetClanId, game) {
+        let probBonus = 0;
+        let probPenalty = 0;
+
+        // ① 実行者（攻撃側）のスキルボーナス
+        if (actionType === 'sabotage' || actionType === 'incite') {
+            probBonus += this.calcNinjutsuProbBonus(doer);
+        } else if (actionType === 'assassinate') {
+            probBonus += this.getNinjutsuLevel(doer) * 0.02;
+        } else if (actionType === 'headhunt') {
+            probBonus += this.calcHeadhuntProbBonus(doer, game);
+        }
+
+        // ② 対象の城（防御側）のスキルによる防諜ペナルティ
+        if (actionType === 'sabotage' || actionType === 'incite' || actionType === 'rumor' || actionType === 'headhunt') {
+            probPenalty += this.calcBugeiCounterIntelligenceBonus(targetCastleId, game);
+        } else if (actionType === 'assassinate') {
+            probPenalty += this.calcBugeiAssassinateDefense(targetCastleId, game);
+            if (targetClanId) {
+                probPenalty += this.calcNinjutsuAssassinateDefense(targetClanId, game);
+            }
+        }
+
+        // ボーナスからペナルティを引いた、最終的な「増減値」を返します
+        return probBonus - probPenalty;
+    }
+
+    // ダメージ（効果量）のスキル補正をまとめて計算します
+    static calcStrategyDamageModifier(actionType, doer) {
+        let damageBonus = 0;
+
+        if (actionType === 'sabotage') {
+            damageBonus += this.calcNinjutsuSabotageBonus(doer);
+        } else if (actionType === 'incite') {
+            damageBonus += this.calcNinjutsuInciteBonus(doer);
+        }
+        
+        return damageBonus;
+    }
 }
