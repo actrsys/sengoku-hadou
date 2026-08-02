@@ -289,7 +289,10 @@ class UIManager {
             // タブ切り替えボタンも個別に音を鳴らすので、共通の音をキャンセルします！
             if (btn.classList.contains('busho-tab-btn') || btn.classList.contains('busho-scope-btn')) return;
 
-            // ★追加：イベントダイアログ内の隠しボタンによる決定音を防ぐため、共通の音をキャンセルします！
+            // 兵科ボタンやスライダーのショートカットボタンも個別に音を鳴らすのでキャンセルします！
+            if (btn.classList.contains('troop-type-btn') || btn.classList.contains('qty-shortcut-btn')) return;
+
+            // イベントダイアログ内の隠しボタンによる決定音を防ぐため、共通の音をキャンセルします！
             if (btn.closest('.event-dialog-modal')) return;
 
             const text = btn.textContent.trim();
