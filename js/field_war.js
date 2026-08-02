@@ -2897,10 +2897,11 @@ class FieldWarManager {
             dmgToAtk = Math.floor(dmgToAtk * defKabukiResult.atkMult); // 傾奇者による反撃ダメージ増幅
         }
 
-        // ★追加: プレイヤーがいないAI同士の戦いなら、ダメージを約3分の2（0.666）に減らします！
+        // ★プレイヤーがいないAI同士の戦いなら、ダメージを抑制します！
         if (!isPlayerInvolved) {
-            dmgToDef = Math.floor(dmgToDef * 0.666);
-            dmgToAtk = Math.floor(dmgToAtk * 0.666);
+            const autoRate = window.WarParams.War.AutoWarDamageRate || 0.666;
+            dmgToDef = Math.floor(dmgToDef * autoRate);
+            dmgToAtk = Math.floor(dmgToAtk * autoRate);
         }
 
         // ダメージ適用（兵数以上のダメージは受けないようにガード）
