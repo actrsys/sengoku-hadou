@@ -328,9 +328,13 @@ class DiplomacyManager {
             // ★追加：持参した金による確率アップ（15金につき0.1%アップ。1500金で最大10%アップします）
             acceptProb += (gold / 15) * 0.1;
             
-            // ★追加: 表裏比興による親善ボーナス（スキルマネージャーに問い合わせます）
+            // ★追加: 技能による親善ボーナス（スキルマネージャーに問い合わせます）
             if (typeof SkillManager !== 'undefined') {
-                acceptProb += SkillManager.calcGoodwillProbBonus(doer, this.game);
+                if (SkillManager.calcDiplomacyProbBonus) {
+                    acceptProb += SkillManager.calcDiplomacyProbBonus('goodwill', doer, this.game);
+                } else if (SkillManager.calcGoodwillProbBonus) {
+                    acceptProb += SkillManager.calcGoodwillProbBonus(doer, this.game);
+                }
             }
             
             // ★友好・同盟・支配・従属のいずれかの関係なら最終的な確率に+50%、和睦は+30%します
@@ -371,6 +375,11 @@ class DiplomacyManager {
             }
 
             const chance = relation.sentiment + doerDiplomacy;
+
+            // ★追加: 技能による同盟ボーナス
+            if (type === 'alliance' && typeof SkillManager !== 'undefined' && SkillManager.calcDiplomacyProbBonus) {
+                acceptProb += SkillManager.calcDiplomacyProbBonus('alliance', doer, this.game);
+            }
 
             if (type === 'subordinate') {
                 const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);

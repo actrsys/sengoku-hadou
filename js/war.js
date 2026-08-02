@@ -1143,6 +1143,12 @@ class WarManager {
                 let atkMoraleTrainBonus = Math.max(0.01, (atkMorale / 100) + (atkTraining / 100));
                 
                 let successRate = ((Math.sqrt(10 + defBestInt) * (Math.sqrt(defInt) * 2)) / ((Math.sqrt(50 + atkBestInt) * (Math.sqrt(atkInt) * 2)) * atkMoraleTrainBonus) * 0.75) - 0.2;
+                
+                // ★追加：スキルマネージャーに問い合わせて挑発成功率のボーナスを加算します
+                if (typeof SkillManager !== 'undefined' && SkillManager.calcSiegeStrategyProbBonus) {
+                    successRate += SkillManager.calcSiegeStrategyProbBonus('provoke', activeBushos, this.game);
+                }
+
                 successRate = Math.max(0, Math.min(0.99, successRate));
                 
                 if (Math.random() < successRate) {
@@ -1208,6 +1214,11 @@ class WarManager {
                     if (bonus > ninjutsuBonus) ninjutsuBonus = bonus;
                 });
                 successRate += ninjutsuBonus;
+
+                // ★追加：スキルによる火計成功率ボーナス
+                if (SkillManager.calcSiegeStrategyProbBonus) {
+                    successRate += SkillManager.calcSiegeStrategyProbBonus('fire', activeBushos, this.game);
+                }
             }
             
             successRate = Math.max(0, Math.min(0.99, successRate));

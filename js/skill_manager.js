@@ -9,24 +9,26 @@
 // あとで名前を変更したい時は、右側の文字（"悪天巧者"など）を書き換えるだけで全てに反映されます。
 // ==========================================
 const SKILL_NAMES = {
-    MOUNTAIN: "踏破",
-    RETREAT: "退き巧者",
     MOUSHO: "猛将",
     ONI: "鬼",
-    WEATHER: "悪天巧者",
+    SOGEKI: "狙撃",
     SHUYARI: "朱槍",
-    AKAZONAE: "赤備え",
-    IJUTSU: "医術",
     KABUKIMONO: "傾奇者",
+    AKAZONAE: "赤備え",
+    MOUNTAIN: "踏破",
+    WEATHER: "悪天巧者",
+    RETREAT: "退き巧者",
+    BOSHO: "謀将",
+    BOSHIN: "謀神",
+    IJUTSU: "医術",
     TENKA_FUBU: "天下布武",
     ECHIGO_NO_RYU: "越後の龍",
     KAI_NO_TORA: "甲斐の虎",
     MIKAWA_NO_SHIKA: "三河の鹿",
     HITOTARASHI: "人たらし",
-    SOGEKI: "狙撃",
     HYORIHIKYO: "表裏比興",
     PHOENIX: "常陸の不死鳥",
-    BOSHO: "謀将"
+    OU_NO_GYOSHO: "奥羽の驍将"
 };
 
 const APTITUDE_NAMES = {
@@ -90,11 +92,15 @@ const SKILL_DESCRIPTIONS = {
     // 狙撃
     [SKILL_NAMES.SOGEKI]: "①遠距離攻撃時に一定確率でクリティカルが発生するようになる。（野戦：鉄砲）",
     // 表裏比興
-    [SKILL_NAMES.HYORIHIKYO]: "①自身が大名または使者である時、親善の成功率が上昇する。\n②自身が大名または使者である時、断交時のペナルティが減少する。\n③自身が大名である時、主家からの援軍要請を拒否できる。",
+    [SKILL_NAMES.HYORIHIKYO]: "①自身が大名または外交の使者である時、親善の成功率が上昇する。\n②自身が大名または外交の使者である時、断交時のペナルティが減少する。\n③自身が大名である時、主家からの援軍要請を拒否できる。",
     // 常陸の不死鳥
     [SKILL_NAMES.PHOENIX]: "①戦没しなくなる。\n②大名として滅亡した時、諸勢力となる。\n③諸勢力の頭領である時、空白地を奪って大名となる。",
-    // 謀将
-    [SKILL_NAMES.BOSHO]: "①自身が大名、国主または暗殺の担当者である時、暗殺の基本成功率が５％上昇する。"
+    // 謀将 ※内部的に謀将が大名や国主である時のみ、暗殺を図るようになる
+    [SKILL_NAMES.BOSHO]: "①自身が大名、国主または暗殺の担当者である時、暗殺の基本成功率が５％上昇する。",
+    // 奥羽の驍将
+    [SKILL_NAMES.OU_NO_GYOSHO]: "①大名、国主または暗殺の担当者である時、暗殺の基本成功率が８％上昇する。\n②野戦で自部隊と戦闘する相手部隊のクリティカル発生を無効化する。\n③大名、国主または外交の使者である時、親善・同盟の成功率が１０％上昇する。",
+    // 謀神
+    [SKILL_NAMES.BOSHIN]: "①大名、国主または暗殺の担当者である時、暗殺の基本成功率が８％上昇する。\n②大名、国主または計略の担当者である時、破壊工作・民心撹乱の成功率が１０％上昇する。\n③攻城戦で自部隊が行う火計の成功率が１５％、挑発の成功率が５％上昇する。"
 };
 
 class SkillManager {
@@ -795,13 +801,50 @@ class SkillManager {
         return modifier;
     }
     
-    // ＜親善ボーナス＞ 表裏比興による親善の最終成功率アップ
-    static calcGoodwillProbBonus(busho, game) {
+    // ＜外交ボーナス＞ 技能による外交の最終成功率アップ
+    static calcDiplomacyProbBonus(actionType, busho, game) {
         let probBonus = 0;
-        if (this.hasSkill(busho, SKILL_NAMES.HYORIHIKYO, game)) {
-            probBonus += 15; // 15%プラス
+        
+        // 表裏比興による親善ボーナス（後方互換性対応）
+        if (actionType === 'goodwill') {
+            if (this.hasSkill(busho, SKILL_NAMES.HYORIHIKYO, game)) {
+                probBonus += 15;
+            }
         }
+        
+        // 奥羽の驍将による親善・同盟ボーナス
+        if (actionType === 'goodwill' || actionType === 'alliance') {
+            let hasOuNoGyosho = false;
+            if (this.hasSkill(busho, SKILL_NAMES.OU_NO_GYOSHO, game)) {
+                hasOuNoGyosho = true;
+            } else {
+                const daimyo = game.bushos.find(b => b.clan === busho.clan && b.isDaimyo);
+                if (daimyo && this.hasSkill(daimyo, SKILL_NAMES.OU_NO_GYOSHO, game)) {
+                    hasOuNoGyosho = true;
+                } else {
+                    const doerCastle = game.getCastle(busho.castleId);
+                    if (doerCastle && doerCastle.legionId !== 0) {
+                        const legion = game.legions ? game.legions.find(l => l.clanId === busho.clan && l.legionNo === doerCastle.legionId) : null;
+                        if (legion && legion.commanderId) {
+                            const commander = game.getBusho(legion.commanderId);
+                            if (commander && this.hasSkill(commander, SKILL_NAMES.OU_NO_GYOSHO, game)) {
+                                hasOuNoGyosho = true;
+                            }
+                        }
+                    }
+                }
+            }
+            if (hasOuNoGyosho) {
+                probBonus += 10;
+            }
+        }
+
         return probBonus;
+    }
+
+    // ＜親善ボーナス＞ 表裏比興による親善の最終成功率アップ（互換性用）
+    static calcGoodwillProbBonus(busho, game) {
+        return this.calcDiplomacyProbBonus('goodwill', busho, game);
     }
 
     // ＜断交ペナルティ軽減＞ 表裏比興による断交時のマイナス効果の軽減
@@ -895,9 +938,11 @@ class SkillManager {
     // ==========================================
     // 武将の持つスキルによって、AIが指定の特別行動（暗殺など）を実行可能になるか判定します
     static hasAIExtendedAction(busho, actionType, game) {
-        // 暗殺行動の場合、「謀将」スキルを持っていれば許可します
+        // 暗殺行動の場合、「謀将」「奥羽の驍将」「謀神」スキルを持っていれば許可します
         if (actionType === 'assassinate') {
-            return this.hasSkill(busho, SKILL_NAMES.BOSHO, game);
+            return this.hasSkill(busho, SKILL_NAMES.BOSHO, game) ||
+                   this.hasSkill(busho, SKILL_NAMES.OU_NO_GYOSHO, game) ||
+                   this.hasSkill(busho, SKILL_NAMES.BOSHIN, game);
         }
         
         // 将来、他の行動拡張が増えた場合はここに追記します
@@ -912,33 +957,42 @@ class SkillManager {
         let probBonus = 0;
         let probPenalty = 0;
 
+        // 特定のスキルを持っているか（大名、国主、担当者）チェックする便利な魔法
+        const checkSkill = (skillName) => {
+            if (this.hasSkill(doer, skillName, game)) return true;
+            const daimyo = game.bushos.find(b => b.clan === doer.clan && b.isDaimyo);
+            if (daimyo && this.hasSkill(daimyo, skillName, game)) return true;
+            const doerCastle = game.getCastle(doer.castleId);
+            if (doerCastle && doerCastle.legionId !== 0) {
+                const legion = game.legions ? game.legions.find(l => l.clanId === doer.clan && l.legionNo === doerCastle.legionId) : null;
+                if (legion && legion.commanderId) {
+                    const commander = game.getBusho(legion.commanderId);
+                    if (commander && this.hasSkill(commander, skillName, game)) return true;
+                }
+            }
+            return false;
+        };
+
         // ① 実行者（攻撃側）のスキルボーナス
         if (actionType === 'sabotage' || actionType === 'incite') {
             probBonus += this.calcNinjutsuProbBonus(doer);
+            // 謀神によるボーナス
+            if (checkSkill(SKILL_NAMES.BOSHIN)) {
+                probBonus += 0.10;
+            }
         } else if (actionType === 'assassinate') {
             probBonus += this.getNinjutsuLevel(doer) * 0.02;
-            // ★追加：謀将スキルによる暗殺の基本成功率アップ
-            if (this.hasSkill(doer, SKILL_NAMES.BOSHO, game)) {
-                probBonus += 0.05;
-            } else {
-                // 大名が持っているかチェック
-                const daimyo = game.bushos.find(b => b.clan === doer.clan && b.isDaimyo);
-                if (daimyo && this.hasSkill(daimyo, SKILL_NAMES.BOSHO, game)) {
-                    probBonus += 0.05;
-                } else {
-                    // ★追加：実行者が所属する軍団の国主が持っているかチェック
-                    const doerCastle = game.getCastle(doer.castleId);
-                    if (doerCastle && doerCastle.legionId !== 0) {
-                        const legion = game.legions ? game.legions.find(l => l.clanId === doer.clan && l.legionNo === doerCastle.legionId) : null;
-                        if (legion && legion.commanderId) {
-                            const commander = game.getBusho(legion.commanderId);
-                            if (commander && this.hasSkill(commander, SKILL_NAMES.BOSHO, game)) {
-                                probBonus += 0.05;
-                            }
-                        }
-                    }
-                }
+            
+            // 暗殺の基本成功率アップ（同系統は最大値のみ）
+            let assassinateBonus = 0;
+            if (checkSkill(SKILL_NAMES.OU_NO_GYOSHO) || checkSkill(SKILL_NAMES.BOSHIN)) {
+                assassinateBonus = Math.max(assassinateBonus, 0.08);
             }
+            if (checkSkill(SKILL_NAMES.BOSHO)) {
+                assassinateBonus = Math.max(assassinateBonus, 0.05);
+            }
+            probBonus += assassinateBonus;
+            
         } else if (actionType === 'headhunt') {
             probBonus += this.calcHeadhuntProbBonus(doer, game);
         }
@@ -956,7 +1010,7 @@ class SkillManager {
         // ボーナスからペナルティを引いた、最終的な「増減値」を返します
         return probBonus - probPenalty;
     }
-
+    
     // ダメージ（効果量）のスキル補正をまとめて計算します
     static calcStrategyDamageModifier(actionType, doer) {
         let damageBonus = 0;
@@ -968,5 +1022,22 @@ class SkillManager {
         }
         
         return damageBonus;
+    }
+    
+    // ＜攻城戦計略ボーナス＞ 攻城戦での計略（火計・挑発）の成功率ボーナス
+    static calcSiegeStrategyProbBonus(actionType, bushos, game) {
+        if (!bushos || bushos.length === 0) return 0;
+        let bonus = 0;
+        let hasBoshin = bushos.some(b => b && b.skill && b.skill.includes(SKILL_NAMES.BOSHIN));
+        if (hasBoshin) {
+            if (actionType === 'fire') bonus += 0.15;
+            if (actionType === 'provoke') bonus += 0.05;
+        }
+        return bonus;
+    }
+
+    // ＜敵クリティカル無効化＞ 野戦で相手のクリティカルを無効化する
+    static canInvalidateEnemyCritical(unit, game) {
+        return this.hasSkill(unit, SKILL_NAMES.OU_NO_GYOSHO, game);
     }
 }
