@@ -858,9 +858,9 @@ window.GameEvents.push({
                         c.population = Math.min(999999, (c.population || 0) + 8000);
                     } else {
                         // 【家康の居城以外の拠点の場合】
-                        // 兵士数が4000未満なら4000に、4000以上なら+500します（上限は99999）
-                        if ((c.soldiers || 0) < 4000) {
-                            c.soldiers = 4000;
+                        // 兵士数が4000未満なら3000に、3000以上なら+500します（上限は99999）
+                        if ((c.soldiers || 0) < 3000) {
+                            c.soldiers = 3000;
                         } else {
                             c.soldiers = Math.min(99999, (c.soldiers || 0) + 500);
                         }
