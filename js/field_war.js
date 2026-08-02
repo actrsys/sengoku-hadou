@@ -1162,8 +1162,13 @@ class FieldWarManager {
                         } else {
                             const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
                             // ★修正: 攻撃可能範囲かどうかの判定を共通関数化
-                            if (targetUnit && unit.ap >= 1 && this.canAttackTarget(unit, x, y)) {
-                                hex.classList.add('attackable');
+                            if (targetUnit && this.canAttackTarget(unit, x, y)) {
+                                let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                                let turnCost = this.getTurnCost(unit.direction, targetDir);
+                                // ★修正：振り向くためのコスト＋攻撃コスト(1)が残っているか確認します！
+                                if (unit.ap >= turnCost + 1) {
+                                    hex.classList.add('attackable');
+                                }
                             } else if (this.getDistance(unit.x, unit.y, x, y) === 1) {
                                 let targetDir = this.getDirection(unit.x, unit.y, x, y);
                                 let turnCost = this.getTurnCost(unit.direction, targetDir);
@@ -1178,8 +1183,13 @@ class FieldWarManager {
                         } else {
                             const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
                             // ★修正: 攻撃可能範囲かどうかの判定を共通関数化
-                            if (targetUnit && unit.ap >= 1 && this.canAttackTarget(unit, x, y)) {
-                                hex.classList.add('attackable');
+                            if (targetUnit && this.canAttackTarget(unit, x, y)) {
+                                let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                                let turnCost = this.getTurnCost(unit.direction, targetDir);
+                                // ★修正：振り向くためのコスト＋攻撃コスト(1)が残っているか確認します！
+                                if (unit.ap >= turnCost + 1) {
+                                    hex.classList.add('attackable');
+                                }
                             }
                         }
                     }
@@ -2392,17 +2402,17 @@ class FieldWarManager {
                 let targetDir = this.getDirection(unit.x, unit.y, x, y);
                 let turnCost = this.getTurnCost(unit.direction, targetDir);
                 
-                // まっすぐ向くための行動力(方向転換コスト + 攻撃コスト1)が余っているか確認します
-                if (turnCost > 0 && unit.ap >= turnCost + 1) {
-                    unit.ap -= turnCost;
-                    unit.direction = targetDir;
-                    this.log(`${unit.name}隊が攻撃前に対象へ向き直った。`);
-                }
-
-                if (unit.ap >= 1) {
+                // ★修正：まっすぐ向くための行動力(方向転換コスト + 攻撃コスト1)が確実に余っているか確認します
+                if (unit.ap >= turnCost + 1) {
+                    if (turnCost > 0) {
+                        unit.ap -= turnCost;
+                        unit.direction = targetDir;
+                        this.log(`${unit.name}隊が攻撃前に対象へ向き直った。`);
+                    }
                     unit.ap -= 1;
                     this.executeAttack(unit, targetUnit);
                 } else {
+                    // 足りない場合はキャンセルして元の状態に戻します
                     this.cancelAction();
                     if(clickedUnit) this.showUnitInfo(clickedUnit);
                 }
@@ -2441,14 +2451,13 @@ class FieldWarManager {
                 let targetDir = this.getDirection(unit.x, unit.y, x, y);
                 let turnCost = this.getTurnCost(unit.direction, targetDir);
                 
-                // まっすぐ向くための行動力(方向転換コスト + 攻撃コスト1)が余っているか確認します
-                if (turnCost > 0 && unit.ap >= turnCost + 1) {
-                    unit.ap -= turnCost;
-                    unit.direction = targetDir;
-                    this.log(`${unit.name}隊が攻撃前に対象へ向き直った。`);
-                }
-
-                if (unit.ap >= 1) {
+                // ★修正：まっすぐ向くための行動力(方向転換コスト + 攻撃コスト1)が確実に余っているか確認します
+                if (unit.ap >= turnCost + 1) {
+                    if (turnCost > 0) {
+                        unit.ap -= turnCost;
+                        unit.direction = targetDir;
+                        this.log(`${unit.name}隊が攻撃前に対象へ向き直った。`);
+                    }
                     unit.ap -= 1;
                     this.executeAttack(unit, targetUnit);
                 } else {
