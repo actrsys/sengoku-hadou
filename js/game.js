@@ -2089,6 +2089,14 @@ class GameManager {
             if (c.ownerClan === 0) return;
             c.isDone = false;
 
+            // ★追加：月初の拠点防御力上昇スキルの効果を適用します
+            if (typeof SkillManager !== 'undefined' && typeof SkillManager.calcMonthlyDefenseBonus === 'function') {
+                const defBonus = SkillManager.calcMonthlyDefenseBonus(c, this);
+                if (defBonus > 0) {
+                    c.defense = Math.min(c.maxDefense, c.defense + defBonus);
+                }
+            }
+
             let income = GameSystem.calcBaseGoldIncome(c);
             income = GameSystem.applyVariance(income, window.MainParams.Economy.IncomeFluctuation);
             if (this.month === 3) income += income * 3;

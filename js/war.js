@@ -1478,7 +1478,7 @@ class WarManager {
         if (typeof SkillManager !== 'undefined' && activeArmyObjForEquip) {
             let clanId = activeArmyObjForEquip.ownerClan || (activeBushos[0] ? activeBushos[0].clan : 0);
             let kunishuId = activeArmyObjForEquip.kunishuId || (activeBushos[0] ? activeBushos[0].belongKunishuId : 0);
-            activeSkillAtkMod = SkillManager.calcSkillDamageModifier(activeBushos, clanId, kunishuId, activeAllBushos);
+            activeSkillAtkMod = SkillManager.calcSkillDamageModifier(activeBushos, clanId, kunishuId, activeAllBushos, false, !isAtkTurnGroup);
         }
 
         targetList.forEach(t => {
@@ -1508,7 +1508,7 @@ class WarManager {
             if (typeof SkillManager !== 'undefined') {
                 let clanId = (t.army && t.army.ownerClan) ? t.army.ownerClan : (t.bushos[0] ? t.bushos[0].clan : 0);
                 let kunishuId = (t.army && t.army.kunishuId) ? t.army.kunishuId : (t.bushos[0] ? t.bushos[0].belongKunishuId : 0);
-                targetSkillDefMod = SkillManager.calcSkillDefenseModifier(t.bushos, clanId, kunishuId, targetAllBushos);
+                targetSkillDefMod = SkillManager.calcSkillDefenseModifier(t.bushos, clanId, kunishuId, targetAllBushos, false, isAtkTurnGroup);
             }
 
             // ★制限：被ダメージ軽減は、適性とスキルを合わせても元の10%未満にならないようにガードします！
@@ -1527,11 +1527,11 @@ class WarManager {
             if (typeof SkillManager !== 'undefined') {
                 let clanIdT = (t.army && t.army.ownerClan) ? t.army.ownerClan : (t.bushos[0] ? t.bushos[0].clan : 0);
                 let kunishuIdT = (t.army && t.army.kunishuId) ? t.army.kunishuId : (t.bushos[0] ? t.bushos[0].belongKunishuId : 0);
-                counterSkillAtkMod = SkillManager.calcSkillDamageModifier(t.bushos, clanIdT, kunishuIdT, targetAllBushos);
+                counterSkillAtkMod = SkillManager.calcSkillDamageModifier(t.bushos, clanIdT, kunishuIdT, targetAllBushos, false, isAtkTurnGroup);
 
                 let clanIdA = activeArmyObjForEquip ? (activeArmyObjForEquip.ownerClan || (activeBushos[0] ? activeBushos[0].clan : 0)) : 0;
                 let kunishuIdA = activeArmyObjForEquip ? (activeArmyObjForEquip.kunishuId || (activeBushos[0] ? activeBushos[0].belongKunishuId : 0)) : 0;
-                activeSkillDefMod = SkillManager.calcSkillDefenseModifier(activeBushos, clanIdA, kunishuIdA, activeAllBushos);
+                activeSkillDefMod = SkillManager.calcSkillDefenseModifier(activeBushos, clanIdA, kunishuIdA, activeAllBushos, false, !isAtkTurnGroup);
             }
 
             // ★反撃の軽減にもガードをかけます

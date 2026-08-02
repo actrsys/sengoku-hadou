@@ -19,8 +19,9 @@ const SKILL_NAMES = {
     KAI_NO_TORA: "甲斐の虎",
     ECHIGO_NO_RYU: "越後の龍",
     MIKAWA_NO_SHIKA: "三河の鹿",
+    JOSHU_NO_OHAN: "上州の黄斑",
     
-    // 移動・地形系
+    // 移動・環境系
     MOUNTAIN: "踏破",
     WEATHER: "悪天巧者",
     RETREAT: "退き巧者",
@@ -87,8 +88,10 @@ const SKILL_DESCRIPTIONS = {
     [SKILL_NAMES.ECHIGO_NO_RYU]: "①自部隊が与えるダメージが２０％上昇し、受けるダメージが１０％減少する。（野戦／攻城戦）\n②自部隊は一定確率でクリティカルが発生するようになる。（野戦）",
     // 三河の鹿
     [SKILL_NAMES.MIKAWA_NO_SHIKA]: "①自部隊が受けるダメージが３０％減少する。（野戦／攻城戦）",
+    // 上州の黄斑
+    [SKILL_NAMES.JOSHU_NO_OHAN]: "①自身が守備側で参戦している時、全ての味方部隊は与えるダメージが１０％上昇し、受けるダメージが２０％減少する。（攻城戦）\n②大名勢力に所属している時、毎月の開始時に、自身の所属拠点の防御力が５上昇する。",
     
-    // ----- 地形・移動系 -----
+    // ----- 移動・環境系 -----
     // 踏破
     [SKILL_NAMES.MOUNTAIN]: "①騎馬隊で山岳地形へ侵入可能になる。",
     // 悪天巧者
@@ -672,12 +675,12 @@ class SkillManager {
 
         return { isCritical: false, atkMult: 1.0, defMult: 1.0, finalDmgMult: 1.0, skillName: "" };
     }
-
+    
     // ==========================================
     // ★追加：野戦・攻城戦でのスキルによる最終ダメージ増減の魔法
     // ==========================================
     // 与ダメージ増加倍率を計算します
-    static calcSkillDamageModifier(bushos, clanId, kunishuId, allAlliedBushosList, isFieldWarAdjacent = false) {
+    static calcSkillDamageModifier(bushos, clanId, kunishuId, allAlliedBushosList, isFieldWarAdjacent = false, isDefender = false) {
         if (!bushos || bushos.length === 0) return 1.0;
         let modifier = 0; // 追加分
         
@@ -689,7 +692,7 @@ class SkillManager {
         let hasKaiInAlly = allAlliedBushosList.some(b => {
             if (b && b.skill && b.skill.includes(SKILL_NAMES.KAI_NO_TORA)) {
                 if (kunishuId > 0 && b.belongKunishuId === kunishuId) return true;
-                if (clanId > 0 && b.clan === clanId && b.belongKunishuId === 0) return true;
+                if (clanId > 0 && b.clan === clanId && (b.belongKunishuId || 0) === 0) return true;
             }
             return false;
         });
@@ -701,11 +704,23 @@ class SkillManager {
             if (hasShuyari) modifier += 0.10; // 10%アップ
         }
 
+        // ★追加：上州の黄斑（自身が守備側で参戦している時、全ての味方部隊は与えるダメージが１０％上昇）
+        if (isDefender) {
+            let hasJoshuInAlly = allAlliedBushosList.some(b => {
+                if (b && b.skill && b.skill.includes(SKILL_NAMES.JOSHU_NO_OHAN)) {
+                    if (kunishuId > 0 && b.belongKunishuId === kunishuId) return true;
+                    if (clanId > 0 && b.clan === clanId && (b.belongKunishuId || 0) === 0) return true;
+                }
+                return false;
+            });
+            if (hasJoshuInAlly) modifier += 0.10; // 10%アップ
+        }
+
         return 1.0 + modifier;
     }
 
     // 被ダメージ軽減倍率を計算します
-    static calcSkillDefenseModifier(bushos, clanId, kunishuId, allAlliedBushosList) {
+    static calcSkillDefenseModifier(bushos, clanId, kunishuId, allAlliedBushosList, isFieldWarAdjacent = false, isDefender = false) {
         if (!bushos || bushos.length === 0) return 1.0;
         let reducePct = 0; // 軽減率(%)
         
@@ -718,7 +733,7 @@ class SkillManager {
         let hasKaiInAlly = allAlliedBushosList.some(b => {
             if (b && b.skill && b.skill.includes(SKILL_NAMES.KAI_NO_TORA)) {
                 if (kunishuId > 0 && b.belongKunishuId === kunishuId) return true;
-                if (clanId > 0 && b.clan === clanId && b.belongKunishuId === 0) return true;
+                if (clanId > 0 && b.clan === clanId && (b.belongKunishuId || 0) === 0) return true;
             }
             return false;
         });
@@ -734,6 +749,18 @@ class SkillManager {
         // ★追加：自部隊に赤備えがいるか
         if (bushos.some(b => b && b.skill && b.skill.includes(SKILL_NAMES.AKAZONAE))) {
             reducePct += 10;
+        }
+
+        // ★追加：上州の黄斑（自身が守備側で参戦している時、全ての味方部隊は受けるダメージが２０％減少）
+        if (isDefender) {
+            let hasJoshuInAlly = allAlliedBushosList.some(b => {
+                if (b && b.skill && b.skill.includes(SKILL_NAMES.JOSHU_NO_OHAN)) {
+                    if (kunishuId > 0 && b.belongKunishuId === kunishuId) return true;
+                    if (clanId > 0 && b.clan === clanId && (b.belongKunishuId || 0) === 0) return true;
+                }
+                return false;
+            });
+            if (hasJoshuInAlly) reducePct += 20;
         }
 
         // 軽減率（％）を倍率に直して返します（下限の制限は戦場の計算時に行います）
@@ -811,8 +838,28 @@ class SkillManager {
             modifier *= 0.5;
         }
 
-        // 💡 今後「治水」や「防災」などの新しいスキルを追加したい時は、ここに書き足すだけでOKです！
+        // 今後「治水」や「防災」などの新しいスキルを追加したい時は、ここに書き足すだけでOKです！
         return modifier;
+    }
+
+    // ＜拠点防御力上昇＞ 上州の黄斑により、毎月拠点の防御力が上昇する
+    static calcMonthlyDefenseBonus(castle, game) {
+        if (!castle || castle.ownerClan === 0) return 0;
+        
+        let defenseBonus = 0;
+        
+        // そのお城にいる味方の武将を集めます
+        const bushos = game.getCastleBushos(castle.id).filter(b => b.status === 'active' && b.clan === castle.ownerClan);
+
+        // 「上州の黄斑」を持っている武将を探します。
+        // 大名勢力に所属している時（belongKunishuId === 0）という条件を満たす武将1人につき +5 します。
+        bushos.forEach(b => {
+            if ((b.belongKunishuId || 0) === 0 && this.hasSkill(b, SKILL_NAMES.JOSHU_NO_OHAN, game)) {
+                defenseBonus += 5;
+            }
+        });
+
+        return defenseBonus;
     }
     
     // ＜外交ボーナス＞ 技能による外交の最終成功率アップ
