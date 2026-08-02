@@ -907,8 +907,8 @@ class LifeSystem {
         // その中で「一門」の武将だけを抽出します！
         const activeFamily = activeBushos.filter(b => daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
 
-        // まだ登場していない一門（※コマンドからの家督相続に合わせ、出生前の武将は除外します！）
-        const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && !b.isNotBorn && daimyo.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
+        // まだ登場していない一門（※他勢力所属予定の武将を弾くため、自勢力予定か無所属に限定します）
+        const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && !b.isNotBorn && (b.clan === daimyo.clan || b.clan === 0) && daimyo.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
         
         // 浪人や諸勢力（※頭領は除く）に所属している一門武将も探します！
         const externalFamily = this.game.bushos.filter(b => {
@@ -1110,8 +1110,8 @@ class LifeSystem {
         // その中で国主の「一門」の武将だけを抽出します！
         const activeFamily = activeBushos.filter(b => commander.familyIds.some(fId => b.familyIds.includes(fId)));
 
-        // まだ登場していない一門
-        const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && !b.isNotBorn && commander.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
+        // まだ登場していない一門（※他勢力所属予定の武将を弾くため、自勢力予定か無所属に限定します）
+        const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && !b.isNotBorn && (b.clan === commander.clan || b.clan === 0) && commander.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
         
         // 浪人や諸勢力に所属している一門武将も探します！
         const externalFamily = this.game.bushos.filter(b => {
