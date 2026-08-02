@@ -563,7 +563,7 @@ Object.assign(WarManager.prototype, {
 
             const showInterceptDialog = async (onResult) => {
                 const startAllyReinforcement = () => {
-                    this.checkDefenderReinforcement(defCastle, atkClan, () => {
+                    this.checkDefenderReinforcement(defCastle, atkClan, async () => {
                     
                     // ★追加：守備側の援軍に「プレイヤーが操作できる部隊（直轄領）」が含まれている場合は、強制的に手動戦闘（画面表示）にします！
                     if (this.state.defSelfReinforcement && this.state.defSelfReinforcement.castle.ownerClan === pid && !this.state.defSelfReinforcement.castle.isDelegated && !this.state.defSelfReinforcement.isKunishuForce) {
@@ -572,6 +572,27 @@ Object.assign(WarManager.prototype, {
                     if (this.state.defReinforcement && this.state.defReinforcement.castle.ownerClan === pid && !this.state.defReinforcement.castle.isDelegated && !this.state.defReinforcement.isKunishuForce) {
                         this.state.isPlayerInvolved = true;
                     }
+
+                    // ==========================================
+                    // ★追加：守備側の援軍の参戦メッセージとログを表示します
+                    // ==========================================
+                    const processDefReinforcement = async (reinfData, isSelf) => {
+                        if (reinfData) {
+                            let reinfType = isSelf ? "応援軍" : "友軍";
+                            let leaderName = reinfData.bushos && reinfData.bushos.length > 0 ? reinfData.bushos[0].name : "総大将";
+                            let msg = `${reinfData.castle.name}の${leaderName}が守備側の援軍として参戦しました！`;
+                            
+                            this.game.ui.log(`【${reinfType}】${reinfData.castle.name}の${leaderName}が守備側の援軍として参戦しました。`);
+                            
+                            const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                            if (this.state.isPlayerInvolved || !skipAnim) {
+                                await this.game.ui.showDialogAsync(msg);
+                            }
+                        }
+                    };
+                    await processDefReinforcement(this.state.defSelfReinforcement, true);
+                    await processDefReinforcement(this.state.defReinforcement, false);
+                    // ==========================================
 
                     if (defClan === pid && !defCastle.isDelegated && !defCastle.isKunishu) {
                         this.game.ui.hideAIGuardTemporarily();
