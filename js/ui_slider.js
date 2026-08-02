@@ -559,7 +559,8 @@ class UISliderManager {
             const isSeaBattle = this.game.warManager && this.game.warManager.state && this.game.warManager.state.isSeaBattle;
             
             // AIと同じ魔法を使って、能力が高い順に軍馬や鉄砲を賢く配分します！
-            const autoAssigns = this.game.warManager.autoDivideSoldiers(bushos, totalSoldiers, totalHorses, totalGuns, isSeaBattle);
+            // ★修正：プレイヤーのUIであることを伝えるための目印「true」を渡します！
+            const autoAssigns = this.game.warManager.autoDivideSoldiers(bushos, totalSoldiers, totalHorses, totalGuns, isSeaBattle, true);
             assignments = autoAssigns.map(a => ({
                 id: a.busho.id,
                 count: a.soldiers,

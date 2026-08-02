@@ -188,13 +188,18 @@ Object.assign(WarManager.prototype, {
         }).map(t => t.id);
     },
     
-    // ★修正: AIが鉄砲・騎馬を「強さ順」に賢く配分し、余った兵士を足軽で均等に分けるロジックを追加
-    autoDivideSoldiers(bushos, totalSoldiers, totalHorses = 0, totalGuns = 0) {
+    // ★修正：AIが鉄砲・騎馬を「強さ順」に賢く配分し、余った兵士を足軽で均等に分けるロジックを追加
+    // ★追加：ui_sliderからの呼び出しを受け取れるように引数（isSeaBattleParam, isPlayerUI）を追加します！
+    autoDivideSoldiers(bushos, totalSoldiers, totalHorses = 0, totalGuns = 0, isSeaBattleParam = false, isPlayerUI = false) {
         if (!bushos || bushos.length === 0) return [];
-        if (bushos.length === 1) return [{ busho: bushos[0], soldiers: totalSoldiers, troopType: 'ashigaru' }];
+        
+        // ★修正: プレイヤーの編成画面では、1人の時でも強制的に足軽にせず、ちゃんと計算させます！
+        if (bushos.length === 1 && !isPlayerUI) {
+            return [{ busho: bushos[0], soldiers: totalSoldiers, troopType: 'ashigaru' }];
+        }
         
         // ★追加：海戦の時は、軍馬を「0頭」として扱って騎馬隊を作らせないようにします！
-        const isSeaBattle = this.state && this.state.isSeaBattle;
+        const isSeaBattle = isSeaBattleParam || (this.state && this.state.isSeaBattle);
         let availableHorses = isSeaBattle ? 0 : totalHorses;
         let availableGuns = totalGuns;
 
@@ -221,7 +226,6 @@ Object.assign(WarManager.prototype, {
         assignments[0].req += (totalSoldiers - totalReq);
         assignments[0].soldiers = assignments[0].req;
 
-        // ★修正：上で作った availableHorses と availableGuns をそのまま使います
         let poolSoldiers = 0; // 余った兵士を貯めるプール
         
         const maxTeppoCount = Math.floor(N / 2);
@@ -239,7 +243,8 @@ Object.assign(WarManager.prototype, {
             let req = a.req;
             
             // ★追加: 総大将は100%揃わないとダメ。他の人は50%でOKというルール
-            let threshold = isGeneral ? req : req * 0.5;
+            // ★修正：プレイヤーの編成画面では、馬や鉄砲を無駄なく使わせるため、総大将も50%でOKにします！
+            let threshold = (isGeneral && !isPlayerUI) ? req : req * 0.5;
 
             // 騎馬の判定
             if (availableHorses >= threshold) {
@@ -267,13 +272,19 @@ Object.assign(WarManager.prototype, {
 
         // ★修正: 余った兵士がいるのに、足軽が「ゼロ」になってしまった時だけ特別ルール発動！
         if (poolSoldiers > 0 && ashigaruAssigns.length === 0 && lastChangedAssign) {
-            // 最後に変身した人に「ごめん、足軽に戻って！」とお願いします
-            lastChangedAssign.troopType = 'ashigaru';
-            // 足軽に戻るので、プールに貯めていた「減らした分の兵士」を元に戻して帳尻を合わせます
-            poolSoldiers -= (lastChangedAssign.req - lastChangedAssign.soldiers);
-            lastChangedAssign.soldiers = lastChangedAssign.req;
-            // この人を足軽グループに入れます
-            ashigaruAssigns.push(lastChangedAssign);
+            if (isPlayerUI) {
+                // ★追加: プレイヤーの編成画面の場合は、無理に足軽を作らず、一番強い総大将に余った兵士を押し付けます！
+                assignments[0].soldiers += poolSoldiers;
+                poolSoldiers = 0; // 押し付けたのでプールを空にします
+            } else {
+                // 最後に変身した人に「ごめん、足軽に戻って！」とお願いします
+                lastChangedAssign.troopType = 'ashigaru';
+                // 足軽に戻るので、プールに貯めていた「減らした分の兵士」を元に戻して帳尻を合わせます
+                poolSoldiers -= (lastChangedAssign.req - lastChangedAssign.soldiers);
+                lastChangedAssign.soldiers = lastChangedAssign.req;
+                // この人を足軽グループに入れます
+                ashigaruAssigns.push(lastChangedAssign);
+            }
         }
 
         // ★追加: 余った兵士（プール）を、足軽みんなで「均等に」分け合います
