@@ -20,6 +20,12 @@ Object.assign(WarManager.prototype, {
         return true;
     },
     
+    // ★追加：メッセージ用の家名を一元管理する魔法（プレイヤー自身の家なら「当家」に差し替えます）
+    getDisplayClanName(clanId, rawName) {
+        const pid = Number(this.game.playerClanId);
+        return (Number(clanId) === pid) ? "当家" : rawName;
+    },
+    
     // ★追加：大名や国主が他軍団の城に逃げ込んだ時に、軍団を解散させる共通の魔法です！
     handleDaimyoEscape(busho, targetCastle) {
         if (busho.isDaimyo && Number(targetCastle.legionId) !== 0) {
@@ -370,11 +376,11 @@ Object.assign(WarManager.prototype, {
             const atkClanData = this.game.clans.find(c => c.id === atkClan);
             const atkProvData = this.game.provinces.find(p => p.id === atkCastle.provinceId);
             const atkArmyName = atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : (atkClanData ? atkClanData.getArmyName() : "敵軍");
-            const atkDaimyoName = (atkClanData && atkClanData.name) ? atkClanData.name : (atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : (atkProvData ? atkProvData.province : "中立"));
+            const atkDaimyoName = this.getDisplayClanName(atkClan, (atkClanData && atkClanData.name) ? atkClanData.name : (atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : (atkProvData ? atkProvData.province : "中立")));
             
             const defClanData = this.game.clans.find(c => c.id === defClan);
             const defProvData = this.game.provinces.find(p => p.id === defCastle.provinceId);
-            const defDaimyoName = (defClanData && defClanData.name) ? defClanData.name : (defCastle.isKunishu ? defCastle.name : (defProvData ? defProvData.province : "中立"));
+            const defDaimyoName = this.getDisplayClanName(defClan, (defClanData && defClanData.name) ? defClanData.name : (defCastle.isKunishu ? defCastle.name : (defProvData ? defProvData.province : "中立")));
             
             // ★追加：大名の居城かどうかを判定して記憶します
             const defDaimyo = this.game.bushos.find(b => b.clan === defClan && b.isDaimyo);
@@ -1264,8 +1270,8 @@ Object.assign(WarManager.prototype, {
                 const atkProvData = this.game.provinces.find(p => p.id === s.sourceCastle.provinceId);
                 const defClanData = this.game.clans.find(c => c.id === s.oldDefClanId);
                 const defProvData = this.game.provinces.find(p => p.id === s.defender.provinceId);
-                const atkDaimyoName = atkClanData ? atkClanData.name : (s.attacker.isKunishu ? s.attacker.name : (atkProvData ? atkProvData.province : "中立"));
-                const defDaimyoName = defClanData ? defClanData.name : (s.defender.isKunishu ? s.defender.name : (defProvData ? defProvData.province : "中立"));
+                const atkDaimyoName = this.getDisplayClanName(s.attacker.ownerClan, atkClanData ? atkClanData.name : (s.attacker.isKunishu ? s.attacker.name : (atkProvData ? atkProvData.province : "中立")));
+                const defDaimyoName = this.getDisplayClanName(s.oldDefClanId, defClanData ? defClanData.name : (s.defender.isKunishu ? s.defender.name : (defProvData ? defProvData.province : "中立")));
                 
                 if (attackerWon) {
                     aiResultMsg = `${atkDaimyoName}の${s.atkBushos[0].name}が\n${defDaimyoName}の${s.defender.name}を攻め落としました！`;
@@ -1599,7 +1605,7 @@ Object.assign(WarManager.prototype, {
                 
                 // ★追加：誰が鎮圧したのか分かるように、攻撃側の情報を取得します
                 const atkClanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
-                const atkDaimyoName = atkClanData ? atkClanData.name : "大名家";
+                const atkDaimyoName = this.getDisplayClanName(s.attacker.ownerClan, atkClanData ? atkClanData.name : "大名家");
                 const leaderName = s.atkBushos[0].name;
                 
                 if (attackerWon) {
