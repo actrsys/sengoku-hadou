@@ -555,8 +555,11 @@ class UISliderManager {
         
         let assignments = [];
         if (this.game.warManager && typeof this.game.warManager.autoDivideSoldiers === 'function') {
+            // ★追加：海戦かどうかを調べて、AIの魔法に教えます！
+            const isSeaBattle = this.game.warManager && this.game.warManager.state && this.game.warManager.state.isSeaBattle;
+            
             // AIと同じ魔法を使って、能力が高い順に軍馬や鉄砲を賢く配分します！
-            const autoAssigns = this.game.warManager.autoDivideSoldiers(bushos, totalSoldiers, totalHorses, totalGuns);
+            const autoAssigns = this.game.warManager.autoDivideSoldiers(bushos, totalSoldiers, totalHorses, totalGuns, isSeaBattle);
             assignments = autoAssigns.map(a => ({
                 id: a.busho.id,
                 count: a.soldiers,

@@ -106,7 +106,102 @@ class WarSystem {
 
 class WarManager {
     constructor(game) { this.game = game; this.state = { active: false }; this.pendingPrisoners = []; }
+    
+    // ★追加：AIとプレイヤーで共通して使う、賢い部隊分割の魔法です！
+    autoDivideSoldiers(bushos, totalSoldiers, totalHorses, totalGuns, isSeaBattle = false) {
+        let assignments = bushos.map(b => {
+            let aptKiba = 0, aptTeppo = 0, aptYumi = 0;
+            if (typeof SkillManager !== 'undefined') {
+                aptKiba = SkillManager.getAptitudeLevel(b.aptKiba);
+                aptTeppo = SkillManager.getAptitudeLevel(b.aptTeppo);
+                aptYumi = SkillManager.getAptitudeLevel(b.aptYumi);
+            }
+            return {
+                busho: b,
+                soldiers: 0,
+                troopType: 'ashigaru',
+                aptKiba: aptKiba,
+                aptTeppo: aptTeppo,
+                aptYumi: aptYumi
+            };
+        });
 
+        // 兵力の基本分配（総大将1.5、他1.0）
+        let ratioSum = 1.5 + (bushos.length - 1) * 1.0;
+        let baseAmount = Math.floor(totalSoldiers / ratioSum);
+        let remain = totalSoldiers;
+
+        for (let i = 1; i < assignments.length; i++) {
+            assignments[i].soldiers = baseAmount;
+            remain -= baseAmount;
+        }
+        if (assignments.length > 0) {
+            assignments[0].soldiers = remain;
+        }
+
+        let availHorses = totalHorses;
+        let availGuns = totalGuns;
+
+        // 各武将の得意な兵科を決定
+        assignments.forEach(a => {
+            if (isSeaBattle) {
+                a.bestEquip = (a.aptTeppo >= a.aptYumi && a.aptTeppo > 0) ? 'teppo' : 'ashigaru';
+            } else {
+                if (a.aptKiba >= a.aptTeppo && a.aptKiba > 0) a.bestEquip = 'kiba';
+                else if (a.aptTeppo > 0) a.bestEquip = 'teppo';
+                else a.bestEquip = 'ashigaru';
+            }
+        });
+
+        // 鉄砲の割り当て（適性が高い順）
+        assignments.filter(a => a.bestEquip === 'teppo').sort((a, b) => b.aptTeppo - a.aptTeppo).forEach(a => {
+            if (availGuns <= 0) return;
+            let needed = a.soldiers;
+            if (availGuns >= needed) {
+                a.troopType = 'teppo';
+                availGuns -= needed;
+            } else {
+                // 兵数を減らして鉄砲隊にするか判定（元の兵数の半分までは減らしてよい）
+                let minAllowed = Math.floor(baseAmount * 0.5);
+                if (minAllowed < 1) minAllowed = 1;
+                if (availGuns >= minAllowed) {
+                    let surplus = a.soldiers - availGuns;
+                    a.soldiers = availGuns;
+                    a.troopType = 'teppo';
+                    availGuns = 0;
+                    // 余った兵士を他の武将（総大将か副将）に渡す
+                    let receiver = (a === assignments[0] && assignments.length > 1) ? assignments[1] : assignments[0];
+                    receiver.soldiers += surplus;
+                }
+            }
+        });
+
+        // 騎馬の割り当て（適性が高い順）
+        if (!isSeaBattle) {
+            assignments.filter(a => a.bestEquip === 'kiba').sort((a, b) => b.aptKiba - a.aptKiba).forEach(a => {
+                if (availHorses <= 0) return;
+                let needed = a.soldiers;
+                if (availHorses >= needed) {
+                    a.troopType = 'kiba';
+                    availHorses -= needed;
+                } else {
+                    let minAllowed = Math.floor(baseAmount * 0.5);
+                    if (minAllowed < 1) minAllowed = 1;
+                    if (availHorses >= minAllowed) {
+                        let surplus = a.soldiers - availHorses;
+                        a.soldiers = availHorses;
+                        a.troopType = 'kiba';
+                        availHorses = 0;
+                        let receiver = (a === assignments[0] && assignments.length > 1) ? assignments[1] : assignments[0];
+                        receiver.soldiers += surplus;
+                    }
+                }
+            });
+        }
+
+        return assignments;
+    }
+    
     // ★追加：部隊のデータ（兵士数や士気など）をまとめて取り出す、便利なおまとめ魔法です！
     getArmyData(role) {
         const s = this.state;

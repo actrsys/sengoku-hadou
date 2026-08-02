@@ -1328,11 +1328,42 @@ class AIEngine {
 
         // 4. 一番強い武将の「7割以下」の武将はお留守番させます（足切り）
         const threshold = maxPower * 0.7;
-        let sorted = evaluatedBushos // ★変更：後から中身をいじれるように「const」から「let」にします
+        let sorted = evaluatedBushos 
             .filter(eb => eb.perceivedPower > threshold) // 7割より大きい人だけ残す
             .sort((a, b) => b.perceivedPower - a.perceivedPower) // 見積もり戦闘力が強い順に並べる
-            .slice(0, 5) // 最大5人まで選ぶ（既存の仕組みに合わせます）
-            .map(eb => eb.busho); // 魔法の箱から武将データだけを取り出す
+            .map(eb => eb.busho); // ★スライスは後回し！魔法の箱から武将データだけを取り出す
+
+        // ★追加：海戦が予想される場合、操船スキルが高い武将を確保する
+        let isSeaBattle = false;
+        if (typeof GameSystem.isSeaRoute === 'function') {
+            isSeaBattle = GameSystem.isSeaRoute(this.game, source, target, source.ownerClan);
+        }
+
+        if (isSeaBattle && sorted.length > 0) {
+            let general = sorted[0];
+            let genMarLvl = (typeof SkillManager !== 'undefined') ? SkillManager.getAptitudeLevel(general.aptMaritime) : 0;
+            let bestNav = null;
+            let bestNavLvl = genMarLvl;
+
+            // 評価した全員の中から（足切りされた武将も含めて）最高の航海士を探す
+            evaluatedBushos.forEach(eb => {
+                if (eb.busho.id === general.id) return;
+                let lvl = (typeof SkillManager !== 'undefined') ? SkillManager.getAptitudeLevel(eb.busho.aptMaritime) : 0;
+                if (lvl > bestNavLvl) {
+                    bestNavLvl = lvl;
+                    bestNav = eb.busho;
+                }
+            });
+
+            // 操船が上手い人がいたら、総大将のすぐ後ろにねじ込みます！
+            if (bestNav) {
+                sorted = sorted.filter(b => b.id !== bestNav.id);
+                sorted.splice(1, 0, bestNav);
+            }
+        }
+
+        // ここで最大5人まで選びます
+        sorted = sorted.slice(0, 5);
 
         // ★追加：イベント作戦で「絶対にこの人を大将にする！」と指名されていたら、一番前にねじ込みます
         if (operation && operation.designatedCommanderId) {
@@ -1393,11 +1424,42 @@ class AIEngine {
         });
 
         const threshold = maxPower * 0.7;
-        const sorted = evaluatedBushos
+        let sorted = evaluatedBushos
             .filter(eb => eb.perceivedPower > threshold)
             .sort((a, b) => b.perceivedPower - a.perceivedPower)
-            .slice(0, 5)
-            .map(eb => eb.busho);
+            .map(eb => eb.busho); // ★ここもスライスを後回しにします！
+
+        // ★追加：諸勢力との戦いが海戦になる場合、操船スキルが高い武将を確保する
+        let isSeaBattle = false;
+        if (typeof GameSystem.isSeaRoute === 'function') {
+            const targetCastle = this.game.getCastle(kunishu.castleId);
+            if (targetCastle) {
+                isSeaBattle = GameSystem.isSeaRoute(this.game, sourceCastle, targetCastle, sourceCastle.ownerClan);
+            }
+        }
+
+        if (isSeaBattle && sorted.length > 0) {
+            let general = sorted[0];
+            let genMarLvl = (typeof SkillManager !== 'undefined') ? SkillManager.getAptitudeLevel(general.aptMaritime) : 0;
+            let bestNav = null;
+            let bestNavLvl = genMarLvl;
+
+            evaluatedBushos.forEach(eb => {
+                if (eb.busho.id === general.id) return;
+                let lvl = (typeof SkillManager !== 'undefined') ? SkillManager.getAptitudeLevel(eb.busho.aptMaritime) : 0;
+                if (lvl > bestNavLvl) {
+                    bestNavLvl = lvl;
+                    bestNav = eb.busho;
+                }
+            });
+
+            if (bestNav) {
+                sorted = sorted.filter(b => b.id !== bestNav.id);
+                sorted.splice(1, 0, bestNav);
+            }
+        }
+
+        sorted = sorted.slice(0, 5);
 
         const sendHorses = (sourceCastle.horses || 0) < sendSoldiers * 0.2 ? 0 : (sourceCastle.horses || 0);
         const sendGuns = (sourceCastle.guns || 0) < sendSoldiers * 0.2 ? 0 : (sourceCastle.guns || 0);
@@ -2337,6 +2399,12 @@ class AIEngine {
                         // 第一目標勢力に所属する武将を全員取得（大名は除く）
                         const enemyBushos = this.game.bushos.filter(b => b.clan === memoryClanId && b.status === 'active' && !b.isDaimyo && b.castleId > 0);
                         
+                        // ★追加：スキルマネージャーに問い合わせて、リーダーのスキルによって「暗殺」行動が拡張（許可）されているか確認します
+                        let canAssassinate = false;
+                        if (typeof SkillManager !== 'undefined' && typeof SkillManager.hasAIExtendedAction === 'function') {
+                            canAssassinate = SkillManager.hasAIExtendedAction(leader, 'assassinate', this.game);
+                        }
+
                         // ★修正：リーダー（直轄なら大名、軍団なら国主）の智謀による基本スコアアップ (5〜10点の枠に収めます)
                         let baseRumorHeadhuntScore = 5;
                         if (leader.intelligence >= 75) {
@@ -2417,6 +2485,15 @@ class AIEngine {
                             if (!hasNemesis && availableGold >= 100) {
                                 actions.push({ type: 'headhunt', stat: 'intelligence', score: finalScore, cost: 100, targetId: targetBusho.castleId, targetBushoId: targetBusho.id, gold: 100 });
                             }
+                            
+                            // ★追加：AIの暗殺
+                            // プレイヤー勢力を対象にしない
+                            // 通常の計略の1/10の確率になるように調整して追加する
+                            if (canAssassinate && memoryClanId !== this.game.playerClanId) {
+                                if (Math.random() < 0.1) {
+                                    actions.push({ type: 'assassinate', stat: 'intelligence', score: finalScore, cost: 0, targetId: targetBusho.castleId, targetBushoId: targetBusho.id });
+                                }
+                            }
                         });
                     }
 
@@ -2494,6 +2571,9 @@ class AIEngine {
                     }
                     if (action.type === 'headhunt') {
                         return StrategySystem.calcHeadhuntScore(b) - StrategySystem.calcHeadhuntScore(a);
+                    }
+                    if (action.type === 'assassinate') {
+                        return StrategySystem.calcAssassinateScore(b) - StrategySystem.calcAssassinateScore(a);
                     }
                     // 計略以外の普通のお仕事は、今まで通り1つの能力（stat）で比べっこします
                     return b[action.stat] - a[action.stat];
@@ -2631,6 +2711,41 @@ class AIEngine {
                     this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, isSuccess, 'headhunt', targetBusho.isCastellan && isSuccess, targetBusho.id);
                     
                     this.game.strategySystem.applyHeadhuntEffect(doer, targetBusho, castle, isSuccess);
+                    
+                    let keepAction = false;
+                    if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
+                        const bonusProb = Math.min(100, 3 + Math.floor((leader.intelligence - 91) / 5) * 3);
+                        if (Math.random() * 100 < bonusProb) {
+                            keepAction = true;
+                            hasBonusSabotageUsed = true;
+                        }
+                    }
+                    if (!keepAction) doer.isActionDone = true; 
+                    actionDoneInThisStep = true; break;
+                }
+
+                if (action.type === 'assassinate') {
+                    const targetBusho = this.game.getBusho(action.targetBushoId);
+                    targetBusho.lastApproachedClanId = doer.clan;
+                    
+                    let isSuccess = this.game.strategySystem.calcAssassinate(doer.id, action.targetBushoId, true);
+                    this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, isSuccess, 'assassinate', false, targetBusho.id);
+                    
+                    if (isSuccess) {
+                        if (this.game.lifeSystem && typeof this.game.lifeSystem.processDeath === 'function') {
+                            this.game.lifeSystem.processDeath(targetBusho, 'assassination'); 
+                        } else {
+                            targetBusho.status = 'dead';
+                            targetBusho.isCastellan = false;
+                            targetBusho.isGunshi = false;
+                            targetBusho.isCommander = false;
+                            const targetCastle = this.game.getCastle(targetBusho.castleId);
+                            if (targetCastle) {
+                                targetCastle.samuraiIds = targetCastle.samuraiIds.filter(id => id !== targetBusho.id);
+                            }
+                            this.game.updateAllCastlesLords();
+                        }
+                    }
                     
                     let keepAction = false;
                     if (!hasBonusSabotageUsed && leader.intelligence >= 91) {

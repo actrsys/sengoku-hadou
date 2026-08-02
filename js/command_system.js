@@ -3111,6 +3111,10 @@ class CommandSystem {
         const myClanId = atkCastle.ownerClan;
         let targetCastle = this.game.getCastle(targetCastleId);
         
+        // ★追加：海戦ルートかどうかを判定して、一番最初に記録します！
+        this.game.warManager.state = this.game.warManager.state || {};
+        this.game.warManager.state.isSeaBattle = GameSystem.isSeaRoute(this.game, atkCastle, targetCastle, myClanId);
+        
         // ★追加：諸勢力の場合はダミーのターゲットオブジェクトを作る
         if (extraData && extraData.isKunishu) {
             const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
