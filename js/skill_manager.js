@@ -25,7 +25,8 @@ const SKILL_NAMES = {
     HITOTARASHI: "人たらし",
     SOGEKI: "狙撃",
     HYORIHIKYO: "表裏比興",
-    PHOENIX: "常陸の不死鳥"
+    PHOENIX: "常陸の不死鳥",
+    BOSHO: "謀将"
 };
 
 const APTITUDE_NAMES = {
@@ -91,7 +92,9 @@ const SKILL_DESCRIPTIONS = {
     // 表裏比興
     [SKILL_NAMES.HYORIHIKYO]: "①自身が大名または使者である時、親善の成功率が上昇する。\n②自身が大名または使者である時、断交時のペナルティが減少する。\n③自身が大名である時、主家からの援軍要請を拒否できる。",
     // 常陸の不死鳥
-    [SKILL_NAMES.PHOENIX]: "①戦没しなくなる。\n②大名として滅亡した時、諸勢力となる。\n③諸勢力の頭領である時、空白地を奪って大名となる。"
+    [SKILL_NAMES.PHOENIX]: "①戦没しなくなる。\n②大名として滅亡した時、諸勢力となる。\n③諸勢力の頭領である時、空白地を奪って大名となる。",
+    // 謀将
+    [SKILL_NAMES.BOSHO]: "①自身が大名、国主または暗殺の担当者である時、暗殺の基本成功率が５％上昇する。"
 };
 
 class SkillManager {
@@ -888,6 +891,20 @@ class SkillManager {
     }
     
     // ==========================================
+    // ★追加：AIの行動バリエーション拡張を一元管理する窓口
+    // ==========================================
+    // 武将の持つスキルによって、AIが指定の特別行動（暗殺など）を実行可能になるか判定します
+    static hasAIExtendedAction(busho, actionType, game) {
+        // 暗殺行動の場合、「謀将」スキルを持っていれば許可します
+        if (actionType === 'assassinate') {
+            return this.hasSkill(busho, SKILL_NAMES.BOSHO, game);
+        }
+        
+        // 将来、他の行動拡張が増えた場合はここに追記します
+        return false;
+    }
+
+    // ==========================================
     // ★追加：計略コマンドのスキル補正を一元管理する共通窓口
     // ==========================================
     // 成功率のスキル補正をまとめて計算します
@@ -900,6 +917,28 @@ class SkillManager {
             probBonus += this.calcNinjutsuProbBonus(doer);
         } else if (actionType === 'assassinate') {
             probBonus += this.getNinjutsuLevel(doer) * 0.02;
+            // ★追加：謀将スキルによる暗殺の基本成功率アップ
+            if (this.hasSkill(doer, SKILL_NAMES.BOSHO, game)) {
+                probBonus += 0.05;
+            } else {
+                // 大名が持っているかチェック
+                const daimyo = game.bushos.find(b => b.clan === doer.clan && b.isDaimyo);
+                if (daimyo && this.hasSkill(daimyo, SKILL_NAMES.BOSHO, game)) {
+                    probBonus += 0.05;
+                } else {
+                    // ★追加：実行者が所属する軍団の国主が持っているかチェック
+                    const doerCastle = game.getCastle(doer.castleId);
+                    if (doerCastle && doerCastle.legionId !== 0) {
+                        const legion = game.legions ? game.legions.find(l => l.clanId === doer.clan && l.legionNo === doerCastle.legionId) : null;
+                        if (legion && legion.commanderId) {
+                            const commander = game.getBusho(legion.commanderId);
+                            if (commander && this.hasSkill(commander, SKILL_NAMES.BOSHO, game)) {
+                                probBonus += 0.05;
+                            }
+                        }
+                    }
+                }
+            }
         } else if (actionType === 'headhunt') {
             probBonus += this.calcHeadhuntProbBonus(doer, game);
         }
