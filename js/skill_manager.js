@@ -365,6 +365,18 @@ class SkillManager {
         if (!busho || !busho.aptBugei) return 0;
         return this.getAptitudeLevel(busho.aptBugei);
     }
+    
+    // ＜暗殺防諜＞ ターゲット拠点の武芸Lvを合計して、暗殺の成功率を下げる（重複可）
+    static calcBugeiAssassinateDefense(castleId, game) {
+        if (!game || !castleId) return 0;
+        const bushos = game.getCastleBushos(castleId).filter(b => b.status === 'active');
+        let totalLvl = 0;
+        bushos.forEach(b => {
+            totalLvl += this.getBugeiLevel(b);
+        });
+        // 1レベルにつき2%（0.02）マイナスします
+        return totalLvl * 0.02;
+    }
 
     // ＜防諜効果＞ 拠点の武将の武芸レベルを合計して、調略の成功率を下げる（最大20％）
     static calcBugeiCounterIntelligenceBonus(castleId, game) {
@@ -443,6 +455,18 @@ class SkillManager {
             }
         }
         return 0;
+    }
+    
+    // ＜暗殺防諜＞ ターゲット勢力全体の忍術レベルを合計して、暗殺の成功率を下げる（重複可）
+    static calcNinjutsuAssassinateDefense(clanId, game) {
+        if (!game || clanId === 0) return 0;
+        const bushos = game.bushos.filter(b => b.clan === clanId && b.status === 'active');
+        let totalLvl = 0;
+        bushos.forEach(b => {
+            totalLvl += this.getNinjutsuLevel(b);
+        });
+        // 1レベルにつき1%（0.01）マイナスします
+        return totalLvl * 0.01;
     }
 
     // 攻城戦で攻撃側の時、火計最終成功率をLv1につき＋３％する魔法です

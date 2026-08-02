@@ -138,6 +138,15 @@ class GunshiSystem {
             if (perceivedProb > 0.15) return "厳しい交渉になるでしょう。。"; 
             return "おやめください。条件を提示するまでもなく、門前払いされるでしょう。"; 
         }
+
+        // ★追加：暗殺の場合は成功率が非常に低いため、専用の低い基準で判定します！
+        if (action.type === 'assassinate') {
+            if (perceivedProb >= 0.15) return "暗殺の機としては上々です。実行に移すべきかと！";
+            if (perceivedProb >= 0.10) return "隙があるように見受けられます。運が良ければ仕留められましょう。"; 
+            if (perceivedProb >= 0.05) return "警護が厚く厳しいかと。刃を届かせるのは至難の業です。"; 
+            if (perceivedProb >= 0.01) return "警戒されており危険です。今は好機ではありませぬ。"; 
+            return "おやめください。失敗する未来しか見えませぬ。"; 
+        }
         
         // ★調略コマンド（離間計・破壊工作・民心撹乱）の場合は、成功率と効果量の組み合わせで自然なつなぎ言葉にします
         if (action.type === 'rumor' || action.type === 'sabotage' || action.type === 'incite' || action.type === 'kuko') {

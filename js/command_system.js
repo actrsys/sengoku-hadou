@@ -21,7 +21,7 @@ const COMMAND_MENU_STRUCTURE = [
         items: [
             { label: "外交", items: ['goodwill', 'truce', 'alliance', 'marriage', 'dominate', 'subordinate', 'vassalage', 'break_alliance'] },
             { label: "諸勢力", items: ['kunishu_goodwill', 'kunishu_incorporate', 'kunishu_subjugate'] },
-            { label: "調略", items: ['sabotage', 'incite', 'rumor', 'headhunt', 'kuko'] },
+            { label: "計略", items: ['sabotage', 'incite', 'rumor', 'headhunt', 'assassinate', 'kuko'] },
             { label: "朝廷", items: ['tribute', 'court_truce'] }
         ]
     },
@@ -530,7 +530,7 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: true, 
         startMode: 'map_select', targetType: 'enemy_all',
         sortKey: 'intelligence' 
-    },// 差し替え後
+    },
     'headhunt': { 
         label: "武将引抜", category: 'FOREIGN_STRATEGY', 
         costGold: 0, costRice: 0,
@@ -538,7 +538,14 @@ const COMMAND_SPECS = {
         startMode: 'map_select', targetType: 'enemy_all',
         sortKey: 'intelligence'
     },
-    'kuko': { 
+    'assassinate': { 
+        label: "暗殺", category: 'FOREIGN_STRATEGY', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: true, 
+        startMode: 'map_select', targetType: 'enemy_all',
+        sortKey: 'intelligence' 
+    },
+    'kuko': {
         label: "駆虎呑狼", category: 'FOREIGN_STRATEGY', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: true, 
@@ -722,7 +729,7 @@ class CommandSystem {
         let isEnemyTarget = false;
         let targetCastle = null;
         // ★追加: 'kunishu_headhunt_target' も敵の城を見に行くコマンドとして追加します！
-        if (['rumor_target_busho','headhunt_target','kunishu_headhunt_target','view_only'].includes(actionType)) {
+        if (['rumor_target_busho','headhunt_target','assassinate_target','kunishu_headhunt_target','view_only'].includes(actionType)) {
              isEnemyTarget = true;
              targetCastle = this.game.getCastle(targetId);
         }
@@ -775,7 +782,12 @@ class CommandSystem {
             bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && b.status === 'active' && !b.isDaimyo); 
             infoHtml = "<div>武将引抜の対象とする武将を選択してください </div>"; 
         }
-        else if (actionType === 'kuko_doer') { 
+        else if (actionType === 'assassinate_target') { 
+            const targetCastle = this.game.getCastle(targetId);
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && b.status === 'active' && !b.isDaimyo); 
+            infoHtml = "<div>暗殺の対象とする武将を選択してください</div>"; 
+        }
+        else if (actionType === 'kuko_doer') {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
             infoHtml = "<div>駆虎呑狼を実行する担当官を選択してください</div>"; 
         }
@@ -787,7 +799,11 @@ class CommandSystem {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
             infoHtml = "<div>引抜を実行する担当官を選択してください</div>"; 
         }
-        else if (actionType === 'interview') { 
+        else if (actionType === 'assassinate_doer') {
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
+            infoHtml = "<div>暗殺を実行する担当官を選択してください</div>"; 
+        }
+        else if (actionType === 'interview') {
             bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active' && !b.isDaimyo); 
             infoHtml = "<div>面談する武将を選択してください</div>"; 
         }
@@ -997,6 +1013,9 @@ class CommandSystem {
                      if (actionType === 'headhunt_doer') {
                          return typeof StrategySystem.calcHeadhuntScore === 'function' ? StrategySystem.calcHeadhuntScore(target) : 0;
                      }
+                     if (actionType === 'assassinate_doer') {
+                         return typeof StrategySystem.calcAssassinateScore === 'function' ? StrategySystem.calcAssassinateScore(target) : 0;
+                     }
                      if (actionType === 'kuko_doer') {
                          return typeof StrategySystem.calcKukoScore === 'function' ? StrategySystem.calcKukoScore(target) : 0;
                      }
@@ -1145,10 +1164,10 @@ class CommandSystem {
         const actionRequiredCommands = [
             'farm', 'commerce', 'repair', 'charity', 
             'war', 'draft', 'training', 'soldier_charity', 'transport', 'kunishu_subjugate', 
-            'goodwill', 'truce', 'alliance', 'marriage', 'dominate', 'subordinate', 'break_alliance', 
+            'goodwill', 'truce', 'alliance', 'marriage', 'dominate', 'subordinate', 'break_alliance',
             'kunishu_goodwill', 'kunishu_incorporate', 
-            'sabotage', 'incite', 'rumor', 'headhunt', 
-            'tribute', 'court_truce', 
+            'sabotage', 'incite', 'rumor', 'headhunt', 'assassinate',
+            'tribute', 'court_truce',
             'employ', 'move'
         ];
         if (actionRequiredCommands.includes(type)) {
@@ -1843,6 +1862,17 @@ class CommandSystem {
         
         if (actionType === 'headhunt_doer') {
             this.game.ui.openQuantitySelector('headhunt_gold', selectedIds, extraData.targetId);
+            return;
+        }
+
+        if (actionType === 'assassinate_target') {
+            this.game.ui.openBushoSelector('assassinate_doer', null, { targetId: firstId });
+            return;
+        }
+        
+        if (actionType === 'assassinate_doer') {
+            const trueProb = this.game.strategySystem.getAssassinateProb(firstId, extraData.targetId);
+            this.showAdviceAndExecute('assassinate', () => this.game.strategySystem.executeAssassinate(firstId, extraData.targetId), { trueProb: trueProb });
             return;
         }
 
@@ -2846,6 +2876,7 @@ class CommandSystem {
             case 'sabotage': return "破壊工作を行う城を選択してください";
             case 'rumor': return "離間計対象の居城を選択してください";
             case 'headhunt': case 'headhunt_select_castle': return "引抜対象の居城を選択してください";
+            case 'assassinate': return "暗殺対象の居城を選択してください";
             case 'kuko': return "駆虎呑狼の標的となる一つ目の勢力を選択してください";
             case 'kuko_target_b': return "駆虎呑狼の標的となる二つ目の勢力を選択してください";
             case 'goodwill': return "親善を行う相手を選択してください";
@@ -3027,6 +3058,8 @@ class CommandSystem {
             this.game.ui.openBushoSelector('rumor_target_busho', targetCastle.id, null, onBackToMap);
         } else if (mode === 'headhunt' || mode === 'headhunt_select_castle') {
             this.game.ui.openBushoSelector('headhunt_target', targetCastle.id, null, onBackToMap);
+        } else if (mode === 'assassinate') {
+            this.game.ui.openBushoSelector('assassinate_target', targetCastle.id, null, onBackToMap);
         } else if (mode === 'kuko') {
             this.game.tempKukoData = { clanAId: targetCastle.ownerClan };
             this.enterMapSelection('kuko_target_b');

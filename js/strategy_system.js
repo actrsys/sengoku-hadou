@@ -47,6 +47,15 @@ class StrategySystem {
         return (busho.intelligence * 0.8) + (busho.charm * 0.2) + (busho.loyalty * 0.1);
     }
 
+    // --- 暗殺 ---
+    static calcAssassinateScore(busho) {
+        let score = busho.strength;
+        if (typeof SkillManager !== 'undefined') {
+            score += SkillManager.getNinjutsuLevel(busho) * 20;
+        }
+        return score;
+    }
+
     // --- 駆虎呑狼 ---
     static getKukoProbBase(busho) {
         return (busho.intelligence + (Math.sqrt(busho.loyalty) * 2)) / 180;
@@ -298,6 +307,50 @@ class StrategySystem {
 
         return Math.max(0, Math.min(1.0, successRate));
     }
+
+    getAssassinateProb(doerId, targetBushoId) {
+        const doer = this.game.getBusho(doerId);
+        const target = this.game.getBusho(targetBushoId);
+        const targetCastle = this.game.getCastle(target.castleId);
+        
+        let prob = doer.intelligence / 1000; // 基本成功率は担当者の智謀/10(%)
+
+        if (typeof SkillManager !== 'undefined') {
+            // 担当者の忍術スキルLv×２％成功率がアップ。
+            prob += SkillManager.getNinjutsuLevel(doer) * 0.02;
+            
+            // 自勢力に忍術持ちがいるとき、いる場所にかかわらずLv１につき暗殺成功率を１％下げる
+            prob -= SkillManager.calcNinjutsuAssassinateDefense(target.clan, this.game);
+            
+            // 武芸持ちがいる拠点に対する、暗殺の成功率をLv１につき２％ダウン
+            prob -= SkillManager.calcBugeiAssassinateDefense(target.castleId, this.game);
+        }
+
+        // 暗殺対象の拠点の兵士数１０名につき成功率０．２％ダウン。
+        if (targetCastle) {
+            const soldiers = targetCastle.soldiers;
+            prob -= (Math.floor(soldiers / 10) * 0.002);
+        }
+
+        // 暗殺対象の拠点にいる、相手と同じ勢力の武将１人につき成功率が６％ダウン。
+        if (targetCastle) {
+            const sameClanBushos = this.game.getCastleBushos(targetCastle.id).filter(b => b.clan === target.clan && b.status === 'active');
+            prob -= (sameClanBushos.length * 0.06);
+        }
+
+        // 成功率は最低０％で、うまく条件が噛み合わない限り絶対失敗する仕様
+        return Math.max(0, prob);
+    }
+
+    calcAssassinate(doerId, targetBushoId, isExecute = false) {
+        const doer = this.game.getBusho(doerId);
+        const prob = this.getAssassinateProb(doerId, targetBushoId);
+        let success = Math.random() < prob;
+
+        if (isExecute) this.addStrategyExperience(doer, success, 15, 5, 3, 1);
+
+        return success;
+    }
     
     // ★追加: 破壊工作の予測ダメージを計算する魔法
     getSabotageExpectedDamage(doerId, targetId) {
@@ -463,7 +516,7 @@ class StrategySystem {
             
             if (isSuccess) penalty = 4;
             else penalty = 2;
-        } else if (actionType === 'sabotage' || actionType === 'headhunt') {
+        } else if (actionType === 'sabotage' || actionType === 'headhunt' || actionType === 'assassinate') {
             if (isSuccess) {
                 alwaysDiscovered = true;
                 if (actionType === 'sabotage') penalty = 4;
@@ -471,6 +524,7 @@ class StrategySystem {
                     if (isCastellanHeadhunt) penalty = 32;
                     else penalty = 16;
                 }
+                else if (actionType === 'assassinate') penalty = 30;
             } else {
                 const numerator = Math.sqrt((doer.strength * 1.5) + doer.intelligence);
                 const denominator = Math.sqrt(15 + bestStr + (bestInt * 1.5));
@@ -493,11 +547,11 @@ class StrategySystem {
                 const tBusho = this.game.getBusho(targetBushoId);
                 if (tBusho) targetBushoName = tBusho.name;
             }
-
+            
             // ① 犯人がバレた場合（隠密失敗）の目撃報告
             if (isDiscovered) {
                 let msg1 = "";
-                if (actionType === 'incite' || actionType === 'sabotage') {
+                if (actionType === 'incite' || actionType === 'sabotage' || actionType === 'assassinate') {
                     msg1 = `${doerClanName}の手の者が${targetCastle.name}周辺で目撃されたようです`;
                 } else if (actionType === 'rumor') {
                     msg1 = `${targetBushoName}が${doerClanName}の手の者と面会していたようです`;
@@ -644,6 +698,51 @@ class StrategySystem {
             }
         } else {
             this.game.ui.showResultModal(`${doer.name}の引抜工作は失敗しました……\n${target.name}は応じませんでした${covertMsg}`);
+        }
+        
+        doer.isActionDone = true; 
+        this.game.ui.updatePanelHeader(); 
+        this.game.ui.renderCommandMenu();
+        this.game.ui.renderMap();
+    }
+
+    // 暗殺を実行する魔法
+    executeAssassinate(doerId, targetBushoId) {
+        const doer = this.game.getBusho(doerId);
+        const target = this.game.getBusho(targetBushoId);
+        
+        // メモを残す魔法
+        target.lastApproachedClanId = doer.clan;
+        
+        let isSuccess = this.calcAssassinate(doerId, targetBushoId, true);
+        const covertMsg = this.handleCovertAction(doerId, target.castleId, isSuccess, 'assassinate', false, target.id);
+        
+        if (isSuccess) {
+            // 暗殺成功時の処理
+            if (this.game.lifeSystem && typeof this.game.lifeSystem.processDeath === 'function') {
+                this.game.lifeSystem.processDeath(target, 'assassination'); 
+            } else {
+                target.status = 'dead';
+                target.isCastellan = false;
+                target.isGunshi = false;
+                target.isCommander = false;
+                const targetCastle = this.game.getCastle(target.castleId);
+                if (targetCastle) {
+                    targetCastle.samuraiIds = targetCastle.samuraiIds.filter(id => id !== target.id);
+                }
+                this.game.updateAllCastlesLords();
+            }
+            
+            const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
+            doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(maxStat * 0.5);
+            if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 30);
+            
+            this.game.ui.showResultModal(`${doer.name}の暗殺が成功！\n${target.name}を討ち取りました！${covertMsg}`);
+        } else {
+            doer.achievementTotal = (doer.achievementTotal || 0) + 5;
+            if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+            
+            this.game.ui.showResultModal(`${doer.name}の暗殺は失敗しました……\n${target.name}の警護が固く、手出しできませんでした。${covertMsg}`);
         }
         
         doer.isActionDone = true; 
