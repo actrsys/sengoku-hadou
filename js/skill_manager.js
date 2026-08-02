@@ -43,7 +43,7 @@ const SKILL_NAMES = {
 
 const APTITUDE_NAMES = {
     ASHIGARU: "足軽",
-    KIBA: "騎馬",
+    KIBA: "馬術",
     YUMI: "弓術",
     TEPPO: "砲術",
     BUGEI: "武芸",
