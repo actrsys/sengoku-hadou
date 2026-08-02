@@ -474,8 +474,8 @@ Object.assign(UIInfoManager.prototype, {
                                 let desc = typeof SkillManager !== 'undefined' ? SkillManager.getSkillDescription(skillName) : "";
                                 if (!desc) desc = "詳細不明。";
                                 
-                                // ★追加：スマホ版なら文字を小さく（約0.64remに）します
-                                const innerDescFontSize = isPc ? "0.85rem" : "0.64rem";
+                                // ★追加：スマホ版なら文字を小さく（約0.62remに）します
+                                const innerDescFontSize = isPc ? "0.85rem" : "0.62rem";
                                 
                                 // 説明文をセットして、瞬時に表示を切り替えます
                                 descText.innerHTML = `
