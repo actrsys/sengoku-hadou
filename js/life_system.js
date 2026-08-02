@@ -909,30 +909,33 @@ class LifeSystem {
 
         // まだ登場していない一門（※他勢力所属予定の武将を弾くため、自勢力予定か無所属に限定します）
         const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && !b.isNotBorn && (b.clan === daimyo.clan || b.clan === 0) && daimyo.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
-        
-        // 浪人や諸勢力（※頭領は除く）に所属している一門武将も探します！
-        const externalFamily = this.game.bushos.filter(b => {
-            // 自分自身は除外します
-            if (b.id === daimyo.id) return false;
-            // 一門ではない武将も除外します
-            if (!daimyo.familyIds.some(fId => b.familyIds.includes(fId))) return false;
-            
-            // 浪人なら候補に入れます
-            if (b.status === 'ronin') return true;
-            
-            // 諸勢力に所属している武将の場合
-            if ((b.belongKunishuId || 0) > 0 && b.clan === 0) {
-                // 諸勢力のデータを調べて、その武将が頭領かどうかを確認します
-                const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId) : null;
-                // 頭領だった場合は、候補から外します
-                if (kunishu && kunishu.leaderId === b.id) {
-                    return false; 
+
+        // ★追加：AI大名の場合のみ、浪人や諸勢力に所属している一門武将も探します！
+        let externalFamily = [];
+        if (Number(daimyo.clan) !== Number(this.game.playerClanId)) {
+            externalFamily = this.game.bushos.filter(b => {
+                // 自分自身は除外します
+                if (b.id === daimyo.id) return false;
+                // 一門ではない武将も除外します
+                if (!daimyo.familyIds.some(fId => b.familyIds.includes(fId))) return false;
+                
+                // 浪人なら候補に入れます
+                if (b.status === 'ronin') return true;
+                
+                // 諸勢力に所属している武将の場合
+                if ((b.belongKunishuId || 0) > 0 && b.clan === 0) {
+                    // 諸勢力のデータを調べて、その武将が頭領かどうかを確認します
+                    const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId) : null;
+                    // 頭領だった場合は、候補から外します
+                    if (kunishu && kunishu.leaderId === b.id) {
+                        return false; 
+                    }
+                    // 頭領ではない普通の武将なら候補に入れます
+                    return true;
                 }
-                // 頭領ではない普通の武将なら候補に入れます
-                return true;
-            }
-            return false;
-        });
+                return false;
+            });
+        }
 
         // まずは一門だけで候補リストを作ります
         let allCandidates = [...activeFamily, ...unbornFamily, ...externalFamily];
@@ -1112,19 +1115,22 @@ class LifeSystem {
 
         // まだ登場していない一門（※他勢力所属予定の武将を弾くため、自勢力予定か無所属に限定します）
         const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && !b.isNotBorn && (b.clan === commander.clan || b.clan === 0) && commander.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
-        
-        // 浪人や諸勢力に所属している一門武将も探します！
-        const externalFamily = this.game.bushos.filter(b => {
-            if (b.id === commander.id || b.isDaimyo || b.isCommander) return false;
-            if (!commander.familyIds.some(fId => b.familyIds.includes(fId))) return false;
-            if (b.status === 'ronin') return true;
-            if ((b.belongKunishuId || 0) > 0 && b.clan === 0) {
-                const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId) : null;
-                if (kunishu && kunishu.leaderId === b.id) return false; 
-                return true;
-            }
-            return false;
-        });
+
+        // ★追加：AI国主の場合のみ、浪人や諸勢力に所属している一門武将も探します！
+        let externalFamily = [];
+        if (Number(commander.clan) !== Number(this.game.playerClanId)) {
+            externalFamily = this.game.bushos.filter(b => {
+                if (b.id === commander.id || b.isDaimyo || b.isCommander) return false;
+                if (!commander.familyIds.some(fId => b.familyIds.includes(fId))) return false;
+                if (b.status === 'ronin') return true;
+                if ((b.belongKunishuId || 0) > 0 && b.clan === 0) {
+                    const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId) : null;
+                    if (kunishu && kunishu.leaderId === b.id) return false; 
+                    return true;
+                }
+                return false;
+            });
+        }
 
         // まずは一門だけで候補リストを作ります
         let allCandidates = [...activeFamily, ...unbornFamily, ...externalFamily];
