@@ -505,7 +505,7 @@ class StrategySystem {
                     if (isCastellanHeadhunt) penalty = 32;
                     else penalty = 16;
                 }
-                else if (actionType === 'assassinate') penalty = 30;
+                else if (actionType === 'assassinate') penalty = 32;
             } else {
                 const numerator = Math.sqrt((doer.strength * 1.5) + doer.intelligence);
                 const denominator = Math.sqrt(15 + bestStr + (bestInt * 1.5));
