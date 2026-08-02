@@ -1680,7 +1680,8 @@ Object.assign(WarManager.prototype, {
 
                     // ★追加：色が中立に変わったので、メッセージの前に地図を更新します！
                     // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
-                    const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                    // ★変更：プレイヤー勢力が関わっている場合はエフェクトをスキップしません！
+                    const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
                     if (typeof this.game.ui.playCaptureEffect === 'function' && (s.isPlayerInvolved || !skipAnim)) {
                         // 画面が真っ白になった瞬間に色を塗り替えるお願いを渡します
                         await this.game.ui.playCaptureEffect(targetC.id, () => {
@@ -1883,7 +1884,8 @@ Object.assign(WarManager.prototype, {
 
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
                 // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
-                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                // ★変更：プレイヤー勢力が関わっている場合はエフェクトをスキップしません！
+                const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
                 if (typeof this.game.ui.playCaptureEffect === 'function' && (s.isPlayerInvolved || !skipAnim)) {
                     await this.game.ui.playCaptureEffect(s.defender.id, () => {
                         this.game.ui.updateClanColors();
@@ -1987,7 +1989,8 @@ Object.assign(WarManager.prototype, {
 
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
                 // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
-                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                // ★変更：プレイヤー勢力が関わっている場合はエフェクトをスキップしません！
+                const skipAnim = (window.GameConfig && window.GameConfig.aiWarNotify === false) && !s.isPlayerFactionInvolved;
                 if (typeof this.game.ui.playCaptureEffect === 'function' && (s.isPlayerInvolved || !skipAnim)) {
                     await this.game.ui.playCaptureEffect(s.defender.id, () => {
                         this.game.ui.updateClanColors();
