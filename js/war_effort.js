@@ -1296,6 +1296,18 @@ Object.assign(WarManager.prototype, {
                 }
             };
             
+            // ★修正：諸勢力の判定でエラーにならないよう、プレイヤー関与の判定を上のほうに移動しました！
+            const pid = Number(this.game.playerClanId);
+            const isAtkPlayer = (Number(s.attacker.ownerClan) === pid) || 
+                                (s.reinforcement && Number(s.reinforcement.castle.ownerClan) === pid) || 
+                                (s.selfReinforcement && Number(s.selfReinforcement.castle.ownerClan) === pid) ||
+                                (s.retreatedReinforcements && s.retreatedReinforcements.some(r => r.isAttackerData && r.data.castle && Number(r.data.castle.ownerClan) === pid));
+            const isDefPlayer = (Number(s.oldDefClanId) === pid) || 
+                                (s.defReinforcement && Number(s.defReinforcement.castle.ownerClan) === pid) || 
+                                (s.defSelfReinforcement && Number(s.defSelfReinforcement.castle.ownerClan) === pid) ||
+                                (s.retreatedReinforcements && s.retreatedReinforcements.some(r => !r.isAttackerData && r.data.castle && Number(r.data.castle.ownerClan) === pid));
+            const enemyName = isAtkPlayer ? (this.game.clans.find(c => c.id === s.oldDefClanId)?.getArmyName() || "敵軍") : s.attacker.name;
+
             // ★ここから「生存率の計算」と「援軍の帰還処理」を丸ごと新しくします！
             
             // 1. 攻城戦の本当の死者を出す（全体の死者から、野戦の死者を引きます）
@@ -2028,16 +2040,6 @@ Object.assign(WarManager.prototype, {
             }
                 
             let resultMsg = "";
-            const pid = Number(this.game.playerClanId);
-            const isAtkPlayer = (Number(s.attacker.ownerClan) === pid) || 
-                                (s.reinforcement && Number(s.reinforcement.castle.ownerClan) === pid) || 
-                                (s.selfReinforcement && Number(s.selfReinforcement.castle.ownerClan) === pid) ||
-                                (s.retreatedReinforcements && s.retreatedReinforcements.some(r => r.isAttackerData && r.data.castle && Number(r.data.castle.ownerClan) === pid));
-            const isDefPlayer = (Number(s.oldDefClanId) === pid) || 
-                                (s.defReinforcement && Number(s.defReinforcement.castle.ownerClan) === pid) || 
-                                (s.defSelfReinforcement && Number(s.defSelfReinforcement.castle.ownerClan) === pid) ||
-                                (s.retreatedReinforcements && s.retreatedReinforcements.some(r => !r.isAttackerData && r.data.castle && Number(r.data.castle.ownerClan) === pid));
-            const enemyName = isAtkPlayer ? (this.game.clans.find(c => c.id === s.oldDefClanId)?.getArmyName() || "敵軍") : s.attacker.name;
 
             if (attackerWon) {
                 // ★ここから書き足し：城側が負けた・撤退した時の追加減少
@@ -2164,6 +2166,9 @@ Object.assign(WarManager.prototype, {
             if (this.game.ui && typeof this.game.ui.hideAIWarThinking === 'function') {
                 this.game.ui.hideAIWarThinking();
             }
+
+            // ★追加：エラー時も戦争状態をオフにして、マップがフリーズするのを防ぐストッパー解除の魔法です！
+            this.state.active = false; 
 
             if (this.state.isPlayerInvolved) this.game.ui.showDialog("合戦処理中にエラーが発生しましたが、ゲームを継続します。", false, () => { this.game.finishTurn(); });
             else this.game.finishTurn();
