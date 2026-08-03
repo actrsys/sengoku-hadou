@@ -2288,8 +2288,20 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
 .fw-unit-icon::before { content: ""; display: block; width: 96%; height: 96%; position: absolute; top: 2%; left: 2%; -webkit-mask-image: url('../data/images/field_war_images/butai_icon.png'); mask-image: url('../data/images/field_war_images/butai_icon.png'); -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; transition: background-color 0.3s; }
 .fw-unit.preview { opacity: 0.6; animation: fw-blink 1s infinite; z-index: 18; }
 
-/* 部隊アイコン下部の兵数表示 */
-.fw-unit-soldiers { position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%) scale(0.45); transform-origin: bottom center; font-size: 10px; color: #fff; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; pointer-events: none; z-index: 25; white-space: nowrap; line-height: 1; letter-spacing: 0.5px; }
+/* 部隊アイコン下部の兵数と兵科アイコンをまとめる枠 */
+.fw-unit-status-wrap { position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%) scale(0.45); transform-origin: bottom center; display: flex; align-items: center; justify-content: center; gap: 3px; pointer-events: none; z-index: 25; }
+
+/* 兵科アイコン（枠と背景） */
+.fw-troop-icon { width: 14px; height: 14px; background-color: rgba(0, 0, 0, 0.7); border: 1px solid #d4af37; border-radius: 2px; position: relative; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+
+/* 兵科アイコンの中身（画像を使って白くくり抜く部分） */
+.fw-troop-icon::after { content: ""; width: 85%; height: 85%; background-color: #fff; -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat; -webkit-mask-position: center; mask-size: contain; mask-repeat: no-repeat; mask-position: center; }
+.fw-troop-icon[data-type="ashigaru"]::after { -webkit-mask-image: url('../data/images/icon/ashigaru.webp'); mask-image: url('../data/images/icon/ashigaru.webp'); }
+.fw-troop-icon[data-type="kiba"]::after { -webkit-mask-image: url('../data/images/icon/kiba.webp'); mask-image: url('../data/images/icon/kiba.webp'); }
+.fw-troop-icon[data-type="teppou"]::after { -webkit-mask-image: url('../data/images/icon/teppou.webp'); mask-image: url('../data/images/icon/teppou.webp'); }
+
+/* 部隊アイコン下部の兵数表示（配置は親枠に任せるのでリセットします） */
+.fw-unit-soldiers { font-size: 10px; color: #fff; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; white-space: nowrap; line-height: 1; letter-spacing: 0.5px; }
 
 /* 野戦の部隊カラーと影 */
 .fw-unit.attacker .fw-unit-icon { filter: drop-shadow(1px 0 0 #8e0000) drop-shadow(-1px 0 0 #8e0000) drop-shadow(0 1px 0 #8e0000) drop-shadow(0 -1px 0 #8e0000) drop-shadow(2px 2px 2px rgba(0,0,0,0.8)); }

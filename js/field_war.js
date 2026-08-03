@@ -1311,7 +1311,14 @@ class FieldWarManager {
             pEl.style.setProperty('--fw-dir', `${this.previewTarget.direction * 60}deg`);
             pEl.style.pointerEvents = 'none'; 
             
-            pEl.innerHTML = `<div class="fw-unit-icon"></div><div class="fw-unit-soldiers">${unit.soldiers}</div>`;
+            let troopIconClass = unit.troopType === 'teppo' ? 'teppou' : unit.troopType;
+            pEl.innerHTML = `
+                <div class="fw-unit-icon"></div>
+                <div class="fw-unit-status-wrap">
+                    <div class="fw-troop-icon" data-type="${troopIconClass}"></div>
+                    <div class="fw-unit-soldiers">${unit.soldiers}</div>
+                </div>
+            `;
             if (unit.isGeneral) {
                 pEl.classList.add('general');
             }
@@ -1349,7 +1356,15 @@ class FieldWarManager {
             uEl.style.top = `${u.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;     
             uEl.style.setProperty('--fw-dir', `${u.direction * 60}deg`);
             uEl.style.pointerEvents = 'none'; 
-            uEl.innerHTML = `<div class="fw-unit-icon"></div><div class="fw-unit-soldiers">${u.soldiers}</div>`;
+            
+            let troopIconClass = u.troopType === 'teppo' ? 'teppou' : u.troopType;
+            uEl.innerHTML = `
+                <div class="fw-unit-icon"></div>
+                <div class="fw-unit-status-wrap">
+                    <div class="fw-troop-icon" data-type="${troopIconClass}"></div>
+                    <div class="fw-unit-soldiers">${u.soldiers}</div>
+                </div>
+            `;
             
             this.mapEl.appendChild(uEl);
         });
