@@ -228,7 +228,7 @@ Object.assign(WarManager.prototype, {
                     let dialogMsg = `${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。(持参金: ${gold})\n援軍を派遣しますか？`;
                     // スキルを持っている場合は専用のメッセージになります
                     if (isBoss && canDeclineBoss) {
-                        dialogMsg = `主家である ${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。\n「表裏比興」の才をもって、これを断ることも可能です。派遣しますか？`;
+                        dialogMsg = `主家である ${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。\n援軍を派遣しますか？`;
                     }
                     
                     const choices = [
