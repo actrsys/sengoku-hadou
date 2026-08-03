@@ -476,6 +476,7 @@ class FieldWarManager {
             this.mapEl.style.height = `${totalH}px`;
             this.mapEl.oncontextmenu = (e) => {
                 e.preventDefault();
+                this.hideUnitInfo(); // ★追加: 右クリック時も部隊情報を閉じる
                 this.cancelAction();
             };
         }
@@ -543,6 +544,11 @@ class FieldWarManager {
                 if (isMoved) {
                     e.stopPropagation(); // ここでストップをかけます！
                     e.preventDefault();
+                } else {
+                    // ★追加：ドラッグじゃなく普通にクリックした時、部隊やマス以外（背景や海など）なら部隊情報を閉じる
+                    if (!e.target.classList.contains('fw-hex') && !e.target.closest('.fw-unit')) {
+                        this.hideUnitInfo();
+                    }
                 }
             }, true); // true にすることで、誰よりも早く見張ることができます
         }
@@ -605,6 +611,8 @@ class FieldWarManager {
 
     cancelAction() {
         if (!this.active || !this.isPlayerTurn()) return;
+        
+        this.hideUnitInfo(); // ★追加: キャンセル時も部隊情報を閉じて軍団情報を戻す
         
         const unit = this.turnQueue[0];
         if (unit.hasActionDone) return;
