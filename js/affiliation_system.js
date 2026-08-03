@@ -213,7 +213,7 @@ class AffiliationSystem {
                     if (castle.id !== currentCastle.id && castle.ownerClan !== 0 && castle.ownerClan !== oldClanId) {
                         let lord = this.game.getBusho(castle.castellanId);
                         if (!lord) {
-                            lord = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
+                            lord = this.game.getClanDaimyo(castle.ownerClan); // ★高速化：索引を使って一瞬で見つけます
                         }
                         let affDiff = 50;
                         if (lord) {
@@ -449,6 +449,8 @@ class AffiliationSystem {
 
         // お城の持ち主のデータを書き換えます
         castle.ownerClan = newClanId;
+        // ★高速化：持ち城索引（getClanCastles）を作り直してもらうための合図です
+        this.game.castleOwnershipVersion = (this.game.castleOwnershipVersion || 0) + 1;
 
         // 画面の絵をすぐに描き直す魔法！
         if (this.game && this.game.ui) {
@@ -665,8 +667,8 @@ class AffiliationSystem {
             }
         }
         
-        const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
-        const innovation = daimyo ? daimyo.innovation : 50; 
+        const daimyo = this.game.getClanDaimyo(castle.ownerClan); // ★高速化：索引を使って一瞬で見つけます
+        const innovation = daimyo ? daimyo.innovation : 50;
         const abilityFactor = innovation / 100;
         const meritFactor = (100 - innovation) / 100;
 

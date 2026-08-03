@@ -2445,8 +2445,8 @@ class DiplomacyManager {
 
         // ★追加：相手の大名から「宿敵」として恨まれている場合、交渉しても失敗しやすいので外交対象から外します！
         // （無駄な資金や行動回数を消費しないようにする賢いAIの魔法です）
-        const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo);
-        const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+        const myDaimyo = this.game.getClanDaimyo(myClanId); // ★高速化：索引を使って一瞬で見つけます
+        const targetDaimyo = this.game.getClanDaimyo(targetClanId); // ★高速化：索引を使って一瞬で見つけます
         if (myDaimyo && targetDaimyo && targetDaimyo.nemesisIds && targetDaimyo.nemesisIds.includes(myDaimyo.id)) {
             return { action: 'none', gold: 0 };
         }
@@ -2526,8 +2526,8 @@ class DiplomacyManager {
         if (!amISubordinate && rel.status !== '支配' && targetClanTotal * 8 <= myPower && !isTargetShogun) {
             // 自分の領地と相手の領地が直接くっついているか調べます
             let isDirectlyAdjacent = false;
-            const myCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
-            const targetCastles = this.game.castles.filter(c => c.ownerClan === targetClanId);
+            const myCastles = this.game.getClanCastles(myClanId);
+            const targetCastles = this.game.getClanCastles(targetClanId);
             
             for (let mc of myCastles) {
                 for (let tc of targetCastles) {

@@ -1669,6 +1669,37 @@ class GameManager {
         }
         return this._castleMap.get(Number(id));
     }
+    getClan(id) {
+        // ★高速化：勢力も同じように索引（Map）を使って一瞬で見つけます！
+        if (this._clanMapSource !== this.clans || this._clanMapSize !== this.clans.length) {
+            this._clanMap = new Map();
+            this.clans.forEach(c => this._clanMap.set(Number(c.id), c));
+            this._clanMapSource = this.clans;
+            this._clanMapSize = this.clans.length;
+        }
+        return this._clanMap.get(Number(id));
+    }
+    // ★高速化：「勢力ID→大名武将」を一瞬で取り出します（毎回全武将から探す代わりに、勢力が覚えているIDを使います）
+    getClanDaimyo(clanId) {
+        const clan = this.getClan(clanId);
+        return clan ? this.getBusho(clan.leaderId) : undefined;
+    }
+    // ★高速化：「勢力ID→持ち城リスト」を一瞬で取り出します。
+    // お城の持ち主（ownerClan）が変わった時だけ索引を作り直すよう、
+    // castle_manager.js と affiliation_system.js 側で this.castleOwnershipVersion を1つ増やしてもらいます。
+    getClanCastles(clanId) {
+        const version = this.castleOwnershipVersion || 0;
+        if (this._clanCastlesSource !== this.castles || this._clanCastlesVersion !== version) {
+            this._clanCastlesMap = new Map();
+            this.castles.forEach(c => {
+                if (!this._clanCastlesMap.has(c.ownerClan)) this._clanCastlesMap.set(c.ownerClan, []);
+                this._clanCastlesMap.get(c.ownerClan).push(c);
+            });
+            this._clanCastlesSource = this.castles;
+            this._clanCastlesVersion = version;
+        }
+        return this._clanCastlesMap.get(Number(clanId)) || [];
+    }
     // ★ 修正：まだ生まれていない人（unborn）や亡くなった人（dead）は無視するようにします
     getCastleBushos(cid) { const c = this.getCastle(cid); return c ? c.samuraiIds.map(id => this.getBusho(id)).filter(b => b && b.status !== 'unborn' && b.status !== 'dead') : []; }
     getCurrentTurnCastle() { return this.turnQueue[this.currentIndex]; }

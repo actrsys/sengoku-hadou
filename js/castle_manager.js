@@ -14,6 +14,8 @@ class CastleManager {
 
         castle.ownerClan = Number(newOwnerId);
         castle.legionId = Number(newLegionId); // 攻撃側の軍団IDになる
+        // ★高速化：持ち城索引（getClanCastles）を作り直してもらうための合図です
+        this.game.castleOwnershipVersion = (this.game.castleOwnershipVersion || 0) + 1;
 
         // 石山城と尾山城のこっそり改名イベント
         if (castle.id === 33 || castle.id === 74) {

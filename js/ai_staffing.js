@@ -229,8 +229,8 @@ class AIStaffing {
             const activeLegionsCount = this.game.legions.filter(l => l.clanId === clanId && l.commanderId > 0).length;
             if (activeLegionsCount >= 8) return;
         }
-
-        const myCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        
+        const myCastles = this.game.getClanCastles(clanId);
         const myDirectCastles = myCastles.filter(c => Number(c.legionId) === 0);
         
         // 条件：直轄領が8城以上
@@ -412,12 +412,16 @@ class AIStaffing {
         let lowestTotal = 9999;
         
         // 全員の能力の合計点を調べます（1.5倍にする前の素の合計点で計算します）
+        // ★高速化：後で武将ごとの点数を探し直すことがないよう、ID→点数の索引（Map）も一緒に作っておきます
+        const bushoStatMap = new Map();
         const bushoStats = myBushos.map(b => {
             const total = b.leadership + b.strength + b.politics + b.diplomacy + b.intelligence;
             totalSum += total;
             if (total > highestTotal) highestTotal = total;
             if (total < lowestTotal) lowestTotal = total;
-            return { busho: b, total: total };
+            const stat = { busho: b, total: total };
+            bushoStatMap.set(b.id, stat);
+            return stat;
         });
 
         const avgTotal = myBushos.length > 0 ? totalSum / myBushos.length : 0;
@@ -443,7 +447,7 @@ class AIStaffing {
         const types = new Map();
 
         myBushos.forEach(b => {
-            const stat = bushoStats.find(s => s.busho.id === b.id);
+            const stat = bushoStatMap.get(b.id); // ★高速化：探す代わりに索引から一瞬で取り出します
             const t = stat.total;
             let type = 'バランス型';
 
@@ -479,12 +483,12 @@ class AIStaffing {
         if (this.evaluationCache[clanId].castleRoles) {
             return this.evaluationCache[clanId].castleRoles;
         }
-
-        const myCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        
+        const myCastles = this.game.getClanCastles(clanId);
         const roles = new Map();
 
         // 大名のいるお城を探します
-        const daimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo);
+        const daimyo = this.game.getClanDaimyo(clanId); // ★高速化：索引を使って一瞬で見つけます
         const daimyoCastleId = daimyo ? daimyo.castleId : -1;
 
         myCastles.forEach(castle => {

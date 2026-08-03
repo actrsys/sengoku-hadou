@@ -142,7 +142,7 @@ class AIOperationManager {
             if (!this.historyOwnedCastles[clan.id]) this.historyOwnedCastles[clan.id] = [];
             
             // 現在の所持拠点を調べてリストの先頭に追加します
-            const currentCastleIds = this.game.castles.filter(c => c.ownerClan === clan.id).map(c => c.id);
+            const currentCastleIds = this.game.getClanCastles(clan.id).map(c => c.id);
             this.historyOwnedCastles[clan.id].unshift(currentCastleIds);
             
             // もし記憶が60ヶ月分を超えたら、一番古い記憶（最後尾）を消します
@@ -157,7 +157,7 @@ class AIOperationManager {
                 this.draftBases[clan.id] = {};
             }
 
-            const myCastles = this.game.castles.filter(c => c.ownerClan === clan.id);
+            const myCastles = this.game.getClanCastles(clan.id);
             // ★修正：数値の0と文字の"0"が混ざって重複しないように、必ず数値(Number)に統一します！
             const legionIds = [...new Set(myCastles.map(c => Number(c.legionId || 0)))];
 
@@ -167,7 +167,7 @@ class AIOperationManager {
 
                 // ★変更：新しく一元化した共通魔法を使って、自軍団の領土から直接攻撃できる敵拠点のリストを作ります！
                 const reachableEnemyCastleIds = new Set();
-                const myLegionCastles = this.game.castles.filter(c => c.ownerClan === clan.id && c.legionId === legionId);
+                const myLegionCastles = this.game.getClanCastles(clan.id).filter(c => c.legionId === legionId);
                 const visitedForRoute = new Set();
                 
                 myLegionCastles.forEach(myC => {
@@ -185,7 +185,7 @@ class AIOperationManager {
                 
                 const grandObj = this.grandObjectives[clan.id][legionId];
                 if (grandObj) {
-                    const currentMyCastleCount = this.game.castles.filter(c => c.ownerClan === clan.id).length;
+                    const currentMyCastleCount = this.game.getClanCastles(clan.id).length;
                     
                     // 前月よりも自拠点の数が減っていたら方針を消去して再考
                     if (currentMyCastleCount < grandObj.prevMyCastleCount) {
@@ -195,7 +195,7 @@ class AIOperationManager {
                         
                         let currentTargetCount = 0;
                         if (grandObj.type === '大名攻略') {
-                            currentTargetCount = this.game.castles.filter(c => c.ownerClan === grandObj.targetClanId).length;
+                            currentTargetCount = this.game.getClanCastles(grandObj.targetClanId).length;
                         } else if (grandObj.type === '国攻略') {
                             currentTargetCount = this.game.castles.filter(c => {
                                 if (c.provinceId === grandObj.targetProvId && c.ownerClan !== clan.id) {
@@ -210,7 +210,7 @@ class AIOperationManager {
                             const pastOwnedSet = new Set();
                             history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
                             
-                            const currentMyCastles = new Set(this.game.castles.filter(c => c.ownerClan === clan.id).map(c => c.id));
+                            const currentMyCastles = new Set(this.game.getClanCastles(clan.id).map(c => c.id));
                             
                             for (const cid of pastOwnedSet) {
                                 // 今は自分のものではない場合
@@ -227,7 +227,7 @@ class AIOperationManager {
                             }
                         } else if (grandObj.type === '国内平定') {
                             // ★追加：国内平定の場合、自軍団の管轄内（自分の城）にいる敵対諸勢力の数を数えます
-                            const myCastles = this.game.castles.filter(c => c.ownerClan === clan.id && c.legionId === legionId);
+                            const myCastles = this.game.getClanCastles(clan.id).filter(c => c.legionId === legionId);
                             myCastles.forEach(myC => {
                                 // ★修正：商人は攻撃対象にならないので、ターゲットから除外します！
                                 const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(myC.id).filter(k => k.getRelation(clan.id) <= 30 && k.ideology !== '商人');
@@ -250,7 +250,7 @@ class AIOperationManager {
                                 shouldCancel = true;
                             } else {
                                 // ★変更：GameSystem.isReachableを使わず、自領から直接攻撃できるか判定します
-                                const targetCastles = this.game.castles.filter(c => c.ownerClan === targetClanId);
+                                const targetCastles = this.game.getClanCastles(targetClanId);
                                 
                                 let hasRoute = false;
                                 for (const tgtC of targetCastles) {
@@ -292,7 +292,7 @@ class AIOperationManager {
                             const pastOwnedSet = new Set();
                             history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
                             
-                            const currentMyCastleIds = new Set(this.game.castles.filter(c => c.ownerClan === clan.id).map(c => c.id));
+                            const currentMyCastleIds = new Set(this.game.getClanCastles(clan.id).map(c => c.id));
                             
                             let hasRoute = false;
                             
@@ -367,9 +367,9 @@ class AIOperationManager {
     // ★追加：同盟や支配されている相手に攻撃したいけど友好度が高くて我慢している時に、友好度を1下げる魔法です
     decreaseSentimentForHighTension(clanId) {
         const myPower = this.game.aiEngine.getClanPrestige(clanId);
-        const myDaimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo) || { duty: 50 };
+        const myDaimyo = this.game.getClanDaimyo(clanId) || { duty: 50 };
 
-        const myClanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        const myClanCastles = this.game.getClanCastles(clanId);
         const neighborCastles = [];
         myClanCastles.forEach(myC => {
             if (myC.adjacentCastleIds) {
@@ -428,7 +428,7 @@ class AIOperationManager {
         // まずは前の月の記憶を消しておきます
         this.draftBases[clanId][legionId] = null;
 
-        const myClanCastles = this.game.castles.filter(c => c.ownerClan === clanId && c.legionId === legionId);
+        const myClanCastles = this.game.getClanCastles(clanId).filter(c => c.legionId === legionId);
         // お城が1つしかない時は、輸送できないので選びません！
         if (myClanCastles.length <= 1) return; 
 
@@ -440,7 +440,7 @@ class AIOperationManager {
             startCastleId = op.stagingBase;
         } else {
             // そうでなければ、お殿様がいるお城をスタート地点にします
-            const daimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo);
+            const daimyo = this.game.getClanDaimyo(clanId);
             if (daimyo && daimyo.castleId) {
                 const daimyoCastle = this.game.getCastle(daimyo.castleId);
                 if (daimyoCastle && daimyoCastle.legionId === legionId) {
@@ -501,11 +501,11 @@ class AIOperationManager {
 
         const myClanId = clan.id;
         const myPower = this.game.aiEngine.getClanPrestige(myClanId);
-        const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo) || { duty: 50, intelligence: 50 };
+        const myDaimyo = this.game.getClanDaimyo(myClanId) || { duty: 50, intelligence: 50 };
         const smartness = this.game.aiEngine.getAISmartness(myDaimyo.intelligence);
 
         // 周りのお城を探します
-        const myCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
+        const myCastles = this.game.getClanCastles(myClanId);
         const neighborCastles = [];
         myCastles.forEach(myCastle => {
             if (myCastle.adjacentCastleIds) {
@@ -526,7 +526,7 @@ class AIOperationManager {
         directNeighbors.forEach(neighborId => {
             const rel = this.game.getRelation(myClanId, neighborId);
             if (rel && rel.status === '敵対') {
-                const enemyCastles = this.game.castles.filter(c => c.ownerClan === neighborId);
+                const enemyCastles = this.game.getClanCastles(neighborId);
                 enemyCastles.forEach(enemyCastle => {
                     if (enemyCastle.adjacentCastleIds) {
                         enemyCastle.adjacentCastleIds.forEach(adjId => {
@@ -597,7 +597,7 @@ class AIOperationManager {
             await this.game.eventManager.processEvents('before_ai_operation', clanId);
         }
 
-        const myClanCastles = this.game.castles.filter(c => c.ownerClan === clanId && c.legionId === legionId);
+        const myClanCastles = this.game.getClanCastles(clanId).filter(c => c.legionId === legionId);
         if (myClanCastles.length === 0) return;
 
         const startY = Number(this.game.gameStartYear || window.MainParams.StartYear || 1560);
@@ -825,7 +825,7 @@ class AIOperationManager {
         operationCandidates.sort((a, b) => b.score - a.score);
 
         // ★追加：攻撃目標のスコア順から、調略の第一～第三目標を抽出します！
-        const myDaimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo) || { intelligence: 50 };
+        const myDaimyo = this.game.getClanDaimyo(clanId) || { intelligence: 50 };
         const myDaimyoInt = myDaimyo.intelligence;
         
         let maxSabotageTargets = 1; // 智謀69以下は第一目標まで
@@ -1138,7 +1138,7 @@ class AIOperationManager {
                         if (objectiveType) {
                             let initialTargetCount = 0;
                             if (objectiveType === '大名攻略') {
-                                initialTargetCount = this.game.castles.filter(c => c.ownerClan === targetClanId).length;
+                                initialTargetCount = this.game.getClanCastles(targetClanId).length;
                             } else if (objectiveType === '国攻略') {
                                 initialTargetCount = this.game.castles.filter(c => {
                                     if (c.provinceId === targetProvId && c.ownerClan !== clanId) {
@@ -1150,7 +1150,7 @@ class AIOperationManager {
                             } else if (objectiveType === '反攻作戦') {
                                 // ★今回追加：反攻作戦の時の初期ターゲット数（取り返すべき拠点数）を計算します
                                 const history = this.historyOwnedCastles[clanId];
-                                const currentMyCastles = new Set(this.game.castles.filter(c => c.ownerClan === clanId).map(c => c.id));
+                                const currentMyCastles = new Set(this.game.getClanCastles(clanId).map(c => c.id));
                                 const pastOwnedSet = new Set();
                                 history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
                                 
@@ -1168,7 +1168,7 @@ class AIOperationManager {
                                 }
                             } else if (objectiveType === '国内平定') {
                                 // ★追加：初期ターゲット数として、自軍団内の敵対諸勢力の数をカウントします
-                                const myCastles = this.game.castles.filter(c => c.ownerClan === clanId && c.legionId === legionId);
+                                const myCastles = this.game.getClanCastles(clanId).filter(c => c.legionId === legionId);
                                 myCastles.forEach(myC => {
                                     // ★修正：商人は攻撃対象にならないので、ターゲットから除外します！
                                     const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(myC.id).filter(k => k.getRelation(clanId) <= 30 && k.ideology !== '商人');
@@ -1176,7 +1176,7 @@ class AIOperationManager {
                                 });
                             }
                             
-                            const myCastleCount = this.game.castles.filter(c => c.ownerClan === clanId).length;
+                            const myCastleCount = this.game.getClanCastles(clanId).length;
                             
                             this.grandObjectives[clanId][legionId] = {
                                 type: objectiveType,
@@ -1280,7 +1280,7 @@ class AIOperationManager {
 
         let commanderName = "不明";
         if (legionId === 0) {
-            const daimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo);
+            const daimyo = this.game.getClanDaimyo(clanId);
             commanderName = daimyo ? daimyo.name : "大名直轄";
         } else {
             const legion = this.game.legions ? this.game.legions.find(l => l.clanId === clanId && l.legionNo === legionId) : null;
