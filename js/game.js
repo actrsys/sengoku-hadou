@@ -24,8 +24,10 @@ window.MainParams = {
     Economy: {
         IncomeGoldRate: 1, IncomeFluctuation: 0.15,
         ConsumeRicePerSoldier: 0.03,
-        TradeRateBase: 3.0,
-        TradeRateMin: 2.3, TradeRateMax: 3.7, TradeFluctuation: 0.5,
+        // 米相場
+        TradeRateBase: 2.0,
+        // 米相場の下限1.5　上限2.5
+        TradeRateMin: 1.5, TradeRateMax: 2.5, TradeFluctuation: 0.5,
         PriceAmmo: 1
     },
     // ★ここを追加：内政コマンドの費用をここで一括管理します！
