@@ -838,9 +838,9 @@ window.GameEvents.push({
                 matsudairaBushos.forEach(b => {
                     b.loyalty = Math.min(100, (b.loyalty || 0) + 10);
                 });
-
+                
                 // 城の兵士、人口、民忠のボーナス
-                const matsudairaCastles = game.castles.filter(c => c.ownerClan === motoyasu.clan);
+                const matsudairaCastles = game.getClanCastles(motoyasu.clan);
                 matsudairaCastles.forEach(c => {
                     // 民忠を上限にする処理はそのまま残します
                     c.peoplesLoyalty = c.maxPeoplesLoyalty || 100;
@@ -952,15 +952,15 @@ window.GameEvents.push({
         const nobunaga = game.getBusho(1006006);
         const motoyasu = game.getBusho(1301006);
         
-        const odaClan = game.clans.find(c => c.id === nobunaga.clan);
-        const matsudairaClan = game.clans.find(c => c.id === motoyasu.clan);
+        const odaClan = game.getClan(nobunaga.clan);
+        const matsudairaClan = game.getClan(motoyasu.clan);
         
         // 今川氏真(1004010)の大名家名を取得します
         const ujizane = game.getBusho(1004010);
         let imagawaClanName = "今川家";
         let imagawaFamilyName = "今川";
         if (ujizane && ujizane.clan > 0) {
-            const imagawaClan = game.clans.find(c => c.id === ujizane.clan);
+            const imagawaClan = game.getClan(ujizane.clan);
             if (imagawaClan) imagawaClanName = imagawaClan.name;
             if (ujizane.familyName) imagawaFamilyName = ujizane.familyName;
         }
@@ -1385,8 +1385,8 @@ window.GameEvents.push({
 
         // 万が一姫のデータ集（game.princesses）が未定義だった時のエラーを防ぎます
         const oichi = game.princesses ? game.princesses.find(p => p.id === oichiId) : null;
-        const nobunagaClan = game.clans.find(c => c.id === nobunaga.clan);
-        const nagamasaClan = game.clans.find(c => c.id === nagamasa.clan);
+        const nobunagaClan = game.getClan(nobunaga.clan);
+        const nagamasaClan = game.getClan(nagamasa.clan);
 
         if (!oichi || !nobunagaClan || !nagamasaClan) return; // 万が一データがない場合の安全装置です
 
@@ -1509,8 +1509,8 @@ window.GameEvents.push({
         
         const toyamaClanId = deadBusho.clan;
         const odaClanId = nobunaga.clan;
-        const toyamaClan = game.clans.find(c => c.id === toyamaClanId);
-        const odaClan = game.clans.find(c => c.id === odaClanId);
+        const toyamaClan = game.getClan(toyamaClanId);
+        const odaClan = game.getClan(odaClanId);
         
         // ★ ここが重要です！通常の死亡メッセージや家督相続を「スキップする」ようにフラグを立てます
         context.skipNormalMessage = true;
@@ -1537,9 +1537,9 @@ window.GameEvents.push({
                 }
             });
         }
-
+        
         // ② 遠山家のお城を織田家の直轄（0）として引き渡します
-        const toyamaCastles = game.castles.filter(c => Number(c.ownerClan) === Number(toyamaClanId));
+        const toyamaCastles = game.getClanCastles(toyamaClanId);
         toyamaCastles.forEach(c => {
             if (game.castleManager && game.castleManager.changeOwner) {
                 game.castleManager.changeOwner(c, odaClanId, true, 0); // trueで平和的に引き渡し
@@ -2019,16 +2019,16 @@ window.GameEvents.push({
         const yoshitsugu = game.getBusho(1020014);
         const ashikagaClanId = yoshiteru.clan;
         const miyoshiClanId = yoshitsugu.clan;
-
+        
         // 大名家のデータを取得し、現在の家名（動的）を特定します
-        const miyoshiClan = game.clans.find(c => c.id === miyoshiClanId);
+        const miyoshiClan = game.getClan(miyoshiClanId);
         const miyoshiClanName = miyoshiClan ? miyoshiClan.name : "三好家";
-        const ashikagaClan = game.clans.find(c => c.id === ashikagaClanId);
+        const ashikagaClan = game.getClan(ashikagaClanId);
         const ashikagaClanName = ashikagaClan ? ashikagaClan.name : "足利家";
         const yoshiteruName = yoshiteru.name.replace('|', '');
-
+        
         // ① まず、足利家の城をすべて三好家のものにします
-        const ashikagaCastles = game.castles.filter(c => c.ownerClan === ashikagaClanId);
+        const ashikagaCastles = game.getClanCastles(ashikagaClanId);
         ashikagaCastles.forEach(castle => {
             if (game.castleManager) {
                 game.castleManager.changeOwner(castle, miyoshiClanId, true);
@@ -2171,10 +2171,10 @@ window.GameEvents.push({
             // 条件３：美濃国（地方ID: 27）の城を1つ以上所有しているかチェックします
             // 日本中の城の中から、美濃国にあって、かつ織田家の持ち物である城が1つでもあるか確認します
             const hasMinoCastle = game.castles.some(c => c.provinceId === 27 && c.ownerClan === nobunaga.clan);
-
+            
             // 上記の３つの条件をすべてクリアしていたら、将軍の逃げ込み先を織田家に決定します
             if (isYoshimotoDead && ownsAllOwari && hasMinoCastle) {
-                targetClan = game.clans.find(c => c.id === nobunaga.clan);
+                targetClan = game.getClan(nobunaga.clan);
             }
         }
 
@@ -2302,9 +2302,9 @@ window.GameEvents.push({
         clanBushos.forEach(b => {
             b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
         });
-
+        
         // ②所有する城の人口、兵士、金、兵糧、民忠をアップさせます（それぞれの上限を超えないように制限します）
-        const clanCastles = game.castles.filter(c => c.ownerClan === targetClanId);
+        const clanCastles = game.getClanCastles(targetClanId);
         clanCastles.forEach(c => {
             c.population = Math.min(999999, c.population + 2000);
             c.soldiers = Math.min(99999, c.soldiers + 1000);
@@ -2371,9 +2371,9 @@ window.GameEvents.push({
         // 2. その武将が所属している勢力が、二条城（ID26）の持ち主か確認します
         const nijo = game.getCastle(26);
         if (!nijo || nijo.ownerClan !== candidate.clan) return false;
-
+        
         // 3. その勢力が「合計9城以上」支配している、力のある勢力か確認します
-        const clanCastles = game.castles.filter(c => c.ownerClan === candidate.clan);
+        const clanCastles = game.getClanCastles(candidate.clan);
         if (clanCastles.length < 9) return false;
 
         // 4. ただし、その勢力が「プレイヤー」だった場合は、勝手に移動させないようにここで止めます
@@ -2451,16 +2451,16 @@ window.GameEvents.push({
         // ⑤ 擁立勢力がID90（槇島城）を所有しているか確認します
         const makishimaCastle = game.getCastle(90);
         if (!makishimaCastle || makishimaCastle.ownerClan !== sponsorClanId) return false;
-
+        
         // ⑥ 擁立勢力の大名（殿様）が誰かを探します
-        const sponsorDaimyo = game.bushos.find(b => b.clan === sponsorClanId && b.isDaimyo);
+        const sponsorDaimyo = game.getClanDaimyo(sponsorClanId);
         if (!sponsorDaimyo) return false;
 
         // ⑦ 擁立勢力の大名の居城が、二条城（26）でも槇島城（90）でもないことを確認します
         if (sponsorDaimyo.castleId === 26 || sponsorDaimyo.castleId === 90) return false;
-
+        
         // ⑧ 擁立勢力が「合計9城以上」所有しているか数えます（他に7城＋二条城＋槇島城＝9城）
-        const sponsorCastles = game.castles.filter(c => c.ownerClan === sponsorClanId);
+        const sponsorCastles = game.getClanCastles(sponsorClanId);
         if (sponsorCastles.length < 9) return false;
 
         // ⑨ 朝廷に「征夷大将軍（ID1）」の官位の空きがあるか確認します
@@ -2475,9 +2475,9 @@ window.GameEvents.push({
         
         const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
         if (!candidate) return;
-
+        
         const sponsorClanId = candidate.clan;
-        const sponsorClan = game.clans.find(c => c.id === sponsorClanId);
+        const sponsorClan = game.getClan(sponsorClanId);
         const nijoCastle = game.getCastle(26);
         const makishimaCastle = game.getCastle(90);
 
@@ -2509,7 +2509,7 @@ window.GameEvents.push({
         // --- 3. 二条城と槇島城の整理と、持ち主の変更 ---
         
         // 擁立勢力の大名が今いるお城（引越し先）を特定します
-        const sponsorDaimyo = game.bushos.find(b => b.clan === sponsorClanId && b.isDaimyo);
+        const sponsorDaimyo = game.getClanDaimyo(sponsorClanId);
         const destinationCastleId = sponsorDaimyo.castleId;
 
         // 二条城(26)と槇島城(90)にいる「擁立勢力の武将（将軍候補以外）」を全員、大名の元へ送ります
@@ -2818,9 +2818,9 @@ window.GameEvents.push({
         const hisahide = game.getBusho(1202002);
         const nagayasu = game.getBusho(1020021);
         const miyoshiClanId = yoshitsugu.clan;
-
+        
         // ① 三好長逸を新しい大名（殿様）にします
-        const miyoshiClan = game.clans.find(c => c.id === miyoshiClanId);
+        const miyoshiClan = game.getClan(miyoshiClanId);
         if (miyoshiClan) {
             miyoshiClan.leaderId = nagayasu.id;
         }
@@ -2844,10 +2844,10 @@ window.GameEvents.push({
         // ④ 三好義継を松永家に保護させ、忠誠度を100にする
         // お引越しセンターの魔法（joinClan）を使って、古いお城から出して新しいお城に入れます
         game.affiliationSystem.joinClan(yoshitsugu, hisahide.clan, hisahide.castleId, 100);
-
+        
         // ★追加：三好長逸家所属の拠点と武将へのペナルティ処理
         // お城の人口・兵士・民忠を減らします
-        const miyoshiCastles = game.castles.filter(c => c.ownerClan === miyoshiClanId);
+        const miyoshiCastles = game.getClanCastles(miyoshiClanId);
         miyoshiCastles.forEach(c => {
             c.population = Math.floor(c.population * 0.8); // 人口20%減少（残りが80%）
             c.soldiers = Math.floor(c.soldiers * 0.7);     // 兵士30%減少（残りが70%）
@@ -2921,13 +2921,13 @@ window.GameEvents.push({
         // 4. 三好義継（ID: 1020014）が松永家に所属しているか確認します
         const yoshitsugu = game.getBusho(1020014);
         if (!yoshitsugu || yoshitsugu.clan !== matsunagaClanId) return false;
-
+        
         // 5. 将軍擁立勢力または将軍家の領地と、松永家の領地が隣接しているか確認します
-        const matsunagaCastles = game.castles.filter(c => c.ownerClan === matsunagaClanId);
+        const matsunagaCastles = game.getClanCastles(matsunagaClanId);
         let isAdjacent = false;
 
         // まず擁立勢力の城と繋がっているか調べます
-        const sponsorCastles = game.castles.filter(c => c.ownerClan === sponsorClanId);
+        const sponsorCastles = game.getClanCastles(sponsorClanId);
         for (let sc of sponsorCastles) {
             for (let mc of matsunagaCastles) {
                 if (GameSystem.isAdjacent(sc, mc)) {
@@ -2937,10 +2937,10 @@ window.GameEvents.push({
             }
             if (isAdjacent) break;
         }
-
+        
         // 擁立勢力と繋がっておらず、将軍家が存在する場合は、将軍家の城とも隣接判定します
         if (!isAdjacent && shogunClanId !== 0) {
-            const shogunCastles = game.castles.filter(c => c.ownerClan === shogunClanId);
+            const shogunCastles = game.getClanCastles(shogunClanId);
             for (let sc of shogunCastles) {
                 for (let mc of matsunagaCastles) {
                     if (GameSystem.isAdjacent(sc, mc)) {
@@ -2960,7 +2960,7 @@ window.GameEvents.push({
     execute: async function(game) {
         const hisahide = game.getBusho(1202002);
         const matsunagaClanId = hisahide.clan;
-        const matsunagaClan = game.clans.find(c => c.id === matsunagaClanId);
+        const matsunagaClan = game.getClan(matsunagaClanId);
         
         let sponsorClanId = 0;
         let candidateName = "将軍";
@@ -2976,7 +2976,7 @@ window.GameEvents.push({
             candidateName = shogun.name.replace('|', '');
         }
         
-        const sponsorClan = game.clans.find(c => c.id === sponsorClanId);
+        const sponsorClan = game.getClan(sponsorClanId);
         
         // 全て変数から名前を取るように徹底しました
         const hisahideName = hisahide.name.replace('|', '');
@@ -2984,9 +2984,9 @@ window.GameEvents.push({
         const matsunagaClanName = matsunagaClan ? matsunagaClan.name : "松永家";
         const hisahideCastle = game.getCastle(hisahide.castleId);
         const hisahideCastleName = hisahideCastle ? hisahideCastle.name : "居城";
-
+        
         // ① 城の所有権を移す処理（内部処理）
-        const matsunagaCastles = game.castles.filter(c => c.ownerClan === matsunagaClanId);
+        const matsunagaCastles = game.getClanCastles(matsunagaClanId);
         matsunagaCastles.forEach(castle => {
             game.castleManager.changeOwner(castle, sponsorClanId, true);
         });
@@ -3260,13 +3260,13 @@ window.GameEvents.push({
             }
         }
         if (!targetLord || !mainCastle) return false;
-
+        
         // 対象となる城のリストを作ります（国主なら軍団の全城、城主ならその城のみ）
         let targetCastles = [];
         if (targetLord.isCommander && game.legions) {
             const legion = game.legions.find(l => l.clanId === miyoshiClanId && l.commanderId === targetLord.id);
             if (legion) {
-                targetCastles = game.castles.filter(c => c.ownerClan === miyoshiClanId && c.legionId === legion.legionNo);
+                targetCastles = game.getClanCastles(miyoshiClanId).filter(c => c.legionId === legion.legionNo);
             }
         }
         if (targetCastles.length === 0) {
@@ -3280,12 +3280,12 @@ window.GameEvents.push({
         // 5. 松永久秀（ID: 1202002）が将軍擁立勢力に所属しているか確認します
         const hisahide = game.getBusho(1202002);
         if (!hisahide || hisahide.clan !== sponsorClanId) return false;
-
+        // 差し替え後
         // 6. 対象の城のいずれかが、将軍擁立勢力または将軍家の城が隣接しているか確認します
         let isAdjacent = false;
         
-        const sponsorCastles = game.castles.filter(c => c.ownerClan === sponsorClanId);
-        const shogunCastles = shogunClanId !== 0 ? game.castles.filter(c => c.ownerClan === shogunClanId) : [];
+        const sponsorCastles = game.getClanCastles(sponsorClanId);
+        const shogunCastles = shogunClanId !== 0 ? game.getClanCastles(shogunClanId) : [];
 
         for (let targetC of targetCastles) {
             // まず擁立勢力の城と繋がっているか調べます
@@ -3326,7 +3326,7 @@ window.GameEvents.push({
             sponsorClanId = game.flags['shogun_sponsor_clan_id'];
         }
         
-        const sponsorClan = game.clans.find(c => c.id === sponsorClanId);
+        const sponsorClan = game.getClan(sponsorClanId);
         const nagayasu = game.getBusho(1020021);
         const miyoshiClanId = nagayasu.clan;
 
@@ -3342,13 +3342,13 @@ window.GameEvents.push({
             }
         }
         if (!targetLord || !mainCastle) return;
-
+        
         let targetCastles = [];
         let legionToDismiss = null;
         if (targetLord.isCommander && game.legions) {
             legionToDismiss = game.legions.find(l => l.clanId === miyoshiClanId && l.commanderId === targetLord.id);
             if (legionToDismiss) {
-                targetCastles = game.castles.filter(c => c.ownerClan === miyoshiClanId && c.legionId === legionToDismiss.legionNo);
+                targetCastles = game.getClanCastles(miyoshiClanId).filter(c => c.legionId === legionToDismiss.legionNo);
             }
         }
         if (targetCastles.length === 0) {
@@ -3358,7 +3358,7 @@ window.GameEvents.push({
 
         const sponsorName = sponsorClan ? sponsorClan.name : "擁立勢力";
         const itamiLordName = targetLord.name.replace('|', '');
-        const miyoshiClan = game.clans.find(c => c.id === miyoshiClanId);
+        const miyoshiClan = game.getClan(miyoshiClanId);
         const miyoshiClanName = miyoshiClan ? miyoshiClan.name : "三好家";
         
         // 対象となる城の、元の城主（出席番号）をそれぞれ記録しておきます
@@ -3575,13 +3575,13 @@ window.GameEvents.push({
 
         // 万が一、畠山家自身が将軍を擁立していたら、自分自身に降伏することになってしまうので止めます
         if (hatakeyamaClanId === sponsorClanId || hatakeyamaClanId === shogunClanId) return false;
-
+        
         // 4. 将軍擁立勢力または将軍家の領地と、畠山家の領地が隣接しているか確認します
-        const hatakeyamaCastles = game.castles.filter(c => c.ownerClan === hatakeyamaClanId);
+        const hatakeyamaCastles = game.getClanCastles(hatakeyamaClanId);
         let isAdjacent = false;
 
         // まず擁立勢力の城と繋がっているか調べます
-        const sponsorCastles = game.castles.filter(c => c.ownerClan === sponsorClanId);
+        const sponsorCastles = game.getClanCastles(sponsorClanId);
         for (let sc of sponsorCastles) {
             for (let hc of hatakeyamaCastles) {
                 if (GameSystem.isAdjacent(sc, hc)) {
@@ -3591,10 +3591,10 @@ window.GameEvents.push({
             }
             if (isAdjacent) break;
         }
-
+        
         // 擁立勢力と繋がっておらず、将軍家が存在する場合は、将軍家の城とも隣接判定します
         if (!isAdjacent && shogunClanId !== 0) {
-            const shogunCastles = game.castles.filter(c => c.ownerClan === shogunClanId);
+            const shogunCastles = game.getClanCastles(shogunClanId);
             for (let sc of shogunCastles) {
                 for (let hc of hatakeyamaCastles) {
                     if (GameSystem.isAdjacent(sc, hc)) {
@@ -3615,9 +3615,9 @@ window.GameEvents.push({
         // 対象の畠山大名をもう一度特定します
         const hatakeyamaDaimyo = window.EventCheck.getDaimyo(game, [1041012, 1041013, 1041016]);
         if (!hatakeyamaDaimyo) return;
-
+        
         const hatakeyamaClanId = hatakeyamaDaimyo.clan;
-        const hatakeyamaClan = game.clans.find(c => c.id === hatakeyamaClanId);
+        const hatakeyamaClan = game.getClan(hatakeyamaClanId);
         
         let sponsorClanId = 0;
         let candidateName = "将軍";
@@ -3633,7 +3633,7 @@ window.GameEvents.push({
             candidateName = shogun.name.replace('|', '');
         }
         
-        const sponsorClan = game.clans.find(c => c.id === sponsorClanId);
+        const sponsorClan = game.getClan(sponsorClanId);
         
         // メッセージ用に名前を用意します
         const hatakeyamaName = hatakeyamaDaimyo.name.replace('|', '');
@@ -3641,10 +3641,10 @@ window.GameEvents.push({
         const hatakeyamaClanName = hatakeyamaClan ? hatakeyamaClan.name : "畠山家";
         const hatakeyamaCastle = game.getCastle(hatakeyamaDaimyo.castleId);
         const hatakeyamaCastleName = hatakeyamaCastle ? hatakeyamaCastle.name : "居城";
-
+        
         // ① 畠山家の城の所有権を、将軍擁立勢力に移します
         // 第3引数の「true」によって、平和的な引き渡しとなりバグを防ぎます
-        const hatakeyamaCastles = game.castles.filter(c => c.ownerClan === hatakeyamaClanId);
+        const hatakeyamaCastles = game.getClanCastles(hatakeyamaClanId);
         hatakeyamaCastles.forEach(castle => {
             game.castleManager.changeOwner(castle, sponsorClanId, true);
         });
@@ -3766,7 +3766,7 @@ window.GameEvents.push({
         }
 
         // ⑪ メッセージを画面に出してお知らせします
-        const clan = game.clans.find(c => c.id === clanId);
+        const clan = game.getClan(clanId);
         const clanName = clan ? clan.name : "最上家";
         const yoshiakiName = successor.name.replace('|', '');
 
@@ -3908,7 +3908,7 @@ window.GameEvents.push({
         }
 
         // ⑩ メッセージを画面に出してお知らせします
-        const clan = game.clans.find(c => c.id === clanId);
+        const clan = game.getClan(clanId);
         const clanName = clan ? clan.name : "北畠家";
         const tomonoriName = oldDaimyo.name.replace('|', '');
         const tomofusaName = successor.name.replace('|', '');
@@ -4001,7 +4001,7 @@ window.GameEvents.push({
         }
 
         // ⑩ メッセージを画面に出してお知らせします
-        const clan = game.clans.find(c => c.id === clanId);
+        const clan = game.getClan(clanId);
         const clanName = clan ? clan.name : "伊達家";
         const harumuneName = oldDaimyo.name.replace('|', '');
         const terumuneName = successor.name.replace('|', '');
