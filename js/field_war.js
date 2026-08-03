@@ -1123,11 +1123,6 @@ class FieldWarManager {
         }
     }
 
-    hideUnitInfo() {
-        const infoEl = document.getElementById('fw-unit-info');
-        if (infoEl) infoEl.classList.add('hidden');
-    }
-
     // ★追加: 攻撃可能かどうかの判定関数（兵科による違いを吸収）
     canAttackTarget(attacker, targetX, targetY) {
         const dist = this.getDistance(attacker.x, attacker.y, targetX, targetY);
