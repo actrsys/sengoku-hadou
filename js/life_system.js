@@ -25,6 +25,7 @@ class LifeSystem {
 
             await this.checkBirth();
             await this.checkNameChange();
+            this.checkFaceChange(); // ★今回追加：毎年1月に顔が変わるかチェックします！
             
             // ★ここから追加：ダイアログを閉じた直後に重い処理が走って固まるのを防ぐため、一瞬だけ息継ぎ（お休み）をさせます！
             await new Promise(resolve => setTimeout(resolve, 50));
@@ -146,10 +147,16 @@ class LifeSystem {
         }
 
         // 2. 顔変更のチェック
-        if (busho.faceChange && busho.faceChange.startsWith('daimyo:')) {
-            const newFace = busho.faceChange.split(':')[1].trim();
-            if (newFace) {
-                busho.faceIcon = newFace;
+        if (busho.faceChange && busho.faceChange.includes('daimyo:')) {
+            const changes = busho.faceChange.split('/');
+            for (const change of changes) {
+                const parts = change.split(':');
+                if (parts.length === 2 && parts[0].trim() === 'daimyo') {
+                    const newFace = parts[1].trim();
+                    if (newFace) {
+                        busho.faceIcon = newFace;
+                    }
+                }
             }
         }
 
@@ -249,6 +256,30 @@ class LifeSystem {
             }
             if (this.game.ui && typeof this.game.ui.updatePanelHeader === 'function') {
                 this.game.ui.updatePanelHeader();
+            }
+        }
+    }
+
+    // ★ 年指定で顔グラフィックを変更する魔法！（毎年1月に行います）
+    checkFaceChange() {
+        const currentYear = this.game.year;
+
+        for (const b of this.game.bushos) {
+            if (!b.faceChange) continue;
+
+            // 「/」で区切られている複数の顔変更予定を一つずつ確認します
+            const changes = b.faceChange.split('/');
+            for (const change of changes) {
+                const parts = change.split(':');
+                if (parts.length === 2) {
+                    const condition = parts[0].trim();
+                    const newFace = parts[1].trim();
+
+                    // 条件が数字（年）で、今の年とピッタリ同じなら顔グラを差し替えます！
+                    if (!isNaN(condition) && Number(condition) === currentYear) {
+                        b.faceIcon = newFace;
+                    }
+                }
             }
         }
     }
