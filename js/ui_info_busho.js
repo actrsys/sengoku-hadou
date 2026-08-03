@@ -634,6 +634,7 @@ Object.assign(UIInfoManager.prototype, {
         this.bushoLastSortStateKey = null;
         this.bushoLastScope = null;
         this.bushoSavedData = null;
+        this._invalidateListItemsCache('busho'); // ★行HTMLのキャッシュも一緒に破棄します
 
         if (actionType === 'view_only' || actionType === 'all_busho_list') {
             this.pushModal('busho_selector', [actionType, targetId, extraData, onBack]);
@@ -1024,105 +1025,111 @@ Object.assign(UIInfoManager.prototype, {
             ].filter(Boolean);
         }
 
-        let items = [];
-        displayBushos.forEach(b => {
-            if (actionType === 'banish' && b.isCastellan) return; 
-            if (actionType === 'employ_target' && b.isDaimyo) return;
-            if (actionType === 'reward' && b.isDaimyo) return; 
-            
-            let isSelectable = !b.isActionDone; 
-            if (isActionFree) isSelectable = true; 
-            
-            const isSelected = (this.commonSelectedIds || []).includes(b.id);
-            
-            let currentAcc = null;
-            const bCastle = castleMap.get(b.castleId); // ★高速化
-            if (bCastle && bCastle.investigatedUntil >= this.game.getCurrentTurnId()) {
-                currentAcc = bCastle.investigatedAccuracy;
-            } else if (isEnemyTarget && targetCastle) {
-                currentAcc = targetCastle.investigatedAccuracy;
-            }
-            const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, currentAcc, this.game.playerClanId, myDaimyo);
+        // ★高速化：タブ・範囲・並び順・選択状態が前回と同じなら、重い行生成をサボって使い回します
+        const itemsCacheKey = `${actionType}|${targetId}|${this.bushoCurrentTab}|${this.bushoCurrentScope}|${hideActionCol}|${currentSortStateKey}`;
 
-            const inputType = isMulti ? 'checkbox' : 'radio';
-            let inputHtml = !isViewMode ? `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} ${isSelected ? 'checked' : ''} style="display:none;">` : '';
+        let items = this._getCachedListItems('busho', itemsCacheKey, () => {
+            const built = [];
+            displayBushos.forEach(b => {
+                if (actionType === 'banish' && b.isCastellan) return; 
+                if (actionType === 'employ_target' && b.isDaimyo) return;
+                if (actionType === 'reward' && b.isDaimyo) return; 
+                
+                let isSelectable = !b.isActionDone; 
+                if (isActionFree) isSelectable = true; 
+                
+                const isSelected = (this.commonSelectedIds || []).includes(b.id);
+                
+                let currentAcc = null;
+                const bCastle = castleMap.get(b.castleId); // ★高速化
+                if (bCastle && bCastle.investigatedUntil >= this.game.getCurrentTurnId()) {
+                    currentAcc = bCastle.investigatedAccuracy;
+                } else if (isEnemyTarget && targetCastle) {
+                    currentAcc = targetCastle.investigatedAccuracy;
+                }
+                const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, currentAcc, this.game.playerClanId, myDaimyo);
 
-            let cells = [];
-            if (this.bushoCurrentTab === 'stats') {
-                cells = [
-                    !hideActionCol ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
-                    `<span class="col-name">${hideActionCol && !isViewMode ? inputHtml : ''}${b.name}</span>`,
-                    `<span class="col-rank">${b.getRankName()}</span>`,
-                    `<span class="col-stat">${getStat('leadership')}</span>`,
-                    `<span class="col-stat">${getStat('strength')}</span>`,
-                    `<span class="col-stat">${getStat('politics')}</span>`,
-                    `<span class="col-stat">${getStat('diplomacy')}</span>`,
-                    `<span class="col-stat">${getStat('intelligence')}</span>`,
-                    `<span class="col-stat">${getStat('charm')}</span>`
-                ].filter(Boolean);
-            } else {
-                let forceName = ""; 
-                let familyMark = "";
-                if (b.belongKunishuId > 0) {
-                    const kunishu = this.game.kunishuSystem.getKunishu(b.belongKunishuId);
-                    forceName = kunishu ? kunishu.getName(this.game) : "諸勢力";
-                } else if (b.clan > 0) {
-                    const clan = clanMap.get(b.clan); // ★高速化
-                    forceName = clan ? clan.name : "大名家";
-                    const daimyo = clan ? bushoMap.get(clan.leaderId) : null; // ★高速化
-                    if (daimyo && (b.id === daimyo.id || b.isDaimyo)) { familyMark = "◯"; }
-                    else if (daimyo) {
-                        const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
-                        const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-                        if (bFamily.some(fId => dFamily.includes(fId))) familyMark = "◯";
+                const inputType = isMulti ? 'checkbox' : 'radio';
+                let inputHtml = !isViewMode ? `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} ${isSelected ? 'checked' : ''} style="display:none;">` : '';
+
+                let cells = [];
+                if (this.bushoCurrentTab === 'stats') {
+                    cells = [
+                        !hideActionCol ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
+                        `<span class="col-name">${hideActionCol && !isViewMode ? inputHtml : ''}${b.name}</span>`,
+                        `<span class="col-rank">${b.getRankName()}</span>`,
+                        `<span class="col-stat">${getStat('leadership')}</span>`,
+                        `<span class="col-stat">${getStat('strength')}</span>`,
+                        `<span class="col-stat">${getStat('politics')}</span>`,
+                        `<span class="col-stat">${getStat('diplomacy')}</span>`,
+                        `<span class="col-stat">${getStat('intelligence')}</span>`,
+                        `<span class="col-stat">${getStat('charm')}</span>`
+                    ].filter(Boolean);
+                } else {
+                    let forceName = ""; 
+                    let familyMark = "";
+                    if (b.belongKunishuId > 0) {
+                        const kunishu = this.game.kunishuSystem.getKunishu(b.belongKunishuId);
+                        forceName = kunishu ? kunishu.getName(this.game) : "諸勢力";
+                    } else if (b.clan > 0) {
+                        const clan = clanMap.get(b.clan); // ★高速化
+                        forceName = clan ? clan.name : "大名家";
+                        const daimyo = clan ? bushoMap.get(clan.leaderId) : null; // ★高速化
+                        if (daimyo && (b.id === daimyo.id || b.isDaimyo)) { familyMark = "◯"; }
+                        else if (daimyo) {
+                            const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+                            const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+                            if (bFamily.some(fId => dFamily.includes(fId))) familyMark = "◯";
+                        }
+                    }
+                    const bCastleName = bCastle ? bCastle.name : "";
+                    const age = b.isAutoLeader ? "" : (this.game.year - b.birthYear + 1);
+                    let salary = "";
+                    if (b.clan > 0 && !b.isDaimyo && b.status !== 'ronin') {
+                        const clan = clanMap.get(b.clan); // ★高速化
+                        const daimyo = clan ? bushoMap.get(clan.leaderId) : null; // ★高速化
+                        salary = b.getSalary(daimyo);
+                        if (salary === 0) salary = "";
+                    }
+                    let factionNameStr = b.factionName || "";
+                    
+                    cells = [
+                        !hideActionCol ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
+                        `<span class="col-name">${hideActionCol && !isViewMode ? inputHtml : ''}${b.name}</span>`,
+                        // 横スクロールに戻す時のために残しておきます： `<span class="col-rank">${b.getRankName()}</span>`,
+                        `<span class="col-faction">${forceName}</span>`,
+                        `<span class="col-castle">${bCastleName}</span>`,
+                        `<span class="col-age">${age}</span>`,
+                        `<span class="col-family">${familyMark}</span>`,
+                        `<span class="col-salary">${salary}</span>`,
+                        `<span class="col-faction-leader">${factionNameStr}</span>`
+                    ].filter(Boolean);
+                }
+                
+                let onClickStr = "";
+                let itemClassThis = itemClassStr;
+                
+                if (!isSelectable && !isViewMode) {
+                    itemClassThis += " disabled";
+                } else {
+                    if (isSelected) {
+                        itemClassThis += " selected";
+                    }
+                    
+                    if (isViewMode) {
+                        onClickStr = `window.GameApp.ui.info.showBushoDetailModalById(${b.id})`;
+                    } else {
+                        onClickStr = `window.GameApp.ui.info.handleBushoSelect(event, ${isMulti}, ${spec.costGold || 0}, ${spec.costRice || 0}, '${actionType}')`;
                     }
                 }
-                const bCastleName = bCastle ? bCastle.name : "";
-                const age = b.isAutoLeader ? "" : (this.game.year - b.birthYear + 1);
-                let salary = "";
-                if (b.clan > 0 && !b.isDaimyo && b.status !== 'ronin') {
-                    const clan = clanMap.get(b.clan); // ★高速化
-                    const daimyo = clan ? bushoMap.get(clan.leaderId) : null; // ★高速化
-                    salary = b.getSalary(daimyo);
-                    if (salary === 0) salary = "";
-                }
-                let factionNameStr = b.factionName || "";
-                
-                cells = [
-                    !hideActionCol ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
-                    `<span class="col-name">${hideActionCol && !isViewMode ? inputHtml : ''}${b.name}</span>`,
-                    // 横スクロールに戻す時のために残しておきます： `<span class="col-rank">${b.getRankName()}</span>`,
-                    `<span class="col-faction">${forceName}</span>`,
-                    `<span class="col-castle">${bCastleName}</span>`,
-                    `<span class="col-age">${age}</span>`,
-                    `<span class="col-family">${familyMark}</span>`,
-                    `<span class="col-salary">${salary}</span>`,
-                    `<span class="col-faction-leader">${factionNameStr}</span>`
-                ].filter(Boolean);
-            }
-            
-            let onClickStr = "";
-            let itemClassThis = itemClassStr;
-            
-            if (!isSelectable && !isViewMode) {
-                itemClassThis += " disabled";
-            } else {
-                if (isSelected) {
-                    itemClassThis += " selected";
-                }
-                
-                if (isViewMode) {
-                    onClickStr = `window.GameApp.ui.info.showBushoDetailModalById(${b.id})`;
-                } else {
-                    onClickStr = `window.GameApp.ui.info.handleBushoSelect(event, ${isMulti}, ${spec.costGold || 0}, ${spec.costRice || 0}, '${actionType}')`;
-                }
-            }
 
-            items.push({
-                onClick: onClickStr,
-                cells: cells,
-                itemClass: itemClassThis
+                built.push({
+                    onClick: onClickStr,
+                    cells: cells,
+                    itemClass: itemClassThis
+                });
             });
+            return built;
         });
         
         let onConfirmHandler = null;

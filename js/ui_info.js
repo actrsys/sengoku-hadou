@@ -13,6 +13,7 @@ class UIInfoManager {
     // --- 共通モーダル（枠の使い回し）管理 ---
     closeCommonModal() {
         this._stableSortBases = {}; // ★全リスト共通の「前回の並び順」を記憶する箱をリセットします
+        this._listItemsCache = {};  // ★全リスト共通の「重い一覧HTML生成結果」を記憶する箱をリセットします
 
         this.modalHistory = [];
         this.currentModalInfo = null;
@@ -34,6 +35,9 @@ class UIInfoManager {
         this.bushoLastScope = null;
         this.bushoSavedData = null;
         this.bushoSavedSelectedIds = [];
+        
+        // 武将詳細のタブ初期化
+        this.bushoDetailCurrentTab = 'status';
         
         // 外交リストのタブ状態リセット
         this.diploCurrentTab = 'daimyo';
@@ -91,6 +95,29 @@ class UIInfoManager {
         if (!this._stableSortBases) this._stableSortBases = {};
         // ★修正：空っぽ（null）が渡された時は、複製しようとせずにそのまま空っぽにします！
         this._stableSortBases[listId] = sortedArray ? [...sortedArray] : null;
+    }
+
+    // ==========================================
+    // ★新機能：一覧の行HTML（重い生成処理）を使い回すための共通の魔法
+    // タブ・絞り込み・並び順・選択状態が前回の描画と全く同じ時だけ、
+    // 高コストな再生成をサボって使い回します。
+    // 武将一覧のような件数の多いリストで、詳細画面との行き来を
+    // 一瞬で終わらせるのが狙いです（他のリストからも共通で使えます）。
+    // ==========================================
+    _getCachedListItems(listId, cacheKey, buildItemsFn) {
+        if (!this._listItemsCache) this._listItemsCache = {};
+        const cached = this._listItemsCache[listId];
+        if (cached && cached.key === cacheKey) {
+            return cached.items;
+        }
+        const items = buildItemsFn();
+        this._listItemsCache[listId] = { key: cacheKey, items };
+        return items;
+    }
+
+    // ★新機能：明示的にキャッシュを捨てたい時に使う魔法（一覧を開き直す時などに呼びます）
+    _invalidateListItemsCache(listId) {
+        if (this._listItemsCache) delete this._listItemsCache[listId];
     }
 
     _toggleSortState(currentSortKey, currentIsAsc, clickedSortKey, defaultAscKeys) {
