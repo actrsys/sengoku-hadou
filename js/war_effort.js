@@ -640,7 +640,7 @@ Object.assign(WarManager.prototype, {
                     }
                     choices.push({ label: '送らない', className: 'btn-danger', onClick: () => resolveConfirmed(false) });
                     
-                    this.game.ui.showDialog(`${requesterName}殿が${targetInfoStr}${reinfCastleName}に参戦を求めています。\n援軍を送りますか？`, false, null, null, { choices: choices });
+                    this.game.ui.showDialog(`${requesterName}が${targetInfoStr}${reinfCastleName}に救援を求めています。\n援軍を送りますか？`, false, null, null, { choices: choices });
                 };
                 
                 const isConfirmed = await new Promise((resolve) => {
@@ -2917,7 +2917,7 @@ Object.assign(WarManager.prototype, {
                     }
                     choices.push({ label: '送らない', className: 'btn-danger', onClick: () => onComplete(null) });
 
-                    this.game.ui.showDialog(`${requesterName}殿が${bestCastle.name}に参戦を求めています。\n援軍を送りますか？`, false, null, null, { choices: choices });
+                    this.game.ui.showDialog(`${requesterName}が${bestCastle.name}に救援を求めています。\n援軍を送りますか？`, false, null, null, { choices: choices });
                 };
                 showReq();
             } else {
