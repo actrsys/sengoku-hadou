@@ -2203,7 +2203,7 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
 .fw-tab.defender.active { background: rgba(66, 165, 245, 0.6); }
 
 /* ★修正: 部隊情報 (fw-unit-info) の和風・縦並びスタイル */
-.fw-floating-unit { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.85); border: 2px solid #d4af37; padding: 10px; border-radius: 6px; z-index: 100; pointer-events: none; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.7); white-space: nowrap; color: #fff; text-shadow: 1px 1px 1px #000; min-width: 180px; }
+.fw-floating-unit { position: absolute; background: rgba(0, 0, 0, 0.85); border: 2px solid #d4af37; padding: 10px; border-radius: 6px; z-index: 100; pointer-events: none; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.7); white-space: nowrap; color: #fff; text-shadow: 1px 1px 1px #000; min-width: 180px; }
 .fw-unit-header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid rgba(212, 175, 55, 0.5); padding-bottom: 4px; gap: 15px; }
 .fw-unit-name { font-size: 1.1rem; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .fw-unit-type { font-size: 0.8rem; color: #ccc; }

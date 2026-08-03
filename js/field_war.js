@@ -991,13 +991,11 @@ class FieldWarManager {
         let clanNameText = "";
         
         if (unit.kunishuId) {
-            // 諸勢力の場合：諸勢力の名称を引っ張ってきます
             const kunishu = this.game.kunishuSystem.getKunishu(unit.kunishuId);
             if (kunishu) {
-                clanNameText = `${kunishu.getName(this.game)} `; // 「〇〇衆 」という文字を作ります
+                clanNameText = `${kunishu.getName(this.game)} `; 
             }
         } else if (unit.bushoId) {
-            // 大名家に所属している武将の場合
             const busho = this.game.getBusho(unit.bushoId);
             if (busho && busho.clan > 0) {
                 const clanData = this.game.clans.find(c => c.id === busho.clan);
@@ -1007,7 +1005,6 @@ class FieldWarManager {
             }
         }
         
-        // ★追加：専用の箱から、この部隊が所属するグループの士気と訓練度を取り出します！
         let unitMorale = 50;
         let unitTraining = 50;
         if (this.groupStats && this.groupStats[unit.groupId]) {
@@ -1015,7 +1012,7 @@ class FieldWarManager {
             unitTraining = this.groupStats[unit.groupId].training;
         }
 
-        infoEl.style.borderColor = color; // 枠線を陣営カラーに合わせる
+        infoEl.style.borderColor = color; 
         infoEl.innerHTML = `
             <div class="fw-unit-header">
                 <div class="fw-unit-name" style="color: ${color};">${clanNameText}${unit.name}</div>
@@ -1037,7 +1034,52 @@ class FieldWarManager {
                 <div class="fw-unit-ability"><span class="fw-status-label">智</span><span>${GameSystem.toGradeHTML(unit.stats.int)}</span></div>
             </div>
         `;
+        
         infoEl.classList.remove('hidden');
+
+        // ★追加: 部隊情報を出す時、上部の軍団情報を隠します
+        const statusBar = document.getElementById('fw-status-bar');
+        if (statusBar) statusBar.classList.add('hidden');
+
+        // ★追加: クリックした部隊アイコンの近くに、はみ出さないように配置する魔法
+        const uEl = document.getElementById(`fw-unit-el-${unit.id}`);
+        if (uEl) {
+            const rect = uEl.getBoundingClientRect();
+            const infoRect = infoEl.getBoundingClientRect();
+            const screenW = window.innerWidth;
+            const screenH = window.innerHeight;
+            
+            // まずはアイコンの右下に配置しようとします
+            let posX = rect.right + 10;
+            let posY = rect.bottom + 10;
+
+            // もし右側が画面からはみ出るなら、アイコンの左側に配置します
+            if (posX + infoRect.width > screenW - 10) {
+                posX = rect.left - infoRect.width - 10;
+                if (posX < 10) posX = 10; // 左もはみ出るなら画面端に固定
+            }
+
+            // もし下側が画面からはみ出るなら、アイコンの上側に配置します
+            if (posY + infoRect.height > screenH - 10) {
+                posY = rect.top - infoRect.height - 10;
+                if (posY < 10) posY = 10; // 上もはみ出るなら画面端に固定
+            }
+
+            // 最終的に計算した位置を適用します
+            infoEl.style.left = posX + 'px';
+            infoEl.style.top = posY + 'px';
+        }
+    }
+
+    hideUnitInfo() {
+        const infoEl = document.getElementById('fw-unit-info');
+        if (infoEl) infoEl.classList.add('hidden');
+        
+        // ★追加: 部隊情報を閉じた時、隠していた軍団情報を元に戻します
+        const statusBar = document.getElementById('fw-status-bar');
+        if (statusBar && this.isInfoMode) {
+            statusBar.classList.remove('hidden');
+        }
     }
 
     hideUnitInfo() {
