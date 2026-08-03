@@ -2183,7 +2183,7 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
 .fw-map-scroll.grabbing { cursor: grabbing; }
 
 .fw-floating-status { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; z-index: 100; gap: 10px; }
-.fw-status-wrapper { display: flex; flex-direction: column; gap: 5px; flex: 1; max-width: 300px; pointer-events: auto; }
+.fw-status-wrapper { display: flex; flex-direction: column; gap: 5px; flex: 1; max-width: 300px; pointer-events: none; }
 
 /* ★追加: 軍団情報 (fw-atk-status, fw-def-status) の和風スタイル */
 .fw-status-box { background: rgba(0, 0, 0, 0.6); border: 2px solid rgba(212, 175, 55, 0.4); border-radius: 6px; padding: 8px; color: #fff; text-shadow: 1px 1px 1px #000; box-shadow: 0 4px 6px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 4px; }
@@ -2195,7 +2195,7 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
 .fw-status-label { color: #ffd54f; font-weight: normal; }
 .fw-status-value { font-weight: bold; }
 
-.fw-tabs { display: flex; gap: 2px; flex-wrap: wrap; }
+.fw-tabs { display: flex; gap: 2px; flex-wrap: wrap; pointer-events: auto; }
 .fw-tabs.right-align { justify-content: flex-end; }
 .fw-tab { background: rgba(0, 0, 0, 0.5); color: #ccc; border: 1px solid rgba(255,255,255,0.3); padding: 2px 8px; font-size: 0.75rem; border-radius: 4px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
 .fw-tab.active { color: #fff; border-color: #fff; font-weight: bold; }
@@ -2203,7 +2203,7 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
 .fw-tab.defender.active { background: rgba(66, 165, 245, 0.6); }
 
 /* ★修正: 部隊情報 (fw-unit-info) の和風・縦並びスタイル */
-.fw-floating-unit { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.85); border: 2px solid #d4af37; padding: 10px; border-radius: 6px; z-index: 100; pointer-events: none; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.7); white-space: nowrap; color: #fff; text-shadow: 1px 1px 1px #000; min-width: 180px; }
+.fw-floating-unit { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.85); border: 2px solid #d4af37; padding: 10px; border-radius: 6px; z-index: 100; pointer-events: none; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.7); white-space: nowrap; color: #fff; text-shadow: 1px 1px 1px #000; min-width: 180px; }
 .fw-unit-header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid rgba(212, 175, 55, 0.5); padding-bottom: 4px; gap: 15px; }
 .fw-unit-name { font-size: 1.1rem; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .fw-unit-type { font-size: 0.8rem; color: #ccc; }
@@ -2214,7 +2214,7 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
 
 .fw-floating-log { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 600px; height: 100px; overflow-y: auto; background: rgba(0, 0, 0, 0.6); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; padding: 5px 10px; font-size: 0.85rem; z-index: 100; pointer-events: auto; text-shadow: 1px 1px 1px #000; }
 
-.fw-controls { height: 10vh; min-height: 50px; background: #333; display: flex; justify-content: flex-end; align-items: center; padding: 0 20px; flex-shrink: 0; border-top: 2px solid #111; }
+.fw-controls { height: 10vh; min-height: 50px; background: #000; display: flex; justify-content: flex-end; align-items: center; padding: 0 20px; flex-shrink: 0; border-top: 2px solid #111; }
 .fw-menu-group { display: flex; gap: 15px; height: 100%; align-items: center; }
 .fw-menu-group button { height: 60%; min-height: 30px; min-width: 100px; font-size: 1.1rem; border-radius: 8px; font-weight: bold; display: flex; justify-content: center; align-items: center; padding: 0; margin: 0; line-height: 1; }
 #fw-map { background-color: transparent; overflow: hidden; }
