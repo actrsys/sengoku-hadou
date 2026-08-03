@@ -1187,9 +1187,8 @@ Object.assign(WarManager.prototype, {
                 this.endWar(true, true, capturedBushos, target.id); 
             }
         };
-        if (defCastle.ownerClan === this.game.playerClanId) { 
-            if (candidates.length === 1) runRetreat(candidates[0].id); else this.game.ui.showRetreatSelector(defCastle, candidates, (id) => runRetreat(id)); 
-        } else { candidates.sort((a,b) => WarSystem.calcRetreatScore(b) - WarSystem.calcRetreatScore(a)); runRetreat(candidates[0].id); }
+        candidates.sort((a,b) => WarSystem.calcRetreatScore(b) - WarSystem.calcRetreatScore(a)); 
+        runRetreat(candidates[0].id);
     },
     
     async endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { // ★ async を追加

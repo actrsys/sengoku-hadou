@@ -1064,7 +1064,6 @@ body:not(.is-pc) .saveload-slot-btn > div:first-child > div:last-child > span {
 #intercept-confirm-modal { z-index: 6000; }
 #quantity-modal { z-index: 6500; }
 #settings-modal { z-index: 7000; }
-#retreat-modal { z-index: 8000; }
 #unit-divide-modal { z-index: 8010; }
 #daimyo-list-modal { z-index: 8100; }
 #daimyo-detail-modal { z-index: 8150; }
@@ -2628,32 +2627,6 @@ body.is-pc {
     .war-reinf-card .stat-val-large { font-size: 1.2rem !important; }
 }
 
-/* =========================================================
-   ★ 撤退先選択専用の魔法（完全独立版）
-   ========================================================= */
-.retreat-grid {
-    display: grid; 
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); 
-    gap: 10px; 
-    margin-top: 20px; 
-    overflow-y: auto;
-}
-.retreat-btn { 
-    padding: 15px; 
-    border: 2px solid #ccc; 
-    border-radius: 8px; 
-    font-weight: bold; 
-    cursor: pointer; 
-    background: #fff; 
-    transition: transform 0.1s, background-color 0.2s, border-color 0.2s; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-}
-body.is-pc .retreat-btn:hover { 
-    transform: scale(1.02); 
-    background: #f0f8ff; 
-}
 /* =========================================================
    ★ 専用ロード画面の魔法
    ========================================================= */

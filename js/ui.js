@@ -3097,30 +3097,7 @@ class UIManager {
             if (guard) guard.classList.add('hidden');
         }
     }
-
-    showRetreatSelector(castle, candidates, onSelect) {
-        const modal = document.getElementById('retreat-modal');
-        const list = document.getElementById('retreat-list');
-        if (!modal || !list) return; 
-        
-        modal.classList.remove('hidden'); 
-        list.innerHTML = '';
-        
-        candidates.forEach(c => {
-            const div = document.createElement('div'); 
-            // 撤退専用のデザイン（retreat-btn）を使います
-            div.className = 'retreat-btn'; 
-            div.innerHTML = `<div style="text-align:center;"><strong>${c.name}</strong><br><small>兵士:${c.soldiers} 防御:${c.defense}</small></div>`;
-            
-            div.onclick = () => { 
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                modal.classList.add('hidden'); 
-                onSelect(c.id); 
-            };
-            list.appendChild(div);
-        });
-    }
-
+    
     showPrisonerModal(captives) {
         this.info.showPrisonerModal(captives);
     }
