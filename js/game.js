@@ -1705,13 +1705,7 @@ class GameManager {
     getCurrentTurnCastle() { return this.turnQueue[this.currentIndex]; }
     getCurrentTurnId() { return this.year * 12 + this.month; }
     getClanTotalSoldiers(clanId) { return this.getClanCastles(clanId).reduce((sum, c) => sum + c.soldiers, 0); }
-    getClanGunshi(clanId) {
-    // ★高速化：全武将から探す代わりに、勢力が覚えているgunshiIdで一瞬で見つけます
-    const clan = this.getClan(clanId);
-    if (!clan) return undefined;
-    const gunshi = this.getBusho(clan.gunshiId);
-    return (gunshi && gunshi.status === 'active') ? gunshi : undefined;
-}
+    getClanGunshi(clanId) { return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi && b.status === 'active'); }
 
     getNavigatorInfo(castle) {
         let faceIcon = 'koshou.webp';

@@ -159,44 +159,35 @@ class CustomScrollbar {
             };
         }
 
-        // スマホ・PC共通のドラッグ（バーを掴んでスクロールさせる処理）です// 差し替え後
+        // スマホ・PC共通のドラッグ（バーを掴んでスクロールさせる処理）です
         this.onStartY = (e) => {
             this.isDraggingY = true;
             this.thumbY.classList.add('dragging');
+            // タッチ操作とマウス操作の両方からY座標を取得します
             this.startY = e.touches ? e.touches[0].clientY : e.clientY;
             this.startScrollTop = this.list.scrollTop;
-
-            // ★追加：ドラッグ中に毎回リフローが起きないよう、開始時に一度だけ寸法を測って覚えておきます
-            this.dragListHeight = this.list.clientHeight;
-            this.dragScrollHeight = this.list.scrollHeight;
-            this.dragTrackHeight = this.trackY.clientHeight || this.dragListHeight;
-            this.dragThumbHeight = parseFloat(this.thumbY.style.height);
-            this._dragTicking = false;
             
+            // スマホでバーを掴んだ時に画面全体がスクロールしてしまうのを防ぎます
             if (e.cancelable) e.preventDefault();
         };
-
+        
         this.onMoveY = (e) => {
             if (!this.isDraggingY) return;
             const currentY = e.touches ? e.touches[0].clientY : e.clientY;
-            this._pendingDeltaY = currentY - this.startY;
-
-            // ★追加：連続で発生するタッチ・マウス移動を間引き、1フレームにつき1回だけ反映します
-            if (this._dragTicking) return;
-            this._dragTicking = true;
-            requestAnimationFrame(() => {
-                this._dragTicking = false;
-                if (!this.isDraggingY) return;
-
-                const maxScrollTop = this.dragScrollHeight - this.dragListHeight;
-                const maxThumbTop = this.dragTrackHeight - this.dragThumbHeight;
-                if (maxThumbTop === 0) return;
-
-                const scrollRatio = this._pendingDeltaY / maxThumbTop;
-                this.list.scrollTop = this.startScrollTop + (scrollRatio * maxScrollTop);
-
-                this.update();
-            });
+            const deltaY = currentY - this.startY;
+            
+            const listHeight = this.list.clientHeight;
+            const scrollHeight = this.list.scrollHeight;
+            const trackHeight = this.trackY.clientHeight || listHeight; 
+            const thumbHeight = parseFloat(this.thumbY.style.height);
+            
+            const maxScrollTop = scrollHeight - listHeight;
+            const maxThumbTop = trackHeight - thumbHeight; 
+            
+            const scrollRatio = deltaY / maxThumbTop;
+            this.list.scrollTop = this.startScrollTop + (scrollRatio * maxScrollTop);
+            
+            this.update();
         };
         
         this.onEnd = () => {
