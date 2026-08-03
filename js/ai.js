@@ -307,7 +307,7 @@ class AIEngine {
                 
                 if (myClan && myClan.currentDiplomacyTarget) {
                     // まずは自分のお殿様（大名）を探します。いない時は城主を大名の代わりにします
-                    const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
+                    const daimyo = this.game.getClanDaimyo(castle.ownerClan) || castellan;
                     
                     // 今までの基本の確率（約10%）を計算します
                     let diplomacyChance = ((window.AIParams.AI.DiplomacyChance || 0.3) / 3) * (mods.aggression); 
@@ -382,7 +382,7 @@ class AIEngine {
 
         // --- 修正後：正確な見積もりと戦闘力比の計算 ---
 
-        const myDaimyo = this.game.bushos.find(b => b.clan === myCastle.ownerClan && b.isDaimyo) || { personality: 'normal', intelligence: 50, duty: 50, nemesisIds: [] };
+        const myDaimyo = this.game.getClanDaimyo(myCastle.ownerClan) || { personality: 'normal', intelligence: 50, duty: 50, nemesisIds: [] };
 
         // ★追加：リーダー（直轄なら大名、それ以外なら国主）を特定して、その居城がある地方を調べます！
         let leader = myDaimyo;
@@ -408,7 +408,7 @@ class AIEngine {
         }
 
         const myClanId = myCastle.ownerClan;
-        const myClanCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
+        const myClanCastles = this.game.getClanCastles(myClanId);
         const myTotalPower = this.getClanPrestige(myClanId);
 
         // ★追加：自分の軍団が抱えている「方針」を調べます！
@@ -421,7 +421,7 @@ class AIEngine {
         let hasShogunCandidate = false;
         
         // 自勢力の武将の中に「左馬頭（ID: 80）」の官位を持つ人がいるか探します！
-        const myBushos = this.game.bushos.filter(b => b.clan === myClanId);
+        const myBushos = this.game.getClanCastles(myClanId).flatMap(c => this.game.getCastleBushos(c.id));
         for (const b of myBushos) {
             if (b.courtRankIds && b.courtRankIds.includes(80)) {
                 hasShogunCandidate = true;
@@ -1156,7 +1156,7 @@ class AIEngine {
             }
 
             // 5. 相手の殿様が、自分の殿様の「宿敵」だった場合の特別な執着！
-            const targetDaimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);
+            const targetDaimyo = this.game.getClanDaimyo(target.ownerClan);
             let isNemesisDaimyo = false;
             if (targetDaimyo && myDaimyo.nemesisIds && myDaimyo.nemesisIds.includes(targetDaimyo.id)) {
                 prob += 10; // 宿敵には容赦しません！
@@ -1470,7 +1470,7 @@ class AIEngine {
     
     execInternalAffairs(castle, castellan, mods, smartness) {
         // ① 大名を取得します（全体で使う用）
-        const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
+        const daimyo = this.game.getClanDaimyo(castle.ownerClan) || castellan;
 
         // ★追加：行動回数の計算基準となる「リーダー（直轄なら大名、それ以外なら国主）」と「軍師」を決めます！
         let leader = daimyo;
@@ -1487,7 +1487,7 @@ class AIEngine {
         }
 
         // ★修正：軍師は大名家（勢力）に1人だけなので、軍団の場所に関係なく勢力全体から探し出します！
-        const gunshi = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isGunshi);
+        const gunshi = this.game.getClanGunshi(castle.ownerClan);
 
         // ★追加：リーダーと軍師の能力から、AIが「目指すべき最大値（キャップ）」を計算する魔法！
         // リーダーは各能力、軍師は智謀で計算し、高い方を採用します（50 + 能力/2）
@@ -1823,7 +1823,7 @@ class AIEngine {
 
                 // ===== 目標兵力の計算 =====
                 // 自分の軍団全体の「総石高」を調べます！
-                const myCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan && c.legionId === castle.legionId);
+                const myCastles = this.game.getClanCastles(castle.ownerClan).filter(c => c.legionId === castle.legionId);
                 const totalKokudaka = myCastles.reduce((sum, c) => sum + c.kokudaka, 0);
 
                 // 石高をベースにした新しい計算式で、目標にする兵士の数を決めます
@@ -2128,7 +2128,7 @@ class AIEngine {
                         keepSoldiers = Math.floor(maxEnemyMaxCastleSoldiers * 0.5);
 
                         // でも、自分の軍団全体の兵力が、敵の全体の半分以下なら…
-                        const myCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan && c.legionId === castle.legionId);
+                        const myCastles = this.game.getClanCastles(castle.ownerClan).filter(c => c.legionId === castle.legionId);
                         const myTotalSoldiers = myCastles.reduce((sum, c) => sum + c.soldiers, 0);
                         const enemyHalf = maxEnemyTotalSoldiers * 0.5;
 
@@ -2397,7 +2397,9 @@ class AIEngine {
                     // ② 第一目標勢力（記憶している大名家）が保護されていない場合（離間計、武将引抜が可能）
                     if (!isClanProtected && memoryClanId !== 0 && memoryClanId !== castle.ownerClan) {
                         // 第一目標勢力に所属する武将を全員取得（大名は除く）
-                        const enemyBushos = this.game.bushos.filter(b => b.clan === memoryClanId && b.status === 'active' && !b.isDaimyo && b.castleId > 0);
+                        const enemyBushos = this.game.getClanCastles(memoryClanId)
+                            .flatMap(c => this.game.getCastleBushos(c.id))
+                            .filter(b => !b.isDaimyo && b.castleId > 0);
                         
                         // ★追加：スキルマネージャーに問い合わせて、リーダーのスキルによって「暗殺」行動が拡張（許可）されているか確認します
                         let canAssassinate = false;
@@ -3148,7 +3150,7 @@ class AIEngine {
         const targetClanId = targetData.targetId;
         
         // 相手の大名（殿様）を探して、その人がいるお城をターゲットにします
-        const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+        const targetDaimyo = this.game.getClanDaimyo(targetClanId);
         let targetCastle = null;
         if (targetDaimyo) {
             targetCastle = this.game.castles.find(c => c.id === targetDaimyo.castleId);
