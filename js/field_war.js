@@ -1034,41 +1034,74 @@ class FieldWarManager {
                 <div class="fw-unit-ability"><span class="fw-status-label">智</span><span>${GameSystem.toGradeHTML(unit.stats.int)}</span></div>
             </div>
         `;
-        
+
+        // ★修正：サイズを正確に測るため、一瞬だけ透明（visibility: hidden）にして画面に出します
+        infoEl.style.visibility = 'hidden';
+        infoEl.style.left = '0px';
+        infoEl.style.top = '0px';
         infoEl.classList.remove('hidden');
 
         // ★追加: 部隊情報を出す時、上部の軍団情報を隠します
         const statusBar = document.getElementById('fw-status-bar');
         if (statusBar) statusBar.classList.add('hidden');
 
-        // ★追加: クリックした部隊アイコンの近くに、はみ出さないように配置する魔法
+        // ★修正：画面の黒帯や絶対座標に影響されないよう、ゲーム内部のローカル座標系だけで計算する魔法です！
         const uEl = document.getElementById(`fw-unit-el-${unit.id}`);
-        if (uEl) {
-            const rect = uEl.getBoundingClientRect();
-            const infoRect = infoEl.getBoundingClientRect();
-            const screenW = window.innerWidth;
-            const screenH = window.innerHeight;
-            
-            // まずはアイコンの右下に配置しようとします
-            let posX = rect.right + 10;
-            let posY = rect.bottom + 10;
+        const mapEl = document.getElementById('fw-map');
+        const scrollEl = document.getElementById('fw-map-scroll');
+        const mainArea = document.getElementById('fw-main-area');
 
-            // もし右側が画面からはみ出るなら、アイコンの左側に配置します
-            if (posX + infoRect.width > screenW - 10) {
-                posX = rect.left - infoRect.width - 10;
-                if (posX < 10) posX = 10; // 左もはみ出るなら画面端に固定
+        if (uEl && mapEl && scrollEl && mainArea) {
+            // マップの現在の拡大率を取得
+            let scale = 1;
+            const transform = mapEl.style.transform;
+            if (transform && transform.includes('scale')) {
+                const match = transform.match(/scale\(([^)]+)\)/);
+                if (match && match[1]) scale = parseFloat(match[1]);
             }
 
-            // もし下側が画面からはみ出るなら、アイコンの上側に配置します
-            if (posY + infoRect.height > screenH - 10) {
-                posY = rect.top - infoRect.height - 10;
-                if (posY < 10) posY = 10; // 上もはみ出るなら画面端に固定
+            // 部隊アイコンの「マップ上の位置」と「サイズ」を取得
+            const uLeft = parseFloat(uEl.style.left) || 0;
+            const uTop = parseFloat(uEl.style.top) || 0;
+            const uWidth = parseFloat(uEl.style.width) || 24;
+            const uHeight = parseFloat(uEl.style.height) || 24;
+
+            // スクロール量を差し引いて、表示エリア（fw-main-area）の左上を(0,0)とした場合の座標を計算します
+            // これにより、画面の黒帯（外側のオフセット）を完全に無視できます
+            const iconRightEdge = (uLeft + uWidth) * scale - scrollEl.scrollLeft;
+            const iconBottomEdge = (uTop + uHeight) * scale - scrollEl.scrollTop;
+            const iconLeftEdge = uLeft * scale - scrollEl.scrollLeft;
+            const iconTopEdge = uTop * scale - scrollEl.scrollTop;
+
+            // ポップアップ自体のサイズと、表示可能エリアのサイズ
+            const infoW = infoEl.offsetWidth;
+            const infoH = infoEl.offsetHeight;
+            const mainW = mainArea.clientWidth;
+            const mainH = mainArea.clientHeight;
+
+            // 基本はアイコンの右下に配置
+            let posX = iconRightEdge + 5;
+            let posY = iconBottomEdge + 5;
+
+            // もし右側が画面外にはみ出るなら、アイコンの左側に配置
+            if (posX + infoW > mainW - 5) {
+                posX = iconLeftEdge - infoW - 5;
+                if (posX < 5) posX = 5; // 左もはみ出るなら画面端に固定
             }
 
-            // 最終的に計算した位置を適用します
+            // もし下側が画面外にはみ出るなら、アイコンの上側に配置
+            if (posY + infoH > mainH - 5) {
+                posY = iconTopEdge - infoH - 5;
+                if (posY < 5) posY = 5; // 上もはみ出るなら画面端に固定
+            }
+
+            // 計算したローカル座標をセット
             infoEl.style.left = posX + 'px';
             infoEl.style.top = posY + 'px';
         }
+        
+        // 透明マントを脱いで正式に表示します
+        infoEl.style.visibility = '';
     }
 
     hideUnitInfo() {
