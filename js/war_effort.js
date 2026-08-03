@@ -111,8 +111,8 @@ Object.assign(WarManager.prototype, {
         const atkClanId = atkCastle.isKunishu ? atkCastle.kunishuId : atkCastle.ownerClan;
         const defClanId = defCastle.isKunishu ? defCastle.kunishuId : defCastle.ownerClan;
         
-        const atkClanName = atkClanId === pid ? "我が軍" : (atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : (this.game.clans.find(c => c.id === atkClanId)?.name || "敵軍"));
-        const defClanName = defClanId === pid ? "我が軍" : (defCastle.isKunishu ? (defCastle.getName ? defCastle.getName(this.game) : defCastle.name) : (this.game.clans.find(c => c.id === defClanId)?.name || "敵軍"));
+        const atkClanName = atkClanId === pid ? "当家" : (atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : (this.game.clans.find(c => c.id === atkClanId)?.name || "敵軍"));
+        const defClanName = defClanId === pid ? "当家" : (defCastle.isKunishu ? (defCastle.getName ? defCastle.getName(this.game) : defCastle.name) : (this.game.clans.find(c => c.id === defClanId)?.name || "敵軍"));
         const defProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
         const defProvName = defProv ? defProv.province : "不明な国";
 
@@ -146,7 +146,7 @@ Object.assign(WarManager.prototype, {
                 if (candidates && candidates.length > 0) {
                     const cand = candidates[0];
                     const rClan = this.game.clans.find(c => c.id === cand.force.id);
-                    enemyReinfMsg = `また、${cand.castle.name}や${cand.force.isKunishu ? (cand.force.getName ? cand.force.getName(this.game) : cand.force.name) : (rClan ? rClan.name : "他勢力")}からの援軍が予想されます。`;
+                    enemyReinfMsg = `さらに、${cand.castle.name}や${cand.force.isKunishu ? (cand.force.getName ? cand.force.getName(this.game) : cand.force.name) : (rClan ? rClan.name : "他勢力")}からの援軍が予想されます。`;
                 }
             } else {
                 const connected = atkCastle.getConnectedCastles ? atkCastle.getConnectedCastles(this.game) : [];
@@ -154,7 +154,7 @@ Object.assign(WarManager.prototype, {
                 if (candidates && candidates.length > 0) {
                     const cand = candidates[0];
                     const rClan = this.game.clans.find(c => c.id === cand.force.id);
-                    enemyReinfMsg = `また、${cand.castle.name}や${cand.force.isKunishu ? (cand.force.getName ? cand.force.getName(this.game) : cand.force.name) : (rClan ? rClan.name : "他勢力")}からの援軍が予想されます。`;
+                    enemyReinfMsg = `さらに、${cand.castle.name}や${cand.force.isKunishu ? (cand.force.getName ? cand.force.getName(this.game) : cand.force.name) : (rClan ? rClan.name : "他勢力")}からの援軍が予想されます。`;
                 }
             }
         }
