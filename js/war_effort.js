@@ -101,9 +101,16 @@ Object.assign(WarManager.prototype, {
     // ★追加：軍師による戦況報告の魔法
     showSituationReport(isAttack, atkCastle, atkBushos, defCastle, helperCastle, onComplete) {
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
-        if (!gunshi) {
-            onComplete();
-            return;
+        
+        // ★変更：軍師がいなくても小姓が出てきてくれるようにします
+        let advisorFace = "koshou.webp";
+        let advisorName = "小姓";
+        let advisorInt = 30; // 智謀は30として計算します
+
+        if (gunshi) {
+            advisorFace = gunshi.faceIcon;
+            advisorName = gunshi.name;
+            advisorInt = gunshi.intelligence;
         }
 
         const pid = this.game.playerClanId;
@@ -120,8 +127,9 @@ Object.assign(WarManager.prototype, {
         const atkLeaderName = atkLeader ? atkLeader.name.split('|').join('') : "総大将";
 
         const getPerceivedSoldiers = (val) => {
-            let accuracy = 0.5 + (gunshi.intelligence / 95) * 0.49;
-            if (gunshi.intelligence >= 95) accuracy = 0.99;
+            // ★変更：軍師の智謀の代わりに小姓（または軍師）の智謀を使います
+            let accuracy = 0.5 + (advisorInt / 95) * 0.49;
+            if (advisorInt >= 95) accuracy = 0.99;
             const maxError = 1.0 - accuracy;
             let perceived = Math.floor(val * (1.0 + (Math.random() * 2 - 1.0) * maxError));
             return Math.max(100, Math.round(perceived / 100) * 100);
@@ -163,10 +171,17 @@ Object.assign(WarManager.prototype, {
         const enemyVal = getPerceivedSoldiers(enemySoldiers);
 
         const helperBushos = this.game.getCastleBushos(helperCastle.id).filter(b => b.status === 'active' && b.clan === pid);
-        let bestBushoName = "不明";
+        let helperMsg = "誰も在城しておりません。";
         if (helperBushos.length > 0) {
             helperBushos.sort((a,b) => (b.leadership + b.strength) - (a.leadership + a.strength));
-            bestBushoName = helperBushos[0].name.split('|').join('');
+            const bestBusho = helperBushos[0];
+            // ★変更：一番強い武将が大名なら特別なメッセージに変えます
+            if (bestBusho.isDaimyo) {
+                helperMsg = `殿自ら出陣なされるとあらば、お味方の戦意も高まることでしょう。`;
+            } else {
+                const bestBushoName = bestBusho.name.split('|').join('');
+                helperMsg = `${bestBushoName}殿が在城しております。`;
+            }
         }
 
         const msgs = [];
@@ -189,7 +204,7 @@ Object.assign(WarManager.prototype, {
         
         const allyName = isAttack ? "お味方" : defCastle.name;
         msgs.push(`「${allyName}の兵力はおよそ${allyVal}。敵方はおよそ${enemyVal}。${enemyReinfMsg}」`);
-        msgs.push(`「${helperCastle.name}の兵力は${helperCastle.soldiers}。${bestBushoName}殿が在城しております。」`);
+        msgs.push(`「${helperCastle.name}の兵力は${helperCastle.soldiers}。${helperMsg}」`);
 
         let idx = 0;
         const showNext = () => {
@@ -197,9 +212,10 @@ Object.assign(WarManager.prototype, {
                 onComplete();
                 return;
             }
+            // ★変更：軍師または小姓の顔と名前でメッセージを出します
             this.game.ui.showDialog(msgs[idx], false, showNext, null, {
-                leftFace: gunshi.faceIcon,
-                leftName: gunshi.name
+                leftFace: advisorFace,
+                leftName: advisorName
             });
             idx++;
         };
@@ -235,8 +251,7 @@ Object.assign(WarManager.prototype, {
                     const choices = [
                         { label: '派遣する', className: 'btn-primary', onClick: onAccept }
                     ];
-                    // ★軍師がいて、拠点の情報がそろっている場合は戦況ボタンを追加
-                    if (gunshi && atkCastle && defCastle && helperCastle) {
+                    if (atkCastle && defCastle && helperCastle) {
                         choices.push({
                             label: '戦況', className: 'btn-secondary', onClick: () => {
                                 game.warManager.showSituationReport(isAttack, atkCastle, atkBushos, defCastle, helperCastle, showDialogFunc);
@@ -627,17 +642,14 @@ Object.assign(WarManager.prototype, {
                 
                 let resolveConfirmed = null;
                 const showReq = () => {
-                    const gunshi = this.game.getClanGunshi(pid);
                     const choices = [
                         { label: '送る', className: 'btn-primary', onClick: () => resolveConfirmed(true) }
                     ];
-                    if (gunshi) {
-                        choices.push({
-                            label: '戦況', className: 'btn-secondary', onClick: () => {
-                                this.showSituationReport(true, atkCastle, atkBushos, defCastle, selfReinforcementData.castle, showReq);
-                            }
-                        });
-                    }
+                    choices.push({
+                        label: '戦況', className: 'btn-secondary', onClick: () => {
+                            this.showSituationReport(true, atkCastle, atkBushos, defCastle, selfReinforcementData.castle, showReq);
+                        }
+                    });
                     choices.push({ label: '送らない', className: 'btn-danger', onClick: () => resolveConfirmed(false) });
                     
                     this.game.ui.showDialog(`${requesterName}が${targetInfoStr}${reinfCastleName}に救援を求めています。\n援軍を送りますか？`, false, null, null, { choices: choices });
@@ -2904,17 +2916,14 @@ Object.assign(WarManager.prototype, {
                 };
                 
                 const showReq = () => {
-                    const gunshi = this.game.getClanGunshi(pid);
                     const choices = [
                         { label: '送る', className: 'btn-primary', onClick: () => promptBusho() }
                     ];
-                    if (gunshi) {
-                        choices.push({
-                            label: '戦況', className: 'btn-secondary', onClick: () => {
-                                this.showSituationReport(false, this.state.sourceCastle, this.state.atkBushos, defCastle, bestCastle, showReq);
-                            }
-                        });
-                    }
+                    choices.push({
+                        label: '戦況', className: 'btn-secondary', onClick: () => {
+                            this.showSituationReport(false, this.state.sourceCastle, this.state.atkBushos, defCastle, bestCastle, showReq);
+                        }
+                    });
                     choices.push({ label: '送らない', className: 'btn-danger', onClick: () => onComplete(null) });
 
                     this.game.ui.showDialog(`${requesterName}が${bestCastle.name}に救援を求めています。\n援軍を送りますか？`, false, null, null, { choices: choices });
