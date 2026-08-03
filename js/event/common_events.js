@@ -1118,7 +1118,7 @@ window.GameEvents.push({
                 // ★追加：スキルマネージャーに「スキルによる災害被害の倍率」を聞いて計算します
                 if (typeof SkillManager !== 'undefined') {
                     popDropRate *= SkillManager.calcDisasterDamageModifier(c, game);
-                }
+                }		
                 
                 c.population = Math.max(0, Math.floor(c.population * (1.0 - popDropRate)));
                 
@@ -1155,7 +1155,7 @@ window.GameEvents.push({
             let logMessages = [];
             
             // まずは自分の領地（お城のリスト）を集めます
-            const myCastles = game.castles.filter(c => c.ownerClan === clan.id);
+            const myCastles = game.getClanCastles(clan.id);
             if (myCastles.length === 0) return; // 城がなければスキップします
             
             // 他の大名家との関係を調べます
@@ -1225,8 +1225,8 @@ window.GameEvents.push({
             if (!currentCastle || currentCastle.ownerClan === 0) continue; 
             
             const clanId = currentCastle.ownerClan;
+            const daimyo = game.getClanDaimyo(clanId);
             const clanBushos = game.bushos.filter(b => b.clan === clanId && b.status !== 'dead');
-            const daimyo = clanBushos.find(b => b.isDaimyo);
             
             // 何らかの理由でその大名家に大名がいなければスキップします
             if (!daimyo) continue;
@@ -1293,7 +1293,7 @@ window.GameEvents.push({
                         game.affiliationSystem.joinClan(ronin, clanId, currentCastle.id);
                         
                         // ここから追加した部分です。勢力（大名家）の名前を調べて、メッセージ画面を出します。
-                        const clanData = game.clans.find(c => c.id === clanId);
+                        const clanData = game.getClan(clanId);
                         const clanName = clanData ? clanData.name : "当家";
                         if (game.ui && game.ui.showDialogAsync) {
                             await game.ui.showDialogAsync(`「ははっ！　これから${clanName}のために身命を賭して働きまする！」`, false, 0, {
@@ -1340,10 +1340,10 @@ window.GameEvents.push({
     
     execute: async function(game) {
         if (!game.ui) return;
-
+        
         const playerClanId = game.playerClanId;
-        const playerClan = game.clans.find(c => c.id === playerClanId);
-        const playerDaimyo = game.bushos.find(b => b.clan === playerClanId && b.isDaimyo);
+        const playerClan = game.getClan(playerClanId);
+        const playerDaimyo = game.getClanDaimyo(playerClanId);
         
         // 今月すでに吸収された勢力の出席番号をメモしておく箱です（二重処理を防ぎます）
         const absorbedClans = new Set();
@@ -1365,7 +1365,7 @@ window.GameEvents.push({
             }
 
             // 2. 吸収される側のお城をすべて吸収する大名家にプレゼントして、直轄（0）にします
-            const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(subordinateClanId));
+            const myCastles = game.getClanCastles(subordinateClanId);
             myCastles.forEach(c => {
                 if (game.castleManager && game.castleManager.changeOwner) {
                     game.castleManager.changeOwner(c, dominantClanId, true, 0);
@@ -1397,7 +1397,7 @@ window.GameEvents.push({
             // 空き城データやプレイヤー自身の勢力、今月すでに吸収された勢力は飛ばします
             if (clan.id === 0 || clan.id === playerClanId || absorbedClans.has(clan.id)) continue;
 
-            const aiDaimyo = game.bushos.find(b => b.clan === clan.id && b.isDaimyo);
+            const aiDaimyo = game.getClanDaimyo(clan.id);
             if (!aiDaimyo) continue;
 
             // 自分が従属している相手（ターゲット）を書き出すためのリストです
@@ -1414,9 +1414,9 @@ window.GameEvents.push({
                     if (diplomacyData && diplomacyData.status === '従属') {
                         // プレイヤーへの臣従は月に1回までの制限があります
                         if (targetId === playerClanId && playerOffered) return;
-
-                        const targetClan = game.clans.find(c => c.id === targetId);
-                        const targetDaimyo = game.bushos.find(b => b.clan === targetId && b.isDaimyo);
+                        
+                        const targetClan = game.getClan(targetId);
+                        const targetDaimyo = game.getClanDaimyo(targetId);
                         if (!targetClan || !targetDaimyo) return;
 
                         // 従属・支配期間のカウントが24未満なら飛ばします
@@ -1460,8 +1460,8 @@ window.GameEvents.push({
 
                 targets.sort((a, b) => {
                     // その国の中にある相手のお城の数をそれぞれ数えます
-                    const aCount = game.castles.filter(c => c.ownerClan === a.id && c.provinceId === myProvinceId).length;
-                    const bCount = game.castles.filter(c => c.ownerClan === b.id && c.provinceId === myProvinceId).length;
+                    const aCount = game.getClanCastles(a.id).filter(c => c.provinceId === myProvinceId).length;
+                    const bCount = game.getClanCastles(b.id).filter(c => c.provinceId === myProvinceId).length;
                     
                     if (aCount !== bCount) {
                         return bCount - aCount; // お城の数が多い方が優先して一番上に来ます
@@ -1514,7 +1514,10 @@ window.GameEvents.push({
 
                 // 小姓役のナビゲーターを取得します
                 let myCastle = game.getCastle(playerDaimyo.castleId);
-                if (!myCastle) myCastle = game.castles.find(c => c.ownerClan === playerClanId);
+                if (!myCastle) {
+                    const myClanCastles = game.getClanCastles(playerClanId);
+                    myCastle = myClanCastles.length > 0 ? myClanCastles[0] : null;
+                }
                 const nav = myCastle ? game.getNavigatorInfo(myCastle) : { faceIcon: 'unknown_face.webp', name: '小姓' };
 
                 let introMsg = "";

@@ -53,8 +53,8 @@ window.EventCheck = {
     
     // ⑥ ★「勢力同士の領地が隣接しているか」確認します
     areClansAdjacent: function(game, clanIdA, clanIdB) {
-        const castlesA = game.castles.filter(c => c.ownerClan === clanIdA);
-        const castlesB = game.castles.filter(c => c.ownerClan === clanIdB);
+        const castlesA = game.getClanCastles(clanIdA);
+        const castlesB = game.getClanCastles(clanIdB);
         
         // どちらかが城を持っていなければ隣接していません
         if (castlesA.length === 0 || castlesB.length === 0) return false;
@@ -431,9 +431,9 @@ window.GameEvents.push({
         const yoshimoto = game.getBusho(1004009);
         const imagawaClanId = yoshimoto.clan;
         const nobunaga = game.getBusho(1006006);
-
-        const imagawaClan = game.clans.find(c => c.id === imagawaClanId);
-        const odaClan = game.clans.find(c => c.id === nobunaga.clan);
+        
+        const imagawaClan = game.getClan(imagawaClanId);
+        const odaClan = game.getClan(nobunaga.clan);
 
         // --- 1. 武将の配役決定（オーディション） ---
         // 織田家にいる武将（信長以外）を全員集めます
@@ -668,7 +668,7 @@ window.GameEvents.push({
             let totalLostSoldiers = 0; // 減った兵士の合計を入れる箱です
             let totalLostPopulation = 0; // 減った人口の合計を入れる箱です
 
-            const imagawaCastles = game.castles.filter(c => c.ownerClan === imagawaClanId);
+            const imagawaCastles = game.getClanCastles(imagawaClanId);
             imagawaCastles.forEach(c => {
                 // 減らす前の「元の数」を覚えておきます
                 const oldSoldiers = c.soldiers || 0;
@@ -700,7 +700,7 @@ window.GameEvents.push({
                     b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
                 });
 
-                const odaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
+                const odaCastles = game.getClanCastles(nobunaga.clan);
                 
                 // 織田家のお城の数で割り算をして、「１つのお城に均等に配る数」を計算します
                 let soldiersPerCastle = 0;
@@ -749,12 +749,12 @@ window.GameEvents.push({
                 }
 
                 // 今川家が現在持っているお城をすべて調べます
-                const imagawaCastles = game.castles.filter(c => c.ownerClan === imagawaClanId);
+                const imagawaCastles = game.getClanCastles(imagawaClanId);
                 const myCastleCount = imagawaCastles.length;
                 
                 // 織田家のお城の数（初期の目標数）を数えておきます
                 const odaClanId = nobunaga.clan;
-                const odaCastleCount = game.castles.filter(c => c.ownerClan === odaClanId).length;
+                const odaCastleCount = game.getClanCastles(odaClanId).length;
 
                 // 今川家のお城のデータから、現在存在している軍団の番号（0の直轄や1～8の軍団）を重複なく集めます
                 const legionIds = [...new Set(imagawaCastles.map(c => Number(c.legionId || 0)))];

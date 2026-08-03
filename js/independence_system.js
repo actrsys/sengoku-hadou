@@ -18,7 +18,7 @@ class IndependenceSystem {
             const castellan = this.game.getBusho(c.castellanId);
             if (!castellan || castellan.isDaimyo) return false; 
             if (castellan.belongKunishuId > 0) return false;
-            const clanCastles = this.game.castles.filter(cl => cl.ownerClan === c.ownerClan);
+            const clanCastles = this.game.getClanCastles(c.ownerClan);
             if (clanCastles.length <= 1) return false;
             return true;
         });
@@ -30,7 +30,7 @@ class IndependenceSystem {
 
         for (const castle of potentialRebels) {
             const castellan = this.game.getBusho(castle.castellanId);
-            const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
+            const daimyo = this.game.getClanDaimyo(castle.ownerClan);
             if (!castellan || !daimyo) continue;
             if (daimyo.factionId !== 0 && castellan.factionId === daimyo.factionId) continue; 
 
@@ -150,7 +150,7 @@ class IndependenceSystem {
         // ★追加：もし強制的な寝返り先（forceTargetClanId）が指定されていたら、無条件でそこに決めます！
         if (forceTargetClanId) {
             targetClanId = forceTargetClanId;
-            targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+            targetDaimyo = this.game.getClanDaimyo(targetClanId);
         }
         // ★追加：独立志向(indep)でなければ、寝返り先を探します
         else if (intention !== 'indep') {
@@ -186,7 +186,7 @@ class IndependenceSystem {
                 // もし元の主家と隣接する城が1つもなかったら、この大名家は遠すぎるので無視（スキップ）します
                 if (!isNear) continue;
                 
-                const enemyDaimyo = this.game.bushos.find(b => b.clan === clan.id && b.isDaimyo);
+                const enemyDaimyo = this.game.getClanDaimyo(clan.id);
                 if (!enemyDaimyo) continue;
 
                 // ★今回追加：自拠点（起点となるお城）と直接隣接しているかどうかも調べます！
@@ -257,7 +257,7 @@ class IndependenceSystem {
         if (targetClanId) {
             isDefection = true;
             newClanId = targetClanId;
-            const targetClan = this.game.clans.find(c => c.id === targetClanId);
+            const targetClan = this.game.getClan(targetClanId);
             newClanName = targetClan ? targetClan.name : "敵対大名";
 
             // ★追加：大名家が変わるので功績半分！
@@ -289,7 +289,7 @@ class IndependenceSystem {
                 id: newClanId, name: newClanName, yomi: newClanYomi, color: newColor, leaderId: rebellionLeader.id
             });
 
-            const oldClanForDip = this.game.clans.find(c => c.id === oldClanId);
+            const oldClanForDip = this.game.getClan(oldClanId);
             if (oldClanForDip) {
                 this.game.clans.forEach(otherClan => {
                     if (otherClan.id === 0 || otherClan.id === oldClanId) return;
@@ -354,7 +354,7 @@ class IndependenceSystem {
             }
             this.game.castleManager.changeOwner(castle, newClanId);
 
-            const oldClan = this.game.clans.find(c => c.id === oldClanId);
+            const oldClan = this.game.getClan(oldClanId);
             if (oldClan) oldClan.diplomacyValue[newClanId] = { status: '敵対', sentiment: 0 };
             newClan.diplomacyValue[oldClanId] = { status: '敵対', sentiment: 0 };
         }
@@ -393,7 +393,7 @@ class IndependenceSystem {
         }
 
         // ★先に独立・寝返りのメインメッセージを作り、ログに出力します
-        const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
+        const oldClanName = this.game.getClan(oldClanId)?.name || "不明";
         let msg = "";
         
         const castellanNameStr = castellan.name.replace(/\|/g, '');
@@ -513,7 +513,7 @@ class IndependenceSystem {
         // お城の元の色と、新しい色を調べます
         let oldColor = { r: 255, g: 255, b: 255 };
         let newColorRgb = { r: 255, g: 255, b: 255 };
-        const oldClanData = this.game.clans.find(c => c.id === oldClanId);
+        const oldClanData = this.game.getClan(oldClanId);
         if (oldClanData && oldClanData.color && typeof DataManager !== 'undefined') oldColor = DataManager.hexToRgb(oldClanData.color);
         const newClanDataObj = this.game.clans.find(c => c.id === newClanId);
         if (newClanDataObj && newClanDataObj.color && typeof DataManager !== 'undefined') newColorRgb = DataManager.hexToRgb(newClanDataObj.color);
@@ -559,7 +559,7 @@ class IndependenceSystem {
         // ★追加：自分の担当大名家から独立が起きて新大名家が誕生した場合に、どちらを担当するか選べる魔法！
         if (oldClanId === this.game.playerClanId && !isDefection) {
             // 現在の旧勢力の大名（討死して代替わりしている可能性も考慮）を探します
-            const currentOldDaimyo = this.game.bushos.find(b => b.clan === oldClanId && b.isDaimyo);
+            const currentOldDaimyo = this.game.getClanDaimyo(oldClanId);
             if (currentOldDaimyo && rebellionLeader) {
                 // 名前から「|」を取り除いて綺麗な表示にします
                 const oldLeaderName = currentOldDaimyo.name.replace('|', '');
@@ -801,7 +801,7 @@ class IndependenceSystem {
      */
     calcClanPower(clanId) {
         let pop = 0, sol = 0, koku = 0, gold = 0, rice = 0;
-        const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        const clanCastles = this.game.getClanCastles(clanId);
         clanCastles.forEach(c => { 
             pop += c.population; sol += c.soldiers; koku += c.kokudaka; gold += c.gold; rice += c.rice; 
         });
@@ -1021,7 +1021,7 @@ class IndependenceSystem {
             const totalDead = warResult.deadAttacker + warResult.deadDefender;
             if (totalDead > 0) {
                 // 旧勢力（oldClanId）が持っている全てのお城を集めます
-                const clanCastles = this.game.castles.filter(c => c.ownerClan === oldClanId);
+                const clanCastles = this.game.getClanCastles(oldClanId);
                 const totalClanSoldiers = clanCastles.reduce((sum, c) => sum + c.soldiers, 0);
                 
                 if (totalClanSoldiers > 0) {
@@ -1049,7 +1049,7 @@ class IndependenceSystem {
 
                 // ★ここから追加：逃亡先の城を探す魔法です
                 let escapeCastleId = castle.id; // 万が一見つからなかった時のために、今の城を覚えておきます
-                const oldClanData = this.game.clans.find(c => c.id === oldClanId);
+                const oldClanData = this.game.getClan(oldClanId);
                 
                 if (oldClanData) {
                     let candidateClans = [];
@@ -1071,7 +1071,7 @@ class IndependenceSystem {
                     let targetCastles = [];
                     // 仲が良い大名家から順番に、城を持っているか調べます
                     for (const cClan of candidateClans) {
-                        const cList = this.game.castles.filter(c => c.ownerClan === cClan.id);
+                        const cList = this.game.getClanCastles(cClan.id);
                         if (cList.length > 0) {
                             targetCastles = cList; // 城が見つかったら、それをターゲットにします
                             break; 
@@ -1619,8 +1619,8 @@ class IndependenceSystem {
      */
     async askPlayerForDefection(rebellionLeader, oldClanId) {
         return new Promise((resolve) => {
-            const playerClan = this.game.clans.find(c => c.id === this.game.playerClanId);
-            const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+            const playerClan = this.game.getClan(this.game.playerClanId);
+            const myDaimyo = this.game.getClanDaimyo(this.game.playerClanId);
             
             // 案内役の取得 (小姓など)
             let myCastle = null;
@@ -1628,7 +1628,7 @@ class IndependenceSystem {
             if (!myCastle) myCastle = this.game.castles.find(c => c.ownerClan === this.game.playerClanId);
             const nav = myCastle ? this.game.getNavigatorInfo(myCastle) : { faceIcon: 'unknown_face.webp', name: '小姓' };
 
-            const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
+            const oldClanName = this.game.getClan(oldClanId)?.name || "不明";
             const traitorNameStr = rebellionLeader.name.replace(/\|/g, '');
             const myDaimyoNameStr = myDaimyo ? myDaimyo.name.replace(/\|/g, '') : '当主';
 

@@ -21,9 +21,9 @@ class FactionSystem {
         const F = window.WarParams.Faction || {};
         const baseFactor = F.AffinityFactorBase || 0.5;
         const divisor = F.AffinityDivisor || 25;
-
+        
         // 大名との相性による補正
-        const daimyo = this.game.bushos.find(b => b.clan === busho.clan && b.isDaimyo);
+        const daimyo = this.game.getClanDaimyo(busho.clan);
         let factor = 1.0;
         
         if (daimyo) {
@@ -112,7 +112,7 @@ class FactionSystem {
             
             // ★ここから書き足し：大名と一門なら下野しにくくする魔法！
             // まずは自分の仕えている大名（殿様）を探します
-            const daimyo = this.game.bushos.find(db => db.clan === b.clan && db.isDaimyo);
+            const daimyo = this.game.getClanDaimyo(b.clan);
             if (daimyo) {
                 // 自分と大名の家族ID(familyIds)に共通のものがあるか調べます
                 const isFamily = b.familyIds.some(id => daimyo.familyIds.includes(id));
@@ -132,7 +132,7 @@ class FactionSystem {
     }
 
     async executeRonin(busho) { // ★ async を追加します！
-        const clan = this.game.clans.find(c => c.id === busho.clan);
+        const clan = this.game.getClan(busho.clan);
         const clanName = clan ? clan.name : "当家";
         
         // ★新しいお引越しセンターの魔法を使います！
@@ -552,7 +552,7 @@ class FactionSystem {
             let daimyoInt = daimyo ? daimyo.intelligence : 50;
 
             if (Math.random() * 100 < daimyoInt) { 
-                const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId); 
+                const clanCastles = this.game.getClanCastles(clanId); 
                 clanCastles.forEach(castle => { 
                     const currentCastellan = this.game.getBusho(castle.castellanId);
                     if (currentCastellan && currentCastellan.isDaimyo) return;

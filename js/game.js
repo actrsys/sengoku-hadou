@@ -1267,15 +1267,15 @@ class GameSystem {
 
     // ★追加：特定の勢力との交易収入を計算します
     static calcTradeIncomeWithTarget(clanId, targetClanId, game) {
-        const clan = game.clans.find(c => c.id === clanId);
-        const targetClan = game.clans.find(c => c.id === targetClanId);
+        const clan = game.getClan(clanId);
+        const targetClan = game.getClan(targetClanId);
         if (!clan || !targetClan) return 0;
         
         const rel = game.getRelation(clanId, targetClanId);
         if (!rel || !['友好', '同盟', '支配', '従属'].includes(rel.status)) return 0;
         
-        const myCastles = game.castles.filter(c => c.ownerClan === clanId);
-        const targetCastles = game.castles.filter(c => c.ownerClan === targetClanId);
+        const myCastles = game.getClanCastles(clanId);
+        const targetCastles = game.getClanCastles(targetClanId);
         if (myCastles.length === 0 || targetCastles.length === 0) return 0;
         
         let targetIncome = 0;
@@ -1704,7 +1704,7 @@ class GameManager {
     getCastleBushos(cid) { const c = this.getCastle(cid); return c ? c.samuraiIds.map(id => this.getBusho(id)).filter(b => b && b.status !== 'unborn' && b.status !== 'dead') : []; }
     getCurrentTurnCastle() { return this.turnQueue[this.currentIndex]; }
     getCurrentTurnId() { return this.year * 12 + this.month; }
-    getClanTotalSoldiers(clanId) { return this.castles.filter(c => Number(c.ownerClan) === Number(clanId)).reduce((sum, c) => sum + c.soldiers, 0); }
+    getClanTotalSoldiers(clanId) { return this.getClanCastles(clanId).reduce((sum, c) => sum + c.soldiers, 0); }
     getClanGunshi(clanId) { return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi && b.status === 'active'); }
 
     getNavigatorInfo(castle) {
@@ -1712,7 +1712,7 @@ class GameManager {
         let name = '小姓';
         
         const ownerClanId = castle.ownerClan;
-        const daimyo = this.bushos.find(b => b.clan === ownerClanId && b.isDaimyo);
+        const daimyo = this.getClanDaimyo(ownerClanId);
         
         if (daimyo && Number(daimyo.castleId) === Number(castle.id)) {
             let hasSpecialPrincess = false;
@@ -1744,11 +1744,11 @@ class GameManager {
     
     // ==========================================
     // ★全ての大名の「威信（daimyoPrestige）」を計算して箱に入れる魔法です
-    updateAllClanPrestige() {
+    updateAllClanPrestige() {// 差し替え前
         this.clans.forEach(clan => {
             // 空き家（中立）に加えて、滅亡した勢力も計算を飛ばすようにします
             if (clan.id === 0 || clan.isDestroyed) return;
-            const castles = this.castles.filter(c => c.ownerClan === clan.id);
+            const castles = this.getClanCastles(clan.id);
             let pop = 0, sol = 0, koku = 0, gold = 0, rice = 0;
             
             // ★追加：収入の計算もここで一括で行います！
@@ -2306,7 +2306,7 @@ class GameManager {
 
                 // ★追加：城の所有数によるブレーキです！
                 // まず、このお城の持ち主が、全部でいくつお城を持っているか数えます
-                const ownedCastlesCount = this.castles.filter(castle => castle.ownerClan === c.ownerClan).length;
+                const ownedCastlesCount = this.getClanCastles(c.ownerClan).length;
                 // 城の所有数を25で割り、1を足してペナルティ値とします（最低でも1なので安全です）
                 const castlePenalty = 1 + (ownedCastlesCount / 25);
                 
@@ -2786,7 +2786,7 @@ class GameManager {
         if(newLeader) { 
             newLeader.isDaimyo = true; 
             newLeader.loyalty = 100; // ★新しく大名になったら、忠誠度を100にします！
-            this.clans.find(c => c.id === clanId).leaderId = newLeaderId; 
+            this.getClan(clanId).leaderId = newLeaderId; 
             
             // ★追加：新しい大名が住んでいるお城を直轄（軍団ID: 0）に戻します
             const daimyoCastle = this.getCastle(newLeader.castleId);

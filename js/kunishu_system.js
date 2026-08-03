@@ -198,7 +198,7 @@ class KunishuSystem {
                     // 友好度が70以上（献上してくれるライン）の場合のみ
                     if (rel && rel.sentiment >= 70) {
                         // その大名のいる「居城」を探して、そこにお届け物をします
-                        const daimyo = this.game.bushos.find(b => b.clan === clanIdNum && b.isDaimyo);
+                        const daimyo = this.game.getClanDaimyo(clanIdNum);
                         if (daimyo && daimyo.castleId) {
                             const targetCastle = this.game.getCastle(daimyo.castleId);
                             // お城が見つかって、毎月10%の確率に当たったらアクション！
@@ -259,7 +259,7 @@ class KunishuSystem {
         if (!castellan) return;
 
         const leader = this.game.getBusho(kunishu.leaderId);
-        const clanData = this.game.clans.find(c => c.id === clanId);
+        const clanData = this.game.getClan(clanId);
         if (!leader || !clanData) return;
 
         // 諸勢力の名前と、大名家の名前を準備します！
@@ -579,7 +579,7 @@ class KunishuSystem {
                             kunishu.isDestroyed = true;
                             kunishu.soldiers = 0;
 
-                            const clanData = this.game.clans.find(c => c.id === targetClanId);
+                            const clanData = this.game.getClan(targetClanId);
                             const clanName = clanData ? clanData.name : "";
                             
                             let targetStr = clanName + "に";
@@ -784,10 +784,10 @@ class KunishuSystem {
         const castle = this.game.getCastle(castleId);
         
         if (!kunishu) return;
-
-        const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
+        
+        const myClan = this.game.getClan(this.game.playerClanId);
         const myPrestige = myClan ? myClan.daimyoPrestige : 0;
-        const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const myDaimyo = this.game.getClanDaimyo(this.game.playerClanId);
         const leader = this.game.getBusho(kunishu.leaderId);
 
         let baseProb = 0;
