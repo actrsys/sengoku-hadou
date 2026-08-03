@@ -1649,11 +1649,28 @@ class GameManager {
     init() { this.startMonth(); }
     getBusho(id) { 
         if (!id || Number(id) === 0) return undefined;
-        return this.bushos.find(b => Number(b.id) === Number(id)); 
+        // ★高速化：毎回全員を先頭から探す(find)代わりに、ID→武将の「索引（Map）」を作って一瞬で見つけます！
+        // （セーブ読込などで配列そのものが入れ替わった時も自動で作り直されるよう、参照と件数の両方をチェックします）
+        if (this._bushoMapSource !== this.bushos || this._bushoMapSize !== this.bushos.length) {
+            this._bushoMap = new Map();
+            this.bushos.forEach(b => this._bushoMap.set(Number(b.id), b));
+            this._bushoMapSource = this.bushos;
+            this._bushoMapSize = this.bushos.length;
+        }
+        return this._bushoMap.get(Number(id));
     }
-    getCastle(id) { return this.castles.find(c => Number(c.id) === Number(id)); }
+    getCastle(id) {
+        // ★高速化：お城も同じように索引（Map）を使って一瞬で見つけます！
+        if (this._castleMapSource !== this.castles || this._castleMapSize !== this.castles.length) {
+            this._castleMap = new Map();
+            this.castles.forEach(c => this._castleMap.set(Number(c.id), c));
+            this._castleMapSource = this.castles;
+            this._castleMapSize = this.castles.length;
+        }
+        return this._castleMap.get(Number(id));
+    }
     // ★ 修正：まだ生まれていない人（unborn）や亡くなった人（dead）は無視するようにします
-    getCastleBushos(cid) { const c = this.castles.find(c => Number(c.id) === Number(cid)); return c ? c.samuraiIds.map(id => this.getBusho(id)).filter(b => b && b.status !== 'unborn' && b.status !== 'dead') : []; }
+    getCastleBushos(cid) { const c = this.getCastle(cid); return c ? c.samuraiIds.map(id => this.getBusho(id)).filter(b => b && b.status !== 'unborn' && b.status !== 'dead') : []; }
     getCurrentTurnCastle() { return this.turnQueue[this.currentIndex]; }
     getCurrentTurnId() { return this.year * 12 + this.month; }
     getClanTotalSoldiers(clanId) { return this.castles.filter(c => Number(c.ownerClan) === Number(clanId)).reduce((sum, c) => sum + c.soldiers, 0); }
@@ -1921,7 +1938,7 @@ class GameManager {
 
         this.clans.forEach(clan => {
             if (clan.id !== 0 && !clan.isDestroyed) {
-                const daimyo = this.bushos.find(b => b.clan === clan.id && b.isDaimyo);
+                const daimyo = this.getBusho(clan.leaderId); // ★高速化：全武将から探す代わりに、勢力が覚えているIDで一瞬で見つけます
                 if (daimyo && daimyo.factionId > 0) {
                     this.bushos.forEach(b => {
                         if (b.clan === clan.id && b.status === 'active' && b.factionId === daimyo.factionId) {
@@ -2085,6 +2102,15 @@ class GameManager {
         
         if (this.month % 3 === 0) this.factionSystem.optimizeCastellans();
         
+        // ★高速化：この先のループで城の数だけ「全武将リスト」を探し直すのを防ぐため、先に「勢力ID→大名」の索引を1回だけ作ります！
+        const daimyoByClanIdForGrowth = new Map();
+        this.clans.forEach(clan => {
+            if (clan.id !== 0 && !clan.isDestroyed) {
+                const d = this.getBusho(clan.leaderId);
+                if (d) daimyoByClanIdForGrowth.set(clan.id, d);
+            }
+        });
+
         this.castles.forEach(c => {
             if (c.ownerClan === 0) return;
             c.isDone = false;
@@ -2226,7 +2252,7 @@ class GameManager {
 
             // ★追加：毎月の兵士の自然増加計算
             // まず、このお城の持ち主である大名様を探し出します
-            const daimyoBusho = this.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
+            const daimyoBusho = daimyoByClanIdForGrowth.get(c.ownerClan);
             if (daimyoBusho) {
                 // 1. 大名補正の計算
                 // まずは能力値の平均を出して、0.0〜1.0の割合にします（能力補正）
@@ -2308,11 +2334,20 @@ class GameManager {
         }
 
         // ★ここから新しく書き足し！：収入やイベントが全部終わった「後」に、金や兵糧を消費します！
+        // ★高速化：ここでも城の数だけ「全武将リスト」を探し直すのを防ぐため、先に索引を1回だけ作ります！
+        const daimyoByClanIdForUpkeep = new Map();
+        this.clans.forEach(clan => {
+            if (clan.id !== 0 && !clan.isDestroyed) {
+                const d = this.getBusho(clan.leaderId);
+                if (d) daimyoByClanIdForUpkeep.set(clan.id, d);
+            }
+        });
+
         this.castles.forEach(c => {
             if (c.ownerClan === 0) return;
 
             const bushos = this.getCastleBushos(c.id);
-            const daimyo = this.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
+            const daimyo = daimyoByClanIdForUpkeep.get(c.ownerClan);
             
             let consumeGold = 0;
             bushos.forEach(b => {
@@ -2387,7 +2422,7 @@ class GameManager {
                     // ★修正：滅亡フラグをチェックして、生き残っている勢力だけ会議をします
                     if (clan.id !== 0 && !clan.isDestroyed && clan.id !== this.playerClanId) {
                         // ★追加：国主を決める前に、まずは大名自身に最適な居城を探させてお引越しさせます！
-                        const daimyo = this.bushos.find(b => b.clan === clan.id && b.isDaimyo);
+                        const daimyo = this.getBusho(clan.leaderId); // ★高速化：索引を使って一瞬で見つけます
                         if (daimyo && daimyo.castleId) {
                             const daimyoCastle = this.getCastle(daimyo.castleId);
                             if (daimyoCastle) {
