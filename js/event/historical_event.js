@@ -687,11 +687,11 @@ window.GameEvents.push({
             const bonusSoldiers = Math.floor(totalLostSoldiers / 2);
             const bonusPopulation = Math.floor(totalLostPopulation / 2);
 
-            // ★義元死亡後、今川勢力に所属する松平系（1301000～1301999）以外の武将の忠誠度を15回復します※難易度調整とイベントの進行ための調整用
-            const imagawaRemainingBushos = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && !(b.id >= 1301000 && b.id <= 1301999));
-            imagawaRemainingBushos.forEach(b => {
-                b.loyalty = Math.min(100, (b.loyalty || 0) + 15);
-            });
+            // ★義元死亡後、今川勢力に所属する松平系（1301000～1301999）以外の武将の忠誠度を15回復します※難易度調整とイベントの進行ための調整用。今は一旦無効
+            // const imagawaRemainingBushos = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && !(b.id >= 1301000 && b.id <= 1301999));
+            // imagawaRemainingBushos.forEach(b => {
+            //     b.loyalty = Math.min(100, (b.loyalty || 0) + 15);
+            // });
 
             // 織田家に勝利のボーナス（忠誠と民忠アップ、そして今川から減った分の半分の兵士・人口）を与えます
             if (nobunaga && nobunaga.clan > 0) {
