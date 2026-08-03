@@ -98,9 +98,117 @@ Object.assign(WarManager.prototype, {
     },
 
     // ★追加：援軍のメッセージを一元管理する専門の窓口（係）です！
+    // ★追加：軍師による戦況報告の魔法
+    showSituationReport(isAttack, atkCastle, atkBushos, defCastle, helperCastle, onComplete) {
+        const gunshi = this.game.getClanGunshi(this.game.playerClanId);
+        if (!gunshi) {
+            onComplete();
+            return;
+        }
+
+        const pid = this.game.playerClanId;
+        
+        const atkClanId = atkCastle.isKunishu ? atkCastle.kunishuId : atkCastle.ownerClan;
+        const defClanId = defCastle.isKunishu ? defCastle.kunishuId : defCastle.ownerClan;
+        
+        const atkClanName = atkClanId === pid ? "我が軍" : (atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : (this.game.clans.find(c => c.id === atkClanId)?.name || "敵軍"));
+        const defClanName = defClanId === pid ? "我が軍" : (defCastle.isKunishu ? (defCastle.getName ? defCastle.getName(this.game) : defCastle.name) : (this.game.clans.find(c => c.id === defClanId)?.name || "敵軍"));
+        const defProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
+        const defProvName = defProv ? defProv.province : "不明な国";
+
+        const atkLeader = atkBushos && atkBushos.length > 0 ? atkBushos[0] : null;
+        const atkLeaderName = atkLeader ? atkLeader.name.split('|').join('') : "総大将";
+
+        const getPerceivedSoldiers = (val) => {
+            let accuracy = 0.5 + (gunshi.intelligence / 95) * 0.49;
+            if (gunshi.intelligence >= 95) accuracy = 0.99;
+            const maxError = 1.0 - accuracy;
+            let perceived = Math.floor(val * (1.0 + (Math.random() * 2 - 1.0) * maxError));
+            return Math.max(100, Math.round(perceived / 100) * 100);
+        };
+
+        let allySoldiers = 0;
+        let enemySoldiers = 0;
+        
+        if (isAttack) {
+            allySoldiers = this.state && this.state.attacker ? this.state.attacker.soldiers : atkCastle.soldiers; 
+            enemySoldiers = defCastle.soldiers;
+        } else {
+            allySoldiers = defCastle.soldiers;
+            enemySoldiers = this.state && this.state.attacker ? this.state.attacker.soldiers : atkCastle.soldiers; 
+        }
+
+        let enemyReinfMsg = "";
+        if (this.game.diplomacyManager) {
+            if (isAttack) {
+                const connected = defCastle.getConnectedCastles ? defCastle.getConnectedCastles(this.game) : [];
+                const candidates = this.game.diplomacyManager.findAvailableReinforcements(false, true, defCastle.id, defCastle, defClanId, atkClanId, connected);
+                if (candidates && candidates.length > 0) {
+                    const cand = candidates[0];
+                    const rClan = this.game.clans.find(c => c.id === cand.force.id);
+                    enemyReinfMsg = `また、${cand.castle.name}や${cand.force.isKunishu ? (cand.force.getName ? cand.force.getName(this.game) : cand.force.name) : (rClan ? rClan.name : "他勢力")}からの援軍が予想されます。`;
+                }
+            } else {
+                const connected = atkCastle.getConnectedCastles ? atkCastle.getConnectedCastles(this.game) : [];
+                const candidates = this.game.diplomacyManager.findAvailableReinforcements(false, false, atkCastle.id, atkCastle, atkClanId, defClanId, connected);
+                if (candidates && candidates.length > 0) {
+                    const cand = candidates[0];
+                    const rClan = this.game.clans.find(c => c.id === cand.force.id);
+                    enemyReinfMsg = `また、${cand.castle.name}や${cand.force.isKunishu ? (cand.force.getName ? cand.force.getName(this.game) : cand.force.name) : (rClan ? rClan.name : "他勢力")}からの援軍が予想されます。`;
+                }
+            }
+        }
+
+        const allyVal = getPerceivedSoldiers(allySoldiers);
+        const enemyVal = getPerceivedSoldiers(enemySoldiers);
+
+        const helperBushos = this.game.getCastleBushos(helperCastle.id).filter(b => b.status === 'active' && b.clan === pid);
+        let bestBushoName = "不明";
+        if (helperBushos.length > 0) {
+            helperBushos.sort((a,b) => (b.leadership + b.strength) - (a.leadership + a.strength));
+            bestBushoName = helperBushos[0].name.split('|').join('');
+        }
+
+        const msgs = [];
+        
+        if (isAttack) {
+            if (defCastle.isKunishu) {
+                msgs.push(`「${atkClanName}の${atkLeaderName}が、${defProvName}の国衆・${defClanName}への攻撃に際し、援軍を求めております」`);
+            } else {
+                msgs.push(`「${atkClanName}の${atkLeaderName}が、${defClanName}の${defCastle.name}への攻撃に際し、援軍を求めております」`);
+            }
+        } else {
+            if (atkCastle.isKunishu) {
+                const atkProv = this.game.provinces.find(p => p.id === atkCastle.provinceId);
+                const atkProvName = atkProv ? atkProv.province : "不明な国";
+                msgs.push(`「${atkProvName}の国衆・${atkClanName}が、${defClanName}の${defCastle.name}を攻撃するべく迫っております」`);
+            } else {
+                msgs.push(`「${atkClanName}の${atkLeaderName}が、${defClanName}の${defCastle.name}を攻撃するべく迫っております」`);
+            }
+        }
+        
+        msgs.push(`「お味方の兵力はおよそ${allyVal}。敵方はおよそ${enemyVal}。${enemyReinfMsg}」`);
+        msgs.push(`「${helperCastle.name}の兵力は${helperCastle.soldiers}。${bestBushoName}が在城しております。」`);
+
+        let idx = 0;
+        const showNext = () => {
+            if (idx >= msgs.length) {
+                onComplete();
+                return;
+            }
+            this.game.ui.showDialog(msgs[idx], false, showNext, null, {
+                leftFace: gunshi.faceIcon,
+                leftName: gunshi.name
+            });
+            idx++;
+        };
+        showNext();
+    },
+
+    // ★援軍のメッセージを一元管理する専門の窓口（係）です！
     reinfMsgHelper: {
         // 1. プレイヤーに援軍の要請が来た時のメッセージ
-        showRequest: (game, myClanName, targetInfoStr, gold, isBoss, isAttack, onAccept, onDecline) => {
+        showRequest: (game, myClanName, targetInfoStr, gold, isBoss, isAttack, onAccept, onDecline, atkCastle, atkBushos, defCastle, helperCastle) => {
             const typeStr = isAttack ? "攻撃の" : "守備側の";
             
             // ★追加: 大名が表裏比興を持っているか確認します
@@ -109,19 +217,37 @@ Object.assign(WarManager.prototype, {
                 canDeclineBoss = SkillManager.canDeclineBossReinforcement(game.playerClanId, game);
             }
 
-            if (isBoss && !canDeclineBoss) {
-                const bossMsg = isAttack 
-                    ? `主家である ${myClanName} が\n${targetInfoStr}侵攻します。\n当家は従属しているため直ちに出陣します！`
-                    : `主家である ${myClanName} から${typeStr}援軍要請が届きました。\n当家は従属しているため直ちに出陣します！`;
-                game.ui.showDialog(bossMsg, false, onAccept);
-            } else {
-                let dialogMsg = `${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。(持参金: ${gold})\n援軍を派遣しますか？`;
-                // スキルを持っている場合は専用のメッセージになります
-                if (isBoss && canDeclineBoss) {
-                    dialogMsg = `主家である ${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。\n「表裏比興」の才をもって、これを断ることも可能です。派遣しますか？`;
+            const showDialogFunc = () => {
+                const gunshi = game.getClanGunshi(game.playerClanId);
+                if (isBoss && !canDeclineBoss) {
+                    const bossMsg = isAttack 
+                        ? `主家である ${myClanName} が\n${targetInfoStr}侵攻します。\n当家は従属しているため直ちに出陣します！`
+                        : `主家である ${myClanName} から${typeStr}援軍要請が届きました。\n当家は従属しているため直ちに出陣します！`;
+                    game.ui.showDialog(bossMsg, false, onAccept);
+                } else {
+                    let dialogMsg = `${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。(持参金: ${gold})\n援軍を派遣しますか？`;
+                    // スキルを持っている場合は専用のメッセージになります
+                    if (isBoss && canDeclineBoss) {
+                        dialogMsg = `主家である ${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。\n「表裏比興」の才をもって、これを断ることも可能です。派遣しますか？`;
+                    }
+                    
+                    const choices = [
+                        { label: '派遣する', className: 'btn-primary', onClick: onAccept }
+                    ];
+                    // ★軍師がいて、拠点の情報がそろっている場合は戦況ボタンを追加
+                    if (gunshi && atkCastle && defCastle && helperCastle) {
+                        choices.push({
+                            label: '戦況', className: 'btn-secondary', onClick: () => {
+                                game.warManager.showSituationReport(isAttack, atkCastle, atkBushos, defCastle, helperCastle, showDialogFunc);
+                            }
+                        });
+                    }
+                    choices.push({ label: '断る', className: 'btn-danger', onClick: onDecline });
+
+                    game.ui.showDialog(dialogMsg, false, null, null, { choices: choices });
                 }
-                game.ui.showDialog(dialogMsg, true, onAccept, onDecline);
-            }
+            };
+            showDialogFunc();
         },
         
         // 2. 相手が援軍を断ってきた時のメッセージ
@@ -480,7 +606,7 @@ Object.assign(WarManager.prototype, {
             if (defProv && (!atkProv || atkProv.id !== defProv.id)) {
                 defProv.marketRate = Math.min(maxTradeRate, defProv.marketRate + 0.3);
             }
-
+            
             if (selfReinforcementData && selfReinforcementData.castle.ownerClan === pid && !selfReinforcementData.castle.isDelegated && atkCastle.isDelegated) {
                 const requesterName = atkBushos[0].name;
                 const reinfCastleName = selfReinforcementData.castle.name;
@@ -498,11 +624,27 @@ Object.assign(WarManager.prototype, {
                 
                 this.game.ui.hideAIGuardTemporarily();
                 
+                let resolveConfirmed = null;
+                const showReq = () => {
+                    const gunshi = this.game.getClanGunshi(pid);
+                    const choices = [
+                        { label: '送る', className: 'btn-primary', onClick: () => resolveConfirmed(true) }
+                    ];
+                    if (gunshi) {
+                        choices.push({
+                            label: '戦況', className: 'btn-secondary', onClick: () => {
+                                this.showSituationReport(true, atkCastle, atkBushos, defCastle, selfReinforcementData.castle, showReq);
+                            }
+                        });
+                    }
+                    choices.push({ label: '送らない', className: 'btn-secondary', onClick: () => resolveConfirmed(false) });
+                    
+                    this.game.ui.showDialog(`${requesterName}殿が${targetInfoStr}${reinfCastleName}に参戦を求めています。\n援軍を送りますか？`, false, null, null, { choices: choices });
+                };
+                
                 const isConfirmed = await new Promise((resolve) => {
-                    this.game.ui.showDialog(`${requesterName}殿が${targetInfoStr}${reinfCastleName}に参戦を求めています。\n援軍を送りますか？`, true, 
-                        () => resolve(true), 
-                        () => resolve(false)
-                    );
+                    resolveConfirmed = resolve;
+                    showReq();
                 });
                 
                 this.game.ui.restoreAIGuard();
@@ -2742,30 +2884,41 @@ Object.assign(WarManager.prototype, {
             candidateCastles.sort((a,b) => b.soldiers - a.soldiers);
             const bestCastle = candidateCastles[0];
             console.log(`自勢力の援軍を呼ぶお城を選びました: ${bestCastle.name}`);
+            // 差し替え後：checkDefenderSelfReinforcement 内の委任城からの守備応援要請
             
-            // ★追加：委任城主が攻められた時、援軍候補が「直轄城」ならプレイヤーに尋ねる！
             if (defClanId === pid && !bestCastle.isDelegated) {
                 const castellan = this.game.getBusho(defCastle.castellanId);
                 const requesterName = castellan ? castellan.name : "城主";
                 
-                this.game.ui.showDialog(`${requesterName}殿が${bestCastle.name}に参戦を求めています。\n援軍を送りますか？`, true, () => {
-                    // 「はい」の場合、武将選択画面を開いて自分で選べるようにします
-                    const promptBusho = () => {
-                        this.game.ui.openBushoSelector('def_self_reinf_deploy', bestCastle.id, {
-                            hideCancel: false, 
-                            onConfirm: (selectedBushoIds) => {
-                                this.handleBushoSelectionForDefSelfReinf(bestCastle.id, selectedBushoIds, onComplete, promptBusho);
-                            },
-                            onCancel: () => {
-                                this.game.ui.showDialog("援軍の派遣を取りやめました。", false, () => onComplete(null));
+                const promptBusho = () => {
+                    this.game.ui.openBushoSelector('def_self_reinf_deploy', bestCastle.id, {
+                        hideCancel: false, 
+                        onConfirm: (selectedBushoIds) => {
+                            this.handleBushoSelectionForDefSelfReinf(bestCastle.id, selectedBushoIds, onComplete, promptBusho);
+                        },
+                        onCancel: () => {
+                            this.game.ui.showDialog("援軍の派遣を取りやめました。", false, () => onComplete(null));
+                        }
+                    });
+                };
+                
+                const showReq = () => {
+                    const gunshi = this.game.getClanGunshi(pid);
+                    const choices = [
+                        { label: '送る', className: 'btn-primary', onClick: () => promptBusho() }
+                    ];
+                    if (gunshi) {
+                        choices.push({
+                            label: '戦況', className: 'btn-secondary', onClick: () => {
+                                this.showSituationReport(false, this.state.sourceCastle, this.state.atkBushos, defCastle, bestCastle, showReq);
                             }
                         });
-                    };
-                    promptBusho();
-                }, () => {
-                    // 「いいえ」の場合
-                    onComplete(null);
-                });
+                    }
+                    choices.push({ label: '送らない', className: 'btn-secondary', onClick: () => onComplete(null) });
+
+                    this.game.ui.showDialog(`${requesterName}殿が${bestCastle.name}に参戦を求めています。\n援軍を送りますか？`, false, null, null, { choices: choices });
+                };
+                showReq();
             } else {
                 // 自動で援軍を送る
                 this.executeDefSelfReinforcementAuto(bestCastle, defCastle, (reinfData) => {
@@ -3020,7 +3173,7 @@ Object.assign(WarManager.prototype, {
             this.game.warManager.reinfMsgHelper.showRequest(this.game, myClanName, targetInfoStr, gold, isBoss, false, startSelection, () => {
                 this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
                 this.game.ui.showDialog(`援軍要請を断りました。`, false, onComplete);
-            });
+            }, this.state.sourceCastle, this.state.atkBushos, defCastle, helperCastle);
             return;
         }
 
