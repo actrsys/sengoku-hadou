@@ -187,7 +187,7 @@ class LifeSystem {
                             if (oldName !== newName) {
                                 let prefix = "";
                                 if (b.clan !== 0) {
-                                    const currentClan = this.game.clans.find(c => c.id === b.clan);
+                                    const currentClan = this.game.getClan(b.clan);
                                     if (currentClan) prefix = `${currentClan.name}の`;
                                 }
                                 
@@ -197,7 +197,7 @@ class LifeSystem {
                                 // ★先に大名家の名前を新しくする処理を終わらせます！
                                 // （先ほど消してしまった変数ではなく、新しい共通の b.familyName を使います）
                                 if (b.isDaimyo && b.clan !== 0) {
-                                    const clan = this.game.clans.find(c => c.id === b.clan);
+                                    const clan = this.game.getClan(b.clan);
                                     if (clan) {
                                         const oldClanName = clan.name;
                                         const newBaseName = `${b.familyName}家`;
@@ -467,7 +467,7 @@ class LifeSystem {
                     if (fatherNameStr !== "") {
                         // ★ここから変更：お父さんの身分によってメッセージを切り替えます！
                         let isRoyal = false;
-                        const playerDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+                        const playerDaimyo = this.game.getClanDaimyo(this.game.playerClanId);
                         const fatherData = this.game.getBusho(p.realFatherId); // お父さんのデータをもう一度呼び出します
                         
                         if (playerDaimyo && fatherData) {
@@ -629,8 +629,8 @@ class LifeSystem {
                             
                             // 他に誰もいなければ、婚姻のシール（isMarriage）を剥がします！
                             if (!hasOtherMarriage) {
-                                const clanAData = this.game.clans.find(c => c.id === clanA);
-                                const clanBData = this.game.clans.find(c => c.id === clanB);
+                                const clanAData = this.game.getClan(clanA);
+                                const clanBData = this.game.getClan(clanB);
                                 
                                 if (clanAData && clanAData.diplomacyValue[clanB]) {
                                     clanAData.diplomacyValue[clanB].isMarriage = false;
@@ -691,8 +691,8 @@ class LifeSystem {
                         });
                         
                         if (!hasOtherMarriage) {
-                            const clanAData = this.game.clans.find(c => c.id === clanA);
-                            const clanBData = this.game.clans.find(c => c.id === clanB);
+                            const clanAData = this.game.getClan(clanA);
+                            const clanBData = this.game.getClan(clanB);
                             
                             if (clanAData && clanAData.diplomacyValue[clanB]) {
                                 clanAData.diplomacyValue[clanB].isMarriage = false;
@@ -717,7 +717,7 @@ class LifeSystem {
                     
                     // 実家（originalClanId）が残っているか
                     if (princess.originalClanId > 0) {
-                        const originalClanCastles = this.game.castles.filter(c => c.ownerClan === princess.originalClanId);
+                        const originalClanCastles = this.game.getClanCastles(princess.originalClanId);
                         if (originalClanCastles.length > 0) {
                             nextClanId = princess.originalClanId;
                         }
@@ -757,14 +757,14 @@ class LifeSystem {
                         // ★ここから書き足し：大名家の「姫の名簿」も書き換えます！
                         // 1. 今までいた大名家（亡くなった夫の家）の名簿から名前を消します
                         if (busho.clan !== 0) {
-                            const oldClan = this.game.clans.find(c => c.id === busho.clan);
+                            const oldClan = this.game.getClan(busho.clan);
                             if (oldClan && oldClan.princessIds) {
                                 oldClan.princessIds = oldClan.princessIds.filter(id => id !== princess.id);
                             }
                         }
                         
                         // 2. 新しく帰る大名家の名簿に名前を書き足します
-                        const newClan = this.game.clans.find(c => c.id === nextClanId);
+                        const newClan = this.game.getClan(nextClanId);
                         if (newClan) {
                             if (!newClan.princessIds) newClan.princessIds = [];
                             if (!newClan.princessIds.includes(princess.id)) {
@@ -776,7 +776,7 @@ class LifeSystem {
                         princess.status = 'unmarried'; // 再び未婚に戻ります
                     } else {
                         // ★ここから修正：実家も親戚もない場合、夫の家が残っているかチェックします
-                        const husbandClanCastles = busho.clan > 0 ? this.game.castles.filter(c => c.ownerClan === busho.clan) : [];
+                        const husbandClanCastles = busho.clan > 0 ? this.game.getClanCastles(busho.clan) : [];
                         
                         if (husbandClanCastles.length > 0) {
                             // 夫の家がまだお城を持っていれば、所属も名簿も変えず、「未婚」に戻って居座ります
@@ -786,7 +786,7 @@ class LifeSystem {
                             princess.status = 'dead';
                             
                             if (busho.clan !== 0) {
-                                const oldClan = this.game.clans.find(c => c.id === busho.clan);
+                                const oldClan = this.game.getClan(busho.clan);
                                 if (oldClan && oldClan.princessIds) {
                                     oldClan.princessIds = oldClan.princessIds.filter(id => id !== princess.id);
                                 }
@@ -889,7 +889,7 @@ class LifeSystem {
     async handleDaimyoDeath(daimyo) {
         // ==========================================
         // ★すでにすべてのお城を失って「滅亡」している場合は、後継ぎは選びません！
-        const clanCastles = this.game.castles.filter(c => c.ownerClan === daimyo.clan);
+        const clanCastles = this.game.getClanCastles(daimyo.clan);
         if (clanCastles.length === 0) {
             daimyo.isDaimyo = false;
             return; 
@@ -1060,7 +1060,7 @@ class LifeSystem {
             
             // ==========================================
             // ★大名交代の共通の魔法を呼び出します！
-            const clan = this.game.clans.find(c => c.id === daimyo.clan);
+            const clan = this.game.getClan(daimyo.clan);
             const originalClanName = clan ? clan.name : ""; // ★元の家名をメモしておきます
             this.applyDaimyoChangeEffects(daimyo, successor, messages);
             // ==========================================
@@ -1222,7 +1222,7 @@ class LifeSystem {
                 targetCastle.castellanId = successor.id;
             }
 
-            const clan = this.game.clans.find(c => c.id === commander.clan);
+            const clan = this.game.getClan(commander.clan);
             const clanPrefix = clan ? `${clan.name}の` : "";
             
             let mainMsg = "";
@@ -1244,7 +1244,7 @@ class LifeSystem {
                 this.game.castleManager.disbandLegion(legion.id);
             }
             
-            const clan = this.game.clans.find(c => c.id === commander.clan);
+            const clan = this.game.getClan(commander.clan);
             const clanPrefix = clan ? `${clan.name}の` : "";
             
             const msg = `${clanPrefix}国主・${commander.name.replace('|','')}が死亡しました。\n後任となる武将がいないため、軍団は解散されました。`;
@@ -1291,7 +1291,7 @@ class LifeSystem {
                 b.loyalty = Math.max(0, Math.min(100, b.loyalty + changeVal));
             });
             
-            const clanCastlesInfo = this.game.castles.filter(c => c.ownerClan === oldDaimyo.clan);
+            const clanCastlesInfo = this.game.getClanCastles(oldDaimyo.clan);
             clanCastlesInfo.forEach(c => {
                 c.peoplesLoyalty = Math.max(0, Math.min(100, (c.peoplesLoyalty || 50) + changeVal));
                 if (changeVal < 0) {
@@ -1353,7 +1353,7 @@ class LifeSystem {
         }
 
         // ★当主交代に合わせて大名家の名前を変更し、マップを更新します！
-        const clan = this.game.clans.find(c => c.id === oldDaimyo.clan);
+        const clan = this.game.getClan(oldDaimyo.clan);
         if (clan) {
             const oldClanName = clan.name;
             const safeFamilyName = successor.familyName || successor.name;
@@ -1381,7 +1381,7 @@ class LifeSystem {
     // ==========================================
     async executeSuccessionCommand(newDaimyoId) {
         const successor = this.game.getBusho(newDaimyoId);
-        const clan = this.game.clans.find(c => c.id === this.game.playerClanId);
+        const clan = this.game.getClan(this.game.playerClanId);
         const oldDaimyo = this.game.getBusho(clan.leaderId);
 
         if (!oldDaimyo || !successor) return;
@@ -1484,11 +1484,11 @@ class LifeSystem {
         if (!clanId || clanId === 0) return;
         
         // 大名家のデータを探します
-        const clan = this.game.clans.find(c => c.id === clanId);
+        const clan = this.game.getClan(clanId);
         if (!clan || clan.extinctionNotified) return; // すでに通知済みなら二重に出さないようにします
 
         // その大名家が持っているお城を数えます
-        const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        const clanCastles = this.game.getClanCastles(clanId);
         
         // 滅亡の条件：お城が0個になった、または後継ぎがいない場合です
         if (clanCastles.length === 0 || reason === 'no_heir') {
@@ -1521,7 +1521,7 @@ class LifeSystem {
             
             // ★ここから追加：未婚の姫を、攻め滅ぼした大名家が総取りする魔法
             if (killerClanId > 0 && killerClanId !== clan.id) {
-                const killerClan = this.game.clans.find(c => c.id === killerClanId);
+                const killerClan = this.game.getClan(killerClanId);
                 if (killerClan) {
                     // その家にいる未婚の姫を全員集めます
                     const targetPrincesses = this.game.princesses.filter(p => p.currentClanId === clan.id && p.status === 'unmarried');
@@ -1682,7 +1682,7 @@ class LifeSystem {
         }
 
         // ★変更：お父さんを探してメモします（一門武将も選べるようにしました）
-        const clan = this.game.clans.find(c => c.id === clanId);
+        const clan = this.game.getClan(clanId);
         if (!clan) return null;
         
         let father = null;

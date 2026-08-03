@@ -105,13 +105,13 @@ class CourtRankSystem {
 
     // 指定した大名家の「朝廷への貢献度」を調べる魔法です
     getContribution(clanId) {
-        const clan = this.game.clans.find(c => c.id === clanId);
+        const clan = this.game.getClan(clanId);
         return clan ? (clan.courtContribution || 0) : 0;
     }
 
     // お金を積んで、朝廷への貢献度を上げる魔法です
     addContribution(clanId, goldAmount) {
-        const clan = this.game.clans.find(c => c.id === clanId);
+        const clan = this.game.getClan(clanId);
         if (!clan) return false;
 
         // とりあえず今回は「払ったお金の分だけ貢献度が上がる」という計算にしておきます
@@ -123,13 +123,13 @@ class CourtRankSystem {
 
     // ★追加：指定した大名家の「朝廷からの信用」を調べる魔法です
     getTrust(clanId) {
-        const clan = this.game.clans.find(c => c.id === clanId);
+        const clan = this.game.getClan(clanId);
         return clan ? (clan.courtTrust || 0) : 0;
     }
 
     // ★追加：朝廷からの信用を上げる魔法です
     addTrust(clanId, trustAmount) {
-        const clan = this.game.clans.find(c => c.id === clanId);
+        const clan = this.game.getClan(clanId);
         if (!clan) return false;
 
         // 上限の1000を超えないように見張る魔法（Math.min）をかけておきます！
@@ -270,7 +270,7 @@ class CourtRankSystem {
             });
 
             // 大名家が所有しているお城の国名を集めます
-            const clanCastles = this.game.castles ? this.game.castles.filter(c => c.clanId === clan.id) : [];
+            const clanCastles = this.game.getClanCastles ? this.game.getClanCastles(clan.id) : [];
             const ownedProvinces = [];
             clanCastles.forEach(c => {
                 if (c.province) {

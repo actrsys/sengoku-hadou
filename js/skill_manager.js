@@ -925,7 +925,7 @@ class SkillManager {
             if (this.hasSkill(busho, SKILL_NAMES.OU_NO_GYOSHO, game)) {
                 hasOuNoGyosho = true;
             } else {
-                const daimyo = game.bushos.find(b => b.clan === busho.clan && b.isDaimyo);
+                const daimyo = game.getClanDaimyo(busho.clan);
                 if (daimyo && this.hasSkill(daimyo, SKILL_NAMES.OU_NO_GYOSHO, game)) {
                     hasOuNoGyosho = true;
                 } else {
@@ -962,7 +962,7 @@ class SkillManager {
             hasSkill = true;
         } else {
             // 大名自身が持っているかチェック
-            const daimyo = game.bushos.find(b => b.clan === doerClanId && b.isDaimyo);
+            const daimyo = game.getClanDaimyo(doerClanId);
             if (daimyo && this.hasSkill(daimyo, SKILL_NAMES.HYORIHIKYO, game)) {
                 hasSkill = true;
             }
@@ -978,7 +978,7 @@ class SkillManager {
 
     // ＜援軍要請の拒否＞ 表裏比興により主家からの援軍を断れるかどうかの判定
     static canDeclineBossReinforcement(clanId, game) {
-        const daimyo = game.bushos.find(b => b.clan === clanId && b.isDaimyo);
+        const daimyo = game.getClanDaimyo(clanId);
         if (daimyo && this.hasSkill(daimyo, SKILL_NAMES.HYORIHIKYO, game)) {
             return true;
         }
@@ -1104,7 +1104,7 @@ class SkillManager {
         // 特定のスキルを持っているか（大名、国主、担当者）チェックする便利な魔法
         const checkSkill = (skillName) => {
             if (this.hasSkill(doer, skillName, game)) return true;
-            const daimyo = game.bushos.find(b => b.clan === doer.clan && b.isDaimyo);
+            const daimyo = game.getClanDaimyo(doer.clan);
             if (daimyo && this.hasSkill(daimyo, skillName, game)) return true;
             const doerCastle = game.getCastle(doer.castleId);
             if (doerCastle && doerCastle.legionId !== 0) {

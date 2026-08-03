@@ -99,7 +99,7 @@ class StrategySystem {
     // ==========================================
     
     getLeaderOrGunshiInt(clanId) {
-        const daimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo);
+        const daimyo = this.game.getClanDaimyo(clanId);
         const gunshi = this.game.bushos.find(b => b.clan === clanId && b.isGunshi);
         const intDaimyo = daimyo ? daimyo.intelligence : 50;
         const intGunshi = gunshi ? gunshi.intelligence : 0;
@@ -107,8 +107,8 @@ class StrategySystem {
     }
 
     getKukoModifiers(clanAId, clanBId) {
-        const daimyoA = this.game.bushos.find(b => b.clan === clanAId && b.isDaimyo) || { affinity: 50 };
-        const daimyoB = this.game.bushos.find(b => b.clan === clanBId && b.isDaimyo) || { affinity: 50 };
+        const daimyoA = this.game.getClanDaimyo(clanAId) || { affinity: 50 };
+        const daimyoB = this.game.getClanDaimyo(clanBId) || { affinity: 50 };
         const affinityDiff = typeof GameSystem !== 'undefined' ? GameSystem.calcAffinityDiff(daimyoA.affinity, daimyoB.affinity) : 25;
         
         const defAInt = this.getLeaderOrGunshiInt(clanAId);
@@ -126,8 +126,8 @@ class StrategySystem {
         else if (['同盟', '支配', '従属'].includes(relation.status)) relMod = 0.7;
         
         let isAdjacent = false;
-        const castlesA = this.game.castles.filter(c => c.ownerClan === clanAId);
-        const castlesB = this.game.castles.filter(c => c.ownerClan === clanBId);
+        const castlesA = this.game.getClanCastles(clanAId);
+        const castlesB = this.game.getClanCastles(clanBId);
         for (const ca of castlesA) {
             for (const cb of castlesB) {
                 // 隣接しているか調べます
@@ -258,8 +258,8 @@ class StrategySystem {
     getHeadhuntProb(doerId, targetBushoId, gold) {
         const doer = this.game.getBusho(doerId);
         const target = this.game.getBusho(targetBushoId);
-        const targetLord = this.game.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
-        const newLord = this.game.bushos.find(b => b.clan === doer.clan && b.isDaimyo) || { affinity: 50 }; 
+        const targetLord = this.game.getClanDaimyo(target.clan) || { affinity: 50 }; 
+        const newLord = this.game.getClanDaimyo(doer.clan) || { affinity: 50 };
 
         const S = window.MainParams.Strategy;
         const goldEffect = Math.min(S.HeadhuntGoldMaxEffect, gold * S.HeadhuntGoldEffect);
@@ -520,7 +520,7 @@ class StrategySystem {
 
         // --- お知らせメッセージの作成 (プレイヤーが被害者の場合) ---
         if (targetClanId === this.game.playerClanId && doer.clan !== this.game.playerClanId) {
-            const doerClanName = this.game.clans.find(c => c.id === doer.clan)?.name || "不明な勢力";
+            const doerClanName = this.game.getClan(doer.clan)?.name || "不明な勢力";
             
             // 狙われた武将の名前を取得します
             let targetBushoName = "◯◯";
@@ -561,7 +561,7 @@ class StrategySystem {
         if (isDiscovered) {
             this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -penalty);
             if (doer.clan === this.game.playerClanId) {
-                const targetClanName = this.game.clans.find(c => c.id === targetClanId)?.name || "不明な勢力";
+                const targetClanName = this.game.getClan(targetClanId)?.name || "不明な勢力";
                 return `\n工作が発覚し、${targetClanName}との友好度が低下しました……`;
             }
         }
@@ -611,7 +611,7 @@ class StrategySystem {
                 target.status = 'active';
                 target.isGunshi = false;
                 
-                const targetLord = this.game.bushos.find(b => b.clan === oldClanId && b.isDaimyo) || { affinity: 50 };
+                const targetLord = this.game.getClanDaimyo(oldClanId) || { affinity: 50 };
                 captiveMsgs = this.game.independenceSystem.resolveSubordinates(oldCastle, target, targetLord, newClanId, oldClanId);
                 
                 this.game.getCastleBushos(oldCastle.id).forEach(b => {
@@ -785,13 +785,14 @@ class StrategySystem {
     // 駆虎呑狼を実行する魔法
     executeKuko(doerId, clanAId, clanBId) {
         const doer = this.game.getBusho(doerId);
-        const clanA = this.game.clans.find(c => c.id === clanAId);
-        const clanB = this.game.clans.find(c => c.id === clanBId);
+        const clanA = this.game.getClan(clanAId);
+        const clanB = this.game.getClan(clanBId);
         
         const result = this.calcKuko(doerId, clanAId, clanBId, true);
         
         // ターゲットAの居城で隠密判定を行います
-        const targetCastleA = this.game.castles.find(c => c.ownerClan === clanAId && c.id === this.game.bushos.find(b=>b.clan===clanAId && b.isDaimyo)?.castleId);
+        const daimyoA = this.game.getClanDaimyo(clanAId);
+        const targetCastleA = daimyoA ? this.game.getCastle(daimyoA.castleId) : null;
         let covertMsg = "";
         if (targetCastleA) {
             covertMsg = this.handleCovertAction(doerId, targetCastleA.id, result.success, 'kuko', false, null);
@@ -812,8 +813,8 @@ class StrategySystem {
                         if (!this.game.aiOperationManager.grandObjectives) this.game.aiOperationManager.grandObjectives = {};
                         if (!this.game.aiOperationManager.grandObjectives[myClanId]) this.game.aiOperationManager.grandObjectives[myClanId] = {};
                         
-                        const myCastleCount = this.game.castles.filter(c => c.ownerClan === myClanId).length;
-                        const targetCastleCount = this.game.castles.filter(c => c.ownerClan === targetId).length;
+                        const myCastleCount = this.game.getClanCastles(myClanId).length;
+                        const targetCastleCount = this.game.getClanCastles(targetId).length;
                         
                         const legions = [0]; // 0は直轄です
                         if (this.game.legions) {
