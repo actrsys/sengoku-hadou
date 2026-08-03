@@ -787,9 +787,20 @@ class FieldWarManager {
         let atkDisplayName = getDisplayName(true, this.activeAtkTab);
         let defDisplayName = getDisplayName(false, this.activeDefTab);
 
-        // 値を２行に分けて表示します
-        const atkHTML = `${atkDisplayName}<br><div style="margin-top:2px;">兵: ${curAtk.soldiers} / 糧: ${curAtk.rice}<br>士気: ${curAtk.morale} / 訓練: ${curAtk.training}</div>`;
-        const defHTML = `${defDisplayName}<br><div style="margin-top:2px;">兵: ${curDef.soldiers} / 糧: ${curDef.rice}<br>士気: ${curDef.morale} / 訓練: ${curDef.training}</div>`;
+        const createStatusHTML = (displayName, stats) => `
+            <div class="fw-status-box">
+                <div class="fw-status-name">${displayName}</div>
+                <div class="fw-status-stats">
+                    <div class="fw-status-row"><span class="fw-status-label">兵士</span><span class="fw-status-value">${stats.soldiers}</span></div>
+                    <div class="fw-status-row"><span class="fw-status-label">兵糧</span><span class="fw-status-value">${stats.rice}</span></div>
+                    <div class="fw-status-row"><span class="fw-status-label">士気</span><span class="fw-status-value">${stats.morale}</span></div>
+                    <div class="fw-status-row"><span class="fw-status-label">訓練</span><span class="fw-status-value">${stats.training}</span></div>
+                </div>
+            </div>
+        `;
+
+        const atkHTML = createStatusHTML(atkDisplayName, curAtk);
+        const defHTML = createStatusHTML(defDisplayName, curDef);
 
         const atkEl = document.getElementById('fw-atk-status');
         const defEl = document.getElementById('fw-def-status');
@@ -1004,18 +1015,26 @@ class FieldWarManager {
             unitTraining = this.groupStats[unit.groupId].training;
         }
 
+        infoEl.style.borderColor = color; // 枠線を陣営カラーに合わせる
         infoEl.innerHTML = `
-            <div style="font-weight:bold; color: ${color};">
-                ${clanNameText}${unit.name} <span style="font-size:0.8rem; color:#555;">(${typeName})</span>
+            <div class="fw-unit-header">
+                <div class="fw-unit-name" style="color: ${color};">${clanNameText}${unit.name}</div>
+                <div class="fw-unit-type">${typeName}</div>
             </div>
-            <div style="font-size:0.9rem; font-weight:bold; display:flex; align-items:baseline; gap:10px;">
-                <span>兵士: ${unit.soldiers}</span>
-                <span style="font-size:0.75rem; color:#333; font-weight:normal;">士気:${unitMorale} 訓練:${unitTraining}</span>
+            <div class="fw-unit-stats">
+                <div class="fw-unit-row">
+                    <span class="fw-status-label">兵士</span>
+                    <span class="fw-status-value">${unit.soldiers}</span>
+                </div>
+                <div class="fw-unit-row">
+                    <span class="fw-status-label">士気</span><span class="fw-status-value">${unitMorale}</span>
+                    <span class="fw-status-label" style="margin-left: 10px;">訓練</span><span class="fw-status-value">${unitTraining}</span>
+                </div>
             </div>
-            <div style="font-size:0.8rem; color:#333; display:flex; gap:5px; align-items:center; margin-top:2px;">
-                統:${GameSystem.toGradeHTML(unit.stats.ldr)} 
-                武:${GameSystem.toGradeHTML(unit.stats.str)} 
-                智:${GameSystem.toGradeHTML(unit.stats.int)}
+            <div class="fw-unit-abilities">
+                <div class="fw-unit-ability"><span class="fw-status-label">統</span><span>${GameSystem.toGradeHTML(unit.stats.ldr)}</span></div>
+                <div class="fw-unit-ability"><span class="fw-status-label">武</span><span>${GameSystem.toGradeHTML(unit.stats.str)}</span></div>
+                <div class="fw-unit-ability"><span class="fw-status-label">智</span><span>${GameSystem.toGradeHTML(unit.stats.int)}</span></div>
             </div>
         `;
         infoEl.classList.remove('hidden');

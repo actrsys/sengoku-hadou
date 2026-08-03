@@ -2152,22 +2152,49 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
    ========================================================= */
 /* 新しい全画面・フローティングレイアウト */
 #field-war-modal { padding: 0 !important; }
-#field-war-modal .modal-content.fw-fullscreen-content { width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; margin: 0 !important; border-radius: 0 !important; border: none !important; padding: 0 !important; background: #222; display: flex; flex-direction: column; }
+#field-war-modal .modal-content.fw-fullscreen-content { 
+    width: 100% !important; 
+    height: 100% !important; 
+    max-width: none !important; 
+    max-height: none !important; 
+    margin: 0 !important; 
+    border-radius: 0 !important; 
+    border: none !important; 
+    padding: 0 !important; 
+    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); /* ★和風ベースカラーに変更 */
+    display: flex; 
+    flex-direction: column; 
+}
+body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
+    border: 2px solid #d4af37 !important;
+    border-radius: 8px !important;
+    width: 95% !important;
+    height: 95% !important;
+    max-width: 1200px !important;
+    margin: auto !important;
+}
 
 .fw-top-bar { height: 30px; background: #000; color: #fff; display: flex; align-items: center; padding: 0 10px; font-size: 0.9rem; font-weight: bold; gap: 20px; flex-shrink: 0; }
 .fw-main-area { flex: 1; position: relative; overflow: hidden; background: #81c784; }
-.fw-main-area.is-sea-battle { background: #2ab6f6; } /* ★追加：海戦時は海の色（#2ab6f6）にする魔法 */
+.fw-main-area.is-sea-battle { background: #2ab6f6; } 
 
-/* ★追加：スクロールバーを消して、ドラッグの手のマークにする魔法 */
 .fw-map-scroll { width: 100%; height: 100%; overflow: auto; display: block; scrollbar-width: none; -ms-overflow-style: none; cursor: grab; }
 .fw-map-scroll::-webkit-scrollbar { display: none; }
 .fw-map-scroll.grabbing { cursor: grabbing; }
 
 .fw-floating-status { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; z-index: 100; gap: 10px; }
 .fw-status-wrapper { display: flex; flex-direction: column; gap: 5px; flex: 1; max-width: 300px; pointer-events: auto; }
-.fw-floating-status .army-box { margin: 0; padding: 5px 10px; font-size: 0.85rem; background: rgba(0, 0, 0, 0.7) !important; color: #fff; border: 2px solid; }
-.fw-floating-status .attacker { border-color: #ef5350; }
-.fw-floating-status .defender { border-color: #42a5f5; }
+
+/* ★追加: 軍団情報 (fw-atk-status, fw-def-status) の和風スタイル */
+.fw-status-box { background: rgba(0, 0, 0, 0.6); border: 2px solid rgba(212, 175, 55, 0.4); border-radius: 6px; padding: 8px; color: #fff; text-shadow: 1px 1px 1px #000; box-shadow: 0 4px 6px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 4px; }
+.fw-status-container.attacker .fw-status-box { border-color: #ef5350; }
+.fw-status-container.defender .fw-status-box { border-color: #42a5f5; }
+.fw-status-name { font-size: 1.1rem; font-weight: bold; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; border-bottom: 1px solid rgba(212, 175, 55, 0.5); padding-bottom: 4px; margin-bottom: 2px; }
+.fw-status-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 0.85rem; }
+.fw-status-row { display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 2px 6px; align-items: center; }
+.fw-status-label { color: #ffd54f; font-weight: normal; }
+.fw-status-value { font-weight: bold; }
+
 .fw-tabs { display: flex; gap: 2px; flex-wrap: wrap; }
 .fw-tabs.right-align { justify-content: flex-end; }
 .fw-tab { background: rgba(0, 0, 0, 0.5); color: #ccc; border: 1px solid rgba(255,255,255,0.3); padding: 2px 8px; font-size: 0.75rem; border-radius: 4px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
@@ -2175,7 +2202,15 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
 .fw-tab.attacker.active { background: rgba(239, 83, 80, 0.6); }
 .fw-tab.defender.active { background: rgba(66, 165, 245, 0.6); }
 
-.fw-floating-unit { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, 0.9); border: 2px solid #333; padding: 5px 15px; font-size: 0.85rem; border-radius: 6px; z-index: 100; pointer-events: none; display: flex; gap: 15px; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5); white-space: nowrap; }
+/* ★修正: 部隊情報 (fw-unit-info) の和風・縦並びスタイル */
+.fw-floating-unit { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.85); border: 2px solid #d4af37; padding: 10px; border-radius: 6px; z-index: 100; pointer-events: none; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.7); white-space: nowrap; color: #fff; text-shadow: 1px 1px 1px #000; min-width: 180px; }
+.fw-unit-header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid rgba(212, 175, 55, 0.5); padding-bottom: 4px; gap: 15px; }
+.fw-unit-name { font-size: 1.1rem; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.fw-unit-type { font-size: 0.8rem; color: #ccc; }
+.fw-unit-stats { display: flex; flex-direction: column; gap: 4px; }
+.fw-unit-row { display: flex; justify-content: space-between; align-items: center; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 2px 6px; font-size: 0.9rem; }
+.fw-unit-abilities { display: flex; gap: 10px; justify-content: space-between; margin-top: 2px; }
+.fw-unit-ability { display: flex; align-items: center; gap: 4px; font-size: 0.85rem; font-weight: bold; }
 
 .fw-floating-log { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 600px; height: 100px; overflow-y: auto; background: rgba(0, 0, 0, 0.6); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; padding: 5px 10px; font-size: 0.85rem; z-index: 100; pointer-events: auto; text-shadow: 1px 1px 1px #000; }
 
