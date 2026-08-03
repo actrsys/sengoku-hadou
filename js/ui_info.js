@@ -1378,6 +1378,11 @@ class UIInfoManager {
         
         listContainer.style.display = 'none';
         listContainer.innerHTML = '';
+        // ★前回このリストに付けていた「仮想スクロール」の監視が残っていたら、ここで必ず外します
+        if (listContainer._virtualScrollHandler) {
+            listContainer.removeEventListener('scroll', listContainer._virtualScrollHandler);
+            listContainer._virtualScrollHandler = null;
+        }
         modal.classList.remove('hidden');
 
         if (titleEl) titleEl.textContent = config.title || "";
@@ -1500,82 +1505,50 @@ class UIInfoManager {
         const totalItems = config.items.length;
         const INITIAL_RENDER_COUNT = 30;
         const CHUNK_SIZE = 50;
-
-        // ★スクロール位置を復元するために、あらかじめ必要な数だけリストを生成しておく魔法
-        let assumedItemHeight = 40; 
-        let requiredItems = config.scrollPos ? Math.ceil(config.scrollPos / assumedItemHeight) + 20 : INITIAL_RENDER_COUNT;
-        const initialLimit = Math.min(totalItems, Math.max(INITIAL_RENDER_COUNT, requiredItems));
-
-        let initialHtmlParts = [];
-        
-        if (config.headers && config.headers.length > 0) {
-            const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
-            initialHtmlParts.push(`<div class="list-header sortable-header ${config.headerClass || ''}">${headerCols}</div>`);
-        }
-
-        for (let i = 0; i < initialLimit; i++) {
-            initialHtmlParts.push(buildItemHtml(config.items[i], i));
-        }
-        
-        for (let i = totalItems; i < 8; i++) {
-            const emptyCells = config.headers ? config.headers.map(() => `<span></span>`).join('') : '';
-            initialHtmlParts.push(`<div class="select-item ${config.itemClass || ''}" style="cursor:default; pointer-events:none;">${emptyCells}</div>`);
-        }
-
-        listContainer.innerHTML = `<div class="list-inner-wrapper" style="${wrapperStyle}">${initialHtmlParts.join('')}</div>`;
+        const VIRTUALIZE_THRESHOLD = 150; // ★これを超える件数のリストは「仮想スクロール」に切り替えます
 
         // ★「文字数」を数えて、文字数が多い場合だけ文字を小さくします
-        const adjustTextFit = (startIndex, endIndex) => {
+        // （仮想スクロールでは常に「今表示中の行」だけをチェックすれば十分なので引数なしにしました）
+        const adjustTextFit = () => {
             const listInner = listContainer.querySelector('.list-inner-wrapper');
             if (!listInner) return;
             const itemEls = listInner.querySelectorAll('.select-item');
-            
-            for (let i = startIndex; i < endIndex; i++) {
-                if (itemEls[i]) {
-                    const cells = itemEls[i].children;
-                    for (let j = 0; j < cells.length; j++) {
-                        const cell = cells[j];
-                        
-                        // 名前の列だけを対象にします
-                        const isNameCol = cell.classList.contains('col-name') || 
-                                          cell.classList.contains('col-daimyo-name') || 
-                                          cell.classList.contains('col-kunishu-name') || 
-                                          cell.classList.contains('col-faction-name') || 
-                                          cell.classList.contains('col-princess-name') ||
-                                          cell.classList.contains('col-castle-name') ||
-                                          cell.classList.contains('col-leader-name');
-                        
-                        if (!isNameCol) continue;
-                        
-                        // ゲージやアイコンなどの複雑な要素がある場合はスキップします
-                        if (cell.querySelector('.bar-bg') || cell.querySelector('.bar-bg-busho') || cell.querySelector('input') || cell.querySelector('img')) continue;
-                        
-                        const textLen = cell.textContent.trim().length;
-                        
-                        // 4文字を超える場合（5文字以上）のみ縮小します
-                        if (textLen > 4) {
-                            // 5文字なら0.9倍、6文字なら0.8倍...と計算し、最小でも0.6倍でストップさせます
-                            const scale = Math.max(0.6, 1.0 - ((textLen - 4) * 0.1));
-                            cell.style.fontSize = `calc(100% * ${scale})`;
-                        }
+
+            itemEls.forEach(itemEl => {
+                const cells = itemEl.children;
+                for (let j = 0; j < cells.length; j++) {
+                    const cell = cells[j];
+
+                    // 名前の列だけを対象にします
+                    const isNameCol = cell.classList.contains('col-name') ||
+                                      cell.classList.contains('col-daimyo-name') ||
+                                      cell.classList.contains('col-kunishu-name') ||
+                                      cell.classList.contains('col-faction-name') ||
+                                      cell.classList.contains('col-princess-name') ||
+                                      cell.classList.contains('col-castle-name') ||
+                                      cell.classList.contains('col-leader-name');
+
+                    if (!isNameCol) continue;
+
+                    // ゲージやアイコンなどの複雑な要素がある場合はスキップします
+                    if (cell.querySelector('.bar-bg') || cell.querySelector('.bar-bg-busho') || cell.querySelector('input') || cell.querySelector('img')) continue;
+
+                    const textLen = cell.textContent.trim().length;
+
+                    // 4文字を超える場合（5文字以上）のみ縮小します
+                    if (textLen > 4) {
+                        const scale = Math.max(0.6, 1.0 - ((textLen - 4) * 0.1));
+                        cell.style.fontSize = `calc(100% * ${scale})`;
                     }
                 }
-            }
-        };
-
-        const attachEvents = (startIndex, endIndex) => {
-            // ★イベントを付けた直後（画面に文字が描画された直後）にサイズ調整の魔法を発動します！
-            requestAnimationFrame(() => {
-                adjustTextFit(startIndex, endIndex);
             });
         };
 
         // ★一つ一つの行にクリックの監視をつけるのではなく、リストの大元に1つだけ監視をつけます！（イベントデリゲーション）
-        const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
-        if (innerWrapper && !innerWrapper.dataset.eventDelegated) {
+        const attachDelegatedClick = (innerWrapper) => {
+            if (innerWrapper.dataset.eventDelegated) return;
             innerWrapper.dataset.eventDelegated = "true";
             innerWrapper.addEventListener('click', (e) => {
-                // クリックされた場所の親要素を辿って、「data-action-index」を持っている行を探します
                 const targetItem = e.target.closest('[data-action-index]');
                 if (targetItem) {
                     const index = parseInt(targetItem.getAttribute('data-action-index'));
@@ -1589,31 +1562,150 @@ class UIInfoManager {
                                 return typeof value === 'function' ? value.bind(target) : value;
                             }
                         });
-                        // 見つかったら、その行に設定されているクリックの魔法を実行します
                         config.items[index].onClick(pseudoEvent);
                     }
                 }
             });
-        }
+        };
 
-        attachEvents(0, initialLimit);
+        const attachSortClicks = () => {
+            if (config.onSortClick) {
+                const headerSpans = listContainer.querySelectorAll('.sortable-header span[data-sort]');
+                headerSpans.forEach(span => {
+                    span.onclick = (e) => {
+                        const key = e.currentTarget.getAttribute('data-sort');
+                        if (!key) return;
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                        config.onSortClick(key);
+                    };
+                });
+            }
+        };
 
-        if (config.onSortClick) {
-            const headerSpans = listContainer.querySelectorAll('.sortable-header span[data-sort]');
-            headerSpans.forEach(span => {
-                span.onclick = (e) => {
-                    const key = e.currentTarget.getAttribute('data-sort');
-                    if (!key) return;
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    config.onSortClick(key);
-                };
+        // ==========================================
+        // ★新機能：件数が多いリストは「仮想スクロール」にして、見えている行だけ描画します
+        // ==========================================
+        if (totalItems > VIRTUALIZE_THRESHOLD) {
+            let rowHeight = 40; // 仮の行の高さ（実測できたら後で補正します）
+            const BUFFER_ROWS = 15; // 画面外にも少し多めに描画しておく余裕（バッファ）
+            let lastRange = { start: -1, end: -1 };
+
+            let headerHtml = '';
+            if (config.headers && config.headers.length > 0) {
+                const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
+                headerHtml = `<div class="list-header sortable-header ${config.headerClass || ''}">${headerCols}</div>`;
+            }
+
+            listContainer.innerHTML = `<div class="list-inner-wrapper" style="${wrapperStyle}">${headerHtml}<div class="virtual-scroll-body" style="display:flex; flex-direction:column;"></div></div>`;
+
+            const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
+            const scrollBody = innerWrapper.querySelector('.virtual-scroll-body');
+
+            // ★元々の行間の隙間(gap)の設定を、そのまま引き継ぎます
+            const gapPx = parseFloat(window.getComputedStyle(innerWrapper).rowGap) || parseFloat(window.getComputedStyle(innerWrapper).gap) || 0;
+            scrollBody.style.gap = `${gapPx}px`;
+
+            attachDelegatedClick(innerWrapper);
+            attachSortClicks();
+
+            const renderVisibleWindow = (force = false) => {
+                if (this._currentListRenderId !== currentRenderId) return;
+
+                const viewportHeight = listContainer.clientHeight || 400;
+                const scrollTop = listContainer.scrollTop;
+
+                const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - BUFFER_ROWS);
+                const visibleRowCount = Math.ceil(viewportHeight / rowHeight) + BUFFER_ROWS * 2;
+                const endIndex = Math.min(totalItems, startIndex + visibleRowCount);
+
+                if (!force && startIndex === lastRange.start && endIndex === lastRange.end) return;
+                lastRange = { start: startIndex, end: endIndex };
+
+                const rowsHtml = [];
+                for (let i = startIndex; i < endIndex; i++) {
+                    rowsHtml.push(buildItemHtml(config.items[i], i));
+                }
+
+                scrollBody.style.paddingTop = `${startIndex * rowHeight}px`;
+                scrollBody.style.paddingBottom = `${Math.max(0, (totalItems - endIndex) * rowHeight)}px`;
+                scrollBody.innerHTML = rowsHtml.join('');
+
+                requestAnimationFrame(adjustTextFit);
+            };
+
+            // ★スクロールのたびに毎回計算しすぎないよう、アニメーションフレームで間引きます
+            let scrollTicking = false;
+            const scrollHandler = () => {
+                if (scrollTicking) return;
+                scrollTicking = true;
+                requestAnimationFrame(() => {
+                    renderVisibleWindow();
+                    scrollTicking = false;
+                });
+            };
+            listContainer.addEventListener('scroll', scrollHandler);
+            listContainer._virtualScrollHandler = scrollHandler;
+
+            // ★スクロール位置を復元できるように、まず仮の行の高さで全体の高さだけ確保してからスクロールさせます
+            scrollBody.style.paddingBottom = `${Math.max(0, (totalItems - 1) * rowHeight)}px`;
+            listContainer.style.display = 'block';
+            listContainer.scrollTop = config.scrollPos || 0;
+
+            renderVisibleWindow(true);
+
+            requestAnimationFrame(() => {
+                // ★実際の行の高さを測って、仮の値とズレていたら補正して描画し直します
+                const sample = scrollBody.querySelector('.select-item');
+                if (sample) {
+                    const measured = sample.offsetHeight + gapPx;
+                    if (measured > 0 && Math.abs(measured - rowHeight) > 1) {
+                        rowHeight = measured;
+                        lastRange = { start: -1, end: -1 };
+                        renderVisibleWindow(true);
+                    }
+                }
+                if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
+                    this.ui.updateCustomScrollbars();
+                }
             });
+
+            return;
         }
+
+        // ==========================================
+        // ★従来通りの描画（件数が少ないリスト向け・変更なし）
+        // ==========================================
+        let assumedItemHeight = 40; 
+        let requiredItems = config.scrollPos ? Math.ceil(config.scrollPos / assumedItemHeight) + 20 : INITIAL_RENDER_COUNT;
+        const initialLimit = Math.min(totalItems, Math.max(INITIAL_RENDER_COUNT, requiredItems));
+
+        let initialHtmlParts = [];
+
+        if (config.headers && config.headers.length > 0) {
+            const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
+            initialHtmlParts.push(`<div class="list-header sortable-header ${config.headerClass || ''}">${headerCols}</div>`);
+        }
+
+        for (let i = 0; i < initialLimit; i++) {
+            initialHtmlParts.push(buildItemHtml(config.items[i], i));
+        }
+
+        for (let i = totalItems; i < 8; i++) {
+            const emptyCells = config.headers ? config.headers.map(() => `<span></span>`).join('') : '';
+            initialHtmlParts.push(`<div class="select-item ${config.itemClass || ''}" style="cursor:default; pointer-events:none;">${emptyCells}</div>`);
+        }
+
+        listContainer.innerHTML = `<div class="list-inner-wrapper" style="${wrapperStyle}">${initialHtmlParts.join('')}</div>`;
+
+        const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
+        attachDelegatedClick(innerWrapper);
+
+        requestAnimationFrame(adjustTextFit);
+        attachSortClicks();
 
         listContainer.style.display = 'block';
         listContainer.scrollTop = config.scrollPos || 0;
 
-        // ★修正：ボタンが出現して画面の高さが確定するのを「ほんの一瞬（10ミリ秒）」だけ待ってからスクロールバーを呼び出します！
         setTimeout(() => {
             if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
                 this.ui.updateCustomScrollbars();
@@ -1627,20 +1719,19 @@ class UIInfoManager {
 
                 const chunkParts = [];
                 const endLimit = Math.min(currentIndex + CHUNK_SIZE, totalItems);
-                
+
                 for (let i = currentIndex; i < endLimit; i++) {
                     chunkParts.push(buildItemHtml(config.items[i], i));
                 }
-                
+
                 const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
                 if (innerWrapper) {
                     innerWrapper.insertAdjacentHTML('beforeend', chunkParts.join(''));
                 }
-                
-                attachEvents(currentIndex, endLimit);
+
+                requestAnimationFrame(adjustTextFit);
                 currentIndex = endLimit;
 
-                // ★ここでも、追加した後に一瞬待ってから長さを合わせます！
                 setTimeout(() => {
                     if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
                         this.ui.updateCustomScrollbars();
