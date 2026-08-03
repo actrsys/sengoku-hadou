@@ -2907,7 +2907,7 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.openBushoSelector('def_self_reinf_deploy', bestCastle.id, {
                         hideCancel: false, 
                         onConfirm: (selectedBushoIds) => {
-                            this.handleBushoSelectionForDefSelfReinf(bestCastle.id, selectedBushoIds, onComplete, promptBusho);
+                            this.game.commandSystem.handleBushoSelectionForDefSelfReinf(bestCastle.id, selectedBushoIds, defCastle, onComplete, promptBusho);
                         },
                         onCancel: () => {
                             this.game.ui.showDialog("援軍の派遣を取りやめました。", false, () => onComplete(null));

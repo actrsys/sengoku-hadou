@@ -2996,10 +2996,10 @@ class CommandSystem {
 
             // 自軍援軍の時はそのまま進む
             if (mode === 'atk_self_reinforcement') {
-                this._promptPlayerAtkSelfReinforcement(targetCastle, temp.atkCastle, temp.targetCastle, temp.onComplete, backToMap);
+                this.game.commandSystem._promptPlayerAtkSelfReinforcement(targetCastle, temp.atkCastle, temp.targetCastle, temp.onComplete, backToMap);
             } else if (mode === 'def_self_reinforcement') {
                 // ★修正：warManagerではなく、command_system内の魔法を直接呼び出します！
-                this._promptPlayerDefSelfReinforcement(targetCastle, temp.defCastle, temp.onComplete, backToMap);
+                this.game.commandSystem._promptPlayerDefSelfReinforcement(targetCastle, temp.defCastle, temp.onComplete, backToMap);
             }
             return;
         }
