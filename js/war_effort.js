@@ -187,8 +187,9 @@ Object.assign(WarManager.prototype, {
             }
         }
         
-        msgs.push(`「お味方の兵力はおよそ${allyVal}。敵方はおよそ${enemyVal}。${enemyReinfMsg}」`);
-        msgs.push(`「${helperCastle.name}の兵力は${helperCastle.soldiers}。${bestBushoName}が在城しております。」`);
+        const allyName = isAttack ? "お味方" : defCastle.name;
+        msgs.push(`「${allyName}の兵力はおよそ${allyVal}。敵方はおよそ${enemyVal}。${enemyReinfMsg}」`);
+        msgs.push(`「${helperCastle.name}の兵力は${helperCastle.soldiers}。${bestBushoName}殿が在城しております。」`);
 
         let idx = 0;
         const showNext = () => {
@@ -637,7 +638,7 @@ Object.assign(WarManager.prototype, {
                             }
                         });
                     }
-                    choices.push({ label: '送らない', className: 'btn-secondary', onClick: () => resolveConfirmed(false) });
+                    choices.push({ label: '送らない', className: 'btn-danger', onClick: () => resolveConfirmed(false) });
                     
                     this.game.ui.showDialog(`${requesterName}殿が${targetInfoStr}${reinfCastleName}に参戦を求めています。\n援軍を送りますか？`, false, null, null, { choices: choices });
                 };
@@ -2914,7 +2915,7 @@ Object.assign(WarManager.prototype, {
                             }
                         });
                     }
-                    choices.push({ label: '送らない', className: 'btn-secondary', onClick: () => onComplete(null) });
+                    choices.push({ label: '送らない', className: 'btn-danger', onClick: () => onComplete(null) });
 
                     this.game.ui.showDialog(`${requesterName}殿が${bestCastle.name}に参戦を求めています。\n援軍を送りますか？`, false, null, null, { choices: choices });
                 };
