@@ -93,8 +93,7 @@ window.GameEvents.push({
         mapOverlay.style.zIndex = '7500'; 
         mapOverlay.style.display = 'flex';
         mapOverlay.style.justifyContent = 'center';
-        mapOverlay.style.alignItems = 'flex-start';
-        mapOverlay.style.paddingTop = '5vh'; 
+        mapOverlay.style.alignItems = 'center';
 
         const mapContainer = document.createElement('div');
         mapContainer.style.position = 'relative';
