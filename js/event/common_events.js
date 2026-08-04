@@ -1393,8 +1393,8 @@ window.GameEvents.push({
 
         // すべての大名家（臣従する側）を順番に探していきます
         for (const clan of game.clans) {
-            // 空き城データやプレイヤー自身の勢力、今月すでに吸収された勢力は飛ばします
-            if (clan.id === 0 || clan.id === playerClanId || absorbedClans.has(clan.id)) continue;
+            // 空き城データやプレイヤー自身の勢力、今月すでに吸収された勢力、滅亡済みの勢力は飛ばします
+            if (clan.id === 0 || clan.id === playerClanId || absorbedClans.has(clan.id) || clan.isDestroyed) continue;
 
             const aiDaimyo = game.getClanDaimyo(clan.id);
             if (!aiDaimyo) continue;
@@ -1416,7 +1416,7 @@ window.GameEvents.push({
                         
                         const targetClan = game.getClan(targetId);
                         const targetDaimyo = game.getClanDaimyo(targetId);
-                        if (!targetClan || !targetDaimyo) return;
+                        if (!targetClan || targetClan.isDestroyed || !targetDaimyo) return;
 
                         // 従属・支配期間のカウントが24未満なら飛ばします
                         if (diplomacyData.subordinateMonths < 24) return;
