@@ -1533,6 +1533,9 @@ class UIInfoManager {
                     // ゲージやアイコンなどの複雑な要素がある場合はスキップします
                     if (cell.querySelector('.bar-bg') || cell.querySelector('.bar-bg-busho') || cell.querySelector('input') || cell.querySelector('img')) continue;
 
+                    // ★追加：前回 ui_info_busho.js で「最初から縮めた状態」にした要素を見つけたら、二重処理によるチラつきを防ぐためロボットをストップさせます！
+                    if (cell.querySelector('span[style*="transform"]')) continue;
+
                     const textLen = cell.textContent.trim().length;
 
                     // 4文字を超える場合（5文字以上）のみ縮小します
