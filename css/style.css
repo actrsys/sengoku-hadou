@@ -1813,25 +1813,14 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
     border-radius: 2px;
 }
 
+/* 限界突破したゲージがそのまま枠を突き破る魔法 */
 .bar-fill-busho.over-connected {
-    border-radius: 2px 0 0 2px;
-}
-
-.bar-fill-busho-over {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 100%;
-    margin-left: -4px;
-    padding-left: 4px;
-    box-sizing: content-box;
-    border-radius: 0 2px 2px 0;
-    background: linear-gradient(to right, #ffb74d 0px, #ffb74d 4px, #dcd8c0 30%, #fffff0 100%);
-    box-shadow: 
-        0 -1px 0 rgba(0, 0, 0, 0.25),
-        0 -2px 0 rgba(0, 0, 0, 0.08),
-        0 1px 0 rgba(0, 0, 0, 0.25),
-        0 2px 0 rgba(0, 0, 0, 0.08);
+    position: relative;
+    z-index: 10; /* 親の枠線を完全に覆い隠すために手前に出します */
+    border-radius: 2px;
+    /* 先端に向かって急激に白く発光するグラデーション */
+    background: linear-gradient(to right, #d35400 0%, #ffb74d 60%, #fffff0 100%);
+    box-shadow: 0 0 6px rgba(255, 255, 240, 0.8);
 }
 
 .bar-fill-busho-over::before {

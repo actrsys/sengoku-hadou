@@ -198,11 +198,10 @@ Object.assign(UIInfoManager.prototype, {
             let percent = perceived !== null ? Math.max(0, perceived) : 0;
             if(perceived === null) percent = 0; 
 
-            // ★修正：計算式は元の「100を基準」に戻します
-            let basePercent = Math.min(100, percent);
-            let overPercent = percent > 100 ? percent - 100 : 0;
-            let overBarHtml = overPercent > 0 ? `<div class="bar-fill-busho-over" style="width:${overPercent}%;"></div>` : "";
-            let fillClass = overPercent > 0 ? "bar-fill-busho over-connected" : "bar-fill-busho";
+            // ★変更：限界突破のゲージを分けず、1つのゲージがそのまま枠を突き破るようにします
+            let basePercent = percent;
+            let overBarHtml = ""; 
+            let fillClass = percent > 100 ? "bar-fill-busho over-connected" : "bar-fill-busho";
 
             const expInfo = typeof busho.getExpInfo === 'function' ? busho.getExpInfo(statKey) : null;
 
