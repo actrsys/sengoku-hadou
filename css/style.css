@@ -1815,6 +1815,8 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
 
 .bar-fill-busho.over-connected {
     border-radius: 2px 0 0 2px;
+    position: relative;
+    z-index: 1; /* 限界突破ゲージよりも手前に出す魔法です */
 }
 
 .bar-fill-busho-over {
@@ -1841,8 +1843,8 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
     border-radius: 0 2px 2px 0;
     /* 左端を元のゲージと同じ明るいオレンジ（#ffb74d）にして、白へ繋げます */
     background: linear-gradient(to right, #ffb74d 0%, #dcd8c0 30%, #fffff0 100%);
-    /* 光の中心を右に2ピクセルずらすことで、左側の元ゲージに光が落ちるのを防ぎます */
-    box-shadow: 2px 0 4px rgba(255, 255, 240, 0.6);
+    /* 光の位置を中心に戻します（左の漏れは手前のゲージが隠してくれます） */
+    box-shadow: 0 0 4px rgba(255, 255, 240, 0.6);
 }
 
 /* ★追加：経験値ゲージの中身（白いバー） */
