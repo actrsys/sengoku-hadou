@@ -1636,7 +1636,7 @@ class FieldWarManager {
         // ★追加: 騎馬の地形ペナルティ
         if (unit && unit.troopType === 'kiba') {
             if (terrain === 'mountain') {
-                if (!SkillManager.canKibaEnterMountain(unit, this.game)) {
+                if (!SkillManager.hasMountainSkill(unit, this.game)) {
                     return 999; // 踏破がなければ山は通行不可！
                 }
                 // 踏破があれば足軽と同じコスト(3)で入れるので加算はしません
@@ -1648,10 +1648,11 @@ class FieldWarManager {
         // ★追加: 海の判定
         let isSea = (this.grid && this.grid[row] && this.grid[row][x]) ? this.grid[row][x].isSea : false;
 
-        // ★追加: 忍術適性による移動コスト軽減（足軽限定、山岳・森・川のみ）
-        let ninjutsuReduction = 0;
+        // ★追加: 忍術適性・踏破スキルによる移動コスト軽減（足軽限定）
+        let terrainMoveReduction = 0;
         if (typeof SkillManager !== 'undefined') {
-            ninjutsuReduction = SkillManager.getNinjutsuMoveCostReduction(unit, terrain, isSea, this.game);
+            terrainMoveReduction += SkillManager.getNinjutsuMoveCostReduction(unit, terrain, isSea, this.game);
+            terrainMoveReduction += SkillManager.getMountainMoveCostReduction(unit, terrain, this.game);
         }
 
         // ★追加: 海の移動コスト軽減 (操船)
@@ -1660,9 +1661,9 @@ class FieldWarManager {
             baseCost = Math.max(1, baseCost - reduction); // 最低コスト1は守ります
         }
 
-        // 忍術の移動コスト軽減の適用
-        if (ninjutsuReduction > 0) {
-            baseCost = Math.max(1, baseCost - ninjutsuReduction); // 最低コスト1は守ります
+        // スキル適性の移動コスト軽減の適用
+        if (terrainMoveReduction > 0) {
+            baseCost = Math.max(1, baseCost - terrainMoveReduction); // 最低コスト1は守ります
         }
 
         let zocCost = 1;
@@ -1765,9 +1766,14 @@ class FieldWarManager {
                     
                     // ★追加: ターゲットマスの計算にも騎馬ペナルティを含めます
                     if (unit.troopType === 'kiba') {
-                        if (terrain === 'mountain' && !SkillManager.canKibaEnterMountain(unit, this.game)) c = 999;
+                        if (terrain === 'mountain' && !SkillManager.hasMountainSkill(unit, this.game)) c = 999;
                         if (terrain === 'forest') c += 1;
                         if (terrain === 'river') c += 1;
+                    }
+                    
+                    // ★追加: スキルによるコスト軽減を反映させます（最低コスト1は守る）
+                    if (typeof SkillManager !== 'undefined') {
+                        c = Math.max(1, c - SkillManager.getMountainMoveCostReduction(unit, terrain, this.game));
                     }
                 }
 

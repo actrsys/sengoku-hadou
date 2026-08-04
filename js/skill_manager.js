@@ -99,7 +99,7 @@ const SKILL_DESCRIPTIONS = {
     
     // ----- 移動・環境系 -----
     // 踏破
-    [SKILL_NAMES.MOUNTAIN]: "①騎馬隊で山岳地形へ侵入可能になる。（野戦）",
+    [SKILL_NAMES.MOUNTAIN]: "①足軽隊である時、山岳地形へ侵入する際の消費行動力が１減少する。（野戦）\n②騎馬隊である時、山岳地形へ侵入可能になる。（野戦）",
     // 悪天巧者
     [SKILL_NAMES.WEATHER]: "①悪天候時に受ける行動力のペナルティを無効化する。（野戦）\n②悪天候時に受けるダメージ補正のペナルティを無効化する。（野戦／攻城戦）",
     // 退き巧者
@@ -566,8 +566,17 @@ class SkillManager {
     }
 
     // 「踏破」を持っているか（天下布武も兼ねる）
-    static canKibaEnterMountain(unit, game) {
+    static hasMountainSkill(unit, game) {
         return this.hasSkill(unit, SKILL_NAMES.MOUNTAIN, game) || this.hasSkill(unit, SKILL_NAMES.TENKA_FUBU, game);
+    }
+
+    // 野戦で足軽隊の時、山岳地形に侵入するための必要行動力を１軽減する魔法です
+    static getMountainMoveCostReduction(unit, terrain, game) {
+        if (unit.troopType !== 'ashigaru') return 0;
+        if (terrain === 'mountain' && this.hasMountainSkill(unit, game)) {
+            return 1;
+        }
+        return 0;
     }
 
     // 「退き巧者」を持っているか（天下布武も兼ねる）
