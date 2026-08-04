@@ -1709,8 +1709,8 @@ class AIEngine {
                 const horseFillRate = (castle.horses || 0) / targetAmount;
                 const gunFillRate = (castle.guns || 0) / targetAmount;
 
-                // ④ いよいよ点数（スコア）の計算です！基本は控えめの「10点」からスタートします
-                let horseScore = 10 + ((0.5 - horseFillRate) * 10);
+                // ④ いよいよ点数（スコア）の計算です！やや馬を優先するため、馬は「13点」、鉄砲は「10点」からスタートします
+                let horseScore = 13 + ((0.5 - horseFillRate) * 10);
                 let gunScore = 10 + ((0.5 - gunFillRate) * 10);
 
                 // 革新性による点数：高いほど鉄砲が、低いほど軍馬がプラスになります（最大で±5点）
