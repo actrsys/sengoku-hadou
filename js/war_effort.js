@@ -1212,7 +1212,7 @@ Object.assign(WarManager.prototype, {
                             if (resultType === 'attacker_win_fatal') {
                                 // ★修正：兵糧切れなどで降伏した場合、生き残った兵士を吸収できるように「soldiers = 0」にするのをやめました！
                                 if (this.game.ui && this.state.isPlayerInvolved) {
-                                    this.game.ui.log("野戦での敗北により、城はそのまま陥落しました！");
+                                    this.game.ui.log("野戦での敗北により、城は放棄されました！");
                                 }
                                 this.endWar(true);
                             } else if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') {

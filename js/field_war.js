@@ -2279,9 +2279,9 @@ class FieldWarManager {
                 else endMessage = `守備軍の総大将が戦線から離脱した！`;
                 endResult = 'attacker_win';
             } else {
-                if (isAtkPlayer) endMessage = `敵の総大将を撃破しました！（そのまま城を制圧します）`;
-                else if (isDefPlayer) endMessage = `総大将が撃破され、我が軍は敗北しました……（城も陥落します）`;
-                else endMessage = `守備軍の総大将が敗走した！（城はそのまま陥落する）`;
+                if (isAtkPlayer) endMessage = `敵の総大将を撃破しました！ そのまま拠点を制圧します！`;
+                else if (isDefPlayer) endMessage = `総大将が撃破され、我が軍は散り散りに敗走しました……`;
+                else endMessage = `守備軍の総大将が敗走した！`;
                 endResult = 'attacker_win_fatal';
             }
         }
@@ -2301,7 +2301,7 @@ class FieldWarManager {
             }
             else if (defTotalRice <= 0) {
                 if (isAtkPlayer) endMessage = `${enemyName}は兵糧が尽き、散り散りに敗走していきました！`;
-                else if (isDefPlayer) endMessage = `兵糧が底を突き、戦線を維持できません。城を放棄し敗走します……`;
+                else if (isDefPlayer) endMessage = `兵糧が底をつきました。城を放棄し敗走します……`;
                 else endMessage = `兵糧が尽き、守備軍は城を放棄して敗走した！`;
                 endResult = 'attacker_win_fatal';
             }
