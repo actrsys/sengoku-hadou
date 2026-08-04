@@ -537,86 +537,16 @@ class KunishuSystem {
             const kunishuName = kunishu.getName(this.game);
             const leaderName = leader ? leader.name.replace('|', '') : "頭領";
 
-            // ★後継ぎ候補が誰もいなくなった場合（合流か、モブ生成）
+            // ★後継ぎ候補が誰もいなくなった場合（モブ生成）
             if (allCandidates.length === 0) {
-                let isIncorporated = false; // 取込が成功したかどうかの印です
+                const inheritedAffinity = leader ? (leader.affinity || 50) : 50;
+                const inheritedInnovation = leader ? (leader.innovation || 0) : 0;
+                this.createAutoLeader(kunishu, inheritedAffinity, inheritedInnovation);
 
-                // お亡くなりになった頭領に一門（親戚）がいるか調べます
-                if (leader && leader.familyIds && leader.familyIds.length > 0) {
-                    const externalRelatives = this.game.bushos.filter(b => 
-                        b.status === 'active' && 
-                        b.id !== leader.id && 
-                        b.clan > 0 && 
-                        leader.familyIds.some(fId => b.familyIds.includes(fId))
-                    );
-
-                    if (externalRelatives.length > 0) {
-                        externalRelatives.forEach(b => {
-                            b._affinityDiff = Math.abs((leader.affinity || 0) - (b.affinity || 0));
-                            b._baseScore = b.leadership + b.intelligence;
-                        });
-
-                        externalRelatives.sort((a, b) => {
-                            if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
-                            const aIsYounger = a.birthYear > leader.birthYear;
-                            const bIsYounger = b.birthYear > leader.birthYear;
-                            if (aIsYounger && !bIsYounger) return -1;
-                            if (!aIsYounger && bIsYounger) return 1;
-                            if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
-                            return b._baseScore - a._baseScore;
-                        });
-
-                        const bestRel = externalRelatives[0];
-                        const targetClanId = bestRel.clan;
-                        const targetCastleId = bestRel.castleId;
-                        const targetCastle = this.game.getCastle(targetCastleId);
-
-                        if (targetCastle) {
-                            targetCastle.soldiers = Math.min(99999, targetCastle.soldiers + kunishu.soldiers);
-                            targetCastle.horses = Math.min(99999, (targetCastle.horses || 0) + (kunishu.horses || 0));
-                            targetCastle.guns = Math.min(99999, (targetCastle.guns || 0) + (kunishu.guns || 0));
-                            
-                            kunishu.isDestroyed = true;
-                            kunishu.soldiers = 0;
-
-                            const clanData = this.game.getClan(targetClanId);
-                            const clanName = clanData ? clanData.name : "";
-                            
-                            let targetStr = clanName + "に";
-                            if (targetClanId === this.game.playerClanId) {
-                                targetStr = "当家に";
-                            }
-                            
-                            const baseMsg = `${kunishuName}の${leaderName}が死亡しました。${kunishuName}は${targetStr}臣従しました。`;
-                            
-                            // ログ（履歴）には【ラベル】を付けます
-                            this.game.ui.log(`【諸勢力臣従】${baseMsg}`);
-                            
-                            // 大名と同じように、画面を止めてダイアログを出します！
-                            await this.game.ui.showDialogAsync(baseMsg, false, 0);
-                            
-                            // プレイヤーの勢力に合流してくれた場合のUI更新
-                            if (targetClanId === this.game.playerClanId) {
-                                if (this.game.ui.updatePanelHeader) this.game.ui.updatePanelHeader();
-                                if (this.game.ui.renderCommandMenu) this.game.ui.renderCommandMenu();
-                                if (this.game.ui.renderMap) this.game.ui.renderMap();
-                            }
-                            
-                            isIncorporated = true;
-                        }
-                    }
-                }
-
-                if (!isIncorporated) {
-                    const inheritedAffinity = leader ? (leader.affinity || 50) : 50;
-                    const inheritedInnovation = leader ? (leader.innovation || 0) : 0;
-                    this.createAutoLeader(kunishu, inheritedAffinity, inheritedInnovation);
-
-                    // ★ダイアログとログを出します
-                    const baseMsg = `${kunishuName}の${leaderName}が死亡しました。`;
-                    this.game.ui.log(`【頭領死亡】${baseMsg}`);
-                    await this.game.ui.showDialogAsync(baseMsg, false, 0);
-                }
+                // ★ダイアログとログを出します
+                const baseMsg = `${kunishuName}の${leaderName}が死亡しました。`;
+                this.game.ui.log(`【頭領死亡】${baseMsg}`);
+                await this.game.ui.showDialogAsync(baseMsg, false, 0);
                 return; 
             }
 
