@@ -1050,11 +1050,19 @@ Object.assign(UIInfoManager.prototype, {
                 const inputType = isMulti ? 'checkbox' : 'radio';
                 let inputHtml = !isViewMode ? `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} ${isSelected ? 'checked' : ''} style="display:none;">` : '';
 
+                // ★追加：長い名前が後から縮む時の「チラつき」を防ぐため、HTMLを作る段階で最初から縮めておきます！
+                let compressedNameHtml = b.name;
+                if (b.name && b.name.length >= 5) {
+                    let scale = 1.0 - (b.name.length - 4) * 0.1;
+                    if (scale < 0.55) scale = 0.55;
+                    compressedNameHtml = `<span style="font-size: ${scale}em; transform: scaleY(${1/scale}); letter-spacing: -0.5px; display: inline-block; transform-origin: left center;">${b.name}</span>`;
+                }
+
                 let cells = [];
                 if (this.bushoCurrentTab === 'stats') {
                     cells = [
                         !hideActionCol ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
-                        `<span class="col-name">${hideActionCol && !isViewMode ? inputHtml : ''}${b.name}</span>`,
+                        `<span class="col-name">${hideActionCol && !isViewMode ? inputHtml : ''}${compressedNameHtml}</span>`,
                         `<span class="col-rank">${b.getRankName()}</span>`,
                         `<span class="col-stat">${getStat('leadership')}</span>`,
                         `<span class="col-stat">${getStat('strength')}</span>`,
@@ -1093,8 +1101,7 @@ Object.assign(UIInfoManager.prototype, {
                     
                     cells = [
                         !hideActionCol ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
-                        `<span class="col-name">${hideActionCol && !isViewMode ? inputHtml : ''}${b.name}</span>`,
-                        // 横スクロールに戻す時のために残しておきます： `<span class="col-rank">${b.getRankName()}</span>`,
+                        `<span class="col-name">${hideActionCol && !isViewMode ? inputHtml : ''}${compressedNameHtml}</span>`,
                         `<span class="col-faction">${forceName}</span>`,
                         `<span class="col-castle">${bCastleName}</span>`,
                         `<span class="col-age">${age}</span>`,
