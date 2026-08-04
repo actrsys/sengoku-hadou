@@ -269,7 +269,8 @@ Object.assign(UIManager.prototype, {
             baseScale * (config.max || 2.5)     
         ];
         
-        if (this.zoomLevel === undefined) {
+        // ★マップが新しく作られる時（ロードやタイトルに戻った時）も、ズームをデフォルトに初期化します
+        if (this.zoomLevel === undefined || !this.hasInitializedMap) {
             if (this.game.phase === 'daimyo_select') {
                 // 0 番目：一番小さいサイズ（min） 1 番目：中くらいのサイズ（mid） 2 番目：一番大きいサイズ（max）
                 this.zoomLevel = 1; 
