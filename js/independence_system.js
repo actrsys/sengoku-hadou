@@ -1033,19 +1033,28 @@ class IndependenceSystem {
                     });
                 }
             }
-
+            
             if (result === 'rebel_win') {
                 // 【反乱軍の勝利】
-                this.game.ui.log(`反乱軍が勝利し、${oldDaimyo.name}は討死しました。`);
-
-                // ★追加：データが変わってマップの色がフライングで塗り替わるのを防ぐストッパーをかけます！
+                
+                // ★追加：データが変わってマップの色がフフライングで塗り替わるのを防ぐストッパーをかけます！
                 this.game.isSuspendingColorUpdate = true;
+                
+                // ★ここから修正：旧大名が討死するか追放されるかを判定します
+                const currentYear = this.game.year;
+                const isDaimyoDead = oldDaimyo.deathFlag === true || currentYear >= oldDaimyo.originalEndYear;
 
                 // 勝手に後継ぎが選ばれて大名が2人にならないように、先に大名の印を外しておきます
                 oldDaimyo.isDaimyo = false;
 
-                // 大名死亡処理（life_systemにお任せします）
-                await this.game.lifeSystem.executeDeath(oldDaimyo);
+                if (isDaimyoDead) {
+                    this.game.ui.log(`反乱軍が勝利し、${oldDaimyo.name}は討死しました。`);
+                    // 大名死亡処理（life_systemにお任せします）
+                    await this.game.lifeSystem.executeDeath(oldDaimyo);
+                } else {
+                    this.game.ui.log(`反乱軍が勝利し、${oldDaimyo.name}は追放されました。`);
+                    // 追放の場合は後で他の家臣と一緒に浪人として逃亡させます
+                }
 
                 // ★ここから追加：逃亡先の城を探す魔法です
                 let escapeCastleId = castle.id; // 万が一見つからなかった時のために、今の城を覚えておきます
@@ -1095,10 +1104,10 @@ class IndependenceSystem {
                 }
                 // ★逃亡先探しここまで
                 
-                // ★変更：主家側として戦って負けた武将たちを全員「浪人」にして、逃亡先に移動させます！（亡くなった大名本人は除外）
+                // ★変更：主家側として戦って負けた武将たちを全員「浪人」にして、逃亡先に移動させます！（討死した大名本人は除外）
                 const roninBushos = []; // 後で一門の子どもたちを探すためのメモ帳です
                 daimyoMembers.forEach(b => {
-                    if (b.id !== oldDaimyo.id) {
+                    if (b.id !== oldDaimyo.id || !isDaimyoDead) {
                         this.game.affiliationSystem.becomeRonin(b);
                         this.game.affiliationSystem.moveCastle(b, escapeCastleId);
                         roninBushos.push(b);
@@ -1106,7 +1115,6 @@ class IndependenceSystem {
                 });
 
                 // ★追加：主家や逃げた武将の「一門」で、まだ登場していない子どもたちを処理します！
-                const currentYear = this.game.year;
                 const unbornFamily = this.game.bushos.filter(b => {
                     if (b.status !== 'unborn') return false; // まだ登場していない人だけを探します
                     
@@ -1247,7 +1255,12 @@ class IndependenceSystem {
                 const info = rebellionLeader._nameChangeInfo;
                 const leaderNameStr = (info && info.isNameChanged) ? info.oldNameStr : rebellionLeader.name.replace(/\|/g, '');
                 
-                let resultMsg = `${oldDaimyoNameStr}は討死しました！\n${leaderNameStr}が新たな大名となります！`;
+                let resultMsg = "";
+                if (isDaimyoDead) {
+                    resultMsg = `${oldDaimyoNameStr}は討死しました！\n${leaderNameStr}が新たな大名となります！`;
+                } else {
+                    resultMsg = `${oldDaimyoNameStr}は追放されました！\n${leaderNameStr}が新たな大名となります！`;
+                }
                 await this.game.ui.showDialogAsync(resultMsg);
 
                 // ★変更：改名があった場合は、文章を分けてダイアログを出します
