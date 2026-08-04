@@ -1822,6 +1822,7 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
     top: 0;
     bottom: 0;
     left: 100%;
+    margin-left: -1px;
     border-radius: 0 2px 2px 0;
     background: linear-gradient(to right, #dcd8c0, #fffff0);
     box-shadow: 0 0 4px rgba(255, 255, 240, 0.6);
