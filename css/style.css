@@ -1826,7 +1826,10 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
     padding-left: 2px;
     box-sizing: content-box;
     border-radius: 0 2px 2px 0;
-    background: linear-gradient(to right, #ffb74d 0%, #dcd8c0 30%, #fffff0 100%);
+    background: 
+        linear-gradient(to right, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0) 80%) top / 100% 2px no-repeat,
+        linear-gradient(to right, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0) 80%) bottom / 100% 2px no-repeat,
+        linear-gradient(to right, #ffb74d 0%, #dcd8c0 30%, #fffff0 100%);
 }
 
 .bar-fill-busho-over::before {
