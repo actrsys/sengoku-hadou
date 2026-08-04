@@ -1482,12 +1482,18 @@ class UIInfoManager {
                     clickStr = `onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); ${item.onClick}"`;
                 }
             }
+
+            // ★追加：スクロールで順番がズレないよう、データ上の「本当の出席番号（index）」を見て色分けのシールを貼ります！
+            const stripeClass = (index % 2 === 1) ? "row-striped" : "";
+
             // 先ほどの文字数を数える魔法は取り消して、シンプルな形に戻します
             const cells = item.cells.map(c => {
                 const strC = String(c);
                 return strC.trim().startsWith('<') ? strC : `<span>${strC}</span>`;
             }).join('');
-            return `<div class="select-item ${config.itemClass || ''} ${extraClass}" ${cursorStr} ${clickStr} ${indexAttr}>${cells}</div>`;
+            
+            // ★変更：クラスのリストに ${stripeClass} を追加します
+            return `<div class="select-item ${config.itemClass || ''} ${extraClass} ${stripeClass}" ${cursorStr} ${clickStr} ${indexAttr}>${cells}</div>`;
         };
 
         if (!config.items || config.items.length === 0) {

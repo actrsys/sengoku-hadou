@@ -573,7 +573,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 /* リストヘッダー・アイテム (ゼブラ柄) */
 .list-header { background: #0d1a10; color: #ffd54f; font-weight: bold; position: sticky; top: 0; z-index: 10; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .select-item { border-bottom: 1px solid rgba(255,215,79,0.3); scroll-snap-align: start; cursor: pointer; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
-.select-item:nth-child(even) { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
+.select-item.row-striped { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
 .select-item:hover { background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%) !important; }
 .select-item.disabled { color: #9e9e9e !important; pointer-events: none; background: linear-gradient(to bottom, #455a64 0%, #263238 100%) !important; text-shadow: 1px 1px 0 #000 !important; }
 .select-item.selected { background: rgba(255, 152, 0, 0.4) !important; border-left: 5px solid #ffd54f; }
@@ -638,7 +638,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 
 /* 履歴リストアイテム */
 .history-list-item { scroll-snap-align: start; padding: 8px 10px; border-bottom: 1px solid rgba(255, 215, 79, 0.3); font-size: 0.9rem; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
-.history-list-item:nth-child(even) { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
+.history-list-item.row-striped { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
 .history-list-item:last-child { border-bottom: none; }
 
 /* ★追加：履歴画面やリスト画面の全体高さを、行数や空っぽに関係なく固定する魔法 */
