@@ -126,16 +126,39 @@ class FieldWarManager {
         // 目標とするマス数分の「本来の横幅(ピクセル)」を計算します
         const targetWidthPx = (targetCols - 1) * (this.hexW * 0.75) + this.hexW;
         
-        // 実際の画面の横幅を測ります
+        // 実際の画面の横幅・縦幅を測ります
         const availableWidth = scrollArea.clientWidth;
+        const availableHeight = scrollArea.clientHeight;
 
-        // 画面の幅にピッタリ合わせるための拡大/縮小率（スケール）を割り出します
+        // マップ全体の実際の幅と高さを計算します
+        const totalW = (this.cols - 1) * (this.hexW * 0.75) + this.hexW;
+        const totalH = (this.rows * 2 - 1) * (this.hexH / 2) + this.hexH;
+
+        // マップの外側が見えない（画面を覆い尽くす）最小のスケールを計算します
+        const minScaleX = availableWidth / totalW;
+        const minScaleY = availableHeight / totalH;
+        // 縦・横どちらも画面より小さくならないように、大きい方を採用します
+        const minCoverScale = Math.max(minScaleX, minScaleY);
+
+        // 画面の幅にピッタリ合わせるための基本の拡大/縮小率（スケール）を割り出します
         const baseScale = availableWidth / targetWidthPx;
 
         // ズーム段階の設定
         // PC版は今の状態(baseScale)をズーム状態(大)として設定し、半分程度をズームアウト状態(小)にする
         // スマホ版は今の状態(baseScale)をズームアウト状態(小)として設定し、倍程度をズーム状態(大)にする
-        this.fwZoomStages = isPC ? [baseScale * 0.6, baseScale] : [baseScale, baseScale * 2.0];
+        let zoomOutScale = isPC ? baseScale * 0.6 : baseScale;
+        let zoomInScale = isPC ? baseScale : baseScale * 2.0;
+
+        // ズームアウトした時にマスの外側（背景）が見えないように、限界値（minCoverScale）でガードします
+        zoomOutScale = Math.max(zoomOutScale, minCoverScale);
+        zoomInScale = Math.max(zoomInScale, minCoverScale); // 念のためこちらもガード
+
+        // もし限界値が大きすぎてズームインより大きくなってしまった場合の安全装置です
+        if (zoomOutScale >= zoomInScale) {
+            zoomInScale = zoomOutScale * 1.5;
+        }
+
+        this.fwZoomStages = [zoomOutScale, zoomInScale];
         
         if (this.fwZoomLevel === undefined) {
             this.fwZoomLevel = isPC ? 1 : 0;
