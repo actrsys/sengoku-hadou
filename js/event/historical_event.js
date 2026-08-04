@@ -674,9 +674,9 @@ window.GameEvents.push({
                 const oldSoldiers = c.soldiers || 0;
                 const oldPopulation = c.population || 0;
                 
-                // 兵力を0.7倍、人口を0.8倍にします（小数点は切り捨てます）
-                c.soldiers = Math.floor(oldSoldiers * 0.7);
-                c.population = Math.floor(oldPopulation * 0.8);
+                // 兵力を0.5倍、人口を0.7倍にします（小数点は切り捨てます）
+                c.soldiers = Math.floor(oldSoldiers * 0.5);
+                c.population = Math.floor(oldPopulation * 0.7);
                 
                 // 元の数から今の数を引いて「減った数」を計算し、合計の箱に足していきます
                 totalLostSoldiers += (oldSoldiers - c.soldiers);
