@@ -130,14 +130,76 @@ class FieldWarManager {
         const availableWidth = scrollArea.clientWidth;
 
         // 画面の幅にピッタリ合わせるための拡大/縮小率（スケール）を割り出します
-        let scale = availableWidth / targetWidthPx;
+        const baseScale = availableWidth / targetWidthPx;
 
-        // 割り出したスケールをマップに適用します
-        mapArea.style.transformOrigin = 'top left';
-        mapArea.style.transform = `scale(${scale})`;
-        mapArea.style.margin = '0';
+        // ズーム段階の設定
+        // PC版は今の状態(baseScale)をズーム状態(大)として設定し、半分程度をズームアウト状態(小)にする
+        // スマホ版は今の状態(baseScale)をズームアウト状態(小)として設定し、倍程度をズーム状態(大)にする
+        this.fwZoomStages = isPC ? [baseScale * 0.6, baseScale] : [baseScale, baseScale * 2.0];
+        
+        if (this.fwZoomLevel === undefined) {
+            this.fwZoomLevel = isPC ? 1 : 0;
+        }
+
+        this.applyMapScale();
         
         scrollArea.style.display = 'block';
+    }
+
+    // マップのスケールを適用する魔法
+    applyMapScale(targetScale, cx, cy) {
+        const mapArea = document.getElementById('fw-map');
+        const scrollArea = document.getElementById('fw-map-scroll');
+        if (!mapArea || !scrollArea) return;
+
+        let scale = targetScale !== undefined ? targetScale : this.fwZoomStages[this.fwZoomLevel];
+
+        let oldScale = this.currentMapScale || scale;
+        this.currentMapScale = scale;
+
+        if (cx !== undefined && cy !== undefined) {
+            const rect = scrollArea.getBoundingClientRect();
+            const clientX = cx - rect.left;
+            const clientY = cy - rect.top;
+
+            const logicalX = (scrollArea.scrollLeft + clientX) / oldScale;
+            const logicalY = (scrollArea.scrollTop + clientY) / oldScale;
+
+            mapArea.style.transformOrigin = 'top left';
+            mapArea.style.transform = `scale(${scale})`;
+            mapArea.style.margin = '0';
+
+            scrollArea.scrollLeft = logicalX * scale - clientX;
+            scrollArea.scrollTop = logicalY * scale - clientY;
+        } else {
+            mapArea.style.transformOrigin = 'top left';
+            mapArea.style.transform = `scale(${scale})`;
+            mapArea.style.margin = '0';
+        }
+    }
+
+    // マップのズームを変更する魔法
+    changeFwMapZoom(direction, cx, cy) {
+        if (!this.fwZoomStages) return;
+        let nextIdx = this.fwZoomLevel + direction;
+        if (nextIdx < 0) nextIdx = 0;
+        if (nextIdx >= this.fwZoomStages.length) nextIdx = this.fwZoomStages.length - 1;
+
+        if (nextIdx === this.fwZoomLevel) return;
+
+        this.fwZoomLevel = nextIdx;
+        this.applyMapScale(this.fwZoomStages[this.fwZoomLevel], cx, cy);
+        
+        // ズーム後に部隊情報パネルがズレないよう再配置します
+        if (this.isInfoMode && this.turnQueue && this.turnQueue.length > 0) {
+            const currentUnit = this.turnQueue[0];
+            const activeEl = document.getElementById(`fw-unit-el-${currentUnit.id}`);
+            if (activeEl && activeEl.classList.contains('active')) {
+                setTimeout(() => {
+                    this.showUnitInfo(currentUnit);
+                }, 50);
+            }
+        }
     }
     
     async startFieldWar(warState, onComplete) {
@@ -538,7 +600,7 @@ class FieldWarManager {
                     scrollEl.scrollTop = scrollTop - walkY;
                 }
             };
-
+            
             // ★マップ全体の操作を見張って、「ドラッグした直後のクリック」ならマス目への指示をキャンセルするガードマンです
             scrollEl.addEventListener('click', (e) => {
                 if (isMoved) {
@@ -551,6 +613,73 @@ class FieldWarManager {
                     }
                 }
             }, true); // true にすることで、誰よりも早く見張ることができます
+
+            // ★ここから追加: 野戦マップのズーム操作
+            this.isFwZooming = false;
+            scrollEl.addEventListener('wheel', (e) => {
+                if (document.body.classList.contains('is-pc')) {
+                    e.preventDefault(); 
+                    if (this.isFwZooming) return; 
+                    
+                    this.isFwZooming = true;
+                    setTimeout(() => { this.isFwZooming = false; }, 300); 
+
+                    if (e.deltaY < 0) this.changeFwMapZoom(1, e.clientX, e.clientY);       
+                    else if (e.deltaY > 0) this.changeFwMapZoom(-1, e.clientX, e.clientY); 
+                }
+            }, { passive: false });
+
+            let initialPinchDist = null;
+
+            scrollEl.addEventListener('touchstart', (e) => {
+                if (e.touches.length >= 2) {
+                    e.preventDefault(); 
+                }
+                if (e.touches.length === 2) {
+                    initialPinchDist = Math.hypot(
+                        e.touches[0].pageX - e.touches[1].pageX,
+                        e.touches[0].pageY - e.touches[1].pageY
+                    );
+                }
+            }, { passive: false });
+
+            scrollEl.addEventListener('touchmove', (e) => {
+                if (e.touches.length >= 2) {
+                    e.preventDefault(); 
+                }
+                if (e.touches.length === 2) {
+                    if (initialPinchDist === null) return;
+                    
+                    if (this.isFwZooming) return;
+                    
+                    const currentDist = Math.hypot(
+                        e.touches[0].pageX - e.touches[1].pageX,
+                        e.touches[0].pageY - e.touches[1].pageY
+                    );
+                    
+                    const diff = currentDist - initialPinchDist;
+                    
+                    const rect = scrollEl.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+
+                    if (diff > 40) {
+                        this.isFwZooming = true; setTimeout(() => { this.isFwZooming = false; }, 300); 
+                        this.changeFwMapZoom(1, centerX, centerY);
+                        initialPinchDist = currentDist; 
+                    } else if (diff < -40) {
+                        this.isFwZooming = true; setTimeout(() => { this.isFwZooming = false; }, 300); 
+                        this.changeFwMapZoom(-1, centerX, centerY);
+                        initialPinchDist = currentDist;
+                    }
+                }
+            }, { passive: false });
+
+            scrollEl.addEventListener('touchend', (e) => {
+                if (e.touches.length < 2) {
+                    initialPinchDist = null;
+                }
+            });
         }
 
         const btnWait = document.getElementById('fw-btn-wait');
