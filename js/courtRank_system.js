@@ -157,17 +157,17 @@ class CourtRankSystem {
 
         // 国主限定の優先官位
         if (busho.isCommander && !busho.isDaimyo) {
-            if (bushoId === 1006004) preferredRankIds = [151]; // 木下秀吉: 筑前守
-            else if (bushoId === 1006002) preferredRankIds = [114]; // 柴田勝家: 修理亮
-            else if (bushoId === 1006003) preferredRankIds = [94]; // 丹羽長秀: 越前守
-            else if (bushoId === 1006007) preferredRankIds = [161, 162]; // 滝川一益: 左近将監
-            else if (bushoId === 1900001) preferredRankIds = [196]; // 明智光秀: 日向守
+            if (bushoId === 1401002) preferredRankIds = [151]; // 木下秀吉: 筑前守
+            else if (bushoId === 1006078) preferredRankIds = [114]; // 柴田勝家: 修理亮
+            else if (bushoId === 1006117) preferredRankIds = [94]; // 丹羽長秀: 越前守
+            else if (bushoId === 1006087) preferredRankIds = [161, 162]; // 滝川一益: 左近将監
+            else if (bushoId === 1201003) preferredRankIds = [196]; // 明智光秀: 日向守
         }
         
         // 大名限定の優先官位
         if (busho.isDaimyo) {
-            // 織田信長（ID:1006001、または名前で判定）
-            if (bushoId === 1006001 || bushoName === '織田信長') {
+            // 織田信長（ID:1006006、または名前で判定）
+            if (bushoId === 1006006 || bushoName === '織田信長') {
                 preferredRankIds = [25, 26, 27, 28, 160]; // 参議、弾正大忠
             }
         }
