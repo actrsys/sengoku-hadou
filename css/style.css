@@ -1822,17 +1822,16 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
     top: 0;
     bottom: 0;
     left: 100%;
-    margin-left: -2px;
-    padding-left: 2px;
+    margin-left: -4px;
+    padding-left: 4px;
     box-sizing: content-box;
     border-radius: 0 2px 2px 0;
-    background: linear-gradient(to right, #ffb74d 0%, #dcd8c0 30%, #fffff0 100%);
-    /* 追加：外側に2ドットの枠線（影）を落とします。外側ほど薄くしています */
+    background: linear-gradient(to right, #ffb74d 0px, #ffb74d 4px, #dcd8c0 30%, #fffff0 100%);
     box-shadow: 
-        0 -1px 0 rgba(0, 0, 0, 0.25), /* 上 1ドット目（少し濃い） */
-        0 -2px 0 rgba(0, 0, 0, 0.08), /* 上 2ドット目（薄い） */
-        0 1px 0 rgba(0, 0, 0, 0.25),  /* 下 1ドット目（少し濃い） */
-        0 2px 0 rgba(0, 0, 0, 0.08);  /* 下 2ドット目（薄い） */
+        0 -1px 0 rgba(0, 0, 0, 0.25),
+        0 -2px 0 rgba(0, 0, 0, 0.08),
+        0 1px 0 rgba(0, 0, 0, 0.25),
+        0 2px 0 rgba(0, 0, 0, 0.08);
 }
 
 .bar-fill-busho-over::before {
