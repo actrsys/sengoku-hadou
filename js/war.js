@@ -1567,7 +1567,7 @@ class WarManager {
         } else if (type === 'bow' || type === 'def_bow') {
             multiplier = 0.4;
             defMultiplier = 0.6;
-            counterRisk = 0.2;
+            counterRisk = 0.0;
             wallDmgRate = 0;
         } else if (type === 'siege') {
             multiplier = 0.5;
@@ -1780,18 +1780,24 @@ class WarManager {
         
         pushMsg(`${activeArmyName} の${actionName}！`);
         
-        pushMsg({
+        let damageMsgData = {
             type: 'damage',
             target: isAtkTurnGroup ? 'defender' : 'attacker',
             soldierDmgDetails: dmgResult.details,
             wallDmg: calculatedWallDmg,
-            counterTarget: s.turn,
-            counterDmg: actualCounterDmg,
             se: actionSe,
             currentStats: getCurrentStats()
-        });
+        };
         
-        let resultMsg = `敵兵 計${actualSoldierDmg}人`; 
+        // 実際の反撃ダメージが1以上の時だけ、ダメージのポップアップを表示します。
+        if (actualCounterDmg > 0) {
+            damageMsgData.counterTarget = s.turn;
+            damageMsgData.counterDmg = actualCounterDmg;
+        }
+        
+        pushMsg(damageMsgData);
+        
+        let resultMsg = `敵兵 計${actualSoldierDmg}人`;
         
         if (actualCounterDmg > 0) {
             resultMsg += ` を撃破し、反撃により ${actualCounterDmg}人 の損害を被った！`;
