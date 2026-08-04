@@ -1888,6 +1888,16 @@ class UIManager {
         
         const mobileArea = document.getElementById('command-area');
         const pcArea = document.getElementById('pc-new-command-area');
+        
+        // ★ここから追加：親の箱が隠れていてボタンが見えなくなるのを防ぐ魔法です！
+        if (document.body.classList.contains('is-pc')) {
+            const pcContainer = document.getElementById('pc-new-ui-container');
+            if (pcContainer) pcContainer.classList.remove('hidden');
+        } else {
+            // スマホ版の場合も念のため表示状態に戻します
+            if (mobileArea) mobileArea.style.display = 'grid';
+        }
+        
         const areas = [mobileArea, pcArea];
         
         areas.forEach(area => {
