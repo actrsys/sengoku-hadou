@@ -148,7 +148,7 @@ class FieldWarManager {
         // スマホ版は今の状態(baseScale)をズームアウト状態(小)として設定し、倍程度をズーム状態(大)にする
         let zoomOutScale = isPC ? baseScale * 0.6 : baseScale;
         let zoomInScale = isPC ? baseScale : baseScale * 2.0;
-
+        
         // ズームアウトした時にマスの外側（背景）が見えないように、限界値（minCoverScale）でガードします
         zoomOutScale = Math.max(zoomOutScale, minCoverScale);
         zoomInScale = Math.max(zoomInScale, minCoverScale); // 念のためこちらもガード
@@ -156,6 +156,11 @@ class FieldWarManager {
         // もし限界値が大きすぎてズームインより大きくなってしまった場合の安全装置です
         if (zoomOutScale >= zoomInScale) {
             zoomInScale = zoomOutScale * 1.5;
+        } else if (isPC) {
+            // ★PC版に限り、マップが狭くて引きとの差があまりない場合は、ズーム時の倍率を少し上げてメリハリをつけます
+            if (zoomInScale / zoomOutScale < 1.4) {
+                zoomInScale = zoomOutScale * 1.5;
+            }
         }
 
         this.fwZoomStages = [zoomOutScale, zoomInScale];
