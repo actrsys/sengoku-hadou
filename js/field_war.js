@@ -528,6 +528,7 @@ class FieldWarManager {
             }
 
             this.initUI();
+            this.initMapElements(); // ★追加：最初に1回だけマス目を作る魔法
             this.updateMap();
             this.updateStatus();
             this.log("両軍、布陣を完了。野戦を開始します！");
@@ -1307,10 +1308,14 @@ class FieldWarManager {
         }
     }
 
-    updateMap() {
+    // ==============================================
+    // ★追加: 最初に1回だけマップのマス目（土台）と部隊アイコンを作る魔法
+    // ==============================================
+    initMapElements() {
         if (!this.mapEl) return;
-        this.mapEl.innerHTML = '';
+        this.mapEl.innerHTML = ''; // 念のためお掃除
 
+        // 1. 移動ルートの線を引くための透明な画用紙（SVG）
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.id = 'fw-svg-layer';
         svg.style.position = 'absolute'; 
@@ -1322,9 +1327,8 @@ class FieldWarManager {
         svg.style.zIndex = '15';
         this.mapEl.appendChild(svg);
         
-        const unit = this.turnQueue[0];
-        const isPlayerTurn = this.isPlayerTurn();
-
+        // 2. マス目（HEX）を作る
+        this.hexElements = {}; // マス目をすぐ探し出せるようにする名簿
         for (let x = 0; x < this.cols; x++) {
             for (let row = 0; row < this.rows; row++) {
                 const y = (x % 2 === 0) ? row * 2 : row * 2 + 1;
@@ -1334,7 +1338,7 @@ class FieldWarManager {
                 hex.id = `fw-hex-${x}-${y}`; // IDをつけておく
 
                 if (this.grid && this.grid[row] && this.grid[row][x]) {
-                    // ★修正：勘違いしてマス目を真っ黒にしていました！元の地形クラスを付与するように戻します
+                    // ★修正：下地は黒ですが、マス目にはちゃんと地形の見た目（色）をつけます！
                     if (this.grid[row][x].isSea) {
                         hex.classList.add('hex-sea');
                     } else {
@@ -1345,184 +1349,47 @@ class FieldWarManager {
                 hex.style.left = `${x * (this.hexW * 0.75)}px`;
                 hex.style.top = `${y * (this.hexH / 2)}px`;
                 
-                if (isPlayerTurn && unit && !this.isInfoMode) {
-                    if (this.state === 'PHASE_MOVE' || this.state === 'MOVE_PREVIEW') {
-                        if (x === unit.x && y === unit.y) {
-                            hex.classList.add('current-pos');
-                        } else if (this.reachable && this.reachable[`${x},${y}`]) {
-                            hex.classList.add('movable');
-                        } else if (this.units.some(u => u.x === x && u.y === y && u.isAttacker === unit.isAttacker)) {
-                            const enemies = this.units.filter(u => u.isAttacker !== unit.isAttacker);
-                            let minStartDist = 999;
-                            enemies.forEach(e => {
-                                let d = this.getDistance(unit.x, unit.y, e.x, e.y);
-                                if (d < minStartDist) minStartDist = d;
-                            });
-                            
-                            // 描画時もそのマスの「地形コスト」を正しく見るようにしました
-                            let row_t = Math.floor(y / 2);
-                            let terrain_t = (this.grid && this.grid[row_t] && this.grid[row_t][x]) ? this.grid[row_t][x].terrain : 'plain';
-                            let baseCost = 1;
-                            if (terrain_t === 'forest') baseCost = 2;
-                            else if (terrain_t === 'river') baseCost = 3;
-                            else if (terrain_t === 'mountain') baseCost = 3;
-
-                            let minEnemyDistToTarget = 999;
-                            enemies.forEach(e => {
-                                let d = this.getDistance(x, y, e.x, e.y);
-                                if (d < minEnemyDistToTarget) minEnemyDistToTarget = d;
-                            });
-
-                            // ★追加: ZOCと地形の大きい方を採用
-                            let zocCost = (minEnemyDistToTarget <= 2) ? 2 : 1;
-                            let costToEnter = Math.max(baseCost, zocCost);
-                            
-                            if (this.getDistance(unit.x, unit.y, x, y) === 1) {
-                                // 自分のすぐ隣にいる味方の場合
-                                if (minStartDist === 1) costToEnter = Math.max(baseCost, 4); // 離脱ペナルティ
-                                // ★変更: "<=" ではなく "<" にすることで、ここで歩数が尽きる一番外側のマスは塗られません！
-                                if (costToEnter < unit.ap) hex.classList.add('movable');
-                            } else {
-                                // 離れた味方の場合
-                                let canPass = false;
-                                const neighbors = this.getNeighbors(x, y);
-                                for (let n of neighbors) {
-                                    let key = `${n.x},${n.y}`;
-                                    if (this.reachable && this.reachable[key]) {
-                                        // ★変更: ここも "<" にして、通り抜けられる余力があるかを見ます
-                                        if (this.reachable[key].cost + costToEnter < unit.ap) {
-                                            canPass = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                                if (canPass) hex.classList.add('movable');
-                            }
-                        }
-                    } else if (this.state === 'PHASE_DIR') {
-                        if (x === unit.x && y === unit.y) {
-                            hex.classList.add('current-pos');
-                        } else {
-                            const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
-                            // ★修正: 攻撃可能範囲かどうかの判定を共通関数化
-                            if (targetUnit && this.canAttackTarget(unit, x, y)) {
-                                let targetDir = this.getDirection(unit.x, unit.y, x, y);
-                                let turnCost = this.getTurnCost(unit.direction, targetDir);
-                                // ★修正：振り向くためのコスト＋攻撃コスト(1)が残っているか確認します！
-                                if (unit.ap >= turnCost + 1) {
-                                    hex.classList.add('attackable');
-                                }
-                            } else if (this.getDistance(unit.x, unit.y, x, y) === 1) {
-                                let targetDir = this.getDirection(unit.x, unit.y, x, y);
-                                let turnCost = this.getTurnCost(unit.direction, targetDir);
-                                if (unit.ap >= turnCost) {
-                                    hex.classList.add('fw-dir-highlight');
-                                }
-                            }
-                        }
-                    } else if (this.state === 'PHASE_ATTACK') {
-                        if (x === unit.x && y === unit.y) {
-                            hex.classList.add('current-pos');
-                        } else {
-                            const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
-                            // ★修正: 攻撃可能範囲かどうかの判定を共通関数化
-                            if (targetUnit && this.canAttackTarget(unit, x, y)) {
-                                let targetDir = this.getDirection(unit.x, unit.y, x, y);
-                                let turnCost = this.getTurnCost(unit.direction, targetDir);
-                                // ★修正：振り向くためのコスト＋攻撃コスト(1)が残っているか確認します！
-                                if (unit.ap >= turnCost + 1) {
-                                    hex.classList.add('attackable');
-                                }
-                            }
-                        }
-                    }
-                }
-                
+                // クリックされた時の魔法
                 hex.onclick = () => this.onHexClick(x, y);
                 this.mapEl.appendChild(hex);
+                
+                // 名簿に登録
+                this.hexElements[`${x},${y}`] = hex;
             }
         }
-        
-        if (this.state === 'MOVE_PREVIEW' && this.previewTarget && unit && !this.isInfoMode) {
-            this.drawPath(this.previewTarget.path, unit.x, unit.y);
-            
-            let iconSize = 16 + Math.min(Math.floor(Math.max(0, unit.soldiers - 1) / 1000), 5) * 3;
 
-            const pEl = document.createElement('div');
-            pEl.className = `fw-unit ${unit.isAttacker ? 'attacker' : 'defender'} preview`;
-            pEl.style.width = `${iconSize}px`; 
-            pEl.style.height = `${iconSize}px`;
-            pEl.style.left = `${this.previewTarget.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`;
-            pEl.style.top = `${this.previewTarget.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;    
-            pEl.style.setProperty('--fw-dir', `${this.previewTarget.direction * 60}deg`);
-            pEl.style.pointerEvents = 'none'; 
-            
-            let pRow = Math.floor(this.previewTarget.y / 2);
-            let pIsSea = (this.grid && this.grid[pRow] && this.grid[pRow][this.previewTarget.x]) ? this.grid[pRow][this.previewTarget.x].isSea : false;
-            
-            let pCustomStyle = "";
-            if (pIsSea) {
-                // HTMLに埋め込むため、パスの最初は「data/」になります
-                pCustomStyle = `<style>.fw-unit.preview .fw-unit-icon::before { -webkit-mask-image: url('data/images/field_war_images/ship_icon.png') !important; mask-image: url('data/images/field_war_images/ship_icon.png') !important; }</style>`;
-            }
+        // 3. 移動プレビュー用の部隊アイコン（普段は隠しておく）
+        const pEl = document.createElement('div');
+        pEl.id = 'fw-preview-unit';
+        pEl.className = 'fw-unit preview hidden'; // 最初は hidden
+        pEl.style.pointerEvents = 'none';
+        this.mapEl.appendChild(pEl);
 
-            pEl.innerHTML = `
-                ${pCustomStyle}
-                <div class="fw-unit-icon"></div>
-                <div class="fw-unit-status-wrap">
-                    <div class="fw-troop-icon" data-type="${unit.troopType}"></div>
-                    <div class="fw-unit-soldiers">${unit.soldiers}</div>
-                </div>
-            `;
-            if (unit.isGeneral) {
-                pEl.classList.add('general');
-            }
-            this.mapEl.appendChild(pEl);
-        }
-
-        const isAtkPlayer = (Number(this.warState.attacker.ownerClan) === Number(this.game.playerClanId));
-        const isDefPlayer = (Number(this.warState.defender.ownerClan) === Number(this.game.playerClanId));
-        
+        // 4. 全部隊のアイコンを作る
         this.units.forEach((u) => {
             let iconSize = 16 + Math.min(Math.floor(Math.max(0, u.soldiers - 1) / 1000), 5) * 3;
 
             const uEl = document.createElement('div');
-            uEl.id = `fw-unit-el-${u.id}`; // ★アニメーションのために、部隊ごとに固有の目印（ID）をつけます！
-            const isActive = (unit && u.id === unit.id);
+            uEl.id = `fw-unit-el-${u.id}`; 
             
-            // ★ここから差し替え
             let colorClass = u.isAttacker ? 'attacker' : 'defender';
-            
-            // ★修正: 自勢力の援軍なら「self-ally」、他国の援軍なら「ally」のタグを足します！
             if (u.isSelfReinforcement) {
                 colorClass += ' self-ally'; 
             } else if (u.isReinforcement) {
                 colorClass += ' ally'; 
             }
 
-            uEl.className = `fw-unit ${colorClass} ${isActive ? 'active' : ''}`;
+            uEl.className = `fw-unit ${colorClass}`;
             if (u.isGeneral) {
-                uEl.classList.add('general'); // 総大将なら白枠の設計図を追加
+                uEl.classList.add('general');
             }
             
             uEl.style.width = `${iconSize}px`; 
             uEl.style.height = `${iconSize}px`; 
-            uEl.style.left = `${u.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`; 
-            uEl.style.top = `${u.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;     
-            uEl.style.setProperty('--fw-dir', `${u.direction * 60}deg`);
             uEl.style.pointerEvents = 'none'; 
             
-            let uRow = Math.floor(u.y / 2);
-            let uIsSea = (this.grid && this.grid[uRow] && this.grid[uRow][u.x]) ? this.grid[uRow][u.x].isSea : false;
-            
-            let customStyle = "";
-            if (uIsSea) {
-                // HTMLに埋め込むため、パスの最初は「data/」になります
-                customStyle = `<style>#fw-unit-el-${u.id} .fw-unit-icon::before { -webkit-mask-image: url('data/images/field_war_images/ship_icon.png') !important; mask-image: url('data/images/field_war_images/ship_icon.png') !important; }</style>`;
-            }
-            
             uEl.innerHTML = `
-                ${customStyle}
+                <style id="style-fw-unit-el-${u.id}"></style>
                 <div class="fw-unit-icon"></div>
                 <div class="fw-unit-status-wrap">
                     <div class="fw-troop-icon" data-type="${u.troopType}"></div>
@@ -1532,7 +1399,194 @@ class FieldWarManager {
             
             this.mapEl.appendChild(uEl);
         });
+    }
 
+    // ==============================================
+    // ★変更: 毎回作り直すのをやめて、位置や色（クラス）だけを更新する魔法
+    // ==============================================
+    updateMap() {
+        if (!this.mapEl || !this.hexElements) return;
+        
+        const unit = this.turnQueue[0];
+        const isPlayerTurn = this.isPlayerTurn();
+
+        // 1. 移動ルートの線を消す（線だけは都度引き直します）
+        const svg = document.getElementById('fw-svg-layer');
+        if (svg) svg.innerHTML = '';
+        
+        // 2. 全部隊のアイコンの状態を更新する
+        this.units.forEach((u) => {
+            const uEl = document.getElementById(`fw-unit-el-${u.id}`);
+            if (!uEl) return;
+            
+            // サイズと位置の更新（兵士数で変わる）
+            let iconSize = 16 + Math.min(Math.floor(Math.max(0, u.soldiers - 1) / 1000), 5) * 3;
+            uEl.style.width = `${iconSize}px`; 
+            uEl.style.height = `${iconSize}px`; 
+            uEl.style.left = `${u.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`; 
+            uEl.style.top = `${u.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;     
+            uEl.style.setProperty('--fw-dir', `${u.direction * 60}deg`);
+
+            // アクティブ表示の切り替え
+            const isActive = (unit && u.id === unit.id);
+            if (isActive) uEl.classList.add('active');
+            else uEl.classList.remove('active');
+
+            // 海戦用（船の見た目）の判定
+            let uRow = Math.floor(u.y / 2);
+            let uIsSea = (this.grid && this.grid[uRow] && this.grid[uRow][u.x]) ? this.grid[uRow][u.x].isSea : false;
+            const styleTag = uEl.querySelector(`#style-fw-unit-el-${u.id}`);
+            if (styleTag) {
+                if (uIsSea) {
+                    styleTag.innerHTML = `#fw-unit-el-${u.id} .fw-unit-icon::before { -webkit-mask-image: url('data/images/field_war_images/ship_icon.png') !important; mask-image: url('data/images/field_war_images/ship_icon.png') !important; }`;
+                } else {
+                    styleTag.innerHTML = '';
+                }
+            }
+
+            // 兵士数・兵科アイコンの更新
+            const soldierDiv = uEl.querySelector('.fw-unit-soldiers');
+            if (soldierDiv) soldierDiv.innerText = u.soldiers;
+            const troopIconDiv = uEl.querySelector('.fw-troop-icon');
+            if (troopIconDiv) troopIconDiv.dataset.type = u.troopType;
+        });
+
+        // 3. プレビュー用の部隊アイコンの表示更新
+        const pEl = document.getElementById('fw-preview-unit');
+        if (pEl) {
+            if (this.state === 'MOVE_PREVIEW' && this.previewTarget && unit && !this.isInfoMode) {
+                this.drawPath(this.previewTarget.path, unit.x, unit.y); // ルートの線を描く
+                
+                let iconSize = 16 + Math.min(Math.floor(Math.max(0, unit.soldiers - 1) / 1000), 5) * 3;
+                pEl.className = `fw-unit ${unit.isAttacker ? 'attacker' : 'defender'} preview`;
+                if (unit.isGeneral) pEl.classList.add('general');
+                
+                pEl.style.width = `${iconSize}px`; 
+                pEl.style.height = `${iconSize}px`;
+                pEl.style.left = `${this.previewTarget.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`;
+                pEl.style.top = `${this.previewTarget.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;    
+                pEl.style.setProperty('--fw-dir', `${this.previewTarget.direction * 60}deg`);
+                
+                let pRow = Math.floor(this.previewTarget.y / 2);
+                let pIsSea = (this.grid && this.grid[pRow] && this.grid[pRow][this.previewTarget.x]) ? this.grid[pRow][this.previewTarget.x].isSea : false;
+                
+                let pCustomStyle = "";
+                if (pIsSea) {
+                    pCustomStyle = `<style>#fw-preview-unit .fw-unit-icon::before { -webkit-mask-image: url('data/images/field_war_images/ship_icon.png') !important; mask-image: url('data/images/field_war_images/ship_icon.png') !important; }</style>`;
+                }
+
+                pEl.innerHTML = `
+                    ${pCustomStyle}
+                    <div class="fw-unit-icon"></div>
+                    <div class="fw-unit-status-wrap">
+                        <div class="fw-troop-icon" data-type="${unit.troopType}"></div>
+                        <div class="fw-unit-soldiers">${unit.soldiers}</div>
+                    </div>
+                `;
+                pEl.classList.remove('hidden');
+            } else {
+                pEl.classList.add('hidden'); // プレビューが必要ない時は隠す
+            }
+        }
+
+        // 4. マス目（HEX）のハイライト更新
+        // 一旦すべてのハイライトクラス（色塗り）を剥がす
+        for (let key in this.hexElements) {
+            const hex = this.hexElements[key];
+            hex.classList.remove('current-pos', 'movable', 'attackable', 'fw-dir-highlight');
+        }
+
+        // 必要なマス目だけにクラス（色塗り）を付与する
+        if (isPlayerTurn && unit && !this.isInfoMode) {
+            // 現在地を光らせる
+            if (this.hexElements[`${unit.x},${unit.y}`]) {
+                this.hexElements[`${unit.x},${unit.y}`].classList.add('current-pos');
+            }
+
+            if (this.state === 'PHASE_MOVE' || this.state === 'MOVE_PREVIEW') {
+                for (let key in this.reachable) {
+                    let parts = key.split(',');
+                    let x = parseInt(parts[0]);
+                    let y = parseInt(parts[1]);
+                    
+                    const hex = this.hexElements[key];
+                    if (!hex) continue;
+                    if (x === unit.x && y === unit.y) continue; // current-posがついてるのでスキップ
+
+                    // 敵や味方がいるか等チェック
+                    if (this.units.some(u => u.x === x && u.y === y && u.isAttacker === unit.isAttacker)) {
+                        // 味方がいるマスの場合、通り抜けられるかチェック
+                        const enemies = this.units.filter(u => u.isAttacker !== unit.isAttacker);
+                        let minStartDist = 999;
+                        enemies.forEach(e => {
+                            let d = this.getDistance(unit.x, unit.y, e.x, e.y);
+                            if (d < minStartDist) minStartDist = d;
+                        });
+                        
+                        let row_t = Math.floor(y / 2);
+                        let terrain_t = (this.grid && this.grid[row_t] && this.grid[row_t][x]) ? this.grid[row_t][x].terrain : 'plain';
+                        let baseCost = 1;
+                        if (terrain_t === 'forest') baseCost = 2;
+                        else if (terrain_t === 'river' || terrain_t === 'mountain') baseCost = 3;
+
+                        let minEnemyDistToTarget = 999;
+                        enemies.forEach(e => {
+                            let d = this.getDistance(x, y, e.x, e.y);
+                            if (d < minEnemyDistToTarget) minEnemyDistToTarget = d;
+                        });
+
+                        let zocCost = (minEnemyDistToTarget <= 2) ? 2 : 1;
+                        let costToEnter = Math.max(baseCost, zocCost);
+                        
+                        if (this.getDistance(unit.x, unit.y, x, y) === 1) {
+                            if (minStartDist === 1) costToEnter = Math.max(baseCost, 4); 
+                            if (costToEnter < unit.ap) hex.classList.add('movable');
+                        } else {
+                            let canPass = false;
+                            const neighbors = this.getNeighbors(x, y);
+                            for (let n of neighbors) {
+                                let nKey = `${n.x},${n.y}`;
+                                if (this.reachable && this.reachable[nKey]) {
+                                    if (this.reachable[nKey].cost + costToEnter < unit.ap) {
+                                        canPass = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (canPass) hex.classList.add('movable');
+                        }
+                    } else {
+                        // 誰もいない移動可能マス
+                        hex.classList.add('movable');
+                    }
+                }
+            } else if (this.state === 'PHASE_DIR' || this.state === 'PHASE_ATTACK') {
+                for (let x = 0; x < this.cols; x++) {
+                    for (let row = 0; row < this.rows; row++) {
+                        const y = (x % 2 === 0) ? row * 2 : row * 2 + 1;
+                        const hex = this.hexElements[`${x},${y}`];
+                        if (!hex) continue;
+                        if (x === unit.x && y === unit.y) continue; // current-posがついてるのでスキップ
+
+                        const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
+                        if (targetUnit && this.canAttackTarget(unit, x, y)) {
+                            let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                            let turnCost = this.getTurnCost(unit.direction, targetDir);
+                            if (unit.ap >= turnCost + 1) {
+                                hex.classList.add('attackable');
+                            }
+                        } else if (this.state === 'PHASE_DIR' && this.getDistance(unit.x, unit.y, x, y) === 1) {
+                            let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                            let turnCost = this.getTurnCost(unit.direction, targetDir);
+                            if (unit.ap >= turnCost) {
+                                hex.classList.add('fw-dir-highlight');
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
         this.updateMenu();
     }
 
