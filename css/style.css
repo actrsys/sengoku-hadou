@@ -2243,59 +2243,23 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
     animation: sea-pixel-anim 1.5s steps(3, end) infinite !important; /* 3コマのパラパラアニメ */
 }
 
-/* ★追加: 海戦マップ用の海（ドット絵風の波・網目） */
-.hex-sea { 
-    /* ▼ 模様のズレや色を保存しておく「変数」の箱を用意します（初期値） */
-    --sea-bg: #2ab6f6;
-    --sea-pos-x: 0px;
-    --sea-pos-y: 0px;
-    
-    /* ▼ 変数の箱に入っている色を塗ります */
-    background-color: var(--sea-bg) !important; 
-    background-image: 
-        /* ドット波の網目 1（七宝柄風の丸みのある網） */
-        radial-gradient(circle at 8px 8px, transparent 5px, rgba(255, 255, 255, 0.35) 5px, rgba(255, 255, 255, 0.35) 7px, transparent 7px),
-        /* ドット波の網目 2（交差部分） */
-        radial-gradient(circle at 0px 0px, transparent 5px, rgba(255, 255, 255, 0.35) 5px, rgba(255, 255, 255, 0.35) 7px, transparent 7px) !important;
-    background-size: 16px 16px, 16px 16px !important;
-    image-rendering: pixelated; /* ピクセルアート（ドット絵）感を強調する魔法 */
-    
-    /* ▼ 動きをゆっくりにするため 1.5s → 4s に変更しました */
-    animation: sea-pixel-anim 4s steps(3, end) infinite !important; 
-}
-
-/* ▼ 提案いただいた「7種類のひとかたまり」でムラを作る魔法です */
-/* 隣り合うマスに順番に別の色とズレ、アニメーションのタイミング（delay）を配ります */
-.hex-sea:nth-child(7n+1) { --sea-bg: #2ab6f6; --sea-pos-x: 0px; --sea-pos-y: 0px; animation-delay: 0s !important; }
-.hex-sea:nth-child(7n+2) { --sea-bg: #29b0f0; --sea-pos-x: -4px; --sea-pos-y: 2px; animation-delay: -0.6s !important; }
-.hex-sea:nth-child(7n+3) { --sea-bg: #28aae8; --sea-pos-x: 2px; --sea-pos-y: -4px; animation-delay: -2.3s !important; }
-.hex-sea:nth-child(7n+4) { --sea-bg: #4fc3f7; --sea-pos-x: 8px; --sea-pos-y: -2px; animation-delay: -1.2s !important; } /* 少し明るめ */
-.hex-sea:nth-child(7n+5) { --sea-bg: #29b0f0; --sea-pos-x: -6px; --sea-pos-y: 4px; animation-delay: -3.5s !important; }
-.hex-sea:nth-child(7n+6) { --sea-bg: #2ab6f6; --sea-pos-x: 4px; --sea-pos-y: 6px; animation-delay: -1.8s !important; }
-.hex-sea:nth-child(7n+7) { --sea-bg: #26c6da; --sea-pos-x: -2px; --sea-pos-y: -6px; animation-delay: -2.9s !important; } /* 少し緑がかった深み */
-
 /* 海の3コマパラパラアニメーション */
 @keyframes sea-pixel-anim {
     0% {
         background-position: 
-            var(--sea-pos-x) var(--sea-pos-y), 
-            var(--sea-pos-x) var(--sea-pos-y);
+            0px 0px, 0px 0px;       /* 波網目 */
     }
     33.33% {
-        /* それぞれに配られた位置から、2pxだけ計算でズラして揺らします */
         background-position: 
-            calc(var(--sea-pos-x) + 2px) var(--sea-pos-y), 
-            calc(var(--sea-pos-x) + 2px) var(--sea-pos-y);
+            2px 0px, 2px 0px;       /* 波網目は少しだけ横に揺れる */
     }
     66.66% {
         background-position: 
-            var(--sea-pos-x) calc(var(--sea-pos-y) + 2px), 
-            var(--sea-pos-x) calc(var(--sea-pos-y) + 2px);
+            0px 2px, 0px 2px;       /* 波網目は少しだけ縦に揺れる */
     }
     100% {
         background-position: 
-            var(--sea-pos-x) var(--sea-pos-y), 
-            var(--sea-pos-x) var(--sea-pos-y);
+            0px 0px, 0px 0px;
     }
 }
 
