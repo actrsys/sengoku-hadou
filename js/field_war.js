@@ -1416,17 +1416,28 @@ class FieldWarManager {
         
         // 2. 全部隊のアイコンの状態を更新する
         
-        // ★古い部隊が残らないように、まずは全員に透明マントを被せて隠します（プレビュー用のアイコンは除きます）
+        // ★修正：ワープ現象を防ぐため、全員を隠すのではなく「戦場からいなくなった部隊」だけを名指しで隠します
         const allUnitIcons = this.mapEl.querySelectorAll('.fw-unit:not(.preview)');
-        allUnitIcons.forEach(icon => icon.style.display = 'none');
+        allUnitIcons.forEach(icon => {
+            // アイコンのID（例：fw-unit-el-atk_0）から、部隊のID（atk_0）だけを取り出します
+            const unitId = icon.id.replace('fw-unit-el-', '');
+            
+            // 今の戦場リスト（this.units）に、その部隊がいるか確認します
+            const isAlive = this.units.some(u => u.id === unitId);
+            
+            if (!isAlive) {
+                // リストにいない（撤退や壊滅した）部隊のアイコンだけを隠します
+                icon.style.display = 'none';
+            } else if (icon.style.display === 'none') {
+                // 生きている部隊が何かの拍子に隠れていたら、表示を元に戻します
+                icon.style.display = '';
+            }
+        });
 
         this.units.forEach((u) => {
             const uEl = document.getElementById(`fw-unit-el-${u.id}`);
             if (!uEl) return;
             
-            // ★追加：戦場に残っている部隊だけ、透明マントを脱がせて見えるようにします
-            uEl.style.display = '';
-
             // サイズと位置の更新（兵士数で変わる）
             let iconSize = 16 + Math.min(Math.floor(Math.max(0, u.soldiers - 1) / 1000), 5) * 3;
             uEl.style.width = `${iconSize}px`; 
