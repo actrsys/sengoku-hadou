@@ -1376,19 +1376,24 @@ class FieldWarManager {
                         dirs.forEach(d => {
                             let nx = x + d.dx;
                             let ny = y + d.dy;
+                            
+                            // マップの範囲内かチェック
                             if (nx >= 0 && nx < this.cols && ny >= 0 && ny < this.rows * 2) {
                                 let nRow = Math.floor(ny / 2);
                                 // 隣が海だったら、その辺に浜辺色の線を引きます
                                 if (this.grid[nRow] && this.grid[nRow][nx] && this.grid[nRow][nx].isSea) {
-                                    // #fff59d が黄色っぽい白（砂浜色）のカラーコードです
-                                    beachLines.push(`<line x1="${d.x1}" y1="${d.y1}" x2="${d.x2}" y2="${d.y2}" stroke="#fff59d" stroke-width="8" stroke-linecap="round" />`);
+                                    beachLines.push(`<line x1="${d.x1}" y1="${d.y1}" x2="${d.x2}" y2="${d.y2}" stroke="#fff59d" stroke-width="5" stroke-linecap="butt" />`);
                                 }
+                            } else {
+                                // ★修正: 海戦マップは「島」なので、マップの枠外は「すべて海」として扱います！
+                                beachLines.push(`<line x1="${d.x1}" y1="${d.y1}" x2="${d.x2}" y2="${d.y2}" stroke="#fff59d" stroke-width="5" stroke-linecap="butt" />`);
                             }
                         });
 
                         // 浜辺の線が1本でもあれば、それをマスの内側に貼り付けます
                         if (beachLines.length > 0) {
-                            hex.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 26" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0;">${beachLines.join('')}</svg>`;
+                            // ★修正: 線がど真ん中に潰れないよう、絵筆（SVG）のサイズを幅30px・高さ26pxにガチガチに固定します！
+                            hex.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 26" width="30" height="26" style="position: absolute; top: 0; left: 0; width: 30px; height: 26px; flex-shrink: 0; display: block; pointer-events: none; z-index: 0;">${beachLines.join('')}</svg>`;
                         }
                     }
                 }
