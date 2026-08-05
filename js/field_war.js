@@ -1415,10 +1415,18 @@ class FieldWarManager {
         if (svg) svg.innerHTML = '';
         
         // 2. 全部隊のアイコンの状態を更新する
+        
+        // ★古い部隊が残らないように、まずは全員に透明マントを被せて隠します（プレビュー用のアイコンは除きます）
+        const allUnitIcons = this.mapEl.querySelectorAll('.fw-unit:not(.preview)');
+        allUnitIcons.forEach(icon => icon.style.display = 'none');
+
         this.units.forEach((u) => {
             const uEl = document.getElementById(`fw-unit-el-${u.id}`);
             if (!uEl) return;
             
+            // ★追加：戦場に残っている部隊だけ、透明マントを脱がせて見えるようにします
+            uEl.style.display = '';
+
             // サイズと位置の更新（兵士数で変わる）
             let iconSize = 16 + Math.min(Math.floor(Math.max(0, u.soldiers - 1) / 1000), 5) * 3;
             uEl.style.width = `${iconSize}px`; 
