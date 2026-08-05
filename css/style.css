@@ -2242,39 +2242,55 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
 .hex-river { background-color: #4fc3f7 !important; background-image: radial-gradient(ellipse 8px 4px at 4px 4px, rgba(255, 255, 255, 0.4) 30%, transparent 50%), radial-gradient(ellipse 8px 4px at 12px 12px, rgba(255, 255, 255, 0.2) 30%, transparent 50%) !important; background-size: 16px 16px !important; animation: river-ripple 1.5s infinite !important; }
 .hex-mountain { background-color: #795548 !important; background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.15) 50%, transparent 50%) !important; background-size: 10px 10px !important; }
 
-/* ★追加: 海戦マップ用の海（ドット絵風の波・網目） */
+/* ★変更: 海戦マップ用の海（落ち着いた暗い青ベースに、数十本の線で描く波模様） */
 .hex-sea { 
-    background-color: #2ab6f6 !important; 
+    background-color: #2c445e !important; 
     background-image: 
-        /* ドット波の網目 1（七宝柄風の丸みのある網） */
-        radial-gradient(circle at 8px 8px, transparent 5px, rgba(255, 255, 255, 0.45) 5px, rgba(255, 255, 255, 0.45) 7px, transparent 7px),
-        /* ドット波の網目 2（交差部分） */
-        radial-gradient(circle at 0px 0px, transparent 5px, rgba(255, 255, 255, 0.45) 5px, rgba(255, 255, 255, 0.45) 7px, transparent 7px) !important;
+        /* 暗いまだらな線 */
+        linear-gradient(25deg, transparent 35%, rgba(20, 35, 55, 0.7) 38%, transparent 42%),
+        linear-gradient(65deg, transparent 55%, rgba(15, 30, 45, 0.6) 58%, transparent 62%),
+        linear-gradient(110deg, transparent 15%, rgba(25, 40, 60, 0.5) 17%, transparent 20%),
+        linear-gradient(160deg, transparent 75%, rgba(10, 25, 40, 0.7) 77%, transparent 80%),
+        linear-gradient(5deg, transparent 45%, rgba(15, 30, 45, 0.6) 47%, transparent 50%),
+        linear-gradient(145deg, transparent 25%, rgba(20, 35, 55, 0.5) 27%, transparent 30%),
+        /* 明るい白っぽいまだらな線 */
+        linear-gradient(35deg, transparent 45%, rgba(255, 255, 255, 0.2) 47%, transparent 50%),
+        linear-gradient(75deg, transparent 15%, rgba(255, 255, 255, 0.15) 17%, transparent 20%),
+        linear-gradient(115deg, transparent 65%, rgba(255, 255, 255, 0.1) 67%, transparent 70%),
+        linear-gradient(155deg, transparent 35%, rgba(255, 255, 255, 0.25) 37%, transparent 40%),
+        linear-gradient(15deg, transparent 85%, rgba(255, 255, 255, 0.15) 87%, transparent 90%),
+        linear-gradient(175deg, transparent 55%, rgba(255, 255, 255, 0.1) 57%, transparent 60%) !important;
     background-size: 
-        16px 16px, /* 波網目 1 */
-        16px 16px  /* 波網目 2 */
-        !important;
-    image-rendering: pixelated; /* ピクセルアート（ドット絵）感を強調する魔法 */
-    animation: sea-pixel-anim 1.5s steps(3, end) infinite !important; /* 3コマのパラパラアニメ */
+        16px 22px, 24px 18px, 14px 26px, 30px 16px, 20px 28px, 26px 20px,
+        18px 24px, 22px 16px, 26px 30px, 16px 20px, 28px 14px, 20px 24px !important;
+    image-rendering: pixelated; /* ピクセル感を残して雰囲気を合わせます */
+    animation: sea-flow-lines 2.5s steps(3, end) infinite !important; /* ゆっくり2段階で同じ方向に流れるアニメーション */
 }
 
-/* 海の3コマパラパラアニメーション */
-@keyframes sea-pixel-anim {
+/* 海の波が同じ方向へ流れるアニメーション */
+@keyframes sea-flow-lines {
     0% {
         background-position: 
-            0px 0px, 0px 0px;       /* 波網目 */
+            0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px,
+            0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px;
     }
     33.33% {
+        /* 同じ方向（右下）へ少し動く */
         background-position: 
-            2px 0px, 2px 0px;       /* 波網目は少しだけ横に揺れる */
+            2px 2px, 2px 2px, 2px 2px, 2px 2px, 2px 2px, 2px 2px,
+            2px 2px, 2px 2px, 2px 2px, 2px 2px, 2px 2px, 2px 2px;
     }
     66.66% {
+        /* さらに同じ方向（右下）へ動く */
         background-position: 
-            0px 2px, 0px 2px;       /* 波網目は少しだけ縦に揺れる */
+            4px 4px, 4px 4px, 4px 4px, 4px 4px, 4px 4px, 4px 4px,
+            4px 4px, 4px 4px, 4px 4px, 4px 4px, 4px 4px, 4px 4px;
     }
     100% {
+        /* リセットされてループします */
         background-position: 
-            0px 0px, 0px 0px;
+            0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px,
+            0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px;
     }
 }
 
