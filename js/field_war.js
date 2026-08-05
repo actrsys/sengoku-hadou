@@ -1076,13 +1076,6 @@ class FieldWarManager {
                 weatherEl.style.color = timeColor || '#ffb300';
             }
         }
-
-        // ★修正：時間や海戦でマップの下地（背景色）を変えるのをやめて、常に真っ黒に固定します！
-        const mainArea = document.getElementById('fw-main-area');
-        if (mainArea) {
-            mainArea.classList.remove('is-evening', 'is-night', 'is-sea-battle');
-            mainArea.style.backgroundColor = '#000000'; // 強制的に真っ黒にします
-        }
     }
     
     updateMenu() {

@@ -2166,8 +2166,7 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
 }
 
 .fw-top-bar { height: 30px; background: #000; color: #fff; display: flex; align-items: center; padding: 0 10px; font-size: 0.9rem; font-weight: bold; gap: 20px; flex-shrink: 0; }
-.fw-main-area { flex: 1; position: relative; overflow: hidden; background: #81c784; }
-.fw-main-area.is-sea-battle { background: #2ab6f6; } 
+.fw-main-area { flex: 1; position: relative; overflow: hidden; background: #000000 !important; }
 
 .fw-map-scroll { width: 100%; height: 100%; overflow: auto; display: block; scrollbar-width: none; -ms-overflow-style: none; cursor: grab; }
 .fw-map-scroll::-webkit-scrollbar { display: none; }
