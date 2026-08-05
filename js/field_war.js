@@ -393,7 +393,8 @@ class FieldWarManager {
                     x: deployPos.x,
                     y: deployPos.y,
                     direction: deployDir,
-                    mobility: mobility, 
+                    displayAngle: deployDir * 60, // ★追加：アニメーション用の絶対角度
+                    mobility: mobility,
                     ap: mobility,
                     soldiers: assign.soldiers,
                     initialSoldiers: assign.soldiers, // ★追加：デフォルトの兵士数を覚えておく
@@ -481,7 +482,8 @@ class FieldWarManager {
                     x: deployPos.x,
                     y: deployPos.y,
                     direction: deployDir,
-                    mobility: mobility, 
+                    displayAngle: deployDir * 60, // ★追加：アニメーション用の絶対角度
+                    mobility: mobility,
                     ap: mobility,
                     soldiers: assign.soldiers,
                     initialSoldiers: assign.soldiers, // ★追加：デフォルトの兵士数を覚えておく
@@ -1444,7 +1446,16 @@ class FieldWarManager {
             uEl.style.height = `${iconSize}px`; 
             uEl.style.left = `${u.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`; 
             uEl.style.top = `${u.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;     
-            uEl.style.setProperty('--fw-dir', `${u.direction * 60}deg`);
+            
+            // ★修正：近い方向へ回って向きを変える魔法
+            if (u.displayAngle === undefined) u.displayAngle = u.direction * 60;
+            let targetAngle = u.direction * 60;
+            let diff = (targetAngle - u.displayAngle) % 360;
+            if (diff > 180) diff -= 360;
+            if (diff < -180) diff += 360;
+            u.displayAngle += diff;
+
+            uEl.style.setProperty('--fw-dir', `${u.displayAngle}deg`);
 
             // アクティブ表示の切り替え
             const isActive = (unit && u.id === unit.id);
@@ -1484,7 +1495,15 @@ class FieldWarManager {
                 pEl.style.height = `${iconSize}px`;
                 pEl.style.left = `${this.previewTarget.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`;
                 pEl.style.top = `${this.previewTarget.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;    
-                pEl.style.setProperty('--fw-dir', `${this.previewTarget.direction * 60}deg`);
+                
+                // ★追加：プレビューも近い方向へ回るように計算
+                let pTargetAngle = this.previewTarget.direction * 60;
+                let pDiff = (pTargetAngle - unit.displayAngle) % 360;
+                if (pDiff > 180) pDiff -= 360;
+                if (pDiff < -180) pDiff += 360;
+                let pDisplayAngle = unit.displayAngle + pDiff;
+
+                pEl.style.setProperty('--fw-dir', `${pDisplayAngle}deg`);
                 
                 let pRow = Math.floor(this.previewTarget.y / 2);
                 let pIsSea = (this.grid && this.grid[pRow] && this.grid[pRow][this.previewTarget.x]) ? this.grid[pRow][this.previewTarget.x].isSea : false;
