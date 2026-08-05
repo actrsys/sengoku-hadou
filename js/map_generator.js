@@ -96,8 +96,8 @@ class HexMapGenerator {
 
     // ★追加：海を中心としたマップを作る魔法
     _generateSeaMap(cols, rows, totalHexes) {
-        // 7〜10割が海
-        const seaPercent = this.rand(70, 100);
+        // ★修正: 陸地を少なくするため、海を85〜95%にします
+        const seaPercent = this.rand(85, 95);
         const seaTargetCount = Math.floor(totalHexes * (seaPercent / 100));
 
         // 残りが平地とたまに森
@@ -117,11 +117,13 @@ class HexMapGenerator {
             map.push(row);
         }
 
-        // 2. 陸地（平地）の塊を作る
-        this._generateClustersOn(map, cols, rows, 'plain', remainHexes, 3, 8, 'sea');
+        // 2. 陸地（平地）の島を作る
+        // ★修正: 塊のサイズを少し大きく（4〜12）して島っぽくし、一番後ろに「2」を渡して、マップの端2マスには絶対に作らないようにします！
+        this._generateClustersOn(map, cols, rows, 'plain', remainHexes, 4, 12, 'sea', 2);
 
         // 3. 陸地（平地）の上に森の塊を作る
-        this._generateClustersOn(map, cols, rows, 'forest', forestTargetCount, 1, 3, 'plain');
+        // 森は今まで通りで大丈夫です（端には平地がないので、自動的に森もできません）
+        this._generateClustersOn(map, cols, rows, 'forest', forestTargetCount, 1, 3, 'plain', 0);
 
         return {
             cols: cols,
@@ -131,14 +133,20 @@ class HexMapGenerator {
     }
 
     // ★追加：特定の地形（baseTerrain）の上に塊を作る魔法
-    _generateClustersOn(map, cols, rows, terrainType, targetCount, minSize, maxSize, baseTerrain) {
+    // ★修正: 端っこに作らないための「見えないバリア（padding）」機能を追加しました！
+    _generateClustersOn(map, cols, rows, terrainType, targetCount, minSize, maxSize, baseTerrain, padding = 0) {
         let currentCount = 0;
         let attempts = 0;
 
         while (currentCount < targetCount && attempts < 1000) {
             attempts++;
-            let startX = this.rand(0, cols - 1);
-            let startY = this.rand(0, rows - 1);
+            
+            // ★修正: バリア（padding）の内側からスタート地点をランダムに選びます
+            let startX = this.rand(padding, cols - 1 - padding);
+            let startY = this.rand(padding, rows - 1 - padding);
+
+            // 万が一計算がズレた時の安全装置です
+            if (startX < 0 || startX >= cols || startY < 0 || startY >= rows) continue;
 
             if (map[startY][startX].terrain !== baseTerrain) continue;
 
@@ -150,6 +158,11 @@ class HexMapGenerator {
                 let idx = this.rand(0, queue.length - 1);
                 let pos = queue.splice(idx, 1)[0];
 
+                // ★追加: 広がっていく時も、バリア（padding）の外には絶対に出ないようにブロックします！
+                if (pos.x < padding || pos.x >= cols - padding || pos.y < padding || pos.y >= rows - padding) {
+                    continue;
+                }
+
                 if (map[pos.y][pos.x].terrain === baseTerrain) {
                     map[pos.y][pos.x].terrain = terrainType;
                     currentCount++;
@@ -157,8 +170,11 @@ class HexMapGenerator {
 
                     let neighbors = this._getNeighbors(pos.x, pos.y, cols, rows);
                     for (let n of neighbors) {
-                        if (map[n.y][n.x].terrain === baseTerrain) {
-                            queue.push(n);
+                        // ★追加: 次の候補を探す時も、バリアの中だけを探します
+                        if (n.x >= padding && n.x < cols - padding && n.y >= padding && n.y < rows - padding) {
+                            if (map[n.y][n.x].terrain === baseTerrain) {
+                                queue.push(n);
+                            }
                         }
                     }
                 }
