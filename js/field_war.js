@@ -1468,7 +1468,16 @@ class FieldWarManager {
             pEl.style.setProperty('--fw-dir', `${this.previewTarget.direction * 60}deg`);
             pEl.style.pointerEvents = 'none'; 
             
+            let pRow = Math.floor(this.previewTarget.y / 2);
+            let pIsSea = (this.grid && this.grid[pRow] && this.grid[pRow][this.previewTarget.x]) ? this.grid[pRow][this.previewTarget.x].isSea : false;
+            
+            let pCustomStyle = "";
+            if (pIsSea) {
+                pCustomStyle = `<style>.fw-unit.preview .fw-unit-icon::before { -webkit-mask-image: url('../data/images/field_war_images/ship_icon.png') !important; mask-image: url('../data/images/field_war_images/ship_icon.png') !important; }</style>`;
+            }
+
             pEl.innerHTML = `
+                ${pCustomStyle}
                 <div class="fw-unit-icon"></div>
                 <div class="fw-unit-status-wrap">
                     <div class="fw-troop-icon" data-type="${unit.troopType}"></div>
@@ -1513,7 +1522,16 @@ class FieldWarManager {
             uEl.style.setProperty('--fw-dir', `${u.direction * 60}deg`);
             uEl.style.pointerEvents = 'none'; 
             
+            let uRow = Math.floor(u.y / 2);
+            let uIsSea = (this.grid && this.grid[uRow] && this.grid[uRow][u.x]) ? this.grid[uRow][u.x].isSea : false;
+            
+            let customStyle = "";
+            if (uIsSea) {
+                customStyle = `<style>#fw-unit-el-${u.id} .fw-unit-icon::before { -webkit-mask-image: url('../data/images/field_war_images/ship_icon.png') !important; mask-image: url('../data/images/field_war_images/ship_icon.png') !important; }</style>`;
+            }
+            
             uEl.innerHTML = `
+                ${customStyle}
                 <div class="fw-unit-icon"></div>
                 <div class="fw-unit-status-wrap">
                     <div class="fw-troop-icon" data-type="${u.troopType}"></div>
