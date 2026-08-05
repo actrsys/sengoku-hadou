@@ -1077,20 +1077,11 @@ class FieldWarManager {
             }
         }
 
-        // 時間帯に合わせて画面の色を変える魔法をかけます
+        // ★修正：時間や海戦でマップの下地（背景色）を変えるのをやめて、常に真っ黒に固定します！
         const mainArea = document.getElementById('fw-main-area');
         if (mainArea) {
             mainArea.classList.remove('is-evening', 'is-night', 'is-sea-battle');
-            if (this.isEveningTurn()) {
-                mainArea.classList.add('is-evening');
-            } else if (this.isNightTurn()) {
-                mainArea.classList.add('is-night');
-            }
-            
-            // ★追加：海戦の時は背景を海の色にする魔法
-            if (this.warState && this.warState.isSeaBattle) {
-                mainArea.classList.add('is-sea-battle');
-            }
+            mainArea.style.backgroundColor = '#000000'; // 強制的に真っ黒にします
         }
     }
     
@@ -1347,16 +1338,15 @@ class FieldWarManager {
                 
                 const hex = document.createElement('div');
                 hex.className = 'fw-hex';
+                hex.id = `fw-hex-${x}-${y}`; // IDをつけておく
 
-                // ★追加: 地形に合わせてCSSのクラスを追加（色を塗る指示）
-                let isSeaHex = false;
                 if (this.grid && this.grid[row] && this.grid[row][x]) {
-                    // ★変更: 軽量化のため、下地はすべて真っ黒にします！地形ごとの重いクラス付与もやめました！
+                    // ★修正：勘違いしてマス目を真っ黒にしていました！元の地形クラスを付与するように戻します
                     if (this.grid[row][x].isSea) {
-                        isSeaHex = true;
+                        hex.classList.add('hex-sea');
+                    } else {
+                        hex.classList.add(`hex-${this.grid[row][x].terrain}`);
                     }
-                    hex.style.backgroundColor = '#000000';
-                    hex.style.backgroundImage = 'none'; // 念のためグラデーションなどを消去
                 }
                 
                 hex.style.left = `${x * (this.hexW * 0.75)}px`;
