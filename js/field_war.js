@@ -1344,10 +1344,12 @@ class FieldWarManager {
                 hex.className = 'fw-hex';
 
                 // ★追加: 地形に合わせてCSSのクラスを追加（色を塗る指示）
+                let isSeaHex = false;
                 if (this.grid && this.grid[row] && this.grid[row][x]) {
                     // もし「海マーク(isSea)」がついていたら、強制的に海の見た目にします！
                     if (this.grid[row][x].isSea) {
                         hex.classList.add('hex-sea');
+                        isSeaHex = true;
                     } else {
                         hex.classList.add(`hex-${this.grid[row][x].terrain}`);
                     }
@@ -1355,6 +1357,41 @@ class FieldWarManager {
                 
                 hex.style.left = `${x * (this.hexW * 0.75)}px`;
                 hex.style.top = `${y * (this.hexH / 2)}px`;
+
+                // ★追加: 海戦の時、海に面した平地や森の端を「浜辺」にする魔法！
+                if (this.warState && this.warState.isSeaBattle && !isSeaHex) {
+                    let cell = this.grid[row] && this.grid[row][x];
+                    if (cell && (cell.terrain === 'plain' || cell.terrain === 'forest')) {
+                        let beachLines = [];
+                        // 六角形の6つの辺の座標（上、右上、右下、下、左下、左上）
+                        const dirs = [
+                            {dx: 0, dy: -2, x1: 7.5, y1: 0, x2: 22.5, y2: 0},
+                            {dx: 1, dy: -1, x1: 22.5, y1: 0, x2: 30, y2: 13},
+                            {dx: 1, dy: 1,  x1: 30, y1: 13, x2: 22.5, y2: 26},
+                            {dx: 0, dy: 2,  x1: 22.5, y2: 26, x2: 7.5, y2: 26},
+                            {dx: -1, dy: 1, x1: 7.5, y2: 26, x2: 0, y2: 13},
+                            {dx: -1, dy: -1, x1: 0, y2: 13, x2: 7.5, y2: 0}
+                        ];
+
+                        dirs.forEach(d => {
+                            let nx = x + d.dx;
+                            let ny = y + d.dy;
+                            if (nx >= 0 && nx < this.cols && ny >= 0 && ny < this.rows * 2) {
+                                let nRow = Math.floor(ny / 2);
+                                // 隣が海だったら、その辺に浜辺色の線を引きます
+                                if (this.grid[nRow] && this.grid[nRow][nx] && this.grid[nRow][nx].isSea) {
+                                    // #fff59d が黄色っぽい白（砂浜色）のカラーコードです
+                                    beachLines.push(`<line x1="${d.x1}" y1="${d.y1}" x2="${d.x2}" y2="${d.y2}" stroke="#fff59d" stroke-width="8" stroke-linecap="round" />`);
+                                }
+                            }
+                        });
+
+                        // 浜辺の線が1本でもあれば、それをマスの内側に貼り付けます
+                        if (beachLines.length > 0) {
+                            hex.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 26" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0;">${beachLines.join('')}</svg>`;
+                        }
+                    }
+                }
                 
                 if (isPlayerTurn && unit && !this.isInfoMode) {
                     if (this.state === 'PHASE_MOVE' || this.state === 'MOVE_PREVIEW') {
