@@ -1473,7 +1473,8 @@ class FieldWarManager {
             
             let pCustomStyle = "";
             if (pIsSea) {
-                pCustomStyle = `<style>.fw-unit.preview .fw-unit-icon::before { -webkit-mask-image: url('../data/images/field_war_images/ship_icon.png') !important; mask-image: url('../data/images/field_war_images/ship_icon.png') !important; }</style>`;
+                // HTMLに埋め込むため、パスの最初は「data/」になります
+                pCustomStyle = `<style>.fw-unit.preview .fw-unit-icon::before { -webkit-mask-image: url('data/images/field_war_images/ship_icon.png') !important; mask-image: url('data/images/field_war_images/ship_icon.png') !important; }</style>`;
             }
 
             pEl.innerHTML = `
@@ -1527,7 +1528,8 @@ class FieldWarManager {
             
             let customStyle = "";
             if (uIsSea) {
-                customStyle = `<style>#fw-unit-el-${u.id} .fw-unit-icon::before { -webkit-mask-image: url('../data/images/field_war_images/ship_icon.png') !important; mask-image: url('../data/images/field_war_images/ship_icon.png') !important; }</style>`;
+                // HTMLに埋め込むため、パスの最初は「data/」になります
+                customStyle = `<style>#fw-unit-el-${u.id} .fw-unit-icon::before { -webkit-mask-image: url('data/images/field_war_images/ship_icon.png') !important; mask-image: url('data/images/field_war_images/ship_icon.png') !important; }</style>`;
             }
             
             uEl.innerHTML = `
