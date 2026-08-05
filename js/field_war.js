@@ -271,13 +271,6 @@ class FieldWarManager {
         
         this.hideUnitInfo();
 
-        if (isPlayerInvolved) {
-            // ★追加: 野戦開始時に裏の日本地図（背景）の更新とアニメーションを完全にストップして軽くします！
-            if (this.game.ui && typeof this.game.ui.pauseBackgroundUpdates === 'function') {
-                this.game.ui.pauseBackgroundUpdates();
-            }
-        }
-
         // ★追加: 新しく作ったマップ工場でランダムなマップを作る
         const mapFactory = new HexMapGenerator();
         const mapData = mapFactory.generate();
