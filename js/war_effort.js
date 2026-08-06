@@ -1460,8 +1460,11 @@ Object.assign(WarManager.prototype, {
                 if (this.pendingPrisoners && this.pendingPrisoners.length > 0) {
                     if (winnerClan === this.game.playerClanId) {
                         
-                        // ★変更：大名がいたら〜の古い処理を消して、新しいフェーズ管理の魔法にバトンタッチします！
-                        this.startPrisonerPhase();
+                        // ★変更：捕らえた人数を報告してから、新しいフェーズ管理の魔法にバトンタッチします！
+                        const prisonerCount = this.pendingPrisoners.length;
+                        this.game.ui.showDialog(`${prisonerCount}名の武将を捕らえました！`, false, () => {
+                            this.startPrisonerPhase();
+                        });
                     
                     } else {
                         // AIが勝った場合は自動で処理します
