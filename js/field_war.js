@@ -3749,7 +3749,6 @@ class FieldWarManager {
         }
 
         const maxEnemySoldiers = Math.max(...enemies.map(e => e.soldiers), 1);
-        const maxAllySoldiers = Math.max(...allies.map(a => a.soldiers), unit.soldiers, 1);
 
         // --- 1. ターゲット敵の選定 (スコア制) ---
         let targetEnemy = null;
@@ -3847,12 +3846,6 @@ class FieldWarManager {
             let reachable = this.findPaths(unit, unit.ap - 1); 
             let bestTargetHex = null;
             let bestMoveScore = -Infinity;
-            
-            let allyMinDistToTarget = 999;
-            allies.forEach(a => {
-                let d = this.getDistance(a.x, a.y, targetEnemy.x, targetEnemy.y);
-                if (d < allyMinDistToTarget) allyMinDistToTarget = d;
-            });
 
             // 自軍の総大将を探しておく
             let myGeneral = allies.find(a => a.isGeneral);
