@@ -779,6 +779,8 @@ Object.assign(UIInfoManager.prototype, {
                             }
                         }
                     }
+                    // ★追加：所領分配は「0個選択」でも決定できるので、ボタンが暗くならないようにします！
+                    this.updateCommonConfirmBtn(0);
                 },
                 cells: [
                     `<span class="col-act">${inputHtml}<span class="status-mark" style="${statusStyle}">${displayLegionStr}</span></span>`,
