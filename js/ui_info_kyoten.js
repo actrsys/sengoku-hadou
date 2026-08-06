@@ -715,6 +715,8 @@ Object.assign(UIInfoManager.prototype, {
                 }
             });
             this.allotFiefSavedState = true;
+            // ★追加：画面を開いた時の「最初の状態」をメモしておきます！
+            this.allotFiefInitialIds = [...this.commonSelectedIds];
         }
 
         myCastles.sort((a, b) => {
@@ -779,8 +781,29 @@ Object.assign(UIInfoManager.prototype, {
                             }
                         }
                     }
-                    // ★追加：所領分配は「0個選択」でも決定できるので、ボタンが暗くならないようにします！
-                    this.updateCommonConfirmBtn(0);
+                    
+                    // ★追加：最初の状態から「変更」があった時だけ決定ボタンを明るくします！
+                    let isChanged = false;
+                    if (this.allotFiefInitialIds) {
+                        if (this.commonSelectedIds.length !== this.allotFiefInitialIds.length) {
+                            isChanged = true;
+                        } else {
+                            isChanged = this.commonSelectedIds.some(id => !this.allotFiefInitialIds.includes(id));
+                        }
+                    }
+                    
+                    const confirmBtn = document.getElementById('selector-confirm-btn');
+                    if (confirmBtn) {
+                        if (isChanged) {
+                            confirmBtn.disabled = false;
+                            confirmBtn.style.opacity = '1';
+                            confirmBtn.style.cursor = 'pointer';
+                        } else {
+                            confirmBtn.disabled = true;
+                            confirmBtn.style.opacity = '0.5';
+                            confirmBtn.style.cursor = 'not-allowed';
+                        }
+                    }
                 },
                 cells: [
                     `<span class="col-act">${inputHtml}<span class="status-mark" style="${statusStyle}">${displayLegionStr}</span></span>`,
@@ -809,6 +832,7 @@ Object.assign(UIInfoManager.prototype, {
             onBack: () => {
                 this.commonSelectedIds = [];
                 this.allotFiefSavedState = false;
+                this.allotFiefInitialIds = null; // ★お掃除
                 this.closeCommonModal();
             },
             onConfirm: () => {
@@ -816,10 +840,31 @@ Object.assign(UIInfoManager.prototype, {
                 this.closeCommonModal();
                 this.commonSelectedIds = [];
                 this.allotFiefSavedState = false;
+                this.allotFiefInitialIds = null; // ★お掃除
                 window.GameApp.commandSystem.executeAllotFief(legionNo, selectedIds, myCastles);
             }
         });
         
-        this.updateCommonConfirmBtn(0); // 0個でも決定可能（すべて直轄にする場合）
+        // ★変更：画面を開いた直後は「変更なし（初期状態）」なので決定ボタンを暗くします
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        if (confirmBtn) {
+            let isChanged = false;
+            if (this.allotFiefInitialIds) {
+                if (this.commonSelectedIds.length !== this.allotFiefInitialIds.length) {
+                    isChanged = true;
+                } else {
+                    isChanged = this.commonSelectedIds.some(id => !this.allotFiefInitialIds.includes(id));
+                }
+            }
+            if (isChanged) {
+                confirmBtn.disabled = false;
+                confirmBtn.style.opacity = '1';
+                confirmBtn.style.cursor = 'pointer';
+            } else {
+                confirmBtn.disabled = true;
+                confirmBtn.style.opacity = '0.5';
+                confirmBtn.style.cursor = 'not-allowed';
+            }
+        }
     }
 });
