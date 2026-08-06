@@ -3858,65 +3858,26 @@ class FieldWarManager {
             let bestTargetHex = null;
             let bestMoveScore = -Infinity;
             
-            const mySoldierRatio = unit.soldiers / maxAllySoldiers; 
-            
             let allyMinDistToTarget = 999;
             allies.forEach(a => {
                 let d = this.getDistance(a.x, a.y, targetEnemy.x, targetEnemy.y);
                 if (d < allyMinDistToTarget) allyMinDistToTarget = d;
             });
 
-            // ★追加: 自軍の総大将を探しておく
+            // 自軍の総大将を探しておく
             let myGeneral = allies.find(a => a.isGeneral);
             if (unit.isGeneral) myGeneral = unit;
 
-            // ★追加：守備側で、敵がまだ遠い場合、2～3ターンで到達できそうな「良い陣地（山や森）」を探します！
-            let idealCampHex = null;
-            // ★修正：援軍が総大将から離れすぎている場合は陣地探しよりも合流を優先させる
-            let shouldSearchCamp = !unit.isAttacker && distToTarget >= 3 && !isFleeing;
-            if (shouldSearchCamp && unit.isReinforcement && myGeneral) {
-                let dToGenStart = this.getDistance(unit.x, unit.y, myGeneral.x, myGeneral.y);
-                if (dToGenStart > 5) shouldSearchCamp = false;
-            }
-
-            if (shouldSearchCamp) {
-                let bestCampScore = -Infinity;
-                // 自分の周り5マス（2～3ターンで届く範囲）を見渡します
-                for (let cx = Math.max(0, unit.x - 5); cx <= Math.min(this.cols - 1, unit.x + 5); cx++) {
-                    for (let cy = Math.max(0, unit.y - 10); cy <= Math.min(this.rows * 2 - 1, unit.y + 10); cy++) {
-                        // HEXマップの性質上、存在しないマスは飛ばします
-                        if (cx % 2 !== cy % 2) continue;
-                        
-                        let cRow = Math.floor(cy / 2);
-                        let distToMe = this.getDistance(unit.x, unit.y, cx, cy);
-                        
-                        // 遠すぎず、自分の足元以外の場所をチェックします
-                        if (distToMe > 0 && distToMe <= 5) {
-                            let cTerrain = (this.grid && this.grid[cRow] && this.grid[cRow][cx]) ? this.grid[cRow][cx].terrain : 'plain';
-                            
-                            // 騎馬隊は山に入れないので、山なら無視します
-                            if (unit.troopType === 'kiba' && cTerrain === 'mountain') continue;
-
-                            if (cTerrain === 'mountain' || cTerrain === 'forest') {
-                                // 敵に近すぎる場所は危ないので避けます
-                                let distCampToEnemy = this.getDistance(cx, cy, targetEnemy.x, targetEnemy.y);
-                                // ★修正：敵から距離6未満の場所は危険なので陣地候補から外します！
-                                if (distCampToEnemy >= 6) {
-                                    // 山なら50点、森なら20点。そこから距離が遠い分だけ減点します
-                                    let campScore = (cTerrain === 'mountain' ? 50 : 20) - distToMe * 5;
-                                    
-                                    // 既に味方が陣取っていたら遠慮します
-                                    if (allies.some(a => a.x === cx && a.y === cy)) campScore -= 100;
-                                    
-                                    if (campScore > bestCampScore) {
-                                        bestCampScore = campScore;
-                                        idealCampHex = { x: cx, y: cy };
-                                    }
-                                }
-                            }
-                        }
+            // ★追加: 戦場で味方の誰かがすでに敵と殴り合っているか（交戦中か）を全体チェック
+            let isAnyAllyEngaged = false;
+            for (let a of allies) {
+                for (let e of enemies) {
+                    if (this.getDistance(a.x, a.y, e.x, e.y) === 1) {
+                        isAnyAllyEngaged = true; 
+                        break;
                     }
                 }
+                if (isAnyAllyEngaged) break;
             }
 
             let aStarPath = this.findAStarPath(unit, targetEnemy.x, targetEnemy.y);
@@ -3941,245 +3902,144 @@ class FieldWarManager {
                 let ny = parseInt(parts[1]);
                 let hexInfo = reachable[key];
                 
+                // ★追加：味方がいるマスには重なって止まれないようにガード（すり抜けは可能）
+                if ((nx !== unit.x || ny !== unit.y) && allies.some(a => a.x === nx && a.y === ny)) {
+                    continue;
+                }
+                
                 let score = 0;
                 let dToEnemy = this.getDistance(nx, ny, targetEnemy.x, targetEnemy.y);
 
-                // ★追加：意味もなくウロウロするのを防ぐため、今いる場所（動かない）にボーナスをあげます
+                // 今いる場所（動かない）への軽いボーナス（反復横跳び防止）
                 if (nx === unit.x && ny === unit.y) {
-                    score += 5; // ★修正：進行の妨げにならないよう15から5へ減らします
+                    score += 5; 
                 }
 
-                // ★追加: 最終的に止まるマスの「地形」を見てスコアを調整します
+                // 地形による評価（距離に応じたグラデーション）
                 let row_t = Math.floor(ny / 2);
                 let terrain_t = (this.grid && this.grid[row_t] && this.grid[row_t][nx]) ? this.grid[row_t][nx].terrain : 'plain';
                 
-                let dToGenForTerrain = myGeneral ? this.getDistance(unit.x, unit.y, myGeneral.x, myGeneral.y) : 0;
-                let isFarFromGen = (!unit.isGeneral && dToGenForTerrain > 4);
-
                 if (terrain_t === 'river') {
-                    // ★修正：敵との距離に応じて、川を嫌がる度合いを滑らかに変える（グラデーション）
-                    // 距離1なら 0.9 (とても危険)、距離10以上離れていれば 0.1 (ただの通り道) になる計算です
                     let riverDanger = Math.max(0.1, 1.0 - (dToEnemy / 10)); 
-                    
-                    let baseRiverPenalty = 20; // 基本の川ペナルティ
-                    // 守備側で、かつ総大将との合流を急いでいない場合は、さらに川を嫌がります
-                    if (!unit.isAttacker && !isFarFromGen) {
-                        baseRiverPenalty += 30; 
-                    }
-                    
-                    // 距離に応じた危険度（riverDanger）を掛け算して、マイナス点を決めます
-                    score -= (baseRiverPenalty * riverDanger);
+                    score -= 30 * riverDanger;
                 } else if (terrain_t === 'mountain') {
-                    score += 15; // 山は防御力が上がるので、陣取るには良い場所！
-                    if (!unit.isAttacker) score += 40; // ★守備側なら山はさらに大好き！
+                    score += 15; 
+                    if (!unit.isAttacker) score += 20;
                 } else if (terrain_t === 'forest') {
-                    score += 10; // 森も防御力が少し上がるので好き
-                    if (!unit.isAttacker) score += 20; // ★守備側なら森もさらに好き！
+                    score += 10; 
+                    if (!unit.isAttacker) score += 10;
                 }
 
-                // ★追加: 守備側で現在地が川の場合、川以外のマスへ脱出することに強いボーナスを与えます
-                if (!unit.isAttacker && currentTerrain === 'river' && terrain_t !== 'river') {
-                    score += 100; // 川からの脱出を最優先！
-                }
-
-                // ★追加：さっき見つけた「理想の陣地」があるなら、そこへ向かうマスにボーナスをつけます！
-                if (idealCampHex) {
-                    // ★修正：ただし、そのマスに行くと敵に近すぎ（距離5未満）の場合は危険なのでボーナスを無しにします！
-                    if (dToEnemy >= 5) {
-                        let dToCamp = this.getDistance(nx, ny, idealCampHex.x, idealCampHex.y);
-                        // 陣地にぴったり止まれるなら高得点！
-                        if (dToCamp === 0) {
-                            score += 80; // ★150だと高すぎるので少し下げました
-                        } else {
-                            // 陣地に近づくほど高得点になります
-                            score += (5 - dToCamp) * 10; // ★ここも少し下げました
-                        }
-                    }
-                }
-
+                // 兵科ごとの移動評価（無限に逃げる計算をすべて廃止し、適切な距離を目標にさせる）
                 if (isFleeing) {
-                    if (dToEnemy >= distToTarget) {
-                        score += dToEnemy * 50;
-                        let dirToCell = this.getDirection(targetEnemy.x, targetEnemy.y, nx, ny);
-                        let dirDiff = Math.abs(idealDir - dirToCell);
-                        dirDiff = Math.min(dirDiff, 6 - dirDiff);
-                        score -= dirDiff * 20; 
-                    } else {
-                        score -= 9999;
-                    }
+                    // 逃げる時は無限に端を目指すのではなく、敵から距離3〜4の「安全な場所」を目標にする
+                    let distDiff = Math.abs(dToEnemy - 3);
+                    score -= distDiff * 30; // 距離3から外れるほど減点
                     
-                    // ★追加：逃げる時は、マップの端や角（どん詰まり）を避けるようにします！
-                    // 周りにある「行けるマス」の数を数えます
                     let edgeCheck = this.getNeighbors(nx, ny);
-                    // 普通は6マスありますが、端や角は少なくなります
                     if (edgeCheck.length < 6) {
-                        // 周りのマスが少ない（行き止まりに近い）ほど、点数を大きくマイナスします
-                        score -= (6 - edgeCheck.length) * 30; 
+                        score -= (6 - edgeCheck.length) * 30; // 行き止まりを避ける
                     }
                 } else {
                     if (aStarIdealHexes[`${nx},${ny}`]) {
-                        // ★守備側は敵に突っ込むAStarパスへの執着を薄くします
-                        if (!unit.isAttacker) score += 10;
-                        else score += 30;
+                        score += (!unit.isAttacker) ? 10 : 30;
                     }
 
                     if (unit.troopType === 'teppo') {
-                        // 雨や雪、夜で視界や火縄が使いにくい時
-                        if (this.weather === 'rain' || this.weather === 'snow' || this.isNightTurn()) {
-                            if (dToEnemy === 1) {
-                                score -= 100; // わざわざ隣接しに行くのは危険なのでマイナス
-                            } else {
-                                score += dToEnemy * 20; // 敵から離れれば離れるほど安心（スコアプラス）
-                            }
-                            
-                            // ★追加：雨や雪、夜で離れる時も、マップの端や角（どん詰まり）を避けるようにします！
-                            let edgeCheck = this.getNeighbors(nx, ny);
-                            if (edgeCheck.length < 6) {
-                                score -= (6 - edgeCheck.length) * 30; 
-                            }
+                        // 鉄砲も無限に遠ざからず、常に「適切な距離」をキープしようとする
+                        let idealDist = (this.weather === 'rain' || this.weather === 'snow' || this.isNightTurn()) ? 2 : 3;
+                        if (dToEnemy === 1) {
+                            score -= 100; // 隣接は絶対に避ける
                         } else {
-                            // 盾になってくれる前衛部隊を探します
-                            const vanguardAllies = allies.filter(a => a.troopType !== 'teppo' && !a.isGeneral);
-                            
-                            if (vanguardAllies.length > 0) {
-                                // 前衛がいる時は、距離3〜4から安全に撃ちたい
-                                if (dToEnemy === 3) score += 100;
-                                else if (dToEnemy === 4) score += 90;
-                                else if (dToEnemy === 2) score += 30; // 近すぎるので少し減点
-                                else if (dToEnemy === 1) score -= 100; // 隣接はダメ！
-                                else {
-                                    // ★守備側なら、遠い敵へ無理に近づかず待機を良しとする
-                                    if (!unit.isAttacker && dToEnemy > 4) score += 20;
-                                    else score -= dToEnemy * 10;
-                                }
-                                
-                                // 前衛の近く（後ろ）をキープするようにします
-                                let minDistToVanguard = 999;
-                                vanguardAllies.forEach(v => {
-                                    let d = this.getDistance(nx, ny, v.x, v.y);
-                                    if (d < minDistToVanguard) minDistToVanguard = d;
-                                });
-                                // 前衛から距離1〜2の場所にいると高評価
-                                if (minDistToVanguard === 1 || minDistToVanguard === 2) score += 40;
-                                else score -= minDistToVanguard * 10;
-                            } else {
-                                // ★修正：前衛がいない時も、できる限り距離3〜4を維持するように！
-                                if (dToEnemy === 3) score += 100;
-                                else if (dToEnemy === 4) score += 90;
-                                else if (dToEnemy === 2) score += 30;
-                                else if (dToEnemy === 1) score -= 100;
-                                else {
-                                    if (!unit.isAttacker && dToEnemy > 4) score += 20;
-                                    else score -= dToEnemy * 10;
-                                }
-                            }
+                            let distDiff = Math.abs(dToEnemy - idealDist);
+                            score -= distDiff * 20; // 理想の距離から外れるほど減点
                         }
                     } else if (unit.troopType === 'kiba') {
-                        // ★騎馬隊専用：回り込み＆遊撃ロジック
-                        // 1. 基本的な距離ペナルティを軽減（足軽より遠くまで走り回るのを許容する）
-                        score -= dToEnemy * 8;
+                        // 騎馬隊
+                        if (dToEnemy > 4) {
+                            score -= dToEnemy * 15;
+                        } else {
+                            score -= dToEnemy * 5;  
+                            
+                            let dirFromTargetToHex = this.getDirection(targetEnemy.x, targetEnemy.y, nx, ny);
+                            let sectorDiff = Math.abs(targetEnemy.direction - dirFromTargetToHex);
+                            sectorDiff = Math.min(sectorDiff, 6 - sectorDiff);
 
-                        // 2. 回り込み評価：敵の背後や側面のセクター（方向）にいるマスほど高得点
-                        // 敵から見て、そのマスがどの方向にあるかを計算します
-                        let dirFromTargetToHex = this.getDirection(targetEnemy.x, targetEnemy.y, nx, ny);
-                        let sectorDiff = Math.abs(targetEnemy.direction - dirFromTargetToHex);
-                        sectorDiff = Math.min(sectorDiff, 6 - sectorDiff);
-
-                        // sectorDiff: 0=真後ろ, 1=斜め後ろ, 2=真横, 3=正面
-                        if (sectorDiff === 0) score += 100; // 真後ろセクターを最優先で目指す
-                        else if (sectorDiff === 1) score += 60;  // 斜め後ろも好む
-                        else if (sectorDiff === 2) score += 20;  // 横も悪くない
-
-                        // 3. 守備側でも騎馬は「待ち」すぎず、遊撃として動く
-                        if (!unit.isAttacker) {
-                            score += 30; // 待機よりも移動すること自体にボーナス
-                            if (dToEnemy <= 8) score += 40; // 数ターンで届く距離なら積極的に寄る
+                            if (sectorDiff === 3) score += 80;      // 真後ろ
+                            else if (sectorDiff === 2) score += 40; // 側面
+                            else if (sectorDiff === 1) score += 10; // 斜め前
                         }
 
-                        // 4. 突撃準備：隣接する場合は「敵の正面以外」を強く好む
+                        if (!unit.isAttacker) {
+                            if (dToEnemy <= 8) score += (8 - dToEnemy) * 5; 
+                        }
+
                         if (dToEnemy === 1) {
                             let atkDir = this.getDirection(nx, ny, targetEnemy.x, targetEnemy.y);
                             let oppositeAtkDir = (atkDir + 3) % 6;
                             let hitAngle = Math.abs(targetEnemy.direction - oppositeAtkDir);
                             hitAngle = Math.min(hitAngle, 6 - hitAngle);
 
-                            if (hitAngle === 3) score += 150; // 背後からの突撃ポジション！
-                            else if (hitAngle === 2) score += 80; // 側面！
-                            else score -= 50; // 正面衝突は騎馬の損害も増えるので避ける
+                            if (hitAngle === 3) score += 150; 
+                            else if (hitAngle === 2) score += 80; 
+                            else score -= 50; 
                         }
-
                     } else {
-                        // ★足軽の動き
-                        if (!unit.isAttacker) {
+                        // ★足軽の動き（味方が戦っていれば一斉に殴りかかる）
+                        if (!unit.isAttacker && !isAnyAllyEngaged) {
                             if (dToEnemy === 1) score += 100;
                             else if (dToEnemy === 2) score += 40;
                             else {
-                                // ★修正：ターゲットとの距離(distToTarget)に応じて、前進する意欲を滑らかに変える
-                                // 遠い(15マス以上)なら焦らず(2)、近い(3マス等)なら一気に詰める(14)グラデーション
                                 let approachDesire = Math.max(2, 17 - distToTarget);
                                 score -= dToEnemy * approachDesire; 
                             }
                         } else {
-                            score -= dToEnemy * 20; 
+                            // 攻撃側、または味方がすでに戦っているなら「距離を詰める事」を最優先にして囲む！
+                            score -= dToEnemy * 25; 
                         }
 
-                        const friendlyTeppos = allies.filter(a => a.troopType === 'teppo');
-                        friendlyTeppos.forEach(teppo => {
-                            let dToTeppo = this.getDistance(nx, ny, teppo.x, teppo.y);
-                            let teppoToEnemy = this.getDistance(teppo.x, teppo.y, targetEnemy.x, targetEnemy.y);
-                            if (dToTeppo === 1 && dToEnemy < teppoToEnemy) {
-                                score += 50; 
-                            }
-                        });
-
-                        // ★追加: 足軽も、隣接して殴れる時は「敵の横や後ろ」を取れるマスを賢く選ぶ！
                         if (dToEnemy === 1) {
                             let atkDir = this.getDirection(nx, ny, targetEnemy.x, targetEnemy.y);
                             let oppositeAtkDir = (atkDir + 3) % 6;
                             let hitAngle = Math.abs(targetEnemy.direction - oppositeAtkDir);
                             hitAngle = Math.min(hitAngle, 6 - hitAngle);
 
-                            // hitAngle: 0=正面, 1=斜め前, 2=側面, 3=背後
-                            if (hitAngle === 3) score += 80; // 背後なら高評価
-                            else if (hitAngle === 2) score += 40; // 側面でも高評価
+                            if (hitAngle === 3) score += 80; 
+                            else if (hitAngle === 2) score += 40; 
                         }
                     }
 
-                    // ★修正: 総大将の近くに陣取るロジック（敵との距離に応じたグラデーション）
+                    // 総大将との距離評価（グラデーション）
                     if (!unit.isGeneral && myGeneral) {
                         let dToGen = this.getDistance(nx, ny, myGeneral.x, myGeneral.y);
                         let isKiba = unit.troopType === 'kiba';
                         
-                        // ★敵が遠い(10マス以上)なら1.0(フル)、近い(2マス以下)なら0.2まで求心力を弱める
-                        let dangerFactor = Math.max(0.2, Math.min(1.0, distToTarget / 10));
+                        // 敵が近い(交戦中)ほど、総大将から離れて自由に戦う
+                        let dangerFactor = Math.max(0.0, Math.min(1.0, distToTarget / 10));
                         
                         if (dToGen >= 1 && dToGen <= 3) {
-                            // 平和な時ほど総大将の近くでボーナス（騎馬は縛りを弱く）
                             score += (isKiba ? 10 : 30) * dangerFactor; 
                         } else if (dToGen > 3) {
-                            // 離れるペナルティも、敵が近いほど掛け算で緩くなる
                             let basePenalty = isKiba ? 2 : (unit.isReinforcement ? 20 : 10);
                             score -= (dToGen - 3) * (basePenalty * dangerFactor); 
                         }
                     }
 
-                    // 性格による前進意欲の調整
-                    if (myPersonality === 'aggressive') {
-                        score -= dToEnemy * 3; 
+                    // ★修正: 総大将や性格による逃げ腰も「無限に端に逃げる」のを修正
+                    if (unit.isGeneral && myPersonality !== 'aggressive') {
+                        // 後方の安全な距離（4〜5）を維持しようとする
+                        let safeDist = 5;
+                        let distDiff = Math.abs(dToEnemy - safeDist); 
+                        score -= distDiff * 15; 
                     } else if (myPersonality === 'conservative') {
-                        score += dToEnemy * 3; 
+                        let safeDist = 3;
+                        let distDiff = Math.abs(dToEnemy - safeDist);
+                        score -= distDiff * 10;
+                    } else if (myPersonality === 'aggressive') {
+                        score -= dToEnemy * 5; 
                     }
 
-                    // 総大将の引きこもり評価
-                    if (unit.isGeneral && myPersonality !== 'aggressive' && allies.length > 0) {
-                        if (dToEnemy <= allyMinDistToTarget) {
-                            score -= 200; 
-                        } else {
-                            score += dToEnemy * 10; 
-                        }
-                    }
-
-                    // ★追加: 孤立ペナルティ（距離に応じた曲線のグラデーション）
+                    // 孤立ペナルティ
                     if (allies.length > 0) {
                         let minDistToAlly = 999;
                         allies.forEach(a => {
@@ -4187,21 +4047,16 @@ class FieldWarManager {
                             if (dToAlly < minDistToAlly) minDistToAlly = dToAlly;
                         });
                         
-                        let isKiba = unit.troopType === 'kiba';
-                        
-                        // ★味方との距離が離れるほど、少しずつペナルティが重くなっていく（2乗のカーブ）
-                        // 距離1〜2は陣形を組んでいるとみなしてペナルティなし
                         if (minDistToAlly > 2) {
-                            let isolationFactor = minDistToAlly - 2; // 距離3で1、4で2、5で3...
-                            let isolationPenalty = isKiba ? 3 : 12; // 騎馬隊は遊撃得意なので孤立を恐れない
-                            
-                            // 距離が離れるほどペナルティが急激に（距離の2乗で）重くなる
+                            let isKiba = unit.troopType === 'kiba';
+                            let isolationFactor = minDistToAlly - 2; 
+                            let isolationPenalty = isKiba ? 3 : 12; 
                             score -= (isolationFactor * isolationFactor) * isolationPenalty; 
                         }
                     }
                 }
 
-                // 智謀の倍率を掛けて、動きのブレを計算
+                // 智謀のブレ
                 score += Math.random() * 5 * randMult; 
 
                 if (score > bestMoveScore) {
