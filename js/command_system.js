@@ -3171,7 +3171,8 @@ class CommandSystem {
                     },
                     () => {
                         this.game.warManager.startWar(atkCastle, targetCastle, currentAtkBushos, currentSVal, rVal, hVal, gVal, null, selfReinfData);
-                    }
+                    },
+                    { okText: '要請する', cancelText: '要請しない' }
                 );
             } else {
                 allyForceCandidates.sort((a,b) => b.force.soldiers - a.force.soldiers);
@@ -3245,7 +3246,8 @@ class CommandSystem {
                     },
                     () => {
                         askConfirmAndProceedToAlly(null);
-                    }
+                    },
+                    { okText: '援軍を出す', cancelText: '出さない' }
                 );
             } else {
                 selfCandidates.sort((a,b) => b.soldiers - a.soldiers);

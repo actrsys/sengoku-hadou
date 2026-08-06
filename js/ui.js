@@ -1973,7 +1973,8 @@ class UIManager {
                         },
                         () => {
                             // 「いいえ（やめない）」を選んだ時は何もしません
-                        }
+                        },
+                        { okText: 'やめる', okClass: 'btn-danger', cancelText: '続ける' }
                     );
                 } else {
                     // 援軍以外の普通の行動なら、小窓を出さずにすぐキャンセル

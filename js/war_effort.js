@@ -242,14 +242,14 @@ Object.assign(WarManager.prototype, {
                         : `主家である ${myClanName} から${typeStr}援軍要請が届きました。\n当家は従属しているため直ちに出陣します！`;
                     game.ui.showDialog(bossMsg, false, onAccept);
                 } else {
-                    let dialogMsg = `${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。(持参金: ${gold})\n援軍を派遣しますか？`;
+                    let dialogMsg = `${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。(持参金: ${gold})\n援軍要請に応じますか？`;
                     // スキルを持っている場合は専用のメッセージになります
                     if (isBoss && canDeclineBoss) {
-                        dialogMsg = `主家である ${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。\n援軍を派遣しますか？`;
+                        dialogMsg = `主家である ${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。\n援軍要請に応じますか？`;
                     }
                     
                     const choices = [
-                        { label: '派遣する', className: 'btn-primary', onClick: onAccept }
+                        { label: '応じる', className: 'btn-primary', onClick: onAccept }
                     ];
                     if (atkCastle && defCastle && helperCastle) {
                         choices.push({
@@ -258,7 +258,7 @@ Object.assign(WarManager.prototype, {
                             }
                         });
                     }
-                    choices.push({ label: '断る', className: 'btn-danger', onClick: onDecline });
+                    choices.push({ label: '応じない', className: 'btn-danger', onClick: onDecline });
 
                     game.ui.showDialog(dialogMsg, false, null, null, { choices: choices });
                 }
@@ -643,22 +643,17 @@ Object.assign(WarManager.prototype, {
                 let resolveConfirmed = null;
                 const showReq = () => {
                     const choices = [
-                        { label: '送る', className: 'btn-primary', onClick: () => resolveConfirmed(true) }
+                        { label: '応じる', className: 'btn-primary', onClick: () => resolveConfirmed(true) }
                     ];
                     choices.push({
                         label: '戦況', className: 'btn-secondary', onClick: () => {
                             this.showSituationReport(true, atkCastle, atkBushos, defCastle, selfReinforcementData.castle, showReq);
                         }
                     });
-                    choices.push({ label: '送らない', className: 'btn-danger', onClick: () => resolveConfirmed(false) });
+                    choices.push({ label: '応じない', className: 'btn-danger', onClick: () => resolveConfirmed(false) });
                     
-                    this.game.ui.showDialog(`${requesterName}が${targetInfoStr}${reinfCastleName}に救援を求めています。\n援軍を送りますか？`, false, null, null, { choices: choices });
+                    this.game.ui.showDialog(`${requesterName}が${targetInfoStr}${reinfCastleName}に救援を求めています。\n援軍要請に応じますか？`, false, null, null, { choices: choices });
                 };
-                
-                const isConfirmed = await new Promise((resolve) => {
-                    resolveConfirmed = resolve;
-                    showReq();
-                });
                 
                 this.game.ui.restoreAIGuard();
                 if (!isConfirmed) {
@@ -2890,7 +2885,8 @@ Object.assign(WarManager.prototype, {
                 () => {
                     this.game.ui.hideAIGuardTemporarily();
                     onComplete(null); 
-                }
+                },
+                { okText: '援軍を出す', cancelText: '出さない' }
             );
         } else {
             // AIなら自動で一番兵士が多い城から送る
@@ -2917,16 +2913,16 @@ Object.assign(WarManager.prototype, {
                 
                 const showReq = () => {
                     const choices = [
-                        { label: '送る', className: 'btn-primary', onClick: () => promptBusho() }
+                        { label: '応じる', className: 'btn-primary', onClick: () => promptBusho() }
                     ];
                     choices.push({
                         label: '戦況', className: 'btn-secondary', onClick: () => {
                             this.showSituationReport(false, this.state.sourceCastle, this.state.atkBushos, defCastle, bestCastle, showReq);
                         }
                     });
-                    choices.push({ label: '送らない', className: 'btn-danger', onClick: () => onComplete(null) });
+                    choices.push({ label: '応じない', className: 'btn-danger', onClick: () => onComplete(null) });
 
-                    this.game.ui.showDialog(`${requesterName}が${bestCastle.name}に救援を求めています。\n援軍を送りますか？`, false, null, null, { choices: choices });
+                    this.game.ui.showDialog(`${requesterName}が${bestCastle.name}に救援を求めています。\n援軍要請に応じますか？`, false, null, null, { choices: choices });
                 };
                 showReq();
             } else {
@@ -2985,7 +2981,8 @@ Object.assign(WarManager.prototype, {
                 () => {
                     this.game.ui.hideAIGuardTemporarily();
                     onComplete(); 
-                }
+                },
+                { okText: '要請する', cancelText: '要請しない' }
             );
         } else {
             // ★追加：戦力比較用の合計兵力を計算しておきます（確率計算で必要になります）
