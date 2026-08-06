@@ -3920,9 +3920,18 @@ class FieldWarManager {
                 let isFarFromGen = (!unit.isGeneral && dToGenForTerrain > 4);
 
                 if (terrain_t === 'river') {
-                    score -= 20; // 川の上で止まると被ダメージが増えるので極力避ける！
-                    // ★修正：守備側はさらに川を嫌がるが、総大将から遠く離れて合流を急いでいる時は例外とする
-                    if (!unit.isAttacker && !isFarFromGen) score -= 30; 
+                    // ★修正：敵との距離に応じて、川を嫌がる度合いを滑らかに変える（グラデーション）
+                    // 距離1なら 0.9 (とても危険)、距離10以上離れていれば 0.1 (ただの通り道) になる計算です
+                    let riverDanger = Math.max(0.1, 1.0 - (dToEnemy / 10)); 
+                    
+                    let baseRiverPenalty = 20; // 基本の川ペナルティ
+                    // 守備側で、かつ総大将との合流を急いでいない場合は、さらに川を嫌がります
+                    if (!unit.isAttacker && !isFarFromGen) {
+                        baseRiverPenalty += 30; 
+                    }
+                    
+                    // 距離に応じた危険度（riverDanger）を掛け算して、マイナス点を決めます
+                    score -= (baseRiverPenalty * riverDanger);
                 } else if (terrain_t === 'mountain') {
                     score += 15; // 山は防御力が上がるので、陣取るには良い場所！
                     if (!unit.isAttacker) score += 40; // ★守備側なら山はさらに大好き！
@@ -4085,6 +4094,18 @@ class FieldWarManager {
                                 score += 50; 
                             }
                         });
+
+                        // ★追加: 足軽も、隣接して殴れる時は「敵の横や後ろ」を取れるマスを賢く選ぶ！
+                        if (dToEnemy === 1) {
+                            let atkDir = this.getDirection(nx, ny, targetEnemy.x, targetEnemy.y);
+                            let oppositeAtkDir = (atkDir + 3) % 6;
+                            let hitAngle = Math.abs(targetEnemy.direction - oppositeAtkDir);
+                            hitAngle = Math.min(hitAngle, 6 - hitAngle);
+
+                            // hitAngle: 0=正面, 1=斜め前, 2=側面, 3=背後
+                            if (hitAngle === 3) score += 80; // 背後なら高評価
+                            else if (hitAngle === 2) score += 40; // 側面でも高評価
+                        }
                     }
 
                     // ★修正: 総大将の近くに陣取るロジック（敵との距離に応じたグラデーション）
