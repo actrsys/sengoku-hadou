@@ -2911,6 +2911,59 @@ class GameManager {
 
         this.castles = d.castles.map(c => new Castle(c)); 
         this.bushos = d.bushos.map(b => new Busho(b));
+        
+        // ★ここから追加：セーブデータを読み込んだ後に、最新の武将データ(CSV)から「適性・技能・能力値・性格」だけを上書き（同期）する魔法です！
+        try {
+            // 今プレイしているシナリオのフォルダを探します
+            const path = `./data/scenarios/${this.scenarioFolder}/`;
+            // 最新の武将ファイル（warriors.bin または warriors.csv）を読み込みます
+            const bushosText = await DataManager.fetchCompressed(path + "warriors.bin").catch(() => DataManager.fetchText(path + "warriors.csv"));
+            // 読み込んだ文字を、武将のリストに翻訳します
+            const latestBushos = DataManager.parseCSV(bushosText, Busho);
+            
+            // 最新の武将リストを「出席番号（ID）」でパッと探せるように、早見表を作ります
+            const latestBushoMap = new Map();
+            latestBushos.forEach(b => latestBushoMap.set(b.id, b));
+            
+            // セーブデータから復元した自分の武将たちを1人ずつチェックします
+            this.bushos.forEach(savedBusho => {
+                // 最新のデータの中に同じIDの人がいるか探します
+                const latestData = latestBushoMap.get(savedBusho.id);
+                if (latestData) {
+                    // ① 適性と技能の差し替え
+                    savedBusho.aptAshigaru = latestData.aptAshigaru; // 足軽
+                    savedBusho.aptKiba = latestData.aptKiba;         // 騎馬
+                    savedBusho.aptTeppo = latestData.aptTeppo;       // 鉄砲
+                    savedBusho.aptYumi = latestData.aptYumi;         // 弓術
+                    savedBusho.aptBugei = latestData.aptBugei;       // 武芸
+                    savedBusho.aptNinjutsu = latestData.aptNinjutsu; // 忍術
+                    savedBusho.aptMaritime = latestData.aptMaritime; // 操船
+                    savedBusho.skill = latestData.skill;             // 技能
+
+                    // ② 性格・相性パラメータの差し替え（絶対変動しないもの）
+                    savedBusho.innovation = latestData.innovation;   // 革新
+                    savedBusho.cooperation = latestData.cooperation; // 協調
+                    savedBusho.ambition = latestData.ambition;       // 野心
+                    savedBusho.duty = latestData.duty;               // 義理
+                    savedBusho.affinity = latestData.affinity;       // 相性
+
+                    // ③ 魅力の差し替え（経験値による変動がないためそのまま）
+                    savedBusho.charm = latestData.charm;
+
+                    // ④ 他の5つの能力値は、「全盛期の基礎値（ベース）」を差し替えます！
+                    savedBusho.baseLeadership = latestData.baseLeadership;     // 統率
+                    savedBusho.baseStrength = latestData.baseStrength;         // 武勇
+                    savedBusho.basePolitics = latestData.basePolitics;         // 政治
+                    savedBusho.baseDiplomacy = latestData.baseDiplomacy;       // 外交
+                    savedBusho.baseIntelligence = latestData.baseIntelligence; // 智謀
+                }
+            });
+        } catch (error) {
+            // 万が一ファイルの読み込みに失敗しても、ゲームが止まらないようにする安全装置です
+            console.warn("最新の武将データの読み込み（同期）に失敗しましたが、ゲームはそのまま続行します。", error);
+        }
+        // ★追加ここまで！
+
         this.princesses = (d.princesses || []).map(p => new Princess(p));
         this.provinces = (d.provinces || []).map(p => new Province(p));
         this.legions = (d.legions || []).map(l => new Legion(l));
