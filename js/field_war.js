@@ -4065,10 +4065,14 @@ class FieldWarManager {
                     } else {
                         // ★足軽の動き
                         if (!unit.isAttacker) {
-                            // 守備側は敵が射程に入るのをじっと待ちます（自分から突っ込まない）
-                            if (dToEnemy === 1) score += 100; // 目の前に来たら最高！殴る！
-                            else if (dToEnemy === 2) score += 40; // すぐそこまで来てる
-                            else score -= dToEnemy * 5; // 遠くても焦らない
+                            if (dToEnemy === 1) score += 100;
+                            else if (dToEnemy === 2) score += 40;
+                            else {
+                                // ★修正：ターゲットとの距離(distToTarget)に応じて、前進する意欲を滑らかに変える
+                                // 遠い(15マス以上)なら焦らず(2)、近い(3マス等)なら一気に詰める(14)グラデーション
+                                let approachDesire = Math.max(2, 17 - distToTarget);
+                                score -= dToEnemy * approachDesire; 
+                            }
                         } else {
                             score -= dToEnemy * 20; 
                         }
@@ -4083,15 +4087,21 @@ class FieldWarManager {
                         });
                     }
 
-                    // ★修正: 守備側・攻撃側問わず、総大将ではない場合、総大将の近くに陣取る（合流を促す）
+                    // ★修正: 総大将の近くに陣取るロジック（敵との距離に応じたグラデーション）
                     if (!unit.isGeneral && myGeneral) {
                         let dToGen = this.getDistance(nx, ny, myGeneral.x, myGeneral.y);
+                        let isKiba = unit.troopType === 'kiba';
+                        
+                        // ★敵が遠い(10マス以上)なら1.0(フル)、近い(2マス以下)なら0.2まで求心力を弱める
+                        let dangerFactor = Math.max(0.2, Math.min(1.0, distToTarget / 10));
+                        
                         if (dToGen >= 1 && dToGen <= 3) {
-                            score += 30; // 総大将の近くは安心
+                            // 平和な時ほど総大将の近くでボーナス（騎馬は縛りを弱く）
+                            score += (isKiba ? 10 : 30) * dangerFactor; 
                         } else if (dToGen > 3) {
-                            // 離れると不安になるので減点（援軍は強く合流を促す）
-                            let genPenalty = unit.isReinforcement ? 20 : 10;
-                            score -= (dToGen - 3) * genPenalty; 
+                            // 離れるペナルティも、敵が近いほど掛け算で緩くなる
+                            let basePenalty = isKiba ? 2 : (unit.isReinforcement ? 20 : 10);
+                            score -= (dToGen - 3) * (basePenalty * dangerFactor); 
                         }
                     }
 
@@ -4111,7 +4121,7 @@ class FieldWarManager {
                         }
                     }
 
-                    // ★追加: 孤立ペナルティ（一番近い味方と5マス以上離れると怖がってスコアを下げる）
+                    // ★追加: 孤立ペナルティ（距離に応じた曲線のグラデーション）
                     if (allies.length > 0) {
                         let minDistToAlly = 999;
                         allies.forEach(a => {
@@ -4119,10 +4129,16 @@ class FieldWarManager {
                             if (dToAlly < minDistToAlly) minDistToAlly = dToAlly;
                         });
                         
-                        // 一番近い味方でも5マス以上離れているなら減点！
-                        if (minDistToAlly >= 5) {
-                            // 5マスなら-40点、6マスなら-80点...と、離れるほど強く嫌がるようにします
-                            score -= (minDistToAlly - 4) * 40; 
+                        let isKiba = unit.troopType === 'kiba';
+                        
+                        // ★味方との距離が離れるほど、少しずつペナルティが重くなっていく（2乗のカーブ）
+                        // 距離1〜2は陣形を組んでいるとみなしてペナルティなし
+                        if (minDistToAlly > 2) {
+                            let isolationFactor = minDistToAlly - 2; // 距離3で1、4で2、5で3...
+                            let isolationPenalty = isKiba ? 3 : 12; // 騎馬隊は遊撃得意なので孤立を恐れない
+                            
+                            // 距離が離れるほどペナルティが急激に（距離の2乗で）重くなる
+                            score -= (isolationFactor * isolationFactor) * isolationPenalty; 
                         }
                     }
                 }
