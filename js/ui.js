@@ -347,82 +347,42 @@ class UIManager {
             }
         });
         
-        // ==========================================
-        // ★ここから追加：長い名前を自動で見つけてギュッと縮める「文字圧縮ロボット」（レイアウト崩れ完全解決版）
-        // ==========================================
-        const textObserver = new MutationObserver(() => {
-            // ★ロボットが自分の作業（文字を包んだり小さくしたり）に反応しないよう、一旦見張りを止めます！
-            textObserver.disconnect();
+        window.addEventListener('resize', () => {
+            if (this.hasInitializedMap && this.game && (this.game.phase === 'game' || this.game.phase === 'daimyo_select')) {
+                const sc = document.getElementById('map-scroll-container');
+                if (!sc) return;
 
-            // ★リストの中の文字は ui_info.js の専用魔法で圧縮するので、ロボットの監視対象から外します！
-            const targetSelectors = [
-                '#war-atk-name', '#war-def-name', 
-                '.sp-clan',                       
-                '.daimyo-detail-name',            
-                '.daimyo-confirm-info h3'
-            ];
-
-            const targets = document.querySelectorAll(targetSelectors.join(', '));
-            
-            targets.forEach(el => {
-                // ★改善点1：リストの枠組み（Grid）を壊さないように、文字を包む「専用の内箱（span）」を作ります
-                let inner = el.querySelector('.compressed-text-wrapper');
-                let text = "";
-                
-                if (!inner) {
-                    text = el.textContent.trim();
-                    if (!text) return; // 空っぽなら何もしない
-                    
-                    el.innerHTML = ''; // 元の文字を消して、内箱に詰め直します
-                    inner = document.createElement('span');
-                    inner.className = 'compressed-text-wrapper';
-                    inner.textContent = text;
-                    el.appendChild(inner);
-                } else {
-                    text = inner.textContent.trim();
+                // サイズ変更が始まった瞬間に、今の中心の場所を箱にしまいます
+                if (savedLogicalX === null && savedLogicalY === null) {
+                    const currentLeft = parseFloat(this.mapEl.style.left || 0);
+                    const currentTop = parseFloat(this.mapEl.style.top || 0);
+                    savedLogicalX = (sc.scrollLeft + sc.clientWidth / 2 - currentLeft) / this.mapScale;
+                    savedLogicalY = (sc.scrollTop + sc.clientHeight / 2 - currentTop) / this.mapScale;
                 }
-                
-                if (inner.dataset.compressedText === text) return;
-                
-                if (text.length >= 5) {
-                    let scale = 1.0 - (text.length - 4) * 0.1;
-                    if (scale < 0.55) scale = 0.55; 
 
-                    // ★改善点2：魔法のタネあかし★
-                    // 1. まずフォントサイズ（em）を直接小さくします。
-                    // これによりシステム上の「横幅」も小さくなるため、リストの列が押し広げられなくなります！
-                    inner.style.fontSize = `${scale}em`;
-                    
-                    // 2. フォントサイズを下げたことで「縦幅」も小さくなってしまうので、
-                    // transformの『scaleY（縦方向の引き伸ばし）』を使って、元の高さ（1.0）まで引き伸ばします！
-                    inner.style.transform = `scaleY(${1 / scale})`;
-                    
-                    inner.style.letterSpacing = '-0.5px';
-                } else {
-                    // 4文字以下の場合は元に戻す
-                    inner.style.fontSize = '';
-                    inner.style.transform = '';
-                    inner.style.letterSpacing = '';
-                }
+                if (resizeTimer) clearTimeout(resizeTimer);
                 
-                inner.dataset.compressedText = text;
-            });
+                resizeTimer = setTimeout(() => {
+                    this.fitMapToScreen();
+                    
+                    const newLeft = parseFloat(this.mapEl.style.left || 0);
+                    const newTop = parseFloat(this.mapEl.style.top || 0);
+                    
+                    // 最初に覚えておいた場所を中心にするようにスクロールします
+                    if (savedLogicalX !== null && savedLogicalY !== null) {
+                        sc.scrollLeft = (savedLogicalX * this.mapScale + newLeft) - sc.clientWidth / 2;
+                        sc.scrollTop = (savedLogicalY * this.mapScale + newTop) - sc.clientHeight / 2;
+                    }
+                    
+                    // 次のサイズ変更のために、覚えた場所を綺麗に空っぽにしておきます
+                    savedLogicalX = null;
+                    savedLogicalY = null;
+                }, 200); 
+            }
+        });
 
-            // ★ロボットの作業が終わったので、また見張りを再開させます！
-            textObserver.observe(document.body, {
-                childList: true,
-                subtree: true,
-                characterData: true
-            });
-        });
-        
-        // 最初の見張りのスタート
-        textObserver.observe(document.body, {
-            childList: true,
-            subtree: true,
-            characterData: true
-        });
-        // ==========================================
+        // ★ここから追加：ウィンドウ付属のボタンを外に出す改修
+        const modals = document.querySelectorAll('.modal');
 
         // ★ここから追加：ウィンドウ付属のボタンを外に出す改修
         const modals = document.querySelectorAll('.modal');
