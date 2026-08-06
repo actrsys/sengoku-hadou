@@ -1595,9 +1595,20 @@ class FieldWarManager {
                         
                         let row_t = Math.floor(y / 2);
                         let terrain_t = (this.grid && this.grid[row_t] && this.grid[row_t][x]) ? this.grid[row_t][x].terrain : 'plain';
+                        let isSea_t = (this.grid && this.grid[row_t] && this.grid[row_t][x]) ? this.grid[row_t][x].isSea : false;
+                        
                         let baseCost = 1;
-                        if (terrain_t === 'forest') baseCost = 2;
-                        else if (terrain_t === 'river' || terrain_t === 'mountain') baseCost = 3;
+                        if (typeof SkillManager !== 'undefined') {
+                            const tempAllies = this.units.filter(u => u.isAttacker === unit.isAttacker && u.id !== unit.id);
+                            baseCost = SkillManager.calcTerrainMoveCost(unit, terrain_t, isSea_t, tempAllies, this.game);
+                        } else {
+                            if (terrain_t === 'forest') baseCost = 2;
+                            else if (terrain_t === 'river' || terrain_t === 'mountain') baseCost = 3;
+                            if (unit.troopType === 'kiba') {
+                                if (terrain_t === 'mountain') baseCost = 999;
+                                else if (terrain_t === 'forest' || terrain_t === 'river') baseCost += 1;
+                            }
+                        }
 
                         let minEnemyDistToTarget = 999;
                         enemies.forEach(e => {
@@ -1761,43 +1772,22 @@ class FieldWarManager {
         let row = Math.floor(y / 2);
         let terrain = (this.grid && this.grid[row] && this.grid[row][x]) ? this.grid[row][x].terrain : 'plain';
         
-        let baseCost = 1; // 平地
-        if (terrain === 'forest') baseCost = 2; // 森
-        else if (terrain === 'river') baseCost = 3; // 川
-        else if (terrain === 'mountain') baseCost = 3; // 山
-
-        // ★追加: 騎馬の地形ペナルティ
-        if (unit && unit.troopType === 'kiba') {
-            if (terrain === 'mountain') {
-                if (!SkillManager.hasMountainSkill(unit, this.game)) {
-                    return 999; // 踏破がなければ山は通行不可！
-                }
-                // 踏破があれば足軽と同じコスト(3)で入れるので加算はしません
-            }
-            if (terrain === 'forest') baseCost += 1; // 森はコスト+1
-            if (terrain === 'river') baseCost += 1;  // 川もコスト+1
-        }
-
-        // ★追加: 海の判定
         let isSea = (this.grid && this.grid[row] && this.grid[row][x]) ? this.grid[row][x].isSea : false;
 
-        // ★追加: 忍術適性・踏破スキルによる移動コスト軽減（足軽限定）
-        let terrainMoveReduction = 0;
+        // ★修正: 地形コストの計算をスキルマネージャーに一任します！
+        let baseCost = 1;
         if (typeof SkillManager !== 'undefined') {
-            terrainMoveReduction += SkillManager.getNinjutsuMoveCostReduction(unit, terrain, isSea, this.game);
-            terrainMoveReduction += SkillManager.getMountainMoveCostReduction(unit, terrain, this.game);
+            baseCost = SkillManager.calcTerrainMoveCost(unit, terrain, isSea, allies, this.game);
+        } else {
+            if (terrain === 'forest') baseCost = 2;
+            else if (terrain === 'river' || terrain === 'mountain') baseCost = 3;
+            if (unit && unit.troopType === 'kiba') {
+                if (terrain === 'mountain') return 999;
+                if (terrain === 'forest' || terrain === 'river') baseCost += 1;
+            }
         }
-
-        // ★追加: 海の移動コスト軽減 (操船)
-        if (isSea) {
-            let reduction = SkillManager.getMaritimeMoveCostReduction(unit, allies, this.game);
-            baseCost = Math.max(1, baseCost - reduction); // 最低コスト1は守ります
-        }
-
-        // スキル適性の移動コスト軽減の適用
-        if (terrainMoveReduction > 0) {
-            baseCost = Math.max(1, baseCost - terrainMoveReduction); // 最低コスト1は守ります
-        }
+        
+        if (baseCost >= 999) return 999;
 
         let zocCost = 1;
         if (isFirstStep && startDist === 1) {
@@ -1893,22 +1883,22 @@ class FieldWarManager {
                 } else {
                     let row = Math.floor(n.y / 2);
                     let terrain = (this.grid && this.grid[row] && this.grid[row][n.x]) ? this.grid[row][n.x].terrain : 'plain';
-                    if (terrain === 'forest') c = 2;
-                    else if (terrain === 'river') c = 3;
-                    else if (terrain === 'mountain') c = 3;
-                    
-                    // ★追加: ターゲットマスの計算にも騎馬ペナルティを含めます
-                    if (unit.troopType === 'kiba') {
-                        if (terrain === 'mountain' && !SkillManager.hasMountainSkill(unit, this.game)) c = 999;
-                        if (terrain === 'forest') c += 1;
-                        if (terrain === 'river') c += 1;
-                    }
-                    
-                    // ★追加: スキルによるコスト軽減を反映させます（最低コスト1は守る）
+                    let isSea = (this.grid && this.grid[row] && this.grid[row][n.x]) ? this.grid[row][n.x].isSea : false;
+
+                    // ★修正: ターゲットマスのコスト計算もスキルマネージャーに一任します！
                     if (typeof SkillManager !== 'undefined') {
-                        c = Math.max(1, c - SkillManager.getMountainMoveCostReduction(unit, terrain, this.game));
+                        c = SkillManager.calcTerrainMoveCost(unit, terrain, isSea, allies, this.game);
+                    } else {
+                        if (terrain === 'forest') c = 2;
+                        else if (terrain === 'river' || terrain === 'mountain') c = 3;
+                        if (unit.troopType === 'kiba') {
+                            if (terrain === 'mountain') c = 999;
+                            else if (terrain === 'forest' || terrain === 'river') c += 1;
+                        }
                     }
                 }
+
+                if (c >= 999) continue; // 通行不可のマスは候補から外す
 
                 let gCost = currentNode.g + c;
                 let hCost = this.getDistance(n.x, n.y, targetX, targetY);

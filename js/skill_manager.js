@@ -122,7 +122,7 @@ const SKILL_DESCRIPTIONS = {
     [SKILL_NAMES.IJUTSU]: "①同じ拠点にいる武将の戦没確率が減少する。\n②災害によって拠点が受ける人口ダメージが減少する。",
     // 人たらし
     [SKILL_NAMES.HITOTARASHI]: "①自身が登用の担当者である時、登用の成功率が１５％上昇する。\n②自身が武将引抜の担当者である時、武将引抜の成功率が２％上昇する。\n③派閥を形成しやすくなる。",
-    // 常陸の不死鳥※実質NPC専用スキル
+    // 常陸の不死鳥※プレイヤー大名の居城が落城したら即座に滅亡するため、戦没回避以外は実質NPC専用技能。
     [SKILL_NAMES.PHOENIX]: "①戦没しなくなる。\n②大名として滅亡した時、諸勢力となる。\n③諸勢力の頭領である時、空白地を奪って大名となる。"
 };
 
@@ -1192,5 +1192,43 @@ class SkillManager {
     // ＜敵クリティカル無効化＞ 野野戦で相手のクリティカルを無効化する
     static canInvalidateEnemyCritical(unit, game) {
         return this.hasSkill(unit, SKILL_NAMES.OU_NO_GYOSHO, game) || this.hasSkill(unit, SKILL_NAMES.RAIJIN, game);
+    }
+    
+    // ==========================================
+    // ★追加：地形による移動コストの計算をここで一元管理します！
+    // 踏破や忍術による軽減、騎馬のペナルティなどをすべて統合します。
+    // ==========================================
+    static calcTerrainMoveCost(unit, terrain, isSea, allies, game) {
+        let baseCost = 1; // 平地の基本コスト
+        
+        if (terrain === 'forest') baseCost = 2;
+        else if (terrain === 'river') baseCost = 3;
+        else if (terrain === 'mountain') baseCost = 3;
+
+        // 騎馬の地形ペナルティ
+        if (unit.troopType === 'kiba') {
+            if (terrain === 'mountain') {
+                if (!this.hasMountainSkill(unit, game)) {
+                    return 999; // 踏破がなければ山は通行不可！
+                }
+                // 踏破があれば足軽と同じコスト(3)で入れるので加算しません
+            } else {
+                if (terrain === 'forest') baseCost += 1;
+                if (terrain === 'river') baseCost += 1;
+            }
+        }
+
+        let reduction = 0;
+        
+        if (isSea) {
+            // 海の移動コスト軽減 (操船)
+            reduction += this.getMaritimeMoveCostReduction(unit, allies, game);
+        } else {
+            // 忍術適性・踏破スキルによる移動コスト軽減（足軽限定）
+            reduction += this.getNinjutsuMoveCostReduction(unit, terrain, isSea, game);
+            reduction += this.getMountainMoveCostReduction(unit, terrain, game);
+        }
+
+        return Math.max(1, baseCost - reduction); // 最低コスト1は守ります
     }
 }
