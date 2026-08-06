@@ -1192,7 +1192,7 @@ class CommandSystem {
             'war', 'draft', 'training', 'soldier_charity', 'transport', 'kunishu_subjugate', 
             'goodwill', 'truce', 'alliance', 'marriage', 'dominate', 'subordinate', 'break_alliance',
             'kunishu_goodwill', 'kunishu_incorporate', 
-            'sabotage', 'incite', 'rumor', 'headhunt', 'assassinate',
+            'sabotage', 'incite', 'rumor', 'headhunt', 'assassinate', 'kuko',
             'tribute', 'court_truce',
             'employ', 'move'
         ];
@@ -3674,10 +3674,11 @@ class CommandSystem {
         let count = 0;
         
         const legion = this.game.legions ? this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === Number(legionNo)) : null;
+        const numSelectedIds = selectedCastleIds.map(id => Number(id));
         
         candidateCastles.forEach(c => {
             const isCommanderCastle = legion && Number(c.castellanId) === Number(legion.commanderId);
-            const isSelected = selectedCastleIds.includes(c.id) || isCommanderCastle;
+            const isSelected = numSelectedIds.includes(Number(c.id)) || isCommanderCastle;
 
             if (isSelected) {
                 if (Number(c.legionId) !== Number(legionNo)) {
