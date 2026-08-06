@@ -814,7 +814,7 @@ Object.assign(UIInfoManager.prototype, {
                 this.closeCommonModal();
                 this.commonSelectedIds = [];
                 this.allotFiefSavedState = false;
-                window.GameApp.commandSystem.executeAllotFief(legionNo, targetLegionId, selectedIds, myCastles);
+                window.GameApp.commandSystem.executeAllotFief(legionNo, selectedIds, myCastles);
             }
         });
         

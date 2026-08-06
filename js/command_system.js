@@ -3674,20 +3674,32 @@ class CommandSystem {
         let count = 0;
         
         const legion = this.game.legions ? this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === Number(legionNo)) : null;
-        const numSelectedIds = selectedCastleIds.map(id => Number(id));
         
-        candidateCastles.forEach(c => {
-            const isCommanderCastle = legion && Number(c.castellanId) === Number(legion.commanderId);
-            const isSelected = numSelectedIds.includes(Number(c.id)) || isCommanderCastle;
+        // どんな形でIDが送られてきても、確実に「数字」として取り出せるようにする安全装置です
+        const numSelectedIds = selectedCastleIds.map(item => {
+            if (typeof item === 'object' && item !== null) return Number(item.id);
+            return Number(item);
+        });
+
+        // 候補リストが空っぽで送られてきた場合の保険として、自分の全てのお城を対象にします
+        const targetCastles = candidateCastles || this.game.castles.filter(c => Number(c.ownerClan) === Number(this.game.playerClanId));
+        
+        targetCastles.forEach(c => {
+            // ★ここが一番重要です！画面用の「コピー」ではなく、ゲーム本体の「本物のお城データ」を直接引っ張り出して書き換えます
+            const realCastle = this.game.getCastle(c.id || c);
+            if (!realCastle) return;
+
+            const isCommanderCastle = legion && Number(realCastle.castellanId) === Number(legion.commanderId);
+            const isSelected = numSelectedIds.includes(Number(realCastle.id)) || isCommanderCastle;
 
             if (isSelected) {
-                if (Number(c.legionId) !== Number(legionNo)) {
-                    c.legionId = legionNo;
+                if (Number(realCastle.legionId) !== Number(legionNo)) {
+                    realCastle.legionId = legionNo;
                     count++;
                 }
             } else {
-                if (Number(c.legionId) === Number(legionNo)) {
-                    c.legionId = 0;
+                if (Number(realCastle.legionId) === Number(legionNo)) {
+                    realCastle.legionId = 0;
                     count++;
                 }
             }
