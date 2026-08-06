@@ -811,6 +811,38 @@ class FieldWarManager {
         }
     }
 
+    // ★追加：2つの座標（または部隊）の中間地点へカメラを移動させる魔法です
+    scrollToCenterPos(x1, y1, x2, y2) {
+        const scrollEl = document.getElementById('fw-map-scroll');
+        const mapEl = document.getElementById('fw-map');
+        if (!scrollEl || !mapEl) return;
+
+        // 現在のマップのスケール（拡大率）を読み取ります
+        const transform = mapEl.style.transform;
+        let scale = 1;
+        if (transform && transform.includes('scale')) {
+            const match = transform.match(/scale\(([^)]+)\)/);
+            if (match && match[1]) scale = parseFloat(match[1]);
+        }
+
+        // 2つの座標の中心を計算します
+        const midX = (x1 + x2) / 2;
+        const midY = (y1 + y2) / 2;
+
+        // 拡大率を掛け算して、本当のピクセル位置を計算します
+        const px = (midX * (this.hexW * 0.75) + this.hexW / 2) * scale;
+        const py = (midY * (this.hexH / 2) + this.hexH / 2) * scale;
+
+        const containerW = scrollEl.clientWidth;
+        const containerH = scrollEl.clientHeight;
+
+        scrollEl.scrollTo({
+            left: px - containerW / 2,
+            top: py - containerH / 2,
+            behavior: 'smooth'
+        });
+    }
+
     scrollToUnit(unit) {
         const scrollEl = document.getElementById('fw-map-scroll');
         const mapEl = document.getElementById('fw-map');
@@ -2754,6 +2786,9 @@ class FieldWarManager {
                 unit.hasMoved = true; // ★ 移動したことを記録
                 this.log(`${unit.name}隊が移動（向きも変更）。`);
                 
+                // ★追加：移動した部隊にカメラを追従させます
+                this.scrollToUnit(unit);
+                
                 // ★追加：大雪の時、動かした直後に兵力を減らします（攻撃側3%、守備側1%）
                 if (this.isHeavySnowBattle) {
                     let snowPenaltyRate = unit.isAttacker ? 0.03 : 0.01;
@@ -2874,6 +2909,8 @@ class FieldWarManager {
         // ★追加：攻撃の直前に最新の向きを画面に反映させて、少しだけ待ちます（クルッと振り向く動きを見せるため）
         if (isPlayerInvolved) {
             this.updateMap();
+            // ★追加：攻撃を仕掛ける部隊と対象の部隊の「中間」にカメラを移動させます
+            this.scrollToCenterPos(attacker.x, attacker.y, defender.x, defender.y);
             await new Promise(r => setTimeout(r, 200)); // 0.2秒待ってから計算とアニメーション開始
         }
 
@@ -4193,6 +4230,8 @@ class FieldWarManager {
                 
                 if (isPlayerInvolved) {
                     this.log(`${unit.name}隊が${isFleeing ? '後退' : '移動'}。`);
+                    // ★追加：移動した部隊にカメラを追従させます
+                    this.scrollToUnit(unit);
                 }
                 
                 // ★追加：大雪の時、AIも動かした直後に兵力を減らします（攻撃側3%、守備側1%）
