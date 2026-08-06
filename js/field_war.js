@@ -3870,20 +3870,22 @@ class FieldWarManager {
                 if (isAnyAllyEngaged) break;
             }
 
-            let aStarPath = this.findAStarPath(unit, targetEnemy.x, targetEnemy.y);
+            // ★お掃除: 逃げている時は無駄に重いルート検索(A*)をしないようにブロック
             let aStarIdealHexes = {};
-            if (aStarPath && !isFleeing) {
-                let accumulatedCost = 0;
-                for (let i = 0; i < aStarPath.length; i++) {
-                    let step = aStarPath[i];
-                    accumulatedCost += step.cost;
-                    if (accumulatedCost <= unit.ap - 1) {
-                        aStarIdealHexes[`${step.x},${step.y}`] = true;
-                    } else break;
+            if (!isFleeing) {
+                let aStarPath = this.findAStarPath(unit, targetEnemy.x, targetEnemy.y);
+                if (aStarPath) {
+                    let accumulatedCost = 0;
+                    for (let i = 0; i < aStarPath.length; i++) {
+                        let step = aStarPath[i];
+                        accumulatedCost += step.cost;
+                        if (accumulatedCost <= unit.ap - 1) {
+                            aStarIdealHexes[`${step.x},${step.y}`] = true;
+                        } else break;
+                    }
                 }
             }
-
-            const idealDir = this.getDirection(targetEnemy.x, targetEnemy.y, unit.x, unit.y);
+            
             reachable[`${unit.x},${unit.y}`] = { cost: 0, path: [] };
 
             for (let key in reachable) {
