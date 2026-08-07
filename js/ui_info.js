@@ -2369,9 +2369,9 @@ class UIInfoManager {
                             <!-- 【ステータス部：下段】 -->
                             <div style="${groupWrapStyle}">
                                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
+                                    ${makeEmptyRow()}
                                     ${makeRow('軍馬', totalHorses)}
                                     ${makeRow('鉄砲', totalGuns)}
-                                    ${makeEmptyRow()}
                                 </div>
                                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
                                     ${makeRow('兵士', soldiers)}
