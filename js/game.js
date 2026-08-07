@@ -596,9 +596,15 @@ class GameSystem {
         // 武将データが無い場合や、大名・諸勢力は対象外にします
         if (!busho || busho.isDaimyo || busho.belongKunishuId > 0) return false;
         
-        // 設定値を引っ張ってきます
-        const advLoyalty = (window.MainParams && window.MainParams.Gunshi) ? window.MainParams.Gunshi.AdviceLoyalty : 74;
-        const advRecognition = (window.MainParams && window.MainParams.Gunshi) ? window.MainParams.Gunshi.AdviceRecognition : 30;
+        // 設定値が存在するか厳密にチェックします。無ければエラーを出して処理をピタッと止めます！
+        if (!window.MainParams || !window.MainParams.Gunshi || window.MainParams.Gunshi.AdviceLoyalty === undefined || window.MainParams.Gunshi.AdviceRecognition === undefined) {
+            alert("【エラー】軍師の助言基準値（AdviceLoyalty または AdviceRecognition）が設定されていません。game.js の MainParams を確認してください。");
+            throw new Error("軍師の助言基準値データが不足しているため、処理を中断します。");
+        }
+
+        // 設定値を引っ張ってきます（無い場合は上の処理でストップするので、ここは確実に数字が入っています）
+        const advLoyalty = window.MainParams.Gunshi.AdviceLoyalty;
+        const advRecognition = window.MainParams.Gunshi.AdviceRecognition;
         
         // 不満条件に当てはまるかどうかを判定して返します
         return busho.loyalty <= advLoyalty || (busho.recognitionNeed || 0) >= advRecognition;
