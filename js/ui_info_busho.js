@@ -1070,7 +1070,8 @@ Object.assign(UIInfoManager.prototype, {
                         // 基準の文字数（3または5）以上の場合、1文字増えるごとに0.1ずつ縮小します
                         let scale = 1.0 - (text.length - (threshold - 1)) * 0.1;
                         if (scale < 0.55) scale = 0.55;
-                        return `<span style="font-size: ${scale}em; transform: scaleY(${1/scale}); letter-spacing: -0.5px; display: inline-block; transform-origin: left center;">${text}</span>`;
+                        // ★修正：letter-spacingによって削られた右側の空間を「padding-right: 1px;」で補って食い込みを防ぎます
+                        return `<span style="font-size: ${scale}em; transform: scaleY(${1/scale}); letter-spacing: -0.5px; padding-right: 1px; display: inline-block; transform-origin: left center;">${text}</span>`;
                     }
                     return text;
                 };

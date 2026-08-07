@@ -1532,7 +1532,10 @@ class UIInfoManager {
                                       cell.classList.contains('col-faction-name') ||
                                       cell.classList.contains('col-princess-name') ||
                                       cell.classList.contains('col-castle-name') ||
-                                      cell.classList.contains('col-leader-name');
+                                      cell.classList.contains('col-leader-name') ||
+                                      cell.classList.contains('col-father') ||
+                                      cell.classList.contains('col-husband') ||
+                                      cell.classList.contains('col-castellan');
 
                     if (!isNameCol) continue;
 
@@ -2714,7 +2717,7 @@ class UIInfoManager {
                 onClick: (e) => this.handleCommonSelect(index, e.currentTarget, false),
                 cells: [
                     `<strong class="col-kunishu-name">${force.name}</strong>`,
-                    `<span>${force.leaderName}</span>`,
+                    `<span class="col-leader-name">${force.leaderName}</span>`,
                     `<span>${force.soldiers}</span>`,
                     `<span>${friendBarHtml}</span>`,
                     `<span class="${statusClass}" style="font-weight:bold;">${relStatus}</span>`
