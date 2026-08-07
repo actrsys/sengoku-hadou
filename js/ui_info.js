@@ -489,7 +489,7 @@ class UIInfoManager {
         }
         
         if (this.daimyoCurrentTab === 'status') {
-            gridSpStr = "2fr 1.5fr 1fr 1.5fr 1.5fr 1fr";
+            gridSpStr = "1.5fr 1.5fr 1fr 1.5fr 1.5fr 1fr";
             gridPcStr = "140px 100px 60px 100px 100px 60px 1fr";
             headers = [
                 `<span data-sort="name">勢力名${getSortMark('name')}</span>`,
@@ -501,7 +501,7 @@ class UIInfoManager {
                 `<span class="pc-only"></span>`
             ];
         } else if (this.daimyoCurrentTab === 'military') {
-            gridSpStr = "2fr 1fr 1fr 1.5fr 1.5fr 1.5fr";
+            gridSpStr = "1.5fr 1fr 1fr 1.5fr 1.5fr 1.5fr";
             gridPcStr = "140px 60px 60px 80px 80px 80px 1fr";
             headers = [
                 `<span data-sort="name">勢力名${getSortMark('name')}</span>`,
@@ -513,7 +513,7 @@ class UIInfoManager {
                 `<span class="pc-only"></span>`
             ];
         } else if (this.daimyoCurrentTab === 'economy') {
-            gridSpStr = "2fr 1fr 1.1fr 1.1fr 1.1fr 1.1fr 1.1fr";
+            gridSpStr = "1.5fr 1fr 1.1fr 1.1fr 1.1fr 1.1fr 1.1fr";
             gridPcStr = "140px 80px 80px 80px 80px 80px 80px 1fr";
             headers = [
                 `<span data-sort="name">勢力名${getSortMark('name')}</span>`,
@@ -526,7 +526,7 @@ class UIInfoManager {
                 `<span class="pc-only"></span>`
             ];
         } else if (this.daimyoCurrentTab === 'power') {
-            gridSpStr = "2fr 1.5fr 1.25fr 1.25fr 1.25fr 1.25fr";
+            gridSpStr = "1.5fr 1.5fr 1.25fr 1.25fr 1.25fr 1.25fr";
             gridPcStr = "140px 100px 80px 80px 80px 80px 1fr";
             headers = [
                 `<span data-sort="name">勢力名${getSortMark('name')}</span>`,
