@@ -2850,27 +2850,24 @@ class GameManager {
     }
     
     // ==========================================
-    // ★追加：セーブデータ用の勢力図画像を生成する魔法
+    // ★追加：セーブデータ用の勢力図画像を生成する魔法（修正版）
     // ==========================================
     async generateSaveMapImage() {
         return new Promise(async (resolve) => {
             const w = this.mapWidth || 1200;
             const h = this.mapHeight || 800;
 
-            // 白地図とカラーコードマップ（塗る場所の目印）を読み込みます
+            // 白地図を読み込みます
             const loadImg = (src) => new Promise(res => { 
                 const img = new Image(); 
                 img.onload = () => res(img); 
                 img.onerror = () => res(null); 
                 img.src = src; 
             });
-            const [whiteMapImg, colorCodeImg] = await Promise.all([
-                loadImg('./data/images/map/japan_white_map.png'),
-                loadImg('./data/images/map/japan_colorcode_map.png')
-            ]);
+            const whiteMapImg = await loadImg('./data/images/map/japan_white_map.png');
 
-            if (!whiteMapImg || !colorCodeImg) {
-                resolve(null); return; // 画像が見つからなければ諦めます
+            if (!whiteMapImg) {
+                resolve(null); return; 
             }
 
             const canvas = document.createElement('canvas');
@@ -2881,61 +2878,20 @@ class GameManager {
             // 1. まずは白地図を描きます
             ctx.drawImage(whiteMapImg, 0, 0, w, h);
 
-            // 2. どこに何色を塗るかの目印（カラーコード）を読み取ります
-            const colorCanvas = document.createElement('canvas');
-            colorCanvas.width = w;
-            colorCanvas.height = h;
-            const colorCtx = colorCanvas.getContext('2d');
-            colorCtx.drawImage(colorCodeImg, 0, 0, w, h);
-            const colorData = colorCtx.getImageData(0, 0, w, h).data;
-
-            // 3. それぞれのお城が今「何色」に塗られるべきか調べます
-            const clanColorMap = new Map();
-            const hexToRgb = (hex) => {
-                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
-            };
-
-            this.castles.forEach(c => {
-                if (c.ownerClan > 0 && c.castlesColorCode) {
-                    const clan = this.getClan(c.ownerClan);
-                    if (clan && clan.color) {
-                        clanColorMap.set(c.castlesColorCode.toLowerCase(), hexToRgb(clan.color));
-                    }
-                }
-            });
-
-            // 4. 白地図の上に重ねる「色付きの透明フィルム」を作ります
-            const overlayData = ctx.createImageData(w, h);
-            const dstData = overlayData.data;
-
-            for (let i = 0; i < colorData.length; i += 4) {
-                const a = colorData[i+3];
-                if (a > 0) {
-                    const r = colorData[i].toString(16).padStart(2, '0');
-                    const g = colorData[i+1].toString(16).padStart(2, '0');
-                    const b = colorData[i+2].toString(16).padStart(2, '0');
-                    const hex = `#${r}${g}${b}`.toLowerCase();
-
-                    const targetColor = clanColorMap.get(hex);
-                    if (targetColor) {
-                        dstData[i] = targetColor.r;
-                        dstData[i+1] = targetColor.g;
-                        dstData[i+2] = targetColor.b;
-                        dstData[i+3] = 160; // 少し濃いめの半透明で塗ります
-                    }
-                }
+            // 2. 画面に表示されている「色塗り済みの透明フィルム」をそのまま重ねます！
+            const clanColorOverlay = document.getElementById('clan-color-overlay');
+            if (clanColorOverlay) {
+                ctx.drawImage(clanColorOverlay, 0, 0, w, h);
+            } else if (this.ui && this.ui.lastClanColorsImageData) {
+                // 万が一画面に無い場合も、記憶しておいたデータから復元して重ねます
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = w;
+                tempCanvas.height = h;
+                tempCanvas.getContext('2d').putImageData(this.ui.lastClanColorsImageData, 0, 0);
+                ctx.drawImage(tempCanvas, 0, 0, w, h);
             }
 
-            const overlayCanvas = document.createElement('canvas');
-            overlayCanvas.width = w;
-            overlayCanvas.height = h;
-            overlayCanvas.getContext('2d').putImageData(overlayData, 0, 0);
-            
-            // 白地図の上に色付きフィルムを重ねます
-            ctx.drawImage(overlayCanvas, 0, 0);
-
-            // 5. データが重くならないように、最後に「1/4のサイズ」に縮小して写真を撮ります
+            // 3. データが重くならないように、最後に「1/4のサイズ」に縮小して写真を撮ります
             const thumbCanvas = document.createElement('canvas');
             const scale = 0.25; 
             thumbCanvas.width = w * scale;
