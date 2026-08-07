@@ -500,9 +500,22 @@ class UIInfoManager {
             ];
         }
 
+        // ★追加：勢力名が3文字以上の場合は縮小する魔法
+        const getCompressedTextHtml = (text, threshold) => {
+            if (!text) return "";
+            if (text.length >= threshold) {
+                let scale = 1.0 - (text.length - (threshold - 1)) * 0.1;
+                if (scale < 0.55) scale = 0.55;
+                return `<span style="font-size: ${scale}em; transform: scaleY(${1/scale}); letter-spacing: -0.5px; padding-right: 1px; display: inline-block; transform-origin: left center;">${text}</span>`;
+            }
+            return text;
+        };
+
         let items = [];
 
         clanDataList.forEach(d => {
+            const compressedDaimyoName = getCompressedTextHtml(d.name, 3); // ★魔法をかけます！
+
             let cells = [];
             if (this.daimyoCurrentTab === 'status') {
                 let statusClass = "text-white";
@@ -514,7 +527,7 @@ class UIInfoManager {
                 const friendBarHtml = d.id === this.game.playerClanId ? "" : this._createBarHtml(d.friendScore, 'friend');
                 
                 cells = [
-                    `<span class="col-daimyo-name">${d.name}</span>`,
+                    `<span class="col-daimyo-name">${compressedDaimyoName}</span>`,
                     `<span class="col-leader-name">${d.leaderName}</span>`,
                     `<span class="col-castle-count">${d.castlesCount}</span>`,
                     `<span class="col-prestige">${powerBarHtml}</span>`,
@@ -524,7 +537,7 @@ class UIInfoManager {
                 ];
             } else if (this.daimyoCurrentTab === 'military') {
                 cells = [
-                    `<span class="col-daimyo-name">${d.name}</span>`,
+                    `<span class="col-daimyo-name">${compressedDaimyoName}</span>`,
                     `<span class="col-castle-count">${d.castlesCount}</span>`,
                     `<span class="col-soldiers">${d.soldiers}</span>`,
                     `<span class="col-horses">${d.horses}</span>`,
@@ -535,7 +548,7 @@ class UIInfoManager {
                 ];
             } else if (this.daimyoCurrentTab === 'economy') {
                 cells = [
-                    `<span class="col-daimyo-name">${d.name}</span>`,
+                    `<span class="col-daimyo-name">${compressedDaimyoName}</span>`,
                     `<span class="col-kokudaka">${d.kokudaka}</span>`,
                     `<span class="col-commerce">${d.commerce}</span>`,
                     `<span class="col-gold">${d.gold}</span>`,

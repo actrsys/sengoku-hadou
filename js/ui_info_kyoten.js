@@ -507,12 +507,25 @@ Object.assign(UIInfoManager.prototype, {
             ];
         }
 
+        // ★追加：勢力名が3文字以上の場合は縮小する魔法
+        const getCompressedTextHtml = (text, threshold) => {
+            if (!text) return "";
+            if (text.length >= threshold) {
+                let scale = 1.0 - (text.length - (threshold - 1)) * 0.1;
+                if (scale < 0.55) scale = 0.55;
+                return `<span style="font-size: ${scale}em; transform: scaleY(${1/scale}); letter-spacing: -0.5px; padding-right: 1px; display: inline-block; transform-origin: left center;">${text}</span>`;
+            }
+            return text;
+        };
+
         let items = [];
         
         displayCastles.forEach(c => {
             // ★高速化：ループ内でも早見表を使います
             const clanData = clanMap.get(c.ownerClan);
             const clanName = clanData ? clanData.name : "";
+            const compressedClanName = getCompressedTextHtml(clanName, 3); // ★魔法をかけます！
+            
             const castellan = bushoMap.get(c.castellanId);
             const castellanName = castellan ? castellan.name : "";
             
@@ -534,7 +547,7 @@ Object.assign(UIInfoManager.prototype, {
             if (this.currentKyotenTab === 'status') {
                 cells = [
                     `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
-                    `<span class="col-clan">${clanName}</span>`,
+                    `<span class="col-clan">${compressedClanName}</span>`,
                     `<span class="col-castellan">${castellanName}</span>`,
                     `<span class="col-province">${provinceName}</span>`,
                     `<span class="col-busho-count">${bushosCount}</span>`,
