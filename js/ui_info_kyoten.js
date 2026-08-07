@@ -513,8 +513,10 @@ Object.assign(UIInfoManager.prototype, {
         const getCompressedTextHtml = (text, threshold) => {
             if (!text) return "";
             if (text.length >= threshold) {
-                let scale = 1.0 - (text.length - (threshold - 1)) * 0.1;
-                if (scale < 0.55) scale = 0.55;
+                // ★修正：縮み具合を少し緩やかにしました（0.1 → 0.08）
+                let scale = 1.0 - (text.length - (threshold - 1)) * 0.08;
+                // ★修正：これ以上小さくならない下限も少し緩めました（0.55 → 0.6）
+                if (scale < 0.6) scale = 0.6;
                 return `<span style="font-size: ${scale}em; transform: scaleY(${1/scale}); letter-spacing: -0.5px; padding-right: 1px; display: inline-block; transform-origin: left center;">${text}</span>`;
             }
             return text;
