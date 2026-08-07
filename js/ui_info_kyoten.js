@@ -469,7 +469,7 @@ Object.assign(UIInfoManager.prototype, {
         let gridPcStr = "";
 
         if (this.currentKyotenTab === 'status') {
-            gridSpStr = "1.4fr 1fr 1.2fr 1fr 0.6fr 1fr 1fr";
+            gridSpStr = "1.4fr 1.15fr 1.25fr 0.9fr 0.6fr 0.95fr 0.95fr";
             gridPcStr = "140px 100px 100px 100px 60px 80px 80px 1fr";
             headers = [
                 `<span data-sort="name">拠点名${getSortMark('name')}</span>`,
