@@ -96,12 +96,24 @@ class LifeSystem {
                 penaltyOldInt = Math.ceil((age - 55) / 3);
             }
             
+            // 寿命前補正（死亡年5年前から毎年2ずつ下がる）
+            let penaltyLifespan = 0;
+            // プレイヤー大名の延命ボーナス(+5年)も考慮した「本当の死亡年」を出します
+            const actualEndYear = (b.isDaimyo && b.clan === this.game.playerClanId) ? b.endYear + 5 : b.endYear;
+            
+            // 今の年が「本当の死亡年の5年前」以上なら、ペナルティを与えます
+            if (currentYear >= actualEndYear - 5) {
+                // 5年前で2、4年前で4、3年前で6...となるように計算します（最後に2を掛け算しています）
+                penaltyLifespan = (currentYear - (actualEndYear - 5) + 1) * 2;
+            }
+            
             // 基礎値からペナルティを引いて、0以下にならないように（最低1）セットします
-            b.leadership = Math.max(1, b.baseLeadership - penaltyYoung - penaltyOldGeneral);
-            b.strength = Math.max(1, b.baseStrength - penaltyYoung - penaltyOldGeneral);
-            b.politics = Math.max(1, b.basePolitics - penaltyYoung - penaltyOldGeneral);
-            b.diplomacy = Math.max(1, b.baseDiplomacy - penaltyYoung - penaltyOldGeneral);
-            b.intelligence = Math.max(1, b.baseIntelligence - penaltyYoung - penaltyOldInt);
+            // ★新しいペナルティ（penaltyLifespan）も一緒に引き算します！
+            b.leadership = Math.max(1, b.baseLeadership - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
+            b.strength = Math.max(1, b.baseStrength - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
+            b.politics = Math.max(1, b.basePolitics - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
+            b.diplomacy = Math.max(1, b.baseDiplomacy - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
+            b.intelligence = Math.max(1, b.baseIntelligence - penaltyYoung - penaltyOldInt - penaltyLifespan);
         }
     }
     
