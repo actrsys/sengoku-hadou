@@ -1088,6 +1088,11 @@ Object.assign(UIInfoManager.prototype, {
                     compressedNameHtml = getCompressedTextHtml(b.name, 5);
                 }
 
+                // ★追加：褒美コマンドで軍師の助言対象となる武将なら、名前の色をオレンジにします
+                if (actionType === 'reward' && gunshi && !b.isDaimyo && b.belongKunishuId === 0 && (b.loyalty <= 74 || (b.recognitionNeed || 0) >= 30)) {
+                    compressedNameHtml = `<span class="text-orange">${compressedNameHtml}</span>`;
+                }
+
                 let cells = [];
                 if (this.bushoCurrentTab === 'stats') {
                     cells = [

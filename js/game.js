@@ -2956,6 +2956,7 @@ class GameManager {
             if (typeof this.ui.clearCommandMenu === 'function') this.ui.clearCommandMenu();
         }
         this.eventManager = new EventManager(this);
+        if (this.gunshiSystem) this.gunshiSystem.onStartMonth();
         
         // --- 復元作業 ---
         this.flags = d.flags || {};

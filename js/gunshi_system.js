@@ -47,28 +47,37 @@ class GunshiSystem {
             const gunshiIsUnhappy = unhappyBushos.some(b => b.id === gunshi.id);
             const othersUnhappy = unhappyBushos.filter(b => b.id !== gunshi.id);
 
-            let msg = "";
-            // 軍師自身が不満を持っている場合
-            if (gunshiIsUnhappy) {
-                msg += `「殿、恐れながら申し上げます。一族郎党を養う為にも、温情あるご配慮を賜りたく存じます」<br>`;
-            }
-            // 他の武将が不満を持っている場合
-            if (othersUnhappy.length > 0) {
-                const names = othersUnhappy.slice(0, 2).map(b => b.name).join("殿や");
-                const etc = othersUnhappy.length > 2 ? "殿ら、数名" : "殿";
-                
-                if (gunshiIsUnhappy) {
-                    msg += `<br>「また、${names}${etc}の不満が溜まる前に、厚き処遇を願います」`;
+            // 他の武将の不満を報告するための処理を一つにまとめます
+            const showOthersAdvice = () => {
+                if (othersUnhappy.length > 0) {
+                    const names = othersUnhappy.slice(0, 2).map(b => b.name).join("殿や");
+                    const etc = othersUnhappy.length > 2 ? "殿ら、数名" : "殿";
+                    
+                    let msg = "";
+                    if (gunshiIsUnhappy) {
+                        msg = `「また、${names}${etc}の不満が溜まる前に、厚き処遇を願います」`;
+                    } else {
+                        msg = `「殿、${names}${etc}の不満が溜まる前に、厚き処遇を願います」`;
+                    }
+                    this.game.ui.showDialog(msg, false, onComplete, null, {
+                        leftFace: gunshi.faceIcon,
+                        leftName: gunshi.name
+                    });
                 } else {
-                    msg += `「殿、${names}${etc}の不満が溜まる前に、厚き処遇を願います」`;
+                    if (onComplete) onComplete();
                 }
-            }
+            };
 
-            // ダイアログを表示して、閉じたら(onComplete)次に進む
-            this.game.ui.showDialog(msg, false, onComplete, null, {
-                leftFace: gunshi.faceIcon,
-                leftName: gunshi.name
-            });
+            // まず軍師の不満があればそれを話し、終わったら他の人の不満を話させます
+            if (gunshiIsUnhappy) {
+                const msg = `「殿、恐れながら申し上げます。一族郎党を養う為にも、温情あるご配慮を賜りたく存じます」`;
+                this.game.ui.showDialog(msg, false, showOthersAdvice, null, {
+                    leftFace: gunshi.faceIcon,
+                    leftName: gunshi.name
+                });
+            } else {
+                showOthersAdvice();
+            }
         } else {
             // 不満な人がいなければ、そのまま次に進む
             if (onComplete) onComplete();
