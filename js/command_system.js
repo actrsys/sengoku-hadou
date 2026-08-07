@@ -1578,6 +1578,8 @@ class CommandSystem {
         const title = document.getElementById('saveload-title');
         const list = document.getElementById('saveload-list');
         const tabs = document.getElementById('saveload-tabs'); // ★追加：タブを入れる箱を見つけます
+        
+        list.style.overflowX = 'hidden'; // 横スクロールを禁止します
 
         title.innerText = mode === 'save' ? 'セーブするスロットを選択' : 'ロードするスロットを選択';
         
@@ -1725,7 +1727,8 @@ class CommandSystem {
                     dateStr = `${d.year}年 ${d.month}月`;
                     
                     if (d.scenarioName) {
-                        scenarioStr = (d.scenarioNo ? d.scenarioNo + "：" : "") + d.scenarioName;
+                        // シナリオの番号と年数（1560年など）を消して、名前だけにします
+                        scenarioStr = d.scenarioName.replace(/^[0-9]+年\s*/, '');
                     } else {
                         scenarioStr = "不明なシナリオ";
                     }
@@ -1836,6 +1839,13 @@ class CommandSystem {
 
                 list.appendChild(btn);
             });
+
+            // カスタムスクロールバーを更新して、縦スクロールができるようにします
+            setTimeout(() => {
+                if (this.game.ui && typeof this.game.ui.updateCustomScrollbars === 'function') {
+                    this.game.ui.updateCustomScrollbars();
+                }
+            }, 10);
         };
 
         // ★追加：タブのボタンを押した時の動きを登録します
