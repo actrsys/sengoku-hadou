@@ -2262,11 +2262,6 @@ class UIInfoManager {
         const backToScenarioBtn = document.getElementById('btn-back-to-scenario');
         if (backToScenarioBtn) backToScenarioBtn.classList.add('hidden');
         
-        let faceHtml = "";
-        if (leader && leader.faceIcon) {
-            faceHtml = `<img src="data/images/faceicons/${leader.faceIcon}" class="daimyo-confirm-face" onerror="this.style.display='none'">`;
-        }
-
         // 大名の情報を集めて合算します
         const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
         const castlesCount = clanCastles.length;
@@ -2293,28 +2288,92 @@ class UIInfoManager {
         const bushosCount = this.game.bushos.filter(b => b.clan === clanId && b.status !== 'dead' && b.status !== 'unborn').length;
         const clanData = this.game.clans.find(c => c.id === clanId);
         const princessCount = clanData && clanData.princessIds ? clanData.princessIds.length : 0;
+        const clanYomi = clanData ? (clanData.yomi || "") : "";
+
+        // スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！
+        const isPc = document.body.classList.contains('is-pc');
+
+        const fSizeCastleYomi = isPc ? "0.75rem" : "0.65rem";
+        const fSizeCastleName = isPc ? "1.4rem" : "1.25rem";
+        const fSizeLordLabel = isPc ? "1.05rem" : "0.95rem";
+        const fSizeStatLabel = isPc ? "0.85rem" : "0.70rem";
+        const fSizeStatValue = isPc ? "0.85rem" : "0.70rem";
+
+        const gridGap = isPc ? "8px 6px" : "8px 3px";
+        const faceStyle = "width: 100%; max-width: 90px; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0;";
+
+        let faceHtml = "";
+        if (leader && leader.faceIcon) {
+            faceHtml = `<img src="data/images/faceicons/${leader.faceIcon}" style="${faceStyle}" onerror="this.style.display='none'">`;
+        } else {
+            faceHtml = `<div style="${faceStyle}"></div>`;
+        }
+
+        const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 4px;";
+        const statBoxStyle = "background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 2px 6px; display: flex; justify-content: space-between; align-items: center;";
+        const labelStyle = `color: #ffd54f; font-size: ${fSizeStatLabel}; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: left;`;
+        const valueStyle = `color: #fff; font-size: ${fSizeStatValue}; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: right; font-variant-numeric: tabular-nums;`;
+        
+        const makeRow = (label, value) => {
+            let extraLabelStyle = "";
+            if (!isPc && label.length >= 3) {
+                extraLabelStyle = " letter-spacing: -1px; transform: scaleX(0.9); transform-origin: left center; display: inline-block;";
+            }
+            return `<div style="${statBoxStyle}"><span style="${labelStyle}${extraLabelStyle}">${label}</span><span style="${valueStyle}">${value}</span></div>`;
+        };
+        const makeEmptyRow = () => `<div style="${statBoxStyle}; visibility: hidden;"><span>&nbsp;</span><span>&nbsp;</span></div>`;
 
         if (this.ui.daimyoConfirmBody) {
             this.ui.daimyoConfirmBody.innerHTML = `
-                <div class="daimyo-confirm-compact">
-                    ${faceHtml}
-                    <div class="daimyo-confirm-info">
-                        <h3 style="margin:0 0 5px 0; font-size:1.2rem; border:none; padding:0;">${clanName}</h3>
-                        <div style="font-size:0.95rem; margin-bottom: 3px;">大名　${leader ? leader.name : "不明"}</div>
+                <div class="kyoten-detail-wrapper" style="padding: 8px 10px; display: flex; flex-direction: column; box-sizing: border-box; text-align: left;">
+                    
+                    <!-- 【ヘッダー部】 左上に顔グラ、右にテキスト情報 -->
+                    <div style="display: flex; align-items: flex-start; gap: 15px; margin-bottom: 10px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 8px;">
+                        <div style="flex-shrink: 0; width: 90px;">
+                            ${faceHtml}
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                            <!-- 勢力名 -->
+                            <div style="display: flex; align-items: flex-end; gap: 15px;">
+                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                                    <span style="font-size: ${fSizeCastleYomi}; color: #ccc; min-height: 1em;">${clanYomi}</span>
+                                    <span style="font-size: ${fSizeCastleName}; font-weight: bold; color: #fff; line-height: 1;">${clanName}</span>
+                                </div>
+                            </div>
+                            <!-- 大名 -->
+                            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+                                <div style="font-size: ${fSizeLordLabel}; color: #ffd54f;">大名 <span style="color: #fff; font-weight: bold;">${leader ? leader.name : "不明"}</span></div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="daimyo-confirm-stats">
-                    <div class="stat-box"><span>拠点</span><span class="stat-val">${castlesCount}</span></div>
-                    <div class="stat-box"><span>人口</span><span class="stat-val">${totalPopulation}</span></div>
-                    <div class="stat-box"><span>武将</span><span class="stat-val">${bushosCount}</span></div>
-                    <div class="stat-box"><span>姫</span><span class="stat-val">${princessCount}</span></div>
-                    <div class="stat-box"><span>石高</span><span class="stat-val">${totalKokudaka}</span></div>
-                    <div class="stat-box"><span>鉱山</span><span class="stat-val">${totalCommerce}</span></div>
-                    <div class="stat-box"><span>金</span><span class="stat-val">${totalGold}</span></div>
-                    <div class="stat-box"><span>兵糧</span><span class="stat-val">${totalRice}</span></div>
-                    <div class="stat-box"><span>兵士</span><span class="stat-val">${soldiers}</span></div>
-                    <div class="stat-box"><span>軍馬</span><span class="stat-val">${totalHorses}</span></div>
-                    <div class="stat-box"><span>鉄砲</span><span class="stat-val">${totalGuns}</span></div>
+
+                    <!-- 【ステータス部：上段】 -->
+                    <div style="${groupWrapStyle} margin-bottom: 8px;">
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
+                            ${makeRow('拠点', castlesCount)}
+                            ${makeRow('武将', bushosCount)}
+                            ${makeRow('姫', princessCount)}
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
+                            ${makeRow('人口', totalPopulation)}
+                            ${makeRow('石高', totalKokudaka)}
+                            ${makeRow('鉱山', totalCommerce)}
+                        </div>
+                    </div>
+
+                    <!-- 【ステータス部：下段】 -->
+                    <div style="${groupWrapStyle}">
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
+                            ${makeRow('軍馬', totalHorses)}
+                            ${makeRow('鉄砲', totalGuns)}
+                            ${makeEmptyRow()}
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
+                            ${makeRow('兵士', soldiers)}
+                            ${makeRow('金', totalGold)}
+                            ${makeRow('兵糧', totalRice)}
+                        </div>
+                    </div>
                 </div>
             `;
         }
