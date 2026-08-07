@@ -102,8 +102,12 @@ class LifeSystem {
             
             // 今の年が「死亡年の5年前」以上なら、ペナルティを与えます
             if (currentYear >= actualEndYear - 5) {
-                // 5年前で2、4年前で4、3年前で6...となるように計算します（最後に2を掛け算しています）
-                penaltyLifespan = (currentYear - (actualEndYear - 5) + 1) * 2;
+                // 「5年前」の時点を「1年目」として数え始めます
+                const yearsPassed = currentYear - (actualEndYear - 5) + 1;
+                
+                // 経過した年数に2を掛けて、毎年のペナルティ（2, 4, 6...）を出します
+                // 寿命を過ぎて生きている場合も、この年数が増え続けるため減少が続きます
+                penaltyLifespan = yearsPassed * 2;
             }
             
             // 基礎値からペナルティを引いて、0以下にならないように（最低1）セットします
