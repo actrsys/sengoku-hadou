@@ -1748,10 +1748,15 @@ class CommandSystem {
                         const playerClan = d.clans.find(c => c.id === d.playerClanId);
                         if (playerClan) clanStr = playerClan.name;
                     }
+
+                    // ★追加：スマホ版で、勢力名が5文字以上の場合はシナリオ名を非表示にします
+                    if (!document.body.classList.contains('is-pc') && clanStr.length >= 5) {
+                        scenarioStr = "";
+                    }
                 }
                 
                 // ★修正：スロットの表示名を数字だけにします
-                const slotNumberText = prefix === 'sengoku_autosave_slot' ? displayIndex : i; 
+                const slotNumberText = prefix === 'sengoku_autosave_slot' ? displayIndex : i;
 
                 // ★変更：全体で一番新しいデータかどうかだけを判定します
                 let isGlobalLatest = (hasData && slotInfo.time === globalLatestTime && globalLatestTime > 0);
