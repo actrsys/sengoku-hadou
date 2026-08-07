@@ -2804,7 +2804,7 @@ class GameManager {
     // ==========================================
     
     // どんな方法でセーブする時も、この魔法で「今のゲームの全データ」をひとまとめにします
-    _createSaveDataObj() {
+    async _createSaveDataObj() {
         let scenarioIndex = SCENARIOS.findIndex(s => s.folder === this.scenarioFolder);
         let scenarioName = "不明なシナリオ";
         let scenarioNo = "";
@@ -2818,6 +2818,9 @@ class GameManager {
         const now = new Date();
         const saveTime = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
+        // ★追加：保存時の勢力図の写真を撮るのを待ちます
+        const mapThumbnail = await this.generateSaveMapImage();
+
         return { 
             year: this.year, 
             month: this.month, 
@@ -2827,7 +2830,8 @@ class GameManager {
             scenarioName: scenarioName,
             scenarioNo: scenarioNo,
             saveTime: saveTime,
-            saveTimestamp: now.getTime(), // 被りを防ぐためミリ秒単位の正確な時間を記録します
+            saveTimestamp: now.getTime(),
+            mapThumbnail: mapThumbnail, // ★追加：撮った写真も一緒に保存します
             castles: this.castles,
             bushos: this.bushos,
             clans: this.clans,
@@ -2844,7 +2848,108 @@ class GameManager {
             flags: this.flags || {}
         };
     }
+    
+    // ==========================================
+    // ★追加：セーブデータ用の勢力図画像を生成する魔法
+    // ==========================================
+    async generateSaveMapImage() {
+        return new Promise(async (resolve) => {
+            const w = this.mapWidth || 1200;
+            const h = this.mapHeight || 800;
 
+            // 白地図とカラーコードマップ（塗る場所の目印）を読み込みます
+            const loadImg = (src) => new Promise(res => { 
+                const img = new Image(); 
+                img.onload = () => res(img); 
+                img.onerror = () => res(null); 
+                img.src = src; 
+            });
+            const [whiteMapImg, colorCodeImg] = await Promise.all([
+                loadImg('./data/images/map/japan_white_map.png'),
+                loadImg('./data/images/map/japan_colorcode_map.png')
+            ]);
+
+            if (!whiteMapImg || !colorCodeImg) {
+                resolve(null); return; // 画像が見つからなければ諦めます
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+
+            // 1. まずは白地図を描きます
+            ctx.drawImage(whiteMapImg, 0, 0, w, h);
+
+            // 2. どこに何色を塗るかの目印（カラーコード）を読み取ります
+            const colorCanvas = document.createElement('canvas');
+            colorCanvas.width = w;
+            colorCanvas.height = h;
+            const colorCtx = colorCanvas.getContext('2d');
+            colorCtx.drawImage(colorCodeImg, 0, 0, w, h);
+            const colorData = colorCtx.getImageData(0, 0, w, h).data;
+
+            // 3. それぞれのお城が今「何色」に塗られるべきか調べます
+            const clanColorMap = new Map();
+            const hexToRgb = (hex) => {
+                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+            };
+
+            this.castles.forEach(c => {
+                if (c.ownerClan > 0 && c.castlesColorCode) {
+                    const clan = this.getClan(c.ownerClan);
+                    if (clan && clan.color) {
+                        clanColorMap.set(c.castlesColorCode.toLowerCase(), hexToRgb(clan.color));
+                    }
+                }
+            });
+
+            // 4. 白地図の上に重ねる「色付きの透明フィルム」を作ります
+            const overlayData = ctx.createImageData(w, h);
+            const dstData = overlayData.data;
+
+            for (let i = 0; i < colorData.length; i += 4) {
+                const a = colorData[i+3];
+                if (a > 0) {
+                    const r = colorData[i].toString(16).padStart(2, '0');
+                    const g = colorData[i+1].toString(16).padStart(2, '0');
+                    const b = colorData[i+2].toString(16).padStart(2, '0');
+                    const hex = `#${r}${g}${b}`.toLowerCase();
+
+                    const targetColor = clanColorMap.get(hex);
+                    if (targetColor) {
+                        dstData[i] = targetColor.r;
+                        dstData[i+1] = targetColor.g;
+                        dstData[i+2] = targetColor.b;
+                        dstData[i+3] = 160; // 少し濃いめの半透明で塗ります
+                    }
+                }
+            }
+
+            const overlayCanvas = document.createElement('canvas');
+            overlayCanvas.width = w;
+            overlayCanvas.height = h;
+            overlayCanvas.getContext('2d').putImageData(overlayData, 0, 0);
+            
+            // 白地図の上に色付きフィルムを重ねます
+            ctx.drawImage(overlayCanvas, 0, 0);
+
+            // 5. データが重くならないように、最後に「1/4のサイズ」に縮小して写真を撮ります
+            const thumbCanvas = document.createElement('canvas');
+            const scale = 0.25; 
+            thumbCanvas.width = w * scale;
+            thumbCanvas.height = h * scale;
+            const thumbCtx = thumbCanvas.getContext('2d');
+            thumbCtx.imageSmoothingEnabled = true;
+            thumbCtx.imageSmoothingQuality = 'high';
+            thumbCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+
+            // 画像のデータを文字（Base64）にしてお渡しします
+            resolve(thumbCanvas.toDataURL('image/jpeg', 0.6));
+        });
+    }
+    
     // どんな方法でロードした時も、この魔法で「受け取ったデータ」をゲーム内に展開します
     async _restoreSaveDataObj(d) {
         // --- お掃除作業 ---
@@ -3058,8 +3163,8 @@ class GameManager {
     }
 
     // ファイルへセーブ
-    saveGameToFile() { 
-        const data = this._createSaveDataObj();
+    async saveGameToFile() { 
+        const data = await this._createSaveDataObj(); // ★待つように変更
         const encryptedData = this._encryptData(data); // ★暗号化します
         const blob = new Blob([encryptedData], {type: 'application/octet-stream'}); // ★バイナリデータとして保存します
         const url = URL.createObjectURL(blob); 
@@ -3091,7 +3196,7 @@ class GameManager {
     
     // スロットへセーブ (IndexedDB)
     async saveGameToLocal(slotNo = 1) { 
-        const data = this._createSaveDataObj();
+        const data = await this._createSaveDataObj(); // ★待つように変更
         const encryptedData = this._encryptData(data); // ★暗号化します
         try {
             await saveToDB("sengoku_save_slot" + slotNo, encryptedData);
@@ -3149,7 +3254,7 @@ class GameManager {
             // スロットの番号（1～5）を覚えておくための箱から数字を取り出します（最初は1から）
             let autoSaveIndex = parseInt(localStorage.getItem('autoSaveIndex')) || 1;
             
-            const data = this._createSaveDataObj();
+            const data = await this._createSaveDataObj(); // ★待つように変更
             const encryptedData = this._encryptData(data);
             
             // オートセーブ専用の「sengoku_autosave_slot〇」にセーブを書き込みます

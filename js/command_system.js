@@ -1611,12 +1611,11 @@ class CommandSystem {
                 btn.className = 'saveload-slot-btn empty-slot';
                 btn.disabled = true; 
                 btn.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
-                        <div class="saveload-slot-title" style="color: inherit; text-shadow: none; margin: 0;">スロット ${i}</div>
-                        <div style="font-size: 0.8rem; color: #78909c; font-family: monospace;">----/--/-- --:--</div>
-                    </div>
-                    <div class="saveload-slot-info" style="flex-direction: column; justify-content: center; align-items: center; width: 100%; gap: 4px; flex: 1;">
-                        <div>読み込み中...</div>
+                    <div class="saveload-slot-number">${i}</div>
+                    <div class="saveload-slot-image"><div class="saveload-map-placeholder"></div></div>
+                    <div class="saveload-slot-content empty">
+                        <div class="saveload-slot-time">----/--/-- --:--</div>
+                        <div class="saveload-slot-empty-text">読み込み中...</div>
                     </div>
                 `;
                 list.appendChild(btn);
@@ -1748,8 +1747,8 @@ class CommandSystem {
                     }
                 }
                 
-                // 見た目上の名前（手動ならスロット番号そのまま、オートなら並べ替えた順番）
-                const displayTitle = prefix === 'sengoku_autosave_slot' ? `オート ${displayIndex}` : `スロット ${i}`; 
+                // ★修正：スロットの表示名を数字だけにします
+                const slotNumberText = prefix === 'sengoku_autosave_slot' ? displayIndex : i; 
 
                 // ★変更：全体で一番新しいデータかどうかだけを判定します
                 let isGlobalLatest = (hasData && slotInfo.time === globalLatestTime && globalLatestTime > 0);
@@ -1769,32 +1768,38 @@ class CommandSystem {
                     latestMarkHtml = `<span style="color: #ff8a80; font-weight: bold; margin-right: 8px; text-shadow: 1px 1px 0 #000;">最新!</span>`;
                 }
 
+                // ★追加：保存しておいた写真があれば表示します
+                let mapImageHtml = `<div class="saveload-map-placeholder">NO DATA</div>`;
+                if (hasData && d.mapThumbnail) {
+                    mapImageHtml = `<img src="${d.mapThumbnail}" class="saveload-map-thumb">`;
+                }
+
                 if (hasData) {
                     // ★変更：最新スロットには専用のクラス（印）を追加してCSSでお化粧します
                     btn.className = 'saveload-slot-btn' + (isGlobalLatest ? ' global-latest-slot' : '');
                     btn.disabled = false; 
                     btn.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
-                            <div class="saveload-slot-title" style="margin: 0;">${displayTitle}</div>
-                            <div style="font-size: 0.8rem; color: #b0bec5; font-family: monospace; display: flex; align-items: center;">${latestMarkHtml}${saveTimeStr}</div>
-                        </div>
-                        <div class="saveload-slot-info" style="flex-direction: column; gap: 4px; width: 100%; flex: 1; justify-content: center;">
-                            <div style="font-size: 0.85rem; color: #cfd8dc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left;">${scenarioStr}</div>
-                            <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%;">
-                                <span style="font-size: 1.3rem; font-weight: bold; color: #ffd54f; text-shadow: 1px 1px 0 #000, 2px 2px 5px rgba(0,0,0,0.8);">${clanStr}</span>
-                                <span style="font-size: 1rem; color: #fff;">${dateStr} <span style="font-size: 0.8rem; color: #b0bec5;">(${passedYearsStr})</span></span>
+                        <div class="saveload-slot-number">${slotNumberText}</div>
+                        <div class="saveload-slot-image">${mapImageHtml}</div>
+                        <div class="saveload-slot-content">
+                            <div class="saveload-slot-header">
+                                <div class="saveload-slot-time">${latestMarkHtml}${saveTimeStr}</div>
+                            </div>
+                            <div class="saveload-slot-scenario">${scenarioStr}</div>
+                            <div class="saveload-slot-main-info">
+                                <span class="saveload-slot-clan">${clanStr}</span>
+                                <span class="saveload-slot-date">${dateStr} <span class="saveload-slot-passed">(${passedYearsStr})</span></span>
                             </div>
                         </div>
                     `;
                 } else {
                     btn.className = 'saveload-slot-btn empty-slot';
                     btn.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px;">
-                            <div class="saveload-slot-title" style="color: inherit; text-shadow: none; margin: 0;">${displayTitle}</div>
-                            <div style="font-size: 0.8rem; color: #78909c; font-family: monospace;">----/--/-- --:--</div>
-                        </div>
-                        <div class="saveload-slot-info" style="flex-direction: column; justify-content: center; align-items: center; width: 100%; gap: 4px; flex: 1;">
-                            <div>NO DATA</div>
+                        <div class="saveload-slot-number">${slotNumberText}</div>
+                        <div class="saveload-slot-image"><div class="saveload-map-placeholder">NO DATA</div></div>
+                        <div class="saveload-slot-content empty">
+                            <div class="saveload-slot-time">----/--/-- --:--</div>
+                            <div class="saveload-slot-empty-text">NO DATA</div>
                         </div>
                     `;
                     
