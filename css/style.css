@@ -2648,7 +2648,7 @@ body.is-pc {
     .grade-plus { font-size: 0.8rem !important; }
 
     /* PC版: 大名選択 */
-    #daimyo-confirm-modal .modal-content { top: 20px; left: 20px; bottom: auto; right: auto; width: 420px; max-width: calc(100vw - 40px); overflow-x: hidden;}
+    #daimyo-confirm-modal .modal-content { top: 20px; left: 20px; bottom: auto; right: auto; width: 500px; max-width: calc(100vw - 40px); overflow-x: hidden;}
     
     #daimyo-confirm-body { display: block; }
 
