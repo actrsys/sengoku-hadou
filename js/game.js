@@ -21,6 +21,11 @@ const SCENARIOS = [
 window.MainParams = {
     StartYear: 1560, StartMonth: 4,
     System: { UseRandomNames: true },
+    // ★ここを追加：軍師が助言（警告）を出す基準値です！一元管理します。
+    Gunshi: {
+        AdviceLoyalty: 74,      // 忠誠度がこれ以下なら警告
+        AdviceRecognition: 30   // 承認欲求がこれ以上なら警告
+    },
     Economy: {
         IncomeGoldRate: 1, IncomeFluctuation: 0.15,
         ConsumeRicePerSoldier: 0.03,
