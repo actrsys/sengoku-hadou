@@ -98,10 +98,9 @@ class LifeSystem {
             
             // 寿命前補正（死亡年5年前から毎年2ずつ下がる）
             let penaltyLifespan = 0;
-            // プレイヤー大名の延命ボーナス(+5年)も考慮した「本当の死亡年」を出します
-            const actualEndYear = (b.isDaimyo && b.clan === this.game.playerClanId) ? b.endYear + 5 : b.endYear;
+            const actualEndYear = b.endYear;
             
-            // 今の年が「本当の死亡年の5年前」以上なら、ペナルティを与えます
+            // 今の年が「死亡年の5年前」以上なら、ペナルティを与えます
             if (currentYear >= actualEndYear - 5) {
                 // 5年前で2、4年前で4、3年前で6...となるように計算します（最後に2を掛け算しています）
                 penaltyLifespan = (currentYear - (actualEndYear - 5) + 1) * 2;
@@ -553,17 +552,15 @@ class LifeSystem {
         const currentYear = this.game.year;
         
         // 【変更点①】没年の「1年前（endYear - 1）」を迎えている武将を探すようにしました！
-        // プレイヤーの大名武将のみ、寿命を本来の寿命＋５年として計算します！
         const targetBushos = this.game.bushos.filter(b => {
             if (b.status === 'dead') return false; // ★変更：未登場（unborn）を除外しないようにしました
-            const actualEndYear = (b.isDaimyo && b.clan === this.game.playerClanId) ? b.endYear + 5 : b.endYear;
+            const actualEndYear = b.endYear;
             return currentYear >= (actualEndYear - 1);
         });
 
         for (const b of targetBushos) {
             // 【変更点②】没年の「1年前」をスタート地点として、そこから何年過ぎたかを計算します
-            // ここでもプレイヤーの大名武将なら寿命を＋５年として計算します！
-            const actualEndYear = (b.isDaimyo && b.clan === this.game.playerClanId) ? b.endYear + 5 : b.endYear;
+            const actualEndYear = b.endYear;
             const yearsPassed = currentYear - (actualEndYear - 1);
             
             // 【変更点③】確率は、スタート（没年1年前）が2%(0.02)、次の年（没年）が4%(0.04)...と増えます
