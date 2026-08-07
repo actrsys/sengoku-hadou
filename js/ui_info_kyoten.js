@@ -497,7 +497,7 @@ Object.assign(UIInfoManager.prototype, {
             ];
         } else if (this.currentKyotenTab === 'economy') {
             gridSpStr = "1.4fr 1.2fr 1.1fr 1.1fr 1.2fr 1.2fr";
-            gridPcStr = "140px 60px 80px 80px 100px 100px 1fr";
+            gridPcStr = "140px 110px 90px 90px 90px 90px 1fr";
             headers = [
                 `<span data-sort="name">拠点名${getSortMark('name')}</span>`,
                 `<span data-sort="population">人口${getSortMark('population')}</span>`,
