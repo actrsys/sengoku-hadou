@@ -249,10 +249,11 @@ Object.assign(UIInfoManager.prototype, {
         if (busho.givenName) {
             if (busho.familyYomi && busho.givenYomi) {
                 // 読みが分かれている場合は、間に少しだけスペース（0.25文字分）を入れます
-                displayYomi = `${busho.familyYomi}<span style="margin-left: 0.25em;"></span>${busho.givenYomi}`;
+                // ★修正：空っぽの箱では隙間が潰れてしまうため、ブロックにして幅を持たせます
+                displayYomi = `${busho.familyYomi}<span style="display: inline-block; width: 0.25em;"></span>${busho.givenYomi}`;
             }
             // 名前が分かれている場合は、間に少しだけスペースを入れます
-            displayName = `${busho.familyName}<span style="margin-left: 0.25em;"></span>${busho.givenName}`;
+            displayName = `${busho.familyName}<span style="display: inline-block; width: 0.25em;"></span>${busho.givenName}`;
         }
         
         // ★追加：スマホ版かどうかで縦の隙間（行間）を変える準備をします
