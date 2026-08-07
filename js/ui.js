@@ -1536,7 +1536,28 @@ class UIManager {
         const castellan = this.game.getBusho(castle.castellanId);
         const clanData = this.game.clans.find(cd => cd.id === castle.ownerClan);
         const clanName = clanData ? clanData.name : "中立";
-        const castellanName = castellan ? castellan.name : "-";
+        
+        const getCompressedTextHtml = (text, threshold) => {
+            if (!text) return "";
+            if (text.length >= threshold) {
+                let scale = 1.0 - (text.length - (threshold - 1)) * 0.1;
+                if (scale < 0.65) scale = 0.65;
+                return `<span style="font-size: ${scale}em !important; transform: scaleY(${1/scale}); letter-spacing: -0.5px; padding-right: 1px; display: inline-block; transform-origin: left center; line-height: 1;">${text}</span>`;
+            }
+            return text;
+        };
+
+        const getCompressedBushoNameHtml = (busho) => {
+            if (!busho) return "-";
+            if (busho.givenName) {
+                return getCompressedTextHtml(busho.familyName, 3) + getCompressedTextHtml(busho.givenName, 3);
+            } else {
+                return getCompressedTextHtml(busho.name.replace('|', ''), 5);
+            }
+        };
+
+        const compressedClanName = getCompressedTextHtml(clanName, 4);
+        const compressedCastellanName = getCompressedBushoNameHtml(castellan);
         
         let provinceName = "";
         if (this.game.provinces) {
@@ -1592,7 +1613,7 @@ class UIManager {
 
         let clanHtml = "";
         if (Number(castle.ownerClan) !== 0) {
-            clanHtml = `<span class="sp-clan">${clanName}</span>`;
+            clanHtml = `<span class="sp-clan">${compressedClanName}</span>`;
         }
 
         const isPc = document.body.classList.contains('is-pc');
@@ -1600,7 +1621,7 @@ class UIManager {
 
         if (isPc) {
             content = `
-                <div class="sp-info-header">${clanHtml}<span class="sp-province">${provinceName}</span><span class="sp-castle">${castle.name}</span><span class="sp-lord-label">城主</span><span class="sp-lord-name">${castellanName}</span></div>
+                <div class="sp-info-header">${clanHtml}<span class="sp-province">${provinceName}</span><span class="sp-castle">${castle.name}</span><span class="sp-lord-label">城主</span><span class="sp-lord-name">${compressedCastellanName}</span></div>
                 <div class="sp-info-body">
                     <div class="sp-face-wrapper">${faceHtml}</div>
                     <div class="sp-params-grid">
@@ -1629,7 +1650,7 @@ class UIManager {
             `;
         } else {
             content = `
-                <div class="sp-info-header">${clanHtml}<span class="sp-province">${provinceName}</span><span class="sp-castle">${castle.name}</span><span class="sp-lord-label">城主</span><span class="sp-lord-name">${castellanName}</span></div>
+                <div class="sp-info-header">${clanHtml}<span class="sp-province">${provinceName}</span><span class="sp-castle">${castle.name}</span><span class="sp-lord-label">城主</span><span class="sp-lord-name">${compressedCastellanName}</span></div>
                 <div class="sp-info-body">
                     <div class="sp-face-column">
                         <div class="sp-face-wrapper">${faceHtml}</div>
