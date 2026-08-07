@@ -2293,17 +2293,14 @@ class UIInfoManager {
         // スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！
         const isPc = document.body.classList.contains('is-pc');
 
-        // ★文字サイズの変更（PCは1.4倍、スマホは1.1倍）
-        const fSizeCastleYomi = isPc ? "1.05rem" : "0.715rem";
-        const fSizeCastleName = isPc ? "1.96rem" : "1.375rem";
-        const fSizeLordLabel = isPc ? "1.47rem" : "1.045rem";
-        const fSizeStatLabel = isPc ? "1.19rem" : "0.77rem";
-        const fSizeStatValue = isPc ? "1.19rem" : "0.77rem";
+        // ★文字サイズの変更（PCは前回の0.85倍程度に縮小、スマホはそのまま）
+        const fSizeCastleYomi = isPc ? "0.9rem" : "0.715rem";
+        const fSizeCastleName = isPc ? "1.65rem" : "1.375rem";
+        const fSizeLordLabel = isPc ? "1.25rem" : "1.045rem";
+        const fSizeStatLabel = isPc ? "1.0rem" : "0.77rem";
+        const fSizeStatValue = isPc ? "1.0rem" : "0.77rem";
 
-        // ★隙間を半分に
         const gridGap = isPc ? "4px 3px" : "4px 1.5px";
-        
-        // ★顔グラのサイズ（PCは変えない90px、スマホは0.8倍の72px）
         const faceWidth = isPc ? "90px" : "72px";
         const faceStyle = `width: 100%; max-width: ${faceWidth}; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0;`;
 
@@ -2330,7 +2327,7 @@ class UIInfoManager {
 
         if (this.ui.daimyoConfirmBody) {
             this.ui.daimyoConfirmBody.innerHTML = `
-                <h3 style="margin-top:0; margin-bottom:8px; border-bottom:1px solid rgba(212, 175, 55, 0.5); padding-bottom:5px; color:#ffd54f; text-shadow:1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align:left;">勢力情報</h3>
+                <h3>勢力情報</h3>
                 <div class="scroll-wrapper no-custom-scrollbar" style="padding:0; border: 2px solid #d4af37; border-radius: 4px; box-shadow: 0 0 10px rgba(0,0,0,0.5);">
                     <div class="list-container hide-native-scroll" style="display:block; overflow:hidden; min-height:100%;">
                         <div class="kyoten-detail-wrapper" style="padding: 4px 5px; display: flex; flex-direction: column; box-sizing: border-box; text-align: left;">
