@@ -74,10 +74,18 @@ document.addEventListener("DOMContentLoaded", () => {
         const btnFalse = document.getElementById(`btn-${type}-false`);
         
         if (btnTrue) {
-            btnTrue.addEventListener('click', () => updateToggleSetting(type, true));
+            btnTrue.addEventListener('click', () => {
+                // ★追加：ボタンを押した時に選択音を鳴らす魔法です
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                updateToggleSetting(type, true);
+            });
         }
         if (btnFalse) {
-            btnFalse.addEventListener('click', () => updateToggleSetting(type, false));
+            btnFalse.addEventListener('click', () => {
+                // ★追加：ボタンを押した時に選択音を鳴らす魔法です
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                updateToggleSetting(type, false);
+            });
         }
     });
 
@@ -111,5 +119,29 @@ document.addEventListener("DOMContentLoaded", () => {
             const modal = document.getElementById('settings-modal');
             if (modal) modal.classList.add('hidden');
         });
+    }
+    
+    // =========================================
+    // ★追加：設定画面が開かれた時に、ゲージの色を正しく塗り直す魔法
+    // =========================================
+    const settingsModal = document.getElementById('settings-modal');
+    if (settingsModal) {
+        // 画面の変化（透明マントを被ったり脱いだり）を監視する見張り番を作ります
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                // 「hidden」という透明マントが外れて、画面が見えるようになった時
+                if (!settingsModal.classList.contains('hidden')) {
+                    // BGMとSEのスライダーのゲージを、今のつまみの位置に合わせて塗り直します
+                    ['bgm', 'se'].forEach(type => {
+                        const range = document.getElementById(`setting-${type}-volume`);
+                        if (range) {
+                            updateSettingSlider(type, range.value);
+                        }
+                    });
+                }
+            });
+        });
+        // 設定画面の「class（状態）」の変化を監視するように見張り番に指示します
+        observer.observe(settingsModal, { attributes: true, attributeFilter: ['class'] });
     }
 });
