@@ -469,7 +469,7 @@ Object.assign(UIInfoManager.prototype, {
         let gridPcStr = "";
 
         if (this.currentKyotenTab === 'status') {
-            gridSpStr = "1.6fr 1fr 1fr 1fr 0.6fr 1fr 1fr";
+            gridSpStr = "1.4fr 1fr 1.2fr 1fr 0.6fr 1fr 1fr";
             gridPcStr = "140px 100px 100px 100px 60px 80px 80px 1fr";
             headers = [
                 `<span data-sort="name">拠点名${getSortMark('name')}</span>`,
@@ -482,7 +482,7 @@ Object.assign(UIInfoManager.prototype, {
                 `<span class="pc-only"></span>`
             ];
         } else if (this.currentKyotenTab === 'military') {
-            gridSpStr = "1.6fr 1.2fr 1.1fr 1.1fr 1.1fr 1.1fr";
+            gridSpStr = "1.4fr 1.1fr 1.2fr 1.1fr 1.2fr 1.2fr";
             gridPcStr = "140px 100px 80px 80px 80px 80px 1fr";
             headers = [
                 `<span data-sort="name">拠点名${getSortMark('name')}</span>`,
@@ -494,7 +494,7 @@ Object.assign(UIInfoManager.prototype, {
                 `<span class="pc-only"></span>`
             ];
         } else if (this.currentKyotenTab === 'economy') {
-            gridSpStr = "1.6fr 1.2fr 1fr 1fr 1.2fr 1.2fr";
+            gridSpStr = "1.4fr 1.2fr 1.1fr 1.1fr 1.2fr 1.2fr";
             gridPcStr = "140px 60px 80px 80px 100px 100px 1fr";
             headers = [
                 `<span data-sort="name">拠点名${getSortMark('name')}</span>`,
