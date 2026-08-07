@@ -33,17 +33,12 @@ class GunshiSystem {
         // ここを通ったら「今月は報告した」という印をつける
         this.hasShownAdviceThisMonth = true;
 
-        // ★追加：game.jsの設定から助言の基準値を引っ張ってきます
-        const advLoyalty = (window.MainParams && window.MainParams.Gunshi) ? window.MainParams.Gunshi.AdviceLoyalty : 74;
-        const advRecognition = (window.MainParams && window.MainParams.Gunshi) ? window.MainParams.Gunshi.AdviceRecognition : 30;
-
-        // 不満を持つ武将をリストアップ（大名や諸勢力は除く）
+        // 不満を持つ武将をリストアップ
+        // ★変更：一元化された判定の窓口（isUnhappyBusho）を呼び出してチェックさせます
         const unhappyBushos = this.game.bushos.filter(b => 
             b.clan === this.game.playerClanId && 
             b.status === 'active' && 
-            !b.isDaimyo &&
-            b.belongKunishuId === 0 &&
-            (b.loyalty <= advLoyalty || (b.recognitionNeed || 0) >= advRecognition)
+            GameSystem.isUnhappyBusho(b)
         );
 
         // 不満を持っている人がいた場合

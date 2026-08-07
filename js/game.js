@@ -591,6 +591,19 @@ class GameSystem {
         return 1.0;
     }
 
+    // ★追加：軍師が警告を出す「不満を持っている武将」かどうかの判定を一元化します
+    static isUnhappyBusho(busho) {
+        // 武将データが無い場合や、大名・諸勢力は対象外にします
+        if (!busho || busho.isDaimyo || busho.belongKunishuId > 0) return false;
+        
+        // 設定値を引っ張ってきます
+        const advLoyalty = (window.MainParams && window.MainParams.Gunshi) ? window.MainParams.Gunshi.AdviceLoyalty : 74;
+        const advRecognition = (window.MainParams && window.MainParams.Gunshi) ? window.MainParams.Gunshi.AdviceRecognition : 30;
+        
+        // 不満条件に当てはまるかどうかを判定して返します
+        return busho.loyalty <= advLoyalty || (busho.recognitionNeed || 0) >= advRecognition;
+    }
+
     static calcBaseGoldIncome(castle) {
         const baseGold = (castle.population * 0.01) + (castle.peoplesLoyalty / 2) + (castle.commerce / 4);
         return Math.floor(baseGold * window.MainParams.Economy.IncomeGoldRate);

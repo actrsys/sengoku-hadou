@@ -1088,12 +1088,8 @@ Object.assign(UIInfoManager.prototype, {
                     compressedNameHtml = getCompressedTextHtml(b.name, 5);
                 }
 
-                // ★追加：game.jsの設定から助言の基準値を引っ張ってきます
-                const advLoyalty = (window.MainParams && window.MainParams.Gunshi) ? window.MainParams.Gunshi.AdviceLoyalty : 74;
-                const advRecognition = (window.MainParams && window.MainParams.Gunshi) ? window.MainParams.Gunshi.AdviceRecognition : 30;
-
-                // ★追加：褒美コマンドで軍師の助言対象となる武将なら、名前の色をオレンジ（派閥の色）にします
-                if (actionType === 'reward' && gunshi && !b.isDaimyo && b.belongKunishuId === 0 && (b.loyalty <= advLoyalty || (b.recognitionNeed || 0) >= advRecognition)) {
+                // ★変更：一元化された判定の窓口（isUnhappyBusho）を使って、対象なら名前をオレンジ色にします
+                if (actionType === 'reward' && gunshi && GameSystem.isUnhappyBusho(b)) {
                     compressedNameHtml = `<span class="text-orange">${compressedNameHtml}</span>`;
                 }
 
