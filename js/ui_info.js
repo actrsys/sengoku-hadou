@@ -330,6 +330,7 @@ class UIInfoManager {
                 <button class="busho-tab-btn ${this.daimyoCurrentTab === 'status' ? 'active' : ''}" data-tab="status">基本</button>
                 <button class="busho-tab-btn ${this.daimyoCurrentTab === 'military' ? 'active' : ''}" data-tab="military">軍事</button>
                 <button class="busho-tab-btn ${this.daimyoCurrentTab === 'economy' ? 'active' : ''}" data-tab="economy">経済</button>
+                <button class="busho-tab-btn ${this.daimyoCurrentTab === 'power' ? 'active' : ''}" data-tab="power">国力</button>
             </div>
         `;
         
@@ -338,6 +339,7 @@ class UIInfoManager {
             
             let totalSoldiers = 0, totalHorses = 0, totalGuns = 0;
             let totalKokudaka = 0, totalCommerce = 0, totalGold = 0, totalRice = 0;
+            let totalPopulation = 0, totalMaxKokudaka = 0, totalMaxCommerce = 0;
             
             const clanCastles = this.game.castles.filter(c => c.ownerClan === clan.id);
             const castlesCount = clanCastles.length;
@@ -350,13 +352,26 @@ class UIInfoManager {
                 totalCommerce += c.commerce || 0;
                 totalGold += c.gold || 0;
                 totalRice += c.rice || 0;
+                totalPopulation += c.population || 0;
+                totalMaxKokudaka += c.maxKokudaka !== undefined ? c.maxKokudaka : (c.kokudaka || 0);
+                totalMaxCommerce += c.maxCommerce !== undefined ? c.maxCommerce : (c.commerce || 0);
             });
 
             // ★表示側で計算は行わず、勢力データに保存されている値を読むだけにします
             let totalGoldIncome = clan.goldIncome || 0;
             let totalRiceIncome = clan.riceIncome || 0;
             
-            const bushosCount = this.game.bushos.filter(b => b.clan === clan.id && b.status === 'active').length;
+            const clanBushos = this.game.bushos.filter(b => b.clan === clan.id && b.status === 'active');
+            const bushosCount = clanBushos.length;
+
+            let totalGoldConsume = 0;
+            if (leader) {
+                clanBushos.forEach(b => {
+                    totalGoldConsume += b.getSalary(leader);
+                });
+            }
+            let totalRiceConsume = Math.floor(totalSoldiers * window.MainParams.Economy.ConsumeRicePerSoldier) * 12;
+
             const princessCount = clan.princessIds ? clan.princessIds.length : 0;
             
             let friendScore = 50;
@@ -390,6 +405,11 @@ class UIInfoManager {
                 goldIncome: totalGoldIncome,
                 rice: totalRice,
                 riceIncome: totalRiceIncome,
+                population: totalPopulation,
+                maxKokudaka: totalMaxKokudaka,
+                maxCommerce: totalMaxCommerce,
+                goldConsume: totalGoldConsume,
+                riceConsume: totalRiceConsume,
                 friendScore: friendScore,
                 friendStatus: friendStatus
             };
@@ -418,6 +438,11 @@ class UIInfoManager {
                     case 'goldIncome': valA = a.goldIncome; valB = b.goldIncome; break;
                     case 'rice': valA = a.rice; valB = b.rice; break;
                     case 'riceIncome': valA = a.riceIncome; valB = b.riceIncome; break;
+                    case 'population': valA = a.population; valB = b.population; break;
+                    case 'maxKokudaka': valA = a.maxKokudaka; valB = b.maxKokudaka; break;
+                    case 'maxCommerce': valA = a.maxCommerce; valB = b.maxCommerce; break;
+                    case 'goldConsume': valA = a.goldConsume; valB = b.goldConsume; break;
+                    case 'riceConsume': valA = a.riceConsume; valB = b.riceConsume; break;
                     case 'friend': 
                         valA = a.id === this.game.playerClanId ? 999 : a.friendScore;
                         valB = b.id === this.game.playerClanId ? 999 : b.friendScore;
@@ -461,7 +486,7 @@ class UIInfoManager {
         }
         
         if (this.daimyoCurrentTab === 'status') {
-            gridSpStr = "2.5fr 2fr 1fr 2fr 2fr 1.5fr";
+            gridSpStr = "2fr 1.5fr 1fr 1.5fr 1.5fr 1fr";
             gridPcStr = "140px 100px 60px 100px 100px 60px 1fr";
             headers = [
                 `<span data-sort="name">勢力名${getSortMark('name')}</span>`,
@@ -473,29 +498,40 @@ class UIInfoManager {
                 `<span class="pc-only"></span>`
             ];
         } else if (this.daimyoCurrentTab === 'military') {
-            gridSpStr = "2fr 1fr 1.2fr 1fr 1fr 1fr 0.8fr";
-            gridPcStr = "140px 60px 80px 80px 80px 60px 50px 1fr";
+            gridSpStr = "2fr 1fr 1fr 1.5fr 1.5fr 1.5fr";
+            gridPcStr = "140px 60px 60px 80px 80px 80px 1fr";
             headers = [
                 `<span data-sort="name">勢力名${getSortMark('name')}</span>`,
-                `<span data-sort="castlesCount">拠点${getSortMark('castlesCount')}</span>`,
+                `<span data-sort="bushosCount">武将${getSortMark('bushosCount')}</span>`,
+                `<span data-sort="princessCount">姫${getSortMark('princessCount')}</span>`,
                 `<span data-sort="soldiers">兵士${getSortMark('soldiers')}</span>`,
                 `<span data-sort="horses">軍馬${getSortMark('horses')}</span>`,
                 `<span data-sort="guns">鉄砲${getSortMark('guns')}</span>`,
-                `<span data-sort="bushosCount">武将${getSortMark('bushosCount')}</span>`,
-                `<span data-sort="princessCount">姫${getSortMark('princessCount')}</span>`,
                 `<span class="pc-only"></span>`
             ];
         } else if (this.daimyoCurrentTab === 'economy') {
-            gridSpStr = "2fr 1.2fr 1.2fr 1.2fr 1.5fr 1.5fr 1.5fr";
-            gridPcStr = "140px 80px 80px 80px 100px 80px 100px 1fr";
+            gridSpStr = "2fr 1fr 1.1fr 1.1fr 1.1fr 1.1fr 1.1fr";
+            gridPcStr = "140px 80px 80px 80px 80px 80px 80px 1fr";
             headers = [
                 `<span data-sort="name">勢力名${getSortMark('name')}</span>`,
-                `<span data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
-                `<span data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
                 `<span data-sort="gold">金${getSortMark('gold')}</span>`,
                 `<span data-sort="goldIncome">月収入${getSortMark('goldIncome')}</span>`,
+                `<span data-sort="goldConsume">月支出${getSortMark('goldConsume')}</span>`,
                 `<span data-sort="rice">兵糧${getSortMark('rice')}</span>`,
                 `<span data-sort="riceIncome">年収穫${getSortMark('riceIncome')}</span>`,
+                `<span data-sort="riceConsume">米消費${getSortMark('riceConsume')}</span>`,
+                `<span class="pc-only"></span>`
+            ];
+        } else if (this.daimyoCurrentTab === 'power') {
+            gridSpStr = "2fr 1.5fr 1.25fr 1.25fr 1.25fr 1.25fr";
+            gridPcStr = "140px 100px 80px 80px 80px 80px 1fr";
+            headers = [
+                `<span data-sort="name">勢力名${getSortMark('name')}</span>`,
+                `<span data-sort="population">人口${getSortMark('population')}</span>`,
+                `<span data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
+                `<span data-sort="maxKokudaka">最大石高${getSortMark('maxKokudaka')}</span>`,
+                `<span data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
+                `<span data-sort="maxCommerce">最大鉱山${getSortMark('maxCommerce')}</span>`,
                 `<span class="pc-only"></span>`
             ];
         }
@@ -538,23 +574,32 @@ class UIInfoManager {
             } else if (this.daimyoCurrentTab === 'military') {
                 cells = [
                     `<span class="col-daimyo-name">${compressedDaimyoName}</span>`,
-                    `<span class="col-castle-count">${d.castlesCount}</span>`,
+                    `<span class="col-busho-count">${d.bushosCount}</span>`,
+                    `<span class="col-busho-count">${d.princessCount}</span>`,
                     `<span class="col-soldiers">${d.soldiers}</span>`,
                     `<span class="col-horses">${d.horses}</span>`,
                     `<span class="col-guns">${d.guns}</span>`,
-                    `<span class="col-busho-count">${d.bushosCount}</span>`,
-                    `<span class="col-busho-count">${d.princessCount}</span>`,
                     `<span class="col-empty pc-only"></span>`
                 ];
             } else if (this.daimyoCurrentTab === 'economy') {
                 cells = [
                     `<span class="col-daimyo-name">${compressedDaimyoName}</span>`,
-                    `<span class="col-kokudaka">${d.kokudaka}</span>`,
-                    `<span class="col-commerce">${d.commerce}</span>`,
                     `<span class="col-gold">${d.gold}</span>`,
                     `<span class="col-gold-income">${d.goldIncome}</span>`,
+                    `<span class="col-gold-consume">${d.goldConsume}</span>`,
                     `<span class="col-rice">${d.rice}</span>`,
                     `<span class="col-rice-income">${d.riceIncome}</span>`,
+                    `<span class="col-rice-consume">${d.riceConsume}</span>`,
+                    `<span class="col-empty pc-only"></span>`
+                ];
+            } else if (this.daimyoCurrentTab === 'power') {
+                cells = [
+                    `<span class="col-daimyo-name">${compressedDaimyoName}</span>`,
+                    `<span class="col-population">${d.population}</span>`,
+                    `<span class="col-kokudaka">${d.kokudaka}</span>`,
+                    `<span class="col-kokudaka">${d.maxKokudaka}</span>`,
+                    `<span class="col-commerce">${d.commerce}</span>`,
+                    `<span class="col-commerce">${d.maxCommerce}</span>`,
                     `<span class="col-empty pc-only"></span>`
                 ];
             }
