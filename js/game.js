@@ -108,7 +108,6 @@ class DataManager {
             return { clans, castles, bushos, kunishus, courtRanks, princesses, provinces, legions, mapWidth: this.mapImageWidth, mapHeight: this.mapImageHeight };
         } catch (error) {
             console.error(error);
-            alert(`データの読み込みに失敗しました。\nフォルダ構成を確認してください。`);
             throw error;
         }
     }
@@ -733,8 +732,8 @@ class GameSystem {
     static isPortCastle(c) {
         if (!c) return false;
         // 港となる拠点のIDを、ここ一箇所だけで管理します
-        //春日山城(ID2)、石山御坊(ID33)、松波城(ID72)、尾山御坊(ID74)、北庄城(ID76)、立花山城(ID148)、平戸城(ID155)、内城(ID169)、厳原城(ID174)、安濃津城(予定)、土崎港(予定)、十三湊(予定)
-        const portCastleIds = [2, 33, 72, 74, 76, 148, 155, 169, 174];
+        //春日山城(ID2)、石山御坊(ID33)、松波城(ID72)、尾山御坊(ID74)、北庄城(ID76)、立花山城(ID148)、平戸城(ID155)、内城(ID169)、厳原城(ID174)、湊城(ID219)、安濃津城(ID251)
+        const portCastleIds = [2, 33, 72, 74, 76, 148, 155, 169, 174, 219, 251];
         return portCastleIds.includes(c.id);
     }
     
@@ -1595,8 +1594,13 @@ class GameManager {
         } catch (e) {
             if (this.ui) this.ui.hideLoadingScreen();
             console.error(e);
-            alert("シナリオデータの読み込みに失敗しました。");
-            this.ui.returnToTitle();
+            if (this.ui) {
+                this.ui.showDialog("シナリオデータの読み込みに失敗しました。", false, () => {
+                    this.ui.returnToTitle();
+                });
+            } else {
+                this.returnToTitle();
+            }
         }
     }
     
@@ -3176,7 +3180,9 @@ class GameManager {
                 await this._restoreSaveDataObj(d);
             } catch(err) { 
                 console.error(err); 
-                alert("セーブデータの読み込みに失敗しました。データが壊れているか、形式が異なります。"); 
+                if (this.ui) {
+                    this.ui.showDialog("セーブデータの読み込みに失敗しました。", false);
+                }
             } 
         }; 
         reader.readAsArrayBuffer(file); // ★テキストではなくバイナリとして読み込む魔法に変更します
@@ -3199,7 +3205,9 @@ class GameManager {
             if (this.ui) this.ui.showDialog(`スロット ${slotNo} にセーブが完了しました。`, false);
         } catch (e) {
             console.error("セーブエラーの詳細:", e);
-            alert("セーブに失敗しました。エラー原因: " + e.message);
+            if (this.ui) {
+                this.ui.showDialog("セーブに失敗しました。エラー原因: " + e.message, false);
+            }
         } finally {
             this.hideSaveGuard(); // ★追加：保存が終わったらバリアを解除します
         }
@@ -3218,8 +3226,10 @@ class GameManager {
         }
 
         if (!rawData) {
-            alert(`スロット ${slotNo} にはセーブデータがありません。`);
-            if (this.ui) this.ui.hideLoadingScreen(); // ★エラーで止まる時は蓋を開けます
+            if (this.ui) {
+                this.ui.hideLoadingScreen(); // ★エラーで止まる時は蓋を開けます
+                this.ui.showDialog(`スロット ${slotNo} にはセーブデータがありません。`, false);
+            }
             return;
         }
 
@@ -3234,9 +3244,11 @@ class GameManager {
             await this._restoreSaveDataObj(d);
         } catch(err) { 
             console.error(err); 
-            alert("セーブデータの読み込みに失敗しました。データが壊れている可能性があります。"); 
-            if (this.ui) this.ui.hideLoadingScreen(); // ★エラーの時も蓋を開けます
-        } 
+            if (this.ui) {
+                this.ui.hideLoadingScreen(); // ★エラーの時も蓋を開けます
+                this.ui.showDialog("セーブデータの読み込みに失敗しました。", false);
+            }
+        }
     }
 
     // ★追加：オートセーブを裏で実行する魔法
@@ -3314,8 +3326,10 @@ class GameManager {
         if (latestSlot !== -1) {
             this.loadGameFromLocal(latestSlot, latestPrefix);
         } else {
-            alert("セーブデータが見つかりません。");
-            if (this.ui) this.ui.hideLoadingScreen(); // ★データがなくてやめる時は蓋を開けます
+            if (this.ui) {
+                this.ui.hideLoadingScreen(); // ★データがなくてやめる時は蓋を開けます
+                this.ui.showDialog("セーブデータが見つかりません。", false);
+            }
         }
     }
     
