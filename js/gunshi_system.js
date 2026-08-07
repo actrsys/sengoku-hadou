@@ -75,7 +75,9 @@ class GunshiSystem {
                 if (target.id === gunshi.id) {
                     msg = `「${tonoStr}恐れながら申し上げます。一族郎党を養う為にも、温情あるご配慮を賜りたく存じます」`;
                 } else {
-                    if (target.loyalty <= 74) {
+                    const dangerLoyalty = window.MainParams.Gunshi.DangerLoyalty;
+                    
+                    if (target.loyalty <= dangerLoyalty) {
                         msg = `「${tonoStr}${target.name}殿は待遇に不満を抱えておられるご様子。どうかご厚遇をお願い申し上げます」`;
                     } else {
                         msg = `「${tonoStr}${target.name}殿の不満が溜まる前に、お取り計らいをお願い申し上げます」`;

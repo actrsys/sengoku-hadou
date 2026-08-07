@@ -1088,9 +1088,16 @@ Object.assign(UIInfoManager.prototype, {
                     compressedNameHtml = getCompressedTextHtml(b.name, 5);
                 }
 
-                // ★変更：一元化された判定の窓口（isUnhappyBusho）を使って、対象なら名前をオレンジ色にします
-                if (actionType === 'reward' && gunshi && GameSystem.isUnhappyBusho(b)) {
-                    compressedNameHtml = `<span class="text-orange">${compressedNameHtml}</span>`;
+                // ★変更：一元化された数字を引っ張り、忠誠度の低さに応じて赤・オレンジに色分けします
+                if (actionType === 'reward' && gunshi && !b.isDaimyo && !(b.belongKunishuId > 0)) {
+                    const adviceLoyalty = window.MainParams.Gunshi.AdviceLoyalty || 84;
+                    const dangerLoyalty = window.MainParams.Gunshi.DangerLoyalty || 74; // 万が一設定がない場合の保険
+                    
+                    if (b.loyalty <= dangerLoyalty) {
+                        compressedNameHtml = `<span class="text-red">${compressedNameHtml}</span>`;
+                    } else if (b.loyalty <= adviceLoyalty) {
+                        compressedNameHtml = `<span class="text-orange">${compressedNameHtml}</span>`;
+                    }
                 }
 
                 let cells = [];

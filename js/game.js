@@ -23,7 +23,8 @@ window.MainParams = {
     System: { UseRandomNames: true },
     // ★軍師が助言（警告）を出す基準値です！一元管理します。
     Gunshi: {
-        AdviceLoyalty: 84      // 忠誠度がこれ以下なら警告
+        AdviceLoyalty: 84,     // 忠誠度がこれ以下なら警告（オレンジ）
+        DangerLoyalty: 74      // 忠誠度がこれ以下なら危険（赤）
     },
     Economy: {
         IncomeGoldRate: 1, IncomeFluctuation: 0.15,
