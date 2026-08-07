@@ -346,19 +346,40 @@ class UIManager {
                 }, 200); 
             }
         });
+        
+        window.addEventListener('resize', () => {
+            if (this.hasInitializedMap && this.game && (this.game.phase === 'game' || this.game.phase === 'daimyo_select')) {
+                const sc = document.getElementById('map-scroll-container');
+                if (!sc) return;
 
-        // ★ここから追加：ウィンドウ付属のボタンを外に出す改修
-        const modals = document.querySelectorAll('.modal');
-        modals.forEach(modal => {
-            modal.style.flexDirection = 'column';
-            const content = modal.querySelector('.modal-content');
-            const footer = modal.querySelector('.modal-footer');
-            if (content && footer) {
-                // フッター（ボタン部分）をコンテンツの外に出す
-                modal.appendChild(footer);
+                // サイズ変更が始まった瞬間に、今の中心の場所を箱にしまいます
+                if (savedLogicalX === null && savedLogicalY === null) {
+                    const currentLeft = parseFloat(this.mapEl.style.left || 0);
+                    const currentTop = parseFloat(this.mapEl.style.top || 0);
+                    savedLogicalX = (sc.scrollLeft + sc.clientWidth / 2 - currentLeft) / this.mapScale;
+                    savedLogicalY = (sc.scrollTop + sc.clientHeight / 2 - currentTop) / this.mapScale;
+                }
+
+                if (resizeTimer) clearTimeout(resizeTimer);
+                
+                resizeTimer = setTimeout(() => {
+                    this.fitMapToScreen();
+                    
+                    const newLeft = parseFloat(this.mapEl.style.left || 0);
+                    const newTop = parseFloat(this.mapEl.style.top || 0);
+                    
+                    // 最初に覚えておいた場所を中心にするようにスクロールします
+                    if (savedLogicalX !== null && savedLogicalY !== null) {
+                        sc.scrollLeft = (savedLogicalX * this.mapScale + newLeft) - sc.clientWidth / 2;
+                        sc.scrollTop = (savedLogicalY * this.mapScale + newTop) - sc.clientHeight / 2;
+                    }
+                    
+                    // 次のサイズ変更のために、覚えた場所を綺麗に空っぽにしておきます
+                    savedLogicalX = null;
+                    savedLogicalY = null;
+                }, 200); 
             }
         });
-    }
 
         // ★ここから追加：ウィンドウ付属のボタンを外に出す改修
         const modals = document.querySelectorAll('.modal');
