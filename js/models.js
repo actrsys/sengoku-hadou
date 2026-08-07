@@ -604,7 +604,35 @@ class Busho {
         // 能力値の限界値（基礎値100なら最大120など）
         const maxLimit = baseVal < 90 ? 110 : 120;
         
-        return Math.min(maxLimit, baseVal + bonus);
+        // まずは本来の計算を終わらせます
+        let finalVal = Math.min(maxLimit, baseVal + bonus);
+        
+        // ★ここから追加：大名および一門の能力ボーナス（+5）を計算します
+        let familyBonus = 0;
+        // どこかの大名家に所属していて、かつゲームのデータが存在している時だけ計算します
+        if (this.clan !== 0 && window.GameApp) {
+            // 自分自身が大名なら文句なしでボーナス獲得です
+            if (this.isDaimyo) {
+                familyBonus = 5;
+            } else {
+                // 大名でない場合は、今の大名様を探し出して血縁関係を調べます
+                const daimyo = window.GameApp.getClanDaimyo(this.clan);
+                if (daimyo) {
+                    // 自分の一門リスト、または大名の一門リストにお互いの名前（ID）があれば親戚（一門）とみなします
+                    const myFamily = Array.isArray(this.familyIds) ? this.familyIds : [];
+                    const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+                    if (myFamily.includes(daimyo.id) || dFamily.includes(this.id)) {
+                        familyBonus = 5;
+                    }
+                }
+            }
+        }
+        
+        // 本来の計算結果に一門ボーナスを足します
+        finalVal += familyBonus;
+        
+        // すべて合わせて上限「120」を越えないようにして返します
+        return Math.min(120, finalVal);
     }
 
     // ==========================================
