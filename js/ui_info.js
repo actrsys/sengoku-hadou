@@ -585,7 +585,7 @@ class UIInfoManager {
                     `<span class="col-empty pc-only"></span>`
                 ];
             } else if (this.daimyoCurrentTab === 'economy') {
-                const formatNum = (num) => (!isPc && num >= 100000) ? Math.floor(num / 1000) + '千' : num;
+                const formatNum = (num) => (!isPc && num >= 10000) ? Math.floor(num / 1000) + '千' : num;
                 cells = [
                     `<span class="col-daimyo-name">${compressedDaimyoName}</span>`,
                     `<span class="col-gold">${formatNum(d.gold)}</span>`,
