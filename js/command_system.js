@@ -1812,12 +1812,15 @@ class CommandSystem {
                     }
                 }
 
+                // ★追加：ダイアログに出すための名前を用意します
+                const displayTitle = prefix === 'sengoku_autosave_slot' ? `オート ${displayIndex}` : `スロット ${i}`;
+
                 btn.onclick = () => {
                     const modal = document.getElementById('saveload-modal');
                     if (modal) modal.classList.add('hidden');
                     
                     if (mode === 'save') {
-                        this.game.ui.showDialog(`スロット ${i} に現在の状態をセーブ（上書き）しますか？`, true, () => {
+                        this.game.ui.showDialog(`${displayTitle} に現在の状態をセーブ（上書き）しますか？`, true, () => {
                             this.game.saveGameToLocal(i);
                         }, null, { okText: 'セーブする', okClass: 'btn-primary', cancelText: 'やめる' });
                     } else {
