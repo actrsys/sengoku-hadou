@@ -2691,9 +2691,9 @@ class UIManager {
                 let scale = 1.0 - (text.length - (threshold - 1)) * step;
                 if (scale < minScale) scale = minScale;
                 
-                // ★修正：CSSの「!important」に負けないように、ここでも font-size に「!important」をつけて確実に横幅を縮小させます！
-                // ★さらに transform-origin と vertical-align を bottom に統一し、隣の文字と下端をピタッと揃えて上に引き伸ばします。
-                return `<span style="font-size: ${scale}em !important; transform: scaleY(${1/scale}); letter-spacing: -0.5px; padding-right: 1px; display: inline-block; transform-origin: left bottom; vertical-align: bottom;">${text}</span>`;
+                // ★修正：枠が「中央揃え」になっているため、伸びる基準点を「ど真ん中（left center）」に戻しました！
+                // 行の高さ（line-height）も1に固定して、上下のズレを完全に防ぎます。
+                return `<span style="font-size: ${scale}em !important; transform: scaleY(${1/scale}); letter-spacing: -0.5px; padding-right: 1px; display: inline-block; transform-origin: left center; line-height: 1;">${text}</span>`;
             }
             return text;
         };
