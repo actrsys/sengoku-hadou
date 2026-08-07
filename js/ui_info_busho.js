@@ -1063,12 +1063,25 @@ Object.assign(UIInfoManager.prototype, {
                 const inputType = isMulti ? 'checkbox' : 'radio';
                 let inputHtml = !isViewMode ? `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} ${isSelected ? 'checked' : ''} style="display:none;">` : '';
 
-                // ★追加：長い名前が後から縮む時の「チラつき」を防ぐため、HTMLを作る段階で最初から縮めておきます！
-                let compressedNameHtml = b.name;
-                if (b.name && b.name.length >= 5) {
-                    let scale = 1.0 - (b.name.length - 4) * 0.1;
-                    if (scale < 0.55) scale = 0.55;
-                    compressedNameHtml = `<span style="font-size: ${scale}em; transform: scaleY(${1/scale}); letter-spacing: -0.5px; display: inline-block; transform-origin: left center;">${b.name}</span>`;
+                // ★変更：文字圧縮機能の最適化。姓名が分かれている場合はそれぞれ縮小します
+                const getCompressedTextHtml = (text, threshold) => {
+                    if (!text) return "";
+                    if (text.length >= threshold) {
+                        // 基準の文字数（3または5）以上の場合、1文字増えるごとに0.1ずつ縮小します
+                        let scale = 1.0 - (text.length - (threshold - 1)) * 0.1;
+                        if (scale < 0.55) scale = 0.55;
+                        return `<span style="font-size: ${scale}em; transform: scaleY(${1/scale}); letter-spacing: -0.5px; display: inline-block; transform-origin: left center;">${text}</span>`;
+                    }
+                    return text;
+                };
+
+                let compressedNameHtml = "";
+                if (b.givenName) {
+                    // 姓名が分かれている場合はそれぞれ3文字以上で縮小
+                    compressedNameHtml = getCompressedTextHtml(b.familyName, 3) + getCompressedTextHtml(b.givenName, 3);
+                } else {
+                    // 姓名が分かれていない場合は合計5文字以上で縮小
+                    compressedNameHtml = getCompressedTextHtml(b.name, 5);
                 }
 
                 let cells = [];
