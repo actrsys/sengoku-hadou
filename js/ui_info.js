@@ -500,7 +500,7 @@ class UIInfoManager {
             ];
         }
 
-        // ★追加：勢力名が3文字以上の場合は縮小する魔法
+        // ★追加：勢力名が4文字以上の場合は縮小する魔法
         const getCompressedTextHtml = (text, threshold) => {
             if (!text) return "";
             if (text.length >= threshold) {
@@ -514,7 +514,7 @@ class UIInfoManager {
         let items = [];
 
         clanDataList.forEach(d => {
-            const compressedDaimyoName = getCompressedTextHtml(d.name, 3); // ★魔法をかけます！
+            const compressedDaimyoName = getCompressedTextHtml(d.name, 4); // ★魔法をかけます！
 
             let cells = [];
             if (this.daimyoCurrentTab === 'status') {

@@ -507,7 +507,7 @@ Object.assign(UIInfoManager.prototype, {
             ];
         }
 
-        // ★追加：勢力名が3文字以上の場合は縮小する魔法
+        // ★追加：勢力名が4文字以上の場合は縮小する魔法
         const getCompressedTextHtml = (text, threshold) => {
             if (!text) return "";
             if (text.length >= threshold) {
@@ -524,7 +524,7 @@ Object.assign(UIInfoManager.prototype, {
             // ★高速化：ループ内でも早見表を使います
             const clanData = clanMap.get(c.ownerClan);
             const clanName = clanData ? clanData.name : "";
-            const compressedClanName = getCompressedTextHtml(clanName, 3); // ★魔法をかけます！
+            const compressedClanName = getCompressedTextHtml(clanName, 4); // ★魔法をかけます！
             
             const castellan = bushoMap.get(c.castellanId);
             const castellanName = castellan ? castellan.name : "";
