@@ -277,6 +277,7 @@ class UIInfoManager {
         // ★枠の大元で、タブの表示/非表示（ダミータブ）を一括管理します
         const tabsEl = document.getElementById('selector-tabs');
         if (tabsEl) {
+            const isPc = document.body.classList.contains('is-pc'); // ★PCかスマホか調べる魔法を追加します
             if (isInfoScreen) {
                 tabsEl.classList.add('hidden');
             } else {
@@ -284,7 +285,7 @@ class UIInfoManager {
                 tabsEl.style.justifyContent = 'flex-start';
                 tabsEl.style.paddingLeft = '10px';
                 tabsEl.style.alignItems = 'flex-end';
-                tabsEl.innerHTML = '<div style="display: flex; gap: 5px;"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button></div>';
+                tabsEl.innerHTML = `<div style="display: flex; gap: 5px;"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">${isPc ? '基本' : '基'}</button></div>`;
             }
         }
         
@@ -325,12 +326,14 @@ class UIInfoManager {
         
         if (!this.daimyoCurrentTab) this.daimyoCurrentTab = 'status';
 
+        const isPc = document.body.classList.contains('is-pc'); // ★PCかスマホか調べる魔法を追加します
+
         let tabsHtml = `
             <div style="display: flex; gap: 5px;">
-                <button class="busho-tab-btn ${this.daimyoCurrentTab === 'status' ? 'active' : ''}" data-tab="status">基本</button>
-                <button class="busho-tab-btn ${this.daimyoCurrentTab === 'military' ? 'active' : ''}" data-tab="military">軍事</button>
-                <button class="busho-tab-btn ${this.daimyoCurrentTab === 'economy' ? 'active' : ''}" data-tab="economy">経済</button>
-                <button class="busho-tab-btn ${this.daimyoCurrentTab === 'power' ? 'active' : ''}" data-tab="power">国力</button>
+                <button class="busho-tab-btn ${this.daimyoCurrentTab === 'status' ? 'active' : ''}" data-tab="status">${isPc ? '基本' : '基'}</button>
+                <button class="busho-tab-btn ${this.daimyoCurrentTab === 'military' ? 'active' : ''}" data-tab="military">${isPc ? '軍事' : '軍'}</button>
+                <button class="busho-tab-btn ${this.daimyoCurrentTab === 'economy' ? 'active' : ''}" data-tab="economy">${isPc ? '経済' : '経'}</button>
+                <button class="busho-tab-btn ${this.daimyoCurrentTab === 'power' ? 'active' : ''}" data-tab="power">${isPc ? '国力' : '国'}</button>
             </div>
         `;
         
@@ -921,12 +924,14 @@ class UIInfoManager {
     _renderDiplomacyList(id, name, type, onClose, scrollPos = 0) {
         if (!this.diploCurrentTab) this.diploCurrentTab = 'daimyo';
 
+        const isPc = document.body.classList.contains('is-pc'); // ★PCかスマホか調べる魔法を追加します
+
         let tabsHtml = null;
         if (type === 'daimyo') {
             tabsHtml = `
                 <div style="display: flex; gap: 5px;">
-                    <button class="busho-tab-btn ${this.diploCurrentTab === 'daimyo' ? 'active' : ''}" data-tab="daimyo">大名家</button>
-                    <button class="busho-tab-btn ${this.diploCurrentTab === 'kunishu' ? 'active' : ''}" data-tab="kunishu">諸勢力</button>
+                    <button class="busho-tab-btn ${this.diploCurrentTab === 'daimyo' ? 'active' : ''}" data-tab="daimyo">${isPc ? '大名家' : '大'}</button>
+                    <button class="busho-tab-btn ${this.diploCurrentTab === 'kunishu' ? 'active' : ''}" data-tab="kunishu">${isPc ? '諸勢力' : '諸'}</button>
                 </div>
             `;
         } else {
@@ -1903,10 +1908,12 @@ class UIInfoManager {
                 princesses = this.game.princesses.filter(p => p.status !== 'unborn' && p.status !== 'dead');
             }
 
+            const isPc = document.body.classList.contains('is-pc'); // ★PCかスマホか調べる魔法を追加します
+
             tabsHtml = `
                 <div style="display: flex; gap: 5px; margin-left: 15px;">
-                    <button class="busho-scope-btn ${this.princessCurrentScope === 'clan' ? 'active' : ''}" data-scope="clan">自家</button>
-                    <button class="busho-scope-btn ${this.princessCurrentScope === 'all' ? 'active' : ''}" data-scope="all">全国</button>
+                    <button class="busho-scope-btn ${this.princessCurrentScope === 'clan' ? 'active' : ''}" data-scope="clan">${isPc ? '自家' : '自'}</button>
+                    <button class="busho-scope-btn ${this.princessCurrentScope === 'all' ? 'active' : ''}" data-scope="all">${isPc ? '全国' : '全'}</button>
                 </div>
             `;
         }

@@ -348,22 +348,24 @@ Object.assign(UIInfoManager.prototype, {
             this.currentKyotenScope = 'clan';
         }
         
+        const isPc = document.body.classList.contains('is-pc'); // ★PCかスマホか調べる魔法を追加します
+
         let scopeHtml = '';
         // ★選択モードの時は「全国」タブは隠して、自家のお城だけを選ばせます
         if (clanId === null && !isSelectMode) {
             scopeHtml = `
                 <div style="display: flex; gap: 5px; margin-left: 15px;">
-                    <button class="busho-scope-btn ${this.currentKyotenScope === 'clan' ? 'active' : ''}" data-scope="clan">自家</button>
-                    <button class="busho-scope-btn ${this.currentKyotenScope === 'all' ? 'active' : ''}" data-scope="all">全国</button>
+                    <button class="busho-scope-btn ${this.currentKyotenScope === 'clan' ? 'active' : ''}" data-scope="clan">${isPc ? '自家' : '自'}</button>
+                    <button class="busho-scope-btn ${this.currentKyotenScope === 'all' ? 'active' : ''}" data-scope="all">${isPc ? '全国' : '全'}</button>
                 </div>
             `;
         }
 
         let tabsHtml = `
             <div style="display: flex; gap: 5px;">
-                <button class="busho-tab-btn ${this.currentKyotenTab === 'status' ? 'active' : ''}" data-tab="status">基本</button>
-                <button class="busho-tab-btn ${this.currentKyotenTab === 'military' ? 'active' : ''}" data-tab="military">軍事</button>
-                <button class="busho-tab-btn ${this.currentKyotenTab === 'economy' ? 'active' : ''}" data-tab="economy">経済</button>
+                <button class="busho-tab-btn ${this.currentKyotenTab === 'status' ? 'active' : ''}" data-tab="status">${isPc ? '基本' : '基'}</button>
+                <button class="busho-tab-btn ${this.currentKyotenTab === 'military' ? 'active' : ''}" data-tab="military">${isPc ? '軍事' : '軍'}</button>
+                <button class="busho-tab-btn ${this.currentKyotenTab === 'economy' ? 'active' : ''}" data-tab="economy">${isPc ? '経済' : '経'}</button>
             </div>
             ${scopeHtml}
         `;

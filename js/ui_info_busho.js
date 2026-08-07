@@ -19,6 +19,8 @@ Object.assign(UIInfoManager.prototype, {
         const confirmBtn = document.getElementById('selector-confirm-btn');
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
 
+        const isPc = document.body.classList.contains('is-pc'); // ★これを追加してPCかスマホか調べます
+
         if (!this.bushoDetailCurrentTab) this.bushoDetailCurrentTab = 'status';
 
         modal.classList.remove('hidden');
@@ -34,8 +36,8 @@ Object.assign(UIInfoManager.prototype, {
             tabsEl.style.alignItems = 'flex-end';
             tabsEl.innerHTML = `
                 <div style="display: flex; gap: 5px;">
-                    <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'status' ? 'active' : ''}" id="busho-detail-tab-status">基本</button>
-                    <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'aptitude' ? 'active' : ''}" id="busho-detail-tab-aptitude">技能</button>
+                    <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'status' ? 'active' : ''}" id="busho-detail-tab-status">${isPc ? '基本' : '基'}</button>
+                    <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'aptitude' ? 'active' : ''}" id="busho-detail-tab-aptitude">${isPc ? '技能' : '技'}</button>
                 </div>
             `;
             
@@ -256,7 +258,6 @@ Object.assign(UIInfoManager.prototype, {
         }
 
         // ★追加：スマホ版かどうかで縦の隙間（行間）を変える準備をします
-        const isPc = document.body.classList.contains('is-pc');
         const rowGap = isPc ? "6px" : "3px"; // ★スマホ版はきゅっと詰めます
         const groupGap = "4px"; // ★グループ内の行間。適性⇔技能説明のダミーと共有して高さを一致させます
         const groupWrapStyle = `background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: ${groupGap};`;
@@ -743,19 +744,21 @@ Object.assign(UIInfoManager.prototype, {
         // デフォルトではヘッダーのソート状態を指定せず、コマンドごとの最適な計算結果順（初期並び順）で表示します
         // （ユーザーがヘッダーをクリックした時のみ this.bushoCurrentSortKey が設定され、ソートが実行されます）
 
+        const isPc = document.body.classList.contains('is-pc'); // ★PCかスマホか調べる魔法を追加します
+
         let scopeHtml = '';
         if (actionType === 'all_busho_list') {
             scopeHtml = `
                 <div style="display: flex; gap: 5px; margin-left: 15px;">
-                        <button class="busho-scope-btn ${this.bushoCurrentScope === 'clan' ? 'active' : ''}" data-scope="clan">自家</button>
-                        <button class="busho-scope-btn ${this.bushoCurrentScope === 'all' ? 'active' : ''}" data-scope="all">全国</button>
+                        <button class="busho-scope-btn ${this.bushoCurrentScope === 'clan' ? 'active' : ''}" data-scope="clan">${isPc ? '自家' : '自'}</button>
+                        <button class="busho-scope-btn ${this.bushoCurrentScope === 'all' ? 'active' : ''}" data-scope="all">${isPc ? '全国' : '全'}</button>
                 </div>
             `;
         }
         let tabsHtml = `
             <div style="display: flex; gap: 5px;">
-                <button class="busho-tab-btn ${this.bushoCurrentTab === 'stats' ? 'active' : ''}" data-tab="stats">基本</button>
-                <button class="busho-tab-btn ${this.bushoCurrentTab === 'status' ? 'active' : ''}" data-tab="status">状態</button>
+                <button class="busho-tab-btn ${this.bushoCurrentTab === 'stats' ? 'active' : ''}" data-tab="stats">${isPc ? '基本' : '基'}</button>
+                <button class="busho-tab-btn ${this.bushoCurrentTab === 'status' ? 'active' : ''}" data-tab="status">${isPc ? '状態' : '状'}</button>
             </div>
             ${scopeHtml}
         `;
