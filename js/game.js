@@ -2803,6 +2803,27 @@ class GameManager {
     // ★ここから整理整頓！：セーブとロードの「共通の魔法（まとめ）」です
     // ==========================================
     
+    // ★追加：保存中に画面を触れなくするガード（バリア）の魔法！
+    showSaveGuard() {
+        let el = document.getElementById('save-guard');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'save-guard';
+            el.innerHTML = '<div style="animation: blink-loading 1.5s infinite;">保存中...</div>';
+            // 戦争思考中と同じような点滅文字と、画面全体を覆う半透明の黒背景を設定します
+            el.style.cssText = "position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 9999; display: flex; justify-content: center; align-items: center; color: #ffffff; font-size: 2rem; font-weight: bold; text-shadow: 2px 2px 4px #000, -2px -2px 4px #000, 2px -2px 4px #000, -2px 2px 4px #000; pointer-events: all;";
+            document.body.appendChild(el);
+        }
+        el.style.display = 'flex';
+    }
+
+    hideSaveGuard() {
+        const el = document.getElementById('save-guard');
+        if (el) {
+            el.style.display = 'none';
+        }
+    }
+
     // どんな方法でセーブする時も、この魔法で「今のゲームの全データ」をひとまとめにします
     async _createSaveDataObj() {
         let scenarioIndex = SCENARIOS.findIndex(s => s.folder === this.scenarioFolder);
@@ -2901,8 +2922,14 @@ class GameManager {
             thumbCtx.imageSmoothingQuality = 'high';
             thumbCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
 
-            // 画像のデータを文字（Base64）にしてお渡しします
-            resolve(thumbCanvas.toDataURL('image/jpeg', 0.6));
+            // ★超重要：ブラウザのセキュリティ制限（CORS）でエラーになるのを防ぐバリアです！
+            try {
+                const dataUrl = thumbCanvas.toDataURL('image/jpeg', 0.6);
+                resolve(dataUrl);
+            } catch (e) {
+                console.warn("セキュリティ制限により、セーブ用画像の生成をスキップしました:", e);
+                resolve(null); // エラーが起きてもゲームが止まらないようにします
+            }
         });
     }
     
@@ -3120,15 +3147,20 @@ class GameManager {
 
     // ファイルへセーブ
     async saveGameToFile() { 
-        const data = await this._createSaveDataObj(); // ★待つように変更
-        const encryptedData = this._encryptData(data); // ★暗号化します
-        const blob = new Blob([encryptedData], {type: 'application/octet-stream'}); // ★バイナリデータとして保存します
-        const url = URL.createObjectURL(blob); 
-        const a = document.createElement('a'); 
-        a.href = url; 
-        a.download = `sengoku_save_${this.year}_${this.month}.sav`; // ★拡張子を.savに変更します
-        a.click(); 
-        URL.revokeObjectURL(url); 
+        this.showSaveGuard(); // ★追加：保存中のバリアを張ります
+        try {
+            const data = await this._createSaveDataObj(); // ★待つように変更
+            const encryptedData = this._encryptData(data); // ★暗号化します
+            const blob = new Blob([encryptedData], {type: 'application/octet-stream'}); // ★バイナリデータとして保存します
+            const url = URL.createObjectURL(blob); 
+            const a = document.createElement('a'); 
+            a.href = url; 
+            a.download = `sengoku_save_${this.year}_${this.month}.sav`; // ★拡張子を.savに変更します
+            a.click(); 
+            URL.revokeObjectURL(url); 
+        } finally {
+            this.hideSaveGuard(); // ★追加：保存が終わったらバリアを解除します
+        }
     }
     
     // ファイルからロード
@@ -3152,9 +3184,10 @@ class GameManager {
     
     // スロットへセーブ (IndexedDB)
     async saveGameToLocal(slotNo = 1) { 
-        const data = await this._createSaveDataObj(); // ★待つように変更
-        const encryptedData = this._encryptData(data); // ★暗号化します
+        this.showSaveGuard(); // ★追加：保存中のバリアを張ります
         try {
+            const data = await this._createSaveDataObj(); // ★待つように変更
+            const encryptedData = this._encryptData(data); // ★暗号化します
             await saveToDB("sengoku_save_slot" + slotNo, encryptedData);
             this.hasSaveData = true; // ★追加：セーブしたので「データあり」の印をつけます
             
@@ -3167,6 +3200,8 @@ class GameManager {
         } catch (e) {
             console.error("セーブエラーの詳細:", e);
             alert("セーブに失敗しました。エラー原因: " + e.message);
+        } finally {
+            this.hideSaveGuard(); // ★追加：保存が終わったらバリアを解除します
         }
     }
 
@@ -3206,6 +3241,7 @@ class GameManager {
 
     // ★追加：オートセーブを裏で実行する魔法
     async executeAutoSave() {
+        this.showSaveGuard(); // ★追加：保存中のバリアを張ります
         try {
             // スロットの番号（1～5）を覚えておくための箱から数字を取り出します（最初は1から）
             let autoSaveIndex = parseInt(localStorage.getItem('autoSaveIndex')) || 1;
@@ -3223,6 +3259,8 @@ class GameManager {
             
         } catch (e) {
             console.error("オートセーブに失敗しました:", e);
+        } finally {
+            this.hideSaveGuard(); // ★追加：保存が終わったらバリアを解除します
         }
     }
 
