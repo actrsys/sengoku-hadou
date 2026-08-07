@@ -903,7 +903,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     flex-direction: row; 
     align-items: stretch;
     width: 100%;
-    min-height: 80px; /* ★写真が入るので少し高さを広げます */
+    height: 90px; /* ★高さを固定して、空とデータありの縦幅を統一します */
     box-sizing: border-box; 
     padding: 0 !important; 
     margin-bottom: 8px !important; 
@@ -1106,6 +1106,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 }
 
 /* ★スマホ版の文字サイズや幅の微調整 */
+body:not(.is-pc) .saveload-slot-btn { height: 85px; } /* ★スマホ版での高さを固定 */
 body:not(.is-pc) .saveload-slot-number { width: 30px; font-size: 1.2rem; }
 body:not(.is-pc) .saveload-slot-image { width: 80px; }
 body:not(.is-pc) .saveload-slot-content { padding: 4px 8px; }
