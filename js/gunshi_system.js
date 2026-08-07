@@ -43,48 +43,61 @@ class GunshiSystem {
 
         // 不満を持っている人がいた場合
         if (unhappyBushos.length > 0) {
-            // 不満を持つ武将を一人ずつ報告するためのリストを作ります
-            let targetList = [];
-            
-            // もし軍師自身に不満があれば、一番最初に報告させます
+            let messageList = [];
+
+            // 1. 軍師自身の不満判定（あれば最優先）
             const gunshiBusho = unhappyBushos.find(b => b.id === gunshi.id);
+            if (gunshiBusho) {
+                messageList.push("恐れながら申し上げます。一族郎党を養う為にも、温情あるご配慮を賜りたく存じます");
+            }
+
+            // 2. 軍師以外の武将をグループ分け
             const others = unhappyBushos.filter(b => b.id !== gunshi.id);
-            
-            // 軍師以外の武将は忠誠度が低い順に並べ替えます
-            others.sort((a, b) => a.loyalty - b.loyalty);
+            const dangerLoyalty = window.MainParams.Gunshi.DangerLoyalty; // 74
 
-            // リストに合体させます
-            if (gunshiBusho) targetList.push(gunshiBusho);
-            targetList = targetList.concat(others);
+            // 74以下の武将グループ（危険）
+            const dangerGroup = others.filter(b => b.loyalty <= dangerLoyalty);
+            // 84以下の武将グループ（74より上〜84以下：不満）
+            const warningGroup = others.filter(b => b.loyalty > dangerLoyalty);
 
-            let isFirst = true;
+            // 忠誠度の低い順（昇順）にソート
+            dangerGroup.sort((a, b) => a.loyalty - b.loyalty);
+            warningGroup.sort((a, b) => a.loyalty - b.loyalty);
 
-            // 順番に一人ずつ報告する魔法です
+            // 危険グループ（74以下）のメッセージ構築
+            if (dangerGroup.length >= 3) {
+                const topName = dangerGroup[0].name;
+                const count = dangerGroup.length;
+                messageList.push(`${topName}殿以下${count}名の者が待遇に不満を抱えておられるご様子。どうかご厚遇をお願い申し上げます`);
+            } else {
+                dangerGroup.forEach(b => {
+                    messageList.push(`${b.name}殿は待遇に不満を抱えておられるご様子。どうかご厚遇をお願い申し上げます`);
+                });
+            }
+
+            // 不満グループ（84以下）のメッセージ構築
+            if (warningGroup.length >= 3) {
+                const topName = warningGroup[0].name;
+                const count = warningGroup.length;
+                messageList.push(`${topName}殿以下${count}名、かの者らの不満が溜まる前にお取り計らいをお願い申し上げます`);
+            } else {
+                warningGroup.forEach(b => {
+                    messageList.push(`${b.name}殿の不満が溜まる前に、お取り計らいをお願い申し上げます`);
+                });
+            }
+
+            // 3. メッセージを順番にダイアログ表示する処理
+            let msgIndex = 0;
             const showNext = () => {
-                if (targetList.length === 0) {
+                if (msgIndex >= messageList.length) {
                     if (onComplete) onComplete();
                     return;
                 }
 
-                const target = targetList.shift();
-                let msg = "";
-
-                // 最初のメッセージだけ「殿、」を付けます
-                const tonoStr = isFirst ? "殿、" : "";
-
-                if (target.id === gunshi.id) {
-                    msg = `「${tonoStr}恐れながら申し上げます。一族郎党を養う為にも、温情あるご配慮を賜りたく存じます」`;
-                } else {
-                    const dangerLoyalty = window.MainParams.Gunshi.DangerLoyalty;
-                    
-                    if (target.loyalty <= dangerLoyalty) {
-                        msg = `「${tonoStr}${target.name}殿は待遇に不満を抱えておられるご様子。どうかご厚遇をお願い申し上げます」`;
-                    } else {
-                        msg = `「${tonoStr}${target.name}殿の不満が溜まる前に、お取り計らいをお願い申し上げます」`;
-                    }
-                }
-
-                isFirst = false;
+                // 最初の1回目の発言にだけ「殿、」を付与します
+                const tonoStr = (msgIndex === 0) ? "殿、" : "";
+                const msg = `「${tonoStr}${messageList[msgIndex]}」`;
+                msgIndex++;
 
                 this.game.ui.showDialog(msg, false, showNext, null, {
                     leftFace: gunshi.faceIcon,
