@@ -242,57 +242,17 @@ Object.assign(UIInfoManager.prototype, {
 
         const yomiStr = busho.yomi ? busho.yomi : "";
         
-        let nameAreaPc = "";
-        let nameAreaSp = "";
+        // ★修正：箱で分けるのではなく、純粋に文字として「少しだけ空く空白文字（&ensp;）」を挟み込みます
+        let displayYomi = yomiStr;
+        let displayName = busho.name;
         
         if (busho.givenName) {
-            // 読み仮名のブロック（姓と名がある場合だけ隙間をあけます）
-            let yomiHtmlPc = yomiStr;
-            let yomiHtmlSp = yomiStr;
             if (busho.familyYomi && busho.givenYomi) {
-                yomiHtmlPc = `<div style="display:flex; gap:0.25em;"><span>${busho.familyYomi}</span><span>${busho.givenYomi}</span></div>`;
-                yomiHtmlSp = `<div style="display:flex; gap:0.25em;"><span>${busho.familyYomi}</span><span>${busho.givenYomi}</span></div>`;
+                // 読みが分かれている場合は、間に半角スペース幅の空白文字を入れます
+                displayYomi = busho.familyYomi + "&ensp;" + busho.givenYomi;
             }
-            
-            // PC版の表示（Flexboxを使って確実に隙間をあけます）
-            nameAreaPc = `
-                <span style="font-size:0.8rem; color:#ccc; margin-bottom:2px; display:block;">${yomiHtmlPc}</span>
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <div class="daimyo-detail-name" style="font-size: 1.5rem; display: flex; gap: 0.25em;">
-                        <span>${busho.familyName}</span>
-                        <span>${busho.givenName}</span>
-                    </div>
-                    ${rankName}
-                </div>
-            `;
-            
-            // スマホ版の表示（Flexboxを使って確実に隙間をあけます）
-            nameAreaSp = `
-                <span style="font-size:0.75rem; color:#ccc; margin-bottom:0px; display:block;">${yomiHtmlSp}</span>
-                <div style="display:flex; align-items:center; gap:5px;">
-                    <div class="daimyo-detail-name" style="font-size:1.3rem; display: flex; gap: 0.25em;">
-                        <span>${busho.familyName}</span>
-                        <span>${busho.givenName}</span>
-                    </div>
-                    ${rankName}
-                </div>
-            `;
-        } else {
-            // 姓名が分かれていない場合は今まで通り
-            nameAreaPc = `
-                <span style="font-size:0.8rem; color:#ccc; margin-bottom:2px; display:block;">${yomiStr}</span>
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <div class="daimyo-detail-name" style="font-size: 1.5rem;">${busho.name}</div>
-                    ${rankName}
-                </div>
-            `;
-            nameAreaSp = `
-                <span style="font-size:0.75rem; color:#ccc; margin-bottom:0px; display:block;">${yomiStr}</span>
-                <div style="display:flex; align-items:center; gap:5px;">
-                    <div class="daimyo-detail-name" style="font-size:1.3rem;">${busho.name}</div>
-                    ${rankName}
-                </div>
-            `;
+            // 名前が分かれている場合は、間に半角スペース幅の空白文字を入れます
+            displayName = busho.familyName + "&ensp;" + busho.givenName;
         }
 
         // ★追加：スマホ版かどうかで縦の隙間（行間）を変える準備をします
@@ -449,7 +409,11 @@ Object.assign(UIInfoManager.prototype, {
                 <div class="daimyo-detail-container" style="padding: 10px; min-height: 100%;">
                     <div class="daimyo-detail-header pc-only" style="margin-bottom: 10px;">
                         <div style="display:flex; flex-direction:column;">
-                            ${nameAreaPc}
+                            <span style="font-size:0.8rem; color:#ccc; margin-bottom:2px;">${displayYomi}</span>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <div class="daimyo-detail-name" style="font-size: 1.5rem;">${displayName}</div>
+                                ${rankName}
+                            </div>
                             <div style="display:flex; align-items:center; gap:10px; margin-top: 4px; font-size: 0.95rem; color: #ccc;">
                                 <span>${affiliationName}</span>
                                 <span>${busho.getRankName()}</span>
@@ -460,7 +424,11 @@ Object.assign(UIInfoManager.prototype, {
                         <div class="daimyo-detail-left">
                             ${faceHtml}
                             <div class="daimyo-detail-header sp-only" style="flex-direction:column; align-items:flex-start; gap:2px; margin-bottom: 0; justify-content: center;">
-                                ${nameAreaSp}
+                                <span style="font-size:0.75rem; color:#ccc;">${displayYomi}</span>
+                                <div style="display:flex; align-items:center; gap:5px;">
+                                    <div class="daimyo-detail-name" style="font-size:1.3rem;">${displayName}</div>
+                                    ${rankName}
+                                </div>
                                 <div style="display:flex; align-items:center; gap:8px; margin-top: 2px; font-size: 0.85rem; color: #ccc;">
                                     <span>${affiliationName}</span>
                                     <span>${busho.getRankName()}</span>
