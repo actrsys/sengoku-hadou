@@ -1768,7 +1768,7 @@ class CommandSystem {
                 let latestMarkHtml = "";
                 if (isGlobalLatest) {
                     // 全体で一番新しいデータには「最新!」の文字をつけます
-                    latestMarkHtml = `<span style="color: #ff8a80; font-weight: bold; margin-right: 8px; text-shadow: 1px 1px 0 #000;">最新!</span>`;
+                    latestMarkHtml = `<span class="saveload-latest-mark" style="color: #ff8a80; font-weight: bold; text-shadow: 1px 1px 0 #000;">最新!</span>`;
                 }
 
                 // ★追加：保存しておいた写真があれば表示します
@@ -1785,13 +1785,13 @@ class CommandSystem {
                         <div class="saveload-slot-number">${slotNumberText}</div>
                         <div class="saveload-slot-image">${mapImageHtml}</div>
                         <div class="saveload-slot-content">
-                            <div class="saveload-slot-header">
-                                <div class="saveload-slot-time">${latestMarkHtml}${saveTimeStr}</div>
-                            </div>
-                            <div class="saveload-slot-scenario">${scenarioStr}</div>
-                            <div class="saveload-slot-main-info">
+                            <div class="saveload-row-top">
                                 <span class="saveload-slot-clan">${clanStr}</span>
+                                <span class="saveload-slot-scenario">${scenarioStr}</span>
+                            </div>
+                            <div class="saveload-row-bottom">
                                 <span class="saveload-slot-date">${dateStr} <span class="saveload-slot-passed">(${passedYearsStr})</span></span>
+                                <div class="saveload-slot-time">${latestMarkHtml}<span class="saveload-time-text">${saveTimeStr}</span></div>
                             </div>
                         </div>
                     `;

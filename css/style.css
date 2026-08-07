@@ -1024,17 +1024,22 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .saveload-slot-content {
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: space-around;
     padding: 8px 12px;
     flex: 1;
     min-width: 0; 
 }
 
-.saveload-slot-header {
+.saveload-row-top {
     display: flex;
-    justify-content: flex-end; /* 最新マークと時間を右に寄せます */
-    align-items: center;
-    margin-bottom: 2px;
+    align-items: baseline;
+    gap: 15px;
+}
+
+.saveload-row-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
 }
 
 .saveload-slot-time {
@@ -1043,6 +1048,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     font-family: monospace;
     display: flex;
     align-items: center;
+    gap: 8px;
 }
 
 .saveload-slot-scenario {
@@ -1051,14 +1057,6 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    margin-bottom: 2px;
-}
-
-.saveload-slot-main-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    width: 100%;
 }
 
 .saveload-slot-clan {
@@ -1117,6 +1115,19 @@ body:not(.is-pc) .saveload-slot-time { font-size: 0.7rem; }
 body:not(.is-pc) .saveload-slot-scenario { font-size: 0.75rem; }
 body:not(.is-pc) .saveload-slot-passed { font-size: 0.7rem; }
 body:not(.is-pc) .saveload-slot-empty-text { font-size: 0.85rem; }
+
+body:not(.is-pc) .saveload-row-top { gap: 8px; }
+body:not(.is-pc) .saveload-row-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    margin-top: 4px;
+}
+body:not(.is-pc) .saveload-slot-time {
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    gap: 6px;
+}
 
 /* =========================================================
    各種モーダル・オーバーレイ・ガード
