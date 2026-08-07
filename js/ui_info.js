@@ -585,14 +585,15 @@ class UIInfoManager {
                     `<span class="col-empty pc-only"></span>`
                 ];
             } else if (this.daimyoCurrentTab === 'economy') {
+                const formatNum = (num) => (!isPc && num >= 100000) ? Math.floor(num / 1000) + '千' : num;
                 cells = [
                     `<span class="col-daimyo-name">${compressedDaimyoName}</span>`,
-                    `<span class="col-gold">${d.gold}</span>`,
-                    `<span class="col-gold-income">${d.goldIncome}</span>`,
-                    `<span class="col-gold-consume">${d.goldConsume}</span>`,
-                    `<span class="col-rice">${d.rice}</span>`,
-                    `<span class="col-rice-income">${d.riceIncome}</span>`,
-                    `<span class="col-rice-consume">${d.riceConsume}</span>`,
+                    `<span class="col-gold">${formatNum(d.gold)}</span>`,
+                    `<span class="col-gold-income">${formatNum(d.goldIncome)}</span>`,
+                    `<span class="col-gold-consume">${formatNum(d.goldConsume)}</span>`,
+                    `<span class="col-rice">${formatNum(d.rice)}</span>`,
+                    `<span class="col-rice-income">${formatNum(d.riceIncome)}</span>`,
+                    `<span class="col-rice-consume">${formatNum(d.riceConsume)}</span>`,
                     `<span class="col-empty pc-only"></span>`
                 ];
             } else if (this.daimyoCurrentTab === 'power') {
