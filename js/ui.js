@@ -2686,13 +2686,14 @@ class UIManager {
         const getCompressedTextHtml = (text, threshold, isStrong = false) => {
             if (!text) return "";
             if (text.length >= threshold) {
-                // ★修正：PC版でもしっかり縮小されるように、基本の縮み具合（step）を0.1に戻しました！
                 const step = isStrong ? 0.15 : 0.1;
                 const minScale = isStrong ? 0.55 : 0.65;
                 let scale = 1.0 - (text.length - (threshold - 1)) * step;
                 if (scale < minScale) scale = minScale;
-                // ★修正：文字が変に縦にズレて大きく見えるのを防ぐため、vertical-align: bottom を追加して隣の文字とピタッと揃えます
-                return `<span style="font-size: ${scale}em; transform: scaleY(${1/scale}); letter-spacing: -0.5px; padding-right: 1px; display: inline-block; transform-origin: left center; vertical-align: bottom;">${text}</span>`;
+                
+                // ★修正：CSSの「!important」に負けないように、ここでも font-size に「!important」をつけて確実に横幅を縮小させます！
+                // ★さらに transform-origin と vertical-align を bottom に統一し、隣の文字と下端をピタッと揃えて上に引き伸ばします。
+                return `<span style="font-size: ${scale}em !important; transform: scaleY(${1/scale}); letter-spacing: -0.5px; padding-right: 1px; display: inline-block; transform-origin: left bottom; vertical-align: bottom;">${text}</span>`;
             }
             return text;
         };
