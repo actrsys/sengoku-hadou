@@ -43,40 +43,55 @@ class GunshiSystem {
 
         // 不満を持っている人がいた場合
         if (unhappyBushos.length > 0) {
-            const gunshiIsUnhappy = unhappyBushos.some(b => b.id === gunshi.id);
-            const othersUnhappy = unhappyBushos.filter(b => b.id !== gunshi.id);
+            // 不満を持つ武将を一人ずつ報告するためのリストを作ります
+            let targetList = [];
+            
+            // もし軍師自身に不満があれば、一番最初に報告させます
+            const gunshiBusho = unhappyBushos.find(b => b.id === gunshi.id);
+            const others = unhappyBushos.filter(b => b.id !== gunshi.id);
+            
+            // 軍師以外の武将は忠誠度が低い順に並べ替えます
+            others.sort((a, b) => a.loyalty - b.loyalty);
 
-            // 他の武将の不満を報告するための処理を一つにまとめます
-            const showOthersAdvice = () => {
-                if (othersUnhappy.length > 0) {
-                    const names = othersUnhappy.slice(0, 2).map(b => b.name).join("殿や");
-                    const etc = othersUnhappy.length > 2 ? "殿ら、数名" : "殿";
-                    
-                    let msg = "";
-                    if (gunshiIsUnhappy) {
-                        msg = `「また、${names}${etc}の不満が溜まる前に、厚き処遇を願います」`;
-                    } else {
-                        msg = `「殿、${names}${etc}の不満が溜まる前に、厚き処遇を願います」`;
-                    }
-                    this.game.ui.showDialog(msg, false, onComplete, null, {
-                        leftFace: gunshi.faceIcon,
-                        leftName: gunshi.name
-                    });
-                } else {
+            // リストに合体させます
+            if (gunshiBusho) targetList.push(gunshiBusho);
+            targetList = targetList.concat(others);
+
+            let isFirst = true;
+
+            // 順番に一人ずつ報告する魔法です
+            const showNext = () => {
+                if (targetList.length === 0) {
                     if (onComplete) onComplete();
+                    return;
                 }
-            };
 
-            // まず軍師の不満があればそれを話し、終わったら他の人の不満を話させます
-            if (gunshiIsUnhappy) {
-                const msg = `「殿、恐れながら申し上げます。一族郎党を養う為にも、温情あるご配慮を賜りたく存じます」`;
-                this.game.ui.showDialog(msg, false, showOthersAdvice, null, {
+                const target = targetList.shift();
+                let msg = "";
+
+                // 最初のメッセージだけ「殿、」を付けます
+                const tonoStr = isFirst ? "殿、" : "";
+
+                if (target.id === gunshi.id) {
+                    msg = `「${tonoStr}恐れながら申し上げます。一族郎党を養う為にも、温情あるご配慮を賜りたく存じます」`;
+                } else {
+                    if (target.loyalty <= 74) {
+                        msg = `「${tonoStr}${target.name}殿は待遇に不満を抱えておられるご様子。どうかご厚遇をお願い申し上げます」`;
+                    } else {
+                        msg = `「${tonoStr}${target.name}殿の不満が溜まる前に、お取り計らいをお願い申し上げます」`;
+                    }
+                }
+
+                isFirst = false;
+
+                this.game.ui.showDialog(msg, false, showNext, null, {
                     leftFace: gunshi.faceIcon,
                     leftName: gunshi.name
                 });
-            } else {
-                showOthersAdvice();
-            }
+            };
+
+            // 最初の報告をスタートします
+            showNext();
         } else {
             // 不満な人がいなければ、そのまま次に進む
             if (onComplete) onComplete();

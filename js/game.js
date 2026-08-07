@@ -21,10 +21,9 @@ const SCENARIOS = [
 window.MainParams = {
     StartYear: 1560, StartMonth: 4,
     System: { UseRandomNames: true },
-    // ★ここを追加：軍師が助言（警告）を出す基準値です！一元管理します。
+    // ★軍師が助言（警告）を出す基準値です！一元管理します。
     Gunshi: {
-        AdviceLoyalty: 74,      // 忠誠度がこれ以下なら警告
-        AdviceRecognition: 30   // 承認欲求がこれ以上なら警告
+        AdviceLoyalty: 84      // 忠誠度がこれ以下なら警告
     },
     Economy: {
         IncomeGoldRate: 1, IncomeFluctuation: 0.15,
@@ -597,10 +596,9 @@ class GameSystem {
         if (!busho || busho.isDaimyo || busho.belongKunishuId > 0) return false;
         
         const advLoyalty = window.MainParams.Gunshi.AdviceLoyalty;
-        const advRecognition = window.MainParams.Gunshi.AdviceRecognition;
         
-        // 不満条件に当てはまるかどうかを判定して返します
-        return busho.loyalty <= advLoyalty || (busho.recognitionNeed || 0) >= advRecognition;
+        // 忠誠度が基準値以下の武将を不満と判定します
+        return busho.loyalty <= advLoyalty;
     }
 
     static calcBaseGoldIncome(castle) {

@@ -1001,9 +1001,9 @@ class CommandSystem {
 
                  const cCastle = currentCastle;
                  try {
-                     // ★追加：褒美コマンドの場合は、一元化した判定を使って不満武将を最優先しつつ、忠誠度が低い順に並べます
+                     // ★追加：褒美コマンドの場合は、忠誠度が低い順に並べます
                      if (actionType === 'reward') {
-                         return (GameSystem.isUnhappyBusho(target) ? 1000 : 0) + (100 - target.loyalty);
+                         return (100 - target.loyalty);
                      }
 
                      if (['farm', 'commerce'].includes(actionType)) {
