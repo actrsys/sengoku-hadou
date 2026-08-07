@@ -2681,6 +2681,31 @@ class UIManager {
             const el = document.getElementById(id); 
             if(el) el.textContent = val; 
         };
+
+        // ★追加：勢力名と武将名を、文字数に応じてキュッと縮める魔法です！
+        const getCompressedTextHtml = (text, threshold, isStrong = false) => {
+            if (!text) return "";
+            if (text.length >= threshold) {
+                // isStrongが「はい（true）」なら、スマホ版の援軍用に少し強めに縮小します
+                const step = isStrong ? 0.15 : 0.05;
+                const minScale = isStrong ? 0.55 : 0.75;
+                let scale = 1.0 - (text.length - (threshold - 1)) * step;
+                if (scale < minScale) scale = minScale;
+                return `<span style="font-size: ${scale}em; transform: scaleY(${1/scale}); letter-spacing: -0.5px; padding-right: 1px; display: inline-block; transform-origin: left center;">${text}</span>`;
+            }
+            return text;
+        };
+
+        const getCompressedBushoNameHtml = (busho, isStrong = false) => {
+            if (!busho) return "不明";
+            if (busho.givenName) {
+                // 姓と名が分かれている場合は、それぞれ3文字以上で縮小します
+                return getCompressedTextHtml(busho.familyName, 3, isStrong) + getCompressedTextHtml(busho.givenName, 3, isStrong);
+            } else {
+                // 分かれていない場合は、5文字以上で縮小します
+                return getCompressedTextHtml(busho.name.replace('|', ''), 5, isStrong);
+            }
+        };
         
         const updateFace = (id, busho) => {
             const el = document.getElementById(id);
@@ -2725,7 +2750,10 @@ class UIManager {
             const prov = this.game.provinces.find(p => p.id === s.sourceCastle.provinceId);
             atkName = prov ? prov.province : "土豪";
         }
-        setTxt('war-atk-name', atkName);
+        
+        // ★修正：さっき作った魔法で縮小した文字（HTML）を入れます！
+        const atkNameEl = document.getElementById('war-atk-name');
+        if (atkNameEl) atkNameEl.innerHTML = getCompressedTextHtml(atkName, 4);
         
         const atkTitleEl = document.getElementById('war-atk-name').parentElement;
         if (atkName.length >= 8) {
@@ -2734,7 +2762,10 @@ class UIManager {
             atkTitleEl.classList.remove('title-long-text');
         }
         
-        setTxt('war-atk-busho', s.atkBushos[0].name.split('|').join('') + '軍');
+        // ★修正：武将名も魔法を使って縮小します！
+        const atkBushoEl = document.getElementById('war-atk-busho');
+        if (atkBushoEl) atkBushoEl.innerHTML = getCompressedBushoNameHtml(s.atkBushos[0]) + '軍';
+        
         setTxt('war-atk-soldier', s.attacker.soldiers + '人');
         setTxt('war-atk-rice', s.attacker.rice); 
         setTxt('war-atk-training', s.attacker.training);
@@ -2754,7 +2785,10 @@ class UIManager {
             const prov = this.game.provinces.find(p => p.id === s.defender.provinceId);
             defNameText = prov ? prov.province : "土豪";
         }
-        setTxt('war-def-name', defNameText);
+        
+        // ★修正：守備側も魔法で縮小します！
+        const defNameEl = document.getElementById('war-def-name');
+        if (defNameEl) defNameEl.innerHTML = getCompressedTextHtml(defNameText, 4);
         
         const defTitleEl = document.getElementById('war-def-name').parentElement;
         if (defNameText.length >= 8) {
@@ -2763,7 +2797,10 @@ class UIManager {
             defTitleEl.classList.remove('title-long-text');
         }
 
-        setTxt('war-def-busho', s.defBusho.name.split('|').join('') + '軍');
+        // ★修正：武将名も魔法で縮小します！
+        const defBushoEl = document.getElementById('war-def-busho');
+        if (defBushoEl) defBushoEl.innerHTML = getCompressedBushoNameHtml(s.defBusho) + '軍';
+        
         setTxt('war-def-soldier', s.defender.soldiers + '人');
         setTxt('war-def-rice', s.defender.rice); 
         setTxt('war-def-training', s.defender.training);
@@ -2810,8 +2847,9 @@ class UIManager {
                     bushoEl.style.visibility = 'hidden';
                     card.querySelector('.reinf-content-wrap').style.visibility = 'hidden';
 
-                    orgEl.textContent = '';
-                    bushoEl.textContent = '';
+                    // ★修正：innerHTMLで空っぽにします
+                    orgEl.innerHTML = '';
+                    bushoEl.innerHTML = '';
                     soldierEl.textContent = '';
                     riceEl.textContent = '';
                     trainingEl.textContent = '';
@@ -2841,8 +2879,12 @@ class UIManager {
                 faceContainer.classList.remove('hidden');
                 emptyIcon.classList.add('hidden');
 
+                // ★追加：スマホ版かどうかを調べて、援軍を少し強めに縮小するための目印を作ります
+                const isMobile = !document.body.classList.contains('is-pc');
+
                 const leader = reinfData.bushos && reinfData.bushos.length > 0 ? reinfData.bushos[0] : null;
-                const leaderName = leader ? leader.name.split('|').join('') + "軍" : "不明";
+                // ★修正：魔法を使って武将名を縮小します！
+                const leaderNameHtml = leader ? getCompressedBushoNameHtml(leader, isMobile) + "軍" : "不明";
                 
                 if (leader && leader.faceIcon) {
                     faceImg.src = `data/images/faceicons/${leader.faceIcon}`;
@@ -2868,8 +2910,9 @@ class UIManager {
                 }
 
                 // ここでHTMLに値を流し込みます
-                orgEl.textContent = orgName;
-                bushoEl.textContent = leaderName;
+                // ★修正：勢力名も魔法を使って縮小します！
+                orgEl.innerHTML = getCompressedTextHtml(orgName, 4, isMobile);
+                bushoEl.innerHTML = leaderNameHtml;
                 soldierEl.textContent = (reinfData.soldiers || 0) + '人';
                 riceEl.textContent = reinfData.rice || 0;
                 trainingEl.textContent = reinfData.training || 0;
