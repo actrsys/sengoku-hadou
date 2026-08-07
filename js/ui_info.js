@@ -2293,14 +2293,19 @@ class UIInfoManager {
         // スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！
         const isPc = document.body.classList.contains('is-pc');
 
-        const fSizeCastleYomi = isPc ? "0.75rem" : "0.65rem";
-        const fSizeCastleName = isPc ? "1.4rem" : "1.25rem";
-        const fSizeLordLabel = isPc ? "1.05rem" : "0.95rem";
-        const fSizeStatLabel = isPc ? "0.85rem" : "0.70rem";
-        const fSizeStatValue = isPc ? "0.85rem" : "0.70rem";
+        // ★文字サイズの変更（PCは1.4倍、スマホは1.1倍）
+        const fSizeCastleYomi = isPc ? "1.05rem" : "0.715rem";
+        const fSizeCastleName = isPc ? "1.96rem" : "1.375rem";
+        const fSizeLordLabel = isPc ? "1.47rem" : "1.045rem";
+        const fSizeStatLabel = isPc ? "1.19rem" : "0.77rem";
+        const fSizeStatValue = isPc ? "1.19rem" : "0.77rem";
 
-        const gridGap = isPc ? "8px 6px" : "8px 3px";
-        const faceStyle = "width: 100%; max-width: 90px; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0;";
+        // ★隙間を半分に
+        const gridGap = isPc ? "4px 3px" : "4px 1.5px";
+        
+        // ★顔グラのサイズ（PCは変えない90px、スマホは0.8倍の72px）
+        const faceWidth = isPc ? "90px" : "72px";
+        const faceStyle = `width: 100%; max-width: ${faceWidth}; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0;`;
 
         let faceHtml = "";
         if (leader && leader.faceIcon) {
@@ -2309,8 +2314,8 @@ class UIInfoManager {
             faceHtml = `<div style="${faceStyle}"></div>`;
         }
 
-        const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 4px;";
-        const statBoxStyle = "background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 2px 6px; display: flex; justify-content: space-between; align-items: center;";
+        const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 2px; display: flex; flex-direction: column; gap: 2px;";
+        const statBoxStyle = "background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 1px 3px; display: flex; justify-content: space-between; align-items: center;";
         const labelStyle = `color: #ffd54f; font-size: ${fSizeStatLabel}; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: left;`;
         const valueStyle = `color: #fff; font-size: ${fSizeStatValue}; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: right; font-variant-numeric: tabular-nums;`;
         
@@ -2325,53 +2330,58 @@ class UIInfoManager {
 
         if (this.ui.daimyoConfirmBody) {
             this.ui.daimyoConfirmBody.innerHTML = `
-                <div class="kyoten-detail-wrapper" style="padding: 8px 10px; display: flex; flex-direction: column; box-sizing: border-box; text-align: left;">
-                    
-                    <!-- 【ヘッダー部】 左上に顔グラ、右にテキスト情報 -->
-                    <div style="display: flex; align-items: flex-start; gap: 15px; margin-bottom: 10px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 8px;">
-                        <div style="flex-shrink: 0; width: 90px;">
-                            ${faceHtml}
-                        </div>
-                        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
-                            <!-- 勢力名 -->
-                            <div style="display: flex; align-items: flex-end; gap: 15px;">
-                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                                    <span style="font-size: ${fSizeCastleYomi}; color: #ccc; min-height: 1em;">${clanYomi}</span>
-                                    <span style="font-size: ${fSizeCastleName}; font-weight: bold; color: #fff; line-height: 1;">${clanName}</span>
+                <h3 style="margin-top:0; margin-bottom:8px; border-bottom:1px solid rgba(212, 175, 55, 0.5); padding-bottom:5px; color:#ffd54f; text-shadow:1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align:left;">勢力情報</h3>
+                <div class="scroll-wrapper no-custom-scrollbar" style="padding:0; border: 2px solid #d4af37; border-radius: 4px; box-shadow: 0 0 10px rgba(0,0,0,0.5);">
+                    <div class="list-container hide-native-scroll" style="display:block; overflow:hidden; min-height:100%;">
+                        <div class="kyoten-detail-wrapper" style="padding: 4px 5px; display: flex; flex-direction: column; box-sizing: border-box; text-align: left;">
+                            
+                            <!-- 【ヘッダー部】 左上に顔グラ、右にテキスト情報 -->
+                            <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 5px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 4px;">
+                                <div style="flex-shrink: 0; width: ${faceWidth};">
+                                    ${faceHtml}
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 3px; flex: 1;">
+                                    <!-- 勢力名 -->
+                                    <div style="display: flex; align-items: flex-end; gap: 8px;">
+                                        <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                                            <span style="font-size: ${fSizeCastleYomi}; color: #ccc; min-height: 1em;">${clanYomi}</span>
+                                            <span style="font-size: ${fSizeCastleName}; font-weight: bold; color: #fff; line-height: 1;">${clanName}</span>
+                                        </div>
+                                    </div>
+                                    <!-- 大名 -->
+                                    <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px;">
+                                        <div style="font-size: ${fSizeLordLabel}; color: #ffd54f;">大名 <span style="color: #fff; font-weight: bold;">${leader ? leader.name : "不明"}</span></div>
+                                    </div>
                                 </div>
                             </div>
-                            <!-- 大名 -->
-                            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
-                                <div style="font-size: ${fSizeLordLabel}; color: #ffd54f;">大名 <span style="color: #fff; font-weight: bold;">${leader ? leader.name : "不明"}</span></div>
+
+                            <!-- 【ステータス部：上段】 -->
+                            <div style="${groupWrapStyle} margin-bottom: 4px;">
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
+                                    ${makeRow('拠点', castlesCount)}
+                                    ${makeRow('武将', bushosCount)}
+                                    ${makeRow('姫', princessCount)}
+                                </div>
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
+                                    ${makeRow('人口', totalPopulation)}
+                                    ${makeRow('石高', totalKokudaka)}
+                                    ${makeRow('鉱山', totalCommerce)}
+                                </div>
                             </div>
-                        </div>
-                    </div>
 
-                    <!-- 【ステータス部：上段】 -->
-                    <div style="${groupWrapStyle} margin-bottom: 8px;">
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
-                            ${makeRow('拠点', castlesCount)}
-                            ${makeRow('武将', bushosCount)}
-                            ${makeRow('姫', princessCount)}
-                        </div>
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
-                            ${makeRow('人口', totalPopulation)}
-                            ${makeRow('石高', totalKokudaka)}
-                            ${makeRow('鉱山', totalCommerce)}
-                        </div>
-                    </div>
-
-                    <!-- 【ステータス部：下段】 -->
-                    <div style="${groupWrapStyle}">
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
-                            ${makeRow('軍馬', totalHorses)}
-                            ${makeRow('鉄砲', totalGuns)}
-                            ${makeEmptyRow()}
-                        </div>
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
-                            ${makeRow('兵士', soldiers)}
-                            ${makeRow('金', totalGold)}
-                            ${makeRow('兵糧', totalRice)}
+                            <!-- 【ステータス部：下段】 -->
+                            <div style="${groupWrapStyle}">
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
+                                    ${makeRow('軍馬', totalHorses)}
+                                    ${makeRow('鉄砲', totalGuns)}
+                                    ${makeEmptyRow()}
+                                </div>
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
+                                    ${makeRow('兵士', soldiers)}
+                                    ${makeRow('金', totalGold)}
+                                    ${makeRow('兵糧', totalRice)}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
