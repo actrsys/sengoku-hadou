@@ -1696,11 +1696,6 @@ Object.assign(WarManager.prototype, {
                 // 武将を戦場リストから消す
                 if (isAttackerData) {
                     reinf.bushos.forEach(rb => { s.atkBushos = s.atkBushos.filter(b => b.id !== rb.id); });
-                } else {
-                    reinf.bushos.forEach(rb => {
-                        const idx = s.defender.samuraiIds.indexOf(rb.id);
-                        if (idx !== -1) s.defender.samuraiIds.splice(idx, 1);
-                    });
                 }
             };
 
@@ -1757,11 +1752,6 @@ Object.assign(WarManager.prototype, {
                     
                     if (isAttackerData) {
                         reinf.bushos.forEach(rb => { s.atkBushos = s.atkBushos.filter(b => b.id !== rb.id); });
-                    } else {
-                        reinf.bushos.forEach(rb => {
-                            const idx = s.defender.samuraiIds.indexOf(rb.id);
-                            if (idx !== -1) s.defender.samuraiIds.splice(idx, 1);
-                        });
                     }
                 });
             }
