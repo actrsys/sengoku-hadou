@@ -2254,8 +2254,8 @@ window.GameEvents.push({
         // 将軍候補を新しい大名家に移動させます
         candidate.belongKunishuId = 0;
         if (game.affiliationSystem) {
-            // ★第4引数に「100」を渡して忠誠度を固定します
-            game.affiliationSystem.joinClan(candidate, targetClan.id, targetCastleId, 100);
+            // ★第4引数に「100」を渡して忠誠度を固定し、第5引数に「true」を渡して功績をそのまま引き継ぎます
+            game.affiliationSystem.joinClan(candidate, targetClan.id, targetCastleId, 100, true);
         } else {
             // 万が一システムがない時の安全策
             if (candidate.castleId > 0) {
@@ -2287,8 +2287,9 @@ window.GameEvents.push({
                 rBusho.belongKunishuId = 0;
 
                 if (game.affiliationSystem) {
-                    // ★第4引数に「100」を渡して忠誠度を固定します
-                    game.affiliationSystem.joinClan(rBusho, targetClan.id, targetCastleId, 100);
+                    // ★第4引数に「100」を渡して忠誠度を固定し、第5引数に「true」を渡して功績をそのまま引き継ぎます
+                    game.affiliationSystem.joinClan(rBusho, targetClan.id, targetCastleId, 100, true);
+
                     // もし城主だったなら、古いお城の城主を更新します
                     if (wasCastellan && oldCastleId > 0) {
                         const oldCastle = game.getCastle(oldCastleId);
@@ -2310,6 +2311,11 @@ window.GameEvents.push({
                     if (newCastle && !newCastle.samuraiIds.includes(rBusho.id)) {
                         newCastle.samuraiIds.push(rBusho.id);
                     }
+                }
+                
+                // ★追加：特定の3名（和田惟政、細川藤孝、明智光秀）には功績を500プラスします
+                if (id === 1017035 || id === 1017029 || id === 1201003) {
+                    rBusho.achievementTotal = (rBusho.achievementTotal || 0) + 500;
                 }
             }
         });

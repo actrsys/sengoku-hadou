@@ -15,15 +15,17 @@ class AffiliationSystem {
      * @param {number} newClanId - 新しい大名家のID
      * @param {number} newCastleId - 新しく入るお城のID
      * @param {number|null} forceLoyalty - イベント専用の固定忠誠度（指定がなければ相性計算）
+     * @param {boolean} keepAchievement - ★追加：イベント等で功績を半分にしたくない場合に true を指定します
      */
-    joinClan(busho, newClanId, newCastleId, forceLoyalty = null) {
+    joinClan(busho, newClanId, newCastleId, forceLoyalty = null, keepAchievement = false) {
         const oldClanId = busho.clan;
 
         // 1. 今いるお城から出ます
         this.leaveCastle(busho);
 
         // 2. もし元々どこかの大名家にいて、別の大名家に移るなら、功績を半分にします！
-        if (oldClanId !== 0 && oldClanId !== newClanId) {
+        // ★修正：keepAchievement が true の場合は功績をそのまま維持します！
+        if (oldClanId !== 0 && oldClanId !== newClanId && !keepAchievement) {
             busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
         }
 
