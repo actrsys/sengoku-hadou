@@ -557,13 +557,15 @@ class AIStaffing {
                 if (hasEnemyNeighbor) break; // 1つでも敵と面していたら、もう探さなくてOK
             }
             
-            // もし敵と全く面していなければ（完全な後方になったら）解散します
-            if (!hasEnemyNeighbor) {
+            // もし敵と全く面していなければ（完全な後方になったら）、
+            // 「現在の軍団が上限（8枠）まで埋まっている場合のみ」解散します
+            const currentActiveCount = this.game.legions.filter(l => l.clanId === clanId && l.commanderId > 0).length;
+            if (!hasEnemyNeighbor && currentActiveCount >= 8) {
                 if (this.game.castleManager) this.game.castleManager.disbandLegion(legion.id);
                 const cmd = this.game.getBusho(legion.commanderId);
                 const clanName = this.game.clans.find(c => c.id === clanId)?.name || "不明な大名家";
                 const cmdName = cmd ? cmd.name : "不明な国主";
-                console.log(`【軍団解散】${clanName}の「${cmdName}軍団」は、担当地域が完全に後方化したため解散され、直轄に編入されました。`);
+                console.log(`【軍団解散】${clanName}の「${cmdName}軍団」は、担当地域が完全に後方化し、かつ軍団枠が上限に達しているため解散され、直轄に編入されました。`);
                 hasDisbanded = true;
                 return;
             }
