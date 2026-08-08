@@ -221,7 +221,7 @@ class AIStaffing {
         this.evaluationCache = {};
         this.lastMonth = -1;
     }
-
+    
     // ★追加：AI大名が軍団を新設する機能
     createNewLegionIfNeeded(clanId) {
         // ★追加：すでに軍団が最大数（8個）に達している場合は作らない！
@@ -341,6 +341,7 @@ class AIStaffing {
             // 空き枠（解散済み）があれば、その軍団データを再利用します
             newLegionNo = deadLegion.legionNo;
             deadLegion.commanderId = newCommander.id;
+            deadLegion.establishedTurnId = this.game.getCurrentTurnId(); // ★今回追加：発足月をリセットします
         } else {
             // 空き枠がなければ、新しく番号を作ります（活動中の番号だけを避ける）
             const activeNos = clanLegions.filter(l => l.commanderId > 0).map(l => l.legionNo);
@@ -362,7 +363,8 @@ class AIStaffing {
                 id: newLegionId,
                 clanId: clanId,
                 legionNo: newLegionNo,
-                commanderId: newCommander.id
+                commanderId: newCommander.id,
+                establishedTurnId: this.game.getCurrentTurnId() // ★今回追加：発足月を記録します
             });
             if (!this.game.legions) this.game.legions = [];
             this.game.legions.push(newLegion);
@@ -416,7 +418,7 @@ class AIStaffing {
             delete this.game.aiOperationManager.operations[clanId];
         }
     }
-
+    
     // 毎月、古いメモ（キャッシュ）を消して新しく調べ直す準備をします
     clearCacheIfNeeded() {
         if (this.game.month !== this.lastMonth) {
@@ -604,7 +606,84 @@ class AIStaffing {
         this.evaluationCache[clanId].castleRoles = roles;
         return roles;
     }
+    
+    // ★今回追加：役目を終えた軍団や人手不足の軍団を解散させる魔法
+    checkLegionDisband(clanId) {
+        if (!this.game.legions) return;
+        
+        const currentTurnId = this.game.getCurrentTurnId();
+        // この大名家で活動中の軍団を調べます
+        const activeLegions = this.game.legions.filter(l => l.clanId === clanId && l.commanderId > 0);
+        
+        activeLegions.forEach(legion => {
+            // クールダウン（発足から24ヶ月未満）なら何もしません
+            if (currentTurnId - legion.establishedTurnId < 24) return;
+            
+            // この軍団が持っているお城のリスト
+            const legionCastles = this.game.getClanCastles(clanId).filter(c => c.legionId === legion.legionNo);
+            if (legionCastles.length === 0) {
+                // お城が1つもなければ自動的に解散されます（castle_managerの処理と重複しますが念のため）
+                if (this.game.castleManager) this.game.castleManager.disbandLegion(legion.id);
+                return;
+            }
 
+            // 【条件②】所属拠点数を所属武将数が下回っている場合
+            // まず、この軍団のお城にいる武将を数えます
+            let legionBushoCount = 0;
+            legionCastles.forEach(c => {
+                // その城にいる活動中の自勢力武将の数を足します
+                const bushosInCastle = this.game.getCastleBushos(c.id).filter(b => b.clan === clanId && b.status === 'active');
+                legionBushoCount += bushosInCastle.length;
+            });
+            
+            if (legionBushoCount < legionCastles.length) {
+                // 解散を実行します！
+                if (this.game.castleManager) this.game.castleManager.disbandLegion(legion.id);
+                const cmd = this.game.getBusho(legion.commanderId);
+                const clanName = this.game.clans.find(c => c.id === clanId)?.name || "不明な大名家";
+                const cmdName = cmd ? cmd.name : "不明な国主";
+                console.log(`【軍団解散】${clanName}の「${cmdName}軍団」は、人手不足（拠点${legionCastles.length}に対して武将${legionBushoCount}人）のため解散されました。`);
+                return; // 解散したので次の軍団へ
+            }
+
+            // 【条件①】すべての隣接拠点が「自勢力」または「同盟・支配・従属」しかない場合
+            let hasEnemyNeighbor = false;
+            for (const castle of legionCastles) {
+                if (castle.adjacentCastleIds) {
+                    for (const adjId of castle.adjacentCastleIds) {
+                        const adjCastle = this.game.getCastle(adjId);
+                        if (!adjCastle) continue;
+                        
+                        if (adjCastle.ownerClan === 0) {
+                            // 空き城は敵の扱い（野盗がいるかもしれないので油断できない）
+                            hasEnemyNeighbor = true;
+                            break;
+                        } else if (adjCastle.ownerClan !== clanId) {
+                            // 自分以外の勢力なら、関係を調べます
+                            const rel = this.game.getRelation(clanId, adjCastle.ownerClan);
+                            // 同盟・支配・従属「以外」なら敵扱い（和睦や友好も油断できないとみなします）
+                            if (!rel || !['同盟', '支配', '従属'].includes(rel.status)) {
+                                hasEnemyNeighbor = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (hasEnemyNeighbor) break; // 1つでも敵と面していたら、もう探さなくてOK
+            }
+            
+            // もし敵と全く面していなければ（完全な後方になったら）解散します
+            if (!hasEnemyNeighbor) {
+                if (this.game.castleManager) this.game.castleManager.disbandLegion(legion.id);
+                const cmd = this.game.getBusho(legion.commanderId);
+                const clanName = this.game.clans.find(c => c.id === clanId)?.name || "不明な大名家";
+                const cmdName = cmd ? cmd.name : "不明な国主";
+                console.log(`【軍団解散】${clanName}の「${cmdName}軍団」は、担当地域が完全に後方化したため解散され、直轄に編入されました。`);
+                return;
+            }
+        });
+    }
+    
     // 大名家の目的（防衛、攻撃、内政など）を決めます
     determineClanGoal(clanId, legionId) {
         const cacheKey = `${clanId}_${legionId}`;

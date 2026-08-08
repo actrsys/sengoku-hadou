@@ -2516,6 +2516,9 @@ class GameManager {
                             }
                         }
 
+                        // ★今回追加：新設の前に、役目を終えた軍団や人手不足の軍団を解散させます
+                        this.aiStaffing.checkLegionDisband(clan.id);
+
                         this.aiStaffing.createNewLegionIfNeeded(clan.id);
                     }
                 });

@@ -1171,5 +1171,8 @@ class Legion {
         const foundCommanderId = data.commanderId || data['commanderId\r'] || data['commanderId\n'] || this.commanderId || 0;
         // 国主を任されている武将の出席番号
         this.commanderId = Number(foundCommanderId);
+
+        // ★今回追加：軍団が発足した月（ターンID）を覚える箱です（クールダウン用）
+        this.establishedTurnId = Number(data.establishedTurnId || (window.GameApp ? window.GameApp.getCurrentTurnId() : 0));
     }
 }
