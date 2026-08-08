@@ -236,10 +236,6 @@ class AIStaffing {
         // 条件：直轄領が8城以上
         if (myDirectCastles.length < 8) return false; // ★変更：失敗時は false を返す
         
-        // 条件：直轄領の合計兵士数が20000を越えている
-        const totalSoldiers = myDirectCastles.reduce((sum, c) => sum + c.soldiers, 0);
-        if (totalSoldiers <= 20000) return false; // ★変更：失敗時は false を返す
-        
         // ★今回追加：国ごとの直轄拠点の数を数えておきます
         const directCastleCountByProvince = {};
         myDirectCastles.forEach(c => {
@@ -325,11 +321,18 @@ class AIStaffing {
         // 居城と同じ国にある直轄城をスコア順に選ぶ
         const sameProvinceCastles = castleScores.filter(cs => cs.castle.provinceId === baseCastle.provinceId);
         
-        // ★修正：大名や国主がすでにいる国の場合は、新しく軍団に任せる拠点を「最大2つまで」に制限します
+        // ★大名や国主がすでにいる国の場合は、新しく軍団に任せる拠点を「最大2つまで」に制限します
         let maxAssignCount = 3;
+        let requiredTotalSoldiers = 20000; // ★基本は直轄で合計20000人必要
+
         if (occupiedProvinces.has(baseCastle.provinceId)) {
             maxAssignCount = 2;
+            requiredTotalSoldiers = 12000; // ★大名や国主が既にいる国の場合は12000人
         }
+
+        // ★移動してきた兵士数のチェック！
+        const totalSoldiers = myDirectCastles.reduce((sum, c) => sum + c.soldiers, 0);
+        if (totalSoldiers <= requiredTotalSoldiers) return false; 
         
         const targetCastles = sameProvinceCastles.slice(0, maxAssignCount).map(cs => cs.castle);
         
