@@ -2118,9 +2118,25 @@ window.GameEvents.push({
     timing: "shogun_death",        // ★ 新しく作った将軍死亡のタイミングです
     isOneTime: true,               // 一度発生したら二度と起きません
     
-    // お供の武将IDリストを「このイベントの持ち物」としてここに1箇所だけ書きます！
-    // 和田惟政、細川藤孝、明智光秀、明智秀満、溝尾茂朝
-    retainerIds: [1017035, 1017029, 1201003, 1201006, 1201021],
+    // 同行するお供の武将IDリストを動的に集める魔法
+    getRetainerIds: function(game) {
+        const ids = new Set([1017035, 1017029]); // 和田惟政、細川藤孝を基本セットにします
+        
+        // 明智光秀（1201003）を探します
+        const mitsuhide = game.getBusho(1201003);
+        if (mitsuhide && mitsuhide.clan !== 0) {
+            // IDが1201000～1201999の範囲で、光秀と同じ勢力に所属する武将を全員探して追加します
+            game.bushos.forEach(b => {
+                if (b.id >= 1201000 && b.id <= 1201999 && b.clan === mitsuhide.clan) {
+                    ids.add(b.id);
+                }
+            });
+        } else {
+            // 光秀自身が存在する場合は、光秀単体だけでも追加しておきます
+            if (mitsuhide) ids.add(mitsuhide.id);
+        }
+        return Array.from(ids);
+    },
     
     checkCondition: function(game, context) {
         // 将軍死亡の情報が届いていなければ無視します
@@ -2143,8 +2159,8 @@ window.GameEvents.push({
         }
 
         // お供の武将が1人以上存在するかチェックします
-        // 「some」という魔法を使って、リストの中に1人でも条件に合う人がいるか探します
-        const hasRetainer = this.retainerIds.some(id => {
+        const retainerIds = this.getRetainerIds(game);
+        const hasRetainer = retainerIds.some(id => {
             const rBusho = game.getBusho(id);
             // 存在し、生まれていて、死んでおらず、大名ではない人がいればOK（true）になります
             return rBusho && rBusho.status !== 'unborn' && rBusho.status !== 'dead' && !rBusho.isDaimyo;
@@ -2256,8 +2272,9 @@ window.GameEvents.push({
             }
         }
 
-        // 【お供の移動処理】ここで直接リストを書かず、上で登録した「this.retainerIds」を使います！
-        this.retainerIds.forEach(id => {
+        // 【お供の移動処理】動的に取得したリストを使用して同行させます
+        const retainerIds = this.getRetainerIds(game);
+        retainerIds.forEach(id => {
             const rBusho = game.getBusho(id);
             // 存在し、生きていて、大名ではない場合のみお供として移動します
             if (rBusho && rBusho.status !== 'unborn' && rBusho.status !== 'dead' && !rBusho.isDaimyo) {
