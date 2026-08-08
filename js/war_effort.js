@@ -97,6 +97,45 @@ Object.assign(WarManager.prototype, {
         return candidates;
     },
 
+    // ★ここから追加：解放された捕虜が帰るお城（帰還先）を決める一元化された魔法です！
+    getReleaseReturnCastle(prisoner, friendlyCastles, originalClanId) {
+        if (!friendlyCastles || friendlyCastles.length === 0) return null;
+
+        let returnCandidates = friendlyCastles;
+        let targetLegionId = null;
+
+        // 大名の場合は、まず直轄領（軍団ID: 0）を優先して探します
+        if (prisoner.isDaimyo) {
+            targetLegionId = 0;
+        } 
+        // 国主の場合は、自分の担当する軍団を探します
+        else if (prisoner.isCommander) {
+            const myLegion = this.game.legions ? this.game.legions.find(l => Number(l.commanderId) === Number(prisoner.id)) : null;
+            if (myLegion) targetLegionId = myLegion.legionNo;
+        } 
+        // 一般武将の場合は、元いたお城の軍団を探します
+        else {
+            const pCastle = this.game.getCastle(prisoner.castleId);
+            if (pCastle && pCastle.ownerClan === originalClanId) {
+                targetLegionId = pCastle.legionId;
+            } else if (this.state && this.state.oldDefLegionId !== undefined && pCastle && pCastle.id === this.state.defender.id) {
+                targetLegionId = this.state.oldDefLegionId;
+            }
+        }
+        
+        // 目標の軍団がわかっている場合、その軍団の城に絞り込みます
+        if (targetLegionId !== null) {
+            const legionCastles = returnCandidates.filter(c => Number(c.legionId) === Number(targetLegionId));
+            // その軍団の城がまだ残っていれば、候補をそこに絞ります
+            if (legionCastles.length > 0) {
+                returnCandidates = legionCastles;
+            }
+        }
+
+        // 候補の中からランダムに1つ選びます
+        return returnCandidates[Math.floor(Math.random() * returnCandidates.length)];
+    },
+
     // ★追加：援軍のメッセージを一元管理する専門の窓口（係）です！
     // ★追加：軍師による戦況報告の魔法
     showSituationReport(isAttack, atkCastle, atkBushos, defCastle, helperCastle, onComplete) {
@@ -2407,27 +2446,8 @@ Object.assign(WarManager.prototype, {
             if (isExtinct) prisoner.isDaimyo = false;
             
            if (!isExtinct) {
-                // ★ここから「元の軍団」を探す魔法です
-                let returnCandidates = friendlyCastles;
-                let targetLegionId = null;
-                const pCastle = this.game.getCastle(prisoner.castleId);
-                
-                if (prisoner.isCommander) {
-                    const myLegion = this.game.legions ? this.game.legions.find(l => Number(l.commanderId) === Number(prisoner.id)) : null;
-                    if (myLegion) targetLegionId = myLegion.legionNo;
-                } else if (pCastle && pCastle.ownerClan === originalClanId) {
-                    targetLegionId = pCastle.legionId;
-                } else if (this.state && this.state.oldDefLegionId !== undefined && pCastle && pCastle.id === this.state.defender.id) {
-                    targetLegionId = this.state.oldDefLegionId;
-                }
-                
-                if (targetLegionId !== null) {
-                    const legionCastles = returnCandidates.filter(c => Number(c.legionId) === Number(targetLegionId));
-                    if (legionCastles.length > 0) {
-                        returnCandidates = legionCastles;
-                    }
-                }
-                const returnCastle = returnCandidates[Math.floor(Math.random() * returnCandidates.length)];
+                // ★一元化された魔法を使って帰還先を決めます！
+                const returnCastle = this.getReleaseReturnCastle(prisoner, friendlyCastles, originalClanId);
 
                 this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); 
                 this.game.affiliationSystem.moveCastle(prisoner, returnCastle.id);
@@ -2667,27 +2687,8 @@ Object.assign(WarManager.prototype, {
                     }
                 } else {
                     if (!isExtinct) {
-                        // ★ここから「元の軍団」を探す魔法です
-                        let returnCandidates = friendlyCastles;
-                        let targetLegionId = null;
-                        const pCastle = this.game.getCastle(prisoner.castleId);
-                        
-                        if (prisoner.isCommander) {
-                            const myLegion = this.game.legions ? this.game.legions.find(l => Number(l.commanderId) === Number(prisoner.id)) : null;
-                            if (myLegion) targetLegionId = myLegion.legionNo;
-                        } else if (pCastle && pCastle.ownerClan === originalClanId) {
-                            targetLegionId = pCastle.legionId;
-                        } else if (this.state && this.state.oldDefLegionId !== undefined && pCastle && pCastle.id === this.state.defender.id) {
-                            targetLegionId = this.state.oldDefLegionId;
-                        }
-                        
-                        if (targetLegionId !== null) {
-                            const legionCastles = returnCandidates.filter(c => Number(c.legionId) === Number(targetLegionId));
-                            if (legionCastles.length > 0) {
-                                returnCandidates = legionCastles;
-                            }
-                        }
-                        const returnCastle = returnCandidates[Math.floor(Math.random() * returnCandidates.length)];
+                        // ★一元化された魔法を使って帰還先を決めます！
+                        const returnCastle = this.getReleaseReturnCastle(prisoner, friendlyCastles, originalClanId);
 
                         this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); 
                         this.game.affiliationSystem.moveCastle(prisoner, returnCastle.id);
@@ -2823,27 +2824,8 @@ Object.assign(WarManager.prototype, {
                     const friendlyCastlesExt = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
                     
                     if (friendlyCastlesExt.length > 0) {
-                        // ★ここから「元の軍団」を探す魔法です
-                        let returnCandidates = friendlyCastlesExt;
-                        let targetLegionId = null;
-                        const pCastle = this.game.getCastle(p.castleId);
-                        
-                        if (p.isCommander) {
-                            const myLegion = this.game.legions ? this.game.legions.find(l => Number(l.commanderId) === Number(p.id)) : null;
-                            if (myLegion) targetLegionId = myLegion.legionNo;
-                        } else if (pCastle && pCastle.ownerClan === originalClanId) {
-                            targetLegionId = pCastle.legionId;
-                        } else if (this.state && this.state.oldDefLegionId !== undefined && pCastle && pCastle.id === this.state.defender.id) {
-                            targetLegionId = this.state.oldDefLegionId;
-                        }
-                        
-                        if (targetLegionId !== null) {
-                            const legionCastles = returnCandidates.filter(c => Number(c.legionId) === Number(targetLegionId));
-                            if (legionCastles.length > 0) {
-                                returnCandidates = legionCastles;
-                            }
-                        }
-                        const returnCastle = returnCandidates[Math.floor(Math.random() * returnCandidates.length)];
+                        // ★一元化された魔法を使って帰還先を決めます！
+                        const returnCastle = this.getReleaseReturnCastle(p, friendlyCastlesExt, originalClanId);
 
                         this.game.factionSystem.handleMove(p, 0, returnCastle.id); 
                         this.game.affiliationSystem.moveCastle(p, returnCastle.id);
