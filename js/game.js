@@ -2516,10 +2516,30 @@ class GameManager {
                             }
                         }
 
-                        // ★今回追加：新設の前に、役目を終えた軍団や人手不足の軍団を解散させます
-                        this.aiStaffing.checkLegionDisband(clan.id);
-
-                        this.aiStaffing.createNewLegionIfNeeded(clan.id);
+                        // ★変更：解散は1月のみ実行し、新設と合わせて条件を満たす限りループさせます！
+                        if (this.month === 1) {
+                            let changed = true;
+                            let loopCount = 0; // 無限ループ防止（念のため最大10回まで）
+                            while (changed && loopCount < 10) {
+                                changed = false;
+                                const disbanded = this.aiStaffing.checkLegionDisband(clan.id);
+                                const created = this.aiStaffing.createNewLegionIfNeeded(clan.id);
+                                
+                                // 解散か新設、どちらかが実行されたら「状況が変わった」としてもう1度ループします
+                                if (disbanded || created) {
+                                    changed = true;
+                                }
+                                loopCount++;
+                            }
+                        } else {
+                            // 4, 7, 10月は解散は行わず、新設のみをループ実行します
+                            let created = true;
+                            let loopCount = 0;
+                            while (created && loopCount < 10) {
+                                created = this.aiStaffing.createNewLegionIfNeeded(clan.id);
+                                loopCount++;
+                            }
+                        }
                     }
                 });
             }
