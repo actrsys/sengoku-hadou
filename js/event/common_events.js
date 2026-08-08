@@ -201,9 +201,9 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        // 対象となる武将のIDリスト（1020005三好長慶、1004009今川義元）
+        // 対象となる武将のIDリスト（今川義元：ID1004009）
         // 例：1001001, 1001002, 1001003...
-        const targetIds = [1020005, 1004009];
+        const targetIds = [1004009];
         
         for (const id of targetIds) {
             const busho = game.getBusho(id);
