@@ -240,6 +240,14 @@ class AIStaffing {
         const totalSoldiers = myDirectCastles.reduce((sum, c) => sum + c.soldiers, 0);
         if (totalSoldiers <= 20000) return;
         
+        // ★今回追加：国ごとの直轄拠点の数を数えておきます
+        const directCastleCountByProvince = {};
+        myDirectCastles.forEach(c => {
+            if (c.provinceId > 0) {
+                directCastleCountByProvince[c.provinceId] = (directCastleCountByProvince[c.provinceId] || 0) + 1;
+            }
+        });
+
         const occupiedProvinces = new Set();
         const daimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo);
         if (daimyo && daimyo.castleId) {
@@ -255,8 +263,16 @@ class AIStaffing {
             }
         });
         
-        // 条件：大名・国主のいない国に直轄領を所有している
-        const candidateCastles = myDirectCastles.filter(c => c.provinceId > 0 && !occupiedProvinces.has(c.provinceId));
+        // ★大名や国主がいない国が候補。またはに、すでにいたとしても「直轄拠点が6つ以上」残っている国なら候補にします
+        const candidateCastles = myDirectCastles.filter(c => {
+            if (c.provinceId === 0) return false;
+            // 誰もいない国ならOK
+            if (!occupiedProvinces.has(c.provinceId)) return true;
+            // すでに誰かいる国でも、直轄拠点が6つ以上残っているなら特別にOK
+            if (occupiedProvinces.has(c.provinceId) && directCastleCountByProvince[c.provinceId] >= 6) return true;
+            return false;
+        });
+        
         if (candidateCastles.length === 0) return;
         
         // 新国主の選定
@@ -306,9 +322,16 @@ class AIStaffing {
         castleScores.sort((a, b) => b.score - a.score);
         const baseCastle = castleScores[0].castle;
         
-        // 居城と同じ国にある直轄城をスコア順に最大3つ（居城含む）選ぶ
+        // 居城と同じ国にある直轄城をスコア順に選ぶ
         const sameProvinceCastles = castleScores.filter(cs => cs.castle.provinceId === baseCastle.provinceId);
-        const targetCastles = sameProvinceCastles.slice(0, 3).map(cs => cs.castle);
+        
+        // ★修正：大名や国主がすでにいる国の場合は、新しく軍団に任せる拠点を「最大2つまで」に制限します
+        let maxAssignCount = 3;
+        if (occupiedProvinces.has(baseCastle.provinceId)) {
+            maxAssignCount = 2;
+        }
+        
+        const targetCastles = sameProvinceCastles.slice(0, maxAssignCount).map(cs => cs.castle);
         
         // ★修正：空き枠（解散済みの軍団）があれば再利用するロジックに変更！
         const deadLegion = clanLegions.find(l => l.commanderId === 0);
@@ -364,14 +387,20 @@ class AIStaffing {
                 b.id !== newCommander.id
             );
 
-            // 見つかったお友達を順番に調べます
-            sameFactionBushos.forEach(b => {
+            // ① まず、直轄（軍団IDが0）のお城にいるお友達だけを別のリストにまとめます
+            const directBushos = sameFactionBushos.filter(b => {
                 const bCastle = this.game.getCastle(b.castleId);
-                // そのお友達が今いるお城が「直轄（軍団IDが0）」だったら、新国主のお城へお引越しさせます
-                if (bCastle && Number(bCastle.legionId) === 0) {
-                    this.game.affiliationSystem.moveCastle(b, baseCastle.id);
-                }
+                return bCastle && Number(bCastle.legionId) === 0;
             });
+
+            // ② そのリストにいる人数の「3分の1」を計算します（端数は切り捨てます）
+            const maxMoveCount = Math.floor(directBushos.length / 3);
+
+            // ③ 計算した人数の分だけ、順番に新国主のお城へお引越しさせます
+            for (let i = 0; i < maxMoveCount; i++) {
+                const b = directBushos[i];
+                this.game.affiliationSystem.moveCastle(b, baseCastle.id);
+            }
         }
 
         // 対象城の軍団変更
