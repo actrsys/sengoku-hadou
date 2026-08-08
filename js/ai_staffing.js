@@ -323,11 +323,10 @@ class AIStaffing {
         
         // ★大名や国主がすでにいる国の場合は、新しく軍団に任せる拠点を「最大2つまで」に制限します
         let maxAssignCount = 3;
-        let requiredTotalSoldiers = 20000; // ★基本は直轄で合計20000人必要
+        let requiredTotalSoldiers = 20000; // ★直轄領に合計20000人以上の余裕が必要です
 
         if (occupiedProvinces.has(baseCastle.provinceId)) {
             maxAssignCount = 2;
-            requiredTotalSoldiers = 12000; // ★大名や国主が既にいる国の場合は12000人
         }
 
         // ★移動してきた兵士数のチェック！
