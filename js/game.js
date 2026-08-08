@@ -204,7 +204,8 @@ class DataManager {
                     if (parts.length === 3) {
                         const targetYear = Number(parts[0].trim());
                         // ゲーム開始年「以前」か「同じ年」に起きた改名イベントの中で、一番新しいものを探します
-                        if (targetYear <= startYear && targetYear > latestYear) {
+                        // （daimyoなどの文字が入っていてNaNになるものは無視します）
+                        if (!isNaN(targetYear) && targetYear <= startYear && targetYear > latestYear) {
                             latestYear = targetYear;
                             
                             // ★修正：見つかった文字をメモしておくだけにします
@@ -218,6 +219,30 @@ class DataManager {
                 if (latestYear !== -1) {
                     // ★修正：新しく作った共通の改名魔法を呼び出します！
                     b.applyNameChangeData(latestNameData, latestYomiData);
+                }
+            }
+
+            // ★ここから追加：ゲーム開始時点で「すでに顔が変わっているはず」の武将の顔グラを変えておく魔法です！
+            if (b.faceChange) {
+                const changes = b.faceChange.split('/');
+                let latestYear = -1;
+                let latestFaceData = "";
+
+                for (const change of changes) {
+                    const parts = change.split(':');
+                    if (parts.length === 2) {
+                        const targetYear = Number(parts[0].trim());
+                        // 条件が数字（年）で、ゲーム開始年「以前」か「同じ年」の中で一番新しいものを探します
+                        if (!isNaN(targetYear) && targetYear <= startYear && targetYear > latestYear) {
+                            latestYear = targetYear;
+                            latestFaceData = parts[1].trim();
+                        }
+                    }
+                }
+
+                // もし過去の顔変更データが見つかったら、最初からその顔にしておきます！
+                if (latestYear !== -1 && latestFaceData) {
+                    b.faceIcon = latestFaceData;
                 }
             }
             
@@ -257,10 +282,17 @@ class DataManager {
                         }
 
                         // ★開始時点で既に大名なら、「daimyo:」の顔変更データを適用します！
-                        if (b.faceChange && b.faceChange.startsWith('daimyo:')) {
-                            const newFace = b.faceChange.split(':')[1].trim();
-                            if (newFace) {
-                                b.faceIcon = newFace;
+                        // （「/」区切りで複数指定されている場合にも対応させます）
+                        if (b.faceChange && b.faceChange.includes('daimyo:')) {
+                            const changes = b.faceChange.split('/');
+                            for (const change of changes) {
+                                const parts = change.split(':');
+                                if (parts.length === 2 && parts[0].trim() === 'daimyo') {
+                                    const newFace = parts[1].trim();
+                                    if (newFace) {
+                                        b.faceIcon = newFace;
+                                    }
+                                }
                             }
                         }
                         
