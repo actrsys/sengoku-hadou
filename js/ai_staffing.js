@@ -495,17 +495,18 @@ class AIStaffing {
         const activeLegions = this.game.legions.filter(l => l.clanId === clanId && l.commanderId > 0);
         
         activeLegions.forEach(legion => {
-            // クールダウン（発足から24ヶ月未満）なら何もしません
-            if (currentTurnId - legion.establishedTurnId < 24) return;
-            
-            // この軍団が持っているお城のリスト
+            // この軍団が持っているお城のリストを先に取得します
             const legionCastles = this.game.getClanCastles(clanId).filter(c => c.legionId === legion.legionNo);
+            
             if (legionCastles.length === 0) {
-                // お城が1つもなければ自動的に解散されます（castle_managerの処理と重複しますが念のため）
+                // お城が1つもなければ、期間に関係なく自動的に解散されます
                 if (this.game.castleManager) this.game.castleManager.disbandLegion(legion.id);
                 hasDisbanded = true;
                 return;
             }
+
+            // 拠点がある場合のみ、クールダウン（発足から24ヶ月未満）をチェックしてスキップします
+            if (currentTurnId - legion.establishedTurnId < 24) return;
 
             // 【条件②】所属拠点数を所属武将数が下回っている場合
             // まず、この軍団のお城にいる武将を数えます
