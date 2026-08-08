@@ -835,7 +835,8 @@ class AIEngine {
                 // ★大雪の城からは援軍が来ないので、計算に入れません！
                 if (!isReinfHeavySnow) {
                     // 自分が呼べそうな自家援軍（出撃元の城と同じ軍団で、出撃元の城以外で、兵力1000以上の城）
-                    if (c.ownerClan === myCastle.ownerClan && c.legionId === myCastle.legionId && c.id !== myCastle.id && c.soldiers >= 1000) {
+                    // ★修正：直轄（軍団ID0）なら、他の軍団の城からも援軍が来ると見積もります！
+                    if (c.ownerClan === myCastle.ownerClan && (c.legionId === myCastle.legionId || myCastle.legionId === 0) && c.id !== myCastle.id && c.soldiers >= 1000) {
                         myReinfPower += (c.soldiers * 0.5) * errorRate; // 兵力の半分くらい来てくれると予想
                     }
                     // 相手が呼べそうな自家援軍（守る城以外で、兵力1000以上の城）
@@ -1514,7 +1515,8 @@ class AIEngine {
             if (current.adjacentCastleIds) {
                 current.adjacentCastleIds.forEach(adjId => {
                     const c = this.game.getCastle(adjId);
-                    if (c && c.ownerClan === castle.ownerClan && c.legionId === castle.legionId && !visitedCastles.has(c.id)) {
+                    // ★修正：直轄（軍団ID0）なら、他軍団のお城ともネットワークを繋げて物資移動などができるようにします！
+                    if (c && c.ownerClan === castle.ownerClan && (c.legionId === castle.legionId || castle.legionId === 0) && !visitedCastles.has(c.id)) {
                         adjMyCastles.push(c);
                     }
                 });

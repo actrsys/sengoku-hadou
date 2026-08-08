@@ -973,7 +973,8 @@ class GameSystem {
                     const adjCastle = game.getCastle(adjId);
                     if (adjCastle) {
                         // 自領かどうかの判定（isLegionOnlyがtrueなら軍団も一致するか見ます）
-                        const isMyTerritory = (adjCastle.ownerClan === clanId) && (!isLegionOnly || adjCastle.legionId === legionId);
+                        // ★修正：直轄（軍団ID0）の場合は、isLegionOnlyがtrueでも軍団制限を無視して通れるようにします！
+                        const isMyTerritory = (adjCastle.ownerClan === clanId) && (!isLegionOnly || adjCastle.legionId === legionId || legionId === 0);
                         
                         if (isMyTerritory) {
                             // 自領ならさらに奥へ進むためにキューに入れます

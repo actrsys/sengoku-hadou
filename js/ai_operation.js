@@ -687,7 +687,8 @@ class AIOperationManager {
                             visited.add(adjId);
                             const adjCastle = this.game.getCastle(adjId);
                             if (adjCastle) {
-                                if (adjCastle.ownerClan === clanId && adjCastle.legionId === legionId) {
+                                // ★修正：直轄（軍団ID0）なら、他の軍団の城も通過OKにします！
+                                if (adjCastle.ownerClan === clanId && (adjCastle.legionId === legionId || legionId === 0)) {
                                     // 自領ならさらに奥へ進めます
                                     queue.push({ castle: adjCastle, distance: currentDist + 1 });
                                 } else if (adjCastle.ownerClan !== clanId) {
@@ -705,7 +706,8 @@ class AIOperationManager {
                 if (target.adjacentCastleIds) {
                     isDirectlyAdjacent = target.adjacentCastleIds.some(adjId => {
                         const adjCastle = this.game.getCastle(adjId);
-                        return adjCastle && adjCastle.ownerClan === clanId && adjCastle.legionId === legionId;
+                        // ★修正：ここも直轄なら他の軍団を隣接の足場にできるようにします！
+                        return adjCastle && adjCastle.ownerClan === clanId && (adjCastle.legionId === legionId || legionId === 0);
                     });
                 }
                 if (!isDirectlyAdjacent) return false;
@@ -923,7 +925,8 @@ class AIOperationManager {
                     if (stagingCastle && stagingCastle.adjacentCastleIds) {
                         const adjMyCastles = stagingCastle.adjacentCastleIds
                             .map(id => this.game.getCastle(id))
-                            .filter(c => c && c.ownerClan === clanId && c.legionId === legionId)
+                            // ★修正：直轄なら他の軍団の城も予備拠点候補にします！
+                            .filter(c => c && c.ownerClan === clanId && (c.legionId === legionId || legionId === 0))
                             .sort((a, b) => (b.soldiers + b.defense) - (a.soldiers + a.defense));
                         if (adjMyCastles.length > 0) {
                             supportBaseId = adjMyCastles[0].id;
