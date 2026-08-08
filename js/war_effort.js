@@ -1364,6 +1364,7 @@ Object.assign(WarManager.prototype, {
             
             // ★変更：城の所有者が変わる前に、古い大名家のIDをしっかり記憶しておきます！
             s.oldDefClanId = s.defender.ownerClan; 
+            s.oldDefLegionId = s.defender.legionId; // ★追加：古い軍団IDも記憶しておきます
             s.extinctionNotified = false; // フラグの初期化
 
             // ★追加：プレイヤー勢力が関わっているかどうかのフラグを用意します！
@@ -2405,10 +2406,31 @@ Object.assign(WarManager.prototype, {
             // 解放時
             if (isExtinct) prisoner.isDaimyo = false;
             
-            if (!isExtinct) {
-                const returnCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
+           if (!isExtinct) {
+                // ★ここから「元の軍団」を探す魔法です
+                let returnCandidates = friendlyCastles;
+                let targetLegionId = null;
+                const pCastle = this.game.getCastle(prisoner.castleId);
+                
+                if (prisoner.isCommander) {
+                    const myLegion = this.game.legions ? this.game.legions.find(l => Number(l.commanderId) === Number(prisoner.id)) : null;
+                    if (myLegion) targetLegionId = myLegion.legionNo;
+                } else if (pCastle && pCastle.ownerClan === originalClanId) {
+                    targetLegionId = pCastle.legionId;
+                } else if (this.state && this.state.oldDefLegionId !== undefined && pCastle && pCastle.id === this.state.defender.id) {
+                    targetLegionId = this.state.oldDefLegionId;
+                }
+                
+                if (targetLegionId !== null) {
+                    const legionCastles = returnCandidates.filter(c => Number(c.legionId) === Number(targetLegionId));
+                    if (legionCastles.length > 0) {
+                        returnCandidates = legionCastles;
+                    }
+                }
+                const returnCastle = returnCandidates[Math.floor(Math.random() * returnCandidates.length)];
+
                 this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); 
-                this.game.affiliationSystem.enterCastle(prisoner, returnCastle.id);
+                this.game.affiliationSystem.moveCastle(prisoner, returnCastle.id);
                 prisoner.status = 'active'; 
                 prisoner.isCastellan = false;
             } else {
@@ -2640,14 +2662,35 @@ Object.assign(WarManager.prototype, {
                 if (kunishu && !kunishu.isDestroyed) {
                     const returnCastle = this.game.getCastle(kunishu.castleId);
                     if (returnCastle) {
-                        this.game.affiliationSystem.enterCastle(prisoner, returnCastle.id);
+                        this.game.affiliationSystem.moveCastle(prisoner, returnCastle.id);
                         prisoner.status = 'active'; 
                     }
                 } else {
                     if (!isExtinct) {
-                        const returnCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
+                        // ★ここから「元の軍団」を探す魔法です
+                        let returnCandidates = friendlyCastles;
+                        let targetLegionId = null;
+                        const pCastle = this.game.getCastle(prisoner.castleId);
+                        
+                        if (prisoner.isCommander) {
+                            const myLegion = this.game.legions ? this.game.legions.find(l => Number(l.commanderId) === Number(prisoner.id)) : null;
+                            if (myLegion) targetLegionId = myLegion.legionNo;
+                        } else if (pCastle && pCastle.ownerClan === originalClanId) {
+                            targetLegionId = pCastle.legionId;
+                        } else if (this.state && this.state.oldDefLegionId !== undefined && pCastle && pCastle.id === this.state.defender.id) {
+                            targetLegionId = this.state.oldDefLegionId;
+                        }
+                        
+                        if (targetLegionId !== null) {
+                            const legionCastles = returnCandidates.filter(c => Number(c.legionId) === Number(targetLegionId));
+                            if (legionCastles.length > 0) {
+                                returnCandidates = legionCastles;
+                            }
+                        }
+                        const returnCastle = returnCandidates[Math.floor(Math.random() * returnCandidates.length)];
+
                         this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); 
-                        this.game.affiliationSystem.enterCastle(prisoner, returnCastle.id);
+                        this.game.affiliationSystem.moveCastle(prisoner, returnCastle.id);
                         prisoner.status = 'active'; 
                         prisoner.isCastellan = false;
                     } else { 
@@ -2773,16 +2816,37 @@ Object.assign(WarManager.prototype, {
                 // 見逃された！
                 const kunishu = p.belongKunishuId > 0 ? this.game.kunishuSystem.getKunishu(p.belongKunishuId) : null;
                 if (kunishu && !kunishu.isDestroyed) {
-                    this.game.affiliationSystem.enterCastle(p, kunishu.castleId);
+                    this.game.affiliationSystem.moveCastle(p, kunishu.castleId);
                     p.status = 'active'; 
                 } else {
                     const originalClanId = p.clan; 
                     const friendlyCastlesExt = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
                     
                     if (friendlyCastlesExt.length > 0) {
-                        const returnCastle = friendlyCastlesExt[Math.floor(Math.random() * friendlyCastlesExt.length)];
+                        // ★ここから「元の軍団」を探す魔法です
+                        let returnCandidates = friendlyCastlesExt;
+                        let targetLegionId = null;
+                        const pCastle = this.game.getCastle(p.castleId);
+                        
+                        if (p.isCommander) {
+                            const myLegion = this.game.legions ? this.game.legions.find(l => Number(l.commanderId) === Number(p.id)) : null;
+                            if (myLegion) targetLegionId = myLegion.legionNo;
+                        } else if (pCastle && pCastle.ownerClan === originalClanId) {
+                            targetLegionId = pCastle.legionId;
+                        } else if (this.state && this.state.oldDefLegionId !== undefined && pCastle && pCastle.id === this.state.defender.id) {
+                            targetLegionId = this.state.oldDefLegionId;
+                        }
+                        
+                        if (targetLegionId !== null) {
+                            const legionCastles = returnCandidates.filter(c => Number(c.legionId) === Number(targetLegionId));
+                            if (legionCastles.length > 0) {
+                                returnCandidates = legionCastles;
+                            }
+                        }
+                        const returnCastle = returnCandidates[Math.floor(Math.random() * returnCandidates.length)];
+
                         this.game.factionSystem.handleMove(p, 0, returnCastle.id); 
-                        this.game.affiliationSystem.enterCastle(p, returnCastle.id);
+                        this.game.affiliationSystem.moveCastle(p, returnCastle.id);
                         p.status = 'active'; 
                         p.isCastellan = false;
                     } else {
