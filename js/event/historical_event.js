@@ -3950,45 +3950,49 @@ window.GameEvents.push({
         if (game.year < 1561) return false;
         if (game.month < 9 || game.month > 11) return false;
 
-        // 2. 上杉謙信（1001015）が大名であること
+        // 2. 上杉謙信（1001015）、武田信玄（1002002）、北条氏康（1003003）が大名であること
         const kenshin = window.EventCheck.getDaimyo(game, 1001015);
         if (!kenshin) return false;
-
-        // 3. 武田信玄（1002002）が大名であること
         const shingen = window.EventCheck.getDaimyo(game, 1002002);
         if (!shingen) return false;
+        const ujiyasu = window.EventCheck.getDaimyo(game, 1003003);
+        if (!ujiyasu) return false;
 
         const uesugiClanId = kenshin.clan;
         const takedaClanId = shingen.clan;
+        const hojoClanId = ujiyasu.clan;
 
-        // 4. プレイヤーが上杉または武田を担当していないこと
+        // 3. プレイヤーが上杉または武田を担当していないこと
         if (game.playerClanId === uesugiClanId || game.playerClanId === takedaClanId) return false;
 
-        // 5. 上杉と武田が敵対していること
+        // 4. 上杉と武田が敵対、かつ上杉と北条が敵対していること
         if (game.diplomacyManager) {
-            const rel = game.diplomacyManager.getRelation(uesugiClanId, takedaClanId);
-            if (!rel || rel.status !== '敵対') return false;
+            const relTakeda = game.diplomacyManager.getRelation(uesugiClanId, takedaClanId);
+            if (!relTakeda || relTakeda.status !== '敵対') return false;
+
+            const relHojo = game.diplomacyManager.getRelation(uesugiClanId, hojoClanId);
+            if (!relHojo || relHojo.status !== '敵対') return false;
         } else {
             return false;
         }
 
-        // 6. 海津城（ID5）が武田の拠点であること
+        // 5. 海津城（ID5）が武田の拠点であること
         const kaizuCastle = game.getCastle(5);
         if (!kaizuCastle || kaizuCastle.ownerClan !== takedaClanId) return false;
 
-        // 7. 海津城と上杉謙信の拠点が隣接していること
+        // 6. 海津城と上杉謙信の拠点が隣接していること
         const kenshinCastle = game.getCastle(kenshin.castleId);
         if (!kenshinCastle) return false;
         if (typeof GameSystem !== 'undefined' && !GameSystem.isAdjacent(kaizuCastle, kenshinCastle)) return false;
 
-        // 8. 山本勘助、武田信繁、春日虎綱、馬場信房 が武田に所属し生存していること
+        // 7. 山本勘助、武田信繁、春日虎綱、馬場信房 が武田に所属し生存していること
         const takedaReqIds = [1002077, 1002013, 1002041, 1002059];
         for (let id of takedaReqIds) {
             const b = game.getBusho(id);
             if (!b || b.status !== 'active' || b.clan !== takedaClanId) return false;
         }
 
-        // 9. 柿崎景家、甘粕景持 が上杉に所属し生存していること
+        // 8. 柿崎景家、甘粕景持 が上杉に所属し生存していること
         const uesugiReqIds = [1001026, 1001016];
         for (let id of uesugiReqIds) {
             const b = game.getBusho(id);
