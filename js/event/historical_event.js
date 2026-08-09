@@ -3980,10 +3980,19 @@ window.GameEvents.push({
         const kaizuCastle = game.getCastle(5);
         if (!kaizuCastle || kaizuCastle.ownerClan !== takedaClanId) return false;
 
-        // 6. 海津城と上杉謙信の拠点が隣接していること
-        const kenshinCastle = game.getCastle(kenshin.castleId);
-        if (!kenshinCastle) return false;
-        if (typeof GameSystem !== 'undefined' && !GameSystem.isAdjacent(kaizuCastle, kenshinCastle)) return false;
+        // 6. 海津城と上杉家（上杉謙信勢力）の拠点が隣接していること
+        let isAdjacentToUesugi = false;
+        if (kaizuCastle.adjacentCastleIds) {
+            for (let adjId of kaizuCastle.adjacentCastleIds) {
+                const adjCastle = game.getCastle(adjId);
+                // 海津城と繋がっているお城の中に、上杉家の持ち城があるか調べます
+                if (adjCastle && adjCastle.ownerClan === uesugiClanId) {
+                    isAdjacentToUesugi = true;
+                    break; // １つでも見つかれば条件クリアなので探すのをやめます
+                }
+            }
+        }
+        if (!isAdjacentToUesugi) return false; // 見つからなかったらイベントをストップします
 
         // 7. 山本勘助、武田信繁、春日虎綱、馬場信房 が武田に所属し生存していること
         const takedaReqIds = [1002077, 1002013, 1002041, 1002059];
