@@ -329,8 +329,8 @@ window.EventTextManager = {
         return [
             { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「そんな……公方様が……」` },
             { type: 'log', msg: `幕臣・${args.fujitakaName}が変事を聞いて馳せ参じた頃には、すべて終わった後のことであった。` },
-            { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「……いかん、こうしてはおれぬ。${args.yoshiakiGivenName}様をお救いせねば」` },
-            { type: 'log', msg: `${args.fujitakaName}はすぐさまその場を離れ、${args.yoshiteruGivenName}の弟・${args.yoshiakiGivenName}の救出に動き出した。` },
+            { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「……いかん、こうしてはおれぬ。${args.yoshiakiGivenName}様の御身が心配じゃ」` },
+            { type: 'log', msg: `${args.fujitakaName}はすぐさまその場を離れ、${args.yoshiteruGivenName}の弟・${args.yoshiakiGivenName}の救出に向けて動き出した。` },
             { type: 'log', msg: `この日の夕刻、焼け跡には激しい夕立の雨が降リ注いだ。` }
         ];
     }
