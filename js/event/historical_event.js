@@ -3999,7 +3999,12 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-    
+        // BGMを変更します
+        if (window.AudioManager) {
+            window.AudioManager.memorizeCurrentBgm();
+            window.AudioManager.playBGM("SC_ex_Scene1_Duel.ogg");
+        }
+        
         // 登場人物たちのデータを取得します
         const kenshin = game.getBusho(1001015);
         const shingen = game.getBusho(1002002);
