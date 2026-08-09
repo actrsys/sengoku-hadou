@@ -216,7 +216,7 @@ window.EventTextManager = {
     // 川中島の戦い
     kawanakajima_event: function(args) {
         return [
-            { type: 'log', msg: `永禄四年。関東管領職を継ぎ、名を${args.kenshinName}と改めた男が、越後より兵を発した。` },
+            { type: 'log', msg: `${args.year}年${args.month}月。関東管領職を継いだ${args.kenshinName}が越後より兵を発した。` },
             { type: 'log', msg: `関東制圧を目指す${args.kenshinName}にとって、信濃を固め後顧の憂いを断つことは急務であった。` },
             { type: 'log', msg: `${args.kenshinGivenName}は海津城を制圧せしめんと、一万三千の兵を率いて出陣。善光寺を経て妻女山に布陣した。` },
             { type: 'log', msg: `これを受けて${args.shingenName}も甲府を発し、茶臼山に対陣した。総勢およそ二万。` },
