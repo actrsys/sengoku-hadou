@@ -277,5 +277,61 @@ window.EventTextManager = {
             { type: 'log', msg: `${args.uesugiFamilyName}方・死者三千余、${args.takedaFamilyName}方・死者四千余。互いに多数の犠牲を出す未曾有の大いくさとなった。` },
             { type: 'log', msg: `川中島での両者の激突の報は、瞬く間に日ノ本全土へと知れ渡ることとなった。` }
         ];
+    },
+
+    // 永禄の変（パート1）
+    eiroku_no_hen_part1: function(args) {
+        return [
+            { type: 'log', msg: `${args.nagayasuCastleName}` },
+            { type: 'dialog', leftName: args.nagayasuName, leftFace: args.nagayasuFace, msg: `「ええい、先代様が亡くなって以来、何もかもうまくいかぬわい」` },
+            { type: 'dialog', leftName: args.masakatsuName, leftFace: args.masakatsuFace, msg: `「公方様の動きも活発になっておるようじゃな。あれが死んだのが余程嬉しいらしい」` },
+            { type: 'dialog', leftName: args.tomomichiName, leftFace: args.tomomichiFace, msg: `「それよ。多方に手を回しておるようだが……」` },
+            { type: 'dialog', leftName: args.masakatsuName, leftFace: args.masakatsuFace, msg: `「何も言えぬよ。我らとしても、公方様が相手となっては臣下の礼を取らざるをえまい」` },
+            { type: 'dialog', leftName: args.nagayasuName, leftFace: args.nagayasuFace, msg: `「……邪魔じゃな」` },
+            { type: 'dialog', leftName: args.masakatsuName, leftFace: args.masakatsuFace, msg: `「……左様」` },
+            { type: 'dialog', leftName: args.tomomichiName, leftFace: args.tomomichiFace, msg: `「……如何するつもりだ？」` },
+            { type: 'dialog', leftName: args.nagayasuName, leftFace: args.nagayasuFace, msg: `「決まっておる。お隠れになっていただくのよ」` },
+            { type: 'dialog', leftName: args.tomomichiName, leftFace: args.tomomichiFace, msg: `「ふむ……とすると、ちょうどよい男がおるな」` },
+            { type: 'dialog', leftName: args.nagayasuName, leftFace: args.nagayasuFace, msg: `「奇遇じゃのう。わしにも心当たりがあるわい」` },
+            { type: 'dialog', leftName: args.masakatsuName, leftFace: args.masakatsuFace, msg: `「……おぬしら、まさか」` },
+            { type: 'dialog', leftName: args.nagayasuName, leftFace: args.nagayasuFace, msg: `「ふ、ふふふふふ……」` },
+            { type: 'log', msg: `${args.year}年${args.month}月 京の空は薄曇りであった。` },
+            { type: 'log', msg: `この頃、将軍・${args.yoshiteruName}は幕府権威の回復を目指し、二条御所の大改築を進めていた。` },
+            { type: 'log', msg: `石垣と大堀を備えた城郭のような御所は、将軍の決意の表れでもあった。` },
+            { type: 'log', msg: `${args.yoshiteruGivenName}は自ら政治決済を行い、その政治的地位を固めていった。` },
+            { type: 'log', msg: `諸大名の争いにも積極的に介入し、大名らに将軍家が一定の影響力を持つことを示し、その存在感を増していったのである。` },
+            { type: 'log', msg: `一方で、畿内の覇者として君臨した${args.miyoshiFamilyName}家であったが、当主・${args.nagayoshiName}の死後、その影響力を失いつつあった。` },
+            { type: 'log', msg: `傀儡としての将軍を求める${args.miyoshiFamilyName}家にとって、意のままにならない将軍は邪魔な存在であった。` },
+            { type: 'log', msg: `${args.year}年${args.month}月。${args.miyoshiFamilyName}家当主・${args.yoshitsuguName}は三人衆の説得を受け、一万余の軍勢を率いて上洛した。` },
+            { type: 'log', msg: `革堂、知恩寺、相国寺に分宿した${args.miyoshiFamilyName}家の動向は、あくまで平穏であった。` },
+            { type: 'log', msg: `しかし、翌明朝、${args.yoshitsuguGivenName}勢は清水寺参詣を名目として、突如、二条御所に押し寄せた。` },
+            { type: 'log', msg: `戦端が開かれたのは、辰の刻のことであった。` }
+        ];
+    },
+
+    // 永禄の変（パート2）
+    eiroku_no_hen_part2: function(args) {
+        return [
+            { type: 'log', msg: `御所内の軍勢はわずか二百に満たなかった。${args.yoshiteruGivenName}は劣勢を悟り、死を覚悟した。` },
+            { type: 'dialog', leftName: args.yoshiteruName, leftFace: args.yoshiteruFace, msg: `「おのれ、天下を乱す狼藉者どもめ……」` },
+            { type: 'dialog', leftName: args.yoshiteruName, leftFace: args.yoshiteruFace, msg: `「この${args.yoshiteruGivenName}、将軍として恥じぬ死に様を見せてくれようぞ！」` },
+            { type: 'log', msg: `${args.yoshiteruGivenName}は近臣を率い、薙刀を振るって斬り込んだ。` },
+            { type: 'log', msg: `塚原卜伝に兵法を学んだ将軍の技は凄まじく、切れ味の鈍った刀を幾度も持ち替えて奮戦した。` },
+            { type: 'log', msg: `しかし、多勢に無勢。近臣たちは次々と討死していった。` },
+            { type: 'log', msg: `丑の初刻、${args.yoshiteruGivenName}はついに討たれた。` },
+            { type: 'log', msg: `${args.yoshiteruGivenName}の関係者はことごとく自害し、あるいは殺害された。` },
+            { type: 'log', msg: `殺戮が終わると、${args.miyoshiFamilyName}軍は二条御所に火を放った。多くの殿舎が炎に包まれた。` }
+        ];
+    },
+
+    // 永禄の変（パート3）
+    eiroku_no_hen_part3: function(args) {
+        return [
+            { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「そんな……公方様が……」` },
+            { type: 'log', msg: `幕臣・${args.fujitakaName}が変事を聞いて馳せ参じた頃には、すべて終わった後のことであった。` },
+            { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「……いかん、こうしてはおれぬ。${args.yoshiakiGivenName}様をお救いせねば」` },
+            { type: 'log', msg: `${args.fujitakaName}はすぐさまその場を離れ、${args.yoshiteruGivenName}の弟・${args.yoshiakiGivenName}の救出に動き出した。` },
+            { type: 'log', msg: `この日の夕刻、焼け跡には激しい夕立の雨が降リ注いだ。` }
+        ];
     }
 };

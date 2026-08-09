@@ -1912,6 +1912,13 @@ window.GameEvents.push({
     execute: async function(game) {
         const yoshiteru = game.getBusho(1017003);
         const yoshitsugu = game.getBusho(1020014);
+        const nagayasu = game.getBusho(1020021);
+        const masakatsu = game.getBusho(1020024);
+        const tomomichi = game.getBusho(1020029);
+        const nagayoshi = game.getBusho(1020005);
+        const fujitaka = game.getBusho(1017029);
+        const yoshiaki = game.getBusho(1017004);
+        
         const ashikagaClanId = yoshiteru.clan;
         const miyoshiClanId = yoshitsugu.clan;
         
@@ -1922,6 +1929,60 @@ window.GameEvents.push({
         const ashikagaClanName = ashikagaClan ? ashikagaClan.name : "足利家";
         const yoshiteruName = yoshiteru.name.replace('|', '');
         
+        const nagayasuCastle = nagayasu ? game.getCastle(nagayasu.castleId) : null;
+        
+        const args = {
+            nagayasuCastleName: nagayasuCastle ? nagayasuCastle.name : "居城",
+            nagayasuName: nagayasu ? nagayasu.name.replace('|', '') : "三好長逸",
+            nagayasuFace: nagayasu ? nagayasu.faceIcon : "unknown_face.webp",
+            masakatsuName: masakatsu ? masakatsu.name.replace('|', '') : "三好政勝",
+            masakatsuFace: masakatsu ? masakatsu.faceIcon : "unknown_face.webp",
+            tomomichiName: tomomichi ? tomomichi.name.replace('|', '') : "石成友通",
+            tomomichiFace: tomomichi ? tomomichi.faceIcon : "unknown_face.webp",
+            yoshiteruName: yoshiteruName,
+            yoshiteruGivenName: yoshiteru ? (yoshiteru.givenName || "義輝") : "義輝",
+            yoshiteruFace: yoshiteru ? yoshiteru.faceIcon : "unknown_face.webp",
+            miyoshiFamilyName: yoshitsugu ? (yoshitsugu.familyName || "三好") : "三好",
+            nagayoshiName: nagayoshi ? nagayoshi.name.replace('|', '') : "三好長慶",
+            yoshitsuguName: yoshitsugu ? yoshitsugu.name.replace('|', '') : "三好義継",
+            yoshitsuguGivenName: yoshitsugu ? (yoshitsugu.givenName || "義継") : "義継",
+            fujitakaName: fujitaka ? fujitaka.name.replace('|', '') : "細川藤孝",
+            fujitakaGivenName: fujitaka ? (fujitaka.givenName || "藤孝") : "藤孝",
+            fujitakaFace: fujitaka ? fujitaka.faceIcon : "unknown_face.webp",
+            yoshiakiGivenName: yoshiaki ? (yoshiaki.givenName || "義昭") : "義昭",
+            year: game.year,
+            month: game.month
+        };
+
+        if (window.AudioManager) {
+            window.AudioManager.memorizeCurrentBgm();
+            window.AudioManager.playBGM("SC_ex_Scene1_Duel.ogg");
+        }
+        
+        if (window.EventTextManager && window.EventTextManager.eiroku_no_hen_part1) {
+            await window.EventTextManager.playSequence(game, window.EventTextManager.eiroku_no_hen_part1(args));
+        }
+        
+        if (window.AudioManager) {
+            window.AudioManager.playBGM("SC_ex_Scene6_Fate.ogg");
+        }
+        
+        if (window.EventTextManager && window.EventTextManager.eiroku_no_hen_part2) {
+            await window.EventTextManager.playSequence(game, window.EventTextManager.eiroku_no_hen_part2(args));
+        }
+
+        if (window.AudioManager) {
+            window.AudioManager.playBGM("SC_ex_Scene3_Odyssey.ogg");
+        }
+
+        if (window.EventTextManager && window.EventTextManager.eiroku_no_hen_part3) {
+            await window.EventTextManager.playSequence(game, window.EventTextManager.eiroku_no_hen_part3(args));
+        }
+        
+        if (window.AudioManager) {
+            window.AudioManager.restoreMemorizedBgm();
+        }
+
         // ① まず、足利家の城をすべて三好家のものにします
         const ashikagaCastles = game.getClanCastles(ashikagaClanId);
         ashikagaCastles.forEach(castle => {
