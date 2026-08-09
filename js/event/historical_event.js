@@ -3946,8 +3946,9 @@ window.GameEvents.push({
     isOneTime: true,             // 一度発生したら二度と起きません
     
     checkCondition: function(game) {
-        // 1. 1561年9月であること
-        if (game.year !== 1561 || game.month !== 9) return false;
+        // 1. 1561年以降で、9月〜11月であること
+        if (game.year < 1561) return false;
+        if (game.month < 9 || game.month > 11) return false;
 
         // 2. 上杉謙信（1001015）が大名であること
         const kenshin = window.EventCheck.getDaimyo(game, 1001015);
@@ -4017,6 +4018,8 @@ window.GameEvents.push({
 
         // 台本に渡す情報をひとまとめにします
         const args = {
+            year: game.year,
+            month: game.month,
             kenshinName: kenshin.name.replace('|', ''),
             uesugiFamilyName: kenshin.familyName || "上杉",
             kenshinGivenName: kenshin.givenName || "謙信",
