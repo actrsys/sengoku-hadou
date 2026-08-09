@@ -1899,8 +1899,9 @@ window.GameEvents.push({
         // 6. 一乗院覚慶（足利義昭・ID: 1017004）が生存しているか確認します
         if (!window.EventCheck.isAlive(game, 1017004)) return false;
 
-        // 7. プレイヤーが足利家を担当している場合はイベントを起こしません
+        // 7. プレイヤーが足利家・三好家を担当している場合はイベントを起こしません
         if (game.playerClanId === ashikagaClanId) return false;
+        if (game.playerClanId === miyoshiClanId) return false;
 
         // 8. 足利家と三好家の領地（お城同士の道）が隣接しているか確認します
         if (!window.EventCheck.areClansAdjacent(game, ashikagaClanId, miyoshiClanId)) return false;
@@ -2054,14 +2055,6 @@ window.GameEvents.push({
                 deadShogunClanId: ashikagaClanId,
                 killerClanId: miyoshiClanId
             });
-        }
-        
-        if (game.playerClanId === ashikagaClanId) {
-            setTimeout(() => {
-                game.ui.showDialog(`${ashikagaClanName}は滅亡しました……`, false, () => {
-                    game.ui.returnToTitle();
-                });
-            }, 1000);
         }
     }
 });
