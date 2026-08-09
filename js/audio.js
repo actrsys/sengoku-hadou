@@ -4,10 +4,8 @@
 class AudioManager {
     constructor() {
         this.bgmPlayer = null;
-        // ★ここから書き足し！
         this.currentBgmName = null; // 今鳴っている曲の名前を入れておく箱
         this.memoBgmName = null;    // 元の曲を覚えておくためのメモ帳
-        // ★書き足しここまで！
         
         // ★ユーザーが設定した音量（最初は1.0＝100%）を覚えておきます。
         // ブラウザに記憶があればそれを読み込みます！
@@ -40,6 +38,18 @@ class AudioManager {
             'SC_ex_Scene1_Duel.ogg': {
                 start: 0,
                 end: (0 + 3841330) / 44100,
+                baseVolume: 0.05
+            },
+            // イベントBGM3
+            'SC_ex_Scene6_Fate.ogg': {
+                start: 604787,
+                end: (604787 + 6350355) / 44100,
+                baseVolume: 0.05
+            },
+            // イベントBGM4
+            'SC_ex_Scene3_Odyssey.ogg': {
+                start: 0,
+                end: (0 + 3924855) / 44100,
                 baseVolume: 0.05
             },
             // 攻城戦BGM
