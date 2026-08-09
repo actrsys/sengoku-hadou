@@ -2044,7 +2044,7 @@ window.GameEvents.push({
         });
 
         // ⑦ メッセージ表示（動的な名前を使用）
-        const msg = `${yoshitsuguName}と三好三人衆らが御所を襲撃！ 奮戦の末に${yoshiteruName}は討死し、${ashikagaClanName}は滅亡しました。 旧領はすべて${miyoshiClanName}の手に落ちました。`;
+        const msg = `${yoshitsuguName}が二条御所を襲撃、${yoshiteruName}は討死し、${ashikagaClanName}の旧領はすべて${miyoshiClanName}の手に落ちました。`;
         game.ui.log(`【イベント】永禄の変：${msg}`);
         await game.ui.showDialogAsync(msg, false, 0);
 
