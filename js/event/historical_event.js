@@ -2060,273 +2060,273 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 将軍候補庇護（予備イベント）
+// ★ 将軍庇護第１段階 足利義昭が朝倉家を頼る
 // ==========================================
 window.GameEvents.push({
-    id: "historical_shogun_protection", 
-    timing: "shogun_death",        // ★ 新しく作った将軍死亡のタイミングです
-    isOneTime: true,               // 一度発生したら二度と起きません
+    id: "historical_shogun_protection_1", 
+    timing: "startMonth_before",
+    isOneTime: true,
     
-    // 同行するお供の武将IDリストを動的に集める魔法
-    getRetainerIds: function(game) {
-        const ids = new Set([1017035, 1017029]); // 和田惟政、細川藤孝を基本セットにします
-        
-        // 明智光秀（1201003）を探します
+    checkCondition: function(game) {
+        // 1. 足利義輝（ID: 1017003）が死亡しているか
+        if (!window.EventCheck.isDead(game, 1017003)) return false;
+
+        // 2. 一乗院覚慶（足利義昭・ID: 1017004）が生存し、左馬頭（ID: 80）の官位を有しているか
+        const yoshiaki = game.getBusho(1017004);
+        if (!yoshiaki || !window.EventCheck.isAlive(game, 1017004)) return false;
+        if (!yoshiaki.courtRankIds || !yoshiaki.courtRankIds.includes(80)) return false;
+
+        // 3. 細川藤孝（ID: 1017029）が生存しているか
+        if (!window.EventCheck.isAlive(game, 1017029)) return false;
+
+        // 4. 明智光秀（ID: 1201003）が生存し、朝倉義景（ID: 1007008）勢力に所属しているか
         const mitsuhide = game.getBusho(1201003);
-        if (mitsuhide && mitsuhide.clan !== 0) {
-            // IDが1201000～1201999の範囲で、光秀と同じ勢力に所属する武将を全員探して追加します
-            game.bushos.forEach(b => {
-                if (b.id >= 1201000 && b.id <= 1201999 && b.clan === mitsuhide.clan) {
-                    ids.add(b.id);
-                }
-            });
-        } else {
-            // 光秀自身が存在する場合は、光秀単体だけでも追加しておきます
-            if (mitsuhide) ids.add(mitsuhide.id);
-        }
-        return Array.from(ids);
-    },
-    
-    checkCondition: function(game, context) {
-        // 将軍死亡の情報が届いていなければ無視します
-        if (!context || !context.deadShogunClanId) return false;
+        const asakuraDaimyo = window.EventCheck.getDaimyo(game, 1007008);
+        if (!mitsuhide || !window.EventCheck.isAlive(game, 1201003) || !asakuraDaimyo) return false;
+        if (mitsuhide.clan !== asakuraDaimyo.clan) return false;
 
-        // 世界に将軍候補（ID80:左馬頭）が存在するか確認します
-        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80) && b.status !== 'unborn' && b.status !== 'dead');
-        if (!candidate) return false;
+        // 5. 朝倉勢力と滅亡した将軍家との友好度が５１以上あるか
+        const yoshiteru = game.getBusho(1017003);
+        const ashikagaClanId = yoshiteru ? yoshiteru.clan : 0;
+        if (!ashikagaClanId || ashikagaClanId === 0) return false;
 
-        // 候補が浪人か、諸勢力所属で頭領ではない場合のみイベントを起こします
-        if (candidate.status === 'ronin') {
-            // 浪人なのでOKです
-        } else if ((candidate.belongKunishuId || 0) > 0) {
-            const kunishu = game.kunishuSystem ? game.kunishuSystem.getKunishu(candidate.belongKunishuId) : null;
-            if (kunishu && kunishu.leaderId === candidate.id) {
-                return false; // 頭領なのでダメです
-            }
+        if (game.diplomacyManager) {
+            const rel = game.diplomacyManager.getRelation(asakuraDaimyo.clan, ashikagaClanId);
+            if (!rel || rel.sentiment < 51) return false;
         } else {
-            return false; // 浪人でも諸勢力でもない場合はダメです
+            return false;
         }
 
-        // お供の武将が1人以上存在するかチェックします
-        const retainerIds = this.getRetainerIds(game);
-        const hasRetainer = retainerIds.some(id => {
-            const rBusho = game.getBusho(id);
-            // 存在し、生まれていて、死んでおらず、大名ではない人がいればOK（true）になります
-            return rBusho && rBusho.status !== 'unborn' && rBusho.status !== 'dead' && !rBusho.isDaimyo;
-        });
+        // 6. 朝倉勢力の威信が、滅亡していない勢力の中で上位１５位以内に入っているか
+        const activeClans = game.clans.filter(c => c.id !== 0 && !c.isDestroyed);
+        activeClans.sort((a, b) => (b.daimyoPrestige || 0) - (a.daimyoPrestige || 0));
         
-        // もし条件に合うお供が誰もいなければ、イベントは起きません
-        if (!hasRetainer) return false;
+        const top15 = activeClans.slice(0, 15);
+        const isTop15 = top15.some(c => c.id === asakuraDaimyo.clan);
+        if (!isTop15) return false;
 
         return true;
     },
     
-    execute: async function(game, context) {
-        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
-        if (!candidate) return;
+    execute: async function(game) {
+        const yoshiaki = game.getBusho(1017004);
+        const fujitaka = game.getBusho(1017029);
+        const wada = game.getBusho(1017035);
+        const mitsuhide = game.getBusho(1201003);
+        const asakuraDaimyo = game.getBusho(1007008);
+        
+        const asakuraClanId = asakuraDaimyo.clan;
+        const targetCastleId = asakuraDaimyo.castleId; 
 
-        const killerClanId = context.killerClanId;
-        const deadShogunClanId = context.deadShogunClanId; // 滅亡した将軍家
-
-        let targetClan = null;
-
-        // ② 織田信長（1006006）の勢力判定
-        const nobunaga = game.getBusho(1006006);
-        if (nobunaga && nobunaga.isDaimyo && nobunaga.clan !== 0 && nobunaga.clan !== killerClanId) {
-            // 条件１：今川義元（1004009）が死亡しているかチェックします
-            const yoshimoto = game.getBusho(1004009);
-            const isYoshimotoDead = yoshimoto && yoshimoto.status === 'dead';
-
-            // 条件２：尾張国（地方ID: 23）のすべての城を所有しているかチェックします
-            // まず尾張国の城をすべて集めて、そのすべてが織田家の持ち物か確認します
-            const owariCastles = game.castles.filter(c => c.provinceId === 23);
-            const ownsAllOwari = owariCastles.length > 0 && owariCastles.every(c => c.ownerClan === nobunaga.clan);
-
-            // 条件３：美濃国（地方ID: 27）の城を1つ以上所有しているかチェックします
-            // 日本中の城の中から、美濃国にあって、かつ織田家の持ち物である城が1つでもあるか確認します
-            const hasMinoCastle = game.castles.some(c => c.provinceId === 27 && c.ownerClan === nobunaga.clan);
-            
-            // 上記の３つの条件をすべてクリアしていたら、将軍の逃げ込み先を織田家に決定します
-            if (isYoshimotoDead && ownsAllOwari && hasMinoCastle) {
-                targetClan = game.getClan(nobunaga.clan);
-            }
-        }
-
-        // ③ 元々の足利家との友好度・威信による判定
-        if (!targetClan) {
-            let bestClans = [];
-            let maxSentiment = -1;
-
-            game.clans.forEach(c => {
-                if (c.id === 0 || c.id === killerClanId) return;
-                // まだ生き残っているか（城を持っているか）確認します
-                const hasCastle = game.castles.some(castle => castle.ownerClan === c.id);
-                if (!hasCastle) return;
-
-                const rel = game.diplomacyManager.getRelation(deadShogunClanId, c.id);
-                const sentiment = rel ? rel.sentiment : 50;
-
-                if (sentiment > maxSentiment) {
-                    maxSentiment = sentiment;
-                    bestClans = [c];
-                } else if (sentiment === maxSentiment) {
-                    bestClans.push(c);
-                }
-            });
-
-            if (bestClans.length > 0) {
-                // 威信が高い順、同じならIDが若い順に並べ替えます
-                bestClans.sort((a, b) => {
-                    if (b.daimyoPrestige !== a.daimyoPrestige) {
-                        return b.daimyoPrestige - a.daimyoPrestige;
-                    }
-                    return a.id - b.id;
-                });
-                targetClan = bestClans[0];
-            }
-        }
-
-        // ④ 候補となる大名家が存在しなければ、ここでイベントを終了します
-        if (!targetClan) return;
-
-        // 移動先の大名居城を取得します
-        const targetDaimyo = game.bushos.find(b => b.clan === targetClan.id && b.isDaimyo);
-        if (!targetDaimyo) return;
-        const targetCastleId = targetDaimyo.castleId;
-
-        // 【将軍候補の改名と顔変更処理】
-        // ライフシステムの一元管理魔法を呼び出します！
+        // 覚慶の還俗・改名・顔変更処理
         if (game.lifeSystem) {
-            game.lifeSystem.applyDaimyoNameAndFaceChange(candidate);
+            game.lifeSystem.applyDaimyoNameAndFaceChange(yoshiaki);
         }
 
-        // 将軍候補を新しい大名家に移動させます
-        candidate.belongKunishuId = 0;
-        if (game.affiliationSystem) {
-            // ★第4引数に「100」を渡して忠誠度を固定し、第5引数に「true」を渡して功績をそのまま引き継ぎます
-            game.affiliationSystem.joinClan(candidate, targetClan.id, targetCastleId, 100, true);
-        } else {
-            // 万が一システムがない時の安全策
-            if (candidate.castleId > 0) {
-                const oldCastle = game.getCastle(candidate.castleId);
-                if (oldCastle) oldCastle.samuraiIds = oldCastle.samuraiIds.filter(sid => sid !== candidate.id);
-            }
-            candidate.clan = targetClan.id;
-            candidate.castleId = targetCastleId;
-            candidate.status = 'active';
-            candidate.loyalty = 100;
-            const newCandidateCastle = game.getCastle(targetCastleId);
-            if (newCandidateCastle && !newCandidateCastle.samuraiIds.includes(candidate.id)) {
-                newCandidateCastle.samuraiIds.push(candidate.id);
-            }
+        // 覚慶、細川藤孝、(生きていれば)和田惟政が、朝倉勢力の所属になる。（功績を半減させないルート）
+        const targetBushos = [yoshiaki, fujitaka];
+        if (wada && window.EventCheck.isAlive(game, 1017035)) {
+            targetBushos.push(wada);
         }
 
-        // 【お供の移動処理】動的に取得したリストを使用して同行させます
-        const retainerIds = this.getRetainerIds(game);
-        retainerIds.forEach(id => {
-            const rBusho = game.getBusho(id);
-            // 存在し、生きていて、大名ではない場合のみお供として移動します
-            if (rBusho && rBusho.status !== 'unborn' && rBusho.status !== 'dead' && !rBusho.isDaimyo) {
-                let wasCastellan = rBusho.isCastellan;
-                let oldCastleId = rBusho.castleId;
-                
-                // バッジを剥奪します
-                rBusho.isCastellan = false;
-                rBusho.isGunshi = false;
-                rBusho.belongKunishuId = 0;
-
-                if (game.affiliationSystem) {
-                    // ★第4引数に「100」を渡して忠誠度を固定し、第5引数に「true」を渡して功績をそのまま引き継ぎます
-                    game.affiliationSystem.joinClan(rBusho, targetClan.id, targetCastleId, 100, true);
-
-                    // もし城主だったなら、古いお城の城主を更新します
-                    if (wasCastellan && oldCastleId > 0) {
-                        const oldCastle = game.getCastle(oldCastleId);
-                        if (oldCastle) game.affiliationSystem.updateCastleLord(oldCastle);
-                    }
-                } else {
-                    // 今いる城から抜きます
-                    if (oldCastleId > 0) {
-                        const oldCastle = game.getCastle(oldCastleId);
-                        if (oldCastle) oldCastle.samuraiIds = oldCastle.samuraiIds.filter(sid => sid !== rBusho.id);
-                    }
-                    // 新しい城へ所属させます
-                    rBusho.clan = targetClan.id;
-                    rBusho.castleId = targetCastleId;
-                    rBusho.status = 'active';
-                    rBusho.loyalty = 100;
-                    
-                    const newCastle = game.getCastle(targetCastleId);
-                    if (newCastle && !newCastle.samuraiIds.includes(rBusho.id)) {
-                        newCastle.samuraiIds.push(rBusho.id);
-                    }
-                }
-                
-                // ★追加：特定の3名（和田惟政、細川藤孝、明智光秀）には功績を500プラスします
-                if (id === 1017035 || id === 1017029 || id === 1201003) {
-                    rBusho.achievementTotal = (rBusho.achievementTotal || 0) + 500;
-                }
+        targetBushos.forEach(b => {
+            if (game.affiliationSystem) {
+                // 第4引数: 100(忠誠固定), 第5引数: true(功績維持)
+                game.affiliationSystem.joinClan(b, asakuraClanId, targetCastleId, 100, true);
+            } else {
+                b.clan = asakuraClanId;
+                b.castleId = targetCastleId;
+                b.status = 'active';
+                b.loyalty = 100;
             }
         });
 
-        // ログにお知らせを出力します
-        const candidateName = candidate.name.replace('|', '');
-        const msg = `${candidateName}は幕府再興のため、${targetClan.name}の庇護下に入りました。`;
-        game.ui.log(`【イベント】${msg}`);
-        await game.ui.showDialogAsync(msg, false, 0);
+        // 覚慶と細川藤孝、和田惟政、明智光秀の忠誠度が１００になる。
+        targetBushos.forEach(b => b.loyalty = 100);
+        if (mitsuhide) mitsuhide.loyalty = 100;
 
-        // 将軍を庇護した大名家にボーナスを与えます
-        const targetClanId = targetClan.id;
-        
-        // ①所属する武将の忠誠度を+5します（最大100まで）
-        const clanBushos = game.bushos.filter(b => b.clan === targetClanId && b.status === 'active');
-        clanBushos.forEach(b => {
+        // 朝倉勢力の武将すべての忠誠度が５アップする。（上限１００）
+        const asakuraBushos = game.bushos.filter(b => b.clan === asakuraClanId && b.status === 'active');
+        asakuraBushos.forEach(b => {
             b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
         });
-        
-        // ②所有する城の人口、兵士、金、兵糧、民忠をアップさせます（それぞれの上限を超えないように制限します）
-        const clanCastles = game.getClanCastles(targetClanId);
-        clanCastles.forEach(c => {
-            c.population = Math.min(999999, c.population + 2000);
-            c.soldiers = Math.min(99999, c.soldiers + 1000);
-            c.gold = Math.min(99999, c.gold + 1000);
-            c.rice = Math.min(99999, c.rice + 2000);
-            c.peoplesLoyalty = Math.min(c.maxPeoplesLoyalty || 100, c.peoplesLoyalty + 30);
+
+        // 和田惟政、細川藤孝、明智光秀の功績が３００上昇する。
+        [fujitaka, wada, mitsuhide].forEach(b => {
+            if (b && window.EventCheck.isAlive(game, b.id)) {
+                b.achievementTotal = (b.achievementTotal || 0) + 300;
+            }
         });
 
-        // ③近江国、山城国に城を持つ勢力（友好勢力などを除く）との関係を敵対にします
-        // まず「近江国」と「山城国」の地方IDを調べます
-        const targetProvinces = game.provinces.filter(p => p.province === '近江国' || p.province === '山城国');
-        const targetProvinceIds = targetProvinces.map(p => p.id);
+        // 朝倉勢力の全ての拠点の民忠が１００になり、それぞれ人口・米が２０００、兵士・金が１０００アップする。
+        const asakuraCastles = game.getClanCastles(asakuraClanId);
+        asakuraCastles.forEach(c => {
+            c.peoplesLoyalty = 100; 
+            c.population = Math.min(999999, (c.population || 0) + 2000);
+            c.rice = Math.min(99999, (c.rice || 0) + 2000);
+            c.soldiers = Math.min(99999, (c.soldiers || 0) + 1000);
+            c.gold = Math.min(99999, (c.gold || 0) + 1000);
+        });
 
-        // 対象となる国にある城の持ち主（大名家ID）を、重複しないように集めます
+        const yoshiakiName = yoshiaki.name.replace(/\|/g, '');
+        const asakuraName = asakuraDaimyo.name.replace(/\|/g, '');
+        const asakuraClanName = game.getClan(asakuraClanId)?.name || "朝倉家";
+        const msg = `${yoshiakiName}は幕府再興のため、${asakuraName}を頼り${asakuraClanName}の庇護下に入りました。`;
+        
+        game.ui.log(`【イベント】${msg}`);
+        await game.ui.showDialogAsync(msg, false, 0);
+    }
+});
+
+// ==========================================
+// ★ 将軍庇護第２段階 足利義昭が織田家を頼る
+// ==========================================
+window.GameEvents.push({
+    id: "historical_shogun_protection_2",
+    timing: "startMonth_before",
+    isOneTime: true,
+    
+    checkCondition: function(game) {
+        // 1. 足利義昭、明智光秀、細川藤孝が朝倉義景勢力に所属しているか
+        const yoshiaki = game.getBusho(1017004);
+        const mitsuhide = game.getBusho(1201003);
+        const fujitaka = game.getBusho(1017029);
+        const asakuraDaimyo = window.EventCheck.getDaimyo(game, 1007008);
+
+        if (!yoshiaki || !mitsuhide || !fujitaka || !asakuraDaimyo) return false;
+        
+        const asakuraClanId = asakuraDaimyo.clan;
+        if (yoshiaki.clan !== asakuraClanId || mitsuhide.clan !== asakuraClanId || fujitaka.clan !== asakuraClanId) return false;
+
+        // 2. 織田信長勢力の威信が、朝倉勢力の威信の１．５倍以上あるか
+        const nobunagaDaimyo = window.EventCheck.getDaimyo(game, 1006006);
+        if (!nobunagaDaimyo) return false;
+
+        const nobunagaClanId = nobunagaDaimyo.clan;
+        const odaClan = game.getClan(nobunagaClanId);
+        const asakuraClan = game.getClan(asakuraClanId);
+
+        if (!odaClan || !asakuraClan) return false;
+        if ((odaClan.daimyoPrestige || 0) < (asakuraClan.daimyoPrestige || 0) * 1.5) return false;
+
+        // 3. 朝倉勢力が山城国（ID30）・近江国（ID29）にある拠点を所有していないか
+        const checkProvinceIds = [29, 30];
+        const checkCastles = game.castles.filter(c => checkProvinceIds.includes(c.provinceId));
+        const asakuraHasCastleInTarget = checkCastles.some(c => c.ownerClan === asakuraClanId);
+        if (asakuraHasCastleInTarget) return false;
+
+        return true;
+    },
+    
+    execute: async function(game) {
+        const yoshiaki = game.getBusho(1017004);
+        const mitsuhide = game.getBusho(1201003);
+        const fujitaka = game.getBusho(1017029);
+        const wada = game.getBusho(1017035);
+        const asakuraDaimyo = game.getBusho(1007008);
+        const nobunagaDaimyo = game.getBusho(1006006);
+        
+        const asakuraClanId = asakuraDaimyo.clan;
+        const nobunagaClanId = nobunagaDaimyo.clan;
+        const targetCastleId = nobunagaDaimyo.castleId;
+
+        // 移籍対象の武将リストを作成
+        let targetBushos = [yoshiaki, mitsuhide, fujitaka];
+        if (wada && wada.clan === asakuraClanId && window.EventCheck.isAlive(game, 1017035)) {
+            targetBushos.push(wada);
+        }
+
+        // 明智光秀の家臣（ID1201000～ID1201999）が朝倉に居れば一緒に移籍
+        game.bushos.forEach(b => {
+            if (b.id >= 1201000 && b.id <= 1201999 && b.clan === asakuraClanId && b.id !== 1201003) {
+                targetBushos.push(b);
+            }
+        });
+
+        // 移籍実行（功績を半減させないルートを通る）
+        targetBushos.forEach(b => {
+            if (game.affiliationSystem) {
+                game.affiliationSystem.joinClan(b, nobunagaClanId, targetCastleId, 100, true);
+            } else {
+                b.clan = nobunagaClanId;
+                b.castleId = targetCastleId;
+                b.status = 'active';
+                b.loyalty = 100;
+            }
+        });
+
+        // 足利義昭、細川藤孝、和田惟政、明智光秀とその家臣の忠誠度が１００になる。
+        // 朝倉勢力から移籍した武将すべての忠誠度が５アップする。（上限１００）
+        targetBushos.forEach(b => {
+            b.loyalty = 100;
+        });
+
+        // 和田惟政、細川藤孝、明智光秀の功績が５００上昇する。
+        [fujitaka, wada, mitsuhide].forEach(b => {
+            if (b && targetBushos.includes(b)) {
+                b.achievementTotal = (b.achievementTotal || 0) + 500;
+            }
+        });
+
+        // 織田勢力の全ての拠点の民忠が１００になり、それぞれ人口・米が５０００、兵士・金が２０００アップする。
+        const odaCastles = game.getClanCastles(nobunagaClanId);
+        odaCastles.forEach(c => {
+            c.peoplesLoyalty = 100;
+            c.population = Math.min(999999, (c.population || 0) + 5000);
+            c.rice = Math.min(99999, (c.rice || 0) + 5000);
+            c.soldiers = Math.min(99999, (c.soldiers || 0) + 2000);
+            c.gold = Math.min(99999, (c.gold || 0) + 2000);
+        });
+
+        // 朝倉勢力の全ての拠点の民忠が１０低下し、それぞれ人口・兵士が０．７倍になる（小数点以下切り捨て）。
+        const asakuraCastles = game.getClanCastles(asakuraClanId);
+        asakuraCastles.forEach(c => {
+            c.peoplesLoyalty = Math.max(0, (c.peoplesLoyalty || 0) - 10);
+            c.population = Math.floor((c.population || 0) * 0.7);
+            c.soldiers = Math.floor((c.soldiers || 0) * 0.7);
+        });
+
+        // 織田勢力と朝倉勢力が敵対し、友好度が０になる
+        if (game.diplomacyManager) {
+            game.diplomacyManager.changeStatus(nobunagaClanId, asakuraClanId, '敵対', 0);
+            const relA = game.diplomacyManager.getRelation(nobunagaClanId, asakuraClanId);
+            const relB = game.diplomacyManager.getRelation(asakuraClanId, nobunagaClanId);
+            if (relA) relA.sentiment = 0;
+            if (relB) relB.sentiment = 0;
+        }
+
+        // 織田勢力と、近江国（ID29）・山城国（ID30）・大和国（ID31）・伊賀国（ID26）・伊勢国（ID24）・志摩国（ID25）に拠点を持っている勢力とが敵対し、友好度が０になる。
+        // （※織田勢力と関係が友好・同盟・支配・従属・和睦状態の勢力は除く。ID0の勢力（中立）は除く）
+        const targetProvinceIds = [29, 30, 31, 26, 24, 25];
         const enemyClanIds = new Set();
         game.castles.forEach(c => {
-            // 城が対象の国にあり、空き城（0）ではなく、将軍を庇護した勢力自身でもない場合
-            if (targetProvinceIds.includes(c.provinceId) && c.ownerClan !== 0 && c.ownerClan !== targetClanId) {
+            if (targetProvinceIds.includes(c.provinceId) && c.ownerClan !== 0 && c.ownerClan !== nobunagaClanId) {
                 enemyClanIds.add(c.ownerClan);
             }
         });
 
-        // 見つかった勢力との関係をひとつずつチェックし、変更します
         if (game.diplomacyManager) {
             enemyClanIds.forEach(clanId => {
-                const relation = game.diplomacyManager.getRelation(targetClanId, clanId);
+                const relation = game.diplomacyManager.getRelation(nobunagaClanId, clanId);
                 if (relation) {
-                    // 元々「友好」「同盟」「支配」「従属」ではない場合のみ、敵対にします
-                    if (!['友好', '同盟', '支配', '従属'].includes(relation.status)) {
-                        // 状態を「敵対」にします
-                        game.diplomacyManager.changeStatus(targetClanId, clanId, '敵対', 0);
-                        // お互いの関係値を「0」まで下げます
-                        const relA = game.diplomacyManager.getRelation(targetClanId, clanId);
-                        const relB = game.diplomacyManager.getRelation(clanId, targetClanId);
+                    // 友好・同盟・支配・従属・和睦 は除く
+                    if (!['友好', '同盟', '支配', '従属', '和睦'].includes(relation.status)) {
+                        game.diplomacyManager.changeStatus(nobunagaClanId, clanId, '敵対', 0);
+                        const relA = game.diplomacyManager.getRelation(nobunagaClanId, clanId);
+                        const relB = game.diplomacyManager.getRelation(clanId, nobunagaClanId);
                         if (relA) relA.sentiment = 0;
                         if (relB) relB.sentiment = 0;
                     }
                 }
             });
         }
+
+        const yoshiakiName = yoshiaki.name.replace(/\|/g, '');
+        const nobunagaName = nobunagaDaimyo.name.replace(/\|/g, '');
+        const msg = `${yoshiakiName}は上洛のため、${nobunagaName}を頼り美濃へ動座しました。`;
         
+        game.ui.log(`【イベント】${msg}`);
+        await game.ui.showDialogAsync(msg, false, 0);
     }
 });
 
