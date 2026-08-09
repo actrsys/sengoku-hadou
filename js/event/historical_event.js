@@ -2048,14 +2048,7 @@ window.GameEvents.push({
         const msg = `${yoshitsuguName}が二条御所を襲撃、${yoshiteruName}は討死し、${ashikagaClanName}の旧領はすべて${miyoshiClanName}の手に落ちました。`;
         game.ui.log(`【イベント】永禄の変：${msg}`);
         await game.ui.showDialogAsync(msg, false, 0);
-
-        // ⑧ 死亡イベントの通知
-        if (game.eventManager) {
-            await game.eventManager.processEvents('shogun_death', {
-                deadShogunClanId: ashikagaClanId,
-                killerClanId: miyoshiClanId
-            });
-        }
+        
     }
 });
 
