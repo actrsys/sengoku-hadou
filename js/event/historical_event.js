@@ -1859,6 +1859,7 @@ window.GameEvents.push({
 
 // ==========================================
 // ★ 永禄の変（将軍襲撃イベント）
+// 備考：三好家プレイヤーはイベントを進行する場合自力での将軍撃破が必要
 // ==========================================
 window.GameEvents.push({
     id: "historical_eiroku_no_hen",
@@ -2173,6 +2174,8 @@ window.GameEvents.push({
 
 // ==========================================
 // ★ 将軍庇護第２段階 足利義昭が織田家を頼る
+// 備考：朝倉家プレイヤーは勢力拡大や関連武将の追放で回避可能
+// 織田方は来た将軍を追い返せないフレーバー性を重視
 // ==========================================
 window.GameEvents.push({
     id: "historical_shogun_protection_2",
@@ -2454,6 +2457,11 @@ window.GameEvents.push({
         const sponsorClan = game.getClan(sponsorClanId);
         const nijoCastle = game.getCastle(26);
         const makishimaCastle = game.getCastle(90);
+
+        // ★追加：大名家を作る「前」に、名前と顔グラフィックを大名用に更新します！
+        if (game.lifeSystem) {
+            game.lifeSystem.applyDaimyoNameAndFaceChange(candidate);
+        }
 
         // --- 1. 新しい大名家（将軍家）を設立します ---
         const newClanId = Math.max(...game.clans.map(c => c.id)) + 1; // 一番大きいIDの次を使います
