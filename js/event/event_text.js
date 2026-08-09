@@ -318,7 +318,7 @@ window.EventTextManager = {
             { type: 'log', msg: `${args.yoshiteruGivenName}は近臣を率い、薙刀を振るって斬り込んだ。` },
             { type: 'log', msg: `塚原卜伝に兵法を学んだ将軍の技は凄まじく、切れ味の鈍った刀を幾度も持ち替えて奮戦した。` },
             { type: 'log', msg: `しかし、多勢に無勢。近臣たちは次々と討死していった。` },
-            { type: 'log', msg: `丑の初刻、${args.yoshiteruGivenName}はついに討たれた。` },
+            { type: 'log', msg: `牛の初刻、${args.yoshiteruGivenName}はついに討たれた。` },
             { type: 'log', msg: `${args.yoshiteruGivenName}の関係者はことごとく自害し、あるいは殺害された。` },
             { type: 'log', msg: `殺戮が終わると、${args.miyoshiFamilyName}軍は二条御所に火を放った。多くの殿舎が炎に包まれた。` }
         ];
