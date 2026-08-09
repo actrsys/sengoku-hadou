@@ -1892,10 +1892,17 @@ window.GameEvents.push({
         
         const ashikagaClanId = yoshiteru.clan;
 
-        // 5. プレイヤーが足利家を担当している場合はイベントを起こしません
+        // 5. 細川藤孝（ID: 1017029）が生存し、将軍勢力に所属しているか確認します
+        const fujitaka = game.getBusho(1017029);
+        if (!fujitaka || !window.EventCheck.isAlive(game, 1017029) || fujitaka.clan !== ashikagaClanId) return false;
+
+        // 6. 一乗院覚慶（足利義昭・ID: 1017004）が生存しているか確認します
+        if (!window.EventCheck.isAlive(game, 1017004)) return false;
+
+        // 7. プレイヤーが足利家を担当している場合はイベントを起こしません
         if (game.playerClanId === ashikagaClanId) return false;
 
-        // 6. 足利家と三好家の領地（お城同士の道）が隣接しているか確認します
+        // 8. 足利家と三好家の領地（お城同士の道）が隣接しているか確認します
         if (!window.EventCheck.areClansAdjacent(game, ashikagaClanId, miyoshiClanId)) return false;
 
         // すべての条件を満たしたらイベント発生の合図を出します
