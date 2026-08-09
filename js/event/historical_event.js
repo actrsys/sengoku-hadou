@@ -3936,3 +3936,132 @@ window.GameEvents.push({
         }
     }
 });
+
+// ==========================================
+// ★ 川中島の戦い
+// ==========================================
+window.GameEvents.push({
+    id: "historical_kawanakajima",
+    timing: "startMonth_before", // 月初の処理前に発生するかチェックします
+    isOneTime: true,             // 一度発生したら二度と起きません
+    
+    checkCondition: function(game) {
+        // 1. 1561年9月であること
+        if (game.year !== 1561 || game.month !== 9) return false;
+
+        // 2. 上杉謙信（1001015）が大名であること
+        const kenshin = window.EventCheck.getDaimyo(game, 1001015);
+        if (!kenshin) return false;
+
+        // 3. 武田信玄（1002002）が大名であること
+        const shingen = window.EventCheck.getDaimyo(game, 1002002);
+        if (!shingen) return false;
+
+        const uesugiClanId = kenshin.clan;
+        const takedaClanId = shingen.clan;
+
+        // 4. プレイヤーが上杉または武田を担当していないこと
+        if (game.playerClanId === uesugiClanId || game.playerClanId === takedaClanId) return false;
+
+        // 5. 上杉と武田が敵対していること
+        if (game.diplomacyManager) {
+            const rel = game.diplomacyManager.getRelation(uesugiClanId, takedaClanId);
+            if (!rel || rel.status !== '敵対') return false;
+        } else {
+            return false;
+        }
+
+        // 6. 海津城（ID5）が武田の拠点であること
+        const kaizuCastle = game.getCastle(5);
+        if (!kaizuCastle || kaizuCastle.ownerClan !== takedaClanId) return false;
+
+        // 7. 海津城と上杉謙信の拠点が隣接していること
+        const kenshinCastle = game.getCastle(kenshin.castleId);
+        if (!kenshinCastle) return false;
+        if (typeof GameSystem !== 'undefined' && !GameSystem.isAdjacent(kaizuCastle, kenshinCastle)) return false;
+
+        // 8. 山本勘助、武田信繁、春日虎綱、馬場信房 が武田に所属し生存していること
+        const takedaReqIds = [1002077, 1002013, 1002041, 1002059];
+        for (let id of takedaReqIds) {
+            const b = game.getBusho(id);
+            if (!b || b.status !== 'active' || b.clan !== takedaClanId) return false;
+        }
+
+        // 9. 柿崎景家、甘粕景持 が上杉に所属し生存していること
+        const uesugiReqIds = [1001026, 1001016];
+        for (let id of uesugiReqIds) {
+            const b = game.getBusho(id);
+            if (!b || b.status !== 'active' || b.clan !== uesugiClanId) return false;
+        }
+
+        // すべての条件を満たしたらイベント発生の合図を出します
+        return true;
+    },
+    
+    execute: async function(game) {
+    
+        // 登場人物たちのデータを取得します
+        const kenshin = game.getBusho(1001015);
+        const shingen = game.getBusho(1002002);
+        const kansuke = game.getBusho(1002077);
+        const nobushige = game.getBusho(1002013);
+        const toratsuna = game.getBusho(1002041);
+        const nobufusa = game.getBusho(1002059);
+        const kageie = game.getBusho(1001026);
+        const kagemochi = game.getBusho(1001016);
+
+        // 台本に渡す情報をひとまとめにします
+        const args = {
+            kenshinName: kenshin.name.replace('|', ''),
+            uesugiFamilyName: kenshin.familyName || "上杉",
+            kenshinGivenName: kenshin.givenName || "謙信",
+            kenshinFace: kenshin.faceIcon || "unknown_face.webp",
+
+            shingenName: shingen.name.replace('|', ''),
+            takedaFamilyName: shingen.familyName || "武田",
+            shingenGivenName: shingen.givenName || "信玄",
+            shingenFace: shingen.faceIcon || "unknown_face.webp",
+
+            kansukeName: kansuke.name.replace('|', ''),
+            kansukeFace: kansuke.faceIcon || "unknown_face.webp",
+
+            nobushigeName: nobushige.name.replace('|', ''),
+            nobushigeGivenName: nobushige.givenName || "信繁",
+            nobushigeFace: nobushige.faceIcon || "unknown_face.webp",
+
+            toratsunaFamilyName: toratsuna.familyName || "春日",
+            nobufusaFamilyName: nobufusa.familyName || "馬場",
+
+            kageieName: kageie.name.replace('|', ''),
+            kageieFace: kageie.faceIcon || "unknown_face.webp",
+
+            kagemochiName: kagemochi.name.replace('|', ''),
+            kagemochiFamilyName: kagemochi.familyName || "甘粕",
+            kagemochiFace: kagemochi.faceIcon || "unknown_face.webp"
+        };
+
+        // イベントテキストを再生します
+        if (window.EventTextManager && window.EventTextManager.kawanakajima_event) {
+            await window.EventTextManager.playSequence(game, window.EventTextManager.kawanakajima_event(args));
+        }
+
+        // 戦死処理（山本勘助、武田信繁）
+        // 死亡システムに、通常の死亡メッセージを出さないようにお願いして処理させます
+        const deadBushos = [kansuke, nobushige];
+        for (const busho of deadBushos) {
+            if (game.lifeSystem) {
+                await game.lifeSystem.executeDeath(busho, { skipNormalMessage: true });
+            }
+        }
+        
+        // 画面に討死のお知らせを出します
+        const deadMsg = `${args.takedaFamilyName}家の${args.kansukeName}、${args.nobushigeName}が討死しました。`;
+        game.ui.log(`【討死】${deadMsg}`);
+        await game.ui.showDialogAsync(deadMsg, false, 0);
+
+        // BGMを元に戻します
+        if (window.AudioManager) {
+            window.AudioManager.restoreMemorizedBgm();
+        }
+    }
+});
