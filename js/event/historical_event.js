@@ -4059,11 +4059,6 @@ window.GameEvents.push({
             }
         }
         
-        // 画面に討死のお知らせを出します
-        const deadMsg = `${args.takedaFamilyName}家の${args.kansukeName}、${args.nobushigeName}が討死しました。`;
-        game.ui.log(`【討死】${deadMsg}`);
-        await game.ui.showDialogAsync(deadMsg, false, 0);
-
         // BGMを元に戻します
         if (window.AudioManager) {
             window.AudioManager.restoreMemorizedBgm();
