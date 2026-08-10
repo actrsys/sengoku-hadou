@@ -2391,6 +2391,56 @@ window.GameEvents.push({
             nijo.castellanId = candidate.id;
         }
 
+        // ★ここから追加：所属勢力に軍団の空き（1〜8）があるか確認し、空きがあれば国主に任命します
+        if (game.legions && nijo) {
+            const sponsorClanId = candidate.clan;
+            const sponsorLegions = game.legions.filter(l => l.clanId === sponsorClanId);
+            const activeNos = sponsorLegions.filter(l => l.commanderId > 0).map(l => l.legionNo);
+            
+            let newLegionNo = -1;
+            let emptyLegion = sponsorLegions.find(l => l.commanderId === 0);
+            
+            // すでに解散済みの空っぽの軍団があれば、その枠を再利用します
+            if (emptyLegion) {
+                newLegionNo = emptyLegion.legionNo;
+                emptyLegion.commanderId = candidate.id;
+            } else {
+                // 無ければ1から8の間で空いている番号を探します
+                for (let i = 1; i <= 8; i++) {
+                    if (!activeNos.includes(i)) {
+                        newLegionNo = i;
+                        break;
+                    }
+                }
+                // 空き番号が見つかったら、新しく軍団のデータを作ります
+                if (newLegionNo !== -1) {
+                    let maxLegionId = 0;
+                    game.legions.forEach(l => { if (l.id > maxLegionId) maxLegionId = l.id; });
+                    const newLegion = typeof Legion !== 'undefined' ? new Legion({
+                        id: maxLegionId + 1,
+                        clanId: sponsorClanId,
+                        legionNo: newLegionNo,
+                        commanderId: candidate.id
+                    }) : {
+                        id: maxLegionId + 1,
+                        clanId: sponsorClanId,
+                        legionNo: newLegionNo,
+                        commanderId: candidate.id
+                    };
+                    game.legions.push(newLegion);
+                }
+            }
+            
+            // 将軍候補が国主になれた場合、二条城をその軍団の所属にして委任状態にします
+            if (newLegionNo !== -1) {
+                candidate.isCommander = true;
+                if (candidate.isGunshi) candidate.isGunshi = false; // 念のため軍師バッジを外します
+                nijo.legionId = newLegionNo;
+                nijo.isDelegated = true; // AIに委任する状態にします
+            }
+        }
+        // ★追加ここまで
+
         // ★追加：将軍を擁立した勢力を記録します（game.flagsに入れるだけで自動でセーブデータに保存されます）
         game.flags = game.flags || {};
         game.flags['shogun_sponsor_clan_id'] = candidate.clan;
