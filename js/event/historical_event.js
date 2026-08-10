@@ -2080,6 +2080,7 @@ window.GameEvents.push({
         if (mitsuhide.clan !== asakuraDaimyo.clan) return false;
 
         // 5. 朝倉勢力と滅亡した将軍家との友好度が５１以上あるか
+        /*
         const yoshiteru = game.getBusho(1017003);
         const ashikagaClanId = yoshiteru ? yoshiteru.clan : 0;
         if (!ashikagaClanId || ashikagaClanId === 0) return false;
@@ -2090,6 +2091,7 @@ window.GameEvents.push({
         } else {
             return false;
         }
+        */
 
         // 6. 朝倉勢力の威信が、滅亡していない勢力の中で上位１５位以内に入っているか
         const activeClans = game.clans.filter(c => c.id !== 0 && !c.isDestroyed);
