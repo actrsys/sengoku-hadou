@@ -445,9 +445,9 @@ window.GameEvents.push({
         // 選ばれた人は次のオーディションから外します
         odaBushos = odaBushos.filter(b => b.id !== (juushinA ? juushinA.id : 0));
 
-        // 重臣B（佐久間信盛）: 貢献度600以上で武勇最高。いなければ貢献度最高の中で武勇最高。
-        let juushinB = odaBushos.filter(b => b.achievementTotal >= 600).sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
-        if (!juushinB) juushinB = [...odaBushos].sort((a, b) => ((b.achievementTotal || 0) !== (a.achievementTotal || 0) ? (b.achievementTotal || 0) - (a.achievementTotal || 0) : (b.strength || 0) - (a.strength || 0)))[0];
+        // 重臣B（佐久間信盛）: 貢献度600以上で統率最高。いなければ貢献度最高の中で統率最高。
+        let juushinB = odaBushos.filter(b => b.achievementTotal >= 600).sort((a, b) => (b.leadership || 0) - (a.leadership || 0))[0];
+        if (!juushinB) juushinB = [...odaBushos].sort((a, b) => ((b.achievementTotal || 0) !== (a.achievementTotal || 0) ? (b.achievementTotal || 0) - (a.achievementTotal || 0) : (b.leadership || 0) - (a.leadership || 0)))[0];
         odaBushos = odaBushos.filter(b => b.id !== (juushinB ? juushinB.id : 0));
 
         // 新参C（森可成）: 貢献度599以下で武勇最高。いなければ武勇最高。
