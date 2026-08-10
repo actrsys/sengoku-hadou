@@ -196,6 +196,15 @@ class AIOperationManager {
                         let currentTargetCount = 0;
                         if (grandObj.type === '大名攻略') {
                             currentTargetCount = this.game.getClanCastles(grandObj.targetClanId).length;
+                        } else if (grandObj.type === '地方統一') {
+                            currentTargetCount = this.game.castles.filter(c => {
+                                const prov = this.game.provinces.find(p => p.id === c.provinceId);
+                                if (prov && prov.regionId === grandObj.targetRegionId && c.ownerClan !== clan.id) {
+                                    const rel = this.game.getRelation(clan.id, c.ownerClan);
+                                    return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                                }
+                                return false;
+                            }).length;
                         } else if (grandObj.type === '国攻略') {
                             currentTargetCount = this.game.castles.filter(c => {
                                 if (c.provinceId === grandObj.targetProvId && c.ownerClan !== clan.id) {
@@ -237,8 +246,8 @@ class AIOperationManager {
 
                         let shouldCancel = false;
 
-                        // ターゲット拠点が0になったら達成として消去
-                        if (currentTargetCount === 0 && (grandObj.type === '大名攻略' || grandObj.type === '国攻略' || grandObj.type === '反攻作戦' || grandObj.type === '国内平定')) {
+                       // ターゲット拠点が0になったら達成として消去
+                        if (currentTargetCount === 0 && (grandObj.type === '大名攻略' || grandObj.type === '地方統一' || grandObj.type === '国攻略' || grandObj.type === '反攻作戦' || grandObj.type === '国内平定')) {
                             shouldCancel = true;
                         }
 
@@ -264,6 +273,28 @@ class AIOperationManager {
                                 if (!hasRoute) {
                                     shouldCancel = true;
                                 }
+                            }
+                        } else if (!shouldCancel && grandObj.type === '地方統一') {
+                            // ★追加：地方統一の場合も、目標の地方へ直接攻撃できる道があるかチェックします！
+                            let hasRoute = false;
+                            const targetCastles = this.game.castles.filter(c => {
+                                const prov = this.game.provinces.find(p => p.id === c.provinceId);
+                                if (prov && prov.regionId === grandObj.targetRegionId && c.ownerClan !== clan.id) {
+                                    const rel = this.game.getRelation(clan.id, c.ownerClan);
+                                    return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                                }
+                                return false;
+                            });
+                            
+                            for (const tgtC of targetCastles) {
+                                if (reachableEnemyCastleIds.has(tgtC.id)) {
+                                    hasRoute = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (!hasRoute) {
+                                shouldCancel = true;
                             }
                         } else if (!shouldCancel && grandObj.type === '国攻略') {
                             // ★追加：国攻略の場合も、目標の国へ直接攻撃できる道があるかチェックします！
@@ -777,6 +808,11 @@ class AIOperationManager {
                         if (!decision.target.isKunishuTarget) {
                             if (myGrandObj.type === '大名攻略' && decision.target.ownerClan === myGrandObj.targetClanId) {
                                 isTargetMatch = true;
+                            } else if (myGrandObj.type === '地方統一') {
+                                const tgtProv = this.game.provinces.find(p => p.id === decision.target.provinceId);
+                                if (tgtProv && tgtProv.regionId === myGrandObj.targetRegionId) {
+                                    isTargetMatch = true;
+                                }
                             } else if (myGrandObj.type === '国攻略' && decision.target.provinceId === myGrandObj.targetProvId) {
                                 isTargetMatch = true;
                             } else if (myGrandObj.type === '反攻作戦') {
@@ -790,7 +826,12 @@ class AIOperationManager {
                             }
                         } else {
                             // 諸勢力の場合、お城の国（provinceId）で判定します
-                            if (myGrandObj.type === '国攻略' && myCastle.provinceId === myGrandObj.targetProvId) {
+                            if (myGrandObj.type === '地方統一') {
+                                const myProv = this.game.provinces.find(p => p.id === myCastle.provinceId);
+                                if (myProv && myProv.regionId === myGrandObj.targetRegionId) {
+                                    isTargetMatch = true;
+                                }
+                            } else if (myGrandObj.type === '国攻略' && myCastle.provinceId === myGrandObj.targetProvId) {
                                 isTargetMatch = true;
                             } else if (myGrandObj.type === '反攻作戦') {
                                 // ★今回追加：諸勢力の場合でも、その居城が奪還対象ならマッチ
@@ -1091,12 +1132,39 @@ class AIOperationManager {
                         
                         // 初期値を '拠点攻略' から null に変更します
                         let objectiveType = null; 
+                        let targetRegionId = 0; // ★追加：地方のIDを覚えておく箱
 
                         // 攻撃先が空き拠点(IDが0)や諸勢力でない場合
                         if (targetClanId !== 0 && !firstTarget.isKunishuTarget) {
-                            const targetClanTotalSoldiers = this.game.getClanTotalSoldiers(targetClanId);
-                            if (myTotalSoldiers > targetClanTotalSoldiers) {
-                                objectiveType = '大名攻略';
+                            // ★追加：大名攻略より先に、規模の大きい「地方統一」ができるかチェックします！
+                            if (targetProvId > 0) {
+                                const targetProv = this.game.provinces.find(p => p.id === targetProvId);
+                                if (targetProv && targetProv.regionId > 0) {
+                                    targetRegionId = targetProv.regionId;
+                                    let enemyRegionSoldiers = 0;
+                                    
+                                    this.game.castles.forEach(c => {
+                                        const prov = this.game.provinces.find(p => p.id === c.provinceId);
+                                        if (prov && prov.regionId === targetRegionId && c.ownerClan !== clanId) {
+                                            const rel = this.game.getRelation(clanId, c.ownerClan);
+                                            if (!rel || !['同盟', '支配', '従属', '友好'].includes(rel.status)) {
+                                                enemyRegionSoldiers += c.soldiers;
+                                            }
+                                        }
+                                    });
+
+                                    if (myTotalSoldiers > enemyRegionSoldiers) {
+                                        objectiveType = '地方統一';
+                                    }
+                                }
+                            }
+                            
+                            // 地方統一にならなかった場合、大名攻略の判定
+                            if (!objectiveType) {
+                                const targetClanTotalSoldiers = this.game.getClanTotalSoldiers(targetClanId);
+                                if (myTotalSoldiers > targetClanTotalSoldiers) {
+                                    objectiveType = '大名攻略';
+                                }
                             }
                         }
 
@@ -1142,6 +1210,15 @@ class AIOperationManager {
                             let initialTargetCount = 0;
                             if (objectiveType === '大名攻略') {
                                 initialTargetCount = this.game.getClanCastles(targetClanId).length;
+                            } else if (objectiveType === '地方統一') {
+                                initialTargetCount = this.game.castles.filter(c => {
+                                    const prov = this.game.provinces.find(p => p.id === c.provinceId);
+                                    if (prov && prov.regionId === targetRegionId && c.ownerClan !== clanId) {
+                                        const rel = this.game.getRelation(clanId, c.ownerClan);
+                                        return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                                    }
+                                    return false;
+                                }).length;
                             } else if (objectiveType === '国攻略') {
                                 initialTargetCount = this.game.castles.filter(c => {
                                     if (c.provinceId === targetProvId && c.ownerClan !== clanId) {
@@ -1185,6 +1262,7 @@ class AIOperationManager {
                                 type: objectiveType,
                                 targetClanId: targetClanId,
                                 targetProvId: targetProvId,
+                                targetRegionId: targetRegionId, // ★追加：地方のIDも保存します
                                 turnCount: 24, // 24ターン（2年間）待機
                                 historyTargetCount: [initialTargetCount], // 過去24回分を毎月覚える箱
                                 prevMyCastleCount: myCastleCount // 前月分の自拠点数
@@ -1299,6 +1377,10 @@ class AIOperationManager {
             if (obj.type === '大名攻略') {
                 const targetClan = this.game.clans.find(c => c.id === obj.targetClanId);
                 grandObjStr = targetClan ? `【${targetClan.name}の攻略】` : "【不明な大名の攻略】";
+            } else if (obj.type === '地方統一') {
+                const provs = this.game.provinces.filter(p => p.regionId === obj.targetRegionId);
+                const regionName = (provs.length > 0 && provs[0].region) ? provs[0].region : "不明な";
+                grandObjStr = `【${regionName}地方の統一】`;
             } else if (obj.type === '国攻略') {
                 const targetProv = this.game.provinces.find(p => p.id === obj.targetProvId);
                 grandObjStr = targetProv ? `【${targetProv.province}の統一】` : "【不明な国の攻略】";
