@@ -808,32 +808,10 @@ class StrategySystem {
             
             // 友好度0かつ隣接している場合の「大目標強制上書き」の魔法です！
             if (mods.specialEffect) {
-                if (this.game.aiOperationManager) {
-                    const updateGrandObj = (myClanId, targetId) => {
-                        if (!this.game.aiOperationManager.grandObjectives) this.game.aiOperationManager.grandObjectives = {};
-                        if (!this.game.aiOperationManager.grandObjectives[myClanId]) this.game.aiOperationManager.grandObjectives[myClanId] = {};
-                        
-                        const myCastleCount = this.game.getClanCastles(myClanId).length;
-                        const targetCastleCount = this.game.getClanCastles(targetId).length;
-                        
-                        const legions = [0]; // 0は直轄です
-                        if (this.game.legions) {
-                            this.game.legions.filter(l => l.clanId === myClanId && l.commanderId > 0).forEach(l => legions.push(l.legionNo));
-                        }
-                        
-                        // 直轄とすべての軍団の方針を強制的に書き換えます
-                        for (const legionNo of legions) {
-                            this.game.aiOperationManager.grandObjectives[myClanId][legionNo] = {
-                                type: '大名攻略',
-                                targetClanId: targetId,
-                                turnCount: 24,
-                                historyTargetCount: [targetCastleCount],
-                                prevMyCastleCount: myCastleCount
-                            };
-                        }
-                    };
-                    updateGrandObj(clanAId, clanBId);
-                    updateGrandObj(clanBId, clanAId);
+                if (this.game.aiOperationManager && typeof this.game.aiOperationManager.setGrandObjectiveToAllLegions === 'function') {
+                    // ★新しく作った一元化の魔法を呼び出して、両勢力に大名攻略の方針をセットします！
+                    this.game.aiOperationManager.setGrandObjectiveToAllLegions(clanAId, '大名攻略', clanBId, 24);
+                    this.game.aiOperationManager.setGrandObjectiveToAllLegions(clanBId, '大名攻略', clanAId, 24);
                     specialMsg = `両勢力は互いを不倶戴天の敵とみなし、軍を起こしました！`;
                     baseMsg = "";
                 }
