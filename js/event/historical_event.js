@@ -2147,12 +2147,10 @@ window.GameEvents.push({
             b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
         });
 
-        // 和田惟政、細川藤孝、明智光秀の功績が３００上昇する。
-        [fujitaka, wada, mitsuhide].forEach(b => {
-            if (b && window.EventCheck.isAlive(game, b.id)) {
-                b.achievementTotal = (b.achievementTotal || 0) + 300;
-            }
-        });
+        // 明智光秀の功績が５００上昇する。
+        if (mitsuhide && window.EventCheck.isAlive(game, mitsuhide.id)) {
+            mitsuhide.achievementTotal = (mitsuhide.achievementTotal || 0) + 500;
+        }
 
         // 朝倉勢力の全ての拠点の民忠が１００になり、それぞれ人口・米が２０００、兵士・金が１０００アップする。
         const asakuraCastles = game.getClanCastles(asakuraClanId);
@@ -2259,12 +2257,10 @@ window.GameEvents.push({
             b.loyalty = 100;
         });
 
-        // 和田惟政、細川藤孝、明智光秀の功績が５００上昇する。
-        [fujitaka, wada, mitsuhide].forEach(b => {
-            if (b && targetBushos.includes(b)) {
-                b.achievementTotal = (b.achievementTotal || 0) + 500;
-            }
-        });
+        // 明智光秀の功績が５００上昇する。
+        if (mitsuhide && targetBushos.includes(mitsuhide)) {
+            mitsuhide.achievementTotal = (mitsuhide.achievementTotal || 0) + 500;
+        }
 
         // 織田勢力の全ての拠点の民忠が１００になり、それぞれ人口・米が５０００、兵士・金が２０００アップする。
         const odaCastles = game.getClanCastles(nobunagaClanId);
