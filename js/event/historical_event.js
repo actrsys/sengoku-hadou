@@ -739,37 +739,10 @@ window.GameEvents.push({
             }
             
             // ★追加：今川家のすべての軍団の攻略目標を織田家に設定します
-            if (game.aiOperationManager) {
-                // AIの作戦管理システムに目標を書き込む準備をします
-                if (!game.aiOperationManager.grandObjectives) {
-                    game.aiOperationManager.grandObjectives = {};
-                }
-                if (!game.aiOperationManager.grandObjectives[imagawaClanId]) {
-                    game.aiOperationManager.grandObjectives[imagawaClanId] = {};
-                }
-
-                // 今川家が現在持っているお城をすべて調べます
-                const imagawaCastles = game.getClanCastles(imagawaClanId);
-                const myCastleCount = imagawaCastles.length;
-                
-                // 織田家のお城の数（初期の目標数）を数えておきます
+            if (game.aiOperationManager && typeof game.aiOperationManager.setGrandObjectiveToAllLegions === 'function') {
                 const odaClanId = nobunaga.clan;
-                const odaCastleCount = game.getClanCastles(odaClanId).length;
-
-                // 今川家のお城のデータから、現在存在している軍団の番号（0の直轄や1～8の軍団）を重複なく集めます
-                const legionIds = [...new Set(imagawaCastles.map(c => Number(c.legionId || 0)))];
-
-                // 見つかったすべての軍団に、織田家を目標とする方針（大名攻略）を持たせます
-                for (const legionId of legionIds) {
-                    game.aiOperationManager.grandObjectives[imagawaClanId][legionId] = {
-                        type: '大名攻略',
-                        targetClanId: odaClanId,
-                        targetProvId: 0,
-                        turnCount: 24, // 24ターン（2年間）諦めずに狙い続けるようにします
-                        historyTargetCount: [odaCastleCount], // 目標の初期数を記憶させます
-                        prevMyCastleCount: myCastleCount // 自分の拠点数を記憶させます
-                    };
-                }
+                // 今川家のすべての軍団に「大名攻略（織田家）」の方針を24ターン（2年間）設定します
+                game.aiOperationManager.setGrandObjectiveToAllLegions(imagawaClanId, '大名攻略', odaClanId, 24);
             }
 
             // 籠城ルートはここでイベントが終わり、義元も生き残ります
@@ -2313,6 +2286,22 @@ window.GameEvents.push({
                     }
                 }
             });
+        }
+
+        // ★追加：織田勢力のすべての軍団に「地方統一（近畿）」の方針を10年間（120ターン）持たせます！
+        if (game.aiOperationManager && typeof game.aiOperationManager.setGrandObjectiveToAllLegions === 'function') {
+            // 山城国（ID: 30）などの近畿地方の地方IDを取得します
+            let kinkiRegionId = 5; // 見つからなかった時のための基本の数字です
+            const yamashiro = game.provinces.find(p => p.id === 30);
+            if (yamashiro && yamashiro.regionId) {
+                kinkiRegionId = yamashiro.regionId;
+            } else {
+                const kinkiProv = game.provinces.find(p => p.region === '近畿' || p.region === '畿内');
+                if (kinkiProv) kinkiRegionId = kinkiProv.regionId;
+            }
+            
+            // 織田家に「地方統一（近畿地方）」を120ターン（10年間）で設定します
+            game.aiOperationManager.setGrandObjectiveToAllLegions(nobunagaClanId, '地方統一', kinkiRegionId, 120);
         }
 
         const yoshiakiName = yoshiaki.name.replace(/\|/g, '');

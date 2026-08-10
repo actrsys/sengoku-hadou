@@ -65,6 +65,82 @@ class AIOperationManager {
         }
     }
 
+    // ★追加：特定の大名勢力のすべての軍団に、一括で方針を持たせる一元化ロジックです！
+    setGrandObjectiveToAllLegions(clanId, objectiveType, targetId, turnCount) {
+        if (!this.grandObjectives) this.grandObjectives = {};
+        if (!this.grandObjectives[clanId]) this.grandObjectives[clanId] = {};
+
+        const clanCastles = this.game.getClanCastles(clanId);
+        const myCastleCount = clanCastles.length;
+        
+        // その大名家が持っているすべての軍団ID（0の直轄や1～8の軍団）を重複なく集めます
+        const legionIds = [...new Set(clanCastles.map(c => Number(c.legionId || 0)))];
+
+        // ターゲットの初期数を数えます
+        let initialTargetCount = 0;
+        if (objectiveType === '大名攻略') {
+            initialTargetCount = this.game.getClanCastles(targetId).length;
+        } else if (objectiveType === '地方統一') {
+            initialTargetCount = this.game.castles.filter(c => {
+                const prov = this.game.provinces.find(p => p.id === c.provinceId);
+                if (prov && prov.regionId === targetId && c.ownerClan !== clanId) {
+                    const rel = this.game.getRelation(clanId, c.ownerClan);
+                    return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                }
+                return false;
+            }).length;
+        } else if (objectiveType === '国攻略') {
+            initialTargetCount = this.game.castles.filter(c => {
+                if (c.provinceId === targetId && c.ownerClan !== clanId) {
+                    const rel = this.game.getRelation(clanId, c.ownerClan);
+                    return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                }
+                return false;
+            }).length;
+        } else if (objectiveType === '反攻作戦') {
+            const history = this.historyOwnedCastles[clanId] || [];
+            const pastOwnedSet = new Set();
+            history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
+            const currentMyCastles = new Set(clanCastles.map(c => c.id));
+            for (const cid of pastOwnedSet) {
+                if (!currentMyCastles.has(cid)) {
+                    const c = this.game.getCastle(cid);
+                    if (c) {
+                        const rel = this.game.getRelation(clanId, c.ownerClan);
+                        // 友好勢力でなければ取り返す拠点としてカウント
+                        if (!rel || !['同盟', '支配', '従属', '友好'].includes(rel.status)) {
+                            initialTargetCount++;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 見つかったすべての軍団に、方針をセットします！
+        for (const legionId of legionIds) {
+            let legionTargetCount = initialTargetCount;
+            // 国内平定だけは、自軍団の領内にいる諸勢力の数を数えるので軍団ごとに計算します
+            if (objectiveType === '国内平定') {
+                legionTargetCount = 0;
+                const legionCastles = clanCastles.filter(c => c.legionId === legionId);
+                legionCastles.forEach(myC => {
+                    const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(myC.id).filter(k => k.getRelation(clanId) <= 30 && k.ideology !== '商人');
+                    legionTargetCount += kunishusInCastle.length;
+                });
+            }
+
+            this.grandObjectives[clanId][legionId] = {
+                type: objectiveType,
+                targetClanId: objectiveType === '大名攻略' ? targetId : 0,
+                targetProvId: objectiveType === '国攻略' ? targetId : 0,
+                targetRegionId: objectiveType === '地方統一' ? targetId : 0,
+                turnCount: turnCount,
+                historyTargetCount: [legionTargetCount], // 目標の初期数を記憶させます
+                prevMyCastleCount: myCastleCount // 自分の拠点数を記憶させます
+            };
+        }
+    }
+
     // ★追加：すべての作戦を巡回して、不正なデータ（矛盾）がないか健康診断をする魔法です！
     validateAllOperations() {
         for (const clanIdStr in this.operations) {
