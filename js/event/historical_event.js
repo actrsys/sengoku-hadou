@@ -3128,18 +3128,18 @@ window.GameEvents.push({
         const nagamasa = game.getBusho(1203002);
         if (nagamasa && nagamasa.status !== 'dead') return false;
         
-        // 2. 三好長逸（ID: 1020021）が大名であるか確認します
-        const nagayasu = window.EventCheck.getDaimyo(game, 1020021);
-        if (!nagayasu) return false;
+        // 2. 三好義継（ID: 1020014）または三好長逸（ID: 1020021）が大名であるか確認します
+        const miyoshiDaimyo = window.EventCheck.getDaimyo(game, [1020014, 1020021]);
+        if (!miyoshiDaimyo) return false;
         
-        // 3. 池田知正（ID: 1203004）が存在し、三好長逸の家に所属する城主または国主であるか確認します
+        // 3. 池田知正（ID: 1203004）が存在し、三好義継または三好長逸の家に所属する城主または国主であるか確認します
         const tomomasa = game.getBusho(1203004);
-        if (!tomomasa || tomomasa.clan !== nagayasu.clan) return false;
+        if (!tomomasa || tomomasa.clan !== miyoshiDaimyo.clan) return false;
         if (!tomomasa.isCastellan && !tomomasa.isCommander) return false;
 
         // 4. 池田知正の居城が伊丹城（ID: 51）であるか、または伊丹城が池田知正の軍団に所属しているか確認します
         const itamiCastle = game.getCastle(51);
-        if (!itamiCastle || itamiCastle.ownerClan !== nagayasu.clan) return false;
+        if (!itamiCastle || itamiCastle.ownerClan !== miyoshiDaimyo.clan) return false;
 
         let isItamiInvolved = false;
         if (tomomasa.isCommander) {
@@ -3151,9 +3151,9 @@ window.GameEvents.push({
         }
         if (!isItamiInvolved) return false;
 
-        // 5. 荒木村重（ID: 1203006）が存在し、三好家に所属しているか確認します
+        // 5. 荒木村重（ID: 1203006）が存在し、対象の家に所属しているか確認します
         const murashige = game.getBusho(1203006);
-        if (!murashige || murashige.clan !== nagayasu.clan) return false;
+        if (!murashige || murashige.clan !== miyoshiDaimyo.clan) return false;
 
         // 6. 荒木村重が池田知正と同じ場所にいるか確認します
         if (tomomasa.isCommander) {
