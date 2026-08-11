@@ -1076,42 +1076,13 @@ class LifeSystem {
                 }
             }
 
-            // 新大名がもし国主だった場合、その国主を解任し軍団を解散させます
-            if (successor.isCommander) {
-                if (this.game.castleManager) {
-                    const oldLegion = this.game.legions ? this.game.legions.find(l => l.commanderId === successor.id) : null;
-                    if (oldLegion) {
-                        this.game.castleManager.disbandLegion(oldLegion.id);
-                    }
-                }
-                successor.isCommander = false;
-            }
-
-            // 選ばれた後継者を、死亡した大名がいた城へ移動させます
-            const baseCastle = this.game.getCastle(daimyo.castleId);
-            if (baseCastle) {
-                // 元々どこかの城にいた場合は、お城を出ます
-                if (successor.status === 'ronin' || successor.status === 'active') {
-                    this.game.affiliationSystem.leaveCastle(successor);
-                }
-
-                successor.status = 'active';
-                successor.clan = daimyo.clan;
-                successor.castleId = baseCastle.id;
-                successor.loyalty = 100;
-                if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
-            }
-
-            // ★ライフシステムの一元管理魔法を使って、大名就任時の改名と顔変更を行います！
-            this.applyDaimyoNameAndFaceChange(successor, messages);
-
-            this.game.changeLeader(daimyo.clan, successor.id);
-            
             // ==========================================
             // ★大名交代の共通の魔法を呼び出します！
             const clan = this.game.getClan(daimyo.clan);
             const originalClanName = clan ? clan.name : ""; // ★元の家名をメモしておきます
-            this.applyDaimyoChangeEffects(daimyo, successor, messages);
+            
+            // ★一元化した引き継ぎセットアップ魔法にお任せします（死亡による交代なので、生前退位のフラグは false にします）
+            this.setupNewDaimyo(daimyo, successor, messages, false);
             // ==========================================
             
             // ★メモしておいた家名を使って「〇〇家の」という言葉を作ります
@@ -1424,7 +1395,89 @@ class LifeSystem {
             this.game.ui.renderMap();
         }
     }
+    
+    // ==========================================
+    // ★新旧の大名が交代する時の「引き継ぎ作業」をひとまとめにした魔法です！
+    // ==========================================
+    setupNewDaimyo(oldDaimyo, successor, messages, isAliveSuccession = false) {
+        // 1. 生前退位（家督相続コマンドやイベント）の時だけの特別な処理です
+        if (isAliveSuccession) {
+            // 功績の譲渡
+            const meritTransfer = Math.floor((oldDaimyo.achievementTotal || 0) / 3);
+            successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
+            oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
 
+            // 先代大名の役職を外し、隠居状態にします
+            oldDaimyo.isDaimyo = false;
+            oldDaimyo.isRetired = true;
+        }
+
+        // 2. 新大名がもし国主だった場合、その軍団を解散させます
+        if (successor.isCommander && this.game.castleManager) {
+            const oldLegion = this.game.legions ? this.game.legions.find(l => l.commanderId === successor.id) : null;
+            if (oldLegion) {
+                this.game.castleManager.disbandLegion(oldLegion.id);
+            }
+            successor.isCommander = false;
+        }
+
+        // 3. 選ばれた後継者を、先代の大名がいたお城へお引越しさせます
+        const baseCastle = this.game.getCastle(oldDaimyo.castleId);
+        if (baseCastle) {
+            if (successor.status === 'ronin' || successor.status === 'active') {
+                this.game.affiliationSystem.leaveCastle(successor);
+            }
+            successor.status = 'active';
+            successor.clan = oldDaimyo.clan;
+            successor.castleId = baseCastle.id;
+            successor.loyalty = 100;
+            if (!baseCastle.samuraiIds.includes(successor.id)) {
+                baseCastle.samuraiIds.push(successor.id);
+            }
+        }
+
+        // 4. 新しい大名を任命し、城主のバッジもつけます
+        successor.isDaimyo = true;
+        successor.isCastellan = true;
+        if (successor.isGunshi) {
+            successor.isGunshi = false;
+        }
+
+        if (baseCastle) {
+            const castleBushos = this.game.getCastleBushos(baseCastle.id);
+            castleBushos.forEach(b => {
+                if (b.id !== successor.id && b.isCastellan) {
+                    b.isCastellan = false;
+                }
+            });
+            baseCastle.castellanId = successor.id;
+        }
+
+        // 5. 大名就任時の改名と顔変更を行います
+        this.applyDaimyoNameAndFaceChange(successor, messages);
+
+        // 6. 先代が将軍職を持っていて生前退位の場合、後継ぎに左馬頭を与えます
+        if (isAliveSuccession && oldDaimyo.courtRankIds && oldDaimyo.courtRankIds.includes(1)) {
+            const isRelative = oldDaimyo.familyIds.some(fId => successor.familyIds.includes(fId));
+            if (isRelative) {
+                if (!this.game.courtRankSystem.grantRank(successor, 98)) {
+                    this.game.courtRankSystem.grantRank(successor, 99);
+                }
+            }
+        }
+
+        // 7. システム上のリーダー情報を書き換えます
+        this.game.changeLeader(oldDaimyo.clan, successor.id);
+
+        // 城主が入れ替わったことをシステムに報告します
+        if (baseCastle && this.game.affiliationSystem) {
+            this.game.affiliationSystem.updateCastleLord(baseCastle);
+        }
+
+        // 8. 忠誠度や外交関係など、大名交代による影響を計算します
+        this.applyDaimyoChangeEffects(oldDaimyo, successor, messages, isAliveSuccession);
+    }
+    
     // ==========================================
     // ★ここから追加：コマンドから「生前退位（家督相続）」を実行する魔法です！
     // ==========================================
@@ -1440,81 +1493,10 @@ class LifeSystem {
 
         const messages = []; // 順番に出すメッセージを溜めておくリスト
 
-        // ★今回追加：功績の譲渡処理
-        const meritTransfer = Math.floor((oldDaimyo.achievementTotal || 0) / 3);
-        successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
-        oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
-
-        // ① 先代大名の役職を外し、隠居状態にします
-        oldDaimyo.isDaimyo = false;
-        oldDaimyo.isRetired = true;
-
-        // ★追加：新大名がもし国主だった場合、その軍団を解散させます
-        if (successor.isCommander && this.game.castleManager) {
-            const oldLegion = this.game.legions ? this.game.legions.find(l => l.commanderId === successor.id) : null;
-            if (oldLegion) {
-                this.game.castleManager.disbandLegion(oldLegion.id);
-            }
-        }
-
-        // ★修正：コマンドの時は「急遽元服し～」の文章は出さないように、messages.push を削除しました！
-        if (successor.status === 'unborn') {
-            successor.status = 'active'; 
-            successor.clan = oldDaimyo.clan; 
-            successor.castleId = oldDaimyo.castleId; 
-            successor.loyalty = 100; 
-            
-            const castle = this.game.getCastle(successor.castleId);
-            if (castle && !castle.samuraiIds.includes(successor.id)) {
-                castle.samuraiIds.push(successor.id);
-            }
-        }
-
-        // ② 新しい大名を任命します
-        successor.isDaimyo = true;
-        successor.isCastellan = true;
-        if (successor.isGunshi) {
-            successor.isGunshi = false;
-        }
-
-        // ③ 新大名のお城の城主を新大名にします
-        const targetCastle = this.game.getCastle(successor.castleId);
-        if (targetCastle) {
-            const castleBushos = this.game.getCastleBushos(targetCastle.id);
-            castleBushos.forEach(b => {
-                if (b.id !== successor.id && b.isCastellan) {
-                    b.isCastellan = false;
-                }
-            });
-            targetCastle.castellanId = successor.id;
-        }
-
-        // ★ライフシステムの一元管理魔法を使って、大名就任時の改名と顔変更を行います！
-        this.applyDaimyoNameAndFaceChange(successor, messages);
-
-        // ★先代が征夷大将軍（ID1）を持っていれば、後継ぎに「左馬頭（ID98または99）」を与える魔法！
-        if (oldDaimyo.courtRankIds && oldDaimyo.courtRankIds.includes(1)) {
-            const isRelative = oldDaimyo.familyIds.some(fId => successor.familyIds.includes(fId));
-            if (isRelative) {
-                // まず98を渡してみて、ダメなら99を渡します
-                if (!this.game.courtRankSystem.grantRank(successor, 98)) {
-                    this.game.courtRankSystem.grantRank(successor, 99);
-                }
-            }
-        }
-
-        this.game.changeLeader(clan.id, successor.id);
-
-        if (oldDaimyo.castleId) {
-            const oldCastle = this.game.getCastle(oldDaimyo.castleId);
-            if (oldCastle && this.game.affiliationSystem) {
-                this.game.affiliationSystem.updateCastleLord(oldCastle);
-            }
-        }
-
         // ==========================================
-        // ★大名交代の共通の魔法を呼び出します！
-        this.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
+        // ★一元化した引き継ぎセットアップ魔法にすべてお任せします！
+        // （生前退位のコマンドなので、フラグは true にします）
+        this.setupNewDaimyo(oldDaimyo, successor, messages, true);
         // ==========================================
 
         // ★修正：改名する前の「元の名前」を使ってメッセージを作ります！

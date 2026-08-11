@@ -180,51 +180,9 @@ window.EventAction = {
 
     // ④ ★家督相続（生前退位）の一連の処理をまとめてやってくれる魔法
     executeSuccession: function(game, oldDaimyo, successor, messages) {
-        const clanId = oldDaimyo.clan;
-
-        // ① 功績の譲渡（旧大名の功績の3分の1を譲り受けます）
-        const meritTransfer = Math.floor((oldDaimyo.achievementTotal || 0) / 3);
-        successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
-        oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
-
-        // ② 旧大名から大名のバッジを外し、隠居状態にします
-        oldDaimyo.isDaimyo = false;
-        oldDaimyo.isRetired = true;
-        
-        // ③ 新大名が旧大名と違うお城にいたら、旧大名のいるお城へ呼び寄せます
-        this.moveBusho(game, successor, oldDaimyo.castleId);
-
-        // ④ 新大名にバッジをつけます
-        successor.isDaimyo = true;
-        if (successor.isGunshi) {
-            successor.isGunshi = false; // もし軍師だったらバッジを外します
-        }
-
-        // ⑤ お城の城主データを新大名に書き換えます
-        const targetCastle = game.getCastle(successor.castleId);
-        this.appointCastellan(game, successor, targetCastle);
-
-        // ⑥ 大名就任時の改名と顔変更を行います
-        if (game.lifeSystem) {
-            game.lifeSystem.applyDaimyoNameAndFaceChange(successor, messages);
-        }
-
-        // ⑦ 大名家のリーダーを新大名に設定します
-        if (game.changeLeader) {
-            game.changeLeader(clanId, successor.id);
-        }
-
-        // ⑧ 旧大名の城の城主情報を更新します
-        if (oldDaimyo.castleId) {
-            const oldCastle = game.getCastle(oldDaimyo.castleId);
-            if (oldCastle && game.affiliationSystem) {
-                game.affiliationSystem.updateCastleLord(oldCastle);
-            }
-        }
-
-        // ⑨ 当主交代の共通の魔法（能力差による忠誠度の変化など）を呼び出します
-        if (game.lifeSystem) {
-            game.lifeSystem.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
+        if (game.lifeSystem && typeof game.lifeSystem.setupNewDaimyo === 'function') {
+            // ★life_system に新しく作った、一番優秀なお道具箱（魔法）に全てお任せします！
+            game.lifeSystem.setupNewDaimyo(oldDaimyo, successor, messages, true);
         }
     },
 
