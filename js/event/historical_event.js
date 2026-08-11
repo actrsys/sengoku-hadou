@@ -76,6 +76,43 @@ window.EventCheck = {
         if (provinceCastles.length === 0) return false;
         // その地方の城の「全員(every)」が、指定の勢力のものかチェックします
         return provinceCastles.every(c => c.ownerClan === clanId);
+    },
+    
+    // ⑧ ★将軍（または将軍候補）と、それを擁立している勢力の情報をまとめて調べます
+    getShogunInfo: function(game) {
+        let sponsorClanId = 0;
+        let shogunClanId = 0;
+        let candidateName = "将軍";
+
+        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
+        const shogun = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(1));
+
+        if (candidate && candidate.clan !== 0) {
+            sponsorClanId = candidate.clan;
+            candidateName = candidate.name.replace(/\|/g, '');
+        } else if (shogun && shogun.isDaimyo && shogun.clan !== 0) {
+            shogunClanId = shogun.clan;
+            // 擁立勢力を取得し、同盟が続いているか確認します
+            if (game.flags && game.flags['shogun_sponsor_clan_id']) {
+                sponsorClanId = game.flags['shogun_sponsor_clan_id'];
+                const rel = game.diplomacyManager ? game.diplomacyManager.getRelation(sponsorClanId, shogunClanId) : null;
+                if (!rel || rel.status !== '同盟') {
+                    return null; // 同盟が切れていたら無効です
+                }
+            } else {
+                return null; // 記録がなければ無効です
+            }
+            candidateName = shogun.name.replace(/\|/g, '');
+        } else {
+            return null; // どちらもいなければ無効です
+        }
+
+        // 調べた情報をひとまとめにして箱に入れて返します
+        return {
+            sponsorClanId: sponsorClanId,
+            shogunClanId: shogunClanId,
+            candidateName: candidateName
+        };
     }
 };
 
@@ -138,6 +175,56 @@ window.EventAction = {
         // システムに報告します
         if (game.affiliationSystem) {
             game.affiliationSystem.updateCastleLord(castle);
+        }
+    },
+
+    // ④ ★家督相続（生前退位）の一連の処理をまとめてやってくれる魔法
+    executeSuccession: function(game, oldDaimyo, successor, messages) {
+        const clanId = oldDaimyo.clan;
+
+        // ① 功績の譲渡（旧大名の功績の3分の1を譲り受けます）
+        const meritTransfer = Math.floor((oldDaimyo.achievementTotal || 0) / 3);
+        successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
+        oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
+
+        // ② 旧大名から大名のバッジを外し、隠居状態にします
+        oldDaimyo.isDaimyo = false;
+        oldDaimyo.isRetired = true;
+        
+        // ③ 新大名が旧大名と違うお城にいたら、旧大名のいるお城へ呼び寄せます
+        this.moveBusho(game, successor, oldDaimyo.castleId);
+
+        // ④ 新大名にバッジをつけます
+        successor.isDaimyo = true;
+        if (successor.isGunshi) {
+            successor.isGunshi = false; // もし軍師だったらバッジを外します
+        }
+
+        // ⑤ お城の城主データを新大名に書き換えます
+        const targetCastle = game.getCastle(successor.castleId);
+        this.appointCastellan(game, successor, targetCastle);
+
+        // ⑥ 大名就任時の改名と顔変更を行います
+        if (game.lifeSystem) {
+            game.lifeSystem.applyDaimyoNameAndFaceChange(successor, messages);
+        }
+
+        // ⑦ 大名家のリーダーを新大名に設定します
+        if (game.changeLeader) {
+            game.changeLeader(clanId, successor.id);
+        }
+
+        // ⑧ 旧大名の城の城主情報を更新します
+        if (oldDaimyo.castleId) {
+            const oldCastle = game.getCastle(oldDaimyo.castleId);
+            if (oldCastle && game.affiliationSystem) {
+                game.affiliationSystem.updateCastleLord(oldCastle);
+            }
+        }
+
+        // ⑨ 当主交代の共通の魔法（能力差による忠誠度の変化など）を呼び出します
+        if (game.lifeSystem) {
+            game.lifeSystem.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
         }
     }
 };
@@ -1195,49 +1282,8 @@ window.GameEvents.push({
         const clanId = oldDaimyo.clan;
         const messages = [];
 
-        // ① 功績の譲渡（生前退位コマンドと同じように、旧大名の功績の3分の1を譲り受けます）
-        const meritTransfer = Math.floor((oldDaimyo.achievementTotal || 0) / 3);
-        successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
-        oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
-
-        // ② 久政から大名のバッジを外し、隠居状態にします
-        oldDaimyo.isDaimyo = false;
-        oldDaimyo.isRetired = true;
-        
-        // ③ もし長政が久政と違うお城にいたら、久政のいるお城へ呼び寄せます
-        window.EventAction.moveBusho(game, successor, oldDaimyo.castleId);
-
-        // ④ 長政を新しい大名に任命します（城主任命は後で行います）
-        successor.isDaimyo = true;
-        if (successor.isGunshi) {
-            successor.isGunshi = false; // もし軍師だったらバッジを外します
-        }
-
-        // ⑤ お城の城主データを長政に書き換えます
-        const targetCastle = game.getCastle(successor.castleId);
-        window.EventAction.appointCastellan(game, successor, targetCastle);
-
-        // ⑥ ライフシステムの一元管理魔法を使って、大名就任時の改名と顔変更を行います！
-        if (game.lifeSystem) {
-            game.lifeSystem.applyDaimyoNameAndFaceChange(successor, messages);
-        }
-
-        // ⑧ 大名家のリーダーを長政に設定します
-        game.changeLeader(clanId, successor.id);
-
-        // ⑨ 旧大名の城の城主情報を更新します
-        if (oldDaimyo.castleId) {
-            const oldCastle = game.getCastle(oldDaimyo.castleId);
-            if (oldCastle && game.affiliationSystem) {
-                game.affiliationSystem.updateCastleLord(oldCastle);
-            }
-        }
-
-        // ⑩ 当主交代の共通の魔法を呼び出します（能力差による忠誠度の変化など）
-        // 第4引数に true を入れて、生前退位（家督相続）と同じようにショックを和らげる設定にしています！
-        if (game.lifeSystem) {
-            game.lifeSystem.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
-        }
+        // 新しく作った家督相続の魔法を呼び出します
+        window.EventAction.executeSuccession(game, oldDaimyo, successor, messages);
 
         // ⑪ メッセージを画面に出してお知らせします
         const hisamasaName = oldDaimyo.name.replace('|', '');
@@ -2823,30 +2869,11 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         // 1. 将軍候補（ID80:左馬頭）または将軍家（ID1:征夷大将軍）と、その擁立勢力を特定します
-        let sponsorClanId = 0;
-        let shogunClanId = 0;
-
-        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
-        const shogun = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(1));
-
-        if (candidate && candidate.clan !== 0) {
-            sponsorClanId = candidate.clan;
-        } else if (shogun && shogun.isDaimyo && shogun.clan !== 0) {
-            shogunClanId = shogun.clan;
-            // 入城イベントで記録した擁立勢力を取得します
-            if (game.flags && game.flags['shogun_sponsor_clan_id']) {
-                sponsorClanId = game.flags['shogun_sponsor_clan_id'];
-                // 将軍家と擁立勢力が同盟しているか確認します
-                const rel = game.diplomacyManager ? game.diplomacyManager.getRelation(sponsorClanId, shogunClanId) : null;
-                if (!rel || rel.status !== '同盟') {
-                    return false;
-                }
-            } else {
-                return false;
-            }
-        } else {
-            return false; // どちらもいなければイベントは起きません
-        }
+        const shogunInfo = window.EventCheck.getShogunInfo(game);
+        if (!shogunInfo) return false;
+        
+        const sponsorClanId = shogunInfo.sponsorClanId;
+        const shogunClanId = shogunInfo.shogunClanId;
         
         // 2. 三好長逸（ID: 1020021）が大名であるか確認します
         const nagayasu = window.EventCheck.getDaimyo(game, 1020021);
@@ -2904,19 +2931,11 @@ window.GameEvents.push({
         const matsunagaClanId = hisahide.clan;
         const matsunagaClan = game.getClan(matsunagaClanId);
         
-        let sponsorClanId = 0;
-        let candidateName = "将軍";
-
-        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
-        const shogun = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(1));
-
-        if (candidate && candidate.clan !== 0) {
-            sponsorClanId = candidate.clan;
-            candidateName = candidate.name.replace('|', '');
-        } else if (shogun && game.flags && game.flags['shogun_sponsor_clan_id']) {
-            sponsorClanId = game.flags['shogun_sponsor_clan_id'];
-            candidateName = shogun.name.replace('|', '');
-        }
+        const shogunInfo = window.EventCheck.getShogunInfo(game);
+        if (!shogunInfo) return; // 万が一取得できなければ安全のために中止します
+        
+        const sponsorClanId = shogunInfo.sponsorClanId;
+        const candidateName = shogunInfo.candidateName;
         
         const sponsorClan = game.getClan(sponsorClanId);
         
@@ -3119,30 +3138,11 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         // 1. 将軍候補（ID80:左馬頭）または将軍家（ID1:征夷大将軍）と、その擁立勢力を特定します
-        let sponsorClanId = 0;
-        let shogunClanId = 0;
-
-        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
-        const shogun = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(1));
-
-        if (candidate && candidate.clan !== 0) {
-            sponsorClanId = candidate.clan;
-        } else if (shogun && shogun.isDaimyo && shogun.clan !== 0) {
-            shogunClanId = shogun.clan;
-            // 入城イベントで記録した擁立勢力を取得します
-            if (game.flags && game.flags['shogun_sponsor_clan_id']) {
-                sponsorClanId = game.flags['shogun_sponsor_clan_id'];
-                // 将軍家と擁立勢力が同盟しているか確認します
-                const rel = game.diplomacyManager ? game.diplomacyManager.getRelation(sponsorClanId, shogunClanId) : null;
-                if (!rel || rel.status !== '同盟') {
-                    return false;
-                }
-            } else {
-                return false;
-            }
-        } else {
-            return false; // どちらもいなければイベントは起きません
-        }
+        const shogunInfo = window.EventCheck.getShogunInfo(game);
+        if (!shogunInfo) return false;
+        
+        const sponsorClanId = shogunInfo.sponsorClanId;
+        const shogunClanId = shogunInfo.shogunClanId;
 
         // 2. 三好長逸（ID: 1020021）が大名であるか確認します
         const nagayasu = game.getBusho(1020021);
@@ -3222,14 +3222,10 @@ window.GameEvents.push({
     
     execute: async function(game) {
         // メッセージや処理に必要な情報を集めます
-        let sponsorClanId = 0;
-        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
+        const shogunInfo = window.EventCheck.getShogunInfo(game);
+        if (!shogunInfo) return;
         
-        if (candidate && candidate.clan !== 0) {
-            sponsorClanId = candidate.clan;
-        } else if (game.flags && game.flags['shogun_sponsor_clan_id']) {
-            sponsorClanId = game.flags['shogun_sponsor_clan_id'];
-        }
+        const sponsorClanId = shogunInfo.sponsorClanId;
         
         const sponsorClan = game.getClan(sponsorClanId);
         const nagayasu = game.getBusho(1020021);
@@ -3416,30 +3412,11 @@ window.GameEvents.push({
         if (game.playerClanId === hatakeyamaClanId) return false;
 
         // 3. 将軍候補（ID80:左馬頭）または将軍家（ID1:征夷大将軍）と、その擁立勢力を特定します
-        let sponsorClanId = 0;
-        let shogunClanId = 0;
-
-        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
-        const shogun = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(1));
-
-        if (candidate && candidate.clan !== 0) {
-            sponsorClanId = candidate.clan;
-        } else if (shogun && shogun.isDaimyo && shogun.clan !== 0) {
-            shogunClanId = shogun.clan;
-            // 入城イベントで記録した擁立勢力を取得します
-            if (game.flags && game.flags['shogun_sponsor_clan_id']) {
-                sponsorClanId = game.flags['shogun_sponsor_clan_id'];
-                // 将軍家と擁立勢力が同盟しているか確認します
-                const rel = game.diplomacyManager ? game.diplomacyManager.getRelation(sponsorClanId, shogunClanId) : null;
-                if (!rel || rel.status !== '同盟') {
-                    return false;
-                }
-            } else {
-                return false;
-            }
-        } else {
-            return false; // どちらもいなければイベントは起きません
-        }
+        const shogunInfo = window.EventCheck.getShogunInfo(game);
+        if (!shogunInfo) return false;
+        
+        const sponsorClanId = shogunInfo.sponsorClanId;
+        const shogunClanId = shogunInfo.shogunClanId;
 
         // 万が一、畠山家自身が将軍を擁立していたら、自分自身に降伏することになってしまうので止めます
         if (hatakeyamaClanId === sponsorClanId || hatakeyamaClanId === shogunClanId) return false;
@@ -3487,19 +3464,11 @@ window.GameEvents.push({
         const hatakeyamaClanId = hatakeyamaDaimyo.clan;
         const hatakeyamaClan = game.getClan(hatakeyamaClanId);
         
-        let sponsorClanId = 0;
-        let candidateName = "将軍";
-
-        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
-        const shogun = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(1));
-
-        if (candidate && candidate.clan !== 0) {
-            sponsorClanId = candidate.clan;
-            candidateName = candidate.name.replace('|', '');
-        } else if (shogun && game.flags && game.flags['shogun_sponsor_clan_id']) {
-            sponsorClanId = game.flags['shogun_sponsor_clan_id'];
-            candidateName = shogun.name.replace('|', '');
-        }
+        const shogunInfo = window.EventCheck.getShogunInfo(game);
+        if (!shogunInfo) return;
+        
+        const sponsorClanId = shogunInfo.sponsorClanId;
+        const candidateName = shogunInfo.candidateName;
         
         const sponsorClan = game.getClan(sponsorClanId);
         
@@ -3575,29 +3544,7 @@ window.GameEvents.push({
         const clanId = oldDaimyo.clan;
         const messages = [];
 
-        // ① 功績の譲渡（旧大名の功績の3分の1を譲り受けます）
-        const meritTransfer = Math.floor((oldDaimyo.achievementTotal || 0) / 3);
-        successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
-        oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
-
-        // ② 義守から大名のバッジを外し、隠居状態にします
-        oldDaimyo.isDaimyo = false;
-        oldDaimyo.isRetired = true;
-        
-        // ③ もし義光が義守と違うお城にいたら、義守のいるお城へ呼び寄せます
-        window.EventAction.moveBusho(game, successor, oldDaimyo.castleId);
-
-        // ④ 義光を新しい大名に任命します（城主任命は後で行います）
-        successor.isDaimyo = true;
-        if (successor.isGunshi) {
-            successor.isGunshi = false; // もし軍師だったらバッジを外します
-        }
-
-        // ⑤ お城の城主データを義光に書き換えます
-        const targetCastle = game.getCastle(successor.castleId);
-        window.EventAction.appointCastellan(game, successor, targetCastle);
-
-        // ⑥ 義守の出家と改名処理（栄林と号する）
+        // 義守の出家と改名処理（栄林と号する）
         const oldNameStr = oldDaimyo.name.replace('|', ''); // 改名前のフルネームをメモしておきます
         
         // 下の名前を「栄林」に変え、読み仮名も設定します
@@ -3607,33 +3554,12 @@ window.GameEvents.push({
         oldDaimyo.yomi = oldDaimyo.familyYomi + oldDaimyo.givenYomi;
 
         const newNameStr = oldDaimyo.name.replace('|', ''); // 改名後のフルネーム
-        
-        // 通常の改名メッセージの形でお知らせの文章を作ります
         messages.push(`${oldNameStr}は出家して「${newNameStr}」と号しました。`);
 
-        // ⑦ ライフシステムの一元管理魔法を使って、大名就任時の改名と顔変更を行います！
-        if (game.lifeSystem) {
-            game.lifeSystem.applyDaimyoNameAndFaceChange(successor, messages);
-        }
+        // 新しく作った家督相続の魔法を呼び出します
+        window.EventAction.executeSuccession(game, oldDaimyo, successor, messages);
 
-        // ⑧ 大名家のリーダーを義光に設定します
-        game.changeLeader(clanId, successor.id);
-
-        // ⑨ 旧大名の城の城主情報を更新します
-        if (oldDaimyo.castleId) {
-            const oldCastle = game.getCastle(oldDaimyo.castleId);
-            if (oldCastle && game.affiliationSystem) {
-                game.affiliationSystem.updateCastleLord(oldCastle);
-            }
-        }
-
-        // ⑩ 当主交代の共通の魔法を呼び出します（能力差による忠誠度の変化など）
-        // 第4引数に true を入れて、ショックを和らげる設定にしています！
-        if (game.lifeSystem) {
-            game.lifeSystem.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
-        }
-
-        // ⑪ メッセージを画面に出してお知らせします
+        // メッセージを画面に出してお知らせします
         const clan = game.getClan(clanId);
         const clanName = clan ? clan.name : "最上家";
         const yoshiakiName = successor.name.replace('|', '');
@@ -3732,48 +3658,8 @@ window.GameEvents.push({
         const clanId = oldDaimyo.clan;
         const messages = [];
 
-        // ① 功績の譲渡
-        const meritTransfer = Math.floor((oldDaimyo.achievementTotal || 0) / 3);
-        successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
-        oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
-
-        // ② 具教から大名のバッジを外し、隠居状態にします
-        oldDaimyo.isDaimyo = false;
-        oldDaimyo.isRetired = true;
-        
-        // ③ もし具房が具教と違うお城にいたら、具教のいるお城へ呼び寄せます
-        window.EventAction.moveBusho(game, successor, oldDaimyo.castleId);
-
-        // ④ 具房を新しい大名に任命します（城主任命は後で行います）
-        successor.isDaimyo = true;
-        if (successor.isGunshi) {
-            successor.isGunshi = false; // もし軍師だったらバッジを外します
-        }
-
-        // ⑤ お城の城主データを具房に書き換えます
-        const targetCastle = game.getCastle(successor.castleId);
-        window.EventAction.appointCastellan(game, successor, targetCastle);
-
-        // ⑥ ライフシステムの一元管理魔法を使って、大名就任時の改名と顔変更を行います！
-        if (game.lifeSystem) {
-            game.lifeSystem.applyDaimyoNameAndFaceChange(successor, messages);
-        }
-
-        // ⑦ 大名家のリーダーを具房に設定します
-        game.changeLeader(clanId, successor.id);
-
-        // ⑧ 旧大名の城の城主情報を更新します
-        if (oldDaimyo.castleId) {
-            const oldCastle = game.getCastle(oldDaimyo.castleId);
-            if (oldCastle && game.affiliationSystem) {
-                game.affiliationSystem.updateCastleLord(oldCastle);
-            }
-        }
-
-        // ⑨ 当主交代の共通の魔法を呼び出します
-        if (game.lifeSystem) {
-            game.lifeSystem.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
-        }
+        // 新しく作った家督相続の魔法を呼び出します
+        window.EventAction.executeSuccession(game, oldDaimyo, successor, messages);
 
         // ⑩ メッセージを画面に出してお知らせします
         const clan = game.getClan(clanId);
@@ -3825,48 +3711,8 @@ window.GameEvents.push({
         const clanId = oldDaimyo.clan;
         const messages = [];
 
-        // ① 功績の譲渡
-        const meritTransfer = Math.floor((oldDaimyo.achievementTotal || 0) / 3);
-        successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
-        oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
-
-        // ② 晴宗から大名のバッジを外し、隠居状態にします
-        oldDaimyo.isDaimyo = false;
-        oldDaimyo.isRetired = true;
-        
-        // ③ もし輝宗が晴宗と違うお城にいたら、晴宗のいるお城へ呼び寄せます
-        window.EventAction.moveBusho(game, successor, oldDaimyo.castleId);
-
-        // ④ 輝宗を新しい大名に任命します（城主任命は後で行います）
-        successor.isDaimyo = true;
-        if (successor.isGunshi) {
-            successor.isGunshi = false; // もし軍師だったらバッジを外します
-        }
-
-        // ⑤ お城の城主データを輝宗に書き換えます
-        const targetCastle = game.getCastle(successor.castleId);
-        window.EventAction.appointCastellan(game, successor, targetCastle);
-
-        // ⑥ ライフシステムの一元管理魔法を使って、大名就任時の改名と顔変更を行います！
-        if (game.lifeSystem) {
-            game.lifeSystem.applyDaimyoNameAndFaceChange(successor, messages);
-        }
-
-        // ⑦ 大名家のリーダーを輝宗に設定します
-        game.changeLeader(clanId, successor.id);
-
-        // ⑧ 旧大名の城の城主情報を更新します
-        if (oldDaimyo.castleId) {
-            const oldCastle = game.getCastle(oldDaimyo.castleId);
-            if (oldCastle && game.affiliationSystem) {
-                game.affiliationSystem.updateCastleLord(oldCastle);
-            }
-        }
-
-        // ⑨ 当主交代の共通の魔法を呼び出します
-        if (game.lifeSystem) {
-            game.lifeSystem.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
-        }
+        // 新しく作った家督相続の魔法を呼び出します
+        window.EventAction.executeSuccession(game, oldDaimyo, successor, messages);
 
         // ⑩ メッセージを画面に出してお知らせします
         const clan = game.getClan(clanId);
