@@ -2025,27 +2025,28 @@ window.GameEvents.push({
         // 3. 細川藤孝（ID: 1017029）が生存しているか
         if (!window.EventCheck.isAlive(game, 1017029)) return false;
 
-        // 4. 明智光秀（ID: 1201003）が生存し、朝倉義景（ID: 1007008）勢力に所属しているか
-        const mitsuhide = game.getBusho(1201003);
+        // 4. 朝倉義景（ID: 1007008）が大名であるか
         const asakuraDaimyo = window.EventCheck.getDaimyo(game, 1007008);
-        if (!mitsuhide || !window.EventCheck.isAlive(game, 1201003) || !asakuraDaimyo) return false;
-        if (mitsuhide.clan !== asakuraDaimyo.clan) return false;
+        if (!asakuraDaimyo) return false;
+        
+        // 5. 山城国（ID: 30）の拠点を１つ以上、三好義継または三好長逸が当主である勢力が所有しているか
+        const targetDaimyo = window.EventCheck.getDaimyo(game, [1020014, 1020021]);
+        if (!targetDaimyo) return false;
+        
+        const yamashiroCastles = game.castles.filter(c => c.provinceId === 30);
+        const hasYamashiroCastle = yamashiroCastles.some(c => c.ownerClan === targetDaimyo.clan);
+        if (!hasYamashiroCastle) return false;
 
-        // 5. 朝倉勢力と滅亡した将軍家との友好度が５１以上あるか
-        /*
-        const yoshiteru = game.getBusho(1017003);
-        const ashikagaClanId = yoshiteru ? yoshiteru.clan : 0;
-        if (!ashikagaClanId || ashikagaClanId === 0) return false;
+        // 6. 松永久秀（ID: 1202002）が生存し、三好勢力に所属しているか
+        if (!window.EventCheck.isAlive(game, 1202002)) return false;
+        const hisahide = game.getBusho(1202002);
+        if (hisahide.clan !== targetDaimyo.clan) return false;
 
-        if (game.diplomacyManager) {
-            const rel = game.diplomacyManager.getRelation(asakuraDaimyo.clan, ashikagaClanId);
-            if (!rel || rel.sentiment < 51) return false;
-        } else {
-            return false;
-        }
-        */
+        // 7. 一乗谷城（ID: 16）を朝倉勢力が所有しているか
+        const ichijodani = game.getCastle(16);
+        if (!ichijodani || ichijodani.ownerClan !== asakuraDaimyo.clan) return false;
 
-        // 6. 朝倉勢力の威信が、滅亡していない勢力の中で上位１５位以内に入っているか
+        // 8. 朝倉勢力の威信が、滅亡していない勢力の中で上位１５位以内に入っているか
         const activeClans = game.clans.filter(c => c.id !== 0 && !c.isDestroyed);
         activeClans.sort((a, b) => (b.daimyoPrestige || 0) - (a.daimyoPrestige || 0));
         
@@ -2060,7 +2061,6 @@ window.GameEvents.push({
         const yoshiaki = game.getBusho(1017004);
         const fujitaka = game.getBusho(1017029);
         const wada = game.getBusho(1017035);
-        const mitsuhide = game.getBusho(1201003);
         const asakuraDaimyo = game.getBusho(1007008);
         
         const asakuraClanId = asakuraDaimyo.clan;
@@ -2089,21 +2089,15 @@ window.GameEvents.push({
             }
         });
 
-        // 覚慶と細川藤孝、和田惟政、明智光秀の忠誠度が１００になる。
+        // 覚慶と細川藤孝、和田惟政の忠誠度が１００になる。
         targetBushos.forEach(b => b.loyalty = 100);
-        if (mitsuhide) mitsuhide.loyalty = 100;
 
         // 朝倉勢力の武将すべての忠誠度が５アップする。（上限１００）
         const asakuraBushos = game.bushos.filter(b => b.clan === asakuraClanId && b.status === 'active');
         asakuraBushos.forEach(b => {
             b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
         });
-
-        // 明智光秀の功績が５００上昇する。
-        if (mitsuhide && window.EventCheck.isAlive(game, mitsuhide.id)) {
-            mitsuhide.achievementTotal = (mitsuhide.achievementTotal || 0) + 500;
-        }
-
+        
         // 朝倉勢力の全ての拠点の民忠が１００になり、それぞれ人口・米が２０００、兵士・金が１０００アップする。
         const asakuraCastles = game.getClanCastles(asakuraClanId);
         asakuraCastles.forEach(c => {
@@ -2114,10 +2108,59 @@ window.GameEvents.push({
             c.gold = Math.min(99999, (c.gold || 0) + 1000);
         });
 
+        // --- 会話イベントのための準備 ---
+        // 細川藤孝の官位を取得（なければ下の名前）
+        let fujitakaTitle = fujitaka.givenName || fujitaka.name.replace('|', '');
+        if (fujitaka.courtRankIds && fujitaka.courtRankIds.length > 0 && game.courtRankSystem) {
+            const topRankId = Math.min(...fujitaka.courtRankIds);
+            const rank = game.courtRankSystem.getRank(topRankId);
+            if (rank) fujitakaTitle = rank.rankName2 || rank.rankName;
+        }
+
+        // 朝倉義景の官位を取得（なければ下の名前）
+        let asakuraTitle = asakuraDaimyo.givenName || asakuraDaimyo.name.replace('|', '');
+        if (asakuraDaimyo.courtRankIds && asakuraDaimyo.courtRankIds.length > 0 && game.courtRankSystem) {
+            const topRankId = Math.min(...asakuraDaimyo.courtRankIds);
+            const rank = game.courtRankSystem.getRank(topRankId);
+            if (rank) asakuraTitle = rank.rankName2 || rank.rankName;
+        }
+
+        // 会話に出てくる他の武将の名前を用意します
+        const yoshiteru = game.getBusho(1017003);
+        const yoshiteruName = yoshiteru ? yoshiteru.name.replace('|', '') : "足利義輝";
+        
+        const hisahide = game.getBusho(1202002);
+        const hisahideFamilyName = hisahide ? (hisahide.familyName || hisahide.name.split('|')[0] || "松永") : "松永";
+        
+        const yoshitsugu = game.getBusho(1020014); 
+        const miyoshiFamilyName = yoshitsugu ? (yoshitsugu.familyName || yoshitsugu.name.split('|')[0] || "三好") : "三好";
+
+        // 台本に渡す情報をひとまとめにします
+        const args = {
+            year: game.year,
+            month: game.month,
+            fujitakaName: fujitaka.name.replace('|', ''),
+            fujitakaFamilyName: fujitaka.familyName || fujitaka.name.split('|')[0] || "細川",
+            fujitakaFace: fujitaka.faceIcon || "unknown_face.webp",
+            fujitakaTitle: fujitakaTitle,
+            asakuraName: asakuraDaimyo.name.replace('|', ''),
+            asakuraFace: asakuraDaimyo.faceIcon || "unknown_face.webp",
+            asakuraTitle: asakuraTitle,
+            yoshiteruName: yoshiteruName,
+            hisahideFamilyName: hisahideFamilyName,
+            miyoshiFamilyName: miyoshiFamilyName
+        };
+
+        // ここでさっき event_text.js に書いた台本を再生します！
+        if (window.EventTextManager && window.EventTextManager.shogun_protection_1) {
+            await window.EventTextManager.playSequence(game, window.EventTextManager.shogun_protection_1(args));
+        }
+        // ------------------------------------
+
         const yoshiakiName = yoshiaki.name.replace(/\|/g, '');
-        const asakuraName = asakuraDaimyo.name.replace(/\|/g, '');
+        const asakuraNameDisplay = asakuraDaimyo.name.replace(/\|/g, '');
         const asakuraClanName = game.getClan(asakuraClanId)?.name || "朝倉家";
-        const msg = `${yoshiakiName}は幕府再興のため、${asakuraName}を頼り${asakuraClanName}の庇護下に入りました。`;
+        const msg = `${yoshiakiName}は幕府再興のため、${asakuraNameDisplay}を頼り${asakuraClanName}の庇護下に入りました。`;
         
         game.ui.log(`【イベント】${msg}`);
         await game.ui.showDialogAsync(msg, false, 0);

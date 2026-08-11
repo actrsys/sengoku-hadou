@@ -333,5 +333,42 @@ window.EventTextManager = {
             { type: 'log', msg: `${args.fujitakaName}はすぐさまその場を離れ、${args.yoshiteruGivenName}の弟・${args.yoshiakiGivenName}の救出に向けて動き出した。` },
             { type: 'log', msg: `この日の夕刻、焼け跡には激しい夕立の雨が降リ注いだ。` }
         ];
+    },
+    
+    // 将軍庇護第１段階 足利義昭が朝倉家を頼る
+    shogun_protection_1: function(args) {
+        return [
+            { type: 'log', msg: `${args.year}年${args.month}月 越前国 一乗谷` },
+            { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「お初にお目にかかる。某、${args.fujitakaFamilyName}${args.fujitakaTitle}と申す者にござる」` },
+            { type: 'dialog', leftName: args.asakuraName, leftFace: args.asakuraFace, msg: `「よう参られました。朝倉${args.asakuraTitle}にございまする」` },
+            { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「うむ。此度は直接の会談の場を設けていただき、感謝申し上げる」` },
+            { type: 'log', msg: `亡き将軍・${args.yoshiteruName}。` },
+            { type: 'log', msg: `その弟・覚慶は、${args.hisahideFamilyName}らによって興福寺にとどめおかれ、${args.miyoshiFamilyName}勢によって監視されていた。` },
+            { type: 'log', msg: `興福寺・一乗院に入っていた覚慶は、将来的に興福寺別当の座を約束されていた。` },
+            { type: 'log', msg: `興福寺は大和において権勢を誇っており、覚慶を殺害した場合に興福寺を敵に回すことをおそれ、${args.miyoshiFamilyName}勢は覚慶をあくまで軟禁するのみにとどめていた。` },
+            { type: 'log', msg: `覚慶は兄の遺臣である${args.fujitakaName}らの手引きによって、密かに興福寺から脱出し、足利将軍家の当主になることを宣言。` },
+            { type: 'log', msg: `還俗して「足利義秋」と名乗り、朝廷から従五位下・左馬頭の叙位・任官を受けていた。` },
+            { type: 'log', msg: `その後、義秋は${args.asakuraName}のいる一乗谷に迎え入れられた。` },
+            { type: 'log', msg: `一乗谷では義秋の元服式が執り行われ、この時、義秋は「足利義昭」と再び改名をしている。` },
+            { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「越前はよき土地にござるな。左馬頭様も一乗谷を気に入られたご様子じゃ」` },
+            { type: 'dialog', leftName: args.asakuraName, leftFace: args.asakuraFace, msg: `「それはなによりにござりまする」` },
+            { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「左馬頭様は時折、遠い目をなさるのだ」` },
+            { type: 'dialog', leftName: args.asakuraName, leftFace: args.asakuraFace, msg: `「ほう」` },
+            { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「${args.miyoshiFamilyName}の者が畿内を牛耳り、我が物顔で京を闊歩する。このような世の中に大層お嘆きであらせられる」` },
+            { type: 'dialog', leftName: args.asakuraName, leftFace: args.asakuraFace, msg: `「……は。心中お察しいたしまする」` },
+            { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「我らには左馬頭様のご懸念を取って払う義務がござる」` },
+            { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「${args.asakuraTitle}殿も同じ心持ちであることは、我らも存ずるところ」` },
+            { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「ともに左馬頭様を盛り立てて参りましょうぞ」` },
+            { type: 'dialog', leftName: args.asakuraName, leftFace: args.asakuraFace, msg: `「左馬頭様におかれましては、お労しゅうございまする」` },
+            { type: 'dialog', leftName: args.asakuraName, leftFace: args.asakuraFace, msg: `「越前は冬になると美しい雪が見られまする。左馬頭様のお心の慰みにもなりましょう」` },
+            { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「……」` },
+            { type: 'dialog', leftName: args.asakuraName, leftFace: args.asakuraFace, msg: `「ここらに住む者としましては、雪が深うなりましたら、移動には不便なのがちと厄介でございますが。帰ることすらままなりませぬゆえ」` },
+            { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「左馬頭様は${args.asakuraTitle}殿を頼りにされておられる」` },
+            { type: 'dialog', leftName: args.asakuraName, leftFace: args.asakuraFace, msg: `「左馬頭様も流浪の折にはさぞかしお辛い思いをなされたことでしょう」` },
+            { type: 'dialog', leftName: args.asakuraName, leftFace: args.asakuraFace, msg: `「しばらく当家にご滞在なされるがよろしかろうと存じまする」` },
+            { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「……ご厚意、重々に痛み入る。しからば、本日はこれにて」` },
+            { type: 'log', msg: `足利義昭は一乗谷において、上洛に向けて諸大名への協力要請を積極的に行った。` },
+            { type: 'log', msg: `しかし、そのいずれもが実現には至らず、義昭の滞在は長期間に及ぶこととなったのである。` }
+        ];
     }
 };
