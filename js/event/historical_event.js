@@ -270,46 +270,8 @@ window.GameEvents.push({
         window.EventAction.appointCastellan(game, motoyasu, okazakiCastle);
 
         // ★追加：今川家の国主（軍団1～8）に空きがあるなら、家康を国主にする処理
-        if (game.legions) {
-            const clanLegions = game.legions.filter(l => l.clanId === motoyasu.clan);
-            const activeNos = clanLegions.filter(l => l.commanderId > 0).map(l => l.legionNo);
-            
-            let newLegionNo = -1;
-            let emptyLegion = clanLegions.find(l => l.commanderId === 0);
-            
-            // すでに解散済みの空っぽの軍団があれば、その枠を再利用します
-            if (emptyLegion) {
-                newLegionNo = emptyLegion.legionNo;
-                emptyLegion.commanderId = motoyasu.id;
-            } else {
-                // 無ければ1～8の番号で、まだ使われていない空いている番号を探します
-                for (let i = 1; i <= 8; i++) {
-                    if (!activeNos.includes(i)) {
-                        newLegionNo = i;
-                        break;
-                    }
-                }
-                
-                // 空き番号が見つかったら、新しく軍団のデータを作成します
-                if (newLegionNo !== -1) {
-                    let maxLegionId = 0;
-                    game.legions.forEach(l => { if (l.id > maxLegionId) maxLegionId = l.id; });
-                    const newLegion = typeof Legion !== 'undefined' ? new Legion({
-                        id: maxLegionId + 1,
-                        clanId: motoyasu.clan,
-                        legionNo: newLegionNo,
-                        commanderId: motoyasu.id
-                    }) : {
-                        id: maxLegionId + 1,
-                        clanId: motoyasu.clan,
-                        legionNo: newLegionNo,
-                        commanderId: motoyasu.id
-                    };
-                    game.legions.push(newLegion);
-                }
-            }
-            
-            // 無事に国主になれた場合、岡崎城をその新しい軍団に所属させます
+        if (game.aiStaffing) {
+            const newLegionNo = game.aiStaffing.assignNewLegion(motoyasu.clan, motoyasu.id);
             if (newLegionNo !== -1) {
                 motoyasu.isCommander = true;
                 if (motoyasu.isGunshi) motoyasu.isGunshi = false; // 念のため軍師バッジを外します
@@ -2377,46 +2339,8 @@ window.GameEvents.push({
         }
 
         // ★ここから追加：所属勢力に軍団の空き（1〜8）があるか確認し、空きがあれば国主に任命します
-        if (game.legions && nijo) {
-            const sponsorClanId = candidate.clan;
-            const sponsorLegions = game.legions.filter(l => l.clanId === sponsorClanId);
-            const activeNos = sponsorLegions.filter(l => l.commanderId > 0).map(l => l.legionNo);
-            
-            let newLegionNo = -1;
-            let emptyLegion = sponsorLegions.find(l => l.commanderId === 0);
-            
-            // すでに解散済みの空っぽの軍団があれば、その枠を再利用します
-            if (emptyLegion) {
-                newLegionNo = emptyLegion.legionNo;
-                emptyLegion.commanderId = candidate.id;
-            } else {
-                // 無ければ1から8の間で空いている番号を探します
-                for (let i = 1; i <= 8; i++) {
-                    if (!activeNos.includes(i)) {
-                        newLegionNo = i;
-                        break;
-                    }
-                }
-                // 空き番号が見つかったら、新しく軍団のデータを作ります
-                if (newLegionNo !== -1) {
-                    let maxLegionId = 0;
-                    game.legions.forEach(l => { if (l.id > maxLegionId) maxLegionId = l.id; });
-                    const newLegion = typeof Legion !== 'undefined' ? new Legion({
-                        id: maxLegionId + 1,
-                        clanId: sponsorClanId,
-                        legionNo: newLegionNo,
-                        commanderId: candidate.id
-                    }) : {
-                        id: maxLegionId + 1,
-                        clanId: sponsorClanId,
-                        legionNo: newLegionNo,
-                        commanderId: candidate.id
-                    };
-                    game.legions.push(newLegion);
-                }
-            }
-            
-            // 将軍候補が国主になれた場合、二条城をその軍団の所属にして委任状態にします
+        if (game.aiStaffing && nijo) {
+            const newLegionNo = game.aiStaffing.assignNewLegion(candidate.clan, candidate.id);
             if (newLegionNo !== -1) {
                 candidate.isCommander = true;
                 if (candidate.isGunshi) candidate.isGunshi = false; // 念のため軍師バッジを外します
@@ -2424,7 +2348,6 @@ window.GameEvents.push({
                 nijo.isDelegated = true; // AIに委任する状態にします
             }
         }
-        // ★追加ここまで
 
         // ★追加：将軍を擁立した勢力を記録します（game.flagsに入れるだけで自動でセーブデータに保存されます）
         game.flags = game.flags || {};
@@ -3032,45 +2955,8 @@ window.GameEvents.push({
         }
 
         // 臣従先の勢力に軍団の空き（1〜8）があるか確認し、空きがあれば国主に任命します
-        if (game.legions && targetCastle) {
-            const sponsorLegions = game.legions.filter(l => l.clanId === sponsorClanId);
-            const activeNos = sponsorLegions.filter(l => l.commanderId > 0).map(l => l.legionNo);
-            
-            let newLegionNo = -1;
-            let emptyLegion = sponsorLegions.find(l => l.commanderId === 0);
-            
-            // 解散済みの軍団があればそれを再利用します
-            if (emptyLegion) {
-                newLegionNo = emptyLegion.legionNo;
-                emptyLegion.commanderId = hisahide.id;
-            } else {
-                // 無ければ1から8の間で空いている番号を探します
-                for (let i = 1; i <= 8; i++) {
-                    if (!activeNos.includes(i)) {
-                        newLegionNo = i;
-                        break;
-                    }
-                }
-                // 空き番号が見つかったら、新しく軍団のデータを作ります
-                if (newLegionNo !== -1) {
-                    let maxLegionId = 0;
-                    game.legions.forEach(l => { if (l.id > maxLegionId) maxLegionId = l.id; });
-                    const newLegion = typeof Legion !== 'undefined' ? new Legion({
-                        id: maxLegionId + 1,
-                        clanId: sponsorClanId,
-                        legionNo: newLegionNo,
-                        commanderId: hisahide.id
-                    }) : {
-                        id: maxLegionId + 1,
-                        clanId: sponsorClanId,
-                        legionNo: newLegionNo,
-                        commanderId: hisahide.id
-                    };
-                    game.legions.push(newLegion);
-                }
-            }
-            
-            // 松永久秀が国主になれた場合、居城をその軍団の所属にします
+        if (game.aiStaffing && targetCastle) {
+            const newLegionNo = game.aiStaffing.assignNewLegion(sponsorClanId, hisahide.id);
             if (newLegionNo !== -1) {
                 hisahide.isCommander = true;
                 if (hisahide.isGunshi) hisahide.isGunshi = false; // 軍師バッジは念のため外します
@@ -3485,45 +3371,8 @@ window.GameEvents.push({
         });
 
         // 臣従先の勢力に軍団の空き（1〜8）があるか確認し、空きがあれば国主に任命します
-        if (game.legions && murashigeNewCastle) {
-            const sponsorLegions = game.legions.filter(l => l.clanId === sponsorClanId);
-            const activeNos = sponsorLegions.filter(l => l.commanderId > 0).map(l => l.legionNo);
-            
-            let newLegionNo = -1;
-            let emptyLegion = sponsorLegions.find(l => l.commanderId === 0);
-            
-            // 解散済みの軍団があればそれを再利用します
-            if (emptyLegion) {
-                newLegionNo = emptyLegion.legionNo;
-                emptyLegion.commanderId = murashige.id;
-            } else {
-                // 無ければ1から8の間で空いている番号を探します
-                for (let i = 1; i <= 8; i++) {
-                    if (!activeNos.includes(i)) {
-                        newLegionNo = i;
-                        break;
-                    }
-                }
-                // 空き番号が見つかったら、新しく軍団のデータを作ります
-                if (newLegionNo !== -1) {
-                    let maxLegionId = 0;
-                    game.legions.forEach(l => { if (l.id > maxLegionId) maxLegionId = l.id; });
-                    const newLegion = typeof Legion !== 'undefined' ? new Legion({
-                        id: maxLegionId + 1,
-                        clanId: sponsorClanId,
-                        legionNo: newLegionNo,
-                        commanderId: murashige.id
-                    }) : {
-                        id: maxLegionId + 1,
-                        clanId: sponsorClanId,
-                        legionNo: newLegionNo,
-                        commanderId: murashige.id
-                    };
-                    game.legions.push(newLegion);
-                }
-            }
-            
-            // 荒木村重が国主になれた場合、居城をその軍団の所属にします
+        if (game.aiStaffing && murashigeNewCastle) {
+            const newLegionNo = game.aiStaffing.assignNewLegion(sponsorClanId, murashige.id);
             if (newLegionNo !== -1) {
                 murashige.isCommander = true;
                 if (murashige.isGunshi) murashige.isGunshi = false; // 軍師バッジは念のため外します

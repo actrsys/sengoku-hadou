@@ -221,6 +221,55 @@ class AIStaffing {
         this.evaluationCache = {};
         this.lastMonth = -1;
     }
+
+    // ==========================================
+    // ★追加：軍団の空き枠を探す、または新しく作る共通の魔法（人事部で一元管理）
+    // ==========================================
+    assignNewLegion(clanId, commanderId) {
+        if (!this.game.legions) this.game.legions = [];
+        const clanLegions = this.game.legions.filter(l => l.clanId === clanId);
+        const activeNos = clanLegions.filter(l => l.commanderId > 0).map(l => l.legionNo);
+        
+        let newLegionNo = -1;
+        const emptyLegion = clanLegions.find(l => l.commanderId === 0);
+        
+        // すでに解散済みの空っぽの軍団があれば、その枠を再利用します
+        if (emptyLegion) {
+            newLegionNo = emptyLegion.legionNo;
+            emptyLegion.commanderId = commanderId;
+            emptyLegion.establishedTurnId = this.game.getCurrentTurnId(); // 発足月をリセットします
+        } else {
+            // 無ければ1から8の間で空いている番号を探します
+            for (let i = 1; i <= 8; i++) {
+                if (!activeNos.includes(i)) {
+                    newLegionNo = i;
+                    break;
+                }
+            }
+            // 空き番号が見つかったら、新しく軍団のデータを作ります
+            if (newLegionNo !== -1) {
+                let maxLegionId = 0;
+                this.game.legions.forEach(l => { if (l.id > maxLegionId) maxLegionId = l.id; });
+                const newLegion = typeof Legion !== 'undefined' ? new Legion({
+                    id: maxLegionId + 1,
+                    clanId: clanId,
+                    legionNo: newLegionNo,
+                    commanderId: commanderId,
+                    establishedTurnId: this.game.getCurrentTurnId()
+                }) : {
+                    id: maxLegionId + 1,
+                    clanId: clanId,
+                    legionNo: newLegionNo,
+                    commanderId: commanderId,
+                    establishedTurnId: this.game.getCurrentTurnId()
+                };
+                this.game.legions.push(newLegion);
+            }
+        }
+        
+        // 無事に軍団が割り当てられたらその番号を、失敗したら-1を返します
+        return newLegionNo;
+    }
     
     // ★追加：AI大名が軍団を新設する機能
     createNewLegionIfNeeded(clanId) {
@@ -399,42 +448,11 @@ class AIStaffing {
         if (futureLegionBushoIds.size < targetCastles.length) return false; // ★変更：失敗時は false を返す
         // ==========================================
         
-        // ★修正：空き枠（解散済みの軍団）があれば再利用するロジックに変更！
-        const deadLegion = clanLegions.find(l => l.commanderId === 0);
-        let newLegionNo = 1;
+        // ★修正：人事部の魔法を呼び出します！
+        const newLegionNo = this.assignNewLegion(clanId, newCommander.id);
         
-        if (deadLegion) {
-            // 空き枠（解散済み）があれば、その軍団データを再利用します
-            newLegionNo = deadLegion.legionNo;
-            deadLegion.commanderId = newCommander.id;
-            deadLegion.establishedTurnId = this.game.getCurrentTurnId(); // ★今回追加：発足月をリセットします
-        } else {
-            // 空き枠がなければ、新しく番号を作ります（活動中の番号だけを避ける）
-            const activeNos = clanLegions.filter(l => l.commanderId > 0).map(l => l.legionNo);
-            while (activeNos.includes(newLegionNo)) {
-                newLegionNo++;
-            }
-            
-            // ★念のためのフェイルセーフ：番号が8を超えてしまったら中止します
-            if (newLegionNo > 8) return false; // ★変更：失敗時は false を返す
-            
-            let maxLegionId = 0;
-            if (this.game.legions && this.game.legions.length > 0) {
-                this.game.legions.forEach(l => { if (l.id > maxLegionId) maxLegionId = l.id; });
-            }
-            const newLegionId = maxLegionId + 1;
-            
-            // 軍団データ作成と登録
-            const newLegion = new Legion({
-                id: newLegionId,
-                clanId: clanId,
-                legionNo: newLegionNo,
-                commanderId: newCommander.id,
-                establishedTurnId: this.game.getCurrentTurnId() // ★今回追加：発足月を記録します
-            });
-            if (!this.game.legions) this.game.legions = [];
-            this.game.legions.push(newLegion);
-        }
+        // 番号が割り当てられなかったら失敗として中止します
+        if (newLegionNo === -1) return false;
         
         // 新国主を移動させて国主にする
         this.game.affiliationSystem.moveCastle(newCommander, baseCastle.id);
