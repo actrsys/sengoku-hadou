@@ -226,6 +226,54 @@ window.EventAction = {
         if (game.lifeSystem) {
             game.lifeSystem.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
         }
+    },
+
+    // ⑤ ★勢力を丸ごと吸収する（城と武将の引き継ぎ）魔法
+    absorbClan: function(game, subordinateClanId, dominantClanId, excludeBushoId = 0, fixedLoyalty = null) {
+        // ① 吸収される側の軍団をすべて解散させます（お片付け）
+        if (game.legions) {
+            const myLegions = game.legions.filter(l => Number(l.clanId) === Number(subordinateClanId));
+            myLegions.forEach(l => {
+                if (game.castleManager && game.castleManager.disbandLegion) {
+                    game.castleManager.disbandLegion(l.id);
+                }
+            });
+        }
+
+        // ② 吸収される側のお城をすべて吸収する大名家にプレゼントして、直轄（0）にします
+        const myCastles = game.getClanCastles(subordinateClanId);
+        myCastles.forEach(c => {
+            if (game.castleManager && game.castleManager.changeOwner) {
+                game.castleManager.changeOwner(c, dominantClanId, true, 0); // trueで平和的に引き渡し
+            } else {
+                c.ownerClan = dominantClanId;
+            }
+            c.legionId = 0; // 直轄に戻す
+        });
+
+        // ③ 吸収される側の武将（除外ID以外）を吸収する大名家に入れます
+        const myBushos = game.bushos.filter(b => Number(b.clan) === Number(subordinateClanId) && b.status !== 'dead' && b.id !== excludeBushoId);
+        myBushos.forEach(b => {
+            if (fixedLoyalty !== null && game.affiliationSystem && game.affiliationSystem.joinClan) {
+                // 忠誠度が指定されている場合（臣従イベントなど）はお引越しセンターの魔法を使います
+                game.affiliationSystem.joinClan(b, dominantClanId, b.castleId, fixedLoyalty);
+            } else {
+                // それ以外（乗っ取りなど）は個別に処理して相性で忠誠を再計算します
+                b.isDaimyo = false;
+                b.isCommander = false;
+                b.isGunshi = false;
+                b.clan = dominantClanId;
+                if (game.affiliationSystem && game.affiliationSystem.updateLoyaltyForNewLord) {
+                    game.affiliationSystem.updateLoyaltyForNewLord(b, dominantClanId);
+                }
+            }
+        });
+
+        // ④ 吸収される側（旧勢力）の滅亡フラグを立てます
+        const subordinateClan = game.getClan(subordinateClanId);
+        if (subordinateClan) {
+            subordinateClan.extinctionNotified = true;
+        }
     }
 };
 
@@ -1509,43 +1557,8 @@ window.GameEvents.push({
         // ----------------------------------------------------
         // 1. 遠山景任勢力が織田信長勢力に吸収される
         // ----------------------------------------------------
-        // ① 遠山家の軍団をすべて解散させます
-        if (game.legions) {
-            const toyamaLegions = game.legions.filter(l => Number(l.clanId) === Number(toyamaClanId));
-            toyamaLegions.forEach(l => {
-                if (game.castleManager && game.castleManager.disbandLegion) {
-                    game.castleManager.disbandLegion(l.id);
-                }
-            });
-        }
-        
-        // ② 遠山家のお城を織田家の直轄（0）として引き渡します
-        const toyamaCastles = game.getClanCastles(toyamaClanId);
-        toyamaCastles.forEach(c => {
-            if (game.castleManager && game.castleManager.changeOwner) {
-                game.castleManager.changeOwner(c, odaClanId, true, 0); // trueで平和的に引き渡し
-            } else {
-                c.ownerClan = odaClanId;
-            }
-        });
-
-        // ③ 遠山家の武将（死亡した景任以外）を織田家に入れます
-        const toyamaBushos = game.bushos.filter(b => Number(b.clan) === Number(toyamaClanId) && b.id !== deadBusho.id && b.status !== 'dead');
-        toyamaBushos.forEach(b => {
-            b.isDaimyo = false;
-            b.isCommander = false;
-            b.isGunshi = false;
-            b.clan = odaClanId;
-            // 忠誠度の再計算をお願いします
-            if (game.affiliationSystem && game.affiliationSystem.updateLoyaltyForNewLord) {
-                game.affiliationSystem.updateLoyaltyForNewLord(b, odaClanId);
-            }
-        });
-
-        // ④ 遠山家の滅亡フラグを立てます
-        if (toyamaClan) {
-            toyamaClan.extinctionNotified = true;
-        }
+        // 共通の魔法を呼び出します（景任本人は除外します）
+        window.EventAction.absorbClan(game, toyamaClanId, odaClanId, deadBusho.id);
 
         // ----------------------------------------------------
         // 2. 織田勝長が、遠山景任の養子になる
@@ -2946,17 +2959,13 @@ window.GameEvents.push({
         const hisahideCastle = game.getCastle(hisahide.castleId);
         const hisahideCastleName = hisahideCastle ? hisahideCastle.name : "居城";
         
-        // ① 城の所有権を移す処理（内部処理）
+        // 元々松永家が持っていたお城のリストを覚えておきます（後の信貴山城の判定用）
         const matsunagaCastles = game.getClanCastles(matsunagaClanId);
-        matsunagaCastles.forEach(castle => {
-            game.castleManager.changeOwner(castle, sponsorClanId, true);
-        });
-
-        // ② 武将を全員合流させる処理（内部処理）
         const matsunagaBushos = game.bushos.filter(b => b.clan === matsunagaClanId && b.status === 'active');
-        matsunagaBushos.forEach(busho => {
-            game.affiliationSystem.joinClan(busho, sponsorClanId, busho.castleId, 100);
-        });
+
+        // ①・②・④ 勢力の吸収と武将の合流処理（内部処理）
+        // （第5引数に100を渡すことで、全員の忠誠度が100で合流します）
+        window.EventAction.absorbClan(game, matsunagaClanId, sponsorClanId, 0, 100);
         
         // ③ 松永久秀を改めて城主に任命する処理
         // 信貴山城（ID: 39）が元々松永家のものだった場合、松永久秀を信貴山城へお引越しさせます
@@ -2991,13 +3000,8 @@ window.GameEvents.push({
                 });
             }
         }
-
-        // ④ 勢力としては終了させる処理（内部処理）
-        if (matsunagaClan) {
-            matsunagaClan.extinctionNotified = true;
-        }
-
-        // ⑤ メッセージ表示
+        
+        // ④ メッセージ表示
         const msg = `${hisahideName}が${sponsorName}の上洛に同調し臣従しました！`;
         
         game.ui.log(`【イベント】${msg}`);
@@ -3479,28 +3483,12 @@ window.GameEvents.push({
         const hatakeyamaCastle = game.getCastle(hatakeyamaDaimyo.castleId);
         const hatakeyamaCastleName = hatakeyamaCastle ? hatakeyamaCastle.name : "居城";
         
-        // ① 畠山家の城の所有権を、将軍擁立勢力に移します
-        // 第3引数の「true」によって、平和的な引き渡しとなりバグを防ぎます
-        const hatakeyamaCastles = game.getClanCastles(hatakeyamaClanId);
-        hatakeyamaCastles.forEach(castle => {
-            game.castleManager.changeOwner(castle, sponsorClanId, true);
-        });
-
-        // ② 畠山家の武将を全員、将軍擁立勢力に合流させます
-        // 第4引数の「100」によって、忠誠度がピッタリ100になります
-        const hatakeyamaBushos = game.bushos.filter(b => b.clan === hatakeyamaClanId && b.status === 'active');
-        hatakeyamaBushos.forEach(busho => {
-            game.affiliationSystem.joinClan(busho, sponsorClanId, busho.castleId, 100);
-        });
+        // ①・②・④ 勢力の吸収と武将の合流処理（内部処理）
+        window.EventAction.absorbClan(game, hatakeyamaClanId, sponsorClanId, 0, 100);
         
         // ③ 畠山大名を改めて城主に任命します（joinClanの中で大名や城主のバッジは一度外れているため）
         if (hatakeyamaCastle) {
             window.EventAction.appointCastellan(game, hatakeyamaDaimyo, hatakeyamaCastle);
-        }
-
-        // ④ 畠山家という勢力自体を終了させます（滅亡フラグを立てます）
-        if (hatakeyamaClan) {
-            hatakeyamaClan.extinctionNotified = true;
         }
 
         // ⑤ 画面に何が起きたかメッセージを出してお知らせします
