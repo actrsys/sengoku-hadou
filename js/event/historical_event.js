@@ -1014,10 +1014,11 @@ window.GameEvents.push({
 
         // 信長の官位名を取得します
         let nobunagaTitle = "上総介";
-        if (nobunaga.courtRankIds && nobunaga.courtRankIds.length > 0 && game.courtRankSystem) {
-            const topRankId = Math.min(...nobunaga.courtRankIds);
-            const rank = game.courtRankSystem.getRank(topRankId);
-            if (rank) nobunagaTitle = rank.rankName2 || rank.rankName;
+        if (game.courtRankSystem && typeof game.courtRankSystem.getHighestRankName === 'function') {
+            const rankName = game.courtRankSystem.getHighestRankName(nobunaga);
+            if (rankName !== "なし") {
+                nobunagaTitle = rankName;
+            }
         }
 
         // 信長の居城名を取得します
@@ -2111,18 +2112,20 @@ window.GameEvents.push({
         // --- 会話イベントのための準備 ---
         // 細川藤孝の官位を取得（なければ下の名前）
         let fujitakaTitle = fujitaka.givenName || fujitaka.name.replace('|', '');
-        if (fujitaka.courtRankIds && fujitaka.courtRankIds.length > 0 && game.courtRankSystem) {
-            const topRankId = Math.min(...fujitaka.courtRankIds);
-            const rank = game.courtRankSystem.getRank(topRankId);
-            if (rank) fujitakaTitle = rank.rankName2 || rank.rankName;
+        if (game.courtRankSystem && typeof game.courtRankSystem.getHighestRankName === 'function') {
+            const rankName = game.courtRankSystem.getHighestRankName(fujitaka);
+            if (rankName !== "なし") {
+                fujitakaTitle = rankName;
+            }
         }
 
         // 朝倉義景の官位を取得（なければ下の名前）
         let asakuraTitle = asakuraDaimyo.givenName || asakuraDaimyo.name.replace('|', '');
-        if (asakuraDaimyo.courtRankIds && asakuraDaimyo.courtRankIds.length > 0 && game.courtRankSystem) {
-            const topRankId = Math.min(...asakuraDaimyo.courtRankIds);
-            const rank = game.courtRankSystem.getRank(topRankId);
-            if (rank) asakuraTitle = rank.rankName2 || rank.rankName;
+        if (game.courtRankSystem && typeof game.courtRankSystem.getHighestRankName === 'function') {
+            const rankName = game.courtRankSystem.getHighestRankName(asakuraDaimyo);
+            if (rankName !== "なし") {
+                asakuraTitle = rankName;
+            }
         }
 
         // 会話に出てくる他の武将の名前を用意します
