@@ -859,7 +859,7 @@ class LifeSystem {
             });
             busho.courtRankIds = []; // 自分の持ち物リストは空っぽにします
 
-            // 武将が死亡した時点で、将軍なら生き残っている一門に「左馬頭（ID80）」を託します！
+            // 死亡した武将が将軍なら生き残っている一門に「左馬頭（ID98または99）」を託します！
             if (wasShogun) {
                 const relative = this.game.bushos.find(b => 
                     b.status !== 'dead' && 
@@ -870,10 +870,15 @@ class LifeSystem {
                 
                 if (relative) {
                     if (this.game.courtRankSystem) {
-                        this.game.courtRankSystem.grantRank(relative, 80);
+                        // まず98を渡してみて、ダメなら99を渡します
+                        if (!this.game.courtRankSystem.grantRank(relative, 98)) {
+                            this.game.courtRankSystem.grantRank(relative, 99);
+                        }
                     } else {
                         if (!relative.courtRankIds) relative.courtRankIds = [];
-                        if (!relative.courtRankIds.includes(80)) relative.courtRankIds.push(80);
+                        if (!relative.courtRankIds.includes(98) && !relative.courtRankIds.includes(99)) {
+                            relative.courtRankIds.push(98);
+                        }
                     }
                 }
             }
@@ -1487,11 +1492,14 @@ class LifeSystem {
         // ★ライフシステムの一元管理魔法を使って、大名就任時の改名と顔変更を行います！
         this.applyDaimyoNameAndFaceChange(successor, messages);
 
-        // ★先代が征夷大将軍（ID1）を持っていれば、後継ぎに「左馬頭（ID80）」を与える魔法！
+        // ★先代が征夷大将軍（ID1）を持っていれば、後継ぎに「左馬頭（ID98または99）」を与える魔法！
         if (oldDaimyo.courtRankIds && oldDaimyo.courtRankIds.includes(1)) {
             const isRelative = oldDaimyo.familyIds.some(fId => successor.familyIds.includes(fId));
             if (isRelative) {
-                this.game.courtRankSystem.grantRank(successor, 80);
+                // まず98を渡してみて、ダメなら99を渡します
+                if (!this.game.courtRankSystem.grantRank(successor, 98)) {
+                    this.game.courtRankSystem.grantRank(successor, 99);
+                }
             }
         }
 

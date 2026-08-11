@@ -157,18 +157,18 @@ class CourtRankSystem {
 
         // 国主限定の優先官位
         if (busho.isCommander && !busho.isDaimyo) {
-            if (bushoId === 1401002) preferredRankIds = [151]; // 木下秀吉: 筑前守
-            else if (bushoId === 1006078) preferredRankIds = [114]; // 柴田勝家: 修理亮
-            else if (bushoId === 1006117) preferredRankIds = [94]; // 丹羽長秀: 越前守
-            else if (bushoId === 1006087) preferredRankIds = [161, 162]; // 滝川一益: 左近将監
-            else if (bushoId === 1201003) preferredRankIds = [196]; // 明智光秀: 日向守
+            if (bushoId === 1401002) preferredRankIds = [169]; // 木下秀吉: 筑前守
+            else if (bushoId === 1006078) preferredRankIds = [132]; // 柴田勝家: 修理亮
+            else if (bushoId === 1006117) preferredRankIds = [112]; // 丹羽長秀: 越前守
+            else if (bushoId === 1006087) preferredRankIds = [179, 180]; // 滝川一益: 左近将監
+            else if (bushoId === 1201003) preferredRankIds = [214]; // 明智光秀: 日向守
         }
         
         // 大名限定の優先官位
         if (busho.isDaimyo) {
             // 織田信長（ID:1006006、または名前で判定）
             if (bushoId === 1006006 || bushoName === '織田信長') {
-                preferredRankIds = [25, 26, 27, 28, 160]; // 参議、弾正大忠
+                preferredRankIds = [25, 26, 27, 28, 178]; // 参議、弾正大忠
             }
         }
 
@@ -239,12 +239,14 @@ class CourtRankSystem {
                 }
             }
 
-            // ★追加：もし当主が「左馬頭（ID80）」を持っていて、朝廷に「征夷大将軍（ID1）」が空いていたら特別に就任する魔法！
-            if (leader.courtRankIds && leader.courtRankIds.includes(80)) {
+            // ★追加：もし当主が「左馬頭（ID98または99）」を持っていて、朝廷に「征夷大将軍（ID1）」が空いていたら特別に就任する魔法！
+            if (leader.courtRankIds && (leader.courtRankIds.includes(98) || leader.courtRankIds.includes(99))) {
                 if (this.availableRanks.includes(1)) {
                     this.grantRank(leader, 1);
-                    leader.courtRankIds = leader.courtRankIds.filter(id => id !== 80);
-                    this.returnRank(80);
+                    
+                    const samanoKamiId = leader.courtRankIds.includes(98) ? 98 : 99;
+                    leader.courtRankIds = leader.courtRankIds.filter(id => id !== samanoKamiId);
+                    this.returnRank(samanoKamiId);
                     
                     const leaderName = leader.name.replace('|', '');
                     const msg = `${leaderName}が征夷大将軍に就任しました。`;
@@ -263,8 +265,10 @@ class CourtRankSystem {
             // ------------------------------------------
             let candidates = this.ranks.filter(r => {
                 if (!this.availableRanks.includes(r.id)) return false;
+                // ランク３以上の官位は通常の手順では任官されません
                 if (r.rankNo < 4) return false;
-                if (r.id === 80) return false;
+                // 左馬頭も通常の手順では任官されません
+                if (r.id === 98 || r.id === 99) return false;
                 if (r.rankNo >= currentMaxRankNo) return false;
                 return basePrestige >= r.necessaryPrestige && contribution >= (r.necessaryPrestige * 4.5);
             });
@@ -304,7 +308,7 @@ class CourtRankSystem {
                     let cmdrCandidates = this.ranks.filter(r => {
                         if (!this.availableRanks.includes(r.id)) return false;
                         if (r.rankNo < 4) return false;
-                        if (r.id === 80) return false;
+                        if (r.id === 98 || r.id === 99) return false;
                         if (r.rankNo >= cmdrMaxRankNo) return false;
                         if (r.rankNo < currentMaxRankNo + 2) return false; // 大名より2低いランクまで
                         if ((commander.achievementTotal || 0) < r.necessaryPrestige) return false; // 功績チェック
