@@ -1542,17 +1542,6 @@ class LifeSystem {
                 }
             }
 
-            const leader = this.game.getBusho(clan.leaderId);
-            if (leader && leader.status !== 'dead' && leader.isDaimyo && leader.courtRankIds && leader.courtRankIds.includes(1) && clanCastles.length === 0) {
-                // ★追加：将軍の勢力が滅亡したことをイベントシステムに伝えます！
-                if (this.game.eventManager) {
-                    await this.game.eventManager.processEvents('shogun_death', {
-                        deadShogunClanId: clan.id,
-                        killerClanId: killerClanId
-                    });
-                }
-            }
-            
             // ★ここから追加：未婚の姫を、攻め滅ぼした大名家が総取りする魔法
             if (killerClanId > 0 && killerClanId !== clan.id) {
                 const killerClan = this.game.getClan(killerClanId);

@@ -40,8 +40,7 @@ class EventManager {
             after_command: [],        // コマンド実行直後
 
             after_battle_blink: [], // 地図の点滅が終わった直後の特別な引き出し
-            busho_death: [],         // 武将が死亡した瞬間に呼ばれる特別な引き出し
-            shogun_death: []       // 将軍が死亡した直後に呼ばれる特別な引き出し
+            busho_death: []         // 武将が死亡した瞬間に呼ばれる特別な引き出し
         };
         
         window.GameEvents.forEach(ev => this.registerEvent(ev));
@@ -74,6 +73,8 @@ class EventManager {
 
         // ★追加：このタイミングで歴史イベントがすでに起きたかをメモする変数です
         let historicalEventOccurred = false;
+        // ★追加：お片付け（画面更新）が必要かどうかをメモするシールを用意します
+        let needRefreshScreen = false;
 
         for (const ev of targetEvents) {
             const isHistorical = ev.id && ev.id.startsWith("historical_");
@@ -103,6 +104,9 @@ class EventManager {
                 try {
                     await ev.execute(this.game, context);
 
+                    // ★追加：イベントが実行されたので、後でお片付けをするためのシールを貼ります
+                    needRefreshScreen = true;
+
                     // 一度きりイベントは「正常終了後」にスタンプを押します
                     if (ev.isOneTime) {
                         this.game.flags = this.game.flags || {};
@@ -127,6 +131,12 @@ class EventManager {
                     console.warn(`イベント ${ev.id} の実行中にエラーが出ましたが、進行を継続します:`, error);
                 }
             }
+        }
+
+        // ★追加：全てのイベントのチェックと実行が終わった後、お片付けシールが貼られていたら1回だけ画面を更新します
+        if (needRefreshScreen && window.EventAction && window.EventAction.refreshScreen) {
+            // event_managerの中では「this.game」という名前でゲームデータを管理しているので、それを渡します
+            window.EventAction.refreshScreen(this.game);
         }
     }
 }
