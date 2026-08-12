@@ -1635,7 +1635,42 @@ window.GameEvents.push({
 
         // 名前が変わってしまう前に、「現在の武将の名前」と「現在のお城の名前」をメモしておきます！
         const nobunagaName = nobunaga.name.replace('|', ''); 
+        const nobunagaGivenName = nobunaga.givenName || "信長";
+        const nobunagaFace = nobunaga.faceIcon || "unknown_face.webp";
         const oldCastleName = inabayama.name;
+
+        // 信長様の官位を調べてメモしておきます
+        let nobunagaTitle = "上総介";
+        if (game.courtRankSystem && typeof game.courtRankSystem.getHighestRankName === 'function') {
+            const rankName = game.courtRankSystem.getHighestRankName(nobunaga);
+            if (rankName !== "なし") {
+                nobunagaTitle = rankName;
+            }
+        }
+
+        // セリフの台本に渡すデータ（配役表）を準備します
+        const args = {
+            nobunagaName: nobunagaName,
+            nobunagaGivenName: nobunagaGivenName,
+            nobunagaFace: nobunagaFace,
+            nobunagaTitle: nobunagaTitle
+        };
+
+        // 音楽を清洲同盟と同じものに変更します
+        if (window.AudioManager) {
+            window.AudioManager.memorizeCurrentBgm();
+            window.AudioManager.playBGM("06_Snowy Sacred Approach.ogg");
+        }
+
+        // 新しく書き足したイベントテキスト（台本）を呼び出して再生します
+        if (window.EventTextManager && window.EventTextManager.rename_gifu_castle) {
+            await window.EventTextManager.playSequence(game, window.EventTextManager.rename_gifu_castle(args));
+        }
+
+        // イベントが終わったので、音楽を元の曲に戻します
+        if (window.AudioManager) {
+            window.AudioManager.restoreMemorizedBgm();
+        }
 
         // ① 稲葉山城の名前を「岐阜城」に変更します
         inabayama.name = "岐阜城";

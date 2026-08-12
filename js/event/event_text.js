@@ -370,5 +370,47 @@ window.EventTextManager = {
             { type: 'log', msg: `足利義昭は一乗谷において、上洛に向けて諸大名への協力要請を積極的に行った。` },
             { type: 'log', msg: `しかし、そのいずれもが実現には至らず、義昭の滞在は長期間に及ぶこととなったのである。` }
         ];
+    },
+
+    // ==========================================
+    // ここから下を新しく書き足します
+    // ==========================================
+    // 岐阜城改称イベント
+    rename_gifu_castle: function(args) {
+        return [
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「禅師。沢彦禅師。よう参られた。いや、よう参られましたな」` },
+            { type: 'dialog', leftName: "沢彦", leftFace: "takugen_souon.webp", msg: `「ほっほっほ。お久しゅうございます」` },
+            { type: 'dialog', leftName: "沢彦", leftFace: "takugen_souon.webp", msg: `「${args.nobunagaTitle}様におかれましては、ご健勝のこと、祝着至極に存じまする」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「禅師もお変わりなくご息災であるご様子。何よりじゃ」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「して、井ノ口に代わる城の名。お考えいただけましたか」` },
+            { type: 'dialog', leftName: "沢彦", leftFace: "takugen_souon.webp", msg: `「はい。こちらに」` },
+            { type: 'log', msg: `沢彦は三本の巻物を取り出し、${args.nobunagaGivenName}の前に置いた。` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「おお！ かたじけない！ 感謝いたしますぞ！」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「では、早速……」` },
+            { type: 'log', msg: `${args.nobunagaGivenName}は一番手前に置かれた巻物を手に取り、目の前で広げた。巻物には『岐山』と書かれていた。` },
+            { type: 'dialog', leftName: "沢彦", leftFace: "takugen_souon.webp", msg: `「『周の文王、岐山より起り、天下を定む』という言葉がございます」` },
+            { type: 'dialog', leftName: "沢彦", leftFace: "takugen_souon.webp", msg: `「これを手本とするのがよろしいかと」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「ううむ……よき案じゃ。よき案じゃが……しかし、そのまま岐山というのは、些か捻りがないな……」` },
+            { type: 'dialog', leftName: "沢彦", leftFace: "takugen_souon.webp", msg: `「左様にござりまするか」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「うむ……」` },
+            { type: 'log', msg: `${args.nobunagaGivenName}は岐山の巻物を置き、二番目の巻物を開いた。そこには『岐陽』と書かれていた。` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「禅師、これは？ なんと読むのじゃ？」` },
+            { type: 'dialog', leftName: "沢彦", leftFace: "takugen_souon.webp", msg: `「ぎよう、と読みまする」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「ぎよう城……ぎよう城……ううむ、口に馴染まぬな……」` },
+            { type: 'dialog', leftName: "沢彦", leftFace: "takugen_souon.webp", msg: `「ほっほっほ。左様にござりまするか」` },
+            { type: 'log', msg: `${args.nobunagaGivenName}は岐陽の巻物を置き、ため息を吐いた。そして一番奥の巻物を手に取った。\n${args.nobunagaGivenName}が巻物を開くと、そこには『岐阜』の文字が書かれていた。` },
+            { type: 'dialog', leftName: "沢彦", leftFace: "takugen_souon.webp", msg: `「ぎふ、と読みまする」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「ぎふ……岐阜城か」` },
+            { type: 'dialog', leftName: "沢彦", leftFace: "takugen_souon.webp", msg: `「『曲阜』という土地がございます」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「孔子生誕の地じゃな」` },
+            { type: 'dialog', leftName: "沢彦", leftFace: "takugen_souon.webp", msg: `「左様にござりまする。武と智を兼ね備えられたる${args.nobunagaTitle}様に相応しい名かと存じまする」` },
+            { type: 'dialog', leftName: "沢彦", leftFace: "takugen_souon.webp", msg: `「織田${args.nobunagaTitle}、岐阜より起り、天下を定む。いかがでございましょう？」` },
+            { type: 'log', msg: `${args.nobunagaGivenName}は膝を打った。` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「気に入った！ 気に入り申した！」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「本日よりこの地は、『岐阜』じゃ！」` },
+            { type: 'log', msg: `こうして${args.nobunagaName}は稲葉山城の名を岐阜城と改めた。` },
+            { type: 'log', msg: `以降、${args.nobunagaGivenName}は岐阜城を拠点として天下布武の戦いを展開していくこととなる。` }
+        ];
     }
+    
 };
