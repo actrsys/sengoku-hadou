@@ -20,24 +20,13 @@ Object.assign(WarManager.prototype, {
         return true;
     },
     
-    // ★メッセージ用の家名を一元管理する魔法（プレイヤー自身の家なら「当家」に差し替えます）
+    // ★追加：メッセージ用の家名を一元管理する魔法（プレイヤー自身の家なら「当家」に差し替えます）
     getDisplayClanName(clanId, rawName) {
         const pid = Number(this.game.playerClanId);
         return (Number(clanId) === pid) ? "当家" : rawName;
     },
     
-    // ★部隊のリストの中で、大名や城主を探して一番前（総大将）に移動させる共通の魔法です！
-    setLeaderToFront(bushos) {
-        if (!bushos || bushos.length <= 1) return;
-        let leaderIdx = bushos.findIndex(b => b.isDaimyo);
-        if (leaderIdx === -1) leaderIdx = bushos.findIndex(b => b.isCastellan);
-        if (leaderIdx > 0) {
-            const leader = bushos.splice(leaderIdx, 1)[0];
-            bushos.unshift(leader);
-        }
-    },
-    
-    // ★大名や国主が他軍団の城に逃げ込んだ時に、軍団を解散させる共通の魔法です！
+    // ★追加：大名や国主が他軍団の城に逃げ込んだ時に、軍団を解散させる共通の魔法です！
     handleDaimyoEscape(busho, targetCastle) {
         if (busho.isDaimyo && Number(targetCastle.legionId) !== 0) {
             // 大名が他軍団に逃げ込んだ場合は、逃げ込んだ先の軍団を解散して直轄にする
@@ -539,7 +528,12 @@ Object.assign(WarManager.prototype, {
         }
 
         try {
-            this.setLeaderToFront(atkBushos);
+            let atkLeaderIdx = atkBushos.findIndex(b => b.isDaimyo);
+            if (atkLeaderIdx === -1) atkLeaderIdx = atkBushos.findIndex(b => b.isCastellan);
+            if (atkLeaderIdx > 0) {
+                const leader = atkBushos.splice(atkLeaderIdx, 1)[0];
+                atkBushos.unshift(leader);
+            }
             
             const pid = Number(this.game.playerClanId);
             const atkClan = Number(atkCastle.ownerClan !== undefined ? atkCastle.ownerClan : (atkCastle.isKunishu ? -1 : 0));
@@ -861,7 +855,12 @@ Object.assign(WarManager.prototype, {
                                     this.game.ui.openBushoSelector('def_intercept_deploy', defCastle.id, {
                                         onConfirm: (selectedBushoIds) => {
                                             const defBushos = selectedBushoIds.map(id => this.game.getBusho(id));
-                                            this.setLeaderToFront(defBushos);
+                                            let defLeaderIdx = defBushos.findIndex(b => b.isDaimyo);
+                                            if (defLeaderIdx === -1) defLeaderIdx = defBushos.findIndex(b => b.isCastellan);
+                                            if (defLeaderIdx > 0) {
+                                                const leader = defBushos.splice(defLeaderIdx, 1)[0];
+                                                defBushos.unshift(leader);
+                                            }
                                             this.game.ui.openQuantitySelector('def_intercept', [defCastle], null, {
                                                 onConfirm: (inputs) => {
                                                     const inputData = inputs[defCastle.id] || inputs;
@@ -1064,8 +1063,13 @@ Object.assign(WarManager.prototype, {
                                     defBushos.push({id: 'dummy_guard', name: "侍大将", strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"});
                                 }
                             }
-                            
-                            this.setLeaderToFront(defBushos);
+                                
+                            let defLeaderIdx = defBushos.findIndex(b => b.isDaimyo);
+                            if (defLeaderIdx === -1) defLeaderIdx = defBushos.findIndex(b => b.isCastellan);
+                            if (defLeaderIdx > 0) {
+                                const leader = defBushos.splice(defLeaderIdx, 1)[0];
+                                defBushos.unshift(leader);
+                            }
                             
                             const handleDefDivide = (callback) => {
                                 let finalDefAssignments = [];
