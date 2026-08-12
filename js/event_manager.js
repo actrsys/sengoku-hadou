@@ -134,7 +134,7 @@ class EventManager {
         }
 
         // ★追加：全てのイベントのチェックと実行が終わった後、お片付けシールが貼られていたら1回だけ画面を更新します
-        if (needRefreshScreen && window.EventAction && window.EventAction.refreshScreen) {
+        if (needRefreshScreen && timing !== 'game_start' && window.EventAction && window.EventAction.refreshScreen) {
             // event_managerの中では「this.game」という名前でゲームデータを管理しているので、それを渡します
             window.EventAction.refreshScreen(this.game);
         }
