@@ -13,6 +13,10 @@
         <script src="js/pako.min.js"></script>
 </head>
 <body>
+    <!-- ★追加：Chromeのサボりを防ぐための、見えないダミー文字 -->
+    <div style="font-family: 'abashiri-mincho'; position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; overflow: hidden;">あ</div>
+    <div style="font-family: 'FudeGoshirae'; position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; overflow: hidden;">あ</div>
+
     <div id="game-screen">
     
     <div id="global-loading-screen" class="hidden">
@@ -660,19 +664,17 @@
         // まず画面のサイズ調整を行います
         resizeGameScreen();
         
-        // ブラウザに「今すぐこの2つのフォントを絶対に読み込みなさい！」と直接命令して待ちます
-        Promise.all([
-            document.fonts.load("16px 'abashiri-mincho'"),
-            document.fonts.load("16px 'FudeGoshirae'")
-        ]).then(function () {
-            // フォントの準備が完了したら、画面を一瞬だけ隠してすぐに出し直します
-            // これにより、ブラウザに「新しいフォントで画面を描き直しなさい！」と強制します
-            document.body.style.display = 'none';
-            setTimeout(function() {
-                document.body.style.display = '';
-            }, 10);
+        // ★追加：フォントの準備が終わるまで、画面全体を「透明」にして隠しておきます
+        document.body.style.visibility = 'hidden';
+
+        // Chromeも必ず言うことを聞く「すべてのフォントの準備完了を待つ」魔法です
+        document.fonts.ready.then(function() {
+            // 準備が完全に終わったら、画面を見えるように戻します
+            document.body.style.visibility = 'visible';
         }).catch(function(err) {
             console.error("フォントの読み込み待機中にエラーが発生しました:", err);
+            // 万が一エラーが起きても、画面が真っ暗なままにならないように見えるようにします
+            document.body.style.visibility = 'visible';
         });
     });
 
