@@ -655,7 +655,26 @@
     }
     
     window.addEventListener('resize', resizeGameScreen);
-    window.addEventListener('DOMContentLoaded', resizeGameScreen);
+    
+    window.addEventListener('DOMContentLoaded', function() {
+        // まず画面のサイズ調整を行います
+        resizeGameScreen();
+        
+        // ブラウザに「今すぐこの2つのフォントを絶対に読み込みなさい！」と直接命令して待ちます
+        Promise.all([
+            document.fonts.load("16px 'abashiri-mincho'"),
+            document.fonts.load("16px 'FudeGoshirae'")
+        ]).then(function () {
+            // フォントの準備が完了したら、画面を一瞬だけ隠してすぐに出し直します
+            // これにより、ブラウザに「新しいフォントで画面を描き直しなさい！」と強制します
+            document.body.style.display = 'none';
+            setTimeout(function() {
+                document.body.style.display = '';
+            }, 10);
+        }).catch(function(err) {
+            console.error("フォントの読み込み待機中にエラーが発生しました:", err);
+        });
+    });
 
     // リロードやページを閉じようとした時に警告を出す
     window.addEventListener('beforeunload', function (e) {
