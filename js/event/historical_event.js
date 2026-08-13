@@ -2107,10 +2107,27 @@ window.GameEvents.push({
             game.lifeSystem.applyDaimyoNameAndFaceChange(yoshiaki);
         }
 
-        // 覚慶、細川藤孝、(生きていれば)和田惟政が、朝倉勢力の所属になる。（功績を半減させないルート）
+        // 覚慶、細川藤孝とその一門、(生きていれば)和田惟政とその一門が、朝倉勢力の所属になる。（功績を半減させないルート）
         const targetBushos = [yoshiaki, fujitaka];
+
+        // 細川藤孝の一門（1017030～1017033）を追加します
+        const fujitakaFamilyIds = [1017030, 1017031, 1017032, 1017033];
+        fujitakaFamilyIds.forEach(id => {
+            const member = game.getBusho(id);
+            // 存在していて、なおかつ生きているか確認してからリストに入れます
+            if (member && window.EventCheck.isAlive(game, id)) {
+                targetBushos.push(member);
+            }
+        });
+
         if (wada && window.EventCheck.isAlive(game, 1017035)) {
             targetBushos.push(wada);
+
+            // 和田惟政の一門（1017036）を追加します
+            const wadaFamily = game.getBusho(1017036);
+            if (wadaFamily && window.EventCheck.isAlive(game, 1017036)) {
+                targetBushos.push(wadaFamily);
+            }
         }
 
         targetBushos.forEach(b => {
@@ -2271,8 +2288,25 @@ window.GameEvents.push({
 
         // 移籍対象の武将リストを作成
         let targetBushos = [yoshiaki, mitsuhide, fujitaka];
+
+        // 細川藤孝の一門（1017030～1017033）が朝倉に居れば一緒に移籍させます
+        const fujitakaFamilyIds = [1017030, 1017031, 1017032, 1017033];
+        fujitakaFamilyIds.forEach(id => {
+            const member = game.getBusho(id);
+            // 存在していて、朝倉家に所属しており、生きているか確認します
+            if (member && member.clan === asakuraClanId && window.EventCheck.isAlive(game, id)) {
+                targetBushos.push(member);
+            }
+        });
+
         if (wada && wada.clan === asakuraClanId && window.EventCheck.isAlive(game, 1017035)) {
             targetBushos.push(wada);
+
+            // 和田惟政の一門（1017036）が朝倉に居れば一緒に移籍させます
+            const wadaFamily = game.getBusho(1017036);
+            if (wadaFamily && wadaFamily.clan === asakuraClanId && window.EventCheck.isAlive(game, 1017036)) {
+                targetBushos.push(wadaFamily);
+            }
         }
 
         // 明智光秀の家臣（ID1201000～ID1201999）が朝倉に居れば一緒に移籍
