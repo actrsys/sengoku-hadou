@@ -2189,9 +2189,20 @@ window.GameEvents.push({
             miyoshiFamilyName: miyoshiFamilyName
         };
 
-        // ここでさっき event_text.js に書いた台本を再生します！
+        // ★追加：BGMをメモして専用の曲に変更します
+        if (window.AudioManager) {
+            window.AudioManager.memorizeCurrentBgm();
+            window.AudioManager.playBGM("SC_ex_Field1_Cruising1.ogg");
+        }
+
+        // event_text.js に書いた台本を再生します！
         if (window.EventTextManager && window.EventTextManager.shogun_protection_1) {
             await window.EventTextManager.playSequence(game, window.EventTextManager.shogun_protection_1(args));
+        }
+
+        // ★追加：イベントが終わったのでBGMを元に戻します
+        if (window.AudioManager) {
+            window.AudioManager.restoreMemorizedBgm();
         }
         // ------------------------------------
 
