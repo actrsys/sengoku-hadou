@@ -2053,13 +2053,14 @@ window.GameEvents.push({
         // 1. 足利義輝（ID: 1017003）が死亡しているか
         if (!window.EventCheck.isDead(game, 1017003)) return false;
 
-        // 2. 一乗院覚慶（足利義昭・ID: 1017004）が生存し、左馬頭（ID: 80）の官位を有しているか
+        // 2. 一乗院覚慶（足利義昭・ID: 1017004）が生存し、左馬頭（ID: 80）の官位を有し、大名ではないか確認します
         const yoshiaki = game.getBusho(1017004);
-        if (!yoshiaki || !window.EventCheck.isAlive(game, 1017004)) return false;
+        if (!yoshiaki || !window.EventCheck.isAlive(game, 1017004) || yoshiaki.isDaimyo) return false;
         if (!yoshiaki.courtRankIds || !yoshiaki.courtRankIds.includes(80)) return false;
 
-        // 3. 細川藤孝（ID: 1017029）が生存しているか
-        if (!window.EventCheck.isAlive(game, 1017029)) return false;
+        // 3. 細川藤孝（ID: 1017029）が生存し、大名ではないか確認します
+        const fujitaka = game.getBusho(1017029);
+        if (!fujitaka || !window.EventCheck.isAlive(game, 1017029) || fujitaka.isDaimyo) return false;
 
         // 4. 朝倉義景（ID: 1007008）が大名であるか
         const asakuraDaimyo = window.EventCheck.getDaimyo(game, 1007008);
@@ -2114,18 +2115,18 @@ window.GameEvents.push({
         const fujitakaFamilyIds = [1017030, 1017031, 1017032, 1017033];
         fujitakaFamilyIds.forEach(id => {
             const member = game.getBusho(id);
-            // 存在していて、なおかつ生きているか確認してからリストに入れます
-            if (member && window.EventCheck.isAlive(game, id)) {
+            // 存在していて、なおかつ生きているか、さらに大名ではないか確認してからリストに入れます
+            if (member && window.EventCheck.isAlive(game, id) && !member.isDaimyo) {
                 targetBushos.push(member);
             }
         });
 
-        if (wada && window.EventCheck.isAlive(game, 1017035)) {
+        if (wada && window.EventCheck.isAlive(game, 1017035) && !wada.isDaimyo) {
             targetBushos.push(wada);
 
             // 和田惟政の一門（1017036）を追加します
             const wadaFamily = game.getBusho(1017036);
-            if (wadaFamily && window.EventCheck.isAlive(game, 1017036)) {
+            if (wadaFamily && window.EventCheck.isAlive(game, 1017036) && !wadaFamily.isDaimyo) {
                 targetBushos.push(wadaFamily);
             }
         }
