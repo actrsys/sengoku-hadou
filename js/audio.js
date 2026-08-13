@@ -48,8 +48,14 @@ class AudioManager {
             },
             // イベントBGM4
             'SC_ex_Scene3_Odyssey.ogg': {
+                start: 81408,
+                end: (81408 + 3924855) / 44100,
+                baseVolume: 0.05
+            },
+            // イベントBGM5
+            'SC_ex_Field1_Cruising1.ogg': {
                 start: 0,
-                end: (0 + 3924855) / 44100,
+                end: (0 + 4639937) / 44100,
                 baseVolume: 0.05
             },
             // 攻城戦BGM
@@ -91,6 +97,7 @@ class AudioManager {
             'victory.ogg': { baseVolume: 0.1 },
             'katana001.ogg': { baseVolume: 0.04 },
             'katana002.ogg': { baseVolume: 0.05 },
+            'zangeki001.ogg': { baseVolume: 0.05 },
         };
         
         // もしカタログに書いていない音が呼ばれたときの「とりあえずの音量」
