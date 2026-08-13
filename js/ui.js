@@ -301,7 +301,9 @@ class UIManager {
             if (["一括", "直轄", "委任", "不可", "許可"].includes(text)) return;
 
             if (window.AudioManager) {
-                if (["戻る", "閉じる", "いいえ", "やめる", "撤退", "解放", "処断", "シナリオ選択に戻る"].includes(text)) {
+                if (text === "処断する") {
+                    window.AudioManager.playSE('zangeki001.ogg');
+                } else if (["戻る", "閉じる", "いいえ", "やめる", "撤退", "解放", "処断", "シナリオ選択に戻る"].includes(text)) {
                     window.AudioManager.playSE('cancel.ogg');
                 } else {
                     window.AudioManager.playSE('decision.ogg');
