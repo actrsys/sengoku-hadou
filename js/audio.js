@@ -97,7 +97,7 @@ class AudioManager {
             'victory.ogg': { baseVolume: 0.1 },
             'katana001.ogg': { baseVolume: 0.04 },
             'katana002.ogg': { baseVolume: 0.05 },
-            'zangeki001.ogg': { baseVolume: 0.05 },
+            'zangeki001.ogg': { baseVolume: 0.06 },
         };
         
         // もしカタログに書いていない音が呼ばれたときの「とりあえずの音量」
