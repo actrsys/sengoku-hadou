@@ -1648,7 +1648,8 @@ class LifeSystem {
             } else {
                 // プレイヤー以外の滅亡時、大名が生きていれば浪人にします
                 const leader = this.game.getBusho(clan.leaderId);
-                if (leader && leader.status !== 'dead') {
+                // すでに諸勢力の頭領などになっている場合は浪人にしない条件を追加します
+                if (leader && leader.status !== 'dead' && (leader.belongKunishuId || 0) === 0) {
                     leader.isDaimyo = false;
                     this.game.affiliationSystem.becomeRonin(leader);
                 }
