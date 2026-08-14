@@ -859,7 +859,7 @@ class LifeSystem {
             });
             busho.courtRankIds = []; // 自分の持ち物リストは空っぽにします
 
-            // 死亡した武将が将軍なら生き残っている一門に「左馬頭（ID98または99）」を託します！
+            // 死亡した武将が将軍なら生き残っている一門に「左馬頭」を託します！
             if (wasShogun) {
                 const relative = this.game.bushos.find(b => 
                     b.status !== 'dead' && 
@@ -869,15 +869,18 @@ class LifeSystem {
                 );
                 
                 if (relative) {
+                    // ★修正：一元化したリストのIDを順番に試します！
                     if (this.game.courtRankSystem) {
-                        // まず98を渡してみて、ダメなら99を渡します
-                        if (!this.game.courtRankSystem.grantRank(relative, 98)) {
-                            this.game.courtRankSystem.grantRank(relative, 99);
+                        for (let id of window.EventCheck.RANK_IDS_CANDIDATE) {
+                            if (this.game.courtRankSystem.grantRank(relative, id)) {
+                                break; // 授与できたら終了
+                            }
                         }
                     } else {
                         if (!relative.courtRankIds) relative.courtRankIds = [];
-                        if (!relative.courtRankIds.includes(98) && !relative.courtRankIds.includes(99)) {
-                            relative.courtRankIds.push(98);
+                        const hasCandidateRank = window.EventCheck.RANK_IDS_CANDIDATE.some(id => relative.courtRankIds.includes(id));
+                        if (!hasCandidateRank) {
+                            relative.courtRankIds.push(window.EventCheck.RANK_IDS_CANDIDATE[0]);
                         }
                     }
                 }

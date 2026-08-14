@@ -139,18 +139,12 @@ class CourtRankSystem {
     }
     
     // ==========================================
-    // ★ここから追加：月初めの官位授与チェック
+    // ★月初めの官位授与チェック
     // ==========================================
-    // ★追加：候補官位の中から領地などを考えて1つ選んで授与する共通の魔法
-    selectAndGrantRank(busho, candidates, ownedProvinces, messages) {
-        if (!candidates || candidates.length === 0) return null;
 
-        // 候補の中で「一番偉い（rankNoが一番小さい）ランク」を見つけます
-        candidates.sort((a, b) => a.rankNo - b.rankNo);
-        const bestRankNo = candidates[0].rankNo;
-        const finalCandidates = candidates.filter(r => r.rankNo === bestRankNo);
-
-        // ★追加：特定の武将に対する「優先官位」のチェック
+    // ★武将の「優先官位ID」のリストを答えてくれる専用の窓口（魔法）です！
+    getPreferredRankIds(busho) {
+        if (!busho) return [];
         let preferredRankIds = [];
         const bushoId = Number(busho.id);
         const bushoName = busho.name.replace(/\|/g, '');
@@ -168,9 +162,24 @@ class CourtRankSystem {
         if (busho.isDaimyo) {
             // 織田信長（ID:1006006、または名前で判定）
             if (bushoId === 1006006 || bushoName === '織田信長') {
-                preferredRankIds = [25, 26, 27, 28, 178]; // 参議、弾正大忠
+                preferredRankIds = [46, 25, 26, 27, 28, 9, 10, 11, 12, 6, 5]; // 弾正大弼、参議、権大納言、内大臣、右大臣
             }
         }
+        return preferredRankIds;
+    }
+
+    // ★候補官位の中から領地などを考えて1つ選んで授与する共通の魔法
+    selectAndGrantRank(busho, candidates, ownedProvinces, messages) {
+        if (!candidates || candidates.length === 0) return null;
+
+        // 候補の中で「一番偉い（rankNoが一番小さい）ランク」を見つけます
+        candidates.sort((a, b) => a.rankNo - b.rankNo);
+        const bestRankNo = candidates[0].rankNo;
+        const finalCandidates = candidates.filter(r => r.rankNo === bestRankNo);
+
+        // ★優先官位のリストは、新しく作った専用の窓口から受け取ります！
+        const preferredRankIds = this.getPreferredRankIds(busho);
+        const bushoName = busho.name.replace(/\|/g, '');
 
         let selectedRank = null;
 
@@ -239,12 +248,12 @@ class CourtRankSystem {
                 }
             }
 
-            // ★追加：もし当主が「左馬頭（ID98または99）」を持っていて、朝廷に「征夷大将軍（ID1）」が空いていたら特別に就任する魔法！
-            if (leader.courtRankIds && (leader.courtRankIds.includes(98) || leader.courtRankIds.includes(99))) {
-                if (this.availableRanks.includes(1)) {
-                    this.grantRank(leader, 1);
+            // ★もし当主が「左馬頭」を持っていて、朝廷に「征夷大将軍」が空いていたら特別に就任する魔法！
+            if (leader.courtRankIds && window.EventCheck.RANK_IDS_CANDIDATE.some(id => leader.courtRankIds.includes(id))) {
+                if (this.availableRanks.includes(window.EventCheck.RANK_ID_SHOGUN)) {
+                    this.grantRank(leader, window.EventCheck.RANK_ID_SHOGUN);
                     
-                    const samanoKamiId = leader.courtRankIds.includes(98) ? 98 : 99;
+                    const samanoKamiId = leader.courtRankIds.find(id => window.EventCheck.RANK_IDS_CANDIDATE.includes(id));
                     leader.courtRankIds = leader.courtRankIds.filter(id => id !== samanoKamiId);
                     this.returnRank(samanoKamiId);
                     
@@ -263,12 +272,17 @@ class CourtRankSystem {
             // ------------------------------------------
             // 1. 大名の官位チェック
             // ------------------------------------------
+            // ★大名の優先官位リストを窓口から受け取っておきます
+            const leaderPreferredRanks = this.getPreferredRankIds(leader);
+
             let candidates = this.ranks.filter(r => {
                 if (!this.availableRanks.includes(r.id)) return false;
-                // ランク３以上の官位は通常の手順では任官されません
-                if (r.rankNo < 4) return false;
+                
+                // ランク３以上の官位は通常の手順では任官されません（★ただし本人の優先リストに入っていれば通します！）
+                if (r.rankNo < 4 && !leaderPreferredRanks.includes(r.id)) return false;
+                
                 // 左馬頭も通常の手順では任官されません
-                if (r.id === 98 || r.id === 99) return false;
+                if (window.EventCheck.RANK_IDS_CANDIDATE.includes(r.id)) return false;
                 if (r.rankNo >= currentMaxRankNo) return false;
                 return basePrestige >= r.necessaryPrestige && contribution >= (r.necessaryPrestige * 4.5);
             });
@@ -305,10 +319,16 @@ class CourtRankSystem {
                         }
                     }
 
+                    // ★国主の優先官位リストを窓口から受け取っておきます
+                    const cmdrPreferredRanks = this.getPreferredRankIds(commander);
+
                     let cmdrCandidates = this.ranks.filter(r => {
                         if (!this.availableRanks.includes(r.id)) return false;
-                        if (r.rankNo < 4) return false;
-                        if (r.id === 98 || r.id === 99) return false;
+                        
+                        // ランク３以上の官位は通常の手順では任官されません（★優先リストに入っていれば通します！）
+                        if (r.rankNo < 4 && !cmdrPreferredRanks.includes(r.id)) return false;
+                        
+                        if (window.EventCheck.RANK_IDS_CANDIDATE.includes(r.id)) return false;
                         if (r.rankNo >= cmdrMaxRankNo) return false;
                         if (r.rankNo < currentMaxRankNo + 2) return false; // 大名より2低いランクまで
                         if ((commander.achievementTotal || 0) < r.necessaryPrestige) return false; // 功績チェック

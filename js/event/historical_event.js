@@ -11,25 +11,40 @@ window.GameEvents = window.GameEvents || [];
 // ★ イベント用の便利なチェック係（共通の魔法）
 // ==========================================
 window.EventCheck = {
-    // ① 指定したIDの武将が存在して、「生きている（活動中か浪人）」か確認します
+    // 1, 将軍と将軍候補の「官位ID」を一元管理する箱です！
+    // 将来IDが変わった時は、ここの数字を変えるだけで全部に反映されます。
+    RANK_ID_SHOGUN: 1,
+    RANK_IDS_CANDIDATE: [98, 99],
+
+    // 2. 将軍候補（左馬頭を持つ武将）を探して渡す魔法
+    getCandidateBusho: function(game) {
+        return game.bushos.find(b => b.courtRankIds && this.RANK_IDS_CANDIDATE.some(id => b.courtRankIds.includes(id)));
+    },
+
+    // 3. 将軍を探して渡す魔法
+    getShogunBusho: function(game) {
+        return game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(this.RANK_ID_SHOGUN));
+    },
+
+    // 4. 指定したIDの武将が存在して、「生きている（活動中か浪人）」か確認します
     isAlive: function(game, bushoId) {
         const busho = game.getBusho(bushoId);
         return busho ? (busho.status !== 'dead' && busho.status !== 'unborn') : false;
     },
     
-    // ② 指定したIDの武将が存在して、「死んでいる」か確認します
+    // 5. 指定したIDの武将が存在して、「死んでいる」か確認します
     isDead: function(game, bushoId) {
         const busho = game.getBusho(bushoId);
         return busho ? (busho.status === 'dead') : false;
     },
     
-    // ③ 指定したIDの武将が存在して、「大名として活動しているか」確認します（はい/いいえ のみ）
+    // 6. 指定したIDの武将が存在して、「大名として活動しているか」確認します（はい/いいえ のみ）
     isDaimyo: function(game, bushoId) {
         const busho = game.getBusho(bushoId);
         return busho ? (this.isAlive(game, bushoId) && busho.isDaimyo && busho.clan !== 0) : false;
     },
 
-    // ④ ★「OR（または）」の動き：リストの中の「誰か一人」が大名なら、そのデータを渡します
+    // 7. 「OR（または）」の動き：リストの中の「誰か一人」が大名なら、そのデータを渡します
     getDaimyo: function(game, bushoIds) {
         // もし1つの数字だけが渡されたら、探しやすいようにリストの形 [ ] に直します
         const ids = Array.isArray(bushoIds) ? bushoIds : [bushoIds];
@@ -44,14 +59,14 @@ window.EventCheck = {
         return null; // 誰も条件を満たさなければ空っぽ（null）を返します
     },
 
-    // ⑤ ★「AND（かつ）」の動き：リストの「全員」が大名として存在しているか確認します
+    // 8. 「AND（かつ）」の動き：リストの「全員」が大名として存在しているか確認します
     hasAllDaimyos: function(game, bushoIds) {
         const ids = Array.isArray(bushoIds) ? bushoIds : [bushoIds];
         // リストの「全員(every)」が、getDaimyoの条件をクリアできるかチェックします
         return ids.every(id => this.getDaimyo(game, id) !== null);
     },
     
-    // ⑥ ★「勢力同士の領地が隣接しているか」確認します
+    // 9. 「勢力同士の領地が隣接しているか」確認します
     areClansAdjacent: function(game, clanIdA, clanIdB) {
         const castlesA = game.getClanCastles(clanIdA);
         const castlesB = game.getClanCastles(clanIdB);
@@ -69,7 +84,7 @@ window.EventCheck = {
         return false;
     },
 
-    // ⑦ ★「指定した地方（国）の城を全て持っているか」確認します
+    // 10. 「指定した地方（国）の城を全て持っているか」確認します
     ownsAllCastlesInProvince: function(game, clanId, provinceId) {
         const provinceCastles = game.castles.filter(c => c.provinceId === provinceId);
         // その地方に城が無い場合は false を返します
@@ -78,14 +93,15 @@ window.EventCheck = {
         return provinceCastles.every(c => c.ownerClan === clanId);
     },
     
-    // ⑧ ★将軍（または将軍候補）と、それを擁立している勢力の情報をまとめて調べます
+    // 11, 将軍（または将軍候補）と、それを擁立している勢力の情報をまとめて調べます
     getShogunInfo: function(game) {
         let sponsorClanId = 0;
         let shogunClanId = 0;
         let candidateName = "将軍";
 
-        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
-        const shogun = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(1));
+        // 一元管理の魔法を呼び出すように変更します！
+        const candidate = this.getCandidateBusho(game);
+        const shogun = this.getShogunBusho(game);
 
         if (candidate && candidate.clan !== 0) {
             sponsorClanId = candidate.clan;
@@ -1339,7 +1355,7 @@ window.GameEvents.push({
         if (oichi.status !== 'unmarried' || !isOdaPrincess) return false;
 
         // 8. ここを追加します：織田信長勢力が将軍候補（または将軍）を抱えているか確認します
-        const candidate = game.bushos.find(b => b.clan === nobunaga.clan && b.courtRankIds && (b.courtRankIds.includes(80) || b.courtRankIds.includes(1)));
+        const candidate = game.bushos.find(b => b.clan === nobunaga.clan && b.courtRankIds && (window.EventCheck.RANK_IDS_CANDIDATE.some(id => b.courtRankIds.includes(id)) || b.courtRankIds.includes(window.EventCheck.RANK_ID_SHOGUN)));
         if (!candidate) return false;
 
         // 9. 六角義賢（ID: 1018003）または六角義治（ID: 1018004）が大名であるか確認します
@@ -1378,8 +1394,8 @@ window.GameEvents.push({
 
         if (!oichi || !nobunagaClan || !nagamasaClan) return; // 万が一データがない場合の安全装置です
 
-        // ★ここを追加します：将軍候補の情報を取得しておきます
-        const candidate = game.bushos.find(b => b.clan === nobunaga.clan && b.courtRankIds && (b.courtRankIds.includes(80) || b.courtRankIds.includes(1)));
+        // 将軍候補の情報を取得しておきます
+        const candidate = game.bushos.find(b => b.clan === nobunaga.clan && b.courtRankIds && (window.EventCheck.RANK_IDS_CANDIDATE.some(id => b.courtRankIds.includes(id)) || b.courtRankIds.includes(window.EventCheck.RANK_ID_SHOGUN)));
         const candidateName = candidate ? candidate.name.replace(/\|/g, '') : "将軍";
 
         // ① お市の所属を浅井家に変更し、旦那さんを長政に設定します
@@ -2053,10 +2069,10 @@ window.GameEvents.push({
         // 1. 足利義輝（ID: 1017003）が死亡しているか
         if (!window.EventCheck.isDead(game, 1017003)) return false;
 
-        // 2. 一乗院覚慶（足利義昭・ID: 1017004）が生存し、左馬頭（ID: 80）の官位を有し、大名ではないか確認します
+        // 2. 一乗院覚慶（足利義昭・ID: 1017004）が生存し、左馬頭の官位を有し、大名ではないか確認します
         const yoshiaki = game.getBusho(1017004);
         if (!yoshiaki || !window.EventCheck.isAlive(game, 1017004) || yoshiaki.isDaimyo) return false;
-        if (!yoshiaki.courtRankIds || !yoshiaki.courtRankIds.includes(80)) return false;
+        if (!yoshiaki.courtRankIds || !window.EventCheck.RANK_IDS_CANDIDATE.some(id => yoshiaki.courtRankIds.includes(id))) return false;
 
         // 3. 細川藤孝（ID: 1017029）が生存し、大名ではないか確認します
         const fujitaka = game.getBusho(1017029);
@@ -2448,12 +2464,12 @@ window.GameEvents.push({
     isOneTime: false, // 条件を満たしている間は、何度でも（毎月）チェックします
     
     checkCondition: function(game) {
-        // ★修正：すでに世界に「征夷大将軍（ID1）」がいるか、「すでに擁立イベントが終わったスタンプ」があるなら、入城イベントはもう起きません！
-        const shogunExists = game.bushos.some(b => b.courtRankIds && b.courtRankIds.includes(1));
+        // ★修正：すでに世界に「征夷大将軍」がいるか、「すでに擁立イベントが終わったスタンプ」があるなら、入城イベントはもう起きません！
+        const shogunExists = window.EventCheck.getShogunBusho(game) !== undefined;
         if (shogunExists || (game.flags && game.flags['historical_shogun_coronation'])) return false;
 
-        // 1. 将軍候補（ID80:左馬頭の官位を持つ武将）を世界中から探します
-        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
+        // 1. 将軍候補（左馬頭の官位を持つ武将）を世界中から探します
+        const candidate = window.EventCheck.getCandidateBusho(game);
         
         // 将軍候補がいない、あるいはすでに大名（独立済み）なら、このイベントは必要ありません
         if (!candidate || candidate.isDaimyo || candidate.clan === 0) return false;
@@ -2479,7 +2495,7 @@ window.GameEvents.push({
     
     execute: async function(game) {
         // 1. 将軍候補を特定します
-        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
+        const candidate = window.EventCheck.getCandidateBusho(game);
         if (!candidate) return;
 
         // 2. 二条城(26)に「元々の城主」がいれば、そのバッジを剥がします
@@ -2533,8 +2549,8 @@ window.GameEvents.push({
     isOneTime: true,                    // 一度発生したら二度と起きません
     
     checkCondition: function(game) {
-        // ① ID80（左馬頭）の官位を持つ武将（将軍候補）を探します
-        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
+        // ① 将軍候補を探します
+        const candidate = window.EventCheck.getCandidateBusho(game);
         if (!candidate) return false; // 見つからなければイベントは起きません
 
         // ② 将軍候補が大名であってはなりません
@@ -2574,7 +2590,7 @@ window.GameEvents.push({
     execute: async function(game) {
         // イベントが起きた時に実際に実行される魔法です
         
-        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
+        const candidate = window.EventCheck.getCandidateBusho(game);
         if (!candidate) return;
         
         const sponsorClanId = candidate.clan;
@@ -2646,12 +2662,17 @@ window.GameEvents.push({
         nijoCastle.castellanId = candidate.id;
 
         // --- 4. 官位の変更（左馬頭を返して、征夷大将軍をもらいます） ---
-        candidate.courtRankIds = candidate.courtRankIds.filter(id => id !== 80); // 左馬頭を削除
+        const samanoKamiId = candidate.courtRankIds.find(id => window.EventCheck.RANK_IDS_CANDIDATE.includes(id));
+        if (samanoKamiId) {
+            candidate.courtRankIds = candidate.courtRankIds.filter(id => id !== samanoKamiId); // 左馬頭を削除
+            if (game.courtRankSystem) {
+                game.courtRankSystem.returnRank(samanoKamiId); // 朝廷に返す
+            }
+        }
         if (game.courtRankSystem) {
-            game.courtRankSystem.returnRank(80); // 朝廷に返す
-            game.courtRankSystem.grantRank(candidate, 1); // 征夷大将軍をもらう
+            game.courtRankSystem.grantRank(candidate, window.EventCheck.RANK_ID_SHOGUN); // 征夷大将軍をもらう
         } else {
-            candidate.courtRankIds.push(1); // 万が一システムがない時の安全策
+            candidate.courtRankIds.push(window.EventCheck.RANK_ID_SHOGUN); // 万が一システムがない時の安全策
         }
 
         // --- 5. 擁立勢力と将軍家を「同盟」にして、関係値を100にします ---
