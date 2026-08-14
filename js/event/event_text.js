@@ -268,12 +268,11 @@ window.EventTextManager = {
             { type: 'dialog', leftName: args.shingenName, leftFace: args.shingenFace, msg: `「ぐぬうっ！ ${args.kenshinGivenName}かっ！？」` },
             { type: 'log', msg: `${args.shingenGivenName}は立ち上がり、軍配をもって${args.kenshinGivenName}の太刀を受け止めた。` },
             { type: 'log', msg: `側近が槍で馬を突くと、馬は驚いて駆け出し、${args.kenshinGivenName}はその場を去った。` },
-            { type: 'log', msg: `妻女山　${args.takedaFamilyName}軍の別働隊` },
-            { type: 'log', msg: `もぬけの空となった妻女山。そこに攻め込んだ${args.takedaFamilyName}軍の別働隊は異変に気付き、急ぎ八幡原へと軍を進めていた。` },
+            { type: 'log', msg: `一方、もぬけの空となった妻女山に攻め込んだ${args.takedaFamilyName}軍の別働隊は、異変に気付き、急ぎ八幡原へと軍を進めていた。` },
             { type: 'log', msg: `しかし、別働隊の行く手に、${args.uesugiFamilyName}軍のしんがりを務める${args.kagemochiName}が立ちふさがった。` },
-            { type: 'log', msg: `${args.kagemochiName}勢は大軍を受け止めながら見事な撤退戦を展開。果敢に別働隊を足止めした` },
-            { type: 'log', msg: `昼前になって、ようやく${args.takedaFamilyName}軍の別働隊が八幡原に到着。` },
-            { type: 'log', msg: `挟撃される形となった${args.uesugiFamilyName}軍は兵を引き、越後へと撤退していった。` },
+            { type: 'log', msg: `${args.kagemochiName}勢は大軍を受け止めながら見事な撤退戦を展開。果敢に別働隊を足止めした。` },
+            { type: 'log', msg: `足止めを受けた${args.takedaFamilyName}軍の別働隊が八幡原に到着したのは、昼前になってようやくのことだった。` },
+            { type: 'log', msg: `挟撃される形となった${args.uesugiFamilyName}軍はやむをえず兵を引き、越後へと撤退。` },
             { type: 'log', msg: `${args.uesugiFamilyName}方・死者三千余、${args.takedaFamilyName}方・死者四千余。互いに多数の犠牲を出す未曾有の大いくさとなった。` },
             { type: 'log', msg: `川中島での両者の激突の報は、瞬く間に日ノ本全土へと知れ渡ることとなった。` }
         ];
