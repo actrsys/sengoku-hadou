@@ -2067,10 +2067,17 @@ window.GameEvents.push({
         if (!asakuraDaimyo) return false;
         
         // 5. 山城国（ID: 30）の拠点を１つ以上、三好義継または三好長逸が当主である勢力が所有しているか
-        // 6. 松永久秀（ID: 1202002）が生存し、三好勢力に所属しているか
+        // 6. 松永久秀（ID: 1202002）が生存し、三好勢力に所属しているか、または自身が大名であるか
         const targetDaimyoIds = [1020014, 1020021];
         let isConditionMet = false;
         
+        // まず、松永久秀が生きているか確認します
+        if (!window.EventCheck.isAlive(game, 1202002)) return false;
+        const hisahide = game.getBusho(1202002);
+        
+        // 松永久秀が独立して「大名」になっているかを調べます
+        const isHisahideDaimyo = hisahide.isDaimyo && hisahide.clan !== 0;
+
         // 義継と長逸の勢力を順番にチェックし、どちらかが条件を満たせばOKとします
         for (let id of targetDaimyoIds) {
             const daimyo = window.EventCheck.getDaimyo(game, id);
@@ -2079,12 +2086,11 @@ window.GameEvents.push({
                 const yamashiroCastles = game.castles.filter(c => c.provinceId === 30);
                 const hasYamashiroCastle = yamashiroCastles.some(c => c.ownerClan === daimyo.clan);
                 
-                // 松永久秀が生存しており、かつその大名の勢力に所属しているかチェックします
-                const hisahide = game.getBusho(1202002);
-                const hasHisahide = window.EventCheck.isAlive(game, 1202002) && hisahide && hisahide.clan === daimyo.clan;
+                // 松永久秀がその大名の勢力に所属しているかチェックします
+                const belongsToDaimyo = hisahide.clan === daimyo.clan;
                 
-                // 山城国の拠点と松永久秀の所属、両方を満たしていれば条件クリアです
-                if (hasYamashiroCastle && hasHisahide) {
+                // 山城国の拠点条件を満たし、かつ、松永久秀がその勢力に所属しているか、自身が大名になっていればクリアです
+                if (hasYamashiroCastle && (belongsToDaimyo || isHisahideDaimyo)) {
                     isConditionMet = true;
                     break; // １つでも条件を満たす勢力が見つかれば、探すのをやめます
                 }
