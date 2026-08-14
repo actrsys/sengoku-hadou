@@ -86,10 +86,9 @@ class AffiliationSystem {
         if (this.game && this.game.factionSystem) {
             this.game.factionSystem.updateFactions();
         }
-        if (this.game && this.game.ui) {
-            this.game.ui.renderMap();
-            this.game.ui.updatePanelHeader();
-        }
+        
+        // 画面の絵をすぐに描き直す魔法！
+        this.updateUI();
     }
 
     /**
@@ -257,10 +256,7 @@ class AffiliationSystem {
         }
 
         // ★ここから追加：画面の絵をすぐに描き直す魔法！
-        if (this.game && this.game.ui) {
-            this.game.ui.renderMap();
-            this.game.ui.updatePanelHeader();
-        }
+        this.updateUI();
     }
 
     // ★追加：スキルマネージャーの情報をもとに諸勢力を結成
@@ -347,10 +343,9 @@ class AffiliationSystem {
         });
 
         if (this.game && this.game.factionSystem) this.game.factionSystem.updateFactions();
-        if (this.game && this.game.ui) {
-            this.game.ui.renderMap();
-            this.game.ui.updatePanelHeader();
-        }
+        
+        // 画面の絵をすぐに描き直す魔法！
+        this.updateUI();
     }
 
     // ★追加：旧家臣が生存スキルの諸勢力に合流する処理
@@ -415,10 +410,7 @@ class AffiliationSystem {
         this.enterCastle(busho, newCastleId);
 
         // ★ここから追加：画面の絵をすぐに描き直す魔法！
-        if (this.game && this.game.ui) {
-            this.game.ui.renderMap();
-            this.game.ui.updatePanelHeader();
-        }
+        this.updateUI();
     }
 
     /**
@@ -455,10 +447,7 @@ class AffiliationSystem {
         this.game.castleOwnershipVersion = (this.game.castleOwnershipVersion || 0) + 1;
 
         // 画面の絵をすぐに描き直す魔法！
-        if (this.game && this.game.ui) {
-            this.game.ui.renderMap();
-            this.game.ui.updatePanelHeader();
-        }
+        this.updateUI();
     }
 
     /**
@@ -534,10 +523,27 @@ class AffiliationSystem {
         // 基本の50にアップ分を足して、最高100までにします
         busho.loyalty = Math.min(100, 50 + loyaltyUp);
     }
+
+    /**
+     * （共通の道具）画面の絵をすぐに描き直す魔法！
+     */
+    updateUI() {
+        if (this.game && this.game.ui) {
+            try {
+                this.game.ui.renderMap();
+                // パネルが開いている（お城が選択されている）時だけ更新するように安全対策をします
+                if (this.game.ui.currentCastle && typeof this.game.ui.updatePanelHeader === 'function') {
+                    this.game.ui.updatePanelHeader();
+                }
+            } catch (e) {
+                console.warn("UI更新をスキップしました", e);
+            }
+        }
+    }
     
     /**
      * ========================================================
-     * ★ここから下は、新しく設立された「人事部」の魔法です！★
+     * ★ここからは「人事部」の魔法です！★
      * ========================================================
      */
 
