@@ -849,8 +849,8 @@ class LifeSystem {
         // ★ここを追加：官位を持っていたら朝廷に返す魔法！
         if (busho.courtRankIds && busho.courtRankIds.length > 0) {
             let wasShogun = false;
-            // ★追加：もし征夷大将軍（ID1）を持っていたら、後継ぎのためにメモを残しておきます！
-            if (busho.courtRankIds.includes(1)) {
+            // ★追加：もし征夷大将軍を持っていたら、後継ぎのためにメモを残しておきます！
+            if (busho.courtRankIds.includes(this.game.courtRankSystem.RANK_ID_SHOGUN)) {
                 busho._wasShogun = true;
                 wasShogun = true;
             }
@@ -871,16 +871,16 @@ class LifeSystem {
                 if (relative) {
                     // ★修正：一元化したリストのIDを順番に試します！
                     if (this.game.courtRankSystem) {
-                        for (let id of window.EventCheck.RANK_IDS_CANDIDATE) {
+                        for (let id of this.game.courtRankSystem.RANK_IDS_CANDIDATE) {
                             if (this.game.courtRankSystem.grantRank(relative, id)) {
                                 break; // 授与できたら終了
                             }
                         }
                     } else {
                         if (!relative.courtRankIds) relative.courtRankIds = [];
-                        const hasCandidateRank = window.EventCheck.RANK_IDS_CANDIDATE.some(id => relative.courtRankIds.includes(id));
+                        const hasCandidateRank = this.game.courtRankSystem.RANK_IDS_CANDIDATE.some(id => relative.courtRankIds.includes(id));
                         if (!hasCandidateRank) {
-                            relative.courtRankIds.push(window.EventCheck.RANK_IDS_CANDIDATE[0]);
+                            relative.courtRankIds.push(this.game.courtRankSystem.RANK_IDS_CANDIDATE[0]);
                         }
                     }
                 }
@@ -1460,11 +1460,14 @@ class LifeSystem {
         this.applyDaimyoNameAndFaceChange(successor, messages);
 
         // 6. 先代が将軍職を持っていて生前退位の場合、後継ぎに左馬頭を与えます
-        if (isAliveSuccession && oldDaimyo.courtRankIds && oldDaimyo.courtRankIds.includes(1)) {
+        if (isAliveSuccession && oldDaimyo.courtRankIds && oldDaimyo.courtRankIds.includes(this.game.courtRankSystem.RANK_ID_SHOGUN)) {
             const isRelative = oldDaimyo.familyIds.some(fId => successor.familyIds.includes(fId));
             if (isRelative) {
-                if (!this.game.courtRankSystem.grantRank(successor, 98)) {
-                    this.game.courtRankSystem.grantRank(successor, 99);
+                // 直書きの番号ではなく、一元化したリストのIDを順番に試します
+                for (let id of this.game.courtRankSystem.RANK_IDS_CANDIDATE) {
+                    if (this.game.courtRankSystem.grantRank(successor, id)) {
+                        break;
+                    }
                 }
             }
         }

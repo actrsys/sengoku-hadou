@@ -10,6 +10,10 @@ class CourtRankSystem {
         
         // ★追加：朝廷が現在持っている（誰も持っていない）官位のIDリストです
         this.availableRanks = []; 
+        
+        // ★追加：特別な官位（征夷大将軍・左馬頭）のIDを一元管理する箱です！
+        this.RANK_ID_SHOGUN = 1;
+        this.RANK_IDS_CANDIDATE = [98, 99];
     }
 
     // CSVから読み込んだデータをセットする魔法です
@@ -249,11 +253,11 @@ class CourtRankSystem {
             }
 
             // ★もし当主が「左馬頭」を持っていて、朝廷に「征夷大将軍」が空いていたら特別に就任する魔法！
-            if (leader.courtRankIds && window.EventCheck.RANK_IDS_CANDIDATE.some(id => leader.courtRankIds.includes(id))) {
-                if (this.availableRanks.includes(window.EventCheck.RANK_ID_SHOGUN)) {
-                    this.grantRank(leader, window.EventCheck.RANK_ID_SHOGUN);
+            if (leader.courtRankIds && this.RANK_IDS_CANDIDATE.some(id => leader.courtRankIds.includes(id))) {
+                if (this.availableRanks.includes(this.RANK_ID_SHOGUN)) {
+                    this.grantRank(leader, this.RANK_ID_SHOGUN);
                     
-                    const samanoKamiId = leader.courtRankIds.find(id => window.EventCheck.RANK_IDS_CANDIDATE.includes(id));
+                    const samanoKamiId = leader.courtRankIds.find(id => this.RANK_IDS_CANDIDATE.includes(id));
                     leader.courtRankIds = leader.courtRankIds.filter(id => id !== samanoKamiId);
                     this.returnRank(samanoKamiId);
                     
@@ -282,7 +286,7 @@ class CourtRankSystem {
                 if (r.rankNo < 4 && !leaderPreferredRanks.includes(r.id)) return false;
                 
                 // 左馬頭も通常の手順では任官されません
-                if (window.EventCheck.RANK_IDS_CANDIDATE.includes(r.id)) return false;
+                if (this.RANK_IDS_CANDIDATE.includes(r.id)) return false;
                 if (r.rankNo >= currentMaxRankNo) return false;
                 return basePrestige >= r.necessaryPrestige && contribution >= (r.necessaryPrestige * 4.5);
             });
@@ -328,7 +332,7 @@ class CourtRankSystem {
                         // ランク３以上の官位は通常の手順では任官されません（★優先リストに入っていれば通します！）
                         if (r.rankNo < 4 && !cmdrPreferredRanks.includes(r.id)) return false;
                         
-                        if (window.EventCheck.RANK_IDS_CANDIDATE.includes(r.id)) return false;
+                        if (this.RANK_IDS_CANDIDATE.includes(r.id)) return false;
                         if (r.rankNo >= cmdrMaxRankNo) return false;
                         if (r.rankNo < currentMaxRankNo + 2) return false; // 大名より2低いランクまで
                         if ((commander.achievementTotal || 0) < r.necessaryPrestige) return false; // 功績チェック
