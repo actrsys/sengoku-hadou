@@ -76,7 +76,12 @@ class StrategySystem {
         }
         
         // 同じ勢力にいる、自分以外の活動中の武将を集めます
-        const sameClanBushos = this.game.bushos.filter(b => b.clan === targetBusho.clan && b.id !== targetBusho.id && b.status === 'active');
+        const sameClanBushos = [];
+        const clanCastles = this.game.getClanCastles(targetBusho.clan);
+        clanCastles.forEach(c => {
+            const bList = this.game.getCastleBushos(c.id).filter(b => b.id !== targetBusho.id && b.status === 'active');
+            sameClanBushos.push(...bList);
+        });
         
         // その中に一門の武将がいるか探します
         const familyInClan = sameClanBushos.filter(b => b.familyIds && targetBusho.familyIds && b.familyIds.some(fId => targetBusho.familyIds.includes(fId)));
@@ -100,7 +105,7 @@ class StrategySystem {
     
     getLeaderOrGunshiInt(clanId) {
         const daimyo = this.game.getClanDaimyo(clanId);
-        const gunshi = this.game.bushos.find(b => b.clan === clanId && b.isGunshi);
+        const gunshi = this.game.getClanGunshi(clanId);
         const intDaimyo = daimyo ? daimyo.intelligence : 50;
         const intGunshi = gunshi ? gunshi.intelligence : 0;
         return Math.max(intDaimyo, intGunshi); // 高い方を返します

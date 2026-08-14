@@ -2026,13 +2026,17 @@ class GameManager {
             if (clan.id !== 0 && !clan.isDestroyed) {
                 const daimyo = this.getBusho(clan.leaderId); // ★高速化：全武将から探す代わりに、勢力が覚えているIDで一瞬で見つけます
                 if (daimyo && daimyo.factionId > 0) {
-                    this.bushos.forEach(b => {
-                        if (b.clan === clan.id && b.status === 'active' && b.factionId === daimyo.factionId) {
-                            // 設定された数値ぶん忠誠度を上げます
-                            b.loyalty = Math.min(100, b.loyalty + boostLoy);
-                            // 設定された数値ぶん承認欲求を下げます（最小値チェックも設定から読み込み）
-                            b.recognitionNeed = Math.max(minRec, (b.recognitionNeed || 0) - decayRec);
-                        }
+                    const clanCastles = this.getClanCastles(clan.id);
+                    clanCastles.forEach(c => {
+                        const bushos = this.getCastleBushos(c.id);
+                        bushos.forEach(b => {
+                            if (b.status === 'active' && b.factionId === daimyo.factionId) {
+                                // 設定された数値ぶん忠誠度を上げます
+                                b.loyalty = Math.min(100, b.loyalty + boostLoy);
+                                // 設定された数値ぶん承認欲求を下げます（最小値チェックも設定から読み込み）
+                                b.recognitionNeed = Math.max(minRec, (b.recognitionNeed || 0) - decayRec);
+                            }
+                        });
                     });
                 }
             }
