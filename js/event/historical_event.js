@@ -2050,6 +2050,7 @@ window.GameEvents.push({
     isOneTime: true,
     
     checkCondition: function(game) {
+    /*
         // 1. 足利義輝（ID: 1017003）が死亡しているか
         if (!window.EventCheck.isDead(game, 1017003)) return false;
 
@@ -2111,7 +2112,8 @@ window.GameEvents.push({
         const top15 = activeClans.slice(0, 15);
         const isTop15 = top15.some(c => c.id === asakuraDaimyo.clan);
         if (!isTop15) return false;
-
+        
+    */
         return true;
     },
     
