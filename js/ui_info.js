@@ -1711,17 +1711,29 @@ class UIInfoManager {
                 requestAnimationFrame(adjustTextFit);
             };
 
-            // ★スクロールのたびに毎回計算しすぎないよう、アニメーションフレームで間引きます
+            // ★追加：スクロールのたびに毎回計算しすぎないよう、アニメーションフレームとタイマーで間引きます！
             let scrollTicking = false;
+            let scrollTimeout = null;
+
             const scrollHandler = () => {
-                if (scrollTicking) return;
-                scrollTicking = true;
-                requestAnimationFrame(() => {
+                // 指を離してスクロールがピタッと止まった時のための保険タイマーです
+                if (scrollTimeout) clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => {
                     renderVisibleWindow();
                     scrollTicking = false;
+                }, 50);
+
+                if (scrollTicking) return;
+                scrollTicking = true;
+
+                requestAnimationFrame(() => {
+                    renderVisibleWindow();
+                    scrollTicking = false; // 次のフレームですぐに描画を許可します
                 });
             };
-            listContainer.addEventListener('scroll', scrollHandler);
+
+            // passive: true をつけることで、スクロール自体が指に吸い付くように滑らかになります
+            listContainer.addEventListener('scroll', scrollHandler, { passive: true });
             listContainer._virtualScrollHandler = scrollHandler;
 
             // ★スクロール位置を復元できるように、まず仮の行の高さで全体の高さだけ確保してからスクロールさせます
