@@ -49,19 +49,9 @@ class AIEngine {
     
     async execAI(castle) {
         try {
-            // ★調査用：1560年4月かつ今川家（ClanID: 1）の特定の城なら、一色家（ClanID: 15）への親善を強制記憶
-            if (this.game.year === 1560 && this.game.month === 4 && castle.ownerClan === 1) {
-                const myClan = this.game.clans.find(c => c.id === 1);
-                if (myClan && !myClan.currentDiplomacyTarget) {
-                    myClan.currentDiplomacyTarget = {
-                        targetId: 15,
-                        action: 'goodwill',
-                        gold: 300
-                    };
-                    console.log("【調査】今川家が強制的に一色家へ親善を設定しました");
-                }
-            }
-
+            // ★追加：AIが考え始める前に一瞬だけ処理を休ませて（息継ぎをして）、スマホがパンクするのを防ぎます！
+            await new Promise(resolve => setTimeout(resolve, 0));
+            
             // ★イベント追加：コマンドの選択前（AI操作時）
             if (this.game.eventManager) {
                 await this.game.eventManager.processEvents('before_command', castle);
@@ -293,7 +283,7 @@ class AIEngine {
 
             // ★追加：緊急の修復や施しを行ったら、戦争などは行わずに残りの内政のみ行います
             if (emergencyActionDone) {
-                this.execInternalAffairs(castle, castellan, mods, smartness);
+                await this.execInternalAffairs(castle, castellan, mods, smartness);
                 this.game.finishTurn();
                 return;
             }
@@ -356,7 +346,7 @@ class AIEngine {
             }
             
             // 内政フェーズ (軍事行動をしなかった場合)
-            this.execInternalAffairs(castle, castellan, mods, smartness);
+            await this.execInternalAffairs(castle, castellan, mods, smartness);
             this.game.finishTurn();
 
         } catch(e) {
@@ -1469,7 +1459,7 @@ class AIEngine {
         this.game.kunishuSystem.executeKunishuSubjugate(sourceCastle, sourceCastle.id, sorted.map(b => b.id), sendSoldiers, sendRice, sendHorses, sendGuns, kunishu);
     }
     
-    execInternalAffairs(castle, castellan, mods, smartness) {
+    async execInternalAffairs(castle, castellan, mods, smartness) {
         // ① 大名を取得します（全体で使う用）
         const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
 
@@ -1603,6 +1593,9 @@ class AIEngine {
         
         // ③ 決められた回数だけ、行動を繰り返します！
         for (let step = 0; step < maxActions; step++) {
+            // ★追加：スマホの強制リロード対策。行動を1回考えるごとに一瞬「息継ぎ」をして、ブラウザのフリーズを防ぎます！
+            await new Promise(resolve => setTimeout(resolve, 0));
+
             // ★毎回、AIが安全に使えるお金（給金と余裕分を引いた額）を計算します！
             const availableGold = GameSystem.calcAvailableGoldForAI(castle, this.game);
 
