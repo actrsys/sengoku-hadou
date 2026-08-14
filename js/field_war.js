@@ -2139,7 +2139,8 @@ class FieldWarManager {
                 this.updateStatus();
                 setTimeout(() => this.processAITurn(), 600);
             } else {
-                this.processAITurn(); // ★プレイヤーがいなければウェイトなしで即実行！
+                // ★修正：野戦のAIターンでも、一瞬だけ息継ぎを入れてパンクを防ぎます！
+                setTimeout(() => this.processAITurn(), 0);
             }
         }
     }

@@ -200,6 +200,9 @@ class AIOperationManager {
         this.validateAllOperations();
 
         for (const clan of this.game.clans) {
+            // ★追加：大名家ごとに一瞬「息継ぎ」を入れて、月替わりの激しい計算の重さを軽減します！
+            await new Promise(resolve => setTimeout(resolve, 0));
+
             if (clan.id === 0 || clan.isDestroyed) continue; // ★滅亡した勢力はスキップします！
 
             const isPlayerClan = (clan.id === this.game.playerClanId);

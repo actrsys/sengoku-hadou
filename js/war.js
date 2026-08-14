@@ -1922,7 +1922,8 @@ class WarManager {
                     
                     // ★追加：裏で高速計算する時は待たずにすぐ実行、画面に出す時だけ待ちます！
                     if (!s.isPlayerInvolved) {
-                        this.execWarAI();
+                        // ★修正：AIの作戦立案も、一瞬だけ息継ぎ（0秒待機）をしてフリーズを防ぎます！
+                        setTimeout(() => this.execWarAI(), 0);
                     } else {
                         setTimeout(() => this.execWarAI(), 800); 
                     }
@@ -2001,7 +2002,8 @@ class WarManager {
                 } else {
                     // ★追加：裏で高速計算する時は待たずにすぐ実行、画面に出す時だけ待ちます！
                     if (!s.isPlayerInvolved) {
-                        this.resolveWarAction(action.type, action.extraVal);
+                        // ★修正：AI同士の高速戦闘でも、一瞬だけ息継ぎを入れてスマホのパンクを防ぎます！
+                        setTimeout(() => this.resolveWarAction(action.type, action.extraVal), 0);
                     } else {
                         // 少し間をあけて（演出を見やすくして）実行します
                         setTimeout(() => {
