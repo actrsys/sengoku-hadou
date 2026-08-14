@@ -141,16 +141,6 @@ Object.assign(UIManager.prototype, {
                         this.lastDragY = y;
                     }
                     
-                    // ★追加：マップを動かしている最中、大名家の名前シールも一緒に動かします！
-                    // cssのtransformだけで動かすので、毎回作り直すよりずっと軽いです
-                    const labels = document.querySelectorAll('.daimyo-name-label');
-                    if (labels.length > 0) {
-                        labels.forEach(label => {
-                            // style.leftなどはそのままに、マップのスクロール量（scrollLeft/Top）に合わせてシールをずらします
-                            label.style.transform = `translate(calc(-50% - ${sc.scrollLeft}px), calc(-100% - ${sc.scrollTop}px))`;
-                        });
-                    }
-
                     this.isMapTicking = false; // ★画面を描き終わったらスイッチを戻して、次の動きを受け付けます
                 });
                 
@@ -1221,23 +1211,14 @@ Object.assign(UIManager.prototype, {
         }
 
         // 3. 計算が終わったら、実際にマップの一番手前に貼り付けます！
-        // マップのスクロール枠を探しておきます
-        const sc = document.getElementById('map-scroll-container');
-        const currentScrollX = sc ? sc.scrollLeft : 0;
-        const currentScrollY = sc ? sc.scrollTop : 0;
-
         labelsData.forEach(l => {
             const el = document.createElement('div');
             el.className = 'daimyo-name-label';
             el.textContent = l.name;
-            // ★変更：マップと一緒に動くように、マップ全体が入っている枠（mapEl）に貼り付ける前提で絶対座標を指定します
             el.style.position = 'absolute';
             el.style.left = `${l.x}px`;
             el.style.top = `${l.y + l.offsetY}px`;
-            
-            // ★変更：最初から今のスクロール位置に合わせてズラしておきます
-            el.style.transform = `translate(calc(-50% - ${currentScrollX}px), calc(-100% - ${currentScrollY}px))`;
-            
+            el.style.transform = 'translate(-50%, -100%)';
             el.style.zIndex = '200';
 
             // ★追加：外交先などを選んでいる時で、もし選べない相手なら少し暗くします
@@ -1274,12 +1255,7 @@ Object.assign(UIManager.prototype, {
             };
             // ★追加ここまで！
 
-            // ★変更：マップ自体（mapEl）ではなく、その外側の「マップを包んでいる枠（map-wrapper）」にシールを貼り付けます！
-            // こうすることで、マップが動いてもシールは同じ場所に留まり、transformの魔法でズラすことができるようになります。
-            const mapWrapper = document.getElementById('map-wrapper');
-            if (mapWrapper) {
-                mapWrapper.appendChild(el);
-            }
+            this.mapEl.appendChild(el);
         });
     },
     
