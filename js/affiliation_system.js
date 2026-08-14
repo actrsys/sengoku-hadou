@@ -32,9 +32,14 @@ class AffiliationSystem {
         // 3. 前の派閥のデータなどを綺麗に忘れさせます
         this.resetFactionData(busho);
 
-        // 4. 新しい大名家の所属にして、状態を「活動中(active)」にします
+        // 4. 新しい大名家の所属にします
         busho.clan = newClanId;
-        busho.status = 'active';
+        
+        // ★修正：死亡や未登場の武将は状態を強制的に変えないようにします
+        if (busho.status !== 'dead' && busho.status !== 'unborn') {
+            busho.status = 'active';
+        }
+        
         busho.isCastellan = false;
         busho.isDaimyo = false;
         busho.isGunshi = false; // ★ここを書き足します！軍師のバッジを外します
@@ -149,8 +154,13 @@ class AffiliationSystem {
 
         // 3. 浪人になるので、肩書きを外します
         busho.clan = 0;
-        busho.status = 'ronin';
-        busho.loyalty = 50; // ★浪人になったので、忠誠度を50にします！
+        
+        // ★修正：死亡や未登場の武将は状態を強制的に変えないようにします
+        if (busho.status !== 'dead' && busho.status !== 'unborn') {
+            busho.status = 'ronin';
+            busho.loyalty = 50; // ★浪人になったので、忠誠度を50にします！
+        }
+        
         busho.isCastellan = false;
         busho.isDaimyo = false;
         busho.isGunshi = false; // ★ここを書き足します！軍師のバッジを外します
@@ -352,7 +362,12 @@ class AffiliationSystem {
     _joinSurvivalKunishu(busho, kunishu) {
         this.resetFactionData(busho);
         busho.clan = 0;
-        busho.status = 'active';
+        
+        // ★修正：死亡や未登場の武将は状態を強制的に変えないようにします
+        if (busho.status !== 'dead' && busho.status !== 'unborn') {
+            busho.status = 'active';
+        }
+        
         busho.isCastellan = false;
         busho.isDaimyo = false;
         busho.isGunshi = false;
@@ -477,9 +492,12 @@ class AffiliationSystem {
         busho.castleId = newCastleId;
         const newCastle = this.game.getCastle(newCastleId);
         if (newCastle) {
-            // お城のリストに自分がいなければ、名前を書きます
-            if (!newCastle.samuraiIds.some(id => Number(id) === Number(busho.id))) {
-                newCastle.samuraiIds.push(Number(busho.id));
+            // ★修正：死亡や未登場の武将はお城のリストには入れないようにします
+            if (busho.status !== 'dead' && busho.status !== 'unborn') {
+                // お城のリストに自分がいなければ、名前を書きます
+                if (!newCastle.samuraiIds.some(id => Number(id) === Number(busho.id))) {
+                    newCastle.samuraiIds.push(Number(busho.id));
+                }
             }
             this.updateCastleLord(newCastle);
         }

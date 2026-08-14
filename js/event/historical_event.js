@@ -2344,7 +2344,8 @@ window.GameEvents.push({
 
         // 明智光秀の家臣（ID1201000～ID1201999）が朝倉に居れば一緒に移籍
         game.bushos.forEach(b => {
-            if (b.id >= 1201000 && b.id <= 1201999 && b.clan === asakuraClanId && b.id !== 1201003) {
+            // 死亡している武将以外（現役、または未登場）ならそのまま移籍リストに入れます
+            if (b.id >= 1201000 && b.id <= 1201999 && b.clan === asakuraClanId && b.id !== 1201003 && b.status !== 'dead') {
                 targetBushos.push(b);
             }
         });
