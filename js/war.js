@@ -1469,7 +1469,7 @@ class WarManager {
 
         // 守備側のターンなら、自分のお城の防御力を攻撃パワーにも乗せます
         if (!isAtkTurnGroup) {
-            let activeCastleMod = 1.5 + (s.defender.defense / 1000);
+            let activeCastleMod = 0.5 + (s.defender.defense / 1000);
             activeAtkPower = activeAtkPower * activeCastleMod;
         }
 
@@ -1618,7 +1618,7 @@ class WarManager {
         }
 
         targetList.forEach(t => {
-            let castleMod = isAtkTurnGroup ? (1.5 + (s.defender.defense / 1000)) : 1.0;
+            let castleMod = isAtkTurnGroup ? (0.5 + (s.defender.defense / 1000)) : 1.0;
             let isRojo = (!isAtkTurnGroup && s.plannedActions[t.role] && s.plannedActions[t.role].type === 'def_attack');
             let rojoMod = isRojo ? 0.5 : 1.0;
 
