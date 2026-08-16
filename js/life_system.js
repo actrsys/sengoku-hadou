@@ -507,6 +507,15 @@ class LifeSystem {
                 p.status = 'unmarried'; // 登場して「未婚」になります
                 p.currentClanId = targetClanId;
                 
+                // ★ここを追加：登場した姫を、大名家の「姫の名簿」にしっかり登録します！
+                const targetClan = this.game.getClan(targetClanId);
+                if (targetClan) {
+                    if (!targetClan.princessIds) targetClan.princessIds = [];
+                    if (!targetClan.princessIds.includes(p.id)) {
+                        targetClan.princessIds.push(p.id);
+                    }
+                }
+                
                 // プレイヤーの大名家に姫がやってきたらお知らせのメッセージを作ります
                 if (targetClanId === this.game.playerClanId) {
                     let msg = "";
