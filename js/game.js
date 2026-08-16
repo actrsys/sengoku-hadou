@@ -186,6 +186,10 @@ class DataManager {
         princesses.forEach(p => {
             if (p.startYear === 9999 || p.endYear < startYear) {
                 p.status = 'dead';
+            } else if (p.birthYear > startYear) {
+                p.status = 'not_born'; // まだ生まれていない姫
+            } else if (p.startYear > startYear) {
+                p.status = 'unborn'; // 生まれているけれど、まだ登場の年齢になっていない姫
             }
         });
 
