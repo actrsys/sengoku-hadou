@@ -362,13 +362,23 @@ class Busho {
         }
         
         // ★【生没年・登場年】
-        // 数字として扱うために Number() で囲みます
-        this.birthYear = Number(data.birthYear || 1500); // 生年（空なら1500）
-        this.endYear = Number(data.endYear || 1650);     // 没年（空なら1650）
-        this.startYear = Number(data.startYear || 1500); // 登場年（空なら1500）
+        if (data.birthYear === undefined || data.birthYear === null || data.birthYear === "") {
+            throw new Error(`【エラー】武将データ（ID: ${this.id}, 名前: ${this.name}）の「誕生年(birthYear)」が読み取れませんでした。処理を中断します。`);
+        }
+        if (data.endYear === undefined || data.endYear === null || data.endYear === "") {
+            throw new Error(`【エラー】武将データ（ID: ${this.id}, 名前: ${this.name}）の「没年(endYear)」が読み取れませんでした。処理を中断します。`);
+        }
+        if (data.startYear === undefined || data.startYear === null || data.startYear === "") {
+            throw new Error(`【エラー】武将データ（ID: ${this.id}, 名前: ${this.name}）の「登場年(startYear)」が読み取れませんでした。処理を中断します。`);
+        }
+
+        // 必須データが確認できたら、数字として扱います
+        this.birthYear = Number(data.birthYear);
+        this.endYear = Number(data.endYear);
+        this.startYear = Number(data.startYear);
 
         // ★追加：本来の没年（初期データ）をメモしておきます
-        this.originalEndYear = Number(data.endYear || 1650);
+        this.originalEndYear = Number(data.endYear);
 
         this.nameChange = data.nameChange || ""; // 変わる年:新しい名前:新しい読み仮名/変わる年... の形式の改名データ
 
@@ -837,11 +847,21 @@ class Princess {
         this.id = Number(this.id);
         this.name = data.name || "姫";
         this.yomi = data.yomi || "";
-        this.birthYear = Number(this.birthYear || 1500);
+        if (data.birthYear === undefined || data.birthYear === null || data.birthYear === "") {
+            throw new Error(`【エラー】姫データ（ID: ${this.id}, 名前: ${this.name}）の「誕生年(birthYear)」が読み取れませんでした。処理を中断します。`);
+        }
+        if (data.startYear === undefined || data.startYear === null || data.startYear === "") {
+            throw new Error(`【エラー】姫データ（ID: ${this.id}, 名前: ${this.name}）の「登場年(startYear)」が読み取れませんでした。処理を中断します。`);
+        }
+        if (data.endYear === undefined || data.endYear === null || data.endYear === "") {
+            throw new Error(`【エラー】姫データ（ID: ${this.id}, 名前: ${this.name}）の「没年(endYear)」が読み取れませんでした。処理を中断します。`);
+        }
+
+        this.birthYear = Number(data.birthYear);
         
         // ★今回追加：登場年、没年、顔画像
-        this.startYear = Number(this.startYear || 1500); // 登場年
-        this.endYear = Number(this.endYear || 1650);     // 没年
+        this.startYear = Number(data.startYear); // 登場年
+        this.endYear = Number(data.endYear);     // 没年
         this.faceIcon = data.faceIcon || 'unknown_princess_face.webp'; // 姫用の汎用画像
         
         this.originalClanId = Number(this.originalClanId || 0); // 生まれた大名家のID
