@@ -308,6 +308,7 @@ class UIInfoManager {
         else if (info.pageType === 'force_selector') this._renderForceSelector(...info.args, info.scrollPos);
         else if (info.pageType === 'appoint_legion_castle') this._renderAppointLegionCastle(...info.args, info.scrollPos);
         else if (info.pageType === 'allot_fief') this._renderAllotFief(...info.args, info.scrollPos);
+        else if (info.pageType === 'princess_detail') this._renderPrincessDetail(...info.args, info.scrollPos);
     }
     
     showDaimyoList() {
@@ -2015,7 +2016,7 @@ class UIInfoManager {
 
             const isSelected = this.commonSelectedIds && this.commonSelectedIds.includes(p.id);
             return {
-                onClick: isSelectMode ? (e) => this.handleCommonSelect(p.id, e.currentTarget, false) : null,
+                onClick: isSelectMode ? (e) => this.handleCommonSelect(p.id, e.currentTarget, false) : `window.GameApp.ui.info.showPrincessDetail(${p.id})`,
                 cells: [
                     `<strong class="col-princess-name">${p.name}</strong>`,
                     `<span class="col-clan">${clanName}</span>`,
@@ -2896,4 +2897,184 @@ class UIInfoManager {
         
         this.updateCommonConfirmBtn();
     }
+    
+    // ==========================================
+    // ★ ここから追加：姫の詳細画面の魔法です
+    // ==========================================
+    showPrincessDetail(princessId) {
+        this.pushModal('princess_detail', [princessId]);
+    }
+
+    _renderPrincessDetail(princessId, scrollPos = 0) {
+        const princess = this.game.princesses.find(p => p.id === princessId);
+        if (!princess) return;
+
+        const modal = document.getElementById('selector-modal');
+        const title = document.getElementById('selector-title');
+        const listContainer = document.getElementById('selector-list');
+        const contextEl = document.getElementById('selector-context-info');
+        const tabsEl = document.getElementById('selector-tabs');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+
+        const isPc = document.body.classList.contains('is-pc');
+
+        modal.classList.remove('hidden');
+        if (title) title.textContent = "姫情報";
+        if (contextEl) contextEl.classList.add('hidden');
+        if (tabsEl) tabsEl.classList.add('hidden'); // タブ切り替えはなしにします
+        if (confirmBtn) confirmBtn.classList.add('hidden');
+
+        if(backBtn) {
+            backBtn.style.display = '';
+            backBtn.textContent = this.modalHistory.length > 0 ? '戻る' : '閉じる';
+            backBtn.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                this.popModal();
+            };
+            const footer = backBtn.parentElement;
+            if (footer) footer.style.justifyContent = 'center';
+        }
+
+        let faceHtml = princess.faceIcon ? `<img src="data/images/faceicons/${princess.faceIcon}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_princess_face.webp'">` : `<img src="data/images/faceicons/unknown_princess_face.webp" class="daimyo-detail-face">`;
+
+        let affiliationName = "無所属";
+        let isFamily = false;
+        let lordName = "なし";
+        
+        // 嫁いでいる場合は今の勢力、そうでなければ実家の勢力を調べます
+        const clanId = (princess.husbandId > 0) ? princess.currentClanId : princess.originalClanId;
+        if (clanId > 0) {
+            const clan = this.game.clans.find(c => c.id === clanId);
+            if (clan) {
+                affiliationName = clan.name;
+                const daimyo = this.game.getBusho(clan.leaderId); 
+                if (daimyo) {
+                    lordName = daimyo.name;
+                    // 一門かどうかを確認します
+                    const pFamily = Array.isArray(princess.familyIds) ? princess.familyIds : [];
+                    const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+                    if (pFamily.some(fId => dFamily.includes(fId))) {
+                        isFamily = true;
+                    }
+                }
+            }
+        }
+
+        const age = this.game.year - princess.birthYear + 1;
+        const ageStr = `${age}歳`;
+        
+        const father = this.game.getBusho(princess.realFatherId);
+        const fatherName = father ? father.name : "不明";
+
+        const husband = this.game.getBusho(princess.husbandId);
+        const husbandName = husband ? husband.name : "なし";
+
+        // ステータスの枠だけを作って中は空っぽにする魔法です
+        const getEmptyStatRow = (label) => {
+            const labelWidth = isPc ? "40px" : "30px";
+            const gradeWidth = isPc ? "35px" : "25px";
+
+            return `
+                <div class="daimyo-detail-stat-box" style="justify-content: flex-start; padding-right: 5px;">
+                    <span class="daimyo-detail-label" style="width: ${labelWidth}; min-width: ${labelWidth}; margin-right: 5px; text-align: left;">${label}</span>
+                    <span style="width: ${gradeWidth}; text-align: left; font-weight: bold; display: flex; align-items: center; color: #777;">-</span>
+                    <div class="busho-stat-bar-wrapper" style="flex: 1; margin-right: 0; max-width: none; margin-left: 5px;">
+                        <div class="bar-bg-busho" style="width: calc(100% * 100 / 120);">
+                            <div class="bar-fill-busho" style="width: 0%;"></div>
+                        </div>
+                        <div class="exp-bar-bg" style="visibility: hidden; width: calc(100% * 100 / 120);"></div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const displayYomi = princess.yomi || "";
+        const displayName = princess.name || "姫";
+
+        const rowGap = isPc ? "6px" : "3px";
+        const groupGap = "4px";
+        const groupWrapStyle = `background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: ${groupGap};`;
+
+        const makeRow = (label, value) => {
+            let extraLabelStyle = "";
+            if (!isPc && label.length >= 3) {
+                extraLabelStyle = " letter-spacing: -1px; transform: scaleX(0.9); transform-origin: left center; display: inline-block;";
+            }
+            return `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label" style="${extraLabelStyle}">${label}</span><span class="daimyo-detail-value">${value}</span></div>`;
+        };
+
+        const statHtml = `
+            <div style="${groupWrapStyle} flex: 1; min-width: 0;">
+                ${getEmptyStatRow('統率')}
+                ${getEmptyStatRow('武勇')}
+                ${getEmptyStatRow('内政')}
+                ${getEmptyStatRow('外交')}
+                ${getEmptyStatRow('智謀')}
+                ${getEmptyStatRow('魅力')}
+            </div>
+        `;
+
+        const infoHtml = `
+            <div style="display: flex; flex-direction: column; gap: ${rowGap}; flex: 1; min-width: 0;">
+                <div style="${groupWrapStyle}">
+                    ${makeRow('所在', '&nbsp;')}
+                    ${makeRow('主君', lordName)}
+                </div>
+                <div style="${groupWrapStyle}">
+                    ${makeRow('年齢', ageStr)}
+                    ${makeRow('一門', isFamily ? "◯" : "&nbsp;")}
+                    ${makeRow('父親', fatherName)}
+                    ${makeRow('配偶者', husbandName)}
+                </div>
+            </div>
+        `;
+
+        const rightContentHtml = `
+            <div style="display: flex; flex-direction: row; gap: ${rowGap}; width: 100%;">
+                ${statHtml}
+                ${infoHtml}
+            </div>
+        `;
+
+        if (listContainer) {
+            listContainer.className = 'list-container hide-native-scroll';
+            listContainer.style.display = 'block';
+            listContainer.innerHTML = `
+                <div class="daimyo-detail-container" style="padding: 10px; min-height: 100%;">
+                    <div class="daimyo-detail-header pc-only" style="margin-bottom: 10px;">
+                        <div style="display:flex; flex-direction:column;">
+                            <span style="font-size:0.8rem; color:#ccc; margin-bottom:2px;">${displayYomi}</span>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <div class="daimyo-detail-name" style="font-size: 1.5rem;">${displayName}</div>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:10px; margin-top: 4px; font-size: 0.95rem; color: #ccc;">
+                                <span>${affiliationName}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="daimyo-detail-body">
+                        <div class="daimyo-detail-left">
+                            ${faceHtml}
+                            <div class="daimyo-detail-header sp-only" style="flex-direction:column; align-items:flex-start; gap:2px; margin-bottom: 0; justify-content: center;">
+                                <span style="font-size:0.75rem; color:#ccc;">${displayYomi}</span>
+                                <div style="display:flex; align-items:center; gap:5px;">
+                                    <div class="daimyo-detail-name" style="font-size:1.3rem;">${displayName}</div>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:8px; margin-top: 2px; font-size: 0.85rem; color: #ccc;">
+                                    <span>${affiliationName}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="daimyo-detail-right" style="gap: ${rowGap};">
+                            ${rightContentHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            listContainer.scrollTop = scrollPos;
+        }
+    }
+    
 }
