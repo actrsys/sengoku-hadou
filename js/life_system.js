@@ -17,9 +17,10 @@ class LifeSystem {
             const currentYear = this.game.year;
             for (const p of this.game.princesses) {
                 if (p.birthYear > currentYear) {
-                    p.status = 'not_born';
-                } else if (p.status === 'not_born' && p.birthYear <= currentYear) {
                     p.status = 'unborn';
+                    p.isNotBorn = true;
+                } else if (p.isNotBorn && p.birthYear <= currentYear) {
+                    p.isNotBorn = false; // 生まれたのでフラグを下ろします
                 }
             }
 

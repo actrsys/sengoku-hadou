@@ -187,13 +187,15 @@ class DataManager {
             if (p.startYear === 9999 || p.endYear < startYear) {
                 p.status = 'dead';
             } else if (p.birthYear > startYear) {
-                p.status = 'not_born'; // まだ生まれていない姫
+                p.status = 'unborn';  // 武将と同じ 'unborn' に統一します
+                p.isNotBorn = true;   // まだ生まれていない姫（出生前）
             } else if (p.startYear > startYear) {
-                p.status = 'unborn'; // 生まれているけれど、まだ登場の年齢になっていない姫
+                p.status = 'unborn';
+                p.isNotBorn = false;  // 生まれてはいるが、まだ登場の年齢になっていない姫
             }
             
             // ★ここを追加：まだ登場していない姫は、大名家の「姫の名簿」から一旦名前を消しておきます！
-            if (p.status === 'dead' || p.status === 'not_born' || p.status === 'unborn') {
+            if (p.status === 'dead' || p.status === 'unborn') {
                 clans.forEach(clan => {
                     if (clan.princessIds && clan.princessIds.includes(p.id)) {
                         clan.princessIds = clan.princessIds.filter(id => id !== p.id);
