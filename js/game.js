@@ -195,30 +195,30 @@ class DataManager {
             // ★ゲーム開始時点で「すでに改名しているはず」の武将の名前と読み仮名を変えておく魔法です！
             if (b.nameChange) {
                 const changes = b.nameChange.split('/');
-                let latestYear = -1;
-                let latestNameData = "";
-                let latestYomiData = "";
+                const validChanges = [];
 
                 for (const change of changes) {
                     const parts = change.split(':');
                     if (parts.length === 3) {
                         const targetYear = Number(parts[0].trim());
-                        // ゲーム開始年「以前」か「同じ年」に起きた改名イベントの中で、一番新しいものを探します
+                        // ゲーム開始年「以前」か「同じ年」に起きた改名イベントを集めます
                         // （daimyoなどの文字が入っていてNaNになるものは無視します）
-                        if (!isNaN(targetYear) && targetYear <= startYear && targetYear > latestYear) {
-                            latestYear = targetYear;
-                            
-                            // ★修正：見つかった文字をメモしておくだけにします
-                            latestNameData = parts[1].trim();
-                            latestYomiData = parts[2].trim();
+                        if (!isNaN(targetYear) && targetYear <= startYear) {
+                            validChanges.push({
+                                year: targetYear,
+                                nameData: parts[1].trim(),
+                                yomiData: parts[2].trim()
+                            });
                         }
                     }
                 }
 
-                // もし改名データが見つかったら、最初からその名前と読み仮名にしておきます！
-                if (latestYear !== -1) {
-                    // ★修正：新しく作った共通の改名魔法を呼び出します！
-                    b.applyNameChangeData(latestNameData, latestYomiData);
+                // 順番に上書きするために、年代の古い順（昇順）に並び替えます
+                validChanges.sort((a, b) => a.year - b.year);
+
+                // 古いものから順番に名前と読み仮名を更新していきます
+                for (const change of validChanges) {
+                    b.applyNameChangeData(change.nameData, change.yomiData);
                 }
             }
 
