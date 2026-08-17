@@ -1742,9 +1742,7 @@ window.GameEvents.push({
         }
 
         // ⑧ 画面にイベントが起きたことのメッセージを出してお知らせします
-        const msg = `${nobunagaName}が居城を${oldCastleName}に移し、「岐阜城」と改称しました！`;
         game.ui.log(`【イベント】${nobunagaName}が${oldCastleName}を「岐阜城」と改称しました。`);
-        await game.ui.showDialogAsync(msg, false, 0);
     }
 });
 
@@ -1932,11 +1930,21 @@ window.GameEvents.push({
         
         const nagayasuCastle = nagayasu ? game.getCastle(nagayasu.castleId) : null;
         
+        // 政勝の官位を調べる処理
+        let masakatsuTitle = "下野守";
+        if (masakatsu && game.courtRankSystem && typeof game.courtRankSystem.getHighestRankName === 'function') {
+            const rankName = game.courtRankSystem.getHighestRankName(masakatsu);
+            if (rankName !== "なし") {
+                masakatsuTitle = rankName;
+            }
+        }
+        
         const args = {
             nagayasuCastleName: nagayasuCastle ? nagayasuCastle.name : "居城",
             nagayasuName: nagayasu ? nagayasu.name.replace('|', '') : "三好長逸",
             nagayasuFace: nagayasu ? nagayasu.faceIcon : "unknown_face.webp",
             masakatsuName: masakatsu ? masakatsu.name.replace('|', '') : "三好政勝",
+            masakatsuTitle: masakatsuTitle, // 三好政勝の官位
             masakatsuFace: masakatsu ? masakatsu.faceIcon : "unknown_face.webp",
             tomomichiName: tomomichi ? tomomichi.name.replace('|', '') : "石成友通",
             tomomichiFace: tomomichi ? tomomichi.faceIcon : "unknown_face.webp",
@@ -2637,8 +2645,6 @@ window.GameEvents.push({
             game.aiOperationManager.setGrandObjectiveToAllLegions(nobunagaClanId, '地方統一', kinkiRegionId, 120);
         }
 
-        const yoshiakiName = yoshiaki.name.replace(/\|/g, '');
-        const nobunagaName = nobunagaDaimyo.name.replace(/\|/g, '');
         const msg = `${yoshiakiName}は上洛のため、${nobunagaName}を頼りその庇護下に入りました。`;
         
         game.ui.log(`【イベント】${msg}`);
