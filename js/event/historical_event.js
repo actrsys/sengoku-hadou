@@ -2223,6 +2223,40 @@ window.GameEvents.push({
         const yoshitsugu = game.getBusho(1020014); 
         const miyoshiFamilyName = yoshitsugu ? (yoshitsugu.familyName || yoshitsugu.name.split('|')[0] || "三好") : "三好";
 
+        // ★追加：上杉、毛利、織田の条件チェック
+        let showExtraNarration = false;
+        
+        // 3人が「大名」として存在するかチェックします
+        const kenshin = window.EventCheck.getDaimyo(game, 1001015);
+        const motonari = window.EventCheck.getDaimyo(game, 1025002);
+        const nobunaga = window.EventCheck.getDaimyo(game, 1006006);
+
+        // それぞれのお城（春日山城:2、吉田郡山城:120、清洲城:7）のデータを取得します
+        const kasugayama = game.getCastle(2);
+        const yoshidakoriyama = game.getCastle(120);
+        const kiyosu = game.getCastle(7);
+
+        // 名前を入れるための空箱だけを用意します（未定義のままにします）
+        let kenshinName;
+        let motonariName;
+        let nobunagaName;
+
+        // 全員が大名として存在していて、かつお城のデータも存在するか確認します
+        if (kenshin && motonari && nobunaga && kasugayama && yoshidakoriyama && kiyosu) {
+            // それぞれの勢力（clan）が、指定されたお城を所有しているか確認します
+            if (kasugayama.ownerClan === kenshin.clan && 
+                yoshidakoriyama.ownerClan === motonari.clan && 
+                kiyosu.ownerClan === nobunaga.clan) {
+                
+                showExtraNarration = true; // 条件クリアのシールを貼ります
+                
+                // 台本に渡す名前を、ゲーム内の最新のフルネームに更新します
+                kenshinName = kenshin.name.replace(/\|/g, '');
+                motonariName = motonari.name.replace(/\|/g, '');
+                nobunagaName = nobunaga.name.replace(/\|/g, '');
+            }
+        }
+
         // 台本に渡す情報をひとまとめにします
         const args = {
             year: game.year,
@@ -2236,7 +2270,12 @@ window.GameEvents.push({
             asakuraTitle: asakuraTitle,
             yoshiteruName: yoshiteruName,
             hisahideFamilyName: hisahideFamilyName,
-            miyoshiFamilyName: miyoshiFamilyName
+            miyoshiFamilyName: miyoshiFamilyName,
+            // ★追加：台本に追加の情報を渡します
+            showExtraNarration: showExtraNarration,
+            kenshinName: kenshinName,
+            motonariName: motonariName,
+            nobunagaName: nobunagaName
         };
 
         // ★追加：BGMをメモして専用の曲に変更します
@@ -2497,14 +2536,19 @@ window.GameEvents.push({
         });
 
         // 足利義昭、細川藤孝、和田惟政、明智光秀とその家臣の忠誠度が１００になる。
-        // 朝倉勢力から移籍した武将すべての忠誠度が５アップする。（上限１００）
         targetBushos.forEach(b => {
             b.loyalty = 100;
         });
 
-        // 明智光秀の功績が５００上昇する。
+        // 織田勢力の武将すべての忠誠度が５アップする。（上限１００）
+        const odaBushos = game.bushos.filter(b => b.clan === nobunagaClanId && b.status === 'active' && !targetBushos.includes(b));
+        odaBushos.forEach(b => {
+            b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
+        });
+
+        // 明智光秀の功績が１０００上昇する。
         if (mitsuhide && targetBushos.includes(mitsuhide)) {
-            mitsuhide.achievementTotal = (mitsuhide.achievementTotal || 0) + 500;
+            mitsuhide.achievementTotal = (mitsuhide.achievementTotal || 0) + 1000;
         }
 
         // 織田勢力の全ての拠点の民忠が１００になり、それぞれ人口・米が５０００、兵士・金が２０００アップする。

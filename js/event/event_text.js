@@ -336,7 +336,7 @@ window.EventTextManager = {
     
     // 将軍庇護第１段階 足利義昭が朝倉家を頼る
     shogun_protection_1: function(args) {
-        return [
+        let messages = [
             { type: 'log', msg: `${args.year}年${args.month}月 越前国 一乗谷` },
             { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「お初にお目にかかる。某、${args.fujitakaFamilyName}${args.fujitakaTitle}と申す者にござる」` },
             { type: 'dialog', leftName: args.asakuraName, leftFace: args.asakuraFace, msg: `「よう参られました。朝倉${args.asakuraTitle}にございまする」` },
@@ -367,9 +367,18 @@ window.EventTextManager = {
             { type: 'dialog', leftName: args.asakuraName, leftFace: args.asakuraFace, msg: `「左馬頭様も流浪の折にはさぞかしお辛い思いをなされたことでしょう」` },
             { type: 'dialog', leftName: args.asakuraName, leftFace: args.asakuraFace, msg: `「しばらく当家にご滞在なされるがよろしかろうと存じまする」` },
             { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「……ご厚意、重々に痛み入る。しからば、本日はこれにて」` },
-            { type: 'log', msg: `足利義昭は一乗谷において、上洛に向けて諸大名への協力要請を積極的に行った。` },
-            { type: 'log', msg: `しかし、そのいずれもが実現には至らず、義昭の滞在は長期間に及ぶこととなったのである。` }
+            { type: 'log', msg: `足利義昭は一乗谷において、上洛に向けて諸大名への協力要請を積極的に行った。` }
         ];
+
+        // ★ historical_event.js から「追加ナレーションの条件をクリアした」と連絡が来ていたら、テキストを追加します
+        if (args.showExtraNarration) {
+            messages.push({ type: 'log', msg: `越後国の${args.kenshinName}、安芸国の${args.motonariName}、そして尾張国の${args.nobunagaName}――` });
+        }
+
+        // 最後の締めくくりの文章を追加します
+        messages.push({ type: 'log', msg: `しかし、そのいずれもが実現には至らず、義昭の滞在は長期間に及ぶこととなったのである。` });
+
+        return messages;
     },
 
     // 将軍庇護第２段階 足利義昭が織田家を頼る
