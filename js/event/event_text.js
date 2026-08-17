@@ -372,9 +372,38 @@ window.EventTextManager = {
         ];
     },
 
-    // ==========================================
-    // ここから下を新しく書き足します
-    // ==========================================
+    // 将軍庇護第２段階 足利義昭が織田家を頼る
+    shogun_protection_2: function(args) {
+        return [
+            { type: 'log', msg: `前将軍・${args.yoshiteruName}の弟・${args.yoshiakiName}は${args.asakuraName}の庇護下に入り、${args.asakuraProvinceName}に滞在しながらも、諸大名に対して上洛への協力要請を行っていた。` },
+            { type: 'log', msg: `${args.nobunagaProvinceName}の${args.nobunagaName}はこれに応じるべく、${args.hisahideName}への協力要請を取り付け、着々と準備を行っていた。` },
+            { type: 'log', msg: `${args.yoshiakiName}は${args.asakuraFamilyName}家に仕えていた${args.mitsuhideName}の仲介により、信長との交渉を進めていた。` },
+            { type: 'dialog', leftName: args.mitsuhideName, leftFace: args.mitsuhideFace, msg: `「越前におりましても、近頃は${args.odaFamilyName}様のお噂をよく耳にいたしまする」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「ほう？ どのような噂じゃ？」` },
+            { type: 'dialog', leftName: args.mitsuhideName, leftFace: args.mitsuhideFace, msg: `「その勢い、昇り龍のようであると」` },
+            { type: 'dialog', leftName: args.mitsuhideName, leftFace: args.mitsuhideFace, msg: `「今川治部を食らい、美濃を平らげ……龍が望む果ては如何なる空ぞ、と」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「ふん、わしは龍か」` },
+            { type: 'dialog', leftName: args.mitsuhideName, leftFace: args.mitsuhideFace, msg: `「上様は某に、${args.nobunagaTitle}殿のお側にて力を尽くすようにと申されました」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「なに？ わしの家臣になると申すか？ おぬしは${args.asakuraFamilyName}の家臣であろう？」` },
+            { type: 'dialog', leftName: args.mitsuhideName, leftFace: args.mitsuhideFace, msg: `「某は${args.asakuraFamilyName}の臣である前に将軍家に仕える身。上様の命とあらばそのように」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「ふうん。おぬしは龍の尻に鞭を入れに来たというわけか」` },
+            { type: 'dialog', leftName: args.mitsuhideName, leftFace: args.mitsuhideFace, msg: `「い、いえ、そのようなことは……」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「くく……まあよい。ちょうど政に精通した者がほしいと思うておったところじゃ」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「${args.mitsuhideTitle}と申したか？ よかろう、わしに仕えよ」` },
+            { type: 'dialog', leftName: args.mitsuhideName, leftFace: args.mitsuhideFace, msg: `「はっ、ははっ。ありがたき幸せに存じまする」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「ふん。で、上様は${args.asakuraProvinceName}を出られるのか？」` },
+            { type: 'dialog', leftName: args.mitsuhideName, leftFace: args.mitsuhideFace, msg: `「上様のお心はとうに${args.asakuraProvinceName}を離れておりますれば」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「当家で${args.asakuraFamilyName}ほどのもてなしができるとは思えぬ。こちらへ来れば、前より待遇は悪うなるやもしれんぞ」` },
+            { type: 'dialog', leftName: args.mitsuhideName, leftFace: args.mitsuhideFace, msg: `「天が龍を求めておりまする」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「ふっ……ふはははははっ！ ぬかしおるわ！」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「よかろう、${args.mitsuhideTitle}とやら。わしの手の者を${args.asakuraProvinceName}へ迎えにやる。おぬしもそれに同行せよ」` },
+            { type: 'dialog', leftName: args.mitsuhideName, leftFace: args.mitsuhideFace, msg: `「はっ。御意にござりまする、殿」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「はっはっはっ……」` },
+            { type: 'log', msg: `${args.year}年${args.month}月、${args.yoshiakiName}は${args.asakuraCastleName}を出発し美濃へ入った。` },
+            { type: 'log', msg: `${args.nobunagaName}はこれを手厚く迎え、${args.yoshiakiGivenName}と歩調を揃えて上洛の軍を挙げたのであった。` }
+        ];
+    },
+    
     // 岐阜城改称イベント
     rename_gifu_castle: function(args) {
         return [

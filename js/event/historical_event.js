@@ -2304,6 +2304,10 @@ window.GameEvents.push({
         const asakuraHasCastleInTarget = checkCastles.some(c => c.ownerClan === asakuraClanId);
         if (asakuraHasCastleInTarget) return false;
 
+        // 4. 松永久秀（ID: 1202002）が大名であるか
+        const hisahideDaimyo = window.EventCheck.getDaimyo(game, 1202002);
+        if (!hisahideDaimyo) return false;
+
         return true;
     },
     
@@ -2314,10 +2318,110 @@ window.GameEvents.push({
         const wada = game.getBusho(1017035);
         const asakuraDaimyo = game.getBusho(1007008);
         const nobunagaDaimyo = game.getBusho(1006006);
+        const hisahideDaimyo = game.getBusho(1202002);
         
         const asakuraClanId = asakuraDaimyo.clan;
         const nobunagaClanId = nobunagaDaimyo.clan;
         const targetCastleId = nobunagaDaimyo.castleId;
+        const hisahideClanId = hisahideDaimyo.clan;
+
+        // --- 会話イベントのための準備 ---
+        const yoshiteru = game.getBusho(1017003);
+        const yoshiteruName = yoshiteru ? yoshiteru.name.replace(/\|/g, '') : "足利義輝";
+        const yoshiakiName = yoshiaki.name.replace(/\|/g, '');
+        const yoshiakiGivenName = yoshiaki.givenName || "義昭";
+
+        // 信長関連
+        const nobunagaName = nobunagaDaimyo.name.replace(/\|/g, '');
+        const odaFamilyName = nobunagaDaimyo.familyName || nobunagaDaimyo.name.split('|')[0] || "織田";
+        const nobunagaFace = nobunagaDaimyo.faceIcon || "unknown_face.webp";
+        let nobunagaTitle = nobunagaDaimyo.givenName || nobunagaDaimyo.name.replace(/\|/g, '');
+        if (game.courtRankSystem && typeof game.courtRankSystem.getHighestRankName === 'function') {
+            const rankName = game.courtRankSystem.getHighestRankName(nobunagaDaimyo);
+            if (rankName !== "なし") {
+                nobunagaTitle = rankName;
+            } else {
+                nobunagaTitle = "上総介";
+            }
+        } else {
+             nobunagaTitle = "上総介";
+        }
+        
+        let nobunagaProvinceName = "美濃";
+        if (nobunagaDaimyo.castleId) {
+            const c = game.getCastle(nobunagaDaimyo.castleId);
+            if (c) {
+                const p = game.provinces.find(prov => prov.id === c.provinceId);
+                if (p) nobunagaProvinceName = p.province;
+            }
+        }
+
+        // 朝倉義景関連
+        const asakuraName = asakuraDaimyo.name.replace(/\|/g, '');
+        const asakuraFamilyName = asakuraDaimyo.familyName || asakuraDaimyo.name.split('|')[0] || "朝倉";
+        
+        let asakuraProvinceName = "越前";
+        let asakuraCastleName = "城";
+        if (asakuraDaimyo.castleId) {
+            const c = game.getCastle(asakuraDaimyo.castleId);
+            if (c) {
+                asakuraCastleName = c.name;
+                const p = game.provinces.find(prov => prov.id === c.provinceId);
+                if (p) asakuraProvinceName = p.province;
+            }
+        }
+
+        // 明智光秀関連
+        const mitsuhideName = mitsuhide.name.replace(/\|/g, '');
+        const mitsuhideFace = mitsuhide.faceIcon || "unknown_face.webp";
+        let mitsuhideTitle = mitsuhide.givenName || mitsuhide.name.replace(/\|/g, '');
+        if (game.courtRankSystem && typeof game.courtRankSystem.getHighestRankName === 'function') {
+            const rankName = game.courtRankSystem.getHighestRankName(mitsuhide);
+            if (rankName !== "なし") {
+                mitsuhideTitle = rankName;
+            } else {
+                mitsuhideTitle = "十兵衛";
+            }
+        } else {
+            mitsuhideTitle = "十兵衛";
+        }
+
+        // 松永久秀関連
+        const hisahideName = hisahideDaimyo.name.replace(/\|/g, '');
+
+        const args = {
+            year: game.year,
+            month: game.month,
+            yoshiteruName: yoshiteruName,
+            yoshiakiName: yoshiakiName,
+            yoshiakiGivenName: yoshiakiGivenName,
+            asakuraName: asakuraName,
+            asakuraFamilyName: asakuraFamilyName,
+            asakuraProvinceName: asakuraProvinceName,
+            asakuraCastleName: asakuraCastleName,
+            nobunagaProvinceName: nobunagaProvinceName,
+            nobunagaName: nobunagaName,
+            hisahideName: hisahideName,
+            mitsuhideName: mitsuhideName,
+            mitsuhideFace: mitsuhideFace,
+            odaFamilyName: odaFamilyName,
+            nobunagaFace: nobunagaFace,
+            nobunagaTitle: nobunagaTitle,
+            mitsuhideTitle: mitsuhideTitle
+        };
+
+        if (window.AudioManager) {
+            window.AudioManager.memorizeCurrentBgm();
+            window.AudioManager.playBGM("SC_ex_Scene3_Odyssey.ogg");
+        }
+
+        if (window.EventTextManager && window.EventTextManager.shogun_protection_2) {
+            await window.EventTextManager.playSequence(game, window.EventTextManager.shogun_protection_2(args));
+        }
+
+        if (window.AudioManager) {
+            window.AudioManager.restoreMemorizedBgm();
+        }
 
         // 移籍対象の武将リストを作成
         let targetBushos = [yoshiaki, mitsuhide, fujitaka];
@@ -2424,6 +2528,23 @@ window.GameEvents.push({
                     }
                 }
             });
+
+            // ★ここから追加：織田勢力と松永勢力の友好度を100にします
+            // 松永勢力がもし織田勢力と同盟・支配・従属関係ではない場合は同盟します
+            let hisahideRel = game.diplomacyManager.getRelation(nobunagaClanId, hisahideClanId);
+            if (hisahideRel && !['同盟', '支配', '従属'].includes(hisahideRel.status)) {
+                game.diplomacyManager.changeStatus(nobunagaClanId, hisahideClanId, '同盟', 0);
+            }
+            const relA_hisahide = game.diplomacyManager.getRelation(nobunagaClanId, hisahideClanId);
+            const relB_hisahide = game.diplomacyManager.getRelation(hisahideClanId, nobunagaClanId);
+            if (relA_hisahide) {
+                relA_hisahide.sentiment = 100;
+                relA_hisahide.isEvent = true; // イベント同盟の印
+            }
+            if (relB_hisahide) {
+                relB_hisahide.sentiment = 100;
+                relB_hisahide.isEvent = true; // イベント同盟の印
+            }
         }
 
         // ★追加：織田勢力のすべての軍団に「地方統一（近畿）」の方針を10年間（120ターン）持たせます！
