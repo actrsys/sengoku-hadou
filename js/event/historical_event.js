@@ -2262,7 +2262,6 @@ window.GameEvents.push({
         const msg = `${yoshiakiName}は幕府再興のため、${asakuraNameDisplay}を頼り${asakuraClanName}の庇護下に入りました。`;
         
         game.ui.log(`【イベント】${msg}`);
-        await game.ui.showDialogAsync(msg, false, 0);
     }
 });
 
@@ -2298,15 +2297,46 @@ window.GameEvents.push({
         if (!odaClan || !asakuraClan) return false;
         if ((odaClan.daimyoPrestige || 0) < (asakuraClan.daimyoPrestige || 0) * 1.5) return false;
 
-        // 3. 朝倉勢力が山城国（ID30）・近江国（ID29）にある拠点を所有していないか
+        // 3. 松永久秀（ID: 1202002）が大名であるか確認します
+        const hisahideDaimyo = window.EventCheck.getDaimyo(game, 1202002);
+        if (!hisahideDaimyo) return false;
+
+        // 4. 今川義元（ID: 1004009）が死亡しているか確認します
+        if (!window.EventCheck.isDead(game, 1004009)) return false;
+
+        // 5. 織田勢力が稲葉山城（ID: 3）を所有しているか確認します
+        const inabayama = game.getCastle(3);
+        if (!inabayama || inabayama.ownerClan !== nobunagaClanId) return false;
+
+        // 6. 朝倉勢力が山城国（ID30）・近江国（ID29）にある拠点を所有していたらイベントは起きません
         const checkProvinceIds = [29, 30];
         const checkCastles = game.castles.filter(c => checkProvinceIds.includes(c.provinceId));
         const asakuraHasCastleInTarget = checkCastles.some(c => c.ownerClan === asakuraClanId);
         if (asakuraHasCastleInTarget) return false;
 
-        // 4. 松永久秀（ID: 1202002）が大名であるか
-        const hisahideDaimyo = window.EventCheck.getDaimyo(game, 1202002);
-        if (!hisahideDaimyo) return false;
+        // 7. 織田勢力が尾張国（地方ID: 23）のすべての城を所有しているか確認します
+        if (!window.EventCheck.ownsAllCastlesInProvince(game, nobunagaClanId, 23)) return false;
+
+        // 8. 美濃国（地方ID: 27）に、織田家と敵対している勢力の城がないか確認します
+        const minoCastles = game.castles.filter(c => c.provinceId === 27);
+        let hasEnemyInMino = false;
+        if (game.diplomacyManager) {
+            for (let c of minoCastles) {
+                // 空き城（0）ではなく、織田家自身の城でもない場合を調べます
+                if (c.ownerClan !== 0 && c.ownerClan !== nobunagaClanId) {
+                    // その城の持ち主と織田家の関係をチェックします
+                    const rel = game.diplomacyManager.getRelation(nobunagaClanId, c.ownerClan);
+                    // 敵対状態の勢力が見つかったら、「敵がいる」という目印（フラグ）を立てます
+                    if (rel && rel.status === '敵対') {
+                        hasEnemyInMino = true;
+                        break; // ひとつでも見つかれば十分なので、探すのをやめます
+                    }
+                }
+            }
+        }
+        
+        // 敵対勢力の城が美濃国にひとつでもあったら、イベントは起きません
+        if (hasEnemyInMino) return false;
 
         return true;
     },
@@ -2565,10 +2595,9 @@ window.GameEvents.push({
 
         const yoshiakiName = yoshiaki.name.replace(/\|/g, '');
         const nobunagaName = nobunagaDaimyo.name.replace(/\|/g, '');
-        const msg = `${yoshiakiName}は上洛のため、${nobunagaName}を頼り美濃へ動座しました。`;
+        const msg = `${yoshiakiName}は上洛のため、${nobunagaName}を頼りその庇護下に入りました。`;
         
         game.ui.log(`【イベント】${msg}`);
-        await game.ui.showDialogAsync(msg, false, 0);
     }
 });
 
