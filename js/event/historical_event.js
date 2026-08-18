@@ -1922,7 +1922,7 @@ window.GameEvents.push({
         const miyoshiClanName = miyoshiClan ? miyoshiClan.name : "三好家";
         const ashikagaClan = game.getClan(ashikagaClanId);
         const ashikagaClanName = ashikagaClan ? ashikagaClan.name : "足利家";
-        const yoshiteruName = yoshiteru.name.replace('|', ''	);
+        const yoshiteruName = yoshiteru.fullName;
         
         const nagayasuCastle = nagayasu ? game.getCastle(nagayasu.castleId) : null;
         
@@ -2200,7 +2200,7 @@ window.GameEvents.push({
 
         // --- 会話イベントのための準備 ---
         // 細川藤孝の官位を取得（なければ下の名前）
-        let fujitakaTitle = fujitaka.givenName || fujitaka.name.replace('|', '');
+        let fujitakaTitle = fujitaka.givenName || fujitaka.fullName;
         if (game.courtRankSystem && typeof game.courtRankSystem.getHighestRankName === 'function') {
             const rankName = game.courtRankSystem.getHighestRankName(fujitaka);
             if (rankName !== "なし") {
@@ -2209,7 +2209,7 @@ window.GameEvents.push({
         }
 
         // 朝倉義景の官位を取得（なければ下の名前）
-        let asakuraTitle = asakuraDaimyo.givenName || asakuraDaimyo.name.replace('|', '');
+        let asakuraTitle = asakuraDaimyo.givenName || asakuraDaimyo.fullName;
         if (game.courtRankSystem && typeof game.courtRankSystem.getHighestRankName === 'function') {
             const rankName = game.courtRankSystem.getHighestRankName(asakuraDaimyo);
             if (rankName !== "なし") {
@@ -2219,7 +2219,7 @@ window.GameEvents.push({
 
         // 会話に出てくる他の武将の名前を用意します
         const yoshiteru = game.getBusho(1017003);
-        const yoshiteruName = yoshiteru ? yoshiteru.name.replace('|', '') : "足利義輝";
+        const yoshiteruName = yoshiteru ? yoshiteru.fullName : "足利義輝";
         
         const hisahide = game.getBusho(1202002);
         const hisahideFamilyName = hisahide ? (hisahide.familyName || hisahide.name.split('|')[0] || "松永") : "松永";
