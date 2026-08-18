@@ -126,7 +126,7 @@ class LifeSystem {
     // ==========================================
     applyDaimyoNameAndFaceChange(busho, messages = null) {
         let isNameChanged = false;
-        let oldNameStr = busho.name.replace(/\|/g, '');
+        let oldNameStr = busho.fullName;
         let newNameStr = "";
 
         // 1. 改名のチェック
@@ -151,7 +151,7 @@ class LifeSystem {
                         busho.yomi = busho.familyYomi + busho.givenYomi;
                     }
                     
-                    newNameStr = busho.name.replace(/\|/g, '');
+                    newNameStr = busho.fullName;
                     isNameChanged = true;
 
                     // メッセージのリストが渡されていたら、お知らせを追加します
@@ -223,8 +223,8 @@ class LifeSystem {
                                     const clan = this.game.getClan(b.clan);
                                     if (clan) {
                                         const oldClanName = clan.name;
-                                        const newBaseName = `${b.familyName}家`;
-                                        const newClanYomi = b.familyYomi ? `${b.familyYomi}け` : "";
+                                        const newBaseName = b.clanNameStr;
+                                        const newClanYomi = b.clanYomiStr;
                                         
                                         if (clan.baseName !== newBaseName) {
                                             clan.baseName = newBaseName; 
@@ -340,7 +340,7 @@ class LifeSystem {
                             targetCastle.samuraiIds = targetCastle.samuraiIds.filter(id => id !== currentLeader.id);
                         }
                         
-                        const bushoName = b.name.replace('|', '');
+                        const bushoName = b.fullName;
                         const kunishuName = kunishu.getName(this.game);
                         const msg = `${bushoName}が${kunishuName}の頭領に就任しました。`;
                         
@@ -383,7 +383,7 @@ class LifeSystem {
 
                         // プレイヤーの大名家に仕官した場合のお知らせ表示
                         if (b.clan === this.game.playerClanId) {
-                            const nameStr = b.name.replace('|', '');
+                            const nameStr = b.fullName;
                             const msg = `${nameStr}が元服し、当家に加わりました！`;
                             this.game.ui.log(msg);
                             await this.game.ui.showDialogAsync(msg, false, 0);
@@ -457,7 +457,7 @@ class LifeSystem {
                     
                     // プレイヤーの大名家にやってきた場合は、お知らせのメッセージを作ります
                     if (b.status === 'active' && b.clan === this.game.playerClanId) {
-                        const nameStr = b.name.replace('|', '');
+                        const nameStr = b.fullName;
                         let msg = "";
                         if (hasRelative) {
                             msg = `${nameStr}が元服し、当家に加わりました！`;
@@ -491,7 +491,7 @@ class LifeSystem {
                 const father = this.game.getBusho(p.realFatherId);
                 if (father && father.status !== 'dead' && father.status !== 'unborn' && father.clan !== 0) {
                     targetClanId = father.clan;
-                    fatherNameStr = father.name.replace('|', ''); // ★お父さんの名前から「|」を消してメモします
+                    fatherNameStr = father.fullName; // ★お父さんの名前から「|」を消してメモします
                 }
             }
             
@@ -594,7 +594,7 @@ class LifeSystem {
                 
                 // もしプレイヤーの家臣で、すでに登場していて、かつ「イベントで通常のメッセージを消す」指示がなければお知らせを出します
                 if (b.clan === this.game.playerClanId && !wasUnborn && !context.skipNormalMessage) {
-                    const name = b.name.replace('|', '');
+                    const name = b.fullName;
                     this.game.ui.log(`${name}が死亡しました……`);
                     // ★一人ずつ順番にダイアログを出して、押すまで待ちます！
                     await this.game.ui.showDialogAsync(`${name}が死亡しました……`, false, 0);
@@ -632,7 +632,7 @@ class LifeSystem {
                 
                 // もしプレイヤーの家臣で、すでに登場していて、かつ「イベントで通常のメッセージを消す」指示がなければお知らせを出します
                 if (b.clan === this.game.playerClanId && !wasUnborn && !context.skipNormalMessage) {
-                    const name = b.name.replace('|', '');
+                    const name = b.fullName;
                     this.game.ui.log(`戦傷が元となり${name}が死亡しました……`);
                     await this.game.ui.showDialogAsync(`戦傷が元となり${name}が死亡しました……`, false, 0);
                 }
@@ -758,7 +758,7 @@ class LifeSystem {
                             if (clanA === this.game.playerClanId || clanB === this.game.playerClanId) {
                                 const targetClanName = (clanA === this.game.playerClanId) ? clanBData?.name : clanAData?.name;
                                 if (targetClanName) {
-                                    const breakMsg = `夫である${busho.name.replace('|', '')}の死により、${targetClanName}との婚姻関係は解消されました。`;
+                                    const breakMsg = `夫である${busho.fullName}の死により、${targetClanName}との婚姻関係は解消されました。`;
                                     this.game.ui.log(breakMsg);
                                     await this.game.ui.showDialogAsync(breakMsg, false, 0);
                                 }
@@ -1069,7 +1069,7 @@ class LifeSystem {
             }
 
             // ★修正：改名前の「元の名前」をメモしておきます！
-            const originalName = successor.name.replace('|', '');
+            const originalName = successor.fullName;
 
             let isExternalSuccessor = false;
 
@@ -1081,11 +1081,11 @@ class LifeSystem {
                     const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(successor.belongKunishuId) : null;
                     const kunishuName = kunishu ? kunishu.getName(this.game) : "諸勢力";
                     successor.belongKunishuId = 0;
-                    messages.push(`${kunishuName}より${successor.name.replace('|','')}が\n当主として迎え入れられました。`);
+                    messages.push(`${kunishuName}より${successor.fullName}が\n当主として迎え入れられました。`);
                 } else if (successor.status === 'ronin') {
-                    messages.push(`${successor.name.replace('|','')}が当主として迎え入れられました。`);
+                    messages.push(`${successor.fullName}が当主として迎え入れられました。`);
                 } else {
-                    messages.push(`${successor.name.replace('|','')}が急遽元服し、家督を継ぎました。`);
+                    messages.push(`${successor.fullName}が急遽元服し、家督を継ぎました。`);
                 }
             }
 
@@ -1103,11 +1103,11 @@ class LifeSystem {
             
             let mainMsg = "";
             if (isExternalSuccessor) {
-                mainMsg = `${clanPrefix}${daimyo.name.replace('|','')}が死亡しました。`;
+                mainMsg = `${clanPrefix}${daimyo.fullName}が死亡しました。`;
                 this.game.ui.log(`【当主交代】${mainMsg}`);
             } else {
                 // ★修正：改名する前の「元の名前」を使います！
-                mainMsg = `${clanPrefix}${daimyo.name.replace('|','')}が死亡し、${originalName}が家督を継ぎました。`;
+                mainMsg = `${clanPrefix}${daimyo.fullName}が死亡し、${originalName}が家督を継ぎました。`;
                 this.game.ui.log(`【当主交代】${mainMsg}`);
             }
             
@@ -1205,7 +1205,7 @@ class LifeSystem {
             // ★並び替えて一番上に来た人を、自動で後任の国主にします！
             successor = allCandidates[0];
 
-            const originalName = successor.name.replace('|', '');
+            const originalName = successor.fullName;
             let isExternalSuccessor = false;
 
             if (successor.status === 'unborn' || successor.status === 'ronin' || (successor.belongKunishuId || 0) > 0) {
@@ -1215,11 +1215,11 @@ class LifeSystem {
                     const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(successor.belongKunishuId) : null;
                     const kunishuName = kunishu ? kunishu.getName(this.game) : "諸勢力";
                     successor.belongKunishuId = 0;
-                    messages.push(`${kunishuName}より${successor.name.replace('|','')}が\n跡継ぎとして迎え入れられました。`);
+                    messages.push(`${kunishuName}より${successor.fullName}が\n跡継ぎとして迎え入れられました。`);
                 } else if (successor.status === 'ronin') {
-                    messages.push(`${successor.name.replace('|','')}が跡を継ぎました。`);
+                    messages.push(`${successor.fullName}が跡を継ぎました。`);
                 } else {
-                    messages.push(`${successor.name.replace('|','')}が急遽元服し、跡を継ぎました。`);
+                    messages.push(`${successor.fullName}が急遽元服し、跡を継ぎました。`);
                 }
             }
 
@@ -1260,9 +1260,9 @@ class LifeSystem {
             
             let mainMsg = "";
             if (isExternalSuccessor) {
-                mainMsg = `${clanPrefix}国主・${commander.name.replace('|','')}が死亡しました。`;
+                mainMsg = `${clanPrefix}国主・${commander.fullName}が死亡しました。`;
             } else {
-                mainMsg = `${clanPrefix}国主・${commander.name.replace('|','')}が死亡し、${originalName}が新たな国主となりました。`;
+                mainMsg = `${clanPrefix}国主・${commander.fullName}が死亡し、${originalName}が新たな国主となりました。`;
             }
             this.game.ui.log(`【国主交代】${mainMsg}`);
             messages.unshift(mainMsg);
@@ -1280,7 +1280,7 @@ class LifeSystem {
             const clan = this.game.getClan(commander.clan);
             const clanPrefix = clan ? `${clan.name}の` : "";
             
-            const msg = `${clanPrefix}国主・${commander.name.replace('|','')}が死亡しました。\n後任となる武将がいないため、軍団は解散されました。`;
+            const msg = `${clanPrefix}国主・${commander.fullName}が死亡しました。\n後任となる武将がいないため、軍団は解散されました。`;
             this.game.ui.log(msg);
             await this.game.ui.showDialogAsync(msg, false, 0);
         }
@@ -1389,10 +1389,8 @@ class LifeSystem {
         const clan = this.game.getClan(oldDaimyo.clan);
         if (clan) {
             const oldClanName = clan.name;
-            const safeFamilyName = successor.familyName || successor.name;
-            const newBaseName = `${safeFamilyName}家`;
-            const safeFamilyYomi = successor.familyYomi || successor.yomi;
-            const newClanYomi = safeFamilyYomi ? `${safeFamilyYomi}け` : "";
+            const newBaseName = successor.clanNameStr;
+            const newClanYomi = successor.clanYomiStr;
             
             // ★修正：今の家名（例：若狭武田家）ではなく、本来の家名（baseName：武田家）と比べるようにします！
             // そうしないと、同じ武田家が跡を継いだ時に「若狭武田家は武田家になります」と出てしまいます。
@@ -1505,7 +1503,7 @@ class LifeSystem {
         if (!oldDaimyo || !successor) return;
 
         // ★追加：改名する前に、いまの「元の名前」をメモしておきます！
-        const originalName = successor.name.replace('|', '');
+        const originalName = successor.fullName;
 
         const messages = []; // 順番に出すメッセージを溜めておくリスト
 

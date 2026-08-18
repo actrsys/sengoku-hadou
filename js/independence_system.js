@@ -278,12 +278,10 @@ class IndependenceSystem {
             }
 
             // ★新大名家の名前は神輿の人物ベース（改名後なら新しい名前が使われます）
-            const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name; 
-            newClanName = `${familyName}家`;
+            newClanName = rebellionLeader.clanNameStr;
             
             // ★新大名家の読み仮名も神輿の人物から取ります！
-            const familyYomi = rebellionLeader.familyYomi || rebellionLeader.yomi.split('|')[0] || rebellionLeader.yomi;
-            const newClanYomi = familyYomi ? `${familyYomi}け` : "";
+            const newClanYomi = rebellionLeader.clanYomiStr;
 
             const newClan = new Clan({
                 id: newClanId, name: newClanName, yomi: newClanYomi, color: newColor, leaderId: rebellionLeader.id
@@ -396,10 +394,10 @@ class IndependenceSystem {
         const oldClanName = this.game.getClan(oldClanId)?.name || "不明";
         let msg = "";
         
-        const castellanNameStr = castellan.name.replace(/\|/g, '');
+        const castellanNameStr = castellan.fullName;
         // 改名していれば古い名前を、していなければそのままの名前を表示用に使います
         const info = rebellionLeader._nameChangeInfo;
-        const leaderNameStr = (info && info.isNameChanged) ? info.oldNameStr : rebellionLeader.name.replace(/\|/g, '');
+        const leaderNameStr = (info && info.isNameChanged) ? info.oldNameStr : rebellionLeader.fullName;
         
         // ★メッセージの出し分け
         if (isProxyRebellion) {
@@ -562,8 +560,8 @@ class IndependenceSystem {
             const currentOldDaimyo = this.game.getClanDaimyo(oldClanId);
             if (currentOldDaimyo && rebellionLeader) {
                 // 名前から「|」を取り除いて綺麗な表示にします
-                const oldLeaderName = currentOldDaimyo.name.replace('|', '');
-                const newLeaderName = rebellionLeader.name.replace('|', '');
+                const oldLeaderName = currentOldDaimyo.fullName;
+                const newLeaderName = rebellionLeader.fullName;
 
                 // ★変更：選んだ大名家のID（番号）を受け取るようにします
                 const chosenClanId = await new Promise(resolve => {
@@ -1365,8 +1363,7 @@ class IndependenceSystem {
         const defClanId = isPlayerDaimyo ? oldDaimyo.clan : -1;
 
         // この時点から、勢力名を「謀反武将の苗字＋家」にしてあげます
-        const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name; 
-        const rebelClanName = `${familyName}家`;
+        const rebelClanName = rebellionLeader.clanNameStr;
 
         // ★追加：大名と謀反リーダーが現在いるお城のデータを探して、士気と訓練度を取り出します！
         const daimyoCastle = this.game.getCastle(oldDaimyo.castleId);
@@ -1642,8 +1639,8 @@ class IndependenceSystem {
             const nav = myCastle ? this.game.getNavigatorInfo(myCastle) : { faceIcon: 'unknown_face.webp', name: '小姓' };
 
             const oldClanName = this.game.getClan(oldClanId)?.name || "不明";
-            const traitorNameStr = rebellionLeader.name.replace(/\|/g, '');
-            const myDaimyoNameStr = myDaimyo ? myDaimyo.name.replace(/\|/g, '') : '当主';
+            const traitorNameStr = rebellionLeader.fullName;
+            const myDaimyoNameStr = myDaimyo ? myDaimyo.fullName : '当主';
 
             // 呼び名の判定
             let traitorCallName = "";

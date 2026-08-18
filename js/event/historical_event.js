@@ -100,7 +100,7 @@ window.EventCheck = {
 
         if (candidate && candidate.clan !== 0) {
             sponsorClanId = candidate.clan;
-            candidateName = candidate.name.replace(/\|/g, '');
+            candidateName = candidate.fullName;
         } else if (shogun && shogun.isDaimyo && shogun.clan !== 0) {
             shogunClanId = shogun.clan;
             // 擁立勢力を取得し、同盟が続いているか確認します
@@ -113,7 +113,7 @@ window.EventCheck = {
             } else {
                 return null; // 記録がなければ無効です
             }
-            candidateName = shogun.name.replace(/\|/g, '');
+            candidateName = shogun.fullName;
         } else {
             return null; // どちらもいなければ無効です
         }
@@ -683,10 +683,8 @@ window.GameEvents.push({
             const isPlayerInvolved = (game.playerClanId === nobunaga.clan || game.playerClanId === imagawaClanId);
 
             // ★追加：武将のデータから「姓＋家」の形を作ります
-            const odaFamilyName = nobunaga.familyName || nobunaga.name.split('|')[0] || "織田";
-            const imagawaFamilyName = yoshimoto.familyName || yoshimoto.name.split('|')[0] || "今川";
-            const odaName = `${odaFamilyName}家`;
-            const imagawaName = `${imagawaFamilyName}家`;
+            const odaName = nobunaga.clanNameStr || "織田家";
+            const imagawaName = yoshimoto.clanNameStr || "今川家";
 
             // ① 両家の武将の討死処理（使いまわし版）
             // 織田家と今川家で「違う部分」だけをリストにまとめます
@@ -713,7 +711,7 @@ window.GameEvents.push({
                     }
                     // プレイヤーが関係している場合のみ、一人ずつメッセージを出します
                     if (isPlayerInvolved) {
-                        const bushoName = busho.name.replace('|', '');
+                        const bushoName = busho.fullName;
                         // 自分がその勢力なら「当家」、違うならリストに登録した「〇〇家」を表示させます
                         const prefix = (game.playerClanId === target.clanId) ? "当家" : target.clanName;
                         const msg = `${prefix}の${bushoName}が討死しました。`;
@@ -1041,32 +1039,32 @@ window.GameEvents.push({
 
         // イベントテキストの台本に渡す変数をひとまとめにします
         const args = {
-            motoyasuName: motoyasu.name.replace('|', ''),
+            motoyasuName: motoyasu.fullName,
             motoyasuGivenName: motoyasu.givenName || "家康",
-            matsudairaFamilyName: motoyasu.familyName || "徳川",
+            matsudairaFamilyName: motoyasu.familyNameStr || "徳川",
             motoyasuFace: motoyasu.faceIcon || "unknown_face.webp",
             
             imagawaClanName: imagawaClanName,
             imagawaFamilyName: imagawaFamilyName,
             
-            nobunagaName: nobunaga.name.replace('|', ''),
+            nobunagaName: nobunaga.fullName,
             nobunagaGivenName: nobunaga.givenName || "信長", 
-            odaFamilyName: nobunaga.familyName || "織田",
+            odaFamilyName: nobunaga.familyNameStr || "織田",
             nobunagaFace: nobunaga.faceIcon || "unknown_face.webp",
             
             odaClanName: odaClan ? odaClan.name : "織田家",
             matsudairaClanName: matsudairaClan ? matsudairaClan.name : "徳川家",
             
-            kashinAName: kashinA ? kashinA.name.replace('|', '') : "小姓",
-            kashinAGivenName: kashinA ? (kashinA.givenName || kashinA.name.replace('|', '')) : "小姓",
+            kashinAName: kashinA ? kashinA.fullName : "小姓",
+            kashinAGivenName: kashinA ? (kashinA.givenName || kashinA.fullName) : "小姓",
             kashinAFace: kashinA ? kashinA.faceIcon : "koshou.webp",
             
-            kashinBName: kashinB ? kashinB.name.replace('|', '') : "小姓",
-            kashinBGivenName: kashinB ? (kashinB.givenName || kashinB.name.replace('|', '')) : "小姓",
+            kashinBName: kashinB ? kashinB.fullName : "小姓",
+            kashinBGivenName: kashinB ? (kashinB.givenName || kashinB.fullName) : "小姓",
             kashinBFace: kashinB ? kashinB.faceIcon : "koshou.webp",
             
-            shinzanCName: shinzanC ? shinzanC.name.replace('|', '') : "小姓",
-            shinzanCGivenName: shinzanC ? (shinzanC.givenName || shinzanC.name.replace('|', '')) : "小姓",
+            shinzanCName: shinzanC ? shinzanC.fullName : "小姓",
+            shinzanCGivenName: shinzanC ? (shinzanC.givenName || shinzanC.fullName) : "小姓",
             shinzanCFace: shinzanC ? shinzanC.faceIcon : "koshou.webp",
 
             nobunagaCastleName: nobunagaCastleName,
@@ -1304,8 +1302,8 @@ window.GameEvents.push({
         window.EventAction.executeSuccession(game, oldDaimyo, successor, messages);
 
         // ⑪ メッセージを画面に出してお知らせします
-        const hisamasaName = oldDaimyo.name.replace('|', '');
-        const nagamasaName = successor.name.replace('|', '');
+        const hisamasaName = oldDaimyo.fullName;
+        const nagamasaName = successor.fullName;
         const mainMsg = `浅井家の${hisamasaName}が隠居し、\n${nagamasaName}が新たな当主として家督を継ぎました！`;
         
         game.ui.log(`【イベント】浅井家家督相続：${mainMsg}`);
@@ -1431,12 +1429,10 @@ window.GameEvents.push({
 
         // ⑤ 画面にメッセージを出してお知らせします
         // ★変更：家名や武将名を指定の形に整えます
-        const odaFamilyName = nobunaga.familyName || nobunaga.name.split('|')[0] || "織田";
-        const azaiFamilyName = nagamasa.familyName || nagamasa.name.split('|')[0] || "浅井";
-        const odaName = `${odaFamilyName}家`;
-        const azaiName = `${azaiFamilyName}家`;
+        const odaName = nobunaga.clanNameStr || "織田家";
+        const azaiName = nagamasa.clanNameStr || "浅井家";
         const oichiName = oichi.name;
-        const nagamasaName = nagamasa.name.replace(/\|/g, '');
+        const nagamasaName = nagamasa.fullName;
 
         // ★変更：ご希望の文章に変更します
         const msg = `亡き将軍の後継者である${candidateName}公の要請に応じ、${azaiName}が${odaName}に従属しました。\n${odaName}の${oichiName}が${nagamasaName}に輿入れしました。`;
@@ -1520,9 +1516,9 @@ window.GameEvents.push({
         const targetCastle = game.getCastle(targetCastleId);
         const castleName = targetCastle ? targetCastle.name : "居城";
 
-        const deadName = deadBusho.name.replace('|', '');
+        const deadName = deadBusho.fullName;
         const odaName = odaClan ? odaClan.name : "織田家";
-        const katsunagaName = katsunaga.name.replace('|', '');
+        const katsunagaName = katsunaga.fullName;
 
         // ----------------------------------------------------
         // 1. 遠山景任勢力が織田信長勢力に吸収される
@@ -1645,7 +1641,7 @@ window.GameEvents.push({
         if (!nobunaga || !inabayama || !kiyosu) return; 
 
         // 名前が変わってしまう前に、「現在の武将の名前」と「現在のお城の名前」をメモしておきます！
-        const nobunagaName = nobunaga.name.replace('|', ''); 
+        const nobunagaName = nobunaga.fullName;
         const nobunagaGivenName = nobunaga.givenName || "信長";
         const nobunagaFace = nobunaga.faceIcon || "unknown_face.webp";
         const oldCastleName = inabayama.name;
@@ -1787,7 +1783,7 @@ window.GameEvents.push({
         if (!motoyasu || !hikuma || !okazaki) return; 
 
         // 名前が変わってしまう前に、「現在の武将の名前」と「現在のお城の名前」をメモしておきます
-        const motoyasuName = motoyasu.name.replace('|', ''); 
+        const motoyasuName = motoyasu.fullName;
         const oldCastleName = hikuma.name;
 
         // ① 曳馬城の名前を「浜松城」に変更します
@@ -1926,7 +1922,7 @@ window.GameEvents.push({
         const miyoshiClanName = miyoshiClan ? miyoshiClan.name : "三好家";
         const ashikagaClan = game.getClan(ashikagaClanId);
         const ashikagaClanName = ashikagaClan ? ashikagaClan.name : "足利家";
-        const yoshiteruName = yoshiteru.name.replace('|', '');
+        const yoshiteruName = yoshiteru.name.replace('|', ''	);
         
         const nagayasuCastle = nagayasu ? game.getCastle(nagayasu.castleId) : null;
         
@@ -1941,21 +1937,21 @@ window.GameEvents.push({
         
         const args = {
             nagayasuCastleName: nagayasuCastle ? nagayasuCastle.name : "居城",
-            nagayasuName: nagayasu ? nagayasu.name.replace('|', '') : "三好長逸",
+            nagayasuName: nagayasu ? nagayasu.fullName : "三好長逸",
             nagayasuFace: nagayasu ? nagayasu.faceIcon : "unknown_face.webp",
-            masakatsuName: masakatsu ? masakatsu.name.replace('|', '') : "三好政勝",
+            masakatsuName: masakatsu ? masakatsu.fullName : "三好政勝",
             masakatsuTitle: masakatsuTitle, // 三好政勝の官位
             masakatsuFace: masakatsu ? masakatsu.faceIcon : "unknown_face.webp",
-            tomomichiName: tomomichi ? tomomichi.name.replace('|', '') : "石成友通",
+            tomomichiName: tomomichi ? tomomichi.fullName : "石成友通",
             tomomichiFace: tomomichi ? tomomichi.faceIcon : "unknown_face.webp",
             yoshiteruName: yoshiteruName,
             yoshiteruGivenName: yoshiteru ? (yoshiteru.givenName || "義輝") : "義輝",
             yoshiteruFace: yoshiteru ? yoshiteru.faceIcon : "unknown_face.webp",
-            miyoshiFamilyName: yoshitsugu ? (yoshitsugu.familyName || "三好") : "三好",
-            nagayoshiName: nagayoshi ? nagayoshi.name.replace('|', '') : "三好長慶",
-            yoshitsuguName: yoshitsugu ? yoshitsugu.name.replace('|', '') : "三好義継",
+            miyoshiFamilyName: yoshitsugu ? (yoshitsugu.familyNameStr || "三好") : "三好",
+            nagayoshiName: nagayoshi ? nagayoshi.fullName : "三好長慶",
+            yoshitsuguName: yoshitsugu ? yoshitsugu.fullName : "三好義継",
             yoshitsuguGivenName: yoshitsugu ? (yoshitsugu.givenName || "義継") : "義継",
-            fujitakaName: fujitaka ? fujitaka.name.replace('|', '') : "細川藤孝",
+            fujitakaName: fujitaka ? fujitaka.fullName : "細川藤孝",
             fujitakaGivenName: fujitaka ? (fujitaka.givenName || "藤孝") : "藤孝",
             fujitakaFace: fujitaka ? fujitaka.faceIcon : "unknown_face.webp",
             yoshiakiGivenName: yoshiaki ? (yoshiaki.givenName || "義昭") : "義昭",
@@ -2041,7 +2037,7 @@ window.GameEvents.push({
             }
         });
 
-        const yoshitsuguName = yoshitsugu.name.replace('|', '');
+        const yoshitsuguName = yoshitsugu.fullName;
 
         // ⑥ 三好三人衆の忠誠度を100にします
         const trioIds = [1020021, 1020024, 1020029];
@@ -2303,8 +2299,8 @@ window.GameEvents.push({
         }
         // ------------------------------------
 
-        const yoshiakiName = yoshiaki.name.replace(/\|/g, '');
-        const asakuraNameDisplay = asakuraDaimyo.name.replace(/\|/g, '');
+        const yoshiakiName = yoshiaki.fullName;
+        const asakuraNameDisplay = asakuraDaimyo.fullName;
         const asakuraClanName = game.getClan(asakuraClanId)?.name || "朝倉家";
         const msg = `${yoshiakiName}は幕府再興のため、${asakuraNameDisplay}を頼り${asakuraClanName}の庇護下に入りました。`;
         
@@ -2404,15 +2400,15 @@ window.GameEvents.push({
 
         // --- 会話イベントのための準備 ---
         const yoshiteru = game.getBusho(1017003);
-        const yoshiteruName = yoshiteru ? yoshiteru.name.replace(/\|/g, '') : "足利義輝";
-        const yoshiakiName = yoshiaki.name.replace(/\|/g, '');
+        const yoshiteruName = yoshiteru ? yoshiteru.fullName : "足利義輝";
+        const yoshiakiName = yoshiaki.fullName;
         const yoshiakiGivenName = yoshiaki.givenName || "義昭";
 
         // 信長関連
-        const nobunagaName = nobunagaDaimyo.name.replace(/\|/g, '');
-        const odaFamilyName = nobunagaDaimyo.familyName || nobunagaDaimyo.name.split('|')[0] || "織田";
+        const nobunagaName = nobunagaDaimyo.fullName;
+        const odaFamilyName = nobunagaDaimyo.familyNameStr || "織田";
         const nobunagaFace = nobunagaDaimyo.faceIcon || "unknown_face.webp";
-        let nobunagaTitle = nobunagaDaimyo.givenName || nobunagaDaimyo.name.replace(/\|/g, '');
+        let nobunagaTitle = nobunagaDaimyo.givenName || nobunagaDaimyo.fullName;
         if (game.courtRankSystem && typeof game.courtRankSystem.getHighestRankName === 'function') {
             const rankName = game.courtRankSystem.getHighestRankName(nobunagaDaimyo);
             if (rankName !== "なし") {
@@ -2434,8 +2430,8 @@ window.GameEvents.push({
         }
 
         // 朝倉義景関連
-        const asakuraName = asakuraDaimyo.name.replace(/\|/g, '');
-        const asakuraFamilyName = asakuraDaimyo.familyName || asakuraDaimyo.name.split('|')[0] || "朝倉";
+        const asakuraName = asakuraDaimyo.fullName;
+        const asakuraFamilyName = asakuraDaimyo.familyNameStr || "朝倉";
         
         let asakuraProvinceName = "越前";
         let asakuraCastleName = "城";
@@ -2449,9 +2445,9 @@ window.GameEvents.push({
         }
 
         // 明智光秀関連
-        const mitsuhideName = mitsuhide.name.replace(/\|/g, '');
+        const mitsuhideName = mitsuhide.fullName;
         const mitsuhideFace = mitsuhide.faceIcon || "unknown_face.webp";
-        let mitsuhideTitle = mitsuhide.givenName || mitsuhide.name.replace(/\|/g, '');
+        let mitsuhideTitle = mitsuhide.givenName || mitsuhide.fullName;
         if (game.courtRankSystem && typeof game.courtRankSystem.getHighestRankName === 'function') {
             const rankName = game.courtRankSystem.getHighestRankName(mitsuhide);
             if (rankName !== "なし") {
@@ -2464,7 +2460,7 @@ window.GameEvents.push({
         }
 
         // 松永久秀関連
-        const hisahideName = hisahideDaimyo.name.replace(/\|/g, '');
+        const hisahideName = hisahideDaimyo.fullName;
 
         const args = {
             year: game.year,
@@ -2730,7 +2726,7 @@ window.GameEvents.push({
         game.flags['shogun_sponsor_clan_id'] = candidate.clan;
 
         // 何が起きたか後でわかるように、履歴（ログ）にこっそり記録しておきます
-        const name = candidate.name.replace('|', '');
+        const name = candidate.fullName;
         game.ui.log(`(将軍候補の${name}が、幕府再興のため二条城へ入城しました)`);
         
     }
@@ -2801,8 +2797,7 @@ window.GameEvents.push({
 
         // --- 1. 新しい大名家（将軍家）を設立します ---
         const newClanId = Math.max(...game.clans.map(c => c.id)) + 1; // 一番大きいIDの次を使います
-        const surname = candidate.name.includes('|') ? candidate.name.split('|')[0] : candidate.familyName || "足利";
-        const newClanName = surname + "家";
+        const newClanName = candidate.clanNameStr || "足利家";
         const newColor = "#f8b500"; // 黄金色にして特別感を出します
         
         const newClan = new Clan({
@@ -3039,7 +3034,7 @@ window.GameEvents.push({
             }
         }
         
-        const candidateName = candidate.name.replace('|', '');
+        const candidateName = candidate.fullName;
         const sponsorName = sponsorClan.name;
         
         await game.ui.showDialogAsync(`${candidateName}が征夷大将軍に就任しました！\n${sponsorName}と${newClanName}は固い同盟で結ばれました。`, false, 0);
@@ -3275,7 +3270,7 @@ window.GameEvents.push({
         const sponsorClan = game.getClan(sponsorClanId);
         
         // 全て変数から名前を取るように徹底しました
-        const hisahideName = hisahide.name.replace('|', '');
+        const hisahideName = hisahide.fullName;
         const sponsorName = sponsorClan ? sponsorClan.name : "擁立勢力";
         const matsunagaClanName = matsunagaClan ? matsunagaClan.name : "松永家";
         const hisahideCastle = game.getCastle(hisahide.castleId);
@@ -3438,8 +3433,8 @@ window.GameEvents.push({
         }
 
         // 4. メッセージの表示（個別に表示）
-        const murashigeName = murashige.name.replace('|', '');
-        const tomomasaFamilyName = tomomasa.familyName || tomomasa.name.split('|')[0] || "池田";
+        const murashigeName = murashige.fullName;
+        const tomomasaFamilyName = tomomasa.familyNameStr || "池田";
         
         // メッセージ1：強襲と実権奪取
         const msg1 = `${murashigeName}が${castleNameBefore}を強襲し、${tomomasaFamilyName}家の実権を握りました！`;
@@ -3584,7 +3579,7 @@ window.GameEvents.push({
         const targetCastleIds = targetCastles.map(c => c.id);
 
         const sponsorName = sponsorClan ? sponsorClan.name : "擁立勢力";
-        const itamiLordName = targetLord.name.replace('|', '');
+        const itamiLordName = targetLord.fullName;
         const miyoshiClan = game.getClan(miyoshiClanId);
         const miyoshiClanName = miyoshiClan ? miyoshiClan.name : "三好家";
         
@@ -3799,7 +3794,7 @@ window.GameEvents.push({
         const sponsorClan = game.getClan(sponsorClanId);
         
         // メッセージ用に名前を用意します
-        const hatakeyamaName = hatakeyamaDaimyo.name.replace('|', '');
+        const hatakeyamaName = hatakeyamaDaimyo.fullName;
         const sponsorName = sponsorClan ? sponsorClan.name : "擁立勢力";
         const hatakeyamaClanName = hatakeyamaClan ? hatakeyamaClan.name : "畠山家";
         const hatakeyamaCastle = game.getCastle(hatakeyamaDaimyo.castleId);
@@ -3854,8 +3849,8 @@ window.GameEvents.push({
         const clanId = oldDaimyo.clan;
         const messages = [];
 
-        // 義守の出家と改名処理（栄林と号する）
-        const oldNameStr = oldDaimyo.name.replace('|', ''); // 改名前のフルネームをメモしておきます
+       // 義守の出家と改名処理（栄林と号する）
+        const oldNameStr = oldDaimyo.fullName; // 改名前のフルネームをメモしておきます
         
         // 下の名前を「栄林」に変え、読み仮名も設定します
         oldDaimyo.givenName = "栄林";
@@ -3863,16 +3858,16 @@ window.GameEvents.push({
         oldDaimyo.givenYomi = "えいりん";
         oldDaimyo.yomi = oldDaimyo.familyYomi + oldDaimyo.givenYomi;
 
-        const newNameStr = oldDaimyo.name.replace('|', ''); // 改名後のフルネーム
+        const newNameStr = oldDaimyo.fullName; // 改名後のフルネーム
         messages.push(`${oldNameStr}は出家して「${newNameStr}」と号しました。`);
-
+        
         // 新しく作った家督相続の魔法を呼び出します
         window.EventAction.executeSuccession(game, oldDaimyo, successor, messages);
 
         // メッセージを画面に出してお知らせします
         const clan = game.getClan(clanId);
         const clanName = clan ? clan.name : "最上家";
-        const yoshiakiName = successor.name.replace('|', '');
+        const yoshiakiName = successor.fullName;
 
         const mainMsg = `${clanName}の${oldNameStr}が隠居し、\n${yoshiakiName}が新たな当主として家督を継ぎました！`;
         
@@ -3974,8 +3969,8 @@ window.GameEvents.push({
         // ⑩ メッセージを画面に出してお知らせします
         const clan = game.getClan(clanId);
         const clanName = clan ? clan.name : "北畠家";
-        const tomonoriName = oldDaimyo.name.replace('|', '');
-        const tomofusaName = successor.name.replace('|', '');
+        const tomonoriName = oldDaimyo.fullName;
+        const tomofusaName = successor.fullName;
 
         const mainMsg = `${clanName}の${tomonoriName}が隠居し、\n${tomofusaName}が新たな当主として家督を継ぎました！`;
         
@@ -4027,8 +4022,8 @@ window.GameEvents.push({
         // ⑩ メッセージを画面に出してお知らせします
         const clan = game.getClan(clanId);
         const clanName = clan ? clan.name : "伊達家";
-        const harumuneName = oldDaimyo.name.replace('|', '');
-        const terumuneName = successor.name.replace('|', '');
+        const harumuneName = oldDaimyo.fullName;
+        const terumuneName = successor.fullName;
 
         const mainMsg = `${clanName}の${harumuneName}が隠居し、\n${terumuneName}が新たな当主として家督を継ぎました！`;
         
@@ -4133,36 +4128,46 @@ window.GameEvents.push({
         const kageie = game.getBusho(1001026);
         const kagemochi = game.getBusho(1001016);
 
+        // 甘粕景持の官位を取得する処理を追加します
+        let kagemochiTitle = "近江守";
+        if (game.courtRankSystem && typeof game.courtRankSystem.getHighestRankName === 'function') {
+            const rankName = game.courtRankSystem.getHighestRankName(kagemochi);
+            if (rankName !== "なし") {
+                kagemochiTitle = rankName;
+            }
+        }
+
         // 台本に渡す情報をひとまとめにします
         const args = {
             year: game.year,
             month: game.month,
-            kenshinName: kenshin.name.replace('|', ''),
-            uesugiFamilyName: kenshin.familyName || "上杉",
+            kenshinName: kenshin.fullName,
+            uesugiFamilyName: kenshin.familyNameStr || "上杉",
             kenshinGivenName: kenshin.givenName || "謙信",
             kenshinFace: kenshin.faceIcon || "unknown_face.webp",
 
-            shingenName: shingen.name.replace('|', ''),
-            takedaFamilyName: shingen.familyName || "武田",
+            shingenName: shingen.fullName,
+            takedaFamilyName: shingen.familyNameStr || "武田",
             shingenGivenName: shingen.givenName || "信玄",
             shingenFace: shingen.faceIcon || "unknown_face.webp",
 
-            kansukeName: kansuke.name.replace('|', ''),
+            kansukeName: kansuke.fullName,
             kansukeFace: kansuke.faceIcon || "unknown_face.webp",
 
-            nobushigeName: nobushige.name.replace('|', ''),
+            nobushigeName: nobushige.fullName,
             nobushigeGivenName: nobushige.givenName || "信繁",
             nobushigeFace: nobushige.faceIcon || "unknown_face.webp",
 
-            toratsunaFamilyName: toratsuna.familyName || "春日",
-            nobufusaFamilyName: nobufusa.familyName || "馬場",
+            toratsunaFamilyName: toratsuna.familyNameStr || "春日",
+            nobufusaFamilyName: nobufusa.familyNameStr || "馬場",
 
-            kageieName: kageie.name.replace('|', ''),
+            kageieName: kageie.fullName,
             kageieFace: kageie.faceIcon || "unknown_face.webp",
 
-            kagemochiName: kagemochi.name.replace('|', ''),
-            kagemochiFamilyName: kagemochi.familyName || "甘粕",
-            kagemochiFace: kagemochi.faceIcon || "unknown_face.webp"
+            kagemochiName: kagemochi.fullName,
+            kagemochiFamilyName: kagemochi.familyNameStr || "甘粕",
+            kagemochiFace: kagemochi.faceIcon || "unknown_face.webp",
+            kagemochiTitle: kagemochiTitle
         };
 
         // イベントテキストを再生します

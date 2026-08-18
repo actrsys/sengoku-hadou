@@ -821,7 +821,7 @@ class Busho {
     }
     
     // ==========================================
-    // ★新しく追加：名前と読み仮名を一箇所で書き換える共通の魔法
+    // 名前と読み仮名を一箇所で書き換える共通の魔法
     // ==========================================
     applyNameChangeData(nameData, yomiData) {
         if (nameData) {
@@ -837,6 +837,30 @@ class Busho {
             this.givenYomi = newYomiParts[1] === "0" ? this.givenYomi : (newYomiParts[1] || "");
             this.yomi = this.familyYomi + this.givenYomi;
         }
+    }
+
+    // ==========================================
+    // フルネームや家名を簡単に取り出すための共通の魔法
+    // ==========================================
+    // 「｜」を抜いた綺麗なフルネームを返します
+    get fullName() {
+        return this.name ? this.name.replace(/\|/g, '') : "";
+    }
+
+    // 苗字（姓）だけを確実に取り出します
+    get familyNameStr() {
+        return this.familyName || (this.name ? this.name.split('|')[0] : "");
+    }
+
+    // 「〇〇家」という大名家の文字を作って返します
+    get clanNameStr() {
+        return this.familyNameStr ? `${this.familyNameStr}家` : "";
+    }
+
+    // 「〇〇け」という大名家の読み仮名を作って返します
+    get clanYomiStr() {
+        const yomiStr = this.familyYomi || (this.yomi ? this.yomi.split('|')[0] : "");
+        return yomiStr ? `${yomiStr}け` : "";
     }
 }
 
@@ -1026,8 +1050,7 @@ class Kunishu {
         // ② もし名前が空っぽなら、頭領の武将データを探します
         const leader = game.getBusho(this.leaderId);
         if (leader) {
-            // 武将の名前（例：上杉|謙信）を「|」で割って、前の部分（上杉）だけを取ります
-            const surname = leader.name.split('|')[0];
+            const surname = leader.familyNameStr;
             return `${surname}衆`;
         }
         return "諸勢力";
