@@ -384,10 +384,10 @@ const COMMAND_SPECS = {
     },
     'soldier_charity': { 
         label: "兵施し", category: 'MILITARY', 
-        costGold: 0, costRice: 200, 
+        costGold: 0, get costRice() { return window.MainParams.CommandCost.SoldierCharity; }, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
-        msg: "米: 200 (1回あたり)\n兵士の士気を上げます",
+        get msg() { return `米: ${window.MainParams.CommandCost.SoldierCharity} (1回あたり)\n兵士の士気を上げます`; },
         canExecute: (game, castle) => CAN_EXECUTE_RULES.canSoldierCharity(game, castle)
     },
     'transport': { 
@@ -409,17 +409,17 @@ const COMMAND_SPECS = {
     // --- 人事 (PERSONNEL) ---
     'reward': { 
         label: "褒美", category: 'PERSONNEL', 
-        costGold: 100, costRice: 0, 
+        get costGold() { return window.MainParams.CommandCost.Reward; }, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'loyalty',
-        msg: "金: 100 (1人あたり)\n褒美を与えます",
+        get msg() { return `金: ${window.MainParams.CommandCost.Reward} (1人あたり)\n褒美を与えます`; },
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyo(game)
     },
     'reward_all': { 
         label: "一括褒美", category: 'PERSONNEL', 
-        costGold: 3000, costRice: 0, 
+        get costGold() { return window.MainParams.CommandCost.RewardAll; }, costRice: 0, 
         isSystem: true, action: 'reward_all',
-        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyo(game) && castle.gold >= 3000
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyo(game) && castle.gold >= window.MainParams.CommandCost.RewardAll
     },
     'interview': {
         label: "面談", category: 'PERSONNEL', 
@@ -1523,7 +1523,7 @@ class CommandSystem {
                 this.showSaveLoadModal('save');
                 break;
             case 'reward_all':
-                this.game.ui.showDialog("金3000を支払い、家臣全員に褒美を与えます。よろしいですか？", true, () => {
+                this.game.ui.showDialog(`金${window.MainParams.CommandCost.RewardAll}を支払い、家臣全員に褒美を与えます。よろしいですか？`, true, () => {
                     this.executeRewardAll();
                 }, null, { okText: '実行', cancelText: 'やめる' });
                 break;
@@ -2600,7 +2600,7 @@ class CommandSystem {
         if (!this.checkResource(castle, spec.costGold, 0)) return;
 
         let count = 0;
-        let totalEffect = 0;
+        let totalEffect = 0; // （※ログ表示用に残しておきますが、厳密な効果量は一元化魔法の中で計算されるため、おおよその目安になります）
 
         bushoIds.forEach(bid => {
             const target = this.game.getBusho(bid);
@@ -2610,17 +2610,12 @@ class CommandSystem {
 
             castle.gold -= spec.costGold;
             
-            // ★変更：費用を100にしても効果量は元(200)と同じにするため、計算には「200」を渡します
-            const effect = GameSystem.calcRewardEffect(200, daimyo, target);
-
-            this.game.factionSystem.updateRecognition(target, -effect * 2 - 5);
-
-            // ★追加：忠誠度をランダムで1～3アップさせる
-            const loyaltyUp = Math.floor(Math.random() * 3) + 1;
-            target.loyalty = Math.min(100, target.loyalty + loyaltyUp);
+            // ★修正：新しく作った一元化の魔法を呼び出して、忠誠度アップと承認欲求ダウンをまとめて行います！
+            GameSystem.applyRewardEffect(target, daimyo, this.game);
 
             count++;
-            totalEffect += effect;
+            // ★ログ用のおおよその効果量として記録しておきます
+            totalEffect += GameSystem.calcRewardEffect(daimyo, target);
         });
         
         let msg = null;
@@ -2635,8 +2630,9 @@ class CommandSystem {
     
     executeRewardAll() {
         const castle = this.game.getCurrentTurnCastle();
+        const cost = window.MainParams.CommandCost.RewardAll;
         // ★変更：共通魔法でチェックします
-        if (!this.checkResource(castle, 3000, 0)) return;
+        if (!this.checkResource(castle, cost, 0)) return;
 
         const daimyo = this.game.bushos.find(b => b.id === this.game.clans.find(c => c.id === this.game.playerClanId).leaderId);
         
@@ -2652,26 +2648,22 @@ class CommandSystem {
             return;
         }
 
-        // 金を3000消費
-        castle.gold -= 3000;
+        // 金を消費
+        castle.gold -= cost;
         
         let count = 0;
-        let totalEffect = 0;
+        let totalEffect = 0; // ログ用
 
-        // 全員にそれぞれ2回ずつ効果を適用する
+        // ★修正：全員に「2回分」の効果を一元化の魔法を使って適用します！
         targets.forEach(target => {
-            const effect1 = GameSystem.calcRewardEffect(200, daimyo, target);
-            const effect2 = GameSystem.calcRewardEffect(200, daimyo, target);
-            const effect = effect1 + effect2;
-
-            this.game.factionSystem.updateRecognition(target, -effect * 2 - 10); // 2回分で -10
-
-            const loyaltyUp1 = Math.floor(Math.random() * 3) + 1;
-            const loyaltyUp2 = Math.floor(Math.random() * 3) + 1;
-            target.loyalty = Math.min(100, target.loyalty + loyaltyUp1 + loyaltyUp2);
+            // 1回目の効果
+            GameSystem.applyRewardEffect(target, daimyo, this.game);
+            // 2回目の効果
+            GameSystem.applyRewardEffect(target, daimyo, this.game);
 
             count++;
-            totalEffect += effect;
+            // ★ログ用のおおよその効果量（2回分）を記録しておきます
+            totalEffect += GameSystem.calcRewardEffect(daimyo, target) * 2;
         });
         
         this.finishCommand(`${count}名の家臣に褒美を与えました`, false, `${count}名に一括褒美を実行 (合計効果:${totalEffect})`);

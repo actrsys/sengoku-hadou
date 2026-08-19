@@ -37,16 +37,19 @@ window.MainParams = {
     },
     // ★ここを追加：内政コマンドの費用をここで一括管理します！
     CommandCost: {
-        Farm: 100,     // 石高開発の費用（金）
-        Commerce: 100, // 鉱山開発の費用（金）
-        Repair: 100,   // 城壁修復の費用（金）
-        Charity: 200   // 民施しの費用（米）
+        Farm: 100,            // 石高開発の費用（金）
+        Commerce: 100,        // 鉱山開発の費用（金）
+        Repair: 100,          // 城壁修復の費用（金）
+        Charity: 200,         // 民施しの費用（米）
+        Reward: 100,          // 褒美の費用（金）
+        SoldierCharity: 200,  // 兵施しの費用（米）
+        RewardAll: 3000       // 一括褒美の費用（金）
     },
     Strategy: {
         InvestigateDifficulty: 50, EmploymentDiff: 1.5,
         HeadhuntBaseDiff: 50, HeadhuntGoldEffect: 0.01, HeadhuntGoldMaxEffect: 15,
         HeadhuntIntWeight: 0.8, HeadhuntLoyaltyWeight: 1.0, HeadhuntDutyWeight: 0.8,
-        RewardBaseEffect: 10, RewardGoldFactor: 0.1, RewardDistancePenalty: 0.2,
+        RewardBaseEffect: 30, RewardDistancePenalty: 0.2,
         AffinityLordWeight: 0.5, AffinityNewLordWeight: 0.6, AffinityDoerWeight: 0.4
     }
 };
@@ -1184,14 +1187,34 @@ class GameSystem {
         const classicAff = this.calcAffinityDiff(a.affinity, b.affinity); 
         return Math.floor(dist * 0.8 + classicAff * 0.4); 
     }
-    static calcRewardEffect(gold, daimyo, target) {
+    static calcRewardEffect(daimyo, target) {
         const S = window.MainParams.Strategy;
         const dist = this.calcValueDistance(daimyo, target);
         let penalty = dist * S.RewardDistancePenalty;
-        let baseIncrease = S.RewardBaseEffect + (gold * S.RewardGoldFactor);
+        let baseIncrease = S.RewardBaseEffect;
         let actualIncrease = baseIncrease - penalty;
         if (actualIncrease < 0) actualIncrease = 0;
         return Math.floor(actualIncrease);
+    }
+
+    // ==========================================
+    // ★ここから追加：褒美の効果（忠誠度アップと承認欲求ダウン）を一元化する魔法！
+    // ==========================================
+    static applyRewardEffect(busho, daimyo, game) { // ★修正：お金の引数を消しました
+        // 1. 忠誠度のアップ（1〜3）
+        const loyaltyUp = Math.floor(Math.random() * 3) + 1;
+        busho.loyalty = Math.min(100, busho.loyalty + loyaltyUp);
+
+        // 2. 承認欲求のダウン
+        // まず、大名との相性などから「効果のベース（effect）」を計算します
+        const effect = this.calcRewardEffect(daimyo, busho);
+        // そのベースを使って、実際にどれくらい下げるか（-effect * 2 - 5）を計算して適用します
+        if (game && game.factionSystem && typeof game.factionSystem.updateRecognition === 'function') {
+            game.factionSystem.updateRecognition(busho, -effect * 2 - 5);
+        }
+
+        // 画面にお知らせ（ログなど）を出すために、上がった忠誠度の数字を返してあげます
+        return loyaltyUp;
     }
     
     static calcEmploymentSuccess(recruiter, target, recruiterClanPower, targetClanPower) {

@@ -1889,7 +1889,7 @@ class AIEngine {
             if (perceivedMorale < targetMaxMorale) {
                 // ★修正：固定の100ではなく、目標値からどれだけ足りないかでスコアを出します
                 let score = targetMaxMorale - perceivedMorale;
-                actions.push({ type: 'soldier_charity', stat: 'leadership', score: score, cost: 200 }); 
+                actions.push({ type: 'soldier_charity', stat: 'leadership', score: score, cost: window.MainParams.CommandCost.SoldierCharity }); 
             }
 
             // 6. 石高開発
@@ -2294,9 +2294,12 @@ class AIEngine {
             const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && b.status === 'active');
             
             for (let b of castleBushos) {
-                // 今月すでに褒美をもらっている人は除外します
+                // ★修正：今月すでに褒美をもらっているかチェックし、忠誠度が低い場合は2回目も許容します！
                 if (b.lastRewardedTurnId === this.game.getCurrentTurnId()) {
-                    continue;
+                    // すでに2回もらっているか、忠誠度が70より高ければ除外します（2回目は忠誠度70以下限定）
+                    if ((b.rewardedCountThisMonth || 0) >= 2 || b.loyalty > 70) {
+                        continue;
+                    }
                 }
 
                 if ((b.recognitionNeed || 0) < 0) {
@@ -2312,10 +2315,10 @@ class AIEngine {
                 
                 // ② 忠誠度が95以下の場合（サイコロを振って対象にする魔法です！）
                 if (b.loyalty <= 95) {
-                    // ★修正：確率を全体的に上げました！(95で0.5%、70以下で10%)
-                    let prob = 10; // 70以下の時は問答無用で10%
+                    // ★修正：基礎確率を少し上げました！(95で2%、70以下で20%)
+                    let prob = 20; // 70以下の時は問答無用で20%
                     if (b.loyalty > 70) {
-                        prob = 0.5 + ((95 - b.loyalty) / 25) * 9.5; 
+                        prob = 2.0 + ((95 - b.loyalty) / 25) * 18.0; 
                     }
                     
                     // 2. お殿様（大名）の義理(duty)による確率の増減
@@ -2338,7 +2341,7 @@ class AIEngine {
                 }
             }
             
-            if (rewardTargets.length > 0 && availableGold >= 100) {
+            if (rewardTargets.length > 0 && availableGold >= window.MainParams.CommandCost.Reward) {
                 // ★修正：一番忠誠度が低い武将に合わせて、優先度スコア（やりたさ）を計算します！
                 // 忠誠95なら1点、60以下なら40点になります。
                 let rewardScore = 15; // 承認欲求だけで選ばれた時などの基本点です
@@ -2349,7 +2352,7 @@ class AIEngine {
                     rewardScore = 1 + ((95 - minLoyaltyForReward) / 35) * 39;
                 }
                 
-                actions.push({ type: 'reward', stat: 'none', score: rewardScore, cost: 100, targets: rewardTargets });
+                actions.push({ type: 'reward', stat: 'none', score: rewardScore, cost: window.MainParams.CommandCost.Reward, targets: rewardTargets });
             }
             
             // ★13. 計略（スコアは一律低めに設定）
@@ -2536,23 +2539,23 @@ class AIEngine {
                     });
                     const targetBusho = action.targets[0];
                     
-                    if (availableGold >= 100) {
-                        castle.gold -= 100;
-                        // 褒美の効果をプレイヤーと同じように計算（効果は200相当で据え置き）
-                        const effect = GameSystem.calcRewardEffect(200, daimyo, targetBusho);
-                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) {
-                            this.game.factionSystem.updateRecognition(targetBusho, -effect * 2 - 5);
-                        }
-                        
-                        // ★追加：忠誠度をランダムで1～3アップさせる（プレイヤーと同じ！）
-                        const loyaltyUp = Math.floor(Math.random() * 3) + 1;
-                        targetBusho.loyalty = Math.min(100, targetBusho.loyalty + loyaltyUp);
+                    if (availableGold >= window.MainParams.CommandCost.Reward) {
+                        castle.gold -= window.MainParams.CommandCost.Reward;
+                        // ★修正：新しく作った一元化の魔法を呼び出して、忠誠度アップと承認欲求ダウンをまとめて行います！
+                        // （金額に関係なく、常に一定の効果が出ます）
+                        GameSystem.applyRewardEffect(targetBusho, daimyo, this.game);
                         
                         // ★「行動済」マークもつけません！
-                        targetBusho.lastRewardedTurnId = this.game.getCurrentTurnId(); // 今月褒美をもらったことを記録します
+                        // ★追加：今月何回もらったかをカウントして記録します！
+                        if (targetBusho.lastRewardedTurnId === this.game.getCurrentTurnId()) {
+                            targetBusho.rewardedCountThisMonth = (targetBusho.rewardedCountThisMonth || 1) + 1;
+                        } else {
+                            targetBusho.lastRewardedTurnId = this.game.getCurrentTurnId();
+                            targetBusho.rewardedCountThisMonth = 1;
+                        }
                         step--; // 行動回数を消費しないようにします
                         actionDoneInThisStep = true; 
-                        break; 
+                        break;
                     }
                     continue; // もしお金が足りなかったら、この行動は諦めて次を探します
                 }
@@ -2887,8 +2890,8 @@ class AIEngine {
                     
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
-                if (action.type === 'soldier_charity' && castle.rice >= 200) {
-                    castle.rice -= 200;
+                if (action.type === 'soldier_charity' && castle.rice >= window.MainParams.CommandCost.SoldierCharity) {
+                    castle.rice -= window.MainParams.CommandCost.SoldierCharity;
                     const val = GameSystem.calcSoldierCharity(doer, castle.soldiers, 1.0, true);
                     const oldVal = castle.morale;
                     castle.morale = Math.min(100, castle.morale + val);
