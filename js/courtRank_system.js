@@ -151,7 +151,7 @@ class CourtRankSystem {
         if (!busho) return [];
         let preferredRankIds = [];
         const bushoId = Number(busho.id);
-        const bushoName = busho.name.replace(/\|/g, '');
+        const bushoName = busho.fullName;
 
         // 国主限定の優先官位
         if (busho.isCommander && !busho.isDaimyo) {
@@ -183,7 +183,7 @@ class CourtRankSystem {
 
         // ★優先官位のリストは、新しく作った専用の窓口から受け取ります！
         const preferredRankIds = this.getPreferredRankIds(busho);
-        const bushoName = busho.name.replace(/\|/g, '');
+        const bushoName = busho.fullName;
 
         let selectedRank = null;
 
@@ -261,7 +261,7 @@ class CourtRankSystem {
                     leader.courtRankIds = leader.courtRankIds.filter(id => id !== samanoKamiId);
                     this.returnRank(samanoKamiId);
                     
-                    const leaderName = leader.name.replace('|', '');
+                    const leaderName = leader.fullName;
                     const msg = `${leaderName}が征夷大将軍に就任しました。`;
                     messages.push(msg);
                     this.game.ui.log(`【叙任】${msg}`);

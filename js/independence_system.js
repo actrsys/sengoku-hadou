@@ -1189,12 +1189,10 @@ class IndependenceSystem {
                 // 勢力名を変更
                 const clan = this.game.clans.find(c => c.id === oldClanId);
                 if (clan) {
-                    const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name;
-                    clan.name = `${familyName}家`;
+                    clan.name = rebellionLeader.clanNameStr;
                     
                     // ★読み仮名も一緒に変更します！
-                    const familyYomi = rebellionLeader.familyYomi || rebellionLeader.yomi.split('|')[0] || rebellionLeader.yomi;
-                    clan.yomi = familyYomi ? `${familyYomi}け` : "";
+                    clan.yomi = rebellionLeader.clanYomiStr;
                     
                     clan.leaderId = rebellionLeader.id;
 
@@ -1249,9 +1247,9 @@ class IndependenceSystem {
                 }
 
                 // 結果のメッセージを出します！
-                const oldDaimyoNameStr = oldDaimyo.name.replace(/\|/g, '');
+                const oldDaimyoNameStr = oldDaimyo.fullName;
                 const info = rebellionLeader._nameChangeInfo;
-                const leaderNameStr = (info && info.isNameChanged) ? info.oldNameStr : rebellionLeader.name.replace(/\|/g, '');
+                const leaderNameStr = (info && info.isNameChanged) ? info.oldNameStr : rebellionLeader.fullName;
                 
                 let resultMsg = "";
                 if (isDaimyoDead) {
@@ -1653,12 +1651,7 @@ class IndependenceSystem {
             }
             if (!traitorCallName) {
                 // 官位がなければ下の名（givenNameが無い場合はnameを分割）＋とやら
-                let given = rebellionLeader.givenName;
-                if (!given) {
-                    const parts = rebellionLeader.name.split('|');
-                    given = parts.length > 1 ? parts[1] : parts[0];
-                }
-                traitorCallName = given.replace(/\|/g, '') + "とやら";
+                traitorCallName = rebellionLeader.givenNameStr + "とやら";
             }
 
             const greetMsg = `「${oldClanName}の${traitorNameStr}と申す者が殿を頼って参りました。お会いになりますか？」`;

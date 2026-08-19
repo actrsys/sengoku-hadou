@@ -174,7 +174,7 @@ Object.assign(WarManager.prototype, {
         const defProvName = defProv ? defProv.province : "不明な国";
 
         const atkLeader = atkBushos && atkBushos.length > 0 ? atkBushos[0] : null;
-        const atkLeaderName = atkLeader ? atkLeader.name.split('|').join('') : "総大将";
+        const atkLeaderName = atkLeader ? atkLeader.fullName : "総大将";
 
         const getPerceivedSoldiers = (val) => {
             // ★変更：軍師の智謀の代わりに小姓（または軍師）の智謀を使います
@@ -229,7 +229,7 @@ Object.assign(WarManager.prototype, {
             if (bestBusho.isDaimyo) {
                 helperMsg = `殿自ら出陣なされるとあらば、お味方の戦意も高まることでしょう。`;
             } else {
-                const bestBushoName = bestBusho.name.split('|').join('');
+                const bestBushoName = bestBusho.fullName;
                 helperMsg = `${bestBushoName}殿が在城しております。`;
             }
         }
