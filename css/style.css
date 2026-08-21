@@ -1320,52 +1320,6 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 
 .start-content { max-width: 600px; text-align: center; }
 .clan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 20px; overflow-y: auto; }
-/* シナリオ選択用の新しいリストデザイン（縦並び＆端が切れないように余白を追加） */
-.scenario-list-vertical { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; padding: 5px; overflow: visible; }
-
-/* シナリオボタンのデザインを和風に統一 */
-.clan-btn { 
-    padding: 15px; 
-    border: 2px solid rgba(212, 175, 55, 0.4); 
-    border-radius: 8px; 
-    font-weight: bold; 
-    cursor: pointer; 
-    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); 
-    color: #fff;
-    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
-    transition: transform 0.1s, background 0.2s, border-color 0.2s; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-}
-.clan-btn:hover { 
-    transform: scale(1.02); 
-    background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%); 
-    border-color: #ffd54f;
-}
-.clan-btn.selected { 
-    background: rgba(255, 152, 0, 0.4); 
-    border-color: #ffd54f; 
-    color: #ffd54f; 
-    box-shadow: 0 0 10px rgba(255, 213, 79, 0.5); 
-    transform: scale(1.02); 
-}
-
-/* シナリオ説明文の箱を和風に統一 */
-.scenario-desc-box { 
-    margin-top: 20px; 
-    padding: 15px; 
-    background: rgba(0, 0, 0, 0.4); 
-    border: 1px solid rgba(212, 175, 55, 0.3); 
-    border-radius: 8px; 
-    text-align: left; 
-    font-size: 0.95rem; 
-    line-height: 1.5; 
-    display: none; 
-    color: #fff;
-    text-shadow: 1px 1px 1px #000;
-}
-
 /* リスト表示時はウィンドウ幅を統一 */
 #result-modal .modal-content:has(.daimyo-list-container, .faction-list-container, .princess-list-container) {
     max-width: 800px !important;
@@ -1665,8 +1619,13 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     position: absolute; bottom: 45px; left: 50%; transform: translateX(-50%); z-index: 4000; 
     pointer-events: auto; white-space: nowrap; 
 }
-.floating-back-btn:hover { 
-    transform: translateX(-50%) scale(1.05); 
+.floating-back-btn:hover,
+.floating-back-btn:focus-visible {
+    transform: translateX(-50%) scale(1.05);
+    outline: none;
+}
+.floating-back-btn:active {
+    transform: translateX(-50%) scale(0.99);
 }
 .floating-back-btn.hidden, .daimyo-confirm-buttons.hidden { display: none !important; }
 .daimyo-confirm-buttons { position: absolute; bottom: 45px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; pointer-events: auto; z-index: 4001; }
@@ -3619,8 +3578,8 @@ body:not(.is-pc) #map-container {
     transform: translateY(1px);
 }
 
-#start-btn { border-left-color: #a94435; }
-#watch-start-btn { border-left-color: #657b6d; }
+#start-btn { border-left-color: rgba(184,154,84,0.62); }
+#watch-start-btn { border-left-color: rgba(184,154,84,0.62); }
 #settings-btn { color: #c3beae; }
 
 .title-tap-message {
@@ -3702,79 +3661,6 @@ body:not(.is-pc) #map-container {
     100% { transform: translateX(320%); opacity: 0.35; }
 }
 
-/* シナリオ選択も入口画面と同じ黒漆・鈍金へ寄せます。 */
-#scenario-modal {
-    background:
-        radial-gradient(circle at 20% 18%, rgba(110,87,45,0.12), transparent 34%),
-        rgba(5,7,7,0.92);
-}
-#scenario-modal .start-content {
-    width: min(720px, 92%);
-    max-width: 720px;
-    padding: clamp(18px, 3vw, 30px);
-    background: linear-gradient(145deg, rgba(19,24,23,0.98), rgba(9,12,12,0.98));
-    border: 1px solid rgba(184,154,84,0.42);
-    border-radius: 0;
-    box-shadow: 0 24px 65px rgba(0,0,0,0.62), inset 0 0 40px rgba(0,0,0,0.18);
-}
-#scenario-modal .start-content > h2 {
-    margin: 2px 0 14px;
-    color: #eee5cf;
-    font-family: 'FudeGoshirae', 'abashiri-mincho', serif;
-    font-size: clamp(1.8rem, 4vw, 2.5rem);
-    font-weight: 400;
-    letter-spacing: 0.14em;
-    text-shadow: 0 3px 0 #000;
-}
-#scenario-modal .scenario-list-vertical,
-#scenario-modal #scenario-list {
-    gap: 8px;
-    margin-top: 10px;
-}
-#scenario-modal .clan-btn {
-    min-height: 48px;
-    padding: 10px 18px;
-    border: 1px solid rgba(184,154,84,0.30);
-    border-left: 3px solid rgba(184,154,84,0.58);
-    border-radius: 0;
-    background: linear-gradient(90deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012));
-    color: #dfd7c2;
-    letter-spacing: 0.08em;
-    box-shadow: none;
-    transform: none;
-}
-#scenario-modal .clan-btn:hover {
-    transform: none;
-    background: rgba(120,92,43,0.20);
-    border-color: rgba(221,196,126,0.66);
-}
-#scenario-modal .clan-btn.selected {
-    transform: none;
-    color: #fff1c7;
-    background: linear-gradient(90deg, rgba(111,31,26,0.48), rgba(120,92,43,0.17));
-    border-color: #c2a55d;
-    border-left-color: #e0c77e;
-    box-shadow: inset 0 0 22px rgba(0,0,0,0.24);
-}
-#scenario-modal .scenario-desc-box {
-    margin-top: 13px;
-    padding: 14px 16px;
-    border: 1px solid rgba(184,154,84,0.24);
-    border-radius: 0;
-    background: rgba(0,0,0,0.26);
-    color: #cbc4b3;
-    text-shadow: none;
-}
-#scenario-modal .modal-footer {
-    margin-top: 14px;
-    min-height: 54px;
-}
-#scenario-modal .btn-primary,
-#scenario-modal .btn-secondary {
-    min-width: 130px;
-    border-radius: 0;
-}
-
 /* 低負荷端末では装飾アニメーションを完全停止してもレイアウトは崩れません。 */
 @media (prefers-reduced-motion: reduce) {
     .title-tap-message,
@@ -3839,9 +3725,9 @@ body:not(.is-pc) #map-container {
 }
 
 /* =========================================================
-   Round29: シナリオ選択レイアウト固定
-   説明文の長短でモーダル全体が伸縮しないよう、PCは一覧/説明の2ペイン、
-   スマホは固定行の縦積みにします。説明本文だけ内部スクロールします。
+   シナリオ選択
+   外枠と見出しは共通 .modal-content / h3 をそのまま使用。
+   ここでは2ペイン配置・説明欄・シナリオボタンだけを定義する。
    ========================================================= */
 #scenario-modal .start-content {
     width: min(860px, 94%);
@@ -3860,22 +3746,23 @@ body:not(.is-pc) #map-container {
     overflow: hidden !important;
 }
 
-#scenario-modal .start-content > h2 {
+/* 見出しの見た目は共通モーダルの h3 に一元化。 */
+#scenario-modal .start-content > h3 {
     grid-area: scenario-heading;
-    margin: 0;
-    padding-bottom: 12px;
-    border-bottom: 1px solid rgba(184,154,84,0.24);
 }
 
-#scenario-modal .scenario-list-vertical,
 #scenario-modal #scenario-list {
     grid-area: scenario-list;
+    display: flex;
+    flex-direction: column;
     min-width: 0;
     min-height: 0;
     height: 100%;
     margin: 0;
-    padding: 2px 6px 2px 2px;
+    padding: 5px;
     gap: 8px;
+    background: rgba(8,24,15,0.16);
+    border-radius: 9px;
     overflow-x: hidden;
     overflow-y: auto;
     align-content: start;
@@ -3885,41 +3772,94 @@ body:not(.is-pc) #map-container {
 
 #scenario-modal .clan-btn {
     flex: 0 0 auto;
+    min-height: 48px;
+    padding: 10px 16px;
+    border: 2px solid #8f865f;
+    border-left-width: 4px;
+    border-left-color: #d0af45;
+    border-radius: 8px;
+    background: linear-gradient(to bottom, #41525b 0%, #31424b 52%, #25343b 100%);
+    color: #f5f3e8;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.78);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.14),
+        inset 0 -1px 0 rgba(0,0,0,0.34),
+        0 3px 6px rgba(0,0,0,0.32);
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transform: none;
+    transition: transform 0.10s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#scenario-modal .clan-btn:hover,
+#scenario-modal .clan-btn:focus-visible {
+    transform: translateY(-2px) scale(1.018);
+    background: linear-gradient(to bottom, #607680 0%, #485f6a 52%, #394d56 100%);
+    border-color: #f0d56f;
+    border-left-color: #ffe98d;
+    color: #fffdf2;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.22),
+        inset 0 -1px 0 rgba(0,0,0,0.22),
+        0 0 0 1px rgba(255,238,166,0.18),
+        0 0 11px rgba(255,215,95,0.22),
+        0 5px 9px rgba(0,0,0,0.36);
+    outline: none;
+}
+
+#scenario-modal .clan-btn.selected {
+    transform: translateY(-1px) scale(1.018);
+    background: linear-gradient(to bottom, #aa7a32 0%, #875b22 52%, #704619 100%);
+    border-color: #ffe88a;
+    border-left-color: #fff0a8;
+    color: #fff9d9;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.18),
+        inset 0 -1px 0 rgba(0,0,0,0.25),
+        0 0 0 1px rgba(255,239,170,0.24),
+        0 0 13px rgba(255,213,79,0.30),
+        0 4px 8px rgba(0,0,0,0.34);
+}
+
+#scenario-modal .clan-btn:active {
+    transform: translateY(0) scale(0.995);
+    box-shadow:
+        inset 0 2px 5px rgba(0,0,0,0.28),
+        0 1px 2px rgba(0,0,0,0.20);
 }
 
 #scenario-modal .scenario-desc-box {
     grid-area: scenario-desc;
+    display: none;
+    flex-direction: column;
     min-width: 0;
     min-height: 0;
     height: 100%;
     margin: 0;
     padding: 0;
     overflow: hidden;
-    flex-direction: column;
     box-sizing: border-box;
+    border: 1px solid rgba(212,175,55,0.46);
+    border-radius: 8px;
+    background: rgba(10,28,16,0.56);
+    color: #fff;
     text-align: left;
-}
-
-#scenario-modal .scenario-desc-title {
-    flex: 0 0 auto;
-    padding: 15px 16px 12px;
-    color: #eee5cf;
-    font-family: 'FudeGoshirae', 'abashiri-mincho', serif;
-    font-size: 1.12rem;
-    line-height: 1.35;
-    letter-spacing: 0.06em;
-    border-bottom: 1px solid rgba(184,154,84,0.18);
+    text-shadow: 1px 1px 1px rgba(0,0,0,0.70);
 }
 
 #scenario-modal .scenario-desc-text {
     flex: 1 1 auto;
     min-height: 0;
-    padding: 14px 16px 16px;
+    padding: 16px 18px 18px;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
     box-sizing: border-box;
-    color: #cbc4b3;
+    color: #f3efe0;
     font-size: 0.95rem;
     line-height: 1.7;
     white-space: pre-wrap;
@@ -3931,11 +3871,15 @@ body:not(.is-pc) #map-container {
     margin: 0;
     min-height: 54px;
     padding: 8px 0 0;
-    border-top: 1px solid rgba(184,154,84,0.16);
+    border-top: 1px solid rgba(212,175,55,0.30);
 }
 
-/* 200半角文字程度なら通常はスクロールせず読める広さを確保。
-   それ以上の文章だけ説明欄の内部でスクロールします。 */
+#scenario-modal .btn-primary,
+#scenario-modal .btn-secondary {
+    min-width: 130px;
+}
+
+/* 200半角文字程度なら通常はスクロールせず読める広さを確保。 */
 @media (min-width: 721px) {
     #scenario-modal .scenario-desc-text {
         min-height: 190px;
@@ -3950,7 +3894,6 @@ body:not(.is-pc) #map-container {
         height: min(600px, calc(100vh - 88px));
         min-height: 0;
         max-height: calc(100vh - 88px);
-        padding: 16px;
         grid-template-columns: minmax(0, 1fr);
         grid-template-rows: auto minmax(104px, 0.7fr) minmax(168px, 1.15fr) auto;
         grid-template-areas:
@@ -3961,30 +3904,20 @@ body:not(.is-pc) #map-container {
         row-gap: 10px;
     }
 
-    #scenario-modal .start-content > h2 {
-        padding-bottom: 9px;
-        font-size: clamp(1.55rem, 7vw, 2rem);
+    #scenario-modal .start-content > h3 {
+        margin-bottom: 0;
     }
 
-    #scenario-modal .scenario-list-vertical,
     #scenario-modal #scenario-list {
-        padding-right: 4px;
         gap: 6px;
     }
 
     #scenario-modal .clan-btn {
-        min-height: 42px;
-        padding: 8px 12px;
         font-size: 0.9rem;
     }
 
-    #scenario-modal .scenario-desc-title {
-        padding: 11px 12px 9px;
-        font-size: 1rem;
-    }
-
     #scenario-modal .scenario-desc-text {
-        padding: 10px 12px 12px;
+        padding: 13px 14px 15px;
         font-size: 0.88rem;
         line-height: 1.62;
     }
@@ -3995,14 +3928,13 @@ body:not(.is-pc) #map-container {
     }
 }
 
-/* 高さの低い横持ちスマホ：上下積みでは窮屈なので再び2ペインにします。 */
+/* 高さの低い横持ちスマホ：上下積みでは窮屈なので2ペイン。 */
 @media (max-height: 430px) and (min-width: 560px) {
     #scenario-modal .start-content {
         width: min(900px, 95%);
         max-width: 900px;
         height: calc(100vh - 76px);
         max-height: calc(100vh - 76px);
-        padding: 12px 16px;
         grid-template-columns: minmax(210px, 0.8fr) minmax(0, 1.2fr);
         grid-template-rows: auto minmax(0, 1fr) auto;
         grid-template-areas:
@@ -4013,25 +3945,17 @@ body:not(.is-pc) #map-container {
         row-gap: 7px;
     }
 
-    #scenario-modal .start-content > h2 {
-        font-size: 1.35rem;
-        padding-bottom: 5px;
+    #scenario-modal .start-content > h3 {
+        margin-bottom: 0;
     }
 
     #scenario-modal .clan-btn {
-        min-height: 36px;
-        padding: 5px 10px;
         font-size: 0.82rem;
-    }
-
-    #scenario-modal .scenario-desc-title {
-        padding: 7px 10px 5px;
-        font-size: 0.92rem;
     }
 
     #scenario-modal .scenario-desc-text {
         min-height: 0;
-        padding: 7px 10px 8px;
+        padding: 13px 14px 15px;
         font-size: 0.8rem;
         line-height: 1.48;
     }
@@ -4049,114 +3973,37 @@ body:not(.is-pc) #map-container {
     }
 }
 
+/* PCでも高さが低い場合は説明欄の余白を少し圧縮する。 */
+@media (min-width: 721px) and (max-height: 560px) {
+    #scenario-modal .scenario-desc-text {
+        padding: 13px 14px 15px;
+    }
+}
+
+
 /* =========================================================
-   Round33: 元UIベースの視認性優先・新タイトル意匠との橋渡し調整
-   - Round30〜32の全面統一は使用せず、元の形状・役割色・立体感を維持
-   - 暗色パネルだけ少し明るくし、黒緑＋鈍金へ穏やかに寄せる
-   - hover / focus / active は「今選んでいる」ことを明確にする
+   CURRENT UI TUNING
+   元UIの役割色・形状は維持し、共通パネルと操作フィードバックだけを調整。
    ========================================================= */
 :root {
-    --r33-panel-top: #2d5738;
-    --r33-panel-bottom: #21422a;
-    --r33-panel-deep: #172d1d;
-    --r33-gold: #c9aa50;
-    --r33-gold-bright: #f0d77c;
-    --r33-paper: #f5f0df;
+    --ui-panel-top: #2d5738;
+    --ui-panel-bottom: #21422a;
+    --ui-panel-deep: #172d1d;
+    --ui-gold: #c9aa50;
 }
 
-/* --- タイトル / ローディング：従来の新意匠を保ったまま一段明るく --- */
-:root {
-    --title-ink-0: #151918;
-    --title-ink-1: #1c2422;
-    --title-ink-2: #26302c;
-    --title-gold: #c5a45a;
-    --title-gold-bright: #ead184;
-    --title-gold-dim: rgba(197, 164, 90, 0.42);
-    --title-paper: #f3ecd9;
-    --title-muted: #c0baa6;
-    --title-red: #812b23;
-}
-#title-screen,
-#global-loading-screen {
-    background:
-        radial-gradient(circle at 18% 24%, rgba(145, 111, 55, 0.18) 0, rgba(145, 111, 55, 0) 34%),
-        radial-gradient(circle at 82% 76%, rgba(54, 96, 76, 0.22) 0, rgba(54, 96, 76, 0) 36%),
-        linear-gradient(115deg, rgba(255,255,255,0.026) 0 1px, transparent 1px 38px),
-        linear-gradient(155deg, var(--title-ink-0) 0%, var(--title-ink-1) 52%, #141918 100%);
-}
-.title-content {
-    background: linear-gradient(135deg, rgba(25,31,29,0.88), rgba(38,47,42,0.76));
-    border-color: rgba(197,164,90,0.34);
-    box-shadow: 0 24px 64px rgba(0,0,0,0.38), inset 0 0 42px rgba(255,255,255,0.018);
-}
-.title-btn {
-    background: linear-gradient(90deg, rgba(255,255,255,0.070), rgba(255,255,255,0.022));
-    border-color: rgba(197,164,90,0.40);
-    border-left-color: rgba(197,164,90,0.74);
-    color: #f0e8d3;
-}
-.title-btn:hover,
-.title-btn:focus-visible {
-    padding-left: 31px;
-    background: linear-gradient(90deg, rgba(165,126,55,0.38), rgba(255,255,255,0.075));
-    border-color: rgba(240,215,124,0.92);
-    border-left-color: #ffe49a;
-    color: #fff8e5;
-    box-shadow: 0 0 0 1px rgba(255,231,159,0.28), 0 0 18px rgba(221,196,126,0.18);
-    outline: none;
-}
-.title-btn:active {
-    background: linear-gradient(90deg, rgba(130,43,35,0.56), rgba(90,70,42,0.20));
-    box-shadow: inset 0 2px 8px rgba(0,0,0,0.34), 0 0 0 1px rgba(240,215,124,0.48);
-}
-.loading-text { color: #ccc4ae; }
-.loading-track { background: rgba(197,164,90,0.24); }
-
-/* --- シナリオ選択：暗すぎない黒緑へ。選択状態は強く光らせる --- */
-#scenario-modal {
-    background:
-        radial-gradient(circle at 20% 18%, rgba(145,111,55,0.16), transparent 36%),
-        rgba(9,13,12,0.82);
-}
-#scenario-modal .start-content {
-    background: linear-gradient(145deg, rgba(35,45,40,0.985), rgba(20,27,24,0.985));
-    border-color: rgba(197,164,90,0.52);
-    box-shadow: 0 22px 54px rgba(0,0,0,0.48), inset 0 0 32px rgba(255,255,255,0.016);
-}
-#scenario-modal .clan-btn {
-    background: linear-gradient(to bottom, #305c3a 0%, #23472e 100%);
-    border-color: rgba(212,175,55,0.52);
-}
-#scenario-modal .clan-btn:hover,
-#scenario-modal .clan-btn:focus-visible {
-    transform: scale(1.025);
-    background: linear-gradient(to bottom, #4a8055 0%, #336a42 100%);
-    border-color: #ffe27a;
-    box-shadow: 0 0 0 1px rgba(255,239,176,0.32), 0 0 12px rgba(255,213,79,0.28);
-    outline: none;
-}
-#scenario-modal .clan-btn.selected {
-    background: linear-gradient(to bottom, rgba(184,126,42,0.82), rgba(123,72,27,0.88));
-    border-color: #ffe58a;
-    color: #fff3bd;
-    box-shadow: 0 0 0 1px rgba(255,242,184,0.38), 0 0 18px rgba(255,213,79,0.42), inset 0 0 12px rgba(255,224,129,0.10);
-}
-#scenario-modal .scenario-desc-box {
-    background: rgba(10,17,14,0.56);
-    border-color: rgba(212,175,55,0.40);
-}
-
-/* --- ゲーム中の器だけ少し明るく。元のレイアウト・角丸・立体感は維持 --- */
 #top-info-bar,
 #bottom-command-bar,
 body.is-pc #pc-new-status-panel,
 .modal .modal-content {
-    background: linear-gradient(to bottom, var(--r33-panel-top) 0%, var(--r33-panel-bottom) 100%);
-    border-color: var(--r33-gold);
+    background: linear-gradient(to bottom, var(--ui-panel-top) 0%, var(--ui-panel-bottom) 100%);
+    border-color: var(--ui-gold);
 }
+
 .sp-info-header {
-    background: var(--r33-panel-deep);
+    background: var(--ui-panel-deep);
 }
+
 .modal .modal-content h3,
 .sp-clan,
 .sp-lord-label,
@@ -4165,10 +4012,10 @@ body.is-pc #pc-new-status-panel,
     color: #ffe070;
 }
 
-/* --- コマンド：元の色・形を残し、hover/選択中だけ明確に強調 --- */
 .cmd-btn {
     transition: transform 0.10s ease, box-shadow 0.12s ease, background 0.14s ease, border-color 0.14s ease;
 }
+
 .cmd-btn:hover,
 .cmd-btn:focus-visible {
     transform: translateY(-1px) scale(1.025);
@@ -4181,6 +4028,7 @@ body.is-pc #pc-new-status-panel,
     outline: none;
     z-index: 2;
 }
+
 .cmd-btn.finish:hover,
 .cmd-btn.finish:focus-visible {
     box-shadow:
@@ -4189,6 +4037,7 @@ body.is-pc #pc-new-status-panel,
         0 0 13px rgba(255,100,90,0.30),
         0 3px 5px rgba(0,0,0,0.42);
 }
+
 .cmd-btn.back:hover,
 .cmd-btn.back:focus-visible {
     box-shadow:
@@ -4197,6 +4046,7 @@ body.is-pc #pc-new-status-panel,
         0 0 12px rgba(176,190,197,0.24),
         0 3px 5px rgba(0,0,0,0.42);
 }
+
 body.is-pc .pc-cmd-col .cmd-btn.category.active {
     background: linear-gradient(135deg, #91b7aa 0%, #d0e0da 100%);
     border-color: #fff7d5 #ffe49a #e2bd54 #ffe49a;
@@ -4208,18 +4058,18 @@ body.is-pc .pc-cmd-col .cmd-btn.category.active {
     transform: translateY(-1px);
 }
 
-/* --- 汎用 決定/キャンセル/危険：特殊形状と役割色を完全維持し、hoverを発光で補強 --- */
-.btn-primary,
-.btn-secondary,
-.btn-danger {
+.btn-primary:not(.floating-back-btn),
+.btn-secondary:not(.floating-back-btn),
+.btn-danger:not(.floating-back-btn) {
     transition: transform 0.14s ease, filter 0.14s ease;
 }
-.btn-primary:hover,
-.btn-secondary:hover,
-.btn-danger:hover,
-.btn-primary:focus-visible,
-.btn-secondary:focus-visible,
-.btn-danger:focus-visible {
+
+.btn-primary:not(.floating-back-btn):hover,
+.btn-secondary:not(.floating-back-btn):hover,
+.btn-danger:not(.floating-back-btn):hover,
+.btn-primary:not(.floating-back-btn):focus-visible,
+.btn-secondary:not(.floating-back-btn):focus-visible,
+.btn-danger:not(.floating-back-btn):focus-visible {
     transform: translateY(-1px) scale(1.06);
     filter:
         drop-shadow(0 0 2px rgba(255,255,240,0.92))
@@ -4227,300 +4077,15 @@ body.is-pc .pc-cmd-col .cmd-btn.category.active {
         drop-shadow(0 5px 5px rgba(0,0,0,0.48));
     outline: none;
 }
-.btn-primary:active,
-.btn-secondary:active,
-.btn-danger:active {
+
+.btn-primary:not(.floating-back-btn):active,
+.btn-secondary:not(.floating-back-btn):active,
+.btn-danger:not(.floating-back-btn):active {
     transform: translateY(1px) scale(1.01);
     filter: drop-shadow(0 2px 2px rgba(0,0,0,0.50));
 }
 
-/* =========================================================
-   Round34: 入口3画面を元UI寄りへ再調整
-   - タイトル / シナリオ選択 / ローディングの「配置」はRound28-29を維持
-   - 黒漆・無彩色へ寄せすぎた質感を、本編の深緑＋金＋角丸＋立体感へ戻す
-   - 本編と入口の中間点を狙い、彩度・明度は元UIより少し落ち着かせる
-   ========================================================= */
-:root {
-    --r34-entry-green-top: #355f40;
-    --r34-entry-green-mid: #294d34;
-    --r34-entry-green-bottom: #203c29;
-    --r34-entry-green-deep: #172d1e;
-    --r34-entry-green-hover-top: #4b7a56;
-    --r34-entry-green-hover-bottom: #356442;
-    --r34-entry-gold: #d0af45;
-    --r34-entry-gold-bright: #f2d86d;
-    --r34-entry-paper: #fff7dc;
-    --r34-entry-muted: #ddd6bd;
-}
-
-/* ---------- タイトル：現行2カラムを維持し、本編UIの色・角丸・立体感へ ---------- */
-#title-screen,
-#global-loading-screen {
-    background:
-        radial-gradient(circle at 20% 20%, rgba(212,175,55,0.13) 0, rgba(212,175,55,0) 35%),
-        radial-gradient(circle at 82% 78%, rgba(112,159,122,0.16) 0, rgba(112,159,122,0) 37%),
-        linear-gradient(145deg, #324b3b 0%, #273e32 48%, #1d3227 100%);
-    color: var(--r34-entry-paper);
-}
-
-#title-screen::before,
-#global-loading-screen::before {
-    inset: 16px;
-    border: 1px solid rgba(212,175,55,0.46);
-    border-radius: 8px;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.045), 0 0 16px rgba(0,0,0,0.18);
-}
-
-#title-screen::after,
-#global-loading-screen::after {
-    background: linear-gradient(90deg, transparent 0%, rgba(212,175,55,0.04) 17%, rgba(212,175,55,0.20) 50%, rgba(212,175,55,0.04) 83%, transparent 100%);
-}
-
-.title-content {
-    color: var(--r34-entry-paper);
-    background: linear-gradient(to bottom, rgba(53,95,64,0.94) 0%, rgba(32,60,41,0.95) 100%);
-    border: 2px solid rgba(208,175,69,0.78);
-    border-radius: 10px;
-    box-shadow:
-        0 15px 34px rgba(0,0,0,0.34),
-        inset 0 1px 0 rgba(255,255,255,0.075),
-        inset 0 -12px 28px rgba(0,0,0,0.10);
-}
-
-.title-content::before {
-    background: linear-gradient(to bottom, transparent, rgba(242,216,109,0.30) 18%, rgba(242,216,109,0.30) 82%, transparent);
-}
-
-.title-kicker {
-    color: #f0d36c;
-    opacity: 0.96;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.55);
-}
-
-.game-title {
-    color: #fffdf2;
-    text-shadow:
-        2px 2px 0 #102218,
-        -1px -1px 0 rgba(0,0,0,0.65),
-        0 5px 12px rgba(0,0,0,0.58);
-}
-
-.title-rule::before,
-.title-rule::after,
-.loading-rule::before,
-.loading-rule::after {
-    background: linear-gradient(90deg, transparent, var(--r34-entry-gold-bright));
-}
-
-.title-rule span,
-.loading-rule span {
-    border-color: var(--r34-entry-gold-bright);
-    background: rgba(53,95,64,0.58);
-}
-
-.title-subtitle {
-    color: #f0ead6;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.52);
-}
-
-.title-btn {
-    min-height: 50px;
-    padding: 10px 42px 10px 22px;
-    border: 1.5px solid rgba(212,175,55,0.66);
-    border-left: 4px solid #e4c250;
-    border-radius: 7px;
-    background: linear-gradient(to bottom, #315c3b 0%, #23472e 100%);
-    color: #fff;
-    text-align: left;
-    text-shadow: 1px 1px 0 #0b1c10, -1px -1px 0 rgba(0,0,0,0.36);
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.08),
-        0 2px 5px rgba(0,0,0,0.30);
-    transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, padding-left 0.12s ease;
-}
-
-.title-btn::after {
-    color: rgba(255,229,122,0.82);
-}
-
-.title-btn:hover,
-.title-btn:focus-visible {
-    padding-left: 26px;
-    transform: translateY(-1px) scale(1.018);
-    background: linear-gradient(to bottom, var(--r34-entry-green-hover-top) 0%, var(--r34-entry-green-hover-bottom) 100%);
-    border-color: #ffe57b;
-    border-left-color: #fff0a0;
-    color: #fffdeb;
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.13),
-        0 0 0 1px rgba(255,232,132,0.18),
-        0 0 11px rgba(255,213,79,0.22),
-        0 4px 7px rgba(0,0,0,0.32);
-    outline: none;
-}
-
-.title-btn:active {
-    transform: translateY(1px) scale(0.995);
-    background: linear-gradient(to bottom, #23442b 0%, #1b3522 100%);
-    box-shadow: inset 0 2px 7px rgba(0,0,0,0.42);
-}
-
-#start-btn { border-left-color: #e4c250; }
-#watch-start-btn { border-left-color: #9bc0a4; }
-#settings-btn { color: #ece7d6; }
-
-.title-tap-message {
-    color: #fff4cb;
-    border-top-color: rgba(212,175,55,0.42);
-    border-bottom-color: rgba(212,175,55,0.42);
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.50);
-}
-
-/* ---------- ローディング：黒い儀式感より、本編の深緑パネル感へ ---------- */
-.loading-stage {
-    width: min(440px, 80vw);
-    padding: 30px 28px 27px;
-    box-sizing: border-box;
-    color: var(--r34-entry-paper);
-    background: linear-gradient(to bottom, rgba(53,95,64,0.90), rgba(31,59,40,0.92));
-    border: 2px solid rgba(208,175,69,0.74);
-    border-radius: 10px;
-    box-shadow: 0 13px 32px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.07);
-}
-
-.loading-title {
-    color: #fffdf0;
-    text-shadow: 2px 2px 0 #102218, 0 4px 10px rgba(0,0,0,0.52);
-}
-
-.loading-text {
-    color: #eee7cc;
-    font-weight: 700;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.46);
-}
-
-.loading-track {
-    height: 4px;
-    border-radius: 3px;
-    background: rgba(7,28,14,0.48);
-    border: 1px solid rgba(212,175,55,0.36);
-    box-sizing: border-box;
-}
-
-.loading-track span {
-    background: linear-gradient(90deg, transparent, #fff0a0 46%, #d4af37 60%, transparent);
-}
-
-/* ---------- シナリオ選択：Round29の2ペイン配置をそのまま、元UIの質感へ ---------- */
-#scenario-modal {
-    background: rgba(12,25,17,0.70);
-}
-
-#scenario-modal .start-content {
-    background: linear-gradient(to bottom, #355f40 0%, #23472e 100%);
-    border: 2px solid #d0af45;
-    border-radius: 10px;
-    box-shadow:
-        0 14px 34px rgba(0,0,0,0.46),
-        inset 0 1px 0 rgba(255,255,255,0.075),
-        inset 0 -14px 30px rgba(0,0,0,0.09);
-}
-
-#scenario-modal .start-content > h2 {
-    color: #ffe278;
-    font-weight: 700;
-    text-shadow: 1px 1px 0 #132819, -1px -1px 0 rgba(0,0,0,0.32);
-    border-bottom: 2px solid rgba(212,175,55,0.56);
-}
-
-#scenario-modal .clan-btn {
-    min-height: 48px;
-    padding: 10px 16px;
-    border: 2px solid rgba(212,175,55,0.48);
-    border-left: 2px solid rgba(212,175,55,0.48);
-    border-radius: 8px;
-    background: linear-gradient(to bottom, #315c3b 0%, #23472e 100%);
-    color: #fff;
-    text-shadow: 1px 1px 0 #0d1d11, -1px -1px 0 rgba(0,0,0,0.34);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.055), 0 2px 4px rgba(0,0,0,0.20);
-    transition: transform 0.10s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-#scenario-modal .clan-btn:hover,
-#scenario-modal .clan-btn:focus-visible {
-    transform: translateY(-1px) scale(1.018);
-    background: linear-gradient(to bottom, #4c7e58 0%, #356542 100%);
-    border-color: #ffe16b;
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.10),
-        0 0 0 1px rgba(255,239,176,0.20),
-        0 0 10px rgba(255,213,79,0.25),
-        0 3px 5px rgba(0,0,0,0.28);
-    outline: none;
-}
-
-#scenario-modal .clan-btn.selected {
-    transform: translateY(-1px) scale(1.018);
-    color: #fff7c4;
-    background: linear-gradient(to bottom, #9c6d25 0%, #744b19 100%);
-    border-color: #ffe477;
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.10),
-        0 0 0 1px rgba(255,238,163,0.24),
-        0 0 12px rgba(255,213,79,0.32),
-        0 3px 5px rgba(0,0,0,0.30);
-}
-
-#scenario-modal .scenario-desc-box {
-    background: rgba(10,28,16,0.56);
-    border: 1px solid rgba(212,175,55,0.46);
-    border-radius: 8px;
-    color: #fff;
-    text-shadow: 1px 1px 1px rgba(0,0,0,0.70);
-}
-
-#scenario-modal .scenario-desc-title {
-    color: #ffe278;
-    font-family: 'abashiri-mincho', serif;
-    font-weight: 700;
-    border-bottom-color: rgba(212,175,55,0.34);
-}
-
-#scenario-modal .scenario-desc-text {
-    color: #f3efe0;
-}
-
-#scenario-modal .modal-footer {
-    border-top-color: rgba(212,175,55,0.30);
-}
-
-/* 決定 / 閉じるはRound33で復元した本編共通ボタンをそのまま使う。 */
-#scenario-modal .btn-primary,
-#scenario-modal .btn-secondary {
-    min-width: 130px;
-}
-
-@media (max-width: 720px), (max-height: 560px) {
-    #title-screen::before,
-    #global-loading-screen::before { inset: 9px; border-radius: 6px; }
-    .title-content { border-radius: 8px; }
-    .loading-stage { padding: 24px 20px 22px; border-radius: 8px; }
-}
-
-/* =========================================================
-   Round35: タイトルアクセント統一 / セーブロード画面安定化
-   - 「観戦する」だけ異なっていた左アクセント色を他メニューと統一
-   - セーブロードモーダルの外寸を内容・読み込み状態に依存させない
-   - カスタムスクロールバー外枠の後付けによるレイアウト揺れを抑制
-   - スマホ実機で保存時刻の下端が切れないようスロット内余白を再調整
-   ========================================================= */
-
-/* タイトル：観戦だけ別色にせず、入口メニューの左アクセントを統一します。 */
-#watch-start-btn {
-    border-left-color: #e4c250;
-}
-
-/* セーブ / ロード：ウインドウ本体は中身の量ではなく親画面から高さを決めます。 */
+/* セーブ / ロード：読み込み前後でウインドウ外寸を変えない。 */
 #saveload-modal .modal-content.modal-small {
     height: calc(100% - 8px) !important;
     max-height: 610px !important;
@@ -4528,7 +4093,6 @@ body.is-pc .pc-cmd-col .cmd-btn.category.active {
     overflow: hidden !important;
 }
 
-/* 見出し・タブ・フッターは固定し、リストだけが残り領域を使う構造にします。 */
 #saveload-modal #saveload-title,
 #saveload-modal #saveload-tabs,
 #saveload-modal .modal-footer {
@@ -4551,32 +4115,36 @@ body.is-pc .pc-cmd-col .cmd-btn.category.active {
     min-height: 0 !important;
 }
 
-/* スマホ：フォント差・実機の行ボックス差を吸収できる縦幅を確保します。 */
 body:not(.is-pc) .saveload-slot-btn {
     height: 94px;
     min-height: 94px;
 }
+
 body:not(.is-pc) .saveload-slot-content {
     justify-content: center;
     gap: 2px;
     padding-top: 5px;
     padding-bottom: 5px;
 }
+
 body:not(.is-pc) .saveload-row-top {
     flex: 0 0 auto;
     min-height: 1.35em;
     line-height: 1.2;
 }
+
 body:not(.is-pc) .saveload-row-bottom {
     flex: 0 0 auto;
     gap: 2px;
     margin-top: 2px;
     line-height: 1.2;
 }
+
 body:not(.is-pc) .saveload-slot-date,
 body:not(.is-pc) .saveload-slot-time {
     line-height: 1.25;
 }
+
 body:not(.is-pc) .saveload-slot-time {
     min-height: 1.25em;
     width: 100%;
@@ -4585,306 +4153,10 @@ body:not(.is-pc) .saveload-slot-time {
     padding-bottom: 1px;
     box-sizing: border-box;
 }
+
 body:not(.is-pc) .saveload-time-text,
 body:not(.is-pc) .saveload-latest-mark {
     white-space: nowrap;
     flex-shrink: 0;
 }
 
-/* =========================================================
-   Round36: タイトル / 全体ローディングを初期ダーク案へ復帰
-   - Round35のセーブロード安定化は維持
-   - シナリオ選択はRound34の深緑＋金デザインを維持
-   - タイトル左アクセントは全メニューで統一
-   - シナリオ説明は ui.js 側で本文のみ表示し、既存の .scenario-desc-text 余白を使用
-   ========================================================= */
-:root {
-    --title-ink-0: #090b0c;
-    --title-ink-1: #111617;
-    --title-ink-2: #1a2221;
-    --title-gold: #b89a54;
-    --title-gold-bright: #ddc47e;
-    --title-gold-dim: rgba(184, 154, 84, 0.34);
-    --title-paper: #ede6d3;
-    --title-muted: #aaa692;
-    --title-red: #6f1f1a;
-}
-
-/* タイトルと全体ローディングのみ、Round28の黒漆・鈍金へ戻す。 */
-#title-screen,
-#global-loading-screen {
-    background:
-        radial-gradient(circle at 18% 24%, rgba(110, 87, 45, 0.13) 0, rgba(110, 87, 45, 0) 31%),
-        radial-gradient(circle at 82% 76%, rgba(35, 70, 58, 0.16) 0, rgba(35, 70, 58, 0) 33%),
-        linear-gradient(115deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 38px),
-        linear-gradient(155deg, var(--title-ink-0) 0%, var(--title-ink-1) 52%, #0b0e0f 100%);
-    color: var(--title-paper);
-}
-
-#title-screen::before,
-#global-loading-screen::before {
-    inset: 18px;
-    border: 1px solid rgba(184, 154, 84, 0.28);
-    border-radius: 0;
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.75);
-}
-
-#title-screen::after,
-#global-loading-screen::after {
-    background: linear-gradient(90deg, transparent 0%, rgba(184,154,84,0.06) 20%, rgba(184,154,84,0.18) 50%, rgba(184,154,84,0.06) 80%, transparent 100%);
-}
-
-.title-content {
-    color: var(--title-paper);
-    background: linear-gradient(135deg, rgba(12,15,15,0.78), rgba(26,31,29,0.62));
-    border: 1px solid rgba(184,154,84,0.22);
-    border-radius: 0;
-    box-shadow: 0 24px 70px rgba(0,0,0,0.46), inset 0 0 45px rgba(0,0,0,0.22);
-}
-
-.title-content::before {
-    background: linear-gradient(to bottom, transparent, rgba(184,154,84,0.30) 18%, rgba(184,154,84,0.30) 82%, transparent);
-}
-
-.title-kicker {
-    color: var(--title-gold);
-    opacity: 0.88;
-    text-shadow: none;
-}
-
-.game-title {
-    color: #f0e8d1;
-    text-shadow: 0 4px 0 #050606, 0 12px 28px rgba(0,0,0,0.8);
-}
-
-.title-rule::before,
-.title-rule::after,
-.loading-rule::before,
-.loading-rule::after {
-    background: linear-gradient(90deg, transparent, var(--title-gold));
-}
-
-.title-rule span,
-.loading-rule span {
-    border-color: var(--title-gold-bright);
-    background: transparent;
-}
-
-.title-subtitle {
-    color: var(--title-muted);
-    text-shadow: none;
-}
-
-.title-btn {
-    min-height: 50px;
-    padding: 10px 44px 10px 24px;
-    border: 1px solid rgba(184,154,84,0.28);
-    border-left: 3px solid rgba(184,154,84,0.62);
-    border-radius: 0;
-    background: linear-gradient(90deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
-    color: #e8e0cb;
-    text-shadow: 0 2px 2px #000;
-    box-shadow: none;
-    transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, padding-left 0.16s ease;
-}
-
-.title-btn::after {
-    color: rgba(221,196,126,0.55);
-}
-
-.title-btn:hover,
-.title-btn:focus-visible {
-    padding-left: 31px;
-    transform: none;
-    background: linear-gradient(90deg, rgba(123,94,39,0.24), rgba(255,255,255,0.035));
-    border-color: rgba(221,196,126,0.65);
-    border-left-color: var(--title-gold-bright);
-    color: #fff4d7;
-    box-shadow: none;
-    outline: none;
-}
-
-.title-btn:active {
-    transform: translateY(1px);
-    background: rgba(111,31,26,0.34);
-    box-shadow: none;
-}
-
-/* Round35で揃えた意図を維持し、観戦だけ別色にはしない。 */
-#start-btn,
-#continue-btn,
-#load-btn,
-#watch-start-btn,
-#settings-btn {
-    border-left-color: rgba(184,154,84,0.62);
-}
-#settings-btn { color: #c3beae; }
-
-.title-tap-message {
-    color: #d8cfb5;
-    border-top-color: rgba(184,154,84,0.22);
-    border-bottom-color: rgba(184,154,84,0.22);
-    text-shadow: none;
-}
-
-/* 全体ローディング：緑パネルを外し、初期の静かな黒漆表示へ。 */
-.loading-stage {
-    width: min(420px, 78vw);
-    padding: 0;
-    color: var(--title-paper);
-    background: transparent;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-}
-
-.loading-title {
-    color: var(--title-paper);
-    text-shadow: 0 4px 0 #050606, 0 10px 24px rgba(0,0,0,0.72);
-}
-
-.loading-text {
-    color: #b8b19f;
-    font-weight: 400;
-    text-shadow: none;
-}
-
-.loading-track {
-    width: min(240px, 68%);
-    height: 2px;
-    border: 0;
-    border-radius: 0;
-    background: rgba(184,154,84,0.16);
-}
-
-.loading-track span {
-    background: linear-gradient(90deg, transparent, var(--title-gold-bright), transparent);
-}
-
-/* シナリオ説明本文は枠から離し、PC/スマホとも既存レイアウトを崩さない。 */
-#scenario-modal .scenario-desc-text {
-    padding: 16px 18px 18px;
-}
-
-@media (max-width: 720px), (max-height: 560px) {
-    #title-screen::before,
-    #global-loading-screen::before {
-        inset: 9px;
-        border-radius: 0;
-    }
-    .title-content { border-radius: 0; }
-    .loading-stage {
-        padding: 0;
-        border-radius: 0;
-    }
-    #scenario-modal .scenario-desc-text {
-        padding: 13px 14px 15px;
-    }
-}
-
-/* =========================================================
-   Round37: シナリオ選択ボタンの視認性向上
-   - ウインドウの深緑とボタン色を明確に分離
-   - 青みのある翡翠色 + 金縁 + 内側ハイライトで「押せる」感を強化
-   - 選択中の金茶色は維持し、hover は一段明るくする
-   ========================================================= */
-#scenario-modal .scenario-list-vertical,
-#scenario-modal #scenario-list {
-    background: rgba(8, 24, 15, 0.16);
-    border-radius: 9px;
-    padding: 5px;
-}
-
-#scenario-modal .clan-btn {
-    border-color: rgba(221, 190, 92, 0.64);
-    border-left-width: 4px;
-    border-left-color: #d9b955;
-    background: linear-gradient(to bottom, #3f765e 0%, #2c5f4b 52%, #244d3d 100%);
-    color: #fffdf3;
-    font-weight: 700;
-    text-shadow: 0 1px 1px rgba(0,0,0,0.78);
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.16),
-        inset 0 -1px 0 rgba(0,0,0,0.25),
-        0 3px 6px rgba(0,0,0,0.28);
-}
-
-#scenario-modal .clan-btn:hover,
-#scenario-modal .clan-btn:focus-visible {
-    transform: translateY(-2px) scale(1.018);
-    background: linear-gradient(to bottom, #62967a 0%, #42765e 54%, #35634f 100%);
-    border-color: #ffe477;
-    border-left-color: #ffe98d;
-    color: #fffbe5;
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.23),
-        inset 0 -1px 0 rgba(0,0,0,0.18),
-        0 0 0 1px rgba(255,238,166,0.20),
-        0 0 12px rgba(255,215,95,0.27),
-        0 5px 9px rgba(0,0,0,0.34);
-}
-
-#scenario-modal .clan-btn.selected {
-    background: linear-gradient(to bottom, #a9782d 0%, #85591f 52%, #704619 100%);
-    border-color: #ffe88a;
-    border-left-color: #fff0a8;
-    color: #fff9d9;
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.18),
-        inset 0 -1px 0 rgba(0,0,0,0.25),
-        0 0 0 1px rgba(255,239,170,0.24),
-        0 0 13px rgba(255,213,79,0.30),
-        0 4px 8px rgba(0,0,0,0.34);
-}
-
-#scenario-modal .clan-btn:active {
-    transform: translateY(0) scale(0.995);
-    box-shadow:
-        inset 0 2px 5px rgba(0,0,0,0.28),
-        0 1px 2px rgba(0,0,0,0.20);
-}
-
-
-/* =========================================================
-   Round38: シナリオ選択ボタンを「ウインドウ色」から分離
-   - 既存UIの共通傾向に合わせ、深緑パネルの上に鉄紺〜青灰の操作面を置く
-   - 通常＝鉄紺、hover＝明るい青灰、selected＝金茶
-   - 配置・サイズ・シナリオ説明欄はRound37のまま
-   ========================================================= */
-#scenario-modal .clan-btn {
-    background: linear-gradient(to bottom, #41525b 0%, #31424b 52%, #25343b 100%);
-    border-color: #8f865f;
-    border-left-color: #d0af45;
-    color: #f5f3e8;
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.14),
-        inset 0 -1px 0 rgba(0,0,0,0.34),
-        0 3px 6px rgba(0,0,0,0.32);
-}
-
-#scenario-modal .clan-btn:hover,
-#scenario-modal .clan-btn:focus-visible {
-    background: linear-gradient(to bottom, #607680 0%, #485f6a 52%, #394d56 100%);
-    border-color: #f0d56f;
-    border-left-color: #ffe98d;
-    color: #fffdf2;
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.22),
-        inset 0 -1px 0 rgba(0,0,0,0.22),
-        0 0 0 1px rgba(255,238,166,0.18),
-        0 0 11px rgba(255,215,95,0.22),
-        0 5px 9px rgba(0,0,0,0.36);
-}
-
-#scenario-modal .clan-btn.selected {
-    background: linear-gradient(to bottom, #aa7a32 0%, #875b22 52%, #704619 100%);
-    border-color: #ffe88a;
-    border-left-color: #fff0a8;
-    color: #fff9d9;
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.18),
-        inset 0 -1px 0 rgba(0,0,0,0.25),
-        0 0 0 1px rgba(255,239,170,0.24),
-        0 0 13px rgba(255,213,79,0.30),
-        0 4px 8px rgba(0,0,0,0.34);
-}
