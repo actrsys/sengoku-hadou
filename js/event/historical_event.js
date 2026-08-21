@@ -209,10 +209,22 @@ window.EventAction = {
     },
 
     // ④ ★家督相続（生前退位）の一連の処理をまとめてやってくれる魔法
-    executeSuccession: function(game, oldDaimyo, successor, messages) {
+    executeSuccession: async function(game, oldDaimyo, successor, messages) {
         if (game.lifeSystem && typeof game.lifeSystem.setupNewDaimyo === 'function') {
             // ★life_system に新しく作った、一番優秀なお道具箱（魔法）に全てお任せします！
             game.lifeSystem.setupNewDaimyo(oldDaimyo, successor, messages, true);
+
+            // ★Round25：家督相続が完了すると、setupNewDaimyo側で後継者は
+            // 先代大名の居城へ移動し、新しい大名・城主としてcastleIdが確定します。
+            // その「相続後の実際の居城」へイベント開始カメラをぬるっと寄せます。
+            // 固定城IDを持たせないので、ゲーム進行で居城が変わっていても追従します。
+            const successorCastleId = Number(successor && successor.castleId);
+            if (successorCastleId > 0 && game.ui && typeof game.ui.focusMapOnCastle === 'function') {
+                await game.ui.focusMapOnCastle(successorCastleId, {
+                    transition: 'smooth',
+                    reason: 'historical_succession'
+                });
+            }
         }
     },
 
@@ -1366,7 +1378,7 @@ window.GameEvents.push({
         const messages = [];
 
         // 新しく作った家督相続の魔法を呼び出します
-        window.EventAction.executeSuccession(game, oldDaimyo, successor, messages);
+        await window.EventAction.executeSuccession(game, oldDaimyo, successor, messages);
 
         // ⑪ メッセージを画面に出してお知らせします
         const hisamasaName = oldDaimyo.fullName;
@@ -1626,6 +1638,15 @@ window.GameEvents.push({
 
             // 勝長を新しい城主に任命します
             window.EventAction.appointCastellan(game, katsunaga, targetCastle);
+
+            // ★Round25：養子入りによる家督継承も、継承後の勝長の実際の居城へ
+            // メッセージ表示前にぬるっとカメラを寄せます。
+            if (game.ui && typeof game.ui.focusMapOnCastle === 'function' && Number(katsunaga.castleId) > 0) {
+                await game.ui.focusMapOnCastle(Number(katsunaga.castleId), {
+                    transition: 'smooth',
+                    reason: 'historical_adoptive_succession'
+                });
+            }
         }
 
         // ----------------------------------------------------
@@ -3951,7 +3972,7 @@ window.GameEvents.push({
         messages.push(`${oldNameStr}は出家して「${newNameStr}」と号しました。`);
         
         // 新しく作った家督相続の魔法を呼び出します
-        window.EventAction.executeSuccession(game, oldDaimyo, successor, messages);
+        await window.EventAction.executeSuccession(game, oldDaimyo, successor, messages);
 
         // メッセージを画面に出してお知らせします
         const clan = game.getClan(clanId);
@@ -4053,7 +4074,7 @@ window.GameEvents.push({
         const messages = [];
 
         // 新しく作った家督相続の魔法を呼び出します
-        window.EventAction.executeSuccession(game, oldDaimyo, successor, messages);
+        await window.EventAction.executeSuccession(game, oldDaimyo, successor, messages);
 
         // ⑩ メッセージを画面に出してお知らせします
         const clan = game.getClan(clanId);
@@ -4106,7 +4127,7 @@ window.GameEvents.push({
         const messages = [];
 
         // 新しく作った家督相続の魔法を呼び出します
-        window.EventAction.executeSuccession(game, oldDaimyo, successor, messages);
+        await window.EventAction.executeSuccession(game, oldDaimyo, successor, messages);
 
         // ⑩ メッセージを画面に出してお知らせします
         const clan = game.getClan(clanId);
