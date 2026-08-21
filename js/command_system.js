@@ -1618,6 +1618,10 @@ class CommandSystem {
         const tabs = document.getElementById('saveload-tabs'); // ★追加：タブを入れる箱を見つけます
         
         list.style.overflowX = 'hidden'; // 横スクロールを禁止します
+        // ★Round35：HTMLに残っている60vhを無効化します。
+        // カスタムスクロールバーが初回生成時にこの値を外枠へコピーすると、
+        // 読み込み完了の瞬間にロード画面の寸法が変わる原因になるためです。
+        list.style.maxHeight = 'none';
 
         title.innerText = mode === 'save' ? 'セーブするスロットを選択' : 'ロードするスロットを選択';
         
@@ -1919,9 +1923,20 @@ class CommandSystem {
             };
         }
 
-        // 準備ができたら最初の「手動」リストを表示して、画面を出します！
+        // ★Round35：先に読み込み中の5枠を作り、カスタムスクロールバーの外枠も
+        // モーダルを見せる前に確定させます。従来はデータ読み込み完了後に外枠が
+        // 後付けされていたため、表示中にウインドウ寸法が揺れることがありました。
         renderSlots(currentPrefix);
+        if (this.game.ui && typeof this.game.ui.updateCustomScrollbars === 'function') {
+            this.game.ui.updateCustomScrollbars(list);
+        }
         modal.classList.remove('hidden');
+        // display:none が解除された次フレームで実寸を取り直します。
+        requestAnimationFrame(() => {
+            if (this.game.ui && typeof this.game.ui.updateCustomScrollbars === 'function') {
+                this.game.ui.updateCustomScrollbars(list);
+            }
+        });
     }
     
     handleBushoSelection(actionType, selectedIds, targetId, extraData) {

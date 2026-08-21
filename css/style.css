@@ -4048,3 +4048,545 @@ body:not(.is-pc) #map-container {
         padding-bottom: 5px;
     }
 }
+
+/* =========================================================
+   Round33: 元UIベースの視認性優先・新タイトル意匠との橋渡し調整
+   - Round30〜32の全面統一は使用せず、元の形状・役割色・立体感を維持
+   - 暗色パネルだけ少し明るくし、黒緑＋鈍金へ穏やかに寄せる
+   - hover / focus / active は「今選んでいる」ことを明確にする
+   ========================================================= */
+:root {
+    --r33-panel-top: #2d5738;
+    --r33-panel-bottom: #21422a;
+    --r33-panel-deep: #172d1d;
+    --r33-gold: #c9aa50;
+    --r33-gold-bright: #f0d77c;
+    --r33-paper: #f5f0df;
+}
+
+/* --- タイトル / ローディング：従来の新意匠を保ったまま一段明るく --- */
+:root {
+    --title-ink-0: #151918;
+    --title-ink-1: #1c2422;
+    --title-ink-2: #26302c;
+    --title-gold: #c5a45a;
+    --title-gold-bright: #ead184;
+    --title-gold-dim: rgba(197, 164, 90, 0.42);
+    --title-paper: #f3ecd9;
+    --title-muted: #c0baa6;
+    --title-red: #812b23;
+}
+#title-screen,
+#global-loading-screen {
+    background:
+        radial-gradient(circle at 18% 24%, rgba(145, 111, 55, 0.18) 0, rgba(145, 111, 55, 0) 34%),
+        radial-gradient(circle at 82% 76%, rgba(54, 96, 76, 0.22) 0, rgba(54, 96, 76, 0) 36%),
+        linear-gradient(115deg, rgba(255,255,255,0.026) 0 1px, transparent 1px 38px),
+        linear-gradient(155deg, var(--title-ink-0) 0%, var(--title-ink-1) 52%, #141918 100%);
+}
+.title-content {
+    background: linear-gradient(135deg, rgba(25,31,29,0.88), rgba(38,47,42,0.76));
+    border-color: rgba(197,164,90,0.34);
+    box-shadow: 0 24px 64px rgba(0,0,0,0.38), inset 0 0 42px rgba(255,255,255,0.018);
+}
+.title-btn {
+    background: linear-gradient(90deg, rgba(255,255,255,0.070), rgba(255,255,255,0.022));
+    border-color: rgba(197,164,90,0.40);
+    border-left-color: rgba(197,164,90,0.74);
+    color: #f0e8d3;
+}
+.title-btn:hover,
+.title-btn:focus-visible {
+    padding-left: 31px;
+    background: linear-gradient(90deg, rgba(165,126,55,0.38), rgba(255,255,255,0.075));
+    border-color: rgba(240,215,124,0.92);
+    border-left-color: #ffe49a;
+    color: #fff8e5;
+    box-shadow: 0 0 0 1px rgba(255,231,159,0.28), 0 0 18px rgba(221,196,126,0.18);
+    outline: none;
+}
+.title-btn:active {
+    background: linear-gradient(90deg, rgba(130,43,35,0.56), rgba(90,70,42,0.20));
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.34), 0 0 0 1px rgba(240,215,124,0.48);
+}
+.loading-text { color: #ccc4ae; }
+.loading-track { background: rgba(197,164,90,0.24); }
+
+/* --- シナリオ選択：暗すぎない黒緑へ。選択状態は強く光らせる --- */
+#scenario-modal {
+    background:
+        radial-gradient(circle at 20% 18%, rgba(145,111,55,0.16), transparent 36%),
+        rgba(9,13,12,0.82);
+}
+#scenario-modal .start-content {
+    background: linear-gradient(145deg, rgba(35,45,40,0.985), rgba(20,27,24,0.985));
+    border-color: rgba(197,164,90,0.52);
+    box-shadow: 0 22px 54px rgba(0,0,0,0.48), inset 0 0 32px rgba(255,255,255,0.016);
+}
+#scenario-modal .clan-btn {
+    background: linear-gradient(to bottom, #305c3a 0%, #23472e 100%);
+    border-color: rgba(212,175,55,0.52);
+}
+#scenario-modal .clan-btn:hover,
+#scenario-modal .clan-btn:focus-visible {
+    transform: scale(1.025);
+    background: linear-gradient(to bottom, #4a8055 0%, #336a42 100%);
+    border-color: #ffe27a;
+    box-shadow: 0 0 0 1px rgba(255,239,176,0.32), 0 0 12px rgba(255,213,79,0.28);
+    outline: none;
+}
+#scenario-modal .clan-btn.selected {
+    background: linear-gradient(to bottom, rgba(184,126,42,0.82), rgba(123,72,27,0.88));
+    border-color: #ffe58a;
+    color: #fff3bd;
+    box-shadow: 0 0 0 1px rgba(255,242,184,0.38), 0 0 18px rgba(255,213,79,0.42), inset 0 0 12px rgba(255,224,129,0.10);
+}
+#scenario-modal .scenario-desc-box {
+    background: rgba(10,17,14,0.56);
+    border-color: rgba(212,175,55,0.40);
+}
+
+/* --- ゲーム中の器だけ少し明るく。元のレイアウト・角丸・立体感は維持 --- */
+#top-info-bar,
+#bottom-command-bar,
+body.is-pc #pc-new-status-panel,
+.modal .modal-content {
+    background: linear-gradient(to bottom, var(--r33-panel-top) 0%, var(--r33-panel-bottom) 100%);
+    border-color: var(--r33-gold);
+}
+.sp-info-header {
+    background: var(--r33-panel-deep);
+}
+.modal .modal-content h3,
+.sp-clan,
+.sp-lord-label,
+.sp-label,
+.sp-footer-box span:first-child {
+    color: #ffe070;
+}
+
+/* --- コマンド：元の色・形を残し、hover/選択中だけ明確に強調 --- */
+.cmd-btn {
+    transition: transform 0.10s ease, box-shadow 0.12s ease, background 0.14s ease, border-color 0.14s ease;
+}
+.cmd-btn:hover,
+.cmd-btn:focus-visible {
+    transform: translateY(-1px) scale(1.025);
+    border-color: #fff9dd #f3dc94 #d8b64f #f3dc94;
+    box-shadow:
+        inset 0 0 0 1px rgba(0,50,40,0.30),
+        0 0 0 2px rgba(255,239,180,0.38),
+        0 0 13px rgba(255,213,79,0.28),
+        0 3px 5px rgba(0,0,0,0.42);
+    outline: none;
+    z-index: 2;
+}
+.cmd-btn.finish:hover,
+.cmd-btn.finish:focus-visible {
+    box-shadow:
+        inset 0 0 0 1px rgba(60,0,0,0.28),
+        0 0 0 2px rgba(255,202,178,0.38),
+        0 0 13px rgba(255,100,90,0.30),
+        0 3px 5px rgba(0,0,0,0.42);
+}
+.cmd-btn.back:hover,
+.cmd-btn.back:focus-visible {
+    box-shadow:
+        inset 0 0 0 1px rgba(20,30,40,0.26),
+        0 0 0 2px rgba(222,235,240,0.30),
+        0 0 12px rgba(176,190,197,0.24),
+        0 3px 5px rgba(0,0,0,0.42);
+}
+body.is-pc .pc-cmd-col .cmd-btn.category.active {
+    background: linear-gradient(135deg, #91b7aa 0%, #d0e0da 100%);
+    border-color: #fff7d5 #ffe49a #e2bd54 #ffe49a;
+    box-shadow:
+        inset 0 0 0 1px rgba(0,50,40,0.34),
+        0 0 0 2px rgba(255,239,180,0.48),
+        0 0 16px rgba(255,213,79,0.34),
+        0 3px 6px rgba(0,0,0,0.34);
+    transform: translateY(-1px);
+}
+
+/* --- 汎用 決定/キャンセル/危険：特殊形状と役割色を完全維持し、hoverを発光で補強 --- */
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+    transition: transform 0.14s ease, filter 0.14s ease;
+}
+.btn-primary:hover,
+.btn-secondary:hover,
+.btn-danger:hover,
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.btn-danger:focus-visible {
+    transform: translateY(-1px) scale(1.06);
+    filter:
+        drop-shadow(0 0 2px rgba(255,255,240,0.92))
+        drop-shadow(0 0 7px rgba(255,220,112,0.66))
+        drop-shadow(0 5px 5px rgba(0,0,0,0.48));
+    outline: none;
+}
+.btn-primary:active,
+.btn-secondary:active,
+.btn-danger:active {
+    transform: translateY(1px) scale(1.01);
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.50));
+}
+
+/* =========================================================
+   Round34: 入口3画面を元UI寄りへ再調整
+   - タイトル / シナリオ選択 / ローディングの「配置」はRound28-29を維持
+   - 黒漆・無彩色へ寄せすぎた質感を、本編の深緑＋金＋角丸＋立体感へ戻す
+   - 本編と入口の中間点を狙い、彩度・明度は元UIより少し落ち着かせる
+   ========================================================= */
+:root {
+    --r34-entry-green-top: #355f40;
+    --r34-entry-green-mid: #294d34;
+    --r34-entry-green-bottom: #203c29;
+    --r34-entry-green-deep: #172d1e;
+    --r34-entry-green-hover-top: #4b7a56;
+    --r34-entry-green-hover-bottom: #356442;
+    --r34-entry-gold: #d0af45;
+    --r34-entry-gold-bright: #f2d86d;
+    --r34-entry-paper: #fff7dc;
+    --r34-entry-muted: #ddd6bd;
+}
+
+/* ---------- タイトル：現行2カラムを維持し、本編UIの色・角丸・立体感へ ---------- */
+#title-screen,
+#global-loading-screen {
+    background:
+        radial-gradient(circle at 20% 20%, rgba(212,175,55,0.13) 0, rgba(212,175,55,0) 35%),
+        radial-gradient(circle at 82% 78%, rgba(112,159,122,0.16) 0, rgba(112,159,122,0) 37%),
+        linear-gradient(145deg, #324b3b 0%, #273e32 48%, #1d3227 100%);
+    color: var(--r34-entry-paper);
+}
+
+#title-screen::before,
+#global-loading-screen::before {
+    inset: 16px;
+    border: 1px solid rgba(212,175,55,0.46);
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.045), 0 0 16px rgba(0,0,0,0.18);
+}
+
+#title-screen::after,
+#global-loading-screen::after {
+    background: linear-gradient(90deg, transparent 0%, rgba(212,175,55,0.04) 17%, rgba(212,175,55,0.20) 50%, rgba(212,175,55,0.04) 83%, transparent 100%);
+}
+
+.title-content {
+    color: var(--r34-entry-paper);
+    background: linear-gradient(to bottom, rgba(53,95,64,0.94) 0%, rgba(32,60,41,0.95) 100%);
+    border: 2px solid rgba(208,175,69,0.78);
+    border-radius: 10px;
+    box-shadow:
+        0 15px 34px rgba(0,0,0,0.34),
+        inset 0 1px 0 rgba(255,255,255,0.075),
+        inset 0 -12px 28px rgba(0,0,0,0.10);
+}
+
+.title-content::before {
+    background: linear-gradient(to bottom, transparent, rgba(242,216,109,0.30) 18%, rgba(242,216,109,0.30) 82%, transparent);
+}
+
+.title-kicker {
+    color: #f0d36c;
+    opacity: 0.96;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.55);
+}
+
+.game-title {
+    color: #fffdf2;
+    text-shadow:
+        2px 2px 0 #102218,
+        -1px -1px 0 rgba(0,0,0,0.65),
+        0 5px 12px rgba(0,0,0,0.58);
+}
+
+.title-rule::before,
+.title-rule::after,
+.loading-rule::before,
+.loading-rule::after {
+    background: linear-gradient(90deg, transparent, var(--r34-entry-gold-bright));
+}
+
+.title-rule span,
+.loading-rule span {
+    border-color: var(--r34-entry-gold-bright);
+    background: rgba(53,95,64,0.58);
+}
+
+.title-subtitle {
+    color: #f0ead6;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.52);
+}
+
+.title-btn {
+    min-height: 50px;
+    padding: 10px 42px 10px 22px;
+    border: 1.5px solid rgba(212,175,55,0.66);
+    border-left: 4px solid #e4c250;
+    border-radius: 7px;
+    background: linear-gradient(to bottom, #315c3b 0%, #23472e 100%);
+    color: #fff;
+    text-align: left;
+    text-shadow: 1px 1px 0 #0b1c10, -1px -1px 0 rgba(0,0,0,0.36);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.08),
+        0 2px 5px rgba(0,0,0,0.30);
+    transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, padding-left 0.12s ease;
+}
+
+.title-btn::after {
+    color: rgba(255,229,122,0.82);
+}
+
+.title-btn:hover,
+.title-btn:focus-visible {
+    padding-left: 26px;
+    transform: translateY(-1px) scale(1.018);
+    background: linear-gradient(to bottom, var(--r34-entry-green-hover-top) 0%, var(--r34-entry-green-hover-bottom) 100%);
+    border-color: #ffe57b;
+    border-left-color: #fff0a0;
+    color: #fffdeb;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.13),
+        0 0 0 1px rgba(255,232,132,0.18),
+        0 0 11px rgba(255,213,79,0.22),
+        0 4px 7px rgba(0,0,0,0.32);
+    outline: none;
+}
+
+.title-btn:active {
+    transform: translateY(1px) scale(0.995);
+    background: linear-gradient(to bottom, #23442b 0%, #1b3522 100%);
+    box-shadow: inset 0 2px 7px rgba(0,0,0,0.42);
+}
+
+#start-btn { border-left-color: #e4c250; }
+#watch-start-btn { border-left-color: #9bc0a4; }
+#settings-btn { color: #ece7d6; }
+
+.title-tap-message {
+    color: #fff4cb;
+    border-top-color: rgba(212,175,55,0.42);
+    border-bottom-color: rgba(212,175,55,0.42);
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.50);
+}
+
+/* ---------- ローディング：黒い儀式感より、本編の深緑パネル感へ ---------- */
+.loading-stage {
+    width: min(440px, 80vw);
+    padding: 30px 28px 27px;
+    box-sizing: border-box;
+    color: var(--r34-entry-paper);
+    background: linear-gradient(to bottom, rgba(53,95,64,0.90), rgba(31,59,40,0.92));
+    border: 2px solid rgba(208,175,69,0.74);
+    border-radius: 10px;
+    box-shadow: 0 13px 32px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+.loading-title {
+    color: #fffdf0;
+    text-shadow: 2px 2px 0 #102218, 0 4px 10px rgba(0,0,0,0.52);
+}
+
+.loading-text {
+    color: #eee7cc;
+    font-weight: 700;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.46);
+}
+
+.loading-track {
+    height: 4px;
+    border-radius: 3px;
+    background: rgba(7,28,14,0.48);
+    border: 1px solid rgba(212,175,55,0.36);
+    box-sizing: border-box;
+}
+
+.loading-track span {
+    background: linear-gradient(90deg, transparent, #fff0a0 46%, #d4af37 60%, transparent);
+}
+
+/* ---------- シナリオ選択：Round29の2ペイン配置をそのまま、元UIの質感へ ---------- */
+#scenario-modal {
+    background: rgba(12,25,17,0.70);
+}
+
+#scenario-modal .start-content {
+    background: linear-gradient(to bottom, #355f40 0%, #23472e 100%);
+    border: 2px solid #d0af45;
+    border-radius: 10px;
+    box-shadow:
+        0 14px 34px rgba(0,0,0,0.46),
+        inset 0 1px 0 rgba(255,255,255,0.075),
+        inset 0 -14px 30px rgba(0,0,0,0.09);
+}
+
+#scenario-modal .start-content > h2 {
+    color: #ffe278;
+    font-weight: 700;
+    text-shadow: 1px 1px 0 #132819, -1px -1px 0 rgba(0,0,0,0.32);
+    border-bottom: 2px solid rgba(212,175,55,0.56);
+}
+
+#scenario-modal .clan-btn {
+    min-height: 48px;
+    padding: 10px 16px;
+    border: 2px solid rgba(212,175,55,0.48);
+    border-left: 2px solid rgba(212,175,55,0.48);
+    border-radius: 8px;
+    background: linear-gradient(to bottom, #315c3b 0%, #23472e 100%);
+    color: #fff;
+    text-shadow: 1px 1px 0 #0d1d11, -1px -1px 0 rgba(0,0,0,0.34);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.055), 0 2px 4px rgba(0,0,0,0.20);
+    transition: transform 0.10s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#scenario-modal .clan-btn:hover,
+#scenario-modal .clan-btn:focus-visible {
+    transform: translateY(-1px) scale(1.018);
+    background: linear-gradient(to bottom, #4c7e58 0%, #356542 100%);
+    border-color: #ffe16b;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.10),
+        0 0 0 1px rgba(255,239,176,0.20),
+        0 0 10px rgba(255,213,79,0.25),
+        0 3px 5px rgba(0,0,0,0.28);
+    outline: none;
+}
+
+#scenario-modal .clan-btn.selected {
+    transform: translateY(-1px) scale(1.018);
+    color: #fff7c4;
+    background: linear-gradient(to bottom, #9c6d25 0%, #744b19 100%);
+    border-color: #ffe477;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.10),
+        0 0 0 1px rgba(255,238,163,0.24),
+        0 0 12px rgba(255,213,79,0.32),
+        0 3px 5px rgba(0,0,0,0.30);
+}
+
+#scenario-modal .scenario-desc-box {
+    background: rgba(10,28,16,0.56);
+    border: 1px solid rgba(212,175,55,0.46);
+    border-radius: 8px;
+    color: #fff;
+    text-shadow: 1px 1px 1px rgba(0,0,0,0.70);
+}
+
+#scenario-modal .scenario-desc-title {
+    color: #ffe278;
+    font-family: 'abashiri-mincho', serif;
+    font-weight: 700;
+    border-bottom-color: rgba(212,175,55,0.34);
+}
+
+#scenario-modal .scenario-desc-text {
+    color: #f3efe0;
+}
+
+#scenario-modal .modal-footer {
+    border-top-color: rgba(212,175,55,0.30);
+}
+
+/* 決定 / 閉じるはRound33で復元した本編共通ボタンをそのまま使う。 */
+#scenario-modal .btn-primary,
+#scenario-modal .btn-secondary {
+    min-width: 130px;
+}
+
+@media (max-width: 720px), (max-height: 560px) {
+    #title-screen::before,
+    #global-loading-screen::before { inset: 9px; border-radius: 6px; }
+    .title-content { border-radius: 8px; }
+    .loading-stage { padding: 24px 20px 22px; border-radius: 8px; }
+}
+
+/* =========================================================
+   Round35: タイトルアクセント統一 / セーブロード画面安定化
+   - 「観戦する」だけ異なっていた左アクセント色を他メニューと統一
+   - セーブロードモーダルの外寸を内容・読み込み状態に依存させない
+   - カスタムスクロールバー外枠の後付けによるレイアウト揺れを抑制
+   - スマホ実機で保存時刻の下端が切れないようスロット内余白を再調整
+   ========================================================= */
+
+/* タイトル：観戦だけ別色にせず、入口メニューの左アクセントを統一します。 */
+#watch-start-btn {
+    border-left-color: #e4c250;
+}
+
+/* セーブ / ロード：ウインドウ本体は中身の量ではなく親画面から高さを決めます。 */
+#saveload-modal .modal-content.modal-small {
+    height: calc(100% - 8px) !important;
+    max-height: 610px !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* 見出し・タブ・フッターは固定し、リストだけが残り領域を使う構造にします。 */
+#saveload-modal #saveload-title,
+#saveload-modal #saveload-tabs,
+#saveload-modal .modal-footer {
+    flex: 0 0 auto;
+}
+
+#saveload-modal .scroll-wrapper {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    box-sizing: border-box;
+}
+
+#saveload-list {
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    max-height: none !important;
+    min-height: 0 !important;
+}
+
+/* スマホ：フォント差・実機の行ボックス差を吸収できる縦幅を確保します。 */
+body:not(.is-pc) .saveload-slot-btn {
+    height: 94px;
+    min-height: 94px;
+}
+body:not(.is-pc) .saveload-slot-content {
+    justify-content: center;
+    gap: 2px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+body:not(.is-pc) .saveload-row-top {
+    flex: 0 0 auto;
+    min-height: 1.35em;
+    line-height: 1.2;
+}
+body:not(.is-pc) .saveload-row-bottom {
+    flex: 0 0 auto;
+    gap: 2px;
+    margin-top: 2px;
+    line-height: 1.2;
+}
+body:not(.is-pc) .saveload-slot-date,
+body:not(.is-pc) .saveload-slot-time {
+    line-height: 1.25;
+}
+body:not(.is-pc) .saveload-slot-time {
+    min-height: 1.25em;
+    width: 100%;
+    white-space: nowrap;
+    overflow: visible;
+    padding-bottom: 1px;
+    box-sizing: border-box;
+}
+body:not(.is-pc) .saveload-time-text,
+body:not(.is-pc) .saveload-latest-mark {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
