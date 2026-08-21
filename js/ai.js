@@ -64,6 +64,7 @@ class AIEngine {
         try {
             // ★追加：AIが考え始める前に一瞬だけ処理を休ませて（息継ぎをして）、スマホがパンクするのを防ぎます！
             await new Promise(resolve => setTimeout(resolve, 0));
+            if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'exec:start');
             
             // ★イベント追加：コマンドの選択前（AI操作時）
             if (this.game.eventManager) {
@@ -94,6 +95,7 @@ class AIEngine {
             }
             
             // ★大名のお引越しと、軍師任命の処理を「人事部」に任せます！
+            if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'staffing:relocate');
             let isRelocated = false;
             if (this.game.aiStaffing) {
                 isRelocated = this.game.aiStaffing.relocateDaimyo(castle, castellan);
@@ -120,6 +122,7 @@ class AIEngine {
             if (myOperation && myOperation.type === '攻撃' && myOperation.status === '実行中') {
                 // そして、自分のお城がその「出撃元（stagingBase）」に選ばれている場合だけ出陣します！
                 if (myOperation.stagingBase === castle.id) {
+                    if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'operation:reachability');
                     
                     // ★追加：出陣する前に、道が繋がっているか、まだ「敵」かどうかの最終チェックをします！
                     let canReach = false;
@@ -1483,6 +1486,8 @@ class AIEngine {
     }
     
     async execInternalAffairs(castle, castellan, mods, smartness) {
+        if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'internal:start');
+
         // ① 大名を取得します（全体で使う用）
         const daimyo = this.game.getClanDaimyo(castle.ownerClan) || castellan;
 
@@ -1517,10 +1522,11 @@ class AIEngine {
         const reachableMyCastles = [];
         const visitedCastles = new Set();
         const searchQueue = [castle];
+        let searchHead = 0;
         visitedCastles.add(castle.id);
 
-        while (searchQueue.length > 0) {
-            const current = searchQueue.shift();
+        while (searchHead < searchQueue.length) {
+            const current = searchQueue[searchHead++];
             // 自分のお城もリストに入れておきます（後で便利です）
             reachableMyCastles.push(current);
 
@@ -2247,6 +2253,7 @@ class AIEngine {
             if (this.game.aiStaffing && !isSrcHeavySnow) {
                 // ★追加：移動先として大雪の城を除外したリストを渡します！
                 const validReachableCastles = reachableMyCastles.filter(c => !heavySnowProvIds.has(c.provinceId));
+                if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'internal:plan_move');
                 const moveActions = this.game.aiStaffing.planMoveAction(castle, availableBushos, validReachableCastles);
                 if (moveActions && moveActions.length > 0) {
                     // 何人もの移動リストを、そのまま全部行動の候補に追加します！
@@ -2449,6 +2456,13 @@ class AIEngine {
                             maxError = 0.3 * (95 - evaluatorInt) / 45;
                         }
                         
+                        if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, `internal:strategy_scan:${enemyBushos.length}`);
+
+                        // ★軽量化：同じ敵勢力についての「一門・役職」早見表は1回だけ作ります。
+                        const officerStatusContext = (this.game.strategySystem && typeof this.game.strategySystem.buildOfficerStatusContext === 'function')
+                            ? this.game.strategySystem.buildOfficerStatusContext(memoryClanId)
+                            : null;
+
                         enemyBushos.forEach(targetBusho => {
                             // ターゲット個別の「優先度」を計算します
                             let targetPriority = 0;
@@ -2482,7 +2496,7 @@ class AIEngine {
                             }
 
                             // ★修正：ターゲットが役職者本人か、役職持ち一門か、ただの一門かでAIの優先度ダウンを分けます（一元化対応）
-                            const officerStatus = this.game.strategySystem.checkOfficerStatus(targetBusho);
+                            const officerStatus = this.game.strategySystem.checkOfficerStatus(targetBusho, officerStatusContext);
                             if (officerStatus === 3) {
                                 targetPriority -= 30; // 役職者本人の場合は成功率がガクッと下がるので一番大きく優先度を下げる
                             } else if (officerStatus === 2) {

@@ -87,11 +87,13 @@ class AffiliationSystem {
             }
         }
 
-        // ★ここから追加：人が増えたり減ったりしたので、派閥を新しく組み直す魔法を呼び出します！
+        // ★軽量化：所属が変化した大名家だけ派閥を再編します。
+        // 派閥は大名家ごとに独立しているため、全国全勢力を作り直す必要はありません。
         if (this.game && this.game.factionSystem) {
-            this.game.factionSystem.updateFactions();
+            if (oldClanId !== 0 && oldClanId !== newClanId) this.game.factionSystem.updateFactions(oldClanId);
+            if (newClanId !== 0) this.game.factionSystem.updateFactions(newClanId);
         }
-        
+
         // 画面の絵をすぐに描き直す魔法！
         this.updateUI();
     }
@@ -121,7 +123,7 @@ class AffiliationSystem {
         busho._lastClanId = oldClanId;
 
         // ★大名家が滅亡したかどうかのチェック（元いた大名家の城が0個なら滅亡と判断します）
-        const isClanDestroyed = (oldClanId !== 0) && (this.game.castles.filter(c => c.ownerClan === oldClanId).length === 0);
+        const isClanDestroyed = (oldClanId !== 0) && (this.game.getClanCastles(oldClanId).length === 0);
         
         // ★変更：スキルマネージャーに滅亡時の生存（諸勢力化）スキルがないか聞きに行きます
         // （プレイヤー大名の場合はこの魔法は使わずに通常のゲームオーバーへ進ませます！）
@@ -192,7 +194,7 @@ class AffiliationSystem {
         
         // ★追加：大名家が滅亡したわけではない場合（追放や出奔）、元主君を宿敵として記録します
         if (oldClanId !== 0 && !isClanDestroyed) {
-            const daimyo = this.game.bushos.find(b => b.clan === oldClanId && b.isDaimyo);
+            const daimyo = this.game.getClanDaimyo(oldClanId);
             if (daimyo && busho.id !== daimyo.id && !busho.nemesisIds.includes(daimyo.id)) {
                 const nemesisCount = (reason === 'banish') ? 180 : 60;
                 busho.nemesisList.push({ id: daimyo.id, count: nemesisCount });
@@ -260,9 +262,9 @@ class AffiliationSystem {
             this.enterCastle(busho, nextCastleId);
         }
 
-        // ★ここから追加：人が減ったので、派閥を新しく組み直す魔法を呼び出します！
-        if (this.game && this.game.factionSystem) {
-            this.game.factionSystem.updateFactions();
+        // ★軽量化：抜けた元大名家だけ派閥を再編します。
+        if (this.game && this.game.factionSystem && oldClanId !== 0) {
+            this.game.factionSystem.updateFactions(oldClanId);
         }
 
         // ★ここから追加：画面の絵をすぐに描き直す魔法！
@@ -352,7 +354,7 @@ class AffiliationSystem {
             }
         });
 
-        if (this.game && this.game.factionSystem) this.game.factionSystem.updateFactions();
+        if (this.game && this.game.factionSystem && oldClanId !== 0) this.game.factionSystem.updateFactions(oldClanId);
         
         // 画面の絵をすぐに描き直す魔法！
         this.updateUI();
@@ -461,8 +463,8 @@ class AffiliationSystem {
         // ★高速化：持ち城索引（getClanCastles）を作り直してもらうための合図です
         this.game.castleOwnershipVersion = (this.game.castleOwnershipVersion || 0) + 1;
 
-        // 画面の絵をすぐに描き直す魔法！
-        this.updateUI();
+        // 所有者変更は領土色そのものが変わるため、観戦中もここだけは即時反映します。
+        this.updateUI(true);
     }
 
     /**
@@ -530,7 +532,7 @@ class AffiliationSystem {
      */
     updateLoyaltyForNewLord(busho, clanId) {
         // 新しい殿様（大名）を探します
-        const daimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo) || { affinity: 50 };
+        const daimyo = this.game.getClanDaimyo(clanId) || { affinity: 50 };
         
         // 殿様との相性の「ズレ（差）」を計算します（0〜50の数字になります）
         const affDiff = GameSystem.calcAffinityDiff(daimyo.affinity, busho.affinity);
@@ -545,17 +547,27 @@ class AffiliationSystem {
     /**
      * （共通の道具）画面の絵をすぐに描き直す魔法！
      */
-    updateUI() {
-        if (this.game && this.game.ui) {
-            try {
-                this.game.ui.renderMap();
-                // パネルが開いている（お城が選択されている）時だけ更新するように安全対策をします
-                if (this.game.ui.currentCastle && typeof this.game.ui.updatePanelHeader === 'function') {
-                    this.game.ui.updatePanelHeader();
-                }
-            } catch (e) {
-                console.warn("UI更新をスキップしました", e);
+    updateUI(forceDuringAI = false) {
+        if (!this.game || !this.game.ui) return;
+
+        // ★最重要安定化：
+        // AI思考中の武将移動・登用・下野のたびに renderMap() を呼ぶと、
+        // 城DOM再生成＋雪レイヤー＋領土色ImageData更新が短時間に何度も重なります。
+        // AI中は内部データだけ更新し、次に通常画面を描くタイミングまで延期します。
+        if (this.game.isProcessingAI && !forceDuringAI) {
+            this.game._aiDeferredMapRefresh = true;
+            return;
+        }
+
+        try {
+            this.game.ui.renderMap();
+            this.game._aiDeferredMapRefresh = false;
+            // パネルが開いている（お城が選択されている）時だけ更新するように安全対策をします
+            if (this.game.ui.currentCastle && typeof this.game.ui.updatePanelHeader === 'function') {
+                this.game.ui.updatePanelHeader();
             }
+        } catch (e) {
+            console.warn("UI更新をスキップしました", e);
         }
     }
     
@@ -581,8 +593,14 @@ class AffiliationSystem {
             const currentGunshi = this.game.getClanGunshi(castle.ownerClan);
             if (!currentGunshi) {
                 const daimyoFactionId = castellan.factionId;
-                const myClanBushos = this.game.bushos.filter(b => b.clan === castle.ownerClan && b.status === 'active');
-                
+                // ★軽量化：全国4000人を走査せず、当家の持ち城名簿だけから集めます。
+                const myClanBushos = [];
+                this.game.getClanCastles(castle.ownerClan).forEach(c => {
+                    this.game.getCastleBushos(c.id).forEach(b => {
+                        if (b.clan === castle.ownerClan && b.status === 'active') myClanBushos.push(b);
+                    });
+                });
+
                 let candidates = myClanBushos.filter(b => 
                     !b.isDaimyo && 
                     !b.isCastellan && 

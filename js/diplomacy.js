@@ -20,7 +20,7 @@ class DiplomacyManager {
      * データが存在しない場合はデフォルト値を生成して返します
      */
     getDiplomacyData(clanId, targetId) {
-        const clan = this.game.clans.find(c => Number(c.id) === Number(clanId));
+        const clan = this.game.getClan(clanId);
         if (!clan) return null;
 
         if (!clan.diplomacyValue) {
@@ -29,7 +29,7 @@ class DiplomacyManager {
 
         if (!clan.diplomacyValue[targetId]) {
             // 相手側(targetId)のデータに自分(clanId)への設定があるか確認します
-            const targetClan = this.game.clans.find(c => Number(c.id) === Number(targetId));
+            const targetClan = this.game.getClan(targetId);
             if (targetClan && targetClan.diplomacyValue && targetClan.diplomacyValue[clanId]) {
                 // もし相手側が設定を持っていれば、同じ値をコピーします
                 const oppData = targetClan.diplomacyValue[clanId];
@@ -209,8 +209,8 @@ class DiplomacyManager {
                 const isFriendlyWithThreat = targetToThreatRel && ['同盟', '支配', '従属', '友好'].includes(targetToThreatRel.status);
                 if (!isFriendlyWithThreat) {
                     let isAdjacent = false;
-                    const threatCastles = this.game.castles.filter(cas => cas.ownerClan === mainThreatId);
-                    const targetCastles = this.game.castles.filter(cas => cas.ownerClan === targetClanId);
+                    const threatCastles = this.game.getClanCastles(mainThreatId);
+                    const targetCastles = this.game.getClanCastles(targetClanId);
                     
                     for (let tc of targetCastles) {
                         for (let mc of threatCastles) {
@@ -382,7 +382,7 @@ class DiplomacyManager {
             }
 
             if (type === 'subordinate') {
-                const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+                const targetDaimyo = this.game.getClanDaimyo(targetClanId);
                 const targetDuty = targetDaimyo ? targetDaimyo.duty : 50;
                 acceptProb += (targetDuty - 50); 
             } else if (type === 'truce') {
@@ -461,8 +461,8 @@ class DiplomacyManager {
 
         // ★追加：使者を送った側の大名が、送られた側の大名の宿敵リストに入っている場合は確率を半減
         if (finalProb > 0) {
-            const doerDaimyo = this.game.bushos.find(b => b.clan === doerClanId && b.isDaimyo);
-            const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+            const doerDaimyo = this.game.getClanDaimyo(doerClanId);
+            const targetDaimyo = this.game.getClanDaimyo(targetClanId);
             
             if (doerDaimyo && targetDaimyo && targetDaimyo.nemesisIds && targetDaimyo.nemesisIds.includes(doerDaimyo.id)) {
                 finalProb = Math.floor(finalProb / 2);
@@ -513,7 +513,7 @@ class DiplomacyManager {
             const helperToEnemyRel = (enemyClanId === 0) ? null : this.getRelation(helperForceId, enemyClanId);
             helperToEnemySentiment = helperToEnemyRel ? helperToEnemyRel.sentiment : 50;
             
-            const helperDaimyo = this.game.bushos.find(b => b.clan === helperForceId && b.isDaimyo);
+            const helperDaimyo = this.game.getClanDaimyo(helperForceId);
             duty = helperDaimyo ? helperDaimyo.duty : 50;
         }
 
@@ -610,8 +610,8 @@ class DiplomacyManager {
 
         // ★追加：要請した側の大名が、要請された側の大名の宿敵なら確率半減
         if (!isKunishu && prob > 0) {
-            const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo);
-            const helperDaimyo = this.game.bushos.find(b => b.clan === helperForceId && b.isDaimyo);
+            const myDaimyo = this.game.getClanDaimyo(myClanId);
+            const helperDaimyo = this.game.getClanDaimyo(helperForceId);
             if (myDaimyo && helperDaimyo && helperDaimyo.nemesisIds && helperDaimyo.nemesisIds.includes(myDaimyo.id)) {
                 prob = Math.floor(prob / 2);
             }
@@ -910,7 +910,7 @@ class DiplomacyManager {
             greetMsg1 = `「${receiverCallName}。重大な用件ゆえ、此度はわし自ら参りました」`;
             greetMsg2 = `「これは${senderCallName}……して、どのような御用向きでござるか？」`;
         } else {
-            const senderDaimyo = this.game.bushos.find(b => b.clan === senderBusho.clan && b.isDaimyo);
+            const senderDaimyo = this.game.getClanDaimyo(senderBusho.clan);
             let daimyoRef = "当主";
             if (senderDaimyo) {
                 // 官位システムが持っている将軍IDを使います
@@ -1049,7 +1049,7 @@ class DiplomacyManager {
             }
 
             if (doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
-                const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+                const targetDaimyo = this.game.getClanDaimyo(targetClanId);
                 if (targetDaimyo) await this.playDiplomacyConversation(doer, targetDaimyo, type, isSuccess);
             }
 
@@ -1076,7 +1076,7 @@ class DiplomacyManager {
             let isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, type);
 
             if (doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
-                const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+                const targetDaimyo = this.game.getClanDaimyo(targetClanId);
                 if (targetDaimyo) await this.playDiplomacyConversation(doer, targetDaimyo, type, isSuccess);
             }
 
@@ -1327,7 +1327,7 @@ class DiplomacyManager {
             this.calcDiplomacyExp(doer, type, isSuccess || canNegotiate, true);
 
             if (doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
-                const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+                const targetDaimyo = this.game.getClanDaimyo(targetClanId);
                 if (targetDaimyo) {
                     let convSuccess = false;
                     if (isSuccess) convSuccess = true;
@@ -1409,7 +1409,7 @@ class DiplomacyManager {
             this.calcDiplomacyExp(doer, type, isSuccess || canNegotiate, true);
 
             if (doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
-                const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+                const targetDaimyo = this.game.getClanDaimyo(targetClanId);
                 if (targetDaimyo) {
                     let convSuccess = false;
                     if (isSuccess) convSuccess = true;
@@ -1499,7 +1499,7 @@ class DiplomacyManager {
             }
 
             if (doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
-                const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+                const targetDaimyo = this.game.getClanDaimyo(targetClanId);
                 if (targetDaimyo) await this.playDiplomacyConversation(doer, targetDaimyo, type, isSuccess);
             }
 
@@ -1560,7 +1560,7 @@ class DiplomacyManager {
         if (myCastles.length === 0) return;
 
         const myLegionCastles = myCastles.filter(c => c.legionId === castleA.legionId);
-        const daimyo = this.game.bushos.find(b => b.clan === subordinateClanId && b.isDaimyo);
+        const daimyo = this.game.getClanDaimyo(subordinateClanId);
         const isDaimyoInA = (daimyo && daimyo.castleId === castleId);
         const commanderInA = this.game.bushos.find(b => b.castleId === castleId && b.isCommander && b.status === 'active');
 
@@ -1734,7 +1734,7 @@ class DiplomacyManager {
 
         if (availablePrincess) {
             const domBushos = this.game.bushos.filter(b => b.clan === dominantClanId && b.status === 'active' && !b.female);
-            const domDaimyo = this.game.bushos.find(b => b.clan === dominantClanId && b.isDaimyo);
+            const domDaimyo = this.game.getClanDaimyo(dominantClanId);
             
             domBushos.sort((a, b) => {
                 const getWeight = (target) => {
@@ -1759,7 +1759,7 @@ class DiplomacyManager {
             }
         }
 
-        const daimyo = this.game.bushos.find(b => b.clan === subordinateClanId && b.isDaimyo);
+        const daimyo = this.game.getClanDaimyo(subordinateClanId);
         let hostage = null;
         if (daimyo) {
             const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
@@ -1851,7 +1851,7 @@ class DiplomacyManager {
         if (!hostage) return;
 
         // 相手の大名（当主）がどこにいるか探します
-        const dominantDaimyo = this.game.bushos.find(b => b.clan === dominantClanId && b.isDaimyo);
+        const dominantDaimyo = this.game.getClanDaimyo(dominantClanId);
         const targetCastleId = dominantDaimyo ? dominantDaimyo.castleId : null;
 
         if (!targetCastleId) return;
@@ -1942,7 +1942,7 @@ class DiplomacyManager {
         const isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, 'marriage');
         
         if (doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
-            const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+            const targetDaimyo = this.game.getClanDaimyo(targetClanId);
             // ★変更：会話処理に向けて、姫と対象武将のオブジェクトをパスします
             if (targetDaimyo) await this.playDiplomacyConversation(doer, targetDaimyo, 'marriage', isSuccess, princess, targetBusho);
         }
@@ -1985,7 +1985,7 @@ class DiplomacyManager {
         const doer = this.game.getBusho(doerId);
 
         if (doer && doer.clan === this.game.playerClanId && targetClanId !== this.game.playerClanId) {
-            const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+            const targetDaimyo = this.game.getClanDaimyo(targetClanId);
             if (targetDaimyo) await this.playDiplomacyConversation(doer, targetDaimyo, 'vassalage', true);
         }
         
@@ -2053,8 +2053,8 @@ class DiplomacyManager {
         }
 
         const targetClan = this.game.clans.find(c => c.id === targetClanId);
-        const myDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
-        const enemyDaimyo = this.game.bushos.find(b => b.clan === doer.clan && b.isDaimyo);
+        const myDaimyo = this.game.getClanDaimyo(targetClanId);
+        const enemyDaimyo = this.game.getClanDaimyo(doer.clan);
         
         let myCastle = null;
         if (myDaimyo) myCastle = this.game.getCastle(myDaimyo.castleId);
@@ -2213,7 +2213,7 @@ class DiplomacyManager {
                 }
 
                 // 2. 人質
-                const reqDaimyo = this.game.bushos.find(b => b.clan === doer.clan && b.isDaimyo);
+                const reqDaimyo = this.game.getClanDaimyo(doer.clan);
                 if (reqDaimyo) {
                     const dFamily = Array.isArray(reqDaimyo.familyIds) ? reqDaimyo.familyIds : [];
                     const kinsmen = this.game.bushos.filter(b => {
@@ -3002,7 +3002,7 @@ class DiplomacyManager {
             }
 
             // 2. 差し出せる一門武将が3人以下の場合は絶対に差し出さない（4人以上いる時だけ候補にする）
-            const reqDaimyo = this.game.bushos.find(b => b.clan === requestClanId && b.isDaimyo);
+            const reqDaimyo = this.game.getClanDaimyo(requestClanId);
             if (reqDaimyo) {
                 const dFamily = Array.isArray(reqDaimyo.familyIds) ? reqDaimyo.familyIds : [];
                 const kinsmen = this.game.bushos.filter(b => {
@@ -3073,7 +3073,7 @@ class DiplomacyManager {
 
         if (availablePrincess) {
             const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && b.status === 'active' && !b.female);
-            const tgtDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+            const tgtDaimyo = this.game.getClanDaimyo(targetClanId);
             
             tgtBushos.sort((a, b) => {
                 const getWeight = (target) => {
@@ -3098,7 +3098,7 @@ class DiplomacyManager {
             }
         }
 
-        const daimyo = this.game.bushos.find(b => b.clan === requestClanId && b.isDaimyo);
+        const daimyo = this.game.getClanDaimyo(requestClanId);
         let hostage = null;
         if (daimyo) {
             const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];

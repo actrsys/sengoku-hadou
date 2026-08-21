@@ -69,34 +69,67 @@ class StrategySystem {
     
     // ★追加：対象が役職者本人か、役職持ちの一門か、ただの一門かなどを判定する魔法です（一元化）
     // 戻り値：3(役職者本人), 2(役職持ちの一門), 1(同じ勢力に一門がいる), 0(それ以外)
-    checkOfficerStatus(targetBusho) {
+
+    // ★軽量化：AIが同じ敵勢力の武将を何十人も評価する時に使う早見表を1回だけ作ります。
+    // familyIds の「共通IDがあるか」という従来判定をそのまま、人数カウントと役職者Setへ変換します。
+    buildOfficerStatusContext(clanId) {
+        const numericClanId = Number(clanId);
+        const familyCounts = new Map();
+        const officerFamilyIds = new Set();
+        const memberIds = new Set();
+
+        const clanCastles = this.game.getClanCastles(numericClanId);
+        for (const c of clanCastles) {
+            const members = this.game.getCastleBushos(c.id);
+            for (const b of members) {
+                if (!b || Number(b.clan) !== numericClanId || b.status !== 'active') continue;
+                memberIds.add(Number(b.id));
+                const seen = new Set(Array.isArray(b.familyIds) ? b.familyIds : []);
+                const isOfficer = !!(b.isDaimyo || b.isCastellan || b.isCommander || b.isGunshi);
+                for (const fId of seen) {
+                    familyCounts.set(fId, (familyCounts.get(fId) || 0) + 1);
+                    if (isOfficer) officerFamilyIds.add(fId);
+                }
+            }
+        }
+
+        return { clanId: numericClanId, familyCounts, officerFamilyIds, memberIds };
+    }
+
+    checkOfficerStatus(targetBusho, context = null) {
+        if (!targetBusho) return 0;
+
         // レベル3: 役職者本人
         if (targetBusho.isDaimyo || targetBusho.isCastellan || targetBusho.isCommander || targetBusho.isGunshi) {
             return 3;
         }
-        
-        // 同じ勢力にいる、自分以外の活動中の武将を集めます
-        const sameClanBushos = [];
-        const clanCastles = this.game.getClanCastles(targetBusho.clan);
-        clanCastles.forEach(c => {
-            const bList = this.game.getCastleBushos(c.id).filter(b => b.id !== targetBusho.id && b.status === 'active');
-            sameClanBushos.push(...bList);
-        });
-        
-        // その中に一門の武将がいるか探します
-        const familyInClan = sameClanBushos.filter(b => b.familyIds && targetBusho.familyIds && b.familyIds.some(fId => targetBusho.familyIds.includes(fId)));
-        
-        if (familyInClan.length > 0) {
-            // 一門の中に役職持ちがいるかチェックします
-            const hasOfficerFamily = familyInClan.some(b => b.isDaimyo || b.isCastellan || b.isCommander || b.isGunshi);
-            if (hasOfficerFamily) {
+
+        const targetClanId = Number(targetBusho.clan);
+        if (targetClanId <= 0 || !Array.isArray(targetBusho.familyIds) || targetBusho.familyIds.length === 0) return 0;
+
+        const ctx = (context && Number(context.clanId) === targetClanId)
+            ? context
+            : this.buildOfficerStatusContext(targetClanId);
+
+        let hasFamily = false;
+        // 早見表の城内名簿に対象本人が実際に含まれている時だけ、本人1人分を差し引きます。
+        // セーブ移行直後など名簿が一時的に不整合でも、従来の「target本人を除外」と同じ結果を保ちます。
+        const ownContribution = ctx.memberIds && ctx.memberIds.has(Number(targetBusho.id)) ? 1 : 0;
+        const seenTargetIds = new Set();
+
+        for (const fId of targetBusho.familyIds) {
+            if (seenTargetIds.has(fId)) continue;
+            seenTargetIds.add(fId);
+
+            if (ctx.officerFamilyIds.has(fId)) {
                 return 2; // レベル2: 役職持ちの一門がいる
-            } else {
-                return 1; // レベル1: （役職は持っていないが）一門がいる
+            }
+            if ((ctx.familyCounts.get(fId) || 0) > ownContribution) {
+                hasFamily = true;
             }
         }
 
-        return 0; // レベル0: どれにも当てはまらない
+        return hasFamily ? 1 : 0;
     }
     
     // ==========================================

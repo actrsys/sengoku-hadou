@@ -1493,8 +1493,55 @@ class GameManager {
         
         this.hasAutoSavedThisMonth = false; // ★追加：その月にオートセーブしたかどうかを覚えておく箱です
         this.phase = 'title';
+
+        // ★実機診断：強制リロード前にAIがどこまで進んでいたか、同一タブのsessionStorageから復元します。
+        setTimeout(() => this._showPreviousAIDiagnostic(), 0);
     }
-    
+
+    writeAIDiagnostic(castle, phase) {
+        // PCでは再現していないため、余計な同期ストレージ書込を避けてスマホ版だけ記録します。
+        if (typeof sessionStorage === 'undefined') return;
+        if (document.body && document.body.classList.contains('is-pc')) return;
+        try {
+            const data = {
+                year: this.year,
+                month: this.month,
+                index: this.currentIndex + 1,
+                total: this.turnQueue ? this.turnQueue.length : 0,
+                castleId: castle ? castle.id : 0,
+                castleName: castle ? castle.name : '',
+                clanId: castle ? castle.ownerClan : 0,
+                phase: phase || '',
+                time: Date.now()
+            };
+            sessionStorage.setItem('sengoku_ai_last_checkpoint_v1', JSON.stringify(data));
+            const oldBadge = document.getElementById('ai-last-checkpoint-badge');
+            if (oldBadge) oldBadge.remove();
+        } catch (e) {
+        }
+    }
+
+    _showPreviousAIDiagnostic() {
+        if (typeof sessionStorage === 'undefined') return;
+        try {
+            const raw = sessionStorage.getItem('sengoku_ai_last_checkpoint_v1');
+            if (!raw) return;
+            const data = JSON.parse(raw);
+            if (!data || data.phase === 'turn_finished') return;
+            if (data.time && Date.now() - data.time > 2 * 60 * 60 * 1000) return;
+            if (document.getElementById('ai-last-checkpoint-badge')) return;
+
+            const el = document.createElement('div');
+            el.id = 'ai-last-checkpoint-badge';
+            el.textContent = `前回AI停止位置: ${data.index || '?'} / ${data.total || '?'}　${data.castleName || '城'}(ID:${data.castleId || '?'})　${data.phase || '不明'}`;
+            el.title = 'タップすると閉じます';
+            el.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:20000;max-width:calc(100vw - 16px);padding:6px 9px;background:rgba(0,0,0,.82);color:#fff;font-size:11px;line-height:1.35;border-radius:5px;pointer-events:auto;';
+            el.onclick = () => el.remove();
+            document.body.appendChild(el);
+        } catch (e) {
+        }
+    }
+
     getRelation(id1, id2) { 
         const rel = this.diplomacyManager.getRelation(id1, id2); 
         if (rel) {
@@ -2802,6 +2849,8 @@ class GameManager {
     }
     
     async finishTurn() { 
+        const wasProcessingAI = this.isProcessingAI;
+
         // ★最強ストッパー２：合戦中やマップ選択中なら、絶対にターンを勝手に終わらせない！
         if (this.warManager && this.warManager.state && this.warManager.state.active) return; 
         if (this.selectionMode != null) return;
@@ -2833,13 +2882,15 @@ class GameManager {
 
         const castle = this.getCurrentTurnCastle(); 
         if(castle) {
-            castle.isDone = true; 
+            castle.isDone = true;
+            if (wasProcessingAI) this.writeAIDiagnostic(castle, 'turn_end:event');
             // ★イベント追加：各城の行動終了直後
             if (this.eventManager) {
                 await this.eventManager.processEvents('turn_end', castle);
             }
+            if (wasProcessingAI) this.writeAIDiagnostic(castle, 'turn_finished');
         }
-        
+
         this.currentIndex++; 
         // ★追加：ターンが終わって次に行く時も、スマホがパンクしないように一瞬「息継ぎ」をさせます！
         setTimeout(() => {
