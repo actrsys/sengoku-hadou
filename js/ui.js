@@ -1786,8 +1786,8 @@ class UIManager {
 
                         // 下の説明用の窓に文章を出して、見えるようにします
                         if (descBox) {
-                            descBox.innerHTML = `<strong style="font-size:1.1rem;">${s.name}</strong><br><br>${s.desc}`;
-                            descBox.style.display = 'block';
+                            descBox.innerHTML = `<div class="scenario-desc-text">${s.desc}</div>`;
+                            descBox.style.display = 'flex';
                         }
                     }
                 };
@@ -1798,8 +1798,8 @@ class UIManager {
                     div.classList.add('selected');
                     selectedScenario = s;
                     if (descBox) {
-                        descBox.innerHTML = `<strong style="font-size:1.1rem;">${s.name}</strong><br><br>${s.desc}`;
-                        descBox.style.display = 'block';
+                        descBox.innerHTML = `<div class="scenario-desc-text">${s.desc}</div>`;
+                        descBox.style.display = 'flex';
                     }
                 }
             });
