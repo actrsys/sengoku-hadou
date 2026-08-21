@@ -533,6 +533,69 @@ class UIManager {
         });
     }
 
+    // ★Round 9：会話用の顔画像を、DOMへ出す前に読み込み・デコードしておきます。
+    // 古いスマホで src 差し替え直後に旧画像の一部が残る描画破綻を避けるための処理です。
+    async _prepareDialogFaceImage(faceIcon) {
+        if (!faceIcon || typeof Image === 'undefined') return null;
+
+        const loadOne = async (src) => {
+            const img = new Image();
+            img.alt = '';
+            img.draggable = false;
+            img.loading = 'eager';
+            img.decoding = 'async';
+            img.width = 85;
+            img.height = 85;
+            img.src = src;
+
+            const waitLoad = () => new Promise(resolve => {
+                if (img.complete) {
+                    resolve(img.naturalWidth > 0);
+                    return;
+                }
+                let settled = false;
+                const done = (ok) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    img.onload = null;
+                    img.onerror = null;
+                    resolve(ok);
+                };
+                const timer = setTimeout(() => done(false), 1500);
+                img.onload = () => done(img.naturalWidth > 0);
+                img.onerror = () => done(false);
+            });
+
+            try {
+                if (typeof img.decode === 'function') {
+                    await img.decode();
+                    if (img.naturalWidth > 0) return img;
+                }
+            } catch (e) {
+                // decode() が失敗した場合も、通常の load 完了を確認してからフォールバックします。
+            }
+
+            return (await waitLoad()) ? img : null;
+        };
+
+        const primarySrc = `data/images/faceicons/${faceIcon}`;
+        let img = await loadOne(primarySrc);
+        if (!img && faceIcon !== 'unknown_face.webp') {
+            img = await loadOne('data/images/faceicons/unknown_face.webp');
+        }
+        return img;
+    }
+
+    _prepareDialogFaces(customOpts) {
+        const leftFace = customOpts?.leftFace || null;
+        const rightFace = customOpts?.rightFace || null;
+        return Promise.all([
+            this._prepareDialogFaceImage(leftFace),
+            this._prepareDialogFaceImage(rightFace)
+        ]).then(([leftImg, rightImg]) => ({ leftImg, rightImg }));
+    }
+
     showDialogAsync(msg, isConfirm = false, autoCloseTime = 0, customOpts = null) {
         // ★追加：確認ダイアログ（はい/いいえ等）や、複数の選択肢があるかをチェックします
         const hasChoices = isConfirm || (customOpts && customOpts.choices && customOpts.choices.length > 0);
@@ -541,8 +604,9 @@ class UIManager {
         if (this.game && this.game.isWatchMode && autoCloseTime === 0 && !hasChoices) {
             autoCloseTime = 1000;
         }
+        const faceLoadPromise = this._prepareDialogFaces(customOpts);
         return new Promise(resolve => {
-            this.dialogQueue.push({ msg, isConfirm, onOk: resolve, onCancel: resolve, autoCloseTime, customOpts });
+            this.dialogQueue.push({ msg, isConfirm, onOk: resolve, onCancel: resolve, autoCloseTime, customOpts, faceLoadPromise });
             if (!this.isDialogShowing) {
                 this.processDialogQueue();
             }
@@ -558,13 +622,14 @@ class UIManager {
         if (this.game && this.game.isWatchMode && !hasChoices) {
             autoCloseTime = 1000;
         }
-        this.dialogQueue.push({ msg, isConfirm, onOk, onCancel, autoCloseTime: autoCloseTime, customOpts });
+        const faceLoadPromise = this._prepareDialogFaces(customOpts);
+        this.dialogQueue.push({ msg, isConfirm, onOk, onCancel, autoCloseTime: autoCloseTime, customOpts, faceLoadPromise });
         if (!this.isDialogShowing) {
             this.processDialogQueue();
         }
     }
     
-    processDialogQueue() {
+    async processDialogQueue() {
         if (this.dialogQueue.length === 0) {
             this.isDialogShowing = false;
             return;
@@ -634,27 +699,44 @@ class UIManager {
         let rightFace = dialog.customOpts?.rightFace;
         let rightName = dialog.customOpts?.rightName;
 
+        let movedRightFaceToLeft = false;
         if (!document.body.classList.contains('is-pc')) {
             // 右側にしか設定されていない場合は左側に移動します
             if (rightFace && !leftFace) {
                 leftFace = rightFace;
                 leftName = rightName;
+                movedRightFaceToLeft = true;
             }
             // 右側は常にクリアして空っぽにします
             rightFace = null;
             rightName = null;
         }
         
-        // 顔画像のサイズを 85px に大きくし、名前を枠に重ねるための準備をします
-        const setFaceAndName = (faceEl, nameEl, faceIcon, nameText) => {
+        // ★Round 9：次の顔画像は、完全に読み込み・デコードしてから1回でDOMへ差し替えます。
+        // ダイアログをキューに入れた時点から先読みしているので、通常はここで待たされません。
+        let preparedFaces = { leftImg: null, rightImg: null };
+        try {
+            preparedFaces = dialog.faceLoadPromise ? await dialog.faceLoadPromise : await this._prepareDialogFaces(dialog.customOpts);
+        } catch (e) {
+            console.warn('会話用顔画像の事前デコードに失敗しました:', e);
+        }
+        if (movedRightFaceToLeft) {
+            preparedFaces.leftImg = preparedFaces.rightImg;
+            preparedFaces.rightImg = null;
+        }
+
+        const setFaceAndName = (faceEl, nameEl, faceIcon, nameText, preparedImg) => {
             let hasContent = false;
             if (faceEl) {
-                if (faceIcon) {
-                    // 画像サイズをギリギリまで（85px）大きくします
-                    faceEl.innerHTML = `<div class="sp-face-wrapper" style="margin: 0; width: 85px; height: 85px;"><img src="data/images/faceicons/${faceIcon}" onerror="this.src='data/images/faceicons/unknown_face.webp'"></div>`;
+                // 前の画像を確実にDOMから外してから、新しい画像を入れます。
+                faceEl.replaceChildren();
+                if (faceIcon && preparedImg) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'sp-face-wrapper dialog-face-wrapper';
+                    preparedImg.className = 'dialog-face-img';
+                    wrapper.appendChild(preparedImg);
+                    faceEl.appendChild(wrapper);
                     hasContent = true;
-                } else {
-                    faceEl.innerHTML = '';
                 }
             }
             if (nameEl) {
@@ -669,22 +751,21 @@ class UIManager {
             
             // どちらか一方しかいない場合は、いない方のスペースを消して詰め、メッセージを広くします
             if (faceEl && faceEl.parentElement) {
-                if (hasContent) {
-                    faceEl.parentElement.style.display = 'flex';
-                } else {
-                    faceEl.parentElement.style.display = 'none';
-                }
+                faceEl.parentElement.style.display = hasContent ? 'flex' : 'none';
             }
         };
 
-        setFaceAndName(leftFaceEl, leftNameEl, leftFace, leftName);
-        setFaceAndName(rightFaceEl, rightNameEl, rightFace, rightName);
+        setFaceAndName(leftFaceEl, leftNameEl, leftFace, leftName, preparedFaces.leftImg);
+        setFaceAndName(rightFaceEl, rightNameEl, rightFace, rightName, preparedFaces.rightImg);
         
         let autoCloseTimer = null;
 
         const cleanupAndNext = (callback) => {
             if (autoCloseTimer) clearTimeout(autoCloseTimer);
             modal.classList.add('hidden');
+            // ★Round 9：前の顔画像を非表示状態で即座に破棄し、旧画像レイヤーを次の会話へ持ち越しません。
+            if (leftFaceEl) leftFaceEl.replaceChildren();
+            if (rightFaceEl) rightFaceEl.replaceChildren();
             
             this.restoreAIGuard();
 
@@ -697,9 +778,13 @@ class UIManager {
             this.isDialogShowing = false;
 
             const executeNext = () => {
-                setTimeout(() => {
-                    this.processDialogQueue();
-                }, 10);
+                const runNext = () => this.processDialogQueue();
+                // 1フレーム空けて、古い画像レイヤーの破棄をブラウザへ確定させてから次の顔を表示します。
+                if (typeof requestAnimationFrame === 'function') {
+                    requestAnimationFrame(() => setTimeout(runNext, 0));
+                } else {
+                    setTimeout(runNext, 16);
+                }
             };
 
             try {

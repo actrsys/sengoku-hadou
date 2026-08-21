@@ -13,15 +13,21 @@ button, input, select, textarea, label, a, .cmd-btn, .title-btn, .zoom-btn, .sel
     src: url('../data/fonts/fude-goshirae.woff2?v=1') format('woff2'); /* ファイルへの道順 */
     font-weight: normal;
     font-style: normal;
-    font-display: block;
+    font-display: swap;
 }
 @font-face {
     font-family: 'abashiri-mincho';
     src: url('../data/fonts/abashiri-mincho.woff2?v=1') format('woff2');
     font-weight: normal;
     font-style: normal;
-    font-display: block;
+    font-display: swap;
 }
+
+/* ★Round 8: フォント明示ロード完了までは初期画面だけ隠し、
+   読込失敗・タイムアウト時はフォールバックで必ず表示します。 */
+html.fonts-loading body { visibility: hidden; }
+html.fonts-ready body,
+html.fonts-fallback body { visibility: visible; }
 
 :root {
     --bg-color: #eceff1;
@@ -226,6 +232,25 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 .sp-info-body { display: flex; padding: 3px 5px; background: transparent; border-bottom: 1px solid rgba(255,255,255,0.2); }
 .sp-face-wrapper { width: 50px; height: 50px; margin-right: 8px; flex-shrink: 0; border: 1.5px solid #fff; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); overflow: hidden; }
 .sp-face-wrapper img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ★Round 9：会話顔画像専用。GPU合成の癖に依存せず、デコード済み画像を静的に1枚描画します。 */
+.dialog-face-wrapper {
+    width: 85px;
+    height: 85px;
+    margin: 0;
+    flex: 0 0 85px;
+    overflow: hidden;
+}
+.dialog-face-wrapper .dialog-face-img {
+    display: block;
+    width: 85px;
+    height: 85px;
+    object-fit: cover;
+    image-rendering: auto;
+    transform: none !important;
+    will-change: auto !important;
+    backface-visibility: visible;
+}
 .sp-params-grid { display: grid; grid-template-columns: auto auto auto auto auto 50px; column-gap: 3px; row-gap: 1px; flex: 1; align-items: center; }
 .sp-label { display: flex; align-items: center; color: #ffd54f; font-size: 0.8rem; height: 100%; white-space: nowrap; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .sp-val { display: flex; align-items: center; justify-content: flex-end; height: 100%; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }

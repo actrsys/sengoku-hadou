@@ -20,6 +20,25 @@ Object.assign(WarManager.prototype, {
         return true;
     },
     
+    // ★Round 9：援軍の「所属大名家」を一元判定します。
+    // 諸勢力は城に滞在していても、その城を所有する大名家の部隊ではありません。
+    getReinforcementClanId(reinfData) {
+        if (!reinfData) return null;
+        if (reinfData.isKunishuForce || reinfData.isKunishu || Number(reinfData.kunishuId || 0) > 0) return null;
+        const helperCastle = reinfData.castle;
+        if (!helperCastle || helperCastle.isKunishu) return null;
+        const clanId = Number(helperCastle.ownerClan);
+        return Number.isFinite(clanId) && clanId > 0 ? clanId : null;
+    },
+
+    // ★Round 9：援軍が「プレイヤー勢力そのもの」かを一元判定します。
+    isPlayerClanReinforcement(reinfData, playerClanId = null) {
+        const clanId = this.getReinforcementClanId(reinfData);
+        if (clanId === null) return false;
+        const pid = playerClanId === null ? Number(this.game.playerClanId) : Number(playerClanId);
+        return clanId === pid;
+    },
+    
     // ★追加：メッセージ用の家名を一元管理する魔法（プレイヤー自身の家なら「当家」に差し替えます）
     getDisplayClanName(clanId, rawName) {
         const pid = Number(this.game.playerClanId);
@@ -547,8 +566,8 @@ Object.assign(WarManager.prototype, {
 
             // ★追加：プレイヤー勢力（委任軍団や援軍含む）が関わっているかどうかを判定します
             let isPlayerFactionInvolved = (atkClan === pid) || (defClan === pid);
-            if (reinforcementData && reinforcementData.castle.ownerClan === pid) isPlayerFactionInvolved = true;
-            if (selfReinforcementData && selfReinforcementData.castle.ownerClan === pid) isPlayerFactionInvolved = true;
+            if (this.isPlayerClanReinforcement(reinforcementData, pid)) isPlayerFactionInvolved = true;
+            if (this.isPlayerClanReinforcement(selfReinforcementData, pid)) isPlayerFactionInvolved = true;
 
             let isPlayerInvolved = false;
             if (atkClan === pid && !atkCastle.isDelegated && !atkCastle.isKunishu) isPlayerInvolved = true;
@@ -725,7 +744,7 @@ Object.assign(WarManager.prototype, {
             const processReinforcement = async (reinfData, isSelf) => {
                 if (reinfData) {
                     const hC = reinfData.castle;
-                    if (hC.ownerClan === pid && !hC.isDelegated && !reinfData.isKunishuForce) isPlayerInvolved = true;
+                    if (this.isPlayerClanReinforcement(reinfData, pid) && !hC.isDelegated) isPlayerInvolved = true;
                     
                     let reinfType = isSelf ? "応援軍" : "友軍";
                     let leaderName = reinfData.bushos && reinfData.bushos.length > 0 ? reinfData.bushos[0].name : "総大将";
@@ -766,10 +785,11 @@ Object.assign(WarManager.prototype, {
                 this.game.diplomacyManager.changeStatus(atkClan, defClan, '敵対');
                 this.game.diplomacyManager.updateSentiment(atkClan, defClan, -100);
             }
-            if (reinforcementData && this.game.diplomacyManager && !reinforcementData.castle.isKunishu && !defCastle.isKunishu) {
-                const helperClan = reinforcementData.castle.ownerClan;
-                if (helperClan !== 0 && defClan !== 0) {
-                    // ★修正：攻撃の援軍に入った時は「敵対」にせず、友好度を7下げるだけにします！
+            if (reinforcementData && this.game.diplomacyManager && !defCastle.isKunishu) {
+                // ★Round 9：諸勢力の所在地の城主を「援軍大名」と誤認しないようにします。
+                const helperClan = this.getReinforcementClanId(reinforcementData);
+                if (helperClan !== null && defClan !== 0) {
+                    // 攻撃の大名家援軍に入った時は「敵対」にせず、友好度を7下げるだけにします。
                     this.game.diplomacyManager.updateSentiment(helperClan, defClan, -7);
                 }
             }
@@ -796,20 +816,20 @@ Object.assign(WarManager.prototype, {
                     this.checkDefenderReinforcement(defCastle, atkClan, async () => {
                     
                     // ★追加：守備側の援軍にプレイヤー勢力が含まれる場合はフラグを更新します！
-                    if (this.state.defSelfReinforcement && this.state.defSelfReinforcement.castle.ownerClan === pid) {
+                    if (this.isPlayerClanReinforcement(this.state.defSelfReinforcement, pid)) {
                         isPlayerFactionInvolved = true;
                         this.state.isPlayerFactionInvolved = true;
                     }
-                    if (this.state.defReinforcement && this.state.defReinforcement.castle.ownerClan === pid) {
+                    if (this.isPlayerClanReinforcement(this.state.defReinforcement, pid)) {
                         isPlayerFactionInvolved = true;
                         this.state.isPlayerFactionInvolved = true;
                     }
 
                     // ★追加：守備側の援軍に「プレイヤーが操作できる部隊（直轄領）」が含まれている場合は、強制的に手動戦闘（画面表示）にします！
-                    if (this.state.defSelfReinforcement && this.state.defSelfReinforcement.castle.ownerClan === pid && !this.state.defSelfReinforcement.castle.isDelegated && !this.state.defSelfReinforcement.isKunishuForce) {
+                    if (this.isPlayerClanReinforcement(this.state.defSelfReinforcement, pid) && !this.state.defSelfReinforcement.castle.isDelegated) {
                         this.state.isPlayerInvolved = true;
                     }
-                    if (this.state.defReinforcement && this.state.defReinforcement.castle.ownerClan === pid && !this.state.defReinforcement.castle.isDelegated && !this.state.defReinforcement.isKunishuForce) {
+                    if (this.isPlayerClanReinforcement(this.state.defReinforcement, pid) && !this.state.defReinforcement.castle.isDelegated) {
                         this.state.isPlayerInvolved = true;
                     }
 
@@ -1097,7 +1117,7 @@ Object.assign(WarManager.prototype, {
                                 };
 
                                 const processNextAtk = () => {
-                                    if (atkClan === pid && !atkCastle.isDelegated && this.state.reinforcement && this.state.reinforcement.castle.ownerClan === pid && !this.state.reinforcement.isKunishuForce) {
+                                    if (atkClan === pid && !atkCastle.isDelegated && this.isPlayerClanReinforcement(this.state.reinforcement, pid)) {
                                         this.game.ui.showUnitDivideModal(this.state.reinforcement.bushos, this.state.reinforcement.soldiers, this.state.reinforcement.horses, this.state.reinforcement.guns, (rAssigns) => {
                                             finalAtkAssignments = finalAtkAssignments.concat(rAssigns);
                                             finishAtk();
@@ -1405,13 +1425,13 @@ Object.assign(WarManager.prototype, {
             // ★追加：プレイヤー勢力が関わっているかどうかのフラグを用意します！
             const pid = Number(this.game.playerClanId);
             const isAtkPlayer = (Number(s.attacker.ownerClan) === pid) || 
-                                (s.reinforcement && Number(s.reinforcement.castle.ownerClan) === pid) || 
-                                (s.selfReinforcement && Number(s.selfReinforcement.castle.ownerClan) === pid) ||
-                                (s.retreatedReinforcements && s.retreatedReinforcements.some(r => r.isAttackerData && r.data.castle && Number(r.data.castle.ownerClan) === pid));
+                                this.isPlayerClanReinforcement(s.reinforcement, pid) || 
+                                this.isPlayerClanReinforcement(s.selfReinforcement, pid) ||
+                                (s.retreatedReinforcements && s.retreatedReinforcements.some(r => r.isAttackerData && this.isPlayerClanReinforcement(r.data, pid)));
             const isDefPlayer = (Number(s.oldDefClanId) === pid) || 
-                                (s.defReinforcement && Number(s.defReinforcement.castle.ownerClan) === pid) || 
-                                (s.defSelfReinforcement && Number(s.defSelfReinforcement.castle.ownerClan) === pid) ||
-                                (s.retreatedReinforcements && s.retreatedReinforcements.some(r => !r.isAttackerData && r.data.castle && Number(r.data.castle.ownerClan) === pid));
+                                this.isPlayerClanReinforcement(s.defReinforcement, pid) || 
+                                this.isPlayerClanReinforcement(s.defSelfReinforcement, pid) ||
+                                (s.retreatedReinforcements && s.retreatedReinforcements.some(r => !r.isAttackerData && this.isPlayerClanReinforcement(r.data, pid)));
             s.isPlayerFactionInvolved = isAtkPlayer || isDefPlayer;
 
             // ★追加：大名の居城が攻め落とされたかのフラグを立てます（撤退による明け渡しも含む）
@@ -1756,11 +1776,11 @@ Object.assign(WarManager.prototype, {
             if (this.game.diplomacyManager) {
                 // 攻撃陣営（大名と援軍）を調べます
                 const atkClan = (!s.attacker.isKunishu && s.attacker.ownerClan !== 0) ? s.attacker.ownerClan : null;
-                const atkAlly = (s.reinforcement && !s.reinforcement.castle.isKunishu && s.reinforcement.castle.ownerClan !== 0 && !s.reinforcement.isSelf) ? s.reinforcement.castle.ownerClan : null;
+                const atkAlly = (s.reinforcement && !s.reinforcement.isSelf) ? this.getReinforcementClanId(s.reinforcement) : null;
                 
                 // 守備陣営（大名と援軍）を調べます
                 const defClan = (!s.defender.isKunishu && s.oldDefClanId !== 0) ? s.oldDefClanId : null;
-                const defAlly = (s.defReinforcement && !s.defReinforcement.castle.isKunishu && s.defReinforcement.castle.ownerClan !== 0 && !s.defReinforcement.isSelf) ? s.defReinforcement.castle.ownerClan : null;
+                const defAlly = (s.defReinforcement && !s.defReinforcement.isSelf) ? this.getReinforcementClanId(s.defReinforcement) : null;
 
                 // 攻撃側大名 と 守備側援軍大名 の友好度ダウン
                 if (atkClan && defAlly) {
@@ -2104,9 +2124,9 @@ Object.assign(WarManager.prototype, {
                 if (s.isPlayerInvolved) {
                     const pid = Number(this.game.playerClanId);
                     const isAtkMain = (Number(s.attacker.ownerClan) === pid);
-                    const isAtkAlly = (s.reinforcement && Number(s.reinforcement.castle.ownerClan) === pid) || 
-                                      (s.selfReinforcement && Number(s.selfReinforcement.castle.ownerClan) === pid) ||
-                                      (s.retreatedReinforcements && s.retreatedReinforcements.some(r => r.isAttackerData && r.data.castle && Number(r.data.castle.ownerClan) === pid));
+                    const isAtkAlly = this.isPlayerClanReinforcement(s.reinforcement, pid) || 
+                                      this.isPlayerClanReinforcement(s.selfReinforcement, pid) ||
+                                      (s.retreatedReinforcements && s.retreatedReinforcements.some(r => r.isAttackerData && this.isPlayerClanReinforcement(r.data, pid)));
                     const isAtkSide = isAtkMain || isAtkAlly;
                     
                     // ★追加：ダイアログを出す前にバリアを解除します！
