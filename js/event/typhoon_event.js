@@ -70,7 +70,7 @@ window.GameEvents.push({
 
         writeDiag('overlay_shell');
         const overlayParts = fx && typeof fx.createOverlay === 'function'
-            ? await fx.createOverlay(game)
+            ? await fx.createOverlay(game, { diagPrefix })
             : null;
         if (!overlayParts) {
             // common_events.js より先に呼ばれる構成は通常ありませんが、安全側で中止します。

@@ -52,7 +52,101 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         return img.naturalWidth > 0;
     };
 
+    const nextPaint = () => new Promise(resolve => {
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
+        else setTimeout(resolve, 0);
+    });
+
+    // Round20: イベント地図を載せる間だけ、スマホの巨大通常マップを合成対象から外します。
+    // 半透明暗幕の裏で通常マップ一式を保持したまま、別の1200x800画像をdecodeするピークを避けます。
+    const suspendMainMapForOverlay = async (game, mapOverlay, diagPrefix = null) => {
+        const isPC = document.body.classList.contains('is-pc');
+        const ui = game && game.ui;
+        const scroll = document.getElementById('map-scroll-container');
+        const state = {
+            ui,
+            pausedByUs: false,
+            scroll,
+            oldDisplay: scroll ? scroll.style.display : '',
+            isPC
+        };
+
+        if (ui && typeof ui.pauseBackgroundUpdates === 'function' && !ui.isBackgroundPaused) {
+            ui.pauseBackgroundUpdates();
+            state.pausedByUs = true;
+        }
+
+        // PCは余裕があるため従来表示を維持。スマホだけ巨大マップを一時的に外します。
+        if (!isPC && scroll) scroll.style.display = 'none';
+        mapOverlay._eventMapRestoreState = state;
+        if (diagPrefix) writeDiag(game, `${diagPrefix}:main_map_suspended`);
+
+        // display:none をcompositorへ反映してからイベント地図を作ります。
+        if (!isPC) await nextPaint();
+        return state;
+    };
+
+    // Round20: スマホでは既存の pixelProvinceMap から600x400程度の白地図を生成します。
+    // japan_white_map.png の1200x800フル画像decode/GPUテクスチャ確保を避けるのが目的です。
+    const createLightweightBaseCanvas = (game, options = {}) => {
+        const mapW = game && game.mapWidth ? game.mapWidth : 1200;
+        const mapH = game && game.mapHeight ? game.mapHeight : 800;
+        const pixelProvinceMap = game && game.ui ? game.ui.pixelProvinceMap : null;
+        if (!pixelProvinceMap || pixelProvinceMap.length < mapW * mapH) return null;
+
+        const renderScale = options.renderScale || 0.5;
+        const canvas = document.createElement('canvas');
+        canvas.className = 'event-map-base-canvas';
+        canvas.width = Math.max(1, Math.round(mapW * renderScale));
+        canvas.height = Math.max(1, Math.round(mapH * renderScale));
+        canvas.style.width = '100%';
+        canvas.style.height = 'auto';
+        canvas.style.display = 'block';
+        canvas.style.pointerEvents = 'none';
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+        const img = ctx.createImageData(canvas.width, canvas.height);
+        const dst = img.data;
+
+        const sampleProvince = (dx, dy) => {
+            const sx = Math.min(mapW - 1, Math.floor(((dx + 0.5) * mapW) / canvas.width));
+            const sy = Math.min(mapH - 1, Math.floor(((dy + 0.5) * mapH) / canvas.height));
+            return pixelProvinceMap[sy * mapW + sx] || 0;
+        };
+
+        for (let y = 0; y < canvas.height; y++) {
+            for (let x = 0; x < canvas.width; x++) {
+                const pid = sampleProvince(x, y);
+                if (!pid) continue; // 海は透明。mapContainerの緑が見えます。
+
+                let border = false;
+                if (x + 1 < canvas.width) {
+                    const right = sampleProvince(x + 1, y);
+                    if (right && right !== pid) border = true;
+                }
+                if (!border && y + 1 < canvas.height) {
+                    const down = sampleProvince(x, y + 1);
+                    if (down && down !== pid) border = true;
+                }
+
+                const di = (y * canvas.width + x) * 4;
+                const tone = border ? 170 : 248;
+                dst[di] = tone;
+                dst[di + 1] = tone;
+                dst[di + 2] = tone;
+                dst[di + 3] = 255;
+            }
+        }
+        ctx.putImageData(img, 0, 0);
+        return canvas;
+    };
+
     const createOverlay = async (game, options = {}) => {
+        const diagPrefix = options.diagPrefix || null;
+        const isPC = document.body.classList.contains('is-pc');
+
+        // まず軽い暗幕だけを置きます。スマホは完全不透明にして裏の巨大マップを合成不要にします。
         const mapOverlay = document.createElement('div');
         mapOverlay.className = 'event-map-overlay';
         mapOverlay.style.position = 'fixed';
@@ -60,11 +154,15 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         mapOverlay.style.left = '0';
         mapOverlay.style.width = '100%';
         mapOverlay.style.height = '100%';
-        mapOverlay.style.backgroundColor = options.overlayColor || 'rgba(0,0,0,0.85)';
+        mapOverlay.style.backgroundColor = options.overlayColor || (isPC ? 'rgba(0,0,0,0.85)' : '#000');
         mapOverlay.style.zIndex = String(options.zIndex || 7500);
         mapOverlay.style.display = 'flex';
         mapOverlay.style.justifyContent = 'center';
         mapOverlay.style.alignItems = 'center';
+        document.body.appendChild(mapOverlay);
+        if (diagPrefix) writeDiag(game, `${diagPrefix}:overlay_dom`);
+
+        await suspendMainMapForOverlay(game, mapOverlay, diagPrefix);
 
         const mapContainer = document.createElement('div');
         mapContainer.className = 'event-map-container';
@@ -76,18 +174,38 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         mapContainer.style.backgroundColor = options.backgroundColor || '#81c784';
         mapContainer.style.overflow = 'hidden';
 
-        const whiteMapImg = new Image();
-        whiteMapImg.src = options.mapSrc || WHITE_MAP_SRC;
-        whiteMapImg.style.width = '100%';
-        whiteMapImg.style.display = 'block';
-        whiteMapImg.style.pointerEvents = 'none';
+        let whiteMapImg = null;
+        let baseCanvas = null;
 
-        mapContainer.appendChild(whiteMapImg);
+        if (!isPC && !options.forceImageBase) {
+            if (diagPrefix) writeDiag(game, `${diagPrefix}:base_canvas_build`);
+            baseCanvas = createLightweightBaseCanvas(game, { renderScale: options.renderScale || 0.5 });
+            if (baseCanvas) {
+                mapContainer.appendChild(baseCanvas);
+                if (diagPrefix) writeDiag(game, `${diagPrefix}:base_canvas_done`);
+            }
+        }
+
+        // pixelProvinceMapがまだ無い特殊ケース、またはPCだけ従来の白地図画像へフォールバックします。
+        if (!baseCanvas) {
+            if (diagPrefix) writeDiag(game, `${diagPrefix}:base_image_load`);
+            whiteMapImg = new Image();
+            whiteMapImg.src = options.mapSrc || WHITE_MAP_SRC;
+            whiteMapImg.style.width = '100%';
+            whiteMapImg.style.display = 'block';
+            whiteMapImg.style.pointerEvents = 'none';
+            mapContainer.appendChild(whiteMapImg);
+        }
+
         mapOverlay.appendChild(mapContainer);
-        document.body.appendChild(mapOverlay);
-        await waitForImage(whiteMapImg, options.imageTimeoutMs || 1000);
 
-        return { mapOverlay, mapContainer, whiteMapImg };
+        if (whiteMapImg) {
+            await waitForImage(whiteMapImg, options.imageTimeoutMs || 1000);
+            if (diagPrefix) writeDiag(game, `${diagPrefix}:base_image_done`);
+        }
+
+        if (diagPrefix) writeDiag(game, `${diagPrefix}:overlay_ready`);
+        return { mapOverlay, mapContainer, whiteMapImg, baseCanvas };
     };
 
     const getRenderScale = () => document.body.classList.contains('is-pc') ? 1 : 0.5;
@@ -285,15 +403,30 @@ window.EventMapEffects = window.EventMapEffects || (() => {
     };
 
     const cleanupOverlay = async (mapOverlay) => {
+        const restoreState = mapOverlay ? mapOverlay._eventMapRestoreState : null;
         if (mapOverlay) {
             mapOverlay.querySelectorAll('canvas').forEach(c => {
                 try { c.width = 1; c.height = 1; } catch (e) {}
+            });
+            mapOverlay.querySelectorAll('img').forEach(img => {
+                try { img.src = ''; } catch (e) {}
             });
             if (mapOverlay.parentNode) mapOverlay.parentNode.removeChild(mapOverlay);
         }
         // Round16よりイベント専用の巨大RGBAキャッシュは使いません。
         window.ProvinceImageDataCache = null;
         window.CastleColorImageDataCache = null;
+
+        // Canvas/GPU面の解放をブラウザへ反映してから通常マップを戻します。
+        await nextPaint();
+        if (restoreState) {
+            if (!restoreState.isPC && restoreState.scroll) {
+                restoreState.scroll.style.display = restoreState.oldDisplay;
+            }
+            if (restoreState.pausedByUs && restoreState.ui && typeof restoreState.ui.resumeBackgroundUpdates === 'function') {
+                restoreState.ui.resumeBackgroundUpdates();
+            }
+        }
         await new Promise(resolve => setTimeout(resolve, 0));
     };
 
@@ -301,6 +434,7 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         writeDiag,
         waitForImage,
         createOverlay,
+        createLightweightBaseCanvas,
         getRenderScale,
         ensureProvinceSource,
         createProvinceCanvas,
@@ -327,7 +461,7 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
     await game.ui.showDialogAsync(initialMsg, false, 0);
 
     fx.writeDiag(game, `${diagPrefix}:overlay_shell`);
-    const { mapOverlay, mapContainer } = await fx.createOverlay(game);
+    const { mapOverlay, mapContainer } = await fx.createOverlay(game, { diagPrefix });
 
     fx.writeDiag(game, `${diagPrefix}:mask_build`);
     const { canvas } = await fx.createProvinceCanvas(
