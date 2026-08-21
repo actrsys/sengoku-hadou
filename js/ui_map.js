@@ -38,6 +38,46 @@ const MAP_ZOOM_CONFIG = {
 //  Object.assignではそれぞれのメソッドの間に必ずカンマが必要です
 Object.assign(UIManager.prototype, {
 
+    // ★Round 13：地図の慣性をズーム開始前に必ず止めます。
+    _stopMapInertia() {
+        if (this.inertiaFrame) {
+            cancelAnimationFrame(this.inertiaFrame);
+            this.inertiaFrame = null;
+        }
+        this.velocityX = 0;
+        this.velocityY = 0;
+    },
+
+    // ★Round 13：巨大マップの強制GPUレイヤー化はPCだけに限定します。
+    // 古いスマホでは scale() だけの方が合成メモリを増やしにくく安定します。
+    _getMapScaleTransform(scale, forcePcGpu = false) {
+        const isPC = document.body.classList.contains('is-pc');
+        return (isPC || forcePcGpu) ? `scale(${scale}) translateZ(0)` : `scale(${scale})`;
+    },
+
+    // ★Round 13：スクロール範囲用spacerを一元管理します。
+    _getMapSpacer(sc) {
+        let spacer = document.getElementById('map-spacer');
+        if (!spacer) {
+            spacer = document.createElement('div');
+            spacer.id = 'map-spacer';
+            spacer.style.position = 'absolute';
+            spacer.style.pointerEvents = 'none';
+            spacer.style.left = '0px';
+            spacer.style.top = '0px';
+            sc.appendChild(spacer);
+            sc.style.position = 'relative';
+        }
+        return spacer;
+    },
+
+    _setMapSpacerSize(sc, width, height) {
+        const spacer = this._getMapSpacer(sc);
+        // floorだと見た目のmapよりscroll領域が最大1px弱短くなるためceilで不足を防ぎます。
+        spacer.style.width = `${Math.ceil(Math.max(0, width))}px`;
+        spacer.style.height = `${Math.ceil(Math.max(0, height))}px`;
+    },
+
     initMapDrag() {
         this.isDraggingMap = false;
         this.dragStartX = 0;
@@ -61,10 +101,7 @@ Object.assign(UIManager.prototype, {
             
             const isPC = document.body.classList.contains('is-pc');
 
-            if (this.inertiaFrame) {
-                cancelAnimationFrame(this.inertiaFrame);
-                this.inertiaFrame = null;
-            }
+            this._stopMapInertia();
 
             this.isMouseDown = true;
             this.isDraggingMap = false;
@@ -164,55 +201,57 @@ Object.assign(UIManager.prototype, {
 
         let initialPinchDist = null;
 
+        const resetPinch = (e) => {
+            if (!e || !e.touches || e.touches.length < 2) {
+                initialPinchDist = null;
+                this.isZooming = false;
+            }
+        };
+
         sc.addEventListener('touchstart', (e) => {
             if (e.touches.length >= 2) {
-                e.preventDefault(); 
+                e.preventDefault();
+                this._stopMapInertia();
             }
             if (e.touches.length === 2) {
                 initialPinchDist = Math.hypot(
-                    e.touches[0].pageX - e.touches[1].pageX,
-                    e.touches[0].pageY - e.touches[1].pageY
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
                 );
             }
         }, { passive: false });
 
         sc.addEventListener('touchmove', (e) => {
-            if (e.touches.length >= 2) {
-                e.preventDefault(); 
-            }
-            if (e.touches.length === 2) {
-                if (initialPinchDist === null) return;
-                
-                if (this.isZooming) return;
-                
-                const currentDist = Math.hypot(
-                    e.touches[0].pageX - e.touches[1].pageX,
-                    e.touches[0].pageY - e.touches[1].pageY
-                );
-                
-                const diff = currentDist - initialPinchDist;
-                
-                const rect = sc.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
+            if (e.touches.length >= 2) e.preventDefault();
+            if (e.touches.length !== 2 || initialPinchDist === null || this.isZooming) return;
 
-                if (diff > 50) {
-                    this.isZooming = true; setTimeout(() => { this.isZooming = false; }, 350); 
-                    this.changeMapZoom(1, centerX, centerY);
-                    initialPinchDist = currentDist; 
-                } else if (diff < -50) {
-                    this.isZooming = true; setTimeout(() => { this.isZooming = false; }, 350); 
-                    this.changeMapZoom(-1, centerX, centerY);
-                    initialPinchDist = currentDist;
-                }
+            const t0 = e.touches[0];
+            const t1 = e.touches[1];
+            const currentDist = Math.hypot(
+                t0.clientX - t1.clientX,
+                t0.clientY - t1.clientY
+            );
+            const diff = currentDist - initialPinchDist;
+
+            // ★Round 13：画面中央ではなく、実際に2本指でつまんでいる中点をズーム中心にします。
+            const pinchCenterX = (t0.clientX + t1.clientX) / 2;
+            const pinchCenterY = (t0.clientY + t1.clientY) / 2;
+
+            if (diff > 50) {
+                this.isZooming = true;
+                setTimeout(() => { this.isZooming = false; }, 350);
+                this.changeMapZoom(1, pinchCenterX, pinchCenterY);
+                initialPinchDist = currentDist;
+            } else if (diff < -50) {
+                this.isZooming = true;
+                setTimeout(() => { this.isZooming = false; }, 350);
+                this.changeMapZoom(-1, pinchCenterX, pinchCenterY);
+                initialPinchDist = currentDist;
             }
         }, { passive: false });
 
-        sc.addEventListener('touchend', (e) => {
-            if (e.touches.length < 2) {
-                initialPinchDist = null;
-            }
-        });
+        sc.addEventListener('touchend', resetPinch, { passive: true });
+        sc.addEventListener('touchcancel', resetPinch, { passive: true });
     },
 
     applyInertia(sc) {
@@ -310,34 +349,29 @@ Object.assign(UIManager.prototype, {
                 this.mapEl.style.margin = '0px'; 
                 
                 this.mapEl.style.transformOrigin = '0 0';
-                // ★スマホのグラフィック専用の脳みそ（GPU）に描画を任せて、スクロールを滑らかにする魔法です！
-                this.mapEl.style.transform = `scale(${this.mapScale}) translateZ(0)`;
+                this.mapEl.style.transform = this._getMapScaleTransform(this.mapScale);
 
-                let spacer = document.getElementById('map-spacer');
-                if (!spacer) {
-                    spacer = document.createElement('div');
-                    spacer.id = 'map-spacer';
-                    spacer.style.position = 'absolute';
-                    spacer.style.pointerEvents = 'none';
-                    sc.appendChild(spacer);
-                    sc.style.position = 'relative'; 
-                }
-                spacer.style.left = '0px';
-                spacer.style.top = '0px';
-                spacer.style.width = `${Math.floor(scaledW + marginLeft * 2)}px`;
-                spacer.style.height = `${Math.floor(scaledH + marginTop * 2)}px`;
+                this._setMapSpacerSize(
+                    sc,
+                    scaledW + marginLeft * 2,
+                    scaledH + marginTop * 2
+                );
             }
         }
     },
     
     changeMapZoom(direction, cx = null, cy = null) {
         const sc = document.getElementById('map-scroll-container');
-        const isPC = document.body.classList.contains('is-pc'); 
+        const isPC = document.body.classList.contains('is-pc');
 
+        if (!sc || !this.mapEl || !Array.isArray(this.zoomStages) || this.zoomStages.length === 0) return;
         if (this.isAnimatingZoom) return;
 
+        // 慣性移動とズームが同時にscrollLeft/Topを書き換えないようにします。
+        this._stopMapInertia();
+
         let oldScale = this.mapScale;
-        const scales = this.zoomStages; 
+        const scales = this.zoomStages;
 
         let closestIdx = 0;
         let minDiff = Infinity;
@@ -417,24 +451,17 @@ Object.assign(UIManager.prototype, {
                 const currentScrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easeOut;
                 const currentScrollTop = startScrollTop + (targetScrollTop - startScrollTop) * easeOut;
 
-                let spacer = document.getElementById('map-spacer');
-                if (!spacer) {
-                    spacer = document.createElement('div');
-                    spacer.id = 'map-spacer';
-                    spacer.style.position = 'absolute';
-                    spacer.style.pointerEvents = 'none';
-                    sc.appendChild(spacer);
-                    sc.style.position = 'relative';
-                }
-                spacer.style.width = `${Math.floor(mapW * currentScale + currentMarginX * 2)}px`;
-                spacer.style.height = `${Math.floor(mapH * currentScale + currentMarginY * 2)}px`;
-                
+                this._setMapSpacerSize(
+                    sc,
+                    mapW * currentScale + currentMarginX * 2,
+                    mapH * currentScale + currentMarginY * 2
+                );
+
                 this.mapEl.style.position = 'absolute';
                 this.mapEl.style.left = `${currentMarginX}px`;
                 this.mapEl.style.top = `${currentMarginY}px`;
                 this.mapEl.style.transformOrigin = '0 0';
-                // ★ズーム中もグラフィック専用の脳みそ（GPU）を使って滑らかに動かします！
-                this.mapEl.style.transform = `scale(${currentScale}) translateZ(0)`;
+                this.mapEl.style.transform = this._getMapScaleTransform(currentScale, true);
 
                 sc.scrollLeft = currentScrollLeft;
                 sc.scrollTop = currentScrollTop;
@@ -452,23 +479,22 @@ Object.assign(UIManager.prototype, {
             };
             requestAnimationFrame(animate); 
         } else {
-            // ★ここをごっそり差し替え！：スクロールのガタつきを防ぐための魔法
-            sc.style.overflow = 'hidden'; 
-            
-            // ズームアウト（小さく）する時は、先にスクロール位置を移動させておきます
-            if (targetScale < oldScale) {
-                sc.scrollLeft = targetScrollLeft;
-                sc.scrollTop = targetScrollTop;
-            }
-            
+            // ★Round 13：overflowを hidden→auto と切り替えると、古いChromeで
+            // scroll範囲の再作成と強制クランプが起きやすいため、常時autoのまま更新します。
             this.mapScale = targetScale;
             this.applyMapScale();
-            
-            // ズームイン（大きく）する時は、サイズを変えた後に移動させます
+
+            // spacerとtransformを同じターンで更新した直後に目的位置を設定します。
             sc.scrollLeft = targetScrollLeft;
             sc.scrollTop = targetScrollTop;
-            
-            sc.style.overflow = 'auto';
+
+            // 一部の古いWebViewはレイアウト確定前のscroll値を丸めるため、
+            // 次フレームに「ずれていた時だけ」1回補正します。
+            requestAnimationFrame(() => {
+                if (Math.abs(sc.scrollLeft - targetScrollLeft) > 0.5) sc.scrollLeft = targetScrollLeft;
+                if (Math.abs(sc.scrollTop - targetScrollTop) > 0.5) sc.scrollTop = targetScrollTop;
+            });
+
             this.updateZoomButtons();
         }
     },

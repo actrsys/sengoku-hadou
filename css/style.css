@@ -93,6 +93,8 @@ input[type="range"]:active::-moz-range-thumb {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    /* ★Round 13：全面レイヤーの1物理pxオーバースキャンを確実にこの箱で切ります。 */
+    isolation: isolate;
 }
 
 img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
@@ -3357,4 +3359,26 @@ body.background-paused #map-container {
     font-size: 1.8rem;
     font-weight: bold;
     margin-bottom: 20px;
+}
+
+/* =========================================================
+   ★Round 13：全画面レイヤーの端に出る1pxシーム対策
+   =========================================================
+   #game-screen 自体の論理解像度は変更せず、背景を持つ全画面レイヤーだけを
+   1物理px分だけ外側へ描き、親の overflow:hidden で切り取ります。
+   これにより transform の小数倍率で子要素の端が半透明補間されても、
+   下にある画面が線状に覗きにくくなります。 */
+#title-screen,
+#global-loading-screen,
+.modal {
+    top: calc(0px - var(--screen-edge-bleed, 1px)) !important;
+    left: calc(0px - var(--screen-edge-bleed, 1px)) !important;
+    width: calc(100% + var(--screen-edge-bleed, 1px) + var(--screen-edge-bleed, 1px)) !important;
+    height: calc(100% + var(--screen-edge-bleed, 1px) + var(--screen-edge-bleed, 1px)) !important;
+}
+
+/* スマホの巨大メインマップは常時GPUレイヤー化しません。
+   ui_map.js側でも translateZ(0) をPCだけに限定します。 */
+body:not(.is-pc) #map-container {
+    transform-style: flat;
 }
