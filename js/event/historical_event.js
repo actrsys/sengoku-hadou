@@ -140,8 +140,13 @@ window.EventAction = {
             game.updateAllClanPrestige();
         }
         if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
+            // ★Round5：月末・月初・AI中は再描画を延期し、プレイヤー復帰時に1回だけ行います。
+            if (game.isProcessingAI && !game.isWatchMode) {
+                game._aiDeferredMapRefresh = true;
+            } else {
+                game.ui.renderMap();
+                game.ui.updatePanelHeader();
+            }
         }
     },
 

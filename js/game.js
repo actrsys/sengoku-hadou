@@ -1498,8 +1498,8 @@ class GameManager {
         setTimeout(() => this._showPreviousAIDiagnostic(), 0);
     }
 
-    writeAIDiagnostic(castle, phase) {
-        // PCでは再現していないため、余計な同期ストレージ書込を避けてスマホ版だけ記録します。
+    writeSystemDiagnostic(phase, castle = null) {
+        // ★Round5 実機診断：AI城だけでなく月末・月初・プレイヤー復帰まで記録します。
         if (typeof sessionStorage === 'undefined') return;
         if (document.body && document.body.classList.contains('is-pc')) return;
         try {
@@ -1521,19 +1521,24 @@ class GameManager {
         }
     }
 
+    writeAIDiagnostic(castle, phase) {
+        this.writeSystemDiagnostic(phase, castle);
+    }
+
     _showPreviousAIDiagnostic() {
         if (typeof sessionStorage === 'undefined') return;
         try {
             const raw = sessionStorage.getItem('sengoku_ai_last_checkpoint_v1');
             if (!raw) return;
             const data = JSON.parse(raw);
-            if (!data || data.phase === 'turn_finished') return;
+            if (!data || data.phase === 'turn_finished' || data.phase === 'player_turn:ready') return;
             if (data.time && Date.now() - data.time > 2 * 60 * 60 * 1000) return;
             if (document.getElementById('ai-last-checkpoint-badge')) return;
 
             const el = document.createElement('div');
             el.id = 'ai-last-checkpoint-badge';
-            el.textContent = `前回AI停止位置: ${data.index || '?'} / ${data.total || '?'}　${data.castleName || '城'}(ID:${data.castleId || '?'})　${data.phase || '不明'}`;
+            const castleText = data.castleId ? `　${data.castleName || '城'}(ID:${data.castleId})` : '';
+            el.textContent = `前回停止位置: ${data.index || '?'} / ${data.total || '?'}${castleText}　${data.phase || '不明'}`;
             el.title = 'タップすると閉じます';
             el.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:20000;max-width:calc(100vw - 16px);padding:6px 9px;background:rgba(0,0,0,.82);color:#fff;font-size:11px;line-height:1.35;border-radius:5px;pointer-events:auto;';
             el.onclick = () => el.remove();
@@ -2117,6 +2122,7 @@ class GameManager {
     
     async startMonth() { 
         this.hasAutoSavedThisMonth = false; // ★月が替わったので、オートセーブ済みの印を消します
+        this.writeSystemDiagnostic('month_start:start');
 
         // ★追加：月初の処理が始まったら、ユーザーが勝手に操作できないように膜（ガード）を張ります！
         this.isProcessingAI = true;
@@ -2245,13 +2251,16 @@ class GameManager {
         // 月初イベント【前】をチェックして実行します
         if (this.eventManager) {
             await this.eventManager.processEvents('startMonth_before');
+            this.writeSystemDiagnostic('month_start:event_before_done');
         }
         
         // 元服の処理が終わるまでしっかり待ちます！
         await this.lifeSystem.processStartMonth();
+        this.writeSystemDiagnostic('month_start:life_done');
         
         // 武将の下野（出奔）が終わるまで待ちます！
         await this.factionSystem.processStartMonth(); 
+        this.writeSystemDiagnostic('month_start:faction_done');
 
         // ★安定化：全国派閥再編などで作った一時配列を解放できるよう、
         // 次の全国処理へ入る前にブラウザへ一度制御を返します。
@@ -2533,6 +2542,7 @@ class GameManager {
         // ここで9月の兵糧収穫イベントなどが実行されます！
         if (this.eventManager) {
             await this.eventManager.processEvents('startMonth_after');
+            this.writeSystemDiagnostic('month_start:event_after_done');
         }
 
         // ★ここから新しく書き足し！：収入やイベントが全部終わった「後」に、金や兵糧を消費します！
@@ -2667,11 +2677,14 @@ class GameManager {
                 }
             }
         }
+        this.writeSystemDiagnostic('month_start:staffing_done');
         if (this.aiOperationManager) {
             await this.aiOperationManager.processMonthlyOperations();
         }
+        this.writeSystemDiagnostic('month_start:operations_done');
 
         this.currentIndex = 0; 
+        this.writeSystemDiagnostic('month_start:before_turn_queue');
         this.processTurn();
     }
 
@@ -2687,6 +2700,7 @@ class GameManager {
         
         // ★ここを修正！ 全ての城が終わって翌月（endMonth）に行く前にも、メッセージが消えるのをじっと待ちます！
         if (this.currentIndex >= this.turnQueue.length) { 
+            this.writeSystemDiagnostic('month_transition:ai_queue_done');
             if (this.ui && this.ui.waitForDialogs) {
                 await this.ui.waitForDialogs();
             }
@@ -2700,6 +2714,7 @@ class GameManager {
                     this.ui.hideAIGuardText(); // ★中身を壊さずに、透明にして文字だけを隠します！
                 }
             }
+            this.writeSystemDiagnostic('month_transition:before_endMonth');
             await this.endMonth(); // ← ★「await」を書き足します！
             return; 
         }
@@ -2755,11 +2770,6 @@ class GameManager {
             return;
         }
         
-        // プレイヤーの直轄城（手動操作）の時だけマップを綺麗に描き直すようにしました。
-        if (isPlayerCastle && !castle.isDelegated) {
-            this.ui.renderMap();
-        }
-
         if (isPlayerCastle) {
             // ==========================================
             // ★ごっそり差し替え！委任のチェックを入れます
@@ -2791,6 +2801,7 @@ class GameManager {
             } else {
                 // 直轄（今まで通りプレイヤーが動かす）の場合
                 this.isProcessingAI = false; 
+                this.writeSystemDiagnostic('player_turn:enter', castle);
 
                 // ★毎月一番最初の自分のターンで、裏側でオートセーブを走らせます！
                 if (!this.hasAutoSavedThisMonth && window.GameConfig && window.GameConfig.autoSave) {
@@ -2800,13 +2811,19 @@ class GameManager {
                         // ★安定化：オートセーブをAI進行と並走させない。
                         // 古いスマホでは「全データ保存」とAI思考が重なるとメモリの山ができるため、
                         // 保存が終わってから操作を返します。
+                        this.writeSystemDiagnostic('player_turn:before_autosave', castle);
                         await this.executeAutoSave();
+                        this.writeSystemDiagnostic('player_turn:after_autosave', castle);
                     }
                 }
 
                 if(this.ui.aiGuard) this.ui.aiGuard.classList.add('hidden');
 
+                // ★Round5：プレイヤー復帰時のフルマップ描画はここ1回だけ。
+                this.writeSystemDiagnostic('player_turn:before_render', castle);
                 this.ui.renderMap();
+                this._aiDeferredMapRefresh = false;
+                this.writeSystemDiagnostic('player_turn:after_render', castle);
                 this.ui.scrollToActiveCastle(castle);
                 
                 this.ui.showTurnStartDialog(castle, () => {
@@ -2816,6 +2833,7 @@ class GameManager {
                             await this.eventManager.processEvents('before_command', castle);
                         }
                         this.ui.showControlPanel(castle); 
+                        this.writeSystemDiagnostic('player_turn:ready', castle);
                     });
                 });
             }
@@ -2899,6 +2917,7 @@ class GameManager {
     }
 
     async endMonth() {
+        this.writeSystemDiagnostic('month_end:start');
         // ==========================================
         // ★ 新しい一元管理の魔法：「画面にメッセージが出ている間は絶対に待つ」という最強の関所を作ります！
         const waitIfBusy = async () => {
@@ -2913,42 +2932,49 @@ class GameManager {
         // ★ここを書き足し！：月末イベント【前】（寿命などの処理が始まる前）を実行します
         if (this.eventManager) {
             await this.eventManager.processEvents('endMonth_before');
+            this.writeSystemDiagnostic('month_end:event_before_done');
         }
         await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
 
         // 1つ目の係員：派閥
         if (this.factionSystem && typeof this.factionSystem.processEndMonth === 'function') {
             await this.factionSystem.processEndMonth(); 
+            this.writeSystemDiagnostic('month_end:faction_done');
         }
         await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
 
         // 2つ目の係員：独立（反乱して空白地になる処理など）
         if (this.independenceSystem && typeof this.independenceSystem.checkIndependence === 'function') {
             await this.independenceSystem.checkIndependence();
+            this.writeSystemDiagnostic('month_end:independence_done');
         }
         await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
         
         // 3つ目の係員：外交
         if (this.diplomacyManager && typeof this.diplomacyManager.processEndMonth === 'function') {
             this.diplomacyManager.processEndMonth();
+            this.writeSystemDiagnostic('month_end:diplomacy_done');
         }
         await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
 
         // 4つ目の係員：諸勢力（反乱など）
         if (this.kunishuSystem && typeof this.kunishuSystem.processEndMonth === 'function') {
             await this.kunishuSystem.processEndMonth();
+            this.writeSystemDiagnostic('month_end:kunishu_done');
         }
         await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
         
         // 5つ目の係員：寿命
         if (this.lifeSystem && typeof this.lifeSystem.processEndMonth === 'function') {
             await this.lifeSystem.processEndMonth(); 
+            this.writeSystemDiagnostic('month_end:life_done');
         }
         await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
 
         // 6つ目の係員：月末の特別イベント（災害など）
         if (this.eventManager) {
             await this.eventManager.processEvents('endMonth_after');
+            this.writeSystemDiagnostic('month_end:event_after_done');
         }
         await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
 
@@ -2963,7 +2989,8 @@ class GameManager {
         const isEnding = await this.endingSystem.checkEnding();
         if (!isEnding) {
             // エンディングでなければ次の月へ進みます
-            this.startMonth(); 
+            this.writeSystemDiagnostic('month_end:before_startMonth');
+            await this.startMonth(); 
         }
     }
     

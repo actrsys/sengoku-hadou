@@ -102,7 +102,13 @@ class EventManager {
 
                 // 「try〜catch」という安全装置で魔法を実行します
                 try {
+                    if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                        this.game.writeSystemDiagnostic(`event:${timing}:${ev.id}:execute`);
+                    }
                     await ev.execute(this.game, context);
+                    if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                        this.game.writeSystemDiagnostic(`event:${timing}:${ev.id}:done`);
+                    }
 
                     // ★追加：イベントが実行されたので、後でお片付けをするためのシールを貼ります
                     needRefreshScreen = true;
@@ -135,6 +141,9 @@ class EventManager {
 
         // ★追加：全てのイベントのチェックと実行が終わった後、お片付けシールが貼られていたら1回だけ画面を更新します
         if (needRefreshScreen && timing !== 'game_start' && window.EventAction && window.EventAction.refreshScreen) {
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic(`event:${timing}:refresh`);
+            }
             // event_managerの中では「this.game」という名前でゲームデータを管理しているので、それを渡します
             window.EventAction.refreshScreen(this.game);
         }

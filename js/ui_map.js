@@ -545,6 +545,17 @@ Object.assign(UIManager.prototype, {
     
     renderMap() {
         if (!this.mapEl) return;
+
+        // ★Round5：古い全画面Canvasの描画/GPUバッファを先に縮めてからDOMを捨てます。
+        this.mapEl.querySelectorAll('canvas').forEach(oldCanvas => {
+            try {
+                const oldCtx = oldCanvas.getContext('2d');
+                if (oldCtx) oldCtx.clearRect(0, 0, oldCanvas.width, oldCanvas.height);
+                oldCanvas.width = 1;
+                oldCanvas.height = 1;
+            } catch (e) {
+            }
+        });
         this.mapEl.innerHTML = ''; 
         
         // ★追加：一旦、勢力名シールが出ている合図をリセットします
@@ -669,7 +680,6 @@ Object.assign(UIManager.prototype, {
         overlay.style.top = '0px';
         overlay.style.pointerEvents = 'none'; // クリックの邪魔をしないようにする魔法です
         overlay.style.zIndex = '3'; // お城の線より下、マップ画像より上に敷きます
-        overlay.classList.add('anim-map-glow'); // ぼわーっと光るアニメーションの準備
         this.mapEl.appendChild(overlay);
         
         // ★ここから追加：ホバーで光らせる画用紙と、キープして光らせる画用紙を追加します！
@@ -682,7 +692,6 @@ Object.assign(UIManager.prototype, {
         hoverBlinkOverlay.style.top = '0px';
         hoverBlinkOverlay.style.pointerEvents = 'none'; 
         hoverBlinkOverlay.style.zIndex = '3'; 
-        hoverBlinkOverlay.classList.add('anim-map-glow'); 
         this.mapEl.appendChild(hoverBlinkOverlay);
 
         const keepBlinkOverlay = document.createElement('canvas');
@@ -694,7 +703,6 @@ Object.assign(UIManager.prototype, {
         keepBlinkOverlay.style.top = '0px';
         keepBlinkOverlay.style.pointerEvents = 'none'; 
         keepBlinkOverlay.style.zIndex = '3'; 
-        keepBlinkOverlay.classList.add('anim-map-glow-fast'); 
         this.mapEl.appendChild(keepBlinkOverlay);
 
         // ==========================================
@@ -1390,6 +1398,7 @@ Object.assign(UIManager.prototype, {
 
         // 完成した絵の具を、画用紙にドーンと乗せます！
         ctx.putImageData(outputData, 0, 0);
+        overlay.classList.add('anim-map-glow');
     },
 
     // 光を消す魔法です
@@ -1399,6 +1408,7 @@ Object.assign(UIManager.prototype, {
         const ctx = overlay.getContext('2d');
         // 画用紙を綺麗にするだけ！
         ctx.clearRect(0, 0, overlay.width, overlay.height);
+        overlay.classList.remove('anim-map-glow');
     },
 
     // ==========================================
@@ -1783,14 +1793,21 @@ Object.assign(UIManager.prototype, {
         ctx.clearRect(0, 0, width, height);
 
         // ★追加：色に合わせて、外側にぼやっと広がる光のフィルター（魔法）をかけます！
-        overlay.style.filter = `drop-shadow(0px 0px 15px rgba(${colorRGB.r}, ${colorRGB.g}, ${colorRGB.b}, 1)) blur(3px)`;
-
         // その勢力のお城の「出席番号」をすべて集めます
         const targetCastleIds = this.game.castles.filter(c => c.ownerClan === clanId).map(c => c.id);
         const targetIdsSet = new Set(targetCastleIds);
         
         // お城がない（滅亡しているなど）なら何もしません
-        if (targetIdsSet.size === 0) return;
+        if (targetIdsSet.size === 0) {
+            overlay.style.filter = 'none';
+            overlay.classList.remove('anim-map-glow', 'anim-map-glow-fast');
+            return;
+        }
+
+        // ★Round5：実際に光っている間だけ全画面Canvasの合成アニメーションを有効化します。
+        overlay.style.filter = `drop-shadow(0px 0px 15px rgba(${colorRGB.r}, ${colorRGB.g}, ${colorRGB.b}, 1)) blur(3px)`;
+        overlay.classList.remove('anim-map-glow', 'anim-map-glow-fast');
+        overlay.classList.add(canvasId === 'keep-blink-overlay' ? 'anim-map-glow-fast' : 'anim-map-glow');
 
         // 新しく光らせるための透明な絵の具セットを作ります
         const outputData = ctx.createImageData(width, height);
@@ -1817,6 +1834,7 @@ Object.assign(UIManager.prototype, {
         
         // ★追加：光のフィルター効果も忘れずにリセット（消去）します！
         overlay.style.filter = 'none';
+        overlay.classList.remove('anim-map-glow', 'anim-map-glow-fast');
         
         const ctx = overlay.getContext('2d');
         ctx.clearRect(0, 0, overlay.width, overlay.height);

@@ -84,6 +84,20 @@ window.GameEvents.push({
         }
 
         const mapOverlay = document.createElement('div');
+
+        // ★Round5：台風演出終了時にイベント専用の巨大Canvas/ImageDataを明示的に解放します。
+        const releaseTyphoonMapMemory = () => {
+            try {
+                mapOverlay.querySelectorAll('canvas').forEach(c => {
+                    c.width = 1;
+                    c.height = 1;
+                });
+            } catch (e) {
+            }
+            window.CastleColorImageDataCache = null;
+            window.ProvinceImageDataCache = null;
+        };
+
         mapOverlay.style.position = 'fixed';
         mapOverlay.style.top = '0';
         mapOverlay.style.left = '0';
@@ -505,6 +519,7 @@ window.GameEvents.push({
             });
 
             // メッセージを出す前に、まず地図（mapOverlay）を画面から消します
+            releaseTyphoonMapMemory();
             document.body.removeChild(mapOverlay);
 
             if (damagedProvinceMap.size > 0) {
@@ -530,6 +545,7 @@ window.GameEvents.push({
 
         } else {
             // 被害がなかった場合も、ここで忘れずに地図を消します
+            releaseTyphoonMapMemory();
             document.body.removeChild(mapOverlay);
             await game.ui.showDialogAsync("今回は大きな被害はなかったようです。", false, 0);
         }

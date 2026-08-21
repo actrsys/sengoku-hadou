@@ -8,8 +8,20 @@ class LifeSystem {
         this.game = game;
     }
 
+    // ★Round5：古いセーブや特殊イベントで familyIds が空欄でも停止しない安全装置です。
+    _normalizeFamilyArrays() {
+        const normalize = (person) => {
+            if (!person) return;
+            if (!Array.isArray(person.baseFamilyIds)) person.baseFamilyIds = [];
+            if (!Array.isArray(person.familyIds)) person.familyIds = [...person.baseFamilyIds];
+        };
+        (this.game.bushos || []).forEach(normalize);
+        (this.game.princesses || []).forEach(normalize);
+    }
+
     // 毎月の初め（1月）に「新しく登場する武将がいないか」をチェックします
     async processStartMonth() {
+        this._normalizeFamilyArrays();
         if (this.game.month === 1) {
             this.updateAllBushosAge(); // 毎年1月に、全員の年齢と能力を計算し直します！
             
@@ -42,6 +54,7 @@ class LifeSystem {
 
     // 毎月の終わりに「寿命を迎えて亡くなる武将がいないか」をチェックします
     async processEndMonth() {
+        this._normalizeFamilyArrays();
         await this.checkDeath();
     }
 
@@ -734,6 +747,7 @@ class LifeSystem {
 
     // お別れの処理をするところです
     async executeDeath(busho, context = {}) { // ★修正：イベントの指示（context）を受け取れるようにします
+        this._normalizeFamilyArrays();
         // ★高速化：最後に所属を0へ変更する前の勢力IDを覚えておきます。
         const formerClanId = Number(busho.clan) || 0;
         busho.status = 'dead'; // ステータスを「死亡」にします

@@ -538,8 +538,8 @@
             <div class="context-menu-item" id="ctx-menu-finish">命令終了</div>
         </div>
     </div>
-    <script src="js/howler.js"></script>
-    <script src="js/howler.min.js"></script>
+    <!-- Round5: Howlerは1本だけ読み込み、min版が無い環境では通常版へフォールバック -->
+    <script src="js/howler.min.js" onerror="this.onerror=null; this.src='js/howler.js';"></script>
     <script src="js/audio.js"></script>
     <script src="js/models.js"></script>
     <script src="js/courtRank_system.js"></script>

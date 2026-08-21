@@ -356,6 +356,9 @@ body:not(.is-pc):has(.modal:not(.hidden)) #bottom-command-bar {
 #map-scroll-container.grabbing { cursor: grabbing; }
 
 #map-container { position: relative; background-image: url('../data/images/map/japan_map.png'); background-size: 100% 100%; background-repeat: no-repeat; transform-origin: 0 0; margin: 0; flex: none; will-change: transform; backface-visibility: hidden; }
+/* ★Round5：スマホでは巨大マップを常時GPUレイヤーとして予約しない。 */
+body:not(.is-pc) #map-scroll-container { will-change: auto; }
+body:not(.is-pc) #map-container { will-change: auto; backface-visibility: visible; }
 #pc-map-overlay { display: none !important; }
 #zoom-controls { display: none !important; }
 

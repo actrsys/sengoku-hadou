@@ -161,7 +161,12 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
         }
     });
 
+    // ★Round5：イベント専用の巨大Canvas/ImageDataを次のマップ描画より先に解放します。
+    mapOverlay.querySelectorAll('canvas').forEach(c => {
+        try { c.width = 1; c.height = 1; } catch (e) {}
+    });
     document.body.removeChild(mapOverlay);
+    window.ProvinceImageDataCache = null;
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // プレイヤーの領地の被害報告
@@ -1611,9 +1616,13 @@ window.GameEvents.push({
 
         // 最後に、誰かが臣従して地図に変化があった場合のみ、画面を綺麗に描き直します
         if (needMapUpdate) {
-            if (game.ui.updatePanelHeader) game.ui.updatePanelHeader();
-            if (game.ui.renderCommandMenu) game.ui.renderCommandMenu();
-            if (game.ui.renderMap) game.ui.renderMap();
+            if (game.isProcessingAI && !game.isWatchMode) {
+                game._aiDeferredMapRefresh = true;
+            } else {
+                if (game.ui.updatePanelHeader) game.ui.updatePanelHeader();
+                if (game.ui.renderCommandMenu) game.ui.renderCommandMenu();
+                if (game.ui.renderMap) game.ui.renderMap();
+            }
         }
     }
 });
