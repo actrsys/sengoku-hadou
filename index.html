@@ -76,12 +76,22 @@
     <div id="game-screen">
     
     <div id="global-loading-screen" class="hidden">
-            <div class="loading-text">Now Loading...</div>
+            <div class="loading-stage" aria-live="polite">
+                <div class="loading-title">戦国覇道</div>
+                <div class="loading-rule" aria-hidden="true"><span></span></div>
+                <div class="loading-text">NOW LOADING</div>
+                <div class="loading-track" aria-hidden="true"><span></span></div>
+            </div>
         </div>
 
         <div id="title-screen">
             <div class="title-content">
-                <h1 class="game-title">戦国覇道</h1>
+                <div class="title-brand">
+                    <div class="title-kicker">SENGOKU STRATEGY</div>
+                    <h1 class="game-title">戦国覇道</h1>
+                    <div class="title-rule" aria-hidden="true"><span></span></div>
+                    <div class="title-subtitle">乱世を駆け、天下への道を拓く</div>
+                </div>
                 <div class="title-menu">
                     <div id="menu-buttons" class="hidden">
                         <button id="start-btn" class="title-btn" onclick="window.GameApp.startNewGame()">はじめから</button>

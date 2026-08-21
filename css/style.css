@@ -3400,3 +3400,440 @@ body.background-paused #map-container {
 body:not(.is-pc) #map-container {
     transform-style: flat;
 }
+
+/* =========================================================
+   ★Round 28：タイトル / ローディング / シナリオ選択の意匠統一
+   静的グラデーションと1px装飾のみ。追加画像・Canvas・常時GPUアニメーションなし。
+   ========================================================= */
+:root {
+    --title-ink-0: #090b0c;
+    --title-ink-1: #111617;
+    --title-ink-2: #1a2221;
+    --title-gold: #b89a54;
+    --title-gold-bright: #ddc47e;
+    --title-gold-dim: rgba(184, 154, 84, 0.34);
+    --title-paper: #ede6d3;
+    --title-muted: #aaa692;
+    --title-red: #6f1f1a;
+}
+
+#title-screen,
+#global-loading-screen {
+    background:
+        radial-gradient(circle at 18% 24%, rgba(110, 87, 45, 0.13) 0, rgba(110, 87, 45, 0) 31%),
+        radial-gradient(circle at 82% 76%, rgba(35, 70, 58, 0.16) 0, rgba(35, 70, 58, 0) 33%),
+        linear-gradient(115deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 38px),
+        linear-gradient(155deg, var(--title-ink-0) 0%, var(--title-ink-1) 52%, #0b0e0f 100%);
+    color: var(--title-paper);
+}
+
+#title-screen {
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    padding: max(18px, env(safe-area-inset-top)) max(22px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left));
+    box-sizing: border-box;
+}
+
+#title-screen::before,
+#title-screen::after,
+#global-loading-screen::before,
+#global-loading-screen::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+    z-index: 0;
+}
+
+#title-screen::before,
+#global-loading-screen::before {
+    inset: 18px;
+    border: 1px solid rgba(184, 154, 84, 0.28);
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.75);
+}
+
+#title-screen::after,
+#global-loading-screen::after {
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(184,154,84,0.06) 20%, rgba(184,154,84,0.18) 50%, rgba(184,154,84,0.06) 80%, transparent 100%);
+}
+
+.title-content {
+    position: relative;
+    z-index: 1;
+    width: min(940px, 92%);
+    min-height: min(520px, 78vh);
+    padding: clamp(30px, 5vw, 58px);
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(250px, 0.75fr);
+    align-items: center;
+    gap: clamp(36px, 6vw, 76px);
+    text-align: left;
+    color: var(--title-paper);
+    background: linear-gradient(135deg, rgba(12,15,15,0.78), rgba(26,31,29,0.62));
+    border: 1px solid rgba(184,154,84,0.22);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.46), inset 0 0 45px rgba(0,0,0,0.22);
+}
+
+.title-content::before {
+    content: '';
+    position: absolute;
+    top: 36px;
+    bottom: 36px;
+    left: calc(63% - 1px);
+    width: 1px;
+    background: linear-gradient(to bottom, transparent, rgba(184,154,84,0.30) 18%, rgba(184,154,84,0.30) 82%, transparent);
+    pointer-events: none;
+}
+
+.title-brand {
+    min-width: 0;
+    padding-left: clamp(6px, 1vw, 16px);
+}
+
+.title-kicker {
+    margin-bottom: 12px;
+    color: var(--title-gold);
+    font-family: serif;
+    font-size: clamp(0.64rem, 1.1vw, 0.78rem);
+    font-weight: 400;
+    letter-spacing: 0.34em;
+    opacity: 0.88;
+}
+
+.game-title {
+    margin: 0;
+    font-family: 'FudeGoshirae', 'abashiri-mincho', serif;
+    font-size: clamp(4rem, 8.4vw, 7rem);
+    line-height: 0.98;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: #f0e8d1;
+    text-shadow: 0 4px 0 #050606, 0 12px 28px rgba(0,0,0,0.8);
+    white-space: nowrap;
+}
+
+.title-rule,
+.loading-rule {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: min(330px, 88%);
+    height: 13px;
+    margin: 22px 0 16px;
+}
+.title-rule::before,
+.title-rule::after,
+.loading-rule::before,
+.loading-rule::after {
+    content: '';
+    height: 1px;
+    flex: 1;
+    background: linear-gradient(90deg, transparent, var(--title-gold));
+}
+.title-rule::after,
+.loading-rule::after { transform: scaleX(-1); }
+.title-rule span,
+.loading-rule span {
+    width: 7px;
+    height: 7px;
+    border: 1px solid var(--title-gold-bright);
+    transform: rotate(45deg);
+    box-sizing: border-box;
+}
+
+.title-subtitle {
+    color: var(--title-muted);
+    font-size: clamp(0.9rem, 1.5vw, 1.08rem);
+    font-weight: 400;
+    letter-spacing: 0.16em;
+}
+
+.title-menu {
+    width: 100%;
+    max-width: 310px;
+    justify-self: end;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+#title-screen #menu-buttons {
+    width: 100%;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.title-btn {
+    position: relative;
+    width: 100%;
+    min-height: 50px;
+    padding: 10px 44px 10px 24px;
+    box-sizing: border-box;
+    overflow: hidden;
+    border: 1px solid rgba(184,154,84,0.28);
+    border-left: 3px solid rgba(184,154,84,0.62);
+    border-radius: 0;
+    background: linear-gradient(90deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
+    color: #e8e0cb;
+    font-family: 'abashiri-mincho', serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-align: left;
+    text-shadow: 0 2px 2px #000;
+    transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, padding-left 0.16s ease;
+}
+
+.title-btn::after {
+    content: '›';
+    position: absolute;
+    right: 18px;
+    top: 50%;
+    transform: translateY(-53%);
+    color: rgba(221,196,126,0.55);
+    font-family: serif;
+    font-size: 1.3rem;
+    font-weight: 400;
+}
+
+.title-btn:hover,
+.title-btn:focus-visible {
+    padding-left: 31px;
+    background: linear-gradient(90deg, rgba(123,94,39,0.24), rgba(255,255,255,0.035));
+    border-color: rgba(221,196,126,0.65);
+    border-left-color: var(--title-gold-bright);
+    color: #fff4d7;
+    outline: none;
+}
+
+.title-btn:active {
+    background: rgba(111,31,26,0.34);
+    transform: translateY(1px);
+}
+
+#start-btn { border-left-color: #a94435; }
+#watch-start-btn { border-left-color: #657b6d; }
+#settings-btn { color: #c3beae; }
+
+.title-tap-message {
+    width: 100%;
+    margin: 0;
+    padding: 22px 10px;
+    box-sizing: border-box;
+    color: #d8cfb5;
+    font-family: serif;
+    font-size: clamp(0.78rem, 1.3vw, 0.94rem);
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-align: center;
+    border-top: 1px solid rgba(184,154,84,0.22);
+    border-bottom: 1px solid rgba(184,154,84,0.22);
+    animation: titleTapPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes titleTapPulse {
+    0%, 100% { opacity: 0.48; }
+    50% { opacity: 1; }
+}
+
+/* ローディング：タイトル画面と同じ素材感で、表示物だけを絞ります。 */
+#global-loading-screen {
+    position: absolute;
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+    box-sizing: border-box;
+}
+
+.loading-stage {
+    position: relative;
+    z-index: 1;
+    width: min(420px, 78vw);
+    text-align: center;
+    color: var(--title-paper);
+}
+.loading-title {
+    font-family: 'FudeGoshirae', 'abashiri-mincho', serif;
+    font-size: clamp(2.6rem, 7vw, 4.6rem);
+    line-height: 1;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    text-shadow: 0 4px 0 #050606, 0 10px 24px rgba(0,0,0,0.72);
+}
+.loading-rule {
+    width: min(280px, 76%);
+    margin: 20px auto 18px;
+}
+.loading-text {
+    color: #b8b19f;
+    font-family: serif;
+    font-size: 0.74rem;
+    font-weight: 400;
+    letter-spacing: 0.42em;
+    animation: none;
+}
+.loading-track {
+    width: min(240px, 68%);
+    height: 2px;
+    margin: 18px auto 0;
+    overflow: hidden;
+    background: rgba(184,154,84,0.16);
+}
+.loading-track span {
+    display: block;
+    width: 32%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, var(--title-gold-bright), transparent);
+    animation: titleLoadingSweep 1.65s ease-in-out infinite;
+}
+@keyframes titleLoadingSweep {
+    0% { transform: translateX(-110%); opacity: 0.35; }
+    50% { opacity: 1; }
+    100% { transform: translateX(320%); opacity: 0.35; }
+}
+
+/* シナリオ選択も入口画面と同じ黒漆・鈍金へ寄せます。 */
+#scenario-modal {
+    background:
+        radial-gradient(circle at 20% 18%, rgba(110,87,45,0.12), transparent 34%),
+        rgba(5,7,7,0.92);
+}
+#scenario-modal .start-content {
+    width: min(720px, 92%);
+    max-width: 720px;
+    padding: clamp(18px, 3vw, 30px);
+    background: linear-gradient(145deg, rgba(19,24,23,0.98), rgba(9,12,12,0.98));
+    border: 1px solid rgba(184,154,84,0.42);
+    border-radius: 0;
+    box-shadow: 0 24px 65px rgba(0,0,0,0.62), inset 0 0 40px rgba(0,0,0,0.18);
+}
+#scenario-modal .start-content > h2 {
+    margin: 2px 0 14px;
+    color: #eee5cf;
+    font-family: 'FudeGoshirae', 'abashiri-mincho', serif;
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-shadow: 0 3px 0 #000;
+}
+#scenario-modal .scenario-list-vertical,
+#scenario-modal #scenario-list {
+    gap: 8px;
+    margin-top: 10px;
+}
+#scenario-modal .clan-btn {
+    min-height: 48px;
+    padding: 10px 18px;
+    border: 1px solid rgba(184,154,84,0.30);
+    border-left: 3px solid rgba(184,154,84,0.58);
+    border-radius: 0;
+    background: linear-gradient(90deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012));
+    color: #dfd7c2;
+    letter-spacing: 0.08em;
+    box-shadow: none;
+    transform: none;
+}
+#scenario-modal .clan-btn:hover {
+    transform: none;
+    background: rgba(120,92,43,0.20);
+    border-color: rgba(221,196,126,0.66);
+}
+#scenario-modal .clan-btn.selected {
+    transform: none;
+    color: #fff1c7;
+    background: linear-gradient(90deg, rgba(111,31,26,0.48), rgba(120,92,43,0.17));
+    border-color: #c2a55d;
+    border-left-color: #e0c77e;
+    box-shadow: inset 0 0 22px rgba(0,0,0,0.24);
+}
+#scenario-modal .scenario-desc-box {
+    margin-top: 13px;
+    padding: 14px 16px;
+    border: 1px solid rgba(184,154,84,0.24);
+    border-radius: 0;
+    background: rgba(0,0,0,0.26);
+    color: #cbc4b3;
+    text-shadow: none;
+}
+#scenario-modal .modal-footer {
+    margin-top: 14px;
+    min-height: 54px;
+}
+#scenario-modal .btn-primary,
+#scenario-modal .btn-secondary {
+    min-width: 130px;
+    border-radius: 0;
+}
+
+/* 低負荷端末では装飾アニメーションを完全停止してもレイアウトは崩れません。 */
+@media (prefers-reduced-motion: reduce) {
+    .title-tap-message,
+    .loading-track span { animation: none !important; }
+    .loading-track span { width: 100%; opacity: 0.65; }
+}
+
+/* 縦長・狭幅端末：題字とメニューを上下にして、5項目以上でも収めやすくします。 */
+@media (max-width: 720px), (max-height: 560px) {
+    #title-screen { padding: 14px; }
+    #title-screen::before,
+    #global-loading-screen::before { inset: 9px; }
+    .title-content {
+        width: min(620px, 94%);
+        min-height: 0;
+        max-height: 94%;
+        padding: clamp(20px, 4vw, 30px);
+        grid-template-columns: 1fr;
+        gap: 20px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+    .title-content::before { display: none; }
+    .title-brand { text-align: center; padding-left: 0; }
+    .game-title { font-size: clamp(3.1rem, 13vw, 5.2rem); }
+    .title-kicker { margin-bottom: 8px; }
+    .title-rule { margin: 14px auto 10px; }
+    .title-subtitle { font-size: 0.82rem; }
+    .title-menu { justify-self: center; max-width: 360px; }
+    #title-screen #menu-buttons { gap: 6px; }
+    .title-btn {
+        min-height: 43px;
+        padding-top: 7px;
+        padding-bottom: 7px;
+        font-size: 0.94rem;
+    }
+    .title-tap-message { padding: 15px 8px; }
+}
+
+/* 特に高さの低い横持ちスマホでは題字をさらに縮め、メニューを2列にします。 */
+@media (max-height: 430px) and (min-width: 560px) {
+    .title-content {
+        width: min(900px, 95%);
+        padding: 18px 24px;
+        grid-template-columns: minmax(190px, 0.8fr) minmax(320px, 1.2fr);
+        gap: 28px;
+        overflow: hidden;
+    }
+    .title-brand { text-align: left; }
+    .game-title { font-size: clamp(2.9rem, 7vw, 4.1rem); }
+    .title-rule { margin: 11px 0 8px; }
+    .title-subtitle { font-size: 0.72rem; }
+    #title-screen #menu-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+    }
+    .title-btn { min-height: 42px; font-size: 0.88rem; padding-left: 16px; padding-right: 30px; }
+    .title-btn:hover,
+    .title-btn:focus-visible { padding-left: 20px; }
+    .title-btn::after { right: 10px; }
+}
