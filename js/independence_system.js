@@ -478,8 +478,18 @@ class IndependenceSystem {
 
         this.game.updateCastleLord(castle);
         
-        // ★追加：独立や寝返りで勢力が大きく変わるので、威信を最新に更新しておきます！
-        if (window.GameApp) window.GameApp.updateAllClanPrestige();
+        // ★Round7：独立・寝返りで実際に値が変わった旧勢力と新勢力だけ威信を更新します。
+        // 全勢力の再計算はイベント終了後の共通更新でも行われるため、演出直前の瞬間負荷を抑えます。
+        if (window.GameApp) {
+            if (typeof window.GameApp.updateClanPrestige === 'function') {
+                window.GameApp.updateClanPrestige(oldClanId);
+                if (Number(newClanId) !== Number(oldClanId)) {
+                    window.GameApp.updateClanPrestige(newClanId);
+                }
+            } else if (typeof window.GameApp.updateAllClanPrestige === 'function') {
+                window.GameApp.updateAllClanPrestige();
+            }
+        }
         
         // ★ここから複数城に対応した演出魔法の始まりです！
         // 今回勢力が変わった城（独立・寝返りに参加した城）のIDをすべて集めます
@@ -517,21 +527,48 @@ class IndependenceSystem {
         if (newClanDataObj && newClanDataObj.color && typeof DataManager !== 'undefined') newColorRgb = DataManager.hexToRgb(newClanDataObj.color);
 
         // 参加したお城をすべて同時にチカチカ点滅させます！
+        if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+            this.game.writeSystemDiagnostic('independence:blink_start');
+        }
         await this.game.ui.playBattleBlink(changedCastleIds, oldColor, newColorRgb, 1000);
+        if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+            this.game.writeSystemDiagnostic('independence:blink_done');
+        }
 
-        // ★追加：点滅が終わったらストッパーを外して、新しい色を塗れるようにします！
+        // ★点滅が終わったらストッパーを外して、新しい色を塗れるようにします。
         this.game.isSuspendingColorUpdate = false;
 
-        // フワッと光るアニメーションと一緒に、色を新しく塗り替えます！
+        // Round7:
+        // 以前は白い発光Canvasを保持している「途中」で renderMap() を呼び、
+        // 発光用バッファ＋勢力色ImageData＋新しいDOMが同時に存在していました。
+        // 古いスマホではここがメモリ/GPUピークになるため、
+        // 発光演出を完全に片付けてから地図更新を1回だけ行います。
+        // 点滅CanvasのGPU解放にも1イベントループ分の隙間を与えます。
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+            this.game.writeSystemDiagnostic('independence:capture_start');
+        }
         if (typeof this.game.ui.playCaptureEffect === 'function') {
-            await this.game.ui.playCaptureEffect(changedCastleIds, () => {
-                if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
-                    this.game.ui.renderMap();
+            await this.game.ui.playCaptureEffect(changedCastleIds);
+        }
+        if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+            this.game.writeSystemDiagnostic('independence:capture_done');
+        }
+
+        // AI/月末処理中はRound5以降の方針どおり、プレイヤー復帰時の1回へ描画を延期します。
+        // 観戦中や通常操作中だけ、ここで1回描き直します。
+        if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+            if (this.game.isProcessingAI && !this.game.isWatchMode) {
+                this.game._aiDeferredMapRefresh = true;
+                if (typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic('independence:render_deferred');
                 }
-            });
-        } else {
-            if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+            } else {
                 this.game.ui.renderMap();
+                if (typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic('independence:render_done');
+                }
             }
         }
         // バリアを解除します

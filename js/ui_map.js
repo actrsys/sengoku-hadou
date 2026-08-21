@@ -1923,127 +1923,200 @@ Object.assign(UIManager.prototype, {
     // ==========================================
     // ★追加：指定したお城の領地だけをチカチカ点滅させる魔法です！
     // ==========================================
+    /**
+     * Round7: 城領域エフェクト用の軽量マスクを作ります。
+     * 以前はマップ全体(例:1200x800)の ImageData / Canvas を複数枚同時生成していました。
+     * 対象城が占める範囲だけを切り抜くことで、古いスマホの瞬間メモリ/GPU負荷を抑えます。
+     */
+    _buildCastleEffectMask(castleIdOrIds, expandSteps = 0, glowPadding = 24) {
+        const mapWidth = Number(this.game.mapWidth || 1200);
+        const mapHeight = Number(this.game.mapHeight || 800);
+        const pixelMap = this.pixelCastleMap;
+
+        if (!pixelMap || pixelMap.length < mapWidth * mapHeight) return null;
+
+        const targetIdsArray = Array.isArray(castleIdOrIds) ? castleIdOrIds : [castleIdOrIds];
+        const targetIds = new Set(targetIdsArray.map(id => Number(id)).filter(id => Number.isFinite(id)));
+        if (targetIds.size === 0) return null;
+
+        let minX = mapWidth, minY = mapHeight, maxX = -1, maxY = -1;
+
+        // まず対象領域の外接矩形だけを求めます。巨大な全画面 targetPixels は作りません。
+        for (let i = 0; i < mapWidth * mapHeight; i++) {
+            if (!targetIds.has(pixelMap[i])) continue;
+            const y = Math.floor(i / mapWidth);
+            const x = i - (y * mapWidth);
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+        }
+
+        if (maxX < minX || maxY < minY) return null;
+
+        // blur / drop-shadow が切れないように余白を持たせます。
+        const margin = Math.max(0, Number(expandSteps) || 0) + Math.max(0, Number(glowPadding) || 0);
+        const left = Math.max(0, minX - margin);
+        const top = Math.max(0, minY - margin);
+        const right = Math.min(mapWidth - 1, maxX + margin);
+        const bottom = Math.min(mapHeight - 1, maxY + margin);
+        const width = right - left + 1;
+        const height = bottom - top + 1;
+
+        const targetPixels = new Uint8Array(width * height);
+
+        for (let y = minY; y <= maxY; y++) {
+            const srcRow = y * mapWidth;
+            const dstRow = (y - top) * width;
+            for (let x = minX; x <= maxX; x++) {
+                if (targetIds.has(pixelMap[srcRow + x])) {
+                    targetPixels[dstRow + (x - left)] = 1;
+                }
+            }
+        }
+
+        // 点滅用の少し太い縁取り。切り抜き領域内だけで行うので非常に小さく済みます。
+        const steps = Math.max(0, Number(expandSteps) || 0);
+        for (let step = 0; step < steps; step++) {
+            const before = new Uint8Array(targetPixels);
+            for (let y = 1; y < height - 1; y++) {
+                const row = y * width;
+                for (let x = 1; x < width - 1; x++) {
+                    const i = row + x;
+                    if (before[i] !== 0) continue;
+                    if (before[i - width] === 1 || before[i + width] === 1 ||
+                        before[i - 1] === 1 || before[i + 1] === 1) {
+                        targetPixels[i] = 1;
+                    }
+                }
+            }
+        }
+
+        const maskCanvas = document.createElement('canvas');
+        maskCanvas.width = width;
+        maskCanvas.height = height;
+        const maskCtx = maskCanvas.getContext('2d');
+        const maskData = maskCtx.createImageData(width, height);
+
+        for (let i = 0; i < targetPixels.length; i++) {
+            if (targetPixels[i] !== 1) continue;
+            const idx = i * 4;
+            maskData.data[idx] = 255;
+            maskData.data[idx + 1] = 255;
+            maskData.data[idx + 2] = 255;
+            maskData.data[idx + 3] = 255;
+        }
+        maskCtx.putImageData(maskData, 0, 0);
+
+        return {
+            left, top, width, height, canvas: maskCanvas,
+            release() {
+                // Canvasのサイズを1x1に戻すと、多くのWebViewでGPUバッファも早く解放されます。
+                maskCanvas.width = 1;
+                maskCanvas.height = 1;
+            }
+        };
+    },
+
+    _createCroppedEffectOverlay(id, maskInfo, zIndex) {
+        const oldOverlay = document.getElementById(id);
+        if (oldOverlay) {
+            try {
+                oldOverlay.width = 1;
+                oldOverlay.height = 1;
+            } catch (e) {}
+            if (oldOverlay.parentNode) oldOverlay.parentNode.removeChild(oldOverlay);
+        }
+
+        const overlay = document.createElement('canvas');
+        overlay.id = id;
+        overlay.width = maskInfo.width;
+        overlay.height = maskInfo.height;
+        overlay.style.position = 'absolute';
+        overlay.style.left = `${maskInfo.left}px`;
+        overlay.style.top = `${maskInfo.top}px`;
+        overlay.style.pointerEvents = 'none';
+        overlay.style.zIndex = String(zIndex);
+        this.mapEl.appendChild(overlay);
+        return overlay;
+    },
+
+    _releaseEffectOverlay(overlay, maskInfo) {
+        if (overlay) {
+            try {
+                const ctx = overlay.getContext('2d');
+                if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+                overlay.style.filter = 'none';
+                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                overlay.width = 1;
+                overlay.height = 1;
+            } catch (e) {}
+        }
+        if (maskInfo && typeof maskInfo.release === 'function') {
+            maskInfo.release();
+        }
+    },
+
     playBattleBlink(castleIdOrIds, colorA, colorB, durationMs) {
         return new Promise(resolve => {
             this.showMapGuard();
 
-            let overlay = document.getElementById('battle-blink-overlay');
-            if (!overlay) {
-                overlay = document.createElement('canvas');
-                overlay.id = 'battle-blink-overlay';
-                overlay.width = this.game.mapWidth || 1200;
-                overlay.height = this.game.mapHeight || 800;
-                overlay.style.position = 'absolute';
-                overlay.style.left = '0px';
-                overlay.style.top = '0px';
-                overlay.style.pointerEvents = 'none';
-                overlay.style.zIndex = '6'; 
-                this.mapEl.appendChild(overlay);
+            // Round7: 対象城の周囲だけの小さなCanvasを使います。
+            const maskInfo = this._buildCastleEffectMask(castleIdOrIds, 2, 24);
+            if (!maskInfo) {
+                this.hideMapGuard();
+                resolve();
+                return;
             }
-            
+
+            const overlay = this._createCroppedEffectOverlay('battle-blink-overlay', maskInfo, 6);
             const ctx = overlay.getContext('2d');
             const width = overlay.width;
             const height = overlay.height;
-            const outputDataA = ctx.createImageData(width, height);
-            const outputDataB = ctx.createImageData(width, height);
-            
+
             const colorA_RGB = colorA || { r: 255, g: 255, b: 255 };
             const colorB_RGB = colorB || { r: 255, g: 255, b: 255 };
 
-            if (this.pixelCastleMap) {
-                const targetPixels = new Uint8Array(width * height);
+            // 2色分の巨大ImageData/Canvasを持たず、同じ1枚のマスクを色だけ変えて使います。
+            const paintColor = (color) => {
+                ctx.clearRect(0, 0, width, height);
+                ctx.save();
+                ctx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, 0.78)`;
+                ctx.fillRect(0, 0, width, height);
+                ctx.globalCompositeOperation = 'destination-in';
+                ctx.drawImage(maskInfo.canvas, 0, 0);
+                ctx.restore();
+                overlay.style.filter = `drop-shadow(0px 0px 15px rgba(${color.r}, ${color.g}, ${color.b}, 1)) blur(3px)`;
+            };
 
-                const targetIdsArray = Array.isArray(castleIdOrIds) ? castleIdOrIds : [castleIdOrIds];
-                const targetIdsSet = new Set(targetIdsArray);
-
-                for (let i = 0; i < this.pixelCastleMap.length; i++) {
-                    if (targetIdsSet.has(this.pixelCastleMap[i])) {
-                        targetPixels[i] = 1;
-                    }
-                }
-
-                for (let step = 0; step < 2; step++) {
-                    const tempPixels = new Uint8Array(targetPixels);
-                    for (let y = 1; y < height - 1; y++) {
-                        for (let x = 1; x < width - 1; x++) {
-                            const i = y * width + x;
-                            if (tempPixels[i] === 0) {
-                                if (tempPixels[i - width] === 1 ||
-                                    tempPixels[i + width] === 1 ||
-                                    tempPixels[i - 1] === 1 ||
-                                    tempPixels[i + 1] === 1) {
-                                    targetPixels[i] = 1;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                for (let i = 0; i < targetPixels.length; i++) {
-                    if (targetPixels[i] === 1) {
-                        const idx = i * 4;
-                        outputDataA.data[idx] = colorA_RGB.r;
-                        outputDataA.data[idx+1] = colorA_RGB.g;
-                        outputDataA.data[idx+2] = colorA_RGB.b;
-                        outputDataA.data[idx+3] = 200;
-                        
-                        outputDataB.data[idx] = colorB_RGB.r;
-                        outputDataB.data[idx+1] = colorB_RGB.g;
-                        outputDataB.data[idx+2] = colorB_RGB.b;
-                        outputDataB.data[idx+3] = 200; 
-                    }
-                }
-            }
-
-            // ★ここから新しい魔法：2つの色の「スタンプ」をあらかじめ作っておきます！
-            const tempCanvasA = document.createElement('canvas');
-            tempCanvasA.width = width;
-            tempCanvasA.height = height;
-            tempCanvasA.getContext('2d').putImageData(outputDataA, 0, 0);
-
-            const tempCanvasB = document.createElement('canvas');
-            tempCanvasB.width = width;
-            tempCanvasB.height = height;
-            tempCanvasB.getContext('2d').putImageData(outputDataB, 0, 0);
-            // ★新しい魔法ここまで！
-            
-            let startTime = performance.now();
+            const startTime = performance.now();
             let isA = true;
-            const blinkInterval = 250; 
+            const blinkInterval = 250;
             let lastSwitchTime = startTime;
+
+            paintColor(colorA_RGB);
+
+            const finish = () => {
+                this._releaseEffectOverlay(overlay, maskInfo);
+                this.hideMapGuard();
+                resolve();
+            };
 
             const animate = (currentTime) => {
                 if (currentTime - startTime > durationMs) {
-                    ctx.clearRect(0, 0, width, height);
-                    // ★終わったらフィルター（ぼやっと光る効果）をリセットします！
-                    overlay.style.filter = 'none';
-                    this.hideMapGuard(); 
-                    resolve();
+                    finish();
                     return;
                 }
-                
+
                 if (currentTime - lastSwitchTime > blinkInterval) {
                     isA = !isA;
                     lastSwitchTime = currentTime;
-                    ctx.clearRect(0, 0, width, height);
-                    
-                    // ★追加：点滅する色に合わせて、ぼやっと広がるフィルターの色も変えます！
-                    if (isA) {
-                        overlay.style.filter = `drop-shadow(0px 0px 15px rgba(${colorA_RGB.r}, ${colorA_RGB.g}, ${colorA_RGB.b}, 1)) blur(3px)`;
-                    } else {
-                        overlay.style.filter = `drop-shadow(0px 0px 15px rgba(${colorB_RGB.r}, ${colorB_RGB.g}, ${colorB_RGB.b}, 1)) blur(3px)`;
-                    }
-
-                    // ★重たい作業をやめて、用意したスタンプをポンッと押すだけにします！
-                    ctx.drawImage(isA ? tempCanvasA : tempCanvasB, 0, 0);
+                    paintColor(isA ? colorA_RGB : colorB_RGB);
                 }
-                
+
                 requestAnimationFrame(animate);
             };
-            
-            // ★最初の1回目もスタンプとフィルターをセットします！
-            overlay.style.filter = `drop-shadow(0px 0px 15px rgba(${colorA_RGB.r}, ${colorA_RGB.g}, ${colorA_RGB.b}, 1)) blur(3px)`;
-            ctx.drawImage(tempCanvasA, 0, 0);
+
             requestAnimationFrame(animate);
         });
     },
@@ -2055,110 +2128,67 @@ Object.assign(UIManager.prototype, {
         return new Promise(resolve => {
             this.showMapGuard();
 
-            let overlay = document.getElementById('capture-effect-overlay');
-            if (!overlay) {
-                overlay = document.createElement('canvas');
-                overlay.id = 'capture-effect-overlay';
-                overlay.width = this.game.mapWidth || 1200;
-                overlay.height = this.game.mapHeight || 800;
-                overlay.style.position = 'absolute';
-                overlay.style.left = '0px';
-                overlay.style.top = '0px';
-                overlay.style.pointerEvents = 'none';
-                overlay.style.zIndex = '7';
-                this.mapEl.appendChild(overlay);
+            // Round7: こちらも対象城周辺だけに限定します。
+            const maskInfo = this._buildCastleEffectMask(castleIdOrIds, 0, 24);
+            if (!maskInfo) {
+                if (typeof onHalfway === 'function') onHalfway();
+                this.hideMapGuard();
+                resolve();
+                return;
             }
-            
+
+            const overlay = this._createCroppedEffectOverlay('capture-effect-overlay', maskInfo, 7);
             const ctx = overlay.getContext('2d');
             const width = overlay.width;
             const height = overlay.height;
-            
-            const targetPixels = new Uint8Array(width * height);
-            const edgePixels = new Uint8Array(width * height);
-            
-            if (this.pixelCastleMap) {
-                const targetIdsArray = Array.isArray(castleIdOrIds) ? castleIdOrIds : [castleIdOrIds];
-                const targetIdsSet = new Set(targetIdsArray);
 
-                for (let i = 0; i < this.pixelCastleMap.length; i++) {
-                    if (targetIdsSet.has(this.pixelCastleMap[i])) {
-                        targetPixels[i] = 1;
-                    }
-                }
-                for (let y = 1; y < height - 1; y++) {
-                    for (let x = 1; x < width - 1; x++) {
-                        const i = y * width + x;
-                        if (targetPixels[i] === 1) {
-                            if (targetPixels[i - width] === 0 || targetPixels[i + width] === 0 ||
-                                targetPixels[i - 1] === 0 || targetPixels[i + 1] === 0) {
-                                edgePixels[i] = 1;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ★ここから新しい魔法：最初に1枚だけ「光るスタンプ」を作っておきます！
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = width;
-            tempCanvas.height = height;
-            const tempCtx = tempCanvas.getContext('2d');
-            const baseImgData = tempCtx.createImageData(width, height);
-            
-            for (let i = 0; i < targetPixels.length; i++) {
-                if (targetPixels[i] === 1) {
-                    const idx = i * 4;
-                    baseImgData.data[idx] = 255;
-                    baseImgData.data[idx+1] = 255;
-                    baseImgData.data[idx+2] = 255;
-                    baseImgData.data[idx+3] = 255; // 完全に不透明な白で作ります
-                }
-            }
-            tempCtx.putImageData(baseImgData, 0, 0);
-            // ★新しい魔法ここまで！
-            
-            // ★追加：城が落ちる時は白い光なので、白いぼやっとしたフィルターをかけます！
             overlay.style.filter = 'drop-shadow(0px 0px 15px rgba(255, 255, 255, 1)) blur(3px)';
-            
-            let startTime = performance.now();
+
+            const drawWhiteMask = (alpha) => {
+                ctx.clearRect(0, 0, width, height);
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, width, height);
+                ctx.globalCompositeOperation = 'destination-in';
+                ctx.drawImage(maskInfo.canvas, 0, 0);
+                ctx.restore();
+            };
+
+            const startTime = performance.now();
             const durationRise = 800;
             const durationFlash = 600;
             const totalDuration = durationRise + durationFlash;
             let halfwayDone = false;
 
+            const finish = () => {
+                this._releaseEffectOverlay(overlay, maskInfo);
+                this.hideMapGuard();
+                resolve();
+            };
+
             const animate = (currentTime) => {
                 const elapsed = currentTime - startTime;
-                ctx.clearRect(0, 0, width, height);
 
                 if (elapsed < durationRise) {
                     const progress = elapsed / durationRise;
-                    // ★毎フレーム絵の具を作るのをやめて、スタンプを半透明にして押します！
-                    ctx.globalAlpha = progress * 0.9;
-                    ctx.drawImage(tempCanvas, 0, 0);
-                    ctx.globalAlpha = 1.0; // 忘れずに元に戻します
+                    drawWhiteMask(progress * 0.9);
                 } else if (elapsed < totalDuration) {
                     if (!halfwayDone) {
                         halfwayDone = true;
-                        if (onHalfway) onHalfway();
+                        if (typeof onHalfway === 'function') onHalfway();
                     }
                     const progress = (elapsed - durationRise) / durationFlash;
-                    const alpha = 1.0 - progress;
-                    // ★ここもスタンプを押すだけです！
-                    ctx.globalAlpha = alpha;
-                    ctx.drawImage(tempCanvas, 0, 0);
-                    ctx.globalAlpha = 1.0;
+                    drawWhiteMask(1.0 - progress);
                 }
 
                 if (elapsed < totalDuration) {
                     requestAnimationFrame(animate);
                 } else {
-                    ctx.clearRect(0, 0, width, height);
-                    // ★終わったらフィルターを忘れずにリセットします！
-                    overlay.style.filter = 'none';
-                    this.hideMapGuard();
-                    resolve();
+                    finish();
                 }
             };
+
             requestAnimationFrame(animate);
         });
     }
