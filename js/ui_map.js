@@ -145,6 +145,9 @@ Object.assign(UIManager.prototype, {
             canvas.height = 1;
         } catch (e) {}
         canvas.remove();
+        if (canvasId === 'snow-overlay' && this._lastSnowOverlay === canvas) {
+            this._lastSnowOverlay = null;
+        }
     },
 
     // ★Round14：ズーム中に強制リロードされた場合だけ既存の実機診断に痕跡を残します。
@@ -684,9 +687,24 @@ Object.assign(UIManager.prototype, {
         // 毎回3.8MB級のCanvasを捨てて作り直すメモリピークを避けます。
         let persistentClanColor = document.getElementById('clan-color-overlay') || this._lastClanColorOverlay || null;
 
-        // ★Round5/14：一時エフェクトCanvasだけを縮めて解放します。
+        // ★Round15：雪Canvasも「雪が存在する間」は静的表示層として再利用します。
+        // renderMapごとにCanvasを捨てて、別途3.8MB級ImageDataで復元する必要をなくします。
+        const hasHeavySnowForRender = Array.isArray(this.game.provinces) && this.game.provinces.some(
+            p => p.statusEffects && p.statusEffects.includes('heavySnow')
+        );
+        let persistentSnowOverlay = hasHeavySnowForRender
+            ? (document.getElementById('snow-overlay') || this._lastSnowOverlay || null)
+            : null;
+        if (!hasHeavySnowForRender) {
+            this._releaseMapOverlayCanvas('snow-overlay');
+            persistentSnowOverlay = null;
+            this.lastSnowHash = null;
+            this._snowOverlayDirty = false;
+        }
+
+        // ★Round5/14/15：一時エフェクトCanvasだけを縮めて解放します。
         this.mapEl.querySelectorAll('canvas').forEach(oldCanvas => {
-            if (oldCanvas === persistentClanColor) return;
+            if (oldCanvas === persistentClanColor || oldCanvas === persistentSnowOverlay) return;
             try {
                 const oldCtx = oldCanvas.getContext('2d');
                 if (oldCtx) oldCtx.clearRect(0, 0, oldCanvas.width, oldCanvas.height);
@@ -703,6 +721,14 @@ Object.assign(UIManager.prototype, {
                 persistentClanColor.height = mapH;
             }
             this.mapEl.appendChild(persistentClanColor);
+        }
+        if (persistentSnowOverlay) {
+            if (persistentSnowOverlay.width !== mapW || persistentSnowOverlay.height !== mapH) {
+                persistentSnowOverlay.width = mapW;
+                persistentSnowOverlay.height = mapH;
+                this._snowOverlayDirty = true;
+            }
+            this.mapEl.appendChild(persistentSnowOverlay);
         }
         
         // ★追加：一旦、勢力名シールが出ている合図をリセットします
@@ -1521,7 +1547,16 @@ Object.assign(UIManager.prototype, {
     // ★大雪の国のマップ上に、白い水玉模様を描く魔法です！
     // ==========================================
     updateSnowOverlay() {
-        if (this.isBackgroundPaused) return;
+        // ★Round15：月初AI中はイベント演出と雪Canvas確保を重ねません。
+        // 状態だけdirtyにして、プレイヤー復帰時のrenderMapで1回だけ描きます。
+        if (this.isBackgroundPaused) {
+            this._snowOverlayDirty = true;
+            return;
+        }
+        if (this.game && this.game.isProcessingAI && !this.game.isWatchMode) {
+            this._snowOverlayDirty = true;
+            return;
+        }
 
         const hasHeavySnow = Array.isArray(this.game.provinces) && this.game.provinces.some(
             p => p.statusEffects && p.statusEffects.includes('heavySnow')
@@ -1529,18 +1564,20 @@ Object.assign(UIManager.prototype, {
         if (!hasHeavySnow) {
             this._releaseMapOverlayCanvas('snow-overlay');
             this.lastSnowHash = null;
-            this.lastSnowImageData = null;
+            this._snowOverlayDirty = false;
             return;
         }
 
+        const existingOverlay = document.getElementById('snow-overlay');
         const overlay = this._ensureMapOverlayCanvas('snow-overlay', 4);
         if (!overlay) return;
+        const canReusePixels = existingOverlay === overlay && this._lastSnowOverlay === overlay;
 
-        // DataManagerにこっそりしまっておいた画像データ（裏側の秘密マップ）をもらいます
-        const sourceData = DataManager.provinceImageData;
-        
-        // ★修正：ロードしたばかりで画像データが無い場合は、読み込んでからやり直します！
-        if (!sourceData) {
+        // pixelProvinceMapがあれば雪描画にはprovince ImageData自体は不要です。
+        // 未生成の場合だけ従来の色コード判定用ImageDataを準備します。
+        let sourceData = DataManager.provinceImageData;
+        if (!this.pixelProvinceMap && !sourceData) {
+            this._snowOverlayDirty = true;
             const provMapImg = new Image();
             provMapImg.src = './data/images/map/japan_provinces.png';
             provMapImg.onload = () => {
@@ -1549,119 +1586,89 @@ Object.assign(UIManager.prototype, {
                 tempCanvas.height = provMapImg.naturalHeight;
                 const tempCtx = tempCanvas.getContext('2d');
                 tempCtx.drawImage(provMapImg, 0, 0);
-                DataManager.provinceImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                try {
+                    DataManager.provinceImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                } finally {
+                    // getImageData取得後は一時Canvasのbacking storeを解放します。
+                    try { tempCanvas.width = 1; tempCanvas.height = 1; } catch (e) {}
+                }
                 this.updateSnowOverlay();
             };
             return;
         }
 
-        // ★ここから記憶の魔法！
-        // 全部の国の大雪状態を「0（降ってない）」「1（降ってる）」という文字にして繋げます
-        const currentSnowHash = this.game.provinces.map(p => p.statusEffects && p.statusEffects.includes('heavySnow') ? '1' : '0').join('');
-        
-        // もし前回の状態と全く同じで、しかも記憶した絵（写真）が残っていれば…
-        if (this.lastSnowHash === currentSnowHash && this.lastSnowImageData && this.lastSnowImageData.width === overlay.width) {
-            // 新しく計算せずに、記憶しておいた写真をそのまま画用紙に貼り付けて終わります！（超軽量化！）
-            const ctx = overlay.getContext('2d');
-            ctx.putImageData(this.lastSnowImageData, 0, 0);
+        const currentSnowHash = this.game.provinces
+            .map(p => p.statusEffects && p.statusEffects.includes('heavySnow') ? '1' : '0')
+            .join('');
+
+        // 雪Canvas自体をrenderMap間で保持するため、状態が同じならImageDataの再生成は不要です。
+        if (canReusePixels && this.lastSnowHash === currentSnowHash && !this._snowOverlayDirty) {
             return;
         }
-        // 今の状態を「前回」として記憶しておきます
-        this.lastSnowHash = currentSnowHash;
-        // ★記憶の魔法ここまで！
 
         const ctx = overlay.getContext('2d');
         const width = overlay.width;
         const height = overlay.height;
-        
-        // まずは前の雪を全部消して綺麗にします
         ctx.clearRect(0, 0, width, height);
 
-        // 「heavySnow（大雪）」のシールが貼られている国の色コードを全部集めます
-        const targetColors = this.game.provinces
-            .filter(p => p.statusEffects && p.statusEffects.includes('heavySnow'))
-            .map(p => DataManager.hexToRgb(p.color_code));
+        const targetProvIds = new Set(
+            this.game.provinces
+                .filter(p => p.statusEffects && p.statusEffects.includes('heavySnow'))
+                .map(p => p.id)
+        );
 
-        // ★軽量化：雪ImageDataも毎回newせず、同じサイズなら再利用します。
-        let outputData = this.lastSnowImageData;
-        if (!outputData || outputData.width !== width || outputData.height !== height) {
-            outputData = ctx.createImageData(width, height);
-        } else {
-            outputData.data.fill(0);
-        }
+        // ★Round15：Canvas自体をキャッシュするので、別に同サイズのlastSnowImageDataを
+        // 常駐させません。ImageDataはこの描画中だけ使い、put後はGC可能にします。
+        const outputData = ctx.createImageData(width, height);
 
-        if (targetColors.length === 0) {
-            // 雪が無い場合も、再利用中の透明バッファをそのまま記憶します。
-            ctx.putImageData(outputData, 0, 0);
-            this.lastSnowImageData = outputData;
-            return;
-        }
-
-        // 画像の「点（ピクセル）」を1個ずつ調べていきます！
         if (this.pixelProvinceMap) {
-            // ★超高速化：すでに国のピクセルマップ（キャッシュ）があれば、RGB判定を飛ばして一瞬で塗ります！
-            const targetProvIds = new Set(
-                this.game.provinces
-                    .filter(p => p.statusEffects && p.statusEffects.includes('heavySnow'))
-                    .map(p => p.id)
-            );
-            
-            for (let i = 0; i < sourceData.data.length; i += 4) {
-                if (sourceData.data[i+3] === 0) continue; // 透明な場所は無視
-                const pxIdx = i / 4;
-                // 今のピクセルが「大雪の国」か一瞬で判定します
-                if (targetProvIds.has(this.pixelProvinceMap[pxIdx])) {
-                    const x = pxIdx % width;
-                    const y = Math.floor(pxIdx / width);
-                    const modX = x % 8;
-                    const modY = y % 8;
-                    if ((modX < 2 && modY < 2) || (modX >= 4 && modX < 6 && modY >= 4 && modY < 6)) {
-                        outputData.data[i] = 255;
-                        outputData.data[i+1] = 255;
-                        outputData.data[i+2] = 255;
-                        outputData.data[i+3] = 210;
-                    }
+            for (let pxIdx = 0; pxIdx < this.pixelProvinceMap.length; pxIdx++) {
+                if (!targetProvIds.has(this.pixelProvinceMap[pxIdx])) continue;
+                const x = pxIdx % width;
+                const y = Math.floor(pxIdx / width);
+                const modX = x % 8;
+                const modY = y % 8;
+                if ((modX < 2 && modY < 2) || (modX >= 4 && modX < 6 && modY >= 4 && modY < 6)) {
+                    const i = pxIdx * 4;
+                    outputData.data[i] = 255;
+                    outputData.data[i + 1] = 255;
+                    outputData.data[i + 2] = 255;
+                    outputData.data[i + 3] = 210;
                 }
             }
         } else {
-            // ★保険：まだマップが作られていなければ、今まで通り色コードで探します
+            // 保険：pixelProvinceMap未生成時だけ従来の色コード判定を使います。
+            const targetColors = this.game.provinces
+                .filter(p => targetProvIds.has(p.id))
+                .map(p => DataManager.hexToRgb(p.color_code));
             for (let i = 0; i < sourceData.data.length; i += 4) {
-                const r = sourceData.data[i];
-                const g = sourceData.data[i+1];
-                const b = sourceData.data[i+2];
-                const a = sourceData.data[i+3];
-
-                if (a === 0) continue; 
-
+                if (sourceData.data[i + 3] === 0) continue;
                 let match = false;
-                for (let c of targetColors) {
-                    if (r === c.r && g === c.g && b === c.b) {
+                for (const c of targetColors) {
+                    if (sourceData.data[i] === c.r && sourceData.data[i + 1] === c.g && sourceData.data[i + 2] === c.b) {
                         match = true;
                         break;
                     }
                 }
-
-                if (match) {
-                    const pixelIndex = i / 4;
-                    const x = pixelIndex % width;
-                    const y = Math.floor(pixelIndex / width);
-                    const modX = x % 8;
-                    const modY = y % 8;
-                    if ((modX < 2 && modY < 2) || (modX >= 4 && modX < 6 && modY >= 4 && modY < 6)) {
-                        outputData.data[i] = 255;
-                        outputData.data[i+1] = 255;
-                        outputData.data[i+2] = 255;
-                        outputData.data[i+3] = 210;
-                    }
+                if (!match) continue;
+                const pxIdx = i / 4;
+                const x = pxIdx % width;
+                const y = Math.floor(pxIdx / width);
+                const modX = x % 8;
+                const modY = y % 8;
+                if ((modX < 2 && modY < 2) || (modX >= 4 && modX < 6 && modY >= 4 && modY < 6)) {
+                    outputData.data[i] = 255;
+                    outputData.data[i + 1] = 255;
+                    outputData.data[i + 2] = 255;
+                    outputData.data[i + 3] = 210;
                 }
             }
         }
-        
-        // 完成した雪の絵の具を、画用紙にドーンと乗せます！
+
         ctx.putImageData(outputData, 0, 0);
-        
-        // ★ここで描いた雪の絵（写真）を丸ごと記憶します！
-        this.lastSnowImageData = outputData;
+        this.lastSnowHash = currentSnowHash;
+        this._lastSnowOverlay = overlay;
+        this._snowOverlayDirty = false;
     },
 
     // ==========================================
