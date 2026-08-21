@@ -2013,7 +2013,7 @@ class GameManager {
                         if (leader) {
                             const castle = this.getCastle(leader.castleId);
                             if (castle && castle.name) {
-                                const castleBase = castle.name.replace(/(城|館|御所|御坊)$/, "");
+                                const castleBase = castle.shortName;
                                 const clanBase = clan.baseName.replace(/家$/, "");
                                 if (castleBase === clanBase) return true;
                             }
@@ -2042,8 +2042,8 @@ class GameManager {
                             if (hasSameProvClan) {
                                 // 同じ国に別の同名勢力がいる場合は、国名ではなく最初から城名（拠点名）をつけます
                                 if (castle.name) {
-                                    const castleName = castle.name.replace(/(城|館|御所|御坊)$/, "");
-                                    const castleYomi = (castle.yomi || "").replace(/(じょう|やかた|ごしょ|ごぼう)$/, "");
+                                    const castleName = castle.shortName;
+                                    const castleYomi = castle.shortYomi;
                                     clan.name = castleName + clan.baseName;
                                     clan.yomi = castleYomi + clan.baseYomi;
                                 }
@@ -2051,9 +2051,9 @@ class GameManager {
                                 // いなければ今まで通り国名をつける
                                 const province = this.provinces.find(p => p.id === myProvId);
                                 if (province && province.province) {
-                                    const provName = province.province.replace(/国$/, "");
+                                    const provName = province.shortName;
                                     // ★国名の読みから「のくに」を抜きます
-                                    const provYomi = (province.provinceYomi || "").replace(/のくに$/, "");
+                                    const provYomi = province.shortYomi;
                                     clan.name = provName + clan.baseName;
                                     clan.yomi = provYomi + clan.baseYomi;
                                 }
@@ -2083,9 +2083,9 @@ class GameManager {
                             const castle = this.getCastle(leader.castleId);
                             if (castle && castle.name) {
                                 // ★城だけでなく、館（やかた）、御所（ごしょ）、御坊（ごぼう）も抜くように対応します
-                                const castleName = castle.name.replace(/(城|館|御所|御坊)$/, "");
+                                const castleName = castle.shortName;
                                 // ★読み仮名からも、じょう、やかた、ごしょ、ごぼうを抜きます
-                                const castleYomi = (castle.yomi || "").replace(/(じょう|やかた|ごしょ|ごぼう)$/, "");
+                                const castleYomi = castle.shortYomi;
                                 clan.name = castleName + clan.baseName;
                                 clan.yomi = castleYomi + clan.baseYomi;
                             }

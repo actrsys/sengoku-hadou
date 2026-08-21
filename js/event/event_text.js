@@ -145,11 +145,11 @@ window.EventTextManager = {
     okehazama_part1: function(args) {
         return [
             { type: 'log', msg: `覇を競う群雄の中にあって、東海に一際大きな影があった。` },
-            { type: 'log', msg: `${args.yoshimotoName}。\n駿河・遠江・三河を従え、海道一の弓取りと名高い大大名である。` },
-            { type: 'log', msg: `三河を平定した${args.yoshimotoName}はさらに支配地域を拡大するべく、大軍を率いて${args.sunpuCastleName}より出陣。${args.owariProvinceName}への侵攻を開始した。` },
+            { type: 'log', msg: `${args.yoshimotoName}。\n${args.surugaProvinceShort}・${args.toutoumiProvinceShort}・${args.mikawaProvinceShort}を従え、海道一の弓取りと名高い大大名である。` },
+            { type: 'log', msg: `${args.mikawaProvinceShort}を平定した${args.yoshimotoName}はさらに支配地域を拡大するべく、大軍を率いて${args.sunpuCastleName}より出陣。${args.owariProvinceName}への侵攻を開始した。` },
             { type: 'log', msg: `一方、${args.yoshimotoGivenName}出陣の報を受け、${args.owariProvinceName}・${args.nobunagaFamilyName}家では重臣らが一同に介し、軍議を行っていた。` },
             { type: 'dialog', leftName: args.juushinAName, leftFace: args.juushinAFace, msg: `「${args.nobunagaGivenName}様、${args.yoshimotoFamilyName}軍は総勢二万五千の大軍でござる。かくなる上は、降伏するしかありませぬ」` },
-            { type: 'dialog', leftName: args.juushinBName, leftFace: args.juushinBFace, msg: `「馬鹿なことを申すな！　一戦交えずして降伏など武士の名折れにござる」` },
+            { type: 'dialog', leftName: args.juushinBName, leftFace: args.juushinBFace, msg: `「馬鹿なことを申すな！ 一戦交えずして降伏など武士の名折れにござる」` },
             { type: 'dialog', leftName: args.juushinBName, leftFace: args.juushinBFace, msg: `「${args.nobunagaGivenName}様、ここは籠城して援軍を待つべきかと」` },
             { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「何を悠長なことを……殿、ここは一か八か打って出るしかありませぬ！」` },
             { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「引き籠っていては、勝機は開けませぬぞ！」` }
@@ -158,22 +158,26 @@ window.EventTextManager = {
     okehazama_imagawa_part1: function(args) {
         return [
             { type: 'log', msg: `覇を競う群雄の中にあって、東海に一際大きな影があった。` },
-            { type: 'log', msg: `${args.yoshimotoName}。\n駿河・遠江・三河を従え、海道一の弓取りと名高い大大名である。` },
-            { type: 'log', msg: `三河を平定した${args.yoshimotoName}はさらに支配地域を拡大するべく、${args.owariProvinceName}への侵攻を目論んでいた。` },
-            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「殿、お待ちを。${args.nobunagaGivenName}を侮ってはなりません。${args.owariProvinceName}への出陣はどうかご再考くだされ」` },
-            { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「なんじゃ、臆病風に吹かれたか、${args.juushinFGivenName}。${args.owariProvinceShort}のうつけを相手に、心配が過ぎるのではないか？」` },
-            { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「${args.nobunagaFamilyName}の小倅ごとき、わし自ら軍を率いて、一息に捻り潰してくれようぞ」` },
-            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「しかし、${args.nobunagaGivenName}の${args.owariProvinceName}をまとめ上げた手腕は本物にござりまする。一筋縄ではいきますまい」` },
-            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「うつけとは申しますが、あれとて周囲を欺く策略やもしれませぬぞ」` },
+            { type: 'log', msg: `${args.yoshimotoName}。\n${args.surugaProvinceShort}・${args.toutoumiProvinceShort}・${args.mikawaProvinceShort}を従え、海道一の弓取りと名高い大大名である。` },
+            { type: 'log', msg: `${args.mikawaProvinceShort}を平定した${args.yoshimotoName}はさらに支配地域を拡大するべく、${args.owariProvinceName}への侵攻を目論んでいた。` },
+            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「殿、今こそ${args.owariProvinceShort}を切り取る絶好の機会に存じまする」` },
+            { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「相手は${args.owariProvinceShort}の虎と呼ばれた${args.nobuhideName}の子じゃ」` },
+            { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「あれの恐ろしさは皆が一番よく知っておろう？」` },
+            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「もはや虎はおりませぬ、${args.nobunagaGivenName}はうつけとの噂。気にするほどの男ではございませぬ」` },
+            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「武田・北条との関係は盤石。${args.mikawaProvinceShort}の情勢も落ち着いている今、後顧の憂いはございませぬ」` },
+            { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「${args.owariProvinceName}をまとめ上げた${args.nobunagaGivenName}の手腕は本物であろう」` },
+            { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「虎の子もまた虎ということじゃ。迂闊に手を出せば噛みつかれようぞ」` },
+            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「はっ……しかし、今を逃しては……」` },
             { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「ううむ……」` }
         ];
     },
     okehazama_imagawa_attack: function(args) {
         return [
-            { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「ふん！　${args.nobunagaGivenName}なにするものぞ！　${args.nobunagaFamilyName}軍など稚児に等しい……わし自ら一捻りにしてくれよう！」` },
-            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「はっ。出過ぎた真似を申しました」` },
-            { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「出陣じゃ！　支度をいたせ！」` },
-            { type: 'log', msg: `こうして${args.yoshimotoName}は大軍をもって${args.owariProvinceName}への侵攻を開始したのであった。` }
+            { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「……決めたぞ」` },
+            { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「${args.nobunagaGivenName}なにするものぞ。わし自ら一捻りにしてくれよう」` },
+            { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「陣触れを出すがよい」` },
+            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「ははーっ！」` },
+            { type: 'log', msg: `こうして${args.yoshimotoName}は、${args.owariProvinceName}への侵攻を開始したのであった。` }
         ];
     },
     okehazama_oda_gungi: function(args) {
@@ -188,9 +192,10 @@ window.EventTextManager = {
     },
     okehazama_imagawa_defend: function(args) {
         return [
-            { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「……あいわかった。おぬしがそこまで申すのであれば、此度の出陣は取りやめとする」` },
-            { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「しかし、いずれ必ず${args.owariProvinceName}は取る！　心して備えよ！」` },
-            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「はっ。御意にございまする」` }
+            { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「控えよ。今はその機ではないわ」` },
+            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「はっ……御意にござりまする」` },
+            { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「とはいえ、いずれは相見えねばならぬ敵じゃ。心して備えるがよい」` },
+            { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「ははっ」` }
         ];
     },
     okehazama_attack: function(args) {

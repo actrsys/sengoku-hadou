@@ -4,6 +4,16 @@
  * 修正: 諸勢力の「name」機能追加と、CSVからの「大名用/諸勢力用」の外交値の読み取り機能を追加
  */
 
+// ==========================================
+// ★地名・拠点名の短縮ルール
+// 表示用の短い名前が必要な時は各モデルの shortName / shortYomi を使い、
+// 呼び出し側で replace() を重複させないようにします。
+// ==========================================
+const MODEL_CASTLE_NAME_SUFFIX_RE = /(城|御所|御坊|館)$/;
+const MODEL_CASTLE_YOMI_SUFFIX_RE = /(じょう|ごしょ|ごぼう|やかた)$/;
+const MODEL_PROVINCE_NAME_SUFFIX_RE = /国$/;
+const MODEL_PROVINCE_YOMI_SUFFIX_RE = /のくに$/;
+
 class Clan {
     constructor(data) {
         Object.assign(this, data);
@@ -266,6 +276,23 @@ class Castle {
             }
         }
         return connectedCastles;
+    }
+
+    // 拠点名から末尾の「城」「御所」「御坊」「館」を消した短い名前を返す魔法
+    get shortName() {
+        const full = this.name || "";
+        if (!full) return "";
+        const shortened = full.replace(MODEL_CASTLE_NAME_SUFFIX_RE, '');
+        // 万一名前そのものが「城」などだけでも空文字にはしません
+        return shortened || full;
+    }
+
+    // 拠点名の読みから末尾の「じょう」「ごしょ」「ごぼう」「やかた」を消します
+    get shortYomi() {
+        const full = this.yomi || "";
+        if (!full) return "";
+        const shortened = full.replace(MODEL_CASTLE_YOMI_SUFFIX_RE, '');
+        return shortened || full;
     }
 }
 
@@ -1117,6 +1144,22 @@ class Province {
         this.marketRate = data.marketRate !== undefined ? Number(data.marketRate) : 10.0; 
         
         this.statusEffects = Array.isArray(data.statusEffects) ? data.statusEffects : []; // ★豊作・凶作などの「状態異常」
+    }
+
+    // 国名から末尾の「国」を消した短い名前を返す魔法
+    get shortName() {
+        const full = this.province || "";
+        if (!full) return "";
+        const shortened = full.replace(MODEL_PROVINCE_NAME_SUFFIX_RE, '');
+        return shortened || full;
+    }
+
+    // 国名の読みから末尾の「のくに」を消した短い読みを返します
+    get shortYomi() {
+        const full = this.provinceYomi || "";
+        if (!full) return "";
+        const shortened = full.replace(MODEL_PROVINCE_YOMI_SUFFIX_RE, '');
+        return shortened || full;
     }
 }
 

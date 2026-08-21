@@ -587,35 +587,65 @@ window.GameEvents.push({
             })[0];
         }
 
+        // ★追加：織田信秀（ID: 1006004）のデータを取得します
+        const nobuhide = game.getBusho(1006004);
+
+        // ★追加：駿河・遠江・三河・尾張の国名を取得します
+        let surugaProvinceShort = "駿河";
+        let toutoumiProvinceShort = "遠江";
+        let mikawaProvinceShort = "三河";
+        let owariProvinceName = "尾張国";
+        let owariProvinceShort = "尾張";
+        
+        if (game.provinces) {
+            const pSuruga = game.provinces.find(prov => prov.id === 20);
+            if (pSuruga) surugaProvinceShort = pSuruga.shortName;
+            const pToutoumi = game.provinces.find(prov => prov.id === 21);
+            if (pToutoumi) toutoumiProvinceShort = pToutoumi.shortName;
+            const pMikawa = game.provinces.find(prov => prov.id === 22);
+            if (pMikawa) mikawaProvinceShort = pMikawa.shortName;
+            const pOwari = game.provinces.find(prov => prov.id === 23);
+            if (pOwari) {
+                owariProvinceName = pOwari.province;
+                owariProvinceShort = pOwari.shortName;
+            }
+        }
+
         // 台本に渡す情報をひとまとめにします
         const args = {
-            yoshimotoName: yoshimoto.name.replace('|', ''),
+            yoshimotoName: yoshimoto.fullName,
             yoshimotoFamilyName: yoshimoto.familyName || "今川",
             yoshimotoGivenName: yoshimoto.givenName || "義元",
             yoshimotoFace: yoshimoto.faceIcon || "unknown_face.webp",
-            nobunagaName: nobunaga.name.replace('|', ''),
+            nobunagaName: nobunaga.fullName,
             nobunagaFamilyName: nobunaga.familyName || "織田",
             nobunagaGivenName: nobunaga.givenName || "信長",
             nobunagaFace: nobunaga.faceIcon || "unknown_face.webp",
             sunpuCastleName: game.getCastle(13)?.name || "駿府城",
-            owariProvinceName: "尾張国",
-            owariProvinceShort: "尾張",
+            owariProvinceName: owariProvinceName,     // ★変更
+            owariProvinceShort: owariProvinceShort,   // ★変更
+            mikawaProvinceShort: mikawaProvinceShort, // ★追加
+            surugaProvinceShort: surugaProvinceShort, // ★追加
+            toutoumiProvinceShort: toutoumiProvinceShort, // ★追加
             odaClanName: odaClan ? odaClan.name : "織田家",
             imagawaClanName: imagawaClan ? imagawaClan.name : "今川家",
             
-            juushinAName: juushinA ? juushinA.name.replace('|', '') : "小姓",
+            juushinAName: juushinA ? juushinA.fullName : "小姓",
             juushinAFace: juushinA ? juushinA.faceIcon : "koshou.webp",
-            juushinBName: juushinB ? juushinB.name.replace('|', '') : "小姓",
+            juushinBName: juushinB ? juushinB.fullName : "小姓",
             juushinBFace: juushinB ? juushinB.faceIcon : "koshou.webp",
-            shinzanCName: shinzanC ? shinzanC.name.replace('|', '') : "小姓",
+            shinzanCName: shinzanC ? shinzanC.fullName : "小姓",
             shinzanCFace: shinzanC ? shinzanC.faceIcon : "koshou.webp",
-            shinzanDName: shinzanD ? shinzanD.name.replace('|', '') : "小姓",
+            shinzanDName: shinzanD ? shinzanD.fullName : "小姓",
             shinzanDFace: shinzanD ? shinzanD.faceIcon : "koshou.webp",
-            mouriName: mouri ? mouri.name.replace('|', '') : "小姓",
+            mouriName: mouri ? mouri.fullName : "小姓",
             mouriFace: mouri ? mouri.faceIcon : "koshou.webp",
-            juushinFName: juushinF ? juushinF.name.replace('|', '') : "小姓",
+            juushinFName: juushinF ? juushinF.fullName : "小姓",
             juushinFFace: juushinF ? juushinF.faceIcon : "koshou.webp",
-            juushinFGivenName: juushinF ? (juushinF.givenName || juushinF.name.replace('|', '')) : "小姓"
+            juushinFGivenName: juushinF ? (juushinF.givenName || juushinF.fullName) : "小姓",
+            
+            // ★追加：織田信秀の名前を台本に渡します（もしデータが無ければ"織田信秀"とします）
+            nobuhideName: nobuhide ? nobuhide.fullName : "織田信秀"
         };
 
         // --- 2. イベント開始 ---
@@ -1056,13 +1086,25 @@ window.GameEvents.push({
 
         // 信長の居城名を取得します
         let nobunagaCastleName = "城";
+        let nobunagaCastleShort = "城"; // ★追加
         if (nobunaga.castleId > 0) {
             const castle = game.getCastle(nobunaga.castleId);
-            if (castle) nobunagaCastleName = castle.name;
+            if (castle) {
+                nobunagaCastleName = castle.name;
+                nobunagaCastleShort = castle.shortName;
+            }
+        }
+
+        // ★追加：三河国の名前を取得します
+        let mikawaProvinceShort = "三河";
+        if (game.provinces) {
+            const pMikawa = game.provinces.find(prov => prov.id === 22);
+            if (pMikawa) mikawaProvinceShort = pMikawa.shortName;
         }
 
         // イベントテキストの台本に渡す変数をひとまとめにします
         const args = {
+            mikawaProvinceShort: mikawaProvinceShort, // ★追加
             motoyasuName: motoyasu.fullName,
             motoyasuGivenName: motoyasu.givenName || "家康",
             matsudairaFamilyName: motoyasu.familyNameStr || "徳川",
@@ -1092,7 +1134,7 @@ window.GameEvents.push({
             shinzanCFace: shinzanC ? shinzanC.faceIcon : "koshou.webp",
 
             nobunagaCastleName: nobunagaCastleName,
-            nobunagaCastleShort: nobunagaCastleName.replace(/城$/, ''), // 「清洲城」から「城」を消した名前を作ります
+            nobunagaCastleShort: nobunagaCastleShort, // ★変更（魔法の変数を使用）
             nobunagaTitle: nobunagaTitle,
             year: game.year,
             month: game.month
@@ -1413,7 +1455,7 @@ window.GameEvents.push({
 
         // 将軍候補の情報を取得しておきます
         const candidate = game.bushos.find(b => b.clan === nobunaga.clan && b.courtRankIds && (game.courtRankSystem.RANK_IDS_CANDIDATE.some(id => b.courtRankIds.includes(id)) || b.courtRankIds.includes(game.courtRankSystem.RANK_ID_SHOGUN)));
-        const candidateName = candidate ? candidate.name.replace(/\|/g, '') : "将軍";
+        const candidateName = candidate ? candidate.fullName : "将軍";
 
         // ① お市の所属を浅井家に変更し、旦那さんを長政に設定します
         oichi.currentClanId = nagamasa.clan;
@@ -2279,9 +2321,9 @@ window.GameEvents.push({
                 showExtraNarration = true; // 条件クリアのシールを貼ります
                 
                 // 台本に渡す名前を、ゲーム内の最新のフルネームに更新します
-                kenshinName = kenshin.name.replace(/\|/g, '');
-                motonariName = motonari.name.replace(/\|/g, '');
-                nobunagaName = nobunaga.name.replace(/\|/g, '');
+                kenshinName = kenshin.fullName;
+                motonariName = motonari.fullName;
+                nobunagaName = nobunaga.fullName;
             }
         }
 
@@ -2289,11 +2331,11 @@ window.GameEvents.push({
         const args = {
             year: game.year,
             month: game.month,
-            fujitakaName: fujitaka.name.replace('|', ''),
+            fujitakaName: fujitaka.fullName,
             fujitakaFamilyName: fujitaka.familyName || fujitaka.name.split('|')[0] || "細川",
             fujitakaFace: fujitaka.faceIcon || "unknown_face.webp",
             fujitakaTitle: fujitakaTitle,
-            asakuraName: asakuraDaimyo.name.replace('|', ''),
+            asakuraName: asakuraDaimyo.fullName,
             asakuraFace: asakuraDaimyo.faceIcon || "unknown_face.webp",
             asakuraTitle: asakuraTitle,
             yoshiteruName: yoshiteruName,
@@ -2449,7 +2491,7 @@ window.GameEvents.push({
             const c = game.getCastle(nobunagaDaimyo.castleId);
             if (c) {
                 const p = game.provinces.find(prov => prov.id === c.provinceId);
-                if (p) nobunagaProvinceName = p.province;
+                if (p) nobunagaProvinceName = p.shortName;
             }
         }
 
@@ -2464,7 +2506,7 @@ window.GameEvents.push({
             if (c) {
                 asakuraCastleName = c.name;
                 const p = game.provinces.find(prov => prov.id === c.provinceId);
-                if (p) asakuraProvinceName = p.province;
+                if (p) asakuraProvinceName = p.shortName;
             }
         }
 
