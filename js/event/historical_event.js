@@ -132,20 +132,34 @@ window.EventCheck = {
 // ==========================================
 window.EventAction = {
     // ① 画面の見た目や情報を最新の状態に描き直します（お片付け）
-    refreshScreen: function(game) {
-        if (game.factionSystem) {
-            game.factionSystem.updateFactions();
-        }
-        if (typeof game.updateAllClanPrestige === 'function') {
-            game.updateAllClanPrestige();
-        }
+    refreshScreen: async function(game) {
+        // ★Round10：イベント直後の全国更新を一気に重ねず、処理ごとにブラウザへ制御を返します。
+        // 更新内容と順序は従来どおり「派閥 → 威信 → 画面」です。
+        // まずイベント本体が作った一時データを解放できる隙を1回作ります。
+        if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:pre_yield');
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:faction:start');
+        if (game.factionSystem) game.factionSystem.updateFactions();
+        if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:faction:done');
+
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:prestige:start');
+        if (typeof game.updateAllClanPrestige === 'function') game.updateAllClanPrestige();
+        if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:prestige:done');
+
+        await new Promise(resolve => setTimeout(resolve, 0));
+
         if (game.ui) {
-            // ★Round5：月末・月初・AI中は再描画を延期し、プレイヤー復帰時に1回だけ行います。
             if (game.isProcessingAI && !game.isWatchMode) {
                 game._aiDeferredMapRefresh = true;
+                if (typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:map:deferred');
             } else {
+                if (typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:map:start');
                 game.ui.renderMap();
                 game.ui.updatePanelHeader();
+                if (typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:map:done');
             }
         }
     },

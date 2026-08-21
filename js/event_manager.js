@@ -145,7 +145,11 @@ class EventManager {
                 this.game.writeSystemDiagnostic(`event:${timing}:refresh`);
             }
             // event_managerの中では「this.game」という名前でゲームデータを管理しているので、それを渡します
-            window.EventAction.refreshScreen(this.game);
+            // ★Round10：段階更新が終わるまで待ちます。
+            await window.EventAction.refreshScreen(this.game);
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic(`event:${timing}:refresh_done`);
+            }
         }
     }
 }

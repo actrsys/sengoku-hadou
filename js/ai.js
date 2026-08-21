@@ -122,7 +122,7 @@ class AIEngine {
             if (myOperation && myOperation.type === '攻撃' && myOperation.status === '実行中') {
                 // そして、自分のお城がその「出撃元（stagingBase）」に選ばれている場合だけ出陣します！
                 if (myOperation.stagingBase === castle.id) {
-                    if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'operation:reachability');
+                    if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'operation:reachability:start');
                     
                     // ★追加：出陣する前に、道が繋がっているか、まだ「敵」かどうかの最終チェックをします！
                     let canReach = false;
@@ -145,6 +145,8 @@ class AIEngine {
                                     targetProvId = targetCastle.provinceId; // 目的地のお城の国をセットします
                                     // 自領の別のお城にいるかもしれないので、道が繋がっているか確認します
                                     canReach = GameSystem.isReachable(this.game, castle, targetCastle, castle.ownerClan);
+
+                                    if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'operation:reachability:done');
                                 }
                             }
                         }
@@ -159,6 +161,8 @@ class AIEngine {
                             } else {
                                 // 道が繋がっているか、魔法を使って再確認します！
                                 canReach = GameSystem.isReachable(this.game, castle, targetCastle, castle.ownerClan);
+
+                                if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'operation:reachability:done');
                                 
                                 // ★追加：お休み期間（immunityUntil）ではないか、味方や同盟国になっていないかチェックします！
                                 // 今の月（TurnId）よりもお休み期間の方が未来なら、攻撃は我慢します
@@ -208,6 +212,10 @@ class AIEngine {
                         }
                     }
 
+                    if (this.game.writeAIDiagnostic && myOperation.isEventOperation) {
+                        this.game.writeAIDiagnostic(castle, 'operation:reachability:done');
+                    }
+
                     // もし道が途切れていたり、すでに敵じゃなくなっていたら、作戦のメモを消して中止します！
                     if (!canReach || !isStillEnemy) {
                         delete this.game.aiOperationManager.operations[castle.ownerClan][castle.legionId];
@@ -234,12 +242,14 @@ class AIEngine {
                             if (myOperation.isKunishuTarget) {
                                 const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
                                 if (targetKunishu) {
+                                    if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'operation:war_dispatch:kunishu');
                                     this.executeKunishuSubjugateAI(castle, targetKunishu, castellan, myOperation.requiredForce, myOperation.requiredRice);
                                 }
                             } else {
                                 const targetCastle = this.game.getCastle(myOperation.targetId);
                                 if (targetCastle) {
                                     // ★変更：一番最後に「myOperation（作戦のメモ）」も一緒に渡してあげます！
+                                    if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'operation:war_dispatch:daimyo');
                                     this.executeAttack(castle, targetCastle, castellan, myOperation.requiredForce, myOperation.requiredRice, myOperation);
                                 }
                             }

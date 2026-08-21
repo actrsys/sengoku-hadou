@@ -691,6 +691,10 @@ const numberNames = ["", "第一席", "第二席", "第三席", "第四席", "�
 class CommandSystem {
     constructor(game) {
         this.game = game;
+        // ★Round10：出陣・移動系で使う隣接索引。城配列が変わらない限り使い回します。
+        this._adjacencySource = null;
+        this._adjacencySize = -1;
+        this._adjacencyMap = null;
     }
     
     // ==========================================
@@ -1122,19 +1126,44 @@ class CommandSystem {
     }
     
     // ★追加：道が繋がっているお城をまとめて調べる共通の魔法です！
+    _ensureAdjacencyMap() {
+        const castles = this.game.castles || [];
+        if (this._adjacencySource === castles && this._adjacencySize === castles.length && this._adjacencyMap) return;
+
+        const sets = new Map();
+        for (const c of castles) sets.set(Number(c.id), new Set());
+        for (const c of castles) {
+            const fromId = Number(c.id);
+            for (const rawId of (c.adjacentCastleIds || [])) {
+                const toId = Number(rawId);
+                if (!sets.has(toId) || toId === fromId) continue;
+                sets.get(fromId).add(toId);
+                sets.get(toId).add(fromId); // isAdjacent() と同じく片側記載でも隣接扱い
+            }
+        }
+        this._adjacencyMap = new Map();
+        sets.forEach((set, id) => this._adjacencyMap.set(id, Array.from(set)));
+        this._adjacencySource = castles;
+        this._adjacencySize = castles.length;
+    }
+
     getConnectedCastles(startCastle, clanId) {
         const connectedCastles = new Set();
+        if (!startCastle) return connectedCastles;
+
+        this._ensureAdjacencyMap();
         const queue = [startCastle];
+        let head = 0;
         connectedCastles.add(Number(startCastle.id));
 
-        while (queue.length > 0) {
-            const current = queue.shift();
-            const neighbors = this.game.castles.filter(adj => 
-                Number(adj.ownerClan) === Number(clanId) && 
-                GameSystem.isAdjacent(current, adj) &&
-                !connectedCastles.has(Number(adj.id))
-            );
-            for (const n of neighbors) {
+        // ★Round10：全城 filter × 到達城数をやめ、キャッシュ済み隣接IDだけをたどります。
+        while (head < queue.length) {
+            const current = queue[head++];
+            const neighborIds = this._adjacencyMap.get(Number(current.id)) || [];
+            for (const adjId of neighborIds) {
+                if (connectedCastles.has(Number(adjId))) continue;
+                const n = this.game.getCastle(adjId);
+                if (!n || Number(n.ownerClan) !== Number(clanId)) continue;
                 connectedCastles.add(Number(n.id));
                 queue.push(n);
             }
@@ -3163,19 +3192,25 @@ class CommandSystem {
         const pid = this.game.playerClanId;
         
         // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
+        if (this.game.writeSystemDiagnostic) this.game.writeSystemDiagnostic('war_prepare:connected:start', atkCastle);
         const connectedCastles = this.getConnectedCastles(atkCastle, myClanId);
+        if (this.game.writeSystemDiagnostic) this.game.writeSystemDiagnostic('war_prepare:connected:done', atkCastle);
         
         // ★修正：条件のチェックをすべて「外交の専門部署」に任せます！
+        if (this.game.writeSystemDiagnostic) this.game.writeSystemDiagnostic('war_prepare:self_reinforcement_scan:start', atkCastle);
         const selfCandidates = this.game.diplomacyManager.findAvailableReinforcements(
             true, false, atkCastle.id, targetCastle, myClanId, targetCastle.ownerClan, connectedCastles
         );
+        if (this.game.writeSystemDiagnostic) this.game.writeSystemDiagnostic('war_prepare:self_reinforcement_scan:done', atkCastle);
 
         // ★追加：兵数や武将が変わるので、最新のものを引数で受け取るようにしました
         const proceedToAlly = (selfReinfData, currentAtkBushos = atkBushos, currentSVal = sVal) => {
             // ★修正：こちらも他勢力の条件チェックを「外交の専門部署」に一任します！
+            if (this.game.writeSystemDiagnostic) this.game.writeSystemDiagnostic('war_prepare:ally_reinforcement_scan:start', atkCastle);
             const allyForceCandidates = this.game.diplomacyManager.findAvailableReinforcements(
                 false, false, atkCastle.id, targetCastle, myClanId, targetCastle.ownerClan, connectedCastles
             );
+            if (this.game.writeSystemDiagnostic) this.game.writeSystemDiagnostic('war_prepare:ally_reinforcement_scan:done', atkCastle);
 
             if (allyForceCandidates.length === 0) {
                 this.game.warManager.startWar(atkCastle, targetCastle, currentAtkBushos, currentSVal, rVal, hVal, gVal, null, selfReinfData);

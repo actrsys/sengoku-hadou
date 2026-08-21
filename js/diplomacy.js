@@ -2854,6 +2854,25 @@ class DiplomacyManager {
             }
         }
 
+        // ★Round10：援軍候補ごとに全城を some() し直さないよう、
+        // 「接続領＋その隣接城」と「攻撃対象＋その隣接城」を1回だけ集合化します。
+        // isAdjacent() と同じく、隣接IDが片側にしか書かれていない場合も両方向として扱います。
+        const connectedIdSet = new Set(Array.from(connectedCastles || [], id => Number(id)));
+        const connectedOrAdjacentIds = new Set(connectedIdSet);
+        const targetId = Number(targetCastle.id);
+        const targetOrAdjacentIds = new Set([targetId]);
+
+        for (const castle of this.game.castles) {
+            const castleId = Number(castle.id);
+            for (const rawAdjId of (castle.adjacentCastleIds || [])) {
+                const adjId = Number(rawAdjId);
+                if (connectedIdSet.has(castleId)) connectedOrAdjacentIds.add(adjId);
+                if (connectedIdSet.has(adjId)) connectedOrAdjacentIds.add(castleId);
+                if (castleId === targetId) targetOrAdjacentIds.add(adjId);
+                if (adjId === targetId) targetOrAdjacentIds.add(castleId);
+            }
+        }
+
         this.game.castles.forEach(c => {
             // 1. 共通の条件：大雪の国からは出陣できません
             const prov = this.game.provinces.find(p => p.id === c.provinceId);
@@ -2870,8 +2889,8 @@ class DiplomacyManager {
                 if (Number(c.ownerClan) !== Number(myClanId)) return;
                 
                 // 道が繋がっているか、すぐ隣か
-                const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
-                const isNextToEnemy = (c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle);
+                const isConnected = connectedOrAdjacentIds.has(Number(c.id));
+                const isNextToEnemy = targetOrAdjacentIds.has(Number(c.id));
                 
                 if (isConnected || isNextToEnemy) {
                     const availableBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active');
@@ -2911,11 +2930,11 @@ class DiplomacyManager {
                             // ★同盟・支配・従属関係であれば、自勢力を通って繋がる拠点（攻撃先と隣接していなくても）を援軍として呼べるようにします！
                             let isConnected = false;
                             if (isMyAllyOrVassal) {
-                                isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
+                                isConnected = connectedOrAdjacentIds.has(Number(c.id));
                             }
                             
                             // 自軍側が応援を呼ぶ時は、対象と直接隣接していればOK（敵の敵は味方として）
-                            const isNextToEnemy = !isDefending && ((c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle));
+                            const isNextToEnemy = !isDefending && (targetOrAdjacentIds.has(Number(c.id)));
                             
                             if (isConnected || isNextToEnemy) {
                                 const availableBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active');
@@ -2951,8 +2970,8 @@ class DiplomacyManager {
                         (k.soldiers >= 1000 && enemyKunishuRel < 100);
 
                     if (canRequest) {
-                        const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
-                        const isNextToEnemy = !isDefending && ((c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle));
+                        const isConnected = connectedOrAdjacentIds.has(Number(c.id));
+                        const isNextToEnemy = !isDefending && (targetOrAdjacentIds.has(Number(c.id)));
                         
                         if (isConnected || isNextToEnemy) {
                             const members = this.game.kunishuSystem.getKunishuMembers(k.id);

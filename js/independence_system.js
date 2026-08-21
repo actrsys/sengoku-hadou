@@ -549,12 +549,38 @@ class IndependenceSystem {
         if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
             this.game.writeSystemDiagnostic('independence:capture_start');
         }
+
+        // ★Round10：通常の城制圧と同じタイミングで色を切り替えます。
+        // 白い制圧エフェクトが最大になった瞬間(onHalfway)に下の勢力色を更新するため、
+        // エフェクトが消えた時には既に新勢力色が見える状態になります。
+        let colorUpdatedDuringCapture = false;
+        const applyNewClanColor = () => {
+            if (colorUpdatedDuringCapture) return;
+            colorUpdatedDuringCapture = true;
+            if (this.game.ui && typeof this.game.ui.updateClanColors === 'function') {
+                if (typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('independence:color_update:start');
+                this.game.ui.updateClanColors();
+                if (typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('independence:color_update:done');
+            }
+        };
+
         if (typeof this.game.ui.playCaptureEffect === 'function') {
-            await this.game.ui.playCaptureEffect(changedCastleIds);
+            await this.game.ui.playCaptureEffect(changedCastleIds, applyNewClanColor);
+        } else {
+            applyNewClanColor();
         }
+        // 実装差やエフェクト中断があっても、色更新だけは必ず完了させます。
+        applyNewClanColor();
+
         if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
             this.game.writeSystemDiagnostic('independence:capture_done');
         }
+
+        // 次のメッセージを出す前に、新しい色を1フレーム確実に描画させます。
+        await new Promise(resolve => {
+            if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
+            else setTimeout(resolve, 0);
+        });
 
         // AI/月末処理中はRound5以降の方針どおり、プレイヤー復帰時の1回へ描画を延期します。
         // 観戦中や通常操作中だけ、ここで1回描き直します。

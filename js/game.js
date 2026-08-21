@@ -951,49 +951,38 @@ class GameSystem {
     static calcBuyGunAmount(gold, daimyo, castellan) { return this.calcBuyEquipAmount(gold, daimyo, castellan, 'gun'); }
 
     static isReachable(game, startCastle, targetCastle, movingClanId) {
-        // ★追加：もし城のデータが空っぽだったら、エラーになる前にすぐストップします！
+        // ★Round10：AI出陣直前に何度も通るため、到達判定の一時オブジェクト生成を減らします。
         if (!startCastle || !targetCastle) return false;
 
         if (this.isAdjacent(startCastle, targetCastle)) return true;
 
-        const visited = new Set();
-        const queue = [{ castle: startCastle, distance: 0 }];
-        visited.add(startCastle.id);
+        const visited = new Set([Number(startCastle.id)]);
+        const queue = [startCastle];
+        let head = 0;
 
-        while (queue.length > 0) {
-            const currentData = queue.shift();
-            const current = currentData.castle;
-            const currentDist = currentData.distance;
+        while (head < queue.length) {
+            const current = queue[head++];
+            const adjacentIds = current.adjacentCastleIds || [];
 
-            const neighbors = [];
-            if (current.adjacentCastleIds) {
-                current.adjacentCastleIds.forEach(adjId => {
-                    const c = game.getCastle(adjId);
-                    if (c) neighbors.push(c);
-                });
-            }
-            
-            for (const next of neighbors) {
-                if (next.id === targetCastle.id) return true;
-                
-                if (!visited.has(next.id)) {
-                    let canPass = false;
-                    
-                    // 自分のお城（自領）だけを通り抜けられるようにします！
-                    if (Number(next.ownerClan) === Number(movingClanId)) {
-                        canPass = true;
-                    } else if (next.ownerClan !== 0) {
-                        // ★追加：同盟、支配、従属の勢力も通り抜けられるようにします！
-                        const rel = game.getRelation(movingClanId, next.ownerClan);
-                        if (rel && ['同盟', '支配', '従属'].includes(rel.status)) {
-                            canPass = true;
-                        }
-                    }
-                    
-                    if (canPass) {
-                        visited.add(next.id);
-                        queue.push({ castle: next, distance: currentDist + 1 });
-                    }
+            for (const adjId of adjacentIds) {
+                const next = game.getCastle(adjId);
+                if (!next) continue;
+                if (Number(next.id) === Number(targetCastle.id)) return true;
+
+                const nextId = Number(next.id);
+                if (visited.has(nextId)) continue;
+
+                let canPass = false;
+                if (Number(next.ownerClan) === Number(movingClanId)) {
+                    canPass = true;
+                } else if (Number(next.ownerClan) !== 0) {
+                    const rel = game.getRelation(movingClanId, next.ownerClan);
+                    if (rel && ['同盟', '支配', '従属'].includes(rel.status)) canPass = true;
+                }
+
+                if (canPass) {
+                    visited.add(nextId);
+                    queue.push(next);
                 }
             }
         }
