@@ -78,6 +78,106 @@ Object.assign(UIManager.prototype, {
         spacer.style.height = `${Math.ceil(Math.max(0, height))}px`;
     },
 
+    // ★Round 14：地図本体をCSS backgroundではなく、常駐する画像要素として保持します。
+    // 古いスマホでスクロール先の背景タイルが遅れて描画されるcheckerboardingを抑え、
+    // renderMapのたびに地図画像の描画資源を捨てないようにします。
+    _ensureMapBaseImage(mapW, mapH) {
+        let img = this._mapBaseImage;
+        if (!img) {
+            img = new Image();
+            img.id = 'map-base-image';
+            img.alt = '';
+            img.draggable = false;
+            img.loading = 'eager';
+            img.decoding = 'async';
+            try { img.fetchPriority = 'high'; } catch (e) {}
+
+            const markReady = () => {
+                if (this.mapEl) this.mapEl.classList.add('base-map-image-ready');
+            };
+            img.addEventListener('load', markReady, { once: true });
+            img.src = './data/images/map/japan_map.png';
+            this._mapBaseImage = img;
+
+            // preload済みでもdecode済みとは限らないので、要素を保持したままdecodeを促します。
+            if (typeof img.decode === 'function') {
+                img.decode().then(markReady).catch(() => {});
+            } else if (img.complete && img.naturalWidth > 0) {
+                markReady();
+            }
+        }
+
+        img.style.width = `${mapW}px`;
+        img.style.height = `${mapH}px`;
+        return img;
+    },
+
+    // ★Round 14：普段は不要な全画面Canvasは必要になった時だけ確保します。
+    _ensureMapOverlayCanvas(canvasId, zIndex = 3) {
+        if (!this.mapEl) return null;
+        const mapW = this.game.mapWidth || 1200;
+        const mapH = this.game.mapHeight || 800;
+        let canvas = document.getElementById(canvasId);
+        if (!canvas) {
+            canvas = document.createElement('canvas');
+            canvas.id = canvasId;
+            canvas.style.position = 'absolute';
+            canvas.style.left = '0px';
+            canvas.style.top = '0px';
+            canvas.style.pointerEvents = 'none';
+            canvas.style.zIndex = String(zIndex);
+            this.mapEl.appendChild(canvas);
+        }
+        if (canvas.width !== mapW || canvas.height !== mapH) {
+            canvas.width = mapW;
+            canvas.height = mapH;
+        }
+        return canvas;
+    },
+
+    _releaseMapOverlayCanvas(canvasId) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        try {
+            const ctx = canvas.getContext('2d');
+            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+            canvas.width = 1;
+            canvas.height = 1;
+        } catch (e) {}
+        canvas.remove();
+    },
+
+    // ★Round14：ズーム中に強制リロードされた場合だけ既存の実機診断に痕跡を残します。
+    // 正常終了したら直前の診断値へ戻すため、普段のAI診断を汚しません。
+    _beginMapZoomDiagnostic(level) {
+        if (document.body.classList.contains('is-pc')) return;
+        try {
+            if (this._mapZoomPreviousDiagnostic === undefined && typeof sessionStorage !== 'undefined') {
+                this._mapZoomPreviousDiagnostic = sessionStorage.getItem('sengoku_ai_last_checkpoint_v1');
+            }
+        } catch (e) {
+            this._mapZoomPreviousDiagnostic = null;
+        }
+        if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+            this.game.writeSystemDiagnostic(`map_zoom:start:${level}`);
+        }
+    },
+
+    _endMapZoomDiagnostic() {
+        if (document.body.classList.contains('is-pc')) return;
+        if (this._mapZoomPreviousDiagnostic === undefined) return;
+        try {
+            if (typeof sessionStorage !== 'undefined') {
+                if (this._mapZoomPreviousDiagnostic) {
+                    sessionStorage.setItem('sengoku_ai_last_checkpoint_v1', this._mapZoomPreviousDiagnostic);
+                } else {
+                    sessionStorage.removeItem('sengoku_ai_last_checkpoint_v1');
+                }
+            }
+        } catch (e) {}
+        this._mapZoomPreviousDiagnostic = undefined;
+    },
+
     initMapDrag() {
         this.isDraggingMap = false;
         this.dragStartX = 0;
@@ -389,6 +489,8 @@ Object.assign(UIManager.prototype, {
 
         if (Math.abs(targetScale - oldScale) < 0.01) return;
 
+        this._beginMapZoomDiagnostic(this.zoomLevel);
+
         const rect = sc.getBoundingClientRect();
         cx = cx !== null ? cx : rect.left + rect.width / 2;
         cy = cy !== null ? cy : rect.top + rect.height / 2;
@@ -475,6 +577,7 @@ Object.assign(UIManager.prototype, {
                     sc.scrollTop = targetScrollTop;
                     this.updateZoomButtons();
                     this.isAnimatingZoom = false;
+                    this._endMapZoomDiagnostic();
                 }
             };
             requestAnimationFrame(animate); 
@@ -493,6 +596,7 @@ Object.assign(UIManager.prototype, {
             requestAnimationFrame(() => {
                 if (Math.abs(sc.scrollLeft - targetScrollLeft) > 0.5) sc.scrollLeft = targetScrollLeft;
                 if (Math.abs(sc.scrollTop - targetScrollTop) > 0.5) sc.scrollTop = targetScrollTop;
+                this._endMapZoomDiagnostic();
             });
 
             this.updateZoomButtons();
@@ -572,17 +676,34 @@ Object.assign(UIManager.prototype, {
     renderMap() {
         if (!this.mapEl) return;
 
-        // ★Round5：古い全画面Canvasの描画/GPUバッファを先に縮めてからDOMを捨てます。
+        const mapW = this.game.mapWidth || 1200;
+        const mapH = this.game.mapHeight || 800;
+        const baseMapImage = this._ensureMapBaseImage(mapW, mapH);
+
+        // ★Round14：勢力色Canvasは地図の静的コア層なので、renderMapをまたいで再利用します。
+        // 毎回3.8MB級のCanvasを捨てて作り直すメモリピークを避けます。
+        let persistentClanColor = document.getElementById('clan-color-overlay') || this._lastClanColorOverlay || null;
+
+        // ★Round5/14：一時エフェクトCanvasだけを縮めて解放します。
         this.mapEl.querySelectorAll('canvas').forEach(oldCanvas => {
+            if (oldCanvas === persistentClanColor) return;
             try {
                 const oldCtx = oldCanvas.getContext('2d');
                 if (oldCtx) oldCtx.clearRect(0, 0, oldCanvas.width, oldCanvas.height);
                 oldCanvas.width = 1;
                 oldCanvas.height = 1;
-            } catch (e) {
-            }
+            } catch (e) {}
         });
-        this.mapEl.innerHTML = ''; 
+
+        // 地図画像そのものは同じImage要素を保持し、毎回decode/raster資源を捨てません。
+        this.mapEl.replaceChildren(baseMapImage);
+        if (persistentClanColor) {
+            if (persistentClanColor.width !== mapW || persistentClanColor.height !== mapH) {
+                persistentClanColor.width = mapW;
+                persistentClanColor.height = mapH;
+            }
+            this.mapEl.appendChild(persistentClanColor);
+        }
         
         // ★追加：一旦、勢力名シールが出ている合図をリセットします
         document.body.classList.remove('showing-daimyo-labels');
@@ -676,13 +797,10 @@ Object.assign(UIManager.prototype, {
         // ★追加：ポップアップの目印シールを貼るために、絶対に「今のターンの城」を取得する魔法です
         const turnCastle = this.game.getCurrentTurnCastle();
 
-        const mapW = this.game.mapWidth || 1200;
-        const mapH = this.game.mapHeight || 800;
-        
         // ==========================================
         // ★最新版：勢力の色で国を塗るための画用紙を敷きます！
         // ==========================================
-        let clanColorOverlay = document.getElementById('clan-color-overlay');
+        let clanColorOverlay = persistentClanColor || document.getElementById('clan-color-overlay');
         if (!clanColorOverlay) {
             clanColorOverlay = document.createElement('canvas');
             clanColorOverlay.id = 'clan-color-overlay';
@@ -696,54 +814,12 @@ Object.assign(UIManager.prototype, {
         }
         this.mapEl.appendChild(clanColorOverlay);
 
-        // 地方を光らせるための「透明な画用紙（キャンバス）」を敷いておきます！
-        const overlay = document.createElement('canvas');
-        overlay.id = 'province-overlay';
-        overlay.width = mapW;
-        overlay.height = mapH;
-        overlay.style.position = 'absolute';
-        overlay.style.left = '0px';
-        overlay.style.top = '0px';
-        overlay.style.pointerEvents = 'none'; // クリックの邪魔をしないようにする魔法です
-        overlay.style.zIndex = '3'; // お城の線より下、マップ画像より上に敷きます
-        this.mapEl.appendChild(overlay);
-        
-        // ★ここから追加：ホバーで光らせる画用紙と、キープして光らせる画用紙を追加します！
-        const hoverBlinkOverlay = document.createElement('canvas');
-        hoverBlinkOverlay.id = 'hover-blink-overlay';
-        hoverBlinkOverlay.width = mapW;
-        hoverBlinkOverlay.height = mapH;
-        hoverBlinkOverlay.style.position = 'absolute';
-        hoverBlinkOverlay.style.left = '0px';
-        hoverBlinkOverlay.style.top = '0px';
-        hoverBlinkOverlay.style.pointerEvents = 'none'; 
-        hoverBlinkOverlay.style.zIndex = '3'; 
-        this.mapEl.appendChild(hoverBlinkOverlay);
-
-        const keepBlinkOverlay = document.createElement('canvas');
-        keepBlinkOverlay.id = 'keep-blink-overlay';
-        keepBlinkOverlay.width = mapW;
-        keepBlinkOverlay.height = mapH;
-        keepBlinkOverlay.style.position = 'absolute';
-        keepBlinkOverlay.style.left = '0px';
-        keepBlinkOverlay.style.top = '0px';
-        keepBlinkOverlay.style.pointerEvents = 'none'; 
-        keepBlinkOverlay.style.zIndex = '3'; 
-        this.mapEl.appendChild(keepBlinkOverlay);
-
-        // ==========================================
-        // ★今回追加：大雪を表現するための水玉キャンバスを敷きます！
-        // ==========================================
-        const snowOverlay = document.createElement('canvas');
-        snowOverlay.id = 'snow-overlay';
-        snowOverlay.width = mapW;
-        snowOverlay.height = mapH;
-        snowOverlay.style.position = 'absolute';
-        snowOverlay.style.left = '0px';
-        snowOverlay.style.top = '0px';
-        snowOverlay.style.pointerEvents = 'none'; 
-        snowOverlay.style.zIndex = '4'; // province-overlay(3)より上、SVG(5)やお城(10)より下
-        this.mapEl.appendChild(snowOverlay);
+        // ★Round14：普段透明な全画面Canvasは常駐させません。
+        // PCのhoverだけは頻繁に使うためPC時のみ先に確保し、
+        // 地方ハイライト・キープ光・雪は実際に必要になった時だけ生成します。
+        if (document.body.classList.contains('is-pc')) {
+            this._ensureMapOverlayCanvas('hover-blink-overlay', 3);
+        }
 
         const svgNS = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(svgNS, "svg");
@@ -1356,7 +1432,7 @@ Object.assign(UIManager.prototype, {
     // ★ここから追加！：特定の地方（または国）を光らせる魔法です！
     // ==========================================
     highlightRegion(regionId) {
-        const overlay = document.getElementById('province-overlay');
+        const overlay = this._ensureMapOverlayCanvas('province-overlay', 3);
         if (!overlay) return;
         const ctx = overlay.getContext('2d');
         const width = overlay.width;
@@ -1431,8 +1507,12 @@ Object.assign(UIManager.prototype, {
     clearHighlight() {
         const overlay = document.getElementById('province-overlay');
         if (!overlay) return;
+        if (!document.body.classList.contains('is-pc')) {
+            this._releaseMapOverlayCanvas('province-overlay');
+            return;
+        }
         const ctx = overlay.getContext('2d');
-        // 画用紙を綺麗にするだけ！
+        // PCでは再利用するため中身だけ消します。
         ctx.clearRect(0, 0, overlay.width, overlay.height);
         overlay.classList.remove('anim-map-glow');
     },
@@ -1442,7 +1522,18 @@ Object.assign(UIManager.prototype, {
     // ==========================================
     updateSnowOverlay() {
         if (this.isBackgroundPaused) return;
-        const overlay = document.getElementById('snow-overlay');
+
+        const hasHeavySnow = Array.isArray(this.game.provinces) && this.game.provinces.some(
+            p => p.statusEffects && p.statusEffects.includes('heavySnow')
+        );
+        if (!hasHeavySnow) {
+            this._releaseMapOverlayCanvas('snow-overlay');
+            this.lastSnowHash = null;
+            this.lastSnowImageData = null;
+            return;
+        }
+
+        const overlay = this._ensureMapOverlayCanvas('snow-overlay', 4);
         if (!overlay) return;
 
         // DataManagerにこっそりしまっておいた画像データ（裏側の秘密マップ）をもらいます
@@ -1807,9 +1898,10 @@ Object.assign(UIManager.prototype, {
     // ★新魔法：特定の勢力の領土（色がついているところ）だけを光らせる魔法です！
     // ==========================================
     drawClanHighlight(canvasId, clanId, colorRGB = {r: 255, g: 255, b: 255}, alpha = 100) {
-        const overlay = document.getElementById(canvasId);
         // pixelCastleMap がまだ無い時（最初のロードの瞬間など）や、中立の時はストップします
-        if (!overlay || !this.pixelCastleMap || clanId === 0) return;
+        if (!this.pixelCastleMap || clanId === 0) return;
+        const overlay = this._ensureMapOverlayCanvas(canvasId, 3);
+        if (!overlay) return;
         
         const ctx = overlay.getContext('2d');
         const width = overlay.width;
@@ -1875,9 +1967,8 @@ Object.assign(UIManager.prototype, {
             // （ぼやける光の魔法は drawClanHighlight の中で自動的にかかるようになりました！）
             this.drawClanHighlight('keep-blink-overlay', this.game.tempKukoData.clanAId, {r: 255, g: 255, b: 0}, 160);
         } else {
-            // それ以外の時はキープ用キャンバスを綺麗にします
-            // （フィルターの解除も clearClanHighlight の中で自動的に行われます！）
-            this.clearClanHighlight('keep-blink-overlay');
+            // ★Round14：使っていない間は1200x800の透明Canvas自体を持たないようにします。
+            this._releaseMapOverlayCanvas('keep-blink-overlay');
         }
     },
 
