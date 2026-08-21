@@ -1552,7 +1552,8 @@ class GameManager {
         return rel;
     }
     
-    startNewGame() {
+    startNewGame(options = {}) {
+        const startInWatchMode = !!(options && options.watchMode);
         if(this.ui) this.ui.forceResetModals();
         
         // ★前回のゲームの記憶やフラグを綺麗にお掃除します！
@@ -1591,11 +1592,18 @@ class GameManager {
         }
         
         this.ui.showScenarioSelection(SCENARIOS, (folder) => {
-            this.loadScenario(folder);
+            this.loadScenario(folder, { startInWatchMode });
         });
     }
+
+    // Round27：タイトル画面の「観戦する」。
+    // シナリオ選択までは「はじめから」と完全に共用し、選択後だけ大名選択を飛ばして観戦開始します。
+    startWatchGame() {
+        this.startNewGame({ watchMode: true });
+    }
     
-    async loadScenario(folder) {
+    async loadScenario(folder, options = {}) {
+        const startInWatchMode = !!(options && options.startInWatchMode);
         // ★追加：シナリオの準備を始める前に、画面をロード画面で隠します
         if (this.ui) this.ui.showLoadingScreen();
         // ★追加：ロード画面がしっかり表示されるまで、ほんの一瞬（0.05秒）だけ待ちます
@@ -1628,6 +1636,12 @@ class GameManager {
             
             // ★追加：今のシナリオのフォルダ名をゲーム全体で覚えておく魔法です！
             this.scenarioFolder = folder;
+
+            // Round27：タイトルから観戦開始した場合は、game_startイベントより前に観戦状態へ入ります。
+            // これでゲーム開始イベントも「プレイヤー勢力なし」の通常観戦ルールで処理されます。
+            if (startInWatchMode) {
+                this._prepareFreshWatchMode(null);
+            }
             
             this.kunishuSystem.setKunishuData(data.kunishus || []);
             this.courtRankSystem.setRankData(data.courtRanks || []);
@@ -1715,16 +1729,36 @@ class GameManager {
             this.preloadFaceIcons();
             
             document.getElementById('app').classList.remove('hidden');
-            
-            this.phase = 'daimyo_select';
+
+            // Round27：タイトルから観戦を選んだ場合は、大名選択画面を経由しません。
+            // 先に観戦状態へしておくことで、ゲーム開始直後の月初イベントも通常の観戦ルール（AI分岐・自動送り）で処理されます。
+            if (startInWatchMode) {
+                this.phase = 'game';
+            } else {
+                this.phase = 'daimyo_select';
+            }
+
             this.ui.renderMap();
             // カットイン表示を消しました！
 
             // ★追加：マップの準備がすべて終わったら、少しだけ待ってからロード画面を隠します
             await new Promise(resolve => setTimeout(resolve, 100));
             if (this.ui) this.ui.hideLoadingScreen();
+
+            // 観戦開始はロード画面を閉じてから。通常の「はじめから」と同じ startMonth() を入口にします。
+            if (startInWatchMode) {
+                setTimeout(() => this.init(), 0);
+            }
             
         } catch (e) {
+            if (startInWatchMode) {
+                this.isWatchMode = false;
+                this.originalPlayerClanId = null;
+                this.playerClanId = 1;
+                this._watchReturnRequested = false;
+                this._watchReturnInProgress = false;
+                this._watchReturnSafePoint = null;
+            }
             if (this.ui) this.ui.hideLoadingScreen();
             console.error(e);
             if (this.ui) {
@@ -3574,8 +3608,9 @@ class GameManager {
     // ==========================================
     // 観戦モードの切り替え
     // ==========================================
-    startWatchMode() {
-        this.originalPlayerClanId = this.playerClanId;
+    // Round27：途中からの観戦と、タイトルから最初から観戦する処理で状態初期化を共用します。
+    _prepareFreshWatchMode(originalPlayerClanId = null) {
+        this.originalPlayerClanId = originalPlayerClanId;
         this.playerClanId = -100;
         this.isWatchMode = true;
         this._watchReturnRequested = false;
@@ -3584,10 +3619,14 @@ class GameManager {
         if (this.ui && typeof this.ui.hideWatchReturnReserved === 'function') {
             this.ui.hideWatchReturnReserved();
         }
-        
         if (this.ui && typeof this.ui.clearCommandMenu === 'function') {
             this.ui.clearCommandMenu();
         }
+    }
+
+    startWatchMode() {
+        // ゲーム途中から観戦する場合は、戻る時の参考として元の担当勢力を覚えておきます。
+        this._prepareFreshWatchMode(this.playerClanId);
         this.processTurn();
     }
 
