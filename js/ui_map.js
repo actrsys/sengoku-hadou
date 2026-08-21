@@ -607,10 +607,11 @@ Object.assign(UIManager.prototype, {
     },
     
     // ==========================================
-    // ★Round21：イベント・戦争演出で共通利用する「拠点へカメラを寄せる」魔法
+    // ★Round23：イベント・戦争演出で共通利用する「拠点へカメラを寄せる」魔法
     // castle / castleId / castleId配列のいずれも受け取れます。
+    // transition: 'smooth' ならぬるっと移動、'instant' なら瞬時に移動します。
+    // 旧 immediate オプションも互換維持（true=instant / false=smooth）。
     // ズーム倍率は変えず、現在の倍率のまま対象地点を画面中央へ寄せます。
-    // 古いスマホではsmoothスクロールを避けてrenderer負荷を増やさないよう即時移動します。
     // ==========================================
     focusMapOnCastle(castleOrId, options = {}) {
         const sc = document.getElementById('map-scroll-container');
@@ -646,17 +647,29 @@ Object.assign(UIManager.prototype, {
         const targetLeft = Math.max(0, Math.min(maxLeft, scaledX - sc.clientWidth / 2));
         const targetTop = Math.max(0, Math.min(maxTop, scaledY - sc.clientHeight / 2));
 
-        // ほぼ目的地なら再スクロールしません。
+        // ほぼ目的地なら再スクロールしません。これが二重カメラ指定の見た目上の揺れも防ぎます。
         if (Math.abs(sc.scrollLeft - targetLeft) < 1 && Math.abs(sc.scrollTop - targetTop) < 1) {
             return Promise.resolve(true);
         }
 
-        const isPC = document.body.classList.contains('is-pc');
-        const immediate = options.immediate === true || (!isPC && options.immediate !== false);
-        const behavior = immediate ? 'auto' : 'smooth';
+        // Round23：明示的なtransitionを最優先。旧 immediate も互換維持します。
+        let transition = options.transition;
+        if (transition !== 'smooth' && transition !== 'instant') {
+            if (options.immediate === true) transition = 'instant';
+            else if (options.immediate === false) transition = 'smooth';
+            else {
+                const isPC = document.body.classList.contains('is-pc');
+                transition = isPC ? 'smooth' : 'instant';
+            }
+        }
+
+        // OS側で「動きを減らす」が指定されている場合は瞬時移動を優先します。
+        if (transition === 'smooth' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            transition = 'instant';
+        }
+
         const lockInteraction = options.lockInteraction !== false;
         if (lockInteraction) {
-            // focusが重なってもpointer-eventsを誤って'none'のまま残さないようスタック管理します。
             if ((this._mapFocusLockCount || 0) === 0) {
                 this._mapFocusPrevPointerEvents = sc.style.pointerEvents;
             }
@@ -665,20 +678,24 @@ Object.assign(UIManager.prototype, {
         }
 
         if (this.game && typeof this.game.writeSystemDiagnostic === 'function' && options.reason) {
-            this.game.writeSystemDiagnostic(`map_focus:${options.reason}:start`, castles[0]);
+            this.game.writeSystemDiagnostic(`map_focus:${options.reason}:${transition}:start`, castles[0]);
+        }
+
+        // 新しいカメラ命令が来たら、前のsmooth移動はそこで終わらせます。
+        // イベント中の「ぱっと場面転換」が前のアニメーションに引っ張られないための処理です。
+        if (typeof this._cancelActiveMapFocus === 'function') {
+            this._cancelActiveMapFocus();
         }
 
         return new Promise(resolve => {
             let done = false;
-            let idleTimer = null;
-            let fallbackTimer = null;
+            let rafId = 0;
 
-            const cleanup = () => {
+            const cleanup = (result = true) => {
                 if (done) return;
                 done = true;
-                if (idleTimer) clearTimeout(idleTimer);
-                if (fallbackTimer) clearTimeout(fallbackTimer);
-                sc.removeEventListener('scroll', onScroll);
+                if (rafId && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(rafId);
+
                 if (lockInteraction) {
                     this._mapFocusLockCount = Math.max(0, (this._mapFocusLockCount || 1) - 1);
                     if (this._mapFocusLockCount === 0) {
@@ -686,34 +703,77 @@ Object.assign(UIManager.prototype, {
                         this._mapFocusPrevPointerEvents = '';
                     }
                 }
-                if (this.game && typeof this.game.writeSystemDiagnostic === 'function' && options.reason) {
-                    this.game.writeSystemDiagnostic(`map_focus:${options.reason}:done`, castles[0]);
+
+                if (this._cancelActiveMapFocus === cancelSelf) {
+                    this._cancelActiveMapFocus = null;
                 }
-                resolve(true);
+
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function' && options.reason) {
+                    this.game.writeSystemDiagnostic(`map_focus:${options.reason}:${transition}:done`, castles[0]);
+                }
+                resolve(result);
             };
 
-            const onScroll = () => {
-                if (idleTimer) clearTimeout(idleTimer);
-                idleTimer = setTimeout(cleanup, 90);
+            const cancelSelf = () => cleanup(false);
+            this._cancelActiveMapFocus = cancelSelf;
+
+            if (transition === 'instant') {
+                sc.scrollLeft = targetLeft;
+                sc.scrollTop = targetTop;
+
+                // spacer/transform更新直後でも確実に目的地へ置くため、次フレームに1回だけ補正します。
+                if (typeof requestAnimationFrame === 'function') {
+                    rafId = requestAnimationFrame(() => {
+                        rafId = 0;
+                        if (Math.abs(sc.scrollLeft - targetLeft) > 0.5) sc.scrollLeft = targetLeft;
+                        if (Math.abs(sc.scrollTop - targetTop) > 0.5) sc.scrollTop = targetTop;
+                        cleanup(true);
+                    });
+                } else {
+                    cleanup(true);
+                }
+                return;
+            }
+
+            // Round23：ブラウザ依存のscroll-behavior:smoothではなく、自前のrAF補間で統一。
+            // 古いAndroid/WebViewでも速度・完了タイミングをこちらで管理できます。
+            const startLeft = sc.scrollLeft;
+            const startTop = sc.scrollTop;
+            const dx = targetLeft - startLeft;
+            const dy = targetTop - startTop;
+            const distance = Math.hypot(dx, dy);
+            const viewportDiag = Math.max(1, Math.hypot(sc.clientWidth, sc.clientHeight));
+            const distanceRatio = Math.min(3, distance / viewportDiag);
+            const duration = Number.isFinite(Number(options.duration))
+                ? Math.max(120, Math.min(1200, Number(options.duration)))
+                : Math.round(300 + distanceRatio * 120);
+            const startTime = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
+            const animate = (now) => {
+                if (done) return;
+                const currentTime = Number.isFinite(now) ? now : ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now());
+                const t = Math.max(0, Math.min(1, (currentTime - startTime) / duration));
+                // easeOutCubic：出だしはしっかり動き、目的地では自然に止まります。
+                const eased = 1 - Math.pow(1 - t, 3);
+                sc.scrollLeft = startLeft + dx * eased;
+                sc.scrollTop = startTop + dy * eased;
+
+                if (t < 1) {
+                    rafId = requestAnimationFrame(animate);
+                } else {
+                    rafId = 0;
+                    sc.scrollLeft = targetLeft;
+                    sc.scrollTop = targetTop;
+                    cleanup(true);
+                }
             };
 
-            sc.addEventListener('scroll', onScroll, { passive: true });
-            sc.scrollTo({ left: targetLeft, top: targetTop, behavior });
-
-            if (immediate) {
-                // 旧スマホでは1フレームだけ描画機会を与えてから次の演出へ進みます。
-                requestAnimationFrame(() => {
-                    if (Math.abs(sc.scrollLeft - targetLeft) > 0.5) sc.scrollLeft = targetLeft;
-                    if (Math.abs(sc.scrollTop - targetTop) > 0.5) sc.scrollTop = targetTop;
-                    requestAnimationFrame(cleanup);
-                });
+            if (typeof requestAnimationFrame === 'function') {
+                rafId = requestAnimationFrame(animate);
             } else {
-                // scrollend未対応ブラウザ向け。scrollが止まれば90msで完了、最長900msで必ず解放します。
-                fallbackTimer = setTimeout(cleanup, 900);
-                // すでにブラウザ側で位置が変わっていてscrollイベントが来ない場合のお守り。
-                setTimeout(() => {
-                    if (!done && Math.abs(sc.scrollLeft - targetLeft) < 1 && Math.abs(sc.scrollTop - targetTop) < 1) cleanup();
-                }, 120);
+                sc.scrollLeft = targetLeft;
+                sc.scrollTop = targetTop;
+                cleanup(true);
             }
         });
     },
@@ -2240,8 +2300,8 @@ Object.assign(UIManager.prototype, {
     },
 
     async playBattleBlink(castleIdOrIds, colorA, colorB, durationMs) {
-        // Round21: 点滅する場所が画面外にならないよう、演出前に必ず対象へ寄せます。
-        await this.focusMapOnCastle(castleIdOrIds, { reason: 'battle_blink' });
+        // Round23: 点滅する場所が画面外にならないよう、演出側が1回だけ滑らかに対象へ寄せます。
+        await this.focusMapOnCastle(castleIdOrIds, { transition: 'smooth', reason: 'battle_blink' });
         return new Promise(resolve => {
             this.showMapGuard();
 
@@ -2309,8 +2369,8 @@ Object.assign(UIManager.prototype, {
     // ★城が落ちた時の、フワッと白く光る魔法！
     // ==========================================
     async playCaptureEffect(castleIdOrIds, onHalfway) {
-        // Round21: プレイヤー戦後でも、白い制圧演出が画面外で走らないよう対象へ寄せます。
-        await this.focusMapOnCastle(castleIdOrIds, { reason: 'capture_effect' });
+        // Round23: プレイヤー戦後でも、白い制圧演出が画面外で走らないよう演出側で滑らかに寄せます。
+        await this.focusMapOnCastle(castleIdOrIds, { transition: 'smooth', reason: 'capture_effect' });
         return new Promise(resolve => {
             this.showMapGuard();
 

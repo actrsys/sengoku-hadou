@@ -514,9 +514,8 @@ class IndependenceSystem {
         // 画面を勝手に触られないようにバリアを張ります
         if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
 
-        // 独立したお城（起点の城）にカメラを移動させます！
-        this.game.ui.scrollToActiveCastle(castle, false);
-        await new Promise(res => setTimeout(res, 600)); 
+        // ★Round23：カメラ移動はplayBattleBlink側へ一元化。
+        // ここで起点城へ先に動かすと、参加城群の中心へもう一度動いて二段階に見えるため削除しました。
 
         // お城の元の色と、新しい色を調べます
         let oldColor = { r: 255, g: 255, b: 255 };
@@ -1050,9 +1049,7 @@ class IndependenceSystem {
             if (!isPlayerDaimyo) {
                 if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
                 
-                // お城にカメラを移動します
-                this.game.ui.scrollToActiveCastle(castle, false);
-                await new Promise(res => setTimeout(res, 600));
+                // ★Round23：カメラ移動はplayBattleBlink側へ一元化し、二重移動を防ぎます。
 
                 // 謀反に参加する城（反乱軍の城）をすべて集めます
                 const rebelCastleIds = [];

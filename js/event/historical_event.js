@@ -1105,7 +1105,7 @@ window.GameEvents.push({
         // イベントテキストの台本に渡す変数をひとまとめにします
         const args = {
             mikawaProvinceShort: mikawaProvinceShort, // ★追加
-            motoyasuCastleId: motoyasu.castleId, // Round21: 松平側会話のカメラ位置
+            motoyasuCastleId: motoyasu.castleId, // Round23: 松平側会話のカメラ位置
             motoyasuName: motoyasu.fullName,
             motoyasuGivenName: motoyasu.givenName || "家康",
             matsudairaFamilyName: motoyasu.familyNameStr || "徳川",
@@ -1849,9 +1849,9 @@ window.GameEvents.push({
         // 万が一データがない場合のエラーを防ぎます
         if (!motoyasu || !hikuma || !okazaki) return; 
 
-        // Round21: 改称イベントの舞台である曳馬城（ID12）へ、イベント表示前にカメラを寄せます。
+        // Round23: 改称イベントの舞台である曳馬城（ID12）へ、イベント表示前にカメラを寄せます。
         if (game.ui && typeof game.ui.focusMapOnCastle === 'function') {
-            await game.ui.focusMapOnCastle(12, { immediate: true, reason: 'historical_event' });
+            await game.ui.focusMapOnCastle(12, { transition: 'smooth', reason: 'historical_event' });
         }
 
         // 名前が変わってしまう前に、「現在の武将の名前」と「現在のお城の名前」をメモしておきます
@@ -2009,7 +2009,7 @@ window.GameEvents.push({
         
         const args = {
             nagayasuCastleName: nagayasuCastle ? nagayasuCastle.name : "居城",
-            nagayasuCastleId: nagayasuCastle ? nagayasuCastle.id : null, // Round21: 三人衆会談のカメラ位置
+            nagayasuCastleId: nagayasuCastle ? nagayasuCastle.id : null, // Round23: 三人衆会談のカメラ位置
             nagayasuName: nagayasu ? nagayasu.fullName : "三好長逸",
             nagayasuFace: nagayasu ? nagayasu.faceIcon : "unknown_face.webp",
             masakatsuName: masakatsu ? masakatsu.fullName : "三好政勝",
@@ -2538,7 +2538,7 @@ window.GameEvents.push({
         const args = {
             year: game.year,
             month: game.month,
-            nobunagaCastleId: targetCastleId, // Round21: 信長との会談場所
+            nobunagaCastleId: targetCastleId, // Round23: 信長との会談場所
             yoshiteruName: yoshiteruName,
             yoshiakiName: yoshiakiName,
             yoshiakiGivenName: yoshiakiGivenName,
@@ -3111,9 +3111,9 @@ window.GameEvents.push({
         const candidateName = candidate.fullName;
         const sponsorName = sponsorClan.name;
         
-        // Round21: 将軍就任の舞台である二条城（ID26）へ寄せてから結果を表示します。
+        // Round23: 将軍就任の舞台である二条城（ID26）へ寄せてから結果を表示します。
         if (game.ui && typeof game.ui.focusMapOnCastle === 'function') {
-            await game.ui.focusMapOnCastle(26, { immediate: true, reason: 'historical_event' });
+            await game.ui.focusMapOnCastle(26, { transition: 'smooth', reason: 'historical_event' });
         }
 
         await game.ui.showDialogAsync(`${candidateName}が征夷大将軍に就任しました！\n${sponsorName}と${newClanName}は固い同盟で結ばれました。`, false, 0);
@@ -3518,9 +3518,9 @@ window.GameEvents.push({
         // メッセージ1：強襲と実権奪取
         const msg1 = `${murashigeName}が${castleNameBefore}を強襲し、${tomomasaFamilyName}家の実権を握りました！`;
         game.ui.log(`【イベント】荒木村重の池田家乗っ取り：${murashigeName}が${tomomasaFamilyName}家の実権を握りました。`);
-        // Round21: 強襲の舞台である伊丹城（ID51）へ寄せてから通知します。
+        // Round23: 強襲の舞台である伊丹城（ID51）へ寄せてから通知します。
         if (game.ui && typeof game.ui.focusMapOnCastle === 'function') {
-            await game.ui.focusMapOnCastle(51, { immediate: true, reason: 'historical_event' });
+            await game.ui.focusMapOnCastle(51, { transition: 'smooth', reason: 'historical_event' });
         }
         await game.ui.showDialogAsync(msg1, false, 0);
 

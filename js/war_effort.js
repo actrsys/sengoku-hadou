@@ -640,10 +640,8 @@ Object.assign(WarManager.prototype, {
                     // ★追加：メッセージを閉じた後からバリアを張ります！
                     if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
 
-                    // ★ここから追加：メッセージを閉じた後、戦場となるお城にスクロールして点滅させます！
-                    const realDefCastle = this.game.getCastle(defCastle.id);
-                    this.game.ui.scrollToActiveCastle(realDefCastle, false);
-                    await new Promise(res => setTimeout(res, 600)); // スクロール完了を少し待ちます
+                    // ★Round23：戦場へのカメラ移動はplayBattleBlink側へ一元化しました。
+                    // 事前scroll＋点滅側focusの二重移動を防ぎます。
                     
                     let atkColor = { r: 255, g: 255, b: 255 };
                     if (!atkCastle.isKunishu && atkClan !== 0) {
@@ -718,6 +716,13 @@ Object.assign(WarManager.prototype, {
                     
                     this.game.ui.showDialog(`${requesterName}が${targetInfoStr}${reinfCastleName}に救援を求めています。\n援軍要請に応じますか？`, false, null, null, { choices: choices });
                 };
+
+                // ★Round17：以前から抜けていた「選択結果を待つ Promise」を復元します。
+                // isConfirmed が未定義のまま参照される潜在バグもここで解消します。
+                const isConfirmed = await new Promise(resolve => {
+                    resolveConfirmed = resolve;
+                    showReq();
+                });
                 
                 this.game.ui.restoreAIGuard();
                 if (!isConfirmed) {
@@ -844,7 +849,8 @@ Object.assign(WarManager.prototype, {
                             
                             this.game.ui.log(`【${reinfType}】${reinfData.castle.name}の${leaderName}が守備側の援軍として参戦しました。`);
                             
-                            if (this.canShowNotify(isPlayerFactionInvolved, this.state.isPlayerInvolved)) {
+                            if (!reinfData._joinNoticeShown && this.canShowNotify(isPlayerFactionInvolved, this.state.isPlayerInvolved)) {
+                                reinfData._joinNoticeShown = true;
                                 await this.game.ui.showDialogAsync(msg);
                             }
                         }
@@ -3265,6 +3271,8 @@ Object.assign(WarManager.prototype, {
                 const leaderName = leader ? leader.name : "頭領";
                 const nameStr = `${kunishu.getName(this.game)}の${leaderName}`;
                 
+                // ★Round17：この時点で参戦通知を出すため、後段の共通参戦通知では二重表示しません。
+                if (this.state.defReinforcement) this.state.defReinforcement._joinNoticeShown = true;
                 this.game.warManager.reinfMsgHelper.showAcceptance(this.game, nameStr, true, defCastle.isDelegated, false, onComplete, false);
             } else {
                 onComplete();
@@ -3345,6 +3353,8 @@ Object.assign(WarManager.prototype, {
             const castellanName = castellan ? castellan.name : "城主";
             const nameStr = `${helperCastle.name}の${castellanName}`;
             
+            // ★Round17：この時点で参戦通知を出すため、後段の共通参戦通知では二重表示しません。
+            if (this.state.defReinforcement) this.state.defReinforcement._joinNoticeShown = true;
             this.game.warManager.reinfMsgHelper.showAcceptance(this.game, nameStr, false, defCastle.isDelegated, false, onComplete, false);
         } else {
             onComplete();

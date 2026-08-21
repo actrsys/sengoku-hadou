@@ -30,11 +30,13 @@ window.EventTextManager = {
             preloadItemFaces(sequence[i + 2]);
 
             if (item.type === 'camera') {
-                // Round21: 歴史イベントの舞台が確定している時だけ、指定拠点へカメラを寄せます。
+                // Round23: 歴史イベントの舞台が確定している時だけ、指定拠点へカメラを寄せます。
+                // transition:'smooth' はイベント開始、'instant' はイベント中の場面転換に使います。
                 // 拠点IDが不明・未指定なら何もしません。ズーム倍率も変更しません。
                 if (item.castleId !== undefined && item.castleId !== null && game.ui && typeof game.ui.focusMapOnCastle === 'function') {
                     await game.ui.focusMapOnCastle(item.castleId, {
-                        immediate: item.immediate !== false,
+                        transition: item.transition || (item.immediate === false ? 'smooth' : 'instant'),
+                        duration: item.duration,
                         reason: 'historical_event'
                     });
                 }
@@ -72,7 +74,7 @@ window.EventTextManager = {
     // 清洲同盟（使者の到着まで）
     kiyosu_alliance_part1: function(args) {
         return [
-            { type: 'camera', castleId: args.motoyasuCastleId, immediate: true },
+            { type: 'camera', castleId: args.motoyasuCastleId, transition: 'smooth' },
             { type: 'log', msg: `今川義元の死後、三河で独立を果たした${args.motoyasuName}は、隣国${args.imagawaFamilyName}家と敵対関係となっていた。` },
             { type: 'log', msg: `${args.motoyasuGivenName}は長年に渡り敵対関係にあった${args.odaFamilyName}家との同盟を模索していた。` },
             { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「皆々様方、ご足労いただき感謝申し上げる」` },
@@ -93,7 +95,7 @@ window.EventTextManager = {
             { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「うむ。此度はわし自ら${args.nobunagaCastleShort}に赴かねばなるまい」` },
             { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「わし自ら訪問することで、当方の誠意と覚悟を見せるのじゃ。よいな」` },
             { type: 'dialog', leftName: args.kashinAName, leftFace: args.kashinAFace, msg: `「ははっ！」` },
-            { type: 'camera', castleId: 7, immediate: true },
+            { type: 'camera', castleId: 7, transition: 'instant' },
             { type: 'log', msg: `${args.year}年${args.month}月　${args.nobunagaCastleName}` }
         ];
     },
@@ -109,7 +111,7 @@ window.EventTextManager = {
     // 清洲同盟（織田家専用：使者の取り次ぎ）
     kiyosu_alliance_oda_arrival: function(args) {
         return [
-            { type: 'camera', castleId: 7, immediate: true },
+            { type: 'camera', castleId: 7, transition: 'instant' },
             { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「殿。${args.matsudairaFamilyName}家から使者が参っておりまする」` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「${args.matsudairaFamilyName}か……ふむ」` }
         ];
@@ -118,7 +120,7 @@ window.EventTextManager = {
     // 清洲同盟（織田家専用：面会決定〜対面）
     kiyosu_alliance_oda_accept: function(args) {
         return [
-            { type: 'camera', castleId: 7, immediate: true },
+            { type: 'camera', castleId: 7, transition: 'instant' },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「ふっ、会うてやろうではないか。通せ」` },
             { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「はっ！」` },
             { type: 'log', msg: `${args.nobunagaGivenName}と${args.motoyasuGivenName}は、${args.nobunagaCastleName}内で対面した。` }
@@ -128,7 +130,7 @@ window.EventTextManager = {
     // 清洲同盟（面会して同盟成立ルート）
     kiyosu_alliance_accept: function(args) {
         return [
-            { type: 'camera', castleId: 7, immediate: true },
+            { type: 'camera', castleId: 7, transition: 'instant' },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「おぬし自ら来るとはのう。よう来た、竹千代」` },
             { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「お懐かしゅうございまする、吉法師様。いえ、${args.nobunagaTitle}様」` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「はっはっは！\nわしとそなたの仲ではないか。吉法師で構わぬわい」` },
@@ -148,7 +150,7 @@ window.EventTextManager = {
     // 清洲同盟（織田家専用：使者を追い返すルート）
     kiyosu_alliance_reject: function(args) {
         return [
-            { type: 'camera', castleId: 7, immediate: true },
+            { type: 'camera', castleId: 7, transition: 'instant' },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「追い返せ」` },
             { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「へ……？　よろしいのですか？」` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「我らと結びたいと申すのであろう。構わぬ、追っ払え」` },
@@ -159,11 +161,11 @@ window.EventTextManager = {
     //桶狭間の戦い
     okehazama_part1: function(args) {
         return [
-            { type: 'camera', castleId: 13, immediate: true },
+            { type: 'camera', castleId: 13, transition: 'smooth' },
             { type: 'log', msg: `覇を競う群雄の中にあって、東海に一際大きな影があった。` },
             { type: 'log', msg: `${args.yoshimotoName}。\n${args.surugaProvinceShort}・${args.toutoumiProvinceShort}・${args.mikawaProvinceShort}を従え、海道一の弓取りと名高い大大名である。` },
             { type: 'log', msg: `${args.mikawaProvinceShort}を平定した${args.yoshimotoName}はさらに支配地域を拡大するべく、大軍を率いて${args.sunpuCastleName}より出陣。${args.owariProvinceName}への侵攻を開始した。` },
-            { type: 'camera', castleId: 7, immediate: true },
+            { type: 'camera', castleId: 7, transition: 'instant' },
             { type: 'log', msg: `一方、${args.yoshimotoGivenName}出陣の報を受け、${args.owariProvinceName}・${args.nobunagaFamilyName}家では重臣らが一同に介し、軍議を行っていた。` },
             { type: 'dialog', leftName: args.juushinAName, leftFace: args.juushinAFace, msg: `「${args.nobunagaGivenName}様、${args.yoshimotoFamilyName}軍は総勢二万五千の大軍でござる。かくなる上は、降伏するしかありませぬ」` },
             { type: 'dialog', leftName: args.juushinBName, leftFace: args.juushinBFace, msg: `「馬鹿なことを申すな！ 一戦交えずして降伏など武士の名折れにござる」` },
@@ -174,7 +176,7 @@ window.EventTextManager = {
     },
     okehazama_imagawa_part1: function(args) {
         return [
-            { type: 'camera', castleId: 13, immediate: true },
+            { type: 'camera', castleId: 13, transition: 'smooth' },
             { type: 'log', msg: `覇を競う群雄の中にあって、東海に一際大きな影があった。` },
             { type: 'log', msg: `${args.yoshimotoName}。\n${args.surugaProvinceShort}・${args.toutoumiProvinceShort}・${args.mikawaProvinceShort}を従え、海道一の弓取りと名高い大大名である。` },
             { type: 'log', msg: `${args.mikawaProvinceShort}を平定した${args.yoshimotoName}はさらに支配地域を拡大するべく、${args.owariProvinceName}への侵攻を目論んでいた。` },
@@ -192,7 +194,7 @@ window.EventTextManager = {
     },
     okehazama_imagawa_attack: function(args) {
         return [
-            { type: 'camera', castleId: 13, immediate: true },
+            { type: 'camera', castleId: 13, transition: 'instant' },
             { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「……決めたぞ」` },
             { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「${args.nobunagaGivenName}なにするものぞ。わし自ら一捻りにしてくれよう」` },
             { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「陣触れを出すがよい」` },
@@ -202,7 +204,7 @@ window.EventTextManager = {
     },
     okehazama_oda_gungi: function(args) {
         return [
-            { type: 'camera', castleId: 7, immediate: true },
+            { type: 'camera', castleId: 7, transition: 'instant' },
             { type: 'log', msg: `一方、${args.yoshimotoGivenName}出陣の報を受け、${args.owariProvinceName}・${args.odaClanName}では重臣らが一同に介し、軍議を行っていた。` },
             { type: 'dialog', leftName: args.juushinAName, leftFace: args.juushinAFace, msg: `「${args.nobunagaGivenName}様、${args.yoshimotoFamilyName}軍は総勢二万五千の大軍でござる。かくなる上は、降伏するしかありませぬ」` },
             { type: 'dialog', leftName: args.juushinBName, leftFace: args.juushinBFace, msg: `「馬鹿なことを申すな！　一戦交えずして降伏など武士の名折れにござる」` },
@@ -213,7 +215,7 @@ window.EventTextManager = {
     },
     okehazama_imagawa_defend: function(args) {
         return [
-            { type: 'camera', castleId: 13, immediate: true },
+            { type: 'camera', castleId: 13, transition: 'instant' },
             { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「控えよ。今はその機ではないわ」` },
             { type: 'dialog', leftName: args.juushinFName, leftFace: args.juushinFFace, msg: `「はっ……御意にござりまする」` },
             { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「とはいえ、いずれは相見えねばならぬ敵じゃ。心して備えるがよい」` },
@@ -222,7 +224,7 @@ window.EventTextManager = {
     },
     okehazama_attack: function(args) {
         return [
-            { type: 'camera', castleId: 7, immediate: true },
+            { type: 'camera', castleId: 7, transition: 'instant' },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「誰ぞ、鼓をもて！」` },
             { type: 'dialog', leftName: "小姓", leftFace: "koshou.webp", msg: `「はっ！」` },
             { type: 'log', msg: `${args.nobunagaGivenName}は小姓の鼓の音に合わせて舞いはじめた。` },
@@ -250,7 +252,7 @@ window.EventTextManager = {
     },
     okehazama_defend: function(args) {
         return [
-            { type: 'camera', castleId: 7, immediate: true },
+            { type: 'camera', castleId: 7, transition: 'instant' },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「……籠城じゃ。あれほどの大軍相手に打って出るなど真の勇者ではない。それは匹夫の勇じゃ」` },
             { type: 'dialog', leftName: args.juushinAName, leftFace: args.juushinAFace, msg: `「はっ。左様にございまする」` },
             { type: 'dialog', leftName: args.juushinBName, leftFace: args.juushinBFace, msg: `「むむむ……しかしそれでは万に一つも勝ち目はありませぬぞ」` },
@@ -263,7 +265,7 @@ window.EventTextManager = {
     // 川中島の戦い
     kawanakajima_event: function(args) {
         return [
-            { type: 'camera', castleId: 5, immediate: true },
+            { type: 'camera', castleId: 5, transition: 'smooth' },
             { type: 'log', msg: `${args.year}年${args.month}月。関東管領職を継いだ${args.kenshinName}が越後より兵を発した。` },
             { type: 'log', msg: `関東制圧を目指す${args.kenshinName}にとって、信濃を固め後顧の憂いを断つことは急務であった。` },
             { type: 'log', msg: `${args.kenshinGivenName}は海津城を制圧せしめんと、一万三千の兵を率いて出陣。善光寺を経て妻女山に布陣した。` },
@@ -329,7 +331,7 @@ window.EventTextManager = {
     // 永禄の変（パート1）
     eiroku_no_hen_part1: function(args) {
         return [
-            { type: 'camera', castleId: args.nagayasuCastleId, immediate: true },
+            { type: 'camera', castleId: args.nagayasuCastleId, transition: 'smooth' },
             { type: 'log', msg: `${args.nagayasuCastleName}` },
             { type: 'dialog', leftName: args.nagayasuName, leftFace: args.nagayasuFace, msg: `「ええい、先代様が亡くなって以来、何もかもうまくいかぬわい」` },
             { type: 'dialog', leftName: args.masakatsuName, leftFace: args.masakatsuFace, msg: `「公方様の動きも活発になっておるようじゃな。先代様が死んだのが余程嬉しいらしい」` },
@@ -351,7 +353,7 @@ window.EventTextManager = {
             { type: 'dialog', leftName: args.nagayasuName, leftFace: args.nagayasuFace, msg: `「それはよい。あれはわしらの言葉を疑いもせぬじゃろう」` },
             { type: 'dialog', leftName: args.masakatsuName, leftFace: args.masakatsuFace, msg: `「……おぬしら、まさか」` },
             { type: 'dialog', leftName: args.nagayasuName, leftFace: args.nagayasuFace, msg: `「ふ、ふふふふふ……」` },
-            { type: 'camera', castleId: 26, immediate: true },
+            { type: 'camera', castleId: 26, transition: 'instant' },
             { type: 'log', msg: `${args.year}年${args.month}月 京の空は薄曇りであった。` },
             { type: 'log', msg: `この頃、将軍・${args.yoshiteruName}は幕府権威の回復を目指し、二条御所の大改築を進めていた。` },
             { type: 'log', msg: `石垣と大堀を備えた城郭のような御所は、将軍の決意の表れでもあった。` },
@@ -369,7 +371,7 @@ window.EventTextManager = {
     // 永禄の変（パート2）
     eiroku_no_hen_part2: function(args) {
         return [
-            { type: 'camera', castleId: 26, immediate: true },
+            { type: 'camera', castleId: 26, transition: 'instant' },
             { type: 'log', msg: `御所内の軍勢はわずか二百に満たなかった。${args.yoshiteruGivenName}は劣勢を悟り、死を覚悟した。` },
             { type: 'dialog', leftName: args.yoshiteruName, leftFace: args.yoshiteruFace, msg: `「おのれ、天下を乱す狼藉者どもめ……」` },
             { type: 'dialog', leftName: args.yoshiteruName, leftFace: args.yoshiteruFace, msg: `「この${args.yoshiteruGivenName}、将軍として恥じぬ死に様を見せてくれようぞ！」` },
@@ -385,7 +387,7 @@ window.EventTextManager = {
     // 永禄の変（パート3）
     eiroku_no_hen_part3: function(args) {
         return [
-            { type: 'camera', castleId: 26, immediate: true },
+            { type: 'camera', castleId: 26, transition: 'instant' },
             { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「そんな……公方様が……」` },
             { type: 'log', msg: `幕臣・${args.fujitakaName}が変事を聞いて馳せ参じた頃には、すべて終わった後のことであった。` },
             { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「……いかん、こうしてはおれぬ。${args.yoshiakiGivenName}様の御身が心配じゃ」` },
@@ -397,7 +399,7 @@ window.EventTextManager = {
     // 将軍庇護第１段階 足利義昭が朝倉家を頼る
     shogun_protection_1: function(args) {
         let messages = [
-            { type: 'camera', castleId: 16, immediate: true },
+            { type: 'camera', castleId: 16, transition: 'smooth' },
             { type: 'log', msg: `${args.year}年${args.month}月 越前国 一乗谷` },
             { type: 'dialog', leftName: args.fujitakaName, leftFace: args.fujitakaFace, msg: `「お初にお目にかかる。某、${args.fujitakaFamilyName}${args.fujitakaTitle}と申す者にござる」` },
             { type: 'dialog', leftName: args.asakuraName, leftFace: args.asakuraFace, msg: `「よう参られました。朝倉${args.asakuraTitle}にございまする」` },
@@ -445,7 +447,7 @@ window.EventTextManager = {
     // 将軍庇護第２段階 足利義昭が織田家を頼る
     shogun_protection_2: function(args) {
         return [
-            { type: 'camera', castleId: args.nobunagaCastleId, immediate: true },
+            { type: 'camera', castleId: args.nobunagaCastleId, transition: 'smooth' },
             { type: 'log', msg: `前将軍・${args.yoshiteruName}の弟・${args.yoshiakiName}は${args.asakuraName}の庇護下に入り、${args.asakuraProvinceName}に滞在しながらも、諸大名に対して上洛への協力要請を行っていた。` },
             { type: 'log', msg: `${args.nobunagaProvinceName}の${args.nobunagaName}はこれに応じるべく、${args.hisahideName}への協力要請を取り付け、着々と準備を行っていた。` },
             { type: 'log', msg: `${args.yoshiakiName}は${args.asakuraFamilyName}家に仕えていた${args.mitsuhideName}の仲介により、信長との交渉を進めていた。` },
@@ -478,7 +480,7 @@ window.EventTextManager = {
     // 岐阜城改称イベント
     rename_gifu_castle: function(args) {
         return [
-            { type: 'camera', castleId: 3, immediate: true },
+            { type: 'camera', castleId: 3, transition: 'smooth' },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「禅師。沢彦禅師。よう参られた。いや、よう参られましたな」` },
             { type: 'dialog', leftName: "沢彦", leftFace: "takugen_souon.webp", msg: `「ほっほっほ。お久しゅうございます」` },
             { type: 'dialog', leftName: "沢彦", leftFace: "takugen_souon.webp", msg: `「${args.nobunagaTitle}様におかれましては、ご健勝のこと、祝着至極に存じまする」` },
