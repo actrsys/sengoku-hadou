@@ -86,8 +86,51 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         return state;
     };
 
-    // Round20: スマホでは既存の pixelProvinceMap から600x400程度の白地図を生成します。
-    // japan_white_map.png の1200x800フル画像decode/GPUテクスチャ確保を避けるのが目的です。
+    // Round22: スマホの軽量地図でも「海岸線・国境線」がはっきり読めるようにします。
+    // 元画像をdecodeせず pixelProvinceMap から生成する軽量方針はRound20のまま維持します。
+    const sampleProvinceForCanvas = (pixelProvinceMap, srcW, srcH, dstW, dstH, dx, dy) => {
+        if (dx < 0 || dy < 0 || dx >= dstW || dy >= dstH) return 0;
+        const sx = Math.min(srcW - 1, Math.floor(((dx + 0.5) * srcW) / dstW));
+        const sy = Math.min(srcH - 1, Math.floor(((dy + 0.5) * srcH) / dstH));
+        return pixelProvinceMap[sy * srcW + sx] || 0;
+    };
+
+    // province画像の境界ピクセル自体が0(透明)のデータでも、両側の国IDを見て境界として復元します。
+    // これにより半解像度化しても国境が消えにくくなります。
+    const isProvinceBoundaryPixel = (pixelProvinceMap, srcW, srcH, dstW, dstH, x, y) => {
+        const pid = sampleProvinceForCanvas(pixelProvinceMap, srcW, srcH, dstW, dstH, x, y);
+        const left  = sampleProvinceForCanvas(pixelProvinceMap, srcW, srcH, dstW, dstH, x - 1, y);
+        const right = sampleProvinceForCanvas(pixelProvinceMap, srcW, srcH, dstW, dstH, x + 1, y);
+        const up    = sampleProvinceForCanvas(pixelProvinceMap, srcW, srcH, dstW, dstH, x, y - 1);
+        const down  = sampleProvinceForCanvas(pixelProvinceMap, srcW, srcH, dstW, dstH, x, y + 1);
+
+        if (pid) {
+            // 海岸線も国境線も境界として扱います。
+            return left !== pid || right !== pid || up !== pid || down !== pid;
+        }
+
+        // 元の国境線が透明ピクセルの場合、1px先だけでは両側が0になることがあるため2px先まで確認します。
+        const left2  = left  || sampleProvinceForCanvas(pixelProvinceMap, srcW, srcH, dstW, dstH, x - 2, y);
+        const right2 = right || sampleProvinceForCanvas(pixelProvinceMap, srcW, srcH, dstW, dstH, x + 2, y);
+        const up2    = up    || sampleProvinceForCanvas(pixelProvinceMap, srcW, srcH, dstW, dstH, x, y - 2);
+        const down2  = down  || sampleProvinceForCanvas(pixelProvinceMap, srcW, srcH, dstW, dstH, x, y + 2);
+        return (left2 && right2 && left2 !== right2) || (up2 && down2 && up2 !== down2);
+    };
+
+    const drawProvinceBoundaries = (dst, pixelProvinceMap, srcW, srcH, dstW, dstH, tone = 72, alpha = 245) => {
+        if (!dst || !pixelProvinceMap) return;
+        for (let y = 0; y < dstH; y++) {
+            for (let x = 0; x < dstW; x++) {
+                if (!isProvinceBoundaryPixel(pixelProvinceMap, srcW, srcH, dstW, dstH, x, y)) continue;
+                const di = (y * dstW + x) * 4;
+                dst[di] = tone;
+                dst[di + 1] = tone;
+                dst[di + 2] = tone;
+                dst[di + 3] = alpha;
+            }
+        }
+    };
+
     const createLightweightBaseCanvas = (game, options = {}) => {
         const mapW = game && game.mapWidth ? game.mapWidth : 1200;
         const mapH = game && game.mapHeight ? game.mapHeight : 800;
@@ -109,35 +152,35 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         const img = ctx.createImageData(canvas.width, canvas.height);
         const dst = img.data;
 
-        const sampleProvince = (dx, dy) => {
-            const sx = Math.min(mapW - 1, Math.floor(((dx + 0.5) * mapW) / canvas.width));
-            const sy = Math.min(mapH - 1, Math.floor(((dy + 0.5) * mapH) / canvas.height));
-            return pixelProvinceMap[sy * mapW + sx] || 0;
-        };
-
+        // Round24：海もこの既存Canvasへ直接描きます。
+        // 追加CanvasやCSSフィルタは使わず、1回のImageData生成の中だけで完結させるためGPU負荷は増やしません。
+        // 海は青水色、陸地は明るい生成り色。海には18px間隔で短い1px線を入れて、
+        // 古いスマホでも地図らしさを出しつつ合成レイヤーを増やさないようにします。
         for (let y = 0; y < canvas.height; y++) {
+            const seaPatternRow = (y % 18) === 7;
+            const seaPatternShift = (Math.floor(y / 18) * 11) % 42;
             for (let x = 0; x < canvas.width; x++) {
-                const pid = sampleProvince(x, y);
-                if (!pid) continue; // 海は透明。mapContainerの緑が見えます。
-
-                let border = false;
-                if (x + 1 < canvas.width) {
-                    const right = sampleProvince(x + 1, y);
-                    if (right && right !== pid) border = true;
-                }
-                if (!border && y + 1 < canvas.height) {
-                    const down = sampleProvince(x, y + 1);
-                    if (down && down !== pid) border = true;
-                }
-
+                const pid = sampleProvinceForCanvas(pixelProvinceMap, mapW, mapH, canvas.width, canvas.height, x, y);
                 const di = (y * canvas.width + x) * 4;
-                const tone = border ? 170 : 248;
-                dst[di] = tone;
-                dst[di + 1] = tone;
-                dst[di + 2] = tone;
-                dst[di + 3] = 255;
+                if (pid) {
+                    dst[di] = 248;
+                    dst[di + 1] = 248;
+                    dst[di + 2] = 244;
+                    dst[di + 3] = 255;
+                } else {
+                    const wave = seaPatternRow && ((x + seaPatternShift) % 42) < 16;
+                    dst[di] = wave ? 151 : 183;
+                    dst[di + 1] = wave ? 207 : 224;
+                    dst[di + 2] = wave ? 232 : 242;
+                    dst[di + 3] = 255;
+                }
             }
         }
+
+        // 最後に海岸線・国境線を濃く上書きします。
+        // 「透明な国境ピクセル」も復元するため、白い一枚板に見える問題を防ぎます。
+        drawProvinceBoundaries(dst, pixelProvinceMap, mapW, mapH, canvas.width, canvas.height, 68, 255);
+
         ctx.putImageData(img, 0, 0);
         return canvas;
     };
@@ -171,7 +214,7 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         mapContainer.style.maxWidth = options.maxWidth || '800px';
         mapContainer.style.border = options.border || '4px solid #fff';
         mapContainer.style.borderRadius = options.borderRadius || '8px';
-        mapContainer.style.backgroundColor = options.backgroundColor || '#81c784';
+        mapContainer.style.backgroundColor = options.backgroundColor || (isPC ? '#81c784' : '#b7e0f0');
         mapContainer.style.overflow = 'hidden';
 
         let whiteMapImg = null;
@@ -308,6 +351,14 @@ window.EventMapEffects = window.EventMapEffects || (() => {
                     }
                 }
             }
+
+            // Round22: スマホでは災害色の上からも国境線を描き直します。
+            // ベース地図に線があっても半透明/点滅色で埋もれるため、効果Canvas自身に線を持たせます。
+            // 新しいCanvasは増やさないので、Round20のメモリ削減効果は維持されます。
+            if (src.pixelProvinceMap && renderScale < 1) {
+                drawProvinceBoundaries(dst, src.pixelProvinceMap, src.srcW, src.srcH, canvas.width, canvas.height, 58, 245);
+            }
+
             ctx.putImageData(img, 0, 0);
         }
 
@@ -435,6 +486,7 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         waitForImage,
         createOverlay,
         createLightweightBaseCanvas,
+        drawProvinceBoundaries,
         getRenderScale,
         ensureProvinceSource,
         createProvinceCanvas,

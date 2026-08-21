@@ -432,9 +432,47 @@ class UIManager {
     }
     
     // ==========================================
+    // Round24：AI進捗表示の状態を正規化します。
+    // 戦争・援軍・迎撃などで一時非表示カウンタが複数段積まれ、restoreが1回だけだと
+    // opacity:0 が残ることがありました。AI進捗を更新する瞬間を「表示状態の最終権威」にします。
+    _hasAIProgressBlockingUI() {
+        if (!this.game) return false;
+        if (this.game.selectionMode != null) return true;
+        const visible = (id) => {
+            const el = document.getElementById(id);
+            return !!(el && !el.classList.contains('hidden'));
+        };
+        return visible('dialog-modal') ||
+            visible('result-modal') ||
+            visible('intercept-confirm-modal') ||
+            visible('unit-divide-modal') ||
+            visible('prisoner-modal') ||
+            visible('selector-modal') ||
+            visible('quantity-modal') ||
+            visible('war-modal') ||
+            visible('cutin-overlay');
+    }
+
+    normalizeAIProgressGuard() {
+        const guard = this.aiGuard || document.getElementById('ai-guard');
+        if (!guard || !this.game || !this.game.isProcessingAI || this._hasAIProgressBlockingUI()) return false;
+
+        // ここは新しいAI拠点へ進む／MAX表示する安定地点なので、過去の一時非表示を持ち越しません。
+        this.guardHiddenCount = 0;
+        this.guardTextHiddenCount = 0;
+        guard.style.opacity = '1';
+        guard.style.display = '';
+        guard.classList.remove('hidden');
+        guard.classList.remove('hide-text');
+        return true;
+    }
+
     // AI思考中に進捗を表示する魔法です！
     updateAIProgress(current, total) {
         if (!this.aiGuard) return;
+
+        // Round24：数字だけ更新されてガードが透明のまま、という状態を自己修復します。
+        this.normalizeAIProgressGuard();
 
         // ★軽量化：AIの城ターンごとに innerHTML を丸ごと作り直さず、数字だけ更新します。
         let currentEl = this.aiGuard.querySelector('[data-ai-progress-current]');
@@ -497,6 +535,7 @@ class UIManager {
                     // ★修正：プレイヤーのターン中など、すぐに表示しない場合でも透明化の魔法だけは確実に解いておきます！
                     aiGuard.style.opacity = '1';
                     
+                    if (typeof this.applyAIGuardTextState === 'function') this.applyAIGuardTextState();
                     if (this.game && this.game.isProcessingAI) {
                         // マップで援軍の城を選んでいる最中は、絶対に膜を復活させない魔法！
                         if (!this.game.selectionMode) {
@@ -1457,8 +1496,10 @@ class UIManager {
         if(this.unitDivideModal) this.unitDivideModal.classList.add('hidden');
         if(this.aiGuard) {
             this.aiGuard.classList.add('hidden'); 
+            this.aiGuard.classList.remove('hide-text');
             this.aiGuard.style.opacity = '1'; // もし透明になっていたら元に戻しておきます！
             this.guardHiddenCount = 0;        // 何回隠したかの記憶もきれいに忘れます！
+            this.guardTextHiddenCount = 0;    // 文字だけを隠す側のスタックも同時に初期化します
         }
         
         if (typeof this.hideAIWarThinking === 'function') {
