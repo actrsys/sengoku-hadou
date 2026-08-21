@@ -163,15 +163,17 @@ window.EventMapEffects = window.EventMapEffects || (() => {
                 const pid = sampleProvinceForCanvas(pixelProvinceMap, mapW, mapH, canvas.width, canvas.height, x, y);
                 const di = (y * canvas.width + x) * 4;
                 if (pid) {
+                    // 陸地の色
                     dst[di] = 248;
                     dst[di + 1] = 248;
                     dst[di + 2] = 244;
                     dst[di + 3] = 255;
                 } else {
                     const wave = seaPatternRow && ((x + seaPatternShift) % 42) < 16;
-                    dst[di] = wave ? 151 : 183;
-                    dst[di + 1] = wave ? 207 : 224;
-                    dst[di + 2] = wave ? 232 : 242;
+                    // 海・波模様
+                    dst[di] = wave ? 146 : 59;
+                    dst[di + 1] = wave ? 194 : 139;
+                    dst[di + 2] = wave ? 238 : 199;
                     dst[di + 3] = 255;
                 }
             }
