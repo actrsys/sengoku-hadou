@@ -31,20 +31,24 @@ class AIStaffing {
         const reachableMyCastles = [];
         const visitedCastles = new Set();
         const searchQueue = [castle];
+        let searchHead = 0;
         visitedCastles.add(castle.id);
 
-        while (searchQueue.length > 0) {
-            const current = searchQueue.shift();
+        while (searchHead < searchQueue.length) {
+            const current = searchQueue[searchHead++];
             
             // 自軍団のお城なら、お引越し先の候補リストに入れます
             if (Number(current.ownerClan) === Number(clanId) && Number(current.legionId) === Number(targetLegionId)) {
                 reachableMyCastles.push(current);
             }
 
-            const adjCastles = this.game.castles.filter(c => 
-                GameSystem.isAdjacent(current, c) &&
-                !visitedCastles.has(c.id)
-            );
+            // ★高速化：隣接城IDがある場合は、全国の城を毎回filterせず直接たどります。
+            // 古いシナリオ等でadjacentCastleIdsが無い場合だけ従来方式へフォールバックします。
+            const adjCastles = (Array.isArray(current.adjacentCastleIds) && current.adjacentCastleIds.length > 0)
+                ? current.adjacentCastleIds
+                    .map(id => this.game.getCastle(id))
+                    .filter(c => c && !visitedCastles.has(c.id))
+                : this.game.castles.filter(c => GameSystem.isAdjacent(current, c) && !visitedCastles.has(c.id));
 
             for (const n of adjCastles) {
                 let canPass = false;
@@ -829,19 +833,23 @@ class AIStaffing {
         const myReachableCastles = [];
         const visitedCastles = new Set();
         const searchQueue = [castle];
+        let searchHead = 0;
         visitedCastles.add(castle.id);
 
-        while (searchQueue.length > 0) {
-            const current = searchQueue.shift();
+        while (searchHead < searchQueue.length) {
+            const current = searchQueue[searchHead++];
             
             if (Number(current.ownerClan) === Number(clanId)) {
                 myReachableCastles.push(current);
             }
 
-            const adjCastles = this.game.castles.filter(c => 
-                GameSystem.isAdjacent(current, c) &&
-                !visitedCastles.has(c.id)
-            );
+            // ★高速化：隣接城IDがある場合は、全国の城を毎回filterせず直接たどります。
+            // 古いシナリオ等でadjacentCastleIdsが無い場合だけ従来方式へフォールバックします。
+            const adjCastles = (Array.isArray(current.adjacentCastleIds) && current.adjacentCastleIds.length > 0)
+                ? current.adjacentCastleIds
+                    .map(id => this.game.getCastle(id))
+                    .filter(c => c && !visitedCastles.has(c.id))
+                : this.game.castles.filter(c => GameSystem.isAdjacent(current, c) && !visitedCastles.has(c.id));
 
             for (const n of adjCastles) {
                 let canPass = false;

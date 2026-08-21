@@ -35,10 +35,8 @@ class LifeSystem {
             // ★追加：毎年1月に、ランダムで新しい姫が登場するかチェックします！
             await this.checkRandomPrincessAppearance();
 
-            // 新しく登場した武将たちのために、派閥を組み直す魔法を呼び出します！
-            if (this.game.factionSystem) {
-                this.game.factionSystem.updateFactions();
-            }
+            // ★高速化：派閥再編は、この直後に GameManager → factionSystem.processStartMonth() から
+            // 必ず1回実行されるため、1月だけ同じ全国再編を二重実行するのをやめます。
         }
     }
 
@@ -564,6 +562,10 @@ class LifeSystem {
         }
 
         const currentYear = this.game.year;
+
+        // ★高速化：同じ月に複数人が死亡しても、死亡者ごとに全国の派閥を再編しません。
+        // 変化した勢力IDだけを集め、死亡判定が終わった後に各勢力1回だけ再編します。
+        const factionDirtyClanIds = new Set();
         
         // 【変更点①】没年の「1年前（endYear - 1）」を迎えている武将を探すようにしました！
         const targetBushos = this.game.bushos.filter(b => {
@@ -585,12 +587,14 @@ class LifeSystem {
                 const wasUnborn = (b.status === 'unborn'); // ★追加：死ぬ前に未登場だったかメモしておく
                 
                 // ★ここから追加：武将死亡時のイベント専用の引き出しを開けます
-                let context = { deadBusho: b, skipNormalMessage: false, skipDaimyoSuccession: false };
+                const formerClanId = Number(b.clan) || 0;
+                let context = { deadBusho: b, skipNormalMessage: false, skipDaimyoSuccession: false, deferFactionUpdate: true };
                 if (this.game.eventManager) {
                     await this.game.eventManager.processEvents('busho_death', context);
                 }
 
                 await this.executeDeath(b, context); // ★修正：イベントの結果（context）を渡します
+                if (formerClanId > 0) factionDirtyClanIds.add(formerClanId);
                 
                 // もしプレイヤーの家臣で、すでに登場していて、かつ「イベントで通常のメッセージを消す」指示がなければお知らせを出します
                 if (b.clan === this.game.playerClanId && !wasUnborn && !context.skipNormalMessage) {
@@ -623,12 +627,14 @@ class LifeSystem {
                 const wasUnborn = (b.status === 'unborn');
                 
                 // ★ここから追加：武将死亡時のイベント専用の引き出しを開けます
-                let context = { deadBusho: b, skipNormalMessage: false, skipDaimyoSuccession: false };
+                const formerClanId = Number(b.clan) || 0;
+                let context = { deadBusho: b, skipNormalMessage: false, skipDaimyoSuccession: false, deferFactionUpdate: true };
                 if (this.game.eventManager) {
                     await this.game.eventManager.processEvents('busho_death', context);
                 }
 
                 await this.executeDeath(b, context); // ★修正：イベントの結果（context）を渡します
+                if (formerClanId > 0) factionDirtyClanIds.add(formerClanId);
                 
                 // もしプレイヤーの家臣で、すでに登場していて、かつ「イベントで通常のメッセージを消す」指示がなければお知らせを出します
                 if (b.clan === this.game.playerClanId && !wasUnborn && !context.skipNormalMessage) {
@@ -637,6 +643,15 @@ class LifeSystem {
                     await this.game.ui.showDialogAsync(`戦傷が元となり${name}が死亡しました……`, false, 0);
                 }
             }
+        }
+
+        // ★高速化：死亡で変化した勢力だけ、まとめて1回ずつ派閥を再編します。
+        if (this.game.factionSystem && factionDirtyClanIds.size > 0) {
+            for (const clanId of factionDirtyClanIds) {
+                this.game.factionSystem.updateFactions(clanId);
+            }
+            // 大きな月でもブラウザへ制御を返す機会を作ります。
+            await new Promise(resolve => setTimeout(resolve, 0));
         }
 
         // ★追加：全ての死亡判定が終わったので、全員のdeathFlagを綺麗にお掃除（false）します！
@@ -719,6 +734,8 @@ class LifeSystem {
 
     // お別れの処理をするところです
     async executeDeath(busho, context = {}) { // ★修正：イベントの指示（context）を受け取れるようにします
+        // ★高速化：最後に所属を0へ変更する前の勢力IDを覚えておきます。
+        const formerClanId = Number(busho.clan) || 0;
         busho.status = 'dead'; // ステータスを「死亡」にします
         
         // ★追加：自分が死んだ年より後に生まれる予定だった子供（実父としている武将・姫）を連鎖的に死亡させます
@@ -941,9 +958,10 @@ class LifeSystem {
         busho.castleId = 0;
         busho.belongKunishuId = 0;
 
-        // ★ここから追加：武将が亡くなって人が減ったので、派閥を組み直す魔法を呼び出します！
-        if (this.game.factionSystem) {
-            this.game.factionSystem.updateFactions();
+        // ★高速化：通常の単発死亡なら、その武将がいた勢力だけ再編します。
+        // 月末の一括死亡判定中は checkDeath() 側でまとめて処理します。
+        if (!context.deferFactionUpdate && this.game.factionSystem && formerClanId > 0) {
+            this.game.factionSystem.updateFactions(formerClanId);
         }
     }
 
@@ -1674,7 +1692,7 @@ class LifeSystem {
     // ==========================================
 
     // ① ランダムな姫のプロフィール（データ）を作る機能です
-    createRandomPrincess(clanId, currentYear, isInitial, specificFatherId = null) {
+    createRandomPrincess(clanId, currentYear, isInitial, specificFatherId = null, deferFamilyRebuild = false) {
         let randomName = "姫";
         let candidateNames = [];
 
@@ -1801,10 +1819,15 @@ class LifeSystem {
         // 完成したデータを正式な「姫クラス」にして、ゲーム本体の名簿に登録します
         const princess = new Princess(princessData);
         
-        // ★修正：司令塔を使って、新しく生まれた姫の親戚リストを正しく繋ぎ合わせます！
-        FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
         
+        // ★修正：先に名簿へ追加してから一門関係を更新します。
+        // 旧処理は追加前にrebuildしていたため、その姫自身が再構築対象に入っていませんでした。
         this.game.princesses.push(princess);
+
+        // ★安定化：年初などで複数の姫をまとめて生成する時は、全国一門再構築を最後の1回にまとめられます。
+        if (!deferFamilyRebuild) {
+            FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
+        }
 
         // ★ここを書き足し！：大名家の「所有している姫リスト」にしっかり登録します！
         if (!clan.princessIds) {
@@ -1821,6 +1844,7 @@ class LifeSystem {
     // ② ゲーム開始時に、各家に姫を分配する機能です
     distributeInitialPrincesses() {
         const currentYear = this.game.year;
+        let familyRebuildNeeded = false;
         
         this.game.clans.forEach(clan => {
             if (clan.id === 0) return; // 空き家（中立）は無視します
@@ -1837,7 +1861,7 @@ class LifeSystem {
                 // 女性（female）や子供なし（childless）のシールが貼られていないかチェックします
                 if (leader && !leader.female && !leader.childless) {
                     if (Math.random() < 0.5) {
-                        this.createRandomPrincess(clan.id, currentYear, true, clan.leaderId);
+                        if (this.createRandomPrincess(clan.id, currentYear, true, clan.leaderId, true)) familyRebuildNeeded = true;
                     }
                 }
 
@@ -1854,17 +1878,23 @@ class LifeSystem {
                     if (familyBushos.length > 0) {
                         if (Math.random() < 0.25) {
                             const randomFather = familyBushos[Math.floor(Math.random() * familyBushos.length)];
-                            this.createRandomPrincess(clan.id, currentYear, true, randomFather.id);
+                            if (this.createRandomPrincess(clan.id, currentYear, true, randomFather.id, true)) familyRebuildNeeded = true;
                         }
                     }
                 }
             }
         });
+
+        // ★安定化：初期配置で何人生成されても、全国一門再構築は最後に1回だけ行います。
+        if (familyRebuildNeeded) {
+            FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
+        }
     }
 
     // ③ 毎年1月にランダムで新しい姫を登場させる機能です
     async checkRandomPrincessAppearance() {
         const currentYear = this.game.year;
+        let familyRebuildNeeded = false;
 
         for (const clan of this.game.clans) {
             if (clan.id === 0) continue;
@@ -1885,7 +1915,8 @@ class LifeSystem {
             // 女性（female）や子供なし（childless）のシールが貼られていないかチェックします
             if (leader && !leader.female && !leader.childless) {
                 if (Math.random() < prob) {
-                    const newPrincess = this.createRandomPrincess(clan.id, currentYear, false, clan.leaderId);
+                    const newPrincess = this.createRandomPrincess(clan.id, currentYear, false, clan.leaderId, true);
+                    if (newPrincess) familyRebuildNeeded = true;
                     
                     // プレイヤーの大名家だった場合は、画面にお知らせのメッセージを出します
                     if (newPrincess && clan.id === this.game.playerClanId) {
@@ -1915,7 +1946,8 @@ class LifeSystem {
                     if (Math.random() < familyProb) {
                         // 一門武将の中からランダムに一人を父親に選びます
                         const randomFather = familyBushos[Math.floor(Math.random() * familyBushos.length)];
-                        const newPrincess = this.createRandomPrincess(clan.id, currentYear, false, randomFather.id);
+                        const newPrincess = this.createRandomPrincess(clan.id, currentYear, false, randomFather.id, true);
+                        if (newPrincess) familyRebuildNeeded = true;
                         
                         if (newPrincess && clan.id === this.game.playerClanId) {
                             const fatherName = randomFather.name.replace('|', '');
@@ -1927,6 +1959,11 @@ class LifeSystem {
                     }
                 }
             }
+        }
+        // ★安定化：1月に複数家で姫が誕生しても、4000人規模の全国一門再構築は1回だけ。
+        // 一門索引自体は全武将・全姫を対象にするため、他勢力・浪人・未所属との血縁も維持されます。
+        if (familyRebuildNeeded) {
+            FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
         }
     }
 

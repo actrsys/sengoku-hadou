@@ -1284,7 +1284,8 @@ class IndependenceSystem {
                 oldDaimyo.isDaimyo = false;
 
                 // この特別な状態で、派閥の振り分け直しを行います
-                this.game.factionSystem.updateFactions();
+                // ★高速化：変化しているのは主家だけなので、全国ではなくこの勢力だけ再編します。
+                this.game.factionSystem.updateFactions(oldClanId);
 
                 // ★追加：計算が終わったら、すべて元の状態（永続化しないように）に戻します！
                 daimyoMembers.forEach(b => {

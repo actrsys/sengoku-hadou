@@ -2205,7 +2205,10 @@ class GameManager {
         
         // 武将の下野（出奔）が終わるまで待ちます！
         await this.factionSystem.processStartMonth(); 
-        
+
+        // ★安定化：全国派閥再編などで作った一時配列を解放できるよう、
+        // 次の全国処理へ入る前にブラウザへ一度制御を返します。
+        await new Promise(resolve => setTimeout(resolve, 0));        
         this.affiliationSystem.processRoninMovements();
         
         this.updateAllCastlesLords();
@@ -2570,7 +2573,9 @@ class GameManager {
         // ★ここから追加：毎月の初めに、各大名家に「作戦会議（カウントダウンの進行や新しい目標決め）」をさせます！
         if (this.month === 1 || this.month === 4 || this.month === 7 || this.month === 10) {
             if (this.aiStaffing) {
-                this.clans.forEach(clan => {
+                // ★安定化：四半期の全国人事を1本の長い同期処理にせず、数勢力ごとにブラウザへ制御を返します。
+                let staffingProcessed = 0;
+                for (const clan of this.clans) {
                     // ★修正：滅亡フラグをチェックして、生き残っている勢力だけ会議をします
                     if (clan.id !== 0 && !clan.isDestroyed && clan.id !== this.playerClanId) {
                         // ★追加：国主を決める前に、まずは大名自身に最適な居城を探させてお引越しさせます！
@@ -2606,8 +2611,13 @@ class GameManager {
                                 loopCount++;
                             }
                         }
+
+                        staffingProcessed++;
+                        if (staffingProcessed % 4 === 0) {
+                            await new Promise(resolve => setTimeout(resolve, 0));
+                        }
                     }
-                });
+                }
             }
         }
         if (this.aiOperationManager) {
@@ -2740,7 +2750,10 @@ class GameManager {
                     this.hasAutoSavedThisMonth = true;
                     // ★ゲーム開始直後の最初の月は、意味がないのでオートセーブをスキップします！
                     if (this.year !== this.gameStartYear || this.month !== this.gameStartMonth) {
-                        this.executeAutoSave();
+                        // ★安定化：オートセーブをAI進行と並走させない。
+                        // 古いスマホでは「全データ保存」とAI思考が重なるとメモリの山ができるため、
+                        // 保存が終わってから操作を返します。
+                        await this.executeAutoSave();
                     }
                 }
 
@@ -2967,7 +2980,7 @@ class GameManager {
     }
 
     // どんな方法でセーブする時も、この魔法で「今のゲームの全データ」をひとまとめにします
-    async _createSaveDataObj() {
+    async _createSaveDataObj(options = {}) {
         let scenarioIndex = SCENARIOS.findIndex(s => s.folder === this.scenarioFolder);
         let scenarioName = "不明なシナリオ";
         let scenarioNo = "";
@@ -2981,8 +2994,10 @@ class GameManager {
         const now = new Date();
         const saveTime = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-        // ★追加：保存時の勢力図の写真を撮るのを待ちます
-        const mapThumbnail = await this.generateSaveMapImage();
+        // ★安定化：オートセーブ時は勢力図サムネイルを作らない選択ができます。
+        // フルサイズCanvas→縮小Canvasの同時生成は、低メモリ端末では大きな瞬間負荷になります。
+        const includeThumbnail = options.includeThumbnail !== false;
+        const mapThumbnail = includeThumbnail ? await this.generateSaveMapImage() : null;
 
         return { 
             year: this.year, 
@@ -3390,28 +3405,30 @@ class GameManager {
         }
     }
 
-    // ★追加：オートセーブを裏で実行する魔法
+    // ★追加：オートセーブを実行する魔法
     async executeAutoSave() {
-        this.showSaveGuard(); // ★追加：保存中のバリアを張ります
+        // ★安定化：何らかの経路で二重呼び出しされても、同時に2本走らせません。
+        if (this._autoSaveInProgress) return;
+        this._autoSaveInProgress = true;
+        this.showSaveGuard();
         try {
-            // スロットの番号（1～5）を覚えておくための箱から数字を取り出します（最初は1から）
             let autoSaveIndex = parseInt(localStorage.getItem('autoSaveIndex')) || 1;
-            
-            const data = await this._createSaveDataObj(); // ★待つように変更
-            const encryptedData = this._encryptData(data);
-            
-            // オートセーブ専用の「sengoku_autosave_slot〇」にセーブを書き込みます
-            await saveToDB("sengoku_autosave_slot" + autoSaveIndex, encryptedData);
-            
-            // 次にセーブするスロットの番号を1つ進めます（5の次は1に戻します）
+
+            // ★低メモリ端末対策
+            // オートセーブは内部IndexedDB専用なので、勢力図サムネイルを省き、
+            // JSON.stringify→巨大文字列→TextEncoder→巨大Uint8Array という一時的な二重・三重保持も避けます。
+            // ロード側は従来から「Uint8Arrayなら復号、オブジェクトならそのまま」に対応しているため互換性があります。
+            const data = await this._createSaveDataObj({ includeThumbnail: false });
+            await saveToDB("sengoku_autosave_slot" + autoSaveIndex, data);
+
             autoSaveIndex++;
             if (autoSaveIndex > 5) autoSaveIndex = 1;
             localStorage.setItem('autoSaveIndex', autoSaveIndex);
-            
         } catch (e) {
             console.error("オートセーブに失敗しました:", e);
         } finally {
-            this.hideSaveGuard(); // ★追加：保存が終わったらバリアを解除します
+            this._autoSaveInProgress = false;
+            this.hideSaveGuard();
         }
     }
 
@@ -3544,9 +3561,19 @@ async function saveToDB(key, data) {
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readwrite');
+        let finished = false;
+        const closeAndFinish = (ok, value) => {
+            if (finished) return;
+            finished = true;
+            try { db.close(); } catch (_) {}
+            if (ok) resolve(value);
+            else reject(value);
+        };
+
         tx.objectStore(STORE_NAME).put(data, key);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+        tx.oncomplete = () => closeAndFinish(true);
+        tx.onerror = () => closeAndFinish(false, tx.error);
+        tx.onabort = () => closeAndFinish(false, tx.error || new Error('IndexedDB transaction aborted'));
     });
 }
 
@@ -3555,7 +3582,20 @@ async function loadFromDB(key) {
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
         const request = tx.objectStore(STORE_NAME).get(key);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
+        let result;
+        let finished = false;
+        const closeAndFinish = (ok, value) => {
+            if (finished) return;
+            finished = true;
+            try { db.close(); } catch (_) {}
+            if (ok) resolve(value);
+            else reject(value);
+        };
+
+        request.onsuccess = () => { result = request.result; };
+        request.onerror = () => closeAndFinish(false, request.error);
+        tx.oncomplete = () => closeAndFinish(true, result);
+        tx.onerror = () => closeAndFinish(false, tx.error || request.error);
+        tx.onabort = () => closeAndFinish(false, tx.error || request.error || new Error('IndexedDB transaction aborted'));
     });
 }

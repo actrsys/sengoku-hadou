@@ -737,7 +737,7 @@ class Busho {
 
     // ★奥さんが増えたり減ったりした時に、一門リストを作り直す機能
     // ★高速化のため、早見表（allPeopleMap）を引数に追加しました！
-    updateFamilyIds(bushos = [], princesses = [], allPeopleMap = null) {
+    updateFamilyIds(bushos = [], princesses = [], allPeopleMap = null, familyContext = null) {
         // ★安全対策：他のシステムから呼ばれた時に名簿がなければ、ゲーム本体から借ります！
         if (bushos.length === 0 && window.GameApp) bushos = window.GameApp.bushos;
         if (princesses.length === 0 && window.GameApp) princesses = window.GameApp.princesses;
@@ -749,27 +749,26 @@ class Busho {
             princesses.forEach(p => allPeopleMap.set(p.id, p));
         }
 
-        // まずは普段使う用のリストに、金庫（baseFamilyIds）の中身を丸写しします
-        this.familyIds = [...this.baseFamilyIds];
+        // ★高速化：FamilyLinkerから索引を受け取った時は、全姫・全人物の走査を避けます。
+        this.familyIds = [...(this.baseFamilyIds || [])];
+        const familySeen = new Set(this.familyIds);
+        const addFamilyId = (id) => {
+            if (id > 0 && !familySeen.has(id)) {
+                familySeen.add(id);
+                this.familyIds.push(id);
+            }
+        };
         
         // ★実父・実母・養父が設定されていて、まだリストに入っていなければ全員追加します！
         const parentIds = [this.realFatherId, this.realMotherId, this.adoptiveFatherId];
-        parentIds.forEach(pId => {
-            if (pId > 0 && !this.familyIds.includes(pId)) {
-                this.familyIds.push(pId);
-            }
-        });
+        parentIds.forEach(pId => addFamilyId(pId));
 
         // ★今回追加：実母の親戚（一門）を、自分にだけ「一方通行」でコピーします！
         if (this.realMotherId > 0) {
             // ★高速化：早見表からお母さんをパッと探します
             const mother = allPeopleMap.get(this.realMotherId);
             if (mother && mother.baseFamilyIds) {
-                mother.baseFamilyIds.forEach(fId => {
-                    if (!this.familyIds.includes(fId)) {
-                        this.familyIds.push(fId);
-                    }
-                });
+                mother.baseFamilyIds.forEach(fId => addFamilyId(fId));
             }
         }
 
@@ -779,45 +778,42 @@ class Busho {
             const wifeData = allPeopleMap.get(wId);
             if (wifeData && wifeData.baseFamilyIds) {
                 // 奥さんが持っている「一門リスト」を一方通行でコピーします！
-                wifeData.baseFamilyIds.forEach(fId => {
-                    if (!this.familyIds.includes(fId)) {
-                        this.familyIds.push(fId);
-                    }
-                });
+                wifeData.baseFamilyIds.forEach(fId => addFamilyId(fId));
             }
         });
 
         // ★今回追加：自分の娘（実の娘、または養女）や、実姉妹の「お婿さん（夫）」を、自分の一門（familyIds）として迎え入れます！
-        // これにより、お婿さんが自勢力にいる場合、優先的に大名の後継ぎになれる（直系として機能する）ようになります！
-        princesses.forEach(p => {
-            // 1. 自分の娘（実娘・養女）がお嫁にいっている場合
-            const isMyDaughter = (p.realFatherId === this.id || p.adoptiveFatherId === this.id);
-            if (isMyDaughter && p.status === 'married' && p.husbandId > 0) {
-                if (!this.familyIds.includes(p.husbandId)) {
-                    this.familyIds.push(p.husbandId);
-                }
-            }
+        if (familyContext) {
+            // FamilyLinkerが姫を元の順番で走査して作った索引なので、従来と同じ順序で追加されます。
+            const husbandIds = familyContext.marriageHusbandsByBushoId.get(this.id) || [];
+            husbandIds.forEach(id => addFamilyId(id));
 
-            // 2. 自分の姉妹がお嫁にいっている場合
-            // （実父が同じお姫様で、自分自身とは異なるIDの場合）
-            if (this.realFatherId > 0 && this.realFatherId === p.realFatherId && p.id !== this.id) {
-                if (p.status === 'married' && p.husbandId > 0) {
-                    if (!this.familyIds.includes(p.husbandId)) {
-                        this.familyIds.push(p.husbandId);
-                    }
-                }
-            }
-        });
+            // 母系の子孫も、元のallPeople順になるようindex順に統合します。
+            const maternal = [];
+            (this.baseFamilyIds || []).forEach(motherId => {
+                const children = familyContext.childrenByMotherId.get(motherId);
+                if (children) maternal.push(...children);
+            });
+            maternal.sort((a, b) => a.index - b.index);
+            maternal.forEach(entry => addFamilyId(entry.id));
+        } else {
+            // 単独でupdateFamilyIdsを呼ばれた場合は従来処理を残して互換性を守ります。
+            princesses.forEach(p => {
+                const isMyDaughter = (p.realFatherId === this.id || p.adoptiveFatherId === this.id);
+                if (isMyDaughter && p.status === 'married' && p.husbandId > 0) addFamilyId(p.husbandId);
 
-        // ★自分の一門の女性（娘や姉妹など）から生まれた子供（孫や甥っ子）を、自分の親戚として迎え入れます！
-        const allPeople = [...bushos, ...princesses];
-        allPeople.forEach(person => {
-            if (person.realMotherId > 0 && this.baseFamilyIds.includes(person.realMotherId)) {
-                if (!this.familyIds.includes(person.id)) {
-                    this.familyIds.push(person.id);
+                if (this.realFatherId > 0 && this.realFatherId === p.realFatherId && p.id !== this.id) {
+                    if (p.status === 'married' && p.husbandId > 0) addFamilyId(p.husbandId);
                 }
-            }
-        });
+            });
+
+            const allPeople = [...bushos, ...princesses];
+            allPeople.forEach(person => {
+                if (person.realMotherId > 0 && (this.baseFamilyIds || []).includes(person.realMotherId)) {
+                    addFamilyId(person.id);
+                }
+            });
+        }
     }
     
     // ==========================================
@@ -922,7 +918,7 @@ class Princess {
 
     // ★追加：父親や夫の一門を反映させる機能
     // ★高速化のため、早見表（allPeopleMap）を引数に追加しました！
-    updateFamilyIds(bushos = [], princesses = [], allPeopleMap = null) {
+    updateFamilyIds(bushos = [], princesses = [], allPeopleMap = null, familyContext = null) {
         // ★安全対策
         if (bushos.length === 0 && window.GameApp) bushos = window.GameApp.bushos;
         if (princesses.length === 0 && window.GameApp) princesses = window.GameApp.princesses;
@@ -934,27 +930,26 @@ class Princess {
             princesses.forEach(p => allPeopleMap.set(p.id, p));
         }
 
-        this.familyIds = [...this.baseFamilyIds];
+        this.familyIds = [...(this.baseFamilyIds || [])];
+        const familySeen = new Set(this.familyIds);
+        const addFamilyId = (id) => {
+            if (id > 0 && !familySeen.has(id)) {
+                familySeen.add(id);
+                this.familyIds.push(id);
+            }
+        };
 
         // 実父・実母・養父のリストを作って、順番に確認します
         const parentIds = [this.realFatherId, this.realMotherId, this.adoptiveFatherId];
         
-        parentIds.forEach(pId => {
-            if (pId > 0 && !this.familyIds.includes(pId)) {
-                this.familyIds.push(pId);
-            }
-        });
+        parentIds.forEach(pId => addFamilyId(pId));
 
         // ★今回追加：実母の親戚（一門）を、自分にだけ「一方通行」でコピーします！
         if (this.realMotherId > 0) {
             // ★高速化：早見表からお母さんをパッと探します
             const mother = allPeopleMap.get(this.realMotherId);
             if (mother && mother.baseFamilyIds) {
-                mother.baseFamilyIds.forEach(fId => {
-                    if (!this.familyIds.includes(fId)) {
-                        this.familyIds.push(fId);
-                    }
-                });
+                mother.baseFamilyIds.forEach(fId => addFamilyId(fId));
             }
         }
 
@@ -963,23 +958,25 @@ class Princess {
             // ★高速化：早見表から旦那さんをパッと探します
             const husband = allPeopleMap.get(this.husbandId);
             if (husband && husband.baseFamilyIds) {
-                husband.baseFamilyIds.forEach(fId => {
-                    if (!this.familyIds.includes(fId)) {
-                        this.familyIds.push(fId);
-                    }
-                });
+                husband.baseFamilyIds.forEach(fId => addFamilyId(fId));
             }
         }
 
         // 自分の一門の女性（娘や姉妹など）から生まれた子供（孫や甥っ子）を、自分の親戚として迎え入れます！
-        const allPeople = [...bushos, ...princesses];
-        allPeople.forEach(person => {
-            if (person.realMotherId > 0 && this.baseFamilyIds.includes(person.realMotherId)) {
-                if (!this.familyIds.includes(person.id)) {
-                    this.familyIds.push(person.id);
-                }
-            }
-        });
+        if (familyContext) {
+            const maternal = [];
+            (this.baseFamilyIds || []).forEach(motherId => {
+                const children = familyContext.childrenByMotherId.get(motherId);
+                if (children) maternal.push(...children);
+            });
+            maternal.sort((a, b) => a.index - b.index);
+            maternal.forEach(entry => addFamilyId(entry.id));
+        } else {
+            const allPeople = [...bushos, ...princesses];
+            allPeople.forEach(person => {
+                if (person.realMotherId > 0 && (this.baseFamilyIds || []).includes(person.realMotherId)) addFamilyId(person.id);
+            });
+        }
     }
 }
 
@@ -1134,13 +1131,51 @@ class FamilyLinker {
 
         // 1. まずは男系（実父・養父）の絶対的な繋がりである「金庫（baseFamilyIds）」を完成させます
         this.linkAdoptiveRelations(bushos, princesses, allPeopleMap);
+
+        // ★高速化：この後の各人物処理で「全姫」「全人物」を毎回走査しないための索引を1回だけ作ります。
+        const allPeople = [...bushos, ...princesses];
+        const childrenByMotherId = new Map();
+        allPeople.forEach((person, index) => {
+            const motherId = Number(person.realMotherId) || 0;
+            if (motherId <= 0) return;
+            if (!childrenByMotherId.has(motherId)) childrenByMotherId.set(motherId, []);
+            childrenByMotherId.get(motherId).push({ id: person.id, index });
+        });
+
+        // 「この武将から見て、娘・養女・実姉妹に当たる既婚姫の夫」を姫の元順序で記録します。
+        const bushosByRealFatherId = new Map();
+        bushos.forEach(b => {
+            const fatherId = Number(b.realFatherId) || 0;
+            if (fatherId <= 0) return;
+            if (!bushosByRealFatherId.has(fatherId)) bushosByRealFatherId.set(fatherId, []);
+            bushosByRealFatherId.get(fatherId).push(b);
+        });
+        const marriageHusbandsByBushoId = new Map();
+        const pushHusband = (bushoId, husbandId) => {
+            if (!bushoId || !husbandId) return;
+            if (!marriageHusbandsByBushoId.has(bushoId)) marriageHusbandsByBushoId.set(bushoId, []);
+            const arr = marriageHusbandsByBushoId.get(bushoId);
+            if (!arr.includes(husbandId)) arr.push(husbandId);
+        };
+        princesses.forEach(p => {
+            if (p.status !== 'married' || !(p.husbandId > 0)) return;
+            const targets = new Set();
+            if (p.realFatherId > 0) targets.add(p.realFatherId);
+            if (p.adoptiveFatherId > 0) targets.add(p.adoptiveFatherId);
+            if (p.realFatherId > 0) {
+                const siblings = bushosByRealFatherId.get(p.realFatherId) || [];
+                siblings.forEach(b => { if (b.id !== p.id) targets.add(b.id); });
+            }
+            targets.forEach(id => pushHusband(id, p.husbandId));
+        });
+        const familyContext = { childrenByMotherId, marriageHusbandsByBushoId };
         
         // 2. 次に、姫の個人の繋がり（母方の実家や、夫の繋がり）を個別にコピーさせます
-        princesses.forEach(p => p.updateFamilyIds(bushos, princesses, allPeopleMap));
+        princesses.forEach(p => p.updateFamilyIds(bushos, princesses, allPeopleMap, familyContext));
         
         // 3. 最後に、武将の個人の繋がり（母方の実家、妻の実家、娘婿や義弟）をコピーさせます
         // ※武将が娘婿を認識するためには「姫のデータが完成している」必要があるので、一番最後に実行します！
-        bushos.forEach(b => b.updateFamilyIds(bushos, princesses, allPeopleMap));
+        bushos.forEach(b => b.updateFamilyIds(bushos, princesses, allPeopleMap, familyContext));
     }
 
     static linkAdoptiveRelations(bushos, princesses, allPeopleMap) {

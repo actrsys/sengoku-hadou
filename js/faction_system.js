@@ -147,7 +147,7 @@ class FactionSystem {
     /**
      * 派閥の更新ロジック (改修版)
      */
-    updateFactions() {
+    updateFactions(targetClanId = null) {
         const F = window.WarParams.Faction || {};
         const achieveLeader = F.AchievementLeader || 500;
         
@@ -158,25 +158,34 @@ class FactionSystem {
         const stayBonusDiv = F.SolidarityStayDiv || 3;
         const joinThreshold = 35; // 派閥に入るための合格ライン（強制的に35）
 
-        const clans = this.game.clans;
+        // ★高速化：死亡などで1勢力だけ変化した時は、その勢力だけ再編できます。
+        const targetId = (targetClanId === null || targetClanId === undefined) ? null : Number(targetClanId);
+        const clans = targetId === null
+            ? this.game.clans
+            : this.game.clans.filter(c => Number(c.id) === targetId);
+
+        // ★高速化：勢力ごとに毎回4000人をfilterするのをやめ、全武将を最大1回だけ走査します。
+        const membersByClan = new Map();
+        for (const b of this.game.bushos) {
+            if (b.status !== 'active' || Number(b.clan) === 0) continue;
+            if (targetId !== null && Number(b.clan) !== targetId) continue;
+            const cid = Number(b.clan);
+            if (!membersByClan.has(cid)) membersByClan.set(cid, []);
+            membersByClan.get(cid).push(b);
+        }
         
         clans.forEach(clan => {
-            if (clan.id === 0) return;
+            if (Number(clan.id) === 0) return;
 
-            const members = this.game.bushos.filter(b => b.clan === clan.id && b.status === 'active');
+            const members = membersByClan.get(Number(clan.id)) || [];
             
-            // ★追加：記憶を消す前に、「前回の派閥リーダー」が誰だったかメモしておきます！
+            // ★高速化：前派閥主を武将ごとにmembers.findするのをやめます。
+            const previousLeaderByFaction = new Map();
+            members.forEach(m => {
+                if (m.factionId > 0 && m.isFactionLeader && !previousLeaderByFaction.has(m.factionId)) previousLeaderByFaction.set(m.factionId, m.id);
+            });
             members.forEach(b => {
-                if (b.factionId > 0) {
-                    const prevLeader = members.find(m => m.factionId === b.factionId && m.isFactionLeader);
-                    if (prevLeader) {
-                        b.previousLeaderId = prevLeader.id;
-                    } else {
-                        b.previousLeaderId = 0;
-                    }
-                } else {
-                    b.previousLeaderId = 0;
-                }
+                b.previousLeaderId = b.factionId > 0 ? (previousLeaderByFaction.get(b.factionId) || 0) : 0;
             });
 
             // 既存の派閥IDとリーダーフラグをクリア (再編)
@@ -213,6 +222,37 @@ class FactionSystem {
             if (members.length >= 15) maxFactions = 4;
             if (members.length >= 20) maxFactions = 5;
 
+            // ★高速化：同じ候補リスト・履歴を得点計算のたびに作り直さないための小さなキャッシュです。
+            const leaderGroupMetaCache = new WeakMap();
+            const battleSetCache = new WeakMap();
+            const familySetCache = new WeakMap();
+            const getLeaderGroupMeta = (availableLeaders) => {
+                let meta = leaderGroupMetaCache.get(availableLeaders);
+                if (meta) return meta;
+                const maxByStat = { leadership: 0, strength: 0, politics: 0, diplomacy: 0, intelligence: 0 };
+                const idSet = new Set();
+                availableLeaders.forEach(l => {
+                    idSet.add(l.id);
+                    for (const key of Object.keys(maxByStat)) {
+                        const v = Number(l[key]) || 0;
+                        if (v > maxByStat[key]) maxByStat[key] = v;
+                    }
+                });
+                meta = { maxByStat, idSet };
+                leaderGroupMetaCache.set(availableLeaders, meta);
+                return meta;
+            };
+            const getBattleSet = (b) => {
+                let set = battleSetCache.get(b);
+                if (!set) { set = new Set(b.battleHistory || []); battleSetCache.set(b, set); }
+                return set;
+            };
+            const getFamilySet = (b) => {
+                let set = familySetCache.get(b);
+                if (!set) { set = new Set(b.familyIds || []); familySetCache.set(b, set); }
+                return set;
+            };
+
             // 点数計算ルールを「共通の道具（calcScore）」としてまとめました
             const calcScore = (voter, leader, availableLeaders) => {
                 const stats = [
@@ -224,13 +264,16 @@ class FactionSystem {
                 ];
                 const bestStatKey = stats.reduce((max, stat) => stat.val > max.val ? stat : max, stats[0]).key;
 
-                const maxLeaderStatVal = Math.max(...availableLeaders.map(l => Number(l[bestStatKey]) || 0));
+                const leaderGroupMeta = getLeaderGroupMeta(availableLeaders);
+                const maxLeaderStatVal = leaderGroupMeta.maxByStat[bestStatKey];
 
                 const affDiff = GameSystem.calcAffinityDiff(voter.affinity, leader.affinity);
                 const innoDiff = Math.abs(voter.innovation - leader.innovation);
 
                 let solidarityBonus = 0;
-                const battleOverlap = voter.battleHistory.filter(h => leader.battleHistory.includes(h)).length;
+                const leaderBattleSet = getBattleSet(leader);
+                let battleOverlap = 0;
+                (voter.battleHistory || []).forEach(h => { if (leaderBattleSet.has(h)) battleOverlap++; });
                 solidarityBonus += battleOverlap * battleBonus;
 
                 let totalOverlapMonths = 0;
@@ -285,7 +328,7 @@ class FactionSystem {
                 let factionChangePenalty = 0;
 
                 // 自分の前のリーダーが今回も候補（availableLeaders）にいるか確認します
-                const isPrevLeaderAvailable = availableLeaders.some(l => l.id === voter.previousLeaderId);
+                const isPrevLeaderAvailable = leaderGroupMeta.idSet.has(voter.previousLeaderId);
 
                 if (voter.previousLeaderId > 0) {
                     if (voter.previousLeaderId === leader.id) {
@@ -300,7 +343,8 @@ class FactionSystem {
                 // ★追加：一門じゃない場合は少しだけ入りにくくする（点数を上げる）魔法です！
                 let familyPenalty = 0;
                 // 投票する武将とリーダーが、お互いの一門リストに同じ番号を持っているか確認します
-                const isFamily = voter.familyIds && leader.familyIds && voter.familyIds.some(fId => leader.familyIds.includes(fId));
+                const leaderFamilySet = getFamilySet(leader);
+                const isFamily = voter.familyIds && leader.familyIds && voter.familyIds.some(fId => leaderFamilySet.has(fId));
                 // もし一門じゃなかったら、ペナルティとして点数を増やします
                 if (!isFamily) {
                     familyPenalty = 5; // ちょっとだけ入りにくくするために5点を足します
@@ -542,10 +586,16 @@ class FactionSystem {
      * 3ヶ月ごとの城主最適化処理（大名による自動任命）
      */
     optimizeCastellans() { 
-        // 変更箇所：this.castles などを this.game.castles と呼ぶように直しています
-        const clanIds = [...new Set(this.game.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))]; 
+        // ★高速化：勢力ごとに4000人をfilterし直さず、最初の1回で所属別にまとめます。
+        const clanIds = [...new Set(this.game.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))];
+        const bushosByClan = new Map();
+        this.game.bushos.forEach(b => {
+            if (b.status === 'unborn') return;
+            if (!bushosByClan.has(b.clan)) bushosByClan.set(b.clan, []);
+            bushosByClan.get(b.clan).push(b);
+        });
         clanIds.forEach(clanId => { 
-            const myBushos = this.game.bushos.filter(b => b.clan === clanId && b.status !== 'unborn'); 
+            const myBushos = bushosByClan.get(clanId) || [];
             if(myBushos.length===0) return; 
             
             const daimyo = myBushos.find(b => b.isDaimyo);
