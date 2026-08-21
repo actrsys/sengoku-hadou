@@ -11,142 +11,153 @@ window.playEventSoundAndBlock = function() {
 };
 
 // ==========================================
-// ★ マップを光らせる共通の魔法（いろんなイベントで使い回せます！）
+// ★Round16：イベント専用マップの共通基盤
+// 白地図・半解像度Canvas・国マスク・タップ待ち・後始末を一元化します。
 // ==========================================
-window.playProvinceMapEffect = async function(game, eventType, initialMsg, affectedProvIds, drawR, drawG, drawB) {
-    if (affectedProvIds.size === 0 || !game.ui) return;
+window.EventMapEffects = window.EventMapEffects || (() => {
+    const WHITE_MAP_SRC = './data/images/map/japan_white_map.png';
+    const PROVINCE_MAP_SRC = './data/images/map/japan_provinces.png';
+    const CASTLE_COLOR_MAP_SRC = './data/images/map/japan_colorcode_map.png';
 
-    // ★Round15：イベント演出のどこでrendererが止まったか分かるように細分化します。
-    const diagNameMap = { '大雪': 'heavy_snow', '豊作': 'good_harvest', '凶作': 'bad_harvest', '飢饉': 'famine', '疫病': 'epidemic', '地震': 'earthquake' };
-    const diagName = diagNameMap[eventType] || 'province_effect';
-    const writeDiag = (stage) => {
+    const writeDiag = (game, label) => {
         if (game && typeof game.writeSystemDiagnostic === 'function') {
-            game.writeSystemDiagnostic(`event_effect:${diagName}:${stage}`);
+            game.writeSystemDiagnostic(label);
         }
     };
 
-    if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
-
-    writeDiag('dialog');
-    await game.ui.showDialogAsync(initialMsg, false, 0);
-
-    // ★Round15：イベント用マップは通常マップとは独立しています。
-    // 裏側の巨大マップをわざわざズームリセットすると、transform再ラスタライズと
-    // イベントCanvas確保が同時に起きるため、ここでは触りません。
-    writeDiag('overlay_shell');
-    const mapOverlay = document.createElement('div');
-    mapOverlay.style.position = 'fixed';
-    mapOverlay.style.top = '0';
-    mapOverlay.style.left = '0';
-    mapOverlay.style.width = '100%';
-    mapOverlay.style.height = '100%';
-    mapOverlay.style.backgroundColor = 'rgba(0,0,0,0.85)';
-    mapOverlay.style.zIndex = '7500';
-    mapOverlay.style.display = 'flex';
-    mapOverlay.style.justifyContent = 'center';
-    mapOverlay.style.alignItems = 'center';
-
-    const mapContainer = document.createElement('div');
-    mapContainer.style.position = 'relative';
-    mapContainer.style.width = '95%';
-    mapContainer.style.maxWidth = '800px';
-    mapContainer.style.border = '4px solid #fff';
-    mapContainer.style.borderRadius = '8px';
-    mapContainer.style.backgroundColor = '#81c784';
-    mapContainer.style.overflow = 'hidden';
-
-    const whiteMapImg = new Image();
-    whiteMapImg.src = './data/images/map/japan_white_map.png';
-    whiteMapImg.style.width = '100%';
-    whiteMapImg.style.display = 'block';
-
-    mapContainer.appendChild(whiteMapImg);
-    mapOverlay.appendChild(mapContainer);
-    document.body.appendChild(mapOverlay);
-
-    await new Promise(resolve => {
-        if (whiteMapImg.complete) resolve();
-        else {
-            whiteMapImg.onload = resolve;
-            whiteMapImg.onerror = resolve;
-            setTimeout(resolve, 1000);
+    const waitForImage = async (img, timeoutMs = 1000) => {
+        if (!img) return false;
+        if (img.complete && img.naturalWidth > 0) {
+            if (typeof img.decode === 'function') {
+                try { await img.decode(); } catch (e) {}
+            }
+            return true;
         }
-    });
-
-    // ★Round15：通常マップが既に保持している国IDピクセル索引を最優先で共有します。
-    // これがあればprovince ImageData自体をイベントのために用意する必要がありません。
-    const pixelProvinceMap = game.ui && game.ui.pixelProvinceMap;
-    const mapPixelCount = (game.mapWidth || 1200) * (game.mapHeight || 800);
-    const hasPixelProvinceMap = pixelProvinceMap && pixelProvinceMap.length >= mapPixelCount;
-    let sourceData = (typeof DataManager !== 'undefined') ? DataManager.provinceImageData : null;
-    if (!hasPixelProvinceMap && !sourceData) {
-        writeDiag('source_load');
-        const provMapImg = new Image();
-        provMapImg.src = './data/images/map/japan_provinces.png';
         await new Promise(resolve => {
-            if (provMapImg.complete) resolve();
-            else {
-                provMapImg.onload = resolve;
-                provMapImg.onerror = resolve;
-                setTimeout(resolve, 1000);
-            }
+            let done = false;
+            const finish = () => {
+                if (done) return;
+                done = true;
+                img.onload = null;
+                img.onerror = null;
+                resolve();
+            };
+            img.onload = finish;
+            img.onerror = finish;
+            setTimeout(finish, timeoutMs);
         });
-        if (provMapImg.naturalWidth > 0) {
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = provMapImg.naturalWidth;
-            tempCanvas.height = provMapImg.naturalHeight;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.drawImage(provMapImg, 0, 0);
-            try {
-                sourceData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-                if (typeof DataManager !== 'undefined') DataManager.provinceImageData = sourceData;
-            } catch (e) {
-                console.error('画像読み取りエラー:', e);
-            }
-            // getImageData取得後はGPU backing storeを即解放します。
-            try { tempCanvas.width = 1; tempCanvas.height = 1; } catch (e) {}
+        if (img.naturalWidth > 0 && typeof img.decode === 'function') {
+            try { await img.decode(); } catch (e) {}
         }
-    }
+        return img.naturalWidth > 0;
+    };
 
-    if (hasPixelProvinceMap || sourceData) {
-        writeDiag('mask_build');
+    const createOverlay = async (game, options = {}) => {
+        const mapOverlay = document.createElement('div');
+        mapOverlay.className = 'event-map-overlay';
+        mapOverlay.style.position = 'fixed';
+        mapOverlay.style.top = '0';
+        mapOverlay.style.left = '0';
+        mapOverlay.style.width = '100%';
+        mapOverlay.style.height = '100%';
+        mapOverlay.style.backgroundColor = options.overlayColor || 'rgba(0,0,0,0.85)';
+        mapOverlay.style.zIndex = String(options.zIndex || 7500);
+        mapOverlay.style.display = 'flex';
+        mapOverlay.style.justifyContent = 'center';
+        mapOverlay.style.alignItems = 'center';
+
+        const mapContainer = document.createElement('div');
+        mapContainer.className = 'event-map-container';
+        mapContainer.style.position = 'relative';
+        mapContainer.style.width = options.width || '95%';
+        mapContainer.style.maxWidth = options.maxWidth || '800px';
+        mapContainer.style.border = options.border || '4px solid #fff';
+        mapContainer.style.borderRadius = options.borderRadius || '8px';
+        mapContainer.style.backgroundColor = options.backgroundColor || '#81c784';
+        mapContainer.style.overflow = 'hidden';
+
+        const whiteMapImg = new Image();
+        whiteMapImg.src = options.mapSrc || WHITE_MAP_SRC;
+        whiteMapImg.style.width = '100%';
+        whiteMapImg.style.display = 'block';
+        whiteMapImg.style.pointerEvents = 'none';
+
+        mapContainer.appendChild(whiteMapImg);
+        mapOverlay.appendChild(mapContainer);
+        document.body.appendChild(mapOverlay);
+        await waitForImage(whiteMapImg, options.imageTimeoutMs || 1000);
+
+        return { mapOverlay, mapContainer, whiteMapImg };
+    };
+
+    const getRenderScale = () => document.body.classList.contains('is-pc') ? 1 : 0.5;
+
+    const ensureProvinceSource = async (game, diagPrefix = null) => {
+        const mapW = game.mapWidth || 1200;
+        const mapH = game.mapHeight || 800;
+        const pixelProvinceMap = game.ui && game.ui.pixelProvinceMap;
+        const hasPixelProvinceMap = !!(pixelProvinceMap && pixelProvinceMap.length >= mapW * mapH);
+        let sourceData = (typeof DataManager !== 'undefined') ? DataManager.provinceImageData : null;
+
+        if (!hasPixelProvinceMap && !sourceData) {
+            if (diagPrefix) writeDiag(game, `${diagPrefix}:source_load`);
+            const provMapImg = new Image();
+            provMapImg.src = PROVINCE_MAP_SRC;
+            const ok = await waitForImage(provMapImg);
+            if (ok) {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = provMapImg.naturalWidth;
+                tempCanvas.height = provMapImg.naturalHeight;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(provMapImg, 0, 0);
+                try {
+                    sourceData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                    if (typeof DataManager !== 'undefined') DataManager.provinceImageData = sourceData;
+                } catch (e) {
+                    console.error('画像読み取りエラー:', e);
+                }
+                try { tempCanvas.width = 1; tempCanvas.height = 1; } catch (e) {}
+            }
+        }
+
+        return {
+            pixelProvinceMap: hasPixelProvinceMap ? pixelProvinceMap : null,
+            sourceData,
+            srcW: hasPixelProvinceMap ? mapW : (sourceData ? sourceData.width : mapW),
+            srcH: hasPixelProvinceMap ? mapH : (sourceData ? sourceData.height : mapH)
+        };
+    };
+
+    const createProvinceCanvas = async (game, affectedProvIds, color, options = {}) => {
+        const src = await ensureProvinceSource(game, options.diagPrefix || null);
+        const renderScale = options.renderScale || getRenderScale();
         const canvas = document.createElement('canvas');
-        const isPC = document.body.classList.contains('is-pc');
-        const srcW = hasPixelProvinceMap ? (game.mapWidth || 1200) : sourceData.width;
-        const srcH = hasPixelProvinceMap ? (game.mapHeight || 800) : sourceData.height;
-        // ★Round15：スマホのイベント表示は最大800px幅なので、内部Canvasは1/2解像度で十分です。
-        // CSSで同じ大きさに表示し、半透明の地域ハイライトという見た目は維持します。
-        const renderScale = isPC ? 1 : 0.5;
-        canvas.width = Math.max(1, Math.round(srcW * renderScale));
-        canvas.height = Math.max(1, Math.round(srcH * renderScale));
+        canvas.width = Math.max(1, Math.round(src.srcW * renderScale));
+        canvas.height = Math.max(1, Math.round(src.srcH * renderScale));
         canvas.style.position = 'absolute';
         canvas.style.top = '0';
         canvas.style.left = '0';
         canvas.style.width = '100%';
         canvas.style.height = '100%';
         canvas.style.pointerEvents = 'none';
-        canvas.style.animation = 'blink 1s 2';
+        if (options.animation) canvas.style.animation = options.animation;
 
-        const ctx = canvas.getContext('2d');
-        const targetProvIds = affectedProvIds instanceof Set ? affectedProvIds : new Set(affectedProvIds);
+        const targetProvIds = affectedProvIds instanceof Set ? affectedProvIds : new Set(affectedProvIds || []);
+        if (targetProvIds.size > 0 && (src.pixelProvinceMap || src.sourceData)) {
+            const ctx = canvas.getContext('2d');
+            const img = ctx.createImageData(canvas.width, canvas.height);
+            const dst = img.data;
+            const drawR = color.r | 0, drawG = color.g | 0, drawB = color.b | 0;
+            const alpha = color.a === undefined ? 180 : color.a | 0;
 
-        // ImageDataはこの小さな関数の中だけで生存させ、putImageData後に参照を残しません。
-        const buildMask = () => {
-            const newImgData = ctx.createImageData(canvas.width, canvas.height);
-            const dstData = newImgData.data;
-
-            if (hasPixelProvinceMap) {
+            if (src.pixelProvinceMap) {
                 for (let y = 0; y < canvas.height; y++) {
-                    const sy = Math.min(srcH - 1, Math.floor(((y + 0.5) * srcH) / canvas.height));
+                    const sy = Math.min(src.srcH - 1, Math.floor(((y + 0.5) * src.srcH) / canvas.height));
                     for (let x = 0; x < canvas.width; x++) {
-                        const sx = Math.min(srcW - 1, Math.floor(((x + 0.5) * srcW) / canvas.width));
-                        const srcPx = sy * srcW + sx;
-                        if (!targetProvIds.has(pixelProvinceMap[srcPx])) continue;
+                        const sx = Math.min(src.srcW - 1, Math.floor(((x + 0.5) * src.srcW) / canvas.width));
+                        if (!targetProvIds.has(src.pixelProvinceMap[sy * src.srcW + sx])) continue;
                         const di = (y * canvas.width + x) * 4;
-                        dstData[di] = drawR;
-                        dstData[di + 1] = drawG;
-                        dstData[di + 2] = drawB;
-                        dstData[di + 3] = 180;
+                        dst[di] = drawR; dst[di + 1] = drawG; dst[di + 2] = drawB; dst[di + 3] = alpha;
                     }
                 }
             } else {
@@ -156,72 +167,189 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
                     return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
                 };
                 targetProvIds.forEach(pId => {
-                    const pData = game.provinces.find(p => p.id === pId);
-                    if (pData && pData.color_code) {
-                        const rgb = hexToRgb(pData.color_code);
+                    const p = game.provinces.find(prov => prov.id === pId);
+                    if (p && p.color_code) {
+                        const rgb = hexToRgb(p.color_code);
                         if (rgb) targetColors.push(rgb);
                     }
                 });
-                const src = sourceData.data;
+                const sd = src.sourceData.data;
                 for (let y = 0; y < canvas.height; y++) {
-                    const sy = Math.min(srcH - 1, Math.floor(((y + 0.5) * srcH) / canvas.height));
+                    const sy = Math.min(src.srcH - 1, Math.floor(((y + 0.5) * src.srcH) / canvas.height));
                     for (let x = 0; x < canvas.width; x++) {
-                        const sx = Math.min(srcW - 1, Math.floor(((x + 0.5) * srcW) / canvas.width));
-                        const si = (sy * srcW + sx) * 4;
-                        if (src[si + 3] === 0) continue;
+                        const sx = Math.min(src.srcW - 1, Math.floor(((x + 0.5) * src.srcW) / canvas.width));
+                        const si = (sy * src.srcW + sx) * 4;
+                        if (sd[si + 3] === 0) continue;
                         let match = false;
                         for (const c of targetColors) {
-                            if (src[si] === c.r && src[si + 1] === c.g && src[si + 2] === c.b) { match = true; break; }
+                            if (sd[si] === c.r && sd[si + 1] === c.g && sd[si + 2] === c.b) { match = true; break; }
                         }
                         if (!match) continue;
                         const di = (y * canvas.width + x) * 4;
-                        dstData[di] = drawR;
-                        dstData[di + 1] = drawG;
-                        dstData[di + 2] = drawB;
-                        dstData[di + 3] = 180;
+                        dst[di] = drawR; dst[di + 1] = drawG; dst[di + 2] = drawB; dst[di + 3] = alpha;
                     }
                 }
             }
-            ctx.putImageData(newImgData, 0, 0);
-        };
-
-        buildMask();
-        mapContainer.appendChild(canvas);
-        writeDiag('mask_done');
-        // 一時ImageDataを回収できる隙を作ってからアニメーションを待ちます。
-        await new Promise(resolve => setTimeout(resolve, 0));
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        canvas.style.animation = 'none';
-        canvas.style.opacity = '1.0';
-    }
-
-    writeDiag('wait_input');
-    await new Promise(resolve => {
-        const onTouch = () => {
-            mapOverlay.removeEventListener('click', onTouch);
-            mapOverlay.removeEventListener('touchstart', onTouch);
-            resolve();
-        };
-        mapOverlay.addEventListener('click', onTouch);
-        mapOverlay.addEventListener('touchstart', onTouch, { passive: true });
-
-        if (game && game.isWatchMode) {
-            setTimeout(onTouch, 1000);
+            ctx.putImageData(img, 0, 0);
         }
-    });
 
-    writeDiag('cleanup');
-    mapOverlay.querySelectorAll('canvas').forEach(c => {
-        try { c.width = 1; c.height = 1; } catch (e) {}
-    });
-    if (mapOverlay.parentNode) mapOverlay.parentNode.removeChild(mapOverlay);
-    // 旧版が残したイベント専用キャッシュがあれば明示的に解放します。
-    window.ProvinceImageDataCache = null;
-    sourceData = null;
+        return { canvas, srcW: src.srcW, srcH: src.srcH, renderScale };
+    };
+
+    // 台風の正確な拠点当たり判定用。
+    // 元の「色コード画像を1pxずつRGB文字列化」ではなく、同じ色グループIDへ一度だけ変換して再利用します。
+    let castleColorIndexCache = null;
+    const ensureCastleColorIndex = async (game, diagPrefix = null) => {
+        const signature = (game.castles || []).map(c => {
+            let color = (c.castlesColorCode || c.colorCode || c.color_code || '').trim().toLowerCase();
+            if (color && !color.startsWith('#')) color = '#' + color;
+            return `${c.id}:${color}`;
+        }).join('|');
+        if (castleColorIndexCache && castleColorIndexCache.signature === signature) return castleColorIndexCache;
+
+        if (diagPrefix) writeDiag(game, `${diagPrefix}:castle_index_load`);
+        const img = new Image();
+        img.src = CASTLE_COLOR_MAP_SRC;
+        const ok = await waitForImage(img);
+        if (!ok) return null;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        let imageData = null;
+        try { imageData = ctx.getImageData(0, 0, canvas.width, canvas.height); }
+        catch (e) { console.error('画像読み取りエラー:', e); }
+        if (!imageData) {
+            try { canvas.width = 1; canvas.height = 1; } catch (e) {}
+            return null;
+        }
+
+        const colorToGroup = new Map();
+        const castleGroupById = new Map();
+        let nextGroup = 1;
+        for (const c of (game.castles || [])) {
+            let hex = (c.castlesColorCode || c.colorCode || c.color_code || '').trim().toLowerCase();
+            if (!hex) continue;
+            if (!hex.startsWith('#')) hex = '#' + hex;
+            const m = /^#([0-9a-f]{6})$/i.exec(hex);
+            if (!m) continue;
+            const rgbKey = parseInt(m[1], 16);
+            let groupId = colorToGroup.get(rgbKey);
+            if (!groupId) {
+                groupId = nextGroup++;
+                colorToGroup.set(rgbKey, groupId);
+            }
+            castleGroupById.set(c.id, groupId);
+        }
+
+        const GroupArray = nextGroup <= 65535 ? Uint16Array : Uint32Array;
+        const pixelGroupMap = new GroupArray(canvas.width * canvas.height);
+        const sd = imageData.data;
+        for (let i = 0, p = 0; i < sd.length; i += 4, p++) {
+            if (sd[i + 3] === 0) continue;
+            const key = (sd[i] << 16) | (sd[i + 1] << 8) | sd[i + 2];
+            const groupId = colorToGroup.get(key);
+            if (groupId) pixelGroupMap[p] = groupId;
+        }
+
+        const result = {
+            signature,
+            width: canvas.width,
+            height: canvas.height,
+            pixelGroupMap,
+            castleGroupById
+        };
+        castleColorIndexCache = result;
+        imageData = null;
+        try { canvas.width = 1; canvas.height = 1; } catch (e) {}
+        if (diagPrefix) writeDiag(game, `${diagPrefix}:castle_index_done`);
+        return result;
+    };
+
+    const waitForDismiss = async (game, mapOverlay) => {
+        await new Promise(resolve => {
+            let finished = false;
+            const onTouch = () => {
+                if (finished) return;
+                finished = true;
+                mapOverlay.removeEventListener('click', onTouch);
+                mapOverlay.removeEventListener('touchstart', onTouch);
+                resolve();
+            };
+            mapOverlay.addEventListener('click', onTouch);
+            mapOverlay.addEventListener('touchstart', onTouch, { passive: true });
+            if (game && game.isWatchMode) setTimeout(onTouch, 1000);
+        });
+    };
+
+    const cleanupOverlay = async (mapOverlay) => {
+        if (mapOverlay) {
+            mapOverlay.querySelectorAll('canvas').forEach(c => {
+                try { c.width = 1; c.height = 1; } catch (e) {}
+            });
+            if (mapOverlay.parentNode) mapOverlay.parentNode.removeChild(mapOverlay);
+        }
+        // Round16よりイベント専用の巨大RGBAキャッシュは使いません。
+        window.ProvinceImageDataCache = null;
+        window.CastleColorImageDataCache = null;
+        await new Promise(resolve => setTimeout(resolve, 0));
+    };
+
+    return {
+        writeDiag,
+        waitForImage,
+        createOverlay,
+        getRenderScale,
+        ensureProvinceSource,
+        createProvinceCanvas,
+        ensureCastleColorIndex,
+        waitForDismiss,
+        cleanupOverlay
+    };
+})();
+
+// ==========================================
+// ★ マップを光らせる共通の魔法（凶作・豊作・大雪など）
+// Round16：上の共通イベント地図基盤へ統合しました。
+// ==========================================
+window.playProvinceMapEffect = async function(game, eventType, initialMsg, affectedProvIds, drawR, drawG, drawB) {
+    if (!affectedProvIds || affectedProvIds.size === 0 || !game.ui) return;
+
+    const diagNameMap = { '大雪': 'heavy_snow', '豊作': 'good_harvest', '凶作': 'bad_harvest', '飢饉': 'famine', '疫病': 'epidemic', '地震': 'earthquake' };
+    const diagName = diagNameMap[eventType] || 'province_effect';
+    const diagPrefix = `event_effect:${diagName}`;
+    const fx = window.EventMapEffects;
+
+    if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
+    fx.writeDiag(game, `${diagPrefix}:dialog`);
+    await game.ui.showDialogAsync(initialMsg, false, 0);
+
+    fx.writeDiag(game, `${diagPrefix}:overlay_shell`);
+    const { mapOverlay, mapContainer } = await fx.createOverlay(game);
+
+    fx.writeDiag(game, `${diagPrefix}:mask_build`);
+    const { canvas } = await fx.createProvinceCanvas(
+        game,
+        affectedProvIds,
+        { r: drawR, g: drawG, b: drawB, a: 180 },
+        { animation: 'blink 1s 2', diagPrefix }
+    );
+    mapContainer.appendChild(canvas);
+    fx.writeDiag(game, `${diagPrefix}:mask_done`);
+
     await new Promise(resolve => setTimeout(resolve, 0));
-    writeDiag('cleanup_done');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    canvas.style.animation = 'none';
+    canvas.style.opacity = '1.0';
 
-    // プレイヤーの領地の被害報告
+    fx.writeDiag(game, `${diagPrefix}:wait_input`);
+    await fx.waitForDismiss(game, mapOverlay);
+    fx.writeDiag(game, `${diagPrefix}:cleanup`);
+    await fx.cleanupOverlay(mapOverlay);
+    fx.writeDiag(game, `${diagPrefix}:cleanup_done`);
+
     const playerAffectedProvinces = new Set();
     game.castles.forEach(c => {
         if (c.ownerClan === game.playerClanId && affectedProvIds.has(c.provinceId)) {
@@ -229,7 +357,7 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
         }
     });
 
-    for (let pid of playerAffectedProvinces) {
+    for (const pid of playerAffectedProvinces) {
         const p = game.provinces.find(prov => prov.id === pid);
         const pName = p ? p.province : 'どこかの国';
         let msg = '';
@@ -239,8 +367,7 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
         else if (eventType === '疫病') msg = `${pName}で恐ろしい疫病が猛威を振るっています……`;
         else if (eventType === '地震') msg = `${pName}で大地震による甚大な被害が出ています……`;
         else if (eventType === '大雪') msg = `${pName}は深い雪に閉ざされています……`;
-
-        await game.ui.showDialogAsync(msg, false, 0);
+        if (msg) await game.ui.showDialogAsync(msg, false, 0);
     }
 };
 

@@ -1,6 +1,8 @@
 /**
  * typhoon_event.js
  * 台風イベント専用のファイルです。
+ * Round16: 進路・被害ロジックは維持し、イベント地図基盤は common_events.js の
+ * EventMapEffects と共有します。
  */
 
 window.GameEvents = window.GameEvents || [];
@@ -24,514 +26,276 @@ window.GameEvents.push({
         console.log("=== 台風イベント開始 ===");
 
         const SHOW_TYPHOON_PATH = true;
-
-        // ★ダイアログを出す前に、音を鳴らしてバリアを張る魔法を呼びます！
-        if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
-
-        await game.ui.showDialogAsync("台風が接近しています……", false, 0);
-
-        const resetZoomBtn = document.getElementById('map-reset-zoom');
-        if (resetZoomBtn) resetZoomBtn.click();
-
-        const damagedProvinceMap = new Map();
-        const damagedPlayerCastles = [];      
-        
-        // ★修正：円の大きさ用（visualScale）と、ダメージ規模用（damageScale）を分けます！
-        
-        // 1. まずは「見た目の大きさ（visualScale）」を今まで通りランダムに決めます
-        let visualScale = 1;
-        const scaleDice = Math.random() * 100; 
-
-        if (scaleDice < 10) {
-            visualScale = 1; 
-        } else if (scaleDice < 35) {
-            visualScale = 2; 
-        } else if (scaleDice < 65) {
-            visualScale = 3; 
-        } else if (scaleDice < 85) {
-            visualScale = 4; 
-        } else if (scaleDice < 93) {
-            visualScale = 5; 
-        } else if (scaleDice < 97) {
-            visualScale = 6; 
-        } else if (scaleDice < 99) {
-            visualScale = 7; 
-        } else {
-            visualScale = Math.floor(Math.random() * 3) + 8; 
-        }
-
-        // 2. 次に「被害の規模（damageScale）」を決めます。
-        // （低い数字が出やすく、高い数字になるほど極端に出にくくなる「えぐれたピラミッド型」の確率です）
-        let damageScale = 1;
-        const damageDice = Math.random() * 100;
-        
-        if (damageDice < 40) {
-            damageScale = 1; // 40% (一番よく出る、ごく軽微な被害)
-        } else if (damageDice < 65) {
-            damageScale = 2; // 25% (そこそこ出る、軽微な被害)
-        } else if (damageDice < 80) {
-            damageScale = 3; // 15%
-        } else if (damageDice < 90) {
-            damageScale = 4; // 10%
-        } else if (damageDice < 95) {
-            damageScale = 5; // 5%
-        } else if (damageDice < 98) {
-            damageScale = 6; // 3%
-        } else if (damageDice < 99.5) {
-            damageScale = 7; // 1.5% (めったに出ない甚大な被害)
-        } else {
-            damageScale = 8; // 0.5% (数年に一度レベルの超レアな大災害)
-        }
-
-        const mapOverlay = document.createElement('div');
-
-        // ★Round5：台風演出終了時にイベント専用の巨大Canvas/ImageDataを明示的に解放します。
-        const releaseTyphoonMapMemory = () => {
-            try {
-                mapOverlay.querySelectorAll('canvas').forEach(c => {
-                    c.width = 1;
-                    c.height = 1;
-                });
-            } catch (e) {
-            }
-            window.CastleColorImageDataCache = null;
-            window.ProvinceImageDataCache = null;
+        const fx = window.EventMapEffects;
+        const diagPrefix = 'event_effect:typhoon';
+        const writeDiag = (stage) => {
+            if (fx && typeof fx.writeDiag === 'function') fx.writeDiag(game, `${diagPrefix}:${stage}`);
+            else if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic(`${diagPrefix}:${stage}`);
         };
 
-        mapOverlay.style.position = 'fixed';
-        mapOverlay.style.top = '0';
-        mapOverlay.style.left = '0';
-        mapOverlay.style.width = '100%';
-        mapOverlay.style.height = '100%';
-        mapOverlay.style.backgroundColor = 'rgba(0,0,0,0.85)';
-        mapOverlay.style.zIndex = '7500'; 
-        mapOverlay.style.display = 'flex';
-        mapOverlay.style.justifyContent = 'center';
-        mapOverlay.style.alignItems = 'center';
+        if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
+        writeDiag('dialog');
+        await game.ui.showDialogAsync("台風が接近しています……", false, 0);
 
-        const mapContainer = document.createElement('div');
-        mapContainer.style.position = 'relative';
-        mapContainer.style.width = '95%';
-        mapContainer.style.maxWidth = '800px';
-        mapContainer.style.border = '4px solid #fff';
-        mapContainer.style.borderRadius = '8px';
-        mapContainer.style.backgroundColor = '#81c784';
-        mapContainer.style.overflow = 'hidden';
+        // ★Round16：イベント用地図は通常マップと独立しているため、裏側のズームは触りません。
+        // 旧版の map-reset-zoom.click() は、巨大マップ再ラスタライズとイベントCanvas確保を
+        // 同時に発生させるため削除しました。
 
-        const whiteMapImg = new Image();
-        whiteMapImg.src = './data/images/map/japan_white_map.png'; 
-        whiteMapImg.style.width = '100%';
-        whiteMapImg.style.display = 'block';
+        const damagedProvinceMap = new Map();
+        const damagedPlayerCastles = [];
 
-        mapContainer.appendChild(whiteMapImg);
-        mapOverlay.appendChild(mapContainer);
-        document.body.appendChild(mapOverlay);
+        // 1. 見た目の大きさ（visualScale）
+        let visualScale = 1;
+        const scaleDice = Math.random() * 100;
+        if (scaleDice < 10) visualScale = 1;
+        else if (scaleDice < 35) visualScale = 2;
+        else if (scaleDice < 65) visualScale = 3;
+        else if (scaleDice < 85) visualScale = 4;
+        else if (scaleDice < 93) visualScale = 5;
+        else if (scaleDice < 97) visualScale = 6;
+        else if (scaleDice < 99) visualScale = 7;
+        else visualScale = Math.floor(Math.random() * 3) + 8;
 
-        await new Promise(resolve => {
-            if (whiteMapImg.complete) resolve();
-            else {
-                whiteMapImg.onload = resolve;
-                whiteMapImg.onerror = resolve;
-                setTimeout(resolve, 1000); 
-            }
-        });
+        // 2. 被害の規模（damageScale）
+        let damageScale = 1;
+        const damageDice = Math.random() * 100;
+        if (damageDice < 40) damageScale = 1;
+        else if (damageDice < 65) damageScale = 2;
+        else if (damageDice < 80) damageScale = 3;
+        else if (damageDice < 90) damageScale = 4;
+        else if (damageDice < 95) damageScale = 5;
+        else if (damageDice < 98) damageScale = 6;
+        else if (damageDice < 99.5) damageScale = 7;
+        else damageScale = 8;
 
-        // ★ 拠点のマップ画像を読み込みます（当たり判定用です）
-        if (!window.CastleColorImageDataCache) {
-            const castleMapImg = new Image();
-            castleMapImg.src = './data/images/map/japan_colorcode_map.png';
-            
-            await new Promise(resolve => {
-                if (castleMapImg.complete) resolve();
-                else {
-                    castleMapImg.onload = resolve;
-                    castleMapImg.onerror = resolve;
-                    setTimeout(resolve, 1000); 
-                }
-            });
-
-            if (castleMapImg.naturalWidth > 0) {
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = castleMapImg.naturalWidth;
-                tempCanvas.height = castleMapImg.naturalHeight;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.drawImage(castleMapImg, 0, 0);
-                try {
-                    window.CastleColorImageDataCache = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-                } catch (e) {
-                    console.error("画像読み取りエラー:", e);
-                }
-            }
+        writeDiag('overlay_shell');
+        const overlayParts = fx && typeof fx.createOverlay === 'function'
+            ? await fx.createOverlay(game)
+            : null;
+        if (!overlayParts) {
+            // common_events.js より先に呼ばれる構成は通常ありませんが、安全側で中止します。
+            console.error('EventMapEffects が初期化されていません');
+            return;
         }
+        const { mapOverlay, mapContainer } = overlayParts;
 
-        // ★ 国のマップ画像も白地図を塗るために必要なので、残して読み込みます
-        if (!window.ProvinceImageDataCache) {
-            const provMapImg = new Image();
-            provMapImg.src = './data/images/map/japan_provinces.png';
-            
-            await new Promise(resolve => {
-                if (provMapImg.complete) resolve();
-                else {
-                    provMapImg.onload = resolve;
-                    provMapImg.onerror = resolve;
-                    setTimeout(resolve, 1000); 
-                }
-            });
-
-            if (provMapImg.naturalWidth > 0) {
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = provMapImg.naturalWidth;
-                tempCanvas.height = provMapImg.naturalHeight;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.drawImage(provMapImg, 0, 0);
-                try {
-                    window.ProvinceImageDataCache = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-                } catch (e) {
-                    console.error("画像読み取りエラー:", e);
-                }
-            }
-        }
+        // ★Round16：旧 CastleColorImageDataCache を廃止。
+        // 色コード画像は初回だけ読み、一度「pixel -> 色グループID」のTypedArrayへ変換します。
+        // 同じ色コードを共有する拠点は同じgroupIdなので、旧版の色一致ロジックと同じ扱いです。
+        writeDiag('castle_index');
+        const castleIndex = await fx.ensureCastleColorIndex(game, diagPrefix);
 
         const pathData = [];
-        const damagedCastleMap = new Map(); // ★ 拠点ごとのダメージを保存する箱を新しく用意します
+        const damagedCastleMap = new Map();
 
-        // ★ 色判定用のデータを拠点マップ（CastleColorImageDataCache）に変えます
-        if (window.CastleColorImageDataCache) {
-            const width = window.CastleColorImageDataCache.width;
-            const height = window.CastleColorImageDataCache.height;
-            const data = window.CastleColorImageDataCache.data;
+        if (castleIndex) {
+            const width = castleIndex.width;
+            const height = castleIndex.height;
+            const pixelGroupMap = castleIndex.pixelGroupMap;
+            const castleGroupById = castleIndex.castleGroupById;
 
-            // 透明な部分を無視し、正確な16進数カラーコードを取得します
-            const getPixelHex = (x, y) => {
-                x = Math.floor(x); y = Math.floor(y);
-                if (x < 0 || x >= width || y < 0 || y >= height) return null;
-                const idx = (y * width + x) * 4;
-                if (data[idx+3] === 0) return null; // 完全な透明はスキップ
-                
-                // RGB値を確実に6桁の16進数文字列（#付き）に変換します
-                return "#" + ((1 << 24) + (data[idx] << 16) + (data[idx+1] << 8) + data[idx+2]).toString(16).slice(1);
-            };
-
-            let r = Math.pow(Math.random(), 3); 
-            let typhoonX = -500 + (r * (width * 0.7 + 500)); 
+            let r = Math.pow(Math.random(), 3);
+            let typhoonX = -500 + (r * (width * 0.7 + 500));
             let typhoonY = height + 500;
-            
-            // ★修正：円の半径や風の強さは「visualScale（見た目の大きさ）」を使います！
-            let initialScale = Math.min(10, Math.max(1, visualScale));
-            let typhoonRadius = 100 + (initialScale * 15); 
-            
-            const damagedColorCodes = new Set(); 
+
+            const initialScale = Math.min(10, Math.max(1, visualScale));
+            let typhoonRadius = 100 + (initialScale * 15);
+            const damagedGroupIds = new Set();
             const windStrength = 40 - (initialScale * 3) + (Math.random() * 5);
+            let wasOnCastle = false;
+            let castleHitCount = 0;
 
-            // ★ 拠点の色リストを「完全な統一フォーマット（小文字・#付き）」で準備します
-            const validCastleColors = new Set();
-            if (game.castles) {
-                for (let c of game.castles) {
-                    // ★ ここが修正の要です！拠点のデータ名「castlesColorCode」を真っ先に読み取ります
-                    let cColor = (c.castlesColorCode || c.colorCode || c.color_code || "").trim().toLowerCase();
-                    if (cColor) {
-                        if (!cColor.startsWith("#")) cColor = "#" + cColor;
-                        validCastleColors.add(cColor);
-                    }
-                }
-            }
-            
-            let wasOnCastle = false; 
-            let castleHitCount = 0; 
-
+            writeDiag('path_calc');
             while (typhoonX < width + typhoonRadius && typhoonY > -typhoonRadius && typhoonY < height + 1000 && typhoonRadius > 30) {
-                
                 pathData.push({ x: typhoonX, y: typhoonY, radius: typhoonRadius });
 
                 let moveX = Math.random() * 25 + 10;
-                let moveY = Math.random() * 30 + 15 + (initialScale * 2.0); 
+                let moveY = Math.random() * 30 + 15 + (initialScale * 2.0);
+                const progress = Math.max(0, (height + 500 - typhoonY) / height);
+                moveX += windStrength * progress * 1.5;
 
-                let progress = Math.max(0, (height + 500 - typhoonY) / height); 
-                
-                moveX += windStrength * progress * 1.5; 
-                
-                let fallPower = 50 - (initialScale * 3); 
-                moveY -= fallPower * Math.pow(progress, 1.5); 
-
-                if (wasOnCastle) {
-                    moveY -= 15; 
-                }
+                const fallPower = 50 - (initialScale * 3);
+                moveY -= fallPower * Math.pow(progress, 1.5);
+                if (wasOnCastle) moveY -= 15;
 
                 typhoonX += moveX;
                 typhoonY -= moveY;
 
                 let onCastle = false;
-
-                // ★ 当たり判定の範囲を計算します
                 if (typhoonX > -typhoonRadius && typhoonX < width + typhoonRadius &&
                     typhoonY > -typhoonRadius && typhoonY < height + typhoonRadius) {
-
                     const rSq = typhoonRadius * typhoonRadius;
                     const startX = Math.max(0, Math.floor(typhoonX - typhoonRadius));
                     const endX = Math.min(width - 1, Math.ceil(typhoonX + typhoonRadius));
                     const startY = Math.max(0, Math.floor(typhoonY - typhoonRadius));
                     const endY = Math.min(height - 1, Math.ceil(typhoonY + typhoonRadius));
 
-                    // ★ 2マス飛ばしをやめ、1ピクセル単位で「すべての隙間」を完全にスキャンします
+                    // 判定密度は旧版と同じ1ピクセル単位です。
                     for (let y = startY; y <= endY; y++) {
+                        const row = y * width;
                         for (let x = startX; x <= endX; x++) {
                             const dx = x - typhoonX;
                             const dy = y - typhoonY;
-                            
-                            // 円の内側かどうかを判定します
-                            if (dx * dx + dy * dy <= rSq) {
-                                const hex = getPixelHex(x, y);
-                                if (hex) {
-                                    // 読み取った色（既に小文字・#付き）がリストにあるか確認します
-                                    if (validCastleColors.has(hex)) {
-                                        damagedColorCodes.add(hex);
-                                        onCastle = true; 
-                                    }
-                                }
+                            if (dx * dx + dy * dy > rSq) continue;
+                            const groupId = pixelGroupMap[row + x];
+                            if (groupId !== 0) {
+                                damagedGroupIds.add(groupId);
+                                onCastle = true;
                             }
                         }
                     }
                 }
 
                 let baseDecay;
-                if (onCastle) {
-                    baseDecay = (Math.random() * 1.0) - 0.2; 
-                } else {
-                    baseDecay = (Math.random() * 1.5) - 1.4; 
-                }
-                
-                let northDecay = 0.1 * progress;
+                if (onCastle) baseDecay = (Math.random() * 1.0) - 0.2;
+                else baseDecay = (Math.random() * 1.5) - 1.4;
 
+                const northDecay = 0.1 * progress;
                 if (onCastle) {
                     castleHitCount++;
-                    let castleDecay = 0.3 + (castleHitCount * 0.1); 
+                    const castleDecay = 0.3 + (castleHitCount * 0.1);
                     typhoonRadius -= (baseDecay + northDecay + castleDecay);
                 } else {
-                    castleHitCount = 0; 
+                    castleHitCount = 0;
                     typhoonRadius -= (baseDecay + northDecay);
                 }
 
                 if (typhoonRadius > 250) typhoonRadius = 250;
-
                 wasOnCastle = onCastle;
             }
-            
             pathData.push({ x: typhoonX, y: typhoonY, radius: typhoonRadius });
+            writeDiag('path_done');
 
-            // ★ 被害を受ける「拠点」と、その拠点が所属する「国」をまとめます
+            // 被害決定は旧版と同じく game.castles の順番で行い、乱数呼び出し順も維持します。
             if (game.castles && game.castles.length > 0) {
-                for (let castle of game.castles) {
-                    // ★ こちらも修正ポイントです！
-                    let castleColor = (castle.castlesColorCode || castle.colorCode || castle.color_code || "").trim().toLowerCase();
-                    if (castleColor) {
-                        if (!castleColor.startsWith("#")) castleColor = "#" + castleColor;
-                        
-                        // 統一フォーマット同士で完璧に一致するかチェックします
-                        if (damagedColorCodes.has(castleColor)) {
-                            const shift = Math.floor(Math.random() * 3) - 1;
-                            // ★修正：拠点へのダメージ規模は「damageScale」を基準に計算します！
-                            let finalScale = Math.max(1, Math.min(10, damageScale + shift));
-                            damagedCastleMap.set(castle.id, finalScale); 
-                            
-                            if (!damagedProvinceMap.has(castle.provinceId)) {
-                                damagedProvinceMap.set(castle.provinceId, finalScale);
-                            }
+                for (const castle of game.castles) {
+                    const groupId = castleGroupById.get(castle.id) || 0;
+                    if (groupId !== 0 && damagedGroupIds.has(groupId)) {
+                        const shift = Math.floor(Math.random() * 3) - 1;
+                        const finalScale = Math.max(1, Math.min(10, damageScale + shift));
+                        damagedCastleMap.set(castle.id, finalScale);
+                        if (!damagedProvinceMap.has(castle.provinceId)) {
+                            damagedProvinceMap.set(castle.provinceId, finalScale);
                         }
                     }
                 }
             }
         }
 
-        // ７月か８月の台風なら、被害を受けた国に「凶作」のシールを貼ります！
+        // 7月・8月の台風は被害国に凶作を付与
         if (game.month === 7 || game.month === 8) {
             damagedProvinceMap.forEach((scale, pId) => {
                 const p = game.provinces.find(prov => prov.id === pId);
                 if (p) {
                     if (!p.statusEffects) p.statusEffects = [];
-                    if (!p.statusEffects.includes('badHarvest')) {
-                        p.statusEffects.push('badHarvest');
-                    }
+                    if (!p.statusEffects.includes('badHarvest')) p.statusEffects.push('badHarvest');
                 }
             });
         }
-        
-        // 台風の被害を受けた国だけでなく、他の国にも影響を出します！
+
+        // 市場相場への影響
         if (damagedProvinceMap.size > 0) {
             const baseRate = window.MainParams.Economy.TradeRateBase || 5.0;
             game.provinces.forEach(prov => {
                 if (prov && prov.marketRate !== undefined) {
-                    // 台風の被害を受けた国かどうか調べます
                     if (damagedProvinceMap.has(prov.id)) {
-                        // 被害を受けた国は基本相場の0.6倍アップします！
                         prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + (baseRate * 0.6));
                     } else {
-                        // 被害を受けていない他の国も、影響で基本相場の0.2倍アップします！
                         prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + (baseRate * 0.2));
                     }
                 }
             });
         }
-        
-        game.castles.forEach(castle => {
-            // ★ ダメージ計算を「拠点単位」にします！
-            if (damagedCastleMap.has(castle.id)) {
-                const finalScale = damagedCastleMap.get(castle.id);
-                const dropPercent = finalScale * 0.03;
-                
-                // 城防御力15につき1%のダメージ軽減率を計算します（最大100%カット）
-                const defenseCutRate = Math.min(1.0, Math.floor(castle.defense / 15) * 0.01);
-                const actualDropPercent = dropPercent * (1.0 - defenseCutRate);
-                
-                castle.kokudaka = Math.floor(castle.kokudaka * (1.0 - actualDropPercent));
-                castle.defense = Math.floor(castle.defense * (1.0 - dropPercent)); // 防御のダメージは軽減しません
-                
-                if (finalScale >= 6) {
-                    const solDropRate = ((finalScale - 5) * 0.04) * (1.0 - defenseCutRate);
-                    castle.soldiers = Math.floor(castle.soldiers * (1.0 - solDropRate));
-                    
-                    let popDropRate = ((finalScale - 5) * 0.02) * (1.0 - defenseCutRate);
-                    
-                    // ★追加：スキルマネージャーに「スキルによる災害被害の倍率」を聞いて計算します
-                    if (typeof SkillManager !== 'undefined') {
-                        popDropRate *= SkillManager.calcDisasterDamageModifier(castle, game);
-                    }
-                    
-                    castle.population = Math.floor(castle.population * (1.0 - popDropRate));
-                }
 
-                if (castle.ownerClan === game.playerClanId) {
-                    damagedPlayerCastles.push({ castle: castle, scale: finalScale });
+        // 拠点への被害
+        game.castles.forEach(castle => {
+            if (!damagedCastleMap.has(castle.id)) return;
+            const finalScale = damagedCastleMap.get(castle.id);
+            const dropPercent = finalScale * 0.03;
+            const defenseCutRate = Math.min(1.0, Math.floor(castle.defense / 15) * 0.01);
+            const actualDropPercent = dropPercent * (1.0 - defenseCutRate);
+
+            castle.kokudaka = Math.floor(castle.kokudaka * (1.0 - actualDropPercent));
+            castle.defense = Math.floor(castle.defense * (1.0 - dropPercent));
+
+            if (finalScale >= 6) {
+                const solDropRate = ((finalScale - 5) * 0.04) * (1.0 - defenseCutRate);
+                castle.soldiers = Math.floor(castle.soldiers * (1.0 - solDropRate));
+
+                let popDropRate = ((finalScale - 5) * 0.02) * (1.0 - defenseCutRate);
+                if (typeof SkillManager !== 'undefined') {
+                    popDropRate *= SkillManager.calcDisasterDamageModifier(castle, game);
                 }
+                castle.population = Math.floor(castle.population * (1.0 - popDropRate));
+            }
+
+            if (castle.ownerClan === game.playerClanId) {
+                damagedPlayerCastles.push({ castle, scale: finalScale });
             }
         });
 
+        // ★Round16：国ハイライトCanvasは凶作・大雪等と同じ共通関数を使用します。
+        // スマホでは内部解像度1/2、PCは等倍。台風進路だけこのCanvasへ追加描画します。
         if (damagedProvinceMap.size > 0 || SHOW_TYPHOON_PATH) {
-            
-            if (window.ProvinceImageDataCache) {
-                const canvas = document.createElement('canvas');
-                canvas.width = window.ProvinceImageDataCache.width;
-                canvas.height = window.ProvinceImageDataCache.height;
-                canvas.style.position = 'absolute';
-                canvas.style.top = '0';
-                canvas.style.left = '0';
-                canvas.style.width = '100%';
-                canvas.style.height = '100%';
-                canvas.style.pointerEvents = 'none';
-                
-                if (damagedProvinceMap.size > 0) {
-                    canvas.style.animation = 'blink 1s 2';
-                }
+            writeDiag('visual_build');
+            const affectedProvIds = new Set(damagedProvinceMap.keys());
+            const { canvas, srcW, srcH } = await fx.createProvinceCanvas(
+                game,
+                affectedProvIds,
+                { r: 0, g: 0, b: 255, a: 180 },
+                { animation: damagedProvinceMap.size > 0 ? 'blink 1s 2' : '', diagPrefix }
+            );
+            const ctx = canvas.getContext('2d');
 
-                const ctx = canvas.getContext('2d');
-                
-                if (damagedProvinceMap.size > 0) {
-                    const targetColors = [];
-                    const hexToRgb = (hex) => {
-                        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                        return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
-                    };
-                    
-                    damagedProvinceMap.forEach((scale, pId) => {
-                        const pData = game.provinces.find(p => p.id === pId);
-                        if (pData && pData.color_code) {
-                            const rgb = hexToRgb(pData.color_code);
-                            if (rgb) targetColors.push(rgb);
-                        }
-                    });
+            if (SHOW_TYPHOON_PATH && pathData.length > 0) {
+                const sx = canvas.width / srcW;
+                const sy = canvas.height / srcH;
+                ctx.save();
+                ctx.scale(sx, sy);
 
-                    if (targetColors.length > 0) {
-                        const srcData = window.ProvinceImageDataCache.data;
-                        const newImgData = ctx.createImageData(canvas.width, canvas.height);
-                        const dstData = newImgData.data;
-
-                        for (let i = 0; i < srcData.length; i += 4) {
-                            const r = srcData[i], g = srcData[i+1], b = srcData[i+2], a = srcData[i+3];
-                            if (a > 0) {
-                                let isTarget = false;
-                                for (let c of targetColors) {
-                                    // ★ ここが修正ポイントです！完全に一致する色だけを正解にします
-                                    if (r === c.r && g === c.g && b === c.b) {
-                                        isTarget = true;
-                                        break;
-                                    }
-                                }
-                                if (isTarget) {
-                                    dstData[i] = 0;
-                                    dstData[i+1] = 0;
-                                    dstData[i+2] = 255;
-                                    dstData[i+3] = 180;
-                                }
-                            }
-                        }
-                        ctx.putImageData(newImgData, 0, 0);
+                ctx.lineWidth = 6;
+                ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+                ctx.setLineDash([8, 8]);
+                for (let i = 0; i < pathData.length; i++) {
+                    if (i % 2 === 0 || i === pathData.length - 1) {
+                        ctx.beginPath();
+                        ctx.arc(pathData[i].x, pathData[i].y, Math.max(0, pathData[i].radius), 0, Math.PI * 2);
+                        ctx.stroke();
                     }
                 }
 
-                if (SHOW_TYPHOON_PATH && pathData.length > 0) {
-                    ctx.lineWidth = 6; 
-                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; 
-                    ctx.setLineDash([8, 8]); 
-
-                    for (let i = 0; i < pathData.length; i++) {
-                        if (i % 2 === 0 || i === pathData.length - 1) {
-                            ctx.beginPath();
-                            ctx.arc(pathData[i].x, pathData[i].y, Math.max(0, pathData[i].radius), 0, Math.PI * 2);
-                            ctx.stroke();
-                        }
-                    }
-
-                    ctx.beginPath();
-                    ctx.setLineDash([20, 20]); 
-                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; 
-                    ctx.lineWidth = 4; 
-                    ctx.lineCap = 'round'; 
-                    ctx.lineJoin = 'round'; 
-
-                    ctx.moveTo(pathData[0].x, pathData[0].y);
-                    for (let i = 1; i < pathData.length; i++) {
-                        ctx.lineTo(pathData[i].x, pathData[i].y);
-                    }
-                    ctx.stroke(); 
-                    ctx.setLineDash([]); 
-                }
-
-                mapContainer.appendChild(canvas);
-
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
-                canvas.style.animation = 'none';
-                canvas.style.opacity = '1.0';
+                ctx.beginPath();
+                ctx.setLineDash([20, 20]);
+                ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.moveTo(pathData[0].x, pathData[0].y);
+                for (let i = 1; i < pathData.length; i++) ctx.lineTo(pathData[i].x, pathData[i].y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
             }
 
-            // ★文字は出さずに、プレイヤーが画面を触る（クリックやタップする）までストップして待ちます！
-            await new Promise(resolve => {
-                const onTouch = () => {
-                    mapOverlay.removeEventListener('click', onTouch);
-                    mapOverlay.removeEventListener('touchstart', onTouch);
-                    resolve(); // 触ってくれたらストッパーを解除して先に進みます！
-                };
-                mapOverlay.addEventListener('click', onTouch);
-                mapOverlay.addEventListener('touchstart', onTouch, { passive: true });
+            mapContainer.appendChild(canvas);
+            writeDiag('visual_done');
+            await new Promise(resolve => setTimeout(resolve, 0));
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            canvas.style.animation = 'none';
+            canvas.style.opacity = '1.0';
 
-                if (game && game.isWatchMode) {
-                    setTimeout(onTouch, 1000);
-                }
-            });
-
-            // メッセージを出す前に、まず地図（mapOverlay）を画面から消します
-            releaseTyphoonMapMemory();
-            document.body.removeChild(mapOverlay);
+            writeDiag('wait_input');
+            await fx.waitForDismiss(game, mapOverlay);
+            writeDiag('cleanup');
+            await fx.cleanupOverlay(mapOverlay);
+            writeDiag('cleanup_done');
 
             if (damagedProvinceMap.size > 0) {
-                // ★ここから追加：実際に拠点にダメージが入った「最大の規模（スケール）」を調べます！
                 let maxDamageScale = 0;
                 damagedCastleMap.forEach(scale => {
-                    if (scale > maxDamageScale) {
-                        maxDamageScale = scale;
-                    }
+                    if (scale > maxDamageScale) maxDamageScale = scale;
                 });
 
-                // ★判定を「baseScale（発生時の規模）」から「maxDamageScale（実際の最大被害規模）」に変更します！
                 if (maxDamageScale <= 3) {
                     await game.ui.showDialogAsync("小規模な台風により、各地で軽微な被害が発生しているようです……", false, 0);
                 } else if (maxDamageScale <= 7) {
@@ -542,17 +306,12 @@ window.GameEvents.push({
             } else {
                 await game.ui.showDialogAsync("今回は大きな被害はなかったようです。", false, 0);
             }
-
         } else {
-            // 被害がなかった場合も、ここで忘れずに地図を消します
-            releaseTyphoonMapMemory();
-            document.body.removeChild(mapOverlay);
+            await fx.cleanupOverlay(mapOverlay);
             await game.ui.showDialogAsync("今回は大きな被害はなかったようです。", false, 0);
         }
 
-        // ★マップを閉じた後の硬直時間を3秒（3000）から1秒（1000）に減らしました！
         await new Promise(resolve => setTimeout(resolve, 1000));
-
         for (const data of damagedPlayerCastles) {
             await game.ui.showDialogAsync(` ${data.castle.name} が台風の被害を受けました……`, false, 0);
         }
