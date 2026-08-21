@@ -646,6 +646,34 @@ class UIManager {
         ]).then(([leftImg, rightImg]) => ({ leftImg, rightImg }));
     }
 
+    // ★Round19：イベント会話の継ぎ目で暗幕や会話枠が一瞬消えないよう、
+    // 「次のダイアログが来るかもしれない短い猶予」を管理します。
+    _cancelDialogHandoffClose() {
+        if (this._dialogHandoffTimer) {
+            clearTimeout(this._dialogHandoffTimer);
+            this._dialogHandoffTimer = null;
+        }
+        this._dialogHandoffPending = false;
+    }
+
+    _scheduleDialogHandoffClose(closeFn, graceMs = 180) {
+        this._cancelDialogHandoffClose();
+        const token = (this._dialogHandoffToken || 0) + 1;
+        this._dialogHandoffToken = token;
+        this._dialogHandoffPending = true;
+
+        // 画面は残したまま「現在のダイアログ処理」は完了扱いにします。
+        // この猶予中に showDialog/showDialogAsync が来れば、古い画面を隠さず次へ引き継げます。
+        this.isDialogShowing = false;
+
+        this._dialogHandoffTimer = setTimeout(() => {
+            if (!this._dialogHandoffPending || token !== this._dialogHandoffToken) return;
+            this._dialogHandoffTimer = null;
+            this._dialogHandoffPending = false;
+            closeFn();
+        }, Math.max(0, graceMs));
+    }
+
     showDialogAsync(msg, isConfirm = false, autoCloseTime = 0, customOpts = null) {
         // ★追加：確認ダイアログ（はい/いいえ等）や、複数の選択肢があるかをチェックします
         const hasChoices = isConfirm || (customOpts && customOpts.choices && customOpts.choices.length > 0);
@@ -657,7 +685,8 @@ class UIManager {
         const faceLoadPromise = this._prepareDialogFaces(customOpts);
         return new Promise(resolve => {
             this.dialogQueue.push({ msg, isConfirm, onOk: resolve, onCancel: resolve, autoCloseTime, customOpts, faceLoadPromise });
-            if (!this.isDialogShowing) {
+            if (!this.isDialogShowing || this._dialogHandoffPending) {
+                this._cancelDialogHandoffClose();
                 this.processDialogQueue();
             }
         });
@@ -674,12 +703,15 @@ class UIManager {
         }
         const faceLoadPromise = this._prepareDialogFaces(customOpts);
         this.dialogQueue.push({ msg, isConfirm, onOk, onCancel, autoCloseTime: autoCloseTime, customOpts, faceLoadPromise });
-        if (!this.isDialogShowing) {
+        if (!this.isDialogShowing || this._dialogHandoffPending) {
+            this._cancelDialogHandoffClose();
             this.processDialogQueue();
         }
     }
     
     async processDialogQueue() {
+        // ★Round19：猶予中に次のダイアログが来た場合、旧画面を隠す予定だけ取り消します。
+        if (this._dialogHandoffPending) this._cancelDialogHandoffClose();
         if (this.dialogQueue.length === 0) {
             this.isDialogShowing = false;
             return;
@@ -775,6 +807,7 @@ class UIManager {
                 resetFooter.style.padding = '';
                 resetFooter.style.margin = '';
                 resetFooter.style.justifyContent = '';
+                resetFooter.style.pointerEvents = '';
                 resetFooter.style.order = '';
                 resetFooter.style.removeProperty('margin-top');
                 resetFooter.style.removeProperty('margin-bottom');
@@ -825,10 +858,21 @@ class UIManager {
         const cleanupAndNext = (callback) => {
             if (autoCloseTimer) clearTimeout(autoCloseTimer);
 
-            // 選択肢のない通常会話は、次の会話がすぐキューへ入る可能性があります。
-            // その場合は暗幕・会話枠・現在の顔を維持したまま次へ引き継ぎます。
+            // ★Round19：選択肢の有無に関係なく、次の会話が来る可能性がある間は
+            // 暗幕・会話枠・現在の本文/顔を維持します。
+            // 以前は選択肢だけ即 closeCompletely() していたため、分岐のたびに高確率で1フレーム以上の隙間が発生していました。
             const hasQueuedChoices = dialog.isConfirm || !!(dialog.customOpts && dialog.customOpts.choices && dialog.customOpts.choices.length > 0);
-            let closedEarly = false;
+
+            // 連打防止。見た目の配置は変えず、入力だけ止めます。
+            const currentFooter = modal.querySelector('.modal-footer');
+            if (currentFooter) currentFooter.style.pointerEvents = 'none';
+            modal.removeEventListener('click', this._currentEventClickHandler);
+            modal.style.cursor = '';
+            const currentContent = modal.querySelector('.modal-content');
+            if (currentContent) {
+                currentContent.removeEventListener('click', this._currentEventClickHandler);
+                currentContent.style.cursor = '';
+            }
 
             const closeCompletely = () => {
                 modal.classList.add('hidden');
@@ -842,24 +886,19 @@ class UIManager {
             };
 
             const continueOrClose = () => {
-                if (!hasQueuedChoices && this.dialogQueue.length > 0) {
-                    // ★Round 11：ここでは modal を隠さず、AIGuard も戻しません。
-                    // 次画像の decode 中も今の会話画面を保持し、準備完了時に中身だけ交換します。
+                if (this.dialogQueue.length > 0) {
+                    // 次の画像の decode 中も今の会話画面を保持し、準備完了時に中身だけ交換します。
                     this.isDialogShowing = true;
                     this.processDialogQueue();
-                } else {
-                    if (!closedEarly) closeCompletely();
-                    // 選択肢付きダイアログ等で、コールバック中に次のダイアログが積まれていた場合も処理します。
-                    if (this.dialogQueue.length > 0) this.processDialogQueue();
+                    return;
                 }
-            };
 
-            // 確認・選択肢ダイアログは、選択後に重い処理が続くことがあるため従来どおり即座に閉じます。
-            // シームレス引き継ぎは「次へ進むだけ」の会話ダイアログに限定します。
-            if (hasQueuedChoices) {
-                closeCompletely();
-                closedEarly = true;
-            }
+                // 次の会話がまだ積まれていなくても、分岐処理や setTimeout(0) 等を1つ挟むだけで
+                // すぐ次が来るケースがあります。イベント/会話は少し長め、通常UIは短めに待ちます。
+                const isConversationLike = isBottomMessage || hasQueuedChoices;
+                const graceMs = isConversationLike ? 220 : 80;
+                this._scheduleDialogHandoffClose(closeCompletely, graceMs);
+            };
 
             // ★追加：ダイアログを進めた時に、鳴っているSEを0.1秒でスッと消す魔法です！
             if (window.AudioManager && typeof window.AudioManager.fadeOutSe === 'function') {
@@ -879,9 +918,14 @@ class UIManager {
             try {
                 if (callback) {
                     const result = callback();
-                    if (result instanceof Promise) {
-                        result.catch(e => console.error(e)).finally(scheduleHandoff);
-                        return;
+                    // ★Round17：コールバックが async でも、その Promise の完了を待ってから
+                    // ダイアログを handoff してはいけません。
+                    // コールバック内で showDialogAsync() を await すると、
+                    // 「現在のダイアログは callback 完了待ち / 次のダイアログは現在の終了待ち」
+                    // という相互待ち（デッドロック）になります。
+                    // Promise はエラー監視だけ行い、画面の handoff 自体は即座に予約します。
+                    if (result && typeof result.then === 'function') {
+                        result.catch(e => console.error(e));
                     }
                 }
             } catch (e) {
@@ -1076,7 +1120,7 @@ class UIManager {
                             if (choice.label === "戻る" || choice.label === "いいえ") window.AudioManager.playSE('cancel.ogg');
                             else window.AudioManager.playSE('decision.ogg');
                         }
-                        modal.classList.remove('event-choices-active');
+                        // ★Round19：ここで選択肢用レイアウトを外すと、次の会話まで一瞬配置が跳ねるため維持します。
                         cleanupAndNext(choice.onClick);
                     };
                     footer.appendChild(btn);
