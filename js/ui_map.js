@@ -606,67 +606,125 @@ Object.assign(UIManager.prototype, {
         }
     },
     
-    scrollToActiveCastle(castle = null, immediate = false) {
-        const targetCastle = castle || this.currentCastle || this.game.getCurrentTurnCastle();
+    // ==========================================
+    // ★Round21：イベント・戦争演出で共通利用する「拠点へカメラを寄せる」魔法
+    // castle / castleId / castleId配列のいずれも受け取れます。
+    // ズーム倍率は変えず、現在の倍率のまま対象地点を画面中央へ寄せます。
+    // 古いスマホではsmoothスクロールを避けてrenderer負荷を増やさないよう即時移動します。
+    // ==========================================
+    focusMapOnCastle(castleOrId, options = {}) {
         const sc = document.getElementById('map-scroll-container');
-        if (!sc || !targetCastle) return;
+        if (!sc || !this.mapEl) return Promise.resolve(false);
 
-        // ★ここから追加：移動が始まる前に、透明なバリアを張って操作できなくします
-        sc.style.pointerEvents = 'none';
-        
-        const posX = targetCastle.pixelX !== undefined ? targetCastle.pixelX : 0;
-        const posY = targetCastle.pixelY !== undefined ? targetCastle.pixelY : 0;
-        
-        const currentLeft = parseFloat(this.mapEl.style.left || 0);
-        const currentTop = parseFloat(this.mapEl.style.top || 0);
-        
-        const scaledX = posX * this.mapScale + currentLeft;
-        const scaledY = posY * this.mapScale + currentTop;
-        
-        const targetLeft = scaledX - sc.clientWidth / 2;
-        const targetTop = scaledY - sc.clientHeight / 2;
+        const rawTargets = Array.isArray(castleOrId) ? castleOrId : [castleOrId];
+        const castles = rawTargets.map(target => {
+            if (!target) return null;
+            if (typeof target === 'object' && target.pixelX !== undefined && target.pixelY !== undefined) return target;
+            return this.game && typeof this.game.getCastle === 'function' ? this.game.getCastle(Number(target)) : null;
+        }).filter(c => c && Number.isFinite(Number(c.pixelX)) && Number.isFinite(Number(c.pixelY)));
 
-        sc.scrollTo({
-            left: targetLeft,
-            top: targetTop,
-            behavior: immediate ? 'auto' : 'smooth'
-        });
+        if (castles.length === 0) return Promise.resolve(false);
 
-        // ★ここを書き換え：スクロールが終わったか監視して、終わってから0.2秒待ちます！
-        const finishScroll = () => {
-            setTimeout(() => {
-                sc.style.pointerEvents = '';
-            }, 200); // スクロール完了から0.2秒（200ミリ秒）待ってバリア解除
-        };
+        // Round20のイベント地図表示中など、通常マップ自体が退避中なら無理に動かしません。
+        const scStyle = window.getComputedStyle ? window.getComputedStyle(sc) : null;
+        if (sc.style.display === 'none' || (scStyle && scStyle.display === 'none')) return Promise.resolve(false);
+        if (sc.clientWidth <= 0 || sc.clientHeight <= 0) return Promise.resolve(false);
 
-        if (immediate) {
-            finishScroll(); // 一瞬で移動する時はすぐにタイマーをスタート
-        } else {
-            let scrollTimer;
-            let isScrolling = false;
+        this._stopMapInertia();
 
-            const checkScroll = () => {
-                isScrolling = true;
-                clearTimeout(scrollTimer);
-                // スクロールが100ミリ秒止まったら「完了した」とみなします
-                scrollTimer = setTimeout(() => {
-                    sc.removeEventListener('scroll', checkScroll);
-                    finishScroll();
-                }, 100); 
+        // 複数城なら、その中心地点へ寄せます。独立イベントなどの複数領地点滅にも対応します。
+        const avgX = castles.reduce((sum, c) => sum + Number(c.pixelX), 0) / castles.length;
+        const avgY = castles.reduce((sum, c) => sum + Number(c.pixelY), 0) / castles.length;
+
+        const currentLeft = parseFloat(this.mapEl.style.left || 0) || 0;
+        const currentTop = parseFloat(this.mapEl.style.top || 0) || 0;
+        const scaledX = avgX * this.mapScale + currentLeft;
+        const scaledY = avgY * this.mapScale + currentTop;
+
+        const maxLeft = Math.max(0, sc.scrollWidth - sc.clientWidth);
+        const maxTop = Math.max(0, sc.scrollHeight - sc.clientHeight);
+        const targetLeft = Math.max(0, Math.min(maxLeft, scaledX - sc.clientWidth / 2));
+        const targetTop = Math.max(0, Math.min(maxTop, scaledY - sc.clientHeight / 2));
+
+        // ほぼ目的地なら再スクロールしません。
+        if (Math.abs(sc.scrollLeft - targetLeft) < 1 && Math.abs(sc.scrollTop - targetTop) < 1) {
+            return Promise.resolve(true);
+        }
+
+        const isPC = document.body.classList.contains('is-pc');
+        const immediate = options.immediate === true || (!isPC && options.immediate !== false);
+        const behavior = immediate ? 'auto' : 'smooth';
+        const lockInteraction = options.lockInteraction !== false;
+        if (lockInteraction) {
+            // focusが重なってもpointer-eventsを誤って'none'のまま残さないようスタック管理します。
+            if ((this._mapFocusLockCount || 0) === 0) {
+                this._mapFocusPrevPointerEvents = sc.style.pointerEvents;
+            }
+            this._mapFocusLockCount = (this._mapFocusLockCount || 0) + 1;
+            sc.style.pointerEvents = 'none';
+        }
+
+        if (this.game && typeof this.game.writeSystemDiagnostic === 'function' && options.reason) {
+            this.game.writeSystemDiagnostic(`map_focus:${options.reason}:start`, castles[0]);
+        }
+
+        return new Promise(resolve => {
+            let done = false;
+            let idleTimer = null;
+            let fallbackTimer = null;
+
+            const cleanup = () => {
+                if (done) return;
+                done = true;
+                if (idleTimer) clearTimeout(idleTimer);
+                if (fallbackTimer) clearTimeout(fallbackTimer);
+                sc.removeEventListener('scroll', onScroll);
+                if (lockInteraction) {
+                    this._mapFocusLockCount = Math.max(0, (this._mapFocusLockCount || 1) - 1);
+                    if (this._mapFocusLockCount === 0) {
+                        sc.style.pointerEvents = this._mapFocusPrevPointerEvents || '';
+                        this._mapFocusPrevPointerEvents = '';
+                    }
+                }
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function' && options.reason) {
+                    this.game.writeSystemDiagnostic(`map_focus:${options.reason}:done`, castles[0]);
+                }
+                resolve(true);
             };
 
-            // ブラウザが「スクロールしてるよ！」と教えてくれるたびにチェックします
-            sc.addEventListener('scroll', checkScroll);
+            const onScroll = () => {
+                if (idleTimer) clearTimeout(idleTimer);
+                idleTimer = setTimeout(cleanup, 90);
+            };
 
-            // すでに目的地にいるなど、スクロールが全く起きなかった時のお守り
-            setTimeout(() => {
-                if (!isScrolling) {
-                    sc.removeEventListener('scroll', checkScroll);
-                    clearTimeout(scrollTimer);
-                    finishScroll();
-                }
-            }, 200);
-        }
+            sc.addEventListener('scroll', onScroll, { passive: true });
+            sc.scrollTo({ left: targetLeft, top: targetTop, behavior });
+
+            if (immediate) {
+                // 旧スマホでは1フレームだけ描画機会を与えてから次の演出へ進みます。
+                requestAnimationFrame(() => {
+                    if (Math.abs(sc.scrollLeft - targetLeft) > 0.5) sc.scrollLeft = targetLeft;
+                    if (Math.abs(sc.scrollTop - targetTop) > 0.5) sc.scrollTop = targetTop;
+                    requestAnimationFrame(cleanup);
+                });
+            } else {
+                // scrollend未対応ブラウザ向け。scrollが止まれば90msで完了、最長900msで必ず解放します。
+                fallbackTimer = setTimeout(cleanup, 900);
+                // すでにブラウザ側で位置が変わっていてscrollイベントが来ない場合のお守り。
+                setTimeout(() => {
+                    if (!done && Math.abs(sc.scrollLeft - targetLeft) < 1 && Math.abs(sc.scrollTop - targetTop) < 1) cleanup();
+                }, 120);
+            }
+        });
+    },
+
+    // 既存コードとの互換窓口。今後はfocusMapOnCastleを直接awaitできます。
+    scrollToActiveCastle(castle = null, immediate = false) {
+        const targetCastle = castle || this.currentCastle || this.game.getCurrentTurnCastle();
+        return this.focusMapOnCastle(targetCastle, {
+            immediate: immediate,
+            reason: 'active_castle'
+        });
     },
     
     updateZoomButtons() {
@@ -2181,7 +2239,9 @@ Object.assign(UIManager.prototype, {
         }
     },
 
-    playBattleBlink(castleIdOrIds, colorA, colorB, durationMs) {
+    async playBattleBlink(castleIdOrIds, colorA, colorB, durationMs) {
+        // Round21: 点滅する場所が画面外にならないよう、演出前に必ず対象へ寄せます。
+        await this.focusMapOnCastle(castleIdOrIds, { reason: 'battle_blink' });
         return new Promise(resolve => {
             this.showMapGuard();
 
@@ -2248,7 +2308,9 @@ Object.assign(UIManager.prototype, {
     // ==========================================
     // ★城が落ちた時の、フワッと白く光る魔法！
     // ==========================================
-    playCaptureEffect(castleIdOrIds, onHalfway) {
+    async playCaptureEffect(castleIdOrIds, onHalfway) {
+        // Round21: プレイヤー戦後でも、白い制圧演出が画面外で走らないよう対象へ寄せます。
+        await this.focusMapOnCastle(castleIdOrIds, { reason: 'capture_effect' });
         return new Promise(resolve => {
             this.showMapGuard();
 
