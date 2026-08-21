@@ -736,7 +736,7 @@ Object.assign(UIInfoManager.prototype, {
         let targetCastle = null;
         if (['rumor_target_busho','headhunt_target','view_only'].includes(actionType)) {
              isEnemyTarget = true;
-             targetCastle = castleMap.get(targetId); // ★高速化
+             targetCastle = castleMap.get(targetId);
         }
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
         const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
@@ -758,6 +758,7 @@ Object.assign(UIInfoManager.prototype, {
         let tabsHtml = `
             <div style="display: flex; gap: 5px;">
                 <button class="busho-tab-btn ${this.bushoCurrentTab === 'stats' ? 'active' : ''}" data-tab="stats">${isPc ? '基本' : '基'}</button>
+                <button class="busho-tab-btn ${this.bushoCurrentTab === 'aptitude' ? 'active' : ''}" data-tab="aptitude">${isPc ? '適性' : '適'}</button>
                 <button class="busho-tab-btn ${this.bushoCurrentTab === 'status' ? 'active' : ''}" data-tab="status">${isPc ? '状態' : '状'}</button>
             </div>
             ${scopeHtml}
@@ -779,7 +780,7 @@ Object.assign(UIInfoManager.prototype, {
         }
 
         const getSortRankAll = (b) => {
-            const isGunshi = b.isGunshi || (b.clan > 0 && clanMap.get(b.clan)?.gunshiId === b.id); // ★高速化
+            const isGunshi = b.isGunshi || (b.clan > 0 && clanMap.get(b.clan)?.gunshiId === b.id);
             const isCommander = window.GameApp && window.GameApp.legions && window.GameApp.legions.some(l => l.commanderId === b.id);
             if (b.clan === this.game.playerClanId) return b.isDaimyo ? 10000 : (isCommander ? 9500 : (b.isCastellan ? 9000 : (isGunshi ? 8500 : 8000)));
             if (b.clan > 0) return 5000 - b.clan * 10 + (b.isDaimyo ? 4 : (isCommander ? 3.5 : (b.isCastellan ? 3 : (isGunshi ? 2 : 1))));
@@ -788,7 +789,7 @@ Object.assign(UIInfoManager.prototype, {
             return 0;
         };
         const getSortRankClan = (b) => {
-            const isGunshi = b.isGunshi || (b.clan > 0 && clanMap.get(b.clan)?.gunshiId === b.id); // ★高速化
+            const isGunshi = b.isGunshi || (b.clan > 0 && clanMap.get(b.clan)?.gunshiId === b.id);
             const isCommander = window.GameApp && window.GameApp.legions && window.GameApp.legions.some(l => l.commanderId === b.id);
             if (b.isDaimyo) return 8;
             if (isCommander) return 7;
@@ -841,7 +842,7 @@ Object.assign(UIInfoManager.prototype, {
                                 const kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
                                 return { yomi: kunishu ? (kunishu.yomi || kunishu.name || "") : "んんん", name: kunishu ? (kunishu.name || "") : "んんん" };
                             } else if (busho.clan > 0) {
-                                const clan = clanMap.get(busho.clan); // ★高速化
+                                const clan = clanMap.get(busho.clan);
                                 return { yomi: clan ? (clan.yomi || clan.name || "") : "んんん", name: clan ? (clan.name || "") : "んんん" };
                             }
                             return { yomi: "んんん", name: "んんん" };
@@ -852,7 +853,7 @@ Object.assign(UIInfoManager.prototype, {
                         return cmp;
                     } else if (this.bushoCurrentSortKey === 'castle') {
                         const getCastleInfo = (busho) => {
-                            const castle = castleMap.get(busho.castleId); // ★高速化
+                            const castle = castleMap.get(busho.castleId);
                             return { yomi: castle ? (castle.yomi || castle.name || "") : "んんん", name: castle ? (castle.name || "") : "んんん" };
                         };
                         const infoA = getCastleInfo(a); const infoB = getCastleInfo(b);
@@ -879,8 +880,8 @@ Object.assign(UIInfoManager.prototype, {
                     } else if (this.bushoCurrentSortKey === 'family') {
                         const checkFamily = (busho) => {
                             if (busho.clan > 0) {
-                                const clan = clanMap.get(busho.clan); // ★高速化
-                                const daimyo = clan ? bushoMap.get(clan.leaderId) : null; // ★高速化
+                                const clan = clanMap.get(busho.clan);
+                                const daimyo = clan ? bushoMap.get(clan.leaderId) : null;
                                 if (daimyo && (busho.id === daimyo.id || busho.isDaimyo)) return 1;
                                 if (daimyo) {
                                     const bFam = Array.isArray(busho.familyIds) ? busho.familyIds : [];
@@ -892,13 +893,16 @@ Object.assign(UIInfoManager.prototype, {
                         };
                         valA = checkFamily(a); valB = checkFamily(b);
                     } else if (this.bushoCurrentSortKey === 'salary') {
-                        const daimyoA = a.clan > 0 ? bushoMap.get(clanMap.get(a.clan)?.leaderId) : null; // ★高速化
-                        const daimyoB = b.clan > 0 ? bushoMap.get(clanMap.get(b.clan)?.leaderId) : null; // ★高速化
+                        const daimyoA = a.clan > 0 ? bushoMap.get(clanMap.get(a.clan)?.leaderId) : null;
+                        const daimyoB = b.clan > 0 ? bushoMap.get(clanMap.get(b.clan)?.leaderId) : null;
                         valA = a.clan > 0 && !a.isDaimyo && a.status !== 'ronin' ? a.getSalary(daimyoA) : 0;
                         valB = b.clan > 0 && !b.isDaimyo && b.status !== 'ronin' ? b.getSalary(daimyoB) : 0;
+                    } else if (['aptAshigaru', 'aptKiba', 'aptTeppo', 'aptYumi', 'aptBugei', 'aptNinjutsu', 'aptMaritime'].includes(this.bushoCurrentSortKey)) {
+                        valA = typeof SkillManager !== 'undefined' ? SkillManager.getAptitudeLevel(a[this.bushoCurrentSortKey]) : 0;
+                        valB = typeof SkillManager !== 'undefined' ? SkillManager.getAptitudeLevel(b[this.bushoCurrentSortKey]) : 0;
                     } else {
                         const getAccForSort = (busho) => {
-                            const c = castleMap.get(busho.castleId); // ★高速化
+                            const c = castleMap.get(busho.castleId);
                             if (c && c.investigatedUntil >= this.game.getCurrentTurnId()) return c.investigatedAccuracy;
                             return acc;
                         };
@@ -1014,6 +1018,25 @@ Object.assign(UIInfoManager.prototype, {
                 `<span data-sort="intelligence">智謀${getSortMark('intelligence')}</span>`,
                 `<span data-sort="charm">魅力${getSortMark('charm')}</span>`
             ].filter(Boolean);
+        } else if (this.bushoCurrentTab === 'aptitude') {
+            if (hideActionCol) {
+                gridSpStr = "2.4fr 1.23fr 1.23fr 1.23fr 1.23fr 1.23fr 1.23fr 1.23fr";
+                gridPcStr = "100px 1fr 1fr 1fr 1fr 1fr 1fr 1fr";
+            } else {
+                gridSpStr = "25px 2.4fr 1.23fr 1.23fr 1.23fr 1.23fr 1.23fr 1.23fr 1.23fr";
+                gridPcStr = "35px 100px 1fr 1fr 1fr 1fr 1fr 1fr 1fr";
+            }
+            headers = [
+                !hideActionCol ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
+                `<span data-sort="name">名前${getSortMark('name')}</span>`,
+                `<span data-sort="aptAshigaru">足軽${getSortMark('aptAshigaru')}</span>`,
+                `<span data-sort="aptKiba">馬術${getSortMark('aptKiba')}</span>`,
+                `<span data-sort="aptYumi">弓術${getSortMark('aptYumi')}</span>`,
+                `<span data-sort="aptTeppo">砲術${getSortMark('aptTeppo')}</span>`,
+                `<span data-sort="aptBugei">武芸${getSortMark('aptBugei')}</span>`,
+                `<span data-sort="aptNinjutsu">忍術${getSortMark('aptNinjutsu')}</span>`,
+                `<span data-sort="aptMaritime">操船${getSortMark('aptMaritime')}</span>`
+            ].filter(Boolean);
         } else {
             headerClassStr += " status-mode";
             itemClassStr += " status-mode";
@@ -1055,7 +1078,7 @@ Object.assign(UIInfoManager.prototype, {
                 const isSelected = (this.commonSelectedIds || []).includes(b.id);
                 
                 let currentAcc = null;
-                const bCastle = castleMap.get(b.castleId); // ★高速化
+                const bCastle = castleMap.get(b.castleId);
                 if (bCastle && bCastle.investigatedUntil >= this.game.getCurrentTurnId()) {
                     currentAcc = bCastle.investigatedAccuracy;
                 } else if (isEnemyTarget && targetCastle) {
@@ -1113,16 +1136,32 @@ Object.assign(UIInfoManager.prototype, {
                         `<span class="col-stat">${getStat('intelligence')}</span>`,
                         `<span class="col-stat">${getStat('charm')}</span>`
                     ].filter(Boolean);
+                } else if (this.bushoCurrentTab === 'aptitude') {
+                    const getAptGradeHtml = (val) => {
+                        const lowVal = val ? val.toLowerCase() : 'e';
+                        return `<div class="grade-container rank-${lowVal}"><span class="grade-main">${val}</span></div>`;
+                    };
+                    cells = [
+                        !hideActionCol ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
+                        `<span class="col-name">${hideActionCol && !isViewMode ? inputHtml : ''}${compressedNameHtml}</span>`,
+                        `<span class="col-stat">${getAptGradeHtml(b.aptAshigaru)}</span>`,
+                        `<span class="col-stat">${getAptGradeHtml(b.aptKiba)}</span>`,
+                        `<span class="col-stat">${getAptGradeHtml(b.aptYumi)}</span>`,
+                        `<span class="col-stat">${getAptGradeHtml(b.aptTeppo)}</span>`,
+                        `<span class="col-stat">${getAptGradeHtml(b.aptBugei)}</span>`,
+                        `<span class="col-stat">${getAptGradeHtml(b.aptNinjutsu)}</span>`,
+                        `<span class="col-stat">${getAptGradeHtml(b.aptMaritime)}</span>`
+                    ].filter(Boolean);
                 } else {
-                    let forceName = ""; 
+                    let forceName = "";
                     let familyMark = "";
                     if (b.belongKunishuId > 0) {
                         const kunishu = this.game.kunishuSystem.getKunishu(b.belongKunishuId);
                         forceName = kunishu ? kunishu.getName(this.game) : "諸勢力";
                     } else if (b.clan > 0) {
-                        const clan = clanMap.get(b.clan); // ★高速化
+                        const clan = clanMap.get(b.clan);
                         forceName = clan ? clan.name : "大名家";
-                        const daimyo = clan ? bushoMap.get(clan.leaderId) : null; // ★高速化
+                        const daimyo = clan ? bushoMap.get(clan.leaderId) : null;
                         if (daimyo && (b.id === daimyo.id || b.isDaimyo)) { familyMark = "◯"; }
                         else if (daimyo) {
                             const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
@@ -1134,8 +1173,8 @@ Object.assign(UIInfoManager.prototype, {
                     const age = b.isAutoLeader ? "" : (this.game.year - b.birthYear + 1);
                     let salary = "";
                     if (b.clan > 0 && !b.isDaimyo && b.status !== 'ronin') {
-                        const clan = clanMap.get(b.clan); // ★高速化
-                        const daimyo = clan ? bushoMap.get(clan.leaderId) : null; // ★高速化
+                        const clan = clanMap.get(b.clan);
+                        const daimyo = clan ? bushoMap.get(clan.leaderId) : null;
                         salary = b.getSalary(daimyo);
                         if (salary === 0) salary = "";
                     }
@@ -1198,11 +1237,11 @@ Object.assign(UIInfoManager.prototype, {
         
         // 基本タブ・状態タブの時は横幅の制限を外して画面内に収めます
         // （将来「状態タブ」だけ横スクロールに戻す場合は、ここから `|| this.bushoCurrentTab === 'status'` を消すだけでOK）
-        let isFitMode = this.bushoCurrentTab === 'stats' || this.bushoCurrentTab === 'status';
+        let isFitMode = this.bushoCurrentTab === 'stats' || this.bushoCurrentTab === 'status' || this.bushoCurrentTab === 'aptitude';
         let minW = isFitMode ? "100%" : (isViewMode ? "700px" : "750px");
 
         // CSSで見た目を微調整するための目印を追加します
-        if (this.bushoCurrentTab === 'stats') {
+        if (this.bushoCurrentTab === 'stats' || this.bushoCurrentTab === 'aptitude') {
             headerClassStr += " stats-mode";
             itemClassStr += " stats-mode";
         }

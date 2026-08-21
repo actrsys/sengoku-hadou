@@ -3058,7 +3058,7 @@ window.GameEvents.push({
         if (!yoshitsugu) return false;
 
         // 3. 松永長頼（ID: 1202004）が死亡しているか確認します
-        if (!window.EventCheck.isDead(game, 1202004)) return false;
+        // if (!window.EventCheck.isDead(game, 1202004)) return false;
 
         // 4. 松永久秀（ID: 1202002）が存在し、大名ではないことを確認します
         const hisahide = game.getBusho(1202002);

@@ -125,6 +125,9 @@ class HexMapGenerator {
         // 森は今まで通りで大丈夫です（端には平地がないので、自動的に森もできません）
         this._generateClustersOn(map, cols, rows, 'forest', forestTargetCount, 1, 3, 'plain', 0);
 
+        // ★追加：最後に、陸地に完全に囲まれた海（湖）を探して、川に変える魔法を使います！
+        this._fillEnclosedSea(map, cols, rows);
+
         return {
             cols: cols,
             rows: rows,
@@ -141,24 +144,21 @@ class HexMapGenerator {
         while (currentCount < targetCount && attempts < 1000) {
             attempts++;
             
-            // ★修正: バリア（padding）の内側からスタート地点をランダムに選びます
             let startX = this.rand(padding, cols - 1 - padding);
             let startY = this.rand(padding, rows - 1 - padding);
 
-            // 万が一計算がズレた時の安全装置です
             if (startX < 0 || startX >= cols || startY < 0 || startY >= rows) continue;
-
             if (map[startY][startX].terrain !== baseTerrain) continue;
 
             let clusterSize = this.rand(minSize, maxSize);
-            let queue = [{ x: startX, y: startY }];
+            // ★変更：「今どっちから来たか（prevDir）」と「何マスまっすぐ進んだか（straightCount）」のメモを持たせます！
+            let queue = [{ x: startX, y: startY, prevDir: null, straightCount: 1 }];
             let clustered = 0;
 
             while (queue.length > 0 && clustered < clusterSize && currentCount < targetCount) {
                 let idx = this.rand(0, queue.length - 1);
                 let pos = queue.splice(idx, 1)[0];
 
-                // ★追加: 広がっていく時も、バリア（padding）の外には絶対に出ないようにブロックします！
                 if (pos.x < padding || pos.x >= cols - padding || pos.y < padding || pos.y >= rows - padding) {
                     continue;
                 }
@@ -168,12 +168,32 @@ class HexMapGenerator {
                     currentCount++;
                     clustered++;
 
-                    let neighbors = this._getNeighbors(pos.x, pos.y, cols, rows);
-                    for (let n of neighbors) {
-                        // ★追加: 次の候補を探す時も、バリアの中だけを探します
-                        if (n.x >= padding && n.x < cols - padding && n.y >= padding && n.y < rows - padding) {
-                            if (map[n.y][n.x].terrain === baseTerrain) {
-                                queue.push(n);
+                    // ★変更：方向（0〜5）付きで隣のマスを取得して、まっすぐ進みすぎていないかチェックします
+                    const isEven = (pos.x % 2 === 0);
+                    let dirs = isEven 
+                        ? [[0, -1], [1, -1], [1, 0], [0, 1], [-1, 0], [-1, -1]]
+                        : [[0, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0]];
+                    
+                    for (let d = 0; d < dirs.length; d++) {
+                        let nx = pos.x + dirs[d][0];
+                        let ny = pos.y + dirs[d][1];
+                        
+                        if (nx >= padding && nx < cols - padding && ny >= padding && ny < rows - padding) {
+                            if (map[ny][nx].terrain === baseTerrain) {
+                                
+                                // まっすぐ進んでいるかどうかのチェック
+                                let nextStraightCount = 1;
+                                if (pos.prevDir === d) {
+                                    // 前回と同じ方向なら、まっすぐ進んだ数を増やします
+                                    nextStraightCount = pos.straightCount + 1;
+                                }
+                                
+                                // ★まっすぐ3マス目に行こうとしたら、そこには進まないようにストップをかけます！
+                                if (nextStraightCount >= 3) {
+                                    continue; // この方向はスキップして別の方向を探します
+                                }
+                                
+                                queue.push({ x: nx, y: ny, prevDir: d, straightCount: nextStraightCount });
                             }
                         }
                     }
@@ -319,6 +339,48 @@ class HexMapGenerator {
             for (let x = 0; x < cols; x++) {
                 if (map[tunnelY][x].terrain === 'mountain') {
                     map[tunnelY][x].terrain = 'plain';
+                }
+            }
+        }
+    }
+    
+    // ★追加：陸地に完全に囲まれてしまった海（湖）を探し出して、川に変える魔法です
+    _fillEnclosedSea(map, cols, rows) {
+        // パトロール済みのマスをメモする地図を作ります
+        let visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+        let queue = [];
+
+        // 1. まず、マップの「一番端っこ」にある海をすべて探して、調査リストに入れます
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                // 端っこのマスかどうかをチェック
+                if (x === 0 || x === cols - 1 || y === 0 || y === rows - 1) {
+                    if (map[y][x].terrain === 'sea') {
+                        queue.push({ x: x, y: y });
+                        visited[y][x] = true; // 外海としてパトロール済みにします
+                    }
+                }
+            }
+        }
+
+        // 2. 端っこの海から繋がっている海を、どんどん「外海」としてマーキングしていきます
+        while (queue.length > 0) {
+            let curr = queue.shift();
+            let neighbors = this._getNeighbors(curr.x, curr.y, cols, rows);
+            for (let n of neighbors) {
+                // まだパトロールしていない海があれば、リストに追加します
+                if (!visited[n.y][n.x] && map[n.y][n.x].terrain === 'sea') {
+                    visited[n.y][n.x] = true;
+                    queue.push(n);
+                }
+            }
+        }
+
+        // 3. 最後にマップ全体を見渡します。海なのに「外海マーキング」がされていないマスは「川」に変えます
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                if (map[y][x].terrain === 'sea' && !visited[y][x]) {
+                    map[y][x].terrain = 'river';
                 }
             }
         }

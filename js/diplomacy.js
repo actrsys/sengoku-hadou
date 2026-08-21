@@ -795,7 +795,7 @@ class DiplomacyManager {
         }
         if (!nameToCall) {
             nameToCall = busho.givenName || busho.name.replace(/^[^|]*\|?/, ''); 
-            if (!nameToCall) nameToCall = busho.name.replace(/\|/g, '');
+            if (!nameToCall) nameToCall = busho.fullName;
         }
         return nameToCall + "殿";
     }
@@ -880,8 +880,8 @@ class DiplomacyManager {
         const senderCallName = this.getCallName(senderBusho);
         const receiverCallName = this.getCallName(receiverDaimyo);
 
-        const senderNameStr = senderBusho.name.replace(/\|/g, '');
-        const receiverNameStr = receiverDaimyo.name.replace(/\|/g, '');
+        const senderNameStr = senderBusho.fullName;
+        const receiverNameStr = receiverDaimyo.fullName;
 
         let princessName = "姫";
         if (princess) princessName = princess.name;
@@ -894,10 +894,10 @@ class DiplomacyManager {
                 if (rName !== "なし") rankName = rName;
             }
             if (rankName) {
-                const familyName = targetBusho.familyName || targetBusho.name.split('|')[0] || "";
+                const familyName = targetBusho.familyNameStr || "";
                 targetBushoName = `${familyName}${rankName}`;
             } else {
-                targetBushoName = targetBusho.name.replace(/\|/g, '');
+                targetBushoName = targetBusho.fullName;
             }
         }
 
@@ -923,10 +923,10 @@ class DiplomacyManager {
                         if (rName !== "なし") rankName = rName;
                     }
                     if (rankName) {
-                        const familyName = senderDaimyo.familyName || senderDaimyo.name.split('|')[0] || "";
+                        const familyName = senderDaimyo.familyNameStr || "";
                         daimyoRef = `${familyName}${rankName}`;
                     } else {
-                        daimyoRef = `${senderClanName}当主・${senderDaimyo.name.replace(/\|/g, '')}`;
+                        daimyoRef = `${senderClanName}当主・${senderDaimyo.fullName}`;
                     }
                 }
             } else {
@@ -2063,7 +2063,7 @@ class DiplomacyManager {
 
         const isEnemy = this.game.getRelation(targetClanId, doer.clan)?.status === '敵対';
         const isDaimyoSelf = (doer.isDaimyo);
-        const enemyDaimyoName = enemyDaimyo ? enemyDaimyo.name.replace(/\|/g, '') : "当主";
+        const enemyDaimyoName = enemyDaimyo ? enemyDaimyo.fullName : "当主";
 
         let introMsg = "";
         if (isDaimyoSelf) {
@@ -2080,8 +2080,8 @@ class DiplomacyManager {
         const enemyCallName = this.getCallName(doer);
 
         const myDaimyoFace = myDaimyo ? myDaimyo.faceIcon : 'unknown_face.webp';
-        const myDaimyoNameStr = myDaimyo ? myDaimyo.name.replace(/\|/g, '') : '当主';
-        const doerNameStr = doer.name.replace(/\|/g, '');
+        const myDaimyoNameStr = myDaimyo ? myDaimyo.fullName : '当主';
+        const doerNameStr = doer.fullName;
 
         const msgs = this.getDiplomacyMessages(type, isDaimyoSelf, doerClan.name, targetClan.name, enemyCallName, myCallName);
 
@@ -2356,7 +2356,7 @@ class DiplomacyManager {
                                 if (rName !== "なし") rankName = rName;
                             }
                             if (rankName) {
-                                const familyName = enemyDaimyo.familyName || enemyDaimyo.name.split('|')[0] || "";
+                                const familyName = enemyDaimyo.familyNameStr || "";
                                 daimyoRef = `${familyName}${rankName}`;
                             } else {
                                 daimyoRef = `${doerClan.name}当主・${enemyDaimyoName}`;
