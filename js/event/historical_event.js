@@ -911,10 +911,10 @@ window.GameEvents.push({
 
         if (!castle) return;
 
-        // ★独立させる直前に、松平系（ID: 1301000～1301999）の武将の忠誠度を10下げます
+        // ★独立させる直前に、松平系（ID: 1301000～1301999）の武将の忠誠度を20下げます
         const matsudairaBushosBefore = game.bushos.filter(b => b.clan === ujizane.clan && b.status === 'active' && b.id >= 1301000 && b.id <= 1301999);
         matsudairaBushosBefore.forEach(b => {
-            b.loyalty = Math.max(0, (b.loyalty || 0) - 10);
+            b.loyalty = Math.max(0, (b.loyalty || 0) - 20);
         });
 
         // 独立システムを呼び出して、強制的に独立を実行します
