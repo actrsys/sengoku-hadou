@@ -1253,11 +1253,69 @@ class UIManager {
         return `<div class="status-bar-container ${emptyBgClass}"><div class="status-bar-fill ${fillClass}" style="width: ${percent}%;"></div><div class="status-bar-text">${displayText}</div></div>`;
     }
 
+    // ==========================================
+    // Round26：観戦終了予約はイベントへ割り込むダイアログではなく、
+    // 操作不能の小さな案内だけを出します。ゲーム状態には触れません。
+    // ==========================================
+    showWatchReturnReserved(message = '観戦終了を予約しました') {
+        let notice = document.getElementById('watch-return-reserved-notice');
+        if (!notice) {
+            notice = document.createElement('div');
+            notice.id = 'watch-return-reserved-notice';
+            notice.style.position = 'fixed';
+            notice.style.left = '50%';
+            notice.style.bottom = 'max(18px, env(safe-area-inset-bottom))';
+            notice.style.transform = 'translateX(-50%)';
+            notice.style.zIndex = '12000';
+            notice.style.pointerEvents = 'none';
+            notice.style.padding = '8px 14px';
+            notice.style.borderRadius = '8px';
+            notice.style.border = '1px solid rgba(255,255,255,0.65)';
+            notice.style.background = 'rgba(0,0,0,0.78)';
+            notice.style.color = '#fff';
+            notice.style.fontSize = document.body.classList.contains('is-pc') ? '0.9rem' : '0.8rem';
+            notice.style.fontWeight = 'bold';
+            notice.style.textAlign = 'center';
+            notice.style.whiteSpace = 'pre-line';
+            notice.style.textShadow = '1px 1px 2px #000';
+            document.body.appendChild(notice);
+        }
+        notice.textContent = message;
+        notice.style.display = 'block';
+    }
+
+    hideWatchReturnReserved() {
+        const notice = document.getElementById('watch-return-reserved-notice');
+        if (notice && notice.parentNode) notice.parentNode.removeChild(notice);
+    }
+
     initContextMenu() {
         this.contextMenu = document.getElementById('custom-context-menu');
 
         // ★右クリックやスマホの長押しで実行する中身をひとまとめにします
         const executeContextMenuAction = (e) => {
+            // Round26：観戦中の右クリック／長押しは、どんなイベント画面の最中でも
+            // 「閉じる」等を押さず、まず観戦終了の予約だけを行います。
+            // 2回目以降はGameManager側の予約フラグで無視されます。
+            if (this.game && this.game.isWatchMode) {
+                if (e && e.preventDefault) e.preventDefault();
+                if (typeof this.game.requestWatchReturn === 'function') {
+                    const accepted = this.game.requestWatchReturn();
+                    // 災害イベント地図などが「確認タップ待ち」まで進んでいる場合は、
+                    // 帰還予約をした操作を「地図を見終えた」入力としても扱います。
+                    // イベント本体や被害計算は飛ばさず、この待ちだけを解除します。
+                    if (accepted) {
+                        const passiveEventMap = document.querySelector('.event-map-overlay');
+                        if (passiveEventMap && typeof passiveEventMap.click === 'function') {
+                            setTimeout(() => {
+                                if (passiveEventMap.isConnected) passiveEventMap.click();
+                            }, 0);
+                        }
+                    }
+                }
+                return;
+            }
+
             // ==========================================
             // ★PC版のみ「閉じる」「戻る」「いいえ」を右クリックで押せる魔法！
             // ==========================================
@@ -1298,15 +1356,6 @@ class UIManager {
             if (openModal) {
                 if (e && e.preventDefault) e.preventDefault(); // ブラウザ本来のメニューも出さないようにします
                 return; // ここで処理を終わらせて、ボタンを押すのをやめます
-            }
-
-            // ★追加：観戦モード中の場合は、観戦終了の確認ダイアログを出します！
-            if (this.game && this.game.isWatchMode) {
-                if (e && e.preventDefault) e.preventDefault();
-                this.showDialog("観戦をやめますか？", true, () => {
-                    this.game.stopWatchMode();
-                }, null, { okText: '観戦をやめる', okClass: 'btn-primary', cancelText: '観戦を続ける' });
-                return;
             }
 
             // 画面の中に「命令終了」のボタンがあるか”すべて”探して集めます

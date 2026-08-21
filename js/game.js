@@ -1443,6 +1443,11 @@ class GameManager {
         this.isProcessingAI = false; 
         this.lastMenuState = null;
         this.aiTimer = null;
+
+        // Round26：観戦終了はその場で割り込まず、安全な処理区切りまで予約して待ちます。
+        this._watchReturnRequested = false;
+        this._watchReturnInProgress = false;
+        this._watchReturnSafePoint = null;
         
         this.kunishuSystem = new KunishuSystem(this);
         this.commandSystem = new CommandSystem(this);
@@ -2674,6 +2679,11 @@ class GameManager {
 
         this.currentIndex = 0; 
         this.writeSystemDiagnostic('month_start:before_turn_queue');
+
+        // Round26：月末～月初の一連処理中に観戦終了が予約されていた場合は、
+        // ここを「月処理が完全に一段落した安全地点」として帰還確認へ移ります。
+        if (await this.tryProcessQueuedWatchReturn('month_start_complete')) return;
+
         this.processTurn();
     }
 
@@ -2899,6 +2909,11 @@ class GameManager {
         }
 
         this.currentIndex++; 
+
+        // Round26：戦争・外交・turn_endイベントまで含めて「今の拠点1件」が完全終了した地点です。
+        // 観戦終了予約があれば次の拠点へ進まず、ここで初めて帰還確認を開きます。
+        if (await this.tryProcessQueuedWatchReturn('turn_complete')) return;
+
         // ★追加：ターンが終わって次に行く時も、スマホがパンクしないように一瞬「息継ぎ」をさせます！
         setTimeout(() => {
             this.processTurn(); 
@@ -3563,11 +3578,106 @@ class GameManager {
         this.originalPlayerClanId = this.playerClanId;
         this.playerClanId = -100;
         this.isWatchMode = true;
+        this._watchReturnRequested = false;
+        this._watchReturnInProgress = false;
+        this._watchReturnSafePoint = null;
+        if (this.ui && typeof this.ui.hideWatchReturnReserved === 'function') {
+            this.ui.hideWatchReturnReserved();
+        }
         
         if (this.ui && typeof this.ui.clearCommandMenu === 'function') {
             this.ui.clearCommandMenu();
         }
         this.processTurn();
+    }
+
+    // Round26：右クリック／長押しでは、その場で選択画面を出さず「帰還予約」だけを立てます。
+    // 予約後の同じ操作は無視され、現在の戦争・イベント・月処理を途中で切断しません。
+    requestWatchReturn() {
+        if (!this.isWatchMode) return false;
+        if (this._watchReturnRequested || this._watchReturnInProgress) return false;
+
+        this._watchReturnRequested = true;
+        this._watchReturnSafePoint = null;
+        if (typeof this.writeSystemDiagnostic === 'function') {
+            this.writeSystemDiagnostic('watch_return:requested');
+        }
+        if (this.ui && typeof this.ui.showWatchReturnReserved === 'function') {
+            this.ui.showWatchReturnReserved('観戦終了を予約しました\n現在の処理が終わるまで待機します');
+        }
+        return true;
+    }
+
+    // Round26：呼び出すのは「拠点1件の完了後」または「月初処理の全完了後」だけです。
+    // 念のため戦闘・選択・残存ダイアログも確認してから帰還確認へ進みます。
+    async tryProcessQueuedWatchReturn(reason = 'safe_point') {
+        if (!this.isWatchMode || !this._watchReturnRequested || this._watchReturnInProgress) return false;
+        if (this.warManager && this.warManager.state && this.warManager.state.active) return false;
+        if (this.fieldWarManager && this.fieldWarManager.active) return false;
+        if (this.selectionMode != null) return false;
+
+        if (this.ui && typeof this.ui.waitForDialogs === 'function') {
+            await this.ui.waitForDialogs();
+        }
+
+        // wait中に状態が変わった場合は、もう一度条件を確認します。
+        if (!this.isWatchMode || !this._watchReturnRequested || this._watchReturnInProgress) return false;
+        if (this.warManager && this.warManager.state && this.warManager.state.active) return false;
+        if (this.fieldWarManager && this.fieldWarManager.active) return false;
+        if (this.selectionMode != null) return false;
+
+        // 災害イベント地図・占領点滅などが万一残っている時は、その場では割り込みません。
+        const eventOverlay = typeof document !== 'undefined' ? document.querySelector('.event-map-overlay') : null;
+        const battleGuard = typeof document !== 'undefined' ? document.getElementById('battle-blink-guard') : null;
+        if (eventOverlay || (battleGuard && battleGuard.style.display !== 'none')) return false;
+
+        this._watchReturnInProgress = true;
+        this._watchReturnSafePoint = reason;
+        if (this.aiTimer) {
+            clearTimeout(this.aiTimer);
+            this.aiTimer = null;
+        }
+        if (this.ui && typeof this.ui.hideWatchReturnReserved === 'function') {
+            this.ui.hideWatchReturnReserved();
+        }
+        if (typeof this.writeSystemDiagnostic === 'function') {
+            this.writeSystemDiagnostic(`watch_return:safe:${reason}`);
+        }
+
+        // 以前と同じ確認自体は残しますが、「安全地点」に到着してから初めて表示します。
+        this.ui.showDialog('観戦をやめますか？', true, () => {
+            this.stopWatchMode();
+        }, () => {
+            this.cancelQueuedWatchReturn();
+        }, { okText: '観戦をやめる', okClass: 'btn-primary', cancelText: '観戦を続ける' });
+        return true;
+    }
+
+    _resetWatchReturnState() {
+        this._watchReturnRequested = false;
+        this._watchReturnInProgress = false;
+        this._watchReturnSafePoint = null;
+        if (this.ui && typeof this.ui.hideWatchReturnReserved === 'function') {
+            this.ui.hideWatchReturnReserved();
+        }
+    }
+
+    // 帰還確認・勢力選択をキャンセルした時は、止めていた安全地点から観戦を再開します。
+    cancelQueuedWatchReturn() {
+        const shouldResume = this.isWatchMode;
+        this._resetWatchReturnState();
+        if (!shouldResume) return;
+
+        this.isProcessingAI = true;
+        if (this.ui && this.ui.aiGuard) {
+            this.ui.aiGuard.classList.remove('hidden');
+            if (typeof this.ui.restoreAIGuardText === 'function') this.ui.restoreAIGuardText(true);
+            if (this.turnQueue && this.turnQueue.length > 0 && typeof this.ui.updateAIProgress === 'function') {
+                const displayIndex = Math.min(this.currentIndex + 1, this.turnQueue.length);
+                this.ui.updateAIProgress(displayIndex, this.turnQueue.length);
+            }
+        }
+        setTimeout(() => this.processTurn(), 0);
     }
 
     stopWatchMode() {
@@ -3576,21 +3686,39 @@ class GameManager {
             return;
         }
 
+        // この画面を開いている間はAI進行を完全に止めたままにします。
+        if (this.aiTimer) {
+            clearTimeout(this.aiTimer);
+            this.aiTimer = null;
+        }
+
         this.ui.info.showDaimyoSelector((selectedClanId) => {
             const selectedClan = this.clans.find(c => c.id === selectedClanId);
+            if (!selectedClan) {
+                this.cancelQueuedWatchReturn();
+                return;
+            }
             this.ui.showDialog(`${selectedClan.name}でゲームを再開しますか？`, true, () => {
                 this.isWatchMode = false;
                 this.playerClanId = selectedClan.id;
+                this._resetWatchReturnState();
                 
                 if (this.ui.clearCommandMenu) {
                     this.ui.clearCommandMenu();
                 }
+                if (this.ui.aiGuard) this.ui.aiGuard.classList.add('hidden');
                 this.ui.renderMap();
+
+                // Round26：安全地点でAI進行を止めているため、担当勢力決定後に明示的に再開します。
+                setTimeout(() => this.processTurn(), 0);
             }, () => {
+                this.cancelQueuedWatchReturn();
             }, { okText: '再開する', okClass: 'btn-primary', cancelText: '観戦を続ける' });
         }, () => {
+            this.cancelQueuedWatchReturn();
         });
     }
+
 }
 
 window.addEventListener('DOMContentLoaded', () => {

@@ -451,6 +451,10 @@ window.EventMapEffects = window.EventMapEffects || (() => {
     };
 
     const waitForDismiss = async (game, mapOverlay) => {
+        // Round26：観戦終了予約が、災害地図の点滅中（入力待ち開始前）に入っていた場合、
+        // 後からここで永久にタップ待ちにならないよう「見終えた」扱いで先へ進めます。
+        if (game && game.isWatchMode && game._watchReturnRequested) return;
+
         await new Promise(resolve => {
             let finished = false;
             const onTouch = () => {
