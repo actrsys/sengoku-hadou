@@ -691,7 +691,8 @@ class UIManager {
             return;
         }
 
-        msgEl.innerHTML = dialog.msg.replace(/\n/g, '<br>');
+        // ★Round 11：次の顔画像のデコードが終わるまでは、現在表示中のメッセージと顔をそのまま維持します。
+        // 先に文章だけ切り替えると「次の台詞＋前の顔」が一瞬見えるため、文章も顔と同じタイミングで更新します。
 
         // スマホ版の場合は強制的に左側に寄せて、右側を空にする処理
         let leftFace = dialog.customOpts?.leftFace;
@@ -728,15 +729,16 @@ class UIManager {
         const setFaceAndName = (faceEl, nameEl, faceIcon, nameText, preparedImg) => {
             let hasContent = false;
             if (faceEl) {
-                // 前の画像を確実にDOMから外してから、新しい画像を入れます。
-                faceEl.replaceChildren();
                 if (faceIcon && preparedImg) {
                     const wrapper = document.createElement('div');
                     wrapper.className = 'sp-face-wrapper dialog-face-wrapper';
                     preparedImg.className = 'dialog-face-img';
                     wrapper.appendChild(preparedImg);
-                    faceEl.appendChild(wrapper);
+                    // ★Round 11：空にしてから append する2段階更新をやめ、1回のDOM更新で旧顔→新顔へ交換します。
+                    faceEl.replaceChildren(wrapper);
                     hasContent = true;
+                } else {
+                    faceEl.replaceChildren();
                 }
             }
             if (nameEl) {
@@ -755,6 +757,9 @@ class UIManager {
             }
         };
 
+        // ★Round 11：次の画像が準備できた同じ処理単位の中で、文章と顔をまとめて更新します。
+        // これにより「次の台詞＋前の顔」や、顔だけ空になるフレームを作りません。
+        msgEl.innerHTML = dialog.msg.replace(/\n/g, '<br>');
         setFaceAndName(leftFaceEl, leftNameEl, leftFace, leftName, preparedFaces.leftImg);
         setFaceAndName(rightFaceEl, rightNameEl, rightFace, rightName, preparedFaces.rightImg);
         
@@ -762,28 +767,52 @@ class UIManager {
 
         const cleanupAndNext = (callback) => {
             if (autoCloseTimer) clearTimeout(autoCloseTimer);
-            modal.classList.add('hidden');
-            // ★Round 9：前の顔画像を非表示状態で即座に破棄し、旧画像レイヤーを次の会話へ持ち越しません。
-            if (leftFaceEl) leftFaceEl.replaceChildren();
-            if (rightFaceEl) rightFaceEl.replaceChildren();
-            
-            this.restoreAIGuard();
 
-            // ★追加：ダイアログを閉じた時に、鳴っているSEを0.1秒でスッと消す魔法です！
+            // 選択肢のない通常会話は、次の会話がすぐキューへ入る可能性があります。
+            // その場合は暗幕・会話枠・現在の顔を維持したまま次へ引き継ぎます。
+            const hasQueuedChoices = dialog.isConfirm || !!(dialog.customOpts && dialog.customOpts.choices && dialog.customOpts.choices.length > 0);
+            let closedEarly = false;
+
+            const closeCompletely = () => {
+                modal.classList.add('hidden');
+                if (leftFaceEl) leftFaceEl.replaceChildren();
+                if (rightFaceEl) rightFaceEl.replaceChildren();
+                this.restoreAIGuard();
+                this.isDialogShowing = false;
+            };
+
+            const continueOrClose = () => {
+                if (!hasQueuedChoices && this.dialogQueue.length > 0) {
+                    // ★Round 11：ここでは modal を隠さず、AIGuard も戻しません。
+                    // 次画像の decode 中も今の会話画面を保持し、準備完了時に中身だけ交換します。
+                    this.isDialogShowing = true;
+                    this.processDialogQueue();
+                } else {
+                    if (!closedEarly) closeCompletely();
+                    // 選択肢付きダイアログ等で、コールバック中に次のダイアログが積まれていた場合も処理します。
+                    if (this.dialogQueue.length > 0) this.processDialogQueue();
+                }
+            };
+
+            // 確認・選択肢ダイアログは、選択後に重い処理が続くことがあるため従来どおり即座に閉じます。
+            // シームレス引き継ぎは「次へ進むだけ」の会話ダイアログに限定します。
+            if (hasQueuedChoices) {
+                closeCompletely();
+                closedEarly = true;
+            }
+
+            // ★追加：ダイアログを進めた時に、鳴っているSEを0.1秒でスッと消す魔法です！
             if (window.AudioManager && typeof window.AudioManager.fadeOutSe === 'function') {
                 window.AudioManager.fadeOutSe(0.1);
             }
 
-            // 今のダイアログが閉じたので「表示中」の合図を消します！
-            this.isDialogShowing = false;
-
-            const executeNext = () => {
-                const runNext = () => this.processDialogQueue();
-                // 1フレーム空けて、古い画像レイヤーの破棄をブラウザへ確定させてから次の顔を表示します。
-                if (typeof requestAnimationFrame === 'function') {
-                    requestAnimationFrame(() => setTimeout(runNext, 0));
+            const scheduleHandoff = () => {
+                // showDialogAsync の resolve() で再開する async/await の継続処理を先に走らせ、
+                // 次の会話がキューへ積まれた後で「維持して続行／完全に閉じる」を判定します。
+                if (typeof queueMicrotask === 'function') {
+                    queueMicrotask(continueOrClose);
                 } else {
-                    setTimeout(runNext, 16);
+                    Promise.resolve().then(continueOrClose);
                 }
             };
 
@@ -791,15 +820,15 @@ class UIManager {
                 if (callback) {
                     const result = callback();
                     if (result instanceof Promise) {
-                        result.catch(e => console.error(e)).finally(executeNext);
-                        return; 
+                        result.catch(e => console.error(e)).finally(scheduleHandoff);
+                        return;
                     }
                 }
             } catch (e) {
                 console.error("ダイアログの処理中にエラー:", e);
             }
-            
-            executeNext();
+
+            scheduleHandoff();
         };
         
         // ★修正：okBtnが見つからなくても、安全にフッター（ボタンの置き場）を見つける魔法です！
