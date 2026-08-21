@@ -361,6 +361,11 @@ window.GameEvents.push({
                             legion.status = 'wait';
                             legion.targetId = 0;
                             legion.route = [];
+
+                            // ★Round6：軍団だけ解散してAI作戦が翌月まで残らないよう、その場で計画も片付けます
+                            if (game.aiOperationManager && typeof game.aiOperationManager.clearLegionPlanning === 'function') {
+                                game.aiOperationManager.clearLegionPlanning(motoyasu.clan, oldLegionId);
+                            }
                         }
                     }
                 }
@@ -3644,11 +3649,17 @@ window.GameEvents.push({
         if (targetLord.isCommander) {
             targetLord.isCommander = false;
             if (legionToDismiss) {
+                const dismissedLegionNo = Number(legionToDismiss.legionNo || 0);
                 legionToDismiss.commanderId = 0;
                 legionToDismiss.objective = null;
                 legionToDismiss.status = 'wait';
                 legionToDismiss.targetId = 0;
                 legionToDismiss.route = [];
+
+                // ★Round6：イベントによる軍団解散と同時に、その軍団専用のAI計画も削除します
+                if (game.aiOperationManager && typeof game.aiOperationManager.clearLegionPlanning === 'function') {
+                    game.aiOperationManager.clearLegionPlanning(miyoshiClanId, dismissedLegionNo);
+                }
             }
         }
 

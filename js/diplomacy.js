@@ -1623,6 +1623,9 @@ class DiplomacyManager {
                 legion.status = 'wait';
                 legion.targetId = 0;
                 legion.route = [];
+                if (this.game.aiOperationManager && typeof this.game.aiOperationManager.clearLegionPlanning === 'function') {
+                    this.game.aiOperationManager.clearLegionPlanning(subordinateClanId, targetLegionId);
+                }
             }
         }
 
@@ -1645,6 +1648,9 @@ class DiplomacyManager {
                 legion.status = 'wait';
                 legion.targetId = 0;
                 legion.route = [];
+                if (this.game.aiOperationManager && typeof this.game.aiOperationManager.clearLegionPlanning === 'function') {
+                    this.game.aiOperationManager.clearLegionPlanning(subordinateClanId, targetLegionId);
+                }
             }
             disbandedCommander = true;
         }

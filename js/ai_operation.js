@@ -65,6 +65,47 @@ class AIOperationManager {
         }
     }
 
+    // ★Round6：軍団が解散・国主不在になった時、その軍団専用の作戦メモをまとめて片付けます。
+    // operationsだけを消すとgrandObjectivesやdraftBasesが同じ軍団Noの再利用時に残るため、3種類を一括処理します。
+    clearLegionPlanning(clanId, legionId) {
+        clanId = Number(clanId);
+        legionId = Number(legionId || 0);
+
+        const clearFrom = (store) => {
+            if (!store || !store[clanId]) return;
+            delete store[clanId][legionId];
+            if (Object.keys(store[clanId]).length === 0) {
+                delete store[clanId];
+            }
+        };
+
+        clearFrom(this.operations);
+        clearFrom(this.draftBases);
+        clearFrom(this.grandObjectives);
+    }
+
+    // ★Round6：非直轄軍団が「現在も有効な軍団」かを一元判定します。
+    isActiveLegion(clanId, legionId) {
+        clanId = Number(clanId);
+        legionId = Number(legionId || 0);
+        if (legionId === 0) return true;
+        if (!this.game.legions) return false;
+
+        const legion = this.game.legions.find(l =>
+            Number(l.clanId) === clanId &&
+            Number(l.legionNo) === legionId &&
+            Number(l.commanderId || 0) > 0
+        );
+        if (!legion) return false;
+
+        const commander = this.game.getBusho(legion.commanderId);
+        return !!(
+            commander &&
+            commander.status === 'active' &&
+            Number(commander.clan) === clanId
+        );
+    }
+
     // ★追加：特定の大名勢力のすべての軍団に、一括で方針を持たせる一元化ロジックです！
     setGrandObjectiveToAllLegions(clanId, objectiveType, targetId, turnCount) {
         if (!this.grandObjectives) this.grandObjectives = {};
@@ -74,7 +115,8 @@ class AIOperationManager {
         const myCastleCount = clanCastles.length;
         
         // その大名家が持っているすべての軍団ID（0の直轄や1～8の軍団）を重複なく集めます
-        const legionIds = [...new Set(clanCastles.map(c => Number(c.legionId || 0)))];
+        const legionIds = [...new Set(clanCastles.map(c => Number(c.legionId || 0)))]
+            .filter(legionId => legionId === 0 || this.isActiveLegion(clanId, legionId));
 
         // ターゲットの初期数を数えます
         let initialTargetCount = 0;
@@ -146,55 +188,67 @@ class AIOperationManager {
         for (const clanIdStr in this.operations) {
             const clanId = Number(clanIdStr);
             const clanOps = this.operations[clanId];
-            for (const legionIdStr in clanOps) {
+            if (!clanOps || typeof clanOps !== 'object') {
+                delete this.operations[clanId];
+                continue;
+            }
+
+            for (const legionIdStr of Object.keys(clanOps)) {
                 const legionId = Number(legionIdStr);
                 const op = clanOps[legionId];
                 let isInvalid = false;
+                let invalidReason = '';
 
-                // 1. その大名家がもう滅亡していないかチェック
-                const clan = this.game.clans.find(c => c.id === clanId);
-                
-                // ★追加：軍団のデータを探します（直轄である0番は除きます）
-                const legion = legionId === 0 ? true : this.game.legions.find(l => l.clanId === clanId && l.legionNo === legionId);
+                const clan = typeof this.game.getClan === 'function'
+                    ? this.game.getClan(clanId)
+                    : this.game.clans.find(c => Number(c.id) === clanId);
 
-                if (!clan || clan.id === 0) {
+                if (!clan || clan.id === 0 || clan.isDestroyed) {
                     isInvalid = true;
-                } else if (!op) {
+                    invalidReason = '勢力消滅';
+                } else if (!op || typeof op !== 'object') {
                     isInvalid = true;
-                } else if (legionId !== 0 && (!legion || legion.commanderId === 0)) {
-                    // ★追加：国主が剥奪されたり、軍団が解体された場合は不正とみなして作戦を破棄します
-                    isInvalid = true;
+                    invalidReason = '作戦データ欠損';
+                } else if (legionId !== 0 && !this.isActiveLegion(clanId, legionId)) {
+                    // イベント・死亡・軍団再編で作戦より先に軍団が消えた正常な後片付け対象です
+                    const logInfo = this.getOperationLogInfo(clanId, legionId);
+                    console.info(`【AI作戦整理】${logInfo.clanName} の旧軍団${legionId}の作戦記録(${op.type || '不明'})を整理しました。`);
+                    this.clearLegionPlanning(clanId, legionId);
+                    continue;
                 } else {
-                    // 2. 作戦データの中身が壊れていないかチェック
                     if (op.type === '攻撃') {
-                        // 数値が「NaN（非数）」になってしまっていないか、出撃元が設定されているか
-                        if (!op.stagingBase || isNaN(op.requiredForce) || isNaN(op.requiredRice) || isNaN(op.turnsRemaining)) {
+                        if (!op.stagingBase || isNaN(op.requiredForce) || isNaN(op.requiredRice) || isNaN(op.turnsRemaining) || isNaN(op.maxTurns)) {
                             isInvalid = true;
+                            invalidReason = '攻撃作戦の数値/出撃元不整合';
                         } else {
-                            // 出撃予定のお城が、イベントなどで別の大名家に奪われていないか
                             const stagingCastle = this.game.getCastle(op.stagingBase);
-                            if (!stagingCastle || stagingCastle.ownerClan !== clanId || stagingCastle.legionId !== legionId) {
+                            if (!stagingCastle ||
+                                Number(stagingCastle.ownerClan) !== clanId ||
+                                Number(stagingCastle.legionId || 0) !== legionId) {
                                 isInvalid = true;
+                                invalidReason = '出撃元の所属変更';
                             }
                         }
                     } else if (op.type === '外交' || op.type === '内政') {
                         if (isNaN(op.turnsRemaining) || isNaN(op.maxTurns)) {
                             isInvalid = true;
+                            invalidReason = '期間データ不整合';
                         }
+                    } else {
+                        isInvalid = true;
+                        invalidReason = '未知の作戦種別';
                     }
                 }
 
-                // 不正が見つかったら、作戦を白紙に戻して安全に立て直させます
                 if (isInvalid) {
-                    // ★変更：大名家名や軍団長名を取得して表示します
                     const logInfo = this.getOperationLogInfo(clanId, legionId);
-                    console.warn(`【AI自己診断】${logInfo.clanName} (軍団長: ${logInfo.commanderName}) の不正な作戦データ(${op ? op.type : '不明'})を検知したため、破棄しました。`);
-                    delete this.operations[clanId][legionId];
+                    console.warn(`【AI自己診断】${logInfo.clanName} (軍団長: ${logInfo.commanderName}) の不正な作戦データ(${op ? op.type : '不明'} / ${invalidReason})を検知したため、破棄しました。`);
+                    this.clearLegionPlanning(clanId, legionId);
                 }
             }
         }
     }
-    
+
     async processMonthlyOperations() {
         // ★追加：毎月の作戦会議を始める前に、まず全体の健康診断を行います！
         this.validateAllOperations();
@@ -238,7 +292,8 @@ class AIOperationManager {
 
             const myCastles = this.game.getClanCastles(clan.id);
             // ★修正：数値の0と文字の"0"が混ざって重複しないように、必ず数値(Number)に統一します！
-            const legionIds = [...new Set(myCastles.map(c => Number(c.legionId || 0)))];
+            const legionIds = [...new Set(myCastles.map(c => Number(c.legionId || 0)))]
+                .filter(legionId => legionId === 0 || this.isActiveLegion(clan.id, legionId));
 
             for (const legionId of legionIds) {
                 // ★追加：プレイヤー大名家で、かつ直轄（ID0）の場合は、勝手に作戦を立てないようにスキップします！

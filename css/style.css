@@ -1,7 +1,12 @@
 /* =========================================================
    戦国覇道 ベース設定・変数
    ========================================================= */
-html { width: 100%; height: 100%; height: 100dvh; overscroll-behavior: none; }
+html { width: 100%; height: 100%; height: 100dvh; overscroll-behavior: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+/* ★スマホ安全対策：ボタン連打をブラウザのダブルタップ拡大として扱わせない */
+button, input, select, textarea, label, a, .cmd-btn, .title-btn, .zoom-btn, .select-item {
+    touch-action: manipulation;
+}
 
 @font-face {
     font-family: 'FudeGoshirae'; /* プログラムの中で使う「あだ名」です */

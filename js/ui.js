@@ -111,29 +111,49 @@ class UIManager {
         this.initMapDrag();
         this.initContextMenu();
         this.initSidebarResize(); 
+        // ★スマホ安全対策：ブラウザ標準のダブルタップ拡大を確実に止めます。
+        // 近い位置を短時間で2回触った時だけ止めるので、別々のボタンを素早く押す操作は妨げません。
         let lastTouchEnd = 0;
+        let lastTouchX = 0;
+        let lastTouchY = 0;
         document.addEventListener('touchend', (event) => {
-            const now = (new Date()).getTime();
-            if (now - lastTouchEnd <= 300) {
-                event.preventDefault(); 
-            }
-            lastTouchEnd = now;
+            const now = Date.now();
+            const touch = event.changedTouches && event.changedTouches[0];
+            const x = touch ? touch.clientX : 0;
+            const y = touch ? touch.clientY : 0;
+            const dx = x - lastTouchX;
+            const dy = y - lastTouchY;
+            const isNearPreviousTap = (dx * dx + dy * dy) <= (40 * 40);
 
-            // ★ここから書き足し：タッチが終わった瞬間に、ボタンなどから「カーソルが乗っている状態」を強制的に引き剥がす魔法です！
+            if (now - lastTouchEnd <= 320 && isNearPreviousTap && event.cancelable) {
+                event.preventDefault();
+            }
+
+            lastTouchEnd = now;
+            lastTouchX = x;
+            lastTouchY = y;
+
             if (event.target && typeof event.target.blur === 'function') {
                 setTimeout(() => {
                     event.target.blur();
-                }, 50); // クリックの邪魔にならないよう、ほんの少しだけ待ってから引き剥がします
+                }, 50);
             }
-            // ★書き足すのはここまで！
-        }, false);
-        
+        }, { passive: false });
+
+        // ★iOS Safari系のブラウザ標準ピンチ拡大を停止。
+        // マップの2本指ズームはui_map.jsのtouchイベントで独自処理するため、その機能は残ります。
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach(type => {
+            document.addEventListener(type, (event) => {
+                if (event.cancelable) event.preventDefault();
+            }, { passive: false });
+        });
+
         document.addEventListener('touchmove', (e) => {
-            if (e.touches.length > 1) {
+            if (e.touches.length > 1 && e.cancelable) {
                 e.preventDefault();
             }
         }, { passive: false });
-        
+
         const titleScreen = document.getElementById('title-screen');
         const tapMessage = document.getElementById('tap-to-proceed');
         const menuButtons = document.getElementById('menu-buttons');

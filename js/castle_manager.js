@@ -249,7 +249,20 @@ class CastleManager {
                     commander.isCommander = false;
                 }
             }
+            const clanId = Number(legion.clanId);
+            const legionNo = Number(legion.legionNo);
             legion.commanderId = 0;
+
+            // ★Round6：軍団解散と同時にAIの作戦・長期方針・徴兵拠点メモも破棄します
+            if (this.game.aiOperationManager) {
+                if (typeof this.game.aiOperationManager.clearLegionPlanning === 'function') {
+                    this.game.aiOperationManager.clearLegionPlanning(clanId, legionNo);
+                } else {
+                    if (this.game.aiOperationManager.operations?.[clanId]) delete this.game.aiOperationManager.operations[clanId][legionNo];
+                    if (this.game.aiOperationManager.grandObjectives?.[clanId]) delete this.game.aiOperationManager.grandObjectives[clanId][legionNo];
+                    if (this.game.aiOperationManager.draftBases?.[clanId]) delete this.game.aiOperationManager.draftBases[clanId][legionNo];
+                }
+            }
             
             // ★修正：c.legionIdに入っているのは固有IDではなく「軍団No(1~8)」なので、
             // 大名家の一致と、軍団Noの一致の両方を確認して直轄に戻します！
