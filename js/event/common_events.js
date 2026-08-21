@@ -117,16 +117,27 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         return (left2 && right2 && left2 !== right2) || (up2 && down2 && up2 !== down2);
     };
 
-    const drawProvinceBoundaries = (dst, pixelProvinceMap, srcW, srcH, dstW, dstH, tone = 72, alpha = 245) => {
+    const drawProvinceBoundaries = (dst, pixelProvinceMap, srcW, srcH, dstW, dstH, tone = 72, alpha = 245, thickness = 1) => {
         if (!dst || !pixelProvinceMap) return;
+        const radius = Math.max(0, Math.floor(thickness) - 1);
         for (let y = 0; y < dstH; y++) {
             for (let x = 0; x < dstW; x++) {
                 if (!isProvinceBoundaryPixel(pixelProvinceMap, srcW, srcH, dstW, dstH, x, y)) continue;
-                const di = (y * dstW + x) * 4;
-                dst[di] = tone;
-                dst[di + 1] = tone;
-                dst[di + 2] = tone;
-                dst[di + 3] = alpha;
+
+                for (let oy = -radius; oy <= radius; oy++) {
+                    for (let ox = -radius; ox <= radius; ox++) {
+                        // thickness=2 は境界の周囲1pxまで広げます。小さな国を潰しにくいよう円形に近い膨張にします。
+                        if (radius > 0 && Math.abs(ox) + Math.abs(oy) > radius) continue;
+                        const px = x + ox;
+                        const py = y + oy;
+                        if (px < 0 || py < 0 || px >= dstW || py >= dstH) continue;
+                        const di = (py * dstW + px) * 4;
+                        dst[di] = tone;
+                        dst[di + 1] = tone;
+                        dst[di + 2] = tone;
+                        dst[di + 3] = alpha;
+                    }
+                }
             }
         }
     };
@@ -181,7 +192,7 @@ window.EventMapEffects = window.EventMapEffects || (() => {
 
         // 最後に海岸線・国境線を濃く上書きします。
         // 「透明な国境ピクセル」も復元するため、白い一枚板に見える問題を防ぎます。
-        drawProvinceBoundaries(dst, pixelProvinceMap, mapW, mapH, canvas.width, canvas.height, 68, 255);
+        drawProvinceBoundaries(dst, pixelProvinceMap, mapW, mapH, canvas.width, canvas.height, 28, 255, 2);
 
         ctx.putImageData(img, 0, 0);
         return canvas;
@@ -358,7 +369,7 @@ window.EventMapEffects = window.EventMapEffects || (() => {
             // ベース地図に線があっても半透明/点滅色で埋もれるため、効果Canvas自身に線を持たせます。
             // 新しいCanvasは増やさないので、Round20のメモリ削減効果は維持されます。
             if (src.pixelProvinceMap && renderScale < 1) {
-                drawProvinceBoundaries(dst, src.pixelProvinceMap, src.srcW, src.srcH, canvas.width, canvas.height, 58, 245);
+                drawProvinceBoundaries(dst, src.pixelProvinceMap, src.srcW, src.srcH, canvas.width, canvas.height, 28, 245, 2);
             }
 
             ctx.putImageData(img, 0, 0);
