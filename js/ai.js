@@ -22,8 +22,21 @@ class AIEngine {
 
     // ★追加：大名の威信（daimyoPrestige）を取り出す魔法です！
     getClanPrestige(clanId) {
-        if (clanId === 0) return 0;
-        const clan = this.game.clans.find(c => c.id === clanId);
+        const numericClanId = Number(clanId);
+        if (numericClanId === 0) return 0;
+
+        // ★軽量化＋挙動維持：このAI思考で実際に参照した勢力だけ最新化します。
+        // 以前の updateAllClanPrestige() と違い全勢力を毎城走査しませんが、
+        // 比較対象になった勢力の威信は必ず「現在値」になります。
+        if (!this._prestigeRefreshedThisExec) this._prestigeRefreshedThisExec = new Set();
+        if (!this._prestigeRefreshedThisExec.has(numericClanId) && typeof this.game.updateClanPrestige === 'function') {
+            this.game.updateClanPrestige(numericClanId);
+            this._prestigeRefreshedThisExec.add(numericClanId);
+        }
+
+        const clan = typeof this.game.getClan === 'function'
+            ? this.game.getClan(numericClanId)
+            : this.game.clans.find(c => Number(c.id) === numericClanId);
         return clan ? Math.max(1, clan.daimyoPrestige) : 1;
     }
 
@@ -57,8 +70,15 @@ class AIEngine {
                 await this.game.eventManager.processEvents('before_command', castle);
             }
 
-            // ★AIが考え始める前に、すべての大名の威信を最新にします！
-            this.game.updateAllClanPrestige();
+            // ★軽量化：このAI思考中に威信を最新化した勢力を記録します。
+            // 自勢力は必ずここで更新し、敵勢力は getClanPrestige() で参照された時だけ更新します。
+            this._prestigeRefreshedThisExec = new Set();
+            if (typeof this.game.updateClanPrestige === 'function') {
+                this.game.updateClanPrestige(castle.ownerClan);
+                this._prestigeRefreshedThisExec.add(Number(castle.ownerClan));
+            } else {
+                this.game.updateAllClanPrestige();
+            }
             // ★自分の城で、かつ「委任されていない（直轄）」の時だけプレイヤーに操作を戻します
             if (Number(castle.ownerClan) === Number(this.game.playerClanId) && !castle.isDelegated) {
                 console.warn("AI Alert: Player castle detected in AI routine. Returning control to player.");
@@ -297,7 +317,7 @@ class AIEngine {
                 
                 if (myClan && myClan.currentDiplomacyTarget) {
                     // まずは自分のお殿様（大名）を探します。いない時は城主を大名の代わりにします
-                    const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
+                    const daimyo = this.game.getClanDaimyo(castle.ownerClan) || castellan;
                     
                     // 今までの基本の確率（約10%）を計算します
                     let diplomacyChance = ((window.AIParams.AI.DiplomacyChance || 0.3) / 3) * (mods.aggression); 
@@ -398,7 +418,7 @@ class AIEngine {
         }
 
         const myClanId = myCastle.ownerClan;
-        const myClanCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
+        const myClanCastles = this.game.getClanCastles(myClanId);
         const myTotalPower = this.getClanPrestige(myClanId);
 
         // ★追加：自分の軍団が抱えている「方針」を調べます！
@@ -779,7 +799,7 @@ class AIEngine {
             // ★今回追加：もし相手が同盟国や従属先だったら、特別に「破棄して攻撃するかのスコア」を計算します！
             if (rel && (rel.status === '同盟' || rel.status === '従属')) {
                 // お隣の城リストを作って専門部署に渡してあげます
-                const myClanCastles = this.game.castles.filter(c => c.ownerClan === myCastle.ownerClan);
+                const myClanCastles = this.game.getClanCastles(myCastle.ownerClan);
                 const neighborCastles = [];
                 myClanCastles.forEach(myC => {
                     if (myC.adjacentCastleIds) {
@@ -1821,7 +1841,7 @@ class AIEngine {
 
                 // ===== 目標兵力の計算 =====
                 // 自分の軍団全体の「総石高」を調べます！
-                const myCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan && c.legionId === castle.legionId);
+                const myCastles = this.game.getClanCastles(castle.ownerClan).filter(c => c.legionId === castle.legionId);
                 const totalKokudaka = myCastles.reduce((sum, c) => sum + c.kokudaka, 0);
 
                 // 石高をベースにした新しい計算式で、目標にする兵士の数を決めます
@@ -2088,7 +2108,7 @@ class AIEngine {
                                 hasEnemy = true;
                                 if (adj.ownerClan !== 0) {
                                     // その敵の大名家の、全部の兵士数と一番兵士が多いお城を調べます
-                                    const enemyCastles = this.game.castles.filter(c => c.ownerClan === adj.ownerClan);
+                                    const enemyCastles = this.game.getClanCastles(adj.ownerClan);
                                     const enemyTotal = enemyCastles.reduce((sum, c) => sum + c.soldiers, 0);
                                     const enemyMax = enemyCastles.length > 0 ? Math.max(...enemyCastles.map(c => c.soldiers)) : 0;
                                     
@@ -2126,7 +2146,7 @@ class AIEngine {
                         keepSoldiers = Math.floor(maxEnemyMaxCastleSoldiers * 0.5);
 
                         // でも、自分の軍団全体の兵力が、敵の全体の半分以下なら…
-                        const myCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan && c.legionId === castle.legionId);
+                        const myCastles = this.game.getClanCastles(castle.ownerClan).filter(c => c.legionId === castle.legionId);
                         const myTotalSoldiers = myCastles.reduce((sum, c) => sum + c.soldiers, 0);
                         const enemyHalf = maxEnemyTotalSoldiers * 0.5;
 
@@ -3157,11 +3177,11 @@ class AIEngine {
         const targetDaimyo = this.game.getClanDaimyo(targetClanId);
         let targetCastle = null;
         if (targetDaimyo) {
-            targetCastle = this.game.castles.find(c => c.id === targetDaimyo.castleId);
+            targetCastle = this.game.getCastle(targetDaimyo.castleId);
         }
         // 万が一お殿様が見つからなかった時は、とりあえず見つかった相手の城にします
         if (!targetCastle) {
-            const neighbors = this.game.castles.filter(c => c.ownerClan === targetClanId);
+            const neighbors = this.game.getClanCastles(targetClanId);
             if (neighbors.length > 0) targetCastle = neighbors[0];
         }
         if (!targetCastle) return;

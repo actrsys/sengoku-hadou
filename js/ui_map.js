@@ -1455,14 +1455,20 @@ Object.assign(UIManager.prototype, {
             .filter(p => p.statusEffects && p.statusEffects.includes('heavySnow'))
             .map(p => DataManager.hexToRgb(p.color_code));
 
-        if (targetColors.length === 0) {
-            // ★雪が全く無い場合も「透明な絵」として記憶しておきます
-            this.lastSnowImageData = ctx.getImageData(0, 0, width, height);
-            return;
+        // ★軽量化：雪ImageDataも毎回newせず、同じサイズなら再利用します。
+        let outputData = this.lastSnowImageData;
+        if (!outputData || outputData.width !== width || outputData.height !== height) {
+            outputData = ctx.createImageData(width, height);
+        } else {
+            outputData.data.fill(0);
         }
 
-        // 新しく雪を降らせるための透明な絵の具セットを作ります
-        const outputData = ctx.createImageData(width, height);
+        if (targetColors.length === 0) {
+            // 雪が無い場合も、再利用中の透明バッファをそのまま記憶します。
+            ctx.putImageData(outputData, 0, 0);
+            this.lastSnowImageData = outputData;
+            return;
+        }
 
         // 画像の「点（ピクセル）」を1個ずつ調べていきます！
         if (this.pixelProvinceMap) {
@@ -1539,17 +1545,23 @@ Object.assign(UIManager.prototype, {
         const overlay = document.getElementById('clan-color-overlay');
         if (!overlay) return;
 
-        // ★修正：独立や謀反の演出中でストップがかかっている時は、新しい計算をせずに「記憶しておいた前の画像」を貼り直して終わります！
+        const ctx = overlay.getContext('2d');
+        const width = overlay.width;
+        const height = overlay.height;
+
         if (this.game && this.game.isSuspendingColorUpdate) {
-            if (this.lastClanColorsImageData) {
-                const ctx = overlay.getContext('2d');
+            if (this.lastClanColorsImageData && this.lastClanColorsImageData.width === width && this.lastClanColorsImageData.height === height) {
                 ctx.putImageData(this.lastClanColorsImageData, 0, 0);
+                this._lastClanColorOverlay = overlay;
             }
             return;
         }
 
         const sourceData = DataManager.provinceImageData;
         if (!sourceData) {
+            // 多重ロード防止。
+            if (this._isLoadingProvinceImageData) return;
+            this._isLoadingProvinceImageData = true;
             const provMapImg = new Image();
             provMapImg.src = './data/images/map/japan_provinces.png';
             provMapImg.onload = () => {
@@ -1559,300 +1571,200 @@ Object.assign(UIManager.prototype, {
                 const tempCtx = tempCanvas.getContext('2d');
                 tempCtx.drawImage(provMapImg, 0, 0);
                 DataManager.provinceImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                this._isLoadingProvinceImageData = false;
                 this.updateClanColors();
             };
+            provMapImg.onerror = () => { this._isLoadingProvinceImageData = false; };
             return;
         }
 
-        // ★ここから記憶の魔法！
-        // お城の持ち主の「出席番号」を全員分繋げた文字の暗号を作ります（例：1,1,2,0,3...）
         const currentOwnerHash = this.game.castles.map(c => c.ownerClan).join(',');
-        
-        // もし前回の状態と全く同じで、しかも記憶した絵（写真）が残っていれば…
-        if (this.lastClanColorsHash === currentOwnerHash && this.lastClanColorsImageData && this.lastClanColorsImageData.width === overlay.width) {
-            // 新しく計算せずに、記憶しておいた写真をそのまま画用紙に貼り付けて終わります！（超軽量化！）
-            const ctx = overlay.getContext('2d');
+        if (this.lastClanColorsHash === currentOwnerHash &&
+            this.lastClanColorsImageData &&
+            this.lastClanColorsImageData.width === width &&
+            this.lastClanColorsImageData.height === height) {
+            // 再計算はせず、記憶済みImageDataを再利用して描き戻します。
+            // putImageData自体は新しい巨大配列を作らないため、描画の正しさを優先します。
             ctx.putImageData(this.lastClanColorsImageData, 0, 0);
+            this._lastClanColorOverlay = overlay;
             return;
         }
-        // 今の状態を「前回」として記憶しておきます
         this.lastClanColorsHash = currentOwnerHash;
-        // ★記憶の魔法ここまで！
-
-        const ctx = overlay.getContext('2d');
-        const width = overlay.width;
-        const height = overlay.height;
-        ctx.clearRect(0, 0, width, height);
 
         const pixelSize = width * height;
         const sd = sourceData.data;
 
         // ==========================================
-        // ★超絶最適化：マップの陣取り（領地計算）は、ゲーム中に形が変わらないので「最初の1回」だけやります！
-        // （毎回96万ピクセルを計算するのをやめて、キャッシュを使い回します）
+        // ★省メモリ化：領土割当マップは初回だけ作成。
+        // 旧実装は pixelSize サイズの Int32Array を多数同時に持っていました。
+        // 永続2本 + BFS用キュー1本だけにし、IDが65535以下なら永続配列はUint16にします。
         // ==========================================
-        if (!this.pixelCastleMap || this.pixelCastleMap.length !== pixelSize) {
-            this.pixelCastleMap = new Int32Array(pixelSize);
-            this.pixelCastleMap.fill(0);
-            
-            // 国の境界も一緒に記憶しておきます
-            this.pixelProvinceMap = new Int32Array(pixelSize);
-            this.pixelProvinceMap.fill(0);
+        if (!this.pixelCastleMap || this.pixelCastleMap.length !== pixelSize ||
+            !this.pixelProvinceMap || this.pixelProvinceMap.length !== pixelSize) {
+            let maxCastleId = 0;
+            let maxProvinceId = 0;
+            for (const c of this.game.castles) maxCastleId = Math.max(maxCastleId, Number(c.id) || 0);
+            for (const p of this.game.provinces) maxProvinceId = Math.max(maxProvinceId, Number(p.id) || 0);
+            const CastleArray = maxCastleId <= 65535 ? Uint16Array : Uint32Array;
+            const ProvinceArray = maxProvinceId <= 65535 ? Uint16Array : Uint32Array;
+            this.pixelCastleMap = new CastleArray(pixelSize);
+            this.pixelProvinceMap = new ProvinceArray(pixelSize);
 
-            const colorToProvince = new Map();
-            this.game.provinces.forEach(p => {
+            const colorToProvinceId = new Map();
+            const castlesByProvince = new Map();
+            for (const p of this.game.provinces) {
                 const rgb = DataManager.hexToRgb(p.color_code);
-                if (rgb) {
-                    const colorInt = (rgb.r << 16) | (rgb.g << 8) | rgb.b;
-                    colorToProvince.set(colorInt, p);
-                }
-            });
-
-            for (let i = 0; i < sd.length; i += 4) {
-                if (sd[i+3] === 0) continue; 
-                const colorInt = (sd[i] << 16) | (sd[i+1] << 8) | sd[i+2];
-                const province = colorToProvince.get(colorInt);
-                if (province) {
-                    this.pixelProvinceMap[i / 4] = province.id;
-                }
+                if (rgb) colorToProvinceId.set((rgb.r << 16) | (rgb.g << 8) | rgb.b, Number(p.id));
+                castlesByProvince.set(Number(p.id), []);
+            }
+            for (const c of this.game.castles) {
+                const pid = Number(c.provinceId);
+                if (!castlesByProvince.has(pid)) castlesByProvince.set(pid, []);
+                castlesByProvince.get(pid).push(c);
             }
 
-            const queueX = new Int32Array(pixelSize);
-            const queueY = new Int32Array(pixelSize);
-            const queueCastleId = new Int32Array(pixelSize); 
-            const queueProvId = new Int32Array(pixelSize); 
-            let head = 0;
-            let tail = 0;
-            
-            const distanceMap = new Int32Array(pixelSize);
-            distanceMap.fill(999999);
+            for (let i = 0; i < sd.length; i += 4) {
+                if (sd[i + 3] === 0) continue;
+                const colorInt = (sd[i] << 16) | (sd[i + 1] << 8) | sd[i + 2];
+                const provinceId = colorToProvinceId.get(colorInt);
+                if (provinceId) this.pixelProvinceMap[i >> 2] = provinceId;
+            }
 
-            this.game.provinces.forEach(p => {
-                const castles = this.game.castles.filter(c => c.provinceId === p.id);
-                castles.forEach(c => {
-                    const cx = Math.floor(c.pixelX !== undefined ? c.pixelX : 0);
-                    const cy = Math.floor(c.pixelY !== undefined ? c.pixelY : 0);
-                    
-                    if (cx >= 0 && cx < width && cy >= 0 && cy < height) {
-                        const idx = cy * width + cx;
-                        queueX[tail] = cx;
-                        queueY[tail] = cy;
-                        queueCastleId[tail] = c.id; 
-                        queueProvId[tail] = p.id;
-                        tail++;
-                        
-                        this.pixelCastleMap[idx] = c.id; 
-                        distanceMap[idx] = 0;
-                    }
-                });
-            });
+            // 位置そのもの（pixel index）だけを持つ単一キュー。
+            const queue = new Int32Array(pixelSize);
+            let head = 0, tail = 0;
+            for (const c of this.game.castles) {
+                const cx = Math.floor(c.pixelX !== undefined ? c.pixelX : 0);
+                const cy = Math.floor(c.pixelY !== undefined ? c.pixelY : 0);
+                if (cx < 0 || cx >= width || cy < 0 || cy >= height) continue;
+                const idx = cy * width + cx;
+                if (this.pixelProvinceMap[idx] !== Number(c.provinceId)) continue;
+                if (this.pixelCastleMap[idx] === 0) queue[tail++] = idx;
+                this.pixelCastleMap[idx] = Number(c.id);
+            }
 
             const dx = [0, 1, 0, -1, 1, 1, -1, -1];
             const dy = [-1, 0, 1, 0, -1, 1, 1, -1];
-            
             while (head < tail) {
-                const x = queueX[head];
-                const y = queueY[head];
-                const qCastleId = queueCastleId[head]; 
-                const qProvId = queueProvId[head]; 
-                head++;
-                
-                const currIdx = y * width + x;
-                const currDist = distanceMap[currIdx];
-
+                const currIdx = queue[head++];
+                const x = currIdx % width;
+                const y = Math.floor(currIdx / width);
+                const qCastleId = this.pixelCastleMap[currIdx];
+                const qProvId = this.pixelProvinceMap[currIdx];
                 for (let d = 0; d < 8; d++) {
-                    const nx = x + dx[d];
-                    const ny = y + dy[d];
-                    
-                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                        const nIdx = ny * width + nx;
-                        if (this.pixelProvinceMap[nIdx] === qProvId) {
-                            if (distanceMap[nIdx] > currDist + 1) {
-                                distanceMap[nIdx] = currDist + 1;
-                                this.pixelCastleMap[nIdx] = qCastleId; 
-                                
-                                queueX[tail] = nx;
-                                queueY[tail] = ny;
-                                queueCastleId[tail] = qCastleId; 
-                                queueProvId[tail] = qProvId; 
-                                tail++;
-                            }
-                        }
+                    const nx = x + dx[d], ny = y + dy[d];
+                    if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+                    const nIdx = ny * width + nx;
+                    if (this.pixelCastleMap[nIdx] === 0 && this.pixelProvinceMap[nIdx] === qProvId) {
+                        this.pixelCastleMap[nIdx] = qCastleId;
+                        queue[tail++] = nIdx;
                     }
                 }
             }
 
-            // 飛び地の計算も最初の1回だけ！
-            for (let i = 0; i < sd.length; i += 4) {
-                if (sd[i+3] === 0) continue;
-                const pxIdx = i / 4;
+            // 万一BFSで割当されなかった飛び地だけ、同じ国の城から最近傍を選びます。
+            // castles.filter() を「各ピクセルごと」に呼ばないのが重要です。
+            for (let pxIdx = 0; pxIdx < pixelSize; pxIdx++) {
+                if (sd[pxIdx * 4 + 3] === 0 || this.pixelCastleMap[pxIdx] !== 0) continue;
                 const provId = this.pixelProvinceMap[pxIdx];
                 if (provId === 0) continue;
-
-                if (this.pixelCastleMap[pxIdx] === 0) {
-                    const castlesInProv = this.game.castles.filter(c => c.provinceId === provId);
-                    if (castlesInProv.length > 0) {
-                        const px = pxIdx % width;
-                        const py = Math.floor(pxIdx / width);
-                        let minDistSq = Infinity;
-                        let targetCastleId = 0;
-                        for (let j = 0; j < castlesInProv.length; j++) {
-                            const c = castlesInProv[j];
-                            const cx = c.pixelX !== undefined ? c.pixelX : 0;
-                            const cy = c.pixelY !== undefined ? c.pixelY : 0;
-                            const dSq = (px - cx) * (px - cx) + (py - cy) * (py - cy);
-                            if (dSq < minDistSq) {
-                                minDistSq = dSq;
-                                targetCastleId = c.id;
-                            }
-                        }
-                        this.pixelCastleMap[pxIdx] = targetCastleId;
-                    }
+                const candidates = castlesByProvince.get(Number(provId)) || [];
+                if (candidates.length === 0) continue;
+                const px = pxIdx % width;
+                const py = Math.floor(pxIdx / width);
+                let minDistSq = Infinity, targetCastleId = 0;
+                for (const c of candidates) {
+                    const cx = c.pixelX !== undefined ? c.pixelX : 0;
+                    const cy = c.pixelY !== undefined ? c.pixelY : 0;
+                    const dSq = (px - cx) * (px - cx) + (py - cy) * (py - cy);
+                    if (dSq < minDistSq) { minDistSq = dSq; targetCastleId = Number(c.id); }
                 }
+                this.pixelCastleMap[pxIdx] = targetCastleId;
             }
         }
 
-        // 1. 勢力ごとの色を準備します
         const clanColors = new Map();
-        this.game.clans.forEach(clan => {
-            if (clan.id !== 0 && clan.color) clanColors.set(clan.id, DataManager.hexToRgb(clan.color));
-        });
-
-        // 2. どのお城がどの勢力のものか、パッと分かる早見表を作ります
-        let maxCastleId = 0;
-        this.game.castles.forEach(c => { if(c.id > maxCastleId) maxCastleId = c.id; });
-        const castleToClanMap = new Int32Array(maxCastleId + 1);
-        this.game.castles.forEach(c => {
-            castleToClanMap[c.id] = c.ownerClan;
-        });
-
-        const outputData = ctx.createImageData(width, height);
-        const finalClanMap = new Int32Array(pixelSize);
-        finalClanMap.fill(0);
-
-        // 3. 記憶しておいた「各ピクセルがどのお城のものか（pixelCastleMap）」を使って、一瞬で色を塗ります！
-        for (let i = 0; i < sd.length; i += 4) {
-            if (sd[i+3] === 0) continue;
-
-            const pxIdx = i / 4;
-            const castleId = this.pixelCastleMap[pxIdx];
-            if (castleId === 0) continue;
-
-            // お城の持ち主（大名家）を早見表から引っ張り出します
-            const targetClanId = castleToClanMap[castleId];
-            finalClanMap[pxIdx] = targetClanId;
-
-            const clanRgb = (targetClanId !== 0) ? clanColors.get(targetClanId) : null;
-            if (clanRgb) {
-                outputData.data[i] = clanRgb.r;
-                outputData.data[i+1] = clanRgb.g;
-                outputData.data[i+2] = clanRgb.b;
-            } else {
-                outputData.data[i] = 255;
-                outputData.data[i+1] = 255;
-                outputData.data[i+2] = 255;
-            }
-            outputData.data[i+3] = 100; // 少し透明にします
+        for (const clan of this.game.clans) {
+            if (clan.id !== 0 && clan.color) clanColors.set(Number(clan.id), DataManager.hexToRgb(clan.color));
         }
 
-        // ★ここから追加：色を1px広く塗る（じわっと滲ませる）魔法です！
-        // 一度塗り終わった絵をコピーして「お手本」にします
-        const tempOutput = new Uint8ClampedArray(outputData.data);
-        
-        // 絵の端っこはチェックできないので、1ピクセル内側から調べます
+        let maxCastleId = 0, maxClanId = 0;
+        for (const c of this.game.castles) {
+            maxCastleId = Math.max(maxCastleId, Number(c.id) || 0);
+            maxClanId = Math.max(maxClanId, Number(c.ownerClan) || 0);
+        }
+        const ClanArray = maxClanId <= 65535 ? Uint16Array : Uint32Array;
+        const castleToClanMap = new ClanArray(maxCastleId + 1);
+        for (const c of this.game.castles) castleToClanMap[Number(c.id)] = Number(c.ownerClan) || 0;
+
+        // 画像バッファも毎回newせず再利用します。
+        let outputData = this.lastClanColorsImageData;
+        if (!outputData || outputData.width !== width || outputData.height !== height) {
+            outputData = ctx.createImageData(width, height);
+        } else {
+            outputData.data.fill(0);
+        }
+        const od = outputData.data;
+
+        const paintClanPixel = (pixelIndex, outIndex) => {
+            const castleId = this.pixelCastleMap[pixelIndex];
+            if (castleId === 0) return false;
+            const clanId = castleToClanMap[castleId];
+            const rgb = clanId !== 0 ? clanColors.get(clanId) : null;
+            if (rgb) { od[outIndex] = rgb.r; od[outIndex + 1] = rgb.g; od[outIndex + 2] = rgb.b; }
+            else { od[outIndex] = 255; od[outIndex + 1] = 255; od[outIndex + 2] = 255; }
+            od[outIndex + 3] = 100;
+            return true;
+        };
+
+        // 本体を描画。
+        for (let pxIdx = 0; pxIdx < pixelSize; pxIdx++) {
+            const i = pxIdx * 4;
+            if (sd[i + 3] === 0) continue;
+            paintClanPixel(pxIdx, i);
+        }
+
+        // 1pxのにじみ。コピー画像を作らず、元の県画像が透明かどうかで判定します。
         for (let y = 1; y < height - 1; y++) {
             for (let x = 1; x < width - 1; x++) {
                 const pxIdx = y * width + x;
-                const idx = pxIdx * 4;
-                
-                // もし今の場所が「まだ塗られていない（透明）」なら…
-                if (tempOutput[idx + 3] === 0) {
-                    // 上・下・左・右の場所を計算します
-                    const upIdx = (y - 1) * width + x;
-                    const downIdx = (y + 1) * width + x;
-                    const leftIdx = y * width + (x - 1);
-                    const rightIdx = y * width + (x + 1);
-
-                    const up = upIdx * 4;
-                    const down = downIdx * 4;
-                    const left = leftIdx * 4;
-                    const right = rightIdx * 4;
-
-                    // もし上下左右のどこかに色が塗られていたら、その色をコッソリ借ります！
-                    // ★追加：色と一緒に「勢力ID」もコッソリ借りてメモしておきます（後で境界線を正確に引くため）
-                    if (tempOutput[up + 3] > 0) {
-                        outputData.data[idx] = tempOutput[up];
-                        outputData.data[idx+1] = tempOutput[up+1];
-                        outputData.data[idx+2] = tempOutput[up+2];
-                        outputData.data[idx+3] = tempOutput[up+3];
-                        finalClanMap[pxIdx] = finalClanMap[upIdx];
-                    } else if (tempOutput[down + 3] > 0) {
-                        outputData.data[idx] = tempOutput[down];
-                        outputData.data[idx+1] = tempOutput[down+1];
-                        outputData.data[idx+2] = tempOutput[down+2];
-                        outputData.data[idx+3] = tempOutput[down+3];
-                        finalClanMap[pxIdx] = finalClanMap[downIdx];
-                    } else if (tempOutput[left + 3] > 0) {
-                        outputData.data[idx] = tempOutput[left];
-                        outputData.data[idx+1] = tempOutput[left+1];
-                        outputData.data[idx+2] = tempOutput[left+2];
-                        outputData.data[idx+3] = tempOutput[left+3];
-                        finalClanMap[pxIdx] = finalClanMap[leftIdx];
-                    } else if (tempOutput[right + 3] > 0) {
-                        outputData.data[idx] = tempOutput[right];
-                        outputData.data[idx+1] = tempOutput[right+1];
-                        outputData.data[idx+2] = tempOutput[right+2];
-                        outputData.data[idx+3] = tempOutput[right+3];
-                        finalClanMap[pxIdx] = finalClanMap[rightIdx];
-                    }
+                const i = pxIdx * 4;
+                if (sd[i + 3] !== 0) continue;
+                const neighbors = [pxIdx - width, pxIdx + width, pxIdx - 1, pxIdx + 1];
+                for (const nIdx of neighbors) {
+                    if (sd[nIdx * 4 + 3] > 0 && paintClanPixel(nIdx, i)) break;
                 }
             }
         }
 
-        // ==========================================
-        // ★ここから追加：勢力と勢力の間に「境界線」を引く魔法です！
-        // ==========================================
-        // 滲ませる処理が終わった後の、完成間近の絵をもう一度チェックします
-        const borderTempOutput = new Uint8ClampedArray(outputData.data);
-
+        // 国境線。finalClanMap/borderTempOutputを作らず、pixelCastleMapから直接所有勢力を比較します。
         for (let y = 1; y < height - 1; y++) {
             for (let x = 1; x < width - 1; x++) {
                 const pxIdx = y * width + x;
-                const idx = pxIdx * 4;
-                
-                // 色が塗られている（透明じゃない）場所だけをチェックします
-                if (borderTempOutput[idx + 3] > 0) {
-                    const myClan = finalClanMap[pxIdx];
-                    
-                    // 中立（0）の場所は境界線を引かずに飛ばします
-                    if (myClan === 0) continue; 
-                    
-                    // 上下左右のピクセルの勢力IDを調べます
-                    const upClan = finalClanMap[pxIdx - width];
-                    const downClan = finalClanMap[pxIdx + width];
-                    const leftClan = finalClanMap[pxIdx - 1];
-                    const rightClan = finalClanMap[pxIdx + 1];
-
-                    // 「隣が中立（0）ではなく、かつ自分と違う勢力」が１つでもあれば、そこは他の勢力との国境です！
-                    if ((upClan !== 0 && upClan !== myClan) ||
-                        (downClan !== 0 && downClan !== myClan) ||
-                        (leftClan !== 0 && leftClan !== myClan) ||
-                        (rightClan !== 0 && rightClan !== myClan)) {
-                        
-                        // 境界線として、元の色を少し暗くしてクッキリさせます
-                        outputData.data[idx] = Math.max(0, borderTempOutput[idx] - 50);     // R（赤）を暗く
-                        outputData.data[idx+1] = Math.max(0, borderTempOutput[idx+1] - 50); // G（緑）を暗く
-                        outputData.data[idx+2] = Math.max(0, borderTempOutput[idx+2] - 50); // B（青）を暗く
-                        outputData.data[idx+3] = 160; // 不透明度を少し上げて、線を際立たせます
-                    }
+                const i = pxIdx * 4;
+                if (sd[i + 3] === 0 || od[i + 3] === 0) continue;
+                const castleId = this.pixelCastleMap[pxIdx];
+                const myClan = castleId ? castleToClanMap[castleId] : 0;
+                if (myClan === 0) continue;
+                const neighborIdxs = [pxIdx - width, pxIdx + width, pxIdx - 1, pxIdx + 1];
+                let isBorder = false;
+                for (const nIdx of neighborIdxs) {
+                    const nCastleId = this.pixelCastleMap[nIdx];
+                    const nClan = nCastleId ? castleToClanMap[nCastleId] : 0;
+                    if (nClan !== 0 && nClan !== myClan) { isBorder = true; break; }
+                }
+                if (isBorder) {
+                    od[i] = Math.max(0, od[i] - 50);
+                    od[i + 1] = Math.max(0, od[i + 1] - 50);
+                    od[i + 2] = Math.max(0, od[i + 2] - 50);
+                    od[i + 3] = 160;
                 }
             }
         }
-        
+
         ctx.putImageData(outputData, 0, 0);
-        
-        // ★ここで描いた勢力の色（写真）を丸ごと記憶します！
         this.lastClanColorsImageData = outputData;
+        this._lastClanColorOverlay = overlay;
     },
 
     // ==========================================

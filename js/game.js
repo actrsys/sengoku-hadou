@@ -1692,35 +1692,51 @@ class GameManager {
     }
     
     // ==========================================
-    // ★ここから追加！：ゲームの裏側で、武将の顔画像を少しずつ読み込んでおく魔法です！
+    // ★軽量化：顔画像の大量プリロードを抑制します。
+    // スマホでは一覧に出ていない数千枚まで先読みすると、画像デコードキャッシュだけで
+    // WebView がメモリ不足になりやすいため、必要になった画像を通常の <img> 読み込みに任せます。
+    // PCでも「大名・城主」など最初に見える可能性が高い顔だけ、少量ずつアイドル時に読み込みます。
     // ==========================================
     preloadFaceIcons() {
-        const faceFiles = new Set();
-        this.bushos.forEach(b => {
-            if (b.faceIcon && b.faceIcon !== 'unknown_face.webp') {
-                faceFiles.add(b.faceIcon);
-            }
-        });
+        const isPc = document.body.classList.contains('is-pc');
+        if (!isPc) return;
 
-        const urls = Array.from(faceFiles).map(filename => `./data/images/faceicons/${filename}`);
-        
-        // ブラウザが一度に処理しやすい「10枚ずつ」の束にして、一斉に読み込みます
-        const batchSize = 10;
-        const loadBatch = async (startIndex) => {
-            if (startIndex >= urls.length) return;
-            
-            const batch = urls.slice(startIndex, startIndex + batchSize);
-            await Promise.all(batch.map(url => new Promise(res => {
-                const img = new Image();
-                img.onload = img.onerror = res;
-                img.src = url;
-            })));
-            
-            // 次の束へ進みます
-            loadBatch(startIndex + batchSize);
+        const faceFiles = new Set();
+        const addFaceByBushoId = (id) => {
+            const b = this.getBusho(id);
+            if (b && b.faceIcon && b.faceIcon !== 'unknown_face.webp') faceFiles.add(b.faceIcon);
         };
 
-        loadBatch(0);
+        // 重要人物だけを優先。全武将はプリロードしません。
+        this.clans.forEach(c => addFaceByBushoId(c.leaderId));
+        this.castles.forEach(c => addFaceByBushoId(c.castellanId));
+
+        const urls = Array.from(faceFiles)
+            .slice(0, 96)
+            .map(filename => `./data/images/faceicons/${filename}`);
+        const batchSize = 4;
+
+        const scheduleIdle = (fn) => {
+            if ('requestIdleCallback' in window) {
+                window.requestIdleCallback(fn, { timeout: 500 });
+            } else {
+                setTimeout(fn, 50);
+            }
+        };
+
+        const loadBatch = async (startIndex) => {
+            if (startIndex >= urls.length) return;
+            const batch = urls.slice(startIndex, startIndex + batchSize);
+            await Promise.all(batch.map(url => new Promise(resolve => {
+                const img = new Image();
+                img.onload = img.onerror = resolve;
+                img.decoding = 'async';
+                img.src = url;
+            })));
+            scheduleIdle(() => loadBatch(startIndex + batchSize));
+        };
+
+        scheduleIdle(() => loadBatch(0));
     }
     
     handleDaimyoSelect(castle) {
@@ -1774,8 +1790,15 @@ class GameManager {
     }
     // ★高速化：「勢力ID→大名武将」を一瞬で取り出します（毎回全武将から探す代わりに、勢力が覚えているIDを使います）
     getClanDaimyo(clanId) {
-        const clan = this.getClan(clanId);
-        return clan ? this.getBusho(clan.leaderId) : undefined;
+        const numericClanId = Number(clanId);
+        const clan = this.getClan(numericClanId);
+        if (clan) {
+            const leader = this.getBusho(clan.leaderId);
+            // leaderId が正常なら最速経路。セーブ移行直後などで一時的に不整合でも、
+            // 以前の「clan + isDaimyo 検索」と同じ結果へフォールバックします。
+            if (leader && Number(leader.clan) === numericClanId && leader.isDaimyo) return leader;
+        }
+        return this.bushos.find(b => Number(b.clan) === numericClanId && b.isDaimyo);
     }
     // ★高速化：「勢力ID→持ち城リスト」を一瞬で取り出します。
     // お城の持ち主（ownerClan）が変わった時だけ索引を作り直すよう、
@@ -1798,7 +1821,14 @@ class GameManager {
     getCurrentTurnCastle() { return this.turnQueue[this.currentIndex]; }
     getCurrentTurnId() { return this.year * 12 + this.month; }
     getClanTotalSoldiers(clanId) { return this.getClanCastles(clanId).reduce((sum, c) => sum + c.soldiers, 0); }
-    getClanGunshi(clanId) { return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi && b.status === 'active'); }
+    getClanGunshi(clanId) {
+        const clan = this.getClan(clanId);
+        if (clan && clan.gunshiId) {
+            const gunshi = this.getBusho(clan.gunshiId);
+            if (gunshi && Number(gunshi.clan) === Number(clanId) && gunshi.isGunshi && gunshi.status === 'active') return gunshi;
+        }
+        return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi && b.status === 'active');
+    }
 
     getNavigatorInfo(castle) {
         let faceIcon = 'koshou.webp';
@@ -1836,55 +1866,49 @@ class GameManager {
     }
     
     // ==========================================
-    // ★全ての大名の「威信（daimyoPrestige）」を計算して箱に入れる魔法です
-    updateAllClanPrestige() {// 差し替え前
-        this.clans.forEach(clan => {
-            // 空き家（中立）に加えて、滅亡した勢力も計算を飛ばすようにします
-            if (clan.id === 0 || clan.isDestroyed) return;
-            const castles = this.getClanCastles(clan.id);
-            let pop = 0, sol = 0, koku = 0, gold = 0, rice = 0;
-            
-            // ★追加：収入の計算もここで一括で行います！
-            let goldIncome = 0;
-            let riceIncome = 0;
+    // ★軽量化：1勢力だけ威信・収入を更新できるように分割します。
+    // AIの「1城ごとの思考」で全勢力を再計算する必要はありません。
+    // ==========================================
+    updateClanPrestige(clanId) {
+        const clan = this.getClan(clanId);
+        if (!clan || clan.id === 0 || clan.isDestroyed) return;
 
-            castles.forEach(c => { 
-                pop += c.population; 
-                sol += c.soldiers; 
-                koku += c.kokudaka; 
-                gold += c.gold; 
-                rice += c.rice; 
-                
-                // ★拠点の月収入（港ボーナス・一揆マイナス込み）を足します
-                goldIncome += GameSystem.calcExpectedGoldIncome(c, this);
-                // ★拠点の年収穫を足します
-                riceIncome += GameSystem.calcBaseRiceIncome(c);
-            });
-            
-            // ★外交（交易）収入を足します
-            goldIncome += GameSystem.calcClanTradeIncome(clan.id, this);
-            
-            // ★計算結果を勢力のデータに保存して、表示側で読むだけにします
-            clan.goldIncome = goldIncome;
-            clan.riceIncome = riceIncome;
-            
-            // まずは今まで通り、兵士やお金から「基本の威信」を計算します
-            const basePrestige = Math.floor(pop / 200) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 150) + Math.floor(rice / 300);
-            
-            // ★追加：後で官位を得る計算などに使えるよう、ベースの素の威信を記憶しておきます
-            clan.basePrestige = basePrestige;
+        const castles = this.getClanCastles(clan.id);
+        let pop = 0, sol = 0, koku = 0, gold = 0, rice = 0;
+        let goldIncome = 0;
+        let riceIncome = 0;
 
-            // ★追加：大名の武将データから官位ボーナスを取得します
-            let rankBonus = 0;
-            const leader = this.getBusho(clan.leaderId);
-            if (leader) {
-                rankBonus = this.courtRankSystem.getBushoRankBonus(leader);
-            }
-            
-            // ベース威信と官位ボーナスを足し算して、最終的な威信にします
-            clan.daimyoPrestige = basePrestige + rankBonus;
-            
-        });
+        for (const c of castles) {
+            pop += c.population;
+            sol += c.soldiers;
+            koku += c.kokudaka;
+            gold += c.gold;
+            rice += c.rice;
+            goldIncome += GameSystem.calcExpectedGoldIncome(c, this);
+            riceIncome += GameSystem.calcBaseRiceIncome(c);
+        }
+
+        goldIncome += GameSystem.calcClanTradeIncome(clan.id, this);
+        clan.goldIncome = goldIncome;
+        clan.riceIncome = riceIncome;
+
+        const basePrestige = Math.floor(pop / 200) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 150) + Math.floor(rice / 300);
+        clan.basePrestige = basePrestige;
+
+        let rankBonus = 0;
+        const leader = this.getBusho(clan.leaderId);
+        if (leader && this.courtRankSystem) {
+            rankBonus = this.courtRankSystem.getBushoRankBonus(leader);
+        }
+        clan.daimyoPrestige = basePrestige + rankBonus;
+    }
+
+    // 全勢力の再計算が本当に必要な月初・大きな状態変更用。
+    updateAllClanPrestige() {
+        for (const clan of this.clans) {
+            if (clan.id === 0 || clan.isDestroyed) continue;
+            this.updateClanPrestige(clan.id);
+        }
     }
     
     // ★大名家の表示名を更新する魔法です（同名被りの回避）

@@ -1537,7 +1537,14 @@ class UIInfoManager {
             wrapperStyle = `width: ${config.minWidth}; min-width: 100%;`;
         }
 
+        // ★軽量化：大量リストは「行データそのもの」も必要な分だけ作れるようにします。
+        // config.items の代わりに itemCount + getItem(index) を渡せます。
+        const hasLazyItems = Number.isFinite(config.itemCount) && typeof config.getItem === 'function';
+        const totalItems = hasLazyItems ? Math.max(0, Number(config.itemCount) || 0) : ((config.items && config.items.length) || 0);
+        const getItemAt = (index) => hasLazyItems ? config.getItem(index) : config.items[index];
+
         const buildItemHtml = (item, index) => {
+            if (!item) return '';
             const cursorStr = item.onClick ? "style='cursor:pointer;'" : "style='cursor:default;'";
             const extraClass = item.itemClass || '';
             let clickStr = "";
@@ -1563,7 +1570,7 @@ class UIInfoManager {
             return `<div class="select-item ${config.itemClass || ''} ${extraClass} ${stripeClass}" ${cursorStr} ${clickStr} ${indexAttr}>${cells}</div>`;
         };
 
-        if (!config.items || config.items.length === 0) {
+        if (totalItems === 0) {
             let emptyHtml = '';
             if (config.headers && config.headers.length > 0) {
                 const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
@@ -1575,7 +1582,6 @@ class UIInfoManager {
             return;
         }
 
-        const totalItems = config.items.length;
         const INITIAL_RENDER_COUNT = 30;
         const CHUNK_SIZE = 50;
         const VIRTUALIZE_THRESHOLD = 150; // ★これを超える件数のリストは「仮想スクロール」に切り替えます
@@ -1631,7 +1637,8 @@ class UIInfoManager {
                 const targetItem = e.target.closest('[data-action-index]');
                 if (targetItem) {
                     const index = parseInt(targetItem.getAttribute('data-action-index'));
-                    if (config.items && config.items[index] && typeof config.items[index].onClick === 'function') {
+                    const item = getItemAt(index);
+                    if (item && typeof item.onClick === 'function') {
                         // ★修正：大枠の監視を使うと「枠」がクリックされたことになってしまうので、
                         // 該当の「行」がクリックされたと錯覚させる「身代わりのイベント（Proxy）」を作って渡します！
                         const pseudoEvent = new Proxy(e, {
@@ -1641,7 +1648,7 @@ class UIInfoManager {
                                 return typeof value === 'function' ? value.bind(target) : value;
                             }
                         });
-                        config.items[index].onClick(pseudoEvent);
+                        item.onClick(pseudoEvent);
                     }
                 }
             });
@@ -1702,7 +1709,7 @@ class UIInfoManager {
 
                 const rowsHtml = [];
                 for (let i = startIndex; i < endIndex; i++) {
-                    rowsHtml.push(buildItemHtml(config.items[i], i));
+                    rowsHtml.push(buildItemHtml(getItemAt(i), i));
                 }
 
                 scrollBody.style.paddingTop = `${startIndex * rowHeight}px`;
@@ -1778,7 +1785,7 @@ class UIInfoManager {
         }
 
         for (let i = 0; i < initialLimit; i++) {
-            initialHtmlParts.push(buildItemHtml(config.items[i], i));
+            initialHtmlParts.push(buildItemHtml(getItemAt(i), i));
         }
 
         for (let i = totalItems; i < 8; i++) {
@@ -1812,7 +1819,7 @@ class UIInfoManager {
                 const endLimit = Math.min(currentIndex + CHUNK_SIZE, totalItems);
 
                 for (let i = currentIndex; i < endLimit; i++) {
-                    chunkParts.push(buildItemHtml(config.items[i], i));
+                    chunkParts.push(buildItemHtml(getItemAt(i), i));
                 }
 
                 const innerWrapper = listContainer.querySelector('.list-inner-wrapper');

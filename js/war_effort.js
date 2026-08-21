@@ -570,7 +570,7 @@ Object.assign(WarManager.prototype, {
             const defDaimyoName = this.getDisplayClanName(defClan, (defClanData && defClanData.name) ? defClanData.name : (defCastle.isKunishu ? defCastle.name : (defProvData ? defProvData.province : "中立")));
             
             // ★追加：大名の居城かどうかを判定して記憶します
-            const defDaimyo = this.game.bushos.find(b => b.clan === defClan && b.isDaimyo);
+            const defDaimyo = this.game.getClanDaimyo(defClan);
             const isDaimyoCastle = (defDaimyo && defDaimyo.castleId === defCastle.id);
 
             // ★追加：最短ルートが海路を通るか（海戦か）どうかを判定して記憶します
@@ -2151,7 +2151,7 @@ Object.assign(WarManager.prototype, {
                 
                 const maxCharm = Math.max(...s.atkBushos.map(b => b.charm));
                 const subCharm = s.atkBushos.reduce((acc, b) => acc + b.charm, 0) - maxCharm;
-                const daimyo = this.game.bushos.find(b => b.clan === s.attacker.ownerClan && b.isDaimyo) || {charm: 50};
+                const daimyo = this.game.getClanDaimyo(s.attacker.ownerClan) || {charm: 50};
                 const charmScore = maxCharm + (subCharm * 0.1) + (daimyo.charm * window.WarParams.War.DaimyoCharmWeight);
                 let lossRate = Math.max(0, window.WarParams.War.LootingBaseRate - (charmScore * window.WarParams.War.LootingCharmFactor)); 
                 if (lossRate > 0) {
@@ -2706,9 +2706,11 @@ Object.assign(WarManager.prototype, {
     },
     
     async autoResolvePrisoners(captives, winnerClanId) { // ★ async を追加
-        const aiBushos = this.game.bushos.filter(b => b.clan === winnerClanId && b.status !== 'unborn'); 
-        // AIもプレイヤーと同じように大名（または代表者）の魅力や相性を使うようにします
-        const recruiter = aiBushos.find(b => b.isDaimyo) || aiBushos[0] || { charm: 50, affinity: 0 };
+        // ★軽量化：勝者勢力の全武将を毎回filterせず、既存の大名索引を使います。
+        // 大名が存在しない特殊ケースだけ従来相当の代表者検索へフォールバックします。
+        const recruiter = this.game.getClanDaimyo(winnerClanId) ||
+            this.game.bushos.find(b => b.clan === winnerClanId && b.status !== 'unborn') ||
+            { charm: 50, affinity: 0 };
 
         // ★大名から先に処理するように並べ替えます
         captives.sort((a, b) => (b.isDaimyo ? 1 : 0) - (a.isDaimyo ? 1 : 0));
@@ -3221,7 +3223,7 @@ Object.assign(WarManager.prototype, {
 
         if (!['支配', '従属', '同盟'].includes(myToHelperRel.status)) this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
 
-        const helperDaimyo = this.game.bushos.find(b => b.clan === helperClanId && b.isDaimyo) || { duty: 50 };
+        const helperDaimyo = this.game.getClanDaimyo(helperClanId) || { duty: 50 };
         
         const rate = (myToHelperRel.sentiment + helperDaimyo.duty) / 400;
         let reinfSoldiers = Math.floor(helperCastle.soldiers * rate);
@@ -3336,7 +3338,7 @@ Object.assign(WarManager.prototype, {
         if (!executedBusho || killerClanId === 0 || executedBusho.clan === 0) return;
         
         // 斬った側の大名武将を探す
-        const killerDaimyo = this.game.bushos.find(b => b.clan === killerClanId && b.isDaimyo);
+        const killerDaimyo = this.game.getClanDaimyo(killerClanId);
         if (!killerDaimyo) return;
         const killerId = killerDaimyo.id;
 
