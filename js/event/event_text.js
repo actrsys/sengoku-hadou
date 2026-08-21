@@ -9,8 +9,26 @@ window.EventTextManager = {
     // ★ 共通のテキスト再生プレイヤー
     // ==========================================
     playSequence: async function(game, sequence) {
+        // ★Round12：次に使う顔を最大2会話先までだけ先読みします。
+        // 大量に保持せず、現在の会話を読んでいる時間を次のdecodeに使うための小さな先読みです。
+        const preloadItemFaces = (item) => {
+            if (!item || item.type !== 'dialog' || !game.ui || typeof game.ui.preloadDialogFace !== 'function') return;
+            const leftFace = item.leftFace || (item.leftName === '小姓' ? 'koshou.webp' : null);
+            const rightFace = item.rightFace || (item.rightName === '小姓' ? 'koshou.webp' : null);
+            if (leftFace) game.ui.preloadDialogFace(leftFace);
+            if (rightFace) game.ui.preloadDialogFace(rightFace);
+        };
+
+        preloadItemFaces(sequence[0]);
+        preloadItemFaces(sequence[1]);
+        preloadItemFaces(sequence[2]);
+
         // 受け取った台本（sequence）を上から順番に再生します
-        for (const item of sequence) {
+        for (let i = 0; i < sequence.length; i++) {
+            const item = sequence[i];
+            // 現在行を表示する前に、さらに2行先を先読みキューへ追加します。
+            preloadItemFaces(sequence[i + 2]);
+
             if (item.type === 'log') {
                 // 顔画像のない、ただのメッセージとして表示します
                 await game.ui.showDialogAsync(item.msg, false, 0, { isEvent: true });

@@ -298,6 +298,10 @@ class UIManager {
 
         this.dialogQueue = []; 
         this.isDialogShowing = false; 
+        // ★Round12：会話顔は直近だけを小さく先読みし、登場人物が多いイベントでも次行待ちを減らします。
+        this._dialogFacePreloadCache = new Map();
+        this._dialogFacePreloadCacheLimit = 4;
+        this._dialogGuardHeld = false;
 
         document.addEventListener('click', (e) => {
             const btn = e.target.closest('button');
@@ -533,10 +537,19 @@ class UIManager {
         });
     }
 
-    // ★Round 9：会話用の顔画像を、DOMへ出す前に読み込み・デコードしておきます。
-    // 古いスマホで src 差し替え直後に旧画像の一部が残る描画破綻を避けるための処理です。
-    async _prepareDialogFaceImage(faceIcon) {
-        if (!faceIcon || typeof Image === 'undefined') return null;
+    // ★Round12：会話用の顔画像を、DOMへ出す前に読み込み・デコードしておきます。
+    // 同じ顔を短時間に何度も使う場合は、小さな先読みキャッシュを共有します。
+    _getDialogFaceTemplatePromise(faceIcon) {
+        if (!faceIcon || typeof Image === 'undefined') return Promise.resolve(null);
+        if (!this._dialogFacePreloadCache) this._dialogFacePreloadCache = new Map();
+
+        if (this._dialogFacePreloadCache.has(faceIcon)) {
+            const hit = this._dialogFacePreloadCache.get(faceIcon);
+            // Mapの末尾へ移し、直近使用順にします。
+            this._dialogFacePreloadCache.delete(faceIcon);
+            this._dialogFacePreloadCache.set(faceIcon, hit);
+            return hit;
+        }
 
         const loadOne = async (src) => {
             const img = new Image();
@@ -573,16 +586,53 @@ class UIManager {
                     if (img.naturalWidth > 0) return img;
                 }
             } catch (e) {
-                // decode() が失敗した場合も、通常の load 完了を確認してからフォールバックします。
+                // decode() が失敗した場合も通常のload完了を確認します。
             }
-
             return (await waitLoad()) ? img : null;
         };
 
-        const primarySrc = `data/images/faceicons/${faceIcon}`;
-        let img = await loadOne(primarySrc);
-        if (!img && faceIcon !== 'unknown_face.webp') {
-            img = await loadOne('data/images/faceicons/unknown_face.webp');
+        const promise = (async () => {
+            let img = await loadOne(`data/images/faceicons/${faceIcon}`);
+            if (!img && faceIcon !== 'unknown_face.webp') {
+                img = await loadOne('data/images/faceicons/unknown_face.webp');
+            }
+            return img;
+        })();
+
+        this._dialogFacePreloadCache.set(faceIcon, promise);
+        const limit = Math.max(2, this._dialogFacePreloadCacheLimit || 4);
+        while (this._dialogFacePreloadCache.size > limit) {
+            const oldestKey = this._dialogFacePreloadCache.keys().next().value;
+            this._dialogFacePreloadCache.delete(oldestKey);
+        }
+        return promise;
+    }
+
+    preloadDialogFace(faceIcon) {
+        if (!faceIcon) return;
+        // 先読みは待たずに開始だけします。失敗は実表示時のフォールバックに任せます。
+        this._getDialogFaceTemplatePromise(faceIcon).catch(() => null);
+    }
+
+    async _prepareDialogFaceImage(faceIcon) {
+        if (!faceIcon || typeof Image === 'undefined') return null;
+        const template = await this._getDialogFaceTemplatePromise(faceIcon);
+        if (!template) return null;
+
+        // 同じImage要素そのものを使い回すとDOM間を移動してしまうので、表示用は複製します。
+        const img = template.cloneNode(false);
+        img.alt = '';
+        img.draggable = false;
+        img.loading = 'eager';
+        img.decoding = 'async';
+        img.width = 85;
+        img.height = 85;
+
+        // 先読み済みリソースなので通常は即時完了。念のため表示前decodeを保証します。
+        try {
+            if (typeof img.decode === 'function') await img.decode();
+        } catch (e) {
+            // clone側のdecodeが使えない古いWebViewでは、既に読み込み済みのsrcをそのまま使用します。
         }
         return img;
     }
@@ -639,33 +689,6 @@ class UIManager {
         const dialog = this.dialogQueue.shift();
         
         const modal = document.getElementById('dialog-modal');
-        // 前回の画面で使った特別な配置（真ん中寄せなど）を、一度きれいにリセットしてお掃除します！
-        if (modal) {
-            modal.style.display = '';
-            modal.style.flexDirection = '';
-            modal.style.justifyContent = '';
-            const footer = modal.querySelector('.modal-footer');
-            if (footer) {
-                footer.style.position = '';
-                footer.style.top = '';
-                footer.style.bottom = '';
-                footer.style.left = '';
-                footer.style.transform = '';
-                footer.style.zIndex = '';
-                footer.style.width = '';
-                footer.style.maxWidth = '';
-                footer.style.padding = '';
-                footer.style.margin = '';
-                footer.style.justifyContent = '';
-                footer.style.order = '';
-                footer.style.removeProperty('margin-top');
-                footer.style.removeProperty('margin-bottom');
-            }
-            const modalContent = modal.querySelector('.modal-content');
-            if (modalContent) {
-                modalContent.style.removeProperty('margin-top');
-            }
-        }
 
         const msgEl = document.getElementById('dialog-message');
         const leftFaceEl = document.getElementById('dialog-left-face');
@@ -677,7 +700,11 @@ class UIManager {
         let okBtn = document.getElementById('dialog-btn-ok');
         let cancelBtn = document.getElementById('dialog-btn-cancel');
 
-        this.hideAIGuardTemporarily();
+        // ★Round12：連続会話中はAIガードの一時非表示カウントを積み増さず、シーケンス全体で1回だけ保持します。
+        if (!this._dialogGuardHeld) {
+            this.hideAIGuardTemporarily();
+            this._dialogGuardHeld = true;
+        }
 
         if (!modal) {
             if (dialog.isConfirm) {
@@ -686,7 +713,10 @@ class UIManager {
                 alert(dialog.msg);
                 if (dialog.onOk) dialog.onOk();
             }
-            this.restoreAIGuard(); 
+            if (this._dialogGuardHeld) {
+                this.restoreAIGuard();
+                this._dialogGuardHeld = false;
+            }
             this.processDialogQueue(); 
             return;
         }
@@ -724,6 +754,33 @@ class UIManager {
         if (movedRightFaceToLeft) {
             preparedFaces.leftImg = preparedFaces.rightImg;
             preparedFaces.rightImg = null;
+        }
+
+        // ★Round12：ここまでは現在表示中の会話画面に一切触れません。
+        // 次の顔が準備できた後で初めて前回の配置を掃除し、同じ処理単位で次の内容へ切り替えます。
+        if (modal) {
+            modal.style.display = '';
+            modal.style.flexDirection = '';
+            modal.style.justifyContent = '';
+            const resetFooter = modal.querySelector('.modal-footer');
+            if (resetFooter) {
+                resetFooter.style.position = '';
+                resetFooter.style.top = '';
+                resetFooter.style.bottom = '';
+                resetFooter.style.left = '';
+                resetFooter.style.transform = '';
+                resetFooter.style.zIndex = '';
+                resetFooter.style.width = '';
+                resetFooter.style.maxWidth = '';
+                resetFooter.style.padding = '';
+                resetFooter.style.margin = '';
+                resetFooter.style.justifyContent = '';
+                resetFooter.style.order = '';
+                resetFooter.style.removeProperty('margin-top');
+                resetFooter.style.removeProperty('margin-bottom');
+            }
+            const resetContent = modal.querySelector('.modal-content');
+            if (resetContent) resetContent.style.removeProperty('margin-top');
         }
 
         const setFaceAndName = (faceEl, nameEl, faceIcon, nameText, preparedImg) => {
@@ -777,7 +834,10 @@ class UIManager {
                 modal.classList.add('hidden');
                 if (leftFaceEl) leftFaceEl.replaceChildren();
                 if (rightFaceEl) rightFaceEl.replaceChildren();
-                this.restoreAIGuard();
+                if (this._dialogGuardHeld) {
+                    this.restoreAIGuard();
+                    this._dialogGuardHeld = false;
+                }
                 this.isDialogShowing = false;
             };
 
@@ -1237,31 +1297,34 @@ class UIManager {
     // ==========================================
     // ★ここから追加：画面内のリストに自作スクロールバーをつける魔法
     // ==========================================
-    updateCustomScrollbars() {
-        // スクロールバーをつけたいリストの目印（クラスやID）をここにまとめて書きます
+    updateCustomScrollbars(targetRoot = document) {
+        // ★Round12：まずDOMから外れた古いScrollbarを破棄し、documentに残るtouchmove等の参照を解放します。
+        if (typeof CustomScrollbar !== 'undefined' && typeof CustomScrollbar.cleanupDisconnected === 'function') {
+            CustomScrollbar.cleanupDisconnected();
+        }
+
         const selectors = [
-            '.list-container', 
-            '#divide-list', 
-            '.daimyo-list-container', 
+            '.list-container',
+            '#divide-list',
+            '.daimyo-list-container',
             '.faction-list-container',
             '.princess-list-container',
             '#history-list'
         ];
-        
-        // 画面の中から、上の目印がついているリストを全部探してきます
-        const targets = document.querySelectorAll(selectors.join(', '));
-        
+
+        // targetRootを渡した場合は、その部分だけを更新できます。従来どおり引数なしなら画面全体です。
+        const root = targetRoot && typeof targetRoot.querySelectorAll === 'function' ? targetRoot : document;
+        const targets = [];
+        if (root.matches && root.matches(selectors.join(', '))) targets.push(root);
+        root.querySelectorAll(selectors.join(', ')).forEach(el => targets.push(el));
+
         targets.forEach(listEl => {
-            if (listEl.customScrollbar) {
-                // すでにスクロールバーがついていたら、長さを計算し直すだけ
-                listEl.customScrollbar.update();
-            } else {
-                // まだついていなかったら、新しく取り付けます
-                if (typeof CustomScrollbar !== 'undefined') {
-                    listEl.customScrollbar = new CustomScrollbar(listEl);
-                    // 画面の準備が整うのをほんの少しだけ待ってから長さを合わせます
-                    setTimeout(() => listEl.customScrollbar.update(), 10);
-                }
+            if (listEl.customScrollbar && !listEl.customScrollbar._destroyed) {
+                // update()直呼びではなく1フレームにまとめます。
+                if (typeof listEl.customScrollbar.scheduleUpdate === 'function') listEl.customScrollbar.scheduleUpdate();
+                else listEl.customScrollbar.update();
+            } else if (typeof CustomScrollbar !== 'undefined') {
+                listEl.customScrollbar = new CustomScrollbar(listEl);
             }
         });
     }

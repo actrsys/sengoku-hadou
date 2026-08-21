@@ -1,35 +1,44 @@
 /**
  * custom_scrollbar.js
  * 縦スクロール専用版
+ * Round 12: 長時間プレイ時のイベントリスナー残留と、ドラッグ中の二重更新を抑制
  */
 class CustomScrollbar {
     constructor(listElement) {
         this.list = listElement;
-        
-        // 親が 'scroll-wrapper' じゃなければ、自動で枠を作って囲んであげる魔法！
+        this._destroyed = false;
+        this._scrollTicking = false;
+        this._dragListenersAttached = false;
+        this._hasOverflow = null;
+
+        // スマホ版（モバイル）かPC版かを自動で見分ける設定です
+        this.isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        this.isLocked = false;
+
+        // 親が 'scroll-wrapper' じゃなければ、自動で枠を作って囲みます
         if (this.list.parentElement && this.list.parentElement.classList.contains('scroll-wrapper')) {
             this.wrapper = this.list.parentElement;
+            this._createdWrapper = false;
         } else {
             this.wrapper = document.createElement('div');
             this.wrapper.className = 'scroll-wrapper';
-            
-            // リストの大きさの情報を、外枠にも引き継いでおきます
+            this._createdWrapper = true;
+
+            // リストの大きさの情報を、外枠にも引き継ぎます
             this.wrapper.style.flex = this.list.style.flex || '1';
             this.wrapper.style.maxHeight = this.list.style.maxHeight;
-            // ★フレックスボックス内で要素がはみ出さない（押し出されない）ための絶対的なおまじないです！
             this.wrapper.style.minHeight = this.list.style.minHeight || '0';
             this.wrapper.style.overflow = 'hidden';
             this.wrapper.style.height = this.list.style.height;
-            
+
             if (this.list.parentNode) {
                 this.list.parentNode.insertBefore(this.wrapper, this.list);
             }
             this.wrapper.appendChild(this.list);
         }
-        
-        // 元からあるスマホやパソコンのスクロールバーを隠す魔法をかけます
+
         this.list.classList.add('hide-native-scroll');
-        
+
         // ★縦用のバー
         this.trackY = document.createElement('div');
         this.trackY.className = 'custom-scrollbar-track';
@@ -47,108 +56,115 @@ class CustomScrollbar {
         this.btnDown.className = 'custom-scrollbar-btn down';
         this.wrapper.appendChild(this.btnDown);
 
-        // 行の高さ（1行分）を自動で計算してズレをなくす魔法の計算式です
-        const getScrollStep = () => {
-            // ★修正：ui_info.jsで作られる「実際の1行（.select-item）」を直接探し出して測ります
-            const item = this.list.querySelector('.select-item');
-            
-            if (item) {
-                // その行を囲んでいる親要素（list-inner-wrapper）の隙間設定も取得します
-                const parentStyle = window.getComputedStyle(item.parentElement);
-                const gap = parseFloat(parentStyle.rowGap) || parseFloat(parentStyle.gap) || 0;
-                
-                let step = item.offsetHeight + gap;
-                
-                // 安全装置：もし測った高さがおかしい場合は、ui_info.jsの基本値(40)に合わせます
-                if (step <= 0 || step > this.list.clientHeight) {
-                    step = 40;
-                }
-                return step;
-            }
-            return 40; // 要素が何もない時の安全な基本値です
-        };
-
-        // ボタンのクリックイベント（計算した1行分をスクロールします）
-        this.btnUp.addEventListener('click', () => {
-            if (typeof this.list.scrollBy === 'function') {
-                this.list.scrollBy({ top: -getScrollStep(), behavior: 'smooth' });
-            } else {
-                // 古いブラウザなどで scrollBy が使えない場合の安全装置です
-                this.list.scrollTop -= getScrollStep();
-            }
-        });
-        this.btnDown.addEventListener('click', () => {
-            if (typeof this.list.scrollBy === 'function') {
-                this.list.scrollBy({ top: getScrollStep(), behavior: 'smooth' });
-            } else {
-                // 古いブラウザなどで scrollBy が使えない場合の安全装置です
-                this.list.scrollTop += getScrollStep();
-            }
-        });
-        
-        // スマホ版（モバイル）かPC版かを自動で見分ける設定です
-        this.isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        this.isLocked = false;
-
-        // バーを掴んで引っ張る（ドラッグする）ための準備をします
+        // バーを掴んで引っ張る（ドラッグする）ための準備
         this.isDraggingY = false;
         this.startY = 0;
         this.startScrollTop = 0;
-        
+
         this.initEvents();
+
+        // ★Round12：生存中インスタンスを一元管理し、DOMから消えたものを後で確実に破棄できるようにします。
+        CustomScrollbar.instances.add(this);
+        CustomScrollbar._ensureSharedResizeListener();
+
+        // 初回は1フレーム後に寸法を合わせます。
+        this.scheduleUpdate();
     }
-    
+
+    getScrollStep() {
+        const item = this.list.querySelector('.select-item');
+        if (item) {
+            const parentStyle = window.getComputedStyle(item.parentElement);
+            const gap = parseFloat(parentStyle.rowGap) || parseFloat(parentStyle.gap) || 0;
+            let step = item.offsetHeight + gap;
+            if (step <= 0 || step > this.list.clientHeight) step = 40;
+            return step;
+        }
+        return 40;
+    }
+
+    scheduleUpdate() {
+        if (this._destroyed || this._scrollTicking) return;
+        this._scrollTicking = true;
+        const raf = window.requestAnimationFrame || ((cb) => setTimeout(cb, 16));
+        raf(() => {
+            this._scrollTicking = false;
+            if (this._destroyed) return;
+            // DOMから外れたリストは、その場で後始末します。
+            if (!this.list || !this.list.isConnected) {
+                this.destroy();
+                return;
+            }
+            this.update();
+        });
+    }
+
     update() {
+        if (this._destroyed || !this.list || !this.trackY || !this.thumbY) return;
+
         const listHeight = this.list.clientHeight;
         const scrollHeight = this.list.scrollHeight;
         const scrollTop = this.list.scrollTop;
-
         const trackHeight = this.trackY.clientHeight || listHeight;
-        
-        // 制限を外して、スマホ版でもバーを掴めるようにします
-        this.trackY.style.pointerEvents = 'auto';
-        this.thumbY.style.pointerEvents = 'auto';
-        
-        if (scrollHeight <= listHeight) {
-            this.thumbY.style.height = '100%';
-            this.thumbY.style.top = '0px';
-            // スクロールが不要な状態の時は掴めないようにします
-            this.thumbY.style.pointerEvents = 'none';
-        } else {
-            let thumbHeight = Math.max(40, (listHeight / scrollHeight) * trackHeight);
-            this.thumbY.style.height = `${thumbHeight}px`;
-            const maxScrollTop = scrollHeight - listHeight;
-            const maxThumbTop = trackHeight - thumbHeight;
-            const scrollRatioY = scrollTop / maxScrollTop;
-            this.thumbY.style.top = `${scrollRatioY * maxThumbTop}px`;
+
+        // display:none などでまだ寸法が確定していない時は、次回更新に任せます。
+        if (listHeight <= 0 || trackHeight <= 0) return;
+
+        const hasOverflow = scrollHeight > listHeight + 1;
+        if (this._hasOverflow !== hasOverflow) {
+            this._hasOverflow = hasOverflow;
+            this.trackY.style.pointerEvents = hasOverflow ? 'auto' : 'none';
+            this.thumbY.style.pointerEvents = hasOverflow ? 'auto' : 'none';
         }
 
-        // --- ボタンの色（有効・無効）の更新 ---
-        // 上端なら「上」ボタンを銀色に
+        if (!hasOverflow) {
+            if (this.thumbY.style.height !== '100%') this.thumbY.style.height = '100%';
+            if (this.thumbY.style.top !== '0px') this.thumbY.style.top = '0px';
+        } else {
+            const thumbHeight = Math.max(40, (listHeight / scrollHeight) * trackHeight);
+            const maxScrollTop = Math.max(1, scrollHeight - listHeight);
+            const maxThumbTop = Math.max(0, trackHeight - thumbHeight);
+            const scrollRatioY = Math.max(0, Math.min(1, scrollTop / maxScrollTop));
+            const nextHeight = `${thumbHeight}px`;
+            const nextTop = `${scrollRatioY * maxThumbTop}px`;
+            if (this.thumbY.style.height !== nextHeight) this.thumbY.style.height = nextHeight;
+            if (this.thumbY.style.top !== nextTop) this.thumbY.style.top = nextTop;
+        }
+
         this.btnUp.classList.toggle('disabled', scrollTop <= 0);
-        // 下端なら「下」ボタンを銀色に
         this.btnDown.classList.toggle('disabled', scrollTop + listHeight >= scrollHeight - 1);
     }
-    
-    initEvents() {
-        this.onListScroll = () => {
-            // ★軽量化：スクロール時の計算に少しだけ休憩（アニメーションフレーム）を挟み、スマホでのカクつきを防ぎます！
-            if (!this._scrollTicking) {
-                requestAnimationFrame(() => {
-                    this.update();
-                    this._scrollTicking = false;
-                });
-                this._scrollTicking = true;
-            }
-        };
 
-        // スマホ（モバイルデバイス）用の指スワイプ制御の処理です
+    _attachDragListeners() {
+        if (this._dragListenersAttached) return;
+        this._dragListenersAttached = true;
+        document.addEventListener('mousemove', this.onDocMouseMove, { passive: false });
+        document.addEventListener('touchmove', this.onDocMouseMove, { passive: false });
+        document.addEventListener('mouseup', this.onEnd);
+        document.addEventListener('touchend', this.onEnd);
+        document.addEventListener('touchcancel', this.onEnd);
+    }
+
+    _detachDragListeners() {
+        if (!this._dragListenersAttached) return;
+        this._dragListenersAttached = false;
+        document.removeEventListener('mousemove', this.onDocMouseMove);
+        document.removeEventListener('touchmove', this.onDocMouseMove);
+        document.removeEventListener('mouseup', this.onEnd);
+        document.removeEventListener('touchend', this.onEnd);
+        document.removeEventListener('touchcancel', this.onEnd);
+    }
+
+    initEvents() {
+        this.onListScroll = () => this.scheduleUpdate();
+
+        // スマホ用：ローディング中やAIガード中はリスト側の指スクロールを止めます。
         if (this.isMobile) {
             this.onListTouchMove = (e) => {
                 const globalLoading = document.getElementById('global-loading-screen');
                 const aiGuard = document.getElementById('ai-guard');
                 const warAiGuard = document.getElementById('war-ai-guard');
-                
+
                 const isGlobalLoading = globalLoading && !globalLoading.classList.contains('hidden');
                 const isAIGuard = aiGuard && !aiGuard.classList.contains('hidden');
                 const isWarAiGuard = warAiGuard && !warAiGuard.classList.contains('hidden');
@@ -159,103 +175,129 @@ class CustomScrollbar {
             };
         }
 
-        // スマホ・PC共通のドラッグ（バーを掴んでスクロールさせる処理）です
         this.onStartY = (e) => {
+            if (this._destroyed || !this._hasOverflow) return;
             this.isDraggingY = true;
             this.thumbY.classList.add('dragging');
-            // タッチ操作とマウス操作の両方からY座標を取得します
             this.startY = e.touches ? e.touches[0].clientY : e.clientY;
             this.startScrollTop = this.list.scrollTop;
-            
-            // スマホでバーを掴んだ時に画面全体がスクロールしてしまうのを防ぎます
+            this._attachDragListeners();
             if (e.cancelable) e.preventDefault();
         };
-        
+
         this.onMoveY = (e) => {
-            if (!this.isDraggingY) return;
-            const currentY = e.touches ? e.touches[0].clientY : e.clientY;
+            if (!this.isDraggingY || this._destroyed) return;
+            const point = e.touches ? e.touches[0] : e;
+            if (!point) return;
+            const currentY = point.clientY;
             const deltaY = currentY - this.startY;
-            
+
             const listHeight = this.list.clientHeight;
             const scrollHeight = this.list.scrollHeight;
-            const trackHeight = this.trackY.clientHeight || listHeight; 
-            const thumbHeight = parseFloat(this.thumbY.style.height);
-            
-            const maxScrollTop = scrollHeight - listHeight;
-            const maxThumbTop = trackHeight - thumbHeight; 
-            
+            const trackHeight = this.trackY.clientHeight || listHeight;
+            const thumbHeight = parseFloat(this.thumbY.style.height) || trackHeight;
+            const maxScrollTop = Math.max(0, scrollHeight - listHeight);
+            const maxThumbTop = Math.max(0, trackHeight - thumbHeight);
+            if (maxScrollTop <= 0 || maxThumbTop <= 0) return;
+
             const scrollRatio = deltaY / maxThumbTop;
             this.list.scrollTop = this.startScrollTop + (scrollRatio * maxScrollTop);
-            
-            this.update();
+            // ★Round12：ここではupdate()を直接呼びません。
+            // scrollイベント側で1フレーム1回にまとめることで二重更新を防ぎます。
         };
-        
+
         this.onEnd = () => {
+            if (!this.isDraggingY && !this._dragListenersAttached) return;
             this.isDraggingY = false;
-            this.thumbY.classList.remove('dragging');
+            if (this.thumbY) this.thumbY.classList.remove('dragging');
+            this._detachDragListeners();
+            this.scheduleUpdate();
         };
 
         this.onDocMouseMove = (e) => {
-            if (this.isDraggingY) {
-                this.onMoveY(e);
-                // ドラッグ中も画面が裏で動かないように固定します
-                if (e.cancelable) e.preventDefault();
+            if (!this.isDraggingY) return;
+            this.onMoveY(e);
+            if (e.cancelable) e.preventDefault();
+        };
+
+        this.onBtnUp = () => {
+            const step = this.getScrollStep();
+            if (typeof this.list.scrollBy === 'function') {
+                this.list.scrollBy({ top: -step, behavior: this.isMobile ? 'auto' : 'smooth' });
+            } else {
+                this.list.scrollTop -= step;
             }
         };
-        
-        this.onWindowResize = () => this.update();
+        this.onBtnDown = () => {
+            const step = this.getScrollStep();
+            if (typeof this.list.scrollBy === 'function') {
+                this.list.scrollBy({ top: step, behavior: this.isMobile ? 'auto' : 'smooth' });
+            } else {
+                this.list.scrollTop += step;
+            }
+        };
 
-        // ここから実際にイベントを取り付けます
-        this.list.addEventListener('scroll', this.onListScroll);
-        
+        this.list.addEventListener('scroll', this.onListScroll, { passive: true });
         if (this.isMobile) {
-            // スマホ版：指でのスワイプ監視
             this.list.addEventListener('touchmove', this.onListTouchMove, { passive: false });
         }
-        
-        // PC・スマホ共通：マウス操作やタッチ操作を取り付けます
         this.thumbY.addEventListener('mousedown', this.onStartY);
         this.thumbY.addEventListener('touchstart', this.onStartY, { passive: false });
-        
-        document.addEventListener('mousemove', this.onDocMouseMove, { passive: false });
-        document.addEventListener('touchmove', this.onDocMouseMove, { passive: false });
-        
-        document.addEventListener('mouseup', this.onEnd);
-        document.addEventListener('touchend', this.onEnd);
-        
-        window.addEventListener('resize', this.onWindowResize);
+        this.btnUp.addEventListener('click', this.onBtnUp);
+        this.btnDown.addEventListener('click', this.onBtnDown);
     }
 
-    // ★お片付けの魔法
     destroy() {
-        if (this.trackY) this.trackY.remove();
-        if (this.btnUp) this.btnUp.remove();
-        if (this.btnDown) this.btnDown.remove();
-        
-        this.list.classList.remove('hide-native-scroll');
-        
-        if (this.onListScroll) this.list.removeEventListener('scroll', this.onListScroll);
-        
-        // 取り付けたイベントを、綺麗にお片付け（解除）します
-        if (this.isMobile) {
-            if (this.onListTouchMove) {
-                this.list.removeEventListener('touchmove', this.onListTouchMove);
-            }
+        if (this._destroyed) return;
+        this._destroyed = true;
+        this.isDraggingY = false;
+        this._detachDragListeners();
+
+        if (this.list) {
+            this.list.classList.remove('hide-native-scroll');
+            if (this.onListScroll) this.list.removeEventListener('scroll', this.onListScroll);
+            if (this.isMobile && this.onListTouchMove) this.list.removeEventListener('touchmove', this.onListTouchMove);
         }
         if (this.thumbY && this.onStartY) {
             this.thumbY.removeEventListener('mousedown', this.onStartY);
             this.thumbY.removeEventListener('touchstart', this.onStartY);
         }
-        if (this.onDocMouseMove) {
-            document.removeEventListener('mousemove', this.onDocMouseMove);
-            document.removeEventListener('touchmove', this.onDocMouseMove);
-        }
-        if (this.onEnd) {
-            document.removeEventListener('mouseup', this.onEnd);
-            document.removeEventListener('touchend', this.onEnd);
+        if (this.btnUp && this.onBtnUp) this.btnUp.removeEventListener('click', this.onBtnUp);
+        if (this.btnDown && this.onBtnDown) this.btnDown.removeEventListener('click', this.onBtnDown);
+
+        if (this.trackY) this.trackY.remove();
+        if (this.btnUp) this.btnUp.remove();
+        if (this.btnDown) this.btnDown.remove();
+
+        if (this.list && this.list.customScrollbar === this) {
+            this.list.customScrollbar = null;
         }
 
-        if (this.onWindowResize) window.removeEventListener('resize', this.onWindowResize);
+        CustomScrollbar.instances.delete(this);
+        CustomScrollbar._releaseSharedResizeListenerIfUnused();
     }
 }
+
+// ★Round12：resize監視はScrollbarごとではなく1本だけにします。
+CustomScrollbar.instances = new Set();
+CustomScrollbar._sharedResizeHandler = null;
+CustomScrollbar._ensureSharedResizeListener = function() {
+    if (CustomScrollbar._sharedResizeHandler) return;
+    CustomScrollbar._sharedResizeHandler = () => {
+        CustomScrollbar.cleanupDisconnected();
+        CustomScrollbar.instances.forEach(instance => instance.scheduleUpdate());
+    };
+    window.addEventListener('resize', CustomScrollbar._sharedResizeHandler, { passive: true });
+};
+CustomScrollbar._releaseSharedResizeListenerIfUnused = function() {
+    if (CustomScrollbar.instances.size !== 0 || !CustomScrollbar._sharedResizeHandler) return;
+    window.removeEventListener('resize', CustomScrollbar._sharedResizeHandler);
+    CustomScrollbar._sharedResizeHandler = null;
+};
+CustomScrollbar.cleanupDisconnected = function() {
+    Array.from(CustomScrollbar.instances).forEach(instance => {
+        if (!instance.list || !instance.list.isConnected) instance.destroy();
+    });
+};
+
 window.CustomScrollbar = CustomScrollbar;

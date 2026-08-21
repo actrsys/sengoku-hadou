@@ -1174,40 +1174,43 @@ class CommandSystem {
     // ★追加：同盟・支配・従属の勢力も通って繋がっているお城を調べる移動・輸送用の魔法です！
     getConnectedCastlesForMove(startCastle, clanId) {
         const connectedCastles = new Set();
+        if (!startCastle) return connectedCastles;
+
+        // ★Round12：Round10で作った隣接索引を移動・輸送側でも共有します。
+        // 到達城ごとに全城をfilterする処理をやめ、実際の隣接城だけを辿ります。
+        this._ensureAdjacencyMap();
         const queue = [startCastle];
-        const visited = new Set();
-        visited.add(Number(startCastle.id));
+        let head = 0;
+        const visited = new Set([Number(startCastle.id)]);
+        const passableClanCache = new Map();
+        passableClanCache.set(Number(clanId), true);
+        passableClanCache.set(0, false);
 
-        while (queue.length > 0) {
-            const current = queue.shift();
-            const neighbors = this.game.castles.filter(adj => {
-                if (!GameSystem.isAdjacent(current, adj)) return false;
-                if (visited.has(Number(adj.id))) return false;
+        const canPassClan = (ownerClan) => {
+            const ownerId = Number(ownerClan);
+            if (passableClanCache.has(ownerId)) return passableClanCache.get(ownerId);
+            const rel = this.game.getRelation(clanId, ownerClan);
+            const passable = !!(rel && ['同盟', '支配', '従属'].includes(rel.status));
+            passableClanCache.set(ownerId, passable);
+            return passable;
+        };
 
-                // 自分のお城なら通れる
-                if (Number(adj.ownerClan) === Number(clanId)) return true;
-                
-                // 他の勢力でも、同盟・支配・従属なら通れる
-                if (adj.ownerClan !== 0) {
-                    const rel = this.game.getRelation(clanId, adj.ownerClan);
-                    if (rel && ['同盟', '支配', '従属'].includes(rel.status)) {
-                        return true;
-                    }
-                }
-                return false;
-            });
-            
-            for (const n of neighbors) {
-                visited.add(Number(n.id));
+        while (head < queue.length) {
+            const current = queue[head++];
+            const neighborIds = this._adjacencyMap.get(Number(current.id)) || [];
+            for (const adjId of neighborIds) {
+                const nId = Number(adjId);
+                if (visited.has(nId)) continue;
+                const n = this.game.getCastle(adjId);
+                if (!n || !canPassClan(n.ownerClan)) continue;
+
+                visited.add(nId);
                 queue.push(n);
                 // 繋がっている「自領」として登録するのは自分のお城だけ！
-                if (Number(n.ownerClan) === Number(clanId)) {
-                    connectedCastles.add(Number(n.id));
-                }
+                if (Number(n.ownerClan) === Number(clanId)) connectedCastles.add(nId);
             }
         }
-        
-        // 最初のお城も自領として登録します
+
         connectedCastles.add(Number(startCastle.id));
         return connectedCastles;
     }
@@ -1231,8 +1234,9 @@ class CommandSystem {
             'employ', 'move'
         ];
         if (actionRequiredCommands.includes(type)) {
-            const activeBushos = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === castle.ownerClan && b.status === 'active' && !b.isActionDone);
-            if (activeBushos.length === 0) return false;
+            // ★Round12：可否判定だけなので配列を作らず、1人見つかった時点で終了します。
+            const hasActiveBusho = this.game.bushos.some(b => b.castleId === castle.id && b.clan === castle.ownerClan && b.status === 'active' && !b.isActionDone);
+            if (!hasActiveBusho) return false;
         }
 
         // 【共通ルール】設計図に設定されているコスト（金・兵糧）のチェック
@@ -1882,7 +1886,7 @@ class CommandSystem {
             // カスタムスクロールバーを更新して、縦スクロールができるようにします
             setTimeout(() => {
                 if (this.game.ui && typeof this.game.ui.updateCustomScrollbars === 'function') {
-                    this.game.ui.updateCustomScrollbars();
+                    this.game.ui.updateCustomScrollbars(list);
                 }
             }, 10);
         };

@@ -1763,7 +1763,7 @@ class UIInfoManager {
                     }
                 }
                 if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
-                    this.ui.updateCustomScrollbars();
+                    this.ui.updateCustomScrollbars(listContainer);
                 }
             });
 
@@ -1806,7 +1806,7 @@ class UIInfoManager {
 
         setTimeout(() => {
             if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
-                this.ui.updateCustomScrollbars();
+                this.ui.updateCustomScrollbars(listContainer);
             }
         }, 10);
 
@@ -1832,7 +1832,7 @@ class UIInfoManager {
 
                 setTimeout(() => {
                     if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
-                        this.ui.updateCustomScrollbars();
+                        this.ui.updateCustomScrollbars(listContainer);
                     }
                 }, 10);
 

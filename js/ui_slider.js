@@ -16,7 +16,8 @@ class UISliderManager {
         this.ui.hideAIGuardTemporarily(); // ★これを追加します！
         
         // ★追加：複数スライダーの時だけ全画面にするための目印をつけます
-        const isMultiMode = ['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport'].includes(type);
+        const multiSliderTypes = new Set(['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport']);
+        const isMultiMode = multiSliderTypes.has(type);
         if (isMultiMode) {
             this.ui.quantityModal.classList.add('multi-slider-mode');
         } else {
@@ -28,6 +29,24 @@ class UISliderManager {
         if (this.ui.charityTypeSelector) this.ui.charityTypeSelector.classList.add('hidden');
         if (this.ui.tradeTypeInfo) this.ui.tradeTypeInfo.classList.add('hidden'); 
         const c = this.ui.currentCastle;
+
+        // ★Round12：input中に同じ武将やDOMを全件検索しないため、この画面を開いた時に一度だけ保持します。
+        const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
+        const castellan = this.game.getBusho(c.castellanId);
+        let inputs = {};
+        const sliderRefs = new Map();
+        const stockEls = {};
+
+        let sourceCastleForMulti = c;
+        if (type === 'def_intercept') sourceCastleForMulti = (data && data.length > 0) ? data[0] : c;
+        if (type === 'def_reinf_supplies' || type === 'atk_reinf_supplies' || type === 'def_self_reinf_supplies' || type === 'atk_self_reinf_supplies') {
+            sourceCastleForMulti = (data && data.length > 0) ? data[0] : c;
+        }
+
+        const getSliderValue = (id) => {
+            const ref = sliderRefs.get(id);
+            return parseInt(ref && ref.num ? ref.num.value : 0) || 0;
+        };
 
         // ★追加：相場の説明文と、動的な数値表示用の箱を作る処理を一元管理します！
         const setTradeRateInfo = (itemName, unit, amount, price, extraHTML = "", needCostDiv = true) => {
@@ -47,21 +66,21 @@ class UISliderManager {
             let isValid = true;
 
             if (type === 'transport') {
-                const g = parseInt(document.getElementById('num-gold')?.value) || 0;
-                const r = parseInt(document.getElementById('num-rice')?.value) || 0;
-                const s = parseInt(document.getElementById('num-soldiers')?.value) || 0;
-                const h = parseInt(document.getElementById('num-horses')?.value) || 0;
-                const gun = parseInt(document.getElementById('num-guns')?.value) || 0;
+                const g = getSliderValue('gold');
+                const r = getSliderValue('rice');
+                const s = getSliderValue('soldiers');
+                const h = getSliderValue('horses');
+                const gun = getSliderValue('guns');
                 if (g === 0 && r === 0 && s === 0 && h === 0 && gun === 0) isValid = false;
             } else if (type === 'headhunt_gold' || type === 'charity' || type === 'reinf_gold') {
                 isValid = true; 
             } else if (type === 'war_supplies' || type === 'def_intercept' || type === 'def_reinf_supplies' || type === 'atk_reinf_supplies') {
-                const s = parseInt(document.getElementById('num-soldiers')?.value) || 0;
+                const s = getSliderValue('soldiers');
                 if (s <= 0) isValid = false; 
             } else {
-                const inputsEl = document.querySelectorAll('.qty-control input[type="number"]');
-                if (inputsEl.length > 0) {
-                    const val = parseInt(inputsEl[0].value) || 0;
+                const firstRef = sliderRefs.values().next().value;
+                if (firstRef && firstRef.num) {
+                    const val = parseInt(firstRef.num.value) || 0;
                     if (val <= 0) isValid = false;
                 }
             }
@@ -75,31 +94,21 @@ class UISliderManager {
             }
 
             // ★追加：複数スライダーの時の、上部の「残数」表示をパタパタ更新します！
-            if (['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport'].includes(type)) {
-                let sCastle = c;
-                if (type === 'def_intercept') sCastle = (data && data.length > 0) ? data[0] : c;
-                if (type === 'def_reinf_supplies' || type === 'atk_reinf_supplies' || type === 'def_self_reinf_supplies' || type === 'atk_self_reinf_supplies') sCastle = (data && data.length > 0) ? data[0] : c;
-                
+            if (isMultiMode) {
                 const updateStock = (id, baseVal) => {
-                    const el = document.getElementById(`multi-stock-${id}`);
-                    if (el) {
-                        const v = parseInt(document.getElementById(`num-${id}`)?.value) || 0;
-                        el.textContent = baseVal - v;
-                    }
+                    const el = stockEls[id];
+                    if (el) el.textContent = baseVal - getSliderValue(id);
                 };
-                updateStock('gold', sCastle.gold);
-                updateStock('rice', sCastle.rice);
-                updateStock('soldiers', sCastle.soldiers);
-                updateStock('horses', sCastle.horses || 0);
-                updateStock('guns', sCastle.guns || 0);
+                updateStock('gold', sourceCastleForMulti.gold);
+                updateStock('rice', sourceCastleForMulti.rice);
+                updateStock('soldiers', sourceCastleForMulti.soldiers);
+                updateStock('horses', sourceCastleForMulti.horses || 0);
+                updateStock('guns', sourceCastleForMulti.guns || 0);
             }
 
             // ★追加：スライダーを動かすたびに呼ばれるこの場所で、必要資金を計算してパタパタ表示します！
             const displayEl = document.getElementById('dynamic-cost-display');
             if (displayEl) {
-                const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
-                const castellan = this.game.getBusho(c.castellanId);
-                
                 const makeGrid = (itemName, afterItem, afterGold) => {
                     return `
                         <div class="trade-result-row">
@@ -124,30 +133,41 @@ class UISliderManager {
                 };
                 
                 if (type === 'draft') {
-                    const amount = parseInt(document.getElementById('num-soldiers')?.value) || 0;
+                    const amount = getSliderValue('soldiers');
                     const busho = this.game.getBusho(data[0]);
                     const cost = GameSystem.calcDraftCost(amount, busho, c.peoplesLoyalty, c.population);
                     displayEl.innerHTML = makeGrid("兵士", c.soldiers + amount, c.gold - cost);
                 } else if (['buy_rice', 'buy_ammo', 'buy_horses', 'buy_guns'].includes(type)) {
                     // ★取引の計算は、すべて GameSystem の窓口にお願いするだけになりました！
-                    const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
+                    const amount = getSliderValue('amount');
                     const tradeData = GameSystem.calcTradeCostAndRate(type, amount, c, daimyo, castellan, this.game.provinces);
                     const itemName = type === 'buy_rice' ? "兵糧" : (type === 'buy_ammo' ? "矢弾" : (type === 'buy_horses' ? "軍馬" : "鉄砲"));
                     const currentItem = type === 'buy_rice' ? c.rice : (type === 'buy_ammo' ? (c.ammo || 0) : (type === 'buy_horses' ? (c.horses || 0) : (c.guns || 0)));
                     displayEl.innerHTML = makeGrid(itemName, currentItem + amount, c.gold - tradeData.cost);
                 } else if (type === 'sell_rice') {
-                    const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
+                    const amount = getSliderValue('amount');
                     const tradeData = GameSystem.calcTradeCostAndRate(type, amount, c, daimyo, castellan, this.game.provinces);
                     displayEl.innerHTML = makeGrid("兵糧", c.rice - amount, c.gold + tradeData.cost);
                 }
             }
+        };
+
+        // ★Round12：連続inputによる料金・残数・確認ボタン更新を1フレーム1回にまとめます。
+        let quantityUiRaf = 0;
+        const scheduleQuantityUIUpdate = () => {
+            if (quantityUiRaf) return;
+            const raf = window.requestAnimationFrame || ((cb) => setTimeout(cb, 16));
+            quantityUiRaf = raf(() => {
+                quantityUiRaf = 0;
+                checkValidQuantity();
+            });
         };
         
         const createSlider = (label, id, max, currentVal, minVal = 0, isTransport = false, targetCurrent = 0, targetMaxLimit = 99999) => {
             const wrap = document.createElement('div');
             wrap.className = 'qty-row';
             
-            const isSingle = !(['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport'].includes(type));
+            const isSingle = !isMultiMode;
             
             // ボタンの位置と表示を自動で切り替える仕組み
             const updateButtons = (v) => {
@@ -200,6 +220,7 @@ class UISliderManager {
                 const range = wrap.querySelector(`#range-${id}`);
                 const numTgt = wrap.querySelector(`#num-tgt-${id}`);
                 const numHidden = wrap.querySelector(`#num-${id}`);
+                sliderRefs.set(id, { range, num: numHidden, numTgt });
                 
                 // ★追加：見た目（青銀のゲージ）と数字を同時に更新する専用の魔法です
                 const updateSliderUI = (v) => {
@@ -210,7 +231,7 @@ class UISliderManager {
                     numHidden.value = v;
                     numTgt.value = targetCurrent + v;
                     updateButtons(v);
-                    checkValidQuantity();
+                    scheduleQuantityUIUpdate();
                 };
 
                 const setVal = (v) => {
@@ -276,6 +297,7 @@ class UISliderManager {
                 
                 const range = wrap.querySelector(`#range-${id}`);
                 const num = wrap.querySelector(`#num-${id}`);
+                sliderRefs.set(id, { range, num });
                 
                 const updateSliderUI = (v) => {
                     const percent = max > minVal ? ((v - minVal) / (max - minVal)) * 100 : 0;
@@ -283,7 +305,7 @@ class UISliderManager {
                     range.value = v;
                     num.value = v;
                     updateButtons(v);
-                    checkValidQuantity();
+                    scheduleQuantityUIUpdate();
                 };
 
                 const setVal = (v) => {
@@ -336,17 +358,8 @@ class UISliderManager {
             }
         };
 
-        let inputs = {};
-        
-        // ★追加：計算のために大名と城主をあらかじめ探しておきます
-        const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
-        const castellan = this.game.getBusho(c.castellanId);
-
         // ★今回追加：複数スライダー画面のための「上部の物資・残数表示」
-        const isMultiSliderMode = ['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport'].includes(type);
-        let sourceCastleForMulti = c;
-        if (type === 'def_intercept') sourceCastleForMulti = (data && data.length > 0) ? data[0] : c;
-        if (type === 'def_reinf_supplies' || type === 'atk_reinf_supplies' || type === 'def_self_reinf_supplies' || type === 'atk_self_reinf_supplies') sourceCastleForMulti = (data && data.length > 0) ? data[0] : c;
+        const isMultiSliderMode = isMultiMode;
 
         if (isMultiSliderMode) {
             const stockDiv = document.createElement('div');
@@ -361,6 +374,9 @@ class UISliderManager {
                 </div>
             `;
             this.ui.quantityContainer.appendChild(stockDiv);
+            ['gold', 'rice', 'soldiers', 'horses', 'guns'].forEach(id => {
+                stockEls[id] = stockDiv.querySelector(`#multi-stock-${id}`);
+            });
         }
         
         if (type === 'draft') {
@@ -553,6 +569,12 @@ class UISliderManager {
             `;
         }
         
+        const divideStockSoldiers = stockContainer ? stockContainer.querySelector('#divide-stock-soldiers') : null;
+        const divideStockHorses = stockContainer ? stockContainer.querySelector('#divide-stock-horses') : null;
+        const divideStockGuns = stockContainer ? stockContainer.querySelector('#divide-stock-guns') : null;
+        const divideRefs = new Map();
+        const isSeaBattleForDivide = !!(this.game.warManager && this.game.warManager.state && this.game.warManager.state.isSeaBattle);
+
         let assignments = [];
         if (this.game.warManager && typeof this.game.warManager.autoDivideSoldiers === 'function') {
             // ★追加：海戦かどうかを調べて、AIの魔法に教えます！
@@ -583,145 +605,93 @@ class UISliderManager {
             }
         }
 
-        const updateRemain = (triggerBushoId = null, triggerType = null) => {
+        const updateRemain = () => {
             let sum = 0;
             let usedHorses = 0;
             let usedGuns = 0;
-            
+
+            // ★Round12：DOMをid検索し直さず、行生成時に保存した参照から現在値を読みます。
             const currentData = bushos.map(b => {
-                const typeEl = document.getElementById(`div-type-${b.id}`);
-                const numEl = document.getElementById(`div-num-${b.id}`);
-                const typeVal = typeEl ? typeEl.value : 'ashigaru';
-                let numVal = numEl ? parseInt(numEl.value) || 0 : 0;
+                const ref = divideRefs.get(b.id);
+                const typeVal = ref && ref.typeSel ? ref.typeSel.value : 'ashigaru';
+                const numVal = ref && ref.num ? (parseInt(ref.num.value) || 0) : 0;
+                sum += numVal;
+                if (typeVal === 'kiba') usedHorses += numVal;
+                if (typeVal === 'teppo') usedGuns += numVal;
                 return { id: b.id, type: typeVal, count: numVal };
             });
 
-            if (triggerType === 'type_change' && triggerBushoId) {
-                const bData = currentData.find(d => d.id === triggerBushoId);
-                if (bData && bData.type === 'kiba') {
-                    const otherKiba = currentData.filter(d => d.id !== triggerBushoId && d.type === 'kiba').reduce((s, d) => s + d.count, 0);
-                    const maxKiba = Math.max(0, totalHorses - otherKiba);
-                    if (bData.count > maxKiba) {
-                        bData.count = maxKiba;
-                        if (bData.count < 1) bData.count = 1; 
-                        if (maxKiba === 0) {
-                            bData.type = 'ashigaru';
-                            document.getElementById(`div-type-${triggerBushoId}`).value = 'ashigaru';
-                        }
-                    }
-                } else if (bData && bData.type === 'teppo') {
-                    const otherTeppo = currentData.filter(d => d.id !== triggerBushoId && d.type === 'teppo').reduce((s, d) => s + d.count, 0);
-                    const maxTeppo = Math.max(0, totalGuns - otherTeppo);
-                    if (bData.count > maxTeppo) {
-                        bData.count = maxTeppo;
-                        if (bData.count < 1) bData.count = 1;
-                        if (maxTeppo === 0) {
-                            bData.type = 'ashigaru';
-                            document.getElementById(`div-type-${triggerBushoId}`).value = 'ashigaru';
-                        }
-                    }
-                }
-            } else if (triggerType === 'num_change' && triggerBushoId) {
-                const bData = currentData.find(d => d.id === triggerBushoId);
-                if (bData && bData.type === 'kiba') {
-                    const otherKiba = currentData.filter(d => d.id !== triggerBushoId && d.type === 'kiba').reduce((s, d) => s + d.count, 0);
-                    const maxKiba = Math.max(0, totalHorses - otherKiba);
-                    if (bData.count > maxKiba) bData.count = maxKiba;
-                } else if (bData && bData.type === 'teppo') {
-                    const otherTeppo = currentData.filter(d => d.id !== triggerBushoId && d.type === 'teppo').reduce((s, d) => s + d.count, 0);
-                    const maxTeppo = Math.max(0, totalGuns - otherTeppo);
-                    if (bData.count > maxTeppo) bData.count = maxTeppo;
-                }
-            }
-
-            sum = currentData.reduce((s, d) => s + d.count, 0);
-            usedHorses = currentData.filter(d => d.type === 'kiba').reduce((s, d) => s + d.count, 0);
-            usedGuns = currentData.filter(d => d.type === 'teppo').reduce((s, d) => s + d.count, 0);
-            
             const rem = totalSoldiers - sum;
             currentData.forEach(d => {
-                const range = document.getElementById(`div-range-${d.id}`);
-                const num = document.getElementById(`div-num-${d.id}`);
-                if (!range || !num) return;
+                const ref = divideRefs.get(d.id);
+                if (!ref || !ref.range || !ref.num) return;
+                const range = ref.range;
+                const num = ref.num;
 
                 if (parseInt(num.value) !== d.count) {
                     num.value = d.count;
                     range.value = d.count;
                 }
 
-                // ★追加：部隊分割画面でも、青銀のゲージの割合を計算してCSSに教えます
-                // ★修正：スライダーのバーのズレを直すため、背景ゲージの割合は全体の最大値と最小値を基準に計算します
                 const actualMax = parseInt(range.max) || 1;
                 const actualMin = parseInt(range.min) || 1;
                 const percent = actualMax > actualMin ? ((d.count - actualMin) / (actualMax - actualMin)) * 100 : 0;
                 range.style.setProperty('--value', percent + '%');
 
-                // ボタンの表示・非表示を数量指定スライダーと揃える魔法
                 let otherSum = sum - d.count;
                 let maxAllowed = totalSoldiers - otherSum;
                 if (d.type === 'kiba') {
-                    let otherHorses = usedHorses - d.count; 
+                    const otherHorses = usedHorses - d.count;
                     maxAllowed = Math.min(maxAllowed, totalHorses - otherHorses);
                 }
                 if (d.type === 'teppo') {
-                    let otherGuns = usedGuns - d.count;
+                    const otherGuns = usedGuns - d.count;
                     maxAllowed = Math.min(maxAllowed, totalGuns - otherGuns);
                 }
                 if (maxAllowed < 1) maxAllowed = 1;
 
-                const btnMin = document.getElementById(`div-btn-min-${d.id}`);
-                const btnHalf = document.getElementById(`div-btn-half-${d.id}`);
-                const btnMax = document.getElementById(`div-btn-max-${d.id}`);
-                
+                const btnMin = ref.btnMin;
+                const btnHalf = ref.btnHalf;
+                const btnMax = ref.btnMax;
                 if (btnMin && btnHalf && btnMax) {
                     if (maxAllowed <= 1) {
                         btnMin.style.display = ''; btnMin.disabled = true; btnMin.style.order = 1;
                         btnHalf.style.display = ''; btnHalf.disabled = true; btnHalf.style.order = 3;
                         btnMax.style.display = 'none';
                     } else if (d.count <= 1) {
-                        // 最小の時：「最小(無効)」と「半分(有効)」を表示
                         btnMin.style.display = ''; btnMin.disabled = true; btnMin.style.order = 1;
                         btnHalf.style.display = ''; btnHalf.disabled = false; btnHalf.style.order = 3;
                         btnMax.style.display = 'none';
                     } else if (d.count >= maxAllowed) {
-                        // 最大の時：「半分(有効)」と「最大(無効)」を表示
                         btnMin.style.display = 'none';
                         btnHalf.style.display = ''; btnHalf.disabled = false; btnHalf.style.order = 1;
                         btnMax.style.display = ''; btnMax.disabled = true; btnMax.style.order = 3;
                     } else {
-                        // 中間の時：「最小(有効)」と「最大(有効)」を表示
                         btnMin.style.display = ''; btnMin.disabled = false; btnMin.style.order = 1;
                         btnHalf.style.display = 'none';
                         btnMax.style.display = ''; btnMax.disabled = false; btnMax.style.order = 3;
                     }
                 }
 
-                // ★追加：兵種ボタンの無効化（余っている軍馬や鉄砲がない場合は押せなくします）
-                const btnKiba = document.getElementById(`troop-type-group-${d.id}`)?.querySelector('[data-type="kiba"]');
-                const btnTeppo = document.getElementById(`troop-type-group-${d.id}`)?.querySelector('[data-type="teppo"]');
-                
-                // ★今回追加：海戦かどうかを調べます！
-                const isSeaBattle = this.game.warManager && this.game.warManager.state && this.game.warManager.state.isSeaBattle;
-
+                const btnKiba = ref.btnKiba;
+                const btnTeppo = ref.btnTeppo;
                 if (btnKiba) {
                     const availHorses = totalHorses - (usedHorses - (d.type === 'kiba' ? d.count : 0));
-                    
-                    if (isSeaBattle) {
-                        // ★海戦なら強制的にボタンを押せなくして、暗くします！
+                    if (isSeaBattleForDivide) {
                         btnKiba.disabled = true;
                         btnKiba.classList.add('disabled');
                         btnKiba.style.opacity = '0.5';
-                        btnKiba.title = "海戦では騎馬隊を編成できません";
+                        btnKiba.title = '海戦では騎馬隊を編成できません';
                     } else if (availHorses <= 0 && d.type !== 'kiba') {
                         btnKiba.disabled = true;
                         btnKiba.classList.add('disabled');
                         btnKiba.style.opacity = '';
-                        btnKiba.title = "";
+                        btnKiba.title = '';
                     } else {
                         btnKiba.disabled = false;
                         btnKiba.classList.remove('disabled');
                         btnKiba.style.opacity = '';
-                        btnKiba.title = "";
+                        btnKiba.title = '';
                     }
                 }
                 if (btnTeppo) {
@@ -735,22 +705,24 @@ class UISliderManager {
                     }
                 }
             });
-            
-            const stockSoldiers = document.getElementById('divide-stock-soldiers');
-            const stockHorses = document.getElementById('divide-stock-horses');
-            const stockGuns = document.getElementById('divide-stock-guns');
 
-            if (stockSoldiers) stockSoldiers.textContent = rem;
-            if (stockHorses) stockHorses.textContent = Math.max(0, totalHorses - usedHorses);
-            if (stockGuns) stockGuns.textContent = Math.max(0, totalGuns - usedGuns);
-            
-            if (rem === 0) {
-                confirmBtn.disabled = false;
-                confirmBtn.style.opacity = 1.0;
-            } else {
-                confirmBtn.disabled = true;
-                confirmBtn.style.opacity = 0.5;
-            }
+            if (divideStockSoldiers) divideStockSoldiers.textContent = rem;
+            if (divideStockHorses) divideStockHorses.textContent = Math.max(0, totalHorses - usedHorses);
+            if (divideStockGuns) divideStockGuns.textContent = Math.max(0, totalGuns - usedGuns);
+
+            confirmBtn.disabled = rem !== 0;
+            confirmBtn.style.opacity = rem === 0 ? 1.0 : 0.5;
+        };
+
+        // ★Round12：ドラッグ中の全行再描画は1フレーム1回にまとめます。
+        let divideUiRaf = 0;
+        const scheduleDivideUIUpdate = () => {
+            if (divideUiRaf) return;
+            const raf = window.requestAnimationFrame || ((cb) => setTimeout(cb, 16));
+            divideUiRaf = raf(() => {
+                divideUiRaf = 0;
+                updateRemain();
+            });
         };
         
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
@@ -795,13 +767,12 @@ class UISliderManager {
                 let otherGuns = 0;
                 bushos.forEach(busho => {
                     if (busho.id !== b.id) {
-                        const tEl = document.getElementById(`div-type-${busho.id}`);
-                        const nEl = document.getElementById(`div-num-${busho.id}`);
-                        const t = tEl ? tEl.value : 'ashigaru';
-                        const c = parseInt(nEl ? nEl.value : 0) || 0;
-                        otherSum += c;
-                        if (t === 'kiba') otherHorses += c;
-                        if (t === 'teppo') otherGuns += c;
+                        const ref = divideRefs.get(busho.id);
+                        const t = ref && ref.typeSel ? ref.typeSel.value : 'ashigaru';
+                        const count = ref && ref.num ? (parseInt(ref.num.value) || 0) : 0;
+                        otherSum += count;
+                        if (t === 'kiba') otherHorses += count;
+                        if (t === 'teppo') otherGuns += count;
                     }
                 });
                 
@@ -833,7 +804,7 @@ class UISliderManager {
                 
                 range.value = v;
                 num.value = v;
-                updateRemain(b.id, 'num_change');
+                scheduleDivideUIUpdate();
             };
 
             // ★変更：第3引数は不要になったので元に戻します
@@ -859,6 +830,10 @@ class UISliderManager {
             };
             
             const typeBtns = div.querySelectorAll(`#troop-type-group-${b.id} .troop-type-btn`);
+            const btnKiba = Array.from(typeBtns).find(btn => btn.getAttribute('data-type') === 'kiba') || null;
+            const btnTeppo = Array.from(typeBtns).find(btn => btn.getAttribute('data-type') === 'teppo') || null;
+            divideRefs.set(b.id, { range, num, typeSel, btnMin, btnHalf, btnMax, btnKiba, btnTeppo, typeBtns });
+
             typeBtns.forEach(btn => {
                 btn.onclick = () => {
                     if (btn.disabled || btn.classList.contains('disabled')) return; // ★追加：無効なボタンは弾く
@@ -875,18 +850,19 @@ class UISliderManager {
         updateRemain();
 
         // ★軽量化＆修正：画面の高さが確定するのを一瞬待ってからスクロールバーを呼び出します！
-        setTimeout(() => {
+        requestAnimationFrame(() => {
             if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
-                this.ui.updateCustomScrollbars();
+                this.ui.updateCustomScrollbars(listEl);
             }
-        }, 10);
+        });
 
         confirmBtn.onclick = () => {
             let sum = 0;
             const finalAssignments = [];
             bushos.forEach(b => {
-                const val = parseInt(document.getElementById(`div-num-${b.id}`).value) || 0;
-                const typeVal = document.getElementById(`div-type-${b.id}`).value;
+                const ref = divideRefs.get(b.id);
+                const val = ref && ref.num ? (parseInt(ref.num.value) || 0) : 0;
+                const typeVal = ref && ref.typeSel ? ref.typeSel.value : 'ashigaru';
                 sum += val;
                 finalAssignments.push({ busho: b, soldiers: val, troopType: typeVal });
             });
