@@ -4,7 +4,23 @@
 html { width: 100%; height: 100%; height: 100dvh; overscroll-behavior: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 /* ★スマホ安全対策：ボタン連打をブラウザのダブルタップ拡大として扱わせない */
-button, input, select, textarea, label, a, .cmd-btn, .title-btn, .zoom-btn, .select-item {
+button, input, select, textarea, label, a, .cmd-btn, .title-btn, .zoom-btn, .select-item.is-clickable { cursor: pointer; }
+.select-item.is-static { cursor: default; }
+.select-item.is-placeholder-row { pointer-events: none; }
+.list-inner-wrapper.has-custom-min-width {
+    width: var(--list-min-width);
+    min-width: 100%;
+}
+.virtual-scroll-body {
+    display: flex;
+    flex-direction: column;
+}
+.list-empty-message {
+    padding: 10px;
+    text-align: center;
+}
+
+.select-item {
     touch-action: manipulation;
 }
 
@@ -1844,7 +1860,396 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
     gap: 5px !important; /* スマホ画面で5つのボタンがはみ出さないように隙間を縮めます */
 }
 
+.list-text-strong { font-weight: bold; }
+.list-bar-cell {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+}
+.bar-fill { width: var(--bar-value, 0%); }
+.delegate-setting-panel {
+    padding: 20px;
+    text-align: center;
+}
+.delegate-setting-mode-buttons {
+    margin: 20px 0;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+.delegate-options {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    text-align: left;
+    transition: opacity 0.3s;
+}
+.delegate-options.is-enabled { opacity: 1; }
+.delegate-options.is-disabled { opacity: 0.5; }
+.delegate-option-row { margin-bottom: 15px; }
+.delegate-option-label {
+    font-weight: bold;
+    display: inline-block;
+    width: 100px;
+}
+.history-empty-msg {
+    padding: 10px;
+    text-align: center;
+    height: 100%;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #aaa;
+}
+
+/* シナリオ開始前の大名確認情報は専用サイズだが、見た目はCSSだけで管理します */
+.daimyo-confirm-scroll {
+    padding: 0;
+    border: 2px solid #d4af37;
+    border-radius: 4px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+.daimyo-confirm-list {
+    display: block;
+    overflow: hidden;
+    min-height: 100%;
+}
+.daimyo-confirm-info {
+    padding: 4px 5px;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    text-align: left;
+}
+.daimyo-confirm-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 5px;
+    border-bottom: 1px solid rgba(212,175,55,0.3);
+    padding-bottom: 4px;
+}
+.daimyo-confirm-face-column {
+    flex-shrink: 0;
+    width: 72px;
+}
+.daimyo-confirm-face {
+    width: 100%;
+    max-width: 72px;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border: 2px solid #fff;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8);
+    border-radius: 6px;
+    background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%);
+    margin: 0;
+}
+.daimyo-confirm-main {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+}
+.daimyo-confirm-title-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+}
+.daimyo-confirm-title-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+.daimyo-confirm-yomi {
+    font-size: 0.715rem;
+    color: #ccc;
+    min-height: 1em;
+}
+.daimyo-confirm-name {
+    font-size: 1.375rem;
+    font-weight: bold;
+    color: #fff;
+    line-height: 1;
+}
+.daimyo-confirm-subinfo {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+.daimyo-confirm-owner {
+    font-size: 1.045rem;
+    color: #ffd54f;
+}
+.daimyo-confirm-owner-value {
+    color: #fff;
+    font-weight: bold;
+}
+.daimyo-confirm-group {
+    background: rgba(0,0,0,0.2);
+    border: 1px solid rgba(212,175,55,0.2);
+    border-radius: 6px;
+    padding: 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.daimyo-confirm-group-upper { margin-bottom: 4px; }
+.daimyo-confirm-grid {
+    display: grid;
+    grid-template-columns: repeat(3,1fr);
+    gap: 4px 1.5px;
+}
+.daimyo-confirm-stat-box {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(212,175,55,0.3);
+    border-radius: 4px;
+    padding: 1px 3px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.daimyo-confirm-stat-box.is-placeholder { visibility: hidden; }
+.daimyo-confirm-stat-label,
+.daimyo-confirm-stat-value {
+    font-size: 0.77rem;
+    text-shadow: 1px 1px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000;
+}
+.daimyo-confirm-stat-label { color: #ffd54f; text-align: left; }
+.daimyo-confirm-stat-value {
+    color: #fff;
+    font-weight: bold;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+body:not(.is-pc) .daimyo-confirm-stat-label.is-long-label {
+    letter-spacing: -1px;
+    transform: scaleX(0.9);
+    transform-origin: left center;
+    display: inline-block;
+}
+body.is-pc .daimyo-confirm-face-column { width: 90px; }
+body.is-pc .daimyo-confirm-face { max-width: 90px; }
+body.is-pc .daimyo-confirm-yomi { font-size: 0.9rem; }
+body.is-pc .daimyo-confirm-name { font-size: 1.65rem; }
+body.is-pc .daimyo-confirm-owner { font-size: 1.25rem; }
+body.is-pc .daimyo-confirm-grid { gap: 4px 3px; }
+body.is-pc .daimyo-confirm-stat-label,
+body.is-pc .daimyo-confirm-stat-value { font-size: 1rem; }
+
+/* 勢力・拠点・諸勢力の情報詳細: ガワと静的レイアウトを共通化 */
+.info-detail-wrapper {
+    padding: 8px 10px;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+.info-detail-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+    padding-bottom: 8px;
+}
+.info-detail-face-column {
+    flex-shrink: 0;
+    width: 90px;
+}
+.info-detail-face {
+    width: 100%;
+    max-width: 90px;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border: 2px solid #fff;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8);
+    border-radius: 6px;
+    background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%);
+    margin: 0;
+}
+.info-detail-face.is-hidden { display: none; }
+.info-detail-main {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+}
+.info-detail-title-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 15px;
+}
+.info-detail-title-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+.info-detail-yomi {
+    font-size: 0.65rem;
+    color: #ccc;
+    min-height: 1em;
+}
+.info-detail-name {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: #fff;
+    line-height: 1;
+}
+.busho-tab-btn.is-static-tab {
+    cursor: default;
+    pointer-events: none;
+}
+.info-detail-ideology {
+    display: inline-block;
+    margin-top: 4px;
+}
+.info-detail-subinfo {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+.info-detail-owner-line {
+    font-size: 0.95rem;
+    color: #ffd54f;
+}
+.info-detail-owner-value {
+    color: #fff;
+    font-weight: bold;
+}
+.info-detail-secondary {
+    font-size: 0.8rem;
+    color: #ccc;
+}
+.info-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px 3px;
+}
+.info-detail-grid-upper { margin-bottom: 8px; }
+.info-detail-grid-lower { margin-bottom: 10px; }
+.info-detail-column {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.info-detail-group {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    border-radius: 6px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.info-detail-stat-box {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 4px;
+    padding: 2px 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.info-detail-stat-label,
+.info-detail-stat-value {
+    font-size: 0.70rem;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
+.info-detail-stat-label {
+    color: #ffd54f;
+    text-align: left;
+}
+.info-detail-stat-value {
+    color: #fff;
+    font-weight: bold;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+body:not(.is-pc) .info-detail-stat-label.is-long-label {
+    letter-spacing: -1px;
+    transform: scaleX(0.9);
+    transform-origin: left center;
+    display: inline-block;
+}
+.info-detail-group.is-placeholder,
+.info-detail-stat-box.is-placeholder { visibility: hidden; }
+.info-detail-footer {
+    display: flex;
+    align-items: flex-end;
+    margin-top: auto;
+    padding-top: 5px;
+}
+.info-detail-footer-split { justify-content: space-between; }
+.info-detail-footer-end { justify-content: flex-end; }
+.info-detail-badges {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+.info-detail-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.detail-status-mark {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+}
+.mark-port { background-color: #0288d1; }
+.mark-horse { background-color: #f57c00; }
+.mark-gun { background-color: #5d4037; }
+.col-name-left {
+    justify-content: flex-start;
+    padding-left: 5px;
+}
+.compressed-list-text {
+    font-size: calc(var(--text-scale, 1) * 1em);
+    transform: scaleY(var(--text-unscale, 1));
+    letter-spacing: -0.5px;
+    padding-right: 1px;
+    display: inline-block;
+    transform-origin: left center;
+}
+.hidden-selection-input { display: none; }
+.allot-fief-status {
+    color: #ccc;
+    font-weight: normal;
+}
+.allot-fief-status.is-selected-status {
+    color: #fdea60;
+    font-weight: bold;
+}
+body.is-pc .info-detail-yomi { font-size: 0.75rem; }
+body.is-pc .info-detail-name { font-size: 1.4rem; }
+body.is-pc .info-detail-owner-line { font-size: 1.05rem; }
+body.is-pc .info-detail-secondary { font-size: 0.9rem; }
+body.is-pc .info-detail-grid { gap: 8px 6px; }
+body.is-pc .info-detail-stat-label,
+body.is-pc .info-detail-stat-value { font-size: 0.85rem; }
+body.is-pc .detail-status-mark { font-size: 0.85rem; }
+
 /* 武将詳細: JSには状態値だけを残し、静的レイアウトはここで管理します */
+.princess-detail-container { --busho-detail-row-gap: 3px; }
+body.is-pc .princess-detail-container { --busho-detail-row-gap: 6px; }
+.princess-empty-grade { color: #777; }
+.princess-empty-bar { width: 0; }
+.princess-detail-label.is-long-label {
+    letter-spacing: -1px;
+    transform: scaleX(0.9);
+    transform-origin: left center;
+    display: inline-block;
+}
+body.is-pc .princess-detail-label.is-long-label {
+    letter-spacing: normal;
+    transform: none;
+}
+
 .busho-detail-tabs {
     justify-content: flex-start;
     padding-left: 10px;
@@ -4397,5 +4802,19 @@ body:not(.is-pc) .saveload-time-text,
 body:not(.is-pc) .saveload-latest-mark {
     white-space: nowrap;
     flex-shrink: 0;
+}
+
+
+.prisoner-result {
+    text-align: center;
+    padding: 10px;
+}
+.prisoner-result-title { margin-top: 0; }
+.prisoner-result-desc { font-size: 1.1rem; }
+.prisoner-result-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
 }
 

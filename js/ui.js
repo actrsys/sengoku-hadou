@@ -1669,7 +1669,9 @@ class UIManager {
                 footer.innerHTML = customFooterHtml;
             } else {
                 // ★変更：青色（btn-primary）からグレー（btn-secondary）に変更します！
-                footer.innerHTML = `<button class="btn-secondary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
+                footer.innerHTML = `<button class="btn-secondary result-close-dynamic">閉じる</button>`;
+                const closeBtn = footer.querySelector('.result-close-dynamic');
+                if (closeBtn) closeBtn.addEventListener('click', () => this.closeResultModal());
             }
         }
         if (this.resultModal) this.resultModal.classList.remove('hidden'); 
@@ -1702,7 +1704,9 @@ class UIManager {
         const footer = document.getElementById('result-footer');
         if (footer) {
             // ★変更：青色（btn-primary）からグレー（btn-secondary）に変更します！
-            footer.innerHTML = `<button class="btn-secondary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
+            footer.innerHTML = `<button class="btn-secondary result-close-dynamic">閉じる</button>`;
+            const closeBtn = footer.querySelector('.result-close-dynamic');
+            if (closeBtn) closeBtn.addEventListener('click', () => this.closeResultModal());
         }
         // ★書き足すのはここまで！
         

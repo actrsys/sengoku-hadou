@@ -1144,9 +1144,9 @@ Object.assign(UIInfoManager.prototype, {
                 }
                 
                 if (isViewMode) {
-                    onClickStr = `window.GameApp.ui.info.showBushoDetailModalById(${b.id})`;
+                    onClickStr = this._withChoiceSound(() => this.showBushoDetailModalById(b.id));
                 } else {
-                    onClickStr = `window.GameApp.ui.info.handleBushoSelect(event, ${isMulti}, ${spec.costGold || 0}, ${spec.costRice || 0}, '${actionType}')`;
+                    onClickStr = this._withChoiceSound((e) => this.handleBushoSelect(e, isMulti, spec.costGold || 0, spec.costRice || 0, actionType));
                 }
             }
 

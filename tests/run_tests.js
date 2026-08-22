@@ -297,6 +297,54 @@ test('武将情報JSは静的inline style / inline eventを持たない', () => 
     assert.strictEqual((source.match(/<[^>]*\bonerror\s*=/g) || []).length, 0);
 });
 
+test('拠点情報JSは静的inline style / inline eventを持たない', () => {
+    const source = read('js/ui_info_kyoten.js');
+    const styles = [...source.matchAll(/style="([^"]*)"/g)].map(m => m[1].trim());
+    assert.ok(styles.every(value => value.startsWith('--')), `静的styleが残っています: ${styles.filter(value => !value.startsWith('--')).join(' | ')}`);
+    assert.strictEqual((source.match(/<[^>]*\bonclick\s*=/g) || []).length, 0);
+    assert.strictEqual((source.match(/<[^>]*\bonerror\s*=/g) || []).length, 0);
+});
+
+test('ui_info.js は静的inline styleと文字列onclickを生成しない', () => {
+    const source = read('js/ui_info.js');
+    const styles = [...source.matchAll(/style="([^"]*)"/g)].map(m => m[1].trim());
+    assert.ok(styles.length > 0, '動的CSS変数まで消えていないか確認してください');
+    assert.ok(styles.every(value => value.startsWith('--')), `静的styleが残っています: ${styles.filter(value => !value.startsWith('--')).join(' | ')}`);
+    assert.strictEqual((source.match(/<[^>]*\bonclick\s*=/g) || []).length, 0);
+    assert.strictEqual((source.match(/<[^>]*\bonerror\s*=/g) || []).length, 0);
+});
+
+test('一覧行のクリック処理は関数イベントに統一する', () => {
+    for (const file of ['js/ui_info.js', 'js/ui_info_busho.js', 'js/ui_info_kyoten.js']) {
+        const source = read(file);
+        assert.ok(!/onClick\s*:\s*`/.test(source), `${file} に文字列onClickがあります`);
+        assert.ok(!/onClickStr\s*=\s*`/.test(source), `${file} に文字列onClickStrがあります`);
+    }
+});
+
+test('主要情報詳細は共通CSSクラスを使い、HTML inline eventを持たない', () => {
+    const source = read('js/ui_info.js');
+    const section = (start, end) => source.slice(source.indexOf('\n    ' + start), source.indexOf('\n    ' + end, source.indexOf('\n    ' + start)));
+    const daimyo = section('_renderDaimyoDetail(', 'showDiplomacyList(');
+    const kunishu = section('_renderKunishuDetail(', 'showKunishuList(');
+    const princess = source.slice(source.indexOf('\n    _renderPrincessDetail('));
+    for (const [name, text] of [['daimyo', daimyo], ['kunishu', kunishu], ['princess', princess]]) {
+        assert.strictEqual((text.match(/style="/g) || []).length, 0, `${name} detail に静的inline styleがあります`);
+        assert.strictEqual((text.match(/onerror\s*=/g) || []).length, 0, `${name} detail にinline onerrorがあります`);
+    }
+    assert.ok(daimyo.includes('info-detail-wrapper'));
+    assert.ok(kunishu.includes('info-detail-wrapper'));
+    assert.ok(princess.includes('busho-detail-container'));
+});
+
+test('捕虜・結果画面の固定ボタンは inline onclick を生成しない', () => {
+    const info = read('js/ui_info.js');
+    const ui = read('js/ui.js');
+    assert.ok(!info.includes('handleDaimyoPrisonerAction(\'hire\')">'));
+    assert.ok(!info.includes('handleDaimyoPrisonerAction(\'release\')">'));
+    assert.ok(!ui.includes('onclick="window.GameApp.ui.closeResultModal()"'));
+});
+
 test('コード構成ガイドが存在し、主要な専門部署を索引化している', () => {
     const doc = read('ARCHITECTURE.md');
     for (const name of ['app_bootstrap.js', 'skill_manager.js', 'turn_manager.js', 'selector_modal_view.js', 'troop_allocation.js']) {

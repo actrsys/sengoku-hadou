@@ -197,18 +197,32 @@ class UIInfoManager {
         this.updateCommonConfirmBtn();
     }
 
+    _withChoiceSound(action) {
+        return (event) => {
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            return action(event);
+        };
+    }
+
+    _bindImageFallbacks(container) {
+        if (!container) return;
+        container.querySelectorAll('[data-face-fallback]').forEach(img => {
+            img.addEventListener('error', () => {
+                const fallback = img.dataset.faceFallback;
+                if (!fallback || img.dataset.fallbackApplied === 'true') return;
+                img.dataset.fallbackApplied = 'true';
+                img.src = fallback;
+            }, { once: true });
+        });
+        container.querySelectorAll('[data-hide-on-error]').forEach(img => {
+            img.addEventListener('error', () => img.classList.add('hidden'), { once: true });
+        });
+    }
+
     updateCommonConfirmBtn(minCount = 1) {
         const confirmBtn = document.getElementById('selector-confirm-btn');
         if (confirmBtn) {
-            if (this.commonSelectedIds && this.commonSelectedIds.length >= minCount) {
-                confirmBtn.disabled = false;
-                confirmBtn.style.opacity = '1';
-                confirmBtn.style.cursor = 'pointer';
-            } else {
-                confirmBtn.disabled = true;
-                confirmBtn.style.opacity = '0.5';
-                confirmBtn.style.cursor = 'not-allowed';
-            }
+            confirmBtn.disabled = !(this.commonSelectedIds && this.commonSelectedIds.length >= minCount);
         }
     }
 
@@ -300,7 +314,7 @@ class UIInfoManager {
                 tabsEl.style.justifyContent = 'flex-start';
                 tabsEl.style.paddingLeft = '10px';
                 tabsEl.style.alignItems = 'flex-end';
-                tabsEl.innerHTML = `<div style="display: flex; gap: 5px;"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">${isPc ? '基本' : '基'}</button></div>`;
+                tabsEl.innerHTML = `<div class="busho-list-tabs"><button class="busho-tab-btn active is-static-tab">${isPc ? '基本' : '基'}</button></div>`;
             }
         }
         
@@ -345,7 +359,7 @@ class UIInfoManager {
         const isPc = document.body.classList.contains('is-pc'); // ★PCかスマホか調べる魔法を追加します
 
         let tabsHtml = `
-            <div style="display: flex; gap: 5px;">
+            <div class="busho-list-tabs">
                 <button class="busho-tab-btn ${this.daimyoCurrentTab === 'status' ? 'active' : ''}" data-tab="status">${isPc ? '基本' : '基'}</button>
                 <button class="busho-tab-btn ${this.daimyoCurrentTab === 'military' ? 'active' : ''}" data-tab="military">${isPc ? '軍事' : '軍'}</button>
                 <button class="busho-tab-btn ${this.daimyoCurrentTab === 'economy' ? 'active' : ''}" data-tab="economy">${isPc ? '経済' : '経'}</button>
@@ -563,7 +577,7 @@ class UIInfoManager {
                 let scale = 1.0 - (text.length - (threshold - 1)) * 0.05;
                 // ★修正：これ以上小さくならない下限も少し緩めました（0.55 → 0.75）
                 if (scale < 0.75) scale = 0.75;
-                return `<span style="font-size: ${scale}em; transform: scaleY(${1/scale}); letter-spacing: -0.5px; padding-right: 1px; display: inline-block; transform-origin: left center;">${text}</span>`;
+                return `<span class="compressed-list-text" style="--text-scale:${scale}; --text-unscale:${1/scale};">${text}</span>`;
             }
             return text;
         };
@@ -631,7 +645,7 @@ class UIInfoManager {
             if (isSelectMode) {
                 onClickStr = (e) => this.handleCommonSelect(d.id, e.currentTarget, false);
             } else {
-                onClickStr = `window.GameApp.ui.info.showDaimyoDetail(${d.id})`;
+                onClickStr = this._withChoiceSound(() => this.showDaimyoDetail(d.id));
             }
 
             items.push({
@@ -746,81 +760,60 @@ class UIInfoManager {
 
         let faceSrc = leader && leader.faceIcon ? `data/images/faceicons/${leader.faceIcon}` : "data/images/faceicons/unknown_face.webp";
 
-        // スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！（拠点詳細のものを流用）
-        const isPc = document.body.classList.contains('is-pc');
-
-        const fSizeCastleYomi = isPc ? "0.75rem" : "0.65rem";
-        const fSizeCastleName = isPc ? "1.4rem" : "1.25rem";
-        const fSizeLordLabel = isPc ? "1.05rem" : "0.95rem";
-        const fSizeStatLabel = isPc ? "0.85rem" : "0.70rem";
-        const fSizeStatValue = isPc ? "0.85rem" : "0.70rem";
-
-        const gridGap = isPc ? "8px 6px" : "8px 3px";
-        const faceStyle = "width: 100%; max-width: 90px; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0;";
-
-        const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 4px;";
-        const statBoxStyle = "background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 2px 6px; display: flex; justify-content: space-between; align-items: center;";
-        const labelStyle = `color: #ffd54f; font-size: ${fSizeStatLabel}; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: left;`;
-        const valueStyle = `color: #fff; font-size: ${fSizeStatValue}; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: right; font-variant-numeric: tabular-nums;`;
-        
         const makeRow = (label, value) => {
-            let extraLabelStyle = "";
-            // スマホ版のみ、3文字以上の項目名（月支出など）は横幅をきゅっと詰めます
-            if (!isPc && label.length >= 3) {
-                extraLabelStyle = " letter-spacing: -1px; transform: scaleX(0.9); transform-origin: left center; display: inline-block;";
-            }
-            return `<div style="${statBoxStyle}"><span style="${labelStyle}${extraLabelStyle}">${label}</span><span style="${valueStyle}">${value}</span></div>`;
+            const longLabelClass = label.length >= 3 ? ' is-long-label' : '';
+            return `<div class="info-detail-stat-box"><span class="info-detail-stat-label${longLabelClass}">${label}</span><span class="info-detail-stat-value">${value}</span></div>`;
         };
-        const makeEmptyRow = () => `<div style="${statBoxStyle}; visibility: hidden;"><span>&nbsp;</span><span>&nbsp;</span></div>`;
+        const makeEmptyRow = () => `<div class="info-detail-stat-box is-placeholder"><span>&nbsp;</span><span>&nbsp;</span></div>`;
 
         const clanYomi = clan.yomi || "";
-        const ideologyHtml = `<div class="daimyo-detail-ideology ${ideologyClass}" style="display: inline-block; margin-top: 4px;">${ideology}</div>`;
+        const ideologyHtml = `<div class="daimyo-detail-ideology info-detail-ideology ${ideologyClass}">${ideology}</div>`;
 
         if (listContainer) {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = `
-                <div class="kyoten-detail-wrapper" style="padding: 8px 10px; min-height: 100%; display: flex; flex-direction: column; box-sizing: border-box;">
+                <div class="kyoten-detail-wrapper info-detail-wrapper">
                     
                     <!-- 【ヘッダー部】 左上に顔グラ、右にテキスト情報 -->
-                    <div style="display: flex; align-items: flex-start; gap: 15px; margin-bottom: 10px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 8px;">
-                        <div style="flex-shrink: 0; width: 90px;">
-                            <img src="${faceSrc}" style="${faceStyle}" onerror="this.src='data/images/faceicons/unknown_face.webp'">
+                    <div class="info-detail-header">
+                        <div class="info-detail-face-column">
+                            <img src="${faceSrc}" class="info-detail-face" data-face-fallback="data/images/faceicons/unknown_face.webp">
                         </div>
-                        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                        <div class="info-detail-main">
                             <!-- 勢力名 -->
-                            <div style="display: flex; align-items: flex-end; gap: 15px;">
-                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                                    <span style="font-size: ${fSizeCastleYomi}; color: #ccc; min-height: 1em;">${clanYomi}</span>
-                                    <span style="font-size: ${fSizeCastleName}; font-weight: bold; color: #fff; line-height: 1;">${clan.name}</span>
+                            <div class="info-detail-title-row">
+                                <div class="info-detail-title-block">
+                                    <span class="info-detail-yomi">${clanYomi}</span>
+                                    <span class="info-detail-name">${clan.name}</span>
                                 </div>
                             </div>
                             <!-- 大名＆イデオロギー -->
-                            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
-                                <div style="font-size: ${fSizeLordLabel}; color: #ffd54f;">大名 <span style="color: #fff; font-weight: bold;">${leaderName}</span></div>
+                            <div class="info-detail-subinfo">
+                                <div class="info-detail-owner-line">大名 <span class="info-detail-owner-value">${leaderName}</span></div>
                                 ${ideologyHtml}
                             </div>
                         </div>
                     </div>
 
                     <!-- 【ステータス部：上段】 -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap}; margin-bottom: 8px;">
+                    <div class="info-detail-grid info-detail-grid-upper">
                         <!-- 左列：武将・姫・浪人 -->
-                        <div style="${groupWrapStyle}">
+                        <div class="info-detail-group">
                             ${makeRow('武将', bushosCount)}
                             ${makeRow('姫', princessCount)}
                             ${makeRow('浪人', roninCount)}
                         </div>
                         
                         <!-- 中央列：拠点・石高・鉱山 -->
-                        <div style="${groupWrapStyle}">
+                        <div class="info-detail-group">
                             ${makeRow('拠点', castlesCount)}
                             ${makeRow('石高', totalKokudaka)}
                             ${makeRow('鉱山', totalCommerce)}
                         </div>
 
                         <!-- 右列：軍馬・鉄砲・空箱 -->
-                        <div style="${groupWrapStyle}">
+                        <div class="info-detail-group">
                             ${makeRow('軍馬', totalHorses)}
                             ${makeRow('鉄砲', totalGuns)}
                             ${makeEmptyRow()}
@@ -828,45 +821,45 @@ class UIInfoManager {
                     </div>
 
                     <!-- 【ステータス部：下段】 -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap}; margin-bottom: 10px;">
+                    <div class="info-detail-grid info-detail-grid-lower">
                         
                         <!-- 左列：金・兵糧 ＋ 独立した人口 -->
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <div style="${groupWrapStyle}">
+                        <div class="info-detail-column">
+                            <div class="info-detail-group">
                                 ${makeRow('金', totalGold)}
                                 ${makeRow('兵糧', totalRice)}
                             </div>
-                            <div style="${groupWrapStyle}">
+                            <div class="info-detail-group">
                                 ${makeRow('人口', totalPopulation)}
                             </div>
                         </div>
 
                         <!-- 中央列：月収入・年収穫 ＋ 見えない箱 -->
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <div style="${groupWrapStyle}">
+                        <div class="info-detail-column">
+                            <div class="info-detail-group">
                                 ${makeRow('月収入', totalGoldIncome)}
                                 ${makeRow('年収穫', totalRiceIncome)}
                             </div>
-                            <div style="${groupWrapStyle}; visibility: hidden;">
+                            <div class="info-detail-group is-placeholder">
                                 ${makeEmptyRow()}
                             </div>
                         </div>
                         
                         <!-- 右列：月支出・米消費 ＋ 独立した兵士 -->
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <div style="${groupWrapStyle}">
+                        <div class="info-detail-column">
+                            <div class="info-detail-group">
                                 ${makeRow('月支出', totalGoldConsume)}
                                 ${makeRow('米消費', consumeRiceYear)}
                             </div>
-                            <div style="${groupWrapStyle}">
+                            <div class="info-detail-group">
                                 ${makeRow('兵士', totalSoldiers)}
                             </div>
                         </div>
                     </div>
 
                     <!-- フッター（アクションボタン） -->
-                    <div style="display: flex; justify-content: flex-end; align-items: flex-end; margin-top: auto; padding-top: 5px;">
-                        <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
+                    <div class="info-detail-footer info-detail-footer-end">
+                        <div class="info-detail-actions">
                             <button class="daimyo-detail-action-btn" id="temp-kyoten-btn" ${castlesCount === 0 ? 'disabled' : ''}>拠点</button>
                             <button class="daimyo-detail-action-btn" id="temp-busho-btn" ${bushosCount === 0 ? 'disabled' : ''}>武将</button>
                             <button class="daimyo-detail-action-btn" id="temp-hime-btn" ${princessCount === 0 ? 'disabled' : ''}>姫</button>
@@ -876,6 +869,8 @@ class UIInfoManager {
                     </div>
                 </div>
             `;
+
+            this._bindImageFallbacks(listContainer);
 
             document.getElementById('temp-kyoten-btn').onclick = (e) => {
                 e.stopPropagation();
@@ -927,7 +922,7 @@ class UIInfoManager {
         let tabsHtml = null;
         if (type === 'daimyo') {
             tabsHtml = `
-                <div style="display: flex; gap: 5px;">
+                <div class="busho-list-tabs">
                     <button class="busho-tab-btn ${this.diploCurrentTab === 'daimyo' ? 'active' : ''}" data-tab="daimyo">${isPc ? '大名家' : '大'}</button>
                     <button class="busho-tab-btn ${this.diploCurrentTab === 'kunishu' ? 'active' : ''}" data-tab="kunishu">${isPc ? '諸勢力' : '諸'}</button>
                 </div>
@@ -1021,7 +1016,7 @@ class UIInfoManager {
             items.push({
                 onClick: null, 
                 cells: [
-                    `<span class="col-daimyo-name" style="font-weight:bold;">${r.name}</span>`,
+                    `<span class="col-daimyo-name list-text-strong">${r.name}</span>`,
                     friendBarHtml,
                     `<span class="col-relation ${statusClass}">${r.status}</span>`,
                     `<span class="col-period">${periodStr}</span>`,
@@ -1034,7 +1029,7 @@ class UIInfoManager {
 
         // カスタムの列幅を指定するためのヘッダーを作ります
         const customHeaderCols = [
-            `<span style="padding-left:5px; justify-content:flex-start;" data-sort="name">勢力名${getSortMark('name')}</span>`,
+            `<span class="col-name-left" data-sort="name">勢力名${getSortMark('name')}</span>`,
             `<span data-sort="sentiment">友好度${getSortMark('sentiment')}</span>`,
             `<span data-sort="status">関係${getSortMark('status')}</span>`,
             `<span class="col-period" data-sort="period">期間${getSortMark('period')}</span>`,
@@ -1164,7 +1159,7 @@ class UIInfoManager {
             let leaderFullName = fId === 0 ? "" : (leader ? leader.name : "不明");
             
             items.push({
-                onClick: `window.GameApp.ui.info.showFactionBushoList(${clan.id}, ${fId}, '${factionNameStr}')`,
+                onClick: this._withChoiceSound(() => this.showFactionBushoList(clan.id, fId, factionNameStr)),
                 cells: [
                     `<strong class="col-faction-name ${nameClass}">${factionNameStr}</strong>`,
                     `<span class="col-leader-name">${leaderFullName}</span>`,
@@ -1239,7 +1234,7 @@ class UIInfoManager {
             if (phaseType === 'hire' && b.hasRefusedHire) isSelectable = false;
 
             const inputType = 'checkbox';
-            let inputHtml = `<input type="${inputType}" name="sel_prisoner" value="${b.id}" ${!isSelectable ? 'disabled' : ''} style="display:none;">`;
+            let inputHtml = `<input type="${inputType}" name="sel_prisoner" value="${b.id}" ${!isSelectable ? 'disabled' : ''} class="hidden-selection-input">`;
 
             const getStat = (stat) => StatPresenter.getDisplayStatHTML(b, stat, gunshi, null, this.game.playerClanId, myDaimyo);
 
@@ -1260,7 +1255,7 @@ class UIInfoManager {
             if (!isSelectable) itemClassThis += " disabled";
 
             items.push({
-                onClick: !isSelectable ? null : `window.GameApp.ui.info.handlePrisonerSelect(event)`,
+                onClick: !isSelectable ? null : this._withChoiceSound((e) => this.handlePrisonerSelect(e)),
                 cells: cells,
                 itemClass: itemClassThis
             });
@@ -1318,63 +1313,57 @@ class UIInfoManager {
         const confirmBtn = document.getElementById('selector-confirm-btn');
 
         if (confirmBtn) {
-            if (checkedCount > 0) {
-                confirmBtn.disabled = false;
-                confirmBtn.style.opacity = 1.0;
-            } else {
-                confirmBtn.disabled = true;
-                confirmBtn.style.opacity = 0.5;
-            }
+            confirmBtn.disabled = checkedCount === 0;
         }
     }
     
     showDaimyoPrisonerModal(prisoner, options = {}) {
         this.ui.hideAIGuardTemporarily();
-        
-        // オプションの中に hideHire（登用を隠す）の指示がない時だけ、登用ボタンを作ります
+
         let hireBtnHtml = '';
         if (!options.hideHire) {
-            if (prisoner.hasRefusedHire) {
-                hireBtnHtml = `<button class="btn-primary" disabled style="opacity:0.5; background-color: #666;">拒否</button>`;
-            } else {
-                hireBtnHtml = `<button class="btn-primary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('hire')">登用</button>`;
-            }
+            hireBtnHtml = prisoner.hasRefusedHire
+                ? '<button class="btn-primary prisoner-refused-btn" disabled>拒否</button>'
+                : '<button class="btn-primary" data-prisoner-action="hire">登用</button>';
         }
 
-        // 大名か姫かで、画面に表示されるタイトルと説明文を変えてあげます
         const titleText = options.hideHire ? '姫の処遇' : '敵大名 捕縛！';
-        const descText = options.hideHire ? `<strong>${prisoner.name}</strong>を捕らえました。<br>処遇を決めてください。` : `敵大名・<strong>${prisoner.name}</strong>を捕縛しました。<br>処遇を決めてください。`;
+        const descText = options.hideHire
+            ? `<strong>${prisoner.name}</strong>を捕らえました。<br>処遇を決めてください。`
+            : `敵大名・<strong>${prisoner.name}</strong>を捕縛しました。<br>処遇を決めてください。`;
 
-        // ボタンの並びを姫と大名で切り替えます
-        let buttonsHtml = '';
-        if (options.hideHire) {
-            // 姫の場合：解放（灰）、据置（青）、処断（赤）の順番にします
-            buttonsHtml = `
-                <button class="btn-secondary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('release')">解放</button>
-                <button class="btn-primary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('keep')">据置</button>
-                <button class="btn-danger" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('kill')">処断</button>
-            `;
-        } else {
-            // 大名の場合：登用（青）、解放（灰）、処断（赤）
-            buttonsHtml = `
+        const buttonsHtml = options.hideHire
+            ? `
+                <button class="btn-secondary" data-prisoner-action="release">解放</button>
+                <button class="btn-primary" data-prisoner-action="keep">据置</button>
+                <button class="btn-danger" data-prisoner-action="kill">処断</button>
+            `
+            : `
                 ${hireBtnHtml}
-                <button class="btn-secondary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('release')">解放</button>
-                <button class="btn-danger" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('kill')">処断</button>
+                <button class="btn-secondary" data-prisoner-action="release">解放</button>
+                <button class="btn-danger" data-prisoner-action="kill">処断</button>
             `;
-        }
 
         const content = `
-            <div style="text-align:center; padding: 10px;">
-                <h3 style="margin-top:0;">${titleText}</h3>
-                <p style="font-size:1.1rem;">${descText}</p>
-                <div style="margin-top:20px; display:flex; justify-content:center; gap:10px;">
+            <div class="prisoner-result">
+                <h3 class="prisoner-result-title">${titleText}</h3>
+                <p class="prisoner-result-desc">${descText}</p>
+                <div class="prisoner-result-actions">
                     ${buttonsHtml}
                 </div>
             </div>
         `;
-        this.ui.showResultModal(content, null, ""); 
+        this.ui.showResultModal(content, null, "");
+
+        if (this.ui.resultBody) {
+            this.ui.resultBody.querySelectorAll('[data-prisoner-action]').forEach(button => {
+                button.addEventListener('click', () => {
+                    this.game.warManager.handleDaimyoPrisonerAction(button.dataset.prisonerAction);
+                });
+            });
+        }
     }
-    
+
     showSettingsModal() {
         const modal = document.getElementById('settings-modal');
         const bgmSlider = document.getElementById('setting-bgm-volume');
@@ -1420,7 +1409,7 @@ class UIInfoManager {
     // ==========================================
     _createBarHtml(percent, type) {
         const safePercent = Math.min(100, Math.max(0, Number(percent) || 0));
-        return `<div style="display: flex; align-items: center; width: 100%; height: 100%;"><div class="bar-bg bar-bg-${type}"><div class="bar-fill bar-fill-${type}" style="width:${safePercent}%;"></div></div></div>`;
+        return `<div class="list-bar-cell"><div class="bar-bg bar-bg-${type}"><div class="bar-fill bar-fill-${type}" style="--bar-value:${safePercent}%;"></div></div></div>`;
     }
 
     _renderListModal(config) {
@@ -1484,10 +1473,8 @@ class UIInfoManager {
         if (config.gridTemplatePc) listContainer.style.setProperty('--grid-cols-pc', config.gridTemplatePc);
         else listContainer.style.removeProperty('--grid-cols-pc');
 
-        let wrapperStyle = "";
-        if (config.minWidth) {
-            wrapperStyle = `width: ${config.minWidth}; min-width: 100%;`;
-        }
+        const wrapperStyle = config.minWidth ? ` style="--list-min-width:${config.minWidth};"` : '';
+        const wrapperClass = config.minWidth ? ' has-custom-min-width' : '';
 
         // ★軽量化：大量リストは「行データそのもの」も必要な分だけ作れるようにします。
         // config.items の代わりに itemCount + getItem(index) を渡せます。
@@ -1497,17 +1484,9 @@ class UIInfoManager {
 
         const buildItemHtml = (item, index) => {
             if (!item) return '';
-            const cursorStr = item.onClick ? "style='cursor:pointer;'" : "style='cursor:default;'";
             const extraClass = item.itemClass || '';
-            let clickStr = "";
-            let indexAttr = "";
-            if (item.onClick) {
-                if (typeof item.onClick === 'function') {
-                    indexAttr = `data-action-index="${index}"`; 
-                } else {
-                    clickStr = `onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); ${item.onClick}"`;
-                }
-            }
+            const actionClass = typeof item.onClick === 'function' ? 'is-clickable' : 'is-static';
+            const indexAttr = typeof item.onClick === 'function' ? `data-action-index="${index}"` : '';
 
             // ★追加：スクロールで順番がズレないよう、データ上の「本当の出席番号（index）」を見て色分けのシールを貼ります！
             const stripeClass = (index % 2 === 1) ? "row-striped" : "";
@@ -1519,7 +1498,7 @@ class UIInfoManager {
             }).join('');
             
             // ★変更：クラスのリストに ${stripeClass} を追加します
-            return `<div class="select-item ${config.itemClass || ''} ${extraClass} ${stripeClass}" ${cursorStr} ${clickStr} ${indexAttr}>${cells}</div>`;
+            return `<div class="select-item ${config.itemClass || ''} ${extraClass} ${stripeClass} ${actionClass}" ${indexAttr}>${cells}</div>`;
         };
 
         if (totalItems === 0) {
@@ -1528,8 +1507,8 @@ class UIInfoManager {
                 const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
                 emptyHtml += `<div class="list-header ${config.headerClass || ''}">${headerCols}</div>`;
             }
-            emptyHtml += config.emptyHtml || '<div style="padding: 10px; text-align: center;">データがありません。</div>';
-            listContainer.innerHTML = `<div class="list-inner-wrapper" style="${wrapperStyle}">${emptyHtml}</div>`;
+            emptyHtml += config.emptyHtml || '<div class="list-empty-message">データがありません。</div>';
+            listContainer.innerHTML = `<div class="list-inner-wrapper${wrapperClass}"${wrapperStyle}>${emptyHtml}</div>`;
             listContainer.style.display = 'block';
             return;
         }
@@ -1568,7 +1547,7 @@ class UIInfoManager {
                     if (cell.querySelector('.bar-bg') || cell.querySelector('.bar-bg-busho') || cell.querySelector('input') || cell.querySelector('img')) continue;
 
                     // ★追加：前回 ui_info_busho.js で「最初から縮めた状態」にした要素を見つけたら、二重処理によるチラつきを防ぐためロボットをストップさせます！
-                    if (cell.querySelector('span[style*="transform"]')) continue;
+                    if (cell.querySelector('.compressed-list-text, .busho-compressed-text')) continue;
 
                     const textLen = cell.textContent.trim().length;
 
@@ -1634,7 +1613,7 @@ class UIInfoManager {
                 headerHtml = `<div class="list-header sortable-header ${config.headerClass || ''}">${headerCols}</div>`;
             }
 
-            listContainer.innerHTML = `<div class="list-inner-wrapper" style="${wrapperStyle}">${headerHtml}<div class="virtual-scroll-body" style="display:flex; flex-direction:column;"></div></div>`;
+            listContainer.innerHTML = `<div class="list-inner-wrapper${wrapperClass}"${wrapperStyle}>${headerHtml}<div class="virtual-scroll-body"></div></div>`;
 
             const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
             const scrollBody = innerWrapper.querySelector('.virtual-scroll-body');
@@ -1742,10 +1721,10 @@ class UIInfoManager {
 
         for (let i = totalItems; i < 8; i++) {
             const emptyCells = config.headers ? config.headers.map(() => `<span></span>`).join('') : '';
-            initialHtmlParts.push(`<div class="select-item ${config.itemClass || ''}" style="cursor:default; pointer-events:none;">${emptyCells}</div>`);
+            initialHtmlParts.push(`<div class="select-item ${config.itemClass || ''} is-static is-placeholder-row">${emptyCells}</div>`);
         }
 
-        listContainer.innerHTML = `<div class="list-inner-wrapper" style="${wrapperStyle}">${initialHtmlParts.join('')}</div>`;
+        listContainer.innerHTML = `<div class="list-inner-wrapper${wrapperClass}"${wrapperStyle}>${initialHtmlParts.join('')}</div>`;
 
         const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
         attachDelegatedClick(innerWrapper);
@@ -1886,7 +1865,7 @@ class UIInfoManager {
             const isPc = document.body.classList.contains('is-pc'); // ★PCかスマホか調べる魔法を追加します
 
             tabsHtml = `
-                <div style="display: flex; gap: 5px; margin-left: 15px;">
+                <div class="busho-scope-tabs">
                     <button class="busho-scope-btn ${this.princessCurrentScope === 'clan' ? 'active' : ''}" data-scope="clan">${isPc ? '自家' : '自'}</button>
                     <button class="busho-scope-btn ${this.princessCurrentScope === 'all' ? 'active' : ''}" data-scope="all">${isPc ? '全国' : '全'}</button>
                 </div>
@@ -1975,7 +1954,7 @@ class UIInfoManager {
 
             const isSelected = this.commonSelectedIds && this.commonSelectedIds.includes(p.id);
             return {
-                onClick: isSelectMode ? (e) => this.handleCommonSelect(p.id, e.currentTarget, false) : `window.GameApp.ui.info.showPrincessDetail(${p.id})`,
+                onClick: isSelectMode ? (e) => this.handleCommonSelect(p.id, e.currentTarget, false) : this._withChoiceSound(() => this.showPrincessDetail(p.id)),
                 cells: [
                     `<strong class="col-princess-name">${p.name}</strong>`,
                     `<span class="col-clan">${clanName}</span>`,
@@ -2076,12 +2055,12 @@ class UIInfoManager {
             const moveDisplay = c.isDelegated ? `<span class="${moveClass}">${moveText}</span>` : `<span class="text-gray"></span>`;
 
             items.push({
-                onClick: `window.GameApp.ui.info.showDelegateSettingModal(${c.id})`,
+                onClick: this._withChoiceSound(() => this.showDelegateSettingModal(c.id)),
                 cells: [
-                    `<span class="col-castle-name" style="font-weight:bold; justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
+                    `<span class="col-castle-name col-name-left list-text-strong">${c.name}</span>`,
                     attackDisplay,
                     moveDisplay,
-                    `<span class="${statusClass}" style="font-weight:bold;">${statusText}</span>`
+                    `<span class="${statusClass} list-text-strong">${statusText}</span>`
                 ]
             });
         });
@@ -2094,7 +2073,7 @@ class UIInfoManager {
             itemClass: "delegate-list-item",
             listClass: "delegate-list-container",
             items: items,
-            emptyHtml: '<div style="padding: 10px; text-align: center;">委任できる城がありません。</div>',
+            emptyHtml: '<div class="list-empty-message">委任できる城がありません。</div>',
             scrollPos: scrollPos,
             gridTemplateSp: "1.5fr 1fr 1fr 1fr",
             gridTemplatePc: "200px 100px 100px 100px"
@@ -2130,20 +2109,20 @@ class UIInfoManager {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = `
-                <div style="padding: 20px; text-align: center;">
-                    <div style="margin: 20px 0; display: flex; justify-content: center; gap: 20px;">
+                <div class="delegate-setting-panel">
+                    <div class="delegate-setting-mode-buttons">
                         <button id="btn-direct-control" class="delegate-btn ${!castle.isDelegated ? 'active' : ''}">直轄</button>
                         <button id="btn-delegate-control" class="delegate-btn ${castle.isDelegated ? 'active' : ''}">委任</button>
                     </div>
                     
-                    <div id="delegate-options" style="margin-bottom: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px; text-align: left; opacity: ${castle.isDelegated ? '1' : '0.5'}; transition: opacity 0.3s;">
-                        <div style="margin-bottom: 15px;">
-                            <span style="font-weight: bold; display: inline-block; width: 100px;">城攻め：</span>
+                    <div id="delegate-options" class="delegate-options ${castle.isDelegated ? 'is-enabled' : 'is-disabled'}">
+                        <div class="delegate-option-row">
+                            <span class="delegate-option-label">城攻め：</span>
                             <button id="btn-attack-deny" class="delegate-sub-btn ${!castle.allowAttack ? 'active' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>不可</button>
                             <button id="btn-attack-allow" class="delegate-sub-btn ${castle.allowAttack ? 'active-allow' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>許可</button>
                         </div>
                         <div>
-                            <span style="font-weight: bold; display: inline-block; width: 100px;">武将移動：</span>
+                            <span class="delegate-option-label">武将移動：</span>
                             <button id="btn-move-deny" class="delegate-sub-btn ${!castle.allowMove ? 'active' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>不可</button>
                             <button id="btn-move-allow" class="delegate-sub-btn ${castle.allowMove ? 'active-allow' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>許可</button>
                         </div>
@@ -2241,76 +2220,54 @@ class UIInfoManager {
         const princessCount = clanData && clanData.princessIds ? clanData.princessIds.length : 0;
         const clanYomi = clanData ? (clanData.yomi || "") : "";
 
-        // スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！
-        const isPc = document.body.classList.contains('is-pc');
-
-        // ★文字サイズの変更（PCは前回の0.85倍程度に縮小、スマホはそのまま）
-        const fSizeCastleYomi = isPc ? "0.9rem" : "0.715rem";
-        const fSizeCastleName = isPc ? "1.65rem" : "1.375rem";
-        const fSizeLordLabel = isPc ? "1.25rem" : "1.045rem";
-        const fSizeStatLabel = isPc ? "1.0rem" : "0.77rem";
-        const fSizeStatValue = isPc ? "1.0rem" : "0.77rem";
-
-        const gridGap = isPc ? "4px 3px" : "4px 1.5px";
-        const faceWidth = isPc ? "90px" : "72px";
-        const faceStyle = `width: 100%; max-width: ${faceWidth}; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0;`;
-
         let faceHtml = "";
         if (leader && leader.faceIcon) {
-            faceHtml = `<img src="data/images/faceicons/${leader.faceIcon}" style="${faceStyle}" onerror="this.style.display='none'">`;
+            faceHtml = `<img src="data/images/faceicons/${leader.faceIcon}" class="daimyo-confirm-face" data-hide-on-error="true">`;
         } else {
-            faceHtml = `<div style="${faceStyle}"></div>`;
+            faceHtml = `<div class="daimyo-confirm-face daimyo-confirm-face-empty"></div>`;
         }
 
-        const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 2px; display: flex; flex-direction: column; gap: 2px;";
-        const statBoxStyle = "background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 1px 3px; display: flex; justify-content: space-between; align-items: center;";
-        const labelStyle = `color: #ffd54f; font-size: ${fSizeStatLabel}; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: left;`;
-        const valueStyle = `color: #fff; font-size: ${fSizeStatValue}; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: right; font-variant-numeric: tabular-nums;`;
-        
         const makeRow = (label, value) => {
-            let extraLabelStyle = "";
-            if (!isPc && label.length >= 3) {
-                extraLabelStyle = " letter-spacing: -1px; transform: scaleX(0.9); transform-origin: left center; display: inline-block;";
-            }
-            return `<div style="${statBoxStyle}"><span style="${labelStyle}${extraLabelStyle}">${label}</span><span style="${valueStyle}">${value}</span></div>`;
+            const longLabelClass = label.length >= 3 ? ' is-long-label' : '';
+            return `<div class="daimyo-confirm-stat-box"><span class="daimyo-confirm-stat-label${longLabelClass}">${label}</span><span class="daimyo-confirm-stat-value">${value}</span></div>`;
         };
-        const makeEmptyRow = () => `<div style="${statBoxStyle}; visibility: hidden;"><span>&nbsp;</span><span>&nbsp;</span></div>`;
+        const makeEmptyRow = () => `<div class="daimyo-confirm-stat-box is-placeholder"><span>&nbsp;</span><span>&nbsp;</span></div>`;
 
         if (this.ui.daimyoConfirmBody) {
             this.ui.daimyoConfirmBody.innerHTML = `
                 <h3>勢力情報</h3>
-                <div class="scroll-wrapper no-custom-scrollbar" style="padding:0; border: 2px solid #d4af37; border-radius: 4px; box-shadow: 0 0 10px rgba(0,0,0,0.5);">
-                    <div class="list-container hide-native-scroll" style="display:block; overflow:hidden; min-height:100%;">
-                        <div class="kyoten-detail-wrapper" style="padding: 4px 5px; display: flex; flex-direction: column; box-sizing: border-box; text-align: left;">
+                <div class="scroll-wrapper no-custom-scrollbar daimyo-confirm-scroll">
+                    <div class="list-container hide-native-scroll daimyo-confirm-list">
+                        <div class="kyoten-detail-wrapper daimyo-confirm-info">
                             
                             <!-- 【ヘッダー部】 左上に顔グラ、右にテキスト情報 -->
-                            <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 5px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 4px;">
-                                <div style="flex-shrink: 0; width: ${faceWidth};">
+                            <div class="daimyo-confirm-header">
+                                <div class="daimyo-confirm-face-column">
                                     ${faceHtml}
                                 </div>
-                                <div style="display: flex; flex-direction: column; gap: 3px; flex: 1;">
+                                <div class="daimyo-confirm-main">
                                     <!-- 勢力名 -->
-                                    <div style="display: flex; align-items: flex-end; gap: 8px;">
-                                        <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                                            <span style="font-size: ${fSizeCastleYomi}; color: #ccc; min-height: 1em;">${clanYomi}</span>
-                                            <span style="font-size: ${fSizeCastleName}; font-weight: bold; color: #fff; line-height: 1;">${clanName}</span>
+                                    <div class="daimyo-confirm-title-row">
+                                        <div class="info-detail-title-block">
+                                            <span class="daimyo-confirm-yomi">${clanYomi}</span>
+                                            <span class="daimyo-confirm-name">${clanName}</span>
                                         </div>
                                     </div>
                                     <!-- 大名 -->
-                                    <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px;">
-                                        <div style="font-size: ${fSizeLordLabel}; color: #ffd54f;">大名 <span style="color: #fff; font-weight: bold;">${leader ? leader.name : "不明"}</span></div>
+                                    <div class="daimyo-confirm-subinfo">
+                                        <div class="daimyo-confirm-owner">大名 <span class="daimyo-confirm-owner-value">${leader ? leader.name : "不明"}</span></div>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- 【ステータス部：上段】 -->
-                            <div style="${groupWrapStyle} margin-bottom: 4px;">
-                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
+                            <div class="daimyo-confirm-group daimyo-confirm-group-upper">
+                                <div class="daimyo-confirm-grid">
                                     ${makeRow('拠点', castlesCount)}
                                     ${makeRow('武将', bushosCount)}
                                     ${makeRow('姫', princessCount)}
                                 </div>
-                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
+                                <div class="daimyo-confirm-grid">
                                     ${makeRow('人口', totalPopulation)}
                                     ${makeRow('石高', totalKokudaka)}
                                     ${makeRow('鉱山', totalCommerce)}
@@ -2318,13 +2275,13 @@ class UIInfoManager {
                             </div>
 
                             <!-- 【ステータス部：下段】 -->
-                            <div style="${groupWrapStyle}">
-                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
+                            <div class="info-detail-group">
+                                <div class="daimyo-confirm-grid">
                                     ${makeEmptyRow()}
                                     ${makeRow('軍馬', totalHorses)}
                                     ${makeRow('鉄砲', totalGuns)}
                                 </div>
-                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap};">
+                                <div class="daimyo-confirm-grid">
                                     ${makeRow('兵士', soldiers)}
                                     ${makeRow('金', totalGold)}
                                     ${makeRow('兵糧', totalRice)}
@@ -2336,6 +2293,8 @@ class UIInfoManager {
             `;
         }
         
+        if (this.ui.daimyoConfirmBody) this._bindImageFallbacks(this.ui.daimyoConfirmBody);
+
         const startBtn = document.getElementById('daimyo-confirm-start-btn');
         if (startBtn) {
             startBtn.onclick = () => {
@@ -2407,88 +2366,65 @@ class UIInfoManager {
         if (ideology === '宗教') ideologyClass = "ideology-hoshu"; 
         else if (ideology === '傭兵') ideologyClass = "ideology-kakushin";
 
-        const ideologyHtml = `<div class="daimyo-detail-ideology ${ideologyClass}" style="display: inline-block; margin-top: 4px;">${ideology}</div>`;
+        const ideologyHtml = `<div class="daimyo-detail-ideology info-detail-ideology ${ideologyClass}">${ideology}</div>`;
 
         let faceSrc = leader && leader.faceIcon ? `data/images/faceicons/${leader.faceIcon}` : "data/images/faceicons/unknown_face.webp";
 
-        // スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！
-        const isPc = document.body.classList.contains('is-pc');
-
-        const fSizeProvYomi = isPc ? "0.75rem" : "0.65rem";
-        const fSizeProvName = isPc ? "1.4rem" : "1.25rem";
-        const fSizeKunishuYomi = isPc ? "0.75rem" : "0.65rem";
-        const fSizeKunishuName = isPc ? "1.4rem" : "1.25rem";
-        const fSizeLordLabel = isPc ? "1.05rem" : "0.95rem";
-        const fSizeStatLabel = isPc ? "0.85rem" : "0.70rem";
-        const fSizeStatValue = isPc ? "0.85rem" : "0.70rem";
-
-        const gridGap = isPc ? "8px 6px" : "8px 3px";
-        const faceStyle = "width: 100%; max-width: 90px; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0;";
-
-        const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 4px;";
-        const statBoxStyle = "background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 2px 6px; display: flex; justify-content: space-between; align-items: center;";
-        const labelStyle = `color: #ffd54f; font-size: ${fSizeStatLabel}; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: left;`;
-        const valueStyle = `color: #fff; font-size: ${fSizeStatValue}; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: right; font-variant-numeric: tabular-nums;`;
-        
         const makeRow = (label, value) => {
-            let extraLabelStyle = "";
-            // スマホ版のみ、3文字以上の項目名（月支出など）は横幅をきゅっと詰めます
-            if (!isPc && label.length >= 3) {
-                extraLabelStyle = " letter-spacing: -1px; transform: scaleX(0.9); transform-origin: left center; display: inline-block;";
-            }
-            return `<div style="${statBoxStyle}"><span style="${labelStyle}${extraLabelStyle}">${label}</span><span style="${valueStyle}">${value}</span></div>`;
+            const longLabelClass = label.length >= 3 ? ' is-long-label' : '';
+            return `<div class="info-detail-stat-box"><span class="info-detail-stat-label${longLabelClass}">${label}</span><span class="info-detail-stat-value">${value}</span></div>`;
         };
-        const makeEmptyRow = () => `<div style="${statBoxStyle}; visibility: hidden;"><span>&nbsp;</span><span>&nbsp;</span></div>`;
+        const makeEmptyRow = () => `<div class="info-detail-stat-box is-placeholder"><span>&nbsp;</span><span>&nbsp;</span></div>`;
 
         if (listContainer) {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = `
-                <div class="kyoten-detail-wrapper" style="padding: 8px 10px; min-height: 100%; display: flex; flex-direction: column; box-sizing: border-box;">
+                <div class="kyoten-detail-wrapper info-detail-wrapper">
                     
                     <!-- 【ヘッダー部】 左上に顔グラ、右にテキスト情報 -->
-                    <div style="display: flex; align-items: flex-start; gap: 15px; margin-bottom: 10px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 8px;">
-                        <div style="flex-shrink: 0; width: 90px;">
-                            <img src="${faceSrc}" style="${faceStyle}" onerror="this.src='data/images/faceicons/unknown_face.webp'">
+                    <div class="info-detail-header">
+                        <div class="info-detail-face-column">
+                            <img src="${faceSrc}" class="info-detail-face" data-face-fallback="data/images/faceicons/unknown_face.webp">
                         </div>
-                        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                        <div class="info-detail-main">
                             <!-- 国名＆諸勢力名 -->
-                            <div style="display: flex; align-items: flex-end; gap: 15px;">
-                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                                    <span style="font-size: ${fSizeProvYomi}; color: #ccc; min-height: 1em;">${provinceYomi}</span>
-                                    <span style="font-size: ${fSizeProvName}; font-weight: bold; color: #fff; line-height: 1;">${provinceName}</span>
+                            <div class="info-detail-title-row">
+                                <div class="info-detail-title-block">
+                                    <span class="info-detail-yomi">${provinceYomi}</span>
+                                    <span class="info-detail-name">${provinceName}</span>
                                 </div>
-                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                                    <span style="font-size: ${fSizeKunishuYomi}; color: #ccc; min-height: 1em;">${kunishuYomi}</span>
-                                    <span style="font-size: ${fSizeKunishuName}; font-weight: bold; color: #fff; line-height: 1;">${kunishuName}</span>
+                                <div class="info-detail-title-block">
+                                    <span class="info-detail-yomi">${kunishuYomi}</span>
+                                    <span class="info-detail-name">${kunishuName}</span>
                                 </div>
                             </div>
                             <!-- 頭領＆イデオロギー -->
-                            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
-                                <div style="font-size: ${fSizeLordLabel}; color: #ffd54f;">頭領 <span style="color: #fff; font-weight: bold;">${leaderName}</span></div>
+                            <div class="info-detail-subinfo">
+                                <div class="info-detail-owner-line">頭領 <span class="info-detail-owner-value">${leaderName}</span></div>
                                 ${ideologyHtml}
                             </div>
                         </div>
                     </div>
 
                     <!-- 【ステータス部：上段】 -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap}; margin-bottom: 8px;">
+                    <div class="info-detail-grid info-detail-grid-upper">
                         <!-- 左列：武将・所在・空箱 -->
-                        <div style="${groupWrapStyle}">
+                        <div class="info-detail-group">
                             ${makeRow('武将', bushosCount)}
                             ${makeRow('所在', baseCastleName)}
                             ${makeEmptyRow()}
                         </div>
                         
                         <!-- 中央列：兵士・訓練・士気 -->
-                        <div style="${groupWrapStyle}">
+                        <div class="info-detail-group">
                             ${makeRow('兵士', kunishu.soldiers)}
                             ${makeRow('訓練', kunishu.training)}
                             ${makeRow('士気', kunishu.morale)}
                         </div>
 
                         <!-- 右列：軍馬・鉄砲・防御 -->
-                        <div style="${groupWrapStyle}">
+                        <div class="info-detail-group">
                             ${makeRow('軍馬', kunishu.horses || 0)}
                             ${makeRow('鉄砲', kunishu.guns || 0)}
                             ${makeRow('防御', kunishu.defense)}
@@ -2496,14 +2432,16 @@ class UIInfoManager {
                     </div>
 
                     <!-- フッター（アクションボタン） -->
-                    <div style="display: flex; justify-content: flex-end; align-items: flex-end; margin-top: auto; padding-top: 5px;">
-                        <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
+                    <div class="info-detail-footer info-detail-footer-end">
+                        <div class="info-detail-actions">
                             <button class="daimyo-detail-action-btn" id="temp-kunishu-busho-btn">武将</button>
                             <button class="daimyo-detail-action-btn" id="temp-kunishu-diplo-btn">外交</button>
                         </div>
                     </div>
                 </div>
             `;
+
+            this._bindImageFallbacks(listContainer);
 
             document.getElementById('temp-kunishu-diplo-btn').onclick = (e) => {
                 e.stopPropagation(); 
@@ -2643,7 +2581,7 @@ class UIInfoManager {
             if (isSelectMode) {
                 onClickStr = (e) => this.handleCommonSelect(kunishu.id, e.currentTarget, false);
             } else {
-                onClickStr = `window.GameApp.ui.info.showKunishuDetail(${kunishu.id})`;
+                onClickStr = this._withChoiceSound(() => this.showKunishuDetail(kunishu.id));
             }
             
             items.push({
@@ -2655,7 +2593,7 @@ class UIInfoManager {
                     `<span class="col-province">${provinceName}</span>`,
                     `<span class="col-soldiers">${kunishu.soldiers}</span>`,
                     `<span class="col-friend">${friendBarHtml}</span>`,
-                    `<span class="col-relation ${relClass}" style="font-weight:bold;">${relStatus}</span>`,
+                    `<span class="col-relation ${relClass} list-text-strong">${relStatus}</span>`,
                     `<span class="col-empty pc-only"></span>`
                 ],
                 itemClass: isSelectMode && isSelected ? "selected" : ""
@@ -2730,7 +2668,7 @@ class UIInfoManager {
         this._renderListModal({
             title: "行動履歴",
             items: items,
-            emptyHtml: '<div class="history-empty-msg" style="padding: 10px; text-align: center; height: 100%; min-height: 200px; display: flex; align-items: center; justify-content: center; color: #aaa;">履歴がありません。</div>',
+            emptyHtml: '<div class="history-empty-msg">履歴がありません。</div>',
             gridTemplateSp: "1fr",
             gridTemplatePc: "1fr",
             scrollPos: scrollPos
@@ -2784,7 +2722,7 @@ class UIInfoManager {
                     `<span class="col-leader-name">${force.leaderName}</span>`,
                     `<span>${force.soldiers}</span>`,
                     `<span>${friendBarHtml}</span>`,
-                    `<span class="${statusClass}" style="font-weight:bold;">${relStatus}</span>`
+                    `<span class="${statusClass} list-text-strong">${relStatus}</span>`
                 ],
                 itemClass: isSelected ? "selected" : ""
             });
@@ -2830,7 +2768,7 @@ class UIInfoManager {
         if (!shell) return;
         const { listContainer } = shell;
 
-        let faceHtml = princess.faceIcon ? `<img src="data/images/faceicons/${princess.faceIcon}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_princess_face.webp'">` : `<img src="data/images/faceicons/unknown_princess_face.webp" class="daimyo-detail-face">`;
+        let faceHtml = princess.faceIcon ? `<img src="data/images/faceicons/${princess.faceIcon}" class="daimyo-detail-face" data-face-fallback="data/images/faceicons/unknown_princess_face.webp">` : `<img src="data/images/faceicons/unknown_princess_face.webp" class="daimyo-detail-face">`;
 
         let affiliationName = "無所属";
         let isFamily = false;
@@ -2865,41 +2803,29 @@ class UIInfoManager {
         const husbandName = husband ? husband.name : "なし";
 
         // ステータスの枠だけを作って中は空っぽにする魔法です
-        const getEmptyStatRow = (label) => {
-            const labelWidth = isPc ? "40px" : "30px";
-            const gradeWidth = isPc ? "35px" : "25px";
-
-            return `
-                <div class="daimyo-detail-stat-box" style="justify-content: flex-start; padding-right: 5px;">
-                    <span class="daimyo-detail-label" style="width: ${labelWidth}; min-width: ${labelWidth}; margin-right: 5px; text-align: left;">${label}</span>
-                    <span style="width: ${gradeWidth}; text-align: left; font-weight: bold; display: flex; align-items: center; color: #777;">-</span>
-                    <div class="busho-stat-bar-wrapper" style="flex: 1; margin-right: 0; max-width: none; margin-left: 5px;">
-                        <div class="bar-bg-busho" style="width: calc(100% * 100 / 120);">
-                            <div class="bar-fill-busho" style="width: 0%;"></div>
-                        </div>
-                        <div class="exp-bar-bg" style="visibility: hidden; width: calc(100% * 100 / 120);"></div>
+        const getEmptyStatRow = (label) => `
+            <div class="daimyo-detail-stat-box busho-detail-stat-box">
+                <span class="daimyo-detail-label busho-detail-stat-label">${label}</span>
+                <span class="busho-detail-stat-grade princess-empty-grade">-</span>
+                <div class="busho-stat-bar-wrapper busho-detail-stat-bar">
+                    <div class="bar-bg-busho busho-detail-bar-base">
+                        <div class="bar-fill-busho princess-empty-bar"></div>
                     </div>
+                    <div class="exp-bar-bg busho-detail-bar-base is-placeholder"></div>
                 </div>
-            `;
-        };
+            </div>
+        `;
 
         const displayYomi = princess.yomi || "";
         const displayName = princess.name || "姫";
 
-        const rowGap = isPc ? "6px" : "3px";
-        const groupGap = "4px";
-        const groupWrapStyle = `background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: ${groupGap};`;
-
         const makeRow = (label, value) => {
-            let extraLabelStyle = "";
-            if (!isPc && label.length >= 3) {
-                extraLabelStyle = " letter-spacing: -1px; transform: scaleX(0.9); transform-origin: left center; display: inline-block;";
-            }
-            return `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label" style="${extraLabelStyle}">${label}</span><span class="daimyo-detail-value">${value}</span></div>`;
+            const longLabelClass = label.length >= 3 ? ' is-long-label' : '';
+            return `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label princess-detail-label${longLabelClass}">${label}</span><span class="daimyo-detail-value">${value}</span></div>`;
         };
 
         const statHtml = `
-            <div style="${groupWrapStyle} flex: 1; min-width: 0;">
+            <div class="busho-detail-group busho-detail-group-grow">
                 ${getEmptyStatRow('統率')}
                 ${getEmptyStatRow('武勇')}
                 ${getEmptyStatRow('内政')}
@@ -2910,12 +2836,12 @@ class UIInfoManager {
         `;
 
         const infoHtml = `
-            <div style="display: flex; flex-direction: column; gap: ${rowGap}; flex: 1; min-width: 0;">
-                <div style="${groupWrapStyle}">
+            <div class="busho-detail-info-column">
+                <div class="busho-detail-group">
                     ${makeRow('所在', '&nbsp;')}
                     ${makeRow('主君', lordName)}
                 </div>
-                <div style="${groupWrapStyle}">
+                <div class="busho-detail-group">
                     ${makeRow('年齢', ageStr)}
                     ${makeRow('一門', isFamily ? "◯" : "&nbsp;")}
                     ${makeRow('父親', fatherName)}
@@ -2925,7 +2851,7 @@ class UIInfoManager {
         `;
 
         const rightContentHtml = `
-            <div style="display: flex; flex-direction: row; gap: ${rowGap}; width: 100%;">
+            <div class="busho-detail-status-layout">
                 ${statHtml}
                 ${infoHtml}
             </div>
@@ -2935,14 +2861,14 @@ class UIInfoManager {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = `
-                <div class="daimyo-detail-container" style="padding: 10px; min-height: 100%;">
-                    <div class="daimyo-detail-header pc-only" style="margin-bottom: 10px;">
-                        <div style="display:flex; flex-direction:column;">
-                            <span style="font-size:0.8rem; color:#ccc; margin-bottom:2px;">${displayYomi}</span>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <div class="daimyo-detail-name" style="font-size: 1.5rem;">${displayName}</div>
+                <div class="daimyo-detail-container busho-detail-container princess-detail-container">
+                    <div class="daimyo-detail-header busho-detail-header-pc pc-only">
+                        <div class="busho-detail-heading-stack">
+                            <span class="busho-detail-yomi pc-only-yomi">${displayYomi}</span>
+                            <div class="busho-detail-name-row pc-name-row">
+                                <div class="daimyo-detail-name busho-detail-name-pc">${displayName}</div>
                             </div>
-                            <div style="display:flex; align-items:center; gap:10px; margin-top: 4px; font-size: 0.95rem; color: #ccc;">
+                            <div class="busho-detail-meta pc-meta">
                                 <span>${affiliationName}</span>
                             </div>
                         </div>
@@ -2950,23 +2876,24 @@ class UIInfoManager {
                     <div class="daimyo-detail-body">
                         <div class="daimyo-detail-left">
                             ${faceHtml}
-                            <div class="daimyo-detail-header sp-only" style="flex-direction:column; align-items:flex-start; gap:2px; margin-bottom: 0; justify-content: center;">
-                                <span style="font-size:0.75rem; color:#ccc;">${displayYomi}</span>
-                                <div style="display:flex; align-items:center; gap:5px;">
-                                    <div class="daimyo-detail-name" style="font-size:1.3rem;">${displayName}</div>
+                            <div class="daimyo-detail-header busho-detail-header-sp sp-only">
+                                <span class="busho-detail-yomi sp-yomi">${displayYomi}</span>
+                                <div class="busho-detail-name-row sp-name-row">
+                                    <div class="daimyo-detail-name busho-detail-name-sp">${displayName}</div>
                                 </div>
-                                <div style="display:flex; align-items:center; gap:8px; margin-top: 2px; font-size: 0.85rem; color: #ccc;">
+                                <div class="busho-detail-meta sp-meta">
                                     <span>${affiliationName}</span>
                                 </div>
                             </div>
                         </div>
-                        <div class="daimyo-detail-right" style="gap: ${rowGap};">
+                        <div class="daimyo-detail-right busho-detail-right">
                             ${rightContentHtml}
                         </div>
                     </div>
                 </div>
             `;
 
+            this._bindImageFallbacks(listContainer);
             listContainer.scrollTop = scrollPos;
         }
     }

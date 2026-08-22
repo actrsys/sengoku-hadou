@@ -67,32 +67,16 @@ Object.assign(UIInfoManager.prototype, {
         // スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！
         const isPc = document.body.classList.contains('is-pc');
 
-        // 文字サイズ（スマホ版はPC版の約0.9倍より小さくします）
-        const fSizeProvYomi = isPc ? "0.75rem" : "0.65rem";
-        const fSizeProvName = isPc ? "1.4rem" : "1.25rem";
-        const fSizeCastleYomi = isPc ? "0.75rem" : "0.65rem";
-        const fSizeCastleName = isPc ? "1.4rem" : "1.25rem";
-        const fSizeLordLabel = isPc ? "1.05rem" : "0.95rem";
-        const fSizeLegionInfo = isPc ? "0.9rem" : "0.8rem";
-        const fSizeStatLabel = isPc ? "0.85rem" : "0.70rem";
-        const fSizeStatValue = isPc ? "0.85rem" : "0.70rem";
-        const fSizeMark = isPc ? "0.85rem" : "0.75rem";
-
-        // 3つの列の隙間（スマホ版は横の隙間を半分にします）
-        const gridGap = isPc ? "8px 6px" : "8px 3px";
-
         let marksHtml = "";
-        if (isPort) marksHtml += `<span class="status-mark" style="font-size: ${fSizeMark}; padding: 4px 8px; background-color: #0288d1;">港</span>`;
-        if (isHorse) marksHtml += `<span class="status-mark" style="font-size: ${fSizeMark}; padding: 4px 8px; background-color: #f57c00;">馬産地</span>`;
-        if (isGun) marksHtml += `<span class="status-mark" style="font-size: ${fSizeMark}; padding: 4px 8px; background-color: #5d4037;">鉄砲産地</span>`;
+        if (isPort) marksHtml += `<span class="status-mark detail-status-mark mark-port">港</span>`;
+        if (isHorse) marksHtml += `<span class="status-mark detail-status-mark mark-horse">馬産地</span>`;
+        if (isGun) marksHtml += `<span class="status-mark detail-status-mark mark-gun">鉄砲産地</span>`;
 
-        // 顔画像（ここはそのままの大きさを維持します）
-        const faceStyle = "width: 100%; max-width: 90px; aspect-ratio: 1/1; object-fit: cover; border: 2px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); border-radius: 6px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); margin: 0;";
         let faceHtml = "";
         if (castellan && castellan.faceIcon) {
-            faceHtml = `<img src="data/images/faceicons/${castellan.faceIcon}" style="${faceStyle}" onerror="this.style.display='none'">`;
+            faceHtml = `<img src="data/images/faceicons/${castellan.faceIcon}" class="info-detail-face castle-detail-face" data-hide-on-error="true">`;
         } else {
-            faceHtml = `<div style="${faceStyle}"></div>`;
+            faceHtml = `<div class="info-detail-face castle-detail-face info-detail-face-empty"></div>`;
         }
 
         const yomiStr = castle.yomi ? castle.yomi : "";
@@ -118,72 +102,61 @@ Object.assign(UIInfoManager.prototype, {
             legionInfoStr = `無所属`;
         }
 
-        // --- 二重背景・ステータス行の生成魔法（文字サイズを上で決めたものに置き換えます） ---
-        const groupWrapStyle = "background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 4px;";
-        const statBoxStyle = "background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 2px 6px; display: flex; justify-content: space-between; align-items: center;";
-        
-        const labelStyle = `color: #ffd54f; font-size: ${fSizeStatLabel}; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: left;`;
-        const valueStyle = `color: #fff; font-size: ${fSizeStatValue}; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; text-align: right; font-variant-numeric: tabular-nums;`;
-        
         const makeRow = (label, value) => {
-            let extraLabelStyle = "";
-            // スマホ版のみ、3文字以上の項目名（月支出など）は横幅をきゅっと詰めます
-            if (!isPc && label.length >= 3) {
-                extraLabelStyle = " letter-spacing: -1px; transform: scaleX(0.9); transform-origin: left center; display: inline-block;";
-            }
-            return `<div style="${statBoxStyle}"><span style="${labelStyle}${extraLabelStyle}">${label}</span><span style="${valueStyle}">${value}</span></div>`;
+            const longLabelClass = label.length >= 3 ? ' is-long-label' : '';
+            return `<div class="info-detail-stat-box"><span class="info-detail-stat-label${longLabelClass}">${label}</span><span class="info-detail-stat-value">${value}</span></div>`;
         };
-        const makeEmptyRow = () => `<div style="${statBoxStyle}; visibility: hidden;"><span>&nbsp;</span><span>&nbsp;</span></div>`;
+        const makeEmptyRow = () => `<div class="info-detail-stat-box is-placeholder"><span>&nbsp;</span><span>&nbsp;</span></div>`;
 
         if (listContainer) {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = `
-                <div class="kyoten-detail-wrapper" style="padding: 8px 10px; min-height: 100%; display: flex; flex-direction: column; box-sizing: border-box;">
+                <div class="kyoten-detail-wrapper info-detail-wrapper">
                     
                     <!-- 【ヘッダー部】 左上に顔グラ、右にテキスト情報 -->
-                    <div style="display: flex; align-items: flex-start; gap: 15px; margin-bottom: 10px; border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 8px;">
-                        <div style="flex-shrink: 0; width: 90px;">
+                    <div class="info-detail-header">
+                        <div class="info-detail-face-column">
                             ${faceHtml}
                         </div>
-                        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                        <div class="info-detail-main">
                             <!-- 国名＆拠点名 -->
-                            <div style="display: flex; align-items: flex-end; gap: 15px;">
-                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                                    <span style="font-size: ${fSizeProvYomi}; color: #ccc; min-height: 1em;">${provinceYomi}</span>
-                                    <span style="font-size: ${fSizeProvName}; font-weight: bold; color: #fff; line-height: 1;">${provinceName}</span>
+                            <div class="info-detail-title-row">
+                                <div class="info-detail-title-block">
+                                    <span class="info-detail-yomi">${provinceYomi}</span>
+                                    <span class="info-detail-name">${provinceName}</span>
                                 </div>
-                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                                    <span style="font-size: ${fSizeCastleYomi}; color: #ccc; min-height: 1em;">${yomiStr}</span>
-                                    <span style="font-size: ${fSizeCastleName}; font-weight: bold; color: #fff; line-height: 1;">${castle.name}</span>
+                                <div class="info-detail-title-block">
+                                    <span class="info-detail-yomi">${yomiStr}</span>
+                                    <span class="info-detail-name">${castle.name}</span>
                                 </div>
                             </div>
                             <!-- 城主＆直轄/国主 -->
-                            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
-                                <div style="font-size: ${fSizeLordLabel}; color: #ffd54f;">城主 <span style="color: #fff; font-weight: bold;">${castellanName}</span></div>
-                                <div style="font-size: ${fSizeLegionInfo}; color: #ccc;">${legionInfoStr}</div>
+                            <div class="info-detail-subinfo">
+                                <div class="info-detail-owner-line">城主 <span class="info-detail-owner-value">${castellanName}</span></div>
+                                <div class="info-detail-secondary">${legionInfoStr}</div>
                             </div>
                         </div>
                     </div>
 
                     <!-- 【ステータス部：上段】 -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap}; margin-bottom: 8px;">
+                    <div class="info-detail-grid info-detail-grid-upper">
                         <!-- 左列：武将・浪人・空箱 -->
-                        <div style="${groupWrapStyle}">
+                        <div class="info-detail-group">
                             ${makeRow('武将', activeBushoCount)}
                             ${makeRow('浪人', roninCount)}
                             ${makeEmptyRow()}
                         </div>
                         
                         <!-- 中央列：石高・鉱山・民忠 -->
-                        <div style="${groupWrapStyle}">
+                        <div class="info-detail-group">
                             ${makeRow('石高', castle.kokudaka)}
                             ${makeRow('鉱山', castle.commerce)}
                             ${makeRow('民忠', castle.peoplesLoyalty)}
                         </div>
 
                         <!-- 右列：訓練・士気・防御 -->
-                        <div style="${groupWrapStyle}">
+                        <div class="info-detail-group">
                             ${makeRow('訓練', castle.training)}
                             ${makeRow('士気', castle.morale)}
                             ${makeRow('防御', castle.defense)}
@@ -191,54 +164,59 @@ Object.assign(UIInfoManager.prototype, {
                     </div>
 
                     <!-- 【ステータス部：下段】 -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${gridGap}; margin-bottom: 10px;">
+                    <div class="info-detail-grid info-detail-grid-lower">
                         
                         <!-- 左列：金・兵糧 ＋ 独立した人口 -->
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <div style="${groupWrapStyle}">
+                        <div class="info-detail-column">
+                            <div class="info-detail-group">
                                 ${makeRow('金', castle.gold)}
                                 ${makeRow('兵糧', castle.rice)}
                             </div>
-                            <div style="${groupWrapStyle}">
+                            <div class="info-detail-group">
                                 ${makeRow('人口', castle.population)}
                             </div>
                         </div>
 
                         <!-- 中央列：月収入・年収穫 ＋ 見えない箱 -->
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <div style="${groupWrapStyle}">
+                        <div class="info-detail-column">
+                            <div class="info-detail-group">
                                 ${makeRow('月収入', totalGoldIncome)}
                                 ${makeRow('年収穫', totalRiceIncome)}
                             </div>
-                            <div style="${groupWrapStyle}; visibility: hidden;">
+                            <div class="info-detail-group is-placeholder">
                                 ${makeEmptyRow()}
                             </div>
                         </div>
 
                         <!-- 右列：軍馬・鉄砲 ＋ 独立した兵士 -->
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <div style="${groupWrapStyle}">
+                        <div class="info-detail-column">
+                            <div class="info-detail-group">
                                 ${makeRow('軍馬', castle.horses || 0)}
                                 ${makeRow('鉄砲', castle.guns || 0)}
                             </div>
-                            <div style="${groupWrapStyle}">
+                            <div class="info-detail-group">
                                 ${makeRow('兵士', castle.soldiers)}
                             </div>
                         </div>
                     </div>
 
                     <!-- フッター（武将/諸勢力） -->
-                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 5px;">
-                        <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                    <div class="info-detail-footer info-detail-footer-split">
+                        <div class="info-detail-badges">
                             ${marksHtml}
                         </div>
-                        <div style="display: flex; gap: 10px;">
+                        <div class="info-detail-actions">
                             <button class="daimyo-detail-action-btn" id="castle-busho-btn" ${bushoCount === 0 ? 'disabled' : ''}>武将</button>
                             <button class="daimyo-detail-action-btn" id="castle-kunishu-btn" ${kunishuCount === 0 ? 'disabled' : ''}>諸勢力</button>
                         </div>
                     </div>
                 </div>
             `;
+
+            const faceImg = listContainer.querySelector('[data-hide-on-error="true"]');
+            if (faceImg) {
+                faceImg.addEventListener('error', () => { faceImg.classList.add('is-hidden'); }, { once: true });
+            }
 
             const btnKunishu = document.getElementById('castle-kunishu-btn');
             if (btnKunishu && kunishuCount > 0) {
@@ -333,7 +311,7 @@ Object.assign(UIInfoManager.prototype, {
         // ★選択モードの時は「全国」タブは隠して、自家のお城だけを選ばせます
         if (clanId === null && !isSelectMode) {
             scopeHtml = `
-                <div style="display: flex; gap: 5px; margin-left: 15px;">
+                <div class="busho-scope-tabs">
                     <button class="busho-scope-btn ${this.currentKyotenScope === 'clan' ? 'active' : ''}" data-scope="clan">${isPc ? '自家' : '自'}</button>
                     <button class="busho-scope-btn ${this.currentKyotenScope === 'all' ? 'active' : ''}" data-scope="all">${isPc ? '全国' : '全'}</button>
                 </div>
@@ -341,7 +319,7 @@ Object.assign(UIInfoManager.prototype, {
         }
 
         let tabsHtml = `
-            <div style="display: flex; gap: 5px;">
+            <div class="busho-list-tabs">
                 <button class="busho-tab-btn ${this.currentKyotenTab === 'status' ? 'active' : ''}" data-tab="status">${isPc ? '基本' : '基'}</button>
                 <button class="busho-tab-btn ${this.currentKyotenTab === 'military' ? 'active' : ''}" data-tab="military">${isPc ? '軍事' : '軍'}</button>
                 <button class="busho-tab-btn ${this.currentKyotenTab === 'economy' ? 'active' : ''}" data-tab="economy">${isPc ? '経済' : '経'}</button>
@@ -496,7 +474,7 @@ Object.assign(UIInfoManager.prototype, {
                 let scale = 1.0 - (text.length - (threshold - 1)) * 0.05;
                 // ★修正：これ以上小さくならない下限も少し緩めました（0.55 → 0.75）
                 if (scale < 0.75) scale = 0.75;
-                return `<span style="font-size: ${scale}em; transform: scaleY(${1/scale}); letter-spacing: -0.5px; padding-right: 1px; display: inline-block; transform-origin: left center;">${text}</span>`;
+                return `<span class="compressed-list-text" style="--text-scale:${scale}; --text-unscale:${1/scale};">${text}</span>`;
             }
             return text;
         };
@@ -529,7 +507,7 @@ Object.assign(UIInfoManager.prototype, {
             let cells = [];
             if (this.currentKyotenTab === 'status') {
                 cells = [
-                    `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
+                    `<span class="col-castle-name col-name-left">${c.name}</span>`,
                     `<span class="col-clan">${compressedClanName}</span>`,
                     `<span class="col-castellan">${castellanName}</span>`,
                     `<span class="col-province">${provinceName}</span>`,
@@ -545,7 +523,7 @@ Object.assign(UIInfoManager.prototype, {
                     legionStr = numberNames[c.legionId] || `第${c.legionId}席`;
                 }
                 cells = [
-                    `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
+                    `<span class="col-castle-name col-name-left">${c.name}</span>`,
                     `<span class="col-legion">${legionStr}</span>`,
                     `<span class="col-soldiers">${c.soldiers}</span>`,
                     `<span class="col-defense">${c.defense}</span>`,
@@ -555,7 +533,7 @@ Object.assign(UIInfoManager.prototype, {
                 ];
             } else if (this.currentKyotenTab === 'economy') {
                 cells = [
-                    `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
+                    `<span class="col-castle-name col-name-left">${c.name}</span>`,
                     `<span class="col-population">${c.population}</span>`,
                     `<span class="col-gold-income">${goldIncome}</span>`,
                     `<span class="col-gold-consume">${consumeGold}</span>`,
@@ -566,7 +544,7 @@ Object.assign(UIInfoManager.prototype, {
             }
 
             // ★通常時と選択時でクリックした時の動きを変えます！
-            let onClickStr = `window.GameApp.ui.info.showCastleDetail(${c.id})`;
+            let onClickStr = this._withChoiceSound(() => this.showCastleDetail(c.id));
             let extraClass = "kyoten-mode";
 
             if (isSelectMode && selectData) {
@@ -726,7 +704,7 @@ Object.assign(UIInfoManager.prototype, {
         myCastles.forEach(c => {
             const cId = Number(c.id);
             const isChecked = this.commonSelectedIds.includes(cId);
-            const inputHtml = `<input type="checkbox" name="sel_allot_fief" value="${cId}" ${isChecked ? 'checked' : ''} style="display:none;">`;
+            const inputHtml = `<input type="checkbox" class="hidden-selection-input" name="sel_allot_fief" value="${cId}" ${isChecked ? 'checked' : ''}>`;
 
             let originalLegionStr = "直轄";
             if (c.legionId > 0) {
@@ -734,17 +712,14 @@ Object.assign(UIInfoManager.prototype, {
             }
 
             let displayLegionStr = "";
-            let statusStyle = "";
             if (isChecked) {
                 displayLegionStr = legionName;
-                statusStyle = "color:#fdea60; font-weight:bold;";
             } else {
                 if (Number(c.legionId) === Number(legionNo)) {
                     displayLegionStr = "直轄";
                 } else {
                     displayLegionStr = originalLegionStr;
                 }
-                statusStyle = "color:#ccc; font-weight:normal;";
             }
 
             const castellan = this.game.getBusho(c.castellanId);
@@ -763,18 +738,13 @@ Object.assign(UIInfoManager.prototype, {
                     const statusSpan = e.currentTarget.querySelector('.status-mark');
                     const isNowChecked = this.commonSelectedIds.includes(cId);
                     if (statusSpan) {
+                        statusSpan.classList.toggle('is-selected-status', isNowChecked);
                         if (isNowChecked) {
-                            statusSpan.style.color = '#fdea60';
-                            statusSpan.style.fontWeight = 'bold';
                             statusSpan.textContent = legionName;
+                        } else if (Number(c.legionId) === Number(legionNo)) {
+                            statusSpan.textContent = "直轄";
                         } else {
-                            statusSpan.style.color = '#ccc';
-                            statusSpan.style.fontWeight = 'normal';
-                            if (Number(c.legionId) === Number(legionNo)) {
-                                statusSpan.textContent = "直轄";
-                            } else {
-                                statusSpan.textContent = originalLegionStr;
-                            }
+                            statusSpan.textContent = originalLegionStr;
                         }
                     }
                     
@@ -790,19 +760,11 @@ Object.assign(UIInfoManager.prototype, {
                     
                     const confirmBtn = document.getElementById('selector-confirm-btn');
                     if (confirmBtn) {
-                        if (isChanged) {
-                            confirmBtn.disabled = false;
-                            confirmBtn.style.opacity = '1';
-                            confirmBtn.style.cursor = 'pointer';
-                        } else {
-                            confirmBtn.disabled = true;
-                            confirmBtn.style.opacity = '0.5';
-                            confirmBtn.style.cursor = 'not-allowed';
-                        }
+                        confirmBtn.disabled = !isChanged;
                     }
                 },
                 cells: [
-                    `<span class="col-act">${inputHtml}<span class="status-mark" style="${statusStyle}">${displayLegionStr}</span></span>`,
+                    `<span class="col-act">${inputHtml}<span class="status-mark allot-fief-status ${isChecked ? 'is-selected-status' : ''}">${displayLegionStr}</span></span>`,
                     `<span class="col-castle-name">${c.name}</span>`,
                     `<span class="col-castellan">${castellanName}</span>`,
                     `<span class="col-province">${provinceName}</span>`,
@@ -852,15 +814,7 @@ Object.assign(UIInfoManager.prototype, {
                     isChanged = this.commonSelectedIds.some(id => !this.allotFiefInitialIds.includes(id));
                 }
             }
-            if (isChanged) {
-                confirmBtn.disabled = false;
-                confirmBtn.style.opacity = '1';
-                confirmBtn.style.cursor = 'pointer';
-            } else {
-                confirmBtn.disabled = true;
-                confirmBtn.style.opacity = '0.5';
-                confirmBtn.style.cursor = 'not-allowed';
-            }
+            confirmBtn.disabled = !isChanged;
         }
     }
 });
