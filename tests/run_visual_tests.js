@@ -192,7 +192,9 @@ async function validateLegionCouncil(cdp) {
     await loadAt(1200, 850, false, true);
     let result = await cdp.call('Runtime.evaluate', {
         expression: `(() => {
-            const content = document.querySelector('.legion-council-content').getBoundingClientRect();
+            const contentEl = document.querySelector('.legion-council-content');
+            const content = contentEl.getBoundingClientRect();
+            const contentStyle = getComputedStyle(contentEl);
             const stage = document.querySelector('.legion-council-stage').getBoundingClientRect();
             const left = document.getElementById('legion-council-left').getBoundingClientRect();
             const center = document.querySelector('.legion-council-center').getBoundingClientRect();
@@ -293,6 +295,7 @@ async function validateLegionCouncil(cdp) {
             const screen = document.getElementById('game-screen').getBoundingClientRect();
             const contentEl = document.querySelector('.legion-council-content');
             const content = contentEl.getBoundingClientRect();
+            const contentStyle = getComputedStyle(contentEl);
             const stage = document.querySelector('.legion-council-stage').getBoundingClientRect();
             const footer = document.querySelector('.legion-council-footer').getBoundingClientRect();
             const actions = document.querySelector('.legion-council-actions').getBoundingClientRect();
@@ -307,7 +310,7 @@ async function validateLegionCouncil(cdp) {
             const orderButtons = [...document.querySelectorAll('.legion-council-order-btn')];
             return { innerWidth:window.innerWidth, innerHeight:window.innerHeight, scrollWidth:document.documentElement.scrollWidth, center,
                 screen:{left:screen.left,right:screen.right,top:screen.top,bottom:screen.bottom,width:screen.width,height:screen.height},
-                content:{left:content.left,right:content.right,top:content.top,bottom:content.bottom,clientHeight:contentEl.clientHeight,scrollHeight:contentEl.scrollHeight,overflowY:getComputedStyle(contentEl).overflowY},
+                content:{left:content.left,right:content.right,top:content.top,bottom:content.bottom,borderBottom:parseFloat(contentStyle.borderBottomWidth)||0,clientHeight:contentEl.clientHeight,scrollHeight:contentEl.scrollHeight,overflowY:contentStyle.overflowY},
                 stage:{top:stage.top,bottom:stage.bottom}, actions:{left:actions.left,right:actions.right,top:actions.top,bottom:actions.bottom}, bulk:{left:bulk.left,right:bulk.right,top:bulk.top,bottom:bulk.bottom}, footer:{top:footer.top,bottom:footer.bottom}, footerOutside:document.querySelector('.legion-council-footer').parentElement === modal,
                 seats:seats.map(r=>({left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height})),
                 firstText:{headingBottom:heading.bottom,nameTop:name.top,nameBottom:name.bottom,policyTop:policy.top,hintDisplay},
@@ -331,6 +334,9 @@ async function validateLegionCouncil(cdp) {
     assert.ok(mobile.actions.top >= mobile.stage.bottom - 1, '一括操作帯は軍団カード群の下側に置く');
     assert.ok(mobile.bulk.right <= mobile.content.right + 1 && mobile.bulk.right >= mobile.content.right - 20, '一括ボタンは評定内容枠の右下へ寄せる');
     assert.ok(mobile.bulk.bottom <= mobile.content.bottom + 1, '一括ボタンが評定内容枠からはみ出しています');
+    const mobileBulkTopGap = mobile.bulk.top - mobile.stage.bottom;
+    const mobileBulkBottomGap = (mobile.content.bottom - mobile.content.borderBottom) - mobile.bulk.bottom;
+    approx(mobileBulkTopGap, mobileBulkBottomGap, 1.0, 'スマホ評定のカード→一括と一括→枠内側の隙間を揃える');
     assert.ok(mobile.content.bottom <= mobile.footer.top + 1, 'スマホ評定の内容枠と終了ボタンが重なっています');
     assert.ok(mobile.footer.top - mobile.content.bottom >= 12, `スマホ評定の内容枠と終了ボタンの隙間が標準モーダルより狭すぎます (${mobile.footer.top - mobile.content.bottom})`);
     assert.ok(mobile.footer.bottom <= mobile.screen.bottom + 1, 'スマホ評定の終了ボタンが9:16ゲーム画面外へ見切れています');
@@ -355,7 +361,9 @@ async function validateLegionCouncil(cdp) {
         expression: `(() => {
             const modal = document.getElementById('legion-council-modal');
             const screen = document.getElementById('game-screen').getBoundingClientRect();
-            const content = document.querySelector('.legion-council-content').getBoundingClientRect();
+            const contentEl = document.querySelector('.legion-council-content');
+            const content = contentEl.getBoundingClientRect();
+            const contentStyle = getComputedStyle(contentEl);
             const stage = document.querySelector('.legion-council-stage').getBoundingClientRect();
             const footerEl = document.querySelector('.legion-council-footer');
             const footer = footerEl.getBoundingClientRect();
@@ -366,7 +374,7 @@ async function validateLegionCouncil(cdp) {
             const name = firstSeat.querySelector('.legion-council-name').getBoundingClientRect();
             const policy = firstSeat.querySelector('.legion-council-policy-summary').getBoundingClientRect();
             const seats = [...document.querySelectorAll('.legion-council-seat')].map(x => x.getBoundingClientRect());
-            return { screen:{bottom:screen.bottom}, content:{right:content.right,bottom:content.bottom}, stage:{bottom:stage.bottom}, actions:{top:actions.top,bottom:actions.bottom}, bulk:{right:bulk.right,bottom:bulk.bottom}, footer:{top:footer.top,bottom:footer.bottom}, footerOutside:footerEl.parentElement === modal,
+            return { screen:{bottom:screen.bottom}, content:{right:content.right,bottom:content.bottom,borderBottom:parseFloat(contentStyle.borderBottomWidth)||0}, stage:{bottom:stage.bottom}, actions:{top:actions.top,bottom:actions.bottom}, bulk:{top:bulk.top,right:bulk.right,bottom:bulk.bottom}, footer:{top:footer.top,bottom:footer.bottom}, footerOutside:footerEl.parentElement === modal,
                 gaps:{a:name.top-heading.bottom,b:policy.top-name.bottom}, seatHeight:firstSeat.getBoundingClientRect().height,
                 seatHeights:seats.map(r=>r.height) };
         })()`, returnByValue: true
@@ -377,6 +385,9 @@ async function validateLegionCouncil(cdp) {
     assert.ok(wideMobile.actions.top >= wideMobile.stage.bottom - 1, '幅広スマホでも一括操作帯はカード群の下に置く');
     assert.ok(wideMobile.bulk.right <= wideMobile.content.right + 1 && wideMobile.bulk.right >= wideMobile.content.right - 24, '幅広スマホでも一括ボタンは右下に寄せる');
     assert.ok(wideMobile.bulk.bottom <= wideMobile.content.bottom + 1, '幅広スマホで一括ボタンが内容枠からはみ出しています');
+    const wideMobileBulkTopGap = wideMobile.bulk.top - wideMobile.stage.bottom;
+    const wideMobileBulkBottomGap = (wideMobile.content.bottom - wideMobile.content.borderBottom) - wideMobile.bulk.bottom;
+    approx(wideMobileBulkTopGap, wideMobileBulkBottomGap, 1.0, '幅広スマホでもカード→一括と一括→枠内側の隙間を揃える');
     assert.ok(wideMobile.content.bottom <= wideMobile.footer.top + 1, '幅広スマホでも内容枠と終了ボタンが重なっています');
     assert.ok(wideMobile.footer.top - wideMobile.content.bottom >= 12, `幅広スマホでも内容枠と終了ボタンに標準相当の隙間が必要です (${wideMobile.footer.top - wideMobile.content.bottom})`);
     assert.ok(wideMobile.footer.bottom <= wideMobile.screen.bottom + 1, '幅広スマホでも終了ボタンが9:16ゲーム画面外へ見切れています');

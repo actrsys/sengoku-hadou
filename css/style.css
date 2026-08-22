@@ -5270,8 +5270,9 @@ body:not(.is-pc) #legion-council-modal .legion-council-content {
     max-height: calc(100% - 58px) !important;
     border-radius: 7px !important;
     overflow: hidden !important;
-    padding: 5px 6px;
-    gap: 1px;
+    /* 一括操作帯が上下同じ余白を自前で持つため、下端だけ二重に余白を足さない。 */
+    padding: 5px 6px 0;
+    gap: 0;
 }
 
 body:not(.is-pc) #legion-council-order-modal .legion-council-order-content {
@@ -5384,10 +5385,11 @@ body:not(.is-pc) .legion-council-policy-chip {
 body:not(.is-pc) .legion-council-seat-hint { display: none; }
 
 body:not(.is-pc) .legion-council-actions {
-    flex: 0 0 36px;
-    min-height: 36px;
+    flex: 0 0 auto;
+    min-height: 0;
     margin: 0;
-    padding: 1px 0;
+    /* カード→一括と一括→枠内側を同じ6pxにする。 */
+    padding: 6px 0;
 }
 
 body:not(.is-pc) .legion-council-bulk-note {
