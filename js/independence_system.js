@@ -480,15 +480,13 @@ class IndependenceSystem {
         
         // ★Round7：独立・寝返りで実際に値が変わった旧勢力と新勢力だけ威信を更新します。
         // 全勢力の再計算はイベント終了後の共通更新でも行われるため、演出直前の瞬間負荷を抑えます。
-        if (window.GameApp) {
-            if (typeof window.GameApp.updateClanPrestige === 'function') {
-                window.GameApp.updateClanPrestige(oldClanId);
-                if (Number(newClanId) !== Number(oldClanId)) {
-                    window.GameApp.updateClanPrestige(newClanId);
-                }
-            } else if (typeof window.GameApp.updateAllClanPrestige === 'function') {
-                window.GameApp.updateAllClanPrestige();
+        if (typeof this.game.updateClanPrestige === 'function') {
+            this.game.updateClanPrestige(oldClanId);
+            if (Number(newClanId) !== Number(oldClanId)) {
+                this.game.updateClanPrestige(newClanId);
             }
+        } else if (typeof this.game.updateAllClanPrestige === 'function') {
+            this.game.updateAllClanPrestige();
         }
         
         // ★ここから複数城に対応した演出魔法の始まりです！
@@ -1295,7 +1293,7 @@ class IndependenceSystem {
                     }
                 }
                 // 勢力情報が変わったので威信を更新
-                if (window.GameApp) window.GameApp.updateAllClanPrestige();
+                if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige();
 
                 // ★追加：ストッパーを外して、新しい色を塗れるようにします！
                 this.game.isSuspendingColorUpdate = false;

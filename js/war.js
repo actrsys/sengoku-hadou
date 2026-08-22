@@ -76,6 +76,42 @@ class WarSystem {
 
     static calcRetreatScore(castle) { return castle.soldiers + (castle.defense * 0.5) + (castle.gold * 0.1) + (castle.rice * 0.1) + (castle.samuraiIds.length * 100); }
 
+    // 戦場となる城に対する「ホーム補正」の正本です。
+    // 大名家は軍団長居城→大名居城→出発城の順で基準地を決め、
+    // 同国 +10%、同地方 +10%（最大1.2倍）。諸勢力は出発城そのものを基準にします。
+    static calcHomeBonusMultiplier(game, activeCastle, defenderCastle) {
+        if (!game || !activeCastle || !defenderCastle) return 1.0;
+
+        let leaderCastle = activeCastle;
+        if (!activeCastle.isKunishu && activeCastle.ownerClan > 0) {
+            leaderCastle = null;
+
+            if (activeCastle.legionId > 0 && game.legions) {
+                const legion = game.legions.find(l => l.id === activeCastle.legionId);
+                if (legion && legion.commanderId > 0) {
+                    const commander = game.getBusho(legion.commanderId);
+                    if (commander && commander.castleId) leaderCastle = game.getCastle(commander.castleId);
+                }
+            }
+
+            if (!leaderCastle) {
+                const daimyo = game.bushos.find(b => b.clan === activeCastle.ownerClan && b.isDaimyo);
+                if (daimyo && daimyo.castleId) leaderCastle = game.getCastle(daimyo.castleId);
+            }
+
+            if (!leaderCastle) leaderCastle = activeCastle;
+        }
+
+        let mult = 1.0;
+        if (leaderCastle.provinceId === defenderCastle.provinceId) mult += 0.1;
+
+        const leaderProv = game.provinces.find(p => p.id === leaderCastle.provinceId);
+        const defProv = game.provinces.find(p => p.id === defenderCastle.provinceId);
+        if (leaderProv && defProv && leaderProv.regionId === defProv.regionId) mult += 0.1;
+
+        return mult;
+    }
+
     static getWarAdvice(gunshi, state) {
         if (state.attacker.soldiers > state.defender.soldiers * 1.5) return Math.random() > 0.3 ? "我が軍が圧倒的です。一気に攻め落としましょう。" : "油断は禁物ですが、勝利は目前です。";
         else if (state.attacker.soldiers < state.defender.soldiers * 0.8) return "敵の兵数が勝っています。無理な突撃は控えるべきかと。";
@@ -1325,7 +1361,7 @@ class WarManager {
             return { atkPower: finalAtk, defPower: finalDef };
         };
 
-        // ★今回追加：リーダーの居城によるホーム補正を計算する魔法！
+        // リーダーの居城によるホーム補正は WarSystem の共通ルールを使います。
         const getHomeBonusMult = (role) => {
             let activeCastle = null;
             if (role === 'attacker') activeCastle = s.sourceCastle;
@@ -1334,34 +1370,8 @@ class WarManager {
             else if (role === 'defender') activeCastle = s.defender;
             else if (role === 'defender_self_reinf') activeCastle = s.defSelfReinforcement ? s.defSelfReinforcement.castle : null;
             else if (role === 'defender_ally_reinf') activeCastle = s.defReinforcement ? s.defReinforcement.castle : null;
-            
-            let mult = 1.0;
-            if (activeCastle && this.game && !activeCastle.isKunishu && activeCastle.ownerClan > 0) {
-                let leaderCastle = null;
-                if (activeCastle.legionId > 0 && this.game.legions) {
-                    const legion = this.game.legions.find(l => l.id === activeCastle.legionId);
-                    if (legion && legion.commanderId > 0) {
-                        const commander = this.game.getBusho(legion.commanderId);
-                        if (commander && commander.castleId) leaderCastle = this.game.getCastle(commander.castleId);
-                    }
-                }
-                if (!leaderCastle) {
-                    const daimyo = this.game.bushos.find(b => b.clan === activeCastle.ownerClan && b.isDaimyo);
-                    if (daimyo && daimyo.castleId) leaderCastle = this.game.getCastle(daimyo.castleId);
-                }
-                if (!leaderCastle) leaderCastle = activeCastle;
 
-                if (leaderCastle.provinceId === s.defender.provinceId) mult += 0.1;
-                const leaderProv = this.game.provinces.find(p => p.id === leaderCastle.provinceId);
-                const defProv = this.game.provinces.find(p => p.id === s.defender.provinceId);
-                if (leaderProv && defProv && leaderProv.regionId === defProv.regionId) mult += 0.1;
-            } else if (activeCastle) {
-                if (activeCastle.provinceId === s.defender.provinceId) mult += 0.1;
-                const leaderProv = this.game.provinces.find(p => p.id === activeCastle.provinceId);
-                const defProv = this.game.provinces.find(p => p.id === s.defender.provinceId);
-                if (leaderProv && defProv && leaderProv.regionId === defProv.regionId) mult += 0.1;
-            }
-            return mult;
+            return WarSystem.calcHomeBonusMultiplier(this.game, activeCastle, s.defender);
         };
 
         let activePowerObj = calcArmyPower(activeBushos, activeSoldiers, activeMorale, activeTraining, (!isAtkTurnGroup && s.turn === 'defender'));

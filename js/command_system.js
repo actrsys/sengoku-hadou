@@ -1015,23 +1015,11 @@ class CommandSystem {
             const doer = this.game.getBusho(firstId);
             const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
             
-            const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
-            const myPrestige = myClan ? myClan.daimyoPrestige : 0;
-            const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
-            const leader = this.game.getBusho(kunishu.leaderId);
-
-            let baseProb = 0;
-            const targetSoldiers = kunishu.soldiers || 1;
-            const ratio = myPrestige / (targetSoldiers * 12);
-            baseProb = 70 * ratio; 
-            
-            const affinityDiff = (myDaimyo && leader) ? PersonnelRules.calcAffinityDiff(myDaimyo.affinity, leader.affinity) : 25;
-            const affinityMod = (25 - affinityDiff) / 25 * 10;
-            
-            const diplomacyMod = (doer.diplomacy - 50) / 50 * 10;
-            
-            let totalProb = baseProb + affinityMod + diplomacyMod;
-            totalProb = Math.max(0, Math.min(100, totalProb)) / 100; 
+            const totalProb = this.game.kunishuSystem.calcIncorporateProbability(
+                doer,
+                kunishu,
+                this.game.playerClanId
+            ) / 100;
 
             this.showAdviceAndExecute('kunishu_incorporate', () => this.game.kunishuSystem.executeKunishuIncorporate(firstId, targetId, extraData.kunishuId), { trueProb: totalProb });
             return;

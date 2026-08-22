@@ -70,7 +70,7 @@
 
 ## 戦争
 
-- `js/war.js` — WarManagerの主要な入口。
+- `js/war.js` — WarManagerの主要な入口。攻城戦・野戦で共通のホーム補正は `WarSystem.calcHomeBonusMultiplier()` を正本とする。
 - `js/war_preparation_controller.js` — 出陣準備・自軍援軍・他勢力援軍・開戦直前UIの司令塔。CommandSystemやAI等はここから開戦準備を開始する。
 - `js/war_effort.js` — 攻城戦・戦争進行の既存大規模処理。今後の整理候補。
 - `js/field_war.js` — 野戦。Rules / View / AI がまだ混在しており今後の整理候補。
@@ -89,7 +89,7 @@
 - `js/faction_system.js` — 派閥。
 - `js/independence_system.js` — 独立。
 - `js/strategy_system.js` — 調略。
-- `js/kunishu_system.js` — 諸勢力。
+- `js/kunishu_system.js` — 諸勢力。取込成功率は `calcIncorporateProbability()` を正本とし、軍師助言と実判定の両方が同じ値を使う。
 
 ## UI
 
@@ -117,16 +117,16 @@
 
 通常テストは「ロジック・設計境界が正しいか」、ビジュアルテストは「実ブラウザ上のレイアウトが崩れていないか」、シミュレーターは「バランス傾向がどうなるか」を担当し、目的を混ぜません。
 
-## 今後の優先整理対象
+## リファクタリング基準版以降の方針
 
-1. 定数・状態判定の共通RulesとUserSettingsの境界を維持し、文字列集合やlocalStorage処理の再分散をテストで防ぐ。
-2. UI分離の残件と重複CSSを、ビジュアル回帰テストを通しながら整理する。
-3. `TurnManager` の月次計算委譲はRound63で大きく整理済み。今後は進行順・イベント境界・AI/プレイヤー切替の司令塔として維持する。
-4. `command_system.js` はRound64で仕様表/セーブロード、Round65で開戦準備を分離済み。今後は残る汎用選択フロー・実行処理の重複を調査し、無理に細分化せず既存Rules/Systemへ戻せる処理を戻す。
-5. `war_effort.js` / `field_war.js` の戦争Rules・進行・View・AI混在を整理する。援軍の受諾確率と持参金計算は攻守共通でDiplomacyManagerを正本として維持する。
-6. `diplomacy.js` / `ai.js` の巨大責務を整理する。
+Round66を今回の全体整理の基準版とし、以後は「整理するための整理」は行いません。
 
-すでに整備済みの所属・城所有権・武将活動/生死状態・モデル境界は、今後は新規変更時の回帰テストで維持する。
+- `TurnManager`、`CommandSystem` は現在の責務境界を維持し、行数だけを理由に追加分割しない。
+- `war_effort.js` / `field_war.js` / `diplomacy.js` / `ai.js` は大きいが、全面分割は新機能や大規模改修で具体的な必要が生じたときだけ行う。
+- 同じゲームルール・計算・重要状態変更が複数箇所に現れた場合は、その重複だけを既存のRules/System/Serviceへ戻す。
+- CSSは実際の競合・表示崩れを発見した周辺だけ整理し、機械的な大掃除はしない。
+- 既に整備した設定、技能、所属、城所有権、武将状態、モデル境界、UI分離は自動テストで維持する。
+- 大規模な構造変更より、機能追加・バグ修正・バランス調整を優先する。
 
 ## 小さいファイルを統合しない判断
 

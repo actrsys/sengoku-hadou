@@ -20,14 +20,8 @@ class HexMapGenerator {
         return Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
-    // マップを作るメインの魔法
-    generate() {
-        // ★追加: 海戦フラグをゲームの記憶から読み取ります！
-        let isSeaBattle = false;
-        if (window.GameApp && window.GameApp.warManager && window.GameApp.warManager.state) {
-            isSeaBattle = window.GameApp.warManager.state.isSeaBattle === true;
-        }
-
+    // マップを作るメインの魔法。戦争状態そのものは参照せず、必要な海戦フラグだけ受け取ります。
+    generate(isSeaBattle = false) {
         // 1. マップの広さをランダムに決める（横16〜22、縦10〜16）
         const cols = this.rand(16, 26);
         const rows = this.rand(10, 20);

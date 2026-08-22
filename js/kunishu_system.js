@@ -673,7 +673,7 @@ class KunishuSystem {
         if (this.game.ui && typeof this.game.ui.updateClanColors === 'function') {
             this.game.ui.updateClanColors();
         }
-        if (window.GameApp) window.GameApp.updateAllClanPrestige();
+        if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige();
     }
 
     // ==========================================
@@ -707,6 +707,29 @@ class KunishuSystem {
         this.game.ui.renderCommandMenu();
     }
     
+    // 諸勢力「取込」の成功率（0～100%）を計算する正本です。
+    // 軍師助言と実際の成否判定が必ず同じ式を使うよう、ここへ集約します。
+    calcIncorporateProbability(doer, kunishu, clanId = this.game.playerClanId) {
+        if (!doer || !kunishu) return 0;
+
+        const myClan = this.game.getClan(clanId);
+        const myPrestige = myClan ? myClan.daimyoPrestige : 0;
+        const myDaimyo = this.game.getClanDaimyo(clanId);
+        const leader = this.game.getBusho(kunishu.leaderId);
+
+        const targetSoldiers = kunishu.soldiers || 1;
+        const ratio = myPrestige / (targetSoldiers * 12);
+        const baseProb = 70 * ratio;
+
+        const affinityDiff = (myDaimyo && leader)
+            ? PersonnelRules.calcAffinityDiff(myDaimyo.affinity, leader.affinity)
+            : 25;
+        const affinityMod = (25 - affinityDiff) / 25 * 10;
+        const diplomacyMod = (doer.diplomacy - 50) / 50 * 10;
+
+        return Math.max(0, Math.min(100, baseProb + affinityMod + diplomacyMod));
+    }
+
     // 諸勢力を自軍に取り込む処理
     executeKunishuIncorporate(doerId, castleId, kunishuId) {
         const doer = this.game.getBusho(doerId);
@@ -715,23 +738,7 @@ class KunishuSystem {
         
         if (!kunishu) return;
         
-        const myClan = this.game.getClan(this.game.playerClanId);
-        const myPrestige = myClan ? myClan.daimyoPrestige : 0;
-        const myDaimyo = this.game.getClanDaimyo(this.game.playerClanId);
-        const leader = this.game.getBusho(kunishu.leaderId);
-
-        let baseProb = 0;
-        const targetSoldiers = kunishu.soldiers || 1;
-        const ratio = myPrestige / (targetSoldiers * 12);
-        baseProb = 70 * ratio;
-        
-        const affinityDiff = (myDaimyo && leader) ? PersonnelRules.calcAffinityDiff(myDaimyo.affinity, leader.affinity) : 25;
-        const affinityMod = (25 - affinityDiff) / 25 * 10;
-        
-        const diplomacyMod = (doer.diplomacy - 50) / 50 * 10;
-        
-        let totalProb = baseProb + affinityMod + diplomacyMod;
-        
+        const totalProb = this.calcIncorporateProbability(doer, kunishu, this.game.playerClanId);
         const isSuccess = (Math.random() * 100) < totalProb;
         
         if (isSuccess) {

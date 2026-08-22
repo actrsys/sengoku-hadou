@@ -1034,5 +1034,108 @@ test('援軍持参金は攻守共通で DiplomacyManager が計算する', () =>
     const combined = prepSource + '\n' + warEffortSource;
     assert.ok(!combined.includes('((ratio - 1.5) / 1.5) * 700'));
 });
+
+
+// ---------------------------------------------------------------------------
+// 最終一元化境界（Round66）
+// ---------------------------------------------------------------------------
+test('諸勢力取込成功率は KunishuSystem を正本とし、軍師助言と実判定で共有する', () => {
+    const ctx = createContext();
+    ctx.PersonnelRules = {
+        calcAffinityDiff: (a, b) => Math.abs(Number(a) - Number(b))
+    };
+    ctx.LifeStatusRules = { isPresent: () => true };
+    loadScript(ctx, 'js/kunishu_system.js');
+    const KunishuSystem = vm.runInContext('KunishuSystem', ctx);
+
+    const doer = { diplomacy: 70 };
+    const kunishu = { soldiers: 1000, leaderId: 9 };
+    const game = {
+        playerClanId: 1,
+        getClan: id => id === 1 ? { daimyoPrestige: 18000 } : null,
+        getClanDaimyo: id => id === 1 ? { affinity: 20 } : null,
+        getBusho: id => id === 9 ? { affinity: 30 } : null
+    };
+    const system = new KunishuSystem(game);
+
+    // 70*(18000/(1000*12)) + ((25-10)/25*10) + ((70-50)/50*10) = 115 -> clamp 100
+    assert.strictEqual(system.calcIncorporateProbability(doer, kunishu, 1), 100);
+    game.getClan = () => ({ daimyoPrestige: 6000 });
+    // 35 + 6 + 4 = 45
+    assert.strictEqual(system.calcIncorporateProbability(doer, kunishu, 1), 45);
+
+    const commandSource = read('js/command_system.js');
+    const kunishuSource = read('js/kunishu_system.js');
+    assert.ok(commandSource.includes('kunishuSystem.calcIncorporateProbability'));
+    assert.ok(kunishuSource.includes('const totalProb = this.calcIncorporateProbability'));
+    assert.ok(!commandSource.includes('targetSoldiers * 12'));
+    assert.ok(!commandSource.includes('const affinityMod = (25 - affinityDiff) / 25 * 10'));
+});
+
+test('攻城戦と野戦のホーム補正は WarSystem の共通計算を使う', () => {
+    const ctx = createContext();
+    ctx.window.WarParams = { War: {}, Military: {} };
+    loadScript(ctx, 'js/war.js');
+    const WarSystem = vm.runInContext('WarSystem', ctx);
+
+    const castles = new Map([
+        [10, { id: 10, provinceId: 1 }],
+        [11, { id: 11, provinceId: 2 }],
+        [12, { id: 12, provinceId: 3 }]
+    ]);
+    const game = {
+        legions: [{ id: 5, commanderId: 50 }],
+        bushos: [
+            { id: 50, clan: 1, castleId: 10 },
+            { id: 99, clan: 1, isDaimyo: true, castleId: 12 }
+        ],
+        provinces: [
+            { id: 1, regionId: 7 },
+            { id: 2, regionId: 7 },
+            { id: 3, regionId: 8 }
+        ],
+        getBusho: id => id === 50 ? { id: 50, castleId: 10 } : null,
+        getCastle: id => castles.get(id) || null
+    };
+    const defender = { id: 20, provinceId: 1 };
+
+    // 軍団長居城と同じ国・地方 = 1.2
+    assert.ok(Math.abs(WarSystem.calcHomeBonusMultiplier(game,
+        { provinceId: 3, ownerClan: 1, legionId: 5, isKunishu: false }, defender) - 1.2) < 1e-9);
+    // 大名居城は別地方 = 1.0
+    assert.strictEqual(WarSystem.calcHomeBonusMultiplier(game,
+        { provinceId: 2, ownerClan: 1, legionId: 0, isKunishu: false }, defender), 1.0);
+    // 諸勢力は自身の城を基準。同地方のみ = 1.1
+    assert.ok(Math.abs(WarSystem.calcHomeBonusMultiplier(game,
+        { provinceId: 2, ownerClan: 0, legionId: 0, isKunishu: true }, defender) - 1.1) < 1e-9);
+
+    const warSource = read('js/war.js');
+    const fieldSource = read('js/field_war.js');
+    assert.ok(warSource.includes('WarSystem.calcHomeBonusMultiplier(this.game, activeCastle, s.defender)'));
+    assert.ok(fieldSource.includes('WarSystem.calcHomeBonusMultiplier(this.game, activeCastle, this.warState.defender)'));
+    assert.ok(!fieldSource.includes('const leaderProv = this.game.provinces.find'));
+});
+
+test('gameを保持する主要Systemは window.GameApp へ戻らない', () => {
+    const files = [
+        'js/event_manager.js',
+        'js/independence_system.js',
+        'js/kunishu_system.js',
+        'js/war_effort.js',
+        'js/map_generator.js'
+    ];
+    const offenders = files.filter(file => read(file).includes('window.GameApp'));
+    assert.deepStrictEqual(offenders, []);
+
+    const eventSource = read('js/event_manager.js');
+    assert.ok(eventSource.includes('const gameFlags = this.game.flags || {}'));
+    assert.ok(!eventSource.includes('appFlags'));
+
+    const mapSource = read('js/map_generator.js');
+    const fieldSource = read('js/field_war.js');
+    assert.ok(mapSource.includes('generate(isSeaBattle = false)'));
+    assert.ok(fieldSource.includes('mapFactory.generate(this.warState.isSeaBattle === true)'));
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

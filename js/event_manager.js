@@ -91,10 +91,9 @@ class EventManager {
 
             // 一度きりイベント用のスタンプ帳を統一して扱います
             const gameFlags = this.game.flags || {};
-            const appFlags = (window.GameApp && window.GameApp.flags) ? window.GameApp.flags : {};
 
-            // どちらかに記録済みなら、もう実行しません
-            if (ev.isOneTime && (gameFlags[ev.id] || appFlags[ev.id])) {
+            // GameManager自身のflagsを正本として、一度きりイベントの再実行を防ぎます。
+            if (ev.isOneTime && gameFlags[ev.id]) {
                 continue;
             }
 
@@ -117,11 +116,6 @@ class EventManager {
                     if (ev.isOneTime) {
                         this.game.flags = this.game.flags || {};
                         this.game.flags[ev.id] = true;
-
-                        if (window.GameApp) {
-                            window.GameApp.flags = window.GameApp.flags || {};
-                            window.GameApp.flags[ev.id] = true;
-                        }
 
                         // 今のゲーム中も処理を軽くするために配列から消しておきます
                         this.events[timing] = this.events[timing].filter(e => e.id !== ev.id);

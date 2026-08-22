@@ -1419,7 +1419,7 @@ Object.assign(WarManager.prototype, {
                         await this.checkTotalTakeover(s); // ★総取りシステムをチェック！
                         const extReason1 = s.isTotalTakeoverExecuted ? 'total_takeover' : 'no_castle';
                         await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason1);
-                        if (window.GameApp) window.GameApp.updateAllClanPrestige(); // 威信を更新
+                        if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige(); // 威信を更新
                         this.game.finishTurn();
                         // ==========================================
                     }
@@ -1429,7 +1429,7 @@ Object.assign(WarManager.prototype, {
                     await this.checkTotalTakeover(s); // ★総取りシステムをチェック！
                     const extReason2 = s.isTotalTakeoverExecuted ? 'total_takeover' : 'no_castle';
                     await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason2);
-                    if (window.GameApp) window.GameApp.updateAllClanPrestige(); // 威信を更新
+                    if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige(); // 威信を更新
                     this.game.finishTurn();
                     // ==========================================
                 }
@@ -2622,7 +2622,7 @@ Object.assign(WarManager.prototype, {
         // 全て終わったので滅亡チェックをしてターンを終了します
         const extReason = this.state.isTotalTakeoverExecuted ? 'total_takeover' : 'no_castle';
         await this.game.lifeSystem.checkClanExtinction(this.state.oldDefClanId, extReason);
-        if (window.GameApp) window.GameApp.updateAllClanPrestige();
+        if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige();
         this.game.finishTurn();
     },
     
@@ -2817,8 +2817,8 @@ Object.assign(WarManager.prototype, {
             }
             if (typeof this.game.updateClanPrestige === 'function') {
                 prestigeClanIds.forEach(clanId => this.game.updateClanPrestige(clanId));
-            } else if (window.GameApp && typeof window.GameApp.updateAllClanPrestige === 'function') {
-                window.GameApp.updateAllClanPrestige();
+            } else if (typeof this.game.updateAllClanPrestige === 'function') {
+                this.game.updateAllClanPrestige();
             }
             if (typeof this.game.writeSystemDiagnostic === 'function') {
                 this.game.writeSystemDiagnostic('war:prestige:done', prestigeDiagnosticCastle);
