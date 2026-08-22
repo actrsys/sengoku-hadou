@@ -209,6 +209,7 @@ test('SelectorModalView がガワ・戻る・決定状態を一元初期化す�
     const wrapper = fakeElement('selector-list-wrapper');
     const contextEl = fakeElement('selector-context-info');
     const tabs = fakeElement('selector-tabs');
+    tabs.classList.add('busho-detail-tabs');
     const confirm = fakeElement('selector-confirm-btn');
     const back = fakeElement('selector-back-btn');
     const content = fakeElement('modal-content');
@@ -230,6 +231,7 @@ test('SelectorModalView がガワ・戻る・決定状態を一元初期化す�
     assert.strictEqual(modal.classList.contains('hidden'), false);
     assert.strictEqual(title.textContent, '武将情報');
     assert.strictEqual(tabs.classList.contains('hidden'), false);
+    assert.strictEqual(tabs.classList.contains('busho-detail-tabs'), false);
     assert.strictEqual(confirm.disabled, true);
     assert.strictEqual(back.textContent, '戻る');
     back.onclick();
@@ -275,6 +277,31 @@ test('index.html に inline onclick を残さない', () => {
 test('ui_slider.js は静的 inline style 属性を生成しない', () => {
     const source = read('js/ui_slider.js');
     assert.strictEqual((source.match(/style=\"/g) || []).length, 0);
+});
+
+test('index.html は inline script を持たず、起動処理を app_bootstrap.js に集約する', () => {
+    const html = read('index.html');
+    assert.strictEqual((html.match(/<script(?![^>]*\bsrc=)[^>]*>/g) || []).length, 0);
+    assert.ok(html.includes('src="js/app_bootstrap.js"'));
+    assert.ok(!html.includes('src="js/ui_bindings.js"'));
+    assert.ok(fs.existsSync(path.join(ROOT, 'js/app_bootstrap.js')));
+    assert.ok(!fs.existsSync(path.join(ROOT, 'js/ui_bindings.js')));
+});
+
+test('武将情報JSは静的inline style / inline eventを持たない', () => {
+    const source = read('js/ui_info_busho.js');
+    const styles = [...source.matchAll(/style="([^"]*)"/g)].map(m => m[1].trim());
+    assert.ok(styles.length > 0, '能力ゲージ等の動的CSS変数まで消えていないか確認してください');
+    assert.ok(styles.every(value => value.startsWith('--')), `静的styleが残っています: ${styles.filter(value => !value.startsWith('--')).join(' | ')}`);
+    assert.strictEqual((source.match(/<[^>]*\bonclick\s*=/g) || []).length, 0);
+    assert.strictEqual((source.match(/<[^>]*\bonerror\s*=/g) || []).length, 0);
+});
+
+test('コード構成ガイドが存在し、主要な専門部署を索引化している', () => {
+    const doc = read('ARCHITECTURE.md');
+    for (const name of ['app_bootstrap.js', 'skill_manager.js', 'turn_manager.js', 'selector_modal_view.js', 'troop_allocation.js']) {
+        assert.ok(doc.includes(name), `${name} がARCHITECTURE.mdにありません`);
+    }
 });
 
 test('バランスシミュレーターが正式ツールとして配置されている', () => {

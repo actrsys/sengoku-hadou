@@ -21,12 +21,9 @@ Object.assign(UIInfoManager.prototype, {
         // 武将詳細では本来のタブ領域（枠の上）を使います。
         if (tabsEl) {
             tabsEl.classList.remove('hidden');
-            // リスト画面と同じ見た目にするためのスタイル
-            tabsEl.style.justifyContent = 'flex-start';
-            tabsEl.style.paddingLeft = '10px';
-            tabsEl.style.alignItems = 'flex-end';
+            tabsEl.classList.add('busho-detail-tabs');
             tabsEl.innerHTML = `
-                <div style="display: flex; gap: 5px;">
+                <div class="busho-detail-tab-buttons">
                     <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'status' ? 'active' : ''}" id="busho-detail-tab-status">${isPc ? '基本' : '基'}</button>
                     <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'aptitude' ? 'active' : ''}" id="busho-detail-tab-aptitude">${isPc ? '技能' : '技'}</button>
                 </div>
@@ -55,7 +52,8 @@ Object.assign(UIInfoManager.prototype, {
             }, 0);
         }
         
-        let faceHtml = busho.faceIcon ? `<img src="data/images/faceicons/${busho.faceIcon}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_face.webp'">` : `<img src="data/images/faceicons/unknown_face.webp" class="daimyo-detail-face">`;
+        const faceSrc = busho.faceIcon ? `data/images/faceicons/${busho.faceIcon}` : 'data/images/faceicons/unknown_face.webp';
+        let faceHtml = `<img src="${faceSrc}" class="daimyo-detail-face busho-detail-face" alt="">`;
 
         let affiliationName = "なし";
         let isFamily = false; 
@@ -190,28 +188,24 @@ Object.assign(UIInfoManager.prototype, {
             if (expInfo) {
                 // ★追加：外枠全体の幅を120としたとき、基準となる100の幅(約83.3%)を指定します
                 expBarHtml = `
-                    <div class="exp-bar-bg" style="width: calc(100% * 100 / 120);">
-                        <div class="exp-bar-fill ${expInfo.isMax ? 'is-max' : ''}" style="width: ${expInfo.percent}%;"></div>
+                    <div class="exp-bar-bg busho-detail-bar-base">
+                        <div class="exp-bar-fill ${expInfo.isMax ? 'is-max' : ''}" style="--bar-value: ${expInfo.percent}%;"></div>
                     </div>
                 `;
             } else {
                 expBarHtml = `
-                    <div class="exp-bar-bg" style="visibility: hidden; width: calc(100% * 100 / 120);"></div>
+                    <div class="exp-bar-bg busho-detail-bar-base is-placeholder"></div>
                 `;
             }
 
-            const isPc = document.body.classList.contains('is-pc');
-            const labelWidth = isPc ? "40px" : "30px";
-            const gradeWidth = isPc ? "35px" : "25px";
-
             return `
-                <div class="daimyo-detail-stat-box" style="justify-content: flex-start; padding-right: 5px;">
-                    <span class="daimyo-detail-label" style="width: ${labelWidth}; min-width: ${labelWidth}; margin-right: 5px; text-align: left;">${label}</span>
-                    <span style="width: ${gradeWidth}; text-align: left; font-weight: bold; display: flex; align-items: center;">${gradeHtml}</span>
-                    <div class="busho-stat-bar-wrapper" style="flex: 1; margin-right: 0; max-width: none; margin-left: 5px;">
+                <div class="daimyo-detail-stat-box busho-detail-stat-box">
+                    <span class="daimyo-detail-label busho-detail-stat-label">${label}</span>
+                    <span class="busho-detail-stat-grade">${gradeHtml}</span>
+                    <div class="busho-stat-bar-wrapper busho-detail-stat-bar">
                         <!-- ★追加：ここにも基準幅(100/120)を指定し、右側に限界突破用のはみ出しスペースを確保します -->
-                        <div class="${mainBarClass}" style="width: calc(100% * 100 / 120);">
-                            <div class="${fillClass}" style="width:${basePercent}%;"></div>
+                        <div class="${mainBarClass} busho-detail-bar-base">
+                            <div class="${fillClass}" style="--bar-value:${basePercent}%;"></div>
                             ${overBarHtml}
                         </div>
                         ${expBarHtml}
@@ -235,24 +229,16 @@ Object.assign(UIInfoManager.prototype, {
             displayName = busho.familyName + "&ensp;" + busho.givenName;
         }
 
-        // ★追加：スマホ版かどうかで縦の隙間（行間）を変える準備をします
-        const rowGap = isPc ? "6px" : "3px"; // ★スマホ版はきゅっと詰めます
-        const groupGap = "4px"; // ★グループ内の行間。適性⇔技能説明のダミーと共有して高さを一致させます
-        const groupWrapStyle = `background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: ${groupGap};`;
-
         let rightContentHtml = '';
         
         const makeRow = (label, value) => {
-            let extraLabelStyle = "";
-            if (!isPc && label.length >= 3) {
-                extraLabelStyle = " letter-spacing: -1px; transform: scaleX(0.9); transform-origin: left center; display: inline-block;";
-            }
-            return `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label" style="${extraLabelStyle}">${label}</span><span class="daimyo-detail-value">${value}</span></div>`;
+            const compactClass = label.length >= 3 ? ' busho-detail-label-compact' : '';
+            return `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label${compactClass}">${label}</span><span class="daimyo-detail-value">${value}</span></div>`;
         };
 
         if (this.bushoDetailCurrentTab === 'status') {
             const statHtml = `
-                <div style="${groupWrapStyle} flex: 1; min-width: 0;">
+                <div class="busho-detail-group busho-detail-group-grow">
                     ${getStatRow('leadership', '統率')}
                     ${getStatRow('strength', '武勇')}
                     ${getStatRow('politics', '内政')}
@@ -263,12 +249,12 @@ Object.assign(UIInfoManager.prototype, {
             `;
 
             const infoHtml = `
-                <div style="display: flex; flex-direction: column; gap: ${rowGap}; flex: 1; min-width: 0;">
-                    <div style="${groupWrapStyle}">
+                <div class="busho-detail-info-column">
+                    <div class="busho-detail-group">
                         ${makeRow('所在', castleName)}
                         ${makeRow('主君', lordName)}
                     </div>
-                    <div style="${groupWrapStyle}">
+                    <div class="busho-detail-group">
                         ${makeRow('年齢', ageStr !== "" ? ageStr : "&nbsp;")}
                         ${makeRow('俸禄', salary !== "" ? salary : "&nbsp;")}
                         ${makeRow('一門', isFamily ? "◯" : "&nbsp;")}
@@ -278,7 +264,7 @@ Object.assign(UIInfoManager.prototype, {
             `;
 
             rightContentHtml = `
-                <div style="display: flex; flex-direction: row; gap: ${rowGap}; width: 100%;">
+                <div class="busho-detail-status-layout">
                     ${statHtml}
                     ${infoHtml}
                 </div>
@@ -312,7 +298,7 @@ Object.assign(UIInfoManager.prototype, {
                     if (apt) {
                         rowInnerHtml += `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">${apt.label}</span><span class="daimyo-detail-value">${getAptGradeHtml(apt.val)}</span></div>`;
                     } else {
-                        rowInnerHtml += `<div class="daimyo-detail-stat-box" style="visibility: hidden;"></div>`;
+                        rowInnerHtml += `<div class="daimyo-detail-stat-box is-placeholder"></div>`;
                     }
                 }
                 aptHtml += `<div class="daimyo-detail-row ${rowClass}">${rowInnerHtml}</div>`;
@@ -333,45 +319,38 @@ Object.assign(UIInfoManager.prototype, {
                         // ★ここから追加：技能がある箱だけクリックできるようにクラスや情報を付けます
                         let clickClass = "";
                         let dataAttr = "";
-                        let cursorStyle = "";
                         if (skills[index]) {
                             clickClass = "skill-box-clickable";
                             dataAttr = `data-skill-name="${skills[index]}"`;
-                            cursorStyle = "cursor: pointer;";
                         }
                         
-                        rowInnerHtml += `<div class="daimyo-detail-stat-box ${clickClass}" ${dataAttr} style="${cursorStyle}"><span class="daimyo-detail-label">技能${index + 1}</span><span class="daimyo-detail-value">${skillName}</span></div>`;
+                        rowInnerHtml += `<div class="daimyo-detail-stat-box ${clickClass}" ${dataAttr}><span class="daimyo-detail-label">技能${index + 1}</span><span class="daimyo-detail-value">${skillName}</span></div>`;
                         // ★ここまで追加
 
                     } else {
                         // 4つ目の枠（空白）は形を綺麗に整えるために透明にして置いておきます
-                        rowInnerHtml += `<div class="daimyo-detail-stat-box" style="visibility: hidden;"></div>`;
+                        rowInnerHtml += `<div class="daimyo-detail-stat-box is-placeholder"></div>`;
                     }
                 }
                 skillHtml += `<div class="daimyo-detail-row daimyo-detail-2col">${rowInnerHtml}</div>`;
             }
 
-            // ★変更：基本タブと同じように flex と gap を使って隙間のサイズを統一し、高さを揃えます
-            // （説明エリアを隠し味として最初から忍ばせておきます）
-            // ★追加：スマホ版なら文字を小さく（0.68remに）します
-            const descTextFontSize = isPc ? "0.95rem" : "0.68rem";
-            
             rightContentHtml = `
-                <div style="display: flex; flex-direction: column; gap: ${rowGap}; width: 100%;">
-                    <div id="busho-aptitude-area" style="${groupWrapStyle} flex: 1;">
+                <div class="busho-detail-aptitude-layout">
+                    <div id="busho-aptitude-area" class="busho-detail-group busho-detail-group-grow">
                         ${aptHtml}
                     </div>
-                    <div id="busho-skill-desc-area" style="${groupWrapStyle} display: none; flex: 1; position: relative;">
+                    <div id="busho-skill-desc-area" class="busho-detail-group busho-detail-group-grow busho-skill-desc-area">
                         <!-- ★ここがダミーの箱を置く場所です（透明にして高さだけ確保します） -->
                         <!-- ★修正：手作りのダミーではなく、適性リストのHTML(aptHtml)をそのまま透明にして再利用することで、1ピクセルの狂いもなく高さを一致させます！ -->
-                        <div style="visibility: hidden; pointer-events: none; display: flex; flex-direction: column; gap: ${groupGap};">
+                        <div class="busho-skill-desc-placeholder">
                             ${aptHtml}
                         </div>
                         <!-- ★実際のテキストはその上に被せるようにして配置します -->
-                        <div id="busho-skill-desc-text" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 5px 8px; font-size: ${descTextFontSize}; line-height: 1.5; color: #fff; text-shadow: 1px 1px 1px #000; text-align: left; box-sizing: border-box; overflow-y: auto;">
+                        <div id="busho-skill-desc-text" class="busho-skill-desc-text">
                         </div>
                     </div>
-                    <div style="${groupWrapStyle}">
+                    <div class="busho-detail-group">
                         ${skillHtml}
                     </div>
                 </div>
@@ -382,15 +361,15 @@ Object.assign(UIInfoManager.prototype, {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = `
-                <div class="daimyo-detail-container" style="padding: 10px; min-height: 100%;">
-                    <div class="daimyo-detail-header pc-only" style="margin-bottom: 10px;">
-                        <div style="display:flex; flex-direction:column;">
-                            <span style="font-size:0.8rem; color:#ccc; margin-bottom:2px;">${displayYomi}</span>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <div class="daimyo-detail-name" style="font-size: 1.5rem;">${displayName}</div>
+                <div class="daimyo-detail-container busho-detail-container">
+                    <div class="daimyo-detail-header pc-only busho-detail-header-pc">
+                        <div class="busho-detail-heading-stack">
+                            <span class="busho-detail-yomi pc-only-yomi">${displayYomi}</span>
+                            <div class="busho-detail-name-row pc-name-row">
+                                <div class="daimyo-detail-name busho-detail-name-pc">${displayName}</div>
                                 ${rankName}
                             </div>
-                            <div style="display:flex; align-items:center; gap:10px; margin-top: 4px; font-size: 0.95rem; color: #ccc;">
+                            <div class="busho-detail-meta pc-meta">
                                 <span>${affiliationName}</span>
                                 <span>${busho.getRankName()}</span>
                             </div>
@@ -399,27 +378,35 @@ Object.assign(UIInfoManager.prototype, {
                     <div class="daimyo-detail-body">
                         <div class="daimyo-detail-left">
                             ${faceHtml}
-                            <div class="daimyo-detail-header sp-only" style="flex-direction:column; align-items:flex-start; gap:2px; margin-bottom: 0; justify-content: center;">
-                                <span style="font-size:0.75rem; color:#ccc;">${displayYomi}</span>
-                                <div style="display:flex; align-items:center; gap:5px;">
-                                    <div class="daimyo-detail-name" style="font-size:1.3rem;">${displayName}</div>
+                            <div class="daimyo-detail-header sp-only busho-detail-header-sp">
+                                <span class="busho-detail-yomi sp-yomi">${displayYomi}</span>
+                                <div class="busho-detail-name-row sp-name-row">
+                                    <div class="daimyo-detail-name busho-detail-name-sp">${displayName}</div>
                                     ${rankName}
                                 </div>
-                                <div style="display:flex; align-items:center; gap:8px; margin-top: 2px; font-size: 0.85rem; color: #ccc;">
+                                <div class="busho-detail-meta sp-meta">
                                     <span>${affiliationName}</span>
                                     <span>${busho.getRankName()}</span>
                                 </div>
                             </div>
                         </div>
-                        <div class="daimyo-detail-right" style="gap: ${rowGap};">
+                        <div class="daimyo-detail-right busho-detail-right">
                             ${rightContentHtml}
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: auto; padding-top: 15px;">
+                    <div class="busho-detail-action-footer">
                         <button class="daimyo-detail-action-btn" id="busho-wife-btn" ${(Array.isArray(busho.wifeIds) && busho.wifeIds.length > 0) ? '' : 'disabled'}>配偶者</button>
                     </div>
                 </div>
             `;
+
+            const detailFace = listContainer.querySelector('.busho-detail-face');
+            if (detailFace) {
+                detailFace.addEventListener('error', () => {
+                    const fallback = 'data/images/faceicons/unknown_face.webp';
+                    if (!detailFace.src.endsWith('/unknown_face.webp')) detailFace.src = fallback;
+                }, { once: true });
+            }
 
             const btnWife = document.getElementById('busho-wife-btn');
             if (btnWife && Array.isArray(busho.wifeIds) && busho.wifeIds.length > 0) {
@@ -462,13 +449,10 @@ Object.assign(UIInfoManager.prototype, {
                                 let desc = typeof SkillManager !== 'undefined' ? SkillManager.getSkillDescription(skillName) : "";
                                 if (!desc) desc = "詳細不明。";
                                 
-                                // ★追加：スマホ版なら文字を小さく（約0.62remに）します
-                                const innerDescFontSize = isPc ? "0.85rem" : "0.62rem";
-                                
                                 // 説明文をセットして、瞬時に表示を切り替えます
                                 descText.innerHTML = `
-                                    <div style="color:#ffd54f; font-weight:bold; margin-bottom:5px; border-bottom:1px solid rgba(212,175,55,0.5); padding-bottom:3px;">【${skillName}】</div>
-                                    <div style="color:#eee; font-size:${innerDescFontSize}; white-space: pre-line;">${desc}</div>
+                                    <div class="busho-skill-desc-title">【${skillName}】</div>
+                                    <div class="busho-skill-desc-body">${desc}</div>
                                 `;
                                 aptArea.style.display = 'none';
                                 descArea.style.display = 'flex';
@@ -703,14 +687,14 @@ Object.assign(UIInfoManager.prototype, {
         let scopeHtml = '';
         if (actionType === 'all_busho_list') {
             scopeHtml = `
-                <div style="display: flex; gap: 5px; margin-left: 15px;">
+                <div class="busho-scope-tabs">
                         <button class="busho-scope-btn ${this.bushoCurrentScope === 'clan' ? 'active' : ''}" data-scope="clan">${isPc ? '自家' : '自'}</button>
                         <button class="busho-scope-btn ${this.bushoCurrentScope === 'all' ? 'active' : ''}" data-scope="all">${isPc ? '全国' : '全'}</button>
                 </div>
             `;
         }
         let tabsHtml = `
-            <div style="display: flex; gap: 5px;">
+            <div class="busho-list-tabs">
                 <button class="busho-tab-btn ${this.bushoCurrentTab === 'stats' ? 'active' : ''}" data-tab="stats">${isPc ? '基本' : '基'}</button>
                 <button class="busho-tab-btn ${this.bushoCurrentTab === 'aptitude' ? 'active' : ''}" data-tab="aptitude">${isPc ? '適性' : '適'}</button>
                 <button class="busho-tab-btn ${this.bushoCurrentTab === 'status' ? 'active' : ''}" data-tab="status">${isPc ? '状態' : '状'}</button>
@@ -1044,7 +1028,7 @@ Object.assign(UIInfoManager.prototype, {
             const getStat = (stat) => StatPresenter.getDisplayStatHTML(b, stat, gunshi, currentAcc, this.game.playerClanId, myDaimyo);
 
             const inputType = isMulti ? 'checkbox' : 'radio';
-            let inputHtml = !isViewMode ? `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} ${isSelected ? 'checked' : ''} style="display:none;">` : '';
+            let inputHtml = !isViewMode ? `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} ${isSelected ? 'checked' : ''} class="selector-native-input">` : '';
 
             // ★変更：文字圧縮機能の最適化。姓名が分かれている場合はそれぞれ縮小します
             const getCompressedTextHtml = (text, threshold) => {
@@ -1054,7 +1038,7 @@ Object.assign(UIInfoManager.prototype, {
                     let scale = 1.0 - (text.length - (threshold - 1)) * 0.1;
                     if (scale < 0.55) scale = 0.55;
                     // ★修正：letter-spacingによって削られた右側の空間を「padding-right: 1px;」で補って食い込みを防ぎます
-                    return `<span style="font-size: ${scale}em; transform: scaleY(${1/scale}); letter-spacing: -0.5px; padding-right: 1px; display: inline-block; transform-origin: left center;">${text}</span>`;
+                    return `<span class="busho-compressed-text" style="--name-font-size:${scale}em; --name-scale-y:${1/scale};">${text}</span>`;
                 }
                 return text;
             };

@@ -57,6 +57,8 @@ class SelectorModalView {
         }
 
         if (tabsEl) {
+            // 前に開いていた詳細画面固有の見た目を次の一覧へ持ち越さない。
+            tabsEl.classList.remove('busho-detail-tabs');
             if (tabsHtml !== null && tabsHtml !== undefined) {
                 tabsEl.innerHTML = tabsHtml;
                 tabsEl.classList.remove('hidden');

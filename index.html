@@ -13,64 +13,8 @@
     <link rel="preload" href="data/fonts/fude-goshirae.woff2?v=1" as="font" type="font/woff2" crossorigin="anonymous">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/animation.css">
-
-    <!-- ★Round 8: WebフォントをCSSの「使用待ち」に任せず、2書体を明示的に読み込みます -->
-    <script>
-    (function() {
-        const root = document.documentElement;
-        const timeoutMs = 6000;
-        let revealed = false;
-
-        const reveal = (reason) => {
-            if (revealed) return;
-            revealed = true;
-            root.classList.remove('fonts-loading');
-            root.classList.add(reason === 'loaded' ? 'fonts-ready' : 'fonts-fallback');
-        };
-
-        // JSやFont Loading APIに何かあっても、画面を永久に隠さないための最終安全装置。
-        const failSafeTimer = setTimeout(() => {
-            console.warn('【FontLoader】フォント待機がタイムアウトしたため、画面表示を優先します。');
-            reveal('timeout');
-        }, timeoutMs);
-
-        if (!document.fonts || typeof document.fonts.load !== 'function') {
-            clearTimeout(failSafeTimer);
-            reveal('unsupported');
-            window.__gameFontLoadPromise = Promise.resolve(false);
-            return;
-        }
-
-        const requests = [
-            // 通常/太字の両方を明示して、初期画面ではまだ非表示の文字用途まで先に確実にロードします。
-            ['400 16px "abashiri-mincho"', '戦国覇道徳川家康今川織田武田上杉一二三四五六七八九〇'],
-            ['700 16px "abashiri-mincho"', '戦国覇道徳川家康今川織田武田上杉一二三四五六七八九〇'],
-            ['400 16px "FudeGoshirae"', '戦国覇道決定取消攻撃内政外交軍団一二三四五六七八九〇'],
-            ['700 16px "FudeGoshirae"', '戦国覇道決定取消攻撃内政外交軍団一二三四五六七八九〇']
-        ];
-
-        window.__gameFontLoadPromise = Promise.all(
-            requests.map(([font, text]) => document.fonts.load(font, text))
-        ).then(async (results) => {
-            const loaded = results.every(list => Array.isArray(list) && list.length > 0);
-            if (!loaded) {
-                throw new Error('指定したWebフォントに一致するFontFaceが見つかりませんでした。');
-            }
-            // 明示ロードの直後に残っているフォントレイアウト処理まで待ちます。
-            await document.fonts.ready;
-            clearTimeout(failSafeTimer);
-            reveal('loaded');
-            console.info('【FontLoader】Webフォント2書体の明示ロードが完了しました。');
-            return true;
-        }).catch((err) => {
-            clearTimeout(failSafeTimer);
-            console.warn('【FontLoader】Webフォントの読み込みに失敗しました。フォールバックで表示します。', err);
-            reveal('error');
-            return false;
-        });
-    })();
-    </script>
-        <script src="js/pako.min.js"></script>
+    <script src="js/app_bootstrap.js"></script>
+    <script src="js/pako.min.js"></script>
 </head>
 <body>
     <div id="game-screen">
@@ -609,7 +553,6 @@
     <script src="js/howler.min.js" onerror="this.onerror=null; this.src='js/howler.js';"></script>
     <script src="js/config.js"></script>
     <script src="js/constants.js"></script>
-    <script src="js/ui_bindings.js"></script>
     <script src="js/game_math.js"></script>
     <script src="js/map_graph.js"></script>
     <script src="js/domestic_rules.js"></script>
@@ -659,120 +602,5 @@
     <script src="js/save_manager.js"></script>
     <script src="js/turn_manager.js"></script>
     <script src="js/game.js"></script>
-    
-    <script>
-    function resizeGameScreen() {
-        const screen = document.getElementById('game-screen');
-        if (!screen) return;
-
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        const viewport = window.visualViewport || null;
-
-        // ★Round 13：CSS pxの整数ではなく「物理ピクセル」の境界へ寄せます。
-        // DPR=3なら 1/3 CSS px 単位で置けるため、高DPI端末で端が半透明になるのを防ぎやすくなります。
-        const dpr = Math.max(1, window.devicePixelRatio || 1);
-        const snapPhysicalPixel = (value) => Math.round(value * dpr) / dpr;
-        const onePhysicalPixel = 1 / dpr;
-
-        // ブラウザのツールバーを除外した実表示領域。visualViewportのoffsetも考慮します。
-        const windowW = viewport ? viewport.width : window.innerWidth;
-        const windowH = viewport ? viewport.height : window.innerHeight;
-        const viewportLeft = viewport ? viewport.offsetLeft : 0;
-        const viewportTop = viewport ? viewport.offsetTop : 0;
-
-        // 全面レイヤーは1物理pxだけ外へ描いてgame-screenでクリップします。
-        // タイトル/攻城戦/各モーダルの端に下地が1px覗く現象への安全マージンです。
-        screen.style.setProperty('--screen-edge-bleed', `${onePhysicalPixel}px`);
-
-        const applyScreenGeometry = (canvasW, canvasH, scale) => {
-            const scaledW = canvasW * scale;
-            const scaledH = canvasH * scale;
-            const left = snapPhysicalPixel(viewportLeft + (windowW - scaledW) / 2);
-            const top = snapPhysicalPixel(viewportTop + (windowH - scaledH) / 2);
-
-            screen.style.width = canvasW + 'px';
-            screen.style.height = canvasH + 'px';
-            screen.style.position = 'absolute';
-            screen.style.left = left + 'px';
-            screen.style.top = top + 'px';
-            screen.style.transformOrigin = 'top left';
-
-            // ★Round 13：scale(1)でも合成レイヤーを作る必要はありません。
-            // 実倍率が1のスマホではtransformを完全に外し、境界のラスタライズを単純化します。
-            screen.style.transform = Math.abs(scale - 1) < 0.000001 ? 'none' : `scale(${scale})`;
-            screen.style.overflow = 'hidden';
-            screen.style.backgroundColor = '#000000';
-        };
-
-        if (!isMobile) {
-            // PC版：1280x720の固定論理解像度はそのまま維持します。
-            document.body.classList.add('is-pc');
-            const baseWidth = 1280;
-            const baseHeight = 720;
-            const scale = Math.min(windowW / baseWidth, windowH / baseHeight);
-            applyScreenGeometry(baseWidth, baseHeight, scale);
-        } else {
-            // スマホ版：9:16の論理比率はそのまま維持します。
-            document.body.classList.remove('is-pc');
-            const targetRatio = 9 / 16;
-            const currentRatio = windowW / windowH;
-
-            let finalW, finalH;
-            if (currentRatio > targetRatio) {
-                finalH = windowH;
-                finalW = windowH * targetRatio;
-            } else {
-                finalW = windowW;
-                finalH = windowW / targetRatio;
-            }
-
-            const minMobileWidth = 360;
-            let canvasW = finalW;
-            let canvasH = finalH;
-            let scale = 1;
-
-            if (finalW < minMobileWidth) {
-                canvasW = minMobileWidth;
-                canvasH = minMobileWidth / targetRatio;
-                scale = finalW / minMobileWidth;
-            }
-
-            applyScreenGeometry(canvasW, canvasH, scale);
-        }
-
-        // 古い版で使用していたCSS zoomが残っていても影響させません。
-        screen.style.zoom = '';
-    }
-    
-    // ★Round 13：アドレスバーの出入り等でresizeが連打されても、1フレーム1回だけ再計算します。
-    let resizeGameScreenFrame = null;
-    function scheduleResizeGameScreen() {
-        if (resizeGameScreenFrame !== null) return;
-        resizeGameScreenFrame = requestAnimationFrame(() => {
-            resizeGameScreenFrame = null;
-            resizeGameScreen();
-        });
-    }
-
-    window.addEventListener('resize', scheduleResizeGameScreen, { passive: true });
-    if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', scheduleResizeGameScreen, { passive: true });
-    }
-    
-    window.addEventListener('DOMContentLoaded', function() {
-        // 画面サイズ調整だけをここで行います。
-        // フォントの明示ロードと初期表示制御は<head>内のFontLoaderが担当します。
-        resizeGameScreen();
-    });
-
-    // リロードやページを閉じようとした時に警告を出す
-    window.addEventListener('beforeunload', function (e) {
-        // ブラウザに「ちょっと待って！本当に閉じていいの？」と言わせる命令
-        e.preventDefault();
-        // 古いブラウザでも動くようにするおまじない
-        e.returnValue = '';
-    });
-    </script>
-    
 </body>
 </html>
