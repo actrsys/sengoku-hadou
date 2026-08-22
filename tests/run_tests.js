@@ -1326,6 +1326,71 @@ test('1560桶狭間データは願証寺と既存一向一揆だけに ikko シ�
     assert.ok(tagged.every(row => row.ideology === '宗教'), '一向宗シールを付けても思想は宗教のまま');
 });
 
+test('寿命補正は LifeSystem が sourceId ごとに安全に適用・解除する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/life_system.js');
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    const busho = { id: 1020005, endYear: 1564, lifespanModifiers: {} };
+    const game = { getBusho: id => Number(id) === 1020005 ? busho : null };
+    const system = new LifeSystem(game);
+
+    assert.strictEqual(system.setLifespanModifier(1020005, 'historical_test', 5), 5);
+    assert.strictEqual(busho.endYear, 1569);
+    assert.strictEqual(busho.lifespanModifiers.historical_test, 5);
+
+    // 同じ補正を再同期しても二重加算しない。
+    assert.strictEqual(system.setLifespanModifier(busho, 'historical_test', 5), 0);
+    assert.strictEqual(busho.endYear, 1569);
+
+    // 他の仕組みによる寿命変更が後から入っても、このsource分だけ解除する。
+    busho.endYear += 10;
+    assert.strictEqual(system.removeLifespanModifier(busho, 'historical_test'), -5);
+    assert.strictEqual(busho.endYear, 1574);
+    assert.strictEqual(busho.lifespanModifiers.historical_test, undefined);
+});
+
+test('常駐歴史イベントは EventManager が状態遷移だけを管理し通常イベント枠を消費しない', () => {
+    const source = read('js/event_manager.js');
+    assert.ok(source.includes("eventData.type === 'resident'"));
+    assert.ok(source.includes('this.game.flags.__residentEventStates'));
+    assert.ok(source.includes("await this.processResidentEvents(timing, context, isHistoricalOff);"));
+    assert.ok(source.includes("stateBook[ev.id] = { active: isActive };"));
+
+    // resident は通常 events 配列へ入れず、通常歴史イベントの historicalEventOccurred を立てない。
+    const registerBlock = source.slice(source.indexOf('registerEvent(eventData)'), source.indexOf('/**\n     * 常駐イベント'));
+    assert.ok(registerBlock.includes('this.residentEvents[timing].push(eventData)'));
+    assert.ok(registerBlock.includes('return;'));
+});
+
+test('三好長慶の寿命補正は historical_event 側が条件・対象・年数を所有する', () => {
+    const historical = read('js/event/historical_event.js');
+    const life = read('js/life_system.js');
+    const eventId = 'historical_miyoshi_nagayoshi_yoshioki_lifespan';
+    const start = historical.indexOf(`id: "${eventId}"`);
+    assert.ok(start >= 0, '三好寿命常駐イベントが存在する');
+    const end = historical.indexOf('// ==========================================', start + 1);
+    const block = historical.slice(start, end);
+
+    assert.ok(block.includes('type: "resident"'));
+    assert.ok(block.includes('timings: ["startMonth_before", "endMonth_before"]'));
+    assert.ok(block.includes('lifespanYears: 5'));
+    assert.ok(block.includes('1020005'));
+    assert.ok(block.includes('1020006'));
+    assert.ok(block.includes('setLifespanModifier(nagayoshi, this.id, this.lifespanYears)'));
+    assert.ok(block.includes('removeLifespanModifier(nagayoshi, this.id)'));
+
+    assert.ok(!life.includes('1020005'), 'LifeSystem に三好長慶IDを持たせない');
+    assert.ok(!life.includes('1020006'), 'LifeSystem に三好義興IDを持たせない');
+    assert.ok(!life.includes('三好長慶'), 'LifeSystem に三好固有知識を持たせない');
+});
+
+test('Busho は寿命補正付きセーブでも本来の没年と補正元を保持する', () => {
+    const models = read('js/models.js');
+    assert.ok(models.includes('data.originalEndYear !== undefined ? data.originalEndYear : data.endYear'));
+    assert.ok(models.includes('this.lifespanModifiers = {};'));
+    assert.ok(models.includes("Object.entries(data.lifespanModifiers)"));
+});
+
 test('攻城戦と野戦のホーム補正は WarSystem の共通計算を使う', () => {
     const ctx = createContext();
     ctx.window.WarParams = { War: {}, Military: {} };

@@ -22,6 +22,42 @@ class LifeSystem {
         person.status = newStatus;
     }
 
+    /**
+     * 寿命補正の低レベル公開窓口です。
+     * LifeSystem は「なぜ何年変えるか」を判断せず、呼び出し元が指定した sourceId と年数だけを安全に反映します。
+     * 同じ sourceId を再適用しても二重加算せず、別の寿命変更を壊さずに解除できます。
+     */
+    setLifespanModifier(personOrId, sourceId, years) {
+        const person = (typeof personOrId === 'object' && personOrId)
+            ? personOrId
+            : (this.game && typeof this.game.getBusho === 'function' ? this.game.getBusho(Number(personOrId)) : null);
+        if (!person || !sourceId) return 0;
+
+        if (!person.lifespanModifiers || typeof person.lifespanModifiers !== 'object' || Array.isArray(person.lifespanModifiers)) {
+            person.lifespanModifiers = {};
+        }
+
+        const oldYears = Number(person.lifespanModifiers[sourceId] || 0);
+        const newYears = Number(years || 0);
+        if (!Number.isFinite(newYears)) return 0;
+
+        const delta = newYears - oldYears;
+        if (delta !== 0) {
+            person.endYear = Number(person.endYear) + delta;
+        }
+
+        if (newYears === 0) {
+            delete person.lifespanModifiers[sourceId];
+        } else {
+            person.lifespanModifiers[sourceId] = newYears;
+        }
+        return delta;
+    }
+
+    removeLifespanModifier(personOrId, sourceId) {
+        return this.setLifespanModifier(personOrId, sourceId, 0);
+    }
+
     // ★Round5：古いセーブや特殊イベントで familyIds が空欄でも停止しない安全装置です。
     _normalizeFamilyArrays() {
         const normalize = (person) => {

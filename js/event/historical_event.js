@@ -1915,6 +1915,36 @@ window.GameEvents.push({
 });
 
 // ==========================================
+// ★ 三好長慶・義興の寿命同期（常駐歴史イベント）
+// 歴史イベント有効時、義興が存命の間だけ長慶の寿命を5年延ばします。
+// 条件・対象・補正量は歴史イベント側が持ち、LifeSystem は指定された補正を安全に適用するだけです。
+// ==========================================
+window.GameEvents.push({
+    id: "historical_miyoshi_nagayoshi_yoshioki_lifespan",
+    type: "resident",
+    // 月初で早めに同期し、月末の寿命判定直前にも再確認します。
+    // これにより途中で歴史イベントをONにした場合も、その月の寿命判定までに反映できます。
+    timings: ["startMonth_before", "endMonth_before"],
+    lifespanYears: 5,
+
+    checkCondition: function(game) {
+        return window.EventCheck.isAlive(game, 1020005) && window.EventCheck.isAlive(game, 1020006);
+    },
+
+    onEnter: async function(game) {
+        const nagayoshi = game.getBusho(1020005);
+        if (!nagayoshi || !game.lifeSystem) return;
+        game.lifeSystem.setLifespanModifier(nagayoshi, this.id, this.lifespanYears);
+    },
+
+    onExit: async function(game) {
+        const nagayoshi = game.getBusho(1020005);
+        if (!nagayoshi || !game.lifeSystem) return;
+        game.lifeSystem.removeLifespanModifier(nagayoshi, this.id);
+    }
+});
+
+// ==========================================
 // ★ 永禄の変（将軍襲撃イベント）
 // 備考：三好家プレイヤーはイベントを進行する場合自力での将軍撃破が必要
 // ==========================================

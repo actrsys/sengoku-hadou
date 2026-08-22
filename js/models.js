@@ -394,8 +394,21 @@ class Busho {
         this.endYear = Number(data.endYear);
         this.startYear = Number(data.startYear);
 
-        // ★追加：本来の没年（初期データ）をメモしておきます
-        this.originalEndYear = Number(data.endYear);
+        // ★追加：本来の没年（初期データ）をメモしておきます。
+        // セーブデータでは originalEndYear を優先し、現在の endYear に一時補正が入っていても基準年を失わないようにします。
+        this.originalEndYear = Number(data.originalEndYear !== undefined ? data.originalEndYear : data.endYear);
+
+        // 寿命への一時補正は「どの仕組みから何年付いたか」を識別して保持します。
+        // endYear 自体はセーブ時点の現在値をそのまま復元し、ここでは再加算しません。
+        this.lifespanModifiers = {};
+        if (data.lifespanModifiers && typeof data.lifespanModifiers === 'object' && !Array.isArray(data.lifespanModifiers)) {
+            Object.entries(data.lifespanModifiers).forEach(([sourceId, years]) => {
+                const value = Number(years);
+                if (sourceId && Number.isFinite(value) && value !== 0) {
+                    this.lifespanModifiers[sourceId] = value;
+                }
+            });
+        }
 
         this.nameChange = data.nameChange || ""; // 変わる年:新しい名前:新しい読み仮名/変わる年... の形式の改名データ
 

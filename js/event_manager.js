@@ -43,20 +43,93 @@ class EventManager {
             busho_death: []         // 武将が死亡した瞬間に呼ばれる特別な引き出し
         };
         
+        // 常駐イベントは通常イベントとは別の引き出しで管理します。
+        // EventManager は「条件が成立した/外れた」という状態遷移だけを担当し、
+        // 実際の効果内容は各イベントファイルと専門Systemへ委譲します。
+        this.residentEvents = {};
+        Object.keys(this.events).forEach(timing => {
+            this.residentEvents[timing] = [];
+        });
+
         window.GameEvents.forEach(ev => this.registerEvent(ev));
     }
 
+    _normalizeTiming(timing) {
+        if (timing === 'startMonth') return 'startMonth_before';
+        if (timing === 'endMonth') return 'endMonth_after';
+        return timing;
+    }
+
     registerEvent(eventData) {
-        const t = eventData.timing;
+        // 常駐イベントだけは複数タイミングを監視できます。
+        // 例：月初に適用しつつ、寿命判定直前の月末にも再確認する。
+        if (eventData && eventData.type === 'resident') {
+            const requestedTimings = Array.isArray(eventData.timings)
+                ? eventData.timings
+                : [eventData.timing];
+            requestedTimings.forEach(rawTiming => {
+                const timing = this._normalizeTiming(rawTiming);
+                if (timing && this.residentEvents[timing]) {
+                    this.residentEvents[timing].push(eventData);
+                }
+            });
+            return;
+        }
+
+        const t = this._normalizeTiming(eventData.timing);
         // 指定された引き出しがあれば、そこに入れます
         if (this.events[t]) {
             this.events[t].push(eventData);
-        } 
-        // もし古い書き方（startMonth や endMonth）で書かれたイベントがあっても、自動で振り分けます
-        else if (t === 'startMonth') {
-            this.events['startMonth_before'].push(eventData);
-        } else if (t === 'endMonth') {
-            this.events['endMonth_after'].push(eventData);
+        }
+    }
+
+    /**
+     * 常駐イベントの状態変化だけを監視します。
+     * false -> true で onEnter、true -> false で onExit を1回だけ実行します。
+     * 状態は game.flags に保存されるため、セーブ/ロードや歴史イベントON/OFFを跨いでも継続できます。
+     */
+    async processResidentEvents(timing, context = null, isHistoricalOff = false) {
+        const targetEvents = this.residentEvents[timing];
+        if (!targetEvents || targetEvents.length === 0) return;
+
+        this.game.flags = this.game.flags || {};
+        const stateBook = this.game.flags.__residentEventStates || (this.game.flags.__residentEventStates = {});
+
+        for (const ev of targetEvents) {
+            const isHistorical = ev.id && ev.id.startsWith('historical_');
+            if (isHistoricalOff && isHistorical) continue;
+
+            const saved = stateBook[ev.id];
+            const wasActive = saved === true || (saved && saved.active === true);
+            let isActive = false;
+
+            try {
+                isActive = !!ev.checkCondition(this.game, context);
+            } catch (error) {
+                console.warn(`常駐イベント ${ev.id} の条件判定中にエラーが出ましたが、進行を継続します:`, error);
+                continue;
+            }
+
+            if (isActive === wasActive) continue;
+
+            try {
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic(`resident_event:${timing}:${ev.id}:${isActive ? 'enter' : 'exit'}`);
+                }
+
+                if (isActive) {
+                    if (typeof ev.onEnter === 'function') {
+                        await ev.onEnter(this.game, context);
+                    }
+                } else if (typeof ev.onExit === 'function') {
+                    await ev.onExit(this.game, context);
+                }
+
+                // 効果の適用/解除が正常終了してから状態を保存します。
+                stateBook[ev.id] = { active: isActive };
+            } catch (error) {
+                console.warn(`常駐イベント ${ev.id} の状態更新中にエラーが出ましたが、進行を継続します:`, error);
+            }
         }
     }
 
@@ -70,6 +143,10 @@ class EventManager {
 
         // 設定で「歴史イベントが発生しない」になっているか確認します
         const isHistoricalOff = (window.UserSettings && window.UserSettings.historicalEvent === false);
+
+        // 常駐イベントは通常イベントとは別枠で先に同期します。
+        // 常駐イベントの状態変化は「その月に起きた歴史イベント1件」には数えません。
+        await this.processResidentEvents(timing, context, isHistoricalOff);
 
         // ★追加：このタイミングで歴史イベントがすでに起きたかをメモする変数です
         let historicalEventOccurred = false;

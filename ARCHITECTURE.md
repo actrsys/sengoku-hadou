@@ -25,6 +25,7 @@
 - `js/turn_manager.js` — 月初・各拠点ターン・月末の進行順を管理。月次の具体的な計算式は持たず、FactionSystem / EconomyRules / DomesticRules / PersonnelRules / AIStaffing 等へ委譲する。
 - `js/data_manager.js` — シナリオ、CSV/BIN、地図データの読み込み。
 - `js/save_manager.js` — セーブ、ロード、IndexedDB、オートセーブ。
+- `js/event_manager.js` — 通常イベントの発火管理に加え、常駐イベントの状態遷移（false→true / true→false）とセーブ継続状態だけを管理する。歴史上の条件・効果量・対象は `js/event/historical_event.js` 等のイベント定義側、実際の数値書換は各専門Systemへ委譲する。
 
 ## ルール・共通計算
 
@@ -50,6 +51,7 @@
 - `models.js` と `data_manager.js` のデータ生成・初期読込は上記ルールの例外。
 - 武将の `active / ronin` は活動・所属状態として `AffiliationSystem.setActivityStatusRaw` が低レベル書換窓口を持つ。通常処理は joinClan / becomeRonin 等の高レベルAPIを使う。
 - 武将・姫の `dead / unborn` は生死・登場状態として `LifeSystem.setLifeStatusRaw` が低レベル書換窓口を持つ。死亡処理そのものは executeDeath / processDeath 等の高レベルAPIを優先する。
+- 寿命補正の実書換は `LifeSystem.setLifespanModifier()` / `removeLifespanModifier()` を窓口とする。LifeSystem は補正理由・対象条件・年数を決めず、`sourceId` ごとの補正を安全に適用・解除するだけに留める。
 - 姫の `unmarried / married`、軍団やAI作戦の `status` は別概念なので、上記と同じSetterには混ぜない。
 
 ## モデル境界
