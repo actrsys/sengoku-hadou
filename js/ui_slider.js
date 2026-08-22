@@ -51,7 +51,7 @@ class UISliderManager {
         // ★追加：相場の説明文と、動的な数値表示用の箱を作る処理を一元管理します！
         const setTradeRateInfo = (itemName, unit, amount, price, extraHTML = "", needCostDiv = true) => {
             this.ui.tradeTypeInfo.classList.remove('hidden');
-            this.ui.tradeTypeInfo.innerHTML = `${itemName} <span style="color:#ffffff;">${amount}</span>${unit} ＝ 金 <span style="color:#ffffff;">${price}</span>${extraHTML ? ' ' + extraHTML : ''}`;
+            this.ui.tradeTypeInfo.innerHTML = `${itemName} <span class="slider-emphasis">${amount}</span>${unit} ＝ 金 <span class="slider-emphasis">${price}</span>${extraHTML ? ' ' + extraHTML : ''}`;
             
             // スライダーと一緒に数字が変わる計算用の箱も、ここで自動的に作ってしまいます
             if (needCostDiv) {
@@ -207,12 +207,12 @@ class UISliderManager {
                 const actualMaxTransport = Math.min(max, targetMaxLimit - targetCurrent);
                 wrap.innerHTML = `
                     <div class="slider-row-label">${label}</div>
-                    <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
-                        <button class="qty-shortcut-btn" id="btn-min-${id}" style="order:1;">最小</button>
-                        <button class="qty-shortcut-btn" id="btn-half-${id}" style="order:3;">半分</button>
-                        <input type="range" id="range-${id}" min="0" max="${actualMaxTransport}" value="0" style="flex:1; order:2;">
-                        <button class="qty-shortcut-btn" id="btn-max-${id}" style="order:3;">最大</button>
-                        <input type="number" id="num-tgt-${id}" min="${targetCurrent}" max="${targetCurrent + actualMaxTransport}" value="${targetCurrent}" style="order:4;">
+                    <div class="qty-control">
+                        <button class="qty-shortcut-btn qty-pos-start" id="btn-min-${id}">最小</button>
+                        <button class="qty-shortcut-btn qty-pos-end" id="btn-half-${id}">半分</button>
+                        <input class="qty-range-main" type="range" id="range-${id}" min="0" max="${actualMaxTransport}" value="0">
+                        <button class="qty-shortcut-btn qty-pos-end" id="btn-max-${id}">最大</button>
+                        <input class="qty-number-end" type="number" id="num-tgt-${id}" min="${targetCurrent}" max="${targetCurrent + actualMaxTransport}" value="${targetCurrent}">
                         <input type="hidden" id="num-${id}" value="0">
                     </div>
                 `;
@@ -286,12 +286,12 @@ class UISliderManager {
                 // isSingle（単体か複数か）に関わらず、全て同じ黄色い文字のデザインに統一します！
                 wrap.innerHTML = `
                     <div class="slider-row-label">${label}</div>
-                    <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
-                        <button class="qty-shortcut-btn" id="btn-min-${id}" style="order:1;">最小</button>
-                        <button class="qty-shortcut-btn" id="btn-half-${id}" style="order:3;">半分</button>
-                        <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="flex:1; order:2;">
-                        <button class="qty-shortcut-btn" id="btn-max-${id}" style="order:3;">最大</button>
-                        <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="order:4;">
+                    <div class="qty-control">
+                        <button class="qty-shortcut-btn qty-pos-start" id="btn-min-${id}">最小</button>
+                        <button class="qty-shortcut-btn qty-pos-end" id="btn-half-${id}">半分</button>
+                        <input class="qty-range-main" type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}">
+                        <button class="qty-shortcut-btn qty-pos-end" id="btn-max-${id}">最大</button>
+                        <input class="qty-number-end" type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}">
                     </div>
                 `;
                 
@@ -438,15 +438,14 @@ class UISliderManager {
             document.getElementById('quantity-title').textContent = "輸送";
             
             const header = document.createElement('div');
-            header.className = 'qty-row'; 
-            header.style.marginBottom = '5px';
+            header.className = 'qty-row transport-column-header';
             header.innerHTML = `
-                <div class="slider-row-label" style="visibility:hidden;">ダミー</div>
-                <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
-                    <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none; order:1;">空</button>
-                    <div style="flex:1; order:2;"></div>
-                    <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none; order:3;">空</button>
-                    <div style="width: 48px; text-align: center; font-weight: bold; order:4; color: #ffd54f; font-size: 0.85rem; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;">輸送先</div>
+                <div class="slider-row-label is-visually-hidden">ダミー</div>
+                <div class="qty-control">
+                    <button class="qty-shortcut-btn qty-pos-start is-control-placeholder">空</button>
+                    <div class="qty-header-spacer"></div>
+                    <button class="qty-shortcut-btn qty-pos-end is-control-placeholder">空</button>
+                    <div class="qty-target-header">輸送先</div>
                 </div>
             `;
             this.ui.quantityContainer.appendChild(header);
@@ -477,7 +476,7 @@ class UISliderManager {
             
             let extraStr = "";
             if (type === 'buy_rice' || type === 'sell_rice') {
-                extraStr = `(取引上限: <span style="color:#ffffff;">${c.tradeLimit || 0}</span>)`;
+                extraStr = `(取引上限: <span class="slider-emphasis">${c.tradeLimit || 0}</span>)`;
             }
             
             // 矢弾は計算結果の箱を使っていないため、最後の引数に false を渡して箱作りをオフにします
@@ -714,7 +713,7 @@ class UISliderManager {
             const myType = assignments[index].type || 'ashigaru';
             
             div.innerHTML = `
-                <div style="font-weight:bold; width:100%; margin-bottom:0; display:flex; align-items:center; justify-content:space-between;">
+                <div class="divide-row-header">
                     <span class="slider-row-label">${b.name}</span>
                     <div class="troop-type-selector" id="troop-type-group-${b.id}">
                         <button class="troop-type-btn ${myType === 'ashigaru' ? 'active' : ''}" data-type="ashigaru">足軽</button>
@@ -722,12 +721,12 @@ class UISliderManager {
                         <button class="troop-type-btn ${myType === 'teppo' ? 'active' : ''}" data-type="teppo">鉄砲</button>
                     </div>
                 </div>
-                <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
-                    <button class="qty-shortcut-btn" id="div-btn-min-${b.id}" style="order:1;">最小</button>
-                    <button class="qty-shortcut-btn" id="div-btn-half-${b.id}" style="order:3;">半分</button>
-                    <input type="range" id="div-range-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}" style="flex:1; order:2;">
-                    <button class="qty-shortcut-btn" id="div-btn-max-${b.id}" style="order:3;">最大</button>
-                    <input type="number" id="div-num-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}" style="order:4;">
+                <div class="qty-control">
+                    <button class="qty-shortcut-btn qty-pos-start" id="div-btn-min-${b.id}">最小</button>
+                    <button class="qty-shortcut-btn qty-pos-end" id="div-btn-half-${b.id}">半分</button>
+                    <input class="qty-range-main" type="range" id="div-range-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}">
+                    <button class="qty-shortcut-btn qty-pos-end" id="div-btn-max-${b.id}">最大</button>
+                    <input class="qty-number-end" type="number" id="div-num-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}">
                 </div>
                 <input type="hidden" id="div-type-${b.id}" value="${myType}">
             `;

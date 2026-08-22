@@ -270,6 +270,26 @@ test('index.html に inline onclick を残さない', () => {
     assert.strictEqual((html.match(/onclick\s*=/g) || []).length, 0);
 });
 
+
+
+test('ui_slider.js は静的 inline style 属性を生成しない', () => {
+    const source = read('js/ui_slider.js');
+    assert.strictEqual((source.match(/style=\"/g) || []).length, 0);
+});
+
+test('バランスシミュレーターが正式ツールとして配置されている', () => {
+    const required = [
+        'tools/simulation/player_focus_sim.py',
+        'tools/simulation/test_player_focus_sim.py',
+        'tools/simulation/README.md'
+    ];
+    const missing = required.filter(file => !fs.existsSync(path.join(ROOT, file)));
+    assert.deepStrictEqual(missing, []);
+    const source = read('tools/simulation/player_focus_sim.py');
+    assert.ok(!source.includes('/mnt/data/sengoku_sim/'), '固定された作業環境パスが残っています');
+    assert.ok(source.includes("SCENARIO_KEY != '1560_okehazama'"), '桶狭間固有イベントのシナリオ境界がありません');
+});
+
 // ---------------------------------------------------------------------------
 // 最低限の構造チェック
 // ---------------------------------------------------------------------------

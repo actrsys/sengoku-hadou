@@ -1411,6 +1411,32 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
     color: #ffd54f;
 }
 .qty-control { display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0; box-sizing: border-box; }
+.slider-emphasis { color: #ffffff; }
+.qty-pos-start { order: 1; }
+.qty-pos-end { order: 3; }
+.qty-range-main { flex: 1; order: 2; }
+.qty-number-end { order: 4; }
+.is-visually-hidden { visibility: hidden; }
+.is-control-placeholder { visibility: hidden; pointer-events: none; }
+.qty-header-spacer { flex: 1; order: 2; }
+.qty-target-header {
+    width: 48px;
+    text-align: center;
+    font-weight: bold;
+    order: 4;
+    color: #ffd54f;
+    font-size: 0.85rem;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
+.transport-column-header { margin-bottom: 5px; }
+.divide-row-header {
+    font-weight: bold;
+    width: 100%;
+    margin-bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
 
 .troop-type-selector { display: flex; gap: 4px; }
 .troop-type-btn { 
