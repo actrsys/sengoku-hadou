@@ -195,7 +195,7 @@ window.GameEvents.push({
 
         // 市場相場への影響
         if (damagedProvinceMap.size > 0) {
-            const baseRate = window.MainParams.Economy.TradeRateBase || 5.0;
+            const baseRate = window.MainParams.Economy.TradeRateBase;
             game.provinces.forEach(prov => {
                 if (prov && prov.marketRate !== undefined) {
                     if (damagedProvinceMap.has(prov.id)) {

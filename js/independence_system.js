@@ -23,10 +23,10 @@ class IndependenceSystem {
             return true;
         });
 
-        const I = window.WarParams.Independence || {};
-        const thresholdBase = I.ThresholdBase || 25;
-        const dutyDiv = I.ThresholdDutyDiv || 2;
-        const ambDiv = I.ThresholdAmbitionDiv || 5;
+        const I = window.WarParams.Independence;
+        const thresholdBase = I.ThresholdBase;
+        const dutyDiv = I.ThresholdDutyDiv;
+        const ambDiv = I.ThresholdAmbitionDiv;
 
         for (const castle of potentialRebels) {
             const castellan = this.game.getBusho(castle.castellanId);
@@ -62,9 +62,9 @@ class IndependenceSystem {
     }
 
     async calculateAndExecute(castle, castellan, daimyo, threshold) {
-        const I = window.WarParams.Independence || {};
-        const probLoyalty = I.ProbLoyaltyFactor || 1;
-        const probAffinity = I.ProbAffinityFactor || 0.5;
+        const I = window.WarParams.Independence;
+        const probLoyalty = I.ProbLoyaltyFactor;
+        const probAffinity = I.ProbAffinityFactor;
         const daimyoBonus = this.calcDaimyoPowerBonus(daimyo);
         const affinityDiff = GameSystem.calcAffinityDiff(castellan.affinity, daimyo.affinity);
         
@@ -94,7 +94,7 @@ class IndependenceSystem {
         const initialClanMap = new Map();
         this.game.castles.forEach(c => initialClanMap.set(c.id, c.ownerClan));
         
-        const I = window.WarParams.Independence || {};
+        const I = window.WarParams.Independence;
 
         // --- ★追加：派閥主を神輿（みこし）に担ぐ処理 ---
         let rebellionLeader = castellan; // デフォルトは謀反を起こした城主
@@ -109,12 +109,12 @@ class IndependenceSystem {
                 const { joinScore, stayScore } = this.calculateLoyaltyScores(factionLeader, castellan, oldDaimyo);
                 
                 // ★追加：派閥主自身も、独立・謀反に踏み切れるだけの野心や不満があるか判定します！
-                const I = window.WarParams.Independence || {};
-                const thresholdBase = I.ThresholdBase || 25;
-                const dutyDiv = I.ThresholdDutyDiv || 2;
-                const ambDiv = I.ThresholdAmbitionDiv || 5;
-                const probLoyalty = I.ProbLoyaltyFactor || 1;
-                const probAffinity = I.ProbAffinityFactor || 0.5;
+                const I = window.WarParams.Independence;
+                const thresholdBase = I.ThresholdBase;
+                const dutyDiv = I.ThresholdDutyDiv;
+                const ambDiv = I.ThresholdAmbitionDiv;
+                const probLoyalty = I.ProbLoyaltyFactor;
+                const probAffinity = I.ProbAffinityFactor;
 
                 const leaderThreshold = thresholdBase + ((50 - factionLeader.duty) / dutyDiv) + ((factionLeader.ambition - 50) / ambDiv);
                 

@@ -3,28 +3,7 @@
  * 戦争処理マネージャー & 戦争計算ロジック
  */
 
-window.WarParams = {
-    Military: {
-        MaxMoraleBase: 120, MaxMoraleCharity: 100,
-        WarMaxRounds: 15, DamageSoldierPower: 0.05, WallDefenseEffect: 0.5, DamageFluctuation: 0.2
-    },
-    War: {
-        ChargeMultiplier: 1.5, ChargeRisk: 1.8, ChargeSoldierDmgRate: 1.0, ChargeWallDmgRate: 0.1,
-        BowMultiplier: 0.6, BowRisk: 0.5,
-        SiegeMultiplier: 1.0, SiegeWallRate: 0.5, SiegeRisk: 10.0,
-        DefChargeMultiplier: 1.2, DefChargeRisk: 2.0, DefBowMultiplier: 0.5,
-        CounterAtkPowerFactor: 0.05,
-        FireSuccessBase: 0.25, FireDamageFactor: 0.8,
-        ShortWarTurnLimit: 5, BaseRecoveryRate: 0.2, RetreatRecoveryRate: 0.3, DaimyoCaptureReduction: 0.3,
-        RetreatResourceLossFactor: 0.2, LootingBaseRate: 0.3, LootingCharmFactor: 0.002, DaimyoCharmWeight: 0.1,
-        RiceConsumptionAtk: 0.05,
-        BaseStat: 30, SubGeneralFactor: 0.2, MinDamage: 50,
-        StatsLdrWeight: 1.2, StatsStrWeight: 0.3, StatsIntWeight: 0.5,
-        MoraleBase: 50, WinStatIncrease: 5,
-        CaptureChanceBase: 0.7, CaptureStrFactor: 0.002,
-        AutoWarDamageRate: 1.0 // ★追加：AI同士のオート戦争時のダメージ補正値
-    }
-};
+
 
 class WarSystem {
     static calcUnitStats(bushos) { 
@@ -258,7 +237,7 @@ class WarManager {
     resolveAutoFieldWar() {
         const s = this.state; let safetyLimit = 20; let turn = 1;
         const atkStats = WarSystem.calcUnitStats(s.atkBushos); const defStats = WarSystem.calcUnitStats([s.defBusho]);
-        const consumeRate = (window.WarParams.War.RiceConsumptionAtk || 0.1) * 0.5;
+        const consumeRate = (window.WarParams.War.RiceConsumptionAtk) * 0.5;
 
         // ★修正: 野戦は全員で一斉にぶつかるため、合算した兵士数を使います！
         let totalAtkSoldiers = s.atkAssignments ? s.atkAssignments.reduce((sum, a) => sum + a.soldiers, 0) : s.attacker.soldiers;
@@ -285,7 +264,7 @@ class WarManager {
 
             let resAtk = WarSystem.calcWarDamage(atkStats, defStats, totalAtkSoldiers, s.defender.fieldSoldiers, 0, s.attacker.morale, s.defender.training, 'charge');
             if (!s.isPlayerInvolved) { 
-                const autoRate = window.WarParams.War.AutoWarDamageRate || 0.666;
+                const autoRate = window.WarParams.War.AutoWarDamageRate;
                 resAtk.soldierDmg = Math.floor(resAtk.soldierDmg * autoRate); 
                 resAtk.counterDmg = Math.floor(resAtk.counterDmg * autoRate); 
             }
@@ -301,7 +280,7 @@ class WarManager {
             
             let resDef = WarSystem.calcWarDamage(defStats, atkStats, s.defender.fieldSoldiers, totalAtkSoldiers, 0, s.defender.morale, s.attacker.training, 'charge');
             if (!s.isPlayerInvolved) { 
-                const autoRate = window.WarParams.War.AutoWarDamageRate || 0.666;
+                const autoRate = window.WarParams.War.AutoWarDamageRate;
                 resDef.soldierDmg = Math.floor(resDef.soldierDmg * autoRate); 
                 resDef.counterDmg = Math.floor(resDef.counterDmg * autoRate); 
             }
@@ -897,7 +876,7 @@ class WarManager {
                 let surviveTurnsWallRojo = predictedWallDmgRojo > 0 ? (def / predictedWallDmgRojo) : 99;
                 let minSurviveTurnsRojo = Math.min(surviveTurnsDefRojo, surviveTurnsWallRojo);
                 
-                let maxRounds = window.WarParams.Military.WarMaxRounds || 15;
+                let maxRounds = window.WarParams.Military.WarMaxRounds;
                 let turnsLeftToWin = Math.max(1, maxRounds - (s.round || 1));
                 
                 let predictableLimit = Math.max(0, Math.floor(myInt / 10));
@@ -1351,7 +1330,7 @@ class WarManager {
                 let dmgRatio = (atkInt * 1.5) / ((atkInt * 1.5) + (defInt * 1.5));
                 //火計の最終ダメージ 実行智謀 * ダメージ倍率 * 0.8(調整用)
                 let baseDamage = atkInt * dmgRatio * 0.8;
-                const autoRate = window.WarParams.War.AutoWarDamageRate || 0.666;
+                const autoRate = window.WarParams.War.AutoWarDamageRate;
                 let calcDamage = Math.floor(s.isPlayerInvolved ? baseDamage : baseDamage * autoRate);
                 
                 s.defender.defense = Math.max(0, s.defender.defense - calcDamage);
@@ -1697,7 +1676,7 @@ class WarManager {
         }
 
         if (!s.isPlayerInvolved) {
-            const autoRate = window.WarParams.War.AutoWarDamageRate || 0.666;
+            const autoRate = window.WarParams.War.AutoWarDamageRate;
             calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * autoRate);
             calculatedWallDmg = Math.floor(calculatedWallDmg * autoRate);
             calculatedCounterDmg = Math.floor(calculatedCounterDmg * autoRate);

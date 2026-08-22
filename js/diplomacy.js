@@ -2641,8 +2641,8 @@ class DiplomacyManager {
         // ★修正：臣従を目指している場合も、外交の土俵に上がれるように条件に追加します
         if (myPower < perceivedTargetTotal * 0.8 || isStrategicPartner || isAimingVassalage) {
             if (Math.random() < smartness * sendProbModifier) {
-                const allianceThreshold = isStrategicPartner ? (window.AIParams.AI.AllianceThreshold || 70) - 15 : (window.AIParams.AI.AllianceThreshold || 70);
-                let goodwillThreshold = isStrategicPartner ? (window.AIParams.AI.GoodwillThreshold || 40) + 20 : (window.AIParams.AI.GoodwillThreshold || 40);
+                const allianceThreshold = isStrategicPartner ? (window.AIParams.AI.AllianceThreshold) - 15 : (window.AIParams.AI.AllianceThreshold);
+                let goodwillThreshold = isStrategicPartner ? (window.AIParams.AI.GoodwillThreshold) + 20 : (window.AIParams.AI.GoodwillThreshold);
 
                 // ★追加：同盟、支配、従属関係にある相手には、関係値が100になるまで親善の対象にします！
                 if (['同盟', '支配', '従属'].includes(rel.status)) {

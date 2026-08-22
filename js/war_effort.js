@@ -673,7 +673,7 @@ Object.assign(WarManager.prototype, {
             }
 
             // ★追加：出陣したことで、攻撃側と守備側の国の米相場が上がります！
-            const maxTradeRate = window.MainParams.Economy.TradeRateMax || 2.5;
+            const maxTradeRate = window.MainParams.Economy.TradeRateMax;
             const atkProv = this.game.provinces.find(p => p.id === atkCastle.provinceId);
             const defProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
             
@@ -3564,12 +3564,12 @@ Object.assign(WarManager.prototype, {
         
         const indepSys = this.game.independenceSystem || new IndependenceSystem(this.game);
         
-        const I = window.WarParams.Independence || {};
-        const thresholdBase = I.ThresholdBase || 25;
-        const dutyDiv = I.ThresholdDutyDiv || 2;
-        const ambDiv = I.ThresholdAmbitionDiv || 5;
-        const probLoyalty = I.ProbLoyaltyFactor || 1;
-        const probAffinity = I.ProbAffinityFactor || 0.5;
+        const I = window.WarParams.Independence;
+        const thresholdBase = I.ThresholdBase;
+        const dutyDiv = I.ThresholdDutyDiv;
+        const ambDiv = I.ThresholdAmbitionDiv;
+        const probLoyalty = I.ProbLoyaltyFactor;
+        const probAffinity = I.ProbAffinityFactor;
         
         // ★追加：各城の判定順序を「派閥主 ＞ 国主 ＞ 功績」の順に並び替えます！
         defCastles.sort((castleA, castleB) => {

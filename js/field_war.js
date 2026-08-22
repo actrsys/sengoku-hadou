@@ -3333,7 +3333,7 @@ class FieldWarManager {
 
         // ★プレイヤーがいないAI同士の戦いなら、ダメージを抑制します！
         if (!isPlayerInvolved) {
-            const autoRate = window.WarParams.War.AutoWarDamageRate || 0.666;
+            const autoRate = window.WarParams.War.AutoWarDamageRate;
             dmgToDef = Math.floor(dmgToDef * autoRate);
             dmgToAtk = Math.floor(dmgToAtk * autoRate);
         }

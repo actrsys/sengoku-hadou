@@ -2378,11 +2378,6 @@ class CommandSystem {
                 this.executeWithEvent('war', () => proceedWar());
             }
         }
-        else if (type === 'war_repair') {
-             const val = parseInt(inputs.soldiers.num.value);
-             if (val <= 0) return;
-             this.executeWithEvent('war_repair', () => this.game.warManager.execWarCmd('repair', val));
-        }
     }
 
     async executeWithEvent(type, executeFunc, extraContext = {}) {
@@ -2516,7 +2511,7 @@ class CommandSystem {
 
                     // 「その城の兵士数 (castle.soldiers)」を渡して計算してもらいます
                     const val = GameSystem.calcTraining(busho, castle.soldiers, bonusRate, true); 
-                    const maxTraining = window.WarParams.Military.MaxTraining || 100;
+                    const maxTraining = window.WarParams.Military.MaxTraining;
                     const oldVal = castle.training;
                     castle.training = Math.min(maxTraining, castle.training + val); 
                     const actualVal = castle.training - oldVal;
@@ -2559,11 +2554,11 @@ class CommandSystem {
             if (actionName === "鉱山開発") detail = `(現在: ${castle.commerce}/${castle.maxCommerce})`;
             if (actionName === "城壁修復") detail = `(現在: ${castle.defense}/${castle.maxDefense})`;
             if (actionName === "訓練") {
-                const maxTraining = window.WarParams.Military.MaxTraining || 100;
+                const maxTraining = window.WarParams.Military.MaxTraining;
                 detail = `(現在: ${castle.training}/${maxTraining})`;
             }
             if (actionName === "兵施し") {
-                const maxMorale = window.WarParams.Military.MaxMorale || 100;
+                const maxMorale = window.WarParams.Military.MaxMorale;
                 detail = `(現在: ${castle.morale}/${maxMorale})`;
             }
             
@@ -2935,7 +2930,7 @@ class CommandSystem {
             busho.isActionDone = true; 
         });
 
-        const maxLoyalty = window.MainParams.Economy.MaxLoyalty || 100;
+        const maxLoyalty = window.MainParams.Economy.MaxLoyalty;
         const oldLoyalty = castle.peoplesLoyalty;
         castle.peoplesLoyalty = Math.min(maxLoyalty, castle.peoplesLoyalty + totalVal); 
         const actualIncrease = castle.peoplesLoyalty - oldLoyalty;

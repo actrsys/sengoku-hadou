@@ -3,17 +3,7 @@
  * 敵大名のターン処理、内政、外交、軍事判断
  */
 
-window.AIParams = {
-    AI: {
-        Difficulty: 'normal',
-        AbilityBase: 50, AbilitySensitivity: 3.0,
-        GunshiBiasFactor: 0.5, GunshiFairnessFactor: 0.01,
-        DiplomacyChance: 0.3, 
-        GoodwillThreshold: 69, 
-        AllianceThreshold: 70, 
-        BreakAllianceDutyFactor: 0.5
-    }
-};
+
 
 class AIEngine {
     constructor(game) {
@@ -41,7 +31,7 @@ class AIEngine {
     }
 
     getDifficultyMods() {
-        const diff = window.AIParams.AI.Difficulty || 'normal';
+        const diff = window.AIParams.AI.Difficulty;
         switch(diff) {
             case 'hard': return { accuracy: 1.0, aggression: 1.2, resourceSave: 0.2 }; 
             case 'easy': return { accuracy: 0.6, aggression: 0.7, resourceSave: 0.6 }; 
@@ -51,8 +41,8 @@ class AIEngine {
 
     getAISmartness(attributeVal) {
         const mods = this.getDifficultyMods();
-        const base = window.AIParams.AI.AbilityBase || 50;
-        const sensitivity = window.AIParams.AI.AbilitySensitivity || 2.0;
+        const base = window.AIParams.AI.AbilityBase;
+        const sensitivity = window.AIParams.AI.AbilitySensitivity;
         let prob = 0.5 + ((attributeVal - base) * sensitivity * 0.01);
         prob = Math.max(0.1, Math.min(0.95, prob));
         if (mods.accuracy > 0.9) prob += 0.1;
@@ -333,7 +323,7 @@ class AIEngine {
                     const daimyo = this.game.getClanDaimyo(castle.ownerClan) || castellan;
                     
                     // 今までの基本の確率（約10%）を計算します
-                    let diplomacyChance = ((window.AIParams.AI.DiplomacyChance || 0.3) / 3) * (mods.aggression); 
+                    let diplomacyChance = ((window.AIParams.AI.DiplomacyChance) / 3) * (mods.aggression); 
                     
                     // 大名の外交ステータスから基準の50を引いて、差を計算します（-50から+50になります）
                     const dipDiff = daimyo.diplomacy - 50;
@@ -759,7 +749,7 @@ class AIEngine {
                 prob += getPersonalityBonus(myGeneral.personality);
 
                 // 難易度補正
-                const diff = window.AIParams.AI.Difficulty || 'normal';
+                const diff = window.AIParams.AI.Difficulty;
                 const diffMulti = diff === 'hard' ? 1.2 : diff === 'easy' ? 0.7 : 1.0;
                 prob *= diffMulti;
 
@@ -981,7 +971,7 @@ class AIEngine {
             prob += getPersonalityBonus(myGeneral.personality);
 
             // 難易度補正
-            const diff = window.AIParams.AI.Difficulty || 'normal';
+            const diff = window.AIParams.AI.Difficulty;
             const diffMulti = diff === 'hard' ? 1.2 : diff === 'easy' ? 0.7 : 1.0;
             prob *= diffMulti;
 
@@ -2025,7 +2015,7 @@ class AIEngine {
             sellScore *= (1 + goldShortageRate);
             
             // お米が高く売れる時はスコアをアップ、安い時はダウンさせます！
-            const standardRate = window.MainParams.Economy.TradeRateBase || 5.0;
+            const standardRate = window.MainParams.Economy.TradeRateBase;
             sellScore *= (baseRiceRate / standardRate); // ★変更：ゲームの基本相場を基準に計算します
             
             // 安全ラインを下回っていたら、絶対に売りません

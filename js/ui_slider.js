@@ -485,12 +485,6 @@ class UISliderManager {
             setTradeRateInfo(itemNameMap[type], unitMap[type], checkAmount, tradeData.rateStr, extraStr, needCostDiv);
 
             inputs.amount = createSlider(sliderLabelMap[type], "amount", realMaxAmount, 0);
-        } else if (type === 'war_repair') {
-            const s = this.game.warManager.state;
-            const defender = s.defender;
-            const maxSoldiers = Math.min(window.WarParams.War.RepairMaxSoldiers, defender.soldiers);
-            document.getElementById('quantity-title').textContent = "補修 (兵士選択)";
-            inputs.soldiers = createSlider("使用兵士数", "soldiers", maxSoldiers, Math.min(50, maxSoldiers));
         }
         
         checkValidQuantity(); 

@@ -18,9 +18,9 @@ class FactionSystem {
         if (!busho || busho.status === 'ronin' || busho.status === 'dead' || busho.isDaimyo) return;
         
         // パラメータ取得
-        const F = window.WarParams.Faction || {};
-        const baseFactor = F.AffinityFactorBase || 0.5;
-        const divisor = F.AffinityDivisor || 25;
+        const F = window.WarParams.Faction;
+        const baseFactor = F.AffinityFactorBase;
+        const divisor = F.AffinityDivisor;
         
         // 大名との相性による補正
         const daimyo = this.game.getClanDaimyo(busho.clan);
@@ -47,8 +47,8 @@ class FactionSystem {
         }
 
         // 設定値から最大値と最小値を取得します（なければ-100と100を予備として使用）
-        const minRec = F.MinRecognition !== undefined ? F.MinRecognition : -100;
-        const maxRec = F.MaxRecognition !== undefined ? F.MaxRecognition : 100;
+        const minRec = F.MinRecognition;
+        const maxRec = F.MaxRecognition;
 
         busho.recognitionNeed = Math.max(minRec, Math.min(maxRec, busho.recognitionNeed + change));
     }
@@ -57,9 +57,9 @@ class FactionSystem {
      * 月末処理: 忠誠度変動と承認欲求の自然減衰
      */
     processEndMonth() {
-        const F = window.WarParams.Faction || {};
-        const threshold = F.LoyaltyChangeThreshold || 20;
-        const decay = F.NaturalDecay || 10;
+        const F = window.WarParams.Faction;
+        const threshold = F.LoyaltyChangeThreshold;
+        const decay = F.NaturalDecay;
 
         this.game.bushos.forEach(b => {
             if (b.status !== 'active' && b.status !== 'ronin') return;
@@ -89,9 +89,9 @@ class FactionSystem {
      * 月初処理: 下野判定と派閥形成
      */
     async processStartMonth() { // ★ async を追加します！
-        const F = window.WarParams.Faction || {};
-        const roninThreshold = F.RoninLoyaltyThreshold || 30;
-        const roninChanceBase = F.RoninChanceBase || 0.5;
+        const F = window.WarParams.Faction;
+        const roninThreshold = F.RoninLoyaltyThreshold;
+        const roninChanceBase = F.RoninChanceBase;
         
         // ★追加：出奔率の全体調整用の倍率（0.5なら50%、0.8なら80%に設定可能）
         const roninMultiplier = 0.5;
@@ -148,14 +148,14 @@ class FactionSystem {
      * 派閥の更新ロジック (改修版)
      */
     updateFactions(targetClanId = null) {
-        const F = window.WarParams.Faction || {};
-        const achieveLeader = F.AchievementLeader || 500;
+        const F = window.WarParams.Faction;
+        const achieveLeader = F.AchievementLeader;
         
         // CSV設定ファイルに上書きされないように、数値を「強制指定」にしています
         const battleBonus = 2; // 強制的に2
-        const stayBonusTrigger = F.SolidarityStayTrigger || 12; 
-        const stayBonusBase = F.SolidarityStayBase || 9;
-        const stayBonusDiv = F.SolidarityStayDiv || 3;
+        const stayBonusTrigger = F.SolidarityStayTrigger; 
+        const stayBonusBase = F.SolidarityStayBase;
+        const stayBonusDiv = F.SolidarityStayDiv;
         const joinThreshold = 35; // 派閥に入るための合格ライン（強制的に35）
 
         // ★高速化：死亡などで1勢力だけ変化した時は、その勢力だけ再編できます。
@@ -567,9 +567,9 @@ class FactionSystem {
      * 参戦履歴の記録
      */
     recordBattle(busho, castleId) {
-        const F = window.WarParams.Faction || {};
-        const achieveBase = F.BattleAchievementBase || 20;
-        const achieveLdr = F.BattleAchievementLdrFactor || 0.3;
+        const F = window.WarParams.Faction;
+        const achieveBase = F.BattleAchievementBase;
+        const achieveLdr = F.BattleAchievementLdrFactor;
 
         const key = `${this.game.year}_${this.game.month}_${castleId}`;
         if (!busho.battleHistory.includes(key)) {

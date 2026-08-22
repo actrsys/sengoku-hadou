@@ -908,7 +908,7 @@ window.GameEvents.push({
             badAffected.forEach(pId => addStatus(pId, 'badHarvest'));
 
             // ★ここから追加：日本中の米相場を動かします！
-            const baseRate = window.MainParams.Economy.TradeRateBase || 5.0;
+            const baseRate = window.MainParams.Economy.TradeRateBase;
             game.provinces.forEach(prov => {
                 if (prov && prov.marketRate !== undefined) {
                     // もしこの国が「凶作（badAffected）」に入っていたら基本相場の0.5倍アップ！
@@ -998,7 +998,7 @@ window.GameEvents.push({
             goodAffected.forEach(pId => addStatus(pId, 'goodHarvest'));
 
             // ★ここから追加：日本中の米相場を動かします！
-            const baseRate = window.MainParams.Economy.TradeRateBase || 5.0;
+            const baseRate = window.MainParams.Economy.TradeRateBase;
             game.provinces.forEach(prov => {
                 if (prov && prov.marketRate !== undefined) {
                     // もしこの国が「豊作（goodAffected）」に入っていたら基本相場の0.5倍ダウン！
@@ -1489,7 +1489,7 @@ window.GameEvents.push({
         if (snowProvIds.size === 0) return;
 
         // ③-1 まずは雪が降っている国の米相場をジワジワと上げます！
-        const baseRate = window.MainParams.Economy.TradeRateBase || 5.0;
+        const baseRate = window.MainParams.Economy.TradeRateBase;
         snowProvIds.forEach(pId => {
             const prov = game.provinces.find(p => p.id === pId);
             if (prov && prov.marketRate !== undefined) {

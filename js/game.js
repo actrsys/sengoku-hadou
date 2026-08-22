@@ -18,41 +18,7 @@ const SCENARIOS = [
     // { name: "1562年 清洲同盟", desc: "桶狭間より２年。２人の英雄は清州の地にて再会を果たす。", folder: "1562_kiyosudoumei", startYear: 1562, startMonth: 1 }
 ];
 
-window.MainParams = {
-    StartYear: 1560, StartMonth: 4,
-    System: { UseRandomNames: true },
-    // ★軍師が助言（警告）を出す基準値です！一元管理します。
-    Gunshi: {
-        AdviceLoyalty: 84,     // 忠誠度がこれ以下なら警告（オレンジ）
-        DangerLoyalty: 74      // 忠誠度がこれ以下なら危険（赤）
-    },
-    Economy: {
-        IncomeGoldRate: 1, IncomeFluctuation: 0.15,
-        ConsumeRicePerSoldier: 0.03,
-        // 米相場
-        TradeRateBase: 2.0,
-        // 米相場の下限1.5　上限2.5
-        TradeRateMin: 1.5, TradeRateMax: 2.5, TradeFluctuation: 0.5,
-        PriceAmmo: 1
-    },
-    // ★ここを追加：内政コマンドの費用をここで一括管理します！
-    CommandCost: {
-        Farm: 100,            // 石高開発の費用（金）
-        Commerce: 100,        // 鉱山開発の費用（金）
-        Repair: 100,          // 城壁修復の費用（金）
-        Charity: 200,         // 民施しの費用（米）
-        Reward: 100,          // 褒美の費用（金）
-        SoldierCharity: 200,  // 兵施しの費用（米）
-        RewardAll: 3000       // 一括褒美の費用（金）
-    },
-    Strategy: {
-        InvestigateDifficulty: 50, EmploymentDiff: 1.5,
-        HeadhuntBaseDiff: 50, HeadhuntGoldEffect: 0.01, HeadhuntGoldMaxEffect: 15,
-        HeadhuntIntWeight: 0.8, HeadhuntLoyaltyWeight: 1.0, HeadhuntDutyWeight: 0.8,
-        RewardBaseEffect: 30, RewardDistancePenalty: 0.2,
-        AffinityLordWeight: 0.5, AffinityNewLordWeight: 0.6, AffinityDoerWeight: 0.4
-    }
-};
+
 
 /* ==========================================================================
     データ管理 (DataManager)
@@ -1229,7 +1195,7 @@ class GameSystem {
     // ★追加：米の相場計算を根本的に一元化する魔法群
     // ==========================================
     static getBaseRiceRate(castle, provinces) {
-        let rate = window.MainParams.Economy.TradeRateBase || 5.0;
+        let rate = window.MainParams.Economy.TradeRateBase;
         if (castle && provinces) {
             const province = provinces.find(p => p.id === castle.provinceId);
             if (province && province.marketRate !== undefined) rate = province.marketRate;
@@ -2160,10 +2126,10 @@ class GameManager {
         }
         
         // 大名と同じ派閥に属している武将の忠誠度アップと承認欲求ダウン（設定値から読み込み）
-        const F = window.WarParams.Faction || {};
-        const minRec = F.MinRecognition !== undefined ? F.MinRecognition : -100;
-        const decayRec = F.SameFactionRecognitionDecay !== undefined ? F.SameFactionRecognitionDecay : 3;
-        const boostLoy = F.SameFactionLoyaltyBoost !== undefined ? F.SameFactionLoyaltyBoost : 1;
+        const F = window.WarParams.Faction;
+        const minRec = F.MinRecognition;
+        const decayRec = F.SameFactionRecognitionDecay;
+        const boostLoy = F.SameFactionLoyaltyBoost;
 
         this.clans.forEach(clan => {
             if (clan.id !== 0 && !clan.isDestroyed) {
@@ -2190,7 +2156,7 @@ class GameManager {
         
         // ★ごっそり差し替え！：相場の変動を「国（province）ごと」に計算するようにします！
         const fluc = window.MainParams.Economy.TradeFluctuation; 
-        const baseRate = window.MainParams.Economy.TradeRateBase || 5.0; // ★基本相場を読み込みます
+        const baseRate = window.MainParams.Economy.TradeRateBase; // ★基本相場を読み込みます
         
         // 季節の風（季節の動きは日本全国共通です！）
         let seasonForce = 0;

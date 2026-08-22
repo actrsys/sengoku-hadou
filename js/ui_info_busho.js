@@ -1090,8 +1090,8 @@ Object.assign(UIInfoManager.prototype, {
 
             // ★変更：一元化された数字を引っ張り、忠誠度の低さに応じて赤・オレンジに色分けします
             if (actionType === 'reward' && gunshi && !b.isDaimyo && !(b.belongKunishuId > 0)) {
-                const adviceLoyalty = window.MainParams.Gunshi.AdviceLoyalty || 84;
-                const dangerLoyalty = window.MainParams.Gunshi.DangerLoyalty || 74; // 万が一設定がない場合の保険
+                const adviceLoyalty = window.MainParams.Gunshi.AdviceLoyalty;
+                const dangerLoyalty = window.MainParams.Gunshi.DangerLoyalty; // 万が一設定がない場合の保険
                 
                 if (b.loyalty <= dangerLoyalty) {
                     compressedNameHtml = `<span class="text-red">${compressedNameHtml}</span>`;
