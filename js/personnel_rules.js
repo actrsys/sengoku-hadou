@@ -55,7 +55,7 @@ class PersonnelRules {
         
         // ★追加：一門の武将が自勢力にいる場合は成功率+0.2
         if (game) {
-            const hasFamily = game.bushos.some(b => b.clan === recruiter.clan && b.status !== 'dead' && b.id !== target.id && b.familyIds && target.familyIds && b.familyIds.some(fId => target.familyIds.includes(fId)));
+            const hasFamily = game.bushos.some(b => b.clan === recruiter.clan && b.status !== window.GameConstants.BushoStatus.DEAD && b.id !== target.id && b.familyIds && target.familyIds && b.familyIds.some(fId => target.familyIds.includes(fId)));
             if (hasFamily) {
                 prob += 0.2;
                 prob = Math.max(0, Math.min(1.0, prob));
@@ -66,7 +66,7 @@ class PersonnelRules {
         if (target.nemesisIds && target.nemesisIds.length > 0 && game) {
             const hasNemesis = target.nemesisIds.some(nId => {
                 const nBusho = game.getBusho(nId);
-                return nBusho && nBusho.clan === recruiter.clan && nBusho.status !== 'dead';
+                return nBusho && nBusho.clan === recruiter.clan && nBusho.status !== window.GameConstants.BushoStatus.DEAD;
             });
             if (hasNemesis) {
                 prob *= 0.5;

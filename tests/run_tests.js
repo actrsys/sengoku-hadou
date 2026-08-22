@@ -1,0 +1,286 @@
+#!/usr/bin/env node
+'use strict';
+
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+const ROOT = path.resolve(__dirname, '..');
+let passed = 0;
+let failed = 0;
+
+function test(name, fn) {
+    try {
+        fn();
+        passed++;
+        console.log(`✓ ${name}`);
+    } catch (error) {
+        failed++;
+        console.error(`✗ ${name}`);
+        console.error(error && error.stack ? error.stack : error);
+    }
+}
+
+function createContext(extra = {}) {
+    const context = {
+        console,
+        Math,
+        Set,
+        Map,
+        Array,
+        Object,
+        Number,
+        String,
+        Boolean,
+        JSON,
+        Date,
+        RegExp,
+        ...extra
+    };
+    context.window = context;
+    vm.createContext(context);
+    return context;
+}
+
+function loadScript(context, relativePath) {
+    const filename = path.join(ROOT, relativePath);
+    const code = fs.readFileSync(filename, 'utf8');
+    vm.runInContext(code, context, { filename });
+}
+
+function read(relativePath) {
+    return fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
+}
+
+class FakeClassList {
+    constructor(initial = []) { this.values = new Set(initial); }
+    add(...names) { names.forEach(name => this.values.add(name)); }
+    remove(...names) { names.forEach(name => this.values.delete(name)); }
+    contains(name) { return this.values.has(name); }
+}
+
+function fakeElement(id) {
+    return {
+        id,
+        classList: new FakeClassList(),
+        style: {},
+        dataset: {},
+        textContent: '',
+        innerHTML: '',
+        disabled: false,
+        onclick: null,
+        parentElement: null,
+        querySelector() { return null; },
+        querySelectorAll() { return []; },
+        getAttribute() { return null; }
+    };
+}
+
+// ---------------------------------------------------------------------------
+// 設定・定数
+// ---------------------------------------------------------------------------
+test('GameConfig / GameConstants が中央定義として読み込める', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
+    assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
+    assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
+    assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
+    assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
+    assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('友好'), false);
+});
+
+test('設定値参照側に独自フォールバック値を残さない', () => {
+    const jsFiles = [];
+    const walk = dir => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) walk(full);
+            else if (entry.name.endsWith('.js') && !entry.name.endsWith('.min.js')) jsFiles.push(full);
+        }
+    };
+    walk(path.join(ROOT, 'js'));
+    const pattern = /(?:MainParams|WarParams|AIParams)\.[A-Za-z0-9_.]+\s*(?:\|\||\?\?)/g;
+    const offenders = [];
+    for (const file of jsFiles) {
+        const matches = fs.readFileSync(file, 'utf8').match(pattern);
+        if (matches) offenders.push(`${path.relative(ROOT, file)}: ${matches.join(', ')}`);
+    }
+    assert.deepStrictEqual(offenders, []);
+});
+
+// ---------------------------------------------------------------------------
+// 地図・兵力・援軍
+// ---------------------------------------------------------------------------
+test('MapGraphService は同盟/支配/従属領だけを中継通過できる', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/map_graph.js');
+    const castles = [
+        { id: 1, ownerClan: 1, adjacentCastleIds: [2] },
+        { id: 2, ownerClan: 2, adjacentCastleIds: [1, 3] },
+        { id: 3, ownerClan: 3, adjacentCastleIds: [2] }
+    ];
+    const relations = new Map();
+    const game = {
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getRelation: (a, b) => relations.get(`${a}:${b}`) || null
+    };
+    relations.set('1:2', { status: '同盟' });
+    assert.strictEqual(ctx.MapGraphService.isReachable(game, castles[0], castles[2], 1), true);
+    relations.set('1:2', { status: '友好' });
+    assert.strictEqual(ctx.MapGraphService.isReachable(game, castles[0], castles[2], 1), false);
+});
+
+test('TroopAllocationService の配分合計は総兵数と一致する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/troop_allocation.js');
+    const bushos = [
+        { id: 1, leadership: 90, strength: 85 },
+        { id: 2, leadership: 70, strength: 80 },
+        { id: 3, leadership: 60, strength: 60 }
+    ];
+    const result = ctx.TroopAllocationService.autoDivideSoldiers({
+        bushos, totalSoldiers: 5000, totalHorses: 1800, totalGuns: 1200, isPlayerUI: false
+    });
+    assert.strictEqual(result.length, 3);
+    assert.strictEqual(result.reduce((sum, row) => sum + row.soldiers, 0), 5000);
+    assert.ok(result.every(row => ['ashigaru', 'kiba', 'teppo'].includes(row.troopType)));
+});
+
+test('ReinforcementService は中央設定の比率で資源を消費する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/reinforcement_service.js');
+    const bushos = [
+        { id: 1, clan: 1, status: 'active', strength: 90 },
+        { id: 2, clan: 1, status: 'active', strength: 70 },
+        { id: 3, clan: 1, status: 'active', strength: 50 }
+    ];
+    const castle = { id: 10, ownerClan: 1, soldiers: 6000, rice: 8000, horses: 3000, guns: 1000, morale: 80, training: 90 };
+    const game = { getCastleBushos: () => bushos };
+    const service = new ctx.ReinforcementService(game);
+    const data = service.createAutoSelfReinforcement(castle);
+    assert.strictEqual(data.soldiers, 3000);
+    assert.strictEqual(data.bushos.length, 3);
+    assert.strictEqual(castle.soldiers, 3000);
+    assert.strictEqual(castle.rice, 5000);
+    assert.ok(data.horses <= 1500 && data.guns <= 1500);
+});
+
+// ---------------------------------------------------------------------------
+// SkillManager 境界
+// ---------------------------------------------------------------------------
+test('SkillManager だけが技能文字列を分解し、天下布武は退き巧者として扱われる', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/skill_manager.js');
+    const SkillManager = vm.runInContext('SkillManager', ctx);
+    const busho = { id: 1, skill: '天下布武|猛将' };
+    assert.deepStrictEqual(Array.from(SkillManager.getSkillList(busho)), ['天下布武', '猛将']);
+    assert.strictEqual(SkillManager.isRetreatMaster(busho, null), true);
+    assert.strictEqual(SkillManager.calcRetreatRecoveryRate([busho], true, 0.2, 0.3, null), 0.6);
+
+    const offenders = [];
+    for (const name of fs.readdirSync(path.join(ROOT, 'js'))) {
+        if (!name.endsWith('.js') || name === 'skill_manager.js' || name.endsWith('.min.js')) continue;
+        const source = read(`js/${name}`);
+        if (/\.skill\s*\.\s*(?:split|includes)\s*\(/.test(source)) offenders.push(name);
+    }
+    for (const name of fs.readdirSync(path.join(ROOT, 'js/event'))) {
+        if (!name.endsWith('.js')) continue;
+        const source = read(`js/event/${name}`);
+        if (/\.skill\s*\.\s*(?:split|includes)\s*\(/.test(source)) offenders.push(`event/${name}`);
+    }
+    assert.deepStrictEqual(offenders, []);
+});
+
+// ---------------------------------------------------------------------------
+// SelectorModal 共通View
+// ---------------------------------------------------------------------------
+test('SelectorModalView がガワ・戻る・決定状態を一元初期化する', () => {
+    const modal = fakeElement('selector-modal');
+    modal.classList.add('hidden');
+    const title = fakeElement('selector-title');
+    const list = fakeElement('selector-list');
+    const wrapper = fakeElement('selector-list-wrapper');
+    const contextEl = fakeElement('selector-context-info');
+    const tabs = fakeElement('selector-tabs');
+    const confirm = fakeElement('selector-confirm-btn');
+    const back = fakeElement('selector-back-btn');
+    const content = fakeElement('modal-content');
+    modal.querySelector = selector => selector === '.modal-content' ? content : (selector === '.btn-secondary' ? back : null);
+    const byId = new Map([
+        ['selector-modal', modal], ['selector-title', title], ['selector-list', list], ['selector-list-wrapper', wrapper],
+        ['selector-context-info', contextEl], ['selector-tabs', tabs], ['selector-confirm-btn', confirm], ['selector-back-btn', back]
+    ]);
+    const document = { getElementById: id => byId.get(id) || null };
+    const ctx = createContext({ document });
+    loadScript(ctx, 'js/selector_modal_view.js');
+    let backed = 0;
+    let confirmed = 0;
+    const view = new ctx.SelectorModalView({ selectorModal: modal, selectorList: list, selectorContextInfo: contextEl, selectorConfirmBtn: confirm });
+    view.open({
+        title: '武将情報', tabsHtml: '<button>基本</button>', backLabel: '戻る', onBack: () => backed++,
+        onConfirm: () => confirmed++, confirmDisabled: true
+    });
+    assert.strictEqual(modal.classList.contains('hidden'), false);
+    assert.strictEqual(title.textContent, '武将情報');
+    assert.strictEqual(tabs.classList.contains('hidden'), false);
+    assert.strictEqual(confirm.disabled, true);
+    assert.strictEqual(back.textContent, '戻る');
+    back.onclick();
+    confirm.onclick();
+    assert.strictEqual(backed, 1);
+    assert.strictEqual(confirmed, 1);
+
+    view.open({ title: '拠点情報', backLabel: '閉じる', onBack: () => backed++ });
+    assert.strictEqual(tabs.classList.contains('hidden'), true);
+    assert.strictEqual(confirm.classList.contains('hidden'), true);
+    assert.strictEqual(confirm.onclick, null);
+});
+
+test('UI情報画面は selector-modal の共通DOMを個別取得しない', () => {
+    const files = ['js/ui_info.js', 'js/ui_info_busho.js', 'js/ui_info_kyoten.js'];
+    const forbidden = [
+        /const\s+modal\s*=\s*document\.getElementById\(['"]selector-modal['"]\)/,
+        /document\.querySelector\(['"]#selector-modal \.btn-secondary['"]\)/,
+        /document\.getElementById\(['"]selector-title['"]\)/
+    ];
+    const offenders = [];
+    for (const file of files) {
+        const source = read(file);
+        for (const pattern of forbidden) if (pattern.test(source)) offenders.push(`${file}: ${pattern}`);
+    }
+    assert.deepStrictEqual(offenders, []);
+});
+
+test('selector 戻るボタンは HTML inline onclick を持たない', () => {
+    const html = read('index.html');
+    const match = html.match(/<button[^>]*id=["']selector-back-btn["'][^>]*>/);
+    assert.ok(match, 'selector-back-btn が見つかりません');
+    assert.ok(!/onclick\s*=/.test(match[0]));
+});
+
+test('index.html に inline onclick を残さない', () => {
+    const html = read('index.html');
+    assert.strictEqual((html.match(/onclick\s*=/g) || []).length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// 最低限の構造チェック
+// ---------------------------------------------------------------------------
+test('index.html のローカル script src はすべて存在する', () => {
+    const html = read('index.html');
+    const refs = [...html.matchAll(/<script\s+[^>]*src=["']([^"']+)["']/g)]
+        .map(m => m[1].split('?')[0])
+        .filter(src => !/^https?:/i.test(src));
+    const missing = refs.filter(src => !fs.existsSync(path.join(ROOT, src)));
+    assert.deepStrictEqual(missing, []);
+});
+
+console.log(`\n${passed} passed, ${failed} failed`);
+if (failed > 0) process.exit(1);

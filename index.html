@@ -94,11 +94,11 @@
                 </div>
                 <div class="title-menu">
                     <div id="menu-buttons" class="hidden">
-                        <button id="start-btn" class="title-btn" onclick="window.GameApp.startNewGame()">はじめから</button>
-                        <button id="continue-btn" class="title-btn" onclick="window.GameApp.continueGame()">続きから</button>
-                        <button id="load-btn" class="title-btn" onclick="window.GameApp.commandSystem.executeSystemCommand('load')">ロード</button>
-                        <button id="watch-start-btn" class="title-btn" onclick="window.GameApp.startWatchGame()">観戦する</button>
-                        <button id="settings-btn" class="title-btn" onclick="window.GameApp.commandSystem.executeSystemCommand('settings')">設定</button>
+                        <button id="start-btn" class="title-btn">はじめから</button>
+                        <button id="continue-btn" class="title-btn">続きから</button>
+                        <button id="load-btn" class="title-btn">ロード</button>
+                        <button id="watch-start-btn" class="title-btn">観戦する</button>
+                        <button id="settings-btn" class="title-btn">設定</button>
                     </div>
 
                     <div id="tap-to-proceed" class="title-tap-message">
@@ -115,7 +115,7 @@
                 <div id="scenario-desc-box" class="scenario-desc-box"></div>
                 <div class="modal-footer">
                     <button id="scenario-confirm-btn" class="btn-primary">決定</button>
-                    <button class="btn-secondary" onclick="window.GameApp.ui.returnToTitle()">閉じる</button>
+                    <button id="scenario-close-btn" class="btn-secondary">閉じる</button>
                 </div>
             </div>
         </div>
@@ -187,11 +187,11 @@
                 <div id="selector-context-info" class="context-info"></div>
                 <div id="selector-tabs" class="busho-tabs hidden"></div>
                 <div class="scroll-wrapper" id="selector-list-wrapper">
-                    <div id="selector-list" class="list-container hide-native-scroll" style="min-width: 100%; display: block;"></div>
+                    <div id="selector-list" class="list-container hide-native-scroll"></div>
                 </div>
                 <div class="modal-footer">
                     <button id="selector-confirm-btn" class="btn-primary">決定</button>
-                    <button class="btn-secondary" onclick="window.GameApp.ui.closeSelector()">戻る</button>
+                    <button id="selector-back-btn" class="btn-secondary">戻る</button>
                 </div>
             </div>
         </div>
@@ -207,7 +207,7 @@
                 <div id="quantity-container"></div>
                 <div class="modal-footer">
                     <button id="quantity-confirm-btn" class="btn-primary">決定</button>
-                    <button class="btn-secondary" onclick="document.getElementById('quantity-modal').classList.add('hidden')">戻る</button>
+                    <button id="quantity-back-btn" class="btn-secondary">戻る</button>
                 </div>
             </div>
         </div>
@@ -231,7 +231,7 @@
             <div class="modal-content result-content">
                 <div id="result-body" class="result-body message-area"></div>
                 <div class="modal-footer" id="result-footer">
-                    <button class="btn-secondary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>
+                    <button id="result-close-btn" class="btn-secondary">閉じる</button>
                 </div>
             </div>
         </div>
@@ -242,7 +242,7 @@
                 <div id="gunshi-message" class="message-area"></div>
                 <div class="modal-footer right">
                     <button id="gunshi-execute-btn" class="btn-primary">実行</button>
-                    <button class="btn-secondary" onclick="document.getElementById('gunshi-modal').classList.add('hidden')">戻る</button>
+                    <button id="gunshi-back-btn" class="btn-secondary">戻る</button>
                 </div>
             </div>
         </div>
@@ -595,7 +595,7 @@
                     </div>
                     
                 <div class="modal-footer" style="justify-content: center; margin-top: 15px;">
-                    <button class="btn-secondary" onclick="document.getElementById('saveload-modal').classList.add('hidden')">閉じる</button>
+                    <button id="saveload-close-btn" class="btn-secondary">閉じる</button>
                 </div>
             </div>
         </div>
@@ -608,6 +608,8 @@
     <!-- Round5: Howlerは1本だけ読み込み、min版が無い環境では通常版へフォールバック -->
     <script src="js/howler.min.js" onerror="this.onerror=null; this.src='js/howler.js';"></script>
     <script src="js/config.js"></script>
+    <script src="js/constants.js"></script>
+    <script src="js/ui_bindings.js"></script>
     <script src="js/game_math.js"></script>
     <script src="js/map_graph.js"></script>
     <script src="js/domestic_rules.js"></script>
@@ -639,6 +641,7 @@
     <script src="js/ai_operation.js"></script>
     <script src="js/independence_system.js"></script>
     <script src="js/affiliation_system.js"></script>
+    <script src="js/selector_modal_view.js"></script>
     <script src="js/ui_info.js"></script>
     <script src="js/ui_info_busho.js"></script>
     <script src="js/ui_info_kyoten.js"></script>

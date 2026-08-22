@@ -27,7 +27,7 @@ class ReinforcementService {
 
     _selectBushos(helperCastle, soldierCount) {
         const availableBushos = this.game.getCastleBushos(helperCastle.id)
-            .filter(busho => busho.clan === helperCastle.ownerClan && busho.status === 'active');
+            .filter(busho => busho.clan === helperCastle.ownerClan && busho.status === window.GameConstants.BushoStatus.ACTIVE);
         return this._selectByStrength(availableBushos, soldierCount);
     }
 

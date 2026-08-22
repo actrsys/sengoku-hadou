@@ -11,23 +11,14 @@ Object.assign(UIInfoManager.prototype, {
     },
     
     _renderBushoDetail(busho, scrollPos = 0) {
-        const modal = document.getElementById('selector-modal');
-        const title = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        const isPc = document.body.classList.contains('is-pc'); // ★これを追加してPCかスマホか調べます
+        const shell = this._openInfoShell('武将情報', { showTabs: true });
+        if (!shell) return;
+        const { listContainer, tabsEl } = shell;
+        const isPc = document.body.classList.contains('is-pc');
 
         if (!this.bushoDetailCurrentTab) this.bushoDetailCurrentTab = 'status';
 
-        modal.classList.remove('hidden');
-        if (title) title.textContent = "武将情報";
-        if (contextEl) contextEl.classList.add('hidden');
-        
-        // ★修正：武将詳細では本来のタブ領域（枠の上）を使います
+        // 武将詳細では本来のタブ領域（枠の上）を使います。
         if (tabsEl) {
             tabsEl.classList.remove('hidden');
             // リスト画面と同じ見た目にするためのスタイル
@@ -64,19 +55,6 @@ Object.assign(UIInfoManager.prototype, {
             }, 0);
         }
         
-        if (confirmBtn) confirmBtn.classList.add('hidden');
-
-        if(backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = this.modalHistory.length > 0 ? '戻る' : '閉じる';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                this.popModal();
-            };
-            const footer = backBtn.parentElement;
-            if (footer) footer.style.justifyContent = 'center';
-        }
-
         let faceHtml = busho.faceIcon ? `<img src="data/images/faceicons/${busho.faceIcon}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_face.webp'">` : `<img src="data/images/faceicons/unknown_face.webp" class="daimyo-detail-face">`;
 
         let affiliationName = "なし";

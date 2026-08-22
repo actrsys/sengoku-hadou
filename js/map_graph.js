@@ -48,7 +48,7 @@ class MapGraphService {
                     canPass = true;
                 } else if (Number(next.ownerClan) !== 0) {
                     const rel = game.getRelation(movingClanId, next.ownerClan);
-                    if (rel && ['同盟', '支配', '従属'].includes(rel.status)) canPass = true;
+                    if (rel && window.DiplomacyRules.canPassTerritory(rel.status)) canPass = true;
                 }
 
                 if (canPass) {
@@ -127,7 +127,7 @@ class MapGraphService {
                     canPass = true;
                 } else if (Number(next.ownerClan) !== 0) {
                     const rel = game.getRelation(movingClanId, next.ownerClan);
-                    if (rel && ['同盟', '支配', '従属'].includes(rel.status)) canPass = true;
+                    if (rel && window.DiplomacyRules.canPassTerritory(rel.status)) canPass = true;
                 }
                 if (canPass) {
                     visited.add(next.id);
@@ -225,7 +225,7 @@ class MapGraphService {
             const ownerId = Number(ownerClan);
             if (passableClanCache.has(ownerId)) return passableClanCache.get(ownerId);
             const relation = this.game.getRelation(clanId, ownerClan);
-            const passable = !!(relation && ['同盟', '支配', '従属'].includes(relation.status));
+            const passable = !!(relation && window.DiplomacyRules.canPassTerritory(relation.status));
             passableClanCache.set(ownerId, passable);
             return passable;
         };

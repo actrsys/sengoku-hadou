@@ -34,7 +34,7 @@ class TurnManager {
                     clanCastles.forEach(c => {
                         const bushos = game.getCastleBushos(c.id);
                         bushos.forEach(b => {
-                            if (b.status === 'active' && b.factionId === daimyo.factionId) {
+                            if (b.status === window.GameConstants.BushoStatus.ACTIVE && b.factionId === daimyo.factionId) {
                                 // 設定された数値ぶん忠誠度を上げます
                                 b.loyalty = Math.min(100, b.loyalty + boostLoy);
                                 // 設定された数値ぶん承認欲求を下げます（最小値チェックも設定から読み込み）
@@ -161,7 +161,7 @@ class TurnManager {
         // 毎月、全武将の宿敵のタイマーを1ずつ減らす処理です
         game.bushos.forEach(b => {
             // 活動中の武将と浪人のみが対象です（まだ生まれていない人や亡くなった人は無視します）
-            if (b.status === 'active' || b.status === 'ronin') {
+            if (b.status === window.GameConstants.BushoStatus.ACTIVE || b.status === window.GameConstants.BushoStatus.RONIN) {
                 // ★追加：月が替わったら面談の記録をリセットします
                 b.isInterviewed = false;
     
@@ -176,7 +176,7 @@ class TurnManager {
                 }
     
                 // ★追加：諸勢力武将に毎月経験値を地道に与える処理
-                if (b.status === 'active' && (b.belongKunishuId || 0) > 0) {
+                if (b.status === window.GameConstants.BushoStatus.ACTIVE && (b.belongKunishuId || 0) > 0) {
                     const kunishu = game.kunishuSystem ? game.kunishuSystem.getKunishu(b.belongKunishuId) : null;
                     if (kunishu) {
                         const isLeader = (b.id === kunishu.leaderId);
@@ -277,7 +277,7 @@ class TurnManager {
                             // 他の大名家のお城の場合は、仲良し手帳（外交データ）を見ます
                             const rel = game.getRelation(c.ownerClan, adjCastle.ownerClan);
                             // 同盟、支配、従属、友好のどれかなら味方！ それ以外は敵扱い！
-                            if (rel && ['同盟', '支配', '従属', '友好'].includes(rel.status)) {
+                            if (rel && window.DiplomacyRules.isFriendly(rel.status)) {
                                 isHostile = false;
                             } else {
                                 isHostile = true;
@@ -903,7 +903,7 @@ class TurnManager {
     
         if (game.isProcessingAI) return;
     
-        const bushos = game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active');
+        const bushos = game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === window.GameConstants.BushoStatus.ACTIVE);
         
         if(bushos.length > 0 && bushos.every(b => b.isActionDone)) {
              setTimeout(() => {

@@ -1245,7 +1245,7 @@ Object.assign(WarManager.prototype, {
                     // ★ 追加: 諸勢力の武将は撤退戦に巻き込まれて捕虜にならないようにします！
                     if (b.belongKunishuId > 0) return;
 
-                    let chance = 0.5 - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3);
+                    let chance = 0.5 - (b.strength * window.WarParams.War.CaptureStrFactor) + (Math.random() * 0.3);
                     if (defCastle.soldiers > 1000) chance -= 0.2;
                     if (b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
                     if (chance > 0.5) { 
@@ -1481,8 +1481,8 @@ Object.assign(WarManager.prototype, {
             // 3. 吸い込み防止の箱と、回復率の設定
             let atkReinfTotalLoss = 0;
             let defReinfTotalLoss = 0;
-            const baseRecoveryRate = window.WarParams.War.BaseRecoveryRate || 0.2;
-            const retreatRecoveryRate = window.WarParams.War.RetreatRecoveryRate || 0.3;
+            const baseRecoveryRate = window.WarParams.War.BaseRecoveryRate;
+            const retreatRecoveryRate = window.WarParams.War.RetreatRecoveryRate;
 
             // ★追加: グループ内に「退き巧者」がいるかを確認して回復率を決める魔法
             const getGroupRecoveryRate = (bushos, isRetreatingTeam) => {
@@ -2058,7 +2058,7 @@ Object.assign(WarManager.prototype, {
                 // ★書き足しここまで
 
                 const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
-                s.attacker.training = Math.min(120, s.attacker.training + (window.WarParams.War.WinStatIncrease || 5)); s.attacker.morale = Math.min(maxMorale, s.attacker.morale + (window.WarParams.War.WinStatIncrease || 5));
+                s.attacker.training = Math.min(120, s.attacker.training + window.WarParams.War.WinStatIncrease); s.attacker.morale = Math.min(maxMorale, s.attacker.morale + window.WarParams.War.WinStatIncrease);
                 
                 const maxCharm = Math.max(...s.atkBushos.map(b => b.charm));
                 const subCharm = s.atkBushos.reduce((acc, b) => acc + b.charm, 0) - maxCharm;
@@ -2195,7 +2195,7 @@ Object.assign(WarManager.prototype, {
             // ★ 修正: 諸勢力に所属している武将は、どんな城の戦いでも絶対に巻き添えで捕虜にならないように守ります！
             if (b.belongKunishuId > 0) return;
 
-            let chance = isLastStand ? 1.0 : ((window.WarParams.War.CaptureChanceBase || 0.7) - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3));
+            let chance = isLastStand ? 1.0 : (window.WarParams.War.CaptureChanceBase - (b.strength * window.WarParams.War.CaptureStrFactor) + (Math.random() * 0.3));
             if (!isLastStand && defeatedCastle.soldiers > 1000) chance -= 0.2; 
             if (!isLastStand && b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
             

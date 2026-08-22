@@ -567,7 +567,7 @@ class LifeSystem {
     // ★ 寿命のチェック（毎月行います）
     async checkDeath() {
         const startY = this.game.gameStartYear || window.MainParams.StartYear;
-        const startM = this.game.gameStartMonth || window.MainParams.StartMonth || 1;
+        const startM = this.game.gameStartMonth || window.MainParams.StartMonth;
         const elapsedTurns = ((this.game.year - startY) * 12) + (this.game.month - startM);
         
         if (elapsedTurns < 3) {

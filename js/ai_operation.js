@@ -765,8 +765,8 @@ class AIOperationManager {
         const myClanCastles = this.game.getClanCastles(clanId).filter(c => c.legionId === legionId);
         if (myClanCastles.length === 0) return;
 
-        const startY = Number(this.game.gameStartYear || window.MainParams.StartYear || 1560);
-        const startM = Number(this.game.gameStartMonth || window.MainParams.StartMonth || 1);
+        const startY = Number(this.game.gameStartYear || window.MainParams.StartYear);
+        const startM = Number(this.game.gameStartMonth || window.MainParams.StartMonth);
         const currentY = Number(this.game.year);
         const currentM = Number(this.game.month);
         const elapsedTurns = ((currentY - startY) * 12) + (currentM - startM);

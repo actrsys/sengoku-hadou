@@ -7,6 +7,7 @@ class UIInfoManager {
         // 元のui.jsとgameの情報を覚えておきます
         this.ui = ui;
         this.game = game;
+        this.selectorView = new SelectorModalView(ui);
         this.closeCommonModal(); // 履歴や状態変数の初期化
     }
     
@@ -17,7 +18,7 @@ class UIInfoManager {
 
         this.modalHistory = [];
         this.currentModalInfo = null;
-        if (this.ui && this.ui.selectorModal) this.ui.selectorModal.classList.add('hidden');
+        if (this.selectorView) this.selectorView.close();
         
         // ★ここを書き足し：リストを完全に閉じる時に、背景の更新を再開させます！
         if (this.ui && typeof this.ui.resumeBackgroundUpdates === 'function') {
@@ -76,6 +77,20 @@ class UIInfoManager {
         
         // ★全リスト共通の選択状態を記憶する箱
         this.commonSelectedIds = [];
+    }
+
+    // --- 共通モーダルのガワ ---
+    _openInfoShell(title, { tabsHtml = null, showTabs = false } = {}) {
+        return this.selectorView.open({
+            title,
+            tabsHtml,
+            showTabs,
+            backLabel: (this.modalHistory && this.modalHistory.length > 0) ? '戻る' : '閉じる',
+            onBack: () => {
+                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                this.popModal();
+            }
+        });
     }
 
     // --- ソート状態の一元管理 ---
@@ -673,30 +688,9 @@ class UIInfoManager {
         const clan = this.game.clans.find(c => c.id === clanId);
         if (!clan) return;
 
-        const modal = document.getElementById('selector-modal');
-        const title = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        modal.classList.remove('hidden');
-        if (title) title.textContent = "勢力情報";
-        if (contextEl) contextEl.classList.add('hidden');
-        if (tabsEl) tabsEl.classList.add('hidden');
-        if (confirmBtn) confirmBtn.classList.add('hidden');
-
-        if(backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = this.modalHistory.length > 0 ? '戻る' : '閉じる';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                this.popModal();
-            };
-            const footer = backBtn.parentElement;
-            if (footer) footer.style.justifyContent = 'center';
-        }
+        const shell = this._openInfoShell("勢力情報");
+        if (!shell) return;
+        const { listContainer } = shell;
 
         const leader = this.game.getBusho(clan.leaderId);
         const leaderName = leader ? leader.name.replace('|', '') : "不明";
@@ -1433,94 +1427,52 @@ class UIInfoManager {
         this._currentListRenderId = (this._currentListRenderId || 0) + 1;
         const currentRenderId = this._currentListRenderId;
 
-        const modal = document.getElementById('selector-modal');
-        const titleEl = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+        const shell = this.selectorView.open({
+            title: config.title || '',
+            contextHtml: config.contextHtml || null,
+            tabsHtml: config.tabsHtml || null,
+            hideBackBtn: !!config.hideBackBtn,
+            backLabel: (this.modalHistory && this.modalHistory.length > 0) ? '戻る' : '閉じる',
+            onBack: () => {
+                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                if (config.onBack) config.onBack();
+                this._currentListRenderId++;
+                this.popModal();
+            },
+            onConfirm: config.onConfirm ? () => {
+                this._currentListRenderId++;
+                config.onConfirm();
+            } : null,
+            confirmDisabled: !!config.onConfirm
+        });
+        if (!shell) return;
 
-        if (!modal || !listContainer) return;
-        
+        const { listContainer, tabsEl } = shell;
         listContainer.style.display = 'none';
         listContainer.innerHTML = '';
-        // ★前回このリストに付けていた「仮想スクロール」の監視が残っていたら、ここで必ず外します
+        // 前回このリストに付けていた仮想スクロール監視が残っていたら必ず外す。
         if (listContainer._virtualScrollHandler) {
             listContainer.removeEventListener('scroll', listContainer._virtualScrollHandler);
             listContainer._virtualScrollHandler = null;
         }
-        modal.classList.remove('hidden');
 
-        if (titleEl) titleEl.textContent = config.title || "";
-
-        if (contextEl) {
-            if (config.contextHtml) {
-                contextEl.classList.remove('hidden');
-                contextEl.innerHTML = config.contextHtml;
-            } else {
-                contextEl.classList.add('hidden');
+        // タブ切り替えとスコープ切り替えは一覧内容側の責務としてここで登録する。
+        if (tabsEl && config.tabsHtml) {
+            if (config.onTabClick) {
+                tabsEl.querySelectorAll('.busho-tab-btn').forEach(btn => {
+                    btn.onclick = () => {
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                        config.onTabClick(btn.getAttribute('data-tab'));
+                    };
+                });
             }
-        }
-
-        if (tabsEl) {
-            if (config.tabsHtml) {
-                tabsEl.classList.remove('hidden');
-                tabsEl.innerHTML = config.tabsHtml;
-                
-                // タブ切り替えとスコープ切り替えの一元化
-                if (config.onTabClick) {
-                    const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
-                    tabBtns.forEach(btn => {
-                        btn.onclick = () => {
-                            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                            config.onTabClick(btn.getAttribute('data-tab'));
-                        };
-                    });
-                }
-                if (config.onScopeClick) {
-                    const scopeBtns = tabsEl.querySelectorAll('.busho-scope-btn');
-                    scopeBtns.forEach(btn => {
-                        btn.onclick = () => {
-                            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                            config.onScopeClick(btn.getAttribute('data-scope'));
-                        };
-                    });
-                }
-            } else {
-                tabsEl.classList.add('hidden');
-            }
-        }
-
-        if (backBtn) {
-            if (config.hideBackBtn) {
-                backBtn.style.display = 'none';
-            } else {
-                backBtn.style.display = '';
-                backBtn.textContent = (this.modalHistory && this.modalHistory.length > 0) ? '戻る' : '閉じる';
-                backBtn.onclick = () => {
-                    if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                    if (config.onBack) config.onBack();
-                    this._currentListRenderId++; 
-                    this.popModal();
-                };
-                const footer = backBtn.parentElement;
-                if (footer) footer.style.justifyContent = 'center';
-            }
-        }
-
-        if (confirmBtn) {
-            if (config.onConfirm) {
-                confirmBtn.classList.remove('hidden');
-                confirmBtn.disabled = true;
-                confirmBtn.style.opacity = '0.5';
-                confirmBtn.style.cursor = 'not-allowed';
-                confirmBtn.onclick = () => {
-                    this._currentListRenderId++; 
-                    config.onConfirm();
-                };
-            } else {
-                confirmBtn.classList.add('hidden');
+            if (config.onScopeClick) {
+                tabsEl.querySelectorAll('.busho-scope-btn').forEach(btn => {
+                    btn.onclick = () => {
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                        config.onScopeClick(btn.getAttribute('data-scope'));
+                    };
+                });
             }
         }
 
@@ -2170,30 +2122,9 @@ class UIInfoManager {
         const castle = this.game.castles.find(c => c.id === castleId);
         if (!castle) return;
 
-        const modal = document.getElementById('selector-modal');
-        const titleEl = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        if (!modal) return;
-        modal.classList.remove('hidden');
-        if (titleEl) titleEl.textContent = `${castle.name} の委任設定`;
-        if (contextEl) contextEl.classList.add('hidden');
-        if (confirmBtn) confirmBtn.classList.add('hidden');
-
-        if(backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = this.modalHistory && this.modalHistory.length > 0 ? '戻る' : '閉じる';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                this.popModal();
-            };
-            const footer = backBtn.parentElement;
-            if (footer) footer.style.justifyContent = 'center';
-        }
+        const shell = this._openInfoShell(`${castle.name} の委任設定`);
+        if (!shell) return;
+        const { listContainer } = shell;
 
         if (listContainer) {
             listContainer.className = 'list-container hide-native-scroll';
@@ -2443,30 +2374,9 @@ class UIInfoManager {
         const kunishu = this.game.kunishuSystem.getKunishu(kunishuId);
         if (!kunishu) return;
 
-        const modal = document.getElementById('selector-modal');
-        const title = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        modal.classList.remove('hidden');
-        if (title) title.textContent = "諸勢力情報";
-        if (contextEl) contextEl.classList.add('hidden');
-        if (tabsEl) tabsEl.classList.add('hidden');
-        if (confirmBtn) confirmBtn.classList.add('hidden');
-
-        if(backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = this.modalHistory.length > 0 ? '戻る' : '閉じる';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                this.popModal();
-            };
-            const footer = backBtn.parentElement;
-            if (footer) footer.style.justifyContent = 'center';
-        }
+        const shell = this._openInfoShell("諸勢力情報");
+        if (!shell) return;
+        const { listContainer } = shell;
 
         const leader = this.game.getBusho(kunishu.leaderId);
         const leaderName = leader ? leader.name.replace('|', '') : "不明";
@@ -2916,32 +2826,9 @@ class UIInfoManager {
         const princess = this.game.princesses.find(p => p.id === princessId);
         if (!princess) return;
 
-        const modal = document.getElementById('selector-modal');
-        const title = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        const isPc = document.body.classList.contains('is-pc');
-
-        modal.classList.remove('hidden');
-        if (title) title.textContent = "姫情報";
-        if (contextEl) contextEl.classList.add('hidden');
-        if (tabsEl) tabsEl.classList.add('hidden'); // タブ切り替えはなしにします
-        if (confirmBtn) confirmBtn.classList.add('hidden');
-
-        if(backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = this.modalHistory.length > 0 ? '戻る' : '閉じる';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                this.popModal();
-            };
-            const footer = backBtn.parentElement;
-            if (footer) footer.style.justifyContent = 'center';
-        }
+        const shell = this._openInfoShell("姫情報");
+        if (!shell) return;
+        const { listContainer } = shell;
 
         let faceHtml = princess.faceIcon ? `<img src="data/images/faceicons/${princess.faceIcon}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_princess_face.webp'">` : `<img src="data/images/faceicons/unknown_princess_face.webp" class="daimyo-detail-face">`;
 

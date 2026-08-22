@@ -15,30 +15,9 @@ Object.assign(UIInfoManager.prototype, {
         const castle = this.game.castles.find(c => c.id === castleId);
         if (!castle) return;
 
-        const modal = document.getElementById('selector-modal');
-        const title = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        modal.classList.remove('hidden');
-        if (title) title.textContent = "拠点情報";
-        if (contextEl) contextEl.classList.add('hidden');
-        if (tabsEl) tabsEl.classList.add('hidden');
-        if (confirmBtn) confirmBtn.classList.add('hidden');
-
-        if(backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = this.modalHistory.length > 0 ? '戻る' : '閉じる';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                this.popModal();
-            };
-            const footer = backBtn.parentElement;
-            if (footer) footer.style.justifyContent = 'center';
-        }
+        const shell = this._openInfoShell("拠点情報");
+        if (!shell) return;
+        const { listContainer } = shell;
 
         const clanData = this.game.clans.find(cd => cd.id === castle.ownerClan);
         const clanName = clanData ? clanData.name : "無所属";
