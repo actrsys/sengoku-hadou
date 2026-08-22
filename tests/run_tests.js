@@ -1514,6 +1514,7 @@ test('評定UIとAIは方針専門部署を正本として参照する', () => {
     assert.ok(councilView.includes('this.editingPolicy'), '軍団別命令は評定全体とは別の局所下書きを持つ');
     assert.ok(councilView.includes('confirmOrderEditor'), '軍団別命令は確定時だけ評定全体の下書きへ反映する');
     assert.ok(html.includes('id="legion-council-bulk-btn"'), '評定一覧下部に一括ボタンを置く');
+    assert.ok(html.includes('class="daimyo-detail-action-btn legion-council-bulk-btn"'), '評定の一括は勢力詳細・拠点詳細と同じ小型操作ボタンを使う');
     assert.ok(councilView.includes('openBulkEditor'), '一括ボタンは専用の一括編集モードを開く');
     assert.ok(councilView.includes('this.editingTouched'), '一括編集は変更した項目だけを全軍団へ反映できるよう変更項目を追跡する');
     assert.ok(councilView.includes("this.orderConfirmBtn.textContent = isBulk ? '一括適用' : '確定'"), '一括編集では確定ボタンを一括適用と表示する');

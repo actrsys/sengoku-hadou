@@ -4940,7 +4940,7 @@ body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
     flex: 0 0 auto;
     text-align: center;
     position: relative;
-    padding: 0 0 5px;
+    padding: 0 0 3px;
 }
 
 #legion-council-modal .legion-council-header h3,
@@ -4969,7 +4969,7 @@ body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
 }
 
 .legion-council-guidance {
-    margin-top: 5px;
+    margin-top: 3px;
     color: rgba(255,255,255,.67);
     font-size: 10px;
 }
@@ -5127,8 +5127,8 @@ body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
 }
 
 .legion-council-footer {
-    flex: 0 0 48px;
-    min-height: 48px;
+    flex: 0 0 42px;
+    min-height: 42px;
     justify-content: center;
     padding: 0;
     margin: 15px 0 0;
@@ -5137,33 +5137,25 @@ body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
 #legion-council-finish-btn { min-width: 180px; }
 
 /* 詳細情報画面と同様に、本体下側へ補助操作帯を確保する。
-   ボタン自身を transform で位置調整せず、操作帯の余白でカード・枠との間隔を作る。 */
+   一括ボタンの見た目は勢力詳細・拠点詳細と同じ daimyo-detail-action-btn をそのまま使い、
+   評定側では配置だけを担当する。 */
 .legion-council-actions {
-    flex: 0 0 42px;
-    min-height: 42px;
+    flex: 0 0 auto;
+    min-height: 0;
     box-sizing: border-box;
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: flex-end;
-    /* 30pxの一括ボタンを上下6pxずつで挟み、カード側と枠側の実隙間を揃える。 */
-    padding: 6px 0;
+    padding: 0;
+}
+
+body.is-pc .legion-council-actions {
+    margin: 6px 0;
 }
 
 .legion-council-bulk-btn {
-    box-sizing: border-box;
-    min-width: 88px;
-    height: 30px;
-    min-height: 30px;
-    padding: 0 14px;
-    font-size: 14px;
+    flex: 0 0 auto;
     line-height: 1;
-}
-
-/* 一括ボタンはhover/focus/activeでも位置を動かさない。共通の発光だけを利用する。 */
-body.is-pc .legion-council-bulk-btn:hover,
-body.is-pc .legion-council-bulk-btn:focus-visible,
-body.is-pc .legion-council-bulk-btn:active {
-    transform: none;
 }
 
 .legion-council-bulk-note {
@@ -5252,8 +5244,8 @@ body.is-pc .legion-council-bulk-btn:active {
 .legion-council-toggle .ui-toggle-btn:disabled { cursor: default; }
 
 .legion-council-order-footer {
-    flex: 0 0 48px;
-    min-height: 48px;
+    flex: 0 0 42px;
+    min-height: 42px;
     justify-content: center;
     margin: 15px 0 0;
     padding: 0;
@@ -5392,16 +5384,10 @@ body:not(.is-pc) .legion-council-policy-chip {
 body:not(.is-pc) .legion-council-seat-hint { display: none; }
 
 body:not(.is-pc) .legion-council-actions {
-    flex: 0 0 30px;
-    min-height: 30px;
+    flex: 0 0 36px;
+    min-height: 36px;
+    margin: 0;
     padding: 1px 0;
-}
-
-body:not(.is-pc) .legion-council-bulk-btn {
-    min-width: 76px;
-    min-height: 28px;
-    padding: 3px 11px;
-    font-size: 11px;
 }
 
 body:not(.is-pc) .legion-council-bulk-note {
