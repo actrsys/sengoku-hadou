@@ -54,6 +54,30 @@ class FactionSystem {
     }
 
     /**
+     * 月初の派閥所属恩恵。大名と同じ派閥の家臣へ忠誠上昇・承認欲求減衰を適用する。
+     */
+    applyStartMonthSameFactionEffects() {
+        const F = window.WarParams.Faction;
+        const minRec = F.MinRecognition;
+        const decayRec = F.SameFactionRecognitionDecay;
+        const boostLoy = F.SameFactionLoyaltyBoost;
+
+        this.game.clans.forEach(clan => {
+            if (clan.id === 0 || clan.isDestroyed) return;
+            const daimyo = this.game.getBusho(clan.leaderId);
+            if (!daimyo || daimyo.factionId <= 0) return;
+
+            this.game.getClanCastles(clan.id).forEach(castle => {
+                this.game.getCastleBushos(castle.id).forEach(busho => {
+                    if (!window.BushoStatusRules.isActive(busho) || busho.factionId !== daimyo.factionId) return;
+                    busho.loyalty = Math.min(100, busho.loyalty + boostLoy);
+                    busho.recognitionNeed = Math.max(minRec, (busho.recognitionNeed || 0) - decayRec);
+                });
+            });
+        });
+    }
+
+    /**
      * 月末処理: 忠誠度変動と承認欲求の自然減衰
      */
     processEndMonth() {

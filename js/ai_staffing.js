@@ -1138,4 +1138,43 @@ class AIStaffing {
         // 完成した複数の移動リストを、そのまま返します！
         return moveActions;
     }
+    /** 四半期の全国AI人事。TurnManagerは実行時期だけを決める。 */
+    async processQuarterlyStaffing(month, playerClanId) {
+        if (![1, 4, 7, 10].includes(month)) return;
+        let staffingProcessed = 0;
+
+        for (const clan of this.game.clans) {
+            if (clan.id === 0 || clan.isDestroyed || clan.id === playerClanId) continue;
+
+            const daimyo = this.game.getBusho(clan.leaderId);
+            if (daimyo && daimyo.castleId) {
+                const daimyoCastle = this.game.getCastle(daimyo.castleId);
+                if (daimyoCastle) this.relocateDaimyo(daimyoCastle, daimyo);
+            }
+
+            if (month === 1) {
+                let changed = true;
+                let loopCount = 0;
+                while (changed && loopCount < 10) {
+                    const disbanded = this.checkLegionDisband(clan.id);
+                    const created = this.createNewLegionIfNeeded(clan.id);
+                    changed = Boolean(disbanded || created);
+                    loopCount++;
+                }
+            } else {
+                let created = true;
+                let loopCount = 0;
+                while (created && loopCount < 10) {
+                    created = this.createNewLegionIfNeeded(clan.id);
+                    loopCount++;
+                }
+            }
+
+            staffingProcessed++;
+            if (staffingProcessed % 4 === 0) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+        }
+    }
+
 }

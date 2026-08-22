@@ -396,6 +396,98 @@ class EconomyRules {
         return consumeGold;
     }
 
+    /** 月初の国別米相場を一括更新する。更新順による差が出ないよう次値を先に計算する。 */
+    static updateMonthlyProvinceMarketRates(game) {
+        const fluc = window.MainParams.Economy.TradeFluctuation;
+        const baseRate = window.MainParams.Economy.TradeRateBase;
+
+        let seasonForce = 0;
+        if (game.month === 9) {
+            const randomDown = (baseRate * 0.5) + (Math.random() * (baseRate * 0.5));
+            seasonForce = -randomDown;
+        } else {
+            seasonForce = baseRate * 0.05;
+        }
+
+        const adjProvinces = {};
+        game.provinces.forEach(p => { adjProvinces[p.id] = new Set(); });
+        game.castles.forEach(castle => {
+            if (castle.provinceId <= 0 || !castle.adjacentCastleIds) return;
+            castle.adjacentCastleIds.forEach(adjId => {
+                const adjCastle = game.getCastle(adjId);
+                if (adjCastle && adjCastle.provinceId > 0 && adjCastle.provinceId !== castle.provinceId) {
+                    adjProvinces[castle.provinceId].add(adjCastle.provinceId);
+                    adjProvinces[adjCastle.provinceId].add(castle.provinceId);
+                }
+            });
+        });
+
+        const nextRates = new Map();
+        game.provinces.forEach(province => {
+            const change = (Math.random() * (fluc * 2)) - fluc;
+            const rubberForce = (baseRate - province.marketRate) * 0.1;
+            let neighborForce = 0;
+            const neighborIds = adjProvinces[province.id];
+            if (neighborIds && neighborIds.size > 0) {
+                let neighborTotalRate = 0;
+                neighborIds.forEach(nId => {
+                    const neighborProvince = game.provinces.find(p => p.id === nId);
+                    if (neighborProvince) neighborTotalRate += neighborProvince.marketRate;
+                });
+                const neighborAverage = neighborTotalRate / neighborIds.size;
+                neighborForce = (neighborAverage - province.marketRate) * 0.05;
+            }
+
+            let newRate = province.marketRate + change + rubberForce + seasonForce + neighborForce;
+            newRate = Math.max(
+                window.MainParams.Economy.TradeRateMin,
+                Math.min(window.MainParams.Economy.TradeRateMax, newRate)
+            );
+            nextRates.set(province.id, newRate);
+        });
+
+        game.provinces.forEach(province => {
+            if (nextRates.has(province.id)) province.marketRate = nextRates.get(province.id);
+        });
+    }
+
+    /** 月初の金収入。一揆・3月増収・港収入を含む。 */
+    static calcMonthlyGoldIncome(castle, game) {
+        let income = this.calcBaseGoldIncome(castle);
+        income = GameMath.applyVariance(income, window.MainParams.Economy.IncomeFluctuation);
+        if (game.month === 3) income += income * 3;
+        income += this.calcPortBonus(castle, game);
+        if (castle.statusEffects && castle.statusEffects.includes('一揆')) income = 0;
+        return income;
+    }
+
+    static calcMonthlyTradeLimit(castle) {
+        return Math.floor((castle.population / 50) + (castle.kokudaka * 4));
+    }
+
+    /** 月初イベント後の給金・兵糧維持費を適用し、給金不足かどうかを返す。 */
+    static applyMonthlyCastleUpkeep(castle, bushos, daimyo) {
+        let consumeGold = 0;
+        bushos.forEach(busho => { consumeGold += busho.getSalary(daimyo); });
+        const isGoldShort = (castle.gold - consumeGold < 0);
+
+        const consumeRice = Math.floor(castle.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier);
+        if (castle.rice - consumeRice < 0) {
+            castle.rice = 0;
+            castle.soldiers = Math.floor(castle.soldiers * 0.95);
+        } else {
+            castle.rice -= consumeRice;
+        }
+        castle.gold = Math.max(0, castle.gold - consumeGold);
+
+        if (castle.soldiers <= 0) {
+            castle.soldiers = 0;
+            castle.training = 0;
+            castle.morale = 0;
+        }
+        return { isGoldShort, consumeGold, consumeRice };
+    }
+
     static calcAvailableGoldForAI(castle, game) {
         const income = this.calcExpectedGoldIncome(castle, game);
         const salary = this.calcCastleSalary(castle, game);

@@ -44,6 +44,96 @@ class DomesticRules {
         return Math.max(1, Math.round(val)); 
     }
 
+    /** 隣接城の安全度から人口・兵士の自然増加倍率(0.2〜1.2)を計算する。 */
+    static calcNeighborGrowthMultiplier(castle, game) {
+        let multiplier = 1.2;
+        let totalAdjacent = 0;
+        let hostileAdjacent = 0;
+
+        if (castle.adjacentCastleIds && castle.adjacentCastleIds.length > 0) {
+            totalAdjacent = castle.adjacentCastleIds.length;
+            castle.adjacentCastleIds.forEach(adjId => {
+                const adjCastle = game.getCastle(adjId);
+                if (!adjCastle) {
+                    totalAdjacent--;
+                    return;
+                }
+
+                let isHostile = false;
+                if (adjCastle.ownerClan === castle.ownerClan) {
+                    isHostile = false;
+                } else if (adjCastle.ownerClan === 0) {
+                    isHostile = true;
+                } else {
+                    const rel = game.getRelation(castle.ownerClan, adjCastle.ownerClan);
+                    isHostile = !(rel && window.DiplomacyRules.isFriendly(rel.status));
+                }
+                if (isHostile) hostileAdjacent++;
+            });
+
+            if (totalAdjacent > 0) {
+                multiplier = 0.2 + (1.0 - (hostileAdjacent / totalAdjacent));
+            }
+        }
+        return multiplier;
+    }
+
+    /** 月初の人口自然増減を計算する。 */
+    static calcMonthlyPopulationGrowth(castle, neighborMultiplier) {
+        const currentLoyalty = Math.max(0, Math.min(100, castle.peoplesLoyalty));
+        let calcLoyalty = currentLoyalty;
+        if (castle.population < 2000 && currentLoyalty < 60) calcLoyalty = 60;
+
+        let growth = Math.floor(
+            ((Math.sqrt(castle.population) * 2) * ((calcLoyalty - 50) / 100)) + (calcLoyalty / 4)
+        );
+
+        if (growth > 0) {
+            growth = Math.floor(growth * neighborMultiplier);
+            const popKokuRatio = castle.population / Math.max(1, castle.kokudaka);
+            let popLowBonus = 1.0;
+            if (popKokuRatio <= 1) {
+                popLowBonus = 3.0;
+            } else if (popKokuRatio <= 5) {
+                popLowBonus = 3.0 - ((popKokuRatio - 1) / 4) * 1.5;
+            } else if (popKokuRatio <= 10) {
+                popLowBonus = 1.5 - ((popKokuRatio - 5) / 5) * 0.5;
+            }
+            growth = Math.floor(growth * popLowBonus);
+        }
+
+        const kokudakaBonus = Math.sqrt(Math.max(0, castle.kokudaka)) * 500;
+        const defenseBonus = Math.sqrt(Math.max(0, castle.defense)) * 200;
+        const loyaltyScore = (castle.peoplesLoyalty / 100) + 0.5;
+        const baseScore = (kokudakaBonus + defenseBonus) * loyaltyScore;
+        if (growth > 0 && castle.population >= baseScore) growth = Math.floor(growth / 20);
+        return growth;
+    }
+
+    /** 月初の兵士自然増加を計算する。 */
+    static calcMonthlySoldierGrowth(castle, daimyo, ownedCastlesCount, neighborMultiplier) {
+        if (!daimyo) return 0;
+        const statBonus = (
+            daimyo.leadership + daimyo.strength + daimyo.politics +
+            daimyo.diplomacy + daimyo.intelligence + daimyo.charm
+        ) / 600;
+        const highestStat = Math.max(
+            daimyo.leadership, daimyo.strength, daimyo.politics,
+            daimyo.diplomacy, daimyo.intelligence, daimyo.charm
+        );
+        const specialtyBonus = 0.5 + (highestStat * 0.005);
+        const daimyoBonus = statBonus * specialtyBonus;
+        const loyaltyBonus = castle.peoplesLoyalty * 0.01;
+        const baseGrowth = Math.sqrt(castle.population) * ((daimyoBonus + loyaltyBonus) / 2) * 1.25;
+        const castlePenalty = 1 + (ownedCastlesCount / 25);
+        const suppressedGrowth = baseGrowth / castlePenalty;
+        const soldierRatio = castle.population > 0 ? (castle.soldiers / castle.population) : 1.0;
+        const penaltyMultiplier = Math.max(0, 1.0 - (soldierRatio * 1.25));
+        let soldierGrowth = Math.floor(suppressedGrowth * penaltyMultiplier);
+        if (soldierGrowth > 0) soldierGrowth = Math.floor(soldierGrowth * neighborMultiplier);
+        return Math.max(0, soldierGrowth);
+    }
+
     static calcFactionBonusRate(bushos) {
         if (!bushos || bushos.length < 2) return 1.0;
         const factionId = bushos[0].factionId;

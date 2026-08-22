@@ -119,6 +119,70 @@ class PersonnelRules {
         return loyaltyUp;
     }
 
+    /** 月初の武将個人メンテナンス。面談印・宿敵タイマー・諸勢力武将経験値を更新する。 */
+    static processMonthlyBushoMaintenance(busho, game) {
+        if (!window.BushoStatusRules.isActive(busho) && !window.BushoStatusRules.isRonin(busho)) return;
+        busho.isInterviewed = false;
+
+        if (busho.nemesisList && busho.nemesisList.length > 0) {
+            busho.nemesisList = busho.nemesisList.filter(nemesis => {
+                nemesis.count -= 1;
+                return nemesis.count > 0;
+            });
+            busho.nemesisIds = busho.nemesisList.map(n => n.id);
+        }
+
+        if (window.BushoStatusRules.isActive(busho) && (busho.belongKunishuId || 0) > 0) {
+            const kunishu = game.kunishuSystem ? game.kunishuSystem.getKunishu(busho.belongKunishuId) : null;
+            if (!kunishu) return;
+            const isLeader = (busho.id === kunishu.leaderId);
+            const addExp = max => Math.floor(Math.random() * max);
+            if (isLeader) {
+                busho.expLeadership = (busho.expLeadership || 0) + addExp(3) + 1;
+                busho.expStrength = (busho.expStrength || 0) + addExp(3) + 1;
+                busho.expPolitics = (busho.expPolitics || 0) + addExp(3) + 1;
+                busho.expDiplomacy = (busho.expDiplomacy || 0) + addExp(3) + 1;
+                busho.expIntelligence = (busho.expIntelligence || 0) + addExp(3) + 1;
+            } else {
+                busho.expLeadership = (busho.expLeadership || 0) + addExp(3);
+                busho.expStrength = (busho.expStrength || 0) + addExp(3);
+                busho.expPolitics = (busho.expPolitics || 0) + addExp(3);
+                busho.expDiplomacy = (busho.expDiplomacy || 0) + addExp(3);
+                busho.expIntelligence = (busho.expIntelligence || 0) + addExp(3);
+            }
+        }
+    }
+
+    /** 月初の役職功績・経験値と、給金不足時の忠誠低下を適用する。 */
+    static applyMonthlyRoleProgress(busho, isGoldShort) {
+        busho.isActionDone = false;
+        if (busho.isCastellan) {
+            busho.achievementTotal += 5;
+        } else if (busho.isGunshi) {
+            busho.achievementTotal += 3;
+        }
+        if (busho.isDaimyo || busho.isCommander) busho.achievementTotal += 2;
+
+        if (busho.isCastellan) {
+            busho.expStrength = (busho.expStrength || 0) + 1;
+            busho.expPolitics = (busho.expPolitics || 0) + 3;
+        }
+        if (busho.isDaimyo || busho.isCommander) {
+            busho.expLeadership = (busho.expLeadership || 0) + 2;
+            busho.expDiplomacy = (busho.expDiplomacy || 0) + 3;
+            busho.expIntelligence = (busho.expIntelligence || 0) + 2;
+        }
+        if (busho.isGunshi) {
+            busho.expLeadership = (busho.expLeadership || 0) + 2;
+            busho.expIntelligence = (busho.expIntelligence || 0) + 5;
+            busho.expPolitics = (busho.expPolitics || 0) + 2;
+            busho.expDiplomacy = (busho.expDiplomacy || 0) + 3;
+        }
+        if (!busho.isDaimyo && isGoldShort) {
+            busho.loyalty = Math.max(0, busho.loyalty - 1);
+        }
+    }
+
     static calcEmploymentSuccess(recruiter, target, recruiterClanPower, targetClanPower, game) {
         const prob = this.getEmployProb(recruiter, target, recruiterClanPower, targetClanPower, game);
         return Math.random() < prob;
