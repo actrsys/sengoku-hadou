@@ -1358,14 +1358,14 @@ class AIEngine {
 
         if (isSeaBattle && sorted.length > 0) {
             let general = sorted[0];
-            let genMarLvl = (typeof SkillManager !== 'undefined') ? SkillManager.getAptitudeLevel(general.aptMaritime) : 0;
+            let genMarLvl = (typeof SkillManager !== 'undefined') ? SkillManager.getMaritimeAptitudeLevel(general) : 0;
             let bestNav = null;
             let bestNavLvl = genMarLvl;
 
             // 評価した全員の中から（足切りされた武将も含めて）最高の航海士を探す
             evaluatedBushos.forEach(eb => {
                 if (eb.busho.id === general.id) return;
-                let lvl = (typeof SkillManager !== 'undefined') ? SkillManager.getAptitudeLevel(eb.busho.aptMaritime) : 0;
+                let lvl = (typeof SkillManager !== 'undefined') ? SkillManager.getMaritimeAptitudeLevel(eb.busho) : 0;
                 if (lvl > bestNavLvl) {
                     bestNavLvl = lvl;
                     bestNav = eb.busho;
@@ -1457,13 +1457,13 @@ class AIEngine {
 
         if (isSeaBattle && sorted.length > 0) {
             let general = sorted[0];
-            let genMarLvl = (typeof SkillManager !== 'undefined') ? SkillManager.getAptitudeLevel(general.aptMaritime) : 0;
+            let genMarLvl = (typeof SkillManager !== 'undefined') ? SkillManager.getMaritimeAptitudeLevel(general) : 0;
             let bestNav = null;
             let bestNavLvl = genMarLvl;
 
             evaluatedBushos.forEach(eb => {
                 if (eb.busho.id === general.id) return;
-                let lvl = (typeof SkillManager !== 'undefined') ? SkillManager.getAptitudeLevel(eb.busho.aptMaritime) : 0;
+                let lvl = (typeof SkillManager !== 'undefined') ? SkillManager.getMaritimeAptitudeLevel(eb.busho) : 0;
                 if (lvl > bestNavLvl) {
                     bestNavLvl = lvl;
                     bestNav = eb.busho;

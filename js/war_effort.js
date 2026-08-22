@@ -1486,26 +1486,10 @@ Object.assign(WarManager.prototype, {
 
             // ★追加: グループ内に「退き巧者」がいるかを確認して回復率を決める魔法
             const getGroupRecoveryRate = (bushos, isRetreatingTeam) => {
-                let rate = isRetreatingTeam ? retreatRecoveryRate : baseRecoveryRate;
-                if (isRetreatingTeam && bushos) {
-                    let hasRetreatMaster = false;
-                    for (let b of bushos) {
-                        if (!b) continue;
-                        let bushoObj = b.skill !== undefined ? b : (this.game && this.game.getBusho ? this.game.getBusho(b.id || b) : null);
-                        if (bushoObj && bushoObj.skill) {
-                            const skills = bushoObj.skill.split('|').map(sk => sk.trim());
-                            // ★修正：SkillManagerで管理している名前の箱を見に行きます
-                            if (typeof SkillManager !== 'undefined' && skills.includes(SkillManager.SKILLS.RETREAT)) {
-                                hasRetreatMaster = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (hasRetreatMaster) {
-                        rate = retreatRecoveryRate * 2; // 退き巧者なら倍（60%）にします！
-                    }
+                if (typeof SkillManager !== 'undefined') {
+                    return SkillManager.calcRetreatRecoveryRate(bushos, isRetreatingTeam, baseRecoveryRate, retreatRecoveryRate, this.game);
                 }
-                return rate;
+                return isRetreatingTeam ? retreatRecoveryRate : baseRecoveryRate;
             };
 
             // 4. 援軍部隊を元の城に帰還させるお帰り魔法

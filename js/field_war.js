@@ -1791,10 +1791,8 @@ class FieldWarManager {
 
         let zocCost = 1;
         if (isFirstStep && startDist === 1) {
-            // ★追加: 退き巧者を持っていなければ離脱ペナルティをかける
-            if (!SkillManager.isRetreatMaster(unit, this.game)) {
-                zocCost = 4;
-            }
+            // 退き巧者による離脱コスト軽減は SkillManager が決定します。
+            zocCost = SkillManager.getDisengageMoveCost(unit, this.game);
         } else if (minEnemyDist <= 2) {
             zocCost = 2;
         }
@@ -2239,11 +2237,8 @@ class FieldWarManager {
                 // ★追加: 赤備えスキルによる士気低下無効化チェック
                 let hasAkazonae = false;
                 if (typeof SkillManager !== 'undefined') {
-                    this.units.forEach(u => {
-                        if (u.groupId === key && SkillManager.hasSkill(u, SkillManager.SKILLS.AKAZONAE, this.game)) {
-                            hasAkazonae = true;
-                        }
-                    });
+                    const groupUnits = this.units.filter(u => u.groupId === key);
+                    hasAkazonae = SkillManager.isMoraleDecayIgnoredForArmy(groupUnits, this.game);
                 }
                 
                 // 赤備えがいる軍は天候による士気低下が無効になります
@@ -2294,23 +2289,18 @@ class FieldWarManager {
 
     // ★追加: 個別部隊の撤退処理
     retreatUnit(unit) {
-        // ★追加: 退き巧者の野戦個別撤退時のボーナス回復処理
-        if (SkillManager.isRetreatMaster(unit, this.game)) {
-            let loss = unit.initialSoldiers - unit.soldiers;
-            if (loss > 0) {
-                // 野戦での個別撤退なので、差分の30%をその場で回復させておきます
-                let bonusRecovery = Math.floor(loss * 0.3);
-                if (bonusRecovery > 0) {
-                    unit.soldiers += bonusRecovery;
-                    this.log(`【退き巧者】${unit.name}隊は被害を最小限に抑えて離脱した！（兵士が${bonusRecovery}回復）`);
-                    // 大元の deadSoldiers から引いて、攻城戦終了時と二重に回復しないようにします
-                    if (this.warState && this.warState.deadSoldiers) {
-                        if (unit.isAttacker) {
-                            this.warState.deadSoldiers.attacker = Math.max(0, this.warState.deadSoldiers.attacker - bonusRecovery);
-                        } else {
-                            this.warState.deadSoldiers.defender = Math.max(0, this.warState.deadSoldiers.defender - bonusRecovery);
-                        }
-                    }
+        // 退き巧者の回復量そのものは SkillManager が決定します。
+        const retreatLoss = unit.initialSoldiers - unit.soldiers;
+        const bonusRecovery = SkillManager.calcRetreatUnitBonusRecovery(unit, retreatLoss, this.game);
+        if (bonusRecovery > 0) {
+            unit.soldiers += bonusRecovery;
+            this.log(`【退き巧者】${unit.name}隊は被害を最小限に抑えて離脱した！（兵士が${bonusRecovery}回復）`);
+            // 大元の deadSoldiers から引いて、攻城戦終了時と二重に回復しないようにします
+            if (this.warState && this.warState.deadSoldiers) {
+                if (unit.isAttacker) {
+                    this.warState.deadSoldiers.attacker = Math.max(0, this.warState.deadSoldiers.attacker - bonusRecovery);
+                } else {
+                    this.warState.deadSoldiers.defender = Math.max(0, this.warState.deadSoldiers.defender - bonusRecovery);
                 }
             }
         }
@@ -3080,7 +3070,7 @@ class FieldWarManager {
 
         let dirMult = 1.0;
         // ★追加: 守備側が「退き巧者」を持っていれば、側面・背後からのダメージ補正を無効化
-        if (!SkillManager.isRetreatMaster(defender, this.game)) {
+        if (!SkillManager.ignoresFlankRearPenalty(defender, this.game)) {
             if (defToAtkDiff === 3) {
                 dirMult = isNight ? 0.3 : 0.5; // 背後（夜は奇襲への対応が遅れ被害増大）
             } else if (defToAtkDiff === 2) {

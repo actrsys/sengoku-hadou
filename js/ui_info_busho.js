@@ -340,11 +340,8 @@ Object.assign(UIInfoManager.prototype, {
                 aptHtml += `<div class="daimyo-detail-row ${rowClass}">${rowInnerHtml}</div>`;
             }
 
-            // 技能は「,」や「|」で区切られているかもしれないので、分けて最大3つ取り出します
-            let skills = [];
-            if (busho.skill) {
-                skills = busho.skill.split(/[|,]/).map(s => s.trim()).filter(s => s);
-            }
+            // 技能データの解釈は SkillManager に一本化します。UIは結果だけ受け取ります。
+            const skills = (typeof SkillManager !== 'undefined') ? SkillManager.getSkillList(busho) : [];
             
             // ★変更：技能を適性と同じように横に2つ並べてから改行するようにします
             let skillHtml = '';

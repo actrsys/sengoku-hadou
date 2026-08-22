@@ -139,6 +139,30 @@ class SkillManager {
         return APTITUDE_DESCRIPTIONS[aptitudeName] || "";
     }
 
+    static getKnownSkillNames() {
+        return Object.values(SKILL_NAMES);
+    }
+
+    static findUnknownSkills(bushos) {
+        const known = new Set(this.getKnownSkillNames());
+        const unknown = new Set();
+        (bushos || []).forEach(busho => {
+            this.getSkillList(busho).forEach(skillName => {
+                if (!known.has(skillName)) unknown.add(skillName);
+            });
+        });
+        return [...unknown].sort();
+    }
+
+    static validateBushoSkills(bushos, contextLabel = '') {
+        const unknown = this.findUnknownSkills(bushos);
+        if (unknown.length > 0) {
+            const label = contextLabel ? ` (${contextLabel})` : '';
+            console.warn(`[SkillManager] 未登録技能を検出${label}:`, unknown);
+        }
+        return unknown;
+    }
+
     // アルファベットの適性ランク（S～E）を、計算用の数字（5～0）に変換する魔法です。
     static getAptitudeLevel(rank) {
         switch(rank) {
@@ -151,20 +175,47 @@ class SkillManager {
         }
     }
 
-    // 武将が指定した「技能」を持っているか確認する魔法です。
-    // ★部隊データだけでなく、武将データそのものが渡されても判定できるように強化しました！
-    static hasSkill(unitOrBusho, skillName, game) {
-        let busho = null;
-        if (unitOrBusho.bushoId) {
-            busho = game.getBusho(unitOrBusho.bushoId);
-        } else if (unitOrBusho.id && unitOrBusho.skill !== undefined) {
-            busho = unitOrBusho;
+    // 部隊・武将のどちらが渡されても、元の武将データへ統一して解決します。
+    // 技能データ形式を知るのは SkillManager だけ、という境界を守るための共通窓口です。
+    static resolveBusho(unitOrBusho, game = null) {
+        if (!unitOrBusho) return null;
+        if (unitOrBusho.skill !== undefined && unitOrBusho.id !== undefined) return unitOrBusho;
+        if (unitOrBusho.bushoId !== undefined && game && typeof game.getBusho === 'function') {
+            return game.getBusho(unitOrBusho.bushoId);
         }
-        if (!busho || !busho.skill) return false;
-        
-        // 「医術|傾奇者」のようになっている文字を「|」で切り分けて、リストにして確認します
-        const skills = busho.skill.split('|').map(s => s.trim());
-        return skills.includes(skillName);
+        return null;
+    }
+
+    // 技能文字列の分解もここだけで行います。CSV側で「|」「,」のどちらが混ざっても同じ扱いです。
+    static getSkillList(unitOrBusho, game = null) {
+        const busho = this.resolveBusho(unitOrBusho, game);
+        if (!busho || !busho.skill) return [];
+        return String(busho.skill)
+            .split(/[|,]/)
+            .map(s => s.trim())
+            .filter(Boolean);
+    }
+
+    // 武将が指定した「技能」を持っているか確認する唯一の判定窓口です。
+    static hasSkill(unitOrBusho, skillName, game = null) {
+        if (!skillName) return false;
+        return this.getSkillList(unitOrBusho, game).includes(skillName);
+    }
+
+    static hasAnySkill(unitOrBusho, skillNames, game = null) {
+        if (!Array.isArray(skillNames) || skillNames.length === 0) return false;
+        const owned = this.getSkillList(unitOrBusho, game);
+        return skillNames.some(skillName => owned.includes(skillName));
+    }
+
+    static groupHasSkill(bushosOrUnits, skillName, game = null) {
+        if (!Array.isArray(bushosOrUnits) || bushosOrUnits.length === 0) return false;
+        return bushosOrUnits.some(item => this.hasSkill(item, skillName, game));
+    }
+
+    static groupHasAnySkill(bushosOrUnits, skillNames, game = null) {
+        if (!Array.isArray(bushosOrUnits) || bushosOrUnits.length === 0) return false;
+        return bushosOrUnits.some(item => this.hasAnySkill(item, skillNames, game));
     }
 
     // ==========================================
@@ -335,19 +386,25 @@ class SkillManager {
         return Math.max(0, 1.0 - (reductionPct / 100)); // 軽減率を倍率に変換（マイナス防止）
     }
 
+    // 武将単体の操船適性レベル。外部ロジックは aptMaritime の内部形式を直接解釈しません。
+    static getMaritimeAptitudeLevel(busho) {
+        if (!busho) return 0;
+        return this.getAptitudeLevel(busho.aptMaritime);
+    }
+
     // 味方の艦隊効果を含めた、最終的な「操船レベル」を計算します
     static getMaritimeLevel(unit, allies, game) {
         const busho = game.getBusho(unit.bushoId);
         if (!busho) return 0;
         
-        let myLvl = this.getAptitudeLevel(busho.aptMaritime);
+        let myLvl = this.getMaritimeAptitudeLevel(busho);
         
         // 艦隊（味方）の中で、一番高い操船レベルを探します
         let maxLvl = 0;
         for (let ally of allies) {
             const allyBusho = game.getBusho(ally.bushoId);
             if (allyBusho) {
-                let lvl = this.getAptitudeLevel(allyBusho.aptMaritime);
+                let lvl = this.getMaritimeAptitudeLevel(allyBusho);
                 if (lvl > maxLvl) maxLvl = lvl;
             }
         }
@@ -584,6 +641,40 @@ class SkillManager {
         return this.hasSkill(unit, SKILL_NAMES.RETREAT, game) || this.hasSkill(unit, SKILL_NAMES.TENKA_FUBU, game);
     }
 
+    // 赤備え：ターン経過・悪天候などによる士気低下を無効化します。
+    static isMoraleDecayIgnored(unitOrBusho, game) {
+        return this.hasSkill(unitOrBusho, SKILL_NAMES.AKAZONAE, game);
+    }
+
+    static isMoraleDecayIgnoredForArmy(bushosOrUnits, game) {
+        return this.groupHasSkill(bushosOrUnits, SKILL_NAMES.AKAZONAE, game);
+    }
+
+    // 退き巧者：撤退時の回復率を2倍にします。非撤退時は通常回復率をそのまま返します。
+    static calcRetreatRecoveryRate(bushosOrUnits, isRetreatingTeam, baseRecoveryRate, retreatRecoveryRate, game) {
+        let rate = isRetreatingTeam ? retreatRecoveryRate : baseRecoveryRate;
+        if (isRetreatingTeam && Array.isArray(bushosOrUnits) && bushosOrUnits.some(item => this.isRetreatMaster(item, game))) {
+            rate *= 2;
+        }
+        return rate;
+    }
+
+    // 退き巧者：野戦で個別撤退した時、戦闘中の損失30%をその場で回復します。
+    static calcRetreatUnitBonusRecovery(unit, loss, game) {
+        if (!this.isRetreatMaster(unit, game)) return 0;
+        return Math.floor(Math.max(0, loss || 0) * 0.30);
+    }
+
+    // 退き巧者：敵隣接状態から最初の一歩で離脱する際の行動力コストを軽減します。
+    static getDisengageMoveCost(unit, game) {
+        return this.isRetreatMaster(unit, game) ? 1 : 4;
+    }
+
+    // 退き巧者：側面・背面から受ける方向補正を無効化します。
+    static ignoresFlankRearPenalty(unit, game) {
+        return this.isRetreatMaster(unit, game);
+    }
+
     // 「傾奇者」を持っているか
     static isKabukimono(unit, game) {
         return this.hasSkill(unit, SKILL_NAMES.KABUKIMONO, game);
@@ -740,12 +831,12 @@ class SkillManager {
         let modifier = 0; // 追加分
         
         // 自部隊に越後の龍がいるか
-        let hasEchigo = bushos.some(b => b && b.skill && b.skill.includes(SKILL_NAMES.ECHIGO_NO_RYU));
+        const hasEchigo = this.groupHasSkill(bushos, SKILL_NAMES.ECHIGO_NO_RYU);
         if (hasEchigo) modifier += 0.20; // 20%アップ
 
         // 同一勢力内に甲斐の虎がいるか
         let hasKaiInAlly = allAlliedBushosList.some(b => {
-            if (b && b.skill && b.skill.includes(SKILL_NAMES.KAI_NO_TORA)) {
+            if (this.hasSkill(b, SKILL_NAMES.KAI_NO_TORA)) {
                 if (kunishuId > 0 && b.belongKunishuId === kunishuId) return true;
                 if (clanId > 0 && b.clan === clanId && (b.belongKunishuId || 0) === 0) return true;
             }
@@ -755,14 +846,14 @@ class SkillManager {
 
         // ★追加：自部隊に朱槍がいて、かつ野戦で隣接戦闘の場合
         if (isFieldWarAdjacent) {
-            let hasShuyari = bushos.some(b => b && b.skill && b.skill.includes(SKILL_NAMES.SHUYARI));
+            let hasShuyari = this.groupHasSkill(bushos, SKILL_NAMES.SHUYARI);
             if (hasShuyari) modifier += 0.10; // 10%アップ
         }
 
         // ★追加：上州の黄斑（自身が守備側で参戦している時、全ての味方部隊は与えるダメージが１０％上昇）
         if (isDefender) {
             let hasJoshuInAlly = allAlliedBushosList.some(b => {
-                if (b && b.skill && b.skill.includes(SKILL_NAMES.JOSHU_NO_OHAN)) {
+                if (this.hasSkill(b, SKILL_NAMES.JOSHU_NO_OHAN)) {
                     if (kunishuId > 0 && b.belongKunishuId === kunishuId) return true;
                     if (clanId > 0 && b.clan === clanId && (b.belongKunishuId || 0) === 0) return true;
                 }
@@ -780,13 +871,13 @@ class SkillManager {
         let reducePct = 0; // 軽減率(%)
         
         // 自部隊に越後の龍がいるか
-        if (bushos.some(b => b && b.skill && b.skill.includes(SKILL_NAMES.ECHIGO_NO_RYU))) {
+        if (this.groupHasSkill(bushos, SKILL_NAMES.ECHIGO_NO_RYU)) {
             reducePct += 10;
         }
 
         // 同一勢力内に甲斐の虎がいるか
         let hasKaiInAlly = allAlliedBushosList.some(b => {
-            if (b && b.skill && b.skill.includes(SKILL_NAMES.KAI_NO_TORA)) {
+            if (this.hasSkill(b, SKILL_NAMES.KAI_NO_TORA)) {
                 if (kunishuId > 0 && b.belongKunishuId === kunishuId) return true;
                 if (clanId > 0 && b.clan === clanId && (b.belongKunishuId || 0) === 0) return true;
             }
@@ -797,19 +888,19 @@ class SkillManager {
         }
 
         // 自部隊に三河の鹿がいるか
-        if (bushos.some(b => b && b.skill && b.skill.includes(SKILL_NAMES.MIKAWA_NO_SHIKA))) {
+        if (this.groupHasSkill(bushos, SKILL_NAMES.MIKAWA_NO_SHIKA)) {
             reducePct += 30;
         }
 
         // ★追加：自部隊に赤備えがいるか
-        if (bushos.some(b => b && b.skill && b.skill.includes(SKILL_NAMES.AKAZONAE))) {
+        if (this.groupHasSkill(bushos, SKILL_NAMES.AKAZONAE)) {
             reducePct += 10;
         }
 
         // ★追加：上州の黄斑（自身が守備側で参戦している時、全ての味方部隊は受けるダメージが２０％減少）
         if (isDefender) {
             let hasJoshuInAlly = allAlliedBushosList.some(b => {
-                if (b && b.skill && b.skill.includes(SKILL_NAMES.JOSHU_NO_OHAN)) {
+                if (this.hasSkill(b, SKILL_NAMES.JOSHU_NO_OHAN)) {
                     if (kunishuId > 0 && b.belongKunishuId === kunishuId) return true;
                     if (clanId > 0 && b.clan === clanId && (b.belongKunishuId || 0) === 0) return true;
                 }
@@ -1181,7 +1272,7 @@ class SkillManager {
     static calcSiegeStrategyProbBonus(actionType, bushos, game) {
         if (!bushos || bushos.length === 0) return 0;
         let bonus = 0;
-        let hasBoshin = bushos.some(b => b && b.skill && b.skill.includes(SKILL_NAMES.BOSHIN));
+        const hasBoshin = this.groupHasSkill(bushos, SKILL_NAMES.BOSHIN);
         if (hasBoshin) {
             if (actionType === 'fire') bonus += 0.15;
             if (actionType === 'provoke') bonus += 0.05;

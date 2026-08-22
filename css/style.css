@@ -2778,6 +2778,30 @@ body.is-pc {
 }
 
 /* ロード中の文字がフワッ、と点滅する動きの指定です */
+/* 保存処理中の操作ガード。見た目はCSS側で管理し、SaveManagerは表示状態だけ切り替える。 */
+#save-guard {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    pointer-events: all;
+}
+
+#save-guard.hidden {
+    display: none;
+}
+
+.save-guard-message {
+    font-size: 2rem;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px #000, -2px -2px 4px #000, 2px -2px 4px #000, -2px 2px 4px #000;
+    animation: blink-loading 1.5s infinite;
+}
+
 @keyframes blink-loading {
     0% { opacity: 0.3; }
     50% { opacity: 1; }

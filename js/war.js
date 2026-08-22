@@ -1921,7 +1921,7 @@ class WarManager {
                 if (s.weather === 'rain' || s.weather === 'snow') moraleDrop += 1; 
                 
                 // ★追加：赤備えを持っていれば攻撃本隊の士気は下がりません
-                let isAtkAkazonae = typeof SkillManager !== 'undefined' && s.atkBushos && s.atkBushos.some(b => SkillManager.hasSkill(b, SkillManager.SKILLS.AKAZONAE, this.game));
+                const isAtkAkazonae = typeof SkillManager !== 'undefined' && SkillManager.isMoraleDecayIgnoredForArmy(s.atkBushos, this.game);
                 if (!isAtkAkazonae) {
                     s.attacker.morale = Math.max(0, (s.attacker.morale ?? 50) - moraleDrop);
                 }
@@ -1945,7 +1945,7 @@ class WarManager {
                 if (s.selfReinforcement) {
                     s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * atkRiceRate));
                     // ★追加：応援軍も赤備えを持っていれば士気低下を無効化
-                    let isSelfAkazonae = typeof SkillManager !== 'undefined' && s.selfReinforcement.bushos && s.selfReinforcement.bushos.some(b => SkillManager.hasSkill(b, SkillManager.SKILLS.AKAZONAE, this.game));
+                    const isSelfAkazonae = typeof SkillManager !== 'undefined' && SkillManager.isMoraleDecayIgnoredForArmy(s.selfReinforcement.bushos, this.game);
                     if (!isSelfAkazonae) {
                         s.selfReinforcement.morale = Math.max(0, (s.selfReinforcement.morale ?? 50) - moraleDrop);
                     }
@@ -1967,7 +1967,7 @@ class WarManager {
                 if (s.reinforcement) {
                     s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * atkRiceRate));
                     // ★追加：友軍も赤備えを持っていれば士気低下を無効化
-                    let isAllyAkazonae = typeof SkillManager !== 'undefined' && s.reinforcement.bushos && s.reinforcement.bushos.some(b => SkillManager.hasSkill(b, SkillManager.SKILLS.AKAZONAE, this.game));
+                    const isAllyAkazonae = typeof SkillManager !== 'undefined' && SkillManager.isMoraleDecayIgnoredForArmy(s.reinforcement.bushos, this.game);
                     if (!isAllyAkazonae) {
                         s.reinforcement.morale = Math.max(0, (s.reinforcement.morale ?? 50) - moraleDrop);
                     }
