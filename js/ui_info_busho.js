@@ -607,6 +607,11 @@ Object.assign(UIInfoManager.prototype, {
             };
         }
         
+        // 新しく武将一覧を開く入口では、前回閉じた時のタブ状態を引き継がず必ず「基本」から始めます。
+        // 詳細画面から「戻る」場合は openBushoSelector() を通らず modalHistory から復元されるため、
+        // 一覧内での一時的なタブ状態は従来どおり保持されます。
+        this.bushoCurrentTab = 'stats';
+
         // ★修正：新しく武将一覧を開くときは、以前開いたリストの記憶（キャッシュ）を消してリセットします
         this.bushoCurrentSortKey = null;
         this.bushoIsSortAsc = false;
