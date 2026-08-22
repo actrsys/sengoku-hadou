@@ -84,6 +84,43 @@ class AIOperationManager {
         clearFrom(this.grandObjectives);
     }
 
+    // 評定方針に反する既存の攻撃作戦だけを即時整理します。
+    // 方針の意味判定は LegionPolicySystem、作戦データの破棄は作戦専門部署で担当します。
+    reconcileLegionPolicy(clanId, legionId) {
+        clanId = Number(clanId);
+        legionId = Number(legionId || 0);
+        const clanOps = this.operations && this.operations[clanId];
+        const op = clanOps ? clanOps[legionId] : null;
+        if (!op || op.type !== '攻撃') return true;
+        if (!this.game.legionPolicySystem || this.game.legionPolicySystem.isOperationAllowed(clanId, legionId, op)) return true;
+
+        delete this.operations[clanId][legionId];
+        const logInfo = this.getOperationLogInfo(clanId, legionId);
+        console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) の攻撃作戦を、評定方針に従って中止しました。`);
+        return false;
+    }
+
+    async onClanBecameAIControlled(clanId) {
+        clanId = Number(clanId || 0);
+        if (!clanId || !this.game.getClan(clanId)) return;
+        // プレイヤー時は月次作戦会議から除外される直轄軍団0だけ、観戦開始時にAI用作戦を補う。
+        if (!this.operations[clanId]) this.operations[clanId] = {};
+        if (!this.operations[clanId][0] && this.game.getClanCastles(clanId).some(c => Number(c.legionId || 0) === 0)) {
+            await this.generateOperation(clanId, 0);
+        }
+    }
+
+    onClanBecamePlayerControlled(clanId) {
+        clanId = Number(clanId || 0);
+        if (!clanId) return;
+        // 直轄はプレイヤー自身が判断するため、観戦中にAIが作った直轄作戦を残さない。
+        this.clearLegionPlanning(clanId, 0);
+        // 非直轄軍団はAI運用を継続するが、以前の評定命令がある場合は復帰時点で再適用する。
+        for (let legionNo = 1; legionNo <= 8; legionNo++) {
+            if (this.isActiveLegion(clanId, legionNo)) this.reconcileLegionPolicy(clanId, legionNo);
+        }
+    }
+
     // ★Round6：非直轄軍団が「現在も有効な軍団」かを一元判定します。
     isActiveLegion(clanId, legionId) {
         clanId = Number(clanId);
@@ -517,6 +554,9 @@ class AIOperationManager {
                 }
                 // ★ここまで追加
 
+                // 評定で今月の方針が変わっていた場合、古い攻撃作戦を持ち越しません。
+                this.reconcileLegionPolicy(clan.id, legionId);
+
                 if (!this.operations[clan.id][legionId]) {
                     await this.generateOperation(clan.id, legionId);
                 } else {
@@ -877,6 +917,11 @@ class AIOperationManager {
                 }
                 if (!isDirectlyAdjacent) return false;
 
+                // 国主評定の軍事方針を専門部署に確認します。
+                if (this.game.legionPolicySystem && !this.game.legionPolicySystem.canAttackClan(clanId, legionId, target.ownerClan)) {
+                    return false;
+                }
+
                 if (target.ownerClan === 0) {
                     if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
                     return true;
@@ -902,9 +947,10 @@ class AIOperationManager {
                 return true;
             });
 
-            // 諸勢力も敵のリストに入れます
+            // 諸勢力も敵のリストに入れます。攻勢禁止なら自主鎮圧も立案しません。
             // ★繋がっている自領のお城すべてにいる諸勢力を探します！
-            if (!myCastle.isDelegated) {
+            const councilAllowsOffense = !this.game.legionPolicySystem || this.game.legionPolicySystem.isOffenseAllowed(clanId, legionId);
+            if (!myCastle.isDelegated && councilAllowsOffense) {
                 visited.forEach(visitedCastleId => {
                     const vCastle = this.game.getCastle(visitedCastleId);
                     if (vCastle) {

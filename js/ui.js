@@ -62,6 +62,8 @@ class UIManager {
         this.slider = new UISliderManager(this, this.game);
         // セーブ／ロードのスロット選択画面は専用Viewへ委譲します。
         this.saveLoadView = new SaveLoadView(this, this.game);
+        // 国主評定の表示・一時編集は専用Viewへ委譲します。
+        this.legionCouncilView = new LegionCouncilView(this, this.game);
         
         this.warModal = document.getElementById('war-modal');
         this.warLog = document.getElementById('war-log');
@@ -321,6 +323,14 @@ class UIManager {
             // イベントダイアログ内の隠しボタンによる決定音を防ぐため、共通の音をキャンセルします！
             if (btn.closest('.event-dialog-modal')) return;
 
+            // ボタン側が data-se で明示した場合は、文言に依存せずそのSEへ統一します。
+            // 動的UIでも「許可/禁止」のような対になる選択音を同じ音へ揃えられます。
+            const explicitSe = btn.dataset ? btn.dataset.se : '';
+            if (explicitSe) {
+                if (window.AudioManager) window.AudioManager.playSE(explicitSe);
+                return;
+            }
+
             const text = btn.textContent.trim();
             
             // 個別に音を鳴らす設定をしたボタンは、共通の「decision.ogg」をキャンセルします
@@ -380,8 +390,8 @@ class UIManager {
         modals.forEach(modal => {
             const content = modal.querySelector('.modal-content');
             const footer = modal.querySelector('.modal-footer');
-            if (content && footer) {
-                // フッター（ボタン部分）をコンテンツの外に出す
+            if (content && footer && !footer.classList.contains('modal-footer-inside')) {
+                // 標準モーダルはフッターを外へ出す。専用全画面などはHTML側の汎用指定で内部保持できる。
                 modal.appendChild(footer);
             }
         });

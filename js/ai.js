@@ -106,7 +106,16 @@ class AIEngine {
 
             // ★修正：軍事フェーズ（出陣）を一番最初に確認するように順番を上に移動させます！
             const clanOps = this.game.aiOperationManager.operations[castle.ownerClan];
-            const myOperation = clanOps ? clanOps[castle.legionId] : null;
+            let myOperation = clanOps ? clanOps[castle.legionId] : null;
+
+            // 評定後に残っていた古い攻撃作戦も、出撃直前にもう一度専門部署へ確認します。
+            if (myOperation && myOperation.type === '攻撃' && this.game.legionPolicySystem &&
+                !this.game.legionPolicySystem.isOperationAllowed(castle.ownerClan, castle.legionId, myOperation)) {
+                if (this.game.aiOperationManager && typeof this.game.aiOperationManager.reconcileLegionPolicy === 'function') {
+                    this.game.aiOperationManager.reconcileLegionPolicy(castle.ownerClan, castle.legionId);
+                }
+                myOperation = null;
+            }
             
             // 自分の大名家に「作戦」があり、それが「攻撃」で、かつ「実行中」の場合
             if (myOperation && myOperation.type === '攻撃' && myOperation.status === '実行中') {

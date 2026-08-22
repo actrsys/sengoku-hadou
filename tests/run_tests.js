@@ -212,6 +212,9 @@ test('UserSettings は GameConfig と分離され、localStorage の正本にな
     assert.strictEqual(values.get('userBgmVolume'), '0.6');
 
     assert.ok(!read('js/ui_settings.js').includes('window.GameConfig.'));
+    assert.ok(!read('js/ui_settings.js').includes('eventManager'), '設定UIは歴史常駐効果の実処理を直接呼ばない');
+    assert.ok(read('js/user_settings.js').includes("'user-setting-changed'"), 'UserSettings が設定変更を通知する');
+    assert.ok(read('js/game.js').includes("detail.key !== 'historicalEvent'"), 'GameManager が歴史イベント設定変更だけを EventManager へルーティングする');
     assert.ok(!read('js/audio.js').includes('localStorage.'));
 });
 
@@ -1326,6 +1329,185 @@ test('1560桶狭間データは願証寺と既存一向一揆だけに ikko シ�
     assert.ok(tagged.every(row => row.ideology === '宗教'), '一向宗シールを付けても思想は宗教のまま');
 });
 
+test('国主評定は月1回だけ開催でき、旧軍団は従来どおり自由裁量になる', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/legion_policy_system.js');
+    const LegionPolicySystem = vm.runInContext('LegionPolicySystem', ctx);
+    const commander = { id: 10, clan: 1, status: 'active' };
+    const game = {
+        playerClanId: 1,
+        year: 1560,
+        month: 5,
+        flags: {},
+        legions: [{ clanId: 1, legionNo: 1, commanderId: 10 }],
+        getBusho: id => Number(id) === 10 ? commander : null,
+        getCurrentTurnId() { return this.year * 12 + this.month; },
+        getRelation: () => ({ status: '普通' })
+    };
+    const system = new LegionPolicySystem(game);
+
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(system.getPolicy(1, 1))), {
+        allowOffense: true,
+        allowNewHostility: true
+    });
+    assert.strictEqual(system.canHoldCouncil(1), true);
+    assert.strictEqual(system.beginCouncil(1), true);
+    assert.strictEqual(system.canHoldCouncil(1), false);
+    game.month = 6;
+    assert.strictEqual(system.canHoldCouncil(1), true);
+});
+
+test('評定の新規交戦禁止は敵対中の相手だけ攻撃可能にし、攻勢禁止は自主攻撃を止める', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/legion_policy_system.js');
+    const LegionPolicySystem = vm.runInContext('LegionPolicySystem', ctx);
+    const game = {
+        playerClanId: 1,
+        flags: {},
+        legions: [{ clanId: 1, legionNo: 1, commanderId: 10 }],
+        getBusho: id => Number(id) === 10 ? { id: 10, clan: 1, status: 'active' } : null,
+        getCurrentTurnId: () => 100,
+        getRelation: (a, b) => ({ status: Number(b) === 2 ? '敵対' : '普通' }),
+        getCastle: () => null
+    };
+    const system = new LegionPolicySystem(game);
+
+    system.setPolicy(1, 1, { allowOffense: true, allowNewHostility: false });
+    assert.strictEqual(system.canAttackClan(1, 1, 2), true, '敵対勢力へは攻撃できる');
+    assert.strictEqual(system.canAttackClan(1, 1, 3), false, '非敵対勢力へは攻撃しない');
+    assert.strictEqual(system.canAttackClan(1, 1, 0), true, '空き城は新規交戦ではない');
+    assert.strictEqual(system.canAttackTarget(1, 1, { isKunishuTarget: true }), true, '諸勢力は攻勢許可だけを見る');
+
+    system.setPolicy(1, 1, { allowOffense: false, allowNewHostility: true });
+    assert.strictEqual(system.canAttackClan(1, 1, 2), false);
+    assert.strictEqual(system.canAttackTarget(1, 1, { isKunishuTarget: true }), false);
+});
+
+
+test('評定方針は観戦・AI操作中は拘束を停止し、プレイヤー復帰時に保存値を再適用する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/legion_policy_system.js');
+    const LegionPolicySystem = vm.runInContext('LegionPolicySystem', ctx);
+    const game = {
+        playerClanId: 1,
+        isWatchMode: false,
+        flags: {},
+        legions: [{ clanId: 1, legionNo: 1, commanderId: 10 }],
+        getBusho: id => Number(id) === 10 ? { id: 10, clan: 1, status: 'active' } : null,
+        getCurrentTurnId: () => 100,
+        getRelation: () => ({ status: '普通' }),
+        getCastle: () => null
+    };
+    const system = new LegionPolicySystem(game);
+    system.setPolicy(1, 1, { allowOffense: false, allowNewHostility: false });
+    assert.strictEqual(system.canAttackClan(1, 1, 2), false, 'プレイヤー操作中は評定の攻勢禁止を守る');
+
+    game.isWatchMode = true;
+    game.playerClanId = -100;
+    assert.strictEqual(system.canAttackClan(1, 1, 2), true, '観戦中は保存済み評定でAI勢力を拘束しない');
+    assert.strictEqual(system.getPolicy(1, 1).allowOffense, false, '観戦中も評定内容そのものは保存しておく');
+
+    game.isWatchMode = false;
+    game.playerClanId = 1;
+    assert.strictEqual(system.canAttackClan(1, 1, 2), false, '同じ勢力へ復帰すると以前の評定命令が再び有効になる');
+});
+
+test('観戦への切替では直轄AI作戦を準備し、プレイヤー復帰時は直轄作戦を片付ける', () => {
+    const gameSource = read('js/game.js');
+    const operationSource = read('js/ai_operation.js');
+    assert.ok(gameSource.includes('onClanBecameAIControlled(previousPlayerClanId)'), '観戦開始時は作戦専門部署へAI移行を通知する');
+    assert.ok(gameSource.includes('onClanBecamePlayerControlled(selectedClan.id)'), '観戦終了時は作戦専門部署へプレイヤー移行を通知する');
+    assert.ok(operationSource.includes('await this.generateOperation(clanId, 0)'), 'AI化した直轄軍団0にはその場で作戦を補う');
+    assert.ok(operationSource.includes('this.clearLegionPlanning(clanId, 0)'), 'プレイヤー化した直轄軍団0のAI作戦は残さない');
+    assert.ok(operationSource.includes('this.reconcileLegionPolicy(clanId, legionNo)'), 'プレイヤー復帰時は非直轄軍団へ保存済み評定を再適用する');
+});
+test('評定方針の確定は LegionPolicySystem が保存し、作戦専門部署へ再確認だけ依頼する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/legion_policy_system.js');
+    const LegionPolicySystem = vm.runInContext('LegionPolicySystem', ctx);
+    let reconcileCount = 0;
+    const game = {
+        playerClanId: 1,
+        flags: {},
+        legions: [{ clanId: 1, legionNo: 1, commanderId: 10 }],
+        getBusho: id => Number(id) === 10 ? { id: 10, clan: 1, status: 'active' } : null,
+        getCurrentTurnId: () => 100,
+        getRelation: () => ({ status: '敵対' }),
+        aiOperationManager: { reconcileLegionPolicy() { reconcileCount++; } }
+    };
+    const system = new LegionPolicySystem(game);
+    const changed = system.commitPolicies(1, { 1: { allowOffense: false, allowNewHostility: false } });
+    assert.strictEqual(changed, 1);
+    assert.strictEqual(game.legions[0].policy.allowOffense, false);
+    assert.strictEqual(game.legions[0].policy.allowNewHostility, false);
+    assert.strictEqual(reconcileCount, 1);
+});
+
+test('評定UIとAIは方針専門部署を正本として参照する', () => {
+    const catalog = read('js/command_catalog.js');
+    const command = read('js/command_system.js');
+    const operation = read('js/ai_operation.js');
+    const ai = read('js/ai.js');
+    const html = read('index.html');
+    const css = read('css/style.css');
+    const ui = read('js/ui.js');
+
+    assert.ok(catalog.includes("'legion_council'"));
+    assert.ok(catalog.includes('game.legionPolicySystem.canHoldCouncil'));
+    assert.ok(command.includes('this.game.ui.legionCouncilView.requestOpen()'));
+    assert.ok(operation.includes('this.game.legionPolicySystem.canAttackClan'));
+    assert.ok(operation.includes('this.game.legionPolicySystem.isOffenseAllowed'));
+    assert.ok(ai.includes('this.game.legionPolicySystem.isOperationAllowed'));
+    assert.ok(html.includes('id="legion-council-modal"'));
+    assert.ok(html.includes('id="legion-council-order-modal"'));
+    assert.ok(html.includes('js/legion_policy_system.js'));
+    assert.ok(html.includes('js/legion_council_view.js'));
+    assert.ok(ui.includes("!footer.classList.contains('modal-footer-inside')"));
+    assert.ok(css.includes('body:not(.is-pc) .legion-council-stage'));
+
+    const councilView = read('js/legion_council_view.js');
+    assert.ok(councilView.includes("this.modal.querySelectorAll('.legion-council-seat')"), '評定は軍団カード全体を選択対象にする');
+    assert.ok(councilView.includes('openOrderEditor'), '軍団別命令は評定一覧と別画面で開く');
+    assert.ok(councilView.includes('this.editingPolicy'), '軍団別命令は評定全体とは別の局所下書きを持つ');
+    assert.ok(councilView.includes('confirmOrderEditor'), '軍団別命令は確定時だけ評定全体の下書きへ反映する');
+    const openOrderStart = councilView.indexOf('openOrderEditor(legionNo)');
+    const openOrderEnd = councilView.indexOf('closeOrderEditor()', openOrderStart);
+    const openOrderBlock = councilView.slice(openOrderStart, openOrderEnd);
+    assert.ok(openOrderBlock.includes("playSE('choice.ogg')"), '軍団カードから命令画面を開く時は選択SEを鳴らす');
+    assert.ok(html.includes('id="legion-council-order-confirm-btn"'), '命令画面に確定ボタンを置く');
+    assert.ok(html.includes('class="modal-footer legion-council-order-footer"'), '命令画面の確定/戻るは標準モーダルと同じく内容枠の外へ出す');
+    assert.ok(html.includes('class="modal-footer legion-council-footer"'), '評定を終えるボタンも標準モーダルと同じく内容枠の外へ出す');
+    assert.ok(!html.includes('modal-footer modal-footer-inside legion-council-footer'), '評定本体だけ内部フッターにする例外を残さない');
+    assert.strictEqual((councilView.match(/data-se="choice\.ogg"/g) || []).length, 4, '許可/禁止の4選択肢はすべて choice SE を明示する');
+    assert.ok(ui.includes("const explicitSe = btn.dataset ? btn.dataset.se : '';"), '共通UIは data-se による明示SEを優先する');
+    const councilCss = read('css/style.css');
+    const hoverStart = councilCss.indexOf('.legion-council-seat:hover');
+    const hoverEnd = councilCss.indexOf('.legion-council-seat-heading', hoverStart);
+    assert.ok(hoverStart >= 0 && !councilCss.slice(hoverStart, hoverEnd).includes('translateY(-1px)'), '軍団カードはhover/focusで上へ動かして見切れさせない');
+    assert.ok(!html.includes('modal-footer modal-footer-inside legion-council-order-footer'), '命令画面だけフッターを内部保持する例外を残さない');
+    assert.ok(html.includes('id="legion-council-order-back-btn"') && html.includes('>戻る</button>'), '命令画面に右クリック互換の戻るボタンを置く');
+    assert.ok(ui.includes("const targetTexts = ['閉じる', '戻る', 'いいえ']"), 'PC右クリックは戻るボタンを共通キャンセル操作として扱う');
+    assert.ok(!councilView.includes('legion-council-order-btn'), '軍団カード内に個別命令ボタンを残さない');
+});
+
+test('評定の二択UIは設定画面と同系統の切替表示を使い、確定SEを二重再生しない', () => {
+    const councilView = read('js/legion_council_view.js');
+    const css = read('css/style.css');
+    assert.strictEqual((councilView.match(/class=\"ui-toggle-btn/g) || []).length, 4, '許可/禁止は4つとも汎用切替ボタンを使う');
+    assert.ok(css.includes('.troop-type-btn,\n.ui-toggle-btn'), '評定切替はユーザー設定と同じ基本ボタン配色を共有する');
+    const confirmOrderStart = councilView.indexOf('\n    confirmOrderEditor() {');
+    const renderOrderStart = councilView.indexOf('\n    renderOrderEditor() {', confirmOrderStart);
+    assert.ok(!councilView.slice(confirmOrderStart, renderOrderStart).includes("playSE('choice.ogg')"), '軍団命令の確定は共通decision SEに重ねてchoiceを鳴らさない');
+    const confirmFinishStart = councilView.indexOf('\n    confirmFinish() {');
+    assert.ok(!councilView.slice(confirmFinishStart).includes("playSE('choice.ogg')"), '命令を確定する確認後にchoiceを重ねて二重SEにしない');
+    assert.ok(councilView.includes("cancelText: '戻る'"), '評定終了確認のキャンセルは共通の戻る表記にしてcancel SEへ揃える');
+    assert.ok(!councilView.includes("cancelText: '評定に戻る'"), '評定に戻るという個別文言を残さない');
+});
+
 test('寿命補正は LifeSystem が sourceId ごとに安全に適用・解除する', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/life_system.js');
@@ -1349,6 +1531,30 @@ test('寿命補正は LifeSystem が sourceId ごとに安全に適用・解除�
     assert.strictEqual(busho.lifespanModifiers.historical_test, undefined);
 });
 
+test('寿命補正の付け外しは寿命前低下を使う能力値へ即時反映する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/life_system.js');
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    const busho = {
+        id: 1020005, birthYear: 1522, endYear: 1564, isNotBorn: false, status: 'active',
+        baseLeadership: 100, baseStrength: 100, basePolitics: 100, baseDiplomacy: 100, baseIntelligence: 100,
+        leadership: 0, strength: 0, politics: 0, diplomacy: 0, intelligence: 0,
+        lifespanModifiers: {}
+    };
+    ctx.window.LifeStatusRules = { isUnborn: () => false };
+    const game = { year: 1560, getBusho: id => Number(id) === 1020005 ? busho : null };
+    const system = new LifeSystem(game);
+
+    system.recalculateBushoAgeStats(busho);
+    assert.strictEqual(busho.leadership, 96, '1564没なら1560年時点で寿命前補正-4が入る');
+    system.setLifespanModifier(busho, 'historical_test', 5);
+    assert.strictEqual(busho.endYear, 1569);
+    assert.strictEqual(busho.leadership, 100, '寿命+5を適用した瞬間に寿命前補正を外す');
+    system.removeLifespanModifier(busho, 'historical_test');
+    assert.strictEqual(busho.endYear, 1564);
+    assert.strictEqual(busho.leadership, 96, '寿命補正を解除した瞬間に寿命前補正を戻す');
+});
+
 test('常駐歴史イベントは EventManager が状態遷移だけを管理し通常イベント枠を消費しない', () => {
     const source = read('js/event_manager.js');
     assert.ok(source.includes("eventData.type === 'resident'"));
@@ -1360,6 +1566,44 @@ test('常駐歴史イベントは EventManager が状態遷移だけを管理し
     const registerBlock = source.slice(source.indexOf('registerEvent(eventData)'), source.indexOf('/**\n     * 常駐イベント'));
     assert.ok(registerBlock.includes('this.residentEvents[timing].push(eventData)'));
     assert.ok(registerBlock.includes('return;'));
+});
+
+test('歴史イベントOFF時は適用中の歴史常駐効果を解除し、ON時は次の登録タイミングで再評価する', async () => {
+    const ctx = createContext();
+    let enters = 0;
+    let exits = 0;
+    ctx.window.GameEvents = [{
+        id: 'historical_resident_test',
+        type: 'resident',
+        timings: ['startMonth_before', 'endMonth_before'],
+        checkCondition: () => true,
+        onEnter: async () => { enters += 1; },
+        onExit: async () => { exits += 1; }
+    }];
+    ctx.window.UserSettings = { historicalEvent: true };
+    loadScript(ctx, 'js/event_manager.js');
+    const EventManager = vm.runInContext('EventManager', ctx);
+    const game = { flags: {}, writeSystemDiagnostic() {} };
+    const manager = new EventManager(game);
+
+    await manager.processEvents('startMonth_before');
+    assert.strictEqual(enters, 1, 'ON中は条件成立で常駐効果を適用する');
+    assert.strictEqual(game.flags.__residentEventStates.historical_resident_test.active, true);
+
+    ctx.window.UserSettings.historicalEvent = false;
+    await manager.onHistoricalEventSettingChanged(false);
+    assert.strictEqual(exits, 1, '設定OFFの瞬間に適用中の常駐効果を解除する');
+    assert.strictEqual(game.flags.__residentEventStates.historical_resident_test.active, false);
+
+    await manager.processEvents('endMonth_before');
+    assert.strictEqual(enters, 1, 'OFF中は条件成立でも再適用しない');
+    assert.strictEqual(exits, 1, '解除済み効果を月末で二重解除しない');
+
+    ctx.window.UserSettings.historicalEvent = true;
+    await manager.onHistoricalEventSettingChanged(true);
+    assert.strictEqual(enters, 1, '再ONした瞬間には常駐効果を勝手に再適用しない');
+    await manager.processEvents('startMonth_before');
+    assert.strictEqual(enters, 2, '再ON後は次の登録タイミングで条件を再評価して適用する');
 });
 
 test('三好長慶の寿命補正は historical_event 側が条件・対象・年数を所有する', () => {
@@ -1382,6 +1626,15 @@ test('三好長慶の寿命補正は historical_event 側が条件・対象・�
     assert.ok(!life.includes('1020005'), 'LifeSystem に三好長慶IDを持たせない');
     assert.ok(!life.includes('1020006'), 'LifeSystem に三好義興IDを持たせない');
     assert.ok(!life.includes('三好長慶'), 'LifeSystem に三好固有知識を持たせない');
+});
+
+test('歴史イベントOFFでロードした場合も保存済みの歴史常駐効果を復元後に解除する', () => {
+    const save = read('js/save_manager.js');
+    assert.ok(save.includes("window.UserSettings.historicalEvent === false"));
+    assert.ok(save.includes('await this.game.eventManager.onHistoricalEventSettingChanged(false)'));
+    const restorePos = save.indexOf('this.game.lifeSystem.updateAllBushosAge();');
+    const cleanupPos = save.indexOf('await this.game.eventManager.onHistoricalEventSettingChanged(false)', restorePos);
+    assert.ok(cleanupPos > restorePos, 'Bushoとflagsを復元してから歴史常駐効果を解除する');
 });
 
 test('Busho は寿命補正付きセーブでも本来の没年と補正元を保持する', () => {
@@ -1440,6 +1693,7 @@ test('gameを保持する主要Systemは window.GameApp へ戻らない', () => 
         'js/event_manager.js',
         'js/independence_system.js',
         'js/kunishu_system.js',
+        'js/legion_policy_system.js',
         'js/war_effort.js',
         'js/map_generator.js'
     ];

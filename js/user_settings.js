@@ -85,6 +85,11 @@ class UserSettingsManager {
     setHistoricalEvent(value) {
         this.historicalEvent = !!value;
         this._write(UserSettingsManager.STORAGE_KEYS.historicalEvent, this.historicalEvent);
+        if (typeof window.dispatchEvent === 'function' && typeof window.CustomEvent === 'function') {
+            window.dispatchEvent(new window.CustomEvent('user-setting-changed', {
+                detail: { key: 'historicalEvent', value: this.historicalEvent }
+            }));
+        }
         return this.historicalEvent;
     }
 

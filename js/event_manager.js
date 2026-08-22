@@ -86,7 +86,9 @@ class EventManager {
     /**
      * 常駐イベントの状態変化だけを監視します。
      * false -> true で onEnter、true -> false で onExit を1回だけ実行します。
-     * 状態は game.flags に保存されるため、セーブ/ロードや歴史イベントON/OFFを跨いでも継続できます。
+     * 状態は game.flags に保存してセーブ/ロード後も復元します。
+     * 歴史イベントをOFFにした場合、historical_ 常駐イベントは条件を評価せず false へ遷移させ、
+     * 適用中の常駐効果を onExit で解除します。再ON後は次の登録タイミングで条件を再評価します。
      */
     async processResidentEvents(timing, context = null, isHistoricalOff = false) {
         const targetEvents = this.residentEvents[timing];
@@ -97,17 +99,21 @@ class EventManager {
 
         for (const ev of targetEvents) {
             const isHistorical = ev.id && ev.id.startsWith('historical_');
-            if (isHistoricalOff && isHistorical) continue;
-
             const saved = stateBook[ev.id];
             const wasActive = saved === true || (saved && saved.active === true);
             let isActive = false;
 
-            try {
-                isActive = !!ev.checkCondition(this.game, context);
-            } catch (error) {
-                console.warn(`常駐イベント ${ev.id} の条件判定中にエラーが出ましたが、進行を継続します:`, error);
-                continue;
+            // 歴史イベントOFF中は、適用済みの historical_ 常駐効果を解除する。
+            // 条件が成立していてもOFF設定を優先し、再ONまでは再適用しない。
+            if (isHistoricalOff && isHistorical) {
+                isActive = false;
+            } else {
+                try {
+                    isActive = !!ev.checkCondition(this.game, context);
+                } catch (error) {
+                    console.warn(`常駐イベント ${ev.id} の条件判定中にエラーが出ましたが、進行を継続します:`, error);
+                    continue;
+                }
             }
 
             if (isActive === wasActive) continue;
@@ -129,6 +135,39 @@ class EventManager {
                 stateBook[ev.id] = { active: isActive };
             } catch (error) {
                 console.warn(`常駐イベント ${ev.id} の状態更新中にエラーが出ましたが、進行を継続します:`, error);
+            }
+        }
+    }
+
+    /**
+     * 設定画面で歴史イベントをOFFにした瞬間、現在適用中の歴史常駐効果だけを解除します。
+     * ONへの切替では即時発火させず、各イベントが登録した次のタイミングで条件を再評価します。
+     */
+    async onHistoricalEventSettingChanged(enabled, context = null) {
+        if (enabled !== false) return;
+
+        this.game.flags = this.game.flags || {};
+        const stateBook = this.game.flags.__residentEventStates || (this.game.flags.__residentEventStates = {});
+        const seen = new Set();
+
+        for (const events of Object.values(this.residentEvents)) {
+            for (const ev of events || []) {
+                if (!ev || !ev.id || !ev.id.startsWith('historical_') || seen.has(ev.id)) continue;
+                seen.add(ev.id);
+
+                const saved = stateBook[ev.id];
+                const wasActive = saved === true || (saved && saved.active === true);
+                if (!wasActive) continue;
+
+                try {
+                    if (typeof ev.onExit === 'function') await ev.onExit(this.game, context);
+                    stateBook[ev.id] = { active: false };
+                    if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                        this.game.writeSystemDiagnostic(`resident_event:setting_off:${ev.id}:exit`);
+                    }
+                } catch (error) {
+                    console.warn(`常駐イベント ${ev.id} のOFF時解除中にエラーが出ましたが、進行を継続します:`, error);
+                }
             }
         }
     }

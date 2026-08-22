@@ -180,6 +180,41 @@
             </div>
         </div>
         
+        <div id="legion-council-modal" class="modal hidden">
+            <div class="modal-content legion-council-content">
+                <div class="legion-council-header">
+                    <div class="legion-council-kicker">国主評定</div>
+                    <h3 id="legion-council-clan-name">評定</h3>
+                    <div id="legion-council-date" class="legion-council-date"></div>
+                    <div class="legion-council-guidance">命令を変更する国主を選んでください。</div>
+                </div>
+                <div class="legion-council-stage">
+                    <div id="legion-council-left" class="legion-council-seats legion-council-left"></div>
+                    <div class="legion-council-center" aria-hidden="true">
+                        <div class="legion-council-emblem">評</div>
+                    </div>
+                    <div id="legion-council-right" class="legion-council-seats legion-council-right"></div>
+                </div>
+                <div class="modal-footer legion-council-footer">
+                    <button id="legion-council-finish-btn" class="btn-primary">評定を終える</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="legion-council-order-modal" class="modal hidden">
+            <div class="modal-content legion-council-order-content">
+                <div class="legion-council-order-header">
+                    <div class="legion-council-kicker">国主への命令</div>
+                    <h3 id="legion-council-order-title">命令</h3>
+                </div>
+                <div id="legion-council-order-body" class="legion-council-order-body"></div>
+                <div class="modal-footer legion-council-order-footer">
+                    <button id="legion-council-order-confirm-btn" class="btn-primary">確定</button>
+                    <button id="legion-council-order-back-btn" class="btn-secondary">戻る</button>
+                </div>
+            </div>
+        </div>
+
         <div id="gunshi-modal" class="modal hidden">
             <div class="modal-content modal-small">
                 <h3 id="gunshi-name">軍師</h3>
@@ -567,6 +602,7 @@
     <script src="js/courtRank_system.js"></script>
     <script src="js/diplomacy.js"></script>
     <script src="js/kunishu_system.js"></script>
+    <script src="js/legion_policy_system.js"></script>
     <script src="js/life_system.js"></script>
     <script src="js/gunshi_system.js"></script>
     <script src="js/troop_allocation.js"></script>
@@ -594,6 +630,7 @@
     <script src="js/ui_info_kyoten.js"></script>
     <script src="js/ui_slider.js"></script>
     <script src="js/ui_settings.js"></script>
+    <script src="js/legion_council_view.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/ui_map.js"></script>
     <script src="js/castle_manager.js"></script>

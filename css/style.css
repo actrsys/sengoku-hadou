@@ -1466,7 +1466,8 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 }
 
 .troop-type-selector { display: flex; gap: 4px; }
-.troop-type-btn { 
+.troop-type-btn,
+.ui-toggle-btn { 
     padding: 4px 12px; 
     font-size: 0.95rem; 
     font-family: 'FudeGoshirae', serif;
@@ -1480,12 +1481,14 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
     box-shadow: inset 0 0 0 1px rgba(30, 15, 10, 0.4), 0 2px 4px rgba(0,0,0,0.4);
 }
-.troop-type-btn:hover:not(.active) { 
+.troop-type-btn:hover:not(.active),
+.ui-toggle-btn:hover:not(.active) { 
     background: linear-gradient(135deg, #795548 0%, #4e342e 100%);
     color: #ffffff;
     border-color: #a1887f #8d6e63 #5d4037 #8d6e63;
 }
-.troop-type-btn.active { 
+.troop-type-btn.active,
+.ui-toggle-btn.active { 
     background: linear-gradient(135deg, #c28e3a 0%, #8a6021 100%); 
     color: #ffffff; 
     border-color: #fce8a1 #d4af37 #a88a2c #d4af37;
@@ -1494,7 +1497,9 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 }
 
 .troop-type-btn.disabled,
-.troop-type-btn:disabled {
+.troop-type-btn:disabled,
+.ui-toggle-btn.disabled,
+.ui-toggle-btn:disabled {
     filter: grayscale(100%) brightness(0.6);
     cursor: not-allowed;
     color: #aaaaaa;
@@ -1504,7 +1509,8 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 }
 
 /* 選ばれている(active)時は、押せなくても(disabled)暗くならず光ったままにする魔法 */
-.troop-type-btn.active:disabled {
+.troop-type-btn.active:disabled,
+.ui-toggle-btn.active:disabled {
     filter: none;
     color: #ffffff;
     border-color: #fce8a1 #d4af37 #a88a2c #d4af37;
@@ -4905,3 +4911,505 @@ body:not(.is-pc) .saveload-latest-mark {
 }
 body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
 
+
+/* ========================================================================== 
+   国主評定
+   PCは16:9、スマホは9:16の固定ゲーム画面内で完結させる。
+   評定本体は一覧専用。命令編集は別モーダルへ分離し、どちらもスクロールさせない。
+   ========================================================================== */
+#legion-council-modal {
+    z-index: 8450;
+    padding: 10px;
+    overflow: hidden !important;
+}
+
+#legion-council-modal .legion-council-content {
+    width: 1040px;
+    max-width: calc(100% - 20px);
+    height: 630px;
+    max-height: calc(100% - 86px);
+    padding: 12px 16px 10px;
+    overflow: hidden !important;
+    background:
+        radial-gradient(circle at 50% 42%, rgba(219, 190, 104, 0.10), transparent 32%),
+        linear-gradient(180deg, #213f29 0%, #142c1c 100%);
+}
+
+.legion-council-header {
+    flex: 0 0 auto;
+    text-align: center;
+    position: relative;
+    padding: 0 0 7px;
+}
+
+#legion-council-modal .legion-council-header h3,
+#legion-council-order-modal .legion-council-order-header h3 {
+    text-align: center;
+    margin: 0;
+    padding: 0 0 4px;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.46);
+    font-size: 27px;
+    letter-spacing: 0.12em;
+}
+
+.legion-council-kicker {
+    color: #d9c27a;
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    margin-bottom: 1px;
+    opacity: 0.9;
+}
+
+.legion-council-date {
+    color: rgba(255,255,255,0.78);
+    font-size: 11px;
+    margin-top: 4px;
+    letter-spacing: 0.12em;
+}
+
+.legion-council-guidance {
+    margin-top: 5px;
+    color: rgba(255,255,255,.67);
+    font-size: 10px;
+}
+
+.legion-council-stage {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(250px, 1fr) 86px minmax(250px, 1fr);
+    gap: 12px;
+    align-items: stretch;
+    overflow: hidden;
+}
+
+.legion-council-seats {
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+    gap: 7px;
+}
+
+.legion-council-seat {
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 70px minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    column-gap: 9px;
+    row-gap: 1px;
+    align-items: center;
+    padding: 6px 8px;
+    border: 1px solid rgba(212, 175, 55, 0.38);
+    background: linear-gradient(135deg, rgba(8, 22, 13, 0.86), rgba(38, 71, 43, 0.82));
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.035), 0 2px 7px rgba(0,0,0,0.22);
+    border-radius: 7px;
+    cursor: pointer;
+    user-select: none;
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+    overflow: hidden;
+}
+
+.legion-council-seat:hover,
+.legion-council-seat:focus-visible {
+    border-color: #f1d574;
+    background: linear-gradient(135deg, rgba(18, 37, 23, 0.94), rgba(53, 88, 54, 0.90));
+    box-shadow: inset 0 0 0 1px rgba(241,213,116,0.22), 0 0 10px rgba(212,175,55,0.20);
+    outline: none;
+}
+
+/* 国主席はタッチ端末のhover残留でも上端へ動かさない。選択感は枠と発光だけで示す。 */
+.legion-council-seat:active { transform: none; }
+
+.legion-council-seat-heading {
+    grid-column: 2;
+    color: #e8cf82;
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.legion-council-face {
+    grid-column: 1;
+    grid-row: 1 / 5;
+    width: 70px;
+    height: 86px;
+    object-fit: cover;
+    object-position: center top;
+    border-radius: 4px;
+    border: 1px solid rgba(229, 202, 118, .65);
+    background: rgba(0,0,0,.25);
+}
+
+.legion-council-name {
+    grid-column: 2;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.legion-council-policy-summary {
+    grid-column: 2;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 3px;
+    text-align: left;
+    font-size: 9px;
+    line-height: 1.2;
+}
+
+.legion-council-policy-chip {
+    display: inline-block;
+    max-width: 100%;
+    padding: 2px 4px;
+    border: 1px solid rgba(212,175,55,.27);
+    border-radius: 999px;
+    background: rgba(0,0,0,.18);
+    color: rgba(255,255,255,.77);
+    white-space: nowrap;
+}
+
+.legion-council-seat-hint {
+    grid-column: 2;
+    align-self: end;
+    color: rgba(232,207,130,.78);
+    font-size: 9px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.legion-council-center {
+    align-self: stretch;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.legion-council-center::before,
+.legion-council-center::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    width: 1px;
+    height: calc(50% - 54px);
+    background: linear-gradient(transparent, rgba(212,175,55,.32));
+}
+
+.legion-council-center::before { top: 0; }
+.legion-council-center::after { bottom: 0; transform: rotate(180deg); }
+
+.legion-council-emblem {
+    width: 64px;
+    height: 64px;
+    border: 2px solid rgba(212,175,55,.66);
+    outline: 1px solid rgba(212,175,55,.25);
+    outline-offset: 4px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: #e8ce78;
+    font-size: 30px;
+    line-height: 1;
+    text-shadow: 0 2px 3px rgba(0,0,0,.55);
+    background: radial-gradient(circle, rgba(75,99,53,.52), rgba(16,42,24,.18));
+}
+
+.legion-council-footer {
+    flex: 0 0 48px;
+    min-height: 48px;
+    justify-content: center;
+    padding: 0;
+    margin: 15px 0 0;
+}
+
+#legion-council-finish-btn { min-width: 180px; }
+
+/* 命令編集も固定画面内で完結させる。項目増加時はスクロールではなくタブ/ページ分割する。 */
+#legion-council-order-modal {
+    z-index: 8460;
+    padding: 10px;
+    overflow: hidden !important;
+}
+
+#legion-council-order-modal .legion-council-order-content {
+    width: 560px;
+    max-width: calc(100% - 20px);
+    height: 320px;
+    max-height: calc(100% - 90px);
+    overflow: hidden !important;
+    padding: 14px;
+}
+
+.legion-council-order-header {
+    flex: 0 0 auto;
+    text-align: center;
+    margin-bottom: 6px;
+}
+
+.legion-council-order-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    padding: 2px 4px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.legion-council-order-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: center;
+    padding: 13px 2px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.legion-council-order-row.disabled-row { opacity: .48; }
+
+.legion-council-order-label {
+    min-width: 0;
+    text-align: left;
+}
+
+.legion-council-order-label strong {
+    display: block;
+    color: #fff6d6;
+    font-size: 15px;
+}
+
+.legion-council-order-label small {
+    display: block;
+    color: rgba(255,255,255,.65);
+    font-size: 11px;
+    margin-top: 3px;
+    line-height: 1.45;
+}
+
+.legion-council-toggle {
+    display: flex;
+    gap: 5px;
+}
+
+.legion-council-toggle .ui-toggle-btn {
+    min-width: 62px;
+    min-height: 38px;
+    padding: 6px 10px;
+    font-family: 'FudeGoshirae', serif;
+}
+
+.legion-council-toggle .ui-toggle-btn:disabled { cursor: default; }
+
+.legion-council-order-footer {
+    flex: 0 0 48px;
+    min-height: 48px;
+    justify-content: center;
+    margin: 15px 0 0;
+    padding: 0;
+}
+
+#legion-council-order-confirm-btn,
+#legion-council-order-back-btn { min-width: 140px; }
+
+/* PC版は #game-screen の固定1280×720論理解像度をそのまま使用する。
+   物理ウインドウ差は app_bootstrap.js の等比縮小と黒帯処理へ委譲する。 */
+
+/* スマホ版も #game-screen の9:16領域内で一覧8席を2列×4段に固定し、スクロールさせない。 */
+body:not(.is-pc) #legion-council-modal,
+body:not(.is-pc) #legion-council-order-modal {
+    padding: 0 !important;
+}
+
+body:not(.is-pc) #legion-council-modal .legion-council-content {
+    width: calc(100% - 12px) !important;
+    max-width: calc(100% - 12px) !important;
+    height: auto !important;
+    max-height: calc(100% - 58px) !important;
+    border-radius: 7px !important;
+    overflow: hidden !important;
+    padding: 5px 6px;
+    gap: 1px;
+}
+
+body:not(.is-pc) #legion-council-order-modal .legion-council-order-content {
+    overflow: hidden !important;
+}
+
+/* 命令画面は標準モーダルと同じく、内容枠の下に確定/戻るフッターを置く。 */
+body:not(.is-pc) #legion-council-order-modal .legion-council-order-content {
+    width: calc(100% - 16px) !important;
+    max-width: calc(100% - 16px) !important;
+    height: auto !important;
+    max-height: calc(100% - 88px) !important;
+    border-radius: 8px !important;
+}
+
+body:not(.is-pc) #legion-council-modal .legion-council-header {
+    padding-bottom: 4px;
+}
+
+body:not(.is-pc) #legion-council-modal .legion-council-header h3,
+body:not(.is-pc) #legion-council-order-modal .legion-council-order-header h3 {
+    font-size: 19px;
+    padding-bottom: 2px;
+}
+
+body:not(.is-pc) .legion-council-kicker {
+    font-size: 8px;
+    margin-bottom: 0;
+}
+
+body:not(.is-pc) .legion-council-date {
+    font-size: 9px;
+    margin-top: 2px;
+}
+
+body:not(.is-pc) .legion-council-guidance {
+    margin-top: 3px;
+    font-size: 8px;
+}
+
+body:not(.is-pc) .legion-council-stage {
+    /* 端末幅が広くても9:16キャンバスの余剰高でカード自体を縦に引き伸ばさない。 */
+    flex: 0 0 auto;
+    min-height: 0;
+    height: 332px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(4, 80px);
+    gap: 4px;
+    align-content: start;
+    overflow: hidden;
+}
+
+body:not(.is-pc) .legion-council-left,
+body:not(.is-pc) .legion-council-right { display: contents; }
+
+body:not(.is-pc) .legion-council-center { display: none; }
+
+body:not(.is-pc) .legion-council-seat {
+    min-height: 0;
+    height: 100%;
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr);
+    grid-template-rows: repeat(3, auto);
+    column-gap: 5px;
+    row-gap: 2px;
+    align-items: center;
+    align-content: center;
+    padding: 3px 4px;
+}
+
+body:not(.is-pc) .legion-council-face {
+    grid-column: 1;
+    grid-row: 1 / 4;
+    width: 46px;
+    height: 56px;
+}
+
+body:not(.is-pc) .legion-council-seat-heading,
+body:not(.is-pc) .legion-council-name,
+body:not(.is-pc) .legion-council-policy-summary {
+    grid-column: 2;
+    width: auto;
+    text-align: left;
+}
+
+body:not(.is-pc) .legion-council-seat-heading {
+    font-size: 8px;
+    margin: 0;
+}
+
+body:not(.is-pc) .legion-council-name {
+    font-size: 11px;
+    margin: 0;
+}
+
+body:not(.is-pc) .legion-council-policy-summary {
+    justify-content: flex-start;
+    align-content: center;
+    margin: 0;
+    gap: 2px;
+    font-size: 7px;
+}
+
+body:not(.is-pc) .legion-council-policy-chip {
+    padding: 1px 3px;
+    white-space: nowrap;
+}
+
+body:not(.is-pc) .legion-council-seat-hint { display: none; }
+
+body:not(.is-pc) .legion-council-footer {
+    flex: 0 0 40px;
+    min-height: 40px;
+    margin: 15px 0 0;
+    padding: 0;
+    position: relative;
+    z-index: 2;
+    width: calc(100% - 12px);
+}
+
+body:not(.is-pc) #legion-council-finish-btn {
+    min-width: 148px;
+    min-height: 30px;
+}
+
+body:not(.is-pc) #legion-council-order-modal .legion-council-order-content {
+    padding: max(8px, env(safe-area-inset-top)) 10px max(8px, env(safe-area-inset-bottom));
+    justify-content: flex-start;
+    gap: 6px;
+}
+
+body:not(.is-pc) .legion-council-order-header {
+    margin-bottom: 4px;
+}
+
+body:not(.is-pc) .legion-council-order-body {
+    flex: 0 0 auto;
+    justify-content: flex-start;
+    padding: 0 2px;
+}
+
+body:not(.is-pc) .legion-council-order-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 10px 2px;
+}
+
+body:not(.is-pc) .legion-council-order-label strong { font-size: 14px; }
+body:not(.is-pc) .legion-council-order-label small { font-size: 10px; margin-top: 2px; }
+
+body:not(.is-pc) .legion-council-toggle { width: 100%; }
+body:not(.is-pc) .legion-council-toggle button {
+    flex: 1 1 50%;
+    min-height: 40px;
+}
+
+body:not(.is-pc) .legion-council-order-footer {
+    flex: 0 0 auto;
+    min-height: 42px;
+    margin: 15px 0 0;
+    padding: 0;
+    gap: 8px;
+    width: calc(100% - 16px);
+}
+
+body:not(.is-pc) #legion-council-order-confirm-btn,
+body:not(.is-pc) #legion-council-order-back-btn {
+    min-width: 0;
+    flex: 1 1 50%;
+    min-height: 36px;
+}

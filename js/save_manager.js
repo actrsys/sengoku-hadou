@@ -311,6 +311,14 @@ class SaveManager {
 
         this.game.updateAllCastlesLords();
         this.game.lifeSystem.updateAllBushosAge();
+
+        // セーブ時に歴史常駐効果が有効でも、現在のユーザー設定が歴史イベントOFFなら
+        // ロード直後に解除して「設定OFFなのに効果だけ残る」状態を作らない。
+        if (window.UserSettings && window.UserSettings.historicalEvent === false
+            && this.game.eventManager && typeof this.game.eventManager.onHistoricalEventSettingChanged === 'function') {
+            await this.game.eventManager.onHistoricalEventSettingChanged(false);
+        }
+
         this.game.updateClanDisplayNames();
 
         this.game.ui.hasInitializedMap = false;

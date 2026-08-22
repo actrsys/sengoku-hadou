@@ -51,11 +51,65 @@ class LifeSystem {
         } else {
             person.lifespanModifiers[sourceId] = newYears;
         }
+
+        // endYear は寿命前能力補正にも使われるため、寿命変更と能力表示を同じ瞬間に同期します。
+        if (delta !== 0) this.recalculateBushoAgeStats(person);
         return delta;
     }
 
     removeLifespanModifier(personOrId, sourceId) {
         return this.setLifespanModifier(personOrId, sourceId, 0);
+    }
+
+    /**
+     * 1人分の年齢・寿命由来の能力補正を再計算します。
+     * LifeSystem が能力計算の正本を持ち、寿命補正の付け外し時にも同じ計算を即時反映します。
+     */
+    recalculateBushoAgeStats(busho, currentYear = null) {
+        if (!busho) return false;
+        const year = Number(currentYear !== null ? currentYear : (this.game ? this.game.year : NaN));
+        if (!Number.isFinite(year) || !Number.isFinite(Number(busho.birthYear)) || !Number.isFinite(Number(busho.endYear))) return false;
+        if (busho.isNotBorn || (window.LifeStatusRules && window.LifeStatusRules.isUnborn(busho))) return false;
+
+        const requiredBaseStats = ['baseLeadership', 'baseStrength', 'basePolitics', 'baseDiplomacy', 'baseIntelligence'];
+        if (requiredBaseStats.some(key => !Number.isFinite(Number(busho[key])))) return false;
+
+        const age = year - Number(busho.birthYear);
+        let penaltyYoung = 0;
+        let penaltyOldGeneral = 0;
+        let penaltyOldInt = 0;
+
+        if (age < 20) {
+            penaltyYoung = 5 + (20 - age);
+        } else if (age < 30) {
+            penaltyYoung = Math.ceil((30 - age) / 2);
+        }
+
+        if (age >= 61) {
+            penaltyOldGeneral = 5 + Math.ceil((age - 60) / 2);
+        } else if (age >= 46) {
+            penaltyOldGeneral = Math.ceil((age - 45) / 3);
+        }
+
+        if (age >= 71) {
+            penaltyOldInt = 5 + Math.ceil((age - 70) / 2);
+        } else if (age >= 56) {
+            penaltyOldInt = Math.ceil((age - 55) / 3);
+        }
+
+        let penaltyLifespan = 0;
+        const actualEndYear = Number(busho.endYear);
+        if (year >= actualEndYear - 5) {
+            const yearsPassed = year - (actualEndYear - 5) + 1;
+            penaltyLifespan = yearsPassed * 2;
+        }
+
+        busho.leadership = Math.max(1, Number(busho.baseLeadership) - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
+        busho.strength = Math.max(1, Number(busho.baseStrength) - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
+        busho.politics = Math.max(1, Number(busho.basePolitics) - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
+        busho.diplomacy = Math.max(1, Number(busho.baseDiplomacy) - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
+        busho.intelligence = Math.max(1, Number(busho.baseIntelligence) - penaltyYoung - penaltyOldInt - penaltyLifespan);
+        return true;
     }
 
     // ★Round5：古いセーブや特殊イベントで familyIds が空欄でも停止しない安全装置です。
@@ -108,77 +162,20 @@ class LifeSystem {
         await this.checkDeath();
     }
 
-    // ★ 全員の年齢から能力値を計算し直す魔法です！
+    // ★ 全員の年齢から能力値を計算し直します。
     updateAllBushosAge() {
         const currentYear = this.game.year;
-        
+
         for (const b of this.game.bushos) {
-            // ★ここから修正：状態は変えず、フラグで「出生前」を管理します
+            // 出生状態の同期は年次処理だけで行い、寿命補正の付け外しからは触りません。
             if (b.birthYear > currentYear) {
                 this.setLifeStatusRaw(b, window.GameConstants.BushoStatus.UNBORN);
-                b.isNotBorn = true; // まだ生まれていないバリエーション
+                b.isNotBorn = true;
             } else if (b.isNotBorn && b.birthYear <= currentYear) {
-                b.isNotBorn = false; // 生まれたのでフラグを下ろします
+                b.isNotBorn = false;
             }
 
-            // 出生前（フラグあり）や、まだ登場していない（元服前）武将は能力計算をスキップ
-            if (b.isNotBorn || window.LifeStatusRules.isUnborn(b)) continue;
-
-            // 今の年齢を計算します
-            const age = currentYear - b.birthYear;
-            
-            let penaltyYoung = 0;       // 若い時のマイナス
-            let penaltyOldGeneral = 0;  // おじいちゃんになった時のマイナス（智謀以外）
-            let penaltyOldInt = 0;      // おじいちゃんになった時のマイナス（智謀だけ）
-            
-            // 若い時のペナルティ計算
-            if (age < 20) {
-                // 0歳〜19歳の場合（20歳時点でのペナルティ5に加えて、1歳若くなるごとにマイナス1）
-                penaltyYoung = 5 + (20 - age);
-            } else if (age < 30) {
-                // 20歳〜29歳の場合（2歳若くなるごとにマイナス1）
-                penaltyYoung = Math.ceil((30 - age) / 2);
-            } 
-            
-            // 46歳以上の場合のペナルティ計算（智謀以外）
-            if (age >= 61) {
-                // 61歳以上の場合は、60歳までのペナルティ（5）に加えて、さらに2年ごとにマイナス1
-                penaltyOldGeneral = 5 + Math.ceil((age - 60) / 2);
-            } else if (age >= 46) {
-                // 46歳〜60歳までは、3年ごとにマイナス1
-                penaltyOldGeneral = Math.ceil((age - 45) / 3);
-            }
-
-            // 56歳以上の場合のペナルティ計算（智謀だけ）
-            if (age >= 71) {
-                // 71歳以上の場合は、70歳までのペナルティ（5）に加えて、さらに2年ごとにマイナス1
-                penaltyOldInt = 5 + Math.ceil((age - 70) / 2);
-            } else if (age >= 56) {
-                // 56歳〜70歳までは、3年ごとにマイナス1
-                penaltyOldInt = Math.ceil((age - 55) / 3);
-            }
-            
-            // 寿命前補正（死亡年5年前から毎年2ずつ下がる）
-            let penaltyLifespan = 0;
-            const actualEndYear = b.endYear;
-            
-            // 今の年が「死亡年の5年前」以上なら、ペナルティを与えます
-            if (currentYear >= actualEndYear - 5) {
-                // 「5年前」の時点を「1年目」として数え始めます
-                const yearsPassed = currentYear - (actualEndYear - 5) + 1;
-                
-                // 経過した年数に2を掛けて、毎年のペナルティ（2, 4, 6...）を出します
-                // 寿命を過ぎて生きている場合も、この年数が増え続けるため減少が続きます
-                penaltyLifespan = yearsPassed * 2;
-            }
-            
-            // 基礎値からペナルティを引いて、0以下にならないように（最低1）セットします
-            // ★新しいペナルティ（penaltyLifespan）も一緒に引き算します！
-            b.leadership = Math.max(1, b.baseLeadership - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
-            b.strength = Math.max(1, b.baseStrength - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
-            b.politics = Math.max(1, b.basePolitics - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
-            b.diplomacy = Math.max(1, b.baseDiplomacy - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
-            b.intelligence = Math.max(1, b.baseIntelligence - penaltyYoung - penaltyOldInt - penaltyLifespan);
+            this.recalculateBushoAgeStats(b, currentYear);
         }
     }
     

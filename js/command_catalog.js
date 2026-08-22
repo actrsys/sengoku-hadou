@@ -43,6 +43,7 @@ const COMMAND_MENU_STRUCTURE = [
     {
         label: "国主",
         items: [
+            'legion_council',
             {
                 label: "国主任命",
                 items: [1, 2, 3, 4, 5, 6, 7, 8].map(n => 'appoint_legion_leader_' + n)
@@ -666,6 +667,12 @@ const COMMAND_SPECS = {
         startMode: 'map_select', targetType: 'hostile_clan_only',
         msg: "朝廷の威光により、敵対大名と和睦します",
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasCourtTrust500(game)
+    },
+
+    // --- 国主評定 ---
+    'legion_council': {
+        label: "評定", category: 'LEGION', isSystem: true, action: 'legion_council',
+        canExecute: (game) => !!(game.legionPolicySystem && game.legionPolicySystem.canHoldCouncil(game.playerClanId))
     },
 
     // --- システム (SYSTEM) - UI生成用プレースホルダ ---

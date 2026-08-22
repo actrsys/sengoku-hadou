@@ -43,6 +43,8 @@ class GameManager {
         this._watchReturnSafePoint = null;
         
         this.kunishuSystem = new KunishuSystem(this);
+        // 国主評定の方針・開催権・AI制約は専門部署で一元管理します。
+        this.legionPolicySystem = new LegionPolicySystem(this);
         // 城の隣接索引・接続探索は全システムでこの1インスタンスを共有します。
         this.mapGraph = new MapGraphService(this);
         this.reinforcementService = new ReinforcementService(this);
@@ -75,6 +77,17 @@ class GameManager {
         this.affiliationSystem = new AffiliationSystem(this);
         // ★ 月初・月末のイベントを管理するシステムを呼び出します！
         this.eventManager = new EventManager(this);
+        // UserSettings は保存と通知だけを担当し、歴史常駐効果の解除は EventManager へ委譲します。
+        this._userSettingChangedHandler = (event) => {
+            const detail = event && event.detail ? event.detail : {};
+            if (detail.key !== 'historicalEvent') return;
+            const manager = this.eventManager;
+            if (!manager || typeof manager.onHistoricalEventSettingChanged !== 'function') return;
+            Promise.resolve(manager.onHistoricalEventSettingChanged(detail.value)).catch(error => {
+                console.warn('歴史イベント設定変更時の常駐効果同期に失敗しました:', error);
+            });
+        };
+        window.addEventListener('user-setting-changed', this._userSettingChangedHandler);
         // ★ 城の管理を専門に行うシステムを呼び出します！
         this.castleManager = new CastleManager(this);
         // ★ 面談システムを呼び出します！
@@ -811,8 +824,14 @@ class GameManager {
 
     startWatchMode() {
         // ゲーム途中から観戦する場合は、戻る時の参考として元の担当勢力を覚えておきます。
-        this._prepareFreshWatchMode(this.playerClanId);
-        this.processTurn();
+        const previousPlayerClanId = Number(this.playerClanId);
+        this._prepareFreshWatchMode(previousPlayerClanId);
+        const prepare = this.aiOperationManager && typeof this.aiOperationManager.onClanBecameAIControlled === 'function'
+            ? this.aiOperationManager.onClanBecameAIControlled(previousPlayerClanId)
+            : null;
+        Promise.resolve(prepare)
+            .catch(error => console.error('観戦開始時のAI作戦準備に失敗しました:', error))
+            .finally(() => this.processTurn());
     }
 
     // Round26：右クリック／長押しでは、その場で選択画面を出さず「帰還予約」だけを立てます。
@@ -926,6 +945,9 @@ class GameManager {
                 this.isWatchMode = false;
                 this.playerClanId = selectedClan.id;
                 this._resetWatchReturnState();
+                if (this.aiOperationManager && typeof this.aiOperationManager.onClanBecamePlayerControlled === 'function') {
+                    this.aiOperationManager.onClanBecamePlayerControlled(selectedClan.id);
+                }
                 
                 if (this.ui.clearCommandMenu) {
                     this.ui.clearCommandMenu();

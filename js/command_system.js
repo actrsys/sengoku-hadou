@@ -810,6 +810,9 @@ class CommandSystem {
             case 'kyoten_list': this.game.ui.showKyotenList(); break;
             // 「settings」と呼ばれたら小窓を開きます
             case 'settings': this.game.ui.showSettingsModal(); break;
+            case 'legion_council':
+                if (this.game.ui.legionCouncilView) this.game.ui.legionCouncilView.requestOpen();
+                break;
             case 'watch':
                 this.game.ui.showDialog("AI同士の戦いを観戦しますか？\n（画面の右クリック、または長押しで中断できます）", true, () => {
                     this.game.startWatchMode();
