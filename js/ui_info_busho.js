@@ -193,8 +193,8 @@ Object.assign(UIInfoManager.prototype, {
         if (busho.clan !== this.game.playerClanId && busho.clan !== 0 && castle) acc = castle.investigatedAccuracy;
         
         const getStatRow = (statKey, label) => {
-            const gradeHtml = GameSystem.getDisplayStatHTML(busho, statKey, gunshi, acc, this.game.playerClanId, myDaimyo);
-            let perceived = GameSystem.getPerceivedStatValue(busho, statKey, gunshi, acc, this.game.playerClanId, myDaimyo);
+            const gradeHtml = StatPresenter.getDisplayStatHTML(busho, statKey, gunshi, acc, this.game.playerClanId, myDaimyo);
+            let perceived = StatPresenter.getPerceivedStatValue(busho, statKey, gunshi, acc, this.game.playerClanId, myDaimyo);
             if (busho.clan === this.game.playerClanId && busho.isDaimyo) perceived = busho[statKey];
             
             let percent = perceived !== null ? Math.max(0, perceived) : 0;
@@ -878,8 +878,8 @@ Object.assign(UIInfoManager.prototype, {
                             return acc;
                         };
 
-                        let perceivedA = GameSystem.getPerceivedStatValue(a, this.bushoCurrentSortKey, gunshi, getAccForSort(a), this.game.playerClanId, myDaimyo);
-                        let perceivedB = GameSystem.getPerceivedStatValue(b, this.bushoCurrentSortKey, gunshi, getAccForSort(b), this.game.playerClanId, myDaimyo);
+                        let perceivedA = StatPresenter.getPerceivedStatValue(a, this.bushoCurrentSortKey, gunshi, getAccForSort(a), this.game.playerClanId, myDaimyo);
+                        let perceivedB = StatPresenter.getPerceivedStatValue(b, this.bushoCurrentSortKey, gunshi, getAccForSort(b), this.game.playerClanId, myDaimyo);
 
                         if (a.clan === this.game.playerClanId && a.isDaimyo) perceivedA = a[this.bushoCurrentSortKey];
                         if (b.clan === this.game.playerClanId && b.isDaimyo) perceivedB = b[this.bushoCurrentSortKey];
@@ -1058,7 +1058,7 @@ Object.assign(UIInfoManager.prototype, {
             } else if (isEnemyTarget && targetCastle) {
                 currentAcc = targetCastle.investigatedAccuracy;
             }
-            const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, currentAcc, this.game.playerClanId, myDaimyo);
+            const getStat = (stat) => StatPresenter.getDisplayStatHTML(b, stat, gunshi, currentAcc, this.game.playerClanId, myDaimyo);
 
             const inputType = isMulti ? 'checkbox' : 'radio';
             let inputHtml = !isViewMode ? `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} ${isSelected ? 'checked' : ''} style="display:none;">` : '';

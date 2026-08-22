@@ -887,7 +887,7 @@ window.GameEvents.push({
             const current = badQueue.shift();
             if (current.distance >= 5) continue; 
 
-            const neighbors = game.castles.filter(c => GameSystem.isAdjacent(current.castle, c));
+            const neighbors = game.castles.filter(c => MapGraphService.isAdjacent(current.castle, c));
             for (let neighbor of neighbors) {
                 if (!visitedBadCastles.has(neighbor.id)) {
                     visitedBadCastles.add(neighbor.id); 
@@ -975,7 +975,7 @@ window.GameEvents.push({
             const current = goodQueue.shift();
             if (current.distance >= 5) continue; 
 
-            const neighbors = game.castles.filter(c => GameSystem.isAdjacent(current.castle, c));
+            const neighbors = game.castles.filter(c => MapGraphService.isAdjacent(current.castle, c));
             for (let neighbor of neighbors) {
                 if (!visitedGoodCastles.has(neighbor.id)) {
                     visitedGoodCastles.add(neighbor.id); 
@@ -1021,8 +1021,8 @@ window.GameEvents.push({
         game.castles.forEach(c => {
             if (c.ownerClan === 0) return; 
             
-            let riceIncome = GameSystem.calcBaseRiceIncome(c);
-            riceIncome = GameSystem.applyVariance(riceIncome, window.MainParams.Economy.IncomeFluctuation);
+            let riceIncome = EconomyRules.calcBaseRiceIncome(c);
+            riceIncome = GameMath.applyVariance(riceIncome, window.MainParams.Economy.IncomeFluctuation);
             
             if (hasStatus(c.provinceId, 'badHarvest')) {
                 riceIncome = Math.floor(riceIncome * 0.8);  //凶作なら80％の収入
@@ -1253,7 +1253,7 @@ window.GameEvents.push({
             if (currentMag <= 1) continue; 
 
             // 道が繋がっているお隣さんのお城を調べます
-            const neighbors = game.castles.filter(c => GameSystem.isAdjacent(current.castle, c));
+            const neighbors = game.castles.filter(c => MapGraphService.isAdjacent(current.castle, c));
             for (let neighbor of neighbors) {
                 if (!visitedCastles.has(neighbor.id)) {
                     visitedCastles.add(neighbor.id); 
@@ -1567,7 +1567,7 @@ window.GameEvents.push({
                 if (targetClan.id === 0 || targetClan.id === clan.id) return;
                 
                 // ★ GameSystemにまとめた計算式を呼び出します！
-                let targetIncome = GameSystem.calcTradeIncomeWithTarget(clan.id, targetClan.id, game);
+                let targetIncome = EconomyRules.calcTradeIncomeWithTarget(clan.id, targetClan.id, game);
                 
                 // 収入が発生し、かつプレイヤーが関係している場合だけログのメモを残します
                 if (targetIncome > 0) {
@@ -1648,8 +1648,8 @@ window.GameEvents.push({
             
             // 大名と浪人の相性のズレを計算します（0〜50の数字になります）
             let affDiff = 50;
-            if (typeof GameSystem !== 'undefined' && GameSystem.calcAffinityDiff) {
-                affDiff = GameSystem.calcAffinityDiff(ronin.affinity, daimyo.affinity);
+            if (typeof PersonnelRules !== 'undefined' && PersonnelRules.calcAffinityDiff) {
+                affDiff = PersonnelRules.calcAffinityDiff(ronin.affinity, daimyo.affinity);
             } else {
                 const diff = Math.abs(ronin.affinity - daimyo.affinity);
                 affDiff = Math.min(diff, 100 - diff);
@@ -1832,8 +1832,8 @@ window.GameEvents.push({
 
                         // 大名同士の相性のズレを計算します（0〜50の数字になります）
                         let affDiff = 25;
-                        if (typeof GameSystem !== 'undefined' && GameSystem.calcAffinityDiff) {
-                            affDiff = GameSystem.calcAffinityDiff(targetDaimyo.affinity, aiDaimyo.affinity);
+                        if (typeof PersonnelRules !== 'undefined' && PersonnelRules.calcAffinityDiff) {
+                            affDiff = PersonnelRules.calcAffinityDiff(targetDaimyo.affinity, aiDaimyo.affinity);
                         } else {
                             const diff = Math.abs(targetDaimyo.affinity - aiDaimyo.affinity);
                             affDiff = Math.min(diff, 100 - diff);

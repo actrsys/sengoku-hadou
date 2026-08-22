@@ -3364,7 +3364,7 @@ class UIManager {
             options.push({ label: "撤退", type: "retreat", desc: "戦場から離脱し、自領へと退却します。" });
         } else if (s.turn === 'defender') {
             // ★修正：中立の空き城（ownerClanが0）の守備軍は、撤退できないようにガードを追加します！
-            if (s.defender.ownerClan !== 0 && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
+            if (s.defender.ownerClan !== 0 && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && MapGraphService.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
                 options.push({ label: "撤退", type: "retreat", desc: "城を捨てて、近隣の安全な城へ退却します。" });
             }
         } else {
@@ -3466,7 +3466,7 @@ class UIManager {
                 div.style.display = 'flex';
                 div.style.alignItems = 'center';
                 
-                const getStat = (stat) => GameSystem.getDisplayStatHTML(c, stat, gunshi, null, this.game.playerClanId, myDaimyo);
+                const getStat = (stat) => StatPresenter.getDisplayStatHTML(c, stat, gunshi, null, this.game.playerClanId, myDaimyo);
 
                 div.innerHTML = `
                     <span style="flex:1; font-weight:bold;">${c.name}</span> 

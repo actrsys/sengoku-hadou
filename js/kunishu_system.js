@@ -92,7 +92,7 @@ class KunishuSystem {
     // イデオロギーによる相性計算の補正
     calcIdeologyAffinity(kunishu, targetBusho) {
         if (!targetBusho) return 25;
-        let baseAffinity = GameSystem.calcAffinityDiff(this.game.getBusho(kunishu.leaderId).affinity, targetBusho.affinity);
+        let baseAffinity = PersonnelRules.calcAffinityDiff(this.game.getBusho(kunishu.leaderId).affinity, targetBusho.affinity);
         
         if (kunishu.ideology === '宗教') {
             // 宗教：相手の革新が30以上で反発開始。50差（革新80）の時に最大の+25になります
@@ -725,7 +725,7 @@ class KunishuSystem {
         const ratio = myPrestige / (targetSoldiers * 12);
         baseProb = 70 * ratio;
         
-        const affinityDiff = (myDaimyo && leader) ? GameSystem.calcAffinityDiff(myDaimyo.affinity, leader.affinity) : 25;
+        const affinityDiff = (myDaimyo && leader) ? PersonnelRules.calcAffinityDiff(myDaimyo.affinity, leader.affinity) : 25;
         const affinityMod = (25 - affinityDiff) / 25 * 10;
         
         const diplomacyMod = (doer.diplomacy - 50) / 50 * 10;

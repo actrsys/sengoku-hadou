@@ -78,12 +78,12 @@ Object.assign(UIInfoManager.prototype, {
         });
         const bushoCount = targetBushos.length;
 
-        let totalGoldIncome = GameSystem.calcBaseGoldIncome(castle);
-        let totalRiceIncome = GameSystem.calcBaseRiceIncome(castle);
+        let totalGoldIncome = EconomyRules.calcBaseGoldIncome(castle);
+        let totalRiceIncome = EconomyRules.calcBaseRiceIncome(castle);
 
-        const isPort = GameSystem.isPortCastle(castle);
-        const isHorse = GameSystem.isProdCastle(castle, 'horse');
-        const isGun = GameSystem.isProdCastle(castle, 'gun');
+        const isPort = EconomyRules.isPortCastle(castle);
+        const isHorse = EconomyRules.isProdCastle(castle, 'horse', this.game.provinces);
+        const isGun = EconomyRules.isProdCastle(castle, 'gun', this.game.provinces);
 
         // スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！
         const isPc = document.body.classList.contains('is-pc');
@@ -422,8 +422,8 @@ Object.assign(UIInfoManager.prototype, {
                     const getBushoCount = (c) => { const stats = castleBushoStatsMap.get(c.id); return (c.ownerClan > 0 && stats) ? stats.count : 0; };
                     const getGoldConsume = (c) => { const stats = castleBushoStatsMap.get(c.id); return (c.ownerClan > 0 && stats) ? stats.salary : 0; };
                     
-                    const getGoldIncome = (c) => GameSystem.calcBaseGoldIncome(c);
-                    const getRiceIncome = (c) => GameSystem.calcBaseRiceIncome(c);
+                    const getGoldIncome = (c) => EconomyRules.calcBaseGoldIncome(c);
+                    const getRiceIncome = (c) => EconomyRules.calcBaseRiceIncome(c);
                     const getRiceConsume = (c) => Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier) * 12;
 
                     switch (this.currentKyotenSortKey) {
@@ -541,8 +541,8 @@ Object.assign(UIInfoManager.prototype, {
             const bushosCount = (c.ownerClan > 0 && stats) ? stats.count : 0;
             const consumeGold = (c.ownerClan > 0 && stats) ? stats.salary : 0;
             
-            let riceIncome = GameSystem.calcBaseRiceIncome(c);
-            let goldIncome = GameSystem.calcBaseGoldIncome(c);
+            let riceIncome = EconomyRules.calcBaseRiceIncome(c);
+            let goldIncome = EconomyRules.calcBaseGoldIncome(c);
 
             let consumeRice = Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier);
             let consumeRiceYear = consumeRice * 12; 

@@ -235,7 +235,7 @@ const CAN_EXECUTE_RULES = {
     canBuyHorses: (game, castle) => {
         const daimyo = game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
         const castellan = game.getBusho(castle.castellanId);
-        const cost = GameSystem.calcBuyHorseCost(1, daimyo, castellan);
+        const cost = EconomyRules.calcBuyHorseCost(1, daimyo, castellan, this.game);
         return castle.gold >= cost;
     },
     canBuyGuns: (game, castle) => {
@@ -244,7 +244,7 @@ const CAN_EXECUTE_RULES = {
         
         const daimyo = game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
         const castellan = game.getBusho(castle.castellanId);
-        const cost = GameSystem.calcBuyGunCost(1, daimyo, castellan);
+        const cost = EconomyRules.calcBuyGunCost(1, daimyo, castellan, this.game);
         return castle.gold >= cost;
     },
     // --- 臣従願のルール追加 ---
@@ -1007,23 +1007,23 @@ class CommandSystem {
                      }
 
                      if (['farm', 'commerce'].includes(actionType)) {
-                         return typeof GameSystem.calcDevelopment === 'function' ? GameSystem.calcDevelopment(target, 1.0) : target.politics;
+                         return typeof DomesticRules.calcDevelopment === 'function' ? DomesticRules.calcDevelopment(target, 1.0) : target.politics;
                      }
                      if (actionType === 'repair') {
-                         return typeof GameSystem.calcRepair === 'function' ? GameSystem.calcRepair(target, 1.0) : target.politics;
+                         return typeof DomesticRules.calcRepair === 'function' ? DomesticRules.calcRepair(target, 1.0) : target.politics;
                      }
                      if (actionType === 'charity') {
-                         return typeof GameSystem.calcCharity === 'function' ? GameSystem.calcCharity(target, 1.0) : target.charm;
+                         return typeof DomesticRules.calcCharity === 'function' ? DomesticRules.calcCharity(target, 1.0) : target.charm;
                      }
                      if (actionType === 'training') {
-                         return typeof GameSystem.calcTraining === 'function' ? GameSystem.calcTraining(target, cCastle.soldiers || 1, 1.0) : target.leadership;
+                         return typeof DomesticRules.calcTraining === 'function' ? DomesticRules.calcTraining(target, cCastle.soldiers || 1, 1.0) : target.leadership;
                      }
                      if (actionType === 'soldier_charity') {
-                         return typeof GameSystem.calcSoldierCharity === 'function' ? GameSystem.calcSoldierCharity(target, cCastle.soldiers || 1, 1.0) : target.leadership;
+                         return typeof DomesticRules.calcSoldierCharity === 'function' ? DomesticRules.calcSoldierCharity(target, cCastle.soldiers || 1, 1.0) : target.leadership;
                      }
                      if (actionType === 'draft') {
                          // ★変更：城の実際の民忠と人口を渡して、リアルな「徴兵効率」でソートします
-                         return typeof GameSystem.calcDraftEfficiency === 'function' ? GameSystem.calcDraftEfficiency(target, cCastle.peoplesLoyalty, cCastle.population) : (target.leadership * 1.5) + (target.charm * 1.5);
+                         return typeof DomesticRules.calcDraftEfficiency === 'function' ? DomesticRules.calcDraftEfficiency(target, cCastle.peoplesLoyalty, cCastle.population) : (target.leadership * 1.5) + (target.charm * 1.5);
                      }
                      if (['war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy'].includes(actionType)) {
                          return (target.leadership * 1.5) + target.strength;
@@ -1069,8 +1069,8 @@ class CommandSystem {
                  } catch (e) {
                  }
 
-                 if (isEnemyTarget) return GameSystem.getPerceivedStatValue(target, sortKey, gunshi, acc, this.game.playerClanId, myDaimyo) || 0;
-                 const val = GameSystem.getPerceivedStatValue(target, sortKey, gunshi, null, this.game.playerClanId, myDaimyo);
+                 if (isEnemyTarget) return StatPresenter.getPerceivedStatValue(target, sortKey, gunshi, acc, this.game.playerClanId, myDaimyo) || 0;
+                 const val = StatPresenter.getPerceivedStatValue(target, sortKey, gunshi, null, this.game.playerClanId, myDaimyo);
                  return val === null ? 0 : val;
             };
             return getSortVal(b) - getSortVal(a);
@@ -1379,7 +1379,7 @@ class CommandSystem {
                     // 条件①：道が繋がっている自分の領土かどうか？
                     const isConnected = connectedCastles.has(Number(targetCastleId));
                     // 条件②：道が繋がっている領土の「すぐ隣の城」かどうか？
-                    const isNextToConnected = this.game.castles.some(myC => connectedCastles.has(Number(myC.id)) && GameSystem.isAdjacent(targetCastle, myC));
+                    const isNextToConnected = this.game.castles.some(myC => connectedCastles.has(Number(myC.id)) && MapGraphService.isAdjacent(targetCastle, myC));
                     
                     // どちらか1つでも当てはまればOK（地図で光らせる）！
                     return isConnected || isNextToConnected;
@@ -1867,7 +1867,7 @@ class CommandSystem {
             const target = this.game.getBusho(extraData.targetId);
             const myPower = this.game.getClanTotalSoldiers(this.game.playerClanId);
             const targetPower = target.clan === 0 ? 0 : this.game.getClanTotalSoldiers(target.clan);
-            const trueProb = GameSystem.getEmployProb(doer, target, myPower, targetPower);
+            const trueProb = PersonnelRules.getEmployProb(doer, target, myPower, targetPower, this.game);
             this.showAdviceAndExecute('employ', () => this.executeEmploy(firstId, extraData.targetId), { targetId: extraData.targetId, trueProb: trueProb });
             return;
         }
@@ -2035,7 +2035,7 @@ class CommandSystem {
             const ratio = myPrestige / (targetSoldiers * 12);
             baseProb = 70 * ratio; 
             
-            const affinityDiff = (myDaimyo && leader) ? GameSystem.calcAffinityDiff(myDaimyo.affinity, leader.affinity) : 25;
+            const affinityDiff = (myDaimyo && leader) ? PersonnelRules.calcAffinityDiff(myDaimyo.affinity, leader.affinity) : 25;
             const affinityMod = (25 - affinityDiff) / 25 * 10;
             
             const diplomacyMod = (doer.diplomacy - 50) / 50 * 10;
@@ -2122,7 +2122,7 @@ class CommandSystem {
 
         if (actionType === 'investigate_deploy') {
             const bushos = selectedIds.map(id => this.game.getBusho(id));
-            const trueProb = GameSystem.getInvestigateProb(bushos);
+            const trueProb = PersonnelRules.getInvestigateProb(bushos);
             this.showAdviceAndExecute('investigate', () => this.executeInvestigate(selectedIds, targetId), { trueProb: trueProb });
             return;
         }
@@ -2319,7 +2319,7 @@ class CommandSystem {
 
         // ★追加：参加武将をリストアップして派閥ボーナスの倍率を出します
         const execBushos = bushoIds.map(id => this.game.getBusho(id)).filter(b => b);
-        const bonusRate = GameSystem.calcFactionBonusRate(execBushos);
+        const bonusRate = DomesticRules.calcFactionBonusRate(execBushos);
         
         // 差し替え後
         if (type === 'appoint' || type === 'appoint_gunshi') {
@@ -2388,7 +2388,7 @@ class CommandSystem {
             
             if (type === 'farm') { 
                 if (castle.gold >= spec.costGold) { 
-                    const val = GameSystem.calcDevelopment(busho, bonusRate, true); castle.gold -= spec.costGold; 
+                    const val = DomesticRules.calcDevelopment(busho, bonusRate, true); castle.gold -= spec.costGold; 
                     const oldVal = castle.kokudaka;
                     castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + val); 
                     const actualVal = castle.kokudaka - oldVal;
@@ -2399,7 +2399,7 @@ class CommandSystem {
             }
             else if (type === 'commerce') { 
                 if (castle.gold >= spec.costGold) { 
-                    const val = GameSystem.calcDevelopment(busho, bonusRate, true); castle.gold -= spec.costGold; 
+                    const val = DomesticRules.calcDevelopment(busho, bonusRate, true); castle.gold -= spec.costGold; 
                     const oldVal = castle.commerce;
                     castle.commerce = Math.min(castle.maxCommerce, castle.commerce + val); 
                     const actualVal = castle.commerce - oldVal;
@@ -2410,7 +2410,7 @@ class CommandSystem {
             }
             else if (type === 'repair') { 
                 if (castle.gold >= spec.costGold) { 
-                    const val = GameSystem.calcRepair(busho, bonusRate, true); castle.gold -= spec.costGold; 
+                    const val = DomesticRules.calcRepair(busho, bonusRate, true); castle.gold -= spec.costGold; 
                     const oldVal = castle.defense;
                     castle.defense = Math.min(castle.maxDefense, castle.defense + val); 
                     const actualVal = castle.defense - oldVal;
@@ -2425,7 +2425,7 @@ class CommandSystem {
                     castle.rice -= spec.costRice;  
 
                     // 「その城の兵士数 (castle.soldiers)」を渡して計算してもらいます
-                    const val = GameSystem.calcTraining(busho, castle.soldiers, bonusRate, true); 
+                    const val = DomesticRules.calcTraining(busho, castle.soldiers, bonusRate, true); 
                     const maxTraining = window.WarParams.Military.MaxTraining;
                     const oldVal = castle.training;
                     castle.training = Math.min(maxTraining, castle.training + val); 
@@ -2441,7 +2441,7 @@ class CommandSystem {
                     castle.rice -= spec.costRice;  
 
                     // こちらも「その城の兵士数」を渡します
-                    const val = GameSystem.calcSoldierCharity(busho, castle.soldiers, bonusRate, true); 
+                    const val = DomesticRules.calcSoldierCharity(busho, castle.soldiers, bonusRate, true); 
                     const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleCharity) ? window.WarParams.Military.MaxMoraleCharity : 100;
                     const oldVal = castle.morale;
                     castle.morale = Math.min(maxMorale, castle.morale + val); 
@@ -2496,7 +2496,7 @@ class CommandSystem {
     executeInvestigate(bushoIds, targetId) {
         const bushos = bushoIds.map(id => this.game.getBusho(id));
         const target = this.game.getCastle(targetId);
-        const result = GameSystem.calcInvestigate(bushos, target);
+        const result = PersonnelRules.calcInvestigate(bushos, target);
         let msg = "";
         if (result.success) {
             target.investigatedUntil = this.game.getCurrentTurnId() + 4; target.investigatedAccuracy = result.accuracy;
@@ -2529,7 +2529,7 @@ class CommandSystem {
         const myPower = this.game.getClanTotalSoldiers(this.game.playerClanId); 
         const targetClanId = target.clan; 
         const targetPower = targetClanId === 0 ? 0 : this.game.getClanTotalSoldiers(targetClanId); 
-        const success = GameSystem.calcEmploymentSuccess(doer, target, myPower, targetPower); 
+        const success = PersonnelRules.calcEmploymentSuccess(doer, target, myPower, targetPower, this.game); 
         let msg = ""; 
         if (success) { 
             const currentC = this.game.getCurrentTurnCastle(); 
@@ -2569,11 +2569,11 @@ class CommandSystem {
             castle.gold -= spec.costGold;
             
             // ★修正：新しく作った一元化の魔法を呼び出して、忠誠度アップと承認欲求ダウンをまとめて行います！
-            GameSystem.applyRewardEffect(target, daimyo, this.game);
+            PersonnelRules.applyRewardEffect(target, daimyo, this.game);
 
             count++;
             // ★ログ用のおおよその効果量として記録しておきます
-            totalEffect += GameSystem.calcRewardEffect(daimyo, target);
+            totalEffect += PersonnelRules.calcRewardEffect(daimyo, target);
         });
         
         let msg = null;
@@ -2615,13 +2615,13 @@ class CommandSystem {
         // ★修正：全員に「2回分」の効果を一元化の魔法を使って適用します！
         targets.forEach(target => {
             // 1回目の効果
-            GameSystem.applyRewardEffect(target, daimyo, this.game);
+            PersonnelRules.applyRewardEffect(target, daimyo, this.game);
             // 2回目の効果
-            GameSystem.applyRewardEffect(target, daimyo, this.game);
+            PersonnelRules.applyRewardEffect(target, daimyo, this.game);
 
             count++;
             // ★ログ用のおおよその効果量（2回分）を記録しておきます
-            totalEffect += GameSystem.calcRewardEffect(daimyo, target) * 2;
+            totalEffect += PersonnelRules.calcRewardEffect(daimyo, target) * 2;
         });
         
         this.finishCommand(`${count}名の家臣に褒美を与えました`, false, `${count}名に一括褒美を実行 (合計効果:${totalEffect})`);
@@ -2722,7 +2722,7 @@ class CommandSystem {
         const castellan = this.game.getBusho(castle.castellanId);
 
         // ★一元化された共通魔法を呼び出して、必要な費用（または利益）を一発で計算します！
-        const tradeData = GameSystem.calcTradeCostAndRate(type, amount, castle, daimyo, castellan, this.game.provinces);
+        const tradeData = EconomyRules.calcTradeCostAndRate(type, amount, castle, daimyo, castellan, this.game.provinces, this.game);
         const costOrGain = tradeData.cost;
         
         let msg = null;
@@ -2770,7 +2770,7 @@ class CommandSystem {
         
         // 選ばれた兵士数を集めるために必要な「お金」を計算します
         // ★変更：お城の人口（castle.population）も渡して、正しい金額を計算させます
-        const costGold = GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty, castle.population);
+        const costGold = DomesticRules.calcDraftCost(soldiers, busho, castle.peoplesLoyalty, castle.population);
         
         // ★変更：共通魔法でチェックします
         if(!this.checkResource(castle, costGold, 0)) return;
@@ -2788,10 +2788,10 @@ class CommandSystem {
         
         // 実行確定：経験値を加算します
         // ★変更：経験値計算の窓口にも、忘れずにお城の人口を渡します
-        GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty, castle.population, true);
+        DomesticRules.calcDraftCost(soldiers, busho, castle.peoplesLoyalty, castle.population, true);
 
         // ★ 徴兵による民忠と人口の減少処理を、GameSystemの専門の魔法にお任せします！
-        const loyaltyPenalty = GameSystem.applyDraftPenalty(castle, soldiers);
+        const loyaltyPenalty = DomesticRules.applyDraftPenalty(castle, soldiers);
 
         castle.gold -= costGold;
         
@@ -2829,13 +2829,13 @@ class CommandSystem {
 
         // ★追加：参加武将をリストアップして派閥ボーナスの倍率を出します
         const execBushos = bushoIds.map(id => this.game.getBusho(id)).filter(b => b);
-        const bonusRate = GameSystem.calcFactionBonusRate(execBushos);
+        const bonusRate = DomesticRules.calcFactionBonusRate(execBushos);
 
         bushoIds.forEach(bid => {
             const busho = this.game.getBusho(bid);
             if (!busho) return;
 
-            const val = GameSystem.calcCharity(busho, bonusRate, true); 
+            const val = DomesticRules.calcCharity(busho, bonusRate, true); 
 
             totalVal += val;
             count++;
@@ -3091,7 +3091,7 @@ class CommandSystem {
         
         // ★追加：海戦ルートかどうかを判定して、一番最初に記録します！
         this.game.warManager.state = this.game.warManager.state || {};
-        this.game.warManager.state.isSeaBattle = GameSystem.isSeaRoute(this.game, atkCastle, targetCastle, myClanId);
+        this.game.warManager.state.isSeaBattle = MapGraphService.isSeaRoute(this.game, atkCastle, targetCastle, myClanId);
         
         // ★追加：諸勢力の場合はダミーのターゲットオブジェクトを作る
         if (extraData && extraData.isKunishu) {

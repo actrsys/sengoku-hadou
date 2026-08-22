@@ -307,7 +307,7 @@ class AIOperationManager {
                 myLegionCastles.forEach(myC => {
                     if (!visitedForRoute.has(myC.id)) {
                         // isLegionOnlyを「true」にして、自軍団のみに絞ります
-                        const territory = GameSystem.getReachableTerritory(this.game, myC, true);
+                        const territory = MapGraphService.getReachableTerritory(this.game, myC, true);
                         territory.myCastles.forEach(c => visitedForRoute.add(c.id));
                         territory.enemyCastles.forEach(c => reachableEnemyCastleIds.add(c.id));
                     }
@@ -392,7 +392,7 @@ class AIOperationManager {
                             if (rel && ['同盟', '支配', '従属', '友好'].includes(rel.status)) {
                                 shouldCancel = true;
                             } else {
-                                // ★変更：GameSystem.isReachableを使わず、自領から直接攻撃できるか判定します
+                                // ★変更：MapGraphService.isReachableを使わず、自領から直接攻撃できるか判定します
                                 const targetCastles = this.game.getClanCastles(targetClanId);
                                 
                                 let hasRoute = false;

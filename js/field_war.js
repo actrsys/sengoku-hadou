@@ -1218,9 +1218,9 @@ class FieldWarManager {
                 </div>
             </div>
             <div class="fw-unit-abilities">
-                <div class="fw-unit-ability"><span class="fw-status-label">統</span><span>${GameSystem.toGradeHTML(unit.stats.ldr)}</span></div>
-                <div class="fw-unit-ability"><span class="fw-status-label">武</span><span>${GameSystem.toGradeHTML(unit.stats.str)}</span></div>
-                <div class="fw-unit-ability"><span class="fw-status-label">智</span><span>${GameSystem.toGradeHTML(unit.stats.int)}</span></div>
+                <div class="fw-unit-ability"><span class="fw-status-label">統</span><span>${StatPresenter.toGradeHTML(unit.stats.ldr)}</span></div>
+                <div class="fw-unit-ability"><span class="fw-status-label">武</span><span>${StatPresenter.toGradeHTML(unit.stats.str)}</span></div>
+                <div class="fw-unit-ability"><span class="fw-status-label">智</span><span>${StatPresenter.toGradeHTML(unit.stats.int)}</span></div>
             </div>
         `;
 

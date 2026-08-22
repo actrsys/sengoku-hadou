@@ -144,7 +144,7 @@ class WarManager {
         } else {
             commands.push({ label: "突撃", type: "def_charge" }, { label: "斉射", type: "def_bow" }, { label: "籠城", type: "def_attack" }, { label: "挑発", type: "provoke" }, { label: "鼓舞", type: "def_inspire" }); 
             // ★修正：中立の空き城（ownerClanが0）の守備軍は、撤退コマンドを選べないようにします！
-            if (s.turn === 'defender' && s.defender.ownerClan !== 0 && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) commands.push({ label: "撤退", type: "retreat" });
+            if (s.turn === 'defender' && s.defender.ownerClan !== 0 && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && MapGraphService.isReachable(this.game, s.defender, c, s.defender.ownerClan))) commands.push({ label: "撤退", type: "retreat" });
         }
         return commands;
     }
@@ -701,7 +701,7 @@ class WarManager {
 
         const options = isDefenderTurn ? ['def_charge', 'def_bow', 'def_attack', 'provoke', 'def_inspire'] : ['charge', 'bow', 'siege', 'fire', 'inspire'];
         
-        if (isDefenderTurn && s.turn === 'defender' && s.defender.ownerClan !== 0 && !s.defender.isKunishu && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
+        if (isDefenderTurn && s.turn === 'defender' && s.defender.ownerClan !== 0 && !s.defender.isKunishu && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && MapGraphService.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
             options.push('retreat');
         } else if (!isDefenderTurn && s.turn === 'attacker' && !s.attacker.isKunishu) {
             options.push('retreat');

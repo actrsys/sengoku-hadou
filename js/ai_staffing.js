@@ -43,7 +43,7 @@ class AIStaffing {
             }
 
             // ★軽量化：全国の全城を毎回filterせず、対称化した隣接索引だけを見ます。
-            // GameSystem.isAdjacent と同じく「片側に記載があれば隣接」の結果を維持します。
+            // MapGraphService.isAdjacent と同じく「片側に記載があれば隣接」の結果を維持します。
             const adjCastles = this._getAdjacentCastles(current).filter(c => !visitedCastles.has(c.id));
 
             for (const n of adjCastles) {
@@ -844,7 +844,7 @@ class AIStaffing {
             }
 
             // ★軽量化：全国の全城を毎回filterせず、対称化した隣接索引だけを見ます。
-            // GameSystem.isAdjacent と同じく「片側に記載があれば隣接」の結果を維持します。
+            // MapGraphService.isAdjacent と同じく「片側に記載があれば隣接」の結果を維持します。
             const adjCastles = this._getAdjacentCastles(current).filter(c => !visitedCastles.has(c.id));
 
             for (const n of adjCastles) {

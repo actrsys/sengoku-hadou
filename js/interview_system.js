@@ -153,8 +153,8 @@ class InterviewSystem {
     // ロジック＆UI表示: 「他者について聞く」の結果
     // ----------------------------------------------------------------------
     executeInterviewTopic(interviewer, target) {
-        const dist = GameSystem.calcValueDistance(interviewer, target); 
-        const affinityDiff = GameSystem.calcAffinityDiff(interviewer.affinity, target.affinity);
+        const dist = PersonnelRules.calcValueDistance(interviewer, target); 
+        const affinityDiff = PersonnelRules.calcAffinityDiff(interviewer.affinity, target.affinity);
         
         let affinityText = "";
         if (dist < 15) affinityText = "あの方とは意気投合します。素晴らしいお方です。";

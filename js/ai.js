@@ -134,7 +134,7 @@ class AIEngine {
                                 if (targetCastle) {
                                     targetProvId = targetCastle.provinceId; // 目的地のお城の国をセットします
                                     // 自領の別のお城にいるかもしれないので、道が繋がっているか確認します
-                                    canReach = GameSystem.isReachable(this.game, castle, targetCastle, castle.ownerClan);
+                                    canReach = MapGraphService.isReachable(this.game, castle, targetCastle, castle.ownerClan);
 
                                     if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'operation:reachability:done');
                                 }
@@ -150,7 +150,7 @@ class AIEngine {
                                 isStillEnemy = true;
                             } else {
                                 // 道が繋がっているか、魔法を使って再確認します！
-                                canReach = GameSystem.isReachable(this.game, castle, targetCastle, castle.ownerClan);
+                                canReach = MapGraphService.isReachable(this.game, castle, targetCastle, castle.ownerClan);
 
                                 if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'operation:reachability:done');
                                 
@@ -280,7 +280,7 @@ class AIEngine {
             if (perceivedDefenseEmg <= castle.maxDefense / 4 && castle.gold >= window.MainParams.CommandCost.Repair) {
                 // 城壁修復
                 castle.gold -= window.MainParams.CommandCost.Repair;
-                const val = GameSystem.calcRepair(castellan, 1.0, true);
+                const val = DomesticRules.calcRepair(castellan, 1.0, true);
                 const oldVal = castle.defense;
                 castle.defense = Math.min(castle.maxDefense, castle.defense + val);
                 
@@ -293,7 +293,7 @@ class AIEngine {
             } else if (perceivedLoyaltyEmg <= 70 && castle.rice >= window.MainParams.CommandCost.Charity) {
                 // 施し
                 castle.rice -= window.MainParams.CommandCost.Charity;
-                const val = GameSystem.calcCharity(castellan, 1.0, true);
+                const val = DomesticRules.calcCharity(castellan, 1.0, true);
                 
                 castle.peoplesLoyalty = Math.min(100, castle.peoplesLoyalty + val);
                 
@@ -1352,8 +1352,8 @@ class AIEngine {
 
         // ★追加：海戦が予想される場合、操船スキルが高い武将を確保する
         let isSeaBattle = false;
-        if (typeof GameSystem.isSeaRoute === 'function') {
-            isSeaBattle = GameSystem.isSeaRoute(this.game, source, target, source.ownerClan);
+        if (typeof MapGraphService.isSeaRoute === 'function') {
+            isSeaBattle = MapGraphService.isSeaRoute(this.game, source, target, source.ownerClan);
         }
 
         if (isSeaBattle && sorted.length > 0) {
@@ -1448,10 +1448,10 @@ class AIEngine {
 
         // ★追加：諸勢力との戦いが海戦になる場合、操船スキルが高い武将を確保する
         let isSeaBattle = false;
-        if (typeof GameSystem.isSeaRoute === 'function') {
+        if (typeof MapGraphService.isSeaRoute === 'function') {
             const targetCastle = this.game.getCastle(kunishu.castleId);
             if (targetCastle) {
-                isSeaBattle = GameSystem.isSeaRoute(this.game, sourceCastle, targetCastle, sourceCastle.ownerClan);
+                isSeaBattle = MapGraphService.isSeaRoute(this.game, sourceCastle, targetCastle, sourceCastle.ownerClan);
             }
         }
 
@@ -1605,9 +1605,9 @@ class AIEngine {
         let hasBonusSabotageUsed = false;
 
         // ★高速化：今の国の兵糧の単価（相場）を一元化された魔法で取得します！
-        const baseRiceRate = GameSystem.getBaseRiceRate(castle, this.game.provinces);
-        const sellActualRate = GameSystem.getRiceActualRate('sell_rice', castle, this.game.provinces).actualRate;
-        const buyActualRate  = GameSystem.getRiceActualRate('buy_rice', castle, this.game.provinces).actualRate;
+        const baseRiceRate = EconomyRules.getBaseRiceRate(castle, this.game.provinces);
+        const sellActualRate = EconomyRules.getRiceActualRate('sell_rice', castle, this.game.provinces, this.game).actualRate;
+        const buyActualRate  = EconomyRules.getRiceActualRate('buy_rice', castle, this.game.provinces, this.game).actualRate;
 
         // ★追加：大雪が降っている国（provinceId）のリストを作ります！
         const heavySnowProvIds = new Set();
@@ -1626,7 +1626,7 @@ class AIEngine {
             await new Promise(resolve => setTimeout(resolve, 0));
 
             // ★毎回、AIが安全に使えるお金（給金と余裕分を引いた額）を計算します！
-            const availableGold = GameSystem.calcAvailableGoldForAI(castle, this.game);
+            const availableGold = EconomyRules.calcAvailableGoldForAI(castle, this.game);
 
             // まだ動ける武将を再確認します
             availableBushos = this.game.getCastleBushos(castle.id).filter(b => 
@@ -1829,7 +1829,7 @@ class AIEngine {
                 const targetGold = Math.floor(baseSoldiers * 1.0);
                 
                 // ★変更：およそ1人集めるのにかかるお金（単価）を、GameSystemに計算してもらいます！
-                const unitPrice = GameSystem.calcDraftUnitPrice(castellan, castle.peoplesLoyalty, castle.population);
+                const unitPrice = DomesticRules.calcDraftUnitPrice(castellan, castle.peoplesLoyalty, castle.population);
                 
                 // ===== 余力計算 =====
                 const surplusGold = Math.max(0, availableGold - targetGold);
@@ -1923,7 +1923,7 @@ class AIEngine {
                 let score = 30;
                 
                 // ★追加：兵士数が年間収穫量の80%を超えていて余裕がない場合は、石高開発の優先度を上げます
-                const annualRiceIncome = GameSystem.calcBaseRiceIncome(castle);
+                const annualRiceIncome = EconomyRules.calcBaseRiceIncome(castle);
                 const soldierToHarvestRatio = annualRiceIncome > 0 ? (castle.soldiers / annualRiceIncome) : 1.0;
                 
                 if (soldierToHarvestRatio > 0.8) {
@@ -1938,7 +1938,7 @@ class AIEngine {
                 let score = 30;
                 
                 // ★追加：金収入に余裕がない場合は、鉱山開発の優先度を上げます
-                const monthlyGoldIncome = GameSystem.calcBaseGoldIncome(castle);
+                const monthlyGoldIncome = EconomyRules.calcBaseGoldIncome(castle);
                 let monthlyGoldConsume = 0;
                 
                 // 今お城にいる全員の給料を計算します
@@ -2287,7 +2287,7 @@ class AIEngine {
                     const leader = this.game.getBusho(k.leaderId);
                     if (leader) {
                         // 2. 城主と頭領の「相性の差」を計算します（0がピッタリ、50が真逆）
-                        const affinityDiff = GameSystem.calcAffinityDiff(castellan.affinity, leader.affinity);
+                        const affinityDiff = PersonnelRules.calcAffinityDiff(castellan.affinity, leader.affinity);
                         
                         // 3. 差が50の時に「25点」下がるように計算します（相性の差を半分にします）
                         const penalty = Math.floor(affinityDiff / 2);
@@ -2354,7 +2354,7 @@ class AIEngine {
                     
                     // 3. お殿様との相性(affinity)による確率の増減
                     // 差が0(ピッタリ)なら10%アップ、差が50(真逆)なら10%ダウンします
-                    const diff = GameSystem.calcAffinityDiff(daimyo.affinity, b.affinity);
+                    const diff = PersonnelRules.calcAffinityDiff(daimyo.affinity, b.affinity);
                     const affinityMod = (25 - diff) * 0.4; 
                     
                     // 全部を足して最終的な確率を出します
@@ -2577,7 +2577,7 @@ class AIEngine {
                         castle.gold -= window.MainParams.CommandCost.Reward;
                         // ★修正：新しく作った一元化の魔法を呼び出して、忠誠度アップと承認欲求ダウンをまとめて行います！
                         // （金額に関係なく、常に一定の効果が出ます）
-                        GameSystem.applyRewardEffect(targetBusho, daimyo, this.game);
+                        PersonnelRules.applyRewardEffect(targetBusho, daimyo, this.game);
                         
                         // ★「行動済」マークもつけません！
                         // ★追加：今月何回もらったかをカウントして記録します！
@@ -2662,7 +2662,7 @@ class AIEngine {
                 if (action.type === 'employ') {
                     const targetRonin = action.targetRonin;
                     const myPower = this.game.getClanTotalSoldiers(castle.ownerClan) || 1;
-                    const success = GameSystem.calcEmploymentSuccess(doer, targetRonin, myPower, 0);
+                    const success = PersonnelRules.calcEmploymentSuccess(doer, targetRonin, myPower, 0, this.game);
                     
                     if (success) {
                         // ★新しいお引越しセンターの魔法を使います！
@@ -2801,7 +2801,7 @@ class AIEngine {
                 
                 if (action.type === 'repair' && availableGold >= window.MainParams.CommandCost.Repair) {
                     castle.gold -= window.MainParams.CommandCost.Repair;
-                    const val = GameSystem.calcRepair(doer, 1.0, true);
+                    const val = DomesticRules.calcRepair(doer, 1.0, true);
                     const oldVal = castle.defense;
                     castle.defense = Math.min(castle.maxDefense, castle.defense + val);
                     
@@ -2815,7 +2815,7 @@ class AIEngine {
                 if (action.type === 'charity' && castle.rice >= window.MainParams.CommandCost.Charity) {
                     castle.rice -= window.MainParams.CommandCost.Charity;
                     
-                    const val = GameSystem.calcCharity(doer, 1.0, true);
+                    const val = DomesticRules.calcCharity(doer, 1.0, true);
                     
                     const oldVal = castle.peoplesLoyalty;
                     castle.peoplesLoyalty = Math.min(100, castle.peoplesLoyalty + val);
@@ -2841,18 +2841,18 @@ class AIEngine {
 
                     let draftCost = action.cost;
                     // ★修正：実行時にもお城の人口を渡して、正しい兵士数を計算します
-                    let soldiers = GameSystem.calcDraftFromGold(draftCost, doer, castle.peoplesLoyalty, castle.population);
+                    let soldiers = DomesticRules.calcDraftFromGold(draftCost, doer, castle.peoplesLoyalty, castle.population);
                     
                     // ネットワーク全体の人口（実際の総人口）を超えないようにします
                     if (actualTotalPop < soldiers) {
                         soldiers = actualTotalPop;
-                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population);
+                        draftCost = DomesticRules.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population);
                     }
 
                     // 兵士が上限（99999）を超えないようにします
                     if (castle.soldiers + soldiers > 99999) {
                         soldiers = 99999 - castle.soldiers;
-                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population);
+                        draftCost = DomesticRules.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population);
                     }
 
                     // ===== 仮想チェック（重要） =====
@@ -2862,12 +2862,12 @@ class AIEngine {
                     if (castle.rice < virtualRiceNeed) {
                         soldiers = Math.floor((castle.rice / 2.0) - castle.soldiers);
                         soldiers = Math.max(0, soldiers);
-                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population);
+                        draftCost = DomesticRules.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population);
                     }
 
                     if (soldiers > 0 && draftCost > 0) {
                         // ★修正：経験値を入れるための最終実行の際にも人口を渡します（trueの前に差し込みます）
-                        GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population, true);
+                        DomesticRules.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population, true);
 
                         // ★大改善：集めた兵士数を、負担の重さ（ウェイト）に合わせて振り分けます！
                         let remainingDraft = soldiers;
@@ -2887,7 +2887,7 @@ class AIEngine {
                                 }
                                 
                                 // ★ 徴兵による民忠と人口の減少処理を、GameSystemの専門の魔法にお任せします！
-                                const loyaltyPenalty = GameSystem.applyDraftPenalty(c, popDecrease);
+                                const loyaltyPenalty = DomesticRules.applyDraftPenalty(c, popDecrease);
                                 
                                 remainingDraft -= popDecrease;
                             }
@@ -2914,7 +2914,7 @@ class AIEngine {
                     }
                 }
                 if (action.type === 'training') {
-                    const val = GameSystem.calcTraining(doer, castle.soldiers, 1.0, true);
+                    const val = DomesticRules.calcTraining(doer, castle.soldiers, 1.0, true);
                     const oldVal = castle.training;
                     castle.training = Math.min(100, castle.training + val);
                     
@@ -2926,7 +2926,7 @@ class AIEngine {
                 }
                 if (action.type === 'soldier_charity' && castle.rice >= window.MainParams.CommandCost.SoldierCharity) {
                     castle.rice -= window.MainParams.CommandCost.SoldierCharity;
-                    const val = GameSystem.calcSoldierCharity(doer, castle.soldiers, 1.0, true);
+                    const val = DomesticRules.calcSoldierCharity(doer, castle.soldiers, 1.0, true);
                     const oldVal = castle.morale;
                     castle.morale = Math.min(100, castle.morale + val);
                     
@@ -2938,7 +2938,7 @@ class AIEngine {
                 }
                 if (action.type === 'farm' && availableGold >= window.MainParams.CommandCost.Farm) {
                     castle.gold -= window.MainParams.CommandCost.Farm;
-                    const val = GameSystem.calcDevelopment(doer, 1.0, true);
+                    const val = DomesticRules.calcDevelopment(doer, 1.0, true);
                     const oldVal = castle.kokudaka;
                     castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + val);
                     
@@ -2950,7 +2950,7 @@ class AIEngine {
                 }
                 if (action.type === 'commerce' && availableGold >= window.MainParams.CommandCost.Commerce) {
                     castle.gold -= window.MainParams.CommandCost.Commerce;
-                    const val = GameSystem.calcDevelopment(doer, 1.0, true);
+                    const val = DomesticRules.calcDevelopment(doer, 1.0, true);
                     const oldVal = castle.commerce;
                     castle.commerce = Math.min(castle.maxCommerce, castle.commerce + val);
                     
@@ -2963,15 +2963,15 @@ class AIEngine {
                 
                 // 特殊行動群
                 if (action.type === 'buy_gun') {
-                    const amount = GameSystem.calcBuyGunAmount(500, daimyo, castellan);
-                    const cost = GameSystem.calcBuyGunCost(amount, daimyo, castellan);
+                    const amount = EconomyRules.calcBuyGunAmount(500, daimyo, castellan, this.game);
+                    const cost = EconomyRules.calcBuyGunCost(amount, daimyo, castellan, this.game);
                     castle.gold -= cost;
                     castle.guns = Math.min(99999, (castle.guns || 0) + amount);
                     tradeCount++; step--; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'buy_horse') {
-                    const amount = GameSystem.calcBuyHorseAmount(500, daimyo, castellan);
-                    const cost = GameSystem.calcBuyHorseCost(amount, daimyo, castellan);
+                    const amount = EconomyRules.calcBuyHorseAmount(500, daimyo, castellan, this.game);
+                    const cost = EconomyRules.calcBuyHorseCost(amount, daimyo, castellan, this.game);
                     castle.gold -= cost;
                     castle.horses = Math.min(99999, (castle.horses || 0) + amount);
                     tradeCount++; step--; actionDoneInThisStep = true; break;
@@ -3220,7 +3220,7 @@ class AIEngine {
             if (currentRel && currentRel.sentiment >= 100) return;
             
             // ★追加：AIが安全に使えるお金（給金と余裕分を引いた額）を計算します！
-            const availableGold = GameSystem.calcAvailableGoldForAI(castle, this.game);
+            const availableGold = EconomyRules.calcAvailableGoldForAI(castle, this.game);
 
             // 使うお金が、お城の貯金箱の5分の1（20%）より多い時は、高すぎるのでキャンセルします！
             if (targetData.gold > availableGold / 5) return;
@@ -3262,7 +3262,7 @@ class AIEngine {
                  castellan.isActionDone = true;
              }// 差し替え後
         } else if (targetData.action === 'court_truce') {
-             const availableGold = GameSystem.calcAvailableGoldForAI(castle, this.game);
+             const availableGold = EconomyRules.calcAvailableGoldForAI(castle, this.game);
              if (availableGold >= targetData.gold) {
                  this.game.diplomacyManager.executeDiplomacy(castellan.id, targetCastleId, 'court_truce', targetData.gold);
                  castellan.isActionDone = true;

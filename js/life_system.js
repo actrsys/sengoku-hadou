@@ -372,8 +372,8 @@ class LifeSystem {
                     if (activeRelatives.length > 0) {
                         // 一門がいる場合：一番相性や年齢の近い一門を頼って大名家に仕官
                         activeRelatives.sort((x, y) => {
-                            const diffAffinityX = GameSystem.calcAffinityDiff(b.affinity || 0, x.affinity || 0);
-                            const diffAffinityY = GameSystem.calcAffinityDiff(b.affinity || 0, y.affinity || 0);
+                            const diffAffinityX = PersonnelRules.calcAffinityDiff(b.affinity || 0, x.affinity || 0);
+                            const diffAffinityY = PersonnelRules.calcAffinityDiff(b.affinity || 0, y.affinity || 0);
                             if (diffAffinityX !== diffAffinityY) {
                                 return diffAffinityX - diffAffinityY;
                             }
@@ -429,8 +429,8 @@ class LifeSystem {
                     // ★ここから変更：複数いる場合は、相性と年齢で一番ピッタリな人を選びます！
                     activeRelatives.sort((x, y) => {
                         // 相性の差を計算します
-                        const diffAffinityX = GameSystem.calcAffinityDiff(b.affinity || 0, x.affinity || 0);
-                        const diffAffinityY = GameSystem.calcAffinityDiff(b.affinity || 0, y.affinity || 0);
+                        const diffAffinityX = PersonnelRules.calcAffinityDiff(b.affinity || 0, x.affinity || 0);
+                        const diffAffinityY = PersonnelRules.calcAffinityDiff(b.affinity || 0, y.affinity || 0);
                         
                         // 相性の差が違えば、差が小さい（相性が近い）人を優先します
                         if (diffAffinityX !== diffAffinityY) {

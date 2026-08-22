@@ -71,7 +71,7 @@ window.EventCheck = {
 
         for (let ca of castlesA) {
             for (let cb of castlesB) {
-                if (typeof GameSystem !== 'undefined' && GameSystem.isAdjacent(ca, cb)) {
+                if (typeof MapGraphService !== 'undefined' && MapGraphService.isAdjacent(ca, cb)) {
                     return true;
                 }
             }
@@ -3329,7 +3329,7 @@ window.GameEvents.push({
         const sponsorCastles = game.getClanCastles(sponsorClanId);
         for (let sc of sponsorCastles) {
             for (let mc of matsunagaCastles) {
-                if (GameSystem.isAdjacent(sc, mc)) {
+                if (MapGraphService.isAdjacent(sc, mc)) {
                     isAdjacent = true;
                     break;
                 }
@@ -3342,7 +3342,7 @@ window.GameEvents.push({
             const shogunCastles = game.getClanCastles(shogunClanId);
             for (let sc of shogunCastles) {
                 for (let mc of matsunagaCastles) {
-                    if (GameSystem.isAdjacent(sc, mc)) {
+                    if (MapGraphService.isAdjacent(sc, mc)) {
                         isAdjacent = true;
                         break;
                     }
@@ -3620,7 +3620,7 @@ window.GameEvents.push({
         for (let targetC of targetCastles) {
             // まず擁立勢力の城と繋がっているか調べます
             for (let sc of sponsorCastles) {
-                if (GameSystem.isAdjacent(sc, targetC)) {
+                if (MapGraphService.isAdjacent(sc, targetC)) {
                     isAdjacent = true;
                     break;
                 }
@@ -3630,7 +3630,7 @@ window.GameEvents.push({
             // 擁立勢力と繋がっておらず、将軍家が存在する場合は、将軍家の城とも隣接判定します
             if (shogunClanId !== 0) {
                 for (let sc of shogunCastles) {
-                    if (GameSystem.isAdjacent(sc, targetC)) {
+                    if (MapGraphService.isAdjacent(sc, targetC)) {
                         isAdjacent = true;
                         break;
                     }
@@ -3860,7 +3860,7 @@ window.GameEvents.push({
         const sponsorCastles = game.getClanCastles(sponsorClanId);
         for (let sc of sponsorCastles) {
             for (let hc of hatakeyamaCastles) {
-                if (GameSystem.isAdjacent(sc, hc)) {
+                if (MapGraphService.isAdjacent(sc, hc)) {
                     isAdjacent = true;
                     break;
                 }
@@ -3873,7 +3873,7 @@ window.GameEvents.push({
             const shogunCastles = game.getClanCastles(shogunClanId);
             for (let sc of shogunCastles) {
                 for (let hc of hatakeyamaCastles) {
-                    if (GameSystem.isAdjacent(sc, hc)) {
+                    if (MapGraphService.isAdjacent(sc, hc)) {
                         isAdjacent = true;
                         break;
                     }

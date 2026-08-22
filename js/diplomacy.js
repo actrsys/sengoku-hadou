@@ -214,7 +214,7 @@ class DiplomacyManager {
                     
                     for (let tc of targetCastles) {
                         for (let mc of threatCastles) {
-                            if (GameSystem.isAdjacent(tc, mc)) {
+                            if (MapGraphService.isAdjacent(tc, mc)) {
                                 isAdjacent = true; break;
                             }
                         }
@@ -559,7 +559,7 @@ class DiplomacyManager {
                 // 初めから隣接しているかチェック
                 for (let hc of helperCastles) {
                     for (let ec of enemyCastles) {
-                        if (GameSystem.isAdjacent(hc, ec)) {
+                        if (MapGraphService.isAdjacent(hc, ec)) {
                             isAlreadyAdjacent = true;
                             break;
                         }
@@ -571,7 +571,7 @@ class DiplomacyManager {
                 if (!isAlreadyAdjacent) {
                     for (let hc of helperCastles) {
                         for (let mc of myCastles) {
-                            if (GameSystem.isAdjacent(hc, mc)) {
+                            if (MapGraphService.isAdjacent(hc, mc)) {
                                 willBeAdjacent = true;
                                 break;
                             }
@@ -1791,8 +1791,8 @@ class DiplomacyManager {
 
                 let isAdjacent = false;
                 for (let dc of domCastles) {
-                    if (typeof window.GameSystem !== 'undefined' && window.GameSystem.isAdjacent) {
-                        if (window.GameSystem.isAdjacent(sc, dc)) {
+                    if (typeof MapGraphService !== 'undefined' && MapGraphService.isAdjacent) {
+                        if (window.MapGraphService.isAdjacent(sc, dc)) {
                             isAdjacent = true;
                             break;
                         }
@@ -2541,7 +2541,7 @@ class DiplomacyManager {
             for (let mc of myCastles) {
                 for (let tc of targetCastles) {
                     // お城同士の道が繋がっているか確認します
-                    if (GameSystem.isAdjacent(mc, tc)) {
+                    if (MapGraphService.isAdjacent(mc, tc)) {
                         isDirectlyAdjacent = true;
                         break;
                     }
@@ -3054,8 +3054,8 @@ class DiplomacyManager {
                     for (let sc of candidateCastles) {
                         let isAdjacent = false;
                         for (let dc of tgtCastles) {
-                            if (typeof window.GameSystem !== 'undefined' && window.GameSystem.isAdjacent) {
-                                if (window.GameSystem.isAdjacent(sc, dc)) {
+                            if (typeof MapGraphService !== 'undefined' && MapGraphService.isAdjacent) {
+                                if (window.MapGraphService.isAdjacent(sc, dc)) {
                                     isAdjacent = true; break;
                                 }
                             } else if (sc.adjacentCastleIds && sc.adjacentCastleIds.includes(dc.id)) {
@@ -3149,8 +3149,8 @@ class DiplomacyManager {
 
                 let isAdjacent = false;
                 for (let dc of tgtCastles) {
-                    if (typeof window.GameSystem !== 'undefined' && window.GameSystem.isAdjacent) {
-                        if (window.GameSystem.isAdjacent(sc, dc)) {
+                    if (typeof MapGraphService !== 'undefined' && MapGraphService.isAdjacent) {
+                        if (window.MapGraphService.isAdjacent(sc, dc)) {
                             isAdjacent = true;
                             break;
                         }

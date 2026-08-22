@@ -147,7 +147,7 @@ class StrategySystem {
     getKukoModifiers(clanAId, clanBId) {
         const daimyoA = this.game.getClanDaimyo(clanAId) || { affinity: 50 };
         const daimyoB = this.game.getClanDaimyo(clanBId) || { affinity: 50 };
-        const affinityDiff = typeof GameSystem !== 'undefined' ? GameSystem.calcAffinityDiff(daimyoA.affinity, daimyoB.affinity) : 25;
+        const affinityDiff = typeof PersonnelRules !== 'undefined' ? PersonnelRules.calcAffinityDiff(daimyoA.affinity, daimyoB.affinity) : 25;
         
         const defAInt = this.getLeaderOrGunshiInt(clanAId);
         const defBInt = this.getLeaderOrGunshiInt(clanBId);
@@ -169,8 +169,8 @@ class StrategySystem {
         for (const ca of castlesA) {
             for (const cb of castlesB) {
                 // 隣接しているか調べます
-                if (typeof GameSystem !== 'undefined' && GameSystem.isAdjacent) {
-                    if (GameSystem.isAdjacent(ca, cb)) {
+                if (typeof MapGraphService !== 'undefined' && MapGraphService.isAdjacent) {
+                    if (MapGraphService.isAdjacent(ca, cb)) {
                         isAdjacent = true;
                         break;
                     }
@@ -246,7 +246,7 @@ class StrategySystem {
         const dutyMod = (target.duty / 120) + 0.75;
         const loyaltyMod = (target.loyalty / 120) + 0.75;
         
-        const affinityDiff = typeof GameSystem !== 'undefined' ? GameSystem.calcAffinityDiff(doer.affinity, target.affinity) : 25;
+        const affinityDiff = typeof PersonnelRules !== 'undefined' ? PersonnelRules.calcAffinityDiff(doer.affinity, target.affinity) : 25;
         const affinityMod = 0.875 + (affinityDiff / 200);
 
         const officerStatus = this.checkOfficerStatus(target);
@@ -303,12 +303,12 @@ class StrategySystem {
         const goldEffect = Math.min(S.HeadhuntGoldMaxEffect, gold * S.HeadhuntGoldEffect);
         const offense = (doer.intelligence * S.HeadhuntIntWeight) + goldEffect;
         const defense = (target.loyalty * S.HeadhuntLoyaltyWeight) + (target.duty * S.HeadhuntDutyWeight) + S.HeadhuntBaseDiff;
-        // 注意：ここは game.js に残した GameSystem.calcAffinityDiff を借ります！
-        const affLord = GameSystem.calcAffinityDiff(target.affinity, targetLord.affinity); 
+        // 注意：ここは game.js に残した PersonnelRules.calcAffinityDiff を借ります！
+        const affLord = PersonnelRules.calcAffinityDiff(target.affinity, targetLord.affinity); 
         const lordBonus = (50 - affLord) * S.AffinityLordWeight; 
-        const affNew = GameSystem.calcAffinityDiff(target.affinity, newLord.affinity);
+        const affNew = PersonnelRules.calcAffinityDiff(target.affinity, newLord.affinity);
         const newBonus = (50 - affNew) * S.AffinityNewLordWeight; 
-        const affDoer = GameSystem.calcAffinityDiff(target.affinity, doer.affinity);
+        const affDoer = PersonnelRules.calcAffinityDiff(target.affinity, doer.affinity);
         const doerBonus = (50 - affDoer) * S.AffinityDoerWeight; 
         const totalOffense = offense + newBonus + doerBonus;
         const totalDefense = defense + lordBonus;

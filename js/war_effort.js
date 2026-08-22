@@ -118,7 +118,7 @@ Object.assign(WarManager.prototype, {
         }
         
         // 経路がつながっているものを優先して返す
-        const reachable = candidates.filter(c => GameSystem.isReachable(this.game, defCastle, c, oldOwner));
+        const reachable = candidates.filter(c => MapGraphService.isReachable(this.game, defCastle, c, oldOwner));
         if (reachable.length > 0) {
             return reachable;
         }
@@ -399,7 +399,7 @@ Object.assign(WarManager.prototype, {
         }
 
         return this.game.castles.filter(target => {
-            if (!GameSystem.isReachable(this.game, currentCastle, target, myClanId)) return false;
+            if (!MapGraphService.isReachable(this.game, currentCastle, target, myClanId)) return false;
             if (target.ownerClan === myClanId) return false;
             if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
             if (target.ownerClan !== 0) {
@@ -475,8 +475,8 @@ Object.assign(WarManager.prototype, {
 
             // ★追加：最短ルートが海路を通るか（海戦か）どうかを判定して記憶します
             let isSeaBattle = false;
-            if (typeof GameSystem.isSeaRoute === 'function') {
-                isSeaBattle = GameSystem.isSeaRoute(this.game, atkCastle, defCastle, atkClan);
+            if (typeof MapGraphService.isSeaRoute === 'function') {
+                isSeaBattle = MapGraphService.isSeaRoute(this.game, atkCastle, defCastle, atkClan);
             }
 
             // ★ここから追加：お城に「攻撃された記憶」をメモ書きします！
@@ -3428,7 +3428,7 @@ Object.assign(WarManager.prototype, {
             // 忠誠度が下がった状態での独立判定を行います
             if (castellan.loyalty <= threshold) {
                 const daimyoBonus = indepSys.calcDaimyoPowerBonus(oldDaimyo);
-                const affinityDiff = GameSystem.calcAffinityDiff(castellan.affinity, oldDaimyo.affinity);
+                const affinityDiff = PersonnelRules.calcAffinityDiff(castellan.affinity, oldDaimyo.affinity);
                 
                 let prob = ((threshold - castellan.loyalty) * probLoyalty) + (affinityDiff * probAffinity) - (daimyoBonus * 2);
                 

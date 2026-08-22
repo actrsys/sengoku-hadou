@@ -20,6 +20,124 @@ class MapGraphService {
         return aToB || bToA;
     }
 
+
+    /**
+     * 同盟・支配・従属領を通過して、目標城まで到達できるか判定する。
+     */
+    static isReachable(game, startCastle, targetCastle, movingClanId) {
+        if (!game || !startCastle || !targetCastle) return false;
+        if (this.isAdjacent(startCastle, targetCastle)) return true;
+
+        const visited = new Set([Number(startCastle.id)]);
+        const queue = [startCastle];
+        let head = 0;
+
+        while (head < queue.length) {
+            const current = queue[head++];
+            const adjacentIds = current.adjacentCastleIds || [];
+            for (const adjId of adjacentIds) {
+                const next = game.getCastle(adjId);
+                if (!next) continue;
+                if (Number(next.id) === Number(targetCastle.id)) return true;
+
+                const nextId = Number(next.id);
+                if (visited.has(nextId)) continue;
+
+                let canPass = false;
+                if (Number(next.ownerClan) === Number(movingClanId)) {
+                    canPass = true;
+                } else if (Number(next.ownerClan) !== 0) {
+                    const rel = game.getRelation(movingClanId, next.ownerClan);
+                    if (rel && ['同盟', '支配', '従属'].includes(rel.status)) canPass = true;
+                }
+
+                if (canPass) {
+                    visited.add(nextId);
+                    queue.push(next);
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 起点から自領（必要なら同一軍団）だけを辿り、内側と境界城を返す。
+     */
+    static getReachableTerritory(game, startCastle, isLegionOnly = false) {
+        const myCastles = new Set();
+        const enemyCastles = new Set();
+        if (!game || !startCastle) return { myCastles: [], enemyCastles: [] };
+
+        const clanId = startCastle.ownerClan;
+        const legionId = startCastle.legionId;
+        const queue = [startCastle];
+        let head = 0;
+        myCastles.add(startCastle.id);
+
+        while (head < queue.length) {
+            const current = queue[head++];
+            const adjacentIds = current.adjacentCastleIds || [];
+            for (const adjId of adjacentIds) {
+                const adjCastle = game.getCastle(adjId);
+                if (!adjCastle) continue;
+                const isMyTerritory = (adjCastle.ownerClan === clanId) &&
+                    (!isLegionOnly || adjCastle.legionId === legionId || legionId === 0);
+                if (isMyTerritory) {
+                    if (!myCastles.has(adjId)) {
+                        myCastles.add(adjId);
+                        queue.push(adjCastle);
+                    }
+                } else {
+                    enemyCastles.add(adjId);
+                }
+            }
+        }
+
+        return {
+            myCastles: Array.from(myCastles).map(id => game.getCastle(id)),
+            enemyCastles: Array.from(enemyCastles).map(id => game.getCastle(id))
+        };
+    }
+
+    /**
+     * 最短到達経路の最後の一歩が海路かを判定する。
+     */
+    static isSeaRoute(game, startCastle, targetCastle, movingClanId) {
+        if (!game || !startCastle || !targetCastle) return false;
+        if (startCastle.id === targetCastle.id) return false;
+
+        const visited = new Set([startCastle.id]);
+        const queue = [startCastle];
+        let head = 0;
+
+        while (head < queue.length) {
+            const current = queue[head++];
+            const adjacentIds = current.adjacentCastleIds || [];
+            for (const adjId of adjacentIds) {
+                const next = game.getCastle(adjId);
+                if (!next) continue;
+
+                if (next.id === targetCastle.id) {
+                    return !!(current.seaRouteIds && current.seaRouteIds.includes(next.id));
+                }
+
+                if (visited.has(next.id)) continue;
+                let canPass = false;
+                if (Number(next.ownerClan) === Number(movingClanId)) {
+                    canPass = true;
+                } else if (Number(next.ownerClan) !== 0) {
+                    const rel = game.getRelation(movingClanId, next.ownerClan);
+                    if (rel && ['同盟', '支配', '従属'].includes(rel.status)) canPass = true;
+                }
+                if (canPass) {
+                    visited.add(next.id);
+                    queue.push(next);
+                }
+            }
+        }
+        return false;
+    }
+
     invalidate() {
         this._source = null;
         this._size = -1;

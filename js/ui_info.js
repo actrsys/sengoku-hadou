@@ -1247,7 +1247,7 @@ class UIInfoManager {
             const inputType = 'checkbox';
             let inputHtml = `<input type="${inputType}" name="sel_prisoner" value="${b.id}" ${!isSelectable ? 'disabled' : ''} style="display:none;">`;
 
-            const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, null, this.game.playerClanId, myDaimyo);
+            const getStat = (stat) => StatPresenter.getDisplayStatHTML(b, stat, gunshi, null, this.game.playerClanId, myDaimyo);
 
             let cells = [
                 `<span class="col-act">${inputHtml}${!isSelectable ? '済' : '未'}</span>`,

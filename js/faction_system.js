@@ -27,7 +27,7 @@ class FactionSystem {
         let factor = 1.0;
         
         if (daimyo) {
-            const diff = GameSystem.calcAffinityDiff(busho.affinity, daimyo.affinity);
+            const diff = PersonnelRules.calcAffinityDiff(busho.affinity, daimyo.affinity);
             
             if (baseAmount > 0) {
                 // 不満が溜まる場合（プラス変動）
@@ -267,7 +267,7 @@ class FactionSystem {
                 const leaderGroupMeta = getLeaderGroupMeta(availableLeaders);
                 const maxLeaderStatVal = leaderGroupMeta.maxByStat[bestStatKey];
 
-                const affDiff = GameSystem.calcAffinityDiff(voter.affinity, leader.affinity);
+                const affDiff = PersonnelRules.calcAffinityDiff(voter.affinity, leader.affinity);
                 const innoDiff = Math.abs(voter.innovation - leader.innovation);
 
                 let solidarityBonus = 0;

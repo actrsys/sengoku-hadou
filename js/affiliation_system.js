@@ -535,7 +535,7 @@ class AffiliationSystem {
         const daimyo = this.game.getClanDaimyo(clanId) || { affinity: 50 };
         
         // 殿様との相性の「ズレ（差）」を計算します（0〜50の数字になります）
-        const affDiff = GameSystem.calcAffinityDiff(daimyo.affinity, busho.affinity);
+        const affDiff = PersonnelRules.calcAffinityDiff(daimyo.affinity, busho.affinity);
         
         // ズレが0（ピッタリ）なら50アップ、ズレが50（真逆）なら0アップにします
         const loyaltyUp = 50 - affDiff;
@@ -610,8 +610,8 @@ class AffiliationSystem {
                 if (candidates.length > 0) {
                     candidates.sort((a, b) => {
                         if (b.intelligence !== a.intelligence) return b.intelligence - a.intelligence; 
-                        const aDiff = GameSystem.calcAffinityDiff(a.affinity, castellan.affinity);
-                        const bDiff = GameSystem.calcAffinityDiff(b.affinity, castellan.affinity);
+                        const aDiff = PersonnelRules.calcAffinityDiff(a.affinity, castellan.affinity);
+                        const bDiff = PersonnelRules.calcAffinityDiff(b.affinity, castellan.affinity);
                         if (aDiff !== bDiff) return aDiff - bDiff; 
                         const aAchieve = a.achievementTotal || 0;
                         const bAchieve = b.achievementTotal || 0;
@@ -773,7 +773,7 @@ class AffiliationSystem {
             if(!currentC) return; 
             
             // 隣接する城のリストを作る
-            const neighbors = this.game.castles.filter(c => GameSystem.isAdjacent(currentC, c)); 
+            const neighbors = this.game.castles.filter(c => MapGraphService.isAdjacent(currentC, c)); 
             
             // 隣に城があって、かつ5%の確率(サイコロ)に当たったらお引越しする
             if (neighbors.length > 0 && Math.random() < 0.05) {

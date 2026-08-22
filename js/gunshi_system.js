@@ -38,7 +38,7 @@ class GunshiSystem {
         const unhappyBushos = this.game.bushos.filter(b => 
             b.clan === this.game.playerClanId && 
             b.status === 'active' && 
-            GameSystem.isUnhappyBusho(b)
+            DomesticRules.isUnhappyBusho(b)
         );
 
         // 不満を持っている人がいた場合
@@ -163,8 +163,8 @@ class GunshiSystem {
         const maxError = 1.0 - accuracy;
         
         // ランダムなノイズ（-1.0 〜 +1.0）を作ってブレさせます
-        // ※ GameSystem.seededRandom を使うようにしました
-        const noise = (GameSystem.seededRandom(seed) - 0.5) * 2;
+        // ※ GameMath.seededRandom を使うようにしました
+        const noise = (GameMath.seededRandom(seed) - 0.5) * 2;
         let perceivedProb = trueProb + noise * maxError;
         perceivedProb = Math.max(0.0, Math.min(1.0, perceivedProb));
         

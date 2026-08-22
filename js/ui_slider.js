@@ -135,18 +135,18 @@ class UISliderManager {
                 if (type === 'draft') {
                     const amount = getSliderValue('soldiers');
                     const busho = this.game.getBusho(data[0]);
-                    const cost = GameSystem.calcDraftCost(amount, busho, c.peoplesLoyalty, c.population);
+                    const cost = DomesticRules.calcDraftCost(amount, busho, c.peoplesLoyalty, c.population);
                     displayEl.innerHTML = makeGrid("兵士", c.soldiers + amount, c.gold - cost);
                 } else if (['buy_rice', 'buy_ammo', 'buy_horses', 'buy_guns'].includes(type)) {
-                    // ★取引の計算は、すべて GameSystem の窓口にお願いするだけになりました！
+                    // ★取引の計算は、すべて EconomyRules の窓口にお願いするだけになりました！
                     const amount = getSliderValue('amount');
-                    const tradeData = GameSystem.calcTradeCostAndRate(type, amount, c, daimyo, castellan, this.game.provinces);
+                    const tradeData = EconomyRules.calcTradeCostAndRate(type, amount, c, daimyo, castellan, this.game.provinces, this.game);
                     const itemName = type === 'buy_rice' ? "兵糧" : (type === 'buy_ammo' ? "矢弾" : (type === 'buy_horses' ? "軍馬" : "鉄砲"));
                     const currentItem = type === 'buy_rice' ? c.rice : (type === 'buy_ammo' ? (c.ammo || 0) : (type === 'buy_horses' ? (c.horses || 0) : (c.guns || 0)));
                     displayEl.innerHTML = makeGrid(itemName, currentItem + amount, c.gold - tradeData.cost);
                 } else if (type === 'sell_rice') {
                     const amount = getSliderValue('amount');
-                    const tradeData = GameSystem.calcTradeCostAndRate(type, amount, c, daimyo, castellan, this.game.provinces);
+                    const tradeData = EconomyRules.calcTradeCostAndRate(type, amount, c, daimyo, castellan, this.game.provinces, this.game);
                     displayEl.innerHTML = makeGrid("兵糧", c.rice - amount, c.gold + tradeData.cost);
                 }
             }
@@ -384,10 +384,10 @@ class UISliderManager {
             const busho = this.game.getBusho(data[0]);
             
             // ★徴兵の最大可能数はルールブックに聞くだけ！
-            const realMaxBuy = GameSystem.calcMaxDraftAmount(c, busho);
+            const realMaxBuy = DomesticRules.calcMaxDraftAmount(c, busho);
             
             // ★変更：「単価」の計算もGameSystemの窓口にお願いするようにしました！
-            const singleCost = GameSystem.calcDraftUnitPrice(busho, c.peoplesLoyalty, c.population);
+            const singleCost = DomesticRules.calcDraftUnitPrice(busho, c.peoplesLoyalty, c.population);
             setTradeRateInfo("兵士", "人", 1, singleCost.toFixed(1));
             
             inputs.soldiers = createSlider("兵士数", "soldiers", realMaxBuy, 0);
@@ -469,11 +469,11 @@ class UISliderManager {
             document.getElementById('quantity-title').textContent = labelMap[type];
             
             // ★最大可能数をルールブックに聞きます
-            const realMaxAmount = GameSystem.calcMaxTradeAmount(type, c, daimyo, castellan, this.game.provinces);
+            const realMaxAmount = EconomyRules.calcMaxTradeAmount(type, c, daimyo, castellan, this.game.provinces, this.game);
             
             // レート計算（ダミーで1単位、兵糧の場合は10単位渡します）
             const checkAmount = (type === 'buy_rice' || type === 'sell_rice') ? 10 : 1;
-            const tradeData = GameSystem.calcTradeCostAndRate(type, checkAmount, c, daimyo, castellan, this.game.provinces);
+            const tradeData = EconomyRules.calcTradeCostAndRate(type, checkAmount, c, daimyo, castellan, this.game.provinces, this.game);
             
             let extraStr = "";
             if (type === 'buy_rice' || type === 'sell_rice') {

@@ -56,7 +56,7 @@ class IndependenceSystem {
      * 基礎値60 ＋ 相性ボーナス（最大50）で、最大100
      */
     calcNewLoyalty(busho, daimyo) {
-        const affDiff = GameSystem.calcAffinityDiff(daimyo.affinity, busho.affinity);
+        const affDiff = PersonnelRules.calcAffinityDiff(daimyo.affinity, busho.affinity);
         const loyaltyUp = 50 - affDiff;
         return Math.min(100, 60 + loyaltyUp);
     }
@@ -66,7 +66,7 @@ class IndependenceSystem {
         const probLoyalty = I.ProbLoyaltyFactor;
         const probAffinity = I.ProbAffinityFactor;
         const daimyoBonus = this.calcDaimyoPowerBonus(daimyo);
-        const affinityDiff = GameSystem.calcAffinityDiff(castellan.affinity, daimyo.affinity);
+        const affinityDiff = PersonnelRules.calcAffinityDiff(castellan.affinity, daimyo.affinity);
         
         let prob = ((threshold - castellan.loyalty) * probLoyalty) + (affinityDiff * probAffinity) - (daimyoBonus * 2);
         
@@ -121,7 +121,7 @@ class IndependenceSystem {
                 let leaderProb = 0;
                 if (factionLeader.loyalty <= leaderThreshold) {
                     const daimyoBonus = this.calcDaimyoPowerBonus(oldDaimyo);
-                    const affinityDiff = GameSystem.calcAffinityDiff(factionLeader.affinity, oldDaimyo.affinity);
+                    const affinityDiff = PersonnelRules.calcAffinityDiff(factionLeader.affinity, oldDaimyo.affinity);
                     leaderProb = ((leaderThreshold - factionLeader.loyalty) * probLoyalty) + (affinityDiff * probAffinity) - (daimyoBonus * 2);
                     
                     // 大名と「一門」関係なら確率を下げる魔法です
@@ -155,7 +155,7 @@ class IndependenceSystem {
         // ★追加：独立志向(indep)でなければ、寝返り先を探します
         else if (intention !== 'indep') {
             // 相性の計算基準を rebellionLeader（神輿になる人物）に変更
-            const oldAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, oldDaimyo.affinity);
+            const oldAffinityDiff = PersonnelRules.calcAffinityDiff(rebellionLeader.affinity, oldDaimyo.affinity);
 
             for (const clan of this.game.clans) {
                 if (clan.id === 0 || clan.id === oldClanId) continue; 
@@ -205,7 +205,7 @@ class IndependenceSystem {
                 let enemyCurrentPower = this.calcClanPower(clan.id);
                 
                 // 相性の計算基準を rebellionLeader に変更
-                const enemyAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, enemyDaimyo.affinity);
+                const enemyAffinityDiff = PersonnelRules.calcAffinityDiff(rebellionLeader.affinity, enemyDaimyo.affinity);
                 let affinityBonus = 0;
                 if (enemyAffinityDiff < oldAffinityDiff) {
                     affinityBonus = oldAffinityDiff - enemyAffinityDiff; 
@@ -682,8 +682,8 @@ class IndependenceSystem {
 
     // ★修正：独立処理中に派閥がリセットされても判定できるように、記憶した元の派閥ID(targetFactionId)をオプションで受け取れるようにします
     calculateLoyaltyScores(busho, newDaimyo, oldDaimyo, targetFactionId = null) {
-        const affNew = GameSystem.calcAffinityDiff(busho.affinity, newDaimyo.affinity);
-        const affOld = GameSystem.calcAffinityDiff(busho.affinity, oldDaimyo.affinity);
+        const affNew = PersonnelRules.calcAffinityDiff(busho.affinity, newDaimyo.affinity);
+        const affOld = PersonnelRules.calcAffinityDiff(busho.affinity, oldDaimyo.affinity);
         let joinScore = (100 - affNew) * 2.0 + (busho.ambition * 0.5);
         let stayScore = (100 - affOld) * 2.0 + (busho.loyalty * 0.5);
 
@@ -816,7 +816,7 @@ class IndependenceSystem {
         let alertMsgs = [];
         captives.forEach(p => {
             if (oldClanId === this.game.playerClanId) {
-                if (GameSystem.calcAffinityDiff(p.affinity, newDaimyo.affinity) > 60) {
+                if (PersonnelRules.calcAffinityDiff(p.affinity, newDaimyo.affinity) > 60) {
                     p.status = 'dead'; p.clan = 0;
                     alertMsgs.push(`処断：${p.name} は処断されました。`);
                 } else {
