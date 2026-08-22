@@ -2343,6 +2343,9 @@ body.is-pc .princess-detail-label.is-long-label {
 .busho-detail-stat-box {
     justify-content: flex-start;
     padding-right: 5px;
+    /* 100の枠を越える限界突破表現は許可しつつ、能力値1行そのものの
+       外（右側の所在・主君などの列）へだけは描画を出さない。 */
+    overflow: hidden;
 }
 .busho-detail-stat-label {
     width: 40px;
@@ -2357,13 +2360,13 @@ body.is-pc .princess-detail-label.is-long-label {
     display: flex;
     align-items: center;
 }
-.busho-detail-stat-bar {
-    flex: 1;
-    margin-right: 0;
-    max-width: none;
-    margin-left: 5px;
+.busho-detail-bar-base {
+    /* 能力値120を左カラムの最大描画幅とし、通常値100の枠はその100/120だけ使う。
+       101〜120のバー本体だけが残り1/6へ伸び、120で左カラム右端に届く。 */
+    width: calc(100% * 100 / 120);
+    /* 親は flex-direction: column のため flex-basis を指定すると高さ方向へ作用する。
+       横幅は width だけで管理し、10pxのゲージ高を維持する。 */
 }
-.busho-detail-bar-base { width: calc(100% * 100 / 120); }
 .bar-fill-busho,
 .exp-bar-fill { width: var(--bar-value, 0%); }
 .daimyo-detail-stat-box.is-placeholder,
@@ -2493,17 +2496,24 @@ body:not(.is-pc) .busho-skill-desc-body { font-size: 0.62rem; }
 
 /* ★追加：能力値と経験値を縦に並べるための外枠 */
 .busho-stat-bar-wrapper {
+    /* 武将詳細の能力/経験ゲージは、残り幅を使って横に伸ばす。
+       旧inline styleで有効だった max-width:none をここへ正式統合する。 */
     flex: 1;
-    max-width: 80px;
-    margin-right: 8px;
+    min-width: 0;
+    max-width: none;
+    margin-left: 5px;
+    margin-right: 0;
+    /* 100の通常枠を越える描画はここでは切らない。
+       101〜120の限界突破部分を、このラッパー内の予約領域へそのまま描く。 */
+    overflow: visible;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    /* gapを削除し、隙間をなくしました */
 }
 
 .bar-bg-busho {
-    width: 100%;
+    /* 幅は .busho-detail-bar-base の100/120指定に任せる。
+       ここで100%にすると通常ゲージが予約領域いっぱいまで伸びてしまう。 */
     height: 10px;
     /* ゲージの背景：灰色のグラデーション */
     background: linear-gradient(to bottom, #1a1a1a 0%, #3a3a3a 50%, #1a1a1a 100%);

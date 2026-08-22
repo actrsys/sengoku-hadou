@@ -7,6 +7,7 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
+
 let passed = 0;
 let failed = 0;
 
@@ -365,6 +366,30 @@ test('バランスシミュレーターが正式ツールとして配置され�
     assert.ok(source.includes("SCENARIO_KEY != '1560_okehazama'"), '桶狭間固有イベントのシナリオ境界がありません');
 });
 
+// 武将能力ゲージ: 100の枠は120予約領域の100/120に留め、bar-bg側で100%上書きしない
+test('busho stat gauge reserves 101-120 breakthrough space', () => {
+    const css = fs.readFileSync(path.join(ROOT, 'css/style.css'), 'utf8');
+    assert(/\.busho-detail-bar-base\s*\{[^}]*width:\s*calc\(100%\s*\*\s*100\s*\/\s*120\)/s.test(css), '100/120 base width missing');
+    const barBg = css.match(/\.bar-bg-busho\s*\{([^}]*)\}/s);
+    assert(barBg, '.bar-bg-busho rule missing');
+    assert(!/width:\s*100%/.test(barBg[1]), '.bar-bg-busho must not override the 100/120 base width');
+});
+
+test('武将詳細の能力ゲージを固定80pxへ戻さない', () => {
+    const css = read('css/style.css');
+    const wrapperMatch = css.match(/\.busho-stat-bar-wrapper\s*\{([^}]*)\}/);
+    assert.ok(wrapperMatch, '.busho-stat-bar-wrapper が見つかりません');
+    const body = wrapperMatch[1];
+    assert.ok(/max-width\s*:\s*none\s*;/.test(body), '能力ゲージの max-width:none がありません');
+    assert.ok(!/max-width\s*:\s*80px\s*;/.test(body), '旧80px上限が復活しています');
+    assert.ok(/flex\s*:\s*1\s*;/.test(body), '能力ゲージが残り幅を使う flex:1 ではありません');
+    assert.ok(/overflow\s*:\s*visible\s*;/.test(body), '101以上のゲージが100の枠を突き破れる overflow:visible がありません');
+    assert.ok(!/clip-path\s*:/.test(body), '能力ゲージの内側ラッパーにクリップがあり、限界突破演出を消す可能性があります');
+    assert.ok(/\.busho-detail-stat-box\s*\{[^}]*overflow\s*:\s*hidden\s*;/s.test(css), '120の予約領域の外だけを止める能力値行の境界がありません');
+    assert.ok(/\.busho-detail-bar-base\s*\{[^}]*width\s*:\s*calc\(100%\s*\*\s*100\s*\/\s*120\)\s*;/s.test(css), '能力100を基準に120までの飛び出し領域を予約する幅計算がありません');
+    assert.ok(/\.bar-bg-busho\s*\{[^}]*overflow\s*:\s*visible\s*;/s.test(css), '100の通常枠から限界突破バーを外へ描画できません');
+});
+
 // ---------------------------------------------------------------------------
 // 最低限の構造チェック
 // ---------------------------------------------------------------------------
@@ -375,6 +400,18 @@ test('index.html のローカル script src はすべて存在する', () => {
         .filter(src => !/^https?:/i.test(src));
     const missing = refs.filter(src => !fs.existsSync(path.join(ROOT, src)));
     assert.deepStrictEqual(missing, []);
+});
+
+// Regression: the 100/120 width reservation must not use flex-basis.
+// busho-stat-bar-wrapper is a column flex container, so flex-basis would collapse/alter gauge height.
+test('Busho stat gauge keeps height while reserving 120-space', () => {
+    const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
+    const block = css.match(/\.busho-detail-bar-base\s*\{([\s\S]*?)\}/);
+    assert(block, 'Missing .busho-detail-bar-base');
+    assert(/width\s*:\s*calc\(100%\s*\*\s*100\s*\/\s*120\)/.test(block[1]), '100/120 width reservation missing');
+    assert(!/flex(?:-basis)?\s*:/.test(block[1]), 'Do not use flex/flex-basis on .busho-detail-bar-base; parent axis is vertical');
+    const bg = css.match(/\.bar-bg-busho\s*\{([\s\S]*?)\}/);
+    assert(bg && /height\s*:\s*10px/.test(bg[1]), 'Busho stat gauge height must remain 10px');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
