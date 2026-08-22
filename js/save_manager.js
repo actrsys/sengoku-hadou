@@ -161,7 +161,7 @@ class SaveManager {
             this.game.ui.clearWarLog();
             if (typeof this.game.ui.clearCommandMenu === 'function') this.game.ui.clearCommandMenu();
         }
-        this.game.eventManager = new EventManager(this);
+        this.game.eventManager = new EventManager(this.game);
         if (this.game.gunshiSystem) this.game.gunshiSystem.onStartMonth();
         
         // --- 復元作業 ---

@@ -488,5 +488,17 @@ test('Busho stat gauge keeps height while reserving 120-space', () => {
     assert(bg && /height\s*:\s*10px/.test(bg[1]), 'Busho stat gauge height must remain 10px');
 });
 
+
+// Regression: SaveManager is not the game facade. After loading a save,
+// EventManager must receive the GameManager instance so event conditions can
+// call getBusho/getCastle/getClan and other game APIs.
+test('SaveManager restores EventManager with GameManager context', () => {
+    const source = read('js/save_manager.js');
+    assert(source.includes('this.game.eventManager = new EventManager(this.game);'),
+        'SaveManager must pass this.game to EventManager during restore');
+    assert(!source.includes('this.game.eventManager = new EventManager(this);'),
+        'SaveManager must not pass itself as EventManager game context');
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
