@@ -67,6 +67,22 @@ window.GameConfig = {
             WallDefenseEffect: 0.5,
             DamageFluctuation: 0.2
         },
+        TroopAllocation: {
+            GeneralRatio: 1.3,
+            EquipmentMinimumRatio: 0.5,
+            MaxTeppoUnitRatio: 0.5
+        },
+        Reinforcement: {
+            SelfSoldierRatio: 0.5,
+            MinimumSoldiers: 500,
+            TwoBushoThreshold: 1500,
+            ThreeBushoThreshold: 2500,
+            EquipmentCapRatio: 0.5,
+            SelfEquipmentMinimumStockRatio: 0.2,
+            AllyRateDivisor: 400,
+            KunishuRateDivisor: 200,
+            RicePerSoldier: 1
+        },
         War: {
             ChargeMultiplier: 1.5,
             ChargeRisk: 1.8,

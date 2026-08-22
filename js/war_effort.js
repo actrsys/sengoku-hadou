@@ -421,125 +421,6 @@ Object.assign(WarManager.prototype, {
     
     // ★修正：AIが鉄砲・騎馬を「強さ順」に賢く配分し、余った兵士を足軽で均等に分けるロジックを追加
     // ★追加：ui_sliderからの呼び出しを受け取れるように引数（isSeaBattleParam, isPlayerUI）を追加します！
-    autoDivideSoldiers(bushos, totalSoldiers, totalHorses = 0, totalGuns = 0, isSeaBattleParam = false, isPlayerUI = false) {
-        if (!bushos || bushos.length === 0) return [];
-        
-        // ★修正: プレイヤーの編成画面では、1人の時でも強制的に足軽にせず、ちゃんと計算させます！
-        if (bushos.length === 1 && !isPlayerUI) {
-            return [{ busho: bushos[0], soldiers: totalSoldiers, troopType: 'ashigaru' }];
-        }
-        
-        // ★追加：海戦の時は、軍馬を「0頭」として扱って騎馬隊を作らせないようにします！
-        const isSeaBattle = isSeaBattleParam || (this.state && this.state.isSeaBattle);
-        let availableHorses = isSeaBattle ? 0 : totalHorses;
-        let availableGuns = totalGuns;
-
-        const N = bushos.length;
-        // 総大将は他部隊の1.3倍の兵力にする
-        const ratioSum = 1.3 + (N - 1) * 1.0;
-        const baseAmount = Math.floor(totalSoldiers / ratioSum);
-        
-        // 1. まずは全員「足軽」として、必要な兵数（req）の目標を決めます
-        let assignments = bushos.map((b, i) => {
-            let req = (i === 0) ? Math.floor(baseAmount * 1.3) : baseAmount;
-            return { 
-                index: i,             // 元の順番を覚えておくための番号札
-                busho: b, 
-                req: req, 
-                soldiers: req,        // とりあえず目標人数をセット
-                troopType: 'ashigaru',
-                score: b.leadership + b.strength // ★強さ（統率＋武勇）の合計点！
-            };
-        });
-
-        // 割り切れない余り兵士を総大将に足す
-        let totalReq = assignments.reduce((sum, a) => sum + a.req, 0);
-        assignments[0].req += (totalSoldiers - totalReq);
-        assignments[0].soldiers = assignments[0].req;
-
-        let poolSoldiers = 0; // 余った兵士を貯めるプール
-        
-        const maxTeppoCount = Math.floor(N / 2);
-        let teppoCount = 0;
-
-        // ★追加: 順番待ちの列を「合計点（強さ）が高い順」に並び替えます！
-        let sortedAssigns = [...assignments].sort((a, b) => b.score - a.score);
-
-        // 万が一、全員が騎馬か鉄砲になってしまった時に、「最後に変身した人」を覚えておく箱です
-        let lastChangedAssign = null;
-
-        // 2. 強い人から順番に、軍馬や鉄砲を配っていきます
-        for (let a of sortedAssigns) {
-            let isGeneral = (a.index === 0);
-            let req = a.req;
-            
-            // ★追加: 総大将は100%揃わないとダメ。他の人は50%でOKというルール
-            // ★修正：プレイヤーの編成画面では、馬や鉄砲を無駄なく使わせるため、総大将も50%でOKにします！
-            let threshold = (isGeneral && !isPlayerUI) ? req : req * 0.5;
-
-            // 騎馬の判定
-            if (availableHorses >= threshold) {
-                a.troopType = 'kiba';
-                let assignCount = Math.min(req, availableHorses);
-                a.soldiers = assignCount;
-                availableHorses -= assignCount;
-                poolSoldiers += (req - assignCount); // 減らした分の兵士はプールへ
-                lastChangedAssign = a;               // 最後に変身した人を記憶
-            } 
-            // 鉄砲の判定
-            else if (availableGuns >= threshold && teppoCount < maxTeppoCount) {
-                a.troopType = 'teppo';
-                let assignCount = Math.min(req, availableGuns);
-                a.soldiers = assignCount;
-                availableGuns -= assignCount;
-                poolSoldiers += (req - assignCount);
-                teppoCount++;
-                lastChangedAssign = a;               // 最後に変身した人を記憶
-            }
-        }
-
-        // 3. 今「足軽」のままの部隊をピックアップします
-        let ashigaruAssigns = assignments.filter(a => a.troopType === 'ashigaru');
-
-        // ★修正: 余った兵士がいるのに、足軽が「ゼロ」になってしまった時だけ特別ルール発動！
-        if (poolSoldiers > 0 && ashigaruAssigns.length === 0 && lastChangedAssign) {
-            if (isPlayerUI) {
-                // ★追加: プレイヤーの編成画面の場合は、無理に足軽を作らず、一番強い総大将に余った兵士を押し付けます！
-                assignments[0].soldiers += poolSoldiers;
-                poolSoldiers = 0; // 押し付けたのでプールを空にします
-            } else {
-                // 最後に変身した人に「ごめん、足軽に戻って！」とお願いします
-                lastChangedAssign.troopType = 'ashigaru';
-                // 足軽に戻るので、プールに貯めていた「減らした分の兵士」を元に戻して帳尻を合わせます
-                poolSoldiers -= (lastChangedAssign.req - lastChangedAssign.soldiers);
-                lastChangedAssign.soldiers = lastChangedAssign.req;
-                // この人を足軽グループに入れます
-                ashigaruAssigns.push(lastChangedAssign);
-            }
-        }
-
-        // ★追加: 余った兵士（プール）を、足軽みんなで「均等に」分け合います
-        if (poolSoldiers > 0 && ashigaruAssigns.length > 0) {
-            let share = Math.floor(poolSoldiers / ashigaruAssigns.length); // 1人あたりの配分
-            let remainder = poolSoldiers % ashigaruAssigns.length;         // 割り切れなかった余り
-            
-            ashigaruAssigns.forEach((a, i) => {
-                a.soldiers += share;
-                // 割り切れなかった分は、先頭の人から順番に1人ずつ足していきます
-                if (i < remainder) {
-                    a.soldiers += 1;
-                }
-            });
-        }
-
-        // 4. 配り終わったら、元の「総大将が一番上」の順番に戻して結果を返します
-        return assignments.map(a => ({
-            busho: a.busho,
-            soldiers: a.soldiers,
-            troopType: a.troopType
-        }));
-    },
-    
     async startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses = 0, atkGuns = 0, reinforcementData = null, selfReinforcementData = null) {
         // ★追加：戦争全体の「開始処理前」の合図を出します
         if (this.game.eventManager) {
@@ -3193,35 +3074,10 @@ Object.assign(WarManager.prototype, {
     },
     
     executeDefSelfReinforcementAuto(helperCastle, defCastle, onComplete) {
-        let reinfSoldiers = Math.floor(helperCastle.soldiers * 0.5);
-        if (reinfSoldiers < 500) reinfSoldiers = 500;
-        if (reinfSoldiers > helperCastle.soldiers) reinfSoldiers = helperCastle.soldiers;
-        
-        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b =>
-            b.clan === helperCastle.ownerClan && b.status === 'active'
-        ).sort((a,b) => b.strength - a.strength);
-
-        let bushoCount = 1;
-        if (reinfSoldiers >= 1500) bushoCount = 2;
-        if (reinfSoldiers >= 2500) bushoCount = 3;
-        if (bushoCount > availableBushos.length) bushoCount = availableBushos.length;
-
-        const reinfBushos = availableBushos.slice(0, bushoCount);
-        const reinfRice = reinfSoldiers; 
-        const reinfHorses = (helperCastle.horses || 0) < reinfSoldiers * 0.2 ? 0 : Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
-        const reinfGuns = (helperCastle.guns || 0) < reinfSoldiers * 0.2 ? 0 : Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
-
-        helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
-        helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
-        helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
-        helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
-
-        const selfReinfData = {
-            castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: false, isSelf: true,
-            morale: helperCastle.morale || 50, training: helperCastle.training || 50
-        };
-        
+        const selfReinfData = this.game.reinforcementService.createAutoSelfReinforcement(helperCastle, {
+            isAttacker: false,
+            isSelf: true
+        });
         onComplete(selfReinfData);
     },
 
@@ -3245,26 +3101,12 @@ Object.assign(WarManager.prototype, {
             // 借りを作ったので友好度が少し下がります
             kunishu.setRelation(myClanId, currentRel - 10);
             
-            const rate = currentRel / 200; 
-            let reinfSoldiers = Math.floor(kunishu.soldiers * rate);
-            reinfSoldiers = Math.max(500, Math.min(reinfSoldiers, kunishu.soldiers));
-            
-            const availableBushos = this.game.kunishuSystem.getKunishuMembers(kunishu.id).sort((a,b) => b.strength - a.strength);
-            let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
-            bushoCount = Math.min(bushoCount, availableBushos.length);
-            const reinfBushos = availableBushos.slice(0, bushoCount);
-            
-            const reinfRice = reinfSoldiers; 
-            const reinfHorses = 0; 
-            const reinfGuns = 0;
-            
-            kunishu.soldiers = Math.max(0, kunishu.soldiers - reinfSoldiers);
-            
-            this.state.defReinforcement = {
-                castle: helperCastle, kunishuId: kunishu.id, bushos: reinfBushos, soldiers: reinfSoldiers,
-                rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false, isKunishuForce: true,
-                morale: kunishu.morale || 50, training: kunishu.training || 50
-            };
+            this.state.defReinforcement = this.game.reinforcementService.createAutoKunishuReinforcement(
+                kunishu,
+                helperCastle,
+                currentRel,
+                { isSelf: false, isKunishuForce: true }
+            );
             
             if (myClanId === this.game.playerClanId) {
                 const leader = this.game.getBusho(kunishu.leaderId);
@@ -3314,30 +3156,12 @@ Object.assign(WarManager.prototype, {
         if (!['支配', '従属', '同盟'].includes(myToHelperRel.status)) this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
 
         const helperDaimyo = this.game.getClanDaimyo(helperClanId) || { duty: 50 };
-        
-        const rate = (myToHelperRel.sentiment + helperDaimyo.duty) / 400;
-        let reinfSoldiers = Math.floor(helperCastle.soldiers * rate);
-        reinfSoldiers = Math.max(500, Math.min(reinfSoldiers, helperCastle.soldiers));
-        
-        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => b.clan === helperCastle.ownerClan && b.status === 'active').sort((a,b) => b.strength - a.strength);
-        let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
-        bushoCount = Math.min(bushoCount, availableBushos.length);
-
-        const reinfBushos = availableBushos.slice(0, bushoCount);
-        const reinfRice = reinfSoldiers; 
-        const reinfHorses = Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
-        const reinfGuns = Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
-
-        helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
-        helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
-        helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
-        helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
-
-        this.state.defReinforcement = {
-            castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false,
-            morale: helperCastle.morale || 50, training: helperCastle.training || 50
-        };
+        this.state.defReinforcement = this.game.reinforcementService.createAutoClanReinforcement(
+            helperCastle,
+            myToHelperRel,
+            helperDaimyo,
+            { isSelf: false }
+        );
 
         const atkForce = this.state.attacker;
         const atkIsKunishu = atkForce.isKunishu || false;

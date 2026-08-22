@@ -220,48 +220,10 @@ class AIStaffing {
         this.game = game;
         this.evaluationCache = {};
         this.lastMonth = -1;
-        this._adjacencySource = null;
-        this._adjacencySize = -1;
-        this._adjacencyMap = null;
-    }
-
-    // ★軽量化：GameSystem.isAdjacent(current, 全城) の総当たりを避ける隣接索引です。
-    // CSVの片側だけに隣接IDが書かれている場合も従来の isAdjacent と同じ結果になるよう、
-    // 読み込み時に両方向へ辺を張ります。
-    _ensureAdjacencyMap() {
-        const castles = this.game.castles || [];
-        if (this._adjacencySource === castles && this._adjacencySize === castles.length && this._adjacencyMap) return;
-
-        const sets = new Map();
-        for (const c of castles) sets.set(Number(c.id), new Set());
-
-        for (const c of castles) {
-            const fromId = Number(c.id);
-            const ids = Array.isArray(c.adjacentCastleIds) ? c.adjacentCastleIds : [];
-            for (const rawId of ids) {
-                const toId = Number(rawId);
-                if (!sets.has(toId) || toId === fromId) continue;
-                sets.get(fromId).add(toId);
-                sets.get(toId).add(fromId);
-            }
-        }
-
-        this._adjacencyMap = new Map();
-        sets.forEach((set, id) => this._adjacencyMap.set(id, Array.from(set)));
-        this._adjacencySource = castles;
-        this._adjacencySize = castles.length;
     }
 
     _getAdjacentCastles(castle) {
-        if (!castle) return [];
-        this._ensureAdjacencyMap();
-        const ids = this._adjacencyMap.get(Number(castle.id)) || [];
-        const result = [];
-        for (const id of ids) {
-            const c = this.game.getCastle(id);
-            if (c) result.push(c);
-        }
-        return result;
+        return this.game.mapGraph.getAdjacentCastles(castle);
     }
 
     // ==========================================

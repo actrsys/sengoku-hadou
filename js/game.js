@@ -513,18 +513,9 @@ class GameSystem {
         return Math.floor(val * rate);
     }
     
-    // ★ここをごっそり差し替え！：マスの位置（xとy）の計算を消して、リストの数字で判断します！
-    static isAdjacent(c1, c2) { 
-        // どちらかのお城のデータが無かったら「繋がってない」にします
-        if (!c1 || !c2) return false;
-        
-        // お城1のリストに、お城2のIDが入っているか？
-        const c1HasC2 = c1.adjacentCastleIds && c1.adjacentCastleIds.includes(c2.id);
-        // お城2のリストに、お城1のIDが入っているか？
-        const c2HasC1 = c2.adjacentCastleIds && c2.adjacentCastleIds.includes(c1.id);
-        
-        // どちらか片方のリストにでもIDが書いてあれば「道が繋がっている」ということにします！
-        return c1HasC2 || c2HasC1;
+    // 城同士の直接隣接判定は地図グラフ専門サービスへ一元化します。
+    static isAdjacent(c1, c2) {
+        return MapGraphService.isAdjacent(c1, c2);
     }
     
     static toGradeHTML(val) {
@@ -1416,6 +1407,9 @@ class GameManager {
         this._watchReturnSafePoint = null;
         
         this.kunishuSystem = new KunishuSystem(this);
+        // 城の隣接索引・接続探索は全システムでこの1インスタンスを共有します。
+        this.mapGraph = new MapGraphService(this);
+        this.reinforcementService = new ReinforcementService(this);
         this.commandSystem = new CommandSystem(this);
         this.warManager = new WarManager(this);
         

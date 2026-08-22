@@ -691,10 +691,6 @@ const numberNames = ["", "第一席", "第二席", "第三席", "第四席", "�
 class CommandSystem {
     constructor(game) {
         this.game = game;
-        // ★Round10：出陣・移動系で使う隣接索引。城配列が変わらない限り使い回します。
-        this._adjacencySource = null;
-        this._adjacencySize = -1;
-        this._adjacencyMap = null;
     }
     
     // ==========================================
@@ -1125,94 +1121,13 @@ class CommandSystem {
         return !hasExecutableCommand(targetMenu);
     }
     
-    // ★追加：道が繋がっているお城をまとめて調べる共通の魔法です！
-    _ensureAdjacencyMap() {
-        const castles = this.game.castles || [];
-        if (this._adjacencySource === castles && this._adjacencySize === castles.length && this._adjacencyMap) return;
-
-        const sets = new Map();
-        for (const c of castles) sets.set(Number(c.id), new Set());
-        for (const c of castles) {
-            const fromId = Number(c.id);
-            for (const rawId of (c.adjacentCastleIds || [])) {
-                const toId = Number(rawId);
-                if (!sets.has(toId) || toId === fromId) continue;
-                sets.get(fromId).add(toId);
-                sets.get(toId).add(fromId); // isAdjacent() と同じく片側記載でも隣接扱い
-            }
-        }
-        this._adjacencyMap = new Map();
-        sets.forEach((set, id) => this._adjacencyMap.set(id, Array.from(set)));
-        this._adjacencySource = castles;
-        this._adjacencySize = castles.length;
-    }
-
+    // 移行互換窓口。接続探索の計算本体は MapGraphService に一元化しています。
     getConnectedCastles(startCastle, clanId) {
-        const connectedCastles = new Set();
-        if (!startCastle) return connectedCastles;
-
-        this._ensureAdjacencyMap();
-        const queue = [startCastle];
-        let head = 0;
-        connectedCastles.add(Number(startCastle.id));
-
-        // ★Round10：全城 filter × 到達城数をやめ、キャッシュ済み隣接IDだけをたどります。
-        while (head < queue.length) {
-            const current = queue[head++];
-            const neighborIds = this._adjacencyMap.get(Number(current.id)) || [];
-            for (const adjId of neighborIds) {
-                if (connectedCastles.has(Number(adjId))) continue;
-                const n = this.game.getCastle(adjId);
-                if (!n || Number(n.ownerClan) !== Number(clanId)) continue;
-                connectedCastles.add(Number(n.id));
-                queue.push(n);
-            }
-        }
-        return connectedCastles;
+        return this.game.mapGraph.getOwnedConnectedIds(startCastle, clanId);
     }
 
-    // ★追加：同盟・支配・従属の勢力も通って繋がっているお城を調べる移動・輸送用の魔法です！
     getConnectedCastlesForMove(startCastle, clanId) {
-        const connectedCastles = new Set();
-        if (!startCastle) return connectedCastles;
-
-        // ★Round12：Round10で作った隣接索引を移動・輸送側でも共有します。
-        // 到達城ごとに全城をfilterする処理をやめ、実際の隣接城だけを辿ります。
-        this._ensureAdjacencyMap();
-        const queue = [startCastle];
-        let head = 0;
-        const visited = new Set([Number(startCastle.id)]);
-        const passableClanCache = new Map();
-        passableClanCache.set(Number(clanId), true);
-        passableClanCache.set(0, false);
-
-        const canPassClan = (ownerClan) => {
-            const ownerId = Number(ownerClan);
-            if (passableClanCache.has(ownerId)) return passableClanCache.get(ownerId);
-            const rel = this.game.getRelation(clanId, ownerClan);
-            const passable = !!(rel && ['同盟', '支配', '従属'].includes(rel.status));
-            passableClanCache.set(ownerId, passable);
-            return passable;
-        };
-
-        while (head < queue.length) {
-            const current = queue[head++];
-            const neighborIds = this._adjacencyMap.get(Number(current.id)) || [];
-            for (const adjId of neighborIds) {
-                const nId = Number(adjId);
-                if (visited.has(nId)) continue;
-                const n = this.game.getCastle(adjId);
-                if (!n || !canPassClan(n.ownerClan)) continue;
-
-                visited.add(nId);
-                queue.push(n);
-                // 繋がっている「自領」として登録するのは自分のお城だけ！
-                if (Number(n.ownerClan) === Number(clanId)) connectedCastles.add(nId);
-            }
-        }
-
-        connectedCastles.add(Number(startCastle.id));
-        return connectedCastles;
+        return this.game.mapGraph.getConnectedOwnIdsForMove(startCastle, clanId);
     }
 
     canExecuteCommand(type) {
@@ -3326,38 +3241,11 @@ class CommandSystem {
     }
     
     executeSelfReinforcementAuto(helperCastle, atkCastle, targetCastle, onComplete) {
-        const myClanId = helperCastle.ownerClan;
-        
-        let reinfSoldiers = Math.floor(helperCastle.soldiers * 0.5);
-        if (reinfSoldiers < 500) reinfSoldiers = 500;
-        if (reinfSoldiers > helperCastle.soldiers) reinfSoldiers = helperCastle.soldiers;
-        
-        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b =>
-            b.clan === helperCastle.ownerClan && b.status === 'active'
-        ).sort((a,b) => b.strength - a.strength);
+        const selfReinfData = this.game.reinforcementService.createAutoSelfReinforcement(helperCastle, {
+            isSelf: true
+        });
 
-        let bushoCount = 1;
-        if (reinfSoldiers >= 1500) bushoCount = 2;
-        if (reinfSoldiers >= 2500) bushoCount = 3;
-        if (bushoCount > availableBushos.length) bushoCount = availableBushos.length;
-
-        const reinfBushos = availableBushos.slice(0, bushoCount);
-        const reinfRice = reinfSoldiers; 
-        const reinfHorses = (helperCastle.horses || 0) < reinfSoldiers * 0.2 ? 0 : Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
-        const reinfGuns = (helperCastle.guns || 0) < reinfSoldiers * 0.2 ? 0 : Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
-
-        helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
-        helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
-        helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
-        helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
-
-        const selfReinfData = {
-            castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: true,
-            morale: helperCastle.morale || 50, training: helperCastle.training || 50
-        };
-        
-        // ★修正：「参戦しました」のメッセージは攻め込んだ後に war_effort.js で出すので、ここでは静かに次へ進みます！
+        // 参戦メッセージは攻め込んだ後に war_effort.js 側で表示します。
         onComplete(selfReinfData);
     }
 
@@ -3521,26 +3409,12 @@ class CommandSystem {
             // 借りを作ったので友好度が少し下がります
             kunishu.setRelation(myClanId, currentRel - 10);
             
-            const rate = currentRel / 200; 
-            let reinfSoldiers = Math.floor(kunishu.soldiers * rate);
-            reinfSoldiers = Math.max(500, Math.min(reinfSoldiers, kunishu.soldiers));
-            
-            const availableBushos = this.game.kunishuSystem.getKunishuMembers(kunishu.id).sort((a,b) => b.strength - a.strength);
-            let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
-            bushoCount = Math.min(bushoCount, availableBushos.length);
-            const reinfBushos = availableBushos.slice(0, bushoCount);
-            
-            const reinfRice = reinfSoldiers; 
-            const reinfHorses = 0; 
-            const reinfGuns = 0;
-            
-            kunishu.soldiers = Math.max(0, kunishu.soldiers - reinfSoldiers);
-            
-            const reinforcementData = {
-                castle: helperCastle, kunishuId: kunishu.id, bushos: reinfBushos, soldiers: reinfSoldiers,
-                rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false, isKunishuForce: true,
-                morale: kunishu.morale || 50, training: kunishu.training || 50
-            };
+            const reinforcementData = this.game.reinforcementService.createAutoKunishuReinforcement(
+                kunishu,
+                helperCastle,
+                currentRel,
+                { isSelf: false, isKunishuForce: true }
+            );
             
             if (myClanId === this.game.playerClanId) {
                 const leader = this.game.getBusho(kunishu.leaderId);
@@ -3626,30 +3500,12 @@ class CommandSystem {
         if (!['支配', '従属', '同盟'].includes(myToHelperRel.status)) this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
 
         const helperDaimyo = this.game.bushos.find(b => b.clan === helperClanId && b.isDaimyo) || { duty: 50 };
-        
-        const rate = (myToHelperRel.sentiment + helperDaimyo.duty) / 400;
-        let reinfSoldiers = Math.floor(helperCastle.soldiers * rate);
-        reinfSoldiers = Math.max(500, Math.min(reinfSoldiers, helperCastle.soldiers));
-        
-        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => b.clan === helperCastle.ownerClan && b.status === 'active').sort((a,b) => b.strength - a.strength);
-        let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
-        bushoCount = Math.min(bushoCount, availableBushos.length);
-
-        const reinfBushos = availableBushos.slice(0, bushoCount);
-        const reinfRice = reinfSoldiers; 
-        const reinfHorses = Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
-        const reinfGuns = Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
-
-        helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
-        helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
-        helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
-        helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
-
-        const reinforcementData = {
-            castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false,
-            morale: helperCastle.morale || 50, training: helperCastle.training || 50
-        };
+        const reinforcementData = this.game.reinforcementService.createAutoClanReinforcement(
+            helperCastle,
+            myToHelperRel,
+            helperDaimyo,
+            { isSelf: false }
+        );
 
         this.game.warManager.applyWarHostility(helperCastle.ownerClan, false, targetCastle.ownerClan, targetCastle.isKunishu, true);
         

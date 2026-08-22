@@ -714,7 +714,7 @@ class AIEngine {
                     if (c.ownerClan === myCastle.ownerClan && c.id !== myCastle.id && c.soldiers >= 1000) {
                         const errorRange = Math.min(0.3, Math.max(0, (100 - myGeneral.intelligence) / 100 * 0.3));
                         const errorRate = 1.0 + (Math.random() - 0.5) * 2 * errorRange;
-                        myReinfPower += (c.soldiers * 0.5) * errorRate;
+                        myReinfPower += (c.soldiers * window.WarParams.Reinforcement.SelfSoldierRatio) * errorRate;
                     }
                 });
 
@@ -853,11 +853,11 @@ class AIEngine {
                     // 自分が呼べそうな自家援軍（出撃元の城と同じ軍団で、出撃元の城以外で、兵力1000以上の城）
                     // ★修正：直轄（軍団ID0）なら、他の軍団の城からも援軍が来ると見積もります！
                     if (c.ownerClan === myCastle.ownerClan && (c.legionId === myCastle.legionId || myCastle.legionId === 0) && c.id !== myCastle.id && c.soldiers >= 1000) {
-                        myReinfPower += (c.soldiers * 0.5) * errorRate; // 兵力の半分くらい来てくれると予想
+                        myReinfPower += (c.soldiers * window.WarParams.Reinforcement.SelfSoldierRatio) * errorRate; // 兵力の半分くらい来てくれると予想
                     }
                     // 相手が呼べそうな自家援軍（守る城以外で、兵力1000以上の城）
                     if (c.ownerClan === target.ownerClan && c.id !== target.id && c.soldiers >= 1000) {
-                        enemyReinfPower += (c.soldiers * 0.5) * errorRate; // 相手の別のお城からの援軍も警戒！
+                        enemyReinfPower += (c.soldiers * window.WarParams.Reinforcement.SelfSoldierRatio) * errorRate; // 相手の別のお城からの援軍も警戒！
                     }
                 }
             });

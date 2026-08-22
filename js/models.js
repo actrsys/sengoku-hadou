@@ -257,25 +257,9 @@ class Castle {
         this.tradeLimit = Number(data.tradeLimit || 0);
     }
 
-    // ★追加：自勢力の道が繋がっているお城をまとめて洗い出す共通の魔法です！
+    // 自勢力内の接続探索は地図グラフ専門サービスへ一元化します。
     getConnectedCastles(game) {
-        const connectedCastles = new Set();
-        const queue = [this];
-        connectedCastles.add(Number(this.id));
-
-        while (queue.length > 0) {
-            const current = queue.shift();
-            const neighbors = game.castles.filter(adj => 
-                Number(adj.ownerClan) === Number(this.ownerClan) && 
-                GameSystem.isAdjacent(current, adj) &&
-                !connectedCastles.has(Number(adj.id))
-            );
-            for (const n of neighbors) {
-                connectedCastles.add(Number(n.id));
-                queue.push(n);
-            }
-        }
-        return connectedCastles;
+        return game.mapGraph.getOwnedConnectedIds(this, this.ownerClan);
     }
 
     // 拠点名から末尾の「城」「御所」「御坊」「館」を消した短い名前を返す魔法

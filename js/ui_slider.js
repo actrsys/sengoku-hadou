@@ -569,35 +569,20 @@ class UISliderManager {
         const divideRefs = new Map();
         const isSeaBattleForDivide = !!(this.game.warManager && this.game.warManager.state && this.game.warManager.state.isSeaBattle);
 
-        let assignments = [];
-        if (this.game.warManager && typeof this.game.warManager.autoDivideSoldiers === 'function') {
-            // ★追加：海戦かどうかを調べて、AIの魔法に教えます！
-            const isSeaBattle = this.game.warManager && this.game.warManager.state && this.game.warManager.state.isSeaBattle;
-            
-            // AIと同じ魔法を使って、能力が高い順に軍馬や鉄砲を賢く配分します！
-            // ★修正：プレイヤーのUIであることを伝えるための目印「true」を渡します！
-            const autoAssigns = this.game.warManager.autoDivideSoldiers(bushos, totalSoldiers, totalHorses, totalGuns, isSeaBattle, true);
-            assignments = autoAssigns.map(a => ({
-                id: a.busho.id,
-                count: a.soldiers,
-                type: a.troopType
-            }));
-        } else {
-            // もし魔法が使えなかった時のための予備の配分です
-            assignments = bushos.map(b => ({ id: b.id, count: 0, type: 'ashigaru' }));
-            
-            let ratioSum = 1.5 + (bushos.length - 1) * 1.0;
-            let baseAmount = Math.floor(totalSoldiers / ratioSum);
-            let remain = totalSoldiers;
-
-            for (let i = 1; i < bushos.length; i++) {
-                assignments[i].count = baseAmount;
-                remain -= baseAmount;
-            }
-            if (assignments.length > 0) {
-                assignments[0].count = remain; 
-            }
-        }
+        const isSeaBattle = !!(this.game.warManager && this.game.warManager.state && this.game.warManager.state.isSeaBattle);
+        const autoAssigns = this.game.warManager.autoDivideSoldiers(
+            bushos,
+            totalSoldiers,
+            totalHorses,
+            totalGuns,
+            isSeaBattle,
+            true
+        );
+        let assignments = autoAssigns.map(assignment => ({
+            id: assignment.busho.id,
+            count: assignment.soldiers,
+            type: assignment.troopType
+        }));
 
         const updateRemain = () => {
             let sum = 0;
