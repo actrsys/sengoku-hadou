@@ -303,7 +303,7 @@ class WarPreparationController {
             }
             
             // 借りを作ったので友好度が少し下がります
-            kunishu.setRelation(myClanId, currentRel - 10);
+            this.game.kunishuSystem.setRelation(kunishu, myClanId, currentRel - 10);
             
             const reinforcementData = this.game.reinforcementService.createAutoKunishuReinforcement(
                 kunishu,

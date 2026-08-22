@@ -317,9 +317,7 @@ class AffiliationSystem {
         busho.isGunshi = false;
         busho.isCommander = false;
         
-        let maxId = 0;
-        this.game.kunishuSystem.kunishus.forEach(k => { if(k.id > maxId) maxId = k.id; });
-        const newKunishuId = maxId + 1;
+        const newKunishuId = this.game.kunishuSystem.allocateRegularDynamicKunishuId();
         
         let familyName = busho.familyName || busho.name.split('|')[0] || busho.name;
         let familyYomi = busho.familyYomi || busho.yomi.split('|')[0] || busho.yomi;
@@ -360,7 +358,7 @@ class AffiliationSystem {
         
         // 敵が見つかったら、関係値を0にして箱にしまいます
         if (enemyClanId > 0) {
-            newKunishu.setRelation(enemyClanId, 0);
+            this.game.kunishuSystem.setRelation(newKunishu, enemyClanId, 0);
         }
         
         this.game.kunishuSystem.kunishus.push(newKunishu);

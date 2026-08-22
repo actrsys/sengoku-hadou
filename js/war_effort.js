@@ -1538,7 +1538,7 @@ Object.assign(WarManager.prototype, {
                         const myClanId = isAttackerData ? s.sourceCastle.ownerClan : s.defender.ownerClan;
                         let isWin = isAttackerData ? attackerWon : !attackerWon;
                         if (isWin) {
-                            kunishu.setRelation(myClanId, kunishu.getRelation(myClanId) + 5);
+                            this.game.kunishuSystem.setRelation(kunishu, myClanId, kunishu.getRelation(myClanId) + 5);
                             if (s.isPlayerInvolved) this.game.ui.log(`(援軍が勝利に貢献し、${kunishu.getName(this.game)}との友好度が上がりました)`);
                         }
                     }
@@ -3125,7 +3125,7 @@ Object.assign(WarManager.prototype, {
             }
             
             // 借りを作ったので友好度が少し下がります
-            kunishu.setRelation(myClanId, currentRel - 10);
+            this.game.kunishuSystem.setRelation(kunishu, myClanId, currentRel - 10);
             
             this.state.defReinforcement = this.game.reinforcementService.createAutoKunishuReinforcement(
                 kunishu,

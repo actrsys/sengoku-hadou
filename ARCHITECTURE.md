@@ -89,7 +89,7 @@
 - `js/faction_system.js` — 派閥。
 - `js/independence_system.js` — 独立。
 - `js/strategy_system.js` — 調略。
-- `js/kunishu_system.js` — 諸勢力。取込成功率は `calcIncorporateProbability()` を正本とし、軍師助言と実判定の両方が同じ値を使う。
+- `js/kunishu_system.js` — 諸勢力。取込成功率は `calcIncorporateProbability()` を正本とし、軍師助言と実判定の両方が同じ値を使う。諸勢力の内部ネットワーク分類（例：一向宗）、本願寺家判定、諸勢力関係値の正規書換、ネットワーク関係連動、占領・討伐による本願寺への反作用、動的諸勢力IDの採番もここを唯一の窓口とする。CastleManager等は諸勢力関係値や諸勢力IDを直接計算・書換しない。
 
 ## UI
 

@@ -1425,7 +1425,7 @@ class LifeSystem {
                     changeAmount = isSuccession ? -2 : -5; // ★生前退位なら半減
                 }
                 if (changeAmount !== 0) {
-                    kunishu.setRelation(oldDaimyo.clan, currentRel + changeAmount);
+                    this.game.kunishuSystem.setRelation(kunishu, oldDaimyo.clan, currentRel + changeAmount);
                 }
             });
         }

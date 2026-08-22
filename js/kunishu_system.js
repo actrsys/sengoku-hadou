@@ -9,9 +9,19 @@ class KunishuSystem {
         this.kunishus = [];
     }
 
-    // ゲーム開始時などにデータをセットする
+    // ゲーム開始時・ロード時にデータをセットする
     setKunishuData(kunishus) {
         this.kunishus = kunishus;
+
+        // Round66以前の1560セーブには networkTag 列が存在しません。
+        // 互換移行だけは旧固定データを識別してシールを補い、通常のゲームルール判定はタグへ一本化します。
+        for (const kunishu of this.kunishus) {
+            if (kunishu.networkTag) continue;
+            const id = Number(kunishu.id);
+            if (kunishu.name === '願証寺' || (id >= 10001 && id <= 10018)) {
+                kunishu.networkTag = 'ikko';
+            }
+        }
     }
 
     // ★追加：頭領を自動生成する「共通の魔法（システム）」です！いつでも使い回せます。
@@ -77,6 +87,170 @@ class KunishuSystem {
 
     getAliveKunishus() {
         return this.kunishus.filter(k => !k.isDestroyed);
+    }
+
+    // 一向宗ネットワークは ideology（宗教）とは別軸で管理します。
+    // 他部署は ID や名称を直接見ず、この専門部署の窓口を使います。
+    isIkkoNetwork(kunishu) {
+        return !!kunishu && kunishu.networkTag === 'ikko';
+    }
+
+    // 現在の本願寺家を取得します。
+    // 本願寺系IDの武将が大名を務める存続勢力が複数ある場合は、威信最大を宗門の中心とします。
+    getHonganjiClan() {
+        const params = window.MainParams.Kunishu.IkkoNetwork;
+        const candidates = this.game.clans.filter(clan => {
+            if (!clan || clan.id === 0 || clan.isDestroyed) return false;
+            const daimyo = this.game.getClanDaimyo(clan.id);
+            if (!daimyo) return false;
+            const daimyoId = Number(daimyo.id);
+            return daimyoId >= params.HonganjiDaimyoIdMin && daimyoId <= params.HonganjiDaimyoIdMax;
+        });
+        if (candidates.length === 0) return null;
+        candidates.sort((a, b) => {
+            const prestigeDiff = Number(b.daimyoPrestige || 0) - Number(a.daimyoPrestige || 0);
+            if (prestigeDiff !== 0) return prestigeDiff;
+            return Number(a.id) - Number(b.id);
+        });
+        return candidates[0];
+    }
+
+    isHonganjiClan(clanId) {
+        const honganji = this.getHonganjiClan();
+        return !!honganji && Number(honganji.id) === Number(clanId);
+    }
+
+    // ゲーム中の諸勢力関係値を書き換える正規窓口です。
+    // Model の setRelation は低レベル保存構造として残し、各Systemはここを経由します。
+    setRelation(kunishu, clanId, value) {
+        if (!kunishu) return;
+        const targetClanId = Number(clanId);
+        if (this.isIkkoNetwork(kunishu) && this.isHonganjiClan(targetClanId)) {
+            kunishu.setRelation(targetClanId, 100);
+            return;
+        }
+        kunishu.setRelation(targetClanId, value);
+    }
+
+    // 一向宗側の加害・摩擦が宗門中央へ波及する唯一の窓口です。
+    // 一向宗同士（本願寺家自身）には適用しません。
+    applyHonganjiRelationPenalty(clanId, amount) {
+        const targetClanId = Number(clanId);
+        const drop = Math.max(0, Number(amount) || 0);
+        if (targetClanId === 0 || drop === 0) return false;
+
+        const honganji = this.getHonganjiClan();
+        if (!honganji || Number(honganji.id) === targetClanId || !this.game.diplomacyManager) return false;
+
+        this.game.diplomacyManager.updateSentiment(targetClanId, honganji.id, -drop);
+        return true;
+    }
+
+    // 本願寺との関係値は「一向宗諸勢力との友好度の上限」としてのみ働きます。
+    // 本願寺より一向宗側が友好的な場合だけ下げ、逆方向の自動回復は行いません。
+    applyIkkoNetworkRelationLink() {
+        const honganji = this.getHonganjiClan();
+        if (!honganji || !this.game.diplomacyManager) return;
+
+        const step = window.MainParams.Kunishu.IkkoNetwork.MonthlyRelationLinkStep;
+        const ikkoForces = this.getAliveKunishus().filter(k => this.isIkkoNetwork(k));
+        const aliveClans = this.game.clans.filter(c => c && c.id !== 0 && !c.isDestroyed);
+
+        for (const kunishu of ikkoForces) {
+            // 宗門中央との関係は常時100。
+            this.setRelation(kunishu, honganji.id, 100);
+
+            for (const clan of aliveClans) {
+                if (Number(clan.id) === Number(honganji.id)) continue;
+                const honganjiRel = this.game.diplomacyManager.getRelation(clan.id, honganji.id);
+                if (!honganjiRel) continue;
+
+                const currentRel = kunishu.getRelation(clan.id);
+                const ceiling = Number(honganjiRel.sentiment);
+                if (currentRel <= ceiling) continue;
+
+                this.setRelation(kunishu, clan.id, Math.max(ceiling, currentRel - step));
+            }
+        }
+    }
+
+    // 城の占領による諸勢力の反発。城の部署は所有権変更だけを担当し、関係処理はここへ集約します。
+    applyRelationDropOnCastleCapture(castle, newOwnerClan) {
+        const clanId = Number(newOwnerClan);
+        if (!castle || clanId === 0) return;
+
+        const params = window.MainParams.Kunishu.IkkoNetwork;
+        const honganji = this.getHonganjiClan();
+        const isHonganjiOwner = !!honganji && Number(honganji.id) === clanId;
+        let ikkoRelationActuallyDropped = false;
+
+        for (const kunishu of this.getKunishusInCastle(castle.id)) {
+            if (this.isIkkoNetwork(kunishu) && isHonganjiOwner) {
+                this.setRelation(kunishu, clanId, 100);
+                continue;
+            }
+
+            const currentRel = kunishu.getRelation(clanId);
+            if (currentRel > 69) continue;
+
+            const newRel = Math.max(0, currentRel - window.MainParams.Kunishu.CaptureRelationDrop);
+            this.setRelation(kunishu, clanId, newRel);
+            if (this.isIkkoNetwork(kunishu) && newRel < currentRel) ikkoRelationActuallyDropped = true;
+
+            if (clanId === this.game.playerClanId) {
+                this.game.ui.log(`(城の主が変わったため、${kunishu.getName(this.game)}との友好度が低下しました)`);
+            }
+        }
+
+        // 同じ城に願証寺＋一向一揆が複数いても、本願寺への波及は「城の占領」1件につき1回だけ。
+        if (ikkoRelationActuallyDropped) {
+            this.applyHonganjiRelationPenalty(clanId, params.CaptureHonganjiRelationDrop);
+        }
+    }
+
+    // 一向一揆討伐開始時の敵対化も専門部署内で一元化します。
+    applySubjugationHostility(kunishu, clanId) {
+        const targetClanId = Number(clanId);
+        if (!kunishu || targetClanId === 0) return;
+
+        if (this.isIkkoNetwork(kunishu) && this.isHonganjiClan(targetClanId)) {
+            this.setRelation(kunishu, targetClanId, 100);
+            return;
+        }
+
+        const currentRel = kunishu.getRelation(targetClanId);
+        let nextRel = currentRel;
+        if (currentRel >= 60) nextRel = 30;
+        else if (currentRel >= 31) nextRel -= 30;
+        else nextRel = 0;
+        this.setRelation(kunishu, targetClanId, nextRel);
+
+        if (this.isIkkoNetwork(kunishu) && nextRel < currentRel) {
+            const params = window.MainParams.Kunishu.IkkoNetwork;
+            this.applyHonganjiRelationPenalty(targetClanId, params.SubjugationHonganjiRelationDrop);
+        }
+    }
+
+    // 一向宗の将来生成用に予約したID帯から、現在空いている最小IDを返します。
+    // 空きがない場合は0を返し、呼び出し側は生成を行いません。
+    findAvailableIkkoGenerationId() {
+        const params = window.MainParams.Kunishu.IkkoNetwork;
+        const usedIds = new Set(this.kunishus.map(k => Number(k.id)));
+        for (let id = params.ReservedIdMin; id <= params.ReservedIdMax; id++) {
+            if (!usedIds.has(id)) return id;
+        }
+        return 0;
+    }
+
+    // 通常の動的諸勢力は一向宗予約帯を使わず、20000以降で採番します。
+    allocateRegularDynamicKunishuId() {
+        const minId = window.MainParams.Kunishu.IkkoNetwork.RegularDynamicIdMin;
+        let maxId = minId - 1;
+        for (const kunishu of this.kunishus) {
+            const id = Number(kunishu.id);
+            if (id >= minId && id > maxId) maxId = id;
+        }
+        return maxId + 1;
     }
 
     // 指定した城にいる諸勢力を取得
@@ -183,6 +357,13 @@ class KunishuSystem {
         // 壊滅していないものを再度取得
         const survivingKunishus = this.getAliveKunishus();
 
+        // 本願寺との関係は一向宗諸勢力の友好度の上限としてのみ連動します。
+        // 先に反映することで、この月に0へ到達した一向一揆も通常の蜂起判定へ進めます。
+        this.applyIkkoNetworkRelationLink();
+
+        // 同じ城の一向宗勢力が複数いても、本願寺への月次反作用を重複させないための記録です。
+        const ikkoBacklashCastleKeys = new Set();
+
         // 2. 城の所有者（大名）に対するアクション
         // ★変更：forEach をやめて、順番待ちができる for...of に変えます
         for (const kunishu of survivingKunishus) {
@@ -246,8 +427,21 @@ class KunishuSystem {
                     change = 0;
                 }
                 
-                kunishu.setRelation(myCastle.ownerClan, currentRel + change);
+                const nextRel = currentRel + change;
+                this.setRelation(kunishu, myCastle.ownerClan, nextRel);
+
+                if (change < 0 && this.isIkkoNetwork(kunishu) && !this.isHonganjiClan(myCastle.ownerClan)) {
+                    ikkoBacklashCastleKeys.add(`${Number(myCastle.ownerClan)}:${Number(myCastle.id)}`);
+                }
             }
+        }
+
+        // 現地で実際に関係悪化が起きた城だけ、本願寺にも小さく波及させます。
+        // 同一城の複数一向宗勢力は1件として扱います。
+        const backlashPenalty = window.MainParams.Kunishu.IkkoNetwork.LocalBacklashHonganjiRelationDrop;
+        for (const key of ikkoBacklashCastleKeys) {
+            const clanId = Number(key.split(':')[0]);
+            this.applyHonganjiRelationPenalty(clanId, backlashPenalty);
         }
     }
 
@@ -694,7 +888,7 @@ class KunishuSystem {
         const increase = this.game.diplomacyManager.calcGoodwillIncrease(gold, doer.diplomacy);
         
         const currentRel = kunishu.getRelation(this.game.playerClanId);
-        kunishu.setRelation(this.game.playerClanId, currentRel + increase);
+        this.setRelation(kunishu, this.game.playerClanId, currentRel + increase);
         
         const kunishuName = kunishu.getName(this.game);
         
@@ -780,12 +974,7 @@ class KunishuSystem {
         
         // startWarの中で減らす処理が行われるため、ここで兵士や物資を減らす手動処理を消去しました（二重減り防止）
 
-        let currentRel = kunishu.getRelation(atkCastle.ownerClan);
-        let nextRel = currentRel;
-        if (currentRel >= 60) nextRel = 30;
-        else if (currentRel >= 31) nextRel -= 30;
-        else nextRel = 0;
-        kunishu.setRelation(atkCastle.ownerClan, nextRel);
+        this.applySubjugationHostility(kunishu, atkCastle.ownerClan);
 
         // ==========================================
         // ★蜂起(executeUprising)と同じように、startWarに合流させます！

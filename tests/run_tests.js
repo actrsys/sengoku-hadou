@@ -1072,6 +1072,260 @@ test('諸勢力取込成功率は KunishuSystem を正本とし、軍師助言�
     assert.ok(!commandSource.includes('const affinityMod = (25 - affinityDiff) / 25 * 10'));
 });
 
+
+test('一向宗ネットワークは ideology と分離し、本願寺家は本願寺系大名の威信最大で決まる', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/models.js');
+    loadScript(ctx, 'js/kunishu_system.js');
+    const Kunishu = vm.runInContext('Kunishu', ctx);
+    const KunishuSystem = vm.runInContext('KunishuSystem', ctx);
+
+    const daimyoByClan = new Map([
+        [19, { id: 1019005, clan: 19, isDaimyo: true }],
+        [30, { id: 1019006, clan: 30, isDaimyo: true }],
+        [1, { id: 1000001, clan: 1, isDaimyo: true }]
+    ]);
+    const game = {
+        clans: [
+            { id: 1, daimyoPrestige: 5000, isDestroyed: false },
+            { id: 19, daimyoPrestige: 10000, isDestroyed: false },
+            { id: 30, daimyoPrestige: 12000, isDestroyed: false }
+        ],
+        getClanDaimyo: id => daimyoByClan.get(Number(id)) || null
+    };
+    const system = new KunishuSystem(game);
+    const ganshoji = new Kunishu({ id: 4, ideology: '宗教', networkTag: 'ikko' });
+    const otherTemple = new Kunishu({ id: 47, ideology: '宗教' });
+
+    assert.strictEqual(ganshoji.ideology, '宗教');
+    assert.strictEqual(ganshoji.networkTag, 'ikko');
+    assert.strictEqual(system.isIkkoNetwork(ganshoji), true);
+    assert.strictEqual(system.isIkkoNetwork(otherTemple), false);
+    const legacyIkko = new Kunishu({ id: 10001, name: '一向一揆', ideology: '宗教' });
+    const legacyGanshoji = new Kunishu({ id: 4, name: '願証寺', ideology: '宗教' });
+    system.setKunishuData([legacyIkko, legacyGanshoji]);
+    assert.strictEqual(legacyIkko.networkTag, 'ikko', '旧セーブの一向一揆へ互換シールを補う');
+    assert.strictEqual(legacyGanshoji.networkTag, 'ikko', '旧セーブの願証寺へ互換シールを補う');
+    assert.strictEqual(system.getHonganjiClan().id, 30, '本願寺系大名のうち威信最大を採用する');
+
+    game.clans[2].isDestroyed = true;
+    assert.strictEqual(system.getHonganjiClan().id, 19, '滅亡した本願寺系勢力は候補から外す');
+});
+
+test('本願寺関係は一向宗友好度の上限として下方向だけ月次連動する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/models.js');
+    loadScript(ctx, 'js/kunishu_system.js');
+    const Kunishu = vm.runInContext('Kunishu', ctx);
+    const KunishuSystem = vm.runInContext('KunishuSystem', ctx);
+
+    const relations = new Map([['1:19', 20], ['19:1', 20]]);
+    const diplomacyManager = {
+        getRelation(a, b) { return { sentiment: relations.get(`${a}:${b}`) ?? 50 }; },
+        updateSentiment(a, b, delta) {
+            for (const key of [`${a}:${b}`, `${b}:${a}`]) {
+                relations.set(key, Math.max(0, Math.min(100, (relations.get(key) ?? 50) + delta)));
+            }
+        }
+    };
+    const game = {
+        clans: [
+            { id: 1, daimyoPrestige: 5000, isDestroyed: false },
+            { id: 19, daimyoPrestige: 10000, isDestroyed: false }
+        ],
+        getClanDaimyo: id => Number(id) === 19
+            ? { id: 1019005, clan: 19, isDaimyo: true }
+            : { id: 1000001, clan: 1, isDaimyo: true },
+        diplomacyManager
+    };
+    const system = new KunishuSystem(game);
+    const ikko = new Kunishu({
+        id: 10001,
+        ideology: '宗教',
+        networkTag: 'ikko',
+        daimyoRelations: {
+            1: { status: '普通', sentiment: 50 },
+            19: { status: '普通', sentiment: 40 }
+        }
+    });
+    system.setKunishuData([ikko]);
+
+    system.applyIkkoNetworkRelationLink();
+    assert.strictEqual(ikko.getRelation(1), 49, '本願寺20より高い50は1だけ悪化する');
+    assert.strictEqual(ikko.getRelation(19), 100, '本願寺家との関係は100に固定する');
+
+    ikko.setRelation(1, 10);
+    system.applyIkkoNetworkRelationLink();
+    assert.strictEqual(ikko.getRelation(1), 10, '本願寺20より低い関係を20へ自動回復させない');
+});
+
+test('一向宗のいる城の占領は現地関係を下げ、本願寺への波及は城ごとに1回だけ', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/models.js');
+    loadScript(ctx, 'js/kunishu_system.js');
+    const Kunishu = vm.runInContext('Kunishu', ctx);
+    const KunishuSystem = vm.runInContext('KunishuSystem', ctx);
+
+    let honganjiSentiment = 50;
+    const diplomacyManager = {
+        getRelation() { return { sentiment: honganjiSentiment }; },
+        updateSentiment(a, b, delta) { honganjiSentiment = Math.max(0, Math.min(100, honganjiSentiment + delta)); }
+    };
+    const game = {
+        playerClanId: 1,
+        clans: [
+            { id: 1, daimyoPrestige: 5000, isDestroyed: false },
+            { id: 19, daimyoPrestige: 10000, isDestroyed: false }
+        ],
+        getClanDaimyo: id => Number(id) === 19
+            ? { id: 1019005, clan: 19, isDaimyo: true }
+            : { id: 1000001, clan: 1, isDaimyo: true },
+        diplomacyManager,
+        ui: { log() {} }
+    };
+    const system = new KunishuSystem(game);
+    const makeIkko = id => new Kunishu({
+        id,
+        name: id === 4 ? '願証寺' : '一向一揆',
+        castleId: 44,
+        ideology: '宗教',
+        networkTag: 'ikko',
+        daimyoRelations: { 1: { status: '普通', sentiment: 50 } }
+    });
+    const ganshoji = makeIkko(4);
+    const ikko = makeIkko(10001);
+    system.setKunishuData([ganshoji, ikko]);
+
+    system.applyRelationDropOnCastleCapture({ id: 44 }, 1);
+    assert.strictEqual(ganshoji.getRelation(1), 30);
+    assert.strictEqual(ikko.getRelation(1), 30);
+    assert.strictEqual(honganjiSentiment, 45, '同一城に複数一向宗勢力がいても本願寺-5は1回だけ');
+});
+
+test('一向宗討伐の開始は対象との関係と本願寺関係を同時に悪化させる', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/models.js');
+    loadScript(ctx, 'js/kunishu_system.js');
+    const Kunishu = vm.runInContext('Kunishu', ctx);
+    const KunishuSystem = vm.runInContext('KunishuSystem', ctx);
+
+    let honganjiSentiment = 50;
+    const diplomacyManager = {
+        getRelation() { return { sentiment: honganjiSentiment }; },
+        updateSentiment(a, b, delta) { honganjiSentiment = Math.max(0, Math.min(100, honganjiSentiment + delta)); }
+    };
+    const game = {
+        clans: [
+            { id: 1, daimyoPrestige: 5000, isDestroyed: false },
+            { id: 19, daimyoPrestige: 10000, isDestroyed: false }
+        ],
+        getClanDaimyo: id => Number(id) === 19
+            ? { id: 1019005, clan: 19, isDaimyo: true }
+            : { id: 1000001, clan: 1, isDaimyo: true },
+        diplomacyManager
+    };
+    const system = new KunishuSystem(game);
+    const ikko = new Kunishu({
+        id: 10001,
+        ideology: '宗教',
+        networkTag: 'ikko',
+        daimyoRelations: { 1: { status: '普通', sentiment: 50 } }
+    });
+
+    system.applySubjugationHostility(ikko, 1);
+    assert.strictEqual(ikko.getRelation(1), 20, '従来の討伐開始時-30を維持する');
+    assert.strictEqual(honganjiSentiment, 40, '一向宗への攻撃で本願寺も-10');
+});
+
+test('諸勢力関係の占領計算と本願寺家定義は KunishuSystem に一元化する', () => {
+    const castleSource = read('js/castle_manager.js');
+    const kunishuSource = read('js/kunishu_system.js');
+    assert.ok(castleSource.includes('kunishuSystem.applyRelationDropOnCastleCapture'));
+    assert.ok(castleSource.includes('kunishuSystem.isHonganjiClan'));
+    assert.ok(!castleSource.includes('applyKunishuRelationDropOnCapture'));
+    assert.ok(!castleSource.includes('1019001'));
+    assert.ok(!castleSource.includes('1019999'));
+    assert.ok(kunishuSource.includes('getHonganjiClan()'));
+});
+
+
+
+test('諸勢力関係値のゲーム中書換は KunishuSystem を正規窓口とし、本願寺と一向宗は100を維持する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/models.js');
+    loadScript(ctx, 'js/kunishu_system.js');
+    const Kunishu = vm.runInContext('Kunishu', ctx);
+    const KunishuSystem = vm.runInContext('KunishuSystem', ctx);
+    const game = {
+        clans: [{ id: 19, daimyoPrestige: 10000, isDestroyed: false }],
+        getClanDaimyo: () => ({ id: 1019005, clan: 19, isDaimyo: true })
+    };
+    const system = new KunishuSystem(game);
+    const ikko = new Kunishu({ id: 10001, ideology: '宗教', networkTag: 'ikko', daimyoRelations: { 19: { status: '友好', sentiment: 100 } } });
+    system.setRelation(ikko, 19, 90);
+    assert.strictEqual(ikko.getRelation(19), 100, '援軍要請や当主交代など別経路の低下も100へ固定する');
+
+    const offenders = [];
+    for (const entry of fs.readdirSync(path.join(ROOT, 'js'), { withFileTypes: true })) {
+        if (!entry.isFile() || !entry.name.endsWith('.js') || entry.name.endsWith('.min.js')) continue;
+        const rel = `js/${entry.name}`;
+        if (rel === 'js/models.js' || rel === 'js/kunishu_system.js') continue;
+        const source = read(rel);
+        if (/\bkunishu\.setRelation\s*\(|\bnewKunishu\.setRelation\s*\(/.test(source)) offenders.push(rel);
+    }
+    assert.deepStrictEqual(offenders, []);
+});
+
+test('一向宗予約IDと通常の動的諸勢力IDは KunishuSystem で分離して採番する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/kunishu_system.js');
+    const KunishuSystem = vm.runInContext('KunishuSystem', ctx);
+    const system = new KunishuSystem({ clans: [] });
+    system.setKunishuData([
+        { id: 10001 }, { id: 10002 }, { id: 10004 },
+        { id: 20000 }, { id: 20003 }
+    ]);
+    assert.strictEqual(system.findAvailableIkkoGenerationId(), 10003);
+    assert.strictEqual(system.allocateRegularDynamicKunishuId(), 20004);
+
+    ctx.MainParams.Kunishu.IkkoNetwork.ReservedIdMin = 10001;
+    ctx.MainParams.Kunishu.IkkoNetwork.ReservedIdMax = 10002;
+    assert.strictEqual(system.findAvailableIkkoGenerationId(), 0, '予約帯に空きがなければ生成用IDを返さない');
+
+    const affiliationSource = read('js/affiliation_system.js');
+    assert.ok(affiliationSource.includes('kunishuSystem.allocateRegularDynamicKunishuId()'));
+    assert.ok(!affiliationSource.includes('const newKunishuId = maxId + 1'));
+});
+
+test('1560桶狭間データは願証寺と既存一向一揆だけに ikko シールを持たせる', () => {
+    const csv = read('data/scenarios/1560_okehazama/kunishuClan.csv');
+    const lines = csv.trimEnd().split(/\r?\n/);
+    const header = lines[0].split(',');
+    const nameIndex = header.indexOf('name');
+    const idIndex = header.indexOf('id');
+    const ideologyIndex = header.indexOf('ideology');
+    const tagIndex = header.indexOf('networkTag');
+    assert.ok(tagIndex >= 0);
+
+    const tagged = [];
+    for (const line of lines.slice(1)) {
+        const cols = line.split(',');
+        if (cols[tagIndex] === 'ikko') {
+            tagged.push({ id: Number(cols[idIndex]), name: cols[nameIndex], ideology: cols[ideologyIndex] });
+        }
+    }
+    assert.strictEqual(tagged.length, 19);
+    assert.ok(tagged.some(row => row.id === 4 && row.name === '願証寺'));
+    assert.strictEqual(tagged.filter(row => row.id >= 10001 && row.id <= 10018).length, 18);
+    assert.ok(tagged.every(row => row.ideology === '宗教'), '一向宗シールを付けても思想は宗教のまま');
+});
+
 test('攻城戦と野戦のホーム補正は WarSystem の共通計算を使う', () => {
     const ctx = createContext();
     ctx.window.WarParams = { War: {}, Military: {} };

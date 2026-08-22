@@ -990,6 +990,9 @@ class Kunishu {
         this.morale = Number(this.morale !== undefined ? this.morale : this.defaultMorale);
         
         this.ideology = this.ideology || '地縁';
+        // 宗教・地縁などの思想とは別軸の内部ネットワーク分類です。
+        // 表示や思想判定には使わず、KunishuSystem の専門ルールだけが参照します。
+        this.networkTag = data.networkTag || this.networkTag || '';
         
         // ★友好度管理の箱です
         this.daimyoRelations = {};

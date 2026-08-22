@@ -19,6 +19,20 @@ window.GameConfig = {
             AdviceLoyalty: 84,
             DangerLoyalty: 74
         },
+        Kunishu: {
+            CaptureRelationDrop: 20,
+            IkkoNetwork: {
+                HonganjiDaimyoIdMin: 1019000,
+                HonganjiDaimyoIdMax: 1019999,
+                ReservedIdMin: 10001,
+                ReservedIdMax: 19999,
+                RegularDynamicIdMin: 20000,
+                MonthlyRelationLinkStep: 1,
+                CaptureHonganjiRelationDrop: 5,
+                SubjugationHonganjiRelationDrop: 10,
+                LocalBacklashHonganjiRelationDrop: 1
+            }
+        },
         Economy: {
             IncomeGoldRate: 1,
             IncomeFluctuation: 0.15,

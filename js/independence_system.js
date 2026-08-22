@@ -325,7 +325,7 @@ class IndependenceSystem {
                         const oldRel = kunishu.getRelation(oldClanId);
                         let newSentiment = 100 - oldRel;
                         newSentiment = Math.max(30, Math.min(50, newSentiment));
-                        kunishu.setRelation(newClanId, newSentiment);
+                        this.game.kunishuSystem.setRelation(kunishu, newClanId, newSentiment);
                     });
                 }
             }
@@ -1288,7 +1288,7 @@ class IndependenceSystem {
                             const currentRel = kunishu.getRelation(clan.id);
                             let newSentiment = 100 - currentRel;
                             newSentiment = Math.max(30, Math.min(50, newSentiment));
-                            kunishu.setRelation(clan.id, newSentiment);
+                            this.game.kunishuSystem.setRelation(kunishu, clan.id, newSentiment);
                         });
                     }
                 }

@@ -28,16 +28,10 @@ class CastleManager {
 
         // 石山城と尾山城のこっそり改名イベント
         if (castle.id === 33 || castle.id === 74) {
-            let isHonganji = false;
-            
-            // 新しい持ち主が空き城（0）ではない場合、大名が本願寺家かどうか調べます
-            if (newOwnerId !== 0) {
-                const newDaimyo = this.game.bushos.find(b => b.clan === newOwnerId && b.isDaimyo);
-                // 大名の出席番号が1019001〜1019999の間なら本願寺家とみなします
-                if (newDaimyo && newDaimyo.id >= 1019001 && newDaimyo.id <= 1019999) {
-                    isHonganji = true;
-                }
-            }
+            // 本願寺家の定義は諸勢力専門部署へ一元化し、ここでは結果だけを利用します。
+            const isHonganji = newOwnerId !== 0
+                && this.game.kunishuSystem
+                && this.game.kunishuSystem.isHonganjiClan(newOwnerId);
 
             // 石山城（ID:33）の改名処理
             if (castle.id === 33) {
@@ -113,7 +107,7 @@ class CastleManager {
 
             // 持ち主が変わったことによる諸勢力の反発をチェックします
             if (oldOwnerId !== newOwnerId && newOwnerId !== 0) {
-                this.applyKunishuRelationDropOnCapture(castle, newOwnerId);
+                this.game.kunishuSystem.applyRelationDropOnCastleCapture(castle, newOwnerId);
             }
         }
 
@@ -304,22 +298,5 @@ class CastleManager {
         });
     }
 
-    // 諸勢力の友好度が下がる処理（war_effort.jsからお引越ししてきました）
-    applyKunishuRelationDropOnCapture(castle, newOwnerClan) {
-        if (newOwnerClan === 0) return; 
-        
-        const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(castle.id);
-        
-        kunishusInCastle.forEach(kunishu => {
-            const currentRel = kunishu.getRelation(newOwnerClan);
-            if (currentRel <= 69) {
-                const newRel = Math.max(0, currentRel - 20);
-                kunishu.setRelation(newOwnerClan, newRel);
-                
-                if (newOwnerClan === this.game.playerClanId) {
-                    this.game.ui.log(`(城の主が変わったため、${kunishu.getName(this.game)}との友好度が低下しました)`);
-                }
-            }
-        });
-    }
+
 }

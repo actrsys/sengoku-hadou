@@ -2648,7 +2648,7 @@ class AIEngine {
                     // 正しい外交の専門部署（diplomacyManager）に計算をお願いするように直します
                     const increase = this.game.diplomacyManager.calcGoodwillIncrease(action.cost, doer);
                     const currentRel = kunishu.getRelation(castle.ownerClan);
-                    kunishu.setRelation(castle.ownerClan, currentRel + increase);
+                    this.game.kunishuSystem.setRelation(kunishu, castle.ownerClan, currentRel + increase);
                     
                     doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(doer.diplomacy * 0.2) + 10;
                     if (this.game.factionSystem && this.game.factionSystem.updateRecognition) {
