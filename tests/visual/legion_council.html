@@ -26,15 +26,16 @@
         <div class="legion-council-seat" data-legion-no="8"><div class="legion-council-seat-heading">第八国主</div><img class="legion-council-face" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='88'%3E%3Crect width='100%25' height='100%25' fill='%23666'/%3E%3C/svg%3E" alt=""><div class="legion-council-name">森可成</div><div class="legion-council-policy-summary"><span class="legion-council-policy-chip">攻勢許可</span><span class="legion-council-policy-chip">新規交戦禁止</span></div><div class="legion-council-seat-hint">選択して命令を変更</div></div>
       </div>
     </div>
+    <div class="legion-council-actions"><button id="legion-council-bulk-btn" type="button" data-se="choice.ogg" class="btn-secondary legion-council-bulk-btn">一括</button></div>
   </div>
   <div class="modal-footer legion-council-footer"><button id="legion-council-finish-btn" class="btn-primary">評定を終える</button></div>
 </div>
 <div id="legion-council-order-modal" class="modal hidden">
   <div class="modal-content legion-council-order-content">
-    <div class="legion-council-order-header"><div class="legion-council-kicker">国主への命令</div><h3 id="legion-council-order-title">第一国主　柴田勝家</h3></div>
+    <div class="legion-council-order-header"><div id="legion-council-order-kicker" class="legion-council-kicker">国主への命令</div><h3 id="legion-council-order-title">第一国主　柴田勝家</h3></div>
     <div id="legion-council-order-body" class="legion-council-order-body">
       <div class="legion-council-order-row"><div class="legion-council-order-label"><strong>攻勢</strong><small>他家・諸勢力への自主的な攻撃</small></div><div class="legion-council-toggle"><button class="ui-toggle-btn active" data-se="choice.ogg">許可</button><button class="ui-toggle-btn" data-se="choice.ogg">禁止</button></div></div>
-      <div class="legion-council-order-row"><div class="legion-council-order-label"><strong>新規交戦</strong><small>現在敵対でない大名家への攻撃</small></div><div class="legion-council-toggle"><button class="ui-toggle-btn" data-se="choice.ogg">許可</button><button class="ui-toggle-btn active" data-se="choice.ogg">禁止</button></div></div>
+      <div class="legion-council-order-row"><div class="legion-council-order-label"><strong>新規交戦</strong><small>現在敵対していない大名家への攻撃</small></div><div class="legion-council-toggle"><button class="ui-toggle-btn" data-se="choice.ogg">許可</button><button class="ui-toggle-btn active" data-se="choice.ogg">禁止</button></div></div>
     </div>
   </div>
   <div class="modal-footer legion-council-order-footer"><button id="legion-council-order-confirm-btn" class="btn-primary">確定</button><button id="legion-council-order-back-btn" class="btn-secondary">戻る</button></div>

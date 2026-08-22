@@ -1386,6 +1386,45 @@ test('評定の新規交戦禁止は敵対中の相手だけ攻撃可能にし�
 });
 
 
+test('評定の一括命令は選択した項目だけを全軍団の下書きへ反映する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/legion_council_view.js');
+    const LegionCouncilView = vm.runInContext('LegionCouncilView', ctx);
+    const view = Object.create(LegionCouncilView.prototype);
+    view.game = {
+        legionPolicySystem: {
+            getDefaultPolicy: () => ({ allowOffense: true, allowNewHostility: true }),
+            normalizePolicy: raw => ({
+                allowOffense: raw && raw.allowOffense !== false,
+                allowNewHostility: raw && raw.allowNewHostility !== false
+            })
+        }
+    };
+    view.members = [
+        { legionNo: 1, policy: { allowOffense: true, allowNewHostility: true } },
+        { legionNo: 2, policy: { allowOffense: false, allowNewHostility: false } }
+    ];
+    view.draft = {
+        1: { allowOffense: true, allowNewHostility: true },
+        2: { allowOffense: false, allowNewHostility: false }
+    };
+    view.editingMode = 'bulk';
+    view.editingPolicy = { allowOffense: false, allowNewHostility: null };
+    view.editingTouched = new Set(['allowOffense']);
+    view.renderSeats = () => {};
+    view.closeOrderEditor = () => {};
+
+    const common = view._getBulkCommonPolicy();
+    assert.strictEqual(common.allowOffense, null, '軍団ごとに値が混在する項目は一括画面で未選択にする');
+    assert.strictEqual(common.allowNewHostility, null, '新規交戦も混在時は未選択にする');
+
+    view.confirmOrderEditor();
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(view.draft)), {
+        1: { allowOffense: false, allowNewHostility: true },
+        2: { allowOffense: false, allowNewHostility: false }
+    }, '一括操作で触っていない項目は各軍団の既存下書きを維持する');
+});
+
 test('評定方針は観戦・AI操作中は拘束を停止し、プレイヤー復帰時に保存値を再適用する', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/constants.js');
@@ -1474,6 +1513,10 @@ test('評定UIとAIは方針専門部署を正本として参照する', () => {
     assert.ok(councilView.includes('openOrderEditor'), '軍団別命令は評定一覧と別画面で開く');
     assert.ok(councilView.includes('this.editingPolicy'), '軍団別命令は評定全体とは別の局所下書きを持つ');
     assert.ok(councilView.includes('confirmOrderEditor'), '軍団別命令は確定時だけ評定全体の下書きへ反映する');
+    assert.ok(html.includes('id="legion-council-bulk-btn"'), '評定一覧下部に一括ボタンを置く');
+    assert.ok(councilView.includes('openBulkEditor'), '一括ボタンは専用の一括編集モードを開く');
+    assert.ok(councilView.includes('this.editingTouched'), '一括編集は変更した項目だけを全軍団へ反映できるよう変更項目を追跡する');
+    assert.ok(councilView.includes("this.orderConfirmBtn.textContent = isBulk ? '一括適用' : '確定'"), '一括編集では確定ボタンを一括適用と表示する');
     const openOrderStart = councilView.indexOf('openOrderEditor(legionNo)');
     const openOrderEnd = councilView.indexOf('closeOrderEditor()', openOrderStart);
     const openOrderBlock = councilView.slice(openOrderStart, openOrderEnd);

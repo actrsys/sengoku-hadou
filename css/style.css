@@ -4928,7 +4928,8 @@ body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
     max-width: calc(100% - 20px);
     height: 630px;
     max-height: calc(100% - 86px);
-    padding: 12px 16px 10px;
+    /* 下端は一括操作帯側で余白を持つ。PCでは上下の実隙間を同寸にする。 */
+    padding: 12px 16px 0;
     overflow: hidden !important;
     background:
         radial-gradient(circle at 50% 42%, rgba(219, 190, 104, 0.10), transparent 32%),
@@ -4939,7 +4940,7 @@ body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
     flex: 0 0 auto;
     text-align: center;
     position: relative;
-    padding: 0 0 7px;
+    padding: 0 0 5px;
 }
 
 #legion-council-modal .legion-council-header h3,
@@ -4988,7 +4989,7 @@ body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
     min-height: 0;
     display: grid;
     grid-template-rows: repeat(4, minmax(0, 1fr));
-    gap: 7px;
+    gap: 5px;
 }
 
 .legion-council-seat {
@@ -5134,6 +5135,44 @@ body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
 }
 
 #legion-council-finish-btn { min-width: 180px; }
+
+/* 詳細情報画面と同様に、本体下側へ補助操作帯を確保する。
+   ボタン自身を transform で位置調整せず、操作帯の余白でカード・枠との間隔を作る。 */
+.legion-council-actions {
+    flex: 0 0 42px;
+    min-height: 42px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    /* 30pxの一括ボタンを上下6pxずつで挟み、カード側と枠側の実隙間を揃える。 */
+    padding: 6px 0;
+}
+
+.legion-council-bulk-btn {
+    box-sizing: border-box;
+    min-width: 88px;
+    height: 30px;
+    min-height: 30px;
+    padding: 0 14px;
+    font-size: 14px;
+    line-height: 1;
+}
+
+/* 一括ボタンはhover/focus/activeでも位置を動かさない。共通の発光だけを利用する。 */
+body.is-pc .legion-council-bulk-btn:hover,
+body.is-pc .legion-council-bulk-btn:focus-visible,
+body.is-pc .legion-council-bulk-btn:active {
+    transform: none;
+}
+
+.legion-council-bulk-note {
+    color: rgba(255,255,255,.68);
+    font-size: 10px;
+    line-height: 1.4;
+    text-align: center;
+    padding: 0 0 4px;
+}
 
 /* 命令編集も固定画面内で完結させる。項目増加時はスクロールではなくタブ/ページ分割する。 */
 #legion-council-order-modal {
@@ -5351,6 +5390,24 @@ body:not(.is-pc) .legion-council-policy-chip {
 }
 
 body:not(.is-pc) .legion-council-seat-hint { display: none; }
+
+body:not(.is-pc) .legion-council-actions {
+    flex: 0 0 30px;
+    min-height: 30px;
+    padding: 1px 0;
+}
+
+body:not(.is-pc) .legion-council-bulk-btn {
+    min-width: 76px;
+    min-height: 28px;
+    padding: 3px 11px;
+    font-size: 11px;
+}
+
+body:not(.is-pc) .legion-council-bulk-note {
+    font-size: 9px;
+    padding-bottom: 2px;
+}
 
 body:not(.is-pc) .legion-council-footer {
     flex: 0 0 40px;

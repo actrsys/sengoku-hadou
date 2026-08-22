@@ -199,12 +199,21 @@ async function validateLegionCouncil(cdp) {
             const right = document.getElementById('legion-council-right').getBoundingClientRect();
             const seats = [...document.querySelectorAll('.legion-council-seat')].map(x => x.getBoundingClientRect());
             const chips = [...document.querySelectorAll('.legion-council-policy-chip')].map(x => x.getBoundingClientRect());
+            const bulk = document.getElementById('legion-council-bulk-btn').getBoundingClientRect();
             return {
                 innerWidth: window.innerWidth, innerHeight: window.innerHeight,
                 content:{left:content.left,right:content.right,top:content.top,bottom:content.bottom,width:content.width,height:content.height,clientHeight:document.querySelector('.legion-council-content').clientHeight,scrollHeight:document.querySelector('.legion-council-content').scrollHeight,overflowY:getComputedStyle(document.querySelector('.legion-council-content')).overflowY},
                 stage:{width:stage.width}, left:{left:left.left,right:left.right,width:left.width}, center:{left:center.left,right:center.right,width:center.width}, right:{left:right.left,right:right.right,width:right.width},
                 seats:seats.map(r=>({left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height})),
-                chips:chips.map(r=>({left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}))
+                chips:chips.map(r=>({left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height})),
+                bulk:{top:bulk.top,bottom:bulk.bottom,left:bulk.left,right:bulk.right,height:bulk.height},
+                bulkText:(() => {
+                    const el = document.getElementById('legion-council-bulk-btn');
+                    const cs = getComputedStyle(el);
+                    return {scrollHeight:el.scrollHeight,clientHeight:el.clientHeight,fontSize:parseFloat(cs.fontSize),lineHeight:parseFloat(cs.lineHeight)};
+                })(),
+                contentBorderBottom: parseFloat(getComputedStyle(document.querySelector('#legion-council-modal .legion-council-content')).borderBottomWidth) || 0,
+                bulkBottomGap: content.bottom - bulk.bottom
             };
         })()`, returnByValue: true
     });
@@ -215,6 +224,24 @@ async function validateLegionCouncil(cdp) {
     assert.ok(pc.center.right < pc.right.left, 'PC評定の中央装飾と右席が重なっています');
     assert.ok(pc.seats.every(r => r.height >= 100), 'PC評定の国主席が潰れています');
     assert.ok(pc.chips.every(c => c.width > 0 && c.height >= 12), 'PC評定の方針表示が潰れています');
+    const bulkTopGap = pc.bulk.top - pc.seats[7].bottom;
+    const bulkBottomInnerGap = pc.bulkBottomGap - pc.contentBorderBottom;
+    assert.ok(bulkTopGap >= 5, `PC評定の第八国主席と一括ボタンの間隔が狭すぎます (${bulkTopGap})`);
+    assert.ok(bulkBottomInnerGap >= 5, `PC評定の一括ボタン下と内容枠内側の隙間が狭すぎます (${bulkBottomInnerGap})`);
+    approx(bulkTopGap, bulkBottomInnerGap, 1.0, 'PC評定の一括ボタン上下の視覚上の隙間を揃える');
+    assert.ok(pc.bulkText.scrollHeight <= pc.bulkText.clientHeight, `PC評定の一括ボタン文字が内側へ収まっていません (${pc.bulkText.scrollHeight}/${pc.bulkText.clientHeight})`);
+    assert.ok(pc.bulkText.lineHeight <= pc.bulk.height - 8, `PC評定の一括ボタン文字が内側装飾枠へ近すぎます (line-height ${pc.bulkText.lineHeight}, height ${pc.bulk.height})`);
+    const bulkCenterX = (pc.bulk.left + pc.bulk.right) / 2;
+    const bulkCenterY = (pc.bulk.top + pc.bulk.bottom) / 2;
+    await cdp.call('Input.dispatchMouseEvent', { type:'mouseMoved', x:bulkCenterX, y:bulkCenterY });
+    await new Promise(resolve => setTimeout(resolve, 40));
+    result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => { const r = document.getElementById('legion-council-bulk-btn').getBoundingClientRect(); return {top:r.top,bottom:r.bottom}; })()`,
+        returnByValue: true
+    });
+    const hoveredBulk = result.result.value;
+    approx(hoveredBulk.top, pc.bulk.top, 0.2, 'PC評定の一括ボタンはhover時に上へ逃がさない');
+    approx(hoveredBulk.bottom, pc.bulk.bottom, 0.2, 'PC評定の一括ボタンはhover時に位置を変えない');
     assert.ok(pc.content.scrollHeight <= pc.content.clientHeight + 1, `PC評定一覧に縦スクロールが発生しています (${pc.content.scrollHeight} > ${pc.content.clientHeight})`);
     assert.strictEqual(pc.content.overflowY, 'hidden', 'PC評定一覧はスクロール領域にしてはいけません');
 
@@ -268,6 +295,8 @@ async function validateLegionCouncil(cdp) {
             const content = contentEl.getBoundingClientRect();
             const stage = document.querySelector('.legion-council-stage').getBoundingClientRect();
             const footer = document.querySelector('.legion-council-footer').getBoundingClientRect();
+            const actions = document.querySelector('.legion-council-actions').getBoundingClientRect();
+            const bulk = document.getElementById('legion-council-bulk-btn').getBoundingClientRect();
             const center = getComputedStyle(document.querySelector('.legion-council-center')).display;
             const seats = [...document.querySelectorAll('.legion-council-seat')].map(x => x.getBoundingClientRect());
             const firstSeat = document.querySelector('.legion-council-seat');
@@ -279,7 +308,7 @@ async function validateLegionCouncil(cdp) {
             return { innerWidth:window.innerWidth, innerHeight:window.innerHeight, scrollWidth:document.documentElement.scrollWidth, center,
                 screen:{left:screen.left,right:screen.right,top:screen.top,bottom:screen.bottom,width:screen.width,height:screen.height},
                 content:{left:content.left,right:content.right,top:content.top,bottom:content.bottom,clientHeight:contentEl.clientHeight,scrollHeight:contentEl.scrollHeight,overflowY:getComputedStyle(contentEl).overflowY},
-                stage:{top:stage.top,bottom:stage.bottom}, footer:{top:footer.top,bottom:footer.bottom}, footerOutside:document.querySelector('.legion-council-footer').parentElement === modal,
+                stage:{top:stage.top,bottom:stage.bottom}, actions:{left:actions.left,right:actions.right,top:actions.top,bottom:actions.bottom}, bulk:{left:bulk.left,right:bulk.right,top:bulk.top,bottom:bulk.bottom}, footer:{top:footer.top,bottom:footer.bottom}, footerOutside:document.querySelector('.legion-council-footer').parentElement === modal,
                 seats:seats.map(r=>({left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height})),
                 firstText:{headingBottom:heading.bottom,nameTop:name.top,nameBottom:name.bottom,policyTop:policy.top,hintDisplay},
                 orderButtonCount: orderButtons.length, modalWidth:modal.getBoundingClientRect().width };
@@ -299,6 +328,9 @@ async function validateLegionCouncil(cdp) {
     assert.strictEqual(mobile.content.overflowY, 'hidden', 'スマホ評定一覧はスクロール領域にしてはいけません');
     assert.strictEqual(mobile.footerOutside, true, '評定を終えるボタンは標準モーダルと同じく内容枠の外側へ置く');
     assert.ok(mobile.stage.bottom <= mobile.content.bottom + 1, 'スマホ評定の8席が内容枠からはみ出しています');
+    assert.ok(mobile.actions.top >= mobile.stage.bottom - 1, '一括操作帯は軍団カード群の下側に置く');
+    assert.ok(mobile.bulk.right <= mobile.content.right + 1 && mobile.bulk.right >= mobile.content.right - 20, '一括ボタンは評定内容枠の右下へ寄せる');
+    assert.ok(mobile.bulk.bottom <= mobile.content.bottom + 1, '一括ボタンが評定内容枠からはみ出しています');
     assert.ok(mobile.content.bottom <= mobile.footer.top + 1, 'スマホ評定の内容枠と終了ボタンが重なっています');
     assert.ok(mobile.footer.top - mobile.content.bottom >= 12, `スマホ評定の内容枠と終了ボタンの隙間が標準モーダルより狭すぎます (${mobile.footer.top - mobile.content.bottom})`);
     assert.ok(mobile.footer.bottom <= mobile.screen.bottom + 1, 'スマホ評定の終了ボタンが9:16ゲーム画面外へ見切れています');
@@ -327,12 +359,14 @@ async function validateLegionCouncil(cdp) {
             const stage = document.querySelector('.legion-council-stage').getBoundingClientRect();
             const footerEl = document.querySelector('.legion-council-footer');
             const footer = footerEl.getBoundingClientRect();
+            const actions = document.querySelector('.legion-council-actions').getBoundingClientRect();
+            const bulk = document.getElementById('legion-council-bulk-btn').getBoundingClientRect();
             const firstSeat = document.querySelector('.legion-council-seat');
             const heading = firstSeat.querySelector('.legion-council-seat-heading').getBoundingClientRect();
             const name = firstSeat.querySelector('.legion-council-name').getBoundingClientRect();
             const policy = firstSeat.querySelector('.legion-council-policy-summary').getBoundingClientRect();
             const seats = [...document.querySelectorAll('.legion-council-seat')].map(x => x.getBoundingClientRect());
-            return { screen:{bottom:screen.bottom}, content:{bottom:content.bottom}, stage:{bottom:stage.bottom}, footer:{top:footer.top,bottom:footer.bottom}, footerOutside:footerEl.parentElement === modal,
+            return { screen:{bottom:screen.bottom}, content:{right:content.right,bottom:content.bottom}, stage:{bottom:stage.bottom}, actions:{top:actions.top,bottom:actions.bottom}, bulk:{right:bulk.right,bottom:bulk.bottom}, footer:{top:footer.top,bottom:footer.bottom}, footerOutside:footerEl.parentElement === modal,
                 gaps:{a:name.top-heading.bottom,b:policy.top-name.bottom}, seatHeight:firstSeat.getBoundingClientRect().height,
                 seatHeights:seats.map(r=>r.height) };
         })()`, returnByValue: true
@@ -340,6 +374,9 @@ async function validateLegionCouncil(cdp) {
     const wideMobile = result.result.value;
     assert.strictEqual(wideMobile.footerOutside, true, '幅広スマホでも終了ボタンは内容枠の外側へ置く');
     assert.ok(wideMobile.stage.bottom <= wideMobile.content.bottom + 1, '幅広スマホでも国主席が内容枠からはみ出しています');
+    assert.ok(wideMobile.actions.top >= wideMobile.stage.bottom - 1, '幅広スマホでも一括操作帯はカード群の下に置く');
+    assert.ok(wideMobile.bulk.right <= wideMobile.content.right + 1 && wideMobile.bulk.right >= wideMobile.content.right - 24, '幅広スマホでも一括ボタンは右下に寄せる');
+    assert.ok(wideMobile.bulk.bottom <= wideMobile.content.bottom + 1, '幅広スマホで一括ボタンが内容枠からはみ出しています');
     assert.ok(wideMobile.content.bottom <= wideMobile.footer.top + 1, '幅広スマホでも内容枠と終了ボタンが重なっています');
     assert.ok(wideMobile.footer.top - wideMobile.content.bottom >= 12, `幅広スマホでも内容枠と終了ボタンに標準相当の隙間が必要です (${wideMobile.footer.top - wideMobile.content.bottom})`);
     assert.ok(wideMobile.footer.bottom <= wideMobile.screen.bottom + 1, '幅広スマホでも終了ボタンが9:16ゲーム画面外へ見切れています');

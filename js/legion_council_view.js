@@ -13,17 +13,22 @@ class LegionCouncilView {
         this.date = document.getElementById('legion-council-date');
         this.clanName = document.getElementById('legion-council-clan-name');
         this.finishBtn = document.getElementById('legion-council-finish-btn');
+        this.bulkBtn = document.getElementById('legion-council-bulk-btn');
         this.orderModal = document.getElementById('legion-council-order-modal');
+        this.orderKicker = document.getElementById('legion-council-order-kicker');
         this.orderTitle = document.getElementById('legion-council-order-title');
         this.orderBody = document.getElementById('legion-council-order-body');
         this.orderConfirmBtn = document.getElementById('legion-council-order-confirm-btn');
         this.orderBackBtn = document.getElementById('legion-council-order-back-btn');
         this.draft = {};
         this.members = [];
+        this.editingMode = null;
         this.editingLegionNo = null;
         this.editingPolicy = null;
+        this.editingTouched = new Set();
 
         if (this.finishBtn) this.finishBtn.onclick = () => this.confirmFinish();
+        if (this.bulkBtn) this.bulkBtn.onclick = () => this.openBulkEditor();
         if (this.orderConfirmBtn) this.orderConfirmBtn.onclick = () => this.confirmOrderEditor();
         if (this.orderBackBtn) this.orderBackBtn.onclick = () => this.closeOrderEditor();
     }
@@ -67,8 +72,10 @@ class LegionCouncilView {
         this.members.forEach(m => {
             this.draft[m.legionNo] = { ...m.policy };
         });
+        this.editingMode = null;
         this.editingLegionNo = null;
         this.editingPolicy = null;
+        this.editingTouched.clear();
 
         const clan = this.game.clans.find(c => Number(c.id) === clanId);
         if (this.clanName) this.clanName.textContent = clan ? `${clan.name} 評定` : '評定';
@@ -84,8 +91,10 @@ class LegionCouncilView {
         if (this.modal) this.modal.classList.add('hidden');
         this.draft = {};
         this.members = [];
+        this.editingMode = null;
         this.editingLegionNo = null;
         this.editingPolicy = null;
+        this.editingTouched.clear();
         if (typeof this.ui.resumeBackgroundUpdates === 'function') this.ui.resumeBackgroundUpdates();
     }
 
@@ -139,20 +148,69 @@ class LegionCouncilView {
         if (!this.orderModal || !this.orderBody) return;
         const member = this.members.find(m => Number(m.legionNo) === Number(legionNo));
         if (!member) return;
+        this.editingMode = 'single';
         this.editingLegionNo = Number(legionNo);
+        this.editingTouched.clear();
         this.editingPolicy = { ...(this.draft[member.legionNo] || member.policy || this.system.getDefaultPolicy()) };
         this.renderOrderEditor();
         if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
         this.orderModal.classList.remove('hidden');
     }
 
+    _getBulkCommonPolicy() {
+        const policies = this.members.map(member => this.system.normalizePolicy(
+            this.draft[member.legionNo] || member.policy || this.system.getDefaultPolicy()
+        ));
+        const commonValue = key => {
+            if (policies.length === 0) return null;
+            const first = policies[0][key];
+            return policies.every(policy => policy[key] === first) ? first : null;
+        };
+        return {
+            allowOffense: commonValue('allowOffense'),
+            allowNewHostility: commonValue('allowNewHostility')
+        };
+    }
+
+    openBulkEditor() {
+        if (!this.orderModal || !this.orderBody || this.members.length === 0) return;
+        this.editingMode = 'bulk';
+        this.editingLegionNo = null;
+        this.editingTouched.clear();
+        this.editingPolicy = this._getBulkCommonPolicy();
+        this.renderOrderEditor();
+        this.orderModal.classList.remove('hidden');
+    }
+
     closeOrderEditor() {
         if (this.orderModal) this.orderModal.classList.add('hidden');
+        this.editingMode = null;
         this.editingLegionNo = null;
         this.editingPolicy = null;
+        this.editingTouched.clear();
     }
 
     confirmOrderEditor() {
+        if (this.editingMode === 'bulk') {
+            if (!this.editingPolicy) {
+                this.closeOrderEditor();
+                return;
+            }
+            this.members.forEach(member => {
+                const current = this.system.normalizePolicy(
+                    this.draft[member.legionNo] || member.policy || this.system.getDefaultPolicy()
+                );
+                const next = { ...current };
+                this.editingTouched.forEach(key => {
+                    if (this.editingPolicy[key] !== null) next[key] = this.editingPolicy[key];
+                });
+                this.draft[member.legionNo] = this.system.normalizePolicy(next);
+            });
+            this.renderSeats();
+            this.closeOrderEditor();
+            return;
+        }
+
         const legionNo = Number(this.editingLegionNo || 0);
         if (!legionNo || !this.editingPolicy) {
             this.closeOrderEditor();
@@ -165,35 +223,49 @@ class LegionCouncilView {
 
     renderOrderEditor() {
         if (!this.orderBody) return;
-        const member = this.members.find(m => Number(m.legionNo) === Number(this.editingLegionNo));
-        if (!member) {
+        const isBulk = this.editingMode === 'bulk';
+        const member = isBulk ? null : this.members.find(m => Number(m.legionNo) === Number(this.editingLegionNo));
+        if (!isBulk && !member) {
             this.orderBody.innerHTML = '';
             return;
         }
 
-        const policy = this.editingPolicy || this.draft[member.legionNo] || this.system.getDefaultPolicy();
+        const policy = this.editingPolicy || (member
+            ? (this.draft[member.legionNo] || this.system.getDefaultPolicy())
+            : this._getBulkCommonPolicy());
         const labels = ['', '第一', '第二', '第三', '第四', '第五', '第六', '第七', '第八'];
-        if (this.orderTitle) this.orderTitle.textContent = `${labels[member.legionNo]}国主　${member.commander.name}`;
+        if (this.orderKicker) this.orderKicker.textContent = isBulk ? '全軍団への命令' : '国主への命令';
+        if (this.orderTitle) this.orderTitle.textContent = isBulk
+            ? '一括命令'
+            : `${labels[member.legionNo]}国主　${member.commander.name}`;
+        if (this.orderConfirmBtn) this.orderConfirmBtn.textContent = isBulk ? '一括適用' : '確定';
+
+        const offenseActiveTrue = policy.allowOffense === true ? 'active' : '';
+        const offenseActiveFalse = policy.allowOffense === false ? 'active' : '';
+        const hostilityActiveTrue = policy.allowNewHostility === true ? 'active' : '';
+        const hostilityActiveFalse = policy.allowNewHostility === false ? 'active' : '';
+        const hostilityDisabled = policy.allowOffense === false;
 
         this.orderBody.innerHTML = `
+            ${isBulk ? '<div class="legion-council-bulk-note">未選択の項目は変更しません。</div>' : ''}
             <div class="legion-council-order-row">
                 <div class="legion-council-order-label">
                     <strong>攻勢</strong>
                     <small>他家・諸勢力への自主的な攻撃</small>
                 </div>
                 <div class="legion-council-toggle" data-key="allowOffense">
-                    <button type="button" data-value="true" data-se="choice.ogg" class="ui-toggle-btn ${policy.allowOffense ? 'active' : ''}">許可</button>
-                    <button type="button" data-value="false" data-se="choice.ogg" class="ui-toggle-btn ${!policy.allowOffense ? 'active' : ''}">禁止</button>
+                    <button type="button" data-value="true" data-se="choice.ogg" class="ui-toggle-btn ${offenseActiveTrue}">許可</button>
+                    <button type="button" data-value="false" data-se="choice.ogg" class="ui-toggle-btn ${offenseActiveFalse}">禁止</button>
                 </div>
             </div>
-            <div class="legion-council-order-row${policy.allowOffense ? '' : ' disabled-row'}">
+            <div class="legion-council-order-row${hostilityDisabled ? ' disabled-row' : ''}">
                 <div class="legion-council-order-label">
                     <strong>新規交戦</strong>
-                    <small>現在敵対でない大名家への攻撃</small>
+                    <small>現在敵対していない大名家への攻撃</small>
                 </div>
                 <div class="legion-council-toggle" data-key="allowNewHostility">
-                    <button type="button" data-value="true" data-se="choice.ogg" class="ui-toggle-btn ${policy.allowNewHostility ? 'active' : ''}" ${policy.allowOffense ? '' : 'disabled'}>許可</button>
-                    <button type="button" data-value="false" data-se="choice.ogg" class="ui-toggle-btn ${!policy.allowNewHostility ? 'active' : ''}" ${policy.allowOffense ? '' : 'disabled'}>禁止</button>
+                    <button type="button" data-value="true" data-se="choice.ogg" class="ui-toggle-btn ${hostilityActiveTrue}" ${hostilityDisabled ? 'disabled' : ''}>許可</button>
+                    <button type="button" data-value="false" data-se="choice.ogg" class="ui-toggle-btn ${hostilityActiveFalse}" ${hostilityDisabled ? 'disabled' : ''}>禁止</button>
                 </div>
             </div>
             `;
@@ -203,8 +275,13 @@ class LegionCouncilView {
                 const wrap = btn.closest('.legion-council-toggle');
                 const key = wrap.dataset.key;
                 const value = btn.dataset.value === 'true';
-                if (!this.editingPolicy) this.editingPolicy = { ...(this.draft[member.legionNo] || this.system.getDefaultPolicy()) };
+                if (!this.editingPolicy) {
+                    this.editingPolicy = isBulk
+                        ? this._getBulkCommonPolicy()
+                        : { ...(this.draft[member.legionNo] || this.system.getDefaultPolicy()) };
+                }
                 this.editingPolicy[key] = value;
+                if (isBulk) this.editingTouched.add(key);
                 this.renderOrderEditor();
             };
         });
