@@ -981,15 +981,15 @@ class WarManager {
 
         const checkDefeatAndPushMsg = () => {
             if (s.defender.defense <= 0) {
-                pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">城の防御が０になった！<br>城は陥落した！</span>`, log: `城防御が0になり、陥落した！` });
+                pushMsg({ text: `<span class="war-critical-message">城の防御が０になった！<br>城は陥落した！</span>`, log: `城防御が0になり、陥落した！` });
             } else if (s.defender.morale <= 0) {
-                pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">守備本隊の士気が崩壊した！<br>城は陥落した！</span>`, log: `守備本隊の士気が0になり、陥落した！` });
+                pushMsg({ text: `<span class="war-critical-message">守備本隊の士気が崩壊した！<br>城は陥落した！</span>`, log: `守備本隊の士気が0になり、陥落した！` });
             } else if (s.defender.soldiers <= 0) {
-                pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">守備本隊が全滅した！<br>城は陥落した！</span>`, log: `守備本隊が全滅し、陥落した！` });
+                pushMsg({ text: `<span class="war-critical-message">守備本隊が全滅した！<br>城は陥落した！</span>`, log: `守備本隊が全滅し、陥落した！` });
             } else if (s.attacker.morale <= 0) {
-                pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">攻撃本隊の士気が崩壊した！<br>攻撃軍は退却した！</span>`, log: `攻撃本隊の士気が0になり、退却した！` });
+                pushMsg({ text: `<span class="war-critical-message">攻撃本隊の士気が崩壊した！<br>攻撃軍は退却した！</span>`, log: `攻撃本隊の士気が0になり、退却した！` });
             } else if (s.attacker.soldiers <= 0) {
-                pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">攻撃本隊が全滅した！<br>守備軍が防ぎ切った！</span>`, log: `攻撃本隊が全滅し、退却した！` });
+                pushMsg({ text: `<span class="war-critical-message">攻撃本隊が全滅した！<br>守備軍が防ぎ切った！</span>`, log: `攻撃本隊が全滅し、退却した！` });
             }
         };
         
@@ -1038,7 +1038,7 @@ class WarManager {
 
         if (type === 'retreat') { 
             if (s.turn === 'attacker') { 
-                pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">攻撃本隊が撤退を開始した！<br>合戦は終結した！</span>`, log: `${activeArmyName} が撤退を開始した！` });
+                pushMsg({ text: `<span class="war-critical-message">攻撃本隊が撤退を開始した！<br>合戦は終結した！</span>`, log: `${activeArmyName} が撤退を開始した！` });
                 const finalize = () => { this.endWar(false, true); };
                 if (s.isPlayerInvolved && actionMessages.length > 0) {
                     this.game.ui.showWarActionMessage(actionMessages, finalize);
@@ -1046,7 +1046,7 @@ class WarManager {
                     finalize();
                 }
             } else if (s.turn === 'defender') { 
-                pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">守備本隊が城を放棄し撤退した！<br>合戦は終結した！</span>`, log: `${activeArmyName} が城を放棄し撤退した！` });
+                pushMsg({ text: `<span class="war-critical-message">守備本隊が城を放棄し撤退した！<br>合戦は終結した！</span>`, log: `${activeArmyName} が城を放棄し撤退した！` });
                 const finalize = () => { this.executeRetreatLogic(s.defender); };
                 if (s.isPlayerInvolved && actionMessages.length > 0) {
                     this.game.ui.showWarActionMessage(actionMessages, finalize);

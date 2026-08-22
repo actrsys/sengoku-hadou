@@ -1730,7 +1730,7 @@ class CommandSystem {
                 let latestMarkHtml = "";
                 if (isGlobalLatest) {
                     // 全体で一番新しいデータには「最新!」の文字をつけます
-                    latestMarkHtml = `<span class="saveload-latest-mark" style="color: #ff8a80; font-weight: bold; text-shadow: 1px 1px 0 #000;">最新!</span>`;
+                    latestMarkHtml = `<span class="saveload-latest-mark">最新!</span>`;
                 }
 
                 // ★追加：保存しておいた写真があれば表示します

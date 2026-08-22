@@ -794,5 +794,56 @@ test('SaveManager restores EventManager with GameManager context', () => {
         'SaveManager must not pass itself as EventManager game context');
 });
 
+
+// ---------------------------------------------------------------------------
+// HTML / CSS / JS separation
+// ---------------------------------------------------------------------------
+test('index.html は inline style を持たない', () => {
+    const html = read('index.html');
+    assert.strictEqual((html.match(/\bstyle\s*=/g) || []).length, 0);
+});
+
+test('自作JSが生成する inline style は動的CSS変数だけに限定する', () => {
+    const offenders = [];
+    const walk = dir => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) walk(full);
+            else if (entry.name.endsWith('.js') && !entry.name.endsWith('.min.js') && entry.name !== 'howler.js') {
+                const rel = path.relative(ROOT, full).replace(/\\/g, '/');
+                const source = fs.readFileSync(full, 'utf8');
+                for (const match of source.matchAll(/style=["']([^"']*)["']/g)) {
+                    const declarations = match[1].split(';').map(x => x.trim()).filter(Boolean);
+                    if (declarations.length === 0 || declarations.some(d => !d.startsWith('--'))) {
+                        offenders.push(`${rel}: ${match[1]}`);
+                    }
+                }
+            }
+        }
+    };
+    walk(path.join(ROOT, 'js'));
+    assert.deepStrictEqual(offenders, []);
+});
+
+test('自作JSが生成するHTMLに inline event 属性を持たない', () => {
+    const attrs = ['onclick=', 'onerror=', 'onchange=', 'oninput=', 'onmouseover=', 'onmouseout='];
+    const offenders = [];
+    const walk = dir => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) walk(full);
+            else if (entry.name.endsWith('.js') && !entry.name.endsWith('.min.js') && entry.name !== 'howler.js') {
+                const rel = path.relative(ROOT, full).replace(/\\/g, '/');
+                const source = fs.readFileSync(full, 'utf8').toLowerCase();
+                for (const attr of attrs) {
+                    if (source.includes(attr)) offenders.push(`${rel}: ${attr}`);
+                }
+            }
+        }
+    };
+    walk(path.join(ROOT, 'js'));
+    assert.deepStrictEqual(offenders, []);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

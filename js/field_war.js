@@ -1201,10 +1201,10 @@ class FieldWarManager {
             unitTraining = this.groupStats[unit.groupId].training;
         }
 
-        infoEl.style.borderColor = color; 
+        infoEl.style.setProperty('--unit-color', color); 
         infoEl.innerHTML = `
             <div class="fw-unit-header">
-                <div class="fw-unit-name" style="color: ${color};">${clanNameText}${unit.name}</div>
+                <div class="fw-unit-name">${clanNameText}${unit.name}</div>
                 <div class="fw-unit-type">${typeName}</div>
             </div>
             <div class="fw-unit-stats">
@@ -1214,7 +1214,7 @@ class FieldWarManager {
                 </div>
                 <div class="fw-unit-row">
                     <span class="fw-status-label">士気</span><span class="fw-status-value">${unitMorale}</span>
-                    <span class="fw-status-label" style="margin-left: 10px;">訓練</span><span class="fw-status-value">${unitTraining}</span>
+                    <span class="fw-status-label fw-status-label-spaced">訓練</span><span class="fw-status-value">${unitTraining}</span>
                 </div>
             </div>
             <div class="fw-unit-abilities">

@@ -376,7 +376,6 @@ class UIManager {
         // ★ここから追加：ウィンドウ付属のボタンを外に出す改修
         const modals = document.querySelectorAll('.modal');
         modals.forEach(modal => {
-            modal.style.flexDirection = 'column';
             const content = modal.querySelector('.modal-content');
             const footer = modal.querySelector('.modal-footer');
             if (content && footer) {
@@ -384,6 +383,16 @@ class UIManager {
                 modal.appendChild(footer);
             }
         });
+    }
+
+    _getCompressedTextHtml(text, threshold, isStrong = false) {
+        if (!text) return "";
+        if (text.length < threshold) return text;
+        const step = isStrong ? 0.15 : 0.1;
+        const minScale = isStrong ? 0.55 : 0.65;
+        let scale = 1.0 - (text.length - (threshold - 1)) * step;
+        if (scale < minScale) scale = minScale;
+        return `<span class="compressed-list-text ui-compressed-text" style="--text-scale:${scale}; --text-unscale:${1 / scale};">${text}</span>`;
     }
 
     // ==========================================
@@ -478,7 +487,7 @@ class UIManager {
         let currentEl = this.aiGuard.querySelector('[data-ai-progress-current]');
         let totalEl = this.aiGuard.querySelector('[data-ai-progress-total]');
         if (!currentEl || !totalEl) {
-            this.aiGuard.innerHTML = `<div class="loading-spinner"></div><div>思考中... (<span data-ai-progress-current style="display:inline-block; width:1.8em; text-align:right; font-family: Arial, sans-serif; font-variant-numeric: tabular-nums;"></span> / <span data-ai-progress-total style="display:inline-block; width:1.8em; text-align:left; font-family: Arial, sans-serif; font-variant-numeric: tabular-nums;"></span>)</div>`;
+            this.aiGuard.innerHTML = `<div class="loading-spinner"></div><div>思考中... (<span data-ai-progress-current class="ai-progress-number is-current"></span> / <span data-ai-progress-total class="ai-progress-number is-total"></span>)</div>`;
             currentEl = this.aiGuard.querySelector('[data-ai-progress-current]');
             totalEl = this.aiGuard.querySelector('[data-ai-progress-total]');
         }
@@ -1250,7 +1259,7 @@ class UIManager {
             emptyBgClass = 'status-bar-empty-bg';
         }
 
-        return `<div class="status-bar-container ${emptyBgClass}"><div class="status-bar-fill ${fillClass}" style="width: ${percent}%;"></div><div class="status-bar-text">${displayText}</div></div>`;
+        return `<div class="status-bar-container ${emptyBgClass}"><div class="status-bar-fill ${fillClass}" style="--status-bar-width:${percent}%;"></div><div class="status-bar-text">${displayText}</div></div>`;
     }
 
     // ==========================================
@@ -1262,26 +1271,9 @@ class UIManager {
         if (!notice) {
             notice = document.createElement('div');
             notice.id = 'watch-return-reserved-notice';
-            notice.style.position = 'fixed';
-            notice.style.left = '50%';
-            notice.style.bottom = 'max(18px, env(safe-area-inset-bottom))';
-            notice.style.transform = 'translateX(-50%)';
-            notice.style.zIndex = '12000';
-            notice.style.pointerEvents = 'none';
-            notice.style.padding = '8px 14px';
-            notice.style.borderRadius = '8px';
-            notice.style.border = '1px solid rgba(255,255,255,0.65)';
-            notice.style.background = 'rgba(0,0,0,0.78)';
-            notice.style.color = '#fff';
-            notice.style.fontSize = document.body.classList.contains('is-pc') ? '0.9rem' : '0.8rem';
-            notice.style.fontWeight = 'bold';
-            notice.style.textAlign = 'center';
-            notice.style.whiteSpace = 'pre-line';
-            notice.style.textShadow = '1px 1px 2px #000';
             document.body.appendChild(notice);
         }
         notice.textContent = message;
-        notice.style.display = 'block';
     }
 
     hideWatchReturnReserved() {
@@ -1883,26 +1875,16 @@ class UIManager {
         const clanData = this.game.clans.find(cd => cd.id === castle.ownerClan);
         const clanName = clanData ? clanData.name : "中立";
         
-        const getCompressedTextHtml = (text, threshold) => {
-            if (!text) return "";
-            if (text.length >= threshold) {
-                let scale = 1.0 - (text.length - (threshold - 1)) * 0.1;
-                if (scale < 0.65) scale = 0.65;
-                return `<span style="font-size: ${scale}em !important; transform: scaleY(${1/scale}); letter-spacing: -0.5px; padding-right: 1px; display: inline-block; transform-origin: left center; line-height: 1;">${text}</span>`;
-            }
-            return text;
-        };
-
         const getCompressedBushoNameHtml = (busho) => {
             if (!busho) return "-";
             if (busho.givenName) {
-                return getCompressedTextHtml(busho.familyName, 3) + getCompressedTextHtml(busho.givenName, 3);
+                return this._getCompressedTextHtml(busho.familyName, 3) + this._getCompressedTextHtml(busho.givenName, 3);
             } else {
-                return getCompressedTextHtml(busho.name.replace('|', ''), 5);
+                return this._getCompressedTextHtml(busho.name.replace('|', ''), 5);
             }
         };
 
-        const compressedClanName = getCompressedTextHtml(clanName, 4);
+        const compressedClanName = this._getCompressedTextHtml(clanName, 4);
         const compressedCastellanName = getCompressedBushoNameHtml(castellan);
         
         let provinceName = "";
@@ -1915,7 +1897,7 @@ class UIManager {
         
         let faceHtml = "";
         if (castellan && castellan.faceIcon) {
-            faceHtml = `<img src="data/images/faceicons/${castellan.faceIcon}" onerror="this.style.display='none'">`;
+            faceHtml = `<img class="sp-castellan-face" src="data/images/faceicons/${castellan.faceIcon}">`;
         }
 
         // ★城にいるアクティブな自軍武将の数を数える魔法です！
@@ -1973,17 +1955,17 @@ class UIManager {
                     <div class="sp-params-grid">
                         <div class="sp-label">石高</div><div class="sp-val">${this.getStatusBarHTML(castle.kokudaka, castle.maxKokudaka, 'blue', isVisible)}</div>
                         <div class="sp-label">訓練</div><div class="sp-val">${this.getStatusBarHTML(castle.training, 100, 'lightblue', isVisible)}</div>
-                        <div class="sp-label">軍馬</div><div class="sp-val-right" style="font-size: 0.85rem;">${mask(castle.horses || 0)}</div>
+                        <div class="sp-label">軍馬</div><div class="sp-val-right sp-val-compact">${mask(castle.horses || 0)}</div>
                         
                         <div class="sp-label">鉱山</div><div class="sp-val">${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</div>
                         <div class="sp-label">士気</div><div class="sp-val">${this.getStatusBarHTML(castle.morale, 100, 'lightblue', isVisible)}</div>
-                        <div class="sp-label">鉄砲</div><div class="sp-val-right" style="font-size: 0.85rem;">${mask(castle.guns || 0)}</div>
+                        <div class="sp-label">鉄砲</div><div class="sp-val-right sp-val-compact">${mask(castle.guns || 0)}</div>
                         
                         <div class="sp-label">民忠</div><div class="sp-val">${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</div>
                         <div class="sp-label">防御</div><div class="sp-val">${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</div>
                         <div class="sp-empty"></div><div class="sp-empty"></div>
                         
-                        <div class="sp-label">人口</div><div class="sp-val-left" style="grid-column: 2 / span 3;">${maskPop(castle.population)}</div>
+                        <div class="sp-label">人口</div><div class="sp-val-left sp-population-value">${maskPop(castle.population)}</div>
                         <div class="sp-label">武将</div><div class="sp-val-right">${maskPop(activeBushoCount)}</div>
                     </div>
                 </div>
@@ -2015,7 +1997,7 @@ class UIManager {
                         <div class="sp-label">防御</div><div class="sp-val">${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</div>
                         <div class="sp-empty"></div><div class="sp-empty"></div>
                         
-                        <div class="sp-label">人口</div><div class="sp-val-left" style="grid-column: 2 / span 3;">${maskPop(castle.population)}</div>
+                        <div class="sp-label">人口</div><div class="sp-val-left sp-population-value">${maskPop(castle.population)}</div>
                         <div class="sp-label">武将</div><div class="sp-val-right">${maskPop(activeBushoCount)}</div>
                     </div>
                 </div>
@@ -2029,6 +2011,11 @@ class UIManager {
 
         if (this.mobileTopLeft) {
             this.mobileTopLeft.innerHTML = content;
+
+            const castellanFace = this.mobileTopLeft.querySelector('.sp-castellan-face');
+            if (castellanFace) {
+                castellanFace.addEventListener('error', () => castellanFace.classList.add('is-broken'), { once: true });
+            }
             
             if (!isPc) {
                 const carousel = this.mobileTopLeft.querySelector('.status-marks-carousel');
@@ -2634,25 +2621,17 @@ class UIManager {
         allCards.forEach(c => c.classList.remove('active-command-turn'));
         
         const isPc = document.body.classList.contains('is-pc');
-        const msgFontSize = isPc ? '' : 'font-size: 60%; line-height: 1.4;';
         
         const msgContainer = document.createElement('div');
         msgContainer.className = 'war-action-message-container';
         
         const textContainer = document.createElement('div');
         textContainer.className = 'war-action-message-text';
-        textContainer.style.cssText = `${msgFontSize}`;
         
         const promptContainer = document.createElement('div');
         promptContainer.className = 'war-action-message-prompt';
         promptContainer.textContent = '▼'; 
         
-        if (isPc) {
-            promptContainer.style.cssText = 'position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); font-size: 1.2rem; color: #eee; cursor: pointer;';
-        } else {
-            promptContainer.style.cssText = 'position: absolute; bottom: 5px; right: 15px; font-size: 0.8rem; color: #eee; cursor: pointer;';
-        }
-
         msgContainer.appendChild(textContainer);
         msgContainer.appendChild(promptContainer);
         this.warControls.appendChild(msgContainer);
@@ -2932,7 +2911,7 @@ class UIManager {
                         if (el.textContent === '---') return;
 
                         if (id === 'war-def-wall-info') {
-                            el.innerHTML = `<span style="color:#fdea60;">${val}</span>`;
+                            el.innerHTML = `<span class="war-highlight-value">${val}</span>`;
                         } else if (id.includes('soldier')) {
                             el.textContent = val + '人';
                         } else {
@@ -3049,30 +3028,14 @@ class UIManager {
             if(el) el.textContent = val; 
         };
 
-        // ★追加：勢力名と武将名を、文字数に応じてキュッと縮める魔法です！
-        const getCompressedTextHtml = (text, threshold, isStrong = false) => {
-            if (!text) return "";
-            if (text.length >= threshold) {
-                const step = isStrong ? 0.15 : 0.1;
-                const minScale = isStrong ? 0.55 : 0.65;
-                let scale = 1.0 - (text.length - (threshold - 1)) * step;
-                if (scale < minScale) scale = minScale;
-                
-                // ★修正：枠が「中央揃え」になっているため、伸びる基準点を「ど真ん中（left center）」に戻しました！
-                // 行の高さ（line-height）も1に固定して、上下のズレを完全に防ぎます。
-                return `<span style="font-size: ${scale}em !important; transform: scaleY(${1/scale}); letter-spacing: -0.5px; padding-right: 1px; display: inline-block; transform-origin: left center; line-height: 1;">${text}</span>`;
-            }
-            return text;
-        };
-
         const getCompressedBushoNameHtml = (busho, isStrong = false) => {
             if (!busho) return "不明";
             if (busho.givenName) {
                 // 姓と名が分かれている場合は、それぞれ3文字以上で縮小します
-                return getCompressedTextHtml(busho.familyName, 3, isStrong) + getCompressedTextHtml(busho.givenName, 3, isStrong);
+                return this._getCompressedTextHtml(busho.familyName, 3, isStrong) + this._getCompressedTextHtml(busho.givenName, 3, isStrong);
             } else {
                 // 分かれていない場合は、5文字以上で縮小します
-                return getCompressedTextHtml(busho.name.replace('|', ''), 5, isStrong);
+                return this._getCompressedTextHtml(busho.name.replace('|', ''), 5, isStrong);
             }
         };
         
@@ -3096,15 +3059,15 @@ class UIManager {
         if (turnEl) turnEl.innerHTML = `残り <span class="turn-number">${Math.max(0, maxRounds - s.round + 1)}</span>ターン`;
         
         const wallEl = document.getElementById('war-def-wall-info');
-        if (wallEl) wallEl.innerHTML = `<span style="color:#fdea60;">${s.defender.defense}</span>`;
+        if (wallEl) wallEl.innerHTML = `<span class="war-highlight-value">${s.defender.defense}</span>`;
 
         const titleNameEl = document.getElementById('war-title-name');
         if (titleNameEl) {
             // ★修正：スマホで長くなった時に単語の途中で改行されないよう、名前と種類のブロックを分けます
             if (s.defender.isKunishu) {
-                titleNameEl.innerHTML = `<span style="display:inline-block;">${s.defender.name}</span> <span style="display:inline-block;">鎮圧戦</span>`;
+                titleNameEl.innerHTML = `<span class="war-title-segment">${s.defender.name}</span> <span class="war-title-segment">鎮圧戦</span>`;
             } else {
-                titleNameEl.innerHTML = `<span style="display:inline-block;">${s.defender.name}</span> <span style="display:inline-block;">攻防戦</span>`;
+                titleNameEl.innerHTML = `<span class="war-title-segment">${s.defender.name}</span> <span class="war-title-segment">攻防戦</span>`;
             }
         }
         
@@ -3122,7 +3085,7 @@ class UIManager {
         
         // ★修正：さっき作った魔法で縮小した文字（HTML）を入れます！
         const atkNameEl = document.getElementById('war-atk-name');
-        if (atkNameEl) atkNameEl.innerHTML = getCompressedTextHtml(atkName, 4);
+        if (atkNameEl) atkNameEl.innerHTML = this._getCompressedTextHtml(atkName, 4);
         
         const atkTitleEl = document.getElementById('war-atk-name').parentElement;
         if (atkName.length >= 8) {
@@ -3157,7 +3120,7 @@ class UIManager {
         
         // ★修正：守備側も魔法で縮小します！
         const defNameEl = document.getElementById('war-def-name');
-        if (defNameEl) defNameEl.innerHTML = getCompressedTextHtml(defNameText, 4);
+        if (defNameEl) defNameEl.innerHTML = this._getCompressedTextHtml(defNameText, 4);
         
         const defTitleEl = document.getElementById('war-def-name').parentElement;
         if (defNameText.length >= 8) {
@@ -3280,7 +3243,7 @@ class UIManager {
 
                 // ここでHTMLに値を流し込みます
                 // ★修正：勢力名も魔法を使って縮小します！
-                orgEl.innerHTML = getCompressedTextHtml(orgName, 4, isMobile);
+                orgEl.innerHTML = this._getCompressedTextHtml(orgName, 4, isMobile);
                 bushoEl.innerHTML = leaderNameHtml;
                 soldierEl.textContent = (reinfData.soldiers || 0) + '人';
                 riceEl.textContent = reinfData.rice || 0;
@@ -3385,7 +3348,7 @@ class UIManager {
         // ★右側の説明を入れる箱（3分の1）
         const descContainer = document.createElement('div');
         descContainer.className = 'war-controls-desc';
-        descContainer.innerHTML = '<div style="color:#aaa; text-align:center; margin-top:15px;">命令を選択してください</div>';
+        descContainer.innerHTML = '<div class="war-command-placeholder">命令を選択してください</div>';
 
         // 2つの箱を画面に追加します
         this.warControls.appendChild(btnContainer);
@@ -3417,9 +3380,9 @@ class UIManager {
                     
                     // 右側の箱に説明を書き出します
                     descContainer.innerHTML = `
-                        <div style="font-weight:bold; font-size:1.1rem; border-bottom:1px solid rgba(212, 175, 55, 0.5); padding-bottom:5px; margin-bottom:5px; color:#ffd54f;">${cmd.label}</div>
+                        <div class="war-command-desc-title">${cmd.label}</div>
                         <div>${cmd.desc}</div>
-                        <div style="margin-top:8px; color:#ff8a80; font-weight:bold; font-size:0.85rem;">もう一度押すと実行します</div>
+                        <div class="war-command-desc-confirm">もう一度押すと実行します</div>
                     `;
 
                     // すべてのボタンの「選択中」の光を消して、今押したボタンだけを光らせます
@@ -3466,15 +3429,13 @@ class UIManager {
 
             candidates.forEach(c => {
                 const div = document.createElement('div');
-                div.className = 'select-item';
-                div.style.display = 'flex';
-                div.style.alignItems = 'center';
+                div.className = 'select-item succession-select-item';
                 
                 const getStat = (stat) => StatPresenter.getDisplayStatHTML(c, stat, gunshi, null, this.game.playerClanId, myDaimyo);
 
                 div.innerHTML = `
-                    <span style="flex:1; font-weight:bold;">${c.name}</span> 
-                    <span style="display:flex; gap:5px; align-items:center;">統:${getStat('leadership')} 政:${getStat('politics')}</span>
+                    <span class="succession-candidate-name">${c.name}</span> 
+                    <span class="succession-candidate-stats">統:${getStat('leadership')} 政:${getStat('politics')}</span>
                 `;
                 div.onclick = () => {
                     this.successionModal.classList.add('hidden');
@@ -3647,15 +3608,11 @@ class UIManager {
         if (!this.warControls) return;
         this.warControls.innerHTML = '';
         
-        const isPc = document.body.classList.contains('is-pc');
-        const msgFontSize = isPc ? '' : 'font-size: 60%; line-height: 1.4;';
-
         const msgContainer = document.createElement('div');
         msgContainer.className = 'war-action-message-container';
         
         const textContainer = document.createElement('div');
         textContainer.className = 'war-action-message-text';
-        textContainer.style.cssText = `${msgFontSize}`;
         textContainer.innerHTML = `<span>${armyName} が作戦を思案中...</span>`;
         
         msgContainer.onclick = (e) => {
@@ -3673,19 +3630,16 @@ class UIManager {
             el = document.createElement('div');
             el.id = 'ai-war-thinking';
             el.innerText = '戦争思考中...';
-            // ★ 文字サイズ（1.5rem）や影の設定を通常の思考中と統一しつつ、チカチカ点滅のアニメーション（blink-loading）を残しています！
-            el.style.cssText = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5500; color: #ffffff; font-size: 1.5rem; font-weight: bold; text-shadow: 2px 2px 4px #000, -2px -2px 4px #000, 2px -2px 4px #000, -2px 2px 4px #000; pointer-events: none; animation: blink-loading 1.5s infinite;";
             const gameScreen = document.getElementById('game-screen');
             if (gameScreen) gameScreen.appendChild(el);
         }
         el.classList.remove('hidden');
-        el.style.display = 'block';
     }
 
     hideAIWarThinking() {
         const el = document.getElementById('ai-war-thinking');
         if (el) {
-            el.style.display = 'none';
+            el.classList.add('hidden');
         }
     }
 }

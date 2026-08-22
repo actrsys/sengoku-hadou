@@ -524,8 +524,6 @@ class UISliderManager {
         const modal = document.getElementById('unit-divide-modal');
         const listEl = document.getElementById('divide-list');
         const confirmBtn = document.getElementById('divide-confirm-btn');
-        const footer = confirmBtn.parentElement;
-        if (footer) footer.style.justifyContent = 'center';
         const stockContainer = document.getElementById('divide-stock-container');
         
         if (!modal || !listEl) return;

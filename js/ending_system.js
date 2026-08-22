@@ -105,7 +105,7 @@ class EndingSystem {
             });
             
             // スタッフロールの最後に余白を作って、文字が画面外に消え切るようにします
-            staffHtml += `<div style="height: 60vh;"></div>`;
+            staffHtml += `<div class="staff-roll-end-spacer"></div>`;
             staffRollContent.innerHTML = staffHtml;
 
             // 下から上へ移動させるアニメーションの設定

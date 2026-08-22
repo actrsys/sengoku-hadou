@@ -250,6 +250,7 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 .sp-info-body { display: flex; padding: 3px 5px; background: transparent; border-bottom: 1px solid rgba(255,255,255,0.2); }
 .sp-face-wrapper { width: 50px; height: 50px; margin-right: 8px; flex-shrink: 0; border: 1.5px solid #fff; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); overflow: hidden; }
 .sp-face-wrapper img { width: 100%; height: 100%; object-fit: cover; }
+.sp-castellan-face.is-broken { display: none; }
 
 /* ★Round 9：会話顔画像専用。GPU合成の癖に依存せず、デコード済み画像を静的に1枚描画します。 */
 .dialog-face-wrapper {
@@ -273,7 +274,9 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 .sp-label { display: flex; align-items: center; color: #ffd54f; font-size: 0.8rem; height: 100%; white-space: nowrap; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .sp-val { display: flex; align-items: center; justify-content: flex-end; height: 100%; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .sp-val-right { display: flex; align-items: center; justify-content: flex-end; font-weight: bold; padding-right: 2px; font-variant-numeric: tabular-nums; height: 100%; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.sp-val-compact { font-size: 0.85rem; }
 .sp-val-left { display: flex; align-items: center; justify-content: flex-start; font-weight: bold; padding-left: 2px; font-variant-numeric: tabular-nums; height: 100%; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.sp-population-value { grid-column: 2 / span 3; }
 .sp-empty {}
 .sp-info-footer { display: flex; justify-content: space-between; gap: 4px; padding: 4px 5px; font-weight: bold; font-size: 0.85rem; }
 .sp-footer-box { flex: 1; display: flex; justify-content: space-between; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.3); color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
@@ -510,6 +513,7 @@ body.showing-daimyo-labels .hover-info { display: none !important; }
 .kunishu-icons-container { position: absolute; bottom: 5px; left: -5px; display: flex; gap: 3px; z-index: 50; pointer-events: auto; }
 .kunishu-icon-wrap { position: relative; width: 18px; height: 18px; cursor: pointer; }
 .kunishu-icon-img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transition: transform 0.2s; }
+.kunishu-icon-img.is-broken { display: none; }
 .kunishu-icon-wrap:hover .kunishu-icon-img { transform: scale(1.2); }
 .kunishu-icon-wrap .kunishu-hover-info { bottom: 150%; left: 50%; right: auto; transform: translate(-50%, 0) scale(0.5) !important; transform-origin: bottom center; z-index: 110; opacity: 0 !important; visibility: hidden !important; }
 .kunishu-icon-wrap:hover .kunishu-hover-info { opacity: 1 !important; visibility: visible !important; transform: translate(-50%, 0) scale(1) !important; }
@@ -629,6 +633,9 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 .result-body { flex: 1; width: 100%; overflow-y: auto; min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; box-sizing: border-box; overscroll-behavior: none; }
 .select-item:last-child { margin-bottom: 0; }
+.select-item.succession-select-item { display: flex; align-items: center; }
+.succession-candidate-name { flex: 1; font-weight: bold; }
+.succession-candidate-stats { display: flex; gap: 5px; align-items: center; }
 
 /* 縦の区切り線（子要素全てに適用） */
 .list-header > *, .select-item > * { 
@@ -961,7 +968,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .bar-bg-friend { background-color: #b71c1c; } .bar-fill-friend { background: linear-gradient(to bottom, #42a5f5, #1565c0); }
 
 .status-bar-container { display: inline-block; vertical-align: middle; width: 60px; height: 14px; background-color: #d17842; border: 1px solid #a69363; position: relative; box-shadow: 0 0 5px rgba(0,0,0,0.8), inset 0 1px 3px rgba(0,0,0,0.6); margin: 0 4px; box-sizing: border-box; }
-.status-bar-fill { height: 100%; }
+.status-bar-fill { height: 100%; width: var(--status-bar-width, 0%); }
 .bar-fill-blue { background: linear-gradient(to bottom, #4a7ab5, #2b4c7e); }
 .bar-fill-lightblue { background: linear-gradient(to bottom, #8db5ca, #5a859e); }
 .bar-fill-maxgreen { background: linear-gradient(to bottom, #4db6ac, #00897b); }
@@ -1182,7 +1189,6 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 }
 
 /* ★スマホ版の文字サイズや幅の微調整 */
-body:not(.is-pc) .saveload-slot-btn { height: 85px; } /* ★スマホ版での高さを固定 */
 body:not(.is-pc) .saveload-slot-number { width: 30px; font-size: 1.2rem; }
 body:not(.is-pc) .saveload-slot-image { width: 80px; }
 body:not(.is-pc) .saveload-slot-content { padding: 4px 8px; }
@@ -1209,7 +1215,7 @@ body:not(.is-pc) .saveload-slot-time {
 /* =========================================================
    各種モーダル・オーバーレイ・ガード
    ========================================================= */
-.modal { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 6000; display: flex; justify-content: center; align-items: center; opacity: 1; padding: env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 60px) env(safe-area-inset-left); box-sizing: border-box; }
+.modal { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 6000; display: flex; flex-direction: column; justify-content: center; align-items: center; opacity: 1; padding: env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 60px) env(safe-area-inset-left); box-sizing: border-box; }
 .modal.hidden { opacity: 0; pointer-events: none; display: none !important;}
 
 /* モーダル（小窓）の重なり順（z-index）の統一リスト（根本解決版） */
@@ -1576,6 +1582,7 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 }
 
 #quantity-modal h3, #trade-type-info, #charity-type-selector, #quantity-modal .modal-footer { flex-shrink: 0; }
+#charity-type-selector { margin-bottom: 10px; }
 #quantity-container { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; padding-right: 5px; padding-bottom: 2px; margin-bottom: 10px; }
 /* 部隊編成画面のモーダルとフレックスボックス設定 */
 /* =========================================================
@@ -1586,11 +1593,13 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 }
 
 /* ヘッダー・在庫状況・フッターは縮まないように固定 */
+#divide-confirm-btn:disabled { opacity: 0.5; }
 #unit-divide-modal h3, 
 #unit-divide-modal #divide-stock-container, 
 #unit-divide-modal .modal-footer { 
-    flex-shrink: 0; 
+    flex-shrink: 0;
 }
+#unit-divide-modal .modal-footer { justify-content: center; }
 
 /* スライダーリスト本体：背景・枠線・余白・スクロール設定をここに集約 */
 #divide-list { 
@@ -1627,6 +1636,9 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 
 /* ガード・カットイン */
 #ai-guard { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: transparent; z-index: 4900; display: flex; justify-content: center; align-items: center; color: white; font-size: 1.5rem; font-weight: bold; flex-direction: column; pointer-events: auto; text-shadow: 2px 2px 4px #000, -2px -2px 4px #000, 2px -2px 4px #000, -2px 2px 4px #000; }
+.ai-progress-number { display: inline-block; width: 1.8em; font-family: Arial, sans-serif; font-variant-numeric: tabular-nums; }
+.ai-progress-number.is-current { text-align: right; }
+.ai-progress-number.is-total { text-align: left; }
 
 /* ★追加：バリアは残したまま、中の文字とスピナーだけを見えなくする透明マントの魔法！ */
 #ai-guard.hide-text {
@@ -2216,6 +2228,7 @@ body:not(.is-pc) .info-detail-stat-label.is-long-label {
     display: inline-block;
     transform-origin: left center;
 }
+.ui-compressed-text { line-height: 1; }
 .hidden-selection-input { display: none; }
 .allot-fief-status {
     color: #ccc;
@@ -2678,6 +2691,8 @@ body:not(.is-pc) .busho-skill-desc-body { font-size: 0.62rem; }
     display: inline-flex;
     align-items: center;
 }
+#war-weather-info { margin-left: 15px; }
+.label-sp { display: none; }
 
 /* ターン数の数字だけ特別扱いする設定 */
 .turn-number {
@@ -2730,6 +2745,8 @@ body:not(.is-pc) .busho-skill-desc-body { font-size: 0.62rem; }
     color: #fff;
     letter-spacing: 2px;
 }
+.war-highlight-value { color: #fdea60; }
+.war-title-segment { display: inline-block; }
 
 .responsive-war-layout { display: flex; flex-direction: column; width: 100%; }
 .responsive-war-left { display: flex; flex-direction: column; flex: 1; overflow: hidden; border-right: none !important; }
@@ -2775,6 +2792,9 @@ body:not(.is-pc) .busho-skill-desc-body { font-size: 0.62rem; }
 .war-controls-area { display: flex !important; width: 100%; gap: 10px; flex-shrink: 0; height: auto; min-height: 100px; box-sizing: border-box; padding: 10px; background: transparent; border-top: none; }
 .war-controls-buttons { flex: 2; display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: max-content; gap: 5px; height: auto; box-sizing: border-box; }
 .war-controls-desc { flex: 3; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 8px; padding: 8px 15px; font-size: 0.95rem; color: #fff; text-shadow: 1px 1px 1px #000; text-align: left; overflow-y: auto; height: 100%; box-sizing: border-box; }
+.war-command-placeholder { color: #aaa; text-align: center; margin-top: 15px; }
+.war-command-desc-title { font-weight: bold; font-size: 1.1rem; border-bottom: 1px solid rgba(212, 175, 55, 0.5); padding-bottom: 5px; margin-bottom: 5px; color: #ffd54f; }
+.war-command-desc-confirm { margin-top: 8px; color: #ff8a80; font-weight: bold; font-size: 0.85rem; }
 /* ★攻城戦のコマンドボタンを重厚な「いくさ」仕様にチューン */
 .war-controls-buttons .cmd-btn { 
     width: 100%; 
@@ -2809,6 +2829,10 @@ body:not(.is-pc) .busho-skill-desc-body { font-size: 0.62rem; }
 }
 
 #war-ai-guard { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 1.5rem; font-weight: bold; z-index: 10; }
+.war-controls-shell { position: relative; flex-shrink: 0; }
+.war-ai-spinner { margin-bottom: 10px; }
+
+.war-critical-message { color: #d32f2f; font-size: 1.2rem; font-weight: bold; }
 
 /* 攻城戦アクションメッセージ */
 .war-action-message-container {
@@ -2841,11 +2865,18 @@ body:not(.is-pc) .busho-skill-desc-body { font-size: 0.62rem; }
     width: 100%;
 }
 .war-action-message-prompt {
-    font-size: 0.95rem;
-    color: #ffeb3b;
+    position: absolute;
+    bottom: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.2rem;
+    color: #eee;
+    cursor: pointer;
     animation: fw-blink 1.5s infinite;
     font-weight: bold;
 }
+body:not(.is-pc) .war-action-message-text { font-size: 60%; line-height: 1.4; }
+body:not(.is-pc) .war-action-message-prompt { left: auto; right: 15px; transform: none; font-size: 0.8rem; }
 
 /* アクティブ部隊ハイライト */
 @keyframes active-army-glow {
@@ -2904,6 +2935,7 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
 .fw-status-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 0.85rem; }
 .fw-status-row { display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 2px 6px; align-items: center; }
 .fw-status-label { color: #ffd54f; font-weight: normal; }
+.fw-status-label-spaced { margin-left: 10px; }
 .fw-status-value { font-weight: bold; }
 
 .fw-tabs { display: flex; gap: 2px; flex-wrap: wrap; pointer-events: auto; }
@@ -2914,9 +2946,9 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
 .fw-tab.defender.active { background: rgba(66, 165, 245, 0.6); }
 
 /* ★修正: 部隊情報 (fw-unit-info) の和風・縦並びスタイル */
-.fw-floating-unit { position: absolute; background: rgba(0, 0, 0, 0.85); border: 2px solid #d4af37; padding: 10px; border-radius: 6px; z-index: 100; pointer-events: none; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.7); white-space: nowrap; color: #fff; text-shadow: 1px 1px 1px #000; min-width: 180px; }
+.fw-floating-unit { position: absolute; background: rgba(0, 0, 0, 0.85); border: 2px solid var(--unit-color, #d4af37); padding: 10px; border-radius: 6px; z-index: 100; pointer-events: none; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.7); white-space: nowrap; color: #fff; text-shadow: 1px 1px 1px #000; min-width: 180px; }
 .fw-unit-header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid rgba(212, 175, 55, 0.5); padding-bottom: 4px; gap: 15px; }
-.fw-unit-name { font-size: 1.1rem; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.fw-unit-name { font-size: 1.1rem; font-weight: bold; color: var(--unit-color, #fff); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .fw-unit-type { font-size: 0.8rem; color: #ccc; }
 .fw-unit-stats { display: flex; flex-direction: column; gap: 4px; }
 .fw-unit-row { display: flex; justify-content: space-between; align-items: center; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 2px 6px; font-size: 0.9rem; }
@@ -2928,7 +2960,7 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
 .fw-controls { height: 10vh; min-height: 50px; background: #000; display: flex; justify-content: flex-end; align-items: center; padding: 0 20px; flex-shrink: 0; border-top: 2px solid #111; }
 .fw-menu-group { display: flex; gap: 15px; height: 100%; align-items: center; }
 .fw-menu-group button { height: 60%; min-height: 30px; min-width: 100px; font-size: 1.1rem; border-radius: 8px; font-weight: bold; display: flex; justify-content: center; align-items: center; padding: 0; margin: 0; line-height: 1; }
-#fw-map { background-color: transparent; overflow: hidden; }
+#fw-map { position: relative; margin: 0; background-color: transparent; overflow: hidden; transition: transform 0.3s; }
 
 /* ★修正: スクロール時のカクつき（重さ）を解消するため、描画の仕組み（GPU）を整えました */
 .fw-hex { width: 30px; height: 26px; background-color: #aed581; clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); position: absolute; box-sizing: border-box; display: flex; justify-content: center; align-items: center; color: rgba(0,0,0,0.3); font-size: 8px; font-weight: bold; transition: background-color 0.2s, filter 0.2s; user-select: none; transform: scale(1.02) translateZ(0); backface-visibility: hidden; will-change: filter; }
@@ -3431,6 +3463,21 @@ body.is-pc {
     text-shadow: 2px 2px 4px #000, -2px -2px 4px #000, 2px -2px 4px #000, -2px 2px 4px #000;
     animation: blink-loading 1.5s infinite;
 }
+
+#ai-war-thinking {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 5500;
+    color: #ffffff;
+    font-size: 1.5rem;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px #000, -2px -2px 4px #000, 2px -2px 4px #000, -2px 2px 4px #000;
+    pointer-events: none;
+    animation: blink-loading 1.5s infinite;
+}
+#ai-war-thinking.hidden { display: none; }
 
 @keyframes blink-loading {
     0% { opacity: 0.3; }
@@ -3977,6 +4024,7 @@ body.background-paused #map-container {
     text-align: center;
     width: 100%;
 }
+.staff-roll-end-spacer { height: 60vh; }
 
 .staff-role {
     font-size: 1.2rem;
@@ -4752,6 +4800,7 @@ body.is-pc .pc-cmd-col .cmd-btn.category.active {
 #saveload-modal .modal-footer {
     flex: 0 0 auto;
 }
+#saveload-tabs { margin-bottom: 10px; }
 
 #saveload-modal .scroll-wrapper {
     flex: 1 1 auto !important;
@@ -4808,6 +4857,8 @@ body:not(.is-pc) .saveload-slot-time {
     box-sizing: border-box;
 }
 
+.saveload-latest-mark { color: #ff8a80; font-weight: bold; text-shadow: 1px 1px 0 #000; }
+
 body:not(.is-pc) .saveload-time-text,
 body:not(.is-pc) .saveload-latest-mark {
     white-space: nowrap;
@@ -4827,4 +4878,25 @@ body:not(.is-pc) .saveload-latest-mark {
     justify-content: center;
     gap: 10px;
 }
+
+
+#watch-return-reserved-notice {
+    position: fixed;
+    left: 50%;
+    bottom: max(18px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    z-index: 12000;
+    pointer-events: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.65);
+    background: rgba(0,0,0,0.78);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-align: center;
+    white-space: pre-line;
+    text-shadow: 1px 1px 2px #000;
+}
+body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
 

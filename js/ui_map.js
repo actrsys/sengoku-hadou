@@ -1146,7 +1146,7 @@ Object.assign(UIManager.prototype, {
                         // 諸勢力の数だけ、アイコンと吹き出しを追加します！
                         kunishuHtml += `
                             <div class="kunishu-icon-wrap">
-                                <img src="data/images/map/various_forces.webp" class="kunishu-icon-img" onerror="this.style.display='none'">
+                                <img src="data/images/map/various_forces.webp" class="kunishu-icon-img">
                                 <div class="hover-info kunishu-hover-info">
                                     <div class="info-line">${kName}</div>
                                     <div class="info-line">${kLeaderName}</div>
@@ -1165,7 +1165,7 @@ Object.assign(UIManager.prototype, {
                     const kanjiNumbers = ["", "一", "二", "三", "四", "五", "六", "七", "八"];
                     const kanjiLegionId = kanjiNumbers[c.legionId] || c.legionId;
                     // 最初は隠しておきます。後で updateCastleGlows() が必要な勢力だけを表示します
-                    legionMarkerHtml = `<div class="legion-marker-base legion-color-${c.legionId}" style="display: none;">${kanjiLegionId}</div>`;
+                    legionMarkerHtml = `<div class="legion-marker-base legion-color-${c.legionId} hidden">${kanjiLegionId}</div>`;
                 }
 
                 // 城の吹き出しと、諸勢力のアイコン、そして軍団マーカーを合体させます！
@@ -1178,6 +1178,9 @@ Object.assign(UIManager.prototype, {
                     ${kunishuHtml}
                     ${legionMarkerHtml}
                 `;
+                el.querySelectorAll('.kunishu-icon-img').forEach(img => {
+                    img.addEventListener('error', () => img.classList.add('is-broken'), { once: true });
+                });
             }
             
             if (isDaimyoSelect) {
@@ -1528,7 +1531,7 @@ Object.assign(UIManager.prototype, {
                 }
                 // 大名選択時は軍団マーカーを消します
                 const marker = card.querySelector('.legion-marker-base');
-                if (marker) marker.style.display = 'none';
+                if (marker) marker.classList.add('hidden');
             });
             return;
         }
@@ -1549,9 +1552,9 @@ Object.assign(UIManager.prototype, {
             const marker = card.querySelector('.legion-marker-base');
             if (marker) {
                 if (clanId === baseClanId && clanId !== 0) {
-                    marker.style.display = 'flex';
+                    marker.classList.remove('hidden');
                 } else {
-                    marker.style.display = 'none';
+                    marker.classList.add('hidden');
                 }
             }
             

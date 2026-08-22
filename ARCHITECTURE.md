@@ -92,6 +92,9 @@
 - `js/ui_map.js` — 地図UI。
 - `js/ui_settings.js` — 設定UI。
 - `css/style.css` — 静的な見た目の正本。JS側は状態値のみCSS変数等で渡す。
+- `index.html` — DOM構造の正本。静的な見た目をinline styleで持たず、固定イベントもinline属性に書かない。
+- 自作JSがHTMLを生成する場合、`style` 属性はゲージ幅・文字縮尺など実行時のCSS変数（`--xxx`）だけを許可する。静的レイアウトはCSSクラスへ置く。
+- 画像エラーやクリック等のイベントは `onclick` / `onerror` 属性ではなく、生成後のイベント登録または既存のイベントデリゲーションを使う。
 
 `selector_modal_view.js` は小さいものの、複数情報画面の初期化漏れを防ぐ共通Viewなので独立を維持します。
 
