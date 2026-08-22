@@ -390,6 +390,18 @@ test('武将詳細の能力ゲージを固定80pxへ戻さない', () => {
     assert.ok(/\.bar-bg-busho\s*\{[^}]*overflow\s*:\s*visible\s*;/s.test(css), '100の通常枠から限界突破バーを外へ描画できません');
 });
 
+test('ビジュアル回帰テストの土台が配置されている', () => {
+    for (const file of ['tests/run_visual_tests.js', 'tests/visual/busho_gauge.html', 'run_visual_tests.bat']) {
+        assert.ok(fs.existsSync(path.join(ROOT, file)), `${file} がありません`);
+    }
+    const runner = read('tests/run_visual_tests.js');
+    const fixture = read('tests/visual/busho_gauge.html');
+    assert.ok(runner.includes('Emulation.setDeviceMetricsOverride'));
+    assert.ok(runner.includes("[80, 100, 110, 120]"));
+    assert.ok(fixture.includes('busho-stat-bar-wrapper'));
+    assert.ok(fixture.includes('over-connected'));
+});
+
 // ---------------------------------------------------------------------------
 // 最低限の構造チェック
 // ---------------------------------------------------------------------------
