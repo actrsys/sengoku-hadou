@@ -41,6 +41,14 @@
 - `js/map_graph.js` — 隣接・到達可能性・海路など地図接続。
 - `js/map_generator.js` — 地図描画用データ生成。
 
+### 重要状態の書き換えルール
+
+- 実行中の `busho.clan` / `busho.castleId` は `AffiliationSystem` だけが直接書き換える。通常は `joinClan` / `becomeRonin` / `moveCastle` を使う。
+- 独立・歴史イベントなど、周辺の名簿や役職処理を呼び出し側が既に管理している特殊処理だけ `setClanIdRaw` / `setCastleIdRaw` を使う。
+- 実行中の `castle.ownerClan` は `CastleManager` だけが直接書き換える。通常は `changeOwner`、副作用を起こしたくない特殊ロールバックだけ `setOwnerIdRaw` を使う。
+- `models.js` と `data_manager.js` のデータ生成・初期読込は上記ルールの例外。
+- `status` は武将・姫・軍団・AI作戦で意味が異なるため、単一の汎用Setterにはまとめない。型ごとの責務を確認して段階的に整理する。
+
 ## 戦争
 
 - `js/war.js` — WarManagerの主要な入口。
@@ -87,11 +95,12 @@
 
 ## 今後の優先整理対象
 
-1. JS内の静的inline style / inline eventをCSSクラス＋イベント登録へ移す。
+1. 所属・城所有者の書き換え境界を維持し、次に武将status等を型ごとに整理する。
 2. `models.js` から `window.GameApp` への直接依存を減らす。
-3. 所属・城主・城所有者など重要状態の書き換え窓口を完全一元化する。
-4. `TurnManager` 内の月次計算を、必要な単位で既存Rules/Systemへ寄せる（小ファイル乱立は避ける）。
-5. `command_system.js`、`war_effort.js`、`field_war.js`、`diplomacy.js`、`ai.js` の巨大責務を整理する。
+3. 定数・状態判定の残りを専門Rulesへ寄せる。
+4. UI分離の残件と重複CSSを、ビジュアル回帰テストを通しながら整理する。
+5. `TurnManager` 内の月次計算を、必要な単位で既存Rules/Systemへ寄せる（小ファイル乱立は避ける）。
+6. `command_system.js`、`war_effort.js`、`field_war.js`、`diplomacy.js`、`ai.js` の巨大責務を整理する。
 
 ## 小さいファイルを統合しない判断
 

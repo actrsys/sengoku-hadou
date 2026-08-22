@@ -10,6 +10,25 @@ class AffiliationSystem {
     }
 
     /**
+     * 低レベル所属書換API。特殊イベントや独立処理など、周辺処理を呼び出し側が
+     * すでに管理している場合だけ使用します。通常は joinClan / becomeRonin を使用してください。
+     * busho.clan の直接代入はこのクラス以外では行いません。
+     */
+    setClanIdRaw(busho, newClanId) {
+        if (!busho) return;
+        busho.clan = Number(newClanId) || 0;
+    }
+
+    /**
+     * 低レベル配置書換API。城内名簿の同期まで必要な通常移動では moveCastle を使用してください。
+     * busho.castleId の直接代入はこのクラス以外では行いません。
+     */
+    setCastleIdRaw(busho, newCastleId) {
+        if (!busho) return;
+        busho.castleId = Number(newCastleId) || 0;
+    }
+
+    /**
      * ① 浪人から仕官したり、敵から寝返ったりして「新しい大名家」に入る時の魔法
      * @param {object} busho - お引越しする武将
      * @param {number} newClanId - 新しい大名家のID
@@ -33,7 +52,7 @@ class AffiliationSystem {
         this.resetFactionData(busho);
 
         // 4. 新しい大名家の所属にします
-        busho.clan = newClanId;
+        this.setClanIdRaw(busho, newClanId);
         
         // ★修正：死亡や未登場の武将は状態を強制的に変えないようにします
         if (busho.status !== 'dead' && busho.status !== 'unborn') {
@@ -106,7 +125,7 @@ class AffiliationSystem {
     becomeRonin(busho, reason = 'desertion') {
         // ★ここから追加：最強の関所！自動で作られた頭領は浪人になれず、ここで消滅します！
         if (busho.isAutoLeader) {
-            busho.clan = 0;
+            this.setClanIdRaw(busho, 0);
             busho.status = 'dead'; // 浪人ではなく、死亡（消滅）扱いにします
             busho.isCastellan = false;
             busho.isDaimyo = false;
@@ -155,7 +174,7 @@ class AffiliationSystem {
         this.resetFactionData(busho);
 
         // 3. 浪人になるので、肩書きを外します
-        busho.clan = 0;
+        this.setClanIdRaw(busho, 0);
         
         // ★修正：死亡や未登場の武将は状態を強制的に変えないようにします
         if (busho.status !== 'dead' && busho.status !== 'unborn') {
@@ -277,7 +296,7 @@ class AffiliationSystem {
         busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
         this.resetFactionData(busho);
         
-        busho.clan = 0;
+        this.setClanIdRaw(busho, 0);
         busho.status = 'active';
         busho.isCastellan = false;
         busho.isDaimyo = false;
@@ -363,7 +382,7 @@ class AffiliationSystem {
     // ★追加：旧家臣が生存スキルの諸勢力に合流する処理
     _joinSurvivalKunishu(busho, kunishu) {
         this.resetFactionData(busho);
-        busho.clan = 0;
+        this.setClanIdRaw(busho, 0);
         
         // ★修正：死亡や未登場の武将は状態を強制的に変えないようにします
         if (busho.status !== 'dead' && busho.status !== 'unborn') {
@@ -430,42 +449,7 @@ class AffiliationSystem {
         this.updateUI();
     }
 
-    /**
-     * ④ お城の「所属（持ち主の大名家）」が変わる時の魔法
-     * 引き抜きや独立などで使います！（※戦争での落城時は castle_manager.js を使用します）
-     * @param {object} castle - 所属が変わるお城
-     * @param {number} newClanId - 新しい大名家のID
-     */
-    changeCastleOwner(castle, newClanId) {
-        if (!castle) return;
-        
-        // ★修正：お城の持ち主が変わった時、もし逃げ遅れた「国主」がいたら、専門のシステムに解散をお願いします！
-        if (this.game && this.game.bushos && this.game.legions && this.game.castleManager) {
-            // その城にいる活動中の武将を探します
-            const bushosInCastle = this.game.bushos.filter(b => Number(b.castleId) === Number(castle.id) && b.status === 'active');
-            
-            bushosInCastle.forEach(b => {
-                if (b.isCommander) {
-                    const myLegion = this.game.legions.find(l => Number(l.commanderId) === Number(b.id));
-                    if (myLegion) {
-                        // 専門のシステムに解散をお任せします！
-                        this.game.castleManager.disbandLegion(myLegion.id);
-                    }
-                }
-            });
-        }
-
-        // ★ここを追加：持ち主が変わったお城自身も、自動的に直轄（軍団ID：0）に戻ります！
-        castle.legionId = 0;
-
-        // お城の持ち主のデータを書き換えます
-        castle.ownerClan = newClanId;
-        // ★高速化：持ち城索引（getClanCastles）を作り直してもらうための合図です
-        this.game.castleOwnershipVersion = (this.game.castleOwnershipVersion || 0) + 1;
-
-        // 所有者変更は領土色そのものが変わるため、観戦中もここだけは即時反映します。
-        this.updateUI(true);
-    }
+    // 城の所有者変更は CastleManager.changeOwner() に一元化しました。
 
     /**
      * （共通の道具）お城から出る時の処理
@@ -491,7 +475,7 @@ class AffiliationSystem {
      * （共通の道具）お城に入る時の処理
      */
     enterCastle(busho, newCastleId) {
-        busho.castleId = newCastleId;
+        this.setCastleIdRaw(busho, newCastleId);
         const newCastle = this.game.getCastle(newCastleId);
         if (newCastle) {
             // ★修正：死亡や未登場の武将はお城のリストには入れないようにします

@@ -644,7 +644,7 @@ class StrategySystem {
             
             if (target.isCastellan && oldCastle) {
                 this.game.castleManager.changeOwner(oldCastle, newClanId);
-                target.clan = newClanId;
+                this.game.affiliationSystem.setClanIdRaw(target, newClanId);
                 target.isActionDone = true;
                 target.status = 'active';
                 target.isGunshi = false;

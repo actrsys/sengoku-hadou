@@ -578,8 +578,8 @@ class KunishuSystem {
                 isExternalSuccessor = true;
                 successor.status = 'active';
                 successor.belongKunishuId = kunishu.id;
-                successor.castleId = kunishu.castleId;
-                successor.clan = 0; 
+                this.game.affiliationSystem.setCastleIdRaw(successor, kunishu.castleId);
+                this.game.affiliationSystem.setClanIdRaw(successor, 0); 
                 successor.loyalty = 100;
                 
                 const castle = this.game.getCastle(kunishu.castleId);

@@ -7,15 +7,24 @@ class CastleManager {
         this.game = game;
     }
 
+    /**
+     * 低レベル所有者書換API。通常の落城・譲渡は changeOwner() を使用してください。
+     * 特殊なロールバックなど、changeOwner() の副作用を発生させたくない場合だけ使用します。
+     * ownerClan の直接代入はこのクラス以外では行いません。
+     */
+    setOwnerIdRaw(castle, newOwnerId) {
+        if (!castle) return;
+        castle.ownerClan = Number(newOwnerId) || 0;
+        this.game.castleOwnershipVersion = (this.game.castleOwnershipVersion || 0) + 1;
+    }
+
     // 城の持ち主を変更する魔法です。isEventがtrueの時は、イベントによる平和的な変更として扱います。
     changeOwner(castle, newOwnerId, isEvent = false, newLegionId = 0) {
         const oldOwnerId = Number(castle.ownerClan);
         const oldLegionId = Number(castle.legionId || 0);
 
-        castle.ownerClan = Number(newOwnerId);
+        this.setOwnerIdRaw(castle, newOwnerId);
         castle.legionId = Number(newLegionId); // 攻撃側の軍団IDになる
-        // ★高速化：持ち城索引（getClanCastles）を作り直してもらうための合図です
-        this.game.castleOwnershipVersion = (this.game.castleOwnershipVersion || 0) + 1;
 
         // 石山城と尾山城のこっそり改名イベント
         if (castle.id === 33 || castle.id === 74) {

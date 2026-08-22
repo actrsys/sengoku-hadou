@@ -384,8 +384,8 @@ class LifeSystem {
 
                         const targetRelative = activeRelatives[0];
                         b.status = 'active';
-                        b.clan = targetRelative.clan;
-                        b.castleId = targetRelative.castleId;
+                        this.game.affiliationSystem.setClanIdRaw(b, targetRelative.clan);
+                        this.game.affiliationSystem.setCastleIdRaw(b, targetRelative.castleId);
 
                         const targetCastle = this.game.getCastle(b.castleId);
                         if (targetCastle) {
@@ -402,7 +402,7 @@ class LifeSystem {
                     } else {
                         // 一門がいない場合：浪人として登場
                         b.status = 'ronin';
-                        b.clan = 0;
+                        this.game.affiliationSystem.setClanIdRaw(b, 0);
                         b.loyalty = 50;
                         const targetCastle = this.game.getCastle(b.castleId);
                         if (targetCastle) {
@@ -444,8 +444,8 @@ class LifeSystem {
                     });
 
                     // 並び替えて1番上に来た武将のお城に移動して、所属する大名家も合わせます
-                    b.castleId = activeRelatives[0].castleId;
-                    b.clan = activeRelatives[0].clan;
+                    this.game.affiliationSystem.setCastleIdRaw(b, activeRelatives[0].castleId);
+                    this.game.affiliationSystem.setClanIdRaw(b, activeRelatives[0].clan);
                 }
 
                 const targetCastle = this.game.getCastle(b.castleId);
@@ -457,10 +457,10 @@ class LifeSystem {
                         if (ownerClanId === 0) {
                             // 城が空き城なら、仕方なく浪人になります
                             b.status = 'ronin';
-                            b.clan = 0;
+                            this.game.affiliationSystem.setClanIdRaw(b, 0);
                             b.loyalty = 50; // ★浪人になったので忠誠度を50にします！
                         } else {
-                            b.clan = ownerClanId;
+                            this.game.affiliationSystem.setClanIdRaw(b, ownerClanId);
                         }
                     }
 
@@ -482,7 +482,7 @@ class LifeSystem {
                 } else {
                     // 万が一城が見つからなかった時の安全策
                     b.status = 'ronin';
-                    b.clan = 0;
+                    this.game.affiliationSystem.setClanIdRaw(b, 0);
                     b.loyalty = 50; // ★浪人になったので忠誠度を50にします！
                 }
             }
@@ -968,8 +968,8 @@ class LifeSystem {
             busho.isGunshi = false;
         }
         
-        busho.clan = 0;
-        busho.castleId = 0;
+        this.game.affiliationSystem.setClanIdRaw(busho, 0);
+        this.game.affiliationSystem.setCastleIdRaw(busho, 0);
         busho.belongKunishuId = 0;
 
         // ★高速化：通常の単発死亡なら、その武将がいた勢力だけ再編します。
@@ -1263,8 +1263,8 @@ class LifeSystem {
                 }
 
                 successor.status = 'active';
-                successor.clan = commander.clan;
-                successor.castleId = baseCastle.id;
+                this.game.affiliationSystem.setClanIdRaw(successor, commander.clan);
+                this.game.affiliationSystem.setCastleIdRaw(successor, baseCastle.id);
                 successor.loyalty = 100;
                 if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
             }
@@ -1471,8 +1471,8 @@ class LifeSystem {
                 this.game.affiliationSystem.leaveCastle(successor);
             }
             successor.status = 'active';
-            successor.clan = oldDaimyo.clan;
-            successor.castleId = baseCastle.id;
+            this.game.affiliationSystem.setClanIdRaw(successor, oldDaimyo.clan);
+            this.game.affiliationSystem.setCastleIdRaw(successor, baseCastle.id);
             successor.loyalty = 100;
             if (!baseCastle.samuraiIds.includes(successor.id)) {
                 baseCastle.samuraiIds.push(successor.id);
@@ -2044,8 +2044,8 @@ class LifeSystem {
                     child.isCastellan = false;
                     child.isCommander = false;
                     child.isGunshi = false;
-                    child.clan = 0;
-                    child.castleId = 0;
+                    this.game.affiliationSystem.setClanIdRaw(child, 0);
+                    this.game.affiliationSystem.setCastleIdRaw(child, 0);
                     child.belongKunishuId = 0;
                 } else {
                     child.currentClanId = 0;

@@ -168,24 +168,7 @@ window.EventAction = {
     moveBusho: function(game, busho, targetCastleId) {
         if (!busho || busho.castleId === targetCastleId) return;
         
-        if (game.affiliationSystem) {
-            game.affiliationSystem.moveCastle(busho, targetCastleId);
-        } else {
-            // システムがない場合の予備の手動お引越し
-            const oldCastle = game.getCastle(busho.castleId);
-            if (oldCastle) {
-                oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== busho.id);
-                if (oldCastle.castellanId === busho.id) {
-                    oldCastle.castellanId = 0;
-                    busho.isCastellan = false;
-                }
-            }
-            busho.castleId = targetCastleId;
-            const targetCastle = game.getCastle(targetCastleId);
-            if (targetCastle && !targetCastle.samuraiIds.includes(busho.id)) {
-                targetCastle.samuraiIds.push(busho.id);
-            }
-        }
+        game.affiliationSystem.moveCastle(busho, targetCastleId);
     },
 
     // ③ 武将を新しい城主に任命して、お城の看板も書き換えます（新魔法）
@@ -243,12 +226,7 @@ window.EventAction = {
         // ② 吸収される側のお城をすべて吸収する大名家にプレゼントして、直轄（0）にします
         const myCastles = game.getClanCastles(subordinateClanId);
         myCastles.forEach(c => {
-            if (game.castleManager && game.castleManager.changeOwner) {
-                game.castleManager.changeOwner(c, dominantClanId, true, 0); // trueで平和的に引き渡し
-            } else {
-                c.ownerClan = dominantClanId;
-            }
-            c.legionId = 0; // 直轄に戻す
+            game.castleManager.changeOwner(c, dominantClanId, true, 0); // trueで平和的に引き渡し
         });
 
         // ③ 吸収される側の武将（除外ID以外）を吸収する大名家に入れます
@@ -262,7 +240,7 @@ window.EventAction = {
                 b.isDaimyo = false;
                 b.isCommander = false;
                 b.isGunshi = false;
-                b.clan = dominantClanId;
+                game.affiliationSystem.setClanIdRaw(b, dominantClanId);
                 if (game.affiliationSystem && game.affiliationSystem.updateLoyaltyForNewLord) {
                     game.affiliationSystem.updateLoyaltyForNewLord(b, dominantClanId);
                 }
@@ -367,11 +345,7 @@ window.GameEvents.push({
                         if (otherCastles.length > 0) {
                             // 別のお城があるなら、その中の一つへ国主をお引越しさせます
                             const newCastle = otherCastles[0];
-                            if (game.affiliationSystem) {
-                                game.affiliationSystem.moveCastle(commander, newCastle.id);
-                            } else {
-                                commander.castleId = newCastle.id;
-                            }
+                            game.affiliationSystem.moveCastle(commander, newCastle.id);
                             
                             // 前の城主バッジを外して、新しいお城の城主に任命し直します
                             commander.isCastellan = true;
@@ -2085,11 +2059,7 @@ window.GameEvents.push({
         // ① まず、足利家の城をすべて三好家のものにします
         const ashikagaCastles = game.getClanCastles(ashikagaClanId);
         ashikagaCastles.forEach(castle => {
-            if (game.castleManager) {
-                game.castleManager.changeOwner(castle, miyoshiClanId, true);
-            } else {
-                castle.ownerClan = miyoshiClanId;
-            }
+            game.castleManager.changeOwner(castle, miyoshiClanId, true);
             castle.castellanId = 0;
         });
 
@@ -2108,15 +2078,7 @@ window.GameEvents.push({
         // ③ 武将を浪人にする
         const ashikagaBushos = game.bushos.filter(b => b.clan === ashikagaClanId && b.status === 'active');
         ashikagaBushos.forEach(b => {
-            if (game.affiliationSystem) {
-                game.affiliationSystem.becomeRonin(b);
-            } else {
-                b.status = 'ronin';
-                b.clan = 0;
-                b.isCastellan = false;
-                b.isGunshi = false;
-                b.loyalty = 50;
-            }
+            game.affiliationSystem.becomeRonin(b);
         });
 
         // ④ 滅亡処理のフラグ
@@ -2262,15 +2224,8 @@ window.GameEvents.push({
         }
 
         targetBushos.forEach(b => {
-            if (game.affiliationSystem) {
-                // 第4引数: 100(忠誠固定), 第5引数: true(功績維持)
-                game.affiliationSystem.joinClan(b, asakuraClanId, targetCastleId, 100, true);
-            } else {
-                b.clan = asakuraClanId;
-                b.castleId = targetCastleId;
-                b.status = 'active';
-                b.loyalty = 100;
-            }
+            // 第4引数: 100(忠誠固定), 第5引数: true(功績維持)
+            game.affiliationSystem.joinClan(b, asakuraClanId, targetCastleId, 100, true);
         });
 
         // 覚慶と細川藤孝、和田惟政の忠誠度が１００になる。
@@ -2624,14 +2579,7 @@ window.GameEvents.push({
 
         // 移籍実行（功績を半減させないルートを通る）
         targetBushos.forEach(b => {
-            if (game.affiliationSystem) {
-                game.affiliationSystem.joinClan(b, nobunagaClanId, targetCastleId, 100, true);
-            } else {
-                b.clan = nobunagaClanId;
-                b.castleId = targetCastleId;
-                b.status = 'active';
-                b.loyalty = 100;
-            }
+            game.affiliationSystem.joinClan(b, nobunagaClanId, targetCastleId, 100, true);
         });
 
         // 足利義昭、細川藤孝、和田惟政、明智光秀とその家臣の忠誠度が１００になる。
@@ -2792,11 +2740,7 @@ window.GameEvents.push({
         }
 
         // 3. 将軍候補を二条城（26）へお引越しさせます
-        if (game.affiliationSystem) {
-            game.affiliationSystem.moveCastle(candidate, 26);
-        } else {
-            candidate.castleId = 26;
-        }
+        game.affiliationSystem.moveCastle(candidate, 26);
 
         // 4. 将軍候補を新しい城主に任命し、お城のデータも書き換えます
         candidate.isCastellan = true;
@@ -2907,12 +2851,10 @@ window.GameEvents.push({
         game.clans.push(newClan); // 世界に新しい大名家を誕生させます！
 
         // --- 2. 将軍候補を「大名」に出世させます ---
-        candidate.clan = newClanId;
+        game.affiliationSystem.setClanIdRaw(candidate, newClanId);
         candidate.isDaimyo = true;
         candidate.isCastellan = false; // 大名になるので城主のバッジは外します
-        if (game.affiliationSystem) {
-            game.affiliationSystem.resetFactionData(candidate); // 派閥を一度リセットします
-        }
+        game.affiliationSystem.resetFactionData(candidate); // 派閥を一度リセットします
 
         // --- 3. 二条城と槇島城の整理と、持ち主の変更 ---
         
@@ -2925,23 +2867,14 @@ window.GameEvents.push({
             const residents = game.bushos.filter(b => b.castleId === castleId && b.clan === sponsorClanId && b.id !== candidate.id);
             residents.forEach(b => {
                 b.isCastellan = false; // 城主バッジを剥がします
-                if (game.affiliationSystem) {
-                    game.affiliationSystem.moveCastle(b, destinationCastleId);
-                } else {
-                    b.castleId = destinationCastleId;
-                }
+                game.affiliationSystem.moveCastle(b, destinationCastleId);
             });
         });
 
         // お城の持ち主を新しい将軍家に変えます
-        if (game.castleManager) {
-            // ★修正：第3引数に「true」を渡して、イベントによる変更であることを教えます
-            game.castleManager.changeOwner(nijoCastle, newClanId, true);
-            game.castleManager.changeOwner(makishimaCastle, newClanId, true);
-        } else {
-            nijoCastle.ownerClan = newClanId;
-            makishimaCastle.ownerClan = newClanId;
-        }
+        // ★第3引数に true を渡し、イベントによる平和的な所有者変更として扱います。
+        game.castleManager.changeOwner(nijoCastle, newClanId, true);
+        game.castleManager.changeOwner(makishimaCastle, newClanId, true);
 
         // 将軍が二条城の城主として座るように設定します
         candidate.isCastellan = true;
@@ -2996,15 +2929,8 @@ window.GameEvents.push({
 
         // リストに入った武将を将軍家のお引越しセンターで移動させます
         followers.forEach(b => {
-            if (game.affiliationSystem) {
-                // ★追加：第4引数に「100」を渡して、イベント専用の固定忠誠度にします
-                game.affiliationSystem.joinClan(b, newClanId, 26, 100); 
-            } else {
-                b.clan = newClanId;
-                b.castleId = 26;
-                b.status = 'active';
-                b.loyalty = 100; // ★システムがない場合の安全策
-            }
+            // ★追加：第4引数に「100」を渡して、イベント専用の固定忠誠度にします
+            game.affiliationSystem.joinClan(b, newClanId, 26, 100); 
         });
 
         // --- 7. 槇島城の城主を、相性が一番近い配下から選びます ---
@@ -3024,11 +2950,7 @@ window.GameEvents.push({
 
             // 一番相性が近い人を槇島城に送って、城主に任命します
             if (bestFollower) {
-                if (game.affiliationSystem) {
-                    game.affiliationSystem.moveCastle(bestFollower, 90);
-                } else {
-                    bestFollower.castleId = 90;
-                }
+                game.affiliationSystem.moveCastle(bestFollower, 90);
                 // 城主のバッジを直接渡します
                 bestFollower.isCastellan = true;
                 makishimaCastle.castellanId = bestFollower.id;
@@ -3720,23 +3642,13 @@ window.GameEvents.push({
 
         // ③ 対象の城の持ち主の看板を「将軍擁立勢力」に掛け替えます
         targetCastles.forEach(castle => {
-            castle.legionId = 0; // 軍団の所属を外して直轄に戻します
-            if (game.castleManager) {
-                game.castleManager.changeOwner(castle, sponsorClanId, true);
-            } else {
-                castle.ownerClan = sponsorClanId;
-            }
+            game.castleManager.changeOwner(castle, sponsorClanId, true, 0);
         });
 
         // ④ 対象の城に集めた降伏組（対象IDの武将）を、将軍擁立勢力に所属変更させます
         targetBushos.forEach(busho => {
-            if (game.affiliationSystem) {
-                // 第4引数に「100」を渡すことで、忠誠度をピッタリ100にセットできます
-                game.affiliationSystem.joinClan(busho, sponsorClanId, busho.castleId, 100);
-            } else {
-                busho.clan = sponsorClanId;
-                busho.loyalty = 100;
-            }
+            // 第4引数に「100」を渡すことで、忠誠度をピッタリ100にセットできます
+            game.affiliationSystem.joinClan(busho, sponsorClanId, busho.castleId, 100);
         });
 
         // ⑤ 国主だった場合の解任処理と軍団の解散処理をします

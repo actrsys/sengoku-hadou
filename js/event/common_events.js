@@ -1783,7 +1783,7 @@ window.GameEvents.push({
                 b.isCommander = false;
                 b.isGunshi = false;
                 
-                b.clan = dominantClanId;
+                game.affiliationSystem.setClanIdRaw(b, dominantClanId);
                 
                 // 人事部（お引越しセンター）にお願いして、新しい殿様との相性で忠誠度を再計算します！
                 if (game.affiliationSystem && game.affiliationSystem.updateLoyaltyForNewLord) {

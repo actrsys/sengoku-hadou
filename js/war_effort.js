@@ -1533,7 +1533,7 @@ Object.assign(WarManager.prototype, {
                         kunishu.horses = Math.min(99999, (kunishu.horses || 0) + returnHorses); 
                         kunishu.guns = Math.min(99999, (kunishu.guns || 0) + returnGuns);       
                         reinf.bushos.forEach(b => {
-                            b.castleId = kunishu.castleId; b.isCastellan = false;
+                            this.game.affiliationSystem.setCastleIdRaw(b, kunishu.castleId); b.isCastellan = false;
                         });
                         const myClanId = isAttackerData ? s.sourceCastle.ownerClan : s.defender.ownerClan;
                         let isWin = isAttackerData ? attackerWon : !attackerWon;
@@ -1562,7 +1562,7 @@ Object.assign(WarManager.prototype, {
                         }
                         
                         reinf.bushos.forEach(b => {
-                            b.castleId = helperCastle.id; 
+                            this.game.affiliationSystem.setCastleIdRaw(b, helperCastle.id); 
                             b.isCastellan = false;
                             if (!helperCastle.samuraiIds.includes(b.id)) helperCastle.samuraiIds.push(b.id);
                         });
@@ -1617,7 +1617,7 @@ Object.assign(WarManager.prototype, {
                             kunishu.horses = Math.min(99999, (kunishu.horses || 0) + (reinf.horses || 0)); 
                             kunishu.guns = Math.min(99999, (kunishu.guns || 0) + (reinf.guns || 0));       
                             reinf.bushos.forEach(b => {
-                                b.castleId = kunishu.castleId; 
+                                this.game.affiliationSystem.setCastleIdRaw(b, kunishu.castleId); 
                                 b.isCastellan = false;
                             });
                         }
@@ -1629,7 +1629,7 @@ Object.assign(WarManager.prototype, {
                             helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + (reinf.horses || 0));
                             helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + (reinf.guns || 0));
                             reinf.bushos.forEach(b => {
-                                b.castleId = helperCastle.id; 
+                                this.game.affiliationSystem.setCastleIdRaw(b, helperCastle.id); 
                                 b.isCastellan = false;
                                 if (!helperCastle.samuraiIds.includes(b.id)) helperCastle.samuraiIds.push(b.id);
                             });

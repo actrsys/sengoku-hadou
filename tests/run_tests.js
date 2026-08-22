@@ -402,6 +402,68 @@ test('ビジュアル回帰テストの土台が配置されている', () => {
     assert.ok(fixture.includes('over-connected'));
 });
 
+
+// ---------------------------------------------------------------------------
+// 重要データの書き換え境界
+// ---------------------------------------------------------------------------
+test('武将所属・配置と城所有者の直接代入は専門部署に限定する', () => {
+    const jsFiles = [];
+    const walk = dir => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) walk(full);
+            else if (entry.name.endsWith('.js') && !entry.name.endsWith('.min.js')) jsFiles.push(full);
+        }
+    };
+    walk(path.join(ROOT, 'js'));
+
+    const allowedClan = new Set(['js/affiliation_system.js', 'js/models.js', 'js/data_manager.js']);
+    const allowedOwner = new Set(['js/castle_manager.js', 'js/models.js']);
+    const clanOffenders = [];
+    const castleOffenders = [];
+    const ownerOffenders = [];
+
+    for (const file of jsFiles) {
+        const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+        const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
+        lines.forEach((line, index) => {
+            if (!allowedClan.has(rel) && /\.clan\s*(?<![=!<>])=(?!=)/.test(line) && !/\.dataset\.clan\s*=/.test(line)) {
+                clanOffenders.push(`${rel}:${index + 1}`);
+            }
+            if (!allowedClan.has(rel) && /\.castleId\s*(?<![=!<>])=(?!=)/.test(line)) {
+                castleOffenders.push(`${rel}:${index + 1}`);
+            }
+            if (!allowedOwner.has(rel) && /\.ownerClan\s*(?<![=!<>])=(?!=)/.test(line)) {
+                ownerOffenders.push(`${rel}:${index + 1}`);
+            }
+        });
+    }
+    assert.deepStrictEqual(clanOffenders, [], `clan直接代入: ${clanOffenders.join(', ')}`);
+    assert.deepStrictEqual(castleOffenders, [], `castleId直接代入: ${castleOffenders.join(', ')}`);
+    assert.deepStrictEqual(ownerOffenders, [], `ownerClan直接代入: ${ownerOffenders.join(', ')}`);
+});
+
+test('低レベル所属Setterは正規化し、城所有者Setterは索引バージョンを更新する', () => {
+    const ctx = createContext({ PersonnelRules: { calcAffinityDiff: () => 0 } });
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/castle_manager.js');
+    const AffiliationSystem = vm.runInContext('AffiliationSystem', ctx);
+    const CastleManager = vm.runInContext('CastleManager', ctx);
+    const game = { castleOwnershipVersion: 7 };
+    const affiliation = new AffiliationSystem(game);
+    const busho = { clan: 1, castleId: 10 };
+    affiliation.setClanIdRaw(busho, '12');
+    affiliation.setCastleIdRaw(busho, '34');
+    assert.strictEqual(busho.clan, 12);
+    assert.strictEqual(busho.castleId, 34);
+
+    const castleManager = new CastleManager(game);
+    const castle = { ownerClan: 2 };
+    castleManager.setOwnerIdRaw(castle, '9');
+    assert.strictEqual(castle.ownerClan, 9);
+    assert.strictEqual(game.castleOwnershipVersion, 8);
+});
+
 // ---------------------------------------------------------------------------
 // 最低限の構造チェック
 // ---------------------------------------------------------------------------

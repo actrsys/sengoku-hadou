@@ -2016,7 +2016,7 @@ class DiplomacyManager {
             b.isCommander = false;
             b.isGunshi = false;
             
-            b.clan = targetClanId;
+            this.game.affiliationSystem.setClanIdRaw(b, targetClanId);
             
             // 人事部（お引越しセンター）にお願いして、新しい殿様との相性で忠誠度を再計算します！
             this.game.affiliationSystem.updateLoyaltyForNewLord(b, targetClanId);
