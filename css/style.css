@@ -1057,6 +1057,11 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     border-color: #546e7a;
 }
 
+.saveload-slot-btn.empty-slot.is-load-disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
 /* --- ここから新しいレイアウト用の設定 --- */
 
 /* 一番左：数字だけが入る空間 */

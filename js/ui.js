@@ -60,6 +60,8 @@ class UIManager {
         this.info = new UIInfoManager(this, this.game);
         // ★追加：スライダーの専門家を準備しておきます
         this.slider = new UISliderManager(this, this.game);
+        // セーブ／ロードのスロット選択画面は専用Viewへ委譲します。
+        this.saveLoadView = new SaveLoadView(this, this.game);
         
         this.warModal = document.getElementById('war-modal');
         this.warLog = document.getElementById('war-log');

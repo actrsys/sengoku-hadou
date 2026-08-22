@@ -489,6 +489,53 @@ class SaveManager {
         }
     }
 
+    /**
+     * IndexedDBから取得した保存値を、旧形式/暗号化形式を吸収してゲームデータへ戻します。
+     * UIは暗号化方式を知らず、この窓口から復号済みデータを受け取ります。
+     */
+    decodeStoredData(rawData) {
+        if (!rawData) return null;
+        if (rawData instanceof Uint8Array) {
+            try {
+                return this._decryptData(rawData);
+            } catch (error) {
+                console.warn('セーブデータの復号に失敗しました:', error);
+                return null;
+            }
+        }
+        return rawData;
+    }
+
+    getSaveTimestamp(data) {
+        if (!data) return 0;
+        return data.saveTimestamp || (data.saveTime ? new Date(data.saveTime).getTime() : 0);
+    }
+
+    /**
+     * セーブスロット表示用の復号済みデータを一括取得します。
+     * 表示順やラベルはView側、保存形式/DBアクセスはSaveManager側が担当します。
+     */
+    async readSaveSlots(prefix, count = 5) {
+        const rows = await Promise.all(
+            Array.from({ length: count }, (_, index) => {
+                const slotNo = index + 1;
+                return loadFromDB(prefix + slotNo)
+                    .then(rawData => ({ slotNo, rawData }))
+                    .catch(() => ({ slotNo, rawData: null }));
+            })
+        );
+
+        return rows.map(({ slotNo, rawData }) => {
+            const data = this.decodeStoredData(rawData);
+            return {
+                originalSlotNo: slotNo,
+                data,
+                saveTimestamp: this.getSaveTimestamp(data),
+                hasData: !!(data && data.year)
+            };
+        });
+    }
+
     // ★追加：最新のセーブデータを自動で見つけて読み込む魔法 (続きから)
     async continueGame() {
         // ★追加：探している間に操作されないようにロード画面で蓋をします！
@@ -502,35 +549,18 @@ class SaveManager {
         const prefixes = ["sengoku_save_slot", "sengoku_autosave_slot"];
 
         for (const prefix of prefixes) {
-            for (let i = 1; i <= 5; i++) {
-                try {
-                    const rawData = await loadFromDB(prefix + i);
-                    if (rawData) {
-                        let d = rawData;
-                        // 暗号化されたデータなら一度開いて中身を見ます
-                        if (d instanceof Uint8Array) {
-                            try {
-                                d = this._decryptData(d);
-                            } catch(err) {
-                                d = null;
-                            }
-                        }
-                        // ★セーブした時間をミリ秒優先で見て、一番新しいものを探します
-                        if (d) {
-                            const time = d.saveTimestamp || (d.saveTime ? new Date(d.saveTime).getTime() : 0);
-                            if (time > latestTime) {
-                                latestTime = time;
-                                latestSlot = i;
-                                latestPrefix = prefix;
-                            } else if (latestSlot === -1) {
-                                // 時間が記録されていなければ、とりあえず見つけたスロットをメモします
-                                latestSlot = i;
-                                latestPrefix = prefix;
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.error("セーブデータ取得エラー:", e);
+            const slots = await this.readSaveSlots(prefix);
+            for (const slot of slots) {
+                if (!slot.data) continue;
+                const time = slot.saveTimestamp;
+                if (time > latestTime) {
+                    latestTime = time;
+                    latestSlot = slot.originalSlotNo;
+                    latestPrefix = prefix;
+                } else if (latestSlot === -1) {
+                    // 時間が記録されていなければ、とりあえず見つけたスロットをメモします
+                    latestSlot = slot.originalSlotNo;
+                    latestPrefix = prefix;
                 }
             }
         }

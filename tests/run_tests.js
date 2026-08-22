@@ -845,5 +845,115 @@ test('自作JSが生成するHTMLに inline event 属性を持たない', () => 
     assert.deepStrictEqual(offenders, []);
 });
 
+
+// ---------------------------------------------------------------------------
+// 月進行の責務境界
+// ---------------------------------------------------------------------------
+test('TurnManager は月次計算を既存の専門部署へ委譲する', () => {
+    const source = read('js/turn_manager.js');
+    assert.ok(source.includes('factionSystem.applyStartMonthSameFactionEffects'));
+    assert.ok(source.includes('EconomyRules.updateMonthlyProvinceMarketRates'));
+    assert.ok(source.includes('EconomyRules.calcMonthlyGoldIncome'));
+    assert.ok(source.includes('DomesticRules.calcMonthlyPopulationGrowth'));
+    assert.ok(source.includes('DomesticRules.calcMonthlySoldierGrowth'));
+    assert.ok(source.includes('PersonnelRules.processMonthlyBushoMaintenance'));
+    assert.ok(source.includes('PersonnelRules.applyMonthlyRoleProgress'));
+    assert.ok(source.includes('aiStaffing.processQuarterlyStaffing'));
+
+    assert.ok(!source.includes('const popKokuRatio = c.population / Math.max(1, c.kokudaka)'));
+    assert.ok(!source.includes('const specialtyBonus = 0.5 + (highestStat * 0.005)'));
+    assert.ok(!source.includes('const rubberForce = (baseRate - p.marketRate) * 0.1'));
+});
+
+test('月次人口・兵士増加の専門RulesがRound62の基準式を再現する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/domestic_rules.js');
+
+    const castle = {
+        population: 10000,
+        peoplesLoyalty: 80,
+        kokudaka: 4000,
+        defense: 500,
+        soldiers: 2000,
+        ownerClan: 1,
+        adjacentCastleIds: []
+    };
+    const daimyo = { leadership: 80, strength: 70, politics: 75, diplomacy: 65, intelligence: 85, charm: 70 };
+    const neighbor = 1.2;
+
+    let oldPop = Math.floor(((Math.sqrt(10000) * 2) * ((80 - 50) / 100)) + (80 / 4));
+    oldPop = Math.floor(oldPop * neighbor);
+    const ratio = 10000 / 4000;
+    const lowBonus = 3.0 - ((ratio - 1) / 4) * 1.5;
+    oldPop = Math.floor(oldPop * lowBonus);
+    const baseScore = (Math.sqrt(4000) * 500 + Math.sqrt(500) * 200) * ((80 / 100) + 0.5);
+    if (oldPop > 0 && 10000 >= baseScore) oldPop = Math.floor(oldPop / 20);
+    assert.strictEqual(ctx.DomesticRules.calcMonthlyPopulationGrowth(castle, neighbor), oldPop);
+
+    const statBonus = (80 + 70 + 75 + 65 + 85 + 70) / 600;
+    const daimyoBonus = statBonus * (0.5 + 85 * 0.005);
+    const baseGrowth = Math.sqrt(10000) * ((daimyoBonus + 80 * 0.01) / 2) * 1.25;
+    const suppressed = baseGrowth / (1 + 5 / 25);
+    const penalty = Math.max(0, 1 - (2000 / 10000) * 1.25);
+    let oldSoldier = Math.floor(suppressed * penalty);
+    if (oldSoldier > 0) oldSoldier = Math.floor(oldSoldier * neighbor);
+    assert.strictEqual(ctx.DomesticRules.calcMonthlySoldierGrowth(castle, daimyo, 5, neighbor), oldSoldier);
+});
+
+test('オートセーブ条件は「未保存 かつ 設定ON」を括弧付きで判定する', () => {
+    const source = read('js/turn_manager.js');
+    assert.ok(source.includes('!game.hasAutoSavedThisMonth && (window.UserSettings ? window.UserSettings.autoSave : true)'));
+    assert.ok(!source.includes('!game.hasAutoSavedThisMonth && window.UserSettings ?'));
+});
+
+
+// ---------------------------------------------------------------------------
+// CommandSystem の責務境界
+// ---------------------------------------------------------------------------
+test('コマンド仕様表は command_catalog.js を正本とする', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/command_catalog.js');
+    const specs = vm.runInContext('COMMAND_SPECS', ctx);
+    const menu = vm.runInContext('COMMAND_MENU_STRUCTURE', ctx);
+    assert.ok(specs.war);
+    assert.strictEqual(specs.save.action, 'save');
+    assert.ok(menu.some(item => item.label === 'システム'));
+
+    const commandSource = read('js/command_system.js');
+    assert.ok(!commandSource.includes('const COMMAND_SPECS ='));
+    assert.ok(!commandSource.includes('const COMMAND_MENU_STRUCTURE ='));
+    assert.ok(!commandSource.includes('const CAN_EXECUTE_RULES ='));
+});
+
+test('SaveLoadView は保存形式・IndexedDB・復号を直接扱わない', () => {
+    const viewSource = read('js/save_load_view.js');
+    const commandSource = read('js/command_system.js');
+    const uiSource = read('js/ui.js');
+
+    assert.ok(viewSource.includes('this.game.saveManager.readSaveSlots'));
+    assert.ok(!viewSource.includes('loadFromDB('));
+    assert.ok(!viewSource.includes('_decryptData'));
+    assert.ok(!commandSource.includes('showSaveLoadModal'));
+    assert.ok(!commandSource.includes("getElementById('saveload-"));
+    assert.ok(uiSource.includes('this.saveLoadView = new SaveLoadView'));
+});
+
+test('SaveManager がスロット読込・保存時刻抽出の公開窓口を持つ', () => {
+    const source = read('js/save_manager.js');
+    assert.ok(source.includes('async readSaveSlots(prefix, count = 5)'));
+    assert.ok(source.includes('decodeStoredData(rawData)'));
+    assert.ok(source.includes('getSaveTimestamp(data)'));
+    assert.ok(source.includes('loadFromDB(prefix + slotNo)'));
+});
+
+test('コマンド定義はWarParamsの独自フォールバックを持たない', () => {
+    const sources = read('js/command_catalog.js') + '\n' + read('js/command_system.js');
+    assert.ok(!sources.includes('MaxTraining) ?'));
+    assert.ok(!sources.includes('MaxMoraleCharity) ?'));
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

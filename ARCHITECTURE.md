@@ -22,7 +22,7 @@
 - `js/constants.js` — 状態文字列と、複数状態をまとめた意味判定（LifeStatusRules / BushoStatusRules / DiplomacyRules）の正本。
 - `js/user_settings.js` — 通知・歴史イベント・オートセーブ・音量などユーザー個人設定とlocalStorageの正本。
 - `js/game.js` — GameManager。ゲーム全体の司令塔。専門部署へ仕事を振る。
-- `js/turn_manager.js` — 月初・各拠点ターン・月末の進行順を管理。
+- `js/turn_manager.js` — 月初・各拠点ターン・月末の進行順を管理。月次の具体的な計算式は持たず、FactionSystem / EconomyRules / DomesticRules / PersonnelRules / AIStaffing 等へ委譲する。
 - `js/data_manager.js` — シナリオ、CSV/BIN、地図データの読み込み。
 - `js/save_manager.js` — セーブ、ロード、IndexedDB、オートセーブ。
 
@@ -58,6 +58,15 @@
 - 武将能力値の一門+5は既存getter互換のため、`GameManager` が `Busho.configureRuntime()` へ「大名を取得する関数」だけを注入する。モデルからはGameManager全体へアクセスしない。
 - 武将肩書きのような表示判断は `StatPresenter`、城・軍団など周囲のゲーム状態を使う判定は利用側/Systemへ置く。
 - 一門関係の再構築は `FamilyLinker.rebuildAllFamilyIds()` を正規窓口とし、各人物がゲーム全体の名簿を取りに行かない。
+
+## コマンド
+
+- `js/command_catalog.js` — コマンドメニュー構造・実行条件・コマンド仕様表の正本。UI表示とCommandSystemが同じ定義を参照する。
+- `js/command_system.js` — コマンド開始、対象選択、実行フローの司令塔。仕様表やセーブ/ロード画面そのものは持たない。
+- `js/save_load_view.js` — セーブ/ロードのスロット選択画面。保存形式や復号は知らず、`SaveManager.readSaveSlots()` から復号済みデータを受け取る。
+- `js/save_manager.js` — IndexedDB・暗号化/復号・保存データ形式の正本。UIが `loadFromDB` や `_decryptData` を直接触らない。
+
+`command_catalog.js` と `save_load_view.js` はそれぞれ約700行/300行の独立した責務で、`command_system.js` の全体像を大きく損ねていたため分離する。小さなコマンド種別ごとには分割しない。
 
 ## 戦争
 
@@ -111,8 +120,8 @@
 
 1. 定数・状態判定の共通RulesとUserSettingsの境界を維持し、文字列集合やlocalStorage処理の再分散をテストで防ぐ。
 2. UI分離の残件と重複CSSを、ビジュアル回帰テストを通しながら整理する。
-3. `TurnManager` 内の月次計算を、必要な単位で既存Rules/Systemへ寄せる（小ファイル乱立は避ける）。
-4. `command_system.js` のコマンド可否・実行・戦争準備など巨大責務を整理する。
+3. `TurnManager` の月次計算委譲はRound63で大きく整理済み。今後は進行順・イベント境界・AI/プレイヤー切替の司令塔として維持する。
+4. `command_system.js` はRound64で仕様表とセーブ/ロードViewを分離。次は戦争準備（援軍・出陣フロー）をWar系の明確な窓口へ寄せ、実行フローをさらに薄くする。
 5. `war_effort.js` / `field_war.js` の戦争Rules・進行・View・AI混在を整理する。
 6. `diplomacy.js` / `ai.js` の巨大責務を整理する。
 
