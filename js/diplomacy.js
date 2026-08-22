@@ -625,6 +625,29 @@ class DiplomacyManager {
     }
 
     /**
+     * 大名家へ援軍を要請するときの持参金を共通計算します。
+     * 攻撃側・守備側で同じ戦力比ルールを使い、支配下の勢力は0金とします。
+     */
+    calcReinforcementOfferGold(requesterClanId, helperClanId, availableGold = 0) {
+        const requesterPower = this.game.getClanTotalSoldiers(requesterClanId) || 1;
+        const helperPower = this.game.getClanTotalSoldiers(helperClanId) || 1;
+        const ratio = helperPower / Math.max(1, requesterPower);
+
+        let gold = 300;
+        if (ratio >= 3.0) {
+            gold = 1000;
+        } else if (ratio > 1.5) {
+            gold = 300 + ((ratio - 1.5) / 1.5) * 700;
+        }
+        gold = Math.floor(gold / 100) * 100;
+        gold = Math.min(gold, Math.max(0, Number(availableGold) || 0));
+
+        const relation = this.game.getRelation(requesterClanId, helperClanId);
+        if (relation && relation.status === window.GameConstants.DiplomacyStatus.DOMINANT) return 0;
+        return gold;
+    }
+
+    /**
      * AIが援軍要請を受けたときの「実効承諾確率」を返します。
      *
      * - 通常の確率計算は getReinforcementAcceptProb() に一元化

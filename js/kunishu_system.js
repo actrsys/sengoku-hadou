@@ -793,9 +793,9 @@ class KunishuSystem {
         };
 
         // ★直接startWarを呼ぶのではなく、command_systemの共通の魔法にお任せします！
-        if (this.game.commandSystem && typeof this.game.commandSystem.checkReinforcementAndStartWar === 'function') {
+        if (this.game.warPreparationController && typeof this.game.warPreparationController.checkReinforcementAndStartWar === 'function') {
             const extraData = { isKunishu: true, kunishuId: kunishu.id };
-            this.game.commandSystem.checkReinforcementAndStartWar(atkCastle, targetCastleId, atkBushos, sendSoldiers, sendRice, sendHorses, sendGuns, extraData);
+            this.game.warPreparationController.checkReinforcementAndStartWar(atkCastle, targetCastleId, atkBushos, sendSoldiers, sendRice, sendHorses, sendGuns, extraData);
         } else {
             // (万が一の時のフォールバック処理)
             const kunishuName = kunishu.getName(this.game);

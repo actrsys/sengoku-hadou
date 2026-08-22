@@ -369,9 +369,9 @@ test('援軍受諾確率の生計算は DiplomacyManager 外から直接呼ば�
     walk(path.join(ROOT, 'js'));
     assert.deepStrictEqual(offenders, []);
 
-    const commandSource = read('js/command_system.js');
+    const prepSource = read('js/war_preparation_controller.js');
     const warEffortSource = read('js/war_effort.js');
-    assert.ok(commandSource.includes('checkAIReinforcementAcceptance'));
+    assert.ok(prepSource.includes('checkAIReinforcementAcceptance'));
     assert.ok(warEffortSource.includes('checkAIReinforcementAcceptance'));
     assert.ok(warEffortSource.includes('getAIReinforcementAcceptanceInfo'));
 });
@@ -955,5 +955,84 @@ test('コマンド定義はWarParamsの独自フォールバックを持たな�
     assert.ok(!sources.includes('MaxMoraleCharity) ?'));
 });
 
+
+
+test('WarPreparationController が開戦準備フローの正本になる', () => {
+    const commandSource = read('js/command_system.js');
+    const prepSource = read('js/war_preparation_controller.js');
+    const gameSource = read('js/game.js');
+
+    assert.ok(prepSource.includes('class WarPreparationController'));
+    assert.ok(prepSource.includes('checkReinforcementAndStartWar('));
+    assert.ok(prepSource.includes('executeReinforcementRequest('));
+    assert.ok(gameSource.includes('this.warPreparationController = new WarPreparationController(this)'));
+    assert.ok(!commandSource.includes('checkReinforcementAndStartWar(atkCastle'));
+    assert.ok(!commandSource.includes('executeReinforcementRequest(gold'));
+    assert.ok(commandSource.includes('this.game.warPreparationController.checkReinforcementAndStartWar'));
+});
+
+test('手動援軍の資源消費・復元は ReinforcementService を正本とする', () => {
+    const ctx = createContext();
+    ctx.window.WarParams = { Reinforcement: {
+        TwoBushoThreshold: 1500, ThreeBushoThreshold: 2500,
+        SelfEquipmentMinimumStockRatio: 0.2, EquipmentCapRatio: 0.5,
+        SelfSoldierRatio: 0.5, MinimumSoldiers: 500, RicePerSoldier: 1,
+        AllyRateDivisor: 400, KunishuRateDivisor: 200
+    }};
+    loadScript(ctx, 'js/reinforcement_service.js');
+    const ReinforcementService = vm.runInContext('ReinforcementService', ctx);
+    const service = new ReinforcementService({});
+    const castle = { soldiers: 5000, rice: 6000, horses: 1000, guns: 800, morale: 70, training: 80 };
+    const bushos = [{ id: 1 }];
+    const data = service.createManualCastleReinforcement(castle, bushos,
+        { soldiers: 1200, rice: 1400, horses: 300, guns: 200 },
+        { isAttacker: true, isSelf: false });
+    assert.deepStrictEqual([castle.soldiers, castle.rice, castle.horses, castle.guns], [3800, 4600, 700, 600]);
+    assert.strictEqual(data.morale, 70);
+    assert.strictEqual(data.training, 80);
+    service.restoreCastleReinforcement(data);
+    assert.deepStrictEqual([castle.soldiers, castle.rice, castle.horses, castle.guns], [5000, 6000, 1000, 800]);
+
+    const prepSource = read('js/war_preparation_controller.js');
+    const warEffortSource = read('js/war_effort.js');
+    assert.ok(prepSource.includes('createManualCastleReinforcement'));
+    assert.ok(prepSource.includes('restoreCastleReinforcement'));
+    assert.ok(warEffortSource.includes('createManualCastleReinforcement'));
+    assert.ok(!/helperCastle\.soldiers\s*=\s*Math\.max\(0, helperCastle\.soldiers - reinf/.test(prepSource));
+    assert.ok(!/helperCastle\.soldiers\s*=\s*Math\.max\(0, helperCastle\.soldiers - reinf/.test(warEffortSource));
+
+    const offenders = [];
+    for (const file of fs.readdirSync(path.join(ROOT, 'js')).filter(x => x.endsWith('.js'))) {
+        if (file === 'reinforcement_service.js') continue;
+        const source = read(`js/${file}`);
+        if (/helperCastle\.(soldiers|rice|horses|guns)\s*=\s*Math\.max/.test(source)) offenders.push(file);
+    }
+    assert.deepStrictEqual(offenders, []);
+});
+
+test('援軍持参金は攻守共通で DiplomacyManager が計算する', () => {
+    const ctx = createContext();
+    ctx.window.GameConstants = { DiplomacyStatus: { DOMINANT: '支配' } };
+    ctx.window.DiplomacyRules = {};
+    ctx.window.SkillManager = { canDeclineBossReinforcement: () => false };
+    loadScript(ctx, 'js/diplomacy.js');
+    const DiplomacyManager = vm.runInContext('DiplomacyManager', ctx);
+    const powers = { 1: 10000, 2: 20000, 3: 40000 };
+    const game = {
+        getClanTotalSoldiers: id => powers[id] || 1,
+        getRelation: (a,b) => ({ status: (a === 1 && b === 3) ? '支配' : '同盟' })
+    };
+    const dm = new DiplomacyManager(game);
+    assert.strictEqual(dm.calcReinforcementOfferGold(1, 2, 99999), 500);
+    assert.strictEqual(dm.calcReinforcementOfferGold(1, 2, 350), 350);
+    assert.strictEqual(dm.calcReinforcementOfferGold(1, 3, 99999), 0);
+
+    const prepSource = read('js/war_preparation_controller.js');
+    const warEffortSource = read('js/war_effort.js');
+    assert.ok(prepSource.includes('calcReinforcementOfferGold'));
+    assert.ok(warEffortSource.includes('calcReinforcementOfferGold'));
+    const combined = prepSource + '\n' + warEffortSource;
+    assert.ok(!combined.includes('((ratio - 1.5) / 1.5) * 700'));
+});
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

@@ -1400,7 +1400,7 @@ class AIEngine {
         // 援軍を探す処理へバトンタッチします
         const sendHorses = (source.horses || 0) < sendSoldiers * 0.2 ? 0 : (source.horses || 0);
         const sendGuns = (source.guns || 0) < sendSoldiers * 0.2 ? 0 : (source.guns || 0);
-        this.game.commandSystem.checkReinforcementAndStartWar(source, target.id, sorted, sendSoldiers, sendRice, sendHorses, sendGuns);
+        this.game.warPreparationController.checkReinforcementAndStartWar(source, target.id, sorted, sendSoldiers, sendRice, sendHorses, sendGuns);
         
         // （「待つ魔法」は消しました！あとはwar.jsが最後までやってくれます）
     }

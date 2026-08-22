@@ -48,6 +48,7 @@ class GameManager {
         this.reinforcementService = new ReinforcementService(this);
         this.commandSystem = new CommandSystem(this);
         this.warManager = new WarManager(this);
+        this.warPreparationController = new WarPreparationController(this);
         
         // FieldWarManagerが存在するか確認してから準備する安全な書き方です
         if (typeof FieldWarManager !== 'undefined') {

@@ -62,7 +62,7 @@
 ## コマンド
 
 - `js/command_catalog.js` — コマンドメニュー構造・実行条件・コマンド仕様表の正本。UI表示とCommandSystemが同じ定義を参照する。
-- `js/command_system.js` — コマンド開始、対象選択、実行フローの司令塔。仕様表やセーブ/ロード画面そのものは持たない。
+- `js/command_system.js` — コマンド開始、汎用の対象選択・数量入力・実行フローの司令塔。仕様表、セーブ/ロード画面、開戦準備そのものは持たない。
 - `js/save_load_view.js` — セーブ/ロードのスロット選択画面。保存形式や復号は知らず、`SaveManager.readSaveSlots()` から復号済みデータを受け取る。
 - `js/save_manager.js` — IndexedDB・暗号化/復号・保存データ形式の正本。UIが `loadFromDB` や `_decryptData` を直接触らない。
 
@@ -71,10 +71,11 @@
 ## 戦争
 
 - `js/war.js` — WarManagerの主要な入口。
+- `js/war_preparation_controller.js` — 出陣準備・自軍援軍・他勢力援軍・開戦直前UIの司令塔。CommandSystemやAI等はここから開戦準備を開始する。
 - `js/war_effort.js` — 攻城戦・戦争進行の既存大規模処理。今後の整理候補。
 - `js/field_war.js` — 野戦。Rules / View / AI がまだ混在しており今後の整理候補。
 - `js/troop_allocation.js` — 兵力自動配分の正本。
-- `js/reinforcement_service.js` — 承諾後の自軍・同盟・諸勢力援軍編成／資源消費の正本。
+- `js/reinforcement_service.js` — 承諾後の自軍・同盟・諸勢力援軍編成／資源消費の正本。自動・手動とも城在庫の増減をここへ集約する。
 - AIが援軍要請を承諾するかどうか（実効確率・大雪・支配関係・拒否可能スキル・最終サイコロ）は `DiplomacyManager.getAIReinforcementAcceptanceInfo()` / `checkAIReinforcementAcceptance()` を正本とし、攻撃側・守備側とも同じ窓口を使う。
 
 `troop_allocation.js` と `reinforcement_service.js` は小さいものの、複数の戦争入口から共通利用され、計算重複防止の役割が明確なため独立を維持します。
@@ -121,8 +122,8 @@
 1. 定数・状態判定の共通RulesとUserSettingsの境界を維持し、文字列集合やlocalStorage処理の再分散をテストで防ぐ。
 2. UI分離の残件と重複CSSを、ビジュアル回帰テストを通しながら整理する。
 3. `TurnManager` の月次計算委譲はRound63で大きく整理済み。今後は進行順・イベント境界・AI/プレイヤー切替の司令塔として維持する。
-4. `command_system.js` はRound64で仕様表とセーブ/ロードViewを分離。次は戦争準備（援軍・出陣フロー）をWar系の明確な窓口へ寄せ、実行フローをさらに薄くする。
-5. `war_effort.js` / `field_war.js` の戦争Rules・進行・View・AI混在を整理する。
+4. `command_system.js` はRound64で仕様表/セーブロード、Round65で開戦準備を分離済み。今後は残る汎用選択フロー・実行処理の重複を調査し、無理に細分化せず既存Rules/Systemへ戻せる処理を戻す。
+5. `war_effort.js` / `field_war.js` の戦争Rules・進行・View・AI混在を整理する。援軍の受諾確率と持参金計算は攻守共通でDiplomacyManagerを正本として維持する。
 6. `diplomacy.js` / `ai.js` の巨大責務を整理する。
 
 すでに整備済みの所属・城所有権・武将活動/生死状態・モデル境界は、今後は新規変更時の回帰テストで維持する。

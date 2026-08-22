@@ -2893,7 +2893,7 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.openBushoSelector('def_self_reinf_deploy', bestCastle.id, {
                         hideCancel: false, 
                         onConfirm: (selectedBushoIds) => {
-                            this.game.commandSystem.handleBushoSelectionForDefSelfReinf(bestCastle.id, selectedBushoIds, defCastle, onComplete, promptBusho);
+                            this.game.warPreparationController.handleBushoSelectionForDefSelfReinf(bestCastle.id, selectedBushoIds, defCastle, onComplete, promptBusho);
                         },
                         onCancel: () => {
                             this.game.ui.showDialog("援軍の派遣を取りやめました。", false, () => onComplete(null));
@@ -2997,8 +2997,6 @@ Object.assign(WarManager.prototype, {
                 maxError = 0.60;
             }
 
-            const myPower = this.game.getClanTotalSoldiers(defClanId) || 1;
-
             // 候補となるお城の点数（スコア）をひとつずつ計算していきます
             allyForceCandidates.forEach(candidate => {
                 let realProb = 0; // 本当の成功確率
@@ -3021,19 +3019,11 @@ Object.assign(WarManager.prototype, {
                     });
                     realProb = info.probability;
                 } else {
-                    // 大名家の場合、持参金を計算してから確率を出します
+                    // 大名家への持参金は攻守共通でDiplomacyManagerを正本とします。
                     const helperClanId = candidate.force.id;
-                    const helperPower = this.game.getClanTotalSoldiers(helperClanId) || 1;
-                    const ratio = helperPower / Math.max(1, myPower);
-                    
-                    reinfGold = 300;
-                    if (ratio >= 3.0) reinfGold = 1000;
-                    else if (ratio > 1.5) reinfGold = 300 + ((ratio - 1.5) / 1.5) * 700;
-                    reinfGold = Math.floor(reinfGold / 100) * 100;
-                    if (reinfGold > defCastle.gold) reinfGold = defCastle.gold;
-                    
-                    const rel = this.game.getRelation(defClanId, helperClanId);
-                    if (rel && rel.status === '支配') reinfGold = 0;
+                    reinfGold = this.game.diplomacyManager.calcReinforcementOfferGold(
+                        defClanId, helperClanId, defCastle.gold
+                    );
 
                     const info = this.game.diplomacyManager.getAIReinforcementAcceptanceInfo({
                         requesterClanId: defClanId,
@@ -3282,16 +3272,11 @@ Object.assign(WarManager.prototype, {
         // ★追加：プレイヤーが参戦することになったので、透明化の魔法を解除して文字が見えるようにします！
         this.game.ui.restoreAIGuardText(true);
 
-        helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
-        helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
-        helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
-        helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
-
-        this.state.defReinforcement = {
-            castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false,
-            morale: helperCastle.morale || 50, training: helperCastle.training || 50
-        };
+        this.state.defReinforcement = this.game.reinforcementService.createManualCastleReinforcement(
+            helperCastle, reinfBushos,
+            { soldiers: reinfSoldiers, rice: reinfRice, horses: reinfHorses, guns: reinfGuns },
+            { isSelf: false }
+        );
         
         const atkForce = this.state.attacker;
         const atkIsKunishu = atkForce.isKunishu || false;

@@ -3465,7 +3465,7 @@ class UIManager {
     showReinforcementGoldSelector(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData, backToMap) {
         const rel = this.game.getRelation(this.game.playerClanId, helperCastle.ownerClan);
         if (rel.status === '支配') {
-            this.game.commandSystem.executeReinforcementRequest(0, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
+            this.game.warPreparationController.executeReinforcementRequest(0, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
             return;
         }
 
@@ -3473,7 +3473,7 @@ class UIManager {
         this.slider.openQuantitySelector('reinf_gold', [atkCastle], null, {
             onConfirm: (inputs) => {
                 const gold = inputs.gold ? parseInt(inputs.gold.num.value) : 0;
-                this.game.commandSystem.executeReinforcementRequest(gold, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
+                this.game.warPreparationController.executeReinforcementRequest(gold, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
             },
             onCancel: () => {
                 if (backToMap) backToMap();

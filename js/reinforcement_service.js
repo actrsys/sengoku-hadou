@@ -115,6 +115,31 @@ class ReinforcementService {
         return data;
     }
 
+    createManualCastleReinforcement(helperCastle, bushos, resources, flags = {}) {
+        const data = {
+            castle: helperCastle,
+            bushos: Array.isArray(bushos) ? bushos : [],
+            soldiers: Math.max(0, Number(resources.soldiers) || 0),
+            rice: Math.max(0, Number(resources.rice) || 0),
+            horses: Math.max(0, Number(resources.horses) || 0),
+            guns: Math.max(0, Number(resources.guns) || 0),
+            ...flags,
+            morale: helperCastle.morale || 50,
+            training: helperCastle.training || 50
+        };
+        this._consumeCastleResources(helperCastle, data);
+        return data;
+    }
+
+    restoreCastleReinforcement(data) {
+        if (!data || !data.castle) return;
+        const castle = data.castle;
+        castle.soldiers += Number(data.soldiers) || 0;
+        castle.rice += Number(data.rice) || 0;
+        castle.horses = (castle.horses || 0) + (Number(data.horses) || 0);
+        castle.guns = (castle.guns || 0) + (Number(data.guns) || 0);
+    }
+
 }
 
 window.ReinforcementService = ReinforcementService;
