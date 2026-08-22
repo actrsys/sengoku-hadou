@@ -73,14 +73,14 @@ const COMMAND_MENU_STRUCTURE = [
 const CAN_EXECUTE_RULES = {
     // --- 人事用 ---
     hasActiveBushoExceptDaimyo: (game) => {
-        return game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo);
+        return game.bushos.some(b => b.clan === game.playerClanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo);
     },
     hasActiveBushoExceptDaimyoAndCastellan: (game) => {
-        return game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
+        return game.bushos.some(b => b.clan === game.playerClanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.isCastellan);
     },
     hasEmployableRonin: (game) => {
         return game.bushos.some(b => {
-            if (b.status !== 'ronin' || b.belongKunishuId > 0) return false;
+            if (!window.BushoStatusRules.isRonin(b) || b.belongKunishuId > 0) return false;
             const targetCastle = game.getCastle(b.castleId);
             return targetCastle && targetCastle.ownerClan === game.playerClanId;
         });
@@ -118,10 +118,10 @@ const CAN_EXECUTE_RULES = {
             // active（登場済み）または unborn（元服前）を対象にする
             // 隠居状態（isRetired）は除外する
             if (b.clan !== game.playerClanId || b.isDaimyo || b.isRetired) return false;
-            if (b.status !== 'active' && b.status !== 'unborn') return false;
+            if (!window.BushoStatusRules.isActive(b) && !window.LifeStatusRules.isUnborn(b)) return false;
             
             // unborn の中でも「出生前」フラグが立っている場合は除外する
-            if (b.status === 'unborn' && b.isNotBorn) return false;
+            if (window.LifeStatusRules.isUnborn(b) && b.isNotBorn) return false;
 
             const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
             return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
@@ -136,7 +136,7 @@ const CAN_EXECUTE_RULES = {
         if (!daimyo) return false;
         
         return game.bushos.some(b => {
-            if (b.clan !== game.playerClanId || b.status !== 'active' || b.isDaimyo) return false;
+            if (b.clan !== game.playerClanId || !window.BushoStatusRules.isActive(b) || b.isDaimyo) return false;
             return b.birthYear >= daimyo.birthYear + 15;
         });
     },
@@ -196,7 +196,7 @@ const CAN_EXECUTE_RULES = {
         if (daimyo) {
             const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
             hasKinsman = game.bushos.some(b => {
-                if (b.clan !== myClanId || b.isDaimyo || b.status !== 'active') return false;
+                if (b.clan !== myClanId || b.isDaimyo || !window.BushoStatusRules.isActive(b)) return false;
                 const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                 return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
             });
@@ -436,7 +436,7 @@ const COMMAND_SPECS = {
         startMode: 'busho_select_special', subType: 'arrange_marriage_busho',
         sortKey: 'leadership',
         msg: "姫を嫁がせる武将を選択してください",
-        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasUnmarriedPrincess(game) && game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo && !b.female)
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasUnmarriedPrincess(game) && game.bushos.some(b => b.clan === game.playerClanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.female)
     },
     'employ': {
         label: "登用", category: 'PERSONNEL', 
@@ -767,83 +767,83 @@ class CommandSystem {
         // --- 条件分岐（誰をリストに出すか） ---
         if (actionType === 'employ_target') { 
             bushos = this.game.bushos.filter(b => {
-                if (b.status !== 'ronin' || b.belongKunishuId > 0) return false;
+                if (!window.BushoStatusRules.isRonin(b) || b.belongKunishuId > 0) return false;
                 const targetCastle = this.game.getCastle(b.castleId);
                 return targetCastle && targetCastle.ownerClan === this.game.playerClanId;
             });
             infoHtml = "<div>登用する浪人を選択してください</div>"; 
         }
         else if (actionType === 'employ_doer') {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
             infoHtml = "<div>登用を行う担当官を選択してください</div>"; 
         } 
         else if (actionType === 'diplomacy_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
             infoHtml = "<div>外交の担当官を選択してください</div>"; 
         }
         // ★追加：貢物を持っていく使者を選ぶリスト
         else if (actionType === 'tribute_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
             infoHtml = "<div>朝廷への使者を選択してください</div>"; 
         }
         else if (actionType === 'rumor_target_busho') { 
             const targetCastle = this.game.getCastle(targetId);
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && b.status === 'active' && !b.isDaimyo); 
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && window.BushoStatusRules.isActive(b) && !b.isDaimyo); 
             infoHtml = "<div>離間計の対象とする武将を選択してください</div>"; 
         }
         else if (actionType === 'rumor_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
             infoHtml = "<div>離間計を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'incite_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
             infoHtml = "<div>民心撹乱を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'sabotage_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
             infoHtml = "<div>破壊工作を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'headhunt_target') { 
             const targetCastle = this.game.getCastle(targetId);
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && b.status === 'active' && !b.isDaimyo); 
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && window.BushoStatusRules.isActive(b) && !b.isDaimyo); 
             infoHtml = "<div>武将引抜の対象とする武将を選択してください </div>"; 
         }
         else if (actionType === 'assassinate_target') { 
             const targetCastle = this.game.getCastle(targetId);
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && b.status === 'active' && !b.isDaimyo); 
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && window.BushoStatusRules.isActive(b) && !b.isDaimyo); 
             infoHtml = "<div>暗殺の対象とする武将を選択してください</div>"; 
         }
         else if (actionType === 'kuko_doer') {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
             infoHtml = "<div>駆虎呑狼を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'kunishu_incorporate_doer') {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
             infoHtml = "<div>取込の交渉を行う担当官を選択してください</div>"; 
         }
         else if (actionType === 'headhunt_doer') {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
             infoHtml = "<div>引抜を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'assassinate_doer') {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
             infoHtml = "<div>暗殺を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'interview') {
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active' && !b.isDaimyo); 
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo); 
             infoHtml = "<div>面談する武将を選択してください</div>"; 
         }
         else if (actionType === 'arrange_marriage_busho') { 
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active' && !b.isDaimyo && !b.female); 
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.female); 
             infoHtml = "<div>姫を嫁がせる武将を選択してください</div>"; 
             if (extraData) extraData.allowDone = true;
         }
         else if (actionType === 'interview_target') {
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active' && b.id !== extraData.interviewer.id && !b.isDaimyo);
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && window.BushoStatusRules.isActive(b) && b.id !== extraData.interviewer.id && !b.isDaimyo);
             infoHtml = `<div>誰についての印象を聞きますか？</div>`; 
         }
         else if (actionType === 'investigate_deploy') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
             infoHtml = "<div>調査を行う武将を選択してください(複数可)</div>"; 
         }
         else if (actionType === 'view_only') { 
@@ -851,7 +851,7 @@ class CommandSystem {
             infoHtml = "<div>武将一覧です</div>"; 
         }
         else if (actionType === 'all_busho_list') { 
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active');
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && window.BushoStatusRules.isActive(b));
             infoHtml = "<div>武将一覧です</div>"; 
             isMulti = false;
         }
@@ -861,7 +861,7 @@ class CommandSystem {
             const targetLeader = this.game.getBusho(targetLeaderId);
             
             bushos = this.game.bushos.filter(b => {
-                if (b.clan !== targetClanId || b.status !== 'active' || b.female) return false;
+                if (b.clan !== targetClanId || !window.BushoStatusRules.isActive(b) || b.female) return false;
                 // 大名本人か、直接の血縁（お互いのリストに直接IDが含まれている）かをチェックします
                 const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                 const lFamily = Array.isArray(targetLeader.familyIds) ? targetLeader.familyIds : [];
@@ -880,7 +880,7 @@ class CommandSystem {
         else if (actionType === 'appoint_gunshi') {
             bushos = this.game.bushos.filter(b => 
                 b.clan === this.game.playerClanId && 
-                b.status === 'active' && 
+                window.BushoStatusRules.isActive(b) && 
                 !b.isDaimyo && 
                 !b.isCastellan
             );
@@ -889,7 +889,7 @@ class CommandSystem {
         else if (actionType === 'appoint_legion_leader') {
             bushos = this.game.bushos.filter(b => 
                 b.clan === this.game.playerClanId && 
-                b.status === 'active' && 
+                window.BushoStatusRules.isActive(b) && 
                 !b.isDaimyo &&
                 !b.isCommander
             );
@@ -898,23 +898,23 @@ class CommandSystem {
         }
         else if (actionType === 'def_intercept_deploy') {
             const targetC = this.game.getCastle(targetId);
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetC.ownerClan && b.status === 'active');
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetC.ownerClan && window.BushoStatusRules.isActive(b));
             infoHtml = "<div>出陣武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') {
             const targetC = this.game.getCastle(targetId);
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetC.ownerClan && b.status === 'active');
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetC.ownerClan && window.BushoStatusRules.isActive(b));
             infoHtml = "<div>派遣する武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy') {
             const targetC = this.game.getCastle(targetId);
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetC.ownerClan && b.status === 'active');
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetC.ownerClan && window.BushoStatusRules.isActive(b));
             infoHtml = "<div>出陣武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'reward') {
             bushos = this.game.bushos.filter(b => 
                 b.clan === this.game.playerClanId && 
-                b.status === 'active' && 
+                window.BushoStatusRules.isActive(b) && 
                 !b.isDaimyo                          
             );
             infoHtml = "<div>褒美を与える武将を選択してください</div>"; 
@@ -922,7 +922,7 @@ class CommandSystem {
         else if (actionType === 'banish') {
             bushos = this.game.bushos.filter(b => 
                 b.clan === this.game.playerClanId && 
-                b.status === 'active' && 
+                window.BushoStatusRules.isActive(b) && 
                 !b.isDaimyo                          
             );
             infoHtml = "<div>追放する武将を選択してください</div>"; 
@@ -933,10 +933,10 @@ class CommandSystem {
                 const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
                 bushos = this.game.bushos.filter(b => {
                     if (b.clan !== this.game.playerClanId || b.isDaimyo || b.isRetired) return false; // 隠居状態（isRetired）は除外する
-                    if (b.status !== 'active' && b.status !== 'unborn') return false;
+                    if (!window.BushoStatusRules.isActive(b) && !window.LifeStatusRules.isUnborn(b)) return false;
 
                     // ★追加：unborn の中でも「出生前」フラグが立っている場合は除外する
-                    if (b.status === 'unborn' && b.isNotBorn) return false;
+                    if (window.LifeStatusRules.isUnborn(b) && b.isNotBorn) return false;
 
                     const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                     return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
@@ -948,7 +948,7 @@ class CommandSystem {
             const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
             if (daimyo) {
                 bushos = this.game.bushos.filter(b => {
-                    if (b.clan !== this.game.playerClanId || b.status !== 'active' || b.isDaimyo) return false;
+                    if (b.clan !== this.game.playerClanId || !window.BushoStatusRules.isActive(b) || b.isDaimyo) return false;
                     return b.birthYear >= daimyo.birthYear + 15;
                 });
             }
@@ -956,7 +956,7 @@ class CommandSystem {
         }
         else {
             // ★追加: 内政などの通常の命令でも、未登場の武将や諸勢力が勝手にリストに出ないようにします
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active');
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b));
             
             if (spec.msg) {
                 infoHtml = `<div>${spec.msg}</div>`;
@@ -987,7 +987,7 @@ class CommandSystem {
                         if (isBoss) return 40 + (target.belongKunishuId * 0.001); 
                         return 50 + (target.belongKunishuId * 0.001); 
                     }
-                    if (target.status === 'ronin') return 90; 
+                    if (window.BushoStatusRules.isRonin(target)) return 90; 
                     return 30; 
                 };
                 const rankA = getRankScore(a);
@@ -1150,7 +1150,7 @@ class CommandSystem {
         ];
         if (actionRequiredCommands.includes(type)) {
             // ★Round12：可否判定だけなので配列を作らず、1人見つかった時点で終了します。
-            const hasActiveBusho = this.game.bushos.some(b => b.castleId === castle.id && b.clan === castle.ownerClan && b.status === 'active' && !b.isActionDone);
+            const hasActiveBusho = this.game.bushos.some(b => b.castleId === castle.id && b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b) && !b.isActionDone);
             if (!hasActiveBusho) return false;
         }
 
@@ -1311,7 +1311,7 @@ class CommandSystem {
                     if (target.ownerClan === 0 || Number(target.ownerClan) === playerClanId) return false;
                     const rel = this.game.getRelation(playerClanId, target.ownerClan);
                     // ★バリア追加：rel が空っぽの時に落ちないようにガードしました！
-                    if (!rel || !['同盟', '支配', '従属'].includes(rel.status)) return false;
+                    if (!rel || !window.DiplomacyRules.isAllianceOrVassal(rel.status)) return false;
                     
                     const daimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);
                     return daimyo && Number(daimyo.castleId) === Number(target.id);
@@ -1409,7 +1409,7 @@ class CommandSystem {
                     if (targetLeader) {
                         // 相手の家の一門武将を探します
                         const kinsmen = this.game.bushos.filter(b => {
-                            if (b.clan !== target.ownerClan || b.status !== 'active') return false;
+                            if (b.clan !== target.ownerClan || !window.BushoStatusRules.isActive(b)) return false;
                             const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                             const lFamily = Array.isArray(targetLeader.familyIds) ? targetLeader.familyIds : [];
                             return b.id === targetLeader.id || bFamily.includes(targetLeader.id) || lFamily.includes(b.id);
@@ -2351,7 +2351,7 @@ class CommandSystem {
                     b.clan === busho.clan && 
                     b.id !== busho.id &&
                     !b.isDaimyo &&
-                    b.status === 'active'
+                    window.BushoStatusRules.isActive(b)
                 );
 
                 const isLeader = busho.isFactionLeader;
@@ -2597,7 +2597,7 @@ class CommandSystem {
         // 褒美の対象となる武将を集める
         const targets = this.game.bushos.filter(b => 
             b.clan === this.game.playerClanId && 
-            b.status === 'active' && 
+            window.BushoStatusRules.isActive(b) && 
             !b.isDaimyo
         );
 
@@ -3501,7 +3501,7 @@ class CommandSystem {
             return;
         }
 
-        if (!['支配', '従属', '同盟'].includes(myToHelperRel.status)) this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
+        if (!window.DiplomacyRules.isAllianceOrVassal(myToHelperRel.status)) this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
 
         const helperDaimyo = this.game.bushos.find(b => b.clan === helperClanId && b.isDaimyo) || { duty: 50 };
         const reinforcementData = this.game.reinforcementService.createAutoClanReinforcement(

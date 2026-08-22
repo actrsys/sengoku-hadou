@@ -112,6 +112,130 @@ test('設定値参照側に独自フォールバック値を残さない', () =>
     assert.deepStrictEqual(offenders, []);
 });
 
+
+
+test('状態の意味判定は共通Rulesを正本として使える', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    const B = ctx.GameConstants.BushoStatus;
+    const D = ctx.GameConstants.DiplomacyStatus;
+
+    assert.strictEqual(ctx.BushoStatusRules.isActive({ status: B.ACTIVE }), true);
+    assert.strictEqual(ctx.BushoStatusRules.isRonin(B.RONIN), true);
+    assert.strictEqual(ctx.LifeStatusRules.isPresent({ status: B.ACTIVE }), true);
+    assert.strictEqual(ctx.LifeStatusRules.isPresent({ status: B.DEAD }), false);
+    assert.strictEqual(ctx.LifeStatusRules.isUnavailable({ status: B.UNBORN }), true);
+
+    assert.strictEqual(ctx.DiplomacyRules.isAllianceOrVassal(D.ALLIANCE), true);
+    assert.strictEqual(ctx.DiplomacyRules.isAllianceOrVassal(D.FRIENDLY), false);
+    assert.strictEqual(ctx.DiplomacyRules.isFriendly(D.FRIENDLY), true);
+    assert.strictEqual(ctx.DiplomacyRules.isPeaceful(D.TRUCE), true);
+    assert.strictEqual(ctx.DiplomacyRules.isProtectedFromImmediateAttack(D.TRUCE), true);
+    assert.strictEqual(ctx.DiplomacyRules.isBasicSentimentStatus(D.NORMAL), true);
+    assert.strictEqual(ctx.DiplomacyRules.isBasicSentimentStatus(D.ALLIANCE), false);
+});
+
+test('実行時コードは武将active/ronin/dead/unbornを文字列で直接比較しない', () => {
+    const allowed = new Set(['js/constants.js', 'js/models.js', 'js/data_manager.js']);
+    const offenders = [];
+    const walk = dir => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) walk(full);
+            else if (entry.name.endsWith('.js') && !entry.name.endsWith('.min.js')) {
+                const rel = path.relative(ROOT, full).replace(/\\/g, '/');
+                if (allowed.has(rel)) continue;
+                const lines = fs.readFileSync(full, 'utf8').split(/\r?\n/);
+                lines.forEach((line, index) => {
+                    if (/\.status\s*(?:===|!==)\s*['"](?:active|ronin|dead|unborn)['"]/.test(line)) {
+                        offenders.push(`${rel}:${index + 1}`);
+                    }
+                });
+            }
+        }
+    };
+    walk(path.join(ROOT, 'js'));
+    assert.deepStrictEqual(offenders, [], `状態文字列の直接比較: ${offenders.join(', ')}`);
+});
+
+test('同盟・支配・従属の集合判定を各Scriptへ複製しない', () => {
+    const offenders = [];
+    const patterns = [
+        /\[['"]同盟['"],\s*['"]支配['"],\s*['"]従属['"]\]\.includes/,
+        /\[['"]支配['"],\s*['"]従属['"],\s*['"]同盟['"]\]\.includes/,
+        /\[['"]同盟['"],\s*['"]従属['"],\s*['"]支配['"]\]\.includes/
+    ];
+    for (const file of fs.readdirSync(path.join(ROOT, 'js'), { withFileTypes: true })) {
+        if (!file.isFile() || !file.name.endsWith('.js') || file.name.endsWith('.min.js')) continue;
+        const rel = `js/${file.name}`;
+        if (rel === 'js/constants.js') continue;
+        const source = read(rel);
+        if (patterns.some(pattern => pattern.test(source))) offenders.push(rel);
+    }
+    const eventDir = path.join(ROOT, 'js', 'event');
+    for (const name of fs.readdirSync(eventDir)) {
+        if (!name.endsWith('.js')) continue;
+        const rel = `js/event/${name}`;
+        const source = read(rel);
+        if (patterns.some(pattern => pattern.test(source))) offenders.push(rel);
+    }
+    assert.deepStrictEqual(offenders, []);
+});
+
+// ---------------------------------------------------------------------------
+// ユーザー設定
+// ---------------------------------------------------------------------------
+test('UserSettings は GameConfig と分離され、localStorage の正本になる', () => {
+    const values = new Map([
+        ['aiWarNotify', 'false'],
+        ['historicalEvent', 'true'],
+        ['autoSave', 'false'],
+        ['userBgmVolume', '0'],
+        ['userSeVolume', '0.35']
+    ]);
+    const storage = {
+        getItem: key => values.has(key) ? values.get(key) : null,
+        setItem: (key, value) => values.set(key, String(value))
+    };
+    const ctx = createContext({ localStorage: storage });
+    loadScript(ctx, 'js/user_settings.js');
+
+    assert.strictEqual(ctx.UserSettings.aiWarNotify, false);
+    assert.strictEqual(ctx.UserSettings.historicalEvent, true);
+    assert.strictEqual(ctx.UserSettings.autoSave, false);
+    assert.strictEqual(ctx.UserSettings.bgmVolume, 0, 'ミュート(0)を再読込時に100%へ戻さない');
+    assert.strictEqual(ctx.UserSettings.seVolume, 0.35);
+
+    ctx.UserSettings.setAutoSave(true);
+    ctx.UserSettings.setBgmVolume(0.6);
+    assert.strictEqual(values.get('autoSave'), 'true');
+    assert.strictEqual(values.get('userBgmVolume'), '0.6');
+
+    assert.ok(!read('js/ui_settings.js').includes('window.GameConfig.'));
+    assert.ok(!read('js/audio.js').includes('localStorage.'));
+});
+
+test('ユーザー設定キーは user_settings.js 以外で直接localStorage操作しない', () => {
+    const keys = ['aiWarNotify', 'historicalEvent', 'autoSave', 'userBgmVolume', 'userSeVolume'];
+    const offenders = [];
+    const walk = dir => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) walk(full);
+            else if (entry.name.endsWith('.js') && !entry.name.endsWith('.min.js')) {
+                const rel = path.relative(ROOT, full).replace(/\\/g, '/');
+                if (rel === 'js/user_settings.js') continue;
+                const source = fs.readFileSync(full, 'utf8');
+                if (keys.some(key => new RegExp(`localStorage\\.(?:getItem|setItem)\\(['"]${key}['"]`).test(source))) {
+                    offenders.push(rel);
+                }
+            }
+        }
+    };
+    walk(path.join(ROOT, 'js'));
+    assert.deepStrictEqual(offenders, []);
+});
+
 // ---------------------------------------------------------------------------
 // 地図・兵力・援軍
 // ---------------------------------------------------------------------------

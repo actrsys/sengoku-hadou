@@ -699,7 +699,7 @@ class TurnManager {
                 game.writeSystemDiagnostic('player_turn:enter', castle);
     
                 // ★毎月一番最初の自分のターンで、裏側でオートセーブを走らせます！
-                if (!game.hasAutoSavedThisMonth && window.GameConfig && window.GameConfig.autoSave) {
+                if (!game.hasAutoSavedThisMonth && window.UserSettings ? window.UserSettings.autoSave : true) {
                     game.hasAutoSavedThisMonth = true;
                     // ★ゲーム開始直後の最初の月は、意味がないのでオートセーブをスキップします！
                     if (game.year !== game.gameStartYear || game.month !== game.gameStartMonth) {

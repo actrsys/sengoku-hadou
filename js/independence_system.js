@@ -703,7 +703,7 @@ class IndependenceSystem {
     }
 
     resolveSubordinates(castle, newDaimyo, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId = null) {
-        const subordinates = this.game.getCastleBushos(castle.id).filter(b => b.clan === oldClanId && b.status === 'active' && b.id !== newDaimyo.id);
+        const subordinates = this.game.getCastleBushos(castle.id).filter(b => b.clan === oldClanId && window.BushoStatusRules.isActive(b) && b.id !== newDaimyo.id);
         const captives = [], joiners = [];
         const escapeCastles = this.game.castles.filter(c => c.ownerClan === oldClanId && c.id !== castle.id);
         
@@ -761,7 +761,7 @@ class IndependenceSystem {
         const otherCastles = this.game.castles.filter(c => c.ownerClan === oldClanId && c.castellanId !== 0 && c.castellanId !== leader.id);
         otherCastles.forEach(castle => {
             const busho = this.game.getBusho(castle.castellanId);
-            if (busho && busho.clan === oldClanId && busho.status === 'active' && busho.factionId !== 0 && busho.factionId === targetFactionId && !busho.isDaimyo && !busho.isCommander && !busho.isFactionLeader) {
+            if (busho && busho.clan === oldClanId && window.BushoStatusRules.isActive(busho) && busho.factionId !== 0 && busho.factionId === targetFactionId && !busho.isDaimyo && !busho.isCommander && !busho.isFactionLeader) {
                 // ★修正：記憶しておいた元の派閥IDを渡します
                 const { joinScore, stayScore } = this.calculateLoyaltyScores(busho, leader, oldDaimyo, leaderOriginalFactionId);
                 if (joinScore > stayScore) {
@@ -785,7 +785,7 @@ class IndependenceSystem {
         const targetFactionId = (leaderOriginalFactionId !== null && leaderOriginalFactionId !== 0) ? leaderOriginalFactionId : newDaimyo.factionId;
         if (!targetFactionId || targetFactionId === 0) return; 
         
-        const potential = this.game.bushos.filter(b => b.clan === oldClanId && b.status === 'active' && !b.isCastellan && b.factionId === targetFactionId && !b.isDaimyo && !b.isCommander && !b.isFactionLeader);
+        const potential = this.game.bushos.filter(b => b.clan === oldClanId && window.BushoStatusRules.isActive(b) && !b.isCastellan && b.factionId === targetFactionId && !b.isDaimyo && !b.isCommander && !b.isFactionLeader);
         const mainCastle = this.game.castles.find(c => c.castellanId === newDaimyo.id);
         if (!mainCastle) return;
 
@@ -902,7 +902,7 @@ class IndependenceSystem {
         }
 
         // 2. 勢力内の全員を呼び出して、どっちの味方か振り分けます。
-        const allMembers = this.game.bushos.filter(b => b.clan === oldClanId && b.status === 'active');
+        const allMembers = this.game.bushos.filter(b => b.clan === oldClanId && window.BushoStatusRules.isActive(b));
         const totalMembers = allMembers.length;
 
         let rebelMembers = [];
@@ -961,7 +961,7 @@ class IndependenceSystem {
             this.game.ui.log(`【下野】${rebellionLeader.name}は野に下りました。`);
             this.game.affiliationSystem.becomeRonin(rebellionLeader);
             // もし神輿と城主が違う人物なら、城主も一緒に浪人にします
-            if (castellan.id !== rebellionLeader.id && castellan.status === 'active') {
+            if (castellan.id !== rebellionLeader.id && window.BushoStatusRules.isActive(castellan)) {
                 this.game.affiliationSystem.becomeRonin(castellan);
             }
             return;
@@ -1174,7 +1174,7 @@ class IndependenceSystem {
 
                 // ★追加：主家や逃げた武将の「一門」で、まだ登場していない子どもたちを処理します！
                 const unbornFamily = this.game.bushos.filter(b => {
-                    if (b.status !== 'unborn') return false; // まだ登場していない人だけを探します
+                    if (!window.LifeStatusRules.isUnborn(b)) return false; // まだ登場していない人だけを探します
                     
                     // 亡くなった旧大名の一門かチェック
                     const isFamilyOfOldDaimyo = b.familyIds.some(fId => oldDaimyo.familyIds.includes(fId));

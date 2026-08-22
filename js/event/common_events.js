@@ -1616,7 +1616,7 @@ window.GameEvents.push({
     
     execute: async function(game) {
         // 諸勢力の頭領などでない、純粋な「浪人」だけをリストアップします
-        const ronins = game.bushos.filter(b => b.status === 'ronin' && !b.belongKunishuId && !b.isAutoLeader);
+        const ronins = game.bushos.filter(b => window.BushoStatusRules.isRonin(b) && !b.belongKunishuId && !b.isAutoLeader);
         
         // 今月すでに処理した浪人をメモしておく箱です（追い払われた人が移動先で再度判定されないようにします）
         const processedRonins = new Set();
@@ -1630,7 +1630,7 @@ window.GameEvents.push({
             
             const clanId = currentCastle.ownerClan;
             const daimyo = game.getClanDaimyo(clanId);
-            const clanBushos = game.bushos.filter(b => b.clan === clanId && b.status !== 'dead');
+            const clanBushos = game.bushos.filter(b => b.clan === clanId && !window.LifeStatusRules.isDead(b));
             
             // 何らかの理由でその大名家に大名がいなければスキップします
             if (!daimyo) continue;
@@ -1640,7 +1640,7 @@ window.GameEvents.push({
             if (ronin.nemesisIds && ronin.nemesisIds.length > 0) {
                 hasNemesis = ronin.nemesisIds.some(nId => {
                     const nBusho = game.getBusho(nId);
-                    return nBusho && nBusho.clan === clanId && nBusho.status !== 'dead';
+                    return nBusho && nBusho.clan === clanId && !window.LifeStatusRules.isDead(nBusho);
                 });
             }
             // 宿敵がいれば絶対に仕官しないので、次の浪人のチェックへ進みます
@@ -1886,7 +1886,7 @@ window.GameEvents.push({
                 playerOffered = true; // 今月はもうプレイヤーには臣従イベントが来ないようにします
 
                 // 使者役として、対象勢力の武将の中から一番「外交」の能力が高い人を選びます
-                const envoys = game.bushos.filter(b => b.clan === clan.id && b.status === 'active' && !b.isDaimyo).sort((a,b) => b.diplomacy - a.diplomacy);
+                const envoys = game.bushos.filter(b => b.clan === clan.id && window.BushoStatusRules.isActive(b) && !b.isDaimyo).sort((a,b) => b.diplomacy - a.diplomacy);
                 const envoy = envoys.length > 0 ? envoys[0] : aiDaimyo;
 
                 // メッセージでお見せするための名前を綺麗に整えます

@@ -9,8 +9,8 @@ class AudioManager {
         
         // ★ユーザーが設定した音量（最初は1.0＝100%）を覚えておきます。
         // ブラウザに記憶があればそれを読み込みます！
-        this.userBgmVolume = parseFloat(localStorage.getItem('userBgmVolume')) || 1.0;
-        this.userSeVolume = parseFloat(localStorage.getItem('userSeVolume')) || 1.0;
+        this.userBgmVolume = window.UserSettings ? window.UserSettings.bgmVolume : 1.0;
+        this.userSeVolume = window.UserSettings ? window.UserSettings.seVolume : 1.0;
 
         // ==========================================
         // ★ BGMのカタログ（個別の音量調整つき！）
@@ -165,7 +165,7 @@ class AudioManager {
     // BGMの音量を変える（設定画面から呼ばれる魔法です）
     setBgmVolume(ratio) {
         this.userBgmVolume = ratio;
-        localStorage.setItem('userBgmVolume', ratio); // ブラウザに記憶させます
+        if (window.UserSettings) window.UserSettings.setBgmVolume(ratio);
         
         // 今鳴っているBGMがあれば、リアルタイムに音量を変えます
         if (this.bgmPlayer) {
@@ -182,7 +182,7 @@ class AudioManager {
     // SEの音量を変える（設定画面から呼ばれる魔法です）
     setSeVolume(ratio) {
         this.userSeVolume = ratio;
-        localStorage.setItem('userSeVolume', ratio); // ブラウザに記憶させます
+        if (window.UserSettings) window.UserSettings.setSeVolume(ratio);
     }
     
     // SEを鳴らす魔法

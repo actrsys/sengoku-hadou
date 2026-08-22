@@ -337,7 +337,7 @@ class EconomyRules {
         if (!clan || !targetClan) return 0;
         
         const rel = game.getRelation(clanId, targetClanId);
-        if (!rel || !['友好', '同盟', '支配', '従属'].includes(rel.status)) return 0;
+        if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) return 0;
         
         const myCastles = game.getClanCastles(clanId);
         const targetCastles = game.getClanCastles(targetClanId);
@@ -387,7 +387,7 @@ class EconomyRules {
 
     static calcCastleSalary(castle, game) {
         if (!game) return 0;
-        const bushos = game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && b.status === 'active');
+        const bushos = game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b));
         const daimyo = game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
         let consumeGold = 0;
         bushos.forEach(b => {

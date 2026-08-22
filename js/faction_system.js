@@ -15,7 +15,7 @@ class FactionSystem {
      * @param {number} baseAmount 基本変動量 (プラスは不満蓄積、マイナスは恩義/解消)
      */
     updateRecognition(busho, baseAmount) {
-        if (!busho || busho.status === 'ronin' || busho.status === 'dead' || busho.isDaimyo) return;
+        if (!busho || window.BushoStatusRules.isRonin(busho) || window.LifeStatusRules.isDead(busho) || busho.isDaimyo) return;
         
         // パラメータ取得
         const F = window.WarParams.Faction;
@@ -62,7 +62,7 @@ class FactionSystem {
         const decay = F.NaturalDecay;
 
         this.game.bushos.forEach(b => {
-            if (b.status !== 'active' && b.status !== 'ronin') return;
+            if (!window.BushoStatusRules.isActive(b) && !window.BushoStatusRules.isRonin(b)) return;
             if (b.clan === 0) return;
 
             // 1. 承認欲求による忠誠度変化
@@ -98,7 +98,7 @@ class FactionSystem {
 
         // 1. 下野判定
         const roninCandidates = this.game.bushos.filter(b => 
-            b.status === 'active' && 
+            window.BushoStatusRules.isActive(b) && 
             b.clan !== 0 && 
             !b.isDaimyo && 
             !b.isCastellan && 
@@ -167,7 +167,7 @@ class FactionSystem {
         // ★高速化：勢力ごとに毎回4000人をfilterするのをやめ、全武将を最大1回だけ走査します。
         const membersByClan = new Map();
         for (const b of this.game.bushos) {
-            if (b.status !== 'active' || Number(b.clan) === 0) continue;
+            if (!window.BushoStatusRules.isActive(b) || Number(b.clan) === 0) continue;
             if (targetId !== null && Number(b.clan) !== targetId) continue;
             const cid = Number(b.clan);
             if (!membersByClan.has(cid)) membersByClan.set(cid, []);
@@ -590,7 +590,7 @@ class FactionSystem {
         const clanIds = [...new Set(this.game.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))];
         const bushosByClan = new Map();
         this.game.bushos.forEach(b => {
-            if (b.status === 'unborn') return;
+            if (window.LifeStatusRules.isUnborn(b)) return;
             if (!bushosByClan.has(b.clan)) bushosByClan.set(b.clan, []);
             bushosByClan.get(b.clan).push(b);
         });
@@ -607,7 +607,7 @@ class FactionSystem {
                     const currentCastellan = this.game.getBusho(castle.castellanId);
                     if (currentCastellan && currentCastellan.isDaimyo) return;
 
-                    const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && b.status === 'active');
+                    const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b));
                     if (castleBushos.length <= 1) return; 
                     
                     this.game.electCastellan(castle, castleBushos);

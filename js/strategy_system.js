@@ -82,7 +82,7 @@ class StrategySystem {
         for (const c of clanCastles) {
             const members = this.game.getCastleBushos(c.id);
             for (const b of members) {
-                if (!b || Number(b.clan) !== numericClanId || b.status !== 'active') continue;
+                if (!b || Number(b.clan) !== numericClanId || !window.BushoStatusRules.isActive(b)) continue;
                 memberIds.add(Number(b.id));
                 const seen = new Set(Array.isArray(b.familyIds) ? b.familyIds : []);
                 const isOfficer = !!(b.isDaimyo || b.isCastellan || b.isCommander || b.isGunshi);
@@ -161,7 +161,7 @@ class StrategySystem {
         let relMod = 1.0;
         if (relation.status === '敵対') relMod = 1.1;
         else if (relation.status === '和睦') relMod = 0;
-        else if (['同盟', '支配', '従属'].includes(relation.status)) relMod = 0.7;
+        else if (window.DiplomacyRules.isAllianceOrVassal(relation.status)) relMod = 0.7;
         
         let isAdjacent = false;
         const castlesA = this.game.getClanCastles(clanAId);
@@ -324,7 +324,7 @@ class StrategySystem {
         if (target.nemesisIds && target.nemesisIds.length > 0) {
             const hasNemesis = target.nemesisIds.some(nId => {
                 const nBusho = this.game.getBusho(nId);
-                return nBusho && nBusho.clan === doer.clan && nBusho.status !== 'dead';
+                return nBusho && nBusho.clan === doer.clan && !window.LifeStatusRules.isDead(nBusho);
             });
             if (hasNemesis) {
                 successRate *= 0.5;
@@ -359,7 +359,7 @@ class StrategySystem {
 
         // 暗殺対象の拠点にいる、相手と同じ勢力の武将１人につき成功率が６％ダウン。（※暗殺対象本人は含めません）
         if (targetCastle) {
-            const sameClanBushos = this.game.getCastleBushos(targetCastle.id).filter(b => b.clan === target.clan && b.status === 'active' && b.id !== target.id);
+            const sameClanBushos = this.game.getCastleBushos(targetCastle.id).filter(b => b.clan === target.clan && window.BushoStatusRules.isActive(b) && b.id !== target.id);
             prob -= (sameClanBushos.length * 0.06);
         }
 
@@ -497,7 +497,7 @@ class StrategySystem {
 
     // ★追加：城の中にいる一番武力の高い武将と、一番智謀の高い武将の能力を調べる魔法です
     getCastleBestStats(castleId) {
-        const bushos = this.game.getCastleBushos(castleId).filter(b => b.status === 'active');
+        const bushos = this.game.getCastleBushos(castleId).filter(b => window.BushoStatusRules.isActive(b));
         let bestStr = 0;
         let bestInt = 0;
         bushos.forEach(b => {
@@ -653,7 +653,7 @@ class StrategySystem {
                 captiveMsgs = this.game.independenceSystem.resolveSubordinates(oldCastle, target, targetLord, newClanId, oldClanId);
                 
                 this.game.getCastleBushos(oldCastle.id).forEach(b => {
-                    if (b.clan === newClanId && b.status === 'active') {
+                    if (b.clan === newClanId && window.BushoStatusRules.isActive(b)) {
                         this.game.affiliationSystem.updateLoyaltyForNewLord(b, newClanId);
                     }
                 });
@@ -661,7 +661,7 @@ class StrategySystem {
                 const myGunshi = this.game.bushos.find(b => b.clan === newClanId && b.isGunshi);
                 this.game.getCastleBushos(oldCastle.id).forEach(b => {
                     if (!myGunshi || b.id !== myGunshi.id) {
-                        if (b.clan === newClanId && b.status === 'active') {
+                        if (b.clan === newClanId && window.BushoStatusRules.isActive(b)) {
                             b.isGunshi = false;
                         }
                     }

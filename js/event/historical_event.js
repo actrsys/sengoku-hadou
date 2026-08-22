@@ -24,13 +24,13 @@ window.EventCheck = {
     // 3. 指定したIDの武将が存在して、「生きている（活動中か浪人）」か確認します
     isAlive: function(game, bushoId) {
         const busho = game.getBusho(bushoId);
-        return busho ? (busho.status !== 'dead' && busho.status !== 'unborn') : false;
+        return busho ? (window.LifeStatusRules.isPresent(busho)) : false;
     },
     
     // 4. 指定したIDの武将が存在して、「死んでいる」か確認します
     isDead: function(game, bushoId) {
         const busho = game.getBusho(bushoId);
-        return busho ? (busho.status === 'dead') : false;
+        return busho ? (window.LifeStatusRules.isDead(busho)) : false;
     },
     
     // 5. 指定したIDの武将が存在して、「大名として活動しているか」確認します（はい/いいえ のみ）
@@ -230,7 +230,7 @@ window.EventAction = {
         });
 
         // ③ 吸収される側の武将（除外ID以外）を吸収する大名家に入れます
-        const myBushos = game.bushos.filter(b => Number(b.clan) === Number(subordinateClanId) && b.status !== 'dead' && b.id !== excludeBushoId);
+        const myBushos = game.bushos.filter(b => Number(b.clan) === Number(subordinateClanId) && !window.LifeStatusRules.isDead(b) && b.id !== excludeBushoId);
         myBushos.forEach(b => {
             if (fixedLoyalty !== null && game.affiliationSystem && game.affiliationSystem.joinClan) {
                 // 忠誠度が指定されている場合（臣従イベントなど）はお引越しセンターの魔法を使います
@@ -296,7 +296,7 @@ window.GameEvents.push({
         // 織田家と今川家が、同盟・従属・支配・友好関係ではないこと
         if (game.diplomacyManager) {
             const rel = game.diplomacyManager.getRelation(imagawaClanId, nobunaga.clan);
-            if (rel && ['同盟', '従属', '支配', '友好'].includes(rel.status)) {
+            if (rel && window.DiplomacyRules.isFriendly(rel.status)) {
                 return false;
             }
         }
@@ -449,7 +449,7 @@ window.GameEvents.push({
         if (game.diplomacyManager) {
             // 織田家と今川家の関係が、同盟・従属・支配・友好・和睦ではないことを確認します
             const rel = game.diplomacyManager.getRelation(odaClanId, imagawaClanId);
-            if (rel && ['同盟', '従属', '支配', '友好', '和睦'].includes(rel.status)) {
+            if (rel && window.DiplomacyRules.isPeaceful(rel.status)) {
                 return false; // もし対象の関係だったら、ここでイベントをストップします
             }
 
@@ -492,11 +492,11 @@ window.GameEvents.push({
 
         // ⑥ ★追加：イベントの配役に必要な人数の武将が揃っているか確認します
         // 織田家には信長以外に「5人」の武将が必要です
-        const odaBushosCount = game.bushos.filter(b => b.clan === odaClanId && b.status === 'active' && b.id !== nobunaga.id).length;
+        const odaBushosCount = game.bushos.filter(b => b.clan === odaClanId && window.BushoStatusRules.isActive(b) && b.id !== nobunaga.id).length;
         if (odaBushosCount < 5) return false;
 
         // 今川家には義元と家康以外に「1人」の武将が必要です
-        const imagawaBushosCount = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && b.id !== yoshimoto.id && b.id !== 1301006).length;
+        const imagawaBushosCount = game.bushos.filter(b => b.clan === imagawaClanId && window.BushoStatusRules.isActive(b) && b.id !== yoshimoto.id && b.id !== 1301006).length;
         if (imagawaBushosCount < 1) return false;
         
         // すべての条件をクリアしたら、イベントを発生させます！
@@ -513,7 +513,7 @@ window.GameEvents.push({
 
         // --- 1. 武将の配役決定（オーディション） ---
         // 織田家にいる武将（信長以外）を全員集めます
-        let odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.status === 'active' && b.id !== nobunaga.id);
+        let odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && window.BushoStatusRules.isActive(b) && b.id !== nobunaga.id);
 
         // 重臣A（林秀貞）: 貢献度600以上で外交最高。いなければ貢献度最高の中で外交最高。
         let juushinA = odaBushos.filter(b => b.achievementTotal >= 600).sort((a, b) => (b.diplomacy || 0) - (a.diplomacy || 0))[0];
@@ -545,7 +545,7 @@ window.GameEvents.push({
 
         // 今川家重臣Fの選出
         let juushinF = null;
-        let imagawaBushosForF = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && b.id !== yoshimoto.id && b.id !== 1301006);
+        let imagawaBushosForF = game.bushos.filter(b => b.clan === imagawaClanId && window.BushoStatusRules.isActive(b) && b.id !== yoshimoto.id && b.id !== 1301006);
 
         // 1. 今川家所属の軍師
         juushinF = imagawaBushosForF.find(b => b.isGunshi);
@@ -738,7 +738,7 @@ window.GameEvents.push({
                 // 本来の寿命（originalEndYear）が1560年以前で、討死フラグがあり、除外IDではない活動中の武将を探します
                 const deadBushos = game.bushos.filter(b => 
                     b.clan === target.clanId && 
-                    b.status === 'active' && 
+                    window.BushoStatusRules.isActive(b) && 
                     b.originalEndYear <= 1560 && 
                     b.isKilledInBattle && 
                     b.id !== target.excludeId
@@ -792,14 +792,14 @@ window.GameEvents.push({
             const bonusPopulation = Math.floor(totalLostPopulation / 2);
 
             // ★義元死亡後、今川勢力に所属する松平系（1301000～1301999）以外の武将の忠誠度を15回復します※難易度調整とイベントの進行ための調整用。今は一旦無効
-            // const imagawaRemainingBushos = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && !(b.id >= 1301000 && b.id <= 1301999));
+            // const imagawaRemainingBushos = game.bushos.filter(b => b.clan === imagawaClanId && window.BushoStatusRules.isActive(b) && !(b.id >= 1301000 && b.id <= 1301999));
             // imagawaRemainingBushos.forEach(b => {
             //     b.loyalty = Math.min(100, (b.loyalty || 0) + 15);
             // });
 
             // 織田家に勝利のボーナス（忠誠と民忠アップ、そして今川から減った分の半分の兵士・人口）を与えます
             if (nobunaga && nobunaga.clan > 0) {
-                const odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.status === 'active');
+                const odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && window.BushoStatusRules.isActive(b));
                 odaBushos.forEach(b => {
                     b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
                 });
@@ -898,7 +898,7 @@ window.GameEvents.push({
         if (!castle) return;
 
         // ★独立させる直前に、松平系（ID: 1301000～1301999）の武将の忠誠度を20下げます
-        const matsudairaBushosBefore = game.bushos.filter(b => b.clan === ujizane.clan && b.status === 'active' && b.id >= 1301000 && b.id <= 1301999);
+        const matsudairaBushosBefore = game.bushos.filter(b => b.clan === ujizane.clan && window.BushoStatusRules.isActive(b) && b.id >= 1301000 && b.id <= 1301999);
         matsudairaBushosBefore.forEach(b => {
             b.loyalty = Math.max(0, (b.loyalty || 0) - 20);
         });
@@ -911,7 +911,7 @@ window.GameEvents.push({
             // ★追加：独立した徳川家康の大名家に所属する武将と城のボーナス処理
             if (motoyasu.clan > 0) {
                 // 武将の忠誠度を+10（最大100まで）
-                const matsudairaBushos = game.bushos.filter(b => b.clan === motoyasu.clan && b.status === 'active');
+                const matsudairaBushos = game.bushos.filter(b => b.clan === motoyasu.clan && window.BushoStatusRules.isActive(b));
                 matsudairaBushos.forEach(b => {
                     b.loyalty = Math.min(100, (b.loyalty || 0) + 10);
                 });
@@ -1004,11 +1004,11 @@ window.GameEvents.push({
 
         // ★追加：イベントの配役に必要な人数の武将が揃っているか確認します
         // 徳川家には家康以外に「2人」の武将が必要です
-        const matsuBushosCount = game.bushos.filter(b => b.clan === motoyasu.clan && b.id !== motoyasu.id && b.status === 'active').length;
+        const matsuBushosCount = game.bushos.filter(b => b.clan === motoyasu.clan && b.id !== motoyasu.id && window.BushoStatusRules.isActive(b)).length;
         if (matsuBushosCount < 2) return false;
 
         // 織田家には信長以外に「1人」の武将が必要です
-        const odaBushosCount = game.bushos.filter(b => b.clan === nobunaga.clan && b.id !== nobunaga.id && b.status === 'active').length;
+        const odaBushosCount = game.bushos.filter(b => b.clan === nobunaga.clan && b.id !== nobunaga.id && window.BushoStatusRules.isActive(b)).length;
         if (odaBushosCount < 1) return false;
 
         // すべての条件を満たしたらイベント発生です！
@@ -1044,7 +1044,7 @@ window.GameEvents.push({
 
         // --- ここから徳川家の配役を選出します ---
         // まず、徳川家に所属していて、家康以外の活動中の武将を全員集めます
-        let matsuBushos = game.bushos.filter(b => b.clan === motoyasu.clan && b.id !== motoyasu.id && b.status === 'active');
+        let matsuBushos = game.bushos.filter(b => b.clan === motoyasu.clan && b.id !== motoyasu.id && window.BushoStatusRules.isActive(b));
         
         // 徳川家臣A：統率がもっとも高い武将
         let kashinA = matsuBushos.sort((a, b) => (b.leadership || 0) - (a.leadership || 0))[0];
@@ -1056,7 +1056,7 @@ window.GameEvents.push({
 
         // --- ここから織田家の配役を選出します ---
         // 織田家に所属していて、信長以外の活動中の武将を全員集めます
-        let odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.id !== nobunaga.id && b.status === 'active');
+        let odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.id !== nobunaga.id && window.BushoStatusRules.isActive(b));
         
         // 織田家新参C：功績が300以下で、智謀がもっとも高い武将
         let shinzanC = odaBushos.filter(b => (b.achievementTotal || 0) <= 300).sort((a, b) => (b.intelligence || 0) - (a.intelligence || 0))[0];
@@ -1324,7 +1324,7 @@ window.GameEvents.push({
 
         // 3. 浅井長政（ID: 1015005）が存在し、久政と同じ勢力に所属しているか確認します
         const nagamasa = game.getBusho(1015005);
-        if (!nagamasa || nagamasa.status !== 'active' || nagamasa.clan !== hisamasa.clan) return false;
+        if (!nagamasa || !window.BushoStatusRules.isActive(nagamasa) || nagamasa.clan !== hisamasa.clan) return false;
 
         // 4. 1561年以降であるか確認します
         if (game.year < 1561) return false;
@@ -1528,16 +1528,16 @@ window.GameEvents.push({
 
         // 7. 織田勝長（ID: 1006013）が存在し、織田信長勢力に所属しているか（生まれていて未登場の場合も含む）確認します
         const katsunaga = game.getBusho(1006013);
-        if (!katsunaga || katsunaga.status === 'dead' || katsunaga.status === 'not_born') return false;
+        if (!katsunaga || window.LifeStatusRules.isDead(katsunaga) || katsunaga.status === 'not_born') return false;
         
         // 勝長が「生まれているが未登場（unborn）」で、出生前フラグが立っている場合はダメ
-        if (katsunaga.status === 'unborn' && katsunaga.isNotBorn) return false;
+        if (window.LifeStatusRules.isUnborn(katsunaga) && katsunaga.isNotBorn) return false;
         
         // 勝長の所属が織田家か、未登場なら父親の所属が織田家か確認します
         let belongsToOda = false;
         if (katsunaga.clan === nobunaga.clan) {
             belongsToOda = true;
-        } else if (katsunaga.status === 'unborn' && katsunaga.realFatherId > 0) {
+        } else if (window.LifeStatusRules.isUnborn(katsunaga) && katsunaga.realFatherId > 0) {
             const father = game.getBusho(katsunaga.realFatherId);
             if (father && father.clan === nobunaga.clan) {
                 belongsToOda = true;
@@ -1598,7 +1598,7 @@ window.GameEvents.push({
         // 3. 織田勝長が遠山景任の居城の城主になる
         // ----------------------------------------------------
         // 勝長がまだ未登場（unborn）の場合は、ゲームに登場（active）させます
-        if (katsunaga.status === 'unborn') {
+        if (window.LifeStatusRules.isUnborn(katsunaga)) {
             game.affiliationSystem.setActivityStatusRaw(katsunaga, window.GameConstants.BushoStatus.ACTIVE);
             katsunaga.loyalty = 100; // 初登場時は忠誠度100にします
         }
@@ -1926,7 +1926,7 @@ window.GameEvents.push({
     checkCondition: function(game) {
         // 1. 三好長慶（ID: 1020005）が死亡しているか確認します
         const nagayoshi = game.getBusho(1020005);
-        if (nagayoshi && nagayoshi.status !== 'dead') return false;
+        if (nagayoshi && !window.LifeStatusRules.isDead(nagayoshi)) return false;
 
         // 2. 三好義継（ID: 1020014）が大名として存在するか確認します
         const yoshitsugu = window.EventCheck.getDaimyo(game, 1020014);
@@ -1939,7 +1939,7 @@ window.GameEvents.push({
         for (let id of requiredMembers) {
             const member = game.getBusho(id);
             // 死んでいる、生まれていない、浪人、または三好家以外にいる場合はイベントが起きません
-            if (!member || member.status === 'dead' || member.status === 'unborn' || member.status === 'ronin' || member.clan !== miyoshiClanId) {
+            if (!member || window.LifeStatusRules.isUnavailable(member) || window.BushoStatusRules.isRonin(member) || member.clan !== miyoshiClanId) {
                 return false;
             }
         }
@@ -2065,7 +2065,7 @@ window.GameEvents.push({
         await game.lifeSystem.executeDeath(yoshiteru);
 
         // ③ 武将を浪人にする
-        const ashikagaBushos = game.bushos.filter(b => b.clan === ashikagaClanId && b.status === 'active');
+        const ashikagaBushos = game.bushos.filter(b => b.clan === ashikagaClanId && window.BushoStatusRules.isActive(b));
         ashikagaBushos.forEach(b => {
             game.affiliationSystem.becomeRonin(b);
         });
@@ -2221,7 +2221,7 @@ window.GameEvents.push({
         targetBushos.forEach(b => b.loyalty = 100);
 
         // 朝倉勢力の武将すべての忠誠度が５アップする。（上限１００）
-        const asakuraBushos = game.bushos.filter(b => b.clan === asakuraClanId && b.status === 'active');
+        const asakuraBushos = game.bushos.filter(b => b.clan === asakuraClanId && window.BushoStatusRules.isActive(b));
         asakuraBushos.forEach(b => {
             b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
         });
@@ -2561,7 +2561,7 @@ window.GameEvents.push({
         // 明智光秀の家臣（ID1201000～ID1201999）が朝倉に居れば一緒に移籍
         game.bushos.forEach(b => {
             // 死亡している武将以外（現役、または未登場）ならそのまま移籍リストに入れます
-            if (b.id >= 1201000 && b.id <= 1201999 && b.clan === asakuraClanId && b.id !== 1201003 && b.status !== 'dead') {
+            if (b.id >= 1201000 && b.id <= 1201999 && b.clan === asakuraClanId && b.id !== 1201003 && !window.LifeStatusRules.isDead(b)) {
                 targetBushos.push(b);
             }
         });
@@ -2577,7 +2577,7 @@ window.GameEvents.push({
         });
 
         // 織田勢力の武将すべての忠誠度が５アップする。（上限１００）
-        const odaBushos = game.bushos.filter(b => b.clan === nobunagaClanId && b.status === 'active' && !targetBushos.includes(b));
+        const odaBushos = game.bushos.filter(b => b.clan === nobunagaClanId && window.BushoStatusRules.isActive(b) && !targetBushos.includes(b));
         odaBushos.forEach(b => {
             b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
         });
@@ -2629,7 +2629,7 @@ window.GameEvents.push({
                 const relation = game.diplomacyManager.getRelation(nobunagaClanId, clanId);
                 if (relation) {
                     // 友好・同盟・支配・従属・和睦 は除く
-                    if (!['友好', '同盟', '支配', '従属', '和睦'].includes(relation.status)) {
+                    if (!window.DiplomacyRules.isPeaceful(relation.status)) {
                         game.diplomacyManager.changeStatus(nobunagaClanId, clanId, '敵対', 0);
                         const relA = game.diplomacyManager.getRelation(nobunagaClanId, clanId);
                         const relB = game.diplomacyManager.getRelation(clanId, nobunagaClanId);
@@ -2642,7 +2642,7 @@ window.GameEvents.push({
             // ★ここから追加：織田勢力と松永勢力の友好度を100にします
             // 松永勢力がもし織田勢力と同盟・支配・従属関係ではない場合は同盟します
             let hisahideRel = game.diplomacyManager.getRelation(nobunagaClanId, hisahideClanId);
-            if (hisahideRel && !['同盟', '支配', '従属'].includes(hisahideRel.status)) {
+            if (hisahideRel && !window.DiplomacyRules.isAllianceOrVassal(hisahideRel.status)) {
                 game.diplomacyManager.changeStatus(nobunagaClanId, hisahideClanId, '同盟', 0);
             }
             const relA_hisahide = game.diplomacyManager.getRelation(nobunagaClanId, hisahideClanId);
@@ -2908,7 +2908,7 @@ window.GameEvents.push({
                     // 大名でも城主でもないこと
                     if (!b.isDaimyo && !b.isCastellan) {
                         // 活動中、または浪人であること
-                        if (b.status === 'active' || b.status === 'ronin') {
+                        if (window.BushoStatusRules.isActive(b) || window.BushoStatusRules.isRonin(b)) {
                             followers.push(b); // 条件をすべて満たしたらリストに入れます
                         }
                     }
@@ -2985,7 +2985,7 @@ window.GameEvents.push({
         });
 
         // 将軍擁立勢力に所属するすべての武将の忠誠度を上げます
-        const sponsorBushos = game.bushos.filter(b => b.clan === sponsorClanId && b.status === 'active');
+        const sponsorBushos = game.bushos.filter(b => b.clan === sponsorClanId && window.BushoStatusRules.isActive(b));
         sponsorBushos.forEach(b => {
             b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
         });
@@ -3011,7 +3011,7 @@ window.GameEvents.push({
                 const relWithSponsor = game.diplomacyManager.getRelation(sponsorClanId, otherClan.id);
                 let condition1 = false;
                 if (relWithSponsor) {
-                    if (relWithSponsor.sentiment >= 70 || ['同盟', '支配', '従属'].includes(relWithSponsor.status)) {
+                    if (relWithSponsor.sentiment >= 70 || window.DiplomacyRules.isAllianceOrVassal(relWithSponsor.status)) {
                         condition1 = true;
                     }
                 }
@@ -3091,7 +3091,7 @@ window.GameEvents.push({
         if (!castle) return;
 
         // ★独立させる直前に、三好家に所属する松永系（1202000～1202999）の武将の忠誠度を15下げます
-        const matsunagaBushosBefore = game.bushos.filter(b => b.clan === yoshitsugu.clan && b.status === 'active' && b.id >= 1202000 && b.id <= 1202999);
+        const matsunagaBushosBefore = game.bushos.filter(b => b.clan === yoshitsugu.clan && window.BushoStatusRules.isActive(b) && b.id >= 1202000 && b.id <= 1202999);
         matsunagaBushosBefore.forEach(b => {
             b.loyalty = Math.max(0, (b.loyalty || 0) - 15);
         });
@@ -3129,7 +3129,7 @@ window.GameEvents.push({
         const miyoshiClanId = yoshitsugu.clan;
         for (let id of trioIds) {
             const member = game.getBusho(id);
-            if (!member || member.status !== 'active' || member.clan !== miyoshiClanId) {
+            if (!member || !window.BushoStatusRules.isActive(member) || member.clan !== miyoshiClanId) {
                 return false;
             }
         }
@@ -3185,7 +3185,7 @@ window.GameEvents.push({
 
         // 対象以外の武将の忠誠度を減らします
         const trioList = [1020021, 1020024, 1020029]; // 三好三人衆の出席番号リスト
-        const miyoshiBushos = game.bushos.filter(b => b.clan === miyoshiClanId && b.status === 'active');
+        const miyoshiBushos = game.bushos.filter(b => b.clan === miyoshiClanId && window.BushoStatusRules.isActive(b));
         miyoshiBushos.forEach(b => {
             // 三好三人衆ではなく、かつ、池田・荒木関連（1203000～1203999）でもない場合
             if (!trioList.includes(b.id) && !(b.id >= 1203000 && b.id <= 1203999)) {
@@ -3289,7 +3289,7 @@ window.GameEvents.push({
         
         // 元々松永家が持っていたお城のリストを覚えておきます（後の信貴山城の判定用）
         const matsunagaCastles = game.getClanCastles(matsunagaClanId);
-        const matsunagaBushos = game.bushos.filter(b => b.clan === matsunagaClanId && b.status === 'active');
+        const matsunagaBushos = game.bushos.filter(b => b.clan === matsunagaClanId && window.BushoStatusRules.isActive(b));
 
         // ①・②・④ 勢力の吸収と武将の合流処理（内部処理）
         // （第5引数に100を渡すことで、全員の忠誠度が100で合流します）
@@ -3348,7 +3348,7 @@ window.GameEvents.push({
     checkCondition: function(game) {
         // 1. 池田長正（ID: 1203002）が死亡しているか確認します
         const nagamasa = game.getBusho(1203002);
-        if (nagamasa && nagamasa.status !== 'dead') return false;
+        if (nagamasa && !window.LifeStatusRules.isDead(nagamasa)) return false;
         
         // 2. 三好義継（ID: 1020014）または三好長逸（ID: 1020021）が大名であるか確認します
         const miyoshiDaimyo = window.EventCheck.getDaimyo(game, [1020014, 1020021]);
@@ -3605,7 +3605,7 @@ window.GameEvents.push({
         });
 
         // ① 三好家所属でIDが1203000～1203999の武将を全員集めます
-        const targetBushos = game.bushos.filter(b => b.clan === miyoshiClanId && b.status === 'active' && b.id >= 1203000 && b.id <= 1203999);
+        const targetBushos = game.bushos.filter(b => b.clan === miyoshiClanId && window.BushoStatusRules.isActive(b) && b.id >= 1203000 && b.id <= 1203999);
         
         // その人たちのうち、対象の城以外にいる人を本城（mainCastle）に集めます
         targetBushos.forEach(busho => {
@@ -3618,7 +3618,7 @@ window.GameEvents.push({
 
         // ② 対象の城にいる人で、今回は降伏しない人（対象ID以外）を長逸の居城へ逃がします
         targetCastles.forEach(castle => {
-            const residents = game.bushos.filter(b => b.castleId === castle.id && b.status === 'active');
+            const residents = game.bushos.filter(b => b.castleId === castle.id && window.BushoStatusRules.isActive(b));
             residents.forEach(busho => {
                 // IDの範囲外の人がいれば、お引越しさせます
                 if (busho.id < 1203000 || busho.id > 1203999) {
@@ -3848,7 +3848,7 @@ window.GameEvents.push({
 
         // ４．最上義光（ID: 1089012）が存在し、義守と同じ勢力に所属しているか確認します
         const yoshiaki = game.getBusho(1089012);
-        if (!yoshiaki || yoshiaki.status !== 'active' || yoshiaki.clan !== yoshimori.clan) return false;
+        if (!yoshiaki || !window.BushoStatusRules.isActive(yoshiaki) || yoshiaki.clan !== yoshimori.clan) return false;
 
         // すべての条件をクリアしたらイベント発生の合図を出します！
         return true;
@@ -3928,7 +3928,7 @@ window.GameEvents.push({
         if (!castle) return;
 
         // ★謀反を起こす直前に、浦上家に所属する宇喜多系（1210000～1210999）の武将の忠誠度を15下げます
-        const ukitaBushos = game.bushos.filter(b => b.clan === munekage.clan && b.status === 'active' && b.id >= 1210000 && b.id <= 1210999);
+        const ukitaBushos = game.bushos.filter(b => b.clan === munekage.clan && window.BushoStatusRules.isActive(b) && b.id >= 1210000 && b.id <= 1210999);
         ukitaBushos.forEach(b => {
             b.loyalty = Math.max(0, (b.loyalty || 0) - 15);
         });
@@ -3962,7 +3962,7 @@ window.GameEvents.push({
 
         // 4. 北畠具房（ID: 1024005）が存在し、具教と同じ勢力に所属しているか確認します
         const tomofusa = game.getBusho(1024005);
-        if (!tomofusa || tomofusa.status !== 'active' || tomofusa.clan !== tomonori.clan) return false;
+        if (!tomofusa || !window.BushoStatusRules.isActive(tomofusa) || tomofusa.clan !== tomonori.clan) return false;
 
         // すべての条件をクリアしたらイベント発生です！
         return true;
@@ -4015,7 +4015,7 @@ window.GameEvents.push({
 
         // 4. 伊達輝宗（ID: 1074008）が存在し、晴宗と同じ勢力に所属しているか確認します
         const terumune = game.getBusho(1074008);
-        if (!terumune || terumune.status !== 'active' || terumune.clan !== harumune.clan) return false;
+        if (!terumune || !window.BushoStatusRules.isActive(terumune) || terumune.clan !== harumune.clan) return false;
 
         // すべての条件をクリアしたらイベント発生です！
         return true;
@@ -4108,14 +4108,14 @@ window.GameEvents.push({
         const takedaReqIds = [1002077, 1002013, 1002041, 1002059];
         for (let id of takedaReqIds) {
             const b = game.getBusho(id);
-            if (!b || b.status !== 'active' || b.clan !== takedaClanId) return false;
+            if (!b || !window.BushoStatusRules.isActive(b) || b.clan !== takedaClanId) return false;
         }
 
         // 8. 柿崎景家、甘粕景持 が上杉に所属し生存していること
         const uesugiReqIds = [1001026, 1001016];
         for (let id of uesugiReqIds) {
             const b = game.getBusho(id);
-            if (!b || b.status !== 'active' || b.clan !== uesugiClanId) return false;
+            if (!b || !window.BushoStatusRules.isActive(b) || b.clan !== uesugiClanId) return false;
         }
 
         // すべての条件を満たしたらイベント発生の合図を出します

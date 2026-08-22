@@ -257,7 +257,7 @@ class GameManager {
             // ★今回追加：ゲーム開始時に、武将の年齢と得意な能力に応じた経験値をプレゼントします！
             this.bushos.forEach(b => {
                 // まだ生まれていない武将は対象外とします
-                if (b.status === 'unborn') return;
+                if (window.LifeStatusRules.isUnborn(b)) return;
 
                 // 年齢を計算します（現在の年 - 生まれた年）
                 let age = this.year - b.birthYear;
@@ -496,7 +496,7 @@ class GameManager {
         return this._clanCastlesMap.get(Number(clanId)) || [];
     }
     // ★ 修正：まだ生まれていない人（unborn）や亡くなった人（dead）は無視するようにします
-    getCastleBushos(cid) { const c = this.getCastle(cid); return c ? c.samuraiIds.map(id => this.getBusho(id)).filter(b => b && b.status !== 'unborn' && b.status !== 'dead') : []; }
+    getCastleBushos(cid) { const c = this.getCastle(cid); return c ? c.samuraiIds.map(id => this.getBusho(id)).filter(b => b && window.LifeStatusRules.isPresent(b)) : []; }
     getCurrentTurnCastle() { return this.turnQueue[this.currentIndex]; }
     getCurrentTurnId() { return this.year * 12 + this.month; }
     getClanTotalSoldiers(clanId) { return this.getClanCastles(clanId).reduce((sum, c) => sum + c.soldiers, 0); }
@@ -504,9 +504,9 @@ class GameManager {
         const clan = this.getClan(clanId);
         if (clan && clan.gunshiId) {
             const gunshi = this.getBusho(clan.gunshiId);
-            if (gunshi && Number(gunshi.clan) === Number(clanId) && gunshi.isGunshi && gunshi.status === 'active') return gunshi;
+            if (gunshi && Number(gunshi.clan) === Number(clanId) && gunshi.isGunshi && window.BushoStatusRules.isActive(gunshi)) return gunshi;
         }
-        return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi && b.status === 'active');
+        return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi && window.BushoStatusRules.isActive(b));
     }
 
     getNavigatorInfo(castle) {

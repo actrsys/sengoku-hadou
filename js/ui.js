@@ -1921,7 +1921,7 @@ class UIManager {
         // ★城にいるアクティブな自軍武将の数を数える魔法です！
         let activeBushoCount = 0;
         if (castle.ownerClan !== 0 && this.game && this.game.bushos) {
-            activeBushoCount = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === castle.ownerClan && b.status === 'active').length;
+            activeBushoCount = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b)).length;
         }
 
         // ★ここから追加：城が「保護期間（戦乱）」かどうかをチェックする魔法です！
@@ -2085,7 +2085,7 @@ class UIManager {
         let roninCount = 0;
         if (this.game && this.game.bushos) {
             // 状態が「浪人（ronin）」になっている人を数えるように変更します！
-            roninCount = this.game.bushos.filter(b => b.castleId === castle.id && b.status === 'ronin').length;
+            roninCount = this.game.bushos.filter(b => b.castleId === castle.id && window.BushoStatusRules.isRonin(b)).length;
         }
 
         // ★今の城がある「国（地方）」の米相場を調べます！

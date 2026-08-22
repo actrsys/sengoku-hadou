@@ -13,7 +13,7 @@ Object.assign(WarManager.prototype, {
         if (isPlayerInvolved) return true;
         
         // AI戦争の通知設定がオフで、かつプレイヤーの勢力が一切関わっていなければ非表示（false）にします
-        const isNotifyOff = window.GameConfig && window.GameConfig.aiWarNotify === false;
+        const isNotifyOff = window.UserSettings && window.UserSettings.aiWarNotify === false;
         if (isNotifyOff && !isPlayerFactionInvolved) return false;
         
         // それ以外（通知オン、またはプレイヤーの勢力が関わっている）なら表示します
@@ -239,7 +239,7 @@ Object.assign(WarManager.prototype, {
         const allyVal = getPerceivedSoldiers(allySoldiers);
         const enemyVal = getPerceivedSoldiers(enemySoldiers);
 
-        const helperBushos = this.game.getCastleBushos(helperCastle.id).filter(b => b.status === 'active' && b.clan === pid);
+        const helperBushos = this.game.getCastleBushos(helperCastle.id).filter(b => window.BushoStatusRules.isActive(b) && b.clan === pid);
         let helperMsg = "誰も在城しておりません。";
         if (helperBushos.length > 0) {
             helperBushos.sort((a,b) => (b.leadership + b.strength) - (a.leadership + a.strength));
@@ -821,7 +821,7 @@ Object.assign(WarManager.prototype, {
                             } else onResult('siege');
                         }
                     } else {
-                        let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status === 'active' && (defCastle.isKunishu ? b.belongKunishuId === defCastle.kunishuId : (b.clan === defCastle.ownerClan && b.belongKunishuId === 0)));
+                        let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => window.BushoStatusRules.isActive(b) && (defCastle.isKunishu ? b.belongKunishuId === defCastle.kunishuId : (b.clan === defCastle.ownerClan && b.belongKunishuId === 0)));
                         let evaluator = availableDefBushos.find(b => b.isDaimyo);
                         if (!evaluator) evaluator = availableDefBushos.find(b => b.isCastellan);
                         
@@ -1241,7 +1241,7 @@ Object.assign(WarManager.prototype, {
                 
                 const capturedBushos = [];
                 this.game.getCastleBushos(defCastle.id).forEach(b => { 
-                    if (b.status === 'ronin') return;
+                    if (window.BushoStatusRules.isRonin(b)) return;
                     // ★ 追加: 諸勢力の武将は撤退戦に巻き込まれて捕虜にならないようにします！
                     if (b.belongKunishuId > 0) return;
 
@@ -1266,7 +1266,7 @@ Object.assign(WarManager.prototype, {
                 
                 defCastle.samuraiIds = defCastle.samuraiIds.filter(id => {
                     const busho = this.game.getBusho(id);
-                    return busho && busho.status === 'ronin';
+                    return busho && window.BushoStatusRules.isRonin(busho);
                 });
                 
                 defCastle.castellanId = 0;
@@ -1806,7 +1806,7 @@ Object.assign(WarManager.prototype, {
                     targetC.samuraiIds = targetC.samuraiIds.filter(id => {
                         const busho = this.game.getBusho(id);
                         // 諸勢力のメンバーか、浪人になって城に残った人だけリストに残します
-                        return kunishuMembers.includes(id) || (busho && busho.status === 'ronin');
+                        return kunishuMembers.includes(id) || (busho && window.BushoStatusRules.isRonin(busho));
                     });
                     
                     resultMsg = `諸勢力の反乱により、${targetC.name}が陥落し空白地となりました。`;
@@ -1854,7 +1854,7 @@ Object.assign(WarManager.prototype, {
 
             s.atkBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
             // ★大名の戦いなら諸勢力を弾き、諸勢力の戦いなら大名を弾く魔法！
-            const defBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.status === 'active' && (s.defender.isKunishu ? b.belongKunishuId === s.defender.kunishuId : (b.clan === s.defender.ownerClan && b.belongKunishuId === 0))).concat(this.pendingPrisoners);
+            const defBushos = this.game.getCastleBushos(s.defender.id).filter(b => window.BushoStatusRules.isActive(b) && (s.defender.isKunishu ? b.belongKunishuId === s.defender.kunishuId : (b.clan === s.defender.ownerClan && b.belongKunishuId === 0))).concat(this.pendingPrisoners);
             if (s.defBusho && s.defBusho.id && !defBushos.find(b => b.id === s.defBusho.id)) defBushos.push(s.defBusho);
             defBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
 
@@ -2191,7 +2191,7 @@ Object.assign(WarManager.prototype, {
 
         losers.forEach(b => { 
             // ★ 修正: 未登場の武将を巻き込んで捕虜や浪人にしないように守ります！
-            if (b.status === 'ronin' || b.status === 'unborn' || b.status === 'dead') return;
+            if (window.BushoStatusRules.isRonin(b) || window.LifeStatusRules.isUnavailable(b)) return;
             // ★ 修正: 諸勢力に所属している武将は、どんな城の戦いでも絶対に巻き添えで捕虜にならないように守ります！
             if (b.belongKunishuId > 0) return;
 
@@ -2296,7 +2296,7 @@ Object.assign(WarManager.prototype, {
             // ★追加：登用を選んだので、チャレンジ回数を1回増やします！
             prisoner.hireChallengeCount = (prisoner.hireChallengeCount || 0) + 1;
 
-            const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId && b.status !== 'unborn');
+            const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId && !window.LifeStatusRules.isUnborn(b));
             const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0];
             
             if (!isExtinct) {
@@ -2412,7 +2412,7 @@ Object.assign(WarManager.prototype, {
 
     async processHireList(selectedIds) {
         // 選ばれた武将たちを順番に登用していきます
-        const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId && b.status !== 'unborn'); 
+        const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId && !window.LifeStatusRules.isUnborn(b)); 
         const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0];
         const targetC = this.game.getCurrentTurnCastle();
 
@@ -2630,7 +2630,7 @@ Object.assign(WarManager.prototype, {
         // ★軽量化：勝者勢力の全武将を毎回filterせず、既存の大名索引を使います。
         // 大名が存在しない特殊ケースだけ従来相当の代表者検索へフォールバックします。
         const recruiter = this.game.getClanDaimyo(winnerClanId) ||
-            this.game.bushos.find(b => b.clan === winnerClanId && b.status !== 'unborn') ||
+            this.game.bushos.find(b => b.clan === winnerClanId && !window.LifeStatusRules.isUnborn(b)) ||
             { charm: 50, affinity: 0 };
 
         // ★大名から先に処理するように並べ替えます
@@ -3213,7 +3213,7 @@ Object.assign(WarManager.prototype, {
             return;
         }
 
-        if (!myToHelperRel || !['支配', '従属', '同盟'].includes(myToHelperRel.status)) this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
+        if (!myToHelperRel || !window.DiplomacyRules.isAllianceOrVassal(myToHelperRel.status)) this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
 
         const helperDaimyo = this.game.getClanDaimyo(helperClanId) || { duty: 50 };
         this.state.defReinforcement = this.game.reinforcementService.createAutoClanReinforcement(
@@ -3322,7 +3322,7 @@ Object.assign(WarManager.prototype, {
         
         // 斬られた武将の元の同僚（同じ大名家に所属する武将）全員をチェック
         this.game.bushos.forEach(b => {
-            if (b.clan === victimClanId && b.status === 'active' && b.id !== executedBusho.id) {
+            if (b.clan === victimClanId && window.BushoStatusRules.isActive(b) && b.id !== executedBusho.id) {
                 if (!b.nemesisList) b.nemesisList = [];
                 
                 // 既に宿敵リストにいるか確認
@@ -3363,7 +3363,7 @@ Object.assign(WarManager.prototype, {
         }
 
         // 一門の武将が自勢力にいる場合は成功率+0.2
-        const hasFamily = this.game.bushos.some(b => b.clan === targetClanId && b.status !== 'dead' && b.id !== prisoner.id && b.familyIds && prisoner.familyIds && b.familyIds.some(fId => prisoner.familyIds.includes(fId)));
+        const hasFamily = this.game.bushos.some(b => b.clan === targetClanId && !window.LifeStatusRules.isDead(b) && b.id !== prisoner.id && b.familyIds && prisoner.familyIds && b.familyIds.some(fId => prisoner.familyIds.includes(fId)));
         if (hasFamily) {
             hireProb += 0.2;
             hireProb = Math.max(0, Math.min(0.99, hireProb));
@@ -3373,7 +3373,7 @@ Object.assign(WarManager.prototype, {
         if (prisoner.nemesisIds && prisoner.nemesisIds.length > 0) {
             const hasNemesis = prisoner.nemesisIds.some(nId => {
                 const nBusho = this.game.getBusho(nId);
-                return nBusho && nBusho.clan === targetClanId && nBusho.status !== 'dead';
+                return nBusho && nBusho.clan === targetClanId && !window.LifeStatusRules.isDead(nBusho);
             });
             if (hasNemesis) {
                 hireProb *= 0.5;
@@ -3436,7 +3436,7 @@ Object.assign(WarManager.prototype, {
             await this.game.ui.showDialogAsync(msg);
         }
 
-        const defBushos = this.game.bushos.filter(b => b.clan === defClanId && b.status === 'active');
+        const defBushos = this.game.bushos.filter(b => b.clan === defClanId && window.BushoStatusRules.isActive(b));
         const oldDaimyo = defBushos.find(b => b.isDaimyo) || defBushos[0];
 
         // 1. 落とされた側の全武将の忠誠度を30下げます（大名以外）
@@ -3561,7 +3561,7 @@ Object.assign(WarManager.prototype, {
 
         // 3. ★変更：すべての処理が終わった一番最後に、大名を裏で浪人にします！
         // (ダイアログやログは直後の滅亡判定システムに任せるため無言で行います)
-        if (oldDaimyo && oldDaimyo.status !== 'dead') {
+        if (oldDaimyo && !window.LifeStatusRules.isDead(oldDaimyo)) {
             // 大名バッジを外して、お引越しセンターに頼んで確実に浪人にします
             oldDaimyo.isDaimyo = false;
             this.game.affiliationSystem.becomeRonin(oldDaimyo);

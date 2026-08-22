@@ -40,19 +40,19 @@ Object.assign(UIInfoManager.prototype, {
         // ★ メイン画面と全く同じ仕様での「武将」と「浪人」のカウント
         let activeBushoCount = 0;
         if (castle.ownerClan !== 0 && this.game && this.game.bushos) {
-            activeBushoCount = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === castle.ownerClan && b.status === 'active').length;
+            activeBushoCount = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b)).length;
         }
 
         let roninCount = 0;
         if (this.game && this.game.bushos) {
-            roninCount = this.game.bushos.filter(b => b.castleId === castle.id && b.status === 'ronin').length;
+            roninCount = this.game.bushos.filter(b => b.castleId === castle.id && window.BushoStatusRules.isRonin(b)).length;
         }
 
         // ボタン活性化チェック用（武将＋浪人）
         const targetBushos = this.game.bushos.filter(b => {
             if (b.castleId !== castle.id) return false;
-            if (b.status === 'ronin') return true;
-            if (castle.ownerClan > 0 && b.status === 'active' && b.clan === castle.ownerClan) return true;
+            if (window.BushoStatusRules.isRonin(b)) return true;
+            if (castle.ownerClan > 0 && window.BushoStatusRules.isActive(b) && b.clan === castle.ownerClan) return true;
             return false;
         });
         const bushoCount = targetBushos.length;
@@ -278,7 +278,7 @@ Object.assign(UIInfoManager.prototype, {
         const castleBushoStatsMap = new Map();
         if (this.game.bushos) {
             this.game.bushos.forEach(b => {
-                if (b.status === 'active' && b.clan > 0) {
+                if (window.BushoStatusRules.isActive(b) && b.clan > 0) {
                     if (!castleBushoStatsMap.has(b.castleId)) {
                         castleBushoStatsMap.set(b.castleId, { count: 0, salary: 0 });
                     }

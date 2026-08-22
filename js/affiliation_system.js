@@ -69,7 +69,7 @@ class AffiliationSystem {
         this.setClanIdRaw(busho, newClanId);
         
         // ★修正：死亡や未登場の武将は状態を強制的に変えないようにします
-        if (busho.status !== 'dead' && busho.status !== 'unborn') {
+        if (window.LifeStatusRules.isPresent(busho)) {
             this.setActivityStatusRaw(busho, window.GameConstants.BushoStatus.ACTIVE);
         }
         
@@ -191,7 +191,7 @@ class AffiliationSystem {
         this.setClanIdRaw(busho, 0);
         
         // ★修正：死亡や未登場の武将は状態を強制的に変えないようにします
-        if (busho.status !== 'dead' && busho.status !== 'unborn') {
+        if (window.LifeStatusRules.isPresent(busho)) {
             this.setActivityStatusRaw(busho, window.GameConstants.BushoStatus.RONIN);
             busho.loyalty = 50; // ★浪人になったので、忠誠度を50にします！
         }
@@ -382,7 +382,7 @@ class AffiliationSystem {
 
         // すでに浪人化された旧家臣を回収する
         this.game.bushos.forEach(b => {
-            if (b.status === 'ronin' && b._lastClanId === oldClanId && b.id !== busho.id) {
+            if (window.BushoStatusRules.isRonin(b) && b._lastClanId === oldClanId && b.id !== busho.id) {
                 this._joinSurvivalKunishu(b, newKunishu);
             }
         });
@@ -399,7 +399,7 @@ class AffiliationSystem {
         this.setClanIdRaw(busho, 0);
         
         // ★修正：死亡や未登場の武将は状態を強制的に変えないようにします
-        if (busho.status !== 'dead' && busho.status !== 'unborn') {
+        if (window.LifeStatusRules.isPresent(busho)) {
             this.setActivityStatusRaw(busho, window.GameConstants.BushoStatus.ACTIVE);
         }
         
@@ -493,7 +493,7 @@ class AffiliationSystem {
         const newCastle = this.game.getCastle(newCastleId);
         if (newCastle) {
             // ★修正：死亡や未登場の武将はお城のリストには入れないようにします
-            if (busho.status !== 'dead' && busho.status !== 'unborn') {
+            if (window.LifeStatusRules.isPresent(busho)) {
                 // お城のリストに自分がいなければ、名前を書きます
                 if (!newCastle.samuraiIds.some(id => Number(id) === Number(busho.id))) {
                     newCastle.samuraiIds.push(Number(busho.id));
@@ -595,7 +595,7 @@ class AffiliationSystem {
                 const myClanBushos = [];
                 this.game.getClanCastles(castle.ownerClan).forEach(c => {
                     this.game.getCastleBushos(c.id).forEach(b => {
-                        if (b.clan === castle.ownerClan && b.status === 'active') myClanBushos.push(b);
+                        if (b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b)) myClanBushos.push(b);
                     });
                 });
 
@@ -632,7 +632,7 @@ class AffiliationSystem {
             return;
         }
 
-        const bushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && b.status === 'active');
+        const bushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b));
         if (bushos.length === 0) {
             castle.castellanId = 0;
             return;
@@ -764,7 +764,7 @@ class AffiliationSystem {
      */
      processRoninMovements() {
         // 全武将から「浪人」かつ「諸勢力に所属していない（IDが0または未定義）」武将を抽出
-        const ronins = this.game.bushos.filter(b => b.status === 'ronin' && !b.belongKunishuId);
+        const ronins = this.game.bushos.filter(b => window.BushoStatusRules.isRonin(b) && !b.belongKunishuId);
         
         ronins.forEach(r => {
             const currentC = this.game.getCastle(r.castleId); 

@@ -45,7 +45,7 @@ class DiplomacyManager {
             } else {
                 // どちらも持っていなければ、初期値の50になります
                 clan.diplomacyValue[targetId] = {
-                    status: '普通', // 状態: '普通', '友好', '敵対', '同盟', '支配', '従属', '和睦'
+                    status: window.GameConstants.DiplomacyStatus.NORMAL, // 状態値の正本は GameConstants
                     sentiment: 50,  // 感情値: 0 - 100
                     trucePeriod: 0, // ★初期値は0にします
                     isMarriage: false, // ★今回追加：最初は結婚のシールは貼っていません
@@ -78,13 +78,13 @@ class DiplomacyManager {
             data.sentiment = Math.max(0, Math.min(100, data.sentiment + delta));
             
             // ★変更：和睦中も、勝手に状態が戻らないように保護します！
-            if (['普通', '友好', '敵対'].includes(data.status)) {
+            if (window.DiplomacyRules.isBasicSentimentStatus(data.status)) {
                 if (data.sentiment >= 70) {
-                    data.status = '友好';
+                    data.status = window.GameConstants.DiplomacyStatus.FRIENDLY;
                 } else if (data.sentiment <= 30) {
-                    data.status = '敵対';
+                    data.status = window.GameConstants.DiplomacyStatus.HOSTILE;
                 } else {
-                    data.status = '普通';
+                    data.status = window.GameConstants.DiplomacyStatus.NORMAL;
                 }
             }
         };
@@ -105,23 +105,23 @@ class DiplomacyManager {
 
         // ★追加：新しく設定される状態が「支配」でも「従属」でもない場合は、継続期間をリセットします。
         // （元々が支配・従属ではなく、今回新しく支配・従属になった場合も0からスタートさせます）
-        if (!['支配', '従属'].includes(newStatus) || !['支配', '従属'].includes(dataA.status)) {
+        if (!window.DiplomacyRules.isVassalRelation(newStatus) || !window.DiplomacyRules.isVassalRelation(dataA.status)) {
             dataA.subordinateMonths = 0;
             dataB.subordinateMonths = 0;
         }
 
         dataA.status = newStatus;
-        if (newStatus === '和睦') dataA.trucePeriod = trucePeriod;
+        if (newStatus === window.GameConstants.DiplomacyStatus.TRUCE) dataA.trucePeriod = trucePeriod;
 
         // 状態の反転処理と同調
-        if (newStatus === '支配') {
-            dataB.status = '従属';
-        } else if (newStatus === '従属') {
-            dataB.status = '支配';
+        if (newStatus === window.GameConstants.DiplomacyStatus.DOMINANT) {
+            dataB.status = window.GameConstants.DiplomacyStatus.SUBORDINATE;
+        } else if (newStatus === window.GameConstants.DiplomacyStatus.SUBORDINATE) {
+            dataB.status = window.GameConstants.DiplomacyStatus.DOMINANT;
         } else {
             // 同盟・敵対・和睦などは共通
             dataB.status = newStatus;
-            if (newStatus === '和睦') dataB.trucePeriod = trucePeriod;
+            if (newStatus === window.GameConstants.DiplomacyStatus.TRUCE) dataB.trucePeriod = trucePeriod;
         }
 
         // ★今回追加：関係が変化したので、両方の大名家の「今月の外交目標」をリセットします！
@@ -147,23 +147,23 @@ class DiplomacyManager {
                 const data = clan.diplomacyValue[targetId];
                 
                 // ★追加：状態が「支配」か「従属」だったら、継続期間を1ヶ月増やします
-                if (data.status === '支配' || data.status === '従属') {
+                if (window.DiplomacyRules.isVassalRelation(data.status)) {
                     data.subordinateMonths = (data.subordinateMonths || 0) + 1;
                 }
 
                 // もし状態が「和睦」で、期間が1以上残っていたら…
-                if (data.status === '和睦' && data.trucePeriod > 0) {
+                if (data.status === window.GameConstants.DiplomacyStatus.TRUCE && data.trucePeriod > 0) {
                     data.trucePeriod -= 1; // 期間を1ヶ月減らします
                     
                     // 減らした結果、期間が0になったら…
                     if (data.trucePeriod <= 0) {
                         // 感情値（仲の良さ）に合わせて、元の状態に戻します！
                         if (data.sentiment >= 70) {
-                            data.status = '友好';
+                            data.status = window.GameConstants.DiplomacyStatus.FRIENDLY;
                         } else if (data.sentiment <= 30) {
-                            data.status = '敵対';
+                            data.status = window.GameConstants.DiplomacyStatus.HOSTILE;
                         } else {
-                            data.status = '普通';
+                            data.status = window.GameConstants.DiplomacyStatus.NORMAL;
                         }
                     }
                 }
@@ -179,7 +179,7 @@ class DiplomacyManager {
         this.game.clans.forEach(c => {
             if (c.id !== 0 && c.id !== clanId && !c.isDestroyed) {
                 const r = this.getRelation(clanId, c.id);
-                if (r && ['同盟', '支配', '従属'].includes(r.status)) {
+                if (r && window.DiplomacyRules.isAllianceOrVassal(r.status)) {
                     count++;
                 }
             }
@@ -200,13 +200,13 @@ class DiplomacyManager {
             const rel = this.getRelation(myClanId, targetClanId);
             
             // ① 共通の敵がいる場合
-            if (targetToThreatRel && targetToThreatRel.status === '敵対' && myToThreatRel && myToThreatRel.status === '敵対') {
+            if (targetToThreatRel && window.DiplomacyRules.isHostile(targetToThreatRel.status) && myToThreatRel && window.DiplomacyRules.isHostile(myToThreatRel.status)) {
                 isStrategicPartner = true;
                 priorityBonus += 1000;
             } 
             // ② 敵対していない相手で、怖い敵の背後を突ける場合
-            else if (rel.status !== '敵対') {
-                const isFriendlyWithThreat = targetToThreatRel && ['同盟', '支配', '従属', '友好'].includes(targetToThreatRel.status);
+            else if (!window.DiplomacyRules.isHostile(rel.status)) {
+                const isFriendlyWithThreat = targetToThreatRel && window.DiplomacyRules.isFriendly(targetToThreatRel.status);
                 if (!isFriendlyWithThreat) {
                     let isAdjacent = false;
                     const threatCastles = this.game.getClanCastles(mainThreatId);
@@ -244,7 +244,7 @@ class DiplomacyManager {
             priority += strategic.priorityBonus;
             
             // 2. 現在の仲の良さで評価する
-            if (rel.status !== '敵対') {
+            if (!window.DiplomacyRules.isHostile(rel.status)) {
                 priority += rel.sentiment * 2;
             } else {
                 priority -= 500;
@@ -338,7 +338,7 @@ class DiplomacyManager {
             }
             
             // ★友好・同盟・支配・従属のいずれかの関係なら最終的な確率に+50%、和睦は+30%します
-            if (['友好', '同盟', '支配', '従属'].includes(relation.status)) {
+            if (window.DiplomacyRules.isFriendly(relation.status)) {
                 acceptProb += 50;
             } else if (relation.status === '和睦') {
                 acceptProb += 30;
@@ -347,7 +347,7 @@ class DiplomacyManager {
             finalProb = Math.max(0, Math.min(100, acceptProb));
 
             // ★兵力差などで確率が下がっても、必ず50%以上の成功率になるお守り
-            if (['友好', '同盟', '支配', '従属'].includes(relation.status) && finalProb < 50) {
+            if (window.DiplomacyRules.isFriendly(relation.status) && finalProb < 50) {
                 finalProb = 50;
             }
         }
@@ -747,7 +747,7 @@ class DiplomacyManager {
         // 忠誠低下を防ぐ効果がなければ、そのまま低下させます
         if (isBreakDomination && !mods.preventLoyaltyDrop) {
             this.game.bushos.forEach(busho => {
-                if (busho.clan === doerClanId && busho.status === 'active' && !busho.isDaimyo) {
+                if (busho.clan === doerClanId && window.BushoStatusRules.isActive(busho) && !busho.isDaimyo) {
                     busho.loyalty = Math.max(0, busho.loyalty - 5); 
                 }
             });
@@ -1215,7 +1215,7 @@ class DiplomacyManager {
                                 
                                 if (myBushos.length > 0) {
                                     myBushos.forEach(b => {
-                                        if (b.status === 'dead') {
+                                        if (window.LifeStatusRules.isDead(b)) {
                                             aiResultMsgs.push(`人質として送っていた ${b.name} は${clanName} によって処断されました……`);
                                             this.game.ui.log(`${b.name} は ${clanName} によって処断されました`);
                                         } else if (b.clan === cId) {
@@ -1627,7 +1627,7 @@ class DiplomacyManager {
         const myLegionCastles = myCastles.filter(c => c.legionId === castleA.legionId);
         const daimyo = this.game.getClanDaimyo(subordinateClanId);
         const isDaimyoInA = (daimyo && daimyo.castleId === castleId);
-        const commanderInA = this.game.bushos.find(b => b.castleId === castleId && b.isCommander && b.status === 'active');
+        const commanderInA = this.game.bushos.find(b => b.castleId === castleId && b.isCommander && window.BushoStatusRules.isActive(b));
 
         let castleB = null;
 
@@ -1665,7 +1665,7 @@ class DiplomacyManager {
 
         if (!castleB) castleB = myCastles[0];
 
-        const bushosInA = this.game.getCastleBushos(castleId).filter(b => b.clan === subordinateClanId && b.status === 'active');
+        const bushosInA = this.game.getCastleBushos(castleId).filter(b => b.clan === subordinateClanId && window.BushoStatusRules.isActive(b));
         const lordB = this.game.getBusho(castleB.castellanId);
 
         if (isDaimyoInA && castleB.legionId !== 0 && lordB && lordB.isCommander) {
@@ -1804,7 +1804,7 @@ class DiplomacyManager {
         }
 
         if (availablePrincess) {
-            const domBushos = this.game.bushos.filter(b => b.clan === dominantClanId && b.status === 'active' && !b.female);
+            const domBushos = this.game.bushos.filter(b => b.clan === dominantClanId && window.BushoStatusRules.isActive(b) && !b.female);
             const domDaimyo = this.game.getClanDaimyo(dominantClanId);
             
             domBushos.sort((a, b) => {
@@ -1835,7 +1835,7 @@ class DiplomacyManager {
         if (daimyo) {
             const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
             const kinsmen = this.game.bushos.filter(b => {
-                if (b.clan !== subordinateClanId || b.isDaimyo || b.status !== 'active') return false;
+                if (b.clan !== subordinateClanId || b.isDaimyo || !window.BushoStatusRules.isActive(b)) return false;
                 const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                 return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
             });
@@ -2276,7 +2276,7 @@ class DiplomacyManager {
                     }
                 }
                 if (availablePrincess) {
-                    const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && b.status === 'active' && !b.female);
+                    const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && window.BushoStatusRules.isActive(b) && !b.female);
                     if (tgtBushos.length > 0) {
                         const targetBusho = tgtBushos.find(b => !b.wifeIds || b.wifeIds.length === 0) || tgtBushos[0];
                         options.push({ type: 'marriage', princess: availablePrincess, busho: targetBusho });
@@ -2288,7 +2288,7 @@ class DiplomacyManager {
                 if (reqDaimyo) {
                     const dFamily = Array.isArray(reqDaimyo.familyIds) ? reqDaimyo.familyIds : [];
                     const kinsmen = this.game.bushos.filter(b => {
-                        if (b.clan !== doer.clan || b.isDaimyo || b.status !== 'active') return false;
+                        if (b.clan !== doer.clan || b.isDaimyo || !window.BushoStatusRules.isActive(b)) return false;
                         const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                         return bFamily.includes(reqDaimyo.id) || dFamily.includes(b.id);
                     });
@@ -2710,7 +2710,7 @@ class DiplomacyManager {
                 let goodwillThreshold = isStrategicPartner ? (window.AIParams.AI.GoodwillThreshold) + 20 : (window.AIParams.AI.GoodwillThreshold);
 
                 // ★追加：同盟、支配、従属関係にある相手には、関係値が100になるまで親善の対象にします！
-                if (['同盟', '支配', '従属'].includes(rel.status)) {
+                if (window.DiplomacyRules.isAllianceOrVassal(rel.status)) {
                     goodwillThreshold = 100;
                 }
 
@@ -2738,7 +2738,7 @@ class DiplomacyManager {
                      }
 
                      // ★追加：同盟・支配・従属相手への親善は、大名の義理が低いほどサボりやすくなります！
-                     if (willGoodwill && ['同盟', '支配', '従属'].includes(rel.status)) {
+                     if (willGoodwill && window.DiplomacyRules.isAllianceOrVassal(rel.status)) {
                          // 義理100で1.0(100%実行)、義理0で0.5(50%の確率で実行)になる計算式です
                          let executeProb = 0.5 + (myDaimyoDuty / 200);
                          // ★追加：臣従を目指している時は、サボる確率を少し減らします（確率を+20%アップ）
@@ -2801,7 +2801,7 @@ class DiplomacyManager {
                      }
                 } else if (rel.sentiment > allianceThreshold) {
                      // ★追加：すでに同盟や支配をしている相手には、新しく「同盟」の提案はしません
-                     if (!['同盟', '支配', '従属'].includes(rel.status)) {
+                     if (!window.DiplomacyRules.isAllianceOrVassal(rel.status)) {
                          return { action: 'alliance', gold: 0 };
                      }
                 }
@@ -2842,7 +2842,7 @@ class DiplomacyManager {
                 if (!clan || clan.isDestroyed) return;
                 
                 const r = this.getRelation(myClanId, clanId);
-                if (r && !['同盟', '支配', '従属'].includes(r.status)) {
+                if (r && !window.DiplomacyRules.isAllianceOrVassal(r.status)) {
                     const p = Math.max(1, clan.daimyoPrestige);
                     if (minEnemyPower === -1 || p < minEnemyPower) {
                         minEnemyPower = p;
@@ -2958,7 +2958,7 @@ class DiplomacyManager {
                 const isNextToEnemy = targetOrAdjacentIds.has(Number(c.id));
                 
                 if (isConnected || isNextToEnemy) {
-                    const availableBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active');
+                    const availableBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b));
                     // 守備の場合は兵糧も500必要
                     const minRice = isDefending ? 500 : 0;
                     
@@ -2982,7 +2982,7 @@ class DiplomacyManager {
                         // 除外
                     } else {
                         const enemyRel = this.getRelation(cOwnerClanId, actualEnemyClanId);
-                        const isEnemyAlly = enemyRel && ['同盟', '支配', '従属', '和睦'].includes(enemyRel.status);
+                        const isEnemyAlly = enemyRel && window.DiplomacyRules.isProtectedFromImmediateAttack(enemyRel.status);
                         const isEnemyMaxGoodwill = enemyRel && enemyRel.sentiment >= 100;
                         
                         // 敵と仲良し過ぎないかチェック（戦争相手と同盟・支配・従属等ではないか）
@@ -2990,7 +2990,7 @@ class DiplomacyManager {
                             
                             // ★自分と「同盟・支配・従属」関係にあるかをチェックします！
                             const myRel = this.getRelation(Number(myClanId), cOwnerClanId);
-                            const isMyAllyOrVassal = myRel && ['同盟', '支配', '従属'].includes(myRel.status);
+                            const isMyAllyOrVassal = myRel && window.DiplomacyRules.isAllianceOrVassal(myRel.status);
                             
                             // ★同盟・支配・従属関係であれば、自勢力を通って繋がる拠点（攻撃先と隣接していなくても）を援軍として呼べるようにします！
                             let isConnected = false;
@@ -3002,7 +3002,7 @@ class DiplomacyManager {
                             const isNextToEnemy = !isDefending && (targetOrAdjacentIds.has(Number(c.id)));
                             
                             if (isConnected || isNextToEnemy) {
-                                const availableBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active');
+                                const availableBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b));
                                 const minRice = isDefending ? 500 : 0;
                                 
                                 if (c.soldiers >= 1000 && c.rice >= minRice && availableBushos.length > 0) {
@@ -3082,7 +3082,7 @@ class DiplomacyManager {
                 for (let pId of reqClan.princessIds) {
                     const p = this.game.princesses.find(pr => pr.id === pId && pr.status === 'unmarried' && pr.id >= 90000);
                     if (p) {
-                        const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && b.status === 'active' && (!b.wifeIds || b.wifeIds.length === 0) && !b.female);
+                        const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && window.BushoStatusRules.isActive(b) && (!b.wifeIds || b.wifeIds.length === 0) && !b.female);
                         if (tgtBushos.length > 0) {
                             options.push({ type: 'marriage', princess: p, busho: tgtBushos[0] });
                         }
@@ -3096,7 +3096,7 @@ class DiplomacyManager {
             if (reqDaimyo) {
                 const dFamily = Array.isArray(reqDaimyo.familyIds) ? reqDaimyo.familyIds : [];
                 const kinsmen = this.game.bushos.filter(b => {
-                    if (b.clan !== requestClanId || b.isDaimyo || b.status !== 'active') return false;
+                    if (b.clan !== requestClanId || b.isDaimyo || !window.BushoStatusRules.isActive(b)) return false;
                     const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                     return bFamily.includes(reqDaimyo.id) || dFamily.includes(b.id);
                 });
@@ -3162,7 +3162,7 @@ class DiplomacyManager {
         }
 
         if (availablePrincess) {
-            const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && b.status === 'active' && !b.female);
+            const tgtBushos = this.game.bushos.filter(b => b.clan === targetClanId && window.BushoStatusRules.isActive(b) && !b.female);
             const tgtDaimyo = this.game.getClanDaimyo(targetClanId);
             
             tgtBushos.sort((a, b) => {
@@ -3193,7 +3193,7 @@ class DiplomacyManager {
         if (daimyo) {
             const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
             const kinsmen = this.game.bushos.filter(b => {
-                if (b.clan !== requestClanId || b.isDaimyo || b.status !== 'active') return false;
+                if (b.clan !== requestClanId || b.isDaimyo || !window.BushoStatusRules.isActive(b)) return false;
                 const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                 return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
             });

@@ -52,7 +52,7 @@ class AIStaffing {
                     canPass = true; // 自分の大名家なら他の軍団の城でも通行OK
                 } else if (n.ownerClan !== 0) {
                     const rel = this.game.getRelation(clanId, n.ownerClan);
-                    if (rel && ['同盟', '支配', '従属'].includes(rel.status)) {
+                    if (rel && window.DiplomacyRules.isAllianceOrVassal(rel.status)) {
                         canPass = true; // 同盟・支配・従属の勢力も通行OK
                     }
                 }
@@ -179,7 +179,7 @@ class AIStaffing {
             // ==========================================
             const castleBushos = this.game.getCastleBushos(castle.id).filter(b => 
                 b.clan === castle.ownerClan && 
-                b.status === 'active' && 
+                window.BushoStatusRules.isActive(b) && 
                 b.id !== castellan.id &&
                 !b.isDaimyo &&         // ★追加：大名はお供にしない！
                 !b.isCommander         // ★追加：国主もお供にしない！
@@ -325,7 +325,7 @@ class AIStaffing {
         if (candidateCastles.length === 0) return false; // ★変更：失敗時は false を返す
         
         // 新国主の選定
-        const myBushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active');
+        const myBushos = this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b));
         let candidates = myBushos.filter(b => !b.isDaimyo && !b.isCommander && (b.achievementTotal || 0) >= 1000);
         if (candidates.length === 0) return false; // ★変更：失敗時は false を返す
         
@@ -404,7 +404,7 @@ class AIStaffing {
                         break;
                     } else if (adjCastle.ownerClan !== clanId) {
                         const rel = this.game.getRelation(clanId, adjCastle.ownerClan);
-                        if (!rel || !['同盟', '支配', '従属'].includes(rel.status)) {
+                        if (!rel || !window.DiplomacyRules.isAllianceOrVassal(rel.status)) {
                             hasEnemyNeighbor = true; // 敵対や和睦も油断できない敵扱い
                             break;
                         }
@@ -420,7 +420,7 @@ class AIStaffing {
         
         // 1. 元々軍団の対象となる城にいる武将をカウント
         targetCastles.forEach(c => {
-            const bushosInCastle = this.game.getCastleBushos(c.id).filter(b => b.clan === clanId && b.status === 'active');
+            const bushosInCastle = this.game.getCastleBushos(c.id).filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b));
             bushosInCastle.forEach(b => futureLegionBushoIds.add(b.id));
         });
         
@@ -431,7 +431,7 @@ class AIStaffing {
         if (newCommander.factionId !== 0) {
             const sameFactionBushos = this.game.bushos.filter(b => 
                 b.clan === clanId && 
-                b.status === 'active' && 
+                window.BushoStatusRules.isActive(b) && 
                 b.factionId === newCommander.factionId && 
                 !b.isDaimyo && 
                 !b.isCommander && 
@@ -468,7 +468,7 @@ class AIStaffing {
             // 同じ大名家で、活動中で、同じ派閥で、大名・国主・城主・軍師ではない人を探します
             const sameFactionBushos = this.game.bushos.filter(b => 
                 b.clan === clanId && 
-                b.status === 'active' && 
+                window.BushoStatusRules.isActive(b) && 
                 b.factionId === newCommander.factionId && 
                 !b.isDaimyo && 
                 !b.isCommander && 
@@ -537,7 +537,7 @@ class AIStaffing {
             let legionBushoCount = 0;
             legionCastles.forEach(c => {
                 // その城にいる活動中の自勢力武将の数を足します
-                const bushosInCastle = this.game.getCastleBushos(c.id).filter(b => b.clan === clanId && b.status === 'active');
+                const bushosInCastle = this.game.getCastleBushos(c.id).filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b));
                 legionBushoCount += bushosInCastle.length;
             });
             
@@ -568,7 +568,7 @@ class AIStaffing {
                             // 自分以外の勢力なら、関係を調べます
                             const rel = this.game.getRelation(clanId, adjCastle.ownerClan);
                             // 同盟・支配・従属「以外」なら敵扱い（和睦や友好も油断できないとみなします）
-                            if (!rel || !['同盟', '支配', '従属'].includes(rel.status)) {
+                            if (!rel || !window.DiplomacyRules.isAllianceOrVassal(rel.status)) {
                                 hasEnemyNeighbor = true;
                                 break;
                             }
@@ -612,7 +612,7 @@ class AIStaffing {
             return this.evaluationCache[clanId].bushoTypes;
         }
 
-        const myBushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active');
+        const myBushos = this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b));
         
         let totalSum = 0;
         let highestTotal = 0;
@@ -853,7 +853,7 @@ class AIStaffing {
                     canPass = true;
                 } else if (n.ownerClan !== 0) {
                     const rel = this.game.getRelation(clanId, n.ownerClan);
-                    if (rel && ['同盟', '支配', '従属'].includes(rel.status)) {
+                    if (rel && window.DiplomacyRules.isAllianceOrVassal(rel.status)) {
                         canPass = true;
                     }
                 }

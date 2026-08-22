@@ -18,8 +18,9 @@
 ## 入口・基盤
 
 - `js/app_bootstrap.js` — ブラウザ起動処理。フォント、固定HTMLボタン、viewport、離脱警告。
-- `js/config.js` — ゲームバランス値の正本。
-- `js/constants.js` — 状態文字列などの共通定数と共通状態判定。
+- `js/config.js` — ゲームルール・バランス値の正本。ユーザー個人の設定は置かない。
+- `js/constants.js` — 状態文字列と、複数状態をまとめた意味判定（LifeStatusRules / BushoStatusRules / DiplomacyRules）の正本。
+- `js/user_settings.js` — 通知・歴史イベント・オートセーブ・音量などユーザー個人設定とlocalStorageの正本。
 - `js/game.js` — GameManager。ゲーム全体の司令塔。専門部署へ仕事を振る。
 - `js/turn_manager.js` — 月初・各拠点ターン・月末の進行順を管理。
 - `js/data_manager.js` — シナリオ、CSV/BIN、地図データの読み込み。
@@ -105,12 +106,14 @@
 
 ## 今後の優先整理対象
 
-1. 所属・城所有者・武将の活動/生死状態の書き換え境界を維持し、直接代入の再発をテストで防ぐ。
-2. モデル境界を維持し、残るグローバル設定依存やモデル内の周辺世界判定を必要に応じてさらに薄くする。
-3. 定数・状態判定の残りを専門Rulesへ寄せる。
-4. UI分離の残件と重複CSSを、ビジュアル回帰テストを通しながら整理する。
-5. `TurnManager` 内の月次計算を、必要な単位で既存Rules/Systemへ寄せる（小ファイル乱立は避ける）。
-6. `command_system.js`、`war_effort.js`、`field_war.js`、`diplomacy.js`、`ai.js` の巨大責務を整理する。
+1. 定数・状態判定の共通RulesとUserSettingsの境界を維持し、文字列集合やlocalStorage処理の再分散をテストで防ぐ。
+2. UI分離の残件と重複CSSを、ビジュアル回帰テストを通しながら整理する。
+3. `TurnManager` 内の月次計算を、必要な単位で既存Rules/Systemへ寄せる（小ファイル乱立は避ける）。
+4. `command_system.js` のコマンド可否・実行・戦争準備など巨大責務を整理する。
+5. `war_effort.js` / `field_war.js` の戦争Rules・進行・View・AI混在を整理する。
+6. `diplomacy.js` / `ai.js` の巨大責務を整理する。
+
+すでに整備済みの所属・城所有権・武将活動/生死状態・モデル境界は、今後は新規変更時の回帰テストで維持する。
 
 ## 小さいファイルを統合しない判断
 

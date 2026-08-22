@@ -101,7 +101,7 @@ class AIOperationManager {
         const commander = this.game.getBusho(legion.commanderId);
         return !!(
             commander &&
-            commander.status === 'active' &&
+            window.BushoStatusRules.isActive(commander) &&
             Number(commander.clan) === clanId
         );
     }
@@ -127,7 +127,7 @@ class AIOperationManager {
                 const prov = this.game.provinces.find(p => p.id === c.provinceId);
                 if (prov && prov.regionId === targetId && c.ownerClan !== clanId) {
                     const rel = this.game.getRelation(clanId, c.ownerClan);
-                    return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
                 }
                 return false;
             }).length;
@@ -135,7 +135,7 @@ class AIOperationManager {
             initialTargetCount = this.game.castles.filter(c => {
                 if (c.provinceId === targetId && c.ownerClan !== clanId) {
                     const rel = this.game.getRelation(clanId, c.ownerClan);
-                    return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
                 }
                 return false;
             }).length;
@@ -150,7 +150,7 @@ class AIOperationManager {
                     if (c) {
                         const rel = this.game.getRelation(clanId, c.ownerClan);
                         // 友好勢力でなければ取り返す拠点としてカウント
-                        if (!rel || !['同盟', '支配', '従属', '友好'].includes(rel.status)) {
+                        if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) {
                             initialTargetCount++;
                         }
                     }
@@ -335,7 +335,7 @@ class AIOperationManager {
                                 const prov = this.game.provinces.find(p => p.id === c.provinceId);
                                 if (prov && prov.regionId === grandObj.targetRegionId && c.ownerClan !== clan.id) {
                                     const rel = this.game.getRelation(clan.id, c.ownerClan);
-                                    return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
                                 }
                                 return false;
                             }).length;
@@ -343,7 +343,7 @@ class AIOperationManager {
                             currentTargetCount = this.game.castles.filter(c => {
                                 if (c.provinceId === grandObj.targetProvId && c.ownerClan !== clan.id) {
                                     const rel = this.game.getRelation(clan.id, c.ownerClan);
-                                    return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
                                 }
                                 return false;
                             }).length;
@@ -362,7 +362,7 @@ class AIOperationManager {
                                     if (c) {
                                         const rel = this.game.getRelation(clan.id, c.ownerClan);
                                         // 友好勢力（同盟・支配・従属・友好）でなければ、取り返す拠点としてカウント
-                                        if (!rel || !['同盟', '支配', '従属', '友好'].includes(rel.status)) {
+                                        if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) {
                                             currentTargetCount++;
                                         }
                                     }
@@ -389,7 +389,7 @@ class AIOperationManager {
                             const targetClanId = grandObj.targetClanId;
                             const rel = this.game.getRelation(clan.id, targetClanId);
                             // 友好的になっていたら消去
-                            if (rel && ['同盟', '支配', '従属', '友好'].includes(rel.status)) {
+                            if (rel && window.DiplomacyRules.isFriendly(rel.status)) {
                                 shouldCancel = true;
                             } else {
                                 // ★変更：MapGraphService.isReachableを使わず、自領から直接攻撃できるか判定します
@@ -415,7 +415,7 @@ class AIOperationManager {
                                 const prov = this.game.provinces.find(p => p.id === c.provinceId);
                                 if (prov && prov.regionId === grandObj.targetRegionId && c.ownerClan !== clan.id) {
                                     const rel = this.game.getRelation(clan.id, c.ownerClan);
-                                    return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
                                 }
                                 return false;
                             });
@@ -436,7 +436,7 @@ class AIOperationManager {
                             const targetCastles = this.game.castles.filter(c => {
                                 if (c.provinceId === grandObj.targetProvId && c.ownerClan !== clan.id) {
                                     const rel = this.game.getRelation(clan.id, c.ownerClan);
-                                    return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
                                 }
                                 return false;
                             });
@@ -468,7 +468,7 @@ class AIOperationManager {
                                     if (tgtC) {
                                         const rel = this.game.getRelation(clan.id, tgtC.ownerClan);
                                         // 友好勢力でなければ、取り返す拠点候補
-                                        if (!rel || !['同盟', '支配', '従属', '友好'].includes(rel.status)) {
+                                        if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) {
                                             // その拠点へ直接攻撃できるかチェックします
                                             if (reachableEnemyCastleIds.has(tgtC.id)) {
                                                 hasRoute = true;
@@ -561,7 +561,7 @@ class AIOperationManager {
                 
                 adjacentClans.forEach(cId => {
                     const r = this.game.getRelation(clanId, cId);
-                    if (r && !['同盟', '支配', '従属'].includes(r.status)) {
+                    if (r && !window.DiplomacyRules.isAllianceOrVassal(r.status)) {
                         const p = this.game.aiEngine.getClanPrestige(cId);
                         if (minEnemyPower === -1 || p < minEnemyPower) {
                             minEnemyPower = p;
@@ -1018,7 +1018,7 @@ class AIOperationManager {
             
             // 同盟・支配・従属・和睦関係ではないかをチェック
             const rel = this.game.getRelation(clanId, cand.target.ownerClan);
-            const isProtected = rel && ['同盟', '支配', '従属', '和睦'].includes(rel.status);
+            const isProtected = rel && window.DiplomacyRules.isProtectedFromImmediateAttack(rel.status);
             
             if (!isProtected && !addedCastleIds.has(cand.target.id)) {
                 // 城IDとその城を所有している大名家IDをセットで記憶します
@@ -1281,7 +1281,7 @@ class AIOperationManager {
                                         const prov = this.game.provinces.find(p => p.id === c.provinceId);
                                         if (prov && prov.regionId === targetRegionId && c.ownerClan !== clanId) {
                                             const rel = this.game.getRelation(clanId, c.ownerClan);
-                                            if (!rel || !['同盟', '支配', '従属', '友好'].includes(rel.status)) {
+                                            if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) {
                                                 enemyRegionSoldiers += c.soldiers;
                                             }
                                         }
@@ -1309,7 +1309,7 @@ class AIOperationManager {
                             this.game.castles.forEach(c => {
                                 if (c.provinceId === targetProvId && c.ownerClan !== clanId) {
                                     const rel = this.game.getRelation(clanId, c.ownerClan);
-                                    if (!rel || !['同盟', '支配', '従属', '友好'].includes(rel.status)) {
+                                    if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) {
                                         enemyProvSoldiers += c.soldiers;
                                     }
                                 }
@@ -1349,7 +1349,7 @@ class AIOperationManager {
                                     const prov = this.game.provinces.find(p => p.id === c.provinceId);
                                     if (prov && prov.regionId === targetRegionId && c.ownerClan !== clanId) {
                                         const rel = this.game.getRelation(clanId, c.ownerClan);
-                                        return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                                        return !rel || !window.DiplomacyRules.isFriendly(rel.status);
                                     }
                                     return false;
                                 }).length;
@@ -1357,7 +1357,7 @@ class AIOperationManager {
                                 initialTargetCount = this.game.castles.filter(c => {
                                     if (c.provinceId === targetProvId && c.ownerClan !== clanId) {
                                         const rel = this.game.getRelation(clanId, c.ownerClan);
-                                        return !rel || !['同盟', '支配', '従属', '友好'].includes(rel.status);
+                                        return !rel || !window.DiplomacyRules.isFriendly(rel.status);
                                     }
                                     return false;
                                 }).length;
@@ -1374,7 +1374,7 @@ class AIOperationManager {
                                         if (c) {
                                             const rel = this.game.getRelation(clanId, c.ownerClan);
                                             // 友好勢力でなければ、取り返す拠点としてカウント
-                                            if (!rel || !['同盟', '支配', '従属', '友好'].includes(rel.status)) {
+                                            if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) {
                                                 initialTargetCount++;
                                             }
                                         }

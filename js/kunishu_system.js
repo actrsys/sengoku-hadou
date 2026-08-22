@@ -86,7 +86,7 @@ class KunishuSystem {
 
     // 特定の諸勢力に所属している武将一覧を取得
     getKunishuMembers(kunishuId) {
-        return this.game.bushos.filter(b => b.belongKunishuId === kunishuId && b.status !== 'dead' && b.status !== 'unborn');
+        return this.game.bushos.filter(b => b.belongKunishuId === kunishuId && window.LifeStatusRules.isPresent(b));
     }
 
     // イデオロギーによる相性計算の補正
@@ -495,7 +495,7 @@ class KunishuSystem {
         if (!leaderAlive && leader) {
             const currentYear = this.game.year;
             unbornFamily = this.game.bushos.filter(b => 
-                b.status === 'unborn' && 
+                window.LifeStatusRules.isUnborn(b) && 
                 leader.familyIds.some(fId => b.familyIds.includes(fId)) && 
                 b.birthYear <= currentYear
             );
@@ -574,7 +574,7 @@ class KunishuSystem {
             let isExternalSuccessor = false;
             let extraMsg = "";
 
-            if (successor.status === 'unborn') {
+            if (window.LifeStatusRules.isUnborn(successor)) {
                 isExternalSuccessor = true;
                 this.game.affiliationSystem.setActivityStatusRaw(successor, window.GameConstants.BushoStatus.ACTIVE);
                 successor.belongKunishuId = kunishu.id;

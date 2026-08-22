@@ -580,7 +580,7 @@ class WarManager {
             if (s.defender && s.defender.soldiers > 0) {
                 let defBushos = [];
                 if (this.game && this.game.getCastleBushos) {
-                    defBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.status === 'active' && (s.defender.isKunishu ? b.belongKunishuId === s.defender.kunishuId : (b.clan === s.defender.ownerClan && b.belongKunishuId === 0)));
+                    defBushos = this.game.getCastleBushos(s.defender.id).filter(b => window.BushoStatusRules.isActive(b) && (s.defender.isKunishu ? b.belongKunishuId === s.defender.kunishuId : (b.clan === s.defender.ownerClan && b.belongKunishuId === 0)));
                 }
                 if (defBushos.length === 0 && s.defBusho) defBushos = [s.defBusho];
                 addExp(defBushos, false);
@@ -1280,7 +1280,7 @@ class WarManager {
             let subs = bushos.slice(1);
 
             if (isDefendingCastle && this.game && s.defender) {
-                const castleBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.clan === s.defender.ownerClan && b.status === 'active');
+                const castleBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.clan === s.defender.ownerClan && window.BushoStatusRules.isActive(b));
                 if (castleBushos.length > 0) {
                     let bestBusho = castleBushos.reduce((best, current) => {
                         let bestScore = best.leadership + best.strength + best.intelligence;

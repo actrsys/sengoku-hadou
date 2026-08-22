@@ -116,7 +116,7 @@ Object.assign(UIInfoManager.prototype, {
         } catch (error) {}
 
         let salary = "";
-        if (busho.clan > 0 && !busho.isDaimyo && busho.status !== 'ronin') {
+        if (busho.clan > 0 && !busho.isDaimyo && !window.BushoStatusRules.isRonin(busho)) {
             const clan = this.game.clans.find(c => c.id === busho.clan);
             const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
             salary = busho.getSalary(daimyo);
@@ -131,7 +131,7 @@ Object.assign(UIInfoManager.prototype, {
         let lordName = "なし";
         if (busho.isDaimyo) {
             lordName = "なし";
-        } else if (busho.status === 'ronin') {
+        } else if (window.BushoStatusRules.isRonin(busho)) {
             lordName = "なし";
         } else if (busho.belongKunishuId > 0) {
             let kunishu = null;
@@ -707,8 +707,8 @@ Object.assign(UIInfoManager.prototype, {
             let baseBushos = [...bushos]; 
             if (actionType === 'all_busho_list' && this.bushoCurrentScope === 'all') {
                 baseBushos = this.game.bushos.filter(b => {
-                    if (b.status === 'unborn' || b.status === 'dead') return false;
-                    if (b.clan > 0 || b.belongKunishuId > 0 || b.status === 'ronin') return true;
+                    if (window.LifeStatusRules.isUnavailable(b)) return false;
+                    if (b.clan > 0 || b.belongKunishuId > 0 || window.BushoStatusRules.isRonin(b)) return true;
                     return false;
                 });
             }
@@ -723,7 +723,7 @@ Object.assign(UIInfoManager.prototype, {
             if (b.clan === this.game.playerClanId) return b.isDaimyo ? 10000 : (isCommander ? 9500 : (b.isCastellan ? 9000 : (isGunshi ? 8500 : 8000)));
             if (b.clan > 0) return 5000 - b.clan * 10 + (b.isDaimyo ? 4 : (isCommander ? 3.5 : (b.isCastellan ? 3 : (isGunshi ? 2 : 1))));
             if (b.belongKunishuId > 0) return 2000 - b.belongKunishuId * 10 + (b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0) ? 2 : 1);
-            if (b.status === 'ronin') return 1000;
+            if (window.BushoStatusRules.isRonin(b)) return 1000;
             return 0;
         };
         const getSortRankClan = (b) => {
@@ -733,7 +733,7 @@ Object.assign(UIInfoManager.prototype, {
             if (isCommander) return 7;
             if (b.isCastellan) return 6;
             if (isGunshi) return 5; 
-            if (b.status === 'ronin') return 1;
+            if (window.BushoStatusRules.isRonin(b)) return 1;
             if (b.belongKunishuId > 0) {
                 const isLeader = b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0);
                 return isLeader ? 3 : 2;
@@ -772,7 +772,7 @@ Object.assign(UIInfoManager.prototype, {
                     } else if (this.bushoCurrentSortKey === 'rank') {
                         valA = getSortRankClan(a); valB = getSortRankClan(b);
                     } else if (this.bushoCurrentSortKey === 'faction') {
-                        const isRoninA = a.status === 'ronin'; const isRoninB = b.status === 'ronin';
+                        const isRoninA = window.BushoStatusRules.isRonin(a); const isRoninB = window.BushoStatusRules.isRonin(b);
                         if (isRoninA && !isRoninB) return 1;
                         if (!isRoninA && isRoninB) return -1;
                         const getFactionInfo = (busho) => {
@@ -833,8 +833,8 @@ Object.assign(UIInfoManager.prototype, {
                     } else if (this.bushoCurrentSortKey === 'salary') {
                         const daimyoA = a.clan > 0 ? bushoMap.get(clanMap.get(a.clan)?.leaderId) : null;
                         const daimyoB = b.clan > 0 ? bushoMap.get(clanMap.get(b.clan)?.leaderId) : null;
-                        valA = a.clan > 0 && !a.isDaimyo && a.status !== 'ronin' ? a.getSalary(daimyoA) : 0;
-                        valB = b.clan > 0 && !b.isDaimyo && b.status !== 'ronin' ? b.getSalary(daimyoB) : 0;
+                        valA = a.clan > 0 && !a.isDaimyo && !window.BushoStatusRules.isRonin(a) ? a.getSalary(daimyoA) : 0;
+                        valB = b.clan > 0 && !b.isDaimyo && !window.BushoStatusRules.isRonin(b) ? b.getSalary(daimyoB) : 0;
                     } else if (['aptAshigaru', 'aptKiba', 'aptTeppo', 'aptYumi', 'aptBugei', 'aptNinjutsu', 'aptMaritime'].includes(this.bushoCurrentSortKey)) {
                         valA = typeof SkillManager !== 'undefined' ? SkillManager.getAptitudeLevel(a[this.bushoCurrentSortKey]) : 0;
                         valB = typeof SkillManager !== 'undefined' ? SkillManager.getAptitudeLevel(b[this.bushoCurrentSortKey]) : 0;
@@ -1113,7 +1113,7 @@ Object.assign(UIInfoManager.prototype, {
                 const bCastleName = bCastle ? bCastle.name : "";
                 const age = b.isAutoLeader ? "" : (this.game.year - b.birthYear + 1);
                 let salary = "";
-                if (b.clan > 0 && !b.isDaimyo && b.status !== 'ronin') {
+                if (b.clan > 0 && !b.isDaimyo && !window.BushoStatusRules.isRonin(b)) {
                     const clan = clanMap.get(b.clan);
                     const daimyo = clan ? bushoMap.get(clan.leaderId) : null;
                     salary = b.getSalary(daimyo);

@@ -38,7 +38,7 @@ class CourtRankSystem {
         const usedRankIds = new Set();
         this.game.bushos.forEach(b => {
             // 死んでいない（活動中など）武将が持っている官位をチェックします
-            if (b.status !== 'dead' && b.courtRankIds && b.courtRankIds.length > 0) {
+            if (!window.LifeStatusRules.isDead(b) && b.courtRankIds && b.courtRankIds.length > 0) {
                 b.courtRankIds.forEach(id => usedRankIds.add(id));
             }
         });
@@ -239,7 +239,7 @@ class CourtRankSystem {
             if (clan.id === 0) return; // 空き家（中立）はチェックしません
 
             const leader = this.game.getBusho(clan.leaderId);
-            if (!leader || leader.status === 'dead' || leader.status === 'unborn') return;
+            if (!leader || window.LifeStatusRules.isUnavailable(leader)) return;
 
             // 当主の現在の最高ランクを調べます (rankNoは小さいほど偉い)
             let currentMaxRankNo = 20; // 何も持っていなければ一番下（20相当）とします
@@ -311,7 +311,7 @@ class CourtRankSystem {
             // 2. 国主たちの官位チェック（大名が官位を持っている場合のみ）
             // ------------------------------------------
             if (currentMaxRankNo < 20) {
-                const commanders = this.game.bushos.filter(b => b.clan === clan.id && b.isCommander && b.status === 'active');
+                const commanders = this.game.bushos.filter(b => b.clan === clan.id && b.isCommander && window.BushoStatusRules.isActive(b));
                 
                 commanders.forEach(commander => {
                     let cmdrMaxRankNo = 20; 

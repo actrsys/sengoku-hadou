@@ -458,7 +458,7 @@ class SkillManager {
     // ＜暗殺防諜＞ ターゲット拠点の武芸Lvを合計して、暗殺の成功率を下げる（重複可）
     static calcBugeiAssassinateDefense(castleId, game) {
         if (!game || !castleId) return 0;
-        const bushos = game.getCastleBushos(castleId).filter(b => b.status === 'active');
+        const bushos = game.getCastleBushos(castleId).filter(b => window.BushoStatusRules.isActive(b));
         let totalLvl = 0;
         bushos.forEach(b => {
             totalLvl += this.getBugeiLevel(b);
@@ -471,7 +471,7 @@ class SkillManager {
     static calcBugeiCounterIntelligenceBonus(castleId, game) {
         if (!game || !castleId) return 0;
         // お城で活動中の武将全員を集めます
-        const bushos = game.getCastleBushos(castleId).filter(b => b.status === 'active');
+        const bushos = game.getCastleBushos(castleId).filter(b => window.BushoStatusRules.isActive(b));
         let totalLvl = 0;
         bushos.forEach(b => {
             totalLvl += this.getBugeiLevel(b);
@@ -549,7 +549,7 @@ class SkillManager {
     // ＜暗殺防諜＞ ターゲット勢力全体の忍術レベルを合計して、暗殺の成功率を下げる（重複可）
     static calcNinjutsuAssassinateDefense(clanId, game) {
         if (!game || clanId === 0) return 0;
-        const bushos = game.bushos.filter(b => b.clan === clanId && b.status === 'active');
+        const bushos = game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b));
         let totalLvl = 0;
         bushos.forEach(b => {
             totalLvl += this.getNinjutsuLevel(b);
@@ -957,7 +957,7 @@ class SkillManager {
         if (!busho || busho.clan === 0 || busho.castleId === 0) return modifier;
 
         // 同じお城にいる味方の武将を集めます
-        const sameCastleBushos = game.getCastleBushos(busho.castleId).filter(other => other.status === 'active' && other.clan === busho.clan);
+        const sameCastleBushos = game.getCastleBushos(busho.castleId).filter(other => window.BushoStatusRules.isActive(other) && other.clan === busho.clan);
 
         // 「医術」を持っている武将がいれば確率を半分（0.5倍）にします
         const hasIjutsu = sameCastleBushos.some(other => this.hasSkill(other, SKILL_NAMES.IJUTSU, game));
@@ -976,7 +976,7 @@ class SkillManager {
         if (!castle || castle.ownerClan === 0) return modifier;
 
         // そのお城にいる味方の武将を集めます
-        const bushos = game.getCastleBushos(castle.id).filter(b => b.status === 'active' && b.clan === castle.ownerClan);
+        const bushos = game.getCastleBushos(castle.id).filter(b => window.BushoStatusRules.isActive(b) && b.clan === castle.ownerClan);
 
         // 「医術」を持っている武将がいれば被害を半分（0.5倍）にします
         const hasIjutsu = bushos.some(b => this.hasSkill(b, SKILL_NAMES.IJUTSU, game));
@@ -995,7 +995,7 @@ class SkillManager {
         let defenseBonus = 0;
         
         // そのお城にいる味方の武将を集めます
-        const bushos = game.getCastleBushos(castle.id).filter(b => b.status === 'active' && b.clan === castle.ownerClan);
+        const bushos = game.getCastleBushos(castle.id).filter(b => window.BushoStatusRules.isActive(b) && b.clan === castle.ownerClan);
 
         // 「上州の黄斑」を持っている武将を探します。
         // 大名勢力に所属している時（belongKunishuId === 0）という条件を満たす武将1人につき +5 します。

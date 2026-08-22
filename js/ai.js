@@ -875,7 +875,7 @@ class AIEngine {
                 const cToTargetRel = this.game.getRelation(c.id, target.ownerClan);
                 if (myRel && this.game.diplomacyManager.isNonAggression(myRel.status) && myRel.sentiment >= 50) {
                     // ★修正：敵対大名と「同盟・支配・従属」関係にあるか、友好度が100の場合は呼べないようにします
-                    const isEnemyAlly = cToTargetRel && ['同盟', '支配', '従属'].includes(cToTargetRel.status);
+                    const isEnemyAlly = cToTargetRel && window.DiplomacyRules.isAllianceOrVassal(cToTargetRel.status);
                     const isEnemyMaxGoodwill = cToTargetRel && cToTargetRel.sentiment >= 100;
                     if (!isEnemyAlly && !isEnemyMaxGoodwill && (!cToTargetRel || !this.game.diplomacyManager.isNonAggression(cToTargetRel.status))) {
                         myReinfPower += expectedReinf;
@@ -887,7 +887,7 @@ class AIEngine {
                 const cToMyRel = this.game.getRelation(c.id, myCastle.ownerClan);
                 if (targetRel && this.game.diplomacyManager.isNonAggression(targetRel.status) && targetRel.sentiment >= 50) {
                     // ★修正：こちらも同じく、自分と「同盟・支配・従属」または友好度100の場合は相手に味方しないようにします
-                    const isMyAlly = cToMyRel && ['同盟', '支配', '従属'].includes(cToMyRel.status);
+                    const isMyAlly = cToMyRel && window.DiplomacyRules.isAllianceOrVassal(cToMyRel.status);
                     const isMyMaxGoodwill = cToMyRel && cToMyRel.sentiment >= 100;
                     if (!isMyAlly && !isMyMaxGoodwill && (!cToMyRel || !this.game.diplomacyManager.isNonAggression(cToMyRel.status))) {
                         enemyReinfPower += expectedReinf;
@@ -940,7 +940,7 @@ class AIEngine {
             }
             
             // 守備側武将の能力による攻撃確率低下 (最大10%)
-            const enemyBushos = this.game.getCastleBushos(target.id).filter(b => b.clan === target.ownerClan && b.status === 'active');
+            const enemyBushos = this.game.getCastleBushos(target.id).filter(b => b.clan === target.ownerClan && window.BushoStatusRules.isActive(b));
             let maxLdr = 0, maxInt = 0;
             if (enemyBushos.length > 0) {
                 maxLdr = Math.max(...enemyBushos.map(b => b.leadership));
@@ -1013,11 +1013,11 @@ class AIEngine {
                             const adjRel = this.game.getRelation(myCastle.ownerClan, adjCastle.ownerClan);
                             if (adjRel) {
                                 // 友好、同盟、支配、従属なら味方として数えます
-                                if (['友好', '同盟', '支配', '従属'].includes(adjRel.status)) {
+                                if (window.DiplomacyRules.isFriendly(adjRel.status)) {
                                     friendlyNeighbors++;
                                 } 
                                 // 敵対、普通、和睦なら敵（潜在的な脅威）として数えます
-                                else if (['敵対', '普通', '和睦'].includes(adjRel.status)) {
+                                else if (!window.DiplomacyRules.isFriendly(adjRel.status)) {
                                     futureEnemyNeighbors++;
                                     
                                     // ★追加：その敵勢力が、現在の大名家全体でまだ隣接していない「新しい勢力」かチェックします
@@ -1301,7 +1301,7 @@ class AIEngine {
         }
         
         // 城にいる武将（自勢力で活動中の武将）を集めます
-        const bushos = this.game.getCastleBushos(source.id).filter(b => b.clan === source.ownerClan && b.status === 'active');
+        const bushos = this.game.getCastleBushos(source.id).filter(b => b.clan === source.ownerClan && window.BushoStatusRules.isActive(b));
         
         // ★ここから追加・書き換え：戦闘力による足切りと、智謀による「見誤り」の魔法！
         // 1. 城主(general)の智謀によって、どれくらい戦闘力を見誤るか（誤差）を決めます
@@ -1411,7 +1411,7 @@ class AIEngine {
             return;
         }
         
-        const bushos = this.game.getCastleBushos(sourceCastle.id).filter(b => b.clan === sourceCastle.ownerClan && b.status === 'active');
+        const bushos = this.game.getCastleBushos(sourceCastle.id).filter(b => b.clan === sourceCastle.ownerClan && window.BushoStatusRules.isActive(b));
         
         let evaluatorInt = general.intelligence;
         let maxError = 0;
@@ -1571,7 +1571,7 @@ class AIEngine {
 
         // お城にいる動ける武将（自分の大名家で、活動中の人）をリストアップします
         let availableBushos = this.game.getCastleBushos(castle.id).filter(b => 
-            !b.isActionDone && b.clan === castle.ownerClan && b.status === 'active'
+            !b.isActionDone && b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b)
         );
 
         // まず、お城に動ける武将がいるか確認します。誰もいなければ何もできません
@@ -1630,7 +1630,7 @@ class AIEngine {
 
             // まだ動ける武将を再確認します
             availableBushos = this.game.getCastleBushos(castle.id).filter(b => 
-                !b.isActionDone && b.clan === castle.ownerClan && b.status === 'active'
+                !b.isActionDone && b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b)
             );
 
             // --- 候補となる行動の点数（スコア）をつける表を作ります ---
@@ -1942,7 +1942,7 @@ class AIEngine {
                 let monthlyGoldConsume = 0;
                 
                 // 今お城にいる全員の給料を計算します
-                const allCastleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && b.status === 'active');
+                const allCastleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b));
                 allCastleBushos.forEach(b => {
                     monthlyGoldConsume += b.getSalary(daimyo);
                 });
@@ -2104,7 +2104,7 @@ class AIEngine {
                             if (adj.ownerClan !== 0) {
                                 const rel = this.game.getRelation(castle.ownerClan, adj.ownerClan);
                                 // 同盟、和睦、支配、従属のどれかなら仲良しです
-                                if (rel && ['同盟', '和睦', '支配', '従属'].includes(rel.status)) {
+                                if (rel && window.DiplomacyRules.isProtectedFromImmediateAttack(rel.status)) {
                                     isFriendly = true;
                                 }
                             }
@@ -2262,7 +2262,7 @@ class AIEngine {
             }
             
             // ★11. 登用（浪人がいる場合、やや優先度を上げる）
-            const ronins = this.game.getCastleBushos(castle.id).filter(b => b.status === 'ronin');
+            const ronins = this.game.getCastleBushos(castle.id).filter(b => window.BushoStatusRules.isRonin(b));
             if (ronins.length > 0) {
                 // 優先度をやや上げて15点にします（上げすぎず、ちょっとすぎないバランス）
                 actions.push({ type: 'employ', stat: 'charm', score: 15, cost: 0, targetRonin: ronins[0] });
@@ -2318,7 +2318,7 @@ class AIEngine {
             // ★選ばれた人の中で「一番低い忠誠度」を覚えておく箱です！
             let minLoyaltyForReward = 100;
             
-            const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && b.status === 'active');
+            const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b));
             
             for (let b of castleBushos) {
                 // ★修正：今月すでに褒美をもらっているかチェックし、忠誠度が低い場合は2回目も許容します！
@@ -2404,7 +2404,7 @@ class AIEngine {
                         if (clan1 === clan2) return true; // 自分自身
                         if (clan2 === 0) return false; // 空き城
                         const rel = this.game.getRelation(clan1, clan2);
-                        return rel && ['同盟', '支配', '従属', '和睦'].includes(rel.status);
+                        return rel && window.DiplomacyRules.isProtectedFromImmediateAttack(rel.status);
                     };
 
                     const isCastleProtected = isProtected(castle.ownerClan, currentCastleOwner);
@@ -2428,7 +2428,7 @@ class AIEngine {
                         const enemyBushos = [];
                         const enemyCastles = this.game.getClanCastles(memoryClanId);
                         enemyCastles.forEach(c => {
-                            const bList = this.game.getCastleBushos(c.id).filter(b => b.status === 'active' && !b.isDaimyo);
+                            const bList = this.game.getCastleBushos(c.id).filter(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo);
                             enemyBushos.push(...bList);
                         });
                         
@@ -2510,7 +2510,7 @@ class AIEngine {
                             if (targetBusho.nemesisIds && targetBusho.nemesisIds.length > 0) {
                                 hasNemesis = targetBusho.nemesisIds.some(nId => {
                                     const nBusho = this.game.getBusho(nId);
-                                    return nBusho && nBusho.clan === castle.ownerClan && nBusho.status !== 'dead';
+                                    return nBusho && nBusho.clan === castle.ownerClan && !window.LifeStatusRules.isDead(nBusho);
                                 });
                             }
                             

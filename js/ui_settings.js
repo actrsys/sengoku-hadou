@@ -1,118 +1,77 @@
 /**
  * ui_settings.js
- * 設定画面の見た目や操作（音量の変更や通知のオンオフなど）を担当するファイルです。
+ * 設定画面の見た目と操作を担当する。
+ * 設定値の保存・正本は UserSettings、音量反映は AudioManager に任せる。
  */
 
-document.addEventListener("DOMContentLoaded", () => {
-    // ゲームの共通設定を入れる箱（window.GameConfig）がまだ無ければ、新しく用意します
-    window.GameConfig = window.GameConfig || {};
+document.addEventListener('DOMContentLoaded', () => {
+    const settings = window.UserSettings;
 
-    // =========================================
-    // 1. スライダー（音量）を動かした時の処理
-    // =========================================
     const updateSettingSlider = (type, value) => {
         const range = document.getElementById(`setting-${type}-volume`);
         const text = document.getElementById(`setting-${type}-text`);
         if (range && text) {
-            // 白い数字の方には「%」を含めず、純粋な数値だけを入れます
             text.textContent = value;
             range.style.setProperty('--value', value + '%');
         }
     };
 
-    // BGM・SEのスライダーそれぞれに「動いた時に数字やゲージを変える魔法」をかけます
+    // 音量スライダー: UserSettings の保存値を画面へ反映する。
     ['bgm', 'se'].forEach(type => {
         const range = document.getElementById(`setting-${type}-volume`);
-        if (range) {
-            range.addEventListener('input', (e) => {
-                updateSettingSlider(type, e.target.value);
-            });
-            
-            // ★追加：スマホでスライダーを触っている間は、画面がスクロールしないようにバリアを張ります
-            range.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
-            range.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
+        if (!range) return;
 
-            // 最初に画面が開いた時にも、ゲージと数字をピタッと合わせておきます
-            updateSettingSlider(type, range.value);
-        }
+        const ratio = type === 'bgm'
+            ? (settings ? settings.bgmVolume : 1)
+            : (settings ? settings.seVolume : 1);
+        range.value = Math.round(ratio * 100);
+        updateSettingSlider(type, range.value);
+
+        range.addEventListener('input', (e) => {
+            updateSettingSlider(type, e.target.value);
+        });
+        range.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+        range.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
     });
 
-    // =========================================
-    // 2. トグルボタン（通知・歴史イベントなど）を押した時の処理
-    // =========================================
-    const updateToggleSetting = (type, isTrue) => {
+    const updateToggleSetting = (type, isTrue, persist = true) => {
         const btnTrue = document.getElementById(`btn-${type}-true`);
         const btnFalse = document.getElementById(`btn-${type}-false`);
-        
-        // 押された方のボタンを光らせて、もう片方の光を消します
+
         if (btnTrue && btnFalse) {
-            if (isTrue) {
-                btnTrue.classList.add('active');
-                btnFalse.classList.remove('active');
-            } else {
-                btnTrue.classList.remove('active');
-                btnFalse.classList.add('active');
-            }
+            btnTrue.classList.toggle('active', isTrue);
+            btnFalse.classList.toggle('active', !isTrue);
         }
-        
-        // 設定の中身を更新して、ブラウザの記憶（localStorage）にも書き込みます
-        if (type === 'notify') {
-            window.GameConfig.aiWarNotify = isTrue;
-            localStorage.setItem('aiWarNotify', isTrue ? 'true' : 'false');
-        } else if (type === 'historical') {
-            window.GameConfig.historicalEvent = isTrue;
-            localStorage.setItem('historicalEvent', isTrue ? 'true' : 'false');
-        } else if (type === 'autosave') {
-            window.GameConfig.autoSave = isTrue;
-            localStorage.setItem('autoSave', isTrue ? 'true' : 'false');
-        }
+
+        if (!persist || !settings) return;
+        if (type === 'notify') settings.setAiWarNotify(isTrue);
+        else if (type === 'historical') settings.setHistoricalEvent(isTrue);
+        else if (type === 'autosave') settings.setAutoSave(isTrue);
     };
 
-    // 各ボタンに「クリックされたらこの魔法を使ってね」というお約束をします
     ['notify', 'historical', 'autosave'].forEach(type => {
         const btnTrue = document.getElementById(`btn-${type}-true`);
         const btnFalse = document.getElementById(`btn-${type}-false`);
-        
+
         if (btnTrue) {
             btnTrue.addEventListener('click', () => {
-                // ★追加：ボタンを押した時に選択音を鳴らす魔法です
                 if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                 updateToggleSetting(type, true);
             });
         }
         if (btnFalse) {
             btnFalse.addEventListener('click', () => {
-                // ★追加：ボタンを押した時に選択音を鳴らす魔法です
                 if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                 updateToggleSetting(type, false);
             });
         }
     });
 
-    // =========================================
-    // 3. ゲーム起動時の初期化（以前の設定を読み込む）
-    // =========================================
-    // AI戦争の通知の記憶を読み出します
-    const savedNotify = localStorage.getItem('aiWarNotify');
-    const isNotify = savedNotify !== 'false';
-    window.GameConfig.aiWarNotify = isNotify;
-    updateToggleSetting('notify', isNotify);
+    // UserSettings は user_settings.js の読込時に localStorage から復元済み。
+    updateToggleSetting('notify', settings ? settings.aiWarNotify : true, false);
+    updateToggleSetting('historical', settings ? settings.historicalEvent : true, false);
+    updateToggleSetting('autosave', settings ? settings.autoSave : true, false);
 
-    // 歴史イベントの記憶を読み出します
-    const savedHistorical = localStorage.getItem('historicalEvent');
-    const isHistorical = savedHistorical !== 'false';
-    window.GameConfig.historicalEvent = isHistorical;
-    updateToggleSetting('historical', isHistorical);
-
-    // オートセーブの記憶を読み出します
-    const savedAutoSave = localStorage.getItem('autoSave');
-    const isAutoSave = savedAutoSave !== 'false'; // デフォルトは「する(true)」にします
-    window.GameConfig.autoSave = isAutoSave;
-    updateToggleSetting('autosave', isAutoSave);
-
-    // =========================================
-    // 4. 「閉じる」ボタンの処理
-    // =========================================
     const closeBtn = document.getElementById('settings-close-btn');
     if (closeBtn) {
         closeBtn.addEventListener('click', () => {
@@ -120,28 +79,16 @@ document.addEventListener("DOMContentLoaded", () => {
             if (modal) modal.classList.add('hidden');
         });
     }
-    
-    // =========================================
-    // ★追加：設定画面が開かれた時に、ゲージの色を正しく塗り直す魔法
-    // =========================================
+
     const settingsModal = document.getElementById('settings-modal');
     if (settingsModal) {
-        // 画面の変化（透明マントを被ったり脱いだり）を監視する見張り番を作ります
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                // 「hidden」という透明マントが外れて、画面が見えるようになった時
-                if (!settingsModal.classList.contains('hidden')) {
-                    // BGMとSEのスライダーのゲージを、今のつまみの位置に合わせて塗り直します
-                    ['bgm', 'se'].forEach(type => {
-                        const range = document.getElementById(`setting-${type}-volume`);
-                        if (range) {
-                            updateSettingSlider(type, range.value);
-                        }
-                    });
-                }
+        const observer = new MutationObserver(() => {
+            if (settingsModal.classList.contains('hidden')) return;
+            ['bgm', 'se'].forEach(type => {
+                const range = document.getElementById(`setting-${type}-volume`);
+                if (range) updateSettingSlider(type, range.value);
             });
         });
-        // 設定画面の「class（状態）」の変化を監視するように見張り番に指示します
         observer.observe(settingsModal, { attributes: true, attributeFilter: ['class'] });
     }
 });

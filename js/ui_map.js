@@ -1564,7 +1564,7 @@ Object.assign(UIManager.prototype, {
                 if (rel) {
                     if (rel.status === '敵対') {
                         card.classList.add('glow-red');   
-                    } else if (['友好', '同盟', '支配', '従属'].includes(rel.status)) {
+                    } else if (window.DiplomacyRules.isFriendly(rel.status)) {
                         card.classList.add('glow-green'); 
                     }
                 }

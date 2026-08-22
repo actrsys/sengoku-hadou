@@ -37,7 +37,7 @@ class GunshiSystem {
         // ★変更：一元化された判定の窓口（isUnhappyBusho）を呼び出してチェックさせます
         const unhappyBushos = this.game.bushos.filter(b => 
             b.clan === this.game.playerClanId && 
-            b.status === 'active' && 
+            window.BushoStatusRules.isActive(b) && 
             DomesticRules.isUnhappyBusho(b)
         );
 

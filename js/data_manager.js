@@ -159,7 +159,7 @@ class DataManager {
             }
             
             // ★ここを追加：まだ登場していない姫は、大名家の「姫の名簿」から一旦名前を消しておきます！
-            if (p.status === 'dead' || p.status === 'unborn') {
+            if (window.LifeStatusRules.isUnavailable(p)) {
                 clans.forEach(clan => {
                     if (clan.princessIds && clan.princessIds.includes(p.id)) {
                         clan.princessIds = clan.princessIds.filter(id => id !== p.id);

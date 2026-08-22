@@ -69,7 +69,7 @@ class EventManager {
         this.game.flags = this.game.flags || {};
 
         // 設定で「歴史イベントが発生しない」になっているか確認します
-        const isHistoricalOff = (window.GameConfig && window.GameConfig.historicalEvent === false);
+        const isHistoricalOff = (window.UserSettings && window.UserSettings.historicalEvent === false);
 
         // ★追加：このタイミングで歴史イベントがすでに起きたかをメモする変数です
         let historicalEventOccurred = false;

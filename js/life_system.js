@@ -86,7 +86,7 @@ class LifeSystem {
             }
 
             // 出生前（フラグあり）や、まだ登場していない（元服前）武将は能力計算をスキップ
-            if (b.isNotBorn || b.status === 'unborn') continue;
+            if (b.isNotBorn || window.LifeStatusRules.isUnborn(b)) continue;
 
             // 今の年齢を計算します
             const age = currentYear - b.birthYear;
@@ -231,7 +231,7 @@ class LifeSystem {
                         const newName = b.name; // 新しいフルネーム
 
                         // ★お知らせを出す準備をします
-                        if (b.status === 'active' || b.status === 'ronin') {
+                        if (window.BushoStatusRules.isActive(b) || window.BushoStatusRules.isRonin(b)) {
                             if (oldName !== newName) {
                                 let prefix = "";
                                 if (b.clan !== 0) {
@@ -330,7 +330,7 @@ class LifeSystem {
         const currentYear = this.game.year;
         
         // まだ登場していない（statusが'unborn'）武将の中で、登場年を迎えた人を探します
-        const unbornBushos = this.game.bushos.filter(b => b.status === 'unborn' && b.startYear <= currentYear);
+        const unbornBushos = this.game.bushos.filter(b => window.LifeStatusRules.isUnborn(b) && b.startYear <= currentYear);
         
         // ★変更：メッセージをためる箱（配列）は使わず、一つずつ順番に出すために「for...of」という魔法の繰り返しを使います！
         for (const b of unbornBushos) {
@@ -378,7 +378,7 @@ class LifeSystem {
 
                     // 活動中の一門武将がいるかチェック
                     const activeRelatives = this.game.bushos.filter(other => 
-                        other.status === 'active' &&
+                        window.BushoStatusRules.isActive(other) &&
                         other.id !== b.id &&
                         b.familyIds.some(fId => other.familyIds.includes(fId))
                     );
@@ -432,7 +432,7 @@ class LifeSystem {
                 // ★追加：「登場前:仕官」の武将に一門武将がいるかチェックします
                 // 条件：すでに登場して活動している、自分自身ではない、一門IDが共通している
                 const activeRelatives = this.game.bushos.filter(other => 
-                    other.status === 'active' &&
+                    window.BushoStatusRules.isActive(other) &&
                     other.id !== b.id &&
                     b.familyIds.some(fId => other.familyIds.includes(fId))
                 );
@@ -481,7 +481,7 @@ class LifeSystem {
                     targetCastle.samuraiIds.push(b.id);
                     
                     // プレイヤーの大名家にやってきた場合は、お知らせのメッセージを作ります
-                    if (b.status === 'active' && b.clan === this.game.playerClanId) {
+                    if (window.BushoStatusRules.isActive(b) && b.clan === this.game.playerClanId) {
                         const nameStr = b.fullName;
                         let msg = "";
                         if (hasRelative) {
@@ -503,7 +503,7 @@ class LifeSystem {
         }
 
         // ★ここから追加：姫の登場チェックを書き足します！
-        const unbornPrincesses = this.game.princesses.filter(p => p.status === 'unborn' && p.startYear <= currentYear);
+        const unbornPrincesses = this.game.princesses.filter(p => window.LifeStatusRules.isUnborn(p) && p.startYear <= currentYear);
 
         // ★変更：ここも「for...of」の魔法の繰り返しに変えて、一つずつ待ちます！
         for (const p of unbornPrincesses) {
@@ -514,7 +514,7 @@ class LifeSystem {
             if (p.realFatherId > 0) {
                 // お父さんがいる場合は、お父さんのいる大名家を探します
                 const father = this.game.getBusho(p.realFatherId);
-                if (father && father.status !== 'dead' && father.status !== 'unborn' && father.clan !== 0) {
+                if (father && window.LifeStatusRules.isPresent(father) && father.clan !== 0) {
                     targetClanId = father.clan;
                     fatherNameStr = father.fullName; // ★お父さんの名前から「|」を消してメモします
                 }
@@ -596,7 +596,7 @@ class LifeSystem {
         
         // 【変更点①】没年の「1年前（endYear - 1）」を迎えている武将を探すようにしました！
         const targetBushos = this.game.bushos.filter(b => {
-            if (b.status === 'dead') return false; // ★変更：未登場（unborn）を除外しないようにしました
+            if (window.LifeStatusRules.isDead(b)) return false; // ★変更：未登場（unborn）を除外しないようにしました
             const actualEndYear = b.endYear;
             return currentYear >= (actualEndYear - 1);
         });
@@ -611,7 +611,7 @@ class LifeSystem {
 
             // サイコロを振って、確率に当たってしまったらお別れです…
             if (Math.random() < deathProb) {
-                const wasUnborn = (b.status === 'unborn'); // ★追加：死ぬ前に未登場だったかメモしておく
+                const wasUnborn = (window.LifeStatusRules.isUnborn(b)); // ★追加：死ぬ前に未登場だったかメモしておく
                 
                 // ★ここから追加：武将死亡時のイベント専用の引き出しを開けます
                 const formerClanId = Number(b.clan) || 0;
@@ -635,7 +635,7 @@ class LifeSystem {
 
         // ★追加：死亡フラグ（deathFlag）が立っている武将の死亡判定
         // すでに寿命で死んだ武将（statusがdead）を除外して、フラグが立っている武将だけを集めます
-        const flagTargetBushos = this.game.bushos.filter(b => b.status !== 'dead' && b.deathFlag === true);
+        const flagTargetBushos = this.game.bushos.filter(b => !window.LifeStatusRules.isDead(b) && b.deathFlag === true);
         
         for (const b of flagTargetBushos) {
             // ★追加：討死武将が本来の寿命を過ぎているかチェックして、確率を変えます
@@ -651,7 +651,7 @@ class LifeSystem {
 
             // 指定された確率で死亡します
             if (Math.random() < deathProb) {
-                const wasUnborn = (b.status === 'unborn');
+                const wasUnborn = (window.LifeStatusRules.isUnborn(b));
                 
                 // ★ここから追加：武将死亡時のイベント専用の引き出しを開けます
                 const formerClanId = Number(b.clan) || 0;
@@ -688,7 +688,7 @@ class LifeSystem {
 
         // ★ここから追加：姫の寿命チェックを書き足します！
         const targetPrincesses = this.game.princesses.filter(p =>
-            p.status !== 'dead' && currentYear >= (p.endYear - 1) // ★変更：未登場（unborn）を除外しないようにしました
+            !window.LifeStatusRules.isDead(p) && currentYear >= (p.endYear - 1) // ★変更：未登場（unborn）を除外しないようにしました
         );
 
         for (const p of targetPrincesses) {
@@ -696,7 +696,7 @@ class LifeSystem {
             const deathProb = 0.02 + (yearsPassed * 0.02);
 
             if (Math.random() < deathProb) {
-                const wasUnborn = (p.status === 'unborn'); // ★追加：死ぬ前に未登場だったかメモしておく
+                const wasUnborn = (window.LifeStatusRules.isUnborn(p)); // ★追加：死ぬ前に未登場だったかメモしておく
                 this.setLifeStatusRaw(p, window.GameConstants.BushoStatus.DEAD); // 「死亡」の印をつけます
                 
                 // もし結婚していたら、旦那さんの奥さんリストから外します
@@ -713,7 +713,7 @@ class LifeSystem {
                             // 他にこの２つの家を結んでいる、生きているお姫様がいるか名簿を探します
                             const hasOtherMarriage = this.game.princesses.some(otherP => {
                                 // 死んでいる、生まれていない、結婚していない姫は除外します
-                                if (otherP.status === 'dead' || otherP.status === 'unborn' || otherP.husbandId === 0) return false;
+                                if (window.LifeStatusRules.isUnavailable(otherP) || otherP.husbandId === 0) return false;
                                 
                                 const otherHusband = this.game.getBusho(otherP.husbandId);
                                 if (!otherHusband) return false;
@@ -782,7 +782,7 @@ class LifeSystem {
                     
                     if (clanA > 0 && clanB > 0 && clanA !== clanB) {
                         const hasOtherMarriage = this.game.princesses.some(otherP => {
-                            if (otherP.status === 'dead' || otherP.status === 'unborn' || otherP.husbandId === 0) return false;
+                            if (window.LifeStatusRules.isUnavailable(otherP) || otherP.husbandId === 0) return false;
                             const otherHusband = this.game.getBusho(otherP.husbandId);
                             if (!otherHusband) return false;
                             return (otherP.originalClanId === clanA && otherHusband.clan === clanB) || 
@@ -827,7 +827,7 @@ class LifeSystem {
                         const father = this.game.getBusho(princess.realFatherId);
                         if (father) {
                             const relatives = this.game.bushos.filter(b => 
-                                b.status !== 'dead' && b.status !== 'unborn' && b.clan > 0 &&
+                                window.LifeStatusRules.isPresent(b) && b.clan > 0 &&
                                 father.familyIds.some(fId => b.familyIds.includes(fId))
                             );
 
@@ -917,8 +917,7 @@ class LifeSystem {
             // 死亡した武将が将軍なら生き残っている一門に「左馬頭」を託します！
             if (wasShogun) {
                 const relative = this.game.bushos.find(b => 
-                    b.status !== 'dead' && 
-                    b.status !== 'unborn' && 
+                    window.LifeStatusRules.isPresent(b) && 
                     b.id !== busho.id && 
                     busho.familyIds.some(fId => b.familyIds.includes(fId))
                 );
@@ -1010,13 +1009,13 @@ class LifeSystem {
         const currentYear = this.game.year;
 
         // 1. 今活躍している家臣たちを集めます！
-        const activeBushos = this.game.bushos.filter(b => b.clan === daimyo.clan && b.id !== daimyo.id && b.status === 'active' && !b.isDaimyo);
+        const activeBushos = this.game.bushos.filter(b => b.clan === daimyo.clan && b.id !== daimyo.id && window.BushoStatusRules.isActive(b) && !b.isDaimyo);
         
         // その中で「一門」の武将だけを抽出します！
         const activeFamily = activeBushos.filter(b => daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
 
         // まだ登場していない一門（※他勢力所属予定の武将を弾くため、自勢力予定か無所属に限定します）
-        const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && !b.isNotBorn && (b.clan === daimyo.clan || b.clan === 0) && daimyo.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
+        const unbornFamily = this.game.bushos.filter(b => window.LifeStatusRules.isUnborn(b) && !b.isNotBorn && (b.clan === daimyo.clan || b.clan === 0) && daimyo.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
 
         // ★追加：AI大名の場合のみ、浪人や諸勢力に所属している一門武将も探します！
         let externalFamily = [];
@@ -1028,7 +1027,7 @@ class LifeSystem {
                 if (!daimyo.familyIds.some(fId => b.familyIds.includes(fId))) return false;
                 
                 // 浪人なら候補に入れます
-                if (b.status === 'ronin') return true;
+                if (window.BushoStatusRules.isRonin(b)) return true;
                 
                 // 諸勢力に所属している武将の場合
                 if ((b.belongKunishuId || 0) > 0 && b.clan === 0) {
@@ -1120,7 +1119,7 @@ class LifeSystem {
             let isExternalSuccessor = false;
 
             // 外部の武将（未登場、浪人、諸勢力）だった場合はメッセージを用意します
-            if (successor.status === 'unborn' || successor.status === 'ronin' || (successor.belongKunishuId || 0) > 0) {
+            if (window.LifeStatusRules.isUnborn(successor) || window.BushoStatusRules.isRonin(successor) || (successor.belongKunishuId || 0) > 0) {
                 isExternalSuccessor = true;
                 
                 if ((successor.belongKunishuId || 0) > 0) {
@@ -1128,7 +1127,7 @@ class LifeSystem {
                     const kunishuName = kunishu ? kunishu.getName(this.game) : "諸勢力";
                     successor.belongKunishuId = 0;
                     messages.push(`${kunishuName}より${successor.fullName}が\n当主として迎え入れられました。`);
-                } else if (successor.status === 'ronin') {
+                } else if (window.BushoStatusRules.isRonin(successor)) {
                     messages.push(`${successor.fullName}が当主として迎え入れられました。`);
                 } else {
                     messages.push(`${successor.fullName}が急遽元服し、家督を継ぎました。`);
@@ -1187,13 +1186,13 @@ class LifeSystem {
         const currentYear = this.game.year;
         
         // 1. 今活躍している家臣たちを集めます！（大名と国主は弾きます）
-        const activeBushos = this.game.bushos.filter(b => b.clan === commander.clan && b.id !== commander.id && b.status === 'active' && !b.isDaimyo && !b.isCommander);
+        const activeBushos = this.game.bushos.filter(b => b.clan === commander.clan && b.id !== commander.id && window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.isCommander);
         
         // その中で国主の「一門」の武将だけを抽出します！
         const activeFamily = activeBushos.filter(b => commander.familyIds.some(fId => b.familyIds.includes(fId)));
 
         // まだ登場していない一門（※他勢力所属予定の武将を弾くため、自勢力予定か無所属に限定します）
-        const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && !b.isNotBorn && (b.clan === commander.clan || b.clan === 0) && commander.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
+        const unbornFamily = this.game.bushos.filter(b => window.LifeStatusRules.isUnborn(b) && !b.isNotBorn && (b.clan === commander.clan || b.clan === 0) && commander.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
 
         // ★追加：AI国主の場合のみ、浪人や諸勢力に所属している一門武将も探します！
         let externalFamily = [];
@@ -1201,7 +1200,7 @@ class LifeSystem {
             externalFamily = this.game.bushos.filter(b => {
                 if (b.id === commander.id || b.isDaimyo || b.isCommander) return false;
                 if (!commander.familyIds.some(fId => b.familyIds.includes(fId))) return false;
-                if (b.status === 'ronin') return true;
+                if (window.BushoStatusRules.isRonin(b)) return true;
                 if ((b.belongKunishuId || 0) > 0 && b.clan === 0) {
                     const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId) : null;
                     if (kunishu && kunishu.leaderId === b.id) return false; 
@@ -1254,7 +1253,7 @@ class LifeSystem {
             const originalName = successor.fullName;
             let isExternalSuccessor = false;
 
-            if (successor.status === 'unborn' || successor.status === 'ronin' || (successor.belongKunishuId || 0) > 0) {
+            if (window.LifeStatusRules.isUnborn(successor) || window.BushoStatusRules.isRonin(successor) || (successor.belongKunishuId || 0) > 0) {
                 isExternalSuccessor = true;
                 
                 if ((successor.belongKunishuId || 0) > 0) {
@@ -1262,7 +1261,7 @@ class LifeSystem {
                     const kunishuName = kunishu ? kunishu.getName(this.game) : "諸勢力";
                     successor.belongKunishuId = 0;
                     messages.push(`${kunishuName}より${successor.fullName}が\n跡継ぎとして迎え入れられました。`);
-                } else if (successor.status === 'ronin') {
+                } else if (window.BushoStatusRules.isRonin(successor)) {
                     messages.push(`${successor.fullName}が跡を継ぎました。`);
                 } else {
                     messages.push(`${successor.fullName}が急遽元服し、跡を継ぎました。`);
@@ -1272,7 +1271,7 @@ class LifeSystem {
             // 選ばれた後任者を、死亡した国主がいた城に移動させます
             const baseCastle = this.game.getCastle(commander.castleId);
             if (baseCastle) {
-                if (successor.status === 'ronin' || successor.status === 'active') {
+                if (window.BushoStatusRules.isRonin(successor) || window.BushoStatusRules.isActive(successor)) {
                     this.game.affiliationSystem.leaveCastle(successor);
                 }
 
@@ -1365,7 +1364,7 @@ class LifeSystem {
         }
 
         if (changeVal !== 0) {
-            const retainers = this.game.bushos.filter(b => b.clan === oldDaimyo.clan && b.id !== successor.id && b.status === 'active');
+            const retainers = this.game.bushos.filter(b => b.clan === oldDaimyo.clan && b.id !== successor.id && window.BushoStatusRules.isActive(b));
             retainers.forEach(b => {
                 b.loyalty = Math.max(0, Math.min(100, b.loyalty + changeVal));
             });
@@ -1481,7 +1480,7 @@ class LifeSystem {
         // 3. 選ばれた後継者を、先代の大名がいたお城へお引越しさせます
         const baseCastle = this.game.getCastle(oldDaimyo.castleId);
         if (baseCastle) {
-            if (successor.status === 'ronin' || successor.status === 'active') {
+            if (window.BushoStatusRules.isRonin(successor) || window.BushoStatusRules.isActive(successor)) {
                 this.game.affiliationSystem.leaveCastle(successor);
             }
             this.game.affiliationSystem.setActivityStatusRaw(successor, window.GameConstants.BushoStatus.ACTIVE);
@@ -1660,7 +1659,7 @@ class LifeSystem {
             }
 
             // もし残っている武将がいたら、全員「浪人」にします
-            this.game.bushos.filter(b => b.clan === clanId && b.status === 'active').forEach(b => {
+            this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b)).forEach(b => {
                 if ((b.belongKunishuId || 0) === 0) {
                     b.achievementTotal = Math.floor((b.achievementTotal || 0) / 2);
                 }
@@ -1672,7 +1671,7 @@ class LifeSystem {
                 this.game.castleManager.changeOwner(c, 0);
                 c.castellanId = 0;
                 this.game.getCastleBushos(c.id).forEach(l => {
-                    if (l.status === 'unborn' || l.status === 'dead') return;
+                    if (window.LifeStatusRules.isUnavailable(l)) return;
                     this.game.affiliationSystem.becomeRonin(l);
                 });
                 this.game.updateCastleLord(c); 
@@ -1704,7 +1703,7 @@ class LifeSystem {
                 const leader = this.game.getBusho(clan.leaderId);
                 // ★まだ滅亡した大名家に所属したまま（leader.clan === clan.id）の場合だけ浪人にします！
                 // これにより、諸勢力化した大名や、登用された大名が浪人になってしまうのを防ぎます。
-                if (leader && leader.status !== 'dead' && leader.clan === clan.id) {
+                if (leader && !window.LifeStatusRules.isDead(leader) && leader.clan === clan.id) {
                     leader.isDaimyo = false;
                     this.game.affiliationSystem.becomeRonin(leader);
                 }
@@ -1897,7 +1896,7 @@ class LifeSystem {
                 if (leader) {
                     const familyBushos = this.game.bushos.filter(b => 
                         b.clan === clan.id && 
-                        b.status === 'active' && 
+                        window.BushoStatusRules.isActive(b) && 
                         b.id !== leader.id && 
                         !b.female && !b.childless &&
                         leader.familyIds.some(fId => b.familyIds.includes(fId))
@@ -1963,7 +1962,7 @@ class LifeSystem {
                 // 生きている同じ家の一門武将（大名本人と女性・子供なしの武将を除く）を探します
                 const familyBushos = this.game.bushos.filter(b => 
                     b.clan === clan.id && 
-                    b.status === 'active' && 
+                    window.BushoStatusRules.isActive(b) && 
                     b.id !== leader.id && 
                     !b.female && !b.childless &&
                     leader.familyIds.some(fId => b.familyIds.includes(fId))
@@ -2021,7 +2020,7 @@ class LifeSystem {
             if (parent.startYear === 9999) return true;
             
             // statusがdeadでなければ生きています
-            if (parent.status !== 'dead') return true;
+            if (!window.LifeStatusRules.isDead(parent)) return true;
             
             return false;
         };
@@ -2031,7 +2030,7 @@ class LifeSystem {
             // 最初から死亡扱い（startYearが9999）の子供は除外します
             if (child.startYear === 9999) return;
             // すでに死亡している子供も除外します
-            if (child.status === 'dead') return;
+            if (window.LifeStatusRules.isDead(child)) return;
             
             // 子供の誕生年が、親の死亡した年より後（未来）かどうかチェックします
             if (child.birthYear > currentYear) {

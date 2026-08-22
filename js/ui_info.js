@@ -394,7 +394,7 @@ class UIInfoManager {
             let totalGoldIncome = clan.goldIncome || 0;
             let totalRiceIncome = clan.riceIncome || 0;
             
-            const clanBushos = this.game.bushos.filter(b => b.clan === clan.id && b.status === 'active');
+            const clanBushos = this.game.bushos.filter(b => b.clan === clan.id && window.BushoStatusRules.isActive(b));
             const bushosCount = clanBushos.length;
 
             let totalGoldConsume = 0;
@@ -718,7 +718,7 @@ class UIInfoManager {
         const castlesCount = clanCastles.length;
         
         // ★武将のリストを取得して、人数と「派閥があるか」を調べます
-        const clanBushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active');
+        const clanBushos = this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b));
         const bushosCount = clanBushos.length;
         const hasFaction = clanBushos.some(b => (b.factionId || 0) > 0);
         
@@ -737,7 +737,7 @@ class UIInfoManager {
             totalPopulation += c.population || 0;
             totalKokudaka += c.kokudaka || 0;
             totalCommerce += c.commerce || 0;
-            roninCount += this.game.bushos.filter(b => b.castleId === c.id && b.status === 'ronin').length;
+            roninCount += this.game.bushos.filter(b => b.castleId === c.id && window.BushoStatusRules.isRonin(b)).length;
         });
 
         // ★表示側で計算は行わず、勢力データに保存されている値を読むだけにします
@@ -888,7 +888,7 @@ class UIInfoManager {
                 e.stopPropagation();
                 if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                 this.openBushoSelector('view_only', null, { 
-                    customBushos: this.game.bushos.filter(b => b.clan === clanId && b.status === 'active'),
+                    customBushos: this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b)),
                     customInfoHtml: `<div>${clan.name} 所属武将</div>`
                 });
             };
@@ -1077,7 +1077,7 @@ class UIInfoManager {
         const clan = this.game.clans.find(c => c.id === clanId);
         if (!clan) return;
         
-        const bushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active');
+        const bushos = this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b));
         const factions = {};
         
         bushos.forEach(b => {
@@ -1206,7 +1206,7 @@ class UIInfoManager {
         const clan = this.game.clans.find(c => c.id === clanId);
         if (!clan) return;
 
-        const targetBushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active' && (b.factionId || 0) === factionId);
+        const targetBushos = this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b) && (b.factionId || 0) === factionId);
 
         this.openBushoSelector('view_only', null, { 
             customBushos: targetBushos,
@@ -1795,7 +1795,7 @@ class UIInfoManager {
         let myPrincesses = [];
         if (myClan) {
             let pIds = Array.isArray(myClan.princessIds) ? [...myClan.princessIds] : [];
-            const myBushos = this.game.bushos.filter(b => b.clan === myClanId && b.status === 'active');
+            const myBushos = this.game.bushos.filter(b => b.clan === myClanId && window.BushoStatusRules.isActive(b));
             myBushos.forEach(b => {
                 if (Array.isArray(b.wifeIds)) {
                     b.wifeIds.forEach(wId => {
@@ -1836,7 +1836,7 @@ class UIInfoManager {
             const viewClanId = targetCastleId;
             const viewClan = this.game.clans.find(c => c.id === viewClanId);
             let pIds = viewClan && Array.isArray(viewClan.princessIds) ? [...viewClan.princessIds] : [];
-            const clanBushos = this.game.bushos.filter(b => b.clan === viewClanId && b.status === 'active');
+            const clanBushos = this.game.bushos.filter(b => b.clan === viewClanId && window.BushoStatusRules.isActive(b));
             clanBushos.forEach(b => {
                 if (Array.isArray(b.wifeIds)) {
                     b.wifeIds.forEach(wId => {
@@ -1844,11 +1844,11 @@ class UIInfoManager {
                     });
                 }
             });
-            princesses = pIds.map(id => this.game.princesses.find(p => p.id === id)).filter(p => p !== undefined && p.status !== 'unborn' && p.status !== 'dead');
+            princesses = pIds.map(id => this.game.princesses.find(p => p.id === id)).filter(p => p !== undefined && window.LifeStatusRules.isPresent(p));
         } else if (doerId === 'view_busho_wife') {
             const targetBusho = this.game.getBusho(targetCastleId);
             let pIds = targetBusho && Array.isArray(targetBusho.wifeIds) ? targetBusho.wifeIds : [];
-            princesses = pIds.map(id => this.game.princesses.find(p => p.id === id)).filter(p => p !== undefined && p.status !== 'unborn' && p.status !== 'dead');
+            princesses = pIds.map(id => this.game.princesses.find(p => p.id === id)).filter(p => p !== undefined && window.LifeStatusRules.isPresent(p));
         } else {
             if (!this.princessCurrentScope) this.princessCurrentScope = 'clan';
 
@@ -1859,7 +1859,7 @@ class UIInfoManager {
             if (this.princessCurrentScope === 'clan') {
                 princesses = myPrincesses;
             } else {
-                princesses = this.game.princesses.filter(p => p.status !== 'unborn' && p.status !== 'dead');
+                princesses = this.game.princesses.filter(p => window.LifeStatusRules.isPresent(p));
             }
 
             const isPc = document.body.classList.contains('is-pc'); // ★PCかスマホか調べる魔法を追加します
@@ -2215,7 +2215,7 @@ class UIInfoManager {
         });
 
         // 武将の数と姫の数も数えます
-        const bushosCount = this.game.bushos.filter(b => b.clan === clanId && b.status !== 'dead' && b.status !== 'unborn').length;
+        const bushosCount = this.game.bushos.filter(b => b.clan === clanId && window.LifeStatusRules.isPresent(b)).length;
         const clanData = this.game.clans.find(c => c.id === clanId);
         const princessCount = clanData && clanData.princessIds ? clanData.princessIds.length : 0;
         const clanYomi = clanData ? (clanData.yomi || "") : "";
