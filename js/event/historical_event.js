@@ -1456,7 +1456,7 @@ window.GameEvents.push({
         if (!nagamasa.wifeIds.includes(oichiId)) {
             nagamasa.wifeIds.push(oichiId);
         }
-        nagamasa.updateFamilyIds(game.princesses);
+        FamilyLinker.rebuildAllFamilyIds(game.bushos, game.princesses);
 
         // ④ 外交システムで支配・従属の婚姻関係を結びます
         if (game.diplomacyManager) {
@@ -1591,18 +1591,15 @@ window.GameEvents.push({
         if (!deadBusho.baseFamilyIds.includes(katsunaga.id)) {
             deadBusho.baseFamilyIds.push(katsunaga.id);
         }
-        // 親戚の繋がりを整理する魔法を呼び出します
-        if (typeof FamilyLinker !== 'undefined' && FamilyLinker.linkAdoptiveRelations) {
-            FamilyLinker.linkAdoptiveRelations(game.bushos);
-        }
-        katsunaga.updateFamilyIds(game.princesses || []);
+        // 養子縁組を含む一門関係は、全人物を知るFamilyLinkerの司令塔から一括再構築します。
+        FamilyLinker.rebuildAllFamilyIds(game.bushos, game.princesses || []);
 
         // ----------------------------------------------------
         // 3. 織田勝長が遠山景任の居城の城主になる
         // ----------------------------------------------------
         // 勝長がまだ未登場（unborn）の場合は、ゲームに登場（active）させます
         if (katsunaga.status === 'unborn') {
-            katsunaga.status = 'active';
+            game.affiliationSystem.setActivityStatusRaw(katsunaga, window.GameConstants.BushoStatus.ACTIVE);
             katsunaga.loyalty = 100; // 初登場時は忠誠度100にします
         }
         
@@ -2065,15 +2062,7 @@ window.GameEvents.push({
 
         // ② 足利義輝の死亡処理と左馬頭の引継ぎ
         // life_system に任せれば、将軍だった場合の処理も全部やってくれます！
-        if (game.lifeSystem) {
-            await game.lifeSystem.executeDeath(yoshiteru);
-        } else {
-            // 万が一システムがない時の安全策
-            yoshiteru.status = 'dead';
-            yoshiteru.isDaimyo = false;
-            yoshiteru.isCastellan = false;
-            yoshiteru.courtRankIds = [];
-        }
+        await game.lifeSystem.executeDeath(yoshiteru);
 
         // ③ 武将を浪人にする
         const ashikagaBushos = game.bushos.filter(b => b.clan === ashikagaClanId && b.status === 'active');

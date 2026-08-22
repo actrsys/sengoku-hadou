@@ -2772,19 +2772,7 @@ class AIEngine {
                     this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, isSuccess, 'assassinate', false, targetBusho.id);
                     
                     if (isSuccess) {
-                        if (this.game.lifeSystem && typeof this.game.lifeSystem.processDeath === 'function') {
-                            this.game.lifeSystem.processDeath(targetBusho, 'assassination'); 
-                        } else {
-                            targetBusho.status = 'dead';
-                            targetBusho.isCastellan = false;
-                            targetBusho.isGunshi = false;
-                            targetBusho.isCommander = false;
-                            const targetCastle = this.game.getCastle(targetBusho.castleId);
-                            if (targetCastle) {
-                                targetCastle.samuraiIds = targetCastle.samuraiIds.filter(id => id !== targetBusho.id);
-                            }
-                            this.game.updateAllCastlesLords();
-                        }
+                        this.game.lifeSystem.processDeath(targetBusho, 'assassination');
                     }
                     
                     let keepAction = false;

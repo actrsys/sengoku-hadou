@@ -646,7 +646,7 @@ class StrategySystem {
                 this.game.castleManager.changeOwner(oldCastle, newClanId);
                 this.game.affiliationSystem.setClanIdRaw(target, newClanId);
                 target.isActionDone = true;
-                target.status = 'active';
+                this.game.affiliationSystem.setActivityStatusRaw(target, window.GameConstants.BushoStatus.ACTIVE);
                 target.isGunshi = false;
                 
                 const targetLord = this.game.getClanDaimyo(oldClanId) || { affinity: 50 };
@@ -737,19 +737,7 @@ class StrategySystem {
         let msg = "";
         if (isSuccess) {
             // 暗殺成功時の処理
-            if (this.game.lifeSystem && typeof this.game.lifeSystem.processDeath === 'function') {
-                this.game.lifeSystem.processDeath(target, 'assassination'); 
-            } else {
-                target.status = 'dead';
-                target.isCastellan = false;
-                target.isGunshi = false;
-                target.isCommander = false;
-                const targetCastle = this.game.getCastle(target.castleId);
-                if (targetCastle) {
-                    targetCastle.samuraiIds = targetCastle.samuraiIds.filter(id => id !== target.id);
-                }
-                this.game.updateAllCastlesLords();
-            }
+            this.game.lifeSystem.processDeath(target, 'assassination');
             
             const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
             doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(maxStat * 0.5);

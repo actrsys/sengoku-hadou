@@ -31,12 +31,12 @@
 - `js/economy_rules.js` — 収入、交易、購入価格、経済計算。
 - `js/personnel_rules.js` — 相性、調査、登用、褒美。
 - `js/game_math.js` — 複数部署から使う小さな汎用数値処理。小さいが共通依存なので独立を維持。
-- `js/stat_presenter.js` — 能力ランクなど表示用整形。小さいがRulesへHTML生成を戻さないため独立を維持。
+- `js/stat_presenter.js` — 能力ランク・武将肩書きなど表示用整形。小さいがRules/ModelへHTML・表示責務を戻さないため独立を維持。
 - `js/skill_manager.js` — 技能文字列の解釈と技能効果の唯一の窓口。
 
 ## 所属・拠点・地図
 
-- `js/affiliation_system.js` — 武将所属・移動・所属関係。
+- `js/affiliation_system.js` — 武将所属・移動・活動状態（active / ronin）。
 - `js/castle_manager.js` — 城主・城所有者など拠点状態の管理。
 - `js/map_graph.js` — 隣接・到達可能性・海路など地図接続。
 - `js/map_generator.js` — 地図描画用データ生成。
@@ -47,7 +47,16 @@
 - 独立・歴史イベントなど、周辺の名簿や役職処理を呼び出し側が既に管理している特殊処理だけ `setClanIdRaw` / `setCastleIdRaw` を使う。
 - 実行中の `castle.ownerClan` は `CastleManager` だけが直接書き換える。通常は `changeOwner`、副作用を起こしたくない特殊ロールバックだけ `setOwnerIdRaw` を使う。
 - `models.js` と `data_manager.js` のデータ生成・初期読込は上記ルールの例外。
-- `status` は武将・姫・軍団・AI作戦で意味が異なるため、単一の汎用Setterにはまとめない。型ごとの責務を確認して段階的に整理する。
+- 武将の `active / ronin` は活動・所属状態として `AffiliationSystem.setActivityStatusRaw` が低レベル書換窓口を持つ。通常処理は joinClan / becomeRonin 等の高レベルAPIを使う。
+- 武将・姫の `dead / unborn` は生死・登場状態として `LifeSystem.setLifeStatusRaw` が低レベル書換窓口を持つ。死亡処理そのものは executeDeath / processDeath 等の高レベルAPIを優先する。
+- 姫の `unmarried / married`、軍団やAI作戦の `status` は別概念なので、上記と同じSetterには混ぜない。
+
+## モデル境界
+
+- `js/models.js` — 保存・ゲーム内データ構造そのもの。ゲーム全体の司令塔 `window.GameApp` を直接参照しない。
+- 武将能力値の一門+5は既存getter互換のため、`GameManager` が `Busho.configureRuntime()` へ「大名を取得する関数」だけを注入する。モデルからはGameManager全体へアクセスしない。
+- 武将肩書きのような表示判断は `StatPresenter`、城・軍団など周囲のゲーム状態を使う判定は利用側/Systemへ置く。
+- 一門関係の再構築は `FamilyLinker.rebuildAllFamilyIds()` を正規窓口とし、各人物がゲーム全体の名簿を取りに行かない。
 
 ## 戦争
 
@@ -55,7 +64,8 @@
 - `js/war_effort.js` — 攻城戦・戦争進行の既存大規模処理。今後の整理候補。
 - `js/field_war.js` — 野戦。Rules / View / AI がまだ混在しており今後の整理候補。
 - `js/troop_allocation.js` — 兵力自動配分の正本。
-- `js/reinforcement_service.js` — 自軍・同盟・諸勢力援軍編成の正本。
+- `js/reinforcement_service.js` — 承諾後の自軍・同盟・諸勢力援軍編成／資源消費の正本。
+- AIが援軍要請を承諾するかどうか（実効確率・大雪・支配関係・拒否可能スキル・最終サイコロ）は `DiplomacyManager.getAIReinforcementAcceptanceInfo()` / `checkAIReinforcementAcceptance()` を正本とし、攻撃側・守備側とも同じ窓口を使う。
 
 `troop_allocation.js` と `reinforcement_service.js` は小さいものの、複数の戦争入口から共通利用され、計算重複防止の役割が明確なため独立を維持します。
 
@@ -95,8 +105,8 @@
 
 ## 今後の優先整理対象
 
-1. 所属・城所有者の書き換え境界を維持し、次に武将status等を型ごとに整理する。
-2. `models.js` から `window.GameApp` への直接依存を減らす。
+1. 所属・城所有者・武将の活動/生死状態の書き換え境界を維持し、直接代入の再発をテストで防ぐ。
+2. モデル境界を維持し、残るグローバル設定依存やモデル内の周辺世界判定を必要に応じてさらに薄くする。
 3. 定数・状態判定の残りを専門Rulesへ寄せる。
 4. UI分離の残件と重複CSSを、ビジュアル回帰テストを通しながら整理する。
 5. `TurnManager` 内の月次計算を、必要な単位で既存Rules/Systemへ寄せる（小ファイル乱立は避ける）。

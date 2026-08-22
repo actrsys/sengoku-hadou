@@ -3382,22 +3382,26 @@ class CommandSystem {
             const kunishu = this.game.kunishuSystem.getKunishu(force.id);
             const currentRel = kunishu.getRelation(myClanId);
             
-            // ★追加：大雪ならAI（諸勢力）は絶対に断ります！
-            let isSuccess = false;
-            if (!isHeavySnow) {
-                // ★修正：確率の計算を、外交の専門部署にお任せします！
-                const prob = this.game.diplomacyManager.getReinforcementAcceptProb(myClanId, force.id, targetCastle.ownerClan, gold, true, atkTotalSoldiers, defTotalSoldiers);
-                isSuccess = (Math.random() * 100 < prob);
-            }
+            const decision = this.game.diplomacyManager.checkAIReinforcementAcceptance({
+                requesterClanId: myClanId,
+                helperForceId: force.id,
+                enemyClanId: targetCastle.ownerClan,
+                gold,
+                isKunishu: true,
+                requesterTotalSoldiers: atkTotalSoldiers,
+                enemyTotalSoldiers: defTotalSoldiers,
+                helperCastleId: helperCastle.id,
+                isHeavySnow
+            });
             
-            if (!isSuccess) {
+            if (!decision.accepted) {
                 if (myClanId === this.game.playerClanId) {
                     const leader = this.game.getBusho(kunishu.leaderId);
                     const leaderName = leader ? leader.name : "頭領";
                     const nameStr = `${kunishu.getName(this.game)}の${leaderName}`;
                     
                     // ★メッセージ係にお任せします！
-                    this.game.warManager.reinfMsgHelper.showRefusal(this.game, nameStr, isHeavySnow, () => {
+                    this.game.warManager.reinfMsgHelper.showRefusal(this.game, nameStr, decision.blockedByHeavySnow, () => {
                         this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
                     });
                 } else {
@@ -3469,26 +3473,26 @@ class CommandSystem {
             return;
         }
 
-        // ★追加：大雪ならAIは絶対に断ります！
-        let isSuccess = false;
-        // ★修正：要請側が相手を「支配」しているなら、大雪でも何でも絶対に強制参加させます！
-        if (myToHelperRel && myToHelperRel.status === '支配') {
-            isSuccess = true;
-        } else if (!isHeavySnow) {
-            // ★修正：確率計算とサイコロは、外交の専門部署にお任せします！
-            // ★お願いするお城のID（helperCastle.id）も渡してあげます！
-            const prob = this.game.diplomacyManager.getReinforcementAcceptProb(myClanId, helperClanId, enemyClanId, gold, false, atkTotalSoldiers, defTotalSoldiers, helperCastle.id);
-            isSuccess = (Math.random() * 100 < prob);
-        }
+        const decision = this.game.diplomacyManager.checkAIReinforcementAcceptance({
+            requesterClanId: myClanId,
+            helperForceId: helperClanId,
+            enemyClanId,
+            gold,
+            isKunishu: false,
+            requesterTotalSoldiers: atkTotalSoldiers,
+            enemyTotalSoldiers: defTotalSoldiers,
+            helperCastleId: helperCastle.id,
+            isHeavySnow
+        });
 
-        if (!isSuccess) {
+        if (!decision.accepted) {
             if (myClanId === this.game.playerClanId) {
                 const castellan = this.game.getBusho(helperCastle.castellanId);
                 const castellanName = castellan ? castellan.name : "城主";
                 const nameStr = `${helperCastle.name}の${castellanName}`;
                 
                 // ★メッセージ係にお任せします！
-                this.game.warManager.reinfMsgHelper.showRefusal(this.game, nameStr, isHeavySnow, () => {
+                this.game.warManager.reinfMsgHelper.showRefusal(this.game, nameStr, decision.blockedByHeavySnow, () => {
                     this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
                 });
             } else {

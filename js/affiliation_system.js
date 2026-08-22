@@ -29,6 +29,20 @@ class AffiliationSystem {
     }
 
     /**
+     * 低レベル活動状態書換API。active / ronin は所属・活動状態としてこの部署が所有します。
+     * dead / unborn は LifeSystem の責務です。
+     */
+    setActivityStatusRaw(busho, newStatus) {
+        if (!busho) return;
+        const S = window.GameConstants.BushoStatus;
+        if (newStatus !== S.ACTIVE && newStatus !== S.RONIN) {
+            console.warn('AffiliationSystem: activity status 以外の書換要求を拒否しました', newStatus, busho.id);
+            return;
+        }
+        busho.status = newStatus;
+    }
+
+    /**
      * ① 浪人から仕官したり、敵から寝返ったりして「新しい大名家」に入る時の魔法
      * @param {object} busho - お引越しする武将
      * @param {number} newClanId - 新しい大名家のID
@@ -56,7 +70,7 @@ class AffiliationSystem {
         
         // ★修正：死亡や未登場の武将は状態を強制的に変えないようにします
         if (busho.status !== 'dead' && busho.status !== 'unborn') {
-            busho.status = 'active';
+            this.setActivityStatusRaw(busho, window.GameConstants.BushoStatus.ACTIVE);
         }
         
         busho.isCastellan = false;
@@ -126,7 +140,7 @@ class AffiliationSystem {
         // ★ここから追加：最強の関所！自動で作られた頭領は浪人になれず、ここで消滅します！
         if (busho.isAutoLeader) {
             this.setClanIdRaw(busho, 0);
-            busho.status = 'dead'; // 浪人ではなく、死亡（消滅）扱いにします
+            this.game.lifeSystem.setLifeStatusRaw(busho, window.GameConstants.BushoStatus.DEAD); // 浪人ではなく、死亡（消滅）扱い
             busho.isCastellan = false;
             busho.isDaimyo = false;
             busho.isGunshi = false; // ★念のためここにも書き足します！
@@ -178,7 +192,7 @@ class AffiliationSystem {
         
         // ★修正：死亡や未登場の武将は状態を強制的に変えないようにします
         if (busho.status !== 'dead' && busho.status !== 'unborn') {
-            busho.status = 'ronin';
+            this.setActivityStatusRaw(busho, window.GameConstants.BushoStatus.RONIN);
             busho.loyalty = 50; // ★浪人になったので、忠誠度を50にします！
         }
         
@@ -297,7 +311,7 @@ class AffiliationSystem {
         this.resetFactionData(busho);
         
         this.setClanIdRaw(busho, 0);
-        busho.status = 'active';
+        this.setActivityStatusRaw(busho, window.GameConstants.BushoStatus.ACTIVE);
         busho.isCastellan = false;
         busho.isDaimyo = false;
         busho.isGunshi = false;
@@ -386,7 +400,7 @@ class AffiliationSystem {
         
         // ★修正：死亡や未登場の武将は状態を強制的に変えないようにします
         if (busho.status !== 'dead' && busho.status !== 'unborn') {
-            busho.status = 'active';
+            this.setActivityStatusRaw(busho, window.GameConstants.BushoStatus.ACTIVE);
         }
         
         busho.isCastellan = false;

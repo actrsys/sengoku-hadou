@@ -173,6 +173,85 @@ test('ReinforcementService は中央設定の比率で資源を消費する', ()
     assert.ok(data.horses <= 1500 && data.guns <= 1500);
 });
 
+
+test('AI援軍受諾は攻守共通の外交判定を使い、大雪・支配・表裏比興を同じ規則で処理する', () => {
+    let canDeclineBoss = false;
+    const ctx = createContext({
+        SkillManager: {
+            canDeclineBossReinforcement: () => canDeclineBoss
+        }
+    });
+    loadScript(ctx, 'js/diplomacy.js');
+    const DiplomacyManager = vm.runInContext('DiplomacyManager', ctx);
+    const manager = new DiplomacyManager({});
+
+    manager.getRelation = () => ({ status: '同盟' });
+    manager.getReinforcementAcceptProb = () => 40;
+
+    let result = manager.checkAIReinforcementAcceptance({
+        requesterClanId: 1, helperForceId: 2, enemyClanId: 3,
+        requesterTotalSoldiers: 5000, enemyTotalSoldiers: 5000
+    }, () => 0.39);
+    assert.strictEqual(result.probability, 40);
+    assert.strictEqual(result.accepted, true);
+
+    result = manager.checkAIReinforcementAcceptance({
+        requesterClanId: 1, helperForceId: 2, enemyClanId: 3,
+        requesterTotalSoldiers: 5000, enemyTotalSoldiers: 5000
+    }, () => 0.40);
+    assert.strictEqual(result.accepted, false);
+
+    result = manager.checkAIReinforcementAcceptance({
+        requesterClanId: 1, helperForceId: 2, enemyClanId: 3,
+        requesterTotalSoldiers: 5000, enemyTotalSoldiers: 5000, isHeavySnow: true
+    }, () => 0);
+    assert.strictEqual(result.probability, 0);
+    assert.strictEqual(result.blockedByHeavySnow, true);
+    assert.strictEqual(result.accepted, false);
+
+    manager.getRelation = () => ({ status: '支配' });
+    canDeclineBoss = false;
+    result = manager.checkAIReinforcementAcceptance({
+        requesterClanId: 1, helperForceId: 2, enemyClanId: 3,
+        requesterTotalSoldiers: 5000, enemyTotalSoldiers: 5000, isHeavySnow: true
+    }, () => 0.99);
+    assert.strictEqual(result.forcedByDominance, true);
+    assert.strictEqual(result.probability, 100);
+    assert.strictEqual(result.accepted, true);
+
+    canDeclineBoss = true;
+    result = manager.checkAIReinforcementAcceptance({
+        requesterClanId: 1, helperForceId: 2, enemyClanId: 3,
+        requesterTotalSoldiers: 5000, enemyTotalSoldiers: 5000, isHeavySnow: true
+    }, () => 0);
+    assert.strictEqual(result.forcedByDominance, false);
+    assert.strictEqual(result.blockedByHeavySnow, true);
+    assert.strictEqual(result.accepted, false);
+});
+
+test('援軍受諾確率の生計算は DiplomacyManager 外から直接呼ばない', () => {
+    const offenders = [];
+    const walk = dir => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) walk(full);
+            else if (entry.name.endsWith('.js') && !entry.name.endsWith('.min.js')) {
+                const rel = path.relative(ROOT, full).replace(/\\/g, '/');
+                if (rel === 'js/diplomacy.js') continue;
+                if (/getReinforcementAcceptProb\s*\(/.test(fs.readFileSync(full, 'utf8'))) offenders.push(rel);
+            }
+        }
+    };
+    walk(path.join(ROOT, 'js'));
+    assert.deepStrictEqual(offenders, []);
+
+    const commandSource = read('js/command_system.js');
+    const warEffortSource = read('js/war_effort.js');
+    assert.ok(commandSource.includes('checkAIReinforcementAcceptance'));
+    assert.ok(warEffortSource.includes('checkAIReinforcementAcceptance'));
+    assert.ok(warEffortSource.includes('getAIReinforcementAcceptanceInfo'));
+});
+
 // ---------------------------------------------------------------------------
 // SkillManager 境界
 // ---------------------------------------------------------------------------
@@ -462,6 +541,97 @@ test('低レベル所属Setterは正規化し、城所有者Setterは索引バ�
     castleManager.setOwnerIdRaw(castle, '9');
     assert.strictEqual(castle.ownerClan, 9);
     assert.strictEqual(game.castleOwnershipVersion, 8);
+});
+
+
+// ---------------------------------------------------------------------------
+// モデル境界・武将状態の所有権
+// ---------------------------------------------------------------------------
+test('models.js は GameApp 全体を直接参照しない', () => {
+    const source = read('js/models.js');
+    assert.ok(!/\bwindow\.GameApp\b/.test(source), 'models.js に window.GameApp 直接参照が残っています');
+});
+
+test('Busho能力値は注入resolver経由でも一門+5を維持する', () => {
+    const ctx = createContext({ MainParams: { StartYear: 1560 } });
+    loadScript(ctx, 'js/models.js');
+    const Busho = vm.runInContext('Busho', ctx);
+    const daimyo = { id: 2, familyIds: [1] };
+    Busho.configureRuntime({ getClanDaimyo: () => daimyo });
+    const busho = Object.create(Busho.prototype);
+    Object.assign(busho, { id: 1, clan: 1, isDaimyo: false, familyIds: [], _leadership: 90, expLeadership: 0 });
+    assert.strictEqual(busho.leadership, 95);
+    daimyo.familyIds = [];
+    assert.strictEqual(busho.leadership, 90);
+    busho.isDaimyo = true;
+    assert.strictEqual(busho.leadership, 95);
+});
+
+test('武将肩書き表示は StatPresenter が担当する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/stat_presenter.js');
+    const p = ctx.StatPresenter;
+    const game = {
+        legions: [{ commanderId: 10 }],
+        kunishuSystem: { getKunishu: id => id === 7 ? { leaderId: 20 } : null }
+    };
+    assert.strictEqual(p.getBushoRankName({ id: 10, status: 'active', isDaimyo: false, isGunshi: false, isCastellan: false, isCommander: false, belongKunishuId: 0 }, game), '国主');
+    assert.strictEqual(p.getBushoRankName({ id: 20, status: 'active', isDaimyo: false, isGunshi: false, isCastellan: false, isCommander: false, belongKunishuId: 7 }, game), '頭領');
+    assert.strictEqual(p.getBushoRankName({ id: 30, status: 'ronin', isDaimyo: false, isGunshi: false, isCastellan: false, isCommander: false, belongKunishuId: 0 }, game), '浪人');
+    assert.ok(!read('js/models.js').includes('getRankName()'), '表示用getRankNameがモデルへ戻っています');
+});
+
+test('武将active/roninとdead/unbornの直接書換は所有部署と初期化処理に限定する', () => {
+    const jsFiles = [];
+    const walk = dir => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) walk(full);
+            else if (entry.name.endsWith('.js') && !entry.name.endsWith('.min.js')) jsFiles.push(full);
+        }
+    };
+    walk(path.join(ROOT, 'js'));
+    const allowed = new Set(['js/affiliation_system.js', 'js/life_system.js', 'js/models.js', 'js/data_manager.js']);
+    const offenders = [];
+    for (const file of jsFiles) {
+        const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+        if (allowed.has(rel)) continue;
+        const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
+        lines.forEach((line, index) => {
+            if (/\.status\s*=\s*['"](?:active|ronin|dead|unborn)['"]/.test(line)) offenders.push(`${rel}:${index + 1}`);
+        });
+    }
+    assert.deepStrictEqual(offenders, [], `武将状態の直接代入: ${offenders.join(', ')}`);
+});
+
+test('活動状態と生死状態の低レベルAPIは担当外状態を拒否する', () => {
+    const silentConsole = { ...console, warn: () => {} };
+    const ctx = createContext({ console: silentConsole, PersonnelRules: { calcAffinityDiff: () => 0 } });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/life_system.js');
+    const AffiliationSystem = vm.runInContext('AffiliationSystem', ctx);
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    const game = {};
+    const a = new AffiliationSystem(game);
+    const l = new LifeSystem(game);
+    const b = { id: 1, status: 'active' };
+    a.setActivityStatusRaw(b, 'ronin');
+    assert.strictEqual(b.status, 'ronin');
+    a.setActivityStatusRaw(b, 'dead');
+    assert.strictEqual(b.status, 'ronin');
+    l.setLifeStatusRaw(b, 'dead');
+    assert.strictEqual(b.status, 'dead');
+    l.setLifeStatusRaw(b, 'active');
+    assert.strictEqual(b.status, 'dead');
+});
+
+test('Legionモデルは現在ターンをGameAppから取得せず、復元側が旧セーブを補完する', () => {
+    const models = read('js/models.js');
+    const saves = read('js/save_manager.js');
+    assert.ok(models.includes('this.establishedTurnId = Number(data.establishedTurnId || 0);'));
+    assert.ok(saves.includes('establishedTurnId: l.establishedTurnId || this.game.getCurrentTurnId()'));
 });
 
 // ---------------------------------------------------------------------------

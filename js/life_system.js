@@ -8,6 +8,20 @@ class LifeSystem {
         this.game = game;
     }
 
+    /**
+     * 低レベル生死・登場状態書換API。dead / unborn は LifeSystem が所有します。
+     * active / ronin は AffiliationSystem の責務です。
+     */
+    setLifeStatusRaw(person, newStatus) {
+        if (!person) return;
+        const S = window.GameConstants.BushoStatus;
+        if (newStatus !== S.DEAD && newStatus !== S.UNBORN) {
+            console.warn('LifeSystem: life status 以外の書換要求を拒否しました', newStatus, person.id);
+            return;
+        }
+        person.status = newStatus;
+    }
+
     // ★Round5：古いセーブや特殊イベントで familyIds が空欄でも停止しない安全装置です。
     _normalizeFamilyArrays() {
         const normalize = (person) => {
@@ -29,7 +43,7 @@ class LifeSystem {
             const currentYear = this.game.year;
             for (const p of this.game.princesses) {
                 if (p.birthYear > currentYear) {
-                    p.status = 'unborn';
+                    this.setLifeStatusRaw(p, window.GameConstants.BushoStatus.UNBORN);
                     p.isNotBorn = true;
                 } else if (p.isNotBorn && p.birthYear <= currentYear) {
                     p.isNotBorn = false; // 生まれたのでフラグを下ろします
@@ -65,7 +79,7 @@ class LifeSystem {
         for (const b of this.game.bushos) {
             // ★ここから修正：状態は変えず、フラグで「出生前」を管理します
             if (b.birthYear > currentYear) {
-                b.status = 'unborn';
+                this.setLifeStatusRaw(b, window.GameConstants.BushoStatus.UNBORN);
                 b.isNotBorn = true; // まだ生まれていないバリエーション
             } else if (b.isNotBorn && b.birthYear <= currentYear) {
                 b.isNotBorn = false; // 生まれたのでフラグを下ろします
@@ -323,7 +337,7 @@ class LifeSystem {
             // ★変更：大名家に所属しておらず、諸勢力でもない場合は「浪人」になります
             if (b.clan === 0 && (b.belongKunishuId || 0) === 0) {
                 // 登場前:浪人 の場合
-                b.status = 'ronin';
+                this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.RONIN);
                 b.loyalty = 50; // ★浪人として登場したので、忠誠度を50にします！
                 const targetCastle = this.game.getCastle(b.castleId);
                 if (targetCastle) {
@@ -336,7 +350,7 @@ class LifeSystem {
 
                 if (isKunishuAlive) {
                     // ★ 諸勢力が健在な場合：そのまま加入
-                    b.status = 'active';
+                    this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.ACTIVE);
                     const targetCastle = this.game.getCastle(b.castleId);
                     if (targetCastle) {
                         targetCastle.samuraiIds.push(b.id);
@@ -346,7 +360,7 @@ class LifeSystem {
                     const currentLeader = this.game.getBusho(kunishu.leaderId);
                     if (currentLeader && currentLeader.isAutoLeader) {
                         kunishu.leaderId = b.id;
-                        currentLeader.status = 'dead';
+                        this.setLifeStatusRaw(currentLeader, window.GameConstants.BushoStatus.DEAD);
                         if (targetCastle) {
                             targetCastle.samuraiIds = targetCastle.samuraiIds.filter(id => id !== currentLeader.id);
                         }
@@ -383,7 +397,7 @@ class LifeSystem {
                         });
 
                         const targetRelative = activeRelatives[0];
-                        b.status = 'active';
+                        this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.ACTIVE);
                         this.game.affiliationSystem.setClanIdRaw(b, targetRelative.clan);
                         this.game.affiliationSystem.setCastleIdRaw(b, targetRelative.castleId);
 
@@ -401,7 +415,7 @@ class LifeSystem {
                         }
                     } else {
                         // 一門がいない場合：浪人として登場
-                        b.status = 'ronin';
+                        this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.RONIN);
                         this.game.affiliationSystem.setClanIdRaw(b, 0);
                         b.loyalty = 50;
                         const targetCastle = this.game.getCastle(b.castleId);
@@ -413,7 +427,7 @@ class LifeSystem {
 
             } else {
                 // 登場前:仕官 の場合
-                b.status = 'active';
+                this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.ACTIVE);
                 
                 // ★追加：「登場前:仕官」の武将に一門武将がいるかチェックします
                 // 条件：すでに登場して活動している、自分自身ではない、一門IDが共通している
@@ -456,7 +470,7 @@ class LifeSystem {
                         const ownerClanId = targetCastle.ownerClan;
                         if (ownerClanId === 0) {
                             // 城が空き城なら、仕方なく浪人になります
-                            b.status = 'ronin';
+                            this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.RONIN);
                             this.game.affiliationSystem.setClanIdRaw(b, 0);
                             b.loyalty = 50; // ★浪人になったので忠誠度を50にします！
                         } else {
@@ -481,7 +495,7 @@ class LifeSystem {
                     }
                 } else {
                     // 万が一城が見つからなかった時の安全策
-                    b.status = 'ronin';
+                    this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.RONIN);
                     this.game.affiliationSystem.setClanIdRaw(b, 0);
                     b.loyalty = 50; // ★浪人になったので忠誠度を50にします！
                 }
@@ -683,7 +697,7 @@ class LifeSystem {
 
             if (Math.random() < deathProb) {
                 const wasUnborn = (p.status === 'unborn'); // ★追加：死ぬ前に未登場だったかメモしておく
-                p.status = 'dead'; // 「死亡」の印をつけます
+                this.setLifeStatusRaw(p, window.GameConstants.BushoStatus.DEAD); // 「死亡」の印をつけます
                 
                 // もし結婚していたら、旦那さんの奥さんリストから外します
                 if (p.husbandId > 0) {
@@ -750,7 +764,7 @@ class LifeSystem {
         this._normalizeFamilyArrays();
         // ★高速化：最後に所属を0へ変更する前の勢力IDを覚えておきます。
         const formerClanId = Number(busho.clan) || 0;
-        busho.status = 'dead'; // ステータスを「死亡」にします
+        this.setLifeStatusRaw(busho, window.GameConstants.BushoStatus.DEAD); // ステータスを「死亡」にします
         
         // ★追加：自分が死んだ年より後に生まれる予定だった子供（実父としている武将・姫）を連鎖的に死亡させます
         this.cascadeDeathToUnbornChildren(busho.id, this.game.year);
@@ -868,7 +882,7 @@ class LifeSystem {
                             princess.status = 'unmarried';
                         } else {
                             // 夫の家も滅びていて完全に身寄りがないなら、ゲームから退場（死亡）させます
-                            princess.status = 'dead';
+                            this.setLifeStatusRaw(princess, window.GameConstants.BushoStatus.DEAD);
                             
                             if (busho.clan !== 0) {
                                 const oldClan = this.game.getClan(busho.clan);
@@ -1202,7 +1216,7 @@ class LifeSystem {
 
         // もし一門の候補が誰もいなければ、特例として「同じ軍団で活躍している家臣」を候補にします！
         if (allCandidates.length === 0) {
-            allCandidates = activeBushos.filter(b => b.legionId === legion.id);
+            allCandidates = activeBushos.filter(b => Number(this.game.getCastle(b.castleId)?.legionId || 0) === Number(legion.id));
         }
 
         if (allCandidates.length > 0) {
@@ -1262,7 +1276,7 @@ class LifeSystem {
                     this.game.affiliationSystem.leaveCastle(successor);
                 }
 
-                successor.status = 'active';
+                this.game.affiliationSystem.setActivityStatusRaw(successor, window.GameConstants.BushoStatus.ACTIVE);
                 this.game.affiliationSystem.setClanIdRaw(successor, commander.clan);
                 this.game.affiliationSystem.setCastleIdRaw(successor, baseCastle.id);
                 successor.loyalty = 100;
@@ -1470,7 +1484,7 @@ class LifeSystem {
             if (successor.status === 'ronin' || successor.status === 'active') {
                 this.game.affiliationSystem.leaveCastle(successor);
             }
-            successor.status = 'active';
+            this.game.affiliationSystem.setActivityStatusRaw(successor, window.GameConstants.BushoStatus.ACTIVE);
             this.game.affiliationSystem.setClanIdRaw(successor, oldDaimyo.clan);
             this.game.affiliationSystem.setCastleIdRaw(successor, baseCastle.id);
             successor.loyalty = 100;
@@ -2038,7 +2052,7 @@ class LifeSystem {
                 }
                 
                 // どちらの親も死んでいる（または片親しかおらず死んだ）場合は、子供も死亡扱いにします
-                child.status = 'dead';
+                this.setLifeStatusRaw(child, window.GameConstants.BushoStatus.DEAD);
                 if (!isPrincess) {
                     child.isDaimyo = false;
                     child.isCastellan = false;

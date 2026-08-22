@@ -516,7 +516,7 @@ class KunishuSystem {
                 // ★ここを書き換え！：名前ではなく「秘密のシール」が貼ってあるか調べます
                 if (b.isAutoLeader) {
                     // 自動で作られた頭領なら「死亡（消滅）」の印をつけます
-                    b.status = 'dead';
+                    this.game.lifeSystem.setLifeStatusRaw(b, window.GameConstants.BushoStatus.DEAD);
                     
                     // お城の名簿からも、この頭領の名前を消しゴムで消しておきます
                     const castle = this.game.getCastle(b.castleId);
@@ -576,7 +576,7 @@ class KunishuSystem {
 
             if (successor.status === 'unborn') {
                 isExternalSuccessor = true;
-                successor.status = 'active';
+                this.game.affiliationSystem.setActivityStatusRaw(successor, window.GameConstants.BushoStatus.ACTIVE);
                 successor.belongKunishuId = kunishu.id;
                 this.game.affiliationSystem.setCastleIdRaw(successor, kunishu.castleId);
                 this.game.affiliationSystem.setClanIdRaw(successor, 0); 

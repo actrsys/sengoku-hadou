@@ -281,6 +281,12 @@ class Castle {
 }
 
 class Busho {
+    // 能力値getterが必要とする最小限の外部参照だけを明示注入します。
+    // モデルからゲーム本体全体を直接参照しないための互換窓口です。
+    static configureRuntime(runtime = {}) {
+        Busho._getClanDaimyo = (typeof runtime.getClanDaimyo === 'function') ? runtime.getClanDaimyo : null;
+    }
+
     constructor(data) {
         Object.assign(this, data);
         this.id = Number(this.id);
@@ -594,14 +600,6 @@ class Busho {
         this.deathFlag = data.deathFlag === true;
     }
 
-    // ★新しく追加：武将自身のデータには軍団IDを持たせず、今いる「お城」のデータを覗きに行く魔法です！
-    // こうしておけば、お城の軍団が変われば武将の軍団も自動で変わるので、間違いが起きません。
-    get legionId() {
-        // もしお城のデータが見つからなかったら、とりあえず「0（直轄）」と答えます
-        if (!window.GameApp || !window.GameApp.castles) return 0;
-        const castle = window.GameApp.castles.find(c => c.id === this.castleId);
-        return castle ? castle.legionId : 0;
-    }
 
     // ==========================================
     // ★能力値と経験値の成長ルールを「1箇所にまとめる」司令塔の魔法
@@ -628,23 +626,18 @@ class Busho {
         // まずは本来の計算を終わらせます
         let finalVal = Math.min(maxLimit, baseVal + bonus);
         
-        // ★ここから追加：大名および一門の能力ボーナス（+5）を計算します
+        // ★大名および一門の能力ボーナス（+5）
+        // モデルはGameManager本体を覗かず、起動時に注入された「大名を取得する関数」だけを使います。
         let familyBonus = 0;
-        // どこかの大名家に所属していて、かつゲームのデータが存在している時だけ計算します
-        if (this.clan !== 0 && window.GameApp) {
-            // 自分自身が大名なら文句なしでボーナス獲得です
+        if (this.clan !== 0) {
             if (this.isDaimyo) {
                 familyBonus = 5;
-            } else {
-                // 大名でない場合は、今の大名様を探し出して血縁関係を調べます
-                const daimyo = window.GameApp.getClanDaimyo(this.clan);
+            } else if (typeof Busho._getClanDaimyo === 'function') {
+                const daimyo = Busho._getClanDaimyo(this.clan);
                 if (daimyo) {
-                    // 自分の一門リスト、または大名の一門リストにお互いの名前（ID）があれば親戚（一門）とみなします
                     const myFamily = Array.isArray(this.familyIds) ? this.familyIds : [];
                     const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-                    if (myFamily.includes(daimyo.id) || dFamily.includes(this.id)) {
-                        familyBonus = 5;
-                    }
+                    if (myFamily.includes(daimyo.id) || dFamily.includes(this.id)) familyBonus = 5;
                 }
             }
         }
@@ -706,25 +699,6 @@ class Busho {
     }
     // ==========================================
     
-    // UI表示用メソッド
-    getRankName() {
-        if (this.status === 'unborn') {
-            if (this.isNotBorn) return "出生前"; // ★フラグが立っていれば「出生前」と表示
-            return "元服前";
-        }
-        if (this.isDaimyo) return "大名";
-        if (this.isGunshi) return "軍師";
-        
-        // 国主のシールを持っているか、軍団の名簿に載っているか、両方チェックします！
-        const isLegionCommander = this.isCommander || (window.GameApp && window.GameApp.legions && window.GameApp.legions.some(l => l.commanderId === this.id));
-        if (this.status === 'active' && isLegionCommander) return "国主";
-        
-        if (this.isCastellan) return "城主";
-        if (this.belongKunishuId > 0 && this.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(this.belongKunishuId)?.leaderId : 0)) return "頭領";
-        if (this.belongKunishuId > 0) return "諸勢力";
-        if (this.status === 'ronin') return "浪人";
-        return "武将";
-    }
     getFactionName() {
         if (this.factionId === 0) return "中立";
         return "派閥" + this.factionId;
@@ -749,10 +723,6 @@ class Busho {
     // ★奥さんが増えたり減ったりした時に、一門リストを作り直す機能
     // ★高速化のため、早見表（allPeopleMap）を引数に追加しました！
     updateFamilyIds(bushos = [], princesses = [], allPeopleMap = null, familyContext = null) {
-        // ★安全対策：他のシステムから呼ばれた時に名簿がなければ、ゲーム本体から借ります！
-        if (bushos.length === 0 && window.GameApp) bushos = window.GameApp.bushos;
-        if (princesses.length === 0 && window.GameApp) princesses = window.GameApp.princesses;
-
         // もし早見表が渡されていなければ、ここで作ります（安全対策）
         if (!allPeopleMap) {
             allPeopleMap = new Map();
@@ -930,10 +900,6 @@ class Princess {
     // ★追加：父親や夫の一門を反映させる機能
     // ★高速化のため、早見表（allPeopleMap）を引数に追加しました！
     updateFamilyIds(bushos = [], princesses = [], allPeopleMap = null, familyContext = null) {
-        // ★安全対策
-        if (bushos.length === 0 && window.GameApp) bushos = window.GameApp.bushos;
-        if (princesses.length === 0 && window.GameApp) princesses = window.GameApp.princesses;
-
         // もし早見表が渡されていなければ、ここで作ります（安全対策）
         if (!allPeopleMap) {
             allPeopleMap = new Map();
@@ -1277,6 +1243,6 @@ class Legion {
         this.commanderId = Number(foundCommanderId);
 
         // ★今回追加：軍団が発足した月（ターンID）を覚える箱です（クールダウン用）
-        this.establishedTurnId = Number(data.establishedTurnId || (window.GameApp ? window.GameApp.getCurrentTurnId() : 0));
+        this.establishedTurnId = Number(data.establishedTurnId || 0);
     }
 }

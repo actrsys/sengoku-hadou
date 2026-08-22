@@ -21,6 +21,10 @@ class GameManager {
         this.castles = []; 
         this.bushos = []; 
         this.legions = []; // ★今回追加：軍団の名簿を入れておく空っぽの箱です
+        // モデルが window.GameApp 全体を直接参照しないよう、能力計算に必要な最小限のresolverだけを注入します。
+        if (typeof Busho !== 'undefined' && typeof Busho.configureRuntime === 'function') {
+            Busho.configureRuntime({ getClanDaimyo: (clanId) => this.getClanDaimyo(clanId) });
+        }
         this.turnQueue = []; 
         this.currentIndex = 0; 
         this.playerClanId = 1;

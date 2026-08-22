@@ -265,7 +265,7 @@ class SaveManager {
 
         this.game.princesses = (d.princesses || []).map(p => new Princess(p));
         this.game.provinces = (d.provinces || []).map(p => new Province(p));
-        this.game.legions = (d.legions || []).map(l => new Legion(l));
+        this.game.legions = (d.legions || []).map(l => new Legion({ ...l, establishedTurnId: l.establishedTurnId || this.game.getCurrentTurnId() }));
         
         FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
 

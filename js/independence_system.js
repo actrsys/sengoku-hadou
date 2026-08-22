@@ -817,7 +817,7 @@ class IndependenceSystem {
         captives.forEach(p => {
             if (oldClanId === this.game.playerClanId) {
                 if (PersonnelRules.calcAffinityDiff(p.affinity, newDaimyo.affinity) > 60) {
-                    p.status = 'dead'; this.game.affiliationSystem.setClanIdRaw(p, 0);
+                    this.game.lifeSystem.setLifeStatusRaw(p, window.GameConstants.BushoStatus.DEAD); this.game.affiliationSystem.setClanIdRaw(p, 0);
                     alertMsgs.push(`処断：${p.name} は処断されました。`);
                 } else {
                     if (returnCastles.length > 0) {
@@ -842,7 +842,7 @@ class IndependenceSystem {
                 }
                 alertMsgs.push(`${p.name} は元の主君のもとへ逃げ去りました。`);
             } else {
-                if (Math.random() < 0.3) { p.status = 'dead'; this.game.affiliationSystem.setClanIdRaw(p, 0); }
+                if (Math.random() < 0.3) { this.game.lifeSystem.setLifeStatusRaw(p, window.GameConstants.BushoStatus.DEAD); this.game.affiliationSystem.setClanIdRaw(p, 0); }
                 else if (returnCastles.length > 0) {
                     const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
                     this.game.affiliationSystem.setClanIdRaw(p, oldClanId); this.game.affiliationSystem.setCastleIdRaw(p, target.id); target.samuraiIds.push(p.id);
@@ -1189,7 +1189,7 @@ class IndependenceSystem {
                     
                     if (b.birthYear <= currentYear) {
                         // すでに生まれているなら、今すぐ元服して一緒に逃げます
-                        b.status = 'ronin'; // 浪人にします
+                        this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.RONIN); // 浪人にします
                         b.loyalty = 50;
                         b.isCastellan = false;
                         b.isDaimyo = false;

@@ -2358,7 +2358,7 @@ Object.assign(WarManager.prototype, {
 
                 this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); 
                 this.game.affiliationSystem.moveCastle(prisoner, returnCastle.id);
-                prisoner.status = 'active'; 
+                this.game.affiliationSystem.setActivityStatusRaw(prisoner, window.GameConstants.BushoStatus.ACTIVE); 
                 prisoner.isCastellan = false;
             } else {
                 this.game.affiliationSystem.becomeRonin(prisoner);
@@ -2590,7 +2590,7 @@ Object.assign(WarManager.prototype, {
                     const returnCastle = this.game.getCastle(kunishu.castleId);
                     if (returnCastle) {
                         this.game.affiliationSystem.moveCastle(prisoner, returnCastle.id);
-                        prisoner.status = 'active'; 
+                        this.game.affiliationSystem.setActivityStatusRaw(prisoner, window.GameConstants.BushoStatus.ACTIVE); 
                     }
                 } else {
                     if (!isExtinct) {
@@ -2599,7 +2599,7 @@ Object.assign(WarManager.prototype, {
 
                         this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); 
                         this.game.affiliationSystem.moveCastle(prisoner, returnCastle.id);
-                        prisoner.status = 'active'; 
+                        this.game.affiliationSystem.setActivityStatusRaw(prisoner, window.GameConstants.BushoStatus.ACTIVE); 
                         prisoner.isCastellan = false;
                     } else { 
                         this.game.affiliationSystem.becomeRonin(prisoner);
@@ -2727,7 +2727,7 @@ Object.assign(WarManager.prototype, {
                 const kunishu = p.belongKunishuId > 0 ? this.game.kunishuSystem.getKunishu(p.belongKunishuId) : null;
                 if (kunishu && !kunishu.isDestroyed) {
                     this.game.affiliationSystem.moveCastle(p, kunishu.castleId);
-                    p.status = 'active'; 
+                    this.game.affiliationSystem.setActivityStatusRaw(p, window.GameConstants.BushoStatus.ACTIVE); 
                 } else {
                     const originalClanId = p.clan; 
                     const friendlyCastlesExt = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
@@ -2738,7 +2738,7 @@ Object.assign(WarManager.prototype, {
 
                         this.game.factionSystem.handleMove(p, 0, returnCastle.id); 
                         this.game.affiliationSystem.moveCastle(p, returnCastle.id);
-                        p.status = 'active'; 
+                        this.game.affiliationSystem.setActivityStatusRaw(p, window.GameConstants.BushoStatus.ACTIVE); 
                         p.isCastellan = false;
                     } else {
                         // ★新しいお引越しセンターの魔法を使います！
@@ -2936,12 +2936,10 @@ Object.assign(WarManager.prototype, {
             return;
         }
 
-        // ★追加：守備側（目的地）のお城がある国が大雪だったら、誰も助けに来られないので諦めます！
+        // 目的地の大雪もAI受諾確率へ渡します。ここで一律中止せず、
+        // 「支配による強制参加」なども含めてDiplomacyManagerの共通判定に任せます。
         const defProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
-        if (defProv && defProv.statusEffects && defProv.statusEffects.includes('heavySnow')) {
-            onComplete();
-            return;
-        }
+        const isDefHeavySnow = !!(defProv && defProv.statusEffects && defProv.statusEffects.includes('heavySnow'));
 
         // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
         const connectedCastles = defCastle.getConnectedCastles(this.game);
@@ -3006,9 +3004,22 @@ Object.assign(WarManager.prototype, {
                 let realProb = 0; // 本当の成功確率
                 let reinfGold = 0;
                 
+                const candidateProv = this.game.provinces.find(p => p.id === candidate.castle.provinceId);
+                const candidateHeavySnow = isDefHeavySnow || !!(candidateProv && candidateProv.statusEffects && candidateProv.statusEffects.includes('heavySnow'));
+
                 if (candidate.force.isKunishu) {
-                    // 諸勢力の場合の確率
-                    realProb = this.game.diplomacyManager.getReinforcementAcceptProb(defClanId, candidate.force.id, atkClanId, 0, true, defTotalSoldiers, atkTotalSoldiers, candidate.castle.id);
+                    const info = this.game.diplomacyManager.getAIReinforcementAcceptanceInfo({
+                        requesterClanId: defClanId,
+                        helperForceId: candidate.force.id,
+                        enemyClanId: atkClanId,
+                        gold: 0,
+                        isKunishu: true,
+                        requesterTotalSoldiers: defTotalSoldiers,
+                        enemyTotalSoldiers: atkTotalSoldiers,
+                        helperCastleId: candidate.castle.id,
+                        isHeavySnow: candidateHeavySnow
+                    });
+                    realProb = info.probability;
                 } else {
                     // 大名家の場合、持参金を計算してから確率を出します
                     const helperClanId = candidate.force.id;
@@ -3022,12 +3033,20 @@ Object.assign(WarManager.prototype, {
                     if (reinfGold > defCastle.gold) reinfGold = defCastle.gold;
                     
                     const rel = this.game.getRelation(defClanId, helperClanId);
-                    if (rel && rel.status === '支配') {
-                        realProb = 100; // 支配している相手なら100%成功します
-                        reinfGold = 0;
-                    } else {
-                        realProb = this.game.diplomacyManager.getReinforcementAcceptProb(defClanId, helperClanId, atkClanId, reinfGold, false, defTotalSoldiers, atkTotalSoldiers, candidate.castle.id);
-                    }
+                    if (rel && rel.status === '支配') reinfGold = 0;
+
+                    const info = this.game.diplomacyManager.getAIReinforcementAcceptanceInfo({
+                        requesterClanId: defClanId,
+                        helperForceId: helperClanId,
+                        enemyClanId: atkClanId,
+                        gold: reinfGold,
+                        isKunishu: false,
+                        requesterTotalSoldiers: defTotalSoldiers,
+                        enemyTotalSoldiers: atkTotalSoldiers,
+                        helperCastleId: candidate.castle.id,
+                        isHeavySnow: candidateHeavySnow
+                    });
+                    realProb = info.probability;
                 }
                 
                 // ★智謀による見誤り（ブレ）を適用
@@ -3077,10 +3096,43 @@ Object.assign(WarManager.prototype, {
         const isHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) || 
                             (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
 
+        // 戦力比較用の合計兵力。攻撃側・守備側のAI受諾判定で同じ値を使います。
+        let defTotalSoldiers = defCastle.soldiers;
+        if (this.state.defSelfReinforcement) defTotalSoldiers += this.state.defSelfReinforcement.soldiers;
+        let atkTotalSoldiers = this.state.attacker ? this.state.attacker.soldiers : 0;
+        if (this.state.reinforcement) atkTotalSoldiers += this.state.reinforcement.soldiers;
+        if (this.state.selfReinforcement) atkTotalSoldiers += this.state.selfReinforcement.soldiers;
+
+        const atkForceForRequest = this.state.attacker;
+        const atkClanIdForRequest = atkForceForRequest && atkForceForRequest.isKunishu ? 0 : (atkForceForRequest ? atkForceForRequest.ownerClan : 0);
+
         // ★諸勢力の場合
         if (force && force.isKunishu) {
             const kunishu = this.game.kunishuSystem.getKunishu(force.id);
             const currentRel = kunishu.getRelation(myClanId);
+            const decision = this.game.diplomacyManager.checkAIReinforcementAcceptance({
+                requesterClanId: myClanId,
+                helperForceId: force.id,
+                enemyClanId: atkClanIdForRequest,
+                gold,
+                isKunishu: true,
+                requesterTotalSoldiers: defTotalSoldiers,
+                enemyTotalSoldiers: atkTotalSoldiers,
+                helperCastleId: helperCastle.id,
+                isHeavySnow
+            });
+
+            if (!decision.accepted) {
+                if (myClanId === this.game.playerClanId) {
+                    const leader = this.game.getBusho(kunishu.leaderId);
+                    const leaderName = leader ? leader.name : "頭領";
+                    const nameStr = `${kunishu.getName(this.game)}の${leaderName}`;
+                    this.game.warManager.reinfMsgHelper.showRefusal(this.game, nameStr, decision.blockedByHeavySnow, onComplete);
+                } else {
+                    onComplete();
+                }
+                return;
+            }
             
             // 借りを作ったので友好度が少し下がります
             kunishu.setRelation(myClanId, currentRel - 10);
@@ -3137,7 +3189,31 @@ Object.assign(WarManager.prototype, {
             return;
         }
 
-        if (!['支配', '従属', '同盟'].includes(myToHelperRel.status)) this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
+        const decision = this.game.diplomacyManager.checkAIReinforcementAcceptance({
+            requesterClanId: myClanId,
+            helperForceId: helperClanId,
+            enemyClanId: atkClanIdForRequest,
+            gold,
+            isKunishu: false,
+            requesterTotalSoldiers: defTotalSoldiers,
+            enemyTotalSoldiers: atkTotalSoldiers,
+            helperCastleId: helperCastle.id,
+            isHeavySnow
+        });
+
+        if (!decision.accepted) {
+            if (myClanId === this.game.playerClanId) {
+                const castellan = this.game.getBusho(helperCastle.castellanId);
+                const castellanName = castellan ? castellan.name : "城主";
+                const nameStr = `${helperCastle.name}の${castellanName}`;
+                this.game.warManager.reinfMsgHelper.showRefusal(this.game, nameStr, decision.blockedByHeavySnow, onComplete);
+            } else {
+                onComplete();
+            }
+            return;
+        }
+
+        if (!myToHelperRel || !['支配', '従属', '同盟'].includes(myToHelperRel.status)) this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
 
         const helperDaimyo = this.game.getClanDaimyo(helperClanId) || { duty: 50 };
         this.state.defReinforcement = this.game.reinforcementService.createAutoClanReinforcement(

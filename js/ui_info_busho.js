@@ -371,7 +371,7 @@ Object.assign(UIInfoManager.prototype, {
                             </div>
                             <div class="busho-detail-meta pc-meta">
                                 <span>${affiliationName}</span>
-                                <span>${busho.getRankName()}</span>
+                                <span>${StatPresenter.getBushoRankName(busho, this.game)}</span>
                             </div>
                         </div>
                     </div>
@@ -386,7 +386,7 @@ Object.assign(UIInfoManager.prototype, {
                                 </div>
                                 <div class="busho-detail-meta sp-meta">
                                     <span>${affiliationName}</span>
-                                    <span>${busho.getRankName()}</span>
+                                    <span>${StatPresenter.getBushoRankName(busho, this.game)}</span>
                                 </div>
                             </div>
                         </div>
@@ -1069,7 +1069,7 @@ Object.assign(UIInfoManager.prototype, {
                 cells = [
                     !hideActionCol ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
                     `<span class="col-name">${hideActionCol && !isViewMode ? inputHtml : ''}${compressedNameHtml}</span>`,
-                    `<span class="col-rank">${b.getRankName()}</span>`,
+                    `<span class="col-rank">${StatPresenter.getBushoRankName(b, this.game)}</span>`,
                     `<span class="col-stat">${getStat('leadership')}</span>`,
                     `<span class="col-stat">${getStat('strength')}</span>`,
                     `<span class="col-stat">${getStat('politics')}</span>`,

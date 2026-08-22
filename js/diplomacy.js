@@ -473,22 +473,26 @@ class DiplomacyManager {
     }
     
     /**
+     * 「支配」関係による強制援軍かどうかを一元判定します。
+     * ＜表裏比興＞などで主家の要請を拒否できる場合は強制扱いにしません。
+     */
+    _isForcedBossReinforcement(requesterClanId, helperForceId, isKunishu = false) {
+        if (isKunishu) return false;
+        const relation = this.getRelation(requesterClanId, helperForceId);
+        if (!relation || relation.status !== '支配') return false;
+
+        if (typeof SkillManager !== 'undefined' && SkillManager.canDeclineBossReinforcement(helperForceId, this.game)) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * 他の大名家や諸勢力が援軍要請を承諾する確率（％）を計算する魔法です（最新版）
      */
     getReinforcementAcceptProb(myClanId, helperForceId, enemyClanId, gold, isKunishu, myTotalSoldiers, enemyTotalSoldiers, helperCastleId = 0) {
-        // ★ 大名家で、相手を「支配」しているなら100%（諸勢力は支配がないのでチェック不要）
-        if (!isKunishu) {
-            const myToHelperRel = this.getRelation(myClanId, helperForceId);
-            if (myToHelperRel && myToHelperRel.status === '支配') {
-                let canDecline = false;
-                if (typeof SkillManager !== 'undefined') {
-                    canDecline = SkillManager.canDeclineBossReinforcement(helperForceId, this.game);
-                }
-                // 相手が表裏比興を持っていない場合は、これまで通り100%強制参加
-                if (!canDecline) {
-                    return 100;
-                }
-            }
+        if (this._isForcedBossReinforcement(myClanId, helperForceId, isKunishu)) {
+            return 100;
         }
 
         let sentiment = 50;
@@ -618,6 +622,67 @@ class DiplomacyManager {
         }
 
         return Math.max(0, Math.min(100, prob));
+    }
+
+    /**
+     * AIが援軍要請を受けたときの「実効承諾確率」を返します。
+     *
+     * - 通常の確率計算は getReinforcementAcceptProb() に一元化
+     * - 大雪中は原則として援軍を拒否
+     * - ただし「支配」関係で、援軍拒否可能スキルを持たない場合は強制参加
+     *
+     * 実際にサイコロを振る処理とは分離し、AIの候補評価でも同じ確率を使えるようにします。
+     */
+    getAIReinforcementAcceptanceInfo({
+        requesterClanId,
+        helperForceId,
+        enemyClanId,
+        gold = 0,
+        isKunishu = false,
+        requesterTotalSoldiers = 0,
+        enemyTotalSoldiers = 0,
+        helperCastleId = 0,
+        isHeavySnow = false
+    }) {
+        const forcedByDominance = this._isForcedBossReinforcement(requesterClanId, helperForceId, isKunishu);
+
+        // 大雪時は原則拒否。ただし、拒否権のない「支配」関係だけは強制参加します。
+        if (isHeavySnow && !forcedByDominance) {
+            return {
+                probability: 0,
+                forcedByDominance: false,
+                blockedByHeavySnow: true
+            };
+        }
+
+        const probability = forcedByDominance
+            ? 100
+            : this.getReinforcementAcceptProb(
+                requesterClanId,
+                helperForceId,
+                enemyClanId,
+                gold,
+                isKunishu,
+                requesterTotalSoldiers,
+                enemyTotalSoldiers,
+                helperCastleId
+            );
+
+        return {
+            probability: Math.max(0, Math.min(100, probability)),
+            forcedByDominance,
+            blockedByHeavySnow: false
+        };
+    }
+
+    /**
+     * AI援軍要請の最終承諾判定。
+     * 攻撃側・守備側とも必ずこの窓口からサイコロを振ります。
+     */
+    checkAIReinforcementAcceptance(options, randomFn = Math.random) {
+        const info = this.getAIReinforcementAcceptanceInfo(options);
+        const accepted = info.forcedByDominance || (randomFn() * 100 < info.probability);
+        return { ...info, accepted };
     }
 
     /**
@@ -1227,7 +1292,7 @@ class DiplomacyManager {
                                                     `${p.name}を処断しました。`,
                                                     false,
                                                     () => {
-                                                        p.status = 'dead';
+                                                        this.game.lifeSystem.setLifeStatusRaw(p, window.GameConstants.BushoStatus.DEAD);
                                                         const husband = this.game.getBusho(p.husbandId);
                                                         if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
                                                         p.husbandId = 0;
@@ -1284,7 +1349,7 @@ class DiplomacyManager {
                     p.husbandId = 0;
 
                     if (aiChoice === 'kill') {
-                        p.status = 'dead';
+                        this.game.lifeSystem.setLifeStatusRaw(p, window.GameConstants.BushoStatus.DEAD);
                         this.game.ui.log(`${p.name} は${aiClanName}によって処断されました……`);
                         if (pOriginClanId === this.game.playerClanId) {
                             this.game.ui.showDialog(`${p.name} は${aiClanName}によって処断されました……`, false, () => processPrincesses(index + 1));

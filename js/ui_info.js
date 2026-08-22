@@ -1241,7 +1241,7 @@ class UIInfoManager {
             let cells = [
                 `<span class="col-act">${inputHtml}${!isSelectable ? '済' : '未'}</span>`,
                 `<span class="col-name">${b.name}</span>`,
-                `<span class="col-rank">${b.getRankName()}</span>`,
+                `<span class="col-rank">${StatPresenter.getBushoRankName(b, this.game)}</span>`,
                 `<span class="col-stat">${getStat('leadership')}</span>`,
                 `<span class="col-stat">${getStat('strength')}</span>`,
                 `<span class="col-stat">${getStat('politics')}</span>`,
