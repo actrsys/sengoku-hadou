@@ -215,15 +215,24 @@ class GameManager {
     async loadScenario(folder, options = {}) {
         const startInWatchMode = !!(options && options.startInWatchMode);
         // ★追加：シナリオの準備を始める前に、画面をロード画面で隠します
-        if (this.ui) this.ui.showLoadingScreen();
-        // ★追加：ロード画面がしっかり表示されるまで、ほんの一瞬（0.05秒）だけ待ちます
-        await new Promise(resolve => setTimeout(resolve, 50));
+        if (this.ui) this.ui.showLoadingScreen('シナリオを準備しています', 0);
+        // 古いスマホでもロード画面を確実に1フレーム描いてから重い処理へ入ります。
+        if (this.ui && typeof this.ui.waitForNextPaint === 'function') await this.ui.waitForNextPaint();
 
         try {
             document.getElementById('title-screen').classList.add('hidden'); 
 
-            const data = await DataManager.loadAll(folder); 
-            this.clans = data.clans; this.castles = data.castles; this.bushos = data.bushos; 
+            const data = await DataManager.loadAll(folder, {
+                onProgress: (value, label) => {
+                    if (this.ui) this.ui.updateLoadingProgress(Math.round(value * 0.72), label);
+                }
+            }); 
+            this.clans = data.clans; this.castles = data.castles; this.bushos = data.bushos;
+            // 地図IDマップはDataManagerとUIで同じTypedArrayを共有し、巨大な複製を作りません。
+            if (this.ui) {
+                this.ui.pixelCastleMap = DataManager.castlePixelMap || null;
+                this.ui.pixelProvinceMap = DataManager.provincePixelMap || null;
+            }
             if (typeof SkillManager !== 'undefined') {
                 SkillManager.validateBushoSkills(this.bushos, folder);
             }
@@ -258,6 +267,11 @@ class GameManager {
             
             this.kunishuSystem.setKunishuData(data.kunishus || []);
             this.courtRankSystem.setRankData(data.courtRanks || []);
+
+            if (this.ui) this.ui.updateLoadingProgress(74, '寿命・登場状態を初期化しています');
+            // 討死武将の初期延命はモデル生成時ではなく、寿命専門部署で一度だけ適用します。
+            this.lifeSystem.initializeBattleDeathLifespans(this.year);
+            if (this.ui && typeof this.ui.waitForNextPaint === 'function') await this.ui.waitForNextPaint();
             
             // ★ここを書き足し！：諸勢力の頭領がいないかチェックして、いなければ自動で作ってもらいます！
             this.kunishuSystem.generateMissingLeaders();
@@ -327,6 +341,7 @@ class GameManager {
                 }
             });
 
+            if (this.ui) this.ui.updateLoadingProgress(82, '初期イベントを確認しています');
             // ★ここから追加：ゲーム開始時の特別なイベント（寿命の延長など）を実行します！
             if (this.eventManager) {
                 await this.eventManager.processEvents('game_start');
@@ -351,11 +366,13 @@ class GameManager {
                 this.phase = 'daimyo_select';
             }
 
+            if (this.ui) this.ui.updateLoadingProgress(90, '地図を描画しています');
             this.ui.renderMap();
             // カットイン表示を消しました！
 
-            // ★追加：マップの準備がすべて終わったら、少しだけ待ってからロード画面を隠します
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // レイアウト・Canvas描画を端末へ反映させてからロード画面を閉じます。
+            if (this.ui) this.ui.updateLoadingProgress(100, '準備完了');
+            if (this.ui && typeof this.ui.waitForNextPaint === 'function') await this.ui.waitForNextPaint();
             if (this.ui) this.ui.hideLoadingScreen();
 
             // 観戦開始はロード画面を閉じてから。通常の「はじめから」と同じ startMonth() を入口にします。

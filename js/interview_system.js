@@ -24,9 +24,15 @@ class InterviewSystem {
         const currentYear = this.game.year;
         const castle = this.game.getCurrentTurnCastle();
 
-        // 寿命間近の時の特別な処理
-        // すでに寿命延長済みの場合は発生しないようにします
-        if (currentYear >= (busho.endYear - 1) && !busho.isLifeExtended) {
+        // 寿命間近の時の特別な処理。
+        // 医師延命は1人1回。従来仕様どおり、討死武将として初期延命された人物には医師延命を重ねません。
+        // 討死補正のsourceId自体はLifeSystem内へ隠し、面談側は意味だけを問い合わせます。
+        const doctorSourceId = 'interview:doctor';
+        const hasDoctorExtension = this.game.lifeSystem
+            && this.game.lifeSystem.hasLifespanModifier(busho, doctorSourceId);
+        const hasBattleDeathExtension = this.game.lifeSystem
+            && this.game.lifeSystem.hasBattleDeathLifespanExtension(busho);
+        if (currentYear >= (busho.endYear - 1) && !hasDoctorExtension && !hasBattleDeathExtension) {
             this.game.ui.showDialog(`${busho.name}は調子が悪そうだ。\n医師に診せますか？\n（消費：金２００）`, true, 
                 () => {
                     if (castle.gold < 200) {
@@ -38,15 +44,16 @@ class InterviewSystem {
 
                     castle.gold -= 200;
                     
-                    // 討死武将と同じ寿命延長ロジック
-                    const originalDeathAge = busho.endYear - busho.birthYear;
-                    if (originalDeathAge < 55) {
-                        busho.endYear = busho.birthYear + 65;
-                    } else {
-                        busho.endYear = busho.endYear + 10;
+                    // 面談側は「どれだけ延ばすか」だけを決め、実際の寿命変更と能力再計算は LifeSystem に任せます。
+                    const currentEndYear = Number(busho.endYear);
+                    const currentDeathAge = currentEndYear - Number(busho.birthYear);
+                    const targetEndYear = currentDeathAge < 55
+                        ? Number(busho.birthYear) + 65
+                        : currentEndYear + 10;
+                    const extensionYears = targetEndYear - currentEndYear;
+                    if (this.game.lifeSystem) {
+                        this.game.lifeSystem.setLifespanModifier(busho, doctorSourceId, extensionYears);
                     }
-                    // 延命処理が無事に終わった印をつけます
-                    busho.isLifeExtended = true;
 
                     this.game.ui.showResultModal(`${busho.name}は少し顔色が良くなったようです`);
                     

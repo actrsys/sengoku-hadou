@@ -113,13 +113,6 @@ class SaveManager {
             const clanColorOverlay = document.getElementById('clan-color-overlay');
             if (clanColorOverlay) {
                 ctx.drawImage(clanColorOverlay, 0, 0, w, h);
-            } else if (this.game.ui && this.game.ui.lastClanColorsImageData) {
-                // 万が一画面に無い場合も、記憶しておいたデータから復元して重ねます
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = w;
-                tempCanvas.height = h;
-                tempCanvas.getContext('2d').putImageData(this.game.ui.lastClanColorsImageData, 0, 0);
-                ctx.drawImage(tempCanvas, 0, 0, w, h);
             }
 
             // 3. データが重くならないように、最後に「1/4のサイズ」に縮小して写真を撮ります
@@ -145,6 +138,7 @@ class SaveManager {
     
     // どんな方法でロードした時も、この魔法で「受け取ったデータ」をゲーム内に展開します
     async _restoreSaveDataObj(d) {
+        if (this.game.ui) this.game.ui.updateLoadingProgress(5, 'セーブデータを復元しています');
         // --- お掃除作業 ---
         this.game.isProcessingAI = false; 
         this.game.isWatchMode = false; 
@@ -180,33 +174,21 @@ class SaveManager {
         this.game.mapHeight = d.mapHeight;
         this.game.aiOperationManager.load(d.aiOperations);
 
-        // 地図や画像の読み込み
-        const imageUrls = [
-            './data/images/map/japan_map.png',
-            './data/images/map/shiro_icon001.png',
-            './data/images/map/japan_colorcode_map.png',
-            './data/images/map/japan_white_map.png',
-            './data/images/map/japan_provinces.png'
-        ];
-
-        await Promise.all(imageUrls.map(url => new Promise(resolve => {
+        // ロード時も巨大画像を同時decodeしません。基本地図だけを先に確認し、
+        // 城色・国色マップは後でDataManagerが1枚ずつ解析します。
+        if (this.game.ui) this.game.ui.updateLoadingProgress(12, '地図の大きさを確認しています');
+        await new Promise(resolve => {
             const img = new Image();
+            img.decoding = 'async';
             img.onload = () => {
-                if (url.includes('japan_map.png')) {
-                    this.game.mapWidth = img.width;
-                    this.game.mapHeight = img.height;
-                }
+                this.game.mapWidth = img.naturalWidth || img.width || this.game.mapWidth || 1200;
+                this.game.mapHeight = img.naturalHeight || img.height || this.game.mapHeight || 800;
                 resolve();
             };
-            img.onerror = () => {
-                if (url.includes('japan_map.png')) {
-                    this.game.mapWidth = 1200;
-                    this.game.mapHeight = 800;
-                }
-                resolve();
-            };
-            img.src = url;
-        })));
+            img.onerror = () => resolve();
+            img.src = './data/images/map/japan_map.png';
+        });
+        if (this.game.ui && typeof this.game.ui.waitForNextPaint === 'function') await this.game.ui.waitForNextPaint();
 
         this.game.castles = d.castles.map(c => new Castle(c)); 
         this.game.bushos = d.bushos.map(b => new Busho(b));
@@ -266,6 +248,19 @@ class SaveManager {
         this.game.princesses = (d.princesses || []).map(p => new Princess(p));
         this.game.provinces = (d.provinces || []).map(p => new Province(p));
         this.game.legions = (d.legions || []).map(l => new Legion({ ...l, establishedTurnId: l.establishedTurnId || this.game.getCurrentTurnId() }));
+
+        // 保存データには巨大なpixel mapを入れず、ロード時に種点→国ID→領土IDの順で低メモリ再生成します。
+        if (this.game.ui) this.game.ui.updateLoadingProgress(35, '城の位置を解析しています');
+        await DataManager.loadCastleSeedPoints('./data/images/map/japan_colorcode_map.png', this.game.castles, {
+            onProgress: ratio => this.game.ui && this.game.ui.updateLoadingProgress(35 + ratio * 10, '城の位置を解析しています')
+        });
+        await DataManager.loadProvinceMap('./data/images/map/japan_provinces.png', this.game.provinces, {
+            onProgress: ratio => this.game.ui && this.game.ui.updateLoadingProgress(47 + ratio * 14, '国境データを解析しています')
+        });
+        await DataManager.buildCastleTerritoryMap(this.game.castles, this.game.provinces, {
+            onProgress: ratio => this.game.ui && this.game.ui.updateLoadingProgress(62 + ratio * 18, '勢力領域を準備しています')
+        });
+        if (this.game.ui && typeof this.game.ui.waitForNextPaint === 'function') await this.game.ui.waitForNextPaint();
         
         FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
 
@@ -321,8 +316,14 @@ class SaveManager {
 
         this.game.updateClanDisplayNames();
 
+        if (this.game.ui) this.game.ui.updateLoadingProgress(90, '地図を描画しています');
         this.game.ui.hasInitializedMap = false;
+        this.game.ui.pixelCastleMap = null;
+        this.game.ui.pixelProvinceMap = null;
+        this.game.ui.lastClanColorsHash = null;
         this.game.ui.renderMap();
+        if (this.game.ui) this.game.ui.updateLoadingProgress(100, '準備完了');
+        if (this.game.ui && typeof this.game.ui.waitForNextPaint === 'function') await this.game.ui.waitForNextPaint();
 
         if (window.AudioManager) {
             window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');

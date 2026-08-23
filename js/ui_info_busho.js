@@ -505,8 +505,11 @@ Object.assign(UIInfoManager.prototype, {
 
         if (confirmBtn && !ctx.isViewMode) {
             const enabled = checkedCount > 0;
-            confirmBtn.disabled = !enabled;
-            confirmBtn.style.opacity = enabled ? 1.0 : 0.5;
+            if (this.selectorView && typeof this.selectorView.setConfirmEnabled === 'function') {
+                this.selectorView.setConfirmEnabled(enabled);
+            } else {
+                confirmBtn.disabled = !enabled;
+            }
         }
     },
 

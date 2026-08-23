@@ -394,12 +394,12 @@ class Busho {
         this.endYear = Number(data.endYear);
         this.startYear = Number(data.startYear);
 
-        // ★追加：本来の没年（初期データ）をメモしておきます。
-        // セーブデータでは originalEndYear を優先し、現在の endYear に一時補正が入っていても基準年を失わないようにします。
+        // 本来の没年。寿命補正で endYear が変化しても、史実上の基準年はここに保持します。
+        // models は値を保持するだけで、延命ルールそのものは判断しません。
         this.originalEndYear = Number(data.originalEndYear !== undefined ? data.originalEndYear : data.endYear);
 
-        // 寿命への一時補正は「どの仕組みから何年付いたか」を識別して保持します。
-        // endYear 自体はセーブ時点の現在値をそのまま復元し、ここでは再加算しません。
+        // 寿命補正は「どの仕組みから何年付いたか」を識別して保持します。
+        // 実際の加算・解除・能力再計算は LifeSystem が担当します。
         this.lifespanModifiers = {};
         if (data.lifespanModifiers && typeof data.lifespanModifiers === 'object' && !Array.isArray(data.lifespanModifiers)) {
             Object.entries(data.lifespanModifiers).forEach(([sourceId, years]) => {
@@ -412,38 +412,9 @@ class Busho {
 
         this.nameChange = data.nameChange || ""; // 変わる年:新しい名前:新しい読み仮名/変わる年... の形式の改名データ
 
-        // ★【ここから書き足し：討死武将の延命処理】
-        // CSVから討死フラグを受け取ってシールを貼ります（TRUEなら true になります）
+        // 討死かどうかは武将データの事実として保持するだけです。
+        // 「討死武将を何年延命するか」というゲームルールは LifeSystem が担当します。
         this.isKilledInBattle = data.isKilledInBattle === true;
-
-        // ★追加1：セーブデータ読み込み時に「何度も寿命が延びてしまうバグ」を防ぐためのシールです
-        this.isLifeExtended = data.isLifeExtended === true;
-
-        // ★追加2：今のシナリオの「開始年」をゲームの設定から取得します
-        const currentStartYear = (window.MainParams && window.MainParams.StartYear) ? window.MainParams.StartYear : 1560;
-        
-        // ★絶対防壁：いかなる場合も、初期endYearがシナリオ開始年未満（1560年スタートなら1559以下）の武将は絶対に登場させません！
-        if (!this.isLifeExtended && this.originalEndYear < currentStartYear) {
-            this.isKilledInBattle = false; // 延命フラグを強制的に折ります
-            this.status = 'dead'; // 強制的に死亡状態にしてお城に入れないようにします
-        }
-        // もし討死フラグがあり、まだ延命処理がされておらず、かつ「ゲーム開始時点でまだ生きている（没年が開始年以上）」場合のみ寿命を書き換えます！
-        else if (this.isKilledInBattle && !this.isLifeExtended && this.endYear >= currentStartYear) {
-            // まず、本来死ぬはずだった時の年齢を計算します（没年 - 生年）
-            const originalDeathAge = this.endYear - this.birthYear;
-            
-            // 分岐の基準を「45歳」にします
-            if (originalDeathAge < 45) {
-                // 本来45歳未満で死ぬはずだった場合は、「55歳まで生きる」ように没年を上書きします
-                this.endYear = this.birthYear + 55;
-            } else {
-                // 本来45歳以上生きるはずだった場合は、元の寿命に「10年」を足して上書きします
-                this.endYear = this.endYear + 10;
-            }
-
-            // 延命処理が無事に終わった印をつけます
-            this.isLifeExtended = true;
-        }
         
         // ★【ここから書き足し：奥さん（姫）の設定】
         // 姫の「ID（出席番号）」だけを覚えておきます

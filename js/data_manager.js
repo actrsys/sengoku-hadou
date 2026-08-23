@@ -8,7 +8,7 @@
    ★ シナリオ定義 & 設定
    ========================================================================== */
 const SCENARIOS = [
-    { name: "1560年 桶狭間の戦い", desc: "海道一の弓取り・今川義元が大軍で上洛を狙う。", folder: "1560_okehazama", startYear: 1560, startMonth: 4 },
+    { name: "1560年 桶狭間の戦い", desc: "永禄三年、畿内では三好氏が権勢を誇っていた。東国では武田・北条・長尾が覇を競い、中国地方では毛利氏が雄飛し、諸大名の争いの火は絶えない。そのような折、海道一の弓取り・今川義元が大軍を率いて尾張へ侵攻を開始した。これを迎え撃つは織田信長。彼はいまだ、尾張一国すら纏め上げられていない。", folder: "1560_okehazama", startYear: 1560, startMonth: 4 },
     { name: "1560年 テストシナリオ", desc: "テスト用モード", folder: "1560_test", startYear: 1560, startMonth: 4 }
     // { name: "1562年 清洲同盟", desc: "桶狭間より２年。２人の英雄は清州の地にて再会を果たす。", folder: "1562_kiyosudoumei", startYear: 1562, startMonth: 1 }
 ];
@@ -22,14 +22,19 @@ class DataManager {
     // ★追加：汎用の姫の名前を入れる箱を用意します！
     static genericPrincessNames = [];
     
-    static async loadAll(folderName) {
+    static async loadAll(folderName, options = {}) {
         const selectedScenario = SCENARIOS.find(s => s.folder === folderName);
         if (selectedScenario) {
             window.MainParams.StartYear = selectedScenario.startYear;
             window.MainParams.StartMonth = selectedScenario.startMonth;
         }
         const path = `./data/scenarios/${folderName}/`;
+        const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+        const progress = (value, label) => {
+            if (onProgress) onProgress(Math.max(0, Math.min(100, Number(value) || 0)), label || '');
+        };
         try {
+            progress(4, 'シナリオデータを読み込んでいます');
             if (window.MainParams.System.UseRandomNames) {
                 // ★ここから追加：generic_princess.csv を読み込む魔法です！
                 try {
@@ -48,6 +53,8 @@ class DataManager {
                 this.fetchText("./data/provinces_map.csv").catch(() => ""),
                 this.fetchText(path + "legions.csv").catch(() => "") // ★軍団データを読み込みます（なければ空文字）
             ]);
+            progress(20, 'データを展開しています');
+            await this.yieldToBrowser();
             const clans = this.parseCSV(clansText, Clan);
             const castles = this.parseCSV(castlesText, Castle);
             const bushos = this.parseCSV(bushosText, Busho);
@@ -60,18 +67,32 @@ class DataManager {
             
             // ★準備係（joinData）に、軍団の名簿も一緒に渡して初期設定を行います
             this.joinData(clans, castles, bushos, princesses, legions);
-            
+            progress(34, '地図データを準備しています');
+            await this.yieldToBrowser();
+
+            // 城色画像は「領域」ではなく各城の種点だけを持つため、まず座標だけを低メモリで取得します。
+            // その後、国IDマップを1回走査で生成し、国内の最寄り城へ各ピクセルを割り当てて領土IDマップを作ります。
+            // 巨大RGBA配列や全画面BFSキューは保持せず、古いスマホでは帯ごとにブラウザへ制御を返します。
             try {
-                await this.loadColorMap('./data/images/map/japan_colorcode_map.png', castles);
+                await this.loadCastleSeedPoints('./data/images/map/japan_colorcode_map.png', castles, {
+                    onProgress: ratio => progress(36 + ratio * 12, '城の位置を解析しています')
+                });
             } catch (e) {
-                console.log("マップ画像の解析をスキップしました");
+                console.log("城位置画像の解析をスキップしました");
             }
 
             try {
-                await this.loadProvinceMap('./data/images/map/japan_provinces.png');
+                await this.loadProvinceMap('./data/images/map/japan_provinces.png', provinces, {
+                    onProgress: ratio => progress(48 + ratio * 18, '国境データを解析しています')
+                });
+                await this.buildCastleTerritoryMap(castles, provinces, {
+                    onProgress: ratio => progress(66 + ratio * 20, '勢力領域を準備しています')
+                });
             } catch (e) {
-                console.log("地方マップ画像の解析をスキップしました");
+                console.log("領土地図の解析をスキップしました");
             }
+            progress(88, 'ゲームデータを仕上げています');
+            await this.yieldToBrowser();
 
             // ★完成した全データをゲーム本体に返します！
             return { clans, castles, bushos, kunishus, courtRanks, princesses, provinces, legions, mapWidth: this.mapImageWidth, mapHeight: this.mapImageHeight };
@@ -409,63 +430,120 @@ class DataManager {
         }
     }
 
-    // ============================================
-    // ★ここから書き足し！：画像から色を探す魔法です！
-    // ============================================
-    static async loadColorMap(url, castles) {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => {
-                // 透明な画用紙（キャンバス）を作って画像を写し取ります
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                
-                // 画像の点（ピクセル）のデータを全部読み取ります
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const data = imageData.data;
+    /** ブラウザへ描画・入力処理の時間を返します。古いスマホで長時間メインスレッドを占有しないために使います。 */
+    static yieldToBrowser() {
+        return new Promise(resolve => {
+            if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(() => setTimeout(resolve, 0));
+            } else {
+                setTimeout(resolve, 0);
+            }
+        });
+    }
 
-                // お城のリストを一つずつ見ていきます
-                for (let c of castles) {
-                    if (c.castlesColorCode) {
-                        const targetColor = this.hexToRgb(c.castlesColorCode);
-                        let found = false;
-                        
-                        // 点を一つずつ調べて、同じ色かチェックします
-                        for (let i = 0; i < data.length; i += 4) {
-                            if (data[i] === targetColor.r && data[i+1] === targetColor.g && data[i+2] === targetColor.b) {
-                                // 同じ色を見つけたら、その場所（XとY）をメモします！
-                                const pixelIndex = i / 4;
-                                c.pixelX = pixelIndex % canvas.width;
-                                c.pixelY = Math.floor(pixelIndex / canvas.width);
-                                found = true;
-                                break; // 見つけたら次のお城へ
-                            }
-                        }
-                        if (!found) {
-                            console.warn(`色 ${c.castlesColorCode} が ${c.name} のために見つかりませんでした！`);
-                        }
-                    }
-                }
-                
-                // 画像の大きさもメモしておきます
-                this.mapImageWidth = img.width;
-                this.mapImageHeight = img.height;
-                resolve();
-            };
-            img.onerror = () => {
-                console.warn("カラーマップの画像の読み込みに失敗しました！");
-                resolve(); // 失敗してもゲームが止まらないようにします
-            };
+    static createCompactIdArray(maxId, length) {
+        if (maxId <= 255) return new Uint8Array(length);
+        if (maxId <= 65535) return new Uint16Array(length);
+        return new Uint32Array(length);
+    }
+
+    static async loadImageElement(url) {
+        return new Promise(resolve => {
+            const img = new Image();
+            img.decoding = 'async';
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(null);
             img.src = url;
         });
     }
 
+    // ============================================
+    // 地図画像の低メモリ解析
+    // ============================================
+    static async scanImageByStrips(url, onStrip, options = {}) {
+        const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+        const img = await this.loadImageElement(url);
+        if (!img) return null;
+
+        const width = img.naturalWidth || img.width;
+        const height = img.naturalHeight || img.height;
+        if (!width || !height) return null;
+
+        const isPC = document.body && document.body.classList.contains('is-pc');
+        // 古いスマホは一時RGBAと連続CPU時間を抑え、PCはyield回数を減らします。
+        const stripHeightBase = isPC ? 128 : 32;
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = Math.min(stripHeightBase, height);
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return null;
+
+        for (let yStart = 0; yStart < height; yStart += stripHeightBase) {
+            const stripHeight = Math.min(stripHeightBase, height - yStart);
+            ctx.clearRect(0, 0, width, canvas.height);
+            ctx.drawImage(img, 0, yStart, width, stripHeight, 0, 0, width, stripHeight);
+            let imageData = ctx.getImageData(0, 0, width, stripHeight);
+            await onStrip(imageData.data, width, stripHeight, yStart, height);
+            imageData = null;
+            if (onProgress) onProgress((yStart + stripHeight) / height);
+            await this.yieldToBrowser();
+        }
+
+        try { canvas.width = 1; canvas.height = 1; } catch (e) {}
+        try { img.src = ''; } catch (e) {}
+        await this.yieldToBrowser();
+        return { width, height };
+    }
+
+    // 城色画像は各領域を塗った画像ではなく、各城の位置を示す数ピクセルの種点画像です。
+    // ここでは巨大なpixelMapを作らず、各城の最初の一致座標だけを取得します。
+    static async loadCastleSeedPoints(url, castles, options = {}) {
+        const colorToCastleId = new Map();
+        const castleById = new Map();
+        const foundIds = new Set();
+        for (const c of castles) {
+            const castleId = Number(c.id) || 0;
+            castleById.set(castleId, c);
+            if (!/^#?[0-9a-f]{6}$/i.test(String(c.castlesColorCode || '').trim())) continue;
+            const rgb = this.hexToRgb(c.castlesColorCode);
+            colorToCastleId.set((rgb.r << 16) | (rgb.g << 8) | rgb.b, castleId);
+        }
+
+        const result = await this.scanImageByStrips(url, async (data, width, stripHeight, yStart) => {
+            const stripPixels = width * stripHeight;
+            for (let p = 0; p < stripPixels; p++) {
+                const i = p * 4;
+                if (data[i + 3] === 0) continue;
+                const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+                const castleId = colorToCastleId.get(key) || 0;
+                if (!castleId || foundIds.has(castleId)) continue;
+                const localY = Math.floor(p / width);
+                const x = p - localY * width;
+                const castle = castleById.get(castleId);
+                if (castle) {
+                    castle.pixelX = x;
+                    castle.pixelY = yStart + localY;
+                }
+                foundIds.add(castleId);
+                if (foundIds.size >= colorToCastleId.size) break;
+            }
+        }, options);
+
+        if (!result) {
+            console.warn('カラーマップの画像の読み込みに失敗しました！');
+            return;
+        }
+        for (const c of castles) {
+            if (c.castlesColorCode && !foundIds.has(Number(c.id))) {
+                console.warn(`色 ${c.castlesColorCode} が ${c.name} のために見つかりませんでした！`);
+            }
+        }
+        this.mapImageWidth = result.width;
+        this.mapImageHeight = result.height;
+    }
+
     static hexToRgb(hex) {
-        // "#ff0000" のような文字を、赤・緑・青の数字に変換する魔法です
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
         return result ? {
             r: parseInt(result[1], 16),
             g: parseInt(result[2], 16),
@@ -473,27 +551,160 @@ class DataManager {
         } : { r: 0, g: 0, b: 0 };
     }
 
-    // ★ここから追加！：地方マップの画像を読み込んで「透明な下敷き」として保存する魔法です！
-    static async loadProvinceMap(url) {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                // 画像の点（ピクセル）のデータを、ゲーム中いつでも使えるように大事にしまっておきます
-                this.provinceImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                resolve();
-            };
-            img.onerror = () => {
-                console.warn("地方マップ画像の読み込みに失敗しました！");
-                resolve(); // 失敗してもゲームが止まらないようにします
-            };
-            img.src = url;
-        });
+    static async loadProvinceMap(url, provinces = [], options = {}) {
+        let maxProvinceId = 0;
+        const colorToProvinceId = new Map();
+        for (const p of provinces) {
+            const provinceId = Number(p.id) || 0;
+            maxProvinceId = Math.max(maxProvinceId, provinceId);
+            if (!/^#?[0-9a-f]{6}$/i.test(String(p.color_code || '').trim())) continue;
+            const rgb = this.hexToRgb(p.color_code);
+            colorToProvinceId.set((rgb.r << 16) | (rgb.g << 8) | rgb.b, provinceId);
+        }
+
+        let pixelMap = null;
+        let territoryPixelCount = 0;
+        const result = await this.scanImageByStrips(url, async (data, width, stripHeight, yStart, totalHeight) => {
+            if (!pixelMap) pixelMap = this.createCompactIdArray(maxProvinceId, width * totalHeight);
+            const stripPixels = width * stripHeight;
+            const base = yStart * width;
+            for (let p = 0; p < stripPixels; p++) {
+                const i = p * 4;
+                if (data[i + 3] === 0) continue;
+                const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+                const provinceId = colorToProvinceId.get(key) || 0;
+                if (provinceId) {
+                    pixelMap[base + p] = provinceId;
+                    territoryPixelCount++;
+                }
+            }
+        }, options);
+
+        if (!result) {
+            console.warn('地方マップ画像の読み込みに失敗しました！');
+            this.provincePixelMap = null;
+            return;
+        }
+        // 城色画像と国画像は同寸。万一先にサイズが分からなかった場合だけ、正しい長さへ作り直します。
+        const requiredLength = result.width * result.height;
+        if (!pixelMap || pixelMap.length !== requiredLength) {
+            const rebuilt = this.createCompactIdArray(maxProvinceId, requiredLength);
+            if (pixelMap) rebuilt.set(pixelMap.subarray(0, Math.min(pixelMap.length, rebuilt.length)));
+            pixelMap = rebuilt;
+        }
+        this.provincePixelMap = pixelMap;
+        this.provincePixelCount = territoryPixelCount;
+        if (!this.mapImageWidth) this.mapImageWidth = result.width;
+        if (!this.mapImageHeight) this.mapImageHeight = result.height;
     }
+
+    // 国IDマップと城の種点から、各国の全ピクセルを最寄りの城へ割り当てます。
+    // r83までの巨大BFSキュー（地図全画素分のInt32Array）は使わず、常駐は国ID＋城IDの2本だけです。
+    static async buildCastleTerritoryMap(castles, provinces = [], options = {}) {
+        const width = Number(this.mapImageWidth) || 0;
+        const height = Number(this.mapImageHeight) || 0;
+        const provinceMap = this.provincePixelMap;
+        if (!width || !height || !provinceMap || provinceMap.length !== width * height) {
+            this.castlePixelMap = null;
+            return;
+        }
+
+        let maxCastleId = 0;
+        let maxProvinceId = 0;
+        for (const c of castles) maxCastleId = Math.max(maxCastleId, Number(c.id) || 0);
+        for (const p of provinces) maxProvinceId = Math.max(maxProvinceId, Number(p.id) || 0);
+        const candidatesByProvince = Array.from({ length: maxProvinceId + 1 }, () => []);
+        for (const c of castles) {
+            const pid = Number(c.provinceId) || 0;
+            const x = Math.floor(Number(c.pixelX));
+            const y = Math.floor(Number(c.pixelY));
+            if (!pid || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+            candidatesByProvince[pid].push({ id: Number(c.id) || 0, x, y });
+        }
+
+        const output = this.createCompactIdArray(maxCastleId, width * height);
+        const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+        const isPC = document.body && document.body.classList.contains('is-pc');
+
+        // r83の8方向multi-source BFSを維持します。ただし旧版のように地図全766万pixel分の
+        // Int32キューを確保せず、国領域として実在するpixel数（現行地図で約94万）だけを確保します。
+        const territoryPixelCount = Math.max(1, Number(this.provincePixelCount) || provinceMap.reduce((n, id) => n + (id ? 1 : 0), 0));
+        let queue = new Uint32Array(territoryPixelCount);
+        let head = 0;
+        let tail = 0;
+
+        for (const c of castles) {
+            const x = Math.floor(Number(c.pixelX));
+            const y = Math.floor(Number(c.pixelY));
+            if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || x >= width || y < 0 || y >= height) continue;
+            const idx = y * width + x;
+            if (provinceMap[idx] !== Number(c.provinceId)) continue;
+            if (output[idx] === 0) {
+                if (tail < queue.length) queue[tail++] = idx;
+                output[idx] = Number(c.id) || 0;
+            }
+        }
+
+        const dx = [0, 1, 0, -1, 1, 1, -1, -1];
+        const dy = [-1, 0, 1, 0, -1, 1, 1, -1];
+        const yieldEvery = isPC ? 262144 : 65536;
+        let nextYield = yieldEvery;
+        while (head < tail) {
+            const currIdx = queue[head++];
+            const x = currIdx % width;
+            const y = Math.floor(currIdx / width);
+            const castleId = output[currIdx];
+            const provinceId = provinceMap[currIdx];
+            for (let d = 0; d < 8; d++) {
+                const nx = x + dx[d];
+                const ny = y + dy[d];
+                if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+                const nIdx = ny * width + nx;
+                if (output[nIdx] !== 0 || provinceMap[nIdx] !== provinceId) continue;
+                output[nIdx] = castleId;
+                if (tail < queue.length) queue[tail++] = nIdx;
+            }
+            if (head >= nextYield) {
+                if (onProgress) onProgress(Math.min(0.9, (head / territoryPixelCount) * 0.9));
+                nextYield += yieldEvery;
+                await this.yieldToBrowser();
+            }
+        }
+
+        // 種点のない飛び地など、BFSで到達できなかった部分だけ同じ国の最寄り城へ割り当てます。
+        const rowsPerChunk = isPC ? 128 : 24;
+        for (let yStart = 0; yStart < height; yStart += rowsPerChunk) {
+            const yEnd = Math.min(height, yStart + rowsPerChunk);
+            for (let y = yStart; y < yEnd; y++) {
+                let idx = y * width;
+                for (let x = 0; x < width; x++, idx++) {
+                    if (!provinceMap[idx] || output[idx]) continue;
+                    const candidates = candidatesByProvince[provinceMap[idx]];
+                    if (!candidates || candidates.length === 0) continue;
+                    let bestId = candidates[0].id;
+                    let bestDist = Infinity;
+                    for (let cIndex = 0; cIndex < candidates.length; cIndex++) {
+                        const c = candidates[cIndex];
+                        const dist = (x - c.x) * (x - c.x) + (y - c.y) * (y - c.y);
+                        if (dist < bestDist) {
+                            bestDist = dist;
+                            bestId = c.id;
+                        }
+                    }
+                    output[idx] = bestId;
+                }
+            }
+            if (onProgress) onProgress(0.9 + (yEnd / height) * 0.1);
+            await this.yieldToBrowser();
+        }
+
+        // 一時BFSキューはここで参照を切り、ゲーム中は国ID＋城IDの2本だけを保持します。
+        queue = null;
+        this.castlePixelMap = output;
+    }
+
+
+
 }
 
 // Classic script間の互換窓口。既存コードの SCENARIOS / DataManager 参照はそのまま使えます。

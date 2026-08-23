@@ -79,9 +79,8 @@ window.GameEvents.push({
         }
         const { mapOverlay, mapContainer } = overlayParts;
 
-        // ★Round16：旧 CastleColorImageDataCache を廃止。
-        // 色コード画像は初回だけ読み、一度「pixel -> 色グループID」のTypedArrayへ変換します。
-        // 同じ色コードを共有する拠点は同じgroupIdなので、旧版の色一致ロジックと同じ扱いです。
+        // ゲーム開始時に作った共有の城IDマップを再利用します。
+        // 台風専用に巨大画像や全画面TypedArrayを作り直さず、城IDから小さなgroup表だけを引きます。
         writeDiag('castle_index');
         const castleIndex = await fx.ensureCastleColorIndex(game, diagPrefix);
 
@@ -91,7 +90,8 @@ window.GameEvents.push({
         if (castleIndex) {
             const width = castleIndex.width;
             const height = castleIndex.height;
-            const pixelGroupMap = castleIndex.pixelGroupMap;
+            const pixelCastleMap = castleIndex.pixelCastleMap;
+            const groupByCastleId = castleIndex.groupByCastleId;
             const castleGroupById = castleIndex.castleGroupById;
 
             let r = Math.pow(Math.random(), 3);
@@ -137,7 +137,8 @@ window.GameEvents.push({
                             const dx = x - typhoonX;
                             const dy = y - typhoonY;
                             if (dx * dx + dy * dy > rSq) continue;
-                            const groupId = pixelGroupMap[row + x];
+                            const castleId = pixelCastleMap[row + x];
+                            const groupId = castleId < groupByCastleId.length ? groupByCastleId[castleId] : 0;
                             if (groupId !== 0) {
                                 damagedGroupIds.add(groupId);
                                 onCastle = true;

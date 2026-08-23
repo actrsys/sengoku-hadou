@@ -423,6 +423,7 @@ async function validateLegionCouncil(cdp) {
     assert.ok(orderMobile.buttons.every(b => b.height >= 40), 'スマホ命令ボタンが小さすぎます');
     assert.deepStrictEqual(orderMobile.actionButtons.map(b => b.text).sort(), ['戻る', '確定'], '命令画面は確定と戻るの2ボタンにします');
     assert.ok(orderMobile.actionButtons.every(b => b.height >= 36), 'スマホ命令画面の確定/戻るボタンが小さすぎます');
+    assert.ok(orderMobile.actionButtons.every(b => b.width <= 128), `スマホ命令画面の確定/戻るボタンが横へ伸びすぎています (${orderMobile.actionButtons.map(b => b.width).join(', ')})`);
     assert.ok(orderMobile.footer.top - orderMobile.content.bottom >= 12, `スマホ命令画面の枠と外側ボタンの隙間が標準モーダルより狭すぎます (${orderMobile.footer.top - orderMobile.content.bottom})`);
     assert.ok(orderMobile.rows.length === 0 || orderMobile.footer.top - orderMobile.rows[orderMobile.rows.length - 1].bottom <= 60, 'スマホ命令画面の本文と外側ボタンが不自然に離れています');
     assert.ok(orderMobile.content.scrollHeight <= orderMobile.content.clientHeight + 4, `スマホ命令画面の内部内容が枠を超えています (${orderMobile.content.scrollHeight} > ${orderMobile.content.clientHeight})`);

@@ -61,6 +61,53 @@ class LifeSystem {
         return this.setLifespanModifier(personOrId, sourceId, 0);
     }
 
+    getLifespanModifier(personOrId, sourceId) {
+        const person = (typeof personOrId === 'object' && personOrId)
+            ? personOrId
+            : (this.game && typeof this.game.getBusho === 'function' ? this.game.getBusho(Number(personOrId)) : null);
+        if (!person || !sourceId || !person.lifespanModifiers) return 0;
+        const value = Number(person.lifespanModifiers[sourceId] || 0);
+        return Number.isFinite(value) ? value : 0;
+    }
+
+    hasLifespanModifier(personOrId, sourceId) {
+        return this.getLifespanModifier(personOrId, sourceId) !== 0;
+    }
+
+    hasBattleDeathLifespanExtension(personOrId) {
+        return this.hasLifespanModifier(personOrId, 'system:battle_death_initial');
+    }
+
+    /**
+     * 新規シナリオ開始時の討死武将延命を一元適用します。
+     * 「討死ならどう延命するか」は寿命ルールなので models ではなく LifeSystem が所有します。
+     * 本来の没年がシナリオ開始前の人物は延命対象にしません。
+     */
+    initializeBattleDeathLifespans(startYear = null) {
+        const year = Number(startYear !== null ? startYear : (this.game ? this.game.year : NaN));
+        if (!Number.isFinite(year) || !this.game || !Array.isArray(this.game.bushos)) return 0;
+
+        let changed = 0;
+        const sourceId = 'system:battle_death_initial';
+        for (const busho of this.game.bushos) {
+            if (!busho || !busho.isKilledInBattle) continue;
+            const originalEndYear = Number(busho.originalEndYear);
+            const birthYear = Number(busho.birthYear);
+            if (!Number.isFinite(originalEndYear) || !Number.isFinite(birthYear)) continue;
+            if (originalEndYear < year) continue;
+
+            const originalDeathAge = originalEndYear - birthYear;
+            const targetEndYear = originalDeathAge < 45
+                ? birthYear + 55
+                : originalEndYear + 10;
+            const years = targetEndYear - originalEndYear;
+            if (years <= 0) continue;
+
+            if (this.setLifespanModifier(busho, sourceId, years) !== 0) changed++;
+        }
+        return changed;
+    }
+
     /**
      * 1人分の年齢・寿命由来の能力補正を再計算します。
      * LifeSystem が能力計算の正本を持ち、寿命補正の付け外し時にも同じ計算を即時反映します。

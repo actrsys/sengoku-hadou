@@ -267,38 +267,32 @@ window.EventMapEffects = window.EventMapEffects || (() => {
     const getRenderScale = () => document.body.classList.contains('is-pc') ? 1 : 0.5;
 
     const ensureProvinceSource = async (game, diagPrefix = null) => {
-        const mapW = game.mapWidth || 1200;
-        const mapH = game.mapHeight || 800;
-        const pixelProvinceMap = game.ui && game.ui.pixelProvinceMap;
-        const hasPixelProvinceMap = !!(pixelProvinceMap && pixelProvinceMap.length >= mapW * mapH);
-        let sourceData = (typeof DataManager !== 'undefined') ? DataManager.provinceImageData : null;
+        let mapW = Number(game.mapWidth || (typeof DataManager !== 'undefined' ? DataManager.mapImageWidth : 0) || 1200);
+        let mapH = Number(game.mapHeight || (typeof DataManager !== 'undefined' ? DataManager.mapImageHeight : 0) || 800);
+        let pixelProvinceMap = (game.ui && game.ui.pixelProvinceMap)
+            || (typeof DataManager !== 'undefined' ? DataManager.provincePixelMap : null);
 
-        if (!hasPixelProvinceMap && !sourceData) {
+        // 通常はゲーム開始時にDataManagerが作った共有IDマップをそのまま使います。
+        // 特殊な呼び出し順で未生成の場合だけ、同じ帯状1走査ローダーで作り直します。
+        if ((!pixelProvinceMap || pixelProvinceMap.length < mapW * mapH)
+            && typeof DataManager !== 'undefined'
+            && typeof DataManager.loadProvinceMap === 'function') {
             if (diagPrefix) writeDiag(game, `${diagPrefix}:source_load`);
-            const provMapImg = new Image();
-            provMapImg.src = PROVINCE_MAP_SRC;
-            const ok = await waitForImage(provMapImg);
-            if (ok) {
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = provMapImg.naturalWidth;
-                tempCanvas.height = provMapImg.naturalHeight;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.drawImage(provMapImg, 0, 0);
-                try {
-                    sourceData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-                    if (typeof DataManager !== 'undefined') DataManager.provinceImageData = sourceData;
-                } catch (e) {
-                    console.error('画像読み取りエラー:', e);
-                }
-                try { tempCanvas.width = 1; tempCanvas.height = 1; } catch (e) {}
+            try {
+                await DataManager.loadProvinceMap(PROVINCE_MAP_SRC, game.provinces || []);
+                pixelProvinceMap = DataManager.provincePixelMap || null;
+                mapW = Number(DataManager.mapImageWidth || mapW);
+                mapH = Number(DataManager.mapImageHeight || mapH);
+                if (game.ui) game.ui.pixelProvinceMap = pixelProvinceMap;
+            } catch (e) {
+                console.error('地方IDマップの再生成に失敗しました:', e);
             }
         }
 
         return {
-            pixelProvinceMap: hasPixelProvinceMap ? pixelProvinceMap : null,
-            sourceData,
-            srcW: hasPixelProvinceMap ? mapW : (sourceData ? sourceData.width : mapW),
-            srcH: hasPixelProvinceMap ? mapH : (sourceData ? sourceData.height : mapH)
+            pixelProvinceMap: pixelProvinceMap && pixelProvinceMap.length >= mapW * mapH ? pixelProvinceMap : null,
+            srcW: mapW,
+            srcH: mapH
         };
     };
 
@@ -317,51 +311,20 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         if (options.animation) canvas.style.animation = options.animation;
 
         const targetProvIds = affectedProvIds instanceof Set ? affectedProvIds : new Set(affectedProvIds || []);
-        if (targetProvIds.size > 0 && (src.pixelProvinceMap || src.sourceData)) {
+        if (targetProvIds.size > 0 && src.pixelProvinceMap) {
             const ctx = canvas.getContext('2d');
             const img = ctx.createImageData(canvas.width, canvas.height);
             const dst = img.data;
             const drawR = color.r | 0, drawG = color.g | 0, drawB = color.b | 0;
             const alpha = color.a === undefined ? 180 : color.a | 0;
 
-            if (src.pixelProvinceMap) {
-                for (let y = 0; y < canvas.height; y++) {
-                    const sy = Math.min(src.srcH - 1, Math.floor(((y + 0.5) * src.srcH) / canvas.height));
-                    for (let x = 0; x < canvas.width; x++) {
-                        const sx = Math.min(src.srcW - 1, Math.floor(((x + 0.5) * src.srcW) / canvas.width));
-                        if (!targetProvIds.has(src.pixelProvinceMap[sy * src.srcW + sx])) continue;
-                        const di = (y * canvas.width + x) * 4;
-                        dst[di] = drawR; dst[di + 1] = drawG; dst[di + 2] = drawB; dst[di + 3] = alpha;
-                    }
-                }
-            } else {
-                const targetColors = [];
-                const hexToRgb = (hex) => {
-                    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                    return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
-                };
-                targetProvIds.forEach(pId => {
-                    const p = game.provinces.find(prov => prov.id === pId);
-                    if (p && p.color_code) {
-                        const rgb = hexToRgb(p.color_code);
-                        if (rgb) targetColors.push(rgb);
-                    }
-                });
-                const sd = src.sourceData.data;
-                for (let y = 0; y < canvas.height; y++) {
-                    const sy = Math.min(src.srcH - 1, Math.floor(((y + 0.5) * src.srcH) / canvas.height));
-                    for (let x = 0; x < canvas.width; x++) {
-                        const sx = Math.min(src.srcW - 1, Math.floor(((x + 0.5) * src.srcW) / canvas.width));
-                        const si = (sy * src.srcW + sx) * 4;
-                        if (sd[si + 3] === 0) continue;
-                        let match = false;
-                        for (const c of targetColors) {
-                            if (sd[si] === c.r && sd[si + 1] === c.g && sd[si + 2] === c.b) { match = true; break; }
-                        }
-                        if (!match) continue;
-                        const di = (y * canvas.width + x) * 4;
-                        dst[di] = drawR; dst[di + 1] = drawG; dst[di + 2] = drawB; dst[di + 3] = alpha;
-                    }
+            for (let y = 0; y < canvas.height; y++) {
+                const sy = Math.min(src.srcH - 1, Math.floor(((y + 0.5) * src.srcH) / canvas.height));
+                for (let x = 0; x < canvas.width; x++) {
+                    const sx = Math.min(src.srcW - 1, Math.floor(((x + 0.5) * src.srcW) / canvas.width));
+                    if (!targetProvIds.has(src.pixelProvinceMap[sy * src.srcW + sx])) continue;
+                    const di = (y * canvas.width + x) * 4;
+                    dst[di] = drawR; dst[di + 1] = drawG; dst[di + 2] = drawB; dst[di + 3] = alpha;
                 }
             }
 
@@ -379,39 +342,35 @@ window.EventMapEffects = window.EventMapEffects || (() => {
     };
 
     // 台風の正確な拠点当たり判定用。
-    // 元の「色コード画像を1pxずつRGB文字列化」ではなく、同じ色グループIDへ一度だけ変換して再利用します。
+    // ゲーム開始時にDataManagerが作った「pixel -> castleId」の共有IDマップを再利用します。
+    // 同色コードを共有する拠点が将来追加されても、castleId -> groupId の小さな表だけで旧色グループ挙動を保ちます。
     let castleColorIndexCache = null;
     const ensureCastleColorIndex = async (game, diagPrefix = null) => {
+        const pixelCastleMap = (game.ui && game.ui.pixelCastleMap)
+            || (typeof DataManager !== 'undefined' ? DataManager.castlePixelMap : null);
+        const width = Number(game.mapWidth || (typeof DataManager !== 'undefined' ? DataManager.mapImageWidth : 0) || 0);
+        const height = Number(game.mapHeight || (typeof DataManager !== 'undefined' ? DataManager.mapImageHeight : 0) || 0);
+        if (!pixelCastleMap || !width || !height || pixelCastleMap.length < width * height) return null;
+
         const signature = (game.castles || []).map(c => {
             let color = (c.castlesColorCode || c.colorCode || c.color_code || '').trim().toLowerCase();
             if (color && !color.startsWith('#')) color = '#' + color;
             return `${c.id}:${color}`;
         }).join('|');
-        if (castleColorIndexCache && castleColorIndexCache.signature === signature) return castleColorIndexCache;
-
-        if (diagPrefix) writeDiag(game, `${diagPrefix}:castle_index_load`);
-        const img = new Image();
-        img.src = CASTLE_COLOR_MAP_SRC;
-        const ok = await waitForImage(img);
-        if (!ok) return null;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        let imageData = null;
-        try { imageData = ctx.getImageData(0, 0, canvas.width, canvas.height); }
-        catch (e) { console.error('画像読み取りエラー:', e); }
-        if (!imageData) {
-            try { canvas.width = 1; canvas.height = 1; } catch (e) {}
-            return null;
+        if (castleColorIndexCache
+            && castleColorIndexCache.signature === signature
+            && castleColorIndexCache.pixelCastleMap === pixelCastleMap) {
+            return castleColorIndexCache;
         }
 
+        if (diagPrefix) writeDiag(game, `${diagPrefix}:castle_index_build`);
         const colorToGroup = new Map();
         const castleGroupById = new Map();
         let nextGroup = 1;
+        let maxCastleId = 0;
         for (const c of (game.castles || [])) {
+            const castleId = Number(c.id) || 0;
+            maxCastleId = Math.max(maxCastleId, castleId);
             let hex = (c.castlesColorCode || c.colorCode || c.color_code || '').trim().toLowerCase();
             if (!hex) continue;
             if (!hex.startsWith('#')) hex = '#' + hex;
@@ -423,31 +382,25 @@ window.EventMapEffects = window.EventMapEffects || (() => {
                 groupId = nextGroup++;
                 colorToGroup.set(rgbKey, groupId);
             }
-            castleGroupById.set(c.id, groupId);
+            castleGroupById.set(castleId, groupId);
         }
 
-        const GroupArray = nextGroup <= 65535 ? Uint16Array : Uint32Array;
-        const pixelGroupMap = new GroupArray(canvas.width * canvas.height);
-        const sd = imageData.data;
-        for (let i = 0, p = 0; i < sd.length; i += 4, p++) {
-            if (sd[i + 3] === 0) continue;
-            const key = (sd[i] << 16) | (sd[i + 1] << 8) | sd[i + 2];
-            const groupId = colorToGroup.get(key);
-            if (groupId) pixelGroupMap[p] = groupId;
-        }
+        const GroupArray = nextGroup <= 255 ? Uint8Array : (nextGroup <= 65535 ? Uint16Array : Uint32Array);
+        const groupByCastleId = new GroupArray(maxCastleId + 1);
+        castleGroupById.forEach((groupId, castleId) => {
+            if (castleId >= 0 && castleId < groupByCastleId.length) groupByCastleId[castleId] = groupId;
+        });
 
-        const result = {
+        castleColorIndexCache = {
             signature,
-            width: canvas.width,
-            height: canvas.height,
-            pixelGroupMap,
+            width,
+            height,
+            pixelCastleMap,
+            groupByCastleId,
             castleGroupById
         };
-        castleColorIndexCache = result;
-        imageData = null;
-        try { canvas.width = 1; canvas.height = 1; } catch (e) {}
         if (diagPrefix) writeDiag(game, `${diagPrefix}:castle_index_done`);
-        return result;
+        return castleColorIndexCache;
     };
 
     const waitForDismiss = async (game, mapOverlay) => {
@@ -481,9 +434,7 @@ window.EventMapEffects = window.EventMapEffects || (() => {
             });
             if (mapOverlay.parentNode) mapOverlay.parentNode.removeChild(mapOverlay);
         }
-        // Round16よりイベント専用の巨大RGBAキャッシュは使いません。
-        window.ProvinceImageDataCache = null;
-        window.CastleColorImageDataCache = null;
+        // イベント専用の巨大RGBAキャッシュは持たず、共有IDマップはゲーム本体側で継続利用します。
 
         // Canvas/GPU面の解放をブラウザへ反映してから通常マップを戻します。
         await nextPaint();
@@ -594,9 +545,9 @@ window.GameEvents.push({
         
         for (const id of targetIds) {
             const busho = game.getBusho(id);
-            // 武将が見つかったら、寿命（没年）を10年延ばします
-            if (busho) {
-                busho.endYear += 10;
+            // このイベントは「対象と+10年」を定義するだけ。寿命変更と能力再計算は LifeSystem に任せます。
+            if (busho && game.lifeSystem) {
+                game.lifeSystem.setLifespanModifier(busho, this.id, 10);
             }
         }
     }

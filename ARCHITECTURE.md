@@ -23,7 +23,7 @@
 - `js/user_settings.js` — 通知・歴史イベント・オートセーブ・音量などユーザー個人設定とlocalStorageの正本。
 - `js/game.js` — GameManager。ゲーム全体の司令塔。専門部署へ仕事を振る。
 - `js/turn_manager.js` — 月初・各拠点ターン・月末の進行順を管理。月次の具体的な計算式は持たず、FactionSystem / EconomyRules / DomesticRules / PersonnelRules / AIStaffing 等へ委譲する。
-- `js/data_manager.js` — シナリオ、CSV/BIN、地図データの読み込み。
+- `js/data_manager.js` — シナリオ、CSV/BIN、地図データの読み込み。城色画像は各城の種点座標だけを帯状解析し、国境画像は国IDマップへ変換する。その後、各国のピクセルを国内の最寄り城へ割り当てて領土用の城IDマップを構築する。巨大RGBAや全画面BFSキューは常駐保持せず、地図UI・イベントは同一TypedArrayを共有する。
 - `js/save_manager.js` — セーブ、ロード、IndexedDB、オートセーブ。
 - `js/event_manager.js` — 通常イベントの発火管理に加え、常駐イベントの状態遷移（false→true / true→false）とセーブ継続状態を管理する。歴史イベントOFF時は適用中の `historical_` 常駐効果を解除し、再ON後は各イベント本来の登録タイミングで条件を再評価する。歴史上の条件・効果量・対象は `js/event/historical_event.js` 等のイベント定義側、実際の数値書換は各専門Systemへ委譲する。 `UserSettings` は設定変更を汎用通知し、`GameManager` が歴史イベント設定だけを `EventManager` へルーティングするため、設定UIは常駐効果の実処理を直接呼ばない。
 
@@ -51,12 +51,12 @@
 - `models.js` と `data_manager.js` のデータ生成・初期読込は上記ルールの例外。
 - 武将の `active / ronin` は活動・所属状態として `AffiliationSystem.setActivityStatusRaw` が低レベル書換窓口を持つ。通常処理は joinClan / becomeRonin 等の高レベルAPIを使う。
 - 武将・姫の `dead / unborn` は生死・登場状態として `LifeSystem.setLifeStatusRaw` が低レベル書換窓口を持つ。死亡処理そのものは executeDeath / processDeath 等の高レベルAPIを優先する。
-- 寿命補正の実書換は `LifeSystem.setLifespanModifier()` / `removeLifespanModifier()` を窓口とする。LifeSystem は補正理由・対象条件・年数を決めず、`sourceId` ごとの補正を安全に適用・解除する。`endYear` は寿命前の能力低下計算にも使うため、補正値が変わった時は `LifeSystem.recalculateBushoAgeStats()` で対象武将の能力も即時同期する。
+- 武将の実行中 `endYear` は `LifeSystem.setLifespanModifier()` / `removeLifespanModifier()` だけが変更する。面談・イベント側は「対象・条件・何年変えるか」を所有して LifeSystem へ依頼し、`models.js` は本来の没年・討死フラグ・補正一覧というデータだけを保持する。シナリオ共通ルールである討死武将の初期延命だけは `LifeSystem.initializeBattleDeathLifespans()` が所有する。補正は `sourceId` ごとに識別して積み重ねられる。既存ゲーム仕様上の組合せ制約（例：討死初期延命済み武将へ医師延命を重ねない）はLifeSystemの意味問い合わせAPIを介して判定し、呼び出し側へ内部sourceIdを漏らさない。`endYear` が変わった瞬間に `LifeSystem.recalculateBushoAgeStats()` で寿命前能力低下も同期する。
 - 姫の `unmarried / married`、軍団やAI作戦の `status` は別概念なので、上記と同じSetterには混ぜない。
 
 ## モデル境界
 
-- `js/models.js` — 保存・ゲーム内データ構造そのもの。ゲーム全体の司令塔 `window.GameApp` を直接参照しない。
+- `js/models.js` — 保存・ゲーム内データ構造そのもの。ゲーム全体の司令塔 `window.GameApp` を直接参照しない。武将モデルは `originalEndYear` / `endYear` / `isKilledInBattle` / `lifespanModifiers` を保持するが、「討死なら延命する」等のゲームルールは実行しない。
 - 武将能力値の一門+5は既存getter互換のため、`GameManager` が `Busho.configureRuntime()` へ「大名を取得する関数」だけを注入する。モデルからはGameManager全体へアクセスしない。
 - 武将肩書きのような表示判断は `StatPresenter`、城・軍団など周囲のゲーム状態を使う判定は利用側/Systemへ置く。
 - 一門関係の再構築は `FamilyLinker.rebuildAllFamilyIds()` を正規窓口とし、各人物がゲーム全体の名簿を取りに行かない。
@@ -112,6 +112,15 @@
 - 国主評定は `index.html` が一覧・命令モーダルの固定DOM構造、`style.css` がPCは16:9（1280×720）の左右対面配置、スマホは9:16の2列×4段配置を担当し、物理ウインドウ差は既存の等比縮小・黒帯処理へ委譲する。`legion_council_view.js` は表示と一時編集、`legion_policy_system.js` はゲームルールを担当する。評定一覧には命令UIを直接置かず、軍団カード全体から別命令モーダルを開く。一覧下側には詳細情報画面と同系統の補助操作帯を置き、右下の［一括］から全軍団用の一括命令を開く。評定一覧・命令画面はいずれも固定ゲーム画面内に収めてスクロールさせず、スマホの2列×4段はカード行を固定高にし、端末幅によって9:16論理画面が高くなってもカード自体やカード内の文字配置を縦に引き伸ばさない。将来命令項目が増えて一画面に収まらない場合はタブまたはページ分割で拡張する。観戦へ移行した勢力は保存済み評定方針を保持するがAIは拘束されず、観戦からプレイヤー操作へ戻した時にその勢力の保存方針を再適用する。直轄軍団0のAI作戦だけは操作主体切替時に `AIOperationManager` が生成/破棄を整理する。
 
 `selector_modal_view.js` は小さいものの、複数情報画面の初期化漏れを防ぐ共通Viewなので独立を維持します。
+
+
+## ローディング・低メモリ端末
+
+- ローディング表示は飾りの無限アニメーションではなく、`DataManager -> GameManager -> UIManager` の進捗通知で現在段階と割合を表示する。`prefers-reduced-motion` でも進捗文字とバー幅は更新される。
+- 3140×2440級の色コード画像は全画面Canvasへ複製して長時間保持しない。`DataManager.buildIndexedPixelMap()` がPCは128行、スマホは32行単位で読み取り、帯ごとにブラウザへ制御を返す。これにより古いスマホでもローディング画面の描画・OS監視・GCの機会を確保する。
+- 城ID・国IDは現シナリオの最大IDに応じて最小のTypedArrayを選ぶ。現行1560シナリオでは双方 `Uint8Array` で、1pixel=1byte。`UIManager`、`EventMapEffects`、台風判定は同じ配列を共有する。
+- スマホの勢力色オーバーレイは内部解像度を縦横1/2（面積1/4）にし、CSSで地図サイズへ拡大する。城・国の判定用IDマップ自体は正確な当たり判定のため原寸を維持する。
+- 起動時に大画像・大量顔画像・音声を同時プリロードしない。必要データを順番に処理し、重い段階の間で描画機会を返す。
 
 ## テストとバランス検証
 

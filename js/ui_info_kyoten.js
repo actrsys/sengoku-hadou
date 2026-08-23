@@ -758,9 +758,11 @@ Object.assign(UIInfoManager.prototype, {
                         }
                     }
                     
-                    const confirmBtn = document.getElementById('selector-confirm-btn');
-                    if (confirmBtn) {
-                        confirmBtn.disabled = !isChanged;
+                    if (this.selectorView && typeof this.selectorView.setConfirmEnabled === 'function') {
+                        this.selectorView.setConfirmEnabled(isChanged);
+                    } else {
+                        const confirmBtn = document.getElementById('selector-confirm-btn');
+                        if (confirmBtn) confirmBtn.disabled = !isChanged;
                     }
                 },
                 cells: [
@@ -814,7 +816,11 @@ Object.assign(UIInfoManager.prototype, {
                     isChanged = this.commonSelectedIds.some(id => !this.allotFiefInitialIds.includes(id));
                 }
             }
-            confirmBtn.disabled = !isChanged;
+            if (this.selectorView && typeof this.selectorView.setConfirmEnabled === 'function') {
+                this.selectorView.setConfirmEnabled(isChanged);
+            } else {
+                confirmBtn.disabled = !isChanged;
+            }
         }
     }
 });

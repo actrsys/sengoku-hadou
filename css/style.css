@@ -4354,31 +4354,45 @@ body:not(.is-pc) #map-container {
     letter-spacing: 0.42em;
     animation: none;
 }
+.loading-status {
+    min-height: 1.4em;
+    margin-top: 12px;
+    color: #d9d2c0;
+    font-family: serif;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    letter-spacing: 0.08em;
+}
 .loading-track {
     width: min(240px, 68%);
-    height: 2px;
-    margin: 18px auto 0;
+    height: 3px;
+    margin: 14px auto 0;
     overflow: hidden;
     background: rgba(184,154,84,0.16);
+    border-radius: 999px;
 }
 .loading-track span {
     display: block;
-    width: 32%;
+    width: 0%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, var(--title-gold-bright), transparent);
-    animation: titleLoadingSweep 1.65s ease-in-out infinite;
+    background: var(--title-gold-bright);
+    box-shadow: 0 0 8px rgba(221, 188, 99, 0.38);
+    transition: width 0.14s linear;
 }
-@keyframes titleLoadingSweep {
-    0% { transform: translateX(-110%); opacity: 0.35; }
-    50% { opacity: 1; }
-    100% { transform: translateX(320%); opacity: 0.35; }
+.loading-progress-text {
+    margin-top: 7px;
+    color: #aaa38f;
+    font-family: serif;
+    font-size: 0.68rem;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    font-variant-numeric: tabular-nums;
 }
 
-/* 低負荷端末では装飾アニメーションを完全停止してもレイアウトは崩れません。 */
+/* OS側で動きを減らしていても、実進捗の幅と数字は更新されます。 */
 @media (prefers-reduced-motion: reduce) {
-    .title-tap-message,
-    .loading-track span { animation: none !important; }
-    .loading-track span { width: 100%; opacity: 0.65; }
+    .title-tap-message { animation: none !important; }
+    .loading-track span { transition: none !important; }
 }
 
 /* 縦長・狭幅端末：題字とメニューを上下にして、5項目以上でも収めやすくします。 */
@@ -5454,7 +5468,8 @@ body:not(.is-pc) .legion-council-order-footer {
 
 body:not(.is-pc) #legion-council-order-confirm-btn,
 body:not(.is-pc) #legion-council-order-back-btn {
-    min-width: 0;
-    flex: 1 1 50%;
+    min-width: 112px;
+    width: 112px;
+    flex: 0 0 112px;
     min-height: 36px;
 }

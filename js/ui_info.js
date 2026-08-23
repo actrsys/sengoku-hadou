@@ -220,10 +220,13 @@ class UIInfoManager {
     }
 
     updateCommonConfirmBtn(minCount = 1) {
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        if (confirmBtn) {
-            confirmBtn.disabled = !(this.commonSelectedIds && this.commonSelectedIds.length >= minCount);
+        const enabled = !!(this.commonSelectedIds && this.commonSelectedIds.length >= minCount);
+        if (this.selectorView && typeof this.selectorView.setConfirmEnabled === 'function') {
+            this.selectorView.setConfirmEnabled(enabled);
+            return;
         }
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        if (confirmBtn) confirmBtn.disabled = !enabled;
     }
 
     // ==========================================
@@ -1312,7 +1315,9 @@ class UIInfoManager {
         const checkedCount = document.querySelectorAll('input[name="sel_prisoner"]:checked').length; 
         const confirmBtn = document.getElementById('selector-confirm-btn');
 
-        if (confirmBtn) {
+        if (this.selectorView && typeof this.selectorView.setConfirmEnabled === 'function') {
+            this.selectorView.setConfirmEnabled(checkedCount > 0);
+        } else if (confirmBtn) {
             confirmBtn.disabled = checkedCount === 0;
         }
     }

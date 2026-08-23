@@ -27,6 +27,21 @@ class SelectorModalView {
         };
     }
 
+    setConfirmEnabled(enabled) {
+        const elements = this.getElements();
+        const confirmBtn = elements && elements.confirmBtn;
+        if (!confirmBtn) return;
+        confirmBtn.disabled = !enabled;
+        // 見た目は共通CSSの :disabled に任せ、過去画面のinline opacity/cursorを持ち越さない。
+        if (confirmBtn.style && typeof confirmBtn.style.removeProperty === 'function') {
+            confirmBtn.style.removeProperty('opacity');
+            confirmBtn.style.removeProperty('cursor');
+        } else if (confirmBtn.style) {
+            confirmBtn.style.opacity = '';
+            confirmBtn.style.cursor = '';
+        }
+    }
+
     open({
         title = '',
         contextHtml = null,
@@ -73,15 +88,18 @@ class SelectorModalView {
         if (confirmBtn) {
             if (typeof onConfirm === 'function') {
                 confirmBtn.classList.remove('hidden');
-                confirmBtn.disabled = !!confirmDisabled;
-                confirmBtn.style.opacity = confirmDisabled ? '0.5' : '';
-                confirmBtn.style.cursor = confirmDisabled ? 'not-allowed' : '';
                 confirmBtn.onclick = onConfirm;
+                this.setConfirmEnabled(!confirmDisabled);
             } else {
                 confirmBtn.classList.add('hidden');
                 confirmBtn.disabled = false;
-                confirmBtn.style.opacity = '';
-                confirmBtn.style.cursor = '';
+                if (confirmBtn.style && typeof confirmBtn.style.removeProperty === 'function') {
+                    confirmBtn.style.removeProperty('opacity');
+                    confirmBtn.style.removeProperty('cursor');
+                } else if (confirmBtn.style) {
+                    confirmBtn.style.opacity = '';
+                    confirmBtn.style.cursor = '';
+                }
                 confirmBtn.onclick = null;
             }
         }

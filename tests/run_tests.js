@@ -440,6 +440,12 @@ test('SelectorModalView がガワ・戻る・決定状態を一元初期化す�
     assert.strictEqual(tabs.classList.contains('hidden'), false);
     assert.strictEqual(tabs.classList.contains('busho-detail-tabs'), false);
     assert.strictEqual(confirm.disabled, true);
+    confirm.style.opacity = '0.5';
+    confirm.style.cursor = 'not-allowed';
+    view.setConfirmEnabled(true);
+    assert.strictEqual(confirm.disabled, false);
+    assert.strictEqual(confirm.style.opacity, '', '再有効化時に古い透明度を残さない');
+    assert.strictEqual(confirm.style.cursor, '', '再有効化時に古いcursorを残さない');
     assert.strictEqual(back.textContent, '戻る');
     back.onclick();
     confirm.onclick();
@@ -1686,6 +1692,131 @@ test('Busho は寿命補正付きセーブでも本来の没年と補正元を�
     assert.ok(models.includes('data.originalEndYear !== undefined ? data.originalEndYear : data.endYear'));
     assert.ok(models.includes('this.lifespanModifiers = {};'));
     assert.ok(models.includes("Object.entries(data.lifespanModifiers)"));
+});
+
+
+test('武将寿命のゲーム中変更は LifeSystem を唯一の正規窓口とする', () => {
+    const models = read('js/models.js');
+    const interview = read('js/interview_system.js');
+    const common = read('js/event/common_events.js');
+    const life = read('js/life_system.js');
+
+    assert.ok(!models.includes('this.isLifeExtended'), '旧isLifeExtendedフラグをモデルへ残さない');
+    assert.ok(!models.includes('originalDeathAge'), 'modelsで討死延命量を計算しない');
+    assert.ok(!interview.includes('busho.endYear ='), '面談はendYearを直接変更しない');
+    assert.ok(interview.includes("setLifespanModifier(busho, doctorSourceId, extensionYears)"), '医師延命はLifeSystemへ委譲する');
+    assert.ok(interview.includes('hasBattleDeathLifespanExtension(busho)'), '従来どおり討死初期延命済み武将には医師延命を重ねない');
+    assert.ok(!interview.includes("'system:battle_death_initial'"), '面談側は討死補正sourceIdを直接知らない');
+    assert.ok(common.includes("game.lifeSystem.setLifespanModifier(busho, this.id, 10)"), '今川義元+10はcommon eventからLifeSystemへ委譲する');
+    assert.ok(life.includes("const sourceId = 'system:battle_death_initial'"), '討死初期延命のsourceIdをLifeSystemが所有する');
+
+    const runtimeFiles = ['js/interview_system.js', 'js/event/common_events.js', 'js/event/historical_event.js'];
+    for (const file of runtimeFiles) {
+        const src = read(file);
+        assert.ok(!/\.endYear\s*(?:\+?=|-=)/.test(src), `${file} に寿命の直接書換を残さない`);
+    }
+});
+
+test('討死武将の初期延命は LifeSystem が従来ルールを再現する', () => {
+    const ctx = createContext();
+    ctx.window.LifeStatusRules = { isUnborn: () => false };
+    loadScript(ctx, 'js/life_system.js');
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    const young = {
+        id: 1, birthYear: 1530, originalEndYear: 1560, endYear: 1560, isKilledInBattle: true,
+        status: 'active', isNotBorn: false, lifespanModifiers: {},
+        baseLeadership: 50, baseStrength: 50, basePolitics: 50, baseDiplomacy: 50, baseIntelligence: 50
+    };
+    const older = {
+        id: 2, birthYear: 1500, originalEndYear: 1560, endYear: 1560, isKilledInBattle: true,
+        status: 'active', isNotBorn: false, lifespanModifiers: {},
+        baseLeadership: 50, baseStrength: 50, basePolitics: 50, baseDiplomacy: 50, baseIntelligence: 50
+    };
+    const alreadyDead = {
+        id: 3, birthYear: 1500, originalEndYear: 1559, endYear: 1559, isKilledInBattle: true,
+        status: 'dead', isNotBorn: false, lifespanModifiers: {},
+        baseLeadership: 50, baseStrength: 50, basePolitics: 50, baseDiplomacy: 50, baseIntelligence: 50
+    };
+    const game = { year: 1560, bushos: [young, older, alreadyDead], getBusho: id => [young, older, alreadyDead].find(b => b.id === Number(id)) };
+    const system = new LifeSystem(game);
+    system.initializeBattleDeathLifespans(1560);
+    assert.strictEqual(young.endYear, 1585, '45歳未満の討死予定は55歳まで延命する');
+    assert.strictEqual(older.endYear, 1570, '45歳以上の討死予定は+10年する');
+    assert.strictEqual(alreadyDead.endYear, 1559, '開始前年以前に死亡済みなら延命しない');
+    assert.strictEqual(young.lifespanModifiers['system:battle_death_initial'], 25);
+    assert.strictEqual(older.lifespanModifiers['system:battle_death_initial'], 10);
+});
+
+test('1560シナリオ説明はユーザー調整版を維持する', () => {
+    const data = read('js/data_manager.js');
+    assert.ok(data.includes('永禄三年、畿内では三好氏が権勢を誇っていた。'));
+    assert.ok(data.includes('彼はいまだ、尾張一国すら纏め上げられていない。'));
+});
+
+test('selector決定ボタンは再有効化時に旧inline透明度を持ち越さない', () => {
+    const view = read('js/selector_modal_view.js');
+    const uiInfo = read('js/ui_info.js');
+    const kyoten = read('js/ui_info_kyoten.js');
+    assert.ok(view.includes('setConfirmEnabled(enabled)'));
+    assert.ok(view.includes("removeProperty('opacity')"));
+    assert.ok(uiInfo.includes('this.selectorView.setConfirmEnabled(enabled)'));
+    assert.ok(kyoten.includes('this.selectorView.setConfirmEnabled(isChanged)'));
+});
+
+test('地図ロードは帯状1走査とコンパクトIDマップで古いスマホの負荷を抑える', () => {
+    const data = read('js/data_manager.js');
+    const uiMap = read('js/ui_map.js');
+    const ui = read('js/ui.js');
+    const html = read('index.html');
+
+    assert.ok(data.includes('static async scanImageByStrips'), '巨大画像の読取は帯状共通ローダーを使う');
+    assert.ok(data.includes('const stripHeightBase = isPC ? 128 : 32;'), '巨大画像はPC128行・スマホ32行の帯で処理する');
+    assert.ok(data.includes('static async loadCastleSeedPoints'), '城色画像は領域ではなく種点座標として解釈する');
+    assert.ok(data.includes('static async buildCastleTerritoryMap'), '国IDと城種点から全領域の城IDマップを構築する');
+    assert.ok(data.includes('const yieldEvery = isPC ? 262144 : 65536;'), 'BFSもスマホでは短い間隔でyieldする');
+    assert.ok(data.includes('new Uint32Array(territoryPixelCount)'), 'BFSキューは全地図ではなく実領域pixel数だけ確保する');
+    assert.ok(data.includes('this.createCompactIdArray(maxCastleId, width * height)'), 'RGBAではなく城ID配列を保持する');
+    assert.ok(data.includes('if (maxId <= 255) return new Uint8Array(length);'), '現行城/国IDでは1pixel=1byteを選べる');
+    assert.ok(!data.includes('this.provinceImageData = ctx.getImageData'), '巨大province RGBAを常駐保持しない');
+    assert.ok(!uiMap.includes('const queue = new Int32Array(pixelSize)'), '初回描画で全画面BFSキューを確保しない');
+    assert.ok(uiMap.includes('const scale = isPC ? 1 : 0.5;'), 'スマホ勢力色Canvasは内部解像度を半分にする');
+    assert.ok(html.includes('id="loading-progress-text"'));
+    assert.ok(ui.includes('updateLoadingProgress(progress, label = null)'), 'ロード画面は実進捗を表示する');
+    assert.ok(!ui.includes('audio.oncanplaythrough = audio.onerror'), 'タイトルロードでSEのcanplaythrough待ちをしない');
+    assert.ok(ui.includes("img.src = './data/images/map/shiro_icon001.png'"), 'タイトル段階の先読みは必要最小限にする');
+});
+
+test('イベント地図も共有IDマップを再利用し巨大RGBAを作り直さない', () => {
+    const common = read('js/event/common_events.js');
+    const typhoon = read('js/event/typhoon_event.js');
+
+    assert.ok(common.includes('DataManager.provincePixelMap'), '地方イベントはDataManagerの国IDマップを再利用する');
+    assert.ok(common.includes('DataManager.castlePixelMap'), '台風用城判定はDataManagerの城IDマップを再利用する');
+    assert.ok(!common.includes('DataManager.provinceImageData'), '地方イベントで巨大province RGBAキャッシュへ戻らない');
+    assert.ok(!common.includes('ProvinceImageDataCache') && !common.includes('CastleColorImageDataCache'), '廃止した巨大イベントキャッシュ名を残さない');
+    assert.ok(!common.includes("ctx.getImageData(0, 0, canvas.width, canvas.height)"), 'イベント側で城色画像を全画面RGBA化しない');
+    assert.ok(common.includes('groupByCastleId'), '同色城グループは小さな城ID->group表で維持する');
+    assert.ok(typhoon.includes('const pixelCastleMap = castleIndex.pixelCastleMap;'));
+    assert.ok(typhoon.includes('groupByCastleId[castleId]'), '台風判定は共有城IDマップから小表を引く');
+});
+
+test('今川義元のcommon延命は討死初期延命と別sourceで積み重なる', () => {
+    const ctx = createContext();
+    ctx.window.LifeStatusRules = { isUnborn: () => false };
+    loadScript(ctx, 'js/life_system.js');
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    const yoshimoto = {
+        id: 1004009, birthYear: 1519, originalEndYear: 1560, endYear: 1560, isKilledInBattle: true,
+        status: 'active', isNotBorn: false, lifespanModifiers: {},
+        baseLeadership: 90, baseStrength: 85, basePolitics: 80, baseDiplomacy: 80, baseIntelligence: 80
+    };
+    const game = { year: 1560, bushos: [yoshimoto], getBusho: id => Number(id) === yoshimoto.id ? yoshimoto : null };
+    const system = new LifeSystem(game);
+    system.initializeBattleDeathLifespans(1560);
+    system.setLifespanModifier(yoshimoto, 'common_life_extension', 10);
+    assert.strictEqual(yoshimoto.endYear, 1584, '従来どおり討死延命1560→1574の後にcommon +10を積む');
+    assert.strictEqual(yoshimoto.lifespanModifiers['system:battle_death_initial'], 14);
+    assert.strictEqual(yoshimoto.lifespanModifiers.common_life_extension, 10);
 });
 
 test('攻城戦と野戦のホーム補正は WarSystem の共通計算を使う', () => {

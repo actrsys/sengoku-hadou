@@ -26,7 +26,10 @@ class UIManager {
         this.selectorConfirmBtn = document.getElementById('selector-confirm-btn');
         this.cutinOverlay = document.getElementById('cutin-overlay');
         this.cutinMessage = document.getElementById('cutin-message'); 
-        this.globalLoadingScreen = document.getElementById('global-loading-screen'); // ★追加：新しいロード画面を操作する準備
+        this.globalLoadingScreen = document.getElementById('global-loading-screen');
+        this.loadingStatus = document.getElementById('loading-status');
+        this.loadingProgressBar = document.getElementById('loading-progress-bar');
+        this.loadingProgressText = document.getElementById('loading-progress-text');
         this.quantityModal = document.getElementById('quantity-modal');
         this.quantityContainer = document.getElementById('quantity-container'); 
         this.quantityConfirmBtn = document.getElementById('quantity-confirm-btn');
@@ -176,42 +179,26 @@ class UIManager {
                     window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
                 }
 
-                // ★ 画像と音声を並列（一斉）に読み込むためのリストを作ります
-                const imageUrls = [
-                    './data/images/map/japan_map.png',
-                    './data/images/map/shiro_icon001.png',
-                    './data/images/map/japan_colorcode_map.png',
-                    './data/images/map/japan_white_map.png',
-                    './data/images/map/japan_provinces.png'
-                ];
-                const audioUrls = [
-                    'data/music/bgm/SC_ex_Town1_Castle.ogg',
-                    'data/music/bgm/SC_ex_Town2_Fortress.ogg',
-                    'data/music/se/decision.ogg',
-                    'data/music/se/choice.ogg',
-                    'data/music/se/cancel.ogg'
-                ];
-
-                // すべてのファイルを「一斉に」読み込み開始します
-                const promises = [
-                    ...imageUrls.map(url => new Promise(res => {
-                        const img = new Image();
-                        img.onload = img.onerror = res;
-                        img.src = url;
-                    })),
-                    ...audioUrls.map(url => new Promise(res => {
-                        const audio = new Audio();
-                        audio.oncanplaythrough = audio.onerror = res;
-                        audio.src = url;
-                        audio.load();
-                    }))
-                ];
-
-                // 全員の準備が整うのを待ちます
-                await Promise.all(promises);
+                // タイトルでは必要最小限だけを準備します。
+                // 巨大な地図画像を何枚も同時decodeすると古いスマホの瞬間メモリが跳ねるため、
+                // 国色・城色・イベント用白地図は実際に必要な段階まで読み込みません。
+                // タイトル段階は城アイコンだけを先読みします。
+                // SEの canplaythrough 待ちは古いWebViewで止まりやすいため行わず、音は必要時にAudioManagerへ任せます。
+                this.updateLoadingProgress(10, '基本データを準備しています');
+                await new Promise(res => {
+                    const img = new Image();
+                    img.onload = img.onerror = res;
+                    img.decoding = 'async';
+                    img.src = './data/images/map/shiro_icon001.png';
+                });
+                this.updateLoadingProgress(85, '基本データを準備しています');
+                await this.waitForNextPaint();
 
                 // セーブデータがあるかチェックしてボタンを制御します
+                this.updateLoadingProgress(90, 'セーブデータを確認しています');
                 await this.checkSaveDataForTitle();
+                this.updateLoadingProgress(100, '準備完了');
+                await this.waitForNextPaint();
 
                 // 準備が終わったら、メッセージを隠してメニューボタンを出します！
                 tapMessage.classList.add('hidden');
@@ -1466,18 +1453,29 @@ class UIManager {
     }
     // ==========================================
 
-    // ★追加：ロード画面をパッと出す魔法
-    showLoadingScreen() {
-        if (this.globalLoadingScreen) {
-            this.globalLoadingScreen.classList.remove('hidden');
-        }
+    // ロード画面。装飾アニメーションではなく、実際の処理段階と進捗率を表示します。
+    showLoadingScreen(label = '準備しています', progress = 0) {
+        if (this.globalLoadingScreen) this.globalLoadingScreen.classList.remove('hidden');
+        this.updateLoadingProgress(progress, label);
     }
 
-    // ★追加：ロード画面をサッと隠す魔法
+    updateLoadingProgress(progress, label = null) {
+        const value = Math.max(0, Math.min(100, Math.round(Number(progress) || 0)));
+        if (label !== null && this.loadingStatus) this.loadingStatus.textContent = String(label);
+        if (this.loadingProgressBar) this.loadingProgressBar.style.width = `${value}%`;
+        if (this.loadingProgressText) this.loadingProgressText.textContent = `${value}%`;
+    }
+
+    // 重い処理の前後で明示的に描画機会を作るための共通窓口です。
+    waitForNextPaint() {
+        return new Promise(resolve => {
+            if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => setTimeout(resolve, 0));
+            else setTimeout(resolve, 0);
+        });
+    }
+
     hideLoadingScreen() {
-        if (this.globalLoadingScreen) {
-            this.globalLoadingScreen.classList.add('hidden');
-        }
+        if (this.globalLoadingScreen) this.globalLoadingScreen.classList.add('hidden');
     }
 
     // ★追加：タイトル画面でセーブデータがあるかチェックする魔法
