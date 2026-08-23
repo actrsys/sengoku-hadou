@@ -2070,6 +2070,11 @@ test('面談は専用View内で完結し16:9/9:16固定・非スクロールで�
     assert.ok(view.includes('showMessages(busho, messages'), '長文を意味単位の順送り表示にできる');
     assert.ok(command.includes("case 'interview':"), '面談開始は汎用武将セレクタではなく専用フローへ渡す');
     assert.ok(!interview.includes('openBushoSelector'), '面談中に汎用武将リストを開かない');
+    assert.ok(html.includes('id="interview-session-footer" class="modal-footer interview-session-footer"'), '面談の決定/戻る系操作は標準modal-footerを使う');
+    assert.ok(html.includes('id="interview-session-inline-actions"'), '面談内容内の専用操作帯を分離する');
+    assert.ok(html.includes('id="interview-session-prev-btn" type="button" class="daimyo-detail-action-btn"'), '面談内ページ送りは標準決定ボタンではなく内側用ボタンを使う');
+    assert.ok(view.includes("button.className = 'daimyo-detail-action-btn interview-session-inline-btn'"), '面談内容内操作は詳細画面系ボタンを使う');
+    assert.ok(view.includes('_renderFooterActions'), '面談の外側フッター操作をViewで分離する');
     assert.ok(!css.includes('body.interview-mode'), '旧ふすま背景の状態管理を残さない');
 });
 

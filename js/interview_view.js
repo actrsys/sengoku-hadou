@@ -20,7 +20,8 @@ class InterviewView {
         this.pageLabel = document.getElementById('interview-session-page-label');
         this.prevBtn = document.getElementById('interview-session-prev-btn');
         this.nextBtn = document.getElementById('interview-session-next-btn');
-        this.actions = document.getElementById('interview-session-actions');
+        this.inlineActions = document.getElementById('interview-session-inline-actions');
+        this.footer = document.getElementById('interview-session-footer');
 
         this.page = 0;
         this.pageItems = [];
@@ -47,7 +48,14 @@ class InterviewView {
 
     _clearView() {
         if (this.body) this.body.replaceChildren();
-        if (this.actions) this.actions.replaceChildren();
+        if (this.inlineActions) {
+            this.inlineActions.replaceChildren();
+            this.inlineActions.classList.add('hidden');
+        }
+        if (this.footer) {
+            this.footer.replaceChildren();
+            this.footer.classList.add('hidden');
+        }
         if (this.pager) this.pager.classList.add('hidden');
         this.pageItems = [];
         this.page = 0;
@@ -84,29 +92,57 @@ class InterviewView {
         this.name.textContent = busho.name || '';
     }
 
-    _makeButton(label, onClick, className = 'btn-secondary') {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = `interview-session-btn ${className}`;
-        button.textContent = label;
+    _bindButton(button, label, onClick, sound = null) {
         button.onclick = () => {
             if (window.AudioManager) {
-                const isBack = label === '戻る' || label.includes('終える') || label === 'やめる';
-                window.AudioManager.playSE(isBack ? 'cancel.ogg' : 'decision.ogg');
+                let se = sound;
+                if (!se) {
+                    const isBack = label === '戻る' || label.includes('終える') || label === 'やめる' || label === '診せない';
+                    se = isBack ? 'cancel.ogg' : 'decision.ogg';
+                }
+                window.AudioManager.playSE(se);
             }
             if (onClick) onClick();
         };
         return button;
     }
 
-    _renderActions(choices) {
-        if (!this.actions) return;
-        this.actions.replaceChildren();
+    _makeFooterButton(label, onClick, className = 'btn-secondary') {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = className;
+        button.textContent = label;
+        return this._bindButton(button, label, onClick);
+    }
+
+    _makeInlineButton(label, onClick) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'daimyo-detail-action-btn interview-session-inline-btn';
+        button.textContent = label;
+        return this._bindButton(button, label, onClick, 'choice.ogg');
+    }
+
+    _renderFooterActions(choices) {
+        if (!this.footer) return;
+        this.footer.replaceChildren();
         (choices || []).forEach(choice => {
-            const button = this._makeButton(choice.label, choice.onClick, choice.className || 'btn-secondary');
+            const button = this._makeFooterButton(choice.label, choice.onClick, choice.className || 'btn-secondary');
             if (choice.disabled) button.disabled = true;
-            this.actions.appendChild(button);
+            this.footer.appendChild(button);
         });
+        this.footer.classList.toggle('hidden', !choices || choices.length === 0);
+    }
+
+    _renderInlineActions(choices) {
+        if (!this.inlineActions) return;
+        this.inlineActions.replaceChildren();
+        (choices || []).forEach(choice => {
+            const button = this._makeInlineButton(choice.label, choice.onClick);
+            if (choice.disabled) button.disabled = true;
+            this.inlineActions.appendChild(button);
+        });
+        this.inlineActions.classList.toggle('hidden', !choices || choices.length === 0);
     }
 
     showInterviewerList(candidates, onSelect, onClose) {
@@ -114,7 +150,8 @@ class InterviewView {
         this._setHeader('面談', '面談する武将を選んでください。');
         this._setSpeaker(null);
         this._renderPagedList(candidates, onSelect, 'interviewer');
-        this._renderActions([
+        this._renderInlineActions([]);
+        this._renderFooterActions([
             { label: '面談を終える', onClick: onClose, className: 'btn-secondary' }
         ]);
     }
@@ -124,7 +161,8 @@ class InterviewView {
         this._setHeader('他者について聞く', '誰についての印象を聞きますか？');
         this._setSpeaker(interviewer);
         this._renderPagedList(candidates, onSelect, 'target');
-        this._renderActions([
+        this._renderInlineActions([]);
+        this._renderFooterActions([
             { label: '戻る', onClick: onBack, className: 'btn-secondary' }
         ]);
     }
@@ -204,7 +242,7 @@ class InterviewView {
         }
     }
 
-    showMenu(busho, message, choices) {
+    showMenu(busho, message, choices, onBack) {
         this._ensureOpen();
         this._setHeader('面談', '話したい内容を選んでください。');
         this._setSpeaker(busho);
@@ -213,7 +251,10 @@ class InterviewView {
             this.body.className = 'interview-session-body interview-session-conversation-view';
             this.body.innerHTML = `<div class="interview-session-message">${message}</div>`;
         }
-        this._renderActions(choices);
+        this._renderInlineActions(choices);
+        this._renderFooterActions(onBack ? [
+            { label: '戻る', onClick: onBack, className: 'btn-secondary' }
+        ] : []);
     }
 
     showPrompt(busho, message, choices, title = '面談') {
@@ -225,7 +266,8 @@ class InterviewView {
             this.body.className = 'interview-session-body interview-session-conversation-view';
             this.body.innerHTML = `<div class="interview-session-message">${message}</div>`;
         }
-        this._renderActions(choices);
+        this._renderInlineActions([]);
+        this._renderFooterActions(choices);
     }
 
     showMessages(busho, messages, onDone, title = '面談') {
@@ -247,7 +289,8 @@ class InterviewView {
                 this.body.className = 'interview-session-body interview-session-conversation-view';
                 this.body.innerHTML = `<div class="interview-session-message">${queue[index]}</div>`;
             }
-            this._renderActions([
+            this._renderInlineActions([]);
+            this._renderFooterActions([
                 {
                     label: isLast ? '戻る' : '次へ',
                     className: isLast ? 'btn-secondary' : 'btn-primary',

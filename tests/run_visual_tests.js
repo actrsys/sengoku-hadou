@@ -454,7 +454,10 @@ async function validateCommandAndInterviewStates(cdp) {
             const activeStyle = getComputedStyle(active);
             const arrow = getComputedStyle(active, '::after');
             const content = document.getElementById('interview-session-content');
+            const footer = document.getElementById('interview-session-footer');
+            const inline = document.querySelector('.interview-session-inline-btn');
             const r = content.getBoundingClientRect();
+            const fr = footer.getBoundingClientRect();
             const cs = getComputedStyle(content);
             return {
                 normalBg: normalStyle.backgroundImage,
@@ -463,6 +466,10 @@ async function validateCommandAndInterviewStates(cdp) {
                 activeArrowTop: arrow.borderTopColor,
                 activeArrowRight: arrow.borderRightColor,
                 rect: {width:r.width,height:r.height,left:r.left,top:r.top,right:r.right,bottom:r.bottom},
+                footer: {top:fr.top,bottom:fr.bottom,left:fr.left,right:fr.right},
+                footerOutside: footer.parentElement === document.getElementById('interview-modal') && !content.contains(footer),
+                standardInsideButtons: content.querySelectorAll('.btn-primary, .btn-secondary, .btn-danger').length,
+                inlineUsesDetailButton: inline && inline.classList.contains('daimyo-detail-action-btn'),
                 overflowY: cs.overflowY,
                 scrollHeight: content.scrollHeight,
                 clientHeight: content.clientHeight
@@ -478,6 +485,10 @@ async function validateCommandAndInterviewStates(cdp) {
     assert.ok(Math.abs((pc.rect.width / pc.rect.height) - (16 / 9)) < 0.03, `PC面談枠が16:9ではありません (${pc.rect.width}x${pc.rect.height})`);
     assert.strictEqual(pc.overflowY, 'hidden', 'PC面談枠をスクロール領域にしない');
     assert.ok(pc.scrollHeight <= pc.clientHeight + 3, 'PC面談内容が枠をはみ出している');
+    assert.strictEqual(pc.footerOutside, true, 'PC面談の戻る/決定系ボタンは内容枠の外へ置く');
+    assert.strictEqual(pc.standardInsideButtons, 0, 'PC面談の内容枠内に標準決定/キャンセルボタンを置かない');
+    assert.strictEqual(pc.inlineUsesDetailButton, true, 'PC面談の内容内操作は詳細画面系ボタンを使う');
+    assert.ok(pc.footer.top - pc.rect.bottom >= 14 && pc.footer.top - pc.rect.bottom <= 16, `PC面談の内容枠と外側ボタンの隙間は15px基準 (${pc.footer.top - pc.rect.bottom})`);
 
     await cdp.call('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 1, mobile: true });
     await cdp.call('Runtime.evaluate', {
@@ -488,16 +499,23 @@ async function validateCommandAndInterviewStates(cdp) {
     result = await cdp.call('Runtime.evaluate', {
         expression: `(() => {
             const content = document.getElementById('interview-session-content');
+            const footer = document.getElementById('interview-session-footer');
             const r = content.getBoundingClientRect();
+            const fr = footer.getBoundingClientRect();
             const cs = getComputedStyle(content);
-            const action = document.querySelector('.interview-session-btn').getBoundingClientRect();
+            const action = document.querySelector('.interview-session-inline-btn').getBoundingClientRect();
+            const footerButton = footer.querySelector('button').getBoundingClientRect();
             return {
                 innerWidth: 360, innerHeight: 640,
                 rect:{width:r.width,height:r.height,left:r.left,top:r.top,right:r.right,bottom:r.bottom},
+                footer:{top:fr.top,bottom:fr.bottom,left:fr.left,right:fr.right},
+                footerOutside:footer.parentElement === document.getElementById('interview-modal') && !content.contains(footer),
+                standardInsideButtons:content.querySelectorAll('.btn-primary, .btn-secondary, .btn-danger').length,
                 overflowY:cs.overflowY,
                 scrollHeight:content.scrollHeight,
                 clientHeight:content.clientHeight,
-                actionHeight:action.height
+                actionHeight:action.height,
+                footerButtonHeight:footerButton.height
             };
         })()`,
         returnByValue: true
@@ -508,9 +526,14 @@ async function validateCommandAndInterviewStates(cdp) {
     assert.ok(mobile.rect.top >= -1 && mobile.rect.bottom <= mobile.innerHeight + 1, 'スマホ面談枠が縦にはみ出している');
     assert.strictEqual(mobile.overflowY, 'hidden', 'スマホ面談枠をスクロール領域にしない');
     assert.ok(mobile.scrollHeight <= mobile.clientHeight + 3, 'スマホ面談内容が枠をはみ出している');
-    assert.ok(mobile.actionHeight >= 27, 'スマホ面談ボタンが小さすぎる');
+    assert.ok(mobile.actionHeight >= 27, 'スマホ面談内操作ボタンが小さすぎる');
+    assert.strictEqual(mobile.footerOutside, true, 'スマホ面談の戻る/決定系ボタンは内容枠の外へ置く');
+    assert.strictEqual(mobile.standardInsideButtons, 0, 'スマホ面談の内容枠内に標準決定/キャンセルボタンを置かない');
+    assert.ok(mobile.footer.top - mobile.rect.bottom >= 14 && mobile.footer.top - mobile.rect.bottom <= 16, `スマホ面談の内容枠と外側ボタンの隙間は15px基準 (${mobile.footer.top - mobile.rect.bottom})`);
+    assert.ok(mobile.footer.bottom <= mobile.innerHeight + 1, 'スマホ面談の外側ボタンが9:16画面からはみ出している');
+    assert.ok(mobile.footerButtonHeight >= 36, 'スマホ面談の外側ボタンが小さすぎる');
 
-    console.log('✓ PC入れ子コマンド選択状態・面談固定16:9/9:16 visual regression');
+    console.log('✓ PC入れ子コマンド選択状態・面談固定16:9/9:16・標準外置きフッター visual regression');
 }
 
 async function validateEndingAndWatchStates(cdp) {

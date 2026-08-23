@@ -128,10 +128,10 @@ class InterviewSystem {
             busho,
             '「殿、どのようなご用件でしょうか？」',
             [
-                { label: '調子はどうだ', className: 'btn-primary', onClick: () => this.executeInterviewStatus(busho) },
-                { label: '他者について聞く', onClick: () => this.showTargetList(busho) },
-                { label: '戻る', onClick: () => this.showInterviewerList() }
-            ]
+                { label: '調子はどうだ', onClick: () => this.executeInterviewStatus(busho) },
+                { label: '他者について聞く', onClick: () => this.showTargetList(busho) }
+            ],
+            () => this.showInterviewerList()
         );
     }
 

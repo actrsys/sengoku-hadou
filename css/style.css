@@ -3734,14 +3734,14 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 }
 
 #interview-modal .interview-session-content {
-    width: 1120px;
-    height: 630px;
+    width: auto;
+    height: min(630px, calc(100% - 75px));
     max-width: calc(100% - 24px);
-    max-height: calc(100% - 24px);
     aspect-ratio: 16 / 9;
     overflow: hidden !important;
     padding: 16px 18px;
     gap: 10px;
+    flex: 0 0 auto;
 }
 
 .interview-session-header {
@@ -3897,26 +3897,42 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 .interview-session-pager button { min-width: 88px; min-height: 30px; padding: 4px 12px; }
 .interview-session-page-label { min-width: 58px; font-size: 12px; }
 
-.interview-session-actions {
-    flex: 0 0 48px;
-    min-height: 48px;
+/* 面談内容の選択肢は「決定/戻る」ではないため、詳細画面と同じ内側用ボタンを使う。 */
+.interview-session-inline-actions {
+    flex: 0 0 42px;
+    min-height: 42px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
+    gap: 8px;
     overflow: hidden;
 }
-.interview-session-btn { min-width: 160px; min-height: 40px; }
+.interview-session-inline-btn {
+    min-width: 150px;
+    min-height: 34px;
+}
+
+/* 決定・戻る・終了などは共通 modal-footer と同じく内容枠の外側へ置く。
+   内容枠との隙間15pxは全モーダル共通の正本 .modal-footer に委譲する。 */
+.interview-session-footer {
+    flex: 0 0 60px;
+    min-height: 60px;
+    width: min(760px, calc(100% - 24px));
+    margin-top: 15px;
+    padding: 0;
+}
+.interview-session-footer > button { min-width: 160px; }
 
 body:not(.is-pc) #interview-modal .interview-session-content {
-    width: calc(100% - 12px) !important;
-    height: auto !important;
+    width: auto !important;
+    height: calc(100% - 75px) !important;
     max-width: calc(100% - 12px) !important;
-    max-height: calc(100% - 12px) !important;
+    max-height: none !important;
     aspect-ratio: 9 / 16;
     padding: 7px;
     gap: 5px;
     overflow: hidden !important;
+    border-radius: 8px !important;
 }
 
 body:not(.is-pc) .interview-session-header {
@@ -3968,18 +3984,32 @@ body:not(.is-pc) .interview-session-pager {
 body:not(.is-pc) .interview-session-pager button { min-width: 74px; min-height: 28px; padding: 2px 8px; font-size: 11px; }
 body:not(.is-pc) .interview-session-page-label { min-width: 42px; font-size: 9px; }
 
-body:not(.is-pc) .interview-session-actions {
-    flex-basis: 92px;
-    min-height: 92px;
-    flex-direction: column;
+body:not(.is-pc) .interview-session-inline-actions {
+    flex-basis: 36px;
+    min-height: 36px;
     gap: 4px;
 }
-body:not(.is-pc) .interview-session-btn {
-    width: min(250px, 92%);
+body:not(.is-pc) .interview-session-inline-btn {
     min-width: 0;
-    min-height: 27px;
-    padding: 3px 12px;
-    font-size: 12px;
+    width: min(142px, 46%);
+    min-height: 30px;
+    padding: 4px 5px;
+    font-size: 10px;
+}
+body:not(.is-pc) .interview-session-footer {
+    flex: 0 0 60px;
+    min-height: 60px;
+    width: calc(100% - 12px);
+    margin-top: 15px;
+    padding: 0;
+    flex-direction: row-reverse;
+    gap: 8px;
+}
+body:not(.is-pc) .interview-session-footer > button {
+    min-width: 112px;
+    min-height: 36px;
+    padding: 7px 14px;
+    font-size: 1rem;
 }
 
 /* =========================================================
