@@ -171,6 +171,14 @@ class TurnManager {
     _scheduleAITurn(castle) {
         const game = this.game;
         game.isProcessingAI = true;
+        // AI進行中は操作できないため、スマホでは背面マップの非必須Canvas/フィルタを外して
+        // GPUメモリの余裕を作ります。戦闘演出は必要時に小さなCanvasを作り直します。
+        if (game.ui && typeof game.ui.releaseMobileTransientMapResources === 'function') {
+            game.ui.releaseMobileTransientMapResources();
+        }
+        if (typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')) {
+            document.body.classList.add('mobile-ai-light-mode');
+        }
         if (game.ui.aiGuard) {
             game.ui.aiGuard.classList.remove('hidden');
             game.ui.restoreAIGuardText(true);
@@ -284,6 +292,8 @@ class TurnManager {
             } else {
                 // 直轄（今まで通りプレイヤーが動かす）の場合
                 game.isProcessingAI = false; 
+                if (typeof document !== 'undefined' && document.body) document.body.classList.remove('mobile-ai-light-mode');
+                if (game.ui && typeof game.ui.recoverMobileMapResources === 'function') game.ui.recoverMobileMapResources();
                 game.writeSystemDiagnostic('player_turn:enter', castle);
     
                 // ★毎月一番最初の自分のターンで、裏側でオートセーブを走らせます！

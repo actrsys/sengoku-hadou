@@ -400,6 +400,9 @@ class UIManager {
     pauseBackgroundUpdates() {
         this.isBackgroundPaused = true;
         document.body.classList.add('background-paused');
+        if (typeof this.releaseMobileTransientMapResources === 'function') {
+            this.releaseMobileTransientMapResources();
+        }
         
         // もし情報パネルのマーク切り替えタイマーが動いていたら、無駄なので止めます
         if (this._statusCarouselTimer) {
@@ -411,6 +414,9 @@ class UIManager {
     resumeBackgroundUpdates() {
         this.isBackgroundPaused = false;
         document.body.classList.remove('background-paused');
+        if (typeof this.recoverMobileMapResources === 'function') {
+            this.recoverMobileMapResources();
+        }
         
         // まだゲームが始まっていない時（タイトル画面など）はここで終わります
         if (!this.game || this.game.phase === 'title') return;

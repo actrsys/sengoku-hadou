@@ -406,7 +406,7 @@ body:not(.is-pc):has(.modal:not(.hidden)) #bottom-command-bar {
 #map-scroll-container.grab { cursor: grab; }
 #map-scroll-container.grabbing { cursor: grabbing; }
 
-#map-container { position: relative; background-image: url('../data/images/map/japan_map.png'); background-size: 100% 100%; background-repeat: no-repeat; transform-origin: 0 0; margin: 0; flex: none; will-change: transform; backface-visibility: hidden; }
+#map-container { position: relative; background-color: #d9e0d7; background-image: none; transform-origin: 0 0; margin: 0; flex: none; will-change: transform; backface-visibility: hidden; }
 /* ★Round14：decode済みの常駐<img>が準備できた後はCSS背景を二重描画しません。 */
 #map-container.base-map-image-ready { background-image: none; }
 #map-base-image {
@@ -423,7 +423,13 @@ body:not(.is-pc):has(.modal:not(.hidden)) #bottom-command-bar {
 }
 /* ★Round5：スマホでは巨大マップを常時GPUレイヤーとして予約しない。 */
 body:not(.is-pc) #map-scroll-container { will-change: auto; }
-body:not(.is-pc) #map-container { will-change: auto; backface-visibility: visible; }
+body:not(.is-pc) #map-container {
+    will-change: auto;
+    backface-visibility: visible;
+    /* スマホはJS側の軽量表示画像だけを使う。CSS背景で原寸地図を二重にdecodeしない。 */
+    background-image: none;
+    background-color: #d9e0d7;
+}
 /* ★Round14：巨大なmap-container全体ではなく、約1200x800の静的な地図画像だけを
    独立レイヤーとして保持します。これによりスクロール先のcheckerboardingを抑えつつ、
    城・SVG・複数Canvasまで一枚の巨大GPU面にまとめることを避けます。 */
@@ -5472,4 +5478,39 @@ body:not(.is-pc) #legion-council-order-back-btn {
     width: 112px;
     flex: 0 0 112px;
     min-height: 36px;
+}
+
+/* =========================================================
+   古いスマホ向け：モーダル/大きなリスト表示中の背面マップ軽量化
+   ========================================================= */
+body:not(.is-pc).background-paused .castle-card,
+body:not(.is-pc).mobile-memory-guard .castle-card,
+body:not(.is-pc).background-paused .castle-card.glow-blue,
+body:not(.is-pc).background-paused .castle-card.glow-red,
+body:not(.is-pc).background-paused .castle-card.glow-green,
+body:not(.is-pc).mobile-memory-guard .castle-card.glow-blue,
+body:not(.is-pc).mobile-memory-guard .castle-card.glow-red,
+body:not(.is-pc).mobile-memory-guard .castle-card.glow-green {
+    filter: none !important;
+    animation: none !important;
+}
+body:not(.is-pc).background-paused .kunishu-icon-img,
+body:not(.is-pc).mobile-memory-guard .kunishu-icon-img,
+body:not(.is-pc).background-paused .daimyo-name-label,
+body:not(.is-pc).mobile-memory-guard .daimyo-name-label {
+    filter: none !important;
+    box-shadow: none !important;
+    animation: none !important;
+}
+
+/* AI連続進行中は、スマホで252城ぶんのdrop-shadow合成を止めてGPUメモリを温存する。 */
+body:not(.is-pc).mobile-ai-light-mode .castle-card,
+body:not(.is-pc).mobile-ai-light-mode .castle-card.glow-blue,
+body:not(.is-pc).mobile-ai-light-mode .castle-card.glow-red,
+body:not(.is-pc).mobile-ai-light-mode .castle-card.glow-green,
+body:not(.is-pc).mobile-ai-light-mode .kunishu-icon-img,
+body:not(.is-pc).mobile-ai-light-mode .daimyo-name-label {
+    filter: none !important;
+    animation: none !important;
+    box-shadow: none !important;
 }

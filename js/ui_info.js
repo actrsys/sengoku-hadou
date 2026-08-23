@@ -24,6 +24,9 @@ class UIInfoManager {
         if (this.ui && typeof this.ui.resumeBackgroundUpdates === 'function') {
             this.ui.resumeBackgroundUpdates();
         }
+        if (this.game && this.game.phase !== 'title' && typeof this.game.writeSystemDiagnostic === 'function') {
+            this.game.writeSystemDiagnostic('ui:modal_closed');
+        }
         
         // 武将一覧などで使う状態のリセット
         this.bushoCurrentTab = 'stats';
@@ -255,6 +258,9 @@ class UIInfoManager {
         // ★ここを書き足し：新しい画面（リストなど）を開く時に、背景の更新をストップします！
         if (this.ui && typeof this.ui.pauseBackgroundUpdates === 'function') {
             this.ui.pauseBackgroundUpdates();
+        }
+        if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+            this.game.writeSystemDiagnostic(`ui:modal:${pageType}`);
         }
 
         if (this.currentModalInfo) {

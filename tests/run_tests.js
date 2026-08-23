@@ -1885,5 +1885,61 @@ test('gameを保持する主要Systemは window.GameApp へ戻らない', () => 
     assert.ok(fieldSource.includes('mapFactory.generate(this.warState.isSeaBattle === true)'));
 });
 
+
+test('古いスマホ向け地図演出は城領域boundsと低解像度帯描画を使う', () => {
+    const data = read('js/data_manager.js');
+    const map = read('js/ui_map.js');
+    assert.ok(data.includes('this.castlePixelBounds = boundsByCastleId'), '起動時に城ごとの外接矩形を保持する');
+    assert.ok(map.includes('const boundsByCastleId = DataManager.castlePixelBounds || null'), '戦闘点滅は事前計算boundsを使う');
+    assert.ok(!map.includes('for (let i = 0; i < mapWidth * mapHeight; i++)'), '戦闘点滅に全地図走査fallbackを残さない');
+    assert.ok(map.includes('_getMapOverlayRasterSize(mapW, mapH)'), '全画面エフェクトは端末別内部解像度を使う');
+    assert.ok(map.includes('_paintCanvasByStrips(canvas, paintPixel'), '巨大ImageDataを一枚作らず帯状描画する');
+    assert.ok(map.includes("img.src = isPC ? './data/images/map/japan_map.png' : './data/images/map/japan_map_mobile.png'"), 'スマホ表示地図は軽量専用画像を使う');
+    assert.ok(fs.existsSync(path.join(ROOT, 'data/images/map/japan_map_mobile.png')));
+});
+
+test('モーダル中はスマホの非必須地図Canvasを解放し勢力色消失を自己回復する', () => {
+    const ui = read('js/ui.js');
+    const map = read('js/ui_map.js');
+    const css = read('css/style.css');
+    assert.ok(ui.includes('this.releaseMobileTransientMapResources()'));
+    assert.ok(ui.includes('this.recoverMobileMapResources()'));
+    assert.ok(map.includes("['province-overlay', 'hover-blink-overlay', 'keep-blink-overlay', 'snow-overlay']"));
+    assert.ok(map.includes('_isClanColorOverlayHealthy()'));
+    assert.ok(map.includes("ctx.getImageData(x, y, 1, 1).data[3] > 0"), '復帰時の確認は1pixelだけ読む');
+    assert.ok(map.includes("canvas.addEventListener('contextlost'"));
+    assert.ok(css.includes('body:not(.is-pc).mobile-memory-guard .castle-card'));
+});
+
+test('月初寿命再計算とAI作戦は古いスマホで協調分割する', () => {
+    const life = read('js/life_system.js');
+    const ops = read('js/ai_operation.js');
+    assert.ok(life.includes('await this.updateAllBushosAgeCooperatively()'));
+    assert.ok(life.includes('const chunkSize = isPC ? 768 : 128'));
+    assert.ok(life.includes("month_start:life:age_done"));
+    assert.ok(!life.includes('_normalizeFamilyArrays'), '旧セーブ用の全人物親族配列正規化を月次処理へ残さない');
+    assert.ok(ops.includes('processedLegions % 2 === 0'));
+    assert.ok(ops.includes('month_start:operations:clan_'));
+});
+
+test('実機診断は古いキュー位置の持越しと通常active_castle上書きを避ける', () => {
+    const game = read('js/game.js');
+    const map = read('js/ui_map.js');
+    const info = read('js/ui_info.js');
+    assert.ok(game.includes('const isQueuePhase = !!castle'), '対象城のない月次/UI処理へ旧AIキュー番号を持ち越さない');
+    assert.ok(game.includes("startsWith('ui:')"), '画面操作の診断はキュー番号ではなく画面操作として表示する');
+    assert.ok(info.includes('`ui:modal:${pageType}`'), '武将一覧など実際に開いている画面を診断へ残す');
+    assert.ok(map.includes("diagnostic: false"));
+    assert.ok(map.includes("options.diagnostic !== false"));
+});
+
+test('セーブ用勢力図はフルサイズCanvasを作らず1/4専用画像へ直接描画する', () => {
+    const save = read('js/save_manager.js');
+    assert.ok(save.includes("japan_white_map_thumb.png"));
+    assert.ok(save.includes('const thumbW = Math.max(1, Math.round(w * scale))'));
+    assert.ok(!save.includes("const canvas = document.createElement('canvas');\n            canvas.width = w;\n            canvas.height = h;"), '3140x2440の中間Canvasを作らない');
+    assert.ok(fs.existsSync(path.join(ROOT, 'data/images/map/japan_white_map_thumb.png')));
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

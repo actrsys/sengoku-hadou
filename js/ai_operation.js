@@ -289,12 +289,18 @@ class AIOperationManager {
     async processMonthlyOperations() {
         // ★追加：毎月の作戦会議を始める前に、まず全体の健康診断を行います！
         this.validateAllOperations();
+        const isPC = typeof document !== 'undefined' && document.body && document.body.classList.contains('is-pc');
+        let processedLegions = 0;
 
         for (const clan of this.game.clans) {
             // ★追加：大名家ごとに一瞬「息継ぎ」を入れて、月替わりの激しい計算の重さを軽減します！
             await new Promise(resolve => setTimeout(resolve, 0));
 
             if (clan.id === 0 || clan.isDestroyed) continue; // ★滅亡した勢力はスキップします！
+            // 実機診断は月初の古い253/252表示ではなく、作戦更新中の勢力を直接残します。
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}`);
+            }
 
             const isPlayerClan = (clan.id === this.game.playerClanId);
 
@@ -333,6 +339,11 @@ class AIOperationManager {
                 .filter(legionId => legionId === 0 || this.isActiveLegion(clan.id, legionId));
 
             for (const legionId of legionIds) {
+                processedLegions++;
+                // 古いスマホでは一勢力が複数軍団を持つ時も連続CPU時間を切ります。
+                if (!isPC && processedLegions % 2 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
                 // ★追加：プレイヤー大名家で、かつ直轄（ID0）の場合は、勝手に作戦を立てないようにスキップします！
                 if (isPlayerClan && legionId === 0) continue;
 

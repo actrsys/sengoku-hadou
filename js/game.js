@@ -107,11 +107,14 @@ class GameManager {
         if (typeof sessionStorage === 'undefined') return;
         if (document.body && document.body.classList.contains('is-pc')) return;
         try {
+            // キュー位置は対象城を明示している処理だけに付ける。
+            // 月次・UI・イベント等へ直前のAI currentIndex を持ち越さない。
+            const isQueuePhase = !!castle;
             const data = {
                 year: this.year,
                 month: this.month,
-                index: this.currentIndex + 1,
-                total: this.turnQueue ? this.turnQueue.length : 0,
+                index: isQueuePhase ? this.currentIndex + 1 : 0,
+                total: isQueuePhase && this.turnQueue ? this.turnQueue.length : 0,
                 castleId: castle ? castle.id : 0,
                 castleName: castle ? castle.name : '',
                 clanId: castle ? castle.ownerClan : 0,
@@ -142,7 +145,11 @@ class GameManager {
             const el = document.createElement('div');
             el.id = 'ai-last-checkpoint-badge';
             const castleText = data.castleId ? `　${data.castleName || '城'}(ID:${data.castleId})` : '';
-            el.textContent = `前回停止位置: ${data.index || '?'} / ${data.total || '?'}${castleText}　${data.phase || '不明'}`;
+            let checkpointText = '処理中';
+            if (Number(data.total) > 0) checkpointText = `${data.index || '?'} / ${data.total}`;
+            else if (String(data.phase || '').startsWith('month_') || String(data.phase || '').startsWith('month')) checkpointText = '月次処理';
+            else if (String(data.phase || '').startsWith('ui:')) checkpointText = '画面操作';
+            el.textContent = `前回停止位置: ${checkpointText}${castleText}　${data.phase || '不明'}`;
             el.title = 'タップすると閉じます';
             el.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:20000;max-width:calc(100vw - 16px);padding:6px 9px;background:rgba(0,0,0,.82);color:#fff;font-size:11px;line-height:1.35;border-radius:5px;pointer-events:auto;';
             el.onclick = () => el.remove();

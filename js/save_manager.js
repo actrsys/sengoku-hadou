@@ -87,51 +87,53 @@ class SaveManager {
         return new Promise(async (resolve) => {
             const w = this.game.mapWidth || 1200;
             const h = this.game.mapHeight || 800;
+            const scale = 0.25;
+            const thumbW = Math.max(1, Math.round(w * scale));
+            const thumbH = Math.max(1, Math.round(h * scale));
 
-            // 白地図を読み込みます
-            const loadImg = (src) => new Promise(res => { 
-                const img = new Image(); 
-                img.onload = () => res(img); 
-                img.onerror = () => res(null); 
-                img.src = src; 
+            // サムネイルのためだけに3140x2440の白地図とCanvasを確保しない。
+            // 1/4サイズの専用画像へ、勢力色Canvasを直接縮小合成します。
+            const loadImg = (src) => new Promise(res => {
+                const img = new Image();
+                img.decoding = 'async';
+                img.onload = () => res(img);
+                img.onerror = () => res(null);
+                img.src = src;
             });
-            const whiteMapImg = await loadImg('./data/images/map/japan_white_map.png');
-
+            const whiteMapImg = await loadImg('./data/images/map/japan_white_map_thumb.png');
             if (!whiteMapImg) {
-                resolve(null); return; 
+                resolve(null);
+                return;
             }
 
-            const canvas = document.createElement('canvas');
-            canvas.width = w;
-            canvas.height = h;
-            const ctx = canvas.getContext('2d');
-
-            // 1. まずは白地図を描きます
-            ctx.drawImage(whiteMapImg, 0, 0, w, h);
-
-            // 2. 画面に表示されている「色塗り済みの透明フィルム」をそのまま重ねます！
-            const clanColorOverlay = document.getElementById('clan-color-overlay');
-            if (clanColorOverlay) {
-                ctx.drawImage(clanColorOverlay, 0, 0, w, h);
-            }
-
-            // 3. データが重くならないように、最後に「1/4のサイズ」に縮小して写真を撮ります
             const thumbCanvas = document.createElement('canvas');
-            const scale = 0.25; 
-            thumbCanvas.width = w * scale;
-            thumbCanvas.height = h * scale;
+            thumbCanvas.width = thumbW;
+            thumbCanvas.height = thumbH;
             const thumbCtx = thumbCanvas.getContext('2d');
+            if (!thumbCtx) {
+                resolve(null);
+                return;
+            }
             thumbCtx.imageSmoothingEnabled = true;
-            thumbCtx.imageSmoothingQuality = 'high';
-            thumbCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+            thumbCtx.imageSmoothingQuality = 'medium';
+            thumbCtx.drawImage(whiteMapImg, 0, 0, thumbW, thumbH);
 
-            // ★超重要：ブラウザのセキュリティ制限（CORS）でエラーになるのを防ぐバリアです！
+            const clanColorOverlay = document.getElementById('clan-color-overlay');
+            if (clanColorOverlay && clanColorOverlay.width > 1 && clanColorOverlay.height > 1) {
+                thumbCtx.drawImage(clanColorOverlay, 0, 0, thumbW, thumbH);
+            }
+
             try {
                 const dataUrl = thumbCanvas.toDataURL('image/jpeg', 0.6);
+                // 参照とbacking storeを早めに小さくして、古いWebViewのGC待ちを減らします。
+                thumbCanvas.width = 1;
+                thumbCanvas.height = 1;
+                try { whiteMapImg.src = ''; } catch (e) {}
                 resolve(dataUrl);
             } catch (e) {
                 console.warn("セキュリティ制限により、セーブ用画像の生成をスキップしました:", e);
-                resolve(null); // エラーが起きてもゲームが止まらないようにします
+                try { thumbCanvas.width = 1; thumbCanvas.height = 1; } catch (ignore) {}
+                resolve(null);
             }
         });
     }

@@ -623,6 +623,22 @@ class DataManager {
         }
 
         const output = this.createCompactIdArray(maxCastleId, width * height);
+        // 戦闘点滅などが毎回地図全766万pixelを走査しなくて済むよう、
+        // 城領域の外接矩形も領域構築と同時に作ります。常駐量は252城ぶんだけです。
+        const boundsByCastleId = Array.from({ length: maxCastleId + 1 }, () => null);
+        const includeInBounds = (castleId, x, y) => {
+            const id = Number(castleId) || 0;
+            if (!id) return;
+            let b = boundsByCastleId[id];
+            if (!b) {
+                boundsByCastleId[id] = { minX: x, maxX: x, minY: y, maxY: y };
+                return;
+            }
+            if (x < b.minX) b.minX = x;
+            if (x > b.maxX) b.maxX = x;
+            if (y < b.minY) b.minY = y;
+            if (y > b.maxY) b.maxY = y;
+        };
         const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
         const isPC = document.body && document.body.classList.contains('is-pc');
 
@@ -642,6 +658,7 @@ class DataManager {
             if (output[idx] === 0) {
                 if (tail < queue.length) queue[tail++] = idx;
                 output[idx] = Number(c.id) || 0;
+                includeInBounds(output[idx], x, y);
             }
         }
 
@@ -662,6 +679,7 @@ class DataManager {
                 const nIdx = ny * width + nx;
                 if (output[nIdx] !== 0 || provinceMap[nIdx] !== provinceId) continue;
                 output[nIdx] = castleId;
+                includeInBounds(castleId, nx, ny);
                 if (tail < queue.length) queue[tail++] = nIdx;
             }
             if (head >= nextYield) {
@@ -692,6 +710,7 @@ class DataManager {
                         }
                     }
                     output[idx] = bestId;
+                    includeInBounds(bestId, x, y);
                 }
             }
             if (onProgress) onProgress(0.9 + (yEnd / height) * 0.1);
@@ -701,6 +720,7 @@ class DataManager {
         // 一時BFSキューはここで参照を切り、ゲーム中は国ID＋城IDの2本だけを保持します。
         queue = null;
         this.castlePixelMap = output;
+        this.castlePixelBounds = boundsByCastleId;
     }
 
 

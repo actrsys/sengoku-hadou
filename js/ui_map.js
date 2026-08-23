@@ -96,7 +96,10 @@ Object.assign(UIManager.prototype, {
                 if (this.mapEl) this.mapEl.classList.add('base-map-image-ready');
             };
             img.addEventListener('load', markReady, { once: true });
-            img.src = './data/images/map/japan_map.png';
+            const isPC = document.body.classList.contains('is-pc');
+            // スマホは表示専用地図だけ75%解像度版を使い、常駐デコードメモリを約45%削減します。
+            // 論理座標・城/国IDマップは従来どおり3140x2440なのでゲーム判定には影響しません。
+            img.src = isPC ? './data/images/map/japan_map.png' : './data/images/map/japan_map_mobile.png';
             this._mapBaseImage = img;
 
             // preload済みでもdecode済みとは限らないので、要素を保持したままdecodeを促します。
@@ -124,11 +127,99 @@ Object.assign(UIManager.prototype, {
         };
     },
 
+    // 全画面エフェクトもスマホでは半解像度へ落とします。
+    // CSS上は原寸地図サイズへ拡大するため、城・国の論理座標や当たり判定は変わりません。
+    _getMapOverlayRasterSize(mapW, mapH) {
+        const isPC = document.body.classList.contains('is-pc');
+        const scale = isPC ? 1 : 0.5;
+        return {
+            width: Math.max(1, Math.round(mapW * scale)),
+            height: Math.max(1, Math.round(mapH * scale)),
+            scale
+        };
+    },
+
+    _sampleIdMap(pixelMap, mapW, mapH, rasterW, rasterH, x, y) {
+        if (!pixelMap) return 0;
+        if (rasterW === mapW && rasterH === mapH) return pixelMap[y * mapW + x] || 0;
+        const sx = Math.min(mapW - 1, Math.floor(((x + 0.5) * mapW) / rasterW));
+        const sy = Math.min(mapH - 1, Math.floor(((y + 0.5) * mapH) / rasterH));
+        return pixelMap[sy * mapW + sx] || 0;
+    },
+
+    // 巨大な全画面ImageDataを1枚作らず、短い帯だけを生成して順番にCanvasへ転送します。
+    // スマホでは1回の一時RGBAを数百KB以下へ抑えます。
+    _paintCanvasByStrips(canvas, paintPixel, stripRows = null) {
+        if (!canvas || typeof paintPixel !== 'function') return false;
+        try {
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return false;
+            const width = canvas.width;
+            const height = canvas.height;
+            const isPC = document.body.classList.contains('is-pc');
+            const rows = Math.max(1, Number(stripRows) || (isPC ? 128 : 32));
+            ctx.clearRect(0, 0, width, height);
+            for (let yStart = 0; yStart < height; yStart += rows) {
+                const h = Math.min(rows, height - yStart);
+                const imageData = ctx.createImageData(width, h);
+                const data = imageData.data;
+                for (let localY = 0; localY < h; localY++) {
+                    const y = yStart + localY;
+                    for (let x = 0; x < width; x++) {
+                        paintPixel(data, (localY * width + x) * 4, x, y, width, height);
+                    }
+                }
+                ctx.putImageData(imageData, 0, yStart);
+            }
+            return true;
+        } catch (error) {
+            // 低メモリでCanvas backing storeが失われた場合も、UI全体を例外で止めない。
+            if (canvas.id === 'clan-color-overlay') {
+                this.lastClanColorsHash = null;
+                this._lastClanColorOverlay = null;
+            }
+            if (canvas.id === 'snow-overlay') {
+                this.lastSnowHash = null;
+                this._snowOverlayDirty = true;
+                this._lastSnowOverlay = null;
+            }
+            console.warn(`地図Canvas(${canvas.id || 'unknown'})の帯状描画をスキップしました:`, error);
+            return false;
+        }
+    },
+
+    _bindMapCanvasRecovery(canvas, canvasId) {
+        if (!canvas || canvas.dataset.mapRecoveryBound === '1') return;
+        canvas.dataset.mapRecoveryBound = '1';
+        const invalidate = () => {
+            if (canvasId === 'clan-color-overlay') {
+                this.lastClanColorsHash = null;
+                this._lastClanColorOverlay = null;
+            }
+            if (canvasId === 'snow-overlay') {
+                this.lastSnowHash = null;
+                this._snowOverlayDirty = true;
+                this._lastSnowOverlay = null;
+            }
+        };
+        canvas.addEventListener('contextlost', event => {
+            try { if (event && typeof event.preventDefault === 'function') event.preventDefault(); } catch (e) {}
+            invalidate();
+        });
+        canvas.addEventListener('contextrestored', () => {
+            invalidate();
+            if (this.isBackgroundPaused) return;
+            if (canvasId === 'clan-color-overlay' && typeof this.updateClanColors === 'function') this.updateClanColors();
+            if (canvasId === 'snow-overlay' && typeof this.updateSnowOverlay === 'function') this.updateSnowOverlay();
+        });
+    },
+
     // ★Round 14：普段は不要な全画面Canvasは必要になった時だけ確保します。
     _ensureMapOverlayCanvas(canvasId, zIndex = 3) {
         if (!this.mapEl) return null;
         const mapW = this.game.mapWidth || 1200;
         const mapH = this.game.mapHeight || 800;
+        const raster = this._getMapOverlayRasterSize(mapW, mapH);
         let canvas = document.getElementById(canvasId);
         if (!canvas) {
             canvas = document.createElement('canvas');
@@ -140,10 +231,13 @@ Object.assign(UIManager.prototype, {
             canvas.style.zIndex = String(zIndex);
             this.mapEl.appendChild(canvas);
         }
-        if (canvas.width !== mapW || canvas.height !== mapH) {
-            canvas.width = mapW;
-            canvas.height = mapH;
+        if (canvas.width !== raster.width || canvas.height !== raster.height) {
+            canvas.width = raster.width;
+            canvas.height = raster.height;
         }
+        canvas.style.width = `${mapW}px`;
+        canvas.style.height = `${mapH}px`;
+        this._bindMapCanvasRecovery(canvas, canvasId);
         return canvas;
     },
 
@@ -159,6 +253,47 @@ Object.assign(UIManager.prototype, {
         canvas.remove();
         if (canvasId === 'snow-overlay' && this._lastSnowOverlay === canvas) {
             this._lastSnowOverlay = null;
+        }
+    },
+
+    // モーダル/大きなリストを開く時、背後で不要な全画面Canvasとアニメーション資源を解放します。
+    // 勢力色Canvasだけは地図の基礎表示なので残し、復帰時に内容喪失を軽量チェックします。
+    releaseMobileTransientMapResources() {
+        if (document.body.classList.contains('is-pc')) return;
+        this._stopMapInertia();
+        if (typeof this._cancelActiveMapFocus === 'function') this._cancelActiveMapFocus();
+        ['province-overlay', 'hover-blink-overlay', 'keep-blink-overlay', 'snow-overlay'].forEach(id => this._releaseMapOverlayCanvas(id));
+        this._snowOverlayDirty = true;
+        this.lastSnowHash = null;
+        document.body.classList.add('mobile-memory-guard');
+    },
+
+    _isClanColorOverlayHealthy() {
+        const overlay = document.getElementById('clan-color-overlay');
+        if (!overlay || overlay.width <= 1 || overlay.height <= 1) return false;
+        const mapW = Number(this.game.mapWidth || 1200);
+        const mapH = Number(this.game.mapHeight || 800);
+        const owned = this.game.castles.find(c => Number(c.ownerClan) !== 0 && Number.isFinite(Number(c.pixelX)) && Number.isFinite(Number(c.pixelY)));
+        if (!owned) return true;
+        const x = Math.max(0, Math.min(overlay.width - 1, Math.floor((Number(owned.pixelX) / mapW) * overlay.width)));
+        const y = Math.max(0, Math.min(overlay.height - 1, Math.floor((Number(owned.pixelY) / mapH) * overlay.height)));
+        try {
+            const ctx = overlay.getContext('2d');
+            if (!ctx) return false;
+            return ctx.getImageData(x, y, 1, 1).data[3] > 0;
+        } catch (e) {
+            return false;
+        }
+    },
+
+    recoverMobileMapResources() {
+        if (document.body.classList.contains('is-pc')) return;
+        document.body.classList.remove('mobile-memory-guard');
+        // 低メモリ時にCanvas backing storeだけ失われてもhashが同じだと再描画されないため、
+        // 所有城の1pixelだけ確認して空なら勢力色を作り直します。
+        if (!this._isClanColorOverlayHealthy()) {
+            this.lastClanColorsHash = null;
+            this._lastClanColorOverlay = null;
         }
     },
 
@@ -689,7 +824,7 @@ Object.assign(UIManager.prototype, {
             sc.style.pointerEvents = 'none';
         }
 
-        if (this.game && typeof this.game.writeSystemDiagnostic === 'function' && options.reason) {
+        if (this.game && typeof this.game.writeSystemDiagnostic === 'function' && options.reason && options.diagnostic !== false) {
             this.game.writeSystemDiagnostic(`map_focus:${options.reason}:${transition}:start`, castles[0]);
         }
 
@@ -720,7 +855,7 @@ Object.assign(UIManager.prototype, {
                     this._cancelActiveMapFocus = null;
                 }
 
-                if (this.game && typeof this.game.writeSystemDiagnostic === 'function' && options.reason) {
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function' && options.reason && options.diagnostic !== false) {
                     this.game.writeSystemDiagnostic(`map_focus:${options.reason}:${transition}:done`, castles[0]);
                 }
                 resolve(result);
@@ -795,7 +930,9 @@ Object.assign(UIManager.prototype, {
         const targetCastle = castle || this.currentCastle || this.game.getCurrentTurnCastle();
         return this.focusMapOnCastle(targetCastle, {
             immediate: immediate,
-            reason: 'active_castle'
+            reason: 'active_castle',
+            // 通常のプレイヤー復帰フォーカスは後から完了して player_turn:ready を上書きしない。
+            diagnostic: false
         });
     },
     
@@ -864,11 +1001,15 @@ Object.assign(UIManager.prototype, {
             this.mapEl.appendChild(persistentClanColor);
         }
         if (persistentSnowOverlay) {
-            if (persistentSnowOverlay.width !== mapW || persistentSnowOverlay.height !== mapH) {
-                persistentSnowOverlay.width = mapW;
-                persistentSnowOverlay.height = mapH;
+            const snowRaster = this._getMapOverlayRasterSize(mapW, mapH);
+            if (persistentSnowOverlay.width !== snowRaster.width || persistentSnowOverlay.height !== snowRaster.height) {
+                persistentSnowOverlay.width = snowRaster.width;
+                persistentSnowOverlay.height = snowRaster.height;
                 this._snowOverlayDirty = true;
             }
+            persistentSnowOverlay.style.width = `${mapW}px`;
+            persistentSnowOverlay.style.height = `${mapH}px`;
+            this._bindMapCanvasRecovery(persistentSnowOverlay, 'snow-overlay');
             this.mapEl.appendChild(persistentSnowOverlay);
         }
         
@@ -982,6 +1123,7 @@ Object.assign(UIManager.prototype, {
             clanColorOverlay.style.pointerEvents = 'none'; 
             clanColorOverlay.style.zIndex = '2'; // マップのすぐ上に敷きます
         }
+        this._bindMapCanvasRecovery(clanColorOverlay, 'clan-color-overlay');
         this.mapEl.appendChild(clanColorOverlay);
 
         // ★Round14：普段透明な全画面Canvasは常駐させません。
@@ -1607,12 +1749,10 @@ Object.assign(UIManager.prototype, {
     highlightRegion(regionId) {
         const overlay = this._ensureMapOverlayCanvas('province-overlay', 3);
         if (!overlay || !this.pixelProvinceMap) return;
-        const ctx = overlay.getContext('2d');
-        const width = overlay.width;
-        const height = overlay.height;
-        if (this.pixelProvinceMap.length !== width * height) return;
+        const mapW = Number(this.game.mapWidth || 1200);
+        const mapH = Number(this.game.mapHeight || 800);
+        if (this.pixelProvinceMap.length !== mapW * mapH) return;
 
-        ctx.clearRect(0, 0, width, height);
         const targetProvIds = new Set(
             this.game.provinces
                 .filter(p => Number(p.regionId) === Number(regionId))
@@ -1620,17 +1760,14 @@ Object.assign(UIManager.prototype, {
         );
         if (targetProvIds.size === 0) return;
 
-        const outputData = ctx.createImageData(width, height);
-        const od = outputData.data;
-        for (let pxIdx = 0; pxIdx < this.pixelProvinceMap.length; pxIdx++) {
-            if (!targetProvIds.has(Number(this.pixelProvinceMap[pxIdx]))) continue;
-            const i = pxIdx * 4;
-            od[i] = 255;
-            od[i + 1] = 50;
-            od[i + 2] = 50;
-            od[i + 3] = 128;
-        }
-        ctx.putImageData(outputData, 0, 0);
+        this._paintCanvasByStrips(overlay, (data, i, x, y, width, height) => {
+            const provinceId = this._sampleIdMap(this.pixelProvinceMap, mapW, mapH, width, height, x, y);
+            if (!targetProvIds.has(Number(provinceId))) return;
+            data[i] = 255;
+            data[i + 1] = 50;
+            data[i + 2] = 50;
+            data[i + 3] = 128;
+        });
         overlay.classList.add('anim-map-glow');
     },
 
@@ -1652,8 +1789,7 @@ Object.assign(UIManager.prototype, {
     // ★大雪の国のマップ上に、白い水玉模様を描く魔法です！
     // ==========================================
     updateSnowOverlay() {
-        // ★Round15：月初AI中はイベント演出と雪Canvas確保を重ねません。
-        // 状態だけdirtyにして、プレイヤー復帰時のrenderMapで1回だけ描きます。
+        // 月初AI中やモーダル表示中は雪Canvasを重ねず、必要になった時だけ復元します。
         if (this.isBackgroundPaused) {
             this._snowOverlayDirty = true;
             return;
@@ -1677,9 +1813,9 @@ Object.assign(UIManager.prototype, {
         const overlay = this._ensureMapOverlayCanvas('snow-overlay', 4);
         if (!overlay) return;
         const canReusePixels = existingOverlay === overlay && this._lastSnowOverlay === overlay;
-
-        // 地方IDマップはロード時にDataManagerが生成します。巨大なRGBA画像はゲーム中保持しません。
-        if (!this.pixelProvinceMap || this.pixelProvinceMap.length !== overlay.width * overlay.height) {
+        const mapW = Number(this.game.mapWidth || 1200);
+        const mapH = Number(this.game.mapHeight || 800);
+        if (!this.pixelProvinceMap || this.pixelProvinceMap.length !== mapW * mapH) {
             this._snowOverlayDirty = true;
             return;
         }
@@ -1687,43 +1823,26 @@ Object.assign(UIManager.prototype, {
         const currentSnowHash = this.game.provinces
             .map(p => p.statusEffects && p.statusEffects.includes('heavySnow') ? '1' : '0')
             .join('');
-
-        // 雪Canvas自体をrenderMap間で保持するため、状態が同じならImageDataの再生成は不要です。
-        if (canReusePixels && this.lastSnowHash === currentSnowHash && !this._snowOverlayDirty) {
-            return;
-        }
-
-        const ctx = overlay.getContext('2d');
-        const width = overlay.width;
-        const height = overlay.height;
-        ctx.clearRect(0, 0, width, height);
+        if (canReusePixels && this.lastSnowHash === currentSnowHash && !this._snowOverlayDirty) return;
 
         const targetProvIds = new Set(
             this.game.provinces
                 .filter(p => p.statusEffects && p.statusEffects.includes('heavySnow'))
-                .map(p => p.id)
+                .map(p => Number(p.id))
         );
 
-        // ★Round15：Canvas自体をキャッシュするので、別に同サイズのlastSnowImageDataを
-        // 常駐させません。ImageDataはこの描画中だけ使い、put後はGC可能にします。
-        const outputData = ctx.createImageData(width, height);
-
-        for (let pxIdx = 0; pxIdx < this.pixelProvinceMap.length; pxIdx++) {
-            if (!targetProvIds.has(this.pixelProvinceMap[pxIdx])) continue;
-            const x = pxIdx % width;
-            const y = Math.floor(pxIdx / width);
+        this._paintCanvasByStrips(overlay, (data, i, x, y, width, height) => {
+            const provinceId = this._sampleIdMap(this.pixelProvinceMap, mapW, mapH, width, height, x, y);
+            if (!targetProvIds.has(Number(provinceId))) return;
             const modX = x % 8;
             const modY = y % 8;
-            if ((modX < 2 && modY < 2) || (modX >= 4 && modX < 6 && modY >= 4 && modY < 6)) {
-                const i = pxIdx * 4;
-                outputData.data[i] = 255;
-                outputData.data[i + 1] = 255;
-                outputData.data[i + 2] = 255;
-                outputData.data[i + 3] = 210;
-            }
-        }
+            if (!((modX < 2 && modY < 2) || (modX >= 4 && modX < 6 && modY >= 4 && modY < 6))) return;
+            data[i] = 255;
+            data[i + 1] = 255;
+            data[i + 2] = 255;
+            data[i + 3] = 210;
+        });
 
-        ctx.putImageData(outputData, 0, 0);
         this.lastSnowHash = currentSnowHash;
         this._lastSnowOverlay = overlay;
         this._snowOverlayDirty = false;
@@ -1741,17 +1860,14 @@ Object.assign(UIManager.prototype, {
         const sourcePixelMap = this.pixelCastleMap || DataManager.castlePixelMap;
         if (!sourcePixelMap || sourcePixelMap.length !== mapW * mapH) return;
         this.pixelCastleMap = sourcePixelMap;
-
         if (this.game && this.game.isSuspendingColorUpdate) return;
 
-        const ctx = overlay.getContext('2d');
         const width = overlay.width;
         const height = overlay.height;
         if (width <= 0 || height <= 0) return;
 
         const currentOwnerHash = `${width}x${height}:` + this.game.castles.map(c => c.ownerClan).join(',');
         if (this.lastClanColorsHash === currentOwnerHash && this._lastClanColorOverlay === overlay) return;
-        this.lastClanColorsHash = currentOwnerHash;
 
         const clanColors = new Map();
         for (const clan of this.game.clans) {
@@ -1767,56 +1883,35 @@ Object.assign(UIManager.prototype, {
         const castleToClanMap = new ClanArray(maxCastleId + 1);
         for (const c of this.game.castles) castleToClanMap[Number(c.id)] = Number(c.ownerClan) || 0;
 
-        // スマホは勢力色Canvasの内部解像度だけ半分です。元の城IDマップを中心点サンプリングします。
-        const sampleCastleId = (x, y) => {
-            if (width === mapW && height === mapH) return sourcePixelMap[y * mapW + x] || 0;
-            const sx = Math.min(mapW - 1, Math.floor(((x + 0.5) * mapW) / width));
-            const sy = Math.min(mapH - 1, Math.floor(((y + 0.5) * mapH) / height));
-            return sourcePixelMap[sy * mapW + sx] || 0;
-        };
-
-        const outputData = ctx.createImageData(width, height);
-        const od = outputData.data;
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                const castleId = sampleCastleId(x, y);
-                if (!castleId) continue;
-                const clanId = castleToClanMap[castleId] || 0;
-                const rgb = clanId !== 0 ? clanColors.get(clanId) : null;
-                const i = (y * width + x) * 4;
-                if (rgb) {
-                    od[i] = rgb.r; od[i + 1] = rgb.g; od[i + 2] = rgb.b;
-                } else {
-                    od[i] = 255; od[i + 1] = 255; od[i + 2] = 255;
-                }
-                od[i + 3] = 100;
+        const sampleCastleId = (x, y) => this._sampleIdMap(sourcePixelMap, mapW, mapH, width, height, x, y);
+        const painted = this._paintCanvasByStrips(overlay, (data, i, x, y) => {
+            const castleId = sampleCastleId(x, y);
+            if (!castleId) return;
+            const clanId = castleToClanMap[castleId] || 0;
+            const rgb = clanId !== 0 ? clanColors.get(clanId) : null;
+            if (rgb) {
+                data[i] = rgb.r; data[i + 1] = rgb.g; data[i + 2] = rgb.b;
+            } else {
+                data[i] = 255; data[i + 1] = 255; data[i + 2] = 255;
             }
-        }
+            data[i + 3] = 100;
 
-        // 所有勢力が変わる境界だけ少し濃くして、縮小したスマホCanvasでも境界を読みやすくします。
-        for (let y = 1; y < height - 1; y++) {
-            for (let x = 1; x < width - 1; x++) {
-                const castleId = sampleCastleId(x, y);
-                if (!castleId) continue;
-                const myClan = castleToClanMap[castleId] || 0;
-                if (!myClan) continue;
-                const neighborClanIds = [
-                    castleToClanMap[sampleCastleId(x - 1, y)] || 0,
-                    castleToClanMap[sampleCastleId(x + 1, y)] || 0,
-                    castleToClanMap[sampleCastleId(x, y - 1)] || 0,
-                    castleToClanMap[sampleCastleId(x, y + 1)] || 0
-                ];
-                if (!neighborClanIds.some(id => id && id !== myClan)) continue;
-                const i = (y * width + x) * 4;
-                od[i] = Math.max(0, od[i] - 50);
-                od[i + 1] = Math.max(0, od[i + 1] - 50);
-                od[i + 2] = Math.max(0, od[i + 2] - 50);
-                od[i + 3] = 160;
-            }
-        }
+            if (x <= 0 || y <= 0 || x >= width - 1 || y >= height - 1 || !clanId) return;
+            const neighborClanIds = [
+                castleToClanMap[sampleCastleId(x - 1, y)] || 0,
+                castleToClanMap[sampleCastleId(x + 1, y)] || 0,
+                castleToClanMap[sampleCastleId(x, y - 1)] || 0,
+                castleToClanMap[sampleCastleId(x, y + 1)] || 0
+            ];
+            if (!neighborClanIds.some(id => id && id !== clanId)) return;
+            data[i] = Math.max(0, data[i] - 50);
+            data[i + 1] = Math.max(0, data[i + 1] - 50);
+            data[i + 2] = Math.max(0, data[i + 2] - 50);
+            data[i + 3] = 160;
+        });
+        if (!painted) return;
 
-        ctx.putImageData(outputData, 0, 0);
-        // Canvas自体を永続保持するため、同サイズImageDataを別途キャッシュして二重保持しません。
+        this.lastClanColorsHash = currentOwnerHash;
         this.lastClanColorsImageData = null;
         this._lastClanColorOverlay = overlay;
     },
@@ -1825,53 +1920,36 @@ Object.assign(UIManager.prototype, {
     // ★新魔法：特定の勢力の領土（色がついているところ）だけを光らせる魔法です！
     // ==========================================
     drawClanHighlight(canvasId, clanId, colorRGB = {r: 255, g: 255, b: 255}, alpha = 100) {
-        // pixelCastleMap がまだ無い時（最初のロードの瞬間など）や、中立の時はストップします
         if (!this.pixelCastleMap || clanId === 0) return;
         const overlay = this._ensureMapOverlayCanvas(canvasId, 3);
         if (!overlay) return;
-        
-        const ctx = overlay.getContext('2d');
-        const width = overlay.width;
-        const height = overlay.height;
-        
-        // まずは前の光を消して綺麗にします
-        ctx.clearRect(0, 0, width, height);
+        const mapW = Number(this.game.mapWidth || 1200);
+        const mapH = Number(this.game.mapHeight || 800);
 
-        // ★追加：色に合わせて、外側にぼやっと広がる光のフィルター（魔法）をかけます！
-        // その勢力のお城の「出席番号」をすべて集めます
-        const targetCastleIds = this.game.castles.filter(c => c.ownerClan === clanId).map(c => c.id);
+        const targetCastleIds = this.game.castles.filter(c => c.ownerClan === clanId).map(c => Number(c.id));
         const targetIdsSet = new Set(targetCastleIds);
-        
-        // お城がない（滅亡しているなど）なら何もしません
         if (targetIdsSet.size === 0) {
             overlay.style.filter = 'none';
             overlay.classList.remove('anim-map-glow', 'anim-map-glow-fast');
+            const ctx = overlay.getContext('2d');
+            if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
             return;
         }
 
-        // ★Round5：実際に光っている間だけ全画面Canvasの合成アニメーションを有効化します。
         overlay.style.filter = `drop-shadow(0px 0px 15px rgba(${colorRGB.r}, ${colorRGB.g}, ${colorRGB.b}, 1)) blur(3px)`;
         overlay.classList.remove('anim-map-glow', 'anim-map-glow-fast');
         overlay.classList.add(canvasId === 'keep-blink-overlay' ? 'anim-map-glow-fast' : 'anim-map-glow');
 
-        // 新しく光らせるための透明な絵の具セットを作ります
-        const outputData = ctx.createImageData(width, height);
-        
-        // 全部ピクセルを調べて、対象のお城の領土だったら色を塗ります！
-        for (let i = 0; i < this.pixelCastleMap.length; i++) {
-            if (targetIdsSet.has(this.pixelCastleMap[i])) {
-                const idx = i * 4;
-                outputData.data[idx] = colorRGB.r;
-                outputData.data[idx+1] = colorRGB.g;
-                outputData.data[idx+2] = colorRGB.b;
-                outputData.data[idx+3] = alpha; 
-            }
-        }
-        
-        // 完成した光を画用紙にドーンと乗せます！
-        ctx.putImageData(outputData, 0, 0);
+        this._paintCanvasByStrips(overlay, (data, i, x, y, width, height) => {
+            const castleId = this._sampleIdMap(this.pixelCastleMap, mapW, mapH, width, height, x, y);
+            if (!targetIdsSet.has(Number(castleId))) return;
+            data[i] = colorRGB.r;
+            data[i + 1] = colorRGB.g;
+            data[i + 2] = colorRGB.b;
+            data[i + 3] = alpha;
+        });
     },
-    
+
     // 光をサッと消す魔法
     clearClanHighlight(canvasId) {
         const overlay = document.getElementById(canvasId);
@@ -1985,17 +2063,22 @@ Object.assign(UIManager.prototype, {
 
         let minX = mapWidth, minY = mapHeight, maxX = -1, maxY = -1;
 
-        // まず対象領域の外接矩形だけを求めます。巨大な全画面 targetPixels は作りません。
-        for (let i = 0; i < mapWidth * mapHeight; i++) {
-            if (!targetIds.has(pixelMap[i])) continue;
-            const y = Math.floor(i / mapWidth);
-            const x = i - (y * mapWidth);
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
+        // 起動時の領域構築で外接矩形も一緒に作ってあります。
+        // 以前は戦闘点滅のたびに地図全766万pixelを同期走査していたため、
+        // 古いスマホではここが強制リロードの大きな候補になっていました。
+        const boundsByCastleId = DataManager.castlePixelBounds || null;
+        if (boundsByCastleId) {
+            targetIds.forEach(id => {
+                const b = boundsByCastleId[Number(id)];
+                if (!b) return;
+                if (b.minX < minX) minX = b.minX;
+                if (b.maxX > maxX) maxX = b.maxX;
+                if (b.minY < minY) minY = b.minY;
+                if (b.maxY > maxY) maxY = b.maxY;
+            });
         }
 
+        // 現行データは必ず起動時にboundsを作る。古いセーブ互換の全地図走査fallbackは持たない。
         if (maxX < minX || maxY < minY) return null;
 
         // blur / drop-shadow が切れないように余白を持たせます。
@@ -2114,6 +2197,10 @@ Object.assign(UIManager.prototype, {
                 resolve();
                 return;
             }
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                const firstId = Array.isArray(castleIdOrIds) ? castleIdOrIds[0] : castleIdOrIds;
+                this.game.writeSystemDiagnostic('battle_blink:mask_ready', this.game.getCastle(Number(firstId)) || null);
+            }
 
             const overlay = this._createCroppedEffectOverlay('battle-blink-overlay', maskInfo, 6);
             const ctx = overlay.getContext('2d');
@@ -2145,6 +2232,10 @@ Object.assign(UIManager.prototype, {
             const finish = () => {
                 this._releaseEffectOverlay(overlay, maskInfo);
                 this.hideMapGuard();
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                    const firstId = Array.isArray(castleIdOrIds) ? castleIdOrIds[0] : castleIdOrIds;
+                    this.game.writeSystemDiagnostic('battle_blink:done', this.game.getCastle(Number(firstId)) || null);
+                }
                 resolve();
             };
 

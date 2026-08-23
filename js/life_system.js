@@ -159,22 +159,13 @@ class LifeSystem {
         return true;
     }
 
-    // ★Round5：古いセーブや特殊イベントで familyIds が空欄でも停止しない安全装置です。
-    _normalizeFamilyArrays() {
-        const normalize = (person) => {
-            if (!person) return;
-            if (!Array.isArray(person.baseFamilyIds)) person.baseFamilyIds = [];
-            if (!Array.isArray(person.familyIds)) person.familyIds = [...person.baseFamilyIds];
-        };
-        (this.game.bushos || []).forEach(normalize);
-        (this.game.princesses || []).forEach(normalize);
-    }
-
     // 毎月の初め（1月）に「新しく登場する武将がいないか」をチェックします
     async processStartMonth() {
-        this._normalizeFamilyArrays();
         if (this.game.month === 1) {
-            this.updateAllBushosAge(); // 毎年1月に、全員の年齢と能力を計算し直します！
+            // 4000人超を一気に再計算すると古いWebViewのwatchdog/メモリ回収が追いつかないため、
+            // 月初だけは小分けにしてブラウザへ制御を返します。
+            await this.updateAllBushosAgeCooperatively();
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:age_done');
             
             // ★ここから追加：姫の年齢（出生前かどうか）も毎年1月にチェックします！
             const currentYear = this.game.year;
@@ -188,15 +179,17 @@ class LifeSystem {
             }
 
             await this.checkBirth();
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:birth_done');
+            await this._yieldToBrowserForLife();
             await this.checkNameChange();
-            this.checkFaceChange(); // ★今回追加：毎年1月に顔が変わるかチェックします！
-            
-            // ★ここから追加：ダイアログを閉じた直後に重い処理が走って固まるのを防ぐため、一瞬だけ息継ぎ（お休み）をさせます！
-            await new Promise(resolve => setTimeout(resolve, 50));
-            // ★追加ここまで！
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:name_done');
+            this.checkFaceChange();
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:face_done');
+            await this._yieldToBrowserForLife();
 
             // ★追加：毎年1月に、ランダムで新しい姫が登場するかチェックします！
             await this.checkRandomPrincessAppearance();
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:princess_done');
 
             // ★高速化：派閥再編は、この直後に GameManager → factionSystem.processStartMonth() から
             // 必ず1回実行されるため、1月だけ同じ全国再編を二重実行するのをやめます。
@@ -205,8 +198,38 @@ class LifeSystem {
 
     // 毎月の終わりに「寿命を迎えて亡くなる武将がいないか」をチェックします
     async processEndMonth() {
-        this._normalizeFamilyArrays();
         await this.checkDeath();
+    }
+
+    _yieldToBrowserForLife() {
+        return new Promise(resolve => {
+            if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(() => setTimeout(resolve, 0));
+            } else {
+                setTimeout(resolve, 0);
+            }
+        });
+    }
+
+    async updateAllBushosAgeCooperatively() {
+        const currentYear = this.game.year;
+        const bushos = this.game.bushos || [];
+        const isPC = typeof document !== 'undefined' && document.body && document.body.classList.contains('is-pc');
+        const chunkSize = isPC ? 768 : 128;
+        for (let start = 0; start < bushos.length; start += chunkSize) {
+            const end = Math.min(bushos.length, start + chunkSize);
+            for (let i = start; i < end; i++) {
+                const b = bushos[i];
+                if (b.birthYear > currentYear) {
+                    this.setLifeStatusRaw(b, window.GameConstants.BushoStatus.UNBORN);
+                    b.isNotBorn = true;
+                } else if (b.isNotBorn && b.birthYear <= currentYear) {
+                    b.isNotBorn = false;
+                }
+                this.recalculateBushoAgeStats(b, currentYear);
+            }
+            if (end < bushos.length) await this._yieldToBrowserForLife();
+        }
     }
 
     // ★ 全員の年齢から能力値を計算し直します。
@@ -841,7 +864,6 @@ class LifeSystem {
 
     // お別れの処理をするところです
     async executeDeath(busho, context = {}) { // ★修正：イベントの指示（context）を受け取れるようにします
-        this._normalizeFamilyArrays();
         // ★高速化：最後に所属を0へ変更する前の勢力IDを覚えておきます。
         const formerClanId = Number(busho.clan) || 0;
         this.setLifeStatusRaw(busho, window.GameConstants.BushoStatus.DEAD); // ステータスを「死亡」にします
