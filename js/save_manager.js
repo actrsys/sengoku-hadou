@@ -236,7 +236,6 @@ class SaveManager {
 
                     // ② 性格・相性パラメータの差し替え（絶対変動しないもの）
                     savedBusho.innovation = latestData.innovation;   // 革新
-                    savedBusho.cooperation = latestData.cooperation; // 協調
                     savedBusho.ambition = latestData.ambition;       // 野心
                     savedBusho.duty = latestData.duty;               // 義理
                     savedBusho.affinity = latestData.affinity;       // 相性

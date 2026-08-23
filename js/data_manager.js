@@ -9,8 +9,8 @@
    ========================================================================== */
 const SCENARIOS = [
     { name: "1560年 桶狭間の戦い", desc: "永禄三年、畿内では三好氏が権勢を誇っていた。東国では武田・北条・長尾が覇を競い、中国地方では毛利氏が雄飛し、諸大名の争いの火は絶えない。そのような折、海道一の弓取り・今川義元が大軍を率いて尾張へ侵攻を開始した。これを迎え撃つは織田信長。彼はいまだ、尾張一国すら纏め上げられていない。", folder: "1560_okehazama", startYear: 1560, startMonth: 4 },
-    { name: "1560年 テストシナリオ", desc: "テスト用モード", folder: "1560_test", startYear: 1560, startMonth: 4 }
-    // { name: "1562年 清洲同盟", desc: "桶狭間より２年。２人の英雄は清州の地にて再会を果たす。", folder: "1562_kiyosudoumei", startYear: 1562, startMonth: 1 }
+    { name: "1560年 開発シナリオ", desc: "開発段階の旧ファイル", folder: "1560_test", startYear: 1560, startMonth: 4 }
+    // { name: "1562年 清洲同盟", desc: "開発段階の旧シナリオ", folder: "1562_kiyosudoumei", startYear: 1562, startMonth: 1 }
 ];
 
 

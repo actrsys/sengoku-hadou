@@ -43,7 +43,6 @@ class KunishuSystem {
             intelligence: 30,
             charm: 30,
             innovation: inheritedInnovation,
-            cooperation: 50,
             ambition: 50,
             duty: 50,
             affinity: inheritedAffinity,

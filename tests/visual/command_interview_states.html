@@ -2,19 +2,37 @@
 <html lang="ja">
 <head><meta charset="utf-8"><!-- APP_CSS --></head>
 <body class="is-pc">
-  <div id="game-screen" style="width:1280px;height:720px;background:#1b3822;padding:24px;box-sizing:border-box;">
-    <div id="pc-new-command-area" style="display:flex;gap:5px;">
+  <div id="game-screen" style="width:1280px;height:720px;background:#1b3822;box-sizing:border-box;position:relative;overflow:hidden;">
+    <div id="pc-new-command-area" style="display:flex;gap:5px;padding:24px;">
       <div class="pc-cmd-col">
         <button id="cmd-normal" class="cmd-btn category">内政</button>
         <button id="cmd-active" class="cmd-btn category active">軍事</button>
       </div>
-      <div class="pc-cmd-col">
-        <button class="cmd-btn">出陣</button>
-        <button class="cmd-btn">援軍</button>
-      </div>
     </div>
-    <div style="margin-top:80px;width:420px;padding:16px;background-image:repeating-linear-gradient(45deg,#8d6e63 0 8px,#a1887f 8px 16px);">
-      <button id="interview-choice" class="interview-choice-btn">調子はどうだ</button>
+
+    <div id="interview-modal" class="modal">
+      <div id="interview-session-content" class="modal-content interview-session-content">
+        <div class="interview-session-header">
+          <div class="interview-session-kicker">家臣面談</div>
+          <h3 id="interview-session-title">面談</h3>
+          <div id="interview-session-hint" class="interview-session-hint">話したい内容を選んでください。</div>
+        </div>
+        <div class="interview-session-main">
+          <div id="interview-session-face-panel" class="interview-session-face-panel">
+            <img id="interview-session-face" class="interview-session-face" alt="">
+            <div id="interview-session-name" class="interview-session-name">武将名</div>
+          </div>
+          <div id="interview-session-body" class="interview-session-body interview-session-conversation-view">
+            <div class="interview-session-message">「殿、どのようなご用件でしょうか？」</div>
+          </div>
+        </div>
+        <div id="interview-session-pager" class="interview-session-pager hidden"></div>
+        <div id="interview-session-actions" class="interview-session-actions">
+          <button class="interview-session-btn btn-primary">調子はどうだ</button>
+          <button class="interview-session-btn btn-secondary">他者について聞く</button>
+          <button class="interview-session-btn btn-secondary">戻る</button>
+        </div>
+      </div>
     </div>
   </div>
 </body>

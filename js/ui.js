@@ -67,6 +67,8 @@ class UIManager {
         this.saveLoadView = new SaveLoadView(this, this.game);
         // 国主評定の表示・一時編集は専用Viewへ委譲します。
         this.legionCouncilView = new LegionCouncilView(this, this.game);
+        // 面談の表示・ページ切替は専用Viewへ委譲します。
+        this.interviewView = new InterviewView(this, this.game);
         
         this.warModal = document.getElementById('war-modal');
         this.warLog = document.getElementById('war-log');
@@ -1068,7 +1070,6 @@ class UIManager {
 
         if (isBottomMessage) {
             modal.classList.add('event-dialog-modal');
-            modal.classList.remove('interview-dialog-modal');
 
             // メッセージを画面の一番下に配置
             modal.style.display = 'flex';
@@ -1113,16 +1114,8 @@ class UIManager {
                     } else {
                         footer.style.width = '100%';
                         footer.style.maxWidth = '100%';
-                        // ★スマホ版で、面談の時だけ縦に並べる魔法！
-                        if (dialog.customOpts && dialog.customOpts.isInterview) {
-                            footer.style.flexDirection = 'column';
-                            footer.style.gap = '12px';
-                            // ★面談の時だけ、メッセージ枠との隙間を少し上に広げて余裕を持たせます！
-                            footer.style.setProperty('margin-bottom', '30px', 'important');
-                        } else {
-                            footer.style.flexDirection = 'row';
-                            footer.style.gap = '10px';
-                        }
+                        footer.style.flexDirection = 'row';
+                        footer.style.gap = '10px';
                     }
                 }
             } else {
@@ -1152,12 +1145,6 @@ class UIManager {
                 footer.style.gap = '';
             }
 
-            if (dialog.customOpts && dialog.customOpts.isInterview) {
-                modal.classList.add('interview-dialog-modal');
-            } else {
-                modal.classList.remove('interview-dialog-modal');
-            }
-
             modal.style.display = 'flex';
             modal.style.flexDirection = 'column';
             modal.style.justifyContent = 'center'; // 通常時は画面の中央付近にまとめます
@@ -1165,10 +1152,6 @@ class UIManager {
             if (footer) {
                 footer.classList.remove('hidden');
                 footer.style.justifyContent = 'center';
-                if (dialog.customOpts && dialog.customOpts.isInterview) {
-                    footer.classList.remove('right');
-                    footer.style.justifyContent = '';
-                }
             }
         }
 
@@ -1180,11 +1163,7 @@ class UIManager {
                     // 最初の選択肢を「okBtn」として扱えるようにお名前シールを貼ります
                     if (index === 0) btn.id = 'dialog-btn-ok';
 
-                    if (dialog.customOpts.isInterview) {
-                        btn.className = 'interview-choice-btn';
-                    } else {
-                        btn.className = choice.className || 'btn-secondary';
-                    }
+                    btn.className = choice.className || 'btn-secondary';
                     btn.textContent = choice.label;
                     
                     if (choice.disabled) {

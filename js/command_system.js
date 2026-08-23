@@ -145,18 +145,10 @@ class CommandSystem {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
             infoHtml = "<div>暗殺を実行する担当官を選択してください</div>"; 
         }
-        else if (actionType === 'interview') {
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo); 
-            infoHtml = "<div>面談する武将を選択してください</div>"; 
-        }
         else if (actionType === 'arrange_marriage_busho') { 
             bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.female); 
             infoHtml = "<div>姫を嫁がせる武将を選択してください</div>"; 
             if (extraData) extraData.allowDone = true;
-        }
-        else if (actionType === 'interview_target') {
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && window.BushoStatusRules.isActive(b) && b.id !== extraData.interviewer.id && !b.isDaimyo);
-            infoHtml = `<div>誰についての印象を聞きますか？</div>`; 
         }
         else if (actionType === 'investigate_deploy') { 
             bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
@@ -758,6 +750,10 @@ class CommandSystem {
                 this.enterMapSelection(type);
                 break;
 
+            case 'interview':
+                if (this.game.interviewSystem) this.game.interviewSystem.open();
+                break;
+
             case 'busho_select':
                 this.game.ui.openBushoSelector(type, targetId, extraData);
                 break;
@@ -1044,18 +1040,6 @@ class CommandSystem {
             const others = extraData.candidates.filter(id => id !== leaderId);
             const sortedIds = [leaderId, ...others];
             this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId });
-            return;
-        }
-
-        if (actionType === 'interview') {
-            const interviewer = this.game.getBusho(firstId);
-            this.game.interviewSystem.showInterviewModal(interviewer);
-            return;
-        }
-        if (actionType === 'interview_target') {
-            const target = this.game.getBusho(firstId);
-            const interviewer = extraData.interviewer;
-            this.game.interviewSystem.executeInterviewTopic(interviewer, target);
             return;
         }
 

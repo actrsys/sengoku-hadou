@@ -3723,119 +3723,263 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 .legion-color-8 { background-color: #546e7a; } /* グレー */
 
 /* =========================================================
-   面談専用のメッセージウィンドウ
+   面談専用モーダル
+   - PCは16:9、スマホは9:16のゲーム画面内で固定
+   - 内部スクロールは禁止し、一覧はページ切替で処理する
    ========================================================= */
-
-/* 面談時のふすま背景（面談モード） */
-body.interview-mode #game-screen::after {
-    content: "";
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    z-index: 5000; /* 地図(100)より上で、全てのウインドウ(6000以上)より下の数値に変更 */
-    background-color: #e8dcc7; /* 和紙のような基本色 */
-    
-    /* ふすまの木枠と、ふすま紙の縦模様をCSSグラデーションで表現 */
-    background-image:
-        linear-gradient(90deg, #4a3318 0px, #4a3318 20px, transparent 20px, transparent calc(50% - 10px), #4a3318 calc(50% - 10px), #4a3318 calc(50% + 10px), transparent calc(50% + 10px), transparent calc(100% - 20px), #4a3318 calc(100% - 20px), #4a3318 100%),
-        linear-gradient(0deg, #4a3318 0px, #4a3318 20px, transparent 20px, transparent calc(100% - 20px), #4a3318 calc(100% - 20px), #4a3318 100%),
-        repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(0,0,0,0.02) 10px, rgba(0,0,0,0.02) 20px);
-    
-    box-shadow: inset 0 0 50px rgba(0,0,0,0.5); /* 奥行きを出す影 */
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto; /* ふすまより後ろのマップ等をクリックできないようにブロック */
+#interview-modal {
+    z-index: 8420;
+    padding: 0 !important;
+    overflow: hidden !important;
 }
 
-.interview-dialog-modal .modal-footer {
+#interview-modal .interview-session-content {
+    width: 1120px;
+    height: 630px;
+    max-width: calc(100% - 24px);
+    max-height: calc(100% - 24px);
+    aspect-ratio: 16 / 9;
+    overflow: hidden !important;
+    padding: 16px 18px;
+    gap: 10px;
+}
+
+.interview-session-header {
+    flex: 0 0 74px;
+    min-height: 74px;
+    text-align: center;
+}
+
+.interview-session-kicker {
+    color: rgba(232,207,130,.78);
+    font-size: 10px;
+    letter-spacing: .18em;
+}
+
+#interview-modal .interview-session-header h3 {
+    margin: 2px 0 4px;
+    padding: 0 0 5px;
+    text-align: center;
+    font-size: 24px;
+}
+
+.interview-session-hint {
+    min-height: 18px;
+    color: rgba(255,255,255,.72);
+    font-size: 12px;
+}
+
+.interview-session-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr);
+    gap: 14px;
+    overflow: hidden;
+}
+
+.interview-session-face-panel {
+    min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    border: 1px solid rgba(212,175,55,.34);
+    background: rgba(0,0,0,.18);
+    overflow: hidden;
+}
+
+.interview-session-face {
+    width: 132px;
+    height: 162px;
+    object-fit: cover;
+    border: 2px solid rgba(212,175,55,.62);
+    background: #111;
+}
+
+.interview-session-name {
+    margin-top: 10px;
+    max-width: 100%;
+    font-size: 18px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.interview-session-body {
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden !important;
+}
+
+.interview-session-content.speaker-hidden .interview-session-main {
+    grid-template-columns: 1fr;
+}
+
+.interview-session-list-view {
+    display: flex;
     align-items: stretch;
-    gap: 12px;
-    /* メッセージウィンドウとデザインを揃える */
-    background-color: rgba(30, 30, 30, 0.95);
-    border: 3px double #d4af37;
-    border-radius: 10px;
-    padding: 20px;
-    margin: 10px auto 20px auto;
-    /* メッセージウィンドウ(modal-small)と横幅を揃える */
-    width: 90%;
-    max-width: 600px;
-    box-sizing: border-box;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.7);
-    justify-content: flex-start !important;
 }
 
-/* スマホ版限定：面談の選択肢を縦並びに強制し、メッセージの上に配置するルール */
-body:not(.is-pc) .interview-dialog-modal .modal-footer {
-    flex-direction: column !important;
-    order: -1 !important;
-}
-
-.interview-choice-btn {
-    position: relative;
-    padding: 10px 15px 10px 45px;
-    border: 2px solid #5a4a32;
-    border-radius: 25px; /* 完全に丸みのある形状 */
-    /* 背景色を常に不透明で保持する。gradientだけの背景はbackground-colorがtransparentになるため、
-       押下時の背景切替とtransitionが重なると中身だけ透けるフレームが発生する。 */
-    background-color: #2b2824;
-    background-image: linear-gradient(to bottom, #3e3a36 0%, #2b2824 100%);
-    color: #f1f1f1;
-    font-size: 0.95rem; /* メッセージフォントに近いサイズ感 */
-    font-family: inherit;
-    text-align: left !important;
-    cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease, color 0.12s ease;
-    display: block;
+.interview-session-person-grid {
     width: 100%;
-    box-sizing: border-box;
-    text-shadow: 1px 1px 1px #000;
-    -webkit-appearance: none;
-    appearance: none;
-    -webkit-tap-highlight-color: transparent;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+    gap: 7px;
+    overflow: hidden;
 }
 
-.interview-choice-btn::before {
-    content: "";
-    position: absolute;
-    left: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    /* 立体的な二重丸の図形 */
-    background: #222;
-    border: 2px solid #d4af37;
-    box-shadow: inset 0 0 4px #ffd54f, 1px 1px 2px rgba(0,0,0,0.8);
+.interview-session-person {
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 58px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border: 1px solid rgba(212,175,55,.36);
+    border-radius: 5px;
+    background: rgba(12,31,18,.82);
+    color: #fff;
+    font: inherit;
+    text-align: left;
+    overflow: hidden;
+}
+.interview-session-person:hover { border-color: #e8ce78; background: rgba(31,70,42,.92); }
+.interview-session-person:active { transform: translateY(1px); }
+
+.interview-session-person-face {
+    width: 58px;
+    height: 70px;
+    object-fit: cover;
+    border: 1px solid rgba(255,255,255,.28);
 }
 
-.interview-choice-btn::after {
-    content: "";
-    position: absolute;
-    left: 20px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #ffd54f;
-    box-shadow: 0 0 3px #fff;
+.interview-session-person-name {
+    min-width: 0;
+    font-size: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.interview-choice-btn:hover {
-    background-color: #2a5a36;
-    background-image: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%);
-    border-color: #ffe066;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.6), 0 0 10px rgba(212, 175, 55, 0.2);
+.interview-session-conversation-view {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 22px;
+    border: 1px solid rgba(212,175,55,.34);
+    background: rgba(0,0,0,.20);
 }
 
-.interview-choice-btn:active {
-    background-color: #0d1a10;
-    background-image: linear-gradient(to bottom, #1c3424 0%, #0d1a10 100%);
-    transform: translateY(1px);
-    box-shadow: inset 0 2px 5px rgba(0,0,0,0.8);
+.interview-session-message {
+    width: 100%;
+    max-width: 760px;
+    font-size: 20px;
+    line-height: 1.85;
+    text-align: left;
+    word-break: break-word;
+}
+
+.interview-session-pager {
+    flex: 0 0 36px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+.interview-session-pager button { min-width: 88px; min-height: 30px; padding: 4px 12px; }
+.interview-session-page-label { min-width: 58px; font-size: 12px; }
+
+.interview-session-actions {
+    flex: 0 0 48px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    overflow: hidden;
+}
+.interview-session-btn { min-width: 160px; min-height: 40px; }
+
+body:not(.is-pc) #interview-modal .interview-session-content {
+    width: calc(100% - 12px) !important;
+    height: auto !important;
+    max-width: calc(100% - 12px) !important;
+    max-height: calc(100% - 12px) !important;
+    aspect-ratio: 9 / 16;
+    padding: 7px;
+    gap: 5px;
+    overflow: hidden !important;
+}
+
+body:not(.is-pc) .interview-session-header {
+    flex-basis: 52px;
+    min-height: 52px;
+}
+body:not(.is-pc) .interview-session-kicker { font-size: 7px; }
+body:not(.is-pc) #interview-modal .interview-session-header h3 { font-size: 18px; margin: 0 0 2px; padding-bottom: 2px; }
+body:not(.is-pc) .interview-session-hint { min-height: 13px; font-size: 8px; }
+
+body:not(.is-pc) .interview-session-main {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 5px;
+}
+
+body:not(.is-pc) .interview-session-face-panel {
+    height: 82px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 9px;
+    padding: 4px 7px;
+}
+body:not(.is-pc) .interview-session-face { width: 58px; height: 70px; }
+body:not(.is-pc) .interview-session-name { margin: 0; font-size: 15px; }
+body:not(.is-pc) .interview-session-content.speaker-hidden .interview-session-main { grid-template-rows: minmax(0, 1fr); }
+
+body:not(.is-pc) .interview-session-person-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+}
+body:not(.is-pc) .interview-session-person {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 4px;
+    padding: 3px 4px;
+}
+body:not(.is-pc) .interview-session-person-face { width: 42px; height: 52px; }
+body:not(.is-pc) .interview-session-person-name { font-size: 10px; }
+
+body:not(.is-pc) .interview-session-conversation-view { padding: 12px 10px; }
+body:not(.is-pc) .interview-session-message { font-size: 14px; line-height: 1.8; }
+
+body:not(.is-pc) .interview-session-pager {
+    flex-basis: 32px;
+    min-height: 32px;
+    gap: 7px;
+}
+body:not(.is-pc) .interview-session-pager button { min-width: 74px; min-height: 28px; padding: 2px 8px; font-size: 11px; }
+body:not(.is-pc) .interview-session-page-label { min-width: 42px; font-size: 9px; }
+
+body:not(.is-pc) .interview-session-actions {
+    flex-basis: 92px;
+    min-height: 92px;
+    flex-direction: column;
+    gap: 4px;
+}
+body:not(.is-pc) .interview-session-btn {
+    width: min(250px, 92%);
+    min-width: 0;
+    min-height: 27px;
+    padding: 3px 12px;
+    font-size: 12px;
 }
 
 /* =========================================================

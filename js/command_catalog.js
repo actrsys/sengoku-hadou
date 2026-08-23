@@ -426,7 +426,7 @@ const COMMAND_SPECS = {
         label: "面談", category: 'PERSONNEL', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: false, 
-        startMode: 'busho_select', sortKey: 'leadership',
+        startMode: 'interview',
         msg: "武将と面談します",
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyo(game)
     },

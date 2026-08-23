@@ -565,13 +565,6 @@ Object.assign(UIInfoManager.prototype, {
     openBushoSelector(actionType, targetId = null, extraData = null, onBack = null) {
         if (actionType === 'appoint' && this.ui.currentCastle) { const isDaimyoHere = this.game.getCastleBushos(this.ui.currentCastle.id).some(b => b.isDaimyo); if (isDaimyoHere) { this.ui.showDialog("大名の居城は城主を変更できません", false); return; } }
         
-        // ★ここから追加：面談で他の武将を選ぶ際に戻るを押したら、面談画面に戻るようにします
-        if (actionType === 'interview_target' && extraData && extraData.interviewer) {
-            extraData.onCancel = () => {
-                this.ui.reopenInterviewModal(extraData.interviewer);
-            };
-        }
-        
         // 新しく武将一覧を開く入口では、前回閉じた時のタブ状態を引き継がず必ず「基本」から始めます。
         // 詳細画面から「戻る」場合は openBushoSelector() を通らず modalHistory から復元されるため、
         // 一覧内での一時的なタブ状態は従来どおり保持されます。
@@ -619,7 +612,7 @@ Object.assign(UIInfoManager.prototype, {
         // ★追加：行動を消費しないコマンドかどうかを判定します
         let isActionFree = false;
         if (extraData && extraData.allowDone) isActionFree = true; 
-        if (['appoint','appoint_legion_leader','employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','war_general', 'kunishu_war_general', 'marriage_princess', 'marriage_kinsman', 'succession', 'succession_target', 'adopt_son_target', 'arrange_marriage_busho'].includes(actionType)) isActionFree = true;
+        if (['appoint','appoint_legion_leader','employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','reward','war_general', 'kunishu_war_general', 'marriage_princess', 'marriage_kinsman', 'succession', 'succession_target', 'adopt_son_target', 'arrange_marriage_busho'].includes(actionType)) isActionFree = true;
         if (['def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy'].includes(actionType)) isActionFree = true;
         
         // ★追加：行動列を隠すかどうかのフラグです

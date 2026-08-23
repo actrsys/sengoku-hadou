@@ -82,19 +82,67 @@ class PersonnelRules {
         return Math.max(0, Math.min(1.0, prob));
     }
 
-    static calcAffinityDiff(a, b) { const diff = Math.abs(a - b); return Math.min(diff, 100 - diff); }
+    static calcAffinityDiff(a, b) {
+        const aa = Number(a || 0);
+        const bb = Number(b || 0);
+        const diff = Math.abs(aa - bb);
+        return Math.min(diff, 100 - diff);
+    }
 
-    static calcValueDistance(a, b) {
-        const diffInno = Math.abs(a.innovation - b.innovation);
-        const coopFactor = (a.cooperation + b.cooperation) / 200; 
-        let dist = diffInno * (1.0 - (coopFactor * 0.5)); 
-        const classicAff = this.calcAffinityDiff(a.affinity, b.affinity); 
-        return Math.floor(dist * 0.8 + classicAff * 0.4); 
+    /**
+     * 人物同士の関係を、相性差を軸に義理・野望で補正して返す。
+     * 専用の補助パラメータは持たず、既存の人物性格値だけを使う。
+     */
+    static calcRelationshipProfile(a, b) {
+        const clamp100 = value => Math.max(0, Math.min(100, Number(value) || 0));
+        const affinityDiff = this.calcAffinityDiff(a.affinity, b.affinity);
+        const dutyA = clamp100(a.duty);
+        const dutyB = clamp100(b.duty);
+        const ambitionA = clamp100(a.ambition);
+        const ambitionB = clamp100(b.ambition);
+        const dutyMean = (dutyA + dutyB) / 2;
+        const ambitionMean = (ambitionA + ambitionB) / 2;
+        const dutyGap = Math.abs(dutyA - dutyB);
+        const ambitionGap = Math.abs(ambitionA - ambitionB);
+
+        // 相性差が主軸。義理が高い者同士は多少の不一致を仕事上は飲み込み、
+        // 野望が強い者同士は競争心が摩擦になりやすい。価値観の差も小さく加味する。
+        let compatibilityScore = 100
+            - affinityDiff * 1.35
+            - dutyGap * 0.10
+            - ambitionGap * 0.08
+            + (dutyMean - 50) * 0.16
+            - (ambitionMean - 50) * 0.12;
+        compatibilityScore = Math.max(0, Math.min(100, compatibilityScore));
+
+        // 「仲が良い」と「実際に話す」は分ける。義理は職務上の接触を増やし、
+        // 野望は不要な接触を避ける方向へ働く。
+        let contactScore = 72
+            - affinityDiff * 1.05
+            + dutyA * 0.18
+            - ambitionA * 0.12
+            + dutyB * 0.06
+            - ambitionB * 0.04;
+        contactScore = Math.max(0, Math.min(100, contactScore));
+
+        return {
+            affinityDiff,
+            dutyMean,
+            ambitionMean,
+            dutyGap,
+            ambitionGap,
+            compatibilityScore: Math.round(compatibilityScore),
+            contactScore: Math.round(contactScore)
+        };
+    }
+
+    static calcRelationshipDistance(a, b) {
+        return 100 - this.calcRelationshipProfile(a, b).compatibilityScore;
     }
 
     static calcRewardEffect(daimyo, target) {
         const S = window.MainParams.Strategy;
-        const dist = this.calcValueDistance(daimyo, target);
+        const dist = this.calcRelationshipDistance(daimyo, target);
         let penalty = dist * S.RewardDistancePenalty;
         let baseIncrease = S.RewardBaseEffect;
         let actualIncrease = baseIncrease - penalty;

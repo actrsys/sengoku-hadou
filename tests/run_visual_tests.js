@@ -453,52 +453,64 @@ async function validateCommandAndInterviewStates(cdp) {
             const normalStyle = getComputedStyle(normal);
             const activeStyle = getComputedStyle(active);
             const arrow = getComputedStyle(active, '::after');
-            const choice = document.getElementById('interview-choice');
-            const choiceStyle = getComputedStyle(choice);
-            const r = choice.getBoundingClientRect();
+            const content = document.getElementById('interview-session-content');
+            const r = content.getBoundingClientRect();
+            const cs = getComputedStyle(content);
             return {
                 normalBg: normalStyle.backgroundImage,
                 activeBg: activeStyle.backgroundImage,
                 activeShadow: activeStyle.boxShadow,
                 activeArrowTop: arrow.borderTopColor,
                 activeArrowRight: arrow.borderRightColor,
-                choiceBg: choiceStyle.backgroundColor,
-                choiceTransition: choiceStyle.transitionProperty,
-                choiceRect: {left:r.left,top:r.top,right:r.right,bottom:r.bottom}
+                rect: {width:r.width,height:r.height,left:r.left,top:r.top,right:r.right,bottom:r.bottom},
+                overflowY: cs.overflowY,
+                scrollHeight: content.scrollHeight,
+                clientHeight: content.clientHeight
             };
         })()`,
         returnByValue: true
     });
-    const initial = result.result.value;
-    assert.notStrictEqual(initial.activeBg, initial.normalBg, 'PCの選択中親コマンドは通常状態と背景を明確に変える');
-    assert.ok(initial.activeShadow.includes('rgb(212, 175, 55)') || initial.activeShadow.includes('rgba(212, 175, 55'), 'PCの選択中親コマンドは金帯を持つ');
-    assert.strictEqual(initial.activeArrowTop, 'rgb(255, 215, 90)', '選択中の階層矢印を金色にする');
-    assert.strictEqual(initial.activeArrowRight, 'rgb(255, 215, 90)', '選択中の階層矢印を金色にする');
-    assert.ok(!initial.choiceTransition.split(',').map(x => x.trim()).some(x => x === 'background' || x === 'background-color' || x === 'all'), '面談ボタンは背景をtransitionしない');
+    const pc = result.result.value;
+    assert.notStrictEqual(pc.activeBg, pc.normalBg, 'PCの選択中親コマンドは通常状態と背景を明確に変える');
+    assert.ok(pc.activeShadow.includes('rgb(212, 175, 55)') || pc.activeShadow.includes('rgba(212, 175, 55'), 'PCの選択中親コマンドは金帯を持つ');
+    assert.strictEqual(pc.activeArrowTop, 'rgb(255, 215, 90)', '選択中の階層矢印を金色にする');
+    assert.strictEqual(pc.activeArrowRight, 'rgb(255, 215, 90)', '選択中の階層矢印を金色にする');
+    assert.ok(Math.abs((pc.rect.width / pc.rect.height) - (16 / 9)) < 0.03, `PC面談枠が16:9ではありません (${pc.rect.width}x${pc.rect.height})`);
+    assert.strictEqual(pc.overflowY, 'hidden', 'PC面談枠をスクロール領域にしない');
+    assert.ok(pc.scrollHeight <= pc.clientHeight + 3, 'PC面談内容が枠をはみ出している');
 
-    const cx = (initial.choiceRect.left + initial.choiceRect.right) / 2;
-    const cy = (initial.choiceRect.top + initial.choiceRect.bottom) / 2;
-    await cdp.call('Input.dispatchMouseEvent', { type:'mouseMoved', x:cx, y:cy });
-    await cdp.call('Input.dispatchMouseEvent', { type:'mousePressed', x:cx, y:cy, button:'left', clickCount:1 });
-    await new Promise(resolve => setTimeout(resolve, 16));
+    await cdp.call('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 1, mobile: true });
+    await cdp.call('Runtime.evaluate', {
+        expression: `document.body.classList.remove('is-pc'); const g=document.getElementById('game-screen'); g.style.width='360px';g.style.height='640px';true`,
+        returnByValue: true
+    });
+    await new Promise(resolve => setTimeout(resolve, 80));
     result = await cdp.call('Runtime.evaluate', {
         expression: `(() => {
-            const cs = getComputedStyle(document.getElementById('interview-choice'));
-            return {backgroundColor:cs.backgroundColor, backgroundImage:cs.backgroundImage, opacity:cs.opacity};
+            const content = document.getElementById('interview-session-content');
+            const r = content.getBoundingClientRect();
+            const cs = getComputedStyle(content);
+            const action = document.querySelector('.interview-session-btn').getBoundingClientRect();
+            return {
+                innerWidth: 360, innerHeight: 640,
+                rect:{width:r.width,height:r.height,left:r.left,top:r.top,right:r.right,bottom:r.bottom},
+                overflowY:cs.overflowY,
+                scrollHeight:content.scrollHeight,
+                clientHeight:content.clientHeight,
+                actionHeight:action.height
+            };
         })()`,
         returnByValue: true
     });
-    const pressed = result.result.value;
-    await cdp.call('Input.dispatchMouseEvent', { type:'mouseReleased', x:cx, y:cy, button:'left', clickCount:1 });
-    const m = pressed.backgroundColor.match(/rgba?\(([^)]+)\)/);
-    assert.ok(m, `面談ボタンの押下背景色を取得できません (${pressed.backgroundColor})`);
-    const parts = m[1].split(',').map(v => Number(v.trim()));
-    const alpha = parts.length >= 4 ? parts[3] : 1;
-    assert.strictEqual(alpha, 1, `面談ボタンは押下中も完全不透明である必要があります (${pressed.backgroundColor})`);
-    assert.strictEqual(Number(pressed.opacity), 1, '面談ボタン本体のopacityを押下で落とさない');
-    assert.notStrictEqual(pressed.backgroundImage, 'none', '押下中も不透明背景の上にグラデーションを維持する');
+    const mobile = result.result.value;
+    assert.ok(Math.abs((mobile.rect.width / mobile.rect.height) - (9 / 16)) < 0.03, `スマホ面談枠が9:16ではありません (${mobile.rect.width}x${mobile.rect.height})`);
+    assert.ok(mobile.rect.left >= -1 && mobile.rect.right <= mobile.innerWidth + 1, 'スマホ面談枠が横にはみ出している');
+    assert.ok(mobile.rect.top >= -1 && mobile.rect.bottom <= mobile.innerHeight + 1, 'スマホ面談枠が縦にはみ出している');
+    assert.strictEqual(mobile.overflowY, 'hidden', 'スマホ面談枠をスクロール領域にしない');
+    assert.ok(mobile.scrollHeight <= mobile.clientHeight + 3, 'スマホ面談内容が枠をはみ出している');
+    assert.ok(mobile.actionHeight >= 27, 'スマホ面談ボタンが小さすぎる');
 
-    console.log('✓ PC入れ子コマンド選択状態・面談押下不透明 visual regression');
+    console.log('✓ PC入れ子コマンド選択状態・面談固定16:9/9:16 visual regression');
 }
 
 async function validateEndingAndWatchStates(cdp) {

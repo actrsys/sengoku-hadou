@@ -1705,7 +1705,7 @@ test('武将寿命のゲーム中変更は LifeSystem を唯一の正規窓口�
     assert.ok(!models.includes('this.isLifeExtended'), '旧isLifeExtendedフラグをモデルへ残さない');
     assert.ok(!models.includes('originalDeathAge'), 'modelsで討死延命量を計算しない');
     assert.ok(!interview.includes('busho.endYear ='), '面談はendYearを直接変更しない');
-    assert.ok(interview.includes("setLifespanModifier(busho, doctorSourceId, extensionYears)"), '医師延命はLifeSystemへ委譲する');
+    assert.ok(interview.includes("setLifespanModifier(busho, 'interview:doctor', extensionYears)"), '医師延命はLifeSystemへ委譲する');
     assert.ok(interview.includes('hasBattleDeathLifespanExtension(busho)'), '従来どおり討死初期延命済み武将には医師延命を重ねない');
     assert.ok(!interview.includes("'system:battle_death_initial'"), '面談側は討死補正sourceIdを直接知らない');
     assert.ok(common.includes("game.lifeSystem.setLifespanModifier(busho, this.id, 10)"), '今川義元+10はcommon eventからLifeSystemへ委譲する');
@@ -2053,16 +2053,41 @@ test('PC入れ子コマンドの選択中表示はhoverと明確に区別する'
     assert.ok(css.includes('body.is-pc .pc-cmd-col .cmd-btn.category.active::after'), '選択中の階層矢印も強調する');
 });
 
-test('面談選択肢は押下中も不透明背景を維持しbackgroundをtransitionしない', () => {
+test('面談は専用View内で完結し16:9/9:16固定・非スクロールでページ切替する', () => {
+    const html = read('index.html');
     const css = read('css/style.css');
-    const base = css.match(/\.interview-choice-btn \{([\s\S]*?)\n\}/);
-    const active = css.match(/\.interview-choice-btn:active \{([\s\S]*?)\n\}/);
-    assert.ok(base && active);
-    assert.ok(base[1].includes('background-color: #2b2824'));
-    assert.ok(base[1].includes('background-image: linear-gradient'));
-    assert.ok(!base[1].includes('transition: all'), 'background-colorをtransparentから補間させない');
-    assert.ok(active[1].includes('background-color: #0d1a10'));
-    assert.ok(active[1].includes('background-image: linear-gradient'));
+    const view = read('js/interview_view.js');
+    const interview = read('js/interview_system.js');
+    const command = read('js/command_system.js');
+
+    assert.ok(html.includes('id="interview-modal"'), '面談専用モーダルをHTMLに持つ');
+    assert.ok(html.includes('js/interview_view.js'), '面談表示を専用Viewとして読み込む');
+    assert.ok(css.includes('aspect-ratio: 16 / 9'), 'PC面談枠は16:9前提');
+    assert.ok(css.includes('aspect-ratio: 9 / 16'), 'スマホ面談枠は9:16前提');
+    assert.ok(css.includes('#interview-modal .interview-session-content'));
+    assert.ok(css.includes('overflow: hidden !important'), '面談本体はスクロールへ逃がさない');
+    assert.ok(view.includes('this.pageSize = this._isPc() ? 12 : 8'), '人数超過はPC/スマホ別のページ切替で処理する');
+    assert.ok(view.includes('showMessages(busho, messages'), '長文を意味単位の順送り表示にできる');
+    assert.ok(command.includes("case 'interview':"), '面談開始は汎用武将セレクタではなく専用フローへ渡す');
+    assert.ok(!interview.includes('openBushoSelector'), '面談中に汎用武将リストを開かない');
+    assert.ok(!css.includes('body.interview-mode'), '旧ふすま背景の状態管理を残さない');
+});
+
+test('協調性を廃止し人物関係は義理・野望・相性差を正本にする', () => {
+    const personnel = read('js/personnel_rules.js');
+    const models = read('js/models.js');
+    const save = read('js/save_manager.js');
+    const kunishu = read('js/kunishu_system.js');
+    const csv = read('data/scenarios/1560_okehazama/warriors.csv');
+
+    assert.ok(personnel.includes('calcRelationshipProfile(a, b)'), '人物関係の共通計算を持つ');
+    assert.ok(personnel.includes('affinityDiff'));
+    assert.ok(personnel.includes('dutyMean'));
+    assert.ok(personnel.includes('ambitionMean'));
+    assert.ok(!models.includes('cooperation'), 'Bushoモデルから協調性を完全に除去する');
+    assert.ok(!save.includes('savedBusho.cooperation'), '保存復元処理に協調性を残さない');
+    assert.ok(!kunishu.includes('cooperation:'), '自動生成武将にも協調性を持たせない');
+    assert.ok(!csv.split(/\r?\n/, 1)[0].split(',').includes('cooperation'), '武将CSVから協調性列を削除する');
 });
 
 
