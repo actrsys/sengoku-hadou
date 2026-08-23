@@ -862,12 +862,12 @@ window.GameEvents.push({
             const baseRate = window.MainParams.Economy.TradeRateBase;
             game.provinces.forEach(prov => {
                 if (prov && prov.marketRate !== undefined) {
-                    // もしこの国が「凶作（badAffected）」に入っていたら基本相場の0.5倍アップ！
+                    // 凶作では米が希少になり、金1で得られる兵糧量が減ります。
                     if (badAffected.has(prov.id)) {
-                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + (baseRate * 0.5));
+                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - (baseRate * 0.5));
                     } else {
-                        // 凶作じゃない他の国も、影響を受けて基本相場の0.25倍アップ！
-                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + (baseRate * 0.25));
+                        // 周辺市場にも不足の影響が波及します。
+                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - (baseRate * 0.25));
                     }
                 }
             });
@@ -952,12 +952,12 @@ window.GameEvents.push({
             const baseRate = window.MainParams.Economy.TradeRateBase;
             game.provinces.forEach(prov => {
                 if (prov && prov.marketRate !== undefined) {
-                    // もしこの国が「豊作（goodAffected）」に入っていたら基本相場の0.5倍ダウン！
+                    // 豊作では米が潤沢になり、金1で得られる兵糧量が増えます。
                     if (goodAffected.has(prov.id)) {
-                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - (baseRate * 0.5));
+                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + (baseRate * 0.5));
                     } else {
-                        // 豊作じゃない他の国も、影響を受けて基本相場の0.2倍ダウン！
-                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - (baseRate * 0.2));
+                        // 周辺市場にも供給増の影響が波及します。
+                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + (baseRate * 0.2));
                     }
                 }
             });
@@ -1439,13 +1439,13 @@ window.GameEvents.push({
         // 雪が降っている国がなければ、何もしないでおしまいです
         if (snowProvIds.size === 0) return;
 
-        // ③-1 まずは雪が降っている国の米相場をジワジワと上げます！
+        // ③-1 雪が降っている国では米が不足し、金1で得られる兵糧量がジワジワ減ります。
         const baseRate = window.MainParams.Economy.TradeRateBase;
         snowProvIds.forEach(pId => {
             const prov = game.provinces.find(p => p.id === pId);
             if (prov && prov.marketRate !== undefined) {
-                // 基本相場の0.1倍（1割）ずつ相場を上げます！
-                prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + (baseRate * 0.1)); 
+                // 基本相場の0.1倍ずつ交換量を下げます。
+                prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - (baseRate * 0.1));
             }
         });
 

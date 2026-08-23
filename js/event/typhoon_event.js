@@ -200,9 +200,9 @@ window.GameEvents.push({
             game.provinces.forEach(prov => {
                 if (prov && prov.marketRate !== undefined) {
                     if (damagedProvinceMap.has(prov.id)) {
-                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + (baseRate * 0.6));
+                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - (baseRate * 0.6));
                     } else {
-                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + (baseRate * 0.2));
+                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - (baseRate * 0.2));
                     }
                 }
             });

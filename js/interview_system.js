@@ -623,15 +623,37 @@ class InterviewSystem {
 
     executeInterviewTopic(interviewer, target) {
         const relation = PersonnelRules.calcRelationshipProfile(interviewer, target);
-        const opinionText = this._getOpinionText(relation.compatibilityScore, this.activeInterviewAttitude);
-        const contactText = this._getContactText(relation, interviewer, this.activeInterviewAttitude);
-        const loyaltyText = this._getTargetLoyaltyText(interviewer, target, relation);
+        const concealment = this._getConcealmentProfile(target);
+        const roughBias = this._getOtherAssessmentBias(interviewer, target, concealment.perceivedLoyalty);
+        const attitude = this.activeInterviewAttitude;
 
-        const messages = [
-            `「${this._getTopicOpening(target)}${opinionText}」`,
-            `「${this._toneTopicFollowup(contactText)}」`,
-            `「${this._toneTopicFollowup(loyaltyText)}」`
-        ];
+        // 本心を隠し切れず冷淡/動揺している武将は、他者についてだけ急に長広舌にはしない。
+        // 基本は口数を減らし、私情が強い相手だけ短く悪く言う／控えめに庇う。
+        if (attitude === 'cold' || attitude === 'startled') {
+            let text;
+            const slanderMin = Number(window.MainParams.Interview.OtherAssessmentBias.BlindSlanderMin);
+            if (Number(roughBias.protectionShift || 0) > 0) {
+                text = `……${target.name}殿ですか。あの方については、さほど案じることはないかと存じます。`;
+            } else if (Number(roughBias.loyaltyPenalty || 0) >= slanderMin) {
+                text = `……${target.name}殿ですか。あの方は、あまり信用なさらぬ方がよろしいかと。`;
+            } else {
+                text = `……${target.name}殿ですか。某から詳しく申し上げることはございませぬ。`;
+            }
+            this.view.showMessages(interviewer, [`「${text}」`], () => this.showMainMenu(interviewer), '他者について聞く');
+            return;
+        }
+
+        const opinionText = this._getOpinionText(relation.compatibilityScore, attitude);
+        const loyaltyText = this._getTargetLoyaltyText(interviewer, target, relation);
+        const messages = [`「${this._getTopicOpening(target)}${opinionText}」`];
+
+        if (attitude === 'reserved') {
+            // 寡黙な態度では接触関係の説明まで重ねず、要点だけ二言で答える。
+            messages.push(`「${loyaltyText}」`);
+        } else {
+            const contactText = this._getContactText(relation, interviewer, attitude);
+            messages.push(`「${contactText}」`, `「${loyaltyText}」`);
+        }
 
         this.view.showMessages(interviewer, messages, () => this.showMainMenu(interviewer), '他者について聞く');
     }
@@ -802,11 +824,20 @@ class InterviewSystem {
         return `表向きは何事もないように振る舞っておりますが、あれは本心ではありますまい。${detail}`;
     }
 
-    _getOtherAssessmentBias(interviewer, target) {
+    _getOtherAssessmentBias(interviewer, target, observedTargetLoyalty = null) {
         const daimyo = this.game && typeof this.game.getClanDaimyo === 'function'
             ? this.game.getClanDaimyo(Number(interviewer && interviewer.clan) || Number(this.game.playerClanId))
             : null;
-        return PersonnelRules.calcOtherAssessmentBias(interviewer, target, daimyo);
+        return PersonnelRules.calcOtherAssessmentBias(interviewer, target, daimyo, observedTargetLoyalty);
+    }
+
+
+    _getBlindProtectedTargetText(bias) {
+        if (!bias || Number(bias.protectionShift || 0) <= 0) return null;
+        if (Number(bias.protectionShift || 0) >= 2) {
+            return '胸中のすべてまでは分かりませぬが、務めぶりを見る限り、さほど案じることはないかと存じます。';
+        }
+        return '詳しい胸中までは読み切れませぬが、今すぐ疑うほどではないかと存じます。';
     }
 
     _getBlindBiasedTargetText(bias) {
@@ -819,32 +850,35 @@ class InterviewSystem {
     }
 
     _getTargetLoyaltyText(interviewer, target, relation) {
-        // 聞き手自身の低忠誠を固定台詞で露呈させない。
-        // 自分の本心を隠せるかどうかは面談開始時の表面態度へ任せ、
-        // 他者については智謀・接触度・対象の偽装から通常どおり判断する。
         const I = window.MainParams.Interview;
         const knowledge = this._calcTargetKnowledge(interviewer, target, relation);
         const concealment = this._getConcealmentProfile(target);
-        const bias = this._getOtherAssessmentBias(interviewer, target);
+        const detected = knowledge >= I.KnowledgeBlindBelow
+            && this._canDetectConcealment(interviewer, target, knowledge, concealment);
+        const observedLoyalty = detected ? concealment.actualLoyalty : concealment.perceivedLoyalty;
+        const bias = this._getOtherAssessmentBias(interviewer, target, observedLoyalty);
 
         if (knowledge < I.KnowledgeBlindBelow) {
+            const protectedBlindText = this._getBlindProtectedTargetText(bias);
+            if (protectedBlindText) return protectedBlindText;
             const biasedBlindText = this._getBlindBiasedTargetText(bias);
             return biasedBlindText || this._getBlindTargetText(interviewer, target, relation, concealment);
         }
 
-        const detected = this._canDetectConcealment(interviewer, target, knowledge, concealment);
-        const baseLoyalty = detected ? concealment.actualLoyalty : concealment.perceivedLoyalty;
-        const assessedLoyalty = Math.max(0, baseLoyalty - Number(bias.loyaltyPenalty || 0));
-        const assessedBand = this._getLoyaltyBand(assessedLoyalty);
+        const assessedLoyalty = Math.max(0, observedLoyalty - Number(bias.loyaltyPenalty || 0));
+        let assessedBand = this._getLoyaltyBand(assessedLoyalty);
+        if (Number(bias.protectionShift || 0) > 0) {
+            assessedBand = this._shiftLoyaltyBand(assessedBand, Number(bias.protectionShift || 0));
+        }
 
-        if (detected) {
+        // 庇っている時は「偽装を見破った」事実自体を伏せ、表面上は客観的な評価として話す。
+        if (detected && Number(bias.protectionShift || 0) <= 0) {
             return this._getDetectedConcealmentText(assessedBand);
         }
 
         const uncertain = knowledge < I.KnowledgeConfidentMin;
         return this._getTargetLoyaltyBandText(assessedBand, uncertain);
     }
-
 }
 
 window.InterviewSystem = InterviewSystem;

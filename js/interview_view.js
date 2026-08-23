@@ -1,6 +1,6 @@
 /**
  * interview_view.js
- * 面談専用モーダルの表示と入力だけを担当する。
+ * 面談上部の情報・一覧と、通常会話文法を再利用した下部メッセージの表示・入力だけを担当する。
  * 面談の判定・台詞生成は InterviewSystem、人物関係計算は PersonnelRules に委譲する。
  * 武将一覧の検索・ソート規則は BushoListSortRules を共用する。
  * button のSEは共通button監視へ委譲し、特殊音だけ data-se で宣言する。
@@ -24,6 +24,10 @@ class InterviewView {
         this.prevBtn = document.getElementById('interview-session-prev-btn');
         this.nextBtn = document.getElementById('interview-session-next-btn');
         this.inlineActions = document.getElementById('interview-session-inline-actions');
+        this.dialogShell = document.getElementById('interview-session-dialog');
+        this.dialogName = document.getElementById('interview-session-dialog-name');
+        this.dialogFace = document.getElementById('interview-session-dialog-face');
+        this.dialogMessage = document.getElementById('interview-session-dialog-message');
         this.footer = document.getElementById('interview-session-footer');
 
         this.page = 0;
@@ -71,6 +75,7 @@ class InterviewView {
             this.footer.classList.add('hidden');
         }
         if (this.pager) this.pager.classList.add('hidden');
+        this._setConversationVisible(false);
         this.pageItems = [];
         this.page = 0;
         this.pageSize = 0;
@@ -82,6 +87,7 @@ class InterviewView {
         this._listDirection = null;
         this._searchComposing = false;
         if (this.content) this.content.classList.remove('interview-conversation-active');
+        if (this.modal) this.modal.classList.remove('interview-conversation-mode');
     }
 
     _setHeader(title, hint = '') {
@@ -246,6 +252,7 @@ class InterviewView {
         this._clearMessageAdvance();
         this._ensureOpen();
         this._setHeader('面談', '面談する武将を選んでください。');
+        this._setConversationVisible(false);
         this._setSpeaker(null);
         this._renderPagedList(candidates, onSelect, 'interviewer');
         this._renderInlineActions([]);
@@ -258,6 +265,7 @@ class InterviewView {
         this._clearMessageAdvance();
         this._ensureOpen();
         this._setHeader('他者について聞く', '誰についての印象を聞きますか？');
+        this._setConversationVisible(false);
         this._setSpeaker(interviewer);
         this._renderPagedList(candidates, onSelect, 'target');
         this._renderInlineActions([]);
@@ -269,6 +277,7 @@ class InterviewView {
     _renderPagedList(items, onSelect, mode) {
         if (!this.body) return;
         if (this.content) this.content.classList.remove('interview-conversation-active');
+        if (this.modal) this.modal.classList.remove('interview-conversation-mode');
         this.pageItems = Array.isArray(items) ? items.slice() : [];
         this.page = 0;
         this.listQuery = '';
@@ -440,32 +449,49 @@ class InterviewView {
         }
     }
 
-    _createConversationFace(busho) {
-        const faceColumn = document.createElement('div');
-        faceColumn.className = 'dialog-face-column interview-session-dialog-face-column';
+    _setConversationVisible(visible) {
+        if (this.dialogShell) {
+            this.dialogShell.classList.toggle('hidden', !visible);
+            if (!visible) this.dialogShell.classList.remove('interview-session-narration-dialog');
+        }
+        if (this.content) this.content.classList.toggle('interview-conversation-active', !!visible);
+        // 通常会話と同じく、会話中は親モーダルが「上部情報＋下端メッセージ」の配置を担当する。
+        // 個々の会話枠を座標指定して中央から押し下げるのではなく、親のレイアウト責務として固定する。
+        if (this.modal) this.modal.classList.toggle('interview-conversation-mode', !!visible);
+        if (!visible) {
+            if (this.dialogName) {
+                this.dialogName.textContent = '';
+                this.dialogName.classList.add('hidden');
+            }
+            if (this.dialogFace) this.dialogFace.replaceChildren();
+            if (this.dialogMessage) this.dialogMessage.textContent = '';
+        }
+    }
 
-        const nameLabel = document.createElement('div');
-        nameLabel.className = 'dialog-name-label interview-session-dialog-name-label';
-        nameLabel.textContent = busho && busho.name ? busho.name : '';
+    _renderConversationFace(busho, narration = false) {
+        if (!this.dialogFace || !this.dialogName) return;
+        this.dialogFace.replaceChildren();
+        if (narration || !busho) {
+            this.dialogName.textContent = '';
+            this.dialogName.classList.add('hidden');
+            return;
+        }
 
-        const faceSpace = document.createElement('div');
-        faceSpace.className = 'interview-session-dialog-face-space';
+        this.dialogName.textContent = busho.name || '';
+        this.dialogName.classList.remove('hidden');
         const wrapper = document.createElement('div');
         wrapper.className = 'sp-face-wrapper dialog-face-wrapper';
         const img = document.createElement('img');
         img.className = 'dialog-face-img';
-        img.src = `data/images/faceicons/${(busho && busho.faceIcon) || 'unknown_face.webp'}`;
+        img.src = `data/images/faceicons/${busho.faceIcon || 'unknown_face.webp'}`;
         img.alt = '';
         img.onerror = () => {
             img.onerror = null;
             img.src = 'data/images/faceicons/unknown_face.webp';
         };
         wrapper.appendChild(img);
-        faceSpace.appendChild(wrapper);
-        faceColumn.append(nameLabel, faceSpace);
-        return faceColumn;
+        this.dialogFace.appendChild(wrapper);
     }
-
 
     _formatConversationMessage(message) {
         return String(message || '')
@@ -475,27 +501,18 @@ class InterviewView {
     }
 
     _renderConversationMessage(busho, message, options = {}) {
-        if (!this.body) return;
         const narration = !!options.narration;
-        if (this.content) this.content.classList.add('interview-conversation-active');
-        this.body.className = `interview-session-body interview-session-conversation-view${narration ? ' interview-session-narration-view' : ''}`;
-        this.body.replaceChildren();
-
-        // 通常会話と同じく、人物名は会話枠の上辺へ重ねる。
-        // 面談ではさらに一段外側の枠を用意し、顔＋本文を一つの会話ユニットとして下部へ固定する。
-        const conversationFrame = document.createElement('div');
-        conversationFrame.className = 'interview-session-conversation-frame';
-
-        const dialogBody = document.createElement('div');
-        dialogBody.className = 'dialog-body-container interview-session-dialog-body';
-        if (!narration) dialogBody.appendChild(this._createConversationFace(busho || this.currentSpeaker));
-
-        const messageArea = document.createElement('div');
-        messageArea.className = 'message-area interview-session-message-area';
-        messageArea.innerHTML = this._formatConversationMessage(message);
-        dialogBody.appendChild(messageArea);
-        conversationFrame.appendChild(dialogBody);
-        this.body.appendChild(conversationFrame);
+        this._setConversationVisible(true);
+        if (this.dialogShell) this.dialogShell.classList.toggle('interview-session-narration-dialog', narration);
+        if (this.body) {
+            this.body.className = 'interview-session-body interview-session-conversation-placeholder';
+            this.body.replaceChildren();
+        }
+        this._renderConversationFace(busho || this.currentSpeaker, narration);
+        if (this.dialogMessage) {
+            this.dialogMessage.classList.toggle('interview-session-narration-message', narration);
+            this.dialogMessage.innerHTML = this._formatConversationMessage(message);
+        }
     }
 
     showMenu(busho, message, choices, onBack) {

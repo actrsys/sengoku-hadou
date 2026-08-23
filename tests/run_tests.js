@@ -88,11 +88,95 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r114');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r118');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('友好'), false);
+});
+
+test('承認欲求の忠誠変動は15刻みで正負対称・閾値未満0', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/faction_system.js');
+    const calc = value => vm.runInContext(`FactionSystem.calcRecognitionLoyaltyChange(${value}, 15)`, ctx);
+    assert.strictEqual(calc(1), 0);
+    assert.strictEqual(calc(14), 0);
+    assert.strictEqual(calc(15), -1);
+    assert.strictEqual(calc(29), -1);
+    assert.strictEqual(calc(30), -2);
+    assert.strictEqual(calc(-1), 0);
+    assert.strictEqual(calc(-14), 0);
+    assert.strictEqual(calc(-15), 1);
+    assert.strictEqual(calc(-29), 1);
+    assert.strictEqual(calc(-30), 2);
+});
+
+test('米相場は「金1で得られる兵糧量」として表示・売買・AIを一元化する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/economy_rules.js');
+    const province = { id: 1, marketRate: 2.0 };
+    const castle = { provinceId: 1, ownerClan: 1, gold: 500, rice: 1000, tradeLimit: 500 };
+    const game = { kunishuSystem: { getAliveKunishus() { return []; } } };
+
+    const buyInfo = ctx.EconomyRules.getRiceActualRate('buy_rice', castle, [province], game);
+    const sellInfo = ctx.EconomyRules.getRiceActualRate('sell_rice', castle, [province], game);
+    assert.strictEqual(ctx.MainParams.Economy.TradeRateBase, 2.0);
+    assert.strictEqual(ctx.MainParams.Economy.TradeRateMin, 1.5);
+    assert.strictEqual(ctx.MainParams.Economy.TradeRateMax, 2.5);
+    assert.ok(!Object.prototype.hasOwnProperty.call(ctx.MainParams.Economy, 'RiceMarketUnit'));
+    assert.strictEqual(buyInfo.ricePerGold, 2.0);
+    assert.strictEqual(sellInfo.ricePerGold, 2.0);
+    assert.strictEqual(ctx.EconomyRules.formatRiceMarketRate(2), '金1＝兵糧2.0');
+
+    // 相場2なら金500で兵糧1000、兵糧1000を売れば金500。
+    assert.strictEqual(ctx.EconomyRules.calcTradeCostAndRate('buy_rice', 1000, castle, null, null, [province], game).cost, 500);
+    assert.strictEqual(ctx.EconomyRules.calcTradeCostAndRate('sell_rice', 1000, castle, null, null, [province], game).cost, 500);
+    assert.strictEqual(ctx.EconomyRules.calcMaxTradeAmount('buy_rice', castle, null, null, [province], game), 1000);
+
+    // 相場5なら金500で兵糧2500。範囲外の値でも式の意味自体が変わらないことを固定する。
+    province.marketRate = 5.0;
+    assert.strictEqual(ctx.EconomyRules.calcTradeCostAndRate('buy_rice', 2500, castle, null, null, [province], game).cost, 500);
+
+    // 商人割引は、新相場定義でも購入・売却の双方でプレイヤー有利に働く。
+    const merchantGame = {
+        kunishuSystem: {
+            getAliveKunishus() {
+                return [{ ideology: '商人', getRelation() { return 100; } }];
+            }
+        }
+    };
+    province.marketRate = 2.0;
+    const merchantBuy = ctx.EconomyRules.getRiceActualRate('buy_rice', castle, [province], merchantGame);
+    const merchantSell = ctx.EconomyRules.getRiceActualRate('sell_rice', castle, [province], merchantGame);
+    assert.ok(merchantBuy.ricePerGold > 2.0, '購入時は金1で得られる兵糧が増える');
+    assert.ok(merchantSell.ricePerGold < 2.0, '売却時は同じ金を得るのに必要な兵糧が減る');
+    assert.strictEqual(ctx.EconomyRules.calcTradeCostAndRate('buy_rice', 1000, castle, null, null, [province], merchantGame).cost, 450);
+    assert.strictEqual(ctx.EconomyRules.calcTradeCostAndRate('sell_rice', 1000, castle, null, null, [province], merchantGame).cost, 550);
+
+    const uiSource = read('js/ui.js');
+    const sliderSource = read('js/ui_slider.js');
+    const aiSource = read('js/ai.js');
+    assert.ok(uiSource.includes('EconomyRules.formatRiceMarketRate(currentRate)'), '常時表示も共通相場表記を使う');
+    assert.ok(sliderSource.includes('EconomyRules.formatRiceMarketRate(rateInfo.ricePerGold)'), '取引画面も金1＝兵糧X.Xを使う');
+    assert.ok(!sliderSource.includes('getRiceMarketUnit'), '旧10兵糧単位の換算を残さない');
+    assert.ok(aiSource.includes('castle.gold * buyActualRate'), 'AI購入可能量も金×兵糧/金で計算する');
+    assert.ok(aiSource.includes('Math.floor(sellAmount / rate)'), 'AI売却益も兵糧÷兵糧/金で計算する');
+    assert.ok(read('js/command_system.js').includes('EconomyRules.calcTradeCostAndRate(type, amount'), 'プレイヤー取引実行もEconomyRulesを正本にする');
+});
+
+test('米相場の供給不足・供給増イベントは「金1で得られる兵糧量」の向きに一致する', () => {
+    const common = read('js/event/common_events.js');
+    const typhoon = read('js/event/typhoon_event.js');
+    const war = read('js/war_effort.js');
+    const economy = read('js/economy_rules.js');
+
+    assert.ok(common.includes('badAffected.has(prov.id)') && common.includes('prov.marketRate - (baseRate * 0.5)'), '凶作では相場値を下げる');
+    assert.ok(common.includes('goodAffected.has(prov.id)') && common.includes('prov.marketRate + (baseRate * 0.5)'), '豊作では相場値を上げる');
+    assert.ok(common.includes('prov.marketRate - (baseRate * 0.1)'), '大雪では相場値を下げる');
+    assert.ok(typhoon.includes('prov.marketRate - (baseRate * 0.6)'), '台風では相場値を下げる');
+    assert.ok(war.includes('atkProv.marketRate - 0.3') && war.includes('defProv.marketRate - 0.3'), '出陣による需要増では相場値を下げる');
+    assert.ok(economy.includes('seasonForce = harvestBoost') && economy.includes('seasonForce = -(baseRate * 0.05)'), '9月の供給増は相場を上げ、通常月は緩やかに下げる');
 });
 
 test('タイトル版表示は GameConfig.Meta.Version を正本にする', () => {
@@ -2062,7 +2146,7 @@ test('PC入れ子コマンドの選択中表示はhoverと明確に区別する'
     assert.ok(css.includes('body.is-pc .pc-cmd-col .cmd-btn.category.active::after'), '選択中の階層矢印も強調する');
 });
 
-test('面談は専用View内で完結し16:9/9:16固定・非スクロールでページ切替する', () => {
+test('面談は専用View内で完結し固定論理画面内・非スクロールでページ切替する', () => {
     const html = read('index.html');
     const css = read('css/style.css');
     const view = read('js/interview_view.js');
@@ -2072,7 +2156,7 @@ test('面談は専用View内で完結し16:9/9:16固定・非スクロールで�
     assert.ok(html.includes('id="interview-modal"'), '面談専用モーダルをHTMLに持つ');
     assert.ok(html.includes('js/interview_view.js'), '面談表示を専用Viewとして読み込む');
     assert.ok(css.includes('aspect-ratio: 16 / 9'), 'PC面談枠は16:9前提');
-    assert.ok(css.includes('aspect-ratio: 9 / 16'), 'スマホ面談枠は9:16前提');
+    assert.ok(css.includes('body:not(.is-pc) #interview-modal .interview-session-content') && css.includes('width: calc(100% - 12px) !important;'), 'スマホ面談枠は9:16論理画面の左右を広く使う');
     assert.ok(css.includes('#interview-modal .interview-session-content'));
     assert.ok(css.includes('overflow: hidden !important'), '面談本体はスクロールへ逃がさない');
     assert.ok(view.includes("if (this._isPc()) return 15;") && view.includes("return mode === 'target' ? 12 : 16;"), '人数超過はPC15人・スマホ初回16人/他者12人のページ切替で処理する');
@@ -2088,16 +2172,16 @@ test('面談は専用View内で完結し16:9/9:16固定・非スクロールで�
     assert.ok(view.includes('_renderFooterActions'), '面談の外側フッター操作をViewで分離する');
     assert.ok(!css.includes('body.interview-mode'), '旧ふすま背景の状態管理を残さない');
     assert.ok(html.includes('js/busho_list_sort_rules.js'), '面談と武将一覧で共通ソート規則を読み込む');
-    assert.ok(view.includes("messageArea.className = 'message-area interview-session-message-area'"), '面談会話は既存message-areaを再利用する');
-    assert.ok(view.includes("dialogBody.className = 'dialog-body-container interview-session-dialog-body'"), '面談会話は通常会話と同じ顔＋メッセージの一体レイアウトを使う');
-    assert.ok(view.includes("conversationFrame.className = 'interview-session-conversation-frame'"), '面談モーダル内では会話部分を専用の薄い外枠でまとめる');
-    assert.ok(css.includes('.interview-session-content.interview-conversation-active .interview-session-inline-actions') && css.includes('margin-top: auto'), '面談の選択肢＋会話はモーダル下部へ寄せる');
-    assert.ok(css.includes('.interview-session-dialog-name-label') && css.includes('top: -18px') && css.includes('left: 20px'), 'PC面談の人物名は通常会話と同じく会話枠上辺へ重ねる');
+    assert.ok(html.includes('id="interview-session-dialog-message" class="message-area"'), '面談下段は通常会話と同じmessage-areaを直接使う');
+    assert.ok(html.includes('class="dialog-body-container"') && html.includes('id="interview-session-dialog-name" class="dialog-name-label'), '面談下段は通常会話の顔＋名前＋メッセージ文法を直接使う');
+    assert.ok(!view.includes('interview-session-conversation-frame'), '旧面談専用会話外枠を残さない');
+    assert.ok(css.includes('#interview-modal .interview-session-dialog') && css.includes('.interview-session-inline-actions'), '上段情報・選択肢・下段通常会話を分離する');
+    assert.ok(css.includes('#interview-session-dialog-name { left: 20px; }'), 'PC面談の人物名は通常会話と同じ枠上辺配置を使う');
     assert.ok(html.includes('id="interview-session-summary-panel"') && !html.includes('id="interview-session-face-panel"'), '上部サマリーへ顔を重複表示しない');
     assert.ok(view.includes('StatPresenter.getDisplayStatHTML(busho, key'), '面談能力は武将一覧・詳細と同じランク表示を使う');
     assert.ok(!view.includes('valueEl.textContent = Number(busho[key]'), '面談で能力の内部数値を表示しない');
     assert.ok(view.includes('_setMessageAdvance') && view.includes("this._renderFooterActions([])"), '選択肢のない面談会話はボタンを出さず画面クリックで進める');
-    assert.ok(css.includes('#interview-modal.interview-message-advance .interview-session-message-area::after'), '面談会話のクリック進行時は▼を表示する');
+    assert.ok(css.includes('#interview-modal.interview-message-advance #interview-session-dialog-message::after'), '面談会話のクリック進行時は▼を表示する');
     assert.ok(view.includes("['統率', 'leadership']") && view.includes("['魅力', 'charm']"), '面談相手の既知能力を人物サマリーに出す');
     assert.ok(!view.includes('loyalty'), '面談Viewで忠誠数値を表示・ソートしない');
     assert.ok(view.includes("search.addEventListener('compositionstart'"), '面談検索は日本語IME変換開始を認識する');
@@ -2105,6 +2189,8 @@ test('面談は専用View内で完結し16:9/9:16固定・非スクロールで�
     assert.ok(!view.includes('nextSearch.focus'), '検索入力のたびにinput DOMを再生成してフォーカスを戻す旧方式を残さない');
     assert.ok(view.includes("this._listGrid.replaceChildren()"), '検索・ソート時は入力欄を残して武将グリッドだけ更新する');
     assert.ok(view.includes("interview-conversation-active"), '会話中は選択肢スロットを固定して本文位置を維持する');
+    assert.ok(view.includes("interview-conversation-mode"), '面談会話中は親モーダルが上部情報と画面下端メッセージの配置を担当する');
+    assert.ok(css.includes('#interview-modal.interview-conversation-mode'), '面談会話の下端固定は親モーダルのレイアウト規則として定義する');
     assert.ok(css.includes('.interview-session-sort-wrap::after'), '面談プルダウンはネイティブselectを保ったまま専用外観を持つ');
     assert.ok(css.includes('#interview-modal .interview-session-footer.hidden'), '外側ボタン非表示時も予約領域を維持して面談枠を動かさない');
     assert.ok(interview.includes('{ narration: true }'), '医師の説明・結果は本人の台詞ではなくナレーション表示へ渡す');
@@ -2355,6 +2441,34 @@ test('面談の他者忠誠評価は偏見を悲観方向にだけ加え高い�
     assert.strictEqual(system._toneTopicFollowup(text), text, '後続台詞へ機械的な相槌や三点リーダを重ねない');
 });
 
+
+
+test('低忠誠・低義理で主君と不一致な武将は近い低忠誠武将を最大2段階まで庇える', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/loyalty_insight_rules.js');
+    loadScript(ctx, 'js/personnel_rules.js');
+
+    const daimyo = { affinity: 50, innovation: 90 };
+    const interviewer = { affinity: 0, innovation: 10, ambition: 80, loyalty: 55, duty: 25 };
+    const closeTarget = { affinity: 4, innovation: 14 };
+    const distantTarget = { affinity: 35, innovation: 80 };
+    const protectedOne = ctx.PersonnelRules.calcOtherAssessmentBias(interviewer, closeTarget, daimyo, 65);
+    const protectedStrong = ctx.PersonnelRules.calcOtherAssessmentBias({ ...interviewer, loyalty: 30, duty: 20 }, closeTarget, daimyo, 45);
+    const notProtected = ctx.PersonnelRules.calcOtherAssessmentBias(interviewer, distantTarget, daimyo, 65);
+
+    assert.ok(protectedOne.protectionShift >= 1, '不満・低義理・主君不一致・対象との近さが重なれば庇護が発生する');
+    assert.strictEqual(protectedStrong.protectionShift, 2, '条件が強く重なる場合でも庇護は最大2段階に止める');
+    assert.strictEqual(notProtected.protectionShift, 0, '対象との相性・革新性が遠ければ庇護しない');
+});
+
+test('低い表面態度の他者評価は長広舌にならず私情が強い相手だけ短く評価する', () => {
+    const interview = read('js/interview_system.js');
+    assert.ok(interview.includes("attitude === 'cold' || attitude === 'startled'"));
+    assert.ok(interview.includes('某から詳しく申し上げることはございませぬ'));
+    assert.ok(interview.includes('あまり信用なさらぬ方がよろしいか'));
+    assert.ok(interview.includes('さほど案じることはないかと存じます'));
+});
 test('方針については能力上位2分野だけを既存ゲーム状態から助言する', () => {
     const ctx = createContext({
         AIDomesticPriorityRules: {

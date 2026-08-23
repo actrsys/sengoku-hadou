@@ -470,18 +470,24 @@ class UISliderManager {
             // ★最大可能数をルールブックに聞きます
             const realMaxAmount = EconomyRules.calcMaxTradeAmount(type, c, daimyo, castellan, this.game.provinces, this.game);
             
-            // レート計算（ダミーで1単位、兵糧の場合は10単位渡します）
-            const checkAmount = (type === 'buy_rice' || type === 'sell_rice') ? 10 : 1;
+            // レート表示。米相場だけは「金1＝兵糧X.X」という共通定義をそのまま表示します。
+            const checkAmount = 1;
             const tradeData = EconomyRules.calcTradeCostAndRate(type, checkAmount, c, daimyo, castellan, this.game.provinces, this.game);
-            
+
             let extraStr = "";
             if (type === 'buy_rice' || type === 'sell_rice') {
                 extraStr = `(取引上限: <span class="slider-emphasis">${c.tradeLimit || 0}</span>)`;
+                const rateInfo = EconomyRules.getRiceActualRate(type, c, this.game.provinces, this.game);
+                this.ui.tradeTypeInfo.classList.remove('hidden');
+                this.ui.tradeTypeInfo.innerHTML = `${EconomyRules.formatRiceMarketRate(rateInfo.ricePerGold)} ${extraStr}`;
+                const costDiv = document.createElement('div');
+                costDiv.id = 'dynamic-cost-display';
+                this.ui.quantityContainer.appendChild(costDiv);
+            } else {
+                // 矢弾は計算結果の箱を使っていないため、最後の引数に false を渡して箱作りをオフにします
+                const needCostDiv = type !== 'buy_ammo';
+                setTradeRateInfo(itemNameMap[type], unitMap[type], checkAmount, tradeData.rateStr, extraStr, needCostDiv);
             }
-            
-            // 矢弾は計算結果の箱を使っていないため、最後の引数に false を渡して箱作りをオフにします
-            const needCostDiv = type !== 'buy_ammo';
-            setTradeRateInfo(itemNameMap[type], unitMap[type], checkAmount, tradeData.rateStr, extraStr, needCostDiv);
 
             inputs.amount = createSlider(sliderLabelMap[type], "amount", realMaxAmount, 0);
         }

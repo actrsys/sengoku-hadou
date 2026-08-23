@@ -141,7 +141,7 @@ class PersonnelRules {
      * 相性差は1につき1を基礎に、革新差と聞き手の野望で悪化する。
      * 一方、主君への忠誠・義理・主君との相性が高いほど私情を抑える。
      */
-    static calcOtherAssessmentBias(interviewer, target, daimyo = null) {
+    static calcOtherAssessmentBias(interviewer, target, daimyo = null, observedTargetLoyalty = null) {
         const cfg = window.MainParams.Interview.OtherAssessmentBias;
         const clamp100 = value => Math.max(0, Math.min(100, Number(value) || 0));
         const affinityDiff = this.calcAffinityDiff(interviewer && interviewer.affinity, target && target.affinity);
@@ -150,8 +150,12 @@ class PersonnelRules {
         const loyalty = clamp100(interviewer && interviewer.loyalty);
         const duty = clamp100(interviewer && interviewer.duty);
         const lordAffinityDiff = daimyo ? this.calcAffinityDiff(interviewer && interviewer.affinity, daimyo.affinity) : 25;
+        const lordInnovationDiff = daimyo
+            ? Math.abs(clamp100(interviewer && interviewer.innovation) - clamp100(daimyo.innovation))
+            : 25;
         const lordAffinityScore = Math.max(0, 100 - lordAffinityDiff * 2);
 
+        // 相手を悪く言う偏り。相性・思想差・野望で強まり、主君への忠誠・義理・主君との相性で抑える。
         const rawBias = affinityDiff * cfg.AffinityWeight
             + innovationDiff * cfg.InnovationWeight
             + Math.max(0, ambition - 50) * cfg.AmbitionWeight;
@@ -165,6 +169,48 @@ class PersonnelRules {
             Math.round(rawBias * (1 - restraint * cfg.RestraintStrength))
         ));
 
+        // 逆方向の「庇護」は固定忠誠値ではなく階段状の点数で扱う。
+        // 自分も不満、義理が低い、主君と相性/思想が遠い、対象とは近く、対象も不満そう――が重なるほど強くなる。
+        // observedTargetLoyalty は聞き手が見抜けた/見せられた忠誠だけを渡し、神視点の実忠誠を漏らさない。
+        const bandSeverity = value => {
+            if (typeof LoyaltyInsightRules !== 'undefined') {
+                return LoyaltyInsightRules.getBandSeverity(LoyaltyInsightRules.getBand(value));
+            }
+            const v = clamp100(value);
+            if (v >= 85) return 0;
+            if (v >= 75) return 1;
+            if (v >= 60) return 2;
+            if (v >= 40) return 3;
+            if (v >= 25) return 4;
+            return 5;
+        };
+        const tier = (value, limits) => limits.reduce((points, limit) => points + (value >= limit ? 1 : 0), 0);
+        const inverseTier = (value, limits) => limits.reduce((points, limit) => points + (value <= limit ? 1 : 0), 0);
+
+        const ownUnrest = bandSeverity(loyalty);
+        const targetSeenLoyalty = observedTargetLoyalty === null || observedTargetLoyalty === undefined
+            ? 100
+            : clamp100(observedTargetLoyalty);
+        const targetUnrest = bandSeverity(targetSeenLoyalty);
+        const lowDuty = inverseTier(duty, [70, 50, 30]);
+        const lordMismatch = tier(lordAffinityDiff, [15, 30, 45]) + tier(lordInnovationDiff, [20, 40, 60]);
+        const targetCloseness = inverseTier(affinityDiff, [24, 12, 6]) + inverseTier(innovationDiff, [24, 12]);
+        const protectionScore = Math.min(3, ownUnrest)
+            + lowDuty
+            + lordMismatch
+            + targetCloseness
+            + Math.min(2, targetUnrest);
+        const protectionEligible = ownUnrest >= 1
+            && lowDuty >= 1
+            && lordMismatch >= 2
+            && targetCloseness >= 2
+            && targetUnrest >= 1;
+        let protectionShift = 0;
+        if (protectionEligible) {
+            if (protectionScore >= Number(cfg.ProtectionStep2Min)) protectionShift = 2;
+            else if (protectionScore >= Number(cfg.ProtectionStep1Min)) protectionShift = 1;
+        }
+
         return {
             affinityDiff,
             innovationDiff,
@@ -172,10 +218,13 @@ class PersonnelRules {
             loyalty,
             duty,
             lordAffinityDiff,
+            lordInnovationDiff,
             lordAffinityScore,
             rawBias,
             restraint,
-            loyaltyPenalty
+            loyaltyPenalty,
+            protectionScore,
+            protectionShift
         };
     }
 

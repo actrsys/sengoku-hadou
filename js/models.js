@@ -914,7 +914,7 @@ class Province {
         this.color_code = data.color_code || "";    // マップ用の色（例：#ff5d00）
         
         // ★セーブデータからは読み込みますが、相場の処理はゲーム本体（game.js）で行います
-        this.marketRate = data.marketRate !== undefined ? Number(data.marketRate) : 10.0; 
+        this.marketRate = data.marketRate !== undefined ? Number(data.marketRate) : 2.0; 
         
         this.statusEffects = Array.isArray(data.statusEffects) ? data.statusEffects : []; // ★豊作・凶作などの「状態異常」
     }

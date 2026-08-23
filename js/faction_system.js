@@ -78,6 +78,18 @@ class FactionSystem {
     }
 
     /**
+     * 承認欲求から月末の忠誠変動量を求める。
+     * 正負を対称に扱い、閾値未満では忠誠を動かさない。
+     */
+    static calcRecognitionLoyaltyChange(recognitionNeed, threshold) {
+        const need = Number(recognitionNeed) || 0;
+        const step = Math.max(1, Number(threshold) || 1);
+        const levels = Math.floor(Math.abs(need) / step);
+        if (levels <= 0) return 0;
+        return need > 0 ? -levels : levels;
+    }
+
+    /**
      * 月末処理: 忠誠度変動と承認欲求の自然減衰
      */
     processEndMonth() {
@@ -91,8 +103,8 @@ class FactionSystem {
 
             // 1. 承認欲求による忠誠度変化
             if (!b.isDaimyo) {
-                // -20ごとに忠誠+1、+20ごとに忠誠-1
-                const loyaltyChange = Math.floor(b.recognitionNeed / -threshold);
+                // 設定された閾値ごとに、マイナス側は忠誠+1、プラス側は忠誠-1。閾値未満は0で、正負を対称に扱う。
+                const loyaltyChange = FactionSystem.calcRecognitionLoyaltyChange(b.recognitionNeed, threshold);
                 if (loyaltyChange !== 0) {
                     b.loyalty = Math.max(0, Math.min(100, b.loyalty + loyaltyChange));
                 }

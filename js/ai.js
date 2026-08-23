@@ -1986,9 +1986,9 @@ class AIEngine {
             const goldShortageRate = shortageGold / (targetGold + 1);
             sellScore *= (1 + goldShortageRate);
             
-            // お米が高く売れる時はスコアをアップ、安い時はダウンさせます！
+            // marketRate は「金1で得られる兵糧量」。値が低いほど米が高く売れるため、売却スコアを上げます。
             const standardRate = window.MainParams.Economy.TradeRateBase;
-            sellScore *= (baseRiceRate / standardRate); // ★変更：ゲームの基本相場を基準に計算します
+            sellScore *= (standardRate / Math.max(0.01, baseRiceRate));
             
             // 安全ラインを下回っていたら、絶対に売りません
             if (castle.rice <= sellSafeRice) {
@@ -2022,7 +2022,7 @@ class AIEngine {
             }
 
             // ===== 所持金補正 =====
-            const buyableAmount = castle.gold / buyActualRate; // ★変更：実際の購入レートを使用
+            const buyableAmount = castle.gold * buyActualRate; // 金1で得られる兵糧量から購入可能量を計算
             const fillRate = Math.min(1, buyableAmount / (shortage + 1));
             const goldMod = 0.5 + 0.5 * fillRate;
 
@@ -2948,11 +2948,11 @@ class AIEngine {
                     const targetGold = Math.floor(baseSoldiers * 1.5);
                     const shortageGold = Math.max(0, targetGold - castle.gold);
                     
-                    // 足りないお金分のお米だけを売るように計算します
-                    const needSellAmount = Math.floor(shortageGold / rate);
-                    
-                    // ★変更：取引上限（金）を米の量に変換して上限とします
-                    const maxSellByTradeLimit = Math.floor((castle.tradeLimit || 0) / rate);
+                    // 足りない金を得るのに必要な兵糧量を計算します（rate = 金1あたり兵糧量）。
+                    const needSellAmount = Math.ceil(shortageGold * rate);
+
+                    // 取引上限（金）を兵糧量へ変換します。
+                    const maxSellByTradeLimit = Math.floor((castle.tradeLimit || 0) * rate);
                     let sellAmount = Math.floor(Math.min(canSellAmount, needSellAmount, maxSellByTradeLimit));
                     
                     // 少しだけしか売らないなら、手間なのでやめます
@@ -2961,7 +2961,7 @@ class AIEngine {
                     }
                     
                     if (sellAmount > 0) {
-                        const gain = Math.floor(sellAmount * rate);
+                        const gain = Math.floor(sellAmount / rate);
                         
                         if (castle.gold + gain <= 99999) {
                             castle.rice -= sellAmount;
@@ -2972,10 +2972,10 @@ class AIEngine {
                             // もし上限(99,999)を超えてしまう場合は、持てる分だけ売るように調整してあげます
                             const maxGain = 99999 - castle.gold;
                             const limitedGain = Math.min(maxGain, castle.tradeLimit || 0); // ★変更：上限も考慮
-                            sellAmount = Math.floor(limitedGain / rate);
-                            
+                            sellAmount = Math.floor(limitedGain * rate);
+
                             if (sellAmount > 0) {
-                                const actualGain = Math.floor(sellAmount * rate);
+                                const actualGain = Math.floor(sellAmount / rate);
                                 castle.rice -= sellAmount;
                                 castle.gold += actualGain;
                                 castle.tradeLimit -= actualGain; // ★変更：減らすのは「得た金額」
@@ -2999,10 +2999,9 @@ class AIEngine {
                     }
                     const extendedShortage = Math.max(0, buyTarget - castle.rice);
                     
-                    // 欲しい分と、お金で買える分の、少ない方にします
-                    // ★変更：取引上限（金）を米の量に変換して上限とします
-                    const maxBuyByTradeLimit = Math.floor((castle.tradeLimit || 0) / rate);
-                    let buyAmount = Math.floor(Math.min(extendedShortage, availableGold / rate, maxBuyByTradeLimit));
+                    // 欲しい分と、お金で買える分の、少ない方にします（rate = 金1あたり兵糧量）。
+                    const maxBuyByTradeLimit = Math.floor((castle.tradeLimit || 0) * rate);
+                    let buyAmount = Math.floor(Math.min(extendedShortage, availableGold * rate, maxBuyByTradeLimit));
                     
                     // ちょい買い防止
                     const minRice = Math.floor(baseSoldiers * 0.3);

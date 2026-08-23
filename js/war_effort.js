@@ -553,17 +553,17 @@ Object.assign(WarManager.prototype, {
                 }
             }
 
-            // ★追加：出陣したことで、攻撃側と守備側の国の米相場が上がります！
-            const maxTradeRate = window.MainParams.Economy.TradeRateMax;
+            // 出陣で兵糧需要が増えるため、金1で得られる兵糧量が下がります。
+            const minTradeRate = window.MainParams.Economy.TradeRateMin;
             const atkProv = this.game.provinces.find(p => p.id === atkCastle.provinceId);
             const defProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
             
             if (atkProv) {
-                atkProv.marketRate = Math.min(maxTradeRate, atkProv.marketRate + 0.3);
+                atkProv.marketRate = Math.max(minTradeRate, atkProv.marketRate - 0.3);
             }
             // 同じ国の中での戦いなら、2重に上がらないようにチェックします
             if (defProv && (!atkProv || atkProv.id !== defProv.id)) {
-                defProv.marketRate = Math.min(maxTradeRate, defProv.marketRate + 0.3);
+                defProv.marketRate = Math.max(minTradeRate, defProv.marketRate - 0.3);
             }
             
             if (selfReinforcementData && selfReinforcementData.castle.ownerClan === pid && !selfReinforcementData.castle.isDelegated && atkCastle.isDelegated) {

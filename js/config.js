@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r114'
+        Version: 'r118'
     },
 
     Main: {
@@ -60,7 +60,10 @@ window.GameConfig = {
                 LordAffinityRestraintWeight: 0.25,
                 RestraintStrength: 0.85,
                 MaxLoyaltyPenalty: 45,
-                BlindSlanderMin: 24
+                BlindSlanderMin: 24,
+                // 反主君的な聞き手が「近い立場の相手」を庇う偏り。固定忠誠値ではなく段階点で最大2段階まで。
+                ProtectionStep1Min: 10,
+                ProtectionStep2Min: 16
             },
             PolicyDisclosure: {
                 LoyaltyWeight: 0.65,
@@ -93,6 +96,7 @@ window.GameConfig = {
             IncomeGoldRate: 1,
             IncomeFluctuation: 0.15,
             ConsumeRicePerSoldier: 0.03,
+            // 米相場は「金1で得られる兵糧量」。2.0なら金1＝兵糧2.0。
             TradeRateBase: 2.0,
             TradeRateMin: 1.5,
             TradeRateMax: 2.5,
@@ -195,7 +199,7 @@ window.GameConfig = {
             AffinityDivisor: 25,
             MinRecognition: -100,
             MaxRecognition: 100,
-            LoyaltyChangeThreshold: 20,
+            LoyaltyChangeThreshold: 15,
             NaturalDecay: 10,
             RoninLoyaltyThreshold: 30,
             RoninChanceBase: 0.5,

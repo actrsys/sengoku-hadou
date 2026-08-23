@@ -123,9 +123,9 @@ class GunshiSystem {
         // 智謀で隠し切れた場合は selfReport 自体が残らないため、本人からは何も申告しない。
         if (selfReport) {
             if (selfReport.assessment.alert === 'red') {
-                messageList.push('恐れながら申し上げます。某の待遇につきましては、今のままでは少々心許なく存じます。一族郎党を養うため、温情あるご配慮を賜りたく存じます');
+                messageList.push('恐れながら申し上げます。今の待遇では、務めにも差し障りがございます。どうかご配慮を賜りたく存じます');
             } else if (selfReport.assessment.alert === 'orange') {
-                messageList.push('恐れながら、某の待遇につきまして、今少しご配慮を賜れればありがたく存じます');
+                messageList.push('恐れながら、某の待遇につきまして、今少しご配慮いただければ幸いにございます');
             }
         }
 

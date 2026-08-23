@@ -237,40 +237,54 @@ class EconomyRules {
         return rate;
     }
 
+    /**
+     * 米相場の表示。marketRate は「金1で得られる兵糧量」を表す。
+     * 例: 2.0 なら 金1＝兵糧2.0。
+     */
+    static formatRiceMarketRate(rate) {
+        return `金1＝兵糧${Number(rate || 0).toFixed(1)}`;
+    }
+
+    /**
+     * 実取引用の米相場を返す。actualRate / ricePerGold はどちらも
+     * 「金1で何兵糧に相当するか」を表す。
+     * 商人割引は購入時は同じ金でより多く買え、売却時は同じ米でより多く金を得られる方向に効く。
+     */
     static getRiceActualRate(type, castle, provinces, game) {
         const baseRate = this.getBaseRiceRate(castle, provinces);
         const myClanId = castle ? castle.ownerClan : 0;
         const merchantDiscount = this.getMerchantDiscount(myClanId, game);
-        
-        let displayRate = baseRate;
+
+        let ricePerGold = baseRate;
         if (type === 'buy_rice') {
-            displayRate = baseRate * (1.0 - merchantDiscount);
+            ricePerGold = baseRate / (1.0 - merchantDiscount);
         } else if (type === 'sell_rice') {
-            displayRate = baseRate * (1.0 + merchantDiscount);
+            ricePerGold = baseRate / (1.0 + merchantDiscount);
         }
-        
+
         return {
-            actualRate: displayRate / 10, // ★÷10の計算をここで完全に一元化
-            displayRateStr: displayRate.toFixed(1) // 画面表示用の文字
+            actualRate: ricePerGold,
+            ricePerGold,
+            displayRateStr: ricePerGold.toFixed(1)
         };
     }
 
     static calcMaxTradeAmount(type, castle, daimyo, castellan, provinces, game) {
         if (type === 'buy_rice') {
             const rateInfo = this.getRiceActualRate('buy_rice', castle, provinces, game);
-            const actualRate = rateInfo.actualRate;
+            const ricePerGold = rateInfo.ricePerGold;
             const maxGold = Math.min(castle.gold, castle.tradeLimit || 0);
-            let maxBuy = Math.floor(maxGold / actualRate);
-            while (maxBuy > 0 && Math.ceil(maxBuy * actualRate) > maxGold) {
+            let maxBuy = Math.floor(maxGold * ricePerGold);
+            while (maxBuy > 0 && Math.ceil(maxBuy / ricePerGold) > maxGold) {
                 maxBuy--;
             }
             return Math.min(maxBuy, 99999 - castle.rice);
         }
         else if (type === 'sell_rice') {
             const rateInfo = this.getRiceActualRate('sell_rice', castle, provinces, game);
-            const actualRate = rateInfo.actualRate;
+            const ricePerGold = rateInfo.ricePerGold;
             const maxGain = Math.min(99999 - castle.gold, castle.tradeLimit || 0);
-            const maxSellByGold = Math.floor(maxGain / actualRate);
+            const maxSellByGold = Math.floor(maxGain * ricePerGold);
             return Math.min(castle.rice, maxSellByGold);
         }
         else if (type === 'buy_ammo') {
@@ -301,11 +315,11 @@ class EconomyRules {
 
         if (type === 'buy_rice') {
             const rateInfo = this.getRiceActualRate('buy_rice', castle, provinces, game);
-            cost = Math.ceil(amount * rateInfo.actualRate);
+            cost = Math.ceil(amount / rateInfo.ricePerGold);
             rateStr = rateInfo.displayRateStr;
         } else if (type === 'sell_rice') {
             const rateInfo = this.getRiceActualRate('sell_rice', castle, provinces, game);
-            cost = Math.floor(amount * rateInfo.actualRate); // 売却の場合は利益
+            cost = Math.floor(amount / rateInfo.ricePerGold); // 売却の場合は利益
             rateStr = rateInfo.displayRateStr;
         } else if (type === 'buy_ammo') {
             const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
@@ -403,10 +417,10 @@ class EconomyRules {
 
         let seasonForce = 0;
         if (game.month === 9) {
-            const randomDown = (baseRate * 0.5) + (Math.random() * (baseRate * 0.5));
-            seasonForce = -randomDown;
+            const harvestBoost = (baseRate * 0.5) + (Math.random() * (baseRate * 0.5));
+            seasonForce = harvestBoost;
         } else {
-            seasonForce = baseRate * 0.05;
+            seasonForce = -(baseRate * 0.05);
         }
 
         const adjProvinces = {};
