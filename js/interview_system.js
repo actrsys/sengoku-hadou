@@ -7,6 +7,7 @@ class InterviewSystem {
     constructor(game) {
         this.game = game;
         this.activeInterviewAttitude = null;
+        this.activeRumor = null;
     }
 
     get view() {
@@ -20,6 +21,7 @@ class InterviewSystem {
 
     close() {
         this.activeInterviewAttitude = null;
+        this.activeRumor = null;
         if (this.view) this.view.close();
         if (this.game && this.game.ui) {
             this.game.ui.updatePanelHeader();
@@ -33,17 +35,13 @@ class InterviewSystem {
                 && window.BushoStatusRules.isActive(b)
                 && !b.isDaimyo
                 && (excludeId === null || Number(b.id) !== Number(excludeId)))
-            .slice()
-            .sort((a, b) => {
-                const leadershipDiff = Number(b.leadership || 0) - Number(a.leadership || 0);
-                if (leadershipDiff !== 0) return leadershipDiff;
-                return Number(a.id || 0) - Number(b.id || 0);
-            });
+            .slice();
     }
 
     showInterviewerList() {
         if (!this.view) return;
         this.activeInterviewAttitude = null;
+        this.activeRumor = null;
         const candidates = this._getInterviewCandidates();
         this.view.showInterviewerList(
             candidates,
@@ -65,6 +63,7 @@ class InterviewSystem {
         // 面談開始後の現在忠誠を基準に、その面談中の表面態度を一度だけ決める。
         // 以後の導入台詞も同じ態度を使い、挨拶だけ急に別人格になるのを防ぐ。
         this.activeInterviewAttitude = this._getSurfaceAttitude(busho);
+        this.activeRumor = null;
 
         this.view.showMessages(
             busho,
@@ -227,7 +226,8 @@ class InterviewSystem {
             [
                 { label: '調子はどうだ', onClick: () => this.executeInterviewStatus(busho) },
                 { label: '方針について', onClick: () => this.executeInterviewPolicy(busho) },
-                { label: '他者について聞く', onClick: () => this.showTargetList(busho) }
+                { label: '他者について聞く', onClick: () => this.showTargetList(busho) },
+                { label: '武将の噂', onClick: () => this.executeInterviewRumor(busho) }
             ],
             () => this.showInterviewerList()
         );
@@ -621,6 +621,250 @@ class InterviewSystem {
         this.view.showMessages(busho, messages, () => this.showMainMenu(busho), '方針について');
     }
 
+    _getRumorStatDefs() {
+        return [
+            ['leadership', '統率'], ['strength', '武勇'], ['politics', '内政'],
+            ['diplomacy', '外交'], ['intelligence', '智謀'], ['charm', '魅力']
+        ];
+    }
+
+    _getRumorExpertDomain(interviewer) {
+        const cfg = window.MainParams.Interview.Rumor;
+        const rows = this._getRumorStatDefs()
+            .map(([key, label], order) => ({ key, label, order, value: Number(interviewer && interviewer[key] || 0) }))
+            .sort((a, b) => b.value - a.value || a.order - b.order);
+        const best = rows[0] || null;
+        return best && best.value >= Number(cfg.ExpertMinStat) ? best : null;
+    }
+
+    _getRumorRegionCastleIds(depth) {
+        const result = new Set();
+        if (!this.game || !Array.isArray(this.game.castles)) return result;
+        const queue = [];
+        for (const castle of this.game.castles) {
+            if (Number(castle.ownerClan) !== Number(this.game.playerClanId)) continue;
+            const id = Number(castle.id);
+            if (result.has(id)) continue;
+            result.add(id);
+            queue.push({ castle, distance: 0 });
+        }
+
+        let head = 0;
+        while (head < queue.length) {
+            const row = queue[head++];
+            if (row.distance >= depth) continue;
+            let adjacentIds = [];
+            if (this.game.mapGraph && typeof this.game.mapGraph.getAdjacentIds === 'function') {
+                adjacentIds = this.game.mapGraph.getAdjacentIds(row.castle);
+            } else {
+                adjacentIds = (this.game.castles || [])
+                    .filter(c => typeof MapGraphService !== 'undefined' && MapGraphService.isAdjacent(row.castle, c))
+                    .map(c => c.id);
+            }
+            for (const rawId of adjacentIds) {
+                const id = Number(rawId);
+                if (result.has(id)) continue;
+                const castle = this.game.getCastle ? this.game.getCastle(id) : this.game.castles.find(c => Number(c.id) === id);
+                if (!castle) continue;
+                result.add(id);
+                queue.push({ castle, distance: row.distance + 1 });
+            }
+        }
+        return result;
+    }
+
+    _getRumorRegionalCandidates(regionCastleIds) {
+        const myClanId = Number(this.game.playerClanId);
+        return (this.game.bushos || []).filter(target => {
+            if (!target || target.isAutoLeader) return false;
+            if (Number(target.clan) === myClanId) return false;
+            const present = !!(window.BushoStatusRules
+                && (window.BushoStatusRules.isActive(target) || window.BushoStatusRules.isRonin(target)));
+            if (!present) return false;
+            return regionCastleIds.has(Number(target.castleId));
+        });
+    }
+
+    _getRumorTopStats(target) {
+        return this._getRumorStatDefs()
+            .map(([key]) => Number(target && target[key] || 0))
+            .sort((a, b) => b - a);
+    }
+
+    _isRumorExpertCandidate(target, domain) {
+        if (!target || !domain) return false;
+        const cfg = window.MainParams.Interview.Rumor;
+        const value = Number(target[domain.key] || 0);
+        const best = Math.max(...this._getRumorStatDefs().map(([key]) => Number(target[key] || 0)));
+        return value >= Number(cfg.CandidateMinStat)
+            && value >= best - Number(cfg.CandidateBestGap);
+    }
+
+    _isRumorGeneralCandidate(target) {
+        const cfg = window.MainParams.Interview.Rumor;
+        const stats = this._getRumorTopStats(target);
+        return stats.length >= 3
+            && stats[0] >= Number(cfg.GeneralMinBestStat)
+            && stats[0] + stats[1] + stats[2] >= Number(cfg.GeneralTopThreeMinTotal);
+    }
+
+    _pickRandom(items) {
+        if (!Array.isArray(items) || items.length === 0) return null;
+        return items[Math.floor(Math.random() * items.length)] || null;
+    }
+
+    _selectRumorTarget(interviewer) {
+        const cfg = window.MainParams.Interview.Rumor;
+        const domain = this._getRumorExpertDomain(interviewer);
+        const depths = [Number(cfg.SearchDepth), Number(cfg.ExtendedSearchDepth)]
+            .filter((value, index, array) => Number.isFinite(value) && value >= 0 && array.indexOf(value) === index);
+
+        for (const depth of depths) {
+            const regional = this._getRumorRegionalCandidates(this._getRumorRegionCastleIds(depth));
+            if (domain) {
+                const expertCandidates = regional.filter(target => this._isRumorExpertCandidate(target, domain));
+                const target = this._pickRandom(expertCandidates);
+                if (target) return { target, mode: 'expert', domain, depth };
+            }
+            const generalCandidates = regional.filter(target => this._isRumorGeneralCandidate(target));
+            const target = this._pickRandom(generalCandidates);
+            if (target) return { target, mode: 'general', domain: null, depth };
+        }
+        return null;
+    }
+
+    _getRumorSubjectText(target) {
+        if (!target) return 'ある武将';
+        if (window.BushoStatusRules && window.BushoStatusRules.isRonin(target)) {
+            return `${target.name}殿という浪人`;
+        }
+        if (Number(target.belongKunishuId || 0) > 0) {
+            const kunishu = this.game.kunishuSystem && this.game.kunishuSystem.getKunishu(target.belongKunishuId);
+            if (kunishu) {
+                const name = kunishu.getName(this.game);
+                if (Number(kunishu.leaderId) === Number(target.id)) return `${name}の頭領、${target.name}殿`;
+                return `${name}の${target.name}殿`;
+            }
+            // 諸勢力の castleId は地域アンカーであり実所在地とは限らない。城名には変換しない。
+            return `${target.name}殿という武将`;
+        }
+        const clan = Number(target.clan) > 0 && this.game.getClan ? this.game.getClan(Number(target.clan)) : null;
+        if (clan) {
+            if (target.isDaimyo) return `${clan.name}を率いる${target.name}殿`;
+            return `${clan.name}の${target.name}殿`;
+        }
+        return `${target.name}殿という武将`;
+    }
+
+    _getRumorOpeningText(row, attitude) {
+        const subject = this._getRumorSubjectText(row.target);
+        const isGeneral = row.mode === 'general';
+        if (attitude === 'reserved') {
+            return isGeneral
+                ? `……${subject}の名なら聞いております。なかなかの御仁だとか。`
+                : `……${subject}の名なら聞いております。`;
+        }
+        if (attitude === 'polite') {
+            return isGeneral
+                ? `詳しいことは存じませぬが、${subject}がなかなかの御仁だとの噂は耳にしております。`
+                : `耳にした話では、${subject}が近頃評判になっているようです。`;
+        }
+        if (attitude === 'welcoming') {
+            return isGeneral
+                ? `そういえば、${subject}がなかなかの御仁だと近頃評判になっております！`
+                : `そういえば、近頃${subject}の噂を耳にしました！`;
+        }
+        return isGeneral
+            ? `詳しいことは存じませぬが、${subject}がなかなかの御仁だと噂になっております。`
+            : `そういえば、近頃${subject}の噂を耳にしました。`;
+    }
+
+    _getRumorAbilityText(row, attitude) {
+        if (row.mode === 'expert' && row.domain) {
+            const prefix = attitude === 'reserved' ? '聞けば、' : '聞けば、';
+            return `${prefix}${row.domain.label}に秀でた御仁だとか。`;
+        }
+        return attitude === 'reserved'
+            ? '腕は立つそうです。'
+            : '評判になるだけあって、なかなか腕の立つ御仁だと聞いております。';
+    }
+
+    _getRumorLoyaltyText(target) {
+        if (!target) return '';
+        if (window.BushoStatusRules && window.BushoStatusRules.isRonin(target)) {
+            return '今は仕える主を持たず、浪々の身だそうです。';
+        }
+        if (Number(target.belongKunishuId || 0) > 0) {
+            const kunishu = this.game.kunishuSystem && this.game.kunishuSystem.getKunishu(target.belongKunishuId);
+            if (kunishu && Number(kunishu.leaderId) === Number(target.id)) {
+                return `今は${kunishu.getName(this.game)}の頭領を務めているそうです。`;
+            }
+        }
+        if (target.isDaimyo) {
+            const clan = this.game.getClan ? this.game.getClan(Number(target.clan)) : null;
+            return clan ? `当人が今の${clan.name}を率いております。` : '当人が一勢力を率いる立場だそうです。';
+        }
+
+        const band = this._getConcealmentProfile(target).perceivedBand;
+        const lordText = Number(target.belongKunishuId || 0) > 0 ? '今の頭領' : '今の主君';
+        if (band === 'stable') return `${lordText}には、かなり信を置いているとの話です。`;
+        if (band === 'warning') return `${lordText}との間に、特段悪い話は聞きませぬ。`;
+        if (band === 'danger' || band === 'dissatisfied') return `${lordText}には、何やら思うところがあるとも聞きます。`;
+        return `${lordText}とは、あまり折り合いがよくないという噂もございます。`;
+    }
+
+    _getRumorMessages(interviewer, row) {
+        if (!row || !row.target) return [];
+        const attitude = this.activeInterviewAttitude;
+        const messages = [this._getRumorOpeningText(row, attitude), this._getRumorAbilityText(row, attitude)];
+        // reserved は口数を抑え、人物名と評判まで。良好～丁寧なら立場・主君との評判まで伝える。
+        if (attitude !== 'reserved') messages.push(this._getRumorLoyaltyText(row.target));
+        return messages.filter(Boolean).map(text => `「${text}」`);
+    }
+
+    executeInterviewRumor(interviewer) {
+        const attitude = this.activeInterviewAttitude;
+        if (attitude === 'cold') {
+            this.view.showMessages(
+                interviewer,
+                ['「……他家の武将の噂まで、某から申し上げることはございませぬ。」'],
+                () => this.showMainMenu(interviewer),
+                '武将の噂'
+            );
+            return;
+        }
+        if (attitude === 'startled') {
+            this.view.showMessages(
+                interviewer,
+                ['「……そ、そのような噂話について、今は申し上げることはございませぬ。」'],
+                () => this.showMainMenu(interviewer),
+                '武将の噂'
+            );
+            return;
+        }
+
+        // 同じ面談中に何度押しても候補を引き直さず、噂コマンドを人材検索ガチャにしない。
+        if (!this.activeRumor || Number(this.activeRumor.interviewerId) !== Number(interviewer.id)) {
+            const row = this._selectRumorTarget(interviewer);
+            this.activeRumor = { interviewerId: Number(interviewer.id), row };
+        }
+        const row = this.activeRumor.row;
+        if (!row) {
+            const text = attitude === 'reserved'
+                ? '……近頃は、これといって耳に残る武将の噂はございませぬ。'
+                : '近頃は、これといって耳に残る武将の噂はございませぬな。';
+            this.view.showMessages(interviewer, [`「${text}」`], () => this.showMainMenu(interviewer), '武将の噂');
+            return;
+        }
+
+        this.view.showMessages(
+            interviewer,
+            this._getRumorMessages(interviewer, row),
+            () => this.showMainMenu(interviewer),
+            '武将の噂'
+        );
+    }
+
     executeInterviewTopic(interviewer, target) {
         const relation = PersonnelRules.calcRelationshipProfile(interviewer, target);
         const concealment = this._getConcealmentProfile(target);
@@ -647,13 +891,21 @@ class InterviewSystem {
         const opinionDirection = this._getOpinionDirection(relation.compatibilityScore);
         const loyaltyAssessment = this._getTargetLoyaltyAssessment(interviewer, target, relation);
         const messages = [`「${this._getTopicOpening(target)}${opinionText}」`];
+        // 3段階の会話列全体で逆接を管理する。1段目の本文中ですでに「ただ／もっとも」を
+        // 使っている場合も使用済みとし、後続で逆接を重ねない。
+        const transitionState = {
+            used: /(?:^|[。！？])(?:ただ|もっとも|正直なところ)、/.test(opinionText),
+            last: null,
+            contactScore: Number(relation && relation.contactScore || 0)
+        };
 
         if (attitude === 'reserved') {
             // 寡黙な態度では接触関係の説明まで重ねず、要点だけ二言で答える。
             const loyaltyText = this._bridgeAssessmentText(
                 loyaltyAssessment.text,
                 opinionDirection,
-                loyaltyAssessment.direction
+                loyaltyAssessment.direction,
+                transitionState
             );
             messages.push(`「${loyaltyText}」`);
         } else {
@@ -661,12 +913,14 @@ class InterviewSystem {
             const contactText = this._bridgeAssessmentText(
                 this._getContactText(relation, interviewer, attitude),
                 opinionDirection,
-                contactDirection
+                contactDirection,
+                transitionState
             );
             const loyaltyText = this._bridgeAssessmentText(
                 loyaltyAssessment.text,
                 contactDirection,
-                loyaltyAssessment.direction
+                loyaltyAssessment.direction,
+                transitionState
             );
             messages.push(`「${contactText}」`, `「${loyaltyText}」`);
         }
@@ -694,16 +948,42 @@ class InterviewSystem {
     }
 
     _stripAssessmentTransition(text) {
-        return String(text || '').replace(/^(?:ただ|もっとも|そのうえ|そのため)、?\s*/, '');
+        return String(text || '').replace(/^(?:ただ|もっとも|正直なところ|そのうえ|そのため)、?\s*/, '');
     }
 
-    _bridgeAssessmentText(text, previousDirection, currentDirection) {
+    _chooseAssessmentTransition(previousDirection, currentDirection, transitionState = null) {
+        // unknown は評価の中立ではなく「情報が足りない」。
+        // よく交流していて直前も好意的なら「知っているが、その奥は別」という逆接の「ただ」。
+        // 接触が十分でないなら「判断材料がない」という告白なので「正直なところ」を使う。
+        if (currentDirection === 'unknown') {
+            const contactScore = Number(transitionState && transitionState.contactScore || 0);
+            if (previousDirection === 'positive' && contactScore >= 52) return 'ただ';
+            if (contactScore < 52) return '正直なところ';
+            return '';
+        }
+        // 好意的な人物評価の後に「普段はさほど話さない」という中立的な接触情報が来る
+        // 場合も、ユーザーが読む意味としては軽い逆接になる。
+        if (previousDirection === 'positive' && (currentDirection === 'neutral' || currentDirection === 'negative')) {
+            return 'ただ';
+        }
+        if (previousDirection === 'neutral' && currentDirection === 'negative') return 'ただ';
+        if (previousDirection === 'negative' && (currentDirection === 'neutral' || currentDirection === 'positive')) {
+            return 'もっとも';
+        }
+        return '';
+    }
+
+    _bridgeAssessmentText(text, previousDirection, currentDirection, transitionState = null) {
         const body = this._stripAssessmentTransition(text);
-        // 3段階会話では各段の境界だけを見る。前段と評価方向が逆転した時だけ逆接を置き、
-        // 2段目と3段目へ機械的に「ただ」を重ねない。
-        if (previousDirection === 'positive' && currentDirection === 'negative') return `ただ、${body}`;
-        if (previousDirection === 'negative' && currentDirection === 'positive') return `もっとも、${body}`;
-        return body;
+        const connector = this._chooseAssessmentTransition(previousDirection, currentDirection, transitionState);
+        // 3段階の会話列では明示的な接続（ただ／もっとも／正直なところ）は原則1回だけ。各文を個別に補正して
+        // 「ただ、…」→「ただ、…」のように重ねるより、後段は独立文で受けた方が自然。
+        if (!connector || (transitionState && transitionState.used)) return body;
+        if (transitionState) {
+            transitionState.used = true;
+            transitionState.last = connector;
+        }
+        return `${connector}、${body}`;
     }
 
     _getOpinionText(score, attitude = this.activeInterviewAttitude) {
@@ -722,7 +1002,7 @@ class InterviewSystem {
         if (contact >= 52) return '必要な折には、よく話をしております。';
         if (contact >= 34) {
             if (relation.compatibilityScore >= 68) {
-                return 'ただ、普段はさほど話す機会がございませぬ。';
+                return '普段はさほど話す機会がございませぬ。';
             }
             return '用向きがなければ、あまり言葉を交わしませぬ。';
         }
@@ -810,26 +1090,28 @@ class InterviewSystem {
     _getBlindTargetText(interviewer, target, relation, concealment) {
         const interviewerInt = Number(interviewer.intelligence || 0);
         const targetInt = Number(target.intelligence || 0);
+        const contactScore = Number(relation && relation.contactScore || 0);
         const hardToRead = concealment.isConcealing || targetInt >= interviewerInt + 20;
 
-        if (relation.contactScore >= 52) {
+        if (contactScore >= 52) {
+            // 普段の人柄や様子は知っている。そのうえで主君への忠誠という奥まった部分だけ
+            // 読めないため、「までは」が自然に成立する。接続詞は系列側で付与する。
             return hardToRead
-                ? 'ただ、あの方は肝心な胸中をほとんど見せませぬ。殿への本心までは、某にも読み切れませぬ。'
-                : 'ただ、殿への胸中となると、某にはほとんど読み取れませぬ。';
+                ? 'あの方は肝心な胸中をほとんど見せませぬ。殿への本心までは、某にも読み切れませぬ。'
+                : '殿への胸中までは、某にも読み切れませぬ。';
         }
-        if (relation.compatibilityScore >= 68) {
+        if (contactScore < 34) {
+            // そもそも接触が乏しい時に「までは」と言うと、一部は知っている含みが出る。
+            // 本心そのものを判断できない、と素直に言い切る。
             return hardToRead
-                ? 'もっとも、殿への胸中となると、あの方はなかなか内心を見せませぬ。某にもほとんど読み取れませぬ。'
-                : 'もっとも、殿への胸中までは、某にもほとんど分かりませぬ。';
+                ? 'あの方は内心を見せぬお方です。殿への本心は、某にも分かりかねます。'
+                : '殿への本心は、某にも分かりかねます。';
         }
-        if (relation.contactScore < 34) {
-            return hardToRead
-                ? 'そのうえ、あの方も内心を見せませぬ。殿への胸中までは、某にはほとんど分かりませぬ。'
-                : 'そのため、殿への胸中までは某にも分かりませぬ。';
-        }
+        // 中程度の接触では多少の人物像は分かるが、忠誠を断じる材料まではない。
+        // 「正直なところ」は接続生成側で必要な時だけ付ける。
         return hardToRead
-            ? 'あの方はなかなか内心を見せぬお方です。殿への胸中までは、某にはほとんど読み取れませぬ。'
-            : '殿への胸中となると、某にはほとんど読み取れませぬ。断じられるほどの材料がございませぬ。';
+            ? 'あの方はなかなか内心を見せませぬ。殿への本心は、某にも読み切れませぬ。'
+            : '殿への本心は、某にも分かりかねます。';
     }
 
     _getTargetLoyaltyBandText(band, uncertain) {
@@ -913,7 +1195,7 @@ class InterviewSystem {
             if (biasedBlindText) return { text: biasedBlindText, direction: 'negative' };
             return {
                 text: this._getBlindTargetText(interviewer, target, relation, concealment),
-                direction: 'neutral'
+                direction: 'unknown'
             };
         }
 

@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r120');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r125');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2208,7 +2208,16 @@ test('面談は専用View内で完結し固定論理画面内・非スクロー�
     assert.ok(ui.includes("target.closest('input, select, textarea, option, [contenteditable=\"true\"]')"), 'スマホ共通touchendは入力・selectからフォーカスを奪わない');
     const sortRules = read('js/busho_list_sort_rules.js');
     assert.ok(sortRules.includes('getInterviewSortOptions()'));
+    assert.ok(sortRules.includes("{ key: 'rank', label: '身分'"), '面談名簿は身分を先頭のソート項目として持つ');
+    assert.ok(sortRules.indexOf("{ key: 'rank', label: '身分'") < sortRules.indexOf("{ key: 'name', label: '名前'") && sortRules.indexOf("{ key: 'name', label: '名前'") < sortRules.indexOf("{ key: 'castle', label: '所在'"), '面談ソートは身分→名前→所在の順に並べる');
+    assert.ok(view.includes("this.listSortKey = 'rank'"), '面談を閉じるとソートを身分順へ戻し別セーブへ持ち越さない');
+    assert.ok(view.includes('_getListSecondaryText(busho)'), '武将選択カードは現在のソート値を名前下へ表示する');
+    assert.ok(view.includes('StatPresenter.getBushoRankName(busho, this.game)') && view.includes('StatPresenter.toGradeText(busho[this.listSortKey])'), '身分/名前は身分、能力ソートは既存ランク文字を名前下へ表示する');
+    assert.ok(css.includes('.interview-session-person-rank') && css.includes('color: #aaa'), '武将名の下に身分を武将詳細系の控えめな灰色で表示する');
+    assert.ok(css.includes('.interview-session-stat-label') && css.includes('color: #ffd54f'), '個別面談の能力項目名は武将詳細と同じ黄橙系ラベル色を使う');
+    assert.ok(view.includes('castle ? castle.name') && !view.includes('所在：${castle.name}') && !view.includes('身分：${rank}'), '個別面談の名前下補助情報はコロン付きラベルを使わず武将詳細系の簡潔なメタ表示にする');
     assert.ok(!sortRules.includes("{ key: 'loyalty'"), '面談の並び替え候補に忠誠を入れない');
+    assert.ok(!sortRules.includes('achievementTotal'), 'プレイヤー非公開の功績を面談ソートや同順位判定に使わない');
     const bushoUi = read('js/ui_info_busho.js');
     assert.ok(bushoUi.includes("BushoListSortRules.compareKnown(this.game, a, b, 'name'"), '元の武将一覧も名前ソートの共通規則を使う');
     assert.ok(bushoUi.includes("BushoListSortRules.compareKnown(this.game, a, b, 'castle'"), '元の武将一覧も所在ソートの共通規則を使う');
@@ -2255,26 +2264,38 @@ test('面談の他者評価は高智謀の偽装・看破・全く読めない�
     assert.ok(!fooled.includes('本心ではありますまい'));
 
     const blindInterviewer = { loyalty: 90, intelligence: 30, duty: 30 };
-    const unreadable = system._getTargetLoyaltyText(blindInterviewer, { loyalty: 50, intelligence: 90, ambition: 50 }, relationClose);
-    assert.ok(unreadable.startsWith('ただ、'), '前段の接触評価を繰り返さず次の論点へつなぐ');
-    assert.ok(unreadable.includes('胸中をほとんど見せませぬ'));
-    assert.ok(unreadable.includes('読み切れませぬ'));
+    const blindAssessment = system._getTargetLoyaltyAssessment(blindInterviewer, { loyalty: 50, intelligence: 90, ambition: 50 }, relationClose);
+    assert.strictEqual(blindAssessment.direction, 'unknown', '全く読めない状態を中立評価とは分ける');
+    assert.ok(!blindAssessment.text.startsWith('ただ、') && !blindAssessment.text.startsWith('もっとも、'), '単体の忠誠所見へ前文依存の接続詞を埋め込まない');
+    assert.ok(blindAssessment.text.includes('胸中をほとんど見せませぬ'));
+    assert.ok(blindAssessment.text.includes('読み切れませぬ'));
 });
 
 
-test('面談の3段階他者評価は評価方向が変わる境界だけ逆接し同じ接続詞を重ねない', () => {
+test('面談の3段階他者評価は軽い逆接・unknownを区別し系列全体で逆接を重ねない', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
     loadScript(ctx, 'js/loyalty_insight_rules.js');
     loadScript(ctx, 'js/interview_system.js');
     const system = new ctx.InterviewSystem({});
 
-    const second = system._bridgeAssessmentText('ただ、普段はさほど話す機会がございませぬ。', 'positive', 'negative');
-    const third = system._bridgeAssessmentText('ただ、待遇に不満を抱えているようです。', 'negative', 'negative');
-    assert.ok(second.startsWith('ただ、'), '好意的評価から悪化する2段目だけ逆接する');
-    assert.ok(!third.startsWith('ただ、'), '2段目が既に悪化している場合は3段目へ「ただ」を重ねない');
+    const state = { used: false, last: null };
+    const second = system._bridgeAssessmentText('ただ、普段はさほど話す機会がございませぬ。', 'positive', 'neutral', state);
+    const third = system._bridgeAssessmentText('ただ、待遇に不満を抱えているようです。', 'neutral', 'negative', state);
+    assert.ok(second.startsWith('ただ、'), '好意的評価から接触が薄くなる2段目には軽い逆接を置く');
+    assert.ok(!third.startsWith('ただ、') && !third.startsWith('もっとも、'), '2段目で逆接を使った後は3段目へ逆接を重ねない');
 
-    const recovered = system._bridgeAssessmentText('もっとも、殿への忠義は本物でしょう。', 'negative', 'positive');
+    const knownPersonState = { used: false, last: null, contactScore: 70 };
+    const knownPersonUnknown = system._bridgeAssessmentText('殿への胸中までは、某にも読み切れませぬ。', 'positive', 'unknown', knownPersonState);
+    assert.ok(knownPersonUnknown.startsWith('ただ、'), '交流が多い相手の本心だけ不明なら「ただ」で一段深い未知へつなぐ');
+
+    const sparseState = { used: false, last: null, contactScore: 40 };
+    const sparseUnknown = system._bridgeAssessmentText('殿への本心は、某にも分かりかねます。', 'neutral', 'unknown', sparseState);
+    assert.ok(sparseUnknown.startsWith('正直なところ、'), '交流が十分でない相手は逆接ではなく情報不足を「正直なところ」で表す');
+    assert.ok(!sparseUnknown.includes('本心までは'), '交流が薄い相手に「までは」を使って一部を知っている含みを出さない');
+
+    const recoveredState = { used: false, last: null };
+    const recovered = system._bridgeAssessmentText('もっとも、殿への忠義は本物でしょう。', 'negative', 'positive', recoveredState);
     assert.ok(recovered.startsWith('もっとも、'), '否定的評価から好転する場合は「もっとも」で自然につなぐ');
 });
 
@@ -2571,12 +2592,22 @@ test('面談の連続台詞は相槌・呼びかけ・立場前置きを後続�
     assert.ok(!system._getMenuPrompt('reserved').includes('殿'), '最初の挨拶直後の用件確認で「殿」を連呼しない');
     assert.ok(!system._getTopicOpening({ name: '家臣' }, 'friendly').includes('ええ、'), '他者評価の導入で相槌を固定しない');
     const contact = system._getContactText({ contactScore: 40, compatibilityScore: 75, affinityDiff: 5 }, { duty: 50, ambition: 50 }, 'friendly');
-    assert.ok(contact.startsWith('ただ、') && !contact.startsWith('信頼は'), '前文の「信頼」を次文頭で重ねない');
+    assert.ok(!contact.startsWith('ただ、') && !contact.startsWith('信頼は'), '接触台詞の素材には前文依存の逆接を埋め込まず「信頼」も文頭で繰り返さない');
     const blind = system._getBlindTargetText({ intelligence: 40 }, { intelligence: 90 }, { contactScore: 60, compatibilityScore: 70 }, { isConcealing: true });
-    assert.ok(blind.startsWith('ただ、') && !blind.includes('普段から話は'), '接触頻度を説明した直後に同じ情報を繰り返さない');
-    const sparseContact = system._getContactText({ contactScore: 40, compatibilityScore: 75, affinityDiff: 5 }, { duty: 50, ambition: 50 }, 'friendly');
-    const sparseBlind = system._getBlindTargetText({ intelligence: 40 }, { intelligence: 90 }, { contactScore: 40, compatibilityScore: 75 }, { isConcealing: true });
-    assert.ok(sparseContact.startsWith('ただ、') && sparseBlind.startsWith('もっとも、'), '連続メッセージで同じ接続詞を重ねない');
+    assert.ok(!blind.startsWith('ただ、') && !blind.startsWith('もっとも、') && !blind.includes('普段から話は'), '忠誠不明の素材は接続詞を内包せず接触頻度も繰り返さない');
+    assert.ok(blind.includes('本心までは'), '交流が多い相手なら人物像は知っているため「本心までは」が成立する');
+    const sparseRaw = system._getBlindTargetText({ intelligence: 40 }, { intelligence: 90 }, { contactScore: 40, compatibilityScore: 60 }, { isConcealing: true });
+    assert.ok(sparseRaw.includes('本心は') && !sparseRaw.includes('本心までは'), '交流が十分でない相手は本心そのものが不明と表現する');
+    const sequenceState = { used: false, last: null, contactScore: 40 };
+    const sparseContact = system._bridgeAssessmentText(
+        system._getContactText({ contactScore: 40, compatibilityScore: 75, affinityDiff: 5 }, { duty: 50, ambition: 50 }, 'friendly'),
+        'positive', 'neutral', sequenceState
+    );
+    const sparseBlind = system._bridgeAssessmentText(
+        system._getBlindTargetText({ intelligence: 40 }, { intelligence: 90 }, { contactScore: 40, compatibilityScore: 75 }, { isConcealing: true }),
+        'neutral', 'unknown', sequenceState
+    );
+    assert.ok(sparseContact.startsWith('ただ、') && !sparseBlind.startsWith('ただ、') && !sparseBlind.startsWith('もっとも、'), '3段階系列では2段目で逆接を使ったら3段目へ重ねない');
     assert.ok(!read('js/interview_system.js').includes('軍団長として申し上げるなら'), '軍団長の立場前置きを文ごとに重ねる旧処理を残さない');
 });
 
@@ -2656,8 +2687,70 @@ test('軍師本人の忠誠報告は自分の偽装を自己看破せず残っ�
     const clever = { id: 2, clan: 1, name: '曲者軍師', intelligence: 90, loyalty: 65, duty: 90, ambition: 80, faceIcon: '' };
     const hiddenGame = { playerClanId: 1, bushos: [clever], getClanGunshi() { return clever; }, ui: { showDialog() { throw new Error('偽装で無色なら報告しない'); } } };
     const hiddenSystem = new ctx.GunshiSystem(hiddenGame);
-    assert.strictEqual(hiddenSystem.getLoyaltyAssessment(clever, clever).alert, 'none', '智謀90なら危険域から2段階上へ偽装して自己報告を隠せる');
+    assert.strictEqual(hiddenSystem.getLoyaltyAssessment(clever, clever).alert, 'none', '大名側の補正がなければ、智謀90軍師は危険域から2段階上へ偽装して自己報告を隠せる');
     hiddenSystem.checkAndShowAdvice({}, () => {});
+
+    const daimyoLow = { id: 10, clan: 1, isDaimyo: true, intelligence: 69 };
+    const lowLordGame = {
+        playerClanId: 1,
+        bushos: [clever, daimyoLow],
+        getClanGunshi() { return clever; },
+        getClanDaimyo() { return daimyoLow; },
+        ui: { showDialog() {} }
+    };
+    const lowLordAssessment = new ctx.GunshiSystem(lowLordGame).getLoyaltyAssessment(clever, clever);
+    assert.strictEqual(lowLordAssessment.selfConcealmentCounterShift, 0, '大名智謀69以下では軍師本人の偽装を控えない');
+    assert.strictEqual(lowLordAssessment.alert, 'none');
+
+    const daimyoMid = { id: 11, clan: 1, isDaimyo: true, intelligence: 70 };
+    const midLordGame = {
+        playerClanId: 1,
+        bushos: [clever, daimyoMid],
+        getClanGunshi() { return clever; },
+        getClanDaimyo() { return daimyoMid; },
+        ui: { showDialog() {} }
+    };
+    const midLordAssessment = new ctx.GunshiSystem(midLordGame).getLoyaltyAssessment(clever, clever);
+    assert.strictEqual(midLordAssessment.selfConcealmentCounterShift, 1, '大名智謀70以上なら軍師本人の偽装を1段階だけ控える');
+    assert.strictEqual(midLordAssessment.assessedBand, 'warning');
+    assert.strictEqual(midLordAssessment.alert, 'orange');
+
+    const daimyoHigh = { id: 12, clan: 1, isDaimyo: true, intelligence: 90 };
+    const highLordGame = {
+        playerClanId: 1,
+        bushos: [clever, daimyoHigh],
+        getClanGunshi() { return clever; },
+        getClanDaimyo() { return daimyoHigh; },
+        ui: { showDialog() {} }
+    };
+    const highLordAssessment = new ctx.GunshiSystem(highLordGame).getLoyaltyAssessment(clever, clever);
+    assert.strictEqual(highLordAssessment.selfConcealmentCounterShift, 2, '大名智謀90以上なら軍師本人の偽装を最大2段階控える');
+    assert.strictEqual(highLordAssessment.assessedBand, 'danger');
+    assert.strictEqual(highLordAssessment.alert, 'red');
+
+    const oneStepGunshi = { id: 3, clan: 1, name: '慎重軍師', intelligence: 70, loyalty: 60, duty: 90, ambition: 30, faceIcon: '' };
+    const cappedGame = {
+        playerClanId: 1,
+        bushos: [oneStepGunshi, daimyoHigh],
+        getClanGunshi() { return oneStepGunshi; },
+        getClanDaimyo() { return daimyoHigh; },
+        ui: { showDialog() {} }
+    };
+    const cappedAssessment = new ctx.GunshiSystem(cappedGame).getLoyaltyAssessment(oneStepGunshi, oneStepGunshi);
+    assert.strictEqual(cappedAssessment.selfConcealmentCounterShift, 1, '大名智謀90でも軍師本人が実際に隠した段階数を越えて補正しない');
+    assert.strictEqual(cappedAssessment.assessedBand, cappedAssessment.actualBand);
+
+    const other = { id: 20, clan: 1, name: '他武将', intelligence: 90, loyalty: 65, duty: 60, ambition: 60, faceIcon: '' };
+    const otherLowLord = new ctx.GunshiSystem({
+        playerClanId: 1, bushos: [clever, other, daimyoLow],
+        getClanGunshi() { return clever; }, getClanDaimyo() { return daimyoLow; }
+    }).getLoyaltyAssessment(other, clever);
+    const otherHighLord = new ctx.GunshiSystem({
+        playerClanId: 1, bushos: [clever, other, daimyoHigh],
+        getClanGunshi() { return clever; }, getClanDaimyo() { return daimyoHigh; }
+    }).getLoyaltyAssessment(other, clever);
+    assert.strictEqual(otherLowLord.assessedBand, otherHighLord.assessedBand, '大名智謀は軍師本人以外の忠誠報告精度を変えない');
+    assert.strictEqual(otherHighLord.selfConcealmentCounterShift, 0);
 });
 
 test('城壁修復の共通スコアは従来AI式と同値で面談参照によって行動基準を変えない', () => {
@@ -2710,6 +2803,24 @@ test('軍師の橙忠誠報告は単独先頭なら「にも」を使わない',
     assert.ok(!dialogs[0].includes('家臣殿にも'), '前文がないのに「にも」で始めない');
 });
 
+test('面談の検索・ソート状態は面談を閉じた時点で身分順へ破棄する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/interview_view.js');
+    const view = Object.create(ctx.InterviewView.prototype);
+    Object.assign(view, {
+        modal: null, body: null, inlineActions: null, footer: null, pager: null, content: null,
+        dialogShell: null, dialogName: null, dialogFace: null, dialogMessage: null,
+        listSortKey: 'politics', listSortAsc: true, listQuery: '柴田', pageItems: [1], page: 2, pageSize: 15,
+        onPageItemSelect: () => {}, currentSpeaker: {}, _listGrid: {}, _listCount: {}, _listDirection: {},
+        _searchComposing: true, _messageAdvanceHandler: null
+    });
+    view._clearView();
+    assert.strictEqual(view.listSortKey, 'rank');
+    assert.strictEqual(view.listSortAsc, false);
+    assert.strictEqual(view.listQuery, '');
+    assert.strictEqual(view.page, 0);
+});
+
 test('面談会話の表示整形は元データを変えず句点と改行だけを除く', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/interview_view.js');
@@ -2737,6 +2848,16 @@ test('通常buttonのSEは共通監視を正本とし特殊音はdata-seへ寄�
     assert.ok(architecture.includes('button系SEは共通button監視を正本にする'), 'SE責務ルールを設計文書へ残す');
 });
 
+test('能力ランクの文字表示はHTML表示と同じ境界を共用する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/stat_presenter.js');
+    assert.strictEqual(ctx.StatPresenter.toGradeText(59), 'C+');
+    assert.strictEqual(ctx.StatPresenter.toGradeText(60), 'B');
+    assert.strictEqual(ctx.StatPresenter.toGradeText(70), 'B+');
+    assert.strictEqual(ctx.StatPresenter.toGradeText(80), 'A');
+    assert.ok(ctx.StatPresenter.toGradeHTML(90).includes('rank-a') && ctx.StatPresenter.toGradeHTML(90).includes('A'));
+});
+
 test('武将一覧共通ソートは面談用検索と既知能力順を安定して処理する', () => {
     const ctx = createContext({ BushoStatusRules: { isRonin: () => false } });
     loadScript(ctx, 'js/busho_list_sort_rules.js');
@@ -2747,13 +2868,87 @@ test('武将一覧共通ソートは面談用検索と既知能力順を安定�
         getCastle(id) { return this.castles.find(c => c.id === id); }
     };
     const list = [
-        { id: 2, name: '佐久間信盛', yomi: 'さくまのぶもり', castleId: 2, leadership: 70 },
-        { id: 1, name: '柴田勝家', yomi: 'しばたかついえ', castleId: 1, leadership: 85 },
-        { id: 3, name: '佐々成政', yomi: 'さっさなりまさ', castleId: 1, leadership: 75 }
+        { id: 2, name: '佐久間信盛', yomi: 'さくまのぶもり', castleId: 2, leadership: 70, achievementTotal: 900 },
+        { id: 1, name: '柴田勝家', yomi: 'しばたかついえ', castleId: 1, leadership: 85, achievementTotal: 1500, isCastellan: true },
+        { id: 3, name: '佐々成政', yomi: 'さっさなりまさ', castleId: 1, leadership: 75, achievementTotal: 1200 },
+        { id: 4, name: '林秀貞', yomi: 'はやしひでさだ', castleId: 1, leadership: 60, achievementTotal: 1600 }
     ];
-    assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'leadership', false)).map(b => b.id), [1, 3, 2]);
+    assert.strictEqual(ctx.BushoListSortRules.getInterviewSortOptions()[0].key, 'rank', '面談の初期選択肢は身分順');
+    assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'rank', false)).map(b => b.id), [1, 2, 3, 4], '身分降順は上位身分優先、同身分は名前順で安定させる');
+    assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'rank', true)).map(b => b.id), [2, 3, 4, 1], '身分昇順は下位身分優先、同身分は名前順で安定させる');
+    assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'leadership', false)).map(b => b.id), [1, 3, 2, 4]);
     assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.filterByName(list, 'さくま')).map(b => b.id), [2]);
-    assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'castle', true)).map(b => b.id), [2, 1, 3]);
+    assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'castle', true)).map(b => b.id), [2, 1, 3, 4]);
+});
+
+test('武将の噂は周辺拠点を一度だけ辿り専門家/総合候補を軽量抽出する', () => {
+    const ctx = createContext({
+        BushoStatusRules: {
+            isActive(b) { return b.status === 'active'; },
+            isRonin(b) { return b.status === 'ronin'; }
+        },
+        MapGraphService: { isAdjacent() { return false; } },
+        LoyaltyInsightRules: {
+            getConcealmentProfile(b) { return { perceivedBand: Number(b.loyalty || 0) >= 85 ? 'stable' : 'danger' }; }
+        }
+    });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/interview_system.js');
+    const castles = [
+        { id: 1, ownerClan: 1 }, { id: 2, ownerClan: 2 }, { id: 3, ownerClan: 3 }, { id: 4, ownerClan: 4 }
+    ];
+    const adjacency = new Map([[1, [2]], [2, [1, 3]], [3, [2, 4]], [4, [3]]]);
+    const low = { id: 10, name: '低能力', clan: 2, castleId: 2, status: 'active', leadership: 40, strength: 30, politics: 30, diplomacy: 30, intelligence: 30, charm: 30, loyalty: 90 };
+    const expertTarget = { id: 11, name: '統率者', clan: 3, castleId: 3, status: 'active', leadership: 75, strength: 72, politics: 50, diplomacy: 40, intelligence: 60, charm: 55, loyalty: 90 };
+    const generalTarget = { id: 12, name: '万能型', clan: 2, castleId: 2, status: 'active', leadership: 65, strength: 60, politics: 60, diplomacy: 45, intelligence: 55, charm: 50, loyalty: 70 };
+    const tooFar = { id: 13, name: '遠方', clan: 4, castleId: 4, status: 'active', leadership: 99, strength: 99, politics: 99, diplomacy: 99, intelligence: 99, charm: 99, loyalty: 90 };
+    const kunishu = { id: 14, name: '蜂須賀政勝', clan: 0, belongKunishuId: 5, castleId: 2, status: 'active', leadership: 62, strength: 65, politics: 55, diplomacy: 50, intelligence: 60, charm: 55, loyalty: 60 };
+    const game = {
+        playerClanId: 1, castles, bushos: [low, expertTarget, generalTarget, tooFar, kunishu],
+        mapGraph: { getAdjacentIds(c) { return adjacency.get(c.id) || []; } },
+        getCastle(id) { return castles.find(c => c.id === Number(id)); },
+        getClan(id) { return { id, name: `勢力${id}` }; },
+        kunishuSystem: { getKunishu(id) { return id === 5 ? { id: 5, leaderId: 99, getName() { return '川並衆'; } } : null; } }
+    };
+    const system = new ctx.InterviewSystem(game);
+    const region2 = system._getRumorRegionCastleIds(2);
+    assert.deepStrictEqual(Array.from(region2).sort((a,b)=>a-b), [1,2,3], '2リンク探索は周辺拠点だけを一度Set化する');
+    assert.strictEqual(system._getRumorExpertDomain({ leadership: 40, strength: 30, politics: 30, diplomacy: 30, intelligence: 30, charm: 30 }), null, '40だけ高い武将を専門家扱いしない');
+    assert.strictEqual(system._getRumorExpertDomain({ leadership: 70, strength: 50, politics: 40, diplomacy: 30, intelligence: 60, charm: 55 }).key, 'leadership');
+    assert.strictEqual(system._isRumorExpertCandidate(low, { key: 'leadership' }), false, '噂対象もB未満なら専門分野候補にしない');
+    assert.strictEqual(system._isRumorExpertCandidate(expertTarget, { key: 'leadership' }), true, 'B以上かつ本人上位能力なら専門分野候補にする');
+    assert.strictEqual(system._isRumorGeneralCandidate(generalTarget), true, '専門性のない聞き手向けに上位3能力の総合力で候補を作る');
+    assert.strictEqual(system._isRumorGeneralCandidate(low), false, '弱い武将を総合的に強い噂対象にしない');
+    assert.ok(!system._getRumorRegionalCandidates(region2).includes(tooFar), '探索範囲外の武将は候補にしない');
+    assert.ok(!system._getRumorSubjectText(kunishu).includes('城'), '諸勢力の地域アンカーを実所在地の城名として噂に出さない');
+});
+
+test('武将の噂は表面態度で情報量を変え同一面談中は再抽選しない', () => {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' },
+        LoyaltyInsightRules: { getConcealmentProfile() { return { perceivedBand: 'danger' }; } }
+    });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/interview_system.js');
+    const target = { id: 20, name: '噂武将', clan: 2, castleId: 2, status: 'active', loyalty: 60 };
+    const messages = [];
+    const game = { playerClanId: 1, bushos: [], castles: [], getClan() { return { name: '他家' }; }, ui: { interviewView: { showMessages(_b, rows) { messages.push(rows); } } } };
+    const system = new ctx.InterviewSystem(game);
+    const row = { target, mode: 'expert', domain: { key: 'leadership', label: '統率' } };
+    system.activeInterviewAttitude = 'friendly';
+    assert.strictEqual(system._getRumorMessages({}, row).length, 3, '良好な態度なら存在・能力・立場/主君評判の3項目を話す');
+    system.activeInterviewAttitude = 'reserved';
+    assert.strictEqual(system._getRumorMessages({}, row).length, 2, '控えめな態度なら2項目に口数を減らす');
+    let picks = 0;
+    system.activeInterviewAttitude = 'friendly';
+    system._selectRumorTarget = () => { picks++; return row; };
+    system.showMainMenu = () => {};
+    system.executeInterviewRumor({ id: 1 });
+    system.executeInterviewRumor({ id: 1 });
+    assert.strictEqual(picks, 1, '同じ面談中に噂を押し直しても候補を再抽選しない');
+    system.activeInterviewAttitude = 'cold';
+    system.executeInterviewRumor({ id: 1 });
+    assert.ok(messages[messages.length - 1][0].includes('申し上げることはございませぬ'), '冷淡な態度では噂を教えない');
 });
 
 test('協調性を廃止し人物関係は義理・野望・相性差を正本にする', () => {

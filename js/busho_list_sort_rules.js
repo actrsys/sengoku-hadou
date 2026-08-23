@@ -6,15 +6,15 @@
 class BushoListSortRules {
     static getInterviewSortOptions() {
         return [
+            { key: 'rank', label: '身分', defaultAsc: false },
+            { key: 'name', label: '名前', defaultAsc: true },
+            { key: 'castle', label: '所在', defaultAsc: true },
             { key: 'leadership', label: '統率', defaultAsc: false },
             { key: 'strength', label: '武勇', defaultAsc: false },
             { key: 'politics', label: '内政', defaultAsc: false },
             { key: 'diplomacy', label: '外交', defaultAsc: false },
             { key: 'intelligence', label: '智謀', defaultAsc: false },
             { key: 'charm', label: '魅力', defaultAsc: false },
-            { key: 'name', label: '名前', defaultAsc: true },
-            { key: 'castle', label: '所在', defaultAsc: true },
-            { key: 'rank', label: '身分', defaultAsc: false }
         ];
     }
 
@@ -31,7 +31,7 @@ class BushoListSortRules {
         });
     }
 
-    static sortKnown(game, items, key = 'leadership', isAsc = false) {
+    static sortKnown(game, items, key = 'rank', isAsc = false) {
         const list = Array.isArray(items) ? items.slice() : [];
         return list.sort((a, b) => {
             const cmp = this.compareKnown(game, a, b, key, isAsc);
@@ -60,7 +60,16 @@ class BushoListSortRules {
         }
 
         if (key === 'rank') {
-            return (this.getClanRank(game, a) - this.getClanRank(game, b)) * direction;
+            const rankDiff = (this.getClanRank(game, a) - this.getClanRank(game, b)) * direction;
+            if (rankDiff !== 0) return rankDiff;
+            // 功績はプレイヤー非公開値なので一覧順にも使わない。同身分内は名前順だけで安定させる。
+            return this._compareText(
+                (a && (a.yomi || a.name)) || '',
+                (b && (b.yomi || b.name)) || '',
+                true,
+                (a && a.name) || '',
+                (b && b.name) || ''
+            );
         }
 
         const numericKeys = ['leadership', 'strength', 'politics', 'diplomacy', 'intelligence', 'charm'];

@@ -4,25 +4,33 @@
  * ゲーム計算からHTML生成を分離する。
  */
 class StatPresenter {
-    static toGradeHTML(val) {
-        let base = "", sub = "", cls = "";
-        if (val >= 110) { base = "S"; sub = "+"; cls = "rank-s"; } 
-        else if (val >= 100) { base = "S"; sub = "";  cls = "rank-s"; }
-        else if (val >= 90) { base = "A"; sub = "+"; cls = "rank-a"; } 
-        else if (val >= 80) { base = "A"; sub = "";  cls = "rank-a"; }
-        else if (val >= 70) { base = "B"; sub = "+"; cls = "rank-b"; } 
-        else if (val >= 60) { base = "B"; sub = "";  cls = "rank-b"; }
-        else if (val >= 50) { base = "C"; sub = "+"; cls = "rank-c"; } 
-        else if (val >= 40) { base = "C"; sub = "";  cls = "rank-c"; }
-        else if (val >= 30) { base = "D"; sub = "+"; cls = "rank-d"; } 
-        else if (val >= 20) { base = "D"; sub = "";  cls = "rank-d"; }
-        else if (val >= 10) { base = "E"; sub = "+"; cls = "rank-e"; } 
-        else { base = "E"; sub = ""; cls = "rank-e"; }
+    static getGradeParts(val) {
+        const value = Number(val || 0);
+        if (value >= 110) return { base: 'S', sub: '+', cls: 'rank-s' };
+        if (value >= 100) return { base: 'S', sub: '',  cls: 'rank-s' };
+        if (value >= 90) return { base: 'A', sub: '+', cls: 'rank-a' };
+        if (value >= 80) return { base: 'A', sub: '',  cls: 'rank-a' };
+        if (value >= 70) return { base: 'B', sub: '+', cls: 'rank-b' };
+        if (value >= 60) return { base: 'B', sub: '',  cls: 'rank-b' };
+        if (value >= 50) return { base: 'C', sub: '+', cls: 'rank-c' };
+        if (value >= 40) return { base: 'C', sub: '',  cls: 'rank-c' };
+        if (value >= 30) return { base: 'D', sub: '+', cls: 'rank-d' };
+        if (value >= 20) return { base: 'D', sub: '',  cls: 'rank-d' };
+        if (value >= 10) return { base: 'E', sub: '+', cls: 'rank-e' };
+        return { base: 'E', sub: '', cls: 'rank-e' };
+    }
 
+    static toGradeText(val) {
+        const grade = this.getGradeParts(val);
+        return `${grade.base}${grade.sub}`;
+    }
+
+    static toGradeHTML(val) {
+        const grade = this.getGradeParts(val);
         return `
-            <span class="grade-container ${cls}">
-                <span class="grade-main">${base}</span>
-                <span class="grade-sub">${sub}</span>
+            <span class="grade-container ${grade.cls}">
+                <span class="grade-main">${grade.base}</span>
+                <span class="grade-sub">${grade.sub}</span>
             </span>`;
     }
 

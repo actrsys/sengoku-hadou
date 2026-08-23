@@ -501,12 +501,13 @@ async function validateCommandAndInterviewStates(cdp) {
     assert.strictEqual(pc.footerOutside, true, 'PC面談の戻る/決定系ボタンは内容枠の外へ置く');
     assert.strictEqual(pc.standardInsideButtons, 0, 'PC面談の内容枠内に標準決定/キャンセルボタンを置かない');
     assert.strictEqual(pc.inlineUsesDedicatedChoiceButton, true, 'PC面談の会話選択肢は詳細画面ボタンを流用せず専用ボタンを使う');
-    assert.strictEqual(pc.inlineButtons.length, 3, 'PC面談メニューは3選択肢を描画する');
+    assert.strictEqual(pc.inlineButtons.length, 4, 'PC面談メニューは4選択肢を2×2で描画する');
     assert.ok(pc.inlineButtons.every(b => b.width >= 240 && b.height >= 38), 'PC面談の選択肢は戻るボタンに負けない十分な大きさを持つ');
     assert.ok(pc.inlineButtons.every(b => b.bg && b.bg !== 'none'), 'PC面談の選択肢は不透明な専用背景を持つ');
     assert.ok(pc.inlineButtons.every(b => b.bg.includes('rgb(88, 105, 121)')), 'PC面談の選択肢は緑の情報枠と分離した藍鉄系を使う');
     assert.ok(Math.abs(pc.inlineButtons[0].top - pc.inlineButtons[1].top) <= 1, 'PC面談の1・2個目は同じ上段へ置く');
-    assert.ok(Math.abs(pc.inlineButtons[0].left - pc.inlineButtons[2].left) <= 1 && pc.inlineButtons[2].top > pc.inlineButtons[0].bottom, 'PC面談の3個目はテンキー7/8/4型で2段目左へ置く');
+    assert.ok(Math.abs(pc.inlineButtons[0].left - pc.inlineButtons[2].left) <= 1 && pc.inlineButtons[2].top > pc.inlineButtons[0].bottom, 'PC面談の3個目は2段目左へ置く');
+    assert.ok(Math.abs(pc.inlineButtons[1].left - pc.inlineButtons[3].left) <= 1 && Math.abs(pc.inlineButtons[2].top - pc.inlineButtons[3].top) <= 1, 'PC面談の4個目は2段目右へ置き2×2にする');
     assert.ok(pc.inlineButtons[0].top >= pc.inlineBox.top + 1 && pc.inlineButtons[2].bottom <= pc.inlineBox.bottom - 1, 'PC面談の上下段ボタン枠を操作帯内で見切らせない');
     assert.ok(pc.rect.width >= 1000, `PC会話開始時も上部情報ウインドウの横幅を維持する (${pc.rect.width})`);
     assert.ok(pc.hint.bottom < pc.summary.top, 'PC面談の案内文が情報枠へかぶらない');
@@ -573,7 +574,8 @@ async function validateCommandAndInterviewStates(cdp) {
     assert.ok(mobile.scrollHeight <= mobile.clientHeight + 3, 'スマホ面談内容が枠をはみ出している');
     assert.ok(mobile.actionHeight >= 27, 'スマホ面談内操作ボタンが小さすぎる');
     assert.ok(Math.abs(mobile.actionButtons[0].top - mobile.actionButtons[1].top) <= 1, 'スマホ面談の1・2個目も同じ上段へ置く');
-    assert.ok(Math.abs(mobile.actionButtons[0].left - mobile.actionButtons[2].left) <= 1 && mobile.actionButtons[2].top > mobile.actionButtons[0].bottom, 'スマホ面談の3個目もテンキー7/8/4型で2段目左へ置く');
+    assert.ok(Math.abs(mobile.actionButtons[0].left - mobile.actionButtons[2].left) <= 1 && mobile.actionButtons[2].top > mobile.actionButtons[0].bottom, 'スマホ面談の3個目は2段目左へ置く');
+    assert.ok(Math.abs(mobile.actionButtons[1].left - mobile.actionButtons[3].left) <= 1 && Math.abs(mobile.actionButtons[2].top - mobile.actionButtons[3].top) <= 1, 'スマホ面談の4個目は2段目右へ置き2×2にする');
     assert.ok(mobile.hintBottom < mobile.summaryTop, 'スマホ面談の「話したい内容」案内が情報枠へかぶらない');
     assert.ok(mobile.actionBottom <= mobile.footer.top + 1, 'スマホ面談は選択肢の下に戻るボタンを置く');
     assert.ok(mobile.footer.bottom < mobile.conversationTop, 'スマホ面談の戻るボタンは下段会話より上へ置く');
@@ -626,7 +628,7 @@ async function validateCommandAndInterviewStates(cdp) {
             pager.innerHTML = '<button class=\"daimyo-detail-action-btn\">前へ</button><span class=\"interview-session-page-label\">1 / 3</span><button class=\"daimyo-detail-action-btn\">次へ</button>';
             const body = document.getElementById('interview-session-body');
             body.className = 'interview-session-body interview-session-list-view interviewer-list-view';
-            body.innerHTML = '<div class=\"interview-session-list-tools\"><input class=\"interview-session-search\" placeholder=\"名前で探す\"><select class=\"interview-session-sort-select\"><option>統率</option></select><button class=\"daimyo-detail-action-btn interview-session-sort-direction\">降順</button><span class=\"interview-session-list-count\">32人</span></div><div class=\"interview-session-person-grid\">' + Array.from({length:16},(_,i)=>'<button class=\"interview-session-person\"><span class=\"interview-session-person-face\"></span><span class=\"interview-session-person-name\">武将'+(i+1)+'</span></button>').join('') + '</div>';
+            body.innerHTML = '<div class=\"interview-session-list-tools\"><input class=\"interview-session-search\" placeholder=\"名前で探す\"><select class=\"interview-session-sort-select\"><option>身分</option></select><button class=\"daimyo-detail-action-btn interview-session-sort-direction\">降順</button><span class=\"interview-session-list-count\">32人</span></div><div class=\"interview-session-person-grid\">' + Array.from({length:16},(_,i)=>'<button class=\"interview-session-person\"><span class=\"interview-session-person-face\"></span><span class=\"interview-session-person-text\"><span class=\"interview-session-person-name\">武将'+(i+1)+'</span><span class=\"interview-session-person-rank\">武将</span></span></button>').join('') + '</div>';
             const cr = content.getBoundingClientRect();
             const br = body.getBoundingClientRect();
             const gr = body.querySelector('.interview-session-person-grid').getBoundingClientRect();
@@ -655,7 +657,7 @@ async function validateCommandAndInterviewStates(cdp) {
             document.getElementById('interview-session-summary-panel').classList.remove('hidden');
             const body = document.getElementById('interview-session-body');
             body.className = 'interview-session-body interview-session-list-view target-list-view';
-            body.innerHTML = '<div class="interview-session-list-tools"><input class="interview-session-search" placeholder="名前で探す"><select class="interview-session-sort-select"><option>統率</option></select><button class="daimyo-detail-action-btn interview-session-sort-direction">降順</button><span class="interview-session-list-count">24人</span></div><div class="interview-session-person-grid">' + Array.from({length:12},(_,i)=>'<button class="interview-session-person"><span class="interview-session-person-face"></span><span class="interview-session-person-name">武将'+(i+1)+'</span></button>').join('') + '</div>';
+            body.innerHTML = '<div class="interview-session-list-tools"><input class="interview-session-search" placeholder="名前で探す"><select class="interview-session-sort-select"><option>身分</option></select><button class="daimyo-detail-action-btn interview-session-sort-direction">降順</button><span class="interview-session-list-count">24人</span></div><div class="interview-session-person-grid">' + Array.from({length:12},(_,i)=>'<button class="interview-session-person"><span class="interview-session-person-face"></span><span class="interview-session-person-text"><span class="interview-session-person-name">武将'+(i+1)+'</span><span class="interview-session-person-rank">武将</span></span></button>').join('') + '</div>';
             const br = body.getBoundingClientRect();
             const gr = body.querySelector('.interview-session-person-grid').getBoundingClientRect();
             const cards = Array.from(body.querySelectorAll('.interview-session-person'));
@@ -684,7 +686,7 @@ async function validateCommandAndInterviewStates(cdp) {
             document.getElementById('interview-session-summary-panel').classList.add('hidden');
             const body = document.getElementById('interview-session-body');
             body.className = 'interview-session-body interview-session-list-view interviewer-list-view';
-            body.innerHTML = '<div class="interview-session-list-tools"><input class="interview-session-search" placeholder="名前で探す"><select class="interview-session-sort-select"><option>統率</option></select><button class="daimyo-detail-action-btn interview-session-sort-direction">降順</button><span class="interview-session-list-count">30人</span></div><div class="interview-session-person-grid">' + Array.from({length:15},(_,i)=>'<button class="interview-session-person"><span class="interview-session-person-face"></span><span class="interview-session-person-name">武将'+(i+1)+'</span></button>').join('') + '</div>';
+            body.innerHTML = '<div class="interview-session-list-tools"><input class="interview-session-search" placeholder="名前で探す"><select class="interview-session-sort-select"><option>身分</option></select><button class="daimyo-detail-action-btn interview-session-sort-direction">降順</button><span class="interview-session-list-count">30人</span></div><div class="interview-session-person-grid">' + Array.from({length:15},(_,i)=>'<button class="interview-session-person"><span class="interview-session-person-face"></span><span class="interview-session-person-text"><span class="interview-session-person-name">武将'+(i+1)+'</span><span class="interview-session-person-rank">武将</span></span></button>').join('') + '</div>';
             const cr=content.getBoundingClientRect(), br=body.getBoundingClientRect(), gr=body.querySelector('.interview-session-person-grid').getBoundingClientRect();
             return {contentScroll:content.scrollHeight,contentClient:content.clientHeight,bodyScroll:body.scrollHeight,bodyClient:body.clientHeight,bodyBottom:br.bottom,gridBottom:gr.bottom,contentBottom:cr.bottom,contentWidth:cr.width};
         })()`,

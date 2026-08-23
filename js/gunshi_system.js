@@ -47,8 +47,24 @@ class GunshiSystem {
             && detectPower + L.DetectGapAllowance >= targetIntelligence;
 
         // 軍師本人については「自分の偽装を自分で看破する」扱いにしない。
-        // 面談と同じ表向きの忠誠を起点にし、そのうえで本人の忠誠・義理による報告の甘さを反映する。
+        // ただし大名の智謀が高ければ、軍師が「この殿にはごまかしが通じない」と判断し、
+        // 自分で掛けた偽装だけを1～2段階ほど控える。真の忠誠より悪く報告することはない。
         let assessedBand = canDetect ? profile.actualBand : profile.perceivedBand;
+        let selfConcealmentCounterShift = 0;
+        if (isSelf && profile.bandShift > 0) {
+            const daimyo = this.game && typeof this.game.getClanDaimyo === 'function'
+                ? this.game.getClanDaimyo(this.game.playerClanId)
+                : (this.game && Array.isArray(this.game.bushos)
+                    ? this.game.bushos.find(b => Number(b.clan) === Number(this.game.playerClanId) && b.isDaimyo)
+                    : null);
+            const daimyoIntelligence = Math.max(0, Math.min(100, Number(daimyo && daimyo.intelligence) || 0));
+            const I = window.MainParams.Interview;
+            const requestedCounterShift = daimyoIntelligence >= I.ConcealHighIntelligence
+                ? I.ConcealHighBandShift
+                : (daimyoIntelligence >= I.ConcealMidIntelligence ? I.ConcealMidBandShift : 0);
+            selfConcealmentCounterShift = Math.min(profile.bandShift, requestedCounterShift);
+            assessedBand = LoyaltyInsightRules.shiftBand(profile.perceivedBand, -selfConcealmentCounterShift);
+        }
 
         // 忠誠・義理が極端に低い軍師は、見えている危険を主君へやや甘く報告する。
         // ランダムな嘘ではなく段階を一定量だけ緩め、同じ月・同じ軍師で表示が揺れないようにする。
@@ -67,6 +83,7 @@ class GunshiSystem {
             reliability: quality.reliability,
             detectedConcealment: canDetect,
             isSelfAssessment: isSelf,
+            selfConcealmentCounterShift,
             actualBand: profile.actualBand,
             perceivedBand: profile.perceivedBand
         };

@@ -3838,7 +3838,7 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     font-size: 12px;
     text-align: left;
     line-height: 1.35;
-    color: rgba(255,255,255,.82);
+    color: #ccc;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -3862,7 +3862,11 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     background: rgba(6,18,10,.55);
 }
 
-.interview-session-stat-label { font-size: 11px; color: rgba(255,255,255,.68); }
+.interview-session-stat-label {
+    font-size: 11px;
+    color: #ffd54f;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
 .interview-session-stat-value {
     min-width: 30px;
     display: flex;
@@ -3971,6 +3975,11 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     padding: 3px 6px !important;
     font-size: 11px !important;
 }
+
+.interview-session-sort-direction:disabled {
+    opacity: .55;
+    cursor: default;
+}
 .interview-session-list-count {
     text-align: right;
     font-size: 10px;
@@ -4020,9 +4029,26 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     border: 1px solid rgba(255,255,255,.28);
 }
 
+.interview-session-person-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    overflow: hidden;
+}
 .interview-session-person-name {
     min-width: 0;
     font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.interview-session-person-rank {
+    min-width: 0;
+    font-size: 11px;
+    line-height: 1.2;
+    color: #aaa;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -4312,6 +4338,7 @@ body:not(.is-pc) .interview-session-person {
 }
 body:not(.is-pc) .interview-session-person-face { width: 38px; height: 46px; }
 body:not(.is-pc) .interview-session-person-name { font-size: 9px; }
+body:not(.is-pc) .interview-session-person-rank { font-size: 7px; gap: 1px; }
 
 body:not(.is-pc) #interview-modal .interview-session-content.interview-conversation-active {
     width: calc(100% - 12px) !important;
@@ -6220,6 +6247,7 @@ body.is-pc #interview-modal .interview-session-content.interview-conversation-ac
 .interview-session-sort-direction { font-size: 13px !important; }
 .interview-session-list-count { font-size: 12px; }
 .interview-session-person-name { font-size: 15px; }
+.interview-session-person-rank { font-size: 12px; }
 .interview-session-page-label { font-size: 13px; }
 
 /* 評定終了は「閉じる/終了」系なので銀のキャンセル色へ統一。 */
@@ -6249,6 +6277,7 @@ body:not(.is-pc) .interview-session-sort-select { font-size: 11px; }
 body:not(.is-pc) .interview-session-sort-direction { font-size: 10px !important; }
 body:not(.is-pc) .interview-session-list-count { font-size: 9px; }
 body:not(.is-pc) .interview-session-person-name { font-size: 10px; }
+body:not(.is-pc) .interview-session-person-rank { font-size: 8px; }
 body:not(.is-pc) .interview-session-page-label { font-size: 10px; }
 body:not(.is-pc) .interview-session-inline-actions {
     width: calc(100% - 28px);

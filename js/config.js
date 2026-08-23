@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r120'
+        Version: 'r125'
     },
 
     Main: {
@@ -76,6 +76,18 @@ window.GameConfig = {
                 GunshiIntelligenceDominanceRatio: 1.2,
                 ReadinessConcernRatio: 0.85,
                 IntrigueCandidateMinProb: 0.15
+            },
+            Rumor: {
+                // 「武将の噂」は面談時だけ軽く周辺地域を走査する。武将ごとの経路探索はしない。
+                SearchDepth: 2,
+                ExtendedSearchDepth: 3,
+                // B以上を「得意分野」として扱う。40だけ高いような武将を専門家扱いしない。
+                ExpertMinStat: 60,
+                CandidateMinStat: 60,
+                CandidateBestGap: 5,
+                // 専門分野を持たない聞き手向けの総合人材。上位3能力の合計で最低限の評判級を判定する。
+                GeneralMinBestStat: 60,
+                GeneralTopThreeMinTotal: 180
             }
         },
         Kunishu: {

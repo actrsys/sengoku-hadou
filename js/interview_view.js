@@ -34,7 +34,7 @@ class InterviewView {
         this.pageItems = [];
         this.pageSize = 0;
         this.onPageItemSelect = null;
-        this.listSortKey = 'leadership';
+        this.listSortKey = 'rank';
         this.listSortAsc = false;
         this.listQuery = '';
         this.currentSpeaker = null;
@@ -79,6 +79,9 @@ class InterviewView {
         this.pageItems = [];
         this.page = 0;
         this.pageSize = 0;
+        // 検索・並び順は面談だけの一時UI状態。面談を閉じたら次の面談へ持ち越さない。
+        this.listSortKey = 'rank';
+        this.listSortAsc = false;
         this.listQuery = '';
         this.onPageItemSelect = null;
         this.currentSpeaker = null;
@@ -128,13 +131,15 @@ class InterviewView {
             const age = busho.isAutoLeader || !Number.isFinite(Number(busho.birthYear))
                 ? ''
                 : `${Math.max(0, Number(this.game.year || 0) - Number(busho.birthYear) + 1)}歳`;
+            // 武将詳細と同じく、名前下の補助情報は「身分：」のような事務的な
+            // ラベル列にせず、灰色の控えめなメタ情報としてそのまま並べる。
             const entries = [
-                castle ? `所在：${castle.name}` : '',
-                rank ? `身分：${rank}` : '',
-                age ? `年齢：${age}` : ''
+                castle ? castle.name : '',
+                rank || '',
+                age || ''
             ].filter(Boolean);
             entries.forEach(text => {
-                const row = document.createElement('div');
+                const row = document.createElement('span');
                 row.className = 'interview-session-meta-row';
                 row.textContent = text;
                 this.meta.appendChild(row);
@@ -386,6 +391,32 @@ class InterviewView {
         return tools;
     }
 
+    _getListSecondaryText(busho) {
+        if (!busho) return '';
+        if (this.listSortKey === 'castle') {
+            const castle = this.game && typeof this.game.getCastle === 'function'
+                ? this.game.getCastle(busho.castleId)
+                : (this.game.castles || []).find(c => Number(c.id) === Number(busho.castleId));
+            return castle ? castle.name : '所在不明';
+        }
+
+        const statLabels = {
+            leadership: '統率', strength: '武勇', politics: '内政',
+            diplomacy: '外交', intelligence: '智謀', charm: '魅力'
+        };
+        if (statLabels[this.listSortKey]) {
+            const grade = window.StatPresenter && typeof StatPresenter.toGradeText === 'function'
+                ? StatPresenter.toGradeText(busho[this.listSortKey])
+                : '';
+            return `${statLabels[this.listSortKey]} ${grade}`.trim();
+        }
+
+        // 身分・名前ソートでは人物識別に役立つ身分表示を維持する。
+        return window.StatPresenter
+            ? StatPresenter.getBushoRankName(busho, this.game)
+            : '武将';
+    }
+
     _renderCurrentPage() {
         if (!this.body || !this._listGrid) return;
 
@@ -411,11 +442,17 @@ class InterviewView {
                 img.src = 'data/images/faceicons/unknown_face.webp';
             };
 
+            const textWrap = document.createElement('span');
+            textWrap.className = 'interview-session-person-text';
             const text = document.createElement('span');
             text.className = 'interview-session-person-name';
             text.textContent = busho.name || '';
+            const rank = document.createElement('span');
+            rank.className = 'interview-session-person-rank';
+            rank.textContent = this._getListSecondaryText(busho);
+            textWrap.append(text, rank);
 
-            button.append(img, text);
+            button.append(img, textWrap);
             button.onclick = () => {
                 if (this.onPageItemSelect) this.onPageItemSelect(busho);
             };
@@ -434,7 +471,10 @@ class InterviewView {
                 ? `${this.pageItems.length}人`
                 : `${listItems.length}/${this.pageItems.length}人`;
         }
-        if (this._listDirection) this._listDirection.textContent = this.listSortAsc ? '昇順' : '降順';
+        if (this._listDirection) {
+            this._listDirection.disabled = false;
+            this._listDirection.textContent = this.listSortAsc ? '昇順' : '降順';
+        }
 
         const showPager = totalPages > 1;
         if (this.pager) this.pager.classList.toggle('hidden', !showPager);
