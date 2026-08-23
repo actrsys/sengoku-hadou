@@ -11,7 +11,7 @@
     </div>
 
     <div id="interview-modal" class="modal">
-      <div id="interview-session-content" class="modal-content interview-session-content">
+      <div id="interview-session-content" class="modal-content interview-session-content interview-conversation-active">
         <div class="interview-session-header">
           <div class="interview-session-kicker">家臣面談</div>
           <h3 id="interview-session-title">面談</h3>
@@ -37,21 +37,23 @@
               <div class="interview-session-stat"><span class="interview-session-stat-label">魅力</span><span class="interview-session-stat-value"><span class="grade-container rank-b"><span class="grade-main">B</span><span class="grade-sub">+</span></span></span></div>
             </div>
           </div>
-          <div id="interview-session-body" class="interview-session-body interview-session-conversation-view">
-            <div class="dialog-body-container interview-session-dialog-body">
-              <div class="dialog-face-column interview-session-dialog-face-column">
-                <div class="dialog-name-label interview-session-dialog-name-label">武将名</div>
-                <div class="interview-session-dialog-face-space"><div class="sp-face-wrapper dialog-face-wrapper"></div></div>
+          <div class="interview-session-stage">
+            <div id="interview-session-inline-actions" class="interview-session-inline-actions">
+              <button class="daimyo-detail-action-btn interview-session-inline-btn">調子はどうだ</button>
+              <button class="daimyo-detail-action-btn interview-session-inline-btn">他者について聞く</button>
+            </div>
+            <div id="interview-session-body" class="interview-session-body interview-session-conversation-view">
+              <div class="dialog-body-container interview-session-dialog-body">
+                <div class="dialog-face-column interview-session-dialog-face-column">
+                  <div class="dialog-name-label interview-session-dialog-name-label">武将名</div>
+                  <div class="interview-session-dialog-face-space"><div class="sp-face-wrapper dialog-face-wrapper"></div></div>
+                </div>
+                <div class="message-area interview-session-message-area">「殿、どのようなご用件でしょうか？」</div>
               </div>
-              <div class="message-area interview-session-message-area">「殿、どのようなご用件でしょうか？」</div>
             </div>
           </div>
         </div>
         <div id="interview-session-pager" class="interview-session-pager hidden"></div>
-        <div id="interview-session-inline-actions" class="interview-session-inline-actions">
-          <button class="daimyo-detail-action-btn interview-session-inline-btn">調子はどうだ</button>
-          <button class="daimyo-detail-action-btn interview-session-inline-btn">他者について聞く</button>
-        </div>
       </div>
       <div id="interview-session-footer" class="modal-footer interview-session-footer">
         <button class="btn-secondary">戻る</button>

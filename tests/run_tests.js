@@ -88,10 +88,19 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r102');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('友好'), false);
+});
+
+test('タイトル版表示は GameConfig.Meta.Version を正本にする', () => {
+    const html = read('index.html');
+    const bootstrap = read('js/app_bootstrap.js');
+    assert.ok(html.includes('id="title-version"'));
+    assert.ok(!html.includes('ver. r102'));
+    assert.ok(bootstrap.includes('window.GameConfig?.Meta?.Version'));
 });
 
 test('設定値参照側に独自フォールバック値を残さない', () => {
@@ -2088,6 +2097,16 @@ test('面談は専用View内で完結し16:9/9:16固定・非スクロールで�
     assert.ok(css.includes('#interview-modal.interview-message-advance .interview-session-message-area::after'), '面談会話のクリック進行時は▼を表示する');
     assert.ok(view.includes("['統率', 'leadership']") && view.includes("['魅力', 'charm']"), '面談相手の既知能力を人物サマリーに出す');
     assert.ok(!view.includes('loyalty'), '面談Viewで忠誠数値を表示・ソートしない');
+    assert.ok(view.includes("search.addEventListener('compositionstart'"), '面談検索は日本語IME変換開始を認識する');
+    assert.ok(view.includes("search.addEventListener('compositionend'"), '面談検索はIME確定後に絞り込みを反映する');
+    assert.ok(!view.includes('nextSearch.focus'), '検索入力のたびにinput DOMを再生成してフォーカスを戻す旧方式を残さない');
+    assert.ok(view.includes("this._listGrid.replaceChildren()"), '検索・ソート時は入力欄を残して武将グリッドだけ更新する');
+    assert.ok(view.includes("interview-conversation-active"), '会話中は選択肢スロットを固定して本文位置を維持する');
+    assert.ok(css.includes('.interview-session-sort-wrap::after'), '面談プルダウンはネイティブselectを保ったまま専用外観を持つ');
+    assert.ok(css.includes('#interview-modal .interview-session-footer.hidden'), '外側ボタン非表示時も予約領域を維持して面談枠を動かさない');
+    assert.ok(interview.includes('{ narration: true }'), '医師の説明・結果は本人の台詞ではなくナレーション表示へ渡す');
+    const ui = read('js/ui.js');
+    assert.ok(ui.includes("target.closest('input, select, textarea, option, [contenteditable=\"true\"]')"), 'スマホ共通touchendは入力・selectからフォーカスを奪わない');
     const sortRules = read('js/busho_list_sort_rules.js');
     assert.ok(sortRules.includes('getInterviewSortOptions()'));
     assert.ok(!sortRules.includes("{ key: 'loyalty'"), '面談の並び替え候補に忠誠を入れない');

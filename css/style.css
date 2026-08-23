@@ -3779,6 +3779,15 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     overflow: hidden;
 }
 
+.interview-session-stage {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    overflow: hidden;
+}
+
 /* 面談中に常時見せる既知情報。顔は通常会話と同じくメッセージ側だけに置く。 */
 .interview-session-summary-panel {
     min-width: 0;
@@ -3818,11 +3827,13 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     display: grid;
     gap: 5px;
     min-width: 0;
+    text-align: left;
 }
 
 .interview-session-meta-row {
     min-width: 0;
     font-size: 12px;
+    text-align: left;
     line-height: 1.35;
     color: rgba(255,255,255,.82);
     white-space: nowrap;
@@ -3886,21 +3897,69 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 }
 
 .interview-session-search,
-.interview-session-sort-select {
+.interview-session-sort-wrap {
     min-width: 0;
     height: 34px;
     box-sizing: border-box;
-    border: 1px solid rgba(212,175,55,.38);
-    border-radius: 4px;
-    background: rgba(0,0,0,.52);
+    border: 1px solid rgba(212,175,55,.55);
+    border-radius: 5px;
+    background: linear-gradient(to bottom, rgba(39,72,45,.96), rgba(12,30,18,.96));
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.35);
+    color: #fff;
+}
+
+.interview-session-search {
+    font: inherit;
+    font-size: 12px;
+    padding: 4px 9px;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    touch-action: manipulation;
+    -webkit-user-select: text;
+    user-select: text;
+}
+.interview-session-search:focus,
+.interview-session-sort-wrap:focus-within {
+    border-color: #f0d878;
+    box-shadow: inset 0 0 0 1px rgba(255,225,125,.22), 0 0 0 1px rgba(212,175,55,.22);
+}
+.interview-session-search::placeholder { color: rgba(255,255,255,.5); }
+
+.interview-session-sort-wrap {
+    position: relative;
+    display: block;
+    overflow: hidden;
+}
+.interview-session-sort-wrap::after {
+    content: "▼";
+    position: absolute;
+    top: 50%;
+    right: 7px;
+    transform: translateY(-50%);
+    color: #e8ce78;
+    font-size: 8px;
+    line-height: 1;
+    pointer-events: none;
+}
+.interview-session-sort-select {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
     color: #fff;
     font: inherit;
     font-size: 12px;
-    padding: 4px 8px;
+    padding: 4px 22px 4px 8px;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    touch-action: manipulation;
 }
-
-.interview-session-search::placeholder { color: rgba(255,255,255,.48); }
-.interview-session-sort-select option { color: #111; }
+.interview-session-sort-select option { color: #111; background: #f3ecd2; }
 .interview-session-sort-direction {
     min-width: 0 !important;
     width: 72px;
@@ -4011,6 +4070,14 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     line-height: 1.6;
 }
 
+.interview-session-narration-view .interview-session-dialog-body {
+    display: flex;
+}
+.interview-session-narration-view .interview-session-message-area {
+    width: 100%;
+    flex: 1 1 auto;
+}
+
 /* 普通の会話と同じく、選択肢のない台詞は画面タップで進行する。 */
 #interview-modal.interview-message-advance { cursor: pointer; }
 #interview-modal.interview-message-advance .interview-session-message-area::after {
@@ -4035,7 +4102,8 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 .interview-session-pager button { min-width: 88px; min-height: 30px; padding: 4px 12px; }
 .interview-session-page-label { min-width: 58px; font-size: 12px; }
 
-/* 面談内容の選択肢は「決定/戻る」ではないため、詳細画面と同じ内側用ボタンを使う。 */
+/* 面談内容の選択肢は会話本文より上の固定スロットへ置く。
+   会話中は選択肢が無い時も領域だけ予約し、本文位置を上下させない。 */
 .interview-session-inline-actions {
     flex: 0 0 42px;
     min-height: 42px;
@@ -4044,6 +4112,11 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     justify-content: center;
     gap: 8px;
     overflow: hidden;
+}
+.interview-session-content.interview-conversation-active .interview-session-inline-actions.hidden {
+    display: flex !important;
+    visibility: hidden;
+    pointer-events: none;
 }
 .interview-session-inline-btn {
     min-width: 150px;
@@ -4060,6 +4133,13 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     padding: 0;
 }
 .interview-session-footer > button { min-width: 160px; }
+
+/* 外側ボタンの有無で面談枠の上下位置を動かさない。 */
+#interview-modal .interview-session-footer.hidden {
+    display: flex !important;
+    visibility: hidden;
+    pointer-events: none;
+}
 
 body:not(.is-pc) #interview-modal .interview-session-content {
     width: auto !important;
@@ -4086,6 +4166,7 @@ body:not(.is-pc) .interview-session-main {
     grid-template-rows: 112px minmax(0, 1fr);
     gap: 5px;
 }
+body:not(.is-pc) .interview-session-stage { gap: 4px; }
 
 body:not(.is-pc) .interview-session-summary-panel {
     height: auto;
@@ -4124,10 +4205,20 @@ body:not(.is-pc) .interview-session-list-tools {
     gap: 3px;
 }
 body:not(.is-pc) .interview-session-search,
-body:not(.is-pc) .interview-session-sort-select {
+body:not(.is-pc) .interview-session-sort-wrap {
     height: 29px;
-    padding: 2px 4px;
-    font-size: 8px;
+}
+body:not(.is-pc) .interview-session-search {
+    padding: 2px 5px;
+    font-size: 10px;
+}
+body:not(.is-pc) .interview-session-sort-select {
+    padding: 2px 18px 2px 5px;
+    font-size: 10px;
+}
+body:not(.is-pc) .interview-session-sort-wrap::after {
+    right: 5px;
+    font-size: 7px;
 }
 body:not(.is-pc) .interview-session-sort-direction {
     width: 48px;
@@ -4508,6 +4599,21 @@ body:not(.is-pc) #map-container {
     box-shadow: inset 0 0 0 1px rgba(0,0,0,0.75);
 }
 
+
+.title-version {
+    position: absolute;
+    left: 32px;
+    bottom: 24px;
+    z-index: 2;
+    pointer-events: none;
+    user-select: none;
+    font-family: "abashiri-mincho", serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    color: rgba(221, 196, 126, 0.62);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
 #title-screen::after,
 #global-loading-screen::after {
     left: 0;
@@ -4782,6 +4888,7 @@ body:not(.is-pc) #map-container {
 /* 縦長・狭幅端末：題字とメニューを上下にして、5項目以上でも収めやすくします。 */
 @media (max-width: 720px), (max-height: 560px) {
     #title-screen { padding: 14px; }
+    .title-version { left: 18px; bottom: 14px; font-size: 0.62rem; letter-spacing: 0.08em; }
     #title-screen::before,
     #global-loading-screen::before { inset: 9px; }
     .title-content {

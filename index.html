@@ -52,6 +52,7 @@
                     </div>
                 </div>
             </div>
+            <div id="title-version" class="title-version" aria-label="ゲームバージョン"></div>
         </div>
 
         <div id="scenario-modal" class="modal hidden">
@@ -199,7 +200,10 @@
                         <div id="interview-session-meta" class="interview-session-meta"></div>
                         <div id="interview-session-stats" class="interview-session-stats"></div>
                     </div>
-                    <div id="interview-session-body" class="interview-session-body"></div>
+                    <div class="interview-session-stage">
+                        <div id="interview-session-inline-actions" class="interview-session-inline-actions hidden"></div>
+                        <div id="interview-session-body" class="interview-session-body"></div>
+                    </div>
                 </div>
 
                 <div id="interview-session-pager" class="interview-session-pager hidden">
@@ -207,8 +211,6 @@
                     <span id="interview-session-page-label" class="interview-session-page-label">1 / 1</span>
                     <button id="interview-session-next-btn" type="button" data-se="choice.ogg" class="daimyo-detail-action-btn">次へ</button>
                 </div>
-
-                <div id="interview-session-inline-actions" class="interview-session-inline-actions hidden"></div>
             </div>
             <div id="interview-session-footer" class="modal-footer interview-session-footer"></div>
         </div>

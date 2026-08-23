@@ -9,6 +9,10 @@
  *   GameConfig 内の同一オブジェクトを参照する互換エイリアスとして残す。
  */
 window.GameConfig = {
+    Meta: {
+        Version: 'r102'
+    },
+
     Main: {
         StartYear: 1560,
         StartMonth: 4,

@@ -35,6 +35,10 @@ class InterviewView {
         this.listQuery = '';
         this.currentSpeaker = null;
         this._messageAdvanceHandler = null;
+        this._listGrid = null;
+        this._listCount = null;
+        this._listDirection = null;
+        this._searchComposing = false;
     }
 
     _isPc() {
@@ -73,6 +77,11 @@ class InterviewView {
         this.listQuery = '';
         this.onPageItemSelect = null;
         this.currentSpeaker = null;
+        this._listGrid = null;
+        this._listCount = null;
+        this._listDirection = null;
+        this._searchComposing = false;
+        if (this.content) this.content.classList.remove('interview-conversation-active');
     }
 
     _setHeader(title, hint = '') {
@@ -259,12 +268,20 @@ class InterviewView {
 
     _renderPagedList(items, onSelect, mode) {
         if (!this.body) return;
+        if (this.content) this.content.classList.remove('interview-conversation-active');
         this.pageItems = Array.isArray(items) ? items.slice() : [];
         this.page = 0;
         this.listQuery = '';
         this.onPageItemSelect = onSelect;
         this.pageSize = this._isPc() ? 12 : 8;
+        this._searchComposing = false;
         this.body.className = `interview-session-body interview-session-list-view ${mode === 'target' ? 'target-list-view' : 'interviewer-list-view'}`;
+        this.body.replaceChildren();
+
+        const tools = this._createListTools();
+        this._listGrid = document.createElement('div');
+        this._listGrid.className = 'interview-session-person-grid';
+        this.body.append(tools, this._listGrid);
         this._renderCurrentPage();
     }
 
@@ -276,7 +293,7 @@ class InterviewView {
         return BushoListSortRules.sortKnown(this.game, filtered, this.listSortKey, this.listSortAsc);
     }
 
-    _renderListTools(totalCount, filteredCount) {
+    _createListTools() {
         const tools = document.createElement('div');
         tools.className = 'interview-session-list-tools';
 
@@ -285,19 +302,30 @@ class InterviewView {
         search.className = 'interview-session-search';
         search.placeholder = '名前で探す';
         search.autocomplete = 'off';
+        search.enterKeyHint = 'search';
         search.value = this.listQuery;
         search.setAttribute('aria-label', '武将名で検索');
-        search.oninput = () => {
+
+        const applySearch = () => {
             this.listQuery = search.value;
             this.page = 0;
             this._renderCurrentPage();
-            const nextSearch = this.body && this.body.querySelector('.interview-session-search');
-            if (nextSearch) {
-                nextSearch.focus({ preventScroll: true });
-                nextSearch.setSelectionRange(this.listQuery.length, this.listQuery.length);
-            }
         };
+        search.addEventListener('compositionstart', () => {
+            this._searchComposing = true;
+        });
+        search.addEventListener('compositionend', () => {
+            this._searchComposing = false;
+            applySearch();
+        });
+        search.addEventListener('input', (event) => {
+            this.listQuery = search.value;
+            if (this._searchComposing || event.isComposing) return;
+            applySearch();
+        });
 
+        const sortWrap = document.createElement('span');
+        sortWrap.className = 'interview-session-sort-wrap';
         const sortSelect = document.createElement('select');
         sortSelect.className = 'interview-session-sort-select';
         sortSelect.setAttribute('aria-label', '並び順');
@@ -317,6 +345,7 @@ class InterviewView {
             if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
             this._renderCurrentPage();
         };
+        sortWrap.appendChild(sortSelect);
 
         const direction = this._makeInlineButton(this.listSortAsc ? '昇順' : '降順', () => {
             this.listSortAsc = !this.listSortAsc;
@@ -324,18 +353,18 @@ class InterviewView {
             this._renderCurrentPage();
         });
         direction.classList.add('interview-session-sort-direction');
+        this._listDirection = direction;
 
         const count = document.createElement('span');
         count.className = 'interview-session-list-count';
-        count.textContent = filteredCount === totalCount ? `${totalCount}人` : `${filteredCount}/${totalCount}人`;
+        this._listCount = count;
 
-        tools.append(search, sortSelect, direction, count);
+        tools.append(search, sortWrap, direction, count);
         return tools;
     }
 
     _renderCurrentPage() {
-        if (!this.body) return;
-        this.body.replaceChildren();
+        if (!this.body || !this._listGrid) return;
 
         const listItems = this._getVisibleListItems();
         const totalPages = Math.max(1, Math.ceil(listItems.length / Math.max(1, this.pageSize)));
@@ -343,11 +372,7 @@ class InterviewView {
         const start = this.page * this.pageSize;
         const visibleItems = listItems.slice(start, start + this.pageSize);
 
-        this.body.appendChild(this._renderListTools(this.pageItems.length, listItems.length));
-
-        const grid = document.createElement('div');
-        grid.className = 'interview-session-person-grid';
-
+        this._listGrid.replaceChildren();
         visibleItems.forEach(busho => {
             const button = document.createElement('button');
             button.type = 'button';
@@ -371,16 +396,22 @@ class InterviewView {
             button.onclick = () => {
                 if (this.onPageItemSelect) this.onPageItemSelect(busho);
             };
-            grid.appendChild(button);
+            this._listGrid.appendChild(button);
         });
 
         if (visibleItems.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'interview-session-list-empty';
             empty.textContent = '該当する武将はいません。';
-            grid.appendChild(empty);
+            this._listGrid.appendChild(empty);
         }
-        this.body.appendChild(grid);
+
+        if (this._listCount) {
+            this._listCount.textContent = listItems.length === this.pageItems.length
+                ? `${this.pageItems.length}人`
+                : `${listItems.length}/${this.pageItems.length}人`;
+        }
+        if (this._listDirection) this._listDirection.textContent = this.listSortAsc ? '昇順' : '降順';
 
         const showPager = totalPages > 1;
         if (this.pager) this.pager.classList.toggle('hidden', !showPager);
@@ -429,14 +460,16 @@ class InterviewView {
         return faceColumn;
     }
 
-    _renderConversationMessage(busho, message) {
+    _renderConversationMessage(busho, message, options = {}) {
         if (!this.body) return;
-        this.body.className = 'interview-session-body interview-session-conversation-view';
+        const narration = !!options.narration;
+        if (this.content) this.content.classList.add('interview-conversation-active');
+        this.body.className = `interview-session-body interview-session-conversation-view${narration ? ' interview-session-narration-view' : ''}`;
         this.body.replaceChildren();
 
         const dialogBody = document.createElement('div');
         dialogBody.className = 'dialog-body-container interview-session-dialog-body';
-        dialogBody.appendChild(this._createConversationFace(busho || this.currentSpeaker));
+        if (!narration) dialogBody.appendChild(this._createConversationFace(busho || this.currentSpeaker));
 
         const messageArea = document.createElement('div');
         messageArea.className = 'message-area interview-session-message-area';
@@ -458,18 +491,18 @@ class InterviewView {
         ] : []);
     }
 
-    showPrompt(busho, message, choices, title = '面談') {
+    showPrompt(busho, message, choices, title = '面談', options = {}) {
         this._clearMessageAdvance();
         this._ensureOpen();
         this._setHeader(title, '');
         this._setSpeaker(busho);
         if (this.pager) this.pager.classList.add('hidden');
-        this._renderConversationMessage(busho, message);
+        this._renderConversationMessage(busho, message, options);
         this._renderInlineActions([]);
         this._renderFooterActions(choices);
     }
 
-    showMessages(busho, messages, onDone, title = '面談') {
+    showMessages(busho, messages, onDone, title = '面談', options = {}) {
         const queue = (Array.isArray(messages) ? messages : [messages]).filter(Boolean);
         if (queue.length === 0) {
             if (onDone) onDone();
@@ -483,7 +516,7 @@ class InterviewView {
         let index = 0;
         const render = () => {
             this._setHeader(title, queue.length > 1 ? `${index + 1} / ${queue.length}` : '');
-            this._renderConversationMessage(busho, queue[index]);
+            this._renderConversationMessage(busho, queue[index], options);
             this._renderInlineActions([]);
             this._renderFooterActions([]);
             this._setMessageAdvance(() => {

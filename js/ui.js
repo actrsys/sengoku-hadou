@@ -126,6 +126,16 @@ class UIManager {
         let lastTouchX = 0;
         let lastTouchY = 0;
         document.addEventListener('touchend', (event) => {
+            const target = event.target instanceof Element ? event.target : null;
+            const editingControl = target && target.closest('input, select, textarea, option, [contenteditable="true"]');
+
+            // 入力欄・select はブラウザ標準のフォーカス/IME/選択UIに任せる。
+            // touchend直後のblurやpreventDefaultは、古い実機でselectが開かない・IME変換が確定する原因になる。
+            if (editingControl) {
+                lastTouchEnd = 0;
+                return;
+            }
+
             const now = Date.now();
             const touch = event.changedTouches && event.changedTouches[0];
             const x = touch ? touch.clientX : 0;
@@ -142,9 +152,11 @@ class UIManager {
             lastTouchX = x;
             lastTouchY = y;
 
-            if (event.target && typeof event.target.blur === 'function') {
+            if (target && typeof target.blur === 'function') {
                 setTimeout(() => {
-                    event.target.blur();
+                    // 50msの間にフォーム部品へフォーカスが移った場合も奪わない。
+                    if (document.activeElement && document.activeElement.matches('input, select, textarea, [contenteditable="true"]')) return;
+                    target.blur();
                 }, 50);
             }
         }, { passive: false });

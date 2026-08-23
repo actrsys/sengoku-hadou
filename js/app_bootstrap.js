@@ -63,6 +63,21 @@
         });
     }
 
+    function renderTitleVersion() {
+        const element = document.getElementById('title-version');
+        if (!element) return;
+
+        const version = window.GameConfig?.Meta?.Version;
+        if (!version) {
+            element.textContent = '';
+            element.classList.add('hidden');
+            return;
+        }
+
+        element.textContent = `ver. ${version}`;
+        element.classList.remove('hidden');
+    }
+
     function bindStaticUiEvents() {
         const bind = (id, handler) => {
             const element = document.getElementById(id);
@@ -167,6 +182,7 @@
     }
 
     function initializeDomBindings() {
+        renderTitleVersion();
         bindStaticUiEvents();
         resizeGameScreen();
     }

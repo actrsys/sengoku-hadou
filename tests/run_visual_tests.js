@@ -503,8 +503,11 @@ async function validateCommandAndInterviewStates(cdp) {
             const r = content.getBoundingClientRect();
             const fr = footer.getBoundingClientRect();
             const cs = getComputedStyle(content);
+            const actionBox = document.getElementById('interview-session-inline-actions').getBoundingClientRect();
             const action = document.querySelector('.interview-session-inline-btn').getBoundingClientRect();
+            const message = document.querySelector('.interview-session-message-area').getBoundingClientRect();
             const footerButton = footer.querySelector('button').getBoundingClientRect();
+            const metaAlign = getComputedStyle(document.querySelector('.interview-session-meta-row')).textAlign;
             return {
                 innerWidth: 360, innerHeight: 640,
                 rect:{width:r.width,height:r.height,left:r.left,top:r.top,right:r.right,bottom:r.bottom},
@@ -515,6 +518,7 @@ async function validateCommandAndInterviewStates(cdp) {
                 scrollHeight:content.scrollHeight,
                 clientHeight:content.clientHeight,
                 actionHeight:action.height,
+                actionBottom:actionBox.bottom, messageTop:message.top, metaAlign,
                 footerButtonHeight:footerButton.height
             };
         })()`,
@@ -527,17 +531,41 @@ async function validateCommandAndInterviewStates(cdp) {
     assert.strictEqual(mobile.overflowY, 'hidden', 'スマホ面談枠をスクロール領域にしない');
     assert.ok(mobile.scrollHeight <= mobile.clientHeight + 3, 'スマホ面談内容が枠をはみ出している');
     assert.ok(mobile.actionHeight >= 27, 'スマホ面談内操作ボタンが小さすぎる');
+    assert.ok(mobile.actionBottom <= mobile.messageTop + 1, '面談の会話選択肢は会話本文より上に置く');
+    assert.strictEqual(mobile.metaAlign, 'left', '面談相手の所在・身分・年齢は左揃えにする');
     assert.strictEqual(mobile.footerOutside, true, 'スマホ面談の戻る/決定系ボタンは内容枠の外へ置く');
     assert.strictEqual(mobile.standardInsideButtons, 0, 'スマホ面談の内容枠内に標準決定/キャンセルボタンを置かない');
     assert.ok(mobile.footer.top - mobile.rect.bottom >= 14 && mobile.footer.top - mobile.rect.bottom <= 16, `スマホ面談の内容枠と外側ボタンの隙間は15px基準 (${mobile.footer.top - mobile.rect.bottom})`);
     assert.ok(mobile.footer.bottom <= mobile.innerHeight + 1, 'スマホ面談の外側ボタンが9:16画面からはみ出している');
     assert.ok(mobile.footerButtonHeight >= 36, 'スマホ面談の外側ボタンが小さすぎる');
 
+    result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            const content = document.getElementById('interview-session-content');
+            const footer = document.getElementById('interview-session-footer');
+            const inline = document.getElementById('interview-session-inline-actions');
+            const body = document.getElementById('interview-session-body');
+            const before = {contentTop:content.getBoundingClientRect().top, contentHeight:content.getBoundingClientRect().height, bodyTop:body.getBoundingClientRect().top};
+            inline.classList.add('hidden');
+            footer.classList.add('hidden');
+            const after = {contentTop:content.getBoundingClientRect().top, contentHeight:content.getBoundingClientRect().height, bodyTop:body.getBoundingClientRect().top, footerDisplay:getComputedStyle(footer).display, footerVisibility:getComputedStyle(footer).visibility};
+            return {before, after};
+        })()`,
+        returnByValue: true
+    });
+    const fixedConversation = result.result.value;
+    assert.ok(Math.abs(fixedConversation.before.contentTop - fixedConversation.after.contentTop) < 1, '選択肢/外側ボタンの有無で面談枠を上下移動させない');
+    assert.ok(Math.abs(fixedConversation.before.contentHeight - fixedConversation.after.contentHeight) < 1, '選択肢/外側ボタンの有無で面談枠の高さを変えない');
+    assert.ok(Math.abs(fixedConversation.before.bodyTop - fixedConversation.after.bodyTop) < 1, '選択肢の有無で会話本文を上下移動させない');
+    assert.strictEqual(fixedConversation.after.footerDisplay, 'flex', '面談外側フッターは非表示時も予約領域を維持する');
+    assert.strictEqual(fixedConversation.after.footerVisibility, 'hidden', '面談外側フッターは予約時に見えない');
+
     // 最も狭いスマホ9:16で、検索・ソート付き8人一覧もスクロールなしで収まるか確認する。
     result = await cdp.call('Runtime.evaluate', {
         expression: `(() => {
             const content = document.getElementById('interview-session-content');
             content.classList.add('speaker-hidden');
+            content.classList.remove('interview-conversation-active');
             document.getElementById('interview-session-summary-panel').classList.add('hidden');
             document.getElementById('interview-session-inline-actions').classList.add('hidden');
             const pager = document.getElementById('interview-session-pager');

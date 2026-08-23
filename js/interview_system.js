@@ -90,7 +90,9 @@ class InterviewSystem {
                             this.view.showMessages(
                                 busho,
                                 ['金が足りないため、医師を呼べませんでした……'],
-                                () => this.showMainMenu(busho)
+                                () => this.showMainMenu(busho),
+                                '面談',
+                                { narration: true }
                             );
                             return;
                         }
@@ -109,7 +111,9 @@ class InterviewSystem {
                         this.view.showMessages(
                             busho,
                             [`${busho.name}は少し顔色が良くなったようです。`],
-                            () => this.close()
+                            () => this.close(),
+                            '面談',
+                            { narration: true }
                         );
                     }
                 },
@@ -118,7 +122,9 @@ class InterviewSystem {
                     className: 'btn-secondary',
                     onClick: () => this.showMainMenu(busho)
                 }
-            ]
+            ],
+            '面談',
+            { narration: true }
         );
     }
 
