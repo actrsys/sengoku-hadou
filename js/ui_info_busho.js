@@ -602,8 +602,6 @@ Object.assign(UIInfoManager.prototype, {
         const bushoMap = new Map();
         if (this.game.bushos) this.game.bushos.forEach(b => bushoMap.set(b.id, b));
 
-        // ★軽量化：ソート比較のたびに全軍団へ .some() しないよう、国主IDをSet化します。
-        const commanderIds = new Set((this.game.legions || []).map(l => Number(l.commanderId)).filter(id => id > 0));
         // ==========================================
         
         const isViewMode = (actionType === 'view_only' || actionType === 'all_busho_list');
@@ -712,18 +710,18 @@ Object.assign(UIInfoManager.prototype, {
             this.bushoSavedSortedBushos = null; // スコープが変わったらソートキャッシュは破棄
         }
 
+        const getSortRankClan = (b) => window.BushoListSortRules
+            ? BushoListSortRules.getClanRank(this.game, b)
+            : 0;
         const getSortRankAll = (b) => {
-            const isGunshi = b.isGunshi || (b.clan > 0 && clanMap.get(b.clan)?.gunshiId === b.id);
-            const isCommander = commanderIds.has(Number(b.id));
-            if (b.clan === this.game.playerClanId) return b.isDaimyo ? 10000 : (isCommander ? 9500 : (b.isCastellan ? 9000 : (isGunshi ? 8500 : 8000)));
-            if (b.clan > 0) return 5000 - b.clan * 10 + (b.isDaimyo ? 4 : (isCommander ? 3.5 : (b.isCastellan ? 3 : (isGunshi ? 2 : 1))));
+            const clanRank = getSortRankClan(b);
+            // 勢力内の身分序列は BushoListSortRules を唯一の正本とし、全国一覧では勢力グループ用の点数だけを足す。
+            if (b.clan === this.game.playerClanId) return 6000 + clanRank * 500;
+            if (b.clan > 0) return 5000 - b.clan * 10 + clanRank * 0.1;
             if (b.belongKunishuId > 0) return 2000 - b.belongKunishuId * 10 + (b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0) ? 2 : 1);
             if (window.BushoStatusRules.isRonin(b)) return 1000;
             return 0;
         };
-        const getSortRankClan = (b) => window.BushoListSortRules
-            ? BushoListSortRules.getClanRank(this.game, b)
-            : 0;
         
         let acc = null;
         if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;

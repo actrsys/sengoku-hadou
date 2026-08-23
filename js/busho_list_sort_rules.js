@@ -89,9 +89,9 @@ class BushoListSortRules {
         const isCommander = !!busho.isCommander || !!(game && game.legions
             && game.legions.some(l => Number(l.commanderId) === Number(busho.id)));
         if (busho.isDaimyo) return 8;
-        if (isCommander) return 7;
-        if (busho.isCastellan) return 6;
-        if (isGunshi) return 5;
+        if (isGunshi) return 7;
+        if (isCommander) return 6;
+        if (busho.isCastellan) return 5;
         if (window.BushoStatusRules && window.BushoStatusRules.isRonin(busho)) return 1;
         if (Number(busho.belongKunishuId || 0) > 0) {
             const kunishu = game && game.kunishuSystem ? game.kunishuSystem.getKunishu(busho.belongKunishuId) : null;

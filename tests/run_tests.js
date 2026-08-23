@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r125');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r126');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2874,6 +2874,17 @@ test('武将一覧共通ソートは面談用検索と既知能力順を安定�
         { id: 4, name: '林秀貞', yomi: 'はやしひでさだ', castleId: 1, leadership: 60, achievementTotal: 1600 }
     ];
     assert.strictEqual(ctx.BushoListSortRules.getInterviewSortOptions()[0].key, 'rank', '面談の初期選択肢は身分順');
+    const rankGame = { clans: [], legions: [{ commanderId: 102 }] };
+    const rankList = [
+        { id: 101, name: '軍師役', isGunshi: true, clan: 1 },
+        { id: 102, name: '国主役', isCommander: true, clan: 1 },
+        { id: 103, name: '城主役', isCastellan: true, clan: 1 },
+    ];
+    assert.deepStrictEqual(
+        Array.from(ctx.BushoListSortRules.sortKnown(rankGame, rankList, 'rank', false)).map(b => b.id),
+        [101, 102, 103],
+        '身分降順では軍師を国主より上、国主を城主より上に並べる'
+    );
     assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'rank', false)).map(b => b.id), [1, 2, 3, 4], '身分降順は上位身分優先、同身分は名前順で安定させる');
     assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'rank', true)).map(b => b.id), [2, 3, 4, 1], '身分昇順は下位身分優先、同身分は名前順で安定させる');
     assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'leadership', false)).map(b => b.id), [1, 3, 2, 4]);
