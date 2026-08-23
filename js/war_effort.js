@@ -1335,7 +1335,10 @@ Object.assign(WarManager.prototype, {
                                 (s.retreatedReinforcements && s.retreatedReinforcements.some(r => !r.isAttackerData && this.isPlayerClanReinforcement(r.data, pid)));
             s.isPlayerFactionInvolved = isAtkPlayer || isDefPlayer;
 
-            // ★追加：大名の居城が攻め落とされたかのフラグを立てます（撤退による明け渡しも含む）
+            // 守備側の拠点離脱結果を一度だけ確定します。
+            // retreat: 別拠点への撤退成功 / collapse: 撤退できず敗北 / held: 防衛成功。
+            // 総取りは「大名居城が陥落」だけでなく collapse の時だけ許可します。
+            s.defenderCastleOutcome = attackerWon ? (isRetreat ? 'retreat' : 'collapse') : 'held';
             if (attackerWon && !s.attacker.isKunishu && s.attacker.ownerClan !== 0 && s.oldDefClanId !== 0) {
                 s.isDaimyoCastleFallen = s.isDaimyoCastle;
             }
@@ -3392,7 +3395,9 @@ Object.assign(WarManager.prototype, {
     // これから総取りが発生するかどうかを事前確認する魔法
     isTotalTakeoverPending() {
         const s = this.state;
-        if (!s || !s.isDaimyoCastleFallen) return false; 
+        if (!s || !s.isDaimyoCastleFallen) return false;
+        // 守備側が別拠点への撤退に成功した場合、指揮系統が残るため総取りは発生させません。
+        if (s.defenderCastleOutcome !== 'collapse') return false;
 
         const atkClanId = s.attacker.ownerClan;
         const defClanId = s.oldDefClanId;

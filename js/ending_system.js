@@ -53,18 +53,21 @@ class EndingSystem {
             return;
         }
 
-        // ★追加：ロード画面よりも絶対に手前に来るように、限界突破の数値をセットします！
-        // （ロード画面が手前に出てきてしまう不具合を防ぐためです）
+        // ロード画面より手前で暗転させます。hiddenを外した瞬間から入力遮断します。
         endingScreen.style.zIndex = '99999';
+        const app = document.getElementById('app');
+        const activeElement = document.activeElement;
+        if (activeElement && typeof activeElement.blur === 'function') activeElement.blur();
+        if (app) {
+            app.inert = true;
+            app.style.pointerEvents = 'none';
+        }
 
-        // 1. 画面をゆっくり暗転させます（フェードイン）
+        // 1. 短い暗転。2秒の待ち時間を廃止し、演出と入力遮断を同時に開始します。
         endingScreen.classList.remove('hidden');
-        // 一瞬だけ待つことで、CSSの「2秒かけて暗くする魔法」を確実に発動させます
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await this.game.ui.waitForNextPaint();
         endingScreen.classList.add('show');
-        
-        // 完全に画面が真っ暗になるまで待ちます（2秒）
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 700));
 
         // 2. タイトルとメッセージをふわっと表示します
         titleEl.innerText = titleText;
@@ -127,27 +130,37 @@ class EndingSystem {
             // 文字が流れ終わった後、少し余韻を残します
             await new Promise(resolve => setTimeout(resolve, 2000));
         } else {
-            // ★ ゲームオーバーの時はスタッフロールを飛ばして、少しだけ間を空けます
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // ゲームオーバーはスタッフロールを流さず、短い余韻だけ置きます。
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
 
-        // 5. 画面が「真っ暗な状態のまま」、裏側をタイトル画面に切り替えます！
-        this.game.ui.returnToTitle();
+        // 5. 暗転からロード画面へ受け渡してタイトルを準備します。
+        // 黒幕の裏でロード画面を出した後、黒幕だけを短く退かせるので処理中であることが見えます。
+        this.game.ui.showLoadingScreen('タイトル画面へ戻っています', 5);
+        await this.game.ui.waitForNextPaint();
 
-        // アニメーションの状態や文字をリセットしておきます
+        // アニメーションの状態や文字をリセットしておきます。
         staffRollContainer.style.transition = 'none';
         staffRollContainer.style.transform = 'translateY(0)';
-        
-        // ★追加：裏側でタイトル画面の準備（ロード画面の表示・非表示など）が完全に終わって落ち着くまで、真っ暗なまま長めに待ちます（2.5秒）
-        // こうすることで、裏でごちゃごちゃ動いている様子を真っ暗なフタで完全に隠し切ることができます。
-        await new Promise(resolve => setTimeout(resolve, 2500));
-        
-        // 6. 裏側が完全にタイトル画面になった状態で、ゆっくり暗転を解除します（フェードアウト）
+        titleEl.classList.remove('show');
+        msgEl.classList.remove('show');
+
+        endingScreen.style.transition = 'opacity 0.3s ease-out';
         endingScreen.classList.remove('show');
-        
-        // 完全に明るくなるまで待ってから、エンディングの箱を片付けます
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 300));
         endingScreen.classList.add('hidden');
+
+        // ロード画面が見えている状態でタイトルへの掃除・セーブ確認を完了させます。
+        // 万一タイトル準備で例外が出ても、入力禁止状態だけは残さないようfinallyで解除します。
+        try {
+            await this.game.ui.returnToTitle({ loadingAlreadyVisible: true });
+        } finally {
+            endingScreen.style.transition = '';
+            if (app) {
+                app.inert = false;
+                app.style.pointerEvents = '';
+            }
+        }
     }
 
     // ★毎月の終わりなどに呼ばれる、クリア・ゲームオーバーの総合チェックです

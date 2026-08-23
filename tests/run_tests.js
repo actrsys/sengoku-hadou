@@ -2116,5 +2116,64 @@ test('自家武将の出奔通知は通常メッセージ共通処理showDialogA
     assert.ok(!block.includes('showCutin('), '出奔専用カットインを残さない');
 });
 
+test('総取りは守備側が撤退成功した場合は発生せず、撤退できない崩壊時だけ発生する', () => {
+    const ctx = createContext({ WarManager: class WarManager {} });
+    loadScript(ctx, 'js/war_effort.js');
+    const wm = new ctx.WarManager();
+    wm.game = {
+        castles: [{ id: 10, ownerClan: 2 }],
+        clans: [
+            { id: 1, daimyoPrestige: 300 },
+            { id: 2, daimyoPrestige: 100 }
+        ]
+    };
+    wm.state = {
+        isDaimyoCastleFallen: true,
+        defenderCastleOutcome: 'retreat',
+        attacker: { ownerClan: 1 },
+        oldDefClanId: 2
+    };
+    assert.strictEqual(wm.isTotalTakeoverPending(), false, '撤退成功時は総取りしない');
+    wm.state.defenderCastleOutcome = 'collapse';
+    assert.strictEqual(wm.isTotalTakeoverPending(), true, '撤退できず崩壊した場合は総取り候補になる');
+    wm.state.defenderCastleOutcome = 'held';
+    assert.strictEqual(wm.isTotalTakeoverPending(), false, '防衛成功時は総取りしない');
+});
+
+test('野戦の守備兵糧切れは攻城戦へ移らずcollapse側の即敗北として扱う', () => {
+    const field = read('js/field_war.js');
+    const effort = read('js/war_effort.js');
+    const foodBlock = field.match(/else if \(defTotalRice <= 0\) \{([\s\S]*?)\n\s*\}/);
+    assert.ok(foodBlock, '守備側兵糧切れの判定が必要');
+    assert.ok(foodBlock[1].includes("endResult = 'attacker_win_fatal'"), '守備兵糧切れは野戦で即敗北にする');
+    const fatalBlock = effort.match(/if \(resultType === 'attacker_win_fatal'\) \{([\s\S]*?)\n\s*\} else if/);
+    assert.ok(fatalBlock && fatalBlock[1].includes('this.endWar(true)'), 'fatal敗北は攻城戦へ移らず戦争終了へ進む');
+    assert.ok(!fatalBlock[1].includes('startSiegeWarPhase'), 'fatal敗北から攻城戦へ遷移させない');
+});
+
+test('ゲームオーバーは短い暗転開始直後から入力を遮断しロード画面経由でタイトルへ戻る', () => {
+    const ending = read('js/ending_system.js');
+    const ui = read('js/ui.js');
+    const css = read('css/style.css');
+    assert.ok(css.includes('transition: opacity 0.7s ease-in-out'));
+    assert.ok(css.includes('pointer-events: auto;'), 'ending-screenはhidden解除直後から入力を受け止める');
+    assert.ok(ending.includes('app.inert = true'));
+    assert.ok(ending.includes("this.game.ui.showLoadingScreen('タイトル画面へ戻っています', 5)"));
+    assert.ok(ending.includes("returnToTitle({ loadingAlreadyVisible: true })"));
+    assert.ok(!ending.includes('setTimeout(resolve, 2500)'), '真っ黒のまま2.5秒待つ旧遷移を残さない');
+    assert.ok(ui.includes('const loadingAlreadyVisible = options.loadingAlreadyVisible === true'));
+});
+
+test('観戦終了予約メッセージはbodyではなく固定論理画面内へ配置する', () => {
+    const ui = read('js/ui.js');
+    const css = read('css/style.css');
+    const method = ui.match(/showWatchReturnReserved\([\s\S]*?\n\s*\}/);
+    assert.ok(method);
+    assert.ok(method[0].includes("document.getElementById('game-screen')"));
+    assert.ok(method[0].includes('(gameScreen || document.body).appendChild(notice)'));
+    const rule = css.match(/#watch-return-reserved-notice \{([\s\S]*?)\n\}/);
+    assert.ok(rule && rule[1].includes('position: absolute'), '物理viewport fixedではなくgame-screen内absoluteにする');
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

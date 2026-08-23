@@ -501,6 +501,39 @@ async function validateCommandAndInterviewStates(cdp) {
     console.log('✓ PC入れ子コマンド選択状態・面談押下不透明 visual regression');
 }
 
+async function validateEndingAndWatchStates(cdp) {
+    const html = fixtureHtml('ending_watch_states.html');
+    await cdp.call('Emulation.setDeviceMetricsOverride', { width: 360, height: 800, deviceScaleFactor: 1, mobile: true });
+    await cdp.call('Runtime.evaluate', {
+        expression: `document.open();document.write(${JSON.stringify(html)});document.close();true`,
+        returnByValue: true,
+        awaitPromise: true
+    });
+    await new Promise(resolve => setTimeout(resolve, 80));
+
+    let result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            const screen = document.getElementById('game-screen').getBoundingClientRect();
+            const notice = document.getElementById('watch-return-reserved-notice').getBoundingClientRect();
+            const ending = getComputedStyle(document.getElementById('ending-screen'));
+            const btn = document.getElementById('under-button').getBoundingClientRect();
+            return {screen:{top:screen.top,bottom:screen.bottom,left:screen.left,right:screen.right},notice:{top:notice.top,bottom:notice.bottom,left:notice.left,right:notice.right},pointerEvents:ending.pointerEvents,btn:{x:(btn.left+btn.right)/2,y:(btn.top+btn.bottom)/2}};
+        })()`,
+        returnByValue: true
+    });
+    const state = result.result.value;
+    assert.ok(state.notice.top >= state.screen.top && state.notice.bottom <= state.screen.bottom, '観戦帰還予約は黒帯ではなくgame-screen内に収める');
+    assert.ok(state.notice.left >= state.screen.left && state.notice.right <= state.screen.right, '観戦帰還予約はgame-screen横幅からはみ出さない');
+    assert.strictEqual(state.pointerEvents, 'auto', '透明な暗転開始直後でもending-screenが入力を捕捉する');
+
+    await cdp.call('Input.dispatchMouseEvent', { type:'mousePressed', x:state.btn.x, y:state.btn.y, button:'left', clickCount:1 });
+    await cdp.call('Input.dispatchMouseEvent', { type:'mouseReleased', x:state.btn.x, y:state.btn.y, button:'left', clickCount:1 });
+    await new Promise(resolve => setTimeout(resolve, 30));
+    result = await cdp.call('Runtime.evaluate', { expression:'window.__underClicks', returnByValue:true });
+    assert.strictEqual(result.result.value, 0, '暗転レイヤーが透明な開始フレームでも背面ボタンを押せてはいけない');
+    console.log('✓ game-over input guard / watch-return logical-screen visual regression');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -558,6 +591,7 @@ async function main() {
         console.log('  80/100/110/120 の幅・高さ・限界突破・右列非侵入を実ブラウザで確認しました');
         await validateLegionCouncil(cdp);
         await validateCommandAndInterviewStates(cdp);
+        await validateEndingAndWatchStates(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');

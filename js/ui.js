@@ -1301,7 +1301,8 @@ class UIManager {
         if (!notice) {
             notice = document.createElement('div');
             notice.id = 'watch-return-reserved-notice';
-            document.body.appendChild(notice);
+            const gameScreen = document.getElementById('game-screen');
+            (gameScreen || document.body).appendChild(notice);
         }
         notice.textContent = message;
     }
@@ -1853,30 +1854,30 @@ class UIManager {
             }
         }
     }
-    async returnToTitle() { 
-        // ★追加：お掃除を始める前に、画面をロード画面で隠します
-        this.showLoadingScreen();
-        await new Promise(resolve => setTimeout(resolve, 50));
+    async returnToTitle(options = {}) { 
+        const loadingAlreadyVisible = options.loadingAlreadyVisible === true;
+        // タイトル復帰は必ずロード画面で覆います。EndingSystemから呼ぶ場合は既に表示済みです。
+        if (!loadingAlreadyVisible) this.showLoadingScreen('タイトル画面へ戻っています', 10);
+        else this.updateLoadingProgress(10, 'タイトル画面へ戻っています');
+        await this.waitForNextPaint();
 
         this.forceResetModals();
+        this.updateLoadingProgress(45, '画面を整理しています');
 
-        // ★ここを追加：ゲームのステータスを「タイトル画面」に戻す魔法！
+        // ゲームのステータスを「タイトル画面」に戻します。
         if (this.game) this.game.phase = 'title';
 
         const ts = document.getElementById('title-screen');
         if(ts) ts.classList.remove('hidden'); 
         
-        // ★ここから下を書き足します！
         if (window.AudioManager) {
             window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
         }
-        // ★書き足すのはここまで！
 
-        // ★追加：お掃除が終わってタイトル画面が出たら、少し待ってからロード画面を隠します
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // ★ここを追加：タイトルに戻った時にもセーブデータがあるかチェックしてボタンを更新します
+        this.updateLoadingProgress(75, 'セーブデータを確認しています');
         await this.checkSaveDataForTitle();
+        this.updateLoadingProgress(100, '準備完了');
+        await this.waitForNextPaint();
 
         this.hideLoadingScreen();
     }

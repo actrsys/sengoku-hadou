@@ -3981,14 +3981,14 @@ body.background-paused #map-container {
     align-items: center;
     color: #fff;
     opacity: 0;
-    transition: opacity 2s ease-in-out; /* 2秒かけてゆっくり暗転させる魔法です */
-    pointer-events: none;
+    transition: opacity 0.7s ease-in-out;
+    /* hidden解除と同時に入力を遮断し、暗転開始直後の操作抜けを作らない。 */
+    pointer-events: auto;
     overflow: hidden;
 }
 
 #ending-screen.show {
     opacity: 1;
-    pointer-events: auto; /* 暗転中は他の操作ができないようにします */
 }
 
 #ending-content {
@@ -4926,7 +4926,8 @@ body:not(.is-pc) .saveload-latest-mark {
 
 
 #watch-return-reserved-notice {
-    position: fixed;
+    /* 物理viewportではなく固定論理画面内に置き、縦横比調整用の黒帯へ出さない。 */
+    position: absolute;
     left: 50%;
     bottom: max(18px, env(safe-area-inset-bottom));
     transform: translateX(-50%);
