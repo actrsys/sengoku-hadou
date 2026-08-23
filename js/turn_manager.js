@@ -183,6 +183,9 @@ class TurnManager {
             game.ui.aiGuard.classList.remove('hidden');
             game.ui.restoreAIGuardText(true);
         }
+        // 観戦かプレイ中かでAI進行ロジックは変えない。UIを閉じた直後に落ちた場合も
+        // modal_closeの古い診断が残らないよう、共通AIターンの予約地点を記録します。
+        if (typeof game.writeAIDiagnostic === 'function') game.writeAIDiagnostic(castle, 'ai_turn:scheduled');
         game.ui.updateAIProgress(game.currentIndex + 1, game.turnQueue.length);
         if (game.ui) game.ui.currentCastle = castle;
 

@@ -780,9 +780,25 @@ Object.assign(UIManager.prototype, {
 
         this._stopMapInertia();
 
-        // 複数城なら、その中心地点へ寄せます。独立イベントなどの複数領地点滅にも対応します。
-        const avgX = castles.reduce((sum, c) => sum + Number(c.pixelX), 0) / castles.length;
-        const avgY = castles.reduce((sum, c) => sum + Number(c.pixelY), 0) / castles.length;
+        // 通常操作は城アイコン（種点）を中心にします。戦闘・制圧など領域そのものを
+        // 光らせる演出だけは、起動時に計算した領域重心へ寄せて「カメラ位置」と
+        // 「点滅して見える位置」がスマホでも一致するようにします。
+        const focusAnchor = options.anchor === 'territory' ? 'territory' : 'castle';
+        const focusPoints = castles.map(c => {
+            if (focusAnchor === 'territory') {
+                const center = DataManager.castlePixelCenters && DataManager.castlePixelCenters[Number(c.id)];
+                if (center && Number.isFinite(Number(center.x)) && Number.isFinite(Number(center.y))) {
+                    return { x: Number(center.x), y: Number(center.y) };
+                }
+                const bounds = DataManager.castlePixelBounds && DataManager.castlePixelBounds[Number(c.id)];
+                if (bounds) {
+                    return { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
+                }
+            }
+            return { x: Number(c.pixelX), y: Number(c.pixelY) };
+        });
+        const avgX = focusPoints.reduce((sum, p) => sum + p.x, 0) / focusPoints.length;
+        const avgY = focusPoints.reduce((sum, p) => sum + p.y, 0) / focusPoints.length;
 
         const currentLeft = parseFloat(this.mapEl.style.left || 0) || 0;
         const currentTop = parseFloat(this.mapEl.style.top || 0) || 0;
@@ -894,12 +910,25 @@ Object.assign(UIManager.prototype, {
             const duration = Number.isFinite(Number(options.duration))
                 ? Math.max(120, Math.min(1200, Number(options.duration)))
                 : Math.round(300 + distanceRatio * 120);
-            const startTime = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            // 古い実機では最初のrAFが数百ms遅れることがあります。開始時刻との差をそのまま
+            // 進捗へ使うと、最初の描画でt=1になって「ぬるっと」ではなくワープします。
+            // フレーム間の実経過を積算しつつ、1フレームで進めてよい量を50msまでに制限します。
+            // 高性能端末では従来どおりの所要時間、低FPS端末では少し時間をかけてでも数フレーム描画します。
+            let elapsed = 0;
+            let lastFrameTime = null;
+            const maxFrameAdvance = 50;
 
             const animate = (now) => {
                 if (done) return;
                 const currentTime = Number.isFinite(now) ? now : ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now());
-                const t = Math.max(0, Math.min(1, (currentTime - startTime) / duration));
+                if (lastFrameTime === null) {
+                    lastFrameTime = currentTime;
+                } else {
+                    const rawDelta = Math.max(0, currentTime - lastFrameTime);
+                    elapsed += Math.min(maxFrameAdvance, rawDelta);
+                    lastFrameTime = currentTime;
+                }
+                const t = Math.max(0, Math.min(1, elapsed / duration));
                 // easeOutCubic：出だしはしっかり動き、目的地では自然に止まります。
                 const eased = 1 - Math.pow(1 - t, 3);
                 sc.scrollLeft = startLeft + dx * eased;
@@ -2186,7 +2215,7 @@ Object.assign(UIManager.prototype, {
 
     async playBattleBlink(castleIdOrIds, colorA, colorB, durationMs) {
         // Round23: 点滅する場所が画面外にならないよう、演出側が1回だけ滑らかに対象へ寄せます。
-        await this.focusMapOnCastle(castleIdOrIds, { transition: 'smooth', reason: 'battle_blink' });
+        await this.focusMapOnCastle(castleIdOrIds, { transition: 'smooth', reason: 'battle_blink', anchor: 'territory' });
         return new Promise(resolve => {
             this.showMapGuard();
 
@@ -2263,7 +2292,7 @@ Object.assign(UIManager.prototype, {
     // ==========================================
     async playCaptureEffect(castleIdOrIds, onHalfway) {
         // Round23: プレイヤー戦後でも、白い制圧演出が画面外で走らないよう演出側で滑らかに寄せます。
-        await this.focusMapOnCastle(castleIdOrIds, { transition: 'smooth', reason: 'capture_effect' });
+        await this.focusMapOnCastle(castleIdOrIds, { transition: 'smooth', reason: 'capture_effect', anchor: 'territory' });
         return new Promise(resolve => {
             this.showMapGuard();
 

@@ -161,3 +161,11 @@ Round66を今回の全体整理の基準版とし、以後は「整理するた�
 - 国主評定の二択命令はユーザー設定と同系統の汎用 `.ui-toggle-btn` 表現を使い、未選択は茶系、選択中だけ金色で強調する。確定/戻る等の標準モーダル操作は共通フッター間隔と共通SEに委譲し、個別に重ねてSEを鳴らさない。
 
 - 評定内の「一括」は勢力詳細・拠点詳細の右下操作と同じ `.daimyo-detail-action-btn` を再利用し、評定専用CSSは配置だけを担当する。
+
+## Map focus consistency / low-FPS camera (r89)
+
+- Normal active-castle focus uses the castle icon seed (`pixelX` / `pixelY`).
+- Territory effects such as battle blink and capture effects use `DataManager.castlePixelCenters`, derived while the territory ID map is built, so the camera and the visual territory effect share one anchor.
+- Smooth map focus is driven by accumulated frame deltas with a per-frame advance cap. A delayed first `requestAnimationFrame` must not consume the whole animation and turn a smooth move into an instant jump on slow mobile WebViews.
+- AI progression is identical in normal play and watch mode. Diagnostics may differ only in visibility/checkpoint detail; they must not alter AI decisions, timing rules, or battle flow.
+- Common-modal close diagnostics are staged around selector close and background/map restoration so an OS/browser forced reload can be localized without guessing a cause.

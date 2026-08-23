@@ -18,16 +18,18 @@ class UIInfoManager {
 
         this.modalHistory = [];
         this.currentModalInfo = null;
+        const canDiagnose = this.game && this.game.phase !== 'title' && typeof this.game.writeSystemDiagnostic === 'function';
+        if (canDiagnose) this.game.writeSystemDiagnostic('ui:modal_close:start');
         if (this.selectorView) this.selectorView.close();
+        if (canDiagnose) this.game.writeSystemDiagnostic('ui:modal_close:selector_done');
         
-        // ★ここを書き足し：リストを完全に閉じる時に、背景の更新を再開させます！
+        // リストを完全に閉じる時に背景更新を再開します。強制リロード調査では
+        // この復帰処理の前後を分けて記録し、原因を推測で断定しないようにします。
         if (this.ui && typeof this.ui.resumeBackgroundUpdates === 'function') {
-            this.ui.resumeBackgroundUpdates();
+            if (canDiagnose) this.game.writeSystemDiagnostic('ui:modal_close:recovery_start');
+            this.ui.resumeBackgroundUpdates('ui:modal_close');
+            if (canDiagnose) this.game.writeSystemDiagnostic('ui:modal_close:recovery_done');
         }
-        if (this.game && this.game.phase !== 'title' && typeof this.game.writeSystemDiagnostic === 'function') {
-            this.game.writeSystemDiagnostic('ui:modal_closed');
-        }
-        
         // 武将一覧などで使う状態のリセット
         this.bushoCurrentTab = 'stats';
         this.bushoCurrentScope = 'clan';
@@ -80,6 +82,7 @@ class UIInfoManager {
         
         // ★全リスト共通の選択状態を記憶する箱
         this.commonSelectedIds = [];
+        if (canDiagnose) this.game.writeSystemDiagnostic('ui:modal_close:state_reset_done');
     }
 
     // --- 共通モーダルのガワ ---

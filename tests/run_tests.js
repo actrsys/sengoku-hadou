@@ -2039,5 +2039,42 @@ test('面談選択肢は押下中も不透明背景を維持しbackgroundをtran
     assert.ok(active[1].includes('background-image: linear-gradient'));
 });
 
+
+test('戦闘カメラは城種点ではなく領域重心を使い点滅位置と一致させる', () => {
+    const data = read('js/data_manager.js');
+    const map = read('js/ui_map.js');
+    assert.ok(data.includes('this.castlePixelCenters = centersByCastleId'), '起動時に城領域重心を保持する');
+    assert.ok(data.includes('sumX: 0, sumY: 0, count: 0'), '領域割当と同時に重心を集計する');
+    assert.ok(map.includes("options.anchor === 'territory'"), 'カメラ側に領域中心アンカーを持つ');
+    assert.ok(map.includes("reason: 'battle_blink', anchor: 'territory'"), '戦闘点滅は領域中心へ寄せる');
+    assert.ok(map.includes("reason: 'capture_effect', anchor: 'territory'"), '制圧演出も領域中心へ寄せる');
+});
+
+test('低FPS端末のsmoothカメラは最初の遅延で目的地へワープしない', () => {
+    const map = read('js/ui_map.js');
+    assert.ok(map.includes('let elapsed = 0'));
+    assert.ok(map.includes('let lastFrameTime = null'));
+    assert.ok(map.includes('const maxFrameAdvance = 50'));
+    assert.ok(map.includes('elapsed += Math.min(maxFrameAdvance, rawDelta)'), '1フレームの進行量を制限する');
+    const focusBlock = map.slice(map.indexOf('focusMapOnCastle(castleOrId'), map.indexOf('// 既存コードとの互換窓口'));
+    assert.ok(!focusBlock.includes('(currentTime - startTime) / duration'), 'focusMapOnCastleではrAF開始待ち時間をそのまま進捗へ加算しない');
+});
+
+test('モーダル閉鎖時の実機診断は復帰処理を段階別に記録する', () => {
+    const ui = read('js/ui.js');
+    const info = read('js/ui_info.js');
+    const turn = read('js/turn_manager.js');
+    assert.ok(info.includes("ui:modal_close:start"));
+    assert.ok(info.includes("ui:modal_close:selector_done"));
+    assert.ok(info.includes("resumeBackgroundUpdates('ui:modal_close')"));
+    assert.ok(info.includes("ui:modal_close:state_reset_done"));
+    assert.ok(ui.includes("mark('recover_map_start')"));
+    assert.ok(ui.includes("mark('castle_glows_start')"));
+    assert.ok(ui.includes("mark('clan_colors_start')"));
+    assert.ok(ui.includes("mark('snow_start')"));
+    assert.ok(ui.includes("mark('keep_highlight_start')"));
+    assert.ok(turn.includes("writeAIDiagnostic(castle, 'ai_turn:scheduled')"), 'プレイ時/観戦時共通AIターンで次の診断へ進める');
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

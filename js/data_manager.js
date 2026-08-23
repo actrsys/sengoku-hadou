@@ -606,6 +606,8 @@ class DataManager {
         const provinceMap = this.provincePixelMap;
         if (!width || !height || !provinceMap || provinceMap.length !== width * height) {
             this.castlePixelMap = null;
+            this.castlePixelBounds = null;
+            this.castlePixelCenters = null;
             return;
         }
 
@@ -626,18 +628,28 @@ class DataManager {
         // 戦闘点滅などが毎回地図全766万pixelを走査しなくて済むよう、
         // 城領域の外接矩形も領域構築と同時に作ります。常駐量は252城ぶんだけです。
         const boundsByCastleId = Array.from({ length: maxCastleId + 1 }, () => null);
+        // カメラと領域エフェクトの視覚中心を一致させるため、領域構築と同時に
+        // 各城領域の重心も集計します。252城ぶんの数値だけなので常駐メモリはごく小さいです。
+        const centerStatsByCastleId = Array.from({ length: maxCastleId + 1 }, () => null);
         const includeInBounds = (castleId, x, y) => {
             const id = Number(castleId) || 0;
             if (!id) return;
             let b = boundsByCastleId[id];
             if (!b) {
                 boundsByCastleId[id] = { minX: x, maxX: x, minY: y, maxY: y };
-                return;
+            } else {
+                if (x < b.minX) b.minX = x;
+                if (x > b.maxX) b.maxX = x;
+                if (y < b.minY) b.minY = y;
+                if (y > b.maxY) b.maxY = y;
             }
-            if (x < b.minX) b.minX = x;
-            if (x > b.maxX) b.maxX = x;
-            if (y < b.minY) b.minY = y;
-            if (y > b.maxY) b.maxY = y;
+            let stat = centerStatsByCastleId[id];
+            if (!stat) {
+                stat = centerStatsByCastleId[id] = { sumX: 0, sumY: 0, count: 0 };
+            }
+            stat.sumX += x;
+            stat.sumY += y;
+            stat.count++;
         };
         const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
         const isPC = document.body && document.body.classList.contains('is-pc');
@@ -719,8 +731,16 @@ class DataManager {
 
         // 一時BFSキューはここで参照を切り、ゲーム中は国ID＋城IDの2本だけを保持します。
         queue = null;
+        const centersByCastleId = centerStatsByCastleId.map((stat, id) => {
+            if (stat && stat.count > 0) {
+                return { x: stat.sumX / stat.count, y: stat.sumY / stat.count };
+            }
+            const b = boundsByCastleId[id];
+            return b ? { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 } : null;
+        });
         this.castlePixelMap = output;
         this.castlePixelBounds = boundsByCastleId;
+        this.castlePixelCenters = centersByCastleId;
     }
 
 

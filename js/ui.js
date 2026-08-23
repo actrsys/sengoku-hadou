@@ -411,26 +411,51 @@ class UIManager {
         }
     }
 
-    resumeBackgroundUpdates() {
+    resumeBackgroundUpdates(diagnosticPrefix = '') {
+        const mark = (stage) => {
+            if (!diagnosticPrefix || !this.game || this.game.phase === 'title' || typeof this.game.writeSystemDiagnostic !== 'function') return;
+            this.game.writeSystemDiagnostic(`${diagnosticPrefix}:${stage}`);
+        };
+
         this.isBackgroundPaused = false;
         document.body.classList.remove('background-paused');
+        mark('recover_map_start');
         if (typeof this.recoverMobileMapResources === 'function') {
             this.recoverMobileMapResources();
         }
+        mark('recover_map_done');
         
         // まだゲームが始まっていない時（タイトル画面など）はここで終わります
         if (!this.game || this.game.phase === 'title') return;
 
         // 止めていた間に「お城の兵士数」や「勢力の色」が変わったかもしれないので、
-        // 再開のタイミングで一気に最新の状態に書き換えます！
+        // 再開のタイミングで一気に最新の状態に書き換えます。
         const activeCastle = this.currentCastle || (this.game ? this.game.getCurrentTurnCastle() : null);
+        mark('info_start');
         if (activeCastle) {
             this.updateInfoPanel(activeCastle);
         }
-        if (typeof this.updateCastleGlows === 'function') this.updateCastleGlows();
-        if (typeof this.updateClanColors === 'function') this.updateClanColors();
-        if (typeof this.updateSnowOverlay === 'function') this.updateSnowOverlay();
-        if (typeof this.updateKeepHighlight === 'function') this.updateKeepHighlight();
+        mark('info_done');
+        if (typeof this.updateCastleGlows === 'function') {
+            mark('castle_glows_start');
+            this.updateCastleGlows();
+            mark('castle_glows_done');
+        }
+        if (typeof this.updateClanColors === 'function') {
+            mark('clan_colors_start');
+            this.updateClanColors();
+            mark('clan_colors_done');
+        }
+        if (typeof this.updateSnowOverlay === 'function') {
+            mark('snow_start');
+            this.updateSnowOverlay();
+            mark('snow_done');
+        }
+        if (typeof this.updateKeepHighlight === 'function') {
+            mark('keep_highlight_start');
+            this.updateKeepHighlight();
+            mark('keep_highlight_done');
+        }
     }
     // ==========================================
 
