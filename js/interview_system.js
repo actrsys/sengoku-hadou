@@ -55,14 +55,16 @@ class InterviewSystem {
     startInterview(busho) {
         if (!busho || !this.view) return;
 
-        // 面談へ入った瞬間の本心を基準に、その面談中の表面態度を一度だけ決める。
-        // 以後の導入台詞も同じ態度を使い、挨拶だけ急に別人格になるのを防ぐ。
-        this.activeInterviewAttitude = this._getSurfaceAttitude(busho);
-
+        // 面談による忠誠上昇を先に確定し、その結果を今回の面談態度へ反映する。
+        // 境界を跨いだのに最初の挨拶だけ旧忠誠の態度になるズレを防ぐ。
         if (!busho.isInterviewed) {
             busho.loyalty = Math.min(100, Number(busho.loyalty || 0) + 1);
             busho.isInterviewed = true;
         }
+
+        // 面談開始後の現在忠誠を基準に、その面談中の表面態度を一度だけ決める。
+        // 以後の導入台詞も同じ態度を使い、挨拶だけ急に別人格になるのを防ぐ。
+        this.activeInterviewAttitude = this._getSurfaceAttitude(busho);
 
         this.view.showMessages(
             busho,
@@ -224,6 +226,7 @@ class InterviewSystem {
             this._getMenuPrompt(),
             [
                 { label: '調子はどうだ', onClick: () => this.executeInterviewStatus(busho) },
+                { label: '方針について', onClick: () => this.executeInterviewPolicy(busho) },
                 { label: '他者について聞く', onClick: () => this.showTargetList(busho) }
             ],
             () => this.showInterviewerList()
@@ -246,7 +249,7 @@ class InterviewSystem {
         let policyText = '';
         if (inno > 80) policyText = '最近のやり方は少々古臭い気がしますな。もっと新しいことをせねば。';
         else if (inno < 20) policyText = '古き良き伝統を守ることこそ肝要です。';
-        else policyText = '当家のやり方に特に不満はありません。順調です。';
+        else policyText = '古きに固執するも、新しきに飛びつくも考えもの。肝要なのは、時勢を見極めることかと。';
 
         const concealment = this._getConcealmentProfile(busho);
         const loyaltyBand = concealment.perceivedBand;
@@ -259,30 +262,125 @@ class InterviewSystem {
         this.view.showMessages(busho, messages, () => this.showMainMenu(busho));
     }
 
+    _getPolicyDisclosureProfile(busho) {
+        const cfg = window.MainParams.Interview.PolicyDisclosure;
+        const loyalty = Math.max(0, Math.min(100, Number(busho && busho.loyalty) || 0));
+        const duty = Math.max(0, Math.min(100, Number(busho && busho.duty) || 0));
+        const score = loyalty * cfg.LoyaltyWeight + duty * cfg.DutyWeight;
+        return {
+            score,
+            level: score >= cfg.FullMin ? 'full' : (score >= cfg.PartialMin ? 'partial' : 'guarded')
+        };
+    }
+
+    _tonePolicyText(text, attitude = this.activeInterviewAttitude) {
+        if (!text) return text;
+        if (attitude === 'welcoming') return `はい、${text}`;
+        if (attitude === 'friendly') return text;
+        if (attitude === 'polite') return `恐れながら、${text}`;
+        if (attitude === 'reserved') return `……軍団長として申し上げるなら、${text}`;
+        if (attitude === 'startled') return `……そ、その件でしたら、${text}`;
+        return `……${text}`;
+    }
+
+    _toneTopicFollowup(text, attitude = this.activeInterviewAttitude) {
+        if (!text) return text;
+        if (attitude === 'welcoming') return `ええ、${text}`;
+        if (attitude === 'friendly' || attitude === 'polite') return text;
+        return text.startsWith('……') ? text : `……${text}`;
+    }
+
+    _getCommanderLegion(busho) {
+        if (!busho || !this.game || !Array.isArray(this.game.legions)) return null;
+        return this.game.legions.find(l => Number(l.clanId) === Number(busho.clan)
+            && Number(l.commanderId) === Number(busho.id)) || null;
+    }
+
+    _getOperationTargetName(operation) {
+        if (!operation || operation.type !== '攻撃') return '';
+        if (operation.isKunishuTarget) {
+            const kunishu = this.game.kunishuSystem && this.game.kunishuSystem.getKunishu(operation.targetId);
+            return kunishu ? kunishu.getName(this.game) : '目標の諸勢力';
+        }
+        const target = this.game.getCastle(operation.targetId);
+        return target ? target.name : '目標の城';
+    }
+
+    _getPolicyMessages(busho) {
+        const disclosure = this._getPolicyDisclosureProfile(busho);
+        const legion = this._getCommanderLegion(busho);
+        if (!legion) {
+            return [this._tonePolicyText('某は軍団の方針を定める立場ではございませぬ。')];
+        }
+
+        if (disclosure.level === 'guarded') {
+            return [this._tonePolicyText('軍略の仔細については、今は申し上げることはございませぬ。')];
+        }
+
+        const clanId = Number(busho.clan);
+        const legionId = Number(legion.legionNo);
+        const clanOps = this.game.aiOperationManager && this.game.aiOperationManager.operations
+            ? this.game.aiOperationManager.operations[clanId]
+            : null;
+        const operation = clanOps ? clanOps[legionId] : null;
+        const legionCastles = this.game.getClanCastles(clanId).filter(c => Number(c.legionId) === legionId);
+        const economic = AIDomesticPriorityRules.getBestEconomicPlan(this.game, legionCastles);
+        const messages = [];
+
+        if (operation && operation.type === '攻撃') {
+            const targetName = this._getOperationTargetName(operation);
+            if (disclosure.level === 'full') {
+                messages.push(this._tonePolicyText(`当軍団では、まず${targetName}を攻めるのが最善と見ております。現在もそこを第一の目標としております。`));
+            } else {
+                messages.push(this._tonePolicyText(`攻めるならば、${targetName}方面がよろしいかと考えております。`));
+            }
+        } else if (operation && operation.type === '外交') {
+            messages.push(this._tonePolicyText('今は無理に兵を動かすより、周囲への働きかけを優先すべき時と見ております。'));
+        } else {
+            messages.push(this._tonePolicyText('今は無理に攻めるより、まず領内を整えるべき時と見ております。'));
+        }
+
+        if (economic) {
+            if (disclosure.level === 'full') {
+                messages.push(this._tonePolicyText(`内政に手を入れるなら、${economic.castle.name}の${economic.label}を最も優先したいところです。`));
+            } else {
+                messages.push(this._tonePolicyText(`内政では、今は${economic.label}を優先したいと考えております。`));
+            }
+        }
+        return messages;
+    }
+
+    executeInterviewPolicy(busho) {
+        const messages = this._getPolicyMessages(busho).map(text => `「${text}」`);
+        this.view.showMessages(busho, messages, () => this.showMainMenu(busho), '方針について');
+    }
+
     executeInterviewTopic(interviewer, target) {
         const relation = PersonnelRules.calcRelationshipProfile(interviewer, target);
-        const opinionText = this._getOpinionText(relation.compatibilityScore);
-        const contactText = this._getContactText(relation, interviewer);
+        const opinionText = this._getOpinionText(relation.compatibilityScore, this.activeInterviewAttitude);
+        const contactText = this._getContactText(relation, interviewer, this.activeInterviewAttitude);
         const loyaltyText = this._getTargetLoyaltyText(interviewer, target, relation);
 
         const messages = [
             `「${this._getTopicOpening(target)}${opinionText}」`,
-            `「${contactText}」`,
-            `「${loyaltyText}」`
+            `「${this._toneTopicFollowup(contactText)}」`,
+            `「${this._toneTopicFollowup(loyaltyText)}」`
         ];
 
         this.view.showMessages(interviewer, messages, () => this.showMainMenu(interviewer), '他者について聞く');
     }
 
-    _getOpinionText(score) {
+    _getOpinionText(score, attitude = this.activeInterviewAttitude) {
         if (score >= 82) return 'あの方とは意気投合します。信頼できる御仁です。';
         if (score >= 68) return '話のわかる相手です。信頼しております。';
         if (score >= 52) return '悪い方ではありません。意見が違うことはありますが。';
         if (score >= 36) return '考え方はあまり合いませぬ。ただ、務めは務めです。';
-        return 'あやつとはどうにも反りが合いませぬ。';
+        return ['welcoming', 'friendly', 'polite'].includes(attitude)
+            ? 'あの方とはどうにも反りが合いませぬ。'
+            : 'あやつとはどうにも反りが合いませぬ。';
     }
 
-    _getContactText(relation, interviewer) {
+    _getContactText(relation, interviewer, attitude = this.activeInterviewAttitude) {
         const contact = relation.contactScore;
         if (contact >= 70) return '普段からよく言葉を交わしております。';
         if (contact >= 52) return '必要な折には、よく話をしております。';
@@ -293,60 +391,23 @@ class InterviewSystem {
             return '用向きがなければ、あまり言葉を交わしませぬ。';
         }
         if (relation.affinityDiff >= 42 && Number(interviewer.duty || 0) < 35 && Number(interviewer.ambition || 0) >= 65) {
-            return 'あやつとは、普段ほとんど口をききませぬ。';
+            return ['welcoming', 'friendly', 'polite'].includes(attitude)
+                ? 'あの方とは、普段ほとんど言葉を交わしませぬ。'
+                : 'あやつとは、普段ほとんど口をききませぬ。';
         }
         return '普段はほとんど言葉を交わしませぬ。';
     }
 
     _getLoyaltyBand(loyalty) {
-        const value = Math.max(0, Math.min(100, Number(loyalty) || 0));
-        const stableMin = Number(window.MainParams.Gunshi.AdviceLoyalty) + 1;
-        const warningMin = Number(window.MainParams.Gunshi.DangerLoyalty) + 1;
-        const I = window.MainParams.Interview;
-
-        if (value >= stableMin) return 'stable';
-        if (value >= warningMin) return 'warning';
-        if (value >= I.LoyaltyDangerMin) return 'danger';
-        if (value >= I.LoyaltyDissatisfiedMin) return 'dissatisfied';
-        if (value >= I.LoyaltySeriousMin) return 'serious';
-        return 'critical';
+        return LoyaltyInsightRules.getBand(loyalty);
     }
 
     _shiftLoyaltyBand(band, steps) {
-        const bands = ['critical', 'serious', 'dissatisfied', 'danger', 'warning', 'stable'];
-        const index = bands.indexOf(band);
-        if (index < 0) return band;
-        const shift = Math.max(0, Math.floor(Number(steps) || 0));
-        return bands[Math.min(bands.length - 1, index + shift)];
+        return LoyaltyInsightRules.shiftBand(band, steps);
     }
 
     _getConcealmentProfile(busho) {
-        const I = window.MainParams.Interview;
-        const actualLoyalty = Math.max(0, Math.min(100, Number(busho.loyalty) || 0));
-        const intelligence = Math.max(0, Math.min(100, Number(busho.intelligence) || 0));
-        const actualBand = this._getLoyaltyBand(actualLoyalty);
-        let requestedShift = 0;
-
-        if (intelligence >= I.ConcealHighIntelligence) {
-            requestedShift = I.ConcealHighBandShift;
-        } else if (intelligence >= I.ConcealMidIntelligence) {
-            requestedShift = I.ConcealMidBandShift;
-        }
-
-        const perceivedBand = this._shiftLoyaltyBand(actualBand, requestedShift);
-        const bands = ['critical', 'serious', 'dissatisfied', 'danger', 'warning', 'stable'];
-        const actualIndex = bands.indexOf(actualBand);
-        const perceivedIndex = bands.indexOf(perceivedBand);
-        const bandShift = Math.max(0, perceivedIndex - actualIndex);
-
-        return {
-            actualLoyalty,
-            actualBand,
-            perceivedBand,
-            bandShift,
-            isConcealing: bandShift > 0,
-            level: bandShift >= 2 ? 'strong' : (bandShift === 1 ? 'moderate' : 'none')
-        };
+        return LoyaltyInsightRules.getConcealmentProfile(busho);
     }
 
     _getSelfLoyaltyText(band, attitude = this.activeInterviewAttitude) {
@@ -460,26 +521,45 @@ class InterviewSystem {
         return `表向きは何事もないように振る舞っておりますが、あれは本心ではありますまい。${detail}`;
     }
 
-    _getTargetLoyaltyText(interviewer, target, relation) {
-        if (Number(interviewer.loyalty || 0) < 40) {
-            return '某自身、他人をあれこれ申せる立場ではございませぬ。殿への胸中までは量りかねます。';
-        }
+    _getOtherAssessmentBias(interviewer, target) {
+        const daimyo = this.game && typeof this.game.getClanDaimyo === 'function'
+            ? this.game.getClanDaimyo(Number(interviewer && interviewer.clan) || Number(this.game.playerClanId))
+            : null;
+        return PersonnelRules.calcOtherAssessmentBias(interviewer, target, daimyo);
+    }
 
+    _getBlindBiasedTargetText(bias) {
+        const threshold = Number(window.MainParams.Interview.OtherAssessmentBias.BlindSlanderMin);
+        if (!bias || bias.loyaltyPenalty < threshold) return null;
+        if (bias.loyaltyPenalty >= threshold + 12) {
+            return '詳しい胸中までは読み切れませぬが、あの方をあまり信用なさらぬ方がよろしいかと存じます。';
+        }
+        return '胸中までは読み切れませぬ。ただ、某には少々信用の置けぬところがあるように思えます。';
+    }
+
+    _getTargetLoyaltyText(interviewer, target, relation) {
+        // 聞き手自身の低忠誠を固定台詞で露呈させない。
+        // 自分の本心を隠せるかどうかは面談開始時の表面態度へ任せ、
+        // 他者については智謀・接触度・対象の偽装から通常どおり判断する。
         const I = window.MainParams.Interview;
         const knowledge = this._calcTargetKnowledge(interviewer, target, relation);
         const concealment = this._getConcealmentProfile(target);
+        const bias = this._getOtherAssessmentBias(interviewer, target);
 
         if (knowledge < I.KnowledgeBlindBelow) {
-            return this._getBlindTargetText(interviewer, target, relation, concealment);
+            const biasedBlindText = this._getBlindBiasedTargetText(bias);
+            return biasedBlindText || this._getBlindTargetText(interviewer, target, relation, concealment);
         }
 
-        if (this._canDetectConcealment(interviewer, target, knowledge, concealment)) {
-            return this._getDetectedConcealmentText(concealment.actualBand);
+        const detected = this._canDetectConcealment(interviewer, target, knowledge, concealment);
+        const baseLoyalty = detected ? concealment.actualLoyalty : concealment.perceivedLoyalty;
+        const assessedLoyalty = Math.max(0, baseLoyalty - Number(bias.loyaltyPenalty || 0));
+        const assessedBand = this._getLoyaltyBand(assessedLoyalty);
+
+        if (detected) {
+            return this._getDetectedConcealmentText(assessedBand);
         }
 
-        const assessedBand = concealment.isConcealing
-            ? concealment.perceivedBand
-            : concealment.actualBand;
         const uncertain = knowledge < I.KnowledgeConfidentMin;
         return this._getTargetLoyaltyBandText(assessedBand, uncertain);
     }

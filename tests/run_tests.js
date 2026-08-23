@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r108');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r110');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2124,6 +2124,7 @@ test('面談は専用View内で完結し16:9/9:16固定・非スクロールで�
 test('面談の忠誠評価は軍師警告ラインと連動し低忠誠を段階評価する', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/loyalty_insight_rules.js');
     loadScript(ctx, 'js/interview_system.js');
     const system = new ctx.InterviewSystem({});
 
@@ -2142,6 +2143,8 @@ test('面談の忠誠評価は軍師警告ラインと連動し低忠誠を段�
 test('面談の他者評価は高智謀の偽装・看破・全く読めない状態を区別する', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/personnel_rules.js');
+    loadScript(ctx, 'js/loyalty_insight_rules.js');
     loadScript(ctx, 'js/interview_system.js');
     const system = new ctx.InterviewSystem({});
 
@@ -2170,6 +2173,7 @@ test('面談の他者評価は高智謀の偽装・看破・全く読めない�
 test('面談開始時の表面態度は忠誠・智謀・義理・野望を踏まえて一貫した口調を使う', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/loyalty_insight_rules.js');
     loadScript(ctx, 'js/interview_system.js');
     const system = new ctx.InterviewSystem({});
 
@@ -2191,6 +2195,7 @@ test('面談開始時の表面態度は忠誠・智謀・義理・野望を踏�
 test('面談の忠誠偽装は智謀70以上で1段階・90以上で2段階だけ上に見せる', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/loyalty_insight_rules.js');
     loadScript(ctx, 'js/interview_system.js');
     const system = new ctx.InterviewSystem({});
 
@@ -2219,6 +2224,194 @@ test('面談武将カードは押下時に位置を動かさず最下段の見�
     assert.ok(match, '面談武将カードのactive指定を持つ');
     assert.ok(match[1].includes('transform: none'), '押下時にカードを下へ移動しない');
     assert.ok(!match[1].includes('translateY'), '押下感を位置移動で表現しない');
+});
+
+test('面談の忠誠上昇は最初の表面態度を確定する前に反映する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/loyalty_insight_rules.js');
+    loadScript(ctx, 'js/interview_system.js');
+    let firstMessage = '';
+    const game = {
+        ui: {
+            interviewView: {
+                showMessages(busho, messages) { firstMessage = messages[0]; }
+            }
+        }
+    };
+    const system = new ctx.InterviewSystem(game);
+    const busho = { loyalty: 74, intelligence: 30, duty: 60, ambition: 30, isInterviewed: false };
+    system.startInterview(busho);
+    assert.strictEqual(busho.loyalty, 75, '初回面談の忠誠+1を先に確定する');
+    assert.strictEqual(system.activeInterviewAttitude, 'polite', '74→75で注意段階へ上がった後の態度を使う');
+    assert.ok(firstMessage.includes('恐縮です'));
+});
+
+test('低忠誠の聞き手も他者評価で固定の自己露呈台詞を使わない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/personnel_rules.js');
+    loadScript(ctx, 'js/loyalty_insight_rules.js');
+    loadScript(ctx, 'js/interview_system.js');
+    const system = new ctx.InterviewSystem({});
+    const relation = { contactScore: 80, compatibilityScore: 82, affinityDiff: 8 };
+    const target = { loyalty: 65, intelligence: 40, ambition: 40 };
+
+    const cleverDisloyal = { loyalty: 20, intelligence: 90, duty: 40 };
+    const cleverText = system._getTargetLoyaltyText(cleverDisloyal, target, relation);
+    assert.ok(!cleverText.includes('申せる立場では'), '高智謀の低忠誠武将が自分の不満を固定台詞で露呈しない');
+    assert.ok(cleverText.includes('不満') || cleverText.includes('思うところ'));
+
+    const bluntDisloyal = { loyalty: 20, intelligence: 25, duty: 25 };
+    const bluntText = system._getTargetLoyaltyText(bluntDisloyal, { loyalty: 65, intelligence: 90, ambition: 50 }, relation);
+    assert.ok(!bluntText.includes('申せる立場では'));
+    assert.ok(bluntText.includes('読み切れませぬ') || bluntText.includes('読み取れませぬ'));
+});
+
+test('軍師の忠誠所見は赤・橙・無色だけを返し対象の智謀と軍師の資質を反映する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/loyalty_insight_rules.js');
+    loadScript(ctx, 'js/gunshi_system.js');
+    const game = { playerClanId: 1, getClanGunshi() { return null; } };
+    const system = new ctx.GunshiSystem(game);
+
+    const greatGunshi = { id: 1, intelligence: 95, loyalty: 95, duty: 90 };
+    const weakGunshi = { id: 2, intelligence: 55, loyalty: 95, duty: 90 };
+    const honestDanger = { id: 10, name: '危険武将', loyalty: 65, intelligence: 50, ambition: 40 };
+    const cleverDanger = { id: 11, name: '曲者', loyalty: 65, intelligence: 90, ambition: 70 };
+    const warning = { id: 12, name: '注意武将', loyalty: 80, intelligence: 50, ambition: 40 };
+    const safe = { id: 13, name: '安定武将', loyalty: 90, intelligence: 50, ambition: 40 };
+
+    assert.strictEqual(system.getLoyaltyAssessment(honestDanger, greatGunshi).alert, 'red');
+    assert.strictEqual(system.getLoyaltyAssessment(warning, greatGunshi).alert, 'orange');
+    assert.strictEqual(system.getLoyaltyAssessment(safe, greatGunshi).alert, 'none');
+    assert.strictEqual(system.getLoyaltyAssessment(cleverDanger, greatGunshi).alert, 'red', '高智謀軍師は高智謀対象の偽装を看破する');
+    assert.notStrictEqual(system.getLoyaltyAssessment(cleverDanger, weakGunshi).alert, 'red', '凡庸な軍師は高智謀対象を危険と見抜けない場合がある');
+});
+
+test('褒美一覧は軍師所見の赤→橙→無色を優先し真の忠誠を直接ソート・着色しない', () => {
+    const command = read('js/command_system.js');
+    const bushoUi = read('js/ui_info_busho.js');
+    const gunshi = read('js/gunshi_system.js');
+    assert.ok(command.includes("if (actionType === 'reward')") && command.includes('compareLoyaltyAssessments(a, b, gunshi)'));
+    assert.ok(!command.includes('return (100 - target.loyalty)'), '褒美一覧で実忠誠を直接ソートしない');
+    assert.ok(bushoUi.includes('getLoyaltyAssessment(b, gunshi)'));
+    assert.ok(!bushoUi.includes('b.loyalty <= dangerLoyalty'), '名前色を実忠誠から直接決めない');
+    assert.ok(gunshi.includes("alert === 'red' ? 2 : (alert === 'orange' ? 1 : 0)"));
+});
+
+test('軍師の一般助言精度は智謀を主軸に忠誠・義理も加味する', () => {
+    const ctx = createContext({ GameMath: { seededRandom() { return 0.8; } } });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/loyalty_insight_rules.js');
+    loadScript(ctx, 'js/gunshi_system.js');
+    const system = new ctx.GunshiSystem({});
+    const loyal = system.getAdviceQuality({ intelligence: 80, loyalty: 100, duty: 100 });
+    const disloyal = system.getAdviceQuality({ intelligence: 80, loyalty: 10, duty: 10 });
+    assert.ok(loyal.score > disloyal.score, '同じ智謀でも忠誠・義理が高い軍師ほど助言品質が高い');
+    assert.strictEqual(loyal.intelligence, disloyal.intelligence);
+});
+
+test('革新性の中立回答は待遇の満足不満ではなく方針への距離を答える', () => {
+    const interview = read('js/interview_system.js');
+    assert.ok(interview.includes('古きに固執するも、新しきに飛びつくも考えもの。肝要なのは、時勢を見極めることかと。'));
+    assert.ok(!interview.includes('当家の方針については、今のところ特に異存はございませぬ。'));
+    assert.ok(!interview.includes('当家のやり方に特に不満はありません。順調です。'));
+});
+
+test('他者評価の悲観バイアスは相性差・革新差・野望で増え忠誠・義理・主君相性で抑制される', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/personnel_rules.js');
+
+    const target = { affinity: 30, innovation: 80 };
+    const schemer = { affinity: 0, innovation: 0, ambition: 80, loyalty: 20, duty: 20 };
+    const restrained = { affinity: 0, innovation: 0, ambition: 80, loyalty: 95, duty: 95 };
+    const badLordFit = { affinity: 50 };
+    const goodLordFit = { affinity: 0 };
+    const raw = ctx.PersonnelRules.calcOtherAssessmentBias(schemer, target, badLordFit);
+    const suppressed = ctx.PersonnelRules.calcOtherAssessmentBias(restrained, target, goodLordFit);
+
+    assert.strictEqual(raw.affinityDiff, 30, '相性差は1につき1の基礎悪評になる');
+    assert.ok(raw.innovationDiff > 0 && raw.rawBias > raw.affinityDiff, '革新差と野望が悪評を上積みする');
+    assert.ok(raw.loyaltyPenalty > suppressed.loyaltyPenalty, '忠誠・義理・主君相性が良ければ私情を抑える');
+});
+
+test('面談の他者忠誠評価は偏見を悲観方向にだけ加え高い表面態度でも口調を保つ', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/personnel_rules.js');
+    loadScript(ctx, 'js/loyalty_insight_rules.js');
+    loadScript(ctx, 'js/interview_system.js');
+    const game = { playerClanId: 1, getClanDaimyo() { return { affinity: 50 }; } };
+    const system = new ctx.InterviewSystem(game);
+    system.activeInterviewAttitude = 'reserved';
+    const interviewer = { clan: 1, affinity: 0, innovation: 0, ambition: 90, loyalty: 20, duty: 20, intelligence: 95 };
+    const target = { affinity: 30, innovation: 90, ambition: 40, loyalty: 90, intelligence: 40 };
+    const relation = ctx.PersonnelRules.calcRelationshipProfile(interviewer, target);
+    const text = system._getTargetLoyaltyText(interviewer, target, relation);
+    assert.ok(!text.includes('忠義は本物'), '強い悪評バイアスで実忠誠より悲観的に評する');
+    assert.ok(system._toneTopicFollowup(text).startsWith('……'), '他者評価の後続台詞も最初に確定した態度へ合わせる');
+});
+
+test('方針については軍団長だけが実AI作戦と共通内政スコアを忠誠・義理に応じて開示する', () => {
+    const ctx = createContext({
+        AIDomesticPriorityRules: {
+            getBestEconomicPlan() { return { castle: { name: '清洲城' }, label: '鉱山開発', score: 42 }; }
+        }
+    });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/interview_system.js');
+    const commander = { id: 10, clan: 1, loyalty: 90, duty: 90 };
+    const guarded = { id: 11, clan: 1, loyalty: 20, duty: 20 };
+    const game = {
+        legions: [
+            { clanId: 1, legionNo: 2, commanderId: 10 },
+            { clanId: 1, legionNo: 3, commanderId: 11 }
+        ],
+        aiOperationManager: { operations: { 1: {
+            2: { type: '攻撃', targetId: 99, isKunishuTarget: false },
+            3: { type: '攻撃', targetId: 98, isKunishuTarget: false }
+        } } },
+        getCastle(id) { return { id, name: id === 99 ? '吉田城' : '岡崎城' }; },
+        getClanCastles() { return [{ id: 1, legionId: 2 }, { id: 2, legionId: 3 }]; }
+    };
+    const system = new ctx.InterviewSystem(game);
+    system.activeInterviewAttitude = 'friendly';
+    const full = system._getPolicyMessages(commander).join(' ');
+    assert.ok(full.includes('吉田城') && full.includes('清洲城') && full.includes('鉱山開発'), '忠誠・義理が高い軍団長は具体的な作戦と内政優先を話す');
+    const closed = system._getPolicyMessages(guarded).join(' ');
+    assert.ok(closed.includes('軍略の仔細') && !closed.includes('岡崎城'), '忠誠・義理が低い軍団長は具体目標を開示しない');
+});
+
+test('AIの石高・鉱山優先度は面談と同じAIDomesticPriorityRulesを正本にする', () => {
+    const ai = read('js/ai.js');
+    const html = read('index.html');
+    assert.ok(html.includes('js/ai_domestic_priority_rules.js'));
+    assert.ok(ai.includes('AIDomesticPriorityRules.calcFarmBaseScore(this.game, castle)'));
+    assert.ok(ai.includes('AIDomesticPriorityRules.calcCommerceBaseScore(this.game, castle, daimyo)'));
+    assert.ok(ai.includes('AIDomesticPriorityRules.applyContext(a.score, a.type, castle, castellan, isPreparingAttack)'));
+});
+
+test('軍師の橙忠誠報告は単独先頭なら「にも」を使わない', () => {
+    const ctx = createContext({ BushoStatusRules: { isActive() { return true; } } });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/loyalty_insight_rules.js');
+    loadScript(ctx, 'js/gunshi_system.js');
+    const dialogs = [];
+    const gunshi = { id: 1, intelligence: 90, loyalty: 90, duty: 90, faceIcon: '', name: '軍師' };
+    const target = { id: 2, clan: 1, name: '家臣', loyalty: 80, intelligence: 30, ambition: 30 };
+    const game = {
+        playerClanId: 1,
+        bushos: [target],
+        getClanGunshi() { return gunshi; },
+        ui: { showDialog(msg, _a, cb) { dialogs.push(msg); if (cb) cb(); } }
+    };
+    const system = new ctx.GunshiSystem(game);
+    system.checkAndShowAdvice({}, () => {});
+    assert.ok(dialogs[0].includes('家臣殿には少々思うところ'), '先頭の単独報告は「には」で自然に開始する');
+    assert.ok(!dialogs[0].includes('家臣殿にも'), '前文がないのに「にも」で始めない');
 });
 
 test('面談会話の表示整形は元データを変えず句点と改行だけを除く', () => {

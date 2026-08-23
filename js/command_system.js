@@ -284,6 +284,14 @@ class CommandSystem {
         const isViewOnly = actionType === 'view_only' || actionType === 'all_busho_list';
         
         bushos.sort((a,b) => {
+            if (actionType === 'reward') {
+                if (gunshi && this.game.gunshiSystem) {
+                    return this.game.gunshiSystem.compareLoyaltyAssessments(a, b, gunshi);
+                }
+                // 軍師不在時は真の忠誠を使った並べ替えをしない。
+                return String(a.name || '').localeCompare(String(b.name || ''), 'ja');
+            }
+
             if (isViewOnly) {
                 const getRankScore = (target) => {
                     if (target.isPrincess) return 5; // ★追加：姫を一番上にします！
@@ -309,11 +317,6 @@ class CommandSystem {
 
                  const cCastle = currentCastle;
                  try {
-                     // ★追加：褒美コマンドの場合は、忠誠度が低い順に並べます
-                     if (actionType === 'reward') {
-                         return (100 - target.loyalty);
-                     }
-
                      if (['farm', 'commerce'].includes(actionType)) {
                          return typeof DomesticRules.calcDevelopment === 'function' ? DomesticRules.calcDevelopment(target, 1.0) : target.politics;
                      }

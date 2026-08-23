@@ -1023,14 +1023,13 @@ Object.assign(UIInfoManager.prototype, {
                 compressedNameHtml = getCompressedTextHtml(b.name, 5);
             }
 
-            // ★変更：一元化された数字を引っ張り、忠誠度の低さに応じて赤・オレンジに色分けします
-            if (actionType === 'reward' && gunshi && !b.isDaimyo && !(b.belongKunishuId > 0)) {
-                const adviceLoyalty = window.MainParams.Gunshi.AdviceLoyalty;
-                const dangerLoyalty = window.MainParams.Gunshi.DangerLoyalty; // 万が一設定がない場合の保険
-                
-                if (b.loyalty <= dangerLoyalty) {
+            // 褒美一覧の赤/橙は真の忠誠ではなく、軍師の所見を表示する。
+            // 赤＝危険、橙＝注意の2段階だけに留め、軍師不在時は色を付けない。
+            if (actionType === 'reward' && gunshi && this.game.gunshiSystem && !b.isDaimyo && !(b.belongKunishuId > 0)) {
+                const assessment = this.game.gunshiSystem.getLoyaltyAssessment(b, gunshi);
+                if (assessment.alert === 'red') {
                     compressedNameHtml = `<span class="text-red">${compressedNameHtml}</span>`;
-                } else if (b.loyalty <= adviceLoyalty) {
+                } else if (assessment.alert === 'orange') {
                     compressedNameHtml = `<span class="text-orange">${compressedNameHtml}</span>`;
                 }
             }

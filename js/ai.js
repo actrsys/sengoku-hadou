@@ -1927,45 +1927,15 @@ class AIEngine {
                 actions.push({ type: 'soldier_charity', stat: 'leadership', score: score, cost: window.MainParams.CommandCost.SoldierCharity }); 
             }
 
-            // 6. 石高開発
-            if (castle.kokudaka < castle.maxKokudaka) {
-                let score = 30;
-                
-                // ★追加：兵士数が年間収穫量の80%を超えていて余裕がない場合は、石高開発の優先度を上げます
-                const annualRiceIncome = EconomyRules.calcBaseRiceIncome(castle);
-                const soldierToHarvestRatio = annualRiceIncome > 0 ? (castle.soldiers / annualRiceIncome) : 1.0;
-                
-                if (soldierToHarvestRatio > 0.8) {
-                    score += 20 * Math.min(1.0, ((soldierToHarvestRatio - 0.8) * 2.0)); // 最大で+20点アップ
-                }
-                
-                actions.push({ type: 'farm', stat: 'politics', score: score, cost: window.MainParams.CommandCost.Farm });
+            // 6. 石高開発 / 7. 鉱山開発
+            // 面談の「方針について」と同じ専門Rulesから基礎スコアを受け取る。
+            const farmBaseScore = AIDomesticPriorityRules.calcFarmBaseScore(this.game, castle);
+            if (farmBaseScore !== null) {
+                actions.push({ type: 'farm', stat: 'politics', score: farmBaseScore, cost: window.MainParams.CommandCost.Farm });
             }
-
-            // 7. 鉱山開発
-            if (castle.commerce < castle.maxCommerce) {
-                let score = 30;
-                
-                // ★追加：金収入に余裕がない場合は、鉱山開発の優先度を上げます
-                const monthlyGoldIncome = EconomyRules.calcBaseGoldIncome(castle);
-                let monthlyGoldConsume = 0;
-                
-                // 今お城にいる全員の給料を計算します
-                const allCastleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b));
-                allCastleBushos.forEach(b => {
-                    monthlyGoldConsume += b.getSalary(daimyo);
-                });
-                
-                // 収入が給料の2倍未満しかない場合は、ピンチと判断して点数を上げます
-                if (monthlyGoldIncome < monthlyGoldConsume * 2) {
-                    let shortageRatio = monthlyGoldIncome > 0 ? (monthlyGoldConsume / monthlyGoldIncome) : 2.0;
-                    shortageRatio = Math.min(2.0, shortageRatio);
-                    if (shortageRatio > 0.5) {
-                        score += 20 * Math.min(1.0, ((shortageRatio - 0.5) / 1.5)); // 最大で+20点アップ
-                    }
-                }
-                
-                actions.push({ type: 'commerce', stat: 'politics', score: score, cost: window.MainParams.CommandCost.Commerce });
+            const commerceBaseScore = AIDomesticPriorityRules.calcCommerceBaseScore(this.game, castle, daimyo);
+            if (commerceBaseScore !== null) {
+                actions.push({ type: 'commerce', stat: 'politics', score: commerceBaseScore, cost: window.MainParams.CommandCost.Commerce });
             }
 
             // --- 性格による点数の調整 ---
@@ -1974,31 +1944,30 @@ class AIEngine {
             const isPreparingAttack = (myOp && myOp.type === '攻撃');
 
             actions.forEach(a => {
-                if (isConservative && ['farm', 'commerce', 'repair', 'charity'].includes(a.type)) {
-                    a.score *= 1.2; 
-                }
-                if (isAggressive && ['draft', 'training', 'soldier_charity'].includes(a.type)) {
-                    a.score *= 1.2; 
-                }
+                if (['farm', 'commerce'].includes(a.type)) {
+                    // 石高・鉱山は専門Rulesで性格と作戦状態まで同じ式を使う。
+                    a.score = AIDomesticPriorityRules.applyContext(a.score, a.type, castle, castellan, isPreparingAttack);
+                } else {
+                    if (isConservative && ['repair', 'charity'].includes(a.type)) {
+                        a.score *= 1.2; 
+                    }
+                    if (isAggressive && ['draft', 'training', 'soldier_charity'].includes(a.type)) {
+                        a.score *= 1.2; 
+                    }
 
-                // ★追加：攻撃準備期間中は、内政の優先度を切り替えて軍事に集中します！
-                if (isPreparingAttack) {
-                    // 石高、鉱山、城壁、施しの優先度を半分に（緊急時以外）
-                    if (['farm', 'commerce', 'repair', 'charity'].includes(a.type)) {
-                        let isEmergency = false;
-                        if (a.type === 'repair' && castle.defense <= castle.maxDefense / 4) isEmergency = true;
-                        if (a.type === 'charity' && castle.peoplesLoyalty <= 70) isEmergency = true;
-                        
-                        if (!isEmergency) {
-                            a.score /= 2;
+                    // ★追加：攻撃準備期間中は、内政の優先度を切り替えて軍事に集中します！
+                    if (isPreparingAttack) {
+                        if (['repair', 'charity'].includes(a.type)) {
+                            let isEmergency = false;
+                            if (a.type === 'repair' && castle.defense <= castle.maxDefense / 4) isEmergency = true;
+                            if (a.type === 'charity' && castle.peoplesLoyalty <= 70) isEmergency = true;
+                            if (!isEmergency) a.score /= 2;
+                        }
+                        // 徴兵、訓練、士気、馬・鉄砲購入の優先度を倍に
+                        if (['draft', 'training', 'soldier_charity', 'buy_gun', 'buy_horse'].includes(a.type)) {
+                            a.score *= 2;
                         }
                     }
-                    // 徴兵、訓練、士気、馬・鉄砲購入の優先度を倍に
-                    if (['draft', 'training', 'soldier_charity', 'buy_gun', 'buy_horse'].includes(a.type)) {
-                        a.score *= 2;
-                    }
-                    
-                    // （「特別なお届け物」の計算は、さっきの「お使いリスト」を作る魔法にお引っ越ししました！）
                 }
 
                 a.score *= (0.9 + Math.random() * 0.2);

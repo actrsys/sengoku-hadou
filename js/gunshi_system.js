@@ -15,102 +15,135 @@ class GunshiSystem {
         this.hasShownAdviceThisMonth = false;
     }
 
-    // ターン開始時に不満をチェックして報告する処理
+    getAdviceQuality(gunshi) {
+        if (!gunshi) return { score: 0, reliability: 0 };
+        const Q = window.MainParams.Gunshi.AdviceQuality;
+        const L = window.MainParams.Gunshi.LoyaltyInsight;
+        const intelligence = Math.max(0, Math.min(100, Number(gunshi.intelligence) || 0));
+        const loyalty = Math.max(0, Math.min(100, Number(gunshi.loyalty) || 0));
+        const duty = Math.max(0, Math.min(100, Number(gunshi.duty) || 0));
+        const score = intelligence * Q.IntelligenceWeight
+            + loyalty * Q.LoyaltyWeight
+            + duty * Q.DutyWeight;
+        const reliability = loyalty * L.ReliabilityLoyaltyWeight
+            + duty * L.ReliabilityDutyWeight;
+        return { score: Math.max(0, Math.min(100, score)), reliability, intelligence, loyalty, duty };
+    }
+
+    getLoyaltyAssessment(target, gunshi = null) {
+        const adviser = gunshi || this.game.getClanGunshi(this.game.playerClanId);
+        if (!target || !adviser) {
+            return { alert: 'none', priority: 0, assessedBand: 'stable', severity: 0, confidence: 0, detectedConcealment: false };
+        }
+
+        const profile = LoyaltyInsightRules.getConcealmentProfile(target);
+        const quality = this.getAdviceQuality(adviser);
+        const L = window.MainParams.Gunshi.LoyaltyInsight;
+        const targetIntelligence = Math.max(0, Math.min(100, Number(target.intelligence) || 0));
+        const detectPower = quality.intelligence + quality.duty * L.DetectDutyWeight;
+        const canDetect = profile.isConcealing
+            && quality.intelligence >= L.DetectIntelligenceMin
+            && detectPower + L.DetectGapAllowance >= targetIntelligence;
+
+        let assessedBand = canDetect ? profile.actualBand : profile.perceivedBand;
+
+        // 忠誠・義理が極端に低い軍師は、見えている危険を主君へやや甘く報告する。
+        // ランダムな嘘ではなく段階を一定量だけ緩め、同じ月・同じ軍師で表示が揺れないようにする。
+        let reportShift = 0;
+        if (quality.reliability < L.VerySoftReportBelow) reportShift = 2;
+        else if (quality.reliability < L.SoftReportBelow) reportShift = 1;
+        assessedBand = LoyaltyInsightRules.shiftBand(assessedBand, reportShift);
+
+        const alert = LoyaltyInsightRules.getAlertLevel(assessedBand);
+        return {
+            alert,
+            priority: alert === 'red' ? 2 : (alert === 'orange' ? 1 : 0),
+            assessedBand,
+            severity: LoyaltyInsightRules.getBandSeverity(assessedBand),
+            confidence: quality.score,
+            reliability: quality.reliability,
+            detectedConcealment: canDetect,
+            actualBand: profile.actualBand,
+            perceivedBand: profile.perceivedBand
+        };
+    }
+
+    compareLoyaltyAssessments(a, b, gunshi = null) {
+        const adviser = gunshi || this.game.getClanGunshi(this.game.playerClanId);
+        if (!adviser) {
+            return String(a && a.name || '').localeCompare(String(b && b.name || ''), 'ja');
+        }
+        const aa = this.getLoyaltyAssessment(a, adviser);
+        const bb = this.getLoyaltyAssessment(b, adviser);
+        if (aa.priority !== bb.priority) return bb.priority - aa.priority; // 赤→橙→無色
+        if (aa.severity !== bb.severity) return bb.severity - aa.severity;
+        return String(a && a.name || '').localeCompare(String(b && b.name || ''), 'ja');
+    }
+
+    // ターン開始時に軍師の所見として不満を報告する処理
     checkAndShowAdvice(castle, onComplete) {
-        // すでに今月報告済みなら、何もしないで次に進む
         if (this.hasShownAdviceThisMonth) {
             if (onComplete) onComplete();
             return;
         }
 
-        // 自分の軍師を探す
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
         if (!gunshi) {
-            if (onComplete) onComplete(); // 軍師がいなければ次に進む
+            if (onComplete) onComplete();
+            return;
+        }
+        this.hasShownAdviceThisMonth = true;
+
+        // 真の忠誠を直接読むのではなく、褒美一覧と同じ軍師所見を正本にする。
+        const reports = this.game.bushos
+            .filter(b => b.clan === this.game.playerClanId
+                && window.BushoStatusRules.isActive(b)
+                && !b.isDaimyo
+                && !(b.belongKunishuId > 0))
+            .map(busho => ({ busho, assessment: this.getLoyaltyAssessment(busho, gunshi) }))
+            .filter(item => item.assessment.priority > 0)
+            .sort((a, b) => this.compareLoyaltyAssessments(a.busho, b.busho, gunshi));
+
+        if (reports.length === 0) {
+            if (onComplete) onComplete();
             return;
         }
 
-        // ここを通ったら「今月は報告した」という印をつける
-        this.hasShownAdviceThisMonth = true;
+        const red = reports.filter(item => item.assessment.alert === 'red');
+        const orange = reports.filter(item => item.assessment.alert === 'orange');
+        const messageList = [];
 
-        // 不満を持つ武将をリストアップ
-        // ★変更：一元化された判定の窓口（isUnhappyBusho）を呼び出してチェックさせます
-        const unhappyBushos = this.game.bushos.filter(b => 
-            b.clan === this.game.playerClanId && 
-            window.BushoStatusRules.isActive(b) && 
-            DomesticRules.isUnhappyBusho(b)
-        );
-
-        // 不満を持っている人がいた場合
-        if (unhappyBushos.length > 0) {
-            let messageList = [];
-
-            // 1. 軍師自身の不満判定（あれば最優先）
-            const gunshiBusho = unhappyBushos.find(b => b.id === gunshi.id);
-            if (gunshiBusho) {
-                messageList.push("恐れながら申し上げます。一族郎党を養う為にも、温情あるご配慮を賜りたく存じます");
-            }
-
-            // 2. 軍師以外の武将をグループ分け
-            const others = unhappyBushos.filter(b => b.id !== gunshi.id);
-            const dangerLoyalty = window.MainParams.Gunshi.DangerLoyalty; // 74
-
-            // 74以下の武将グループ（危険）
-            const dangerGroup = others.filter(b => b.loyalty <= dangerLoyalty);
-            // 84以下の武将グループ（74より上〜84以下：不満）
-            const warningGroup = others.filter(b => b.loyalty > dangerLoyalty);
-
-            // 忠誠度の低い順（昇順）にソート
-            dangerGroup.sort((a, b) => a.loyalty - b.loyalty);
-            warningGroup.sort((a, b) => a.loyalty - b.loyalty);
-
-            // 危険グループ（74以下）のメッセージ構築
-            if (dangerGroup.length >= 3) {
-                const topName = dangerGroup[0].name;
-                const count = dangerGroup.length;
-                messageList.push(`${topName}殿以下${count}名の者が待遇に不満を抱えておられるご様子。どうかご厚遇をお願い申し上げます`);
-            } else {
-                dangerGroup.forEach(b => {
-                    messageList.push(`${b.name}殿は待遇に不満を抱えておられるご様子。どうかご厚遇をお願い申し上げます`);
-                });
-            }
-
-            // 不満グループ（84以下）のメッセージ構築
-            if (warningGroup.length >= 3) {
-                const topName = warningGroup[0].name;
-                const count = warningGroup.length;
-                messageList.push(`${topName}殿以下${count}名、かの者らの不満が溜まる前にお取り計らいをお願い申し上げます`);
-            } else {
-                warningGroup.forEach(b => {
-                    messageList.push(`${b.name}殿の不満が溜まる前に、お取り計らいをお願い申し上げます`);
-                });
-            }
-
-            // 3. メッセージを順番にダイアログ表示する処理
-            let msgIndex = 0;
-            const showNext = () => {
-                if (msgIndex >= messageList.length) {
-                    if (onComplete) onComplete();
-                    return;
-                }
-
-                // 最初の1回目の発言にだけ「殿、」を付与します
-                const tonoStr = (msgIndex === 0) ? "殿、" : "";
-                const msg = `「${tonoStr}${messageList[msgIndex]}」`;
-                msgIndex++;
-
-                this.game.ui.showDialog(msg, false, showNext, null, {
-                    leftFace: gunshi.faceIcon,
-                    leftName: gunshi.name
-                });
-            };
-
-            // 最初の報告をスタートします
-            showNext();
+        if (red.length >= 3) {
+            messageList.push(`${red[0].busho.name}殿以下${red.length}名、待遇への不満が深いように見受けられます。どうか早めのご配慮を`);
         } else {
-            // 不満な人がいなければ、そのまま次に進む
-            if (onComplete) onComplete();
+            red.forEach(item => messageList.push(`${item.busho.name}殿は待遇への不満が深いように見受けられます。どうか早めのご配慮を`));
         }
+
+        if (orange.length >= 3) {
+            const particle = messageList.length > 0 ? 'にも' : 'には';
+            messageList.push(`${orange[0].busho.name}殿以下${orange.length}名${particle}、少々思うところがあるようです。今のうちにお取り計らいを`);
+        } else {
+            orange.forEach(item => {
+                const particle = messageList.length > 0 ? 'にも' : 'には';
+                messageList.push(`${item.busho.name}殿${particle}少々思うところがあるようです。今のうちにお取り計らいを`);
+            });
+        }
+
+        let msgIndex = 0;
+        const showNext = () => {
+            if (msgIndex >= messageList.length) {
+                if (onComplete) onComplete();
+                return;
+            }
+            const tonoStr = (msgIndex === 0) ? '殿、' : '';
+            const msg = `「${tonoStr}${messageList[msgIndex]}」`;
+            msgIndex++;
+            this.game.ui.showDialog(msg, false, showNext, null, {
+                leftFace: gunshi.faceIcon,
+                leftName: gunshi.name
+            });
+        };
+        showNext();
     }
     // ==========================================
     // ★コマンド実行前のアドバイスを表示する魔法です
@@ -155,9 +188,11 @@ class GunshiSystem {
             trueProb = trueProb / 100;
         }
         
-        // 正確さを計算します（智謀95以上で最大0.99になります）
-        let accuracy = 0.5 + (gunshi.intelligence / 95) * 0.49;
-        if (accuracy > 0.99 || gunshi.intelligence >= 95) accuracy = 0.99;
+        // 助言の質は智謀を主軸に、軍師自身の忠誠・義理も加味する。
+        // 「見抜く力」と「主君へ誠実に伝える姿勢」の両方が助言精度へ反映される。
+        const adviceQuality = this.getAdviceQuality(gunshi);
+        let accuracy = 0.5 + (adviceQuality.score / 100) * 0.49;
+        if (accuracy > 0.99) accuracy = 0.99;
 
         // 推測がどれくらいブレるかの幅を決めます
         const maxError = 1.0 - accuracy;
@@ -264,3 +299,4 @@ class GunshiSystem {
         return "おやめください。失敗する未来が見えます。"; 
     }
 }
+window.GunshiSystem = GunshiSystem;

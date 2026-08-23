@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r108'
+        Version: 'r110'
     },
 
     Main: {
@@ -21,7 +21,21 @@ window.GameConfig = {
         },
         Gunshi: {
             AdviceLoyalty: 84,
-            DangerLoyalty: 74
+            DangerLoyalty: 74,
+            AdviceQuality: {
+                IntelligenceWeight: 0.75,
+                LoyaltyWeight: 0.15,
+                DutyWeight: 0.10
+            },
+            LoyaltyInsight: {
+                DetectIntelligenceMin: 70,
+                DetectGapAllowance: 10,
+                DetectDutyWeight: 0.10,
+                ReliabilityLoyaltyWeight: 0.65,
+                ReliabilityDutyWeight: 0.35,
+                SoftReportBelow: 45,
+                VerySoftReportBelow: 25
+            }
         },
         Interview: {
             // 85/75 は軍師警告の境界を正本として導出する。以下は面談内の細分化だけを管理する。
@@ -36,7 +50,24 @@ window.GameConfig = {
             ConcealHighIntelligence: 90,
             ConcealHighBandShift: 2,
             ConcealMidIntelligence: 70,
-            ConcealMidBandShift: 1
+            ConcealMidBandShift: 1,
+            OtherAssessmentBias: {
+                AffinityWeight: 1.0,
+                InnovationWeight: 0.35,
+                AmbitionWeight: 0.35,
+                LoyaltyRestraintWeight: 0.40,
+                DutyRestraintWeight: 0.35,
+                LordAffinityRestraintWeight: 0.25,
+                RestraintStrength: 0.85,
+                MaxLoyaltyPenalty: 45,
+                BlindSlanderMin: 24
+            },
+            PolicyDisclosure: {
+                LoyaltyWeight: 0.65,
+                DutyWeight: 0.35,
+                FullMin: 70,
+                PartialMin: 50
+            }
         },
         Kunishu: {
             CaptureRelationDrop: 20,

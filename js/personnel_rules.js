@@ -136,6 +136,49 @@ class PersonnelRules {
         };
     }
 
+    /**
+     * 他者評価で聞き手が対象をどれだけ悲観的に評するかを返す。
+     * 相性差は1につき1を基礎に、革新差と聞き手の野望で悪化する。
+     * 一方、主君への忠誠・義理・主君との相性が高いほど私情を抑える。
+     */
+    static calcOtherAssessmentBias(interviewer, target, daimyo = null) {
+        const cfg = window.MainParams.Interview.OtherAssessmentBias;
+        const clamp100 = value => Math.max(0, Math.min(100, Number(value) || 0));
+        const affinityDiff = this.calcAffinityDiff(interviewer && interviewer.affinity, target && target.affinity);
+        const innovationDiff = Math.abs(clamp100(interviewer && interviewer.innovation) - clamp100(target && target.innovation));
+        const ambition = clamp100(interviewer && interviewer.ambition);
+        const loyalty = clamp100(interviewer && interviewer.loyalty);
+        const duty = clamp100(interviewer && interviewer.duty);
+        const lordAffinityDiff = daimyo ? this.calcAffinityDiff(interviewer && interviewer.affinity, daimyo.affinity) : 25;
+        const lordAffinityScore = Math.max(0, 100 - lordAffinityDiff * 2);
+
+        const rawBias = affinityDiff * cfg.AffinityWeight
+            + innovationDiff * cfg.InnovationWeight
+            + Math.max(0, ambition - 50) * cfg.AmbitionWeight;
+        const restraint = Math.max(0, Math.min(1,
+            (loyalty * cfg.LoyaltyRestraintWeight
+                + duty * cfg.DutyRestraintWeight
+                + lordAffinityScore * cfg.LordAffinityRestraintWeight) / 100
+        ));
+        const loyaltyPenalty = Math.max(0, Math.min(
+            Number(cfg.MaxLoyaltyPenalty),
+            Math.round(rawBias * (1 - restraint * cfg.RestraintStrength))
+        ));
+
+        return {
+            affinityDiff,
+            innovationDiff,
+            ambition,
+            loyalty,
+            duty,
+            lordAffinityDiff,
+            lordAffinityScore,
+            rawBias,
+            restraint,
+            loyaltyPenalty
+        };
+    }
+
     static calcRelationshipDistance(a, b) {
         return 100 - this.calcRelationshipProfile(a, b).compatibilityScore;
     }

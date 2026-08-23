@@ -145,16 +145,6 @@ class DomesticRules {
         return 1.0;
     }
 
-    static isUnhappyBusho(busho) {
-        // 武将データが無い場合や、大名・諸勢力は対象外にします
-        if (!busho || busho.isDaimyo || busho.belongKunishuId > 0) return false;
-        
-        const advLoyalty = window.MainParams.Gunshi.AdviceLoyalty;
-        
-        // 忠誠度が基準値以下の武将を不満と判定します
-        return busho.loyalty <= advLoyalty;
-    }
-
     static calcDraftBushoScore(busho) {
         return (busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2);
     }
