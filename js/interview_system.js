@@ -6,6 +6,7 @@
 class InterviewSystem {
     constructor(game) {
         this.game = game;
+        this.activeInterviewAttitude = null;
     }
 
     get view() {
@@ -18,6 +19,7 @@ class InterviewSystem {
     }
 
     close() {
+        this.activeInterviewAttitude = null;
         if (this.view) this.view.close();
         if (this.game && this.game.ui) {
             this.game.ui.updatePanelHeader();
@@ -41,6 +43,7 @@ class InterviewSystem {
 
     showInterviewerList() {
         if (!this.view) return;
+        this.activeInterviewAttitude = null;
         const candidates = this._getInterviewCandidates();
         this.view.showInterviewerList(
             candidates,
@@ -52,17 +55,106 @@ class InterviewSystem {
     startInterview(busho) {
         if (!busho || !this.view) return;
 
+        // 面談へ入った瞬間の本心を基準に、その面談中の表面態度を一度だけ決める。
+        // 以後の導入台詞も同じ態度を使い、挨拶だけ急に別人格になるのを防ぐ。
+        this.activeInterviewAttitude = this._getSurfaceAttitude(busho);
+
         if (!busho.isInterviewed) {
             busho.loyalty = Math.min(100, Number(busho.loyalty || 0) + 1);
             busho.isInterviewed = true;
         }
 
+        this.view.showMessages(
+            busho,
+            [this._getGreetingText(busho, this.activeInterviewAttitude)],
+            () => this._continueInterviewAfterGreeting(busho),
+            '面談'
+        );
+    }
+
+    _continueInterviewAfterGreeting(busho) {
         if (this._shouldOfferDoctor(busho)) {
             this._showDoctorPrompt(busho);
             return;
         }
-
         this.showMainMenu(busho);
+    }
+
+    _getSurfaceAttitude(busho) {
+        const concealment = this._getConcealmentProfile(busho);
+        const actualBand = this._getLoyaltyBand(concealment.actualLoyalty);
+        const shownBand = this._getLoyaltyBand(concealment.perceivedLoyalty);
+        const intelligence = Number(busho.intelligence || 0);
+        const duty = Number(busho.duty || 0);
+        const ambition = Number(busho.ambition || 0);
+
+        // 高智謀の偽装は挨拶にも反映する。野望が高いほど愛想よく立ち回る余地もある。
+        if (concealment.isConcealing) {
+            if (shownBand === 'stable' && (concealment.level === 'strong' || ambition >= 65)) return 'welcoming';
+            return 'polite';
+        }
+
+        if (actualBand === 'stable') {
+            return concealment.actualLoyalty >= 92 || duty >= 75 ? 'welcoming' : 'friendly';
+        }
+        if (actualBand === 'warning') return duty >= 55 ? 'polite' : 'reserved';
+        if (actualBand === 'danger') return duty >= 65 ? 'polite' : 'reserved';
+        if (actualBand === 'dissatisfied') return duty >= 70 ? 'reserved' : 'cold';
+        if (actualBand === 'serious') {
+            if (intelligence < 55 && duty < 55 && ambition >= 55) return 'startled';
+            return duty >= 70 ? 'reserved' : 'cold';
+        }
+        if (intelligence < 65 && duty < 60) return 'startled';
+        return 'cold';
+    }
+
+    _getGreetingText(busho, attitude = this.activeInterviewAttitude) {
+        switch (attitude) {
+            case 'welcoming':
+                return '「これはこれは、殿！　よくぞお越しくださいました！」';
+            case 'friendly':
+                return '「殿、お越しくださいましたか。ささ、こちらへ」';
+            case 'polite':
+                return '「殿。わざわざお越しいただき、恐縮です」';
+            case 'reserved':
+                return '「……殿。お越しでしたか」';
+            case 'startled':
+                return '「げっ、殿……！　い、いえ、これは失礼を。どうぞ、お入りください」';
+            default:
+                return '「……殿。何かございましたか」';
+        }
+    }
+
+    _getMenuPrompt(attitude = this.activeInterviewAttitude) {
+        switch (attitude) {
+            case 'welcoming':
+                return '「殿、どうぞ何なりとお尋ねください！」';
+            case 'friendly':
+                return '「殿、何なりとお申し付けください」';
+            case 'polite':
+                return '「殿、どのようなご用件でしょうか」';
+            case 'reserved':
+                return '「……殿。ご用件を伺いましょう」';
+            case 'startled':
+                return '「……それで、殿。何のご用でしょうか」';
+            default:
+                return '「……何か、ご用でしょうか」';
+        }
+    }
+
+    _getTopicOpening(target, attitude = this.activeInterviewAttitude) {
+        const name = target && target.name ? target.name : 'その方';
+        switch (attitude) {
+            case 'welcoming':
+            case 'friendly':
+                return `${name}殿ですか。ええ、存じております。`;
+            case 'reserved':
+            case 'cold':
+            case 'startled':
+                return `……${name}殿について、ですか。`;
+            default:
+                return `${name}殿ですか……`;
+        }
     }
 
     _shouldOfferDoctor(busho) {
@@ -132,7 +224,7 @@ class InterviewSystem {
         if (!this.view) return;
         this.view.showMenu(
             busho,
-            '「殿、どのようなご用件でしょうか？」',
+            this._getMenuPrompt(),
             [
                 { label: '調子はどうだ', onClick: () => this.executeInterviewStatus(busho) },
                 { label: '他者について聞く', onClick: () => this.showTargetList(busho) }
@@ -159,33 +251,13 @@ class InterviewSystem {
         else if (inno < 20) policyText = '古き良き伝統を守ることこそ肝要です。';
         else policyText = '当家のやり方に特に不満はありません。順調です。';
 
-        let perceivedLoyalty = Number(busho.loyalty || 0);
-        if (Number(busho.intelligence || 0) >= 85 && perceivedLoyalty < 80) {
-            perceivedLoyalty = Math.max(perceivedLoyalty, 90);
-        } else if (Number(busho.intelligence || 0) >= 70 && perceivedLoyalty < 60) {
-            perceivedLoyalty = Math.max(perceivedLoyalty, 70);
-        }
-
-        let loyaltyText = '';
-        let attitudeText = '';
-        if (perceivedLoyalty >= 85) {
-            loyaltyText = '身に余る御恩、片時も忘れたことはありませぬ。この身は殿のために。';
-        } else if (perceivedLoyalty >= 65) {
-            loyaltyText = '家中はよく治まっております。何も心配なさりませぬよう。';
-        } else if (perceivedLoyalty >= 45) {
-            loyaltyText = '特に不満はありません。与えられた役目は果たします。';
-        } else if (perceivedLoyalty >= 25) {
-            loyaltyText = '……少し、待遇を見直してはいただけませぬか。';
-        } else {
-            loyaltyText = '……。';
-            attitudeText = '目を合わせようとしない。危険な気配を感じる。';
-        }
-
+        const concealment = this._getConcealmentProfile(busho);
+        const loyaltyBand = this._getLoyaltyBand(concealment.perceivedLoyalty);
+        const loyaltyText = this._getSelfLoyaltyText(loyaltyBand, this.activeInterviewAttitude);
         const messages = [
             `「${policyText}」`,
             `「${loyaltyText}」`
         ];
-        if (attitudeText) messages.push(attitudeText);
 
         this.view.showMessages(busho, messages, () => this.showMainMenu(busho));
     }
@@ -197,7 +269,7 @@ class InterviewSystem {
         const loyaltyText = this._getTargetLoyaltyText(interviewer, target, relation);
 
         const messages = [
-            `「${target.name}殿ですか……<br>${opinionText}」`,
+            `「${this._getTopicOpening(target)}${opinionText}」`,
             `「${contactText}」`,
             `「${loyaltyText}」`
         ];
@@ -229,11 +301,69 @@ class InterviewSystem {
         return '普段はほとんど言葉を交わしませぬ。';
     }
 
-    _getTargetLoyaltyText(interviewer, target, relation) {
-        if (Number(interviewer.loyalty || 0) < 40) {
-            return 'さあ……。他人の腹の内など、某には量りかねます。';
+    _getLoyaltyBand(loyalty) {
+        const value = Math.max(0, Math.min(100, Number(loyalty) || 0));
+        const stableMin = Number(window.MainParams.Gunshi.AdviceLoyalty) + 1;
+        const warningMin = Number(window.MainParams.Gunshi.DangerLoyalty) + 1;
+        const I = window.MainParams.Interview;
+
+        if (value >= stableMin) return 'stable';
+        if (value >= warningMin) return 'warning';
+        if (value >= I.LoyaltyDangerMin) return 'danger';
+        if (value >= I.LoyaltyDissatisfiedMin) return 'dissatisfied';
+        if (value >= I.LoyaltySeriousMin) return 'serious';
+        return 'critical';
+    }
+
+    _getConcealmentProfile(busho) {
+        const I = window.MainParams.Interview;
+        const actualLoyalty = Math.max(0, Math.min(100, Number(busho.loyalty) || 0));
+        const intelligence = Math.max(0, Math.min(100, Number(busho.intelligence) || 0));
+        let perceivedLoyalty = actualLoyalty;
+        let level = 'none';
+
+        if (intelligence >= I.ConcealHighIntelligence && actualLoyalty < I.ConcealHighLoyaltyBelow) {
+            perceivedLoyalty = Math.max(actualLoyalty, I.ConcealHighShownLoyalty);
+            level = 'strong';
+        } else if (intelligence >= I.ConcealMidIntelligence && actualLoyalty < I.ConcealMidLoyaltyBelow) {
+            perceivedLoyalty = Math.max(actualLoyalty, I.ConcealMidShownLoyalty);
+            level = 'moderate';
         }
 
+        return {
+            actualLoyalty,
+            perceivedLoyalty,
+            isConcealing: perceivedLoyalty > actualLoyalty,
+            level
+        };
+    }
+
+    _getSelfLoyaltyText(band, attitude = this.activeInterviewAttitude) {
+        switch (band) {
+            case 'stable':
+                return '身に余る御恩、片時も忘れたことはありませぬ。この身は殿のために。';
+            case 'warning':
+                return '不満というほどではございませぬ。ただ、少し思うところはございます。';
+            case 'danger':
+                return attitude === 'reserved'
+                    ? '……大きな不満はございませぬ。ただ、今の待遇には少し思うところがございます。'
+                    : '……正直に申せば、今の待遇にはいささか思うところがございます。';
+            case 'dissatisfied':
+                return attitude === 'cold'
+                    ? '……今のままでよいとは、申し上げられませぬ。もう少しお考えいただきたい。'
+                    : '今のままでは、務めにも身が入りませぬ。もう少しお考えいただきたい。';
+            case 'serious':
+                return attitude === 'startled'
+                    ? '……いえ、その……某にも、思うところくらいはございます。'
+                    : '……某ばかりに我慢を強いるのは、おやめいただきたい。';
+            default:
+                return attitude === 'startled'
+                    ? '……っ。い、いえ、特に申し上げることはございませぬ。'
+                    : '……特に申し上げることはございませぬ。お話は、それだけでしょうか。';
+        }
+    }
+
+    _calcTargetKnowledge(interviewer, target, relation) {
         let knowledge = Number(interviewer.intelligence || 0) * 0.55
             + relation.contactScore * 0.35
             + Number(interviewer.duty || 0) * 0.10;
@@ -241,30 +371,108 @@ class InterviewSystem {
         const intelligenceGap = Math.max(0, Number(target.intelligence || 0) - Number(interviewer.intelligence || 0));
         knowledge -= intelligenceGap * 0.35;
         knowledge -= Math.max(0, Number(target.ambition || 0) - 50) * 0.08;
-        knowledge = Math.max(0, Math.min(100, knowledge));
+        return Math.max(0, Math.min(100, knowledge));
+    }
 
-        if (knowledge < 40) {
-            return '詳しいところまでは存じませぬ。腹の内を断じるほどには分かっておりませぬ。';
+    _canDetectConcealment(interviewer, target, knowledge, concealment) {
+        if (!concealment.isConcealing) return false;
+        const I = window.MainParams.Interview;
+        const interviewerInt = Number(interviewer.intelligence || 0);
+        const targetInt = Number(target.intelligence || 0);
+        return knowledge >= I.ConcealDetectKnowledgeMin
+            && interviewerInt >= I.ConcealDetectIntelligenceMin
+            && interviewerInt + I.ConcealDetectGapAllowance >= targetInt;
+    }
+
+    _getBlindTargetText(interviewer, target, relation, concealment) {
+        const interviewerInt = Number(interviewer.intelligence || 0);
+        const targetInt = Number(target.intelligence || 0);
+        const hardToRead = concealment.isConcealing || targetInt >= interviewerInt + 20;
+
+        if (relation.contactScore >= 52) {
+            return hardToRead
+                ? '普段から話はしておりますが、あの方は肝心な胸中をほとんど見せませぬ。殿への本心までは、某にも読み切れませぬ。'
+                : '普段の様子は存じております。ただ、殿への胸中となると、某にはほとんど読み取れませぬ。';
+        }
+        if (relation.compatibilityScore >= 68) {
+            return hardToRead
+                ? '人柄については信頼しております。ただ、殿への胸中となると、あの方はなかなか内心を見せませぬ。某にもほとんど読み取れませぬ。'
+                : '人柄については信頼しております。ただ、殿への胸中までは、某にもほとんど分かりませぬ。';
+        }
+        if (relation.contactScore < 34) {
+            return hardToRead
+                ? 'もともと深く話す間柄でもなく、あの方も内心を見せませぬ。殿への胸中までは、某にはほとんど分かりませぬ。'
+                : '普段ほとんど言葉を交わしませぬゆえ、殿への胸中までは某にも分かりませぬ。';
+        }
+        return hardToRead
+            ? 'あの方はなかなか内心を見せぬお方です。殿への胸中までは、某にはほとんど読み取れませぬ。'
+            : '殿への胸中となると、某にはほとんど読み取れませぬ。断じられるほどの材料がございませぬ。';
+    }
+
+    _getTargetLoyaltyBandText(band, uncertain) {
+        switch (band) {
+            case 'stable':
+                return uncertain
+                    ? '見たところ、殿への忠義に疑わしいところはなさそうです。'
+                    : '殿への忠義は本物でしょう。疑う余地もありません。';
+            case 'warning':
+                return uncertain
+                    ? '今すぐ危うい様子ではありませぬが、少し思うところはありそうです。'
+                    : '大きな不満はないようですが、少し思うところを抱えているようです。';
+            case 'danger':
+                return uncertain
+                    ? '表立っては務めておりますが、待遇には少し不満があるように見えます。'
+                    : '待遇に不満を抱えているようです。今のうちに気を配るべきかと。';
+            case 'dissatisfied':
+                return uncertain
+                    ? '近頃、不満がかなり溜まっているように見受けられます。'
+                    : 'かなり不満を抱えております。このまま放っておくのは危ういかと。';
+            case 'serious':
+                return uncertain
+                    ? '殿への気持ちはかなり離れているように見えます。十分お気をつけください。'
+                    : '殿への気持ちはかなり離れております。離反を警戒すべきでしょう。';
+            default:
+                return uncertain
+                    ? '極めて危うい気配があります。油断なさらぬ方がよろしいかと。'
+                    : '殿から心が離れております。いつ離反してもおかしくありませぬ。';
+        }
+    }
+
+    _getDetectedConcealmentText(actualBand) {
+        const detail = {
+            warning: '少し思うところを抱えているようです。',
+            danger: '待遇への不満を隠していると見ます。',
+            dissatisfied: 'かなりの不満を抱えながら、それを表には出しておりませぬ。',
+            serious: '殿への気持ちはかなり離れております。それを悟られぬよう振る舞っているのでしょう。',
+            critical: '殿から心が離れております。それを悟られぬよう装っていると見て間違いありませぬ。'
+        }[actualBand] || '何か思うところを隠しているようです。';
+        return `表向きは何事もないように振る舞っておりますが、あれは本心ではありますまい。${detail}`;
+    }
+
+    _getTargetLoyaltyText(interviewer, target, relation) {
+        if (Number(interviewer.loyalty || 0) < 40) {
+            return '某自身、他人をあれこれ申せる立場ではございませぬ。殿への胸中までは量りかねます。';
         }
 
-        const loyalty = Number(target.loyalty || 0);
-        const uncertain = knowledge < 62;
-        if (loyalty >= 85) return uncertain
-            ? '見たところ、殿への忠義に疑わしいところはなさそうです。'
-            : '殿への忠義は本物でしょう。疑う余地もありません。';
-        if (loyalty >= 65) return uncertain
-            ? '少なくとも、今のところ不審な様子は見受けられませぬ。'
-            : '不審な点はありませぬ。真面目に務めております。';
-        if (loyalty >= 45) return uncertain
-            ? '表立って不満は見せませぬが、少し気に留めておくべきかと。'
-            : '今のところは大人しくしておりますが、多少思うところはありそうです。';
-        if (loyalty >= 25) return uncertain
-            ? '近頃、何やら思うところがあるようには見えます。'
-            : '近頃、何やら不満を漏らしているようです。';
-        return uncertain
-            ? '少々危うい気配があります。注意しておいた方がよろしいかと。'
-            : '油断なりませぬ。殿から心が離れつつあるように見えます。';
+        const I = window.MainParams.Interview;
+        const knowledge = this._calcTargetKnowledge(interviewer, target, relation);
+        const concealment = this._getConcealmentProfile(target);
+
+        if (knowledge < I.KnowledgeBlindBelow) {
+            return this._getBlindTargetText(interviewer, target, relation, concealment);
+        }
+
+        if (this._canDetectConcealment(interviewer, target, knowledge, concealment)) {
+            return this._getDetectedConcealmentText(this._getLoyaltyBand(concealment.actualLoyalty));
+        }
+
+        const assessedLoyalty = concealment.isConcealing
+            ? concealment.perceivedLoyalty
+            : concealment.actualLoyalty;
+        const uncertain = knowledge < I.KnowledgeConfidentMin;
+        return this._getTargetLoyaltyBandText(this._getLoyaltyBand(assessedLoyalty), uncertain);
     }
+
 }
 
 window.InterviewSystem = InterviewSystem;

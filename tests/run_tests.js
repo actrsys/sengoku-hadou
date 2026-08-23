@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r105');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r107');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2119,6 +2119,88 @@ test('面談は専用View内で完結し16:9/9:16固定・非スクロールで�
     const bushoUi = read('js/ui_info_busho.js');
     assert.ok(bushoUi.includes("BushoListSortRules.compareKnown(this.game, a, b, 'name'"), '元の武将一覧も名前ソートの共通規則を使う');
     assert.ok(bushoUi.includes("BushoListSortRules.compareKnown(this.game, a, b, 'castle'"), '元の武将一覧も所在ソートの共通規則を使う');
+});
+
+test('面談の忠誠評価は軍師警告ラインと連動し低忠誠を段階評価する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/interview_system.js');
+    const system = new ctx.InterviewSystem({});
+
+    assert.strictEqual(system._getLoyaltyBand(85), 'stable');
+    assert.strictEqual(system._getLoyaltyBand(84), 'warning');
+    assert.strictEqual(system._getLoyaltyBand(75), 'warning');
+    assert.strictEqual(system._getLoyaltyBand(74), 'danger');
+    assert.strictEqual(system._getLoyaltyBand(60), 'danger');
+    assert.strictEqual(system._getLoyaltyBand(59), 'dissatisfied');
+    assert.strictEqual(system._getLoyaltyBand(40), 'dissatisfied');
+    assert.strictEqual(system._getLoyaltyBand(39), 'serious');
+    assert.strictEqual(system._getLoyaltyBand(25), 'serious');
+    assert.strictEqual(system._getLoyaltyBand(24), 'critical');
+});
+
+test('面談の他者評価は高智謀の偽装・看破・全く読めない状態を区別する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/interview_system.js');
+    const system = new ctx.InterviewSystem({});
+
+    const relationClose = { contactScore: 80, compatibilityScore: 82, affinityDiff: 8 };
+    const concealed = { loyalty: 65, intelligence: 85, ambition: 50 };
+
+    const sharpInterviewer = { loyalty: 90, intelligence: 95, duty: 80 };
+    const detected = system._getTargetLoyaltyText(sharpInterviewer, concealed, relationClose);
+    assert.ok(detected.includes('本心ではありますまい'), '高智謀の聞き手は偽装を見抜く');
+    assert.ok(detected.includes('不満'), '看破後は実際の危険度を伝える');
+
+    const middlingInterviewer = { loyalty: 90, intelligence: 65, duty: 80 };
+    const fooled = system._getTargetLoyaltyText(middlingInterviewer, concealed, relationClose);
+    assert.ok(fooled.includes('忠義は本物'), '偽装を見抜けない場合は表向きの忠誠を信じることがある');
+    assert.ok(!fooled.includes('本心ではありますまい'));
+
+    const blindInterviewer = { loyalty: 90, intelligence: 30, duty: 30 };
+    const unreadable = system._getTargetLoyaltyText(blindInterviewer, { loyalty: 50, intelligence: 90, ambition: 50 }, relationClose);
+    assert.ok(unreadable.includes('普段から話はしておりますが'), '前段の接触評価を否定せずにつなぐ');
+    assert.ok(unreadable.includes('胸中をほとんど見せませぬ'));
+    assert.ok(unreadable.includes('読み切れませぬ'));
+});
+
+
+
+test('面談開始時の表面態度は忠誠・智謀・義理・野望を踏まえて一貫した口調を使う', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/interview_system.js');
+    const system = new ctx.InterviewSystem({});
+
+    const loyal = { loyalty: 96, intelligence: 50, duty: 80, ambition: 30 };
+    assert.strictEqual(system._getSurfaceAttitude(loyal), 'welcoming');
+    assert.ok(system._getGreetingText(loyal, 'welcoming').includes('よくぞお越しくださいました'));
+    assert.ok(system._getMenuPrompt('welcoming').includes('何なりと'));
+
+    const bluntDisloyal = { loyalty: 20, intelligence: 35, duty: 25, ambition: 75 };
+    assert.strictEqual(system._getSurfaceAttitude(bluntDisloyal), 'startled');
+    assert.ok(system._getGreetingText(bluntDisloyal, 'startled').includes('げっ、殿'));
+    assert.ok(system._getMenuPrompt('startled').includes('何のご用'));
+
+    const cleverDisloyal = { loyalty: 20, intelligence: 90, duty: 40, ambition: 80 };
+    assert.strictEqual(system._getSurfaceAttitude(cleverDisloyal), 'welcoming', '高智謀なら低忠誠でも表向きは愛想よく取り繕える');
+    assert.ok(!system._getGreetingText(cleverDisloyal, system._getSurfaceAttitude(cleverDisloyal)).includes('げっ'));
+});
+
+test('面談本人の低忠誠表現は観察ナレーションを混ぜず本人の台詞だけで示す', () => {
+    const interview = read('js/interview_system.js');
+    assert.ok(!interview.includes('目を合わせようとしない'));
+    assert.ok(!interview.includes('危険な気配を感じる'));
+    assert.ok(interview.includes('特に申し上げることはございませぬ'));
+});
+
+test('面談武将カードは押下時に位置を動かさず最下段の見切れを防ぐ', () => {
+    const css = read('css/style.css');
+    const match = css.match(/\.interview-session-person:active\s*\{([\s\S]*?)\}/);
+    assert.ok(match, '面談武将カードのactive指定を持つ');
+    assert.ok(match[1].includes('transform: none'), '押下時にカードを下へ移動しない');
+    assert.ok(!match[1].includes('translateY'), '押下感を位置移動で表現しない');
 });
 
 test('面談会話の表示整形は元データを変えず句点と改行だけを除く', () => {

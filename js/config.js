@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r105'
+        Version: 'r107'
     },
 
     Main: {
@@ -22,6 +22,23 @@ window.GameConfig = {
         Gunshi: {
             AdviceLoyalty: 84,
             DangerLoyalty: 74
+        },
+        Interview: {
+            // 85/75 は軍師警告の境界を正本として導出する。以下は面談内の細分化だけを管理する。
+            LoyaltyDangerMin: 60,
+            LoyaltyDissatisfiedMin: 40,
+            LoyaltySeriousMin: 25,
+            KnowledgeBlindBelow: 40,
+            KnowledgeConfidentMin: 62,
+            ConcealDetectKnowledgeMin: 68,
+            ConcealDetectIntelligenceMin: 75,
+            ConcealDetectGapAllowance: 10,
+            ConcealHighIntelligence: 85,
+            ConcealHighLoyaltyBelow: 80,
+            ConcealHighShownLoyalty: 90,
+            ConcealMidIntelligence: 70,
+            ConcealMidLoyaltyBelow: 60,
+            ConcealMidShownLoyalty: 70
         },
         Kunishu: {
             CaptureRelationDrop: 20,

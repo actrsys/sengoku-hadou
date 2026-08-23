@@ -4003,7 +4003,12 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     overflow: hidden;
 }
 .interview-session-person:hover { border-color: #e8ce78; background: rgba(31,70,42,.92); }
-.interview-session-person:active { transform: translateY(1px); }
+.interview-session-person:active {
+    transform: none;
+    filter: brightness(1.12);
+    border-color: #f0d878;
+    box-shadow: inset 0 0 0 1px rgba(240,216,120,.22);
+}
 
 .interview-session-person-face {
     width: 54px;
