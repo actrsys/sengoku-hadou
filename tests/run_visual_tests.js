@@ -538,7 +538,7 @@ async function validateCommandAndInterviewStates(cdp) {
         expression: `(() => {
             const content = document.getElementById('interview-session-content');
             content.classList.add('speaker-hidden');
-            document.getElementById('interview-session-face-panel').classList.add('hidden');
+            document.getElementById('interview-session-summary-panel').classList.add('hidden');
             document.getElementById('interview-session-inline-actions').classList.add('hidden');
             const pager = document.getElementById('interview-session-pager');
             pager.classList.remove('hidden');

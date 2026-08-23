@@ -86,6 +86,8 @@ class SelectorModalView {
         }
 
         if (confirmBtn) {
+            // 標準決定ボタンは共通button-SEの既定 decision に任せる。
+            delete confirmBtn.dataset.se;
             if (typeof onConfirm === 'function') {
                 confirmBtn.classList.remove('hidden');
                 confirmBtn.onclick = onConfirm;
@@ -111,6 +113,7 @@ class SelectorModalView {
             } else {
                 backBtn.style.display = '';
                 backBtn.textContent = backLabel;
+                backBtn.dataset.se = 'cancel.ogg';
                 backBtn.onclick = typeof onBack === 'function' ? onBack : null;
             }
         }

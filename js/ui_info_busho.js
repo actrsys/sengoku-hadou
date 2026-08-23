@@ -412,7 +412,6 @@ Object.assign(UIInfoManager.prototype, {
             if (btnWife && Array.isArray(busho.wifeIds) && busho.wifeIds.length > 0) {
                 btnWife.onclick = (e) => {
                     e.stopPropagation();
-                    if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                     this.pushModal('princess_list', [false, busho.id, 'view_busho_wife']);
                 };
             }

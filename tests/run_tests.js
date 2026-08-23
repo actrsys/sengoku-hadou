@@ -2072,12 +2072,20 @@ test('面談は専用View内で完結し16:9/9:16固定・非スクロールで�
     assert.ok(!interview.includes('openBushoSelector'), '面談中に汎用武将リストを開かない');
     assert.ok(html.includes('id="interview-session-footer" class="modal-footer interview-session-footer"'), '面談の決定/戻る系操作は標準modal-footerを使う');
     assert.ok(html.includes('id="interview-session-inline-actions"'), '面談内容内の専用操作帯を分離する');
-    assert.ok(html.includes('id="interview-session-prev-btn" type="button" class="daimyo-detail-action-btn"'), '面談内ページ送りは標準決定ボタンではなく内側用ボタンを使う');
+    assert.ok(html.includes('id="interview-session-prev-btn" type="button" data-se="choice.ogg" class="daimyo-detail-action-btn"'), '面談内ページ送りは内側用ボタン＋共通button-SEを使う');
     assert.ok(view.includes("button.className = 'daimyo-detail-action-btn interview-session-inline-btn'"), '面談内容内操作は詳細画面系ボタンを使う');
+    assert.ok(view.includes("button.dataset.se = sound"), '面談buttonの特殊SEはdata-seで共通button監視へ委譲する');
+    assert.ok(!view.includes("window.AudioManager.playSE(se)"), '面談button handler内でSEを二重再生しない');
     assert.ok(view.includes('_renderFooterActions'), '面談の外側フッター操作をViewで分離する');
     assert.ok(!css.includes('body.interview-mode'), '旧ふすま背景の状態管理を残さない');
     assert.ok(html.includes('js/busho_list_sort_rules.js'), '面談と武将一覧で共通ソート規則を読み込む');
     assert.ok(view.includes("messageArea.className = 'message-area interview-session-message-area'"), '面談会話は既存message-areaを再利用する');
+    assert.ok(view.includes("dialogBody.className = 'dialog-body-container interview-session-dialog-body'"), '面談会話は通常会話と同じ顔＋メッセージの一体レイアウトを使う');
+    assert.ok(html.includes('id="interview-session-summary-panel"') && !html.includes('id="interview-session-face-panel"'), '上部サマリーへ顔を重複表示しない');
+    assert.ok(view.includes('StatPresenter.getDisplayStatHTML(busho, key'), '面談能力は武将一覧・詳細と同じランク表示を使う');
+    assert.ok(!view.includes('valueEl.textContent = Number(busho[key]'), '面談で能力の内部数値を表示しない');
+    assert.ok(view.includes('_setMessageAdvance') && view.includes("this._renderFooterActions([])"), '選択肢のない面談会話はボタンを出さず画面クリックで進める');
+    assert.ok(css.includes('#interview-modal.interview-message-advance .interview-session-message-area::after'), '面談会話のクリック進行時は▼を表示する');
     assert.ok(view.includes("['統率', 'leadership']") && view.includes("['魅力', 'charm']"), '面談相手の既知能力を人物サマリーに出す');
     assert.ok(!view.includes('loyalty'), '面談Viewで忠誠数値を表示・ソートしない');
     const sortRules = read('js/busho_list_sort_rules.js');
@@ -2086,6 +2094,24 @@ test('面談は専用View内で完結し16:9/9:16固定・非スクロールで�
     const bushoUi = read('js/ui_info_busho.js');
     assert.ok(bushoUi.includes("BushoListSortRules.compareKnown(this.game, a, b, 'name'"), '元の武将一覧も名前ソートの共通規則を使う');
     assert.ok(bushoUi.includes("BushoListSortRules.compareKnown(this.game, a, b, 'castle'"), '元の武将一覧も所在ソートの共通規則を使う');
+});
+
+test('通常buttonのSEは共通監視を正本とし特殊音はdata-seへ寄せる', () => {
+    const ui = read('js/ui.js');
+    const selector = read('js/selector_modal_view.js');
+    const info = read('js/ui_info.js');
+    const busho = read('js/ui_info_busho.js');
+    const kyoten = read('js/ui_info_kyoten.js');
+    const architecture = read('ARCHITECTURE.md');
+
+    assert.ok(ui.includes("const explicitSe = btn.dataset ? btn.dataset.se : ''"), '共通button監視がdata-seを正本として扱う');
+    assert.ok(!ui.includes('["一括", "直轄", "委任", "不可", "許可"].includes(text)'), '文言による場当たり的なSE除外を残さない');
+    assert.ok(selector.includes("backBtn.dataset.se = 'cancel.ogg'"), '共通Selectorの戻る音はView側の宣言だけにする');
+    assert.ok(info.includes('data-se="choice.ogg" class="delegate-btn'), '委任切替はdata-seで選択音を宣言する');
+    assert.ok(!info.includes("if (window.AudioManager) window.AudioManager.playSE('decision.ogg');"), '情報画面の標準buttonでdecisionを重ねて鳴らさない');
+    assert.ok(!busho.includes("if (window.AudioManager) window.AudioManager.playSE('decision.ogg');"), '武将詳細の標準buttonでdecisionを重ねて鳴らさない');
+    assert.ok(!kyoten.includes("if (window.AudioManager) window.AudioManager.playSE('decision.ogg');"), '拠点詳細の標準buttonでdecisionを重ねて鳴らさない');
+    assert.ok(architecture.includes('button系SEは共通button監視を正本にする'), 'SE責務ルールを設計文書へ残す');
 });
 
 test('武将一覧共通ソートは面談用検索と既知能力順を安定して処理する', () => {

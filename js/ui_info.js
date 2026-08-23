@@ -93,7 +93,6 @@ class UIInfoManager {
             showTabs,
             backLabel: (this.modalHistory && this.modalHistory.length > 0) ? '戻る' : '閉じる',
             onBack: () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
                 this.popModal();
             }
         });
@@ -886,19 +885,16 @@ class UIInfoManager {
 
             document.getElementById('temp-kyoten-btn').onclick = (e) => {
                 e.stopPropagation();
-                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                 this.showKyotenList(clan.id);
             };
 
             document.getElementById('temp-diplo-btn').onclick = (e) => {
                 e.stopPropagation(); 
-                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                 this.showDiplomacyList(clan.id, clan.name, 'daimyo');
             };
             
             document.getElementById('temp-busho-btn').onclick = (e) => {
                 e.stopPropagation();
-                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                 this.openBushoSelector('view_only', null, { 
                     customBushos: this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b)),
                     customInfoHtml: `<div>${clan.name} 所属武将</div>`
@@ -907,13 +903,11 @@ class UIInfoManager {
 
             document.getElementById('temp-hime-btn').onclick = (e) => {
                 e.stopPropagation();
-                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                 this.pushModal('princess_list', [false, clan.id, 'view_clan_princess']);
             };
 
             document.getElementById('temp-faction-btn').onclick = (e) => {
                 e.stopPropagation();
-                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                 this.showFactionList(clan.id);
             };
 
@@ -1437,7 +1431,6 @@ class UIInfoManager {
             hideBackBtn: !!config.hideBackBtn,
             backLabel: (this.modalHistory && this.modalHistory.length > 0) ? '戻る' : '閉じる',
             onBack: () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
                 if (config.onBack) config.onBack();
                 this._currentListRenderId++;
                 this.popModal();
@@ -2055,7 +2048,7 @@ class UIInfoManager {
         const isAllDelegated = myCastles.length > 0 && myCastles.every(c => c.isDelegated);
         let toggleBtnClass = isAllDelegated ? "btn-toggle-delegated" : "btn-toggle-direct";
 
-        const contextHtml = `<button id="btn-toggle-all-delegate" class="btn-secondary btn-small ${toggleBtnClass}">一括</button>`;
+        const contextHtml = `<button id="btn-toggle-all-delegate" data-se="choice.ogg" class="btn-secondary btn-small ${toggleBtnClass}">一括</button>`;
 
         let items = [];
         myCastles.forEach(c => {
@@ -2097,7 +2090,6 @@ class UIInfoManager {
             const toggleAllBtn = document.getElementById('btn-toggle-all-delegate');
             if (toggleAllBtn) {
                 toggleAllBtn.onclick = () => {
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                     const newState = !isAllDelegated;
                     myCastles.forEach(c => c.isDelegated = newState);
                     const listContainer = document.getElementById('selector-list');
@@ -2125,20 +2117,20 @@ class UIInfoManager {
             listContainer.innerHTML = `
                 <div class="delegate-setting-panel">
                     <div class="delegate-setting-mode-buttons">
-                        <button id="btn-direct-control" class="delegate-btn ${!castle.isDelegated ? 'active' : ''}">直轄</button>
-                        <button id="btn-delegate-control" class="delegate-btn ${castle.isDelegated ? 'active' : ''}">委任</button>
+                        <button id="btn-direct-control" data-se="choice.ogg" class="delegate-btn ${!castle.isDelegated ? 'active' : ''}">直轄</button>
+                        <button id="btn-delegate-control" data-se="choice.ogg" class="delegate-btn ${castle.isDelegated ? 'active' : ''}">委任</button>
                     </div>
                     
                     <div id="delegate-options" class="delegate-options ${castle.isDelegated ? 'is-enabled' : 'is-disabled'}">
                         <div class="delegate-option-row">
                             <span class="delegate-option-label">城攻め：</span>
-                            <button id="btn-attack-deny" class="delegate-sub-btn ${!castle.allowAttack ? 'active' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>不可</button>
-                            <button id="btn-attack-allow" class="delegate-sub-btn ${castle.allowAttack ? 'active-allow' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>許可</button>
+                            <button id="btn-attack-deny" data-se="choice.ogg" class="delegate-sub-btn ${!castle.allowAttack ? 'active' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>不可</button>
+                            <button id="btn-attack-allow" data-se="choice.ogg" class="delegate-sub-btn ${castle.allowAttack ? 'active-allow' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>許可</button>
                         </div>
                         <div>
                             <span class="delegate-option-label">武将移動：</span>
-                            <button id="btn-move-deny" class="delegate-sub-btn ${!castle.allowMove ? 'active' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>不可</button>
-                            <button id="btn-move-allow" class="delegate-sub-btn ${castle.allowMove ? 'active-allow' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>許可</button>
+                            <button id="btn-move-deny" data-se="choice.ogg" class="delegate-sub-btn ${!castle.allowMove ? 'active' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>不可</button>
+                            <button id="btn-move-allow" data-se="choice.ogg" class="delegate-sub-btn ${castle.allowMove ? 'active-allow' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>許可</button>
                         </div>
                     </div>
                 </div>
@@ -2147,32 +2139,26 @@ class UIInfoManager {
             const updateView = () => this._renderDelegateSetting(castleId, listContainer.scrollTop);
 
             document.getElementById('btn-direct-control').onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                 castle.isDelegated = false;
                 updateView();
             };
             document.getElementById('btn-delegate-control').onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                 castle.isDelegated = true;
                 updateView();
             };
             document.getElementById('btn-attack-deny').onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                 castle.allowAttack = false;
                 updateView();
             };
             document.getElementById('btn-attack-allow').onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                 castle.allowAttack = true;
                 updateView();
             };
             document.getElementById('btn-move-deny').onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                 castle.allowMove = false;
                 updateView();
             };
             document.getElementById('btn-move-allow').onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                 castle.allowMove = true;
                 updateView();
             };
@@ -2459,13 +2445,11 @@ class UIInfoManager {
 
             document.getElementById('temp-kunishu-diplo-btn').onclick = (e) => {
                 e.stopPropagation(); 
-                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                 this.showDiplomacyList(kunishu.id, kunishuName, 'kunishu');
             };
 
             document.getElementById('temp-kunishu-busho-btn').onclick = (e) => {
                 e.stopPropagation();
-                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                 this.openBushoSelector('view_only', null, { 
                     customBushos: this.game.kunishuSystem.getKunishuMembers(kunishuId),
                     customInfoHtml: `<div>${kunishuName} 所属武将</div>`

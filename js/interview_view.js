@@ -3,6 +3,7 @@
  * 面談専用モーダルの表示と入力だけを担当する。
  * 面談の判定・台詞生成は InterviewSystem、人物関係計算は PersonnelRules に委譲する。
  * 武将一覧の検索・ソート規則は BushoListSortRules を共用する。
+ * button のSEは共通button監視へ委譲し、特殊音だけ data-se で宣言する。
  */
 class InterviewView {
     constructor(ui, game) {
@@ -13,8 +14,7 @@ class InterviewView {
         this.content = document.getElementById('interview-session-content');
         this.title = document.getElementById('interview-session-title');
         this.hint = document.getElementById('interview-session-hint');
-        this.facePanel = document.getElementById('interview-session-face-panel');
-        this.face = document.getElementById('interview-session-face');
+        this.summaryPanel = document.getElementById('interview-session-summary-panel');
         this.name = document.getElementById('interview-session-name');
         this.meta = document.getElementById('interview-session-meta');
         this.stats = document.getElementById('interview-session-stats');
@@ -33,6 +33,8 @@ class InterviewView {
         this.listSortKey = 'leadership';
         this.listSortAsc = false;
         this.listQuery = '';
+        this.currentSpeaker = null;
+        this._messageAdvanceHandler = null;
     }
 
     _isPc() {
@@ -47,12 +49,14 @@ class InterviewView {
 
     close() {
         if (!this.modal || this.modal.classList.contains('hidden')) return;
+        this._clearMessageAdvance();
         this.modal.classList.add('hidden');
         this._clearView();
         if (typeof this.ui.resumeBackgroundUpdates === 'function') this.ui.resumeBackgroundUpdates();
     }
 
     _clearView() {
+        this._clearMessageAdvance();
         if (this.body) this.body.replaceChildren();
         if (this.inlineActions) {
             this.inlineActions.replaceChildren();
@@ -68,6 +72,7 @@ class InterviewView {
         this.pageSize = 0;
         this.listQuery = '';
         this.onPageItemSelect = null;
+        this.currentSpeaker = null;
     }
 
     _setHeader(title, hint = '') {
@@ -79,25 +84,19 @@ class InterviewView {
     }
 
     _setSpeaker(busho = null) {
-        if (!this.facePanel || !this.face || !this.name) return;
+        this.currentSpeaker = busho || null;
+        if (!this.summaryPanel || !this.name) return;
         if (!busho) {
-            this.facePanel.classList.add('hidden');
+            this.summaryPanel.classList.add('hidden');
             if (this.content) this.content.classList.add('speaker-hidden');
-            this.face.removeAttribute('src');
             this.name.textContent = '';
             if (this.meta) this.meta.replaceChildren();
             if (this.stats) this.stats.replaceChildren();
             return;
         }
 
-        this.facePanel.classList.remove('hidden');
+        this.summaryPanel.classList.remove('hidden');
         if (this.content) this.content.classList.remove('speaker-hidden');
-        this.face.src = `data/images/faceicons/${busho.faceIcon || 'unknown_face.webp'}`;
-        this.face.alt = '';
-        this.face.onerror = () => {
-            this.face.onerror = null;
-            this.face.src = 'data/images/faceicons/unknown_face.webp';
-        };
         this.name.textContent = busho.name || '';
         this._renderSpeakerSummary(busho);
     }
@@ -133,6 +132,12 @@ class InterviewView {
                 ['統率', 'leadership'], ['武勇', 'strength'], ['内政', 'politics'],
                 ['外交', 'diplomacy'], ['智謀', 'intelligence'], ['魅力', 'charm']
             ];
+            const gunshi = this.game && typeof this.game.getClanGunshi === 'function'
+                ? this.game.getClanGunshi(this.game.playerClanId)
+                : null;
+            const daimyo = this.game && typeof this.game.getClanDaimyo === 'function'
+                ? this.game.getClanDaimyo(this.game.playerClanId)
+                : null;
             statDefs.forEach(([label, key]) => {
                 const cell = document.createElement('div');
                 cell.className = 'interview-session-stat';
@@ -141,34 +146,34 @@ class InterviewView {
                 labelEl.textContent = label;
                 const valueEl = document.createElement('span');
                 valueEl.className = 'interview-session-stat-value';
-                valueEl.textContent = Number(busho[key] || 0);
+                valueEl.innerHTML = window.StatPresenter
+                    ? StatPresenter.getDisplayStatHTML(busho, key, gunshi, null, this.game.playerClanId, daimyo)
+                    : '';
                 cell.append(labelEl, valueEl);
                 this.stats.appendChild(cell);
             });
         }
     }
 
-    _bindButton(button, label, onClick, sound = null) {
+    _bindButton(button, onClick, sound = null) {
+        if (sound) button.dataset.se = sound;
         button.onclick = () => {
-            if (window.AudioManager) {
-                let se = sound;
-                if (!se) {
-                    const isBack = label === '戻る' || label.includes('終える') || label === 'やめる' || label === '診せない';
-                    se = isBack ? 'cancel.ogg' : 'decision.ogg';
-                }
-                window.AudioManager.playSE(se);
-            }
             if (onClick) onClick();
         };
         return button;
     }
 
-    _makeFooterButton(label, onClick, className = 'btn-secondary') {
+    _makeFooterButton(label, onClick, className = 'btn-secondary', sound = null) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = className;
         button.textContent = label;
-        return this._bindButton(button, label, onClick);
+        const resolvedSound = sound || (
+            label === '戻る' || label.includes('終える') || label === 'やめる' || label === '診せない'
+                ? 'cancel.ogg'
+                : null
+        );
+        return this._bindButton(button, onClick, resolvedSound);
     }
 
     _makeInlineButton(label, onClick) {
@@ -176,14 +181,19 @@ class InterviewView {
         button.type = 'button';
         button.className = 'daimyo-detail-action-btn interview-session-inline-btn';
         button.textContent = label;
-        return this._bindButton(button, label, onClick, 'choice.ogg');
+        return this._bindButton(button, onClick, 'choice.ogg');
     }
 
     _renderFooterActions(choices) {
         if (!this.footer) return;
         this.footer.replaceChildren();
         (choices || []).forEach(choice => {
-            const button = this._makeFooterButton(choice.label, choice.onClick, choice.className || 'btn-secondary');
+            const button = this._makeFooterButton(
+                choice.label,
+                choice.onClick,
+                choice.className || 'btn-secondary',
+                choice.sound || null
+            );
             if (choice.disabled) button.disabled = true;
             this.footer.appendChild(button);
         });
@@ -201,25 +211,49 @@ class InterviewView {
         this.inlineActions.classList.toggle('hidden', !choices || choices.length === 0);
     }
 
+    _clearMessageAdvance() {
+        if (this.modal && this._messageAdvanceHandler) {
+            this.modal.removeEventListener('click', this._messageAdvanceHandler);
+        }
+        this._messageAdvanceHandler = null;
+        if (this.modal) this.modal.classList.remove('interview-message-advance');
+    }
+
+    _setMessageAdvance(onAdvance) {
+        this._clearMessageAdvance();
+        if (!this.modal || typeof onAdvance !== 'function') return;
+        this.modal.classList.add('interview-message-advance');
+        this._messageAdvanceHandler = (event) => {
+            if (event.target.closest('button, input, select, textarea, a')) return;
+            event.stopPropagation();
+            this._clearMessageAdvance();
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            onAdvance();
+        };
+        this.modal.addEventListener('click', this._messageAdvanceHandler);
+    }
+
     showInterviewerList(candidates, onSelect, onClose) {
+        this._clearMessageAdvance();
         this._ensureOpen();
         this._setHeader('面談', '面談する武将を選んでください。');
         this._setSpeaker(null);
         this._renderPagedList(candidates, onSelect, 'interviewer');
         this._renderInlineActions([]);
         this._renderFooterActions([
-            { label: '面談を終える', onClick: onClose, className: 'btn-secondary' }
+            { label: '面談を終える', onClick: onClose, className: 'btn-secondary', sound: 'cancel.ogg' }
         ]);
     }
 
     showTargetList(interviewer, candidates, onSelect, onBack) {
+        this._clearMessageAdvance();
         this._ensureOpen();
         this._setHeader('他者について聞く', '誰についての印象を聞きますか？');
         this._setSpeaker(interviewer);
         this._renderPagedList(candidates, onSelect, 'target');
         this._renderInlineActions([]);
         this._renderFooterActions([
-            { label: '戻る', onClick: onBack, className: 'btn-secondary' }
+            { label: '戻る', onClick: onBack, className: 'btn-secondary', sound: 'cancel.ogg' }
         ]);
     }
 
@@ -335,7 +369,6 @@ class InterviewView {
 
             button.append(img, text);
             button.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                 if (this.onPageItemSelect) this.onPageItemSelect(busho);
             };
             grid.appendChild(button);
@@ -357,7 +390,6 @@ class InterviewView {
             this.prevBtn.onclick = () => {
                 if (this.page <= 0) return;
                 this.page -= 1;
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                 this._renderCurrentPage();
             };
         }
@@ -366,40 +398,73 @@ class InterviewView {
             this.nextBtn.onclick = () => {
                 if (this.page >= totalPages - 1) return;
                 this.page += 1;
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                 this._renderCurrentPage();
             };
         }
     }
 
-    _renderConversationMessage(message) {
+    _createConversationFace(busho) {
+        const faceColumn = document.createElement('div');
+        faceColumn.className = 'dialog-face-column interview-session-dialog-face-column';
+
+        const nameLabel = document.createElement('div');
+        nameLabel.className = 'dialog-name-label interview-session-dialog-name-label';
+        nameLabel.textContent = busho && busho.name ? busho.name : '';
+
+        const faceSpace = document.createElement('div');
+        faceSpace.className = 'interview-session-dialog-face-space';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'sp-face-wrapper dialog-face-wrapper';
+        const img = document.createElement('img');
+        img.className = 'dialog-face-img';
+        img.src = `data/images/faceicons/${(busho && busho.faceIcon) || 'unknown_face.webp'}`;
+        img.alt = '';
+        img.onerror = () => {
+            img.onerror = null;
+            img.src = 'data/images/faceicons/unknown_face.webp';
+        };
+        wrapper.appendChild(img);
+        faceSpace.appendChild(wrapper);
+        faceColumn.append(nameLabel, faceSpace);
+        return faceColumn;
+    }
+
+    _renderConversationMessage(busho, message) {
         if (!this.body) return;
         this.body.className = 'interview-session-body interview-session-conversation-view';
         this.body.replaceChildren();
+
+        const dialogBody = document.createElement('div');
+        dialogBody.className = 'dialog-body-container interview-session-dialog-body';
+        dialogBody.appendChild(this._createConversationFace(busho || this.currentSpeaker));
+
         const messageArea = document.createElement('div');
         messageArea.className = 'message-area interview-session-message-area';
         messageArea.innerHTML = message || '';
-        this.body.appendChild(messageArea);
+        dialogBody.appendChild(messageArea);
+        this.body.appendChild(dialogBody);
     }
 
     showMenu(busho, message, choices, onBack) {
+        this._clearMessageAdvance();
         this._ensureOpen();
         this._setHeader('面談', '話したい内容を選んでください。');
         this._setSpeaker(busho);
         if (this.pager) this.pager.classList.add('hidden');
-        this._renderConversationMessage(message);
+        this._renderConversationMessage(busho, message);
         this._renderInlineActions(choices);
         this._renderFooterActions(onBack ? [
-            { label: '戻る', onClick: onBack, className: 'btn-secondary' }
+            { label: '戻る', onClick: onBack, className: 'btn-secondary', sound: 'cancel.ogg' }
         ] : []);
     }
 
     showPrompt(busho, message, choices, title = '面談') {
+        this._clearMessageAdvance();
         this._ensureOpen();
         this._setHeader(title, '');
         this._setSpeaker(busho);
         if (this.pager) this.pager.classList.add('hidden');
-        this._renderConversationMessage(message);
+        this._renderConversationMessage(busho, message);
         this._renderInlineActions([]);
         this._renderFooterActions(choices);
     }
@@ -417,24 +482,18 @@ class InterviewView {
 
         let index = 0;
         const render = () => {
-            const isLast = index >= queue.length - 1;
             this._setHeader(title, queue.length > 1 ? `${index + 1} / ${queue.length}` : '');
-            this._renderConversationMessage(queue[index]);
+            this._renderConversationMessage(busho, queue[index]);
             this._renderInlineActions([]);
-            this._renderFooterActions([
-                {
-                    label: isLast ? '戻る' : '次へ',
-                    className: isLast ? 'btn-secondary' : 'btn-primary',
-                    onClick: () => {
-                        if (isLast) {
-                            if (onDone) onDone();
-                        } else {
-                            index += 1;
-                            render();
-                        }
-                    }
+            this._renderFooterActions([]);
+            this._setMessageAdvance(() => {
+                if (index >= queue.length - 1) {
+                    if (onDone) onDone();
+                    return;
                 }
-            ]);
+                index += 1;
+                render();
+            });
         };
         render();
     }

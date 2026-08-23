@@ -3726,7 +3726,7 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
    面談専用モーダル
    - PCは16:9、スマホは9:16のゲーム画面内で固定
    - 内部スクロールは禁止し、一覧は検索・ソート＋ページ切替で処理する
-   - 会話本文は共通 .message-area を再利用する
+   - 会話は通常会話と同じ「顔＋名前＋ .message-area」の文法を使う
    ========================================================= */
 #interview-modal {
     z-index: 8420;
@@ -3774,49 +3774,38 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     flex: 1 1 auto;
     min-height: 0;
     display: grid;
-    grid-template-columns: 285px minmax(0, 1fr);
+    grid-template-columns: 250px minmax(0, 1fr);
     gap: 14px;
     overflow: hidden;
 }
 
-/* 面談中の人物情報。忠誠・義理・野望・相性は面談で探る情報なので表示しない。 */
-.interview-session-face-panel {
+/* 面談中に常時見せる既知情報。顔は通常会話と同じくメッセージ側だけに置く。 */
+.interview-session-summary-panel {
     min-width: 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
-    gap: 12px;
+    gap: 10px;
     padding: 14px;
     border: 1px solid rgba(212,175,55,.34);
     background: rgba(0,0,0,.18);
     overflow: hidden;
 }
 
-.interview-session-portrait-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+.interview-session-summary-head {
     min-width: 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(212,175,55,.24);
 }
-
-.interview-session-face {
-    width: 118px;
-    height: 144px;
-    flex: 0 0 auto;
-    object-fit: cover;
-    border: 2px solid rgba(212,175,55,.62);
-    background: #111;
+.interview-session-summary-caption {
+    margin-bottom: 3px;
+    color: rgba(232,207,130,.72);
+    font-size: 10px;
+    letter-spacing: .08em;
 }
-
-.interview-session-person-head {
-    min-width: 0;
-    flex: 1 1 auto;
-}
-
 .interview-session-name {
-    margin: 0 0 10px;
     max-width: 100%;
     font-size: 20px;
     font-weight: 700;
@@ -3860,7 +3849,15 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 }
 
 .interview-session-stat-label { font-size: 11px; color: rgba(255,255,255,.68); }
-.interview-session-stat-value { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.interview-session-stat-value {
+    min-width: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    font-size: 17px;
+    font-weight: 700;
+}
+.interview-session-stat-value .grade-container { font-size: 1em; }
 
 .interview-session-body {
     min-width: 0;
@@ -3976,20 +3973,55 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 
 .interview-session-conversation-view {
     display: flex;
-    align-items: flex-start;
+    align-items: flex-end;
     justify-content: stretch;
-    padding: 0;
+    padding: 0 0 6px;
 }
 
-/* 会話ウインドウは既存の .message-area をそのまま使い、面談側では寸法だけ調整する。 */
-.interview-session-message-area {
-    flex: 0 0 auto;
+/* 通常会話と同じ顔列＋message-area。面談独自の顔カードは作らない。 */
+.interview-session-dialog-body {
     width: 100%;
+    position: relative;
+    align-items: center;
+}
+.interview-session-dialog-face-column {
+    position: relative;
+    justify-content: flex-end;
+    padding-top: 26px;
+}
+.interview-session-dialog-name-label {
+    top: 0;
+    left: 0;
+    right: auto;
+    max-width: 118px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.interview-session-dialog-face-space {
+    min-height: 85px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.interview-session-message-area {
     min-height: 132px;
     max-height: 190px;
     overflow: hidden;
     font-size: 1.1rem;
     line-height: 1.6;
+}
+
+/* 普通の会話と同じく、選択肢のない台詞は画面タップで進行する。 */
+#interview-modal.interview-message-advance { cursor: pointer; }
+#interview-modal.interview-message-advance .interview-session-message-area::after {
+    content: "▼";
+    position: absolute;
+    bottom: 4px;
+    right: 8px;
+    color: #ffd54f;
+    font-size: .8rem;
+    animation: fw-blink 1.5s infinite;
+    pointer-events: none;
 }
 
 .interview-session-pager {
@@ -4051,24 +4083,37 @@ body:not(.is-pc) .interview-session-hint { min-height: 13px; font-size: 8px; }
 
 body:not(.is-pc) .interview-session-main {
     grid-template-columns: 1fr;
-    grid-template-rows: 154px minmax(0, 1fr);
+    grid-template-rows: 112px minmax(0, 1fr);
     gap: 5px;
 }
 
-body:not(.is-pc) .interview-session-face-panel {
+body:not(.is-pc) .interview-session-summary-panel {
     height: auto;
-    gap: 5px;
+    display: grid;
+    grid-template-columns: minmax(0, .95fr) minmax(0, 1.25fr);
+    grid-template-rows: auto 1fr;
+    gap: 3px 6px;
     padding: 5px 7px;
 }
-body:not(.is-pc) .interview-session-portrait-row { gap: 8px; min-height: 82px; }
-body:not(.is-pc) .interview-session-face { width: 68px; height: 82px; }
-body:not(.is-pc) .interview-session-name { margin: 0 0 4px; font-size: 15px; }
-body:not(.is-pc) .interview-session-meta { gap: 1px; }
+body:not(.is-pc) .interview-session-summary-head {
+    grid-column: 1;
+    grid-row: 1;
+    padding-bottom: 3px;
+}
+body:not(.is-pc) .interview-session-summary-caption { font-size: 7px; margin-bottom: 1px; }
+body:not(.is-pc) .interview-session-name { font-size: 14px; }
+body:not(.is-pc) .interview-session-meta { grid-column: 1; grid-row: 2; gap: 1px; }
 body:not(.is-pc) .interview-session-meta-row { font-size: 8px; }
-body:not(.is-pc) .interview-session-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; }
-body:not(.is-pc) .interview-session-stat { min-height: 25px; padding: 2px 4px; }
+body:not(.is-pc) .interview-session-stats {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 3px;
+    align-content: center;
+}
+body:not(.is-pc) .interview-session-stat { min-height: 29px; padding: 2px 4px; }
 body:not(.is-pc) .interview-session-stat-label { font-size: 7px; }
-body:not(.is-pc) .interview-session-stat-value { font-size: 11px; }
+body:not(.is-pc) .interview-session-stat-value { min-width: 18px; font-size: 10px; }
 body:not(.is-pc) .interview-session-content.speaker-hidden .interview-session-main { grid-template-rows: minmax(0, 1fr); }
 
 body:not(.is-pc) .interview-session-list-view { gap: 4px; }
@@ -4106,10 +4151,31 @@ body:not(.is-pc) .interview-session-person {
 body:not(.is-pc) .interview-session-person-face { width: 38px; height: 46px; }
 body:not(.is-pc) .interview-session-person-name { font-size: 9px; }
 
+body:not(.is-pc) .interview-session-conversation-view { padding-bottom: 3px; }
+body:not(.is-pc) .interview-session-dialog-body { gap: 8px; }
+body:not(.is-pc) .interview-session-dialog-face-column {
+    width: 75px;
+    padding-top: 22px;
+}
+body:not(.is-pc) .interview-session-dialog-name-label {
+    top: 0;
+    left: 0;
+    max-width: 86px;
+    font-size: .78rem;
+    padding: 2px 7px;
+}
+body:not(.is-pc) .interview-session-dialog-face-space,
+body:not(.is-pc) .interview-session-dialog-face-space .dialog-face-wrapper,
+body:not(.is-pc) .interview-session-dialog-face-space .dialog-face-img {
+    width: 68px;
+    height: 68px;
+    min-height: 68px;
+    flex-basis: 68px;
+}
 body:not(.is-pc) .interview-session-message-area {
-    min-height: 106px;
+    min-height: 102px;
     max-height: 138px;
-    font-size: 0.9rem;
+    font-size: .9rem;
     line-height: 1.55;
 }
 

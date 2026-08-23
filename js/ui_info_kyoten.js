@@ -222,7 +222,6 @@ Object.assign(UIInfoManager.prototype, {
             if (btnKunishu && kunishuCount > 0) {
                 btnKunishu.onclick = (e) => {
                     e.stopPropagation();
-                    if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                     this.showKunishuList(kunishus, castle);
                 };
             }
@@ -231,7 +230,6 @@ Object.assign(UIInfoManager.prototype, {
             if (btnBusho && bushoCount > 0) {
                 btnBusho.onclick = (e) => {
                     e.stopPropagation();
-                    if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                     this.openBushoSelector('view_only', null, { 
                         customBushos: targetBushos,
                         customInfoHtml: `<div>${castle.name} 滞在武将</div>`

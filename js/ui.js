@@ -322,9 +322,6 @@ class UIManager {
 
             const text = btn.textContent.trim();
             
-            // 個別に音を鳴らす設定をしたボタンは、共通の「decision.ogg」をキャンセルします
-            if (["一括", "直轄", "委任", "不可", "許可"].includes(text)) return;
-
             if (window.AudioManager) {
                 if (text === "処断する") {
                     window.AudioManager.playSE('zangeki001.ogg');
