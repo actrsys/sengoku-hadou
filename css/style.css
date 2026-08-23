@@ -440,6 +440,10 @@ body:not(.is-pc) #map-base-image { transform: translateZ(0); backface-visibility
 /* =========================================================
    年月・浪人・米相場のフローティング表示
    ========================================================= */
+#map-floating-status {
+    display: contents;
+}
+
 #mobile-floating-info { 
     position: absolute; bottom: 20px; left: 10px; 
     display: flex; flex-direction: column; gap: 6px; 
@@ -471,9 +475,6 @@ body:not(.is-pc) #map-base-image { transform: translateZ(0); backface-visibility
     box-sizing: border-box;
     text-align: center;
     font-variant-numeric: tabular-nums;
-}
-#mobile-floating-market .floating-market:last-child {
-    width: 180px;
 }
 
 #map-guide { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 8px 20px; border-radius: 20px; pointer-events: none; z-index: 600; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
@@ -3290,21 +3291,26 @@ body.is-pc {
     /* PC版：マップの周りの余白をタイトル画面と同じ色に塗りつぶす魔法 */
     #map-wrapper { background: linear-gradient(135deg, #263238 0%, #37474f 100%); }
     
-    /* PC版：年月、浪人、米相場を右上に横並びで配置 */
-    #mobile-floating-info { 
-        top: 20px; 
-        bottom: auto; 
-        left: auto; 
-        right: 280px; /* 計算して割り出した、ピッタリの位置です */
-        flex-direction: row; 
+    /* PC版：3項目を1つの右寄せFlexグループにし、項目間隔をgapだけで管理する */
+    #map-floating-status {
+        position: absolute;
+        top: 20px;
+        right: 30px;
+        z-index: 500;
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: flex-end;
+        gap: 15px;
+        pointer-events: none;
     }
-    #mobile-floating-market { 
-        top: 20px; 
-        bottom: auto;
-        left: auto;
-        right: 30px; 
-        flex-direction: row; 
-        gap: 15px; /* 浪人と米相場の間の隙間を15pxに固定します */
+    #mobile-floating-info,
+    #mobile-floating-market {
+        position: static;
+        display: flex;
+        flex-direction: row;
+        gap: 15px;
+        z-index: auto;
     }
 
     /* ダンボール箱に閉じ込める魔法 */

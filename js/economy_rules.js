@@ -241,8 +241,12 @@ class EconomyRules {
      * 米相場の表示。marketRate は「金1で得られる兵糧量」を表す。
      * 例: 2.0 なら 金1＝兵糧2.0。
      */
+    static formatRiceMarketValue(rate) {
+        return Number(rate || 0).toFixed(1);
+    }
+
     static formatRiceMarketRate(rate) {
-        return `金1＝兵糧${Number(rate || 0).toFixed(1)}`;
+        return `金1＝兵糧${this.formatRiceMarketValue(rate)}`;
     }
 
     /**
