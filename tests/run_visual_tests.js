@@ -456,6 +456,12 @@ async function validateCommandAndInterviewStates(cdp) {
             const content = document.getElementById('interview-session-content');
             const footer = document.getElementById('interview-session-footer');
             const inline = document.querySelector('.interview-session-inline-btn');
+            const stage = document.querySelector('.interview-session-stage').getBoundingClientRect();
+            const inlineBox = document.getElementById('interview-session-inline-actions').getBoundingClientRect();
+            const conversation = document.querySelector('.interview-session-conversation-frame');
+            const conversationRect = conversation.getBoundingClientRect();
+            const nameRect = document.querySelector('.interview-session-dialog-name-label').getBoundingClientRect();
+            const conversationStyle = getComputedStyle(conversation);
             const r = content.getBoundingClientRect();
             const fr = footer.getBoundingClientRect();
             const cs = getComputedStyle(content);
@@ -470,6 +476,11 @@ async function validateCommandAndInterviewStates(cdp) {
                 footerOutside: footer.parentElement === document.getElementById('interview-modal') && !content.contains(footer),
                 standardInsideButtons: content.querySelectorAll('.btn-primary, .btn-secondary, .btn-danger').length,
                 inlineUsesDetailButton: inline && inline.classList.contains('daimyo-detail-action-btn'),
+                stage: {top:stage.top,bottom:stage.bottom},
+                inlineBox: {top:inlineBox.top,bottom:inlineBox.bottom},
+                conversation: {top:conversationRect.top,bottom:conversationRect.bottom},
+                name: {top:nameRect.top,bottom:nameRect.bottom,left:nameRect.left},
+                conversationBorder: conversationStyle.borderTopStyle,
                 overflowY: cs.overflowY,
                 scrollHeight: content.scrollHeight,
                 clientHeight: content.clientHeight
@@ -488,6 +499,10 @@ async function validateCommandAndInterviewStates(cdp) {
     assert.strictEqual(pc.footerOutside, true, 'PC面談の戻る/決定系ボタンは内容枠の外へ置く');
     assert.strictEqual(pc.standardInsideButtons, 0, 'PC面談の内容枠内に標準決定/キャンセルボタンを置かない');
     assert.strictEqual(pc.inlineUsesDetailButton, true, 'PC面談の内容内操作は詳細画面系ボタンを使う');
+    assert.ok(pc.stage.bottom - pc.conversation.bottom <= 8, `PC面談の会話枠はステージ下部へ寄せる (${pc.stage.bottom - pc.conversation.bottom})`);
+    assert.ok(pc.inlineBox.bottom < pc.conversation.top && pc.conversation.top - pc.inlineBox.bottom >= 14, `PC面談の選択肢は会話枠の少し上へ置く (${pc.conversation.top - pc.inlineBox.bottom})`);
+    assert.ok(pc.name.top < pc.conversation.top && pc.name.bottom > pc.conversation.top, 'PC面談の人物名は会話枠上辺へ重ねる');
+    assert.notStrictEqual(pc.conversationBorder, 'none', 'PC面談の会話部分は外枠で一体化する');
     assert.ok(pc.footer.top - pc.rect.bottom >= 14 && pc.footer.top - pc.rect.bottom <= 16, `PC面談の内容枠と外側ボタンの隙間は15px基準 (${pc.footer.top - pc.rect.bottom})`);
 
     await cdp.call('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 1, mobile: true });
@@ -503,8 +518,11 @@ async function validateCommandAndInterviewStates(cdp) {
             const r = content.getBoundingClientRect();
             const fr = footer.getBoundingClientRect();
             const cs = getComputedStyle(content);
+            const stage = document.querySelector('.interview-session-stage').getBoundingClientRect();
             const actionBox = document.getElementById('interview-session-inline-actions').getBoundingClientRect();
             const action = document.querySelector('.interview-session-inline-btn').getBoundingClientRect();
+            const conversation = document.querySelector('.interview-session-conversation-frame').getBoundingClientRect();
+            const name = document.querySelector('.interview-session-dialog-name-label').getBoundingClientRect();
             const message = document.querySelector('.interview-session-message-area').getBoundingClientRect();
             const footerButton = footer.querySelector('button').getBoundingClientRect();
             const metaAlign = getComputedStyle(document.querySelector('.interview-session-meta-row')).textAlign;
@@ -518,7 +536,11 @@ async function validateCommandAndInterviewStates(cdp) {
                 scrollHeight:content.scrollHeight,
                 clientHeight:content.clientHeight,
                 actionHeight:action.height,
-                actionBottom:actionBox.bottom, messageTop:message.top, metaAlign,
+                stageBottom:stage.bottom,
+                actionBottom:actionBox.bottom,
+                conversationTop:conversation.top, conversationBottom:conversation.bottom,
+                nameTop:name.top, nameBottom:name.bottom,
+                messageTop:message.top, metaAlign,
                 footerButtonHeight:footerButton.height
             };
         })()`,
@@ -531,6 +553,9 @@ async function validateCommandAndInterviewStates(cdp) {
     assert.strictEqual(mobile.overflowY, 'hidden', 'スマホ面談枠をスクロール領域にしない');
     assert.ok(mobile.scrollHeight <= mobile.clientHeight + 3, 'スマホ面談内容が枠をはみ出している');
     assert.ok(mobile.actionHeight >= 27, 'スマホ面談内操作ボタンが小さすぎる');
+    assert.ok(mobile.stageBottom - mobile.conversationBottom <= 6, `スマホ面談の会話枠はステージ下部へ寄せる (${mobile.stageBottom - mobile.conversationBottom})`);
+    assert.ok(mobile.actionBottom < mobile.conversationTop && mobile.conversationTop - mobile.actionBottom >= 12, `スマホ面談の選択肢は会話枠の少し上へ置く (${mobile.conversationTop - mobile.actionBottom})`);
+    assert.ok(mobile.nameTop < mobile.conversationTop && mobile.nameBottom > mobile.conversationTop, 'スマホ面談の人物名は会話枠上辺へ重ねる');
     assert.ok(mobile.actionBottom <= mobile.messageTop + 1, '面談の会話選択肢は会話本文より上に置く');
     assert.strictEqual(mobile.metaAlign, 'left', '面談相手の所在・身分・年齢は左揃えにする');
     assert.strictEqual(mobile.footerOutside, true, 'スマホ面談の戻る/決定系ボタンは内容枠の外へ置く');

@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r102');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r103');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2090,6 +2090,9 @@ test('面談は専用View内で完結し16:9/9:16固定・非スクロールで�
     assert.ok(html.includes('js/busho_list_sort_rules.js'), '面談と武将一覧で共通ソート規則を読み込む');
     assert.ok(view.includes("messageArea.className = 'message-area interview-session-message-area'"), '面談会話は既存message-areaを再利用する');
     assert.ok(view.includes("dialogBody.className = 'dialog-body-container interview-session-dialog-body'"), '面談会話は通常会話と同じ顔＋メッセージの一体レイアウトを使う');
+    assert.ok(view.includes("conversationFrame.className = 'interview-session-conversation-frame'"), '面談モーダル内では会話部分を専用の薄い外枠でまとめる');
+    assert.ok(css.includes('.interview-session-content.interview-conversation-active .interview-session-inline-actions') && css.includes('margin-top: auto'), '面談の選択肢＋会話はモーダル下部へ寄せる');
+    assert.ok(css.includes('.interview-session-dialog-name-label') && css.includes('top: -18px') && css.includes('left: 20px'), 'PC面談の人物名は通常会話と同じく会話枠上辺へ重ねる');
     assert.ok(html.includes('id="interview-session-summary-panel"') && !html.includes('id="interview-session-face-panel"'), '上部サマリーへ顔を重複表示しない');
     assert.ok(view.includes('StatPresenter.getDisplayStatHTML(busho, key'), '面談能力は武将一覧・詳細と同じランク表示を使う');
     assert.ok(!view.includes('valueEl.textContent = Number(busho[key]'), '面談で能力の内部数値を表示しない');

@@ -467,6 +467,11 @@ class InterviewView {
         this.body.className = `interview-session-body interview-session-conversation-view${narration ? ' interview-session-narration-view' : ''}`;
         this.body.replaceChildren();
 
+        // 通常会話と同じく、人物名は会話枠の上辺へ重ねる。
+        // 面談ではさらに一段外側の枠を用意し、顔＋本文を一つの会話ユニットとして下部へ固定する。
+        const conversationFrame = document.createElement('div');
+        conversationFrame.className = 'interview-session-conversation-frame';
+
         const dialogBody = document.createElement('div');
         dialogBody.className = 'dialog-body-container interview-session-dialog-body';
         if (!narration) dialogBody.appendChild(this._createConversationFace(busho || this.currentSpeaker));
@@ -475,7 +480,8 @@ class InterviewView {
         messageArea.className = 'message-area interview-session-message-area';
         messageArea.innerHTML = message || '';
         dialogBody.appendChild(messageArea);
-        this.body.appendChild(dialogBody);
+        conversationFrame.appendChild(dialogBody);
+        this.body.appendChild(conversationFrame);
     }
 
     showMenu(busho, message, choices, onBack) {
