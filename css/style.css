@@ -3558,13 +3558,6 @@ body.is-pc .pc-cmd-col .cmd-btn:last-child {
     margin-bottom: 0;
 }
 
-/* 開いているメニューを光らせて分かりやすくする魔法 */
-body.is-pc .pc-cmd-col .cmd-btn.category.active {
-    background: linear-gradient(135deg, #7e9d93 0%, #b4ccc5 100%);
-    color: #ffffff;
-    border-color: #d4af37 #fae8ad #fffcf0 #fae8ad;
-    box-shadow: inset 0 0 0 1px rgba(0, 50, 40, 0.6), inset 0 2px 6px rgba(0,0,0,0.5), 0 0px 0px rgba(0,0,0,0);
-}
 
 /* 大名選択画面では非表示にします */
 body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
@@ -3782,18 +3775,24 @@ body:not(.is-pc) .interview-dialog-modal .modal-footer {
     padding: 10px 15px 10px 45px;
     border: 2px solid #5a4a32;
     border-radius: 25px; /* 完全に丸みのある形状 */
-    background: linear-gradient(to bottom, #3e3a36 0%, #2b2824 100%);
+    /* 背景色を常に不透明で保持する。gradientだけの背景はbackground-colorがtransparentになるため、
+       押下時の背景切替とtransitionが重なると中身だけ透けるフレームが発生する。 */
+    background-color: #2b2824;
+    background-image: linear-gradient(to bottom, #3e3a36 0%, #2b2824 100%);
     color: #f1f1f1;
     font-size: 0.95rem; /* メッセージフォントに近いサイズ感 */
     font-family: inherit;
     text-align: left !important;
     cursor: pointer;
     box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    transition: all 0.2s;
+    transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease, color 0.12s ease;
     display: block;
     width: 100%;
     box-sizing: border-box;
     text-shadow: 1px 1px 1px #000;
+    -webkit-appearance: none;
+    appearance: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .interview-choice-btn::before {
@@ -3825,14 +3824,16 @@ body:not(.is-pc) .interview-dialog-modal .modal-footer {
 }
 
 .interview-choice-btn:hover {
-    background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%);
+    background-color: #2a5a36;
+    background-image: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%);
     border-color: #ffe066;
     transform: translateY(-1px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.6), 0 0 10px rgba(212, 175, 55, 0.2);
 }
 
 .interview-choice-btn:active {
-    background: #0d1a10;
+    background-color: #0d1a10;
+    background-image: linear-gradient(to bottom, #1c3424 0%, #0d1a10 100%);
     transform: translateY(1px);
     box-shadow: inset 0 2px 5px rgba(0,0,0,0.8);
 }
@@ -4780,15 +4781,28 @@ body.is-pc #pc-new-status-panel,
         0 3px 5px rgba(0,0,0,0.42);
 }
 
+/* PC版：右側に子コマンドを開いている親は、hoverとは別の固定された「選択中」表示にする。 */
 body.is-pc .pc-cmd-col .cmd-btn.category.active {
-    background: linear-gradient(135deg, #91b7aa 0%, #d0e0da 100%);
-    border-color: #fff7d5 #ffe49a #e2bd54 #ffe49a;
+    background: linear-gradient(135deg, #315e4c 0%, #456f5e 100%);
+    color: #fffdf2;
+    border-color: #fff1aa #e0b84c #9b6d13 #e0b84c;
     box-shadow:
-        inset 0 0 0 1px rgba(0,50,40,0.34),
-        0 0 0 2px rgba(255,239,180,0.48),
-        0 0 16px rgba(255,213,79,0.34),
-        0 3px 6px rgba(0,0,0,0.34);
-    transform: translateY(-1px);
+        inset 4px 0 0 #d4af37,
+        inset 0 0 0 1px rgba(255,226,126,0.24),
+        inset 0 3px 7px rgba(0,0,0,0.55),
+        0 0 7px rgba(212,175,55,0.35);
+    text-shadow:
+        1px 1px 0 #0a2118, -1px -1px 0 #0a2118,
+        1px -1px 0 #0a2118, -1px 1px 0 #0a2118,
+        0 2px 2px rgba(0,0,0,0.8);
+    transform: none;
+}
+body.is-pc .pc-cmd-col .cmd-btn.category.active::after {
+    border-top-color: #ffd75a;
+    border-right-color: #ffd75a;
+    filter:
+        drop-shadow(1px 1px 0 #3b2b00)
+        drop-shadow(0 0 3px rgba(255,215,90,0.8));
 }
 
 .btn-primary:not(.floating-back-btn),

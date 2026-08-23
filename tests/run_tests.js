@@ -2019,5 +2019,25 @@ test('セーブデータから一門派生キャッシュを除外する', () =>
     assert.ok(!Object.prototype.hasOwnProperty.call(saved, 'familyIds'));
 });
 
+
+test('PC入れ子コマンドの選択中表示はhoverと明確に区別する', () => {
+    const css = read('css/style.css');
+    assert.ok(css.includes('body.is-pc .pc-cmd-col .cmd-btn.category.active'));
+    assert.ok(css.includes('inset 4px 0 0 #d4af37'), '選択中の親コマンドは左端の金帯で識別する');
+    assert.ok(css.includes('body.is-pc .pc-cmd-col .cmd-btn.category.active::after'), '選択中の階層矢印も強調する');
+});
+
+test('面談選択肢は押下中も不透明背景を維持しbackgroundをtransitionしない', () => {
+    const css = read('css/style.css');
+    const base = css.match(/\.interview-choice-btn \{([\s\S]*?)\n\}/);
+    const active = css.match(/\.interview-choice-btn:active \{([\s\S]*?)\n\}/);
+    assert.ok(base && active);
+    assert.ok(base[1].includes('background-color: #2b2824'));
+    assert.ok(base[1].includes('background-image: linear-gradient'));
+    assert.ok(!base[1].includes('transition: all'), 'background-colorをtransparentから補間させない');
+    assert.ok(active[1].includes('background-color: #0d1a10'));
+    assert.ok(active[1].includes('background-image: linear-gradient'));
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

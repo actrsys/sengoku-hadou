@@ -435,6 +435,72 @@ async function validateLegionCouncil(cdp) {
     console.log('  PC 16:9／スマホ9:16の固定画面内に、評定一覧・命令画面ともスクロールなしで収まることを確認しました');
 }
 
+
+async function validateCommandAndInterviewStates(cdp) {
+    const html = fixtureHtml('command_interview_states.html');
+    await cdp.call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+    await cdp.call('Runtime.evaluate', {
+        expression: `document.open();document.write(${JSON.stringify(html)});document.close();true`,
+        returnByValue: true,
+        awaitPromise: true
+    });
+    await new Promise(resolve => setTimeout(resolve, 80));
+
+    let result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            const normal = document.getElementById('cmd-normal');
+            const active = document.getElementById('cmd-active');
+            const normalStyle = getComputedStyle(normal);
+            const activeStyle = getComputedStyle(active);
+            const arrow = getComputedStyle(active, '::after');
+            const choice = document.getElementById('interview-choice');
+            const choiceStyle = getComputedStyle(choice);
+            const r = choice.getBoundingClientRect();
+            return {
+                normalBg: normalStyle.backgroundImage,
+                activeBg: activeStyle.backgroundImage,
+                activeShadow: activeStyle.boxShadow,
+                activeArrowTop: arrow.borderTopColor,
+                activeArrowRight: arrow.borderRightColor,
+                choiceBg: choiceStyle.backgroundColor,
+                choiceTransition: choiceStyle.transitionProperty,
+                choiceRect: {left:r.left,top:r.top,right:r.right,bottom:r.bottom}
+            };
+        })()`,
+        returnByValue: true
+    });
+    const initial = result.result.value;
+    assert.notStrictEqual(initial.activeBg, initial.normalBg, 'PCの選択中親コマンドは通常状態と背景を明確に変える');
+    assert.ok(initial.activeShadow.includes('rgb(212, 175, 55)') || initial.activeShadow.includes('rgba(212, 175, 55'), 'PCの選択中親コマンドは金帯を持つ');
+    assert.strictEqual(initial.activeArrowTop, 'rgb(255, 215, 90)', '選択中の階層矢印を金色にする');
+    assert.strictEqual(initial.activeArrowRight, 'rgb(255, 215, 90)', '選択中の階層矢印を金色にする');
+    assert.ok(!initial.choiceTransition.split(',').map(x => x.trim()).some(x => x === 'background' || x === 'background-color' || x === 'all'), '面談ボタンは背景をtransitionしない');
+
+    const cx = (initial.choiceRect.left + initial.choiceRect.right) / 2;
+    const cy = (initial.choiceRect.top + initial.choiceRect.bottom) / 2;
+    await cdp.call('Input.dispatchMouseEvent', { type:'mouseMoved', x:cx, y:cy });
+    await cdp.call('Input.dispatchMouseEvent', { type:'mousePressed', x:cx, y:cy, button:'left', clickCount:1 });
+    await new Promise(resolve => setTimeout(resolve, 16));
+    result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            const cs = getComputedStyle(document.getElementById('interview-choice'));
+            return {backgroundColor:cs.backgroundColor, backgroundImage:cs.backgroundImage, opacity:cs.opacity};
+        })()`,
+        returnByValue: true
+    });
+    const pressed = result.result.value;
+    await cdp.call('Input.dispatchMouseEvent', { type:'mouseReleased', x:cx, y:cy, button:'left', clickCount:1 });
+    const m = pressed.backgroundColor.match(/rgba?\(([^)]+)\)/);
+    assert.ok(m, `面談ボタンの押下背景色を取得できません (${pressed.backgroundColor})`);
+    const parts = m[1].split(',').map(v => Number(v.trim()));
+    const alpha = parts.length >= 4 ? parts[3] : 1;
+    assert.strictEqual(alpha, 1, `面談ボタンは押下中も完全不透明である必要があります (${pressed.backgroundColor})`);
+    assert.strictEqual(Number(pressed.opacity), 1, '面談ボタン本体のopacityを押下で落とさない');
+    assert.notStrictEqual(pressed.backgroundImage, 'none', '押下中も不透明背景の上にグラデーションを維持する');
+
+    console.log('✓ PC入れ子コマンド選択状態・面談押下不透明 visual regression');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -491,6 +557,7 @@ async function main() {
         console.log('✓ PC武将能力ゲージ visual/layout regression');
         console.log('  80/100/110/120 の幅・高さ・限界突破・右列非侵入を実ブラウザで確認しました');
         await validateLegionCouncil(cdp);
+        await validateCommandAndInterviewStates(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');
