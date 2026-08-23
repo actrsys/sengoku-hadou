@@ -1899,30 +1899,34 @@ test('古いスマホ向け地図演出は城領域boundsと低解像度帯描�
     assert.ok(fs.existsSync(path.join(ROOT, 'data/images/map/japan_map_mobile.png')));
 });
 
-test('モーダル中はスマホの非必須地図Canvasを解放し勢力色消失を自己回復する', () => {
+test('スマホの一時資源解放では継続表示レイヤーの勢力色と雪を保持する', () => {
     const ui = read('js/ui.js');
     const map = read('js/ui_map.js');
     const css = read('css/style.css');
     assert.ok(ui.includes('this.releaseMobileTransientMapResources()'));
     assert.ok(ui.includes('this.recoverMobileMapResources()'));
-    assert.ok(map.includes("['province-overlay', 'hover-blink-overlay', 'keep-blink-overlay', 'snow-overlay']"));
+    assert.ok(map.includes("['province-overlay', 'hover-blink-overlay', 'keep-blink-overlay']"));
+    const releaseStart = map.indexOf('releaseMobileTransientMapResources()');
+    const releaseEnd = map.indexOf('_isClanColorOverlayHealthy()', releaseStart);
+    const releaseBlock = map.slice(releaseStart, releaseEnd);
+    assert.ok(!releaseBlock.includes("'snow-overlay'"), '雪はAI進行やモーダル表示をまたいで保持する');
     assert.ok(map.includes('_isClanColorOverlayHealthy()'));
-    assert.ok(map.includes("ctx.getImageData(x, y, 1, 1).data[3] > 0"), '復帰時の確認は1pixelだけ読む');
+    assert.ok(map.includes("ctx.getImageData(x, y, 1, 1).data[3] > 0"), '勢力色だけは復帰時に1pixel確認する');
     assert.ok(map.includes("canvas.addEventListener('contextlost'"));
     assert.ok(css.includes('body:not(.is-pc).mobile-memory-guard .castle-card'));
 });
 
-test('雪Canvasは描画失敗やbacking store消失後にキャッシュを無効化して自己回復する', () => {
+test('雪CanvasはAI思考中も保持・更新し、getImageDataで読み戻さない', () => {
     const map = read('js/ui_map.js');
-    const snowStart = map.indexOf('updateSnowOverlay()');
+    const snowStart = map.indexOf('    updateSnowOverlay() {');
     const snowEnd = map.indexOf('// ==========================================\n    // ★新魔法：国を勢力の色で塗りつぶす魔法です！', snowStart);
     const snowBlock = map.slice(snowStart, snowEnd);
-    assert.ok(map.includes('_isSnowOverlayHealthy(expectedHash = null)'));
-    assert.ok(map.includes("ctx.getImageData(probe.x, probe.y, 1, 1).data[3] > 0"), '雪Canvasも1pixelだけで内容喪失を検出する');
+    assert.ok(!map.includes('_isSnowOverlayHealthy('));
+    assert.ok(!map.includes('getImageData(probe.x, probe.y'), '雪Canvasのreadbackを行わない');
     assert.ok(snowBlock.includes('const painted = this._paintCanvasByStrips(overlay'));
-    assert.ok(snowBlock.includes('if (!painted || !snowProbe)'));
-    assert.ok(snowBlock.includes('this._isSnowOverlayHealthy(currentSnowHash)'));
-    assert.ok(map.includes("sc.addEventListener('touchend', recoverSnowAfterTouch"), 'スマホ操作後にも軽量な自己回復チェックを行う');
+    assert.ok(snowBlock.includes('if (!painted)'));
+    assert.ok(!snowBlock.includes('this.game.isProcessingAI'), 'AI思考中を理由に雪更新を止めない');
+    assert.ok(map.includes("sc.addEventListener('touchend', resetPinch"), 'タッチ終了時に雪のreadbackを挟まない');
 });
 
 test('月初寿命再計算とAI作戦は古いスマホで協調分割する', () => {
