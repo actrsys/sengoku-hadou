@@ -2076,6 +2076,35 @@ test('面談は専用View内で完結し16:9/9:16固定・非スクロールで�
     assert.ok(view.includes("button.className = 'daimyo-detail-action-btn interview-session-inline-btn'"), '面談内容内操作は詳細画面系ボタンを使う');
     assert.ok(view.includes('_renderFooterActions'), '面談の外側フッター操作をViewで分離する');
     assert.ok(!css.includes('body.interview-mode'), '旧ふすま背景の状態管理を残さない');
+    assert.ok(html.includes('js/busho_list_sort_rules.js'), '面談と武将一覧で共通ソート規則を読み込む');
+    assert.ok(view.includes("messageArea.className = 'message-area interview-session-message-area'"), '面談会話は既存message-areaを再利用する');
+    assert.ok(view.includes("['統率', 'leadership']") && view.includes("['魅力', 'charm']"), '面談相手の既知能力を人物サマリーに出す');
+    assert.ok(!view.includes('loyalty'), '面談Viewで忠誠数値を表示・ソートしない');
+    const sortRules = read('js/busho_list_sort_rules.js');
+    assert.ok(sortRules.includes('getInterviewSortOptions()'));
+    assert.ok(!sortRules.includes("{ key: 'loyalty'"), '面談の並び替え候補に忠誠を入れない');
+    const bushoUi = read('js/ui_info_busho.js');
+    assert.ok(bushoUi.includes("BushoListSortRules.compareKnown(this.game, a, b, 'name'"), '元の武将一覧も名前ソートの共通規則を使う');
+    assert.ok(bushoUi.includes("BushoListSortRules.compareKnown(this.game, a, b, 'castle'"), '元の武将一覧も所在ソートの共通規則を使う');
+});
+
+test('武将一覧共通ソートは面談用検索と既知能力順を安定して処理する', () => {
+    const ctx = createContext({ BushoStatusRules: { isRonin: () => false } });
+    loadScript(ctx, 'js/busho_list_sort_rules.js');
+    const game = {
+        castles: [{ id: 1, name: '清洲城', yomi: 'きよす' }, { id: 2, name: '岡崎城', yomi: 'おかざき' }],
+        clans: [],
+        legions: [],
+        getCastle(id) { return this.castles.find(c => c.id === id); }
+    };
+    const list = [
+        { id: 2, name: '佐久間信盛', yomi: 'さくまのぶもり', castleId: 2, leadership: 70 },
+        { id: 1, name: '柴田勝家', yomi: 'しばたかついえ', castleId: 1, leadership: 85 },
+        { id: 3, name: '佐々成政', yomi: 'さっさなりまさ', castleId: 1, leadership: 75 }
+    ];
+    assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'leadership', false)).map(b => b.id), [1, 3, 2]);
+    assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.filterByName(list, 'さくま')).map(b => b.id), [2]);
+    assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'castle', true)).map(b => b.id), [2, 1, 3]);
 });
 
 test('協調性を廃止し人物関係は義理・野望・相性差を正本にする', () => {

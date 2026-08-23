@@ -722,20 +722,9 @@ Object.assign(UIInfoManager.prototype, {
             if (window.BushoStatusRules.isRonin(b)) return 1000;
             return 0;
         };
-        const getSortRankClan = (b) => {
-            const isGunshi = b.isGunshi || (b.clan > 0 && clanMap.get(b.clan)?.gunshiId === b.id);
-            const isCommander = commanderIds.has(Number(b.id));
-            if (b.isDaimyo) return 8;
-            if (isCommander) return 7;
-            if (b.isCastellan) return 6;
-            if (isGunshi) return 5; 
-            if (window.BushoStatusRules.isRonin(b)) return 1;
-            if (b.belongKunishuId > 0) {
-                const isLeader = b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0);
-                return isLeader ? 3 : 2;
-            }
-            return 4; 
-        };
+        const getSortRankClan = (b) => window.BushoListSortRules
+            ? BushoListSortRules.getClanRank(this.game, b)
+            : 0;
         
         let acc = null;
         if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
@@ -758,13 +747,7 @@ Object.assign(UIInfoManager.prototype, {
                     if (this.bushoCurrentSortKey === 'action') {
                         valA = a.isActionDone ? 1 : 0; valB = b.isActionDone ? 1 : 0;
                     } else if (this.bushoCurrentSortKey === 'name') {
-                        const yomiA = a.yomi || a.name || ""; const yomiB = b.yomi || b.name || "";
-                        let cmp = this.bushoIsSortAsc ? yomiA.localeCompare(yomiB, 'ja') : yomiB.localeCompare(yomiA, 'ja');
-                        if (cmp === 0) {
-                            const nameA = a.name || ""; const nameB = b.name || "";
-                            cmp = this.bushoIsSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
-                        }
-                        return cmp;
+                        return BushoListSortRules.compareKnown(this.game, a, b, 'name', this.bushoIsSortAsc);
                     } else if (this.bushoCurrentSortKey === 'rank') {
                         valA = getSortRankClan(a); valB = getSortRankClan(b);
                     } else if (this.bushoCurrentSortKey === 'faction') {
@@ -786,14 +769,7 @@ Object.assign(UIInfoManager.prototype, {
                         if (cmp === 0) cmp = this.bushoIsSortAsc ? infoA.name.localeCompare(infoB.name, 'ja') : infoB.name.localeCompare(infoA.name, 'ja');
                         return cmp;
                     } else if (this.bushoCurrentSortKey === 'castle') {
-                        const getCastleInfo = (busho) => {
-                            const castle = castleMap.get(busho.castleId);
-                            return { yomi: castle ? (castle.yomi || castle.name || "") : "んんん", name: castle ? (castle.name || "") : "んんん" };
-                        };
-                        const infoA = getCastleInfo(a); const infoB = getCastleInfo(b);
-                        let cmp = this.bushoIsSortAsc ? infoA.yomi.localeCompare(infoB.yomi, 'ja') : infoB.yomi.localeCompare(infoA.yomi, 'ja');
-                        if (cmp === 0) cmp = this.bushoIsSortAsc ? infoA.name.localeCompare(infoB.name, 'ja') : infoB.name.localeCompare(infoA.name, 'ja');
-                        return cmp;
+                        return BushoListSortRules.compareKnown(this.game, a, b, 'castle', this.bushoIsSortAsc);
                     } else if (this.bushoCurrentSortKey === 'faction_leader') {
                         const getLeaderInfo = (busho) => {
                             if (busho.factionId > 0 && busho.clan > 0 && busho.factionName) {

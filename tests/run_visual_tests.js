@@ -533,7 +533,40 @@ async function validateCommandAndInterviewStates(cdp) {
     assert.ok(mobile.footer.bottom <= mobile.innerHeight + 1, 'スマホ面談の外側ボタンが9:16画面からはみ出している');
     assert.ok(mobile.footerButtonHeight >= 36, 'スマホ面談の外側ボタンが小さすぎる');
 
-    console.log('✓ PC入れ子コマンド選択状態・面談固定16:9/9:16・標準外置きフッター visual regression');
+    // 最も狭いスマホ9:16で、検索・ソート付き8人一覧もスクロールなしで収まるか確認する。
+    result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            const content = document.getElementById('interview-session-content');
+            content.classList.add('speaker-hidden');
+            document.getElementById('interview-session-face-panel').classList.add('hidden');
+            document.getElementById('interview-session-inline-actions').classList.add('hidden');
+            const pager = document.getElementById('interview-session-pager');
+            pager.classList.remove('hidden');
+            pager.innerHTML = '<button class=\"daimyo-detail-action-btn\">前へ</button><span class=\"interview-session-page-label\">1 / 3</span><button class=\"daimyo-detail-action-btn\">次へ</button>';
+            const body = document.getElementById('interview-session-body');
+            body.className = 'interview-session-body interview-session-list-view interviewer-list-view';
+            body.innerHTML = '<div class=\"interview-session-list-tools\"><input class=\"interview-session-search\" placeholder=\"名前で探す\"><select class=\"interview-session-sort-select\"><option>統率</option></select><button class=\"daimyo-detail-action-btn interview-session-sort-direction\">降順</button><span class=\"interview-session-list-count\">24人</span></div><div class=\"interview-session-person-grid\">' + Array.from({length:8},(_,i)=>'<button class=\"interview-session-person\"><span class=\"interview-session-person-face\"></span><span class=\"interview-session-person-name\">武将'+(i+1)+'</span></button>').join('') + '</div>';
+            const cr = content.getBoundingClientRect();
+            const br = body.getBoundingClientRect();
+            const gr = body.querySelector('.interview-session-person-grid').getBoundingClientRect();
+            const tr = body.querySelector('.interview-session-list-tools').getBoundingClientRect();
+            return {
+                contentScroll: content.scrollHeight, contentClient: content.clientHeight,
+                bodyScroll: body.scrollHeight, bodyClient: body.clientHeight,
+                contentBottom: cr.bottom, bodyBottom: br.bottom, gridBottom: gr.bottom, toolsHeight: tr.height,
+                overflowY: getComputedStyle(body).overflowY
+            };
+        })()`,
+        returnByValue: true
+    });
+    const mobileList = result.result.value;
+    assert.strictEqual(mobileList.overflowY, 'hidden', 'スマホ面談一覧をスクロール領域にしない');
+    assert.ok(mobileList.contentScroll <= mobileList.contentClient + 3, '検索・ソート付きスマホ面談一覧が内容枠をはみ出している');
+    assert.ok(mobileList.bodyScroll <= mobileList.bodyClient + 3, '検索・ソート付きスマホ武将一覧が内部ではみ出している');
+    assert.ok(mobileList.gridBottom <= mobileList.bodyBottom + 1, 'スマホ面談の武将カードが一覧領域からはみ出している');
+    assert.ok(mobileList.toolsHeight >= 28, 'スマホ面談の検索・ソート帯が潰れている');
+
+    console.log('✓ PC入れ子コマンド選択状態・面談固定16:9/9:16・標準外置きフッター・スマホ検索ソート一覧 visual regression');
 }
 
 async function validateEndingAndWatchStates(cdp) {
