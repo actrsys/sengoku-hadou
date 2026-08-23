@@ -2078,15 +2078,7 @@ class CommandSystem {
         // ① 子供側に養父（大名）のIDをセットします
         targetBusho.adoptiveFatherId = daimyo.id;
         
-        // ② お互いの「元々の一門リスト」に直接IDを書き込んで、強固な親戚関係を作ります
-        if (!targetBusho.baseFamilyIds.includes(daimyo.id)) {
-            targetBusho.baseFamilyIds.push(daimyo.id);
-        }
-        if (!daimyo.baseFamilyIds.includes(targetBusho.id)) {
-            daimyo.baseFamilyIds.push(targetBusho.id);
-        }
-        
-        // ③ ゲーム全体の一門状態を最新に更新します！
+        // baseFamilyIds / familyIds は派生値なので直接編集せず、正本の養父IDから全体を再構築します。
         FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
 
         this.finishCommand(`${targetBusho.name} を養子として迎え入れました。以降、${targetBusho.name} は当家の一門武将となります。`);

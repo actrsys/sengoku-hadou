@@ -1584,14 +1584,7 @@ window.GameEvents.push({
         // ----------------------------------------------------
         katsunaga.adoptiveFatherId = deadBusho.id;
         
-        // お互いの一門（家族）リストに番号を書き足します
-        if (!katsunaga.baseFamilyIds.includes(deadBusho.id)) {
-            katsunaga.baseFamilyIds.push(deadBusho.id);
-        }
-        if (!deadBusho.baseFamilyIds.includes(katsunaga.id)) {
-            deadBusho.baseFamilyIds.push(katsunaga.id);
-        }
-        // 養子縁組を含む一門関係は、全人物を知るFamilyLinkerの司令塔から一括再構築します。
+        // 一門配列は派生値なので直接編集せず、養父IDを正本としてFamilyLinkerから再構築します。
         FamilyLinker.rebuildAllFamilyIds(game.bushos, game.princesses || []);
 
         // ----------------------------------------------------

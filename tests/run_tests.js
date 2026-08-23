@@ -5,6 +5,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const zlib = require('zlib');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -1939,6 +1940,83 @@ test('セーブ用勢力図はフルサイズCanvasを作らず1/4専用画像�
     assert.ok(save.includes('const thumbW = Math.max(1, Math.round(w * scale))'));
     assert.ok(!save.includes("const canvas = document.createElement('canvas');\n            canvas.width = w;\n            canvas.height = h;"), '3140x2440の中間Canvasを作らない');
     assert.ok(fs.existsSync(path.join(ROOT, 'data/images/map/japan_white_map_thumb.png')));
+});
+
+
+test('武将CSVから旧familyId列を廃止しBINも同じCSV内容へ同期する', () => {
+    const csvPath = path.join(ROOT, 'data/scenarios/1560_okehazama/warriors.csv');
+    const binPath = path.join(ROOT, 'data/scenarios/1560_okehazama/warriors.bin');
+    const csv = fs.readFileSync(csvPath, 'utf8');
+    const lines = csv.trimEnd().split(/\r?\n/);
+    const headers = lines[0].split(',');
+    assert.ok(!headers.includes('familyId'));
+    lines.slice(1).forEach((line, index) => {
+        assert.strictEqual(line.split(',').length, headers.length, `warriors.csv line ${index + 2}`);
+    });
+    const inflated = zlib.inflateSync(fs.readFileSync(binPath)).toString('utf8');
+    assert.strictEqual(inflated, csv, 'warriors.bin は最新CSVと完全一致すること');
+});
+
+test('FamilyLinkerは関係データだけから一門キャッシュを毎回ゼロから再構築する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/family_system.js');
+    const father = { id: 1, realFatherId: 0, realMotherId: 0, adoptiveFatherId: 0, wifeIds: [], baseFamilyIds: [999], familyIds: [999] };
+    const adopted = { id: 2, realFatherId: 0, realMotherId: 0, adoptiveFatherId: 1, wifeIds: [], baseFamilyIds: [999], familyIds: [999] };
+    const unrelated = { id: 3, realFatherId: 0, realMotherId: 0, adoptiveFatherId: 0, wifeIds: [], baseFamilyIds: [1, 2, 3], familyIds: [1, 2, 3] };
+
+    ctx.FamilyLinker.rebuildAllFamilyIds([father, adopted, unrelated], []);
+    assert.deepStrictEqual(Array.from(father.baseFamilyIds), [1, 2]);
+    assert.deepStrictEqual(Array.from(adopted.baseFamilyIds), [2, 1]);
+    assert.deepStrictEqual(Array.from(unrelated.baseFamilyIds), [3]);
+    assert.ok(!father.familyIds.includes(999));
+
+    adopted.adoptiveFatherId = 0;
+    ctx.FamilyLinker.rebuildAllFamilyIds([father, adopted, unrelated], []);
+    assert.deepStrictEqual(Array.from(father.baseFamilyIds), [1]);
+    assert.deepStrictEqual(Array.from(adopted.baseFamilyIds), [2]);
+    assert.ok(!father.familyIds.includes(2), '養子関係解除後に古い一門IDを残さない');
+});
+
+test('一門派生値の構築責務はfamily_systemへ集約しイベント側から直接変更しない', () => {
+    const models = read('js/models.js');
+    const family = read('js/family_system.js');
+    const command = read('js/command_system.js');
+    const historical = read('js/event/historical_event.js');
+    const html = read('index.html');
+
+    assert.ok(!models.includes('data.familyId'));
+    assert.ok(!models.includes('data.baseFamilyIds'));
+    assert.ok(!models.includes('data.familyIds'));
+    assert.ok(!models.includes('class FamilyLinker'));
+    assert.ok(family.includes('class FamilyLinker'));
+    assert.ok(family.includes('Union-Find'));
+    assert.ok(!family.includes('while (changed)'), '連結成分の反復伝播を残さない');
+    assert.ok(!command.includes('baseFamilyIds.push'));
+    assert.ok(!historical.includes('baseFamilyIds.push'));
+    assert.ok(html.indexOf('js/models.js') < html.indexOf('js/family_system.js'));
+    assert.ok(html.indexOf('js/family_system.js') < html.indexOf('js/data_manager.js'));
+});
+
+test('セーブデータから一門派生キャッシュを除外する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    const manager = new ctx.SaveManager({});
+    const source = {
+        id: 10,
+        realFatherId: 1,
+        adoptiveFatherId: 2,
+        wifeIds: [3],
+        baseFamilyIds: [10, 1, 2],
+        familyIds: [10, 1, 2, 3],
+        loyalty: 80
+    };
+    const saved = manager._serializePersonForSave(source);
+    assert.strictEqual(saved.id, 10);
+    assert.strictEqual(saved.realFatherId, 1);
+    assert.deepStrictEqual(Array.from(saved.wifeIds), [3]);
+    assert.strictEqual(saved.loyalty, 80);
+    assert.ok(!Object.prototype.hasOwnProperty.call(saved, 'baseFamilyIds'));
+    assert.ok(!Object.prototype.hasOwnProperty.call(saved, 'familyIds'));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

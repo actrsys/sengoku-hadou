@@ -32,6 +32,17 @@ class SaveManager {
         }
     }
 
+    // baseFamilyIds / familyIds は親子・養子・婚姻から再構築できる派生キャッシュなので保存しません。
+    // 4,000人超の配列重複をセーブへ持ち込まず、JSON化・IndexedDB structured clone時の容量と一時メモリを抑えます。
+    _serializePersonForSave(person) {
+        const result = {};
+        Object.keys(person || {}).forEach(key => {
+            if (key === 'baseFamilyIds' || key === 'familyIds') return;
+            result[key] = person[key];
+        });
+        return result;
+    }
+
     // どんな方法でセーブする時も、この魔法で「今のゲームの全データ」をひとまとめにします
     async _createSaveDataObj(options = {}) {
         let scenarioIndex = SCENARIOS.findIndex(s => s.folder === this.game.scenarioFolder);
@@ -64,9 +75,9 @@ class SaveManager {
             saveTimestamp: now.getTime(),
             mapThumbnail: mapThumbnail, // ★追加：撮った写真も一緒に保存します
             castles: this.game.castles,
-            bushos: this.game.bushos,
+            bushos: this.game.bushos.map(b => this._serializePersonForSave(b)),
             clans: this.game.clans,
-            princesses: this.game.princesses,
+            princesses: this.game.princesses.map(p => this._serializePersonForSave(p)),
             provinces: this.game.provinces,
             legions: this.game.legions,
             playerClanId: this.game.playerClanId,
