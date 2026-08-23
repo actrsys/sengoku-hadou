@@ -127,15 +127,15 @@ class InterviewSystem {
     _getMenuPrompt(attitude = this.activeInterviewAttitude) {
         switch (attitude) {
             case 'welcoming':
-                return '「殿、どうぞ何なりとお尋ねください！」';
+                return '「どうぞ、何なりとお尋ねください！」';
             case 'friendly':
-                return '「殿、何なりとお申し付けください」';
+                return '「何なりとお申し付けください」';
             case 'polite':
-                return '「殿、どのようなご用件でしょうか」';
+                return '「どのようなご用件でしょうか」';
             case 'reserved':
-                return '「……殿。ご用件を伺いましょう」';
+                return '「……ご用件を伺いましょう」';
             case 'startled':
-                return '「……それで、殿。何のご用でしょうか」';
+                return '「……それで、何のご用でしょうか」';
             default:
                 return '「……何か、ご用でしょうか」';
         }
@@ -146,7 +146,7 @@ class InterviewSystem {
         switch (attitude) {
             case 'welcoming':
             case 'friendly':
-                return `${name}殿ですか。ええ、存じております。`;
+                return `${name}殿ですか。存じております。`;
             case 'reserved':
             case 'cold':
             case 'startled':
@@ -245,21 +245,35 @@ class InterviewSystem {
     }
 
     executeInterviewStatus(busho) {
-        const inno = Number(busho.innovation || 0);
-        let policyText = '';
-        if (inno > 80) policyText = '最近のやり方は少々古臭い気がしますな。もっと新しいことをせねば。';
-        else if (inno < 20) policyText = '古き良き伝統を守ることこそ肝要です。';
-        else policyText = '古きに固執するも、新しきに飛びつくも考えもの。肝要なのは、時勢を見極めることかと。';
-
         const concealment = this._getConcealmentProfile(busho);
         const loyaltyBand = concealment.perceivedBand;
         const loyaltyText = this._getSelfLoyaltyText(loyaltyBand, this.activeInterviewAttitude);
-        const messages = [
-            `「${policyText}」`,
-            `「${loyaltyText}」`
-        ];
+        const messages = [loyaltyText];
 
-        this.view.showMessages(busho, messages, () => this.showMainMenu(busho));
+        // 深刻以下は本人が会話自体を拒むため、そこで終える。
+        // それ以外は現在の心境への返答を一度完結させ、価値観は独立した次の発言として扱う。
+        if (loyaltyBand !== 'serious' && loyaltyBand !== 'critical') {
+            const innovationText = this._getInnovationStatusText(busho);
+            if (innovationText) messages.push(innovationText);
+        }
+
+        this.view.showMessages(
+            busho,
+            messages.map(text => `「${text}」`),
+            () => this.showMainMenu(busho)
+        );
+    }
+
+    _getInnovationStatusText(busho) {
+        const inno = Number(busho && busho.innovation || 0);
+        // 勢力詳細の思想表示（保守 <= 33 / 中道 34-66 / 革新 >= 67）に合わせる。
+        if (inno >= 67) {
+            return '古い仕来りに拘りすぎず、良きものは新しくとも取り入れてゆくべきかと考えております。';
+        }
+        if (inno <= 33) {
+            return '古くからの仕来りを軽んじず、守るべきものは守ることが肝要かと存じます。';
+        }
+        return '古きに固執するも、新しきに飛びつくも考えもの。肝要なのは、時勢を見極めることかと。';
     }
 
     _getPolicyDisclosureProfile(busho) {
@@ -273,21 +287,31 @@ class InterviewSystem {
         };
     }
 
-    _tonePolicyText(text, attitude = this.activeInterviewAttitude) {
+    _toneFirstMessage(text, context = 'generic', attitude = this.activeInterviewAttitude) {
         if (!text) return text;
-        if (attitude === 'welcoming') return `はい、${text}`;
-        if (attitude === 'friendly') return text;
+        if (context === 'topic' || context === 'status') return text;
+
         if (attitude === 'polite') return `恐れながら、${text}`;
-        if (attitude === 'reserved') return `……軍団長として申し上げるなら、${text}`;
-        if (attitude === 'startled') return `……そ、その件でしたら、${text}`;
-        return `……${text}`;
+        if (attitude === 'reserved' || attitude === 'cold') {
+            return text.startsWith('……') ? text : `……${text}`;
+        }
+        if (attitude === 'startled') {
+            return text.startsWith('……') ? text : `……そ、その件でしたら、${text}`;
+        }
+        if (attitude === 'welcoming' && context === 'policy') return `はい。${text}`;
+        return text;
     }
 
-    _toneTopicFollowup(text, attitude = this.activeInterviewAttitude) {
-        if (!text) return text;
-        if (attitude === 'welcoming') return `ええ、${text}`;
-        if (attitude === 'friendly' || attitude === 'polite') return text;
-        return text.startsWith('……') ? text : `……${text}`;
+    _toneSequence(texts, context = 'generic', attitude = this.activeInterviewAttitude) {
+        const rows = (texts || []).filter(Boolean).map(text => String(text));
+        if (rows.length === 0) return [];
+        // 呼びかけ・相槌・立場の前置きは最初の一文だけに付ける。
+        rows[0] = this._toneFirstMessage(rows[0], context, attitude);
+        return rows;
+    }
+
+    _toneTopicFollowup(text) {
+        return text;
     }
 
     _getCommanderLegion(busho) {
@@ -306,48 +330,290 @@ class InterviewSystem {
         return target ? target.name : '目標の城';
     }
 
-    _getPolicyMessages(busho) {
-        const disclosure = this._getPolicyDisclosureProfile(busho);
-        const legion = this._getCommanderLegion(busho);
-        if (!legion) {
-            return [this._tonePolicyText('某は軍団の方針を定める立場ではございませぬ。')];
+    _getGunshiAttackPlan(clanId) {
+        const clanOps = this.game && this.game.aiOperationManager && this.game.aiOperationManager.operations
+            ? this.game.aiOperationManager.operations[Number(clanId)]
+            : null;
+        if (!clanOps) return null;
+
+        const plans = Object.entries(clanOps)
+            .map(([legionId, op]) => ({ legionId: Number(legionId), op }))
+            .filter(row => row.op && row.op.type === '攻撃' && row.op.targetId !== undefined && row.op.targetId !== null)
+            .map(row => {
+                const op = row.op;
+                const score = Number(op.planningScore ?? (op.attackTargets && op.attackTargets[0] && op.attackTargets[0].score) ?? 0);
+                return { ...row, score, targetName: this._getOperationTargetName(op) };
+            })
+            .sort((a, b) => b.score - a.score || a.legionId - b.legionId);
+        return plans[0] || null;
+    }
+
+    _getPolicyAbilityDomains(busho) {
+        const cfg = window.MainParams.Interview.PolicyAdvice;
+        let rows = [
+            { key: 'leadership', value: Number(busho && busho.leadership || 0), order: 0 },
+            { key: 'strength', value: Number(busho && busho.strength || 0), order: 1 },
+            { key: 'politics', value: Number(busho && busho.politics || 0), order: 2 },
+            { key: 'diplomacy', value: Number(busho && busho.diplomacy || 0), order: 3 },
+            { key: 'intelligence', value: Number(busho && busho.intelligence || 0), order: 4 }
+        ];
+
+        // 軍師は智謀が高いこと自体が珍しくないため、それだけで毎回「調略」の話に偏らせない。
+        // 智謀が他の主要能力の最高値より1.2倍以上突出している時だけ、調略分野を候補にする。
+        if (busho && busho.isGunshi) {
+            const intelligence = Number(busho.intelligence || 0);
+            const bestOther = Math.max(
+                Number(busho.leadership || 0),
+                Number(busho.strength || 0),
+                Number(busho.politics || 0),
+                Number(busho.diplomacy || 0)
+            );
+            if (bestOther > 0 && intelligence < bestOther * Number(cfg.GunshiIntelligenceDominanceRatio)) {
+                rows = rows.filter(row => row.key !== 'intelligence');
+            }
         }
 
-        if (disclosure.level === 'guarded') {
-            return [this._tonePolicyText('軍略の仔細については、今は申し上げることはございませぬ。')];
-        }
+        return rows.sort((a, b) => b.value - a.value || a.order - b.order);
+    }
 
+    _getPolicyScopeCastles(busho) {
+        if (!this.game || !busho) return [];
         const clanId = Number(busho.clan);
-        const legionId = Number(legion.legionNo);
-        const clanOps = this.game.aiOperationManager && this.game.aiOperationManager.operations
+        if (busho.isGunshi) return this.game.getClanCastles ? this.game.getClanCastles(clanId) : [];
+
+        const legion = this._getCommanderLegion(busho);
+        if (legion && this.game.getClanCastles) {
+            return this.game.getClanCastles(clanId).filter(c => Number(c.legionId) === Number(legion.legionNo));
+        }
+
+        const castle = this.game.getCastle ? this.game.getCastle(Number(busho.castleId)) : null;
+        return castle ? [castle] : [];
+    }
+
+    _getBushoOperation(busho) {
+        if (!this.game || !busho || !this.game.aiOperationManager || !this.game.aiOperationManager.operations) return null;
+        const clanId = Number(busho.clan);
+        if (busho.isGunshi) {
+            const best = this._getGunshiAttackPlan(clanId);
+            return best ? best.op : null;
+        }
+
+        const legion = this._getCommanderLegion(busho);
+        let legionId = legion ? Number(legion.legionNo) : null;
+        if (legionId === null) {
+            const castle = this.game.getCastle ? this.game.getCastle(Number(busho.castleId)) : null;
+            if (castle) legionId = Number(castle.legionId);
+        }
+        const clanOps = this.game.aiOperationManager.operations[clanId];
+        return clanOps && legionId !== null ? clanOps[legionId] || null : null;
+    }
+
+    _getLeadershipPolicyText(busho, disclosure) {
+        let operation = this._getBushoOperation(busho);
+        let targetName = '';
+        if (busho && busho.isGunshi) {
+            const best = this._getGunshiAttackPlan(Number(busho.clan));
+            if (best) {
+                operation = best.op;
+                targetName = best.targetName;
+            }
+        }
+        if (!targetName && operation && operation.type === '攻撃') targetName = this._getOperationTargetName(operation);
+
+        if (operation && operation.type === '攻撃' && targetName) {
+            return disclosure.level === 'full'
+                ? `攻めるなら、${targetName}を第一に見るのがよろしいでしょう。現在の軍勢の動きとも合っております。`
+                : `攻勢に出るなら、${targetName}方面をまず見るのがよろしいかと。`;
+        }
+        return '攻め急ぐより、今は兵を整えて機を待つ方がよろしいかと。';
+    }
+
+    _getStrengthPolicyText(busho, disclosure) {
+        const castles = this._getPolicyScopeCastles(busho).filter(c => Number(c.soldiers || 0) > 0);
+        if (castles.length === 0) return '兵については、まず数を整えてから訓練に移るのがよろしいでしょう。';
+
+        const rows = castles.map(castle => {
+            const trainingMax = Math.max(1, Number(castle.maxTraining || 100));
+            const moraleMax = Math.max(1, Number(castle.maxMorale || 100));
+            const trainingRatio = Math.max(0, Math.min(1, Number(castle.training || 0) / trainingMax));
+            const moraleRatio = Math.max(0, Math.min(1, Number(castle.morale || 0) / moraleMax));
+            return { castle, trainingRatio, moraleRatio, readiness: Math.min(trainingRatio, moraleRatio) };
+        }).sort((a, b) => a.readiness - b.readiness || Number(a.castle.id || 0) - Number(b.castle.id || 0));
+        const worst = rows[0];
+        const concern = Number(window.MainParams.Interview.PolicyAdvice.ReadinessConcernRatio);
+
+        if (worst.trainingRatio < concern && worst.trainingRatio <= worst.moraleRatio) {
+            return disclosure.level === 'full'
+                ? `${worst.castle.name}の兵は、まだ訓練が十分とは申せませぬ。もう少し鍛えておくべきかと。`
+                : '兵の訓練は、もう少し重ねておいた方がよろしいかと。';
+        }
+        if (worst.moraleRatio < concern) {
+            return disclosure.level === 'full'
+                ? `${worst.castle.name}の兵は、士気がやや落ちております。まずは立て直しておきたいところです。`
+                : '兵の士気には、もう少し気を配った方がよろしいかと。';
+        }
+        return '兵の仕上がりは悪くありません。今の状態を保てば、いざという時にも動けましょう。';
+    }
+
+    _getPoliticsPolicyText(busho, disclosure) {
+        const castles = this._getPolicyScopeCastles(busho);
+        if (castles.length === 0 || typeof AIDomesticPriorityRules === 'undefined') {
+            return '内政については、足元を見ながら手を入れてゆくのがよろしいかと。';
+        }
+        const plan = AIDomesticPriorityRules.getBestDomesticPlan(this.game, castles);
+        if (!plan) return '内政面では、今すぐ大きく手を入れるべきところは見当たりませぬ。';
+
+        if (disclosure.level !== 'full') {
+            if (plan.type === 'repair') return '城壁の傷みには、早めに手を入れておいた方がよろしいかと。';
+            if (plan.type === 'farm') return 'まだ石高を伸ばせるところがありそうです。田畑に手を入れるのがよろしいでしょう。';
+            return 'まだ鉱山を伸ばせるところがありそうです。開発を進めるのがよろしいでしょう。';
+        }
+
+        if (plan.type === 'repair') return `${plan.castle.name}の城壁は傷みが目立ちます。修復を優先した方がよろしいかと。`;
+        if (plan.type === 'farm') return `${plan.castle.name}はまだ石高を伸ばす余地がございます。田畑を整えるのがよろしいでしょう。`;
+        return `${plan.castle.name}はまだ鉱山を伸ばす余地がございます。こちらに手を入れるのがよろしいかと。`;
+    }
+
+    _getNeighborClanIds(clanId) {
+        if (!this.game || !this.game.getClanCastles || !this.game.getCastle) return [];
+        const ids = new Set();
+        this.game.getClanCastles(Number(clanId)).forEach(castle => {
+            (castle.adjacentCastleIds || []).forEach(adjId => {
+                const adj = this.game.getCastle(adjId);
+                if (adj && Number(adj.ownerClan) > 0 && Number(adj.ownerClan) !== Number(clanId)) ids.add(Number(adj.ownerClan));
+            });
+        });
+        return [...ids];
+    }
+
+    _getDiplomacyPolicyTarget(busho) {
+        if (!this.game || !busho) return null;
+        const clanId = Number(busho.clan);
+        const clan = this.game.getClan ? this.game.getClan(clanId) : null;
+        if (clan && clan.currentDiplomacyTarget && Number(clan.currentDiplomacyTarget.targetId) > 0) {
+            return { ...clan.currentDiplomacyTarget, targetId: Number(clan.currentDiplomacyTarget.targetId), planned: true };
+        }
+
+        const neighbors = this._getNeighborClanIds(clanId);
+        if (neighbors.length === 0 || !this.game.diplomacyManager || typeof this.game.diplomacyManager.getDiplomacyPriorityList !== 'function') return null;
+        const hostile = neighbors.filter(id => {
+            const rel = this.game.getRelation ? this.game.getRelation(clanId, id) : this.game.diplomacyManager.getRelation(clanId, id);
+            return rel && typeof DiplomacyRules !== 'undefined' && DiplomacyRules.isHostile(rel.status);
+        });
+        let mainThreatId = 0;
+        if (hostile.length > 0 && this.game.aiEngine && typeof this.game.aiEngine.getClanPrestige === 'function') {
+            hostile.sort((a, b) => this.game.aiEngine.getClanPrestige(b) - this.game.aiEngine.getClanPrestige(a));
+            mainThreatId = hostile[0];
+        }
+        const list = this.game.diplomacyManager.getDiplomacyPriorityList(clanId, neighbors, mainThreatId);
+        return list && list[0] ? { targetId: Number(list[0].clanId), planned: false } : null;
+    }
+
+    _getDiplomacyPolicyText(busho, disclosure) {
+        const target = this._getDiplomacyPolicyTarget(busho);
+        if (!target) return '外交については、今すぐ大きく動くより周囲の出方を見てもよろしいかと。';
+        const clan = this.game.getClan ? this.game.getClan(target.targetId) : null;
+        const name = clan ? clan.name : 'その勢力';
+        if (disclosure.level !== 'full') return '外交では、周辺の大名家との関係を一つずつ整えておくのがよろしいかと。';
+
+        const actionText = {
+            goodwill: '関係を深めておく',
+            alliance: '同盟を視野に入れる',
+            truce: '和睦を探る',
+            court_truce: '和睦を探る',
+            subordinate: '従属関係を検討する'
+        }[target.action] || '関係を整えておく';
+        return `外交では、${name}との${actionText}ことに利がありそうです。`;
+    }
+
+    _getIntrigueCandidateClanIds(busho) {
+        const ids = new Set();
+        if (!this.game || !busho) return [];
+        const clanId = Number(busho.clan);
+        const ops = this.game.aiOperationManager && this.game.aiOperationManager.operations
             ? this.game.aiOperationManager.operations[clanId]
             : null;
-        const operation = clanOps ? clanOps[legionId] : null;
-        const legionCastles = this.game.getClanCastles(clanId).filter(c => Number(c.legionId) === legionId);
-        const economic = AIDomesticPriorityRules.getBestEconomicPlan(this.game, legionCastles);
-        const messages = [];
 
-        if (operation && operation.type === '攻撃') {
-            const targetName = this._getOperationTargetName(operation);
-            if (disclosure.level === 'full') {
-                messages.push(this._tonePolicyText(`当軍団では、まず${targetName}を攻めるのが最善と見ております。現在もそこを第一の目標としております。`));
-            } else {
-                messages.push(this._tonePolicyText(`攻めるならば、${targetName}方面がよろしいかと考えております。`));
-            }
-        } else if (operation && operation.type === '外交') {
-            messages.push(this._tonePolicyText('今は無理に兵を動かすより、周囲への働きかけを優先すべき時と見ております。'));
+        const addTargets = op => {
+            (op && op.sabotageTargets || []).forEach(target => {
+                if (Number(target.clanId) > 0 && Number(target.clanId) !== clanId) ids.add(Number(target.clanId));
+            });
+        };
+
+        if (busho.isGunshi && ops) {
+            Object.values(ops).forEach(addTargets);
         } else {
-            messages.push(this._tonePolicyText('今は無理に攻めるより、まず領内を整えるべき時と見ております。'));
+            addTargets(this._getBushoOperation(busho));
+        }
+        if (ids.size === 0) {
+            this._getNeighborClanIds(clanId).forEach(id => {
+                const rel = this.game.getRelation ? this.game.getRelation(clanId, id) : null;
+                const protectedRelation = rel && typeof DiplomacyRules !== 'undefined'
+                    && DiplomacyRules.isProtectedFromImmediateAttack(rel.status);
+                if (!protectedRelation) ids.add(id);
+            });
+        }
+        return [...ids];
+    }
+
+    _getBestIntrigueTarget(busho) {
+        if (!this.game || !busho || !Array.isArray(this.game.bushos)) return null;
+        const clanIds = new Set(this._getIntrigueCandidateClanIds(busho));
+        if (clanIds.size === 0) return null;
+        const candidates = this.game.bushos.filter(target => clanIds.has(Number(target.clan))
+            && !target.isDaimyo
+            && (!window.BushoStatusRules || window.BushoStatusRules.isActive(target)));
+        if (candidates.length === 0) return null;
+
+        const rows = candidates.map(target => {
+            let prob = null;
+            if (this.game.strategySystem && typeof this.game.strategySystem.getHeadhuntProb === 'function') {
+                prob = Number(this.game.strategySystem.getHeadhuntProb(busho.id, target.id, 100));
+            }
+            const fallback = (100 - Number(target.loyalty || 0)) + (100 - Number(target.duty || 0)) * 0.5;
+            return { target, prob, score: Number.isFinite(prob) ? prob : fallback / 150 };
+        }).sort((a, b) => b.score - a.score || Number(a.target.id || 0) - Number(b.target.id || 0));
+        return rows[0] || null;
+    }
+
+    _getIntelligencePolicyText(busho, disclosure) {
+        const row = this._getBestIntrigueTarget(busho);
+        if (!row || (Number.isFinite(row.prob) && row.prob < Number(window.MainParams.Interview.PolicyAdvice.IntrigueCandidateMinProb))) {
+            return '調略については、今すぐ崩しやすい相手は見当たりませぬ。';
+        }
+        if (disclosure.level !== 'full') return '敵方には、調略を仕掛ける余地のある者がいそうです。';
+        const targetClan = this.game.getClan ? this.game.getClan(Number(row.target.clan)) : null;
+        const prefix = targetClan ? `${targetClan.name}の` : '';
+        return `調略を仕掛けるなら、${prefix}${row.target.name}殿は有力な候補かと見ております。`;
+    }
+
+    _getPolicyDomainText(domain, busho, disclosure) {
+        switch (domain) {
+            case 'leadership': return this._getLeadershipPolicyText(busho, disclosure);
+            case 'strength': return this._getStrengthPolicyText(busho, disclosure);
+            case 'politics': return this._getPoliticsPolicyText(busho, disclosure);
+            case 'diplomacy': return this._getDiplomacyPolicyText(busho, disclosure);
+            case 'intelligence': return this._getIntelligencePolicyText(busho, disclosure);
+            default: return '';
+        }
+    }
+
+    _getPolicyMessages(busho) {
+        const disclosure = this._getPolicyDisclosureProfile(busho);
+        if (disclosure.level === 'guarded') {
+            return this._toneSequence(['今は、細かな方針まで申し上げることはございませぬ。'], 'policy');
         }
 
-        if (economic) {
-            if (disclosure.level === 'full') {
-                messages.push(this._tonePolicyText(`内政に手を入れるなら、${economic.castle.name}の${economic.label}を最も優先したいところです。`));
-            } else {
-                messages.push(this._tonePolicyText(`内政では、今は${economic.label}を優先したいと考えております。`));
-            }
+        const maxTopics = Number(window.MainParams.Interview.PolicyAdvice.MaxTopics);
+        const messages = [];
+        for (const row of this._getPolicyAbilityDomains(busho)) {
+            const text = this._getPolicyDomainText(row.key, busho, disclosure);
+            if (!text || messages.includes(text)) continue;
+            messages.push(text);
+            if (messages.length >= maxTopics) break;
         }
-        return messages;
+        if (messages.length === 0) messages.push('今のところ、某から申し上げるほどのことはございませぬ。');
+        return this._toneSequence(messages, 'policy');
     }
 
     executeInterviewPolicy(busho) {
@@ -386,7 +652,7 @@ class InterviewSystem {
         if (contact >= 52) return '必要な折には、よく話をしております。';
         if (contact >= 34) {
             if (relation.compatibilityScore >= 68) {
-                return '信頼はしておりますが、普段はさほど話す機会がございませぬ。';
+                return 'ただ、普段はさほど話す機会がございませぬ。';
             }
             return '用向きがなければ、あまり言葉を交わしませぬ。';
         }
@@ -411,27 +677,42 @@ class InterviewSystem {
     }
 
     _getSelfLoyaltyText(band, attitude = this.activeInterviewAttitude) {
+        const warm = attitude === 'welcoming' || attitude === 'friendly';
+        const formal = attitude === 'polite';
+        const guarded = attitude === 'reserved' || attitude === 'cold';
+        const startled = attitude === 'startled';
         switch (band) {
             case 'stable':
-                return '身に余る御恩、片時も忘れたことはありませぬ。この身は殿のために。';
+                if (startled) return 'は、はい。何の不満もございませぬ。これからも務めを果たしてまいります。';
+                if (guarded) return '特に不満はございませぬ。与えられた務めを果たすのみです。';
+                if (formal) return '身に余る御恩、忘れたことはございませぬ。今後も務めに励む所存です。';
+                return warm
+                    ? '身に余る御恩、片時も忘れたことはありませぬ。この身、殿のために尽くしましょう。'
+                    : '特に不満はございませぬ。これからも務めを果たしてまいります。';
             case 'warning':
+                if (startled) return 'い、いえ、大きな不満など。ただ……少し思うところはございます。';
+                if (guarded) return '不満というほどではございませぬ。少し思うところがある、それだけです。';
+                if (formal) return '大きな不満はございませぬ。ただ、少々思うところはございます。';
                 return '不満というほどではございませぬ。ただ、少し思うところはございます。';
             case 'danger':
-                return attitude === 'reserved'
-                    ? '……大きな不満はございませぬ。ただ、今の待遇には少し思うところがございます。'
-                    : '……正直に申せば、今の待遇にはいささか思うところがございます。';
+                if (startled) return '……その、何もないとは申せませぬ。今の待遇には、少し思うところがございます。';
+                if (guarded) return '大きな不満はございませぬ。ただ、今の待遇には少し思うところがございます。';
+                if (formal) return '申し上げにくいことですが、今の待遇にはいささか思うところがございます。';
+                return '正直に申せば、今の待遇にはいささか思うところがございます。';
             case 'dissatisfied':
-                return attitude === 'cold'
-                    ? '……今のままでよいとは、申し上げられませぬ。もう少しお考えいただきたい。'
-                    : '今のままでは、務めにも身が入りませぬ。もう少しお考えいただきたい。';
+                if (startled) return '……いえ、その……今のままでよいとは、申し上げられませぬ。';
+                if (attitude === 'cold') return '今のままでよいとは、申し上げられませぬ。もう少しお考えいただきたい。';
+                if (attitude === 'reserved') return '今の待遇には、かなり思うところがございます。';
+                if (formal) return '今のままでは務めにも身が入りませぬ。もう少しお考えいただければと。';
+                return '今のままでは、務めにも身が入りませぬ。もう少しお考えいただきたい。';
             case 'serious':
-                return attitude === 'startled'
-                    ? '……いえ、その……某にも、思うところくらいはございます。'
-                    : '……某ばかりに我慢を強いるのは、おやめいただきたい。';
+            case 'critical':
+                if (startled) return '……っ。い、いえ、特に申し上げることはございませぬ。';
+                if (formal) return '申し訳ございませぬが、今は何も申し上げる気にはなれませぬ。';
+                if (warm) return '今は、何を申し上げてもよい言葉にはなりますまい。';
+                return '特に申し上げることはございませぬ。お話は、それだけでしょうか。';
             default:
-                return attitude === 'startled'
-                    ? '……っ。い、いえ、特に申し上げることはございませぬ。'
-                    : '……特に申し上げることはございませぬ。お話は、それだけでしょうか。';
+                return '特に申し上げることはございませぬ。';
         }
     }
 
@@ -463,18 +744,18 @@ class InterviewSystem {
 
         if (relation.contactScore >= 52) {
             return hardToRead
-                ? '普段から話はしておりますが、あの方は肝心な胸中をほとんど見せませぬ。殿への本心までは、某にも読み切れませぬ。'
-                : '普段の様子は存じております。ただ、殿への胸中となると、某にはほとんど読み取れませぬ。';
+                ? 'ただ、あの方は肝心な胸中をほとんど見せませぬ。殿への本心までは、某にも読み切れませぬ。'
+                : 'ただ、殿への胸中となると、某にはほとんど読み取れませぬ。';
         }
         if (relation.compatibilityScore >= 68) {
             return hardToRead
-                ? '人柄については信頼しております。ただ、殿への胸中となると、あの方はなかなか内心を見せませぬ。某にもほとんど読み取れませぬ。'
-                : '人柄については信頼しております。ただ、殿への胸中までは、某にもほとんど分かりませぬ。';
+                ? 'もっとも、殿への胸中となると、あの方はなかなか内心を見せませぬ。某にもほとんど読み取れませぬ。'
+                : 'もっとも、殿への胸中までは、某にもほとんど分かりませぬ。';
         }
         if (relation.contactScore < 34) {
             return hardToRead
-                ? 'もともと深く話す間柄でもなく、あの方も内心を見せませぬ。殿への胸中までは、某にはほとんど分かりませぬ。'
-                : '普段ほとんど言葉を交わしませぬゆえ、殿への胸中までは某にも分かりませぬ。';
+                ? 'そのうえ、あの方も内心を見せませぬ。殿への胸中までは、某にはほとんど分かりませぬ。'
+                : 'そのため、殿への胸中までは某にも分かりませぬ。';
         }
         return hardToRead
             ? 'あの方はなかなか内心を見せぬお方です。殿への胸中までは、某にはほとんど読み取れませぬ。'

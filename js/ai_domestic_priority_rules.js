@@ -43,6 +43,22 @@ class AIDomesticPriorityRules {
         return score;
     }
 
+    static calcRepairBaseScore(castle, perceivedDefense = null) {
+        if (!castle) return null;
+        const maxDefense = Math.max(0, Number(castle.maxDefense || 0));
+        if (maxDefense <= 0) return null;
+        const defense = perceivedDefense === null || perceivedDefense === undefined
+            ? Number(castle.defense || 0)
+            : Number(perceivedDefense || 0);
+        const safeDefense = Math.max(0, Math.min(maxDefense, defense));
+        if (safeDefense >= maxDefense) return null;
+
+        let score = safeDefense <= maxDefense / 4 ? 80 : 20;
+        const defRatio = 1000 / Math.max(1, maxDefense);
+        score = Math.floor(score * defRatio);
+        return score;
+    }
+
     static applyContext(score, type, castle, castellan, isPreparingAttack) {
         if (score === null || score === undefined) return null;
         let adjusted = Number(score);
@@ -77,6 +93,32 @@ class AIDomesticPriorityRules {
             score: this.applyContext(commerce, 'commerce', castle, castellan, isPreparingAttack)
         });
         return rows;
+    }
+
+    static getCastleLocalPriorityScores(game, castle) {
+        if (!game || !castle) return [];
+        const rows = [];
+        const repair = this.calcRepairBaseScore(castle);
+        if (repair !== null) rows.push({
+            type: 'repair',
+            label: '城壁修復',
+            castle,
+            score: repair
+        });
+        rows.push(...this.getCastleEconomicScores(game, castle));
+        return rows;
+    }
+
+    static getBestLocalPlan(game, castle) {
+        return this.getCastleLocalPriorityScores(game, castle)
+            .sort((a, b) => b.score - a.score || String(a.type).localeCompare(String(b.type)))[0] || null;
+    }
+
+    static getBestDomesticPlan(game, castles) {
+        const rows = [];
+        (castles || []).forEach(castle => rows.push(...this.getCastleLocalPriorityScores(game, castle)));
+        rows.sort((a, b) => b.score - a.score || Number(a.castle.id || 0) - Number(b.castle.id || 0));
+        return rows[0] || null;
     }
 
     static getBestEconomicPlan(game, castles) {

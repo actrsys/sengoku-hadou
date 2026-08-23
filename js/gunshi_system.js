@@ -40,11 +40,14 @@ class GunshiSystem {
         const quality = this.getAdviceQuality(adviser);
         const L = window.MainParams.Gunshi.LoyaltyInsight;
         const targetIntelligence = Math.max(0, Math.min(100, Number(target.intelligence) || 0));
+        const isSelf = Number(target.id) === Number(adviser.id);
         const detectPower = quality.intelligence + quality.duty * L.DetectDutyWeight;
-        const canDetect = profile.isConcealing
+        const canDetect = !isSelf && profile.isConcealing
             && quality.intelligence >= L.DetectIntelligenceMin
             && detectPower + L.DetectGapAllowance >= targetIntelligence;
 
+        // 軍師本人については「自分の偽装を自分で看破する」扱いにしない。
+        // 面談と同じ表向きの忠誠を起点にし、そのうえで本人の忠誠・義理による報告の甘さを反映する。
         let assessedBand = canDetect ? profile.actualBand : profile.perceivedBand;
 
         // 忠誠・義理が極端に低い軍師は、見えている危険を主君へやや甘く報告する。
@@ -63,6 +66,7 @@ class GunshiSystem {
             confidence: quality.score,
             reliability: quality.reliability,
             detectedConcealment: canDetect,
+            isSelfAssessment: isSelf,
             actualBand: profile.actualBand,
             perceivedBand: profile.perceivedBand
         };
@@ -109,9 +113,21 @@ class GunshiSystem {
             return;
         }
 
-        const red = reports.filter(item => item.assessment.alert === 'red');
-        const orange = reports.filter(item => item.assessment.alert === 'orange');
+        const selfReport = reports.find(item => Number(item.busho.id) === Number(gunshi.id)) || null;
+        const otherReports = reports.filter(item => Number(item.busho.id) !== Number(gunshi.id));
+        const red = otherReports.filter(item => item.assessment.alert === 'red');
+        const orange = otherReports.filter(item => item.assessment.alert === 'orange');
         const messageList = [];
+
+        // 旧来の「軍師本人だけ一人称で待遇を申し出る」仕様を、現在の偽装・報告品質ルールに合わせて復活させる。
+        // 智謀で隠し切れた場合は selfReport 自体が残らないため、本人からは何も申告しない。
+        if (selfReport) {
+            if (selfReport.assessment.alert === 'red') {
+                messageList.push('恐れながら申し上げます。某の待遇につきましては、今のままでは少々心許なく存じます。一族郎党を養うため、温情あるご配慮を賜りたく存じます');
+            } else if (selfReport.assessment.alert === 'orange') {
+                messageList.push('恐れながら、某の待遇につきまして、今少しご配慮を賜れればありがたく存じます');
+            }
+        }
 
         if (red.length >= 3) {
             messageList.push(`${red[0].busho.name}殿以下${red.length}名、待遇への不満が深いように見受けられます。どうか早めのご配慮を`);

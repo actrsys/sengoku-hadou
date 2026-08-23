@@ -1245,6 +1245,7 @@ class AIOperationManager {
                 attackTargets.push({
                     targetId: targetId, 
                     isKunishuTarget: isKunishuTarget,
+                    score: cand.score,
                     stagingBase: cand.castleId,
                     supportBase: supportBaseId,
                     requiredForce: cand.sendSoldiers, 
@@ -1296,6 +1297,7 @@ class AIOperationManager {
                 this.operations[clanId][legionId] = {
                     type: '攻撃',
                     attackTargets: attackTargets, // ★追加：第一～第三までの目標リストを全部記憶します
+                    planningScore: firstTarget.score,
                     targetId: firstTarget.targetId, 
                     isKunishuTarget: firstTarget.isKunishuTarget,
                     stagingBase: firstTarget.stagingBase,

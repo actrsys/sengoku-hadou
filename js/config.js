@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r110'
+        Version: 'r114'
     },
 
     Main: {
@@ -67,6 +67,12 @@ window.GameConfig = {
                 DutyWeight: 0.35,
                 FullMin: 70,
                 PartialMin: 50
+            },
+            PolicyAdvice: {
+                MaxTopics: 2,
+                GunshiIntelligenceDominanceRatio: 1.2,
+                ReadinessConcernRatio: 0.85,
+                IntrigueCandidateMinProb: 0.15
             }
         },
         Kunishu: {
