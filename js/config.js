@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r126'
+        Version: 'r127'
     },
 
     Main: {
@@ -204,7 +204,9 @@ window.GameConfig = {
             WinStatIncrease: 5,
             CaptureChanceBase: 0.7,
             CaptureStrFactor: 0.002,
-            AutoWarDamageRate: 1.0
+            AutoWarDamageRate: 1.0,
+            // 大名家所属武将の戦争時忠誠加算。内政と同じ √忠誠 × 係数 を攻防能力へ1回だけ加える。
+            LoyaltyBonusFactor: 2
         },
         Faction: {
             AffinityFactorBase: 0.5,

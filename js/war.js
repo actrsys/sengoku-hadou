@@ -6,18 +6,39 @@
 
 
 class WarSystem {
+    // 大名家に所属する武将の「主家のために働く力」を戦争へ反映する共通補正。
+    // 能力値そのものは変更せず、内政と同じ √忠誠 × 係数 を攻防能力へ1回だけ加える。
+    // 諸勢力・浪人など大名家に属さない武将には主君忠誠の戦争補正を与えない。
+    static calcLoyaltyBattleBonus(busho) {
+        if (!busho || Number(busho.clan) <= 0) return 0;
+        const loyalty = Math.max(0, Math.min(100, Number(busho.loyalty) || 0));
+        return Math.sqrt(loyalty) * window.WarParams.War.LoyaltyBonusFactor;
+    }
+
+    static calcGroupLoyaltyBattleBonus(leader, subs = [], subFactor = 0) {
+        if (!leader) return 0;
+        return WarSystem.calcLoyaltyBattleBonus(leader)
+            + subs.reduce((sum, b) => sum + (WarSystem.calcLoyaltyBattleBonus(b) * subFactor), 0);
+    }
+
     static calcUnitStats(bushos) { 
         const W = window.WarParams.War; const M = window.WarParams.Military; const baseStat = W.BaseStat || 30;
-        if (!bushos || bushos.length === 0) return { ldr:baseStat, str:baseStat, int:baseStat, charm:baseStat }; 
+        if (!bushos || bushos.length === 0) return { ldr:baseStat, str:baseStat, int:baseStat, charm:baseStat, loyaltyBonus:0 }; 
         const leader = bushos[0]; const subs = bushos.slice(1); 
         let totalLdr = leader.leadership; let totalStr = leader.strength; let totalInt = leader.intelligence; 
+        const subFactor = W.SubGeneralFactor || 0.2;
         if (subs.length > 0) {
-            const subFactor = W.SubGeneralFactor || 0.2;
             subs.forEach(b => { 
                 totalLdr += b.leadership * subFactor; totalStr += b.strength * subFactor; totalInt += b.intelligence * subFactor; 
             });
         }
-        return { ldr: Math.floor(totalLdr), str: Math.floor(totalStr), int: Math.floor(totalInt), charm: leader.charm }; 
+        return {
+            ldr: Math.floor(totalLdr),
+            str: Math.floor(totalStr),
+            int: Math.floor(totalInt),
+            charm: leader.charm,
+            loyaltyBonus: WarSystem.calcGroupLoyaltyBattleBonus(leader, subs, subFactor)
+        }; 
     }
 
     static calcWarDamage(atkStats, defStats, atkSoldiers, defSoldiers, defWall, atkMorale, defTraining, type) {
@@ -27,8 +48,8 @@ class WarSystem {
         const moraleBonus = (atkMorale - (W.MoraleBase || 50)) / 100; 
         const trainingBonus = (defTraining - (W.MoraleBase || 50)) / 100;
         
-        const atkPower = ((atkStats.ldr * (W.StatsLdrWeight || 1.2)) + (atkStats.str * (W.StatsStrWeight || 0.3)) + (atkSoldiers * M.DamageSoldierPower)) * (1.0 + moraleBonus);
-        const defPower = ((defStats.ldr * 1.0) + (defStats.int * (W.StatsIntWeight || 0.5)) + (defWall * M.WallDefenseEffect) + (defSoldiers * M.DamageSoldierPower)) * (1.0 + trainingBonus);
+        const atkPower = ((atkStats.ldr * (W.StatsLdrWeight || 1.2)) + (atkStats.str * (W.StatsStrWeight || 0.3)) + (atkStats.loyaltyBonus || 0) + (atkSoldiers * M.DamageSoldierPower)) * (1.0 + moraleBonus);
+        const defPower = ((defStats.ldr * 1.0) + (defStats.int * (W.StatsIntWeight || 0.5)) + (defStats.loyaltyBonus || 0) + (defWall * M.WallDefenseEffect) + (defSoldiers * M.DamageSoldierPower)) * (1.0 + trainingBonus);
         
         let multiplier = 1.0, soldierRate = 1.0, wallRate = 0.0, counterRisk = 1.0;
         switch(type) {
@@ -1338,8 +1359,9 @@ class WarManager {
             const soldierFactor = soldiers / (soldiers + 150);
             const sqrtSol = Math.sqrt(soldiers);
 
-            const baseAtk = sqrtSol + ((leader.leadership + subLdrSum * 0.05) * 1.5 + (leader.strength + subStrSum * 0.05)) * soldierFactor;
-            const baseDef = sqrtSol + ((leader.leadership + subLdrSum * 0.05) * 1.5 + (leader.intelligence + subIntSum * 0.05)) * soldierFactor;
+            const loyaltyBonus = WarSystem.calcGroupLoyaltyBattleBonus(leader, subs, 0.05);
+            const baseAtk = sqrtSol + ((leader.leadership + subLdrSum * 0.05) * 1.5 + (leader.strength + subStrSum * 0.05) + loyaltyBonus) * soldierFactor;
+            const baseDef = sqrtSol + ((leader.leadership + subLdrSum * 0.05) * 1.5 + (leader.intelligence + subIntSum * 0.05) + loyaltyBonus) * soldierFactor;
 
             let factionBonus = 1.0;
             const activeBushosList = [leader].concat(subs);

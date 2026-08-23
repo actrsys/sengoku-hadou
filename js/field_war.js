@@ -2907,10 +2907,14 @@ class FieldWarManager {
 
         // 1. 基礎攻撃力・基礎防御力の計算
         // 見やすくするために、武将の強さ（能力の塊）を先に計算しておきます
-        let atkAbilityAtk = attacker.stats.ldr * 1.5 + attacker.stats.str;
-        let atkAbilityDef = attacker.stats.ldr * 1.5 + attacker.stats.int;
-        let defAbilityAtk = defender.stats.ldr * 1.5 + defender.stats.str;
-        let defAbilityDef = defender.stats.ldr * 1.5 + defender.stats.int;
+        const atkBusho = this.game.getBusho(attacker.bushoId);
+        const defBusho = this.game.getBusho(defender.bushoId);
+        const atkLoyaltyBonus = WarSystem.calcLoyaltyBattleBonus(atkBusho);
+        const defLoyaltyBonus = WarSystem.calcLoyaltyBattleBonus(defBusho);
+        let atkAbilityAtk = attacker.stats.ldr * 1.5 + attacker.stats.str + atkLoyaltyBonus;
+        let atkAbilityDef = attacker.stats.ldr * 1.5 + attacker.stats.int + atkLoyaltyBonus;
+        let defAbilityAtk = defender.stats.ldr * 1.5 + defender.stats.str + defLoyaltyBonus;
+        let defAbilityDef = defender.stats.ldr * 1.5 + defender.stats.int + defLoyaltyBonus;
 
         // ★攻撃側の総大将と、守備側の総大将をそれぞれ探して、統率の倍率を計算します
         const atkSideGeneral = this.units.find(u => u.isAttacker === attacker.isAttacker && u.isGeneral);
@@ -3005,8 +3009,9 @@ class FieldWarManager {
                         let uS = Math.max(0, u.soldiers);
                         
                         // 味方部隊の「元々の基礎値」を計算
-                        let uBaseAtk = Math.sqrt(uS) + (u.stats.ldr * 1.5 + u.stats.str) * (uS / (uS + 150));
-                        let uBaseDef = Math.sqrt(uS) + (u.stats.ldr * 1.5 + u.stats.int) * (uS / (uS + 150));
+                        const uLoyaltyBonus = WarSystem.calcLoyaltyBattleBonus(uBusho);
+                        let uBaseAtk = Math.sqrt(uS) + (u.stats.ldr * 1.5 + u.stats.str + uLoyaltyBonus) * (uS / (uS + 150));
+                        let uBaseDef = Math.sqrt(uS) + (u.stats.ldr * 1.5 + u.stats.int + uLoyaltyBonus) * (uS / (uS + 150));
                         
                         bonusAtk += uBaseAtk * rate;
                         bonusDef += uBaseDef * rate;

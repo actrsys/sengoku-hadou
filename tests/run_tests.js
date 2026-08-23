@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r126');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r127');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1916,6 +1916,31 @@ test('今川義元のcommon延命は討死初期延命と別sourceで積み重�
     assert.strictEqual(yoshimoto.endYear, 1584, '従来どおり討死延命1560→1574の後にcommon +10を積む');
     assert.strictEqual(yoshimoto.lifespanModifiers['system:battle_death_initial'], 14);
     assert.strictEqual(yoshimoto.lifespanModifiers.common_life_extension, 10);
+});
+
+test('戦争時の忠誠補正は大名家所属者だけに共通加算される', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/war.js');
+    const WarSystem = vm.runInContext('WarSystem', ctx);
+
+    const daimyo = { clan: 1, loyalty: 100, leadership: 80, strength: 70, intelligence: 60, charm: 50 };
+    const retainer = { clan: 1, loyalty: 25, leadership: 60, strength: 50, intelligence: 40, charm: 50 };
+    const kunishu = { clan: 0, loyalty: 100, leadership: 80, strength: 70, intelligence: 60, charm: 50 };
+
+    assert.strictEqual(WarSystem.calcLoyaltyBattleBonus(daimyo), 20, '忠誠100は最大+20');
+    assert.strictEqual(WarSystem.calcLoyaltyBattleBonus(retainer), 10, '忠誠25は+10');
+    assert.strictEqual(WarSystem.calcLoyaltyBattleBonus({ ...retainer, loyalty: 0 }), 0, '忠誠0でも減点はしない');
+    assert.strictEqual(WarSystem.calcLoyaltyBattleBonus(kunishu), 0, '諸勢力には主君忠誠補正を与えない');
+
+    const stats = WarSystem.calcUnitStats([daimyo, retainer]);
+    assert.ok(Math.abs(stats.loyaltyBonus - 22) < 1e-9, '副将補正は既存の副将寄与率0.2で薄く加える');
+
+    const warSource = read('js/war.js');
+    const fieldSource = read('js/field_war.js');
+    assert.ok(warSource.includes('WarSystem.calcGroupLoyaltyBattleBonus(leader, subs, 0.05)'), '攻城戦も共通忠誠補正を使う');
+    assert.ok(fieldSource.includes('WarSystem.calcLoyaltyBattleBonus(atkBusho)'), '野戦も共通忠誠補正を使う');
+    assert.ok(!fieldSource.includes('Math.sqrt(atkBusho.loyalty)'), '野戦側へ忠誠式を複製しない');
 });
 
 test('攻城戦と野戦のホーム補正は WarSystem の共通計算を使う', () => {

@@ -96,7 +96,7 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 
 ## 戦争
 
-- `js/war.js` — WarManagerの主要な入口。攻城戦・野戦で共通のホーム補正は `WarSystem.calcHomeBonusMultiplier()` を正本とする。
+- `js/war.js` — WarManagerの主要な入口。攻城戦・野戦で共通のホーム補正は `WarSystem.calcHomeBonusMultiplier()`、大名家所属武将の戦争時忠誠加算は `WarSystem.calcLoyaltyBattleBonus()` / `calcGroupLoyaltyBattleBonus()` を正本とする。忠誠補正は能力値自体を書き換えず、攻防能力へ `√忠誠 × War.LoyaltyBonusFactor` を1回だけ加える。諸勢力・浪人には適用しない。
 - `js/war_preparation_controller.js` — 出陣準備・自軍援軍・他勢力援軍・開戦直前UIの司令塔。CommandSystemやAI等はここから開戦準備を開始する。
 - `js/war_effort.js` — 攻城戦・戦争進行の既存大規模処理。今後の整理候補。
 - `js/field_war.js` — 野戦。Rules / View / AI がまだ混在しており今後の整理候補。
