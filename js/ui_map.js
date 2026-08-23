@@ -152,7 +152,7 @@ Object.assign(UIManager.prototype, {
     _paintCanvasByStrips(canvas, paintPixel, stripRows = null) {
         if (!canvas || typeof paintPixel !== 'function') return false;
         try {
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', canvas.id === 'clan-color-overlay' ? { willReadFrequently: true } : undefined);
             if (!ctx) return false;
             const width = canvas.width;
             const height = canvas.height;
@@ -278,7 +278,7 @@ Object.assign(UIManager.prototype, {
         const x = Math.max(0, Math.min(overlay.width - 1, Math.floor((Number(owned.pixelX) / mapW) * overlay.width)));
         const y = Math.max(0, Math.min(overlay.height - 1, Math.floor((Number(owned.pixelY) / mapH) * overlay.height)));
         try {
-            const ctx = overlay.getContext('2d');
+            const ctx = overlay.getContext('2d', { willReadFrequently: true });
             if (!ctx) return false;
             return ctx.getImageData(x, y, 1, 1).data[3] > 0;
         } catch (e) {
@@ -2213,9 +2213,16 @@ Object.assign(UIManager.prototype, {
         }
     },
 
-    async playBattleBlink(castleIdOrIds, colorA, colorB, durationMs) {
-        // Round23: 点滅する場所が画面外にならないよう、演出側が1回だけ滑らかに対象へ寄せます。
-        await this.focusMapOnCastle(castleIdOrIds, { transition: 'smooth', reason: 'battle_blink', anchor: 'territory' });
+    async playBattleBlink(castleIdOrIds, colorA, colorB, durationMs, options = {}) {
+        // 戦争中は開戦時に確定した戦場カメラを維持します。
+        // 開始/終了点滅のたびに同じ地点を再計算すると、スマホではモーダル開閉による
+        // viewport差で数pxずれるため、戦場ロック中は再フォーカスしません。
+        const warState = this.game && this.game.warManager ? this.game.warManager.state : null;
+        const firstId = Array.isArray(castleIdOrIds) ? Number(castleIdOrIds[0]) : Number(castleIdOrIds);
+        const usesLockedBattleCamera = !!(warState && warState.battleCameraLocked && Number(warState.battleFocusCastleId) === firstId);
+        if (options.focus !== false && !usesLockedBattleCamera) {
+            await this.focusMapOnCastle(castleIdOrIds, { transition: options.transition || 'smooth', reason: options.reason || 'battle_blink', anchor: 'territory' });
+        }
         return new Promise(resolve => {
             this.showMapGuard();
 
@@ -2290,9 +2297,14 @@ Object.assign(UIManager.prototype, {
     // ==========================================
     // ★城が落ちた時の、フワッと白く光る魔法！
     // ==========================================
-    async playCaptureEffect(castleIdOrIds, onHalfway) {
-        // Round23: プレイヤー戦後でも、白い制圧演出が画面外で走らないよう演出側で滑らかに寄せます。
-        await this.focusMapOnCastle(castleIdOrIds, { transition: 'smooth', reason: 'capture_effect', anchor: 'territory' });
+    async playCaptureEffect(castleIdOrIds, onHalfway, options = {}) {
+        // 戦争中は開始時から同じ戦場カメラを維持し、制圧演出でも再フォーカスしません。
+        const warState = this.game && this.game.warManager ? this.game.warManager.state : null;
+        const firstId = Array.isArray(castleIdOrIds) ? Number(castleIdOrIds[0]) : Number(castleIdOrIds);
+        const usesLockedBattleCamera = !!(warState && warState.battleCameraLocked && Number(warState.battleFocusCastleId) === firstId);
+        if (options.focus !== false && !usesLockedBattleCamera) {
+            await this.focusMapOnCastle(castleIdOrIds, { transition: options.transition || 'smooth', reason: options.reason || 'capture_effect', anchor: 'territory' });
+        }
         return new Promise(resolve => {
             this.showMapGuard();
 

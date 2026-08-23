@@ -688,13 +688,27 @@ Object.assign(WarManager.prototype, {
                 isKunishuSubjugation: defCastle.isKunishu === true && !atkCastle.isKunishu, // 防衛側が諸勢力で、攻撃側が諸勢力(蜂起)でないなら鎮圧戦！
                 isDaimyoCastle: isDaimyoCastle, // ★大名の居城フラグを追加
                 isSeaBattle: isSeaBattle, // ★海戦フラグを追加
-                isPlayerFactionInvolved: isPlayerFactionInvolved // ★追加
+                isPlayerFactionInvolved: isPlayerFactionInvolved, // ★追加
+                battleFocusCastleId: Number(defCastle.id) || 0,
+                battleCameraLocked: false
             };
 
             // ★追加：戦闘準備が整ったこのタイミングで「戦闘前」の歴史イベントをチェックします
             if (this.game.eventManager) {
                 // イベントマネージャー（受付）を経由させることでフラグが保存されます
                 await this.game.eventManager.processEvents('before_battle', this.state);
+            }
+
+            // 戦闘前イベントが別地点へカメラを動かす可能性もあるため、その完了後に
+            // 戦争中のカメラ基準を一度だけ確定します。以後の点滅/制圧演出は同じ位置を再利用します。
+            const shouldShowBattleMap = isPlayerInvolved || this.canShowNotify(isPlayerFactionInvolved, isPlayerInvolved);
+            if (shouldShowBattleMap && this.game.ui && typeof this.game.ui.focusMapOnCastle === 'function' && this.state.battleFocusCastleId > 0) {
+                await this.game.ui.focusMapOnCastle(this.state.battleFocusCastleId, {
+                    transition: 'smooth',
+                    reason: 'battle_start',
+                    anchor: 'territory'
+                });
+                this.state.battleCameraLocked = true;
             }
 
             const showInterceptDialog = async (onResult) => {
@@ -2750,6 +2764,9 @@ Object.assign(WarManager.prototype, {
     },
     
     async closeWar() { 
+        // ここまでで戦闘演出は完了。以後は通常のターンカメラへ戻れるようロックを解除します。
+        if (this.state) this.state.battleCameraLocked = false;
+
         // ★念のためバリアを強制解除します！
         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 

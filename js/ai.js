@@ -1491,7 +1491,7 @@ class AIEngine {
         const sendGuns = (sourceCastle.guns || 0) < sendSoldiers * 0.2 ? 0 : (sourceCastle.guns || 0);
         
         // ★ kunishuSystem（諸勢力の専門部署）の executeKunishuSubjugate を呼び出します！
-        this.game.kunishuSystem.executeKunishuSubjugate(sourceCastle, sourceCastle.id, sorted.map(b => b.id), sendSoldiers, sendRice, sendHorses, sendGuns, kunishu);
+        this.game.kunishuSystem.executeKunishuSubjugate(sourceCastle, Number(kunishu.castleId), sorted.map(b => b.id), sendSoldiers, sendRice, sendHorses, sendGuns, kunishu);
     }
     
     async execInternalAffairs(castle, castellan, mods, smartness) {

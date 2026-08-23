@@ -169,3 +169,11 @@ Round66を今回の全体整理の基準版とし、以後は「整理するた�
 - Smooth map focus is driven by accumulated frame deltas with a per-frame advance cap. A delayed first `requestAnimationFrame` must not consume the whole animation and turn a smooth move into an instant jump on slow mobile WebViews.
 - AI progression is identical in normal play and watch mode. Diagnostics may differ only in visibility/checkpoint detail; they must not alter AI decisions, timing rules, or battle flow.
 - Common-modal close diagnostics are staged around selector close and background/map restoration so an OS/browser forced reload can be localized without guessing a cause.
+
+
+## 戦闘カメラと諸勢力鎮圧（r90）
+- 戦争中の地図カメラは `WarManager.state.battleFocusCastleId` を正本とし、開戦時に対象拠点の領域中心へ一度だけフォーカスする。
+- 開始点滅・終了点滅・制圧演出は同じ戦場カメラを再利用し、演出ごとの再フォーカスでスマホ表示が数pxずれないようにする。
+- プレイヤーの野戦/攻城戦モーダルを閉じる時は、モーダル非表示後のviewportで同じ戦場中心へ即時補正する。
+- 諸勢力鎮圧の対象拠点は `kunishu.castleId` を正本とし、出撃元拠点IDを戦場に流用しない。
+- 自家武将の出奔通知は専用カットインを持たず、通常通知と同じ `showDialogAsync` を使用する。

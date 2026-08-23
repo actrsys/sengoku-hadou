@@ -163,8 +163,10 @@ class FactionSystem {
         this.game.affiliationSystem.becomeRonin(busho);
 
         if (clan && clan.id === this.game.playerClanId) {
-            this.game.ui.log(`【出奔】${busho.name}は${clanName}に愛想を尽かし、下野しました。`);
-            await this.game.ui.showCutin(`${busho.name} 出奔！`); // ★ await を追加します！
+            const message = `${busho.name}は${clanName}に愛想を尽かし、下野しました。`;
+            this.game.ui.log(`【出奔】${message}`);
+            // 月初カットインではなく、他の通常通知と同じ共通ダイアログをそのまま使います。
+            await this.game.ui.showDialogAsync(message);
         }
     }
 

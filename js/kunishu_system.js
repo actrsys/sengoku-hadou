@@ -971,6 +971,9 @@ class KunishuSystem {
     // 援軍データを受け取れるように引数を追加しました！
     async executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, sendHorses, sendGuns, kunishu, reinforcementData = null, selfReinforcementData = null) {
         const atkBushos = atkBushosIds.map(id => this.game.getBusho(id));
+        // 鎮圧戦の戦場は出撃元ではなく、諸勢力が実際に紐づく拠点を正本にします。
+        // 呼び出し側が古いtargetCastleIdを渡しても演出・援軍判定・戦闘対象がずれないようここで正規化します。
+        const actualTargetCastleId = Number(kunishu && kunishu.castleId) || Number(targetCastleId);
         
         // startWarの中で減らす処理が行われるため、ここで兵士や物資を減らす手動処理を消去しました（二重減り防止）
 
@@ -991,12 +994,12 @@ class KunishuSystem {
         // ★直接startWarを呼ぶのではなく、command_systemの共通の魔法にお任せします！
         if (this.game.warPreparationController && typeof this.game.warPreparationController.checkReinforcementAndStartWar === 'function') {
             const extraData = { isKunishu: true, kunishuId: kunishu.id };
-            this.game.warPreparationController.checkReinforcementAndStartWar(atkCastle, targetCastleId, atkBushos, sendSoldiers, sendRice, sendHorses, sendGuns, extraData);
+            this.game.warPreparationController.checkReinforcementAndStartWar(atkCastle, actualTargetCastleId, atkBushos, sendSoldiers, sendRice, sendHorses, sendGuns, extraData);
         } else {
             // (万が一の時のフォールバック処理)
             const kunishuName = kunishu.getName(this.game);
             const dummyDefender = {
-                id: targetCastleId,
+                id: actualTargetCastleId,
                 name: kunishuName, 
                 ownerClan: -1,
                 soldiers: kunishu.soldiers,

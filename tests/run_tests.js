@@ -2046,8 +2046,8 @@ test('戦闘カメラは城種点ではなく領域重心を使い点滅位置�
     assert.ok(data.includes('this.castlePixelCenters = centersByCastleId'), '起動時に城領域重心を保持する');
     assert.ok(data.includes('sumX: 0, sumY: 0, count: 0'), '領域割当と同時に重心を集計する');
     assert.ok(map.includes("options.anchor === 'territory'"), 'カメラ側に領域中心アンカーを持つ');
-    assert.ok(map.includes("reason: 'battle_blink', anchor: 'territory'"), '戦闘点滅は領域中心へ寄せる');
-    assert.ok(map.includes("reason: 'capture_effect', anchor: 'territory'"), '制圧演出も領域中心へ寄せる');
+    assert.ok(map.includes('usesLockedBattleCamera'), '戦争中の点滅・制圧は開戦時カメラを再利用する');
+    assert.ok(map.includes("anchor: 'territory'"), '戦闘系カメラは領域中心アンカーを使う');
 });
 
 test('低FPS端末のsmoothカメラは最初の遅延で目的地へワープしない', () => {
@@ -2074,6 +2074,46 @@ test('モーダル閉鎖時の実機診断は復帰処理を段階別に記録�
     assert.ok(ui.includes("mark('snow_start')"));
     assert.ok(ui.includes("mark('keep_highlight_start')"));
     assert.ok(turn.includes("writeAIDiagnostic(castle, 'ai_turn:scheduled')"), 'プレイ時/観戦時共通AIターンで次の診断へ進める');
+});
+
+
+test('諸勢力鎮圧は出撃元ではなくkunishu.castleIdを戦場の正本にする', () => {
+    const kunishu = read('js/kunishu_system.js');
+    const ai = read('js/ai.js');
+    assert.ok(kunishu.includes('const actualTargetCastleId = Number(kunishu && kunishu.castleId) || Number(targetCastleId)'));
+    assert.ok(kunishu.includes('checkReinforcementAndStartWar(atkCastle, actualTargetCastleId'));
+    assert.ok(kunishu.includes('id: actualTargetCastleId'));
+    assert.ok(ai.includes('executeKunishuSubjugate(sourceCastle, Number(kunishu.castleId)'));
+    assert.ok(!ai.includes('executeKunishuSubjugate(sourceCastle, sourceCastle.id'), 'AI鎮圧で出撃元IDを戦場として渡さない');
+});
+
+test('戦争中は戦場カメラを一度確定し点滅と制圧で再フォーカスしない', () => {
+    const war = read('js/war_effort.js');
+    const map = read('js/ui_map.js');
+    const ui = read('js/ui.js');
+    assert.ok(war.includes('battleFocusCastleId: Number(defCastle.id) || 0'));
+    assert.ok(war.includes("reason: 'battle_start'"));
+    assert.ok(war.includes('this.state.battleCameraLocked = true'));
+    assert.ok(map.includes('warState.battleCameraLocked'));
+    assert.ok(map.includes('Number(warState.battleFocusCastleId) === firstId'));
+    assert.ok(ui.includes("reason: 'battle_modal_close'"), 'プレイヤー戦闘モーダルを閉じたDOM状態で同じ戦場へ補正する');
+    assert.ok(ui.includes("transition: 'instant'"));
+    assert.ok(war.includes('this.state.battleCameraLocked = false'), '戦争終了後は通常カメラへ戻す');
+});
+
+test('勢力色Canvasの1pixel健全性確認はwillReadFrequently付きcontextを使う', () => {
+    const map = read('js/ui_map.js');
+    assert.ok(map.includes("overlay.getContext('2d', { willReadFrequently: true })"));
+    assert.ok(map.includes("canvas.id === 'clan-color-overlay' ? { willReadFrequently: true } : undefined"), '最初のcontext生成時からreadback用途を宣言する');
+});
+
+test('自家武将の出奔通知は通常メッセージ共通処理showDialogAsyncを使う', () => {
+    const faction = read('js/faction_system.js');
+    const start = faction.indexOf('async executeRonin(busho)');
+    const end = faction.indexOf('/**', start + 10);
+    const block = faction.slice(start, end > start ? end : start + 1800);
+    assert.ok(block.includes('await this.game.ui.showDialogAsync(message)'));
+    assert.ok(!block.includes('showCutin('), '出奔専用カットインを残さない');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

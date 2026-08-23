@@ -2622,6 +2622,19 @@ class UIManager {
     setWarModalVisible(visible) {
         if (!this.warModal) return;
         if (visible) {
+            // 援軍参加などで開戦時にはプレイヤー非関与だった戦争が手動戦闘へ切り替わる場合も、
+            // モーダルを出す前に同じ戦場中心をカメラの正本にします。
+            const openingWarState = this.game && this.game.warManager ? this.game.warManager.state : null;
+            if (openingWarState && Number(openingWarState.battleFocusCastleId) > 0 && !openingWarState.battleCameraLocked && typeof this.focusMapOnCastle === 'function') {
+                openingWarState.battleCameraLocked = true;
+                this.focusMapOnCastle(Number(openingWarState.battleFocusCastleId), {
+                    transition: 'smooth',
+                    reason: 'battle_modal_open',
+                    anchor: 'territory',
+                    diagnostic: false,
+                    lockInteraction: false
+                });
+            }
             this.warModal.classList.remove('hidden');
             // ★追加：攻城戦が始まる時に、平時のコマンドリストを綺麗にお掃除して非表示にします！
             if (typeof this.clearCommandMenu === 'function') {
@@ -2629,6 +2642,22 @@ class UIManager {
             }
         } else {
             this.warModal.classList.add('hidden');
+
+            // スマホでは戦争モーダルの表示/非表示で地図の可視領域寸法が微妙に変わる場合があります。
+            // 戦争中にカメラを固定している場合は、モーダルを閉じたDOM状態で同じ戦場中心へ
+            // 即時補正します。focusMapOnCastleはclientWidth/Height参照時に同期レイアウトを行うため、
+            // 次の描画フレームより前に正しい位置へ戻せます。
+            const warState = this.game && this.game.warManager ? this.game.warManager.state : null;
+            if (warState && warState.battleCameraLocked && Number(warState.battleFocusCastleId) > 0 && typeof this.focusMapOnCastle === 'function') {
+                this.focusMapOnCastle(Number(warState.battleFocusCastleId), {
+                    transition: 'instant',
+                    reason: 'battle_modal_close',
+                    anchor: 'territory',
+                    diagnostic: false,
+                    lockInteraction: false
+                });
+            }
+
             // ★追加：戦争が終わって画面を閉じる時に、カードの「部隊がいたよシール」を全部ひっぺがします
             const allCards = document.querySelectorAll('.responsive-army-box, .army-box');
             allCards.forEach(card => {
