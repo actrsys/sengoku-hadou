@@ -1850,6 +1850,7 @@ class UIManager {
         await this.waitForNextPaint();
 
         this.forceResetModals();
+        if (typeof this.resetMapViewState === 'function') this.resetMapViewState();
         this.updateLoadingProgress(45, '画面を整理しています');
 
         // ゲームのステータスを「タイトル画面」に戻します。

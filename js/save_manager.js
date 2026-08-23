@@ -43,6 +43,118 @@ class SaveManager {
         return result;
     }
 
+    // ゲーム本体を書き換える前に、復元へ進んでよいセーブかを軽量検査する。
+    // ここでは保存構造と主要ID参照だけを見る。画像decode等の実行時失敗は復元側の安全復旧で扱う。
+    _validateSaveDataStructure(data) {
+        const fail = message => { throw new Error(`セーブデータ検証エラー: ${message}`); };
+        if (!data || typeof data !== 'object' || Array.isArray(data)) fail('ルートがオブジェクトではありません');
+
+        const scenarioFolder = String(data.scenarioFolder || '');
+        if (!scenarioFolder) fail('scenarioFolder がありません');
+        if (typeof SCENARIOS !== 'undefined' && Array.isArray(SCENARIOS)
+            && !SCENARIOS.some(s => s && s.folder === scenarioFolder)) {
+            fail(`未登録のシナリオです (${scenarioFolder})`);
+        }
+
+        const year = Number(data.year);
+        const month = Number(data.month);
+        if (!Number.isInteger(year) || year < 1) fail('year が不正です');
+        if (!Number.isInteger(month) || month < 1 || month > 12) fail('month が不正です');
+
+        const requiredArrays = ['castles', 'bushos', 'clans', 'princesses', 'provinces', 'legions', 'kunishus', 'turnQueueIds'];
+        requiredArrays.forEach(key => {
+            if (!Array.isArray(data[key])) fail(`${key} が配列ではありません`);
+        });
+        if (data.castles.length === 0) fail('castles が空です');
+        if (data.bushos.length === 0) fail('bushos が空です');
+        if (data.clans.length === 0) fail('clans が空です');
+
+        const collectIds = (rows, label) => {
+            const ids = new Set();
+            rows.forEach((row, index) => {
+                if (!row || typeof row !== 'object' || Array.isArray(row)) fail(`${label}[${index}] が不正です`);
+                const id = Number(row.id);
+                if (!Number.isInteger(id) || id <= 0) fail(`${label}[${index}].id が不正です`);
+                if (ids.has(id)) fail(`${label} のID ${id} が重複しています`);
+                ids.add(id);
+            });
+            return ids;
+        };
+
+        const castleIds = collectIds(data.castles, 'castles');
+        const bushoIds = collectIds(data.bushos, 'bushos');
+        const clanIds = collectIds(data.clans, 'clans');
+        collectIds(data.provinces, 'provinces');
+        collectIds(data.legions, 'legions');
+        collectIds(data.kunishus, 'kunishus');
+
+        data.castles.forEach((castle, index) => {
+            const ownerClan = Number(castle.ownerClan || 0);
+            if (ownerClan !== 0 && !clanIds.has(ownerClan)) fail(`castles[${index}].ownerClan の参照先がありません`);
+            const castellanId = Number(castle.castellanId || 0);
+            if (castellanId !== 0 && !bushoIds.has(castellanId)) fail(`castles[${index}].castellanId の参照先がありません`);
+        });
+
+        data.bushos.forEach((busho, index) => {
+            const clanId = Number(busho.clan || 0);
+            if (clanId !== 0 && !clanIds.has(clanId)) fail(`bushos[${index}].clan の参照先がありません`);
+            const castleId = Number(busho.castleId || 0);
+            if (castleId !== 0 && !castleIds.has(castleId)) fail(`bushos[${index}].castleId の参照先がありません`);
+        });
+
+        data.clans.forEach((clan, index) => {
+            const leaderId = Number(clan.leaderId || 0);
+            if (leaderId !== 0 && !bushoIds.has(leaderId)) fail(`clans[${index}].leaderId の参照先がありません`);
+        });
+
+        const turnQueueSeen = new Set();
+        data.turnQueueIds.forEach((rawId, index) => {
+            const id = Number(rawId);
+            if (!Number.isInteger(id) || !castleIds.has(id)) fail(`turnQueueIds[${index}] の城IDが不正です`);
+            if (turnQueueSeen.has(id)) fail(`turnQueueIds の城ID ${id} が重複しています`);
+            turnQueueSeen.add(id);
+        });
+        const playerClanId = Number(data.playerClanId);
+        if (!Number.isInteger(playerClanId) || (playerClanId !== -100 && !clanIds.has(playerClanId))) {
+            fail('playerClanId が不正です');
+        }
+        const currentIndex = Number(data.currentIndex || 0);
+        if (!Number.isInteger(currentIndex) || currentIndex < 0
+            || (data.turnQueueIds.length > 0 && currentIndex >= data.turnQueueIds.length)) {
+            fail('currentIndex が不正です');
+        }
+
+        const mapWidth = Number(data.mapWidth);
+        const mapHeight = Number(data.mapHeight);
+        if (!Number.isFinite(mapWidth) || mapWidth <= 0 || !Number.isFinite(mapHeight) || mapHeight <= 0) {
+            fail('地図サイズが不正です');
+        }
+        if (!data.flags || typeof data.flags !== 'object' || Array.isArray(data.flags)) fail('flags が不正です');
+        if (!data.aiOperations || typeof data.aiOperations !== 'object' || Array.isArray(data.aiOperations)) fail('aiOperations が不正です');
+
+        return true;
+    }
+
+    async _recoverFromFailedRestore() {
+        this.game.isProcessingAI = false;
+        this.game.isWatchMode = false;
+        this.game.originalPlayerClanId = null;
+        this.game.selectionMode = null;
+        this.game.validTargets = [];
+        this.game.lastMenuState = null;
+        if (this.game.aiTimer) { clearTimeout(this.game.aiTimer); this.game.aiTimer = null; }
+        if (this.game.warManager && this.game.warManager.state) this.game.warManager.state.active = false;
+        if (this.game.ui) {
+            if (typeof this.game.ui.resetMapViewState === 'function') this.game.ui.resetMapViewState();
+            if (typeof this.game.ui.returnToTitle === 'function') {
+                await this.game.ui.returnToTitle({ loadingAlreadyVisible: true });
+                return;
+            }
+            this.game.ui.hideLoadingScreen();
+        }
+        this.game.phase = 'title';
+    }
+
     // どんな方法でセーブする時も、この魔法で「今のゲームの全データ」をひとまとめにします
     async _createSaveDataObj(options = {}) {
         let scenarioIndex = SCENARIOS.findIndex(s => s.folder === this.game.scenarioFolder);
@@ -151,6 +263,7 @@ class SaveManager {
     
     // どんな方法でロードした時も、この魔法で「受け取ったデータ」をゲーム内に展開します
     async _restoreSaveDataObj(d) {
+        this._validateSaveDataStructure(d);
         if (this.game.ui) this.game.ui.updateLoadingProgress(5, 'セーブデータを復元しています');
         // --- お掃除作業 ---
         this.game.isProcessingAI = false; 
@@ -329,7 +442,12 @@ class SaveManager {
         this.game.updateClanDisplayNames();
 
         if (this.game.ui) this.game.ui.updateLoadingProgress(90, '地図を描画しています');
-        this.game.ui.hasInitializedMap = false;
+        if (this.game.ui && typeof this.game.ui.resetMapViewState === 'function') {
+            this.game.ui.resetMapViewState({ initialZoomLevel: 1 });
+        } else if (this.game.ui) {
+            this.game.ui.currentCastle = null;
+            this.game.ui.hasInitializedMap = false;
+        }
         this.game.ui.pixelCastleMap = null;
         this.game.ui.pixelProvinceMap = null;
         this.game.ui.lastClanColorsHash = null;
@@ -403,20 +521,35 @@ class SaveManager {
     loadGameFromFile(e) { 
         const file = e.target.files[0]; if (!file) return; 
         e.target.value = '';
+        if (this.game.ui) this.game.ui.showLoadingScreen('セーブデータを確認しています', 0);
         
         const reader = new FileReader(); 
         reader.onload = async (evt) => {
+            let restoreStarted = false;
             try { 
                 const uint8 = new Uint8Array(evt.target.result); // ★バイナリデータとして受け取ります
                 const d = this._decryptData(uint8); // ★復号化します
+                this._validateSaveDataStructure(d); // ゲーム状態へ触る前に構造・主要参照を検査します
+                restoreStarted = true;
                 await this._restoreSaveDataObj(d);
             } catch(err) { 
                 console.error(err); 
+                if (restoreStarted) await this._recoverFromFailedRestore();
+                else if (this.game.ui) this.game.ui.hideLoadingScreen();
                 if (this.game.ui) {
-                    this.game.ui.showDialog("セーブデータの読み込みに失敗しました。", false);
+                    const msg = restoreStarted
+                        ? "セーブデータの復元中に問題が発生したため、タイトルへ戻しました。"
+                        : "セーブデータの構造を確認できなかったため、読み込みを中止しました。";
+                    this.game.ui.showDialog(msg, false);
                 }
             } 
         }; 
+        reader.onerror = () => {
+            if (this.game.ui) {
+                this.game.ui.hideLoadingScreen();
+                this.game.ui.showDialog("セーブファイルを読み取れませんでした。", false);
+            }
+        };
         reader.readAsArrayBuffer(file); // ★テキストではなくバイナリとして読み込む魔法に変更します
     }
     
@@ -465,20 +598,26 @@ class SaveManager {
             return;
         }
 
+        let restoreStarted = false;
         try {
             let d;
-            // ★以前の暗号化されていないデータも読み込めるようにする思いやりです
             if (rawData instanceof Uint8Array) {
-                d = this._decryptData(rawData); // ★復号化します
+                d = this._decryptData(rawData);
             } else {
                 d = rawData;
             }
+            this._validateSaveDataStructure(d); // ゲーム状態へ触る前に構造・主要参照を検査します
+            restoreStarted = true;
             await this._restoreSaveDataObj(d);
         } catch(err) { 
             console.error(err); 
+            if (restoreStarted) await this._recoverFromFailedRestore();
+            else if (this.game.ui) this.game.ui.hideLoadingScreen();
             if (this.game.ui) {
-                this.game.ui.hideLoadingScreen(); // ★エラーの時も蓋を開けます
-                this.game.ui.showDialog("セーブデータの読み込みに失敗しました。", false);
+                const msg = restoreStarted
+                    ? "セーブデータの復元中に問題が発生したため、タイトルへ戻しました。"
+                    : "セーブデータの構造を確認できなかったため、読み込みを中止しました。";
+                this.game.ui.showDialog(msg, false);
             }
         }
     }

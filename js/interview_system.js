@@ -685,10 +685,20 @@ class InterviewSystem {
         });
     }
 
-    _getRumorTopStats(target) {
-        return this._getRumorStatDefs()
-            .map(([key]) => Number(target && target[key] || 0))
-            .sort((a, b) => b - a);
+    _getRumorGeneralStatDefs() {
+        // 総合評価はゲーム内の「総合」と同じく魅力を除く5能力で見る。
+        return [
+            ['leadership', '統率'], ['strength', '武勇'], ['politics', '内政'],
+            ['diplomacy', '外交'], ['intelligence', '智謀']
+        ];
+    }
+
+    _getRumorAptitudeDefs() {
+        return [
+            ['aptAshigaru', '足軽'], ['aptKiba', '騎馬'], ['aptTeppo', '鉄砲'],
+            ['aptYumi', '弓術'], ['aptBugei', '武芸'], ['aptNinjutsu', '忍術'],
+            ['aptMaritime', '操船']
+        ];
     }
 
     _isRumorExpertCandidate(target, domain) {
@@ -700,17 +710,74 @@ class InterviewSystem {
             && value >= best - Number(cfg.CandidateBestGap);
     }
 
-    _isRumorGeneralCandidate(target) {
-        const cfg = window.MainParams.Interview.Rumor;
-        const stats = this._getRumorTopStats(target);
-        return stats.length >= 3
-            && stats[0] >= Number(cfg.GeneralMinBestStat)
-            && stats[0] + stats[1] + stats[2] >= Number(cfg.GeneralTopThreeMinTotal);
+    _getRumorGeneralTotal(target) {
+        return this._getRumorGeneralStatDefs()
+            .reduce((sum, [key]) => sum + Number(target && target[key] || 0), 0);
     }
 
-    _pickRandom(items) {
-        if (!Array.isArray(items) || items.length === 0) return null;
-        return items[Math.floor(Math.random() * items.length)] || null;
+    _isRumorGeneralCandidate(target) {
+        if (!target) return false;
+        const cfg = window.MainParams.Interview.Rumor;
+        return this._getRumorGeneralTotal(target) >= Number(cfg.GeneralFiveStatMinTotal);
+    }
+
+    _getRumorBestAptitude(target) {
+        if (!target || typeof SkillManager === 'undefined' || typeof SkillManager.getAptitudeLevel !== 'function') return null;
+        const cfg = window.MainParams.Interview.Rumor;
+        const minLevel = Number(cfg.AptitudeMinLevel);
+        let best = null;
+        this._getRumorAptitudeDefs().forEach(([key, label], order) => {
+            const rank = target[key] || 'E';
+            const level = Number(SkillManager.getAptitudeLevel(rank));
+            if (level < minLevel) return;
+            if (!best || level > best.level || (level === best.level && order < best.order)) {
+                best = { key, label, rank, level, order };
+            }
+        });
+        return best;
+    }
+
+    _getRumorCandidateWeight(row) {
+        if (!row || !row.target) return 1;
+        const cfg = window.MainParams.Interview.Rumor;
+        if (row.mode === 'expert' && row.domain) {
+            const value = Number(row.target[row.domain.key] || 0);
+            return Math.max(1, Math.min(3, 1 + Math.floor((value - Number(cfg.CandidateMinStat)) / 10)));
+        }
+        if (row.mode === 'aptitude' && row.aptitude) {
+            return row.aptitude.level >= 5 ? 3 : 2;
+        }
+        if (row.mode === 'general') {
+            const total = this._getRumorGeneralTotal(row.target);
+            return Math.max(1, Math.min(3, 1 + Math.floor((total - Number(cfg.GeneralFiveStatMinTotal)) / 50)));
+        }
+        return 1;
+    }
+
+    _pickWeightedRumorRow(rows) {
+        if (!Array.isArray(rows) || rows.length === 0) return null;
+        const weighted = rows.map(row => ({ row, weight: this._getRumorCandidateWeight(row) }));
+        const total = weighted.reduce((sum, item) => sum + item.weight, 0);
+        let roll = Math.random() * total;
+        for (const item of weighted) {
+            roll -= item.weight;
+            if (roll < 0) return item.row;
+        }
+        return weighted[weighted.length - 1].row;
+    }
+
+    _buildRumorCandidateRow(target, domain, depth) {
+        if (domain && this._isRumorExpertCandidate(target, domain)) {
+            return { target, mode: 'expert', domain, aptitude: null, depth };
+        }
+        const aptitude = this._getRumorBestAptitude(target);
+        if (aptitude) {
+            return { target, mode: 'aptitude', domain: null, aptitude, depth };
+        }
+        if (this._isRumorGeneralCandidate(target)) {
+            return { target, mode: 'general', domain: null, aptitude: null, depth };
+        }
+        return null;
     }
 
     _selectRumorTarget(interviewer) {
@@ -722,13 +789,32 @@ class InterviewSystem {
         for (const depth of depths) {
             const regional = this._getRumorRegionalCandidates(this._getRumorRegionCastleIds(depth));
             if (domain) {
-                const expertCandidates = regional.filter(target => this._isRumorExpertCandidate(target, domain));
-                const target = this._pickRandom(expertCandidates);
-                if (target) return { target, mode: 'expert', domain, depth };
+                // 得意分野を持つ聞き手は、まず同分野の専門家またはA/S適性の尖った人物を噂する。
+                // それらが周辺にいない時だけ、従来どおり総合型へフォールバックする。
+                const focusedRows = regional.map(target => {
+                    if (this._isRumorExpertCandidate(target, domain)) {
+                        return { target, mode: 'expert', domain, aptitude: null, depth };
+                    }
+                    const aptitude = this._getRumorBestAptitude(target);
+                    return aptitude ? { target, mode: 'aptitude', domain: null, aptitude, depth } : null;
+                }).filter(Boolean);
+                const focused = this._pickWeightedRumorRow(focusedRows);
+                if (focused) return focused;
+
+                const generalRows = regional
+                    .filter(target => this._isRumorGeneralCandidate(target))
+                    .map(target => ({ target, mode: 'general', domain: null, aptitude: null, depth }));
+                const fallback = this._pickWeightedRumorRow(generalRows);
+                if (fallback) return fallback;
+                continue;
             }
-            const generalCandidates = regional.filter(target => this._isRumorGeneralCandidate(target));
-            const target = this._pickRandom(generalCandidates);
-            if (target) return { target, mode: 'general', domain: null, depth };
+
+            // 得意能力のない聞き手は、A/S適性の尖りを優先理由にしつつ総合型も同じ候補群へ入れる。
+            const rows = regional
+                .map(target => this._buildRumorCandidateRow(target, null, depth))
+                .filter(Boolean);
+            const row = this._pickWeightedRumorRow(rows);
+            if (row) return row;
         }
         return null;
     }
@@ -781,28 +867,31 @@ class InterviewSystem {
 
     _getRumorAbilityText(row, attitude) {
         if (row.mode === 'expert' && row.domain) {
-            const prefix = attitude === 'reserved' ? '聞けば、' : '聞けば、';
-            return `${prefix}${row.domain.label}に秀でた御仁だとか。`;
+            return `聞けば、${row.domain.label}に秀でた御仁だとか。`;
+        }
+        if (row.mode === 'aptitude' && row.aptitude) {
+            return attitude === 'reserved'
+                ? `${row.aptitude.label}の扱いには、かなり長けているそうです。`
+                : `${row.aptitude.label}にかけては、かなりの腕前だとの評判です。`;
         }
         return attitude === 'reserved'
-            ? '腕は立つそうです。'
-            : '評判になるだけあって、なかなか腕の立つ御仁だと聞いております。';
+            ? '総じて隙の少ない御仁だそうです。'
+            : '評判になるだけあって、総じて力量のある御仁だと聞いております。';
+    }
+
+    _isRumorLeader(target) {
+        if (!target) return false;
+        if (target.isDaimyo) return true;
+        const kunishuId = Number(target.belongKunishuId || 0);
+        if (kunishuId <= 0) return false;
+        const kunishu = this.game.kunishuSystem && this.game.kunishuSystem.getKunishu(kunishuId);
+        return !!kunishu && Number(kunishu.leaderId) === Number(target.id);
     }
 
     _getRumorLoyaltyText(target) {
         if (!target) return '';
         if (window.BushoStatusRules && window.BushoStatusRules.isRonin(target)) {
             return '今は仕える主を持たず、浪々の身だそうです。';
-        }
-        if (Number(target.belongKunishuId || 0) > 0) {
-            const kunishu = this.game.kunishuSystem && this.game.kunishuSystem.getKunishu(target.belongKunishuId);
-            if (kunishu && Number(kunishu.leaderId) === Number(target.id)) {
-                return `今は${kunishu.getName(this.game)}の頭領を務めているそうです。`;
-            }
-        }
-        if (target.isDaimyo) {
-            const clan = this.game.getClan ? this.game.getClan(Number(target.clan)) : null;
-            return clan ? `当人が今の${clan.name}を率いております。` : '当人が一勢力を率いる立場だそうです。';
         }
 
         const band = this._getConcealmentProfile(target).perceivedBand;
@@ -817,8 +906,10 @@ class InterviewSystem {
         if (!row || !row.target) return [];
         const attitude = this.activeInterviewAttitude;
         const messages = [this._getRumorOpeningText(row, attitude), this._getRumorAbilityText(row, attitude)];
-        // reserved は口数を抑え、人物名と評判まで。良好～丁寧なら立場・主君との評判まで伝える。
-        if (attitude !== 'reserved') messages.push(this._getRumorLoyaltyText(row.target));
+        // reserved は口数を抑え、人物名と評判まで。大名・諸勢力頭領も主君評判を語る意味がないため2段で止める。
+        if (attitude !== 'reserved' && !this._isRumorLeader(row.target)) {
+            messages.push(this._getRumorLoyaltyText(row.target));
+        }
         return messages.filter(Boolean).map(text => `「${text}」`);
     }
 

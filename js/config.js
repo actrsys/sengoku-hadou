@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r128'
+        Version: 'r130'
     },
 
     Main: {
@@ -81,13 +81,14 @@ window.GameConfig = {
                 // 「武将の噂」は面談時だけ軽く周辺地域を走査する。武将ごとの経路探索はしない。
                 SearchDepth: 2,
                 ExtendedSearchDepth: 3,
-                // B以上を「得意分野」として扱う。40だけ高いような武将を専門家扱いしない。
-                ExpertMinStat: 60,
-                CandidateMinStat: 60,
+                // 70以上を「得意分野」として扱い、噂に上がる専門家も同じ最低値を要求する。
+                ExpertMinStat: 70,
+                CandidateMinStat: 70,
                 CandidateBestGap: 5,
-                // 専門分野を持たない聞き手向けの総合人材。上位3能力の合計で最低限の評判級を判定する。
-                GeneralMinBestStat: 60,
-                GeneralTopThreeMinTotal: 180
+                // 専門分野を持たない聞き手向けの総合人材。魅力を除く5能力合計で判定する。
+                GeneralFiveStatMinTotal: 300,
+                // 適性A/Sは能力条件と別の「噂になる理由」として扱う。
+                AptitudeMinLevel: 4
             }
         },
         Kunishu: {

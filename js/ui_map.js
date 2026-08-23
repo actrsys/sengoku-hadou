@@ -48,6 +48,31 @@ Object.assign(UIManager.prototype, {
         this.velocityY = 0;
     },
 
+    // タイトル復帰・新規開始・ロードで前のカメラ状態を持ち越さないための正本。
+    // initialZoomLevel は 0=最小、1=標準、2=最大。通常は標準、タイトルからの観戦だけ0を指定する。
+    resetMapViewState(options = {}) {
+        this._stopMapInertia();
+        if (typeof this._cancelActiveMapFocus === 'function') this._cancelActiveMapFocus();
+        this._cancelActiveMapFocus = null;
+        this._mapViewResetToken = Number(this._mapViewResetToken || 0) + 1;
+        this._mapFocusLockCount = 0;
+        this._mapFocusPrevPointerEvents = '';
+        this.isZooming = false;
+        this.currentCastle = null;
+        this.hasInitializedMap = false;
+        this.zoomLevel = undefined;
+        this._initialMapZoomLevel = Number.isInteger(options.initialZoomLevel)
+            ? Math.max(0, Math.min(2, options.initialZoomLevel))
+            : 1;
+
+        const sc = document.getElementById('map-scroll-container');
+        if (sc) {
+            sc.style.pointerEvents = '';
+            sc.scrollLeft = 0;
+            sc.scrollTop = 0;
+        }
+    },
+
     // ★Round 13：巨大マップの強制GPUレイヤー化はPCだけに限定します。
     // 古いスマホでは scale() だけの方が合成メモリを増やしにくく安定します。
     _getMapScaleTransform(scale, forcePcGpu = false) {
@@ -586,14 +611,12 @@ Object.assign(UIManager.prototype, {
             baseScale * (config.max || 2.5)     
         ];
         
-        // ★マップが新しく作られる時（ロードやタイトルに戻った時）も、ズームをデフォルトに初期化します
+        // 新しいゲーム/ロードでは地図リセット時に予約された初期ズームを使う。
+        // 通常は1（標準）、タイトルからの観戦だけ0（最小）を指定する。
         if (this.zoomLevel === undefined || !this.hasInitializedMap) {
-            if (this.game.phase === 'daimyo_select') {
-                // 0 番目：一番小さいサイズ（min） 1 番目：中くらいのサイズ（mid） 2 番目：一番大きいサイズ（max）
-                this.zoomLevel = 1; 
-            } else {
-                this.zoomLevel = 1; 
-            }
+            const requested = Number.isInteger(this._initialMapZoomLevel) ? this._initialMapZoomLevel : 1;
+            this.zoomLevel = Math.max(0, Math.min(this.zoomStages.length - 1, requested));
+            this._initialMapZoomLevel = null;
         } else {
             if (this.zoomLevel >= this.zoomStages.length) {
                 this.zoomLevel = this.zoomStages.length - 1;
@@ -1090,20 +1113,16 @@ Object.assign(UIManager.prototype, {
             
             const sc = document.getElementById('map-scroll-container');
             if (sc) {
+                const initToken = Number(this._mapViewResetToken || 0);
                 setTimeout(() => {
-                    // ★ここを差し替え！：シナリオのフォルダ名とデバイスに合わせて、最初に中心にするお城を決める魔法です！
-                    const isPC = document.body.classList.contains('is-pc'); // 今がPC版かどうか調べます
-                    const folderName = this.game.scenarioFolder; // さっき覚えさせたシナリオのフォルダ名を取り出します
-                    
-                    // ゲームの続きから（ロード時など）の場合は、今ターンの城を優先します
-                    const currentTarget = this.currentCastle || this.game.getCurrentTurnCastle();
-                    
-                    // 設定箱の中から、今のシナリオ用の設定を探します（無ければDEFAULTを使います）
+                    // リセット前の古い初期フォーカス予約は、新しいゲーム/ロードへ持ち越さない。
+                    if (initToken !== Number(this._mapViewResetToken || 0) || !this.hasInitializedMap) return;
+                    const isPC = document.body.classList.contains('is-pc');
+                    const folderName = this.game.scenarioFolder;
                     const config = INITIAL_MAP_CENTER_CONFIG[folderName] || INITIAL_MAP_CENTER_CONFIG.DEFAULT;
-                    // PCかスマホかで、使うIDを選びます
                     const centerCastleId = isPC ? config.PC : config.MOBILE;
-                    
-                    const centerCastle = currentTarget || this.game.getCastle(centerCastleId);
+                    // 初回表示は常にシナリオ既定地点。前回選択城や現在ターン城を初期中心には使わない。
+                    const centerCastle = this.game.getCastle(centerCastleId);
                     if (centerCastle) {
                         // お城が見つかったら、そこを真ん中にして映します。最初は一瞬で移動させます！
                         this.scrollToActiveCastle(centerCastle, true);

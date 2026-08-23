@@ -193,8 +193,12 @@ class GameManager {
         if (this.ui) {
             this.ui.logHistory = [];
             this.ui.clearWarLog();
-            this.ui.currentCastle = null; // 前の城の記憶を消します
-            this.ui.hasInitializedMap = false; // マップも最初から作り直すようにします
+            if (typeof this.ui.resetMapViewState === 'function') {
+                this.ui.resetMapViewState({ initialZoomLevel: startInWatchMode ? 0 : 1 });
+            } else {
+                this.ui.currentCastle = null;
+                this.ui.hasInitializedMap = false;
+            }
             this.ui.selectedDaimyoId = null; // 選んでいた大名の記憶も消します
         }
         
@@ -221,6 +225,9 @@ class GameManager {
     
     async loadScenario(folder, options = {}) {
         const startInWatchMode = !!(options && options.startInWatchMode);
+        if (this.ui && typeof this.ui.resetMapViewState === 'function') {
+            this.ui.resetMapViewState({ initialZoomLevel: startInWatchMode ? 0 : 1 });
+        }
         // ★追加：シナリオの準備を始める前に、画面をロード画面で隠します
         if (this.ui) this.ui.showLoadingScreen('シナリオを準備しています', 0);
         // 古いスマホでもロード画面を確実に1フレーム描いてから重い処理へ入ります。

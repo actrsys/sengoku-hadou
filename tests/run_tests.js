@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r128');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r130');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2177,6 +2177,46 @@ test('セーブデータから一門派生キャッシュを除外する', () =>
 });
 
 
+test('SaveManager は復元前にセーブ構造と主要ID参照を検証する', () => {
+    const ctx = createContext({
+        SCENARIOS: [{ folder: '1560_okehazama' }]
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    const manager = new ctx.SaveManager({});
+    const valid = {
+        year: 1560, month: 4, scenarioFolder: '1560_okehazama',
+        castles: [{ id: 1, ownerClan: 1, castellanId: 10 }],
+        bushos: [{ id: 10, clan: 1, castleId: 1 }],
+        clans: [{ id: 1, leaderId: 10 }],
+        princesses: [], provinces: [{ id: 1 }], legions: [], kunishus: [],
+        turnQueueIds: [1], currentIndex: 0, playerClanId: 1, mapWidth: 1200, mapHeight: 800,
+        flags: {}, aiOperations: {}
+    };
+    assert.strictEqual(manager._validateSaveDataStructure(valid), true);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, month: 13 }), /month/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, bushos: [{ id: 10, clan: 1, castleId: 999 }] }), /castleId/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, scenarioFolder: 'missing' }), /未登録のシナリオ/);
+});
+
+test('ロード失敗時は事前検証と復元後安全復帰を分離する', () => {
+    const source = read('js/save_manager.js');
+    assert.ok(source.includes('this._validateSaveDataStructure(d); // ゲーム状態へ触る前に構造・主要参照を検査します'));
+    assert.ok(source.includes('if (restoreStarted) await this._recoverFromFailedRestore();'));
+    assert.ok(source.includes('await this.game.ui.returnToTitle({ loadingAlreadyVisible: true });'));
+});
+
+test('地図初期化は前回座標を破棄しシナリオ既定地点を使い、タイトル観戦だけ最小ズームにする', () => {
+    const map = read('js/ui_map.js');
+    const game = read('js/game.js');
+    const ui = read('js/ui.js');
+    assert.ok(map.includes('resetMapViewState(options = {})'));
+    assert.ok(map.includes('sc.scrollLeft = 0') && map.includes('sc.scrollTop = 0'), '前回スクロール座標を破棄する');
+    assert.ok(map.includes('const centerCastle = this.game.getCastle(centerCastleId);'), '初回中心はシナリオ既定城だけから決める');
+    assert.ok(!map.includes('const currentTarget = this.currentCastle || this.game.getCurrentTurnCastle();'), '初回中心へ前回選択城/現在ターン城を混ぜない');
+    assert.ok(game.includes('initialZoomLevel: startInWatchMode ? 0 : 1'), 'タイトル観戦だけ最小ズームを予約する');
+    assert.ok(ui.includes("if (typeof this.resetMapViewState === 'function') this.resetMapViewState();"), 'タイトル復帰時もカメラ状態を破棄する');
+});
+
 test('PC入れ子コマンドの選択中表示はhoverと明確に区別する', () => {
     const css = read('css/style.css');
     assert.ok(css.includes('body.is-pc .pc-cmd-col .cmd-btn.category.active'));
@@ -2934,6 +2974,9 @@ test('武将の噂は周辺拠点を一度だけ辿り専門家/総合候補を�
         MapGraphService: { isAdjacent() { return false; } },
         LoyaltyInsightRules: {
             getConcealmentProfile(b) { return { perceivedBand: Number(b.loyalty || 0) >= 85 ? 'stable' : 'danger' }; }
+        },
+        SkillManager: {
+            getAptitudeLevel(rank) { return ({ S: 5, A: 4, B: 3, C: 2, D: 1, E: 0 })[rank] || 0; }
         }
     });
     loadScript(ctx, 'js/config.js');
@@ -2944,11 +2987,12 @@ test('武将の噂は周辺拠点を一度だけ辿り専門家/総合候補を�
     const adjacency = new Map([[1, [2]], [2, [1, 3]], [3, [2, 4]], [4, [3]]]);
     const low = { id: 10, name: '低能力', clan: 2, castleId: 2, status: 'active', leadership: 40, strength: 30, politics: 30, diplomacy: 30, intelligence: 30, charm: 30, loyalty: 90 };
     const expertTarget = { id: 11, name: '統率者', clan: 3, castleId: 3, status: 'active', leadership: 75, strength: 72, politics: 50, diplomacy: 40, intelligence: 60, charm: 55, loyalty: 90 };
-    const generalTarget = { id: 12, name: '万能型', clan: 2, castleId: 2, status: 'active', leadership: 65, strength: 60, politics: 60, diplomacy: 45, intelligence: 55, charm: 50, loyalty: 70 };
+    const generalTarget = { id: 12, name: '万能型', clan: 2, castleId: 2, status: 'active', leadership: 65, strength: 60, politics: 60, diplomacy: 60, intelligence: 55, charm: 10, loyalty: 70 };
     const tooFar = { id: 13, name: '遠方', clan: 4, castleId: 4, status: 'active', leadership: 99, strength: 99, politics: 99, diplomacy: 99, intelligence: 99, charm: 99, loyalty: 90 };
     const kunishu = { id: 14, name: '蜂須賀政勝', clan: 0, belongKunishuId: 5, castleId: 2, status: 'active', leadership: 62, strength: 65, politics: 55, diplomacy: 50, intelligence: 60, charm: 55, loyalty: 60 };
+    const aptitudeTarget = { id: 15, name: '騎馬巧者', clan: 2, castleId: 2, status: 'active', leadership: 55, strength: 55, politics: 45, diplomacy: 40, intelligence: 45, charm: 45, aptKiba: 'A', loyalty: 80 };
     const game = {
-        playerClanId: 1, castles, bushos: [low, expertTarget, generalTarget, tooFar, kunishu],
+        playerClanId: 1, castles, bushos: [low, expertTarget, generalTarget, tooFar, kunishu, aptitudeTarget],
         mapGraph: { getAdjacentIds(c) { return adjacency.get(c.id) || []; } },
         getCastle(id) { return castles.find(c => c.id === Number(id)); },
         getClan(id) { return { id, name: `勢力${id}` }; },
@@ -2957,12 +3001,17 @@ test('武将の噂は周辺拠点を一度だけ辿り専門家/総合候補を�
     const system = new ctx.InterviewSystem(game);
     const region2 = system._getRumorRegionCastleIds(2);
     assert.deepStrictEqual(Array.from(region2).sort((a,b)=>a-b), [1,2,3], '2リンク探索は周辺拠点だけを一度Set化する');
-    assert.strictEqual(system._getRumorExpertDomain({ leadership: 40, strength: 30, politics: 30, diplomacy: 30, intelligence: 30, charm: 30 }), null, '40だけ高い武将を専門家扱いしない');
+    assert.strictEqual(system._getRumorExpertDomain({ leadership: 69, strength: 30, politics: 30, diplomacy: 30, intelligence: 30, charm: 30 }), null, '70未満だけ高い武将を専門家扱いしない');
     assert.strictEqual(system._getRumorExpertDomain({ leadership: 70, strength: 50, politics: 40, diplomacy: 30, intelligence: 60, charm: 55 }).key, 'leadership');
-    assert.strictEqual(system._isRumorExpertCandidate(low, { key: 'leadership' }), false, '噂対象もB未満なら専門分野候補にしない');
-    assert.strictEqual(system._isRumorExpertCandidate(expertTarget, { key: 'leadership' }), true, 'B以上かつ本人上位能力なら専門分野候補にする');
-    assert.strictEqual(system._isRumorGeneralCandidate(generalTarget), true, '専門性のない聞き手向けに上位3能力の総合力で候補を作る');
+    assert.strictEqual(system._isRumorExpertCandidate(low, { key: 'leadership' }), false, '噂対象も70未満なら専門分野候補にしない');
+    assert.strictEqual(system._isRumorExpertCandidate(expertTarget, { key: 'leadership' }), true, '70以上かつ本人上位能力なら専門分野候補にする');
+    assert.strictEqual(system._getRumorGeneralTotal(generalTarget), 300, '総合は魅力を除く5能力合計を使う');
+    assert.strictEqual(system._isRumorGeneralCandidate(generalTarget), true, '専門性のない聞き手向けに5能力合計300以上を候補にする');
+    assert.strictEqual(system._isRumorGeneralCandidate({ ...generalTarget, diplomacy: 59, charm: 99 }), false, '魅力が高くても5能力合計300未満なら総合候補にしない');
     assert.strictEqual(system._isRumorGeneralCandidate(low), false, '弱い武将を総合的に強い噂対象にしない');
+    const apt = system._getRumorBestAptitude(aptitudeTarget);
+    assert.ok(apt && apt.key === 'aptKiba' && apt.rank === 'A', '能力が低めでもA適性なら噂理由を持てる');
+    assert.strictEqual(system._buildRumorCandidateRow(aptitudeTarget, null, 2).mode, 'aptitude', 'A/S適性を独立した噂候補として扱う');
     assert.ok(!system._getRumorRegionalCandidates(region2).includes(tooFar), '探索範囲外の武将は候補にしない');
     assert.ok(!system._getRumorSubjectText(kunishu).includes('城'), '諸勢力の地域アンカーを実所在地の城名として噂に出さない');
 });
@@ -2976,11 +3025,24 @@ test('武将の噂は表面態度で情報量を変え同一面談中は再抽�
     loadScript(ctx, 'js/interview_system.js');
     const target = { id: 20, name: '噂武将', clan: 2, castleId: 2, status: 'active', loyalty: 60 };
     const messages = [];
-    const game = { playerClanId: 1, bushos: [], castles: [], getClan() { return { name: '他家' }; }, ui: { interviewView: { showMessages(_b, rows) { messages.push(rows); } } } };
+    const game = {
+        playerClanId: 1,
+        bushos: [],
+        castles: [],
+        getClan() { return { name: '他家' }; },
+        kunishuSystem: {
+            getKunishu(id) { return Number(id) === 5 ? { id: 5, leaderId: 22, getName() { return '川並衆'; } } : null; }
+        },
+        ui: { interviewView: { showMessages(_b, rows) { messages.push(rows); } } }
+    };
     const system = new ctx.InterviewSystem(game);
     const row = { target, mode: 'expert', domain: { key: 'leadership', label: '統率' } };
     system.activeInterviewAttitude = 'friendly';
     assert.strictEqual(system._getRumorMessages({}, row).length, 3, '良好な態度なら存在・能力・立場/主君評判の3項目を話す');
+    const daimyoRow = { ...row, target: { ...target, id: 21, isDaimyo: true } };
+    assert.strictEqual(system._getRumorMessages({}, daimyoRow).length, 2, '噂対象が大名本人なら自明な立場説明を重ねず2項目で終える');
+    const leaderRow = { ...row, target: { ...target, id: 22, clan: 0, belongKunishuId: 5 } };
+    assert.strictEqual(system._getRumorMessages({}, leaderRow).length, 2, '噂対象が諸勢力頭領本人なら自明な立場説明を重ねず2項目で終える');
     system.activeInterviewAttitude = 'reserved';
     assert.strictEqual(system._getRumorMessages({}, row).length, 2, '控えめな態度なら2項目に口数を減らす');
     let picks = 0;
