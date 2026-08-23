@@ -644,18 +644,66 @@ class InterviewSystem {
         }
 
         const opinionText = this._getOpinionText(relation.compatibilityScore, attitude);
-        const loyaltyText = this._getTargetLoyaltyText(interviewer, target, relation);
+        const opinionDirection = this._getOpinionDirection(relation.compatibilityScore);
+        const loyaltyAssessment = this._getTargetLoyaltyAssessment(interviewer, target, relation);
         const messages = [`「${this._getTopicOpening(target)}${opinionText}」`];
 
         if (attitude === 'reserved') {
             // 寡黙な態度では接触関係の説明まで重ねず、要点だけ二言で答える。
+            const loyaltyText = this._bridgeAssessmentText(
+                loyaltyAssessment.text,
+                opinionDirection,
+                loyaltyAssessment.direction
+            );
             messages.push(`「${loyaltyText}」`);
         } else {
-            const contactText = this._getContactText(relation, interviewer, attitude);
+            const contactDirection = this._getContactDirection(relation);
+            const contactText = this._bridgeAssessmentText(
+                this._getContactText(relation, interviewer, attitude),
+                opinionDirection,
+                contactDirection
+            );
+            const loyaltyText = this._bridgeAssessmentText(
+                loyaltyAssessment.text,
+                contactDirection,
+                loyaltyAssessment.direction
+            );
             messages.push(`「${contactText}」`, `「${loyaltyText}」`);
         }
 
         this.view.showMessages(interviewer, messages, () => this.showMainMenu(interviewer), '他者について聞く');
+    }
+
+    _getOpinionDirection(score) {
+        if (Number(score) >= 68) return 'positive';
+        if (Number(score) >= 52) return 'neutral';
+        return 'negative';
+    }
+
+    _getContactDirection(relation) {
+        const contact = Number(relation && relation.contactScore || 0);
+        if (contact >= 52) return 'positive';
+        if (contact >= 34) return 'neutral';
+        return 'negative';
+    }
+
+    _getLoyaltyDirection(band) {
+        if (band === 'stable') return 'positive';
+        if (band === 'warning') return 'neutral';
+        return 'negative';
+    }
+
+    _stripAssessmentTransition(text) {
+        return String(text || '').replace(/^(?:ただ|もっとも|そのうえ|そのため)、?\s*/, '');
+    }
+
+    _bridgeAssessmentText(text, previousDirection, currentDirection) {
+        const body = this._stripAssessmentTransition(text);
+        // 3段階会話では各段の境界だけを見る。前段と評価方向が逆転した時だけ逆接を置き、
+        // 2段目と3段目へ機械的に「ただ」を重ねない。
+        if (previousDirection === 'positive' && currentDirection === 'negative') return `ただ、${body}`;
+        if (previousDirection === 'negative' && currentDirection === 'positive') return `もっとも、${body}`;
+        return body;
     }
 
     _getOpinionText(score, attitude = this.activeInterviewAttitude) {
@@ -849,7 +897,7 @@ class InterviewSystem {
         return '胸中までは読み切れませぬ。ただ、某には少々信用の置けぬところがあるように思えます。';
     }
 
-    _getTargetLoyaltyText(interviewer, target, relation) {
+    _getTargetLoyaltyAssessment(interviewer, target, relation) {
         const I = window.MainParams.Interview;
         const knowledge = this._calcTargetKnowledge(interviewer, target, relation);
         const concealment = this._getConcealmentProfile(target);
@@ -860,9 +908,13 @@ class InterviewSystem {
 
         if (knowledge < I.KnowledgeBlindBelow) {
             const protectedBlindText = this._getBlindProtectedTargetText(bias);
-            if (protectedBlindText) return protectedBlindText;
+            if (protectedBlindText) return { text: protectedBlindText, direction: 'positive' };
             const biasedBlindText = this._getBlindBiasedTargetText(bias);
-            return biasedBlindText || this._getBlindTargetText(interviewer, target, relation, concealment);
+            if (biasedBlindText) return { text: biasedBlindText, direction: 'negative' };
+            return {
+                text: this._getBlindTargetText(interviewer, target, relation, concealment),
+                direction: 'neutral'
+            };
         }
 
         const assessedLoyalty = Math.max(0, observedLoyalty - Number(bias.loyaltyPenalty || 0));
@@ -870,14 +922,19 @@ class InterviewSystem {
         if (Number(bias.protectionShift || 0) > 0) {
             assessedBand = this._shiftLoyaltyBand(assessedBand, Number(bias.protectionShift || 0));
         }
+        const direction = this._getLoyaltyDirection(assessedBand);
 
         // 庇っている時は「偽装を見破った」事実自体を伏せ、表面上は客観的な評価として話す。
         if (detected && Number(bias.protectionShift || 0) <= 0) {
-            return this._getDetectedConcealmentText(assessedBand);
+            return { text: this._getDetectedConcealmentText(assessedBand), direction };
         }
 
         const uncertain = knowledge < I.KnowledgeConfidentMin;
-        return this._getTargetLoyaltyBandText(assessedBand, uncertain);
+        return { text: this._getTargetLoyaltyBandText(assessedBand, uncertain), direction };
+    }
+
+    _getTargetLoyaltyText(interviewer, target, relation) {
+        return this._getTargetLoyaltyAssessment(interviewer, target, relation).text;
     }
 }
 

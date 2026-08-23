@@ -199,6 +199,14 @@ class InterviewView {
         return this._bindButton(button, onClick, 'choice.ogg');
     }
 
+    _makeChoiceButton(label, onClick) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'interview-choice-btn';
+        button.textContent = label;
+        return this._bindButton(button, onClick, 'choice.ogg');
+    }
+
     _renderFooterActions(choices) {
         if (!this.footer) return;
         this.footer.replaceChildren();
@@ -219,7 +227,7 @@ class InterviewView {
         if (!this.inlineActions) return;
         this.inlineActions.replaceChildren();
         (choices || []).forEach(choice => {
-            const button = this._makeInlineButton(choice.label, choice.onClick);
+            const button = this._makeChoiceButton(choice.label, choice.onClick);
             if (choice.disabled) button.disabled = true;
             this.inlineActions.appendChild(button);
         });

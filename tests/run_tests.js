@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r118');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r120');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1652,6 +1652,11 @@ test('評定の二択UIは設定画面と同系統の切替表示を使い、確
     assert.ok(!councilView.includes("cancelText: '評定に戻る'"), '評定に戻るという個別文言を残さない');
 });
 
+test('評定終了ボタンは銀のキャンセル系として扱う', () => {
+    const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+    assert.ok(/id="legion-council-finish-btn"[^>]*data-se="cancel\.ogg"[^>]*class="btn-secondary"/.test(html));
+});
+
 test('寿命補正は LifeSystem が sourceId ごとに安全に適用・解除する', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/life_system.js');
@@ -2176,6 +2181,8 @@ test('面談は専用View内で完結し固定論理画面内・非スクロー�
     assert.ok(html.includes('class="dialog-body-container"') && html.includes('id="interview-session-dialog-name" class="dialog-name-label'), '面談下段は通常会話の顔＋名前＋メッセージ文法を直接使う');
     assert.ok(!view.includes('interview-session-conversation-frame'), '旧面談専用会話外枠を残さない');
     assert.ok(css.includes('#interview-modal .interview-session-dialog') && css.includes('.interview-session-inline-actions'), '上段情報・選択肢・下段通常会話を分離する');
+    assert.ok(css.includes('background: linear-gradient(to bottom, #586979') && css.includes('grid-column: 1;'), '面談選択肢は緑と分離した藍鉄系・7/8/4配置を使う');
+    assert.ok(css.includes('box-sizing: border-box') && css.includes('grid-template-rows: repeat(2, 42px)'), '面談選択肢の枠線を行高内へ収めて上下を欠かさない');
     assert.ok(css.includes('#interview-session-dialog-name { left: 20px; }'), 'PC面談の人物名は通常会話と同じ枠上辺配置を使う');
     assert.ok(html.includes('id="interview-session-summary-panel"') && !html.includes('id="interview-session-face-panel"'), '上部サマリーへ顔を重複表示しない');
     assert.ok(view.includes('StatPresenter.getDisplayStatHTML(busho, key'), '面談能力は武将一覧・詳細と同じランク表示を使う');
@@ -2252,6 +2259,23 @@ test('面談の他者評価は高智謀の偽装・看破・全く読めない�
     assert.ok(unreadable.startsWith('ただ、'), '前段の接触評価を繰り返さず次の論点へつなぐ');
     assert.ok(unreadable.includes('胸中をほとんど見せませぬ'));
     assert.ok(unreadable.includes('読み切れませぬ'));
+});
+
+
+test('面談の3段階他者評価は評価方向が変わる境界だけ逆接し同じ接続詞を重ねない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/loyalty_insight_rules.js');
+    loadScript(ctx, 'js/interview_system.js');
+    const system = new ctx.InterviewSystem({});
+
+    const second = system._bridgeAssessmentText('ただ、普段はさほど話す機会がございませぬ。', 'positive', 'negative');
+    const third = system._bridgeAssessmentText('ただ、待遇に不満を抱えているようです。', 'negative', 'negative');
+    assert.ok(second.startsWith('ただ、'), '好意的評価から悪化する2段目だけ逆接する');
+    assert.ok(!third.startsWith('ただ、'), '2段目が既に悪化している場合は3段目へ「ただ」を重ねない');
+
+    const recovered = system._bridgeAssessmentText('もっとも、殿への忠義は本物でしょう。', 'negative', 'positive');
+    assert.ok(recovered.startsWith('もっとも、'), '否定的評価から好転する場合は「もっとも」で自然につなぐ');
 });
 
 

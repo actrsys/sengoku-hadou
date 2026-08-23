@@ -455,7 +455,7 @@ async function validateCommandAndInterviewStates(cdp) {
             const arrow = getComputedStyle(active, '::after');
             const content = document.getElementById('interview-session-content');
             const footer = document.getElementById('interview-session-footer');
-            const inline = document.querySelector('.interview-session-inline-btn');
+            const inline = document.querySelector('.interview-choice-btn');
             const inlineBox = document.getElementById('interview-session-inline-actions').getBoundingClientRect();
             const interviewModal = document.getElementById('interview-modal');
             const conversation = document.getElementById('interview-session-dialog');
@@ -477,7 +477,8 @@ async function validateCommandAndInterviewStates(cdp) {
                 footer: {top:fr.top,bottom:fr.bottom,left:fr.left,right:fr.right},
                 footerOutside: footer.parentElement === document.getElementById('interview-modal') && !content.contains(footer),
                 standardInsideButtons: content.querySelectorAll('.btn-primary, .btn-secondary, .btn-danger').length,
-                inlineUsesDetailButton: inline && inline.classList.contains('daimyo-detail-action-btn'),
+                inlineUsesDedicatedChoiceButton: inline && inline.classList.contains('interview-choice-btn') && !inline.classList.contains('daimyo-detail-action-btn'),
+                inlineButtons: [...document.querySelectorAll('.interview-choice-btn')].map(b => { const br=b.getBoundingClientRect(); return ({width:br.width,height:br.height,left:br.left,right:br.right,top:br.top,bottom:br.bottom,bg:getComputedStyle(b).backgroundImage}); }),
                 inlineBox: {top:inlineBox.top,bottom:inlineBox.bottom},
                 conversation: {top:conversationRect.top,bottom:conversationRect.bottom},
                 modal: {top:modalRect.top,bottom:modalRect.bottom},
@@ -499,7 +500,14 @@ async function validateCommandAndInterviewStates(cdp) {
     assert.ok(pc.scrollHeight <= pc.clientHeight + 3, 'PC面談内容が枠をはみ出している');
     assert.strictEqual(pc.footerOutside, true, 'PC面談の戻る/決定系ボタンは内容枠の外へ置く');
     assert.strictEqual(pc.standardInsideButtons, 0, 'PC面談の内容枠内に標準決定/キャンセルボタンを置かない');
-    assert.strictEqual(pc.inlineUsesDetailButton, true, 'PC面談の内容内操作は詳細画面系ボタンを使う');
+    assert.strictEqual(pc.inlineUsesDedicatedChoiceButton, true, 'PC面談の会話選択肢は詳細画面ボタンを流用せず専用ボタンを使う');
+    assert.strictEqual(pc.inlineButtons.length, 3, 'PC面談メニューは3選択肢を描画する');
+    assert.ok(pc.inlineButtons.every(b => b.width >= 240 && b.height >= 38), 'PC面談の選択肢は戻るボタンに負けない十分な大きさを持つ');
+    assert.ok(pc.inlineButtons.every(b => b.bg && b.bg !== 'none'), 'PC面談の選択肢は不透明な専用背景を持つ');
+    assert.ok(pc.inlineButtons.every(b => b.bg.includes('rgb(88, 105, 121)')), 'PC面談の選択肢は緑の情報枠と分離した藍鉄系を使う');
+    assert.ok(Math.abs(pc.inlineButtons[0].top - pc.inlineButtons[1].top) <= 1, 'PC面談の1・2個目は同じ上段へ置く');
+    assert.ok(Math.abs(pc.inlineButtons[0].left - pc.inlineButtons[2].left) <= 1 && pc.inlineButtons[2].top > pc.inlineButtons[0].bottom, 'PC面談の3個目はテンキー7/8/4型で2段目左へ置く');
+    assert.ok(pc.inlineButtons[0].top >= pc.inlineBox.top + 1 && pc.inlineButtons[2].bottom <= pc.inlineBox.bottom - 1, 'PC面談の上下段ボタン枠を操作帯内で見切らせない');
     assert.ok(pc.rect.width >= 1000, `PC会話開始時も上部情報ウインドウの横幅を維持する (${pc.rect.width})`);
     assert.ok(pc.hint.bottom < pc.summary.top, 'PC面談の案内文が情報枠へかぶらない');
     assert.ok(pc.inlineBox.bottom <= pc.footer.top + 1, 'PC面談は選択肢の下に戻るボタンを置く');
@@ -527,7 +535,8 @@ async function validateCommandAndInterviewStates(cdp) {
             const fr = footer.getBoundingClientRect();
             const cs = getComputedStyle(content);
             const actionBox = document.getElementById('interview-session-inline-actions').getBoundingClientRect();
-            const action = document.querySelector('.interview-session-inline-btn').getBoundingClientRect();
+            const action = document.querySelector('.interview-choice-btn').getBoundingClientRect();
+            const actionButtons = [...document.querySelectorAll('.interview-choice-btn')].map(b => { const br=b.getBoundingClientRect(); return ({left:br.left,top:br.top,bottom:br.bottom}); });
             const conversation = document.getElementById('interview-session-dialog').getBoundingClientRect();
             const name = document.getElementById('interview-session-dialog-name').getBoundingClientRect();
             const message = document.getElementById('interview-session-dialog-message').getBoundingClientRect();
@@ -546,6 +555,7 @@ async function validateCommandAndInterviewStates(cdp) {
                 scrollHeight:content.scrollHeight,
                 clientHeight:content.clientHeight,
                 actionHeight:action.height,
+                actionButtons,
                 actionTop:actionBox.top, actionBottom:actionBox.bottom,
                 conversationTop:conversation.top, conversationBottom:conversation.bottom,
                 nameTop:name.top, nameBottom:name.bottom,
@@ -562,6 +572,8 @@ async function validateCommandAndInterviewStates(cdp) {
     assert.strictEqual(mobile.overflowY, 'hidden', 'スマホ面談枠をスクロール領域にしない');
     assert.ok(mobile.scrollHeight <= mobile.clientHeight + 3, 'スマホ面談内容が枠をはみ出している');
     assert.ok(mobile.actionHeight >= 27, 'スマホ面談内操作ボタンが小さすぎる');
+    assert.ok(Math.abs(mobile.actionButtons[0].top - mobile.actionButtons[1].top) <= 1, 'スマホ面談の1・2個目も同じ上段へ置く');
+    assert.ok(Math.abs(mobile.actionButtons[0].left - mobile.actionButtons[2].left) <= 1 && mobile.actionButtons[2].top > mobile.actionButtons[0].bottom, 'スマホ面談の3個目もテンキー7/8/4型で2段目左へ置く');
     assert.ok(mobile.hintBottom < mobile.summaryTop, 'スマホ面談の「話したい内容」案内が情報枠へかぶらない');
     assert.ok(mobile.actionBottom <= mobile.footer.top + 1, 'スマホ面談は選択肢の下に戻るボタンを置く');
     assert.ok(mobile.footer.bottom < mobile.conversationTop, 'スマホ面談の戻るボタンは下段会話より上へ置く');
@@ -674,7 +686,7 @@ async function validateCommandAndInterviewStates(cdp) {
             body.className = 'interview-session-body interview-session-list-view interviewer-list-view';
             body.innerHTML = '<div class="interview-session-list-tools"><input class="interview-session-search" placeholder="名前で探す"><select class="interview-session-sort-select"><option>統率</option></select><button class="daimyo-detail-action-btn interview-session-sort-direction">降順</button><span class="interview-session-list-count">30人</span></div><div class="interview-session-person-grid">' + Array.from({length:15},(_,i)=>'<button class="interview-session-person"><span class="interview-session-person-face"></span><span class="interview-session-person-name">武将'+(i+1)+'</span></button>').join('') + '</div>';
             const cr=content.getBoundingClientRect(), br=body.getBoundingClientRect(), gr=body.querySelector('.interview-session-person-grid').getBoundingClientRect();
-            return {contentScroll:content.scrollHeight,contentClient:content.clientHeight,bodyScroll:body.scrollHeight,bodyClient:body.clientHeight,bodyBottom:br.bottom,gridBottom:gr.bottom,contentBottom:cr.bottom};
+            return {contentScroll:content.scrollHeight,contentClient:content.clientHeight,bodyScroll:body.scrollHeight,bodyClient:body.clientHeight,bodyBottom:br.bottom,gridBottom:gr.bottom,contentBottom:cr.bottom,contentWidth:cr.width};
         })()`,
         returnByValue: true
     });
@@ -682,6 +694,7 @@ async function validateCommandAndInterviewStates(cdp) {
     assert.ok(pcList.contentScroll <= pcList.contentClient + 3, 'PC面談15人一覧が内容枠をはみ出している');
     assert.ok(pcList.bodyScroll <= pcList.bodyClient + 3, 'PC面談15人一覧が内部ではみ出している');
     assert.ok(pcList.gridBottom <= pcList.bodyBottom + 1, 'PC面談15人カードを一覧下端に収める');
+    assert.ok(Math.abs(pcList.contentWidth - pc.rect.width) <= 1, `PC面談の武将選択時と個別会話時で上部枠幅を統一する (${pcList.contentWidth}/${pc.rect.width})`);
 
     console.log('✓ PC入れ子コマンド選択状態・面談下端会話・中央情報枠・スマホ全幅一覧 visual regression');
 }
