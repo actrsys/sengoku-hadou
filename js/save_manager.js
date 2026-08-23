@@ -146,11 +146,20 @@ class SaveManager {
         if (this.game.warManager && this.game.warManager.state) this.game.warManager.state.active = false;
         if (this.game.ui) {
             if (typeof this.game.ui.resetMapViewState === 'function') this.game.ui.resetMapViewState();
+            this.game.ui.hideLoadingScreen();
+            if (typeof this.game.ui.forceResetModals === 'function') this.game.ui.forceResetModals();
+
+            const message = "セーブデータの復元中に問題が発生したため、タイトルへ戻ります。";
+            if (typeof this.game.ui.showDialogAsync === 'function') {
+                await this.game.ui.showDialogAsync(message, false);
+            } else if (typeof this.game.ui.showDialog === 'function') {
+                await new Promise(resolve => this.game.ui.showDialog(message, false, resolve));
+            }
+
             if (typeof this.game.ui.returnToTitle === 'function') {
-                await this.game.ui.returnToTitle({ loadingAlreadyVisible: true });
+                await this.game.ui.returnToTitle();
                 return;
             }
-            this.game.ui.hideLoadingScreen();
         }
         this.game.phase = 'title';
     }
@@ -534,13 +543,13 @@ class SaveManager {
                 await this._restoreSaveDataObj(d);
             } catch(err) { 
                 console.error(err); 
-                if (restoreStarted) await this._recoverFromFailedRestore();
-                else if (this.game.ui) this.game.ui.hideLoadingScreen();
+                if (restoreStarted) {
+                    await this._recoverFromFailedRestore();
+                    return;
+                }
                 if (this.game.ui) {
-                    const msg = restoreStarted
-                        ? "セーブデータの復元中に問題が発生したため、タイトルへ戻しました。"
-                        : "セーブデータの構造を確認できなかったため、読み込みを中止しました。";
-                    this.game.ui.showDialog(msg, false);
+                    this.game.ui.hideLoadingScreen();
+                    this.game.ui.showDialog("セーブデータの構造を確認できなかったため、読み込みを中止しました。", false);
                 }
             } 
         }; 
@@ -611,13 +620,13 @@ class SaveManager {
             await this._restoreSaveDataObj(d);
         } catch(err) { 
             console.error(err); 
-            if (restoreStarted) await this._recoverFromFailedRestore();
-            else if (this.game.ui) this.game.ui.hideLoadingScreen();
+            if (restoreStarted) {
+                await this._recoverFromFailedRestore();
+                return;
+            }
             if (this.game.ui) {
-                const msg = restoreStarted
-                    ? "セーブデータの復元中に問題が発生したため、タイトルへ戻しました。"
-                    : "セーブデータの構造を確認できなかったため、読み込みを中止しました。";
-                this.game.ui.showDialog(msg, false);
+                this.game.ui.hideLoadingScreen();
+                this.game.ui.showDialog("セーブデータの構造を確認できなかったため、読み込みを中止しました。", false);
             }
         }
     }

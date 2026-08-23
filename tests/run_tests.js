@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r130');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r131');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2198,11 +2198,14 @@ test('SaveManager は復元前にセーブ構造と主要ID参照を検証する
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, scenarioFolder: 'missing' }), /未登録のシナリオ/);
 });
 
-test('ロード失敗時は事前検証と復元後安全復帰を分離する', () => {
+test('ロード失敗時は事前検証と復元後安全復帰を分離し、復帰前に案内する', () => {
     const source = read('js/save_manager.js');
     assert.ok(source.includes('this._validateSaveDataStructure(d); // ゲーム状態へ触る前に構造・主要参照を検査します'));
-    assert.ok(source.includes('if (restoreStarted) await this._recoverFromFailedRestore();'));
-    assert.ok(source.includes('await this.game.ui.returnToTitle({ loadingAlreadyVisible: true });'));
+    assert.ok(source.includes('await this._recoverFromFailedRestore();'));
+    assert.ok(source.includes('セーブデータの復元中に問題が発生したため、タイトルへ戻ります。'));
+    assert.ok(source.includes('await this.game.ui.showDialogAsync(message, false);'));
+    assert.ok(source.includes('await this.game.ui.returnToTitle();'));
+    assert.ok(!source.includes('タイトルへ戻しました。'));
 });
 
 test('地図初期化は前回座標を破棄しシナリオ既定地点を使い、タイトル観戦だけ最小ズームにする', () => {

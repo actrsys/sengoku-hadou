@@ -45,7 +45,7 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - `js/game.js` — GameManager。ゲーム全体の司令塔。専門部署へ仕事を振る。
 - `js/turn_manager.js` — 月初・各拠点ターン・月末の進行順を管理。月次の具体的な計算式は持たず、FactionSystem / EconomyRules / DomesticRules / PersonnelRules / AIStaffing 等へ委譲する。
 - `js/data_manager.js` — シナリオ、CSV/BIN、地図データの読み込み。城色画像は各城の種点座標だけを帯状解析し、国境画像は国IDマップへ変換する。その後、各国のピクセルを国内の最寄り城へ割り当てて領土用の城IDマップを構築する。巨大RGBAや全画面BFSキューは常駐保持せず、地図UI・イベントは同一TypedArrayを共有する。
-- `js/save_manager.js` — セーブ、ロード、IndexedDB、オートセーブ。ロードはゲーム状態へ触る前に保存構造と主要ID参照を事前検証し、復元開始後の実行時失敗だけ安全にタイトルへ戻す。
+- `js/save_manager.js` — セーブ、ロード、IndexedDB、オートセーブ。ロードはゲーム状態へ触る前に保存構造と主要ID参照を事前検証し、復元開始後の実行時失敗だけ、復帰前に「タイトルへ戻ります」と案内してから安全にタイトルへ戻す。
 - `js/event_manager.js` — 通常イベントの発火管理に加え、常駐イベントの状態遷移（false→true / true→false）とセーブ継続状態を管理する。歴史イベントOFF時は適用中の `historical_` 常駐効果を解除し、再ON後は各イベント本来の登録タイミングで条件を再評価する。歴史上の条件・効果量・対象は `js/event/historical_event.js` 等のイベント定義側、実際の数値書換は各専門Systemへ委譲する。 `UserSettings` は設定変更を汎用通知し、`GameManager` が歴史イベント設定だけを `EventManager` へルーティングするため、設定UIは常駐効果の実処理を直接呼ばない。
 
 ## ルール・共通計算
@@ -90,7 +90,7 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - `js/command_catalog.js` — コマンドメニュー構造・実行条件・コマンド仕様表の正本。UI表示とCommandSystemが同じ定義を参照する。
 - `js/command_system.js` — コマンド開始、汎用の対象選択・数量入力・実行フローの司令塔。仕様表、セーブ/ロード画面、開戦準備そのものは持たない。
 - `js/save_load_view.js` — セーブ/ロードのスロット選択画面。保存形式や復号は知らず、`SaveManager.readSaveSlots()` から復号済みデータを受け取る。
-- `js/save_manager.js` — IndexedDB・暗号化/復号・保存データ形式・ロード事前検証の正本。UIが `loadFromDB` や `_decryptData` を直接触らない。復元前に必須配列・年月・シナリオ・主要ID参照を検査し、不正なら現在ゲームを変更せず中止する。復元開始後に画像/Canvas等で失敗した場合だけ入力状態を解除してタイトルへ安全復帰する。
+- `js/save_manager.js` — IndexedDB・暗号化/復号・保存データ形式・ロード事前検証の正本。UIが `loadFromDB` や `_decryptData` を直接触らない。復元前に必須配列・年月・シナリオ・主要ID参照を検査し、不正なら現在ゲームを変更せず中止する。復元開始後に画像/Canvas等で失敗した場合だけ入力状態を解除し、「タイトルへ戻ります」と利用者へ案内してからタイトルへ安全復帰する。
 
 `command_catalog.js` と `save_load_view.js` はそれぞれ約700行/300行の独立した責務で、`command_system.js` の全体像を大きく損ねていたため分離する。小さなコマンド種別ごとには分割しない。
 
