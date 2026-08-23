@@ -1912,6 +1912,19 @@ test('モーダル中はスマホの非必須地図Canvasを解放し勢力色�
     assert.ok(css.includes('body:not(.is-pc).mobile-memory-guard .castle-card'));
 });
 
+test('雪Canvasは描画失敗やbacking store消失後にキャッシュを無効化して自己回復する', () => {
+    const map = read('js/ui_map.js');
+    const snowStart = map.indexOf('updateSnowOverlay()');
+    const snowEnd = map.indexOf('// ==========================================\n    // ★新魔法：国を勢力の色で塗りつぶす魔法です！', snowStart);
+    const snowBlock = map.slice(snowStart, snowEnd);
+    assert.ok(map.includes('_isSnowOverlayHealthy(expectedHash = null)'));
+    assert.ok(map.includes("ctx.getImageData(probe.x, probe.y, 1, 1).data[3] > 0"), '雪Canvasも1pixelだけで内容喪失を検出する');
+    assert.ok(snowBlock.includes('const painted = this._paintCanvasByStrips(overlay'));
+    assert.ok(snowBlock.includes('if (!painted || !snowProbe)'));
+    assert.ok(snowBlock.includes('this._isSnowOverlayHealthy(currentSnowHash)'));
+    assert.ok(map.includes("sc.addEventListener('touchend', recoverSnowAfterTouch"), 'スマホ操作後にも軽量な自己回復チェックを行う');
+});
+
 test('月初寿命再計算とAI作戦は古いスマホで協調分割する', () => {
     const life = read('js/life_system.js');
     const ops = read('js/ai_operation.js');

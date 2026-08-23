@@ -182,6 +182,7 @@ Object.assign(UIManager.prototype, {
                 this.lastSnowHash = null;
                 this._snowOverlayDirty = true;
                 this._lastSnowOverlay = null;
+                this._snowOverlayProbe = null;
             }
             console.warn(`地図Canvas(${canvas.id || 'unknown'})の帯状描画をスキップしました:`, error);
             return false;
@@ -200,6 +201,7 @@ Object.assign(UIManager.prototype, {
                 this.lastSnowHash = null;
                 this._snowOverlayDirty = true;
                 this._lastSnowOverlay = null;
+                this._snowOverlayProbe = null;
             }
         };
         canvas.addEventListener('contextlost', event => {
@@ -251,8 +253,9 @@ Object.assign(UIManager.prototype, {
             canvas.height = 1;
         } catch (e) {}
         canvas.remove();
-        if (canvasId === 'snow-overlay' && this._lastSnowOverlay === canvas) {
-            this._lastSnowOverlay = null;
+        if (canvasId === 'snow-overlay') {
+            if (this._lastSnowOverlay === canvas) this._lastSnowOverlay = null;
+            if (this._snowOverlayProbe && this._snowOverlayProbe.canvas === canvas) this._snowOverlayProbe = null;
         }
     },
 
@@ -266,6 +269,21 @@ Object.assign(UIManager.prototype, {
         this._snowOverlayDirty = true;
         this.lastSnowHash = null;
         document.body.classList.add('mobile-memory-guard');
+    },
+
+    _isSnowOverlayHealthy(expectedHash = null) {
+        const overlay = document.getElementById('snow-overlay');
+        const probe = this._snowOverlayProbe;
+        if (!overlay || overlay.width <= 1 || overlay.height <= 1 || !probe || probe.canvas !== overlay) return false;
+        if (expectedHash !== null && probe.hash !== expectedHash) return false;
+        if (probe.x < 0 || probe.y < 0 || probe.x >= overlay.width || probe.y >= overlay.height) return false;
+        try {
+            const ctx = overlay.getContext('2d', { willReadFrequently: true });
+            if (!ctx) return false;
+            return ctx.getImageData(probe.x, probe.y, 1, 1).data[3] > 0;
+        } catch (e) {
+            return false;
+        }
     },
 
     _isClanColorOverlayHealthy() {
@@ -294,6 +312,18 @@ Object.assign(UIManager.prototype, {
         if (!this._isClanColorOverlayHealthy()) {
             this.lastClanColorsHash = null;
             this._lastClanColorOverlay = null;
+        }
+
+        const hasHeavySnow = Array.isArray(this.game && this.game.provinces) && this.game.provinces.some(
+            p => p.statusEffects && p.statusEffects.includes('heavySnow')
+        );
+        if (hasHeavySnow && !this._isSnowOverlayHealthy()) {
+            // スマホではCanvasのDOMが残ったままbacking storeだけ失われることがある。
+            // 雪状態そのものは生きているため、キャッシュだけ無効化して次の描画で必ず復元する。
+            this.lastSnowHash = null;
+            this._snowOverlayDirty = true;
+            this._lastSnowOverlay = null;
+            this._snowOverlayProbe = null;
         }
     },
 
@@ -500,8 +530,17 @@ Object.assign(UIManager.prototype, {
             }
         }, { passive: false });
 
-        sc.addEventListener('touchend', resetPinch, { passive: true });
-        sc.addEventListener('touchcancel', resetPinch, { passive: true });
+        const recoverSnowAfterTouch = (e) => {
+            resetPinch(e);
+            // iOS/Androidの低メモリ時は、スクロールやピンチの合成中にCanvas内容だけ失われる場合がある。
+            // 指を離した時に1pixelだけ健全性確認し、消えていれば雪レイヤーを描き直す。
+            if (!document.body.classList.contains('is-pc') && !this.isBackgroundPaused &&
+                this.game && !this.game.isProcessingAI && typeof this.updateSnowOverlay === 'function') {
+                requestAnimationFrame(() => this.updateSnowOverlay());
+            }
+        };
+        sc.addEventListener('touchend', recoverSnowAfterTouch, { passive: true });
+        sc.addEventListener('touchcancel', recoverSnowAfterTouch, { passive: true });
     },
 
     applyInertia(sc) {
@@ -1835,6 +1874,7 @@ Object.assign(UIManager.prototype, {
             this._releaseMapOverlayCanvas('snow-overlay');
             this.lastSnowHash = null;
             this._snowOverlayDirty = false;
+            this._snowOverlayProbe = null;
             return;
         }
 
@@ -1852,7 +1892,14 @@ Object.assign(UIManager.prototype, {
         const currentSnowHash = this.game.provinces
             .map(p => p.statusEffects && p.statusEffects.includes('heavySnow') ? '1' : '0')
             .join('');
-        if (canReusePixels && this.lastSnowHash === currentSnowHash && !this._snowOverlayDirty) return;
+        if (canReusePixels && this.lastSnowHash === currentSnowHash && !this._snowOverlayDirty) {
+            if (this._isSnowOverlayHealthy(currentSnowHash)) return;
+            // DOM/サイズ/hashが正常でも、Canvasの実ピクセルが失われていたら再描画へ進む。
+            this.lastSnowHash = null;
+            this._snowOverlayDirty = true;
+            this._lastSnowOverlay = null;
+            this._snowOverlayProbe = null;
+        }
 
         const targetProvIds = new Set(
             this.game.provinces
@@ -1860,7 +1907,8 @@ Object.assign(UIManager.prototype, {
                 .map(p => Number(p.id))
         );
 
-        this._paintCanvasByStrips(overlay, (data, i, x, y, width, height) => {
+        let snowProbe = null;
+        const painted = this._paintCanvasByStrips(overlay, (data, i, x, y, width, height) => {
             const provinceId = this._sampleIdMap(this.pixelProvinceMap, mapW, mapH, width, height, x, y);
             if (!targetProvIds.has(Number(provinceId))) return;
             const modX = x % 8;
@@ -1870,10 +1918,22 @@ Object.assign(UIManager.prototype, {
             data[i + 1] = 255;
             data[i + 2] = 255;
             data[i + 3] = 210;
+            if (!snowProbe) snowProbe = { x, y };
         });
+
+        // 描画失敗時に「成功済みhash」を記録すると、以後ずっと再描画されなくなる。
+        // 特に低メモリのスマホではこれが雪だけ永久に消える原因になるため、失敗状態を維持する。
+        if (!painted || !snowProbe) {
+            this.lastSnowHash = null;
+            this._snowOverlayDirty = true;
+            this._lastSnowOverlay = null;
+            this._snowOverlayProbe = null;
+            return;
+        }
 
         this.lastSnowHash = currentSnowHash;
         this._lastSnowOverlay = overlay;
+        this._snowOverlayProbe = { canvas: overlay, x: snowProbe.x, y: snowProbe.y, hash: currentSnowHash };
         this._snowOverlayDirty = false;
     },
 
