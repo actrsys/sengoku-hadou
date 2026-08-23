@@ -701,6 +701,52 @@ async function validateCommandAndInterviewStates(cdp) {
     console.log('✓ PC入れ子コマンド選択状態・面談下端会話・中央情報枠・スマホ全幅一覧 visual regression');
 }
 
+async function validateFloatingStatusLayout(cdp) {
+    const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css.replace(/<\/style/gi, '<\\/style')}</style></head><body><div id="map-wrapper"><div id="map-floating-status"><div id="mobile-floating-info"><div class="floating-time">1560年 5月</div></div><div id="mobile-floating-market"><div class="floating-market">浪人 12人</div><div class="floating-market">米相場＝2.0</div></div></div></div></body></html>`;
+
+    await cdp.call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+    let result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            document.open();document.write(${JSON.stringify(html)});document.close();
+            document.body.classList.add('is-pc');
+            const map = document.getElementById('map-wrapper');
+            map.style.position='relative'; map.style.width='1280px'; map.style.height='720px';
+            const boxes=[...document.querySelectorAll('.floating-time,.floating-market')].map(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width,text:el.textContent};});
+            const group=document.getElementById('map-floating-status').getBoundingClientRect();
+            const mr=map.getBoundingClientRect();
+            return {boxes, group:{left:group.left,right:group.right,top:group.top}, map:{left:mr.left,right:mr.right,top:mr.top}};
+        })()`,
+        returnByValue: true,
+        awaitPromise: true
+    });
+    const pc = result.result.value;
+    assert.strictEqual(pc.boxes.length, 3, 'PC上部表示は年月・浪人・米相場の3項目');
+    approx(pc.boxes[1].left - pc.boxes[0].right, 15, 0.6, 'PC 年月↔浪人 gap');
+    approx(pc.boxes[2].left - pc.boxes[1].right, 15, 0.6, 'PC 浪人↔米相場 gap');
+    approx(pc.map.right - pc.group.right, 30, 0.6, 'PC 上部情報グループの右余白');
+    assert.ok(pc.boxes[0].right < pc.boxes[1].left && pc.boxes[1].right < pc.boxes[2].left, 'PC上部3項目が重ならない');
+
+    await cdp.call('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 1, mobile: true });
+    result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            document.body.classList.remove('is-pc');
+            const map=document.getElementById('map-wrapper'); map.style.width='360px'; map.style.height='640px';
+            const info=document.getElementById('mobile-floating-info').getBoundingClientRect();
+            const market=document.getElementById('mobile-floating-market').getBoundingClientRect();
+            const mr=map.getBoundingClientRect();
+            return {info:{left:info.left,bottom:info.bottom},market:{top:market.top,right:market.right},map:{left:mr.left,right:mr.right,top:mr.top,bottom:mr.bottom}};
+        })()`,
+        returnByValue: true
+    });
+    const mobile = result.result.value;
+    approx(mobile.info.left - mobile.map.left, 10, 0.6, 'スマホ年月の左余白を維持');
+    approx(mobile.map.bottom - mobile.info.bottom, 20, 0.6, 'スマホ年月の下余白を維持');
+    approx(mobile.market.top - mobile.map.top, 10, 0.6, 'スマホ浪人・相場の上余白を維持');
+    approx(mobile.map.right - mobile.market.right, 10, 0.6, 'スマホ浪人・相場の右余白を維持');
+    console.log('✓ PC上部年月・浪人・米相場 flex-gap / スマホ配置維持 visual regression');
+}
+
 async function validateEndingAndWatchStates(cdp) {
     const html = fixtureHtml('ending_watch_states.html');
     await cdp.call('Emulation.setDeviceMetricsOverride', { width: 360, height: 800, deviceScaleFactor: 1, mobile: true });
@@ -790,6 +836,7 @@ async function main() {
         console.log('✓ PC武将能力ゲージ visual/layout regression');
         console.log('  80/100/110/120 の幅・高さ・限界突破・右列非侵入を実ブラウザで確認しました');
         await validateLegionCouncil(cdp);
+        await validateFloatingStatusLayout(cdp);
         await validateCommandAndInterviewStates(cdp);
         await validateEndingAndWatchStates(cdp);
     } finally {

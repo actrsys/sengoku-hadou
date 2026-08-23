@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r127');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r128');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -157,12 +157,20 @@ test('米相場は「金1で得られる兵糧量」として表示・売買・A
     const uiSource = read('js/ui.js');
     const sliderSource = read('js/ui_slider.js');
     const aiSource = read('js/ai.js');
-    assert.ok(uiSource.includes('EconomyRules.formatRiceMarketRate(currentRate)'), '常時表示も共通相場表記を使う');
+    assert.ok(uiSource.includes('米相場＝${EconomyRules.formatRiceMarketValue(currentRate)}'), '常時表示は短い米相場表記を共通数値フォーマッタから作る');
     assert.ok(sliderSource.includes('EconomyRules.formatRiceMarketRate(rateInfo.ricePerGold)'), '取引画面も金1＝兵糧X.Xを使う');
     assert.ok(!sliderSource.includes('getRiceMarketUnit'), '旧10兵糧単位の換算を残さない');
     assert.ok(aiSource.includes('castle.gold * buyActualRate'), 'AI購入可能量も金×兵糧/金で計算する');
     assert.ok(aiSource.includes('Math.floor(sellAmount / rate)'), 'AI売却益も兵糧÷兵糧/金で計算する');
     assert.ok(read('js/command_system.js').includes('EconomyRules.calcTradeCostAndRate(type, amount'), 'プレイヤー取引実行もEconomyRulesを正本にする');
+});
+
+test('PC上部の年月・浪人・米相場は同一Flexグループのgapで等間隔に並ぶ', () => {
+    const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+    const css = fs.readFileSync(path.join(ROOT, 'css/style.css'), 'utf8');
+    assert.ok(html.includes('<div id="map-floating-status">'), '3項目の共通レイアウト親を持つ');
+    assert.ok(css.includes('#map-floating-status {') && css.includes('gap: 15px;'), 'PC側の項目間隔は共通親のgapで管理する');
+    assert.ok(!css.includes('right: 280px;'), '年月だけを固定座標で押し込む旧配置を残さない');
 });
 
 test('米相場の供給不足・供給増イベントは「金1で得られる兵糧量」の向きに一致する', () => {
