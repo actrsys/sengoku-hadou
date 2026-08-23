@@ -585,7 +585,7 @@ async function validateCommandAndInterviewStates(cdp) {
     assert.strictEqual(fixedConversation.after.footerDisplay, 'flex', '面談外側フッターは非表示時も予約領域を維持する');
     assert.strictEqual(fixedConversation.after.footerVisibility, 'hidden', '面談外側フッターは予約時に見えない');
 
-    // 最も狭いスマホ9:16で、検索・ソート付き8人一覧もスクロールなしで収まるか確認する。
+    // 最も狭いスマホ9:16で、初回の面談相手選択16人一覧もスクロールなしで収まるか確認する。
     result = await cdp.call('Runtime.evaluate', {
         expression: `(() => {
             const content = document.getElementById('interview-session-content');
@@ -598,7 +598,7 @@ async function validateCommandAndInterviewStates(cdp) {
             pager.innerHTML = '<button class=\"daimyo-detail-action-btn\">前へ</button><span class=\"interview-session-page-label\">1 / 3</span><button class=\"daimyo-detail-action-btn\">次へ</button>';
             const body = document.getElementById('interview-session-body');
             body.className = 'interview-session-body interview-session-list-view interviewer-list-view';
-            body.innerHTML = '<div class=\"interview-session-list-tools\"><input class=\"interview-session-search\" placeholder=\"名前で探す\"><select class=\"interview-session-sort-select\"><option>統率</option></select><button class=\"daimyo-detail-action-btn interview-session-sort-direction\">降順</button><span class=\"interview-session-list-count\">24人</span></div><div class=\"interview-session-person-grid\">' + Array.from({length:8},(_,i)=>'<button class=\"interview-session-person\"><span class=\"interview-session-person-face\"></span><span class=\"interview-session-person-name\">武将'+(i+1)+'</span></button>').join('') + '</div>';
+            body.innerHTML = '<div class=\"interview-session-list-tools\"><input class=\"interview-session-search\" placeholder=\"名前で探す\"><select class=\"interview-session-sort-select\"><option>統率</option></select><button class=\"daimyo-detail-action-btn interview-session-sort-direction\">降順</button><span class=\"interview-session-list-count\">32人</span></div><div class=\"interview-session-person-grid\">' + Array.from({length:16},(_,i)=>'<button class=\"interview-session-person\"><span class=\"interview-session-person-face\"></span><span class=\"interview-session-person-name\">武将'+(i+1)+'</span></button>').join('') + '</div>';
             const cr = content.getBoundingClientRect();
             const br = body.getBoundingClientRect();
             const gr = body.querySelector('.interview-session-person-grid').getBoundingClientRect();
@@ -616,8 +616,55 @@ async function validateCommandAndInterviewStates(cdp) {
     assert.strictEqual(mobileList.overflowY, 'hidden', 'スマホ面談一覧をスクロール領域にしない');
     assert.ok(mobileList.contentScroll <= mobileList.contentClient + 3, '検索・ソート付きスマホ面談一覧が内容枠をはみ出している');
     assert.ok(mobileList.bodyScroll <= mobileList.bodyClient + 3, '検索・ソート付きスマホ武将一覧が内部ではみ出している');
-    assert.ok(mobileList.gridBottom <= mobileList.bodyBottom + 1, 'スマホ面談の武将カードが一覧領域からはみ出している');
+    assert.ok(mobileList.gridBottom <= mobileList.bodyBottom + 1, 'スマホ面談の初回16人武将カードが一覧領域からはみ出している');
     assert.ok(mobileList.toolsHeight >= 28, 'スマホ面談の検索・ソート帯が潰れている');
+
+    result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            const content = document.getElementById('interview-session-content');
+            content.classList.remove('speaker-hidden');
+            document.getElementById('interview-session-summary-panel').classList.remove('hidden');
+            const body = document.getElementById('interview-session-body');
+            body.className = 'interview-session-body interview-session-list-view target-list-view';
+            body.innerHTML = '<div class="interview-session-list-tools"><input class="interview-session-search" placeholder="名前で探す"><select class="interview-session-sort-select"><option>統率</option></select><button class="daimyo-detail-action-btn interview-session-sort-direction">降順</button><span class="interview-session-list-count">24人</span></div><div class="interview-session-person-grid">' + Array.from({length:12},(_,i)=>'<button class="interview-session-person"><span class="interview-session-person-face"></span><span class="interview-session-person-name">武将'+(i+1)+'</span></button>').join('') + '</div>';
+            const br = body.getBoundingClientRect();
+            const gr = body.querySelector('.interview-session-person-grid').getBoundingClientRect();
+            const cards = Array.from(body.querySelectorAll('.interview-session-person'));
+            const first = cards[0] ? cards[0].getBoundingClientRect() : null;
+            const last = cards[cards.length - 1] ? cards[cards.length - 1].getBoundingClientRect() : null;
+            return {
+                bodyScroll:body.scrollHeight, bodyClient:body.clientHeight, bodyBottom:br.bottom, gridBottom:gr.bottom,
+                firstHeight:first ? first.height : 0, lastBottom:last ? last.bottom : 0, remaining:last ? br.bottom - last.bottom : 0
+            };
+        })()`,
+        returnByValue: true
+    });
+    const mobileTargetList = result.result.value;
+    assert.ok(mobileTargetList.bodyScroll <= mobileTargetList.bodyClient + 3, 'スマホの他者選択12人一覧が内部ではみ出している');
+    assert.ok(mobileTargetList.gridBottom <= mobileTargetList.bodyBottom + 1, 'スマホの他者選択12人カードを一覧下端に収める');
+    assert.ok(mobileTargetList.lastBottom <= mobileTargetList.bodyBottom + 1, 'スマホの他者選択6行目が一覧下端からはみ出している');
+    assert.ok(mobileTargetList.firstHeight >= 40, 'スマホの他者選択カードが6行化で潰れすぎている');
+
+    await cdp.call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+    result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            document.body.classList.add('is-pc');
+            const g=document.getElementById('game-screen'); g.style.width='1280px'; g.style.height='720px';
+            const content = document.getElementById('interview-session-content');
+            content.classList.add('speaker-hidden');
+            document.getElementById('interview-session-summary-panel').classList.add('hidden');
+            const body = document.getElementById('interview-session-body');
+            body.className = 'interview-session-body interview-session-list-view interviewer-list-view';
+            body.innerHTML = '<div class="interview-session-list-tools"><input class="interview-session-search" placeholder="名前で探す"><select class="interview-session-sort-select"><option>統率</option></select><button class="daimyo-detail-action-btn interview-session-sort-direction">降順</button><span class="interview-session-list-count">30人</span></div><div class="interview-session-person-grid">' + Array.from({length:15},(_,i)=>'<button class="interview-session-person"><span class="interview-session-person-face"></span><span class="interview-session-person-name">武将'+(i+1)+'</span></button>').join('') + '</div>';
+            const cr=content.getBoundingClientRect(), br=body.getBoundingClientRect(), gr=body.querySelector('.interview-session-person-grid').getBoundingClientRect();
+            return {contentScroll:content.scrollHeight,contentClient:content.clientHeight,bodyScroll:body.scrollHeight,bodyClient:body.clientHeight,bodyBottom:br.bottom,gridBottom:gr.bottom,contentBottom:cr.bottom};
+        })()`,
+        returnByValue: true
+    });
+    const pcList = result.result.value;
+    assert.ok(pcList.contentScroll <= pcList.contentClient + 3, 'PC面談15人一覧が内容枠をはみ出している');
+    assert.ok(pcList.bodyScroll <= pcList.bodyClient + 3, 'PC面談15人一覧が内部ではみ出している');
+    assert.ok(pcList.gridBottom <= pcList.bodyBottom + 1, 'PC面談15人カードを一覧下端に収める');
 
     console.log('✓ PC入れ子コマンド選択状態・面談固定16:9/9:16・標準外置きフッター・スマホ検索ソート一覧 visual regression');
 }

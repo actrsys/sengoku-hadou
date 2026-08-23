@@ -273,7 +273,7 @@ class InterviewView {
         this.page = 0;
         this.listQuery = '';
         this.onPageItemSelect = onSelect;
-        this.pageSize = this._isPc() ? 12 : 8;
+        this.pageSize = this._getPageSize(mode);
         this._searchComposing = false;
         this.body.className = `interview-session-body interview-session-list-view ${mode === 'target' ? 'target-list-view' : 'interviewer-list-view'}`;
         this.body.replaceChildren();
@@ -283,6 +283,12 @@ class InterviewView {
         this._listGrid.className = 'interview-session-person-grid';
         this.body.append(tools, this._listGrid);
         this._renderCurrentPage();
+    }
+
+
+    _getPageSize(mode) {
+        if (this._isPc()) return 15;
+        return mode === 'target' ? 12 : 16;
     }
 
     _getVisibleListItems() {
@@ -460,6 +466,14 @@ class InterviewView {
         return faceColumn;
     }
 
+
+    _formatConversationMessage(message) {
+        return String(message || '')
+            .replace(/<br\s*\/?\s*>/gi, '')
+            .replace(/[\r\n]+/g, '')
+            .replace(/。(?=」)/g, '');
+    }
+
     _renderConversationMessage(busho, message, options = {}) {
         if (!this.body) return;
         const narration = !!options.narration;
@@ -478,7 +492,7 @@ class InterviewView {
 
         const messageArea = document.createElement('div');
         messageArea.className = 'message-area interview-session-message-area';
-        messageArea.innerHTML = message || '';
+        messageArea.innerHTML = this._formatConversationMessage(message);
         dialogBody.appendChild(messageArea);
         conversationFrame.appendChild(dialogBody);
         this.body.appendChild(conversationFrame);

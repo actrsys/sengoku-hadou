@@ -3981,7 +3981,7 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     min-height: 0;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-rows: repeat(4, minmax(0, 1fr));
+    grid-template-rows: repeat(5, minmax(0, 1fr));
     gap: 7px;
     overflow: hidden;
 }
@@ -4257,8 +4257,13 @@ body:not(.is-pc) .interview-session-list-count { font-size: 7px; }
 
 body:not(.is-pc) .interview-session-person-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: repeat(4, minmax(0, 1fr));
     gap: 3px;
+}
+body:not(.is-pc) .interviewer-list-view .interview-session-person-grid {
+    grid-template-rows: repeat(8, minmax(0, 1fr));
+}
+body:not(.is-pc) .target-list-view .interview-session-person-grid {
+    grid-template-rows: repeat(6, minmax(0, 1fr));
 }
 body:not(.is-pc) .interview-session-person {
     grid-template-columns: 38px minmax(0, 1fr);

@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r103');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r105');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2075,7 +2075,7 @@ test('面談は専用View内で完結し16:9/9:16固定・非スクロールで�
     assert.ok(css.includes('aspect-ratio: 9 / 16'), 'スマホ面談枠は9:16前提');
     assert.ok(css.includes('#interview-modal .interview-session-content'));
     assert.ok(css.includes('overflow: hidden !important'), '面談本体はスクロールへ逃がさない');
-    assert.ok(view.includes('this.pageSize = this._isPc() ? 12 : 8'), '人数超過はPC/スマホ別のページ切替で処理する');
+    assert.ok(view.includes("if (this._isPc()) return 15;") && view.includes("return mode === 'target' ? 12 : 16;"), '人数超過はPC15人・スマホ初回16人/他者12人のページ切替で処理する');
     assert.ok(view.includes('showMessages(busho, messages'), '長文を意味単位の順送り表示にできる');
     assert.ok(command.includes("case 'interview':"), '面談開始は汎用武将セレクタではなく専用フローへ渡す');
     assert.ok(!interview.includes('openBushoSelector'), '面談中に汎用武将リストを開かない');
@@ -2108,6 +2108,9 @@ test('面談は専用View内で完結し16:9/9:16固定・非スクロールで�
     assert.ok(css.includes('.interview-session-sort-wrap::after'), '面談プルダウンはネイティブselectを保ったまま専用外観を持つ');
     assert.ok(css.includes('#interview-modal .interview-session-footer.hidden'), '外側ボタン非表示時も予約領域を維持して面談枠を動かさない');
     assert.ok(interview.includes('{ narration: true }'), '医師の説明・結果は本人の台詞ではなくナレーション表示へ渡す');
+    assert.ok(view.includes('_formatConversationMessage'), '面談会話の表示整形をViewで一元化する');
+    assert.ok(view.includes(".replace(/<br\\s*\\/?\\s*>/gi, '')") && view.includes(".replace(/[\\r\\n]+/g, '')"), '面談会話は表示時だけ改行を除去する');
+    assert.ok(view.includes(".replace(/。(?=」)/g, '')"), '面談会話は閉じ鉤括弧直前の句点を表示時だけ除去する');
     const ui = read('js/ui.js');
     assert.ok(ui.includes("target.closest('input, select, textarea, option, [contenteditable=\"true\"]')"), 'スマホ共通touchendは入力・selectからフォーカスを奪わない');
     const sortRules = read('js/busho_list_sort_rules.js');
@@ -2116,6 +2119,15 @@ test('面談は専用View内で完結し16:9/9:16固定・非スクロールで�
     const bushoUi = read('js/ui_info_busho.js');
     assert.ok(bushoUi.includes("BushoListSortRules.compareKnown(this.game, a, b, 'name'"), '元の武将一覧も名前ソートの共通規則を使う');
     assert.ok(bushoUi.includes("BushoListSortRules.compareKnown(this.game, a, b, 'castle'"), '元の武将一覧も所在ソートの共通規則を使う');
+});
+
+test('面談会話の表示整形は元データを変えず句点と改行だけを除く', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/interview_view.js');
+    const format = ctx.InterviewView.prototype._formatConversationMessage;
+    assert.strictEqual(format.call({}, '「承知しました。」'), '「承知しました」');
+    assert.strictEqual(format.call({}, '「某ですか……<br>信頼しております。」'), '「某ですか……信頼しております」');
+    assert.strictEqual(format.call({}, '一行目\n二行目'), '一行目二行目');
 });
 
 test('通常buttonのSEは共通監視を正本とし特殊音はdata-seへ寄せる', () => {
