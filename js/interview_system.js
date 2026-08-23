@@ -82,26 +82,23 @@ class InterviewSystem {
 
     _getSurfaceAttitude(busho) {
         const concealment = this._getConcealmentProfile(busho);
-        const actualBand = this._getLoyaltyBand(concealment.actualLoyalty);
-        const shownBand = this._getLoyaltyBand(concealment.perceivedLoyalty);
+        const shownBand = concealment.perceivedBand;
         const intelligence = Number(busho.intelligence || 0);
         const duty = Number(busho.duty || 0);
         const ambition = Number(busho.ambition || 0);
 
-        // 高智謀の偽装は挨拶にも反映する。野望が高いほど愛想よく立ち回る余地もある。
-        if (concealment.isConcealing) {
-            if (shownBand === 'stable' && (concealment.level === 'strong' || ambition >= 65)) return 'welcoming';
-            return 'polite';
+        // 挨拶も「表に見せている忠誠段階」を基準にする。
+        // 智謀による偽装は1～2段階だけ持ち上げ、低忠誠から最高態度へ飛ばさない。
+        if (shownBand === 'stable') {
+            return concealment.actualLoyalty >= 92 || duty >= 75 || concealment.bandShift >= 2 || ambition >= 65
+                ? 'welcoming'
+                : 'friendly';
         }
-
-        if (actualBand === 'stable') {
-            return concealment.actualLoyalty >= 92 || duty >= 75 ? 'welcoming' : 'friendly';
-        }
-        if (actualBand === 'warning') return duty >= 55 ? 'polite' : 'reserved';
-        if (actualBand === 'danger') return duty >= 65 ? 'polite' : 'reserved';
-        if (actualBand === 'dissatisfied') return duty >= 70 ? 'reserved' : 'cold';
-        if (actualBand === 'serious') {
-            if (intelligence < 55 && duty < 55 && ambition >= 55) return 'startled';
+        if (shownBand === 'warning') return duty >= 55 || concealment.isConcealing ? 'polite' : 'reserved';
+        if (shownBand === 'danger') return duty >= 65 || concealment.isConcealing ? 'polite' : 'reserved';
+        if (shownBand === 'dissatisfied') return duty >= 70 ? 'reserved' : 'cold';
+        if (shownBand === 'serious') {
+            if (!concealment.isConcealing && intelligence < 55 && duty < 55 && ambition >= 55) return 'startled';
             return duty >= 70 ? 'reserved' : 'cold';
         }
         if (intelligence < 65 && duty < 60) return 'startled';
@@ -252,7 +249,7 @@ class InterviewSystem {
         else policyText = '当家のやり方に特に不満はありません。順調です。';
 
         const concealment = this._getConcealmentProfile(busho);
-        const loyaltyBand = this._getLoyaltyBand(concealment.perceivedLoyalty);
+        const loyaltyBand = concealment.perceivedBand;
         const loyaltyText = this._getSelfLoyaltyText(loyaltyBand, this.activeInterviewAttitude);
         const messages = [
             `「${policyText}」`,
@@ -315,26 +312,40 @@ class InterviewSystem {
         return 'critical';
     }
 
+    _shiftLoyaltyBand(band, steps) {
+        const bands = ['critical', 'serious', 'dissatisfied', 'danger', 'warning', 'stable'];
+        const index = bands.indexOf(band);
+        if (index < 0) return band;
+        const shift = Math.max(0, Math.floor(Number(steps) || 0));
+        return bands[Math.min(bands.length - 1, index + shift)];
+    }
+
     _getConcealmentProfile(busho) {
         const I = window.MainParams.Interview;
         const actualLoyalty = Math.max(0, Math.min(100, Number(busho.loyalty) || 0));
         const intelligence = Math.max(0, Math.min(100, Number(busho.intelligence) || 0));
-        let perceivedLoyalty = actualLoyalty;
-        let level = 'none';
+        const actualBand = this._getLoyaltyBand(actualLoyalty);
+        let requestedShift = 0;
 
-        if (intelligence >= I.ConcealHighIntelligence && actualLoyalty < I.ConcealHighLoyaltyBelow) {
-            perceivedLoyalty = Math.max(actualLoyalty, I.ConcealHighShownLoyalty);
-            level = 'strong';
-        } else if (intelligence >= I.ConcealMidIntelligence && actualLoyalty < I.ConcealMidLoyaltyBelow) {
-            perceivedLoyalty = Math.max(actualLoyalty, I.ConcealMidShownLoyalty);
-            level = 'moderate';
+        if (intelligence >= I.ConcealHighIntelligence) {
+            requestedShift = I.ConcealHighBandShift;
+        } else if (intelligence >= I.ConcealMidIntelligence) {
+            requestedShift = I.ConcealMidBandShift;
         }
+
+        const perceivedBand = this._shiftLoyaltyBand(actualBand, requestedShift);
+        const bands = ['critical', 'serious', 'dissatisfied', 'danger', 'warning', 'stable'];
+        const actualIndex = bands.indexOf(actualBand);
+        const perceivedIndex = bands.indexOf(perceivedBand);
+        const bandShift = Math.max(0, perceivedIndex - actualIndex);
 
         return {
             actualLoyalty,
-            perceivedLoyalty,
-            isConcealing: perceivedLoyalty > actualLoyalty,
-            level
+            actualBand,
+            perceivedBand,
+            bandShift,
+            isConcealing: bandShift > 0,
+            level: bandShift >= 2 ? 'strong' : (bandShift === 1 ? 'moderate' : 'none')
         };
     }
 
@@ -463,14 +474,14 @@ class InterviewSystem {
         }
 
         if (this._canDetectConcealment(interviewer, target, knowledge, concealment)) {
-            return this._getDetectedConcealmentText(this._getLoyaltyBand(concealment.actualLoyalty));
+            return this._getDetectedConcealmentText(concealment.actualBand);
         }
 
-        const assessedLoyalty = concealment.isConcealing
-            ? concealment.perceivedLoyalty
-            : concealment.actualLoyalty;
+        const assessedBand = concealment.isConcealing
+            ? concealment.perceivedBand
+            : concealment.actualBand;
         const uncertain = knowledge < I.KnowledgeConfidentMin;
-        return this._getTargetLoyaltyBandText(this._getLoyaltyBand(assessedLoyalty), uncertain);
+        return this._getTargetLoyaltyBandText(assessedBand, uncertain);
     }
 
 }

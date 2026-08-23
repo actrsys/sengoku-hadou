@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r107'
+        Version: 'r108'
     },
 
     Main: {
@@ -33,12 +33,10 @@ window.GameConfig = {
             ConcealDetectKnowledgeMin: 68,
             ConcealDetectIntelligenceMin: 75,
             ConcealDetectGapAllowance: 10,
-            ConcealHighIntelligence: 85,
-            ConcealHighLoyaltyBelow: 80,
-            ConcealHighShownLoyalty: 90,
+            ConcealHighIntelligence: 90,
+            ConcealHighBandShift: 2,
             ConcealMidIntelligence: 70,
-            ConcealMidLoyaltyBelow: 60,
-            ConcealMidShownLoyalty: 70
+            ConcealMidBandShift: 1
         },
         Kunishu: {
             CaptureRelationDrop: 20,

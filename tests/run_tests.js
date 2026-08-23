@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r107');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r108');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2146,7 +2146,7 @@ test('面談の他者評価は高智謀の偽装・看破・全く読めない�
     const system = new ctx.InterviewSystem({});
 
     const relationClose = { contactScore: 80, compatibilityScore: 82, affinityDiff: 8 };
-    const concealed = { loyalty: 65, intelligence: 85, ambition: 50 };
+    const concealed = { loyalty: 65, intelligence: 90, ambition: 50 };
 
     const sharpInterviewer = { loyalty: 90, intelligence: 95, duty: 80 };
     const detected = system._getTargetLoyaltyText(sharpInterviewer, concealed, relationClose);
@@ -2184,8 +2184,26 @@ test('面談開始時の表面態度は忠誠・智謀・義理・野望を踏�
     assert.ok(system._getMenuPrompt('startled').includes('何のご用'));
 
     const cleverDisloyal = { loyalty: 20, intelligence: 90, duty: 40, ambition: 80 };
-    assert.strictEqual(system._getSurfaceAttitude(cleverDisloyal), 'welcoming', '高智謀なら低忠誠でも表向きは愛想よく取り繕える');
-    assert.ok(!system._getGreetingText(cleverDisloyal, system._getSurfaceAttitude(cleverDisloyal)).includes('げっ'));
+    assert.strictEqual(system._getSurfaceAttitude(cleverDisloyal), 'cold', '智謀90でも忠誠20は2段階だけ上に見せ、最高態度へ飛ばさない');
+    assert.ok(!system._getGreetingText(cleverDisloyal, system._getSurfaceAttitude(cleverDisloyal)).includes('げっ'), '高智謀なら露骨な動揺は隠せる');
+});
+
+test('面談の忠誠偽装は智謀70以上で1段階・90以上で2段階だけ上に見せる', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/interview_system.js');
+    const system = new ctx.InterviewSystem({});
+
+    const base = { loyalty: 65, duty: 50, ambition: 50 }; // danger
+    assert.strictEqual(system._getConcealmentProfile({ ...base, intelligence: 69 }).perceivedBand, 'danger');
+    assert.strictEqual(system._getConcealmentProfile({ ...base, intelligence: 70 }).perceivedBand, 'warning');
+    assert.strictEqual(system._getConcealmentProfile({ ...base, intelligence: 85 }).perceivedBand, 'warning', '旧85閾値では2段階偽装しない');
+    assert.strictEqual(system._getConcealmentProfile({ ...base, intelligence: 89 }).perceivedBand, 'warning');
+    assert.strictEqual(system._getConcealmentProfile({ ...base, intelligence: 90 }).perceivedBand, 'stable');
+
+    const veryLow = { loyalty: 20, duty: 40, ambition: 60 }; // critical
+    assert.strictEqual(system._getConcealmentProfile({ ...veryLow, intelligence: 70 }).perceivedBand, 'serious');
+    assert.strictEqual(system._getConcealmentProfile({ ...veryLow, intelligence: 90 }).perceivedBand, 'dissatisfied', '低忠誠でも2段階を超えて最高評価へ飛ばさない');
 });
 
 test('面談本人の低忠誠表現は観察ナレーションを混ぜず本人の台詞だけで示す', () => {
