@@ -139,6 +139,19 @@ Object.assign(UIManager.prototype, {
         };
     },
 
+    // 雪は細かな境界線ではなく規則的な水玉を見せる静的レイヤーなので、
+    // 古いスマホでは専用に1/4解像度まで落として常駐メモリと再描画量を抑えます。
+    // PCは従来どおり原寸を維持します。
+    _getSnowOverlayRasterSize(mapW, mapH) {
+        const isPC = document.body.classList.contains('is-pc');
+        const scale = isPC ? 1 : 0.25;
+        return {
+            width: Math.max(1, Math.round(mapW * scale)),
+            height: Math.max(1, Math.round(mapH * scale)),
+            scale
+        };
+    },
+
     _sampleIdMap(pixelMap, mapW, mapH, rasterW, rasterH, x, y) {
         if (!pixelMap) return 0;
         if (rasterW === mapW && rasterH === mapH) return pixelMap[y * mapW + x] || 0;
@@ -219,7 +232,9 @@ Object.assign(UIManager.prototype, {
         if (!this.mapEl) return null;
         const mapW = this.game.mapWidth || 1200;
         const mapH = this.game.mapHeight || 800;
-        const raster = this._getMapOverlayRasterSize(mapW, mapH);
+        const raster = canvasId === 'snow-overlay'
+            ? this._getSnowOverlayRasterSize(mapW, mapH)
+            : this._getMapOverlayRasterSize(mapW, mapH);
         let canvas = document.getElementById(canvasId);
         if (!canvas) {
             canvas = document.createElement('canvas');
@@ -298,9 +313,15 @@ Object.assign(UIManager.prototype, {
             p => p.statusEffects && p.statusEffects.includes('heavySnow')
         );
         if (hasHeavySnow) {
-            // 読み戻し(getImageData)でCanvasの健康確認はしない。
-            // モーダル等から復帰する安全地点で再描画を予約し、表示状態をデータから再構築します。
-            this._snowOverlayDirty = true;
+            // 雪Canvasはモーダル/AI中も保持するため、復帰のたびに全地図を再描画しません。
+            // DOM自体が無い、または明示的に縮退している時だけ再生成を予約します。
+            // backing store喪失はcontextlost/contextrestoredで別途無効化します。
+            const snowOverlay = document.getElementById('snow-overlay');
+            if (!snowOverlay || snowOverlay.width <= 1 || snowOverlay.height <= 1) {
+                this.lastSnowHash = null;
+                this._snowOverlayDirty = true;
+                this._lastSnowOverlay = null;
+            }
         }
     },
 
@@ -1037,7 +1058,7 @@ Object.assign(UIManager.prototype, {
             this.mapEl.appendChild(persistentClanColor);
         }
         if (persistentSnowOverlay) {
-            const snowRaster = this._getMapOverlayRasterSize(mapW, mapH);
+            const snowRaster = this._getSnowOverlayRasterSize(mapW, mapH);
             if (persistentSnowOverlay.width !== snowRaster.width || persistentSnowOverlay.height !== snowRaster.height) {
                 persistentSnowOverlay.width = snowRaster.width;
                 persistentSnowOverlay.height = snowRaster.height;
@@ -1864,12 +1885,21 @@ Object.assign(UIManager.prototype, {
                 .map(p => Number(p.id))
         );
 
+        const isPC = document.body.classList.contains('is-pc');
+        // スマホは1/4解像度なので、4px周期・1px水玉にしてCSS拡大後の見た目を
+        // 従来の半解像度時（約16px周期・約4px水玉）とほぼ揃えます。PCは従来値を維持します。
+        const snowPatternStep = isPC ? 8 : 4;
+        const snowDotSize = isPC ? 2 : 1;
+        const snowPatternHalf = snowPatternStep / 2;
         const painted = this._paintCanvasByStrips(overlay, (data, i, x, y, width, height) => {
             const provinceId = this._sampleIdMap(this.pixelProvinceMap, mapW, mapH, width, height, x, y);
             if (!targetProvIds.has(Number(provinceId))) return;
-            const modX = x % 8;
-            const modY = y % 8;
-            if (!((modX < 2 && modY < 2) || (modX >= 4 && modX < 6 && modY >= 4 && modY < 6))) return;
+            const modX = x % snowPatternStep;
+            const modY = y % snowPatternStep;
+            const firstDot = modX < snowDotSize && modY < snowDotSize;
+            const secondDot = modX >= snowPatternHalf && modX < snowPatternHalf + snowDotSize
+                && modY >= snowPatternHalf && modY < snowPatternHalf + snowDotSize;
+            if (!(firstDot || secondDot)) return;
             data[i] = 255;
             data[i + 1] = 255;
             data[i + 2] = 255;

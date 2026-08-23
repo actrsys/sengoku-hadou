@@ -1916,13 +1916,22 @@ test('スマホの一時資源解放では継続表示レイヤーの勢力色�
     assert.ok(css.includes('body:not(.is-pc).mobile-memory-guard .castle-card'));
 });
 
-test('雪CanvasはAI思考中も保持・更新し、getImageDataで読み戻さない', () => {
+test('雪CanvasはAI思考中も保持しつつ古いスマホでは低メモリ・必要時描画に限定する', () => {
     const map = read('js/ui_map.js');
     const snowStart = map.indexOf('    updateSnowOverlay() {');
     const snowEnd = map.indexOf('// ==========================================\n    // ★新魔法：国を勢力の色で塗りつぶす魔法です！', snowStart);
     const snowBlock = map.slice(snowStart, snowEnd);
+    const recoverStart = map.indexOf('    recoverMobileMapResources() {');
+    const recoverEnd = map.indexOf('    // ★Round14：ズーム中', recoverStart);
+    const recoverBlock = map.slice(recoverStart, recoverEnd);
     assert.ok(!map.includes('_isSnowOverlayHealthy('));
     assert.ok(!map.includes('getImageData(probe.x, probe.y'), '雪Canvasのreadbackを行わない');
+    assert.ok(map.includes('_getSnowOverlayRasterSize(mapW, mapH)'));
+    assert.ok(map.includes('const scale = isPC ? 1 : 0.25'), 'スマホ雪Canvasは1/4解像度にする');
+    assert.ok(map.includes("canvasId === 'snow-overlay'"), '雪Canvasだけ専用内部解像度を使う');
+    assert.ok(map.includes('const snowPatternStep = isPC ? 8 : 4'), '低解像度化後も水玉の見た目サイズを維持する');
+    assert.ok(recoverBlock.includes("const snowOverlay = document.getElementById('snow-overlay')"));
+    assert.ok(recoverBlock.includes('if (!snowOverlay || snowOverlay.width <= 1 || snowOverlay.height <= 1)'), '復帰のたびに雪全体をdirty化しない');
     assert.ok(snowBlock.includes('const painted = this._paintCanvasByStrips(overlay'));
     assert.ok(snowBlock.includes('if (!painted)'));
     assert.ok(!snowBlock.includes('this.game.isProcessingAI'), 'AI思考中を理由に雪更新を止めない');
