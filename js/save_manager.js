@@ -43,6 +43,66 @@ class SaveManager {
         return result;
     }
 
+    _normalizeFaceIconName(faceIcon) {
+        const value = typeof faceIcon === 'string' ? faceIcon.trim() : '';
+        return value || 'unknown_face.webp';
+    }
+
+    _hasAssignedPortrait(faceIcon) {
+        return this._normalizeFaceIconName(faceIcon) !== 'unknown_face.webp';
+    }
+
+    // 旧セーブへ「基本顔を新規追加しただけ」の更新を安全に反映します。
+    // 既に別の顔を持っている武将や、顔変更ルールを抱えている武将には触れません。
+    _syncSimplePortraitAddition(savedBusho, latestData) {
+        if (!savedBusho || !latestData) return false;
+
+        const savedFace = this._normalizeFaceIconName(savedBusho.faceIcon);
+        const latestFace = this._normalizeFaceIconName(latestData.faceIcon);
+        const savedFaceChange = typeof savedBusho.faceChange === 'string' ? savedBusho.faceChange.trim() : '';
+
+        if (savedFaceChange) return false;
+        if (this._hasAssignedPortrait(savedFace)) return false;
+        if (!this._hasAssignedPortrait(latestFace)) return false;
+
+        savedBusho.faceIcon = latestFace;
+        return true;
+    }
+
+    _syncBushoMasterFields(savedBusho, latestData) {
+        if (!savedBusho || !latestData) return false;
+
+        // ① 適性と技能の差し替え
+        savedBusho.aptAshigaru = latestData.aptAshigaru; // 足軽
+        savedBusho.aptKiba = latestData.aptKiba;         // 騎馬
+        savedBusho.aptTeppo = latestData.aptTeppo;       // 鉄砲
+        savedBusho.aptYumi = latestData.aptYumi;         // 弓術
+        savedBusho.aptBugei = latestData.aptBugei;       // 武芸
+        savedBusho.aptNinjutsu = latestData.aptNinjutsu; // 忍術
+        savedBusho.aptMaritime = latestData.aptMaritime; // 操船
+        savedBusho.skill = latestData.skill;             // 技能
+
+        // ② 性格・相性パラメータの差し替え（絶対変動しないもの）
+        savedBusho.innovation = latestData.innovation;   // 革新
+        savedBusho.ambition = latestData.ambition;       // 野心
+        savedBusho.duty = latestData.duty;               // 義理
+        savedBusho.affinity = latestData.affinity;       // 相性
+
+        // ③ 魅力の差し替え（経験値による変動がないためそのまま）
+        savedBusho.charm = latestData.charm;
+
+        // ④ 他の5つの能力値は、「全盛期の基礎値（ベース）」を差し替えます！
+        savedBusho.baseLeadership = latestData.baseLeadership;     // 統率
+        savedBusho.baseStrength = latestData.baseStrength;         // 武勇
+        savedBusho.basePolitics = latestData.basePolitics;         // 政治
+        savedBusho.baseDiplomacy = latestData.baseDiplomacy;       // 外交
+        savedBusho.baseIntelligence = latestData.baseIntelligence; // 智謀
+
+        // ⑤ 顔グラは「単純な基本顔追加」だけを安全に同期します。
+        this._syncSimplePortraitAddition(savedBusho, latestData);
+        return true;
+    }
+
     // ゲーム本体を書き換える前に、復元へ進んでよいセーブかを軽量検査する。
     // ここでは保存構造と主要ID参照だけを見る。画像decode等の実行時失敗は復元側の安全復旧で扱う。
     _validateSaveDataStructure(data) {
@@ -346,31 +406,7 @@ class SaveManager {
                 // 最新のデータの中に同じIDの人がいるか探します
                 const latestData = latestBushoMap.get(savedBusho.id);
                 if (latestData) {
-                    // ① 適性と技能の差し替え
-                    savedBusho.aptAshigaru = latestData.aptAshigaru; // 足軽
-                    savedBusho.aptKiba = latestData.aptKiba;         // 騎馬
-                    savedBusho.aptTeppo = latestData.aptTeppo;       // 鉄砲
-                    savedBusho.aptYumi = latestData.aptYumi;         // 弓術
-                    savedBusho.aptBugei = latestData.aptBugei;       // 武芸
-                    savedBusho.aptNinjutsu = latestData.aptNinjutsu; // 忍術
-                    savedBusho.aptMaritime = latestData.aptMaritime; // 操船
-                    savedBusho.skill = latestData.skill;             // 技能
-
-                    // ② 性格・相性パラメータの差し替え（絶対変動しないもの）
-                    savedBusho.innovation = latestData.innovation;   // 革新
-                    savedBusho.ambition = latestData.ambition;       // 野心
-                    savedBusho.duty = latestData.duty;               // 義理
-                    savedBusho.affinity = latestData.affinity;       // 相性
-
-                    // ③ 魅力の差し替え（経験値による変動がないためそのまま）
-                    savedBusho.charm = latestData.charm;
-
-                    // ④ 他の5つの能力値は、「全盛期の基礎値（ベース）」を差し替えます！
-                    savedBusho.baseLeadership = latestData.baseLeadership;     // 統率
-                    savedBusho.baseStrength = latestData.baseStrength;         // 武勇
-                    savedBusho.basePolitics = latestData.basePolitics;         // 政治
-                    savedBusho.baseDiplomacy = latestData.baseDiplomacy;       // 外交
-                    savedBusho.baseIntelligence = latestData.baseIntelligence; // 智謀
+                    this._syncBushoMasterFields(savedBusho, latestData);
                 }
             });
         } catch (error) {

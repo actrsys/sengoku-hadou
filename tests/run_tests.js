@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r154');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r157');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -3044,6 +3044,28 @@ test('セーブデータから一門派生キャッシュを除外する', () =>
     assert.ok(!Object.prototype.hasOwnProperty.call(saved, 'familyIds'));
 });
 
+
+test('SaveManager は旧セーブで顔未設定の武将に限り最新版の基本顔を同期する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    const manager = new ctx.SaveManager({});
+
+    const added = { faceIcon: 'unknown_face.webp', faceChange: '' };
+    assert.strictEqual(manager._syncSimplePortraitAddition(added, { faceIcon: 'kikkawa_motoharu.webp', faceChange: '' }), true);
+    assert.strictEqual(added.faceIcon, 'kikkawa_motoharu.webp');
+
+    const alreadyHasFace = { faceIcon: 'existing_face.webp', faceChange: '' };
+    assert.strictEqual(manager._syncSimplePortraitAddition(alreadyHasFace, { faceIcon: 'new_face.webp', faceChange: '' }), false);
+    assert.strictEqual(alreadyHasFace.faceIcon, 'existing_face.webp');
+
+    const noLatestFace = { faceIcon: 'unknown_face.webp', faceChange: '' };
+    assert.strictEqual(manager._syncSimplePortraitAddition(noLatestFace, { faceIcon: '', faceChange: '' }), false);
+    assert.strictEqual(noLatestFace.faceIcon, 'unknown_face.webp');
+
+    const hasFaceRule = { faceIcon: 'unknown_face.webp', faceChange: '1553:older_face.webp' };
+    assert.strictEqual(manager._syncSimplePortraitAddition(hasFaceRule, { faceIcon: 'new_face.webp', faceChange: '' }), false);
+    assert.strictEqual(hasFaceRule.faceIcon, 'unknown_face.webp');
+});
 
 test('SaveManager は復元前にセーブ構造と主要ID参照を検証する', () => {
     const ctx = createContext({
