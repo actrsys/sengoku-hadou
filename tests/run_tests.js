@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r160');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r163');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -831,7 +831,7 @@ test('外交の本題も親族・特殊権威の話者距離を最後まで維�
     assert.ok(marriage.demandMsg.includes('左馬頭様に') && !marriage.demandMsg.includes('左馬頭様殿'), '縁談対象も独自の殿付けをせず共通呼称を使う');
 });
 
-test('面談の噂と調略方針も特殊権威の呼称・関係表現を共通化する', () => {
+test('武将の噂は将軍・左馬頭を候補外にし調略方針では従来の特殊呼称を維持する', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
     loadScript(ctx, 'js/busho_list_sort_rules.js');
@@ -855,14 +855,10 @@ test('面談の噂と調略方針も特殊権威の呼称・関係表現を共�
         }
     };
     const interview = new ctx.InterviewSystem(game);
-    interview._getConcealmentProfile = () => ({ perceivedBand: 'stable' });
-    assert.ok(interview._getRumorSubjectText(samano, interviewer).includes('左馬頭様'), '武将の噂でも左馬頭を通常の氏名+殿へ落とさない');
-    assert.ok(!interview._getRumorSubjectText(samano, interviewer).includes('足利義昭殿'));
-    const loyaltyRumor = interview._getRumorLoyaltyText(samano);
-    assert.ok(loyaltyRumor.includes('今の主君のお考え') && !loyaltyRumor.includes('かなり信を置いて'), '特殊権威の他家忠誠噂も普通の家臣の忠誠表現を使わない');
+    assert.strictEqual(interview._isRumorEligibleTarget(interviewer, samano), false, '左馬頭は噂候補にしない');
     interview._getBestIntrigueTarget = () => ({ target: samano, prob: 0.8, score: 0.8 });
     const intrigue = interview._getIntelligencePolicyText(interviewer, { level: 'full' });
-    assert.ok(intrigue.includes('左馬頭様') && !intrigue.includes('足利義昭殿'), '調略方針の候補呼称も特殊権威の共通呼称へ通す');
+    assert.ok(intrigue.includes('左馬頭様') && !intrigue.includes('足利義昭殿'), '噂以外の調略方針では特殊権威の既存呼称を維持する');
 });
 
 test('官位呼びは姓を付けず官位名だけで呼ぶ', () => {
@@ -1944,23 +1940,139 @@ test('指南書は固定論理画面内で記事切替し通常長文スクロ�
     assert.ok(css.includes('.guide-layout'));
     assert.ok(css.includes('body:not(.is-pc) .guide-layout'));
     assert.ok(view.includes("button.className = 'guide-nav-btn'"));
+    assert.ok(view.includes("button.className = 'guide-command-btn'"));
+    assert.ok(view.includes('guide-command-children'));
     assert.ok(view.includes("this._renderArticle(article)"));
 });
 
 test('指南書は公開情報の範囲で国主・弱い武将・褒美・派閥を説明する', () => {
     const guide = read('js/guide_data.js');
-    assert.ok(guide.includes("heading: '国主を置く流れ'"));
-    assert.ok(guide.includes('所領分配'));
-    assert.ok(guide.includes('月に一度「評定」'));
-    assert.ok(!guide.includes("commandMenuLabel: '国主'"), '国主記事に第一席～第八席のコマンドチップを展開しない');
+    assert.ok(guide.includes("heading: '基本の流れ'"));
+    assert.ok(guide.includes("commandMenuLabel: '国主'"));
+    assert.ok(guide.includes("'国主任命': 'legion_appoint'"));
+    assert.ok(guide.includes("'国主解任': 'legion_dismiss'"));
+    assert.ok(guide.includes("'所領分配': 'legion_allot'"));
+    assert.ok(!guide.includes('第一席') && !guide.includes('第二席'), '指南書データに国主の席番号を持ち込まない');
     assert.ok(guide.includes('「侍大将」が最低限の守将として立ちます'));
-    assert.ok(guide.includes("heading: '褒美'"));
-    assert.ok(guide.includes('忠誠を高めることができます'));
-    assert.ok(guide.includes("heading: '派閥'"));
+    assert.ok(guide.includes('忠誠を高めます'));
     assert.ok(guide.includes('派閥主・人数・方針・思想'));
+    assert.ok(guide.includes('同じ派閥の武将を揃えて担当させる'));
     ['義理', '野心', '野望', '承認欲求', 'achievementTotal'].forEach(hiddenWord => {
         assert.ok(!guide.includes(hiddenWord), `指南書に非公開情報 ${hiddenWord} を露出しない`);
     });
+});
+
+test('指南書のコマンド解説は command_catalog の階層を使い、全表示コマンドを個別説明できる', () => {
+    const ctx = createContext({
+        MainParams: { CommandCost: { Farm:1, Commerce:1, Repair:1, Charity:1, SoldierCharity:1, Reward:1, RewardAll:1 } }
+    });
+    ctx.window.MainParams = ctx.MainParams;
+    loadScript(ctx, 'js/command_catalog.js');
+    loadScript(ctx, 'js/guide_data.js');
+    const menus = vm.runInContext('COMMAND_MENU_STRUCTURE', ctx);
+    const docs = vm.runInContext('GUIDE_COMMAND_DOCS', ctx);
+    const collapsed = vm.runInContext('GUIDE_COLLAPSED_COMMAND_GROUPS', ctx);
+
+    const missing = [];
+    const walk = items => {
+        (items || []).forEach(item => {
+            if (typeof item === 'string') {
+                if (/^(appoint_legion_leader_|dismiss_legion_leader_|allot_fief_)/.test(item)) return;
+                if (!docs[item]) missing.push(item);
+                return;
+            }
+            if (!item || !Array.isArray(item.items)) return;
+            if (collapsed[item.label]) {
+                if (!docs[collapsed[item.label]]) missing.push(collapsed[item.label]);
+                return;
+            }
+            walk(item.items);
+        });
+    };
+    menus.forEach(menu => walk(menu.items));
+    assert.deepStrictEqual(Array.from(missing), []);
+});
+
+test('GuideView は国主席番号を展開せず、入れ子から個別コマンド説明へ遷移する', () => {
+    class GuideClassList {
+        constructor() { this.values = new Set(); }
+        add(...names) { names.forEach(name => this.values.add(name)); }
+        remove(...names) { names.forEach(name => this.values.delete(name)); }
+        contains(name) { return this.values.has(name); }
+        toggle(name, force) {
+            if (force === true) { this.values.add(name); return true; }
+            if (force === false) { this.values.delete(name); return false; }
+            if (this.values.has(name)) { this.values.delete(name); return false; }
+            this.values.add(name); return true;
+        }
+    }
+    const makeNode = id => {
+        const node = {
+            id, children: [], classList: new GuideClassList(), dataset: {}, type: '', className: '',
+            _text: '', _listeners: {},
+            appendChild(child) { this.children.push(child); child.parentElement = this; return child; },
+            addEventListener(type, fn) { this._listeners[type] = fn; },
+            click() { if (this._listeners.click) this._listeners.click(); },
+            focus() {},
+            get childElementCount() { return this.children.length; }
+        };
+        Object.defineProperty(node, 'textContent', {
+            get() { return this._text; },
+            set(value) { this._text = String(value); if (value === '') this.children = []; }
+        });
+        return node;
+    };
+    const ids = ['guide-modal','guide-nav','guide-article-title','guide-article-lead','guide-command-list','guide-article-body','guide-close-btn','title-screen'];
+    const elements = Object.fromEntries(ids.map(id => [id, makeNode(id)]));
+    elements['title-screen'].classList.add('hidden');
+    const document = {
+        getElementById(id) { return elements[id] || null; },
+        createElement(tag) { return makeNode(tag); }
+    };
+    const ctx = createContext({
+        document,
+        MainParams: { CommandCost: { Farm:1, Commerce:1, Repair:1, Charity:1, SoldierCharity:1, Reward:1, RewardAll:1 } }
+    });
+    ctx.window.MainParams = ctx.MainParams;
+    loadScript(ctx, 'js/command_catalog.js');
+    loadScript(ctx, 'js/guide_data.js');
+    loadScript(ctx, 'js/guide_view.js');
+    const GuideViewClass = vm.runInContext('GuideView', ctx);
+    const view = new GuideViewClass({}, {});
+
+    const flattenTexts = root => {
+        const values = [];
+        const walk = node => { if (node.textContent) values.push(node.textContent); (node.children || []).forEach(walk); };
+        walk(root);
+        return values;
+    };
+
+    view.open('legion');
+    let texts = flattenTexts(elements['guide-command-list']);
+    ['概要','評定','国主任命','国主解任','所領分配'].forEach(label => assert.ok(texts.includes(label), `${label} が指南書に必要`));
+    assert.ok(!texts.some(text => /^第[一二三四五六七八]席$/.test(text)), '席番号を指南書へ展開しない');
+
+    view.open('foreign');
+    const findButton = (root, label) => {
+        let found = null;
+        const walk = node => {
+            if (found) return;
+            if (node.textContent === label && node._listeners && node._listeners.click) { found = node; return; }
+            (node.children || []).forEach(walk);
+        };
+        walk(root);
+        return found;
+    };
+    const diplomacyGroup = findButton(elements['guide-command-list'], '外交');
+    assert.ok(diplomacyGroup);
+    diplomacyGroup.click();
+    texts = flattenTexts(elements['guide-command-list']);
+    assert.ok(texts.includes('同盟') && texts.includes('婚姻同盟') && texts.includes('臣従願'));
+    const alliance = findButton(elements['guide-command-list'], '同盟');
+    assert.ok(alliance);
+    alliance.click();
+    assert.strictEqual(elements['guide-article-title'].textContent, '同盟');
+    assert.ok(elements['guide-article-lead'].textContent.includes('同盟を申し入れます'));
 });
 
 test('コマンド仕様表は command_catalog.js を正本とする', () => {
@@ -3978,6 +4090,112 @@ test('武将一覧共通ソートは面談用検索と既知能力順を安定�
     assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'leadership', false)).map(b => b.id), [1, 3, 2, 4]);
     assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.filterByName(list, 'さくま')).map(b => b.id), [2]);
     assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'castle', true)).map(b => b.id), [2, 1, 3, 4]);
+});
+
+test('面談の選択肢は簡潔な4項目表記に統一する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/interview_system.js');
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+    let shown = null;
+    const game = { ui: { interviewView: { showMenu(_b, _p, items) { shown = items.map(item => item.label); } } } };
+    const system = new ctx.InterviewSystem(game);
+    system.activeInterviewAttitude = 'friendly';
+    system._getMenuPrompt = () => '何を聞く';
+    system.showMainMenu({ id: 1 });
+    assert.deepStrictEqual(Array.from(shown), ['調子について', '方針について', '他者について', '武将の噂']);
+});
+
+test('武将の噂は他家武将を官位の有無にかかわらずフルネームで識別する', () => {
+    const ctx = createContext({
+        BushoStatusRules: { isRonin() { return false; } },
+        ConversationStandingRules: {
+            getInterviewTargetCallName() { return '参議殿'; }
+        }
+    });
+    loadScript(ctx, 'js/interview_system.js');
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+    const clans = [{ id: 1, name: '織田家' }, { id: 2, name: '他家' }];
+    const game = {
+        playerClanId: 1,
+        getClanDaimyo() { return null; },
+        getClan(id) { return clans.find(c => c.id === Number(id)) || null; },
+        kunishuSystem: { getKunishu() { return null; } }
+    };
+    const system = new ctx.InterviewSystem(game);
+    const interviewer = { id: 1, clan: 1, fullName: '柴田勝家' };
+    const other = { id: 2, clan: 2, name: '佐久間信盛', fullName: '佐久間信盛', familyNameStr: '佐久間', courtRankIds: [10] };
+    assert.strictEqual(system._getRumorSubjectText(other, interviewer), '他家の佐久間信盛殿');
+});
+
+test('武将の噂は主君の近親者を外し話者自身の近親者だけ例外として残す', () => {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' }
+    });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/busho_list_sort_rules.js');
+    loadScript(ctx, 'js/conversation_standing_rules.js');
+    loadScript(ctx, 'js/interview_system.js');
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+
+    const daimyo = { id: 1, clan: 1, isDaimyo: true, realFatherId: 9, birthYear: 1534, courtRankIds: [] };
+    const interviewer = { id: 2, clan: 1, realFatherId: 20, birthYear: 1530, courtRankIds: [] };
+    const daimyoFather = { id: 9, clan: 2, status: 'active', birthYear: 1510, realFatherId: 0, courtRankIds: [] };
+    const speakerFather = { id: 20, clan: 2, status: 'active', birthYear: 1500, realFatherId: 0, courtRankIds: [] };
+    const game = {
+        playerClanId: 1, bushos: [daimyo, interviewer, daimyoFather, speakerFather],
+        getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)) || null; },
+        getClanDaimyo(id) { return Number(id) === 1 ? daimyo : null; },
+        courtRankSystem: { RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [], getRankData() { return null; }, getHighestRankData() { return null; } }
+    };
+    const system = new ctx.InterviewSystem(game);
+    assert.strictEqual(system._isRumorEligibleTarget(interviewer, daimyoFather), false, '主君の父は通常の噂候補から外す');
+    assert.strictEqual(system._isRumorEligibleTarget(interviewer, speakerFather), true, '話者自身の父は噂候補に残す');
+
+    // 主君と話者が同じ父を持つ場合など、対象が双方の親族でも話者自身の関係を優先する。
+    const sharedFather = { ...speakerFather, id: 30 };
+    interviewer.realFatherId = 30;
+    daimyo.realFatherId = 30;
+    game.bushos.push(sharedFather);
+    assert.strictEqual(system._isRumorEligibleTarget(interviewer, sharedFather), true, '話者自身の近親者でもある場合は主君親族除外より優先する');
+});
+
+test('武将の噂で話者の親族は伝聞にせず所属から自然に語り浪人も別文にする', () => {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' },
+        LoyaltyInsightRules: { getConcealmentProfile() { return { perceivedBand: 'stable' }; } }
+    });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/busho_list_sort_rules.js');
+    loadScript(ctx, 'js/conversation_standing_rules.js');
+    loadScript(ctx, 'js/interview_system.js');
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+
+    const daimyo = { id: 1, clan: 1, isDaimyo: true, realFatherId: 0, birthYear: 1534, courtRankIds: [] };
+    const interviewer = { id: 2, clan: 1, realFatherId: 20, birthYear: 1530, courtRankIds: [], intelligence: 70, duty: 80, ambition: 20 };
+    const father = { id: 20, clan: 2, status: 'active', realFatherId: 0, birthYear: 1500, courtRankIds: [], loyalty: 90, fullName: '明智光綱', givenName: '光綱' };
+    const clans = [{ id: 1, name: '織田家' }, { id: 2, name: '朝倉家' }];
+    const game = {
+        playerClanId: 1, bushos: [daimyo, interviewer, father],
+        getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)) || null; },
+        getClan(id) { return clans.find(c => Number(c.id) === Number(id)) || null; },
+        getClanDaimyo(id) { return Number(id) === 1 ? daimyo : null; },
+        kunishuSystem: { getKunishu() { return null; } },
+        courtRankSystem: { RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [], getRankData() { return null; }, getHighestRankData() { return null; } }
+    };
+    const system = new ctx.InterviewSystem(game);
+    system.activeInterviewAttitude = 'friendly';
+    system._getConcealmentProfile = () => ({ perceivedBand: 'stable' });
+    const row = { target: father, mode: 'expert', domain: { key: 'intelligence', label: '智謀' } };
+    let messages = system._getRumorMessages(interviewer, row).join('');
+    assert.ok(messages.includes('父上は今、朝倉家に仕えておられます'), '他家にいる父は所属から話し始める');
+    assert.ok(messages.includes('智謀にはことのほか長けておられます'), '親族の能力は伝聞ではなく本人の言葉として続ける');
+    assert.ok(!/噂|耳に|聞けば|評判/.test(messages), '親族を通常の噂テンプレートへ通さない');
+
+    father.clan = 0;
+    father.status = 'ronin';
+    messages = system._getRumorMessages(interviewer, row).join('');
+    assert.ok(messages.includes('父上は今、仕官せずにおられます'), '浪人の親族は所属家を捏造せず仕官していないことを自然に述べる');
+    assert.ok(!messages.includes('今の主君'), '浪人の親族に主君評を続けない');
 });
 
 test('武将の噂は周辺拠点を一度だけ辿り専門家/総合候補を軽量抽出する', () => {

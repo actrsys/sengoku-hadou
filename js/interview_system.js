@@ -138,9 +138,37 @@ class InterviewSystem {
     }
 
     _isHighAuthorityInterviewTarget(target) {
-        if (!target || !window.ConversationStandingRules) return false;
+        if (!target || !window.ConversationStandingRules
+            || typeof window.ConversationStandingRules.getSpecialAuthority !== 'function') return false;
         const special = window.ConversationStandingRules.getSpecialAuthority(this.game, target);
         return !!special && Number(special.level || 0) >= 2;
+    }
+
+    _isRumorSpecialAuthorityTarget(target) {
+        return this._isHighAuthorityInterviewTarget(target);
+    }
+
+    _isRumorDaimyoFamilyExcluded(interviewer, target) {
+        if (!interviewer || !target || !window.ConversationStandingRules
+            || typeof window.ConversationStandingRules.getSpeakerFamilyDialogueRelation !== 'function') return false;
+
+        // 話者自身の近親者なら、主君の親族でも本人の言葉として語れるため候補に残す。
+        const speakerRelation = window.ConversationStandingRules.getSpeakerFamilyDialogueRelation(this.game, interviewer, target);
+        if (speakerRelation && speakerRelation !== 'none') return false;
+
+        const daimyo = this._getPlayerDaimyo();
+        if (!daimyo) return false;
+        const daimyoRelation = window.ConversationStandingRules.getSpeakerFamilyDialogueRelation(this.game, daimyo, target);
+        return !!daimyoRelation && daimyoRelation !== 'none';
+    }
+
+    _isRumorEligibleTarget(interviewer, target) {
+        if (!target) return false;
+        // 将軍・左馬頭（将軍候補）は「評判の武将を探す」噂候補から外す。
+        if (this._isRumorSpecialAuthorityTarget(target)) return false;
+        // 主君の近親者は、話者自身の近親者でもある場合を除き噂話の対象にしない。
+        if (this._isRumorDaimyoFamilyExcluded(interviewer, target)) return false;
+        return true;
     }
 
     _getHighAuthorityOpinionText(score) {
@@ -311,9 +339,9 @@ class InterviewSystem {
             busho,
             this._getMenuPrompt(this.activeInterviewAttitude, busho),
             [
-                { label: '調子はどうだ', onClick: () => this.executeInterviewStatus(busho) },
+                { label: '調子について', onClick: () => this.executeInterviewStatus(busho) },
                 { label: '方針について', onClick: () => this.executeInterviewPolicy(busho) },
-                { label: '他者について聞く', onClick: () => this.showTargetList(busho) },
+                { label: '他者について', onClick: () => this.showTargetList(busho) },
                 { label: '武将の噂', onClick: () => this.executeInterviewRumor(busho) }
             ],
             () => this.showInterviewerList()
@@ -769,7 +797,7 @@ class InterviewSystem {
         return result;
     }
 
-    _getRumorRegionalCandidates(regionCastleIds) {
+    _getRumorRegionalCandidates(regionCastleIds, interviewer = null) {
         const myClanId = Number(this.game.playerClanId);
         return (this.game.bushos || []).filter(target => {
             if (!target || target.isAutoLeader) return false;
@@ -777,6 +805,7 @@ class InterviewSystem {
             const present = !!(window.BushoStatusRules
                 && (window.BushoStatusRules.isActive(target) || window.BushoStatusRules.isRonin(target)));
             if (!present) return false;
+            if (!this._isRumorEligibleTarget(interviewer, target)) return false;
             return regionCastleIds.has(Number(target.castleId));
         });
     }
@@ -883,7 +912,7 @@ class InterviewSystem {
             .filter((value, index, array) => Number.isFinite(value) && value >= 0 && array.indexOf(value) === index);
 
         for (const depth of depths) {
-            const regional = this._getRumorRegionalCandidates(this._getRumorRegionCastleIds(depth));
+            const regional = this._getRumorRegionalCandidates(this._getRumorRegionCastleIds(depth), interviewer);
             if (domain) {
                 // 得意分野を持つ聞き手は、まず同分野の専門家またはA/S適性の尖った人物を噂する。
                 // それらが周辺にいない時だけ、従来どおり総合型へフォールバックする。
@@ -917,10 +946,19 @@ class InterviewSystem {
 
     _getRumorSubjectText(target, interviewer = null) {
         if (!target) return 'ある武将';
-        const daimyo = this.game.getClanDaimyo ? this.game.getClanDaimyo(Number(this.game.playerClanId) || Number(interviewer && interviewer.clan) || 0) : null;
-        const callName = window.ConversationStandingRules && typeof window.ConversationStandingRules.getInterviewTargetCallName === 'function'
+        const interviewerClanId = Number(interviewer && interviewer.clan) || Number(this.game.playerClanId) || 0;
+        const targetClanId = Number(target.clan) || 0;
+        const daimyo = this.game.getClanDaimyo ? this.game.getClanDaimyo(interviewerClanId) : null;
+        let callName = window.ConversationStandingRules && typeof window.ConversationStandingRules.getInterviewTargetCallName === 'function'
             ? window.ConversationStandingRules.getInterviewTargetCallName(this.game, interviewer, target, daimyo)
             : `${target.name}殿`;
+
+        // 噂では人物の特定を優先する。他家所属なら官位の有無にかかわらずフルネームで示す。
+        // 将軍・左馬頭は候補選定側で除外するため、ここでは一般の他家武将を明確に識別することへ専念する。
+        if (targetClanId > 0 && interviewerClanId > 0 && targetClanId !== interviewerClanId) {
+            const fullName = String(target.fullName || target.name || '').replace(/\|/g, '').trim();
+            if (fullName) callName = `${fullName}殿`;
+        }
         if (window.BushoStatusRules && window.BushoStatusRules.isRonin(target)) {
             return `${callName}という浪人`;
         }
@@ -940,6 +978,97 @@ class InterviewSystem {
             return `${clan.name}の${callName}`;
         }
         return `${callName}という武将`;
+    }
+
+    _getRumorFamilyRelation(interviewer, target) {
+        if (!interviewer || !target || !window.ConversationStandingRules
+            || typeof window.ConversationStandingRules.getSpeakerFamilyDialogueRelation !== 'function') return 'none';
+        return window.ConversationStandingRules.getSpeakerFamilyDialogueRelation(this.game, interviewer, target) || 'none';
+    }
+
+    _getRumorFamilyReference(interviewer, target) {
+        const relation = this._getRumorFamilyRelation(interviewer, target);
+        const given = String(target && (target.givenName || target.givenNameStr) || '').trim();
+        const fallbackName = String(target && (target.fullName || target.name) || '').replace(/\|/g, '').trim();
+        const name = given || fallbackName;
+        const named = (label) => name ? `${label}の${name}` : label;
+        switch (relation) {
+            case 'mother': return '母上';
+            case 'adoptive_father': return '義父上';
+            case 'father': return '父上';
+            case 'older_brother': return target && target.female === true ? '姉上' : '兄上';
+            case 'grandfather': return '祖父上';
+            case 'older_uncle': return '伯父上';
+            case 'younger_uncle': return '叔父上';
+            case 'younger_brother': return named(target && target.female === true ? '妹' : '弟');
+            case 'son': return named(target && target.female === true ? '娘' : '息子');
+            case 'grandson': return named(target && target.female === true ? '孫娘' : '孫');
+            case 'adoptive_child': return named(target && target.female === true ? '養女' : '養子');
+            case 'sibling_child': return named(target && target.female === true ? '姪' : '甥');
+            default: return null;
+        }
+    }
+
+    _isRumorSeniorFamilyRelation(relation) {
+        return ['mother', 'adoptive_father', 'father', 'older_brother', 'grandfather', 'older_uncle', 'younger_uncle'].includes(relation);
+    }
+
+    _getRumorFamilyAffiliationText(interviewer, target) {
+        const relation = this._getRumorFamilyRelation(interviewer, target);
+        const reference = this._getRumorFamilyReference(interviewer, target);
+        if (!reference || relation === 'none') return '';
+        const senior = this._isRumorSeniorFamilyRelation(relation);
+        const presentVerb = senior ? 'おられます' : 'おります';
+        const leadVerb = senior ? '率いておられます' : '率いております';
+
+        if (window.BushoStatusRules && window.BushoStatusRules.isRonin(target)) {
+            return `${reference}は今、仕官せずに${presentVerb}。`;
+        }
+
+        const kunishuId = Number(target.belongKunishuId || 0);
+        if (kunishuId > 0) {
+            const kunishu = this.game.kunishuSystem && this.game.kunishuSystem.getKunishu(kunishuId);
+            if (kunishu) {
+                const name = kunishu.getName(this.game);
+                if (Number(kunishu.leaderId) === Number(target.id)) return `${reference}は今、${name}を${leadVerb}。`;
+                return `${reference}は今、${name}に身を置いて${presentVerb}。`;
+            }
+        }
+
+        const clan = Number(target.clan) > 0 && this.game.getClan ? this.game.getClan(Number(target.clan)) : null;
+        if (clan) {
+            if (target.isDaimyo) return `${reference}は今、${clan.name}を${leadVerb}。`;
+            return `${reference}は今、${clan.name}に仕えて${presentVerb}。`;
+        }
+        return `${reference}は今、他家には仕えずに${presentVerb}。`;
+    }
+
+    _getRumorFamilyAbilityText(interviewer, row, attitude) {
+        const relation = this._getRumorFamilyRelation(interviewer, row && row.target);
+        const senior = this._isRumorSeniorFamilyRelation(relation);
+        const strong = attitude === 'welcoming' || attitude === 'friendly' || attitude === 'polite';
+        if (row.mode === 'expert' && row.domain) {
+            if (senior) return `${row.domain.label}には${strong ? 'ことのほか' : ''}長けておられます。`;
+            return `${row.domain.label}には${strong ? 'かなり' : ''}長けております。`;
+        }
+        if (row.mode === 'aptitude' && row.aptitude) {
+            if (senior) return `${row.aptitude.label}の扱いにも長けておられます。`;
+            return `${row.aptitude.label}の扱いには、かなり長けております。`;
+        }
+        return senior ? '総じて力量は確かな方です。' : '総じて力量は確かなものです。';
+    }
+
+    _getRumorFamilyLoyaltyText(interviewer, target) {
+        if (!target) return '';
+        if (window.BushoStatusRules && window.BushoStatusRules.isRonin(target)) return '';
+        if (this._isRumorLeader(target)) return '';
+
+        const band = this._getConcealmentProfile(target).perceivedBand;
+        const lordText = Number(target.belongKunishuId || 0) > 0 ? '今の頭領' : '今の主君';
+        if (band === 'stable') return `${lordText}との間に、今のところ悪い様子はございませぬ。`;
+        if (band === 'warning') return `${lordText}について、時折思うところはあるようです。`;
+        if (band === 'danger' || band === 'dissatisfied') return `${lordText}とは、少し考えが合わぬところもあるようです。`;
+        return `${lordText}とは、かなり折り合いを欠いているようです。`;
     }
 
     _getRumorOpeningText(row, attitude, interviewer = null) {
@@ -1023,10 +1152,22 @@ class InterviewSystem {
     _getRumorMessages(interviewer, row) {
         if (!row || !row.target) return [];
         const attitude = this.activeInterviewAttitude;
-        const messages = [this._getRumorOpeningText(row, attitude, interviewer), this._getRumorAbilityText(row, attitude)];
-        // reserved は口数を抑え、人物名と評判まで。大名・諸勢力頭領も主君評判を語る意味がないため2段で止める。
-        if (attitude !== 'reserved' && !this._isRumorLeader(row.target)) {
-            messages.push(this._getRumorLoyaltyText(row.target));
+        const familyRelation = this._getRumorFamilyRelation(interviewer, row.target);
+        let messages;
+
+        if (familyRelation !== 'none') {
+            // 話者自身の近親者は「噂を聞いた」という伝聞型にせず、現在の身の置き所から自然に語る。
+            messages = [
+                this._getRumorFamilyAffiliationText(interviewer, row.target),
+                this._getRumorFamilyAbilityText(interviewer, row, attitude)
+            ];
+            if (attitude !== 'reserved') messages.push(this._getRumorFamilyLoyaltyText(interviewer, row.target));
+        } else {
+            messages = [this._getRumorOpeningText(row, attitude, interviewer), this._getRumorAbilityText(row, attitude)];
+            // reserved は口数を抑え、人物名と評判まで。大名・諸勢力頭領も主君評判を語る意味がないため2段で止める。
+            if (attitude !== 'reserved' && !this._isRumorLeader(row.target)) {
+                messages.push(this._getRumorLoyaltyText(row.target));
+            }
         }
         return messages.filter(Boolean)
             .map(text => this._applyIndependentInterviewRegister(text, interviewer))
@@ -1231,7 +1372,7 @@ class InterviewSystem {
                     ? '詳しく言うことはない。'
                     : '某から詳しく申し上げることはございませぬ。';
             }
-            this.view.showMessages(interviewer, [`「${opener}${body}」`], () => this.showMainMenu(interviewer), '他者について聞く');
+            this.view.showMessages(interviewer, [`「${opener}${body}」`], () => this.showMainMenu(interviewer), '他者について');
             return;
         }
 
@@ -1303,7 +1444,7 @@ class InterviewSystem {
             messages.push(`「${contactText}」`, `「${loyaltyText}」`);
         }
 
-        this.view.showMessages(interviewer, messages, () => this.showMainMenu(interviewer), '他者について聞く');
+        this.view.showMessages(interviewer, messages, () => this.showMainMenu(interviewer), '他者について');
     }
 
     _getOpinionDirection(score) {

@@ -280,7 +280,7 @@ class InterviewView {
     showTargetList(interviewer, candidates, onSelect, onBack) {
         this._clearMessageAdvance();
         this._ensureOpen();
-        this._setHeader('他者について聞く', '誰についての印象を聞きますか？');
+        this._setHeader('他者について', '誰についての印象を聞きますか？');
         this._setConversationVisible(false);
         this._setSpeaker(interviewer);
         this._renderPagedList(candidates, onSelect, 'target');
