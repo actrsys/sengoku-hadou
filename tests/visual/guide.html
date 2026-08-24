@@ -8,11 +8,12 @@
       <h3>指南書</h3>
       <div class="guide-layout">
         <nav id="guide-nav" class="guide-nav">
-          <button class="guide-nav-btn">ゲームの基本</button><button class="guide-nav-btn">画面の見方</button><button class="guide-nav-btn">武将と能力</button><button class="guide-nav-btn">城と領国</button><button class="guide-nav-btn">内政</button><button class="guide-nav-btn">軍事</button><button class="guide-nav-btn active">対外</button><button class="guide-nav-btn">取引</button><button class="guide-nav-btn">組織・人事</button><button class="guide-nav-btn">国主・軍団</button><button class="guide-nav-btn">情報</button><button class="guide-nav-btn">システム</button><button class="guide-nav-btn">よくある疑問</button>
+          <button class="guide-nav-btn">ゲームの基本</button><button class="guide-nav-btn">画面の見方</button><button class="guide-nav-btn">武将と能力</button><button class="guide-nav-btn">城と領国</button><button class="guide-nav-btn">内政</button><button class="guide-nav-btn">軍事</button><button class="guide-nav-btn">合戦</button><button class="guide-nav-btn active">対外</button><button class="guide-nav-btn">取引</button><button class="guide-nav-btn">組織・人事</button><button class="guide-nav-btn">国主・軍団</button><button class="guide-nav-btn">情報</button><button class="guide-nav-btn">システム</button><button class="guide-nav-btn">よくある疑問</button>
         </nav>
         <article class="guide-article">
-          <h2>同盟</h2>
-          <p class="guide-article-lead">他の大名家へ同盟を申し入れます。</p>
+          <div class="guide-article-header">
+            <h2>同盟</h2>
+          </div>
           <div class="guide-command-list">
             <div class="guide-command-primary">
               <button class="guide-command-btn">概要</button><button class="guide-command-btn guide-command-group-btn active">外交</button><button class="guide-command-btn guide-command-group-btn">諸勢力</button><button class="guide-command-btn guide-command-group-btn">計略</button><button class="guide-command-btn guide-command-group-btn">朝廷</button>
@@ -22,11 +23,27 @@
             </div>
           </div>
           <div class="guide-article-body">
+            <section class="guide-section"><h4>概要</h4><p>他の大名家へ同盟を申し入れます。</p></section>
             <section class="guide-section"><h4>効果</h4><p>成立すると同盟関係となり、通行や援軍など関係に応じた協力が可能になります。</p></section>
           </div>
         </article>
       </div>
       <div class="modal-footer"><button class="btn-secondary">閉じる</button></div>
+    </div>
+  </div>
+
+  <div id="scenario-modal" class="modal hidden">
+    <div class="modal-content start-content">
+      <h3>シナリオ選択</h3>
+      <div id="scenario-list" class="scenario-list-vertical">
+        <div class="clan-btn selected"><strong>1560年 桶狭間の戦い</strong></div>
+        <div class="clan-btn"><strong>1560年 開発シナリオ</strong></div>
+      </div>
+      <div id="scenario-desc-box" class="scenario-desc-box"><div class="scenario-desc-text">シナリオの説明文です。タイトル画面の「観戦する」から入った場合も同じシナリオ選択画面を使用します。</div></div>
+      <div class="modal-footer">
+        <button class="btn-primary">決定</button>
+        <button class="btn-secondary">閉じる</button>
+      </div>
     </div>
   </div>
 </div>

@@ -226,6 +226,7 @@ class SaveManager {
     }
 
     async _recoverFromFailedRestore() {
+        this.game.isRestoringSave = false;
         this.game.isProcessingAI = false;
         this.game.isWatchMode = false;
         this.game.originalPlayerClanId = null;
@@ -298,7 +299,8 @@ class SaveManager {
             aiOperations: this.game.aiOperationManager.save(),
             turnQueueIds: this.game.turnQueue.map(c => c.id),
             currentIndex: this.game.currentIndex,
-            flags: this.game.flags || {}
+            flags: this.game.flags || {},
+            historyEntries: this.game.historySystem ? this.game.historySystem.serialize() : []
         };
     }
     
@@ -363,6 +365,7 @@ class SaveManager {
     // どんな方法でロードした時も、この魔法で「受け取ったデータ」をゲーム内に展開します
     async _restoreSaveDataObj(d) {
         this._validateSaveDataStructure(d);
+        this.game.isRestoringSave = true;
         if (this.game.ui) this.game.ui.updateLoadingProgress(5, 'セーブデータを復元しています');
         // --- お掃除作業 ---
         this.game.isProcessingAI = false; 
@@ -376,7 +379,7 @@ class SaveManager {
         this.game.lastMenuState = null;
         if (this.game.warManager && this.game.warManager.state) this.game.warManager.state.active = false;
         if (this.game.ui) {
-            this.game.ui.logHistory = [];
+            if (this.game.historySystem) this.game.historySystem.clear();
             this.game.ui.clearWarLog();
             if (typeof this.game.ui.clearCommandMenu === 'function') this.game.ui.clearCommandMenu();
         }
@@ -390,6 +393,7 @@ class SaveManager {
         this.game.gameStartYear = d.gameStartYear || window.MainParams.StartYear;
         this.game.gameStartMonth = d.gameStartMonth || window.MainParams.StartMonth;
         this.game.playerClanId = d.playerClanId || 1;
+        if (this.game.historySystem) this.game.historySystem.load(d.historyEntries || []);
         
         this.game.scenarioFolder = d.scenarioFolder || "";
         this.game.scenarioName = d.scenarioName || "不明なシナリオ";
@@ -505,6 +509,7 @@ class SaveManager {
         }
 
         this.game.updateAllCastlesLords();
+        this.game.isRestoringSave = false;
         this.game.lifeSystem.updateAllBushosAge();
 
         // セーブ時に歴史常駐効果が有効でも、現在のユーザー設定が歴史イベントOFFなら

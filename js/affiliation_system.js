@@ -31,10 +31,19 @@ class AffiliationSystem {
         if (window.BushoStatusRules && !window.BushoStatusRules.isActive(busho)) return false;
 
         const members = Array.isArray(this.game && this.game.bushos) ? this.game.bushos : [];
+        const previousGunshi = members.find(member => Number(member.clan) === numericClanId && member.isGunshi) || null;
         members.forEach(member => {
             if (Number(member.clan) === numericClanId && member.isGunshi) this.clearGunshiRole(member);
         });
         busho.isGunshi = true;
+        if ((!previousGunshi || Number(previousGunshi.id) !== Number(busho.id))
+            && this.game.phase === 'game' && !this.game.isRestoringSave && this.game.historySystem) {
+            const clan = this.game.getClan ? this.game.getClan(numericClanId) : null;
+            const clanName = clan ? clan.name : '大名家';
+            this.game.historySystem.record(`【軍師任命】${clanName}は${busho.fullName || busho.name}を軍師に任命しました。`, {
+                clanIds: [numericClanId], category: 'appointment', inferCurrentTurn: false
+            });
+        }
         return true;
     }
 
@@ -706,6 +715,7 @@ class AffiliationSystem {
     }
 
     electCastellan(castle, bushos) {
+        const previousCastellanId = Number(castle && castle.castellanId) || 0;
         // 国主が存在する城では、城主の再任命ロジックを走らせないようにガードします
         if (bushos && bushos.some(b => b.isCommander)) return;
 
@@ -781,6 +791,13 @@ class AffiliationSystem {
         }
         
         castle.castellanId = best.id;
+        if (Number(best.id) !== previousCastellanId && this.game.phase === 'game' && !this.game.isRestoringSave && this.game.historySystem) {
+            const clan = this.game.getClan ? this.game.getClan(castle.ownerClan) : null;
+            const clanName = clan ? clan.name : '大名家';
+            this.game.historySystem.record(`【城主任命】${clanName}は${best.fullName || best.name}を${castle.name}城主に任命しました。`, {
+                clanIds: [castle.ownerClan], category: 'appointment', inferCurrentTurn: false
+            });
+        }
     }
 
     updateAllCastlesLords() {

@@ -846,11 +846,41 @@ async function validateGuideLayout(cdp) {
                 const content = contentEl.getBoundingClientRect();
                 const nav = document.querySelector('.guide-nav');
                 const article = document.querySelector('.guide-article');
+                const lead = document.querySelector('.guide-article-lead');
+                const commandList = document.querySelector('.guide-command-list');
+                const commandTopBefore = commandList.getBoundingClientRect().top;
+                const firstOverview = document.querySelector('.guide-article-body .guide-section p');
+                if (firstOverview) firstOverview.textContent += ' 追加の説明は本文側へ入るため、見出し下の項目一覧位置には影響しません。';
+                const commandTopAfter = commandList.getBoundingClientRect().top;
+
+                const guideLayoutRect = document.querySelector('.guide-layout').getBoundingClientRect();
+                const guideFooter = document.querySelector('#guide-modal .modal-footer');
+                const guideClose = guideFooter.querySelector('.btn-secondary').getBoundingClientRect();
+                const guideGap = guideClose.top - guideLayoutRect.bottom;
+
+                document.getElementById('guide-modal').classList.add('hidden');
+                const scenarioModal = document.getElementById('scenario-modal');
+                scenarioModal.classList.remove('hidden');
+                const scenarioDesc = document.getElementById('scenario-desc-box');
+                scenarioDesc.style.display = 'flex';
+                const scenarioContentEl = scenarioModal.querySelector('.start-content');
+                const scenarioContent = scenarioContentEl.getBoundingClientRect();
+                const scenarioListRect = document.getElementById('scenario-list').getBoundingClientRect();
+                const scenarioDescRect = scenarioDesc.getBoundingClientRect();
+                const scenarioFooter = scenarioModal.querySelector('.modal-footer');
+                const scenarioClose = scenarioFooter.querySelector('.btn-secondary').getBoundingClientRect();
+                const scenarioMainBottom = Math.max(scenarioListRect.bottom, scenarioDescRect.bottom);
+                const scenarioGap = scenarioClose.top - scenarioMainBottom;
+
                 return {
                     screen:{left:screen.left,top:screen.top,right:screen.right,bottom:screen.bottom},
                     content:{left:content.left,top:content.top,right:content.right,bottom:content.bottom,clientHeight:contentEl.clientHeight,scrollHeight:contentEl.scrollHeight},
                     nav:{clientHeight:nav.clientHeight,scrollHeight:nav.scrollHeight},
-                    article:{clientHeight:article.clientHeight,scrollHeight:article.scrollHeight}
+                    article:{clientHeight:article.clientHeight,scrollHeight:article.scrollHeight},
+                    leadExists: !!lead, commandTopBefore, commandTopAfter,
+                    guideGap,
+                    scenarioGap,
+                    scenarioContent:{left:scenarioContent.left,top:scenarioContent.top,right:scenarioContent.right,bottom:scenarioContent.bottom,clientHeight:scenarioContentEl.clientHeight,scrollHeight:scenarioContentEl.scrollHeight}
                 };
             })()`, returnByValue: true
         });
@@ -867,8 +897,13 @@ async function validateGuideLayout(cdp) {
         assert.ok(state.content.scrollHeight <= state.content.clientHeight + 1, `${cfg.label}: 指南書外枠がスクロールを要求する`);
         assert.ok(state.nav.scrollHeight <= state.nav.clientHeight + 1, `${cfg.label}: 指南書ナビが見切れる`);
         assert.ok(state.article.scrollHeight <= state.article.clientHeight + 1, `${cfg.label}: 指南書記事が見切れる`);
+        assert.strictEqual(state.leadExists, false, `${cfg.label}: 見出し下の説明専用エリアを残さない`);
+        assert.ok(Math.abs(state.commandTopBefore - state.commandTopAfter) <= 0.5, `${cfg.label}: 本文の説明量でコマンド一覧の位置が動く`);
+        assert.ok(state.scenarioContent.left >= state.screen.left - 1 && state.scenarioContent.right <= state.screen.right + 1, `${cfg.label}: シナリオ選択が横にはみ出す`);
+        assert.ok(state.scenarioContent.top >= state.screen.top - 1 && state.scenarioContent.bottom <= state.screen.bottom + 1, `${cfg.label}: シナリオ選択が縦にはみ出す`);
+        assert.ok(Math.abs(state.guideGap - state.scenarioGap) <= 1.5, `${cfg.label}: 指南書とシナリオ選択で閉じるボタン上の余白感が揃っていない (${state.guideGap} vs ${state.scenarioGap})`);
     }
-    console.log('✓ 指南書 PC16:9 / スマホ9:16・非スクロール visual/layout regression');
+    console.log('✓ 指南書 PC16:9 / スマホ9:16・非スクロール / シナリオ・観戦footer余白 visual/layout regression');
 }
 
 async function main() {

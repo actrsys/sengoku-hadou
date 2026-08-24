@@ -41,7 +41,7 @@ class CommandSystem {
         
         // 2. ログを残します
         if (logMsg) {
-            this.game.ui.log(logMsg);
+            this.game.ui.log(logMsg, { clanIds: [this.game.playerClanId], category: 'command', inferCurrentTurn: false });
         }
         
         // 3. 全ての更新が終わってから、最後にメッセージを表示して背景をストップさせます！
@@ -799,9 +799,9 @@ class CommandSystem {
                 break;
             case 'history':
                 if (this.game.ui.info) {
-                    this.game.ui.info.showHistoryModal(this.game.ui.logHistory);
+                    this.game.ui.info.showHistoryModal();
                 } else {
-                    this.game.ui.showHistoryModal(this.game.ui.logHistory);
+                    this.game.ui.showHistoryModal();
                 }
                 break;
             case 'daimyo_list': this.game.ui.showDaimyoList(); break;
@@ -1321,7 +1321,7 @@ class CommandSystem {
                 if (bushos.isGunshi) {
                     this.game.affiliationSystem.clearGunshiRole(bushos);
                 }
-                this.finishCommand(`${bushos.name}を城主に任命しました`); 
+                this.finishCommand(`${bushos.name}を城主に任命しました`, false, `【城主任命】${this.game.getClan(this.game.playerClanId)?.name || '当家'}は${bushos.fullName || bushos.name}を${castle.name}城主に任命しました。`); 
             }
             return;
         }
@@ -1363,7 +1363,7 @@ class CommandSystem {
                 
                 this.game.affiliationSystem.becomeRonin(busho, 'banish');
 
-                this.finishCommand(`${busho.name}を追放しました`);
+                this.finishCommand(`${busho.name}を追放しました`, false, `【追放】${this.game.getClan(this.game.playerClanId)?.name || '当家'}は${busho.fullName || busho.name}を追放しました。`);
             });
             return; 
         }
@@ -1498,7 +1498,7 @@ class CommandSystem {
             });
         }
         bushos.forEach(b => b.isActionDone = true);
-        this.finishCommand(msg, true, `調査実行: ${target.name} (${result.success ? '成功' : '失敗'})`);
+        this.finishCommand(msg, true);
     }
 
     executeEmploy(doerId, targetId) { 
@@ -1530,8 +1530,12 @@ class CommandSystem {
             doer.achievementTotal += 5; 
             this.game.factionSystem.updateRecognition(doer, 10); 
         }
-        doer.isActionDone = true; 
-        this.finishCommand(msg); 
+        doer.isActionDone = true;
+        const clanName = this.game.getClan(this.game.playerClanId)?.name || '当家';
+        const employLog = success
+            ? `【登用】${clanName}は${target.fullName || target.name}の登用に成功しました。`
+            : `【登用】${clanName}の${target.fullName || target.name}への登用は成立しませんでした。`;
+        this.finishCommand(msg, false, employLog);
     }
     
     executeReward(bushoIds) {
@@ -1565,7 +1569,7 @@ class CommandSystem {
         let logMsg = null;
         if (count > 0) {
             msg = `${count}名に褒美（金${count * spec.costGold}）を与えました`;
-            logMsg = `${count}名に褒美を実行 (合計効果:${totalEffect})`;
+            logMsg = `${count}名の家臣に褒美を与えました。`;
         }
 
         this.finishCommand(msg, false, logMsg);
@@ -1609,7 +1613,7 @@ class CommandSystem {
             totalEffect += PersonnelRules.calcRewardEffect(daimyo, target) * 2;
         });
         
-        this.finishCommand(`${count}名の家臣に褒美を与えました`, false, `${count}名に一括褒美を実行 (合計効果:${totalEffect})`);
+        this.finishCommand(`${count}名の家臣に褒美を与えました`, false, `${count}名の家臣に一括して褒美を与えました。`);
     }
 
     executeTransport(bushoIds, targetId, vals) {
@@ -1696,7 +1700,7 @@ class CommandSystem {
         
         const displayMessage = `${busho.name} を「${legionName}」の国主に任命し、\n${castle.name} を本拠としました`;
         
-        this.finishCommand(displayMessage, true);
+        this.finishCommand(displayMessage, true, `【国主任命】${this.game.getClan(this.game.playerClanId)?.name || '当家'}は${busho.fullName || busho.name}を国主に任命し、${castle.name}を本拠としました。`);
     }
     
     executeTrade(type, amount) {
@@ -2125,7 +2129,7 @@ class CommandSystem {
         const numberNames = ["直轄", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
         const legionName = numberNames[legionNo] || `第${legionNo}席`;
         
-        this.finishCommand(`${legionName}の所領分配を完了しました。\n${count}件の拠点の所属が変更されました。`, true);
+        this.finishCommand(`${legionName}の所領分配を完了しました。\n${count}件の拠点の所属が変更されました。`, true, `【所領分配】${this.game.getClan(this.game.playerClanId)?.name || '当家'}は${legionName}の所領を変更しました。`);
     }
     
     executeArrangeMarriage(busho, princess) {
@@ -2141,7 +2145,7 @@ class CommandSystem {
 
         busho.loyalty = 100;
 
-        this.finishCommand(`${busho.name} と ${princess.name} の祝言が執り行われました。新たな縁によって、当家の結束はより一層強固なものとなりました。`);
+        this.finishCommand(`${busho.name} と ${princess.name} の祝言が執り行われました。新たな縁によって、当家の結束はより一層強固なものとなりました。`, false, `【婚姻】${this.game.getClan(this.game.playerClanId)?.name || '当家'}で${busho.fullName || busho.name}と${princess.name}の祝言が執り行われました。`);
     }
 
     // ★追加：国主解任の実行
@@ -2176,6 +2180,6 @@ class CommandSystem {
         
         const commanderName = commander ? commander.name : "不明";
 
-        this.finishCommand(`${commanderName} を ${legionName} の国主から解任しました。所属していた ${count} 件の拠点はすべて直轄領に変更されました。`, true);
+        this.finishCommand(`${commanderName} を ${legionName} の国主から解任しました。所属していた ${count} 件の拠点はすべて直轄領に変更されました。`, true, `【国主解任】${this.game.getClan(this.game.playerClanId)?.name || '当家'}は${commanderName}を国主から解任し、所領を直轄へ戻しました。`);
     }
 }

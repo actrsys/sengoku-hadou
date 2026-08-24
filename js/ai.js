@@ -194,7 +194,7 @@ class AIEngine {
                                                     // 画面のログ（文字の履歴）やダイアログにお知らせを出します
                                                     if (breakMsg !== "") {
                                                         this.game.ui.showDialog(breakMsg, false);
-                                                        this.game.ui.log(`【外交】${breakMsg}`);
+                                                        this.game.ui.log(`【外交】${breakMsg}`, { clanIds: [castle.ownerClan, targetCastle.ownerClan], category: 'diplomacy', inferCurrentTurn: false });
                                                         console.log(breakMsg); // 裏側の記録にも残しておきます
                                                     }
         
@@ -2656,11 +2656,12 @@ class AIEngine {
                 }
                 if (action.type === 'sabotage') {
                     const result = this.game.strategySystem.calcSabotage(doer.id, action.targetId, true);
-                    this.game.strategySystem.handleCovertAction(doer.id, action.targetId, result.success, 'sabotage');
-                    
                     const target = this.game.getCastle(action.targetId);
+                    const targetClanIdForHistory = Number(target && target.ownerClan) || 0;
+                    const covertOutcome = this.game.strategySystem.handleCovertAction(doer.id, action.targetId, result.success, 'sabotage');
                     // ★個別の魔法ではなく、共通の「applyStrategyEffect」を使うように直します！
                     this.game.strategySystem.applyStrategyEffect('sabotage', doer, target, result);
+                    this.game.strategySystem.recordStrategyHistory('破壊工作', doer, target ? target.name : '対象城', result.success, [targetClanIdForHistory], covertOutcome);
                     
                     let keepAction = false;
                     if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
@@ -2675,11 +2676,12 @@ class AIEngine {
                 }
                 if (action.type === 'incite') {
                     const result = this.game.strategySystem.calcIncite(doer.id, action.targetId, true);
-                    this.game.strategySystem.handleCovertAction(doer.id, action.targetId, result.success, 'incite');
-                    
                     const target = this.game.getCastle(action.targetId);
+                    const targetClanIdForHistory = Number(target && target.ownerClan) || 0;
+                    const covertOutcome = this.game.strategySystem.handleCovertAction(doer.id, action.targetId, result.success, 'incite');
                     // ★ここも共通の魔法「applyStrategyEffect」に書き換えます！
                     this.game.strategySystem.applyStrategyEffect('incite', doer, target, result);
+                    this.game.strategySystem.recordStrategyHistory('民心撹乱', doer, target ? target.name : '対象城', result.success, [targetClanIdForHistory], covertOutcome);
                     
                     let keepAction = false;
                     if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
@@ -2697,10 +2699,12 @@ class AIEngine {
                     const targetBusho = this.game.getBusho(action.targetBushoId);
                     
                     targetBusho.lastApproachedClanId = doer.clan;
-                    this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, result.success, 'rumor', false, targetBusho.id);
+                    const targetClanIdForHistory = Number(targetBusho.clan) || 0;
+                    const covertOutcome = this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, result.success, 'rumor', false, targetBusho.id);
                     
                     // ★ここも共通の魔法「applyStrategyEffect」に書き換えます！
                     this.game.strategySystem.applyStrategyEffect('rumor', doer, targetBusho, result);
+                    this.game.strategySystem.recordStrategyHistory('離間計', doer, targetBusho.fullName || targetBusho.name, result.success, [targetClanIdForHistory], covertOutcome);
                     
                     let keepAction = false;
                     if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
@@ -2719,10 +2723,12 @@ class AIEngine {
                     
                     targetBusho.lastApproachedClanId = doer.clan;
 
+                    const targetClanIdForHistory = Number(targetBusho.clan) || 0;
                     let isSuccess = this.game.strategySystem.calcHeadhunt(doer.id, action.targetBushoId, action.gold, true);
-                    this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, isSuccess, 'headhunt', targetBusho.isCastellan && isSuccess, targetBusho.id);
+                    const covertOutcome = this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, isSuccess, 'headhunt', targetBusho.isCastellan && isSuccess, targetBusho.id);
                     
                     this.game.strategySystem.applyHeadhuntEffect(doer, targetBusho, castle, isSuccess);
+                    this.game.strategySystem.recordStrategyHistory('引抜', doer, targetBusho.fullName || targetBusho.name, isSuccess, [targetClanIdForHistory], covertOutcome);
                     
                     let keepAction = false;
                     if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
@@ -2740,12 +2746,14 @@ class AIEngine {
                     const targetBusho = this.game.getBusho(action.targetBushoId);
                     targetBusho.lastApproachedClanId = doer.clan;
                     
+                    const targetClanIdForHistory = Number(targetBusho.clan) || 0;
                     let isSuccess = this.game.strategySystem.calcAssassinate(doer.id, action.targetBushoId, true);
-                    this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, isSuccess, 'assassinate', false, targetBusho.id);
+                    const covertOutcome = this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, isSuccess, 'assassinate', false, targetBusho.id);
                     
                     if (isSuccess) {
                         this.game.lifeSystem.processDeath(targetBusho, 'assassination');
                     }
+                    this.game.strategySystem.recordStrategyHistory('暗殺', doer, targetBusho.fullName || targetBusho.name, isSuccess, [targetClanIdForHistory], covertOutcome);
                     
                     let keepAction = false;
                     if (!hasBonusSabotageUsed && leader.intelligence >= 91) {

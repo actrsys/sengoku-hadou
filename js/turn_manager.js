@@ -38,7 +38,7 @@ class TurnManager {
         
         await game.ui.showCutin(`${game.year}年 ${game.month}月`);
         
-        game.ui.log(`=== ${game.year}年 ${game.month}月 ===`);
+        game.ui.log(`=== ${game.year}年 ${game.month}月 ===`, { history: false });
         
         // 月初イベント【前】をチェックして実行します
         if (game.eventManager) {

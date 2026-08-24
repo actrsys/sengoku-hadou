@@ -28,6 +28,7 @@ class GameManager {
         this.turnQueue = []; 
         this.currentIndex = 0; 
         this.playerClanId = 1;
+        this.historySystem = new HistorySystem(this);
         this.ui = new UIManager(this); 
         this.saveManager = new SaveManager(this);
         this.turnManager = new TurnManager(this);
@@ -191,7 +192,7 @@ class GameManager {
             this.warManager.state.active = false;
         }
         if (this.ui) {
-            this.ui.logHistory = [];
+            if (this.historySystem) this.historySystem.clear();
             this.ui.clearWarLog();
             if (typeof this.ui.resetMapViewState === 'function') {
                 this.ui.resetMapViewState({ initialZoomLevel: startInWatchMode ? 0 : 1 });

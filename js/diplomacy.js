@@ -1376,9 +1376,17 @@ class DiplomacyManager {
     /**
      * ★新設：外交の結果表示と、それに伴う画面の更新をひとまとめに行う魔法です！
      */
-    showDiplomacyResult(doerClanId, isPlayerInvolved, msg, logMsg = "", aiMsg = "", onClose = null) {
+    _recordDiplomacyHistory(text, clanIds = []) {
+        if (!text || !this.game.historySystem) return;
+        this.game.historySystem.record(text, { clanIds, category: 'diplomacy', inferCurrentTurn: false });
+    }
+
+    showDiplomacyResult(doerClanId, isPlayerInvolved, msg, logMsg = "", aiMsg = "", onClose = null, relatedClanIds = null) {
+        const historyClanIds = Array.isArray(relatedClanIds) && relatedClanIds.length > 0 ? relatedClanIds : [doerClanId];
+        const historyText = logMsg || aiMsg;
+        if (historyText) this._recordDiplomacyHistory(historyText, historyClanIds);
+
         if (isPlayerInvolved) {
-            if (logMsg !== "") this.game.ui.log(logMsg);
             if (doerClanId === this.game.playerClanId) {
                 this.game.ui.updatePanelHeader();
                 this.game.ui.renderCommandMenu();
@@ -1387,7 +1395,6 @@ class DiplomacyManager {
             this.game.ui.showResultModal(msg, onClose);
         } else if (aiMsg !== "") {
             this.game.ui.showDialog(aiMsg, false, onClose);
-            this.game.ui.log(aiMsg);
         } else {
             // メッセージが無い場合も、閉じられた後の処理だけはちゃんと引き継ぎます
             if (onClose) onClose();
@@ -1432,11 +1439,12 @@ class DiplomacyManager {
                 if(castle) castle.gold -= gold;
                 
                 msg = `${doer.name}の働きにより、${targetClanName}との関係が改善しました！`;
-                if (isPlayerInvolved) logMsg = `${doerClanName}が${targetClanName}に親善を行いました`;
+                logMsg = `${doerClanName}が${targetClanName}に親善を行いました`;
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
                 this.game.factionSystem.updateRecognition(doer, 15);
             } else {
                 msg = `${this.game.clans.find(c => c.id === targetClanId).name} に親善の品を突き返されました……`;
+                this._recordDiplomacyHistory(`【外交】${doerClanName}の${targetClanName}への親善は受け入れられませんでした。`, [doer.clan, targetClanId]);
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 5);
             }
@@ -1480,6 +1488,7 @@ class DiplomacyManager {
             } else {
                 this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
                 msg = `同盟の締結に失敗しました……`;
+                this._recordDiplomacyHistory(`【外交】${doerClanName}の${targetClanName}への同盟提案は成立しませんでした。`, [doer.clan, targetClanId]);
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
             }
@@ -1684,7 +1693,7 @@ class DiplomacyManager {
             doer.isActionDone = true;
             this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, logMsg, "", () => {
                 processPrincesses(0); 
-            });
+            }, [doer.clan, targetClanId]);
             return;
             
         } else if (type === 'subordinate') {
@@ -1747,17 +1756,18 @@ class DiplomacyManager {
                 this.game.factionSystem.updateRecognition(doer, 30);
 
                 doer.isActionDone = true;
-                this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, logMsg, aiMsg);
+                this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, logMsg, aiMsg, null, [doer.clan, targetClanId]);
             };
             
             const handleFailure = () => {
                 this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.DOMINATE_FAILURE);
                 msg = `条件が折り合わず、${this.game.clans.find(c => c.id === targetClanId).name} への従属を断念しました。`;
+                this._recordDiplomacyHistory(`【外交】${doerClanName}の${targetClanName}への従属願は成立しませんでした。`, [doer.clan, targetClanId]);
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
                 
                 doer.isActionDone = true;
-                this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg);
+                this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, "", "", null, [doer.clan, targetClanId]);
             };
             
             if (isSuccess) {
@@ -1833,17 +1843,18 @@ class DiplomacyManager {
                 this.game.factionSystem.updateRecognition(doer, 30);
 
                 doer.isActionDone = true;
-                this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, logMsg, aiMsg);
+                this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, logMsg, aiMsg, null, [doer.clan, targetClanId]);
             };
             
             const handleFailure = () => {
                 this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
                 msg = `条件が折り合わず、${this.game.clans.find(c => c.id === targetClanId).name} との和睦は決裂しました。`;
+                this._recordDiplomacyHistory(`【外交】${doerClanName}と${targetClanName}の和睦交渉は成立しませんでした。`, [doer.clan, targetClanId]);
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
                 
                 doer.isActionDone = true;
-                this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg);
+                this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, "", "", null, [doer.clan, targetClanId]);
             };
             
             if (isSuccess) {
@@ -1885,6 +1896,7 @@ class DiplomacyManager {
             } else {
                 this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.DOMINATE_FAILURE);
                 msg = `支配の要求は拒否されました……`;
+                this._recordDiplomacyHistory(`【外交】${doerClanName}の${targetClanName}への降伏勧告は拒否されました。`, [doer.clan, targetClanId]);
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
             }
@@ -1901,7 +1913,7 @@ class DiplomacyManager {
         }
         
         doer.isActionDone = true;
-        this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, logMsg, aiMsg);
+        this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, logMsg, aiMsg, null, [doer.clan, targetClanId]);
     }
     
     /**
@@ -2334,7 +2346,7 @@ class DiplomacyManager {
             const msg = `${targetClan.name} と婚姻同盟を締結しました！\n${princess.name} は ${targetBusho.name} の正室として迎えられました。`;
             const logMsg = `${doerClan.name}が${targetClan.name}と婚姻同盟を締結しました`;
 
-            this.showDiplomacyResult(doer.clan, true, msg, logMsg);
+            this.showDiplomacyResult(doer.clan, true, msg, logMsg, "", null, [doer.clan, targetClanId]);
         } else {
             this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
             doer.isActionDone = true;
@@ -2342,7 +2354,8 @@ class DiplomacyManager {
             this.game.factionSystem.updateRecognition(doer, 10);
 
             const msg = `${targetClan.name} との婚姻同盟の締結に失敗しました……`;
-            this.showDiplomacyResult(doer.clan, true, msg);
+            this._recordDiplomacyHistory(`【外交】${doerClan.name}と${targetClan.name}の婚姻同盟は成立しませんでした。`, [doer.clan, targetClanId]);
+            this.showDiplomacyResult(doer.clan, true, msg, "", "", null, [doer.clan, targetClanId]);
         }
     }
 
@@ -2393,6 +2406,8 @@ class DiplomacyManager {
         // 外交担当者に行動完了のシールを貼ります
         if (doer) doer.isActionDone = true;
         
+        this._recordDiplomacyHistory(`【臣従】${this.game.getClan(myClanId)?.name || '当家'}が${targetClan.name}に臣従しました。`, [myClanId, targetClanId]);
+
         // 4. プレイヤーの操作担当を、新しい大名家に切り替えます！
         this.game.playerClanId = targetClanId;
         
@@ -2411,7 +2426,7 @@ class DiplomacyManager {
         const winner = this.game.clans.find(c => Number(c.id) === Number(winnerClanId));
         const loser = this.game.clans.find(c => Number(c.id) === Number(loserClanId));
         if (winner && loser) {
-            this.game.ui.log(`${winner.name}が${loser.name}を従属させました`);
+            this.game.ui.log(`${winner.name}が${loser.name}を従属させました`, { clanIds: [winnerClanId, loserClanId], category: 'diplomacy', inferCurrentTurn: false });
         }
     }
     
@@ -2471,6 +2486,8 @@ class DiplomacyManager {
 
         const doReject = () => {
             this.calcDiplomacyExp(doer, type, false, true);
+            const rejectNames = { goodwill: '親善', alliance: '同盟', dominate: '従属要求', truce: '和睦' };
+            this._recordDiplomacyHistory(`【外交】${targetClan.name}は${doerClan.name}からの${rejectNames[type] || '提案'}を拒否しました。`, [doer.clan, targetClanId]);
 
             if (type === 'goodwill') {
                 const doerCastle = this.game.getCastle(doer.castleId);
@@ -2517,21 +2534,21 @@ class DiplomacyManager {
                 if (myCastleObj) myCastleObj.gold = Math.min(99999, myCastleObj.gold + gold);
                 const increase = this.calcGoodwillIncrease(gold, doer);
                 this.updateSentiment(doer.clan, targetClanId, increase);
-                this.game.ui.log(`${doerClan.name}からの親善を受け入れました`);
+                this.game.ui.log(`${doerClan.name}からの親善を受け入れました`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(`${doerClan.name}との関係が改善しました！`, () => {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
             } else if (type === 'alliance') {
                 this.applyAllianceData(doer.clan, targetClanId);
                 
-                this.game.ui.log(`${doerClan.name}と同盟を結びました`);
+                this.game.ui.log(`${doerClan.name}と同盟を結びました`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(`${doerClan.name} と同盟を結びました！`, () => {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
             } else if (type === 'dominate') {
                 this.applyDominationData(doer.clan, targetClanId);
 
-                this.game.ui.log(`${doerClan.name}に従属しました`);
+                this.game.ui.log(`${doerClan.name}に従属しました`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(`${doerClan.name} に従属しました……`, () => {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
@@ -2542,7 +2559,7 @@ class DiplomacyManager {
                 if (relationA) relationA.sentiment = 50;
                 if (relationB) relationB.sentiment = 50;
 
-                this.game.ui.log(`${doerClan.name}と和睦しました`);
+                this.game.ui.log(`${doerClan.name}と和睦しました`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(`${doerClan.name} と和睦しました。`, () => {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
@@ -2666,7 +2683,7 @@ class DiplomacyManager {
                         conditionMsg = `\n${selectedOption.castle.name} を割譲させました。`;
                     }
 
-                    this.game.ui.log(`${doerClan.name}と条件付きで和睦しました`);
+                    this.game.ui.log(`${doerClan.name}と条件付きで和睦しました`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                     this.game.ui.showResultModal(`${doerClan.name} と和睦しました。${conditionMsg}`, () => {
                         if (onComplete) setTimeout(onComplete, 100);
                     });

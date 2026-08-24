@@ -176,7 +176,7 @@ class FactionSystem {
 
         if (clan && clan.id === this.game.playerClanId) {
             const message = `${busho.name}は${clanName}に愛想を尽かし、下野しました。`;
-            this.game.ui.log(`【出奔】${message}`);
+            this.game.ui.log(`【出奔】${message}`, { clanIds: [clan.id], category: 'personnel', inferCurrentTurn: false });
             // 月初カットインではなく、他の通常通知と同じ共通ダイアログをそのまま使います。
             await this.game.ui.showDialogAsync(message);
         }

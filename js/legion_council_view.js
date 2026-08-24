@@ -44,12 +44,12 @@ class LegionCouncilView {
             return;
         }
         if (!this.system.canHoldCouncil(clanId)) {
-            this.ui.showDialog('今月はすでに評定を開催しています。\n評定は一月に一度だけ開催できます。', false, null, null, { okText: '閉じる' });
+            this.ui.showDialog('今月はすでに評定を開催しています。\n評定は一ヶ月に一度だけ開催できます。', false, null, null, { okText: '閉じる' });
             return;
         }
 
         const nav = this.game.getNavigatorInfo ? this.game.getNavigatorInfo(this.ui.currentCastle) : null;
-        this.ui.showDialog('評定を開きますか？\n評定は一月に一度のみ開催できます。', true, () => {
+        this.ui.showDialog('評定を開きますか？\n評定は一ヶ月に一度のみ開催できます。', true, () => {
             if (!this.system.beginCouncil(clanId)) {
                 this.ui.showDialog('今月は評定を開催できません。', false, null, null, { okText: '閉じる' });
                 return;

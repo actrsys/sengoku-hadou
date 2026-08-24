@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r163');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r168');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1026,6 +1026,115 @@ test('米相場の供給不足・供給増イベントは「金1で得られる�
     assert.ok(economy.includes('seasonForce = harvestBoost') && economy.includes('seasonForce = -(baseRate * 0.05)'), '9月の供給増は相場を上げ、通常月は緩やかに下げる');
 });
 
+test('HistorySystem は自国/全国を関係勢力で分離し保持上限を守る', () => {
+    const ctx = createContext({ GameConfig: { History: { MaxEntries: 3 } } });
+    loadScript(ctx, 'js/history_system.js');
+    const game = { year: 1560, month: 4, playerClanId: 1, getCurrentTurnCastle: () => null, warManager: { state: { active: false } } };
+    const history = new ctx.HistorySystem(game);
+    history.record('自国', { clanIds: [1], category: 'test', inferCurrentTurn: false });
+    history.record('他国', { clanIds: [2], category: 'test', inferCurrentTurn: false });
+    history.record('両国', { clanIds: [1, 2], category: 'test', inferCurrentTurn: false });
+    assert.deepStrictEqual(Array.from(history.getEntries('clan', 1), e => e.text), ['自国', '両国']);
+    assert.strictEqual(history.getEntries('all', 1).length, 3);
+    history.record('追加', { clanIds: [3], inferCurrentTurn: false });
+    assert.deepStrictEqual(Array.from(history.getEntries('all'), e => e.text), ['他国', '両国', '追加']);
+
+    const currentTurnGame = { year: 1560, month: 5, playerClanId: 1, getCurrentTurnCastle: () => ({ ownerClan: 1 }), warManager: { state: { active: false } } };
+    const scoped = new ctx.HistorySystem(currentTurnGame);
+    scoped.record('関係不明');
+    assert.strictEqual(scoped.getEntries('clan', 1).length, 0, '関係勢力不明の全国出来事を現在手番だけで自国扱いしない');
+    scoped.record('自国コマンド', { inferCurrentTurn: true });
+    assert.strictEqual(scoped.getEntries('clan', 1).length, 1, '明示した場合だけ現在手番勢力へ関連付ける');
+});
+
+test('調略履歴は自家実行または発覚済みだけを記録し未発覚の他家工作を漏らさない', () => {
+    const records = [];
+    const ctx = createContext();
+    loadScript(ctx, 'js/strategy_system.js');
+    const game = {
+        playerClanId: 1,
+        historySystem: { record: (text, options) => records.push({ text, options }) },
+        getClan: id => ({ id, name: id === 1 ? '自家' : id === 2 ? '他家A' : '他家B' })
+    };
+    const StrategySystemClass = vm.runInContext('StrategySystem', ctx);
+    const strategy = new StrategySystemClass(game);
+    const myDoer = { clan: 1, name: '自家武将', fullName: '自家武将' };
+    const aiDoer = { clan: 2, name: '他家武将', fullName: '他家武将' };
+
+    strategy.recordStrategyHistory('離間計', aiDoer, '対象武将', false, [3], { isDiscovered: false });
+    assert.strictEqual(records.length, 0, '未発覚の他家調略は全国履歴にも出さない');
+
+    strategy.recordStrategyHistory('離間計', aiDoer, '対象武将', false, [3], { isDiscovered: true });
+    assert.strictEqual(records.length, 1, '発覚した他家調略は全国履歴へ残す');
+    assert.ok(records[0].text.includes('他家Aの他家武将'));
+
+    strategy.recordStrategyHistory('破壊工作', myDoer, '対象城', false, [3], { isDiscovered: false });
+    assert.strictEqual(records.length, 2, '自家が実行した調略は未発覚でも自家自身が把握しているため残す');
+});
+
+test('履歴表示は月ごとの区切りを画面側で生成し履歴件数を消費しない', () => {
+    const info = read('js/ui_info.js');
+    const history = read('js/history_system.js');
+    assert.ok(info.includes('history-month-divider'));
+    assert.ok(info.includes('history-month-label'));
+    assert.ok(info.includes('`${year}年 ${month}月`'));
+    assert.ok(info.includes('disableVirtualization: true'), '可変高の履歴行は固定行高前提の仮想スクロールを使わない');
+    assert.ok(!history.includes('history-month-divider'), '月区切りをHistorySystemの保存エントリとして持たない');
+});
+
+test('コマンドのキャンセル段階では履歴を書かず実行確定後だけ履歴化する', () => {
+    const command = read('js/command_system.js');
+    const start = command.indexOf('showAdviceAndExecute(actionType');
+    const end = command.indexOf('executeCommand(type', start);
+    const adviceFlow = command.slice(start, end);
+    assert.ok(adviceFlow.includes('showCommandAdvice'));
+    assert.ok(!adviceFlow.includes('historySystem.record'));
+    assert.ok(!adviceFlow.includes('ui.log('), '軍師助言でやめた段階を履歴へ残さない');
+});
+
+test('行動履歴はHistorySystemを正本にして自国/全国タブを持ちセーブにも保存する', () => {
+    const game = read('js/game.js');
+    const ui = read('js/ui.js');
+    const info = read('js/ui_info.js');
+    const save = read('js/save_manager.js');
+    const html = read('index.html');
+    assert.ok(game.includes('this.historySystem = new HistorySystem(this)'));
+    assert.ok(ui.includes('this.game.historySystem.record(msg'));
+    assert.ok(info.includes('data-tab="clan">自国</button>'));
+    assert.ok(info.includes('data-tab="all">全国</button>'));
+    assert.ok(save.includes('historyEntries: this.game.historySystem ? this.game.historySystem.serialize() : []'));
+    assert.ok(save.includes('this.game.historySystem.load(d.historyEntries || [])'));
+    assert.ok(html.indexOf('js/history_system.js') < html.indexOf('js/game.js'));
+    assert.ok(!ui.includes('this.logHistory = []'));
+});
+
+test('面談・情報取得は行動履歴へ混ぜず調略と主要人事を履歴化する', () => {
+    const command = read('js/command_system.js');
+    const strategy = read('js/strategy_system.js');
+    const affiliation = read('js/affiliation_system.js');
+    const life = read('js/life_system.js');
+    assert.ok(!command.includes('調査実行: ${target.name}'));
+    assert.ok(strategy.includes("category: 'strategy'"));
+    assert.ok(strategy.includes("this.recordStrategyHistory('暗殺'"));
+    assert.ok(strategy.includes("this.recordStrategyHistory('引抜'"));
+    assert.ok(affiliation.includes('【軍師任命】'));
+    assert.ok(affiliation.includes('【城主任命】'));
+    assert.ok(life.includes('【武将登場】'));
+    assert.ok(life.includes('【武将死亡】'));
+    assert.ok(command.includes("category: 'command'"), 'プレイヤーコマンド履歴は自家へ明示的に紐づける');
+    const history = read('js/history_system.js');
+    assert.ok(history.includes('options.inferCurrentTurn === true'), '関係不明ログを現在手番だけで自国扱いしない');
+    const diplomacy = read('js/diplomacy.js');
+    assert.ok(diplomacy.includes('const historyText = logMsg || aiMsg;'));
+    assert.ok(diplomacy.includes('if (historyText) this._recordDiplomacyHistory(historyText, historyClanIds);'), 'AI同士を含む外交結果も全国履歴へ残す');
+    const ai = read('js/ai.js');
+    assert.ok(ai.includes("recordStrategyHistory('破壊工作'"));
+    assert.ok(ai.includes("recordStrategyHistory('民心撹乱'"));
+    assert.ok(ai.includes("recordStrategyHistory('離間計'"));
+    assert.ok(ai.includes("recordStrategyHistory('引抜'"));
+    assert.ok(ai.includes("recordStrategyHistory('暗殺'"));
+});
+
 test('タイトル版表示は GameConfig.Meta.Version を正本にする', () => {
     const html = read('index.html');
     const bootstrap = read('js/app_bootstrap.js');
@@ -1943,6 +2052,10 @@ test('指南書は固定論理画面内で記事切替し通常長文スクロ�
     assert.ok(view.includes("button.className = 'guide-command-btn'"));
     assert.ok(view.includes('guide-command-children'));
     assert.ok(view.includes("this._renderArticle(article)"));
+    assert.ok(css.includes('.guide-article-header'));
+    assert.ok(!css.includes('.guide-article-lead'), '見出し下の説明専用エリアを残さない');
+    assert.ok(!view.includes('guide-article-lead'), 'GuideViewから見出し下の説明欄参照を除去する');
+    assert.ok(view.includes("heading: '概要'"), '導入文は本文の概要へ移す');
 });
 
 test('指南書は公開情報の範囲で国主・弱い武将・褒美・派閥を説明する', () => {
@@ -1956,10 +2069,60 @@ test('指南書は公開情報の範囲で国主・弱い武将・褒美・派�
     assert.ok(guide.includes('「侍大将」が最低限の守将として立ちます'));
     assert.ok(guide.includes('忠誠を高めます'));
     assert.ok(guide.includes('派閥主・人数・方針・思想'));
-    assert.ok(guide.includes('同じ派閥の武将を揃えて担当させる'));
+    assert.ok(guide.includes('同じ派閥の武将を一緒に働かせたとき'));
     ['義理', '野心', '野望', '承認欲求', 'achievementTotal'].forEach(hiddenWord => {
         assert.ok(!guide.includes(hiddenWord), `指南書に非公開情報 ${hiddenWord} を露出しない`);
     });
+});
+
+test('指南書は公開・体感・非公開の境界を守り、命令口調を避ける', () => {
+    const guide = read('js/guide_data.js');
+    assert.ok(guide.includes('人口：金収入や徴兵できる兵のもとになる'));
+    assert.ok(guide.includes('低い城では一揆が起こることもある'));
+    assert.ok(guide.includes('人数の多い派閥は家中で存在感を持ちやすく'));
+    assert.ok(guide.includes('領国の規模や兵力、蓄え、当主の官位などを反映した勢力の存在感の目安'));
+    assert.ok(guide.includes('すべてを率直に話すとは限りません'));
+    ['野望', '義理', '承認欲求', 'achievementTotal', 'LoyaltyChangeThreshold', 'Recognition'].forEach(hiddenWord => {
+        assert.ok(!guide.includes(hiddenWord), `指南書に非公開情報 ${hiddenWord} を露出しない`);
+    });
+    ['見てください', '確認してください', 'してください', 'して下さい'].forEach(imperative => {
+        assert.ok(!guide.includes(imperative), `指南書を命令口調にしない: ${imperative}`);
+    });
+    assert.ok(!guide.includes('AIの判断ルール'), '観戦の内部実装説明を指南書へ載せない');
+});
+
+test('評定の案内は一ヶ月表記で統一する', () => {
+    const guide = read('js/guide_data.js');
+    const council = read('js/legion_council_view.js');
+    assert.ok(guide.includes('評定は一ヶ月に一度開けます。'));
+    assert.ok(council.includes('評定は一ヶ月に一度だけ開催できます。'));
+    assert.ok(council.includes('評定は一ヶ月に一度のみ開催できます。'));
+    assert.ok(!guide.includes('一月に') && !council.includes('一月に'));
+});
+
+test('指南書とシナリオ選択の閉じる操作は標準modal-footerの余白感へ揃える', () => {
+    const css = read('css/style.css');
+    assert.ok(css.includes('.modal-footer { margin-top: 15px;'));
+    assert.ok(!css.includes('#guide-modal .modal-footer {'), '指南書だけのfooter高さ・余白上書きを残さない');
+    assert.ok(css.includes('#scenario-modal .modal-footer {'));
+    assert.ok(css.includes('min-height: 60px;'));
+    assert.ok(css.includes('margin: 1px 0 0;'), 'PCシナリオ選択はgrid gapと合わせて標準15px相当にする');
+    assert.ok(css.includes('margin-top: 5px;'), '縦スマホのシナリオ選択もgrid gapと合わせて標準15px相当にする');
+    assert.ok(css.includes('margin-top: 8px;'), '横持ちのシナリオ選択もgrid gapと合わせて標準15px相当にする');
+});
+
+test('指南書は合戦を野戦・攻城戦・兵科へ分け、内部倍率を出さず特徴を説明する', () => {
+    const guide = read('js/guide_data.js');
+    assert.ok(guide.includes("id: 'battle'"));
+    assert.ok(guide.includes("{ id: 'battle_field', label: '野戦' }"));
+    assert.ok(guide.includes("{ id: 'battle_siege', label: '攻城戦' }"));
+    assert.ok(guide.includes("id: 'battle_troops', label: '兵科'"));
+    assert.ok(guide.includes("{ id: 'battle_ashigaru', label: '足軽' }"));
+    assert.ok(guide.includes("{ id: 'battle_kiba', label: '騎馬' }"));
+    assert.ok(guide.includes("{ id: 'battle_teppo', label: '鉄砲' }"));
+    assert.ok(guide.includes('移動した直後は攻撃できず'));
+    assert.ok(guide.includes('雨や雪では遠距離射撃ができず'));
+    assert.ok(!guide.includes('1.5倍') && !guide.includes('0.7倍'), '指南書へ内部戦闘倍率を露出しない');
 });
 
 test('指南書のコマンド解説は command_catalog の階層を使い、全表示コマンドを個別説明できる', () => {
@@ -2022,7 +2185,7 @@ test('GuideView は国主席番号を展開せず、入れ子から個別コマ�
         });
         return node;
     };
-    const ids = ['guide-modal','guide-nav','guide-article-title','guide-article-lead','guide-command-list','guide-article-body','guide-close-btn','title-screen'];
+    const ids = ['guide-modal','guide-nav','guide-article-title','guide-command-list','guide-article-body','guide-close-btn','title-screen'];
     const elements = Object.fromEntries(ids.map(id => [id, makeNode(id)]));
     elements['title-screen'].classList.add('hidden');
     const document = {
@@ -2070,9 +2233,30 @@ test('GuideView は国主席番号を展開せず、入れ子から個別コマ�
     assert.ok(texts.includes('同盟') && texts.includes('婚姻同盟') && texts.includes('臣従願'));
     const alliance = findButton(elements['guide-command-list'], '同盟');
     assert.ok(alliance);
+    assert.strictEqual(elements['guide-article-title'].textContent, '外交', '入れ子の親項目を押した時も見出しを押した項目名へ合わせる');
     alliance.click();
     assert.strictEqual(elements['guide-article-title'].textContent, '同盟');
-    assert.ok(elements['guide-article-lead'].textContent.includes('同盟を申し入れます'));
+    let bodyTexts = flattenTexts(elements['guide-article-body']);
+    assert.ok(bodyTexts.includes('概要'));
+    assert.ok(bodyTexts.some(text => text.includes('同盟を申し入れます')));
+
+    view.open('organization');
+    assert.strictEqual(elements['guide-article-title'].textContent, '組織・人事', '左ナビの名称と上部見出しを一致させる');
+
+    view.open('battle');
+    assert.strictEqual(elements['guide-article-title'].textContent, '合戦');
+    const fieldBattle = findButton(elements['guide-command-list'], '野戦');
+    assert.ok(fieldBattle);
+    fieldBattle.click();
+    assert.strictEqual(elements['guide-article-title'].textContent, '野戦');
+    bodyTexts = flattenTexts(elements['guide-article-body']);
+    assert.ok(bodyTexts.some(text => text.includes('城外で部隊を動かして戦う')));
+    const troopGroup = findButton(elements['guide-command-list'], '兵科');
+    assert.ok(troopGroup);
+    troopGroup.click();
+    assert.strictEqual(elements['guide-article-title'].textContent, '兵科');
+    texts = flattenTexts(elements['guide-command-list']);
+    assert.ok(texts.includes('足軽') && texts.includes('騎馬') && texts.includes('鉄砲'));
 });
 
 test('コマンド仕様表は command_catalog.js を正本とする', () => {

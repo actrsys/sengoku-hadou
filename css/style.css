@@ -733,6 +733,28 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .history-list-item { scroll-snap-align: start; padding: 8px 10px; border-bottom: 1px solid rgba(255, 215, 79, 0.3); font-size: 0.9rem; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .history-list-item.row-striped { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
 .history-list-item:last-child { border-bottom: none; }
+.select-item.history-month-divider {
+    height: 30px;
+    display: block;
+    padding: 0;
+    border-top: 1px solid rgba(255, 215, 79, 0.55);
+    border-bottom: 1px solid rgba(255, 215, 79, 0.55);
+    background: linear-gradient(to bottom, #17140d 0%, #0e0c08 100%);
+    color: #f1d27a;
+    text-shadow: 1px 1px 0 #000;
+}
+.select-item.history-month-divider.row-striped { background: linear-gradient(to bottom, #17140d 0%, #0e0c08 100%); }
+.select-item.history-month-divider > * {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    height: 100%;
+    padding: 0 12px;
+    border-right: none;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+}
 
 /* ★追加：履歴画面やリスト画面の全体高さを、行数や空っぽに関係なく固定する魔法 */
 .modal-content:has(.history-list-item),
@@ -5250,10 +5272,11 @@ body:not(.is-pc) #map-container {
 
 #scenario-modal .modal-footer {
     grid-area: scenario-footer;
-    margin: 0;
-    min-height: 54px;
-    padding: 8px 0 0;
-    border-top: 1px solid rgba(212,175,55,0.30);
+    /* グリッドのrow-gapと合わせて、標準modal-footerの15px相当の間隔に揃える。 */
+    margin: 1px 0 0;
+    min-height: 60px;
+    padding: 0;
+    border-top: none;
 }
 
 #scenario-modal .btn-primary,
@@ -5305,8 +5328,9 @@ body:not(.is-pc) #map-container {
     }
 
     #scenario-modal .modal-footer {
-        min-height: 48px;
-        padding-top: 6px;
+        margin-top: 5px;
+        min-height: 60px;
+        padding: 0;
     }
 }
 
@@ -5343,8 +5367,9 @@ body:not(.is-pc) #map-container {
     }
 
     #scenario-modal .modal-footer {
-        min-height: 38px;
-        padding-top: 3px;
+        margin-top: 8px;
+        min-height: 60px;
+        padding: 0;
     }
 
     #scenario-modal .btn-primary,
@@ -6337,3 +6362,278 @@ body:not(.is-pc) .legion-council-name { font-size: 12px; }
 body:not(.is-pc) .legion-council-policy-summary { font-size: 8px; }
 body:not(.is-pc) .legion-council-order-label strong { font-size: 15px; }
 body:not(.is-pc) .legion-council-order-label small { font-size: 11px; }
+
+/* =========================================================
+   指南書 (#guide-modal)
+   長文スクロールに頼らず、項目を切り替えて固定論理画面内で読む。
+   ========================================================= */
+#guide-modal .guide-content {
+    width: min(1040px, 92%);
+    max-width: 1040px;
+    height: 570px;
+    max-height: calc(100% - 92px);
+    overflow: hidden !important;
+    padding: 12px 14px;
+    text-align: left;
+}
+
+#guide-modal .guide-content > h3 {
+    flex: 0 0 auto;
+    margin-bottom: 8px;
+    padding-bottom: 7px;
+}
+
+.guide-layout {
+    min-height: 0;
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 12px;
+}
+
+.guide-nav {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-auto-rows: minmax(0, 1fr);
+    gap: 3px;
+    padding: 7px;
+    background: rgba(7, 18, 10, 0.52);
+    border: 1px solid rgba(201, 170, 80, 0.42);
+    border-radius: 5px;
+}
+
+.guide-nav-btn {
+    min-height: 0;
+    padding: 3px 8px;
+    border: 1px solid rgba(196, 203, 190, 0.25);
+    border-left: 3px solid rgba(201, 170, 80, 0.35);
+    border-radius: 2px;
+    background: rgba(255,255,255,0.035);
+    color: #e9eee8;
+    font-family: 'abashiri-mincho', serif;
+    font-size: 0.78rem;
+    line-height: 1.15;
+    text-align: left;
+}
+
+.guide-nav-btn:hover,
+.guide-nav-btn:focus-visible,
+.guide-nav-btn.active {
+    background: rgba(201, 170, 80, 0.17);
+    border-color: rgba(255, 224, 112, 0.72);
+    border-left-color: #ffe070;
+    color: #fff5c8;
+    outline: none;
+}
+
+.guide-article {
+    min-width: 0;
+    min-height: 0;
+    padding: 13px 16px;
+    box-sizing: border-box;
+    background: rgba(4, 14, 8, 0.34);
+    border: 1px solid rgba(201, 170, 80, 0.32);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+/* 上部は選択中項目の見出しだけにし、説明文は本文の「概要」へ集約する。 */
+.guide-article-header {
+    min-height: 0;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(201, 170, 80, 0.28);
+}
+
+.guide-article h2 {
+    margin: 0;
+    color: #ffe070;
+    font-size: 1.25rem;
+    line-height: 1.25;
+}
+
+.guide-command-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0 0 8px;
+    padding: 5px 6px;
+    border: 1px solid rgba(201, 170, 80, 0.24);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.14);
+}
+
+.guide-command-primary,
+.guide-command-children {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.guide-command-children {
+    padding-top: 4px;
+    border-top: 1px solid rgba(201, 170, 80, 0.2);
+}
+
+.guide-command-btn {
+    min-height: 25px;
+    padding: 3px 8px;
+    border: 1px solid rgba(201, 170, 80, 0.4);
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.22);
+    color: #f2e6b9;
+    font-family: 'abashiri-mincho', serif;
+    font-size: 0.71rem;
+    line-height: 1.15;
+    white-space: nowrap;
+}
+
+.guide-command-btn:hover,
+.guide-command-btn:focus-visible,
+.guide-command-btn.active {
+    border-color: rgba(255, 224, 112, 0.8);
+    background: rgba(201, 170, 80, 0.17);
+    color: #fff5c8;
+    outline: none;
+}
+
+.guide-command-group-btn::after {
+    content: ' ▸';
+    opacity: 0.72;
+}
+
+.guide-command-group-btn.active::after {
+    content: ' ▾';
+}
+
+.guide-command-child-btn {
+    background: rgba(27, 50, 31, 0.5);
+}
+
+.guide-article-body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    align-content: start;
+}
+
+.guide-section {
+    min-width: 0;
+    padding: 8px 10px;
+    border-left: 2px solid rgba(201, 170, 80, 0.58);
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.guide-section h4 {
+    margin: 0 0 4px;
+    color: #f6d974;
+    font-size: 0.86rem;
+    line-height: 1.25;
+}
+
+.guide-section p,
+.guide-section ul {
+    margin: 0;
+    color: #e4e9e2;
+    font-size: 0.76rem;
+    line-height: 1.52;
+}
+
+.guide-section ul {
+    padding-left: 1.25em;
+}
+
+.guide-section li + li {
+    margin-top: 1px;
+}
+
+#guide-title-btn { color: #d8d0b8; }
+
+body:not(.is-pc) #guide-modal {
+    padding: max(8px, env(safe-area-inset-top)) 6px calc(env(safe-area-inset-bottom) + 54px) 6px;
+}
+
+body:not(.is-pc) #guide-modal .guide-content {
+    width: calc(100% - 10px) !important;
+    height: calc(100% - 64px);
+    max-height: calc(100% - 64px) !important;
+    padding: 7px;
+}
+
+body:not(.is-pc) #guide-modal .guide-content > h3 {
+    margin-bottom: 5px;
+    padding-bottom: 4px;
+    font-size: 1rem;
+}
+
+body:not(.is-pc) .guide-layout {
+    grid-template-columns: 104px minmax(0, 1fr);
+    gap: 6px;
+}
+
+body:not(.is-pc) .guide-nav {
+    gap: 2px;
+    padding: 4px;
+}
+
+body:not(.is-pc) .guide-nav-btn {
+    padding: 2px 5px;
+    font-size: 0.65rem;
+    letter-spacing: -0.02em;
+}
+
+body:not(.is-pc) .guide-article {
+    padding: 8px;
+}
+
+body:not(.is-pc) .guide-article-header {
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+}
+
+body:not(.is-pc) .guide-article h2 {
+    font-size: 0.96rem;
+}
+
+body:not(.is-pc) .guide-command-list {
+    gap: 2px;
+    margin-bottom: 5px;
+    padding: 3px;
+}
+
+body:not(.is-pc) .guide-command-primary,
+body:not(.is-pc) .guide-command-children {
+    gap: 2px;
+}
+
+body:not(.is-pc) .guide-command-children {
+    padding-top: 2px;
+}
+
+body:not(.is-pc) .guide-command-btn {
+    min-height: 20px;
+    padding: 2px 4px;
+    font-size: 0.57rem;
+}
+
+body:not(.is-pc) .guide-article-body {
+    grid-template-columns: 1fr;
+    gap: 4px;
+}
+
+body:not(.is-pc) .guide-section {
+    padding: 4px 6px;
+}
+
+body:not(.is-pc) .guide-section h4 {
+    margin-bottom: 2px;
+    font-size: 0.7rem;
+}
+
+body:not(.is-pc) .guide-section p,
+body:not(.is-pc) .guide-section ul {
+    font-size: 0.62rem;
+    line-height: 1.35;
+}
+

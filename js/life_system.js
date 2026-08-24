@@ -415,6 +415,25 @@ class LifeSystem {
         }
     }
     
+    _recordBushoAppearance(busho) {
+        if (!busho || !this.game.historySystem) return;
+        const name = busho.fullName || busho.name;
+        let text = `【武将登場】${name}が登場しました。`;
+        let clanIds = [];
+        if ((busho.belongKunishuId || 0) > 0 && this.game.kunishuSystem) {
+            const kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
+            const groupName = kunishu && typeof kunishu.getName === 'function' ? kunishu.getName(this.game) : '諸勢力';
+            text = `【武将登場】${name}が${groupName}に加わりました。`;
+        } else if (window.BushoStatusRules.isRonin(busho) || Number(busho.clan) === 0) {
+            text = `【武将登場】${name}が浪人として現れました。`;
+        } else if (Number(busho.clan) > 0) {
+            const clan = this.game.getClan(busho.clan);
+            text = `【武将登場】${clan ? clan.name : '大名家'}に${name}が加わりました。`;
+            clanIds = [busho.clan];
+        }
+        this.game.historySystem.record(text, { clanIds, category: 'appearance', inferCurrentTurn: false });
+    }
+
     // ★ 登場のチェック（毎年1月に行います）
     async checkBirth() {
         const currentYear = this.game.year;
@@ -500,7 +519,7 @@ class LifeSystem {
                         if (b.clan === this.game.playerClanId) {
                             const nameStr = b.fullName;
                             const msg = `${nameStr}が元服し、当家に加わりました！`;
-                            this.game.ui.log(msg);
+                            this.game.ui.log(msg, { history: false });
                             await this.game.ui.showDialogAsync(msg, false, 0);
                         }
                     } else {
@@ -580,7 +599,7 @@ class LifeSystem {
                             msg = `${nameStr}が当家に仕官しました！`;
                         }
                         // ★変更：リストに溜め込まず、ここで直接画面に出して「OK」を押すまで待ちます！
-                        this.game.ui.log(msg);
+                        this.game.ui.log(msg, { history: false });
                         await this.game.ui.showDialogAsync(msg, false, 0);
                     }
                 } else {
@@ -590,6 +609,8 @@ class LifeSystem {
                     b.loyalty = 50; // ★浪人になったので忠誠度を50にします！
                 }
             }
+
+            this._recordBushoAppearance(b);
         }
 
         // ★ここから追加：姫の登場チェックを書き足します！
@@ -660,7 +681,7 @@ class LifeSystem {
                         msg = `${p.name}が誕生しました！`;
                     }
                     // ★変更：リストに溜め込まず、ここで直接画面に出して「OK」を押すまで待ちます！
-                    this.game.ui.log(msg);
+                    this.game.ui.log(msg, { clanIds: [targetClanId], category: 'family', inferCurrentTurn: false });
                     await this.game.ui.showDialogAsync(msg, false, 0);
                 }
             }
@@ -714,9 +735,9 @@ class LifeSystem {
                 if (formerClanId > 0) factionDirtyClanIds.add(formerClanId);
                 
                 // もしプレイヤーの家臣で、すでに登場していて、かつ「イベントで通常のメッセージを消す」指示がなければお知らせを出します
-                if (b.clan === this.game.playerClanId && !wasUnborn && !context.skipNormalMessage) {
+                if (formerClanId === this.game.playerClanId && !wasUnborn && !context.skipNormalMessage) {
                     const name = b.fullName;
-                    this.game.ui.log(`${name}が死亡しました……`);
+                    this.game.ui.log(`${name}が死亡しました……`, { history: false });
                     // ★一人ずつ順番にダイアログを出して、押すまで待ちます！
                     await this.game.ui.showDialogAsync(`${name}が死亡しました……`, false, 0);
                 }
@@ -754,9 +775,9 @@ class LifeSystem {
                 if (formerClanId > 0) factionDirtyClanIds.add(formerClanId);
                 
                 // もしプレイヤーの家臣で、すでに登場していて、かつ「イベントで通常のメッセージを消す」指示がなければお知らせを出します
-                if (b.clan === this.game.playerClanId && !wasUnborn && !context.skipNormalMessage) {
+                if (formerClanId === this.game.playerClanId && !wasUnborn && !context.skipNormalMessage) {
                     const name = b.fullName;
-                    this.game.ui.log(`戦傷が元となり${name}が死亡しました……`);
+                    this.game.ui.log(`戦傷が元となり${name}が死亡しました……`, { history: false });
                     await this.game.ui.showDialogAsync(`戦傷が元となり${name}が死亡しました……`, false, 0);
                 }
             }
@@ -853,6 +874,14 @@ class LifeSystem {
     async executeDeath(busho, context = {}) { // ★修正：イベントの指示（context）を受け取れるようにします
         // ★高速化：最後に所属を0へ変更する前の勢力IDを覚えておきます。
         const formerClanId = Number(busho.clan) || 0;
+        const wasUnbornBeforeDeath = window.LifeStatusRules.isUnborn(busho);
+        if (!wasUnbornBeforeDeath && this.game.historySystem) {
+            const clan = formerClanId > 0 ? this.game.getClan(formerClanId) : null;
+            const prefix = clan ? `${clan.name}の` : '';
+            this.game.historySystem.record(`【武将死亡】${prefix}${busho.fullName || busho.name}が死亡しました。`, {
+                clanIds: formerClanId > 0 ? [formerClanId] : [], category: 'death', inferCurrentTurn: false
+            });
+        }
         this.setLifeStatusRaw(busho, window.GameConstants.BushoStatus.DEAD); // ステータスを「死亡」にします
         
         // ★追加：自分が死んだ年より後に生まれる予定だった子供（実父としている武将・姫）を連鎖的に死亡させます
@@ -1232,11 +1261,11 @@ class LifeSystem {
             let mainMsg = "";
             if (isExternalSuccessor) {
                 mainMsg = `${clanPrefix}${daimyo.fullName}が死亡しました。`;
-                this.game.ui.log(`【当主交代】${mainMsg}`);
+                this.game.ui.log(`【当主交代】${mainMsg}`, { clanIds: [daimyo.clan], category: 'succession', inferCurrentTurn: false });
             } else {
                 // ★修正：改名する前の「元の名前」を使います！
                 mainMsg = `${clanPrefix}${daimyo.fullName}が死亡し、${originalName}が家督を継ぎました。`;
-                this.game.ui.log(`【当主交代】${mainMsg}`);
+                this.game.ui.log(`【当主交代】${mainMsg}`, { clanIds: [daimyo.clan], category: 'succession', inferCurrentTurn: false });
             }
             
             // ★一番最初に出すメインの死亡メッセージをリストの先頭に追加します
@@ -1392,7 +1421,7 @@ class LifeSystem {
             } else {
                 mainMsg = `${clanPrefix}国主・${commander.fullName}が死亡し、${originalName}が新たな国主となりました。`;
             }
-            this.game.ui.log(`【国主交代】${mainMsg}`);
+            this.game.ui.log(`【国主交代】${mainMsg}`, { clanIds: [commander.clan], category: 'appointment', inferCurrentTurn: false });
             messages.unshift(mainMsg);
 
             for (const msg of messages) {
@@ -1409,7 +1438,7 @@ class LifeSystem {
             const clanPrefix = clan ? `${clan.name}の` : "";
             
             const msg = `${clanPrefix}国主・${commander.fullName}が死亡しました。\n後任となる武将がいないため、軍団は解散されました。`;
-            this.game.ui.log(msg);
+            this.game.ui.log(msg, { clanIds: [commander.clan], category: 'appointment', inferCurrentTurn: false });
             await this.game.ui.showDialogAsync(msg, false, 0);
         }
     }
@@ -1643,7 +1672,7 @@ class LifeSystem {
 
         // ★修正：改名する前の「元の名前」を使ってメッセージを作ります！
         const mainMsg = `${originalName} が家督を継ぎ、新たな大名となりました！`;
-        this.game.ui.log(`【家督相続】${mainMsg}`);
+        this.game.ui.log(`【家督相続】${mainMsg}`, { clanIds: [clan.id], category: 'succession', inferCurrentTurn: false });
         messages.unshift(mainMsg);
 
         // 順番にダイアログを出します
@@ -1726,7 +1755,7 @@ class LifeSystem {
             }
             
             // 履歴にメッセージを残します
-            this.game.ui.log(extMsg);
+            this.game.ui.log(extMsg, { clanIds: [clanId, killerClanId], category: 'extinction', inferCurrentTurn: false });
             
             // ==========================================
             // ★修正：メッセージを出す「前」に、武将や城の処理を終わらせます！
@@ -2034,7 +2063,7 @@ class LifeSystem {
                         const fatherName = father ? father.name.replace('|', '') : "当家";
                         const msg = `${fatherName}の息女、${newPrincess.name}が誕生しました！`;
                         
-                        this.game.ui.log(msg);
+                        this.game.ui.log(msg, { clanIds: [clan.id], category: 'family', inferCurrentTurn: false });
                         await this.game.ui.showDialogAsync(msg, false, 0); 
                     }
                 }
@@ -2063,7 +2092,7 @@ class LifeSystem {
                             const fatherName = randomFather.name.replace('|', '');
                             const msg = `${fatherName}のご息女、${newPrincess.name}が誕生しました！`;
                             
-                            this.game.ui.log(msg);
+                            this.game.ui.log(msg, { clanIds: [clan.id], category: 'family', inferCurrentTurn: false });
                             await this.game.ui.showDialogAsync(msg, false, 0);
                         }
                     }

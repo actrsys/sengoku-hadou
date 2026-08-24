@@ -7,6 +7,23 @@ class StrategySystem {
     constructor(game) {
         this.game = game;
     }
+
+    _shouldRecordStrategyHistory(doer, covertOutcome = null) {
+        if (!doer) return false;
+        // 自家が実行した調略は、発覚の有無にかかわらず自家が把握しているため記録します。
+        if (Number(doer.clan) === Number(this.game.playerClanId)) return true;
+        // 全国履歴も全知情報にはしません。他家の調略は発覚した場合だけ記録します。
+        return !!(covertOutcome && covertOutcome.isDiscovered);
+    }
+
+    recordStrategyHistory(actionName, doer, targetText, success, clanIds = [], covertOutcome = null) {
+        if (!this.game.historySystem || !doer || !this._shouldRecordStrategyHistory(doer, covertOutcome)) return;
+        const resultText = success ? '成功' : '失敗';
+        const clanName = this.game.getClan(doer.clan)?.name || '不明な勢力';
+        this.game.historySystem.record(`【調略】${clanName}の${doer.fullName || doer.name}による${actionName}が${targetText}に対して${resultText}しました。`, {
+            clanIds: [doer.clan, ...clanIds], category: 'strategy', inferCurrentTurn: false
+        });
+    }
     
     // ==========================================
     // ★計略の能力スコアを計算する共通の処理（一箇所で管理・完全版）
@@ -512,11 +529,11 @@ class StrategySystem {
     handleCovertAction(doerId, targetCastleId, isSuccess, actionType, isCastellanHeadhunt = false, targetBushoId = null) {
         const doer = this.game.getBusho(doerId);
         const targetCastle = this.game.getCastle(targetCastleId);
-        if (!targetCastle) return "";
+        if (!targetCastle) return { message: '', isDiscovered: false, targetClanId: 0 };
 
         const targetClanId = targetCastle.ownerClan;
         // 中立の城や自分の城なら、大名家との友好度は気にしなくて大丈夫です
-        if (targetClanId === 0 || targetClanId === doer.clan) return "";
+        if (targetClanId === 0 || targetClanId === doer.clan) return { message: '', isDiscovered: false, targetClanId };
 
         let covertProb = 0;
         let penalty = 0;
@@ -596,14 +613,15 @@ class StrategySystem {
             }
         }
 
+        let message = '';
         if (isDiscovered) {
             this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -penalty);
             if (doer.clan === this.game.playerClanId) {
                 const targetClanName = this.game.getClan(targetClanId)?.name || "不明な勢力";
-                return `\n工作が発覚し、${targetClanName}との友好度が低下しました……`;
+                message = `\n工作が発覚し、${targetClanName}との友好度が低下しました……`;
             }
         }
-        return "";
+        return { message, isDiscovered, targetClanId };
     }
 
     // ==========================================
@@ -678,6 +696,7 @@ class StrategySystem {
     executeHeadhunt(doerId, targetBushoId, gold) {
         const doer = this.game.getBusho(doerId);
         const target = this.game.getBusho(targetBushoId);
+        const targetClanIdForHistory = Number(target && target.clan) || 0;
         const castle = this.game.getCurrentTurnCastle();
         if (castle.gold < gold) { this.game.ui.showDialog("資金が足りません", false); return; }
         
@@ -687,7 +706,8 @@ class StrategySystem {
         target.lastApproachedClanId = doer.clan;
         
         let isSuccess = this.calcHeadhunt(doerId, targetBushoId, gold, true);
-        const covertMsg = this.handleCovertAction(doerId, target.castleId, isSuccess, 'headhunt', target.isCastellan && isSuccess, target.id);
+        const covertOutcome = this.handleCovertAction(doerId, target.castleId, isSuccess, 'headhunt', target.isCastellan && isSuccess, target.id);
+        const covertMsg = covertOutcome.message;
         
         const oldCastleName = target.isCastellan ? this.game.getCastle(target.castleId)?.name : "";
         
@@ -709,6 +729,7 @@ class StrategySystem {
             msg = `${doer.name}の引抜工作は失敗しました……\n${target.name}は応じませんでした${covertMsg}`;
         }
         
+        this.recordStrategyHistory('引抜', doer, target.fullName || target.name, isSuccess, [targetClanIdForHistory], covertOutcome);
         doer.isActionDone = true; 
         this.game.commandSystem.finishCommand(msg, true);
     }
@@ -717,12 +738,14 @@ class StrategySystem {
     executeAssassinate(doerId, targetBushoId) {
         const doer = this.game.getBusho(doerId);
         const target = this.game.getBusho(targetBushoId);
+        const targetClanIdForHistory = Number(target && target.clan) || 0;
         
         // メモを残す魔法
         target.lastApproachedClanId = doer.clan;
         
         let isSuccess = this.calcAssassinate(doerId, targetBushoId, true);
-        const covertMsg = this.handleCovertAction(doerId, target.castleId, isSuccess, 'assassinate', false, target.id);
+        const covertOutcome = this.handleCovertAction(doerId, target.castleId, isSuccess, 'assassinate', false, target.id);
+        const covertMsg = covertOutcome.message;
         
         let msg = "";
         if (isSuccess) {
@@ -741,6 +764,7 @@ class StrategySystem {
             msg = `${doer.name}の暗殺は失敗しました……\n${target.name}の警護が固く、手出しできませんでした。${covertMsg}`;
         }
         
+        this.recordStrategyHistory('暗殺', doer, target.fullName || target.name, isSuccess, [targetClanIdForHistory], covertOutcome);
         doer.isActionDone = true; 
         this.game.commandSystem.finishCommand(msg, true);
     }
@@ -759,7 +783,10 @@ class StrategySystem {
         else if (actionType === 'rumor') result = this.calcRumor(doerId, targetId, true);
 
         const targetCastleId = isTargetBusho ? targetObj.castleId : targetId;
-        const covertMsg = this.handleCovertAction(doerId, targetCastleId, result.success, actionType, false, isTargetBusho ? targetId : null);
+        const targetCastleForHistory = this.game.getCastle(targetCastleId);
+        const targetClanIdForHistory = isTargetBusho ? Number(targetObj.clan) || 0 : Number(targetCastleForHistory?.ownerClan) || 0;
+        const covertOutcome = this.handleCovertAction(doerId, targetCastleId, result.success, actionType, false, isTargetBusho ? targetId : null);
+        const covertMsg = covertOutcome.message;
 
         let oldVal;
         if (actionType === 'sabotage') oldVal = targetObj.defense;
@@ -785,6 +812,9 @@ class StrategySystem {
             msg = `${doer.name}の${actionName}は失敗しました……${covertMsg}`; 
         }
         
+        const historyActionName = actionType === 'sabotage' ? '破壊工作' : actionType === 'incite' ? '民心撹乱' : '離間計';
+        const historyTarget = isTargetBusho ? (targetObj.fullName || targetObj.name) : targetObj.name;
+        this.recordStrategyHistory(historyActionName, doer, historyTarget, result.success, [targetClanIdForHistory], covertOutcome);
         doer.isActionDone = true; 
         this.game.commandSystem.finishCommand(msg); 
     }
@@ -809,9 +839,11 @@ class StrategySystem {
         // ターゲットAの居城で隠密判定を行います
         const daimyoA = this.game.getClanDaimyo(clanAId);
         const targetCastleA = daimyoA ? this.game.getCastle(daimyoA.castleId) : null;
+        let covertOutcome = null;
         let covertMsg = "";
         if (targetCastleA) {
-            covertMsg = this.handleCovertAction(doerId, targetCastleA.id, result.success, 'kuko', false, null);
+            covertOutcome = this.handleCovertAction(doerId, targetCastleA.id, result.success, 'kuko', false, null);
+            covertMsg = covertOutcome.message;
         }
         
         let msg = "";
@@ -840,6 +872,7 @@ class StrategySystem {
             msg = `${doer.name}の駆虎呑狼の計は失敗しました……${covertMsg}`;
         }
         
+        this.recordStrategyHistory('駆虎呑狼', doer, `${clanA.name}・${clanB.name}`, result.success, [clanAId, clanBId], covertOutcome);
         doer.isActionDone = true; 
         this.game.commandSystem.finishCommand(msg); 
     }

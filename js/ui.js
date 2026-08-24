@@ -6,7 +6,6 @@
 class UIManager {
     constructor(game) {
         this.game = game; this.currentCastle = null; this.menuState = 'MAIN';
-        this.logHistory = [];
         this.mapScale = 1.0;
         this.selectedDaimyoId = null; // ★追加：選択中の大名を記憶する箱
 
@@ -1663,9 +1662,12 @@ class UIManager {
         this.hideContextMenu();
     }
     
-    log(msg) { 
-        this.logHistory.push(`[${this.game.year}年${this.game.month}月] ${msg}`);
-        if(this.logHistory.length > 50) this.logHistory.shift();
+    log(msg, historyOptions = null) { 
+        // 行動履歴は HistorySystem が正本。history:false は戦闘欄などの一時表示だけに使います。
+        if (historyOptions !== false && !(historyOptions && historyOptions.history === false)
+            && this.game.historySystem && typeof this.game.historySystem.record === 'function') {
+            this.game.historySystem.record(msg, historyOptions || {});
+        }
         
         if(this.game.warManager && this.game.warManager.state.active && this.game.warManager.state.isPlayerInvolved && this.warLog) {
              const div = document.createElement('div');
@@ -3585,7 +3587,7 @@ class UIManager {
         this.game.selectionMode = 'atk_ally_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("援軍を要請する勢力の城を選択してください。");
+        this.log("援軍を要請する勢力の城を選択してください。", { history: false });
         this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
 
@@ -3619,7 +3621,7 @@ class UIManager {
         this.game.selectionMode = 'atk_self_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("援軍を出陣させる城を選択してください。");
+        this.log("援軍を出陣させる城を選択してください。", { history: false });
         this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
     
@@ -3638,7 +3640,7 @@ class UIManager {
         this.game.selectionMode = 'def_ally_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("援軍を要請する勢力の城を選択してください。");
+        this.log("援軍を要請する勢力の城を選択してください。", { history: false });
         this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
 
@@ -3672,7 +3674,7 @@ class UIManager {
         this.game.selectionMode = 'def_self_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("援軍を出陣させる城を選択してください。");
+        this.log("援軍を出陣させる城を選択してください。", { history: false });
         this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
     

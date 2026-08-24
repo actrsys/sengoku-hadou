@@ -226,7 +226,7 @@ class CourtRankSystem {
             
             const msg = `朝廷より、${bushoName} が ${rankFullName} に叙されました。`;
             messages.push(msg);
-            this.game.ui.log(`【叙任】${msg}`);
+            this.game.ui.log(`【叙任】${msg}`, { clanIds: Number(busho.clan) > 0 ? [busho.clan] : [], category: 'court', inferCurrentTurn: false });
             
             return selectedRank.rankNo; // 新しくもらったランクの数字を返します
         }
@@ -267,7 +267,7 @@ class CourtRankSystem {
                     const leaderName = leader.fullName;
                     const msg = `${leaderName}が征夷大将軍に就任しました。`;
                     messages.push(msg);
-                    this.game.ui.log(`【叙任】${msg}`);
+                    this.game.ui.log(`【叙任】${msg}`, { clanIds: [clan.id], category: 'court', inferCurrentTurn: false });
                     return;
                 }
             }

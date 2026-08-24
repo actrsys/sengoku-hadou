@@ -72,6 +72,9 @@ class UIInfoManager {
         this.factionCurrentSortKey = null;
         this.isFactionSortAsc = false;
 
+        // 行動履歴は開くたび「自国」を既定にします。
+        this.historyCurrentScope = 'clan';
+
         // 諸勢力一覧で使う状態のリセット
         this.kunishuCurrentSortKey = null;
         this.isKunishuSortAsc = false;
@@ -1609,7 +1612,7 @@ class UIInfoManager {
         // ==========================================
         // ★新機能：件数が多いリストは「仮想スクロール」にして、見えている行だけ描画します
         // ==========================================
-        if (totalItems > VIRTUALIZE_THRESHOLD) {
+        if (!config.disableVirtualization && totalItems > VIRTUALIZE_THRESHOLD) {
             let rowHeight = 40; // 仮の行の高さ（実測できたら後で補正します）
             const BUFFER_ROWS = 15; // 画面外にも少し多めに描画しておく余裕（バッファ）
             let lastRange = { start: -1, end: -1 };
@@ -2644,32 +2647,56 @@ class UIInfoManager {
     // ==========================================
     // ★行動履歴の魔法（共通モーダル対応版）
     // ==========================================
-    showHistoryModal(historyList = []) {
+    showHistoryModal() {
         this.closeCommonModal();
-        this.pushModal('history_list', [historyList, 999999]);
+        this.historyCurrentScope = 'clan';
+        this.pushModal('history_list', []);
     }
 
-    _renderHistoryList(historyList, scrollPos = 0) {
-        let items = [];
-        
-        if (historyList && historyList.length > 0) {
-            items = historyList.map(log => {
-                const text = typeof log === 'string' ? log : (log.text || "");
-                return {
+    _renderHistoryList(scrollPos = 0) {
+        const system = this.game.historySystem;
+        const scope = this.historyCurrentScope === 'all' ? 'all' : 'clan';
+        const historyList = system ? system.getEntries(scope, this.game.playerClanId) : [];
+        const items = [];
+        let lastMonthKey = null;
+        [...historyList].reverse().forEach(entry => {
+            const year = Number(entry && entry.year) || 0;
+            const month = Number(entry && entry.month) || 0;
+            const monthKey = year > 0 && month > 0 ? `${year}-${month}` : 'unknown';
+            if (monthKey !== lastMonthKey) {
+                items.push({
                     onClick: null,
-                    cells: [text],
-                    itemClass: "history-list-item"
-                };
+                    cells: [`<span class="history-month-label">${year > 0 && month > 0 ? `${year}年 ${month}月` : '時期不明'}</span>`],
+                    itemClass: "history-month-divider"
+                });
+                lastMonthKey = monthKey;
+            }
+            items.push({
+                onClick: null,
+                cells: [String(entry?.text || '')],
+                itemClass: "history-list-item"
             });
-        }
+        });
+        const tabsHtml = `<div class="busho-list-tabs history-scope-tabs">
+            <button class="busho-tab-btn ${scope === 'clan' ? 'active' : ''}" data-tab="clan">自国</button>
+            <button class="busho-tab-btn ${scope === 'all' ? 'active' : ''}" data-tab="all">全国</button>
+        </div>`;
 
         this._renderListModal({
             title: "行動履歴",
-            items: items,
-            emptyHtml: '<div class="history-empty-msg">履歴がありません。</div>',
+            tabsHtml,
+            onTabClick: (nextScope) => {
+                this.historyCurrentScope = nextScope === 'all' ? 'all' : 'clan';
+                this._renderHistoryList(0);
+            },
+            items,
+            emptyHtml: `<div class="history-empty-msg">${scope === 'clan' ? '自国に関する履歴はありません。' : '履歴がありません。'}</div>`,
             gridTemplateSp: "1fr",
             gridTemplatePc: "1fr",
-            scrollPos: scrollPos
+            // 履歴は折返し行と月区切りで行高が一定ではないため、固定行高前提の仮想スクロールを使わない。
+            // 30件ずつ段階描画する通常経路で500件まで滑らかに追加します。
+            disableVirtualization: true,
+            scrollPos
         });
     }
 

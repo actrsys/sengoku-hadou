@@ -10,13 +10,14 @@ class GuideView {
         this.modal = document.getElementById('guide-modal');
         this.nav = document.getElementById('guide-nav');
         this.title = document.getElementById('guide-article-title');
-        this.lead = document.getElementById('guide-article-lead');
         this.commandList = document.getElementById('guide-command-list');
         this.body = document.getElementById('guide-article-body');
         this.closeBtn = document.getElementById('guide-close-btn');
         this.activeArticleId = 'basics';
         this.activeCommandId = null;
         this.activeCommandGroupLabel = null;
+        this.activeTopicId = null;
+        this.activeTopicGroupId = null;
         this.didPauseBackground = false;
 
         if (this.closeBtn) this.closeBtn.addEventListener('click', () => this.close());
@@ -31,6 +32,8 @@ class GuideView {
         this.activeArticleId = requested.id;
         this.activeCommandId = null;
         this.activeCommandGroupLabel = null;
+        this.activeTopicId = null;
+        this.activeTopicGroupId = null;
         this._renderNavigation();
         this._renderArticle(requested);
 
@@ -76,6 +79,29 @@ class GuideView {
         return GUIDE_COMMAND_DOCS[commandId] || null;
     }
 
+    _getCommandGroupDoc(articleId, groupLabel) {
+        if (typeof GUIDE_COMMAND_GROUP_DOCS === 'undefined' || !GUIDE_COMMAND_GROUP_DOCS) return null;
+        return GUIDE_COMMAND_GROUP_DOCS[`${articleId}:${groupLabel}`] || null;
+    }
+
+    _getTopicDoc(topicId) {
+        if (typeof GUIDE_TOPIC_DOCS === 'undefined' || !GUIDE_TOPIC_DOCS) return null;
+        return GUIDE_TOPIC_DOCS[topicId] || null;
+    }
+
+    _getTopicItem(article, topicId) {
+        const items = article && Array.isArray(article.topicItems) ? article.topicItems : [];
+        for (const item of items) {
+            if (!item) continue;
+            if (item.id === topicId) return item;
+            if (Array.isArray(item.items)) {
+                const child = item.items.find(entry => entry && entry.id === topicId);
+                if (child) return child;
+            }
+        }
+        return null;
+    }
+
     _renderNavigation() {
         if (!this.nav) return;
         this.nav.textContent = '';
@@ -89,6 +115,8 @@ class GuideView {
                 this.activeArticleId = article.id;
                 this.activeCommandId = null;
                 this.activeCommandGroupLabel = null;
+                this.activeTopicId = null;
+                this.activeTopicGroupId = null;
                 this._renderNavigation();
                 this._renderArticle(article);
             });
@@ -128,19 +156,56 @@ class GuideView {
         });
     }
 
+    _withOverview(lead, sections) {
+        const result = Array.isArray(sections) ? sections.slice() : [];
+        const text = typeof lead === 'string' ? lead.trim() : '';
+        if (text) result.unshift({ heading: '概要', text });
+        return result;
+    }
+
     _renderArticle(article) {
-        const commandDoc = this.activeCommandId ? this._getCommandDoc(this.activeCommandId) : null;
-        if (commandDoc) {
+        let displayTitle = article.label || article.title || '';
+        let sections = article.sections || [];
+
+        if (this.activeTopicId) {
+            const topicDoc = this._getTopicDoc(this.activeTopicId);
+            const topicItem = this._getTopicItem(article, this.activeTopicId);
+            if (topicItem) displayTitle = topicItem.label || displayTitle;
+            if (topicDoc) {
+                sections = this._withOverview(topicDoc.lead, topicDoc.sections);
+            }
+        } else if (this.activeCommandId) {
+            const commandDoc = this._getCommandDoc(this.activeCommandId);
             const commandLabel = this._getActiveCommandDisplayLabel(article, this.activeCommandId);
-            if (this.title) this.title.textContent = commandLabel || article.title || '';
-            if (this.lead) this.lead.textContent = commandDoc.lead || '';
-            this._renderSections(commandDoc.sections || []);
+            displayTitle = commandLabel || displayTitle;
+            if (commandDoc) {
+                sections = this._withOverview(commandDoc.lead, commandDoc.sections);
+            }
+        } else if (this.activeCommandGroupLabel) {
+            displayTitle = this.activeCommandGroupLabel;
+            const groupDoc = this._getCommandGroupDoc(article.id, this.activeCommandGroupLabel);
+            if (groupDoc) {
+                sections = this._withOverview(groupDoc.lead, groupDoc.sections);
+            } else {
+                sections = [];
+            }
+        } else if (this.activeTopicGroupId) {
+            const group = this._getTopicItem(article, this.activeTopicGroupId);
+            displayTitle = group && group.label ? group.label : displayTitle;
+            const groupDoc = this._getTopicDoc(this.activeTopicGroupId);
+            if (groupDoc) {
+                sections = this._withOverview(groupDoc.lead, groupDoc.sections);
+            } else {
+                sections = [];
+            }
         } else {
-            if (this.title) this.title.textContent = article.title || '';
-            if (this.lead) this.lead.textContent = article.lead || '';
-            this._renderSections(article.sections || []);
+            // 大分類の導入文も本文先頭の「概要」へ収めます。
+            sections = this._withOverview(article.lead, article.sections);
         }
-        this._renderCommandExplorer(article);
+
+        if (this.title) this.title.textContent = displayTitle;
+        this._renderSections(sections);
+        this._renderExplorer(article);
     }
 
     _getActiveCommandDisplayLabel(article, commandId) {
@@ -169,6 +234,73 @@ class GuideView {
         return button;
     }
 
+    _renderExplorer(article) {
+        if (article && Array.isArray(article.topicItems) && article.topicItems.length > 0) {
+            this._renderTopicExplorer(article);
+            return;
+        }
+        this._renderCommandExplorer(article);
+    }
+
+    _renderTopicExplorer(article) {
+        if (!this.commandList) return;
+        this.commandList.textContent = '';
+        const items = Array.isArray(article.topicItems) ? article.topicItems : [];
+        this.commandList.classList.toggle('hidden', items.length === 0);
+        if (items.length === 0) return;
+
+        const primary = document.createElement('div');
+        primary.className = 'guide-command-primary';
+        primary.appendChild(this._createCommandButton('概要', {
+            active: !this.activeTopicId && !this.activeTopicGroupId,
+            onClick: () => {
+                this.activeTopicId = null;
+                this.activeTopicGroupId = null;
+                this._renderArticle(article);
+            }
+        }));
+
+        items.forEach(item => {
+            if (!item || !item.id) return;
+            const hasChildren = Array.isArray(item.items) && item.items.length > 0;
+            primary.appendChild(this._createCommandButton(item.label || item.id, {
+                group: hasChildren,
+                active: this.activeTopicId === item.id || this.activeTopicGroupId === item.id,
+                onClick: () => {
+                    if (hasChildren) {
+                        this.activeTopicId = null;
+                        this.activeTopicGroupId = this.activeTopicGroupId === item.id ? null : item.id;
+                    } else {
+                        this.activeTopicId = item.id;
+                        this.activeTopicGroupId = null;
+                    }
+                    this._renderArticle(article);
+                }
+            }));
+        });
+        this.commandList.appendChild(primary);
+
+        if (!this.activeTopicGroupId) return;
+        const activeGroup = items.find(item => item && item.id === this.activeTopicGroupId);
+        if (!activeGroup || !Array.isArray(activeGroup.items)) return;
+
+        const children = document.createElement('div');
+        children.className = 'guide-command-children';
+        activeGroup.items.forEach(item => {
+            if (!item || !item.id || !this._getTopicDoc(item.id)) return;
+            children.appendChild(this._createCommandButton(item.label || item.id, {
+                child: true,
+                active: this.activeTopicId === item.id,
+                onClick: () => {
+                    this.activeTopicId = item.id;
+                    this.activeTopicGroupId = activeGroup.id;
+                    this._renderArticle(article);
+                }
+            }));
+        });
+        if (children.childElementCount > 0) this.commandList.appendChild(children);
+    }
+
     _renderCommandExplorer(article) {
         if (!this.commandList) return;
         this.commandList.textContent = '';
@@ -185,6 +317,8 @@ class GuideView {
             onClick: () => {
                 this.activeCommandId = null;
                 this.activeCommandGroupLabel = null;
+                this.activeTopicId = null;
+                this.activeTopicGroupId = null;
                 this._renderArticle(article);
             }
         }));

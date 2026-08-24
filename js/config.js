@@ -10,7 +10,12 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r163'
+        Version: 'r168'
+    },
+
+    History: {
+        // 構造化した行動履歴の保持上限。UIの一時ログとは分離してセーブにも保存する。
+        MaxEntries: 500
     },
 
     Main: {

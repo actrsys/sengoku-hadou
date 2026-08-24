@@ -500,6 +500,12 @@ class AIStaffing {
         });
         
         this.game.updateCastleLord(baseCastle);
+        if (this.game.historySystem) {
+            const clan = this.game.getClan(clanId);
+            this.game.historySystem.record(`【国主任命】${clan ? clan.name : '大名家'}は${newCommander.fullName || newCommander.name}を国主に任命し、${baseCastle.name}を本拠としました。`, {
+                clanIds: [clanId], category: 'appointment', inferCurrentTurn: false
+            });
+        }
 
         // ★追加：軍団が新設されたため、この大名家の現在の作戦を白紙に戻し、各軍団で新しく作戦を考え直させます！
         if (this.game.aiOperationManager && this.game.aiOperationManager.operations[clanId]) {
