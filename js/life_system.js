@@ -1077,12 +1077,6 @@ class LifeSystem {
         if (busho.isCommander) {
             await this.handleCommanderDeath(busho);
         }
-
-        // 軍師だったら役職を外します
-        if (busho.isGunshi) {
-            busho.isGunshi = false;
-        }
-        
         this.game.affiliationSystem.setClanIdRaw(busho, 0);
         this.game.affiliationSystem.setCastleIdRaw(busho, 0);
         busho.belongKunishuId = 0;
@@ -1598,7 +1592,7 @@ class LifeSystem {
         successor.isDaimyo = true;
         successor.isCastellan = true;
         if (successor.isGunshi) {
-            successor.isGunshi = false;
+            this.game.affiliationSystem.clearGunshiRole(successor);
         }
 
         if (baseCastle) {
@@ -2158,7 +2152,6 @@ class LifeSystem {
                     child.isDaimyo = false;
                     child.isCastellan = false;
                     child.isCommander = false;
-                    child.isGunshi = false;
                     this.game.affiliationSystem.setClanIdRaw(child, 0);
                     this.game.affiliationSystem.setCastleIdRaw(child, 0);
                     child.belongKunishuId = 0;

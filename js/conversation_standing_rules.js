@@ -112,9 +112,6 @@ class ConversationStandingRules {
 
         const thirdPerson = deferenceLevel >= 2 ? 'あのお方' : (deferenceLevel < 0 ? 'あの者' : 'あの方');
         const guardedThirdPerson = deferenceLevel >= 1 ? 'あの方' : 'あやつ';
-        const knowVerb = deferenceLevel >= 3
-            ? 'よく存じ上げております'
-            : (deferenceLevel >= 2 ? '存じ上げております' : (deferenceLevel === 1 ? 'よく存じております' : '存じております'));
 
         return {
             roleDiff,
@@ -124,12 +121,187 @@ class ConversationStandingRules {
             targetSpecial,
             speakerSpecial,
             thirdPerson,
-            guardedThirdPerson,
-            knowVerb
+            guardedThirdPerson
         };
     }
 
-    static getDiplomaticCallName(game, busho) {
+    static _getFamilyName(busho) {
+        if (!busho) return '';
+        return String(busho.familyNameStr || busho.familyName || '').trim();
+    }
+
+    static _getGivenName(busho) {
+        if (!busho) return '';
+        return String(busho.givenName || '').trim();
+    }
+
+    static _getFullName(busho) {
+        if (!busho) return '';
+        const fullName = String(busho.fullName || busho.name || '').replace(/\|/g, '').trim();
+        if (fullName) return fullName;
+        return `${this._getFamilyName(busho)}${this._getGivenName(busho)}`.trim();
+    }
+
+    static areFamily(a, b) {
+        if (!a || !b) return false;
+        if (Number(a.id) > 0 && Number(a.id) === Number(b.id)) return true;
+        const aFamily = Array.isArray(a.familyIds) ? a.familyIds.map(Number) : [];
+        const bFamily = Array.isArray(b.familyIds) ? b.familyIds.map(Number) : [];
+        if (!aFamily.length || !bFamily.length) return false;
+        const bSet = new Set(bFamily);
+        return aFamily.some(id => bSet.has(Number(id)));
+    }
+
+    static _getBusho(game, id) {
+        const targetId = Number(id) || 0;
+        if (!game || targetId <= 0) return null;
+        if (typeof game.getBusho === 'function') return game.getBusho(targetId) || null;
+        return Array.isArray(game.bushos)
+            ? game.bushos.find(b => Number(b && b.id) === targetId) || null
+            : null;
+    }
+
+    /**
+     * adoptiveFatherId は養父・義父だけでなく、武将として登録された母親の参照にも使われる。
+     * ここでは subject から target への直接関係だけを扱い、target.female なら母、それ以外は義父と解釈する。
+     * adoptiveFatherId から兄弟・祖父などの派生関係は推論しない。
+     */
+    static getAdoptiveParentRelation(subject, target) {
+        if (!subject || !target) return 'none';
+        const targetId = Number(target.id) || 0;
+        if (targetId <= 0 || Number(subject.adoptiveFatherId) !== targetId) return 'none';
+        return target.female === true ? 'mother' : 'adoptive_father';
+    }
+
+    /**
+     * 面談の会話文で使う、話者本人から見た近親関係。
+     * adoptiveFatherId の直接関係を先に見てから、realFatherId 系の確実な血縁へフォールバックする。
+     */
+    static getSpeakerFamilyDialogueRelation(game, speaker, target) {
+        const adoptive = this.getAdoptiveParentRelation(speaker, target);
+        if (adoptive !== 'none') return adoptive;
+        return this.getPaternalRelation(game, speaker, target);
+    }
+
+    /**
+     * realFatherId だけを正本として、subject から見た target の実父系血縁を返す。
+     * realMotherId は養父用途と混在するため、会話の血縁判定には使わない。
+     */
+    static getPaternalRelation(game, subject, target) {
+        if (!subject || !target) return 'none';
+        const subjectId = Number(subject.id) || 0;
+        const targetId = Number(target.id) || 0;
+        if (subjectId <= 0 || targetId <= 0 || subjectId === targetId) return 'none';
+
+        const subjectFatherId = Number(subject.realFatherId) || 0;
+        const targetFatherId = Number(target.realFatherId) || 0;
+        if (subjectFatherId === targetId) return 'father';
+        if (targetFatherId === subjectId) return 'son';
+
+        if (subjectFatherId > 0 && subjectFatherId === targetFatherId) {
+            const subjectBirth = Number(subject.birthYear);
+            const targetBirth = Number(target.birthYear);
+            if (Number.isFinite(subjectBirth) && Number.isFinite(targetBirth) && subjectBirth !== targetBirth) {
+                return targetBirth < subjectBirth ? 'older_brother' : 'younger_brother';
+            }
+        }
+
+        const subjectFather = this._getBusho(game, subjectFatherId);
+        if (subjectFather && Number(subjectFather.realFatherId) === targetId) return 'grandfather';
+
+        // 父方の伯父・叔父は、subject の実父と target が同じ実父を持つ兄弟かどうかで判定する。
+        // birthYear が同年・不明で上下を確定できない場合は誤判定を避けて通常呼称へ戻す。
+        if (subjectFather && targetFatherId > 0 && Number(subjectFather.realFatherId) === targetFatherId) {
+            const fatherBirth = Number(subjectFather.birthYear);
+            const targetBirth = Number(target.birthYear);
+            if (Number.isFinite(fatherBirth) && Number.isFinite(targetBirth) && fatherBirth !== targetBirth) {
+                return targetBirth < fatherBirth ? 'older_uncle' : 'younger_uncle';
+            }
+        }
+
+        const targetFather = this._getBusho(game, targetFatherId);
+        if (targetFather && Number(targetFather.realFatherId) === subjectId) return 'grandson';
+        return 'none';
+    }
+
+    /**
+     * 面談で本人が当主へ直接呼びかける時の血縁呼称。
+     * 直接の家族呼称は官位・身分より優先し、父・兄・祖父・父方の伯父/叔父を簡潔に扱う。
+     */
+    static getDirectFamilyCallName(game, speaker, addressee) {
+        const relation = this.getSpeakerFamilyDialogueRelation(game, speaker, addressee);
+        if (relation === 'mother') return '母上';
+        if (relation === 'adoptive_father') return '義父上';
+        if (relation === 'father') return '父上';
+        if (relation === 'older_brother') return '兄上';
+        if (relation === 'grandfather') return '祖父上';
+        if (relation === 'older_uncle') return '伯父上';
+        if (relation === 'younger_uncle') return '叔父上';
+        return null;
+    }
+
+    /**
+     * 面談で第三者が「質問者から見た親族」に言及する時の呼称。
+     * 官位呼びより下位の規則として使い、隠し数値ではなく関係性を自然に匂わせる。
+     */
+    static getRelativeReferenceCallName(game, questioner, target) {
+        const relation = this.getPaternalRelation(game, questioner, target);
+        if (relation === 'father') return '御父君';
+        if (relation === 'son') return '御子息様';
+        if (relation === 'older_brother') return '御兄上';
+        if (relation === 'younger_brother') return '御舎弟';
+        if (relation === 'grandfather') return '御祖父君';
+        if (relation === 'grandson') return 'お孫様';
+        if (relation === 'older_uncle') return '御伯父上';
+        if (relation === 'younger_uncle') return '御叔父上';
+        return null;
+    }
+
+    /**
+     * 面談の「他者について」で、話者本人から見た実父系血縁を呼称へ反映する。
+     * 父・兄・祖父・父方の伯父/叔父は官位より家族呼称を優先する。弟・子・孫は、官位持ちなら
+     * 官位名を敬称なしで呼び、無官なら諱を呼び捨てにして家族内の距離感を出す。
+     */
+    static getSpeakerFamilyReferenceCallName(game, speaker, target) {
+        const relation = this.getSpeakerFamilyDialogueRelation(game, speaker, target);
+        if (relation === 'mother') return '母上';
+        if (relation === 'adoptive_father') return '義父上';
+        if (relation === 'father') return '父上';
+        if (relation === 'older_brother') return '兄上';
+        if (relation === 'grandfather') return '祖父上';
+        if (relation === 'older_uncle') return '伯父上';
+        if (relation === 'younger_uncle') return '叔父上';
+        if (!['younger_brother', 'son', 'grandson'].includes(relation)) return null;
+
+        const special = this.getSpecialAuthority(game, target);
+        if (special.key === 'shogun') return '公方様';
+
+        const rank = this.getHighestCourtRank(game, target);
+        if (rank) return String(rank.rankName2 || '').trim() || this._getGivenName(target) || this._getFullName(target);
+        return this._getGivenName(target) || this._getFullName(target) || 'その者';
+    }
+
+    /**
+     * 無官の人物を会話中でどう呼ぶかを一元管理する。
+     * 原則は姓呼び。同姓同士だけ識別を補い、一門なら諱、一門でなければフルネームにする。
+     */
+    static getUnrankedCallName(speaker, target, suffix = '殿') {
+        if (!target) return `その方${suffix}`;
+        const family = this._getFamilyName(target);
+        const given = this._getGivenName(target);
+        const full = this._getFullName(target) || family || given || 'その方';
+        const speakerFamily = this._getFamilyName(speaker);
+        const sameSurname = !!speakerFamily && !!family && speakerFamily === family;
+
+        if (sameSurname) {
+            if (this.areFamily(speaker, target) && given) return `${given}${suffix}`;
+            return `${full}${suffix}`;
+        }
+        if (family) return `${family}${suffix}`;
+        return `${full}${suffix}`;
+    }
+
+    static getDiplomaticCallName(game, busho, speaker = null) {
         if (!busho) return '殿';
         const special = this.getSpecialAuthority(game, busho);
         if (special.key === 'shogun') return '公方様';
@@ -140,25 +312,51 @@ class ConversationStandingRules {
         }
         if (rank) return `${rank.rankName2}殿`;
 
-        let name = busho.givenName || '';
-        if (!name && busho.name) name = String(busho.name).replace(/^[^|]*\|?/, '');
-        if (!name) name = busho.fullName || '殿';
-        return `${name}殿`;
+        return this.getUnrankedCallName(speaker, busho, '殿');
     }
 
-    static getInterviewTargetCallName(game, speaker, target) {
+    static getInterviewTargetCallName(game, speaker, target, questioner = null) {
         if (!target) return 'その方';
+
+        // 答える本人にとっての実父系血縁を最優先する。
+        // ただし年少側（弟・子・孫）は官位があれば官位名、無官なら諱を敬称なしで呼ぶ。
+        const speakerFamilyCall = this.getSpeakerFamilyReferenceCallName(game, speaker, target);
+        if (speakerFamilyCall) return speakerFamilyCall;
+
         const standing = this.getPersonalStanding(game, speaker, target);
         const special = standing.targetSpecial;
         if (special.key === 'shogun') return '公方様';
 
         const rank = this.getHighestCourtRank(game, target);
         if (special.key === 'shogun_candidate' && rank) return `${rank.rankName2 || '左馬頭'}様`;
-        if (rank) {
-            const family = target.familyNameStr || (target.fullName ? String(target.fullName).slice(0, Math.max(0, String(target.fullName).length - String(target.givenName || '').length)) : '');
-            return `${family || ''}${rank.rankName2}殿`;
+        if (rank) return `${rank.rankName2}殿`;
+
+        const actualQuestioner = questioner || (game && typeof game.getClanDaimyo === 'function'
+            ? game.getClanDaimyo(Number(game.playerClanId) || Number(speaker && speaker.clan) || 0)
+            : null);
+        const relativeCall = this.getRelativeReferenceCallName(game, actualQuestioner, target);
+        if (relativeCall) return relativeCall;
+
+        // 無官の軍師は、質問者・話者どちらの一門でもない時だけ役職名で呼ぶ。
+        // 大名家の血縁者や話者本人の一門なら、血縁・一門側の呼称を優先する。
+        if (target.isGunshi
+            && !this.areFamily(actualQuestioner, target)
+            && !this.areFamily(speaker, target)) {
+            return '軍師殿';
         }
-        return `${target.name || target.fullName || 'その方'}殿`;
+
+        // 面談で第三者が当主と同姓の無官武将を指す時に「織田殿」等とすると、
+        // 質問者である当主自身を指しているように聞こえる。より優先される続柄・役職呼称が
+        // ない場合は、当主との一門関係にかかわらずフルネームで識別する。
+        const questionerFamily = this._getFamilyName(actualQuestioner);
+        const targetFamily = this._getFamilyName(target);
+        if (questionerFamily && targetFamily && questionerFamily === targetFamily
+            && Number(actualQuestioner && actualQuestioner.id) !== Number(target.id)) {
+            const full = this._getFullName(target);
+            if (full) return `${full}殿`;
+        }
+
+        return this.getUnrankedCallName(speaker, target, '殿');
     }
 
     static getAchievementHint(standing) {

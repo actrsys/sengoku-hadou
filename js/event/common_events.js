@@ -1811,7 +1811,6 @@ window.GameEvents.push({
             myBushos.forEach(b => {
                 b.isDaimyo = false;
                 b.isCommander = false;
-                b.isGunshi = false;
                 
                 game.affiliationSystem.setClanIdRaw(b, dominantClanId);
                 
@@ -1929,8 +1928,8 @@ window.GameEvents.push({
                 // 通常外交と同じ会話上の格・呼称を使う。
                 const diplomacyManager = game.diplomacyManager;
                 const isDaimyoSelf = (envoy.id === aiDaimyo.id);
-                const myCallName = diplomacyManager ? diplomacyManager.getCallName(playerDaimyo) : `${playerDaimyo.givenName || playerDaimyoName}殿`;
-                const envoyCallName = diplomacyManager ? diplomacyManager.getCallName(envoy) : `${envoy.givenName || envoyName}殿`;
+                const myCallName = diplomacyManager ? diplomacyManager.getCallName(playerDaimyo, envoy) : `${playerDaimyo.familyNameStr || playerDaimyoName}殿`;
+                const envoyCallName = diplomacyManager ? diplomacyManager.getCallName(envoy, playerDaimyo) : `${envoy.familyNameStr || envoyName}殿`;
                 const greeting = diplomacyManager
                     ? diplomacyManager.buildDiplomacyGreeting(envoy, playerDaimyo)
                     : {

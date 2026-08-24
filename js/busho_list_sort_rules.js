@@ -62,7 +62,14 @@ class BushoListSortRules {
         if (key === 'rank') {
             const rankDiff = (this.getClanRank(game, a) - this.getClanRank(game, b)) * direction;
             if (rankDiff !== 0) return rankDiff;
-            // 功績はプレイヤー非公開値なので一覧順にも使わない。同身分内は名前順だけで安定させる。
+
+            // 功績値そのものは非公開だが、身分順の第二キーとして同じ昇降順へ揃える。
+            // 降順なら高身分・高功績、昇順なら低身分・低功績となり、並びから実績を薄く察せる。
+            const achievementA = Number(a && a.achievementTotal || 0);
+            const achievementB = Number(b && b.achievementTotal || 0);
+            const achievementDiff = (achievementA - achievementB) * direction;
+            if (achievementDiff !== 0) return achievementDiff;
+
             return this._compareText(
                 (a && (a.yomi || a.name)) || '',
                 (b && (b.yomi || b.name)) || '',
@@ -84,8 +91,7 @@ class BushoListSortRules {
 
     static getClanRank(game, busho) {
         if (!busho) return 0;
-        const isGunshi = !!busho.isGunshi || !!(busho.clan > 0 && game && game.clans
-            && Number(game.clans.find(c => Number(c.id) === Number(busho.clan))?.gunshiId) === Number(busho.id));
+        const isGunshi = !!busho.isGunshi;
         const isCommander = !!busho.isCommander || !!(game && game.legions
             && game.legions.some(l => Number(l.commanderId) === Number(busho.id)));
         if (busho.isDaimyo) return 8;

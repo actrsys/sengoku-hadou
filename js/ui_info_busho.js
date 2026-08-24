@@ -746,7 +746,7 @@ Object.assign(UIInfoManager.prototype, {
                     } else if (this.bushoCurrentSortKey === 'name') {
                         return BushoListSortRules.compareKnown(this.game, a, b, 'name', this.bushoIsSortAsc);
                     } else if (this.bushoCurrentSortKey === 'rank') {
-                        valA = getSortRankClan(a); valB = getSortRankClan(b);
+                        return BushoListSortRules.compareKnown(this.game, a, b, 'rank', this.bushoIsSortAsc);
                     } else if (this.bushoCurrentSortKey === 'faction') {
                         const isRoninA = window.BushoStatusRules.isRonin(a); const isRoninB = window.BushoStatusRules.isRonin(b);
                         if (isRoninA && !isRoninB) return 1;

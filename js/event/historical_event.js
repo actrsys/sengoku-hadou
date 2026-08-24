@@ -239,7 +239,6 @@ window.EventAction = {
                 // それ以外（乗っ取りなど）は個別に処理して相性で忠誠を再計算します
                 b.isDaimyo = false;
                 b.isCommander = false;
-                b.isGunshi = false;
                 game.affiliationSystem.setClanIdRaw(b, dominantClanId);
                 if (game.affiliationSystem && game.affiliationSystem.updateLoyaltyForNewLord) {
                     game.affiliationSystem.updateLoyaltyForNewLord(b, dominantClanId);
@@ -388,7 +387,7 @@ window.GameEvents.push({
             const newLegionNo = game.aiStaffing.assignNewLegion(motoyasu.clan, motoyasu.id);
             if (newLegionNo !== -1) {
                 motoyasu.isCommander = true;
-                if (motoyasu.isGunshi) motoyasu.isGunshi = false; // 念のため軍師バッジを外します
+                if (motoyasu.isGunshi) game.affiliationSystem.clearGunshiRole(motoyasu); // 国主就任時は軍師役職を外す
                 okazakiCastle.legionId = newLegionNo;
                 okazakiCastle.isDelegated = true; // AIに委任する状態にします
             }
@@ -2768,7 +2767,7 @@ window.GameEvents.push({
             const newLegionNo = game.aiStaffing.assignNewLegion(candidate.clan, candidate.id);
             if (newLegionNo !== -1) {
                 candidate.isCommander = true;
-                if (candidate.isGunshi) candidate.isGunshi = false; // 念のため軍師バッジを外します
+                if (candidate.isGunshi) game.affiliationSystem.clearGunshiRole(candidate); // 国主就任時は軍師役職を外す
                 nijo.legionId = newLegionNo;
                 nijo.isDelegated = true; // AIに委任する状態にします
             }
@@ -3184,7 +3183,7 @@ window.GameEvents.push({
         
         // 長逸に大名バッジをつけます（もし軍師だった場合はバッジを外します）
         nagayasu.isDaimyo = true;
-        nagayasu.isGunshi = false;
+        game.affiliationSystem.clearGunshiRole(nagayasu);
         
         // ② 三好長逸を、今いるお城の城主にします
         const nagayasuCastle = game.getCastle(nagayasu.castleId);
@@ -3340,7 +3339,7 @@ window.GameEvents.push({
             const newLegionNo = game.aiStaffing.assignNewLegion(sponsorClanId, hisahide.id);
             if (newLegionNo !== -1) {
                 hisahide.isCommander = true;
-                if (hisahide.isGunshi) hisahide.isGunshi = false; // 軍師バッジは念のため外します
+                if (hisahide.isGunshi) game.affiliationSystem.clearGunshiRole(hisahide); // 国主就任時は軍師役職を外す
                 targetCastle.legionId = newLegionNo;
                 targetCastle.isDelegated = true; // AIに委任する状態にします
                 
@@ -3636,7 +3635,7 @@ window.GameEvents.push({
         targetBushos.forEach(busho => {
             if (!targetCastleIds.includes(busho.castleId)) {
                 busho.isCastellan = false;
-                busho.isGunshi = false;
+                game.affiliationSystem.clearGunshiRole(busho);
                 window.EventAction.moveBusho(game, busho, mainCastle.id);
             }
         });
@@ -3728,7 +3727,7 @@ window.GameEvents.push({
             const newLegionNo = game.aiStaffing.assignNewLegion(sponsorClanId, murashige.id);
             if (newLegionNo !== -1) {
                 murashige.isCommander = true;
-                if (murashige.isGunshi) murashige.isGunshi = false; // 軍師バッジは念のため外します
+                if (murashige.isGunshi) game.affiliationSystem.clearGunshiRole(murashige); // 国主就任時は軍師役職を外す
                 murashigeNewCastle.legionId = newLegionNo;
                 murashigeNewCastle.isDelegated = true; // AIに委任する状態にします
                 

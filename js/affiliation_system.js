@@ -10,13 +10,48 @@ class AffiliationSystem {
     }
 
     /**
+     * 軍師役職の解除窓口。
+     * 軍師は大名家に属する役職なので、所属変更・国主/城主/大名就任などで外す時はここを使う。
+     */
+    clearGunshiRole(busho) {
+        if (!busho) return false;
+        const wasGunshi = busho.isGunshi === true;
+        busho.isGunshi = false;
+        return wasGunshi;
+    }
+
+    /**
+     * 一勢力一軍師を保証する唯一の任命窓口。
+     * 既存軍師が複数いた場合も全員の役職を外してから、指定した一人だけを任命する。
+     */
+    appointClanGunshi(clanId, busho) {
+        const numericClanId = Number(clanId) || 0;
+        if (!busho || numericClanId <= 0 || Number(busho.clan) !== numericClanId) return false;
+        if (busho.isDaimyo || busho.isCommander || busho.isCastellan) return false;
+        if (window.BushoStatusRules && !window.BushoStatusRules.isActive(busho)) return false;
+
+        const members = Array.isArray(this.game && this.game.bushos) ? this.game.bushos : [];
+        members.forEach(member => {
+            if (Number(member.clan) === numericClanId && member.isGunshi) this.clearGunshiRole(member);
+        });
+        busho.isGunshi = true;
+        return true;
+    }
+
+    /**
      * 低レベル所属書換API。特殊イベントや独立処理など、周辺処理を呼び出し側が
      * すでに管理している場合だけ使用します。通常は joinClan / becomeRonin を使用してください。
      * busho.clan の直接代入はこのクラス以外では行いません。
      */
     setClanIdRaw(busho, newClanId) {
         if (!busho) return;
-        busho.clan = Number(newClanId) || 0;
+        const nextClanId = Number(newClanId) || 0;
+        const oldClanId = Number(busho.clan) || 0;
+        if (oldClanId !== nextClanId && busho.isGunshi) {
+            // 軍師は「人物の属性」ではなく所属大名家での役職。別家へ持ち越さない。
+            this.clearGunshiRole(busho);
+        }
+        busho.clan = nextClanId;
     }
 
     /**
@@ -75,7 +110,6 @@ class AffiliationSystem {
         
         busho.isCastellan = false;
         busho.isDaimyo = false;
-        busho.isGunshi = false; // ★ここを書き足します！軍師のバッジを外します
         busho.isCommander = false; // ★ここを追加：国主のバッジも外します
 
         // 5. 新しい殿様との相性を計算して、最初の忠誠度を決めます！
@@ -143,7 +177,6 @@ class AffiliationSystem {
             this.game.lifeSystem.setLifeStatusRaw(busho, window.GameConstants.BushoStatus.DEAD); // 浪人ではなく、死亡（消滅）扱い
             busho.isCastellan = false;
             busho.isDaimyo = false;
-            busho.isGunshi = false; // ★念のためここにも書き足します！
             busho.isCommander = false; // ★ここを追加：国主のバッジも外します
             busho.belongKunishuId = 0; // 諸勢力からも外します
             this.leaveCastle(busho); // お城から綺麗にいなくなります
@@ -198,7 +231,6 @@ class AffiliationSystem {
         
         busho.isCastellan = false;
         busho.isDaimyo = false;
-        busho.isGunshi = false; // ★ここを書き足します！軍師のバッジを外します
         busho.isCommander = false; // ★ここを追加：国主のバッジも外します
 
         // ★ここから追加：大名家の名簿から姫を消して、姫を無所属（0）にします
@@ -314,7 +346,6 @@ class AffiliationSystem {
         this.setActivityStatusRaw(busho, window.GameConstants.BushoStatus.ACTIVE);
         busho.isCastellan = false;
         busho.isDaimyo = false;
-        busho.isGunshi = false;
         busho.isCommander = false;
         
         const newKunishuId = this.game.kunishuSystem.allocateRegularDynamicKunishuId();
@@ -403,7 +434,6 @@ class AffiliationSystem {
         
         busho.isCastellan = false;
         busho.isDaimyo = false;
-        busho.isGunshi = false;
         busho.isCommander = false;
         busho.belongKunishuId = kunishu.id;
         
@@ -615,7 +645,7 @@ class AffiliationSystem {
                         return Math.random() - 0.5;
                     });
                     const newGunshi = candidates[0];
-                    newGunshi.isGunshi = true;
+                    this.appointClanGunshi(castle.ownerClan, newGunshi);
                 }
             }
         }
@@ -644,7 +674,7 @@ class AffiliationSystem {
             daimyo.isCastellan = true; 
             castle.castellanId = daimyo.id;
             castle.isDelegated = false;
-            if (daimyo.isGunshi) daimyo.isGunshi = false;
+            if (daimyo.isGunshi) this.clearGunshiRole(daimyo);
             return;
         }
         
@@ -655,7 +685,7 @@ class AffiliationSystem {
             });
             commander.isCastellan = true; 
             castle.castellanId = commander.id;
-            if (commander.isGunshi) commander.isGunshi = false;
+            if (commander.isGunshi) this.clearGunshiRole(commander);
             return;
         }
 
@@ -668,7 +698,7 @@ class AffiliationSystem {
         } else if (lords.length === 1) {
             // 城主が１人だけなら、元々の城主をそのまま維持します
             castle.castellanId = lords[0].id;
-            if (lords[0].isGunshi) lords[0].isGunshi = false;
+            if (lords[0].isGunshi) this.clearGunshiRole(lords[0]);
         } else {
             // 城主が誰もいない場合は、城内の全武将から新しい城主を決めます
             this.electCastellan(castle, bushos);
@@ -747,7 +777,7 @@ class AffiliationSystem {
         best.isCastellan = true;
         
         if (best.isGunshi) {
-            best.isGunshi = false;
+            this.clearGunshiRole(best);
         }
         
         castle.castellanId = best.id;

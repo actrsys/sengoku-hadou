@@ -1191,7 +1191,6 @@ class IndependenceSystem {
                         b.loyalty = 50;
                         b.isCastellan = false;
                         b.isDaimyo = false;
-                        b.isGunshi = false;
                         // お引越しセンターの魔法で、安全に逃亡先の城に入れます
                         this.game.affiliationSystem.enterCastle(b, escapeCastleId);
                         

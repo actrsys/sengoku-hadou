@@ -317,14 +317,6 @@ class DataManager {
                 if(c) c.samuraiIds.push(b.id);
             }
             
-            // ★今回追加：軍師の設定
-            if (b.clan !== 0) {
-                // ★高速化：早見表（clanMap）から大名家をパッと探します！
-                const clan = clanMap.get(Number(b.clan));
-                if (clan && Number(clan.gunshiId) === Number(b.id)) {
-                    b.isGunshi = true;
-                }
-            }
         });
         
         // ★追加：ゲーム開始時点で亡くなっている武将や姫の「配偶者のつながり」を綺麗にお掃除します！

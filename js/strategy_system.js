@@ -647,7 +647,6 @@ class StrategySystem {
                 this.game.affiliationSystem.setClanIdRaw(target, newClanId);
                 target.isActionDone = true;
                 this.game.affiliationSystem.setActivityStatusRaw(target, window.GameConstants.BushoStatus.ACTIVE);
-                target.isGunshi = false;
                 
                 const targetLord = this.game.getClanDaimyo(oldClanId) || { affinity: 50 };
                 captiveMsgs = this.game.independenceSystem.resolveSubordinates(oldCastle, target, targetLord, newClanId, oldClanId);
@@ -655,15 +654,6 @@ class StrategySystem {
                 this.game.getCastleBushos(oldCastle.id).forEach(b => {
                     if (b.clan === newClanId && window.BushoStatusRules.isActive(b)) {
                         this.game.affiliationSystem.updateLoyaltyForNewLord(b, newClanId);
-                    }
-                });
-                
-                const myGunshi = this.game.bushos.find(b => b.clan === newClanId && b.isGunshi);
-                this.game.getCastleBushos(oldCastle.id).forEach(b => {
-                    if (!myGunshi || b.id !== myGunshi.id) {
-                        if (b.clan === newClanId && window.BushoStatusRules.isActive(b)) {
-                            b.isGunshi = false;
-                        }
                     }
                 });
                 

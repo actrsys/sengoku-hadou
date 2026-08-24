@@ -546,12 +546,8 @@ class GameManager {
     getCurrentTurnId() { return this.year * 12 + this.month; }
     getClanTotalSoldiers(clanId) { return this.getClanCastles(clanId).reduce((sum, c) => sum + c.soldiers, 0); }
     getClanGunshi(clanId) {
-        const clan = this.getClan(clanId);
-        if (clan && clan.gunshiId) {
-            const gunshi = this.getBusho(clan.gunshiId);
-            if (gunshi && Number(gunshi.clan) === Number(clanId) && gunshi.isGunshi && window.BushoStatusRules.isActive(gunshi)) return gunshi;
-        }
-        return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi && window.BushoStatusRules.isActive(b));
+        const numericClanId = Number(clanId);
+        return this.bushos.find(b => Number(b.clan) === numericClanId && b.isGunshi && window.BushoStatusRules.isActive(b));
     }
 
     getNavigatorInfo(castle) {

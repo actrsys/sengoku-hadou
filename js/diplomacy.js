@@ -869,11 +869,11 @@ class DiplomacyManager {
      * 武将の敬称付き呼び名を取得する共通窓口。
      * 官位・将軍候補・将軍の扱いは ConversationStandingRules を正本とする。
      */
-    getCallName(busho) {
+    getCallName(busho, speaker = null) {
         if (window.ConversationStandingRules) {
-            return window.ConversationStandingRules.getDiplomaticCallName(this.game, busho);
+            return window.ConversationStandingRules.getDiplomaticCallName(this.game, busho, speaker);
         }
-        return busho ? `${busho.givenName || busho.fullName || ''}殿` : '殿';
+        return busho ? `${busho.familyNameStr || busho.fullName || ''}殿` : '殿';
     }
 
     _getDaimyoReference(daimyo, clanName, suffix = '様') {
@@ -885,26 +885,46 @@ class DiplomacyManager {
         const rank = window.ConversationStandingRules
             ? window.ConversationStandingRules.getHighestCourtRank(this.game, daimyo)
             : null;
-        if (rank) {
-            const family = daimyo.familyNameStr || '';
-            return `${family}${rank.rankName2}${suffix}`;
-        }
+        if (rank) return `${rank.rankName2}${suffix}`;
         return `${clanName || '当家'}当主・${daimyo.fullName}${suffix}`;
     }
 
     /**
+     * 外交会話用の関係温度を返す。
+     * 格式とは混ぜず、敵対なら少し硬く、友好的な関係なら少し柔らかい言い回しへ使う。
+     */
+    getDiplomacyRelationshipTone(senderClanId, receiverClanId) {
+        // 会話表示のためだけに外交データを新規生成しない。既存の関係状態を読むだけに留める。
+        const senderClan = this.game && typeof this.game.getClan === 'function' ? this.game.getClan(senderClanId) : null;
+        const receiverClan = this.game && typeof this.game.getClan === 'function' ? this.game.getClan(receiverClanId) : null;
+        const relation = senderClan && senderClan.diplomacyValue ? senderClan.diplomacyValue[receiverClanId] : null;
+        const reverse = receiverClan && receiverClan.diplomacyValue ? receiverClan.diplomacyValue[senderClanId] : null;
+        const current = relation || reverse || null;
+        const status = current ? current.status : null;
+        if (window.DiplomacyRules && window.DiplomacyRules.isHostile(status)) {
+            return { key: 'hostile', status, sentiment: Number(current && current.sentiment || 0) };
+        }
+        if (window.DiplomacyRules && window.DiplomacyRules.isFriendly(status)) {
+            return { key: 'friendly', status, sentiment: Number(current && current.sentiment || 0) };
+        }
+        return { key: 'neutral', status, sentiment: Number(current && current.sentiment || 0) };
+    }
+
+    /**
      * 大名家の格式・威信と使者本人の身分/官位/功績を踏まえ、外交導入を一元生成する。
-     * 使者は主君の格を背負うが、将軍・将軍候補など本人の権威が主君を上回る場合は
-     * 「主君の名代」として下げず、「意を受けた使者」として扱う。
+     * 使者は主君の格を背負う。ただし将軍・左馬頭など本人が特殊な公的権威を持つ場合は、
+     * 主君の「名代」として自分を下げず、本人自身がこの外交を取り持つ立場として話す。
+     * 敵対/友好の関係温度は格式とは別軸で、応対の愛想だけへ薄く反映する。
      */
     buildDiplomacyGreeting(senderBusho, receiverDaimyo) {
         const senderClan = this.game.getClan(senderBusho && senderBusho.clan);
         const senderClanName = senderClan ? senderClan.name : '当家';
-        const senderCallName = this.getCallName(senderBusho);
-        const receiverCallName = this.getCallName(receiverDaimyo);
+        const senderCallName = this.getCallName(senderBusho, receiverDaimyo);
+        const receiverCallName = this.getCallName(receiverDaimyo, senderBusho);
         const context = window.ConversationStandingRules
             ? window.ConversationStandingRules.getDiplomacyContext(this.game, senderBusho, receiverDaimyo)
-            : { receiverDeferenceLevel: 0, senderDeferenceLevel: 0, envoyOutranksLord: false, senderDaimyo: this.game.getClanDaimyo(senderBusho.clan) };
+            : { receiverDeferenceLevel: 0, senderDeferenceLevel: 0, envoyOutranksLord: false, senderDaimyo: this.game.getClanDaimyo(senderBusho.clan), envoySpecial: { level: 0, key: 'none' } };
+        context.relationshipTone = this.getDiplomacyRelationshipTone(senderBusho && senderBusho.clan, receiverDaimyo && receiverDaimyo.clan);
 
         let greetMsg1 = '';
         let greetMsg2 = '';
@@ -919,7 +939,12 @@ class DiplomacyManager {
             }
         } else {
             const senderDaimyo = context.senderDaimyo || this.game.getClanDaimyo(senderBusho.clan);
-            if (context.envoyOutranksLord) {
+            const envoySpecial = context.envoySpecial || { level: 0, key: 'none' };
+            if (Number(envoySpecial.level || 0) >= 3) {
+                greetMsg1 = `「此度の儀は、両家のためにも進めるべきと考え、わし自ら参った」`;
+            } else if (Number(envoySpecial.level || 0) >= 2) {
+                greetMsg1 = `「此度の儀は、両家のためにも進めるべきと考え、某自ら参りました」`;
+            } else if (context.envoyOutranksLord) {
                 const daimyoRef = this._getDaimyoReference(senderDaimyo, senderClanName, '殿');
                 greetMsg1 = `「此度は${daimyoRef}の意を受け、使者として参りました」`;
             } else {
@@ -931,7 +956,32 @@ class DiplomacyManager {
         }
 
         const receiverDeference = Number(context.receiverDeferenceLevel || 0);
-        if (receiverDeference >= 3) {
+        const relationshipTone = context.relationshipTone && context.relationshipTone.key || 'neutral';
+        if (relationshipTone === 'hostile') {
+            if (receiverDeference >= 3) {
+                greetMsg2 = `「これは${senderCallName}。……御用向きを承りましょう」`;
+            } else if (receiverDeference === 2) {
+                greetMsg2 = `「${senderCallName}か。……して、此度の御用向きは？」`;
+            } else if (receiverDeference === 1) {
+                greetMsg2 = `「${senderCallName}か。使者の役目は承った。して、御用向きは？」`;
+            } else if (senderBusho && senderBusho.isDaimyo) {
+                greetMsg2 = `「……これは${senderCallName}。して、此度は何用にござるか？」`;
+            } else {
+                greetMsg2 = `「……使者か。して、用向きは？」`;
+            }
+        } else if (relationshipTone === 'friendly') {
+            if (receiverDeference >= 3) {
+                greetMsg2 = `「これは${senderCallName}。よくお越しくだされた。まずは御用向きを承りましょう」`;
+            } else if (receiverDeference === 2) {
+                greetMsg2 = `「これは${senderCallName}。遠路ご苦労であった。して、御用向きは？」`;
+            } else if (receiverDeference === 1) {
+                greetMsg2 = `「これは${senderCallName}。使者の役目、ご苦労にござる。して、御用向きは？」`;
+            } else if (senderBusho && senderBusho.isDaimyo) {
+                greetMsg2 = `「これは${senderCallName}。よう参られた。して、どのような御用向きでござるか？」`;
+            } else {
+                greetMsg2 = `「おお、使者か。して、御用向きはいかに？」`;
+            }
+        } else if (receiverDeference >= 3) {
             greetMsg2 = `「これは${senderCallName}。御自らお越しとは……まずは御用向きを承りましょう」`;
         } else if (receiverDeference === 2) {
             greetMsg2 = `「これは${senderCallName}。遠路ご足労いただいた。して、御用向きは？」`;
@@ -1027,12 +1077,54 @@ class DiplomacyManager {
         // 家臣口調へ落とさない。所属が変わっても本人の公的権威は会話上に残す。
         const envoySpecialLevel = Number(conversationContext && conversationContext.envoySpecial && conversationContext.envoySpecial.level || 0);
         if (!isSenderDaimyo && envoySpecialLevel >= 2) {
-            if (type === 'vassalage' || type === 'subordinate') {
-                replyAcceptMsg = `「承知いたしました。主君にもその旨、しかと申し伝えましょう」`;
-                replyRejectMsg = `「承知いたしました。その旨、主君へ申し伝えましょう」`;
-            } else if (type === 'goodwill' || type === 'alliance') {
-                replyAcceptMsg = `「ありがたく存じます。その旨、主君にも申し伝えましょう」`;
-                replyRejectMsg = `「左様にござるか。その旨、主君へ申し伝えましょう」`;
+            // 将軍・左馬頭本人が使者なら、名目上は本人がこの外交を取り持ち、勧めている口調にする。
+            if (type === 'goodwill') {
+                demandMsg = `「両家の仲を深めることは、望ましきことと存ずる。心ばかりの品、どうかお納めくだされ」`;
+                replyAcceptMsg = `「ありがたく存じます。両家の間が、これを機に少しでも近づけば何よりにござる」`;
+                replyRejectMsg = `「左様にござるか。此度は致し方ありますまい」`;
+            } else if (type === 'alliance') {
+                demandMsg = `「両家が盟約を結ぶこと、望ましきことと存ずる。どうかご一考いただきたい」`;
+                replyAcceptMsg = `「ご決断、ありがたく存じます。両家の盟約が末永く続くことを願っております」`;
+                replyRejectMsg = `「左様にござるか。此度は致し方ありますまい」`;
+            } else if (type === 'truce') {
+                demandMsg = `「これ以上の争いは双方のためになりますまい。ここは矛を収め、和睦なされるのがよろしいかと存ずる」`;
+                replyAcceptMsg = `「ご決断、ありがたく存じます。これで両家の争いも収まりましょう」`;
+                replyRejectMsg = `「左様にござるか。なお争いを続けられるというなら、致し方ありますまい」`;
+            } else if (type === 'dominate') {
+                demandMsg = `「大勢を見れば、これ以上の抵抗は双方のためになりますまい。ここは${senderClanName}の傘下に入られるのがよろしいかと存ずる」`;
+            } else if (type === 'vassalage') {
+                demandMsg = `「両家の行く末を考えれば、我らが${receiverClanName}の末席に加わるのがよろしいかと存ずる」`;
+                replyAcceptMsg = `「ご決断、ありがたく存じます。これよりは共に歩んで参りましょう」`;
+                replyRejectMsg = `「左様にござるか。此度は致し方ありますまい」`;
+            } else if (type === 'subordinate') {
+                demandMsg = `「両家の行く末を考えれば、当家は${receiverClanName}の庇護を受けるのがよろしいかと存ずる」`;
+                replyAcceptMsg = `「ご決断、ありがたく存じます。主君にも異存はござりますまい」`;
+                replyRejectMsg = `「左様にござるか。此度は致し方ありますまい」`;
+            } else if (type === 'marriage') {
+                demandMsg = `「両家の縁をより深めるため、当家の${princessName}を${targetBushoName}殿に娶っていただくのがよろしいかと存ずる」`;
+            }
+        }
+
+        // 関係温度は格とは別軸。敵対相手には礼を保ったまま少し硬く、友好的な相手には断る時も角を立てない。
+        const relationshipTone = conversationContext && conversationContext.relationshipTone && conversationContext.relationshipTone.key || 'neutral';
+        if (relationshipTone === 'hostile') {
+            if (type === 'goodwill') {
+                acceptMsg = `「……品は受け取ろう。両家の間に遺恨はあれど、此度の厚意は受け取っておく」`;
+                rejectMsg = `「……今さら親善の品とはな。此度は受け取れぬ。お持ち帰りくだされ」`;
+            } else if (type === 'alliance') {
+                acceptMsg = `「……承知した。これまでの遺恨はいったん置き、盟約を結ぶといたそう」`;
+                rejectMsg = `「……盟約とは、にわかには信じ難い話よ。此度はお断りいたす」`;
+            } else if (type === 'marriage') {
+                rejectMsg = `「……両家の間柄を思えば、今その縁談を受けるわけには参らぬ」`;
+            }
+        } else if (relationshipTone === 'friendly') {
+            if (type === 'goodwill') {
+                acceptMsg = `「かたじけない。変わらぬ御厚意、ありがたく頂戴いたします」`;
+                rejectMsg = `「せっかくのお心遣い、ありがたく存じます。ただ、此度はお受けいたしかねます」`;
+            } else if (type === 'alliance') {
+                rejectMsg = `「ありがたいお話なれど、今は盟約まで進める時ではござらぬ。どうかご容赦を」`;
+            } else if (type === 'marriage') {
+                rejectMsg = `「ありがたいお話なれど、此度の縁談はお受けいたしかねます。どうかご容赦くだされ」`;
             }
         }
 
@@ -1062,8 +1154,8 @@ class DiplomacyManager {
         const senderClanName = senderClan ? senderClan.name : "当家";
         const receiverClanName = receiverClan ? receiverClan.name : "貴家";
 
-        const senderCallName = this.getCallName(senderBusho);
-        const receiverCallName = this.getCallName(receiverDaimyo);
+        const senderCallName = this.getCallName(senderBusho, receiverDaimyo);
+        const receiverCallName = this.getCallName(receiverDaimyo, senderBusho);
 
         const senderNameStr = senderBusho.fullName;
         const receiverNameStr = receiverDaimyo.fullName;
@@ -2171,7 +2263,6 @@ class DiplomacyManager {
         myBushos.forEach(b => {
             b.isDaimyo = false;
             b.isCommander = false;
-            b.isGunshi = false;
             
             this.game.affiliationSystem.setClanIdRaw(b, targetClanId);
             
@@ -2228,8 +2319,8 @@ class DiplomacyManager {
         const isDaimyoSelf = (doer.isDaimyo);
         const enemyDaimyoName = enemyDaimyo ? enemyDaimyo.fullName : "当主";
 
-        const myCallName = this.getCallName(myDaimyo);
-        const enemyCallName = this.getCallName(doer);
+        const myCallName = this.getCallName(myDaimyo, doer);
+        const enemyCallName = this.getCallName(doer, myDaimyo);
         const greeting = this.buildDiplomacyGreeting(doer, myDaimyo);
         const conversationContext = greeting.context;
 

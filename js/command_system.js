@@ -1290,21 +1290,16 @@ class CommandSystem {
         const bonusRate = DomesticRules.calcFactionBonusRate(execBushos);
         
         // 差し替え後
-        if (type === 'appoint' || type === 'appoint_gunshi') {
+        if (type === 'appoint') {
             const bushos = this.game.getBusho(bushoIds[0]);
             if (type === 'appoint') { 
                 const old = this.game.getBusho(castle.castellanId); if(old) old.isCastellan = false; 
                 castle.castellanId = bushos.id; bushos.isCastellan = true; 
                 // ★追加：もし城主になった人が軍師だったら、軍師のお仕事を外します！
                 if (bushos.isGunshi) {
-                    bushos.isGunshi = false;
+                    this.game.affiliationSystem.clearGunshiRole(bushos);
                 }
                 this.finishCommand(`${bushos.name}を城主に任命しました`); 
-            }
-            if (type === 'appoint_gunshi') { 
-                const oldGunshi = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isGunshi); if (oldGunshi) oldGunshi.isGunshi = false; 
-                bushos.isGunshi = true; 
-                this.finishCommand(`${bushos.name}を軍師に任命しました`); 
             }
             return;
         }
@@ -1641,10 +1636,8 @@ class CommandSystem {
     
     executeAppointGunshi(bushoId) {
         const busho = this.game.getBusho(bushoId);
-        const oldGunshi = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isGunshi);
-        if (oldGunshi) oldGunshi.isGunshi = false;
-        busho.isGunshi = true;
-        // ★ここから追加！：軍師に任命された時に、この軍師専用の「秘密の番号（タネ）」を作ります！
+        if (!busho || !this.game.affiliationSystem.appointClanGunshi(this.game.playerClanId, busho)) return;
+        // 軍師に任命された時に、この軍師専用の「秘密の番号（タネ）」を作ります。
         busho.gunshiSeed = Math.floor(Math.random() * 10000);
         this.finishCommand(`${busho.name}を軍師に任命しました`);
     }

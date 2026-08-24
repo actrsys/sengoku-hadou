@@ -86,6 +86,26 @@ class InterviewSystem {
         this.showMainMenu(busho);
     }
 
+    _getPlayerDaimyo() {
+        if (!this.game || typeof this.game.getClanDaimyo !== 'function') return null;
+        return this.game.getClanDaimyo(Number(this.game.playerClanId) || 0) || null;
+    }
+
+    _getDirectAddressName(busho) {
+        const daimyo = this._getPlayerDaimyo();
+        if (window.ConversationStandingRules && daimyo) {
+            const familyCall = window.ConversationStandingRules.getDirectFamilyCallName(this.game, busho, daimyo);
+            if (familyCall) return familyCall;
+        }
+        return '殿';
+    }
+
+    _applyDirectAddress(text, busho) {
+        const address = this._getDirectAddressName(busho);
+        if (address === '殿') return String(text || '');
+        return String(text || '').replace(/殿/g, address);
+    }
+
     _getSurfaceAttitude(busho) {
         const concealment = this._getConcealmentProfile(busho);
         const shownBand = concealment.perceivedBand;
@@ -112,19 +132,20 @@ class InterviewSystem {
     }
 
     _getGreetingText(busho, attitude = this.activeInterviewAttitude) {
+        const address = this._getDirectAddressName(busho);
         switch (attitude) {
             case 'welcoming':
-                return '「これはこれは、殿！　よくぞお越しくださいました！」';
+                return `「これはこれは、${address}！　よくぞお越しくださいました！」`;
             case 'friendly':
-                return '「殿、お越しくださいましたか。ささ、こちらへ」';
+                return `「${address}、お越しくださいましたか。ささ、こちらへ」`;
             case 'polite':
-                return '「殿。わざわざお越しいただき、恐縮です」';
+                return `「${address}。わざわざお越しいただき、恐縮です」`;
             case 'reserved':
-                return '「……殿。お越しでしたか」';
+                return `「……${address}。お越しでしたか」`;
             case 'startled':
-                return '「げっ、殿……！　い、いえ、これは失礼を。どうぞ、お入りください」';
+                return `「げっ、${address}……！　い、いえ、これは失礼を。どうぞ、お入りください」`;
             default:
-                return '「……殿。何かございましたか」';
+                return `「……${address}。何かございましたか」`;
         }
     }
 
@@ -154,14 +175,11 @@ class InterviewSystem {
             : '';
         switch (attitude) {
             case 'welcoming':
-            case 'friendly': {
-                const knowVerb = standing && standing.knowVerb ? standing.knowVerb : '存じております';
-                return `${callName}ですか。${knowVerb}。${hint}`;
-            }
+            case 'friendly':
+                return `${callName}ですか。${hint}`;
             case 'polite': {
                 if ((standing && Number(standing.deferenceLevel || 0) >= 1) || hint) {
-                    const knowVerb = standing && standing.knowVerb ? standing.knowVerb : '存じております';
-                    return `${callName}ですか。${knowVerb}。${hint}`;
+                    return `${callName}ですか。${hint}`;
                 }
                 return `${callName}ですか……`;
             }
@@ -213,7 +231,10 @@ class InterviewSystem {
     executeInterviewStatus(busho) {
         const concealment = this._getConcealmentProfile(busho);
         const loyaltyBand = concealment.perceivedBand;
-        const loyaltyText = this._getSelfLoyaltyText(loyaltyBand, this.activeInterviewAttitude);
+        const loyaltyText = this._applyDirectAddress(
+            this._getSelfLoyaltyText(loyaltyBand, this.activeInterviewAttitude),
+            busho
+        );
         const messages = [loyaltyText];
 
         // 深刻以下は本人が会話自体を拒むため、そこで終える。
@@ -922,6 +943,47 @@ class InterviewSystem {
         );
     }
 
+    _getSpeakerFamilyDialogueRelation(interviewer, target) {
+        if (!window.ConversationStandingRules || typeof window.ConversationStandingRules.getSpeakerFamilyDialogueRelation !== 'function') return 'none';
+        return window.ConversationStandingRules.getSpeakerFamilyDialogueRelation(this.game, interviewer, target);
+    }
+
+    _isCloseFamilyDialogue(interviewer, target) {
+        return this._getSpeakerFamilyDialogueRelation(interviewer, target) !== 'none';
+    }
+
+    _getFamilyOpinionText(score, attitude = this.activeInterviewAttitude) {
+        if (score >= 82) return '気心はよく知れております。考え方にも共感するところが多く、信頼しております。';
+        if (score >= 68) return '考え方には共感するところが多く、信頼しております。';
+        if (score >= 52) return '意見が違うことはありますが、関係は悪くありませぬ。';
+        if (score >= 36) return '考え方はあまり合いませぬ。意見がぶつかることもございます。';
+        return 'どうにも反りが合いませぬ。';
+    }
+
+    _getFamilyContactText(relation, interviewer, attitude = this.activeInterviewAttitude) {
+        const contact = Number(relation && relation.contactScore || 0);
+        if (contact >= 70) return '普段からよく話をしております。';
+        if (contact >= 52) return '折に触れて話をしております。';
+        if (contact >= 34) {
+            if (Number(relation && relation.compatibilityScore || 0) >= 68) {
+                return '普段はさほど話す機会がございませぬ。';
+            }
+            return '用向きがなければ、あまり話はいたしませぬ。';
+        }
+        if (Number(relation && relation.affinityDiff || 0) >= 42 && Number(interviewer && interviewer.duty || 0) < 35 && Number(interviewer && interviewer.ambition || 0) >= 65) {
+            return '普段はほとんど話をいたしませぬ。';
+        }
+        return '普段はほとんど話をいたしませぬ。';
+    }
+
+    _applyFamilyReferenceText(text, isFamily) {
+        if (!isFamily) return String(text || '');
+        return String(text || '')
+            .replace(/^(?:あのお方|あの方|あの者|あやつ)は、?/, '')
+            .replace(/^(?:あのお方|あの方|あの者|あやつ)については、?/, '')
+            .replace(/^(?:あのお方|あの方|あの者|あやつ)を/, '');
+    }
+
     executeInterviewTopic(interviewer, target) {
         const relation = PersonnelRules.calcRelationshipProfile(interviewer, target);
         const standing = window.ConversationStandingRules
@@ -930,6 +992,7 @@ class InterviewSystem {
         const concealment = this._getConcealmentProfile(target);
         const roughBias = this._getOtherAssessmentBias(interviewer, target, concealment.perceivedLoyalty);
         const attitude = this.activeInterviewAttitude;
+        const isFamilyDialogue = this._isCloseFamilyDialogue(interviewer, target);
 
         // 本心を隠し切れず冷淡/動揺している武将は、他者についてだけ急に長広舌にはしない。
         // 基本は口数を減らし、私情が強い相手だけ短く悪く言う／控えめに庇う。
@@ -938,11 +1001,15 @@ class InterviewSystem {
             const slanderMin = Number(window.MainParams.Interview.OtherAssessmentBias.BlindSlanderMin);
             if (Number(roughBias.protectionShift || 0) > 0) {
                 const callName = window.ConversationStandingRules ? window.ConversationStandingRules.getInterviewTargetCallName(this.game, interviewer, target) : `${target.name}殿`;
-                text = `……${callName}ですか。${standing && standing.thirdPerson ? standing.thirdPerson : 'あの方'}については、さほど案じることはないかと存じます。`;
+                text = isFamilyDialogue
+                    ? `……${callName}ですか。さほど案じることはないかと存じます。`
+                    : `……${callName}ですか。${standing && standing.thirdPerson ? standing.thirdPerson : 'あの方'}については、さほど案じることはないかと存じます。`;
             } else if (Number(roughBias.loyaltyPenalty || 0) >= slanderMin) {
                 const callName = window.ConversationStandingRules ? window.ConversationStandingRules.getInterviewTargetCallName(this.game, interviewer, target) : `${target.name}殿`;
                 const ref = standing && standing.guardedThirdPerson ? standing.guardedThirdPerson : 'あの方';
-                text = `……${callName}ですか。${ref}は、あまり信用なさらぬ方がよろしいかと。`;
+                text = isFamilyDialogue
+                    ? `……${callName}ですか。あまり信用なさらぬ方がよろしいかと。`
+                    : `……${callName}ですか。${ref}は、あまり信用なさらぬ方がよろしいかと。`;
             } else {
                 const callName = window.ConversationStandingRules ? window.ConversationStandingRules.getInterviewTargetCallName(this.game, interviewer, target) : `${target.name}殿`;
                 text = `……${callName}ですか。某から詳しく申し上げることはございませぬ。`;
@@ -951,7 +1018,9 @@ class InterviewSystem {
             return;
         }
 
-        const opinionText = this._applyStandingReferenceText(this._getOpinionText(relation.compatibilityScore, attitude), standing);
+        const opinionText = isFamilyDialogue
+            ? this._getFamilyOpinionText(relation.compatibilityScore, attitude)
+            : this._applyStandingReferenceText(this._getOpinionText(relation.compatibilityScore, attitude), standing);
         const opinionDirection = this._getOpinionDirection(relation.compatibilityScore);
         const loyaltyAssessment = this._getTargetLoyaltyAssessment(interviewer, target, relation);
         const messages = [`「${this._getTopicOpening(interviewer, target, standing)}${opinionText}」`];
@@ -966,7 +1035,10 @@ class InterviewSystem {
         if (attitude === 'reserved') {
             // 寡黙な態度では接触関係の説明まで重ねず、要点だけ二言で答える。
             const loyaltyText = this._bridgeAssessmentText(
-                this._applyStandingReferenceText(loyaltyAssessment.text, standing),
+                this._applyFamilyReferenceText(
+                    this._applyStandingReferenceText(this._applyDirectAddress(loyaltyAssessment.text, interviewer), standing),
+                    isFamilyDialogue
+                ),
                 opinionDirection,
                 loyaltyAssessment.direction,
                 transitionState
@@ -975,13 +1047,18 @@ class InterviewSystem {
         } else {
             const contactDirection = this._getContactDirection(relation);
             const contactText = this._bridgeAssessmentText(
-                this._applyStandingReferenceText(this._getContactText(relation, interviewer, attitude), standing),
+                isFamilyDialogue
+                    ? this._getFamilyContactText(relation, interviewer, attitude)
+                    : this._applyStandingReferenceText(this._getContactText(relation, interviewer, attitude), standing),
                 opinionDirection,
                 contactDirection,
                 transitionState
             );
             const loyaltyText = this._bridgeAssessmentText(
-                this._applyStandingReferenceText(loyaltyAssessment.text, standing),
+                this._applyFamilyReferenceText(
+                    this._applyStandingReferenceText(this._applyDirectAddress(loyaltyAssessment.text, interviewer), standing),
+                    isFamilyDialogue
+                ),
                 contactDirection,
                 loyaltyAssessment.direction,
                 transitionState
