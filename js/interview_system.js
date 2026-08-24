@@ -186,7 +186,9 @@ class InterviewSystem {
             case 'reserved':
             case 'cold':
             case 'startled':
-                return `……${callName}について、ですか。`;
+                return this._isCloseFamilyDialogue(interviewer, target)
+                    ? `……${callName}ですか。`
+                    : `……${callName}について、ですか。`;
             default:
                 return `${callName}ですか……${hint}`;
         }
@@ -955,7 +957,7 @@ class InterviewSystem {
     _getFamilyOpinionText(score, attitude = this.activeInterviewAttitude) {
         if (score >= 82) return '気心はよく知れております。考え方にも共感するところが多く、信頼しております。';
         if (score >= 68) return '考え方には共感するところが多く、信頼しております。';
-        if (score >= 52) return '意見が違うことはありますが、関係は悪くありませぬ。';
+        if (score >= 52) return '意見が違うことはありますが、折り合いは悪くありませぬ。';
         if (score >= 36) return '考え方はあまり合いませぬ。意見がぶつかることもございます。';
         return 'どうにも反りが合いませぬ。';
     }

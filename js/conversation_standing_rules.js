@@ -166,26 +166,35 @@ class ConversationStandingRules {
      * ここでは subject から target への直接関係だけを扱い、target.female なら母、それ以外は義父と解釈する。
      * adoptiveFatherId から兄弟・祖父などの派生関係は推論しない。
      */
-    static getAdoptiveParentRelation(subject, target) {
+    static getAdoptiveFamilyDialogueRelation(subject, target) {
         if (!subject || !target) return 'none';
+        const subjectId = Number(subject.id) || 0;
         const targetId = Number(target.id) || 0;
-        if (targetId <= 0 || Number(subject.adoptiveFatherId) !== targetId) return 'none';
-        return target.female === true ? 'mother' : 'adoptive_father';
+        if (subjectId <= 0 || targetId <= 0 || subjectId === targetId) return 'none';
+
+        // 子→adoptiveFatherId の直接参照は、参照先の性別で母／義父を判定する。
+        if (Number(subject.adoptiveFatherId) === targetId) {
+            return target.female === true ? 'mother' : 'adoptive_father';
+        }
+        // 逆向きは「その人物が自分を親として参照している」という直接関係だけを見る。
+        // 養父・義父・武将母のいずれでも、親側からは年少の子として扱う。
+        if (Number(target.adoptiveFatherId) === subjectId) return 'adoptive_child';
+        return 'none';
     }
 
     /**
-     * 面談の会話文で使う、話者本人から見た近親関係。
-     * adoptiveFatherId の直接関係を先に見てから、realFatherId 系の確実な血縁へフォールバックする。
+     * 直接会話で使う、話者本人から見た近親関係。
+     * adoptiveFatherId は直接関係だけを扱い、realFatherId 系の確実な血縁へフォールバックする。
      */
     static getSpeakerFamilyDialogueRelation(game, speaker, target) {
-        const adoptive = this.getAdoptiveParentRelation(speaker, target);
+        const adoptive = this.getAdoptiveFamilyDialogueRelation(speaker, target);
         if (adoptive !== 'none') return adoptive;
         return this.getPaternalRelation(game, speaker, target);
     }
 
     /**
      * realFatherId だけを正本として、subject から見た target の実父系血縁を返す。
-     * realMotherId は養父用途と混在するため、会話の血縁判定には使わない。
+     * realMotherId は princess.csv 側の人物参照なので、武将同士の直接会話判定には使わない。
      */
     static getPaternalRelation(game, subject, target) {
         if (!subject || !target) return 'none';
@@ -228,6 +237,27 @@ class ConversationStandingRules {
      * 面談で本人が当主へ直接呼びかける時の血縁呼称。
      * 直接の家族呼称は官位・身分より優先し、父・兄・祖父・父方の伯父/叔父を簡潔に扱う。
      */
+    static isSeniorFamilyRelation(relation) {
+        return ['mother', 'adoptive_father', 'father', 'older_brother', 'grandfather', 'older_uncle', 'younger_uncle'].includes(relation);
+    }
+
+    static isYoungerFamilyRelation(relation) {
+        return ['younger_brother', 'son', 'grandson', 'adoptive_child'].includes(relation);
+    }
+
+    static isDirectFamilyRelation(relation) {
+        return this.isSeniorFamilyRelation(relation) || this.isYoungerFamilyRelation(relation);
+    }
+
+    static _getYoungerFamilyCallName(game, target) {
+        if (!target) return null;
+        const special = this.getSpecialAuthority(game, target);
+        if (special.key === 'shogun') return '公方様';
+        const rank = this.getHighestCourtRank(game, target);
+        if (rank) return String(rank.rankName2 || '').trim() || this._getGivenName(target) || this._getFullName(target);
+        return this._getGivenName(target) || this._getFullName(target) || null;
+    }
+
     static getDirectFamilyCallName(game, speaker, addressee) {
         const relation = this.getSpeakerFamilyDialogueRelation(game, speaker, addressee);
         if (relation === 'mother') return '母上';
@@ -237,6 +267,9 @@ class ConversationStandingRules {
         if (relation === 'grandfather') return '祖父上';
         if (relation === 'older_uncle') return '伯父上';
         if (relation === 'younger_uncle') return '叔父上';
+        if (this.isYoungerFamilyRelation(relation)) {
+            return this._getYoungerFamilyCallName(game, addressee);
+        }
         return null;
     }
 
@@ -248,7 +281,7 @@ class ConversationStandingRules {
         const relation = this.getPaternalRelation(game, questioner, target);
         if (relation === 'father') return '御父君';
         if (relation === 'son') return '御子息様';
-        if (relation === 'older_brother') return '御兄上';
+        if (relation === 'older_brother') return '御兄君';
         if (relation === 'younger_brother') return '御舎弟';
         if (relation === 'grandfather') return '御祖父君';
         if (relation === 'grandson') return 'お孫様';
@@ -271,14 +304,8 @@ class ConversationStandingRules {
         if (relation === 'grandfather') return '祖父上';
         if (relation === 'older_uncle') return '伯父上';
         if (relation === 'younger_uncle') return '叔父上';
-        if (!['younger_brother', 'son', 'grandson'].includes(relation)) return null;
-
-        const special = this.getSpecialAuthority(game, target);
-        if (special.key === 'shogun') return '公方様';
-
-        const rank = this.getHighestCourtRank(game, target);
-        if (rank) return String(rank.rankName2 || '').trim() || this._getGivenName(target) || this._getFullName(target);
-        return this._getGivenName(target) || this._getFullName(target) || 'その者';
+        if (!this.isYoungerFamilyRelation(relation)) return null;
+        return this._getYoungerFamilyCallName(game, target) || 'その者';
     }
 
     /**
@@ -303,6 +330,12 @@ class ConversationStandingRules {
 
     static getDiplomaticCallName(game, busho, speaker = null) {
         if (!busho) return '殿';
+        // 外交でも本人同士の近親呼称を最優先する。敵対・友好や官位は口調の温度へ残し、
+        // 家族なのに「参議殿」等へ戻る違和感を避ける。
+        if (speaker) {
+            const familyCall = this.getDirectFamilyCallName(game, speaker, busho);
+            if (familyCall) return familyCall;
+        }
         const special = this.getSpecialAuthority(game, busho);
         if (special.key === 'shogun') return '公方様';
 
@@ -442,6 +475,8 @@ class ConversationStandingRules {
 
         const envoyOutranksLord = envoySpecial.level > this.getSpecialAuthority(game, senderDaimyo).level
             || envoyVsLordCourt > 0;
+        const senderToReceiverFamilyRelation = this.getSpeakerFamilyDialogueRelation(game, envoy, receiverDaimyo);
+        const receiverToSenderFamilyRelation = this.getSpeakerFamilyDialogueRelation(game, receiverDaimyo, envoy);
 
         return {
             clanStanding,
@@ -451,7 +486,9 @@ class ConversationStandingRules {
             envoySpecial,
             envoyOutranksLord,
             receiverDeferenceLevel,
-            senderDeferenceLevel
+            senderDeferenceLevel,
+            senderToReceiverFamilyRelation,
+            receiverToSenderFamilyRelation
         };
     }
 }

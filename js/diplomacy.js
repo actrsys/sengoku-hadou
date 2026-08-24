@@ -925,6 +925,14 @@ class DiplomacyManager {
             ? window.ConversationStandingRules.getDiplomacyContext(this.game, senderBusho, receiverDaimyo)
             : { receiverDeferenceLevel: 0, senderDeferenceLevel: 0, envoyOutranksLord: false, senderDaimyo: this.game.getClanDaimyo(senderBusho.clan), envoySpecial: { level: 0, key: 'none' } };
         context.relationshipTone = this.getDiplomacyRelationshipTone(senderBusho && senderBusho.clan, receiverDaimyo && receiverDaimyo.clan);
+        const senderFamilyRelation = context.senderToReceiverFamilyRelation || 'none';
+        const receiverFamilyRelation = context.receiverToSenderFamilyRelation || 'none';
+        const senderAddressesFamily = window.ConversationStandingRules
+            && window.ConversationStandingRules.isDirectFamilyRelation(senderFamilyRelation);
+        const receiverAddressesFamily = window.ConversationStandingRules
+            && window.ConversationStandingRules.isDirectFamilyRelation(receiverFamilyRelation);
+        const receiverRegardsSenderAsSeniorFamily = window.ConversationStandingRules
+            && window.ConversationStandingRules.isSeniorFamilyRelation(receiverFamilyRelation);
 
         let greetMsg1 = '';
         let greetMsg2 = '';
@@ -940,24 +948,48 @@ class DiplomacyManager {
         } else {
             const senderDaimyo = context.senderDaimyo || this.game.getClanDaimyo(senderBusho.clan);
             const envoySpecial = context.envoySpecial || { level: 0, key: 'none' };
+            const familyLead = senderAddressesFamily ? `${receiverCallName}。` : '';
             if (Number(envoySpecial.level || 0) >= 3) {
-                greetMsg1 = `「此度の儀は、両家のためにも進めるべきと考え、わし自ら参った」`;
+                greetMsg1 = `「${familyLead}此度の儀は、両家のためにも進めるべきと考え、わし自ら参った」`;
             } else if (Number(envoySpecial.level || 0) >= 2) {
-                greetMsg1 = `「此度の儀は、両家のためにも進めるべきと考え、某自ら参りました」`;
+                greetMsg1 = `「${familyLead}此度の儀は、両家のためにも進めるべきと考え、某自ら参りました」`;
             } else if (context.envoyOutranksLord) {
                 const daimyoRef = this._getDaimyoReference(senderDaimyo, senderClanName, '殿');
-                greetMsg1 = `「此度は${daimyoRef}の意を受け、使者として参りました」`;
+                greetMsg1 = `「${familyLead}此度は${daimyoRef}の意を受け、使者として参りました」`;
             } else {
                 const daimyoRef = this._getDaimyoReference(senderDaimyo, senderClanName, '様');
-                greetMsg1 = Number(context.senderDeferenceLevel || 0) >= 2
-                    ? `「此度は${daimyoRef}の名代として罷り越しました。まずはお目通りを賜り、ありがたく存じます」`
-                    : `「此度は${daimyoRef}の名代として罷り越しました」`;
+                if (senderAddressesFamily) {
+                    // 父上・兄上等へ「お目通りを賜り」は他人行儀すぎるので、家族呼称を使う時は用件だけ簡潔に述べる。
+                    greetMsg1 = `「${familyLead}此度は${daimyoRef}の名代として参りました」`;
+                } else {
+                    greetMsg1 = Number(context.senderDeferenceLevel || 0) >= 2
+                        ? `「此度は${daimyoRef}の名代として罷り越しました。まずはお目通りを賜り、ありがたく存じます」`
+                        : `「此度は${daimyoRef}の名代として罷り越しました」`;
+                }
             }
         }
 
         const receiverDeference = Number(context.receiverDeferenceLevel || 0);
         const relationshipTone = context.relationshipTone && context.relationshipTone.key || 'neutral';
-        if (relationshipTone === 'hostile') {
+        if (receiverAddressesFamily) {
+            // 親族本人への応対では、格式による敬称より家族呼称を優先する。ただし敵対/友好の温度は残す。
+            // 年長親族には「父上か」のようなぞんざいな係助詞を付けず、年少側は「信忠か」のように自然に受ける。
+            if (receiverRegardsSenderAsSeniorFamily) {
+                if (relationshipTone === 'hostile') {
+                    greetMsg2 = `「……${senderCallName}。して、此度はどのような御用でしょうか？」`;
+                } else if (relationshipTone === 'friendly') {
+                    greetMsg2 = `「${senderCallName}。よくお越しくださいました。して、此度の御用向きは？」`;
+                } else {
+                    greetMsg2 = `「${senderCallName}。して、此度はどのような御用向きでしょうか？」`;
+                }
+            } else if (relationshipTone === 'hostile') {
+                greetMsg2 = `「……${senderCallName}か。して、用向きは？」`;
+            } else if (relationshipTone === 'friendly') {
+                greetMsg2 = `「${senderCallName}か。よく来た。して、用向きは？」`;
+            } else {
+                greetMsg2 = `「${senderCallName}か。して、此度の用向きは？」`;
+            }
+        } else if (relationshipTone === 'hostile') {
             if (receiverDeference >= 3) {
                 greetMsg2 = `「これは${senderCallName}。……御用向きを承りましょう」`;
             } else if (receiverDeference === 2) {
