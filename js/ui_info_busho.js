@@ -727,7 +727,19 @@ Object.assign(UIInfoManager.prototype, {
         if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
 
         const selectedIdsStr = [...(this.commonSelectedIds || [])].sort((a, b) => a - b).join('_');
-        const currentSortStateKey = `${this.bushoCurrentSortKey}_${this.bushoIsSortAsc}_${selectedIdsStr}`;
+        // 行動を消費する武将一覧では、どの並び順でも「未行動 → 行動済」を最優先にします。
+        // 行動状態が変わった直後も古いソートキャッシュを使わないよう、状態自体をキーへ含めます。
+        const actionStateKey = hideActionCol ? '' : (this.bushoSavedBushos || [])
+            .map(b => `${b.id}:${b.isActionDone === true ? 1 : 0}`)
+            .join(',');
+        const currentSortStateKey = `${this.bushoCurrentSortKey}_${this.bushoIsSortAsc}_${selectedIdsStr}_${actionStateKey}`;
+        const groupActionDoneLast = (list) => {
+            if (hideActionCol || !Array.isArray(list)) return list;
+            const pending = [];
+            const done = [];
+            list.forEach(b => (b.isActionDone === true ? done : pending).push(b));
+            return pending.concat(done);
+        };
 
         if (this.bushoSavedSortedBushos && this.bushoLastSortStateKey === currentSortStateKey) {
             displayBushos = this.bushoSavedSortedBushos;
@@ -883,6 +895,7 @@ Object.assign(UIInfoManager.prototype, {
                 this._saveStableSortResult('busho', null); // ★リセット
             }
 
+            displayBushos = groupActionDoneLast(displayBushos);
             this.bushoSavedSortedBushos = displayBushos;
             this.bushoLastSortStateKey = currentSortStateKey;
         }

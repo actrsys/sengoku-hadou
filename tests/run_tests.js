@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r171');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r173');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1161,10 +1161,23 @@ test('戦争履歴は開戦元・援軍・勝敗を実名と全参加勢力で�
     assert.ok(war.includes('【援軍】${helperBase}から${leaderName}が守備側の援軍として参戦しました。'));
     assert.ok(war.includes("['reinforcement', 'selfReinforcement', 'defReinforcement', 'defSelfReinforcement']"), '攻守の援軍勢力を履歴関連勢力へ含める');
     assert.ok(war.includes('retreatedReinforcements'), '途中撤退した援軍も戦争参加勢力として維持する');
-    assert.ok(war.includes('【合戦結果】${atkHistoryClan2}が${defHistoryClan2}の${s.defender.name}を制圧しました。'));
-    assert.ok(war.includes('【合戦結果】${defHistoryClan4}が${s.defender.name}の防衛に成功し、${atkHistoryClan4}を退けました。'));
+    assert.ok(war.includes('recordNormalWarOutcomeHistory(attackerWon, isRetreat, s)'), '野戦だけで終わる場合も共通経路で最終結果を履歴化する');
+    assert.ok(war.includes('【合戦結果】${atkHistoryClan}が${defHistoryClan}の${s.defender.name}を制圧しました。'));
+    assert.ok(war.includes('【合戦結果】${defHistoryClan}が${s.defender.name}の防衛に成功し、${atkHistoryClan}を退けました。'), '攻撃側敗北も必ず最終結果として残す');
+    assert.ok(war.includes('【合戦結果】${atkHistoryClan}は${defHistoryClan}の${s.defender.name}攻略を断念し、撤退しました。'), '攻撃側撤退も最終結果として残す');
+    assert.ok(war.includes('s._historyOutcomeRecorded = true'), '最終結果を二重記録しない');
     assert.ok(war.includes('getHistoryClanName(clanId'), '履歴では当家表記ではなく実際の家名を使う');
 });
+
+test('行動を消費する武将一覧はどのソートでも行動済みを未行動の下へ固定する', () => {
+    const busho = read('js/ui_info_busho.js');
+    assert.ok(busho.includes("const actionStateKey = hideActionCol ? ''"), '行動状態の変化でソートキャッシュを更新する');
+    assert.ok(busho.includes('const groupActionDoneLast = (list) => {'));
+    assert.ok(busho.includes('(b.isActionDone === true ? done : pending).push(b)'));
+    assert.ok(busho.includes('displayBushos = groupActionDoneLast(displayBushos);'), '能力・名前・行動列など個別ソート後に必ず未行動→行動済へ再編する');
+    assert.ok(busho.includes('if (hideActionCol || !Array.isArray(list)) return list;'), '行動消費のない閲覧・任命用一覧には強制グループを適用しない');
+});
+
 
 test('落城後の攻略軍移動は城主再選を保留し最終城主だけ確定する', () => {
     const affiliation = read('js/affiliation_system.js');
@@ -1204,6 +1217,32 @@ test('戦場内の一時ログと諸勢力蜂起の予告は行動履歴へ重�
     assert.ok(effort.includes('(物資搬出率: ${(100*(1-lossRate)).toFixed(0)}%, 捕縛者: ${capturedBushos.length}名)`, { history: false }'));
     assert.ok(effort.includes('(撤退先にて負傷兵 ${recovered}名 が復帰)`, { history: false }'));
     assert.ok(kunishu.includes('【諸勢力蜂起】${castle.name}にて、${kunishuName}が反乱を起こしました！`, { history: false }'));
+});
+
+test('攻城戦メッセージは最新約3表示行へローリングし決着文を単独表示する', () => {
+    const ui = read('js/ui.js');
+    assert.ok(ui.includes('lineHeight * 3.15'));
+    assert.ok(ui.includes('textContainer.removeChild(textContainer.firstElementChild)'));
+    assert.ok(ui.includes('/war-critical-message/i.test'));
+    assert.ok(ui.includes("entry.className = `war-action-message-entry${isCritical ? ' is-critical' : ''}`"));
+    assert.ok(ui.includes("if (isCritical) textContainer.innerHTML = '';"));
+});
+
+test('野戦終了通知は終了瞬間の生存部隊ではなく参加実績を基準にする', () => {
+    const field = read('js/field_war.js');
+    assert.ok(field.includes('this.playerWasInvolved = isPlayerInvolved'));
+    assert.ok(field.includes('const isPlayerInvolved = !!this.playerWasInvolved;'));
+    assert.ok(field.includes('finishFieldWarWithNotice(resultType, message)'));
+    assert.ok(field.includes('攻略を諦めて撤退しました。野戦は終結します。'));
+    assert.ok(field.includes('城内へ退きました。野戦を終え、攻城戦へ移ります。'));
+});
+
+test('攻城戦はラウンド開始時点で決着済みでも終了理由を表示してから戦後処理へ進む', () => {
+    const war = read('js/war.js');
+    assert.ok(war.includes('finishSiegeWithNotice(attackerWon, message)'));
+    assert.ok(war.includes("this.finishSiegeWithNotice(true, '城の防御が０になった！<br>城は陥落した！')"));
+    assert.ok(war.includes("this.finishSiegeWithNotice(true, '守備本隊の士気が崩壊した！<br>城は陥落した！')"));
+    assert.ok(war.includes("this.finishSiegeWithNotice(false, '攻撃本隊の士気が崩壊した！<br>攻撃軍は退却した！')"));
 });
 
 test('大名家滅亡履歴は滅亡家と攻略家を関連勢力として一度だけ記録する', () => {

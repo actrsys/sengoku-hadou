@@ -472,6 +472,25 @@ class WarManager {
         } catch(e) { console.error(e); this.endWar(false); } 
     }
 
+    finishSiegeWithNotice(attackerWon, message) {
+        if (!this.state || !this.state.active) return;
+        const s = this.state;
+        const finalize = () => this.endWar(attackerWon);
+
+        if (s.isPlayerInvolved && this.game && this.game.ui && typeof this.game.ui.showWarActionMessage === 'function') {
+            if (typeof this.game.ui.addWarDetailLog === 'function') {
+                this.game.ui.addWarDetailLog(String(message || '').replace(/<br>/g, ' '));
+            }
+            this.game.ui.showWarActionMessage([{
+                text: `<span class="war-critical-message">${message}</span>`,
+                log: String(message || '').replace(/<br>/g, ' '),
+                critical: true
+            }], finalize);
+        } else {
+            finalize();
+        }
+    }
+
     processWarRound() { 
         if (!this.state.active) return; 
         const s = this.state; 
@@ -568,15 +587,28 @@ class WarManager {
             if (s.wallDamageHistory.length > 5) s.wallDamageHistory.shift();
 
             if (s.defender.defense <= 0) {
-                // ★城壁が壊れて落ちた場合、少しだけ城壁（防御力）を修復してあげます！
-                s.defender.defense += 150; 
-                this.endWar(true); 
-                return; 
-            } 
-            if (s.defender.morale <= 0) { this.endWar(true); return; }
-            if (s.defender.soldiers <= 0) { this.endWar(true); return; }
-            if (s.attacker.morale <= 0) { this.endWar(false); return; }
-            if (s.attacker.soldiers <= 0) { this.endWar(false); return; } 
+                // 城壁が壊れて落ちた場合、少しだけ城壁（防御力）を修復してから戦後処理へ。
+                // ラウンド開始時点で既に0だった場合でも、プレイヤーには終了理由を必ず見せます。
+                s.defender.defense += 150;
+                this.finishSiegeWithNotice(true, '城の防御が０になった！<br>城は陥落した！');
+                return;
+            }
+            if (s.defender.morale <= 0) {
+                this.finishSiegeWithNotice(true, '守備本隊の士気が崩壊した！<br>城は陥落した！');
+                return;
+            }
+            if (s.defender.soldiers <= 0) {
+                this.finishSiegeWithNotice(true, '守備本隊が全滅した！<br>城は陥落した！');
+                return;
+            }
+            if (s.attacker.morale <= 0) {
+                this.finishSiegeWithNotice(false, '攻撃本隊の士気が崩壊した！<br>攻撃軍は退却した！');
+                return;
+            }
+            if (s.attacker.soldiers <= 0) {
+                this.finishSiegeWithNotice(false, '攻撃本隊が全滅した！<br>守備軍が防ぎ切った！');
+                return;
+            }
             
             if (s.attacker.rice <= 0) { 
                 if (s.isPlayerInvolved && this.game.ui) {

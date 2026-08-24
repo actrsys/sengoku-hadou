@@ -2747,32 +2747,77 @@ class UIManager {
         if (warAiGuard) warAiGuard.classList.add('hidden');
         this.warControls.classList.remove('disabled-area');
 
-        this.warControls.innerHTML = ''; 
+        this.warControls.innerHTML = '';
         const allCards = document.querySelectorAll('.army-box, .responsive-army-box');
         allCards.forEach(c => c.classList.remove('active-command-turn'));
-        
-        const isPc = document.body.classList.contains('is-pc');
-        
+
         const msgContainer = document.createElement('div');
         msgContainer.className = 'war-action-message-container';
-        
+
         const textContainer = document.createElement('div');
         textContainer.className = 'war-action-message-text';
-        
+
         const promptContainer = document.createElement('div');
         promptContainer.className = 'war-action-message-prompt';
-        promptContainer.textContent = '▼'; 
-        
+        promptContainer.textContent = '▼';
+
         msgContainer.appendChild(textContainer);
         msgContainer.appendChild(promptContainer);
         this.warControls.appendChild(msgContainer);
-        
+
         let isFinished = false;
-        let isPaused = false; 
+        let isPaused = false;
         let currentTimer = null;
-        let isClickLocked = false; // ★追加：クリックを無視するための鍵
+        let isClickLocked = false;
         if (!Array.isArray(messages)) messages = [messages];
         let currentIndex = 0;
+
+        // 赤字の決着文は従来の inline color だけでなく、現在使っている
+        // .war-critical-message も確実に「重要メッセージ」として扱います。
+        const isCriticalMessage = (item, msgText) => {
+            if (item && typeof item === 'object' && item.critical === true) return true;
+            return /war-critical-message/i.test(msgText || '') || /color\s*:\s*(#d32f2f|red)/i.test(msgText || '');
+        };
+
+        // 通常メッセージは「最新およそ3表示行」を残します。
+        // スマホの自然改行も実際の描画高で判定し、古い項目から落とします。
+        // ただし1件だけで3行を超える長文は途中で切らず、その1件は全文を残します。
+        const trimOldMessages = () => {
+            const style = window.getComputedStyle ? window.getComputedStyle(textContainer) : null;
+            const fontSize = style ? (parseFloat(style.fontSize) || 16) : 16;
+            let lineHeight = style ? parseFloat(style.lineHeight) : NaN;
+            if (!Number.isFinite(lineHeight)) lineHeight = fontSize * 1.5;
+            const maxHeight = lineHeight * 3.15;
+
+            while (textContainer.children.length > 1 && textContainer.scrollHeight > maxHeight) {
+                textContainer.removeChild(textContainer.firstElementChild);
+            }
+        };
+
+        const appendMessage = (item, playAnimation = true) => {
+            const msgText = typeof item === 'string' ? item : ((item && item.text) || '');
+            const isCritical = isCriticalMessage(item, msgText);
+
+            if (isCritical) textContainer.innerHTML = '';
+
+            if (msgText) {
+                const entry = document.createElement('div');
+                entry.className = `war-action-message-entry${isCritical ? ' is-critical' : ''}`;
+                entry.innerHTML = msgText;
+                textContainer.appendChild(entry);
+                if (!isCritical) trimOldMessages();
+            }
+
+            if (playAnimation && item && typeof item !== 'string') {
+                if (item.se && window.AudioManager && item.type !== 'damage' && item.type !== 'recover') {
+                    window.AudioManager.playSE(item.se);
+                }
+                if (item.type === 'damage' || item.type === 'recover') this.playDamageAnimation(item);
+            }
+
+            textContainer.scrollTop = textContainer.scrollHeight;
+            return isCritical;
+        };
 
         const skipToEnd = () => {
             if (isFinished) return;
@@ -2780,36 +2825,20 @@ class UIManager {
             if (currentTimer) clearTimeout(currentTimer);
 
             while (currentIndex < messages.length) {
-                const item = messages[currentIndex++];
-                let msgText = typeof item === 'string' ? item : (item.text || '');
-                
-                let isSpecialMsg = /color\s*:\s*(#d32f2f|red)/i.test(msgText); 
-
-                if (isSpecialMsg) {
-                    textContainer.innerHTML = ''; 
-                }
-                
-                if (msgText) {
-                    textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + msgText;
-                }
-                
-                if (typeof item !== 'string' && item) {
-                    if (item.type === 'damage' || item.type === 'recover') this.playDamageAnimation(item);
-                }
+                appendMessage(messages[currentIndex++], true);
             }
             if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
-            setTimeout(onClick, 300); 
+            setTimeout(onClick, 300);
         };
 
         msgContainer.onclick = (e) => {
-            e.stopPropagation(); e.preventDefault();
-            // ★追加：鍵がかかっている間（1秒間）はクリックしても何も起きません
-            if (isClickLocked) return;
-            if (isFinished) return;
-            
+            e.stopPropagation();
+            e.preventDefault();
+            if (isClickLocked || isFinished) return;
+
             if (isPaused) {
                 isPaused = false;
-                promptContainer.textContent = '▼'; 
+                promptContainer.textContent = '▼';
                 if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                 processNext();
             } else {
@@ -2821,52 +2850,36 @@ class UIManager {
             if (isFinished) return;
             if (currentIndex >= messages.length) {
                 promptContainer.style.visibility = 'hidden';
-                currentTimer = setTimeout(() => { if (!isFinished) { isFinished = true; onClick(); } }, 1200);
+                currentTimer = setTimeout(() => {
+                    if (!isFinished) {
+                        isFinished = true;
+                        onClick();
+                    }
+                }, 1200);
                 return;
             }
+
             const item = messages[currentIndex++];
             let waitTime = 700;
-            
-            let msgText = typeof item === 'string' ? item : (item.text || '');
-            let isSpecialMsg = /color\s*:\s*(#d32f2f|red)/i.test(msgText); 
+            const isCritical = appendMessage(item, true);
 
-            if (isSpecialMsg) {
-                textContainer.innerHTML = ''; 
+            if (item && typeof item !== 'string' && (item.type === 'damage' || item.type === 'recover')) {
+                waitTime = 900;
             }
 
-            if (typeof item === 'string') {
-                textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item;
-            } else if (item.text) {
-                if (item.se && window.AudioManager) window.AudioManager.playSE(item.se);
-                textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item.text;
-                if (item.type === 'damage' || item.type === 'recover') {
-                    this.playDamageAnimation(item);
-                    waitTime = 900;
-                }
-            } else if (item.type === 'damage' || item.type === 'recover') {
-                this.playDamageAnimation(item);
-                waitTime = 900;
-            } else { waitTime = 0; }
-
-            textContainer.scrollTop = textContainer.scrollHeight;
-
-            if (isSpecialMsg) {
+            if (isCritical) {
                 isPaused = true;
-                
-                // ★追加：赤文字の時は1秒間クリックできなくします
                 isClickLocked = true;
-                promptContainer.style.visibility = 'hidden'; // ロック中は進める合図（▼）も隠します
-                
+                promptContainer.style.visibility = 'hidden';
+
                 setTimeout(() => {
-                    isClickLocked = false; // 1秒経ったら鍵を開けます
-                    // 鍵が開いたら、進める合図（▼）を出します
+                    isClickLocked = false;
                     if (!isFinished && isPaused) {
-                        promptContainer.textContent = '▼'; 
+                        promptContainer.textContent = '▼';
                         promptContainer.style.visibility = 'visible';
                     }
                 }, 1000);
-                
-                return; 
+                return;
             }
 
             currentTimer = setTimeout(processNext, waitTime);

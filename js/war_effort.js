@@ -77,6 +77,34 @@ Object.assign(WarManager.prototype, {
         this.game.historySystem.record(text, { clanIds: ids, category: 'war', inferCurrentTurn: false });
     },
 
+    // 通常の大名家同士の合戦結果は、攻撃側勝利・敗北・撤退のどの終了経路でもここで一度だけ記録します。
+    // 個々の攻城戦分岐へ履歴処理を散らさないことで、野戦だけで終わった敗戦などの取りこぼしを防ぎます。
+    recordNormalWarOutcomeHistory(attackerWon, isRetreat = false, state = null) {
+        const s = state || this.state;
+        if (!s || !s.attacker || !s.defender) return;
+        if (s.isKunishuSubjugation || s.attacker.isKunishu) return;
+        if (s._historyOutcomeRecorded === true) return;
+
+        const atkFallback = s.attacker.name || '攻撃側';
+        const defFallback = Number(s.oldDefClanId || 0) > 0 ? '守備側' : `${s.defender.name || '拠点'}守備側`;
+        const atkHistoryClan = this.getHistoryClanName(s.attacker.ownerClan, atkFallback);
+        const defHistoryClan = this.getHistoryClanName(s.oldDefClanId || s.defender.ownerClan, defFallback);
+        let text = '';
+
+        if (attackerWon) {
+            text = isRetreat
+                ? `【合戦結果】${atkHistoryClan}が${defHistoryClan}の${s.defender.name}を占領しました。`
+                : `【合戦結果】${atkHistoryClan}が${defHistoryClan}の${s.defender.name}を制圧しました。`;
+        } else if (isRetreat) {
+            text = `【合戦結果】${atkHistoryClan}は${defHistoryClan}の${s.defender.name}攻略を断念し、撤退しました。`;
+        } else {
+            text = `【合戦結果】${defHistoryClan}が${s.defender.name}の防衛に成功し、${atkHistoryClan}を退けました。`;
+        }
+
+        s._historyOutcomeRecorded = true;
+        this.recordWarHistory(text, this.getWarHistoryClanIds(s));
+    },
+
     // 落城後の攻略軍移動を一括で行い、途中の仮城主任命を発生させません。
     finalizeCapturedCastleStaffing(state) {
         const s = state || this.state;
@@ -1459,6 +1487,9 @@ Object.assign(WarManager.prototype, {
                 await this.game.eventManager.processEvents('after_battle_blink', eventContext);
             }
             // ==========================================
+
+            // 通常戦争の最終結果は、野戦だけで終わった場合も含めてここで必ず一度履歴化します。
+            this.recordNormalWarOutcomeHistory(attackerWon, isRetreat, s);
             
             // ★ここから追加：AI同士の戦争の結果メッセージを記憶しておきます（表示は色が塗られた一番最後にします！）
             let aiResultMsg = "";
@@ -2118,9 +2149,6 @@ Object.assign(WarManager.prototype, {
                 const atkClanData1 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
                 const atkArmyName1 = s.attacker.isKunishu ? s.attacker.name : (atkClanData1 ? atkClanData1.getArmyName() : "敵軍");
                 this.game.ui.log(`【合戦結果】守備軍の撤退により、${atkArmyName1}が${s.defender.name}を占領しました。`, { history: false });
-                const atkHistoryClan1 = this.getHistoryClanName(s.attacker.ownerClan, atkArmyName1);
-                const defHistoryClan1 = this.getHistoryClanName(s.oldDefClanId, '守備側');
-                this.recordWarHistory(`【合戦結果】${atkHistoryClan1}が${defHistoryClan1}の${s.defender.name}を占領しました。`, this.getWarHistoryClanIds(s));
                 
                 if (s.isPlayerInvolved) {
                     const pid = Number(this.game.playerClanId);
@@ -2216,9 +2244,6 @@ Object.assign(WarManager.prototype, {
                 const atkClanData2 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
                 const atkArmyName2 = s.attacker.isKunishu ? s.attacker.name : (atkClanData2 ? atkClanData2.getArmyName() : "敵軍");
                 this.game.ui.log(`【合戦結果】${atkArmyName2}が${s.defender.name}を制圧しました。`, { history: false });
-                const atkHistoryClan2 = this.getHistoryClanName(s.attacker.ownerClan, atkArmyName2);
-                const defHistoryClan2 = this.getHistoryClanName(s.oldDefClanId, '守備側');
-                this.recordWarHistory(`【合戦結果】${atkHistoryClan2}が${defHistoryClan2}の${s.defender.name}を制圧しました。`, this.getWarHistoryClanIds(s));
             } else {
                 s.defender.immunityUntil = this.game.getCurrentTurnId(); 
                 if (isAtkPlayer) resultMsg = isRetreat ? `${s.defender.name}からの撤退を決定しました……` : `${s.defender.name}を落としきることができませんでした……`;
@@ -2231,14 +2256,8 @@ Object.assign(WarManager.prototype, {
                      const atkClanData3 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
                      const atkArmyName3 = s.attacker.isKunishu ? s.attacker.name : (atkClanData3 ? atkClanData3.getArmyName() : "攻撃軍");
                      this.game.ui.log(`【合戦結果】${atkArmyName3}は${s.defender.name}の攻略を諦め、撤退しました。`, { history: false });
-                     const atkHistoryClan3 = this.getHistoryClanName(s.attacker.ownerClan, atkArmyName3);
-                     const defHistoryClan3 = this.getHistoryClanName(s.oldDefClanId, '守備側');
-                     this.recordWarHistory(`【合戦結果】${atkHistoryClan3}は${defHistoryClan3}の${s.defender.name}攻略を断念し、撤退しました。`, this.getWarHistoryClanIds(s));
                 } else {
                      this.game.ui.log(`【合戦結果】${defArmyName}が${s.defender.name}の防衛に成功しました。`, { history: false });
-                     const atkHistoryClan4 = this.getHistoryClanName(s.attacker.ownerClan, s.attacker.name || '攻撃側');
-                     const defHistoryClan4 = this.getHistoryClanName(s.oldDefClanId, defArmyName);
-                     this.recordWarHistory(`【合戦結果】${defHistoryClan4}が${s.defender.name}の防衛に成功し、${atkHistoryClan4}を退けました。`, this.getWarHistoryClanIds(s));
                 }
             } 
 

@@ -104,10 +104,10 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 
 ## 戦争
 
-- `js/war.js` — WarManagerの主要な入口。攻城戦・野戦で共通のホーム補正は `WarSystem.calcHomeBonusMultiplier()`、大名家所属武将の戦争時忠誠加算は `WarSystem.calcLoyaltyBattleBonus()` / `calcGroupLoyaltyBattleBonus()` を正本とする。忠誠補正は能力値自体を書き換えず、攻防能力へ `√忠誠 × War.LoyaltyBonusFactor` を1回だけ加える。諸勢力・浪人には適用しない。
+- `js/war.js` — WarManagerの主要な入口。攻城戦・野戦で共通のホーム補正は `WarSystem.calcHomeBonusMultiplier()`、大名家所属武将の戦争時忠誠加算は `WarSystem.calcLoyaltyBattleBonus()` / `calcGroupLoyaltyBattleBonus()` を正本とする。忠誠補正は能力値自体を書き換えず、攻防能力へ `√忠誠 × War.LoyaltyBonusFactor` を1回だけ加える。諸勢力・浪人には適用しない。攻城戦が決着条件へ入る時は、ラウンド開始時点ですでに防御・士気・兵数が0でも、プレイヤー参加戦では終了理由を表示してから戦後処理へ進む。
 - `js/war_preparation_controller.js` — 出陣準備・自軍援軍・他勢力援軍・開戦直前UIの司令塔。CommandSystemやAI等はここから開戦準備を開始する。
 - `js/war_effort.js` — 攻城戦・戦争進行の既存大規模処理。戦後に攻略軍を別城へ一括移動する場合は途中の城主再選を保留し、全員の移動完了後に出撃元・占領先それぞれ1回だけ城主を確定する。今後の整理候補。
-- `js/field_war.js` — 野戦。Rules / View / AI がまだ混在しており今後の整理候補。
+- `js/field_war.js` — 野戦。Rules / View / AI がまだ混在しており今後の整理候補。野戦終了通知は「終了時点で残っているプレイヤー部隊」ではなく「その野戦にプレイヤーが参加していたか」を保持して判定し、総大将撃破・兵糧切れ・AI撤退などで無言のまま次段階へ進めない。
 - `js/troop_allocation.js` — 兵力自動配分の正本。
 - `js/reinforcement_service.js` — 承諾後の自軍・同盟・諸勢力援軍編成／資源消費の正本。自動・手動とも城在庫の増減をここへ集約する。
 - AIが援軍要請を承諾するかどうか（実効確率・大雪・支配関係・拒否可能スキル・最終サイコロ）は `DiplomacyManager.getAIReinforcementAcceptanceInfo()` / `checkAIReinforcementAcceptance()` を正本とし、攻撃側・守備側とも同じ窓口を使う。
@@ -213,6 +213,7 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - 戦争中の地図カメラは `WarManager.state.battleFocusCastleId` を正本とし、開戦時に対象拠点の領域中心へ一度だけフォーカスする。
 - 開始点滅・終了点滅・制圧演出は同じ戦場カメラを再利用し、演出ごとの再フォーカスでスマホ表示が数pxずれないようにする。
 - プレイヤーの野戦/攻城戦モーダルを閉じる時は、モーダル非表示後のviewportで同じ戦場中心へ即時補正する。
+- 攻城戦アクションメッセージは最新およそ3表示行をローリング表示し、落城・士気崩壊・本隊全滅・撤退などの決着文はそれ以前の通常文を消して単独表示する。クリック早送り時も同じ表示制限を通す。
 - 諸勢力鎮圧の対象拠点は `kunishu.castleId` を正本とし、出撃元拠点IDを戦場に流用しない。
 - 自家武将の出奔通知は専用カットインを持たず、通常通知と同じ `showDialogAsync` を使用する。
 

@@ -517,6 +517,11 @@ class FieldWarManager {
         
         // ★追加：援軍も含めて、プレイヤーが操作する部隊が1つでもあるか調べます！
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
+        // 戦闘終了時の通知判定は「終了瞬間に生き残っているか」ではなく、
+        // この野戦に一度でもプレイヤーが参加していたかを基準にします。
+        // 総大将撃破・全軍撤退の瞬間にプレイヤー部隊が0件になっても、結果を無言で閉じません。
+        this.playerWasInvolved = isPlayerInvolved;
+        this.fieldEndNoticeShown = false;
 
         if (isPlayerInvolved) {
             // ★追加: 野戦開始時に裏の日本地図（背景）の更新とアニメーションを完全にストップして軽くします！
@@ -2345,8 +2350,23 @@ class FieldWarManager {
         }
     }
     
+    finishFieldWarWithNotice(resultType, message) {
+        if (!this.active) return;
+
+        if (message) this.log(message);
+        const shouldShowNotice = !!(this.playerWasInvolved && this.game && this.game.ui && typeof this.game.ui.showDialog === 'function');
+        if (shouldShowNotice && !this.fieldEndNoticeShown) {
+            this.fieldEndNoticeShown = true;
+            this.game.ui.showDialog(message || '野戦は終結しました。', false, () => {
+                this.endFieldWar(resultType);
+            });
+        } else {
+            this.endFieldWar(resultType);
+        }
+    }
+
     checkEndCondition() {
-        const isPlayerInvolved = this.units.some(u => u.isPlayer);
+        const isPlayerInvolved = !!this.playerWasInvolved;
 
         let atkAlive = false, defAlive = false;
         let atkGeneralAlive = false, defGeneralAlive = false;
@@ -2435,16 +2455,7 @@ class FieldWarManager {
 
         // 終了条件を満たしている場合
         if (endResult) {
-            this.log(endMessage);
-            
-            if (isPlayerInvolved && this.game && this.game.ui) {
-                // ★修正: プレイヤーが参加している場合はダイアログを出してから終了処理へ進みます！
-                this.game.ui.showDialog(endMessage, false, () => {
-                    this.endFieldWar(endResult);
-                });
-            } else {
-                this.endFieldWar(endResult);
-            }
+            this.finishFieldWarWithNotice(endResult, endMessage);
             return true;
         }
         
@@ -3705,11 +3716,10 @@ class FieldWarManager {
         // ★修正: 攻撃側の諸勢力でなければ、総大将なら全軍撤退、一般部隊なら個別撤退の判断をします
         // ただし、守備側で最初から兵力差があった場合は総大将の全軍撤退はしません
         if (!isKunishuAttacker && unit.isGeneral && (allySoldiers < enemySoldiers * 0.2) && !isStartUnderdogDef) {
-            if (isPlayerInvolved) {
-                if (unit.isAttacker) this.log(`${unit.name}軍は攻略を諦め、引き揚げていきました！`);
-                else this.log(`${unit.name}軍は不利を悟り、戦場から離脱しました！`);
-            }
-            this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
+            const retreatMessage = unit.isAttacker
+                ? `${unit.name}軍は不利を悟り、攻略を諦めて撤退しました。野戦は終結します。`
+                : `${unit.name}軍は不利を悟り、城内へ退きました。野戦を終え、攻城戦へ移ります。`;
+            this.finishFieldWarWithNotice(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat', retreatMessage);
             return;
         } else if (!isKunishuAttacker && !unit.isGeneral && unit.initialSoldiers > 500 && (unit.soldiers <= 200 || unit.soldiers < enemySoldiers * 0.05)) {
             // ★修正：一般部隊は、元々の兵士数が500より多くて、自分の兵士が少なすぎるか、敵全体に対して少なすぎたら逃げる
@@ -3763,8 +3773,10 @@ class FieldWarManager {
                 if (!isKunishuAttacker) {
                     // ★修正: 攻撃側の諸勢力でなければ撤退
                     if (unit.isGeneral) {
-                        if (isPlayerInvolved) this.log(`${unit.name}軍は不利を悟り、戦場から離脱しました！`);
-                        this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
+                        const retreatMessage = unit.isAttacker
+                            ? `${unit.name}軍は不利を悟り、攻略を諦めて撤退しました。野戦は終結します。`
+                            : `${unit.name}軍は不利を悟り、城内へ退きました。野戦を終え、攻城戦へ移ります。`;
+                        this.finishFieldWarWithNotice(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat', retreatMessage);
                     } else {
                         if (isPlayerInvolved) this.log(`${unit.name}隊は不利を悟り、戦場から撤退しました！`);
                         this.retreatUnit(unit);
