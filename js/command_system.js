@@ -1264,12 +1264,31 @@ class CommandSystem {
     }
 
     async executeWithEvent(type, executeFunc, extraContext = {}) {
-        if (this.game.eventManager) {
-            await this.game.eventManager.processEvents('before_command', { commandType: type, ...extraContext });
-        }
-        await executeFunc();
-        if (this.game.eventManager) {
-            await this.game.eventManager.processEvents('after_command', { commandType: type, ...extraContext });
+        // 外交は軍師助言・事前イベント・人物画像decodeなど複数の await をまたいで会話へ遷移します。
+        // その間だけ旧ダイアログを保持し、固定msのタイムアウトによる黒画面の露出を防ぎます。
+        const diplomacyHandoffTypes = new Set([
+            'goodwill', 'alliance', 'marriage', 'break_alliance',
+            'subordinate', 'vassalage', 'dominate', 'truce', 'court_truce'
+        ]);
+        const ui = this.game?.ui;
+        const holdDialogHandoff = diplomacyHandoffTypes.has(type)
+            && ui
+            && typeof ui.beginDialogHandoffHold === 'function'
+            && typeof ui.endDialogHandoffHold === 'function';
+
+        if (holdDialogHandoff) ui.beginDialogHandoffHold();
+        try {
+            if (this.game.eventManager) {
+                await this.game.eventManager.processEvents('before_command', { commandType: type, ...extraContext });
+            }
+            await executeFunc();
+            if (this.game.eventManager) {
+                await this.game.eventManager.processEvents('after_command', { commandType: type, ...extraContext });
+            }
+        } finally {
+            // 実行途中で対象消失などにより会話/結果が出なかった場合も、使者選択画面を残しっぱなしにしません。
+            if (holdDialogHandoff && typeof ui.completeVisualHandoff === 'function') ui.completeVisualHandoff();
+            if (holdDialogHandoff) ui.endDialogHandoffHold();
         }
     }
 

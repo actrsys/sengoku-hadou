@@ -296,8 +296,13 @@ class ConversationStandingRules {
         }
 
         // 将軍・左馬頭（将軍候補）は通常官位ランクとは別の特殊権威。
-        // 左馬頭はrankNoだけを見ると当主より下になる場合があるため、話者姿勢では先に特殊権威を見る。
+        // 話し相手が特殊権威を持つ時は、こちらの通常官位が上でも上位者口調へ反転させない。
+        // 左馬頭はrankNoだけを見ると下位になり得るため、必ず通常官位比較より先に処理する。
         const special = this.getSpecialAuthority(game, speaker);
+        const addresseeSpecial = this.getSpecialAuthority(game, daimyo);
+        if (addresseeSpecial.level >= 2 && special.level < addresseeSpecial.level) {
+            return { key: 'normal', relation: 'none', respectsSpecialAuthority: addresseeSpecial.key };
+        }
         if (special.level >= 2) {
             return { key: 'higher_court', relation: 'none', specialAuthority: special.key };
         }
@@ -360,7 +365,10 @@ class ConversationStandingRules {
             [/分かりませぬ/g, '分からぬ'],
             [/分かりかねます/g, '分からぬ'],
             [/見受けられます/g, '見える'],
+            [/見えませぬ/g, '見えぬ'],
             [/見えます/g, '見える'],
+            [/望めませぬ/g, '望めぬ'],
+            [/油断はなりませぬ/g, '油断は禁物だ'],
             [/ありますまい/g, 'あるまい'],
             [/なさらぬ/g, 'せぬ'],
             [/お気をつけください/g, '気をつけた方がよい'],
@@ -704,6 +712,10 @@ class ConversationStandingRules {
             || envoyVsLordCourt > 0;
         const senderToReceiverFamilyRelation = this.getSpeakerFamilyDialogueRelation(game, envoy, receiverDaimyo);
         const receiverToSenderFamilyRelation = this.getSpeakerFamilyDialogueRelation(game, receiverDaimyo, envoy);
+        // 挨拶だけでなく外交の本題・承諾・拒否まで同じ話者距離を通す。
+        // 「誰に話しているか」と「相手の格式」を分け、親族・特殊権威・高官の口調を途中で失わない。
+        const senderSpeakerPosture = this.getDaimyoSpeakerPosture(game, envoy, receiverDaimyo);
+        const receiverSpeakerPosture = this.getDaimyoSpeakerPosture(game, receiverDaimyo, envoy);
 
         return {
             clanStanding,
@@ -715,7 +727,9 @@ class ConversationStandingRules {
             receiverDeferenceLevel,
             senderDeferenceLevel,
             senderToReceiverFamilyRelation,
-            receiverToSenderFamilyRelation
+            receiverToSenderFamilyRelation,
+            senderSpeakerPosture,
+            receiverSpeakerPosture
         };
     }
 }

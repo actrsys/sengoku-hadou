@@ -203,7 +203,7 @@ Object.assign(WarManager.prototype, {
         const defProvName = defProv ? defProv.province : "不明な国";
 
         const atkLeader = atkBushos && atkBushos.length > 0 ? atkBushos[0] : null;
-        const atkLeaderName = atkLeader ? atkLeader.fullName : "総大将";
+        const atkLeaderName = atkLeader ? getAdvisorTargetCallName(atkLeader) : "総大将";
 
         const getPerceivedSoldiers = (val) => {
             // ★変更：軍師の智謀の代わりに小姓（または軍師）の智謀を使います

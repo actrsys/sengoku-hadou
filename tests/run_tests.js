@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r152');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r154');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -190,8 +190,9 @@ test('左馬頭・将軍本人は他家所属の使者でも本人の権威を�
     assert.ok(greeting.greetMsg2.includes('左馬頭様'));
     assert.ok(greeting.greetMsg2.includes('御自らお越しとは'));
     let msgs = dm.getDiplomacyMessages('alliance', false, '朝倉家', '織田家', '左馬頭様', '参議殿', '姫', '貴家', greeting.context);
-    assert.ok(msgs.demandMsg.includes('盟約を結ぶこと、望ましきこと'), '提案本体も本人が取り持つ口調にする');
+    assert.ok(msgs.demandMsg.includes('盟約を結ぶことは望ましい'), '提案本体も本人が取り持つ口調にする');
     assert.ok(!msgs.replyAcceptMsg.includes('主君にも'));
+    assert.ok(!/存じます|参りました|ござります/.test(msgs.demandMsg + msgs.replyAcceptMsg), '左馬頭本人の外交本題も一般家臣敬語へ戻らない');
 
     // 左馬頭は通常官位ランクだけでは下位になり得るが、面談では将軍候補の特殊権威を優先する。
     asakura.courtRankIds = [20]; // 参議(rankNo 8)で左馬頭(rankNo 10)より通常官位は上
@@ -451,6 +452,8 @@ test('軍師の当主への口調と報告対象への敬意は面談の会話�
     assert.strictEqual(system._styleForSpeaker(fatherGunshi, '合戦におもむきますか？ 兵力と兵糧の確認をお忘れなく。'), '合戦におもむくか。兵と兵糧の備えは怠るな。', '父などの軍師は合戦前助言も指導的な家族口調にする');
     assert.strictEqual(system._styleForSpeaker(yoshiakiGunshi, 'おやめください。失敗する未来が見えます。'), 'やめておくのがよかろう。失敗する未来が見える。', '高格式軍師は単なる敬語除去ではなく落ち着いた上位者口調へ寄せる');
     assert.ok(!system._getSelfConcernMessage(fatherGunshi, 'red').includes('恐れながら'), '父などの軍師自身の不満表明も一般家臣の恐れ入る口調へ戻さない');
+    assert.ok(!system._getSelfConcernMessage(fatherGunshi, 'red').includes('今の扱い'), '一門軍師本人の不満も待遇ではなく当主との考えの食い違いとして話す');
+    assert.ok(!/ませぬ|ください/.test(system._styleForSpeaker(yoshiakiGunshi, 'おやめください。成功はまず望めませぬ。')), '軍師助言の低成功率文も特殊権威では途中だけ敬語へ戻らない');
     assert.ok(system._getDaimyoAddress(yoshiakiGunshi).endsWith('殿'), '高格式軍師は当主の公的呼称を使いつつ文末は常体にできる');
     assert.strictEqual(system._getTargetCallName(yoshiakiGunshi, fatherGunshi), '御父君', '軍師報告の対象呼称には当主との血縁敬称を反映する');
 
@@ -480,6 +483,7 @@ test('軍師の当主への口調と報告対象への敬意は面談の会話�
     const warEffortSource = read('js/war_effort.js');
     assert.ok(warEffortSource.includes('gunshiDialogue._styleForSpeaker(gunshi, text)'), '戦況報告もGunshiSystemの話者レジスターを通す');
     assert.ok(warEffortSource.includes('gunshiDialogue.getSituationDaimyoSortieText(gunshi)'), '戦況報告の当主出陣文も軍師と当主の関係別に生成する');
+    assert.ok(warEffortSource.includes('atkLeader ? getAdvisorTargetCallName(atkLeader)'), '戦況報告の総大将名も将軍・左馬頭・親族を含む共通呼称へ通す');
 });
 
 test('無官の会話呼称は異姓なら姓、同姓一門なら諱、同姓非一門ならフルネームを使う', () => {
@@ -745,6 +749,95 @@ test('外交の直接親族呼称は面談と共通化し、敵対中でも血�
 
     assert.strictEqual(dm.getCallName(adoptiveFather, adoptedChild), '義父上', '養子が義父を呼ぶ時は義父上');
     assert.strictEqual(dm.getCallName(adoptedChild, adoptiveFather), '忠興', '義父が養子を呼ぶ時は殿を付けない');
+});
+
+test('外交の本題も親族・特殊権威の話者距離を最後まで維持する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/busho_list_sort_rules.js');
+    loadScript(ctx, 'js/conversation_standing_rules.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+
+    const ranks = new Map([
+        [98, { id: 98, rankNo: 10, rankName2: '左馬頭' }],
+        [20, { id: 20, rankNo: 8, rankName2: '参議' }]
+    ]);
+    const clans = [
+        { id: 1, name: '織田家', leaderId: 101, daimyoPrestige: 5000, diplomacyValue: { 2: { status: '敵対', sentiment: 10 } } },
+        { id: 2, name: '織田別家', leaderId: 201, daimyoPrestige: 5000, diplomacyValue: { 1: { status: '敵対', sentiment: 10 } } }
+    ];
+    const father = { id: 101, clan: 1, isDaimyo: true, fullName: '織田信長', familyNameStr: '織田', givenName: '信長', courtRankIds: [], familyIds: [101, 201] };
+    const son = { id: 201, clan: 2, isDaimyo: true, fullName: '織田信忠', familyNameStr: '織田', givenName: '信忠', realFatherId: 101, courtRankIds: [], familyIds: [101, 201] };
+    const bushos = [father, son];
+    const game = {
+        clans, bushos, legions: [],
+        getClan: id => clans.find(c => Number(c.id) === Number(id)),
+        getBusho: id => bushos.find(b => Number(b.id) === Number(id)) || null,
+        getClanDaimyo: id => bushos.find(b => Number(b.clan) === Number(id) && b.isDaimyo) || null,
+        courtRankSystem: {
+            RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [98],
+            getRankData: id => ranks.get(Number(id)) || null,
+            getHighestRankData(busho) { return (busho.courtRankIds || []).map(id => this.getRankData(id)).filter(Boolean).sort((a, b) => a.rankNo - b.rankNo)[0] || null; }
+        }
+    };
+    const dm = new ctx.DiplomacyManager(game);
+    let greeting = dm.buildDiplomacyGreeting(father, son);
+    let msgs = dm.getDiplomacyMessages('alliance', true, '織田家', '織田別家', dm.getCallName(father, son), dm.getCallName(son, father), '姫', '貴家', greeting.context);
+    assert.ok(greeting.greetMsg1.includes('信忠。') && greeting.greetMsg1.includes('わし自ら来た'), '父大名から子大名への導入は親子口調');
+    assert.ok(msgs.demandMsg.includes('盟約を結んでくれ') && !msgs.demandMsg.includes('くだされ'), '本題でも父が子へ一般外交敬語へ戻らない');
+    assert.ok(msgs.replyAcceptMsg.includes('約定は違えるでないぞ'), '成立後の返答まで年長親族の口調を保つ');
+
+    const samano = { id: 301, clan: 1, isDaimyo: true, fullName: '足利義昭', familyNameStr: '足利', givenName: '義昭', courtRankIds: [98], familyIds: [301] };
+    const highReceiver = { id: 302, clan: 2, isDaimyo: true, fullName: '織田信長', familyNameStr: '織田', givenName: '信長', courtRankIds: [20], familyIds: [302] };
+    game.bushos = [samano, highReceiver];
+    clans[0].leaderId = 301; clans[1].leaderId = 302;
+    greeting = dm.buildDiplomacyGreeting(samano, highReceiver);
+    assert.strictEqual(greeting.context.senderSpeakerPosture.key, 'higher_court', '左馬頭本人は通常官位ランクにかかわらず上位者寄りの話者姿勢');
+    assert.strictEqual(greeting.context.receiverSpeakerPosture.key, 'normal', '左馬頭より通常官位が高くても相手が左馬頭へ上位者口調には反転しない');
+    msgs = dm.getDiplomacyMessages('truce', true, '足利家', '織田家', dm.getCallName(samano, highReceiver), dm.getCallName(highReceiver, samano), '姫', '貴家', greeting.context);
+    assert.ok(!msgs.demandMsg.includes('存じ') && !msgs.demandMsg.includes('ください'), '左馬頭大名本人も本題では一般大名敬語へ戻らない');
+    assert.ok(!msgs.rejectMsg.includes('何をほざくか') && !msgs.rejectMsg.includes('素首'), '特殊権威への拒否は敵対していても格式を失わない');
+    assert.ok(/いただ|願いたい|いたしました|ましょう/.test(msgs.acceptMsg + msgs.rejectMsg), '相手側は左馬頭への最低限の敬意を維持する');
+
+    const marriageTarget = { id: 303, clan: 2, isDaimyo: false, fullName: '足利某', familyNameStr: '足利', givenName: '某', courtRankIds: [98], familyIds: [303] };
+    const marriage = dm.getDiplomacyMessages('marriage', true, '足利家', '織田家', '左馬頭様', '参議殿', '姫', dm.getCallName(marriageTarget, samano), greeting.context);
+    assert.ok(marriage.demandMsg.includes('左馬頭様に') && !marriage.demandMsg.includes('左馬頭様殿'), '縁談対象も独自の殿付けをせず共通呼称を使う');
+});
+
+test('面談の噂と調略方針も特殊権威の呼称・関係表現を共通化する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/busho_list_sort_rules.js');
+    loadScript(ctx, 'js/conversation_standing_rules.js');
+    loadScript(ctx, 'js/interview_system.js');
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+
+    const ranks = new Map([[98, { id: 98, rankNo: 10, rankName2: '左馬頭' }]]);
+    const lord = { id: 10, clan: 2, isDaimyo: true, fullName: '朝倉義景', familyNameStr: '朝倉', givenName: '義景', courtRankIds: [], familyIds: [10] };
+    const samano = { id: 11, clan: 2, isDaimyo: false, name: '足利義昭', fullName: '足利義昭', familyNameStr: '足利', givenName: '義昭', courtRankIds: [98], familyIds: [11] };
+    const interviewer = { id: 20, clan: 1, fullName: '明智光秀', familyNameStr: '明智', givenName: '光秀', courtRankIds: [], familyIds: [20] };
+    const clans = [{ id: 1, name: '織田家', leaderId: 21 }, { id: 2, name: '朝倉家', leaderId: 10 }];
+    const game = {
+        playerClanId: 1, clans, bushos: [lord, samano, interviewer],
+        getClan: id => clans.find(c => Number(c.id) === Number(id)),
+        getClanDaimyo: id => Number(id) === 2 ? lord : null,
+        courtRankSystem: {
+            RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [98],
+            getRankData: id => ranks.get(Number(id)) || null,
+            getHighestRankData(busho) { return (busho.courtRankIds || []).map(id => this.getRankData(id)).filter(Boolean)[0] || null; }
+        }
+    };
+    const interview = new ctx.InterviewSystem(game);
+    interview._getConcealmentProfile = () => ({ perceivedBand: 'stable' });
+    assert.ok(interview._getRumorSubjectText(samano, interviewer).includes('左馬頭様'), '武将の噂でも左馬頭を通常の氏名+殿へ落とさない');
+    assert.ok(!interview._getRumorSubjectText(samano, interviewer).includes('足利義昭殿'));
+    const loyaltyRumor = interview._getRumorLoyaltyText(samano);
+    assert.ok(loyaltyRumor.includes('今の主君のお考え') && !loyaltyRumor.includes('かなり信を置いて'), '特殊権威の他家忠誠噂も普通の家臣の忠誠表現を使わない');
+    interview._getBestIntrigueTarget = () => ({ target: samano, prob: 0.8, score: 0.8 });
+    const intrigue = interview._getIntelligencePolicyText(interviewer, { level: 'full' });
+    assert.ok(intrigue.includes('左馬頭様') && !intrigue.includes('足利義昭殿'), '調略方針の候補呼称も特殊権威の共通呼称へ通す');
 });
 
 test('官位呼びは姓を付けず官位名だけで呼ぶ', () => {
@@ -3989,6 +4082,56 @@ test('観戦終了予約メッセージはbodyではなく固定論理画面内�
     assert.ok(method[0].includes('(gameScreen || document.body).appendChild(notice)'));
     const rule = css.match(/#watch-return-reserved-notice \{([\s\S]*?)\n\}/);
     assert.ok(rule && rule[1].includes('position: absolute'), '物理viewport fixedではなくgame-screen内absoluteにする');
+});
+
+
+test('外交の非同期会話遷移は固定時間で旧ダイアログを閉じず明示的handoffを使う', () => {
+    const ui = read('js/ui.js');
+    const command = read('js/command_system.js');
+    const scheduleStart = ui.indexOf('_scheduleDialogHandoffClose(closeFn');
+    const scheduleEnd = ui.indexOf('showDialogAsync(', scheduleStart);
+    const scheduleBlock = ui.slice(scheduleStart, scheduleEnd);
+    assert.ok(ui.includes('beginDialogHandoffHold()'));
+    assert.ok(ui.includes('endDialogHandoffHold()'));
+    assert.ok(ui.includes('_closePendingDialogHandoffNow()'));
+    assert.ok(scheduleBlock.includes("if ((this._dialogHandoffHoldCount || 0) > 0) return;"), 'hold中はgraceMsのtimerを開始しない');
+
+    const execStart = command.indexOf('async executeWithEvent(type');
+    const execEnd = command.indexOf('showAdviceAndExecute(', execStart);
+    const execBlock = command.slice(execStart, execEnd);
+    assert.ok(execBlock.includes("'goodwill', 'alliance', 'marriage', 'break_alliance'"));
+    assert.ok(execBlock.includes('ui.beginDialogHandoffHold()'));
+    assert.ok(execBlock.includes('finally'));
+    assert.ok(execBlock.includes('ui.completeVisualHandoff()'), '例外や無表示終了でも使者選択画面を残さない');
+    assert.ok(execBlock.includes('ui.endDialogHandoffHold()'));
+});
+
+test('外交の使者選択画面は次の会話が可視化されるまで保持する', () => {
+    const ui = read('js/ui.js');
+    const busho = read('js/ui_info_busho.js');
+    assert.ok(ui.includes('beginVisualHandoff(closeFn)'));
+    assert.ok(ui.includes('completeVisualHandoff()'));
+    const dialogVisible = ui.indexOf("modal.classList.remove('hidden');", ui.indexOf('async processDialogQueue')) >= 0
+        ? ui.indexOf("modal.classList.remove('hidden');", ui.indexOf('async processDialogQueue'))
+        : ui.indexOf("modal.classList.remove('hidden');");
+    const handoffAfterDialog = ui.indexOf('this.completeVisualHandoff();', dialogVisible);
+    assert.ok(dialogVisible >= 0 && handoffAfterDialog > dialogVisible, '次の会話を表示した後で元画面を閉じる');
+    assert.ok(busho.includes("actionType === 'diplomacy_doer'"));
+    assert.ok(busho.includes("!['goodwill', 'marriage'].includes(extraData.subAction)"), '別の入力画面へ進む親善・婚姻は直接handoff対象にしない');
+    assert.ok(busho.includes('this.ui.beginVisualHandoff(() => this.closeCommonModal())'));
+});
+
+test('結果画面との引き渡しは結果を先に表示し背景復帰も結果画面で覆ったまま行う', () => {
+    const ui = read('js/ui.js');
+    const showStart = ui.indexOf('showResultModal(msg');
+    const closeStart = ui.indexOf('\n    closeResultModal() {', showStart);
+    const showBlock = ui.slice(showStart, closeStart);
+    assert.ok(showBlock.indexOf("this.resultModal.classList.remove('hidden')") < showBlock.indexOf('this._closePendingDialogHandoffNow()'), '結果画面を可視化してから旧会話を閉じる');
+    assert.ok(showBlock.indexOf('this._closePendingDialogHandoffNow()') < showBlock.indexOf('this.pauseBackgroundUpdates()'), '背景リソース整理より先に引き渡し先を表示する');
+
+    const closeEnd = ui.indexOf('showQuantityModal(', closeStart);
+    const closeBlock = ui.slice(closeStart, closeEnd > closeStart ? closeEnd : closeStart + 2400);
+    assert.ok(closeBlock.indexOf('this.resumeBackgroundUpdates()') < closeBlock.indexOf("this.resultModal.classList.add('hidden')"), '背景を復帰してから結果画面を隠す');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

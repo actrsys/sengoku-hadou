@@ -307,6 +307,10 @@ class UIManager {
         this._dialogFacePreloadCache = new Map();
         this._dialogFacePreloadCacheLimit = 4;
         this._dialogGuardHeld = false;
+        // 外交など、非同期処理をまたぐ会話遷移では固定msではなく明示的な引き渡し完了まで旧画面を保持します。
+        this._dialogHandoffHoldCount = 0;
+        this._dialogHandoffCloseFn = null;
+        this._visualHandoffCloseFn = null;
 
         document.addEventListener('click', (e) => {
             const btn = e.target.closest('button');
@@ -735,6 +739,22 @@ class UIManager {
         ]).then(([leftImg, rightImg]) => ({ leftImg, rightImg }));
     }
 
+    // 使者選択など「別モーダル → 会話」も、次画面が実際に可視化されるまで元画面を保持します。
+    // 固定delayではなく表示完了を引き渡し条件にすることで、顔画像decodeや端末性能に左右されません。
+    beginVisualHandoff(closeFn) {
+        // 多重遷移が来ても古い元画面を残し続けないよう、先行分はここで完了させます。
+        this.completeVisualHandoff();
+        this._visualHandoffCloseFn = typeof closeFn === 'function' ? closeFn : null;
+    }
+
+    completeVisualHandoff() {
+        const closeFn = this._visualHandoffCloseFn;
+        if (typeof closeFn !== 'function') return false;
+        this._visualHandoffCloseFn = null;
+        closeFn();
+        return true;
+    }
+
     // ★Round19：イベント会話の継ぎ目で暗幕や会話枠が一瞬消えないよう、
     // 「次のダイアログが来るかもしれない短い猶予」を管理します。
     _cancelDialogHandoffClose() {
@@ -743,6 +763,36 @@ class UIManager {
             this._dialogHandoffTimer = null;
         }
         this._dialogHandoffPending = false;
+        this._dialogHandoffCloseFn = null;
+    }
+
+    // 外交のように「確認 → before_command → 会話 → 結果」と非同期処理をまたぐ場合、
+    // 固定時間の猶予では端末負荷や画像decode次第で旧画面が先に消えてしまいます。
+    // hold中は閉じる予約だけ保持し、次の画面が実際に用意されるまで見た目を残します。
+    beginDialogHandoffHold() {
+        this._dialogHandoffHoldCount = (this._dialogHandoffHoldCount || 0) + 1;
+    }
+
+    endDialogHandoffHold() {
+        this._dialogHandoffHoldCount = Math.max(0, (this._dialogHandoffHoldCount || 0) - 1);
+        if (this._dialogHandoffHoldCount === 0 && this._dialogHandoffPending) {
+            this._closePendingDialogHandoffNow();
+        }
+    }
+
+    _closePendingDialogHandoffNow() {
+        if (!this._dialogHandoffPending) return false;
+        if (this._dialogHandoffTimer) {
+            clearTimeout(this._dialogHandoffTimer);
+            this._dialogHandoffTimer = null;
+        }
+
+        const closeFn = this._dialogHandoffCloseFn;
+        this._dialogHandoffPending = false;
+        this._dialogHandoffCloseFn = null;
+        this._dialogHandoffToken = (this._dialogHandoffToken || 0) + 1;
+        if (typeof closeFn === 'function') closeFn();
+        return true;
     }
 
     _scheduleDialogHandoffClose(closeFn, graceMs = 180) {
@@ -750,16 +800,22 @@ class UIManager {
         const token = (this._dialogHandoffToken || 0) + 1;
         this._dialogHandoffToken = token;
         this._dialogHandoffPending = true;
+        this._dialogHandoffCloseFn = closeFn;
 
         // 画面は残したまま「現在のダイアログ処理」は完了扱いにします。
         // この猶予中に showDialog/showDialogAsync が来れば、古い画面を隠さず次へ引き継げます。
         this.isDialogShowing = false;
 
+        // 明示的な画面引き渡し中は、固定時間では閉じません。
+        if ((this._dialogHandoffHoldCount || 0) > 0) return;
+
         this._dialogHandoffTimer = setTimeout(() => {
             if (!this._dialogHandoffPending || token !== this._dialogHandoffToken) return;
             this._dialogHandoffTimer = null;
+            const pendingCloseFn = this._dialogHandoffCloseFn;
             this._dialogHandoffPending = false;
-            closeFn();
+            this._dialogHandoffCloseFn = null;
+            if (typeof pendingCloseFn === 'function') pendingCloseFn();
         }, Math.max(0, graceMs));
     }
 
@@ -1242,7 +1298,9 @@ class UIManager {
             }
         }
 
+        // 引き渡し先の会話を先に可視化してから、使者選択など直前の画面を閉じます。
         modal.classList.remove('hidden');
+        this.completeVisualHandoff();
 
         if (dialog.autoCloseTime > 0) {
             autoCloseTimer = setTimeout(() => {
@@ -1682,9 +1740,6 @@ class UIManager {
 
     showResultModal(msg, onClose = null, customFooterHtml = null) { 
         this.hideAIGuardTemporarily(); 
-
-        // ★ここを書き足し：結果画面を開いている間も背景をストップします！
-        this.pauseBackgroundUpdates();
         
         if (this.resultBody) {
             this.resultBody.innerHTML = msg.replace(/\n/g, '<br>');
@@ -1702,16 +1757,23 @@ class UIManager {
                 if (closeBtn) closeBtn.addEventListener('click', () => this.closeResultModal());
             }
         }
+        // 結果画面を先に可視化してから、直前の会話画面を閉じます。
+        // これにより会話→結果の間に背景だけが露出するフレームを作りません。
         if (this.resultModal) this.resultModal.classList.remove('hidden'); 
+        this.completeVisualHandoff();
+        this._closePendingDialogHandoffNow();
+
+        // 背景停止に伴うモバイル向けリソース整理も、結果画面で覆ってから行います。
+        this.pauseBackgroundUpdates();
         this.onResultModalClose = onClose;
     }
     
     closeResultModal() { 
+        // 背景の復帰・再描画を結果画面で覆ったまま完了させてから閉じます。
+        // 先にモーダルを消すと、低速端末で黒い背景が一瞬見えることがあります。
+        this.resumeBackgroundUpdates();
         if (this.resultModal) this.resultModal.classList.add('hidden'); 
         this.restoreAIGuard(); 
-        
-        // ★ここを書き足し：結果画面を閉じたら背景を再開します！
-        this.resumeBackgroundUpdates();
 
         // ★追加：結果画面を閉じた時に、鳴っているSEを0.1秒でスッと消す魔法です！
         if (window.AudioManager && typeof window.AudioManager.fadeOutSe === 'function') {

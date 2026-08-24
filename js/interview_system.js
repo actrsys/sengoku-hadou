@@ -674,7 +674,11 @@ class InterviewSystem {
         if (disclosure.level !== 'full') return '敵方には、調略を仕掛ける余地のある者がいそうです。';
         const targetClan = this.game.getClan ? this.game.getClan(Number(row.target.clan)) : null;
         const prefix = targetClan ? `${targetClan.name}の` : '';
-        return `調略を仕掛けるなら、${prefix}${row.target.name}殿は有力な候補かと見ております。`;
+        const daimyo = this.game.getClanDaimyo ? this.game.getClanDaimyo(Number(this.game.playerClanId) || Number(busho.clan) || 0) : null;
+        const callName = window.ConversationStandingRules && typeof window.ConversationStandingRules.getInterviewTargetCallName === 'function'
+            ? window.ConversationStandingRules.getInterviewTargetCallName(this.game, busho, row.target, daimyo)
+            : `${row.target.name}殿`;
+        return `調略を仕掛けるなら、${prefix}${callName}は有力な候補かと見ております。`;
     }
 
     _getPolicyDomainText(domain, busho, disclosure) {
@@ -911,31 +915,35 @@ class InterviewSystem {
         return null;
     }
 
-    _getRumorSubjectText(target) {
+    _getRumorSubjectText(target, interviewer = null) {
         if (!target) return 'ある武将';
+        const daimyo = this.game.getClanDaimyo ? this.game.getClanDaimyo(Number(this.game.playerClanId) || Number(interviewer && interviewer.clan) || 0) : null;
+        const callName = window.ConversationStandingRules && typeof window.ConversationStandingRules.getInterviewTargetCallName === 'function'
+            ? window.ConversationStandingRules.getInterviewTargetCallName(this.game, interviewer, target, daimyo)
+            : `${target.name}殿`;
         if (window.BushoStatusRules && window.BushoStatusRules.isRonin(target)) {
-            return `${target.name}殿という浪人`;
+            return `${callName}という浪人`;
         }
         if (Number(target.belongKunishuId || 0) > 0) {
             const kunishu = this.game.kunishuSystem && this.game.kunishuSystem.getKunishu(target.belongKunishuId);
             if (kunishu) {
                 const name = kunishu.getName(this.game);
-                if (Number(kunishu.leaderId) === Number(target.id)) return `${name}の頭領、${target.name}殿`;
-                return `${name}の${target.name}殿`;
+                if (Number(kunishu.leaderId) === Number(target.id)) return `${name}の頭領、${callName}`;
+                return `${name}の${callName}`;
             }
             // 諸勢力の castleId は地域アンカーであり実所在地とは限らない。城名には変換しない。
-            return `${target.name}殿という武将`;
+            return `${callName}という武将`;
         }
         const clan = Number(target.clan) > 0 && this.game.getClan ? this.game.getClan(Number(target.clan)) : null;
         if (clan) {
-            if (target.isDaimyo) return `${clan.name}を率いる${target.name}殿`;
-            return `${clan.name}の${target.name}殿`;
+            if (target.isDaimyo) return `${clan.name}を率いる${callName}`;
+            return `${clan.name}の${callName}`;
         }
-        return `${target.name}殿という武将`;
+        return `${callName}という武将`;
     }
 
-    _getRumorOpeningText(row, attitude) {
-        const subject = this._getRumorSubjectText(row.target);
+    _getRumorOpeningText(row, attitude, interviewer = null) {
+        const subject = this._getRumorSubjectText(row.target, interviewer);
         const isGeneral = row.mode === 'general';
         if (attitude === 'reserved') {
             return isGeneral
@@ -988,6 +996,24 @@ class InterviewSystem {
 
         const band = this._getConcealmentProfile(target).perceivedBand;
         const lordText = Number(target.belongKunishuId || 0) > 0 ? '今の頭領' : '今の主君';
+        let style = 'fealty';
+        if (Number(target.belongKunishuId || 0) <= 0 && this.game.getClanDaimyo && window.ConversationStandingRules
+            && typeof window.ConversationStandingRules.getLoyaltyExpressionStyle === 'function') {
+            const lord = this.game.getClanDaimyo(Number(target.clan) || 0);
+            if (lord) style = window.ConversationStandingRules.getLoyaltyExpressionStyle(this.game, lord, target);
+        }
+        if (style === 'authority') {
+            if (band === 'stable') return `${lordText}のお考えには、概ね理解を示しておられるとの話です。`;
+            if (band === 'warning') return `${lordText}のお考えについて、多少思うところはおありとも聞きます。`;
+            if (band === 'danger' || band === 'dissatisfied') return `${lordText}のお考えには、少々納得しかねるところがおありのようです。`;
+            return `${lordText}のお考えに、かなり強く思うところがおありとも聞きます。`;
+        }
+        if (style === 'family') {
+            if (band === 'stable') return `${lordText}のお考えには、よく理解を示しておられるとの話です。`;
+            if (band === 'warning') return `${lordText}のお考えには、多少思うところもおありのようです。`;
+            if (band === 'danger' || band === 'dissatisfied') return `${lordText}のお考えと、少々食い違うところがおありとも聞きます。`;
+            return `${lordText}のお考えには、かなり強く思うところがおありのようです。`;
+        }
         if (band === 'stable') return `${lordText}には、かなり信を置いているとの話です。`;
         if (band === 'warning') return `${lordText}との間に、特段悪い話は聞きませぬ。`;
         if (band === 'danger' || band === 'dissatisfied') return `${lordText}には、何やら思うところがあるとも聞きます。`;
@@ -997,7 +1023,7 @@ class InterviewSystem {
     _getRumorMessages(interviewer, row) {
         if (!row || !row.target) return [];
         const attitude = this.activeInterviewAttitude;
-        const messages = [this._getRumorOpeningText(row, attitude), this._getRumorAbilityText(row, attitude)];
+        const messages = [this._getRumorOpeningText(row, attitude, interviewer), this._getRumorAbilityText(row, attitude)];
         // reserved は口数を抑え、人物名と評判まで。大名・諸勢力頭領も主君評判を語る意味がないため2段で止める。
         if (attitude !== 'reserved' && !this._isRumorLeader(row.target)) {
             messages.push(this._getRumorLoyaltyText(row.target));

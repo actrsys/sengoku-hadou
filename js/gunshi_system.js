@@ -106,15 +106,21 @@ class GunshiSystem {
 
     _getSelfConcernMessage(gunshi, alert) {
         const posture = this._getSpeakerPosture(gunshi);
+        const address = this._getDaimyoAddress(gunshi);
         if (posture.key === 'senior_close') {
             return alert === 'red'
-                ? '今の扱いには、こちらも思うところがある。このままでは務めにも差し障る。少し考えてもらいたい'
-                : 'こちらの扱いについては、少し思うところがある。今一度考えてもらえるとありがたい';
+                ? `${address}の考えには、こちらもかなり思うところがある。一度きちんと話しておきたい`
+                : `${address}の考えには、少し食い違うところがある。折を見て話しておこう`;
         }
-        if (posture.key === 'senior_extended' || posture.key === 'higher_court') {
+        if (posture.key === 'senior_extended') {
             return alert === 'red'
-                ? '今の扱いについては、こちらにも思うところがある。務めに差し障る前に、一度考えてもらいたい'
-                : '今の扱いについては、こちらにも少し思うところがある。一度考えてもらえるとありがたい';
+                ? `${address}の考えには、こちらもかなり思うところがある。一度話しておいた方がよかろう`
+                : `${address}の考えには、少し思うところがある。折を見て話しておくのがよかろう`;
+        }
+        if (posture.key === 'higher_court') {
+            return alert === 'red'
+                ? `${address}の考えには、こちらも強く思うところがある。折を見て一度話しておきたい`
+                : `${address}の考えには、こちらも多少思うところがある。折を見て話しておこう`;
         }
         return alert === 'red'
             ? '恐れながら申し上げます。今の待遇では、務めにも差し障りがございます。どうかご配慮を賜りたく存じます'
@@ -419,7 +425,7 @@ class GunshiSystem {
             if (perceivedProb >= 0.10) return "隙があるように見受けられます。運が良ければ仕留められましょう。"; 
             if (perceivedProb >= 0.05) return "警護が厚く厳しいかと。刃を届かせるのは至難の業です。"; 
             if (perceivedProb >= 0.01) return "警戒されており危険です。今は好機ではありませぬ。"; 
-            return "おやめください。失敗する未来しか見えませぬ。"; 
+            return "おやめください。成功はまず望めませぬ。"; 
         }
         
         // ★計略コマンド（離間計・破壊工作・民心撹乱）の場合は、成功率と効果量の組み合わせで自然なつなぎ言葉にします
@@ -495,9 +501,9 @@ class GunshiSystem {
 
         if (perceivedProb > 0.95) return "必ずや成功するでしょう。好機です！";
         if (perceivedProb > 0.7) return "おそらく上手くいくでしょう。"; 
-        if (perceivedProb > 0.4) return "五分五分といったところです。油断めさるな。"; 
+        if (perceivedProb > 0.4) return "五分五分といったところです。油断はなりませぬ。"; 
         if (perceivedProb > 0.15) return "厳しい結果になるかもしれません。"; 
-        return "おやめください。失敗する未来が見えます。"; 
+        return "おやめください。成功の目はほとんどありませぬ。"; 
     }
 }
 window.GunshiSystem = GunshiSystem;

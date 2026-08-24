@@ -938,7 +938,14 @@ class DiplomacyManager {
         let greetMsg2 = '';
 
         if (senderBusho && senderBusho.isDaimyo) {
-            if (Number(context.senderDeferenceLevel || 0) >= 2) {
+            const senderPosture = context.senderSpeakerPosture && context.senderSpeakerPosture.key || 'normal';
+            if (senderPosture === 'senior_close') {
+                greetMsg1 = `「${receiverCallName}。大事な話があって、わし自ら来た」`;
+            } else if (senderPosture === 'senior_extended') {
+                greetMsg1 = `「${receiverCallName}。少し大事な用向きがあって、わし自ら参った」`;
+            } else if (senderPosture === 'higher_court') {
+                greetMsg1 = `「${receiverCallName}。大事な用向きゆえ、わし自ら参った」`;
+            } else if (Number(context.senderDeferenceLevel || 0) >= 2) {
                 greetMsg1 = `「${receiverCallName}。折り入ってお願いしたき儀があり、此度は某自ら参上いたしました」`;
             } else if (Number(context.senderDeferenceLevel || 0) === 1) {
                 greetMsg1 = `「${receiverCallName}。大事な用向きゆえ、此度はわし自ら参りました」`;
@@ -952,7 +959,7 @@ class DiplomacyManager {
             if (Number(envoySpecial.level || 0) >= 3) {
                 greetMsg1 = `「${familyLead}此度の儀は、両家のためにも進めるべきと考え、わし自ら参った」`;
             } else if (Number(envoySpecial.level || 0) >= 2) {
-                greetMsg1 = `「${familyLead}此度の儀は、両家のためにも進めるべきと考え、某自ら参りました」`;
+                greetMsg1 = `「${familyLead}此度の儀は、両家のためにも進めるべきと考え、某自ら参った」`;
             } else if (context.envoyOutranksLord) {
                 const daimyoRef = this._getDaimyoReference(senderDaimyo, senderClanName, '殿');
                 greetMsg1 = `「${familyLead}此度は${daimyoRef}の意を受け、使者として参りました」`;
@@ -1028,6 +1035,82 @@ class DiplomacyManager {
         return { greetMsg1, greetMsg2, context };
     }
 
+    _styleDiplomacyTextForSpeaker(text, postureKey) {
+        let result = String(text || '');
+        if (!['senior_close', 'senior_extended', 'higher_court'].includes(postureKey)) return result;
+
+        if (window.ConversationStandingRules
+            && typeof window.ConversationStandingRules.applyIndependentDaimyoRegister === 'function') {
+            result = window.ConversationStandingRules.applyIndependentDaimyoRegister(result);
+        }
+
+        result = result
+            .replace(/承知仕った/g, '承知した')
+            .replace(/承知いたす/g, '承知した')
+            .replace(/承知いたしました/g, '承知した')
+            .replace(/左様にござるか/g, 'そうか')
+            .replace(/左様にござる/g, 'そうだな')
+            .replace(/にござる/g, 'だ')
+            .replace(/存ずる/g, '思う')
+            .replace(/存じまする/g, '思う')
+            .replace(/頂戴いたす/g, '受け取ろう')
+            .replace(/お受けいたそう/g, '受けよう')
+            .replace(/返答いたす/g, '返答しよう')
+            .replace(/お願いいたす/g, '頼みたい')
+            .replace(/お願い申し上げる/g, '頼みたい')
+            .replace(/参りましょうぞ/g, '参ろう')
+            .replace(/参りましょう/g, '参ろう')
+            .replace(/なされる/g, 'する')
+            .replace(/なされた/g, 'した')
+            .replace(/なされよ/g, 'されよ');
+
+        if (postureKey === 'senior_close') {
+            return result
+                .replace(/さすがは([^。]+)。くれぐれも約定を違えられぬよう頼みたい/g, 'さすがは$1だ。約定は違えるでないぞ')
+                .replace(/ご承諾いただけるか/g, '承知してくれるか')
+                .replace(/吉日を選びましょうぞ/g, '吉日を選ぶとしよう')
+                .replace(/ではこれにて失礼いたす/g, 'では、今日はこれで戻ろう')
+                .replace(/どうぞお受け取りくだされ/g, '受け取ってくれ')
+                .replace(/どうかお納めくだされ/g, '納めてくれ')
+                .replace(/お引き取りくだされ/g, '今日は引き取ってくれ')
+                .replace(/お引き取りを/g, '今日は引き取ってくれ')
+                .replace(/ご容赦くだされ/g, 'そこは分かってくれ')
+                .replace(/ご一考いただきたい/g, '一度考えてみてくれ')
+                .replace(/いただきたい/g, 'もらいたい')
+                .replace(/くだされ/g, 'くれ')
+                .replace(/賜りたく/g, '受けたく')
+                .replace(/願いたく/g, '願って');
+        }
+
+        return result
+            .replace(/ご承諾いただけるか/g, '承知してもらえるか')
+            .replace(/吉日を選びましょうぞ/g, '吉日を選ぶとしよう')
+            .replace(/ではこれにて失礼いたす/g, 'では、今日はこれで失礼しよう')
+            .replace(/どうぞお受け取りくだされ/g, '受け取ってもらいたい')
+            .replace(/どうかお納めくだされ/g, '納めてもらいたい')
+            .replace(/お引き取りくだされ/g, '引き取ってもらいたい')
+            .replace(/お引き取りを/g, '引き取ってもらいたい')
+            .replace(/ご容赦くだされ/g, 'そこは容赦してもらいたい')
+            .replace(/ご一考いただきたい/g, '一度考えてもらいたい')
+            .replace(/いただきたい/g, 'もらいたい')
+            .replace(/くだされ/g, 'もらいたい')
+            .replace(/賜りたく/g, '受けたく')
+            .replace(/願いたく/g, '願って');
+    }
+
+    _applyDiplomacyConversationRegisters(messages, conversationContext) {
+        if (!conversationContext) return messages;
+        const senderPosture = conversationContext.senderSpeakerPosture && conversationContext.senderSpeakerPosture.key || 'normal';
+        const receiverPosture = conversationContext.receiverSpeakerPosture && conversationContext.receiverSpeakerPosture.key || 'normal';
+        return {
+            demandMsg: this._styleDiplomacyTextForSpeaker(messages.demandMsg, senderPosture),
+            acceptMsg: this._styleDiplomacyTextForSpeaker(messages.acceptMsg, receiverPosture),
+            rejectMsg: this._styleDiplomacyTextForSpeaker(messages.rejectMsg, receiverPosture),
+            replyAcceptMsg: this._styleDiplomacyTextForSpeaker(messages.replyAcceptMsg, senderPosture),
+            replyRejectMsg: this._styleDiplomacyTextForSpeaker(messages.replyRejectMsg, senderPosture)
+        };
+    }
+
     /**
      * 外交会話のメッセージを一括管理する魔法です
      */
@@ -1073,7 +1156,7 @@ class DiplomacyManager {
             replyAcceptMsg = isSenderDaimyo ? `「ありがたき幸せ……此度の御恩、決して忘れませぬ」` : `「ははっ！　殿もさぞお喜びになりましょう！」`;
             replyRejectMsg = `「……左様にござるか。ではこれにて失礼いたす」`;
         } else if (type === 'marriage') {
-            demandMsg = `「両家の絆を強固なものとするため、当家の${princessName}を${targetBushoName}殿に娶っていただきたい」`;
+            demandMsg = `「両家の絆を強固なものとするため、当家の${princessName}を${targetBushoName}に娶っていただきたい」`;
             acceptMsg = `「願ってもない申し出にござる。ありがたくお受けいたそう」`;
             rejectMsg = `「ううむ……こればかりはお受けいたしかねる。どうかお引き取りくだされ」`;
             replyAcceptMsg = `「おお、ご承諾いただけるか！　早速持ち帰り、吉日を選びましょうぞ」`;
@@ -1105,35 +1188,34 @@ class DiplomacyManager {
             }
         }
 
-        // 将軍・将軍候補本人が他家の使者になった場合、主君の代理であっても本人まで
-        // 家臣口調へ落とさない。所属が変わっても本人の公的権威は会話上に残す。
+        // 将軍・左馬頭本人は、使者か大名本人かを問わず普通の家臣・大名テンプレートへ落とさない。
+        // 本人の公的権威から、この外交を自ら勧め、取り持つ常体にする。
         const envoySpecialLevel = Number(conversationContext && conversationContext.envoySpecial && conversationContext.envoySpecial.level || 0);
-        if (!isSenderDaimyo && envoySpecialLevel >= 2) {
-            // 将軍・左馬頭本人が使者なら、名目上は本人がこの外交を取り持ち、勧めている口調にする。
+        if (envoySpecialLevel >= 2) {
             if (type === 'goodwill') {
-                demandMsg = `「両家の仲を深めることは、望ましきことと存ずる。心ばかりの品、どうかお納めくだされ」`;
-                replyAcceptMsg = `「ありがたく存じます。両家の間が、これを機に少しでも近づけば何よりにござる」`;
-                replyRejectMsg = `「左様にござるか。此度は致し方ありますまい」`;
+                demandMsg = `「両家の仲を深めることは望ましい。心ばかりの品だ、受け取ってもらいたい」`;
+                replyAcceptMsg = `「うむ。両家の間が、これを機に少しでも近づけば何よりだ」`;
+                replyRejectMsg = `「そうか。此度は致し方あるまい」`;
             } else if (type === 'alliance') {
-                demandMsg = `「両家が盟約を結ぶこと、望ましきことと存ずる。どうかご一考いただきたい」`;
-                replyAcceptMsg = `「ご決断、ありがたく存じます。両家の盟約が末永く続くことを願っております」`;
-                replyRejectMsg = `「左様にござるか。此度は致し方ありますまい」`;
+                demandMsg = `「両家が盟約を結ぶことは望ましい。どうだ、一度考えてもらいたい」`;
+                replyAcceptMsg = `「うむ。この盟約が末永く続くことを願おう」`;
+                replyRejectMsg = `「そうか。此度は致し方あるまい」`;
             } else if (type === 'truce') {
-                demandMsg = `「これ以上の争いは双方のためになりますまい。ここは矛を収め、和睦なされるのがよろしいかと存ずる」`;
-                replyAcceptMsg = `「ご決断、ありがたく存じます。これで両家の争いも収まりましょう」`;
-                replyRejectMsg = `「左様にござるか。なお争いを続けられるというなら、致し方ありますまい」`;
+                demandMsg = `「これ以上の争いは双方のためになるまい。ここは矛を収め、和睦するのがよかろう」`;
+                replyAcceptMsg = `「うむ。これで両家の争いも収まろう」`;
+                replyRejectMsg = `「そうか。なお争いを続けるというなら、致し方あるまい」`;
             } else if (type === 'dominate') {
-                demandMsg = `「大勢を見れば、これ以上の抵抗は双方のためになりますまい。ここは${senderClanName}の傘下に入られるのがよろしいかと存ずる」`;
+                demandMsg = `「大勢を見れば、これ以上の抵抗は双方のためになるまい。ここは${senderClanName}の傘下に入るのがよかろう」`;
             } else if (type === 'vassalage') {
-                demandMsg = `「両家の行く末を考えれば、我らが${receiverClanName}の末席に加わるのがよろしいかと存ずる」`;
-                replyAcceptMsg = `「ご決断、ありがたく存じます。これよりは共に歩んで参りましょう」`;
-                replyRejectMsg = `「左様にござるか。此度は致し方ありますまい」`;
+                demandMsg = `「両家の行く末を考えれば、我らが${receiverClanName}の末席に加わるのがよかろう」`;
+                replyAcceptMsg = `「うむ。これよりは共に歩んで参ろう」`;
+                replyRejectMsg = `「そうか。此度は致し方あるまい」`;
             } else if (type === 'subordinate') {
-                demandMsg = `「両家の行く末を考えれば、当家は${receiverClanName}の庇護を受けるのがよろしいかと存ずる」`;
-                replyAcceptMsg = `「ご決断、ありがたく存じます。主君にも異存はござりますまい」`;
-                replyRejectMsg = `「左様にござるか。此度は致し方ありますまい」`;
+                demandMsg = `「両家の行く末を考えれば、当家は${receiverClanName}の庇護を受けるのがよかろう」`;
+                replyAcceptMsg = `「うむ。当家としても異存はあるまい」`;
+                replyRejectMsg = `「そうか。此度は致し方あるまい」`;
             } else if (type === 'marriage') {
-                demandMsg = `「両家の縁をより深めるため、当家の${princessName}を${targetBushoName}殿に娶っていただくのがよろしいかと存ずる」`;
+                demandMsg = `「両家の縁をより深めるなら、当家の${princessName}を${targetBushoName}に娶ってもらうのがよかろう」`;
             }
         }
 
@@ -1160,7 +1242,22 @@ class DiplomacyManager {
             }
         }
 
-        return { demandMsg, acceptMsg, rejectMsg, replyAcceptMsg, replyRejectMsg };
+        // 敵対温度は愛想を削るだけで、将軍・左馬頭・明確な高官への最低限の格式までは消さない。
+        // 特に和睦・従属要求の拒否で「何をほざくか」等へ落ちるのを防ぐ。
+        if (receiverRespect >= 2) {
+            if (type === 'truce') {
+                rejectMsg = `「……此度の和睦には応じられぬ。どうかお引き取り願いたい」`;
+            } else if (type === 'dominate') {
+                rejectMsg = `「……申し出は受けられぬ。まだ従うつもりはない。此度はお引き取り願いたい」`;
+            } else if (type === 'subordinate') {
+                rejectMsg = `「……申し出はありがたいが、今は受け入れられぬ。どうかお引き取り願いたい」`;
+            }
+        }
+
+        return this._applyDiplomacyConversationRegisters(
+            { demandMsg, acceptMsg, rejectMsg, replyAcceptMsg, replyRejectMsg },
+            conversationContext
+        );
     }
     
     /**
@@ -1197,17 +1294,8 @@ class DiplomacyManager {
 
         let targetBushoName = "貴家";
         if (targetBusho) {
-            let rankName = "";
-            if (targetBusho.courtRankIds && targetBusho.courtRankIds.length > 0 && this.game.courtRankSystem) {
-                const rName = this.game.courtRankSystem.getHighestRankName(targetBusho);
-                if (rName !== "なし") rankName = rName;
-            }
-            if (rankName) {
-                const familyName = targetBusho.familyNameStr || "";
-                targetBushoName = `${familyName}${rankName}`;
-            } else {
-                targetBushoName = targetBusho.fullName;
-            }
+            // 縁談だけ独自の「姓+官位+殿」を作らず、将軍・左馬頭・官位・血縁を含む共通呼称へ通す。
+            targetBushoName = this.getCallName(targetBusho, senderBusho);
         }
 
         const greeting = this.buildDiplomacyGreeting(senderBusho, receiverDaimyo);

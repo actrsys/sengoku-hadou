@@ -1157,7 +1157,18 @@ Object.assign(UIInfoManager.prototype, {
                 // 仮想スクロールで画面外の行がDOMに無くても、全選択を確実に渡します。
                 const selectedIds = [...new Set((this.commonSelectedIds || []).map(Number).filter(Number.isFinite))];
                 if (selectedIds.length === 0) return;
-                this.closeCommonModal();
+
+                // 外交の使者決定から直接会話へ進む経路は、次のダイアログが実際に描画されるまで
+                // この選択画面を残します。先に閉じると画像decode等の待ち時間に黒い背景が露出します。
+                const directDiplomacyHandoff = actionType === 'diplomacy_doer'
+                    && extraData
+                    && !['goodwill', 'marriage'].includes(extraData.subAction);
+                if (directDiplomacyHandoff && this.ui && typeof this.ui.beginVisualHandoff === 'function') {
+                    this.ui.beginVisualHandoff(() => this.closeCommonModal());
+                } else {
+                    this.closeCommonModal();
+                }
+
                 if (extraData && extraData.onConfirm) {
                     extraData.onConfirm(selectedIds);
                 } else {
