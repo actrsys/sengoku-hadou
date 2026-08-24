@@ -197,7 +197,7 @@ class KunishuSystem {
             if (this.isIkkoNetwork(kunishu) && newRel < currentRel) ikkoRelationActuallyDropped = true;
 
             if (clanId === this.game.playerClanId) {
-                this.game.ui.log(`(城の主が変わったため、${kunishu.getName(this.game)}との友好度が低下しました)`);
+                this.game.ui.log(`(城の主が変わったため、${kunishu.getName(this.game)}との友好度が低下しました)`, { history: false });
             }
         }
 
@@ -501,7 +501,7 @@ class KunishuSystem {
                     if (actualAmount > 0) {
                         castle.gold += actualAmount;
                         const msg = `${kunishuName}が、${clanName}の${castle.name}に金${actualAmount}を献上しました。`;
-                        this.game.ui.log(msg.replace('\n', ''));
+                        this.game.ui.log(msg.replace('\n', ''), { clanIds: [clanId], category: 'kunishu', inferCurrentTurn: false });
                         if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
                     }
                 } else {
@@ -510,7 +510,7 @@ class KunishuSystem {
                     if (actualAmount > 0) {
                         castle.rice += actualAmount;
                         const msg = `${kunishuName}が、${clanName}の${castle.name}に兵糧${actualAmount}を献上しました。`;
-                        this.game.ui.log(msg.replace('\n', ''));
+                        this.game.ui.log(msg.replace('\n', ''), { clanIds: [clanId], category: 'kunishu', inferCurrentTurn: false });
                         if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
                     }
                 }
@@ -546,13 +546,13 @@ class KunishuSystem {
                     if (Math.random() > 0.5 && castle.gold > amount) {
                         castle.gold -= amount;
                         const msg = `${kunishuName}が、${clanName}の${castle.name}で略奪を働き、金${amount}を奪いました！`;
-                        this.game.ui.log(msg.replace('\n', ''));
+                        this.game.ui.log(msg.replace('\n', ''), { clanIds: [clanId], category: 'kunishu', inferCurrentTurn: false });
                         if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
                         actionDone = true; // 略奪をしたので、目印をつけます
                     } else if (castle.rice > amount) {
                         castle.rice -= amount;
                         const msg = `${kunishuName}が、${clanName}の${castle.name}で略奪を働き、兵糧${amount}を奪いました！`;
-                        this.game.ui.log(msg.replace('\n', ''));
+                        this.game.ui.log(msg.replace('\n', ''), { clanIds: [clanId], category: 'kunishu', inferCurrentTurn: false });
                         if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
                         actionDone = true; // 略奪をしたので、目印をつけます
                     }
@@ -602,7 +602,7 @@ class KunishuSystem {
         atkBushos = atkBushos.concat(members.slice(0, 4));
 
         const kunishuName = kunishu.getName(this.game);
-        this.game.ui.log(`【諸勢力蜂起】${castle.name}にて、${kunishuName}が反乱を起こしました！`);
+        this.game.ui.log(`【諸勢力蜂起】${castle.name}にて、${kunishuName}が反乱を起こしました！`, { history: false });
 
         // 諸勢力を専用の一時的な大名(Clan)として扱うためのダミーデータ
         const dummyAttacker = {
@@ -721,7 +721,11 @@ class KunishuSystem {
                     this.game.affiliationSystem.becomeRonin(b);
                 }
             });
-            this.game.ui.log(`【諸勢力壊滅】${this.game.getCastle(kunishu.castleId).name}の諸勢力は壊滅しました。`);
+            const destroyedCastle = this.game.getCastle(kunishu.castleId);
+            const destroyedName = kunishu.getName(this.game);
+            this.game.ui.log(`【諸勢力壊滅】${destroyedName}${destroyedCastle ? `（${destroyedCastle.name}）` : ''}は壊滅しました。`, {
+                clanIds: [], category: 'extinction', inferCurrentTurn: false
+            });
             return;
         }
 
@@ -949,6 +953,12 @@ class KunishuSystem {
             kunishu.soldiers = 0;
 
             const kunishuName = kunishu.getName(this.game);
+            const playerClan = this.game.getClan ? this.game.getClan(this.game.playerClanId) : null;
+            if (this.game.historySystem) {
+                this.game.historySystem.record(`【諸勢力取込】${playerClan ? playerClan.name : '自家'}は${kunishuName}を傘下に加えました。`, {
+                    clanIds: [this.game.playerClanId], category: 'kunishu', inferCurrentTurn: false
+                });
+            }
             this.game.ui.showResultModal(`${doer.name}の説得により、${kunishuName} が我が傘下に加わりました！`);
             
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.3) + 30;

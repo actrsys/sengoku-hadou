@@ -462,9 +462,9 @@ class AffiliationSystem {
      * @param {object} busho - 移動する武将
      * @param {number} newCastleId - 移動先のお城のID
      */
-    moveCastle(busho, newCastleId) {
-        // 1. 今のお城から出ます
-        this.leaveCastle(busho);
+    moveCastle(busho, newCastleId, options = {}) {
+        // 1. 今のお城から出ます。戦後の一括移動などでは城主再選を最後まで保留できます。
+        this.leaveCastle(busho, options);
         
         // 2. 新しいお城に入る前にバッジを外します
         busho.isCastellan = false; 
@@ -494,10 +494,10 @@ class AffiliationSystem {
         }
         
         // 3. 新しいお城に入ります
-        this.enterCastle(busho, newCastleId);
+        this.enterCastle(busho, newCastleId, options);
 
         // ★ここから追加：画面の絵をすぐに描き直す魔法！
-        this.updateUI();
+        if (options.deferUI !== true) this.updateUI();
     }
 
     // 城の所有者変更は CastleManager.changeOwner() に一元化しました。
@@ -505,7 +505,7 @@ class AffiliationSystem {
     /**
      * （共通の道具）お城から出る時の処理
      */
-    leaveCastle(busho) {
+    leaveCastle(busho, options = {}) {
         if (busho.castleId) {
             const oldCastle = this.game.getCastle(busho.castleId);
             if (oldCastle) {
@@ -517,7 +517,7 @@ class AffiliationSystem {
                     oldCastle.castellanId = 0;
                     busho.isCastellan = false;
                 }
-                this.updateCastleLord(oldCastle);
+                if (options.deferCastleLordUpdate !== true) this.updateCastleLord(oldCastle);
             }
         }
     }
@@ -525,7 +525,7 @@ class AffiliationSystem {
     /**
      * （共通の道具）お城に入る時の処理
      */
-    enterCastle(busho, newCastleId) {
+    enterCastle(busho, newCastleId, options = {}) {
         this.setCastleIdRaw(busho, newCastleId);
         const newCastle = this.game.getCastle(newCastleId);
         if (newCastle) {
@@ -536,7 +536,7 @@ class AffiliationSystem {
                     newCastle.samuraiIds.push(Number(busho.id));
                 }
             }
-            this.updateCastleLord(newCastle);
+            if (options.deferCastleLordUpdate !== true) this.updateCastleLord(newCastle);
         }
     }
 

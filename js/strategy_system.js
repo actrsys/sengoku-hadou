@@ -8,20 +8,52 @@ class StrategySystem {
         this.game = game;
     }
 
-    _shouldRecordStrategyHistory(doer, covertOutcome = null) {
-        if (!doer) return false;
-        // 自家が実行した調略は、発覚の有無にかかわらず自家が把握しているため記録します。
-        if (Number(doer.clan) === Number(this.game.playerClanId)) return true;
-        // 全国履歴も全知情報にはしません。他家の調略は発覚した場合だけ記録します。
-        return !!(covertOutcome && covertOutcome.isDiscovered);
+    _getStrategyHistoryMode(actionName, doer, success, clanIds = [], covertOutcome = null) {
+        if (!doer) return null;
+        const playerClanId = Number(this.game.playerClanId);
+        const doerClanId = Number(doer.clan);
+        const targetClanIds = [...new Set((Array.isArray(clanIds) ? clanIds : [clanIds])
+            .map(Number).filter(id => Number.isInteger(id) && id > 0))];
+
+        // 自家が実行した調略は、自家自身が結果を把握しているため通常の調略履歴として残します。
+        if (doerClanId === playerClanId) return 'strategy';
+
+        const playerIsTarget = targetClanIds.includes(playerClanId);
+        if (playerIsTarget) {
+            // 引抜成功は発覚の有無にかかわらず、所属が変わったという結果自体を自家が確認できます。
+            if (actionName === '引抜' && success) return 'visible-result';
+            // 自家が標的の秘密工作は、従来どおり発覚した場合だけ調略履歴へ出します。
+            return covertOutcome && covertOutcome.isDiscovered ? 'strategy' : null;
+        }
+
+        // 他家同士の秘密工作は全国履歴にも載せません。
+        // ただし引抜成功のように、人物の所属変更として外から確認できる結果だけは結果履歴へ残します。
+        if (actionName === '引抜' && success) return 'visible-result';
+        return null;
     }
 
     recordStrategyHistory(actionName, doer, targetText, success, clanIds = [], covertOutcome = null) {
-        if (!this.game.historySystem || !doer || !this._shouldRecordStrategyHistory(doer, covertOutcome)) return;
+        if (!this.game.historySystem || !doer) return;
+        const mode = this._getStrategyHistoryMode(actionName, doer, success, clanIds, covertOutcome);
+        if (!mode) return;
+
+        const targetClanIds = [...new Set((Array.isArray(clanIds) ? clanIds : [clanIds])
+            .map(Number).filter(id => Number.isInteger(id) && id > 0))];
+        const doerClanId = Number(doer.clan);
+        const clanName = this.game.getClan(doerClanId)?.name || '不明な勢力';
+
+        if (mode === 'visible-result') {
+            const oldClanId = targetClanIds[0] || 0;
+            const oldClanName = this.game.getClan(oldClanId)?.name || '以前の所属先';
+            this.game.historySystem.record(`【武将移籍】${targetText}が${oldClanName}を離れ、${clanName}に仕えました。`, {
+                clanIds: [oldClanId, doerClanId], category: 'personnel', inferCurrentTurn: false
+            });
+            return;
+        }
+
         const resultText = success ? '成功' : '失敗';
-        const clanName = this.game.getClan(doer.clan)?.name || '不明な勢力';
         this.game.historySystem.record(`【調略】${clanName}の${doer.fullName || doer.name}による${actionName}が${targetText}に対して${resultText}しました。`, {
-            clanIds: [doer.clan, ...clanIds], category: 'strategy', inferCurrentTurn: false
+            clanIds: [doerClanId, ...targetClanIds], category: 'strategy', inferCurrentTurn: false
         });
     }
     

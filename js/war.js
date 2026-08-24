@@ -347,7 +347,7 @@ class WarManager {
             }
             
             setTimeout(() => {
-                this.game.ui.log(`★ ${s.sourceCastle.name}軍が${s.defender.name}への攻城戦を開始！`);
+                this.game.ui.log(`★ ${s.sourceCastle.name}軍が${s.defender.name}への攻城戦を開始！`, { history: false });
                 this.game.ui.updateWarUI(); this.processWarRound(); 
             }, 500); 
         } else { setTimeout(() => { this.resolveAutoWar(); }, 100); }
@@ -580,7 +580,7 @@ class WarManager {
             
             if (s.attacker.rice <= 0) { 
                 if (s.isPlayerInvolved && this.game.ui) {
-                    this.game.ui.log("攻撃軍の兵糧が尽きました！");
+                    this.game.ui.log("攻撃軍の兵糧が尽きました！", { history: false });
                     this.game.ui.showDialog("攻撃軍の兵糧が尽きました！\n攻撃軍は撤退します。", false, () => {
                         this.endWar(false);
                     });
@@ -591,7 +591,7 @@ class WarManager {
             }
             if (s.defender.rice <= 0) { 
                 if (s.isPlayerInvolved && this.game.ui) {
-                    this.game.ui.log("守備軍の兵糧が尽きました！");
+                    this.game.ui.log("守備軍の兵糧が尽きました！", { history: false });
                     this.game.ui.showDialog("守備軍の兵糧が尽きました！\nこれ以上の籠城は不可能です……。", false, () => {
                         this.endWar(true);
                     });

@@ -2534,21 +2534,21 @@ class DiplomacyManager {
                 if (myCastleObj) myCastleObj.gold = Math.min(99999, myCastleObj.gold + gold);
                 const increase = this.calcGoodwillIncrease(gold, doer);
                 this.updateSentiment(doer.clan, targetClanId, increase);
-                this.game.ui.log(`${doerClan.name}からの親善を受け入れました`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
+                this.game.ui.log(`【外交】${targetClan.name}は${doerClan.name}からの親善を受け入れました。`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(`${doerClan.name}との関係が改善しました！`, () => {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
             } else if (type === 'alliance') {
                 this.applyAllianceData(doer.clan, targetClanId);
                 
-                this.game.ui.log(`${doerClan.name}と同盟を結びました`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
+                this.game.ui.log(`【外交】${targetClan.name}は${doerClan.name}と同盟を結びました。`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(`${doerClan.name} と同盟を結びました！`, () => {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
             } else if (type === 'dominate') {
                 this.applyDominationData(doer.clan, targetClanId);
 
-                this.game.ui.log(`${doerClan.name}に従属しました`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
+                this.game.ui.log(`【外交】${targetClan.name}は${doerClan.name}に従属しました。`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(`${doerClan.name} に従属しました……`, () => {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
@@ -2559,7 +2559,7 @@ class DiplomacyManager {
                 if (relationA) relationA.sentiment = 50;
                 if (relationB) relationB.sentiment = 50;
 
-                this.game.ui.log(`${doerClan.name}と和睦しました`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
+                this.game.ui.log(`【外交】${targetClan.name}は${doerClan.name}と和睦しました。`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(`${doerClan.name} と和睦しました。`, () => {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
@@ -2683,7 +2683,7 @@ class DiplomacyManager {
                         conditionMsg = `\n${selectedOption.castle.name} を割譲させました。`;
                     }
 
-                    this.game.ui.log(`${doerClan.name}と条件付きで和睦しました`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
+                    this.game.ui.log(`【外交】${targetClan.name}は${doerClan.name}と条件付きで和睦しました。`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                     this.game.ui.showResultModal(`${doerClan.name} と和睦しました。${conditionMsg}`, () => {
                         if (onComplete) setTimeout(onComplete, 100);
                     });

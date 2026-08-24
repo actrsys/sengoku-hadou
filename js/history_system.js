@@ -74,10 +74,15 @@ class HistorySystem {
 
     getEntries(scope = 'clan', clanId = null) {
         const entries = Array.isArray(this.entries) ? this.entries : [];
-        if (scope === 'all') return [...entries];
         const targetClanId = Number(clanId ?? this.game?.playerClanId ?? 0);
-        if (targetClanId <= 0) return [];
-        return entries.filter(entry => Array.isArray(entry.clanIds) && entry.clanIds.includes(targetClanId));
+        if (targetClanId <= 0) return scope === 'national' ? [...entries] : [];
+
+        const isRelatedToClan = entry => Array.isArray(entry.clanIds) && entry.clanIds.includes(targetClanId);
+        if (scope === 'national') {
+            // 「全国」は自国を含む全件一覧ではなく、自国が関与していない全国情勢だけを表示します。
+            return entries.filter(entry => !isRelatedToClan(entry));
+        }
+        return entries.filter(isRelatedToClan);
     }
 
     serialize() {

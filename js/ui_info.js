@@ -2655,7 +2655,7 @@ class UIInfoManager {
 
     _renderHistoryList(scrollPos = 0) {
         const system = this.game.historySystem;
-        const scope = this.historyCurrentScope === 'all' ? 'all' : 'clan';
+        const scope = this.historyCurrentScope === 'national' ? 'national' : 'clan';
         const historyList = system ? system.getEntries(scope, this.game.playerClanId) : [];
         const items = [];
         let lastMonthKey = null;
@@ -2679,18 +2679,18 @@ class UIInfoManager {
         });
         const tabsHtml = `<div class="busho-list-tabs history-scope-tabs">
             <button class="busho-tab-btn ${scope === 'clan' ? 'active' : ''}" data-tab="clan">自国</button>
-            <button class="busho-tab-btn ${scope === 'all' ? 'active' : ''}" data-tab="all">全国</button>
+            <button class="busho-tab-btn ${scope === 'national' ? 'active' : ''}" data-tab="national">全国</button>
         </div>`;
 
         this._renderListModal({
             title: "行動履歴",
             tabsHtml,
             onTabClick: (nextScope) => {
-                this.historyCurrentScope = nextScope === 'all' ? 'all' : 'clan';
+                this.historyCurrentScope = nextScope === 'national' ? 'national' : 'clan';
                 this._renderHistoryList(0);
             },
             items,
-            emptyHtml: `<div class="history-empty-msg">${scope === 'clan' ? '自国に関する履歴はありません。' : '履歴がありません。'}</div>`,
+            emptyHtml: `<div class="history-empty-msg">${scope === 'clan' ? '自国に関する履歴はありません。' : '自国が関与しない全国の履歴はありません。'}</div>`,
             gridTemplateSp: "1fr",
             gridTemplatePc: "1fr",
             // 履歴は折返し行と月区切りで行高が一定ではないため、固定行高前提の仮想スクロールを使わない。

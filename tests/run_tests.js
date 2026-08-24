@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r168');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r171');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1026,7 +1026,7 @@ test('米相場の供給不足・供給増イベントは「金1で得られる�
     assert.ok(economy.includes('seasonForce = harvestBoost') && economy.includes('seasonForce = -(baseRate * 0.05)'), '9月の供給増は相場を上げ、通常月は緩やかに下げる');
 });
 
-test('HistorySystem は自国/全国を関係勢力で分離し保持上限を守る', () => {
+test('HistorySystem は自国/全国を排他的に振り分け保持上限を守る', () => {
     const ctx = createContext({ GameConfig: { History: { MaxEntries: 3 } } });
     loadScript(ctx, 'js/history_system.js');
     const game = { year: 1560, month: 4, playerClanId: 1, getCurrentTurnCastle: () => null, warManager: { state: { active: false } } };
@@ -1035,19 +1035,21 @@ test('HistorySystem は自国/全国を関係勢力で分離し保持上限を�
     history.record('他国', { clanIds: [2], category: 'test', inferCurrentTurn: false });
     history.record('両国', { clanIds: [1, 2], category: 'test', inferCurrentTurn: false });
     assert.deepStrictEqual(Array.from(history.getEntries('clan', 1), e => e.text), ['自国', '両国']);
-    assert.strictEqual(history.getEntries('all', 1).length, 3);
+    assert.deepStrictEqual(Array.from(history.getEntries('national', 1), e => e.text), ['他国'], '自国関連の履歴を全国へ重複表示しない');
     history.record('追加', { clanIds: [3], inferCurrentTurn: false });
-    assert.deepStrictEqual(Array.from(history.getEntries('all'), e => e.text), ['他国', '両国', '追加']);
+    assert.deepStrictEqual(Array.from(history.getEntries('national', 1), e => e.text), ['他国', '追加']);
 
     const currentTurnGame = { year: 1560, month: 5, playerClanId: 1, getCurrentTurnCastle: () => ({ ownerClan: 1 }), warManager: { state: { active: false } } };
     const scoped = new ctx.HistorySystem(currentTurnGame);
     scoped.record('関係不明');
     assert.strictEqual(scoped.getEntries('clan', 1).length, 0, '関係勢力不明の全国出来事を現在手番だけで自国扱いしない');
+    assert.strictEqual(scoped.getEntries('national', 1).length, 1, '関係勢力不明の全国出来事は全国側へ置く');
     scoped.record('自国コマンド', { inferCurrentTurn: true });
     assert.strictEqual(scoped.getEntries('clan', 1).length, 1, '明示した場合だけ現在手番勢力へ関連付ける');
+    assert.strictEqual(scoped.getEntries('national', 1).length, 1, '自国コマンドを全国へ重複表示しない');
 });
 
-test('調略履歴は自家実行または発覚済みだけを記録し未発覚の他家工作を漏らさない', () => {
+test('調略履歴は自家関与だけを通常記録し他家同士は見える所属変更だけ残す', () => {
     const records = [];
     const ctx = createContext();
     loadScript(ctx, 'js/strategy_system.js');
@@ -1062,14 +1064,30 @@ test('調略履歴は自家実行または発覚済みだけを記録し未発�
     const aiDoer = { clan: 2, name: '他家武将', fullName: '他家武将' };
 
     strategy.recordStrategyHistory('離間計', aiDoer, '対象武将', false, [3], { isDiscovered: false });
-    assert.strictEqual(records.length, 0, '未発覚の他家調略は全国履歴にも出さない');
-
     strategy.recordStrategyHistory('離間計', aiDoer, '対象武将', false, [3], { isDiscovered: true });
-    assert.strictEqual(records.length, 1, '発覚した他家調略は全国履歴へ残す');
-    assert.ok(records[0].text.includes('他家Aの他家武将'));
+    assert.strictEqual(records.length, 0, '他家同士の秘密工作は発覚していても全国履歴へ出さない');
+
+    strategy.recordStrategyHistory('引抜', aiDoer, '対象武将', true, [3], { isDiscovered: false });
+    assert.strictEqual(records.length, 1, '他家同士でも引抜成功による所属変更は全国履歴へ残す');
+    assert.ok(records[0].text.includes('【武将移籍】'));
+    assert.ok(records[0].text.includes('他家Bを離れ、他家Aに仕えました'));
+    assert.strictEqual(records[0].options.category, 'personnel');
+
+    strategy.recordStrategyHistory('離間計', aiDoer, '自家武将', false, [1], { isDiscovered: false });
+    assert.strictEqual(records.length, 1, '自家が標的でも未発覚の秘密工作は漏らさない');
+    strategy.recordStrategyHistory('離間計', aiDoer, '自家武将', false, [1], { isDiscovered: true });
+    assert.strictEqual(records.length, 2, '自家が標的で発覚した工作は自国履歴へ残す');
 
     strategy.recordStrategyHistory('破壊工作', myDoer, '対象城', false, [3], { isDiscovered: false });
-    assert.strictEqual(records.length, 2, '自家が実行した調略は未発覚でも自家自身が把握しているため残す');
+    assert.strictEqual(records.length, 3, '自家が実行した調略は未発覚でも自家自身が把握しているため残す');
+});
+
+test('自家の拠点行動履歴は実行拠点名を含める', () => {
+    const command = read('js/command_system.js');
+    assert.ok(command.includes('`【${actionName}】${castle.name}で${actionName}を実行しました。`'));
+    assert.ok(command.includes('`【徴兵】${castle.name}で徴兵を行いました。`'));
+    assert.ok(command.includes('`【民施し】${castle.name}で民施しを行いました。`'));
+    assert.ok(!command.includes('`${actionName}を実行 (効果:${totalVal})`'), '拠点名のない旧内政履歴を残さない');
 });
 
 test('履歴表示は月ごとの区切りを画面側で生成し履歴件数を消費しない', () => {
@@ -1101,7 +1119,8 @@ test('行動履歴はHistorySystemを正本にして自国/全国タブを持ち
     assert.ok(game.includes('this.historySystem = new HistorySystem(this)'));
     assert.ok(ui.includes('this.game.historySystem.record(msg'));
     assert.ok(info.includes('data-tab="clan">自国</button>'));
-    assert.ok(info.includes('data-tab="all">全国</button>'));
+    assert.ok(info.includes('data-tab="national">全国</button>'));
+    assert.ok(info.includes("this.historyCurrentScope = nextScope === 'national' ? 'national' : 'clan'"), '全国タブは自国を含むallではなくnationalを使う');
     assert.ok(save.includes('historyEntries: this.game.historySystem ? this.game.historySystem.serialize() : []'));
     assert.ok(save.includes('this.game.historySystem.load(d.historyEntries || [])'));
     assert.ok(html.indexOf('js/history_system.js') < html.indexOf('js/game.js'));
@@ -1133,6 +1152,66 @@ test('面談・情報取得は行動履歴へ混ぜず調略と主要人事を�
     assert.ok(ai.includes("recordStrategyHistory('離間計'"));
     assert.ok(ai.includes("recordStrategyHistory('引抜'"));
     assert.ok(ai.includes("recordStrategyHistory('暗殺'"));
+});
+
+test('戦争履歴は開戦元・援軍・勝敗を実名と全参加勢力で記録する', () => {
+    const war = read('js/war_effort.js');
+    assert.ok(war.includes('【開戦】${atkHistoryName}の${atkBushos[0].name}が${atkCastle.name}から'), '開戦履歴に出撃元を含める');
+    assert.ok(war.includes('【援軍】${helperBase}から${leaderName}が攻撃側の援軍として参戦しました。'));
+    assert.ok(war.includes('【援軍】${helperBase}から${leaderName}が守備側の援軍として参戦しました。'));
+    assert.ok(war.includes("['reinforcement', 'selfReinforcement', 'defReinforcement', 'defSelfReinforcement']"), '攻守の援軍勢力を履歴関連勢力へ含める');
+    assert.ok(war.includes('retreatedReinforcements'), '途中撤退した援軍も戦争参加勢力として維持する');
+    assert.ok(war.includes('【合戦結果】${atkHistoryClan2}が${defHistoryClan2}の${s.defender.name}を制圧しました。'));
+    assert.ok(war.includes('【合戦結果】${defHistoryClan4}が${s.defender.name}の防衛に成功し、${atkHistoryClan4}を退けました。'));
+    assert.ok(war.includes('getHistoryClanName(clanId'), '履歴では当家表記ではなく実際の家名を使う');
+});
+
+test('落城後の攻略軍移動は城主再選を保留し最終城主だけ確定する', () => {
+    const affiliation = read('js/affiliation_system.js');
+    const war = read('js/war_effort.js');
+    assert.ok(affiliation.includes('moveCastle(busho, newCastleId, options = {})'));
+    assert.ok(affiliation.includes('options.deferCastleLordUpdate !== true'));
+    assert.ok(war.includes('finalizeCapturedCastleStaffing(state)'));
+    assert.ok(war.includes("moveCastle(b, s.defender.id, { deferCastleLordUpdate: true, deferUI: true })"));
+    assert.strictEqual((war.match(/this\.finalizeCapturedCastleStaffing\(s\);/g) || []).length, 2, '撤退占領・通常制圧の両経路で一括確定する');
+});
+
+test('全国履歴でも自家コマンドと受諾外交の主語を省略しない', () => {
+    const command = read('js/command_system.js');
+    const diplomacy = read('js/diplomacy.js');
+    assert.ok(command.includes('`${tagged[1]}${clanName}は${tagged[2]}`'));
+    assert.ok(command.includes('`${clanName}は${logMsg}`'));
+    assert.ok(diplomacy.includes('【外交】${targetClan.name}は${doerClan.name}からの親善を受け入れました。'));
+    assert.ok(diplomacy.includes('【外交】${targetClan.name}は${doerClan.name}と同盟を結びました。'));
+    assert.ok(diplomacy.includes('【外交】${targetClan.name}は${doerClan.name}に従属しました。'));
+    assert.ok(diplomacy.includes('【外交】${targetClan.name}は${doerClan.name}と和睦しました。'));
+});
+
+test('諸勢力の壊滅・取込は固有名を持つ履歴として残す', () => {
+    const kunishu = read('js/kunishu_system.js');
+    const war = read('js/war_effort.js');
+    assert.ok(kunishu.includes('【諸勢力壊滅】${destroyedName}'));
+    assert.ok(kunishu.includes("【諸勢力取込】${playerClan ? playerClan.name : '自家'}は${kunishuName}を傘下に加えました。"));
+    assert.ok(war.includes('【諸勢力壊滅】${kunishuName}は${atkHistoryClan}に制圧され、壊滅しました。'));
+});
+
+test('戦場内の一時ログと諸勢力蜂起の予告は行動履歴へ重複混入させない', () => {
+    const war = read('js/war.js');
+    const effort = read('js/war_effort.js');
+    const kunishu = read('js/kunishu_system.js');
+    assert.ok(war.includes('攻撃軍の兵糧が尽きました！", { history: false }'));
+    assert.ok(war.includes('守備軍の兵糧が尽きました！", { history: false }'));
+    assert.ok(effort.includes('(物資搬出率: ${(100*(1-lossRate)).toFixed(0)}%, 捕縛者: ${capturedBushos.length}名)`, { history: false }'));
+    assert.ok(effort.includes('(撤退先にて負傷兵 ${recovered}名 が復帰)`, { history: false }'));
+    assert.ok(kunishu.includes('【諸勢力蜂起】${castle.name}にて、${kunishuName}が反乱を起こしました！`, { history: false }'));
+});
+
+test('大名家滅亡履歴は滅亡家と攻略家を関連勢力として一度だけ記録する', () => {
+    const life = read('js/life_system.js');
+    assert.ok(life.includes('if (!clan || clan.extinctionNotified) return'));
+    assert.ok(life.includes('clan.extinctionNotified = true'));
+    assert.ok(life.includes("category: 'extinction'"));
+    assert.ok(life.includes('clanIds: [clanId, killerClanId]'));
 });
 
 test('タイトル版表示は GameConfig.Meta.Version を正本にする', () => {

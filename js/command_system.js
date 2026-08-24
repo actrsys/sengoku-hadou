@@ -39,9 +39,15 @@ class CommandSystem {
             this.game.ui.renderMap();
         }
         
-        // 2. ログを残します
+        // 2. ログを残します。全国履歴へ切り替えても主語が失われないよう、実際の大名家名を明記します。
         if (logMsg) {
-            this.game.ui.log(logMsg, { clanIds: [this.game.playerClanId], category: 'command', inferCurrentTurn: false });
+            const playerClan = this.game.getClan ? this.game.getClan(this.game.playerClanId) : null;
+            const clanName = playerClan ? playerClan.name : '自家';
+            const tagged = String(logMsg).match(/^(【[^】]+】)(.*)$/);
+            const historyText = tagged
+                ? `${tagged[1]}${clanName}は${tagged[2]}`
+                : `${clanName}は${logMsg}`;
+            this.game.ui.log(historyText, { clanIds: [this.game.playerClanId], category: 'command', inferCurrentTurn: false });
         }
         
         // 3. 全ての更新が終わってから、最後にメッセージを表示して背景をストップさせます！
@@ -1463,12 +1469,12 @@ class CommandSystem {
             }
             
             resultMsg = `${count}名で${actionName}を行いました\n効果: +${totalVal} ${detail}`;
-            logMsg = `${actionName}を実行 (効果:${totalVal})`;
+            logMsg = `【${actionName}】${castle.name}で${actionName}を実行しました。`;
         }
         else if (actionName === "移動") { 
             const targetName = this.game.getCastle(targetId).name; 
             resultMsg = `${count}名が${targetName}へ移動しました`; 
-            logMsg = `${actionName}を実行`;
+            logMsg = `【配置変更】${castle.name}から${targetName}へ武将を移動しました。`;
         }
         
         if (resultMsg || logMsg) {
@@ -1797,7 +1803,7 @@ class CommandSystem {
         this.game.factionSystem.updateRecognition(busho, 10);
         
         // ★ 結果のメッセージに、人口と民忠が減ったことも書き足しておきます
-        this.finishCommand(`${busho.name}が徴兵を行いました\n兵士+${soldiers}\n(人口-${soldiers} / 民忠-${loyaltyPenalty})`);
+        this.finishCommand(`${busho.name}が徴兵を行いました\n兵士+${soldiers}\n(人口-${soldiers} / 民忠-${loyaltyPenalty})`, false, `【徴兵】${castle.name}で徴兵を行いました。`);
     }
     
     executeCharity(bushoIds) { 
@@ -1837,7 +1843,7 @@ class CommandSystem {
         castle.peoplesLoyalty = Math.min(maxLoyalty, castle.peoplesLoyalty + totalVal); 
         const actualIncrease = castle.peoplesLoyalty - oldLoyalty;
         
-        this.finishCommand(`${count}名で施しを行いました\n民忠+${actualIncrease}`, false, `${count}名で施しを実行 (効果:${actualIncrease})`);
+        this.finishCommand(`${count}名で施しを行いました\n民忠+${actualIncrease}`, false, `【民施し】${castle.name}で民施しを行いました。`);
     }
 
     enterMapSelection(mode) {
