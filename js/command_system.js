@@ -781,6 +781,9 @@ class CommandSystem {
 
     executeSystemCommand(action) {
         switch(action) {
+            case 'guide':
+                if (this.game.ui.guideView) this.game.ui.guideView.open();
+                break;
             case 'save': 
                 // セーブ画面（スロット選択）を開きます
                 this.game.ui.saveLoadView.open('save');

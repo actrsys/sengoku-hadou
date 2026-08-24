@@ -64,7 +64,7 @@ const COMMAND_MENU_STRUCTURE = [
     },
     {
         label: "システム",
-        items: ['history', 'settings', 'save', 'load', 'watch', 'title']
+        items: ['guide', 'history', 'settings', 'save', 'load', 'watch', 'title']
     }
 ];
 
@@ -676,6 +676,7 @@ const COMMAND_SPECS = {
     },
 
     // --- システム (SYSTEM) - UI生成用プレースホルダ ---
+    'guide': { label: "指南書", category: 'SYSTEM', isSystem: true, action: 'guide' },
     'history': { label: "履歴", category: 'SYSTEM', isSystem: true, action: 'history' },
     'settings': { label: "設定", category: 'SYSTEM', isSystem: true, action: 'settings' },
     'save': { label: "セーブ", category: 'SYSTEM', isSystem: true, action: 'save' },

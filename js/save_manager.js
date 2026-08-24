@@ -69,6 +69,35 @@ class SaveManager {
         return true;
     }
 
+    // 最新マスターの「数字指定の年代顔」だけを旧セーブへ同期します。
+    // daimyo: は旧セーブに元から存在する指定だけを維持し、その他の非年代条件がある人物は例外として触りません。
+    _syncYearBasedPortraitRules(savedBusho, latestData, currentYear) {
+        if (!savedBusho || !latestData || !window.PortraitRules) return false;
+
+        const savedFaceChange = typeof savedBusho.faceChange === 'string' ? savedBusho.faceChange.trim() : '';
+        const latestFaceChange = typeof latestData.faceChange === 'string' ? latestData.faceChange.trim() : '';
+
+        if (window.PortraitRules.hasUnsupportedNonYearCondition(savedFaceChange, ['daimyo'])) return false;
+
+        const latestYearEntries = window.PortraitRules.getYearEntries(latestFaceChange);
+        const savedYearEntries = window.PortraitRules.getYearEntries(savedFaceChange);
+        if (latestYearEntries.length === 0 && savedYearEntries.length === 0) return false;
+
+        savedBusho.faceChange = window.PortraitRules.replaceYearRules(savedFaceChange, latestFaceChange);
+
+        const yearFace = window.PortraitRules.getLatestYearFace(latestFaceChange, currentYear);
+        if (yearFace) {
+            savedBusho.faceIcon = yearFace;
+
+            // 新しい daimyo: を取り込むのではなく、旧セーブがすでに持っていた大名顔だけを再適用して状態を壊さない。
+            if (savedBusho.isDaimyo === true) {
+                const savedDaimyoFace = window.PortraitRules.getNamedFace(savedFaceChange, 'daimyo');
+                if (savedDaimyoFace) savedBusho.faceIcon = savedDaimyoFace;
+            }
+        }
+        return true;
+    }
+
     _syncBushoMasterFields(savedBusho, latestData) {
         if (!savedBusho || !latestData) return false;
 
@@ -98,8 +127,9 @@ class SaveManager {
         savedBusho.baseDiplomacy = latestData.baseDiplomacy;       // 外交
         savedBusho.baseIntelligence = latestData.baseIntelligence; // 智謀
 
-        // ⑤ 顔グラは「単純な基本顔追加」だけを安全に同期します。
+        // ⑤ 顔グラは、まず単純な基本顔追加を同期し、その後「数字指定の年代顔」だけを最新版へ合わせます。
         this._syncSimplePortraitAddition(savedBusho, latestData);
+        this._syncYearBasedPortraitRules(savedBusho, latestData, this.game.year);
         return true;
     }
 

@@ -63,6 +63,8 @@ class UIManager {
         this.info = new UIInfoManager(this, this.game);
         // ★追加：スライダーの専門家を準備しておきます
         this.slider = new UISliderManager(this, this.game);
+        // 指南書はタイトル・ゲーム中で共通利用する専用Viewへ委譲します。
+        this.guideView = new GuideView(this, this.game);
         // セーブ／ロードのスロット選択画面は専用Viewへ委譲します。
         this.saveLoadView = new SaveLoadView(this, this.game);
         // 国主評定の表示・一時編集は専用Viewへ委譲します。

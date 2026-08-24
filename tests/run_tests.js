@@ -88,11 +88,36 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r157');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r160');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('友好'), false);
+});
+
+test('PortraitRules は年代別顔だけを共通解決し非年代条件を分離する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/portrait_rules.js');
+
+    const rules = ctx.PortraitRules;
+    const faceChange = '1553:middle.webp/1570:late.webp/daimyo:lord.webp';
+    assert.strictEqual(rules.getLatestYearFace(faceChange, 1550), '');
+    assert.strictEqual(rules.getLatestYearFace(faceChange, 1560), 'middle.webp');
+    assert.strictEqual(rules.getLatestYearFace(faceChange, 1580), 'late.webp');
+    assert.strictEqual(rules.getExactYearFace(faceChange, 1570), 'late.webp');
+    assert.strictEqual(rules.getNamedFace(faceChange, 'daimyo'), 'lord.webp');
+    assert.strictEqual(rules.hasUnsupportedNonYearCondition(faceChange, ['daimyo']), false);
+    assert.strictEqual(rules.hasUnsupportedNonYearCondition('event:special.webp', ['daimyo']), true);
+    assert.strictEqual(rules.replaceYearRules('1540:old.webp/daimyo:old_lord.webp', faceChange), '1553:middle.webp/1570:late.webp/daimyo:old_lord.webp');
+});
+
+test('年代別顔の新規開始・年次更新は PortraitRules を同じ正本として使う', () => {
+    const data = read('js/data_manager.js');
+    const life = read('js/life_system.js');
+    const html = read('index.html');
+    assert.ok(data.includes('window.PortraitRules.getLatestYearFace(b.faceChange, startYear)'));
+    assert.ok(life.includes('window.PortraitRules.getExactYearFace(b.faceChange, currentYear)'));
+    assert.ok(html.indexOf('js/portrait_rules.js') < html.indexOf('js/data_manager.js'));
 });
 
 test('会話上の格は官位を優先し同格官位・双方無官の時だけ威信を使う', () => {
@@ -1887,6 +1912,57 @@ test('オートセーブ条件は「未保存 かつ 設定ON」を括弧付き�
 // ---------------------------------------------------------------------------
 // CommandSystem の責務境界
 // ---------------------------------------------------------------------------
+test('指南書はタイトルとシステムコマンドから同じGuideViewを開く', () => {
+    const html = read('index.html');
+    const bootstrap = read('js/app_bootstrap.js');
+    const catalog = read('js/command_catalog.js');
+    const command = read('js/command_system.js');
+    const ui = read('js/ui.js');
+    const guideView = read('js/guide_view.js');
+    const guideData = read('js/guide_data.js');
+
+    assert.ok(html.includes('id="guide-title-btn"'));
+    assert.ok(html.includes('id="guide-modal"'));
+    assert.ok(html.includes('js/guide_data.js') && html.includes('js/guide_view.js'));
+    assert.ok(bootstrap.includes("executeSystemCommand('guide')"));
+    assert.ok(catalog.includes("'guide': { label: \"指南書\""));
+    assert.ok(catalog.includes("items: ['guide', 'history', 'settings', 'save', 'load', 'watch', 'title']"));
+    assert.ok(command.includes("case 'guide':"));
+    assert.ok(command.includes('this.game.ui.guideView.open()'));
+    assert.ok(ui.includes('this.guideView = new GuideView(this, this.game)'));
+    assert.ok(guideView.includes('COMMAND_MENU_STRUCTURE'));
+    assert.ok(guideView.includes('COMMAND_SPECS'));
+    assert.ok(guideData.includes("id: 'basics'"));
+    assert.ok(guideData.includes("id: 'faq'"));
+});
+
+test('指南書は固定論理画面内で記事切替し通常長文スクロールに依存しない', () => {
+    const css = read('css/style.css');
+    const view = read('js/guide_view.js');
+    assert.ok(css.includes('#guide-modal .guide-content'));
+    assert.ok(css.includes('overflow: hidden !important;'));
+    assert.ok(css.includes('.guide-layout'));
+    assert.ok(css.includes('body:not(.is-pc) .guide-layout'));
+    assert.ok(view.includes("button.className = 'guide-nav-btn'"));
+    assert.ok(view.includes("this._renderArticle(article)"));
+});
+
+test('指南書は公開情報の範囲で国主・弱い武将・褒美・派閥を説明する', () => {
+    const guide = read('js/guide_data.js');
+    assert.ok(guide.includes("heading: '国主を置く流れ'"));
+    assert.ok(guide.includes('所領分配'));
+    assert.ok(guide.includes('月に一度「評定」'));
+    assert.ok(!guide.includes("commandMenuLabel: '国主'"), '国主記事に第一席～第八席のコマンドチップを展開しない');
+    assert.ok(guide.includes('「侍大将」が最低限の守将として立ちます'));
+    assert.ok(guide.includes("heading: '褒美'"));
+    assert.ok(guide.includes('忠誠を高めることができます'));
+    assert.ok(guide.includes("heading: '派閥'"));
+    assert.ok(guide.includes('派閥主・人数・方針・思想'));
+    ['義理', '野心', '野望', '承認欲求', 'achievementTotal'].forEach(hiddenWord => {
+        assert.ok(!guide.includes(hiddenWord), `指南書に非公開情報 ${hiddenWord} を露出しない`);
+    });
+});
+
 test('コマンド仕様表は command_catalog.js を正本とする', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
@@ -3065,6 +3141,49 @@ test('SaveManager は旧セーブで顔未設定の武将に限り最新版の�
     const hasFaceRule = { faceIcon: 'unknown_face.webp', faceChange: '1553:older_face.webp' };
     assert.strictEqual(manager._syncSimplePortraitAddition(hasFaceRule, { faceIcon: 'new_face.webp', faceChange: '' }), false);
     assert.strictEqual(hasFaceRule.faceIcon, 'unknown_face.webp');
+});
+
+test('SaveManager は年代別顔の追加・変更だけを旧セーブへ同期する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/portrait_rules.js');
+    loadScript(ctx, 'js/save_manager.js');
+    const manager = new ctx.SaveManager({ year: 1560 });
+
+    const normal = { faceIcon: 'old.webp', faceChange: '1540:old_middle.webp', isDaimyo: false };
+    assert.strictEqual(manager._syncYearBasedPortraitRules(normal, {
+        faceIcon: 'base.webp',
+        faceChange: '1553:new_middle.webp/1570:new_late.webp/daimyo:new_lord.webp'
+    }, 1560), true);
+    assert.strictEqual(normal.faceIcon, 'new_middle.webp');
+    assert.strictEqual(normal.faceChange, '1553:new_middle.webp/1570:new_late.webp');
+    assert.strictEqual(ctx.PortraitRules.getExactYearFace(normal.faceChange, 1570), 'new_late.webp');
+
+    const daimyo = { faceIcon: 'old_lord.webp', faceChange: '1540:old.webp/daimyo:old_lord.webp', isDaimyo: true };
+    assert.strictEqual(manager._syncYearBasedPortraitRules(daimyo, {
+        faceIcon: 'base.webp',
+        faceChange: '1553:new_middle.webp/daimyo:new_lord.webp'
+    }, 1560), true);
+    assert.strictEqual(daimyo.faceIcon, 'old_lord.webp', '最新版のdaimyo顔は取り込まず旧セーブの大名顔を維持する');
+    assert.strictEqual(daimyo.faceChange, '1553:new_middle.webp/daimyo:old_lord.webp');
+
+    const exceptional = { faceIcon: 'special.webp', faceChange: 'event:special.webp', isDaimyo: false };
+    assert.strictEqual(manager._syncYearBasedPortraitRules(exceptional, {
+        faceIcon: 'base.webp', faceChange: '1553:new_middle.webp'
+    }, 1560), false);
+    assert.strictEqual(exceptional.faceIcon, 'special.webp');
+    assert.strictEqual(exceptional.faceChange, 'event:special.webp');
+});
+
+test('SaveManager の武将マスター同期は基本顔追加後に年代別顔を現在年へ再解決する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/portrait_rules.js');
+    loadScript(ctx, 'js/save_manager.js');
+    const manager = new ctx.SaveManager({ year: 1560 });
+    const saved = { faceIcon: 'unknown_face.webp', faceChange: '', isDaimyo: false };
+    const latest = { faceIcon: 'base.webp', faceChange: '1553:middle.webp/1570:late.webp' };
+    manager._syncBushoMasterFields(saved, latest);
+    assert.strictEqual(saved.faceIcon, 'middle.webp');
+    assert.strictEqual(saved.faceChange, '1553:middle.webp/1570:late.webp');
 });
 
 test('SaveManager は復元前にセーブ構造と主要ID参照を検証する', () => {

@@ -93,6 +93,7 @@
         bind('continue-btn', () => getGame()?.continueGame());
         bind('load-btn', () => getGame()?.commandSystem?.executeSystemCommand('load'));
         bind('watch-start-btn', () => getGame()?.startWatchGame());
+        bind('guide-title-btn', () => getGame()?.commandSystem?.executeSystemCommand('guide'));
         bind('settings-btn', () => getGame()?.commandSystem?.executeSystemCommand('settings'));
         bind('scenario-close-btn', () => getGame()?.ui?.returnToTitle());
         bind('quantity-back-btn', () => hide('quantity-modal'));

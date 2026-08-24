@@ -808,6 +808,69 @@ async function validateEndingAndWatchStates(cdp) {
     console.log('✓ game-over input guard / watch-return logical-screen visual regression');
 }
 
+
+async function validateGuideLayout(cdp) {
+    const html = fixtureHtml('guide.html');
+    const loadAt = async (width, height, mobile, isPc) => {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile });
+        await cdp.call('Runtime.evaluate', {
+            expression: `(() => {
+                document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.classList.toggle('is-pc', ${isPc});
+                const screen = document.getElementById('game-screen');
+                const windowW = ${width}, windowH = ${height};
+                let canvasW, canvasH, scale;
+                if (${isPc}) {
+                    canvasW = 1280; canvasH = 720; scale = Math.min(windowW / canvasW, windowH / canvasH);
+                } else {
+                    const targetRatio = 9 / 16, currentRatio = windowW / windowH;
+                    let finalW, finalH;
+                    if (currentRatio > targetRatio) { finalH = windowH; finalW = windowH * targetRatio; }
+                    else { finalW = windowW; finalH = windowW / targetRatio; }
+                    const minMobileWidth = 360;
+                    canvasW = finalW; canvasH = finalH; scale = 1;
+                    if (finalW < minMobileWidth) { canvasW = minMobileWidth; canvasH = minMobileWidth / targetRatio; scale = finalW / minMobileWidth; }
+                }
+                screen.style.width = canvasW + 'px'; screen.style.height = canvasH + 'px';
+                screen.style.position = 'absolute'; screen.style.left = ((windowW - canvasW * scale) / 2) + 'px';
+                screen.style.top = ((windowH - canvasH * scale) / 2) + 'px'; screen.style.transformOrigin = 'top left';
+                screen.style.transform = Math.abs(scale - 1) < 0.000001 ? 'none' : 'scale(' + scale + ')'; screen.style.overflow = 'hidden';
+                return true;
+            })()`, returnByValue: true, awaitPromise: true
+        });
+        await new Promise(resolve => setTimeout(resolve, 80));
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(() => {
+                const screen = document.getElementById('game-screen').getBoundingClientRect();
+                const contentEl = document.querySelector('.guide-content');
+                const content = contentEl.getBoundingClientRect();
+                const nav = document.querySelector('.guide-nav');
+                const article = document.querySelector('.guide-article');
+                return {
+                    screen:{left:screen.left,top:screen.top,right:screen.right,bottom:screen.bottom},
+                    content:{left:content.left,top:content.top,right:content.right,bottom:content.bottom,clientHeight:contentEl.clientHeight,scrollHeight:contentEl.scrollHeight},
+                    nav:{clientHeight:nav.clientHeight,scrollHeight:nav.scrollHeight},
+                    article:{clientHeight:article.clientHeight,scrollHeight:article.scrollHeight}
+                };
+            })()`, returnByValue: true
+        });
+        return result.result.value;
+    };
+
+    for (const cfg of [
+        { width: 1280, height: 720, mobile: false, isPc: true, label: 'PC' },
+        { width: 390, height: 844, mobile: true, isPc: false, label: 'mobile' }
+    ]) {
+        const state = await loadAt(cfg.width, cfg.height, cfg.mobile, cfg.isPc);
+        assert.ok(state.content.left >= state.screen.left - 1 && state.content.right <= state.screen.right + 1, `${cfg.label}: 指南書が横にはみ出す`);
+        assert.ok(state.content.top >= state.screen.top - 1 && state.content.bottom <= state.screen.bottom + 1, `${cfg.label}: 指南書が縦にはみ出す`);
+        assert.ok(state.content.scrollHeight <= state.content.clientHeight + 1, `${cfg.label}: 指南書外枠がスクロールを要求する`);
+        assert.ok(state.nav.scrollHeight <= state.nav.clientHeight + 1, `${cfg.label}: 指南書ナビが見切れる`);
+        assert.ok(state.article.scrollHeight <= state.article.clientHeight + 1, `${cfg.label}: 指南書記事が見切れる`);
+    }
+    console.log('✓ 指南書 PC16:9 / スマホ9:16・非スクロール visual/layout regression');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -867,6 +930,7 @@ async function main() {
         await validateFloatingStatusLayout(cdp);
         await validateCommandAndInterviewStates(cdp);
         await validateEndingAndWatchStates(cdp);
+        await validateGuideLayout(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');

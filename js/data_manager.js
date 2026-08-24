@@ -222,28 +222,11 @@ class DataManager {
                 }
             }
 
-            // ★ここから追加：ゲーム開始時点で「すでに顔が変わっているはず」の武将の顔グラを変えておく魔法です！
-            if (b.faceChange) {
-                const changes = b.faceChange.split('/');
-                let latestYear = -1;
-                let latestFaceData = "";
-
-                for (const change of changes) {
-                    const parts = change.split(':');
-                    if (parts.length === 2) {
-                        const targetYear = Number(parts[0].trim());
-                        // 条件が数字（年）で、ゲーム開始年「以前」か「同じ年」の中で一番新しいものを探します
-                        if (!isNaN(targetYear) && targetYear <= startYear && targetYear > latestYear) {
-                            latestYear = targetYear;
-                            latestFaceData = parts[1].trim();
-                        }
-                    }
-                }
-
-                // もし過去の顔変更データが見つかったら、最初からその顔にしておきます！
-                if (latestYear !== -1 && latestFaceData) {
-                    b.faceIcon = latestFaceData;
-                }
+            // ゲーム開始時点ですでに経過済みの「年代指定顔」は PortraitRules を正本にして解決します。
+            // daimyo: 等の非年代条件はこの段階では扱わず、後段の専門処理へ残します。
+            if (b.faceChange && window.PortraitRules) {
+                const latestFaceData = window.PortraitRules.getLatestYearFace(b.faceChange, startYear);
+                if (latestFaceData) b.faceIcon = latestFaceData;
             }
             
             // ★ゲーム開始時点で既に寿命を迎えている（昔に亡くなっている）、またはダミー用（startYearが9999）武将の処理です！

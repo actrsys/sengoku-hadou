@@ -409,22 +409,9 @@ class LifeSystem {
         const currentYear = this.game.year;
 
         for (const b of this.game.bushos) {
-            if (!b.faceChange) continue;
-
-            // 「/」で区切られている複数の顔変更予定を一つずつ確認します
-            const changes = b.faceChange.split('/');
-            for (const change of changes) {
-                const parts = change.split(':');
-                if (parts.length === 2) {
-                    const condition = parts[0].trim();
-                    const newFace = parts[1].trim();
-
-                    // 条件が数字（年）で、今の年とピッタリ同じなら顔グラを差し替えます！
-                    if (!isNaN(condition) && Number(condition) === currentYear) {
-                        b.faceIcon = newFace;
-                    }
-                }
-            }
+            if (!b.faceChange || !window.PortraitRules) continue;
+            const newFace = window.PortraitRules.getExactYearFace(b.faceChange, currentYear);
+            if (newFace) b.faceIcon = newFace;
         }
     }
     
