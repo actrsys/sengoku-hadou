@@ -145,19 +145,43 @@ class InterviewSystem {
         }
     }
 
-    _getTopicOpening(target, attitude = this.activeInterviewAttitude) {
-        const name = target && target.name ? target.name : 'その方';
+    _getTopicOpening(interviewer, target, standing, attitude = this.activeInterviewAttitude) {
+        const callName = window.ConversationStandingRules
+            ? window.ConversationStandingRules.getInterviewTargetCallName(this.game, interviewer, target)
+            : `${target && target.name ? target.name : 'その方'}殿`;
+        const hint = window.ConversationStandingRules
+            ? window.ConversationStandingRules.getAchievementHint(standing)
+            : '';
         switch (attitude) {
             case 'welcoming':
-            case 'friendly':
-                return `${name}殿ですか。存じております。`;
+            case 'friendly': {
+                const knowVerb = standing && standing.knowVerb ? standing.knowVerb : '存じております';
+                return `${callName}ですか。${knowVerb}。${hint}`;
+            }
+            case 'polite': {
+                if ((standing && Number(standing.deferenceLevel || 0) >= 1) || hint) {
+                    const knowVerb = standing && standing.knowVerb ? standing.knowVerb : '存じております';
+                    return `${callName}ですか。${knowVerb}。${hint}`;
+                }
+                return `${callName}ですか……`;
+            }
             case 'reserved':
             case 'cold':
             case 'startled':
-                return `……${name}殿について、ですか。`;
+                return `……${callName}について、ですか。`;
             default:
-                return `${name}殿ですか……`;
+                return `${callName}ですか……${hint}`;
         }
+    }
+
+    _applyStandingReferenceText(text, standing) {
+        if (!standing) return String(text || '');
+        let result = String(text || '');
+        const thirdPerson = standing.thirdPerson || 'あの方';
+        const guardedThirdPerson = standing.guardedThirdPerson || 'あやつ';
+        result = result.replace(/あのお方|あの方/g, thirdPerson);
+        result = result.replace(/あやつ/g, guardedThirdPerson);
+        return result;
     }
 
     showMainMenu(busho) {
@@ -900,6 +924,9 @@ class InterviewSystem {
 
     executeInterviewTopic(interviewer, target) {
         const relation = PersonnelRules.calcRelationshipProfile(interviewer, target);
+        const standing = window.ConversationStandingRules
+            ? window.ConversationStandingRules.getPersonalStanding(this.game, interviewer, target)
+            : null;
         const concealment = this._getConcealmentProfile(target);
         const roughBias = this._getOtherAssessmentBias(interviewer, target, concealment.perceivedLoyalty);
         const attitude = this.activeInterviewAttitude;
@@ -910,20 +937,24 @@ class InterviewSystem {
             let text;
             const slanderMin = Number(window.MainParams.Interview.OtherAssessmentBias.BlindSlanderMin);
             if (Number(roughBias.protectionShift || 0) > 0) {
-                text = `……${target.name}殿ですか。あの方については、さほど案じることはないかと存じます。`;
+                const callName = window.ConversationStandingRules ? window.ConversationStandingRules.getInterviewTargetCallName(this.game, interviewer, target) : `${target.name}殿`;
+                text = `……${callName}ですか。${standing && standing.thirdPerson ? standing.thirdPerson : 'あの方'}については、さほど案じることはないかと存じます。`;
             } else if (Number(roughBias.loyaltyPenalty || 0) >= slanderMin) {
-                text = `……${target.name}殿ですか。あの方は、あまり信用なさらぬ方がよろしいかと。`;
+                const callName = window.ConversationStandingRules ? window.ConversationStandingRules.getInterviewTargetCallName(this.game, interviewer, target) : `${target.name}殿`;
+                const ref = standing && standing.guardedThirdPerson ? standing.guardedThirdPerson : 'あの方';
+                text = `……${callName}ですか。${ref}は、あまり信用なさらぬ方がよろしいかと。`;
             } else {
-                text = `……${target.name}殿ですか。某から詳しく申し上げることはございませぬ。`;
+                const callName = window.ConversationStandingRules ? window.ConversationStandingRules.getInterviewTargetCallName(this.game, interviewer, target) : `${target.name}殿`;
+                text = `……${callName}ですか。某から詳しく申し上げることはございませぬ。`;
             }
             this.view.showMessages(interviewer, [`「${text}」`], () => this.showMainMenu(interviewer), '他者について聞く');
             return;
         }
 
-        const opinionText = this._getOpinionText(relation.compatibilityScore, attitude);
+        const opinionText = this._applyStandingReferenceText(this._getOpinionText(relation.compatibilityScore, attitude), standing);
         const opinionDirection = this._getOpinionDirection(relation.compatibilityScore);
         const loyaltyAssessment = this._getTargetLoyaltyAssessment(interviewer, target, relation);
-        const messages = [`「${this._getTopicOpening(target)}${opinionText}」`];
+        const messages = [`「${this._getTopicOpening(interviewer, target, standing)}${opinionText}」`];
         // 3段階の会話列全体で逆接を管理する。1段目の本文中ですでに「ただ／もっとも」を
         // 使っている場合も使用済みとし、後続で逆接を重ねない。
         const transitionState = {
@@ -935,7 +966,7 @@ class InterviewSystem {
         if (attitude === 'reserved') {
             // 寡黙な態度では接触関係の説明まで重ねず、要点だけ二言で答える。
             const loyaltyText = this._bridgeAssessmentText(
-                loyaltyAssessment.text,
+                this._applyStandingReferenceText(loyaltyAssessment.text, standing),
                 opinionDirection,
                 loyaltyAssessment.direction,
                 transitionState
@@ -944,13 +975,13 @@ class InterviewSystem {
         } else {
             const contactDirection = this._getContactDirection(relation);
             const contactText = this._bridgeAssessmentText(
-                this._getContactText(relation, interviewer, attitude),
+                this._applyStandingReferenceText(this._getContactText(relation, interviewer, attitude), standing),
                 opinionDirection,
                 contactDirection,
                 transitionState
             );
             const loyaltyText = this._bridgeAssessmentText(
-                loyaltyAssessment.text,
+                this._applyStandingReferenceText(loyaltyAssessment.text, standing),
                 contactDirection,
                 loyaltyAssessment.direction,
                 transitionState

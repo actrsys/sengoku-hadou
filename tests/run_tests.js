@@ -88,11 +88,168 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r133');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r134');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('友好'), false);
+});
+
+test('会話上の格は官位を優先し同格官位・双方無官の時だけ威信を使う', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/busho_list_sort_rules.js');
+    loadScript(ctx, 'js/conversation_standing_rules.js');
+
+    const ranks = new Map([
+        [10, { id: 10, rankNo: 8, rankName2: '参議' }],
+        [11, { id: 11, rankNo: 10, rankName2: '左衛門督' }]
+    ]);
+    const clans = [
+        { id: 1, leaderId: 101, daimyoPrestige: 20000 },
+        { id: 2, leaderId: 201, daimyoPrestige: 1000 }
+    ];
+    const a = { id: 101, clan: 1, isDaimyo: true, courtRankIds: [11] };
+    const b = { id: 201, clan: 2, isDaimyo: true, courtRankIds: [10] };
+    const bushos = [a, b];
+    const game = {
+        clans, bushos, legions: [],
+        getClan: id => clans.find(c => Number(c.id) === Number(id)),
+        getClanDaimyo: id => bushos.find(x => Number(x.clan) === Number(id) && x.isDaimyo),
+        courtRankSystem: {
+            RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [98, 99],
+            getRankData: id => ranks.get(Number(id)) || null,
+            getHighestRankData(busho) {
+                const list = (busho.courtRankIds || []).map(id => this.getRankData(id)).filter(Boolean).sort((x, y) => x.rankNo - y.rankNo);
+                return list[0] || null;
+            }
+        }
+    };
+
+    let cmp = ctx.ConversationStandingRules.compareDaimyoClans(game, 1, 2);
+    assert.strictEqual(cmp.overallRelation, -1, '威信差が大きくても官位下位側を上にはしない');
+
+    a.courtRankIds = [10];
+    cmp = ctx.ConversationStandingRules.compareDaimyoClans(game, 1, 2);
+    assert.strictEqual(cmp.overallRelation, 2, '同格官位なら威信差を会話上の格へ使う');
+
+    a.courtRankIds = [];
+    b.courtRankIds = [];
+    cmp = ctx.ConversationStandingRules.compareDaimyoClans(game, 1, 2);
+    assert.strictEqual(cmp.overallRelation, 2, '双方無官でも威信差を使う');
+});
+
+test('左馬頭・将軍本人は他家所属の使者でも本人の権威を保つ', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/busho_list_sort_rules.js');
+    loadScript(ctx, 'js/conversation_standing_rules.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+
+    const ranks = new Map([
+        [1, { id: 1, rankNo: 1, rankName2: '征夷大将軍' }],
+        [98, { id: 98, rankNo: 10, rankName2: '左馬頭' }],
+        [20, { id: 20, rankNo: 8, rankName2: '参議' }],
+        [30, { id: 30, rankNo: 10, rankName2: '左衛門督' }]
+    ]);
+    const clans = [
+        { id: 1, name: '朝倉家', leaderId: 101, daimyoPrestige: 5000 },
+        { id: 2, name: '織田家', leaderId: 201, daimyoPrestige: 10000 }
+    ];
+    const asakura = { id: 101, clan: 1, isDaimyo: true, fullName: '朝倉義景', familyNameStr: '朝倉', givenName: '義景', courtRankIds: [30], achievementTotal: 500 };
+    const oda = { id: 201, clan: 2, isDaimyo: true, fullName: '織田信長', familyNameStr: '織田', givenName: '信長', courtRankIds: [20], achievementTotal: 1200 };
+    const yoshiaki = { id: 102, clan: 1, isDaimyo: false, fullName: '足利義昭', familyNameStr: '足利', givenName: '義昭', name: '足利義昭', courtRankIds: [98], achievementTotal: 50 };
+    const bushos = [asakura, oda, yoshiaki];
+    const game = {
+        clans, bushos, legions: [],
+        getClan: id => clans.find(c => Number(c.id) === Number(id)),
+        getClanDaimyo: id => bushos.find(x => Number(x.clan) === Number(id) && x.isDaimyo),
+        courtRankSystem: {
+            RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [98, 99],
+            getRankData: id => ranks.get(Number(id)) || null,
+            getHighestRankData(busho) {
+                const list = (busho.courtRankIds || []).map(id => this.getRankData(id)).filter(Boolean).sort((x, y) => x.rankNo - y.rankNo);
+                return list[0] || null;
+            }
+        }
+    };
+    const dm = new ctx.DiplomacyManager(game);
+    game.diplomacyManager = dm;
+
+    let greeting = dm.buildDiplomacyGreeting(yoshiaki, oda);
+    assert.strictEqual(dm.getCallName(yoshiaki), '左馬頭様');
+    assert.ok(greeting.greetMsg1.includes('朝倉左衛門督殿の意を受け'), '主君より本人の格式が高い時は「様の名代」として下げない');
+    assert.ok(greeting.greetMsg2.includes('左馬頭様'));
+    assert.ok(greeting.greetMsg2.includes('御自らお越しとは'));
+
+    yoshiaki.courtRankIds = [1];
+    greeting = dm.buildDiplomacyGreeting(yoshiaki, oda);
+    assert.strictEqual(dm.getCallName(yoshiaki), '公方様');
+    assert.ok(greeting.greetMsg2.includes('公方様'));
+    assert.ok(greeting.context.receiverDeferenceLevel >= 3);
+});
+
+test('外交使者は軍師・国主・功績でも礼遇が少し変わるが効果判定とは分離する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/busho_list_sort_rules.js');
+    loadScript(ctx, 'js/conversation_standing_rules.js');
+    const clans = [
+        { id: 1, leaderId: 101, gunshiId: 102, daimyoPrestige: 5000 },
+        { id: 2, leaderId: 201, daimyoPrestige: 5000 }
+    ];
+    const a = { id: 101, clan: 1, isDaimyo: true, courtRankIds: [], achievementTotal: 500 };
+    const b = { id: 201, clan: 2, isDaimyo: true, courtRankIds: [], achievementTotal: 500 };
+    const gunshi = { id: 102, clan: 1, isDaimyo: false, isGunshi: true, courtRankIds: [], achievementTotal: 800 };
+    const ordinary = { id: 103, clan: 1, isDaimyo: false, courtRankIds: [], achievementTotal: 0 };
+    const bushos = [a, b, gunshi, ordinary];
+    const game = {
+        clans, bushos, legions: [],
+        getClan: id => clans.find(c => Number(c.id) === Number(id)),
+        getClanDaimyo: id => bushos.find(x => Number(x.clan) === Number(id) && x.isDaimyo),
+        courtRankSystem: { RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [], getRankData: () => null, getHighestRankData: () => null }
+    };
+    const high = ctx.ConversationStandingRules.getDiplomacyContext(game, gunshi, b);
+    const low = ctx.ConversationStandingRules.getDiplomacyContext(game, ordinary, b);
+    assert.ok(high.receiverDeferenceLevel > low.receiverDeferenceLevel);
+});
+
+test('面談の他者言及は官位・身分・功績を呼称と敬意へ匂わせる', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/busho_list_sort_rules.js');
+    loadScript(ctx, 'js/conversation_standing_rules.js');
+    const ranks = new Map([[98, { id: 98, rankNo: 10, rankName2: '左馬頭' }]]);
+    const clans = [{ id: 1, leaderId: 100, gunshiId: 101, daimyoPrestige: 5000 }];
+    const speaker = { id: 103, clan: 1, courtRankIds: [], achievementTotal: 0 };
+    const target = { id: 102, clan: 1, name: '足利義昭', fullName: '足利義昭', familyNameStr: '足利', givenName: '義昭', courtRankIds: [98], achievementTotal: 1000 };
+    const game = {
+        clans, bushos: [speaker, target], legions: [],
+        getClan: id => clans.find(c => Number(c.id) === Number(id)),
+        getClanDaimyo: () => null,
+        courtRankSystem: {
+            RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [98, 99],
+            getRankData: id => ranks.get(Number(id)) || null,
+            getHighestRankData(busho) { return (busho.courtRankIds || []).map(id => this.getRankData(id)).filter(Boolean)[0] || null; }
+        }
+    };
+    const standing = ctx.ConversationStandingRules.getPersonalStanding(game, speaker, target);
+    assert.strictEqual(ctx.ConversationStandingRules.getInterviewTargetCallName(game, speaker, target), '左馬頭様');
+    assert.strictEqual(standing.thirdPerson, 'あのお方');
+    assert.strictEqual(standing.knowVerb, 'よく存じ上げております');
+    assert.ok(ctx.ConversationStandingRules.getAchievementHint(standing).includes('家中でもよく知られて'));
+});
+
+test('外交と臣従コモンイベントは会話上の格を共通ルールから取得する', () => {
+    const diplomacy = read('js/diplomacy.js');
+    const common = read('js/event/common_events.js');
+    const index = read('index.html');
+    assert.ok(index.includes('js/conversation_standing_rules.js'));
+    assert.ok(diplomacy.includes('ConversationStandingRules.getDiplomacyContext'));
+    assert.ok(diplomacy.includes('buildDiplomacyGreeting(senderBusho, receiverDaimyo)'));
+    assert.ok(common.includes('diplomacyManager.buildDiplomacyGreeting(envoy, playerDaimyo)'));
+    assert.ok(!common.includes('const getCallName = (busho) =>'), 'コモンイベント側へ官位呼称判定を複製しない');
 });
 
 test('会話組版は鉤括弧で閉じる時だけ終端句点を省き裸の文章は変えない', () => {

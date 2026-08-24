@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r133'
+        Version: 'r134'
     },
 
     Main: {
@@ -36,6 +36,17 @@ window.GameConfig = {
                 SoftReportBelow: 45,
                 VerySoftReportBelow: 25
             }
+        },
+        ConversationStanding: {
+            // 会話上の格差を数値そのものではなく、呼称・敬語・言い回しへ薄く反映するための閾値。
+            // 官位で差が付く大名同士は官位を優先し、同格官位または双方無官の時だけ威信を見る。
+            PrestigeMildRatio: 1.20,
+            PrestigeClearRatio: 1.50,
+            // 功績は非公開値なので、同格付近の人物への敬意を匂わせるだけに使う。
+            AchievementRespectGap: 300,
+            AchievementStrongGap: 700,
+            AchievementRenownMin: 700,
+            AchievementLegendMin: 1200
         },
         Interview: {
             // 85/75 は軍師警告の境界を正本として導出する。以下は面談内の細分化だけを管理する。

@@ -1926,25 +1926,22 @@ window.GameEvents.push({
                 const aiDaimyoName = aiDaimyo.name.replace(/\|/g, '');
                 const aiDaimyoGivenName = aiDaimyo.givenName ? aiDaimyo.givenName : aiDaimyoName;
 
-                // 外交システムと同じように、名前や官位を取得する魔法です
-                const getCallName = (busho) => {
-                    if (!busho) return "殿";
-                    if (busho.courtRankIds && busho.courtRankIds.includes(1)) return "公方様";
-                    let nameToCall = "";
-                    if (busho.courtRankIds && busho.courtRankIds.length > 0 && game.courtRankSystem) {
-                        const rankName = game.courtRankSystem.getHighestRankName(busho);
-                        if (rankName !== "なし") nameToCall = rankName;
-                    }
-                    if (!nameToCall) {
-                        nameToCall = busho.givenName || busho.name.replace(/^[^|]*\|?/, ''); 
-                        if (!nameToCall) nameToCall = busho.name.replace(/\|/g, '');
-                    }
-                    return nameToCall + "殿";
-                };
-
+                // 通常外交と同じ会話上の格・呼称を使う。
+                const diplomacyManager = game.diplomacyManager;
                 const isDaimyoSelf = (envoy.id === aiDaimyo.id);
-                const myCallName = getCallName(playerDaimyo);
-                const envoyCallName = getCallName(envoy);
+                const myCallName = diplomacyManager ? diplomacyManager.getCallName(playerDaimyo) : `${playerDaimyo.givenName || playerDaimyoName}殿`;
+                const envoyCallName = diplomacyManager ? diplomacyManager.getCallName(envoy) : `${envoy.givenName || envoyName}殿`;
+                const greeting = diplomacyManager
+                    ? diplomacyManager.buildDiplomacyGreeting(envoy, playerDaimyo)
+                    : {
+                        greetMsg1: isDaimyoSelf
+                            ? `「${myCallName}。重大な用件ゆえ、此度はわし自ら参りました」`
+                            : `「此度は${aiClanName}当主・${aiDaimyoName}様の名代として罷り越しました」`,
+                        greetMsg2: isDaimyoSelf
+                            ? `「これは${envoyCallName}……して、どのような御用向きでござるか？」`
+                            : `「うむ。して、御用向きはいかに？」`,
+                        context: null
+                    };
 
                 // 小姓役のナビゲーターを取得します
                 let myCastle = game.getCastle(playerDaimyo.castleId);
@@ -1957,6 +1954,8 @@ window.GameEvents.push({
                 let introMsg = "";
                 if (isDaimyoSelf) {
                     introMsg = `「殿、${aiClanName}当主・${aiDaimyoName}様がお見えになっております。お会いになられますか？」`;
+                } else if (greeting.context && greeting.context.envoySpecial && greeting.context.envoySpecial.level >= 2) {
+                    introMsg = `「殿、${aiClanName}より${envoyCallName}がお見えになっております。使者として面会を求めておられます」`;
                 } else {
                     introMsg = `「殿、${aiClanName} から使者が参っております。お会いになられますか？」`;
                 }
@@ -1968,15 +1967,8 @@ window.GameEvents.push({
                     leftFace: nav.faceIcon, leftName: nav.name
                 });
 
-                let greetMsg1 = "";
-                let greetMsg2 = "";
-                if (isDaimyoSelf) {
-                    greetMsg1 = `「${myCallName}。重大な用件ゆえ、此度はわし自ら参りました」`;
-                    greetMsg2 = `「これは${envoyCallName}……して、どのような御用向きでござるか？」`;
-                } else {
-                    greetMsg1 = `「此度は${aiClanName}当主・${aiDaimyoName}の名代として罷り越しました。急な訪問、平にご容赦くだされ」`;
-                    greetMsg2 = `「うむ。して、御用向きはいかに？」`;
-                }
+                const greetMsg1 = greeting.greetMsg1;
+                const greetMsg2 = greeting.greetMsg2;
 
                 await game.ui.showDialogAsync(greetMsg1, false, 0, {
                     leftFace: envoy.faceIcon, leftName: envoyName
@@ -1986,7 +1978,14 @@ window.GameEvents.push({
                     leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
                 });
 
-                await game.ui.showDialogAsync(`「はっ……どうか我らを${playerClan.name}の末席にお加えいただきたく存じます」`, false, 0, {
+                const commonMsgs = diplomacyManager
+                    ? diplomacyManager.getDiplomacyMessages(
+                        'vassalage', isDaimyoSelf, aiClanName, playerClan.name,
+                        envoyCallName, myCallName, '姫', '貴家', greeting.context
+                    )
+                    : { demandMsg: `「どうか我らを${playerClan.name}の末席にお加えいただきたく存じます」` };
+
+                await game.ui.showDialogAsync(commonMsgs.demandMsg, false, 0, {
                     leftFace: envoy.faceIcon, leftName: envoyName
                 });
 
@@ -2008,7 +2007,7 @@ window.GameEvents.push({
                     await game.ui.showDialogAsync(`「よくぞご決心なされた。今後はその力、${playerClan.name}で存分に振るわれよ」`, false, 0, {
                         leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
                     });
-                    let replyAccept = isDaimyoSelf ? `「恐悦至極……今日より${myCallName.replace('殿', '様')}を主君と仰ぎ奉りまする」` : `「ははっ！ ありがたき幸せに存じまする！」`;
+                    let replyAccept = commonMsgs.replyAcceptMsg || (isDaimyoSelf ? `「恐悦至極……今日より${myCallName.replace('殿', '様')}を主君と仰ぎ奉りまする」` : `「ははっ！ ありがたき幸せに存じまする！」`);
                     await game.ui.showDialogAsync(replyAccept, false, 0, {
                         leftFace: envoy.faceIcon, leftName: envoyName
                     });
@@ -2024,7 +2023,7 @@ window.GameEvents.push({
                     await game.ui.showDialogAsync(`「すまぬが、他家を取り込むつもりはない。これまで通り当家を支えていただききたく存ずる」`, false, 0, {
                         leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
                     });
-                    let replyReject = isDaimyoSelf ? `「……左様にござるか。ではこれにて失礼いたす」` : `「……承知仕った。${aiDaimyoGivenName}様にはそのようにお伝えし申す」`;
+                    let replyReject = commonMsgs.replyRejectMsg || (isDaimyoSelf ? `「……左様にござるか。ではこれにて失礼いたす」` : `「……承知仕った。${aiDaimyoGivenName}様にはそのようにお伝えし申す」`);
                     await game.ui.showDialogAsync(replyReject, false, 0, {
                         leftFace: envoy.faceIcon, leftName: envoyName
                     });

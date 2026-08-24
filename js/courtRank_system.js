@@ -90,17 +90,20 @@ class CourtRankSystem {
         return bonus;
     }
 
-    // ★迷子になっていた魔法を復活！
-    // 武将が持っている官位の中で、一番偉い（rankNoが小さい）官位の名前を返します
-    getHighestRankName(busho) {
-        if (!busho || !busho.courtRankIds || busho.courtRankIds.length === 0) return "なし";
-        
-        // 持っている官位データを集めて、偉い順（rankNoが小さい順）に並べ替えます
+    // 武将が持っている官位の中で、一番偉い（rankNoが小さい）官位データを返します。
+    // 会話・威信などがrankNoを独自再解釈せず、この窓口を共用します。
+    getHighestRankData(busho) {
+        if (!busho || !busho.courtRankIds || busho.courtRankIds.length === 0) return null;
         const validRanks = busho.courtRankIds.map(id => this.getRankData(id)).filter(r => r);
-        if (validRanks.length === 0) return "なし";
-        
-        validRanks.sort((a, b) => a.rankNo - b.rankNo);
-        return validRanks[0].rankName2; // （例：征夷大将軍、など）
+        if (validRanks.length === 0) return null;
+        validRanks.sort((a, b) => Number(a.rankNo) - Number(b.rankNo));
+        return validRanks[0];
+    }
+
+    // 武将が持っている官位の中で、一番偉い官位名を返します。
+    getHighestRankName(busho) {
+        const rank = this.getHighestRankData(busho);
+        return rank ? rank.rankName2 : "なし";
     }
     
     // ==========================================

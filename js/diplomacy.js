@@ -866,32 +866,90 @@ class DiplomacyManager {
     }
 
     /**
-     * 武将の敬称付き呼び名を取得する共通の魔法です
+     * 武将の敬称付き呼び名を取得する共通窓口。
+     * 官位・将軍候補・将軍の扱いは ConversationStandingRules を正本とする。
      */
     getCallName(busho) {
-        if (!busho) return "殿";
-        // 官位システムが持っている将軍IDを使います
-        if (busho.courtRankIds && busho.courtRankIds.includes(this.game.courtRankSystem.RANK_ID_SHOGUN)) {
-            return "公方様";
+        if (window.ConversationStandingRules) {
+            return window.ConversationStandingRules.getDiplomaticCallName(this.game, busho);
         }
-        let nameToCall = "";
-        if (busho.courtRankIds && busho.courtRankIds.length > 0 && this.game.courtRankSystem) {
-            const rankName = this.game.courtRankSystem.getHighestRankName(busho);
-            if (rankName !== "なし") {
-                nameToCall = rankName;
+        return busho ? `${busho.givenName || busho.fullName || ''}殿` : '殿';
+    }
+
+    _getDaimyoReference(daimyo, clanName, suffix = '様') {
+        if (!daimyo) return `${clanName || '当家'}当主${suffix}`;
+        const special = window.ConversationStandingRules
+            ? window.ConversationStandingRules.getSpecialAuthority(this.game, daimyo)
+            : { key: 'none' };
+        if (special.key === 'shogun') return `公方${suffix}`;
+        const rank = window.ConversationStandingRules
+            ? window.ConversationStandingRules.getHighestCourtRank(this.game, daimyo)
+            : null;
+        if (rank) {
+            const family = daimyo.familyNameStr || '';
+            return `${family}${rank.rankName2}${suffix}`;
+        }
+        return `${clanName || '当家'}当主・${daimyo.fullName}${suffix}`;
+    }
+
+    /**
+     * 大名家の格式・威信と使者本人の身分/官位/功績を踏まえ、外交導入を一元生成する。
+     * 使者は主君の格を背負うが、将軍・将軍候補など本人の権威が主君を上回る場合は
+     * 「主君の名代」として下げず、「意を受けた使者」として扱う。
+     */
+    buildDiplomacyGreeting(senderBusho, receiverDaimyo) {
+        const senderClan = this.game.getClan(senderBusho && senderBusho.clan);
+        const senderClanName = senderClan ? senderClan.name : '当家';
+        const senderCallName = this.getCallName(senderBusho);
+        const receiverCallName = this.getCallName(receiverDaimyo);
+        const context = window.ConversationStandingRules
+            ? window.ConversationStandingRules.getDiplomacyContext(this.game, senderBusho, receiverDaimyo)
+            : { receiverDeferenceLevel: 0, senderDeferenceLevel: 0, envoyOutranksLord: false, senderDaimyo: this.game.getClanDaimyo(senderBusho.clan) };
+
+        let greetMsg1 = '';
+        let greetMsg2 = '';
+
+        if (senderBusho && senderBusho.isDaimyo) {
+            if (Number(context.senderDeferenceLevel || 0) >= 2) {
+                greetMsg1 = `「${receiverCallName}。折り入ってお願いしたき儀があり、此度は某自ら参上いたしました」`;
+            } else if (Number(context.senderDeferenceLevel || 0) === 1) {
+                greetMsg1 = `「${receiverCallName}。大事な用向きゆえ、此度はわし自ら参りました」`;
+            } else {
+                greetMsg1 = `「${receiverCallName}。重大な用件ゆえ、此度はわし自ら参りました」`;
+            }
+        } else {
+            const senderDaimyo = context.senderDaimyo || this.game.getClanDaimyo(senderBusho.clan);
+            if (context.envoyOutranksLord) {
+                const daimyoRef = this._getDaimyoReference(senderDaimyo, senderClanName, '殿');
+                greetMsg1 = `「此度は${daimyoRef}の意を受け、使者として参りました」`;
+            } else {
+                const daimyoRef = this._getDaimyoReference(senderDaimyo, senderClanName, '様');
+                greetMsg1 = Number(context.senderDeferenceLevel || 0) >= 2
+                    ? `「此度は${daimyoRef}の名代として罷り越しました。まずはお目通りを賜り、ありがたく存じます」`
+                    : `「此度は${daimyoRef}の名代として罷り越しました」`;
             }
         }
-        if (!nameToCall) {
-            nameToCall = busho.givenName || busho.name.replace(/^[^|]*\|?/, ''); 
-            if (!nameToCall) nameToCall = busho.fullName;
+
+        const receiverDeference = Number(context.receiverDeferenceLevel || 0);
+        if (receiverDeference >= 3) {
+            greetMsg2 = `「これは${senderCallName}。御自らお越しとは……まずは御用向きを承りましょう」`;
+        } else if (receiverDeference === 2) {
+            greetMsg2 = `「これは${senderCallName}。遠路ご足労いただいた。して、御用向きは？」`;
+        } else if (receiverDeference === 1) {
+            greetMsg2 = `「${senderCallName}か。使者の役目、ご苦労にござる。して、御用向きは？」`;
+        } else if (senderBusho && senderBusho.isDaimyo) {
+            greetMsg2 = `「これは${senderCallName}……して、どのような御用向きでござるか？」`;
+        } else {
+            greetMsg2 = `「うむ。して、御用向きはいかに？」`;
         }
-        return nameToCall + "殿";
+
+        return { greetMsg1, greetMsg2, context };
     }
 
     /**
      * 外交会話のメッセージを一括管理する魔法です
      */
-    getDiplomacyMessages(type, isSenderDaimyo, senderClanName, receiverClanName, senderCallName, receiverCallName, princessName = "姫", targetBushoName = "貴家") {
+    getDiplomacyMessages(type, isSenderDaimyo, senderClanName, receiverClanName, senderCallName, receiverCallName, princessName = "姫", targetBushoName = "貴家", conversationContext = null) {
         let demandMsg = "";
         let acceptMsg = "";
         let rejectMsg = "";
@@ -939,6 +997,45 @@ class DiplomacyManager {
             replyAcceptMsg = `「おお、ご承諾いただけるか！　早速持ち帰り、吉日を選びましょうぞ」`;
             replyRejectMsg = `「……左様にござるか。まこと残念にござる」`;
         }
+
+        // 同じ外交内容でも、官位・威信・使者本人の格によって礼の厚さだけを薄く変える。
+        // 成否や外交効果そのものは変えず、隠れた格差を会話から少し推測できる程度に留める。
+        const senderRespect = Number(conversationContext && conversationContext.senderDeferenceLevel || 0);
+        const receiverRespect = Number(conversationContext && conversationContext.receiverDeferenceLevel || 0);
+        if (senderRespect >= 2) {
+            if (type === 'goodwill') demandMsg = `「両家の御縁を深めたく、心ばかりの品をお持ちいたしました。どうかお納めくだされ」`;
+            if (type === 'alliance') demandMsg = `「恐れながら、両家繁栄のため盟約をお結びいただきたく存じます」`;
+            if (type === 'truce') demandMsg = `「此度の戦、どうか和睦のお取り計らいを願いたく参りました」`;
+        } else if (senderRespect === 1) {
+            if (type === 'alliance') demandMsg = `「両家繁栄のため、盟約を結んでいただきたく参りました」`;
+            if (type === 'truce' && !isSenderDaimyo) demandMsg = `「両家の和睦につき、ご一考いただきたく存じます」`;
+        }
+
+        if (receiverRespect >= 2) {
+            if (type === 'goodwill') {
+                acceptMsg = `「これはかたじけない。御厚意、ありがたく頂戴いたします」`;
+                rejectMsg = `「せっかくのお申し出ながら、今すぐのお返事はいたしかねます。どうかご容赦くだされ」`;
+            } else if (type === 'alliance') {
+                acceptMsg = `「承知いたしました。これより両家、盟友として力を合わせましょう」`;
+                rejectMsg = `「重大事ゆえ、今しばらく家中で評議いたしたく存じます」`;
+            } else if (type === 'truce') {
+                acceptMsg = `「承知いたしました。此度は矛を収めることといたしましょう」`;
+            }
+        }
+
+        // 将軍・将軍候補本人が他家の使者になった場合、主君の代理であっても本人まで
+        // 家臣口調へ落とさない。所属が変わっても本人の公的権威は会話上に残す。
+        const envoySpecialLevel = Number(conversationContext && conversationContext.envoySpecial && conversationContext.envoySpecial.level || 0);
+        if (!isSenderDaimyo && envoySpecialLevel >= 2) {
+            if (type === 'vassalage' || type === 'subordinate') {
+                replyAcceptMsg = `「承知いたしました。主君にもその旨、しかと申し伝えましょう」`;
+                replyRejectMsg = `「承知いたしました。その旨、主君へ申し伝えましょう」`;
+            } else if (type === 'goodwill' || type === 'alliance') {
+                replyAcceptMsg = `「ありがたく存じます。その旨、主君にも申し伝えましょう」`;
+                replyRejectMsg = `「左様にござるか。その旨、主君へ申し伝えましょう」`;
+            }
+        }
+
         return { demandMsg, acceptMsg, rejectMsg, replyAcceptMsg, replyRejectMsg };
     }
     
@@ -989,40 +1086,12 @@ class DiplomacyManager {
             }
         }
 
-        const msgs = this.getDiplomacyMessages(type, isSenderDaimyo, senderClanName, receiverClanName, senderCallName, receiverCallName, princessName, targetBushoName);
-
-        let greetMsg1 = "";
-        let greetMsg2 = "";
-
-        if (isSenderDaimyo) {
-            greetMsg1 = `「${receiverCallName}。重大な用件ゆえ、此度はわし自ら参りました」`;
-            greetMsg2 = `「これは${senderCallName}……して、どのような御用向きでござるか？」`;
-        } else {
-            const senderDaimyo = this.game.getClanDaimyo(senderBusho.clan);
-            let daimyoRef = "当主";
-            if (senderDaimyo) {
-                // 官位システムが持っている将軍IDを使います
-                if (senderDaimyo.courtRankIds && senderDaimyo.courtRankIds.includes(this.game.courtRankSystem.RANK_ID_SHOGUN)) {
-                    daimyoRef = "公方";
-                } else {
-                    let rankName = "";
-                    if (senderDaimyo.courtRankIds && senderDaimyo.courtRankIds.length > 0 && this.game.courtRankSystem) {
-                        const rName = this.game.courtRankSystem.getHighestRankName(senderDaimyo);
-                        if (rName !== "なし") rankName = rName;
-                    }
-                    if (rankName) {
-                        const familyName = senderDaimyo.familyNameStr || "";
-                        daimyoRef = `${familyName}${rankName}`;
-                    } else {
-                        daimyoRef = `${senderClanName}当主・${senderDaimyo.fullName}`;
-                    }
-                }
-            } else {
-                daimyoRef = `${senderClanName}当主`;
-            }
-            greetMsg1 = `「此度は${daimyoRef}様の名代として罷り越しました」`;
-            greetMsg2 = `「うむ。して、御用向きはいかに？」`;
-        }
+        const greeting = this.buildDiplomacyGreeting(senderBusho, receiverDaimyo);
+        const { greetMsg1, greetMsg2, context: conversationContext } = greeting;
+        const msgs = this.getDiplomacyMessages(
+            type, isSenderDaimyo, senderClanName, receiverClanName,
+            senderCallName, receiverCallName, princessName, targetBushoName, conversationContext
+        );
 
         // ★修正：プレイヤーが使者を送った時は、驚かす必要がないのでSE（playEventSoundAndBlock）を鳴らさないように削除しました！
 
@@ -2159,6 +2228,11 @@ class DiplomacyManager {
         const isDaimyoSelf = (doer.isDaimyo);
         const enemyDaimyoName = enemyDaimyo ? enemyDaimyo.fullName : "当主";
 
+        const myCallName = this.getCallName(myDaimyo);
+        const enemyCallName = this.getCallName(doer);
+        const greeting = this.buildDiplomacyGreeting(doer, myDaimyo);
+        const conversationContext = greeting.context;
+
         let introMsg = "";
         if (isDaimyoSelf) {
             if (isEnemy) {
@@ -2166,18 +2240,20 @@ class DiplomacyManager {
             } else {
                 introMsg = `「殿、${doerClan.name}当主・${enemyDaimyoName}様がお見えになっております。お会いになられますか？」`;
             }
+        } else if (conversationContext && conversationContext.envoySpecial && conversationContext.envoySpecial.level >= 2) {
+            introMsg = `「殿、${doerClan.name}より${enemyCallName}がお見えになっております。使者として面会を求めておられます」`;
         } else {
             introMsg = `「殿、${doerClan.name} から使者が参っております。お会いになられますか？」`;
         }
-
-        const myCallName = this.getCallName(myDaimyo);
-        const enemyCallName = this.getCallName(doer);
 
         const myDaimyoFace = myDaimyo ? myDaimyo.faceIcon : 'unknown_face.webp';
         const myDaimyoNameStr = myDaimyo ? myDaimyo.fullName : '当主';
         const doerNameStr = doer.fullName;
 
-        const msgs = this.getDiplomacyMessages(type, isDaimyoSelf, doerClan.name, targetClan.name, enemyCallName, myCallName);
+        const msgs = this.getDiplomacyMessages(
+            type, isDaimyoSelf, doerClan.name, targetClan.name,
+            enemyCallName, myCallName, '姫', '貴家', conversationContext
+        );
 
         // ★修正：使者が来た瞬間はBGMを変えず、代わりに「使者が来ました！」というお知らせのSEを鳴らします！
         if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
@@ -2432,36 +2508,8 @@ class DiplomacyManager {
                     window.AudioManager.playBGM('SC_ex_Scene3_Odyssey.ogg');
                 }
 
-                let greetMsg1 = "";
-                let greetMsg2 = "";
-                
-                if (isDaimyoSelf) {
-                    greetMsg1 = `「${myCallName}。重大な用件ゆえ、此度はわし自ら参りました」`;
-                    greetMsg2 = `「これは${enemyCallName}……して、どのような御用向きでござるか？」`;
-                } else {
-                    let daimyoRef = "当主";
-                    if (enemyDaimyo) {
-                        if (enemyDaimyo.courtRankIds && enemyDaimyo.courtRankIds.includes(1)) {
-                            daimyoRef = "公方";
-                        } else {
-                            let rankName = "";
-                            if (enemyDaimyo.courtRankIds && enemyDaimyo.courtRankIds.length > 0 && this.game.courtRankSystem) {
-                                const rName = this.game.courtRankSystem.getHighestRankName(enemyDaimyo);
-                                if (rName !== "なし") rankName = rName;
-                            }
-                            if (rankName) {
-                                const familyName = enemyDaimyo.familyNameStr || "";
-                                daimyoRef = `${familyName}${rankName}`;
-                            } else {
-                                daimyoRef = `${doerClan.name}当主・${enemyDaimyoName}`;
-                            }
-                        }
-                    } else {
-                        daimyoRef = `${doerClan.name}当主`;
-                    }
-                    greetMsg1 = `「此度は${daimyoRef}様の名代として罷り越しました」`;
-                    greetMsg2 = `「うむ。して、御用向きはいかに？」`;
-                }
+                const greetMsg1 = greeting.greetMsg1;
+                const greetMsg2 = greeting.greetMsg2;
 
                 this.game.ui.showDialog(greetMsg1, false, () => {
                     this.game.ui.showDialog(greetMsg2, false, () => {
