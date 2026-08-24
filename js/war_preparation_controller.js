@@ -83,7 +83,7 @@ class WarPreparationController {
                     () => {
                         this.game.warManager.startWar(atkCastle, targetCastle, currentAtkBushos, currentSVal, rVal, hVal, gVal, null, selfReinfData);
                     },
-                    { okText: '要請する', cancelText: '要請しない' }
+                    { okText: '要請する', cancelText: '要請しない', closeBeforeOk: true, closeBeforeCancel: true }
                 );
             } else {
                 allyForceCandidates.sort((a,b) => b.force.soldiers - a.force.soldiers);
@@ -115,7 +115,7 @@ class WarPreparationController {
                         this.game.ui.cancelMapSelection();
                         this.game.ui.scrollToActiveCastle(atkCastle);
                     },
-                    { okText: '出陣する', okClass: 'btn-danger', cancelText: 'やめる' }
+                    { okText: '出陣する', okClass: 'btn-danger', cancelText: 'やめる', closeBeforeOk: true, closeBeforeCancel: true }
                 );
             } else {
                 proceedToAlly(selfReinfData, atkBushos, sVal);
@@ -133,7 +133,7 @@ class WarPreparationController {
                     () => {
                         askConfirmAndProceedToAlly(null);
                     },
-                    { okText: '援軍を出す', cancelText: '出さない' }
+                    { okText: '援軍を出す', cancelText: '出さない', closeBeforeOk: true, closeBeforeCancel: true }
                 );
             } else {
                 selfCandidates.sort((a,b) => b.soldiers - a.soldiers);
@@ -241,7 +241,7 @@ class WarPreparationController {
                 if (isHeavySnow) {
                     this.game.ui.showDialog("大雪の影響により、被害が出る場合があります。\nそれでも出陣しますか？", true, () => {
                         proceedWar(); 
-                    });
+                    }, null, { closeBeforeOk: true });
                 } else {
                     proceedWar();
                 }
@@ -360,7 +360,7 @@ class WarPreparationController {
                 this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
                 this.game.ui.showDialog(`援軍要請を断りました。`, false, () => {
                     this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
-                });
+                }, null, { closeBeforeOk: true });
             });
             return;
         }
@@ -424,7 +424,7 @@ class WarPreparationController {
             this.game.ui.openBushoSelector('atk_reinf_deploy', helperCastle.id, {
                 hideCancel: isBoss, 
                 onConfirm: (selectedBushoIds) => promptQuantity(selectedBushoIds.map(id => this.game.getBusho(id))),
-                onCancel: () => this.game.ui.showDialog("援軍の派遣を取りやめました。", false, () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData))
+                onCancel: () => this.game.ui.showDialog("援軍の派遣を取りやめました。", false, () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData), null, { closeBeforeOk: true })
             });
         };
         const promptQuantity = (reinfBushos) => {

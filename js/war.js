@@ -615,7 +615,7 @@ class WarManager {
                     this.game.ui.log("攻撃軍の兵糧が尽きました！", { history: false });
                     this.game.ui.showDialog("攻撃軍の兵糧が尽きました。\n攻撃軍は撤退します。", false, () => {
                         this.endWar(false);
-                    });
+                    }, null, { closeBeforeOk: true });
                 } else {
                     this.endWar(false); 
                 }
@@ -626,7 +626,7 @@ class WarManager {
                     this.game.ui.log("守備軍の兵糧が尽きました！", { history: false });
                     this.game.ui.showDialog("守備軍の兵糧が尽きました。\nこれ以上の籠城は続けられません。", false, () => {
                         this.endWar(true);
-                    });
+                    }, null, { closeBeforeOk: true });
                 } else {
                     this.endWar(true); 
                 }

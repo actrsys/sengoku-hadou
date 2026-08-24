@@ -1265,7 +1265,7 @@ class CommandSystem {
             if (isHeavySnow) {
                 this.game.ui.showDialog("大雪の影響により、被害が出る場合があります。\nそれでも出陣しますか？", true, () => {
                     this.executeWithEvent('war', () => proceedWar());
-                });
+                }, null, { closeBeforeOk: true });
             } else {
                 this.executeWithEvent('war', () => proceedWar());
             }

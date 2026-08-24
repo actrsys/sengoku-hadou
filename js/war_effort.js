@@ -411,7 +411,7 @@ Object.assign(WarManager.prototype, {
                     const bossMsg = isAttack 
                         ? `主家である ${myClanName} が\n${targetInfoStr}侵攻します。\n当家は従属しているため直ちに出陣します！`
                         : `主家である ${myClanName} から${typeStr}援軍要請が届きました。\n当家は従属しているため直ちに出陣します！`;
-                    game.ui.showDialog(bossMsg, false, onAccept);
+                    game.ui.showDialog(bossMsg, false, onAccept, null, { closeBeforeOk: true });
                 } else {
                     let dialogMsg = `${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。(持参金: ${gold})\n援軍要請に応じますか？`;
                     // スキルを持っている場合は専用のメッセージになります
@@ -420,7 +420,7 @@ Object.assign(WarManager.prototype, {
                     }
                     
                     const choices = [
-                        { label: '応じる', className: 'btn-primary', onClick: onAccept }
+                        { label: '応じる', className: 'btn-primary', onClick: onAccept, closeBeforeAction: true }
                     ];
                     if (atkCastle && defCastle && helperCastle) {
                         choices.push({
@@ -429,7 +429,7 @@ Object.assign(WarManager.prototype, {
                             }
                         });
                     }
-                    choices.push({ label: '応じない', className: 'btn-danger', onClick: onDecline });
+                    choices.push({ label: '応じない', className: 'btn-danger', onClick: onDecline, closeBeforeAction: true });
 
                     game.ui.showDialog(dialogMsg, false, null, null, { choices: choices });
                 }
@@ -440,7 +440,7 @@ Object.assign(WarManager.prototype, {
         // 2. 相手が援軍を断ってきた時のメッセージ
         showRefusal: (game, nameStr, isHeavySnow, onComplete) => {
             const reasonMsg = isHeavySnow ? "大雪のため、" : "";
-            game.ui.showDialog(`${reasonMsg}${nameStr}は援軍を拒否しました……`, false, onComplete);
+            game.ui.showDialog(`${reasonMsg}${nameStr}は援軍を拒否しました……`, false, onComplete, null, { closeBeforeOk: true });
         },
         
         // 3. 相手が援軍を承諾してくれた時のメッセージ
@@ -449,21 +449,21 @@ Object.assign(WarManager.prototype, {
             const skipAnim = false;
             
             if (isEnemy) {
-                game.ui.showDialog(`${nameStr}が敵の援軍として参戦しました！`, false, onComplete);
+                game.ui.showDialog(`${nameStr}が敵の援軍として参戦しました！`, false, onComplete, null, { closeBeforeOk: true });
                 return;
             }
             
             if (isDelegated) {
-                game.ui.showDialog(`${nameStr}が友軍として参戦しました！`, false, onComplete);
+                game.ui.showDialog(`${nameStr}が友軍として参戦しました！`, false, onComplete, null, { closeBeforeOk: true });
             } else {
                 if (isKunishu || !isPlayerRequest) {
                     if (skipAnim) {
                         if (onComplete) onComplete();
                     } else {
-                        game.ui.showDialog(`${nameStr}が守備側の援軍として参戦しました！`, false, onComplete);
+                        game.ui.showDialog(`${nameStr}が守備側の援軍として参戦しました！`, false, onComplete, null, { closeBeforeOk: true });
                     }
                 } else {
-                    game.ui.showDialog(`${nameStr}が援軍要請を承諾しました！`, false, onComplete);
+                    game.ui.showDialog(`${nameStr}が援軍要請を承諾しました！`, false, onComplete, null, { closeBeforeOk: true });
                 }
             }
         }
@@ -694,14 +694,14 @@ Object.assign(WarManager.prototype, {
                 let resolveConfirmed = null;
                 const showReq = () => {
                     const choices = [
-                        { label: '応じる', className: 'btn-primary', onClick: () => resolveConfirmed(true) }
+                        { label: '応じる', className: 'btn-primary', onClick: () => resolveConfirmed(true), closeBeforeAction: true }
                     ];
                     choices.push({
                         label: '戦況', className: 'btn-secondary', onClick: () => {
                             this.showSituationReport(true, atkCastle, atkBushos, defCastle, selfReinforcementData.castle, showReq);
                         }
                     });
-                    choices.push({ label: '応じない', className: 'btn-danger', onClick: () => resolveConfirmed(false) });
+                    choices.push({ label: '応じない', className: 'btn-danger', onClick: () => resolveConfirmed(false), closeBeforeAction: true });
                     
                     this.game.ui.showDialog(`${requesterName}が${targetInfoStr}${reinfCastleName}に救援を求めています。\n援軍要請に応じますか？`, false, null, null, { choices: choices });
                 };
@@ -1869,7 +1869,7 @@ Object.assign(WarManager.prototype, {
                     }
                     this.game.ui.showDialog(resultMsg, false, () => { 
                         this.closeWar(); 
-                    });
+                    }, null, { closeBeforeOk: true });
                 } else {
                     // ★修正：戦闘画面は飛ばしますが、結果のメッセージは表示してタップを待ちます！
                     if (this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
@@ -1987,7 +1987,7 @@ Object.assign(WarManager.prototype, {
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                     this.game.ui.showDialog(resultMsg, false, () => { 
                         this.closeWar(); 
-                    });
+                    }, null, { closeBeforeOk: true });
                 } else {
                     // ★追加：AIの城で反乱が起きた時も、専用のメッセージを出してタップを待ちます！
                     if (this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
@@ -2162,9 +2162,9 @@ Object.assign(WarManager.prototype, {
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 
                     if (isAtkSide) {
-                        this.game.ui.showDialog(`敵軍は城を捨てて敗走しました！\n${s.defender.name}を占領します！`, false, finishWarProcess);
+                        this.game.ui.showDialog(`敵軍は城を捨てて敗走しました！\n${s.defender.name}を占領します！`, false, finishWarProcess, null, { closeBeforeOk: true });
                     } else {
-                        this.game.ui.showDialog(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, false, finishWarProcess);
+                        this.game.ui.showDialog(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, false, finishWarProcess, null, { closeBeforeOk: true });
                     }
                 } else {
                     // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
@@ -2284,7 +2284,7 @@ Object.assign(WarManager.prototype, {
                     }
                 }
                 
-                this.game.ui.showDialog(resultMsg, false, finishWarProcess);
+                this.game.ui.showDialog(resultMsg, false, finishWarProcess, null, { closeBeforeOk: true });
             }
             else {
                 // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
@@ -2305,7 +2305,7 @@ Object.assign(WarManager.prototype, {
                 this.game.ui.hideAIWarThinking();
             }
 
-            if (this.state.isPlayerInvolved) this.game.ui.showDialog("合戦処理中にエラーが発生しましたが、ゲームを継続します。", false, () => { this.game.finishTurn(); });
+            if (this.state.isPlayerInvolved) this.game.ui.showDialog("合戦処理中にエラーが発生しましたが、ゲームを継続します。", false, () => { this.game.finishTurn(); }, null, { closeBeforeOk: true });
             else this.game.finishTurn();
         }
     },
@@ -2507,7 +2507,7 @@ Object.assign(WarManager.prototype, {
         }
         this.game.ui.showDialog("登用する武将を選択してください。", false, () => {
             this.openHireSelector();
-        });
+        }, null, { closeBeforeOk: true });
     },
 
     openHireSelector() {
@@ -2533,7 +2533,8 @@ Object.assign(WarManager.prototype, {
     checkFinishHirePhase() {
         this.game.ui.showDialog("登用を終了しますか？", true, 
             () => { this.startKillPhaseIntro(); }, // はい：次のフェーズへ
-            () => { this.openHireSelector(); } // いいえ：リストに戻る
+            () => { this.openHireSelector(); }, // いいえ：リストに戻る
+            { closeBeforeOk: true, closeBeforeCancel: true }
         );
     },
 
@@ -2595,7 +2596,7 @@ Object.assign(WarManager.prototype, {
 
         this.game.ui.showDialog(msg, false, () => {
             this.openHireSelector();
-        });
+        }, null, { closeBeforeOk: true });
     },
 
     startKillPhaseIntro() {
@@ -2608,7 +2609,7 @@ Object.assign(WarManager.prototype, {
         this.pendingKills = [];
         this.game.ui.showDialog("処断する武将を選択してください。", false, () => {
             this.openKillSelector();
-        });
+        }, null, { closeBeforeOk: true });
     },
 
     openKillSelector() {
@@ -2633,7 +2634,8 @@ Object.assign(WarManager.prototype, {
     checkFinishKillPhase() {
         this.game.ui.showDialog("処断を終了しますか？", true, 
             () => { this.finishPrisonerPhase(); }, // はい：全員の処遇を確定させます
-            () => { this.openKillSelector(); } // いいえ：リストに戻る
+            () => { this.openKillSelector(); }, // いいえ：リストに戻る
+            { closeBeforeOk: true, closeBeforeCancel: true }
         );
     },
 
@@ -2679,7 +2681,7 @@ Object.assign(WarManager.prototype, {
                 // そして、処断完了のメッセージを出します
                 this.game.ui.showDialog(`${displayName} を処断しました。`, false, () => {
                     this.openKillSelector();
-                });
+                }, null, { closeBeforeOk: true });
             },
             () => { 
                 // 「やめる」を選んだ時の処理：武将は移さず、そのままリストに戻ります
@@ -2689,7 +2691,8 @@ Object.assign(WarManager.prototype, {
                 okText: '処断する',
                 okClass: 'btn-danger',
                 cancelText: 'やめる',
-                cancelClass: 'btn-secondary'
+                cancelClass: 'btn-secondary',
+                closeBeforeCancel: true
             }
         );
     },
@@ -3006,7 +3009,7 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.hideAIGuardTemporarily();
                     onComplete(null); 
                 },
-                { okText: '援軍を出す', cancelText: '出さない' }
+                { okText: '援軍を出す', cancelText: '出さない', closeBeforeOk: true, closeBeforeCancel: true }
             );
         } else {
             // AIなら自動で一番兵士が多い城から送る
@@ -3026,21 +3029,21 @@ Object.assign(WarManager.prototype, {
                             this.game.warPreparationController.handleBushoSelectionForDefSelfReinf(bestCastle.id, selectedBushoIds, defCastle, onComplete, promptBusho);
                         },
                         onCancel: () => {
-                            this.game.ui.showDialog("援軍の派遣を取りやめました。", false, () => onComplete(null));
+                            this.game.ui.showDialog("援軍の派遣を取りやめました。", false, () => onComplete(null), null, { closeBeforeOk: true });
                         }
                     });
                 };
                 
                 const showReq = () => {
                     const choices = [
-                        { label: '応じる', className: 'btn-primary', onClick: () => promptBusho() }
+                        { label: '応じる', className: 'btn-primary', onClick: () => promptBusho(), closeBeforeAction: true }
                     ];
                     choices.push({
                         label: '戦況', className: 'btn-secondary', onClick: () => {
                             this.showSituationReport(false, this.state.sourceCastle, this.state.atkBushos, defCastle, bestCastle, showReq);
                         }
                     });
-                    choices.push({ label: '応じない', className: 'btn-danger', onClick: () => onComplete(null) });
+                    choices.push({ label: '応じない', className: 'btn-danger', onClick: () => onComplete(null), closeBeforeAction: true });
 
                     this.game.ui.showDialog(`${requesterName}が${bestCastle.name}に救援を求めています。\n援軍要請に応じますか？`, false, null, null, { choices: choices });
                 };
@@ -3100,7 +3103,7 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.hideAIGuardTemporarily();
                     onComplete(); 
                 },
-                { okText: '要請する', cancelText: '要請しない' }
+                { okText: '要請する', cancelText: '要請しない', closeBeforeOk: true, closeBeforeCancel: true }
             );
         } else {
             // ★追加：戦力比較用の合計兵力を計算しておきます（確率計算で必要になります）
@@ -3304,7 +3307,7 @@ Object.assign(WarManager.prototype, {
             
             this.game.warManager.reinfMsgHelper.showRequest(this.game, myClanName, targetInfoStr, gold, isBoss, false, startSelection, () => {
                 this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
-                this.game.ui.showDialog(`援軍要請を断りました。`, false, onComplete);
+                this.game.ui.showDialog(`援軍要請を断りました。`, false, onComplete, null, { closeBeforeOk: true });
             }, this.state.sourceCastle, this.state.atkBushos, defCastle, helperCastle);
             return;
         }
@@ -3377,7 +3380,7 @@ Object.assign(WarManager.prototype, {
             this.game.ui.openBushoSelector('def_reinf_deploy', helperCastle.id, {
                 hideCancel: hideCancel,
                 onConfirm: (selectedBushoIds) => promptQuantity(selectedBushoIds.map(id => this.game.getBusho(id))),
-                onCancel: () => this.game.ui.showDialog("援軍の派遣を取りやめました。", false, onComplete)
+                onCancel: () => this.game.ui.showDialog("援軍の派遣を取りやめました。", false, onComplete, null, { closeBeforeOk: true })
             });
         };
         const promptQuantity = (reinfBushos) => {
@@ -3421,7 +3424,7 @@ Object.assign(WarManager.prototype, {
         this.state.isPlayerInvolved = true;
         const helperClanName = this.game.clans.find(c => c.id === helperClanId)?.name || "援軍";
         const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
-        this.game.ui.showDialog(`${helperClanName}の${leaderName} (${helperCastle.name}) が守備側の援軍として出発しました！`, false, onComplete);
+        this.game.ui.showDialog(`${helperClanName}の${leaderName} (${helperCastle.name}) が守備側の援軍として出発しました！`, false, onComplete, null, { closeBeforeOk: true });
     },
 
     // ★追加：処断した時に、その武将の元の同僚たちの宿敵リストに大名を登録する魔法

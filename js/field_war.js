@@ -768,12 +768,12 @@ class FieldWarManager {
                         if (unit.isAttacker) this.log(`全軍、撤退を開始します……`);
                         else this.log(`全軍、城内へ撤退を開始します……`);
                         this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
-                    });
+                    }, null, { closeBeforeOk: true });
                 } else {
                     this.game.ui.showDialog(`${unit.name}隊を戦場から離脱（撤退）させますか？`, true, () => {
                         this.log(`${unit.name}隊は戦場から撤退しました。`);
                         this.retreatUnit(unit);
-                    });
+                    }, null, { closeBeforeOk: true });
                 }
             };
         }
@@ -2374,7 +2374,7 @@ class FieldWarManager {
             this.fieldEndNoticeShown = true;
             this.game.ui.showDialog(message || '野戦は終結しました。', false, () => {
                 this.endFieldWar(resultType);
-            });
+            }, null, { closeBeforeOk: true });
         } else {
             this.endFieldWar(resultType);
         }

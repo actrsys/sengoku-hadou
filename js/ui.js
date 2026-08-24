@@ -1007,7 +1007,7 @@ class UIManager {
         
         let autoCloseTimer = null;
 
-        const cleanupAndNext = (callback) => {
+        const cleanupAndNext = (callback, closeBeforeAction = false) => {
             if (autoCloseTimer) clearTimeout(autoCloseTimer);
 
             // ★Round19：選択肢の有無に関係なく、次の会話が来る可能性がある間は
@@ -1067,6 +1067,14 @@ class UIManager {
                 }
             };
 
+            // 会話から会話への切替は旧画面を保持しますが、出陣演出・マップ選択・別モーダルなど
+            // 「次が会話ではない」遷移は、入力画面を先に閉じてから処理を始めます。
+            // これにより、次画面が動き始めた後まで古い選択ボタンだけ残る状態を防ぎます。
+            if (closeBeforeAction) {
+                this._cancelDialogHandoffClose();
+                closeCompletely();
+            }
+
             try {
                 if (callback) {
                     const result = callback();
@@ -1084,7 +1092,7 @@ class UIManager {
                 console.error("ダイアログの処理中にエラー:", e);
             }
 
-            scheduleHandoff();
+            if (!closeBeforeAction) scheduleHandoff();
         };
         
         // ★修正：okBtnが見つからなくても、安全にフッター（ボタンの置き場）を見つける魔法です！
@@ -1126,7 +1134,7 @@ class UIManager {
             }
             
             // 擬似的に「決定」の動作をさせます（引数なしのonOkを呼び出します）
-            cleanupAndNext(dialog.onOk);
+            cleanupAndNext(dialog.onOk, dialog.customOpts?.closeBeforeOk === true);
         };
 
         const isEventMode = dialog.customOpts && dialog.customOpts.isEvent;
@@ -1250,7 +1258,7 @@ class UIManager {
                             else window.AudioManager.playSE('decision.ogg');
                         }
                         // ★Round19：ここで選択肢用レイアウトを外すと、次の会話まで一瞬配置が跳ねるため維持します。
-                        cleanupAndNext(choice.onClick);
+                        cleanupAndNext(choice.onClick, choice.closeBeforeAction === true);
                     };
                     footer.appendChild(btn);
                 });
@@ -1268,7 +1276,7 @@ class UIManager {
                         if (modal.classList.contains('event-dialog-modal') && window.AudioManager) {
                             window.AudioManager.playSE('decision.ogg');
                         }
-                        cleanupAndNext(dialog.onOk);
+                        cleanupAndNext(dialog.onOk, dialog.customOpts?.closeBeforeOk === true);
                     };
                     footer.appendChild(okB);
 
@@ -1281,7 +1289,7 @@ class UIManager {
                         if (modal.classList.contains('event-dialog-modal') && window.AudioManager) {
                             window.AudioManager.playSE('cancel.ogg');
                         }
-                        cleanupAndNext(dialog.onCancel);
+                        cleanupAndNext(dialog.onCancel, dialog.customOpts?.closeBeforeCancel === true);
                     };
                     footer.appendChild(canB);
                 } else if (!isBottomMessage) {
@@ -1292,7 +1300,7 @@ class UIManager {
                     closeB.textContent = dialog.customOpts?.okText || '閉じる';
                     closeB.onclick = (e) => {
                         e.stopPropagation();
-                        cleanupAndNext(dialog.onOk);
+                        cleanupAndNext(dialog.onOk, dialog.customOpts?.closeBeforeOk === true);
                     };
                     footer.appendChild(closeB);
                 }
@@ -1312,7 +1320,7 @@ class UIManager {
                         currentOkBtn.click();
                     } else {
                         // ★追加：ボタンがないイベント画面などの場合は、直接「次へ進む」魔法を呼び出します！
-                        cleanupAndNext(dialog.onOk);
+                        cleanupAndNext(dialog.onOk, dialog.customOpts?.closeBeforeOk === true);
                     }
                 }
             }, dialog.autoCloseTime);

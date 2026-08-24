@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r177');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r178');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -4784,6 +4784,30 @@ test('観戦終了予約メッセージはbodyではなく固定論理画面内�
     assert.ok(rule && rule[1].includes('position: absolute'), '物理viewport fixedではなくgame-screen内absoluteにする');
 });
 
+
+test('戦争準備の選択は非会話画面へ進む前に確認ダイアログを閉じる', () => {
+    const ui = read('js/ui.js');
+    const prep = read('js/war_preparation_controller.js');
+    const effort = read('js/war_effort.js');
+    const field = read('js/field_war.js');
+    const war = read('js/war.js');
+
+    const cleanupStart = ui.indexOf('const cleanupAndNext = (callback, closeBeforeAction = false)');
+    const cleanupEnd = ui.indexOf('// ★修正：okBtnが見つからなくても', cleanupStart);
+    const cleanupBlock = ui.slice(cleanupStart, cleanupEnd);
+    assert.ok(cleanupStart >= 0, '非会話遷移用の明示的な即時close指定を持つ');
+    assert.ok(cleanupBlock.indexOf('closeCompletely();') < cleanupBlock.indexOf('const result = callback();'), '指定時はcallbackより先にダイアログを閉じる');
+    assert.ok(ui.includes('choice.closeBeforeAction === true'), 'カスタム選択肢でも先閉じを指定できる');
+    assert.ok(ui.includes('dialog.customOpts?.closeBeforeOk === true'));
+    assert.ok(ui.includes('dialog.customOpts?.closeBeforeCancel === true'));
+
+    const atkPrompt = prep.slice(prep.indexOf('"他勢力に援軍を要請しますか？"'), prep.indexOf('} else {', prep.indexOf('"他勢力に援軍を要請しますか？"')));
+    assert.ok(atkPrompt.includes('closeBeforeOk: true') && atkPrompt.includes('closeBeforeCancel: true'), '攻撃側の援軍要請確認は要請する/しないの双方で先に閉じる');
+    assert.ok(prep.includes("okText: '出陣する', okClass: 'btn-danger', cancelText: 'やめる', closeBeforeOk: true, closeBeforeCancel: true"), '開戦最終確認も演出開始前に閉じる');
+    assert.ok(effort.includes("okText: '要請する', cancelText: '要請しない', closeBeforeOk: true, closeBeforeCancel: true"), '守備側の援軍要請確認も同じ規則にする');
+    assert.ok(field.includes("{ closeBeforeOk: true }"), '野戦撤退・終了通知から戦場状態を動かす前にも閉じる');
+    assert.ok(war.includes('攻撃軍の兵糧が尽きました。') && war.includes('攻撃軍は撤退します。') && war.includes('{ closeBeforeOk: true }'), '攻城戦の兵糧切れ通知も戦争終了前に閉じる');
+});
 
 test('外交の非同期会話遷移は固定時間で旧ダイアログを閉じず明示的handoffを使う', () => {
     const ui = read('js/ui.js');
