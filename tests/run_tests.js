@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r173');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r174');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1240,9 +1240,18 @@ test('野戦終了通知は終了瞬間の生存部隊ではなく参加実績�
 test('攻城戦はラウンド開始時点で決着済みでも終了理由を表示してから戦後処理へ進む', () => {
     const war = read('js/war.js');
     assert.ok(war.includes('finishSiegeWithNotice(attackerWon, message)'));
-    assert.ok(war.includes("this.finishSiegeWithNotice(true, '城の防御が０になった！<br>城は陥落した！')"));
-    assert.ok(war.includes("this.finishSiegeWithNotice(true, '守備本隊の士気が崩壊した！<br>城は陥落した！')"));
-    assert.ok(war.includes("this.finishSiegeWithNotice(false, '攻撃本隊の士気が崩壊した！<br>攻撃軍は退却した！')"));
+    assert.ok(war.includes("this.finishSiegeWithNotice(true, '城の防御が尽き、城は陥落しました。')"));
+    assert.ok(war.includes("this.finishSiegeWithNotice(true, '守備本隊の士気が崩壊し、城は陥落しました。')"));
+    assert.ok(war.includes("this.finishSiegeWithNotice(false, '攻撃本隊の士気が崩壊し、攻撃軍は退却しました。')"));
+    assert.ok(war.includes("`${activeArmyName}は軍を鼓舞しました。`"));
+    assert.ok(war.includes("`${activeArmyName}は火計を仕掛けました。`"));
+    assert.ok(war.includes("`${activeArmyName}は突撃を仕掛けました。`"));
+    assert.ok(war.includes("`${targetSideLabel}に${actualSoldierDmg}人の損害を与えました。`"));
+    assert.ok(war.includes("城壁にも${calculatedWallDmg}の損害を与えました。"));
+    assert.ok(war.includes("return `${factionName}・${bushoName}軍`;"));
+    assert.ok(war.includes("攻撃軍の兵糧が尽きました。\\n攻撃軍は撤退します。"));
+    assert.ok(!war.includes("`${activeArmyName} の${actionName}！`"));
+
 });
 
 test('大名家滅亡履歴は滅亡家と攻略家を関連勢力として一度だけ記録する', () => {

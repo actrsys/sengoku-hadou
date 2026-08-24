@@ -590,30 +590,30 @@ class WarManager {
                 // 城壁が壊れて落ちた場合、少しだけ城壁（防御力）を修復してから戦後処理へ。
                 // ラウンド開始時点で既に0だった場合でも、プレイヤーには終了理由を必ず見せます。
                 s.defender.defense += 150;
-                this.finishSiegeWithNotice(true, '城の防御が０になった！<br>城は陥落した！');
+                this.finishSiegeWithNotice(true, '城の防御が尽き、城は陥落しました。');
                 return;
             }
             if (s.defender.morale <= 0) {
-                this.finishSiegeWithNotice(true, '守備本隊の士気が崩壊した！<br>城は陥落した！');
+                this.finishSiegeWithNotice(true, '守備本隊の士気が崩壊し、城は陥落しました。');
                 return;
             }
             if (s.defender.soldiers <= 0) {
-                this.finishSiegeWithNotice(true, '守備本隊が全滅した！<br>城は陥落した！');
+                this.finishSiegeWithNotice(true, '守備本隊が全滅し、城は陥落しました。');
                 return;
             }
             if (s.attacker.morale <= 0) {
-                this.finishSiegeWithNotice(false, '攻撃本隊の士気が崩壊した！<br>攻撃軍は退却した！');
+                this.finishSiegeWithNotice(false, '攻撃本隊の士気が崩壊し、攻撃軍は退却しました。');
                 return;
             }
             if (s.attacker.soldiers <= 0) {
-                this.finishSiegeWithNotice(false, '攻撃本隊が全滅した！<br>守備軍が防ぎ切った！');
+                this.finishSiegeWithNotice(false, '攻撃本隊が全滅し、守備軍が城を守り切りました。');
                 return;
             }
             
             if (s.attacker.rice <= 0) { 
                 if (s.isPlayerInvolved && this.game.ui) {
                     this.game.ui.log("攻撃軍の兵糧が尽きました！", { history: false });
-                    this.game.ui.showDialog("攻撃軍の兵糧が尽きました！\n攻撃軍は撤退します。", false, () => {
+                    this.game.ui.showDialog("攻撃軍の兵糧が尽きました。\n攻撃軍は撤退します。", false, () => {
                         this.endWar(false);
                     });
                 } else {
@@ -624,7 +624,7 @@ class WarManager {
             if (s.defender.rice <= 0) { 
                 if (s.isPlayerInvolved && this.game.ui) {
                     this.game.ui.log("守備軍の兵糧が尽きました！", { history: false });
-                    this.game.ui.showDialog("守備軍の兵糧が尽きました！\nこれ以上の籠城は不可能です……。", false, () => {
+                    this.game.ui.showDialog("守備軍の兵糧が尽きました。\nこれ以上の籠城は続けられません。", false, () => {
                         this.endWar(true);
                     });
                 } else {
@@ -1070,15 +1070,15 @@ class WarManager {
 
         const checkDefeatAndPushMsg = () => {
             if (s.defender.defense <= 0) {
-                pushMsg({ text: `<span class="war-critical-message">城の防御が０になった！<br>城は陥落した！</span>`, log: `城防御が0になり、陥落した！` });
+                pushMsg({ text: `<span class="war-critical-message">城の防御が尽き、城は陥落しました。</span>`, log: `城防御が0になり、陥落した！` });
             } else if (s.defender.morale <= 0) {
-                pushMsg({ text: `<span class="war-critical-message">守備本隊の士気が崩壊した！<br>城は陥落した！</span>`, log: `守備本隊の士気が0になり、陥落した！` });
+                pushMsg({ text: `<span class="war-critical-message">守備本隊の士気が崩壊し、城は陥落しました。</span>`, log: `守備本隊の士気が0になり、陥落した！` });
             } else if (s.defender.soldiers <= 0) {
-                pushMsg({ text: `<span class="war-critical-message">守備本隊が全滅した！<br>城は陥落した！</span>`, log: `守備本隊が全滅し、陥落した！` });
+                pushMsg({ text: `<span class="war-critical-message">守備本隊が全滅し、城は陥落しました。</span>`, log: `守備本隊が全滅し、陥落した！` });
             } else if (s.attacker.morale <= 0) {
-                pushMsg({ text: `<span class="war-critical-message">攻撃本隊の士気が崩壊した！<br>攻撃軍は退却した！</span>`, log: `攻撃本隊の士気が0になり、退却した！` });
+                pushMsg({ text: `<span class="war-critical-message">攻撃本隊の士気が崩壊し、攻撃軍は退却しました。</span>`, log: `攻撃本隊の士気が0になり、退却した！` });
             } else if (s.attacker.soldiers <= 0) {
-                pushMsg({ text: `<span class="war-critical-message">攻撃本隊が全滅した！<br>守備軍が防ぎ切った！</span>`, log: `攻撃本隊が全滅し、退却した！` });
+                pushMsg({ text: `<span class="war-critical-message">攻撃本隊が全滅し、守備軍が城を守り切りました。</span>`, log: `攻撃本隊が全滅し、退却した！` });
             }
         };
         
@@ -1120,14 +1120,14 @@ class WarManager {
                 }
             }
             const bushoName = leader ? leader.name : "不明";
-            return `${factionName} ${bushoName} 軍`;
+            return `${factionName}・${bushoName}軍`;
         };
 
         let activeArmyName = getArmyDisplayName(s.turn);
 
         if (type === 'retreat') { 
             if (s.turn === 'attacker') { 
-                pushMsg({ text: `<span class="war-critical-message">攻撃本隊が撤退を開始した！<br>合戦は終結した！</span>`, log: `${activeArmyName} が撤退を開始した！` });
+                pushMsg({ text: `<span class="war-critical-message">攻撃本隊は撤退を開始し、合戦は終結しました。</span>`, log: `${activeArmyName} が撤退を開始した！` });
                 const finalize = () => { this.endWar(false, true); };
                 if (s.isPlayerInvolved && actionMessages.length > 0) {
                     this.game.ui.showWarActionMessage(actionMessages, finalize);
@@ -1135,7 +1135,7 @@ class WarManager {
                     finalize();
                 }
             } else if (s.turn === 'defender') { 
-                pushMsg({ text: `<span class="war-critical-message">守備本隊が城を放棄し撤退した！<br>合戦は終結した！</span>`, log: `${activeArmyName} が城を放棄し撤退した！` });
+                pushMsg({ text: `<span class="war-critical-message">守備本隊は城を放棄して撤退し、合戦は終結しました。</span>`, log: `${activeArmyName} が城を放棄し撤退した！` });
                 const finalize = () => { this.executeRetreatLogic(s.defender); };
                 if (s.isPlayerInvolved && actionMessages.length > 0) {
                     this.game.ui.showWarActionMessage(actionMessages, finalize);
@@ -1150,7 +1150,7 @@ class WarManager {
                 else if (s.turn === 'defender_self_reinf') reinfKey = 'defSelfReinforcement';
                 else if (s.turn === 'defender_ally_reinf') reinfKey = 'defReinforcement';
                 
-                pushMsg(`${activeArmyName} は戦場から離脱し、撤退した！`);
+                pushMsg(`${activeArmyName}は戦場から離脱し、撤退しました。`);
                 
                 if (typeof this.retreatReinforcementForce === 'function') {
                     this.retreatReinforcementForce(reinfKey);
@@ -1187,7 +1187,7 @@ class WarManager {
         }
 
         if (type === 'def_attack') { 
-             pushMsg(`${activeArmyName} は籠城し、守りを固めている！`);
+             pushMsg(`${activeArmyName}は籠城し、守りを固めました。`);
              executeNext(); return;
         }
         
@@ -1206,9 +1206,9 @@ class WarManager {
                 s.fireSufferedCount = 0;
             }
 
-            pushMsg(`${activeArmyName} の鼓舞！`);
+            pushMsg(`${activeArmyName}は軍を鼓舞しました。`);
             // ★追加：メッセージと一緒に「最新の数字（currentStats）」を送ることで、すぐに画面を更新させます！
-            pushMsg({ text: `士気が${moraleUp}上昇した！`, log: `${activeArmyName} 鼓舞！ 士気+${moraleUp}`, currentStats: getCurrentStats() });
+            pushMsg({ text: `士気が${moraleUp}上昇しました。`, log: `${activeArmyName} 鼓舞！ 士気+${moraleUp}`, currentStats: getCurrentStats() });
             executeNext(); return;
         }
 
@@ -1233,7 +1233,7 @@ class WarManager {
                 executeNext(); return;
             }
 
-            pushMsg(`${activeArmyName} は敵を挑発している！`);
+            pushMsg(`${activeArmyName}は敵軍を挑発しました。`);
 
             let defBestInt = activeBushos.reduce((max, b) => Math.max(max, b.intelligence), 0);
             let defInt = activeBushos[0].intelligence;
@@ -1245,7 +1245,7 @@ class WarManager {
                 let targetArmyName = getArmyDisplayName(role);
                 
                 if (s.plannedActions[role].type === 'charge') {
-                    pushMsg({ text: `${targetArmyName} は挑発を無視した！`, log: `${activeArmyName} 挑発失敗（${targetArmyName}）` });
+                    pushMsg({ text: `${targetArmyName}は挑発に応じませんでした。`, log: `${activeArmyName} 挑発失敗（${targetArmyName}）` });
                     return;
                 }
 
@@ -1268,9 +1268,9 @@ class WarManager {
                     s.plannedActions[role].type = 'charge';
                     s.plannedActions[role].isProvoked = true;
                     provokedCount++;
-                    pushMsg({ text: `${targetArmyName} は挑発に応じて陣形を変更した！`, log: `${activeArmyName} 挑発成功（${targetArmyName}）` });
+                    pushMsg({ text: `${targetArmyName}は挑発に乗り、陣形を変更しました。`, log: `${activeArmyName} 挑発成功（${targetArmyName}）` });
                 } else {
-                    pushMsg({ text: `${targetArmyName} は挑発を無視した！`, log: `${activeArmyName} 挑発失敗（${targetArmyName}）` });
+                    pushMsg({ text: `${targetArmyName}は挑発に応じませんでした。`, log: `${activeArmyName} 挑発失敗（${targetArmyName}）` });
                 }
             });
             
@@ -1281,7 +1281,7 @@ class WarManager {
         }
 
         if (type === 'fire') {
-            pushMsg(`${activeArmyName} の火計！`);
+            pushMsg(`${activeArmyName}は火計を仕掛けました。`);
             let atkBestInt = activeBushos.reduce((max, b) => Math.max(max, b.intelligence), 0);
             let atkInt = activeBushos[0].intelligence;
             
@@ -1354,10 +1354,10 @@ class WarManager {
                 s.wallDamageHistory[s.wallDamageHistory.length - 1] += (calcDamage || 0);
                 
                 pushMsg({ type: 'damage', target: 'defender', wallDmg: calcDamage, se: 'fire001.mp3', currentStats: getCurrentStats() });
-                pushMsg({ text: `敵城壁に${calcDamage}の被害を与えた！`, log: `${activeArmyName} 火計成功！ 敵城壁に${calcDamage}の被害`});
+                pushMsg({ text: `火計が成功し、敵城壁に${calcDamage}の損害を与えました。`, log: `${activeArmyName} 火計成功！ 敵城壁に${calcDamage}の被害`});
                 checkDefeatAndPushMsg();
             } else {
-                pushMsg({ text: `火計は失敗に終わった……`, log: `${activeArmyName} 火計失敗……`, se: 'miss.ogg' });
+                pushMsg({ text: `火計は失敗に終わりました。`, log: `${activeArmyName} 火計失敗……`, se: 'miss.ogg' });
             }
             executeNext(); return;
         }
@@ -1741,8 +1741,12 @@ class WarManager {
         }
         else if (type === 'siege') actionName = "破壊";
         else if (type === 'charge' || type === 'def_charge') actionName = "突撃";
-        
-        pushMsg(`${activeArmyName} の${actionName}！`);
+
+        let actionMessage = `${activeArmyName}は攻撃を仕掛けました。`;
+        if (actionName === '斉射') actionMessage = `${activeArmyName}は一斉に矢弾を放ちました。`;
+        else if (actionName === '破壊') actionMessage = `${activeArmyName}は城壁への破壊攻撃を行いました。`;
+        else if (actionName === '突撃') actionMessage = `${activeArmyName}は突撃を仕掛けました。`;
+        pushMsg(actionMessage);
         
         let damageMsgData = {
             type: 'damage',
@@ -1761,17 +1765,17 @@ class WarManager {
         
         pushMsg(damageMsgData);
         
-        let resultMsg = `敵兵 計${actualSoldierDmg}人`;
-        
+        const targetSideLabel = isAtkTurnGroup ? '守備側' : '攻撃側';
+        let resultMsg = actualSoldierDmg > 0
+            ? `${targetSideLabel}に${actualSoldierDmg}人の損害を与えました。`
+            : `${targetSideLabel}に有効な損害を与えられませんでした。`;
+
         if (actualCounterDmg > 0) {
-            resultMsg += ` を撃破し、反撃により ${actualCounterDmg}人 の損害を被った！`;
-        } else {
-            resultMsg += ` を撃破した！`;
+            resultMsg += `<br>反撃により、${activeArmyName}も${actualCounterDmg}人の損害を受けました。`;
         }
 
         if (calculatedWallDmg > 0) {
-            // お城へのダメージがある場合は、改行（<br>）して付け足します
-            resultMsg += `<br>城壁に ${calculatedWallDmg} の損害を与えた！`;
+            resultMsg += `<br>城壁にも${calculatedWallDmg}の損害を与えました。`;
         }
         
         // ★ <br> を使って画面に表示しつつ、横長の記録（ログ）には改行をスペースに変えて書き込みます
@@ -1790,7 +1794,7 @@ class WarManager {
                 if (s[r.key]) {
                     if (s[r.key].morale <= 0 && s[r.key].soldiers > 0) {
                         let armyName = getArmyDisplayName(r.role);
-                        pushMsg(`${armyName} は士気が崩壊し、戦場から離脱した！`);
+                        pushMsg(`${armyName}は士気が崩壊し、戦場から離脱しました。`);
                         
                         // 裏側のデータでも「撤退した」ことにします（兵士は減らさずに帰還させます）
                         if (typeof this.retreatReinforcementForce === 'function') {
@@ -1800,7 +1804,7 @@ class WarManager {
                         }
                     } else if (s[r.key].soldiers <= 0) {
                         let destroyedArmyName = getArmyDisplayName(r.role);
-                        pushMsg(`${destroyedArmyName} は壊滅し、戦場から離脱した！`);
+                        pushMsg(`${destroyedArmyName}は壊滅し、戦場から離脱しました。`);
                         
                         // 裏側のデータでも「撤退した」ことにします
                         if (typeof this.retreatReinforcementForce === 'function') {
@@ -2062,8 +2066,8 @@ class WarManager {
                         const isAtkPlayer = (Number(s.attacker.ownerClan) === Number(this.game.playerClanId));
                         const isDefPlayer = (Number(s.defender.ownerClan) === Number(this.game.playerClanId));
                         let msg = "決着がつかず、攻撃軍は撤退しました。";
-                        if (isAtkPlayer) msg = "攻城戦が長引き、我が軍は撤退を余儀なくされました……";
-                        else if (isDefPlayer) msg = "城の防衛に成功しました！ 敵軍は撤退していきました。";
+                        if (isAtkPlayer) msg = "攻城戦が長引いたため、我が軍は撤退します。";
+                        else if (isDefPlayer) msg = "城の防衛に成功し、敵軍は撤退しました。";
                         
                         this.game.ui.showDialog(msg, false, () => {
                             this.endWar(false);
