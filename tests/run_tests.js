@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r131');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r132');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2240,7 +2240,7 @@ test('面談は専用View内で完結し固定論理画面内・非スクロー�
     assert.ok(css.includes('body:not(.is-pc) #interview-modal .interview-session-content') && css.includes('width: calc(100% - 12px) !important;'), 'スマホ面談枠は9:16論理画面の左右を広く使う');
     assert.ok(css.includes('#interview-modal .interview-session-content'));
     assert.ok(css.includes('overflow: hidden !important'), '面談本体はスクロールへ逃がさない');
-    assert.ok(view.includes("if (this._isPc()) return 15;") && view.includes("return mode === 'target' ? 12 : 16;"), '人数超過はPC15人・スマホ初回16人/他者12人のページ切替で処理する');
+    assert.ok(view.includes("if (this._isPc()) return mode === 'target' ? 15 : 20;") && view.includes("return mode === 'target' ? 10 : 14;"), '人数超過はPC通常20人/他者15人・スマホ通常14人/他者10人のページ切替で処理する');
     assert.ok(view.includes('showMessages(busho, messages'), '長文を意味単位の順送り表示にできる');
     assert.ok(command.includes("case 'interview':"), '面談開始は汎用武将セレクタではなく専用フローへ渡す');
     assert.ok(!interview.includes('openBushoSelector'), '面談中に汎用武将リストを開かない');

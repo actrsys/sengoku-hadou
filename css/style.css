@@ -3783,12 +3783,13 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     flex: 1 1 auto;
     min-height: 0;
     display: grid;
-    grid-template-columns: 250px minmax(0, 1fr);
-    gap: 14px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 7px;
     overflow: hidden;
 }
 
 .interview-session-stage {
+    grid-column: 2 / -1;
     min-width: 0;
     min-height: 0;
     display: flex;
@@ -3889,8 +3890,8 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     overflow: hidden !important;
 }
 
-.interview-session-content.speaker-hidden .interview-session-main {
-    grid-template-columns: 1fr;
+.interview-session-content.speaker-hidden .interview-session-stage {
+    grid-column: 1 / -1;
 }
 
 .interview-session-list-view {
@@ -3998,10 +3999,13 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     flex: 1 1 auto;
     min-height: 0;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     grid-template-rows: repeat(5, minmax(0, 1fr));
     gap: 7px;
     overflow: hidden;
+}
+.target-list-view .interview-session-person-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .interview-session-person {
@@ -4252,19 +4256,24 @@ body:not(.is-pc) #interview-modal .interview-session-content {
 }
 
 body:not(.is-pc) .interview-session-header {
-    flex-basis: 52px;
-    min-height: 52px;
+    flex-basis: 62px;
+    min-height: 62px;
 }
 body:not(.is-pc) .interview-session-kicker { font-size: 7px; }
 body:not(.is-pc) #interview-modal .interview-session-header h3 { font-size: 18px; margin: 0 0 2px; padding-bottom: 2px; }
 body:not(.is-pc) .interview-session-hint { min-height: 13px; font-size: 8px; }
 
 body:not(.is-pc) .interview-session-main {
+    --interview-mobile-card-row-height: 52px;
+    --interview-mobile-card-gap: 3px;
     grid-template-columns: 1fr;
-    grid-template-rows: 112px minmax(0, 1fr);
+    grid-template-rows: calc(var(--interview-mobile-card-row-height) * 2 + var(--interview-mobile-card-gap)) minmax(0, 1fr);
     gap: 5px;
 }
-body:not(.is-pc) .interview-session-stage { gap: 4px; }
+body:not(.is-pc) .interview-session-stage {
+    grid-column: 1;
+    gap: 4px;
+}
 
 body:not(.is-pc) .interview-session-summary-panel {
     height: auto;
@@ -4299,7 +4308,7 @@ body:not(.is-pc) .interview-session-list-view { gap: 4px; }
 body:not(.is-pc) .interview-session-list-tools {
     flex-basis: 32px;
     min-height: 32px;
-    grid-template-columns: minmax(0, 1fr) 68px 48px 35px;
+    grid-template-columns: minmax(0, 1fr) 68px 52px 35px;
     gap: 3px;
 }
 body:not(.is-pc) .interview-session-search,
@@ -4319,11 +4328,16 @@ body:not(.is-pc) .interview-session-sort-wrap::after {
     font-size: 7px;
 }
 body:not(.is-pc) .interview-session-sort-direction {
-    width: 48px;
+    width: 52px;
+    min-width: 52px !important;
     height: 29px;
     min-height: 29px !important;
-    font-size: 8px !important;
     padding: 2px !important;
+    font-size: 8px !important;
+    white-space: nowrap !important;
+    word-break: keep-all;
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed;
 }
 body:not(.is-pc) .interview-session-list-count { font-size: 7px; }
 
@@ -4332,10 +4346,11 @@ body:not(.is-pc) .interview-session-person-grid {
     gap: 3px;
 }
 body:not(.is-pc) .interviewer-list-view .interview-session-person-grid {
-    grid-template-rows: repeat(8, minmax(0, 1fr));
+    grid-template-rows: repeat(7, minmax(0, 1fr));
 }
 body:not(.is-pc) .target-list-view .interview-session-person-grid {
-    grid-template-rows: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(5, minmax(0, 1fr));
 }
 body:not(.is-pc) .interview-session-person {
     grid-template-columns: 38px minmax(0, 1fr);

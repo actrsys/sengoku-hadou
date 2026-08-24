@@ -133,12 +133,15 @@ class InterviewView {
                 : `${Math.max(0, Number(this.game.year || 0) - Number(busho.birthYear) + 1)}歳`;
             // 武将詳細と同じく、名前下の補助情報は「身分：」のような事務的な
             // ラベル列にせず、灰色の控えめなメタ情報としてそのまま並べる。
-            const entries = [
-                castle ? castle.name : '',
-                rank || '',
-                age || ''
-            ].filter(Boolean);
-            entries.forEach(text => {
+            // PCは従来どおり所在・身分・年齢を3行で表示する。
+            // スマホは縦方向を節約するため、所在と身分を同じ行へまとめ、年齢だけを別行にする。
+            const entries = this._isPc()
+                ? [castle ? castle.name : '', rank || '', age || '']
+                : [
+                    [castle ? castle.name : '', rank || ''].filter(Boolean).join('　'),
+                    age || ''
+                ];
+            entries.filter(Boolean).forEach(text => {
                 const row = document.createElement('span');
                 row.className = 'interview-session-meta-row';
                 row.textContent = text;
@@ -309,8 +312,10 @@ class InterviewView {
 
 
     _getPageSize(mode) {
-        if (this._isPc()) return 15;
-        return mode === 'target' ? 12 : 16;
+        // PCは4列×5行を基準にし、他者選択では左1列を面談相手情報へ譲って右3列×5行を使う。
+        // スマホは2列×7行を基準にし、他者選択では上2行相当を面談相手情報へ使って下5行を候補にする。
+        if (this._isPc()) return mode === 'target' ? 15 : 20;
+        return mode === 'target' ? 10 : 14;
     }
 
     _getVisibleListItems() {
