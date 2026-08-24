@@ -23,16 +23,30 @@ class ConversationStandingRules {
     static getSpecialAuthority(game, busho) {
         if (!game || !game.courtRankSystem || !busho) return { level: 0, key: 'none' };
         const ids = Array.isArray(busho.courtRankIds) ? busho.courtRankIds.map(Number) : [];
-        if (ids.includes(Number(game.courtRankSystem.RANK_ID_SHOGUN))) {
-            return { level: 3, key: 'shogun' };
+        const shogunId = Number(game.courtRankSystem.RANK_ID_SHOGUN);
+        if (ids.includes(shogunId)) {
+            return { level: 3, key: 'shogun', rankId: shogunId };
         }
         const candidates = Array.isArray(game.courtRankSystem.RANK_IDS_CANDIDATE)
             ? game.courtRankSystem.RANK_IDS_CANDIDATE.map(Number)
             : [];
-        if (candidates.some(id => ids.includes(id))) {
-            return { level: 2, key: 'shogun_candidate' };
+        const candidateId = candidates.find(id => ids.includes(id));
+        if (candidateId !== undefined) {
+            return { level: 2, key: 'shogun_candidate', rankId: Number(candidateId) };
         }
-        return { level: 0, key: 'none' };
+        return { level: 0, key: 'none', rankId: 0 };
+    }
+
+    static getSpecialAuthorityCallName(game, busho) {
+        const special = this.getSpecialAuthority(game, busho);
+        if (special.key === 'shogun') return '公方様';
+        if (special.key === 'shogun_candidate') {
+            const rank = game && game.courtRankSystem && typeof game.courtRankSystem.getRankData === 'function'
+                ? game.courtRankSystem.getRankData(Number(special.rankId))
+                : null;
+            return `${(rank && rank.rankName2) || '左馬頭'}様`;
+        }
+        return null;
     }
 
     static getClanRoleRank(game, busho) {
@@ -230,6 +244,15 @@ class ConversationStandingRules {
 
         const targetFather = this._getBusho(game, targetFatherId);
         if (targetFather && Number(targetFather.realFatherId) === subjectId) return 'grandson';
+
+        // 伯父・叔父側から甥・姪を見る逆方向。target の実父が subject の実兄弟なら、
+        // subject から見た target は年少の傍系親族として扱う。
+        // 性別で呼称を分ける用途ではないため、会話上は sibling_child にまとめる。
+        if (targetFather && subjectFatherId > 0
+            && Number(targetFather.realFatherId) === subjectFatherId
+            && Number(targetFather.id) !== subjectId) {
+            return 'sibling_child';
+        }
         return 'none';
     }
 
@@ -242,11 +265,189 @@ class ConversationStandingRules {
     }
 
     static isYoungerFamilyRelation(relation) {
-        return ['younger_brother', 'son', 'grandson', 'adoptive_child'].includes(relation);
+        return ['younger_brother', 'son', 'grandson', 'adoptive_child', 'sibling_child'].includes(relation);
     }
 
     static isDirectFamilyRelation(relation) {
         return this.isSeniorFamilyRelation(relation) || this.isYoungerFamilyRelation(relation);
+    }
+
+    /**
+     * 面談で、話者が当主に対してどの距離感で話すかを返す。
+     * 血縁と官位を一つの「格スコア」にはせず、家族としての立場を先に判定し、
+     * 血縁がない場合だけ公的格式を見る。
+     */
+    static getDaimyoSpeakerPosture(game, speaker, daimyo) {
+        const relation = this.getSpeakerFamilyDialogueRelation(game, speaker, daimyo);
+
+        // 話者が当主の父・祖父・実兄・武将母・義父に当たる場合。
+        if (['son', 'younger_brother', 'grandson', 'adoptive_child'].includes(relation)) {
+            return { key: 'senior_close', relation };
+        }
+
+        // 話者が当主の伯父・叔父に当たる場合。
+        if (relation === 'sibling_child') {
+            return { key: 'senior_extended', relation };
+        }
+
+        // 家族呼称が成立する関係では、官位による上下より家族としての距離感を優先する。
+        if (this.isDirectFamilyRelation(relation)) {
+            return { key: 'family_other', relation };
+        }
+
+        // 将軍・左馬頭（将軍候補）は通常官位ランクとは別の特殊権威。
+        // 左馬頭はrankNoだけを見ると当主より下になる場合があるため、話者姿勢では先に特殊権威を見る。
+        const special = this.getSpecialAuthority(game, speaker);
+        if (special.level >= 2) {
+            return { key: 'higher_court', relation: 'none', specialAuthority: special.key };
+        }
+
+        // その他の人物は、本人の官位が当主より上なら少し上位者らしい口調を許す。
+        if (this.compareCourtStanding(game, speaker, daimyo) > 0) {
+            return { key: 'higher_court', relation: 'none' };
+        }
+
+        return { key: 'normal', relation: relation || 'none' };
+    }
+
+    // 旧名は面談側の公開入口として維持するが、判定の正本は会話全体で使える名称へ移す。
+    static getInterviewSpeakerPosture(game, speaker, daimyo) {
+        return this.getDaimyoSpeakerPosture(game, speaker, daimyo);
+    }
+
+    static usesIndependentDaimyoRegister(game, speaker, daimyo) {
+        const posture = this.getDaimyoSpeakerPosture(game, speaker, daimyo);
+        return ['senior_close', 'senior_extended', 'higher_court'].includes(posture.key);
+    }
+
+    /**
+     * 当主に対して家中年長者・高格式者が話す時の常体レジスター。
+     * 面談と軍師助言で同じ変換を使い、「誰について話すか」による敬意とは分離する。
+     */
+    static applyIndependentDaimyoRegister(text) {
+        let result = String(text || '');
+        const replacements = [
+            [/^恐れながら、/, ''],
+            [/^恐れながら申し上げます。/, ''],
+            [/^はい。/, ''],
+            [/某から詳しく申し上げることはございませぬ/g, '詳しく言うことはない'],
+            [/某から申し上げるほどのことはございませぬ/g, '特に言うほどのことはない'],
+            [/某から申し上げることはございませぬ/g, '言うことはない'],
+            [/申し上げるほどのことはございませぬ/g, '言うほどのことはない'],
+            [/申し上げることはございませぬ/g, '言うことはない'],
+            [/申し上げる/g, '言う'],
+            [/申せませぬ/g, '言えぬ'],
+            [/ございませぬ/g, 'ない'],
+            [/ございます/g, 'ある'],
+            [/ありませぬ/g, 'ない'],
+            [/合いませぬ/g, '合わぬ'],
+            [/交わしませぬ/g, '交わさぬ'],
+            [/見せませぬ/g, '見せぬ'],
+            [/見当たりませぬ/g, '見当たらぬ'],
+            [/聞きませぬ/g, '聞かぬ'],
+            [/聞きます/g, '聞く'],
+            [/意気投合します/g, '意気投合する'],
+            [/と見ます/g, 'と見る'],
+            [/存じませぬ/g, '知らぬ'],
+            [/ことと存じます/g, 'ことだろう'],
+            [/かと存じます/g, 'と思う'],
+            [/存じます/g, '思う'],
+            [/おりませぬ/g, 'おらぬ'],
+            [/おります/g, 'おる'],
+            [/いたしませぬ/g, 'せぬ'],
+            [/いたします/g, 'する'],
+            [/読み切れませぬ/g, '読み切れぬ'],
+            [/分かりませぬ/g, '分からぬ'],
+            [/分かりかねます/g, '分からぬ'],
+            [/見受けられます/g, '見える'],
+            [/見えます/g, '見える'],
+            [/ありますまい/g, 'あるまい'],
+            [/なさらぬ/g, 'せぬ'],
+            [/お気をつけください/g, '気をつけた方がよい'],
+            [/おやめください/g, 'やめておいた方がよい'],
+            [/お忘れなく/g, '忘れぬようにな'],
+            [/かもしれません/g, 'かもしれぬ'],
+            [/につきまして/g, 'について'],
+            [/べきかと(?=[！!？?]|$)/g, 'べきだろう'],
+            [/られましょう/g, 'られるだろう'],
+            [/ご配慮を賜りたく思う/g, '配慮してもらいたい'],
+            [/ご配慮を賜りたく存じます/g, '配慮してもらいたい'],
+            [/ご配慮いただければ幸いにある/g, 'もう少し配慮してもらえればありがたい'],
+            [/ご配慮いただければ幸いにございます/g, 'もう少し配慮してもらえればありがたい'],
+            [/どうか早めのご配慮を/g, '早めに手を打った方がよい'],
+            [/今のうちにお取り計らいを/g, '今のうちに手を打った方がよい'],
+            [/某にも/g, ''],
+            [/ありません/g, 'ない'],
+            [/よろしいでしょう/g, 'よいだろう'],
+            [/よろしいかと/g, 'よいと思う'],
+            [/よろしい/g, 'よい'],
+            [/べきかと見ておる/g, 'べきと見ておる'],
+            [/候補かと見ておる/g, '候補と見ておる'],
+            [/べきかと考えておる/g, 'べきだと考えておる'],
+            [/肝要かと思う/g, '肝要だと思う'],
+            [/気を配るべきかと。/g, '気を配るべきだろう。'],
+            [/放っておくのは危ういかと。/g, '放っておくのは危ういだろう。'],
+            [/べきかと。/g, 'べきだろう。'],
+            [/ことかと。/g, 'ことだろう。'],
+            [/との話です/g, 'との話だ'],
+            [/でしょう/g, 'だろう'],
+            [/ようです/g, 'ようだ'],
+            [/そうです/g, 'そうだ'],
+            [/ところです/g, 'ところだ'],
+            [/御仁です/g, '御仁だ'],
+            [/評判です/g, '評判だ'],
+            [/耳にしました/g, '耳にした'],
+            [/動けましょう/g, '動けるだろう'],
+            [/ですな/g, 'だな'],
+            [/です(?=[。！？]|$)/g, 'だ'],
+            [/あります/g, 'ある']
+        ];
+        for (const [pattern, replacement] of replacements) result = result.replace(pattern, replacement);
+        return result;
+    }
+
+    /**
+     * 忠誠値を会話でどう言い換えるか。判定値自体は LoyaltyInsightRules のまま、
+     * 一門と特殊権威だけ通常家臣の「忠義」表現から外す。
+     */
+    static getLoyaltyExpressionStyle(game, questioner, target) {
+        const special = this.getSpecialAuthority(game, target);
+        if (special && Number(special.level || 0) >= 2) return 'authority';
+        if (questioner && target && this.areFamily(questioner, target)) return 'family';
+        return 'fealty';
+    }
+
+    /**
+     * 当主より上位の公的格式を持つ話者が、面談で当主へ呼びかけるための呼称。
+     * 通常の家臣用「殿」だけにせず、官位・姓を含む既存の外交呼称規則を再利用する。
+     */
+    static getInterviewDaimyoCallName(game, speaker, daimyo) {
+        const familyCall = this.getDirectFamilyCallName(game, speaker, daimyo);
+        if (familyCall) return familyCall;
+        const special = this.getSpecialAuthority(game, speaker);
+        if (special.level >= 2 || this.compareCourtStanding(game, speaker, daimyo) > 0) {
+            return this.getDiplomaticCallName(game, daimyo, speaker);
+        }
+        return '殿';
+    }
+
+    /**
+     * 当主の父・祖父・兄など「家中の年長者」が、自分より明確に格下の家臣を評する時の呼称。
+     * 高官・特殊権威を持つ相手には使わず、通常の格式判定を優先する。
+     */
+    static getHouseholdElderTargetCallName(game, speaker, target) {
+        if (!target) return 'その者';
+        const special = this.getSpecialAuthority(game, target);
+        if (special.key === 'shogun') return '公方様';
+        const rank = this.getHighestCourtRank(game, target);
+        if (rank) return String(rank.rankName2 || '').trim() || this._getGivenName(target) || this._getFullName(target);
+        if (target.isGunshi) return '軍師';
+        const family = this._getFamilyName(target);
+        const given = this._getGivenName(target);
+        const full = this._getFullName(target);
+        const speakerFamily = this._getFamilyName(speaker);
+        if (family && speakerFamily && family === speakerFamily) return full || given || family;
+        return family || full || given || 'その者';
     }
 
     static _getYoungerFamilyCallName(game, target) {
@@ -336,13 +537,10 @@ class ConversationStandingRules {
             const familyCall = this.getDirectFamilyCallName(game, speaker, busho);
             if (familyCall) return familyCall;
         }
-        const special = this.getSpecialAuthority(game, busho);
-        if (special.key === 'shogun') return '公方様';
+        const specialCall = this.getSpecialAuthorityCallName(game, busho);
+        if (specialCall) return specialCall;
 
         const rank = this.getHighestCourtRank(game, busho);
-        if (special.key === 'shogun_candidate' && rank) {
-            return `${rank.rankName2 || '左馬頭'}様`;
-        }
         if (rank) return `${rank.rankName2}殿`;
 
         return this.getUnrankedCallName(speaker, busho, '殿');
@@ -357,11 +555,10 @@ class ConversationStandingRules {
         if (speakerFamilyCall) return speakerFamilyCall;
 
         const standing = this.getPersonalStanding(game, speaker, target);
-        const special = standing.targetSpecial;
-        if (special.key === 'shogun') return '公方様';
+        const specialCall = this.getSpecialAuthorityCallName(game, target);
+        if (specialCall) return specialCall;
 
         const rank = this.getHighestCourtRank(game, target);
-        if (special.key === 'shogun_candidate' && rank) return `${rank.rankName2 || '左馬頭'}様`;
         if (rank) return `${rank.rankName2}殿`;
 
         const actualQuestioner = questioner || (game && typeof game.getClanDaimyo === 'function'
@@ -392,10 +589,40 @@ class ConversationStandingRules {
         return this.getUnrankedCallName(speaker, target, '殿');
     }
 
-    static getAchievementHint(standing) {
+    static getAchievementHint(standing, context = null) {
         if (!standing) return '';
-        if (Number(standing.achievementRelation || 0) >= 2) return 'その働きは、家中でもよく知られております。';
-        if (Number(standing.achievementRelation || 0) === 1) return 'これまでの働きも、よく耳にしております。';
+        const achievementRelation = Number(standing.achievementRelation || 0);
+        const specialLevel = Number(standing.targetSpecial && standing.targetSpecial.level || 0);
+
+        // 将軍・左馬頭（将軍候補）は、所属家での「働き」を褒める通常家臣向けの功績表現へ落とさない。
+        // 功績差が会話へ滲む場面でも、本人の公的格式と周囲からの敬意を示す言い方へ置き換える。
+        if (specialLevel >= 2 && achievementRelation >= 1) {
+            return '家中の皆も、あのお方には一目置いております。';
+        }
+
+        // 当主の父・祖父・兄など年長近親者を、普通の家臣と同じ「働き」で査定する言い方は避ける。
+        // 数値は見せず、家中での重み・信頼として功績の高さを匂わせる。
+        const game = context && context.game;
+        const questioner = context && context.questioner;
+        const target = context && context.target;
+        if (game && questioner && target && achievementRelation >= 1) {
+            const relation = this.getSpeakerFamilyDialogueRelation(game, questioner, target);
+            if (['mother', 'adoptive_father', 'father', 'older_brother', 'grandfather'].includes(relation)) {
+                if (achievementRelation >= 2) {
+                    return '家中でも、あのお方のお言葉を軽んずる者はおりますまい。';
+                }
+                return '家中でも重きをなしておられるお方です。';
+            }
+            if (['older_uncle', 'younger_uncle'].includes(relation)) {
+                if (achievementRelation >= 2) {
+                    return '家中の皆も、あのお方には一目置いております。';
+                }
+                return '家中でも頼りにされているお方です。';
+            }
+        }
+
+        if (achievementRelation >= 2) return 'その働きは、家中でもよく知られております。';
+        if (achievementRelation === 1) return 'これまでの働きも、よく耳にしております。';
         return '';
     }
 

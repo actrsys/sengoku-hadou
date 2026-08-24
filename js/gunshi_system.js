@@ -9,6 +9,49 @@ class GunshiSystem {
         this.hasShownAdviceThisMonth = false;
     }
 
+    _getPlayerDaimyo() {
+        if (!this.game || typeof this.game.getClanDaimyo !== 'function') return null;
+        return this.game.getClanDaimyo(Number(this.game.playerClanId) || 0) || null;
+    }
+
+    _usesIndependentDaimyoRegister(gunshi) {
+        const daimyo = this._getPlayerDaimyo();
+        return !!(window.ConversationStandingRules && daimyo && gunshi
+            && typeof window.ConversationStandingRules.usesIndependentDaimyoRegister === 'function'
+            && window.ConversationStandingRules.usesIndependentDaimyoRegister(this.game, gunshi, daimyo));
+    }
+
+    _styleForSpeaker(gunshi, text) {
+        if (!this._usesIndependentDaimyoRegister(gunshi)) return String(text || '');
+        let result = String(text || '');
+        if (window.ConversationStandingRules
+            && typeof window.ConversationStandingRules.applyIndependentDaimyoRegister === 'function') {
+            result = window.ConversationStandingRules.applyIndependentDaimyoRegister(result);
+        }
+        // 軍師助言固有の言い回しだけ、共通レジスターでは安全に活用できない活用形をここで整える。
+        return result
+            .replace(/合戦におもむきますか/g, '合戦におもむくか')
+            .replace(/警護が厚く厳しいかと/g, '警護が厚く、厳しいだろう');
+    }
+
+    _getDaimyoAddress(gunshi) {
+        const daimyo = this._getPlayerDaimyo();
+        if (!daimyo || !window.ConversationStandingRules) return '殿';
+        if (typeof window.ConversationStandingRules.getInterviewDaimyoCallName === 'function') {
+            return window.ConversationStandingRules.getInterviewDaimyoCallName(this.game, gunshi, daimyo);
+        }
+        return '殿';
+    }
+
+    _getTargetCallName(gunshi, target) {
+        const daimyo = this._getPlayerDaimyo();
+        if (!target || !window.ConversationStandingRules) return `${target && target.name ? target.name : 'その者'}殿`;
+        if (typeof window.ConversationStandingRules.getInterviewTargetCallName === 'function') {
+            return window.ConversationStandingRules.getInterviewTargetCallName(this.game, gunshi, target, daimyo);
+        }
+        return `${target.name}殿`;
+    }
+
     // 月が替わったときに呼ばれる処理
     onStartMonth() {
         // 月初めに印をリセットします
@@ -147,18 +190,18 @@ class GunshiSystem {
         }
 
         if (red.length >= 3) {
-            messageList.push(`${red[0].busho.name}殿以下${red.length}名、待遇への不満が深いように見受けられます。どうか早めのご配慮を`);
+            messageList.push(`${this._getTargetCallName(gunshi, red[0].busho)}以下${red.length}名、待遇への不満が深いように見受けられます。どうか早めのご配慮を`);
         } else {
-            red.forEach(item => messageList.push(`${item.busho.name}殿は待遇への不満が深いように見受けられます。どうか早めのご配慮を`));
+            red.forEach(item => messageList.push(`${this._getTargetCallName(gunshi, item.busho)}は待遇への不満が深いように見受けられます。どうか早めのご配慮を`));
         }
 
         if (orange.length >= 3) {
             const particle = messageList.length > 0 ? 'にも' : 'には';
-            messageList.push(`${orange[0].busho.name}殿以下${orange.length}名${particle}、少々思うところがあるようです。今のうちにお取り計らいを`);
+            messageList.push(`${this._getTargetCallName(gunshi, orange[0].busho)}以下${orange.length}名${particle}、少々思うところがあるようです。今のうちにお取り計らいを`);
         } else {
             orange.forEach(item => {
                 const particle = messageList.length > 0 ? 'にも' : 'には';
-                messageList.push(`${item.busho.name}殿${particle}少々思うところがあるようです。今のうちにお取り計らいを`);
+                messageList.push(`${this._getTargetCallName(gunshi, item.busho)}${particle}少々思うところがあるようです。今のうちにお取り計らいを`);
             });
         }
 
@@ -168,8 +211,9 @@ class GunshiSystem {
                 if (onComplete) onComplete();
                 return;
             }
-            const tonoStr = (msgIndex === 0) ? '殿、' : '';
-            const msg = `「${tonoStr}${messageList[msgIndex]}」`;
+            const address = (msgIndex === 0) ? `${this._getDaimyoAddress(gunshi)}、` : '';
+            const styledBody = this._styleForSpeaker(gunshi, messageList[msgIndex]);
+            const msg = `「${address}${styledBody}」`;
             msgIndex++;
             this.game.ui.showDialog(msg, false, showNext, null, {
                 leftFace: gunshi.faceIcon,
@@ -187,7 +231,7 @@ class GunshiSystem {
             if (warAdvice) {
                 const gunshi = this.game.getClanGunshi(this.game.playerClanId);
                 // ui.js の小窓を開く魔法を呼び出します
-                this.game.ui.openGunshiModal(gunshi, warAdvice, onConfirm);
+                this.game.ui.openGunshiModal(gunshi, this._styleForSpeaker(gunshi, warAdvice), onConfirm);
                 return;
             }
         }
@@ -208,7 +252,7 @@ class GunshiSystem {
         const msg = this.getAdviceMessage(gunshi, action, seed);
         
         // ui.js の小窓を開く魔法を呼び出します
-        this.game.ui.openGunshiModal(gunshi, msg, onConfirm);
+        this.game.ui.openGunshiModal(gunshi, this._styleForSpeaker(gunshi, msg), onConfirm);
     }
 
     // ★軍師の賢さによって、言うこと（予測）が変わる魔法です

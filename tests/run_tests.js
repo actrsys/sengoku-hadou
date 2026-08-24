@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r145');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r151');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -145,7 +145,8 @@ test('左馬頭・将軍本人は他家所属の使者でも本人の権威を�
     loadScript(ctx, 'js/busho_list_sort_rules.js');
     loadScript(ctx, 'js/conversation_standing_rules.js');
     loadScript(ctx, 'js/diplomacy.js');
-    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+    loadScript(ctx, 'js/interview_system.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager; this.InterviewSystem = InterviewSystem;', ctx);
 
     const ranks = new Map([
         [1, { id: 1, rankNo: 1, rankName2: '征夷大将軍' }],
@@ -160,8 +161,10 @@ test('左馬頭・将軍本人は他家所属の使者でも本人の権威を�
     const asakura = { id: 101, clan: 1, isDaimyo: true, fullName: '朝倉義景', familyNameStr: '朝倉', givenName: '義景', courtRankIds: [30], achievementTotal: 500 };
     const oda = { id: 201, clan: 2, isDaimyo: true, fullName: '織田信長', familyNameStr: '織田', givenName: '信長', courtRankIds: [20], achievementTotal: 1200 };
     const yoshiaki = { id: 102, clan: 1, isDaimyo: false, fullName: '足利義昭', familyNameStr: '足利', givenName: '義昭', name: '足利義昭', courtRankIds: [98], achievementTotal: 50 };
-    const bushos = [asakura, oda, yoshiaki];
+    const asakuraRetainer = { id: 103, clan: 1, isDaimyo: false, fullName: '朝倉景鏡', familyNameStr: '朝倉', givenName: '景鏡', name: '朝倉景鏡', courtRankIds: [], achievementTotal: 200, familyIds: [103] };
+    const bushos = [asakura, oda, yoshiaki, asakuraRetainer];
     const game = {
+        playerClanId: 1,
         clans, bushos, legions: [],
         getClan: id => clans.find(c => Number(c.id) === Number(id)),
         getClanDaimyo: id => bushos.find(x => Number(x.clan) === Number(id) && x.isDaimyo),
@@ -179,6 +182,9 @@ test('左馬頭・将軍本人は他家所属の使者でも本人の権威を�
 
     let greeting = dm.buildDiplomacyGreeting(yoshiaki, oda);
     assert.strictEqual(dm.getCallName(yoshiaki), '左馬頭様');
+    yoshiaki.courtRankIds = [98, 20];
+    assert.strictEqual(dm.getCallName(yoshiaki), '左馬頭様', '左馬頭とより高い通常官位を併有しても特殊呼称は左馬頭様を維持する');
+    yoshiaki.courtRankIds = [98];
     assert.ok(greeting.greetMsg1.includes('両家のためにも進めるべき'), '左馬頭本人が使者なら主君の名代ではなく本人が外交を勧める口調にする');
     assert.ok(!greeting.greetMsg1.includes('朝倉左衛門督殿の意を受け'));
     assert.ok(greeting.greetMsg2.includes('左馬頭様'));
@@ -186,6 +192,34 @@ test('左馬頭・将軍本人は他家所属の使者でも本人の権威を�
     let msgs = dm.getDiplomacyMessages('alliance', false, '朝倉家', '織田家', '左馬頭様', '参議殿', '姫', '貴家', greeting.context);
     assert.ok(msgs.demandMsg.includes('盟約を結ぶこと、望ましきこと'), '提案本体も本人が取り持つ口調にする');
     assert.ok(!msgs.replyAcceptMsg.includes('主君にも'));
+
+    // 左馬頭は通常官位ランクだけでは下位になり得るが、面談では将軍候補の特殊権威を優先する。
+    asakura.courtRankIds = [20]; // 参議(rankNo 8)で左馬頭(rankNo 10)より通常官位は上
+    assert.strictEqual(ctx.ConversationStandingRules.getInterviewSpeakerPosture(game, yoshiaki, asakura).key, 'higher_court');
+    assert.strictEqual(ctx.ConversationStandingRules.getInterviewDaimyoCallName(game, yoshiaki, asakura), '参議殿', '左馬頭本人が面談時に単なる「殿」呼びへ落ちない');
+    const interview = new ctx.InterviewSystem(game);
+    const samanoStatus = interview._getStandingAwareSelfLoyaltyText(yoshiaki, 'stable', 'friendly');
+    assert.ok(!samanoStatus.includes('当家に身を置く'), '左馬頭本人の面談返答で一般家臣の所属意識を強く出さない');
+    assert.ok(!samanoStatus.includes('申し上げ'), '左馬頭本人の面談返答は当主へ過度にへりくだらない');
+
+    // 左馬頭本人に「他者について」を聞いた時も、途中だけ一般家臣敬語へ戻らない。
+    ctx.PersonnelRules = {
+        calcRelationshipProfile: () => ({ compatibilityScore: 75, contactScore: 60, affinityDiff: 0 }),
+        calcOtherAssessmentBias: () => ({ protectionShift: 0, loyaltyPenalty: 0 })
+    };
+    interview._getConcealmentProfile = () => ({ perceivedLoyalty: 90 });
+    interview._getOtherAssessmentBias = () => ({ protectionShift: 0, loyaltyPenalty: 0 });
+    interview._getTargetLoyaltyAssessment = () => ({ text: '参議殿への忠義は本物でしょう。疑う余地もありません。', direction: 'positive' });
+    interview.activeInterviewAttitude = 'friendly';
+    let samanoTopicMessages = [];
+    game.ui = {
+        interviewView: {
+            showMessages: (_speaker, messages) => { samanoTopicMessages = messages.slice(); }
+        }
+    };
+    interview.executeInterviewTopic(yoshiaki, asakuraRetainer);
+    const samanoTopicJoined = samanoTopicMessages.join('');
+    assert.ok(!/です。|おります|ございます|申し上げ|でしょう/.test(samanoTopicJoined), '左馬頭が他者を語る3段会話も高格式者の口調を最後まで維持する');
 
     yoshiaki.courtRankIds = [1];
     greeting = dm.buildDiplomacyGreeting(yoshiaki, oda);
@@ -282,8 +316,155 @@ test('面談の他者言及は官位・身分・功績を呼称と敬意へ匂�
     };
     const standing = ctx.ConversationStandingRules.getPersonalStanding(game, speaker, target);
     assert.strictEqual(ctx.ConversationStandingRules.getInterviewTargetCallName(game, speaker, target), '左馬頭様');
+    target.courtRankIds = [98, 20];
+    ranks.set(20, { id: 20, rankNo: 2, rankName2: '大納言' });
+    assert.strictEqual(ctx.ConversationStandingRules.getInterviewTargetCallName(game, speaker, target), '左馬頭様', '通常官位を併有しても第三者言及では左馬頭様を優先する');
+    target.courtRankIds = [98];
     assert.strictEqual(standing.thirdPerson, 'あのお方');
-    assert.ok(ctx.ConversationStandingRules.getAchievementHint(standing).includes('家中でもよく知られて'));
+    assert.strictEqual(
+        ctx.ConversationStandingRules.getAchievementHint(standing),
+        '家中の皆も、あのお方には一目置いております。',
+        '左馬頭の功績差は通常家臣の「働き」ではなく特殊権威への周囲の敬意として匂わせる'
+    );
+    target.courtRankIds = [1];
+    const shogunStanding = ctx.ConversationStandingRules.getPersonalStanding(game, speaker, target);
+    assert.strictEqual(
+        ctx.ConversationStandingRules.getAchievementHint(shogunStanding),
+        '家中の皆も、あのお方には一目置いております。',
+        '将軍も左馬頭と同じ特殊権威向けの功績匂わせを使う'
+    );
+    target.courtRankIds = [98];
+
+    const ordinaryTarget = { id: 104, clan: 1, name: '丹羽長秀', fullName: '丹羽長秀', familyNameStr: '丹羽', givenName: '長秀', courtRankIds: [], achievementTotal: 1000 };
+    const ordinaryStanding = ctx.ConversationStandingRules.getPersonalStanding(game, speaker, ordinaryTarget);
+    assert.ok(
+        ctx.ConversationStandingRules.getAchievementHint(ordinaryStanding).includes('働き'),
+        '通常の高功績武将は従来どおり働きを匂わせる'
+    );
+
+    const youngDaimyo = { id: 110, clan: 1, isDaimyo: true, realFatherId: 111, birthYear: 1540, courtRankIds: [], achievementTotal: 0 };
+    const father = { id: 111, clan: 1, realFatherId: 112, birthYear: 1510, courtRankIds: [], achievementTotal: 1200 };
+    const grandfather = { id: 112, clan: 1, birthYear: 1480, courtRankIds: [], achievementTotal: 1300 };
+    const uncle = { id: 113, clan: 1, realFatherId: 112, birthYear: 1500, courtRankIds: [], achievementTotal: 1100 };
+    const familyGame = {
+        clans, bushos: [speaker, youngDaimyo, father, grandfather, uncle], legions: [],
+        getClan: id => clans.find(c => Number(c.id) === Number(id)),
+        getClanDaimyo: () => youngDaimyo,
+        getBusho: id => [speaker, youngDaimyo, father, grandfather, uncle].find(x => Number(x.id) === Number(id)) || null,
+        courtRankSystem: { RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [], getRankData: () => null, getHighestRankData: () => null }
+    };
+    const fatherStanding = ctx.ConversationStandingRules.getPersonalStanding(familyGame, speaker, father);
+    assert.strictEqual(
+        ctx.ConversationStandingRules.getAchievementHint(fatherStanding, { game: familyGame, questioner: youngDaimyo, target: father }),
+        '家中でも、あのお方のお言葉を軽んずる者はおりますまい。',
+        '当主の父・祖父・兄など年長近親者は通常家臣の「働き」で査定せず家中での重みとして功績を匂わせる'
+    );
+    const grandfatherStanding = ctx.ConversationStandingRules.getPersonalStanding(familyGame, speaker, grandfather);
+    assert.ok(
+        !ctx.ConversationStandingRules.getAchievementHint(grandfatherStanding, { game: familyGame, questioner: youngDaimyo, target: grandfather }).includes('働き'),
+        '当主の祖父にも通常家臣向けの働き表現を使わない'
+    );
+    const uncleStanding = ctx.ConversationStandingRules.getPersonalStanding(familyGame, speaker, uncle);
+    assert.strictEqual(
+        ctx.ConversationStandingRules.getAchievementHint(uncleStanding, { game: familyGame, questioner: youngDaimyo, target: uncle }),
+        '家中の皆も、あのお方には一目置いております。',
+        '当主の伯父・叔父は父祖兄より一段控えめな年長親族向け表現にする'
+    );
+
+    loadScript(ctx, 'js/interview_system.js');
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+    const interview = new ctx.InterviewSystem(game);
+    assert.strictEqual(interview._isHighAuthorityInterviewTarget(target), true);
+    assert.ok(interview._getHighAuthorityOpinionText(75).includes('深く信頼しております'), '左馬頭・将軍への人物評価は通常の「話のわかる相手」より強く敬う');
+    assert.ok(interview._getHighAuthorityOpinionText(30).includes('軽んじるつもりはございませぬ'), '相性が悪くても特殊権威そのものへの敬意は崩さない');
+});
+
+test('忠誠所見は通常家臣・一門・特殊権威で表現を分ける', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/busho_list_sort_rules.js');
+    loadScript(ctx, 'js/conversation_standing_rules.js');
+    loadScript(ctx, 'js/interview_system.js');
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+
+    const ranks = new Map([[98, { id: 98, rankNo: 10, rankName2: '左馬頭' }]]);
+    const daimyo = { id: 1, clan: 1, isDaimyo: true, fullName: '織田信忠', familyNameStr: '織田', givenName: '信忠', realFatherId: 2, familyIds: [1, 2], courtRankIds: [] };
+    const father = { id: 2, clan: 1, fullName: '織田信長', familyNameStr: '織田', givenName: '信長', familyIds: [1, 2], courtRankIds: [] };
+    const yoshiaki = { id: 3, clan: 1, fullName: '足利義昭', familyNameStr: '足利', givenName: '義昭', familyIds: [3], courtRankIds: [98] };
+    const retainer = { id: 4, clan: 1, fullName: '丹羽長秀', familyNameStr: '丹羽', givenName: '長秀', familyIds: [4], courtRankIds: [] };
+    const bushos = [daimyo, father, yoshiaki, retainer];
+    const game = {
+        playerClanId: 1, bushos, clans: [{ id: 1, leaderId: 1 }],
+        getBusho: id => bushos.find(b => Number(b.id) === Number(id)) || null,
+        getClanDaimyo: () => daimyo,
+        courtRankSystem: {
+            RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [98],
+            getRankData: id => ranks.get(Number(id)) || null,
+            getHighestRankData(busho) { return (busho.courtRankIds || []).map(id => this.getRankData(id)).filter(Boolean)[0] || null; }
+        }
+    };
+    const interview = new ctx.InterviewSystem(game);
+
+    assert.strictEqual(ctx.ConversationStandingRules.getLoyaltyExpressionStyle(game, daimyo, retainer), 'fealty');
+    assert.strictEqual(ctx.ConversationStandingRules.getLoyaltyExpressionStyle(game, daimyo, father), 'family');
+    assert.strictEqual(ctx.ConversationStandingRules.getLoyaltyExpressionStyle(game, daimyo, yoshiaki), 'authority');
+
+    const normal = interview._getTargetLoyaltyBandText('stable', false, 'fealty');
+    const family = interview._getTargetLoyaltyBandText('danger', false, 'family');
+    const authority = interview._getTargetLoyaltyBandText('stable', false, 'authority');
+    assert.ok(normal.includes('忠義'), '通常家臣は従来の忠義表現を維持する');
+    assert.ok(!family.includes('忠義') && family.includes('殿のお考え'), '一門は忠義ではなく当主の考えとの一致・食い違いで匂わせる');
+    assert.ok(!authority.includes('忠義') && authority.includes('理解を示して'), '将軍・左馬頭は忠義ではなく理解・協調として表現する');
+    assert.ok(!family.includes('距離が') && !authority.includes('距離が'), '人間関係を俯瞰した「距離ができた」説明は使わない');
+});
+
+test('軍師の当主への口調と報告対象への敬意は面談の会話規則を共用する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/busho_list_sort_rules.js');
+    loadScript(ctx, 'js/conversation_standing_rules.js');
+    loadScript(ctx, 'js/gunshi_system.js');
+    vm.runInContext('this.GunshiSystem = GunshiSystem;', ctx);
+
+    const ranks = new Map([[98, { id: 98, rankNo: 10, rankName2: '左馬頭' }]]);
+    const daimyo = { id: 1, clan: 1, isDaimyo: true, fullName: '織田信忠', familyNameStr: '織田', givenName: '信忠', realFatherId: 2, familyIds: [1, 2], courtRankIds: [] };
+    const fatherGunshi = { id: 2, clan: 1, isGunshi: true, fullName: '織田信長', familyNameStr: '織田', givenName: '信長', familyIds: [1, 2], courtRankIds: [] };
+    const yoshiakiGunshi = { id: 3, clan: 1, isGunshi: true, fullName: '足利義昭', familyNameStr: '足利', givenName: '義昭', familyIds: [3], courtRankIds: [98] };
+    const bushos = [daimyo, fatherGunshi, yoshiakiGunshi];
+    const game = {
+        playerClanId: 1, bushos, clans: [{ id: 1, leaderId: 1 }],
+        getBusho: id => bushos.find(b => Number(b.id) === Number(id)) || null,
+        getClanDaimyo: () => daimyo,
+        courtRankSystem: {
+            RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [98],
+            getRankData: id => ranks.get(Number(id)) || null,
+            getHighestRankData(busho) { return (busho.courtRankIds || []).map(id => this.getRankData(id)).filter(Boolean)[0] || null; }
+        }
+    };
+    const system = new ctx.GunshiSystem(game);
+
+    assert.strictEqual(ctx.ConversationStandingRules.getDaimyoSpeakerPosture(game, yoshiakiGunshi, daimyo).key, 'higher_court');
+    assert.strictEqual(system._styleForSpeaker(yoshiakiGunshi, 'おそらく上手くいくでしょう。'), 'おそらく上手くいくだろう。', '左馬頭が軍師でも面談同様に当主へ敬語へ戻らない');
+    assert.strictEqual(system._styleForSpeaker(yoshiakiGunshi, '合戦におもむきますか？ 兵力と兵糧の確認をお忘れなく。'), '合戦におもむくか？ 兵力と兵糧の確認を忘れぬようにな。', '戦争助言も左馬頭の軍師だけ敬語へ戻さない');
+    assert.ok(!/ください|ません|ましょう/.test(system._styleForSpeaker(yoshiakiGunshi, 'おやめください。厳しい結果になるかもしれません。運が良ければ仕留められましょう。')), '軍師助言の代表的な敬語活用も高格式者では常体へ整える');
+    assert.strictEqual(system._styleForSpeaker(fatherGunshi, '厳しい結果になるでしょう。'), '厳しい結果になるだろう。', '年長親族が軍師でも当主への常体を使う');
+    assert.ok(system._getDaimyoAddress(yoshiakiGunshi).endsWith('殿'), '高格式軍師は当主の公的呼称を使いつつ文末は常体にできる');
+    assert.strictEqual(system._getTargetCallName(yoshiakiGunshi, fatherGunshi), '御父君', '軍師報告の対象呼称には当主との血縁敬称を反映する');
+
+    ctx.BushoStatusRules = { isActive: () => true };
+    game.getClanGunshi = () => yoshiakiGunshi;
+    const captured = [];
+    game.ui = {
+        showDialog: (msg, _modal, callback) => { captured.push(msg); if (callback) callback(); }
+    };
+    system.getLoyaltyAssessment = target => Number(target.id) === Number(fatherGunshi.id)
+        ? { priority: 2, alert: 'red', severity: 5 }
+        : { priority: 0, alert: 'none', severity: 0 };
+    system.compareLoyaltyAssessments = () => 0;
+    system.checkAndShowAdvice(null, () => {});
+    const report = captured.join('');
+    assert.ok(report.includes('織田殿、御父君は'), '左馬頭の軍師報告でも当主への公的呼称と報告対象への血縁敬称を分離する');
+    assert.ok(!/見受けられます|ご配慮|ございます|でしょう/.test(report), '左馬頭が軍師として報告する時も面談と同じ常体レジスターを最後まで使う');
 });
 
 test('無官の会話呼称は異姓なら姓、同姓一門なら諱、同姓非一門ならフルネームを使う', () => {
@@ -319,6 +500,7 @@ test('面談の実父系呼称は話者本人・質問者との関係を分け�
     vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
 
     const rank = { id: 20, rankNo: 8, rankName2: '秋田城介' };
+    const highRank = { id: 21, rankNo: 2, rankName2: '大納言' };
     const nobuhide = { id: 100, clan: 1, familyNameStr: '織田', givenName: '信秀', fullName: '織田信秀', birthYear: 1511, realFatherId: 99, courtRankIds: [], familyIds: [100, 1, 4, 12, 13] };
     const olderUncle = { id: 12, clan: 1, familyNameStr: '織田', givenName: '信定', fullName: '織田信定', birthYear: 1508, realFatherId: 99, courtRankIds: [], familyIds: [12, 100, 1] };
     const youngerUncle = { id: 13, clan: 1, familyNameStr: '織田', givenName: '信康', fullName: '織田信康', birthYear: 1514, realFatherId: 99, courtRankIds: [], familyIds: [13, 100, 1] };
@@ -330,12 +512,14 @@ test('面談の実父系呼称は話者本人・質問者との関係を分け�
     const grandson = { id: 5, clan: 1, familyNameStr: '織田', givenName: '三法師', fullName: '織田三法師', birthYear: 1578, realFatherId: 2, courtRankIds: [], familyIds: [5, 2, 1] };
     const retainer = { id: 6, clan: 1, familyNameStr: '柴田', givenName: '勝家', fullName: '柴田勝家', birthYear: 1522, realFatherId: 0, courtRankIds: [], familyIds: [6] };
     const gunshi = { id: 7, clan: 1, isGunshi: true, familyNameStr: '沢彦', givenName: '宗恩', fullName: '沢彦宗恩', birthYear: 1500, realFatherId: 0, courtRankIds: [], familyIds: [7] };
+    const commander = { id: 17, clan: 1, isCommander: true, familyNameStr: '丹羽', givenName: '長秀', fullName: '丹羽長秀', birthYear: 1535, realFatherId: 0, courtRankIds: [], familyIds: [17] };
     const odaHiroyoshi = { id: 15, clan: 1, familyNameStr: '織田', givenName: '広良', fullName: '織田広良', birthYear: 1510, realFatherId: 0, courtRankIds: [], familyIds: [15] };
     const adoptiveFather = { id: 8, clan: 1, familyNameStr: '細川', givenName: '幽斎', fullName: '細川幽斎', birthYear: 1534, realFatherId: 0, courtRankIds: [], familyIds: [8, 10], female: false };
     const adoptedChild = { id: 10, clan: 1, familyNameStr: '細川', givenName: '忠興', fullName: '細川忠興', birthYear: 1563, realFatherId: 0, adoptiveFatherId: 8, courtRankIds: [], familyIds: [10, 8] };
     const warriorMother = { id: 9, clan: 1, familyNameStr: '足利', givenName: '徳', fullName: '足利徳', birthYear: 1574, realFatherId: 0, courtRankIds: [], familyIds: [9, 11], female: true };
     const mothersChild = { id: 11, clan: 1, familyNameStr: '喜連川', givenName: '義親', fullName: '喜連川義親', birthYear: 1592, realFatherId: 0, adoptiveFatherId: 9, courtRankIds: [], familyIds: [11, 9] };
-    const bushos = [nobuhide, nobunaga, nobutada, nobukatsu, youngerBrother, grandson, retainer, gunshi, odaHiroyoshi, adoptiveFather, adoptedChild, warriorMother, mothersChild, olderUncle, youngerUncle, sameYearUncle];
+    const highOfficer = { id: 16, clan: 1, familyNameStr: '近衛', givenName: '前久', fullName: '近衛前久', birthYear: 1536, realFatherId: 0, courtRankIds: [21], familyIds: [16], loyalty: 90, duty: 70, ambition: 40, intelligence: 80 };
+    const bushos = [nobuhide, nobunaga, nobutada, nobukatsu, youngerBrother, grandson, retainer, gunshi, commander, odaHiroyoshi, adoptiveFather, adoptedChild, warriorMother, mothersChild, olderUncle, youngerUncle, sameYearUncle, highOfficer];
     const game = {
         playerClanId: 1,
         clans: [], bushos, legions: [],
@@ -343,8 +527,11 @@ test('面談の実父系呼称は話者本人・質問者との関係を分け�
         getClanDaimyo: clanId => Number(clanId) === 1 ? nobunaga : null,
         courtRankSystem: {
             RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [],
-            getRankData: id => Number(id) === 20 ? rank : null,
-            getHighestRankData(busho) { return (busho.courtRankIds || []).includes(20) ? rank : null; }
+            getRankData: id => Number(id) === 20 ? rank : (Number(id) === 21 ? highRank : null),
+            getHighestRankData(busho) {
+                if ((busho.courtRankIds || []).includes(21)) return highRank;
+                return (busho.courtRankIds || []).includes(20) ? rank : null;
+            }
         }
     };
 
@@ -353,6 +540,8 @@ test('面談の実父系呼称は話者本人・質問者との関係を分け�
     assert.strictEqual(ctx.ConversationStandingRules.getDirectFamilyCallName(game, grandson, nobunaga), '祖父上');
     assert.strictEqual(ctx.ConversationStandingRules.getDirectFamilyCallName(game, nobunaga, olderUncle), '伯父上');
     assert.strictEqual(ctx.ConversationStandingRules.getDirectFamilyCallName(game, nobunaga, youngerUncle), '叔父上');
+    assert.strictEqual(ctx.ConversationStandingRules.getPaternalRelation(game, olderUncle, nobunaga), 'sibling_child', '伯父側から甥を見る逆方向も同じ血縁正本で判定する');
+    assert.strictEqual(ctx.ConversationStandingRules.getDirectFamilyCallName(game, olderUncle, nobunaga), '信長', '伯父から甥は年少親族として無官なら諱を呼び捨てにする');
     assert.strictEqual(ctx.ConversationStandingRules.getPaternalRelation(game, nobunaga, sameYearUncle), 'none', '父と同年で伯叔を確定できない場合は誤推論しない');
     assert.strictEqual(ctx.ConversationStandingRules.getDirectFamilyCallName(game, adoptedChild, adoptiveFather), '義父上');
     assert.strictEqual(ctx.ConversationStandingRules.getDirectFamilyCallName(game, mothersChild, warriorMother), '母上');
@@ -418,6 +607,80 @@ test('面談の実父系呼称は話者本人・質問者との関係を分け�
     game.getClanDaimyo = clanId => Number(clanId) === 1 ? nobunaga : null;
     assert.strictEqual(interview._applyDirectAddress('殿への忠義は本物でしょう。', nobutada), '父上への忠義は本物でしょう。');
     assert.strictEqual(interview._getDirectAddressName(retainer), '殿');
+
+    assert.strictEqual(ctx.ConversationStandingRules.getInterviewSpeakerPosture(game, nobuhide, nobunaga).key, 'senior_close', '父・祖父・兄など年長近親者は面談で近い家族口調を使う');
+    assert.strictEqual(ctx.ConversationStandingRules.getInterviewSpeakerPosture(game, olderUncle, nobunaga).key, 'senior_extended', '伯父・叔父は一段距離のある年長親族口調を使う');
+    assert.strictEqual(ctx.ConversationStandingRules.getInterviewSpeakerPosture(game, highOfficer, nobunaga).key, 'higher_court', '当主より官位が上の家臣は高格式者向け口調を使う');
+    assert.ok(interview._getGreetingText(nobuhide, 'friendly').includes('よう来た'), '父から子への温かい挨拶は家臣用の他人行儀な文を使わない');
+    assert.ok(!interview._getGreetingText(nobuhide, 'friendly').includes('お越しくださいました'), '年長近親者から当主へ過度な家臣敬語を使わない');
+    assert.ok(interview._getGreetingText(olderUncle, 'friendly').includes('よう参ったな'), '伯父・叔父から甥への挨拶は少し親しい距離感にする');
+    assert.ok(interview._getGreetingText(olderUncle, 'polite').includes('本日は何用かな'), '伯父・叔父の中間態度は自然な一つの台詞へまとめる');
+    assert.ok(interview._getGreetingText(highOfficer, 'friendly').includes('織田殿') && interview._getGreetingText(highOfficer, 'friendly').includes('よう参られた'), '当主より高官の家臣は当主を少し下に見る高格式者向け挨拶を使う');
+    assert.ok(!interview._getMenuPrompt('friendly', nobuhide).includes('申し付け'), '年長近親者の面談メニュー導入も家臣用敬語へ戻さない');
+    assert.ok(!interview._getStandingAwareSelfLoyaltyText(nobuhide, 'stable', 'friendly').includes('御恩'), '父など年長近親者の忠誠返答で「身に余る御恩」と過度にへりくだらない');
+
+    const elderStanding = ctx.ConversationStandingRules.getPersonalStanding(game, nobuhide, retainer);
+    const elderProfile = interview._getHouseholdElderAssessmentProfile(nobuhide, retainer, elderStanding);
+    assert.ok(elderProfile && elderProfile.key === 'senior_close', '当主の父などは格下家臣を評する時に家中年長者口調を使える');
+    assert.strictEqual(interview._getHouseholdElderTopicOpening(nobuhide, retainer, elderProfile, 'friendly'), '柴田か。');
+    assert.ok(interview._getHouseholdElderOpinionText(75).includes('信頼しておる'), '家中年長者の他者評価は通常家臣より一段くだけた語り口にする');
+
+    const gunshiStanding = ctx.ConversationStandingRules.getPersonalStanding(game, nobuhide, gunshi);
+    assert.strictEqual(interview._getHouseholdElderAssessmentProfile(nobuhide, gunshi, gunshiStanding), null, '軍師など敬意が必要な対象を格下用の長老評価文では扱わない');
+    assert.ok(interview._getIndependentTopicOpening(nobuhide, gunshi, gunshiStanding, null, 'friendly').startsWith('軍師殿か。'), '父が子へ軍師について話す時も対象への敬意だけは呼称に残す');
+    const gunshiOpinion = interview._applyIndependentInterviewRegister(
+        interview._applyStandingReferenceText(interview._getOpinionText(75, 'friendly'), gunshiStanding),
+        nobuhide
+    );
+    assert.ok(!/です。|おります|ございます|申し上げ/.test(gunshiOpinion), '父が子へ軍師について話す時、対象を敬っても聞き手への一般家臣敬語へ戻らない');
+
+    const commanderStanding = ctx.ConversationStandingRules.getPersonalStanding(game, nobuhide, commander);
+    assert.ok(interview._getIndependentTopicOpening(nobuhide, commander, commanderStanding, null, 'friendly').startsWith('丹羽殿か。'), '父が子へ国主について話す時も対象を殿付けで敬いつつ常体で導入する');
+    const commanderOpinion = interview._applyIndependentInterviewRegister(
+        interview._applyStandingReferenceText(interview._getOpinionText(35, 'friendly'), commanderStanding),
+        nobuhide
+    );
+    assert.ok(!/です。|おります|ございます|合いませぬ|申し上げ/.test(commanderOpinion), '国主の評価内容でも父から子への口調を崩さない');
+
+    const highAuthorityPlain = interview._applyIndependentInterviewRegister(interview._getHighAuthorityOpinionText(82), nobuhide);
+    assert.ok(highAuthorityPlain.includes('お考え') && highAuthorityPlain.includes('お方だ'), '父が子へ高格式者を語る時は対象への敬意を残す');
+    assert.ok(!/です。|おります|ございます|申し上げ/.test(highAuthorityPlain), '高格式者への敬意と子への常体を分離する');
+
+    // 実際の「他者について聞く」経路でも、話題の相手の格と聞き手への口調を混同しない。
+    ctx.PersonnelRules = {
+        calcRelationshipProfile: () => ({ compatibilityScore: 75, contactScore: 60, affinityDiff: 0 }),
+        calcOtherAssessmentBias: () => ({ protectionShift: 0, loyaltyPenalty: 0 })
+    };
+    interview._getConcealmentProfile = () => ({ perceivedLoyalty: 90 });
+    interview._getOtherAssessmentBias = () => ({ protectionShift: 0, loyaltyPenalty: 0 });
+    interview._getTargetLoyaltyAssessment = () => ({ text: '殿への忠義は本物でしょう。疑う余地もありません。', direction: 'positive' });
+    interview.activeInterviewAttitude = 'friendly';
+    let capturedTopicMessages = [];
+    game.ui = {
+        interviewView: {
+            showMessages: (_speaker, messages) => { capturedTopicMessages = messages.slice(); }
+        }
+    };
+    interview.executeInterviewTopic(nobuhide, gunshi);
+    const gunshiTopicJoined = capturedTopicMessages.join('');
+    assert.ok(gunshiTopicJoined.includes('軍師殿か。'), '実際の他者評価でも軍師への敬称を残す');
+    assert.ok(!/です。|おります|ございます|申し上げ|でしょう/.test(gunshiTopicJoined), '父が子へ軍師を評する3段会話は最後まで一般家臣敬語へ戻らない');
+
+    capturedTopicMessages = [];
+    interview.executeInterviewTopic(nobuhide, commander);
+    const commanderTopicJoined = capturedTopicMessages.join('');
+    assert.ok(commanderTopicJoined.includes('丹羽殿か。'), '実際の他者評価でも国主への敬意は呼称に残す');
+    assert.ok(!/です。|おります|ございます|申し上げ|でしょう/.test(commanderTopicJoined), '父が子へ国主を評する3段会話も最後まで常体を保つ');
+
+    const policyStyled = interview._applyIndependentInterviewRegister('攻めるなら東を第一に見るのがよろしいでしょう。今の軍勢の動きとも合っております。', nobuhide);
+    assert.ok(policyStyled.includes('よいだろう') && policyStyled.includes('合っておる'), '父・祖父・兄などの方針助言は途中だけ一般家臣敬語へ戻らない');
+    assert.ok(!/よろしいでしょう|おります|申し上げ/.test(policyStyled));
+    const loyaltyStyled = interview._applyIndependentInterviewRegister('信忠への忠義は本物でしょう。疑う余地もありません。', nobuhide);
+    assert.strictEqual(loyaltyStyled, '信忠への忠義は本物だろう。疑う余地もない。', '家中年長者が他者忠誠を評する最後の一言も同じ口調を保つ');
+    interview.activeInterviewAttitude = 'friendly';
+    const rumorStyled = interview._getRumorMessages(nobuhide, { target: { id: 999, name: '他家武将', clan: 0, isDaimyo: true }, mode: 'general' }).join('');
+    assert.ok(!/存じませぬ|おります|ました|そうです|評判です/.test(rumorStyled), '父・祖父・兄などの武将の噂も一般家臣敬語へ戻らない');
+    assert.ok(/知らぬ|なっておる|聞いておる/.test(rumorStyled), '噂本文は年長者らしい常体へ揃える');
 
     const opening = interview._getTopicOpening(nobutada, nobunaga, { deferenceLevel: 3, achievementRelation: 0 }, 'friendly');
     assert.ok(opening.startsWith('父上ですか。'));
