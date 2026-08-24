@@ -73,10 +73,15 @@ class InterviewSystem {
         );
     }
 
-    _continueInterviewAfterGreeting(busho) {
-        if (this._shouldOfferDoctor(busho)) {
-            this._showDoctorPrompt(busho);
-            return;
+    async _continueInterviewAfterGreeting(busho) {
+        const eventManager = this.game && this.game.eventManager;
+        if (eventManager && typeof eventManager.processInterviewEvent === 'function') {
+            const handled = await eventManager.processInterviewEvent({
+                busho,
+                resumeInterview: () => this.showMainMenu(busho),
+                endInterview: () => this.close()
+            });
+            if (handled) return;
         }
         this.showMainMenu(busho);
     }
@@ -153,69 +158,6 @@ class InterviewSystem {
             default:
                 return `${name}殿ですか……`;
         }
-    }
-
-    _shouldOfferDoctor(busho) {
-        const currentYear = Number(this.game.year || 0);
-        const doctorSourceId = 'interview:doctor';
-        const lifeSystem = this.game.lifeSystem;
-        const hasDoctorExtension = !!(lifeSystem && lifeSystem.hasLifespanModifier(busho, doctorSourceId));
-        const hasBattleDeathExtension = !!(lifeSystem && lifeSystem.hasBattleDeathLifespanExtension(busho));
-        return currentYear >= (Number(busho.endYear || 0) - 1)
-            && !hasDoctorExtension
-            && !hasBattleDeathExtension;
-    }
-
-    _showDoctorPrompt(busho) {
-        const castle = this.game.getCurrentTurnCastle();
-        this.view.showPrompt(
-            busho,
-            `${busho.name}は調子が悪そうだ。<br>医師に診せますか？<br>（消費：金２００）`,
-            [
-                {
-                    label: '医師に診せる',
-                    className: 'btn-primary',
-                    onClick: () => {
-                        if (!castle || Number(castle.gold || 0) < 200) {
-                            this.view.showMessages(
-                                busho,
-                                ['金が足りないため、医師を呼べませんでした……'],
-                                () => this.showMainMenu(busho),
-                                '面談',
-                                { narration: true }
-                            );
-                            return;
-                        }
-
-                        castle.gold -= 200;
-                        const currentEndYear = Number(busho.endYear);
-                        const currentDeathAge = currentEndYear - Number(busho.birthYear);
-                        const targetEndYear = currentDeathAge < 55
-                            ? Number(busho.birthYear) + 65
-                            : currentEndYear + 10;
-                        const extensionYears = targetEndYear - currentEndYear;
-                        if (this.game.lifeSystem) {
-                            this.game.lifeSystem.setLifespanModifier(busho, 'interview:doctor', extensionYears);
-                        }
-
-                        this.view.showMessages(
-                            busho,
-                            [`${busho.name}は少し顔色が良くなったようです。`],
-                            () => this.close(),
-                            '面談',
-                            { narration: true }
-                        );
-                    }
-                },
-                {
-                    label: '診せない',
-                    className: 'btn-secondary',
-                    onClick: () => this.showMainMenu(busho)
-                }
-            ],
-            '面談',
-            { narration: true }
-        );
     }
 
     showMainMenu(busho) {
@@ -918,7 +860,7 @@ class InterviewSystem {
         if (attitude === 'cold') {
             this.view.showMessages(
                 interviewer,
-                ['「……他家の武将の噂まで、某から申し上げることはございませぬ。」'],
+                ['「……他家の武将の噂まで、某から申し上げることはございませぬ」'],
                 () => this.showMainMenu(interviewer),
                 '武将の噂'
             );
@@ -927,7 +869,7 @@ class InterviewSystem {
         if (attitude === 'startled') {
             this.view.showMessages(
                 interviewer,
-                ['「……そ、そのような噂話について、今は申し上げることはございませぬ。」'],
+                ['「……そ、そのような噂話について、今は申し上げることはございませぬ」'],
                 () => this.showMainMenu(interviewer),
                 '武将の噂'
             );

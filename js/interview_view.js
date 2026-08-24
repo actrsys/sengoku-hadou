@@ -547,10 +547,12 @@ class InterviewView {
     }
 
     _formatConversationMessage(message) {
-        return String(message || '')
+        const compact = String(message || '')
             .replace(/<br\s*\/?\s*>/gi, '')
-            .replace(/[\r\n]+/g, '')
-            .replace(/。(?=」)/g, '');
+            .replace(/[\r\n]+/g, '');
+        return window.DialogueTextRules
+            ? window.DialogueTextRules.normalizeConversationText(compact)
+            : compact;
     }
 
     _renderConversationMessage(busho, message, options = {}) {

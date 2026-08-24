@@ -78,7 +78,7 @@ window.EventTextManager = {
             { type: 'log', msg: `今川義元の死後、三河で独立を果たした${args.motoyasuName}は、隣国${args.imagawaFamilyName}家と敵対関係となっていた。` },
             { type: 'log', msg: `${args.motoyasuGivenName}は長年に渡り敵対関係にあった${args.odaFamilyName}家との同盟を模索していた。` },
             { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「皆々様方、ご足労いただき感謝申し上げる」` },
-            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「集まってもらったは他でもない。${args.odaFamilyName}との同盟の件じゃ。」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「集まってもらったは他でもない。${args.odaFamilyName}との同盟の件じゃ」` },
             { type: 'dialog', leftName: args.kashinAName, leftFace: args.kashinAFace, msg: `「殿、なりませぬぞ」` },
             { type: 'dialog', leftName: args.kashinAName, leftFace: args.kashinAFace, msg: `「${args.odaFamilyName}と我らは、先々代の清孝公の時代より敵対してまいりました。今さら同盟などと、納得できぬ者も多いでしょう」` },
             { type: 'dialog', leftName: args.kashinBName, leftFace: args.kashinBFace, msg: `「そうは申すが、人質を出さぬと決めた以上、${args.imagawaFamilyName}とはもはやこれまで。一触即発の関係にござる」` },

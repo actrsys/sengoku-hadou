@@ -526,6 +526,85 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
 };
 
 // ==========================================
+// ★ 面談：医師による寿命延長
+// ==========================================
+window.GameEvents.push({
+    id: 'common_interview_doctor',
+    timing: 'interview_after_greeting',
+    isOneTime: false,
+
+    checkCondition: function(game, context) {
+        const busho = context && context.busho;
+        const lifeSystem = game && game.lifeSystem;
+        if (!busho || !lifeSystem) return false;
+
+        const currentYear = Number(game.year || 0);
+        const hasDoctorExtension = lifeSystem.hasLifespanModifier(busho, this.id);
+        const hasBattleDeathExtension = lifeSystem.hasBattleDeathLifespanExtension(busho);
+        return currentYear >= (Number(busho.endYear || 0) - 1)
+            && !hasDoctorExtension
+            && !hasBattleDeathExtension;
+    },
+
+    execute: async function(game, context) {
+        const busho = context && context.busho;
+        const view = game && game.ui ? game.ui.interviewView : null;
+        if (!busho || !view) return;
+
+        const castle = game.getCurrentTurnCastle();
+        const resumeInterview = typeof context.resumeInterview === 'function' ? context.resumeInterview : () => {};
+        const endInterview = typeof context.endInterview === 'function' ? context.endInterview : resumeInterview;
+
+        view.showPrompt(
+            busho,
+            `${busho.name}は調子が悪そうだ。<br>医師に診せますか？<br>（消費：金２００）`,
+            [
+                {
+                    label: '医師に診せる',
+                    className: 'btn-primary',
+                    onClick: () => {
+                        if (!castle || Number(castle.gold || 0) < 200) {
+                            view.showMessages(
+                                busho,
+                                ['金が足りないため、医師を呼べませんでした……'],
+                                resumeInterview,
+                                '面談',
+                                { narration: true }
+                            );
+                            return;
+                        }
+
+                        castle.gold -= 200;
+                        const currentEndYear = Number(busho.endYear);
+                        const currentDeathAge = currentEndYear - Number(busho.birthYear);
+                        const targetEndYear = currentDeathAge < 55
+                            ? Number(busho.birthYear) + 65
+                            : currentEndYear + 10;
+                        const extensionYears = targetEndYear - currentEndYear;
+                        game.lifeSystem.setLifespanModifier(busho, this.id, extensionYears);
+
+                        view.showMessages(
+                            busho,
+                            [`${busho.name}は少し顔色が良くなったようです。`],
+                            endInterview,
+                            '面談',
+                            { narration: true }
+                        );
+                    }
+                },
+                {
+                    label: '診せない',
+                    className: 'btn-secondary',
+                    onClick: resumeInterview
+                }
+            ],
+            '面談',
+            { narration: true }
+        );
+    }
+});
+
+// ==========================================
 // ★ ゲーム開始時：特定武将の寿命延長
 // ==========================================
 window.GameEvents.push({

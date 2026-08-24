@@ -241,7 +241,7 @@ class GunshiSystem {
             if (perceivedProb > 0.95) return "必ずや受け入れられるでしょう。無条件で話がまとまるはずです！"; 
             if (perceivedProb > 0.7) return "おそらく上手くいくでしょう。何かしら要求されるでしょうが、話はまとまるはずです。"; 
             if (perceivedProb > 0.4) return "五分五分といったところです。何かしらの条件を要求される可能性が高いでしょう。"; 
-            if (perceivedProb > 0.15) return "厳しい交渉になるでしょう。。"; 
+            if (perceivedProb > 0.15) return "厳しい交渉になるでしょう。"; 
             return "おやめください。条件を提示するまでもなく、門前払いされるでしょう。"; 
         }
 

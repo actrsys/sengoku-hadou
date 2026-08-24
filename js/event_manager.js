@@ -39,6 +39,8 @@ class EventManager {
             before_command: [],       // コマンド実行直前
             after_command: [],        // コマンド実行直後
 
+            interview_after_greeting: [], // 面談：挨拶直後の特殊コモンイベント
+
             after_battle_blink: [], // 地図の点滅が終わった直後の特別な引き出し
             busho_death: []         // 武将が死亡した瞬間に呼ばれる特別な引き出し
         };
@@ -170,6 +172,51 @@ class EventManager {
                 }
             }
         }
+    }
+
+    /**
+     * 面談の挨拶直後に成立するコモンイベントを最大1件だけ実行します。
+     * 面談は専用オーバーレイ内で進行するため、通常 processEvents() の画面更新は行いません。
+     * 何も成立しなければ false を返し、InterviewSystem が通常メニューへ進みます。
+     */
+    async processInterviewEvent(context = null) {
+        const timing = 'interview_after_greeting';
+        const targetEvents = this.events[timing] || [];
+        if (targetEvents.length === 0) return false;
+
+        this.game.flags = this.game.flags || {};
+        const isHistoricalOff = (window.UserSettings && window.UserSettings.historicalEvent === false);
+
+        for (const ev of targetEvents) {
+            const isHistorical = !!(ev.id && ev.id.startsWith('historical_'));
+            if (isHistoricalOff && isHistorical) continue;
+            if (ev.isOneTime && this.game.flags[ev.id]) continue;
+
+            let matched = false;
+            try {
+                matched = !!ev.checkCondition(this.game, context);
+            } catch (error) {
+                console.warn(`面談イベント ${ev.id} の条件判定中にエラーが出ましたが、面談を継続します:`, error);
+                continue;
+            }
+            if (!matched) continue;
+
+            try {
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic(`event:${timing}:${ev.id}:execute`);
+                }
+                await ev.execute(this.game, context);
+                if (ev.isOneTime) this.game.flags[ev.id] = true;
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic(`event:${timing}:${ev.id}:done`);
+                }
+                return true;
+            } catch (error) {
+                console.warn(`面談イベント ${ev.id} の実行中にエラーが出ましたが、通常面談へ戻します:`, error);
+                return false;
+            }
+        }
+        return false;
     }
 
     // 指定したタイミング（引き出し）のイベントをまとめて実行する魔法です

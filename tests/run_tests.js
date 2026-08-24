@@ -88,11 +88,47 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r132');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r133');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('友好'), false);
+});
+
+test('会話組版は鉤括弧で閉じる時だけ終端句点を省き裸の文章は変えない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/dialogue_text_rules.js');
+    const rules = ctx.DialogueTextRules;
+    assert.strictEqual(rules.normalizeConversationText('「承知しました。」'), '「承知しました」');
+    assert.strictEqual(rules.normalizeConversationText('「第一です。第二です。。」'), '「第一です。第二です」');
+    assert.strictEqual(rules.normalizeConversationText('承知しました。'), '承知しました。');
+    assert.strictEqual(rules.normalizeConversationText('彼は「承知しました。」と答えた。'), '彼は「承知しました」と答えた。');
+});
+
+test('通常会話と面談会話は同じDialogueTextRulesを使い軍師だけの特例にしない', () => {
+    const html = read('index.html');
+    const ui = read('js/ui.js');
+    const view = read('js/interview_view.js');
+    const gunshi = read('js/gunshi_system.js');
+    const dialoguePos = html.indexOf('js/dialogue_text_rules.js');
+    assert.ok(dialoguePos >= 0 && dialoguePos < html.indexOf('js/interview_view.js') && dialoguePos < html.indexOf('js/ui.js'));
+    assert.ok(ui.includes('DialogueTextRules.normalizeConversationText(msg)'), '通常showDialog系は共通会話組版を通す');
+    assert.ok(view.includes('DialogueTextRules.normalizeConversationText(compact)'), '面談専用会話も同じ共通規則を通す');
+    assert.ok(!gunshi.includes('厳しい交渉になるでしょう。。'), '軍師助言に残っていた二重句点も除去する');
+    const dialogueFiles = ['js/diplomacy.js', 'js/event/event_text.js', 'js/interview_system.js'];
+    for (const file of dialogueFiles) assert.ok(!read(file).includes('。」'), `${file} の固定会話文に 。」 を残さない`);
+});
+
+test('面談コモンイベントは挨拶直後に最大1件だけ処理し通常画面refreshを使わない', () => {
+    const manager = read('js/event_manager.js');
+    assert.ok(manager.includes('interview_after_greeting: []'));
+    assert.ok(manager.includes('async processInterviewEvent(context = null)'));
+    assert.ok(manager.includes("const timing = 'interview_after_greeting'"));
+    assert.ok(manager.includes('return true;'), '成立したイベントを1件実行したらhandledを返す');
+    const start = manager.indexOf('async processInterviewEvent(context = null)');
+    const end = manager.indexOf('// 指定したタイミング', start);
+    const block = manager.slice(start, end);
+    assert.ok(!block.includes('EventAction.refreshScreen'), '面談専用オーバーレイ中に通常画面refreshを走らせない');
 });
 
 test('承認欲求の忠誠変動は15刻みで正負対称・閾値未満0', () => {
@@ -1811,8 +1847,11 @@ test('武将寿命のゲーム中変更は LifeSystem を唯一の正規窓口�
     assert.ok(!models.includes('this.isLifeExtended'), '旧isLifeExtendedフラグをモデルへ残さない');
     assert.ok(!models.includes('originalDeathAge'), 'modelsで討死延命量を計算しない');
     assert.ok(!interview.includes('busho.endYear ='), '面談はendYearを直接変更しない');
-    assert.ok(interview.includes("setLifespanModifier(busho, 'interview:doctor', extensionYears)"), '医師延命はLifeSystemへ委譲する');
-    assert.ok(interview.includes('hasBattleDeathLifespanExtension(busho)'), '従来どおり討死初期延命済み武将には医師延命を重ねない');
+    assert.ok(!interview.includes('_shouldOfferDoctor') && !interview.includes('_showDoctorPrompt'), 'InterviewSystem に医師固有処理を残さない');
+    assert.ok(interview.includes('processInterviewEvent({'), '面談挨拶後の特殊処理はEventManagerへ委譲する');
+    assert.ok(common.includes("id: 'common_interview_doctor'") && common.includes("timing: 'interview_after_greeting'"), '医師延命を面談コモンイベントとして登録する');
+    assert.ok(common.includes('hasBattleDeathLifespanExtension(busho)'), '従来どおり討死初期延命済み武将には医師延命を重ねない');
+    assert.ok(common.includes('game.lifeSystem.setLifespanModifier(busho, this.id, extensionYears)'), '医師コモンイベントは寿命変更をLifeSystemへ委譲する');
     assert.ok(!interview.includes("'system:battle_death_initial'"), '面談側は討死補正sourceIdを直接知らない');
     assert.ok(common.includes("game.lifeSystem.setLifespanModifier(busho, this.id, 10)"), '今川義元+10はcommon eventからLifeSystemへ委譲する');
     assert.ok(life.includes("const sourceId = 'system:battle_death_initial'"), '討死初期延命のsourceIdをLifeSystemが所有する');
@@ -2276,10 +2315,11 @@ test('面談は専用View内で完結し固定論理画面内・非スクロー�
     assert.ok(css.includes('#interview-modal.interview-conversation-mode'), '面談会話の下端固定は親モーダルのレイアウト規則として定義する');
     assert.ok(css.includes('.interview-session-sort-wrap::after'), '面談プルダウンはネイティブselectを保ったまま専用外観を持つ');
     assert.ok(css.includes('#interview-modal .interview-session-footer.hidden'), '外側ボタン非表示時も予約領域を維持して面談枠を動かさない');
-    assert.ok(interview.includes('{ narration: true }'), '医師の説明・結果は本人の台詞ではなくナレーション表示へ渡す');
+    const commonEvents = read('js/event/common_events.js');
+    assert.ok(commonEvents.includes('{ narration: true }'), '医師の説明・結果は本人の台詞ではなくナレーション表示へ渡す');
     assert.ok(view.includes('_formatConversationMessage'), '面談会話の表示整形をViewで一元化する');
     assert.ok(view.includes(".replace(/<br\\s*\\/?\\s*>/gi, '')") && view.includes(".replace(/[\\r\\n]+/g, '')"), '面談会話は表示時だけ改行を除去する');
-    assert.ok(view.includes(".replace(/。(?=」)/g, '')"), '面談会話は閉じ鉤括弧直前の句点を表示時だけ除去する');
+    assert.ok(view.includes('DialogueTextRules.normalizeConversationText(compact)'), '閉じ鉤括弧直前の句点処理は面談専用実装にせず共通会話規則へ委譲する');
     const ui = read('js/ui.js');
     assert.ok(ui.includes("target.closest('input, select, textarea, option, [contenteditable=\"true\"]')"), 'スマホ共通touchendは入力・selectからフォーカスを奪わない');
     const sortRules = read('js/busho_list_sort_rules.js');
@@ -2899,6 +2939,7 @@ test('面談の検索・ソート状態は面談を閉じた時点で身分順�
 
 test('面談会話の表示整形は元データを変えず句点と改行だけを除く', () => {
     const ctx = createContext();
+    loadScript(ctx, 'js/dialogue_text_rules.js');
     loadScript(ctx, 'js/interview_view.js');
     const format = ctx.InterviewView.prototype._formatConversationMessage;
     assert.strictEqual(format.call({}, '「承知しました。」'), '「承知しました」');

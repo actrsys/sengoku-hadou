@@ -772,8 +772,11 @@ class UIManager {
             autoCloseTime = 1000;
         }
         const faceLoadPromise = this._prepareDialogFaces(customOpts);
+        const normalizedMsg = window.DialogueTextRules
+            ? window.DialogueTextRules.normalizeConversationText(msg)
+            : String(msg ?? '');
         return new Promise(resolve => {
-            this.dialogQueue.push({ msg, isConfirm, onOk: resolve, onCancel: resolve, autoCloseTime, customOpts, faceLoadPromise });
+            this.dialogQueue.push({ msg: normalizedMsg, isConfirm, onOk: resolve, onCancel: resolve, autoCloseTime, customOpts, faceLoadPromise });
             if (!this.isDialogShowing || this._dialogHandoffPending) {
                 this._cancelDialogHandoffClose();
                 this.processDialogQueue();
@@ -791,7 +794,10 @@ class UIManager {
             autoCloseTime = 1000;
         }
         const faceLoadPromise = this._prepareDialogFaces(customOpts);
-        this.dialogQueue.push({ msg, isConfirm, onOk, onCancel, autoCloseTime: autoCloseTime, customOpts, faceLoadPromise });
+        const normalizedMsg = window.DialogueTextRules
+            ? window.DialogueTextRules.normalizeConversationText(msg)
+            : String(msg ?? '');
+        this.dialogQueue.push({ msg: normalizedMsg, isConfirm, onOk, onCancel, autoCloseTime: autoCloseTime, customOpts, faceLoadPromise });
         if (!this.isDialogShowing || this._dialogHandoffPending) {
             this._cancelDialogHandoffClose();
             this.processDialogQueue();
