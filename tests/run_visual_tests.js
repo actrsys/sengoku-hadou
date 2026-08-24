@@ -906,6 +906,106 @@ async function validateGuideLayout(cdp) {
     console.log('✓ 指南書 PC16:9 / スマホ9:16・非スクロール / シナリオ・観戦footer余白 visual/layout regression');
 }
 
+
+async function validateWarAptitudeLayout(cdp) {
+    const html = fixtureHtml('war_aptitude_layout.html');
+    for (const cfg of [
+        { width: 1280, height: 720, mobile: false, isPc: true, label: 'PC' },
+        { width: 390, height: 844, mobile: true, isPc: false, label: 'mobile' }
+    ]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width: cfg.width, height: cfg.height, deviceScaleFactor: 1, mobile: cfg.mobile });
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(() => {
+                document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.classList.toggle('is-pc', ${cfg.isPc});
+                const screen = document.getElementById('game-screen');
+                const windowW = ${cfg.width}, windowH = ${cfg.height};
+                let canvasW, canvasH, scale;
+                if (${cfg.isPc}) { canvasW=1280; canvasH=720; scale=Math.min(windowW/canvasW,windowH/canvasH); }
+                else {
+                    const targetRatio=9/16, currentRatio=windowW/windowH; let finalW,finalH;
+                    if(currentRatio>targetRatio){finalH=windowH;finalW=windowH*targetRatio;}else{finalW=windowW;finalH=windowW/targetRatio;}
+                    const minMobileWidth=360; canvasW=finalW; canvasH=finalH; scale=1;
+                    if(finalW<minMobileWidth){canvasW=minMobileWidth;canvasH=minMobileWidth/targetRatio;scale=finalW/minMobileWidth;}
+                }
+                screen.style.width=canvasW+'px';screen.style.height=canvasH+'px';screen.style.position='absolute';
+                screen.style.left=((windowW-canvasW*scale)/2)+'px';screen.style.top=((windowH-canvasH*scale)/2)+'px';
+                screen.style.transformOrigin='top left';screen.style.transform=Math.abs(scale-1)<0.000001?'none':'scale('+scale+')';
+                const rect=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height,cx:(r.left+r.right)/2,cy:(r.top+r.bottom)/2};};
+                const rowEls=[1,2,3,4,5].map(i=>document.getElementById('row-'+i));
+                const rows=rowEls.map(rect);
+                const content=rect(document.querySelector('#unit-divide-modal .modal-content'));
+                const list=rect(document.getElementById('divide-list'));
+                const visibleSelector = row => [...row.querySelectorAll('.troop-type-selector')].find(el => getComputedStyle(el).display !== 'none');
+                const selectors=rowEls.map(row=>visibleSelector(row));
+                const selectorRects=selectors.map(rect);
+                const buttonCounts=selectors.map(sel=>sel.querySelectorAll('button.troop-type-btn').length);
+                const firstButtons=[...selectors[0].querySelectorAll('button.troop-type-btn')].map(rect);
+                const cardInfos=rowEls.map(row=>row.querySelector('.divide-card-info')).filter(el=>el && getComputedStyle(el).display !== 'none');
+                const cardInfoRects=cardInfos.map(rect);
+                const firstPcAptLabels=cardInfos[0] ? [...cardInfos[0].querySelectorAll('.troop-aptitude-label')].map(el=>el.textContent.trim()) : [];
+                const firstPcGrades=cardInfos[0] ? cardInfos[0].querySelectorAll('.grade-container').length : 0;
+                const firstAbilities=cardInfos[0] ? [...cardInfos[0].querySelectorAll('.divide-info-label')].map(el=>el.textContent.trim()) : [];
+                const seaPcSelector=rowEls[3].querySelector('.is-pc-selector');
+                const seaPcButtons=seaPcSelector && getComputedStyle(seaPcSelector).display !== 'none' ? seaPcSelector.querySelectorAll('button').length : 0;
+                const firstHeader=rowEls[0].querySelector('.divide-row-header');
+                const mobileButton=firstHeader.querySelector('.troop-type-cycle-btn');
+                const mobileName=firstHeader.querySelector('.slider-row-label');
+                const mobileSummary=firstHeader.querySelector('.troop-aptitude-summary');
+                const firstShortcut=rowEls[0].querySelector('.qty-shortcut-btn');
+                const seaSummary=rowEls[3].querySelector('.troop-aptitude-summary');
+                const mobileLabels=mobileSummary ? [...mobileSummary.querySelectorAll('.troop-aptitude-label')].map(el=>el.textContent.trim()) : [];
+                const seaMobileLabels=seaSummary ? [...seaSummary.querySelectorAll('.troop-aptitude-label')].map(el=>el.textContent.trim()) : [];
+                const info=rect(document.getElementById('fw-unit-info'));
+                const infoLabels=[...document.querySelectorAll('#fw-unit-info .fw-unit-aptitude-label')].map(el=>el.textContent.trim());
+                return {
+                    rows, content, list, selectorRects, buttonCounts, firstButtons, cardInfoRects,
+                    firstPcAptLabels, firstPcGrades, firstAbilities, seaPcButtons,
+                    mobileButton: mobileButton && getComputedStyle(mobileButton).display !== 'none' ? rect(mobileButton) : null,
+                    mobileName: mobileName ? rect(mobileName) : null,
+                    mobileSummary: mobileSummary && getComputedStyle(mobileSummary).display !== 'none' ? rect(mobileSummary) : null,
+                    firstShortcut: firstShortcut ? rect(firstShortcut) : null,
+                    mobileLabels, seaMobileLabels, info, infoLabels,
+                    listClientHeight: document.getElementById('divide-list').clientHeight,
+                    listScrollHeight: document.getElementById('divide-list').scrollHeight
+                };
+            })()`, returnByValue: true, awaitPromise: true
+        });
+        const st=result.result.value;
+        assert.ok(st.content.left >= -1 && st.content.right <= cfg.width + 1, `${cfg.label}: 編成モーダルが横にはみ出す`);
+        assert.ok(st.selectorRects.every((sel, i) => sel.right <= st.rows[i].right + 1 && sel.left >= st.rows[i].left - 1), `${cfg.label}: 兵科欄が武将行からはみ出す`);
+        assert.ok(st.info.right <= st.content.right + 1, `${cfg.label}: 適性付き個別部隊情報が画面外へはみ出す`);
+        assert.ok(st.infoLabels.includes('足軽') && st.infoLabels.includes('弓術') && st.infoLabels.includes('操船'), `${cfg.label}: 個別部隊情報は正式な適性名を表示する`);
+
+        if (cfg.isPc) {
+            assert.ok(Math.abs(st.rows[0].left - st.rows[1].left) <= 1 && Math.abs(st.rows[1].left - st.rows[2].left) <= 1, 'PC: 先頭3人を左列へ配置する');
+            assert.ok(st.rows[3].left > st.rows[0].right, 'PC: 4人目を右列へ配置する');
+            assert.ok(Math.abs(st.rows[3].left - st.rows[4].left) <= 1, 'PC: 4・5人目を同じ右列へ配置する');
+            assert.ok(Math.abs(st.rows[0].top - st.rows[3].top) <= 1, 'PC: 右列1人目は左列1人目と同じ高さに置く');
+            assert.ok(Math.abs(st.rows[1].top - st.rows[4].top) <= 1, 'PC: 右列2人目は左列2人目と同じ高さに置く');
+            assert.ok(st.rows.every(r=>r.height >= 108), 'PC: 各武将を十分な高さのカードとして表示する');
+            assert.ok(st.rows[2].bottom <= st.list.bottom + 1, 'PC: 3段のカードが縦に収まる');
+            assert.strictEqual(st.buttonCounts[0], 3, 'PC: 陸戦は3兵科ボタンを直接選択できる');
+            assert.strictEqual(st.seaPcButtons, 2, 'PC海戦: 選択可能な足軽・鉄砲の2ボタンだけ表示する');
+            assert.ok(st.firstButtons.length === 3 && Math.max(...st.firstButtons.map(x=>x.width)) - Math.min(...st.firstButtons.map(x=>x.width)) <= 1, 'PC: 兵科変更ボタンの幅を揃える');
+            assert.ok(st.firstAbilities.includes('統率') && st.firstAbilities.includes('武勇') && st.firstAbilities.includes('智謀'), 'PC: 統率・武勇・智謀を独立情報として表示する');
+            assert.deepStrictEqual(st.firstPcAptLabels.slice(0,4), ['足軽','馬術','弓術','砲術'], 'PC: 適性名を正式名称で独立表示する');
+            assert.ok(st.firstPcGrades >= 4, 'PC: 適性に共通ランク文字を使う');
+            assert.ok(st.cardInfoRects.every((info,i)=>info.right <= st.rows[i].right + 1), 'PC: 情報欄がカード内に収まる');
+        } else {
+            assert.ok(st.buttonCounts.every(count => count === 1), 'mobile: 各武将の兵科ボタンは1個だけにする');
+            assert.ok(st.mobileButton && st.mobileName && st.mobileSummary, 'mobile: 兵科・武将名・適性を同じヘッダーへ置く');
+            assert.ok(st.mobileButton.right <= st.mobileName.left + 1, 'mobile: 兵科ボタンを武将名の左側へ置く');
+            assert.ok(Math.abs(st.mobileButton.height - st.firstShortcut.height) <= 0.5 && Math.abs(st.mobileButton.width - st.firstShortcut.width) <= 0.5, 'mobile: 兵科ボタンを最小/半分/最大ボタンと同じ大きさにする');
+            assert.ok(Math.abs(st.mobileButton.cy - st.mobileName.cy) <= 2 && Math.abs(st.mobileButton.cy - st.mobileSummary.cy) <= 2, 'mobile: 兵科・武将名・適性の縦位置を揃える');
+            assert.deepStrictEqual(st.mobileLabels, ['足軽','弓術'], 'mobile: 適性名を省略しない');
+            assert.ok(st.seaMobileLabels.includes('操船'), 'mobile海戦: 操船適性を同じ情報欄へ表示する');
+            assert.ok(st.rows.every((row, i, arr) => i === 0 || row.top >= arr[i-1].bottom - 1), 'mobile: 武将行は縦一列を維持する');
+        }
+    }
+    console.log('✓ 部隊編成 PC情報カード / スマホ左兵科＋正式適性名 visual/layout regression');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -966,6 +1066,7 @@ async function main() {
         await validateCommandAndInterviewStates(cdp);
         await validateEndingAndWatchStates(cdp);
         await validateGuideLayout(cdp);
+        await validateWarAptitudeLayout(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');

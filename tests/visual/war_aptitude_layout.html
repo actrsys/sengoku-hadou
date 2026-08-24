@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- APP_CSS -->
+<style>
+html,body{margin:0;width:100%;height:100%;background:#111;overflow:hidden}
+#game-screen{background:#203b28;overflow:hidden}
+#unit-divide-modal{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+#unit-divide-modal .modal-content{width:92%;padding:14px;box-sizing:border-box;background:#31583a;border:2px solid #d4af37}
+.fixture-row{background:rgba(0,0,0,.18)}
+body.is-pc .fixture-mobile-only{display:none!important}
+body:not(.is-pc) .fixture-pc-only{display:none!important}
+#fw-unit-info{left:10px;top:10px;position:relative!important;width:max-content}
+</style>
+</head>
+<body>
+<div id="game-screen">
+  <div id="unit-divide-modal">
+    <div class="modal-content">
+      <div id="divide-list" class="divide-list-two-column">
+
+        <div class="qty-row divide-row fixture-row" id="row-1">
+          <div class="divide-row-header">
+            <div class="troop-type-selector is-mobile-cycle fixture-mobile-only"><button class="troop-type-btn troop-type-cycle-btn active">足軽</button></div>
+            <span class="slider-row-label">籠手田安経</span>
+            <div class="troop-aptitude-summary fixture-mobile-only"><span class="troop-aptitude-item"><span class="troop-aptitude-label">足軽</span><span class="grade-container rank-a"><span class="grade-main">A</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">弓術</span><span class="grade-container rank-c"><span class="grade-main">C</span></span></span></div>
+          </div>
+          <div class="divide-card-info fixture-pc-only"><div class="divide-card-abilities"><span class="divide-ability"><span class="divide-info-label">統率</span><span class="divide-ability-value">78</span></span><span class="divide-ability"><span class="divide-info-label">武勇</span><span class="divide-ability-value">74</span></span><span class="divide-ability"><span class="divide-info-label">智謀</span><span class="divide-ability-value">69</span></span></div><div class="divide-card-aptitudes"><span class="troop-aptitude-item"><span class="troop-aptitude-label">足軽</span><span class="grade-container rank-a"><span class="grade-main">A</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">馬術</span><span class="grade-container rank-b"><span class="grade-main">B</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">弓術</span><span class="grade-container rank-c"><span class="grade-main">C</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">砲術</span><span class="grade-container rank-s"><span class="grade-main">S</span></span></span></div></div>
+          <div class="qty-control"><button class="qty-shortcut-btn">最小</button><input class="qty-range-main" type="range"><button class="qty-shortcut-btn">最大</button><input type="number" value="444"></div>
+          <div class="troop-type-selector is-pc-selector fixture-pc-only"><button class="troop-type-btn active">足軽</button><button class="troop-type-btn">騎馬</button><button class="troop-type-btn">鉄砲</button></div>
+        </div>
+
+        <div class="qty-row divide-row fixture-row" id="row-2">
+          <div class="divide-row-header"><div class="troop-type-selector is-mobile-cycle fixture-mobile-only"><button class="troop-type-btn troop-type-cycle-btn active">騎馬</button></div><span class="slider-row-label">宗義調</span><div class="troop-aptitude-summary fixture-mobile-only"><span class="troop-aptitude-item"><span class="troop-aptitude-label">馬術</span><span class="grade-container rank-s"><span class="grade-main">S</span></span></span></div></div>
+          <div class="divide-card-info fixture-pc-only"><div class="divide-card-abilities"><span class="divide-ability"><span class="divide-info-label">統率</span><span class="divide-ability-value">65</span></span><span class="divide-ability"><span class="divide-info-label">武勇</span><span class="divide-ability-value">72</span></span><span class="divide-ability"><span class="divide-info-label">智謀</span><span class="divide-ability-value">55</span></span></div><div class="divide-card-aptitudes"><span class="troop-aptitude-item"><span class="troop-aptitude-label">足軽</span><span class="grade-container rank-b"><span class="grade-main">B</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">馬術</span><span class="grade-container rank-s"><span class="grade-main">S</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">弓術</span><span class="grade-container rank-a"><span class="grade-main">A</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">砲術</span><span class="grade-container rank-c"><span class="grade-main">C</span></span></span></div></div>
+          <div class="qty-control"><button class="qty-shortcut-btn">最小</button><input class="qty-range-main" type="range"><button class="qty-shortcut-btn">最大</button><input type="number" value="444"></div>
+          <div class="troop-type-selector is-pc-selector fixture-pc-only"><button class="troop-type-btn">足軽</button><button class="troop-type-btn active">騎馬</button><button class="troop-type-btn">鉄砲</button></div>
+        </div>
+
+        <div class="qty-row divide-row fixture-row" id="row-3">
+          <div class="divide-row-header"><div class="troop-type-selector is-mobile-cycle fixture-mobile-only"><button class="troop-type-btn troop-type-cycle-btn active">鉄砲</button></div><span class="slider-row-label">長宗我部元親</span><div class="troop-aptitude-summary fixture-mobile-only"><span class="troop-aptitude-item"><span class="troop-aptitude-label">砲術</span><span class="grade-container rank-a"><span class="grade-main">A</span></span></span></div></div>
+          <div class="divide-card-info fixture-pc-only"><div class="divide-card-abilities"><span class="divide-ability"><span class="divide-info-label">統率</span><span class="divide-ability-value">92</span></span><span class="divide-ability"><span class="divide-info-label">武勇</span><span class="divide-ability-value">87</span></span><span class="divide-ability"><span class="divide-info-label">智謀</span><span class="divide-ability-value">81</span></span></div><div class="divide-card-aptitudes"><span class="troop-aptitude-item"><span class="troop-aptitude-label">足軽</span><span class="grade-container rank-s"><span class="grade-main">S</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">馬術</span><span class="grade-container rank-c"><span class="grade-main">C</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">弓術</span><span class="grade-container rank-a"><span class="grade-main">A</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">砲術</span><span class="grade-container rank-a"><span class="grade-main">A</span></span></span></div></div>
+          <div class="qty-control"><button class="qty-shortcut-btn">最小</button><input class="qty-range-main" type="range"><button class="qty-shortcut-btn">最大</button><input type="number" value="444"></div>
+          <div class="troop-type-selector is-pc-selector fixture-pc-only"><button class="troop-type-btn">足軽</button><button class="troop-type-btn">騎馬</button><button class="troop-type-btn active">鉄砲</button></div>
+        </div>
+
+        <div class="qty-row divide-row fixture-row" id="row-4">
+          <div class="divide-row-header"><div class="troop-type-selector is-mobile-cycle fixture-mobile-only"><button class="troop-type-btn troop-type-cycle-btn active">足軽</button></div><span class="slider-row-label">九鬼嘉隆</span><div class="troop-aptitude-summary fixture-mobile-only"><span class="troop-aptitude-item"><span class="troop-aptitude-label">足軽</span><span class="grade-container rank-b"><span class="grade-main">B</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">弓術</span><span class="grade-container rank-b"><span class="grade-main">B</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">操船</span><span class="grade-container rank-s"><span class="grade-main">S</span></span></span></div></div>
+          <div class="divide-card-info fixture-pc-only"><div class="divide-card-abilities"><span class="divide-ability"><span class="divide-info-label">統率</span><span class="divide-ability-value">83</span></span><span class="divide-ability"><span class="divide-info-label">武勇</span><span class="divide-ability-value">76</span></span><span class="divide-ability"><span class="divide-info-label">智謀</span><span class="divide-ability-value">73</span></span></div><div class="divide-card-aptitudes"><span class="troop-aptitude-item"><span class="troop-aptitude-label">足軽</span><span class="grade-container rank-b"><span class="grade-main">B</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">馬術</span><span class="grade-container rank-c"><span class="grade-main">C</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">弓術</span><span class="grade-container rank-b"><span class="grade-main">B</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">砲術</span><span class="grade-container rank-a"><span class="grade-main">A</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">操船</span><span class="grade-container rank-s"><span class="grade-main">S</span></span></span></div></div>
+          <div class="qty-control"><button class="qty-shortcut-btn">最小</button><input class="qty-range-main" type="range"><button class="qty-shortcut-btn">最大</button><input type="number" value="444"></div>
+          <div class="troop-type-selector is-pc-selector is-sea-battle fixture-pc-only"><button class="troop-type-btn active">足軽</button><button class="troop-type-btn">鉄砲</button></div>
+        </div>
+
+        <div class="qty-row divide-row fixture-row" id="row-5">
+          <div class="divide-row-header"><div class="troop-type-selector is-mobile-cycle fixture-mobile-only"><button class="troop-type-btn troop-type-cycle-btn active">鉄砲</button></div><span class="slider-row-label">村上武吉</span><div class="troop-aptitude-summary fixture-mobile-only"><span class="troop-aptitude-item"><span class="troop-aptitude-label">砲術</span><span class="grade-container rank-b"><span class="grade-main">B</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">操船</span><span class="grade-container rank-a"><span class="grade-main">A</span></span></span></div></div>
+          <div class="divide-card-info fixture-pc-only"><div class="divide-card-abilities"><span class="divide-ability"><span class="divide-info-label">統率</span><span class="divide-ability-value">80</span></span><span class="divide-ability"><span class="divide-info-label">武勇</span><span class="divide-ability-value">82</span></span><span class="divide-ability"><span class="divide-info-label">智謀</span><span class="divide-ability-value">75</span></span></div><div class="divide-card-aptitudes"><span class="troop-aptitude-item"><span class="troop-aptitude-label">足軽</span><span class="grade-container rank-a"><span class="grade-main">A</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">馬術</span><span class="grade-container rank-b"><span class="grade-main">B</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">弓術</span><span class="grade-container rank-c"><span class="grade-main">C</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">砲術</span><span class="grade-container rank-b"><span class="grade-main">B</span></span></span><span class="troop-aptitude-item"><span class="troop-aptitude-label">操船</span><span class="grade-container rank-a"><span class="grade-main">A</span></span></span></div></div>
+          <div class="qty-control"><button class="qty-shortcut-btn">最小</button><input class="qty-range-main" type="range"><button class="qty-shortcut-btn">最大</button><input type="number" value="444"></div>
+          <div class="troop-type-selector is-pc-selector is-sea-battle fixture-pc-only"><button class="troop-type-btn">足軽</button><button class="troop-type-btn active">鉄砲</button></div>
+        </div>
+      </div>
+
+      <div id="fw-unit-info" class="fw-floating-unit" style="--unit-color:#d32f2f">
+        <div class="fw-unit-header"><div class="fw-unit-name">宗家 宗義調</div><div class="fw-unit-type"><span class="fw-unit-type-name">足軽</span><span class="fw-unit-aptitude-item"><span class="fw-unit-aptitude-label">足軽</span><span class="grade-container rank-b"><span class="grade-main">B</span></span></span><span class="fw-unit-aptitude-item"><span class="fw-unit-aptitude-label">弓術</span><span class="grade-container rank-a"><span class="grade-main">A</span></span></span><span class="fw-unit-aptitude-item"><span class="fw-unit-aptitude-label">操船</span><span class="grade-container rank-s"><span class="grade-main">S</span></span></span></div></div>
+        <div class="fw-unit-stats"><div class="fw-unit-row"><span class="fw-status-label">兵士</span><span class="fw-status-value">444</span></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

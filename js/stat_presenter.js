@@ -34,6 +34,13 @@ class StatPresenter {
             </span>`;
     }
 
+    // 適性ランク（S～E）も武将詳細と同じランク文字で表示します。
+    static toAptitudeHTML(rank) {
+        const normalized = String(rank || 'E').trim().toUpperCase();
+        const base = /^[SABCDE]$/.test(normalized) ? normalized : 'E';
+        return `<span class="grade-container rank-${base.toLowerCase()}"><span class="grade-main">${base}</span></span>`;
+    }
+
     static getPerceivedStatValue(target, statName, gunshi, castleAccuracy, playerClanId, daimyo = null) {
         return target[statName];
     }

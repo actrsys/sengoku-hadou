@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r174');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r177');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1667,6 +1667,36 @@ test('index.html に inline onclick を残さない', () => {
 test('ui_slider.js は静的 inline style 属性を生成しない', () => {
     const source = read('js/ui_slider.js');
     assert.strictEqual((source.match(/style=\"/g) || []).length, 0);
+});
+
+
+test('部隊編成はPCカードとスマホ循環ボタンで能力・適性を見やすく表示する', () => {
+    const source = read('js/ui_slider.js');
+    assert.ok(source.includes("const isPcDivide = document.body.classList.contains('is-pc')"), 'PC/スマホで編成UIを分ける');
+    assert.ok(source.includes("StatPresenter.toAptitudeHTML(rank || 'E')"), '適性ランクは共通のランク表示を使う');
+    assert.ok(source.includes('class="divide-card-abilities"'), 'PCカードに能力情報欄を設ける');
+    assert.ok(source.includes('class="divide-info-label">統率</span>'), 'PCカードに統率を表示する');
+    assert.ok(source.includes('class="divide-info-label">武勇</span>'), 'PCカードに武勇を表示する');
+    assert.ok(source.includes('class="divide-info-label">智謀</span>'), 'PCカードに智謀を表示する');
+    assert.ok(source.includes("['足軽', busho.aptAshigaru]"), '適性名は足などへ省略せず足軽と表示する');
+    assert.ok(source.includes("['馬術', busho.aptKiba]"), '馬術を正式名称で表示する');
+    assert.ok(source.includes("['弓術', busho.aptYumi]"), '弓術を正式名称で表示する');
+    assert.ok(source.includes("['砲術', busho.aptTeppo]"), '砲術を正式名称で表示する');
+    assert.ok(source.includes("items.push(['操船', busho.aptMaritime])"), '海戦では操船適性を情報欄へ追加する');
+    assert.ok(source.includes('class="troop-type-btn troop-type-cycle-btn active"'), 'スマホは兵科切替ボタンを1個だけにする');
+    assert.ok(source.includes("isSeaBattleForDivide ? ['ashigaru', 'teppo'] : ['ashigaru', 'kiba', 'teppo']"), 'スマホ海戦では騎馬を循環対象から外す');
+    assert.ok(source.includes("if (aptitudeSummary) aptitudeSummary.innerHTML = aptitudeSummaryHtml(b, nextType, isSeaBattleForDivide)"), 'スマホは兵科切替と同時に適性表示を更新する');
+    assert.ok(source.includes("listEl.classList.toggle('divide-list-two-column', isPcDivide && bushos.length > 3)"), 'PCで4人以上なら左3・右2の2列配置を使う');
+});
+
+test('野戦の個別部隊情報は正式な適性名と共通ランク表示を使う', () => {
+    const source = read('js/field_war.js');
+    assert.ok(source.includes("items.push(['足軽', unitBusho.aptAshigaru], ['弓術', unitBusho.aptYumi])"));
+    assert.ok(source.includes("items.push(['馬術', unitBusho.aptKiba])"));
+    assert.ok(source.includes("items.push(['砲術', unitBusho.aptTeppo])"));
+    assert.ok(source.includes("items.push(['操船', unitBusho.aptMaritime])"));
+    assert.ok(source.includes("StatPresenter.toAptitudeHTML(rank || 'E')"));
+    assert.ok(source.includes('<div class="fw-unit-type">${typeDisplay}</div>'));
 });
 
 test('index.html は inline script を持たず、起動処理を app_bootstrap.js に集約する', () => {

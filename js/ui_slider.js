@@ -571,14 +571,42 @@ class UISliderManager {
         const divideStockGuns = stockContainer ? stockContainer.querySelector('#divide-stock-guns') : null;
         const divideRefs = new Map();
         const isSeaBattleForDivide = !!(this.game.warManager && this.game.warManager.state && this.game.warManager.state.isSeaBattle);
+        const isPcDivide = document.body.classList.contains('is-pc');
+        listEl.classList.toggle('divide-list-two-column', isPcDivide && bushos.length > 3);
 
-        const isSeaBattle = !!(this.game.warManager && this.game.warManager.state && this.game.warManager.state.isSeaBattle);
+        const troopTypeLabel = (type) => type === 'kiba' ? '騎馬' : (type === 'teppo' ? '鉄砲' : '足軽');
+        const aptitudeItemHtml = (label, rank) => `
+            <span class="troop-aptitude-item">
+                <span class="troop-aptitude-label">${label}</span>
+                ${StatPresenter.toAptitudeHTML(rank || 'E')}
+            </span>`;
+        const aptitudeItemsFor = (busho, type) => {
+            if (type === 'kiba') return [['馬術', busho.aptKiba]];
+            if (type === 'teppo') return [['砲術', busho.aptTeppo]];
+            return [['足軽', busho.aptAshigaru], ['弓術', busho.aptYumi]];
+        };
+        const aptitudeSummaryHtml = (busho, type, includeMaritime = false) => {
+            const items = aptitudeItemsFor(busho, type).slice();
+            if (includeMaritime) items.push(['操船', busho.aptMaritime]);
+            return items.map(([label, rank]) => aptitudeItemHtml(label, rank)).join('');
+        };
+        const pcAptitudeSummaryHtml = (busho, includeMaritime = false) => {
+            const items = [
+                ['足軽', busho.aptAshigaru],
+                ['馬術', busho.aptKiba],
+                ['弓術', busho.aptYumi],
+                ['砲術', busho.aptTeppo]
+            ];
+            if (includeMaritime) items.push(['操船', busho.aptMaritime]);
+            return items.map(([label, rank]) => aptitudeItemHtml(label, rank)).join('');
+        };
+
         const autoAssigns = this.game.warManager.autoDivideSoldiers(
             bushos,
             totalSoldiers,
             totalHorses,
             totalGuns,
-            isSeaBattle,
+            isSeaBattleForDivide,
             true
         );
         let assignments = autoAssigns.map(assignment => ({
@@ -659,21 +687,12 @@ class UISliderManager {
                 const btnTeppo = ref.btnTeppo;
                 if (btnKiba) {
                     const availHorses = totalHorses - (usedHorses - (d.type === 'kiba' ? d.count : 0));
-                    if (isSeaBattleForDivide) {
+                    if (availHorses <= 0 && d.type !== 'kiba') {
                         btnKiba.disabled = true;
                         btnKiba.classList.add('disabled');
-                        btnKiba.style.opacity = '0.5';
-                        btnKiba.title = '海戦では騎馬隊を編成できません';
-                    } else if (availHorses <= 0 && d.type !== 'kiba') {
-                        btnKiba.disabled = true;
-                        btnKiba.classList.add('disabled');
-                        btnKiba.style.opacity = '';
-                        btnKiba.title = '';
                     } else {
                         btnKiba.disabled = false;
                         btnKiba.classList.remove('disabled');
-                        btnKiba.style.opacity = '';
-                        btnKiba.title = '';
                     }
                 }
                 if (btnTeppo) {
@@ -684,6 +703,20 @@ class UISliderManager {
                     } else {
                         btnTeppo.disabled = false;
                         btnTeppo.classList.remove('disabled');
+                    }
+                }
+                if (ref.cycleBtn) {
+                    const otherHorses = usedHorses - (d.type === 'kiba' ? d.count : 0);
+                    const otherGuns = usedGuns - (d.type === 'teppo' ? d.count : 0);
+                    const hasKibaAlternative = !isSeaBattleForDivide && (d.type === 'kiba' || totalHorses - otherHorses > 0);
+                    const hasTeppoAlternative = d.type === 'teppo' || totalGuns - otherGuns > 0;
+                    const selectableCount = 1 + (hasKibaAlternative ? 1 : 0) + (hasTeppoAlternative ? 1 : 0);
+                    ref.cycleBtn.disabled = selectableCount <= 1;
+                    ref.cycleBtn.classList.toggle('disabled', selectableCount <= 1);
+                    ref.cycleBtn.dataset.type = d.type;
+                    ref.cycleBtn.textContent = troopTypeLabel(d.type);
+                    if (ref.aptitudeSummary && ref.busho) {
+                        ref.aptitudeSummary.innerHTML = aptitudeSummaryHtml(ref.busho, d.type, isSeaBattleForDivide);
                     }
                 }
             });
@@ -714,17 +747,48 @@ class UISliderManager {
             const div = document.createElement('div');
             div.className = 'qty-row divide-row';
             
-            const myType = assignments[index].type || 'ashigaru';
+            const assignedType = assignments[index].type || 'ashigaru';
+            const myType = isSeaBattleForDivide && assignedType === 'kiba' ? 'ashigaru' : assignedType;
             
-            div.innerHTML = `
-                <div class="divide-row-header">
-                    <span class="slider-row-label">${b.name}</span>
-                    <div class="troop-type-selector" id="troop-type-group-${b.id}">
-                        <button class="troop-type-btn ${myType === 'ashigaru' ? 'active' : ''}" data-type="ashigaru">足軽</button>
-                        <button class="troop-type-btn ${myType === 'kiba' ? 'active' : ''}" data-type="kiba">騎馬</button>
-                        <button class="troop-type-btn ${myType === 'teppo' ? 'active' : ''}" data-type="teppo">鉄砲</button>
+            const aptAshigaru = b.aptAshigaru || 'E';
+            const aptYumi = b.aptYumi || 'E';
+            const aptKiba = b.aptKiba || 'E';
+            const aptTeppo = b.aptTeppo || 'E';
+            const aptMaritime = b.aptMaritime || 'E';
+
+            const pcTroopSelectorHtml = isSeaBattleForDivide
+                ? `
+                    <button class="troop-type-btn ${myType === 'ashigaru' ? 'active' : ''}" data-type="ashigaru">足軽</button>
+                    <button class="troop-type-btn ${myType === 'teppo' ? 'active' : ''}" data-type="teppo">鉄砲</button>
+                `
+                : `
+                    <button class="troop-type-btn ${myType === 'ashigaru' ? 'active' : ''}" data-type="ashigaru">足軽</button>
+                    <button class="troop-type-btn ${myType === 'kiba' ? 'active' : ''}" data-type="kiba">騎馬</button>
+                    <button class="troop-type-btn ${myType === 'teppo' ? 'active' : ''}" data-type="teppo">鉄砲</button>
+                `;
+            const mobileCycleButtonHtml = `
+                <button class="troop-type-btn troop-type-cycle-btn active" data-type="${myType}">${troopTypeLabel(myType)}</button>
+            `;
+            const pcCardInfoHtml = `
+                <div class="divide-card-info">
+                    <div class="divide-card-abilities">
+                        <span class="divide-ability"><span class="divide-info-label">統率</span><span class="divide-ability-value">${Number(b.leadership || 0)}</span></span>
+                        <span class="divide-ability"><span class="divide-info-label">武勇</span><span class="divide-ability-value">${Number(b.strength || 0)}</span></span>
+                        <span class="divide-ability"><span class="divide-info-label">智謀</span><span class="divide-ability-value">${Number(b.intelligence || 0)}</span></span>
+                    </div>
+                    <div class="divide-card-aptitudes" title="武将の適性">
+                        ${pcAptitudeSummaryHtml(b, isSeaBattleForDivide)}
                     </div>
                 </div>
+            `;
+
+            div.innerHTML = `
+                <div class="divide-row-header">
+                    ${isPcDivide ? '' : `<div class="troop-type-selector is-mobile-cycle" id="troop-type-group-${b.id}">${mobileCycleButtonHtml}</div>`}
+                    <span class="slider-row-label">${b.name}</span>
+                    ${isPcDivide ? '' : `<div class="troop-aptitude-summary" title="現在兵科の適性${isSeaBattleForDivide ? ' / 操船適性' : ''}">${aptitudeSummaryHtml(b, myType, isSeaBattleForDivide)}</div>`}
+                </div>
+                ${isPcDivide ? pcCardInfoHtml : ''}
                 <div class="qty-control">
                     <button class="qty-shortcut-btn qty-pos-start" id="div-btn-min-${b.id}">最小</button>
                     <button class="qty-shortcut-btn qty-pos-end" id="div-btn-half-${b.id}">半分</button>
@@ -732,6 +796,7 @@ class UISliderManager {
                     <button class="qty-shortcut-btn qty-pos-end" id="div-btn-max-${b.id}">最大</button>
                     <input class="qty-number-end" type="number" id="div-num-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}">
                 </div>
+                ${isPcDivide ? `<div class="troop-type-selector is-pc-selector ${isSeaBattleForDivide ? 'is-sea-battle' : ''}" id="troop-type-group-${b.id}">${pcTroopSelectorHtml}</div>` : ''}
                 <input type="hidden" id="div-type-${b.id}" value="${myType}">
             `;
             listEl.appendChild(div);
@@ -814,19 +879,53 @@ class UISliderManager {
             const typeBtns = div.querySelectorAll(`#troop-type-group-${b.id} .troop-type-btn`);
             const btnKiba = Array.from(typeBtns).find(btn => btn.getAttribute('data-type') === 'kiba') || null;
             const btnTeppo = Array.from(typeBtns).find(btn => btn.getAttribute('data-type') === 'teppo') || null;
-            divideRefs.set(b.id, { range, num, typeSel, btnMin, btnHalf, btnMax, btnKiba, btnTeppo, typeBtns });
+            const cycleBtn = div.querySelector(`#troop-type-group-${b.id} .troop-type-cycle-btn`);
+            const aptitudeSummary = div.querySelector('.troop-aptitude-summary');
+            divideRefs.set(b.id, { busho: b, range, num, typeSel, btnMin, btnHalf, btnMax, btnKiba, btnTeppo, typeBtns, cycleBtn, aptitudeSummary });
 
-            typeBtns.forEach(btn => {
-                btn.onclick = () => {
-                    if (btn.disabled || btn.classList.contains('disabled')) return; // ★追加：無効なボタンは弾く
+            if (isPcDivide) {
+                typeBtns.forEach(btn => {
+                    btn.onclick = () => {
+                        if (btn.disabled || btn.classList.contains('disabled')) return;
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                        typeBtns.forEach(item => item.classList.remove('active'));
+                        btn.classList.add('active');
+                        typeSel.value = btn.getAttribute('data-type');
+                        onInput(0, 'max');
+                    };
+                });
+            } else if (cycleBtn) {
+                cycleBtn.onclick = () => {
+                    const currentType = typeSel.value || 'ashigaru';
+                    let usedHorsesNow = 0;
+                    let usedGunsNow = 0;
+                    bushos.forEach(busho => {
+                        const ref = divideRefs.get(busho.id);
+                        if (!ref) return;
+                        const count = parseInt(ref.num.value) || 0;
+                        if (ref.typeSel.value === 'kiba') usedHorsesNow += count;
+                        if (ref.typeSel.value === 'teppo') usedGunsNow += count;
+                    });
+                    const ownCount = parseInt(num.value) || 0;
+                    const ownHorses = currentType === 'kiba' ? ownCount : 0;
+                    const ownGuns = currentType === 'teppo' ? ownCount : 0;
+                    const candidates = (isSeaBattleForDivide ? ['ashigaru', 'teppo'] : ['ashigaru', 'kiba', 'teppo']).filter(type => {
+                        if (type === currentType) return true;
+                        if (type === 'kiba') return totalHorses - (usedHorsesNow - ownHorses) > 0;
+                        if (type === 'teppo') return totalGuns - (usedGunsNow - ownGuns) > 0;
+                        return true;
+                    });
+                    if (candidates.length <= 1) return;
+                    const currentIndex = candidates.indexOf(currentType);
+                    const nextType = candidates[(currentIndex + 1 + candidates.length) % candidates.length];
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    typeBtns.forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    typeSel.value = btn.getAttribute('data-type');
-                    // ★修正：兵種を変更した時は、デフォルトで「最大」の値になるようにします
-                    onInput(0, 'max'); 
+                    typeSel.value = nextType;
+                    cycleBtn.dataset.type = nextType;
+                    cycleBtn.textContent = troopTypeLabel(nextType);
+                    if (aptitudeSummary) aptitudeSummary.innerHTML = aptitudeSummaryHtml(b, nextType, isSeaBattleForDivide);
+                    onInput(0, 'max');
                 };
-            });
+            }
         });
 
         updateRemain();

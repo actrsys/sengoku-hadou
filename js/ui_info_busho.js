@@ -271,10 +271,7 @@ Object.assign(UIInfoManager.prototype, {
             `;
         } else if (this.bushoDetailCurrentTab === 'aptitude') {
             // 適性のランク表示を綺麗にする魔法
-            const getAptGradeHtml = (val) => {
-                const lowVal = val ? val.toLowerCase() : 'e';
-                return `<div class="grade-container rank-${lowVal}"><span class="grade-main">${val}</span></div>`;
-            };
+            const getAptGradeHtml = (val) => StatPresenter.toAptitudeHTML(val);
 
             const aptitudes = [
                 { label: '足軽', val: busho.aptAshigaru },
@@ -1059,10 +1056,7 @@ Object.assign(UIInfoManager.prototype, {
                     `<span class="col-stat">${getStat('charm')}</span>`
                 ].filter(Boolean);
             } else if (this.bushoCurrentTab === 'aptitude') {
-                const getAptGradeHtml = (val) => {
-                    const lowVal = val ? val.toLowerCase() : 'e';
-                    return `<div class="grade-container rank-${lowVal}"><span class="grade-main">${val}</span></div>`;
-                };
+                const getAptGradeHtml = (val) => StatPresenter.toAptitudeHTML(val);
                 cells = [
                     !hideActionCol ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
                     `<span class="col-name">${hideActionCol && !isViewMode ? inputHtml : ''}${compressedNameHtml}</span>`,

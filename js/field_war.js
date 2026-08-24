@@ -1181,6 +1181,24 @@ class FieldWarManager {
         if (unit.troopType === 'kiba') typeName = '騎馬';
         if (unit.troopType === 'teppo') typeName = '鉄砲';
 
+        const unitBusho = unit.bushoId ? this.game.getBusho(unit.bushoId) : null;
+        const aptitudeItemHtml = (label, rank) => `
+            <span class="fw-unit-aptitude-item"><span class="fw-unit-aptitude-label">${label}</span>${StatPresenter.toAptitudeHTML(rank || 'E')}</span>`;
+        let aptitudeHtml = '';
+        if (unitBusho) {
+            const items = [];
+            if (unit.troopType === 'ashigaru') {
+                items.push(['足軽', unitBusho.aptAshigaru], ['弓術', unitBusho.aptYumi]);
+            } else if (unit.troopType === 'kiba') {
+                items.push(['馬術', unitBusho.aptKiba]);
+            } else if (unit.troopType === 'teppo') {
+                items.push(['砲術', unitBusho.aptTeppo]);
+            }
+            if (this.warState && this.warState.isSeaBattle) items.push(['操船', unitBusho.aptMaritime]);
+            aptitudeHtml = items.map(([label, rank]) => aptitudeItemHtml(label, rank)).join('');
+        }
+        const typeDisplay = `<span class="fw-unit-type-name">${typeName}</span>${aptitudeHtml}`;
+
         // 大名家や諸勢力の名前を調べる処理
         let clanNameText = "";
         
@@ -1189,13 +1207,10 @@ class FieldWarManager {
             if (kunishu) {
                 clanNameText = `${kunishu.getName(this.game)} `; 
             }
-        } else if (unit.bushoId) {
-            const busho = this.game.getBusho(unit.bushoId);
-            if (busho && busho.clan > 0) {
-                const clanData = this.game.clans.find(c => c.id === busho.clan);
-                if (clanData) {
-                    clanNameText = `${clanData.name} `;
-                }
+        } else if (unitBusho && unitBusho.clan > 0) {
+            const clanData = this.game.clans.find(c => c.id === unitBusho.clan);
+            if (clanData) {
+                clanNameText = `${clanData.name} `;
             }
         }
         
@@ -1210,7 +1225,7 @@ class FieldWarManager {
         infoEl.innerHTML = `
             <div class="fw-unit-header">
                 <div class="fw-unit-name">${clanNameText}${unit.name}</div>
-                <div class="fw-unit-type">${typeName}</div>
+                <div class="fw-unit-type">${typeDisplay}</div>
             </div>
             <div class="fw-unit-stats">
                 <div class="fw-unit-row">
