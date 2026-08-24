@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r151');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r152');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -445,9 +445,12 @@ test('軍師の当主への口調と報告対象への敬意は面談の会話�
 
     assert.strictEqual(ctx.ConversationStandingRules.getDaimyoSpeakerPosture(game, yoshiakiGunshi, daimyo).key, 'higher_court');
     assert.strictEqual(system._styleForSpeaker(yoshiakiGunshi, 'おそらく上手くいくでしょう。'), 'おそらく上手くいくだろう。', '左馬頭が軍師でも面談同様に当主へ敬語へ戻らない');
-    assert.strictEqual(system._styleForSpeaker(yoshiakiGunshi, '合戦におもむきますか？ 兵力と兵糧の確認をお忘れなく。'), '合戦におもむくか？ 兵力と兵糧の確認を忘れぬようにな。', '戦争助言も左馬頭の軍師だけ敬語へ戻さない');
+    assert.strictEqual(system._styleForSpeaker(yoshiakiGunshi, '合戦におもむきますか？ 兵力と兵糧の確認をお忘れなく。'), '合戦におもむくか。兵と兵糧の備えは見ておいた方がよかろう。', '戦争助言も左馬頭の軍師だけ敬語へ戻さず高格式者らしい助言へする');
     assert.ok(!/ください|ません|ましょう/.test(system._styleForSpeaker(yoshiakiGunshi, 'おやめください。厳しい結果になるかもしれません。運が良ければ仕留められましょう。')), '軍師助言の代表的な敬語活用も高格式者では常体へ整える');
     assert.strictEqual(system._styleForSpeaker(fatherGunshi, '厳しい結果になるでしょう。'), '厳しい結果になるだろう。', '年長親族が軍師でも当主への常体を使う');
+    assert.strictEqual(system._styleForSpeaker(fatherGunshi, '合戦におもむきますか？ 兵力と兵糧の確認をお忘れなく。'), '合戦におもむくか。兵と兵糧の備えは怠るな。', '父などの軍師は合戦前助言も指導的な家族口調にする');
+    assert.strictEqual(system._styleForSpeaker(yoshiakiGunshi, 'おやめください。失敗する未来が見えます。'), 'やめておくのがよかろう。失敗する未来が見える。', '高格式軍師は単なる敬語除去ではなく落ち着いた上位者口調へ寄せる');
+    assert.ok(!system._getSelfConcernMessage(fatherGunshi, 'red').includes('恐れながら'), '父などの軍師自身の不満表明も一般家臣の恐れ入る口調へ戻さない');
     assert.ok(system._getDaimyoAddress(yoshiakiGunshi).endsWith('殿'), '高格式軍師は当主の公的呼称を使いつつ文末は常体にできる');
     assert.strictEqual(system._getTargetCallName(yoshiakiGunshi, fatherGunshi), '御父君', '軍師報告の対象呼称には当主との血縁敬称を反映する');
 
@@ -465,6 +468,18 @@ test('軍師の当主への口調と報告対象への敬意は面談の会話�
     const report = captured.join('');
     assert.ok(report.includes('織田殿、御父君は'), '左馬頭の軍師報告でも当主への公的呼称と報告対象への血縁敬称を分離する');
     assert.ok(!/見受けられます|ご配慮|ございます|でしょう/.test(report), '左馬頭が軍師として報告する時も面談と同じ常体レジスターを最後まで使う');
+
+    const familyConcern = system._buildLoyaltyConcernMessage(yoshiakiGunshi, { busho: fatherGunshi, assessment: { alert: 'red' } });
+    assert.ok(familyConcern.includes('御父君') && familyConcern.includes('織田殿の考え'), '高格式軍師は一門の忠誠低下を待遇ではなく当主との考えの食い違いとして報告する');
+    assert.ok(!familyConcern.includes('待遇への不満') && !familyConcern.includes('忠義'), '一門の月初所見でも通常家臣の待遇・忠義表現へ戻さない');
+
+    const authorityConcern = system._styleForSpeaker(fatherGunshi, system._buildLoyaltyConcernMessage(fatherGunshi, { busho: yoshiakiGunshi, assessment: { alert: 'orange' } }));
+    assert.ok(authorityConcern.includes('左馬頭様') && authorityConcern.includes('信忠の考え'), '父の軍師が左馬頭を報告する場合も対象への特殊敬称と子への常体を両立する');
+    assert.ok(!/待遇への不満|忠義|です。|ございます|でしょう/.test(authorityConcern), '特殊権威の忠誠警告を通常家臣表現や聞き手への敬語へ戻さない');
+
+    const warEffortSource = read('js/war_effort.js');
+    assert.ok(warEffortSource.includes('gunshiDialogue._styleForSpeaker(gunshi, text)'), '戦況報告もGunshiSystemの話者レジスターを通す');
+    assert.ok(warEffortSource.includes('gunshiDialogue.getSituationDaimyoSortieText(gunshi)'), '戦況報告の当主出陣文も軍師と当主の関係別に生成する');
 });
 
 test('無官の会話呼称は異姓なら姓、同姓一門なら諱、同姓非一門ならフルネームを使う', () => {

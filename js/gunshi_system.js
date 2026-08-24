@@ -14,24 +14,58 @@ class GunshiSystem {
         return this.game.getClanDaimyo(Number(this.game.playerClanId) || 0) || null;
     }
 
-    _usesIndependentDaimyoRegister(gunshi) {
+    _getSpeakerPosture(gunshi) {
         const daimyo = this._getPlayerDaimyo();
-        return !!(window.ConversationStandingRules && daimyo && gunshi
-            && typeof window.ConversationStandingRules.usesIndependentDaimyoRegister === 'function'
-            && window.ConversationStandingRules.usesIndependentDaimyoRegister(this.game, gunshi, daimyo));
+        if (!window.ConversationStandingRules || !daimyo || !gunshi
+            || typeof window.ConversationStandingRules.getDaimyoSpeakerPosture !== 'function') {
+            return { key: 'normal', relation: 'none' };
+        }
+        return window.ConversationStandingRules.getDaimyoSpeakerPosture(this.game, gunshi, daimyo);
+    }
+
+    _usesIndependentDaimyoRegister(gunshi) {
+        return ['senior_close', 'senior_extended', 'higher_court'].includes(this._getSpeakerPosture(gunshi).key);
     }
 
     _styleForSpeaker(gunshi, text) {
-        if (!this._usesIndependentDaimyoRegister(gunshi)) return String(text || '');
+        const posture = this._getSpeakerPosture(gunshi);
+        if (!['senior_close', 'senior_extended', 'higher_court'].includes(posture.key)) return String(text || '');
         let result = String(text || '');
         if (window.ConversationStandingRules
             && typeof window.ConversationStandingRules.applyIndependentDaimyoRegister === 'function') {
             result = window.ConversationStandingRules.applyIndependentDaimyoRegister(result);
         }
-        // 軍師助言固有の言い回しだけ、共通レジスターでは安全に活用できない活用形をここで整える。
+
+        // 軍師助言固有の活用だけをここで整える。対象人物への敬称は触らず、
+        // 「誰に話しているか」による文末・助言姿勢だけを変える。
+        result = result
+            .replace(/警護が厚く厳しいかと/g, '警護が厚く、厳しいだろう')
+            .replace(/我が軍が圧倒的だ。一気に攻め落としましょう/g, '我が軍が圧倒的だ。一気に攻め落とすのがよい')
+            .replace(/油断は禁物ですが/g, '油断は禁物だが')
+            .replace(/敵の兵数が勝っています/g, '敵の兵数が勝っている')
+            .replace(/敵の出方を見極めましょう/g, '敵の出方を見極めるとよい')
+            .replace(/援軍が予想されます/g, '援軍も来るだろう')
+            .replace(/誰も在城しておりません/g, '誰も在城しておらぬ')
+            .replace(/お味方/g, '味方');
+
+        if (posture.key === 'senior_close') {
+            return result
+                .replace(/合戦におもむきますか？ 兵力と兵糧の確認を忘れぬようにな。/g, '合戦におもむくか。兵と兵糧の備えは怠るな。')
+                .replace(/合戦におもむきますか/g, '合戦におもむくか')
+                .replace(/油断めさるな/g, '油断するな');
+        }
+        if (posture.key === 'senior_extended') {
+            return result
+                .replace(/合戦におもむきますか？ 兵力と兵糧の確認を忘れぬようにな。/g, '合戦におもむくか。兵と兵糧の備えは確かめておくがよい。')
+                .replace(/合戦におもむきますか/g, '合戦におもむくか')
+                .replace(/やめておいた方がよい/g, 'やめておくのがよかろう')
+                .replace(/油断めさるな/g, '油断は禁物だ');
+        }
         return result
+            .replace(/合戦におもむきますか？ 兵力と兵糧の確認を忘れぬようにな。/g, '合戦におもむくか。兵と兵糧の備えは見ておいた方がよかろう。')
             .replace(/合戦におもむきますか/g, '合戦におもむくか')
-            .replace(/警護が厚く厳しいかと/g, '警護が厚く、厳しいだろう');
+            .replace(/やめておいた方がよい/g, 'やめておくのがよかろう')
+            .replace(/油断めさるな/g, '油断は禁物だ');
     }
 
     _getDaimyoAddress(gunshi) {
@@ -46,10 +80,99 @@ class GunshiSystem {
     _getTargetCallName(gunshi, target) {
         const daimyo = this._getPlayerDaimyo();
         if (!target || !window.ConversationStandingRules) return `${target && target.name ? target.name : 'その者'}殿`;
+
+        // 当主の父・祖父・兄などが軍師の場合、普通の格下家臣まで一律「○○殿」とは呼ばない。
+        // ただし軍師・国主・高官・特殊権威や近親者への敬意は、対象側の規則としてそのまま残す。
+        const posture = this._getSpeakerPosture(gunshi);
+        if (['senior_close', 'senior_extended'].includes(posture.key)
+            && typeof window.ConversationStandingRules.getPersonalStanding === 'function'
+            && typeof window.ConversationStandingRules.getHouseholdElderTargetCallName === 'function') {
+            const isFamily = typeof window.ConversationStandingRules.areFamily === 'function'
+                && window.ConversationStandingRules.areFamily(gunshi, target);
+            const standing = window.ConversationStandingRules.getPersonalStanding(this.game, gunshi, target);
+            const special = window.ConversationStandingRules.getSpecialAuthority(this.game, target);
+            const targetOutranksSpeaker = window.ConversationStandingRules.compareCourtStanding(this.game, target, gunshi) > 0;
+            if (!isFamily && Number(standing && standing.deferenceLevel || 0) <= 0
+                && Number(special && special.level || 0) < 2 && !targetOutranksSpeaker) {
+                return window.ConversationStandingRules.getHouseholdElderTargetCallName(this.game, gunshi, target);
+            }
+        }
+
         if (typeof window.ConversationStandingRules.getInterviewTargetCallName === 'function') {
             return window.ConversationStandingRules.getInterviewTargetCallName(this.game, gunshi, target, daimyo);
         }
         return `${target.name}殿`;
+    }
+
+    _getSelfConcernMessage(gunshi, alert) {
+        const posture = this._getSpeakerPosture(gunshi);
+        if (posture.key === 'senior_close') {
+            return alert === 'red'
+                ? '今の扱いには、こちらも思うところがある。このままでは務めにも差し障る。少し考えてもらいたい'
+                : 'こちらの扱いについては、少し思うところがある。今一度考えてもらえるとありがたい';
+        }
+        if (posture.key === 'senior_extended' || posture.key === 'higher_court') {
+            return alert === 'red'
+                ? '今の扱いについては、こちらにも思うところがある。務めに差し障る前に、一度考えてもらいたい'
+                : '今の扱いについては、こちらにも少し思うところがある。一度考えてもらえるとありがたい';
+        }
+        return alert === 'red'
+            ? '恐れながら申し上げます。今の待遇では、務めにも差し障りがございます。どうかご配慮を賜りたく存じます'
+            : '恐れながら、某の待遇につきまして、今少しご配慮いただければ幸いにございます';
+    }
+
+    _getLoyaltyConcernStyle(target) {
+        const daimyo = this._getPlayerDaimyo();
+        if (!window.ConversationStandingRules || !daimyo || !target
+            || typeof window.ConversationStandingRules.getLoyaltyExpressionStyle !== 'function') return 'fealty';
+        return window.ConversationStandingRules.getLoyaltyExpressionStyle(this.game, daimyo, target);
+    }
+
+    _getDaimyoThoughtReference(gunshi) {
+        const posture = this._getSpeakerPosture(gunshi);
+        if (posture.key === 'normal') return '殿のお考え';
+        return `${this._getDaimyoAddress(gunshi)}の考え`;
+    }
+
+    _buildLoyaltyConcernMessage(gunshi, item, hasPrevious = false) {
+        const target = item.busho;
+        const alert = item.assessment.alert;
+        const callName = this._getTargetCallName(gunshi, target);
+        const style = this._getLoyaltyConcernStyle(target);
+        const daimyoThought = this._getDaimyoThoughtReference(gunshi);
+        const independent = this._usesIndependentDaimyoRegister(gunshi);
+
+        if (style === 'family') {
+            if (alert === 'red') {
+                const follow = independent ? '早めに一度話をした方がよい' : '早めに一度お話しになった方がよろしいかと';
+                return `${callName}は、${daimyoThought}にかなり強く思うところがおありのようです。${follow}`;
+            }
+            const follow = independent ? '一度話を聞いてみるとよい' : '一度お話を聞かれてはいかがでしょう';
+            return `${callName}は、近頃${daimyoThought}と少々食い違うところがおありのようです。${follow}`;
+        }
+        if (style === 'authority') {
+            if (alert === 'red') {
+                const follow = independent ? '軽く見ず、折を見て考えを聞いておくとよい' : '軽く見ず、折を見てお考えを聞かれた方がよろしいかと';
+                return `${callName}は、${daimyoThought}に強く思うところがおありのようです。${follow}`;
+            }
+            const follow = independent ? '折を見て考えを聞いておくとよい' : '折を見てお考えを聞かれてもよろしいかと';
+            return `${callName}にも、${daimyoThought}について多少思うところはおありのようです。${follow}`;
+        }
+
+        if (alert === 'red') {
+            return `${callName}は待遇への不満が深いように見受けられます。どうか早めのご配慮を`;
+        }
+        const particle = hasPrevious ? 'にも' : 'には';
+        return `${callName}${particle}少々思うところがあるようです。今のうちにお取り計らいを`;
+    }
+
+    getSituationDaimyoSortieText(gunshi) {
+        const posture = this._getSpeakerPosture(gunshi);
+        const address = this._getDaimyoAddress(gunshi);
+        if (posture.key === 'senior_close') return `${address}自ら出るなら、味方の士気も上がるだろう。`;
+        if (posture.key === 'senior_extended') return `${address}自ら出るなら、味方の士気も上がるだろう。`;
+        if (posture.key === 'higher_court') return `${address}自ら出るなら、味方の士気も上がるだろう。`;
+        return '殿自ら出陣なされるとあらば、お味方の戦意も高まることでしょう。';
     }
 
     // 月が替わったときに呼ばれる処理
@@ -179,31 +302,32 @@ class GunshiSystem {
         const orange = otherReports.filter(item => item.assessment.alert === 'orange');
         const messageList = [];
 
-        // 旧来の「軍師本人だけ一人称で待遇を申し出る」仕様を、現在の偽装・報告品質ルールに合わせて復活させる。
+        // 軍師本人の不満も、本人と当主の距離感に応じた一人称へする。
         // 智謀で隠し切れた場合は selfReport 自体が残らないため、本人からは何も申告しない。
-        if (selfReport) {
-            if (selfReport.assessment.alert === 'red') {
-                messageList.push('恐れながら申し上げます。今の待遇では、務めにも差し障りがございます。どうかご配慮を賜りたく存じます');
-            } else if (selfReport.assessment.alert === 'orange') {
-                messageList.push('恐れながら、某の待遇につきまして、今少しご配慮いただければ幸いにございます');
+        if (selfReport) messageList.push(this._getSelfConcernMessage(gunshi, selfReport.assessment.alert));
+
+        // 通常家臣だけは従来どおり複数人をまとめて「待遇」へ言及できる。
+        // 一門・将軍・左馬頭は同じ「忠誠低下」でも理由を待遇に決めつけず、
+        // 殿の考えとの食い違い／理解・協調として一人ずつ慎重に報告する。
+        const appendConcernGroup = (items, alert) => {
+            const ordinary = items.filter(item => this._getLoyaltyConcernStyle(item.busho) === 'fealty');
+            const relational = items.filter(item => this._getLoyaltyConcernStyle(item.busho) !== 'fealty');
+
+            if (ordinary.length >= 3) {
+                if (alert === 'red') {
+                    messageList.push(`${this._getTargetCallName(gunshi, ordinary[0].busho)}以下${ordinary.length}名、待遇への不満が深いように見受けられます。どうか早めのご配慮を`);
+                } else {
+                    const particle = messageList.length > 0 ? 'にも' : 'には';
+                    messageList.push(`${this._getTargetCallName(gunshi, ordinary[0].busho)}以下${ordinary.length}名${particle}、少々思うところがあるようです。今のうちにお取り計らいを`);
+                }
+            } else {
+                ordinary.forEach(item => messageList.push(this._buildLoyaltyConcernMessage(gunshi, item, messageList.length > 0)));
             }
-        }
+            relational.forEach(item => messageList.push(this._buildLoyaltyConcernMessage(gunshi, item, messageList.length > 0)));
+        };
 
-        if (red.length >= 3) {
-            messageList.push(`${this._getTargetCallName(gunshi, red[0].busho)}以下${red.length}名、待遇への不満が深いように見受けられます。どうか早めのご配慮を`);
-        } else {
-            red.forEach(item => messageList.push(`${this._getTargetCallName(gunshi, item.busho)}は待遇への不満が深いように見受けられます。どうか早めのご配慮を`));
-        }
-
-        if (orange.length >= 3) {
-            const particle = messageList.length > 0 ? 'にも' : 'には';
-            messageList.push(`${this._getTargetCallName(gunshi, orange[0].busho)}以下${orange.length}名${particle}、少々思うところがあるようです。今のうちにお取り計らいを`);
-        } else {
-            orange.forEach(item => {
-                const particle = messageList.length > 0 ? 'にも' : 'には';
-                messageList.push(`${this._getTargetCallName(gunshi, item.busho)}${particle}少々思うところがあるようです。今のうちにお取り計らいを`);
-            });
-        }
+        appendConcernGroup(red, 'red');
+        appendConcernGroup(orange, 'orange');
 
         let msgIndex = 0;
         const showNext = () => {

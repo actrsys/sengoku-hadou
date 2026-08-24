@@ -182,6 +182,16 @@ Object.assign(WarManager.prototype, {
             advisorInt = gunshi.intelligence;
         }
 
+        // 戦況報告も通常の軍師助言と同じ「話者→当主」の会話レジスターを使う。
+        // 小姓代行時は従来文のままにし、軍師がいる時だけ GunshiSystem を正本として整える。
+        const gunshiDialogue = gunshi && this.game.gunshiSystem ? this.game.gunshiSystem : null;
+        const styleAdvisorText = text => gunshiDialogue
+            ? gunshiDialogue._styleForSpeaker(gunshi, text)
+            : String(text || '');
+        const getAdvisorTargetCallName = target => gunshiDialogue
+            ? gunshiDialogue._getTargetCallName(gunshi, target)
+            : `${target && (target.fullName || target.name) ? (target.fullName || target.name) : '武将'}殿`;
+
         const pid = this.game.playerClanId;
         
         const atkClanId = atkCastle.isKunishu ? atkCastle.kunishuId : atkCastle.ownerClan;
@@ -246,10 +256,11 @@ Object.assign(WarManager.prototype, {
             const bestBusho = helperBushos[0];
             // ★変更：一番強い武将が大名なら特別なメッセージに変えます
             if (bestBusho.isDaimyo) {
-                helperMsg = `殿自ら出陣なされるとあらば、お味方の戦意も高まることでしょう。`;
+                helperMsg = gunshiDialogue
+                    ? gunshiDialogue.getSituationDaimyoSortieText(gunshi)
+                    : '殿自ら出陣なされるとあらば、お味方の戦意も高まることでしょう。';
             } else {
-                const bestBushoName = bestBusho.fullName;
-                helperMsg = `${bestBushoName}殿が在城しております。`;
+                helperMsg = `${getAdvisorTargetCallName(bestBusho)}が在城しております。`;
             }
         }
 
@@ -257,23 +268,23 @@ Object.assign(WarManager.prototype, {
         
         if (isAttack) {
             if (defCastle.isKunishu) {
-                msgs.push(`「${atkClanName}の${atkLeaderName}が、${defProvName}の国衆・${defClanName}への攻撃に際し、援軍を求めております」`);
+                msgs.push(`「${styleAdvisorText(`${atkClanName}の${atkLeaderName}が、${defProvName}の国衆・${defClanName}への攻撃に際し、援軍を求めております`)}」`);
             } else {
-                msgs.push(`「${atkClanName}の${atkLeaderName}が、${defClanName}の${defCastle.name}への攻撃に際し、援軍を求めております」`);
+                msgs.push(`「${styleAdvisorText(`${atkClanName}の${atkLeaderName}が、${defClanName}の${defCastle.name}への攻撃に際し、援軍を求めております`)}」`);
             }
         } else {
             if (atkCastle.isKunishu) {
                 const atkProv = this.game.provinces.find(p => p.id === atkCastle.provinceId);
                 const atkProvName = atkProv ? atkProv.province : "不明な国";
-                msgs.push(`「${atkProvName}の国衆・${atkClanName}が、${defClanName}の${defCastle.name}を攻撃するべく迫っております」`);
+                msgs.push(`「${styleAdvisorText(`${atkProvName}の国衆・${atkClanName}が、${defClanName}の${defCastle.name}を攻撃するべく迫っております`)}」`);
             } else {
-                msgs.push(`「${atkClanName}の${atkLeaderName}が、${defClanName}の${defCastle.name}を攻撃するべく迫っております」`);
+                msgs.push(`「${styleAdvisorText(`${atkClanName}の${atkLeaderName}が、${defClanName}の${defCastle.name}を攻撃するべく迫っております`)}」`);
             }
         }
         
         const allyName = isAttack ? "お味方" : defCastle.name;
-        msgs.push(`「${allyName}の兵力はおよそ${allyVal}。敵方はおよそ${enemyVal}。${enemyReinfMsg}」`);
-        msgs.push(`「${helperCastle.name}の兵力は${helperCastle.soldiers}。${helperMsg}」`);
+        msgs.push(`「${styleAdvisorText(`${allyName}の兵力はおよそ${allyVal}。敵方はおよそ${enemyVal}。${enemyReinfMsg}`)}」`);
+        msgs.push(`「${styleAdvisorText(`${helperCastle.name}の兵力は${helperCastle.soldiers}。${helperMsg}`)}」`);
 
         let idx = 0;
         const showNext = () => {
