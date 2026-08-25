@@ -91,7 +91,7 @@ const SKILL_DESCRIPTIONS = {
     // 三河の鹿
     [SKILL_NAMES.MIKAWA_NO_SHIKA]: "①自部隊が受けるダメージが３０％減少する。（野戦／攻城戦）\n②自部隊は一定確率でクリティカルが発生するようになる。（野戦）",
     // 上州の黄斑
-    [SKILL_NAMES.JOSHU_NO_OHAN]: "①自身が守備側で参戦している時、全ての味方部隊は与えるダメージが１０％上昇し、受けるダメージが２０％減少する。（攻城戦）\n②大名勢力に所属している時、毎月の開始時に、自身の所属拠点の防御力が５上昇する。",
+    [SKILL_NAMES.JOSHU_NO_OHAN]: "①自身が守備側で参戦している時、全ての味方部隊は与えるダメージが１０％上昇し、受けるダメージが２０％減少する。（攻城戦）",
     // 雷神
     [SKILL_NAMES.RAIJIN]: "①鬼と悪天巧者を併せ持つ。\n②自部隊と戦闘する相手部隊のクリティカル発生を無効化する。（野戦）",
     // 鎮西一
@@ -988,26 +988,6 @@ class SkillManager {
         return modifier;
     }
 
-    // ＜拠点防御力上昇＞ 上州の黄斑により、毎月拠点の防御力が上昇する
-    static calcMonthlyDefenseBonus(castle, game) {
-        if (!castle || castle.ownerClan === 0) return 0;
-        
-        let defenseBonus = 0;
-        
-        // そのお城にいる味方の武将を集めます
-        const bushos = game.getCastleBushos(castle.id).filter(b => window.BushoStatusRules.isActive(b) && b.clan === castle.ownerClan);
-
-        // 「上州の黄斑」を持っている武将を探します。
-        // 大名勢力に所属している時（belongKunishuId === 0）という条件を満たす武将1人につき +5 します。
-        bushos.forEach(b => {
-            if ((b.belongKunishuId || 0) === 0 && this.hasSkill(b, SKILL_NAMES.JOSHU_NO_OHAN, game)) {
-                defenseBonus += 5;
-            }
-        });
-
-        return defenseBonus;
-    }
-    
     // ＜外交ボーナス＞ 技能による外交の最終成功率アップ
     static calcDiplomacyProbBonus(actionType, busho, game) {
         let probBonus = 0;

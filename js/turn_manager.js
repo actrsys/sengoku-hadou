@@ -66,7 +66,7 @@ class TurnManager {
         
         if (game.month % 3 === 0) game.factionSystem.optimizeCastellans();
         
-        // 月初の拠点更新。計算式は EconomyRules / DomesticRules / SkillManager が担当します。
+        // 月初の拠点更新。計算式は EconomyRules / DomesticRules が担当します。
         const daimyoByClanIdForGrowth = new Map();
         const ownedCastleCountByClanId = new Map();
         game.clans.forEach(clan => {
@@ -79,11 +79,6 @@ class TurnManager {
         game.castles.forEach(castle => {
             if (castle.ownerClan === 0) return;
             castle.isDone = false;
-
-            if (typeof SkillManager !== 'undefined' && typeof SkillManager.calcMonthlyDefenseBonus === 'function') {
-                const defBonus = SkillManager.calcMonthlyDefenseBonus(castle, game);
-                if (defBonus > 0) castle.defense = Math.min(castle.maxDefense, castle.defense + defBonus);
-            }
 
             const income = EconomyRules.calcMonthlyGoldIncome(castle, game);
             castle.gold = Math.min(99999, castle.gold + income);

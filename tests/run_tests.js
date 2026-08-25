@@ -88,11 +88,20 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r202');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r204');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('友好'), false);
+});
+
+test('上州の黄斑は攻城戦の守備部隊補正だけを持ち、月次拠点防御力を上昇させない', () => {
+    const skill = read('js/skill_manager.js');
+    const turn = read('js/turn_manager.js');
+    assert.ok(skill.includes('全ての味方部隊は与えるダメージが１０％上昇し、受けるダメージが２０％減少する'));
+    assert.ok(!skill.includes('calcMonthlyDefenseBonus'));
+    assert.ok(!skill.includes('自身の所属拠点の防御力が５上昇する'));
+    assert.ok(!turn.includes('calcMonthlyDefenseBonus'));
 });
 
 test('PortraitRules は年代別顔だけを共通解決し非年代条件を分離する', () => {
