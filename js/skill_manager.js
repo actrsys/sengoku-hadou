@@ -1133,6 +1133,11 @@ class SkillManager {
             SKILL_NAMES.ONI,
             SKILL_NAMES.SHUYARI,
             SKILL_NAMES.KABUKIMONO,
+            // 固有技能のうち、攻城戦でも基礎補正を持つものでも
+            // 追加のクリティカル効果は野戦限定なので迎撃判断では野戦寄りとして扱う。
+            SKILL_NAMES.KAI_NO_TORA,
+            SKILL_NAMES.ECHIGO_NO_RYU,
+            SKILL_NAMES.MIKAWA_NO_SHIKA,
             SKILL_NAMES.CHINZEI_ICHI,
             SKILL_NAMES.RETREAT,
             SKILL_NAMES.TENKA_FUBU,
@@ -1150,8 +1155,7 @@ class SkillManager {
         // 籠城戦（守備）で特に輝くスキル群
         const siegeSkills = [
             SKILL_NAMES.JOSHU_NO_OHAN,
-            SKILL_NAMES.BOSHIN, 
-            SKILL_NAMES.AKAZONAE 
+            SKILL_NAMES.BOSHIN
         ];
         
         return bushos.some(b => b && siegeSkills.some(skill => this.hasSkill(b, skill, game)));

@@ -1785,41 +1785,40 @@ class LifeSystem {
 
     // ① ランダムな姫のプロフィール（データ）を作る機能です
     createRandomPrincess(clanId, currentYear, isInitial, specificFatherId = null, deferFamilyRebuild = false) {
-        let randomName = "姫";
-        let candidateNames = [];
+        let selectedProfile = { name: "姫", yomi: "ひめ" };
+        let candidateProfiles = [];
 
-        // 1. まずは名前の候補リストを準備します
-        if (typeof DataManager !== 'undefined' && DataManager.genericPrincessNames && DataManager.genericPrincessNames.length > 0) {
-            candidateNames = DataManager.genericPrincessNames;
+        // 1. 名前と読みを必ず対で扱い、姫情報画面でも架空姫の読みを表示できるようにします。
+        if (typeof DataManager !== 'undefined' && DataManager.genericPrincessProfiles && DataManager.genericPrincessProfiles.length > 0) {
+            candidateProfiles = DataManager.genericPrincessProfiles;
         } else {
-            // もしCSVが読み込めなかった場合の予備のリストです
-            candidateNames = ["雪", "桜", "琴", "菊", "桔梗", "百合", "藤", "萩", "蘭", "梅", "楓", "桂", "椿", "凛", "華", "千代", "鶴", "亀", "松", "竹"];
+            candidateProfiles = [
+                { name: "雪", yomi: "ゆき" }, { name: "桜", yomi: "さくら" }, { name: "琴", yomi: "こと" },
+                { name: "菊", yomi: "きく" }, { name: "桔梗", yomi: "ききょう" }, { name: "百合", yomi: "ゆり" },
+                { name: "藤", yomi: "ふじ" }, { name: "萩", yomi: "はぎ" }, { name: "蘭", yomi: "らん" },
+                { name: "梅", yomi: "うめ" }, { name: "楓", yomi: "かえで" }, { name: "桂", yomi: "かつら" },
+                { name: "椿", yomi: "つばき" }, { name: "凛", yomi: "りん" }, { name: "華", yomi: "はな" },
+                { name: "千代", yomi: "ちよ" }, { name: "鶴", yomi: "つる" }, { name: "亀", yomi: "かめ" },
+                { name: "松", yomi: "まつ" }, { name: "竹", yomi: "たけ" }
+            ];
         }
 
-        // 2. それぞれの名前が「今ゲームの中で何回使われているか」を記録するメモ帳を作ります
+        // 2. ゲーム内で同名の姫が少ない候補を優先します。
         const nameCounts = {};
-        candidateNames.forEach(name => nameCounts[name] = 0); // 最初は全部0回にします
-
-        // 3. ゲーム内にいる全ての姫を調べて、同じ名前があったらメモ帳の回数を1ずつ増やします
+        candidateProfiles.forEach(profile => nameCounts[profile.name] = 0);
         this.game.princesses.forEach(p => {
-            if (nameCounts[p.name] !== undefined) {
-                nameCounts[p.name]++;
-            }
+            if (nameCounts[p.name] !== undefined) nameCounts[p.name]++;
         });
 
-        // 4. メモ帳の中から、「一番使われている回数が少ない数」を探し出します
-        let minCount = Infinity; // 最初はわざと無限大の大きさにしておきます
-        for (const name of candidateNames) {
-            if (nameCounts[name] < minCount) {
-                minCount = nameCounts[name];
-            }
+        let minCount = Infinity;
+        for (const profile of candidateProfiles) {
+            if (nameCounts[profile.name] < minCount) minCount = nameCounts[profile.name];
         }
 
-        // 5. その「一番少ない回数」と同じ回数の名前だけを集めて、新しいグループを作ります
-        const leastUsedNames = candidateNames.filter(name => nameCounts[name] === minCount);
-
-        // 6. 最後に、その一番少ないグループの中からランダムで1つ選びます！
-        randomName = leastUsedNames[Math.floor(Math.random() * leastUsedNames.length)];
+        const leastUsedProfiles = candidateProfiles.filter(profile => nameCounts[profile.name] === minCount);
+        selectedProfile = leastUsedProfiles[Math.floor(Math.random() * leastUsedProfiles.length)] || selectedProfile;
+        const randomName = selectedProfile.name;
+        const randomYomi = selectedProfile.yomi || "";
         
         // 既存の姫と出席番号が被らないように、90000番台から自動で番号を割り振ります
         let nextId = 90000; 
@@ -1895,7 +1894,7 @@ class LifeSystem {
         const princessData = {
             id: nextId,
             name: randomName,
-            yomi: "",
+            yomi: randomYomi,
             birthYear: birthYear,
             startYear: startYear,
             endYear: endYear,

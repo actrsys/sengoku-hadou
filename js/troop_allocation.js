@@ -27,6 +27,7 @@ class TroopAllocationService {
         const generalRatio = config.GeneralRatio;
         const equipmentMinimumRatio = config.EquipmentMinimumRatio;
         const maxTeppoUnitRatio = config.MaxTeppoUnitRatio;
+        const equipmentAptitudeWeight = config.EquipmentAptitudeWeight;
 
         let availableHorses = isSeaBattle ? 0 : totalHorses;
         let availableGuns = totalGuns;
@@ -46,7 +47,9 @@ class TroopAllocationService {
                 req: requested,
                 soldiers: requested,
                 troopType: 'ashigaru',
-                score: busho.leadership + busho.strength
+                score: busho.leadership + busho.strength,
+                kibaAptitude: SkillManager.getAptitudeLevel(busho.aptKiba),
+                teppoAptitude: SkillManager.getAptitudeLevel(busho.aptTeppo)
             };
         });
 
@@ -59,9 +62,35 @@ class TroopAllocationService {
         const maxTeppoCount = Math.floor(count * maxTeppoUnitRatio);
         let teppoCount = 0;
 
-        // 装備は統率+武勇が高い武将から優先する。
-        const sortedAssignments = [...assignments].sort((a, b) => b.score - a.score);
+        // 装備は統率+武勇を主軸にしつつ、対応兵科の適性を軽く加点して優先する。
+        // 適性だけで低能力武将が最優先にならないよう、加点幅は GameConfig 側で控えめに管理する。
+        const getEquipmentPriority = (assignment) => {
+            const bestAvailableAptitude = Math.max(
+                availableHorses > 0 ? assignment.kibaAptitude : 0,
+                availableGuns > 0 ? assignment.teppoAptitude : 0
+            );
+            return assignment.score + bestAvailableAptitude * equipmentAptitudeWeight;
+        };
+        const sortedAssignments = [...assignments].sort((a, b) => {
+            const diff = getEquipmentPriority(b) - getEquipmentPriority(a);
+            if (diff !== 0) return diff;
+            return a.index - b.index;
+        });
         let lastChangedAssignment = null;
+
+        const assignEquipment = (assignment, troopType, requested) => {
+            const available = troopType === 'kiba' ? availableHorses : availableGuns;
+            assignment.troopType = troopType;
+            const assignCount = Math.min(requested, available);
+            assignment.soldiers = assignCount;
+            if (troopType === 'kiba') availableHorses -= assignCount;
+            else {
+                availableGuns -= assignCount;
+                teppoCount++;
+            }
+            pooledSoldiers += requested - assignCount;
+            lastChangedAssignment = assignment;
+        };
 
         for (const assignment of sortedAssignments) {
             const isGeneral = assignment.index === 0;
@@ -69,22 +98,17 @@ class TroopAllocationService {
             const threshold = (isGeneral && !isPlayerUI)
                 ? requested
                 : requested * equipmentMinimumRatio;
+            const canUseKiba = availableHorses >= threshold;
+            const canUseTeppo = availableGuns >= threshold && teppoCount < maxTeppoCount;
 
-            if (availableHorses >= threshold) {
-                assignment.troopType = 'kiba';
-                const assignCount = Math.min(requested, availableHorses);
-                assignment.soldiers = assignCount;
-                availableHorses -= assignCount;
-                pooledSoldiers += requested - assignCount;
-                lastChangedAssignment = assignment;
-            } else if (availableGuns >= threshold && teppoCount < maxTeppoCount) {
-                assignment.troopType = 'teppo';
-                const assignCount = Math.min(requested, availableGuns);
-                assignment.soldiers = assignCount;
-                availableGuns -= assignCount;
-                pooledSoldiers += requested - assignCount;
-                teppoCount++;
-                lastChangedAssignment = assignment;
+            if (canUseKiba && canUseTeppo) {
+                // 両方使える時だけ適性の高い方を選ぶ。同値なら従来どおり騎馬を優先する。
+                const preferredType = assignment.teppoAptitude > assignment.kibaAptitude ? 'teppo' : 'kiba';
+                assignEquipment(assignment, preferredType, requested);
+            } else if (canUseKiba) {
+                assignEquipment(assignment, 'kiba', requested);
+            } else if (canUseTeppo) {
+                assignEquipment(assignment, 'teppo', requested);
             }
         }
 

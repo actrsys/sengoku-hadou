@@ -19,8 +19,8 @@ const SCENARIOS = [
     データ管理 (DataManager)
    ========================================================================== */
 class DataManager {
-    // ★追加：汎用の姫の名前を入れる箱を用意します！
-    static genericPrincessNames = [];
+    // ★汎用姫は名前と読みを対で保持します。
+    static genericPrincessProfiles = [];
     
     static async loadAll(folderName, options = {}) {
         const selectedScenario = SCENARIOS.find(s => s.folder === folderName);
@@ -39,7 +39,7 @@ class DataManager {
                 // ★ここから追加：generic_princess.csv を読み込む魔法です！
                 try {
                     const princessNamesText = await this.fetchText("./data/generic_princess.csv");
-                    this.parseGenericPrincessNames(princessNamesText);
+                    this.parseGenericPrincessProfiles(princessNamesText);
                 } catch (e) { console.warn("汎用姫名ファイルなし"); }
             }
             // ★今回追加：princess.csv と legions.csv も一緒に読み込むようにリストに加えます！
@@ -388,20 +388,17 @@ class DataManager {
         }
         return result;
     }
-    // ★ここから追加：読み込んだ generic_princess.csv の文字を、名前のリストに翻訳する魔法です！
-    static parseGenericPrincessNames(text) {
-        // 読み込んだ文字を1行ずつバラバラにして、整理します
+    // generic_princess.csv の名前と読みを、架空姫生成用プロフィールとして保持します。
+    static parseGenericPrincessProfiles(text) {
         const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-        if (lines.length < 2) return; // 1行目（見出し）しかなければ終わります
-        
-        // 2行目から順番に名前を読み取っていきます
+        this.genericPrincessProfiles = [];
+        if (lines.length < 2) return;
+
         for (let i = 1; i < lines.length; i++) {
-            // カンマ（,）で区切られている場合は、最初の項目を名前として受け取ります
-            const name = lines[i].split(',')[0];
-            if (name) {
-                // 用意しておいた汎用姫のリストに名前を書き込みます
-                this.genericPrincessNames.push(name.trim());
-            }
+            const parts = lines[i].split(',');
+            const name = (parts[0] || '').trim();
+            const yomi = (parts[1] || '').trim();
+            if (name) this.genericPrincessProfiles.push({ name, yomi });
         }
     }
 

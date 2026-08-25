@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r204'
+        Version: 'r207'
     },
 
     History: {
@@ -185,7 +185,9 @@ window.GameConfig = {
         TroopAllocation: {
             GeneralRatio: 1.3,
             EquipmentMinimumRatio: 0.5,
-            MaxTeppoUnitRatio: 0.5
+            MaxTeppoUnitRatio: 0.5,
+            // 兵科装備の自動割当では能力値を主軸にしつつ、対応適性1段階につきこの値を加点する。
+            EquipmentAptitudeWeight: 6
         },
         Reinforcement: {
             SelfSoldierRatio: 0.5,

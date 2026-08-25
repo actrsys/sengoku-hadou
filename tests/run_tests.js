@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r204');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r207');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -870,6 +870,75 @@ test('和睦条件は戦況に応じて城・人質・縁組の重さを選ぶ',
     assert.strictEqual(dm._selectTruceConditionOption(options, 1, 2).type, 'marriage', '拮抗時は縁組を優先する');
 });
 
+test('和睦条件の姫はAI同士で架空姫だけ、プレイヤーへの要求では架空姫を優先する', () => {
+    const ctx = createContext({ BushoStatusRules: { isActive: () => true } });
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+
+    const historical = { id: 101, name: '史実姫', status: 'unmarried', birthYear: 1545 };
+    const generated = { id: 90001, name: '架空姫', status: 'unmarried', birthYear: 1545 };
+    const targetBusho = { id: 201, clan: 2, name: '相手一門', birthYear: 1540, female: false, wifeIds: [], familyIds: [] };
+    const clans = [
+        { id: 1, leaderId: 0, princessIds: [historical.id, generated.id] },
+        { id: 2, leaderId: 0, princessIds: [] }
+    ];
+    const game = {
+        playerClanId: 1, clans, princesses: [historical, generated], bushos: [targetBusho], castles: [],
+        getClanDaimyo: () => null,
+        getBusho: id => Number(id) === targetBusho.id ? targetBusho : null
+    };
+    const dm = new ctx.DiplomacyManager(game);
+
+    let marriage = dm._buildTruceConditionOptions(1, 2, { aiVsAi: false }).find(o => o.type === 'marriage');
+    assert.strictEqual(marriage.princess.id, generated.id, 'プレイヤーが和睦条件として姫を求められる時は架空姫を先に選ぶ');
+
+    clans[0].princessIds = [historical.id];
+    marriage = dm._buildTruceConditionOptions(1, 2, { aiVsAi: false }).find(o => o.type === 'marriage');
+    assert.strictEqual(marriage.princess.id, historical.id, '架空姫がいなければプレイヤーの史実姫も候補にできる');
+
+    game.playerClanId = 99;
+    clans[0].princessIds = [historical.id, generated.id];
+    marriage = dm._buildTruceConditionOptions(1, 2, { aiVsAi: true }).find(o => o.type === 'marriage');
+    assert.strictEqual(marriage.princess.id, generated.id, 'AI同士は史実姫を避けて架空姫だけを使う');
+
+    clans[0].princessIds = [historical.id];
+    marriage = dm._buildTruceConditionOptions(1, 2, { aiVsAi: true }).find(o => o.type === 'marriage');
+    assert.strictEqual(marriage, undefined, 'AI同士で架空姫がいなければ史実姫を自動消費しない');
+});
+
+test('架空姫は汎用姫CSVの読みを保持して姫情報画面へ渡す', () => {
+    const ctx = createContext({
+        FamilyLinker: { rebuildAllFamilyIds() {} },
+        Princess: class { constructor(data) { Object.assign(this, data); } }
+    });
+    loadScript(ctx, 'js/data_manager.js');
+    vm.runInContext('this.DataManager = DataManager;', ctx);
+    ctx.DataManager.parseGenericPrincessProfiles('name,yomi\n愛,あい\n菊,きく\n');
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(ctx.DataManager.genericPrincessProfiles)), [
+        { name: '愛', yomi: 'あい' }, { name: '菊', yomi: 'きく' }
+    ], '汎用姫CSVは名前だけでなく読みも保持する');
+
+    // 生成処理がプロフィールの読みを Princess データへ渡すことを実動作で確認する。
+    const fixedMath = Object.create(Math);
+    fixedMath.random = () => 0;
+    ctx.Math = fixedMath;
+    loadScript(ctx, 'js/life_system.js');
+    vm.runInContext('this.LifeSystem = LifeSystem;', ctx);
+    const father = { id: 10, birthYear: 1520, wifeIds: [] };
+    const clan = { id: 1, leaderId: father.id, princessIds: [] };
+    const game = {
+        princesses: [],
+        getClan: id => Number(id) === 1 ? clan : null,
+        getBusho: id => Number(id) === father.id ? father : null
+    };
+    const princess = new ctx.LifeSystem(game).createRandomPrincess(1, 1560, true, father.id);
+    assert.strictEqual(princess.name, '愛');
+    assert.strictEqual(princess.yomi, 'あい', '生成された架空姫へ読みを設定する');
+
+    const uiSrc = read('js/ui_info.js');
+    assert.ok(uiSrc.includes('const displayYomi = princess.yomi || "";'), '姫情報画面はPrincess.yomiをPC/スマホ表示へ使用する');
+});
+
 
 test('AI和睦は現在直接隣接している敵対勢力だけを対象にする', () => {
     const ctx = createContext();
@@ -1093,6 +1162,42 @@ test('婚姻は基本外交statusを上書きせず友好度と外交補正だ�
     assert.strictEqual(rel12.status, '同盟', '支配・従属から同盟への上書きは従来どおり可能');
     assert.strictEqual(rel12.isMarriage, true, 'status上書きでも婚姻フラグを維持する');
     assert.deepStrictEqual(Array.from(rel12.hostageIds), [99], 'status上書きだけでは人質関係を消さない');
+});
+
+test('和睦条件の婚姻は婚姻関係だけ成立させ、通常婚姻の友好度大幅上昇を適用しない', () => {
+    const ctx = createContext({
+        FamilyLinker: { rebuildAllFamilyIds() {} },
+        LifeStatusRules: { isUnavailable: () => false }
+    });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+
+    const rel12 = { status: '和睦', sentiment: 50, trucePeriod: 6, isMarriage: false, isEvent: false, hostageIds: [] };
+    const rel21 = { status: '和睦', sentiment: 50, trucePeriod: 6, isMarriage: false, isEvent: false, hostageIds: [] };
+    const clans = [
+        { id: 1, princessIds: [1], diplomacyValue: { 2: rel12 } },
+        { id: 2, princessIds: [], diplomacyValue: { 1: rel21 } }
+    ];
+    const princess = { id: 1, name: '姫', status: 'unmarried', currentClanId: 1, originalClanId: 1, husbandId: 0 };
+    const husband = { id: 20, clan: 2, wifeIds: [] };
+    const game = {
+        playerClanId: 1,
+        clans,
+        princesses: [princess],
+        bushos: [husband],
+        getClan: id => clans.find(c => Number(c.id) === Number(id)) || null,
+        getBusho: id => Number(id) === 20 ? husband : null
+    };
+    const dm = new ctx.DiplomacyManager(game);
+    dm._applyTruceConditionData('marriage', { princess, busho: husband }, 1, 2);
+
+    assert.strictEqual(rel12.isMarriage, true, '和睦条件でも婚姻関係自体は成立する');
+    assert.strictEqual(rel21.isMarriage, true, '相手側にも婚姻関係を同期する');
+    assert.strictEqual(rel12.sentiment, 50, '和睦条件の婚姻では和睦成立時の友好度50から上乗せしない');
+    assert.strictEqual(rel21.sentiment, 50, '相手側も通常婚姻の大幅な友好度上昇を受けない');
+    assert.strictEqual(rel12.status, '和睦', '婚姻条件で和睦statusを上書きしない');
 });
 
 test('AI従属家の独立意欲は野望で上がり、義理が高いほど平和的な同盟格上げを優先する', () => {
@@ -1873,11 +1978,12 @@ test('MapGraphService は同盟/支配/従属領だけを中継通過できる',
 test('TroopAllocationService の配分合計は総兵数と一致する', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/skill_manager.js');
     loadScript(ctx, 'js/troop_allocation.js');
     const bushos = [
-        { id: 1, leadership: 90, strength: 85 },
-        { id: 2, leadership: 70, strength: 80 },
-        { id: 3, leadership: 60, strength: 60 }
+        { id: 1, leadership: 90, strength: 85, aptKiba: 'C', aptTeppo: 'C' },
+        { id: 2, leadership: 70, strength: 80, aptKiba: 'B', aptTeppo: 'C' },
+        { id: 3, leadership: 60, strength: 60, aptKiba: 'C', aptTeppo: 'B' }
     ];
     const result = ctx.TroopAllocationService.autoDivideSoldiers({
         bushos, totalSoldiers: 5000, totalHorses: 1800, totalGuns: 1200, isPlayerUI: false
@@ -1885,6 +1991,26 @@ test('TroopAllocationService の配分合計は総兵数と一致する', () => 
     assert.strictEqual(result.length, 3);
     assert.strictEqual(result.reduce((sum, row) => sum + row.soldiers, 0), 5000);
     assert.ok(result.every(row => ['ashigaru', 'kiba', 'teppo'].includes(row.troopType)));
+});
+
+
+test('野戦前の自動編成は能力を主軸にしつつ馬術・砲術適性を兵科割当に反映する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/skill_manager.js');
+    loadScript(ctx, 'js/troop_allocation.js');
+    const bushos = [
+        { id: 1, leadership: 90, strength: 90, aptKiba: 'E', aptTeppo: 'E' },
+        { id: 2, leadership: 80, strength: 80, aptKiba: 'S', aptTeppo: 'E' },
+        { id: 3, leadership: 80, strength: 80, aptKiba: 'E', aptTeppo: 'S' }
+    ];
+    const result = ctx.TroopAllocationService.autoDivideSoldiers({
+        bushos, totalSoldiers: 3000, totalHorses: 1000, totalGuns: 1000, isPlayerUI: true
+    });
+    const byId = new Map(result.map(row => [row.busho.id, row]));
+    assert.strictEqual(byId.get(2).troopType, 'kiba', '馬術Sの武将へ騎馬を優先する');
+    assert.strictEqual(byId.get(3).troopType, 'teppo', '砲術Sの武将へ鉄砲を優先する');
+    assert.strictEqual(result.reduce((sum, row) => sum + row.soldiers, 0), 3000);
 });
 
 test('ReinforcementService は中央設定の比率で資源を消費する', () => {
@@ -2011,6 +2137,19 @@ test('SkillManager だけが技能文字列を分解し、天下布武は退き�
         if (/\.skill\s*\.\s*(?:split|includes)\s*\(/.test(source)) offenders.push(`event/${name}`);
     }
     assert.deepStrictEqual(offenders, []);
+});
+
+
+test('AIの野戦・籠城判断は野戦寄り固有技能を漏らさず、両戦場共通の赤備えでは籠城へ偏らない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/skill_manager.js');
+    const SkillManager = vm.runInContext('SkillManager', ctx);
+    for (const skill of ['甲斐の虎', '越後の龍', '三河の鹿', '鎮西一', '雷神', '奥羽の驍将']) {
+        assert.strictEqual(SkillManager.hasFieldWarAdvantageSkill([{ id: 1, skill }], null), true, `${skill} は野戦寄りとして評価する`);
+    }
+    assert.strictEqual(SkillManager.hasSiegeDefenseAdvantageSkill([{ id: 1, skill: '上州の黄斑' }], null), true);
+    assert.strictEqual(SkillManager.hasSiegeDefenseAdvantageSkill([{ id: 1, skill: '謀神' }], null), true);
+    assert.strictEqual(SkillManager.hasSiegeDefenseAdvantageSkill([{ id: 1, skill: '赤備え' }], null), false, '野戦・攻城戦共通効果だけでは籠城寄りにしない');
 });
 
 // ---------------------------------------------------------------------------

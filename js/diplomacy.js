@@ -3678,11 +3678,21 @@ class DiplomacyManager {
         const reqDaimyo = this.game.getClanDaimyo(requestClanId);
         const tgtDaimyo = this.game.getClanDaimyo(targetClanId);
 
-        // 縁組。AI同士では史実姫を自動消費しない既存方針を維持する。
+        // 縁組。90000番台はゲーム中に生成した架空姫。
+        // AI同士では史実姫を自動消費せず、プレイヤーが条件を差し出す場合も架空姫を先に要求する。
         const princessIds = Array.isArray(reqClan.princessIds) ? reqClan.princessIds : [];
-        const availablePrincess = princessIds
+        const unmarriedPrincesses = princessIds
             .map(id => this.game.princesses.find(p => Number(p.id) === Number(id)))
-            .find(p => p && p.status === 'unmarried' && (!aiVsAi || Number(p.id) >= 90000));
+            .filter(p => p && p.status === 'unmarried');
+        const generatedPrincess = unmarriedPrincesses.find(p => Number(p.id) >= 90000) || null;
+        let availablePrincess = null;
+        if (aiVsAi) {
+            availablePrincess = generatedPrincess;
+        } else if (Number(requestClanId) === Number(this.game.playerClanId)) {
+            availablePrincess = generatedPrincess || unmarriedPrincesses[0] || null;
+        } else {
+            availablePrincess = unmarriedPrincesses[0] || null;
+        }
         if (availablePrincess) {
             const targetBushos = this.game.bushos
                 .filter(b => Number(b.clan) === Number(targetClanId) && window.BushoStatusRules.isActive(b) && !b.female && (!aiVsAi || !Array.isArray(b.wifeIds) || b.wifeIds.length === 0))
@@ -3807,9 +3817,12 @@ class DiplomacyManager {
             const princess = conditionData.princess;
             const busho = conditionData.busho;
             if (!princess || !busho) return '';
+            // 和睦条件としての縁組は通常の婚姻外交とは性格が異なり、
+            // 人質・城割譲と同じく「和睦の担保」として扱う。
+            // 婚姻関係そのものは成立させるが、通常婚姻の大幅な友好度上昇は適用しない。
             this._applyMarriageLinkData(
                 princess.id, busho.id, requestClanId, targetClanId,
-                { isMainWife: false, boostSentiment: true }
+                { isMainWife: false, boostSentiment: false }
             );
             return `\n${princess.name}と${busho.name}の縁組が結ばれました。`;
         }
