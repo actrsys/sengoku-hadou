@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r194'
+        Version: 'r200'
     },
 
     History: {
@@ -40,6 +40,18 @@ window.GameConfig = {
                 ReliabilityDutyWeight: 0.35,
                 SoftReportBelow: 45,
                 VerySoftReportBelow: 25
+            }
+        },
+        Diplomacy: {
+            Marriage: {
+                // 婚姻は基本外交状態を上書きせず、両家の関係に重なる恒久的な補正として扱う。
+                SentimentFloor: 75,
+                SentimentIncrease: 35,
+                GoodwillProbBonus: 20,
+                AllianceProbBonus: 25,
+                DominateProbBonus: 12,
+                SubordinateProbBonus: 12,
+                ReinforcementProbBonus: 0.15
             }
         },
         ConversationStanding: {
@@ -262,7 +274,25 @@ window.GameConfig = {
             DiplomacyChance: 0.3,
             GoodwillThreshold: 69,
             AllianceThreshold: 70,
-            BreakAllianceDutyFactor: 0.5
+            BreakAllianceDutyFactor: 0.5,
+            VassalIndependence: {
+                // 独立意欲は野望を主軸に、対主家戦力・友好度・従属期間を補助要因とする。
+                DesireThreshold: 55,
+                AmbitionWeight: 0.55,
+                PowerParityWeight: 35,
+                LowSentimentWeight: 0.20,
+                DutyRestraintWeight: 0.15,
+                MonthsMaxBonus: 10,
+                // 義理が高いほど、直接敵対より親善・対等同盟への移行を優先する。
+                PeacefulDutyWeight: 0.60,
+                PeacefulSentimentWeight: 0.25,
+                PeacefulLowAmbitionWeight: 0.15,
+                PeacefulMarriageBonus: 15,
+                PeacefulRouteThreshold: 50,
+                PeacefulActionBaseChance: 0.25,
+                PeacefulActionDesireScale: 0.005,
+                DirectBreakDutySuppression: 0.75
+            }
         }
     }
 };

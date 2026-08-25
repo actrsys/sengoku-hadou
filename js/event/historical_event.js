@@ -1369,7 +1369,7 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 織田・浅井 婚姻同盟イベント
+// ★ 織田・浅井 婚姻イベント
 // ==========================================
 window.GameEvents.push({
     id: "historical_oda_azai_marriage",
@@ -1462,21 +1462,12 @@ window.GameEvents.push({
             // ★変更：状態を「支配」（織田が支配、浅井が従属）にします
             game.diplomacyManager.changeStatus(nobunaga.clan, nagamasa.clan, '支配', 0);
             
-            // 織田家から見た関係に「結婚シール」と「イベントシール」を貼り、仲良し度を100にします
+            // 婚姻フラグは外交専門部署から両方向へ同期し、イベント関係と友好度だけ個別に付与します。
+            game.diplomacyManager.setMarriageRelation(nobunaga.clan, nagamasa.clan, true);
             const relA = game.diplomacyManager.getDiplomacyData(nobunaga.clan, nagamasa.clan);
-            if (relA) {
-                relA.isMarriage = true;
-                relA.isEvent = true; // ★追加：イベントによる関係であることを覚えさせます
-                relA.sentiment = 100;
-            }
-            
-            // 浅井家から見た関係にもシールを貼り、仲良し度を100にします
             const relB = game.diplomacyManager.getDiplomacyData(nagamasa.clan, nobunaga.clan);
-            if (relB) {
-                relB.isMarriage = true;
-                relB.isEvent = true; // ★追加：イベントによる関係であることを覚えさせます
-                relB.sentiment = 100;
-            }
+            if (relA) { relA.isEvent = true; relA.sentiment = 100; }
+            if (relB) { relB.isEvent = true; relB.sentiment = 100; }
         }
 
         // ⑤ 画面にメッセージを出してお知らせします

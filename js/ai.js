@@ -3153,6 +3153,18 @@ class AIEngine {
     // ★今回変更：相手を探すのはやめて、渡された記憶の通りに実行するだけにしました！
     execAIDiplomacy(castle, castellan, smartness, targetData) {
         const targetClanId = targetData.targetId;
+
+        // 月初に立てた和睦目標でも、実行までに落城などで前線が離れることがある。
+        // 通常和睦・朝廷和睦とも、実行直前に「現在も直接隣接する敵対相手か」を再確認する。
+        if ((targetData.action === 'truce' || targetData.action === 'court_truce')
+            && this.game.diplomacyManager
+            && !this.game.diplomacyManager.canAttemptAITruce(castle.ownerClan, targetClanId)) {
+            const clan = this.game.clans.find(c => Number(c.id) === Number(castle.ownerClan));
+            if (clan && clan.currentDiplomacyTarget && Number(clan.currentDiplomacyTarget.targetId) === Number(targetClanId)) {
+                clan.currentDiplomacyTarget = null;
+            }
+            return;
+        }
         
         // 相手の大名（殿様）を探して、その人がいるお城をターゲットにします
         const targetDaimyo = this.game.getClanDaimyo(targetClanId);

@@ -738,6 +738,16 @@ class AIOperationManager {
         const directNeighbors = [...new Set(neighborCastles.map(c => c.ownerClan))];
         let diplomacyCandidates = [...directNeighbors];
 
+        // 従属先とは領地が離れていても主従関係そのものが外交経路になる。
+        // 平和的な「従属→同盟」格上げや関係改善を検討できるよう、主家を候補へ必ず含める。
+        for (const otherClan of this.game.clans) {
+            if (!otherClan || Number(otherClan.id) <= 0 || Number(otherClan.id) === Number(myClanId) || otherClan.isDestroyed) continue;
+            const rel = this.game.getRelation(myClanId, otherClan.id);
+            if (rel && rel.status === window.GameConstants.DiplomacyStatus.SUBORDINATE && !diplomacyCandidates.includes(otherClan.id)) {
+                diplomacyCandidates.push(otherClan.id);
+            }
+        }
+
         // ★追加：お隣さんの中で「敵対」している相手がいれば、さらにその向こう隣の勢力もリストに入れます！
         directNeighbors.forEach(neighborId => {
             const rel = this.game.getRelation(myClanId, neighborId);
@@ -792,7 +802,7 @@ class AIOperationManager {
             // 外交の専門部署に、この相手に何をするか相談します
             const decision = this.game.diplomacyManager.determineAIDiplomacyAction(
                 myClanId, targetClanId, myPower, targetClanTotal, perceivedTargetTotal, 
-                myDaimyo.duty, smartness, targetData.isStrategicPartner, allyCount, neighborCastles
+                myDaimyo.duty, smartness, targetData.isStrategicPartner, allyCount
             );
 
             // もし「何もしない」以外なら、これを今月の目標に決定します！
@@ -800,7 +810,8 @@ class AIOperationManager {
                 clan.currentDiplomacyTarget = {
                     targetId: targetClanId,
                     action: decision.action,
-                    gold: decision.gold
+                    gold: decision.gold,
+                    reason: decision.reason || ''
                 };
                 break; // 1つ決めたら探すのをおしまいにします
             }

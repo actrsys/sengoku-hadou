@@ -4383,8 +4383,9 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
 }
 
-/* ★一門の◯印のスタイル（黒・太字） */
-.select-item.status-mode .col-family {
+/* ★一門・婚姻の◯印のスタイル */
+.select-item.status-mode .col-family,
+.select-item .col-marriage {
     font-weight: bold;
     color: #fff;
     font-size: 1.2rem;

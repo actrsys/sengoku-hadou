@@ -423,11 +423,14 @@ class UIInfoManager {
             
             let friendScore = 50;
             let friendStatus = "普通";
+            let isMarriage = false;
             if (clan.id !== this.game.playerClanId) {
                 const relation = this.game.getRelation(this.game.playerClanId, clan.id);
                 if (relation) {
                     friendScore = relation.sentiment;
-                    friendStatus = relation.displayStatus || relation.status; 
+                    // 婚姻は基本外交statusとは独立して表示する。
+                    friendStatus = relation.status || "普通";
+                    isMarriage = relation.isMarriage === true;
                 }
             } else {
                 friendStatus = "自家";
@@ -458,7 +461,8 @@ class UIInfoManager {
                 goldConsume: totalGoldConsume,
                 riceConsume: totalRiceConsume,
                 friendScore: friendScore,
-                friendStatus: friendStatus
+                friendStatus: friendStatus,
+                isMarriage: isMarriage
             };
         });
         
@@ -495,10 +499,11 @@ class UIInfoManager {
                         valB = b.id === this.game.playerClanId ? 999 : b.friendScore;
                         break;
                     case 'relation':
-                        const relationRank = { "自家": 0, "婚姻": 1, "同盟": 2, "支配": 3, "従属": 4, "友好": 5, "和睦": 6, "普通": 7, "敵対": 8 };
-                        valA = relationRank[a.friendStatus] !== undefined ? relationRank[a.friendStatus] : 7;
-                        valB = relationRank[b.friendStatus] !== undefined ? relationRank[b.friendStatus] : 7;
+                        const relationRank = { "自家": 0, "同盟": 1, "支配": 2, "従属": 3, "友好": 4, "和睦": 5, "普通": 6, "敵対": 7 };
+                        valA = relationRank[a.friendStatus] !== undefined ? relationRank[a.friendStatus] : 6;
+                        valB = relationRank[b.friendStatus] !== undefined ? relationRank[b.friendStatus] : 6;
                         break;
+                    case 'marriage': valA = a.isMarriage ? 1 : 0; valB = b.isMarriage ? 1 : 0; break;
                 }
 
                 let fallbackCmp = 0;
@@ -533,8 +538,8 @@ class UIInfoManager {
         }
         
         if (this.daimyoCurrentTab === 'status') {
-            gridSpStr = "1.5fr 1.5fr 1fr 1.5fr 1.5fr 1fr";
-            gridPcStr = "140px 100px 60px 100px 100px 60px 1fr";
+            gridSpStr = "1.5fr 1.3fr 0.9fr 1.3fr 1.3fr 0.9fr 0.8fr";
+            gridPcStr = "140px 100px 60px 100px 100px 60px 50px 1fr";
             headers = [
                 `<span data-sort="name">勢力名${getSortMark('name')}</span>`,
                 `<span data-sort="leader">当主${getSortMark('leader')}</span>`,
@@ -542,6 +547,7 @@ class UIInfoManager {
                 `<span data-sort="power">威信${getSortMark('power')}</span>`,
                 `<span data-sort="friend">友好度${getSortMark('friend')}</span>`,
                 `<span data-sort="relation">関係${getSortMark('relation')}</span>`,
+                `<span data-sort="marriage">婚姻${getSortMark('marriage')}</span>`,
                 `<span class="pc-only"></span>`
             ];
         } else if (this.daimyoCurrentTab === 'military') {
@@ -618,6 +624,7 @@ class UIInfoManager {
                     `<span class="col-prestige">${powerBarHtml}</span>`,
                     `<span class="col-friend">${friendBarHtml}</span>`,
                     `<span class="col-relation ${statusClass}">${d.friendStatus}</span>`,
+                    `<span class="col-marriage">${d.isMarriage ? "◯" : ""}</span>`,
                     `<span class="col-empty pc-only"></span>`
                 ];
             } else if (this.daimyoCurrentTab === 'military') {
@@ -950,8 +957,10 @@ class UIInfoManager {
                     id: c.id,
                     name: c.name,
                     sentiment: rel ? rel.sentiment : 50,
-                    status: rel ? (rel.displayStatus || rel.status) : "普通",
-                    trucePeriod: rel ? (rel.trucePeriod || 0) : 0
+                    // 婚姻は別列で示すため、関係列には基本statusだけを表示する。
+                    status: rel ? (rel.status || "普通") : "普通",
+                    trucePeriod: rel ? (rel.trucePeriod || 0) : 0,
+                    isMarriage: rel ? rel.isMarriage === true : false
                 };
             });
         } else if (type === 'daimyo' && this.diploCurrentTab === 'kunishu') {
@@ -962,7 +971,8 @@ class UIInfoManager {
                     name: k.getName(this.game),
                     sentiment: k.getRelation(id, false),
                     status: k.daimyoRelations[id] ? k.daimyoRelations[id].status : "普通",
-                    trucePeriod: k.daimyoRelations[id] ? (k.daimyoRelations[id].trucePeriod || 0) : 0
+                    trucePeriod: k.daimyoRelations[id] ? (k.daimyoRelations[id].trucePeriod || 0) : 0,
+                    isMarriage: false
                 };
             });
         } else if (type === 'kunishu') {
@@ -975,7 +985,8 @@ class UIInfoManager {
                         name: c.name,
                         sentiment: kunishu.getRelation(c.id, false),
                         status: kunishu.daimyoRelations[c.id] ? kunishu.daimyoRelations[c.id].status : "普通",
-                        trucePeriod: kunishu.daimyoRelations[c.id] ? (kunishu.daimyoRelations[c.id].trucePeriod || 0) : 0
+                        trucePeriod: kunishu.daimyoRelations[c.id] ? (kunishu.daimyoRelations[c.id].trucePeriod || 0) : 0,
+                        isMarriage: false
                     };
                 });
             }
@@ -989,11 +1000,12 @@ class UIInfoManager {
                     case 'name': valA = a.name; valB = b.name; break;
                     case 'sentiment': valA = a.sentiment; valB = b.sentiment; break;
                     case 'status':
-                        const relationRank = { "自家": 0, "婚姻": 1, "同盟": 2, "支配": 3, "従属": 4, "友好": 5, "和睦": 6, "普通": 7, "敵対": 8 };
-                        valA = relationRank[a.status] !== undefined ? relationRank[a.status] : 7;
-                        valB = relationRank[b.status] !== undefined ? relationRank[b.status] : 7;
+                        const relationRank = { "自家": 0, "同盟": 1, "支配": 2, "従属": 3, "友好": 4, "和睦": 5, "普通": 6, "敵対": 7 };
+                        valA = relationRank[a.status] !== undefined ? relationRank[a.status] : 6;
+                        valB = relationRank[b.status] !== undefined ? relationRank[b.status] : 6;
                         break;
                     case 'period': valA = a.trucePeriod || 0; valB = b.trucePeriod || 0; break;
+                    case 'marriage': valA = a.isMarriage ? 1 : 0; valB = b.isMarriage ? 1 : 0; break;
                 }
 
                 let fallbackCmp = 0;
@@ -1029,6 +1041,7 @@ class UIInfoManager {
                     friendBarHtml,
                     `<span class="col-relation ${statusClass}">${r.status}</span>`,
                     `<span class="col-period">${periodStr}</span>`,
+                    `<span class="col-marriage">${r.isMarriage ? "◯" : ""}</span>`,
                     ""
                 ]
             });
@@ -1042,6 +1055,7 @@ class UIInfoManager {
             `<span data-sort="sentiment">友好度${getSortMark('sentiment')}</span>`,
             `<span data-sort="status">関係${getSortMark('status')}</span>`,
             `<span class="col-period" data-sort="period">期間${getSortMark('period')}</span>`,
+            `<span data-sort="marriage">婚姻${getSortMark('marriage')}</span>`,
             '<span></span>'
         ];
 
@@ -1054,8 +1068,8 @@ class UIInfoManager {
             listClass: "diplo-list-container",
             items: items,
             scrollPos: scrollPos,
-            gridTemplateSp: "2fr 1.5fr 1fr 1fr 2fr",
-            gridTemplatePc: "150px 100px 80px 80px 1fr",
+            gridTemplateSp: "2fr 1.5fr 1fr 1fr 0.8fr 1.2fr",
+            gridTemplatePc: "150px 100px 80px 80px 50px 1fr",
             onBack: onClose,
             onTabClick: (tabKey) => {
                 this.diploCurrentTab = tabKey;

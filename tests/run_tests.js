@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r194');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r200');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -831,6 +831,330 @@ test('外交の本題も親族・特殊権威の話者距離を最後まで維�
     assert.ok(marriage.demandMsg.includes('左馬頭様に') && !marriage.demandMsg.includes('左馬頭様殿'), '縁談対象も独自の殿付けをせず共通呼称を使う');
 });
 
+
+test('和睦交渉は会話内で具体条件を提示し、条件選択を一元化する', () => {
+    const src = read('js/diplomacy.js');
+    assert.ok(src.includes("{ label: '条件を示させる'"), 'AIからの和睦では事務的な「対価を要求」ではなく条件提示を求める');
+    assert.ok(!src.includes("{ label: '対価を要求'"), '旧い対価要求ラベルを残さない');
+    assert.ok(src.includes('_buildTruceConditionOptions(requestClanId, targetClanId'), '和睦条件候補は共通窓口で生成する');
+    assert.ok(src.includes('_selectTruceConditionOption(options, requestClanId, targetClanId'), '和睦条件の重さは共通選択ロジックを通す');
+    assert.ok(src.includes('和睦の証として'), '条件付き和睦は具体的な条件を会話として提示する');
+    assert.ok(src.includes("{ label: '条件を受ける'"), 'プレイヤー発の条件付き和睦も会話の中で受諾可否を選ぶ');
+    assert.ok(!src.includes('そのような法外な条件、到底飲めませぬ'), '具体条件を示していないのに法外と怒る旧会話を残さない');
+});
+
+test('和睦条件は戦況に応じて城・人質・縁組の重さを選ぶ', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+    const powers = { 1: 3000, 2: 10000 };
+    const dm = new ctx.DiplomacyManager({ getClanTotalSoldiers: id => powers[id] || 1 });
+    const options = [
+        { type: 'marriage' },
+        { type: 'hostage' },
+        { type: 'castle' }
+    ];
+    assert.strictEqual(dm._selectTruceConditionOption(options, 1, 2).type, 'castle', '大きく劣勢なら城割譲を優先する');
+    powers[1] = 8000;
+    assert.strictEqual(dm._selectTruceConditionOption(options, 1, 2).type, 'hostage', 'やや劣勢なら人質を優先する');
+    powers[1] = 10000;
+    assert.strictEqual(dm._selectTruceConditionOption(options, 1, 2).type, 'marriage', '拮抗時は縁組を優先する');
+});
+
+
+test('AI和睦は現在直接隣接している敵対勢力だけを対象にする', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+    const clans = [
+        { id: 1, diplomacyValue: { 2: { status: '敵対', sentiment: 20 }, 3: { status: '敵対', sentiment: 20 } } },
+        { id: 2, diplomacyValue: { 1: { status: '敵対', sentiment: 20 } } },
+        { id: 3, diplomacyValue: { 1: { status: '敵対', sentiment: 20 } } }
+    ];
+    const castles = [
+        { id: 10, ownerClan: 1, adjacentCastleIds: [20] },
+        { id: 20, ownerClan: 2, adjacentCastleIds: [10, 30] },
+        { id: 30, ownerClan: 3, adjacentCastleIds: [20] }
+    ];
+    const game = {
+        clans, castles,
+        getClan: id => clans.find(c => Number(c.id) === Number(id)) || null,
+        getClanCastles: id => castles.filter(c => Number(c.ownerClan) === Number(id)),
+        getCastle: id => castles.find(c => Number(c.id) === Number(id)) || null
+    };
+    const dm = new ctx.DiplomacyManager(game);
+    assert.strictEqual(dm.canAttemptAITruce(1, 2), true, '直接国境を接する敵とは和睦候補にできる');
+    assert.strictEqual(dm.canAttemptAITruce(1, 3), false, '二段先で敵対していても現在隣接していなければAI和睦候補にしない');
+});
+
+test('AI和睦は計画時と実行直前の両方で直接隣接を再確認する', () => {
+    const diplomacy = read('js/diplomacy.js');
+    const ai = read('js/ai.js');
+    assert.ok(diplomacy.includes('if (canAttemptTruce && enemyCount >= 2)'), '月次外交計画で非隣接相手を和睦対象にしない');
+    assert.ok(ai.includes("targetData.action === 'truce' || targetData.action === 'court_truce'"), '実行対象として通常和睦・朝廷和睦を再確認する');
+    assert.ok(ai.includes('!this.game.diplomacyManager.canAttemptAITruce(castle.ownerClan, targetClanId)'), '落城などで前線が離れた場合は実行直前に中止する');
+});
+
+test('AI同士の条件付き和睦は提示条件を申し込んだ側が再判定する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+    const game = { clans: [{ id: 1 }, { id: 2 }], playerClanId: 99 };
+    const dm = new ctx.DiplomacyManager(game);
+    dm._buildTruceConditionOptions = () => [{ type: 'castle', castle: { id: 10 } }];
+    dm._selectTruceConditionOption = options => options[0];
+    dm._getAITrucePressureScore = () => 100;
+
+    let success = 0;
+    let failure = 0;
+    dm._checkAITruceConditionAcceptance = () => false;
+    dm.negotiateTruceConditions(1, 2, () => { success++; }, () => { failure++; });
+    assert.strictEqual(success, 0, '条件が作れただけでは自動成立しない');
+    assert.strictEqual(failure, 1, '申し込んだ側が条件を拒否すれば和睦は決裂する');
+
+    dm._checkAITruceConditionAcceptance = () => true;
+    dm.negotiateTruceConditions(1, 2, () => { success++; }, () => { failure++; });
+    assert.strictEqual(success, 1, '申し込んだ側が条件を受諾した時だけ成立する');
+});
+
+test('AI和睦の条件受諾率は条件の重さと戦況を反映する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+    const clans = [
+        { id: 1, diplomacyValue: { 2: { status: '敵対', sentiment: 20 }, 3: { status: '敵対', sentiment: 20 } } },
+        { id: 2, diplomacyValue: { 1: { status: '敵対', sentiment: 20 } } },
+        { id: 3, diplomacyValue: { 1: { status: '敵対', sentiment: 20 } } }
+    ];
+    const castles = [
+        { id: 10, ownerClan: 1, adjacentCastleIds: [20, 30] },
+        { id: 11, ownerClan: 1, adjacentCastleIds: [] },
+        { id: 12, ownerClan: 1, adjacentCastleIds: [] },
+        { id: 13, ownerClan: 1, adjacentCastleIds: [] },
+        { id: 20, ownerClan: 2, adjacentCastleIds: [10] },
+        { id: 30, ownerClan: 3, adjacentCastleIds: [10] }
+    ];
+    const powers = { 1: 5000, 2: 10000, 3: 6000 };
+    const game = {
+        clans, castles,
+        getClan: id => clans.find(c => Number(c.id) === Number(id)) || null,
+        getClanCastles: id => castles.filter(c => Number(c.ownerClan) === Number(id)),
+        getCastle: id => castles.find(c => Number(c.id) === Number(id)) || null,
+        getClanTotalSoldiers: id => powers[id] || 1
+    };
+    const dm = new ctx.DiplomacyManager(game);
+    const marriage = dm._getAITruceConditionAcceptanceProb(1, 2, { type: 'marriage' });
+    const hostage = dm._getAITruceConditionAcceptanceProb(1, 2, { type: 'hostage' });
+    const castle = dm._getAITruceConditionAcceptanceProb(1, 2, { type: 'castle' });
+    assert.ok(marriage > hostage && hostage > castle, '軽い条件ほど受諾しやすく城割譲は最も重く扱う');
+    assert.ok(castle > 5 && castle < 90, '重い条件でも戦況に応じて成否判定が発生し自動成立・自動拒否に固定しない');
+});
+
+
+test('通常和睦の受諾率は受ける側の敵対数で変わり、申し込む側だけの敵対増加では変わらない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+
+    const makeData = (status = '普通', sentiment = 50) => ({ status, sentiment, trucePeriod: 0, isMarriage: false, isEvent: false, hostageIds: [], subordinateMonths: 0 });
+    const clans = [1, 2, 3, 4].map(id => ({ id, diplomacyValue: {} }));
+    const setPair = (a, b, status, sentiment = 50) => {
+        clans[a - 1].diplomacyValue[b] = makeData(status, sentiment);
+        clans[b - 1].diplomacyValue[a] = makeData(status, sentiment);
+    };
+    setPair(1, 2, '敵対', 40);
+    setPair(1, 3, '普通', 50);
+    setPair(1, 4, '普通', 50);
+    setPair(2, 3, '普通', 50);
+    setPair(2, 4, '普通', 50);
+    setPair(3, 4, '普通', 50);
+
+    const doer = { id: 101, clan: 1, diplomacy: 70 };
+    const targetCastle = { id: 20, ownerClan: 2 };
+    const game = {
+        clans,
+        bushos: [doer],
+        castles: [targetCastle],
+        getClan: id => clans.find(c => Number(c.id) === Number(id)) || null,
+        getBusho: id => Number(id) === 101 ? doer : null,
+        getCastle: id => Number(id) === 20 ? targetCastle : null,
+        getClanTotalSoldiers: () => 10000,
+        getClanDaimyo: () => null
+    };
+    const dm = new ctx.DiplomacyManager(game);
+    const base = dm.getDiplomacyProb(101, 20, 'truce');
+
+    setPair(1, 3, '敵対', 40); // 申込側だけ敵が増える。受諾側2とは共通敵にしない。
+    const requesterMoreEnemies = dm.getDiplomacyProb(101, 20, 'truce');
+    assert.strictEqual(requesterMoreEnemies, base, '申込側だけの敵対数は相手AIの受諾確率へ混ぜない');
+
+    setPair(2, 4, '敵対', 40); // 受諾側に別の敵が増える。
+    const receiverMoreEnemies = dm.getDiplomacyProb(101, 20, 'truce');
+    assert.ok(receiverMoreEnemies > requesterMoreEnemies, '受諾側が多正面を抱えるほど和睦を受けやすくする');
+});
+
+test('通常和睦の受諾率は他の敵との和睦で共通敵が消えても変動しない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+
+    const makeData = (status = '普通', sentiment = 50) => ({ status, sentiment, trucePeriod: 0, isMarriage: false, isEvent: false, hostageIds: [], subordinateMonths: 0 });
+    const clans = [1, 2, 3].map(id => ({ id, diplomacyValue: {} }));
+    const setPair = (a, b, status, sentiment = 50) => {
+        clans[a - 1].diplomacyValue[b] = makeData(status, sentiment);
+        clans[b - 1].diplomacyValue[a] = makeData(status, sentiment);
+    };
+    // 1がA(2)・B(3)双方と敵対し、AとBも敵対中。
+    // この状態だと1と2は3を、1と3は2を共通敵として持つ。
+    setPair(1, 2, '敵対', 35);
+    setPair(1, 3, '敵対', 35);
+    setPair(2, 3, '敵対', 35);
+
+    const doer = { id: 101, clan: 1, diplomacy: 60 };
+    const castleA = { id: 20, ownerClan: 2 };
+    const castleB = { id: 30, ownerClan: 3 };
+    const game = {
+        clans,
+        bushos: [doer],
+        castles: [castleA, castleB],
+        getClan: id => clans.find(c => Number(c.id) === Number(id)) || null,
+        getBusho: id => Number(id) === 101 ? doer : null,
+        getCastle: id => [castleA, castleB].find(c => Number(c.id) === Number(id)) || null,
+        getClanTotalSoldiers: () => 10000,
+        getClanDaimyo: () => null
+    };
+    const dm = new ctx.DiplomacyManager(game);
+
+    const beforeB = dm.getDiplomacyProb(101, 30, 'truce');
+    dm.changeStatus(1, 2, '和睦', 6);
+    const afterAWithB = dm.getDiplomacyProb(101, 30, 'truce');
+    assert.strictEqual(afterAWithB, beforeB, 'Aとの和睦で共通敵が消えてもBの受諾率は変えない');
+
+    dm.changeStatus(1, 2, '敵対');
+    const beforeA = dm.getDiplomacyProb(101, 20, 'truce');
+    dm.changeStatus(1, 3, '和睦', 6);
+    const afterBWithA = dm.getDiplomacyProb(101, 20, 'truce');
+    assert.strictEqual(afterBWithA, beforeA, 'Bとの和睦で共通敵が消えてもAの受諾率は変えない');
+});
+
+test('婚姻は基本外交statusを上書きせず友好度と外交補正だけを重ねる', () => {
+    const ctx = createContext({
+        FamilyLinker: { rebuildAllFamilyIds() {} },
+        LifeStatusRules: { isUnavailable: () => false }
+    });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+
+    const rel12 = { status: '従属', sentiment: 45, trucePeriod: 0, isMarriage: false, isEvent: false, hostageIds: [99], subordinateMonths: 18 };
+    const rel21 = { status: '支配', sentiment: 45, trucePeriod: 0, isMarriage: false, isEvent: false, hostageIds: [99], subordinateMonths: 18 };
+    const clans = [
+        { id: 1, princessIds: [1], diplomacyValue: { 2: rel12 } },
+        { id: 2, princessIds: [], diplomacyValue: { 1: rel21 } }
+    ];
+    const princess = { id: 1, name: '姫', status: 'unmarried', currentClanId: 1, originalClanId: 1, husbandId: 0 };
+    const husband = { id: 20, clan: 2, wifeIds: [] };
+    const game = {
+        playerClanId: 1,
+        clans,
+        princesses: [princess],
+        bushos: [husband],
+        getClan: id => clans.find(c => Number(c.id) === Number(id)) || null,
+        getBusho: id => Number(id) === 20 ? husband : null
+    };
+    const dm = new ctx.DiplomacyManager(game);
+    assert.strictEqual(dm.applyMarriageData(1, 20, 2, false), true);
+    assert.strictEqual(rel12.status, '従属', '婚姻成立だけで従属から同盟へ上書きしない');
+    assert.strictEqual(rel21.status, '支配', '相手側の支配statusも維持する');
+    assert.strictEqual(rel12.isMarriage, true);
+    assert.strictEqual(rel21.isMarriage, true);
+    assert.ok(rel12.sentiment >= ctx.MainParams.Diplomacy.Marriage.SentimentFloor, '婚姻時は友好度を大きく引き上げる');
+    assert.ok(dm.getMarriageDiplomacyBonus('alliance', rel12) > 0);
+    assert.ok(dm.getMarriageDiplomacyBonus('dominate', rel12) > 0);
+    assert.ok(dm.getMarriageDiplomacyBonus('subordinate', rel12) > 0);
+
+    dm.changeStatus(1, 2, '同盟');
+    assert.strictEqual(rel12.status, '同盟', '支配・従属から同盟への上書きは従来どおり可能');
+    assert.strictEqual(rel12.isMarriage, true, 'status上書きでも婚姻フラグを維持する');
+    assert.deepStrictEqual(Array.from(rel12.hostageIds), [99], 'status上書きだけでは人質関係を消さない');
+});
+
+test('AI従属家の独立意欲は野望で上がり、義理が高いほど平和的な同盟格上げを優先する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+
+    const rel12 = { status: '従属', sentiment: 70, trucePeriod: 0, isMarriage: false, isEvent: false, hostageIds: [], subordinateMonths: 24 };
+    const rel21 = { status: '支配', sentiment: 70, trucePeriod: 0, isMarriage: false, isEvent: false, hostageIds: [], subordinateMonths: 24 };
+    const clans = [
+        { id: 1, diplomacyValue: { 2: rel12 }, currentDiplomacyTarget: null },
+        { id: 2, diplomacyValue: { 1: rel21 }, currentDiplomacyTarget: null }
+    ];
+    const daimyo = { id: 11, clan: 1, ambition: 20, duty: 50 };
+    const targetDaimyo = { id: 21, clan: 2, ambition: 50, duty: 50, nemesisIds: [] };
+    const game = {
+        clans,
+        bushos: [daimyo, targetDaimyo],
+        getClan: id => clans.find(c => Number(c.id) === Number(id)) || null,
+        getClanDaimyo: id => Number(id) === 1 ? daimyo : targetDaimyo,
+        getClanTotalSoldiers: () => 10000
+    };
+    const dm = new ctx.DiplomacyManager(game);
+
+    const lowAmbition = dm.getVassalIndependenceDisposition(1, 2, 10000, 10000);
+    daimyo.ambition = 90;
+    const highAmbition = dm.getVassalIndependenceDisposition(1, 2, 10000, 10000);
+    assert.ok(highAmbition.desire > lowAmbition.desire, '野望が高いほど独立意欲が連続的に上がる');
+
+    daimyo.duty = 10;
+    const lowDuty = dm.getVassalIndependenceDisposition(1, 2, 10000, 10000);
+    const lowDutyBreak = dm.calcBreakAllianceScore(1, 2, 10000, 10000, 10, []);
+    daimyo.duty = 90;
+    const highDuty = dm.getVassalIndependenceDisposition(1, 2, 10000, 10000);
+    const highDutyBreak = dm.calcBreakAllianceScore(1, 2, 10000, 10000, 90, []);
+    assert.ok(highDuty.peacefulPreference > lowDuty.peacefulPreference, '義理が高いほど関係改善・同盟格上げを選びやすい');
+    assert.ok(highDutyBreak < lowDutyBreak, '義理が高いほど主家への直接攻撃を抑える');
+});
+
+test('高義理のAI従属家は独立時にまず親善または同盟格上げを計画できる', () => {
+    const customMath = Object.create(Math);
+    customMath.random = () => 0;
+    const ctx = createContext({ Math: customMath });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+
+    const rel12 = { status: '従属', sentiment: 75, trucePeriod: 0, isMarriage: false, isEvent: false, hostageIds: [], subordinateMonths: 24 };
+    const rel21 = { status: '支配', sentiment: 75, trucePeriod: 0, isMarriage: false, isEvent: false, hostageIds: [], subordinateMonths: 24 };
+    const clans = [
+        { id: 1, courtTrust: 0, diplomacyValue: { 2: rel12 } },
+        { id: 2, courtTrust: 0, diplomacyValue: { 1: rel21 } }
+    ];
+    const daimyo = { id: 11, clan: 1, ambition: 90, duty: 90, nemesisIds: [] };
+    const targetDaimyo = { id: 21, clan: 2, ambition: 50, duty: 50, nemesisIds: [] };
+    const game = {
+        clans,
+        bushos: [daimyo, targetDaimyo],
+        getClan: id => clans.find(c => Number(c.id) === Number(id)) || null,
+        getClanDaimyo: id => Number(id) === 1 ? daimyo : targetDaimyo,
+        getClanTotalSoldiers: () => 10000
+    };
+    const dm = new ctx.DiplomacyManager(game);
+    const action = dm.determineAIDiplomacyAction(1, 2, 10000, 10000, 10000, 90, 1, false, 0);
+    assert.strictEqual(action.action, 'alliance');
+    assert.strictEqual(action.reason, 'vassal_peaceful_upgrade');
+});
+
 test('武将の噂は将軍・左馬頭を候補外にし調略方針では従来の特殊呼称を維持する', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
@@ -1088,6 +1412,31 @@ test('自家の拠点行動履歴は実行拠点名を含める', () => {
     assert.ok(command.includes('`【徴兵】${castle.name}で徴兵を行いました。`'));
     assert.ok(command.includes('`【民施し】${castle.name}で民施しを行いました。`'));
     assert.ok(!command.includes('`${actionName}を実行 (効果:${totalVal})`'), '拠点名のない旧内政履歴を残さない');
+});
+
+test('勢力一覧と外交関係一覧は基本関係と婚姻を独立列で表示する', () => {
+    const info = read('js/ui_info.js');
+    const css = read('css/style.css');
+    assert.ok(info.includes('friendStatus = relation.status || "普通"'), '勢力一覧の関係列は婚姻表示で基本statusを上書きしない');
+    assert.ok(info.includes('isMarriage = relation.isMarriage === true'), '勢力一覧は婚姻フラグを独立して読む');
+    assert.ok(info.includes("data-sort=\"marriage\">婚姻${getSortMark('marriage')}"), '婚姻列をソート可能な独立列として持つ');
+    assert.ok(info.includes('`<span class="col-marriage">${d.isMarriage ? "◯" : ""}</span>`'), '勢力一覧は婚姻時だけ丸を表示する');
+    assert.ok(info.includes('`<span class="col-marriage">${r.isMarriage ? "◯" : ""}</span>`'), '外交関係一覧も婚姻時だけ丸を表示する');
+    const diploHeaders = info.slice(info.indexOf('const customHeaderCols = ['), info.indexOf('this._renderListModal({', info.indexOf('const customHeaderCols = [')));
+    assert.ok(diploHeaders.indexOf('関係') < diploHeaders.indexOf('期間') && diploHeaders.indexOf('期間') < diploHeaders.indexOf('婚姻'), '外交関係一覧は関係→和睦残期間→婚姻の順に並べる');
+    assert.ok(css.includes('.select-item .col-marriage'), '婚姻の丸は一門と同系統の強調表示を持つ');
+});
+
+test('スマホ勢力一覧は全タブで勢力名列の幅を揃える', () => {
+    const info = read('js/ui_info.js');
+    const grids = [...info.matchAll(/gridSpStr = "([^"]+)";/g)].slice(0, 4).map(m => m[1]);
+    assert.strictEqual(grids.length, 4, '勢力一覧4タブのスマホ列定義を取得できる');
+    grids.forEach((grid, index) => {
+        const tracks = grid.split(/\s+/).map(v => Number(v.replace('fr', '')));
+        assert.strictEqual(tracks[0], 1.5, `タブ${index + 1}の勢力名列を1.5frで統一する`);
+        const total = tracks.reduce((sum, value) => sum + value, 0);
+        assert.ok(Math.abs(total - 8) < 1e-9, `タブ${index + 1}の総frを8に揃えて勢力名の実幅を一致させる`);
+    });
 });
 
 test('履歴表示は月ごとの区切りを画面側で生成し履歴件数を消費しない', () => {
@@ -2459,7 +2808,7 @@ test('GuideView は国主席番号を展開せず、入れ子から個別コマ�
     assert.ok(diplomacyGroup);
     diplomacyGroup.click();
     texts = flattenTexts(elements['guide-command-list']);
-    assert.ok(texts.includes('同盟') && texts.includes('婚姻同盟') && texts.includes('臣従願'));
+    assert.ok(texts.includes('同盟') && texts.includes('婚姻') && texts.includes('臣従願'));
     const alliance = findButton(elements['guide-command-list'], '同盟');
     assert.ok(alliance);
     assert.strictEqual(elements['guide-article-title'].textContent, '外交', '入れ子の親項目を押した時も見出しを押した項目名へ合わせる');

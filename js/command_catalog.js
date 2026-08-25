@@ -596,7 +596,7 @@ const COMMAND_SPECS = {
         startMode: 'map_select', targetType: 'other_clan_all'
     },
     'marriage': {
-        label: "婚姻同盟", category: 'FOREIGN_DAIMYO',
+        label: "婚姻", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'marriage_valid',

@@ -816,44 +816,17 @@ class LifeSystem {
                     if (husband) {
                         husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
                         
-                        // ★ここから追加：婚姻同盟の解消チェック
+                        // 婚姻フラグの正本は DiplomacyManager。死亡した姫を除外して再評価する。
                         const clanA = p.originalClanId;
                         const clanB = husband.clan;
-                        
-                        if (clanA > 0 && clanB > 0 && clanA !== clanB) {
-                            // 他にこの２つの家を結んでいる、生きているお姫様がいるか名簿を探します
-                            const hasOtherMarriage = this.game.princesses.some(otherP => {
-                                // 死んでいる、生まれていない、結婚していない姫は除外します
-                                if (window.LifeStatusRules.isUnavailable(otherP) || otherP.husbandId === 0) return false;
-                                
-                                const otherHusband = this.game.getBusho(otherP.husbandId);
-                                if (!otherHusband) return false;
-                                
-                                // 実家と嫁ぎ先が、今回と同じ組み合わせかチェックします（A家→B家、またはB家→A家）
-                                return (otherP.originalClanId === clanA && otherHusband.clan === clanB) || 
-                                       (otherP.originalClanId === clanB && otherHusband.clan === clanA);
-                            });
-                            
-                            // 他に誰もいなければ、婚姻のシール（isMarriage）を剥がします！
-                            if (!hasOtherMarriage) {
-                                const clanAData = this.game.getClan(clanA);
-                                const clanBData = this.game.getClan(clanB);
-                                
-                                if (clanAData && clanAData.diplomacyValue[clanB]) {
-                                    clanAData.diplomacyValue[clanB].isMarriage = false;
-                                }
-                                if (clanBData && clanBData.diplomacyValue[clanA]) {
-                                    clanBData.diplomacyValue[clanA].isMarriage = false;
-                                }
-                                
-                                // プレイヤーが関係している家なら、追加でお知らせを出します
-                                if (clanA === this.game.playerClanId || clanB === this.game.playerClanId) {
-                                    const targetClanName = (clanA === this.game.playerClanId) ? clanBData?.name : clanAData?.name;
-                                    if (targetClanName) {
-                                        const breakMsg = `${p.name}の死により、${targetClanName}との婚姻関係は解消されました。`;
-                                        this.game.ui.log(breakMsg);
-                                        await this.game.ui.showDialogAsync(breakMsg, false, 0);
-                                    }
+                        if (clanA > 0 && clanB > 0 && clanA !== clanB && this.game.diplomacyManager) {
+                            const stillMarried = this.game.diplomacyManager.refreshMarriageRelation(clanA, clanB);
+                            if (!stillMarried && (clanA === this.game.playerClanId || clanB === this.game.playerClanId)) {
+                                const otherClan = this.game.getClan(clanA === this.game.playerClanId ? clanB : clanA);
+                                if (otherClan) {
+                                    const breakMsg = `${p.name}の死により、${otherClan.name}との婚姻関係は解消されました。`;
+                                    this.game.ui.log(breakMsg);
+                                    await this.game.ui.showDialogAsync(breakMsg, false, 0);
                                 }
                             }
                         }
@@ -887,44 +860,24 @@ class LifeSystem {
         // ★追加：自分が死んだ年より後に生まれる予定だった子供（実父としている武将・姫）を連鎖的に死亡させます
         this.cascadeDeathToUnbornChildren(busho.id, this.game.year);
         
-        // ★ここから追加：夫が死亡したことによる姫の帰還処理と婚姻同盟の解消
+        // 夫が死亡したことによる姫の帰還処理と婚姻関係の再評価
         if (busho.wifeIds && busho.wifeIds.length > 0) {
             for (const wifeId of busho.wifeIds) {
                 const princess = this.game.princesses.find(p => p.id === wifeId);
                 if (princess && princess.status === 'married') {
                     princess.husbandId = 0; // 未亡人になります
                     
-                    // 1. 婚姻同盟の解消チェック
+                    // 1. 婚姻関係の再評価。夫IDを外した後なので、他の婚姻がなければここでだけフラグが落ちる。
                     const clanA = princess.originalClanId;
                     const clanB = busho.clan;
-                    
-                    if (clanA > 0 && clanB > 0 && clanA !== clanB) {
-                        const hasOtherMarriage = this.game.princesses.some(otherP => {
-                            if (window.LifeStatusRules.isUnavailable(otherP) || otherP.husbandId === 0) return false;
-                            const otherHusband = this.game.getBusho(otherP.husbandId);
-                            if (!otherHusband) return false;
-                            return (otherP.originalClanId === clanA && otherHusband.clan === clanB) || 
-                                   (otherP.originalClanId === clanB && otherHusband.clan === clanA);
-                        });
-                        
-                        if (!hasOtherMarriage) {
-                            const clanAData = this.game.getClan(clanA);
-                            const clanBData = this.game.getClan(clanB);
-                            
-                            if (clanAData && clanAData.diplomacyValue[clanB]) {
-                                clanAData.diplomacyValue[clanB].isMarriage = false;
-                            }
-                            if (clanBData && clanBData.diplomacyValue[clanA]) {
-                                clanBData.diplomacyValue[clanA].isMarriage = false;
-                            }
-                            
-                            if (clanA === this.game.playerClanId || clanB === this.game.playerClanId) {
-                                const targetClanName = (clanA === this.game.playerClanId) ? clanBData?.name : clanAData?.name;
-                                if (targetClanName) {
-                                    const breakMsg = `夫である${busho.fullName}の死により、${targetClanName}との婚姻関係は解消されました。`;
-                                    this.game.ui.log(breakMsg);
-                                    await this.game.ui.showDialogAsync(breakMsg, false, 0);
-                                }
+                    if (clanA > 0 && clanB > 0 && clanA !== clanB && this.game.diplomacyManager) {
+                        const stillMarried = this.game.diplomacyManager.refreshMarriageRelation(clanA, clanB);
+                        if (!stillMarried && (clanA === this.game.playerClanId || clanB === this.game.playerClanId)) {
+                            const otherClan = this.game.getClan(clanA === this.game.playerClanId ? clanB : clanA);
+                            if (otherClan) {
+                                const breakMsg = `夫である${busho.fullName}の死により、${otherClan.name}との婚姻関係は解消されました。`;
+                                this.game.ui.log(breakMsg);
+                                await this.game.ui.showDialogAsync(breakMsg, false, 0);
                             }
                         }
                     }
