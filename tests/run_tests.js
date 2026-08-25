@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r178');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r179');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1689,14 +1689,20 @@ test('部隊編成はPCカードとスマホ循環ボタンで能力・適性を
     assert.ok(source.includes("listEl.classList.toggle('divide-list-two-column', isPcDivide && bushos.length > 3)"), 'PCで4人以上なら左3・右2の2列配置を使う');
 });
 
-test('野戦の個別部隊情報は正式な適性名と共通ランク表示を使う', () => {
+test('野戦の個別部隊情報は固定寸法で全適性と既存の名前圧縮規則を使う', () => {
     const source = read('js/field_war.js');
-    assert.ok(source.includes("items.push(['足軽', unitBusho.aptAshigaru], ['弓術', unitBusho.aptYumi])"));
-    assert.ok(source.includes("items.push(['馬術', unitBusho.aptKiba])"));
-    assert.ok(source.includes("items.push(['砲術', unitBusho.aptTeppo])"));
-    assert.ok(source.includes("items.push(['操船', unitBusho.aptMaritime])"));
-    assert.ok(source.includes("StatPresenter.toAptitudeHTML(rank || 'E')"));
-    assert.ok(source.includes('<div class="fw-unit-type">${typeDisplay}</div>'));
+    const css = read('css/style.css');
+    assert.ok(source.includes("['足軽', unitBusho && unitBusho.aptAshigaru]"));
+    assert.ok(source.includes("['馬術', unitBusho && unitBusho.aptKiba]"));
+    assert.ok(source.includes("['弓術', unitBusho && unitBusho.aptYumi]"));
+    assert.ok(source.includes("['砲術', unitBusho && unitBusho.aptTeppo]"));
+    assert.ok(source.includes("['操船', unitBusho && unitBusho.aptMaritime]"));
+    assert.ok(source.includes('this.game.ui._getCompressedTextHtml(value, threshold, isStrong)'), '一覧と同じ文字圧縮規則を再利用する');
+    assert.ok(source.includes('class="fw-unit-affiliation"'), '勢力名を武将名・兵科から分離する');
+    assert.ok(source.includes('fw-unit-type-value'), '兵科は名前の右ではなく固定情報行へ置く');
+    assert.ok(source.includes('class="fw-unit-aptitudes"'), '能力の下に全適性の固定欄を設ける');
+    assert.ok(css.includes('.fw-floating-unit { position: absolute; width: 280px; min-width: 280px; max-width: 280px; height: 190px; min-height: 190px; max-height: 190px;'), '部隊情報の縦横寸法を固定する');
+    assert.ok(css.includes('grid-template-columns: repeat(5, minmax(0, 1fr))'), '5適性を固定グリッドで表示する');
 });
 
 test('index.html は inline script を持たず、起動処理を app_bootstrap.js に集約する', () => {

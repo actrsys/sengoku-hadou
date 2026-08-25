@@ -3073,21 +3073,23 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
 .fw-tab.attacker.active { background: rgba(239, 83, 80, 0.6); }
 .fw-tab.defender.active { background: rgba(66, 165, 245, 0.6); }
 
-/* ★修正: 部隊情報 (fw-unit-info) の和風・縦並びスタイル */
-.fw-floating-unit { position: absolute; background: rgba(0, 0, 0, 0.85); border: 2px solid var(--unit-color, #d4af37); padding: 10px; border-radius: 6px; z-index: 100; pointer-events: none; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.7); white-space: nowrap; color: #fff; text-shadow: 1px 1px 1px #000; min-width: 180px; }
-.fw-unit-header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid rgba(212, 175, 55, 0.5); padding-bottom: 4px; gap: 15px; }
-.fw-unit-name { font-size: 1.1rem; font-weight: bold; color: var(--unit-color, #fff); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
-.fw-unit-type { font-size: 0.8rem; color: #ccc; }
-.fw-unit-type { display: flex; align-items: center; gap: 4px; }
-.fw-unit-type-name { color: #ddd; margin-right: 2px; }
-.fw-unit-aptitude-item { display: inline-flex; align-items: center; gap: 1px; }
-.fw-unit-aptitude-label { color: #c8b982; font-size: 0.72rem; }
-.fw-unit-type .grade-container { width: 19px; height: 1em; }
-.fw-unit-type .grade-main { font-size: 0.76rem !important; }
+/* ★修正: 部隊情報は内容量に左右されない固定寸法にし、兵科と適性を名前から分離します。 */
+.fw-floating-unit { position: absolute; width: 280px; min-width: 280px; max-width: 280px; height: 190px; min-height: 190px; max-height: 190px; box-sizing: border-box; overflow: hidden; background: rgba(0, 0, 0, 0.85); border: 2px solid var(--unit-color, #d4af37); padding: 9px 10px; border-radius: 6px; z-index: 100; pointer-events: none; display: flex; flex-direction: column; gap: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.7); white-space: nowrap; color: #fff; text-shadow: 1px 1px 1px #000; }
+.fw-unit-header { height: 43px; min-height: 43px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; border-bottom: 1px solid rgba(212, 175, 55, 0.5); padding-bottom: 4px; overflow: hidden; }
+.fw-unit-affiliation { width: 100%; min-width: 0; height: 14px; line-height: 14px; overflow: hidden; text-overflow: ellipsis; color: #c8b982; font-size: 0.72rem; }
+.fw-unit-name { width: 100%; min-width: 0; height: 22px; line-height: 22px; overflow: hidden; text-overflow: ellipsis; font-size: 1.1rem; font-weight: bold; color: var(--unit-color, #fff); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .fw-unit-stats { display: flex; flex-direction: column; gap: 4px; }
-.fw-unit-row { display: flex; justify-content: space-between; align-items: center; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 2px 6px; font-size: 0.9rem; }
-.fw-unit-abilities { display: flex; gap: 10px; justify-content: space-between; margin-top: 2px; }
-.fw-unit-ability { display: flex; align-items: center; gap: 4px; font-size: 0.85rem; font-weight: bold; }
+.fw-unit-row { height: 23px; box-sizing: border-box; display: grid; grid-template-columns: auto minmax(34px, 1fr) auto minmax(40px, 1fr); column-gap: 5px; align-items: center; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; padding: 2px 6px; font-size: 0.9rem; }
+.fw-unit-row .fw-status-value { text-align: right; }
+.fw-unit-type-value { color: #eee; }
+.fw-unit-abilities { height: 22px; min-height: 22px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-items: center; margin-top: 1px; }
+.fw-unit-ability { min-width: 0; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 0.85rem; font-weight: bold; }
+.fw-unit-aptitudes { height: 34px; min-height: 34px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; align-items: stretch; padding-top: 3px; border-top: 1px solid rgba(212, 175, 55, 0.28); }
+.fw-unit-aptitude-item { min-width: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1px; border-radius: 3px; background: rgba(0, 0, 0, 0.22); }
+.fw-unit-aptitude-label { color: #c8b982; font-size: 0.68rem; line-height: 1; }
+.fw-unit-aptitudes .grade-container { width: 20px; height: 1em; }
+.fw-unit-aptitudes .grade-main { font-size: 0.78rem !important; }
+.fw-unit-aptitude-empty { width: 20px; text-align: center; color: #777; font-size: 0.78rem; line-height: 1; }
 
 .fw-floating-log { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 600px; height: 100px; overflow-y: auto; background: rgba(0, 0, 0, 0.6); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; padding: 5px 10px; font-size: 0.85rem; z-index: 100; pointer-events: auto; text-shadow: 1px 1px 1px #000; }
 

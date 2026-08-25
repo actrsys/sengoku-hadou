@@ -956,8 +956,16 @@ async function validateWarAptitudeLayout(cdp) {
                 const seaSummary=rowEls[3].querySelector('.troop-aptitude-summary');
                 const mobileLabels=mobileSummary ? [...mobileSummary.querySelectorAll('.troop-aptitude-label')].map(el=>el.textContent.trim()) : [];
                 const seaMobileLabels=seaSummary ? [...seaSummary.querySelectorAll('.troop-aptitude-label')].map(el=>el.textContent.trim()) : [];
-                const info=rect(document.getElementById('fw-unit-info'));
+                const infoEl=document.getElementById('fw-unit-info');
+                const info=rect(infoEl);
                 const infoLabels=[...document.querySelectorAll('#fw-unit-info .fw-unit-aptitude-label')].map(el=>el.textContent.trim());
+                const infoType=document.querySelector('#fw-unit-info .fw-unit-type-value');
+                const infoName=document.querySelector('#fw-unit-info .fw-unit-name');
+                const infoAffiliation=document.querySelector('#fw-unit-info .fw-unit-affiliation');
+                if(infoType) infoType.textContent='鉄砲';
+                if(infoName) infoName.textContent='とても長い武将姓名表示確認用';
+                if(infoAffiliation) infoAffiliation.textContent='とても長い勢力名称表示確認用';
+                const infoAfterContentChange=rect(infoEl);
                 return {
                     rows, content, list, selectorRects, buttonCounts, firstButtons, cardInfoRects,
                     firstPcAptLabels, firstPcGrades, firstAbilities, seaPcButtons,
@@ -965,7 +973,7 @@ async function validateWarAptitudeLayout(cdp) {
                     mobileName: mobileName ? rect(mobileName) : null,
                     mobileSummary: mobileSummary && getComputedStyle(mobileSummary).display !== 'none' ? rect(mobileSummary) : null,
                     firstShortcut: firstShortcut ? rect(firstShortcut) : null,
-                    mobileLabels, seaMobileLabels, info, infoLabels,
+                    mobileLabels, seaMobileLabels, info, infoLabels, infoAfterContentChange,
                     listClientHeight: document.getElementById('divide-list').clientHeight,
                     listScrollHeight: document.getElementById('divide-list').scrollHeight
                 };
@@ -975,7 +983,8 @@ async function validateWarAptitudeLayout(cdp) {
         assert.ok(st.content.left >= -1 && st.content.right <= cfg.width + 1, `${cfg.label}: 編成モーダルが横にはみ出す`);
         assert.ok(st.selectorRects.every((sel, i) => sel.right <= st.rows[i].right + 1 && sel.left >= st.rows[i].left - 1), `${cfg.label}: 兵科欄が武将行からはみ出す`);
         assert.ok(st.info.right <= st.content.right + 1, `${cfg.label}: 適性付き個別部隊情報が画面外へはみ出す`);
-        assert.ok(st.infoLabels.includes('足軽') && st.infoLabels.includes('弓術') && st.infoLabels.includes('操船'), `${cfg.label}: 個別部隊情報は正式な適性名を表示する`);
+        assert.deepStrictEqual(st.infoLabels, ['足軽','馬術','弓術','砲術','操船'], `${cfg.label}: 個別部隊情報は全適性を固定順で表示する`);
+        assert.ok(Math.abs(st.info.width - st.infoAfterContentChange.width) <= 0.5 && Math.abs(st.info.height - st.infoAfterContentChange.height) <= 0.5, `${cfg.label}: 兵科・武将名・勢力名の長さで個別部隊情報の寸法を変えない`);
 
         if (cfg.isPc) {
             assert.ok(Math.abs(st.rows[0].left - st.rows[1].left) <= 1 && Math.abs(st.rows[1].left - st.rows[2].left) <= 1, 'PC: 先頭3人を左列へ配置する');

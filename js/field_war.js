@@ -1182,36 +1182,40 @@ class FieldWarManager {
         if (unit.troopType === 'teppo') typeName = '鉄砲';
 
         const unitBusho = unit.bushoId ? this.game.getBusho(unit.bushoId) : null;
-        const aptitudeItemHtml = (label, rank) => `
-            <span class="fw-unit-aptitude-item"><span class="fw-unit-aptitude-label">${label}</span>${StatPresenter.toAptitudeHTML(rank || 'E')}</span>`;
-        let aptitudeHtml = '';
-        if (unitBusho) {
-            const items = [];
-            if (unit.troopType === 'ashigaru') {
-                items.push(['足軽', unitBusho.aptAshigaru], ['弓術', unitBusho.aptYumi]);
-            } else if (unit.troopType === 'kiba') {
-                items.push(['馬術', unitBusho.aptKiba]);
-            } else if (unit.troopType === 'teppo') {
-                items.push(['砲術', unitBusho.aptTeppo]);
+        const compressText = (text, threshold, isStrong = false) => {
+            const value = String(text || '').replace(/\|/g, '');
+            if (!value) return '';
+            if (this.game.ui && typeof this.game.ui._getCompressedTextHtml === 'function') {
+                return this.game.ui._getCompressedTextHtml(value, threshold, isStrong);
             }
-            if (this.warState && this.warState.isSeaBattle) items.push(['操船', unitBusho.aptMaritime]);
-            aptitudeHtml = items.map(([label, rank]) => aptitudeItemHtml(label, rank)).join('');
-        }
-        const typeDisplay = `<span class="fw-unit-type-name">${typeName}</span>${aptitudeHtml}`;
+            return value;
+        };
+        const aptitudeItemHtml = (label, rank) => `
+            <span class="fw-unit-aptitude-item"><span class="fw-unit-aptitude-label">${label}</span>${rank ? StatPresenter.toAptitudeHTML(rank) : '<span class="fw-unit-aptitude-empty">-</span>'}</span>`;
+        const aptitudeItems = [
+            ['足軽', unitBusho && unitBusho.aptAshigaru],
+            ['馬術', unitBusho && unitBusho.aptKiba],
+            ['弓術', unitBusho && unitBusho.aptYumi],
+            ['砲術', unitBusho && unitBusho.aptTeppo],
+            ['操船', unitBusho && unitBusho.aptMaritime]
+        ];
+        const aptitudeHtml = aptitudeItems.map(([label, rank]) => aptitudeItemHtml(label, rank)).join('');
 
-        // 大名家や諸勢力の名前を調べる処理
-        let clanNameText = "";
-        
+        // 大名家・諸勢力名と武将名は兵科から分離し、既存の文字圧縮規則で固定幅内に収めます。
+        let affiliationName = '';
         if (unit.kunishuId) {
             const kunishu = this.game.kunishuSystem.getKunishu(unit.kunishuId);
-            if (kunishu) {
-                clanNameText = `${kunishu.getName(this.game)} `; 
-            }
+            if (kunishu) affiliationName = kunishu.getName(this.game);
         } else if (unitBusho && unitBusho.clan > 0) {
             const clanData = this.game.clans.find(c => c.id === unitBusho.clan);
-            if (clanData) {
-                clanNameText = `${clanData.name} `;
-            }
+            if (clanData) affiliationName = clanData.name;
+        }
+        const affiliationNameHtml = compressText(affiliationName || '所属不明', 5);
+        let bushoNameHtml = '';
+        if (unitBusho && unitBusho.givenName) {
+            bushoNameHtml = compressText(unitBusho.familyName, 3) + compressText(unitBusho.givenName, 3);
+        } else {
+            bushoNameHtml = compressText((unitBusho && unitBusho.fullName) || unit.name || '部隊', 5);
         }
         
         let unitMorale = 50;
@@ -1224,13 +1228,13 @@ class FieldWarManager {
         infoEl.style.setProperty('--unit-color', color); 
         infoEl.innerHTML = `
             <div class="fw-unit-header">
-                <div class="fw-unit-name">${clanNameText}${unit.name}</div>
-                <div class="fw-unit-type">${typeDisplay}</div>
+                <div class="fw-unit-affiliation">${affiliationNameHtml}</div>
+                <div class="fw-unit-name">${bushoNameHtml}</div>
             </div>
             <div class="fw-unit-stats">
                 <div class="fw-unit-row">
-                    <span class="fw-status-label">兵士</span>
-                    <span class="fw-status-value">${unit.soldiers}</span>
+                    <span class="fw-status-label">兵科</span><span class="fw-status-value fw-unit-type-value">${typeName}</span>
+                    <span class="fw-status-label fw-status-label-spaced">兵士</span><span class="fw-status-value">${unit.soldiers}</span>
                 </div>
                 <div class="fw-unit-row">
                     <span class="fw-status-label">士気</span><span class="fw-status-value">${unitMorale}</span>
@@ -1242,6 +1246,7 @@ class FieldWarManager {
                 <div class="fw-unit-ability"><span class="fw-status-label">武</span><span>${StatPresenter.toGradeHTML(unit.stats.str)}</span></div>
                 <div class="fw-unit-ability"><span class="fw-status-label">智</span><span>${StatPresenter.toGradeHTML(unit.stats.int)}</span></div>
             </div>
+            <div class="fw-unit-aptitudes">${aptitudeHtml}</div>
         `;
 
         // ★修正：サイズを正確に測るため、一瞬だけ透明（visibility: hidden）にして画面に出します
