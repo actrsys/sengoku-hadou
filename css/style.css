@@ -3136,9 +3136,10 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
     background-size: 30px 26px !important;
 }
 .hex-forest {
-    background-color: #315f37 !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='26' viewBox='0 0 30 26'%3E%3Cg stroke='%231b4827' stroke-width='1'%3E%3Cpath d='M6 19v-5M15 21v-6M24 18v-5'/%3E%3C/g%3E%3Cg fill='%234a7b45'%3E%3Ccircle cx='6' cy='11' r='4'/%3E%3Ccircle cx='15' cy='12' r='5'/%3E%3Ccircle cx='24' cy='10' r='4'/%3E%3C/g%3E%3Cg fill='%23618d53' opacity='.75'%3E%3Ccircle cx='4.5' cy='9.5' r='1.8'/%3E%3Ccircle cx='13' cy='10' r='2'/%3E%3Ccircle cx='22.5' cy='8.5' r='1.7'/%3E%3C/g%3E%3C/svg%3E") !important;
-    background-size: 30px 26px !important;
+    background-color: #2f5734 !important;
+    /* 森は波線ではなく、大小の樹冠が面として連なる斑点状の質感にします。 */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='52' viewBox='0 0 60 52'%3E%3Cg stroke-linecap='round' stroke-linejoin='round'%3E%3Cg fill='%233b6840' opacity='.92'%3E%3Ccircle cx='2' cy='8' r='8'/%3E%3Ccircle cx='15' cy='4' r='9'/%3E%3Ccircle cx='30' cy='10' r='10'/%3E%3Ccircle cx='47' cy='5' r='9'/%3E%3Ccircle cx='59' cy='13' r='9'/%3E%3Ccircle cx='8' cy='28' r='10'/%3E%3Ccircle cx='23' cy='23' r='9'/%3E%3Ccircle cx='39' cy='29' r='11'/%3E%3Ccircle cx='55' cy='25' r='9'/%3E%3Ccircle cx='17' cy='46' r='11'/%3E%3Ccircle cx='34' cy='44' r='9'/%3E%3Ccircle cx='52' cy='47' r='10'/%3E%3C/g%3E%3Cg fill='%2324452b' opacity='.72'%3E%3Ccircle cx='8' cy='15' r='5'/%3E%3Ccircle cx='36' cy='7' r='5'/%3E%3Ccircle cx='17' cy='31' r='6'/%3E%3Ccircle cx='49' cy='35' r='6'/%3E%3Ccircle cx='3' cy='48' r='6'/%3E%3C/g%3E%3Cg fill='none' stroke='%237aa06c' stroke-width='1.4' opacity='.48'%3E%3Cpath d='M-4 8q6-5 12 0M11 5q5-4 10 0M25 12q6-5 12 0M43 6q5-4 10 0M4 29q6-5 12 0M20 24q5-4 10 0M34 30q7-5 14 0M12 47q6-5 12 0M29 44q5-4 10 0M47 48q6-5 12 0'/%3E%3C/g%3E%3Cg stroke='%231a3923' stroke-width='1' opacity='.58'%3E%3Cpath d='M9 20v5M31 17v5M48 17v4M23 35v5M42 39v4M14 50v4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") !important;
+    background-size: 60px 52px !important;
 }
 .hex-river {
     background-color: #4b91b4 !important;
@@ -3147,9 +3148,10 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
     animation: none !important;
 }
 .hex-mountain {
-    background-color: #7b6855 !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='26' viewBox='0 0 30 26'%3E%3Cpath d='M1 21L9 8l5 7 4-10 11 16z' fill='%23655243' opacity='.9'/%3E%3Cpath d='M9 8l2.3 3.2L9.7 11 8.5 13 7 12zM18 5l3 5-2.2-.8-1.4 2.2-1.7-1.3z' fill='%23c4b39d' opacity='.75'/%3E%3Cpath d='M2 21h27' stroke='%234c4036' stroke-width='1' opacity='.55'/%3E%3C/svg%3E") !important;
-    background-size: 30px 26px !important;
+    background-color: #8a6847 !important;
+    /* 山は森や川の曲線と分離し、茶色い地肌・斜面・低い尾根を斜線中心で描きます。 */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='52' viewBox='0 0 60 52'%3E%3Cg stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M-8 38L6 20L16 27L29 10L41 24L52 15L68 36V56H-8Z' fill='%2378583e' opacity='.68'/%3E%3Cpath d='M-6 45L8 30L18 36L31 22L43 34L55 25L67 42V56H-6Z' fill='%23664a35' opacity='.58'/%3E%3Cg fill='none' stroke='%23c29a68' stroke-width='1.6' opacity='.82'%3E%3Cpath d='M-5 34L6 20L16 27L29 10L41 24L52 15L65 32'/%3E%3Cpath d='M2 45L10 34L19 39L31 25L42 36L54 28L61 36'/%3E%3C/g%3E%3Cg fill='none' stroke='%234f392b' stroke-width='1.15' opacity='.72'%3E%3Cpath d='M6 22L2 31M12 25L7 35M29 13L23 25M35 17L29 30M52 18L47 28M57 24L52 34M18 38L14 46M42 36L37 46'/%3E%3C/g%3E%3Cg fill='none' stroke='%23dfbc82' stroke-width='1' opacity='.44'%3E%3Cpath d='M18 17l4-5M39 22l4-5M8 34l4-4M31 33l4-4M52 32l4-4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") !important;
+    background-size: 60px 52px !important;
 }
 
 /* 座標ごとにパターン位置だけずらし、同じチップの連続感を弱めます。 */

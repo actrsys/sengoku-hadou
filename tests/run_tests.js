@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r180');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r182');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -4882,6 +4882,17 @@ test('野戦地形チップは静的な共通描画を使い、川をマス単�
     assert.ok(!hexBlock.includes('translateZ(0)'), '数百HEXをtranslateZで個別レイヤー化しない');
     assert.ok(field.includes('hex.dataset.terrain = visualTerrain'));
     assert.ok(field.includes('terrain-variant-${Math.abs((x * 17 + row * 31)) % 3}'), '静的な座標差分で反復感だけ弱める');
+    const forestStart = css.indexOf('.hex-forest {');
+    const forestEnd = css.indexOf('.hex-river {', forestStart);
+    const forestBlock = css.slice(forestStart, forestEnd);
+    const mountainStart = css.indexOf('.hex-mountain {');
+    const mountainEnd = css.indexOf('/* 座標ごとにパターン位置', mountainStart);
+    const mountainBlock = css.slice(mountainStart, mountainEnd);
+    assert.ok(forestBlock.includes('background-size: 60px 52px'), '森は単独アイコンではなく複数HEXで馴染む広い樹冠パターンを使う');
+    assert.ok(mountainBlock.includes('background-size: 60px 52px'), '山は単独の尖峰ではなく複数HEXで馴染む広い低山・尾根パターンを使う');
+    assert.ok(forestBlock.includes('%3Ccircle'), '森は川の流線と区別できる樹冠の塊を使う');
+    assert.ok(mountainBlock.includes('#8a6847') || mountainBlock.includes('%238a6847'), '山は森・川と区別しやすい茶色系の地肌を使う');
+    assert.ok(mountainBlock.includes('L6 20') && !mountainBlock.includes('%3Ccircle'), '山は樹冠や水面の波ではなく斜面・尾根線で描く');
 });
 
 test('雨雪は背景座標の全画面再描画ではなく少数の合成レイヤーを移動する', () => {

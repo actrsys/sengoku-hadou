@@ -7,12 +7,16 @@ html,body{margin:0;background:#111;color:#fff;font-family:sans-serif}.terrain-st
 <body><div class="terrain-stage"><div id="terrain-map" class="terrain-map"></div><div id="legend" class="terrain-legend"></div></div>
 <script>
 const map=document.getElementById('terrain-map');
-const palette=['plain','plain','forest','plain','mountain','plain','river','plain','forest','plain'];
+// 連続配置したときの馴染みを主に確認する。森と山は大きな塊、川は縦に連続、海は右下へまとめる。
 for(let x=0;x<20;x++)for(let row=0;row<12;row++){
   const y=(x%2===0)?row*2:row*2+1;
-  let type=palette[(x*3+row*5)%palette.length];
-  if(x===9||x===10) type='river';
-  if(x>=16&&row>=7) type='sea';
+  let type='plain';
+  const inForest = x>=2 && x<=7 && row>=2 && row<=8 && !(x===7 && row<=3);
+  const inMountain = x>=11 && x<=16 && row>=2 && row<=8 && !(x===11 && row>=7);
+  if(inForest) type='forest';
+  if(inMountain) type='mountain';
+  if(x===9 || x===10) type='river';
+  if(x>=17 && row>=7) type='sea';
   const h=document.createElement('div');
   h.className=`fw-hex hex-${type} terrain-variant-${Math.abs(x*17+row*31)%3}`;
   h.style.left=`${x*22.5}px`; h.style.top=`${y*13}px`;
