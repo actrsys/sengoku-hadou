@@ -87,7 +87,7 @@ class SaveLoadView {
             // ★追加：手動とオートの両方を含めた、ゲーム全体で一番新しい時間を決定します
             const globalLatestTime = Math.max(currentTabLatestTime, otherLatestTime);
             
-            // ★追加：古いデータなどで時間が全く同じだった場合、全体で1つだけを最新にするための印
+            // 同時刻保存で時間が重なった場合でも、全体で1つだけを最新にするための印
             let foundGlobalLatest = false;
 
             // 3. オートセーブの時だけ、古い順（時間が小さい順）に並べ替えます
@@ -115,29 +115,14 @@ class SaveLoadView {
 
                 if (hasData) {
                     dateStr = `${d.year}年 ${d.month}月`;
-                    
-                    if (d.scenarioName) {
-                        // シナリオの番号と年数（1560年など）を消して、名前だけにします
-                        scenarioStr = d.scenarioName.replace(/^[0-9]+年\s*/, '');
-                    } else {
-                        scenarioStr = "不明なシナリオ";
-                    }
+                    // シナリオの番号と年数（1560年など）を消して、名前だけにします
+                    scenarioStr = d.scenarioName.replace(/^[0-9]+年\s*/, '');
+                    saveTimeStr = d.saveTime;
+                    const passedYears = d.year - d.gameStartYear;
+                    passedYearsStr = `経過: ${passedYears}年`;
 
-                    if (d.saveTime) {
-                        saveTimeStr = d.saveTime;
-                    }
-
-                    if (d.gameStartYear) {
-                        const passedYears = d.year - d.gameStartYear;
-                        passedYearsStr = `経過: ${passedYears}年`;
-                    } else {
-                        passedYearsStr = "経過: 0年";
-                    }
-
-                    if (d.clans && d.playerClanId) {
-                        const playerClan = d.clans.find(c => c.id === d.playerClanId);
-                        if (playerClan) clanStr = playerClan.name;
-                    }
+                    const playerClan = d.clans.find(c => c.id === d.playerClanId);
+                    if (playerClan) clanStr = playerClan.name;
 
                     // ★追加：スマホ版で、勢力名が5文字以上の場合はシナリオ名を非表示にします
                     if (!document.body.classList.contains('is-pc') && clanStr.length >= 5) {

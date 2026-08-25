@@ -287,49 +287,8 @@ class IndependenceSystem {
                 id: newClanId, name: newClanName, yomi: newClanYomi, color: newColor, leaderId: rebellionLeader.id
             });
 
-            const oldClanForDip = this.game.getClan(oldClanId);
-            if (oldClanForDip) {
-                this.game.clans.forEach(otherClan => {
-                    if (otherClan.id === 0 || otherClan.id === oldClanId) return;
-                    
-                    const oldRel = this.game.getRelation(oldClanId, otherClan.id);
-                    if (oldRel) {
-                        let newSentiment = 100 - oldRel.sentiment;
-                        newSentiment = Math.max(30, Math.min(50, newSentiment));
-                        
-                        let newStatus = '普通';
-                        if (newSentiment >= 70) newStatus = '友好';
-                        if (newSentiment <= 30) newStatus = '敵対';
-                        
-                        newClan.diplomacyValue[otherClan.id] = {
-                            status: newStatus,
-                            sentiment: newSentiment,
-                            trucePeriod: 0,
-                            isMarriage: false
-                        };
-                        
-                        if (!otherClan.diplomacyValue) otherClan.diplomacyValue = {};
-                        otherClan.diplomacyValue[newClanId] = {
-                            status: newStatus,
-                            sentiment: newSentiment,
-                            trucePeriod: 0,
-                            isMarriage: false
-                        };
-                    }
-                });
-
-                // ★ここから追加：諸勢力との関係値も反転させます！
-                if (this.game.kunishuSystem) {
-                    const aliveKunishus = this.game.kunishuSystem.getAliveKunishus();
-                    aliveKunishus.forEach(kunishu => {
-                        const oldRel = kunishu.getRelation(oldClanId);
-                        let newSentiment = 100 - oldRel;
-                        newSentiment = Math.max(30, Math.min(50, newSentiment));
-                        this.game.kunishuSystem.setRelation(kunishu, newClanId, newSentiment);
-                    });
-                }
-            }
-
+            // 外交再編は、参加武将の所属が確定してから DiplomacyManager に一括で任せる。
+            // ここでは先に新勢力だけ登録し、旧家の外交データを直接編集しない。
             this.game.clans.push(newClan);
 
             rebellionLeader.isDaimyo = true;
@@ -352,9 +311,6 @@ class IndependenceSystem {
             }
             this.game.castleManager.changeOwner(castle, newClanId);
 
-            const oldClan = this.game.getClan(oldClanId);
-            if (oldClan) oldClan.diplomacyValue[newClanId] = { status: '敵対', sentiment: 0 };
-            newClan.diplomacyValue[oldClanId] = { status: '敵対', sentiment: 0 };
         }
 
         // ★神輿（派閥主）本人の処遇
@@ -457,6 +413,13 @@ class IndependenceSystem {
         // ★修正：記憶しておいた元の派閥ID(leaderOriginalFactionId)を渡して判定させます
         this.resolveFactionWideRebellion(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId);
         this.resolveDistantFactionMembers(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId);
+
+        // 独立勢力の外交は、最終的に誰が新勢力へ残ったか確定してから再編する。
+        // 寝返りは既存勢力へ合流するため対象外。
+        if (!isDefection && this.game.diplomacyManager
+            && typeof this.game.diplomacyManager.reorganizeRelationsAfterRebellion === 'function') {
+            this.game.diplomacyManager.reorganizeRelationsAfterRebellion(oldClanId, newClanId);
+        }
 
         // ★追加：裏切った武将たち全員を、元の大名の「宿敵」に登録します！（期間は120ヶ月）
         oldClanBushoIds.forEach(id => {
@@ -1253,42 +1216,14 @@ class IndependenceSystem {
                     
                     clan.leaderId = rebellionLeader.id;
 
-                    this.game.clans.forEach(otherClan => {
-                        if (otherClan.id === 0 || otherClan.id === clan.id) return;
-                        
-                        const currentRel = this.game.getRelation(clan.id, otherClan.id);
-                        if (currentRel) {
-                            let newSentiment = 100 - currentRel.sentiment;
-                            newSentiment = Math.max(30, Math.min(50, newSentiment));
-                            
-                            let newStatus = '普通';
-                            if (newSentiment >= 70) newStatus = '友好';
-                            if (newSentiment <= 30) newStatus = '敵対';
-                            
-                            currentRel.status = newStatus;
-                            currentRel.sentiment = newSentiment;
-                            currentRel.trucePeriod = 0;
-                            currentRel.isMarriage = false;
-                            
-                            const oppRel = this.game.getRelation(otherClan.id, clan.id);
-                            if (oppRel) {
-                                oppRel.status = newStatus;
-                                oppRel.sentiment = newSentiment;
-                                oppRel.trucePeriod = 0;
-                                oppRel.isMarriage = false;
-                            }
-                        }
-                    });
-
-                    // ★ここから追加：諸勢力との関係値も反転させます！
-                    if (this.game.kunishuSystem) {
-                        const aliveKunishus = this.game.kunishuSystem.getAliveKunishus();
-                        aliveKunishus.forEach(kunishu => {
-                            const currentRel = kunishu.getRelation(clan.id);
-                            let newSentiment = 100 - currentRel;
-                            newSentiment = Math.max(30, Math.min(50, newSentiment));
-                            this.game.kunishuSystem.setRelation(kunishu, clan.id, newSentiment);
-                        });
+                    // 政権交代後の外交関係は DiplomacyManager が一元的に再編する。
+                    // 旧来どおり友好度は反転し特殊関係は破棄するが、婚姻だけは
+                    // 姫の実血縁一門が新政権に残っている場合に限って継承する。
+                    if (this.game.diplomacyManager
+                        && typeof this.game.diplomacyManager.reorganizeRelationsAfterRebellion === 'function') {
+                        this.game.diplomacyManager.reorganizeRelationsAfterRebellion(
+                            oldClanId, oldClanId, { preserveMarriageByFamily: true }
+                        );
                     }
                 }
                 // 勢力情報が変わったので威信を更新

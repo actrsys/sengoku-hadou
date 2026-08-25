@@ -4,6 +4,8 @@
  * GameManager は公開APIの互換窓口だけを持ち、実処理はこの部署へ委譲します。
  */
 
+const SAVE_SCHEMA_VERSION = 2;
+
 class SaveManager {
     constructor(game) {
         this.game = game;
@@ -43,104 +45,26 @@ class SaveManager {
         return result;
     }
 
-    _normalizeFaceIconName(faceIcon) {
-        const value = typeof faceIcon === 'string' ? faceIcon.trim() : '';
-        return value || 'unknown_face.webp';
-    }
-
-    _hasAssignedPortrait(faceIcon) {
-        return this._normalizeFaceIconName(faceIcon) !== 'unknown_face.webp';
-    }
-
-    // 旧セーブへ「基本顔を新規追加しただけ」の更新を安全に反映します。
-    // 既に別の顔を持っている武将や、顔変更ルールを抱えている武将には触れません。
-    _syncSimplePortraitAddition(savedBusho, latestData) {
-        if (!savedBusho || !latestData) return false;
-
-        const savedFace = this._normalizeFaceIconName(savedBusho.faceIcon);
-        const latestFace = this._normalizeFaceIconName(latestData.faceIcon);
-        const savedFaceChange = typeof savedBusho.faceChange === 'string' ? savedBusho.faceChange.trim() : '';
-
-        if (savedFaceChange) return false;
-        if (this._hasAssignedPortrait(savedFace)) return false;
-        if (!this._hasAssignedPortrait(latestFace)) return false;
-
-        savedBusho.faceIcon = latestFace;
-        return true;
-    }
-
-    // 最新マスターの「数字指定の年代顔」だけを旧セーブへ同期します。
-    // daimyo: は旧セーブに元から存在する指定だけを維持し、その他の非年代条件がある人物は例外として触りません。
-    _syncYearBasedPortraitRules(savedBusho, latestData, currentYear) {
-        if (!savedBusho || !latestData || !window.PortraitRules) return false;
-
-        const savedFaceChange = typeof savedBusho.faceChange === 'string' ? savedBusho.faceChange.trim() : '';
-        const latestFaceChange = typeof latestData.faceChange === 'string' ? latestData.faceChange.trim() : '';
-
-        if (window.PortraitRules.hasUnsupportedNonYearCondition(savedFaceChange, ['daimyo'])) return false;
-
-        const latestYearEntries = window.PortraitRules.getYearEntries(latestFaceChange);
-        const savedYearEntries = window.PortraitRules.getYearEntries(savedFaceChange);
-        if (latestYearEntries.length === 0 && savedYearEntries.length === 0) return false;
-
-        savedBusho.faceChange = window.PortraitRules.replaceYearRules(savedFaceChange, latestFaceChange);
-
-        const yearFace = window.PortraitRules.getLatestYearFace(latestFaceChange, currentYear);
-        if (yearFace) {
-            savedBusho.faceIcon = yearFace;
-
-            // 新しい daimyo: を取り込むのではなく、旧セーブがすでに持っていた大名顔だけを再適用して状態を壊さない。
-            if (savedBusho.isDaimyo === true) {
-                const savedDaimyoFace = window.PortraitRules.getNamedFace(savedFaceChange, 'daimyo');
-                if (savedDaimyoFace) savedBusho.faceIcon = savedDaimyoFace;
-            }
-        }
-        return true;
-    }
-
-    _syncBushoMasterFields(savedBusho, latestData) {
-        if (!savedBusho || !latestData) return false;
-
-        // ① 適性と技能の差し替え
-        savedBusho.aptAshigaru = latestData.aptAshigaru; // 足軽
-        savedBusho.aptKiba = latestData.aptKiba;         // 騎馬
-        savedBusho.aptTeppo = latestData.aptTeppo;       // 鉄砲
-        savedBusho.aptYumi = latestData.aptYumi;         // 弓術
-        savedBusho.aptBugei = latestData.aptBugei;       // 武芸
-        savedBusho.aptNinjutsu = latestData.aptNinjutsu; // 忍術
-        savedBusho.aptMaritime = latestData.aptMaritime; // 操船
-        savedBusho.skill = latestData.skill;             // 技能
-
-        // ② 性格・相性パラメータの差し替え（絶対変動しないもの）
-        savedBusho.innovation = latestData.innovation;   // 革新
-        savedBusho.ambition = latestData.ambition;       // 野心
-        savedBusho.duty = latestData.duty;               // 義理
-        savedBusho.affinity = latestData.affinity;       // 相性
-
-        // ③ 魅力の差し替え（経験値による変動がないためそのまま）
-        savedBusho.charm = latestData.charm;
-
-        // ④ 他の5つの能力値は、「全盛期の基礎値（ベース）」を差し替えます！
-        savedBusho.baseLeadership = latestData.baseLeadership;     // 統率
-        savedBusho.baseStrength = latestData.baseStrength;         // 武勇
-        savedBusho.basePolitics = latestData.basePolitics;         // 政治
-        savedBusho.baseDiplomacy = latestData.baseDiplomacy;       // 外交
-        savedBusho.baseIntelligence = latestData.baseIntelligence; // 智謀
-
-        // ⑤ 顔グラは、まず単純な基本顔追加を同期し、その後「数字指定の年代顔」だけを最新版へ合わせます。
-        this._syncSimplePortraitAddition(savedBusho, latestData);
-        this._syncYearBasedPortraitRules(savedBusho, latestData, this.game.year);
-        return true;
-    }
-
     // ゲーム本体を書き換える前に、復元へ進んでよいセーブかを軽量検査する。
     // ここでは保存構造と主要ID参照だけを見る。画像decode等の実行時失敗は復元側の安全復旧で扱う。
     _validateSaveDataStructure(data) {
         const fail = message => { throw new Error(`セーブデータ検証エラー: ${message}`); };
         if (!data || typeof data !== 'object' || Array.isArray(data)) fail('ルートがオブジェクトではありません');
+        if (Number(data.saveSchemaVersion) !== SAVE_SCHEMA_VERSION) {
+            fail(`非対応のセーブ形式です (schema=${data.saveSchemaVersion ?? 'none'})`);
+        }
 
-        const scenarioFolder = String(data.scenarioFolder || '');
-        if (!scenarioFolder) fail('scenarioFolder がありません');
+        const gameStartYear = Number(data.gameStartYear);
+        const gameStartMonth = Number(data.gameStartMonth);
+        if (!Number.isInteger(gameStartYear) || gameStartYear < 1) fail('gameStartYear が不正です');
+        if (!Number.isInteger(gameStartMonth) || gameStartMonth < 1 || gameStartMonth > 12) fail('gameStartMonth が不正です');
+        if (typeof data.scenarioName !== 'string' || !data.scenarioName.trim()) fail('scenarioName がありません');
+        if (typeof data.scenarioNo !== 'string') fail('scenarioNo が不正です');
+        if (!Number.isFinite(Number(data.saveTimestamp)) || Number(data.saveTimestamp) <= 0) fail('saveTimestamp が不正です');
+        if (typeof data.saveTime !== 'string' || !data.saveTime.trim()) fail('saveTime がありません');
+
+        if (typeof data.scenarioFolder !== 'string' || !data.scenarioFolder.trim()) fail('scenarioFolder がありません');
+        const scenarioFolder = data.scenarioFolder;
         if (typeof SCENARIOS !== 'undefined' && Array.isArray(SCENARIOS)
             && !SCENARIOS.some(s => s && s.folder === scenarioFolder)) {
             fail(`未登録のシナリオです (${scenarioFolder})`);
@@ -151,7 +75,7 @@ class SaveManager {
         if (!Number.isInteger(year) || year < 1) fail('year が不正です');
         if (!Number.isInteger(month) || month < 1 || month > 12) fail('month が不正です');
 
-        const requiredArrays = ['castles', 'bushos', 'clans', 'princesses', 'provinces', 'legions', 'kunishus', 'turnQueueIds'];
+        const requiredArrays = ['castles', 'bushos', 'clans', 'princesses', 'provinces', 'legions', 'kunishus', 'turnQueueIds', 'historyEntries'];
         requiredArrays.forEach(key => {
             if (!Array.isArray(data[key])) fail(`${key} が配列ではありません`);
         });
@@ -177,6 +101,33 @@ class SaveManager {
         collectIds(data.provinces, 'provinces');
         collectIds(data.legions, 'legions');
         collectIds(data.kunishus, 'kunishus');
+
+        data.bushos.forEach((busho, index) => {
+            if (!Array.isArray(busho.nemesisList)) fail(`bushos[${index}].nemesisList が現行形式ではありません`);
+        });
+        data.princesses.forEach((princess, index) => {
+            if (!princess || typeof princess !== 'object' || Array.isArray(princess)) {
+                fail(`princesses[${index}] が不正です`);
+            }
+            if (typeof princess.isDiplomaticMarriageActive !== 'boolean') {
+                fail(`princesses[${index}].isDiplomaticMarriageActive が現行形式ではありません`);
+            }
+        });
+        data.legions.forEach((legion, index) => {
+            if (!Object.prototype.hasOwnProperty.call(legion, 'establishedTurnId')
+                || !Number.isFinite(Number(legion.establishedTurnId))) {
+                fail(`legions[${index}].establishedTurnId が現行形式ではありません`);
+            }
+        });
+        data.kunishus.forEach((kunishu, index) => {
+            if (typeof kunishu.networkTag !== 'string') fail(`kunishus[${index}].networkTag が現行形式ではありません`);
+        });
+        data.historyEntries.forEach((entry, index) => {
+            if (!entry || typeof entry !== 'object' || Array.isArray(entry)) fail(`historyEntries[${index}] が現行形式ではありません`);
+            if (typeof entry.text !== 'string' || !Array.isArray(entry.clanIds) || typeof entry.category !== 'string') {
+                fail(`historyEntries[${index}] が現行形式ではありません`);
+            }
+        });
 
         data.castles.forEach((castle, index) => {
             const ownerClan = Number(castle.ownerClan || 0);
@@ -208,7 +159,7 @@ class SaveManager {
         if (!Number.isInteger(playerClanId) || (playerClanId !== -100 && !clanIds.has(playerClanId))) {
             fail('playerClanId が不正です');
         }
-        const currentIndex = Number(data.currentIndex || 0);
+        const currentIndex = Number(data.currentIndex);
         if (!Number.isInteger(currentIndex) || currentIndex < 0
             || (data.turnQueueIds.length > 0 && currentIndex >= data.turnQueueIds.length)) {
             fail('currentIndex が不正です');
@@ -221,6 +172,10 @@ class SaveManager {
         }
         if (!data.flags || typeof data.flags !== 'object' || Array.isArray(data.flags)) fail('flags が不正です');
         if (!data.aiOperations || typeof data.aiOperations !== 'object' || Array.isArray(data.aiOperations)) fail('aiOperations が不正です');
+        ['operations', 'draftBases', 'grandObjectives', 'historyOwnedCastles'].forEach(key => {
+            const value = data.aiOperations[key];
+            if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`aiOperations.${key} が不正です`);
+        });
 
         return true;
     }
@@ -276,6 +231,7 @@ class SaveManager {
         const mapThumbnail = includeThumbnail ? await this.generateSaveMapImage() : null;
 
         return { 
+            saveSchemaVersion: SAVE_SCHEMA_VERSION,
             year: this.game.year, 
             month: this.game.month, 
             gameStartYear: this.game.gameStartYear || window.MainParams.StartYear,
@@ -387,17 +343,17 @@ class SaveManager {
         if (this.game.gunshiSystem) this.game.gunshiSystem.onStartMonth();
         
         // --- 復元作業 ---
-        this.game.flags = d.flags || {};
+        this.game.flags = d.flags;
         this.game.year = d.year;
         this.game.month = d.month;
-        this.game.gameStartYear = d.gameStartYear || window.MainParams.StartYear;
-        this.game.gameStartMonth = d.gameStartMonth || window.MainParams.StartMonth;
-        this.game.playerClanId = d.playerClanId || 1;
-        if (this.game.historySystem) this.game.historySystem.load(d.historyEntries || []);
+        this.game.gameStartYear = d.gameStartYear;
+        this.game.gameStartMonth = d.gameStartMonth;
+        this.game.playerClanId = d.playerClanId;
+        if (this.game.historySystem) this.game.historySystem.load(d.historyEntries);
         
-        this.game.scenarioFolder = d.scenarioFolder || "";
-        this.game.scenarioName = d.scenarioName || "不明なシナリオ";
-        this.game.scenarioNo = d.scenarioNo || "";
+        this.game.scenarioFolder = d.scenarioFolder;
+        this.game.scenarioName = d.scenarioName;
+        this.game.scenarioNo = d.scenarioNo;
         
         this.game.mapWidth = d.mapWidth;
         this.game.mapHeight = d.mapHeight;
@@ -422,36 +378,9 @@ class SaveManager {
         this.game.castles = d.castles.map(c => new Castle(c)); 
         this.game.bushos = d.bushos.map(b => new Busho(b));
         
-        // ★ここから追加：セーブデータを読み込んだ後に、最新の武将データ(CSV)から「適性・技能・能力値・性格」だけを上書き（同期）する魔法です！
-        try {
-            // 今プレイしているシナリオのフォルダを探します
-            const path = `./data/scenarios/${this.game.scenarioFolder}/`;
-            // 最新の武将ファイル（warriors.bin または warriors.csv）を読み込みます
-            const bushosText = await DataManager.fetchCompressed(path + "warriors.bin").catch(() => DataManager.fetchText(path + "warriors.csv"));
-            // 読み込んだ文字を、武将のリストに翻訳します
-            const latestBushos = DataManager.parseCSV(bushosText, Busho);
-            
-            // 最新の武将リストを「出席番号（ID）」でパッと探せるように、早見表を作ります
-            const latestBushoMap = new Map();
-            latestBushos.forEach(b => latestBushoMap.set(b.id, b));
-            
-            // セーブデータから復元した自分の武将たちを1人ずつチェックします
-            this.game.bushos.forEach(savedBusho => {
-                // 最新のデータの中に同じIDの人がいるか探します
-                const latestData = latestBushoMap.get(savedBusho.id);
-                if (latestData) {
-                    this._syncBushoMasterFields(savedBusho, latestData);
-                }
-            });
-        } catch (error) {
-            // 万が一ファイルの読み込みに失敗しても、ゲームが止まらないようにする安全装置です
-            console.warn("最新の武将データの読み込み（同期）に失敗しましたが、ゲームはそのまま続行します。", error);
-        }
-        // ★追加ここまで！
-
-        this.game.princesses = (d.princesses || []).map(p => new Princess(p));
-        this.game.provinces = (d.provinces || []).map(p => new Province(p));
-        this.game.legions = (d.legions || []).map(l => new Legion({ ...l, establishedTurnId: l.establishedTurnId || this.game.getCurrentTurnId() }));
+        this.game.princesses = d.princesses.map(p => new Princess(p));
+        this.game.provinces = d.provinces.map(p => new Province(p));
+        this.game.legions = d.legions.map(l => new Legion(l));
 
         // 保存データには巨大なpixel mapを入れず、ロード時に種点→国ID→領土IDの順で低メモリ再生成します。
         if (this.game.ui) this.game.ui.updateLoadingProgress(35, '城の位置を解析しています');
@@ -473,19 +402,8 @@ class SaveManager {
             if (commander) commander.isCommander = true;
         });
 
-        if (d.kunishus) {
-            this.game.kunishuSystem.setKunishuData(d.kunishus.map(k => new Kunishu(k)));
-        } else {
-            this.game.kunishuSystem.setKunishuData([]);
-        }
-
-        if (d.clans) {
-            this.game.clans = d.clans.map(c => new Clan(c));
-        } else {
-            const scenario = SCENARIOS[0]; 
-            const data = await DataManager.loadAll(scenario.folder);
-            this.game.clans = data.clans;
-        }
+        this.game.kunishuSystem.setKunishuData(d.kunishus.map(k => new Kunishu(k)));
+        this.game.clans = d.clans.map(c => new Clan(c));
         
         const courtRanksText = await DataManager.fetchText("./data/imperialCourtRank.csv").catch(() => "");
         const courtRanks = courtRanksText ? DataManager.parseCSV(courtRanksText, CourtRank) : [];
@@ -496,16 +414,11 @@ class SaveManager {
         
         this.game.phase = 'game';
         
-        if (d.turnQueueIds && d.turnQueueIds.length > 0) {
-            this.game.turnQueue = d.turnQueueIds.map(id => this.game.castles.find(c => c.id === id)).filter(c => c !== undefined);
-            this.game.currentIndex = d.currentIndex || 0;
-        } else {
-            this.game.turnQueue = [...this.game.castles].sort(() => Math.random() - 0.5);
-            this.game.currentIndex = 0;
-        }
+        this.game.turnQueue = d.turnQueueIds.map(id => this.game.castles.find(c => c.id === id));
+        this.game.currentIndex = d.currentIndex;
         
         if (typeof SkillManager !== 'undefined') {
-            SkillManager.validateBushoSkills(this.game.bushos, this.game.scenarioFolder || 'save-data');
+            SkillManager.validateBushoSkills(this.game.bushos, this.game.scenarioFolder);
         }
 
         this.game.updateAllCastlesLords();
@@ -714,7 +627,7 @@ class SaveManager {
             // ★低メモリ端末対策
             // オートセーブは内部IndexedDB専用なので、勢力図サムネイルを省き、
             // JSON.stringify→巨大文字列→TextEncoder→巨大Uint8Array という一時的な二重・三重保持も避けます。
-            // ロード側は従来から「Uint8Arrayなら復号、オブジェクトならそのまま」に対応しているため互換性があります。
+            // SaveManagerは現在仕様として、手動のUint8Arrayと低メモリ用オートセーブのオブジェクトを両方扱います。
             const data = await this._createSaveDataObj({ includeThumbnail: false });
             await saveToDB("sengoku_autosave_slot" + autoSaveIndex, data);
 
@@ -730,8 +643,9 @@ class SaveManager {
     }
 
     /**
-     * IndexedDBから取得した保存値を、旧形式/暗号化形式を吸収してゲームデータへ戻します。
-     * UIは暗号化方式を知らず、この窓口から復号済みデータを受け取ります。
+     * IndexedDBから現在形式の保存値を復元します。
+     * 手動セーブは暗号化Uint8Array、低メモリ向けオートセーブは構造化オブジェクトのため、
+     * UIは保存媒体の違いを知らず、この窓口から共通のゲームデータを受け取ります。
      */
     decodeStoredData(rawData) {
         if (!rawData) return null;
@@ -746,9 +660,13 @@ class SaveManager {
         return rawData;
     }
 
+    isCurrentSaveSchema(data) {
+        return !!data && Number(data.saveSchemaVersion) === SAVE_SCHEMA_VERSION;
+    }
+
     getSaveTimestamp(data) {
-        if (!data) return 0;
-        return data.saveTimestamp || (data.saveTime ? new Date(data.saveTime).getTime() : 0);
+        if (!this.isCurrentSaveSchema(data)) return 0;
+        return Number(data.saveTimestamp) || 0;
     }
 
     /**
@@ -771,7 +689,7 @@ class SaveManager {
                 originalSlotNo: slotNo,
                 data,
                 saveTimestamp: this.getSaveTimestamp(data),
-                hasData: !!(data && data.year)
+                hasData: this.isCurrentSaveSchema(data) && Number.isInteger(Number(data.year))
             };
         });
     }
@@ -791,14 +709,10 @@ class SaveManager {
         for (const prefix of prefixes) {
             const slots = await this.readSaveSlots(prefix);
             for (const slot of slots) {
-                if (!slot.data) continue;
+                if (!slot.hasData) continue;
                 const time = slot.saveTimestamp;
                 if (time > latestTime) {
                     latestTime = time;
-                    latestSlot = slot.originalSlotNo;
-                    latestPrefix = prefix;
-                } else if (latestSlot === -1) {
-                    // 時間が記録されていなければ、とりあえず見つけたスロットをメモします
                     latestSlot = slot.originalSlotNo;
                     latestPrefix = prefix;
                 }

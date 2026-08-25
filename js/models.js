@@ -322,7 +322,7 @@ class Busho {
         }
         
         // --- 能力値と経験値の処理 ---
-        // 1. 古いセーブデータやCSVから読み込んだ基本の能力値を「_」付きの秘密の箱に入れます
+        // 1. セーブデータまたはCSVから読み込んだ基本の能力値を「_」付きの箱に入れます
         this._leadership = Number(data._leadership !== undefined ? data._leadership : (data.leadership || 0));
         this._strength = Number(data._strength !== undefined ? data._strength : (data.strength || 0));
         this._politics = Number(data._politics !== undefined ? data._politics : (data.politics || 0));
@@ -445,19 +445,11 @@ class Busho {
         // 宿敵（敵対する武将）の出席番号と、怒りが収まるまでの「タイマー（月数）」をセットで覚えておくための箱です
         this.nemesisList = [];
 
-        // セーブデータから読み込んだ時（すでに新しいタイマー付きの箱がある場合）
+        // セーブデータは現在形式のタイマー付きリストをそのまま復元します。
         if (data.nemesisList && Array.isArray(data.nemesisList)) {
             this.nemesisList = data.nemesisList;
-        } 
-        // 古いセーブデータ（タイマー無しの昔の箱）が残っている場合
-        else if (data.nemesisIds && Array.isArray(data.nemesisIds)) {
-            data.nemesisIds.forEach(id => {
-                if (id > 0) {
-                    this.nemesisList.push({ id: Number(id), count: 60 }); // デフォルトの60ヶ月をセットします
-                }
-            });
-        } 
-        // CSVなどから「1:30|2」のような文字で届いた場合
+        }
+        // CSVから「1:30|2」のような文字で届いた場合
         else if (typeof data.nemesis === 'string' && data.nemesis.trim() !== "") {
             const parts = String(data.nemesis).split('|');
             parts.forEach(part => {
@@ -766,6 +758,8 @@ class Princess {
         // ★ゲーム中にコロコロ変わるデータ（最初は実家と同じにしておきます）
         this.currentClanId = Number(data.currentClanId !== undefined ? data.currentClanId : this.originalClanId);
         this.husbandId = Number(this.husbandId || 0); // 夫の武将ID
+        // 政略上の婚姻として有効か。謀反で旧政権の縁戚を引き継がない場合も、夫婦関係自体は残す。
+        this.isDiplomaticMarriageActive = data.isDiplomaticMarriageActive !== false;
         
         // 状態（unmarried:未婚, married:既婚, unborn:登場前, dead:死亡 など）
         this.status = data.status || 'unmarried';     

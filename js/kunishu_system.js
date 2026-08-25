@@ -12,16 +12,6 @@ class KunishuSystem {
     // ゲーム開始時・ロード時にデータをセットする
     setKunishuData(kunishus) {
         this.kunishus = kunishus;
-
-        // Round66以前の1560セーブには networkTag 列が存在しません。
-        // 互換移行だけは旧固定データを識別してシールを補い、通常のゲームルール判定はタグへ一本化します。
-        for (const kunishu of this.kunishus) {
-            if (kunishu.networkTag) continue;
-            const id = Number(kunishu.id);
-            if (kunishu.name === '願証寺' || (id >= 10001 && id <= 10018)) {
-                kunishu.networkTag = 'ikko';
-            }
-        }
     }
 
     // ★追加：頭領を自動生成する「共通の魔法（システム）」です！いつでも使い回せます。

@@ -25,44 +25,10 @@ class AIOperationManager {
     }
 
     load(data) {
-        // ★変更：古いセーブデータと、新しいセーブデータの両方に対応する魔法です！
-        this.operations = {};
-        this.draftBases = {};
-        this.grandObjectives = {}; // ★追加：ロード時の初期化
-        this.historyOwnedCastles = {}; // ★今回追加：ロード時の初期化
-        
-        if (data && data.operations) {
-            for (const clanId in data.operations) {
-                if (data.operations[clanId].type) {
-                    this.operations[clanId] = { 0: data.operations[clanId] };
-                } else {
-                    this.operations[clanId] = data.operations[clanId];
-                }
-            }
-            if (data.draftBases) {
-                for (const clanId in data.draftBases) {
-                    if (typeof data.draftBases[clanId] === 'number') {
-                        this.draftBases[clanId] = { 0: data.draftBases[clanId] };
-                    } else {
-                        this.draftBases[clanId] = data.draftBases[clanId] || {};
-                    }
-                }
-            }
-            // ★追加：方針の復元
-            if (data.grandObjectives) {
-                this.grandObjectives = data.grandObjectives;
-            }
-            // ★今回追加：所持拠点IDの履歴の復元
-            if (data.historyOwnedCastles) {
-                this.historyOwnedCastles = data.historyOwnedCastles;
-            }
-        } else {
-            for (const clanId in data) {
-                 if (data[clanId] && data[clanId].type) {
-                     this.operations[clanId] = { 0: data[clanId] };
-                 }
-            }
-        }
+        this.operations = data.operations;
+        this.draftBases = data.draftBases;
+        this.grandObjectives = data.grandObjectives;
+        this.historyOwnedCastles = data.historyOwnedCastles;
     }
 
     // ★Round6：軍団が解散・国主不在になった時、その軍団専用の作戦メモをまとめて片付けます。

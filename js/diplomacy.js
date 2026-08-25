@@ -85,6 +85,7 @@ class DiplomacyManager {
         const b = Number(clanBId);
         return this.game.princesses.some(p => {
             if (!p || p.status !== 'married' || Number(p.husbandId || 0) <= 0) return false;
+            if (p.isDiplomaticMarriageActive === false) return false;
             if (window.LifeStatusRules && window.LifeStatusRules.isUnavailable(p)) return false;
             const husband = this.game.getBusho ? this.game.getBusho(p.husbandId) : null;
             if (!husband) return false;
@@ -98,6 +99,199 @@ class DiplomacyManager {
         const hasMarriage = this._hasActiveMarriageBetweenClans(clanAId, clanBId);
         this.setMarriageRelation(clanAId, clanBId, hasMarriage);
         return hasMarriage;
+    }
+
+    /**
+     * 謀反・独立で政権が組み替わった時の外交再編を一元管理する。
+     * 旧家の対外感情を反転して30～50へ収め、特殊statusを破棄する従来結果を保つ。
+     * 通常の独立新勢力は従来どおり旧家の婚姻を引き継がない。旧大名家を謀反側が
+     * 乗っ取る政権交代だけ preserveMarriageByFamily を使い、婚姻中の姫について
+     * 「夫側の系統を除く実血縁かつ一門の現役武将」が新政権に残る場合のみ、
+     * 外交婚姻を維持する。姫本人の所属・夫婦関係・originalClanId は変更しない。
+     */
+    reorganizeRelationsAfterRebellion(sourceClanId, successorClanId, { preserveMarriageByFamily = false } = {}) {
+        sourceClanId = Number(sourceClanId) || 0;
+        successorClanId = Number(successorClanId) || 0;
+        if (sourceClanId <= 0 || successorClanId <= 0) return false;
+
+        const sourceClan = this.game.getClan(sourceClanId);
+        const successorClan = this.game.getClan(successorClanId);
+        if (!sourceClan || !successorClan) return false;
+
+        const relationSnapshots = [];
+        (this.game.clans || []).forEach(otherClan => {
+            const otherId = Number(otherClan && otherClan.id) || 0;
+            if (otherId <= 0 || otherId === sourceClanId || otherId === successorClanId) return;
+            const relation = this.getDiplomacyData(sourceClanId, otherId);
+            if (!relation) return;
+            relationSnapshots.push({
+                otherId,
+                sentiment: Number(relation.sentiment ?? 50),
+                isMarriage: relation.isMarriage === true
+            });
+        });
+
+        // 肉親一門による婚姻継承は、旧大名家IDをそのまま新政権が引き継ぐ政権交代だけの例外。
+        // 新IDで独立する通常独立には適用せず、従来どおり旧家の婚姻をコピーしない。
+        const shouldPreserveMarriageByFamily = preserveMarriageByFamily && sourceClanId === successorClanId;
+        const marriageReorganization = shouldPreserveMarriageByFamily
+            ? this._collectRebellionMarriageTargets(sourceClanId, successorClanId, relationSnapshots)
+            : { inheritedTargets: new Set(), decisions: [] };
+        const inheritedMarriageTargets = marriageReorganization.inheritedTargets;
+        marriageReorganization.decisions.forEach(decision => {
+            decision.princess.isDiplomaticMarriageActive = decision.keep === true;
+        });
+
+        relationSnapshots.forEach(snapshot => {
+            const inverted = Math.max(30, Math.min(50, 100 - snapshot.sentiment));
+            let status = window.GameConstants.DiplomacyStatus.NORMAL;
+            if (inverted >= 70) status = window.GameConstants.DiplomacyStatus.FRIENDLY;
+            if (inverted <= 30) status = window.GameConstants.DiplomacyStatus.HOSTILE;
+
+            this.changeStatus(successorClanId, snapshot.otherId, status);
+            const relationA = this.getDiplomacyData(successorClanId, snapshot.otherId);
+            const relationB = this.getDiplomacyData(snapshot.otherId, successorClanId);
+            if (relationA) relationA.sentiment = inverted;
+            if (relationB) relationB.sentiment = inverted;
+            this.setMarriageRelation(
+                successorClanId,
+                snapshot.otherId,
+                inheritedMarriageTargets.has(snapshot.otherId)
+            );
+        });
+
+        // 旧家から分離して新勢力を立てた場合だけ、旧家との関係は従来どおり即時敵対にする。
+        if (sourceClanId !== successorClanId) {
+            this.changeStatus(sourceClanId, successorClanId, window.GameConstants.DiplomacyStatus.HOSTILE);
+            const relationA = this.getDiplomacyData(sourceClanId, successorClanId);
+            const relationB = this.getDiplomacyData(successorClanId, sourceClanId);
+            if (relationA) relationA.sentiment = 0;
+            if (relationB) relationB.sentiment = 0;
+            this.setMarriageRelation(sourceClanId, successorClanId, false);
+        }
+
+        // 諸勢力との関係反転も外交再編の一部としてここから専門部署へ依頼する。
+        if (this.game.kunishuSystem && typeof this.game.kunishuSystem.getAliveKunishus === 'function') {
+            const aliveKunishus = this.game.kunishuSystem.getAliveKunishus();
+            aliveKunishus.forEach(kunishu => {
+                const oldSentiment = Number(kunishu.getRelation(sourceClanId) ?? 50);
+                const inverted = Math.max(30, Math.min(50, 100 - oldSentiment));
+                this.game.kunishuSystem.setRelation(kunishu, successorClanId, inverted);
+            });
+        }
+
+        return true;
+    }
+
+    _collectRebellionMarriageTargets(sourceClanId, successorClanId, relationSnapshots) {
+        const marriageRelationTargets = new Set(
+            relationSnapshots.filter(snapshot => snapshot.isMarriage).map(snapshot => Number(snapshot.otherId))
+        );
+        if (marriageRelationTargets.size === 0 || !Array.isArray(this.game.princesses)) {
+            return { inheritedTargets: new Set(), decisions: [] };
+        }
+
+        if (window.FamilyLinker && typeof window.FamilyLinker.rebuildAllFamilyIds === 'function') {
+            window.FamilyLinker.rebuildAllFamilyIds(this.game.bushos || [], this.game.princesses || []);
+        }
+
+        const kinContext = this._buildBloodKinContext();
+        const inheritedTargets = new Set();
+        const decisions = [];
+
+        this.game.princesses.forEach(princess => {
+            if (!princess || princess.status !== 'married' || Number(princess.husbandId || 0) <= 0) return;
+            if (window.LifeStatusRules && window.LifeStatusRules.isUnavailable(princess)) return;
+
+            const husband = this.game.getBusho ? this.game.getBusho(princess.husbandId) : null;
+            if (!husband) return;
+
+            const originClanId = Number(princess.originalClanId || 0);
+            const husbandClanId = Number(husband.clan || princess.currentClanId || 0);
+            let otherClanId = 0;
+
+            // 姫が旧家出身なら嫁ぎ先、姫が他家出身なら旧家/後継家に残った夫の実家を婚姻相手として見る。
+            if (originClanId === sourceClanId && husbandClanId > 0 && husbandClanId !== sourceClanId && husbandClanId !== successorClanId) {
+                otherClanId = husbandClanId;
+            } else if (originClanId > 0 && originClanId !== sourceClanId
+                && (husbandClanId === sourceClanId || husbandClanId === successorClanId)) {
+                otherClanId = originClanId;
+            }
+
+            if (!marriageRelationTargets.has(otherClanId)) return;
+            const keep = this._hasBloodFamilyMemberInSuccessor(princess, husband, successorClanId, kinContext);
+            decisions.push({ princess, keep });
+            if (keep) inheritedTargets.add(otherClanId);
+        });
+
+        return { inheritedTargets, decisions };
+    }
+
+    _buildBloodKinContext() {
+        const people = [...(this.game.bushos || []), ...(this.game.princesses || [])];
+        const personById = new Map();
+        const adjacency = new Map();
+        const ensure = id => {
+            id = Number(id) || 0;
+            if (id <= 0) return null;
+            if (!adjacency.has(id)) adjacency.set(id, new Set());
+            return adjacency.get(id);
+        };
+
+        people.forEach(person => {
+            const id = Number(person && person.id) || 0;
+            if (id <= 0) return;
+            personById.set(id, person);
+            ensure(id);
+        });
+
+        people.forEach(person => {
+            const childId = Number(person && person.id) || 0;
+            if (childId <= 0) return;
+            [person.realFatherId, person.realMotherId].forEach(rawParentId => {
+                const parentId = Number(rawParentId) || 0;
+                if (parentId <= 0 || !personById.has(parentId)) return;
+                ensure(childId).add(parentId);
+                ensure(parentId).add(childId);
+            });
+        });
+
+        return { adjacency };
+    }
+
+    _hasBloodFamilyMemberInSuccessor(princess, husband, successorClanId, kinContext) {
+        const startId = Number(princess && princess.id) || 0;
+        if (startId <= 0) return false;
+
+        const bloodKinIds = new Set([startId]);
+        const queue = [startId];
+        const adjacency = kinContext && kinContext.adjacency ? kinContext.adjacency : new Map();
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const relatives = adjacency.get(current) || [];
+            relatives.forEach(relativeId => {
+                const id = Number(relativeId) || 0;
+                if (id <= 0 || bloodKinIds.has(id)) return;
+                bloodKinIds.add(id);
+                queue.push(id);
+            });
+        }
+
+        // 「一門」であることも必要。婚姻で広がっただけの人物は、血が繋がっていてもここでは継承根拠にしない。
+        const princessFamilyIds = new Set((princess.familyIds || []).map(id => Number(id) || 0));
+        // 夫本人・夫の男系/養家一門は除外し、「夫側に残ったから婚姻継承」とは判定しない。
+        const husbandLineIds = new Set((husband && husband.baseFamilyIds || []).map(id => Number(id) || 0));
+        if (husband && Number(husband.id) > 0) husbandLineIds.add(Number(husband.id));
+
+        return (this.game.bushos || []).some(busho => {
+            const id = Number(busho && busho.id) || 0;
+            if (id <= 0 || Number(busho.clan) !== Number(successorClanId)) return false;
+            const isActive = window.BushoStatusRules && typeof window.BushoStatusRules.isActive === 'function'
+                ? window.BushoStatusRules.isActive(busho)
+                : busho.status === window.GameConstants.BushoStatus.ACTIVE;
+            if (!isActive || busho.isHostage === true) return false;
+            return bloodKinIds.has(id) && princessFamilyIds.has(id) && !husbandLineIds.has(id);
+        });
     }
 
     applyMarriageSentimentBoost(clanId, targetId) {
@@ -2457,6 +2651,7 @@ class DiplomacyManager {
         princess.currentClanId = targetClanId;
         princess.husbandId = targetBushoId;
         princess.status = 'married';
+        princess.isDiplomaticMarriageActive = true;
         if (Number(princess.originalClanId || 0) <= 0) princess.originalClanId = sourceClanId;
 
         if (!Array.isArray(sourceClan.princessIds)) sourceClan.princessIds = [];

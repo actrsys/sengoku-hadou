@@ -97,13 +97,8 @@ class HistorySystem {
 
     load(entries) {
         this.clear();
-        if (!Array.isArray(entries)) return;
         entries.forEach(raw => {
-            if (typeof raw === 'string') {
-                this.record(raw, { clanIds: [], category: 'legacy', inferCurrentTurn: false });
-                return;
-            }
-            if (!raw || typeof raw !== 'object') return;
+            if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
             this.record(raw.text, {
                 year: raw.year,
                 month: raw.month,

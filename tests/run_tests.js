@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r208');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r210');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -147,6 +147,127 @@ test('外交status変更は和睦期間を残さず、主従の向きが変わ�
     manager.changeStatus(1, 2, '従属');
     assert.strictEqual(ctx.game.clans[0].diplomacyValue[2].subordinateMonths, 0, '主従の向きが反転したら月数をリセットする');
     assert.strictEqual(ctx.game.clans[1].diplomacyValue[1].subordinateMonths, 0);
+});
+
+test('謀反後の外交再編はDiplomacyManagerを通し、実家側の肉親一門が残る婚姻だけ維持する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/family_system.js');
+
+    const makeRel = (sentiment, isMarriage) => ({
+        status: '同盟', sentiment, trucePeriod: 4, isMarriage, isEvent: false, hostageIds: [], subordinateMonths: 0
+    });
+    const rel12 = makeRel(80, true);
+    const rel21 = makeRel(80, true);
+    const rel13 = makeRel(60, true);
+    const rel31 = makeRel(60, true);
+
+    const bushos = [
+        { id: 10, clan: 0, status: 'dead', realFatherId: 0, realMotherId: 0, adoptiveFatherId: 0, wifeIds: [] },
+        // 姫Aの実父は死亡済みだが、実兄弟が新政権に残っている。
+        { id: 11, clan: 1, status: 'active', realFatherId: 10, realMotherId: 0, adoptiveFatherId: 0, wifeIds: [] },
+        { id: 20, clan: 2, status: 'active', realFatherId: 0, realMotherId: 0, adoptiveFatherId: 0, wifeIds: [90001] },
+        // 姫Bの夫とその子は新政権に残るが、姫B自身の実家側肉親は残らない。
+        { id: 30, clan: 1, status: 'active', realFatherId: 0, realMotherId: 0, adoptiveFatherId: 0, wifeIds: [90002] },
+        { id: 31, clan: 1, status: 'active', realFatherId: 30, realMotherId: 90002, adoptiveFatherId: 0, wifeIds: [] },
+        { id: 40, clan: 3, status: 'active', realFatherId: 0, realMotherId: 0, adoptiveFatherId: 0, wifeIds: [] }
+    ];
+    const princesses = [
+        { id: 90001, originalClanId: 1, currentClanId: 2, husbandId: 20, status: 'married', realFatherId: 10, realMotherId: 0, adoptiveFatherId: 0 },
+        { id: 90002, originalClanId: 3, currentClanId: 1, husbandId: 30, status: 'married', realFatherId: 40, realMotherId: 0, adoptiveFatherId: 0 }
+    ];
+    ctx.game = {
+        clans: [
+            { id: 1, diplomacyValue: { 2: rel12, 3: rel13 }, currentDiplomacyTarget: null },
+            { id: 2, diplomacyValue: { 1: rel21 }, currentDiplomacyTarget: null },
+            { id: 3, diplomacyValue: { 1: rel31 }, currentDiplomacyTarget: null }
+        ],
+        bushos,
+        princesses,
+        getClan(id) { return this.clans.find(c => Number(c.id) === Number(id)); },
+        getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)); }
+    };
+    loadScript(ctx, 'js/diplomacy.js');
+    const manager = vm.runInContext('new DiplomacyManager(game)', ctx);
+
+    const beforeA = { ...princesses[0] };
+    const beforeB = { ...princesses[1] };
+    assert.strictEqual(manager.reorganizeRelationsAfterRebellion(1, 1, { preserveMarriageByFamily: true }), true);
+
+    assert.strictEqual(rel12.status, '敵対', '80の友好度は反転後30となり敵対へ戻す');
+    assert.strictEqual(rel12.sentiment, 30);
+    assert.strictEqual(rel12.trucePeriod, 0);
+    assert.strictEqual(rel12.isMarriage, true, '父が不在でも実兄弟が新政権に残れば婚姻を維持する');
+    assert.strictEqual(rel21.isMarriage, true);
+    assert.strictEqual(princesses[0].isDiplomaticMarriageActive, true, '維持対象の夫婦は外交婚姻も有効のままにする');
+
+    assert.strictEqual(rel13.sentiment, 40);
+    assert.strictEqual(rel13.status, '普通');
+    assert.strictEqual(rel13.isMarriage, false, '夫と夫側の子だけでは婚姻継承の根拠にしない');
+    assert.strictEqual(rel31.isMarriage, false);
+    assert.strictEqual(princesses[1].isDiplomaticMarriageActive, false, '旧政権由来で継承しない夫婦は外交婚姻だけ無効化する');
+    manager.refreshMarriageRelation(1, 3);
+    assert.strictEqual(rel13.isMarriage, false, '後日の婚姻再評価でも旧政権の婚姻関係を復活させない');
+    assert.strictEqual(rel31.isMarriage, false);
+
+    ['originalClanId', 'currentClanId', 'husbandId', 'status'].forEach(key => {
+        assert.strictEqual(princesses[0][key], beforeA[key], `姫Aの${key}を外交再編で変更しない`);
+        assert.strictEqual(princesses[1][key], beforeB[key], `姫Bの${key}を外交再編で変更しない`);
+    });
+});
+
+test('独立新勢力の外交再編も同じ窓口を使うが、通常独立では旧家の婚姻を引き継がない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/family_system.js');
+    const makeRel = (sentiment, isMarriage = false) => ({
+        status: '同盟', sentiment, trucePeriod: 0, isMarriage, isEvent: false, hostageIds: [], subordinateMonths: 0
+    });
+    const bushos = [
+        { id: 10, clan: 0, status: 'dead', realFatherId: 0, realMotherId: 0, adoptiveFatherId: 0, wifeIds: [] },
+        { id: 11, clan: 4, status: 'active', realFatherId: 10, realMotherId: 0, adoptiveFatherId: 0, wifeIds: [] },
+        { id: 20, clan: 2, status: 'active', realFatherId: 0, realMotherId: 0, adoptiveFatherId: 0, wifeIds: [90001] }
+    ];
+    const princesses = [
+        { id: 90001, originalClanId: 1, currentClanId: 2, husbandId: 20, status: 'married', realFatherId: 10, realMotherId: 0, adoptiveFatherId: 0 }
+    ];
+    ctx.game = {
+        clans: [
+            { id: 1, diplomacyValue: { 2: makeRel(75, true) }, currentDiplomacyTarget: null },
+            { id: 2, diplomacyValue: { 1: makeRel(75, true) }, currentDiplomacyTarget: null },
+            { id: 4, diplomacyValue: {}, currentDiplomacyTarget: null }
+        ],
+        bushos,
+        princesses,
+        getClan(id) { return this.clans.find(c => Number(c.id) === Number(id)); },
+        getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)); }
+    };
+    loadScript(ctx, 'js/diplomacy.js');
+    const manager = vm.runInContext('new DiplomacyManager(game)', ctx);
+    manager.reorganizeRelationsAfterRebellion(1, 4);
+
+    const rel42 = manager.getDiplomacyData(4, 2);
+    const rel24 = manager.getDiplomacyData(2, 4);
+    assert.strictEqual(rel42.sentiment, 30);
+    assert.strictEqual(rel42.status, '敵対');
+    assert.strictEqual(rel42.isMarriage, false, '通常独立は従来どおり旧大名家の婚姻を新勢力へ継承しない');
+    assert.strictEqual(rel24.isMarriage, false);
+    assert.strictEqual(manager.getDiplomacyData(1, 4).status, '敵対');
+    assert.strictEqual(manager.getDiplomacyData(1, 4).sentiment, 0);
+    assert.strictEqual(princesses[0].originalClanId, 1, '姫の実家IDは政治的な独立で書き換えない');
+    assert.strictEqual(princesses[0].currentClanId, 2, '嫁ぎ先所属も維持する');
+    assert.notStrictEqual(princesses[0].isDiplomaticMarriageActive, false, '通常独立では旧家側の夫婦関係を政治的に無効化しない');
+});
+
+test('独立・謀反の外交再編はindependence_systemからDiplomacyManagerへ委譲する', () => {
+    const source = read('js/independence_system.js');
+    assert.ok(source.includes('this.game.diplomacyManager.reorganizeRelationsAfterRebellion(oldClanId, newClanId)'));
+    assert.ok(!source.includes('reorganizeRelationsAfterRebellion(oldClanId, newClanId, { preserveMarriageByFamily: true })'), '通常独立へ婚姻継承例外を適用しない');
+    assert.ok(source.includes('oldClanId, oldClanId, { preserveMarriageByFamily: true }'));
+    assert.ok(!source.includes('newClan.diplomacyValue[otherClan.id]'), '独立側で新勢力の外交データを直接構築しない');
+    assert.ok(!source.includes('currentRel.isMarriage = false'), '謀反側で婚姻フラグを直接破棄しない');
 });
 
 test('士気・訓練の0は未設定扱いにせず戦闘・援軍データへ保持する', () => {
@@ -1754,7 +1875,7 @@ test('行動履歴はHistorySystemを正本にして自国/全国タブを持ち
     assert.ok(info.includes('data-tab="national">全国</button>'));
     assert.ok(info.includes("this.historyCurrentScope = nextScope === 'national' ? 'national' : 'clan'"), '全国タブは自国を含むallではなくnationalを使う');
     assert.ok(save.includes('historyEntries: this.game.historySystem ? this.game.historySystem.serialize() : []'));
-    assert.ok(save.includes('this.game.historySystem.load(d.historyEntries || [])'));
+    assert.ok(save.includes('this.game.historySystem.load(d.historyEntries)'));
     assert.ok(html.indexOf('js/history_system.js') < html.indexOf('js/game.js'));
     assert.ok(!ui.includes('this.logHistory = []'));
 });
@@ -2719,11 +2840,12 @@ test('活動状態と生死状態の低レベルAPIは担当外状態を拒否�
     assert.strictEqual(b.status, 'dead');
 });
 
-test('Legionモデルは現在ターンをGameAppから取得せず、復元側が旧セーブを補完する', () => {
+test('Legionモデルは現在ターンをGameAppから取得せず、現行セーブ値をそのまま復元する', () => {
     const models = read('js/models.js');
     const saves = read('js/save_manager.js');
     assert.ok(models.includes('this.establishedTurnId = Number(data.establishedTurnId || 0);'));
-    assert.ok(saves.includes('establishedTurnId: l.establishedTurnId || this.game.getCurrentTurnId()'));
+    assert.ok(saves.includes('this.game.legions = d.legions.map(l => new Legion(l));'));
+    assert.ok(!saves.includes('establishedTurnId: l.establishedTurnId || this.game.getCurrentTurnId()'));
 });
 
 // ---------------------------------------------------------------------------
@@ -3345,11 +3467,11 @@ test('一向宗ネットワークは ideology と分離し、本願寺家は本�
     assert.strictEqual(ganshoji.networkTag, 'ikko');
     assert.strictEqual(system.isIkkoNetwork(ganshoji), true);
     assert.strictEqual(system.isIkkoNetwork(otherTemple), false);
-    const legacyIkko = new Kunishu({ id: 10001, name: '一向一揆', ideology: '宗教' });
-    const legacyGanshoji = new Kunishu({ id: 4, name: '願証寺', ideology: '宗教' });
-    system.setKunishuData([legacyIkko, legacyGanshoji]);
-    assert.strictEqual(legacyIkko.networkTag, 'ikko', '旧セーブの一向一揆へ互換シールを補う');
-    assert.strictEqual(legacyGanshoji.networkTag, 'ikko', '旧セーブの願証寺へ互換シールを補う');
+    const untaggedIkko = new Kunishu({ id: 10001, name: '一向一揆', ideology: '宗教' });
+    const untaggedGanshoji = new Kunishu({ id: 4, name: '願証寺', ideology: '宗教' });
+    system.setKunishuData([untaggedIkko, untaggedGanshoji]);
+    assert.strictEqual(untaggedIkko.networkTag, '', 'IDからnetworkTagを推測補完しない');
+    assert.strictEqual(untaggedGanshoji.networkTag, '', '名称からnetworkTagを推測補完しない');
     assert.strictEqual(system.getHonganjiClan().id, 30, '本願寺系大名のうち威信最大を採用する');
 
     game.clans[2].isDestroyed = true;
@@ -4312,90 +4434,65 @@ test('セーブデータから一門派生キャッシュを除外する', () =>
 });
 
 
-test('SaveManager は旧セーブで顔未設定の武将に限り最新版の基本顔を同期する', () => {
-    const ctx = createContext();
-    loadScript(ctx, 'js/save_manager.js');
-    const manager = new ctx.SaveManager({});
-
-    const added = { faceIcon: 'unknown_face.webp', faceChange: '' };
-    assert.strictEqual(manager._syncSimplePortraitAddition(added, { faceIcon: 'kikkawa_motoharu.webp', faceChange: '' }), true);
-    assert.strictEqual(added.faceIcon, 'kikkawa_motoharu.webp');
-
-    const alreadyHasFace = { faceIcon: 'existing_face.webp', faceChange: '' };
-    assert.strictEqual(manager._syncSimplePortraitAddition(alreadyHasFace, { faceIcon: 'new_face.webp', faceChange: '' }), false);
-    assert.strictEqual(alreadyHasFace.faceIcon, 'existing_face.webp');
-
-    const noLatestFace = { faceIcon: 'unknown_face.webp', faceChange: '' };
-    assert.strictEqual(manager._syncSimplePortraitAddition(noLatestFace, { faceIcon: '', faceChange: '' }), false);
-    assert.strictEqual(noLatestFace.faceIcon, 'unknown_face.webp');
-
-    const hasFaceRule = { faceIcon: 'unknown_face.webp', faceChange: '1553:older_face.webp' };
-    assert.strictEqual(manager._syncSimplePortraitAddition(hasFaceRule, { faceIcon: 'new_face.webp', faceChange: '' }), false);
-    assert.strictEqual(hasFaceRule.faceIcon, 'unknown_face.webp');
-});
-
-test('SaveManager は年代別顔の追加・変更だけを旧セーブへ同期する', () => {
-    const ctx = createContext();
-    loadScript(ctx, 'js/portrait_rules.js');
-    loadScript(ctx, 'js/save_manager.js');
-    const manager = new ctx.SaveManager({ year: 1560 });
-
-    const normal = { faceIcon: 'old.webp', faceChange: '1540:old_middle.webp', isDaimyo: false };
-    assert.strictEqual(manager._syncYearBasedPortraitRules(normal, {
-        faceIcon: 'base.webp',
-        faceChange: '1553:new_middle.webp/1570:new_late.webp/daimyo:new_lord.webp'
-    }, 1560), true);
-    assert.strictEqual(normal.faceIcon, 'new_middle.webp');
-    assert.strictEqual(normal.faceChange, '1553:new_middle.webp/1570:new_late.webp');
-    assert.strictEqual(ctx.PortraitRules.getExactYearFace(normal.faceChange, 1570), 'new_late.webp');
-
-    const daimyo = { faceIcon: 'old_lord.webp', faceChange: '1540:old.webp/daimyo:old_lord.webp', isDaimyo: true };
-    assert.strictEqual(manager._syncYearBasedPortraitRules(daimyo, {
-        faceIcon: 'base.webp',
-        faceChange: '1553:new_middle.webp/daimyo:new_lord.webp'
-    }, 1560), true);
-    assert.strictEqual(daimyo.faceIcon, 'old_lord.webp', '最新版のdaimyo顔は取り込まず旧セーブの大名顔を維持する');
-    assert.strictEqual(daimyo.faceChange, '1553:new_middle.webp/daimyo:old_lord.webp');
-
-    const exceptional = { faceIcon: 'special.webp', faceChange: 'event:special.webp', isDaimyo: false };
-    assert.strictEqual(manager._syncYearBasedPortraitRules(exceptional, {
-        faceIcon: 'base.webp', faceChange: '1553:new_middle.webp'
-    }, 1560), false);
-    assert.strictEqual(exceptional.faceIcon, 'special.webp');
-    assert.strictEqual(exceptional.faceChange, 'event:special.webp');
-});
-
-test('SaveManager の武将マスター同期は基本顔追加後に年代別顔を現在年へ再解決する', () => {
-    const ctx = createContext();
-    loadScript(ctx, 'js/portrait_rules.js');
-    loadScript(ctx, 'js/save_manager.js');
-    const manager = new ctx.SaveManager({ year: 1560 });
-    const saved = { faceIcon: 'unknown_face.webp', faceChange: '', isDaimyo: false };
-    const latest = { faceIcon: 'base.webp', faceChange: '1553:middle.webp/1570:late.webp' };
-    manager._syncBushoMasterFields(saved, latest);
-    assert.strictEqual(saved.faceIcon, 'middle.webp');
-    assert.strictEqual(saved.faceChange, '1553:middle.webp/1570:late.webp');
-});
-
-test('SaveManager は復元前にセーブ構造と主要ID参照を検証する', () => {
+test('SaveManager は現行スキーマだけを復元前に受理し、旧形式を移行しない', () => {
     const ctx = createContext({
         SCENARIOS: [{ folder: '1560_okehazama' }]
     });
     loadScript(ctx, 'js/save_manager.js');
     const manager = new ctx.SaveManager({});
     const valid = {
-        year: 1560, month: 4, scenarioFolder: '1560_okehazama',
+        saveSchemaVersion: 2,
+        saveTimestamp: 1770000000000,
+        saveTime: '2026/08/25 23:30',
+        year: 1560, month: 4, gameStartYear: 1560, gameStartMonth: 4,
+        scenarioFolder: '1560_okehazama', scenarioName: '1560年 桶狭間の戦い', scenarioNo: 'シナリオ1',
         castles: [{ id: 1, ownerClan: 1, castellanId: 10 }],
-        bushos: [{ id: 10, clan: 1, castleId: 1 }],
+        bushos: [{ id: 10, clan: 1, castleId: 1, nemesisList: [] }],
         clans: [{ id: 1, leaderId: 10 }],
-        princesses: [], provinces: [{ id: 1 }], legions: [], kunishus: [],
+        princesses: [{ id: 90001, isDiplomaticMarriageActive: true }], provinces: [{ id: 1 }], legions: [], kunishus: [],
         turnQueueIds: [1], currentIndex: 0, playerClanId: 1, mapWidth: 1200, mapHeight: 800,
-        flags: {}, aiOperations: {}
+        flags: {}, historyEntries: [],
+        aiOperations: { operations: {}, draftBases: {}, grandObjectives: {}, historyOwnedCastles: {} }
     };
     assert.strictEqual(manager._validateSaveDataStructure(valid), true);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, saveSchemaVersion: undefined }), /非対応のセーブ形式/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, saveSchemaVersion: 0 }), /非対応のセーブ形式/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, saveSchemaVersion: 1 }), /非対応のセーブ形式/, '政治婚姻フラグ導入前のschema 1は読み込まない');
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001 }] }), /isDiplomaticMarriageActive/, 'schema 2では政治婚姻フラグを明示する');
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, month: 13 }), /month/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, bushos: [{ id: 10, clan: 1, castleId: 999 }] }), /castleId/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, bushos: [{ id: 10, clan: 1, castleId: 999, nemesisList: [] }] }), /castleId/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, bushos: [{ id: 10, clan: 1, castleId: 1, nemesisIds: [] }] }), /nemesisList/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, historyEntries: ['旧文字列履歴'] }), /historyEntries/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, aiOperations: { operations: {} } }), /aiOperations/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, scenarioFolder: 'missing' }), /未登録のシナリオ/);
+});
+
+test('旧セーブ互換の移行処理をSaveManager・AI作戦・宿敵・諸勢力へ残さない', () => {
+    const save = read('js/save_manager.js');
+    const operation = read('js/ai_operation.js');
+    const models = read('js/models.js');
+    const kunishu = read('js/kunishu_system.js');
+    const history = read('js/history_system.js');
+    const testKunishuCsv = read('data/scenarios/1560_test/kunishuClan.csv');
+
+    assert.ok(save.includes('saveSchemaVersion: SAVE_SCHEMA_VERSION'));
+    assert.ok(save.includes('Number(data.saveSchemaVersion) !== SAVE_SCHEMA_VERSION'));
+    assert.ok(!save.includes('_syncBushoMasterFields'));
+    assert.ok(!save.includes('_syncSimplePortraitAddition'));
+    assert.ok(!save.includes('_syncYearBasedPortraitRules'));
+    assert.ok(!save.includes('latestBushoMap'));
+    assert.ok(operation.includes('this.operations = data.operations;'));
+    assert.ok(!operation.includes('data.operations[clanId].type'));
+    assert.ok(!operation.includes('for (const clanId in data)'));
+    assert.ok(!models.includes('else if (data.nemesisIds && Array.isArray(data.nemesisIds))'));
+    assert.ok(!kunishu.includes("kunishu.name === '願証寺'"));
+    assert.ok(!kunishu.includes('id >= 10001 && id <= 10018'));
+    assert.ok(!history.includes("category: 'legacy'"));
+    const testKunishuLines = testKunishuCsv.trimEnd().split(/\r?\n/);
+    const testKunishuHeader = testKunishuLines[0].split(',');
+    const testTagIndex = testKunishuHeader.indexOf('networkTag');
+    assert.ok(testTagIndex >= 0, '開発シナリオも現行networkTag列を明示する');
+    assert.strictEqual(testKunishuLines.slice(1).filter(line => line.split(',')[testTagIndex] === 'ikko').length, 19, '開発シナリオも一向宗タグをデータ側で保持する');
 });
 
 test('ロード失敗時は事前検証と復元後安全復帰を分離し、復帰前に案内する', () => {
