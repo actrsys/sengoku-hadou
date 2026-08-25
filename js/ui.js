@@ -1909,6 +1909,16 @@ class UIManager {
                     }
                 }
             });
+
+            // 実データを増やさず、選択画面の密度だけ確認できるダミースロットを末尾へ置きます。
+            const placeholderSlots = Number(window.GameConfig.Main.ScenarioSelection.PlaceholderSlots);
+            for (let index = 0; index < placeholderSlots; index++) {
+                const div = document.createElement('div');
+                div.className = 'clan-btn scenario-placeholder';
+                div.setAttribute('aria-disabled', 'true');
+                div.innerHTML = `<strong>シナリオ ${scenarios.length + index + 1}</strong><span class="scenario-placeholder-note">準備中</span>`;
+                this.scenarioList.appendChild(div);
+            }
             
             // 決定ボタンを押した時の動きを登録します
             if (confirmBtn) {

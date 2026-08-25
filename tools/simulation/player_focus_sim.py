@@ -27,8 +27,6 @@ START_MONTH = 4
 
 SCENARIO_START = {
     '1560_okehazama': (1560, 4),
-    '1560_test': (1560, 4),
-    '1562_kiyosudoumei': (1562, 1),
 }
 
 def I(x,d=0):

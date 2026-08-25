@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r212');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r214');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -415,10 +415,8 @@ test('設定値はGameConfigを正本とし、戦闘・経済・外交にロー�
     assert.ok(diplomacy.includes('MainParams.Diplomacy.FailureSentiment.Dominate'));
 });
 
-test('1560開発シナリオの主従外交データは3要素形式で相互に整合する', () => {
-    const csv = read('data/scenarios/1560_test/clans.csv');
-    assert.ok(csv.includes('80:支配:100'));
-    assert.ok(!csv.includes('|80:支配|100'));
+test('本筋1560シナリオの主従外交データは3要素形式で相互に整合する', () => {
+    const csv = read('data/scenarios/1560_okehazama/clans.csv');
 
     const lines = csv.replace(/^\uFEFF/, '').trim().split(/\r?\n/);
     const header = lines[0].split(',');
@@ -4209,6 +4207,30 @@ test('討死武将の初期延命は LifeSystem が従来ルールを再現す�
     assert.strictEqual(older.lifespanModifiers['system:battle_death_initial'], 10);
 });
 
+test('実データのシナリオ登録は本筋だけにし、シナリオ選択UIはレイアウト確認用に残す', () => {
+    const dataManager = read('js/data_manager.js');
+    const index = read('index.html');
+    const visualGuide = read('tests/visual/guide.html');
+    assert.ok(dataManager.includes('folder: "1560_okehazama"'));
+    assert.ok(!dataManager.includes('folder: "1560_test"'));
+    assert.ok(!dataManager.includes('folder: "1562_kiyosudoumei"'));
+    assert.ok(index.includes('id="scenario-modal"'), '実ゲームのシナリオ選択画面は残す');
+    assert.ok(visualGuide.includes('id="scenario-modal"'), 'レイアウト回帰用のシナリオ選択画面も残す');
+    assert.ok(visualGuide.match(/scenario-placeholder/g)?.length >= 3, 'レイアウト確認用ダミースロットを3枠表示する');
+});
+
+test('シナリオ選択のダミー3枠は実シナリオへ混ぜず選択不可にする', () => {
+    const config = read('js/config.js');
+    const dataManager = read('js/data_manager.js');
+    const ui = read('js/ui.js');
+    const css = read('css/style.css');
+    assert.ok(config.includes('PlaceholderSlots: 3'));
+    assert.strictEqual((dataManager.match(/folder:\s*"/g) || []).length, 1, '実データ登録は桶狭間1件だけにする');
+    assert.ok(ui.includes("div.className = 'clan-btn scenario-placeholder'"));
+    assert.ok(ui.includes("div.setAttribute('aria-disabled', 'true')"));
+    assert.ok(css.includes('#scenario-modal .clan-btn.scenario-placeholder'));
+});
+
 test('1560シナリオ説明はユーザー調整版を維持する', () => {
     const data = read('js/data_manager.js');
     assert.ok(data.includes('永禄三年、畿内では三好氏が権勢を誇っていた。'));
@@ -4578,7 +4600,7 @@ test('旧セーブ互換の移行処理をSaveManager・AI作戦・宿敵・諸�
     const models = read('js/models.js');
     const kunishu = read('js/kunishu_system.js');
     const history = read('js/history_system.js');
-    const testKunishuCsv = read('data/scenarios/1560_test/kunishuClan.csv');
+    const mainKunishuCsv = read('data/scenarios/1560_okehazama/kunishuClan.csv');
 
     assert.ok(save.includes('saveSchemaVersion: SAVE_SCHEMA_VERSION'));
     assert.ok(save.includes('Number(data.saveSchemaVersion) !== SAVE_SCHEMA_VERSION'));
@@ -4593,11 +4615,11 @@ test('旧セーブ互換の移行処理をSaveManager・AI作戦・宿敵・諸�
     assert.ok(!kunishu.includes("kunishu.name === '願証寺'"));
     assert.ok(!kunishu.includes('id >= 10001 && id <= 10018'));
     assert.ok(!history.includes("category: 'legacy'"));
-    const testKunishuLines = testKunishuCsv.trimEnd().split(/\r?\n/);
-    const testKunishuHeader = testKunishuLines[0].split(',');
-    const testTagIndex = testKunishuHeader.indexOf('networkTag');
-    assert.ok(testTagIndex >= 0, '開発シナリオも現行networkTag列を明示する');
-    assert.strictEqual(testKunishuLines.slice(1).filter(line => line.split(',')[testTagIndex] === 'ikko').length, 19, '開発シナリオも一向宗タグをデータ側で保持する');
+    const mainKunishuLines = mainKunishuCsv.trimEnd().split(/\r?\n/);
+    const mainKunishuHeader = mainKunishuLines[0].split(',');
+    const mainTagIndex = mainKunishuHeader.indexOf('networkTag');
+    assert.ok(mainTagIndex >= 0, '本筋シナリオは現行networkTag列を明示する');
+    assert.strictEqual(mainKunishuLines.slice(1).filter(line => line.split(',')[mainTagIndex] === 'ikko').length, 19, '本筋シナリオは一向宗タグをデータ側で保持する');
 });
 
 test('ロード失敗時は事前検証と復元後安全復帰を分離し、復帰前に案内する', () => {

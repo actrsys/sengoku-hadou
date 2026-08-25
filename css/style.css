@@ -5979,6 +5979,40 @@ body:not(.is-pc) #map-container {
         0 1px 2px rgba(0,0,0,0.20);
 }
 
+#scenario-modal .clan-btn.scenario-placeholder {
+    gap: 10px;
+    cursor: not-allowed;
+    opacity: 0.58;
+    border-color: #77786f;
+    border-left-color: #77786f;
+    background: linear-gradient(to bottom, #3a4043 0%, #303638 52%, #282d2f 100%);
+    color: #d4d3cc;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.08),
+        inset 0 -1px 0 rgba(0,0,0,0.28),
+        0 2px 4px rgba(0,0,0,0.24);
+}
+
+#scenario-modal .clan-btn.scenario-placeholder:hover,
+#scenario-modal .clan-btn.scenario-placeholder:active {
+    transform: none;
+    border-color: #77786f;
+    border-left-color: #77786f;
+    background: linear-gradient(to bottom, #3a4043 0%, #303638 52%, #282d2f 100%);
+    color: #d4d3cc;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.08),
+        inset 0 -1px 0 rgba(0,0,0,0.28),
+        0 2px 4px rgba(0,0,0,0.24);
+}
+
+#scenario-modal .scenario-placeholder-note {
+    font-size: 0.72em;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    opacity: 0.78;
+}
+
 #scenario-modal .scenario-desc-box {
     grid-area: scenario-desc;
     display: none;
@@ -7911,4 +7945,21 @@ body:not(.is-pc) #war-title-name.war-title-three-lines .war-title-fixed-line:nth
 }
 body:not(.is-pc) #war-title-name.war-title-three-lines .war-title-fixed-line:nth-child(3) {
     padding-left: 0.6em;
+}
+
+
+/* 実機診断：前回AI処理の停止位置。静的見た目はCSS、操作はaddEventListenerで管理する。 */
+#ai-last-checkpoint-badge {
+    position: fixed;
+    left: 8px;
+    bottom: 8px;
+    z-index: 20000;
+    max-width: calc(100vw - 16px);
+    padding: 6px 9px;
+    background: rgba(0, 0, 0, 0.82);
+    color: #fff;
+    font-size: 11px;
+    line-height: 1.35;
+    border-radius: 5px;
+    pointer-events: auto;
 }

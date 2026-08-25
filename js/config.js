@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r212'
+        Version: 'r214'
     },
 
     History: {
@@ -23,6 +23,10 @@ window.GameConfig = {
         StartMonth: 4,
         System: {
             UseRandomNames: true
+        },
+        ScenarioSelection: {
+            // 実データのシナリオとは分離した、選択不可のレイアウト確認用スロット数。
+            PlaceholderSlots: 3
         },
         Gunshi: {
             AdviceLoyalty: 84,
