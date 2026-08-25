@@ -2195,7 +2195,7 @@ Object.assign(WarManager.prototype, {
                 }
                 // ★書き足しここまで
 
-                const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
+                const maxMorale = window.WarParams.Military.MaxMoraleInternal;
                 s.attacker.training = Math.min(120, s.attacker.training + window.WarParams.War.WinStatIncrease); s.attacker.morale = Math.min(maxMorale, s.attacker.morale + window.WarParams.War.WinStatIncrease);
                 
                 const maxCharm = Math.max(...s.atkBushos.map(b => b.charm));

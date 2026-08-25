@@ -6,6 +6,8 @@ class AudioManager {
         this.bgmPlayer = null;
         this.currentBgmName = null; // 今鳴っている曲の名前を入れておく箱
         this.memoBgmName = null;    // 元の曲を覚えておくためのメモ帳
+        // min版の読込失敗時だけAudioManager自身が通常版を補います。HTMLへinline onerrorを置かないための正規窓口です。
+        this._howlerReadyPromise = this._ensureHowlerReady();
         
         // ★ユーザーが設定した音量（最初は1.0＝100%）を覚えておきます。
         // ブラウザに記憶があればそれを読み込みます！
@@ -99,8 +101,34 @@ class AudioManager {
         this.fallbackSeVolume = 0.1;
     }
 
+
+    _ensureHowlerReady() {
+        if (window.Howl) return Promise.resolve(true);
+
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'js/howler.js';
+            script.onload = () => {
+                if (window.Howl) resolve(true);
+                else reject(new Error('Howler fallback loaded but Howl is unavailable.'));
+            };
+            script.onerror = () => reject(new Error('Howler fallback could not be loaded.'));
+            document.head.appendChild(script);
+        });
+    }
+
+    _retryWhenHowlerReady(action) {
+        if (window.Howl) return false;
+        this._howlerReadyPromise
+            .then(() => action())
+            .catch(error => console.error('【AudioManager】Howlerの読み込みに失敗しました。', error));
+        return true;
+    }
+
     // BGMを鳴らす魔法
     playBGM(fileName, fallbackStart = 0, fallbackEnd = 0) {
+        if (this._retryWhenHowlerReady(() => this.playBGM(fileName, fallbackStart, fallbackEnd))) return;
+
         // 鳴らした曲の名前を覚えさせます
         this.currentBgmName = fileName;
 
@@ -181,15 +209,25 @@ class AudioManager {
     
     // SEを鳴らす魔法
     playSE(fileName) {
+        if (this._retryWhenHowlerReady(() => this.playSE(fileName))) return;
+
         const seData = this.seList[fileName];
         
         // ★ここでも「基本の音量」と「ユーザー設定」を掛け算します！
         const baseVol = seData && seData.baseVolume !== undefined ? seData.baseVolume : this.fallbackSeVolume;
         const finalVolume = baseVol * this.userSeVolume;
 
-        const se = new window.Howl({
-            src: [`data/music/se/${fileName}`], 
-            volume: finalVolume
+        let se = null;
+        const cleanup = () => {
+            if (!se) return;
+            se.unload();
+            se = null;
+        };
+        se = new window.Howl({
+            src: [`data/music/se/${fileName}`],
+            volume: finalVolume,
+            onend: cleanup,
+            onloaderror: cleanup
         });
         se.play();
     }

@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r215'
+        Version: 'r216'
     },
 
     History: {
@@ -181,9 +181,12 @@ window.GameConfig = {
 
     War: {
         Military: {
-            MaxMoraleBase: 120,
-            MaxMoraleCharity: 100,
-            MaxMorale: 100,
+            // 士気は内部データとして120まで保持できる。100超へ上げられるのは戦争由来の増加だけ。
+            MaxMoraleInternal: 120,
+            // 兵施しなど通常の内政行動で上げられる士気上限。
+            MaxMoraleNormal: 100,
+            // 拠点UIの士気ゲージを満タンとして扱う基準。数値表示自体は実値（最大120）を表示する。
+            MaxMoraleGauge: 100,
             MaxTraining: 100,
             WarMaxRounds: 15,
             DamageSoldierPower: 0.05,

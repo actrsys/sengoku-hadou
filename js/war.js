@@ -1197,7 +1197,7 @@ class WarManager {
             
             let activeArmyObj = getArmyObj(s.turn);
             if (activeArmyObj) {
-                const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
+                const maxMorale = window.WarParams.Military.MaxMoraleInternal;
                 activeArmyObj.morale = Math.min(maxMorale, (activeArmyObj.morale ?? 50) + moraleUp);
             }
 
@@ -1727,7 +1727,7 @@ class WarManager {
             if (moraleDiffs[role] !== 0) {
                 let armyObj = getArmyObj(role);
                 if (armyObj) {
-                    const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
+                    const maxMorale = window.WarParams.Military.MaxMoraleInternal;
                     armyObj.morale = Math.max(0, Math.min(maxMorale, (armyObj.morale ?? 50) + moraleDiffs[role]));
                 }
             }

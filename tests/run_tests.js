@@ -88,11 +88,65 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r215');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r216');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('友好'), false);
+});
+
+test('士気上限は内部120・通常100・ゲージ100を設定の正本から使う', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    assert.strictEqual(ctx.WarParams.Military.MaxMoraleInternal, 120);
+    assert.strictEqual(ctx.WarParams.Military.MaxMoraleNormal, 100);
+    assert.strictEqual(ctx.WarParams.Military.MaxMoraleGauge, 100);
+
+    const sources = [
+        read('js/models.js'), read('js/war.js'), read('js/field_war.js'), read('js/war_effort.js')
+    ].join('\n');
+    assert.ok(!sources.includes('MaxMoraleBase'));
+    assert.ok(!/MaxMorale(?:Base|Internal)[^\n]*(?:\?|:)\s*120/.test(sources));
+    assert.ok(!sources.includes('? window.WarParams.Military.MaxMoraleInternal'));
+    assert.ok(read('js/command_system.js').includes('MaxMoraleNormal'));
+    assert.ok(read('js/ui.js').includes('MaxMoraleGauge'));
+});
+
+test('SEは一時Howlを再生終了または読込失敗時に解放する', () => {
+    const source = read('js/audio.js');
+    assert.ok(source.includes('onend: cleanup'));
+    assert.ok(source.includes('onloaderror: cleanup'));
+    assert.ok(source.includes('se.unload()'));
+});
+
+test('通常buttonのSEは共通監視を正本とし二重再生経路を持たない', () => {
+    const source = read('js/ui.js');
+    const scenarioStart = source.indexOf('// 決定ボタンを押した時の動きを登録します');
+    const scenarioEnd = source.indexOf('async returnToTitle', scenarioStart);
+    const scenarioBlock = source.slice(scenarioStart, scenarioEnd);
+    assert.ok(!scenarioBlock.includes("playSE('decision.ogg')"));
+
+    const choiceStart = source.indexOf('// --- ボタンの生成 ---');
+    const choiceEnd = source.indexOf('} else if (!isBottomMessage || hasChoices)', choiceStart);
+    const choiceBlock = source.slice(choiceStart, choiceEnd);
+    assert.ok(choiceBlock.includes("modal.classList.contains('event-dialog-modal')"));
+    assert.ok(!choiceBlock.includes('btn.dataset.se = choiceSe'));
+});
+
+test('index.htmlはinline event属性を持たずHowler fallbackをAudioManagerへ委譲する', () => {
+    const html = read('index.html');
+    assert.ok(!/\son[a-z]+\s*=/i.test(html));
+    assert.ok(html.includes('<script src="js/howler.min.js"></script>'));
+    const audio = read('js/audio.js');
+    assert.ok(audio.includes('_ensureHowlerReady()'));
+    assert.ok(audio.includes("script.src = 'js/howler.js'"));
+    assert.ok(audio.includes('_retryWhenHowlerReady'));
+});
+
+test('城データは旧loyalty列をpeoplesLoyaltyとして推測補完しない', () => {
+    const source = read('js/models.js');
+    assert.ok(source.includes('data.peoplesLoyalty !== undefined ? data.peoplesLoyalty : 0'));
+    assert.ok(!source.includes('data.loyalty || 0'));
 });
 
 test('外交関係の遅延生成は支配と従属の向きを正しく反転する', () => {
@@ -3413,7 +3467,7 @@ test('SaveManager がスロット読込・保存時刻抽出の公開窓口を�
 test('コマンド定義はWarParamsの独自フォールバックを持たない', () => {
     const sources = read('js/command_catalog.js') + '\n' + read('js/command_system.js');
     assert.ok(!sources.includes('MaxTraining) ?'));
-    assert.ok(!sources.includes('MaxMoraleCharity) ?'));
+    assert.ok(!sources.includes('MaxMoraleNormal) ?'));
 });
 
 

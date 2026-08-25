@@ -195,8 +195,8 @@ class Castle {
         // 人口だけは上限が99万9999です
         this.population = Math.min(999999, Number(this.population || 0));
         
-        // 城の民忠を peoplesLoyalty に変更。CSV互換性のため古い loyalty も読めるようにしておく
-        this.peoplesLoyalty = Number(data.peoplesLoyalty !== undefined ? data.peoplesLoyalty : (data.loyalty || 0));
+        // 現行マスターの peoplesLoyalty だけを正本として読む。旧CSV列は推測補完しない。
+        this.peoplesLoyalty = Number(data.peoplesLoyalty !== undefined ? data.peoplesLoyalty : 0);
         this.maxPeoplesLoyalty = Number(data.maxPeoplesLoyalty !== undefined ? data.maxPeoplesLoyalty : 100);
         delete this.loyalty;
         
@@ -204,7 +204,7 @@ class Castle {
         this.maxTraining = Number(data.maxTraining !== undefined ? data.maxTraining : 100);
 
         this.morale = Number(this.morale || 0);
-        const defaultMaxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
+        const defaultMaxMorale = window.WarParams.Military.MaxMoraleInternal;
         this.maxMorale = Number(data.maxMorale !== undefined ? data.maxMorale : defaultMaxMorale);
         
         this.kokudaka = Number(this.kokudaka || 0);

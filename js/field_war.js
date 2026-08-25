@@ -3551,7 +3551,7 @@ class FieldWarManager {
             let atkMoraleChange = Math.round(ratio * 3); 
             
             if (atkMoraleChange !== 0) {
-                const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
+                const maxMorale = window.WarParams.Military.MaxMoraleInternal;
                 if (this.groupStats[attacker.groupId]) {
                     this.groupStats[attacker.groupId].morale = Math.max(0, Math.min(maxMorale, this.groupStats[attacker.groupId].morale + atkMoraleChange));
                 }
@@ -3610,7 +3610,7 @@ class FieldWarManager {
             for (let key in this.groupStats) {
                 if (key.startsWith(winPrefix) && this.groupStats[key]) {
                     let rise = (key === defender.groupId) ? 3 : 1;
-                    const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
+                    const maxMorale = window.WarParams.Military.MaxMoraleInternal;
                     this.groupStats[key].morale = Math.min(maxMorale, this.groupStats[key].morale + rise);
                 }
             }
@@ -3649,7 +3649,7 @@ class FieldWarManager {
             for (let key in this.groupStats) {
                 if (key.startsWith(winPrefix) && this.groupStats[key]) {
                     let rise = (key === defender.groupId) ? 3 : 1;
-                    const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMoraleBase) ? window.WarParams.Military.MaxMoraleBase : 120;
+                    const maxMorale = window.WarParams.Military.MaxMoraleInternal;
                     this.groupStats[key].morale = Math.min(maxMorale, this.groupStats[key].morale + rise);
                 }
             }

@@ -1253,7 +1253,8 @@ class UIManager {
 
                     btn.onclick = (e) => {
                         e.stopPropagation();
-                        if (window.AudioManager) {
+                        // event-dialog-modal は共通button監視の対象外なので、ここだけローカルで1回鳴らす。
+                        if (modal.classList.contains('event-dialog-modal') && window.AudioManager) {
                             if (choice.label === "戻る" || choice.label === "いいえ") window.AudioManager.playSE('cancel.ogg');
                             else window.AudioManager.playSE('decision.ogg');
                         }
@@ -1930,7 +1931,6 @@ class UIManager {
             if (confirmBtn) {
                 confirmBtn.onclick = () => {
                     if (selectedScenario) {
-                        if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                         this.scenarioScreen.classList.add('hidden'); 
                         onSelect(selectedScenario.folder); 
                     }
@@ -2085,7 +2085,7 @@ class UIManager {
                         <div class="sp-label">軍馬</div><div class="sp-val-right sp-val-compact">${mask(castle.horses || 0)}</div>
                         
                         <div class="sp-label">鉱山</div><div class="sp-val">${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</div>
-                        <div class="sp-label">士気</div><div class="sp-val">${this.getStatusBarHTML(castle.morale, 100, 'lightblue', isVisible)}</div>
+                        <div class="sp-label">士気</div><div class="sp-val">${this.getStatusBarHTML(castle.morale, window.WarParams.Military.MaxMoraleGauge, 'lightblue', isVisible)}</div>
                         <div class="sp-label">鉄砲</div><div class="sp-val-right sp-val-compact">${mask(castle.guns || 0)}</div>
                         
                         <div class="sp-label">民忠</div><div class="sp-val">${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</div>
@@ -2117,7 +2117,7 @@ class UIManager {
                         <div class="sp-label">軍馬</div><div class="sp-val-right">${mask(castle.horses || 0)}</div>
                         
                         <div class="sp-label">鉱山</div><div class="sp-val">${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</div>
-                        <div class="sp-label">士気</div><div class="sp-val">${this.getStatusBarHTML(castle.morale, 100, 'lightblue', isVisible)}</div>
+                        <div class="sp-label">士気</div><div class="sp-val">${this.getStatusBarHTML(castle.morale, window.WarParams.Military.MaxMoraleGauge, 'lightblue', isVisible)}</div>
                         <div class="sp-label">鉄砲</div><div class="sp-val-right">${mask(castle.guns || 0)}</div>
                         
                         <div class="sp-label">民忠</div><div class="sp-val">${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</div>

@@ -1437,7 +1437,7 @@ class CommandSystem {
 
                     // こちらも「その城の兵士数」を渡します
                     const val = DomesticRules.calcSoldierCharity(busho, castle.soldiers, bonusRate, true); 
-                    const maxMorale = window.WarParams.Military.MaxMoraleCharity;
+                    const maxMorale = window.WarParams.Military.MaxMoraleNormal;
                     const oldVal = castle.morale;
                     castle.morale = Math.min(maxMorale, castle.morale + val); 
                     const actualVal = castle.morale - oldVal;
@@ -1468,7 +1468,7 @@ class CommandSystem {
                 detail = `(現在: ${castle.training}/${maxTraining})`;
             }
             if (actionName === "兵施し") {
-                const maxMorale = window.WarParams.Military.MaxMorale;
+                const maxMorale = window.WarParams.Military.MaxMoraleGauge;
                 detail = `(現在: ${castle.morale}/${maxMorale})`;
             }
             

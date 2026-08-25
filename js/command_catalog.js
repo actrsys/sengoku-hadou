@@ -149,7 +149,7 @@ const CAN_EXECUTE_RULES = {
         return true;
     },
     canSoldierCharity: (game, castle) => {
-        const maxMorale = window.WarParams.Military.MaxMoraleCharity;
+        const maxMorale = window.WarParams.Military.MaxMoraleNormal;
         if (castle.morale >= maxMorale) return false;
         if (castle.soldiers <= 0) return false;
         return true;
