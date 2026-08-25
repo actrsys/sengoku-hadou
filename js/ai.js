@@ -633,7 +633,7 @@ class AIEngine {
         if (myClanId === this.game.playerClanId) {
             evaluatorInt = myGeneral.intelligence;
         } else {
-            evaluatorInt = myDaimyo.intelligence || 50;
+            evaluatorInt = myDaimyo.intelligence ?? 50;
         }
         
         // 自領のどこかと隣接している大名家をリストアップします

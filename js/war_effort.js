@@ -775,7 +775,7 @@ Object.assign(WarManager.prototype, {
             const attackerForce = {
                 name: atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : atkCastle.name + "遠征軍", 
                 ownerClan: atkCastle.ownerClan || 0, soldiers: atkSoldierCount, bushos: atkBushos, 
-                training: atkCastle.training || 50, morale: atkCastle.morale || 50, rice: atkRice, maxRice: atkRice,
+                training: atkCastle.training ?? 50, morale: atkCastle.morale ?? 50, rice: atkRice, maxRice: atkRice,
                 horses: atkHorses, guns: atkGuns, isKunishu: atkCastle.isKunishu || false, kunishuId: atkCastle.isKunishu ? atkCastle.id : (atkCastle.kunishuId || 0)
             };
 
@@ -1693,8 +1693,8 @@ Object.assign(WarManager.prototype, {
                         
                         // ★追加：帰ってきた兵士たちの士気と訓練度を、お城の兵士たちと混ぜ合わせます！
                         if (helperCastle.soldiers > 0 && finalReturnSoldiers > 0) {
-                            helperCastle.training = Math.floor(((helperCastle.training || 50) * oldSoldiers + (reinf.training || 50) * finalReturnSoldiers) / helperCastle.soldiers);
-                            helperCastle.morale = Math.floor(((helperCastle.morale || 50) * oldSoldiers + (reinf.morale || 50) * finalReturnSoldiers) / helperCastle.soldiers);
+                            helperCastle.training = Math.floor(((helperCastle.training ?? 50) * oldSoldiers + (reinf.training ?? 50) * finalReturnSoldiers) / helperCastle.soldiers);
+                            helperCastle.morale = Math.floor(((helperCastle.morale ?? 50) * oldSoldiers + (reinf.morale ?? 50) * finalReturnSoldiers) / helperCastle.soldiers);
                         }
                         
                         reinf.bushos.forEach(b => {
@@ -3459,7 +3459,7 @@ Object.assign(WarManager.prototype, {
 
     // ★追加：捕虜登用の成功確率を計算する共通の魔法
     calcPrisonerHireProb(recruiter, prisoner, targetClanId, isExtinct, daimyoHiredBonus = 0) {
-        let baseProb = ((recruiter.charm || 50) * 1.5) / ((prisoner.loyalty || 50) * 3) - (isExtinct ? 0 : 0.4);
+        let baseProb = ((recruiter.charm ?? 50) * 1.5) / ((prisoner.loyalty ?? 50) * 3) - (isExtinct ? 0 : 0.4);
         let randomBonus = (Math.random() * 0.2) - 0.1;
         const recruiterAffinity = recruiter.affinity || 0;
         const prisonerAffinity = prisoner.affinity || 0;

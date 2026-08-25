@@ -88,11 +88,140 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r207');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r208');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('友好'), false);
+});
+
+test('外交関係の遅延生成は支配と従属の向きを正しく反転する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    ctx.game = {
+        clans: [
+            { id: 1, diplomacyValue: {} },
+            { id: 2, diplomacyValue: { 1: { status: '支配', sentiment: 82, trucePeriod: 0, isMarriage: true, hostageIds: [99], subordinateMonths: 12 } } }
+        ],
+        getClan(id) { return this.clans.find(c => Number(c.id) === Number(id)); }
+    };
+    loadScript(ctx, 'js/diplomacy.js');
+    const manager = vm.runInContext('new DiplomacyManager(game)', ctx);
+    const relation = manager.getDiplomacyData(1, 2);
+    assert.strictEqual(relation.status, '従属');
+    assert.strictEqual(relation.sentiment, 82);
+    assert.strictEqual(relation.isMarriage, true);
+    assert.deepStrictEqual(Array.from(relation.hostageIds), [99]);
+    assert.strictEqual(relation.subordinateMonths, 12);
+
+    ctx.game.clans[0].diplomacyValue = {};
+    ctx.game.clans[1].diplomacyValue[1].status = '従属';
+    assert.strictEqual(manager.getDiplomacyData(1, 2).status, '支配');
+});
+
+test('外交status変更は和睦期間を残さず、主従の向きが変われば継続月数をリセットする', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    ctx.game = {
+        clans: [
+            { id: 1, diplomacyValue: { 2: { status: '和睦', sentiment: 50, trucePeriod: 5, isMarriage: true, hostageIds: [77], subordinateMonths: 0 } } },
+            { id: 2, diplomacyValue: { 1: { status: '和睦', sentiment: 50, trucePeriod: 5, isMarriage: true, hostageIds: [77], subordinateMonths: 0 } } }
+        ],
+        getClan(id) { return this.clans.find(c => Number(c.id) === Number(id)); }
+    };
+    loadScript(ctx, 'js/diplomacy.js');
+    const manager = vm.runInContext('new DiplomacyManager(game)', ctx);
+    manager.changeStatus(1, 2, '同盟');
+    assert.strictEqual(ctx.game.clans[0].diplomacyValue[2].trucePeriod, 0);
+    assert.strictEqual(ctx.game.clans[1].diplomacyValue[1].trucePeriod, 0);
+    assert.strictEqual(ctx.game.clans[0].diplomacyValue[2].isMarriage, true, 'status変更だけで婚姻を消さない');
+    assert.deepStrictEqual(Array.from(ctx.game.clans[0].diplomacyValue[2].hostageIds), [77], 'status変更だけで人質を消さない');
+
+    manager.changeStatus(1, 2, '支配');
+    ctx.game.clans[0].diplomacyValue[2].subordinateMonths = 20;
+    ctx.game.clans[1].diplomacyValue[1].subordinateMonths = 20;
+    manager.changeStatus(1, 2, '支配');
+    assert.strictEqual(ctx.game.clans[0].diplomacyValue[2].subordinateMonths, 20, '同じ主従関係の継続では月数を保つ');
+    manager.changeStatus(1, 2, '従属');
+    assert.strictEqual(ctx.game.clans[0].diplomacyValue[2].subordinateMonths, 0, '主従の向きが反転したら月数をリセットする');
+    assert.strictEqual(ctx.game.clans[1].diplomacyValue[1].subordinateMonths, 0);
+});
+
+test('士気・訓練の0は未設定扱いにせず戦闘・援軍データへ保持する', () => {
+    const files = ['js/field_war.js', 'js/reinforcement_service.js', 'js/war_effort.js', 'js/war.js', 'js/life_system.js'];
+    files.forEach(file => {
+        const source = read(file);
+        assert.ok(!/\b(?:morale|training)\s*\|\|\s*50\b/.test(source), `${file} に0を50へ置き換えるfallbackを残さない`);
+    });
+    assert.ok(!read('js/life_system.js').includes('(c.peoplesLoyalty || 50)'), '民忠0を家督交代時に50へ戻さない');
+    assert.ok(!read('js/war_effort.js').includes('recruiter.charm || 50'), '魅力0を捕虜登用時に50へ戻さない');
+    assert.ok(!read('js/war_effort.js').includes('prisoner.loyalty || 50'), '忠誠0を捕虜登用時に50へ戻さない');
+
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    ctx.game = { getCastleBushos() { return [{ id: 1, clan: 1, strength: 50, status: 'active' }]; } };
+    loadScript(ctx, 'js/reinforcement_service.js');
+    const service = vm.runInContext('new ReinforcementService(game)', ctx);
+    const castle = { id: 10, ownerClan: 1, soldiers: 1000, rice: 2000, horses: 0, guns: 0, morale: 0, training: 0 };
+    const data = service.createAutoSelfReinforcement(castle);
+    assert.strictEqual(data.morale, 0);
+    assert.strictEqual(data.training, 0);
+});
+
+test('武将の革新性は明示的な0を保持し、未設定時だけ50を使う', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/models.js');
+    ctx.dataZero = { id: 1, clan: 1, castleId: 1, name: '試験武将', birthYear: 1500, endYear: 1580, startYear: 1520, innovation: 0 };
+    ctx.dataBlank = { id: 2, clan: 1, castleId: 1, name: '試験武将二', birthYear: 1500, endYear: 1580, startYear: 1520, innovation: '' };
+    assert.strictEqual(vm.runInContext('new Busho(dataZero).innovation', ctx), 0);
+    assert.strictEqual(vm.runInContext('new Busho(dataBlank).innovation', ctx), 50);
+});
+
+test('設定値はGameConfigを正本とし、戦闘・経済・外交にローカルfallbackを再導入しない', () => {
+    const war = read('js/war.js');
+    const economy = read('js/economy_rules.js');
+    const diplomacy = read('js/diplomacy.js');
+    const config = read('js/config.js');
+    assert.ok(!war.includes('BaseStat || 30'));
+    ['SubGeneralFactor', 'DamageFluctuation', 'MoraleBase', 'StatsLdrWeight', 'StatsStrWeight', 'StatsIntWeight', 'MinDamage', 'CounterAtkPowerFactor'].forEach(key => {
+        assert.ok(!new RegExp(`\\b(?:W|M)\\.${key}\\s*\\|\\|`).test(war), `WarSystemは${key}のローカルfallbackを持たない`);
+    });
+    assert.ok(!/PriceAmmo[^\n]*\|\|\s*1/.test(economy));
+    assert.ok(!diplomacy.includes('DiplomacyManager.PENALTIES'));
+    assert.ok(config.includes('FailureSentiment:'));
+    assert.ok(diplomacy.includes('MainParams.Diplomacy.FailureSentiment.Alliance'));
+    assert.ok(diplomacy.includes('MainParams.Diplomacy.FailureSentiment.Dominate'));
+});
+
+test('1560開発シナリオの主従外交データは3要素形式で相互に整合する', () => {
+    const csv = read('data/scenarios/1560_test/clans.csv');
+    assert.ok(csv.includes('80:支配:100'));
+    assert.ok(!csv.includes('|80:支配|100'));
+
+    const lines = csv.replace(/^\uFEFF/, '').trim().split(/\r?\n/);
+    const header = lines[0].split(',');
+    const idxId = header.indexOf('id');
+    const idxDip = header.indexOf('initDiplomacy');
+    const relations = new Map();
+    for (const line of lines.slice(1)) {
+        const cols = line.split(',');
+        const id = Number(cols[idxId]);
+        const value = cols[idxDip] || '';
+        for (const token of value.split('|').filter(Boolean)) {
+            const parts = token.split(':');
+            assert.strictEqual(parts.length, 3, `外交初期値は target:status:sentiment 形式: clan=${id}, token=${token}`);
+            relations.set(`${id}:${Number(parts[0])}`, parts[1]);
+        }
+    }
+    for (const [key, status] of relations) {
+        if (status !== '支配' && status !== '従属') continue;
+        const [from, to] = key.split(':').map(Number);
+        const opposite = relations.get(`${to}:${from}`);
+        assert.strictEqual(opposite, status === '支配' ? '従属' : '支配', `主従関係は相手側で反転: ${from}<->${to}`);
+    }
 });
 
 test('上州の黄斑は攻城戦の守備部隊補正だけを持ち、月次拠点防御力を上昇させない', () => {

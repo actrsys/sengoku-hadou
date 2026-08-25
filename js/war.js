@@ -22,11 +22,11 @@ class WarSystem {
     }
 
     static calcUnitStats(bushos) { 
-        const W = window.WarParams.War; const M = window.WarParams.Military; const baseStat = W.BaseStat || 30;
+        const W = window.WarParams.War; const M = window.WarParams.Military; const baseStat = W.BaseStat;
         if (!bushos || bushos.length === 0) return { ldr:baseStat, str:baseStat, int:baseStat, charm:baseStat, loyaltyBonus:0 }; 
         const leader = bushos[0]; const subs = bushos.slice(1); 
         let totalLdr = leader.leadership; let totalStr = leader.strength; let totalInt = leader.intelligence; 
-        const subFactor = W.SubGeneralFactor || 0.2;
+        const subFactor = W.SubGeneralFactor;
         if (subs.length > 0) {
             subs.forEach(b => { 
                 totalLdr += b.leadership * subFactor; totalStr += b.strength * subFactor; totalInt += b.intelligence * subFactor; 
@@ -43,13 +43,13 @@ class WarSystem {
 
     static calcWarDamage(atkStats, defStats, atkSoldiers, defSoldiers, defWall, atkMorale, defTraining, type) {
         const M = window.WarParams.Military; const W = window.WarParams.War;
-        const fluctuation = M.DamageFluctuation || 0.2;
+        const fluctuation = M.DamageFluctuation;
         const rand = 1.0 - fluctuation + (Math.random() * fluctuation * 2);
-        const moraleBonus = (atkMorale - (W.MoraleBase || 50)) / 100; 
-        const trainingBonus = (defTraining - (W.MoraleBase || 50)) / 100;
+        const moraleBonus = (atkMorale - W.MoraleBase) / 100; 
+        const trainingBonus = (defTraining - W.MoraleBase) / 100;
         
-        const atkPower = ((atkStats.ldr * (W.StatsLdrWeight || 1.2)) + (atkStats.str * (W.StatsStrWeight || 0.3)) + (atkStats.loyaltyBonus || 0) + (atkSoldiers * M.DamageSoldierPower)) * (1.0 + moraleBonus);
-        const defPower = ((defStats.ldr * 1.0) + (defStats.int * (W.StatsIntWeight || 0.5)) + (defStats.loyaltyBonus || 0) + (defWall * M.WallDefenseEffect) + (defSoldiers * M.DamageSoldierPower)) * (1.0 + trainingBonus);
+        const atkPower = ((atkStats.ldr * W.StatsLdrWeight) + (atkStats.str * W.StatsStrWeight) + (atkStats.loyaltyBonus || 0) + (atkSoldiers * M.DamageSoldierPower)) * (1.0 + moraleBonus);
+        const defPower = ((defStats.ldr * 1.0) + (defStats.int * W.StatsIntWeight) + (defStats.loyaltyBonus || 0) + (defWall * M.WallDefenseEffect) + (defSoldiers * M.DamageSoldierPower)) * (1.0 + trainingBonus);
         
         let multiplier = 1.0, soldierRate = 1.0, wallRate = 0.0, counterRisk = 1.0;
         switch(type) {
@@ -62,12 +62,12 @@ class WarSystem {
         }
         
         const ratio = atkPower / (atkPower + defPower);
-        let baseDmg = Math.max(W.MinDamage || 50, atkPower * ratio * multiplier * rand);
+        let baseDmg = Math.max(W.MinDamage, atkPower * ratio * multiplier * rand);
         
         let counterDmg = 0;
         if (counterRisk > 0 && type !== 'def_attack') {
             const opponentPower = type.startsWith('def_') ? atkPower : defPower;
-            counterDmg = Math.floor(opponentPower * (W.CounterAtkPowerFactor !== undefined ? W.CounterAtkPowerFactor : 0.05) * counterRisk);
+            counterDmg = Math.floor(opponentPower * W.CounterAtkPowerFactor * counterRisk);
         }
         
         return { 
@@ -1251,8 +1251,8 @@ class WarManager {
 
                 let atkBestInt = tbushos.reduce((max, b) => Math.max(max, b.intelligence), 0);
                 let atkInt = tbushos[0].intelligence;
-                let atkMorale = targetArmy.morale || 50;
-                let atkTraining = targetArmy.training || 50;
+                let atkMorale = targetArmy.morale ?? 50;
+                let atkTraining = targetArmy.training ?? 50;
                 let atkMoraleTrainBonus = Math.max(0.01, (atkMorale / 100) + (atkTraining / 100));
                 
                 let successRate = ((Math.sqrt(10 + defBestInt) * (Math.sqrt(defInt) * 2)) / ((Math.sqrt(50 + atkBestInt) * (Math.sqrt(atkInt) * 2)) * atkMoraleTrainBonus) * 0.75) - 0.2;

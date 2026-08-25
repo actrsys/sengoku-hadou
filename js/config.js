@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r207'
+        Version: 'r208'
     },
 
     History: {
@@ -52,6 +52,10 @@ window.GameConfig = {
                 DominateProbBonus: 12,
                 SubordinateProbBonus: 12,
                 ReinforcementProbBonus: 0.15
+            },
+            FailureSentiment: {
+                Alliance: -4,
+                Dominate: -7
             }
         },
         ConversationStanding: {

@@ -493,7 +493,7 @@ class Busho {
         this.duty = Number(this.duty || 0);
         this.ambition = Number(this.ambition || 0);
         this.affinity = Number(this.affinity || 0);
-        this.innovation = Number(this.innovation || 50);
+        this.innovation = Number(this.innovation === '' || this.innovation === undefined || this.innovation === null ? 50 : this.innovation);
 
         // 顔画像ファイル名 (例: "nobunaga.png")。未設定なら null または undefined
         // ★修正：「通常顔|daimyo:大名顔」のような設定を読み取れるようにします！

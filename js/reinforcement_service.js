@@ -57,8 +57,8 @@ class ReinforcementService {
             horses: this._calcEquipment(helperCastle.horses, soldierCount, requireMinimumEquipmentStock),
             guns: this._calcEquipment(helperCastle.guns, soldierCount, requireMinimumEquipmentStock),
             ...flags,
-            morale: helperCastle.morale || 50,
-            training: helperCastle.training || 50
+            morale: helperCastle.morale ?? 50,
+            training: helperCastle.training ?? 50
         };
         this._consumeCastleResources(helperCastle, data);
         return data;
@@ -108,8 +108,8 @@ class ReinforcementService {
             horses: 0,
             guns: 0,
             ...flags,
-            morale: kunishu.morale || 50,
-            training: kunishu.training || 50
+            morale: kunishu.morale ?? 50,
+            training: kunishu.training ?? 50
         };
         kunishu.soldiers = Math.max(0, kunishu.soldiers - soldierCount);
         return data;
@@ -124,8 +124,8 @@ class ReinforcementService {
             horses: Math.max(0, Number(resources.horses) || 0),
             guns: Math.max(0, Number(resources.guns) || 0),
             ...flags,
-            morale: helperCastle.morale || 50,
-            training: helperCastle.training || 50
+            morale: helperCastle.morale ?? 50,
+            training: helperCastle.training ?? 50
         };
         this._consumeCastleResources(helperCastle, data);
         return data;

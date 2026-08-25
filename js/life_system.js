@@ -1436,7 +1436,7 @@ class LifeSystem {
             
             const clanCastlesInfo = this.game.getClanCastles(oldDaimyo.clan);
             clanCastlesInfo.forEach(c => {
-                c.peoplesLoyalty = Math.max(0, Math.min(100, (c.peoplesLoyalty || 50) + changeVal));
+                c.peoplesLoyalty = Math.max(0, Math.min(100, (c.peoplesLoyalty ?? 50) + changeVal));
                 if (changeVal < 0) {
                     const decreasePercent = Math.abs(changeVal);
                     c.soldiers = Math.floor(c.soldiers * ((100 - decreasePercent) / 100));

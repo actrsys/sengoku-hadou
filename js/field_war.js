@@ -502,12 +502,12 @@ class FieldWarManager {
 
         // それぞれの部隊ごとに兵糧、士気、訓練度を分けて管理する「専用の箱」を作ります！
         this.groupStats = {
-            atk_main: { rice: warState.attacker.rice || 0, morale: warState.attacker.morale || 50, training: warState.attacker.training || 50 },
-            atk_ally: warState.reinforcement ? { rice: warState.reinforcement.rice || 0, morale: warState.reinforcement.morale || 50, training: warState.reinforcement.training || 50 } : null,
-            atk_self: warState.selfReinforcement ? { rice: warState.selfReinforcement.rice || 0, morale: warState.selfReinforcement.morale || 50, training: warState.selfReinforcement.training || 50 } : null,
-            def_main: { rice: warState.defFieldRice || 0, morale: warState.defender.morale || 50, training: warState.defender.training || 50 },
-            def_ally: warState.defReinforcement ? { rice: warState.defReinforcement.rice || 0, morale: warState.defReinforcement.morale || 50, training: warState.defReinforcement.training || 50 } : null,
-            def_self: warState.defSelfReinforcement ? { rice: warState.defSelfReinforcement.rice || 0, morale: warState.defSelfReinforcement.morale || 50, training: warState.defSelfReinforcement.training || 50 } : null,
+            atk_main: { rice: warState.attacker.rice || 0, morale: warState.attacker.morale ?? 50, training: warState.attacker.training ?? 50 },
+            atk_ally: warState.reinforcement ? { rice: warState.reinforcement.rice || 0, morale: warState.reinforcement.morale ?? 50, training: warState.reinforcement.training ?? 50 } : null,
+            atk_self: warState.selfReinforcement ? { rice: warState.selfReinforcement.rice || 0, morale: warState.selfReinforcement.morale ?? 50, training: warState.selfReinforcement.training ?? 50 } : null,
+            def_main: { rice: warState.defFieldRice || 0, morale: warState.defender.morale ?? 50, training: warState.defender.training ?? 50 },
+            def_ally: warState.defReinforcement ? { rice: warState.defReinforcement.rice || 0, morale: warState.defReinforcement.morale ?? 50, training: warState.defReinforcement.training ?? 50 } : null,
+            def_self: warState.defSelfReinforcement ? { rice: warState.defSelfReinforcement.rice || 0, morale: warState.defSelfReinforcement.morale ?? 50, training: warState.defSelfReinforcement.training ?? 50 } : null,
         };
 
         this.turnQueue = [];

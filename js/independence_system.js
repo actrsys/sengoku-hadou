@@ -979,8 +979,8 @@ class IndependenceSystem {
         }
 
         // 野心と義理の数字を準備します（40より下、100より上は切り捨てます）
-        const ambition = Math.max(40, Math.min(100, rebellionLeader.ambition || 70));
-        const duty = Math.max(40, Math.min(100, rebellionLeader.duty || 70));
+        const ambition = Math.max(40, Math.min(100, rebellionLeader.ambition ?? 70));
+        const duty = Math.max(40, Math.min(100, rebellionLeader.duty ?? 70));
 
         let coupScore = 50;   // 謀反スコア
         let indepScore = 50;  // 独立スコア

@@ -736,7 +736,7 @@ class KunishuSystem {
 
             // ★後継ぎ候補が誰もいなくなった場合（モブ生成）
             if (allCandidates.length === 0) {
-                const inheritedAffinity = leader ? (leader.affinity || 50) : 50;
+                const inheritedAffinity = leader ? (leader.affinity ?? 50) : 50;
                 const inheritedInnovation = leader ? (leader.innovation || 0) : 0;
                 this.createAutoLeader(kunishu, inheritedAffinity, inheritedInnovation);
 

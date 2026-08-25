@@ -292,7 +292,7 @@ class EconomyRules {
             return Math.min(castle.rice, maxSellByGold);
         }
         else if (type === 'buy_ammo') {
-            const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
+            const price = parseInt(window.MainParams.Economy.PriceAmmo, 10);
             const maxBuy = price > 0 ? Math.floor(castle.gold / price) : 0;
             return Math.min(maxBuy, 99999 - (castle.ammo || 0));
         }
@@ -326,7 +326,7 @@ class EconomyRules {
             cost = Math.floor(amount / rateInfo.ricePerGold); // 売却の場合は利益
             rateStr = rateInfo.displayRateStr;
         } else if (type === 'buy_ammo') {
-            const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
+            const price = parseInt(window.MainParams.Economy.PriceAmmo, 10);
             cost = price * amount;
             rateStr = price.toFixed(1);
         } else if (type === 'buy_horses') {

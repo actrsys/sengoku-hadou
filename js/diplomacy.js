@@ -5,12 +5,6 @@
  */
 
 class DiplomacyManager {
-    // 外交失敗時の友好度低下量をまとめて管理する「定数（きまりごと）」
-    static PENALTIES = {
-        ALLIANCE_FAILURE: -4,  // 同盟・婚姻に失敗した時
-        DOMINATE_FAILURE: -7   // 支配・従属に失敗した時
-    };
-
     constructor(game) {
         this.game = game;
     }
@@ -33,8 +27,14 @@ class DiplomacyManager {
             if (targetClan && targetClan.diplomacyValue && targetClan.diplomacyValue[clanId]) {
                 // もし相手側が設定を持っていれば、同じ値をコピーします
                 const oppData = targetClan.diplomacyValue[clanId];
+                let mirroredStatus = oppData.status;
+                if (oppData.status === window.GameConstants.DiplomacyStatus.DOMINANT) {
+                    mirroredStatus = window.GameConstants.DiplomacyStatus.SUBORDINATE;
+                } else if (oppData.status === window.GameConstants.DiplomacyStatus.SUBORDINATE) {
+                    mirroredStatus = window.GameConstants.DiplomacyStatus.DOMINANT;
+                }
                 clan.diplomacyValue[targetId] = {
-                    status: oppData.status,
+                    status: mirroredStatus,
                     sentiment: oppData.sentiment,
                     trucePeriod: oppData.trucePeriod || 0,
                     isMarriage: oppData.isMarriage || false,
@@ -196,17 +196,20 @@ class DiplomacyManager {
 
         if (!dataA || !dataB) return;
 
-        // ★追加：新しく設定される状態が「支配」でも「従属」でもない場合は、継続期間をリセットします。
-        // （元々が支配・従属ではなく、今回新しく支配・従属になった場合も0からスタートさせます）
-        if (!window.DiplomacyRules.isVassalRelation(newStatus) || !window.DiplomacyRules.isVassalRelation(dataA.status)) {
+        const oldStatusA = dataA.status;
+        // 支配/従属を継続する時だけ継続月数を保つ。主従の向きが逆転した場合は新しい関係として0から数える。
+        if (!window.DiplomacyRules.isVassalRelation(newStatus)
+            || !window.DiplomacyRules.isVassalRelation(oldStatusA)
+            || oldStatusA !== newStatus) {
             dataA.subordinateMonths = 0;
             dataB.subordinateMonths = 0;
         }
 
         // 基本外交statusだけを書き換える。婚姻(isMarriage)と人質(hostageIds)は独立した付加関係なので、
         // 同盟⇔支配/従属などの格上げ・格下げで副作用的に消してはいけない。
+        // 和睦期間は和睦statusだけに属する値なので、別statusへ移る時に古い値を残さない。
         dataA.status = newStatus;
-        if (newStatus === window.GameConstants.DiplomacyStatus.TRUCE) dataA.trucePeriod = trucePeriod;
+        dataA.trucePeriod = newStatus === window.GameConstants.DiplomacyStatus.TRUCE ? trucePeriod : 0;
 
         // 状態の反転処理と同調
         if (newStatus === window.GameConstants.DiplomacyStatus.DOMINANT) {
@@ -216,8 +219,8 @@ class DiplomacyManager {
         } else {
             // 同盟・敵対・和睦などは共通
             dataB.status = newStatus;
-            if (newStatus === window.GameConstants.DiplomacyStatus.TRUCE) dataB.trucePeriod = trucePeriod;
         }
+        dataB.trucePeriod = newStatus === window.GameConstants.DiplomacyStatus.TRUCE ? trucePeriod : 0;
 
         // ★今回追加：関係が変化したので、両方の大名家の「今月の外交目標」をリセットします！
         const clanA = this.game.clans.find(c => c.id === clanId);
@@ -883,7 +886,7 @@ class DiplomacyManager {
         if (becameHostile) {
             this.game.bushos.forEach(b => {
                 if (b.isHostage && ((b.originalClanId === doerClanId && b.clan === targetClanId) || (b.originalClanId === targetClanId && b.clan === doerClanId))) {
-                    let chance = 0.5 - ((b.strength || 30) * 0.002) + (Math.random() * 0.3);
+                    let chance = 0.5 - ((b.strength ?? 30) * 0.002) + (Math.random() * 0.3);
                     if (chance > 0.5) capturedHostages.push(b);
                     else escapedHostages.push(b);
                 }
@@ -1668,7 +1671,7 @@ class DiplomacyManager {
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
                 this.game.factionSystem.updateRecognition(doer, 30);
             } else {
-                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
+                this.updateSentiment(doer.clan, targetClanId, window.MainParams.Diplomacy.FailureSentiment.Alliance);
                 msg = isVassalAllianceUpgrade
                     ? `${targetClanName}に主従関係の解消と同盟への移行を願いましたが、受け入れられませんでした。`
                     : `同盟の締結に失敗しました……`;
@@ -1957,7 +1960,7 @@ class DiplomacyManager {
             };
             
             const handleFailure = (wasNegotiation = false) => {
-                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.DOMINATE_FAILURE);
+                this.updateSentiment(doer.clan, targetClanId, window.MainParams.Diplomacy.FailureSentiment.Dominate);
                 msg = wasNegotiation
                     ? `条件が折り合わず、${this.game.clans.find(c => c.id === targetClanId).name} への従属を断念しました。`
                     : `${this.game.clans.find(c => c.id === targetClanId).name} に従属の願いを受け入れてもらえませんでした。`;
@@ -2025,7 +2028,7 @@ class DiplomacyManager {
             };
             
             const handleFailure = (wasNegotiation = false) => {
-                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
+                this.updateSentiment(doer.clan, targetClanId, window.MainParams.Diplomacy.FailureSentiment.Alliance);
                 msg = wasNegotiation
                     ? `条件が折り合わず、${this.game.clans.find(c => c.id === targetClanId).name} との和睦は決裂しました。`
                     : `${this.game.clans.find(c => c.id === targetClanId).name} に和睦を拒まれました。`;
@@ -2076,7 +2079,7 @@ class DiplomacyManager {
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
                 this.game.factionSystem.updateRecognition(doer, 40);
             } else {
-                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.DOMINATE_FAILURE);
+                this.updateSentiment(doer.clan, targetClanId, window.MainParams.Diplomacy.FailureSentiment.Dominate);
                 msg = `支配の要求は拒否されました……`;
                 this._recordDiplomacyHistory(`【外交】${doerClanName}の${targetClanName}への降伏勧告は拒否されました。`, [doer.clan, targetClanId]);
                 doer.achievementTotal += 5;
@@ -2515,7 +2518,7 @@ class DiplomacyManager {
 
             this.showDiplomacyResult(doer.clan, true, msg, logMsg, "", null, [doer.clan, targetClanId]);
         } else {
-            this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
+            this.updateSentiment(doer.clan, targetClanId, window.MainParams.Diplomacy.FailureSentiment.Alliance);
             doer.isActionDone = true;
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
@@ -2677,17 +2680,17 @@ class DiplomacyManager {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
             } else if (type === 'alliance') {
-                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
+                this.updateSentiment(doer.clan, targetClanId, window.MainParams.Diplomacy.FailureSentiment.Alliance);
                 this.game.ui.showResultModal(isVassalAllianceUpgrade ? `主従関係の解消と同盟への移行を見送りました。` : `同盟の提案を拒否しました。`, () => {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
             } else if (type === 'dominate') {
-                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.DOMINATE_FAILURE);
+                this.updateSentiment(doer.clan, targetClanId, window.MainParams.Diplomacy.FailureSentiment.Dominate);
                 this.game.ui.showResultModal(`従属の要求を断固として拒否しました！`, () => {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
             } else if (type === 'truce') {
-                this.updateSentiment(doer.clan, targetClanId, DiplomacyManager.PENALTIES.ALLIANCE_FAILURE);
+                this.updateSentiment(doer.clan, targetClanId, window.MainParams.Diplomacy.FailureSentiment.Alliance);
                 this.game.ui.showResultModal(`和睦の打診を拒否しました。`, () => {
                     if (onComplete) setTimeout(onComplete, 100);
                 });
