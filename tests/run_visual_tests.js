@@ -1016,6 +1016,47 @@ async function validateWarAptitudeLayout(cdp) {
 }
 
 
+async function validateFieldWarFullscreen(cdp) {
+    const html = fixtureHtml('field_war_fullscreen.html');
+    const cases = [
+        { label:'PC', width:1280, height:720, mobile:false, isPc:true },
+        { label:'mobile', width:360, height:640, mobile:true, isPc:false }
+    ];
+    for (const cfg of cases) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width:cfg.width, height:cfg.height, deviceScaleFactor:1, mobile:cfg.mobile });
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(() => {
+                document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.classList.toggle('is-pc', ${cfg.isPc});
+                const screen=document.getElementById('game-screen');
+                screen.style.left='0px';screen.style.top='0px';screen.style.width='${cfg.width}px';screen.style.height='${cfg.height}px';screen.style.transform='none';
+                const sr=screen.getBoundingClientRect();
+                const modal=document.getElementById('field-war-modal');
+                const content=document.querySelector('#field-war-modal .fw-fullscreen-content');
+                const mr=modal.getBoundingClientRect();
+                const cr=content.getBoundingClientRect();
+                const cs=getComputedStyle(content);
+                return {
+                    screen:{left:sr.left,top:sr.top,right:sr.right,bottom:sr.bottom,width:sr.width,height:sr.height},
+                    modal:{left:mr.left,top:mr.top,right:mr.right,bottom:mr.bottom,width:mr.width,height:mr.height},
+                    content:{left:cr.left,top:cr.top,right:cr.right,bottom:cr.bottom,width:cr.width,height:cr.height},
+                    borderTop:parseFloat(cs.borderTopWidth)||0,borderRight:parseFloat(cs.borderRightWidth)||0,
+                    radius:cs.borderTopLeftRadius,
+                    marginTop:parseFloat(cs.marginTop)||0,marginLeft:parseFloat(cs.marginLeft)||0
+                };
+            })()`, returnByValue:true, awaitPromise:true
+        });
+        const st=result.result.value;
+        assert.ok(st.content.left <= st.screen.left + 1 && st.content.top <= st.screen.top + 1, `${cfg.label}: 野戦画面の左上に元画面が見える隙間があります`);
+        assert.ok(st.content.right >= st.screen.right - 1 && st.content.bottom >= st.screen.bottom - 1, `${cfg.label}: 野戦画面の右下に元画面が見える隙間があります`);
+        assert.strictEqual(st.borderTop, 0, `${cfg.label}: 野戦全画面に外枠を付けない`);
+        assert.strictEqual(st.borderRight, 0, `${cfg.label}: 野戦全画面に外枠を付けない`);
+        assert.ok(st.radius === '0px' || st.radius === '0', `${cfg.label}: 野戦全画面は角丸にしない (${st.radius})`);
+        assert.ok(Math.abs(st.marginTop) <= 0.1 && Math.abs(st.marginLeft) <= 0.1, `${cfg.label}: 野戦全画面に外側余白を残さない`);
+    }
+    console.log('✓ 野戦 PC/スマホ full-screen visual/layout regression');
+}
+
 async function validateFieldTerrainLayout(cdp) {
     const html = fixtureHtml('field_terrain.html');
     await cdp.call('Emulation.setDeviceMetricsOverride', { width: 720, height: 420, deviceScaleFactor: 1, mobile: false });
@@ -1108,6 +1149,7 @@ async function main() {
         await validateEndingAndWatchStates(cdp);
         await validateGuideLayout(cdp);
         await validateWarAptitudeLayout(cdp);
+        await validateFieldWarFullscreen(cdp);
         await validateFieldTerrainLayout(cdp);
     } finally {
         if (cdp) cdp.close();

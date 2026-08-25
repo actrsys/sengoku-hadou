@@ -3031,18 +3031,13 @@ body:not(.is-pc) .war-action-message-prompt { left: auto; right: 15px; transform
     border-radius: 0 !important; 
     border: none !important; 
     padding: 0 !important; 
+    box-shadow: none !important;
     background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); /* ★和風ベースカラーに変更 */
     display: flex; 
     flex-direction: column; 
 }
-body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
-    border: 2px solid #d4af37 !important;
-    border-radius: 8px !important;
-    width: 95% !important;
-    height: 95% !important;
-    max-width: 1200px !important;
-    margin: auto !important;
-}
+/* 野戦は独立した戦闘画面として扱い、PC/スマホとも外側に元画面を見せない。
+   スマホは従来から全画面だったため、共通の全画面指定へ一本化する。 */
 
 .fw-top-bar { height: 30px; background: #000; color: #fff; display: flex; align-items: center; padding: 0 10px; font-size: 0.9rem; font-weight: bold; gap: 20px; flex-shrink: 0; }
 .fw-main-area { flex: 1; position: relative; overflow: hidden; background: #000000 !important; }
