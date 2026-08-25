@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><style><!-- APP_CSS --></style>
+<style>
+html,body{margin:0;background:#111;color:#fff;font-family:sans-serif}.terrain-stage{position:relative;width:720px;height:420px;overflow:hidden;background:#050806}.terrain-map{position:absolute;left:24px;top:24px;width:520px;height:360px}.terrain-legend{position:absolute;right:20px;top:28px;width:142px;display:flex;flex-direction:column;gap:12px}.legend-row{display:flex;align-items:center;gap:10px}.legend-row .fw-hex{position:relative;left:auto!important;top:auto!important;flex:none}.legend-row span{font-size:14px}
+</style></head>
+<body><div class="terrain-stage"><div id="terrain-map" class="terrain-map"></div><div id="legend" class="terrain-legend"></div></div>
+<script>
+const map=document.getElementById('terrain-map');
+const palette=['plain','plain','forest','plain','mountain','plain','river','plain','forest','plain'];
+for(let x=0;x<20;x++)for(let row=0;row<12;row++){
+  const y=(x%2===0)?row*2:row*2+1;
+  let type=palette[(x*3+row*5)%palette.length];
+  if(x===9||x===10) type='river';
+  if(x>=16&&row>=7) type='sea';
+  const h=document.createElement('div');
+  h.className=`fw-hex hex-${type} terrain-variant-${Math.abs(x*17+row*31)%3}`;
+  h.style.left=`${x*22.5}px`; h.style.top=`${y*13}px`;
+  map.appendChild(h);
+}
+for(const [type,label] of [['plain','平地'],['forest','森'],['mountain','山'],['river','川'],['sea','海']]){
+  const row=document.createElement('div');row.className='legend-row';
+  const h=document.createElement('div');h.className=`fw-hex hex-${type}`;
+  const s=document.createElement('span');s.textContent=label;row.append(h,s);document.getElementById('legend').append(row);
+}
+</script></body></html>

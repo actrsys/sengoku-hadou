@@ -1397,12 +1397,13 @@ class FieldWarManager {
                 hex.id = `fw-hex-${x}-${y}`; // IDをつけておく
 
                 if (this.grid && this.grid[row] && this.grid[row][x]) {
-                    // ★修正：下地は黒ですが、マス目にはちゃんと地形の見た目（色）をつけます！
-                    if (this.grid[row][x].isSea) {
-                        hex.classList.add('hex-sea');
-                    } else {
-                        hex.classList.add(`hex-${this.grid[row][x].terrain}`);
-                    }
+                    const cell = this.grid[row][x];
+                    const visualTerrain = cell.isSea ? 'sea' : cell.terrain;
+                    hex.dataset.terrain = visualTerrain;
+                    hex.classList.add(`hex-${visualTerrain}`);
+                    // 同じ模様が碁盤目状に反復して見えないよう、座標から決まる静的なずらしだけを付けます。
+                    // 乱数やアニメーションは使わないため、再描画コストやゲームロジックには影響しません。
+                    hex.classList.add(`terrain-variant-${Math.abs((x * 17 + row * 31)) % 3}`);
                 }
                 
                 hex.style.left = `${x * (this.hexW * 0.75)}px`;

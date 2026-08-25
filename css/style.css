@@ -140,7 +140,6 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(233, 30, 99, 0); } 100% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0); } }
 @keyframes pulse-shadow { 0% { filter: drop-shadow(0 0 0 rgba(233, 30, 99, 0.7)); } 70% { filter: drop-shadow(0 0 10px rgba(233, 30, 99, 0)); } 100% { filter: drop-shadow(0 0 0 rgba(233, 30, 99, 0)); } }
 @keyframes fw-blink { 0%{opacity:0.3;} 50%{opacity:0.8;} 100%{opacity:0.3;} }
-@keyframes river-ripple { 0%, 49.9% { background-position: 0px 0px, 0px 0px; } 50%, 100% { background-position: 8px 2px, 8px 2px; } }
 
 /* =========================================================
    タイトル画面
@@ -3098,8 +3097,8 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
 .fw-menu-group button { height: 60%; min-height: 30px; min-width: 100px; font-size: 1.1rem; border-radius: 8px; font-weight: bold; display: flex; justify-content: center; align-items: center; padding: 0; margin: 0; line-height: 1; }
 #fw-map { position: relative; margin: 0; background-color: transparent; overflow: hidden; transition: transform 0.3s; }
 
-/* ★修正: スクロール時のカクつき（重さ）を解消するため、描画の仕組み（GPU）を整えました */
-.fw-hex { width: 30px; height: 26px; background-color: #aed581; clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); position: absolute; box-sizing: border-box; display: flex; justify-content: center; align-items: center; color: rgba(0,0,0,0.3); font-size: 8px; font-weight: bold; transition: background-color 0.2s, filter 0.2s; user-select: none; transform: scale(1.02) translateZ(0); backface-visibility: hidden; will-change: filter; }
+/* 野戦HEXは数百枚並ぶため、各マスをGPUレイヤー化せず静的描画を基本にします。 */
+.fw-hex { width: 30px; height: 26px; background-color: #7fa65f; clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); position: absolute; box-sizing: border-box; display: flex; justify-content: center; align-items: center; color: rgba(0,0,0,0.3); font-size: 8px; font-weight: bold; transition: filter 0.16s; user-select: none; transform: scale(1.02); }
 
 /* ★追加：縮小して隙間を見せるのではなく、SVGの線で境界をハッキリ描く魔法 */
 .fw-hex::before {
@@ -3126,33 +3125,43 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
 .fw-hex.fw-dir-highlight { cursor: pointer; filter: brightness(1.2); }
 .fw-hex.fw-dir-highlight::after { background-color: rgba(255, 235, 59, 0.5); box-shadow: inset 0 0 10px #fbc02d; }
 
-.hex-plain { background-color: #81c784 !important; background-image: linear-gradient(0deg, rgba(255, 255, 255, 0.15) 50%, transparent 50%) !important; background-size: 10px 10px !important; }
-.hex-forest { background-color: #2e7d32 !important; background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.15) 25%, transparent 25%), linear-gradient(315deg, rgba(0, 0, 0, 0.15) 25%, transparent 25%) !important; background-position: 5px 0, 10px 0 !important; background-size: 10px 10px !important; }
-.hex-river { background-color: #4fc3f7 !important; background-image: radial-gradient(ellipse 8px 4px at 4px 4px, rgba(255, 255, 255, 0.4) 30%, transparent 50%), radial-gradient(ellipse 8px 4px at 12px 12px, rgba(255, 255, 255, 0.2) 30%, transparent 50%) !important; background-size: 16px 16px !important; animation: river-ripple 1.5s infinite !important; }
-.hex-mountain { background-color: #795548 !important; background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.15) 50%, transparent 50%) !important; background-size: 10px 10px !important; }
+/* =========================================================
+   野戦地形チップ
+   - 1マスごとのアニメーションを持たせず、静的なSVGパターンで質感を出します。
+   - SVGは地形ごとに共通なので、数百HEXでも画像資源を使い回せます。
+   ========================================================= */
+.hex-plain {
+    background-color: #769c58 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='26' viewBox='0 0 30 26'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cpath d='M4 20l1-4M7 21l2-5M19 8l1-4M22 9l2-5M12 15l1-3M25 19l1-3' stroke='%235a7f42' stroke-width='1' opacity='.55'/%3E%3Cpath d='M3 7h4M16 20h4M24 12h3' stroke='%23a9c985' stroke-width='1' opacity='.4'/%3E%3C/g%3E%3C/svg%3E") !important;
+    background-size: 30px 26px !important;
+}
+.hex-forest {
+    background-color: #315f37 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='26' viewBox='0 0 30 26'%3E%3Cg stroke='%231b4827' stroke-width='1'%3E%3Cpath d='M6 19v-5M15 21v-6M24 18v-5'/%3E%3C/g%3E%3Cg fill='%234a7b45'%3E%3Ccircle cx='6' cy='11' r='4'/%3E%3Ccircle cx='15' cy='12' r='5'/%3E%3Ccircle cx='24' cy='10' r='4'/%3E%3C/g%3E%3Cg fill='%23618d53' opacity='.75'%3E%3Ccircle cx='4.5' cy='9.5' r='1.8'/%3E%3Ccircle cx='13' cy='10' r='2'/%3E%3Ccircle cx='22.5' cy='8.5' r='1.7'/%3E%3C/g%3E%3C/svg%3E") !important;
+    background-size: 30px 26px !important;
+}
+.hex-river {
+    background-color: #4b91b4 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='26' viewBox='0 0 30 26'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cpath d='M-4 8C4 3 10 13 18 8S31 4 35 8' stroke='%237fc4d7' stroke-width='2' opacity='.72'/%3E%3Cpath d='M-2 18C5 14 10 22 17 18S27 14 33 17' stroke='%23366f94' stroke-width='1.5' opacity='.62'/%3E%3Cpath d='M7 4c3-2 6-2 9 0M18 13c3-2 6-2 9 0' stroke='%23d5edf2' stroke-width='1' opacity='.48'/%3E%3C/g%3E%3C/svg%3E") !important;
+    background-size: 30px 26px !important;
+    animation: none !important;
+}
+.hex-mountain {
+    background-color: #7b6855 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='26' viewBox='0 0 30 26'%3E%3Cpath d='M1 21L9 8l5 7 4-10 11 16z' fill='%23655243' opacity='.9'/%3E%3Cpath d='M9 8l2.3 3.2L9.7 11 8.5 13 7 12zM18 5l3 5-2.2-.8-1.4 2.2-1.7-1.3z' fill='%23c4b39d' opacity='.75'/%3E%3Cpath d='M2 21h27' stroke='%234c4036' stroke-width='1' opacity='.55'/%3E%3C/svg%3E") !important;
+    background-size: 30px 26px !important;
+}
 
-/* ★変更: 海戦マップ用の海（線のデザインに戻し、アニメーションを停止して軽量化） */
-.hex-sea { 
-    background-color: #245b8e !important; 
-    background-image: 
-        /* 暗いまだらな線 */
-        linear-gradient(25deg, transparent 35%, rgba(20, 35, 55, 0.7) 38%, transparent 42%),
-        linear-gradient(65deg, transparent 55%, rgba(15, 30, 45, 0.6) 58%, transparent 62%),
-        linear-gradient(110deg, transparent 15%, rgba(25, 40, 60, 0.5) 17%, transparent 20%),
-        linear-gradient(160deg, transparent 75%, rgba(10, 25, 40, 0.7) 77%, transparent 80%),
-        linear-gradient(5deg, transparent 45%, rgba(15, 30, 45, 0.6) 47%, transparent 50%),
-        linear-gradient(145deg, transparent 25%, rgba(20, 35, 55, 0.5) 27%, transparent 30%),
-        /* 明るい白っぽいまだらな線 */
-        linear-gradient(35deg, transparent 45%, rgba(255, 255, 255, 0.2) 47%, transparent 50%),
-        linear-gradient(75deg, transparent 15%, rgba(255, 255, 255, 0.15) 17%, transparent 20%),
-        linear-gradient(115deg, transparent 65%, rgba(255, 255, 255, 0.1) 67%, transparent 70%),
-        linear-gradient(155deg, transparent 35%, rgba(255, 255, 255, 0.25) 37%, transparent 40%),
-        linear-gradient(15deg, transparent 85%, rgba(255, 255, 255, 0.15) 87%, transparent 90%),
-        linear-gradient(175deg, transparent 55%, rgba(255, 255, 255, 0.1) 57%, transparent 60%) !important;
-    background-size: 
-        16px 22px, 24px 18px, 14px 26px, 30px 16px, 20px 28px, 26px 20px,
-        18px 24px, 22px 16px, 26px 30px, 16px 20px, 28px 14px, 20px 24px !important;
-    image-rendering: pixelated; /* ピクセル感を残して雰囲気を合わせます */
+/* 座標ごとにパターン位置だけずらし、同じチップの連続感を弱めます。 */
+.fw-hex.terrain-variant-1 { background-position: -7px 3px !important; }
+.fw-hex.terrain-variant-2 { background-position: 6px -4px !important; }
+
+/* 海は多重グラデーションを毎HEXで合成せず、1枚の静的な波模様を使い回します。 */
+.hex-sea {
+    background-color: #285c83 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='26' viewBox='0 0 30 26'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cpath d='M-5 7Q1 3 7 7t12 0t12 0' stroke='%235f91ad' stroke-width='1.5' opacity='.75'/%3E%3Cpath d='M-2 17Q4 13 10 17t12 0t12 0' stroke='%231c435f' stroke-width='1.5' opacity='.85'/%3E%3Cpath d='M4 11q4-2 8 0M20 21q4-2 8 0' stroke='%23bfd4df' stroke-width='1' opacity='.35'/%3E%3C/g%3E%3C/svg%3E") !important;
+    background-size: 30px 26px !important;
+    image-rendering: auto;
 }
 
 /* 大雪時の川（氷）：波のアニメーションを消し、水色に太さの違う斜めの光沢（氷のヒビや反射）を表現します */
@@ -3163,6 +3172,7 @@ body.is-pc #field-war-modal .modal-content.fw-fullscreen-content {
         linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.3) 55%, transparent 60%),
         linear-gradient(135deg, transparent 80%, rgba(255, 255, 255, 0.9) 82%, transparent 84%) !important;
     background-size: 100% 100% !important;
+    background-position: 0 0 !important;
     animation: none !important;
 }
 

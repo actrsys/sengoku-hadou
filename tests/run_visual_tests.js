@@ -1015,6 +1015,38 @@ async function validateWarAptitudeLayout(cdp) {
     console.log('✓ 部隊編成 PC情報カード / スマホ左兵科＋正式適性名 visual/layout regression');
 }
 
+
+async function validateFieldTerrainLayout(cdp) {
+    const html = fixtureHtml('field_terrain.html');
+    await cdp.call('Emulation.setDeviceMetricsOverride', { width: 720, height: 420, deviceScaleFactor: 1, mobile: false });
+    let result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            document.open();document.write(${JSON.stringify(html)});document.close();
+            const map=document.getElementById('terrain-map');
+            const tiles=[...map.querySelectorAll('.fw-hex')];
+            const rects=tiles.map(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};});
+            const styleFor=t=>{const el=document.querySelector('.hex-'+t);const cs=getComputedStyle(el);return {bg:cs.backgroundImage,color:cs.backgroundColor,anim:cs.animationName};};
+            return {count:tiles.length,rects,plain:styleFor('plain'),forest:styleFor('forest'),mountain:styleFor('mountain'),river:styleFor('river'),sea:styleFor('sea')};
+        })()`, returnByValue: true, awaitPromise: true
+    });
+    const st=result.result.value;
+    assert.strictEqual(st.count, 240, '野戦地形fixtureは240HEXを描画する');
+    assert.ok(st.rects.every(r=>r.width >= 29 && r.height >= 25), '地形チップ寸法が潰れている');
+    for (const [name,data] of Object.entries({plain:st.plain,forest:st.forest,mountain:st.mountain,river:st.river,sea:st.sea})) {
+        assert.ok(data.bg && data.bg !== 'none', `${name}: 静的な地形模様が必要`);
+    }
+    assert.strictEqual(st.river.anim, 'none', '川チップは常時アニメーションしない');
+    const colors=new Set([st.plain.color,st.forest.color,st.mountain.color,st.river.color,st.sea.color]);
+    assert.strictEqual(colors.size,5,'5地形は基調色だけでも識別できる必要がある');
+    if (process.env.KEEP_VISUAL_SCREENSHOT === '1') {
+        const shot=await cdp.call('Page.captureScreenshot',{format:'png',fromSurface:true});
+        const keep=path.join(ROOT,'tests','visual','last_field_terrain.png');
+        fs.writeFileSync(keep,Buffer.from(shot.data,'base64'));
+        console.log(`  terrain screenshot: ${keep}`);
+    }
+    console.log('✓ 野戦地形チップ static visual/layout regression');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -1076,6 +1108,7 @@ async function main() {
         await validateEndingAndWatchStates(cdp);
         await validateGuideLayout(cdp);
         await validateWarAptitudeLayout(cdp);
+        await validateFieldTerrainLayout(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');

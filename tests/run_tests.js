@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r179');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r180');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -4862,6 +4862,38 @@ test('結果画面との引き渡しは結果を先に表示し背景復帰も�
     const closeEnd = ui.indexOf('showQuantityModal(', closeStart);
     const closeBlock = ui.slice(closeStart, closeEnd > closeStart ? closeEnd : closeStart + 2400);
     assert.ok(closeBlock.indexOf('this.resumeBackgroundUpdates()') < closeBlock.indexOf("this.resultModal.classList.add('hidden')"), '背景を復帰してから結果画面を隠す');
+});
+
+
+test('野戦地形チップは静的な共通描画を使い、川をマス単位で常時アニメーションしない', () => {
+    const css = read('css/style.css');
+    const field = read('js/field_war.js');
+    assert.ok(css.includes('.hex-plain {') && css.includes('.hex-forest {') && css.includes('.hex-mountain {') && css.includes('.hex-river {') && css.includes('.hex-sea {'));
+    assert.ok(css.includes("data:image/svg+xml"), '地形質感は共通の静的SVGを使い回す');
+    const riverStart = css.indexOf('.hex-river {');
+    const riverEnd = css.indexOf('.hex-mountain {', riverStart);
+    const riverBlock = css.slice(riverStart, riverEnd);
+    assert.ok(riverBlock.includes('animation: none !important'), '川HEXは常時アニメーションしない');
+    assert.ok(!css.includes('@keyframes river-ripple'), '旧river-rippleを残さない');
+    const hexStart = css.indexOf('.fw-hex {');
+    const hexEnd = css.indexOf('.fw-hex::before', hexStart);
+    const hexBlock = css.slice(hexStart, hexEnd);
+    assert.ok(!hexBlock.includes('will-change: filter'), '数百HEXをwill-changeで個別レイヤー化しない');
+    assert.ok(!hexBlock.includes('translateZ(0)'), '数百HEXをtranslateZで個別レイヤー化しない');
+    assert.ok(field.includes('hex.dataset.terrain = visualTerrain'));
+    assert.ok(field.includes('terrain-variant-${Math.abs((x * 17 + row * 31)) % 3}'), '静的な座標差分で反復感だけ弱める');
+});
+
+test('雨雪は背景座標の全画面再描画ではなく少数の合成レイヤーを移動する', () => {
+    const css = read('css/animation.css');
+    assert.ok(css.includes('#fw-weather-layer::before, #war-weather-layer::before'));
+    assert.ok(css.includes('contain: paint'));
+    assert.ok(css.includes('@keyframes rain-layer-drift'));
+    assert.ok(css.includes('@keyframes snow-layer-drift'));
+    assert.ok(css.includes('transform: translate3d(-20px, -40px, 0)'));
+    assert.ok(css.includes('transform: translate3d(0, -50px, 0)'));
+    assert.ok(!css.includes('@keyframes rain-fall'), '旧background-position雨アニメーションを残さない');
+    assert.ok(!css.includes('@keyframes snow-fall'), '旧background-position雪アニメーションを残さない');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

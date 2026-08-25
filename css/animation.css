@@ -184,6 +184,15 @@
     height: 100%;
     pointer-events: none; /* マウス操作の邪魔をしないようにする魔法です */
     z-index: 50; /* マップの上、UIの下に配置します */
+    overflow: hidden;
+    contain: paint;
+}
+#fw-weather-layer::before, #war-weather-layer::before {
+    content: "";
+    position: absolute;
+    inset: -80px;
+    pointer-events: none;
+    background-repeat: repeat;
 }
 
 /* 雨の時は、タイルの隙間を濡れた色にして、暗すぎない程度に全体を調整します */
@@ -192,23 +201,25 @@
     filter: brightness(0.85) contrast(1.05); /* 以前より明るめに設定 */
 }
 
-/* こまかい雨の表現：斜めの短い線を複数重ねて、斜めに降らせます */
+/* 雨の見た目は維持しつつ、背景座標の再描画ではなく合成レイヤーの移動で降らせます。 */
 #fw-main-area.is-raining #fw-weather-layer, #war-visual-area.is-raining #war-weather-layer {
     display: block !important;
-    /* 110度の角度で、透明な隙間をたくさん作った細かい雨粒の層を2つ重ねます */
-    background-image: 
+    background: none;
+}
+#fw-main-area.is-raining #fw-weather-layer::before, #war-visual-area.is-raining #war-weather-layer::before {
+    background-image:
         linear-gradient(110deg, transparent 80%, rgba(255,255,255,0.25) 85%, transparent 90%),
         linear-gradient(110deg, transparent 60%, rgba(255,255,255,0.15) 65%, transparent 70%);
-    /* 2つの層の大きさをズラすことで、ランダムな雨のように見せます */
     background-size: 20px 40px, 35px 65px;
     background-position: 0 0, 10px 20px;
-    animation: rain-fall 0.4s linear infinite;
+    transform: translate3d(-20px, -40px, 0);
+    will-change: transform;
+    animation: rain-layer-drift 0.4s linear infinite;
 }
 
-@keyframes rain-fall {
-    0% { background-position: 0px 0px, 10px 20px; }
-    /* それぞれのタイルの大きさに合わせて、斜め右下へ向かってシームレスに動かします */
-    100% { background-position: 20px 40px, 45px 85px; } 
+@keyframes rain-layer-drift {
+    from { transform: translate3d(-20px, -40px, 0); }
+    to   { transform: translate3d(0, 0, 0); }
 }
 
 /* =========================================
@@ -271,24 +282,25 @@
     filter: brightness(1.15) contrast(0.9); /* 全体を白っぽく、少しぼんやりさせます */
 }
 
-/* ★雪が降っている時の表現：半透明の白い水玉を降らせます */
+/* 雪も背景の再描画ではなく、同じ粒模様を載せた合成レイヤーだけを移動させます。 */
 #fw-main-area.is-snowing #fw-weather-layer, #war-visual-area.is-snowing #war-weather-layer {
     display: block !important;
-    /* 丸い水玉（雪）を大きさを変えて2つの層で作ります */
-    background-image: 
+    background: none;
+}
+#fw-main-area.is-snowing #fw-weather-layer::before, #war-visual-area.is-snowing #war-weather-layer::before {
+    background-image:
         radial-gradient(circle, rgba(255,255,255,0.8) 10%, transparent 20%),
         radial-gradient(circle, rgba(255,255,255,0.6) 10%, transparent 20%);
-    /* 雪の粒の散らばり具合を決めます */
     background-size: 30px 30px, 50px 50px;
     background-position: 0 0, 15px 25px;
-    /* 雪は雨より少しゆっくり降らせます */
-    animation: snow-fall 3s linear infinite;
+    transform: translate3d(0, -50px, 0);
+    will-change: transform;
+    animation: snow-layer-drift 3s linear infinite;
 }
 
-@keyframes snow-fall {
-    0% { background-position: 0px 0px, 15px 25px; }
-    /* 真下へゆっくり落とします */
-    100% { background-position: 0px 30px, 15px 75px; }
+@keyframes snow-layer-drift {
+    from { transform: translate3d(0, -50px, 0); }
+    to   { transform: translate3d(0, 0, 0); }
 }
 
 /* 夕方で大雪の時の表現：少し夕焼けのオレンジを混ぜます */
