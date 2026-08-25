@@ -864,13 +864,34 @@ async function validateGuideLayout(cdp) {
                 const scenarioDesc = document.getElementById('scenario-desc-box');
                 scenarioDesc.style.display = 'flex';
                 const scenarioContentEl = scenarioModal.querySelector('.start-content');
-                const scenarioContent = scenarioContentEl.getBoundingClientRect();
-                const scenarioListRect = document.getElementById('scenario-list').getBoundingClientRect();
-                const scenarioDescRect = scenarioDesc.getBoundingClientRect();
+                const scenarioListEl = document.getElementById('scenario-list');
                 const scenarioFooter = scenarioModal.querySelector('.modal-footer');
-                const scenarioClose = scenarioFooter.querySelector('.btn-secondary').getBoundingClientRect();
-                const scenarioMainBottom = Math.max(scenarioListRect.bottom, scenarioDescRect.bottom);
-                const scenarioGap = scenarioClose.top - scenarioMainBottom;
+
+                const captureScenarioLayout = () => {
+                    const scenarioContent = scenarioContentEl.getBoundingClientRect();
+                    const scenarioListRect = scenarioListEl.getBoundingClientRect();
+                    const scenarioDescRect = scenarioDesc.getBoundingClientRect();
+                    const scenarioClose = scenarioFooter.querySelector('.btn-secondary').getBoundingClientRect();
+                    const scenarioMainBottom = Math.max(scenarioListRect.bottom, scenarioDescRect.bottom);
+                    const cards = [...scenarioListEl.querySelectorAll('.clan-btn')].map(el => {
+                        const r = el.getBoundingClientRect();
+                        return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};
+                    });
+                    return {
+                        gap: scenarioClose.top - scenarioMainBottom,
+                        content:{left:scenarioContent.left,top:scenarioContent.top,right:scenarioContent.right,bottom:scenarioContent.bottom,clientHeight:scenarioContentEl.clientHeight,scrollHeight:scenarioContentEl.scrollHeight},
+                        list:{clientHeight:scenarioListEl.clientHeight,scrollHeight:scenarioListEl.scrollHeight,clientWidth:scenarioListEl.clientWidth,scrollWidth:scenarioListEl.scrollWidth},
+                        cards
+                    };
+                };
+
+                const scenarioMany = captureScenarioLayout();
+
+                // 4件以下の従来密度も同じfixtureで再確認する。
+                [...scenarioListEl.children].slice(4).forEach(el => el.remove());
+                scenarioContentEl.classList.remove('scenario-layout-many');
+                scenarioListEl.classList.remove('scenario-list-many');
+                const scenarioFew = captureScenarioLayout();
 
                 return {
                     screen:{left:screen.left,top:screen.top,right:screen.right,bottom:screen.bottom},
@@ -878,9 +899,7 @@ async function validateGuideLayout(cdp) {
                     nav:{clientHeight:nav.clientHeight,scrollHeight:nav.scrollHeight},
                     article:{clientHeight:article.clientHeight,scrollHeight:article.scrollHeight},
                     leadExists: !!lead, commandTopBefore, commandTopAfter,
-                    guideGap,
-                    scenarioGap,
-                    scenarioContent:{left:scenarioContent.left,top:scenarioContent.top,right:scenarioContent.right,bottom:scenarioContent.bottom,clientHeight:scenarioContentEl.clientHeight,scrollHeight:scenarioContentEl.scrollHeight}
+                    guideGap, scenarioMany, scenarioFew
                 };
             })()`, returnByValue: true
         });
@@ -899,9 +918,18 @@ async function validateGuideLayout(cdp) {
         assert.ok(state.article.scrollHeight <= state.article.clientHeight + 1, `${cfg.label}: 指南書記事が見切れる`);
         assert.strictEqual(state.leadExists, false, `${cfg.label}: 見出し下の説明専用エリアを残さない`);
         assert.ok(Math.abs(state.commandTopBefore - state.commandTopAfter) <= 0.5, `${cfg.label}: 本文の説明量でコマンド一覧の位置が動く`);
-        assert.ok(state.scenarioContent.left >= state.screen.left - 1 && state.scenarioContent.right <= state.screen.right + 1, `${cfg.label}: シナリオ選択が横にはみ出す`);
-        assert.ok(state.scenarioContent.top >= state.screen.top - 1 && state.scenarioContent.bottom <= state.screen.bottom + 1, `${cfg.label}: シナリオ選択が縦にはみ出す`);
-        assert.ok(Math.abs(state.guideGap - state.scenarioGap) <= 1.5, `${cfg.label}: 指南書とシナリオ選択で閉じるボタン上の余白感が揃っていない (${state.guideGap} vs ${state.scenarioGap})`);
+        for (const [density, scenario] of [['9件', state.scenarioMany], ['4件', state.scenarioFew]]) {
+            assert.ok(scenario.content.left >= state.screen.left - 1 && scenario.content.right <= state.screen.right + 1, `${cfg.label}/${density}: シナリオ選択が横にはみ出す`);
+            assert.ok(scenario.content.top >= state.screen.top - 1 && scenario.content.bottom <= state.screen.bottom + 1, `${cfg.label}/${density}: シナリオ選択が縦にはみ出す`);
+            assert.ok(scenario.content.scrollHeight <= scenario.content.clientHeight + 1, `${cfg.label}/${density}: シナリオ選択外枠がスクロールを要求する`);
+            assert.ok(scenario.list.scrollHeight <= scenario.list.clientHeight + 1, `${cfg.label}/${density}: シナリオ一覧が縦スクロールを要求する (${scenario.list.scrollHeight}/${scenario.list.clientHeight})`);
+            assert.ok(scenario.list.scrollWidth <= scenario.list.clientWidth + 1, `${cfg.label}/${density}: シナリオ一覧が横スクロールを要求する`);
+            assert.ok(Math.abs(state.guideGap - scenario.gap) <= 1.5, `${cfg.label}/${density}: 指南書とシナリオ選択で閉じるボタン上の余白感が揃っていない (${state.guideGap} vs ${scenario.gap})`);
+        }
+        assert.strictEqual(state.scenarioMany.cards.length, 9, `${cfg.label}: 増加確認用は実シナリオ1件＋ダミー8件を表示する`);
+        assert.strictEqual(state.scenarioFew.cards.length, 4, `${cfg.label}: 少数時の4件確認ができる`);
+        assert.ok(Math.abs(state.scenarioMany.cards[0].top - state.scenarioMany.cards[1].top) <= 3, `${cfg.label}: 5件以上では先頭2件を同じ行に置いて複数列化する`);
+        assert.ok(state.scenarioFew.cards[1].top - state.scenarioFew.cards[0].top >= 30, `${cfg.label}: 4件以下では先頭2件を縦に並べて一列表示を保つ`);
     }
     console.log('✓ 指南書 PC16:9 / スマホ9:16・非スクロール / シナリオ・観戦footer余白 visual/layout regression');
 }

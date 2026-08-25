@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r214');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r215');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -4216,19 +4216,24 @@ test('実データのシナリオ登録は本筋だけにし、シナリオ選�
     assert.ok(!dataManager.includes('folder: "1562_kiyosudoumei"'));
     assert.ok(index.includes('id="scenario-modal"'), '実ゲームのシナリオ選択画面は残す');
     assert.ok(visualGuide.includes('id="scenario-modal"'), 'レイアウト回帰用のシナリオ選択画面も残す');
-    assert.ok(visualGuide.match(/scenario-placeholder/g)?.length >= 3, 'レイアウト確認用ダミースロットを3枠表示する');
+    assert.ok(visualGuide.match(/scenario-placeholder/g)?.length >= 8, 'レイアウト確認用ダミースロットを8枠表示する');
 });
 
-test('シナリオ選択のダミー3枠は実シナリオへ混ぜず選択不可にする', () => {
+test('シナリオ選択のダミー8枠は実シナリオへ混ぜず、件数増加時だけ多列化する', () => {
     const config = read('js/config.js');
     const dataManager = read('js/data_manager.js');
     const ui = read('js/ui.js');
     const css = read('css/style.css');
-    assert.ok(config.includes('PlaceholderSlots: 3'));
+    assert.ok(config.includes('PlaceholderSlots: 8'));
     assert.strictEqual((dataManager.match(/folder:\s*"/g) || []).length, 1, '実データ登録は桶狭間1件だけにする');
     assert.ok(ui.includes("div.className = 'clan-btn scenario-placeholder'"));
     assert.ok(ui.includes("div.setAttribute('aria-disabled', 'true')"));
+    assert.ok(ui.includes("const useMultiColumnLayout = totalScenarioSlots > 4"));
+    assert.ok(ui.includes("scenarioContent.classList.toggle('scenario-layout-many', useMultiColumnLayout)"));
+    assert.ok(ui.includes("this.scenarioList.classList.toggle('scenario-list-many', useMultiColumnLayout)"));
     assert.ok(css.includes('#scenario-modal .clan-btn.scenario-placeholder'));
+    assert.ok(css.includes('#scenario-modal #scenario-list.scenario-list-many'));
+    assert.ok(css.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'));
 });
 
 test('1560シナリオ説明はユーザー調整版を維持する', () => {

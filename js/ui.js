@@ -1870,8 +1870,15 @@ class UIManager {
 
         if (this.scenarioList) {
             this.scenarioList.innerHTML = '';
-            // 縦並びにしてスクロールを禁止する魔法のクラスに書き換えます
+            const placeholderSlots = Number(window.GameConfig.Main.ScenarioSelection.PlaceholderSlots);
+            const totalScenarioSlots = scenarios.length + placeholderSlots;
+            const scenarioContent = this.scenarioScreen.querySelector('.start-content');
+            const useMultiColumnLayout = totalScenarioSlots > 4;
+
+            // 少数時は従来の一列を保ち、増えた時だけ同じカード意匠のまま多列化する。
             this.scenarioList.className = 'scenario-list-vertical';
+            this.scenarioList.classList.toggle('scenario-list-many', useMultiColumnLayout);
+            if (scenarioContent) scenarioContent.classList.toggle('scenario-layout-many', useMultiColumnLayout);
             
             let selectedScenario = null; // 今選ばれているシナリオを覚えておく箱です
 
@@ -1911,7 +1918,6 @@ class UIManager {
             });
 
             // 実データを増やさず、選択画面の密度だけ確認できるダミースロットを末尾へ置きます。
-            const placeholderSlots = Number(window.GameConfig.Main.ScenarioSelection.PlaceholderSlots);
             for (let index = 0; index < placeholderSlots; index++) {
                 const div = document.createElement('div');
                 div.className = 'clan-btn scenario-placeholder';

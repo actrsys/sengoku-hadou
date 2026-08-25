@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r214'
+        Version: 'r215'
     },
 
     History: {
@@ -26,7 +26,7 @@ window.GameConfig = {
         },
         ScenarioSelection: {
             // 実データのシナリオとは分離した、選択不可のレイアウト確認用スロット数。
-            PlaceholderSlots: 3
+            PlaceholderSlots: 8
         },
         Gunshi: {
             AdviceLoyalty: 84,
