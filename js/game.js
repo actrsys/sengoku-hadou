@@ -152,22 +152,16 @@ class GameManager {
             else if (String(data.phase || '').startsWith('ui:')) checkpointText = '画面操作';
             el.textContent = `前回停止位置: ${checkpointText}${castleText}　${data.phase || '不明'}`;
             el.title = 'タップすると閉じます';
-            el.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:20000;max-width:calc(100vw - 16px);padding:6px 9px;background:rgba(0,0,0,.82);color:#fff;font-size:11px;line-height:1.35;border-radius:5px;pointer-events:auto;';
-            el.onclick = () => el.remove();
+            el.addEventListener('click', () => el.remove());
             document.body.appendChild(el);
         } catch (e) {
         }
     }
 
-    getRelation(id1, id2) { 
-        const rel = this.diplomacyManager.getRelation(id1, id2); 
-        if (rel) {
-            rel.alliance = (rel.status === '同盟');
-            rel.friendship = rel.sentiment;
-            // ★追加：画面の見た目だけを変えるための「表示用の名前」を用意します！
-            rel.displayStatus = (rel.status === '同盟' && rel.isMarriage) ? '婚姻' : rel.status;
-        }
-        return rel;
+    getRelation(id1, id2) {
+        // 外交データは DiplomacyManager の正本をそのまま返す。
+        // 表示用の別名や旧API互換値を正本オブジェクトへ書き込まない。
+        return this.diplomacyManager.getRelation(id1, id2);
     }
     
     startNewGame(options = {}) {

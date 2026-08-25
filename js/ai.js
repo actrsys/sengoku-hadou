@@ -198,8 +198,11 @@ class AIEngine {
                                                         console.log(breakMsg); // 裏側の記録にも残しておきます
                                                     }
         
-                                                    this.game.diplomacyManager.applyBreakAlliancePenalty(castle.ownerClan, targetCastle.ownerClan);
-                                                    isStillEnemy = true; // 破棄して敵になったので出陣OK！
+                                                    const breakResult = this.game.diplomacyManager.applyBreakAlliancePenalty(castle.ownerClan, targetCastle.ownerClan);
+                                                    // 断交で発生した人質・婚姻の処遇も、攻撃へ進む前に必ず完了させる。
+                                                    // プレイヤーが拘束側なら既存の捕虜処遇UIを戦後処理なしで再利用する。
+                                                    await this.game.diplomacyManager.resolveBreakAllianceConsequences(breakResult);
+                                                    isStillEnemy = breakResult.becameHostile === true;
                                                 }
                                             } else if (!rel || !this.game.diplomacyManager.isNonAggression(rel.status)) {
                                                 isStillEnemy = true; // 同盟などで守られていなければ敵です！

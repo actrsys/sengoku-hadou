@@ -749,15 +749,21 @@ class Princess {
         this.endYear = Number(data.endYear);     // 没年
         this.faceIcon = data.faceIcon || 'unknown_princess_face.webp'; // 姫用の汎用画像
         
-        this.originalClanId = Number(this.originalClanId || 0); // 生まれた大名家のID
-        
-        this.realFatherId = Number(data.realFatherId || data.fatherId || 0); 
-        this.realMotherId = Number(data.realMotherId || data.motherId || 0);
-        this.adoptiveFatherId = Number(data.adoptiveFatherId || 0);
-        
+        const normalizeRelationId = (value) => {
+            const numeric = Number(value);
+            return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+        };
+        this.originalClanId = normalizeRelationId(this.originalClanId); // 生まれた大名家のID
+
+        // 現行姫データは realFatherId / realMotherId を正本にする。
+        // 「見つかりません」等の未解決値は NaN のまま流さず、関係なし(0)として正規化する。
+        this.realFatherId = normalizeRelationId(data.realFatherId);
+        this.realMotherId = normalizeRelationId(data.realMotherId);
+        this.adoptiveFatherId = normalizeRelationId(data.adoptiveFatherId);
+
         // ★ゲーム中にコロコロ変わるデータ（最初は実家と同じにしておきます）
-        this.currentClanId = Number(data.currentClanId !== undefined ? data.currentClanId : this.originalClanId);
-        this.husbandId = Number(this.husbandId || 0); // 夫の武将ID
+        this.currentClanId = normalizeRelationId(data.currentClanId !== undefined ? data.currentClanId : this.originalClanId);
+        this.husbandId = normalizeRelationId(this.husbandId); // 夫の武将ID
         // 政略上の婚姻として有効か。謀反で旧政権の縁戚を引き継がない場合も、夫婦関係自体は残す。
         this.isDiplomaticMarriageActive = data.isDiplomaticMarriageActive !== false;
         

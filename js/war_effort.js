@@ -2355,7 +2355,10 @@ Object.assign(WarManager.prototype, {
     // ==========================================
     // ★ここから新しいフェーズ管理の魔法です！
     // ==========================================
-    startPrisonerPhase() {
+    startPrisonerPhase(context = null) {
+        // 外交断交など戦後処理以外から捕虜UIを再利用する場合は、完了後の戻り先を保持する。
+        // 通常の戦後処理では context を渡さず、従来どおり戦後処理→ターン終了へ進む。
+        this._prisonerPhaseContext = context && typeof context === 'object' ? context : null;
         // ①大名処遇フェーズ：まずは大名がいるかチェックします
         const daimyoIndex = this.pendingPrisoners.findIndex(p => p.isDaimyo);
         if (daimyoIndex !== -1) {
@@ -2467,7 +2470,9 @@ Object.assign(WarManager.prototype, {
                 this.registerNemesisForExecuted(prisoner, this.game.playerClanId);
                 
                 // ★追加：総取りが発生する場合は家督相続をスキップします
-                const skipSuccession = this.isTotalTakeoverPending();
+                const skipSuccession = this._prisonerPhaseContext?.skipWarCleanup === true
+                    ? false
+                    : this.isTotalTakeoverPending();
                 await this.game.lifeSystem.executeDeath(prisoner, { skipDaimyoSuccession: skipSuccession });
                 
                 this.game.ui.showDialog(`${prisoner.name}を処断しました。`, false, nextStep);
@@ -2542,7 +2547,7 @@ Object.assign(WarManager.prototype, {
         // 選ばれた武将たちを順番に登用していきます
         const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId && !window.LifeStatusRules.isUnborn(b)); 
         const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0];
-        const targetC = this.game.getCurrentTurnCastle();
+        const currentTurnCastle = this.game.getCurrentTurnCastle();
 
         let hiredNames = [];
         let refusedNames = [];
@@ -2567,6 +2572,14 @@ Object.assign(WarManager.prototype, {
             if (hireProb > Math.random()) {
                 // 登用成功！
                 prisoner.belongKunishuId = 0;
+                // 外交断交で拘束した人質は、AI手番中でも現在の拘束城（プレイヤー領）を優先する。
+                // これにより「現在ターンのAI城」へ登用者が移動することを防ぐ。
+                const heldCastle = this.game.getCastle(prisoner.castleId);
+                const targetC = heldCastle && Number(heldCastle.ownerClan) === Number(this.game.playerClanId)
+                    ? heldCastle
+                    : (currentTurnCastle && Number(currentTurnCastle.ownerClan) === Number(this.game.playerClanId)
+                        ? currentTurnCastle
+                        : this.game.castles.find(c => Number(c.ownerClan) === Number(this.game.playerClanId)));
                 if(targetC) { 
                     this.game.affiliationSystem.joinClan(prisoner, this.game.playerClanId, targetC.id);
                 }
@@ -2698,9 +2711,12 @@ Object.assign(WarManager.prototype, {
     },
 
     async finishPrisonerPhase() {
+        const prisonerPhaseContext = this._prisonerPhaseContext;
         // 予定通りに処断を実行します
         if (this.pendingKills && this.pendingKills.length > 0) {
-            const skipSuccession = this.isTotalTakeoverPending(); // ★追加：総取りの事前確認
+            const skipSuccession = prisonerPhaseContext?.skipWarCleanup === true
+                ? false
+                : this.isTotalTakeoverPending(); // ★追加：総取りの事前確認
             for (let p of this.pendingKills) {
                 this.registerNemesisForExecuted(p, this.game.playerClanId);
                 await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: skipSuccession });
@@ -2745,6 +2761,13 @@ Object.assign(WarManager.prototype, {
         // リストを綺麗にお掃除します
         this.pendingPrisoners = [];
         this.pendingKills = [];
+        this._prisonerPhaseContext = null;
+
+        // 外交断交などから捕虜処遇だけを借りた場合は、戦後処理やターン終了を実行せず呼出元へ戻す。
+        if (prisonerPhaseContext?.skipWarCleanup === true) {
+            if (typeof prisonerPhaseContext.onComplete === 'function') prisonerPhaseContext.onComplete();
+            return;
+        }
         
         // ★追加：戦後処理が終わったので、総取りシステムが発動するかチェックします！
         await this.checkTotalTakeover(this.state);

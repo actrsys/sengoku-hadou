@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r210');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r211');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -147,6 +147,104 @@ test('外交status変更は和睦期間を残さず、主従の向きが変わ�
     manager.changeStatus(1, 2, '従属');
     assert.strictEqual(ctx.game.clans[0].diplomacyValue[2].subordinateMonths, 0, '主従の向きが反転したら月数をリセットする');
     assert.strictEqual(ctx.game.clans[1].diplomacyValue[1].subordinateMonths, 0);
+});
+
+test('外交statusを別関係へ変更したら古いイベント保護を持ち越さない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    ctx.game = {
+        clans: [
+            { id: 1, diplomacyValue: { 2: { status: '同盟', sentiment: 100, trucePeriod: 0, isMarriage: false, isEvent: true, hostageIds: [], subordinateMonths: 0 } } },
+            { id: 2, diplomacyValue: { 1: { status: '同盟', sentiment: 100, trucePeriod: 0, isMarriage: false, isEvent: true, hostageIds: [], subordinateMonths: 0 } } }
+        ],
+        getClan(id) { return this.clans.find(c => Number(c.id) === Number(id)); }
+    };
+    loadScript(ctx, 'js/diplomacy.js');
+    const manager = vm.runInContext('new DiplomacyManager(game)', ctx);
+    manager.changeStatus(1, 2, '同盟');
+    assert.strictEqual(ctx.game.clans[0].diplomacyValue[2].isEvent, true, '同じイベント関係の再設定では保護を維持する');
+    manager.changeStatus(1, 2, '敵対');
+    assert.strictEqual(ctx.game.clans[0].diplomacyValue[2].isEvent, false);
+    assert.strictEqual(ctx.game.clans[1].diplomacyValue[1].isEvent, false);
+});
+
+test('人質の脱走は実家所属まで復元し、拘束継続時は通常捕虜へ正しく引き渡せる', () => {
+    const makeGame = () => {
+        const hostage = { id: 10, name: '人質武将', clan: 2, originalClanId: 1, castleId: 22, isHostage: true, strength: 30 };
+        const clans = [
+            { id: 1, diplomacyValue: { 2: { status: '同盟', sentiment: 40, trucePeriod: 0, isMarriage: false, isEvent: false, hostageIds: [10], subordinateMonths: 0 } } },
+            { id: 2, diplomacyValue: { 1: { status: '同盟', sentiment: 40, trucePeriod: 0, isMarriage: false, isEvent: false, hostageIds: [10], subordinateMonths: 0 } } }
+        ];
+        const castles = [
+            { id: 11, ownerClan: 1 },
+            { id: 22, ownerClan: 2 }
+        ];
+        const game = {
+            clans, castles, bushos: [hostage], princesses: [],
+            getClan(id) { return clans.find(c => Number(c.id) === Number(id)); },
+            getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)); },
+            affiliationSystem: {
+                setClanIdRaw(b, id) { b.clan = Number(id) || 0; },
+                moveCastle(b, id) { b.castleId = Number(id) || 0; },
+                becomeRonin(b) { b.clan = 0; b.castleId = 0; b.status = 'ronin'; }
+            }
+        };
+        return { game, hostage };
+    };
+
+    const escapeMath = Object.create(Math);
+    escapeMath.random = () => 0;
+    const ctxEscape = createContext({ Math: escapeMath });
+    loadScript(ctxEscape, 'js/config.js');
+    loadScript(ctxEscape, 'js/constants.js');
+    const escape = makeGame();
+    ctxEscape.game = escape.game;
+    loadScript(ctxEscape, 'js/diplomacy.js');
+    const escapeManager = vm.runInContext('new DiplomacyManager(game)', ctxEscape);
+    const escapeResult = escapeManager.applyBreakAlliancePenalty(1, 2);
+    assert.strictEqual(escapeResult.escapedHostages.length, 1);
+    assert.strictEqual(escape.hostage.clan, 1, '脱走成功時は城だけでなく実家所属へ戻す');
+    assert.strictEqual(escape.hostage.castleId, 11);
+    assert.strictEqual(escape.hostage.isHostage, false);
+    assert.strictEqual(escape.hostage.originalClanId, undefined);
+
+    const captureMath = Object.create(Math);
+    captureMath.random = () => 0.99;
+    const ctxCapture = createContext({ Math: captureMath });
+    loadScript(ctxCapture, 'js/config.js');
+    loadScript(ctxCapture, 'js/constants.js');
+    const capture = makeGame();
+    ctxCapture.game = capture.game;
+    loadScript(ctxCapture, 'js/diplomacy.js');
+    const captureManager = vm.runInContext('new DiplomacyManager(game)', ctxCapture);
+    const captureResult = captureManager.applyBreakAlliancePenalty(1, 2);
+    assert.strictEqual(captureResult.capturedHostageRecords.length, 1);
+    const record = captureResult.capturedHostageRecords[0];
+    assert.strictEqual(record.originClanId, 1);
+    assert.strictEqual(record.captorClanId, 2);
+    assert.strictEqual(capture.hostage.clan, 2, '捕虜処遇へ渡すまでは拘束側情報を維持する');
+    captureManager._convertCapturedHostageToPrisoner(record);
+    assert.strictEqual(capture.hostage.clan, 1, '通常捕虜へ渡す直前に元所属を復元する');
+    assert.strictEqual(capture.hostage.castleId, 22, '拘束先の城は捕虜処遇まで維持する');
+    assert.strictEqual(capture.hostage.isHostage, false);
+    assert.strictEqual(capture.hostage.originalClanId, undefined);
+});
+
+test('姫の血縁IDは現行real系だけを使い未解決文字列をNaNで保持しない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/models.js');
+    ctx.badPrincess = {
+        id: 90001, name: '試験姫', birthYear: 1540, startYear: 1540, endYear: 1600,
+        originalClanId: '見つかりません', realFatherId: '見つかりません', realMotherId: '',
+        fatherId: 12345, husbandId: '不明', status: 'unmarried'
+    };
+    const p = vm.runInContext('new Princess(badPrincess)', ctx);
+    assert.strictEqual(p.originalClanId, 0);
+    assert.strictEqual(p.realFatherId, 0, '旧fatherIdへフォールバックしない');
+    assert.strictEqual(p.realMotherId, 0);
+    assert.strictEqual(p.husbandId, 0);
+    assert.ok(Number.isFinite(p.originalClanId) && Number.isFinite(p.realFatherId) && Number.isFinite(p.husbandId));
 });
 
 test('謀反後の外交再編はDiplomacyManagerを通し、実家側の肉親一門が残る婚姻だけ維持する', () => {
@@ -5743,6 +5841,80 @@ test('攻城戦PCの援軍能力列・本隊戦力行・命令説明欄を横幅
     assert.ok(css.includes('body.is-pc #war-modal .main-army-box .stat-row {\n    padding: 4px 8px !important;'), '本隊戦力行の縦幅を少し広げる');
     assert.ok(css.includes('body.is-pc #war-modal .war-command-board-label {\n    position: absolute;\n    top: 11px;\n    right: 14px;'), '入力対象部隊ラベルを説明欄右上へ置く');
     assert.ok(css.includes('body.is-pc #war-modal .war-controls-desc {\n    overflow-y: hidden;'), 'PC説明欄は不要なスクロールを出さない');
+});
+
+test('外交関係の表示補助値はGameManagerから正本データへ書き込まない', () => {
+    const game = read('js/game.js');
+    const info = read('js/ui_info.js');
+    const block = game.slice(game.indexOf('getRelation(id1, id2)'), game.indexOf('startNewGame(', game.indexOf('getRelation(id1, id2)')));
+    assert.ok(block.includes('return this.diplomacyManager.getRelation(id1, id2)'));
+    assert.ok(!block.includes('displayStatus'));
+    assert.ok(!block.includes('.alliance'));
+    assert.ok(!block.includes('.friendship'));
+    assert.ok(info.includes('relStatus = rel.status;'), '婚姻は独立列のまま基本statusを表示する');
+});
+
+test('歴史イベントの外交値はDiplomacyManagerを通し、存在しない専門部署用fallbackを持たない', () => {
+    const event = read('js/event/historical_event.js');
+    assert.ok(!/diplomacyValue\[[^\]]+\]\s*=/.test(event), 'イベント側で外交関係オブジェクトを直接構築しない');
+    assert.ok(!/\brel\w*\.sentiment\s*=/.test(event), 'イベント側で友好度を直接書き換えない');
+    assert.ok(!/\brel\w*\.isEvent\s*=/.test(event), 'イベント側でイベント保護を直接書き換えない');
+    assert.ok(event.includes('setSentimentAbsolute('));
+    assert.ok(event.includes('setEventRelationFlag('));
+    assert.ok(event.includes('applyMarriageLinkData('), '歴史婚姻も外交専門部署の婚姻APIを通す');
+    assert.ok(!event.includes('oichi.currentClanId = nagamasa.clan'), 'イベント側から姫の所属を直接変更しない');
+    assert.ok(!event.includes('oichi.husbandId = nagamasa.id'), 'イベント側から夫婦関係を直接変更しない');
+    assert.ok(!event.includes('candidate.courtRankIds.push(game.courtRankSystem.RANK_ID_SHOGUN)'), 'courtRankSystemが無いのに参照する壊れたfallbackを残さない');
+});
+
+test('諸勢力の大名旗揚げも外交関係を直接構築せずDiplomacyManagerを通す', () => {
+    const kunishu = read('js/kunishu_system.js');
+    const start = kunishu.indexOf('async executeIndependentRise(');
+    const end = kunishu.indexOf('async ', start + 10);
+    const block = kunishu.slice(start, end > start ? end : kunishu.length);
+    assert.ok(block.includes('this.game.diplomacyManager.changeStatus('));
+    assert.ok(block.includes('this.game.diplomacyManager.setSentimentAbsolute('));
+    assert.ok(!/newClan\.diplomacyValue\[[^\]]+\]\s*=/.test(block));
+    assert.ok(!/otherClan\.diplomacyValue\[[^\]]+\]\s*=/.test(block));
+});
+
+test('前回AI停止位置の診断表示は静的inline styleとonclick代入を使わない', () => {
+    const game = read('js/game.js');
+    const css = read('css/style.css');
+    const start = game.indexOf('_showPreviousAIDiagnostic()');
+    const end = game.indexOf('getRelation(id1, id2)', start);
+    const block = game.slice(start, end);
+    assert.ok(!block.includes('style.cssText'));
+    assert.ok(!block.includes('.onclick ='));
+    assert.ok(block.includes("addEventListener('click'"));
+    assert.ok(css.includes('#ai-last-checkpoint-badge {'));
+});
+
+test('断交時のAI捕虜処遇はasync完了を待ってから結果を表示する', () => {
+    const diplomacy = read('js/diplomacy.js');
+    assert.ok(diplomacy.includes('await this.game.warManager.autoResolvePrisoners(hostages, captorClanId);'));
+    assert.ok(diplomacy.includes('capturedHostageRecords'));
+    assert.ok(diplomacy.includes('_convertCapturedHostageToPrisoner(record)'));
+});
+
+test('AIが断交して攻撃する場合も人質・姫の処遇完了を待ってから進む', () => {
+    const ai = read('js/ai.js');
+    const start = ai.indexOf('const breakResult = this.game.diplomacyManager.applyBreakAlliancePenalty');
+    assert.ok(start >= 0, 'AI断交は結果オブジェクトを受け取る');
+    const block = ai.slice(start, start + 900);
+    assert.ok(block.includes('await this.game.diplomacyManager.resolveBreakAllianceConsequences(breakResult);'));
+    assert.ok(block.includes('isStillEnemy = breakResult.becameHostile === true;'));
+});
+
+test('外交断交から捕虜UIを使う時は戦後処理を走らせず拘束城を登用先に使う', () => {
+    const war = read('js/war_effort.js');
+    assert.ok(war.includes('startPrisonerPhase(context = null)'));
+    assert.ok(war.includes('prisonerPhaseContext?.skipWarCleanup === true'));
+    assert.ok(war.includes("if (typeof prisonerPhaseContext.onComplete === 'function') prisonerPhaseContext.onComplete();"));
+    assert.ok(war.includes('Number(heldCastle.ownerClan) === Number(this.game.playerClanId)'));
+    const diplomacy = read('js/diplomacy.js');
+    assert.ok(diplomacy.includes('startPrisonerPhase({'));
+    assert.ok(diplomacy.includes('skipWarCleanup: true'));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

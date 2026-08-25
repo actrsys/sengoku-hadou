@@ -813,15 +813,15 @@ class KunishuSystem {
         const newClan = new Clan({
             id: newClanId, name: newClanName, yomi: newClanYomi, color: newColor, leaderId: leader.id
         });
-
-        this.game.clans.forEach(otherClan => {
-            if (otherClan.id === 0) return;
-            newClan.diplomacyValue[otherClan.id] = { status: '普通', sentiment: 50, trucePeriod: 0, isMarriage: false };
-            if (!otherClan.diplomacyValue) otherClan.diplomacyValue = {};
-            otherClan.diplomacyValue[newClanId] = { status: '普通', sentiment: 50, trucePeriod: 0, isMarriage: false };
-        });
-        
         this.game.clans.push(newClan);
+
+        // 新勢力の対外関係も外交専門部署に一元化する。
+        // 新Clanを先に世界へ登録してから、既存勢力との中立関係を両方向へ生成する。
+        this.game.clans.forEach(otherClan => {
+            if (otherClan.id === 0 || otherClan.id === newClanId) return;
+            this.game.diplomacyManager.changeStatus(newClanId, otherClan.id, window.GameConstants.DiplomacyStatus.NORMAL, 0);
+            this.game.diplomacyManager.setSentimentAbsolute(newClanId, otherClan.id, 50);
+        });
 
         this.game.castleManager.changeOwner(castle, newClanId, true); 
         

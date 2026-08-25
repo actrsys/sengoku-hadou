@@ -1216,18 +1216,9 @@ window.GameEvents.push({
             if (game.diplomacyManager) {
                 game.diplomacyManager.changeStatus(motoyasu.clan, nobunaga.clan, '同盟', 0);
                 
-                // お互いの関係値を最高の100にします！
-                const relA = game.diplomacyManager.getRelation(motoyasu.clan, nobunaga.clan);
-                if (relA) {
-                    relA.sentiment = 100;
-                    relA.isEvent = true; // ★追加：イベント同盟のシールを貼ります
-                }
-                
-                const relB = game.diplomacyManager.getRelation(nobunaga.clan, motoyasu.clan);
-                if (relB) {
-                    relB.sentiment = 100;
-                    relB.isEvent = true; // ★追加：イベント同盟のシールを貼ります
-                }
+                // お互いの関係値とイベント保護も外交専門部署から両方向へ同期します。
+                game.diplomacyManager.setSentimentAbsolute(motoyasu.clan, nobunaga.clan, 100);
+                game.diplomacyManager.setEventRelationFlag(motoyasu.clan, nobunaga.clan, true);
             }
 
             // 汎用メッセージの表示
@@ -1443,31 +1434,16 @@ window.GameEvents.push({
         const candidate = game.bushos.find(b => b.clan === nobunaga.clan && b.courtRankIds && (game.courtRankSystem.RANK_IDS_CANDIDATE.some(id => b.courtRankIds.includes(id)) || b.courtRankIds.includes(game.courtRankSystem.RANK_ID_SHOGUN)));
         const candidateName = candidate ? candidate.fullName : "将軍";
 
-        // ① お市の所属を浅井家に変更し、旦那さんを長政に設定します
-        oichi.currentClanId = nagamasa.clan;
-        oichi.husbandId = nagamasa.id;
-        oichi.status = 'married'; // 状態を「既婚」にします
-
-        // ② 織田家の姫リストからお市を外します
-        nobunagaClan.princessIds = nobunagaClan.princessIds.filter(id => id !== oichiId);
-
-        // ③ 長政の奥さんリストにお市を追加して、一門（家族）のデータを更新します
-        if (!nagamasa.wifeIds.includes(oichiId)) {
-            nagamasa.wifeIds.push(oichiId);
-        }
-        FamilyLinker.rebuildAllFamilyIds(game.bushos, game.princesses);
-
-        // ④ 外交システムで支配・従属の婚姻関係を結びます
+        // ①〜④ 婚姻そのものと外交関係の更新は DiplomacyManager に一元化します。
+        // 既存イベントと同じく妻順は維持し、通常婚姻コマンドの友好度加算は使わずイベント値100を設定します。
         if (game.diplomacyManager) {
-            // ★変更：状態を「支配」（織田が支配、浅井が従属）にします
+            game.diplomacyManager.applyMarriageLinkData(
+                oichiId, nagamasa.id, nobunaga.clan, nagamasa.clan,
+                { isMainWife: false, boostSentiment: false }
+            );
             game.diplomacyManager.changeStatus(nobunaga.clan, nagamasa.clan, '支配', 0);
-            
-            // 婚姻フラグは外交専門部署から両方向へ同期し、イベント関係と友好度だけ個別に付与します。
-            game.diplomacyManager.setMarriageRelation(nobunaga.clan, nagamasa.clan, true);
-            const relA = game.diplomacyManager.getDiplomacyData(nobunaga.clan, nagamasa.clan);
-            const relB = game.diplomacyManager.getDiplomacyData(nagamasa.clan, nobunaga.clan);
-            if (relA) { relA.isEvent = true; relA.sentiment = 100; }
-            if (relB) { relB.isEvent = true; relB.sentiment = 100; }
+            game.diplomacyManager.setSentimentAbsolute(nobunaga.clan, nagamasa.clan, 100);
+            game.diplomacyManager.setEventRelationFlag(nobunaga.clan, nagamasa.clan, true);
         }
 
         // ⑤ 画面にメッセージを出してお知らせします
@@ -2623,10 +2599,7 @@ window.GameEvents.push({
         // 織田勢力と朝倉勢力が敵対し、友好度が０になる
         if (game.diplomacyManager) {
             game.diplomacyManager.changeStatus(nobunagaClanId, asakuraClanId, '敵対', 0);
-            const relA = game.diplomacyManager.getRelation(nobunagaClanId, asakuraClanId);
-            const relB = game.diplomacyManager.getRelation(asakuraClanId, nobunagaClanId);
-            if (relA) relA.sentiment = 0;
-            if (relB) relB.sentiment = 0;
+            game.diplomacyManager.setSentimentAbsolute(nobunagaClanId, asakuraClanId, 0);
         }
 
         // 織田勢力と、近江国（ID29）・山城国（ID30）・大和国（ID31）・伊賀国（ID26）・伊勢国（ID24）・志摩国（ID25）に拠点を持っている勢力とが敵対し、友好度が０になる。
@@ -2646,10 +2619,7 @@ window.GameEvents.push({
                     // 友好・同盟・支配・従属・和睦 は除く
                     if (!window.DiplomacyRules.isPeaceful(relation.status)) {
                         game.diplomacyManager.changeStatus(nobunagaClanId, clanId, '敵対', 0);
-                        const relA = game.diplomacyManager.getRelation(nobunagaClanId, clanId);
-                        const relB = game.diplomacyManager.getRelation(clanId, nobunagaClanId);
-                        if (relA) relA.sentiment = 0;
-                        if (relB) relB.sentiment = 0;
+                        game.diplomacyManager.setSentimentAbsolute(nobunagaClanId, clanId, 0);
                     }
                 }
             });
@@ -2660,16 +2630,8 @@ window.GameEvents.push({
             if (hisahideRel && !window.DiplomacyRules.isAllianceOrVassal(hisahideRel.status)) {
                 game.diplomacyManager.changeStatus(nobunagaClanId, hisahideClanId, '同盟', 0);
             }
-            const relA_hisahide = game.diplomacyManager.getRelation(nobunagaClanId, hisahideClanId);
-            const relB_hisahide = game.diplomacyManager.getRelation(hisahideClanId, nobunagaClanId);
-            if (relA_hisahide) {
-                relA_hisahide.sentiment = 100;
-                relA_hisahide.isEvent = true; // イベント同盟の印
-            }
-            if (relB_hisahide) {
-                relB_hisahide.sentiment = 100;
-                relB_hisahide.isEvent = true; // イベント同盟の印
-            }
+            game.diplomacyManager.setSentimentAbsolute(nobunagaClanId, hisahideClanId, 100);
+            game.diplomacyManager.setEventRelationFlag(nobunagaClanId, hisahideClanId, true);
         }
 
         // ★追加：織田勢力のすべての軍団に「地方統一（近畿）」の方針を10年間（120ターン）持たせます！
@@ -2888,30 +2850,15 @@ window.GameEvents.push({
         const samanoKamiId = candidate.courtRankIds.find(id => game.courtRankSystem.RANK_IDS_CANDIDATE.includes(id));
         if (samanoKamiId) {
             candidate.courtRankIds = candidate.courtRankIds.filter(id => id !== samanoKamiId); // 左馬頭を削除
-            if (game.courtRankSystem) {
-                game.courtRankSystem.returnRank(samanoKamiId); // 朝廷に返す
-            }
+            game.courtRankSystem.returnRank(samanoKamiId); // 朝廷に返す
         }
-        if (game.courtRankSystem) {
-            game.courtRankSystem.grantRank(candidate, game.courtRankSystem.RANK_ID_SHOGUN); // 征夷大将軍をもらう
-        } else {
-            candidate.courtRankIds.push(game.courtRankSystem.RANK_ID_SHOGUN); // 万が一システムがない時の安全策
-        }
+        game.courtRankSystem.grantRank(candidate, game.courtRankSystem.RANK_ID_SHOGUN); // 征夷大将軍をもらう
 
         // --- 5. 擁立勢力と将軍家を「同盟」にして、関係値を100にします ---
-        if (game.diplomacyManager) {
-            game.diplomacyManager.changeStatus(sponsorClanId, newClanId, '同盟', 0);
-            
-            const relA = game.diplomacyManager.getRelation(sponsorClanId, newClanId);
-            if (relA) relA.sentiment = 100;
-            
-            const relB = game.diplomacyManager.getRelation(newClanId, sponsorClanId);
-            if (relB) relB.sentiment = 100;
-        } else {
-            if (!sponsorClan.diplomacyValue) sponsorClan.diplomacyValue = {};
-            sponsorClan.diplomacyValue[newClanId] = { status: '同盟', sentiment: 100, trucePeriod: 0, isMarriage: false };
-            newClan.diplomacyValue[sponsorClanId] = { status: '同盟', sentiment: 100, trucePeriod: 0, isMarriage: false };
-        }
+        // このイベントの発生条件で必須システムは確認済み。外交データへ直接書き込むfallbackを持たない。
+        game.diplomacyManager.changeStatus(sponsorClanId, newClanId, '同盟', 0);
+
+        game.diplomacyManager.setSentimentAbsolute(sponsorClanId, newClanId, 100);
 
         // --- 6. 指定された武将たちを、配下として将軍家に移動させます ---
         const followers = [];

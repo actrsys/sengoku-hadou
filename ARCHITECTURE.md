@@ -262,6 +262,12 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - `DiplomacyManager.changeStatus()` は基本外交statusと和睦期間の整合を担当し、和睦以外へ移った時は古い `trucePeriod` を残さない。支配/従属の向きが反転した場合は継続月数を新しい主従関係として0から数える。
 - 謀反成功・独立による政権再編の対外関係は `DiplomacyManager.reorganizeRelationsAfterRebellion()` を唯一の窓口とし、`independence_system.js` から `status` / `sentiment` / `trucePeriod` / `isMarriage` を直接編集しない。従来どおり旧関係の友好度を反転して30～50へ収め、同盟・支配・従属・和睦などの特殊statusを破棄する。通常の独立新勢力は従来どおり旧大名家の婚姻を引き継がない。旧大名家を謀反側が乗っ取る政権交代に限り、婚姻中の姫について夫側の男系/養家一門を除いた実血縁かつ一門の現役武将（人質を除く）が新政権に残る場合だけ外交婚姻を維持する。姫の `originalClanId` / `currentClanId` / `husbandId` と夫婦関係自体は変更せず、旧政権由来で継承しない婚姻は `isDiplomaticMarriageActive = false` として後日の再評価でも復活させない。
 - GameConfigに正本がある戦闘・経済・外交の設定値へ、呼び出し側で同じ数値のローカルfallbackを重ねない。
+- 歴史イベントが外交status・絶対友好度・イベント保護・婚姻を変更する場合も `DiplomacyManager` の公開APIを通す。イベント側から `diplomacyValue`、`sentiment`、`isEvent` や姫の婚姻状態を直接書き換えない。`isEvent` はそのイベントが成立させたstatusの保護であり、後から別statusへ変わった時は `changeStatus()` が解除する。
+- ゲーム中に新しい大名家を生成する処理（諸勢力の旗揚げ等）も、勢力を世界へ登録した後の対外関係生成を `DiplomacyManager` に委譲する。ランタイム側で両家の `diplomacyValue` を直接組み立てない。
+- 姫の血縁IDは `realFatherId` / `realMotherId` / `adoptiveFatherId` を正本とし、旧 `fatherId` / `motherId` へフォールバックしない。CSV等に未解決文字列が残っていてもモデル生成時に関係なし(0)へ正規化し、`NaN` を血縁判定へ流さない。
+- 外交人質が敵対化時に脱走成功した場合は、城だけでなく武将所属も元の大名家へ戻す。拘束された場合は「元所属」と「拘束側」を一時レコードで分離し、通常捕虜処遇へ渡す直前に元所属を復元する。AI捕虜処遇は非同期完了を待ってから結果を表示する。 AIが自発的に同盟・従属を破棄して攻撃へ移る経路でも同じ断交後処遇を完了させてから軍事行動を続ける。プレイヤーが拘束側になった捕虜は既存の捕虜処遇UIを利用するが、外交由来では戦後処理・総取り・ターン終了を実行せず呼出元へ戻る。
+- `GameManager.getRelation()` は `DiplomacyManager` の正本関係をそのまま返し、`displayStatus` / `alliance` / `friendship` 等の表示・旧API用プロパティを正本オブジェクトへ注入しない。婚姻は基本statusとは別列・別属性として表示する。
+- JSから動的に出す診断UIも、静的な見た目はCSSへ置き、イベント登録は `addEventListener` を使う。診断表示のために `style.cssText` やHTML属性相当のイベント処理を持ち込まない。
 
 ## 現行セーブ形式の境界（r209～r210）
 - `SaveManager` が保存する `saveSchemaVersion` を唯一の形式識別子とし、値が一致しない保存は復元処理へ入る前に拒否する。自然に同じ構造である過去保存を偶然読めることは前提にせず、旧形式専用の変換コードは持たない。r210では夫婦関係と外交婚姻の有効性を分ける `Princess.isDiplomaticMarriageActive` を保存するため schema 2 とする。

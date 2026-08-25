@@ -2746,9 +2746,9 @@ class UIInfoManager {
                 const rel = this.game.getRelation(this.game.playerClanId, force.id);
                 if (rel) {
                     relVal = rel.sentiment;
-                    relStatus = rel.displayStatus || rel.status;
+                    relStatus = rel.status;
                     if (relStatus === '敵対') statusClass = 'text-red';
-                    else if (['同盟', '支配', '従属', '婚姻', '和睦', '友好'].includes(relStatus)) statusClass = 'text-green';
+                    else if (['同盟', '支配', '従属', '和睦', '友好'].includes(relStatus)) statusClass = 'text-green';
                 }
             }
             const friendBarHtml = this._createBarHtml(relVal, 'friend');
