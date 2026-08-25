@@ -789,17 +789,19 @@ class Kunishu {
         this.castleId = Number(this.castleId);
         this.leaderId = Number(this.leaderId);
         
-        this.maxSoldiers = Number(this.maxSoldiers || 1500);
+        // 上限0は「保有不能」という有効な設定値なので、未指定の場合だけ既定値を使います。
+        const readCap = (value, fallback) => (value === undefined || value === null || value === '') ? fallback : Number(value);
+        this.maxSoldiers = readCap(this.maxSoldiers, 1500);
         this.soldiers = Number(this.soldiers !== undefined ? this.soldiers : this.maxSoldiers);
         
-        this.maxDefense = Number(this.maxDefense || 500);
+        this.maxDefense = readCap(this.maxDefense, 500);
         this.defense = Number(this.defense !== undefined ? this.defense : this.maxDefense);
         
         // ★追加: 馬と鉄砲のステータス
-        this.maxHorses = Number(this.maxHorses || 300);
+        this.maxHorses = readCap(this.maxHorses, 300);
         this.horses = Number(this.horses !== undefined ? this.horses : this.maxHorses);
         
-        this.maxGuns = Number(this.maxGuns || 100);
+        this.maxGuns = readCap(this.maxGuns, 100);
         this.guns = Number(this.guns !== undefined ? this.guns : this.maxGuns);
 
         // ★今回追加：訓練度（training）と士気（morale）のステータス

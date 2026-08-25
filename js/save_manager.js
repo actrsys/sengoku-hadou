@@ -98,6 +98,7 @@ class SaveManager {
         const castleIds = collectIds(data.castles, 'castles');
         const bushoIds = collectIds(data.bushos, 'bushos');
         const clanIds = collectIds(data.clans, 'clans');
+        collectIds(data.princesses, 'princesses');
         collectIds(data.provinces, 'provinces');
         collectIds(data.legions, 'legions');
         collectIds(data.kunishus, 'kunishus');
@@ -106,21 +107,32 @@ class SaveManager {
             if (!Array.isArray(busho.nemesisList)) fail(`bushos[${index}].nemesisList が現行形式ではありません`);
         });
         data.princesses.forEach((princess, index) => {
-            if (!princess || typeof princess !== 'object' || Array.isArray(princess)) {
-                fail(`princesses[${index}] が不正です`);
-            }
             if (typeof princess.isDiplomaticMarriageActive !== 'boolean') {
                 fail(`princesses[${index}].isDiplomaticMarriageActive が現行形式ではありません`);
             }
+            const originalClanId = Number(princess.originalClanId || 0);
+            const currentClanId = Number(princess.currentClanId || 0);
+            const husbandId = Number(princess.husbandId || 0);
+            if (originalClanId !== 0 && !clanIds.has(originalClanId)) fail(`princesses[${index}].originalClanId の参照先がありません`);
+            if (currentClanId !== 0 && !clanIds.has(currentClanId)) fail(`princesses[${index}].currentClanId の参照先がありません`);
+            if (husbandId !== 0 && !bushoIds.has(husbandId)) fail(`princesses[${index}].husbandId の参照先がありません`);
         });
         data.legions.forEach((legion, index) => {
             if (!Object.prototype.hasOwnProperty.call(legion, 'establishedTurnId')
                 || !Number.isFinite(Number(legion.establishedTurnId))) {
                 fail(`legions[${index}].establishedTurnId が現行形式ではありません`);
             }
+            const clanId = Number(legion.clanId || 0);
+            const commanderId = Number(legion.commanderId || 0);
+            if (clanId === 0 || !clanIds.has(clanId)) fail(`legions[${index}].clanId の参照先がありません`);
+            if (commanderId !== 0 && !bushoIds.has(commanderId)) fail(`legions[${index}].commanderId の参照先がありません`);
         });
         data.kunishus.forEach((kunishu, index) => {
             if (typeof kunishu.networkTag !== 'string') fail(`kunishus[${index}].networkTag が現行形式ではありません`);
+            const castleId = Number(kunishu.castleId || 0);
+            const leaderId = Number(kunishu.leaderId || 0);
+            if (castleId === 0 || !castleIds.has(castleId)) fail(`kunishus[${index}].castleId の参照先がありません`);
+            if (leaderId !== 0 && !bushoIds.has(leaderId)) fail(`kunishus[${index}].leaderId の参照先がありません`);
         });
         data.historyEntries.forEach((entry, index) => {
             if (!entry || typeof entry !== 'object' || Array.isArray(entry)) fail(`historyEntries[${index}] が現行形式ではありません`);

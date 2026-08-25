@@ -353,18 +353,8 @@ window.GameEvents.push({
                                 game.affiliationSystem.updateCastleLord(newCastle);
                             }
                         } else {
-                            // もし別のお城がなかった場合は、国主を解任して軍団を空っぽ（解散）にします
-                            commander.isCommander = false;
-                            legion.commanderId = 0;
-                            legion.objective = null;
-                            legion.status = 'wait';
-                            legion.targetId = 0;
-                            legion.route = [];
-
-                            // ★Round6：軍団だけ解散してAI作戦が翌月まで残らないよう、その場で計画も片付けます
-                            if (game.aiOperationManager && typeof game.aiOperationManager.clearLegionPlanning === 'function') {
-                                game.aiOperationManager.clearLegionPlanning(motoyasu.clan, oldLegionId);
-                            }
+                            // 別のお城がなければ、軍団解散の正規窓口へまとめて任せます。
+                            game.castleManager.disbandLegion(legion.id);
                         }
                     }
                 }
@@ -3603,21 +3593,8 @@ window.GameEvents.push({
         });
 
         // ⑤ 国主だった場合の解任処理と軍団の解散処理をします
-        if (targetLord.isCommander) {
-            targetLord.isCommander = false;
-            if (legionToDismiss) {
-                const dismissedLegionNo = Number(legionToDismiss.legionNo || 0);
-                legionToDismiss.commanderId = 0;
-                legionToDismiss.objective = null;
-                legionToDismiss.status = 'wait';
-                legionToDismiss.targetId = 0;
-                legionToDismiss.route = [];
-
-                // ★Round6：イベントによる軍団解散と同時に、その軍団専用のAI計画も削除します
-                if (game.aiOperationManager && typeof game.aiOperationManager.clearLegionPlanning === 'function') {
-                    game.aiOperationManager.clearLegionPlanning(miyoshiClanId, dismissedLegionNo);
-                }
-            }
+        if (targetLord.isCommander && legionToDismiss) {
+            game.castleManager.disbandLegion(legionToDismiss.id);
         }
 
         // ⑥ 降伏を主導した元の城主たちに、もう一度城主のバッジを付けてあげます

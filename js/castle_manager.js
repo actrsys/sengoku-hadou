@@ -239,41 +239,42 @@ class CastleManager {
         }
     }
 
-    // ★追加：軍団を壊滅させ、国主を解任する魔法
+    // 軍団解散の正規窓口。軍団モデル・所属城・AI計画を一度に初期化します。
     disbandLegion(legionId) {
-        if (!legionId || legionId === 0 || !this.game.legions) return;
+        if (!legionId || legionId === 0 || !this.game.legions) return 0;
         
-        const legion = this.game.legions.find(l => l.id === legionId);
-        if (legion) {
-            const commanderId = legion.commanderId;
-            if (commanderId > 0) {
-                const commander = this.game.getBusho(commanderId);
-                if (commander) {
-                    commander.isCommander = false;
-                }
-            }
-            const clanId = Number(legion.clanId);
-            const legionNo = Number(legion.legionNo);
-            legion.commanderId = 0;
+        const legion = this.game.legions.find(l => Number(l.id) === Number(legionId));
+        if (!legion) return 0;
 
-            // ★Round6：軍団解散と同時にAIの作戦・長期方針・徴兵拠点メモも破棄します
-            if (this.game.aiOperationManager) {
-                if (typeof this.game.aiOperationManager.clearLegionPlanning === 'function') {
-                    this.game.aiOperationManager.clearLegionPlanning(clanId, legionNo);
-                } else {
-                    if (this.game.aiOperationManager.operations?.[clanId]) delete this.game.aiOperationManager.operations[clanId][legionNo];
-                    if (this.game.aiOperationManager.grandObjectives?.[clanId]) delete this.game.aiOperationManager.grandObjectives[clanId][legionNo];
-                    if (this.game.aiOperationManager.draftBases?.[clanId]) delete this.game.aiOperationManager.draftBases[clanId][legionNo];
-                }
-            }
-            
-            // ★修正：c.legionIdに入っているのは固有IDではなく「軍団No(1~8)」なので、
-            // 大名家の一致と、軍団Noの一致の両方を確認して直轄に戻します！
-            this.game.castles.filter(c => Number(c.ownerClan) === Number(legion.clanId) && Number(c.legionId) === Number(legion.legionNo)).forEach(c => {
+        const commanderId = Number(legion.commanderId || 0);
+        if (commanderId > 0) {
+            const commander = this.game.getBusho(commanderId);
+            if (commander) commander.isCommander = false;
+        }
+
+        const clanId = Number(legion.clanId);
+        const legionNo = Number(legion.legionNo);
+        legion.commanderId = 0;
+        legion.objective = null;
+        legion.status = 'wait';
+        legion.targetId = 0;
+        legion.route = [];
+
+        // 現行AI作戦管理の正規APIへ解散を通知します。旧形式の直接削除フォールバックは持ちません。
+        if (this.game.aiOperationManager?.clearLegionPlanning) {
+            this.game.aiOperationManager.clearLegionPlanning(clanId, legionNo);
+        }
+
+        let count = 0;
+        // c.legionId は軍団固有IDではなく、その大名家内の軍団Noです。
+        this.game.castles
+            .filter(c => Number(c.ownerClan) === clanId && Number(c.legionId) === legionNo)
+            .forEach(c => {
                 c.legionId = 0;
                 c.isDelegated = false;
+                count++;
             });
-        }
+        return count;
     }
 
     // ★追加：城を失った勢力の、大名以外の武将の忠誠度を全員３ダウンさせる魔法です

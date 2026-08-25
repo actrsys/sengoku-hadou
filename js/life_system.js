@@ -1120,41 +1120,37 @@ class LifeSystem {
         if (allCandidates.length > 0) {
             let successor = null;
 
-            // ★追加：プレイヤー・AI問わず、まず全員を「自動家督相続の優先度」の順番に並び替えます！
-            allCandidates.forEach(b => {
-                b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
-                b._affinityDiff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
-                b._baseScore = b.leadership + b.intelligence;
-                // ★追加：亡くなった大名を「実父」または「養父」として持っているか（実子・養子であるか）の印をつけます
-                b._isDirectSon = (b.realFatherId === daimyo.id || b.adoptiveFatherId === daimyo.id);
-            });
+            // 相続比較用の値は武将モデルへ一時プロパティとして書き込まず、この処理内だけで保持します。
+            const successionMetrics = new Map(allCandidates.map(b => [Number(b.id), {
+                isRelative: daimyo.familyIds.some(fId => b.familyIds.includes(fId)),
+                affinityDiff: Math.abs((daimyo.affinity || 0) - (b.affinity || 0)),
+                baseScore: b.leadership + b.intelligence,
+                isDirectSon: (b.realFatherId === daimyo.id || b.adoptiveFatherId === daimyo.id)
+            }]));
 
             allCandidates.sort((a, b) => {
+                const am = successionMetrics.get(Number(a.id));
+                const bm = successionMetrics.get(Number(b.id));
                 // ★追加：隠居している武将は優先度を一番低く（後回しに）します！
                 if (a.isRetired && !b.isRetired) return 1;
                 if (!a.isRetired && b.isRetired) return -1;
 
                 // 一門（親戚）を優先します
-                if (a._isRelative && !b._isRelative) return -1;
-                if (!a._isRelative && b._isRelative) return 1;
+                if (am.isRelative && !bm.isRelative) return -1;
+                if (!am.isRelative && bm.isRelative) return 1;
                 
-                // どちらも一門（またはどちらも一門ではない）場合は、相性などを比べます
-                if (a._isRelative && b._isRelative) {
-                    if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
-                    
-                    // ★追加：相性の差が同じなら、亡くなった大名の実子や養子を優先します！
-                    if (a._isDirectSon && !b._isDirectSon) return -1;
-                    if (!a._isDirectSon && b._isDirectSon) return 1;
+                if (am.isRelative && bm.isRelative) {
+                    if (am.affinityDiff !== bm.affinityDiff) return am.affinityDiff - bm.affinityDiff;
+                    if (am.isDirectSon && !bm.isDirectSon) return -1;
+                    if (!am.isDirectSon && bm.isDirectSon) return 1;
 
                     const aIsYounger = a.birthYear > daimyo.birthYear;
                     const bIsYounger = b.birthYear > daimyo.birthYear;
                     if (aIsYounger && !bIsYounger) return -1;
                     if (!aIsYounger && bIsYounger) return 1;
-                    
                     if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
                 }
-                // 血の繋がりに関係なく、最後は能力の高さで決めます
-                return b._baseScore - a._baseScore;
+                return bm.baseScore - am.baseScore;
             });
 
             // ★ここから変更：プレイヤーの家なら自分で選ぶ魔法を復活させます！
@@ -1286,30 +1282,28 @@ class LifeSystem {
         if (allCandidates.length > 0) {
             let successor = null;
 
-            // ★変更：プレイヤー・AI問わず、自動でふさわしい人を計算して選びます
-            allCandidates.forEach(b => {
-                b._isRelative = commander.familyIds.some(fId => b.familyIds.includes(fId));
-                b._affinityDiff = Math.abs((commander.affinity || 0) - (b.affinity || 0));
-                b._baseScore = b.leadership + b.intelligence;
-                // ★追加：亡くなった国主を「実父」または「養父」として持っているか（実子・養子であるか）の印をつけます
-                b._isDirectSon = (b.realFatherId === commander.id || b.adoptiveFatherId === commander.id);
-            });
+            // 国主継承の比較値も武将本体へ残さず、ローカルな比較データとして扱います。
+            const successionMetrics = new Map(allCandidates.map(b => [Number(b.id), {
+                isRelative: commander.familyIds.some(fId => b.familyIds.includes(fId)),
+                affinityDiff: Math.abs((commander.affinity || 0) - (b.affinity || 0)),
+                baseScore: b.leadership + b.intelligence,
+                isDirectSon: (b.realFatherId === commander.id || b.adoptiveFatherId === commander.id)
+            }]));
 
             allCandidates.sort((a, b) => {
-                // ★追加：隠居している武将は優先度を一番低く（後回しに）します！
+                const am = successionMetrics.get(Number(a.id));
+                const bm = successionMetrics.get(Number(b.id));
                 if (a.isRetired && !b.isRetired) return 1;
                 if (!a.isRetired && b.isRetired) return -1;
 
-                if (a._isRelative && !b._isRelative) return -1;
-                if (!a._isRelative && b._isRelative) return 1;
-                if (a._isRelative && b._isRelative) {
-                    if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
-                    
-                    // ★追加：相性の差が同じなら、亡くなった国主の実子や養子を優先します！
-                    if (a._isDirectSon && !b._isDirectSon) return -1;
-                    if (!a._isDirectSon && b._isDirectSon) return 1;
+                if (am.isRelative && !bm.isRelative) return -1;
+                if (!am.isRelative && bm.isRelative) return 1;
+                if (am.isRelative && bm.isRelative) {
+                    if (am.affinityDiff !== bm.affinityDiff) return am.affinityDiff - bm.affinityDiff;
+                    if (am.isDirectSon && !bm.isDirectSon) return -1;
+                    if (!am.isDirectSon && bm.isDirectSon) return 1;
                 }
-                return b._baseScore - a._baseScore;
+                return bm.baseScore - am.baseScore;
             });
 
             // ★並び替えて一番上に来た人を、自動で後任の国主にします！

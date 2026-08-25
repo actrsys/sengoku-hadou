@@ -239,6 +239,7 @@ class IndependenceSystem {
         let isDefection = false;
         let newClanId;
         let newClanName;
+        let nameChangeInfo = null;
         
         // ★ここから追加：寝返り先が決まったら、プレイヤーかどうかを確認します！
         if (targetClanId) {
@@ -274,7 +275,7 @@ class IndependenceSystem {
             
             // ★ライフシステムの一元管理魔法を呼び出して、大名就任時の改名と顔変更を行います！
             if (this.game.lifeSystem) {
-                rebellionLeader._nameChangeInfo = this.game.lifeSystem.applyDaimyoNameAndFaceChange(rebellionLeader);
+                nameChangeInfo = this.game.lifeSystem.applyDaimyoNameAndFaceChange(rebellionLeader);
             }
 
             // ★新大名家の名前は神輿の人物ベース（改名後なら新しい名前が使われます）
@@ -352,7 +353,7 @@ class IndependenceSystem {
         
         const castellanNameStr = castellan.fullName;
         // 改名していれば古い名前を、していなければそのままの名前を表示用に使います
-        const info = rebellionLeader._nameChangeInfo;
+        const info = nameChangeInfo;
         const leaderNameStr = (info && info.isNameChanged) ? info.oldNameStr : rebellionLeader.fullName;
         
         // ★メッセージの出し分け
@@ -1202,8 +1203,9 @@ class IndependenceSystem {
                 }
 
                 // ★ライフシステムの一元管理魔法を呼び出して、大名就任時の改名と顔変更を行います！
+                let nameChangeInfo = null;
                 if (this.game.lifeSystem) {
-                    rebellionLeader._nameChangeInfo = this.game.lifeSystem.applyDaimyoNameAndFaceChange(rebellionLeader);
+                    nameChangeInfo = this.game.lifeSystem.applyDaimyoNameAndFaceChange(rebellionLeader);
                 }
 
                 // 勢力名を変更
@@ -1240,7 +1242,7 @@ class IndependenceSystem {
 
                 // 結果のメッセージを出します！
                 const oldDaimyoNameStr = oldDaimyo.fullName;
-                const info = rebellionLeader._nameChangeInfo;
+                const info = nameChangeInfo;
                 const leaderNameStr = (info && info.isNameChanged) ? info.oldNameStr : rebellionLeader.fullName;
                 
                 let resultMsg = "";

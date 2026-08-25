@@ -752,36 +752,26 @@ class AffiliationSystem {
         const abilityFactor = innovation / 100;
         const meritFactor = (100 - innovation) / 100;
 
-        candidates.forEach(b => {
+        const scoredCandidates = candidates.map(b => {
             const leadScore = Math.min(b.leadership, 80) * 0.8 + Math.max(b.leadership - 80, 0) * 0.8 * 0.3;
             const strScore = Math.min(b.strength, 50) * 0.5 + Math.max(b.strength - 50, 0) * 0.5 * 0.3;
             const polScore = Math.min(b.politics, 80) * 0.8 + Math.max(b.politics - 80, 0) * 0.8 * 0.3;
             const dipScore = Math.min(b.diplomacy, 60) * 0.6 + Math.max(b.diplomacy - 60, 0) * 0.6 * 0.3;
             const intScore = Math.min(b.intelligence, 60) * 0.6 + Math.max(b.intelligence - 60, 0) * 0.6 * 0.3;
             const charmScore = Math.min(b.charm, 70) * 0.8 + Math.max(b.charm - 70, 0) * 0.8 * 0.3;
-            
             const abilityScore = leadScore + strScore + polScore + dipScore + intScore + charmScore;
             const meritScore = Math.sqrt((b.achievementTotal || 0) * 64);
-            
-            b._lordScore = (abilityScore * abilityFactor) + (meritScore * meritFactor);
+            let score = (abilityScore * abilityFactor) + (meritScore * meritFactor);
 
-            if (b.isCastellan) {
-                b._lordScore += Math.floor(Math.random() * 41) + 80;
-            }
-
-            if (b.isFactionLeader) {
-                b._lordScore += 10000; 
-            }
-            if (b.isRetired) {
-                b._lordScore -= 50000;
-            }
-            if (b.isGunshi) {
-                b._lordScore -= 100000; 
-            }
+            if (b.isCastellan) score += Math.floor(Math.random() * 41) + 80;
+            if (b.isFactionLeader) score += 10000;
+            if (b.isRetired) score -= 50000;
+            if (b.isGunshi) score -= 100000;
+            return { busho: b, score };
         });
 
-        candidates.sort((a, b) => b._lordScore - a._lordScore);
-        const best = candidates[0];
+        scoredCandidates.sort((a, b) => b.score - a.score);
+        const best = scoredCandidates[0].busho;
 
         bushos.forEach(b => b.isCastellan = false);
         best.isCastellan = true;

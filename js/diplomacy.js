@@ -2437,54 +2437,18 @@ class DiplomacyManager {
         const lordB = this.game.getBusho(castleB.castellanId);
 
         if (isDaimyoInA && castleB.legionId !== 0 && lordB && lordB.isCommander) {
-            lordB.isCommander = false;
             lordB.isCastellan = false;
-            const targetLegionId = castleB.legionId;
-            
-            // 拠点Bと同じ軍団の城をすべて直轄にする
-            this.game.castles.forEach(c => {
-                if (c.ownerClan === subordinateClanId && c.legionId === targetLegionId) {
-                    c.legionId = 0;
-                }
-            });
-            
-            // 軍団データの初期化（解散状態にする）
-            const legion = this.game.legions.find(l => l.clanId === subordinateClanId && l.legionNo === targetLegionId);
-            if (legion) {
-                legion.commanderId = 0;
-                legion.objective = null;
-                legion.status = 'wait';
-                legion.targetId = 0;
-                legion.route = [];
-                if (this.game.aiOperationManager && typeof this.game.aiOperationManager.clearLegionPlanning === 'function') {
-                    this.game.aiOperationManager.clearLegionPlanning(subordinateClanId, targetLegionId);
-                }
-            }
+            const targetLegionNo = Number(castleB.legionId);
+            const legion = this.game.legions.find(l => Number(l.clanId) === Number(subordinateClanId) && Number(l.legionNo) === targetLegionNo);
+            if (legion) this.game.castleManager.disbandLegion(legion.id);
         }
 
         let disbandedCommander = false;
         if (commanderInA && myLegionCastles.length === 0) {
-            commanderInA.isCommander = false;
             commanderInA.isCastellan = false;
-            const targetLegionId = castleA.legionId;
-            
-            this.game.castles.forEach(c => {
-                if (c.ownerClan === subordinateClanId && c.legionId === targetLegionId && c.id !== castleId) {
-                    c.legionId = 0;
-                }
-            });
-            
-            const legion = this.game.legions.find(l => l.clanId === subordinateClanId && l.legionNo === targetLegionId);
-            if (legion) {
-                legion.commanderId = 0;
-                legion.objective = null;
-                legion.status = 'wait';
-                legion.targetId = 0;
-                legion.route = [];
-                if (this.game.aiOperationManager && typeof this.game.aiOperationManager.clearLegionPlanning === 'function') {
-                    this.game.aiOperationManager.clearLegionPlanning(subordinateClanId, targetLegionId);
-                }
-            }
+            const targetLegionNo = Number(castleA.legionId);
+            const legion = this.game.legions.find(l => Number(l.clanId) === Number(subordinateClanId) && Number(l.legionNo) === targetLegionNo);
+            if (legion) this.game.castleManager.disbandLegion(legion.id);
             disbandedCommander = true;
         }
 

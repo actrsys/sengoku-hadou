@@ -737,24 +737,26 @@ class KunishuSystem {
                 return; 
             }
 
-            allCandidates.forEach(b => {
-                b._isRelative = leader ? leader.familyIds.some(fId => b.familyIds.includes(fId)) : false;
-                b._affinityDiff = leader ? Math.abs((leader.affinity || 0) - (b.affinity || 0)) : 0;
-                b._baseScore = b.leadership + b.intelligence;
-            });
+            const successionMetrics = new Map(allCandidates.map(b => [Number(b.id), {
+                isRelative: leader ? leader.familyIds.some(fId => b.familyIds.includes(fId)) : false,
+                affinityDiff: leader ? Math.abs((leader.affinity || 0) - (b.affinity || 0)) : 0,
+                baseScore: b.leadership + b.intelligence
+            }]));
 
             allCandidates.sort((a, b) => {
-                if (a._isRelative && !b._isRelative) return -1;
-                if (!a._isRelative && b._isRelative) return 1;
-                if (a._isRelative && b._isRelative && leader) {
-                    if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
+                const am = successionMetrics.get(Number(a.id));
+                const bm = successionMetrics.get(Number(b.id));
+                if (am.isRelative && !bm.isRelative) return -1;
+                if (!am.isRelative && bm.isRelative) return 1;
+                if (am.isRelative && bm.isRelative && leader) {
+                    if (am.affinityDiff !== bm.affinityDiff) return am.affinityDiff - bm.affinityDiff;
                     const aIsYounger = a.birthYear > leader.birthYear;
                     const bIsYounger = b.birthYear > leader.birthYear;
                     if (aIsYounger && !bIsYounger) return -1;
                     if (!aIsYounger && bIsYounger) return 1;
                     if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
                 }
-                return b._baseScore - a._baseScore;
+                return bm.baseScore - am.baseScore;
             });
 
             const successor = allCandidates[0];
@@ -801,9 +803,7 @@ class KunishuSystem {
         const indepSys = this.game.independenceSystem;
         const newColor = indepSys ? indepSys.generateDistinctColor(castle) : "#ff0000";
 
-        if (indepSys) {
-            leader._nameChangeInfo = indepSys.applyDaimyoNameChange(leader);
-        }
+        const nameChangeInfo = indepSys ? indepSys.applyDaimyoNameChange(leader) : null;
 
         const familyName = leader.familyName || leader.name.split('|')[0] || leader.name;
         const newClanName = `${familyName}家`;
@@ -844,7 +844,7 @@ class KunishuSystem {
         kunishu.isDestroyed = true;
         kunishu.soldiers = 0;
 
-        const info = leader._nameChangeInfo;
+        const info = nameChangeInfo;
         const leaderNameStr = (info && info.isNameChanged) ? info.oldNameStr : leader.name.replace(/\|/g, '');
 
         const msg = `${kunishu.getName(this.game)}の${leaderNameStr}が${castle.name}を乗っ取り、大名として再び旗揚げしました！`;

@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r211');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r212');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -4563,6 +4563,13 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, historyEntries: ['旧文字列履歴'] }), /historyEntries/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, aiOperations: { operations: {} } }), /aiOperations/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, scenarioFolder: 'missing' }), /未登録のシナリオ/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, originalClanId: 999, isDiplomaticMarriageActive: true }] }), /originalClanId/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, currentClanId: 999, isDiplomaticMarriageActive: true }] }), /currentClanId/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, husbandId: 999, isDiplomaticMarriageActive: true }] }), /husbandId/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, legions: [{ id: 1, clanId: 999, commanderId: 0, establishedTurnId: 0 }] }), /legions\[0\]\.clanId/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, legions: [{ id: 1, clanId: 1, commanderId: 999, establishedTurnId: 0 }] }), /commanderId/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, kunishus: [{ id: 1, castleId: 999, leaderId: 0, networkTag: '' }] }), /kunishus\[0\]\.castleId/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, kunishus: [{ id: 1, castleId: 1, leaderId: 999, networkTag: '' }] }), /leaderId/);
 });
 
 test('旧セーブ互換の移行処理をSaveManager・AI作戦・宿敵・諸勢力へ残さない', () => {
@@ -5915,6 +5922,78 @@ test('外交断交から捕虜UIを使う時は戦後処理を走らせず拘束
     const diplomacy = read('js/diplomacy.js');
     assert.ok(diplomacy.includes('startPrisonerPhase({'));
     assert.ok(diplomacy.includes('skipWarCleanup: true'));
+});
+
+
+test('諸勢力の兵科上限0を未指定扱いせず月次補充可能数0として保持する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/models.js');
+    const Kunishu = vm.runInContext('Kunishu', ctx);
+    const k = new Kunishu({
+        id: 1, castleId: 1, leaderId: 0,
+        maxSoldiers: 1200, soldiers: 1200,
+        maxDefense: 500, defense: 500,
+        maxHorses: 0, horses: 0,
+        maxGuns: 0, guns: 0
+    });
+    assert.strictEqual(k.maxHorses, 0);
+    assert.strictEqual(k.maxGuns, 0);
+    assert.strictEqual(k.horses, 0);
+    assert.strictEqual(k.guns, 0);
+});
+
+test('軍団解散はCastleManager一箇所で軍団状態・所属城・AI計画まで初期化する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/castle_manager.js');
+    const CastleManager = vm.runInContext('CastleManager', ctx);
+    const commander = { id: 10, isCommander: true };
+    const legion = { id: 100, clanId: 1, legionNo: 2, commanderId: 10, objective: '攻撃', status: 'move', targetId: 99, route: [1, 2] };
+    const castles = [
+        { id: 1, ownerClan: 1, legionId: 2, isDelegated: true },
+        { id: 2, ownerClan: 1, legionId: 2, isDelegated: true },
+        { id: 3, ownerClan: 2, legionId: 2, isDelegated: true }
+    ];
+    const cleared = [];
+    const game = {
+        legions: [legion], castles,
+        getBusho(id) { return id === 10 ? commander : null; },
+        aiOperationManager: { clearLegionPlanning(clanId, legionNo) { cleared.push([clanId, legionNo]); } }
+    };
+    const manager = new CastleManager(game);
+    assert.strictEqual(manager.disbandLegion(100), 2);
+    assert.strictEqual(commander.isCommander, false);
+    assert.strictEqual(legion.commanderId, 0);
+    assert.strictEqual(legion.objective, null);
+    assert.strictEqual(legion.status, 'wait');
+    assert.strictEqual(legion.targetId, 0);
+    assert.deepStrictEqual(Array.from(legion.route), []);
+    assert.deepStrictEqual(cleared, [[1, 2]]);
+    assert.strictEqual(castles[0].legionId, 0);
+    assert.strictEqual(castles[0].isDelegated, false);
+    assert.strictEqual(castles[1].legionId, 0);
+    assert.strictEqual(castles[2].legionId, 2, '別勢力の同じ軍団Noは触らない');
+
+    const diplomacy = read('js/diplomacy.js');
+    const command = read('js/command_system.js');
+    const historical = read('js/event/historical_event.js');
+    assert.ok(!/legion\.objective = null/.test(diplomacy), '外交側で軍団モデルを直接初期化しない');
+    assert.ok(!/legion\.objective = null/.test(command), 'コマンド側で軍団モデルを直接初期化しない');
+    assert.ok(!/legion(ToDismiss)?\.objective = null/.test(historical), 'イベント側で軍団モデルを直接初期化しない');
+});
+
+test('継承・城主任命の比較用一時値を武将モデルへ書き込まずセーブ汚染を防ぐ', () => {
+    const affiliation = read('js/affiliation_system.js');
+    const life = read('js/life_system.js');
+    const kunishu = read('js/kunishu_system.js');
+    const independence = read('js/independence_system.js');
+    for (const source of [affiliation, life, kunishu, independence]) {
+        assert.ok(!source.includes('._lordScore'));
+        assert.ok(!source.includes('._isRelative'));
+        assert.ok(!source.includes('._affinityDiff'));
+        assert.ok(!source.includes('._baseScore'));
+        assert.ok(!source.includes('._isDirectSon'));
+        assert.ok(!source.includes('._nameChangeInfo'));
+    }
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

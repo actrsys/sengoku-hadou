@@ -2165,25 +2165,8 @@ class CommandSystem {
         if (!legion || !legion.commanderId) return;
 
         const commander = this.game.getBusho(legion.commanderId);
-        if (commander) {
-            commander.isCommander = false;
-        }
-
-        // その軍団の所属をすべて直轄（ID0）に変更
-        let count = 0;
-        this.game.castles.forEach(c => {
-            if (Number(c.ownerClan) === Number(this.game.playerClanId) && Number(c.legionId) === legionNo) {
-                c.legionId = 0;
-                count++;
-            }
-        });
-        
-        // 軍団の作戦などを破棄
-        legion.commanderId = 0;
-        legion.objective = null;
-        legion.status = 'wait';
-        legion.targetId = 0;
-        legion.route = [];
+        // 軍団モデル・所属城・AI計画の破棄は CastleManager の正規窓口へ任せます。
+        const count = this.game.castleManager.disbandLegion(legion.id);
         
         const numberNames = ["", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
         const legionName = numberNames[legionNo] || `第${legionNo}席`;
