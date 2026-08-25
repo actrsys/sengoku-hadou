@@ -37,25 +37,25 @@ class AudioManager {
             // イベントBGM2
             'SC_ex_Scene1_Duel.ogg': {
                 start: 0,
-                end: (0 + 3841330) / 44100,
+                end: 3841330 / 44100,
                 baseVolume: 0.05
             },
             // イベントBGM3
             'SC_ex_Scene6_Fate.ogg': {
-                start: 604787,
+                start: 604787 / 44100,
                 end: (604787 + 6350355) / 44100,
                 baseVolume: 0.05
             },
-            // イベントBGM4
+            // イベントBGM4/外交
             'SC_ex_Scene3_Odyssey.ogg': {
-                start: 81408,
-                end: (81408 + 3924855) / 44100,
+                start: 0,
+                end: 3924855 / 44100,
                 baseVolume: 0.05
             },
             // イベントBGM5
             'SC_ex_Field1_Cruising1.ogg': {
                 start: 0,
-                end: (0 + 4639937) / 44100,
+                end: 4639937 / 44100,
                 baseVolume: 0.05
             },
             // 攻城戦BGM
@@ -68,12 +68,6 @@ class AudioManager {
             '08_Legend of bear slaying.ogg': {
                 start: 671034 / 44100, 
                 end: (671034 + 5327048) / 44100,
-                baseVolume: 0.06
-            },
-            // 外交BGM
-            'SC_ex_Scene3_Odyssey.ogg': {
-                start: 0 / 44100, 
-                end: (0 + 3924855) / 44100,
                 baseVolume: 0.06
             },
         };
