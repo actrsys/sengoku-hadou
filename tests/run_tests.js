@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r200');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r202');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -812,7 +812,7 @@ test('外交の本題も親族・特殊権威の話者距離を最後まで維�
     let msgs = dm.getDiplomacyMessages('alliance', true, '織田家', '織田別家', dm.getCallName(father, son), dm.getCallName(son, father), '姫', '貴家', greeting.context);
     assert.ok(greeting.greetMsg1.includes('信忠。') && greeting.greetMsg1.includes('わし自ら来た'), '父大名から子大名への導入は親子口調');
     assert.ok(msgs.demandMsg.includes('盟約を結んでくれ') && !msgs.demandMsg.includes('くだされ'), '本題でも父が子へ一般外交敬語へ戻らない');
-    assert.ok(msgs.replyAcceptMsg.includes('約定は違えるでないぞ'), '成立後の返答まで年長親族の口調を保つ');
+    assert.ok(msgs.replyAcceptMsg.includes('盟友として力を合わせて参ろう') && !msgs.replyAcceptMsg.includes('申し伝えます'), '成立後の返答まで年長親族本人の口調を保つ');
 
     const samano = { id: 301, clan: 1, isDaimyo: true, fullName: '足利義昭', familyNameStr: '足利', givenName: '義昭', courtRankIds: [98], familyIds: [301] };
     const highReceiver = { id: 302, clan: 2, isDaimyo: true, fullName: '織田信長', familyNameStr: '織田', givenName: '信長', courtRankIds: [20], familyIds: [302] };
@@ -1153,6 +1153,46 @@ test('高義理のAI従属家は独立時にまず親善または同盟格上げ
     const action = dm.determineAIDiplomacyAction(1, 2, 10000, 10000, 10000, 90, 1, false, 0);
     assert.strictEqual(action.action, 'alliance');
     assert.strictEqual(action.reason, 'vassal_peaceful_upgrade');
+});
+
+test('従属家から同盟への移行はプレイヤー発・AI発で同じ穏当な専用会話を使う', () => {
+    const src = read('js/diplomacy.js');
+    assert.ok(src.includes('_getVassalAllianceUpgradeMessages(conversationContext = null)'), '主従解消・同盟移行の文面を共通化する');
+    assert.ok(src.includes('当家が今日まで家を保てましたこと、深く感謝しております'), '主家への謝意を明示して独立要求だけが前面に出ない');
+    assert.ok(src.includes('主従の約を解き、盟友として変わらず力を合わせる'), 'ぼかしすぎず主従解消と同盟移行を明示する');
+    assert.ok(src.includes('demandMsg2: this._styleDiplomacyTextForSpeaker('), '従属家の対等化要求はメッセージ枠を圧迫しないよう二段階会話に分ける');
+    assert.ok(src.includes('if (msgs.demandMsg2) {\n            await this.game.ui.showDialogAsync(msgs.demandMsg2'), 'プレイヤー発の対等化要求も二つ目の台詞を順番に表示する');
+    assert.ok(src.includes('const showRemainingDemand = () => {'), 'AI発の対等化要求も二つ目の台詞を決断画面の前に表示する');
+    assert.ok(src.includes('Object.assign(msgs, this._getVassalAllianceUpgradeMessages(conversationContext))'), 'AI発も共通専用会話へ通す');
+    assert.ok(src.includes("currentRelation.status === window.GameConstants.DiplomacyStatus.SUBORDINATE"), 'プレイヤー発の従属→同盟でも専用会話を判定する');
+    assert.ok(src.includes('主従の約を解き、同盟へ改めたいとの申し出です'), 'プレイヤー側の決断画面でも申し出の意味を明確にする');
+    assert.ok(src.includes("okText = '盟友として認める'"));
+    assert.ok(src.includes("cancelText = '今は認めない'"));
+});
+
+test('外交結果は即時拒否と条件交渉の決裂を混同しない', () => {
+    const src = read('js/diplomacy.js');
+    assert.ok(src.includes('const handleFailure = (wasNegotiation = false) =>'), '従属・和睦の結果文が交渉段階を受け取る');
+    assert.ok(src.includes('に従属の願いを受け入れてもらえませんでした'), '従属願の即時拒否を条件決裂とは表示しない');
+    assert.ok(src.includes('に和睦を拒まれました'), '和睦の即時拒否を条件決裂とは表示しない');
+    assert.ok(src.includes('() => handleFailure(true), subordinationConversation'), '従属の条件交渉だけ条件決裂扱いへ渡す');
+    assert.ok(src.includes('() => handleFailure(true), truceConversation'), '和睦の条件交渉だけ条件決裂扱いへ渡す');
+});
+
+test('従属願の条件提示は事務確認へ切らず外交会話のまま続ける', () => {
+    const src = read('js/diplomacy.js');
+    assert.ok(src.includes('negotiateSubordinationConditions(subordinateClanId, dominantClanId, onSuccess, onFailure, conversation = null)'), '従属条件交渉にも会話contextを渡す');
+    assert.ok(src.includes('従属の証として'), '従属条件を相手当主の具体的な台詞として示す');
+    assert.ok(src.includes("{ label: '条件を受ける', className: 'btn-primary', onClick: acceptCondition }"), '条件提示の直後に会話内で判断する');
+    assert.ok(!src.includes('従属の条件として${selectedOption.busho.name}を人質として差し出すことを要求してきました'), '旧い事務的な条件確認文を残さない');
+});
+
+test('外交導入と臣従会話は話しかけ方と実際の操作を食い違わせない', () => {
+    const diplomacy = read('js/diplomacy.js');
+    const common = read('js/event/common_events.js');
+    assert.ok(diplomacy.includes('和睦の件で面会を求めております'), '敵大名本人の来訪を未知人物の「名乗る者」扱いにしない');
+    assert.ok(!common.includes('お会いになられますか？'), '選択肢を出さない臣従導入で可否を質問しない');
+    assert.ok(!common.includes('いただききたく'), '臣従拒否台詞の旧誤字を残さない');
 });
 
 test('武将の噂は将軍・左馬頭を候補外にし調略方針では従来の特殊呼称を維持する', () => {

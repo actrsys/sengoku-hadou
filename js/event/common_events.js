@@ -1952,11 +1952,11 @@ window.GameEvents.push({
 
                 let introMsg = "";
                 if (isDaimyoSelf) {
-                    introMsg = `「殿、${aiClanName}当主・${aiDaimyoName}様がお見えになっております。お会いになられますか？」`;
+                    introMsg = `「殿、${aiClanName}当主・${aiDaimyoName}様がお見えになっております」`;
                 } else if (greeting.context && greeting.context.envoySpecial && greeting.context.envoySpecial.level >= 2) {
-                    introMsg = `「殿、${aiClanName}より${envoyCallName}がお見えになっております。使者として面会を求めておられます」`;
+                    introMsg = `「殿、${aiClanName}より${envoyCallName}がお見えになっております。使者として参られたとのことです」`;
                 } else {
-                    introMsg = `「殿、${aiClanName} から使者が参っております。お会いになられますか？」`;
+                    introMsg = `「殿、${aiClanName}から使者が参っております」`;
                 }
 
                 // ダイアログを出す前に、音を鳴らしてバリアを張る魔法を呼びます！
@@ -1988,7 +1988,7 @@ window.GameEvents.push({
                     leftFace: envoy.faceIcon, leftName: envoyName
                 });
 
-                await game.ui.showDialogAsync(`「なんと、家臣になりたいと申されるか」`, false, 0, {
+                await game.ui.showDialogAsync(`「……当家に臣従したい、ということか」`, false, 0, {
                     leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
                 });
 
@@ -2019,10 +2019,10 @@ window.GameEvents.push({
 
                 } else {
                     // 家臣にすることを断った時のお返事です
-                    await game.ui.showDialogAsync(`「すまぬが、他家を取り込むつもりはない。これまで通り当家を支えていただききたく存ずる」`, false, 0, {
+                    await game.ui.showDialogAsync(`「申し出の趣は承った。されど今は、他家を取り込むつもりはない。これまでどおり当家を支えてもらいたい」`, false, 0, {
                         leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
                     });
-                    let replyReject = commonMsgs.replyRejectMsg || (isDaimyoSelf ? `「……左様にござるか。ではこれにて失礼いたす」` : `「……承知仕った。${aiDaimyoGivenName}様にはそのようにお伝えし申す」`);
+                    let replyReject = commonMsgs.replyRejectMsg || (isDaimyoSelf ? `「承知いたしました。此度は願いを収めます」` : `「承知いたしました。${aiDaimyoGivenName}様にはそのように申し伝えます」`);
                     await game.ui.showDialogAsync(replyReject, false, 0, {
                         leftFace: envoy.faceIcon, leftName: envoyName
                     });
