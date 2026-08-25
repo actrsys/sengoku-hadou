@@ -65,6 +65,23 @@
     100% { transform: translateY(-40px); opacity: 0; } /* さらに上に上がりつつ、透明になって消える */
 }
 
+/* 攻城戦ポップアップは横・縦の中央補正を保ったまま上へ抜けます。 */
+.war-centered-popup.anim-popup-text {
+    animation-name: war-popup-centered;
+}
+
+@keyframes war-popup-centered {
+    0%   { transform: translate(-50%, -50%) translateY(0); opacity: 1; }
+    50%  { transform: translate(-50%, -50%) translateY(-20px); opacity: 1; }
+    100% { transform: translate(-50%, -50%) translateY(-40px); opacity: 0; }
+}
+
+/* スマホはカード外の戦場レイヤーに置くため、カード端では切れません。 */
+body:not(.is-pc) #war-visual-area .war-mobile-card-popup {
+    font-size: 1.8rem;
+    white-space: nowrap;
+}
+
 /* -----------------------------------------
    4. 画面が赤く光る（大ダメージを受けた時など）
    ----------------------------------------- */
@@ -317,4 +334,16 @@
 }
 #fw-main-area.is-night.is-heavy-snow #fw-map {
     filter: sepia(0.1) saturate(0.8) hue-rotate(10deg) brightness(0.7);
+}
+
+/* r190: 攻城戦ポップアップの座標基準を明示し、clip-path 内で切らない。 */
+#war-visual-area {
+    position: relative;
+}
+.war-wall-container {
+    position: relative;
+    overflow: visible;
+}
+.war-wall-container > .war-wall-popup {
+    white-space: nowrap;
 }

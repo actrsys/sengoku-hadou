@@ -2758,6 +2758,9 @@ class UIManager {
         this.warControls.innerHTML = '';
         const allCards = document.querySelectorAll('.army-box, .responsive-army-box');
         allCards.forEach(c => c.classList.remove('active-command-turn'));
+        document.querySelectorAll('#war-modal .war-side-wrapper.is-active-side').forEach(side => {
+            side.classList.remove('is-active-side');
+        });
 
         const msgContainer = document.createElement('div');
         msgContainer.className = 'war-action-message-container';
@@ -2949,22 +2952,35 @@ class UIManager {
                 }
                 
                 const pop = document.createElement('div');
-                // ★追加：回復の時は緑色のデザイン（recover-popup）を使います！
-                pop.className = isRecover ? 'recover-popup anim-popup-text' : 'damage-popup anim-popup-text';
+                // 回復は緑、ダメージは赤。中央補正を保つ専用アニメーションを使います。
+                pop.className = isRecover
+                    ? 'recover-popup anim-popup-text war-centered-popup'
+                    : 'damage-popup anim-popup-text war-centered-popup';
                 pop.innerHTML = dmgStr;
-                
-                // ★追加：どのカードでも絶対に「ど真ん中」から文字が出るように固定する魔法です！
                 pop.style.position = 'absolute';
-                pop.style.top = '50%';
-                pop.style.left = '50%';
-                pop.style.transform = 'translate(-50%, -50%)';
-                pop.style.zIndex = '100'; // 他のものより一番手前に出します
-                pop.style.pointerEvents = 'none'; // 文字が邪魔でクリックできなくなるのを防ぎます
+                pop.style.zIndex = '120';
+                pop.style.pointerEvents = 'none';
 
-                // ★追加：数字たちが迷子にならないように、このカードを基準（relative）にします！
-                targetCard.style.position = 'relative';
+                const isMobileWar = !document.body.classList.contains('is-pc');
+                const visualArea = document.getElementById('war-visual-area');
+                let popupParent = targetCard;
 
-                targetCard.appendChild(pop);
+                if (isMobileWar && visualArea) {
+                    // スマホではカードの overflow に切られないよう、戦場表示レイヤーへ出します。
+                    // 表示位置だけは対象カードの実座標中央から求めます。
+                    const targetRect = targetCard.getBoundingClientRect();
+                    const visualRect = visualArea.getBoundingClientRect();
+                    pop.classList.add('war-mobile-card-popup');
+                    pop.style.left = `${targetRect.left - visualRect.left + visualArea.scrollLeft + (targetRect.width / 2)}px`;
+                    pop.style.top = `${targetRect.top - visualRect.top + visualArea.scrollTop + (targetRect.height / 2)}px`;
+                    popupParent = visualArea;
+                } else {
+                    // PC版は従来どおりカード中央を基準にします。
+                    pop.style.left = '50%';
+                    pop.style.top = '50%';
+                }
+
+                popupParent.appendChild(pop);
 
                 // アニメーションクラスを外す処理（タイマーで管理）
                 targetCard.damageAnimTimer = setTimeout(() => {
@@ -3002,22 +3018,31 @@ class UIManager {
                 }
                 
                 const pop = document.createElement('div');
-                // ★追加：回復の時は緑色のデザインを使います！
-                pop.className = isRecover ? 'recover-popup anim-popup-text' : 'damage-popup anim-popup-text';
+                // 回復は緑、ダメージは赤。横中央補正がアニメーション中も消えないようにします。
+                pop.className = isRecover
+                    ? 'recover-popup anim-popup-text war-centered-popup'
+                    : 'damage-popup anim-popup-text war-centered-popup';
                 pop.innerHTML = dmgStr;
-                
-                // ★追加：城壁のダメージも絶対に「ど真ん中」から文字が出るように固定します！
                 pop.style.position = 'absolute';
-                pop.style.top = '50%';
-                pop.style.left = '50%';
-                pop.style.transform = 'translate(-50%, -50%)';
-                pop.style.zIndex = '100';
+                pop.style.zIndex = '120';
                 pop.style.pointerEvents = 'none';
+                pop.classList.add('war-wall-popup');
 
-                // ★追加：ダメージの文字（-50など）の基準を八角形の枠にします！
-                hexWrap.style.position = 'relative';
-                // 数字そのものではなく、動かない枠の方にダメージ文字をくっつけます
-                hexWrap.appendChild(pop);
+                // 八角形は clip-path を持つため、その内側にポップアップを置くと
+                // 上昇アニメーションが枠端で切れます。表示だけは外側の戦況バーへ出し、
+                // 実座標は城防御枠の中心へ合わせます。
+                const wallContainer = hexWrap.closest('.war-wall-container');
+                if (wallContainer) {
+                    const hexRect = hexWrap.getBoundingClientRect();
+                    const containerRect = wallContainer.getBoundingClientRect();
+                    pop.style.left = `${hexRect.left - containerRect.left + wallContainer.scrollLeft + (hexRect.width / 2)}px`;
+                    pop.style.top = `${hexRect.top - containerRect.top + wallContainer.scrollTop + (hexRect.height / 2)}px`;
+                    wallContainer.appendChild(pop);
+                } else {
+                    pop.style.top = '50%';
+                    pop.style.left = '50%';
+                    hexWrap.appendChild(pop);
+                }
 
                 // アニメーションクラスを外す処理（タイマー管理）
                 wallEl.damageAnimTimer = setTimeout(() => {
@@ -3204,6 +3229,29 @@ class UIManager {
             }
         };
 
+        // PC版攻城戦では、部隊戦力を主役にしたまま余白へ部隊長能力を補助表示します。
+        // ランク表現は武将詳細・野戦と同じ StatPresenter を正本として共用します。
+        const updateWarLeaderAbilities = (id, busho) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (!busho || !window.StatPresenter || typeof StatPresenter.toGradeHTML !== 'function') {
+                el.innerHTML = '';
+                return;
+            }
+
+            const abilities = [
+                ['統率', busho.leadership],
+                ['武勇', busho.strength],
+                ['智謀', busho.intelligence]
+            ];
+            el.innerHTML = abilities.map(([label, value]) => `
+                <div class="war-leader-ability">
+                    <span class="war-leader-ability-label">${label}</span>
+                    ${StatPresenter.toGradeHTML(value)}
+                </div>
+            `).join('');
+        };
+
         setTxt('war-date-info', `${this.game.year}年 ${this.game.month}月`);
         const maxRounds = window.WarParams.Military.WarMaxRounds;
         
@@ -3215,9 +3263,34 @@ class UIManager {
 
         const titleNameEl = document.getElementById('war-title-name');
         if (titleNameEl) {
-            // ★修正：スマホで長くなった時に単語の途中で改行されないよう、名前と種類のブロックを分けます
+            titleNameEl.classList.remove('war-title-three-lines');
+
             if (s.defender.isKunishu) {
-                titleNameEl.innerHTML = `<span class="war-title-segment">${s.defender.name}</span> <span class="war-title-segment">鎮圧戦</span>`;
+                const isMobileWar = !document.body.classList.contains('is-pc');
+                if (isMobileWar) {
+                    // スマホの諸勢力戦はブラウザ任せの折返しにせず、
+                    // 「国名 / 勢力名 / 鎮圧戦」の3行を最初から確保します。
+                    const province = this.game.provinces.find(p => Number(p.id) === Number(s.defender.provinceId));
+                    const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(s.defender.kunishuId) : null;
+                    let provinceName = province && province.province ? province.province : '';
+                    let factionName = kunishu && typeof kunishu.getName === 'function' ? kunishu.getName(this.game) : '';
+
+                    // 古い状態などで個別名を取れない場合だけ、既存の「国名 勢力名」を分解して補完します。
+                    if (!provinceName || !factionName) {
+                        const nameParts = String(s.defender.name || '').trim().split(/\s+/).filter(Boolean);
+                        if (!provinceName && nameParts.length > 1) provinceName = nameParts.shift();
+                        if (!factionName) factionName = nameParts.join(' ') || String(s.defender.name || '諸勢力');
+                    }
+
+                    titleNameEl.classList.add('war-title-three-lines');
+                    titleNameEl.innerHTML = `
+                        <span class="war-title-segment war-title-fixed-line">${provinceName}</span>
+                        <span class="war-title-segment war-title-fixed-line">${factionName}</span>
+                        <span class="war-title-segment war-title-fixed-line">鎮圧戦</span>
+                    `;
+                } else {
+                    titleNameEl.innerHTML = `<span class="war-title-segment">${s.defender.name}</span> <span class="war-title-segment">鎮圧戦</span>`;
+                }
             } else {
                 titleNameEl.innerHTML = `<span class="war-title-segment">${s.defender.name}</span> <span class="war-title-segment">攻防戦</span>`;
             }
@@ -3257,6 +3330,7 @@ class UIManager {
         setTxt('war-atk-horses', s.attacker.horses || 0);
         setTxt('war-atk-guns', s.attacker.guns || 0);
         updateFace('war-atk-face', s.atkBushos[0]);
+        updateWarLeaderAbilities('war-atk-leader-abilities', s.atkBushos[0]);
         
         const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
         let defNameText = "土豪";
@@ -3292,6 +3366,7 @@ class UIManager {
         setTxt('war-def-horses', s.defender.horses || 0);
         setTxt('war-def-guns', s.defender.guns || 0);
         updateFace('war-def-face', s.defBusho);
+        updateWarLeaderAbilities('war-def-leader-abilities', s.defBusho);
         
         // ★HTMLに用意した枠へ、援軍の情報を流し込む魔法です！
         const updateReinfCardUI = (prefix, reinfData, fallbackClanId) => {
@@ -3309,6 +3384,7 @@ class UIManager {
             const moraleEl = document.getElementById(`war-${prefix}-reinf-morale`);
             const horsesEl = document.getElementById(`war-${prefix}-reinf-horses`);
             const gunsEl = document.getElementById(`war-${prefix}-reinf-guns`);
+            const leaderAbilitiesEl = document.getElementById(`war-${prefix}-reinf-leader-abilities`);
             
             const titleEl = card.querySelector('.responsive-army-title');
             const statsEl = card.querySelector('.responsive-army-stats');
@@ -3340,6 +3416,7 @@ class UIManager {
                     moraleEl.textContent = '';
                     if(horsesEl) horsesEl.textContent = '';
                     if(gunsEl) gunsEl.textContent = '';
+                    if(leaderAbilitiesEl) leaderAbilitiesEl.innerHTML = '';
                     
                     card.dataset.hasUnit = 'false'; // 念のためシールを「いない」にしておきます
                 }
@@ -3367,6 +3444,7 @@ class UIManager {
                 const isMobile = !document.body.classList.contains('is-pc');
 
                 const leader = reinfData.bushos && reinfData.bushos.length > 0 ? reinfData.bushos[0] : null;
+                updateWarLeaderAbilities(`war-${prefix}-reinf-leader-abilities`, leader);
                 // ★修正：魔法を使って武将名を縮小します！
                 const leaderNameHtml = leader ? getCompressedBushoNameHtml(leader, isMobile) + "軍" : "不明";
                 
@@ -3416,6 +3494,11 @@ class UIManager {
         const allCards = document.querySelectorAll('.army-box, .responsive-army-box');
         allCards.forEach(c => c.classList.remove('active-command-turn'));
 
+        const atkSideWrap = document.querySelector('.war-side-wrapper-atk');
+        const defSideWrap = document.querySelector('.war-side-wrapper-def');
+        if (atkSideWrap) atkSideWrap.classList.remove('is-active-side');
+        if (defSideWrap) defSideWrap.classList.remove('is-active-side');
+
         if (s.phase === 'command') {
             let targetCard = null;
             if (s.turn === 'attacker') {
@@ -3436,6 +3519,16 @@ class UIManager {
             if (targetCard) {
                 targetCard.classList.add('active-command-turn');
             }
+
+            const isAttackerActive = String(s.turn || '').startsWith('attacker');
+            if (isAttackerActive && atkSideWrap) atkSideWrap.classList.add('is-active-side');
+            if (!isAttackerActive && defSideWrap) defSideWrap.classList.add('is-active-side');
+        }
+
+        const warScreen = document.querySelector('#war-modal .war-screen');
+        if (warScreen) {
+            warScreen.dataset.activeTurn = String(s.turn || '');
+            warScreen.dataset.phase = String(s.phase || '');
         }
     }
 
@@ -3492,6 +3585,20 @@ class UIManager {
         }
 
         this.warControls.innerHTML = '';
+        this.warControls.classList.toggle('is-attacker-turn', !!isAtkTurn);
+        this.warControls.classList.toggle('is-defender-turn', !isAtkTurn);
+        this.warControls.dataset.turn = String(s.turn || '');
+
+        const roleLabelMap = {
+            attacker: '攻撃本隊',
+            attacker_self_reinf: '攻撃側・同勢力援軍',
+            attacker_ally_reinf: '攻撃側・友軍援軍',
+            defender: '守備本隊',
+            defender_self_reinf: '守備側・同勢力援軍',
+            defender_ally_reinf: '守備側・友軍援軍'
+        };
+        const actingSideLabel = isAtkTurn ? '攻撃軍' : '守備軍';
+        const actingUnitLabel = roleLabelMap[s.turn] || actingSideLabel;
 
         // ★左側のボタンを入れる箱（3分の2）
         const btnContainer = document.createElement('div');
@@ -3500,7 +3607,10 @@ class UIManager {
         // ★右側の説明を入れる箱（3分の1）
         const descContainer = document.createElement('div');
         descContainer.className = 'war-controls-desc';
-        descContainer.innerHTML = '<div class="war-command-placeholder">命令を選択してください</div>';
+        descContainer.innerHTML = `
+            <div class="war-command-board-label">${actingUnitLabel}</div>
+            <div class="war-command-placeholder">命令を選択してください</div>
+        `;
 
         // 2つの箱を画面に追加します
         this.warControls.appendChild(btnContainer);
@@ -3532,6 +3642,7 @@ class UIManager {
                     
                     // 右側の箱に説明を書き出します
                     descContainer.innerHTML = `
+                        <div class="war-command-board-label">${actingUnitLabel}</div>
                         <div class="war-command-desc-title">${cmd.label}</div>
                         <div>${cmd.desc}</div>
                         <div class="war-command-desc-confirm">もう一度押すと実行します</div>

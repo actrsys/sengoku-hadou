@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r183');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r194');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1219,6 +1219,17 @@ test('戦場内の一時ログと諸勢力蜂起の予告は行動履歴へ重�
     assert.ok(kunishu.includes('【諸勢力蜂起】${castle.name}にて、${kunishuName}が反乱を起こしました！`, { history: false }'));
 });
 
+test('スマホの諸勢力攻城戦タイトルは国名・勢力名・鎮圧戦の3行を明示する', () => {
+    const uiSrc = fs.readFileSync(path.join(ROOT, 'js/ui.js'), 'utf8');
+    const cssSrc = fs.readFileSync(path.join(ROOT, 'css/style.css'), 'utf8');
+    assert.match(uiSrc, /war-title-three-lines/);
+    assert.match(uiSrc, /war-title-fixed-line/);
+    assert.match(uiSrc, /provinceName[\s\S]*factionName[\s\S]*鎮圧戦/);
+    assert.match(cssSrc, /body:not\(\.is-pc\) #war-title-name\.war-title-three-lines/);
+    assert.match(cssSrc, /war-title-fixed-line:nth-child\(2\)/);
+    assert.match(cssSrc, /war-title-fixed-line:nth-child\(3\)/);
+});
+
 test('攻城戦メッセージは最新約3表示行へローリングし決着文を単独表示する', () => {
     const ui = read('js/ui.js');
     assert.ok(ui.includes('lineHeight * 3.15'));
@@ -1260,6 +1271,28 @@ test('大名家滅亡履歴は滅亡家と攻略家を関連勢力として一�
     assert.ok(life.includes('clan.extinctionNotified = true'));
     assert.ok(life.includes("category: 'extinction'"));
     assert.ok(life.includes('clanIds: [clanId, killerClanId]'));
+});
+
+test('PC攻城戦は部隊戦力を主役にしつつ部隊長3能力を既存ランク表示で補助表示する', () => {
+    const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+    const css = fs.readFileSync(path.join(ROOT, 'css/style.css'), 'utf8');
+    const ui = fs.readFileSync(path.join(ROOT, 'js/ui.js'), 'utf8');
+
+    [
+        'war-atk-leader-abilities',
+        'war-def-leader-abilities',
+        'war-atk-self-reinf-leader-abilities',
+        'war-atk-ally-reinf-leader-abilities',
+        'war-def-self-reinf-leader-abilities',
+        'war-def-ally-reinf-leader-abilities'
+    ].forEach(id => assert.ok(html.includes(`id="${id}"`), `${id} が必要`));
+
+    assert.ok(ui.includes("['統率', busho.leadership]"));
+    assert.ok(ui.includes("['武勇', busho.strength]"));
+    assert.ok(ui.includes("['智謀', busho.intelligence]"));
+    assert.ok(ui.includes('StatPresenter.toGradeHTML(value)'), '能力ランクは StatPresenter を共用する');
+    assert.ok(css.includes('grid-template-columns: 62px 76px minmax(0, 1fr)'));
+    assert.ok(css.includes('#war-modal .war-leader-abilities {\n    display: none;'), 'スマホ既定では能力欄を表示しない');
 });
 
 test('タイトル版表示は GameConfig.Meta.Version を正本にする', () => {
@@ -2176,6 +2209,39 @@ test('オートセーブ条件は「未保存 かつ 設定ON」を括弧付き�
     assert.ok(!source.includes('!game.hasAutoSavedThisMonth && window.UserSettings ?'));
 });
 
+
+
+test('攻城戦ポップアップは戦場レイヤーを座標基準にし城防御のclip-path外へ表示する', () => {
+    const ui = read('js/ui.js');
+    const animation = read('css/animation.css');
+    assert.ok(animation.includes('#war-visual-area') && animation.includes('position: relative'), 'スマホ用ポップアップのabsolute座標基準を戦場レイヤーに固定する');
+    assert.ok(ui.includes('visualArea.scrollTop') && ui.includes('visualArea.scrollLeft'), 'スクロール済みでも対象カード中央へ合わせる');
+    assert.ok(ui.includes("const wallContainer = hexWrap.closest('.war-wall-container')"), '城防御ポップアップは八角形の外側を表示親にする');
+    assert.ok(ui.includes('wallContainer.appendChild(pop)'), 'clip-pathを持つ八角形内へポップアップを残さない');
+});
+
+test('PC攻城戦の部隊カードは縦積みを避け軍馬・鉄砲まで収める専用レイアウトを持つ', () => {
+    const css = read('css/style.css');
+    assert.ok(css.includes('★ r190 攻城戦PCカード収まり調整'));
+    assert.ok(css.includes('body.is-pc #war-modal .main-army-box .responsive-army-content'));
+    assert.ok(css.includes('grid-template-columns: 84px minmax(0, 1fr) !important'));
+    assert.ok(css.includes('body.is-pc #war-modal .war-reinf-card .responsive-army-stats'));
+});
+
+test('出陣武将が一人だけなら総大将選択リストを省略する', () => {
+    const command = read('js/command_system.js');
+    const normalStart = command.indexOf("if (actionType === 'war_deploy')");
+    const normalEnd = command.indexOf("if (actionType === 'war_general')", normalStart);
+    const normalBlock = command.slice(normalStart, normalEnd);
+    assert.ok(normalBlock.includes('leader || selectedIds.length === 1'));
+    assert.ok(normalBlock.includes("this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId)"));
+
+    const kunishuStart = command.indexOf("if (actionType === 'kunishu_subjugate_deploy')");
+    const kunishuEnd = command.indexOf("if (actionType === 'kunishu_war_general')", kunishuStart);
+    const kunishuBlock = command.slice(kunishuStart, kunishuEnd);
+    assert.ok(kunishuBlock.includes('leader || selectedIds.length === 1'));
+    assert.ok(kunishuBlock.includes("this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { isKunishu: true"));
+});
 
 // ---------------------------------------------------------------------------
 // CommandSystem の責務境界
@@ -4907,5 +4973,15 @@ test('雨雪は背景座標の全画面再描画ではなく少数の合成レ�
     assert.ok(!css.includes('@keyframes snow-fall'), '旧background-position雪アニメーションを残さない');
 });
 
+test('攻城戦PCの援軍能力列・本隊戦力行・命令説明欄を横幅優先で整える', () => {
+    const css = fs.readFileSync(path.join(ROOT, 'css/style.css'), 'utf8');
+    assert.ok(css.includes('grid-template-columns: 62px 60px minmax(0, 1fr) !important;'), '援軍能力列を約0.8倍へ縮める');
+    assert.ok(css.includes('body.is-pc #war-modal .war-reinf-card .war-leader-abilities-reinf {\n    width: 60px;\n    min-width: 60px;'), '援軍能力欄自体も60pxへ揃える');
+    assert.ok(css.includes('body.is-pc #war-modal .main-army-box .stat-row {\n    padding: 4px 8px !important;'), '本隊戦力行の縦幅を少し広げる');
+    assert.ok(css.includes('body.is-pc #war-modal .war-command-board-label {\n    position: absolute;\n    top: 11px;\n    right: 14px;'), '入力対象部隊ラベルを説明欄右上へ置く');
+    assert.ok(css.includes('body.is-pc #war-modal .war-controls-desc {\n    overflow-y: hidden;'), 'PC説明欄は不要なスクロールを出さない');
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
+

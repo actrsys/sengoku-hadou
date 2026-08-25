@@ -1038,9 +1038,11 @@ class CommandSystem {
         if (actionType === 'kunishu_subjugate_deploy') {
              const selectedBushos = selectedIds.map(id => this.game.getBusho(id));
              const leader = selectedBushos.find(b => b.isDaimyo || b.isCastellan);
-             if (leader) {
-                 const others = selectedIds.filter(id => id !== leader.id);
-                 const sortedIds = [leader.id, ...others];
+             if (leader || selectedIds.length === 1) {
+                 // 総大将候補が一人だけなら選択画面を出す意味がないため、その武将を自動確定します。
+                 const leaderId = leader ? leader.id : selectedIds[0];
+                 const others = selectedIds.filter(id => id !== leaderId);
+                 const sortedIds = [leaderId, ...others];
                  this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId });
              } else {
                  this.game.ui.openBushoSelector('kunishu_war_general', targetId, { candidates: selectedIds, kunishuId: extraData.kunishuId });
@@ -1071,9 +1073,11 @@ class CommandSystem {
         if (actionType === 'war_deploy') {
              const selectedBushos = selectedIds.map(id => this.game.getBusho(id));
              const leader = selectedBushos.find(b => b.isDaimyo || b.isCastellan);
-             if (leader) {
-                 const others = selectedIds.filter(id => id !== leader.id);
-                 const sortedIds = [leader.id, ...others];
+             if (leader || selectedIds.length === 1) {
+                 // 総大将候補が一人だけなら選択画面を出さず、そのまま総大将として進めます。
+                 const leaderId = leader ? leader.id : selectedIds[0];
+                 const others = selectedIds.filter(id => id !== leaderId);
+                 const sortedIds = [leaderId, ...others];
                  this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId);
              } else {
                  this.game.ui.openBushoSelector('war_general', targetId, { candidates: selectedIds });

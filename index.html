@@ -305,7 +305,7 @@
                         <div id="war-visual-area" class="war-visual responsive-war-visual">
                             <div id="war-weather-layer" class="hidden"></div>
                             
-                            <div class="war-side-wrapper">
+                            <div class="war-side-wrapper war-side-wrapper-atk">
                                 <div class="war-reinf-col">
                                     
                                     <!-- 【攻撃側・応援軍】（メイン軍と同じ勢力からの援軍） -->
@@ -321,6 +321,7 @@
                                                 </div>
                                                 <div id="war-atk-self-reinf-empty-icon" class="hidden empty-icon">なし</div>
                                             </div>
+                                            <div id="war-atk-self-reinf-leader-abilities" class="war-leader-abilities war-leader-abilities-reinf" aria-label="部隊長能力"></div>
                                             
                                             <div class="responsive-army-stats">
                                                 <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-atk-self-reinf-soldier" class="stat-val-large">---</span></div>
@@ -348,6 +349,7 @@
                                                 </div>
                                                 <div id="war-atk-ally-reinf-empty-icon" class="hidden empty-icon">なし</div>
                                             </div>
+                                            <div id="war-atk-ally-reinf-leader-abilities" class="war-leader-abilities war-leader-abilities-reinf" aria-label="部隊長能力"></div>
                                             
                                             <div class="responsive-army-stats">
                                                 <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-atk-ally-reinf-soldier" class="stat-val-large">---</span></div>
@@ -380,11 +382,12 @@
                                             <div class="stat-row"><div><span class="label-pc">軍馬</span><span class="label-sp">馬</span></div><span id="war-atk-horses"></span></div>
                                             <div class="stat-row"><div><span class="label-pc">鉄砲</span><span class="label-sp">砲</span></div><span id="war-atk-guns"></span></div>
                                         </div>
+                                        <div id="war-atk-leader-abilities" class="war-leader-abilities war-leader-abilities-main" aria-label="部隊長能力"></div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="war-side-wrapper">
+                            <div class="war-side-wrapper war-side-wrapper-def">
                             
                                 <!-- 【守備側・メイン軍】 -->
                                 <div class="army-box defender responsive-army-box main-army-box">
@@ -402,6 +405,7 @@
                                             <div class="stat-row"><div><span class="label-pc">軍馬</span><span class="label-sp">馬</span></div><span id="war-def-horses"></span></div>
                                             <div class="stat-row"><div><span class="label-pc">鉄砲</span><span class="label-sp">砲</span></div><span id="war-def-guns"></span></div>
                                         </div>
+                                        <div id="war-def-leader-abilities" class="war-leader-abilities war-leader-abilities-main" aria-label="部隊長能力"></div>
                                     </div>
                                 </div>
 
@@ -420,6 +424,7 @@
                                                 </div>
                                                 <div id="war-def-self-reinf-empty-icon" class="hidden empty-icon">なし</div>
                                             </div>
+                                            <div id="war-def-self-reinf-leader-abilities" class="war-leader-abilities war-leader-abilities-reinf" aria-label="部隊長能力"></div>
                                             
                                             <div class="responsive-army-stats">
                                                 <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-def-self-reinf-soldier" class="stat-val-large">---</span></div>
@@ -447,6 +452,7 @@
                                                 </div>
                                                 <div id="war-def-ally-reinf-empty-icon" class="hidden empty-icon">なし</div>
                                             </div>
+                                            <div id="war-def-ally-reinf-leader-abilities" class="war-leader-abilities war-leader-abilities-reinf" aria-label="部隊長能力"></div>
                                             
                                             <div class="responsive-army-stats">
                                                 <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-def-ally-reinf-soldier" class="stat-val-large">---</span></div>
