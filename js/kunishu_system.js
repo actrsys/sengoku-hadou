@@ -967,8 +967,7 @@ class KunishuSystem {
     }
     
     // 諸勢力を攻めて壊滅させるための処理
-    // 援軍データを受け取れるように引数を追加しました！
-    async executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, sendHorses, sendGuns, kunishu, reinforcementData = null, selfReinforcementData = null) {
+    async executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, sendHorses, sendGuns, kunishu) {
         const atkBushos = atkBushosIds.map(id => this.game.getBusho(id));
         // 鎮圧戦の戦場は出撃元ではなく、諸勢力が実際に紐づく拠点を正本にします。
         // 呼び出し側が古いtargetCastleIdを渡しても演出・援軍判定・戦闘対象がずれないようここで正規化します。
@@ -990,33 +989,9 @@ class KunishuSystem {
             isWarReallyFinished = true;  
         };
 
-        // ★直接startWarを呼ぶのではなく、command_systemの共通の魔法にお任せします！
-        if (this.game.warPreparationController && typeof this.game.warPreparationController.checkReinforcementAndStartWar === 'function') {
-            const extraData = { isKunishu: true, kunishuId: kunishu.id };
-            this.game.warPreparationController.checkReinforcementAndStartWar(atkCastle, actualTargetCastleId, atkBushos, sendSoldiers, sendRice, sendHorses, sendGuns, extraData);
-        } else {
-            // (万が一の時のフォールバック処理)
-            const kunishuName = kunishu.getName(this.game);
-            const dummyDefender = {
-                id: actualTargetCastleId,
-                name: kunishuName, 
-                ownerClan: -1,
-                soldiers: kunishu.soldiers,
-                defense: kunishu.defense,
-                maxDefense: kunishu.maxDefense,
-                training: kunishu.training, 
-                morale: kunishu.morale,     
-                horses: kunishu.horses || 0,
-                guns: kunishu.guns || 0,    
-                rice: Math.floor(kunishu.soldiers * 1.5), 
-                isKunishu: true,
-                kunishuId: kunishu.id,
-                peoplesLoyalty: 100, 
-                population: 1000,
-                samuraiIds: [] 
-            };
-            this.game.warManager.startWar(atkCastle, dummyDefender, atkBushos, sendSoldiers, sendRice, sendHorses, sendGuns, reinforcementData, selfReinforcementData); 
-        }
+        // 鎮圧戦も通常戦と同じ戦争準備の正規窓口へ必ず合流させます。
+        const extraData = { isKunishu: true, kunishuId: kunishu.id };
+        this.game.warPreparationController.checkReinforcementAndStartWar(atkCastle, actualTargetCastleId, atkBushos, sendSoldiers, sendRice, sendHorses, sendGuns, extraData);
         
         // 戦争とメッセージ表示が完全に終わるまで待ちます
         let failSafeCounter = 0; 

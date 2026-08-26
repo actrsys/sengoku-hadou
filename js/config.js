@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r229'
+        Version: 'r231'
     },
 
     History: {
@@ -264,7 +264,10 @@ window.GameConfig = {
             NaturalDecay: 10,
             RoninLoyaltyThreshold: 30,
             RoninChanceBase: 0.5,
+            RoninChanceMultiplier: 0.5,
             AchievementLeader: 500,
+            BattleHistoryOverlapBonus: 2,
+            JoinThreshold: 35,
             SolidarityStayTrigger: 12,
             SolidarityStayBase: 9,
             SolidarityStayDiv: 3,

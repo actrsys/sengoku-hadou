@@ -217,28 +217,13 @@ class AffiliationSystem {
         busho.isDaimyo = false;
         busho.isCommander = false; // ★ここを追加：国主のバッジも外します
 
-        // ★ここから追加：大名家の名簿から姫を消して、姫を無所属（0）にします
-        if (busho.wifeIds && busho.wifeIds.length > 0 && this.game) {
-            // 前いた大名家の「姫の名簿」から名前を消します
-            if (oldClanId !== 0) {
-                const oldClan = this.game.clans.find(c => c.id === oldClanId);
-                if (oldClan && oldClan.princessIds) {
-                    oldClan.princessIds = oldClan.princessIds.filter(id => !busho.wifeIds.includes(id));
-                }
-            }
+        // 4. 既婚武将の妻は無所属へ移し、通常の出奔では外交婚姻も再評価する。
+        // 人質は現行仕様が別途未確定なので、外交婚姻フラグの張替えだけは行わない。
+        this.syncSpousesForClanChange(busho, oldClanId, 0, {
+            refreshDiplomacy: busho.isHostage !== true
+        });
 
-            // 姫本人の「所属シール」を剥がして「0（無所属）」にします
-            if (this.game.princesses) {
-                busho.wifeIds.forEach(wId => {
-                    const wife = this.game.princesses.find(p => p.id === wId);
-                    if (wife) {
-                        wife.currentClanId = 0;
-                    }
-                });
-            }
-        }
-
-        // 4. お城から出ます
+        // 5. お城から出ます
         this.leaveCastle(busho);
         
         // ★追加：大名家が滅亡したわけではない場合（追放や出奔）、元主君を宿敵として記録します
@@ -379,13 +364,10 @@ class AffiliationSystem {
         this.game.kunishuSystem.kunishus.push(newKunishu);
         busho.belongKunishuId = newKunishuId;
         
-        // 姫の処理
-        if (busho.wifeIds && busho.wifeIds.length > 0 && this.game && this.game.princesses) {
-            busho.wifeIds.forEach(wId => {
-                const wife = this.game.princesses.find(p => p.id === wId);
-                if (wife) wife.currentClanId = 0;
-            });
-        }
+        // 妻の所属・旧家の姫名簿・外交婚姻を、通常の所属変更と同じ窓口で同期する。
+        this.syncSpousesForClanChange(busho, oldClanId, 0, {
+            refreshDiplomacy: busho.isHostage !== true
+        });
         
         // 最後にいた拠点に入る
         this.leaveCastle(busho);
@@ -408,6 +390,7 @@ class AffiliationSystem {
 
     // ★追加：旧家臣が生存スキルの諸勢力に合流する処理
     _joinSurvivalKunishu(busho, kunishu) {
+        const oldClanId = Number(busho.clan) || 0;
         this.resetFactionData(busho);
         this.setClanIdRaw(busho, 0);
         
@@ -421,12 +404,10 @@ class AffiliationSystem {
         busho.isCommander = false;
         busho.belongKunishuId = kunishu.id;
         
-        if (busho.wifeIds && busho.wifeIds.length > 0 && this.game && this.game.princesses) {
-            busho.wifeIds.forEach(wId => {
-                const wife = this.game.princesses.find(p => p.id === wId);
-                if (wife) wife.currentClanId = 0;
-            });
-        }
+        // すでに浪人化済みなら oldClanId=0 なので何もせず、旧家から直接合流する時だけ同期する。
+        this.syncSpousesForClanChange(busho, oldClanId, 0, {
+            refreshDiplomacy: busho.isHostage !== true
+        });
 
         this.leaveCastle(busho);
         this.enterCastle(busho, kunishu.castleId);
@@ -674,15 +655,7 @@ class AffiliationSystem {
      */
 
     /**
-     * ① AI大名のお引越し（特殊な移動処理）
-     */
-    relocateDaimyoAI(castle, castellan) {
-        // ※AI大名のお引越しは ai_staffing.js の新しい人事部に移管されたため、ここは空っぽになりました！
-        return false;
-    }
-
-    /**
-     * ② AI大名の軍師任命
+     * ① AI大名の軍師任命
      */
     appointAIGunshi(castle, castellan) {
         if (castellan.isDaimyo && Number(castle.ownerClan) !== Number(this.game.playerClanId)) {
@@ -699,6 +672,7 @@ class AffiliationSystem {
 
                 let candidates = myClanBushos.filter(b => 
                     !b.isDaimyo && 
+                    !b.isCommander &&
                     !b.isCastellan && 
                     b.factionId === daimyoFactionId
                 );
@@ -722,7 +696,7 @@ class AffiliationSystem {
     }
 
     /**
-     * ③ 城主の自動決定と更新
+     * ② 城主の自動決定と更新
      */
     updateCastleLord(castle) {
         if (!castle || castle.ownerClan === 0) {

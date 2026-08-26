@@ -20,6 +20,28 @@ class MapGraphService {
         return aToB || bToA;
     }
 
+    /**
+     * static探索からもインスタンス側と同じ双方向隣接規則を使う。
+     * 通常はGameが共有するMapGraphServiceの索引を利用し、軽量な単体利用時だけ直接補完する。
+     */
+    static getAdjacentIds(game, castle) {
+        if (!game || !castle) return [];
+        if (game.mapGraph && typeof game.mapGraph.getAdjacentIds === 'function') {
+            return game.mapGraph.getAdjacentIds(castle);
+        }
+
+        const castleId = Number(castle.id);
+        const ids = new Set(Array.isArray(castle.adjacentCastleIds) ? castle.adjacentCastleIds.map(Number) : []);
+        if (Array.isArray(game.castles)) {
+            for (const other of game.castles) {
+                if (!other || Number(other.id) === castleId || !Array.isArray(other.adjacentCastleIds)) continue;
+                if (other.adjacentCastleIds.some(id => Number(id) === castleId)) ids.add(Number(other.id));
+            }
+        }
+        ids.delete(castleId);
+        return Array.from(ids);
+    }
+
 
     /**
      * 同盟・支配・従属領を通過して、目標城まで到達できるか判定する。
@@ -34,7 +56,7 @@ class MapGraphService {
 
         while (head < queue.length) {
             const current = queue[head++];
-            const adjacentIds = current.adjacentCastleIds || [];
+            const adjacentIds = this.getAdjacentIds(game, current);
             for (const adjId of adjacentIds) {
                 const next = game.getCastle(adjId);
                 if (!next) continue;
@@ -76,7 +98,7 @@ class MapGraphService {
 
         while (head < queue.length) {
             const current = queue[head++];
-            const adjacentIds = current.adjacentCastleIds || [];
+            const adjacentIds = this.getAdjacentIds(game, current);
             for (const adjId of adjacentIds) {
                 const adjCastle = game.getCastle(adjId);
                 if (!adjCastle) continue;
@@ -112,13 +134,14 @@ class MapGraphService {
 
         while (head < queue.length) {
             const current = queue[head++];
-            const adjacentIds = current.adjacentCastleIds || [];
+            const adjacentIds = this.getAdjacentIds(game, current);
             for (const adjId of adjacentIds) {
                 const next = game.getCastle(adjId);
                 if (!next) continue;
 
                 if (next.id === targetCastle.id) {
-                    return !!(current.seaRouteIds && current.seaRouteIds.includes(next.id));
+                    return !!((current.seaRouteIds && current.seaRouteIds.includes(next.id)) ||
+                        (next.seaRouteIds && next.seaRouteIds.includes(current.id)));
                 }
 
                 if (visited.has(next.id)) continue;

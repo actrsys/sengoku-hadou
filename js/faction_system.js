@@ -69,7 +69,7 @@ class FactionSystem {
 
             this.game.getClanCastles(clan.id).forEach(castle => {
                 this.game.getCastleBushos(castle.id).forEach(busho => {
-                    if (!window.BushoStatusRules.isActive(busho) || busho.factionId !== daimyo.factionId) return;
+                    if (!window.BushoStatusRules.isActive(busho) || Number(busho.clan) !== Number(clan.id) || busho.factionId !== daimyo.factionId) return;
                     busho.loyalty = Math.min(100, busho.loyalty + boostLoy);
                     busho.recognitionNeed = Math.max(minRec, (busho.recognitionNeed || 0) - decayRec);
                 });
@@ -129,8 +129,7 @@ class FactionSystem {
         const roninThreshold = F.RoninLoyaltyThreshold;
         const roninChanceBase = F.RoninChanceBase;
         
-        // ★追加：出奔率の全体調整用の倍率（0.5なら50%、0.8なら80%に設定可能）
-        const roninMultiplier = 0.5;
+        const roninMultiplier = F.RoninChanceMultiplier;
 
         // 1. 下野判定
         const roninCandidates = this.game.bushos.filter(b => 
@@ -189,12 +188,11 @@ class FactionSystem {
         const F = window.WarParams.Faction;
         const achieveLeader = F.AchievementLeader;
         
-        // CSV設定ファイルに上書きされないように、数値を「強制指定」にしています
-        const battleBonus = 2; // 強制的に2
+        const battleBonus = F.BattleHistoryOverlapBonus;
         const stayBonusTrigger = F.SolidarityStayTrigger; 
         const stayBonusBase = F.SolidarityStayBase;
         const stayBonusDiv = F.SolidarityStayDiv;
-        const joinThreshold = 35; // 派閥に入るための合格ライン（強制的に35）
+        const joinThreshold = F.JoinThreshold;
 
         // ★高速化：死亡などで1勢力だけ変化した時は、その勢力だけ再編できます。
         const targetId = (targetClanId === null || targetClanId === undefined) ? null : Number(targetClanId);

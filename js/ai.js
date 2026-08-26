@@ -86,12 +86,7 @@ class AIEngine {
             
             // ★大名のお引越しと、軍師任命の処理を「人事部」に任せます！
             if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'staffing:relocate');
-            let isRelocated = false;
-            if (this.game.aiStaffing) {
-                isRelocated = this.game.aiStaffing.relocateDaimyo(castle, castellan);
-            } else {
-                isRelocated = this.game.affiliationSystem.relocateDaimyoAI(castle, castellan);
-            }
+            const isRelocated = this.game.aiStaffing.relocateDaimyo(castle, castellan);
             
             if (isRelocated) {
                 // お引越しをしたなら、このお城のターンはおしまいです！

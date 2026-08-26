@@ -571,15 +571,15 @@ Object.assign(UIInfoManager.prototype, {
             contextHtmlStr = "<div>任せる拠点を選択してください</div>";
             onBackFunc = () => {
                 this.closeCommonModal();
-                window.GameApp.ui.showAppointLegionLeaderModal(selectData.legionNo);
+                this.ui.showAppointLegionLeaderModal(selectData.legionNo);
             };
             onConfirmFunc = () => {
                 if (!this.commonSelectedIds || this.commonSelectedIds.length === 0) return;
                 const castleId = this.commonSelectedIds[0];
                 
-                window.GameApp.ui.showDialog("よろしいですか？", true, () => {
+                this.ui.showDialog("よろしいですか？", true, () => {
                     this.closeCommonModal();
-                    window.GameApp.commandSystem.executeAppointLegionLeader(selectData.bushoId, selectData.legionNo, castleId);
+                    this.game.commandSystem.executeAppointLegionLeader(selectData.bushoId, selectData.legionNo, castleId);
                 }, () => {
                     this._renderKyotenList(clanId, isSelectMode, selectData, 0);
                 });
@@ -799,7 +799,7 @@ Object.assign(UIInfoManager.prototype, {
                 this.commonSelectedIds = [];
                 this.allotFiefSavedState = false;
                 this.allotFiefInitialIds = null; // ★お掃除
-                window.GameApp.commandSystem.executeAllotFief(legionNo, selectedIds, myCastles);
+                this.game.commandSystem.executeAllotFief(legionNo, selectedIds, myCastles);
             }
         });
         

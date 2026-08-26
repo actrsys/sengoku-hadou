@@ -2054,7 +2054,7 @@ class UIInfoManager {
         
         this.closeCommonModal(); 
         
-        window.GameApp.commandSystem.handleBushoSelection('marriage_princess', [selectedId], targetCastleId, { doerId: doerId });
+        this.game.commandSystem.handleBushoSelection('marriage_princess', [selectedId], targetCastleId, { doerId: doerId });
     }
     
     // ==========================================

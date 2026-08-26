@@ -29,27 +29,25 @@ Object.assign(UIInfoManager.prototype, {
                 </div>
             `;
             
-            // タブをクリックした時の処理もここで登録します
-            setTimeout(() => {
-                const tabStatus = document.getElementById('busho-detail-tab-status');
-                const tabAptitude = document.getElementById('busho-detail-tab-aptitude');
-                if (tabStatus) {
-                    tabStatus.onclick = (e) => {
-                        e.stopPropagation();
-                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                        this.bushoDetailCurrentTab = 'status';
-                        this._renderBushoDetail(busho, listContainer.scrollTop);
-                    };
-                }
-                if (tabAptitude) {
-                    tabAptitude.onclick = (e) => {
-                        e.stopPropagation();
-                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                        this.bushoDetailCurrentTab = 'aptitude';
-                        this._renderBushoDetail(busho, listContainer.scrollTop);
-                    };
-                }
-            }, 0);
+            // innerHTML反映直後に同じタブ領域から取得できるため、遅延せず現在のDOMへだけ結び付けます。
+            const tabStatus = tabsEl.querySelector('#busho-detail-tab-status');
+            const tabAptitude = tabsEl.querySelector('#busho-detail-tab-aptitude');
+            if (tabStatus) {
+                tabStatus.onclick = (e) => {
+                    e.stopPropagation();
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    this.bushoDetailCurrentTab = 'status';
+                    this._renderBushoDetail(busho, listContainer.scrollTop);
+                };
+            }
+            if (tabAptitude) {
+                tabAptitude.onclick = (e) => {
+                    e.stopPropagation();
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    this.bushoDetailCurrentTab = 'aptitude';
+                    this._renderBushoDetail(busho, listContainer.scrollTop);
+                };
+            }
         }
         
         const faceSrc = busho.faceIcon ? `data/images/faceicons/${busho.faceIcon}` : 'data/images/faceicons/unknown_face.webp';
@@ -715,7 +713,7 @@ Object.assign(UIInfoManager.prototype, {
             // 勢力内の身分序列は BushoListSortRules を唯一の正本とし、全国一覧では勢力グループ用の点数だけを足す。
             if (b.clan === this.game.playerClanId) return 6000 + clanRank * 500;
             if (b.clan > 0) return 5000 - b.clan * 10 + clanRank * 0.1;
-            if (b.belongKunishuId > 0) return 2000 - b.belongKunishuId * 10 + (b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0) ? 2 : 1);
+            if (b.belongKunishuId > 0) return 2000 - b.belongKunishuId * 10 + (b.id === (this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0) ? 2 : 1);
             if (window.BushoStatusRules.isRonin(b)) return 1000;
             return 0;
         };

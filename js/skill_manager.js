@@ -1004,7 +1004,7 @@ class SkillManager {
     static calcDiplomacyProbBonus(actionType, busho, game) {
         let probBonus = 0;
         
-        // 表裏比興による親善ボーナス（後方互換性対応）
+        // 表裏比興による親善ボーナス
         if (actionType === 'goodwill') {
             if (this.hasSkill(busho, SKILL_NAMES.HYORIHIKYO, game)) {
                 probBonus += 15;
@@ -1039,11 +1039,6 @@ class SkillManager {
         }
 
         return probBonus;
-    }
-
-    // ＜親善ボーナス＞ 表裏比興による親善の最終成功率アップ（互換性用）
-    static calcGoodwillProbBonus(busho, game) {
-        return this.calcDiplomacyProbBonus('goodwill', busho, game);
     }
 
     // ＜断交ペナルティ軽減＞ 表裏比興による断交時のマイナス効果の軽減

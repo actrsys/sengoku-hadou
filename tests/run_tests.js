@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r229');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r231');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2442,6 +2442,29 @@ test('MapGraphService は同盟/支配/従属領だけを中継通過できる',
     assert.strictEqual(ctx.MapGraphService.isReachable(game, castles[0], castles[2], 1), false);
 });
 
+
+test('MapGraphService のstatic探索も片側記載の隣接を双方向として扱う', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/map_graph.js');
+    const castles = [
+        { id: 1, ownerClan: 1, adjacentCastleIds: [], seaRouteIds: [] },
+        { id: 2, ownerClan: 2, adjacentCastleIds: [1, 3], seaRouteIds: [1] },
+        { id: 3, ownerClan: 1, adjacentCastleIds: [], seaRouteIds: [] }
+    ];
+    const relations = new Map([['1:2', { status: '同盟' }]]);
+    const game = {
+        castles,
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getRelation: (a, b) => relations.get(`${a}:${b}`) || null
+    };
+    game.mapGraph = new ctx.MapGraphService(game);
+
+    assert.deepStrictEqual(Array.from(game.mapGraph.getAdjacentIds(castles[0])), [2]);
+    assert.strictEqual(ctx.MapGraphService.isReachable(game, castles[0], castles[2], 1), true);
+    assert.strictEqual(ctx.MapGraphService.isSeaRoute(game, castles[0], castles[1], 1), true, '海路情報も逆側だけの記載を認識する');
+});
+
 test('TroopAllocationService の配分合計は総兵数と一致する', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
@@ -2948,6 +2971,105 @@ test('軍師役職は所属変更で持ち越さず任命窓口が一勢力一�
     assert.strictEqual(candidate.isGunshi, true, '指定した武将だけを軍師にする');
     assert.strictEqual(destinationGunshi.isGunshi, false, '既存軍師は任命時に必ず解除する');
     assert.strictEqual(game.bushos.filter(b => b.clan === 2 && b.isGunshi).length, 1, '一勢力に軍師は一人だけ');
+});
+
+test('浪人化は妻を無所属へ移し旧家姫名簿と外交婚姻を同期する', () => {
+    const ctx = createContext({
+        PersonnelRules: { calcAffinityDiff: () => 0 },
+        BushoStatusRules: {
+            isActive: b => b.status === 'active',
+            isPresent: b => b.status !== 'dead' && b.status !== 'unborn',
+            isRonin: b => b.status === 'ronin'
+        }
+    });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/affiliation_system.js');
+    const AffiliationSystem = vm.runInContext('AffiliationSystem', ctx);
+    const oldClan = { id: 1, princessIds: [11] };
+    const wife = { id: 11, originalClanId: 2, currentClanId: 1 };
+    const refreshed = [];
+    const game = {
+        playerClanId: 99,
+        clans: [oldClan],
+        princesses: [wife],
+        bushos: [],
+        getClan: id => Number(id) === 1 ? oldClan : null,
+        getClanCastles: () => [{ id: 10 }],
+        getClanDaimyo: () => null,
+        diplomacyManager: { refreshMarriageRelation: (a, b) => refreshed.push([Number(a), Number(b)]) },
+        factionSystem: { updateFactions() {} }
+    };
+    const affiliation = new AffiliationSystem(game);
+    affiliation.leaveCastle = () => {};
+    affiliation.updateUI = () => {};
+    const busho = {
+        id: 100, clan: 1, castleId: 0, status: 'active', achievementTotal: 80,
+        wifeIds: [11], isHostage: false, isGunshi: false,
+        isCastellan: false, isDaimyo: false, isCommander: false,
+        belongKunishuId: 0, nemesisIds: [], nemesisList: []
+    };
+
+    affiliation.becomeRonin(busho);
+
+    assert.strictEqual(busho.clan, 0);
+    assert.strictEqual(busho.status, 'ronin');
+    assert.strictEqual(wife.currentClanId, 0);
+    assert.deepStrictEqual(oldClan.princessIds, []);
+    assert.ok(refreshed.some(([a, b]) => (a === 2 && b === 1) || (a === 1 && b === 2)), '妻の実家と旧所属家の婚姻を再評価する');
+});
+
+test('残党諸勢力化も妻婚姻同期の共通窓口を通す', () => {
+    const src = read('js/affiliation_system.js');
+    const roninAt = src.indexOf('becomeRonin(busho, reason');
+    const ronin = src.slice(roninAt, src.indexOf('\n    // ★追加：スキルマネージャー', roninAt));
+    assert.ok(ronin.includes('this.syncSpousesForClanChange(busho, oldClanId, 0'));
+    assert.ok(ronin.includes('refreshDiplomacy: busho.isHostage !== true'));
+
+    const createAt = src.indexOf('_createSurvivalKunishu(busho, oldClanId, survivalInfo)');
+    const create = src.slice(createAt, src.indexOf('\n    // ★追加：旧家臣が生存スキル', createAt));
+    assert.ok(create.includes('this.syncSpousesForClanChange(busho, oldClanId, 0'));
+    assert.ok(create.includes('refreshDiplomacy: busho.isHostage !== true'));
+
+    const joinAt = src.indexOf('_joinSurvivalKunishu(busho, kunishu)');
+    const join = src.slice(joinAt, src.indexOf('\n    /**\n     * ③ 同じ大名家', joinAt));
+    assert.ok(join.includes('const oldClanId = Number(busho.clan) || 0;'));
+    assert.ok(join.includes('this.syncSpousesForClanChange(busho, oldClanId, 0'));
+    assert.ok(join.includes('refreshDiplomacy: busho.isHostage !== true'));
+});
+
+test('AI軍師候補は国主を除外し旧大名移動fallbackを残さない', () => {
+    const ctx = createContext({
+        PersonnelRules: { calcAffinityDiff: () => 0 },
+        BushoStatusRules: { isActive: b => b.status === 'active' }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    const AffiliationSystem = vm.runInContext('AffiliationSystem', ctx);
+    const commander = {
+        id: 2, clan: 1, status: 'active', factionId: 7, intelligence: 99, affinity: 10,
+        achievementTotal: 100, isDaimyo: false, isCommander: true, isCastellan: false, isGunshi: false
+    };
+    const candidate = {
+        id: 3, clan: 1, status: 'active', factionId: 7, intelligence: 70, affinity: 10,
+        achievementTotal: 10, isDaimyo: false, isCommander: false, isCastellan: false, isGunshi: false
+    };
+    const castellan = { id: 1, clan: 1, isDaimyo: true, factionId: 7, affinity: 10 };
+    const game = {
+        playerClanId: 99,
+        bushos: [commander, candidate],
+        getClanGunshi: () => null,
+        getClanCastles: () => [{ id: 10 }],
+        getCastleBushos: () => [commander, candidate]
+    };
+    const affiliation = new AffiliationSystem(game);
+    affiliation.appointAIGunshi({ id: 10, ownerClan: 1 }, castellan);
+    assert.strictEqual(commander.isGunshi, false, '国主は軍師候補にしない');
+    assert.strictEqual(candidate.isGunshi, true, '次順位の適格者を軍師にする');
+
+    const ai = read('js/ai.js');
+    const affiliationSource = read('js/affiliation_system.js');
+    assert.ok(ai.includes('const isRelocated = this.game.aiStaffing.relocateDaimyo(castle, castellan);'));
+    assert.ok(!ai.includes('relocateDaimyoAI'));
+    assert.ok(!affiliationSource.includes('relocateDaimyoAI('));
 });
 
 test('軍師役職の実行中書換はAffiliationSystemへ集約し旧gunshiId二重管理を残さない', () => {
@@ -5844,7 +5966,7 @@ test('諸勢力鎮圧は出撃元ではなくkunishu.castleIdを戦場の正本�
     const ai = read('js/ai.js');
     assert.ok(kunishu.includes('const actualTargetCastleId = Number(kunishu && kunishu.castleId) || Number(targetCastleId)'));
     assert.ok(kunishu.includes('checkReinforcementAndStartWar(atkCastle, actualTargetCastleId'));
-    assert.ok(kunishu.includes('id: actualTargetCastleId'));
+    assert.ok(!kunishu.includes('checkReinforcementAndStartWar(atkCastle, targetCastleId'), '呼出元の古い対象IDへ戻さない');
     assert.ok(ai.includes('executeKunishuSubjugate(sourceCastle, Number(kunishu.castleId)'));
     assert.ok(!ai.includes('executeKunishuSubjugate(sourceCastle, sourceCastle.id'), 'AI鎮圧で出撃元IDを戦場として渡さない');
 });
@@ -6673,6 +6795,62 @@ test('城主引抜は旧派閥IDで追随判定しつつ本人の派閥婚姻を
     assert.ok(!block.includes('setClanIdRaw(target, newClanId)'));
 });
 
+
+test('派閥の固定バランス値は GameConfig.Faction を正本にする', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    assert.strictEqual(ctx.WarParams.Faction.RoninChanceMultiplier, 0.5);
+    assert.strictEqual(ctx.WarParams.Faction.BattleHistoryOverlapBonus, 2);
+    assert.strictEqual(ctx.WarParams.Faction.JoinThreshold, 35);
+
+    const faction = read('js/faction_system.js');
+    assert.ok(faction.includes('F.RoninChanceMultiplier'));
+    assert.ok(faction.includes('F.BattleHistoryOverlapBonus'));
+    assert.ok(faction.includes('F.JoinThreshold'));
+    assert.ok(!faction.includes('const roninMultiplier = 0.5'));
+    assert.ok(!faction.includes('const battleBonus = 2'));
+    assert.ok(!faction.includes('const joinThreshold = 35'));
+});
+
+test('武将詳細タブは遅延bindせず現在のタブDOMへ直接結び付ける', () => {
+    const source = read('js/ui_info_busho.js');
+    assert.ok(source.includes("tabsEl.querySelector('#busho-detail-tab-status')"));
+    assert.ok(source.includes("tabsEl.querySelector('#busho-detail-tab-aptitude')"));
+    assert.ok(!/busho-detail-tab-status[\s\S]{0,900}setTimeout\s*\(/.test(source));
+});
+
+
+test('UIInfoManager は保持済み game/ui を使い window.GameApp へ戻らない', () => {
+    for (const file of ['js/ui_info.js', 'js/ui_info_busho.js', 'js/ui_info_kyoten.js']) {
+        assert.ok(!read(file).includes('window.GameApp'), `${file} に window.GameApp 参照を残さない`);
+    }
+});
+
+test('同派閥の月初恩恵は城への同居者ではなく対象大名家所属者だけへ適用する', () => {
+    const source = read('js/faction_system.js');
+    const at = source.indexOf('applyStartMonthSameFactionEffects()');
+    const block = source.slice(at, at + 1700);
+    assert.ok(block.includes('Number(busho.clan) !== Number(clan.id)'));
+});
+
+
+test('外交技能補正は calcDiplomacyProbBonus を唯一の現行APIとして使う', () => {
+    const diplomacy = read('js/diplomacy.js');
+    const skill = read('js/skill_manager.js');
+    assert.ok(diplomacy.includes("SkillManager.calcDiplomacyProbBonus('goodwill', doer, this.game)"));
+    assert.ok(!diplomacy.includes('calcGoodwillProbBonus'));
+    assert.ok(!skill.includes('static calcGoodwillProbBonus'));
+});
+
+
+test('諸勢力鎮圧は WarPreparationController を唯一の戦争開始窓口にする', () => {
+    const source = read('js/kunishu_system.js');
+    const at = source.indexOf('async executeKunishuSubjugate');
+    const block = source.slice(at, at + 4200);
+    assert.ok(block.includes('this.game.warPreparationController.checkReinforcementAndStartWar('));
+    assert.ok(!block.includes('this.game.warManager.startWar(atkCastle, dummyDefender'));
+    assert.ok(!block.includes('const dummyDefender ='));
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
-
