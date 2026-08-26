@@ -1009,7 +1009,6 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .status-bar-text { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); font-size: 11px; color: #111; font-weight: bold; text-shadow: 1px 1px 0 rgba(255,255,255,0.7), -1px -1px 0 rgba(255,255,255,0.7), 1px -1px 0 rgba(255,255,255,0.7), -1px 1px 0 rgba(255,255,255,0.7); line-height: 1; }
 
 .war-face { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1.5px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); margin-bottom: 5px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); }
-.daimyo-confirm-face { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; border: 1.5px solid #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); margin-bottom: 10px; background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%); display: inline-block; }
 
 /* =========================================================
    セーブ・ロード専用スロットボタン (改修版)
@@ -2072,7 +2071,10 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
 .daimyo-confirm-face {
     width: 100%;
     max-width: 72px;
+    height: auto;
     aspect-ratio: 1 / 1;
+    box-sizing: border-box;
+    display: block;
     object-fit: cover;
     border: 2px solid #fff;
     box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8);

@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r222');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r223');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -6310,6 +6310,22 @@ test('現行AudioManagerに存在しない旧互換プロパティやfadeOutSe�
     assert.ok(!source.includes('fadeOutSe'));
     assert.ok(source.includes('memorizeCurrentBgm()'));
     assert.ok(source.includes('restoreMemorizedBgm()'));
+});
+
+
+test('大名選択の顔グラはPC・スマホとも正方形を維持する', () => {
+    const css = read('css/style.css');
+    const selectorAt = css.indexOf('.daimyo-confirm-face {', css.indexOf('/* シナリオ開始前の大名確認情報'));
+    assert.ok(selectorAt >= 0);
+    const block = css.slice(selectorAt, css.indexOf('}', selectorAt) + 1);
+    assert.ok(block.includes('height: auto;'));
+    assert.ok(block.includes('aspect-ratio: 1 / 1;'));
+    assert.ok(block.includes('box-sizing: border-box;'));
+    assert.ok(block.includes('display: block;'));
+    const legacy = css.slice(0, css.indexOf('/* シナリオ開始前の大名確認情報'));
+    assert.ok(!/\.daimyo-confirm-face\s*\{[^}]*height:\s*80px/s.test(legacy), '旧80px高さ指定を残さない');
+    assert.ok(css.includes('body.is-pc .daimyo-confirm-face-column { width: 90px; }'));
+    assert.ok(css.includes('body.is-pc .daimyo-confirm-face { max-width: 90px; }'));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
