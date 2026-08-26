@@ -389,6 +389,8 @@ class DiplomacyManager {
 
     async _resolvePlayerPrincessConflict(princess) {
         const originClanId = this._getPrincessOriginClanId(princess);
+        const holderClanId = Number(princess && princess.currentClanId || 0);
+        const historyClanIds = [originClanId, holderClanId];
         const originClan = this.game.clans.find(c => Number(c.id) === Number(originClanId));
         const originClanName = originClan ? originClan.name : "他勢力";
         const choice = await this._awaitDiplomacyChoice(
@@ -407,7 +409,7 @@ class DiplomacyManager {
                 0,
                 { leftFace: princess.faceIcon || 'unknown_face.webp', leftName: princess.name }
             );
-            this.game.ui.log(`${princess.name} は引き続き妻として留まることになりました`);
+            this.game.ui.log(`${princess.name} は引き続き妻として留まることになりました`, { clanIds: historyClanIds, category: 'family', inferCurrentTurn: false });
             return;
         }
 
@@ -426,7 +428,7 @@ class DiplomacyManager {
             this.game.lifeSystem.setLifeStatusRaw(princess, window.GameConstants.BushoStatus.DEAD);
             FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
             if (originClanId > 0 && marriageTargetClanId > 0) this.refreshMarriageRelation(originClanId, marriageTargetClanId);
-            this.game.ui.log(`${princess.name} を処断しました`);
+            this.game.ui.log(`${princess.name} を処断しました`, { clanIds: historyClanIds, category: 'family', inferCurrentTurn: false });
             await this.game.ui.showDialogAsync(`${princess.name}を処断しました。`, false, 0);
             return;
         }
@@ -445,20 +447,22 @@ class DiplomacyManager {
         }
         FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
         if (originClanId > 0 && marriageTargetClanId > 0) this.refreshMarriageRelation(originClanId, marriageTargetClanId);
-        this.game.ui.log(`${princess.name} と離縁し、実家へ送り返しました`);
+        this.game.ui.log(`${princess.name} と離縁し、実家へ送り返しました`, { clanIds: historyClanIds, category: 'family', inferCurrentTurn: false });
         await this.game.ui.showDialogAsync(`${princess.name}を親元へと送り返しました。`, false, 0);
     }
 
     async _resolveAIPrincessConflict(princess) {
         const aiChoice = this._chooseAIPrincessConflictTreatment(princess);
-        const aiClan = this.game.clans.find(c => Number(c.id) === Number(princess.currentClanId));
+        const holderClanId = Number(princess && princess.currentClanId || 0);
+        const aiClan = this.game.clans.find(c => Number(c.id) === Number(holderClanId));
         const aiClanName = aiClan ? aiClan.name : "敵勢力";
         const originClanId = this._getPrincessOriginClanId(princess);
+        const historyClanIds = [originClanId, holderClanId];
         const husband = this.game.getBusho(princess.husbandId);
         const marriageTargetClanId = Number(husband && husband.clan || princess.currentClanId || 0);
 
         if (aiChoice === 'stay') {
-            this.game.ui.log(`${princess.name} は敵対後も${aiClanName}に妻として留まりました`);
+            this.game.ui.log(`${princess.name} は敵対後も${aiClanName}に妻として留まりました`, { clanIds: historyClanIds, category: 'family', inferCurrentTurn: false });
             return;
         }
 
@@ -469,7 +473,7 @@ class DiplomacyManager {
         if (aiChoice === 'kill') {
             this.game.lifeSystem.setLifeStatusRaw(princess, window.GameConstants.BushoStatus.DEAD);
             if (originClanId > 0 && marriageTargetClanId > 0) this.refreshMarriageRelation(originClanId, marriageTargetClanId);
-            this.game.ui.log(`${princess.name} は${aiClanName}によって処断されました……`);
+            this.game.ui.log(`${princess.name} は${aiClanName}によって処断されました……`, { clanIds: historyClanIds, category: 'family', inferCurrentTurn: false });
             if (originClanId === Number(this.game.playerClanId)) {
                 await this.game.ui.showDialogAsync(`${princess.name} は${aiClanName}によって処断されました……`, false, 0);
             }
@@ -484,7 +488,7 @@ class DiplomacyManager {
             if (!originClan.princessIds.includes(princess.id)) originClan.princessIds.push(princess.id);
         }
         if (originClanId > 0 && marriageTargetClanId > 0) this.refreshMarriageRelation(originClanId, marriageTargetClanId);
-        this.game.ui.log(`${princess.name} は${aiClanName}によって離縁され、戻って参りました`);
+        this.game.ui.log(`${princess.name} は${aiClanName}によって離縁され、戻って参りました`, { clanIds: historyClanIds, category: 'family', inferCurrentTurn: false });
         if (originClanId === Number(this.game.playerClanId)) {
             await this.game.ui.showDialogAsync(`${princess.name} は離縁され、戻って参りました。`, false, 0);
         }
@@ -516,13 +520,13 @@ class DiplomacyManager {
                 playerOriginHostages.forEach(busho => {
                     if (window.LifeStatusRules.isDead(busho)) {
                         aiResultMsgs.push(`人質として送っていた ${busho.name} は${clanName} によって処断されました……`);
-                        this.game.ui.log(`${busho.name} は ${clanName} によって処断されました`);
+                        this.game.ui.log(`${busho.name} は ${clanName} によって処断されました`, { clanIds: [record.originClanId, record.captorClanId], category: 'diplomacy', inferCurrentTurn: false });
                     } else if (Number(busho.clan) === captorClanId) {
                         aiResultMsgs.push(`人質として送っていた ${busho.name} は${clanName} に臣従しました……`);
-                        this.game.ui.log(`${busho.name} は ${clanName} に登用されました`);
+                        this.game.ui.log(`${busho.name} は ${clanName} に登用されました`, { clanIds: [record.originClanId, record.captorClanId], category: 'diplomacy', inferCurrentTurn: false });
                     } else {
                         aiResultMsgs.push(`人質として送っていた ${busho.name} は無事に解放され、戻って参りました！`);
-                        this.game.ui.log(`${busho.name} が ${clanName} より解放されました`);
+                        this.game.ui.log(`${busho.name} が ${clanName} より解放されました`, { clanIds: [record.originClanId, record.captorClanId], category: 'diplomacy', inferCurrentTurn: false });
                     }
                 });
             }
@@ -554,10 +558,10 @@ class DiplomacyManager {
             const busho = record && record.busho;
             if (!busho) continue;
             if (Number(record.originClanId) === playerClanId) {
-                this.game.ui.log(`人質として預けていた ${busho.name} は脱走し、戻って参りました！`);
+                this.game.ui.log(`人質として預けていた ${busho.name} は脱走し、戻って参りました！`, { clanIds: [record.originClanId, record.captorClanId], category: 'diplomacy', inferCurrentTurn: false });
                 await this.game.ui.showDialogAsync(`人質として預けていた ${busho.name} は脱走し、無事に帰還しました！`, false, 0);
             } else if (Number(record.captorClanId) === playerClanId) {
-                this.game.ui.log(`当家に預けられていた ${busho.name} は脱走し、実家へ戻りました`);
+                this.game.ui.log(`当家に預けられていた ${busho.name} は脱走し、実家へ戻りました`, { clanIds: [record.originClanId, record.captorClanId], category: 'diplomacy', inferCurrentTurn: false });
                 await this.game.ui.showDialogAsync(`当家に預けられていた ${busho.name} は脱走し、実家へ戻りました。`, false, 0);
             }
         }

@@ -2028,7 +2028,7 @@ window.GameEvents.push({
                     });
 
                     await game.ui.showDialogAsync(`${aiClanName} が ${playerClan.name} に臣従しました！`, false, 0);
-                    if (game.ui.log) game.ui.log(`${aiClanName} が ${playerClan.name} に臣従しました`);
+                    if (game.ui.log) game.ui.log(`${aiClanName} が ${playerClan.name} に臣従しました`, { clanIds: [clan.id, playerClanId], category: 'diplomacy', inferCurrentTurn: false });
 
                     // 臣従の処理を呼び出します
                     processSubordination(clan.id, playerClanId);
@@ -2051,7 +2051,7 @@ window.GameEvents.push({
                 
                 // おしらせメッセージとログだけを出します
                 await game.ui.showDialogAsync(msg, false, 0);
-                if (game.ui.log) game.ui.log(msg);
+                if (game.ui.log) game.ui.log(msg, { clanIds: [clan.id, selectedTarget.id], category: 'diplomacy', inferCurrentTurn: false });
 
                 // 自動的に臣従の処理を呼び出します
                 processSubordination(clan.id, selectedTarget.id);

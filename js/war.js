@@ -95,7 +95,17 @@ class WarSystem {
         return { success: true, damage: Math.floor(atkBusho.intelligence * window.WarParams.War.FireDamageFactor * (Math.random() + 0.5)) }; 
     }
 
-    static calcRetreatScore(castle) { return castle.soldiers + (castle.defense * 0.5) + (castle.gold * 0.1) + (castle.rice * 0.1) + (castle.samuraiIds.length * 100); }
+    static calcRetreatScore(game, castle) {
+        if (!castle) return 0;
+        const defenderCount = game && typeof game.getCastleBushos === 'function'
+            ? game.getCastleBushos(castle.id).filter(b =>
+                Number(b.clan) === Number(castle.ownerClan) &&
+                Number(b.belongKunishuId || 0) === 0 &&
+                window.BushoStatusRules.isActive(b)
+            ).length
+            : 0;
+        return castle.soldiers + (castle.defense * 0.5) + (castle.gold * 0.1) + (castle.rice * 0.1) + (defenderCount * 100);
+    }
 
     // 戦場となる城に対する「ホーム補正」の正本です。
     // 大名家は軍団長居城→大名居城→出発城の順で基準地を決め、

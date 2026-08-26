@@ -1731,6 +1731,9 @@ class LifeSystem {
                 c.castellanId = 0;
                 this.game.getCastleBushos(c.id).forEach(l => {
                     if (window.LifeStatusRules.isUnavailable(l)) return;
+                    // 後継者不在で処分するのは滅亡した大名家の通常武将だけ。
+                    // 同居する浪人・諸勢力・他家武将は巻き込まない。
+                    if (Number(l.clan) !== Number(clanId) || Number(l.belongKunishuId || 0) > 0) return;
                     this.game.affiliationSystem.becomeRonin(l);
                 });
                 this.game.updateCastleLord(c); 

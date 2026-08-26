@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r226');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r228');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -6466,6 +6466,142 @@ test('指南書は低能力武将の民忠維持上の役目も案内する', ()
     assert.ok(guide.includes('通常の城では民忠が月ごとに少しずつ下がる'));
     assert.ok(guide.includes('各城に最低限の武将を配置しておく意味があります'));
     assert.ok(guide.includes('施しなどで維持できるよう各城に最低限の家臣を置く'));
+});
+
+
+test('AI人事の配置人数は同居人物数ではなく自家の通常活動中武将だけを数える', () => {
+    const staffing = read('js/ai_staffing.js');
+    assert.ok(staffing.includes('_getActiveClanBushosInCastle(castle'));
+    assert.ok(staffing.includes('Number(b.clan) === Number(clanId)'));
+    assert.ok(staffing.includes('Number(b.belongKunishuId || 0) === 0'));
+    assert.ok(staffing.includes('window.BushoStatusRules.isActive(b)'));
+    assert.ok(!staffing.includes('samuraiIds.length'), 'AI人事の人数評価へ物理在城人数を直接使わない');
+    ['totalBushosInNetwork += this._getActiveClanBushoCount(c, clanId);',
+     'let remainingCount = this._getActiveClanBushoCount(castle, clanId);',
+     'let targetCount = this._getActiveClanBushoCount(group.target, clanId);'].forEach(text => assert.ok(staffing.includes(text)));
+});
+
+test('諸勢力蜂起の勝利時は旧城主家臣だけを退避させ同居諸勢力を巻き込まない', () => {
+    const effort = read('js/war_effort.js');
+    const at = effort.indexOf('// 蜂起で退避・浪人化するのは、陥落前の城主家に所属する通常武将だけ。');
+    assert.ok(at >= 0);
+    const block = effort.slice(at, at + 2300);
+    assert.ok(block.includes('Number(b.clan) !== Number(oldOwner)'));
+    assert.ok(block.includes('Number(b.belongKunishuId || 0) > 0'));
+    assert.ok(block.includes('Number(busho.clan) !== Number(oldOwner)'));
+    assert.ok(block.includes('Number(busho.belongKunishuId || 0) > 0'));
+});
+
+test('後継者不在滅亡は滅亡家所属者だけを浪人化し同居人物を処分しない', () => {
+    const life = read('js/life_system.js');
+    const at = life.indexOf('// 後継者不在で処分するのは滅亡した大名家の通常武将だけ。');
+    assert.ok(at >= 0);
+    const block = life.slice(at, at + 550);
+    assert.ok(block.includes('Number(l.clan) !== Number(clanId)'));
+    assert.ok(block.includes('Number(l.belongKunishuId || 0) > 0'));
+    assert.ok(block.includes('this.game.affiliationSystem.becomeRonin(l);'));
+});
+
+test('落城捕虜と守備撤退は敗戦大名家の通常武将だけを処理する', () => {
+    const effort = read('js/war_effort.js');
+    const retreatAt = effort.indexOf('const retreatingClanId = Number(defCastle.ownerClan);');
+    assert.ok(retreatAt >= 0);
+    const retreatBlock = effort.slice(retreatAt, retreatAt + 2100);
+    assert.ok(retreatBlock.includes('Number(b.clan) !== retreatingClanId'));
+    assert.ok(retreatBlock.includes('Number(b.belongKunishuId || 0) > 0'));
+    assert.ok(retreatBlock.includes('Number(busho.clan) !== retreatingClanId'));
+
+    const captureAt = effort.indexOf('processCaptures(defeatedCastle, winnerClanId)');
+    const captureBlock = effort.slice(captureAt, captureAt + 1200);
+    assert.ok(captureBlock.includes('Number(b.clan) !== Number(defeatedCastle.ownerClan)'));
+    assert.ok(captureBlock.includes('Number(b.belongKunishuId || 0) > 0'));
+});
+
+test('撤退先評価の武将数は城主家所属の通常活動中武将だけを使う', () => {
+    const war = read('js/war.js');
+    const at = war.indexOf('static calcRetreatScore(game, castle)');
+    assert.ok(at >= 0);
+    const block = war.slice(at, at + 850);
+    assert.ok(block.includes('Number(b.clan) === Number(castle.ownerClan)'));
+    assert.ok(block.includes('Number(b.belongKunishuId || 0) === 0'));
+    assert.ok(block.includes('window.BushoStatusRules.isActive(b)'));
+    assert.ok(!block.includes('castle.samuraiIds.length'));
+    const effort = read('js/war_effort.js');
+    assert.ok(effort.includes('WarSystem.calcRetreatScore(this.game, b) - WarSystem.calcRetreatScore(this.game, a)'));
+});
+
+test('実機診断はUI初期化前からtitle扱いにして前回checkpointを上書きしない', () => {
+    const game = read('js/game.js');
+    const phaseAt = game.indexOf("this.phase = 'title';");
+    const uiAt = game.indexOf('this.ui = new UIManager(this);');
+    assert.ok(phaseAt >= 0 && uiAt > phaseAt, 'UIManager生成より前にtitleを設定する');
+    const writeAt = game.indexOf('writeSystemDiagnostic(phase, castle = null)');
+    const writeBlock = game.slice(writeAt, writeAt + 700);
+    assert.ok(writeBlock.includes("if (!this.phase || this.phase === 'title') return;"));
+});
+
+test('所在地修正版の下河原恒忠・恒長は葛西家の寺池城に配置する', () => {
+    const csv = read('data/scenarios/1560_okehazama/warriors.csv');
+    const lines = csv.trimEnd().split(/\r?\n/);
+    const headers = lines[0].split(',');
+    const idIndex = headers.indexOf('id');
+    const castleIndex = headers.indexOf('castleId');
+    const clanIndex = headers.indexOf('clan');
+    const byId = new Map(lines.slice(1).map(line => {
+        const cols = line.split(',');
+        return [cols[idIndex], cols];
+    }));
+    for (const id of ['1070038', '1070039']) {
+        const row = byId.get(id);
+        assert.ok(row, `${id} が存在する`);
+        assert.strictEqual(row[clanIndex], '70');
+        assert.strictEqual(row[castleIndex], '200');
+    }
+});
+
+
+test('AI上洛判断は自家所属の通常活動中武将だけを将軍候補に数える', () => {
+    const ai = read('js/ai.js');
+    const at = ai.indexOf('// 自勢力に正式所属する通常の活動中武将だけから「左馬頭（ID: 80）」を探す。');
+    assert.ok(at >= 0);
+    const block = ai.slice(at, at + 900);
+    assert.ok(block.includes('Number(b.clan) === Number(myClanId)'));
+    assert.ok(block.includes('Number(b.belongKunishuId || 0) === 0'));
+    assert.ok(block.includes('window.BushoStatusRules.isActive(b)'));
+    assert.ok(!block.includes('getCastleBushos'));
+});
+
+test('野戦スクロール操作は前回イベントリスナーを解除してから再登録する', () => {
+    const field = read('js/field_war.js');
+    const at = field.indexOf('if (this._fwScrollEventBindings)');
+    assert.ok(at >= 0);
+    const block = field.slice(at, at + 9000);
+    for (const type of ['click', 'wheel', 'touchstart', 'touchmove', 'touchend']) {
+        assert.ok(block.includes(`removeEventListener('${type}'`), `${type} を解除する`);
+        assert.ok(block.includes(`addEventListener('${type}'`), `${type} を再登録する`);
+    }
+    assert.ok(block.includes('this._fwScrollEventBindings = {'));
+});
+
+test('独立・寝返り・謀反履歴は当事者勢力IDを明示する', () => {
+    const src = read('js/independence_system.js');
+    assert.ok(src.includes("category: 'independence'"));
+    assert.ok(src.includes('this._logIndependence(msg, [oldClanId, newClanId]);'));
+    assert.ok(src.includes('this._logIndependence(`${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました。`, [oldClanId]);'));
+    assert.ok(!src.includes('this.game.ui.log(msg);'));
+});
+
+test('臣従成立履歴は臣従元と臣従先を明示する', () => {
+    const src = read('js/event/common_events.js');
+    assert.ok(src.includes("clanIds: [clan.id, playerClanId], category: 'diplomacy'"));
+    assert.ok(src.includes("clanIds: [clan.id, selectedTarget.id], category: 'diplomacy'"));
+});
+
+test('断交時の姫・人質処遇履歴は双方の勢力IDを明示する', () => {
+    const src = read('js/diplomacy.js');
+    assert.ok(src.includes('const historyClanIds = [originClanId, holderClanId];'));
+    assert.ok(src.includes("clanIds: historyClanIds, category: 'family', inferCurrentTurn: false"));
+    assert.ok(src.includes("clanIds: [record.originClanId, record.captorClanId], category: 'diplomacy', inferCurrentTurn: false"));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

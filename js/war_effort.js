@@ -1370,10 +1370,11 @@ Object.assign(WarManager.prototype, {
                 target.guns = Math.min(99999, (target.guns || 0) + carryGuns);
                 
                 const capturedBushos = [];
+                const retreatingClanId = Number(defCastle.ownerClan);
                 this.game.getCastleBushos(defCastle.id).forEach(b => { 
                     if (window.BushoStatusRules.isRonin(b)) return;
-                    // ★ 追加: 諸勢力の武将は撤退戦に巻き込まれて捕虜にならないようにします！
-                    if (b.belongKunishuId > 0) return;
+                    // 撤退戦で動かすのは守備大名家所属の通常武将だけ。
+                    if (Number(b.clan) !== retreatingClanId || Number(b.belongKunishuId || 0) > 0) return;
 
                     let chance = 0.5 - (b.strength * window.WarParams.War.CaptureStrFactor) + (Math.random() * 0.3);
                     if (defCastle.soldiers > 1000) chance -= 0.2;
@@ -1396,7 +1397,10 @@ Object.assign(WarManager.prototype, {
                 
                 defCastle.samuraiIds = defCastle.samuraiIds.filter(id => {
                     const busho = this.game.getBusho(id);
-                    return busho && window.BushoStatusRules.isRonin(busho);
+                    if (!busho || !window.LifeStatusRules.isPresent(busho)) return false;
+                    return Number(busho.clan) !== retreatingClanId ||
+                        Number(busho.belongKunishuId || 0) > 0 ||
+                        window.BushoStatusRules.isRonin(busho);
                 });
                 
                 defCastle.castellanId = 0;
@@ -1409,7 +1413,7 @@ Object.assign(WarManager.prototype, {
                 this.endWar(true, true, capturedBushos, target.id); 
             }
         };
-        candidates.sort((a,b) => WarSystem.calcRetreatScore(b) - WarSystem.calcRetreatScore(a)); 
+        candidates.sort((a,b) => WarSystem.calcRetreatScore(this.game, b) - WarSystem.calcRetreatScore(this.game, a)); 
         runRetreat(candidates[0].id);
     },
     
@@ -1922,33 +1926,29 @@ Object.assign(WarManager.prototype, {
                     const kunishuMembers = this.game.kunishuSystem.getKunishuMembers(s.attacker.kunishuId).map(b => b.id);
                     
                     this.game.getCastleBushos(targetC.id).forEach(b => {
-                        // もし諸勢力のメンバーじゃなかったら（大名家の武将だったら）
-                        if (!kunishuMembers.includes(b.id)) {
-                            if (friendlyCastles.length > 0) {
-                                // ★味方の城がある場合：ランダムに選んだ味方の城へ避難します！
-                                const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
-                                // 派閥などの情報も一緒にお引越しさせます
-                                if (this.game.factionSystem) {
-                                    this.game.factionSystem.handleMove(b, targetC.id, escapeCastle.id);
-                                }
-                                // ★新しいお引越しセンターの魔法を使います！
-                                this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
-                                
-                                // ★修正：共通化された大名逃亡処理を呼び出します
-                                this.handleDaimyoEscape(b, escapeCastle);
-                            } else {
-                                // ★味方の城がない場合（最後の城だった場合）：浪人になります
-                                // ★新しいお引越しセンターの魔法を使います！
-                                this.game.affiliationSystem.becomeRonin(b);
+                        // 蜂起で退避・浪人化するのは、陥落前の城主家に所属する通常武将だけ。
+                        // 同居する別の諸勢力・浪人・他家武将は、その勢力とは無関係なので巻き込まない。
+                        if (Number(b.clan) !== Number(oldOwner) || Number(b.belongKunishuId || 0) > 0) return;
+                        if (friendlyCastles.length > 0) {
+                            const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
+                            if (this.game.factionSystem) {
+                                this.game.factionSystem.handleMove(b, targetC.id, escapeCastle.id);
                             }
+                            this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
+                            this.handleDaimyoEscape(b, escapeCastle);
+                        } else {
+                            this.game.affiliationSystem.becomeRonin(b);
                         }
                     });
                     
-                    // 城のお留守番リスト（samuraiIds）を整理します
+                    // 所属変更APIが旧城主家の武将を名簿から外すので、同居する無関係な人物はそのまま残す。
                     targetC.samuraiIds = targetC.samuraiIds.filter(id => {
                         const busho = this.game.getBusho(id);
-                        // 諸勢力のメンバーか、浪人になって城に残った人だけリストに残します
-                        return kunishuMembers.includes(id) || (busho && window.BushoStatusRules.isRonin(busho));
+                        if (!busho || !window.LifeStatusRules.isPresent(busho)) return false;
+                        return Number(busho.clan) !== Number(oldOwner) ||
+                            Number(busho.belongKunishuId || 0) > 0 ||
+                            window.BushoStatusRules.isRonin(busho) ||
+                            kunishuMembers.includes(id);
                     });
                     
                     resultMsg = `諸勢力の反乱により、${targetC.name}が陥落し空白地となりました。`;
@@ -2321,8 +2321,8 @@ Object.assign(WarManager.prototype, {
         losers.forEach(b => { 
             // ★ 修正: 未登場の武将を巻き込んで捕虜や浪人にしないように守ります！
             if (window.BushoStatusRules.isRonin(b) || window.LifeStatusRules.isUnavailable(b)) return;
-            // ★ 修正: 諸勢力に所属している武将は、どんな城の戦いでも絶対に巻き添えで捕虜にならないように守ります！
-            if (b.belongKunishuId > 0) return;
+            // 敗戦大名家に所属する通常武将だけを捕虜・退避処理の対象にする。
+            if (Number(b.clan) !== Number(defeatedCastle.ownerClan) || Number(b.belongKunishuId || 0) > 0) return;
 
             let chance = isLastStand ? 1.0 : (window.WarParams.War.CaptureChanceBase - (b.strength * window.WarParams.War.CaptureStrFactor) + (Math.random() * 0.3));
             if (!isLastStand && defeatedCastle.soldiers > 1000) chance -= 0.2; 

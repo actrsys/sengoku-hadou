@@ -28,6 +28,8 @@ class GameManager {
         this.turnQueue = []; 
         this.currentIndex = 0; 
         this.playerClanId = 1;
+        // 起動中のUI初期化が前回の実機診断を上書きしないよう、UI生成前からタイトル状態を正本化する。
+        this.phase = 'title';
         this.historySystem = new HistorySystem(this);
         this.ui = new UIManager(this); 
         this.saveManager = new SaveManager(this);
@@ -97,7 +99,6 @@ class GameManager {
         this.endingSystem = new EndingSystem(this);
         
         this.hasAutoSavedThisMonth = false; // ★追加：その月にオートセーブしたかどうかを覚えておく箱です
-        this.phase = 'title';
 
         // ★実機診断：強制リロード前にAIがどこまで進んでいたか、同一タブのsessionStorageから復元します。
         setTimeout(() => this._showPreviousAIDiagnostic(), 0);
@@ -106,6 +107,8 @@ class GameManager {
     writeSystemDiagnostic(phase, castle = null) {
         // ★Round5 実機診断：AI城だけでなく月末・月初・プレイヤー復帰まで記録します。
         if (typeof sessionStorage === 'undefined') return;
+        // 初期化中・タイトル中は前回クラッシュ位置を上書きしない。
+        if (!this.phase || this.phase === 'title') return;
         if (document.body && document.body.classList.contains('is-pc')) return;
         try {
             // キュー位置は対象城を明示している処理だけに付ける。

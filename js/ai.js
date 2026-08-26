@@ -445,13 +445,15 @@ class AIEngine {
         const jorakuTargets = new Set();
         let hasShogunCandidate = false;
         
-        // 自勢力の武将の中に「左馬頭（ID: 80）」の官位を持つ人がいるか探します！
-        const myBushos = [];
-        myClanCastles.forEach(c => {
-            myBushos.push(...this.game.getCastleBushos(c.id));
-        });
+        // 自勢力に正式所属する通常の活動中武将だけから「左馬頭（ID: 80）」を探す。
+        // 自領に滞在している浪人・諸勢力人物を、自家の将軍候補として誤認しない。
+        const myBushos = this.game.bushos.filter(b =>
+            Number(b.clan) === Number(myClanId)
+            && Number(b.belongKunishuId || 0) === 0
+            && window.BushoStatusRules.isActive(b)
+        );
         for (const b of myBushos) {
-            if (b.courtRankIds && b.courtRankIds.includes(80)) {
+            if (Array.isArray(b.courtRankIds) && b.courtRankIds.map(Number).includes(80)) {
                 hasShogunCandidate = true;
                 break;
             }

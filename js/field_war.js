@@ -587,6 +587,22 @@ class FieldWarManager {
         // ★追加：マウスのドラッグでマップをぐりぐりスクロールする魔法
         const scrollEl = document.getElementById('fw-map-scroll');
         if (scrollEl) {
+            // 野戦UIは同じ固定DOMを再利用するため、前回の addEventListener を必ず解除してから再登録する。
+            // 解除しないと野戦回数に比例して wheel/touch/click のクロージャが蓄積する。
+            if (this._fwScrollEventBindings) {
+                const previous = this._fwScrollEventBindings;
+                const el = previous.element;
+                const h = previous.handlers || {};
+                if (el) {
+                    if (h.click) el.removeEventListener('click', h.click, true);
+                    if (h.wheel) el.removeEventListener('wheel', h.wheel, false);
+                    if (h.touchstart) el.removeEventListener('touchstart', h.touchstart, false);
+                    if (h.touchmove) el.removeEventListener('touchmove', h.touchmove, false);
+                    if (h.touchend) el.removeEventListener('touchend', h.touchend, false);
+                }
+                this._fwScrollEventBindings = null;
+            }
+
             let isDragging = false;
             let isMoved = false; // ★ドラッグで動かしたかどうかのメモ
             let startX, startY, scrollLeft, scrollTop;
@@ -643,38 +659,37 @@ class FieldWarManager {
             };
             
             // ★マップ全体の操作を見張って、「ドラッグした直後のクリック」ならマス目への指示をキャンセルするガードマンです
-            scrollEl.addEventListener('click', (e) => {
+            const clickHandler = (e) => {
                 if (isMoved) {
-                    e.stopPropagation(); // ここでストップをかけます！
+                    e.stopPropagation();
                     e.preventDefault();
                 } else {
-                    // ★追加：ドラッグじゃなく普通にクリックした時、部隊やマス以外（背景や海など）なら部隊情報を閉じる
+                    // ドラッグではない通常クリックで、部隊やマス以外なら部隊情報を閉じる
                     if (!e.target.classList.contains('fw-hex') && !e.target.closest('.fw-unit')) {
                         this.hideUnitInfo();
                     }
                 }
-            }, true); // true にすることで、誰よりも早く見張ることができます
+            };
 
-            // ★ここから追加: 野戦マップのズーム操作
+            // ★野戦マップのズーム操作
             this.isFwZooming = false;
-            scrollEl.addEventListener('wheel', (e) => {
+            const wheelHandler = (e) => {
                 if (document.body.classList.contains('is-pc')) {
-                    e.preventDefault(); 
-                    if (this.isFwZooming) return; 
-                    
-                    this.isFwZooming = true;
-                    setTimeout(() => { this.isFwZooming = false; }, 300); 
+                    e.preventDefault();
+                    if (this.isFwZooming) return;
 
-                    if (e.deltaY < 0) this.changeFwMapZoom(1, e.clientX, e.clientY);       
-                    else if (e.deltaY > 0) this.changeFwMapZoom(-1, e.clientX, e.clientY); 
+                    this.isFwZooming = true;
+                    setTimeout(() => { this.isFwZooming = false; }, 300);
+
+                    if (e.deltaY < 0) this.changeFwMapZoom(1, e.clientX, e.clientY);
+                    else if (e.deltaY > 0) this.changeFwMapZoom(-1, e.clientX, e.clientY);
                 }
-            }, { passive: false });
+            };
 
             let initialPinchDist = null;
-
-            scrollEl.addEventListener('touchstart', (e) => {
+            const touchStartHandler = (e) => {
                 if (e.touches.length >= 2) {
-                    e.preventDefault(); 
+                    e.preventDefault();
                 }
                 if (e.touches.length === 2) {
                     initialPinchDist = Math.hypot(
@@ -682,45 +697,60 @@ class FieldWarManager {
                         e.touches[0].pageY - e.touches[1].pageY
                     );
                 }
-            }, { passive: false });
+            };
 
-            scrollEl.addEventListener('touchmove', (e) => {
+            const touchMoveHandler = (e) => {
                 if (e.touches.length >= 2) {
-                    e.preventDefault(); 
+                    e.preventDefault();
                 }
                 if (e.touches.length === 2) {
                     if (initialPinchDist === null) return;
-                    
                     if (this.isFwZooming) return;
-                    
+
                     const currentDist = Math.hypot(
                         e.touches[0].pageX - e.touches[1].pageX,
                         e.touches[0].pageY - e.touches[1].pageY
                     );
-                    
                     const diff = currentDist - initialPinchDist;
-                    
                     const rect = scrollEl.getBoundingClientRect();
                     const centerX = rect.left + rect.width / 2;
                     const centerY = rect.top + rect.height / 2;
 
                     if (diff > 40) {
-                        this.isFwZooming = true; setTimeout(() => { this.isFwZooming = false; }, 300); 
+                        this.isFwZooming = true;
+                        setTimeout(() => { this.isFwZooming = false; }, 300);
                         this.changeFwMapZoom(1, centerX, centerY);
-                        initialPinchDist = currentDist; 
+                        initialPinchDist = currentDist;
                     } else if (diff < -40) {
-                        this.isFwZooming = true; setTimeout(() => { this.isFwZooming = false; }, 300); 
+                        this.isFwZooming = true;
+                        setTimeout(() => { this.isFwZooming = false; }, 300);
                         this.changeFwMapZoom(-1, centerX, centerY);
                         initialPinchDist = currentDist;
                     }
                 }
-            }, { passive: false });
+            };
 
-            scrollEl.addEventListener('touchend', (e) => {
+            const touchEndHandler = (e) => {
                 if (e.touches.length < 2) {
                     initialPinchDist = null;
                 }
-            });
+            };
+
+            scrollEl.addEventListener('click', clickHandler, true);
+            scrollEl.addEventListener('wheel', wheelHandler, { passive: false });
+            scrollEl.addEventListener('touchstart', touchStartHandler, { passive: false });
+            scrollEl.addEventListener('touchmove', touchMoveHandler, { passive: false });
+            scrollEl.addEventListener('touchend', touchEndHandler);
+            this._fwScrollEventBindings = {
+                element: scrollEl,
+                handlers: {
+                    click: clickHandler,
+                    wheel: wheelHandler,
+                    touchstart: touchStartHandler,
+                    touchmove: touchMoveHandler,
+                    touchend: touchEndHandler
+                }
+            };
         }
 
         const btnWait = document.getElementById('fw-btn-wait');

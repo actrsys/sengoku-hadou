@@ -232,6 +232,21 @@ class AIStaffing {
         return this.game.mapGraph.getAdjacentCastles(castle);
     }
 
+    // getCastleBushos() / samuraiIds は同居する浪人・諸勢力等も含むため、
+    // AI人事の「配置人数」は当該大名家に所属する通常の活動中武将だけを数える。
+    _getActiveClanBushosInCastle(castle, clanId = castle ? castle.ownerClan : 0) {
+        if (!castle) return [];
+        return this.game.getCastleBushos(castle.id).filter(b =>
+            Number(b.clan) === Number(clanId) &&
+            Number(b.belongKunishuId || 0) === 0 &&
+            window.BushoStatusRules.isActive(b)
+        );
+    }
+
+    _getActiveClanBushoCount(castle, clanId = castle ? castle.ownerClan : 0) {
+        return this._getActiveClanBushosInCastle(castle, clanId).length;
+    }
+
     // ==========================================
     // ★追加：軍団の空き枠を探す、または新しく作る共通の魔法（人事部で一元管理）
     // ==========================================
@@ -892,7 +907,7 @@ class AIStaffing {
         let totalScale = 0;
         
         sameLegionCastles.forEach(c => {
-            totalBushosInNetwork += c.samuraiIds.length;
+            totalBushosInNetwork += this._getActiveClanBushoCount(c, clanId);
             totalScale += (c.maxKokudaka + c.maxCommerce);
         });
 
@@ -931,10 +946,11 @@ class AIStaffing {
 
                 let countScore = 0;
                 
-                if (target.samuraiIds.length === 0) {
+                const targetBushoCount = this._getActiveClanBushoCount(target, clanId);
+                if (targetBushoCount === 0) {
                     countScore += 200; 
                 } else {
-                    const diff = castleCapacity - target.samuraiIds.length;
+                    const diff = castleCapacity - targetBushoCount;
                     if (diff > 0) {
                         countScore += diff * 20;
                     } else {
@@ -1063,7 +1079,7 @@ class AIStaffing {
         }
 
         // お城に残る人数のカウンターです（最初は今いる全員の数）
-        let remainingCount = castle.samuraiIds.length;
+        let remainingCount = this._getActiveClanBushoCount(castle, clanId);
         const moveActions = []; // まとめた行動を入れる箱です
 
         // 人数による点数を計算する魔法の道具です（全体の状況とお城の大きさの両方を考慮します）
@@ -1089,7 +1105,7 @@ class AIStaffing {
         // 目的地ごとに、まとめて移動の行動を作ります
         targetGroups.forEach(group => {
             let actualMovers = [];
-            let targetCount = group.target.samuraiIds.length;
+            let targetCount = this._getActiveClanBushoCount(group.target, clanId);
             
             for (let busho of group.movers) {
                 // 最低でも城主1人は残すため、1人になったら絶対にお引越しさせません
@@ -1123,8 +1139,8 @@ class AIStaffing {
 
         // もし行きたい人が誰もいなくて、空き城があった時のお留守番機能です
         if (moveActions.length === 0) {
-            const emptyCastles = sameLegionCastles.filter(c => c.samuraiIds.length <= 1 && c.id !== castle.id);
-            if (emptyCastles.length > 0 && castle.samuraiIds.length > 4) {
+            const emptyCastles = sameLegionCastles.filter(c => this._getActiveClanBushoCount(c, clanId) <= 1 && c.id !== castle.id);
+            if (emptyCastles.length > 0 && this._getActiveClanBushoCount(castle, clanId) > 4) {
                 const lowSkillMovers = availableBushos
                     .filter(b => b.id !== castle.castellanId && !b.isCastellan)
                     .sort((a, b) => {

@@ -8,6 +8,14 @@ class IndependenceSystem {
         this.game = game;
     }
 
+    _logIndependence(text, clanIds) {
+        this.game.ui.log(text, {
+            clanIds,
+            category: 'independence',
+            inferCurrentTurn: false
+        });
+    }
+
     /**
      * 月末に呼び出されるメイン処理
      */
@@ -390,9 +398,9 @@ class IndependenceSystem {
         }
         
         // ここで一番最初にログに書き込みます！（改名のログも別で書き込みます）
-        this.game.ui.log(msg);
+        this._logIndependence(msg, [oldClanId, newClanId]);
         if (nameChangeMsg !== "") {
-            this.game.ui.log(nameChangeMsg);
+            this._logIndependence(nameChangeMsg, [oldClanId, newClanId]);
         }
 
         // 部下たちの去就
@@ -698,7 +706,7 @@ class IndependenceSystem {
                     } else {
                         // ★変更：逃げる城がない場合は、潔く野に下る（浪人になる）
                         this.game.affiliationSystem.becomeRonin(busho);
-                        this.game.ui.log(`  -> ${busho.name}は新体制に従わず、野に下りました。`);
+                        this._logIndependence(`  -> ${busho.name}は新体制に従わず、野に下りました。`, [oldClanId, newClanId]);
                     }
                 } else {
                     // 義理が低い場合は、逃げる城があってもなくても消極的合流（節操なく従う）
@@ -712,7 +720,7 @@ class IndependenceSystem {
                 }
             }
         });
-        if (joiners.length > 0) this.game.ui.log(`  -> ${castle.name}にて${joiners.length}名が追随しました。`);
+        if (joiners.length > 0) this._logIndependence(`  -> ${castle.name}にて${joiners.length}名が追随しました。`, [oldClanId, newClanId]);
         return captives.length > 0 ? this.handleCaptives(captives, oldClanId, newClanId, newDaimyo) : [];
     }
 
@@ -727,7 +735,7 @@ class IndependenceSystem {
                 // ★修正：記憶しておいた元の派閥IDを渡します
                 const { joinScore, stayScore } = this.calculateLoyaltyScores(busho, leader, oldDaimyo, leaderOriginalFactionId);
                 if (joinScore > stayScore) {
-                    this.game.ui.log(`  -> 呼応！${castle.name}城主の${busho.name}が${leader.name}に与しました！`);
+                    this._logIndependence(`  -> 呼応！${castle.name}城主の${busho.name}が${leader.name}に与しました！`, [oldClanId, newClanId]);
                     this.game.castleManager.changeOwner(castle, newClanId);
                     // ★大名家が変わるので功績半分！
                     if (busho.clan !== 0 && busho.clan !== newClanId) {
@@ -768,7 +776,7 @@ class IndependenceSystem {
                 this.game.affiliationSystem.setCastleIdRaw(busho, mainCastle.id);
                 busho.loyalty = this.calcNewLoyalty(busho, newDaimyo);
                 mainCastle.samuraiIds.push(busho.id);
-                this.game.ui.log(`  -> ${busho.name}が城を脱出し、${newDaimyo.name}の元へ駆けつけました！`);
+                this._logIndependence(`  -> ${busho.name}が城を脱出し、${newDaimyo.name}の元へ駆けつけました！`, [oldClanId, newClanId]);
             }
         });
     }
@@ -920,7 +928,7 @@ class IndependenceSystem {
         
         // 性格が隠遁者（hermit）の場合は野に下ります
         if (personality === 'hermit') {
-            this.game.ui.log(`【下野】${rebellionLeader.name}は野に下りました。`);
+            this._logIndependence(`【下野】${rebellionLeader.name}は野に下りました。`, [oldClanId]);
             this.game.affiliationSystem.becomeRonin(rebellionLeader);
             // もし神輿と城主が違う人物なら、城主も一緒に浪人にします
             if (castellan.id !== rebellionLeader.id && window.BushoStatusRules.isActive(castellan)) {
@@ -1001,7 +1009,7 @@ class IndependenceSystem {
         
         // 決定した行動を実行します
         if (action === 'coup') {
-            this.game.ui.log(`${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました。`);
+            this._logIndependence(`${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました。`, [oldClanId]);
             await this.game.ui.showDialogAsync(`${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました！`);
 
             // ★ここから追加：謀反の時もカメラを移動してチカチカさせます！
@@ -1068,11 +1076,11 @@ class IndependenceSystem {
                 oldDaimyo.isDaimyo = false;
 
                 if (isDaimyoDead) {
-                    this.game.ui.log(`反乱軍が勝利し、${oldDaimyo.name}は討死しました。`);
+                    this._logIndependence(`反乱軍が勝利し、${oldDaimyo.name}は討死しました。`, [oldClanId]);
                     // 大名死亡処理（life_systemにお任せします）
                     await this.game.lifeSystem.executeDeath(oldDaimyo);
                 } else {
-                    this.game.ui.log(`反乱軍が勝利し、${oldDaimyo.name}は追放されました。`);
+                    this._logIndependence(`反乱軍が勝利し、${oldDaimyo.name}は追放されました。`, [oldClanId]);
                     // 追放の場合は後で他の家臣と一緒に浪人として逃亡させます
                 }
 
@@ -1160,7 +1168,7 @@ class IndependenceSystem {
                         
                         // フルネームから「|」を消して綺麗なお名前にします
                         const cleanName = b.name.replace('|', '');
-                        this.game.ui.log(`【逃亡】${cleanName}は一門の危機に元服を早め、行動を共にしました。`);
+                        this._logIndependence(`【逃亡】${cleanName}は一門の危機に元服を早め、行動を共にしました。`, [oldClanId]);
                     }
                 });
 
@@ -1256,14 +1264,14 @@ class IndependenceSystem {
                 // ★変更：改名があった場合は、文章を分けてダイアログを出します
                 if (info && info.isNameChanged) {
                     const nameChangeMsg = `大名となるにあたり、${info.oldNameStr}は「${info.newNameStr}」と名を改めました。`;
-                    this.game.ui.log(nameChangeMsg); // ログにも記録しておきます
+                    this._logIndependence(nameChangeMsg, [oldClanId]); // ログにも記録しておきます
                     await this.game.ui.showDialogAsync(nameChangeMsg);
                 }
 
             } else if (result === 'daimyo_win') {
                 // 【主家軍の勝利】
                 await this.game.ui.showDialogAsync(`${oldDaimyo.name}が勝利をおさめ、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
-                this.game.ui.log(`${oldDaimyo.name}が勝利をおさめ、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
+                this._logIndependence(`${oldDaimyo.name}が勝利をおさめ、首魁の${rebellionLeader.name}は自領に逃亡しました。`, [oldClanId]);
 
                 // ★追加：後で元に戻せるように、元の功績を覚えておくためのメモ帳を用意します
                 const originalAchievements = new Map();
@@ -1293,7 +1301,7 @@ class IndependenceSystem {
             } else {
                 // 【引き分け】
                 await this.game.ui.showDialogAsync(`決着は着かず、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
-                this.game.ui.log(`決着は着かず、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
+                this._logIndependence(`決着は着かず、首魁の${rebellionLeader.name}は自領に逃亡しました。`, [oldClanId]);
 
                 // 全員を強制的に追従させるため、一時的に派閥IDを反乱リーダーと同じにします
                 const dummyFactionId = rebellionLeader.factionId || 999;
