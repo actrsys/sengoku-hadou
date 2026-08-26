@@ -446,7 +446,7 @@ class SaveManager {
 
         this.game.updateClanDisplayNames();
 
-        if (this.game.ui) this.game.ui.updateLoadingProgress(90, '地図を描画しています');
+        if (this.game.ui) this.game.ui.updateLoadingProgress(90, '地図を読み込んでいます');
         if (this.game.ui && typeof this.game.ui.resetMapViewState === 'function') {
             this.game.ui.resetMapViewState({ initialZoomLevel: 1 });
         } else if (this.game.ui) {
@@ -456,6 +456,12 @@ class SaveManager {
         this.game.ui.pixelCastleMap = null;
         this.game.ui.pixelProvinceMap = null;
         this.game.ui.lastClanColorsHash = null;
+        // セーブ復元時も、実際に表示するPC/スマホ用Imageのload/decode完了を待ってから描画する。
+        // 以前の「寸法確認用の一時Image」が読み込み済みでも、表示用Imageは別なのでここで明示的に待つ。
+        if (this.game.ui && typeof this.game.ui.prepareMapBaseImage === 'function') {
+            await this.game.ui.prepareMapBaseImage(this.game.mapWidth, this.game.mapHeight);
+        }
+        if (this.game.ui) this.game.ui.updateLoadingProgress(96, '地図を描画しています');
         this.game.ui.renderMap();
         if (this.game.ui) this.game.ui.updateLoadingProgress(100, '準備完了');
         if (this.game.ui && typeof this.game.ui.waitForNextPaint === 'function') await this.game.ui.waitForNextPaint();

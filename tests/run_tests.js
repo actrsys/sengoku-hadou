@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r220');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r222');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -4498,6 +4498,31 @@ test('古いスマホ向け地図演出は城領域boundsと低解像度帯描�
     assert.ok(fs.existsSync(path.join(ROOT, 'data/images/map/japan_map_mobile.png')));
 });
 
+
+
+test('新規開始とロードは実表示用地図Imageの読込・decode完了後にロード画面を閉じる', () => {
+    const map = read('js/ui_map.js');
+    const game = read('js/game.js');
+    const save = read('js/save_manager.js');
+
+    assert.ok(map.includes('async prepareMapBaseImage(mapW, mapH)'));
+    assert.ok(map.includes("await img.decode();"), '表示用Imageは対応ブラウザでdecode完了まで待つ');
+    assert.ok(map.includes("img.src = isPC ? './data/images/map/japan_map.png' : './data/images/map/japan_map_mobile.png'"), '実際の端末で表示するImageを待つ');
+
+    const scenarioStart = game.indexOf("this.ui.updateLoadingProgress(90, '地図を読み込んでいます')");
+    const scenarioEnd = game.indexOf('// 観戦開始はロード画面を閉じてから。', scenarioStart);
+    const scenarioBlock = game.slice(scenarioStart, scenarioEnd);
+    assert.ok(scenarioBlock.includes('await this.ui.prepareMapBaseImage(this.mapWidth, this.mapHeight);'));
+    assert.ok(scenarioBlock.indexOf('await this.ui.prepareMapBaseImage') < scenarioBlock.indexOf('this.ui.renderMap();'));
+    assert.ok(scenarioBlock.indexOf('this.ui.renderMap();') < scenarioBlock.indexOf('this.ui.hideLoadingScreen();'));
+
+    const restoreStart = save.indexOf("this.game.ui.updateLoadingProgress(90, '地図を読み込んでいます')");
+    const restoreEnd = save.indexOf("window.AudioManager.playBGM", restoreStart);
+    const restoreBlock = save.slice(restoreStart, restoreEnd);
+    assert.ok(restoreBlock.includes('await this.game.ui.prepareMapBaseImage(this.game.mapWidth, this.game.mapHeight);'));
+    assert.ok(restoreBlock.indexOf('await this.game.ui.prepareMapBaseImage') < restoreBlock.indexOf('this.game.ui.renderMap();'));
+    assert.ok(restoreBlock.indexOf('this.game.ui.renderMap();') < restoreBlock.indexOf('await this.game.ui.waitForNextPaint();'));
+});
 test('スマホの一時資源解放では継続表示レイヤーの勢力色と雪を保持する', () => {
     const ui = read('js/ui.js');
     const map = read('js/ui_map.js');
@@ -4580,6 +4605,44 @@ test('武将CSVから旧familyId列を廃止しBINも同じCSV内容へ同期す
     });
     const inflated = zlib.inflateSync(fs.readFileSync(binPath)).toString('utf8');
     assert.strictEqual(inflated, csv, 'warriors.bin は最新CSVと完全一致すること');
+});
+
+
+test('藤田信吉の系譜・北条家ID再配置と城主・軍団長参照を同期する', () => {
+    const parseSimpleCsv = (relativePath) => {
+        const lines = read(relativePath).trimEnd().split(/\r?\n/);
+        const headers = lines[0].split(',');
+        return lines.slice(1).map(line => {
+            const values = line.split(',');
+            return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? '']));
+        });
+    };
+
+    const warriors = parseSimpleCsv('data/scenarios/1560_okehazama/warriors.csv');
+    const castles = parseSimpleCsv('data/scenarios/1560_okehazama/castles.csv');
+    const legions = parseSimpleCsv('data/scenarios/1560_okehazama/legions.csv');
+    const byId = new Map(warriors.map(row => [row.id, row]));
+    const byName = new Map(warriors.map(row => [row['名前'], row]));
+
+    const yasukuni = byName.get('藤田康邦');
+    const nobuyoshi = byName.get('藤田信吉');
+    assert.ok(yasukuni && nobuyoshi, '藤田康邦・藤田信吉が存在すること');
+    assert.strictEqual(yasukuni.id, '1003065');
+    assert.strictEqual(nobuyoshi.id, '1003066');
+    assert.strictEqual(nobuyoshi.realFatherId, yasukuni.id, '藤田信吉の実父は藤田康邦');
+    assert.strictEqual(Number(nobuyoshi.sortNo), Number(yasukuni.sortNo) + 1, '藤田信吉は藤田康邦の直下に並ぶ');
+
+    castles.forEach(castle => {
+        if (castle.castellanId === '0') return;
+        const castellan = byId.get(castle.castellanId);
+        assert.ok(castellan, `${castle.name} の城主ID ${castle.castellanId} が存在すること`);
+        assert.strictEqual(castellan['名前'], castle['城主名確認用'], `${castle.name} の城主名とIDを同期する`);
+    });
+    legions.forEach(legion => {
+        const commander = byId.get(legion.commanderId);
+        assert.ok(commander, `${legion['軍団']} の軍団長ID ${legion.commanderId} が存在すること`);
+        assert.strictEqual(commander['名前'], legion['軍団長名'], `${legion['軍団']} の軍団長名とIDを同期する`);
+    });
 });
 
 test('FamilyLinkerは関係データだけから一門キャッシュを毎回ゼロから再構築する', () => {

@@ -394,7 +394,13 @@ class GameManager {
                 this.phase = 'daimyo_select';
             }
 
-            if (this.ui) this.ui.updateLoadingProgress(90, '地図を描画しています');
+            if (this.ui) this.ui.updateLoadingProgress(90, '地図を読み込んでいます');
+            // 城/国IDマップだけでなく、実際に画面へ貼るPC/スマホ用の地図画像もdecode完了まで待つ。
+            // ゲーム画面を先に出して地図だけ後から現れる状態を作らない。
+            if (this.ui && typeof this.ui.prepareMapBaseImage === 'function') {
+                await this.ui.prepareMapBaseImage(this.mapWidth, this.mapHeight);
+            }
+            if (this.ui) this.ui.updateLoadingProgress(96, '地図を描画しています');
             this.ui.renderMap();
             // カットイン表示を消しました！
 

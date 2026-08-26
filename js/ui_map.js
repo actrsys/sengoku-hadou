@@ -136,6 +136,50 @@ Object.assign(UIManager.prototype, {
         return img;
     },
 
+    // 新規開始・ロード時に、実際に画面へ貼る地図画像そのものの読込/decode完了を待つ正規窓口。
+    // DataManagerの城/国IDマップが完成していても、表示用Imageのdecodeは別の非同期処理なので、
+    // ここを待たずにロード画面を閉じるとゲーム画面だけ先に出て地図が後から現れてしまう。
+    async prepareMapBaseImage(mapW, mapH) {
+        const img = this._ensureMapBaseImage(mapW, mapH);
+        if (!img) throw new Error('表示用地図画像を準備できませんでした。');
+
+        if (!img.complete) {
+            await new Promise((resolve, reject) => {
+                const onLoad = () => {
+                    cleanup();
+                    resolve();
+                };
+                const onError = () => {
+                    cleanup();
+                    reject(new Error(`表示用地図画像の読み込みに失敗しました: ${img.src || ''}`));
+                };
+                const cleanup = () => {
+                    img.removeEventListener('load', onLoad);
+                    img.removeEventListener('error', onError);
+                };
+                img.addEventListener('load', onLoad);
+                img.addEventListener('error', onError);
+            });
+        }
+
+        if (!img.naturalWidth || !img.naturalHeight) {
+            throw new Error(`表示用地図画像の読み込みに失敗しました: ${img.src || ''}`);
+        }
+
+        // load済みでもデコード待ちのことがあるため、対応ブラウザではdecode完了まで待つ。
+        // 一部WebViewではdecode()だけが失敗する場合があるので、naturalSizeが取れていればload成功を優先する。
+        if (typeof img.decode === 'function') {
+            try {
+                await img.decode();
+            } catch (error) {
+                if (!img.naturalWidth || !img.naturalHeight) throw error;
+            }
+        }
+
+        if (this.mapEl) this.mapEl.classList.add('base-map-image-ready');
+        return img;
+    },
+
     // 勢力色レイヤーはスマホでは内部解像度を半分にし、Canvas/ImageDataの瞬間メモリを約1/4にします。
     // CSS上の大きさは元地図と同じなので、9:16画面で見た目のサイズは変わりません。
     _getClanColorRasterSize(mapW, mapH) {
