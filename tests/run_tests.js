@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r224');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r225');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1964,6 +1964,34 @@ test('HistorySystem は自国/全国を排他的に振り分け保持上限を�
     scoped.record('自国コマンド', { inferCurrentTurn: true });
     assert.strictEqual(scoped.getEntries('clan', 1).length, 1, '明示した場合だけ現在手番勢力へ関連付ける');
     assert.strictEqual(scoped.getEntries('national', 1).length, 1, '自国コマンドを全国へ重複表示しない');
+});
+
+test('大名家向け通常調略は諸勢力頭領を候補にも実行対象にも含めない', () => {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => !!b && b.status === 'active' }
+    });
+    loadScript(ctx, 'js/strategy_system.js');
+    const StrategySystemClass = vm.runInContext('StrategySystem', ctx);
+    const dialogs = [];
+    const game = { ui: { showDialog: msg => dialogs.push(msg) } };
+    const strategy = new StrategySystemClass(game);
+
+    const regular = { id: 10, clan: 2, belongKunishuId: 0, status: 'active' };
+    const kunishuLeader = { id: 20, clan: 0, belongKunishuId: 7, status: 'active' };
+    const foreign = { id: 30, clan: 3, belongKunishuId: 0, status: 'active' };
+    assert.strictEqual(strategy.isRegularClanStrategyTarget(regular, 2), true);
+    assert.strictEqual(strategy.isRegularClanStrategyTarget(kunishuLeader, 2), false, '同じ城にいる諸勢力頭領を敵家臣扱いしない');
+    assert.strictEqual(strategy.isRegularClanStrategyTarget(foreign, 2), false, '別勢力武将も対象勢力の候補に混ぜない');
+    assert.strictEqual(strategy._rejectInvalidRegularStrategyTarget(kunishuLeader), true);
+    assert.strictEqual(dialogs.length, 1, '実行入口でも諸勢力所属者を拒否する');
+
+    const ai = read('js/ai.js');
+    assert.ok(ai.includes('this.game.strategySystem.isRegularClanStrategyTarget(b, memoryClanId)'), 'AI候補抽出は所属勢力まで確認する');
+    assert.ok(ai.includes('isRegularClanStrategyTarget(targetBusho, action.targetClanId)'), 'AIは実行直前にも対象所属を再検証する');
+    const command = read('js/command_system.js');
+    assert.ok(command.includes('Number(b.belongKunishuId || 0) === 0'), 'プレイヤー側の通常調略候補も諸勢力所属者を明示除外する');
+    const architecture = read('ARCHITECTURE.md');
+    assert.ok(architecture.includes('`belongKunishuId > 0` の諸勢力所属者'), '設計文書にも通常調略と諸勢力の責務境界を残す');
 });
 
 test('調略履歴は自家関与だけを通常記録し他家同士は見える所属変更だけ残す', () => {

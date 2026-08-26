@@ -2406,7 +2406,9 @@ class AIEngine {
                         const enemyBushos = [];
                         const enemyCastles = this.game.getClanCastles(memoryClanId);
                         enemyCastles.forEach(c => {
-                            const bList = this.game.getCastleBushos(c.id).filter(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo);
+                            const bList = this.game.getCastleBushos(c.id).filter(b =>
+                                this.game.strategySystem.isRegularClanStrategyTarget(b, memoryClanId) && !b.isDaimyo
+                            );
                             enemyBushos.push(...bList);
                         });
                         
@@ -2497,11 +2499,11 @@ class AIEngine {
                             let finalScore = baseRumorHeadhuntScore + (targetPriority / 100);
                             
                             // 離間計は宿敵がいても実行します（忠誠度を下げて謀反を誘発させるため）
-                            actions.push({ type: 'rumor', stat: 'intelligence', score: finalScore, cost: 0, targetId: targetBusho.castleId, targetBushoId: targetBusho.id });
+                            actions.push({ type: 'rumor', stat: 'intelligence', score: finalScore, cost: 0, targetId: targetBusho.castleId, targetBushoId: targetBusho.id, targetClanId: memoryClanId });
                             
                             // 引抜は、宿敵がいない場合のみ実行します
                             if (!hasNemesis && availableGold >= 100) {
-                                actions.push({ type: 'headhunt', stat: 'intelligence', score: finalScore, cost: 100, targetId: targetBusho.castleId, targetBushoId: targetBusho.id, gold: 100 });
+                                actions.push({ type: 'headhunt', stat: 'intelligence', score: finalScore, cost: 100, targetId: targetBusho.castleId, targetBushoId: targetBusho.id, gold: 100, targetClanId: memoryClanId });
                             }
                             
                             // ★追加：AIの暗殺
@@ -2509,7 +2511,7 @@ class AIEngine {
                             // 通常の計略の1/10の確率になるように調整して追加する
                             if (canAssassinate && memoryClanId !== this.game.playerClanId) {
                                 if (Math.random() < 0.1) {
-                                    actions.push({ type: 'assassinate', stat: 'intelligence', score: finalScore, cost: 0, targetId: targetBusho.castleId, targetBushoId: targetBusho.id });
+                                    actions.push({ type: 'assassinate', stat: 'intelligence', score: finalScore, cost: 0, targetId: targetBusho.castleId, targetBushoId: targetBusho.id, targetClanId: memoryClanId });
                                 }
                             }
                         });
@@ -2701,8 +2703,9 @@ class AIEngine {
                     actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'rumor') {
-                    let result = this.game.strategySystem.calcRumor(doer.id, action.targetBushoId, true);
                     const targetBusho = this.game.getBusho(action.targetBushoId);
+                    if (!this.game.strategySystem.isRegularClanStrategyTarget(targetBusho, action.targetClanId)) continue;
+                    let result = this.game.strategySystem.calcRumor(doer.id, action.targetBushoId, true);
                     
                     targetBusho.lastApproachedClanId = doer.clan;
                     const targetClanIdForHistory = Number(targetBusho.clan) || 0;
@@ -2724,8 +2727,9 @@ class AIEngine {
                     actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'headhunt' && availableGold >= action.cost) {
-                    castle.gold -= action.cost;
                     const targetBusho = this.game.getBusho(action.targetBushoId);
+                    if (!this.game.strategySystem.isRegularClanStrategyTarget(targetBusho, action.targetClanId)) continue;
+                    castle.gold -= action.cost;
                     
                     targetBusho.lastApproachedClanId = doer.clan;
 
@@ -2750,6 +2754,7 @@ class AIEngine {
 
                 if (action.type === 'assassinate') {
                     const targetBusho = this.game.getBusho(action.targetBushoId);
+                    if (!this.game.strategySystem.isRegularClanStrategyTarget(targetBusho, action.targetClanId)) continue;
                     targetBusho.lastApproachedClanId = doer.clan;
                     
                     const targetClanIdForHistory = Number(targetBusho.clan) || 0;

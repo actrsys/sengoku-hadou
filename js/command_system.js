@@ -110,7 +110,7 @@ class CommandSystem {
         }
         else if (actionType === 'rumor_target_busho') { 
             const targetCastle = this.game.getCastle(targetId);
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && window.BushoStatusRules.isActive(b) && !b.isDaimyo); 
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && Number(b.belongKunishuId || 0) === 0 && window.BushoStatusRules.isActive(b) && !b.isDaimyo); 
             infoHtml = "<div>離間計の対象とする武将を選択してください</div>"; 
         }
         else if (actionType === 'rumor_doer') { 
@@ -127,12 +127,12 @@ class CommandSystem {
         }
         else if (actionType === 'headhunt_target') { 
             const targetCastle = this.game.getCastle(targetId);
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && window.BushoStatusRules.isActive(b) && !b.isDaimyo); 
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && Number(b.belongKunishuId || 0) === 0 && window.BushoStatusRules.isActive(b) && !b.isDaimyo); 
             infoHtml = "<div>武将引抜の対象とする武将を選択してください </div>"; 
         }
         else if (actionType === 'assassinate_target') { 
             const targetCastle = this.game.getCastle(targetId);
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && window.BushoStatusRules.isActive(b) && !b.isDaimyo); 
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && Number(b.belongKunishuId || 0) === 0 && window.BushoStatusRules.isActive(b) && !b.isDaimyo); 
             infoHtml = "<div>暗殺の対象とする武将を選択してください</div>"; 
         }
         else if (actionType === 'kuko_doer') {

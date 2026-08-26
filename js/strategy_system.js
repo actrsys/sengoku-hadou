@@ -8,6 +8,25 @@ class StrategySystem {
         this.game = game;
     }
 
+    // 大名家向けの通常調略（離間計・引抜・暗殺）で狙える武将かを判定する正本。
+    // 諸勢力所属者は同じ城にいても大名家臣ではないため、通常調略の対象にしない。
+    isRegularClanStrategyTarget(busho, expectedClanId = null) {
+        if (!busho || !window.BushoStatusRules || !window.BushoStatusRules.isActive(busho)) return false;
+        if (Number(busho.belongKunishuId || 0) > 0) return false;
+        const clanId = Number(busho.clan || 0);
+        if (clanId <= 0) return false;
+        if (expectedClanId !== null && expectedClanId !== undefined && clanId !== Number(expectedClanId)) return false;
+        return true;
+    }
+
+    _rejectInvalidRegularStrategyTarget(target) {
+        if (this.isRegularClanStrategyTarget(target)) return false;
+        if (this.game && this.game.ui && typeof this.game.ui.showDialog === 'function') {
+            this.game.ui.showDialog('その武将は通常の調略対象ではありません', false);
+        }
+        return true;
+    }
+
     _getStrategyHistoryMode(actionName, doer, success, clanIds = [], covertOutcome = null) {
         if (!doer) return null;
         const playerClanId = Number(this.game.playerClanId);
@@ -728,7 +747,8 @@ class StrategySystem {
     executeHeadhunt(doerId, targetBushoId, gold) {
         const doer = this.game.getBusho(doerId);
         const target = this.game.getBusho(targetBushoId);
-        const targetClanIdForHistory = Number(target && target.clan) || 0;
+        if (this._rejectInvalidRegularStrategyTarget(target)) return;
+        const targetClanIdForHistory = Number(target.clan) || 0;
         const castle = this.game.getCurrentTurnCastle();
         if (castle.gold < gold) { this.game.ui.showDialog("資金が足りません", false); return; }
         
@@ -770,7 +790,8 @@ class StrategySystem {
     executeAssassinate(doerId, targetBushoId) {
         const doer = this.game.getBusho(doerId);
         const target = this.game.getBusho(targetBushoId);
-        const targetClanIdForHistory = Number(target && target.clan) || 0;
+        if (this._rejectInvalidRegularStrategyTarget(target)) return;
+        const targetClanIdForHistory = Number(target.clan) || 0;
         
         // メモを残す魔法
         target.lastApproachedClanId = doer.clan;
@@ -806,6 +827,7 @@ class StrategySystem {
         const doer = this.game.getBusho(doerId);
         const isTargetBusho = (actionType === 'rumor');
         const targetObj = isTargetBusho ? this.game.getBusho(targetId) : this.game.getCastle(targetId);
+        if (isTargetBusho && this._rejectInvalidRegularStrategyTarget(targetObj)) return;
         
         if (isTargetBusho) targetObj.lastApproachedClanId = doer.clan;
 
