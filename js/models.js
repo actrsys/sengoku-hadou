@@ -201,7 +201,7 @@ class Castle {
         delete this.loyalty;
         
         this.training = Number(this.training || 0);
-        this.maxTraining = Number(data.maxTraining !== undefined ? data.maxTraining : 100);
+        this.maxTraining = Number(data.maxTraining !== undefined ? data.maxTraining : window.WarParams.Military.MaxTrainingNormal);
 
         this.morale = Number(this.morale || 0);
         const defaultMaxMorale = window.WarParams.Military.MaxMoraleInternal;

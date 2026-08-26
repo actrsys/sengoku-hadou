@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r217'
+        Version: 'r220'
     },
 
     History: {
@@ -187,7 +187,12 @@ window.GameConfig = {
             MaxMoraleNormal: 100,
             // 拠点UIの士気ゲージを満タンとして扱う基準。数値表示自体は実値（最大120）を表示する。
             MaxMoraleGauge: 100,
-            MaxTraining: 100,
+            // 訓練も士気と同じ三層仕様。内部データは120まで保持し、100超へ上げられるのは戦争由来の増加だけ。
+            MaxTrainingInternal: 120,
+            // 通常の訓練コマンドで上げられる上限。
+            MaxTrainingNormal: 100,
+            // 拠点UIの訓練ゲージを満タンとして扱う基準。数値表示自体は実値（最大120）を表示する。
+            MaxTrainingGauge: 100,
             WarMaxRounds: 15,
             DamageSoldierPower: 0.05,
             WallDefenseEffect: 0.5,

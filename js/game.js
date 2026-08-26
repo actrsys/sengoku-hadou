@@ -163,9 +163,26 @@ class GameManager {
         // 表示用の別名や旧API互換値を正本オブジェクトへ書き込まない。
         return this.diplomacyManager.getRelation(id1, id2);
     }
+
+    // タイトル復帰・新規シナリオ読込前に、旧シナリオの巨大IDマップ共有参照をまとめて切る。
+    // 地図画像そのものは共通資産なので解放対象にせず、シナリオごとに再構築されるTypedArrayだけを対象とする。
+    releaseScenarioMapResources() {
+        if (this.ui) {
+            this.ui.pixelCastleMap = null;
+            this.ui.pixelProvinceMap = null;
+            this.ui.lastClanColorsHash = null;
+        }
+        if (window.EventMapEffects && typeof window.EventMapEffects.invalidateCaches === 'function') {
+            window.EventMapEffects.invalidateCaches();
+        }
+        if (typeof DataManager !== 'undefined' && typeof DataManager.releaseMapResources === 'function') {
+            DataManager.releaseMapResources();
+        }
+    }
     
     startNewGame(options = {}) {
         const startInWatchMode = !!(options && options.watchMode);
+        this.releaseScenarioMapResources();
         if(this.ui) this.ui.forceResetModals();
         
         // ★前回のゲームの記憶やフラグを綺麗にお掃除します！
@@ -220,6 +237,8 @@ class GameManager {
     
     async loadScenario(folder, options = {}) {
         const startInWatchMode = !!(options && options.startInWatchMode);
+        // 直接再読込される経路でも旧マップを保持したまま新しいTypedArrayを作らない。
+        this.releaseScenarioMapResources();
         if (this.ui && typeof this.ui.resetMapViewState === 'function') {
             this.ui.resetMapViewState({ initialZoomLevel: startInWatchMode ? 0 : 1 });
         }

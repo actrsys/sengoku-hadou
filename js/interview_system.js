@@ -551,8 +551,9 @@ class InterviewSystem {
         if (castles.length === 0) return '兵については、まず数を整えてから訓練に移るのがよろしいでしょう。';
 
         const rows = castles.map(castle => {
-            const trainingMax = Math.max(1, Number(castle.maxTraining || 100));
-            const moraleMax = Math.max(1, Number(castle.maxMorale || 100));
+            // 戦争由来の100超はボーナスとして扱い、通常の軍備充足判定はゲージ上限100を基準にする。
+            const trainingMax = Math.max(1, Number(window.WarParams.Military.MaxTrainingGauge));
+            const moraleMax = Math.max(1, Number(window.WarParams.Military.MaxMoraleGauge));
             const trainingRatio = Math.max(0, Math.min(1, Number(castle.training || 0) / trainingMax));
             const moraleRatio = Math.max(0, Math.min(1, Number(castle.morale || 0) / moraleMax));
             return { castle, trainingRatio, moraleRatio, readiness: Math.min(trainingRatio, moraleRatio) };

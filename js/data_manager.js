@@ -19,6 +19,18 @@ const SCENARIOS = [
 class DataManager {
     // ★汎用姫は名前と読みを対で保持します。
     static genericPrincessProfiles = [];
+
+    // シナリオ切替時の巨大IDマップを明示的に解放する正規窓口。
+    // UIやイベント側にも同じTypedArrayへの共有参照があるため、GameManagerからそれらを切った後に呼ぶ。
+    static releaseMapResources() {
+        this.provincePixelMap = null;
+        this.castlePixelMap = null;
+        this.castlePixelBounds = null;
+        this.castlePixelCenters = null;
+        this.provincePixelCount = 0;
+        this.mapImageWidth = 0;
+        this.mapImageHeight = 0;
+    }
     
     static async loadAll(folderName, options = {}) {
         const selectedScenario = SCENARIOS.find(s => s.folder === folderName);

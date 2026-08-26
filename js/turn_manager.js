@@ -269,12 +269,7 @@ class TurnManager {
         }
         // ==========================================
         
-        // ★イベント追加：各城の行動開始前
-        if (game.eventManager) {
-            await game.eventManager.processEvents('turn_start', castle);
-        }
-    
-        // 行動開始前イベントで城の持ち主や状態が変わった場合の安全措置
+        // 行動開始前に城の持ち主や状態が変わっていた場合の安全措置
         if (castle.isDone || castle.ownerClan === 0) {
             game.finishTurn();
             return;
@@ -371,10 +366,6 @@ class TurnManager {
         if(castle) {
             castle.isDone = true;
             if (wasProcessingAI) game.writeAIDiagnostic(castle, 'turn_end:event');
-            // ★イベント追加：各城の行動終了直後
-            if (game.eventManager) {
-                await game.eventManager.processEvents('turn_end', castle);
-            }
             if (wasProcessingAI) game.writeAIDiagnostic(castle, 'turn_finished');
         }
     

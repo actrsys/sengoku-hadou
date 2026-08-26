@@ -1898,11 +1898,7 @@ class DiplomacyManager {
 
         // ★会話劇が始まった瞬間に、今のBGMをメモして外交用のBGMに変更します！
         if (window.AudioManager) {
-            if (typeof window.AudioManager.memorizeCurrentBgm === 'function') {
-                window.AudioManager.memorizeCurrentBgm();
-            } else {
-                window.AudioManager._memorizedBgm = window.AudioManager.currentBgmName;
-            }
+            window.AudioManager.memorizeCurrentBgm();
             window.AudioManager.playBGM('SC_ex_Scene3_Odyssey.ogg');
         }
 
@@ -3105,11 +3101,7 @@ class DiplomacyManager {
             () => {
                 // ★「面会する」を選んで本格的に会話劇が始まる瞬間に、外交用のBGMに変更します！
                 if (window.AudioManager) {
-                    if (typeof window.AudioManager.memorizeCurrentBgm === 'function') {
-                        window.AudioManager.memorizeCurrentBgm();
-                    } else {
-                        window.AudioManager._memorizedBgm = window.AudioManager.currentBgmName;
-                    }
+                    window.AudioManager.memorizeCurrentBgm();
                     window.AudioManager.playBGM('SC_ex_Scene3_Odyssey.ogg');
                 }
 

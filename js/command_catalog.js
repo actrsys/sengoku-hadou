@@ -143,7 +143,7 @@ const CAN_EXECUTE_RULES = {
     },
     // --- 軍事用 ---
     canTraining: (game, castle) => {
-        const maxTraining = window.WarParams.Military.MaxTraining;
+        const maxTraining = window.WarParams.Military.MaxTrainingNormal;
         if (castle.training >= maxTraining) return false;
         if (castle.soldiers <= 0) return false;
         return true;

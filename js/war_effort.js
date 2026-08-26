@@ -2195,8 +2195,10 @@ Object.assign(WarManager.prototype, {
                 }
                 // ★書き足しここまで
 
+                const maxTraining = window.WarParams.Military.MaxTrainingInternal;
                 const maxMorale = window.WarParams.Military.MaxMoraleInternal;
-                s.attacker.training = Math.min(120, s.attacker.training + window.WarParams.War.WinStatIncrease); s.attacker.morale = Math.min(maxMorale, s.attacker.morale + window.WarParams.War.WinStatIncrease);
+                s.attacker.training = Math.min(maxTraining, s.attacker.training + window.WarParams.War.WinStatIncrease);
+                s.attacker.morale = Math.min(maxMorale, s.attacker.morale + window.WarParams.War.WinStatIncrease);
                 
                 const maxCharm = Math.max(...s.atkBushos.map(b => b.charm));
                 const subCharm = s.atkBushos.reduce((acc, b) => acc + b.charm, 0) - maxCharm;

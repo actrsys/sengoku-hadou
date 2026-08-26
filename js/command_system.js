@@ -1421,9 +1421,9 @@ class CommandSystem {
 
                     // 「その城の兵士数 (castle.soldiers)」を渡して計算してもらいます
                     const val = DomesticRules.calcTraining(busho, castle.soldiers, bonusRate, true); 
-                    const maxTraining = window.WarParams.Military.MaxTraining;
+                    const maxTraining = window.WarParams.Military.MaxTrainingNormal;
                     const oldVal = castle.training;
-                    castle.training = Math.min(maxTraining, castle.training + val); 
+                    castle.training = oldVal >= maxTraining ? oldVal : Math.min(maxTraining, oldVal + val); 
                     const actualVal = castle.training - oldVal;
                     totalVal += actualVal; count++; actionName = "訓練";
                     busho.achievementTotal += Math.floor(actualVal * 0.5);
@@ -1439,7 +1439,7 @@ class CommandSystem {
                     const val = DomesticRules.calcSoldierCharity(busho, castle.soldiers, bonusRate, true); 
                     const maxMorale = window.WarParams.Military.MaxMoraleNormal;
                     const oldVal = castle.morale;
-                    castle.morale = Math.min(maxMorale, castle.morale + val); 
+                    castle.morale = oldVal >= maxMorale ? oldVal : Math.min(maxMorale, oldVal + val); 
                     const actualVal = castle.morale - oldVal;
                     totalVal += actualVal; count++; actionName = "兵施し";
                     busho.achievementTotal += Math.floor(actualVal * 0.5);
@@ -1464,7 +1464,7 @@ class CommandSystem {
             if (actionName === "鉱山開発") detail = `(現在: ${castle.commerce}/${castle.maxCommerce})`;
             if (actionName === "城壁修復") detail = `(現在: ${castle.defense}/${castle.maxDefense})`;
             if (actionName === "訓練") {
-                const maxTraining = window.WarParams.Military.MaxTraining;
+                const maxTraining = window.WarParams.Military.MaxTrainingGauge;
                 detail = `(現在: ${castle.training}/${maxTraining})`;
             }
             if (actionName === "兵施し") {

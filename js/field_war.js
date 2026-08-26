@@ -3534,12 +3534,13 @@ class FieldWarManager {
 
         this.log(`${atkPrefix}${attacker.name}隊の${atkWeapon}！${dirMsg} 敵に${dmgToDef}の損害！${counterMsg ? defPrefix + counterMsg : ""}`);
         
-        // ★追加：戦闘を行った部隊の所属する軍の訓練度を上昇（上限100）
+        // ★追加：戦闘を行った部隊の所属する軍の訓練度を上昇（戦争由来のみ内部上限120）
+        const maxTraining = window.WarParams.Military.MaxTrainingInternal;
         if (this.groupStats[attacker.groupId]) {
-            this.groupStats[attacker.groupId].training = Math.min(100, this.groupStats[attacker.groupId].training + 1);
+            this.groupStats[attacker.groupId].training = Math.min(maxTraining, this.groupStats[attacker.groupId].training + 1);
         }
         if (this.groupStats[defender.groupId]) {
-            this.groupStats[defender.groupId].training = Math.min(100, this.groupStats[defender.groupId].training + 1);
+            this.groupStats[defender.groupId].training = Math.min(maxTraining, this.groupStats[defender.groupId].training + 1);
         }
 
         // ★追加：ダメージ比率による士気の綱引き（最大3）

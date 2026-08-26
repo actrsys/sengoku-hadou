@@ -147,15 +147,14 @@ class AudioManager {
             volume: finalVolume,
             loop: true, 
             onplay: (id) => {
-                if (loopStart > 0 && this.bgmPlayer) {
-                    const sound = this.bgmPlayer._soundById(id);
-                    if (sound && sound._node && sound._node.bufferSource) {
-                        sound._node.bufferSource.loopStart = loopStart;
-                        if (loopEnd > 0) {
-                            sound._node.bufferSource.loopEnd = loopEnd;
-                        }
-                    }
-                }
+                if (!this.bgmPlayer) return;
+                const sound = this.bgmPlayer._soundById(id);
+                const source = sound && sound._node ? sound._node.bufferSource : null;
+                if (!source) return;
+                // LOOPSTART=0 も正規の値。開始点と終了点を独立して反映し、
+                // start=0 の曲でもメタデータ由来の LOOPEND をファイル末尾へ流さず適用する。
+                if (Number.isFinite(loopStart) && loopStart >= 0) source.loopStart = loopStart;
+                if (Number.isFinite(loopEnd) && loopEnd > loopStart) source.loopEnd = loopEnd;
             }
         });
 
@@ -191,10 +190,9 @@ class AudioManager {
         
         // 今鳴っているBGMがあれば、リアルタイムに音量を変えます
         if (this.bgmPlayer) {
-            // 今鳴っている曲の名前を取り出します
-            const src = this.bgmPlayer._src[0]; 
-            const fileName = src.split('/').pop();
-            const bgmData = this.bgmList[fileName];
+            // Howler内部の _src は読込後に配列から文字列へ変わり得るため参照しない。
+            // AudioManager自身が保持する正規の曲名を使う。
+            const bgmData = this.bgmList[this.currentBgmName];
             const baseVol = bgmData && bgmData.baseVolume !== undefined ? bgmData.baseVolume : this.fallbackBgmVolume;
             
             this.bgmPlayer.volume(baseVol * this.userBgmVolume);

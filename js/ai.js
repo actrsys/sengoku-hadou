@@ -1527,8 +1527,11 @@ class AIEngine {
 
         // ★修正：能力が100を超えた時、永遠に「足りない」と勘違いして内政ループするのを防ぐため、本来の最大値でストッパーをかけます！
         const targetMaxLoyalty = Math.min(castle.maxPeoplesLoyalty || 100, Math.max(Math.floor(50 + (leader.politics / 2)), gunshiCap));
-        const targetMaxTraining = Math.min(castle.maxTraining || 100, Math.max(Math.floor(50 + (leader.strength / 2)), gunshiCap));
-        const targetMaxMorale = Math.min(castle.maxMorale || 100, Math.max(Math.floor(50 + (leader.leadership / 2)), gunshiCap));
+        const normalTrainingCap = window.WarParams.Military.MaxTrainingNormal;
+        const normalMoraleCap = window.WarParams.Military.MaxMoraleNormal;
+        const castleTrainingCap = Number.isFinite(Number(castle.maxTraining)) ? Number(castle.maxTraining) : normalTrainingCap;
+        const targetMaxTraining = Math.min(castleTrainingCap, normalTrainingCap, Math.max(Math.floor(50 + (leader.strength / 2)), gunshiCap));
+        const targetMaxMorale = Math.min(normalMoraleCap, Math.max(Math.floor(50 + (leader.leadership / 2)), gunshiCap));
 
         // ★魔法の改善：最初にお城の繋がりを1回だけ全部調べて、リストを作ります！
         const reachableMyCastles = [];
@@ -1667,8 +1670,8 @@ class AIEngine {
             // 実際の数値に「勘違い分」を足した「AIの思い込みステータス」を作ります
             const perceivedDefense = Math.min(castle.maxDefense, castle.defense + errDefense);
             const perceivedLoyalty = Math.min(100, castle.peoplesLoyalty + errLoyalty);
-            const perceivedTraining = Math.min(100, castle.training + errTraining);
-            const perceivedMorale = Math.min(100, castle.morale + errMorale);
+            const perceivedTraining = Math.min(window.WarParams.Military.MaxTrainingNormal, castle.training + errTraining);
+            const perceivedMorale = Math.min(window.WarParams.Military.MaxMoraleNormal, castle.morale + errMorale);
 
             // ★追加：お金や兵糧の目標値を計算するための「基準兵数」を決めます（兵士0でも活動できるように最低2000を保証します）
             const baseSoldiers = Math.max(2000, castle.soldiers);
@@ -2887,7 +2890,9 @@ class AIEngine {
                 if (action.type === 'training') {
                     const val = DomesticRules.calcTraining(doer, castle.soldiers, 1.0, true);
                     const oldVal = castle.training;
-                    castle.training = Math.min(100, castle.training + val);
+                    const maxTraining = window.WarParams.Military.MaxTrainingNormal;
+                    // 戦争で得た100超の訓練値を通常訓練で100へ巻き戻さない。
+                    castle.training = oldVal >= maxTraining ? oldVal : Math.min(maxTraining, oldVal + val);
                     
                     const actualVal = castle.training - oldVal;
                     doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(actualVal * 0.5);
@@ -2899,7 +2904,9 @@ class AIEngine {
                     castle.rice -= window.MainParams.CommandCost.SoldierCharity;
                     const val = DomesticRules.calcSoldierCharity(doer, castle.soldiers, 1.0, true);
                     const oldVal = castle.morale;
-                    castle.morale = Math.min(100, castle.morale + val);
+                    const maxMorale = window.WarParams.Military.MaxMoraleNormal;
+                    // 戦争で得た100超の士気を兵施しで100へ巻き戻さない。
+                    castle.morale = oldVal >= maxMorale ? oldVal : Math.min(maxMorale, oldVal + val);
                     
                     const actualVal = castle.morale - oldVal;
                     doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(actualVal * 0.5);

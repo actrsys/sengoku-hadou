@@ -785,11 +785,6 @@ class AIOperationManager {
     }
 
     async generateOperation(clanId, legionId) {
-        // ★イベント追加：AIの作戦立案前
-        if (this.game.eventManager) {
-            await this.game.eventManager.processEvents('before_ai_operation', clanId);
-        }
-
         const myClanCastles = this.game.getClanCastles(clanId).filter(c => c.legionId === legionId);
         if (myClanCastles.length === 0) return;
 

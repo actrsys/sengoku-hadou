@@ -1545,7 +1545,7 @@ Object.assign(UIManager.prototype, {
                 // シナリオ選択に戻るボタンを出す
                 if (backToScenarioBtn) {
                     backToScenarioBtn.classList.remove('hidden');
-                    backToScenarioBtn.onclick = () => {
+                    backToScenarioBtn.onclick = async () => {
                         // 二重に鳴るのを防ぐため、ここでの音の魔法を消します
                         document.body.classList.remove('daimyo-select-mode');
                         backToScenarioBtn.classList.add('hidden');
@@ -1556,8 +1556,8 @@ Object.assign(UIManager.prototype, {
                             appContainer.classList.add('hidden');
                         }
                         
-                        this.returnToTitle(); 
-                        if (window.GameApp) window.GameApp.startNewGame();
+                        await this.returnToTitle();
+                        if (this.game) this.game.startNewGame();
                     };
                 }
             } else {

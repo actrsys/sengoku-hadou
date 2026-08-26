@@ -878,7 +878,7 @@ class KunishuSystem {
         castle.gold -= gold;
 
         // ★修正：元のファイルにあったcalcGoodwillIncrease魔法を直接呼び出します
-        const increase = this.game.diplomacyManager.calcGoodwillIncrease(gold, doer.diplomacy);
+        const increase = this.game.diplomacyManager.calcGoodwillIncrease(gold, doer);
         
         const currentRel = kunishu.getRelation(this.game.playerClanId);
         this.setRelation(kunishu, this.game.playerClanId, currentRel + increase);

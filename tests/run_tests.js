@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r217');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r220');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -3297,15 +3297,17 @@ test('評定の案内は一ヶ月表記で統一する', () => {
     assert.ok(!guide.includes('一月に') && !council.includes('一月に'));
 });
 
-test('指南書とシナリオ選択の閉じる操作は標準modal-footerの余白感へ揃える', () => {
+test('標準modal-footerは12pxに統一し、シナリオfooterを内部Gridのrow-gapから分離する', () => {
     const css = read('css/style.css');
-    assert.ok(css.includes('.modal-footer { margin-top: 15px;'));
-    assert.ok(!css.includes('#guide-modal .modal-footer {'), '指南書だけのfooter高さ・余白上書きを残さない');
+    const html = read('index.html');
+    assert.ok(css.includes('--modal-footer-gap: 12px;'), '標準footer間隔12pxをCSS変数で一元化する');
+    assert.ok(css.includes('.modal-footer { margin-top: var(--modal-footer-gap);'), '標準footerは共通変数を参照する');
+    assert.ok(!css.includes('#guide-modal .modal-footer {'), '指南書だけのfooter余白上書きを残さない');
+    assert.ok(html.includes('<div class="scenario-main">'), 'シナリオ一覧と説明をfooterから分離した内側Gridへ置く');
+    assert.ok(css.includes('#scenario-modal .scenario-main {'), 'シナリオ内部Gridを専用領域として持つ');
     assert.ok(css.includes('#scenario-modal .modal-footer {'));
-    assert.ok(css.includes('min-height: 60px;'));
-    assert.ok(css.includes('margin: 1px 0 0;'), 'PCシナリオ選択はgrid gapと合わせて標準15px相当にする');
-    assert.ok(css.includes('margin-top: 5px;'), '縦スマホのシナリオ選択もgrid gapと合わせて標準15px相当にする');
-    assert.ok(css.includes('margin-top: 8px;'), '横持ちのシナリオ選択もgrid gapと合わせて標準15px相当にする');
+    assert.ok(!css.includes('calc(var(--modal-footer-gap) - var(--scenario-'), 'シナリオfooterだけの相殺計算を残さない');
+    assert.ok(!css.includes('--scenario-row-gap:'), 'footerまで巻き込む旧scenario row-gap変数を残さない');
 });
 
 test('指南書は合戦を野戦・攻城戦・兵科へ分け、内部倍率を出さず特徴を説明する', () => {
@@ -6105,6 +6107,146 @@ test('継承・城主任命の比較用一時値を武将モデルへ書き込�
         assert.ok(!source.includes('._isDirectSon'));
         assert.ok(!source.includes('._nameChangeInfo'));
     }
+});
+
+
+test('訓練上限も士気と同じ内部120・通常100・ゲージ100を設定の正本から使う', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    assert.strictEqual(ctx.WarParams.Military.MaxTrainingInternal, 120);
+    assert.strictEqual(ctx.WarParams.Military.MaxTrainingNormal, 100);
+    assert.strictEqual(ctx.WarParams.Military.MaxTrainingGauge, 100);
+
+    const commandCatalog = read('js/command_catalog.js');
+    const commandSystem = read('js/command_system.js');
+    const fieldWar = read('js/field_war.js');
+    const warEffort = read('js/war_effort.js');
+    const ui = read('js/ui.js');
+    const interview = read('js/interview_system.js');
+    assert.ok(commandCatalog.includes('MaxTrainingNormal'));
+    assert.ok(commandSystem.includes('MaxTrainingNormal'));
+    assert.ok(fieldWar.includes('MaxTrainingInternal'));
+    assert.ok(warEffort.includes('MaxTrainingInternal'));
+    assert.ok(ui.includes('MaxTrainingGauge'));
+    assert.ok(interview.includes('MaxTrainingGauge'));
+    assert.ok(![commandCatalog, commandSystem, fieldWar, warEffort, ui, interview].join('\n').includes('Military.MaxTraining;'));
+});
+
+test('通常の訓練・兵施しは戦争由来の100超を100へ巻き戻さない', () => {
+    const ai = read('js/ai.js');
+    const command = read('js/command_system.js');
+    assert.ok(ai.includes('oldVal >= maxTraining ? oldVal : Math.min(maxTraining, oldVal + val)'));
+    assert.ok(ai.includes('oldVal >= maxMorale ? oldVal : Math.min(maxMorale, oldVal + val)'));
+    assert.ok(command.includes('oldVal >= maxTraining ? oldVal : Math.min(maxTraining, oldVal + val)'));
+    assert.ok(command.includes('oldVal >= maxMorale ? oldVal : Math.min(maxMorale, oldVal + val)'));
+    assert.ok(ai.includes('const targetMaxMorale = Math.min(normalMoraleCap'));
+});
+
+test('諸勢力親善は外交共通計算へ武将オブジェクトを渡しNaN化を防ぐ', () => {
+    const source = read('js/kunishu_system.js');
+    assert.ok(source.includes('calcGoodwillIncrease(gold, doer);'));
+    assert.ok(!source.includes('calcGoodwillIncrease(gold, doer.diplomacy)'));
+});
+
+test('BGMはstart=0でもloopEndを適用し音量変更はcurrentBgmNameを正本にする', () => {
+    class MockHowl {
+        constructor(options) {
+            this.options = options;
+            this.bufferSource = {};
+            this.lastVolume = options.volume;
+            MockHowl.instances.push(this);
+        }
+        _soundById() { return { _node: { bufferSource: this.bufferSource } }; }
+        play() { if (this.options.onplay) this.options.onplay(1); return 1; }
+        stop() {}
+        unload() {}
+        volume(value) {
+            if (value !== undefined) this.lastVolume = value;
+            return this.lastVolume;
+        }
+    }
+    MockHowl.instances = [];
+    const ctx = createContext({ Howl: MockHowl });
+    loadScript(ctx, 'js/audio.js');
+
+    ctx.AudioManager.playBGM('SC_ex_Scene1_Duel.ogg');
+    const duel = MockHowl.instances.at(-1);
+    assert.strictEqual(duel.bufferSource.loopStart, 0);
+    assert.ok(Math.abs(duel.bufferSource.loopEnd - (3841330 / 44100)) < 1e-9);
+
+    ctx.AudioManager.playBGM('06_Snowy Sacred Approach.ogg');
+    const snowy = MockHowl.instances.at(-1);
+    ctx.AudioManager.setBgmVolume(0.5);
+    assert.ok(Math.abs(snowy.lastVolume - 0.03) < 1e-9, 'baseVolume 0.06 を維持して音量変更する');
+
+    const source = read('js/audio.js');
+    assert.ok(!source.includes('this.bgmPlayer._src[0]'));
+    assert.ok(!source.includes('if (loopStart > 0 && this.bgmPlayer)'));
+});
+
+test('スマホ状態マークのタイマーは城情報更新のたび先に停止する', () => {
+    const source = read('js/ui.js');
+    const clearAt = source.indexOf('// 城を切り替えた時は、前の城の状態マーク用タイマーを必ず先に破棄する。');
+    const renderAt = source.indexOf('this.mobileTopLeft.innerHTML = content;', clearAt);
+    assert.ok(clearAt >= 0 && renderAt > clearAt);
+    const block = source.slice(clearAt, renderAt);
+    assert.ok(block.includes('clearInterval(this._statusCarouselTimer);'));
+    assert.ok(block.includes('this._statusCarouselTimer = null;'));
+});
+
+test('大名選択からシナリオへ戻る時はタイトル復帰完了を待ってから新規開始する', () => {
+    const source = read('js/ui_map.js');
+    const start = source.indexOf('backToScenarioBtn.onclick = async () =>');
+    assert.ok(start >= 0);
+    const block = source.slice(start, start + 900);
+    assert.ok(block.includes('await this.returnToTitle();'));
+    assert.ok(block.includes('if (this.game) this.game.startNewGame();'));
+    assert.ok(!block.includes('window.GameApp.startNewGame()'));
+});
+
+test('シナリオ切替時は巨大地図IDマップとイベント側共有キャッシュを解放する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/data_manager.js');
+    ctx.DataManager.provincePixelMap = [1, 2, 3];
+    ctx.DataManager.castlePixelMap = [4, 5, 6];
+    ctx.DataManager.castlePixelBounds = [{}];
+    ctx.DataManager.castlePixelCenters = [{}];
+    ctx.DataManager.provincePixelCount = 3;
+    ctx.DataManager.mapImageWidth = 3;
+    ctx.DataManager.mapImageHeight = 1;
+    ctx.DataManager.releaseMapResources();
+    assert.strictEqual(ctx.DataManager.provincePixelMap, null);
+    assert.strictEqual(ctx.DataManager.castlePixelMap, null);
+    assert.strictEqual(ctx.DataManager.castlePixelBounds, null);
+    assert.strictEqual(ctx.DataManager.castlePixelCenters, null);
+    assert.strictEqual(ctx.DataManager.provincePixelCount, 0);
+    assert.strictEqual(ctx.DataManager.mapImageWidth, 0);
+    assert.strictEqual(ctx.DataManager.mapImageHeight, 0);
+
+    const game = read('js/game.js');
+    const events = read('js/event/common_events.js');
+    const ui = read('js/ui.js');
+    assert.ok(game.includes('releaseScenarioMapResources()'));
+    assert.ok(game.includes('DataManager.releaseMapResources();'));
+    assert.ok(game.includes('window.EventMapEffects.invalidateCaches();'));
+    assert.ok(events.includes('const invalidateCaches = () =>'));
+    assert.ok(ui.includes('this.game.releaseScenarioMapResources();'));
+});
+
+test('登録先のない旧イベントタイミング呼出しを実行経路へ残さない', () => {
+    const turn = read('js/turn_manager.js');
+    const aiOp = read('js/ai_operation.js');
+    assert.ok(!turn.includes("processEvents('turn_start'"));
+    assert.ok(!turn.includes("processEvents('turn_end'"));
+    assert.ok(!aiOp.includes("processEvents('before_ai_operation'"));
+});
+
+test('現行AudioManagerに存在しない旧互換プロパティやfadeOutSe分岐を残さない', () => {
+    const source = [read('js/diplomacy.js'), read('js/ui.js')].join('\n');
+    assert.ok(!source.includes('_memorizedBgm'));
+    assert.ok(!source.includes('fadeOutSe'));
+    assert.ok(source.includes('memorizeCurrentBgm()'));
+    assert.ok(source.includes('restoreMemorizedBgm()'));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

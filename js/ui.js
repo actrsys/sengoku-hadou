@@ -1032,11 +1032,6 @@ class UIManager {
                 this._scheduleDialogHandoffClose(closeCompletely, graceMs);
             };
 
-            // ★追加：ダイアログを進めた時に、鳴っているSEを0.1秒でスッと消す魔法です！
-            if (window.AudioManager && typeof window.AudioManager.fadeOutSe === 'function') {
-                window.AudioManager.fadeOutSe(0.1);
-            }
-
             const scheduleHandoff = () => {
                 // showDialogAsync の resolve() で再開する async/await の継続処理を先に走らせ、
                 // 次の会話がキューへ積まれた後で「維持して続行／完全に閉じる」を判定します。
@@ -1708,19 +1703,9 @@ class UIManager {
         if (this.resultModal) this.resultModal.classList.add('hidden'); 
         this.restoreAIGuard(); 
 
-        // ★追加：結果画面を閉じた時に、鳴っているSEを0.1秒でスッと消す魔法です！
-        if (window.AudioManager && typeof window.AudioManager.fadeOutSe === 'function') {
-            window.AudioManager.fadeOutSe(0.1);
-        }
-
         // ★今回追加：もし外交用のBGMが鳴っていたら、結果画面を閉じた瞬間に元のBGMに戻します！
         if (window.AudioManager && window.AudioManager.currentBgmName === 'SC_ex_Scene3_Odyssey.ogg') {
-            if (typeof window.AudioManager.restoreMemorizedBgm === 'function') {
-                window.AudioManager.restoreMemorizedBgm();
-            } else if (window.AudioManager._memorizedBgm) {
-                window.AudioManager.playBGM(window.AudioManager._memorizedBgm);
-                window.AudioManager._memorizedBgm = null;
-            }
+            window.AudioManager.restoreMemorizedBgm();
         }
 
         // 小窓を閉じる時に、必ず「いつもの閉じるボタン」に戻しておきます！
@@ -1867,6 +1852,9 @@ class UIManager {
 
         this.forceResetModals();
         if (typeof this.resetMapViewState === 'function') this.resetMapViewState();
+        if (this.game && typeof this.game.releaseScenarioMapResources === 'function') {
+            this.game.releaseScenarioMapResources();
+        }
         this.updateLoadingProgress(45, '画面を整理しています');
 
         // ゲームのステータスを「タイトル画面」に戻します。
@@ -2001,7 +1989,7 @@ class UIManager {
                     <div class="sp-face-wrapper">${faceHtml}</div>
                     <div class="sp-params-grid">
                         <div class="sp-label">石高</div><div class="sp-val">${this.getStatusBarHTML(castle.kokudaka, castle.maxKokudaka, 'blue', isVisible)}</div>
-                        <div class="sp-label">訓練</div><div class="sp-val">${this.getStatusBarHTML(castle.training, 100, 'lightblue', isVisible)}</div>
+                        <div class="sp-label">訓練</div><div class="sp-val">${this.getStatusBarHTML(castle.training, window.WarParams.Military.MaxTrainingGauge, 'lightblue', isVisible)}</div>
                         <div class="sp-label">軍馬</div><div class="sp-val-right sp-val-compact">${mask(castle.horses || 0)}</div>
                         
                         <div class="sp-label">鉱山</div><div class="sp-val">${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</div>
@@ -2033,7 +2021,7 @@ class UIManager {
                     </div>
                     <div class="sp-params-grid">
                         <div class="sp-label">石高</div><div class="sp-val">${this.getStatusBarHTML(castle.kokudaka, castle.maxKokudaka, 'blue', isVisible)}</div>
-                        <div class="sp-label">訓練</div><div class="sp-val">${this.getStatusBarHTML(castle.training, 100, 'lightblue', isVisible)}</div>
+                        <div class="sp-label">訓練</div><div class="sp-val">${this.getStatusBarHTML(castle.training, window.WarParams.Military.MaxTrainingGauge, 'lightblue', isVisible)}</div>
                         <div class="sp-label">軍馬</div><div class="sp-val-right">${mask(castle.horses || 0)}</div>
                         
                         <div class="sp-label">鉱山</div><div class="sp-val">${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</div>
@@ -2056,6 +2044,13 @@ class UIManager {
             `;
         }
 
+        // 城を切り替えた時は、前の城の状態マーク用タイマーを必ず先に破棄する。
+        // 状態0個/1個の城へ移った場合も古いDOMを定期参照させない。
+        if (this._statusCarouselTimer) {
+            clearInterval(this._statusCarouselTimer);
+            this._statusCarouselTimer = null;
+        }
+
         if (this.mobileTopLeft) {
             this.mobileTopLeft.innerHTML = content;
 
@@ -2071,8 +2066,6 @@ class UIManager {
                     if (marks.length > 0) {
                         let currentIndex = 0;
                         marks[0].classList.add('active'); // fade-inクラスを付けないので初回は一瞬で出ます
-                        
-                        if (this._statusCarouselTimer) clearInterval(this._statusCarouselTimer);
                         
                         if (marks.length > 1) {
                             // 複数ある場合はタップ可能にし、タイマーを回す

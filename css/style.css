@@ -52,6 +52,8 @@ html.fonts-fallback body { visibility: visible; }
     --border-color: #cfd8dc;
     --map-tile-size: 80px;
     --header-height: 100px;
+    /* 標準モーダルの内容枠と決定・戻る・閉じる等の操作列との共通間隔。 */
+    --modal-footer-gap: 12px;
 }
 
 body {
@@ -1374,7 +1376,7 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 #unit-divide-modal h3 { margin-top: 0; }
 .settings-title { margin-top: 0; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
 
-.modal-footer { margin-top: 15px; display: flex; justify-content: center; align-items: center; min-height: 60px; gap: 10px; padding-top: 0; border-top: none; flex-shrink: 0; background: transparent; padding-bottom: env(safe-area-inset-bottom); }
+.modal-footer { margin-top: var(--modal-footer-gap); display: flex; justify-content: center; align-items: center; min-height: 60px; gap: 10px; padding-top: 0; border-top: none; flex-shrink: 0; background: transparent; padding-bottom: env(safe-area-inset-bottom); }
 .modal-footer.right { justify-content: flex-end; }
 
 .start-content { max-width: 600px; text-align: center; }
@@ -5011,7 +5013,7 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
 .interview-session-page-label { min-width: 58px; font-size: 12px; }
 
 /* 決定・戻る・終了などは共通 modal-footer と同じく内容枠の外側へ置く。
-   内容枠との隙間15pxは全モーダル共通の正本 .modal-footer に委譲する。 */
+   内容枠との隙間は全モーダル共通の --modal-footer-gap / .modal-footer に委譲する。 */
 .interview-session-footer {
     flex: 0 0 60px;
     min-height: 60px;
@@ -5908,25 +5910,28 @@ body:not(.is-pc) #map-container {
     max-width: 860px;
     height: clamp(440px, 62vh, 560px);
     max-height: calc(100vh - 96px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden !important;
+}
+
+/* 一覧と説明だけを内側Gridへ閉じ込める。
+   footerをこのGridから外すことで、標準 --modal-footer-gap が他モーダルと同じ意味になる。 */
+#scenario-modal .scenario-main {
+    flex: 1 1 auto;
+    min-height: 0;
     display: grid;
     grid-template-columns: minmax(220px, 0.78fr) minmax(0, 1.22fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-        "scenario-heading scenario-heading"
-        "scenario-list scenario-desc"
-        "scenario-footer scenario-footer";
     column-gap: 18px;
-    row-gap: 14px;
-    overflow: hidden !important;
+    margin-top: 14px;
 }
 
 /* 見出しの見た目は共通モーダルの h3 に一元化。 */
 #scenario-modal .start-content > h3 {
-    grid-area: scenario-heading;
+    flex: 0 0 auto;
 }
 
 #scenario-modal #scenario-list {
-    grid-area: scenario-list;
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -5948,6 +5953,9 @@ body:not(.is-pc) #map-container {
 #scenario-modal .start-content.scenario-layout-many {
     width: min(980px, 96%);
     max-width: 980px;
+}
+
+#scenario-modal .start-content.scenario-layout-many .scenario-main {
     grid-template-columns: minmax(430px, 1.08fr) minmax(0, 0.92fr);
 }
 
@@ -6076,7 +6084,6 @@ body:not(.is-pc) #map-container {
 }
 
 #scenario-modal .scenario-desc-box {
-    grid-area: scenario-desc;
     display: none;
     flex-direction: column;
     min-width: 0;
@@ -6110,9 +6117,6 @@ body:not(.is-pc) #map-container {
 }
 
 #scenario-modal .modal-footer {
-    grid-area: scenario-footer;
-    /* グリッドのrow-gapと合わせて、標準modal-footerの15px相当の間隔に揃える。 */
-    margin: 1px 0 0;
     min-height: 60px;
     padding: 0;
     border-top: none;
@@ -6138,14 +6142,13 @@ body:not(.is-pc) #map-container {
         height: min(600px, calc(100vh - 88px));
         min-height: 0;
         max-height: calc(100vh - 88px);
+    }
+
+    #scenario-modal .scenario-main {
         grid-template-columns: minmax(0, 1fr);
-        grid-template-rows: auto minmax(205px, 0.95fr) minmax(155px, 0.85fr) auto;
-        grid-template-areas:
-            "scenario-heading"
-            "scenario-list"
-            "scenario-desc"
-            "scenario-footer";
+        grid-template-rows: minmax(205px, 0.95fr) minmax(155px, 0.85fr);
         row-gap: 10px;
+        margin-top: 10px;
     }
 
     #scenario-modal .start-content > h3 {
@@ -6166,8 +6169,11 @@ body:not(.is-pc) #map-container {
     #scenario-modal .start-content.scenario-layout-many {
         width: min(620px, 94%);
         max-width: 620px;
+    }
+
+    #scenario-modal .start-content.scenario-layout-many .scenario-main {
         grid-template-columns: minmax(0, 1fr);
-        grid-template-rows: auto minmax(250px, 1.15fr) minmax(130px, 0.65fr) auto;
+        grid-template-rows: minmax(250px, 1.15fr) minmax(130px, 0.65fr);
     }
 
     #scenario-modal #scenario-list.scenario-list-many {
@@ -6189,7 +6195,6 @@ body:not(.is-pc) #map-container {
     }
 
     #scenario-modal .modal-footer {
-        margin-top: 5px;
         min-height: 60px;
         padding: 0;
     }
@@ -6202,19 +6207,22 @@ body:not(.is-pc) #map-container {
         max-width: 900px;
         height: calc(100vh - 76px);
         max-height: calc(100vh - 76px);
+    }
+
+    #scenario-modal .scenario-main {
         grid-template-columns: minmax(210px, 0.8fr) minmax(0, 1.2fr);
-        grid-template-rows: auto minmax(0, 1fr) auto;
-        grid-template-areas:
-            "scenario-heading scenario-heading"
-            "scenario-list scenario-desc"
-            "scenario-footer scenario-footer";
+        grid-template-rows: minmax(0, 1fr);
         column-gap: 12px;
-        row-gap: 7px;
+        row-gap: 0;
+        margin-top: 7px;
     }
 
     #scenario-modal .start-content.scenario-layout-many {
         width: min(960px, 97%);
         max-width: 960px;
+    }
+
+    #scenario-modal .start-content.scenario-layout-many .scenario-main {
         grid-template-columns: minmax(390px, 1.05fr) minmax(0, 0.95fr);
     }
 
@@ -6245,7 +6253,6 @@ body:not(.is-pc) #map-container {
     }
 
     #scenario-modal .modal-footer {
-        margin-top: 8px;
         min-height: 60px;
         padding: 0;
     }

@@ -345,6 +345,11 @@ window.EventMapEffects = window.EventMapEffects || (() => {
     // ゲーム開始時にDataManagerが作った「pixel -> castleId」の共有IDマップを再利用します。
     // 同色コードを共有する拠点が将来追加されても、castleId -> groupId の小さな表だけで旧色グループ挙動を保ちます。
     let castleColorIndexCache = null;
+    const invalidateCaches = () => {
+        // シナリオ切替時に旧castlePixelMapへの参照を残さない。
+        castleColorIndexCache = null;
+    };
+
     const ensureCastleColorIndex = async (game, diagPrefix = null) => {
         const pixelCastleMap = (game.ui && game.ui.pixelCastleMap)
             || (typeof DataManager !== 'undefined' ? DataManager.castlePixelMap : null);
@@ -458,6 +463,7 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         getRenderScale,
         ensureProvinceSource,
         createProvinceCanvas,
+        invalidateCaches,
         ensureCastleColorIndex,
         waitForDismiss,
         cleanupOverlay
