@@ -30,6 +30,8 @@ class GameManager {
         this.playerClanId = 1;
         // 起動中のUI初期化が前回の実機診断を上書きしないよう、UI生成前からタイトル状態を正本化する。
         this.phase = 'title';
+        // タイトル／システムのロード可否はSaveManagerが検査した結果だけを反映する。未検査時は選択不可。
+        this.hasSaveData = false;
         this.historySystem = new HistorySystem(this);
         this.ui = new UIManager(this); 
         this.saveManager = new SaveManager(this);

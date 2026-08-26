@@ -2105,7 +2105,7 @@ class UIInfoManager {
             itemClass: "delegate-list-item",
             listClass: "delegate-list-container",
             items: items,
-            emptyHtml: '<div class="list-empty-message">委任できる城がありません。</div>',
+            emptyHtml: '<div class="list-empty-message">委任できる拠点がありません。</div>',
             scrollPos: scrollPos,
             gridTemplateSp: "1.5fr 1fr 1fr 1fr",
             gridTemplatePc: "200px 100px 100px 100px"

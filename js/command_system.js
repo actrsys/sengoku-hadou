@@ -1867,12 +1867,12 @@ class CommandSystem {
     getSelectionGuideMessage() {
         switch(this.game.selectionMode) {
             case 'war': return "攻撃目標を選択してください";
-            case 'kunishu_subjugate': return "攻撃目標となる諸勢力がいる城を選択してください";
+            case 'kunishu_subjugate': return "攻撃目標となる諸勢力がいる拠点を選択してください";
             case 'move': return "移動先を選択してください";
             case 'transport': return "輸送先を選択してください";
-            case 'investigate': return "調査対象の城を選択してください";
-            case 'incite': return "民心撹乱を行う城を選択してください";
-            case 'sabotage': return "破壊工作を行う城を選択してください";
+            case 'investigate': return "調査対象の拠点を選択してください";
+            case 'incite': return "民心撹乱を行う拠点を選択してください";
+            case 'sabotage': return "破壊工作を行う拠点を選択してください";
             case 'rumor': return "離間計対象の居城を選択してください";
             case 'headhunt': case 'headhunt_select_castle': return "引抜対象の居城を選択してください";
             case 'assassinate': return "暗殺対象の居城を選択してください";
@@ -1883,16 +1883,16 @@ class CommandSystem {
             case 'dominate': return "降伏勧告を行う相手を選択してください";
             case 'subordinate': return "従属願を行う相手を選択してください";
             case 'vassalage': return "臣従願を行う相手を選択してください";
-            case 'kunishu_goodwill': return "親善を行う諸勢力がいる城を選択してください";
-            case 'kunishu_incorporate': return "取込を行う諸勢力がいる城を選択してください";
+            case 'kunishu_goodwill': return "親善を行う諸勢力がいる拠点を選択してください";
+            case 'kunishu_incorporate': return "取込を行う諸勢力がいる拠点を選択してください";
             case 'break_alliance': return "断交する相手を選択してください";
             case 'court_truce': return "朝廷を介して和睦を行う相手を選択してください";
             case 'marriage': return "婚姻を結ぶ相手を選択してください";
             case 'truce': return "和睦交渉を行う相手を選択してください";
-            case 'atk_self_reinforcement': return "援軍を出陣させる城を選択してください";
-            case 'atk_ally_reinforcement': return "援軍を要請する城を選択してください";
-            case 'def_self_reinforcement': return "援軍を出陣させる城を選択してください";
-            case 'def_ally_reinforcement': return "援軍を要請する城を選択してください";
+            case 'atk_self_reinforcement': return "援軍を出陣させる拠点を選択してください";
+            case 'atk_ally_reinforcement': return "援軍を要請する拠点を選択してください";
+            case 'def_self_reinforcement': return "援軍を出陣させる拠点を選択してください";
+            case 'def_ally_reinforcement': return "援軍を要請する拠点を選択してください";
             default: return "対象を選択してください";
         }
     }
@@ -1948,7 +1948,7 @@ class CommandSystem {
                 const forces = allAvailableForces.filter(f => f.castle.id === targetCastle.id).map(f => f.force);
 
                 if (forces.length === 0) {
-                    this.game.ui.showDialog("この城には援軍を出せる勢力がいません。", false, backToMap);
+                    this.game.ui.showDialog("この拠点には援軍を出せる勢力がいません。", false, backToMap);
                     return;
                 }
 
@@ -2010,7 +2010,7 @@ class CommandSystem {
             }
 
             if (kunishus.length === 0) {
-                this.game.ui.showDialog("この城には行動可能な諸勢力がいません。", false);
+                this.game.ui.showDialog("この拠点には行動可能な諸勢力がいません。", false);
                 return;
             }
 

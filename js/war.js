@@ -600,15 +600,15 @@ class WarManager {
                 // 城壁が壊れて落ちた場合、少しだけ城壁（防御力）を修復してから戦後処理へ。
                 // ラウンド開始時点で既に0だった場合でも、プレイヤーには終了理由を必ず見せます。
                 s.defender.defense += 150;
-                this.finishSiegeWithNotice(true, '城の防御が尽き、城は陥落しました。');
+                this.finishSiegeWithNotice(true, '拠点の防御が尽き、拠点は陥落しました。');
                 return;
             }
             if (s.defender.morale <= 0) {
-                this.finishSiegeWithNotice(true, '守備本隊の士気が崩壊し、城は陥落しました。');
+                this.finishSiegeWithNotice(true, '守備本隊の士気が崩壊し、拠点は陥落しました。');
                 return;
             }
             if (s.defender.soldiers <= 0) {
-                this.finishSiegeWithNotice(true, '守備本隊が全滅し、城は陥落しました。');
+                this.finishSiegeWithNotice(true, '守備本隊が全滅し、拠点は陥落しました。');
                 return;
             }
             if (s.attacker.morale <= 0) {
@@ -616,7 +616,7 @@ class WarManager {
                 return;
             }
             if (s.attacker.soldiers <= 0) {
-                this.finishSiegeWithNotice(false, '攻撃本隊が全滅し、守備軍が城を守り切りました。');
+                this.finishSiegeWithNotice(false, '攻撃本隊が全滅し、守備軍が拠点を守り切りました。');
                 return;
             }
             
@@ -1080,15 +1080,15 @@ class WarManager {
 
         const checkDefeatAndPushMsg = () => {
             if (s.defender.defense <= 0) {
-                pushMsg({ text: `<span class="war-critical-message">城の防御が尽き、城は陥落しました。</span>`, log: `城防御が0になり、陥落した！` });
+                pushMsg({ text: `<span class="war-critical-message">拠点の防御が尽き、拠点は陥落しました。</span>`, log: `拠点防御が0になり、陥落した！` });
             } else if (s.defender.morale <= 0) {
-                pushMsg({ text: `<span class="war-critical-message">守備本隊の士気が崩壊し、城は陥落しました。</span>`, log: `守備本隊の士気が0になり、陥落した！` });
+                pushMsg({ text: `<span class="war-critical-message">守備本隊の士気が崩壊し、拠点は陥落しました。</span>`, log: `守備本隊の士気が0になり、陥落した！` });
             } else if (s.defender.soldiers <= 0) {
-                pushMsg({ text: `<span class="war-critical-message">守備本隊が全滅し、城は陥落しました。</span>`, log: `守備本隊が全滅し、陥落した！` });
+                pushMsg({ text: `<span class="war-critical-message">守備本隊が全滅し、拠点は陥落しました。</span>`, log: `守備本隊が全滅し、陥落した！` });
             } else if (s.attacker.morale <= 0) {
                 pushMsg({ text: `<span class="war-critical-message">攻撃本隊の士気が崩壊し、攻撃軍は退却しました。</span>`, log: `攻撃本隊の士気が0になり、退却した！` });
             } else if (s.attacker.soldiers <= 0) {
-                pushMsg({ text: `<span class="war-critical-message">攻撃本隊が全滅し、守備軍が城を守り切りました。</span>`, log: `攻撃本隊が全滅し、退却した！` });
+                pushMsg({ text: `<span class="war-critical-message">攻撃本隊が全滅し、守備軍が拠点を守り切りました。</span>`, log: `攻撃本隊が全滅し、退却した！` });
             }
         };
         
@@ -1145,7 +1145,7 @@ class WarManager {
                     finalize();
                 }
             } else if (s.turn === 'defender') { 
-                pushMsg({ text: `<span class="war-critical-message">守備本隊は城を放棄して撤退し、合戦は終結しました。</span>`, log: `${activeArmyName} が城を放棄し撤退した！` });
+                pushMsg({ text: `<span class="war-critical-message">守備本隊は拠点を放棄して撤退し、合戦は終結しました。</span>`, log: `${activeArmyName} が拠点を放棄し撤退した！` });
                 const finalize = () => { this.executeRetreatLogic(s.defender); };
                 if (s.isPlayerInvolved && actionMessages.length > 0) {
                     this.game.ui.showWarActionMessage(actionMessages, finalize);
@@ -2077,7 +2077,7 @@ class WarManager {
                         const isDefPlayer = (Number(s.defender.ownerClan) === Number(this.game.playerClanId));
                         let msg = "決着がつかず、攻撃軍は撤退しました。";
                         if (isAtkPlayer) msg = "攻城戦が長引いたため、我が軍は撤退します。";
-                        else if (isDefPlayer) msg = "城の防衛に成功し、敵軍は撤退しました。";
+                        else if (isDefPlayer) msg = "拠点の防衛に成功し、敵軍は撤退しました。";
                         
                         this.game.ui.showDialog(msg, false, () => {
                             this.endWar(false);

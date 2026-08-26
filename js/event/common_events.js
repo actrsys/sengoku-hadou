@@ -738,7 +738,7 @@ window.GameEvents.push({
                         
                         // ★変更：自分のお城の時だけ、後でお知らせするためにメモします
                         if (c.ownerClan === game.playerClanId) {
-                            playerIkkiCastles.push(c.name || "どこかの城");
+                            playerIkkiCastles.push(c.name || "どこかの拠点");
                         }
                         
                         // 発生した瞬間の大きな被害を受けます
@@ -829,7 +829,7 @@ window.GameEvents.push({
                 
                 // 画面には出さず、左下のログにだけこっそり書き残します
                 if (game.ui && game.ui.log) {
-                    const cName = c.name || "どこかの城";
+                    const cName = c.name || "どこかの拠点";
                     game.ui.log(`【兵糧攻め】${cName}は敵軍に完全に包囲されています……`);
                 }
             } else {

@@ -796,7 +796,7 @@ class FieldWarManager {
                 if (unit.isGeneral) {
                     this.game.ui.showDialog("全軍を撤退させますか？（総大将が撤退すると野戦は終了します）", true, () => {
                         if (unit.isAttacker) this.log(`全軍、撤退を開始します……`);
-                        else this.log(`全軍、城内へ撤退を開始します……`);
+                        else this.log(`全軍、拠点へ撤退を開始します……`);
                         this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
                     }, null, { closeBeforeOk: true });
                 } else {
@@ -2492,8 +2492,8 @@ class FieldWarManager {
             }
             else if (defTotalRice <= 0) {
                 if (isAtkPlayer) endMessage = `${enemyName}は兵糧が尽き、散り散りに敗走していきました！`;
-                else if (isDefPlayer) endMessage = `兵糧が底をつきました。城を放棄し敗走します……`;
-                else endMessage = `兵糧が尽き、守備軍は城を放棄して敗走した！`;
+                else if (isDefPlayer) endMessage = `兵糧が底をつきました。拠点を放棄し敗走します……`;
+                else endMessage = `兵糧が尽き、守備軍は拠点を放棄して敗走した！`;
                 endResult = 'attacker_win_fatal';
             }
             else if (this.turnCount > this.maxTurns) {
@@ -3770,7 +3770,7 @@ class FieldWarManager {
         if (!isKunishuAttacker && unit.isGeneral && (allySoldiers < enemySoldiers * 0.2) && !isStartUnderdogDef) {
             const retreatMessage = unit.isAttacker
                 ? `${unit.name}軍は不利を悟り、攻略を諦めて撤退しました。野戦は終結します。`
-                : `${unit.name}軍は不利を悟り、城内へ退きました。野戦を終え、攻城戦へ移ります。`;
+                : `${unit.name}軍は不利を悟り、拠点へ退きました。野戦を終え、攻城戦へ移ります。`;
             this.finishFieldWarWithNotice(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat', retreatMessage);
             return;
         } else if (!isKunishuAttacker && !unit.isGeneral && unit.initialSoldiers > 500 && (unit.soldiers <= 200 || unit.soldiers < enemySoldiers * 0.05)) {
@@ -3827,7 +3827,7 @@ class FieldWarManager {
                     if (unit.isGeneral) {
                         const retreatMessage = unit.isAttacker
                             ? `${unit.name}軍は不利を悟り、攻略を諦めて撤退しました。野戦は終結します。`
-                            : `${unit.name}軍は不利を悟り、城内へ退きました。野戦を終え、攻城戦へ移ります。`;
+                            : `${unit.name}軍は不利を悟り、拠点へ退きました。野戦を終え、攻城戦へ移ります。`;
                         this.finishFieldWarWithNotice(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat', retreatMessage);
                     } else {
                         if (isPlayerInvolved) this.log(`${unit.name}隊は不利を悟り、戦場から撤退しました！`);

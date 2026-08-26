@@ -1516,20 +1516,20 @@ class DiplomacyManager {
             } else if (senderPosture === 'higher_court') {
                 greetMsg1 = `「${receiverCallName}。大事な用向きゆえ、わし自ら参った」`;
             } else if (Number(context.senderDeferenceLevel || 0) >= 2) {
-                greetMsg1 = `「${receiverCallName}。折り入ってお願いしたき儀があり、此度は某自ら参上いたしました」`;
+                greetMsg1 = `「${receiverCallName}。折り入ってお願いがあり、某自ら参上いたしました」`;
             } else if (Number(context.senderDeferenceLevel || 0) === 1) {
-                greetMsg1 = `「${receiverCallName}。大事な用向きゆえ、此度はわし自ら参りました」`;
+                greetMsg1 = `「${receiverCallName}。大事な用向きゆえ、わし自ら参りました」`;
             } else {
-                greetMsg1 = `「${receiverCallName}。重大な用件ゆえ、此度はわし自ら参りました」`;
+                greetMsg1 = `「${receiverCallName}。大事な用件ゆえ、わし自ら参りました」`;
             }
         } else {
             const senderDaimyo = context.senderDaimyo || this.game.getClanDaimyo(senderBusho.clan);
             const envoySpecial = context.envoySpecial || { level: 0, key: 'none' };
             const familyLead = senderAddressesFamily ? `${receiverCallName}。` : '';
             if (Number(envoySpecial.level || 0) >= 3) {
-                greetMsg1 = `「${familyLead}此度の儀は、両家のためにも進めるべきと考え、わし自ら参った」`;
+                greetMsg1 = `「${familyLead}両家のため、此度はわし自ら参った」`;
             } else if (Number(envoySpecial.level || 0) >= 2) {
-                greetMsg1 = `「${familyLead}此度の儀は、両家のためにも進めるべきと考え、某自ら参った」`;
+                greetMsg1 = `「${familyLead}両家のため、此度は某自ら参った」`;
             } else if (context.envoyOutranksLord) {
                 const daimyoRef = this._getDaimyoReference(senderDaimyo, senderClanName, '殿');
                 greetMsg1 = `「${familyLead}此度は${daimyoRef}の意を受け、使者として参りました」`;
@@ -1540,7 +1540,7 @@ class DiplomacyManager {
                     greetMsg1 = `「${familyLead}此度は${daimyoRef}の名代として参りました」`;
                 } else {
                     greetMsg1 = Number(context.senderDeferenceLevel || 0) >= 2
-                        ? `「此度は${daimyoRef}の名代として罷り越しました。まずはお目通りを賜り、ありがたく存じます」`
+                        ? `「此度は${daimyoRef}の名代として参りました。お目通り、かたじなく存じます」`
                         : `「此度は${daimyoRef}の名代として罷り越しました」`;
                 }
             }
@@ -1555,7 +1555,7 @@ class DiplomacyManager {
                 if (relationshipTone === 'hostile') {
                     greetMsg2 = `「……${senderCallName}。して、此度はどのような御用でしょうか？」`;
                 } else if (relationshipTone === 'friendly') {
-                    greetMsg2 = `「${senderCallName}。よくお越しくださいました。して、此度の御用向きは？」`;
+                    greetMsg2 = `「${senderCallName}。よくお越しくださいました。御用向きは？」`;
                 } else {
                     greetMsg2 = `「${senderCallName}。して、此度はどのような御用向きでしょうか？」`;
                 }
@@ -1580,24 +1580,24 @@ class DiplomacyManager {
             }
         } else if (relationshipTone === 'friendly') {
             if (receiverDeference >= 3) {
-                greetMsg2 = `「これは${senderCallName}。よくお越しくだされた。まずは御用向きを承りましょう」`;
+                greetMsg2 = `「これは${senderCallName}。よくお越しくだされた。御用向きを承ろう」`;
             } else if (receiverDeference === 2) {
-                greetMsg2 = `「これは${senderCallName}。遠路ご苦労であった。して、御用向きは？」`;
+                greetMsg2 = `「これは${senderCallName}。遠路ご苦労であった。御用向きは？」`;
             } else if (receiverDeference === 1) {
-                greetMsg2 = `「これは${senderCallName}。使者の役目、ご苦労にござる。して、御用向きは？」`;
+                greetMsg2 = `「これは${senderCallName}。使者の役目、ご苦労にござる。御用向きは？」`;
             } else if (senderBusho && senderBusho.isDaimyo) {
-                greetMsg2 = `「これは${senderCallName}。よう参られた。して、どのような御用向きでござるか？」`;
+                greetMsg2 = `「これは${senderCallName}。よう参られた。御用向きはいかに？」`;
             } else {
                 greetMsg2 = `「おお、使者か。して、御用向きはいかに？」`;
             }
         } else if (receiverDeference >= 3) {
-            greetMsg2 = `「これは${senderCallName}。御自らお越しとは……まずは御用向きを承りましょう」`;
+            greetMsg2 = `「これは${senderCallName}。御自らとは……御用向きを承りましょう」`;
         } else if (receiverDeference === 2) {
-            greetMsg2 = `「これは${senderCallName}。遠路ご足労いただいた。して、御用向きは？」`;
+            greetMsg2 = `「これは${senderCallName}。遠路ご足労いただいた。御用向きは？」`;
         } else if (receiverDeference === 1) {
-            greetMsg2 = `「${senderCallName}か。使者の役目、ご苦労にござる。して、御用向きは？」`;
+            greetMsg2 = `「${senderCallName}か。使者の役目、ご苦労にござる。御用向きは？」`;
         } else if (senderBusho && senderBusho.isDaimyo) {
-            greetMsg2 = `「これは${senderCallName}……して、どのような御用向きでござるか？」`;
+            greetMsg2 = `「これは${senderCallName}……御用向きはいかに？」`;
         } else {
             greetMsg2 = `「うむ。して、御用向きはいかに？」`;
         }
@@ -1693,27 +1693,27 @@ class DiplomacyManager {
             ? conversationContext.receiverSpeakerPosture.key : 'normal';
         return {
             demandMsg: this._styleDiplomacyTextForSpeaker(
-                `「長らく御庇護を賜り、当家が今日まで家を保てましたこと、深く感謝しております」`,
+                `「長らくの御庇護により、当家が家を保てたこと、深く感謝しております」`,
                 senderPosture
             ),
             demandMsg2: this._styleDiplomacyTextForSpeaker(
-                `「願わくば、これよりは主従の約を解き、盟友として変わらず力を合わせることをお許しいただきたく存じます」`,
+                `「願わくば主従の約を解き、これよりは盟友として力を合わせることをお許しいただきたく存じます」`,
                 senderPosture
             ),
             acceptMsg: this._styleDiplomacyTextForSpeaker(
-                `「申し出の趣、よく分かった。これまでよく力を尽くしてくれた。よかろう。今日より主従の約を解き、盟友として共に歩もう」`,
+                `「申し出の趣、よく分かった。よかろう。今日より主従の約を解き、盟友として共に歩もう」`,
                 receiverPosture
             ),
             rejectMsg: this._styleDiplomacyTextForSpeaker(
-                `「申し出の趣は承った。これまでの働きもよく分かっている。されど、今はまだ主従の約を解く時ではない。今しばらくはこれまでどおり、力を貸してもらいたい」`,
+                `「申し出の趣は承った。されど、今はまだ主従の約を解く時ではない。今しばらく力を貸してもらいたい」`,
                 receiverPosture
             ),
             replyAcceptMsg: this._styleDiplomacyTextForSpeaker(
-                `「かたじけない。これまで賜った御恩を忘れず、今後は盟友として変わらず力を合わせて参りましょう」`,
+                `「かたじけない。これまでの御恩を忘れず、盟友として力を合わせて参りましょう」`,
                 senderPosture
             ),
             replyRejectMsg: this._styleDiplomacyTextForSpeaker(
-                `「承知いたしました。此度は願いを収めます。今後もこれまでどおり、務めを果たして参ります」`,
+                `「承知いたしました。此度は願いを収め、これまでどおり務めを果たします」`,
                 senderPosture
             )
         };
@@ -1730,9 +1730,9 @@ class DiplomacyManager {
         let replyRejectMsg = "";
 
         if (type === 'goodwill') {
-            demandMsg = `「両家の仲を深めるべく参りました。心ばかりですが、どうぞお受け取りくだされ」`;
+            demandMsg = `「両家の仲を深めたく参りました。心ばかりですが、お受け取りくだされ」`;
             acceptMsg = isSenderDaimyo ? `「${senderCallName}直々の御厚意、かたじけない。ありがたく頂戴いたします」` : `「ありがたい申し出にござる。御厚意、確かに頂戴いたす」`;
-            rejectMsg = `「せっかくのお心遣いながら、此度は受け取ることができぬ。どうかお持ち帰り願いたい」`;
+            rejectMsg = `「お心遣いはありがたいが、此度は受け取れぬ。お持ち帰り願いたい」`;
             replyAcceptMsg = isSenderDaimyo
                 ? `「かたじけない。これを機に、両家の仲がさらに深まれば何よりにござる」`
                 : `「ありがたきお言葉。主君へも確かに申し伝えます」`;
@@ -1742,7 +1742,7 @@ class DiplomacyManager {
         } else if (type === 'alliance') {
             demandMsg = `「両家繁栄の為、どうか我らと盟約を結んでくだされ」`;
             acceptMsg = `「うむ、承知仕った。これより我らは盟友にござる」`;
-            rejectMsg = `「重大事ゆえ、今は盟約を結ぶには至らぬ。此度は見送らせてもらいたい」`;
+            rejectMsg = `「重大事ゆえ、今は盟約を結べぬ。此度は見送らせてもらいたい」`;
             replyAcceptMsg = isSenderDaimyo
                 ? `「うむ。では、これよりは盟友として力を合わせて参ろう」`
                 : `「かたじけない。この盟約、主君へ確かに申し伝えます」`;
@@ -1750,18 +1750,18 @@ class DiplomacyManager {
                 ? `「そうか。では、此度はこれまでとしよう」`
                 : `「承知いたしました。主君にはそのように申し伝えます」`;
         } else if (type === 'dominate') {
-            demandMsg = `「もはや大勢は決し申した。この上の抵抗は無益にござる。いさぎよく${senderClanName}の傘下に加わられよ」`;
+            demandMsg = `「もはや大勢は決し申した。これ以上の抵抗は無益。${senderClanName}の傘下に加わられよ」`;
             acceptMsg = `「……承知仕った。かくなる上は${senderClanName}に従属いたす」`;
             rejectMsg = `「断る。まだ当家が膝を屈する時ではない。その申し出は受けられぬ」`;
-            replyAcceptMsg = `「おお……うかがった甲斐があり申した。共に${senderClanName}を盛り立てて参りましょうぞ」`;
+            replyAcceptMsg = `「かたじけない。共に${senderClanName}を盛り立てて参りましょうぞ」`;
             replyRejectMsg = isSenderDaimyo
                 ? `「そうか。ならば此度はこれまでとしよう」`
                 : `「承知いたした。申し出は確かにお伝え申した。では、これにて失礼いたす」`;
         } else if (type === 'truce') {
             demandMsg = isSenderDaimyo
-                ? `「${receiverCallName}。此度の戦、これ以上いたずらに兵を損なうは本意ではない。両家とも矛を収め、しばし兵を休めることとせぬか」`
-                : `「此度の戦をこれ以上長引かせても、両家とも兵を損なうばかりにござる。ここは互いに矛を収め、和睦を結びたく参りました」`;
-            acceptMsg = `「……よかろう。当家としても、これ以上戦を長引かせる益はない。互いに兵を退き、約定を結ぶといたそう」`;
+                ? `「${receiverCallName}。これ以上兵を損なうは本意ではない。互いに矛を収め、兵を休めぬか」`
+                : `「これ以上戦を長引かせても兵を損なうばかり。互いに矛を収め、和睦を結びたく参りました」`;
+            acceptMsg = `「……よかろう。当家にも戦を長引かせる益はない。互いに兵を退き、約定を結ぼう」`;
             rejectMsg = `「……今ここで兵を退く理由はない。和睦の話は受けられぬ」`;
             replyAcceptMsg = isSenderDaimyo
                 ? `「かたじけない。約定は違えぬ。これにて両家、しばし矛を収めよう」`
@@ -1776,13 +1776,13 @@ class DiplomacyManager {
         } else if (type === 'subordinate') {
             demandMsg = `「当家は${receiverClanName}の傘下に入りたく存じます。どうか御庇護を賜りたく……」`;
             acceptMsg = `「申し出の趣、承知した。これより当家が後ろ盾となろう」`;
-            rejectMsg = `「申し出の趣は承った。されど今は、貴家を当家の庇護に迎える時ではない。此度は見送らせてもらいたい」`;
+            rejectMsg = `「申し出の趣は承った。されど今は、貴家を庇護に迎える時ではない。此度は見送ろう」`;
             replyAcceptMsg = isSenderDaimyo ? `「ありがたき幸せ……此度の御恩、決して忘れませぬ」` : `「ありがたきお言葉。主君へ急ぎ申し伝えます」`;
             replyRejectMsg = isSenderDaimyo
                 ? `「承知いたしました。此度は願いを収めます」`
                 : `「承知いたしました。主君にはそのように申し伝えます」`;
         } else if (type === 'marriage') {
-            demandMsg = `「両家の絆を強固なものとするため、当家の${princessName}を${targetBushoName}に娶っていただきたい」`;
+            demandMsg = `「両家の縁を深めるため、当家の${princessName}を${targetBushoName}に娶っていただきたい」`;
             acceptMsg = `「願ってもない申し出にござる。ありがたくお受けいたそう」`;
             rejectMsg = `「ううむ……こればかりはお受けいたしかねる。どうかお引き取りくだされ」`;
             replyAcceptMsg = isSenderDaimyo
@@ -1800,7 +1800,7 @@ class DiplomacyManager {
         if (senderRespect >= 2) {
             if (type === 'goodwill') demandMsg = `「両家の御縁を深めたく、心ばかりの品をお持ちいたしました。どうかお納めくだされ」`;
             if (type === 'alliance') demandMsg = `「恐れながら、両家繁栄のため盟約をお結びいただきたく存じます」`;
-            if (type === 'truce') demandMsg = `「此度の戦、これ以上兵を損なうは双方のためになりますまい。どうか矛を収め、和睦のお取り計らいを願いたく参りました」`;
+            if (type === 'truce') demandMsg = `「これ以上兵を損なうは双方のためになりますまい。矛を収め、和睦をお願いしたく参りました」`;
         } else if (senderRespect === 1) {
             if (type === 'alliance') demandMsg = `「両家繁栄のため、盟約を結んでいただきたく参りました」`;
             if (type === 'truce' && !isSenderDaimyo) demandMsg = `「これ以上戦を長引かせぬため、両家の和睦につきご一考いただきたく存じます」`;
@@ -1809,7 +1809,7 @@ class DiplomacyManager {
         if (receiverRespect >= 2) {
             if (type === 'goodwill') {
                 acceptMsg = `「これはかたじけない。御厚意、ありがたく頂戴いたします」`;
-                rejectMsg = `「せっかくのお申し出ながら、今すぐのお返事はいたしかねます。どうかご容赦くだされ」`;
+                rejectMsg = `「ありがたいお申し出ながら、今はお受けいたしかねます。ご容赦くだされ」`;
             } else if (type === 'alliance') {
                 acceptMsg = `「承知いたしました。これより両家、盟友として力を合わせましょう」`;
                 rejectMsg = `「重大事ゆえ、今しばらく家中で評議いたしたく存じます」`;
@@ -1823,29 +1823,29 @@ class DiplomacyManager {
         const envoySpecialLevel = Number(conversationContext && conversationContext.envoySpecial && conversationContext.envoySpecial.level || 0);
         if (envoySpecialLevel >= 2) {
             if (type === 'goodwill') {
-                demandMsg = `「両家の仲を深めることは望ましい。心ばかりの品だ、受け取ってもらいたい」`;
+                demandMsg = `「両家の仲を深めたい。心ばかりの品だ、受け取ってもらいたい」`;
                 replyAcceptMsg = `「うむ。両家の間が、これを機に少しでも近づけば何よりだ」`;
                 replyRejectMsg = `「そうか。此度は致し方あるまい」`;
             } else if (type === 'alliance') {
-                demandMsg = `「両家が盟約を結ぶことは望ましい。どうだ、一度考えてもらいたい」`;
+                demandMsg = `「両家で盟約を結びたい。どうだ、考えてもらいたい」`;
                 replyAcceptMsg = `「うむ。この盟約が末永く続くことを願おう」`;
                 replyRejectMsg = `「そうか。此度は致し方あるまい」`;
             } else if (type === 'truce') {
-                demandMsg = `「これ以上の争いは双方のためになるまい。ここは矛を収め、和睦するのがよかろう」`;
+                demandMsg = `「これ以上の争いは双方のためになるまい。矛を収め、和睦するのがよかろう」`;
                 replyAcceptMsg = `「うむ。これで両家の争いも収まろう」`;
                 replyRejectMsg = `「そうか。なお争いを続けるというなら、致し方あるまい」`;
             } else if (type === 'dominate') {
-                demandMsg = `「大勢を見れば、これ以上の抵抗は双方のためになるまい。ここは${senderClanName}の傘下に入るのがよかろう」`;
+                demandMsg = `「大勢は決しておる。${senderClanName}の傘下に入るのがよかろう」`;
             } else if (type === 'vassalage') {
-                demandMsg = `「両家の行く末を考えれば、我らが${receiverClanName}の末席に加わるのがよかろう」`;
+                demandMsg = `「我らが${receiverClanName}の末席に加わるのがよかろう」`;
                 replyAcceptMsg = `「うむ。これよりは共に歩んで参ろう」`;
                 replyRejectMsg = `「そうか。此度は致し方あるまい」`;
             } else if (type === 'subordinate') {
-                demandMsg = `「両家の行く末を考えれば、当家は${receiverClanName}の庇護を受けるのがよかろう」`;
+                demandMsg = `「当家は${receiverClanName}の庇護を受けるのがよかろう」`;
                 replyAcceptMsg = `「うむ。当家としても異存はあるまい」`;
                 replyRejectMsg = `「そうか。此度は致し方あるまい」`;
             } else if (type === 'marriage') {
-                demandMsg = `「両家の縁をより深めるなら、当家の${princessName}を${targetBushoName}に娶ってもらうのがよかろう」`;
+                demandMsg = `「両家の縁を深めるなら、当家の${princessName}を${targetBushoName}に娶ってもらいたい」`;
             }
         }
 
@@ -1853,7 +1853,7 @@ class DiplomacyManager {
         const relationshipTone = conversationContext && conversationContext.relationshipTone && conversationContext.relationshipTone.key || 'neutral';
         if (relationshipTone === 'hostile') {
             if (type === 'goodwill') {
-                acceptMsg = `「……品は受け取ろう。両家の間に遺恨はあれど、此度の厚意は受け取っておく」`;
+                acceptMsg = `「……品は受け取ろう。遺恨はあれど、此度の厚意は受けておく」`;
                 rejectMsg = `「……今さら親善の品とはな。此度は受け取れぬ。お持ち帰りくだされ」`;
             } else if (type === 'alliance') {
                 acceptMsg = `「……承知した。これまでの遺恨はいったん置き、盟約を結ぶといたそう」`;
@@ -1863,12 +1863,12 @@ class DiplomacyManager {
             }
         } else if (relationshipTone === 'friendly') {
             if (type === 'goodwill') {
-                acceptMsg = `「かたじけない。変わらぬ御厚意、ありがたく頂戴いたします」`;
-                rejectMsg = `「せっかくのお心遣い、ありがたく存じます。ただ、此度はお受けいたしかねます」`;
+                acceptMsg = `「かたじけない。変わらぬ御厚意、ありがたく頂戴します」`;
+                rejectMsg = `「お心遣い、ありがたく存じます。ただ、此度はお受けいたしかねます」`;
             } else if (type === 'alliance') {
-                rejectMsg = `「ありがたいお話なれど、今は盟約まで進める時ではござらぬ。どうかご容赦を」`;
+                rejectMsg = `「ありがたいお話なれど、今は盟約を結ぶ時ではござらぬ。ご容赦を」`;
             } else if (type === 'marriage') {
-                rejectMsg = `「ありがたいお話なれど、此度の縁談はお受けいたしかねます。どうかご容赦くだされ」`;
+                rejectMsg = `「ありがたいお話なれど、此度の縁談はお受けいたしかねます。ご容赦くだされ」`;
             }
         }
 
@@ -1878,9 +1878,9 @@ class DiplomacyManager {
             if (type === 'truce') {
                 rejectMsg = `「……此度の和睦には応じられぬ。どうかお引き取り願いたい」`;
             } else if (type === 'dominate') {
-                rejectMsg = `「……申し出は受けられぬ。まだ従うつもりはない。此度はお引き取り願いたい」`;
+                rejectMsg = `「……申し出は受けられぬ。まだ従うつもりはない。お引き取り願いたい」`;
             } else if (type === 'subordinate') {
-                rejectMsg = `「……申し出はありがたいが、今は受け入れられぬ。どうかお引き取り願いたい」`;
+                rejectMsg = `「……申し出はありがたいが、今は受け入れられぬ。お引き取り願いたい」`;
             }
         }
 
@@ -1958,9 +1958,9 @@ class DiplomacyManager {
             if (msgs.replyRejectMsg) await this.game.ui.showDialogAsync(msgs.replyRejectMsg, false, 0, { leftFace: senderBusho.faceIcon, leftName: senderNameStr });
         } else if (isSuccess === 'negotiate') {
             const rawNegotiateMsg = type === 'truce'
-                ? `「和睦そのものに異存はない。されど、ただ矛を収めるだけでは家中が納得せぬ。条件を一つ飲んでもらいたい」`
+                ? `「和睦には異存ない。されど、ただ矛を収めるだけでは家中が納得せぬ。条件を一つ飲んでもらいたい」`
                 : type === 'subordinate'
-                    ? `「従属の申し出そのものに異存はない。されど、無条件で庇護下に迎えるわけにはいかぬ。ひとつ条件を飲んでもらいたい」`
+                    ? `「従属には異存ない。されど、無条件で庇護に迎えるわけにはいかぬ。条件を一つ飲んでもらいたい」`
                     : `「うむ……無条件でというわけにはいかぬな」`;
             const negotiateMsg = this._styleDiplomacyTextForSpeaker(
                 rawNegotiateMsg,
@@ -2600,11 +2600,11 @@ class DiplomacyManager {
         const selectedOption = options[Math.floor(Math.random() * options.length)];
         let conditionText = '';
         if (selectedOption.type === 'marriage') {
-            conditionText = `「従属を受け入れるなら、盟約の証として貴家の${selectedOption.princess.name}を当家の${selectedOption.busho.name}殿へ迎えたい。それを条件としたい」`;
+            conditionText = `「従属の証として、貴家の${selectedOption.princess.name}を当家の${selectedOption.busho.name}殿へ迎えたい。それを条件としよう」`;
         } else if (selectedOption.type === 'hostage') {
-            conditionText = `「従属の証として、${selectedOption.busho.name}殿をしばらく当家へ預けてもらいたい。それが叶うなら、庇護を受け入れよう」`;
+            conditionText = `「従属の証として、${selectedOption.busho.name}殿を当家へ預けてもらいたい。それなら庇護を受け入れよう」`;
         } else if (selectedOption.type === 'castle') {
-            conditionText = `「従属を受け入れるには、境目の${selectedOption.castle.name}を当家へ割譲してもらいたい。それを条件としよう」`;
+            conditionText = `「境目の${selectedOption.castle.name}を当家へ割譲してもらいたい。それを従属の条件としよう」`;
         }
         conditionText = this._styleDiplomacyTextForSpeaker(
             conditionText,
@@ -2613,7 +2613,7 @@ class DiplomacyManager {
 
         const acceptCondition = () => {
             const reply = this._styleDiplomacyTextForSpeaker(
-                `「承知いたしました。その条件を受け入れます。今後は貴家の御庇護に従います」`,
+                `「承知いたしました。その条件を受け、貴家の御庇護に従います」`,
                 context && context.senderSpeakerPosture ? context.senderSpeakerPosture.key : 'normal'
             );
             this.game.ui.showDialog(reply, false, () => {
@@ -2876,7 +2876,7 @@ class DiplomacyManager {
                 introMsg = `「殿、${doerClan.name}当主・${enemyDaimyoName}様がお見えになっております。お会いになられますか？」`;
             }
         } else if (conversationContext && conversationContext.envoySpecial && conversationContext.envoySpecial.level >= 2) {
-            introMsg = `「殿、${doerClan.name}より${enemyCallName}がお見えになっております。使者として面会を求めておられます」`;
+            introMsg = `「殿、${doerClan.name}より${enemyCallName}が使者として参っております。お会いになりますか？」`;
         } else {
             introMsg = `「殿、${doerClan.name} から使者が参っております。お会いになられますか？」`;
         }
@@ -3036,8 +3036,8 @@ class DiplomacyManager {
 
             if (score - penalty < requiredScore) {
                 const noConcessionRaw = isDaimyoSelf
-                    ? `「和睦を望む気持ちは変わらぬが、そこまで譲るつもりはない。無条件で矛を収められぬなら、此度は話を持ち帰ろう」`
-                    : `「和睦を願う身なれど、そこまでの譲歩までは申しつかっておりませぬ。無条件で矛を収めていただけぬなら、此度は話を持ち帰るほかございませぬ」`;
+                    ? `「和睦は望むが、そこまで譲るつもりはない。無条件で矛を収められぬなら、此度は持ち帰ろう」`
+                    : `「和睦は願っておりますが、そこまでの譲歩は申しつかっておりませぬ。無条件でなければ、此度は持ち帰ります」`;
                 const noConcession = this._styleDiplomacyTextForSpeaker(
                     noConcessionRaw,
                     conversationContext && conversationContext.senderSpeakerPosture ? conversationContext.senderSpeakerPosture.key : 'normal'
@@ -3050,8 +3050,8 @@ class DiplomacyManager {
             const selectedOption = this._selectTruceConditionOption(options, doer.clan, targetClanId, score);
             if (!selectedOption) {
                 const noTermsRaw = isDaimyoSelf
-                    ? `「条件を求める考えは分かった。されど、今ここで差し出せるものはない。無条件の和睦を、今一度考えてもらいたい」`
-                    : `「条件を示せとの仰せ、もっともにござる。されど当家から今ここで差し出せるものはござらぬ。無条件での和睦を、今一度お考え願いたい」`;
+                    ? `「条件を求める考えは分かった。だが今は差し出せるものがない。無条件の和睦を考えてもらいたい」`
+                    : `「条件を求められるのはもっとも。されど今は差し出せるものがござらぬ。無条件の和睦をお考え願いたい」`;
                 const noTerms = this._styleDiplomacyTextForSpeaker(
                     noTermsRaw,
                     conversationContext && conversationContext.senderSpeakerPosture ? conversationContext.senderSpeakerPosture.key : 'normal'
@@ -4008,11 +4008,11 @@ class DiplomacyManager {
         if (!option) return '';
         let text = '';
         if (option.type === 'marriage') {
-            text = `「和睦の証として、貴家の${option.princess.name}姫と当家の${option.busho.name}との縁組を願いたい。それが叶うなら、当家も兵を退こう」`;
+            text = `「和睦の証として、貴家の${option.princess.name}姫と当家の${option.busho.name}との縁組を願いたい。それなら兵を退こう」`;
         } else if (option.type === 'hostage') {
-            text = `「和睦の証として、${option.busho.name}殿をしばらく当家へ預けてもらいたい。それならば、此度の戦はここで収めよう」`;
+            text = `「和睦の証として、${option.busho.name}殿を当家へ預けてもらいたい。それなら此度の戦を収めよう」`;
         } else if (option.type === 'castle') {
-            text = `「境目の${option.castle.name}を当家へ渡してもらいたい。それをもって此度の争いの区切りとし、兵を退こう」`;
+            text = `「境目の${option.castle.name}を当家へ渡してもらいたい。それをもって兵を退こう」`;
         }
         const posture = conversationContext && conversationContext.receiverSpeakerPosture
             ? conversationContext.receiverSpeakerPosture.key
@@ -4024,11 +4024,11 @@ class DiplomacyManager {
         if (!option) return '';
         let text = '';
         if (option.type === 'marriage') {
-            text = `「では和睦の証として、当家の${option.princess.name}姫を${option.busho.name}殿へ嫁がせましょう。この縁をもって両家の争いを収めていただきたい」`;
+            text = `「和睦の証として、当家の${option.princess.name}姫を${option.busho.name}殿へ嫁がせましょう。この縁で矛を収めていただきたい」`;
         } else if (option.type === 'hostage') {
-            text = `「では和睦の証として、当家の${option.busho.name}を人質としてお預けいたす。それで兵を退いていただけましょうか」`;
+            text = `「では和睦の証として、当家の${option.busho.name}を人質に出そう。それで兵を退いていただけるか」`;
         } else if (option.type === 'castle') {
-            text = `「では境目の${option.castle.name}を貴家へ渡しましょう。それをもって此度の戦を収めていただきたい」`;
+            text = `「では境目の${option.castle.name}を貴家へ渡しましょう。それで此度の戦を収めていただきたい」`;
         }
         const posture = conversationContext && conversationContext.senderSpeakerPosture
             ? conversationContext.senderSpeakerPosture.key

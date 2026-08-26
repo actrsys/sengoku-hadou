@@ -126,7 +126,7 @@ class WarPreparationController {
             askConfirmAndProceedToAlly(null);
         } else {
             if (myClanId === pid && !atkCastle.isDelegated) {
-                this.game.ui.showDialog("他の城から援軍を出しますか？", true, 
+                this.game.ui.showDialog("他の拠点から援軍を出しますか？", true, 
                     () => {
                         this.game.ui.showSelfReinforcementSelector(selfCandidates, atkCastle, targetCastle, askConfirmAndProceedToAlly);
                     },

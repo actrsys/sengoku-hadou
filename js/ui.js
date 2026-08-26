@@ -1517,57 +1517,31 @@ class UIManager {
         if (this.globalLoadingScreen) this.globalLoadingScreen.classList.add('hidden');
     }
 
-    // ★追加：タイトル画面でセーブデータがあるかチェックする魔法
+    // タイトル画面の「続きから／ロード」は、実際に読み込める保存データがある時だけ有効にします。
+    // DBの存在確認・復号・現行形式の検査は SaveManager を正本とし、UIは結果の表示だけを担当します。
     async checkSaveDataForTitle() {
         const continueBtn = document.getElementById('continue-btn');
         const loadBtn = document.getElementById('load-btn');
         if (!continueBtn && !loadBtn) return;
 
         let hasData = false;
-        
-        // データベースから読み込む機能が使えるか確認します
-        if (typeof loadFromDB === 'function') {
-            for (let i = 1; i <= 5; i++) {
-                try {
-                    const rawData = await loadFromDB("sengoku_save_slot" + i);
-                    if (rawData) {
-                        hasData = true;
-                        break; // 1つでもデータが見つかればOKです
-                    }
-                } catch (e) {
-                    console.error("セーブデータ確認エラー:", e);
-                }
+        try {
+            if (this.game?.saveManager && typeof this.game.saveManager.refreshLoadAvailability === 'function') {
+                hasData = await this.game.saveManager.refreshLoadAvailability();
             }
+        } catch (e) {
+            console.error('セーブデータ確認エラー:', e);
+            if (this.game) this.game.hasSaveData = false;
         }
-        
-        // ★追加：ゲーム本体にセーブデータがあるかないかの印を付けておきます
-        if (this.game) this.game.hasSaveData = hasData;
 
-        // データがない場合はボタンを押せなくして、少し透明（半透明）にします
-        if (!hasData) {
-            if (continueBtn) {
-                continueBtn.disabled = true;
-                continueBtn.style.opacity = '0.5';
-                continueBtn.style.cursor = 'not-allowed';
-            }
-            if (loadBtn) {
-                loadBtn.disabled = true;
-                loadBtn.style.opacity = '0.5';
-                loadBtn.style.cursor = 'not-allowed';
-            }
-        } else {
-            // データがある場合は普通に押せるように戻します
-            if (continueBtn) {
-                continueBtn.disabled = false;
-                continueBtn.style.opacity = '1';
-                continueBtn.style.cursor = 'pointer';
-            }
-            if (loadBtn) {
-                loadBtn.disabled = false;
-                loadBtn.style.opacity = '1';
-                loadBtn.style.cursor = 'pointer';
-            }
-        }
+        const applyState = btn => {
+            if (!btn) return;
+            btn.disabled = !hasData;
+            btn.style.opacity = hasData ? '1' : '0.5';
+            btn.style.cursor = hasData ? 'pointer' : 'not-allowed';
+        };
+        applyState(continueBtn);
+        applyState(loadBtn);
     }
 
     forceResetModals(options = {}) {
@@ -3528,7 +3502,7 @@ class UIManager {
                 { label: "突撃", type: "charge", desc: "突撃します。敵兵士を減らし、城壁にも少し被害を与えます。" }, 
                 { label: "斉射", type: "bow", desc: "遠距離から射撃を行います。反撃を受けにくい攻撃です。" }, 
                 { label: "破壊", type: "siege", desc: "城壁を破壊します。反撃のリスクは高いですが、城壁に大きな被害を与えます。" },
-                { label: "火計", type: "fire", desc: "知略を用いて城に火を放ちます。成功すると敵の防御力を無視して城壁を削ります。" }, 
+                { label: "火計", type: "fire", desc: "知略を用いて拠点に火を放ちます。成功すると敵の防御力を無視して城壁を削ります。" }, 
                 { label: "鼓舞", type: "inspire", desc: "味方を鼓舞して、部隊の士気を高めます。" }
             ];
         } else {
@@ -3547,11 +3521,11 @@ class UIManager {
         } else if (s.turn === 'defender') {
             // ★修正：中立の空き城（ownerClanが0）の守備軍は、撤退できないようにガードを追加します！
             if (s.defender.ownerClan !== 0 && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && MapGraphService.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
-                options.push({ label: "撤退", type: "retreat", desc: "城を捨てて、近隣の安全な城へ退却します。" });
+                options.push({ label: "撤退", type: "retreat", desc: "拠点を捨てて、近隣の安全な拠点へ退却します。" });
             }
         } else {
             // 援軍の場合は攻撃・守備に関わらず撤退可能
-            options.push({ label: "撤退", type: "retreat", desc: "戦場から離脱し、元の城へ引き上げます。" });
+            options.push({ label: "撤退", type: "retreat", desc: "戦場から離脱し、元の拠点へ引き上げます。" });
         }
 
         this.warControls.innerHTML = '';
@@ -3689,7 +3663,7 @@ class UIManager {
         this.game.selectionMode = 'atk_ally_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("援軍を要請する勢力の城を選択してください。", { history: false });
+        this.log("援軍を要請する勢力の拠点を選択してください。", { history: false });
         this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
 
@@ -3723,7 +3697,7 @@ class UIManager {
         this.game.selectionMode = 'atk_self_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("援軍を出陣させる城を選択してください。", { history: false });
+        this.log("援軍を出陣させる拠点を選択してください。", { history: false });
         this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
     
@@ -3742,7 +3716,7 @@ class UIManager {
         this.game.selectionMode = 'def_ally_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("援軍を要請する勢力の城を選択してください。", { history: false });
+        this.log("援軍を要請する勢力の拠点を選択してください。", { history: false });
         this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
 
@@ -3776,7 +3750,7 @@ class UIManager {
         this.game.selectionMode = 'def_self_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("援軍を出陣させる城を選択してください。", { history: false });
+        this.log("援軍を出陣させる拠点を選択してください。", { history: false });
         this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
     

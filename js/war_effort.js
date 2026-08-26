@@ -885,7 +885,7 @@ Object.assign(WarManager.prototype, {
 
                     if (defClan === pid && !defCastle.isDelegated && !defCastle.isKunishu) {
                         if (totalDefSoldiers <= 0) {
-                            if (isPlayerInvolved) this.game.ui.log("城に兵士がいないため、迎撃（野戦）に出られません！", { history: false });
+                            if (isPlayerInvolved) this.game.ui.log("拠点に兵士がいないため、迎撃（野戦）に出られません！", { history: false });
                             onResult('siege');
                         } else {
                             const modal = document.getElementById('intercept-confirm-modal');
@@ -1283,7 +1283,7 @@ Object.assign(WarManager.prototype, {
                             if (resultType === 'attacker_win_fatal') {
                                 // ★修正：兵糧切れなどで降伏した場合、生き残った兵士を吸収できるように「soldiers = 0」にするのをやめました！
                                 if (this.game.ui && this.state.isPlayerInvolved) {
-                                    this.game.ui.log("野戦での敗北により、城は放棄されました！", { history: false });
+                                    this.game.ui.log("野戦での敗北により、拠点は放棄されました！", { history: false });
                                 }
                                 this.endWar(true);
                             } else if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') {
@@ -2166,7 +2166,7 @@ Object.assign(WarManager.prototype, {
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 
                     if (isAtkSide) {
-                        this.game.ui.showDialog(`敵軍は城を捨てて敗走しました！\n${s.defender.name}を占領します！`, false, finishWarProcess, null, { closeBeforeOk: true });
+                        this.game.ui.showDialog(`敵軍は拠点を捨てて敗走しました！\n${s.defender.name}を占領します！`, false, finishWarProcess, null, { closeBeforeOk: true });
                     } else {
                         this.game.ui.showDialog(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, false, finishWarProcess, null, { closeBeforeOk: true });
                     }
@@ -2243,7 +2243,7 @@ Object.assign(WarManager.prototype, {
                 
                 this.finalizeCapturedCastleStaffing(s);
                 
-                if (isAtkPlayer) resultMsg = isRetreat ? `${enemyName}は城を捨てて敗走しました！ 城を占領します！` : `${s.defender.name}を制圧しました！`;
+                if (isAtkPlayer) resultMsg = isRetreat ? `${enemyName}は拠点を捨てて敗走しました！ 拠点を占領します！` : `${s.defender.name}を制圧しました！`;
                 else if (isDefPlayer) resultMsg = isRetreat ? `${s.defender.name}を放棄し、後退します……` : `${s.defender.name}が陥落しました。敵軍がなだれ込んできます……`;
                 else resultMsg = `${s.defender.name}が制圧されました！\n勝者: ${s.attacker.name}`;
                 // ★書き足し２：攻撃側が勝利して制圧した時の履歴ログ
@@ -3027,7 +3027,7 @@ Object.assign(WarManager.prototype, {
             // ★修正：元に戻して、マップ選択前には念押しでガードを外すだけにします
             this.game.ui.hideAIGuardTemporarily(); 
             
-            this.game.ui.showDialog("他の城から援軍を出陣させますか？", true, 
+            this.game.ui.showDialog("他の拠点から援軍を出陣させますか？", true, 
                 () => {
                     this.game.ui.hideAIGuardTemporarily(); 
                     this.game.ui.showDefSelfReinforcementSelector(candidateCastles, defCastle, (reinfData) => {

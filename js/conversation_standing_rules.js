@@ -606,7 +606,7 @@ class ConversationStandingRules {
         // 将軍・左馬頭（将軍候補）は、所属家での「働き」を褒める通常家臣向けの功績表現へ落とさない。
         // 功績差が会話へ滲む場面でも、本人の公的格式と周囲からの敬意を示す言い方へ置き換える。
         if (specialLevel >= 2 && achievementRelation >= 1) {
-            return '家中の皆も、あのお方には一目置いております。';
+            return '家中でも一目置かれております。';
         }
 
         // 当主の父・祖父・兄など年長近親者を、普通の家臣と同じ「働き」で査定する言い方は避ける。
@@ -618,19 +618,19 @@ class ConversationStandingRules {
             const relation = this.getSpeakerFamilyDialogueRelation(game, questioner, target);
             if (['mother', 'adoptive_father', 'father', 'older_brother', 'grandfather'].includes(relation)) {
                 if (achievementRelation >= 2) {
-                    return '家中でも、あのお方のお言葉を軽んずる者はおりますまい。';
+                    return '家中でも、お言葉に重みのあるお方です。';
                 }
-                return '家中でも重きをなしておられるお方です。';
+                return '家中でも重きをなしておられます。';
             }
             if (['older_uncle', 'younger_uncle'].includes(relation)) {
                 if (achievementRelation >= 2) {
-                    return '家中の皆も、あのお方には一目置いております。';
+                    return '家中でも一目置かれております。';
                 }
-                return '家中でも頼りにされているお方です。';
+                return '家中でも頼りにされております。';
             }
         }
 
-        if (achievementRelation >= 2) return 'その働きは、家中でもよく知られております。';
+        if (achievementRelation >= 2) return 'その働きは家中でも知られております。';
         if (achievementRelation === 1) return 'これまでの働きも、よく耳にしております。';
         return '';
     }

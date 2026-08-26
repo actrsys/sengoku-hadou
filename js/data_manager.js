@@ -85,7 +85,7 @@ class DataManager {
             // 巨大RGBA配列や全画面BFSキューは保持せず、古いスマホでは帯ごとにブラウザへ制御を返します。
             try {
                 await this.loadCastleSeedPoints('./data/images/map/japan_colorcode_map.png', castles, {
-                    onProgress: ratio => progress(36 + ratio * 12, '城の位置を解析しています')
+                    onProgress: ratio => progress(36 + ratio * 12, '拠点の位置を解析しています')
                 });
             } catch (e) {
                 console.log("城位置画像の解析をスキップしました");

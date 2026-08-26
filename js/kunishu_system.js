@@ -187,7 +187,7 @@ class KunishuSystem {
             if (this.isIkkoNetwork(kunishu) && newRel < currentRel) ikkoRelationActuallyDropped = true;
 
             if (clanId === this.game.playerClanId) {
-                this.game.ui.log(`(城の主が変わったため、${kunishu.getName(this.game)}との友好度が低下しました)`, { history: false });
+                this.game.ui.log(`(拠点の支配勢力が変わったため、${kunishu.getName(this.game)}との友好度が低下しました)`, { history: false });
             }
         }
 

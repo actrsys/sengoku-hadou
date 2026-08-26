@@ -172,11 +172,11 @@ class InterviewSystem {
     }
 
     _getHighAuthorityOpinionText(score) {
-        if (score >= 82) return 'お考えには深く共感しております。まことに信頼のおけるお方です。';
-        if (score >= 68) return 'お考えには共感するところが多く、深く信頼しております。';
-        if (score >= 52) return 'お考えが異なることはございますが、敬意を失うようなことはございませぬ。';
+        if (score >= 82) return 'お考えには深く共感しております。信頼のおけるお方です。';
+        if (score >= 68) return 'お考えには共感するところが多く、信頼しております。';
+        if (score >= 52) return 'お考えが異なることはあれど、敬意を失うことはございませぬ。';
         if (score >= 36) return 'お考えには合わぬところもございます。ただ、軽々しく評すべきお方ではございませぬ。';
-        return 'お考えにはどうにも相容れぬところがございます。ただ、あのお方の御立場を軽んじるつもりはございませぬ。';
+        return 'お考えには相容れぬところがございます。ただ、御立場を軽んじるつもりはございませぬ。';
     }
 
     _getHighAuthorityContactText(relation) {
@@ -259,7 +259,7 @@ class InterviewSystem {
             case 'reserved':
                 return `「……${address}。お越しでしたか」`;
             case 'startled':
-                return `「げっ、${address}……！　い、いえ、これは失礼を。どうぞ、お入りください」`;
+                return `「げっ、${address}……！　い、いえ、失礼を。どうぞ、お入りください」`;
             default:
                 return `「……${address}。何かございましたか」`;
         }
@@ -540,7 +540,7 @@ class InterviewSystem {
 
         if (operation && operation.type === '攻撃' && targetName) {
             return disclosure.level === 'full'
-                ? `攻めるなら、${targetName}を第一に見るのがよろしいでしょう。現在の軍勢の動きとも合っております。`
+                ? `攻めるなら、${targetName}を第一に見るのがよろしいでしょう。軍勢の動きとも合っております。`
                 : `攻勢に出るなら、${targetName}方面をまず見るのがよろしいかと。`;
         }
         return '攻め急ぐより、今は兵を整えて機を待つ方がよろしいかと。';
@@ -563,12 +563,12 @@ class InterviewSystem {
 
         if (worst.trainingRatio < concern && worst.trainingRatio <= worst.moraleRatio) {
             return disclosure.level === 'full'
-                ? `${worst.castle.name}の兵は、まだ訓練が十分とは申せませぬ。もう少し鍛えておくべきかと。`
+                ? `${worst.castle.name}の兵は、まだ訓練が足りませぬ。もう少し鍛えておくべきかと。`
                 : '兵の訓練は、もう少し重ねておいた方がよろしいかと。';
         }
         if (worst.moraleRatio < concern) {
             return disclosure.level === 'full'
-                ? `${worst.castle.name}の兵は、士気がやや落ちております。まずは立て直しておきたいところです。`
+                ? `${worst.castle.name}の兵は、士気がやや落ちております。立て直しておきたいところです。`
                 : '兵の士気には、もう少し気を配った方がよろしいかと。';
         }
         return '兵の仕上がりは悪くありません。今の状態を保てば、いざという時にも動けましょう。';
@@ -589,8 +589,8 @@ class InterviewSystem {
         }
 
         if (plan.type === 'repair') return `${plan.castle.name}の城壁は傷みが目立ちます。修復を優先した方がよろしいかと。`;
-        if (plan.type === 'farm') return `${plan.castle.name}はまだ石高を伸ばす余地がございます。田畑を整えるのがよろしいでしょう。`;
-        return `${plan.castle.name}はまだ鉱山を伸ばす余地がございます。こちらに手を入れるのがよろしいかと。`;
+        if (plan.type === 'farm') return `${plan.castle.name}はまだ石高を伸ばせます。田畑を整えるのがよろしいでしょう。`;
+        return `${plan.castle.name}はまだ鉱山を伸ばせます。こちらに手を入れるのがよろしいかと。`;
     }
 
     _getNeighborClanIds(clanId) {
@@ -630,10 +630,10 @@ class InterviewSystem {
 
     _getDiplomacyPolicyText(busho, disclosure) {
         const target = this._getDiplomacyPolicyTarget(busho);
-        if (!target) return '外交については、今すぐ大きく動くより周囲の出方を見てもよろしいかと。';
+        if (!target) return '外交は、今は周囲の出方を見てもよろしいかと。';
         const clan = this.game.getClan ? this.game.getClan(target.targetId) : null;
         const name = clan ? clan.name : 'その勢力';
-        if (disclosure.level !== 'full') return '外交では、周辺の大名家との関係を一つずつ整えておくのがよろしいかと。';
+        if (disclosure.level !== 'full') return '外交では、周辺との関係を一つずつ整えるのがよろしいかと。';
 
         const actionText = {
             goodwill: '関係を深めておく',
@@ -707,7 +707,7 @@ class InterviewSystem {
         const callName = window.ConversationStandingRules && typeof window.ConversationStandingRules.getInterviewTargetCallName === 'function'
             ? window.ConversationStandingRules.getInterviewTargetCallName(this.game, busho, row.target, daimyo)
             : `${row.target.name}殿`;
-        return `調略を仕掛けるなら、${prefix}${callName}は有力な候補かと見ております。`;
+        return `調略なら、${prefix}${callName}が有力かと見ております。`;
     }
 
     _getPolicyDomainText(domain, busho, disclosure) {
@@ -1075,16 +1075,16 @@ class InterviewSystem {
         }
         if (attitude === 'polite') {
             return isGeneral
-                ? `詳しいことは存じませぬが、${subject}がなかなかの御仁だとの噂は耳にしております。`
+                ? `詳しくは存じませぬが、${subject}はなかなかの御仁だとか。`
                 : `耳にした話では、${subject}が近頃評判になっているようです。`;
         }
         if (attitude === 'welcoming') {
             return isGeneral
-                ? `そういえば、${subject}がなかなかの御仁だと近頃評判になっております！`
+                ? `そういえば、${subject}はなかなかの御仁だと評判です！`
                 : `そういえば、近頃${subject}の噂を耳にしました！`;
         }
         return isGeneral
-            ? `詳しいことは存じませぬが、${subject}がなかなかの御仁だと噂になっております。`
+            ? `詳しくは存じませぬが、${subject}はなかなかの御仁だとか。`
             : `そういえば、近頃${subject}の噂を耳にしました。`;
     }
 
@@ -1099,7 +1099,7 @@ class InterviewSystem {
         }
         return attitude === 'reserved'
             ? '総じて隙の少ない御仁だそうです。'
-            : '評判になるだけあって、総じて力量のある御仁だと聞いております。';
+            : '評判どおり、力量のある御仁だと聞いております。';
     }
 
     _isRumorLeader(target) {
@@ -1221,7 +1221,7 @@ class InterviewSystem {
     }
 
     _getFamilyOpinionText(score, attitude = this.activeInterviewAttitude) {
-        if (score >= 82) return '気心はよく知れております。考え方にも共感するところが多く、信頼しております。';
+        if (score >= 82) return '気心はよく知れております。考え方にも共感し、信頼しております。';
         if (score >= 68) return '考え方には共感するところが多く、信頼しております。';
         if (score >= 52) return '意見が違うことはありますが、折り合いは悪くありませぬ。';
         if (score >= 36) return '考え方はあまり合いませぬ。意見がぶつかることもございます。';
@@ -1653,17 +1653,17 @@ class InterviewSystem {
 
         if (contactScore >= 52) {
             return hardToRead
-                ? `あの方は肝心な胸中をほとんど見せませぬ。${relationText}までは、某にも読み切れませぬ。`
-                : `${relationText}までは、某にも読み切れませぬ。`;
+                ? `あの方は胸中をほとんど見せませぬ。${relationText}までは読み切れませぬ。`
+                : `${relationText}までは読み切れませぬ。`;
         }
         if (contactScore < 34) {
             return hardToRead
-                ? `あの方は内心を見せぬお方です。${relationText}は、某にも分かりかねます。`
-                : `${relationText}は、某にも分かりかねます。`;
+                ? `あの方は内心を見せませぬ。${relationText}は分かりかねます。`
+                : `${relationText}は分かりかねます。`;
         }
         return hardToRead
-            ? `あの方はなかなか内心を見せませぬ。${relationText}は、某にも読み切れませぬ。`
-            : `${relationText}は、某にも分かりかねます。`;
+            ? `あの方は内心を見せませぬ。${relationText}は読み切れませぬ。`
+            : `${relationText}は分かりかねます。`;
     }
 
     _getTargetLoyaltyBandText(band, uncertain, style = 'fealty') {
@@ -1671,22 +1671,22 @@ class InterviewSystem {
             switch (band) {
                 case 'stable':
                     return uncertain
-                        ? '見たところ、殿のお考えにも理解を示しておられるようです。'
-                        : '殿のお考えにも、よく理解を示しておられるようです。';
+                        ? '殿のお考えには、概ね理解を示しておられるようです。'
+                        : '殿のお考えには、よく理解を示しておられます。';
                 case 'warning':
                     return '殿のお考えについて、多少思うところはおありのようです。';
                 case 'danger':
                     return uncertain
                         ? '殿のお考えに、少々納得しかねるところがおありのようです。'
-                        : '殿のお考えには、少々納得しかねるところがおありのようです。今のうちに気を配られた方がよろしいかと。';
+                        : '殿のお考えには、少々納得しかねるところがおありです。気を配られた方がよろしいかと。';
                 case 'dissatisfied':
                     return uncertain
                         ? '殿のお考えには、納得しかねるところが少なくないご様子です。'
-                        : '殿のお考えには、かなり思うところがおありのようです。軽々しくは扱わぬ方がよろしいかと。';
+                        : '殿のお考えには、かなり思うところがおありです。軽々しく扱わぬ方がよろしいかと。';
                 case 'serious':
-                    return '……軽々しく申し上げるべきではありますまいが、殿のお考えに強く思うところがおありなのは確かなようです。';
+                    return '……軽々しくは申せませぬが、殿のお考えに強く思うところがおありです。';
                 default:
-                    return '……あのお方について軽々しく申し上げるべきではありますまい。ただ、殿のお考えを受け入れ難く思っておられるようです。今後の去就にはお気をつけください。';
+                    return '……軽々しくは申せませぬが、殿のお考えを受け入れ難く思っておられるようです。去就にはご注意を。';
             }
         }
 
@@ -1695,25 +1695,25 @@ class InterviewSystem {
                 case 'stable':
                     return uncertain
                         ? '見たところ、殿のお考えには概ね理解を示しておられるようです。'
-                        : '殿のお考えにはよく理解を示しておられるようです。特に気掛かりなところは見当たりませぬ。';
+                        : '殿のお考えにはよく理解を示しておられます。気掛かりはございませぬ。';
                 case 'warning':
-                    return '殿のお考えには概ね理解を示しておられますが、多少思うところもおありのようです。';
+                    return '殿のお考えには概ね理解を示しておられますが、多少思うところもおありです。';
                 case 'danger':
                     return uncertain
                         ? '近頃は、殿のお考えと少々食い違うところがおありのようです。'
-                        : '殿のお考えには、少々納得しかねるところがおありのようです。今のうちに気を配られた方がよろしいかと。';
+                        : '殿のお考えには、少々納得しかねるところがおありです。気を配られた方がよろしいかと。';
                 case 'dissatisfied':
                     return uncertain
                         ? '殿のお考えに、納得しかねるところが少なくないご様子です。'
-                        : '殿のお考えには、かなり思うところがおありのようです。このまま放っておくのは危ういかと。';
+                        : '殿のお考えには、かなり思うところがおありです。放っておくのは危ういかと。';
                 case 'serious':
                     return uncertain
                         ? '殿のお考えについて、かなり強く思うところがおありのようです。'
-                        : '殿のお考えへの不満はかなり強いようです。今後の動きには気を配るべきでしょう。';
+                        : '殿のお考えへの不満はかなり強いようです。動きには気を配るべきでしょう。';
                 default:
                     return uncertain
                         ? '殿のお考えを受け入れ難く思っておられる気配があります。'
-                        : '殿のお考えを受け入れ難く思っておられるようです。今後の動きには十分お気をつけください。';
+                        : '殿のお考えを受け入れ難く思っておられるようです。動きには十分お気をつけください。';
             }
         }
 
@@ -1721,50 +1721,49 @@ class InterviewSystem {
             case 'stable':
                 return uncertain
                     ? '見たところ、殿への忠義に疑わしいところはなさそうです。'
-                    : '殿への忠義は本物でしょう。疑う余地もありません。';
+                    : '殿への忠義は確かでしょう。';
             case 'warning':
                 return uncertain
                     ? '今すぐ危うい様子ではありませぬが、少し思うところはありそうです。'
-                    : '大きな不満はないようですが、少し思うところを抱えているようです。';
+                    : '大きな不満はないようですが、少し思うところはあるようです。';
             case 'danger':
                 return uncertain
                     ? '表立っては務めておりますが、待遇には少し不満があるように見えます。'
-                    : '待遇に不満を抱えているようです。今のうちに気を配るべきかと。';
+                    : '待遇には不満があるようです。今のうちに気を配るべきかと。';
             case 'dissatisfied':
                 return uncertain
                     ? '近頃、不満がかなり溜まっているように見受けられます。'
-                    : 'かなり不満を抱えております。このまま放っておくのは危ういかと。';
+                    : 'かなり不満を抱えております。放っておくのは危ういかと。';
             case 'serious':
                 return uncertain
-                    ? '殿への気持ちはかなり離れているように見えます。十分お気をつけください。'
+                    ? '殿への気持ちはかなり離れているようです。十分お気をつけください。'
                     : '殿への気持ちはかなり離れております。離反を警戒すべきでしょう。';
             default:
                 return uncertain
                     ? '極めて危うい気配があります。油断なさらぬ方がよろしいかと。'
-                    : '殿から心が離れております。いつ離反してもおかしくありませぬ。';
+                    : '殿から心が離れております。離反に十分お気をつけください。';
         }
     }
 
     _getDetectedConcealmentText(actualBand, style = 'fealty') {
-        let detail;
+        // 「表向きは平静」＋同じ意味の詳細を二文で繰り返さず、
+        // 看破した事実と危険度を一つの発言で伝える。
         if (style === 'authority' || style === 'family') {
-            detail = {
-                warning: '殿のお考えについて、少し思うところを隠しておられるようです。',
-                danger: '殿のお考えに納得しかねるところを隠しておられると見ます。',
-                dissatisfied: '殿のお考えにはかなり思うところがおありですが、それを表には出しておられませぬ。',
-                serious: '殿のお考えへの不満はかなり強いようです。それを悟られぬよう振る舞っておられるのでしょう。',
-                critical: '殿のお考えを受け入れ難く思っておられるようです。それを悟られぬよう装っておられると見ます。'
-            }[actualBand] || '殿のお考えについて、何か思うところを隠しておられるようです。';
-        } else {
-            detail = {
-                warning: '少し思うところを抱えているようです。',
-                danger: '待遇への不満を隠していると見ます。',
-                dissatisfied: 'かなりの不満を抱えながら、それを表には出しておりませぬ。',
-                serious: '殿への気持ちはかなり離れております。それを悟られぬよう振る舞っているのでしょう。',
-                critical: '殿から心が離れております。それを悟られぬよう装っていると見て間違いありませぬ。'
-            }[actualBand] || '何か思うところを隠しているようです。';
+            return {
+                warning: '表向きは平静ですが、殿のお考えに少し思うところを隠しておられるようです。',
+                danger: '表向きは平静ですが、殿のお考えに納得しかねるところを隠しておられると見ます。',
+                dissatisfied: '表には出しておられませぬが、殿のお考えにかなり思うところがおありです。',
+                serious: '表向きは平静ですが、殿のお考えへの不満はかなり強いようです。',
+                critical: '表には出しておられませぬが、殿のお考えを受け入れ難く思っておられるようです。'
+            }[actualBand] || '表向きは平静ですが、殿のお考えに何か思うところを隠しておられるようです。';
         }
-        return `表向きは何事もないように振る舞っておりますが、あれは本心ではありますまい。${detail}`;
+        return {
+            warning: '表向きは平静ですが、少し思うところを抱えているようです。',
+            danger: '表向きは平静ですが、待遇への不満を隠していると見ます。',
+            dissatisfied: '表には出しておりませぬが、かなり不満を抱えているようです。',
+            serious: '表には出しておりませぬが、殿への気持ちはかなり離れております。',
+            critical: '表には出しておりませぬが、殿から心が離れていると見てよいでしょう。'
+        }[actualBand] || '表向きは平静ですが、何か思うところを隠しているようです。';
     }
 
     _getOtherAssessmentBias(interviewer, target, observedTargetLoyalty = null) {
@@ -1779,20 +1778,20 @@ class InterviewSystem {
         if (!bias || Number(bias.protectionShift || 0) <= 0) return null;
         if (Number(bias.protectionShift || 0) >= 2) {
             if (style === 'authority' || style === 'family') {
-                return '胸中のすべてまでは分かりませぬが、日頃の様子を見る限り、さほど案じることはないかと存じます。';
+                return '胸中は分かりませぬが、日頃の様子ならさほど案じることはないかと。';
             }
-            return '胸中のすべてまでは分かりませぬが、務めぶりを見る限り、さほど案じることはないかと存じます。';
+            return '胸中は分かりませぬが、務めぶりならさほど案じることはないかと。';
         }
-        return '詳しい胸中までは読み切れませぬが、今すぐ疑うほどではないかと存じます。';
+        return '胸中は読み切れませぬが、今すぐ疑うほどではないかと。';
     }
 
     _getBlindBiasedTargetText(bias) {
         const threshold = Number(window.MainParams.Interview.OtherAssessmentBias.BlindSlanderMin);
         if (!bias || bias.loyaltyPenalty < threshold) return null;
         if (bias.loyaltyPenalty >= threshold + 12) {
-            return '詳しい胸中までは読み切れませぬが、あの方をあまり信用なさらぬ方がよろしいかと存じます。';
+            return '胸中は読み切れませぬが、あまり信用なさらぬ方がよろしいかと。';
         }
-        return '胸中までは読み切れませぬ。ただ、某には少々信用の置けぬところがあるように思えます。';
+        return '胸中は読み切れませぬが、少々信用の置けぬところがあります。';
     }
 
     _getTargetLoyaltyAssessment(interviewer, target, relation) {

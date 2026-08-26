@@ -430,9 +430,9 @@ class SaveManager {
         this.game.legions = d.legions.map(l => new Legion(l));
 
         // 保存データには巨大なpixel mapを入れず、ロード時に種点→国ID→領土IDの順で低メモリ再生成します。
-        if (this.game.ui) this.game.ui.updateLoadingProgress(35, '城の位置を解析しています');
+        if (this.game.ui) this.game.ui.updateLoadingProgress(35, '拠点の位置を解析しています');
         await DataManager.loadCastleSeedPoints('./data/images/map/japan_colorcode_map.png', this.game.castles, {
-            onProgress: ratio => this.game.ui && this.game.ui.updateLoadingProgress(35 + ratio * 10, '城の位置を解析しています')
+            onProgress: ratio => this.game.ui && this.game.ui.updateLoadingProgress(35 + ratio * 10, '拠点の位置を解析しています')
         });
         await DataManager.loadProvinceMap('./data/images/map/japan_provinces.png', this.game.provinces, {
             onProgress: ratio => this.game.ui && this.game.ui.updateLoadingProgress(47 + ratio * 14, '国境データを解析しています')
@@ -697,6 +697,8 @@ class SaveManager {
             // SaveManagerは現在仕様として、手動のUint8Arrayと低メモリ用オートセーブのオブジェクトを両方扱います。
             const data = await this._createSaveDataObj({ includeThumbnail: false });
             await saveToDB("sengoku_autosave_slot" + autoSaveIndex, data);
+            // オートセーブもロード可能データなので、システムメニューのロード可否へ即時反映します。
+            this.game.hasSaveData = true;
 
             autoSaveIndex++;
             if (autoSaveIndex > 5) autoSaveIndex = 1;
@@ -731,9 +733,35 @@ class SaveManager {
         return !!data && Number(data.saveSchemaVersion) === SAVE_SCHEMA_VERSION;
     }
 
+    // タイトル・システム・ロード画面で共通利用する「実際に読み込めるセーブ」の正本判定。
+    // 単にIndexedDBへ値が存在するだけでは有効とせず、現行schemaかつ復元前構造検査を通るものだけを対象にします。
+    isLoadableSaveData(data) {
+        if (!this.isCurrentSaveSchema(data)) return false;
+        try {
+            this._validateSaveDataStructure(data);
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
     getSaveTimestamp(data) {
         if (!this.isCurrentSaveSchema(data)) return 0;
         return Number(data.saveTimestamp) || 0;
+    }
+
+    async hasAnyLoadableSaveData(prefixes = ['sengoku_save_slot', 'sengoku_autosave_slot']) {
+        for (const prefix of prefixes) {
+            const slots = await this.readSaveSlots(prefix);
+            if (slots.some(slot => slot.hasData)) return true;
+        }
+        return false;
+    }
+
+    async refreshLoadAvailability() {
+        const hasData = await this.hasAnyLoadableSaveData();
+        this.game.hasSaveData = hasData;
+        return hasData;
     }
 
     /**
@@ -752,11 +780,12 @@ class SaveManager {
 
         return rows.map(({ slotNo, rawData }) => {
             const data = this.decodeStoredData(rawData);
+            const hasData = this.isLoadableSaveData(data);
             return {
                 originalSlotNo: slotNo,
                 data,
-                saveTimestamp: this.getSaveTimestamp(data),
-                hasData: this.isCurrentSaveSchema(data) && Number.isInteger(Number(data.year))
+                saveTimestamp: hasData ? this.getSaveTimestamp(data) : 0,
+                hasData
             };
         });
     }

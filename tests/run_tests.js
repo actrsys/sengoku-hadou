@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r237');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r239');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -689,12 +689,12 @@ test('左馬頭・将軍本人は他家所属の使者でも本人の権威を�
     yoshiaki.courtRankIds = [98, 20];
     assert.strictEqual(dm.getCallName(yoshiaki), '左馬頭様', '左馬頭とより高い通常官位を併有しても特殊呼称は左馬頭様を維持する');
     yoshiaki.courtRankIds = [98];
-    assert.ok(greeting.greetMsg1.includes('両家のためにも進めるべき'), '左馬頭本人が使者なら主君の名代ではなく本人が外交を勧める口調にする');
+    assert.ok(greeting.greetMsg1.includes('両家のため') && greeting.greetMsg1.includes('自ら参った'), '左馬頭本人が使者なら主君の名代ではなく本人が外交を取り持つ口調にする');
     assert.ok(!greeting.greetMsg1.includes('朝倉左衛門督殿の意を受け'));
     assert.ok(greeting.greetMsg2.includes('左馬頭様'));
-    assert.ok(greeting.greetMsg2.includes('御自らお越しとは'));
+    assert.ok(greeting.greetMsg2.includes('御自ら'), '受け手も特殊権威本人の来訪として扱う');
     let msgs = dm.getDiplomacyMessages('alliance', false, '朝倉家', '織田家', '左馬頭様', '参議殿', '姫', '貴家', greeting.context);
-    assert.ok(msgs.demandMsg.includes('盟約を結ぶことは望ましい'), '提案本体も本人が取り持つ口調にする');
+    assert.ok(msgs.demandMsg.includes('両家で盟約を結びたい'), '提案本体も本人が取り持つ簡潔な口調にする');
     assert.ok(!msgs.replyAcceptMsg.includes('主君にも'));
     assert.ok(!/存じます|参りました|ござります/.test(msgs.demandMsg + msgs.replyAcceptMsg), '左馬頭本人の外交本題も一般家臣敬語へ戻らない');
 
@@ -828,14 +828,14 @@ test('面談の他者言及は官位・身分・功績を呼称と敬意へ匂�
     assert.strictEqual(standing.thirdPerson, 'あのお方');
     assert.strictEqual(
         ctx.ConversationStandingRules.getAchievementHint(standing),
-        '家中の皆も、あのお方には一目置いております。',
+        '家中でも一目置かれております。',
         '左馬頭の功績差は通常家臣の「働き」ではなく特殊権威への周囲の敬意として匂わせる'
     );
     target.courtRankIds = [1];
     const shogunStanding = ctx.ConversationStandingRules.getPersonalStanding(game, speaker, target);
     assert.strictEqual(
         ctx.ConversationStandingRules.getAchievementHint(shogunStanding),
-        '家中の皆も、あのお方には一目置いております。',
+        '家中でも一目置かれております。',
         '将軍も左馬頭と同じ特殊権威向けの功績匂わせを使う'
     );
     target.courtRankIds = [98];
@@ -861,7 +861,7 @@ test('面談の他者言及は官位・身分・功績を呼称と敬意へ匂�
     const fatherStanding = ctx.ConversationStandingRules.getPersonalStanding(familyGame, speaker, father);
     assert.strictEqual(
         ctx.ConversationStandingRules.getAchievementHint(fatherStanding, { game: familyGame, questioner: youngDaimyo, target: father }),
-        '家中でも、あのお方のお言葉を軽んずる者はおりますまい。',
+        '家中でも、お言葉に重みのあるお方です。',
         '当主の父・祖父・兄など年長近親者は通常家臣の「働き」で査定せず家中での重みとして功績を匂わせる'
     );
     const grandfatherStanding = ctx.ConversationStandingRules.getPersonalStanding(familyGame, speaker, grandfather);
@@ -872,7 +872,7 @@ test('面談の他者言及は官位・身分・功績を呼称と敬意へ匂�
     const uncleStanding = ctx.ConversationStandingRules.getPersonalStanding(familyGame, speaker, uncle);
     assert.strictEqual(
         ctx.ConversationStandingRules.getAchievementHint(uncleStanding, { game: familyGame, questioner: youngDaimyo, target: uncle }),
-        '家中の皆も、あのお方には一目置いております。',
+        '家中でも一目置かれております。',
         '当主の伯父・叔父は父祖兄より一段控えめな年長親族向け表現にする'
     );
 
@@ -880,7 +880,7 @@ test('面談の他者言及は官位・身分・功績を呼称と敬意へ匂�
     vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
     const interview = new ctx.InterviewSystem(game);
     assert.strictEqual(interview._isHighAuthorityInterviewTarget(target), true);
-    assert.ok(interview._getHighAuthorityOpinionText(75).includes('深く信頼しております'), '左馬頭・将軍への人物評価は通常の「話のわかる相手」より強く敬う');
+    assert.ok(interview._getHighAuthorityOpinionText(75).includes('信頼しております'), '左馬頭・将軍への人物評価は通常の「話のわかる相手」より強く敬う');
     assert.ok(interview._getHighAuthorityOpinionText(30).includes('軽んじるつもりはございませぬ'), '相性が悪くても特殊権威そのものへの敬意は崩さない');
 });
 
@@ -1742,8 +1742,8 @@ test('高義理のAI従属家は独立時にまず親善または同盟格上げ
 test('従属家から同盟への移行はプレイヤー発・AI発で同じ穏当な専用会話を使う', () => {
     const src = read('js/diplomacy.js');
     assert.ok(src.includes('_getVassalAllianceUpgradeMessages(conversationContext = null)'), '主従解消・同盟移行の文面を共通化する');
-    assert.ok(src.includes('当家が今日まで家を保てましたこと、深く感謝しております'), '主家への謝意を明示して独立要求だけが前面に出ない');
-    assert.ok(src.includes('主従の約を解き、盟友として変わらず力を合わせる'), 'ぼかしすぎず主従解消と同盟移行を明示する');
+    assert.ok(src.includes('当家が家を保てたこと、深く感謝しております'), '主家への謝意を明示して独立要求だけが前面に出ない');
+    assert.ok(src.includes('主従の約を解き、これよりは盟友として力を合わせる'), 'ぼかしすぎず主従解消と同盟移行を明示する');
     assert.ok(src.includes('demandMsg2: this._styleDiplomacyTextForSpeaker('), '従属家の対等化要求はメッセージ枠を圧迫しないよう二段階会話に分ける');
     assert.ok(src.includes('if (msgs.demandMsg2) {\n            await this.game.ui.showDialogAsync(msgs.demandMsg2'), 'プレイヤー発の対等化要求も二つ目の台詞を順番に表示する');
     assert.ok(src.includes('const showRemainingDemand = () => {'), 'AI発の対等化要求も二つ目の台詞を決断画面の前に表示する');
@@ -1844,6 +1844,17 @@ test('外交と臣従コモンイベントは会話上の格を共通ルール�
     assert.ok(diplomacy.includes('buildDiplomacyGreeting(senderBusho, receiverDaimyo)'));
     assert.ok(common.includes('diplomacyManager.buildDiplomacyGreeting(envoy, playerDaimyo)'));
     assert.ok(!common.includes('const getCallName = (busho) =>'), 'コモンイベント側へ官位呼称判定を複製しない');
+});
+
+test('面談・外交の台詞は身分差を保ちつつ重複した礼辞を一発言へ重ねない', () => {
+    const interviewSrc = read('js/interview_system.js');
+    const diplomacySrc = read('js/diplomacy.js');
+    const architecture = read('ARCHITECTURE.md');
+    assert.ok(architecture.includes('一発言一要点'), '台詞密度の編集基準を設計文書へ残す');
+    assert.ok(architecture.includes('自動切詰め'), '機械的な文字数切断を禁止して文脈を守る');
+    assert.ok(!interviewSrc.includes('表向きは何事もないように振る舞っておりますが、あれは本心ではありますまい'), '看破台詞で表向き説明と本心説明を二重に繰り返さない');
+    assert.ok(!diplomacySrc.includes('これまでの働きもよく分かっている。されど、今はまだ主従の約を解く時ではない。今しばらくはこれまでどおり'), '主従解消拒否で既出の謝意を重ねない');
+    assert.ok(diplomacySrc.includes('_styleDiplomacyTextForSpeaker'), '短縮後も身分別の話者姿勢を通す');
 });
 
 test('会話組版は鉤括弧で閉じる時だけ終端句点を省き裸の文章は変えない', () => {
@@ -2255,14 +2266,14 @@ test('野戦終了通知は終了瞬間の生存部隊ではなく参加実績�
     assert.ok(field.includes('const isPlayerInvolved = !!this.playerWasInvolved;'));
     assert.ok(field.includes('finishFieldWarWithNotice(resultType, message)'));
     assert.ok(field.includes('攻略を諦めて撤退しました。野戦は終結します。'));
-    assert.ok(field.includes('城内へ退きました。野戦を終え、攻城戦へ移ります。'));
+    assert.ok(field.includes('拠点へ退きました。野戦を終え、攻城戦へ移ります。'));
 });
 
 test('攻城戦はラウンド開始時点で決着済みでも終了理由を表示してから戦後処理へ進む', () => {
     const war = read('js/war.js');
     assert.ok(war.includes('finishSiegeWithNotice(attackerWon, message)'));
-    assert.ok(war.includes("this.finishSiegeWithNotice(true, '城の防御が尽き、城は陥落しました。')"));
-    assert.ok(war.includes("this.finishSiegeWithNotice(true, '守備本隊の士気が崩壊し、城は陥落しました。')"));
+    assert.ok(war.includes("this.finishSiegeWithNotice(true, '拠点の防御が尽き、拠点は陥落しました。')"));
+    assert.ok(war.includes("this.finishSiegeWithNotice(true, '守備本隊の士気が崩壊し、拠点は陥落しました。')"));
     assert.ok(war.includes("this.finishSiegeWithNotice(false, '攻撃本隊の士気が崩壊し、攻撃軍は退却しました。')"));
     assert.ok(war.includes("`${activeArmyName}は軍を鼓舞しました。`"));
     assert.ok(war.includes("`${activeArmyName}は火計を仕掛けました。`"));
@@ -3514,7 +3525,7 @@ test('指南書は公開情報の範囲で国主・弱い武将・褒美・派�
 test('指南書は公開・体感・非公開の境界を守り、命令口調を避ける', () => {
     const guide = read('js/guide_data.js');
     assert.ok(guide.includes('人口：金収入や徴兵できる兵のもとになる'));
-    assert.ok(guide.includes('低い城では一揆が起こることもある'));
+    assert.ok(guide.includes('低い拠点では一揆が起こることもある'));
     assert.ok(guide.includes('人数の多い派閥は家中で存在感を持ちやすく'));
     assert.ok(guide.includes('領国の規模や兵力、蓄え、当主の官位などを反映した勢力の存在感の目安'));
     assert.ok(guide.includes('すべてを率直に話すとは限りません'));
@@ -3715,7 +3726,7 @@ test('GuideView は国主席番号を展開せず、入れ子から個別コマ�
     fieldBattle.click();
     assert.strictEqual(elements['guide-article-title'].textContent, '野戦');
     bodyTexts = flattenTexts(elements['guide-article-body']);
-    assert.ok(bodyTexts.some(text => text.includes('城外で部隊を動かして戦う')));
+    assert.ok(bodyTexts.some(text => text.includes('野外で部隊を動かして戦う')));
     const troopGroup = findButton(elements['guide-command-list'], '兵科');
     assert.ok(troopGroup);
     troopGroup.click();
@@ -3760,6 +3771,27 @@ test('SaveManager がスロット読込・保存時刻抽出の公開窓口を�
     assert.ok(source.includes('decodeStoredData(rawData)'));
     assert.ok(source.includes('getSaveTimestamp(data)'));
     assert.ok(source.includes('loadFromDB(prefix + slotNo)'));
+    assert.ok(source.includes('isLoadableSaveData(data)'));
+    assert.ok(source.includes('const hasData = this.isLoadableSaveData(data);'));
+    assert.ok(source.includes("async hasAnyLoadableSaveData(prefixes = ['sengoku_save_slot', 'sengoku_autosave_slot'])"));
+    assert.ok(source.includes('async refreshLoadAvailability()'));
+});
+
+test('タイトルとシステムのロード可否はSaveManagerの実ロード可否判定を共用する', () => {
+    const ui = read('js/ui.js');
+    const catalog = read('js/command_catalog.js');
+    const save = read('js/save_manager.js');
+    const game = read('js/game.js');
+    const at = ui.indexOf('async checkSaveDataForTitle()');
+    const block = ui.slice(at, at + 1200);
+    assert.ok(at >= 0);
+    assert.ok(block.includes('this.game.saveManager.refreshLoadAvailability()'));
+    assert.ok(!block.includes('loadFromDB('), 'タイトルUIがDBキーの存在を直接見ない');
+    assert.ok(block.includes('btn.disabled = !hasData'));
+    assert.ok(catalog.includes("canExecute: (game) => game.hasSaveData === true"));
+    assert.ok(save.includes('this.game.hasSaveData = hasData;'));
+    assert.ok(save.includes('this.game.hasSaveData = true;'), '保存成功時はシステムメニューへ即時反映する');
+    assert.ok(game.includes('this.hasSaveData = false;'), '未検査時はロード不可から開始する');
 });
 
 test('コマンド定義はWarParamsの独自フォールバックを持たない', () => {
@@ -5010,6 +5042,9 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
         aiOperations: { operations: {}, draftBases: {}, grandObjectives: {}, historyOwnedCastles: {} }
     };
     assert.strictEqual(manager._validateSaveDataStructure(valid), true);
+    assert.strictEqual(manager.isLoadableSaveData(valid), true, '現行schemaかつ厳密構造検査を通る保存だけをロード可能とする');
+    assert.strictEqual(manager.isLoadableSaveData({ ...valid, saveSchemaVersion: 1 }), false, '旧schemaはキーが存在してもロード不可');
+    assert.strictEqual(manager.isLoadableSaveData({ ...valid, month: 13 }), false, '現行schemaでも構造不正ならロード不可');
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, saveSchemaVersion: undefined }), /非対応のセーブ形式/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, saveSchemaVersion: 0 }), /非対応のセーブ形式/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, saveSchemaVersion: 1 }), /非対応のセーブ形式/, '政治婚姻フラグ導入前のschema 1は読み込まない');
@@ -5212,13 +5247,13 @@ test('面談の他者評価は高智謀の偽装・看破・全く読めない�
 
     const sharpInterviewer = { loyalty: 90, intelligence: 95, duty: 80 };
     const detected = system._getTargetLoyaltyText(sharpInterviewer, concealed, relationClose);
-    assert.ok(detected.includes('本心ではありますまい'), '高智謀の聞き手は偽装を見抜く');
-    assert.ok(detected.includes('不満'), '看破後は実際の危険度を伝える');
+    assert.ok(detected.includes('表向き') || detected.includes('表には出して'), '高智謀の聞き手は表面上の偽装を見抜く');
+    assert.ok(detected.includes('不満') || detected.includes('思うところ'), '看破後は実際の危険度を伝える');
 
     const middlingInterviewer = { loyalty: 90, intelligence: 65, duty: 80 };
     const fooled = system._getTargetLoyaltyText(middlingInterviewer, concealed, relationClose);
-    assert.ok(fooled.includes('忠義は本物'), '偽装を見抜けない場合は表向きの忠誠を信じることがある');
-    assert.ok(!fooled.includes('本心ではありますまい'));
+    assert.ok(fooled.includes('忠義は確か'), '偽装を見抜けない場合は表向きの忠誠を信じることがある');
+    assert.ok(!fooled.includes('表向き') && !fooled.includes('表には出して'));
 
     const blindInterviewer = { loyalty: 90, intelligence: 30, duty: 30 };
     const blindAssessment = system._getTargetLoyaltyAssessment(blindInterviewer, { loyalty: 50, intelligence: 90, ambition: 50 }, relationClose);
@@ -6725,11 +6760,30 @@ test('システムメニューはセーブ・ロード・設定・履歴・指�
     assert.ok(catalog.includes("items: ['save', 'load', 'settings', 'history', 'guide', 'watch', 'title']"));
 });
 
-test('指南書は低能力武将の民忠維持上の役目も案内する', () => {
+test('指南書は低能力武将の説明を武将と能力へ統合し、一般地点を拠点と表記する', () => {
     const guide = read('js/guide_data.js');
-    assert.ok(guide.includes('通常の城では民忠が月ごとに少しずつ下がる'));
-    assert.ok(guide.includes('各城に最低限の武将を配置しておく意味があります'));
-    assert.ok(guide.includes('施しなどで維持できるよう各城に最低限の家臣を置く'));
+    assert.strictEqual((guide.match(/能力が低めの武将も役に立つ/g) || []).length, 1, '低能力武将の主説明は1箇所だけに置く');
+    assert.ok(!guide.includes('能力が低い武将にも役目はある？'), 'FAQへ同じ説明を重複させない');
+    assert.ok(guide.includes('自領の拠点では民忠が月ごとに少しずつ下がる'));
+    assert.ok(guide.includes('各拠点に最低限の武将を配置しておく意味があります'));
+    assert.ok(!guide.includes('通常の城'));
+    assert.ok(!guide.includes('自領の城'));
+    assert.ok(!guide.includes('敵城'));
+});
+
+test('指南書の攻城戦は攻守双方の兵糧を継戦上の重要要素として案内する', () => {
+    const guide = read('js/guide_data.js');
+    assert.ok(guide.includes('攻撃側・守備側のどちらも兵糧を消費します'));
+    assert.ok(guide.includes('長期戦では双方の兵糧の残りが重要'));
+    assert.ok(guide.includes('尽きた側は戦いを続けられません'));
+});
+
+test('一般地点の表示語は拠点を正本とし、城主・城壁・攻城戦等の複合語は維持する', () => {
+    const architecture = read('ARCHITECTURE.md');
+    assert.ok(architecture.includes('一般名称として場所を指す時は「拠点」を使う'));
+    assert.ok(architecture.includes('城だけでなく館・御所なども含まれる'));
+    assert.ok(architecture.includes('「城主」「城壁」「攻城戦」「籠城」「居城」「落城」「入城」'));
+    assert.ok(architecture.includes('内部の `Castle` 型・`castleId` 等のコード識別子まで機械的に改名しない'));
 });
 
 

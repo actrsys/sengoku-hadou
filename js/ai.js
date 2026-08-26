@@ -2661,7 +2661,7 @@ class AIEngine {
                     const covertOutcome = this.game.strategySystem.handleCovertAction(doer.id, action.targetId, result.success, 'sabotage');
                     // ★個別の魔法ではなく、共通の「applyStrategyEffect」を使うように直します！
                     this.game.strategySystem.applyStrategyEffect('sabotage', doer, target, result);
-                    this.game.strategySystem.recordStrategyHistory('破壊工作', doer, target ? target.name : '対象城', result.success, [targetClanIdForHistory], covertOutcome);
+                    this.game.strategySystem.recordStrategyHistory('破壊工作', doer, target ? target.name : '対象拠点', result.success, [targetClanIdForHistory], covertOutcome);
                     
                     let keepAction = false;
                     if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
@@ -2681,7 +2681,7 @@ class AIEngine {
                     const covertOutcome = this.game.strategySystem.handleCovertAction(doer.id, action.targetId, result.success, 'incite');
                     // ★ここも共通の魔法「applyStrategyEffect」に書き換えます！
                     this.game.strategySystem.applyStrategyEffect('incite', doer, target, result);
-                    this.game.strategySystem.recordStrategyHistory('民心撹乱', doer, target ? target.name : '対象城', result.success, [targetClanIdForHistory], covertOutcome);
+                    this.game.strategySystem.recordStrategyHistory('民心撹乱', doer, target ? target.name : '対象拠点', result.success, [targetClanIdForHistory], covertOutcome);
                     
                     let keepAction = false;
                     if (!hasBonusSabotageUsed && leader.intelligence >= 91) {

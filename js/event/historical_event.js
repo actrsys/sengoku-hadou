@@ -1062,8 +1062,8 @@ window.GameEvents.push({
         }
 
         // 信長の居城名を取得します
-        let nobunagaCastleName = "城";
-        let nobunagaCastleShort = "城"; // ★追加
+        let nobunagaCastleName = "拠点";
+        let nobunagaCastleShort = "拠点"; // ★追加
         if (nobunaga.castleId > 0) {
             const castle = game.getCastle(nobunaga.castleId);
             if (castle) {
@@ -2454,7 +2454,7 @@ window.GameEvents.push({
         const asakuraFamilyName = asakuraDaimyo.familyNameStr || "朝倉";
         
         let asakuraProvinceName = "越前";
-        let asakuraCastleName = "城";
+        let asakuraCastleName = "拠点";
         if (asakuraDaimyo.castleId) {
             const c = game.getCastle(asakuraDaimyo.castleId);
             if (c) {

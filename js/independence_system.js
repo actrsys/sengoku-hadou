@@ -776,7 +776,7 @@ class IndependenceSystem {
                 this.game.affiliationSystem.setCastleIdRaw(busho, mainCastle.id);
                 busho.loyalty = this.calcNewLoyalty(busho, newDaimyo);
                 mainCastle.samuraiIds.push(busho.id);
-                this._logIndependence(`  -> ${busho.name}が城を脱出し、${newDaimyo.name}の元へ駆けつけました！`, [oldClanId, newClanId]);
+                this._logIndependence(`  -> ${busho.name}が拠点を脱出し、${newDaimyo.name}の元へ駆けつけました！`, [oldClanId, newClanId]);
             }
         });
     }
