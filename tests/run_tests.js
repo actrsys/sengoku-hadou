@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r223');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r224');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1932,6 +1932,15 @@ test('米相場の供給不足・供給増イベントは「金1で得られる�
     assert.ok(typhoon.includes('prov.marketRate - (baseRate * 0.6)'), '台風では相場値を下げる');
     assert.ok(war.includes('atkProv.marketRate - 0.3') && war.includes('defProv.marketRate - 0.3'), '出陣による需要増では相場値を下げる');
     assert.ok(economy.includes('seasonForce = harvestBoost') && economy.includes('seasonForce = -(baseRate * 0.05)'), '9月の供給増は相場を上げ、通常月は緩やかに下げる');
+});
+
+
+test('月次交易履歴は当事者勢力を明示して自家関与分を全国へ誤分類しない', () => {
+    const common = read('js/event/common_events.js');
+    assert.ok(common.includes('clanIds: [clan.id, targetClan.id]'), '交易履歴に双方の勢力IDを保存する');
+    assert.ok(common.includes("category: 'trade'"), '交易履歴を専用カテゴリで記録する');
+    assert.ok(common.includes('game.ui.log(log.text, {'), '交易履歴は構造化した関連勢力情報とともに記録する');
+    assert.ok(!common.includes('logMessages.forEach(msg => game.ui.log(msg))'), '関係勢力不明の旧記録経路を残さない');
 });
 
 test('HistorySystem は自国/全国を排他的に振り分け保持上限を守る', () => {

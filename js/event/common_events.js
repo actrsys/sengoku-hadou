@@ -1611,10 +1611,16 @@ window.GameEvents.push({
                     
                     if (clan.id === game.playerClanId) {
                         // 自分が得た収入の場合
-                        logMessages.push(`【交易】${targetClan.name}との往来により、金${targetIncome} の収入を得ました`);
+                        logMessages.push({
+                            text: `【交易】${targetClan.name}との往来により、金${targetIncome} の収入を得ました`,
+                            clanIds: [clan.id, targetClan.id]
+                        });
                     } else if (targetClan.id === game.playerClanId) {
                         // 相手が自分（プレイヤー）の領地のおかげで収入を得た場合
-                        logMessages.push(`【交易】${clan.name}が当家との往来により、金${targetIncome} の利益を得ました`);
+                        logMessages.push({
+                            text: `【交易】${clan.name}が当家との往来により、金${targetIncome} の利益を得ました`,
+                            clanIds: [clan.id, targetClan.id]
+                        });
                     }
                 }
             });
@@ -1632,7 +1638,11 @@ window.GameEvents.push({
             
             // プレイヤーに関係するメモがあれば、左下のログに出力します
             if (logMessages.length > 0 && game.ui && game.ui.log) {
-                logMessages.forEach(msg => game.ui.log(msg));
+                logMessages.forEach(log => game.ui.log(log.text, {
+                    clanIds: log.clanIds,
+                    category: 'trade',
+                    inferCurrentTurn: false
+                }));
             }
         });
     }
