@@ -3183,6 +3183,7 @@ body:not(.is-pc) .war-action-message-prompt { left: auto; right: 15px; transform
 .fw-unit { width: 24px; height: 24px; position: absolute; display: flex; justify-content: center; align-items: center; transition: left 0.3s, top 0.3s, transform 0.3s; pointer-events: none; z-index: 20; }
 .fw-unit-icon { width: 100%; height: 100%; position: absolute; top: 0; left: 0; transform: rotate(var(--fw-dir, 0deg)) translateZ(0); transition: transform 0.3s; will-change: transform; }
 .fw-unit-icon::before { content: ""; display: block; width: 100%; height: 100%; position: absolute; top: 0; left: 0; -webkit-mask-image: url('../data/images/field_war_images/butai_icon.png'); mask-image: url('../data/images/field_war_images/butai_icon.png'); -webkit-mask-size: calc(100% - 2px); mask-size: calc(100% - 2px); -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; transition: background-color 0.3s; }
+.fw-unit.is-sea-unit .fw-unit-icon::before { -webkit-mask-image: url('../data/images/field_war_images/ship_icon.png') !important; mask-image: url('../data/images/field_war_images/ship_icon.png') !important; }
 .fw-unit.preview { opacity: 0.6; animation: fw-blink 1s infinite; z-index: 18; }
 
 /* 部隊アイコン下部の兵数と兵科アイコンをまとめる枠 */
@@ -8076,4 +8077,15 @@ body:not(.is-pc) #war-title-name.war-title-three-lines .war-title-fixed-line:nth
     line-height: 1.35;
     border-radius: 5px;
     pointer-events: auto;
+}
+
+
+/* 全画面戦闘中の旧スマホ向け軽量化。
+   背面地図はJS側でcompositorから外し、戦場側も不要なGPUレイヤーとHEX遷移を抑える。
+   PCの演出・戦闘計算・AI判断には影響させない。 */
+body:not(.is-pc).battle-lightweight-mode #field-war-modal .fw-unit-icon {
+    will-change: auto;
+}
+body:not(.is-pc).battle-lightweight-mode #field-war-modal .fw-hex {
+    transition: none;
 }

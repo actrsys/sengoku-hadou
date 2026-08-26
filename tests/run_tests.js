@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r239');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r240');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -6764,7 +6764,7 @@ test('指南書は低能力武将の説明を武将と能力へ統合し、一�
     const guide = read('js/guide_data.js');
     assert.strictEqual((guide.match(/能力が低めの武将も役に立つ/g) || []).length, 1, '低能力武将の主説明は1箇所だけに置く');
     assert.ok(!guide.includes('能力が低い武将にも役目はある？'), 'FAQへ同じ説明を重複させない');
-    assert.ok(guide.includes('自領の拠点では民忠が月ごとに少しずつ下がる'));
+    assert.ok(guide.includes('拠点では民忠が月ごとに少しずつ下がる'));
     assert.ok(guide.includes('各拠点に最低限の武将を配置しておく意味があります'));
     assert.ok(!guide.includes('通常の城'));
     assert.ok(!guide.includes('自領の城'));
@@ -7428,6 +7428,74 @@ test('姫一覧と詳細の所属表示は未婚でも currentClanId を正本�
     assert.ok(ui.includes('const clanId = Number(princess.currentClanId) || 0;'));
     assert.ok(!ui.includes('(p.husbandId && p.husbandId !== 0) ? p.currentClanId : p.originalClanId'));
     assert.ok(!ui.includes('(princess.husbandId > 0) ? princess.currentClanId : princess.originalClanId'));
+});
+
+
+
+test('全画面戦闘は共通窓口で背景地図を休止しスマホでは compositor から外す', () => {
+    const ui = read('js/ui.js');
+    const field = read('js/field_war.js');
+    assert.ok(ui.includes('suspendMainMapForBattle(owner = \'battle\')'));
+    assert.ok(ui.includes("this._battleSuspendOwners = new Set()"));
+    assert.ok(ui.includes("scroll.style.display = 'none'"));
+    assert.ok(ui.includes("document.body.classList.add('battle-lightweight-mode')"));
+    assert.ok(ui.includes("this.suspendMainMapForBattle('siege-war')"));
+    assert.ok(ui.includes("this.resumeMainMapAfterBattle('siege-war')"));
+    assert.ok(field.includes("this.game.ui.suspendMainMapForBattle('field-war')"));
+    assert.ok(field.includes("this.game.ui.resumeMainMapAfterBattle('field-war')"));
+});
+
+test('野戦描画は部隊DOMと前回ハイライトをキャッシュし動的styleタグを再生成しない', () => {
+    const field = read('js/field_war.js');
+    const css = read('css/style.css');
+    assert.ok(field.includes('this._fwUnitElementCache = new Map()'));
+    assert.ok(field.includes('this._fwHighlightedHexes = new Set()'));
+    assert.ok(field.includes("this._fwUnitElementCache.set(u.id"));
+    assert.ok(field.includes("uEl.classList.toggle('is-sea-unit'"));
+    assert.ok(field.includes("pEl.classList.toggle('is-sea-unit'"));
+    assert.ok(!field.includes('style-fw-unit-el-'));
+    assert.ok(!field.includes('pCustomStyle'));
+    assert.ok(css.includes('.fw-unit.is-sea-unit .fw-unit-icon::before'));
+});
+
+test('野戦の非表示軍勢詳細は情報モード時だけ構築する', () => {
+    const field = read('js/field_war.js');
+    const start = field.indexOf('updateStatus() {');
+    assert.ok(start >= 0);
+    const block = field.slice(start, start + 1200);
+    assert.ok(block.includes('this._updateFieldWarHeader();'));
+    assert.ok(block.includes('if (!this.isInfoMode) return;'));
+    const infoHandler = field.slice(field.indexOf('if (btnInfo) btnInfo.onclick'), field.indexOf('if (btnInfoBack)', field.indexOf('if (btnInfo) btnInfo.onclick')));
+    assert.ok(infoHandler.includes('this.updateStatus();'));
+});
+
+test('攻城戦UIは同じ値の顔画像・能力HTML等を無条件再代入しない', () => {
+    const ui = read('js/ui.js');
+    const start = ui.indexOf('updateWarUI() {');
+    const block = ui.slice(start, start + 15500);
+    assert.ok(block.includes('if (el.textContent !== next) el.textContent = next;'));
+    assert.ok(block.includes('if (el.innerHTML !== next) el.innerHTML = next;'));
+    assert.ok(block.includes("if (el.getAttribute('src') !== src) el.setAttribute('src', src);"));
+});
+
+test('指南書の民忠低下は自領限定と誤記しない', () => {
+    const guide = read('js/guide_data.js');
+    assert.ok(guide.includes('また拠点では民忠が月ごとに少しずつ下がるため'));
+    assert.ok(!guide.includes('自領の拠点では民忠が月ごとに少しずつ下がるため'));
+});
+
+test('第三者の忠誠・不満所見は高精度でも内心を断定しない', () => {
+    const interview = read('js/interview_system.js');
+    const start = interview.indexOf('_getTargetLoyaltyBandText(');
+    const end = interview.indexOf('_getOtherAssessmentBias(', start);
+    const block = interview.slice(start, end);
+    assert.ok(block.includes('少々納得しかねるところがおありのようです'));
+    assert.ok(!block.includes('少々納得しかねるところがおありです'));
+    assert.ok(!block.includes('かなり不満を抱えております'));
+    assert.ok(!block.includes('殿への気持ちはかなり離れております'));
+    assert.ok(!block.includes('殿から心が離れております'));
+    const architecture = read('ARCHITECTURE.md');
+    assert.ok(architecture.includes('第三者の内心は、短縮のために断定形へ変えない'));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

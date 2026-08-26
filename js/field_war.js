@@ -30,6 +30,10 @@ class FieldWarManager {
         this.activeAtkTab = 'main'; // 野戦用タブ（攻撃）
         this.activeDefTab = 'main'; // 野戦用タブ（守備）
         this.weather = 'sunny'; // ★追加：天候を覚える箱（sunny:晴れ, rain:雨）
+        // 描画更新ごとのDOM検索・全HEX走査を避けるための軽量キャッシュ。
+        this._fwUnitElementCache = new Map();
+        this._fwHighlightedHexes = new Set();
+        this._fwPreviewRefs = null;
         window.addEventListener('resize', () => {
             if (this.active) {
                 this.adjustMapScale();
@@ -524,9 +528,17 @@ class FieldWarManager {
         this.fieldEndNoticeShown = false;
 
         if (isPlayerInvolved) {
-            // ★追加: 野戦開始時に裏の日本地図（背景）の更新とアニメーションを完全にストップして軽くします！
-            if (this.game.ui && typeof this.game.ui.pauseBackgroundUpdates === 'function') {
+            // 野戦中は背面の巨大通常地図を戦闘用の共通窓口から休止します。
+            // スマホでは表示自体を compositor から外し、戦場へGPU/メモリを譲ります。
+            if (this.game.ui && typeof this.game.ui.suspendMainMapForBattle === 'function') {
+                this.game.ui.suspendMainMapForBattle('field-war');
+            } else if (this.game.ui && typeof this.game.ui.pauseBackgroundUpdates === 'function') {
                 this.game.ui.pauseBackgroundUpdates();
+            }
+            // スマホでは巨大通常地図を非表示にした状態を一度描画へ反映してから
+            // 240HEXと部隊DOMを組み立て、瞬間的なメモリピークを重ねない。
+            if (!document.body.classList.contains('is-pc') && this.game.ui && typeof this.game.ui.waitForNextPaint === 'function') {
+                await this.game.ui.waitForNextPaint();
             }
 
             // ★追加：野戦が始まる時に、平時のコマンドリストを綺麗にお掃除して非表示にします！
@@ -764,9 +776,10 @@ class FieldWarManager {
         if (btnCmdBack) btnCmdBack.onclick = () => { if(!this.isPlayerTurn()) return; this.isCmdMode = false; this.updateMenu(); };
         
         if (btnInfo) btnInfo.onclick = () => {
-            this.isInfoMode = true; 
-            this.updateMenu(); 
-            this.updateMap(); 
+            this.isInfoMode = true;
+            this.updateStatus(); // 詳細情報は実際に開いた時だけ構築する
+            this.updateMenu();
+            this.updateMap();
         };
         if (btnInfoBack) btnInfoBack.onclick = () => {
             this.isInfoMode = false; 
@@ -874,7 +887,7 @@ class FieldWarManager {
         scrollEl.scrollTo({
             left: px - containerW / 2,
             top: py - containerH / 2,
-            behavior: 'smooth'
+            behavior: (!document.body.classList.contains('is-pc') && document.body.classList.contains('battle-lightweight-mode')) ? 'auto' : 'smooth'
         });
     }
 
@@ -901,7 +914,7 @@ class FieldWarManager {
         scrollEl.scrollTo({
             left: px - containerW / 2,
             top: py - containerH / 2,
-            behavior: 'smooth'
+            behavior: (!document.body.classList.contains('is-pc') && document.body.classList.contains('battle-lightweight-mode')) ? 'auto' : 'smooth'
         });
     }
 
@@ -914,7 +927,50 @@ class FieldWarManager {
         this.logEl.scrollTop = this.logEl.scrollHeight;
     }
 
+    _updateFieldWarHeader() {
+        const turnEl = document.getElementById('fw-turn-info');
+        const turnText = `残りターン ${this.maxTurns - this.turnCount + 1}/${this.maxTurns}`;
+        if (turnEl && turnEl.textContent !== turnText) turnEl.textContent = turnText;
+
+        const dateEl = document.getElementById('fw-date-info');
+        if (dateEl && this.game) {
+            const dateText = `${this.game.year}年 ${this.game.month}月`;
+            if (dateEl.textContent !== dateText) dateEl.textContent = dateText;
+        }
+
+        const weatherEl = document.getElementById('fw-weather-info');
+        let timeStr = '';
+        let timeColor = '';
+        if (this.isEveningTurn()) {
+            timeStr = ' (夕方)';
+            timeColor = '#ff8a65';
+        } else if (this.isNightTurn()) {
+            timeStr = ' (夜)';
+            timeColor = '#b39ddb';
+        }
+        if (weatherEl) {
+            let weatherText = '';
+            let color = '';
+            if (this.weather === 'rain') {
+                weatherText = '☔ 雨' + timeStr;
+                color = timeColor || '#64b5f6';
+            } else if (this.weather === 'snow') {
+                weatherText = '⛄ 雪' + timeStr;
+                color = timeColor || '#b3e5fc';
+            } else {
+                weatherText = `${this.isNightTurn() ? '🌙' : '☀'} 晴れ${timeStr}`;
+                color = timeColor || '#ffb300';
+            }
+            if (weatherEl.textContent !== weatherText) weatherEl.textContent = weatherText;
+            if (weatherEl.style.color !== color) weatherEl.style.color = color;
+        }
+    }
+
     updateStatus() {
+        // ターン・年月・天候は常時更新するが、非表示の軍勢詳細DOMは「情報」表示時だけ構築する。
+        this._updateFieldWarHeader();
+        if (!this.isInfoMode) return;
+
         // メイン、応援軍、友軍のそれぞれの数値を保管する箱を用意します
         let stats = {
             atk: {
@@ -1109,45 +1165,8 @@ class FieldWarManager {
                 defWrapper.style.order = 2;
             }
         }
-
-        // 黒帯のターン表示と年月を更新します
-        const turnEl = document.getElementById('fw-turn-info');
-        if (turnEl) turnEl.innerText = `残りターン ◯/△`.replace('◯', this.maxTurns - this.turnCount + 1).replace('△', this.maxTurns);
-
-        const dateEl = document.getElementById('fw-date-info');
-        if (dateEl && this.game) {
-            dateEl.innerText = `${this.game.year}年 ${this.game.month}月`;
-        }
-        
-        // ★追加：天候と時間帯の文字を更新します
-        const weatherEl = document.getElementById('fw-weather-info');
-        let timeStr = "";
-        let timeColor = "";
-        
-        // ★修正：新しく作った共通の判定機能を使います！
-        if (this.isEveningTurn()) {
-            timeStr = " (夕方)";
-            timeColor = "#ff8a65"; // 夕焼け色
-        } else if (this.isNightTurn()) {
-            timeStr = " (夜)";
-            timeColor = "#b39ddb"; // 夜の紫色
-        }
-
-        if (weatherEl) {
-            if (this.weather === 'rain') {
-                weatherEl.innerText = '☔ 雨' + timeStr;
-                weatherEl.style.color = timeColor || '#64b5f6';
-            } else if (this.weather === 'snow') {
-                weatherEl.innerText = '⛄ 雪' + timeStr;
-                weatherEl.style.color = timeColor || '#b3e5fc';
-            } else {
-                let sunIcon = this.isNightTurn() ? '🌙' : '☀';
-                weatherEl.innerText = `${sunIcon} 晴れ${timeStr}`;
-                weatherEl.style.color = timeColor || '#ffb300';
-            }
-        }
     }
-    
+
     updateMenu() {
         if (!this.active) return;
         
@@ -1403,6 +1422,9 @@ class FieldWarManager {
     initMapElements() {
         if (!this.mapEl) return;
         this.mapEl.innerHTML = ''; // 念のためお掃除
+        this._fwUnitElementCache = new Map();
+        this._fwHighlightedHexes = new Set();
+        this._fwPreviewRefs = null;
 
         // 1. 移動ルートの線を引くための透明な画用紙（SVG）
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -1453,7 +1475,19 @@ class FieldWarManager {
         pEl.id = 'fw-preview-unit';
         pEl.className = 'fw-unit preview hidden'; // 最初は hidden
         pEl.style.pointerEvents = 'none';
+        pEl.innerHTML = `
+            <div class="fw-unit-icon"></div>
+            <div class="fw-unit-status-wrap">
+                <div class="fw-troop-icon"></div>
+                <div class="fw-unit-soldiers"></div>
+            </div>
+        `;
         this.mapEl.appendChild(pEl);
+        this._fwPreviewRefs = {
+            el: pEl,
+            soldierEl: pEl.querySelector('.fw-unit-soldiers'),
+            troopIconEl: pEl.querySelector('.fw-troop-icon')
+        };
 
         // 4. 全部隊のアイコンを作る
         this.units.forEach((u) => {
@@ -1479,15 +1513,19 @@ class FieldWarManager {
             uEl.style.pointerEvents = 'none'; 
             
             uEl.innerHTML = `
-                <style id="style-fw-unit-el-${u.id}"></style>
                 <div class="fw-unit-icon"></div>
                 <div class="fw-unit-status-wrap">
                     <div class="fw-troop-icon" data-type="${u.troopType}"></div>
                     <div class="fw-unit-soldiers">${u.soldiers}</div>
                 </div>
             `;
-            
+
             this.mapEl.appendChild(uEl);
+            this._fwUnitElementCache.set(u.id, {
+                el: uEl,
+                soldierEl: uEl.querySelector('.fw-unit-soldiers'),
+                troopIconEl: uEl.querySelector('.fw-troop-icon')
+            });
         });
     }
 
@@ -1507,33 +1545,27 @@ class FieldWarManager {
         // 2. 全部隊のアイコンの状態を更新する
         
         // ★修正：ワープ現象を防ぐため、全員を隠すのではなく「戦場からいなくなった部隊」だけを名指しで隠します
-        const allUnitIcons = this.mapEl.querySelectorAll('.fw-unit:not(.preview)');
-        allUnitIcons.forEach(icon => {
-            // アイコンのID（例：fw-unit-el-atk_0）から、部隊のID（atk_0）だけを取り出します
-            const unitId = icon.id.replace('fw-unit-el-', '');
-            
-            // 今の戦場リスト（this.units）に、その部隊がいるか確認します
-            const isAlive = this.units.some(u => u.id === unitId);
-            
-            if (!isAlive) {
-                // リストにいない（撤退や壊滅した）部隊のアイコンだけを隠します
-                icon.style.display = 'none';
-            } else if (icon.style.display === 'none') {
-                // 生きている部隊が何かの拍子に隠れていたら、表示を元に戻します
-                icon.style.display = '';
-            }
+        const activeUnitIds = new Set(this.units.map(u => u.id));
+        this._fwUnitElementCache.forEach((refs, unitId) => {
+            const shouldHide = !activeUnitIds.has(unitId);
+            if (refs.el.style.display === (shouldHide ? 'none' : '')) return;
+            refs.el.style.display = shouldHide ? 'none' : '';
         });
 
         this.units.forEach((u) => {
-            const uEl = document.getElementById(`fw-unit-el-${u.id}`);
+            const refs = this._fwUnitElementCache.get(u.id);
+            const uEl = refs && refs.el;
             if (!uEl) return;
             
             // サイズと位置の更新（兵士数で変わる）
             let iconSize = 16 + Math.min(Math.floor(Math.max(0, u.soldiers - 1) / 1000), 5) * 3;
-            uEl.style.width = `${iconSize}px`; 
-            uEl.style.height = `${iconSize}px`; 
-            uEl.style.left = `${u.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`; 
-            uEl.style.top = `${u.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;     
+            const nextWidth = `${iconSize}px`;
+            const nextLeft = `${u.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`;
+            const nextTop = `${u.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;
+            if (uEl.style.width !== nextWidth) uEl.style.width = nextWidth;
+            if (uEl.style.height !== nextWidth) uEl.style.height = nextWidth;
+            if (uEl.style.left !== nextLeft) uEl.style.left = nextLeft;
+            if (uEl.style.top !== nextTop) uEl.style.top = nextTop;
             
             // ★修正：近い方向へ回って向きを変える魔法
             if (u.displayAngle === undefined) u.displayAngle = u.direction * 60;
@@ -1543,30 +1575,22 @@ class FieldWarManager {
             if (diff < -180) diff += 360;
             u.displayAngle += diff;
 
-            uEl.style.setProperty('--fw-dir', `${u.displayAngle}deg`);
+            const nextDir = `${u.displayAngle}deg`;
+            if (uEl.style.getPropertyValue('--fw-dir') !== nextDir) uEl.style.setProperty('--fw-dir', nextDir);
 
             // アクティブ表示の切り替え
-            const isActive = (unit && u.id === unit.id);
-            if (isActive) uEl.classList.add('active');
-            else uEl.classList.remove('active');
+            const isActive = Boolean(unit && u.id === unit.id);
+            uEl.classList.toggle('active', isActive);
 
             // 海戦用（船の見た目）の判定
             let uRow = Math.floor(u.y / 2);
             let uIsSea = (this.grid && this.grid[uRow] && this.grid[uRow][u.x]) ? this.grid[uRow][u.x].isSea : false;
-            const styleTag = uEl.querySelector(`#style-fw-unit-el-${u.id}`);
-            if (styleTag) {
-                if (uIsSea) {
-                    styleTag.innerHTML = `#fw-unit-el-${u.id} .fw-unit-icon::before { -webkit-mask-image: url('data/images/field_war_images/ship_icon.png') !important; mask-image: url('data/images/field_war_images/ship_icon.png') !important; }`;
-                } else {
-                    styleTag.innerHTML = '';
-                }
-            }
+            uEl.classList.toggle('is-sea-unit', Boolean(uIsSea));
 
-            // 兵士数・兵科アイコンの更新
-            const soldierDiv = uEl.querySelector('.fw-unit-soldiers');
-            if (soldierDiv) soldierDiv.innerText = u.soldiers;
-            const troopIconDiv = uEl.querySelector('.fw-troop-icon');
-            if (troopIconDiv) troopIconDiv.dataset.type = u.troopType;
+            // 兵士数・兵科アイコンはキャッシュ済みDOMだけを更新します。
+            const soldierText = String(u.soldiers);
+            if (refs.soldierEl && refs.soldierEl.textContent !== soldierText) refs.soldierEl.textContent = soldierText;
+            if (refs.troopIconEl && refs.troopIconEl.dataset.type !== u.troopType) refs.troopIconEl.dataset.type = u.troopType;
         });
 
         // 3. プレビュー用の部隊アイコンの表示更新
@@ -1596,19 +1620,15 @@ class FieldWarManager {
                 let pRow = Math.floor(this.previewTarget.y / 2);
                 let pIsSea = (this.grid && this.grid[pRow] && this.grid[pRow][this.previewTarget.x]) ? this.grid[pRow][this.previewTarget.x].isSea : false;
                 
-                let pCustomStyle = "";
-                if (pIsSea) {
-                    pCustomStyle = `<style>#fw-preview-unit .fw-unit-icon::before { -webkit-mask-image: url('data/images/field_war_images/ship_icon.png') !important; mask-image: url('data/images/field_war_images/ship_icon.png') !important; }</style>`;
+                pEl.classList.toggle('is-sea-unit', Boolean(pIsSea));
+                const previewRefs = this._fwPreviewRefs;
+                if (previewRefs && previewRefs.soldierEl) {
+                    const soldierText = String(unit.soldiers);
+                    if (previewRefs.soldierEl.textContent !== soldierText) previewRefs.soldierEl.textContent = soldierText;
                 }
-
-                pEl.innerHTML = `
-                    ${pCustomStyle}
-                    <div class="fw-unit-icon"></div>
-                    <div class="fw-unit-status-wrap">
-                        <div class="fw-troop-icon" data-type="${unit.troopType}"></div>
-                        <div class="fw-unit-soldiers">${unit.soldiers}</div>
-                    </div>
-                `;
+                if (previewRefs && previewRefs.troopIconEl && previewRefs.troopIconEl.dataset.type !== unit.troopType) {
+                    previewRefs.troopIconEl.dataset.type = unit.troopType;
+                }
                 pEl.classList.remove('hidden');
             } else {
                 pEl.classList.add('hidden'); // プレビューが必要ない時は隠す
@@ -1616,17 +1636,24 @@ class FieldWarManager {
         }
 
         // 4. マス目（HEX）のハイライト更新
-        // 一旦すべてのハイライトクラス（色塗り）を剥がす
-        for (let key in this.hexElements) {
+        // 毎回240マス全部を触らず、前回実際に光らせたマスだけ解除します。
+        this._fwHighlightedHexes.forEach(key => {
             const hex = this.hexElements[key];
-            hex.classList.remove('current-pos', 'movable', 'attackable', 'fw-dir-highlight');
-        }
+            if (hex) hex.classList.remove('current-pos', 'movable', 'attackable', 'fw-dir-highlight');
+        });
+        this._fwHighlightedHexes.clear();
+        const addHexHighlight = (key, className) => {
+            const hex = this.hexElements[key];
+            if (!hex) return;
+            hex.classList.add(className);
+            this._fwHighlightedHexes.add(key);
+        };
 
         // 必要なマス目だけにクラス（色塗り）を付与する
         if (isPlayerTurn && unit && !this.isInfoMode) {
             // 現在地を光らせる
             if (this.hexElements[`${unit.x},${unit.y}`]) {
-                this.hexElements[`${unit.x},${unit.y}`].classList.add('current-pos');
+                addHexHighlight(`${unit.x},${unit.y}`, 'current-pos');
             }
 
             if (this.state === 'PHASE_MOVE' || this.state === 'MOVE_PREVIEW') {
@@ -1677,7 +1704,7 @@ class FieldWarManager {
                         
                         if (this.getDistance(unit.x, unit.y, x, y) === 1) {
                             if (minStartDist === 1) costToEnter = Math.max(baseCost, 4); 
-                            if (costToEnter < unit.ap) hex.classList.add('movable');
+                            if (costToEnter < unit.ap) addHexHighlight(key, 'movable');
                         } else {
                             let canPass = false;
                             const neighbors = this.getNeighbors(x, y);
@@ -1690,11 +1717,11 @@ class FieldWarManager {
                                     }
                                 }
                             }
-                            if (canPass) hex.classList.add('movable');
+                            if (canPass) addHexHighlight(key, 'movable');
                         }
                     } else {
                         // 誰もいない移動可能マス
-                        hex.classList.add('movable');
+                        addHexHighlight(key, 'movable');
                     }
                 }
             } else if (this.state === 'PHASE_DIR' || this.state === 'PHASE_ATTACK') {
@@ -1710,13 +1737,13 @@ class FieldWarManager {
                             let targetDir = this.getDirection(unit.x, unit.y, x, y);
                             let turnCost = this.getTurnCost(unit.direction, targetDir);
                             if (unit.ap >= turnCost + 1) {
-                                hex.classList.add('attackable');
+                                addHexHighlight(`${x},${y}`, 'attackable');
                             }
                         } else if (this.state === 'PHASE_DIR' && this.getDistance(unit.x, unit.y, x, y) === 1) {
                             let targetDir = this.getDirection(unit.x, unit.y, x, y);
                             let turnCost = this.getTurnCost(unit.direction, targetDir);
                             if (unit.ap >= turnCost) {
-                                hex.classList.add('fw-dir-highlight');
+                                addHexHighlight(`${x},${y}`, 'fw-dir-highlight');
                             }
                         }
                     }
@@ -2738,8 +2765,10 @@ class FieldWarManager {
         const finishProcess = async () => {
             if (this.modal) this.modal.classList.add('hidden');
             
-            // ★追加: 野戦が終わって画面を閉じる時に、裏の日本地図の更新ストップを解除して元に戻します！
-            if (this.game.ui && typeof this.game.ui.resumeBackgroundUpdates === 'function') {
+            // 戦闘用の共通窓口だけが、最後の戦闘所有者が閉じた時に背景を戻します。
+            if (this.game.ui && typeof this.game.ui.resumeMainMapAfterBattle === 'function') {
+                this.game.ui.resumeMainMapAfterBattle('field-war');
+            } else if (this.game.ui && typeof this.game.ui.resumeBackgroundUpdates === 'function') {
                 this.game.ui.resumeBackgroundUpdates();
             }
             

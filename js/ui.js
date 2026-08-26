@@ -8,6 +8,10 @@ class UIManager {
         this.game = game; this.currentCastle = null; this.menuState = 'MAIN';
         this.mapScale = 1.0;
         this.selectedDaimyoId = null; // ★追加：選択中の大名を記憶する箱
+        // 全画面戦闘中は、古いスマホで巨大な通常地図を背面合成し続けない。
+        // 攻城戦と野戦が連続・重複しても早く復帰しないよう所有者Setで管理する。
+        this._battleSuspendOwners = new Set();
+        this._battleSuspendState = null;
 
         this.mapEl = document.getElementById('map-container'); 
         this.panelEl = document.getElementById('pc-sidebar'); 
@@ -408,6 +412,48 @@ class UIManager {
         let scale = 1.0 - (text.length - (threshold - 1)) * step;
         if (scale < minScale) scale = minScale;
         return `<span class="compressed-list-text ui-compressed-text" style="--text-scale:${scale}; --text-unscale:${1 / scale};">${text}</span>`;
+    }
+
+    // ==========================================
+    // 全画面戦闘中の背景地図を安全に休止する共通窓口
+    // ==========================================
+    suspendMainMapForBattle(owner = 'battle') {
+        const key = String(owner || 'battle');
+        if (this._battleSuspendOwners.has(key)) return;
+
+        if (this._battleSuspendOwners.size === 0) {
+            const scroll = document.getElementById('map-scroll-container');
+            const isPC = document.body.classList.contains('is-pc');
+            this._battleSuspendState = {
+                scroll,
+                oldDisplay: scroll ? scroll.style.display : '',
+                pausedByUs: !this.isBackgroundPaused
+            };
+
+            if (this._battleSuspendState.pausedByUs) {
+                this.pauseBackgroundUpdates();
+            }
+            // PCでは通常地図を保持しても余裕がある。スマホだけ巨大レイヤーを
+            // compositor の対象から外し、戦闘画面へGPU/メモリを譲る。
+            if (!isPC && scroll) scroll.style.display = 'none';
+            document.body.classList.add('battle-lightweight-mode');
+        }
+
+        this._battleSuspendOwners.add(key);
+    }
+
+    resumeMainMapAfterBattle(owner = 'battle') {
+        const key = String(owner || 'battle');
+        this._battleSuspendOwners.delete(key);
+        if (this._battleSuspendOwners.size > 0) return;
+
+        const state = this._battleSuspendState;
+        this._battleSuspendState = null;
+        document.body.classList.remove('battle-lightweight-mode');
+        if (state && state.scroll) state.scroll.style.display = state.oldDisplay;
+        if (state && state.pausedByUs) {
+            this.resumeBackgroundUpdates();
+        }
     }
 
     // ==========================================
@@ -1545,6 +1591,13 @@ class UIManager {
     }
 
     forceResetModals(options = {}) {
+        // 戦闘途中のタイトル復帰・強制終了でも、スマホ地図を display:none のまま持ち越さない。
+        const battleState = this._battleSuspendState;
+        if (battleState && battleState.scroll) battleState.scroll.style.display = battleState.oldDisplay;
+        this._battleSuspendOwners.clear();
+        this._battleSuspendState = null;
+        document.body.classList.remove('battle-lightweight-mode');
+
         // 強制リセットでは状態マークの古いDOM参照も必ず解放する。
         if (this._statusCarouselTimer) {
             clearInterval(this._statusCarouselTimer);
@@ -2648,6 +2701,9 @@ class UIManager {
                     lockInteraction: false
                 });
             }
+            if (typeof this.suspendMainMapForBattle === 'function') {
+                this.suspendMainMapForBattle('siege-war');
+            }
             this.warModal.classList.remove('hidden');
             // ★追加：攻城戦が始まる時に、平時のコマンドリストを綺麗にお掃除して非表示にします！
             if (typeof this.clearCommandMenu === 'function') {
@@ -2655,6 +2711,9 @@ class UIManager {
             }
         } else {
             this.warModal.classList.add('hidden');
+            if (typeof this.resumeMainMapAfterBattle === 'function') {
+                this.resumeMainMapAfterBattle('siege-war');
+            }
 
             // スマホでは戦争モーダルの表示/非表示で地図の可視領域寸法が微妙に変わる場合があります。
             // 戦争中にカメラを固定している場合は、モーダルを閉じたDOM状態で同じ戦場中心へ
@@ -3144,9 +3203,28 @@ class UIManager {
         if (!this.game.warManager.state.active) return;
         const s = this.game.warManager.state;
         
-        const setTxt = (id, val) => { 
-            const el = document.getElementById(id); 
-            if(el) el.textContent = val; 
+        const setTxt = (id, val) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const next = String(val ?? '');
+            if (el.textContent !== next) el.textContent = next;
+        };
+        const setTextEl = (el, val) => {
+            if (!el) return;
+            const next = String(val ?? '');
+            if (el.textContent !== next) el.textContent = next;
+        };
+        const setHtmlEl = (el, html) => {
+            if (!el) return;
+            const next = String(html ?? '');
+            if (el.innerHTML !== next) el.innerHTML = next;
+        };
+        const setStyleEl = (el, prop, val) => {
+            if (el && el.style[prop] !== val) el.style[prop] = val;
+        };
+        const setSrcEl = (el, src) => {
+            if (!el) return;
+            if (el.getAttribute('src') !== src) el.setAttribute('src', src);
         };
 
         const getCompressedBushoNameHtml = (busho, isStrong = false) => {
@@ -3163,14 +3241,14 @@ class UIManager {
         const updateFace = (id, busho) => {
             const el = document.getElementById(id);
             if (!el) return;
-            if (busho && busho.faceIcon) {
-                el.src = `data/images/faceicons/${busho.faceIcon}`;
-                el.classList.remove('hidden');
-                el.onerror = () => { el.src = 'data/images/faceicons/unknown_face.webp'; }; 
-            } else {
-                el.src = 'data/images/faceicons/unknown_face.webp';
-                el.classList.remove('hidden');
+            const nextSrc = (busho && busho.faceIcon)
+                ? `data/images/faceicons/${busho.faceIcon}`
+                : 'data/images/faceicons/unknown_face.webp';
+            if (el.getAttribute('src') !== nextSrc) {
+                setSrcEl(el, nextSrc);
+                el.onerror = () => { setSrcEl(el, 'data/images/faceicons/unknown_face.webp'); };
             }
+            el.classList.remove('hidden');
         };
 
         // PC版攻城戦では、部隊戦力を主役にしたまま余白へ部隊長能力を補助表示します。
@@ -3179,7 +3257,7 @@ class UIManager {
             const el = document.getElementById(id);
             if (!el) return;
             if (!busho || !window.StatPresenter || typeof StatPresenter.toGradeHTML !== 'function') {
-                el.innerHTML = '';
+                setHtmlEl(el, '');
                 return;
             }
 
@@ -3188,22 +3266,23 @@ class UIManager {
                 ['武勇', busho.strength],
                 ['智謀', busho.intelligence]
             ];
-            el.innerHTML = abilities.map(([label, value]) => `
+            const nextHtml = abilities.map(([label, value]) => `
                 <div class="war-leader-ability">
                     <span class="war-leader-ability-label">${label}</span>
                     ${StatPresenter.toGradeHTML(value)}
                 </div>
             `).join('');
+            setHtmlEl(el, nextHtml);
         };
 
         setTxt('war-date-info', `${this.game.year}年 ${this.game.month}月`);
         const maxRounds = window.WarParams.Military.WarMaxRounds;
         
         const turnEl = document.getElementById('war-turn-info');
-        if (turnEl) turnEl.innerHTML = `残り <span class="turn-number">${Math.max(0, maxRounds - s.round + 1)}</span>ターン`;
+        setHtmlEl(turnEl, `残り <span class="turn-number">${Math.max(0, maxRounds - s.round + 1)}</span>ターン`);
         
         const wallEl = document.getElementById('war-def-wall-info');
-        if (wallEl) wallEl.innerHTML = `<span class="war-highlight-value">${s.defender.defense}</span>`;
+        setHtmlEl(wallEl, `<span class="war-highlight-value">${s.defender.defense}</span>`);
 
         const titleNameEl = document.getElementById('war-title-name');
         if (titleNameEl) {
@@ -3227,16 +3306,16 @@ class UIManager {
                     }
 
                     titleNameEl.classList.add('war-title-three-lines');
-                    titleNameEl.innerHTML = `
+                    setHtmlEl(titleNameEl, `
                         <span class="war-title-segment war-title-fixed-line">${provinceName}</span>
                         <span class="war-title-segment war-title-fixed-line">${factionName}</span>
                         <span class="war-title-segment war-title-fixed-line">鎮圧戦</span>
-                    `;
+                    `);
                 } else {
-                    titleNameEl.innerHTML = `<span class="war-title-segment">${s.defender.name}</span> <span class="war-title-segment">鎮圧戦</span>`;
+                    setHtmlEl(titleNameEl, `<span class="war-title-segment">${s.defender.name}</span> <span class="war-title-segment">鎮圧戦</span>`);
                 }
             } else {
-                titleNameEl.innerHTML = `<span class="war-title-segment">${s.defender.name}</span> <span class="war-title-segment">攻防戦</span>`;
+                setHtmlEl(titleNameEl, `<span class="war-title-segment">${s.defender.name}</span> <span class="war-title-segment">攻防戦</span>`);
             }
         }
         
@@ -3254,7 +3333,7 @@ class UIManager {
         
         // ★修正：さっき作った魔法で縮小した文字（HTML）を入れます！
         const atkNameEl = document.getElementById('war-atk-name');
-        if (atkNameEl) atkNameEl.innerHTML = this._getCompressedTextHtml(atkName, 4);
+        setHtmlEl(atkNameEl, this._getCompressedTextHtml(atkName, 4));
         
         const atkTitleEl = document.getElementById('war-atk-name').parentElement;
         if (atkName.length >= 8) {
@@ -3265,7 +3344,7 @@ class UIManager {
         
         // ★修正：武将名も魔法を使って縮小します！
         const atkBushoEl = document.getElementById('war-atk-busho');
-        if (atkBushoEl) atkBushoEl.innerHTML = getCompressedBushoNameHtml(s.atkBushos[0]) + '軍';
+        setHtmlEl(atkBushoEl, getCompressedBushoNameHtml(s.atkBushos[0]) + '軍');
         
         setTxt('war-atk-soldier', s.attacker.soldiers + '人');
         setTxt('war-atk-rice', s.attacker.rice); 
@@ -3290,7 +3369,7 @@ class UIManager {
         
         // ★修正：守備側も魔法で縮小します！
         const defNameEl = document.getElementById('war-def-name');
-        if (defNameEl) defNameEl.innerHTML = this._getCompressedTextHtml(defNameText, 4);
+        setHtmlEl(defNameEl, this._getCompressedTextHtml(defNameText, 4));
         
         const defTitleEl = document.getElementById('war-def-name').parentElement;
         if (defNameText.length >= 8) {
@@ -3301,7 +3380,7 @@ class UIManager {
 
         // ★修正：武将名も魔法で縮小します！
         const defBushoEl = document.getElementById('war-def-busho');
-        if (defBushoEl) defBushoEl.innerHTML = getCompressedBushoNameHtml(s.defBusho) + '軍';
+        setHtmlEl(defBushoEl, getCompressedBushoNameHtml(s.defBusho) + '軍');
         
         setTxt('war-def-soldier', s.defender.soldiers + '人');
         setTxt('war-def-rice', s.defender.rice); 
@@ -3344,23 +3423,23 @@ class UIManager {
                     card.dataset.hasUnit = 'false'; // シールを「いない」に貼り替えます
                 } else {
                     // 最初から空っぽ、またはアニメーション完了済みの時はそのまま空にする
-                    card.style.background = 'linear-gradient(to top right, #eeeeee, #777777)';
+                    setStyleEl(card, 'background', 'linear-gradient(to top right, #eeeeee, #777777)');
                     
                     // 中身の要素をすべて透明にして、レイアウト（大きさ）だけを維持します
-                    titleEl.style.visibility = 'hidden';
-                    bushoEl.style.visibility = 'hidden';
-                    card.querySelector('.reinf-content-wrap').style.visibility = 'hidden';
+                    setStyleEl(titleEl, 'visibility', 'hidden');
+                    setStyleEl(bushoEl, 'visibility', 'hidden');
+                    setStyleEl(card.querySelector('.reinf-content-wrap'), 'visibility', 'hidden');
 
                     // ★修正：innerHTMLで空っぽにします
-                    orgEl.innerHTML = '';
-                    bushoEl.innerHTML = '';
-                    soldierEl.textContent = '';
-                    riceEl.textContent = '';
-                    trainingEl.textContent = '';
-                    moraleEl.textContent = '';
-                    if(horsesEl) horsesEl.textContent = '';
-                    if(gunsEl) gunsEl.textContent = '';
-                    if(leaderAbilitiesEl) leaderAbilitiesEl.innerHTML = '';
+                    setHtmlEl(orgEl, '');
+                    setHtmlEl(bushoEl, '');
+                    setTextEl(soldierEl, '');
+                    setTextEl(riceEl, '');
+                    setTextEl(trainingEl, '');
+                    setTextEl(moraleEl, '');
+                    setTextEl(horsesEl, '');
+                    setTextEl(gunsEl, '');
+                    setHtmlEl(leaderAbilitiesEl, '');
                     
                     card.dataset.hasUnit = 'false'; // 念のためシールを「いない」にしておきます
                 }
@@ -3368,18 +3447,18 @@ class UIManager {
                 // 援軍が来ている時は、所属に応じた鮮やかなグラデーションにします！
                 card.dataset.hasUnit = 'true'; // ★追加：部隊が「いる」というシールを貼ります！
                 
-                card.style.backgroundColor = ''; 
-                if (prefix === 'atk-self') card.style.background = 'linear-gradient(to top right, #ffcdd2, #d32f2f)';
-                else if (prefix === 'atk-ally') card.style.background = 'linear-gradient(to top right, #ffecb3, #f57c00)';
-                else if (prefix === 'def-self') card.style.background = 'linear-gradient(to top right, #b3e5fc, #0288d1)';
-                else if (prefix === 'def-ally') card.style.background = 'linear-gradient(to top right, #b2dfdb, #00897b)';
+                setStyleEl(card, 'backgroundColor', ''); 
+                if (prefix === 'atk-self') setStyleEl(card, 'background', 'linear-gradient(to top right, #ffcdd2, #d32f2f)');
+                else if (prefix === 'atk-ally') setStyleEl(card, 'background', 'linear-gradient(to top right, #ffecb3, #f57c00)');
+                else if (prefix === 'def-self') setStyleEl(card, 'background', 'linear-gradient(to top right, #b3e5fc, #0288d1)');
+                else if (prefix === 'def-ally') setStyleEl(card, 'background', 'linear-gradient(to top right, #b2dfdb, #00897b)');
                 
-                card.style.textShadow = '1px 1px 2px rgba(0,0,0,0.6)';
+                setStyleEl(card, 'textShadow', '1px 1px 2px rgba(0,0,0,0.6)');
                 
                 // 透明化を解除して見えるようにします
-                titleEl.style.visibility = '';
-                bushoEl.style.visibility = '';
-                card.querySelector('.reinf-content-wrap').style.visibility = '';
+                setStyleEl(titleEl, 'visibility', '');
+                setStyleEl(bushoEl, 'visibility', '');
+                setStyleEl(card.querySelector('.reinf-content-wrap'), 'visibility', '');
 
                 faceContainer.classList.remove('hidden');
                 emptyIcon.classList.add('hidden');
@@ -3392,11 +3471,12 @@ class UIManager {
                 // ★修正：魔法を使って武将名を縮小します！
                 const leaderNameHtml = leader ? getCompressedBushoNameHtml(leader, isMobile) + "軍" : "不明";
                 
-                if (leader && leader.faceIcon) {
-                    faceImg.src = `data/images/faceicons/${leader.faceIcon}`;
-                    faceImg.onerror = () => { faceImg.src = 'data/images/faceicons/unknown_face.webp'; };
-                } else {
-                    faceImg.src = 'data/images/faceicons/unknown_face.webp';
+                const leaderFaceSrc = (leader && leader.faceIcon)
+                    ? `data/images/faceicons/${leader.faceIcon}`
+                    : 'data/images/faceicons/unknown_face.webp';
+                if (faceImg && faceImg.getAttribute('src') !== leaderFaceSrc) {
+                    setSrcEl(faceImg, leaderFaceSrc);
+                    faceImg.onerror = () => { setSrcEl(faceImg, 'data/images/faceicons/unknown_face.webp'); };
                 }
 
                 let orgName = "";
@@ -3417,14 +3497,14 @@ class UIManager {
 
                 // ここでHTMLに値を流し込みます
                 // ★修正：勢力名も魔法を使って縮小します！
-                orgEl.innerHTML = this._getCompressedTextHtml(orgName, 4, isMobile);
-                bushoEl.innerHTML = leaderNameHtml;
-                soldierEl.textContent = (reinfData.soldiers || 0) + '人';
-                riceEl.textContent = reinfData.rice || 0;
-                trainingEl.textContent = reinfData.training || 0;
-                moraleEl.textContent = reinfData.morale || 0;
-                if(horsesEl) horsesEl.textContent = reinfData.horses || 0;
-                if(gunsEl) gunsEl.textContent = reinfData.guns || 0;
+                setHtmlEl(orgEl, this._getCompressedTextHtml(orgName, 4, isMobile));
+                setHtmlEl(bushoEl, leaderNameHtml);
+                setTextEl(soldierEl, (reinfData.soldiers || 0) + '人');
+                setTextEl(riceEl, reinfData.rice || 0);
+                setTextEl(trainingEl, reinfData.training || 0);
+                setTextEl(moraleEl, reinfData.morale || 0);
+                setTextEl(horsesEl, reinfData.horses || 0);
+                setTextEl(gunsEl, reinfData.guns || 0);
             }
         };
         
