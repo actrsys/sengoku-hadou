@@ -273,7 +273,7 @@ class IndependenceSystem {
             if (castellan.clan !== 0 && castellan.clan !== newClanId) {
                 castellan.achievementTotal = Math.floor((castellan.achievementTotal || 0) / 2);
             }
-            this.game.affiliationSystem.setClanIdRaw(castellan, newClanId);
+            this.game.affiliationSystem.transferClanRaw(castellan, newClanId);
             castellan.loyalty = this.calcNewLoyalty(castellan, targetDaimyo);
             this.game.castleManager.changeOwner(castle, newClanId);
             
@@ -312,7 +312,7 @@ class IndependenceSystem {
             if (castellan.clan !== 0 && castellan.clan !== newClanId) {
                 castellan.achievementTotal = Math.floor((castellan.achievementTotal || 0) / 2);
             }
-            this.game.affiliationSystem.setClanIdRaw(castellan, newClanId);
+            this.game.affiliationSystem.transferClanRaw(castellan, newClanId);
             if (castellan.id === rebellionLeader.id) {
                 castellan.loyalty = 100;
             } else {
@@ -332,7 +332,7 @@ class IndependenceSystem {
             if (rebellionLeader.isCastellan && leaderCastle) {
                 // 派閥主がどこかの城主なら、その城も新勢力になる
                 this.game.castleManager.changeOwner(leaderCastle, newClanId);
-                this.game.affiliationSystem.setClanIdRaw(rebellionLeader, newClanId);
+                this.game.affiliationSystem.transferClanRaw(rebellionLeader, newClanId);
                 if (rebellionLeader.isDaimyo) {
                     rebellionLeader.loyalty = 100;
                 } else {
@@ -344,7 +344,7 @@ class IndependenceSystem {
                     leaderCastle.samuraiIds = leaderCastle.samuraiIds.filter(id => id !== rebellionLeader.id);
                     this.game.updateCastleLord(leaderCastle);
                 }
-                this.game.affiliationSystem.setClanIdRaw(rebellionLeader, newClanId);
+                this.game.affiliationSystem.transferClanRaw(rebellionLeader, newClanId);
                 this.game.affiliationSystem.setCastleIdRaw(rebellionLeader, castle.id);
                 castle.samuraiIds.push(rebellionLeader.id);
                 if (rebellionLeader.isDaimyo) {
@@ -685,7 +685,7 @@ class IndependenceSystem {
                 if (busho.clan !== 0 && busho.clan !== newClanId) {
                     busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
                 }
-                this.game.affiliationSystem.setClanIdRaw(busho, newClanId);
+                this.game.affiliationSystem.transferClanRaw(busho, newClanId);
                 busho.loyalty = this.calcNewLoyalty(busho, newDaimyo);
                 joiners.push(busho);
             } else {
@@ -714,7 +714,7 @@ class IndependenceSystem {
                     if (busho.clan !== 0 && busho.clan !== newClanId) {
                         busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
                     }
-                    this.game.affiliationSystem.setClanIdRaw(busho, newClanId);
+                    this.game.affiliationSystem.transferClanRaw(busho, newClanId);
                     busho.loyalty = Math.max(0, Math.min(40, this.calcNewLoyalty(busho, newDaimyo) - 50)); // 消極的合流は低めに設定
                     joiners.push(busho);
                 }
@@ -741,7 +741,7 @@ class IndependenceSystem {
                     if (busho.clan !== 0 && busho.clan !== newClanId) {
                         busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
                     }
-                    this.game.affiliationSystem.setClanIdRaw(busho, newClanId);
+                    this.game.affiliationSystem.transferClanRaw(busho, newClanId);
                     busho.loyalty = this.calcNewLoyalty(busho, leader);
                     this.resolveSubordinates(castle, leader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId);
                     this.game.updateCastleLord(castle);
@@ -772,7 +772,7 @@ class IndependenceSystem {
                 if (busho.clan !== 0 && busho.clan !== newClanId) {
                     busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
                 }
-                this.game.affiliationSystem.setClanIdRaw(busho, newClanId);
+                this.game.affiliationSystem.transferClanRaw(busho, newClanId);
                 this.game.affiliationSystem.setCastleIdRaw(busho, mainCastle.id);
                 busho.loyalty = this.calcNewLoyalty(busho, newDaimyo);
                 mainCastle.samuraiIds.push(busho.id);

@@ -718,13 +718,17 @@ class StrategySystem {
             }
             
             if (target.isCastellan && oldCastle) {
+                // 部下の追随判定には寝返り前の派閥IDを使うが、本人の旧派閥・承認欲求は新家へ持ち越さない。
+                const targetOriginalFactionId = Number(target.factionId) || 0;
                 this.game.castleManager.changeOwner(oldCastle, newClanId);
-                this.game.affiliationSystem.setClanIdRaw(target, newClanId);
+                this.game.affiliationSystem.transferClanRaw(target, newClanId, { syncSpouses: true });
                 target.isActionDone = true;
                 this.game.affiliationSystem.setActivityStatusRaw(target, window.GameConstants.BushoStatus.ACTIVE);
                 
                 const targetLord = this.game.getClanDaimyo(oldClanId) || { affinity: 50 };
-                captiveMsgs = this.game.independenceSystem.resolveSubordinates(oldCastle, target, targetLord, newClanId, oldClanId);
+                captiveMsgs = this.game.independenceSystem.resolveSubordinates(
+                    oldCastle, target, targetLord, newClanId, oldClanId, targetOriginalFactionId
+                );
                 
                 this.game.getCastleBushos(oldCastle.id).forEach(b => {
                     if (b.clan === newClanId && window.BushoStatusRules.isActive(b)) {

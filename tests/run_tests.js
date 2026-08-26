@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r228');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r229');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -6602,6 +6602,75 @@ test('断交時の姫・人質処遇履歴は双方の勢力IDを明示する', 
     assert.ok(src.includes('const historyClanIds = [originClanId, holderClanId];'));
     assert.ok(src.includes("clanIds: historyClanIds, category: 'family', inferCurrentTurn: false"));
     assert.ok(src.includes("clanIds: [record.originClanId, record.captorClanId], category: 'diplomacy', inferCurrentTurn: false"));
+});
+
+
+test('通常の別家移籍は旧派閥を破棄し妻所属と外交婚姻を同期する', () => {
+    const src = read('js/affiliation_system.js');
+    const transferAt = src.indexOf('transferClanRaw(busho, newClanId');
+    assert.ok(transferAt >= 0);
+    const transfer = src.slice(transferAt, transferAt + 900);
+    assert.ok(transfer.includes('this.resetFactionData(busho);'));
+    assert.ok(transfer.includes('this.setClanIdRaw(busho, nextClanId);'));
+    assert.ok(transfer.includes('this.syncSpousesForClanChange(busho, oldClanId, nextClanId'));
+
+    const spouseAt = src.indexOf('\n    syncSpousesForClanChange(busho, oldClanId, newClanId');
+    const spouse = src.slice(spouseAt, spouseAt + 2600);
+    assert.ok(spouse.includes('wife.currentClanId = newId;'));
+    assert.ok(spouse.includes('touchedPairs.forEach(([a, b]) => this.game.diplomacyManager.refreshMarriageRelation(a, b));'));
+    assert.ok(spouse.includes('oldClan.princessIds = oldClan.princessIds.filter'));
+    assert.ok(spouse.includes('newClan.princessIds.push'));
+
+    const joinAt = src.indexOf('joinClan(busho, newClanId');
+    const join = src.slice(joinAt, joinAt + 3200);
+    assert.ok(join.includes('this.syncSpousesForClanChange(busho, oldClanId, newClanId'));
+    assert.ok(join.includes('refreshDiplomacy: busho.isHostage !== true'));
+});
+
+test('臣従・吸収は武将の派閥婚姻同期と未婚姫移籍を共通窓口へ委譲する', () => {
+    const common = read('js/event/common_events.js');
+    assert.ok(common.includes('game.affiliationSystem.transferClanRaw(b, dominantClanId, { syncSpouses: true });'));
+    assert.ok(common.includes('game.affiliationSystem.transferUnmarriedPrincesses(subordinateClanId, dominantClanId);'));
+
+    const diplomacy = read('js/diplomacy.js');
+    const vassalAt = diplomacy.indexOf('async executeVassalage');
+    const vassal = diplomacy.slice(vassalAt, vassalAt + 3000);
+    assert.ok(vassal.includes('this.game.affiliationSystem.transferClanRaw(b, targetClanId, { syncSpouses: true });'));
+    assert.ok(vassal.includes('this.game.affiliationSystem.transferUnmarriedPrincesses(myClanId, targetClanId);'));
+
+    const historical = read('js/event/historical_event.js');
+    const absorbAt = historical.indexOf('absorbClan: function');
+    const absorb = historical.slice(absorbAt, absorbAt + 2600);
+    assert.ok(absorb.includes('game.affiliationSystem.transferClanRaw(b, dominantClanId, { syncSpouses: true });'));
+    assert.ok(absorb.includes('game.affiliationSystem.transferUnmarriedPrincesses(subordinateClanId, dominantClanId);'));
+});
+
+test('独立・寝返りは旧派閥を破棄するが婚姻は専用外交再編へ残す', () => {
+    const src = read('js/independence_system.js');
+    assert.ok(src.includes('this.game.affiliationSystem.transferClanRaw(castellan, newClanId);'));
+    assert.ok(src.includes('this.game.affiliationSystem.transferClanRaw(rebellionLeader, newClanId);'));
+    assert.ok(src.includes('this.game.affiliationSystem.transferClanRaw(busho, newClanId);'));
+    assert.ok(!src.includes('transferClanRaw(castellan, newClanId, { syncSpouses: true })'));
+    assert.ok(src.includes('reorganizeRelationsAfterRebellion(oldClanId, newClanId)'));
+});
+
+test('life系の改名・姫死亡・婚姻解消履歴は関係勢力IDを明示する', () => {
+    const src = read('js/life_system.js');
+    assert.ok(src.includes("this.game.ui.log(msg, { clanIds: Number(b.clan) > 0 ? [Number(b.clan)] : [], category: 'family', inferCurrentTurn: false });"));
+    assert.ok(src.includes("this.game.ui.log(clanMsg, { clanIds: Number(b.clan) > 0 ? [Number(b.clan)] : [], category: 'family', inferCurrentTurn: false });"));
+    assert.ok(src.includes("this.game.ui.log(breakMsg, { clanIds: [clanA, clanB], category: 'family', inferCurrentTurn: false });"));
+    assert.ok(src.includes("category: 'death', inferCurrentTurn: false"));
+});
+
+
+test('城主引抜は旧派閥IDで追随判定しつつ本人の派閥婚姻を新家へ同期する', () => {
+    const src = read('js/strategy_system.js');
+    const at = src.indexOf('const targetOriginalFactionId = Number(target.factionId) || 0;');
+    assert.ok(at >= 0);
+    const block = src.slice(at, at + 1100);
+    assert.ok(block.includes('this.game.affiliationSystem.transferClanRaw(target, newClanId, { syncSpouses: true });'));
+    assert.ok(block.includes('oldCastle, target, targetLord, newClanId, oldClanId, targetOriginalFactionId'));
+    assert.ok(!block.includes('setClanIdRaw(target, newClanId)'));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

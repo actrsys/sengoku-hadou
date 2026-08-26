@@ -239,12 +239,15 @@ window.EventAction = {
                 // それ以外（乗っ取りなど）は個別に処理して相性で忠誠を再計算します
                 b.isDaimyo = false;
                 b.isCommander = false;
-                game.affiliationSystem.setClanIdRaw(b, dominantClanId);
+                game.affiliationSystem.transferClanRaw(b, dominantClanId, { syncSpouses: true });
                 if (game.affiliationSystem && game.affiliationSystem.updateLoyaltyForNewLord) {
                     game.affiliationSystem.updateLoyaltyForNewLord(b, dominantClanId);
                 }
             }
         });
+
+        // 武将に付随しない未婚姫も、吸収先へ移して旧勢力へ取り残さない。
+        game.affiliationSystem.transferUnmarriedPrincesses(subordinateClanId, dominantClanId);
 
         // ④ 吸収される側（旧勢力）の滅亡フラグを立てます
         const subordinateClan = game.getClan(subordinateClanId);

@@ -1828,13 +1828,16 @@ window.GameEvents.push({
                 b.isDaimyo = false;
                 b.isCommander = false;
                 
-                game.affiliationSystem.setClanIdRaw(b, dominantClanId);
+                game.affiliationSystem.transferClanRaw(b, dominantClanId, { syncSpouses: true });
                 
                 // 人事部（お引越しセンター）にお願いして、新しい殿様との相性で忠誠度を再計算します！
                 if (game.affiliationSystem && game.affiliationSystem.updateLoyaltyForNewLord) {
                     game.affiliationSystem.updateLoyaltyForNewLord(b, dominantClanId);
                 }
             });
+
+            // 武将に付随しない未婚姫も、滅亡済み旧家へ取り残さない。
+            game.affiliationSystem.transferUnmarriedPrincesses(subordinateClanId, dominantClanId);
 
             // 吸収済みリストに追加して、マップ更新の印をつけます
             absorbedClans.add(subordinateClanId);

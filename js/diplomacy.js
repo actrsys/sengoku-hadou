@@ -2803,11 +2803,14 @@ class DiplomacyManager {
             b.isDaimyo = false;
             b.isCommander = false;
             
-            this.game.affiliationSystem.setClanIdRaw(b, targetClanId);
+            this.game.affiliationSystem.transferClanRaw(b, targetClanId, { syncSpouses: true });
             
             // 人事部（お引越しセンター）にお願いして、新しい殿様との相性で忠誠度を再計算します！
             this.game.affiliationSystem.updateLoyaltyForNewLord(b, targetClanId);
         });
+
+        // 武将に付随しない未婚姫も、臣従で消えた旧家へ残さない。
+        this.game.affiliationSystem.transferUnmarriedPrincesses(myClanId, targetClanId);
 
         // 外交担当者に行動完了のシールを貼ります
         if (doer) doer.isActionDone = true;

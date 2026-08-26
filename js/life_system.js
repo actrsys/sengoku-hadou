@@ -371,13 +371,13 @@ class LifeSystem {
                                 await new Promise(resolve => setTimeout(resolve, 50));
 
                                 // ★すべての裏処理が終わってから、メッセージを出して待ちます！
-                                this.game.ui.log(msg);
+                                this.game.ui.log(msg, { clanIds: Number(b.clan) > 0 ? [Number(b.clan)] : [], category: 'family', inferCurrentTurn: false });
                                 if (b.clan === this.game.playerClanId || b.isDaimyo) {
                                     await this.game.ui.showDialogAsync(msg); 
                                 }
                                 
                                 if (clanMsg !== "") {
-                                    this.game.ui.log(clanMsg);
+                                    this.game.ui.log(clanMsg, { clanIds: Number(b.clan) > 0 ? [Number(b.clan)] : [], category: 'family', inferCurrentTurn: false });
                                     await this.game.ui.showDialogAsync(clanMsg);
                                 }
                                 // ==========================================
@@ -825,7 +825,7 @@ class LifeSystem {
                                 const otherClan = this.game.getClan(clanA === this.game.playerClanId ? clanB : clanA);
                                 if (otherClan) {
                                     const breakMsg = `${p.name}の死により、${otherClan.name}との婚姻関係は解消されました。`;
-                                    this.game.ui.log(breakMsg);
+                                    this.game.ui.log(breakMsg, { clanIds: [clanA, clanB], category: 'family', inferCurrentTurn: false });
                                     await this.game.ui.showDialogAsync(breakMsg, false, 0);
                                 }
                             }
@@ -835,7 +835,7 @@ class LifeSystem {
 
                 // プレイヤーの家にいる姫だったら、悲しいお知らせを表示します（未登場の場合は出しません）
                 if (p.currentClanId === this.game.playerClanId && !wasUnborn) {
-                    this.game.ui.log(`${p.name}が死亡しました……`);
+                    this.game.ui.log(`${p.name}が死亡しました……`, { clanIds: Number(p.currentClanId) > 0 ? [Number(p.currentClanId)] : [], category: 'death', inferCurrentTurn: false });
                     await this.game.ui.showDialogAsync(`${p.name}が死亡しました……`, false, 0);
                 }
             }
@@ -876,7 +876,7 @@ class LifeSystem {
                             const otherClan = this.game.getClan(clanA === this.game.playerClanId ? clanB : clanA);
                             if (otherClan) {
                                 const breakMsg = `夫である${busho.fullName}の死により、${otherClan.name}との婚姻関係は解消されました。`;
-                                this.game.ui.log(breakMsg);
+                                this.game.ui.log(breakMsg, { clanIds: [clanA, clanB], category: 'family', inferCurrentTurn: false });
                                 await this.game.ui.showDialogAsync(breakMsg, false, 0);
                             }
                         }

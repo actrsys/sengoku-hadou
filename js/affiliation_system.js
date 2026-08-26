@@ -132,36 +132,11 @@ class AffiliationSystem {
         // 6. 新しいお城に入ります
         this.enterCastle(busho, newCastleId);
 
-        // ★ここから追加：奥さん（姫）とお引越し先の名簿の手続き！
-        if (busho.wifeIds && busho.wifeIds.length > 0 && this.game) {
-            // 前いた大名家の「姫の名簿」から名前を消します
-            if (oldClanId !== 0) {
-                const oldClan = this.game.clans.find(c => c.id === oldClanId);
-                if (oldClan && oldClan.princessIds) {
-                    oldClan.princessIds = oldClan.princessIds.filter(id => !busho.wifeIds.includes(id));
-                }
-            }
-
-            // 新しい大名家の「姫の名簿」に名前を書き足します
-            const newClan = this.game.clans.find(c => c.id === newClanId);
-            if (newClan && newClan.princessIds) {
-                busho.wifeIds.forEach(wId => {
-                    if (!newClan.princessIds.includes(wId)) {
-                        newClan.princessIds.push(wId);
-                    }
-                });
-            }
-
-            // 姫本人の「所属シール」も新しい大名家に貼り替えます
-            if (this.game.princesses) {
-                busho.wifeIds.forEach(wId => {
-                    const wife = this.game.princesses.find(p => p.id === wId);
-                    if (wife) {
-                        wife.currentClanId = newClanId;
-                    }
-                });
-            }
-        }
+        // 7. 既婚武将の妻は夫の所属へ追従させる。
+        // 人質は現行仕様が別途未確定なので、外交婚姻フラグの張替えだけは行わない。
+        this.syncSpousesForClanChange(busho, oldClanId, newClanId, {
+            refreshDiplomacy: busho.isHostage !== true
+        });
 
         // ★軽量化：所属が変化した大名家だけ派閥を再編します。
         // 派閥は大名家ごとに独立しているため、全国全勢力を作り直す必要はありません。
@@ -538,6 +513,92 @@ class AffiliationSystem {
             }
             if (options.deferCastleLordUpdate !== true) this.updateCastleLord(newCastle);
         }
+    }
+
+    /**
+     * 通常の別家移籍に伴う妻（姫）の所属と外交婚姻を同期する。
+     * 独立・謀反は DiplomacyManager.reorganizeRelationsAfterRebellion() が正本なので、
+     * その経路からはこの処理を呼ばない。
+     */
+    syncSpousesForClanChange(busho, oldClanId, newClanId, { refreshDiplomacy = true } = {}) {
+        if (!busho || !this.game || !Array.isArray(busho.wifeIds) || busho.wifeIds.length === 0) return;
+        const oldId = Number(oldClanId) || 0;
+        const newId = Number(newClanId) || 0;
+        if (oldId === newId) return;
+
+        const oldClan = oldId > 0 ? this.game.getClan(oldId) : null;
+        const newClan = newId > 0 ? this.game.getClan(newId) : null;
+        if (oldClan && Array.isArray(oldClan.princessIds)) {
+            oldClan.princessIds = oldClan.princessIds.filter(id => !busho.wifeIds.some(wId => Number(wId) === Number(id)));
+        }
+        if (newClan) {
+            if (!Array.isArray(newClan.princessIds)) newClan.princessIds = [];
+            busho.wifeIds.forEach(wId => {
+                if (!newClan.princessIds.some(id => Number(id) === Number(wId))) newClan.princessIds.push(Number(wId));
+            });
+        }
+
+        // 全妻の所属を先に更新してから外交婚姻を再評価する。
+        // 同じ実家の妻が複数いる場合も、途中状態で旧婚姻を残さないため順序を分ける。
+        const touchedPairs = new Map();
+        busho.wifeIds.forEach(wId => {
+            const wife = Array.isArray(this.game.princesses)
+                ? this.game.princesses.find(p => Number(p.id) === Number(wId))
+                : null;
+            if (!wife) return;
+            const originId = Number(wife.originalClanId) || 0;
+            wife.currentClanId = newId;
+            if (!refreshDiplomacy || !this.game.diplomacyManager || originId <= 0) return;
+            [[originId, oldId], [originId, newId]].forEach(([a, b]) => {
+                if (a <= 0 || b <= 0 || a === b) return;
+                const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+                if (!touchedPairs.has(key)) touchedPairs.set(key, [a, b]);
+            });
+        });
+        if (refreshDiplomacy && this.game.diplomacyManager) {
+            touchedPairs.forEach(([a, b]) => this.game.diplomacyManager.refreshMarriageRelation(a, b));
+        }
+    }
+
+    /**
+     * 平和的な勢力吸収で、武将移籍後も旧家に残る未婚姫を吸収先へ移す。
+     */
+    transferUnmarriedPrincesses(oldClanId, newClanId) {
+        if (!this.game || !Array.isArray(this.game.princesses)) return;
+        const oldId = Number(oldClanId) || 0;
+        const newId = Number(newClanId) || 0;
+        if (oldId <= 0 || newId <= 0 || oldId === newId) return;
+        const oldClan = this.game.getClan(oldId);
+        const newClan = this.game.getClan(newId);
+        if (!newClan) return;
+        if (!Array.isArray(newClan.princessIds)) newClan.princessIds = [];
+
+        this.game.princesses.forEach(princess => {
+            if (!princess || Number(princess.currentClanId) !== oldId) return;
+            if (princess.status !== 'unmarried' || Number(princess.husbandId || 0) > 0) return;
+            princess.currentClanId = newId;
+            if (oldClan && Array.isArray(oldClan.princessIds)) {
+                oldClan.princessIds = oldClan.princessIds.filter(id => Number(id) !== Number(princess.id));
+            }
+            if (!newClan.princessIds.some(id => Number(id) === Number(princess.id))) {
+                newClan.princessIds.push(Number(princess.id));
+            }
+        });
+    }
+
+    /**
+     * 周辺処理を呼び出し側が管理する別家移籍用の共通窓口。
+     * 旧派閥・承認欲求は必ず破棄し、必要な通常移籍だけ妻/婚姻も同期する。
+     */
+    transferClanRaw(busho, newClanId, { syncSpouses = false } = {}) {
+        if (!busho) return 0;
+        const oldClanId = Number(busho.clan) || 0;
+        const nextClanId = Number(newClanId) || 0;
+        if (oldClanId === nextClanId) return oldClanId;
+        this.resetFactionData(busho);
+        this.setClanIdRaw(busho, nextClanId);
+        if (syncSpouses) this.syncSpousesForClanChange(busho, oldClanId, nextClanId, { refreshDiplomacy: true });
+        return oldClanId;
     }
 
     /**
