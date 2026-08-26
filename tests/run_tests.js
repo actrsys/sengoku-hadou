@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r225');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r226');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -3265,7 +3265,7 @@ test('指南書はタイトルとシステムコマンドから同じGuideView�
     assert.ok(html.includes('js/guide_data.js') && html.includes('js/guide_view.js'));
     assert.ok(bootstrap.includes("executeSystemCommand('guide')"));
     assert.ok(catalog.includes("'guide': { label: \"指南書\""));
-    assert.ok(catalog.includes("items: ['guide', 'history', 'settings', 'save', 'load', 'watch', 'title']"));
+    assert.ok(catalog.includes("items: ['save', 'load', 'settings', 'history', 'guide', 'watch', 'title']"));
     assert.ok(command.includes("case 'guide':"));
     assert.ok(command.includes('this.game.ui.guideView.open()'));
     assert.ok(ui.includes('this.guideView = new GuideView(this, this.game)'));
@@ -6363,6 +6363,109 @@ test('大名選択の顔グラはPC・スマホとも正方形を維持する', 
     assert.ok(!/\.daimyo-confirm-face\s*\{[^}]*height:\s*80px/s.test(legacy), '旧80px高さ指定を残さない');
     assert.ok(css.includes('body.is-pc .daimyo-confirm-face-column { width: 90px; }'));
     assert.ok(css.includes('body.is-pc .daimyo-confirm-face { max-width: 90px; }'));
+});
+
+
+test('月次給金と役職成長は城主家所属の通常武将だけを対象にする', () => {
+    const turn = read('js/turn_manager.js');
+    const at = turn.indexOf('給金・役職成長は城主家に所属する通常の活動中武将だけへ限定する');
+    assert.ok(at >= 0);
+    const block = turn.slice(at, at + 850);
+    assert.ok(block.includes('Number(b.clan) === Number(castle.ownerClan)'));
+    assert.ok(block.includes('Number(b.belongKunishuId || 0) === 0'));
+    assert.ok(block.includes('window.BushoStatusRules.isActive(b)'));
+    assert.ok(block.includes('EconomyRules.applyMonthlyCastleUpkeep(castle, bushos, daimyo)'));
+    assert.ok(block.includes('bushos.forEach(busho => PersonnelRules.applyMonthlyRoleProgress'));
+
+    const economy = read('js/economy_rules.js');
+    const salaryAt = economy.indexOf('static calcCastleSalary');
+    const salaryBlock = economy.slice(salaryAt, salaryAt + 650);
+    assert.ok(salaryBlock.includes('Number(b.clan) === Number(castle.ownerClan)'));
+    assert.ok(salaryBlock.includes('Number(b.belongKunishuId || 0) === 0'));
+});
+
+test('通常大名家の防諜は城主家所属の通常武将だけを参照する', () => {
+    const strategy = read('js/strategy_system.js');
+    const at = strategy.indexOf('getCastleBestStats(castleId)');
+    const block = strategy.slice(at, at + 900);
+    assert.ok(block.includes('const castle = this.game.getCastle(castleId);'));
+    assert.ok(block.includes('Number(b.clan) === Number(castle.ownerClan)'));
+    assert.ok(block.includes('Number(b.belongKunishuId || 0) === 0'));
+
+    const skill = read('js/skill_manager.js');
+    ['calcBugeiAssassinateDefense', 'calcBugeiCounterIntelligenceBonus'].forEach(name => {
+        const pos = skill.indexOf(`static ${name}`);
+        assert.ok(pos >= 0);
+        const part = skill.slice(pos, pos + 850);
+        assert.ok(part.includes('const castle = game.getCastle(castleId);'));
+        assert.ok(part.includes('Number(b.clan) === Number(castle.ownerClan)'));
+        assert.ok(part.includes('Number(b.belongKunishuId || 0) === 0'));
+    });
+});
+
+test('新規開始ではAI作戦4種と人事評価キャッシュをすべて破棄する', () => {
+    const op = read('js/ai_operation.js');
+    const resetAt = op.indexOf('resetAllState()');
+    const resetBlock = op.slice(resetAt, resetAt + 450);
+    ['this.operations = {};', 'this.draftBases = {};', 'this.grandObjectives = {};', 'this.historyOwnedCastles = {};'].forEach(text => {
+        assert.ok(resetBlock.includes(text), `${text} を新規ゲームで破棄する`);
+    });
+
+    const game = read('js/game.js');
+    const startAt = game.indexOf('startNewGame(options = {})');
+    const startBlock = game.slice(startAt, startAt + 2600);
+    assert.ok(startBlock.includes('this.aiOperationManager.resetAllState();'));
+    assert.ok(startBlock.includes('this.aiStaffing.resetCaches();'));
+
+    const staffing = read('js/ai_staffing.js');
+    const cacheAt = staffing.indexOf('resetCaches()');
+    const cacheBlock = staffing.slice(cacheAt, cacheAt + 250);
+    assert.ok(cacheBlock.includes('this.evaluationCache = {};'));
+    assert.ok(cacheBlock.includes('this.lastMonth = -1;'));
+});
+
+test('ロード時も前ゲームのAI人事評価キャッシュを破棄する', () => {
+    const save = read('js/save_manager.js');
+    const restoreAt = save.indexOf('async _restoreSaveDataObj(d)');
+    const block = save.slice(restoreAt, restoreAt + 2600);
+    assert.ok(block.includes('this.game.aiStaffing.resetCaches();'));
+});
+
+test('BGM停止APIはstopBGMへ統一し旧stopBgmを残さない', () => {
+    const sources = [read('js/ending_system.js'), read('js/war_effort.js')].join('\n');
+    assert.ok(!sources.includes('stopBgm'));
+    assert.ok(sources.includes('stopBGM'));
+});
+
+test('強制モーダルリセットは状態マークタイマーを破棄しタイトル復帰では背景Canvasを再生成しない', () => {
+    const ui = read('js/ui.js');
+    const resetAt = ui.indexOf('forceResetModals(options = {})');
+    const resetBlock = ui.slice(resetAt, resetAt + 1300);
+    assert.ok(resetBlock.includes('clearInterval(this._statusCarouselTimer);'));
+    assert.ok(resetBlock.includes('this._statusCarouselTimer = null;'));
+    assert.ok(resetBlock.includes('options.skipBackgroundRecovery === true'));
+    const titleAt = ui.indexOf('async returnToTitle(options = {})');
+    const titleBlock = ui.slice(titleAt, titleAt + 900);
+    assert.ok(titleBlock.includes('this.forceResetModals({ skipBackgroundRecovery: true });'));
+});
+
+test('古い実機診断はモーダル閉鎖後の次フレーム到達も記録する', () => {
+    const info = read('js/ui_info.js');
+    assert.ok(info.includes("ui:modal_close:state_reset_done"));
+    assert.ok(info.includes("ui:modal_close:next_frame_done"));
+    assert.ok(info.includes('requestAnimationFrame(() =>'));
+});
+
+test('システムメニューはセーブ・ロード・設定・履歴・指南書・観戦の順に並ぶ', () => {
+    const catalog = read('js/command_catalog.js');
+    assert.ok(catalog.includes("items: ['save', 'load', 'settings', 'history', 'guide', 'watch', 'title']"));
+});
+
+test('指南書は低能力武将の民忠維持上の役目も案内する', () => {
+    const guide = read('js/guide_data.js');
+    assert.ok(guide.includes('通常の城では民忠が月ごとに少しずつ下がる'));
+    assert.ok(guide.includes('各城に最低限の武将を配置しておく意味があります'));
+    assert.ok(guide.includes('施しなどで維持できるよう各城に最低限の家臣を置く'));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

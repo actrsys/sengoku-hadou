@@ -85,7 +85,15 @@ class UIInfoManager {
         
         // ★全リスト共通の選択状態を記憶する箱
         this.commonSelectedIds = [];
-        if (canDiagnose) this.game.writeSystemDiagnostic('ui:modal_close:state_reset_done');
+        if (canDiagnose) {
+            this.game.writeSystemDiagnostic('ui:modal_close:state_reset_done');
+            // 古い実機で描画/GPU反映時に落ちる場合を切り分けるため、次フレーム到達も記録する。
+            requestAnimationFrame(() => {
+                if (this.game && this.game.phase !== 'title' && typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic('ui:modal_close:next_frame_done');
+                }
+            });
+        }
     }
 
     // --- 共通モーダルのガワ ---

@@ -565,7 +565,13 @@ class StrategySystem {
 
     // ★追加：城の中にいる一番武力の高い武将と、一番智謀の高い武将の能力を調べる魔法です
     getCastleBestStats(castleId) {
-        const bushos = this.game.getCastleBushos(castleId).filter(b => window.BushoStatusRules.isActive(b));
+        const castle = this.game.getCastle(castleId);
+        if (!castle) return { bestStr: 0, bestInt: 0 };
+        const bushos = this.game.getCastleBushos(castleId).filter(b =>
+            Number(b.clan) === Number(castle.ownerClan)
+            && Number(b.belongKunishuId || 0) === 0
+            && window.BushoStatusRules.isActive(b)
+        );
         let bestStr = 0;
         let bestInt = 0;
         bushos.forEach(b => {

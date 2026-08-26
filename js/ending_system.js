@@ -12,8 +12,8 @@ class EndingSystem {
     async processGameClear() {
         if (this.game.ui) {
             // これまでのBGMを止めます
-            if (window.AudioManager && typeof window.AudioManager.stopBgm === 'function') {
-                window.AudioManager.stopBgm();
+            if (window.AudioManager && typeof window.AudioManager.stopBGM === 'function') {
+                window.AudioManager.stopBGM();
             }
             
             // 天下統一のメッセージ
@@ -28,8 +28,8 @@ class EndingSystem {
     async processGameOver(reasonMsg = "人間五十年――") {
         if (this.game.ui) {
             // これまでのBGMを止めます
-            if (window.AudioManager && typeof window.AudioManager.stopBgm === 'function') {
-                window.AudioManager.stopBgm();
+            if (window.AudioManager && typeof window.AudioManager.stopBGM === 'function') {
+                window.AudioManager.stopBGM();
             }
             
             const overMessage = reasonMsg + "\n\n野望は潰え、歴史の波に飲まれた。\n\nここに、ひとつの物語が幕を閉じた……";

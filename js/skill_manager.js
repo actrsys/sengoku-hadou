@@ -458,7 +458,13 @@ class SkillManager {
     // ＜暗殺防諜＞ ターゲット拠点の武芸Lvを合計して、暗殺の成功率を下げる（重複可）
     static calcBugeiAssassinateDefense(castleId, game) {
         if (!game || !castleId) return 0;
-        const bushos = game.getCastleBushos(castleId).filter(b => window.BushoStatusRules.isActive(b));
+        const castle = game.getCastle(castleId);
+        if (!castle) return 0;
+        const bushos = game.getCastleBushos(castleId).filter(b =>
+            Number(b.clan) === Number(castle.ownerClan)
+            && Number(b.belongKunishuId || 0) === 0
+            && window.BushoStatusRules.isActive(b)
+        );
         let totalLvl = 0;
         bushos.forEach(b => {
             totalLvl += this.getBugeiLevel(b);
@@ -471,7 +477,13 @@ class SkillManager {
     static calcBugeiCounterIntelligenceBonus(castleId, game) {
         if (!game || !castleId) return 0;
         // お城で活動中の武将全員を集めます
-        const bushos = game.getCastleBushos(castleId).filter(b => window.BushoStatusRules.isActive(b));
+        const castle = game.getCastle(castleId);
+        if (!castle) return 0;
+        const bushos = game.getCastleBushos(castleId).filter(b =>
+            Number(b.clan) === Number(castle.ownerClan)
+            && Number(b.belongKunishuId || 0) === 0
+            && window.BushoStatusRules.isActive(b)
+        );
         let totalLvl = 0;
         bushos.forEach(b => {
             totalLvl += this.getBugeiLevel(b);

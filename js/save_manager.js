@@ -353,6 +353,9 @@ class SaveManager {
         }
         this.game.eventManager = new EventManager(this.game);
         if (this.game.gunshiSystem) this.game.gunshiSystem.onStartMonth();
+        if (this.game.aiStaffing && typeof this.game.aiStaffing.resetCaches === 'function') {
+            this.game.aiStaffing.resetCaches();
+        }
         
         // --- 復元作業 ---
         this.game.flags = d.flags;

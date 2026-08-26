@@ -222,6 +222,12 @@ class AIStaffing {
         this.lastMonth = -1;
     }
 
+    // 新規開始・ロードでは、別ゲームの武将評価や城役割を再利用しない。
+    resetCaches() {
+        this.evaluationCache = {};
+        this.lastMonth = -1;
+    }
+
     _getAdjacentCastles(castle) {
         return this.game.mapGraph.getAdjacentCastles(castle);
     }

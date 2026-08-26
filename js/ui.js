@@ -1540,10 +1540,21 @@ class UIManager {
         }
     }
 
-    forceResetModals() {
-        // ★ここを書き足し：強制リセットの時は、背景ストップも確実に解除しておきます！
+    forceResetModals(options = {}) {
+        // 強制リセットでは状態マークの古いDOM参照も必ず解放する。
+        if (this._statusCarouselTimer) {
+            clearInterval(this._statusCarouselTimer);
+            this._statusCarouselTimer = null;
+        }
+
+        // タイトル復帰時は直後に地図資源を破棄するため、重い背景Canvasを復元し直さない。
         if (this.isBackgroundPaused) {
-            this.resumeBackgroundUpdates();
+            if (options.skipBackgroundRecovery === true) {
+                this.isBackgroundPaused = false;
+                document.body.classList.remove('background-paused');
+            } else {
+                this.resumeBackgroundUpdates();
+            }
         }
 
         const modals = document.querySelectorAll('.modal');
@@ -1850,7 +1861,7 @@ class UIManager {
         else this.updateLoadingProgress(10, 'タイトル画面へ戻っています');
         await this.waitForNextPaint();
 
-        this.forceResetModals();
+        this.forceResetModals({ skipBackgroundRecovery: true });
         if (typeof this.resetMapViewState === 'function') this.resetMapViewState();
         if (this.game && typeof this.game.releaseScenarioMapResources === 'function') {
             this.game.releaseScenarioMapResources();

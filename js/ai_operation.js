@@ -31,6 +31,14 @@ class AIOperationManager {
         this.historyOwnedCastles = data.historyOwnedCastles;
     }
 
+    // 新しいゲームでは、前ゲームの作戦・徴兵拠点・大方針・旧所領履歴をすべて破棄する。
+    resetAllState() {
+        this.operations = {};
+        this.draftBases = {};
+        this.grandObjectives = {};
+        this.historyOwnedCastles = {};
+    }
+
     // ★Round6：軍団が解散・国主不在になった時、その軍団専用の作戦メモをまとめて片付けます。
     // operationsだけを消すとgrandObjectivesやdraftBasesが同じ軍団Noの再利用時に残るため、3種類を一括処理します。
     clearLegionPlanning(clanId, legionId) {

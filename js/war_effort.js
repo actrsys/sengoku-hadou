@@ -1861,8 +1861,8 @@ Object.assign(WarManager.prototype, {
                     if (attackerWon) {
                         if (window.AudioManager) {
                             // ★修正：フェードアウトさせると音量が0になって戻らなくなるので、ピタッと止める魔法にします！
-                            if (typeof window.AudioManager.stopBgm === 'function') {
-                                window.AudioManager.stopBgm();
+                            if (typeof window.AudioManager.stopBGM === 'function') {
+                                window.AudioManager.stopBGM();
                             }
                             window.AudioManager.playSE('victory.ogg');
                         }
@@ -2279,8 +2279,8 @@ Object.assign(WarManager.prototype, {
                 if (attackerWon && !isRetreat && isAtkPlayer) {
                     if (window.AudioManager) {
                         // ★修正：フェードアウトさせると音量が0になって戻らなくなるので、ピタッと止める魔法にします！
-                        if (typeof window.AudioManager.stopBgm === 'function') {
-                            window.AudioManager.stopBgm();
+                        if (typeof window.AudioManager.stopBGM === 'function') {
+                            window.AudioManager.stopBGM();
                         }
                         window.AudioManager.playSE('victory.ogg');
                     }

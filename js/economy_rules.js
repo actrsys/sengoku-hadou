@@ -405,7 +405,7 @@ class EconomyRules {
 
     static calcCastleSalary(castle, game) {
         if (!game) return 0;
-        const bushos = game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b));
+        const bushos = game.getCastleBushos(castle.id).filter(b => Number(b.clan) === Number(castle.ownerClan) && Number(b.belongKunishuId || 0) === 0 && window.BushoStatusRules.isActive(b));
         const daimyo = game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
         let consumeGold = 0;
         bushos.forEach(b => {

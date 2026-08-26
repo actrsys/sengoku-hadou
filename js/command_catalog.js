@@ -64,7 +64,7 @@ const COMMAND_MENU_STRUCTURE = [
     },
     {
         label: "システム",
-        items: ['guide', 'history', 'settings', 'save', 'load', 'watch', 'title']
+        items: ['save', 'load', 'settings', 'history', 'guide', 'watch', 'title']
     }
 ];
 

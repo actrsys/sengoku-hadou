@@ -218,10 +218,12 @@ class GameManager {
         this.flags = {};
         this.eventManager = new EventManager(this);
         
-        // ★AIの作戦データも真っ白にします（これで保護期間無視のバグを防ぎます）！
-        if (this.aiOperationManager) {
-            this.aiOperationManager.operations = {};
-            this.aiOperationManager.draftBases = {};
+        // 新規ゲームへ前ゲームのAI作戦・所領履歴・人事評価を持ち越さない。
+        if (this.aiOperationManager && typeof this.aiOperationManager.resetAllState === 'function') {
+            this.aiOperationManager.resetAllState();
+        }
+        if (this.aiStaffing && typeof this.aiStaffing.resetCaches === 'function') {
+            this.aiStaffing.resetCaches();
         }
         
         this.ui.showScenarioSelection(SCENARIOS, (folder) => {
