@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r216');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r217');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -110,6 +110,36 @@ test('士気上限は内部120・通常100・ゲージ100を設定の正本か�
     assert.ok(!sources.includes('? window.WarParams.Military.MaxMoraleInternal'));
     assert.ok(read('js/command_system.js').includes('MaxMoraleNormal'));
     assert.ok(read('js/ui.js').includes('MaxMoraleGauge'));
+});
+
+test('設定の二択ボタンは兵科classを流用せず共通button SEへ委譲する', () => {
+    const html = read('index.html');
+    const settingsJs = read('js/ui_settings.js');
+    const ids = ['autosave-true', 'autosave-false', 'notify-true', 'notify-false', 'historical-true', 'historical-false'];
+    ids.forEach(id => {
+        const re = new RegExp(`<button[^>]*class="ui-toggle-btn"[^>]*data-se="choice\\.ogg"[^>]*id="btn-${id}"|<button[^>]*id="btn-${id}"[^>]*class="ui-toggle-btn"[^>]*data-se="choice\\.ogg"`);
+        assert.ok(re.test(html), `${id} は ui-toggle-btn + choice SE を使う`);
+    });
+    const settingsBlock = html.slice(html.indexOf('id="settings-modal"'), html.indexOf('id="saveload-modal"'));
+    assert.ok(!settingsBlock.includes('troop-type-btn'), '設定画面に兵科ボタンclassを流用しない');
+    assert.ok(!settingsJs.includes("playSE('choice.ogg')"), '設定Viewからbutton SEを重ねて鳴らさない');
+    assert.ok(read('ARCHITECTURE.md').includes('汎用の二択・切替操作は `.ui-toggle-btn`、兵科選択だけは `.troop-type-btn`'), '切替ボタンと兵科ボタンの意味上の責務を設計文書へ残す');
+});
+
+test('会話選択肢の静的配置はCSSクラスを正本にしJS inline layoutへ戻さない', () => {
+    const ui = read('js/ui.js');
+    const css = read('css/style.css');
+    const layoutWrites = [
+        'footer.style.position', 'footer.style.order', 'footer.style.zIndex',
+        'footer.style.width', 'footer.style.maxWidth', 'footer.style.flexDirection',
+        'footer.style.gap', 'footer.style.justifyContent',
+        "footer.style.setProperty('margin-top'", "footer.style.setProperty('margin-bottom'",
+        "modalContent.style.setProperty('margin-top'",
+        'modal.style.flexDirection', 'modal.style.justifyContent'
+    ];
+    layoutWrites.forEach(token => assert.ok(!ui.includes(token), `静的ダイアログ配置をJSへ戻さない: ${token}`));
+    assert.ok(css.includes('.event-dialog-modal.event-choices-active .modal-footer'), '選択肢footer配置はCSSに置く');
+    assert.ok(css.includes('body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer'), 'スマホ差もCSSに置く');
 });
 
 test('SEは一時Howlを再生終了または読込失敗時に解放する', () => {

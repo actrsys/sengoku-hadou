@@ -943,29 +943,9 @@ class UIManager {
         // ★Round12：ここまでは現在表示中の会話画面に一切触れません。
         // 次の顔が準備できた後で初めて前回の配置を掃除し、同じ処理単位で次の内容へ切り替えます。
         if (modal) {
-            modal.style.display = '';
-            modal.style.flexDirection = '';
-            modal.style.justifyContent = '';
+            // 静的な配置はCSSクラスを正本とする。前回入力停止用の動的状態だけ戻す。
             const resetFooter = modal.querySelector('.modal-footer');
-            if (resetFooter) {
-                resetFooter.style.position = '';
-                resetFooter.style.top = '';
-                resetFooter.style.bottom = '';
-                resetFooter.style.left = '';
-                resetFooter.style.transform = '';
-                resetFooter.style.zIndex = '';
-                resetFooter.style.width = '';
-                resetFooter.style.maxWidth = '';
-                resetFooter.style.padding = '';
-                resetFooter.style.margin = '';
-                resetFooter.style.justifyContent = '';
-                resetFooter.style.pointerEvents = '';
-                resetFooter.style.order = '';
-                resetFooter.style.removeProperty('margin-top');
-                resetFooter.style.removeProperty('margin-bottom');
-            }
-            const resetContent = modal.querySelector('.modal-content');
-            if (resetContent) resetContent.style.removeProperty('margin-top');
+            if (resetFooter) resetFooter.style.pointerEvents = '';
         }
 
         const setFaceAndName = (faceEl, nameEl, faceIcon, nameText, preparedImg) => {
@@ -1150,64 +1130,17 @@ class UIManager {
 
         if (isBottomMessage) {
             modal.classList.add('event-dialog-modal');
-
-            // メッセージを画面の一番下に配置
-            modal.style.display = 'flex';
-            modal.style.flexDirection = 'column';
-            modal.style.justifyContent = 'flex-end';
             
             if (hasChoices) {
-                // 選択肢がある場合
+                // 選択肢の配置は event-choices-active のCSSを正本にする。
                 modal.classList.add('event-choices-active');
-
-                if (footer) {
-                    footer.classList.remove('hidden');
-                    
-                    // ★変更：メッセージ枠の「すぐ上」に配置する魔法
-                    // 親要素(modal)が縦並びのリストになっているので、順番(order)を入れ替えるだけで上にきます！
-                    footer.style.position = 'relative'; 
-                    footer.style.order = '-1'; 
-                    
-                    // ★最上部に飛んでしまう原因だった「上の空きスペース（margin-top: auto）」を、
-                    // 強力な魔法(!important)で上書きし、メッセージ枠から奪い取ってボタン（footer）の上に作らせます！
-                    footer.style.setProperty('margin-top', 'auto', 'important');
-                    footer.style.setProperty('margin-bottom', '15px', 'important'); // メッセージ枠との隙間
-                    
-                    if (modalContent) {
-                        // メッセージ枠の上の空きスペースを消して、ボタンのすぐ下にくっつけます
-                        modalContent.style.setProperty('margin-top', '0', 'important');
-                    }
-                    
-                    footer.style.top = '';
-                    footer.style.bottom = '';
-                    footer.style.left = '';
-                    footer.style.transform = '';
-                    footer.style.zIndex = '1000';
-                    footer.style.padding = '0';
-                    footer.style.justifyContent = 'center';
-                    
-                    if (document.body.classList.contains('is-pc')) {
-                        footer.style.width = '80%';
-                        footer.style.maxWidth = '600px';
-                        footer.style.flexDirection = 'row'; // ★PC版は横並び
-                        footer.style.gap = '10px';
-                    } else {
-                        footer.style.width = '100%';
-                        footer.style.maxWidth = '100%';
-                        footer.style.flexDirection = 'row';
-                        footer.style.gap = '10px';
-                    }
-                }
+                if (footer) footer.classList.remove('hidden');
             } else {
                 // 選択肢がなく、閉じるだけの場合：ボタンを隠して画面クリックで進行
                 modal.classList.remove('event-choices-active');
-                if (footer) {
-                    footer.classList.add('hidden');
-                    footer.style.flexDirection = ''; // お掃除
-                    footer.style.gap = '';
-                }
+                if (footer) footer.classList.add('hidden');
 
-                // ★変更：画面のどこ（黒背景でも枠内でも）をタッチしても進めるようにします
+                // 画面のどこ（黒背景でも枠内でも）をタッチしても進める。
                 modal.style.cursor = 'pointer';
                 modal.addEventListener('click', this._currentEventClickHandler);
                 
@@ -1216,23 +1149,10 @@ class UIManager {
                 }
             }
         } else {
-            // 下側配置ではない通常のダイアログ
+            // 下側配置ではない通常のダイアログ。配置は標準 .modal / .modal-footer に戻す。
             modal.classList.remove('event-dialog-modal');
             modal.classList.remove('event-choices-active');
-            
-            if (footer) {
-                footer.style.flexDirection = ''; // お掃除
-                footer.style.gap = '';
-            }
-
-            modal.style.display = 'flex';
-            modal.style.flexDirection = 'column';
-            modal.style.justifyContent = 'center'; // 通常時は画面の中央付近にまとめます
-
-            if (footer) {
-                footer.classList.remove('hidden');
-                footer.style.justifyContent = 'center';
-            }
+            if (footer) footer.classList.remove('hidden');
         }
 
         // --- ボタンの生成 ---

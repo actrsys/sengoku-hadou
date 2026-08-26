@@ -55,13 +55,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (btnTrue) {
             btnTrue.addEventListener('click', () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                 updateToggleSetting(type, true);
             });
         }
         if (btnFalse) {
             btnFalse.addEventListener('click', () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                 updateToggleSetting(type, false);
             });
         }

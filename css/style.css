@@ -4455,6 +4455,32 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     display: none !important;
 }
 
+/* 会話・イベントの選択肢配置は静的レイアウトなのでCSSを正本にする。
+   JSは event-dialog-modal / event-choices-active の状態切替だけを担当する。 */
+.event-dialog-modal.event-choices-active .modal-footer {
+    position: relative;
+    order: -1;
+    margin-top: auto !important;
+    margin-bottom: 15px !important;
+    z-index: 1000;
+    padding: 0;
+    justify-content: center;
+    width: 80%;
+    max-width: 600px;
+    flex-direction: row;
+    gap: 10px;
+}
+
+.event-dialog-modal.event-choices-active .modal-content {
+    margin-top: 0 !important;
+}
+
+body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
+    width: 100%;
+    max-width: 100%;
+    flex-direction: row;
+}
+
 /* --- 軍団マーカー（お城の右上に配置用） --- */
 .legion-marker-base {
     position: absolute;
@@ -5339,7 +5365,8 @@ body:not(.is-pc) .setting-row {
     display: flex;
     gap: 10px;
 }
-.setting-toggle-group .troop-type-btn {
+.setting-toggle-group .troop-type-btn,
+.setting-toggle-group .ui-toggle-btn {
     flex: 1; /* ボタンを横幅いっぱいに等分する */
     padding: 8px 12px;
     font-size: 1rem;
