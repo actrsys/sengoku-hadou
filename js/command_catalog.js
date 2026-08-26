@@ -242,7 +242,7 @@ const CAN_EXECUTE_RULES = {
     canBuyHorses: (game, castle) => {
         const daimyo = game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
         const castellan = game.getBusho(castle.castellanId);
-        const cost = EconomyRules.calcBuyHorseCost(1, daimyo, castellan, this.game);
+        const cost = EconomyRules.calcBuyHorseCost(1, daimyo, castellan, game);
         return castle.gold >= cost;
     },
     canBuyGuns: (game, castle) => {
@@ -251,7 +251,7 @@ const CAN_EXECUTE_RULES = {
         
         const daimyo = game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
         const castellan = game.getBusho(castle.castellanId);
-        const cost = EconomyRules.calcBuyGunCost(1, daimyo, castellan, this.game);
+        const cost = EconomyRules.calcBuyGunCost(1, daimyo, castellan, game);
         return castle.gold >= cost;
     },
     // --- 臣従願のルール追加 ---
@@ -268,24 +268,13 @@ const CAN_EXECUTE_RULES = {
         const myPrestige = myClan.daimyoPrestige;
         const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(myClanId));
         
-        let hasValidTarget = false;
-        for (let mc of myCastles) {
-            if (mc.adjacentCastleIds) {
-                for (let adjId of mc.adjacentCastleIds) {
-                    const adjC = game.getCastle(adjId);
-                    if (adjC && adjC.ownerClan !== 0 && adjC.ownerClan !== myClanId) {
-                        const targetClan = game.clans.find(c => c.id === adjC.ownerClan);
-                        if (targetClan && targetClan.daimyoPrestige >= myPrestige * 5) {
-                            hasValidTarget = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            if (hasValidTarget) break;
-        }
-        
-        return hasValidTarget;
+        return myCastles.some(myCastle => game.castles.some(adjacentCastle => {
+            if (!MapGraphService.isAdjacent(myCastle, adjacentCastle)) return false;
+            const targetClanId = Number(adjacentCastle.ownerClan) || 0;
+            if (targetClanId === 0 || targetClanId === Number(myClanId)) return false;
+            const targetClan = game.clans.find(c => Number(c.id) === targetClanId);
+            return !!targetClan && targetClan.daimyoPrestige >= myPrestige * 5;
+        }));
     },
     // --- 情報用 ---
     hasFaction: (game) => {

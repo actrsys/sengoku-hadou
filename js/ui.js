@@ -543,6 +543,36 @@ class UIManager {
         if (totalEl && totalEl.textContent !== totalText) totalEl.textContent = totalText;
     }
 
+
+    // AIガードは「操作不能な待機中」を示す共通オーバーレイでもあるため、
+    // 月初・月末などAI城進捗ではない処理中も同じ見た目を再利用する。
+    // 新しいオーバーレイを増やさず、次のAI進捗更新時には updateAIProgress() が通常表示へ戻す。
+    showProcessingStatus(text) {
+        const guard = this.aiGuard || document.getElementById('ai-guard');
+        if (!guard) return;
+
+        this.guardHiddenCount = 0;
+        this.guardTextHiddenCount = 0;
+        guard.style.opacity = '1';
+        guard.style.display = '';
+        guard.classList.remove('hidden');
+        guard.classList.remove('hide-text');
+
+        let spinner = guard.querySelector('.loading-spinner');
+        if (!spinner) {
+            spinner = document.createElement('div');
+            spinner.className = 'loading-spinner';
+        }
+
+        let status = guard.querySelector('[data-processing-status]');
+        if (!status) {
+            status = document.createElement('div');
+            status.setAttribute('data-processing-status', '');
+            guard.replaceChildren(spinner, status);
+        }
+        status.textContent = String(text || '処理中...');
+    }
+
     async waitForDialogs() {
         const isVisible = (id) => {
             const el = document.getElementById(id);

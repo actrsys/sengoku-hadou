@@ -54,6 +54,9 @@ html.fonts-fallback body { visibility: visible; }
     --header-height: 100px;
     /* 標準モーダルの内容枠と決定・戻る・閉じる等の操作列との共通間隔。 */
     --modal-footer-gap: 12px;
+    /* 下部会話だけは名前札がメッセージ枠の上へ16〜18px張り出すため、
+       標準12pxでは視覚的クリアランスが不足する。会話選択肢専用の例外値として18pxを正本化する。 */
+    --dialog-choice-footer-gap: 18px;
 }
 
 body {
@@ -4431,15 +4434,18 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
     /* 画面下部に配置しつつ、枠（ボーダー）を残すための設定 */
     width: calc(100% - 20px) !important;
     max-width: 800px !important;
-    margin: auto auto 0 auto !important;
+    margin: 0 auto !important;
     border-radius: 8px !important;
 }
 
 body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
-    /* スマホ版で枠が消えてしまうのを防ぎ、少し隙間を空けます */
+    /* スマホ版でも縦方向のauto marginを持たせない。
+       選択肢footerは初期化時にmodal-contentの外へ移るため、双方にauto marginがあると
+       空き高さを分け合って「はい/いいえ」だけ画面中央へ浮いてしまう。
+       下端配置は親 .event-dialog-modal の justify-content:flex-end を唯一の正本にする。 */
     width: calc(100% - 20px) !important;
     border-radius: 8px !important;
-    margin: auto auto 0 auto !important;
+    margin: 0 auto !important;
 }
 
 /* 次へ進む（▼）マークを追加して分かりやすくします */
@@ -4464,8 +4470,8 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 .event-dialog-modal.event-choices-active .modal-footer {
     position: relative;
     order: -1;
-    margin-top: auto !important;
-    margin-bottom: 15px !important;
+    margin-top: 0 !important;
+    margin-bottom: var(--dialog-choice-footer-gap) !important;
     z-index: 1000;
     padding: 0;
     justify-content: center;
@@ -4475,14 +4481,12 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     gap: 10px;
 }
 
-.event-dialog-modal.event-choices-active .modal-content {
-    margin-top: 0 !important;
-}
-
 body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
     width: 100%;
     max-width: 100%;
     flex-direction: row;
+    /* 下端配置は親モーダルが担当するため、スマホも標準modal-footerの高さを維持する。
+       内容枠との間隔もPCと同じ --dialog-choice-footer-gap を使う。 */
 }
 
 /* --- 軍団マーカー（お城の右上に配置用） --- */

@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r232');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r237');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -139,7 +139,47 @@ test('会話選択肢の静的配置はCSSクラスを正本にしJS inline layo
     ];
     layoutWrites.forEach(token => assert.ok(!ui.includes(token), `静的ダイアログ配置をJSへ戻さない: ${token}`));
     assert.ok(css.includes('.event-dialog-modal.event-choices-active .modal-footer'), '選択肢footer配置はCSSに置く');
+    assert.ok(css.includes('--dialog-choice-footer-gap: 18px;'), '名前札の張り出しを避ける下部会話専用18px間隔を意味付き変数で正本化する');
+    assert.ok(css.includes('margin-bottom: var(--dialog-choice-footer-gap) !important;'), '会話選択肢は専用の名前札クリアランス変数を参照する');
     assert.ok(css.includes('body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer'), 'スマホ差もCSSに置く');
+});
+
+
+test('下部会話の選択肢は標準footer高を保ち、名前札クリアランスだけ18pxにする', () => {
+    const css = read('css/style.css');
+    const footerStart = css.indexOf('.event-dialog-modal.event-choices-active .modal-footer');
+    const footerBlock = css.slice(footerStart, css.indexOf('}', footerStart) + 1);
+    assert.ok(footerStart >= 0, '会話選択肢footerの配置CSSが必要');
+    assert.ok(footerBlock.includes('margin-top: 0 !important'), '選択肢footer自身で縦余白を吸収しない');
+    const start = css.indexOf('body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer');
+    const block = css.slice(start, css.indexOf('}', start) + 1);
+    assert.ok(start >= 0, 'スマホ会話選択肢の専用CSSが必要');
+    assert.ok(!block.includes('min-height: 0'), 'スマホだけ標準modal-footerの60px最小高さを解除しない');
+    assert.ok(!block.includes('margin-bottom:'), 'スマホだけ会話選択肢の間隔を個別上書きせず、PC共通の18px例外を使う');
+    assert.ok(css.includes('.event-dialog-modal .modal-content.modal-small'), '下部会話枠の配置規則が必要');
+    const contentStart = css.indexOf('.event-dialog-modal .modal-content.modal-small');
+    const contentBlock = css.slice(contentStart, css.indexOf('}', contentStart) + 1);
+    assert.ok(contentBlock.includes('margin: 0 auto !important'), '会話枠側にも縦auto marginを残さない');
+    const mobileContentStart = css.indexOf('body:not(.is-pc) .event-dialog-modal .modal-content.modal-small');
+    const mobileContentBlock = css.slice(mobileContentStart, css.indexOf('}', mobileContentStart) + 1);
+    assert.ok(mobileContentBlock.includes('margin: 0 auto !important'), 'スマホ専用上書きでも縦auto marginを再導入しない');
+});
+
+test('会話確認visual fixtureは実ゲーム同様footerをmodal-content外へ置く', () => {
+    const html = read('tests/visual/dialog_confirm.html');
+    const contentClose = html.indexOf('</div>\n        <!-- 実ゲームでは UIManager 初期化時');
+    const footerAt = html.indexOf('<div class="modal-footer right">');
+    assert.ok(contentClose >= 0 && footerAt > contentClose, 'fixtureでfooterをmodal-contentの兄弟要素にする');
+});
+
+test('月末・月初の長い処理は既存AIガードへ進行中表示を出す', () => {
+    const ui = read('js/ui.js');
+    const turn = read('js/turn_manager.js');
+    assert.ok(ui.includes('showProcessingStatus(text)'), '既存ai-guardを汎用処理表示へ再利用する');
+    assert.ok(ui.includes("[data-processing-status]"), '処理表示は専用テキスト要素を再利用する');
+    assert.ok(turn.includes("showProcessingStatus('月初準備中...')"));
+    assert.ok(turn.includes("showProcessingStatus('月末処理中...')"));
+    assert.ok(!read('index.html').includes('month-processing-guard'), '月処理専用オーバーレイを重複追加しない');
 });
 
 test('SEは一時Howlを再生終了または読込失敗時に解放する', () => {
@@ -3157,6 +3197,46 @@ test('武将active/roninとdead/unbornの直接書換は所有部署と初期化
     assert.deepStrictEqual(offenders, [], `武将状態の直接代入: ${offenders.join(', ')}`);
 });
 
+test('国主は別家の同番号軍団城へ移動しても国主職を誤保持しない', () => {
+    const ctx = createContext({ PersonnelRules: { calcAffinityDiff: () => 0 } });
+    loadScript(ctx, 'js/affiliation_system.js');
+    const AffiliationSystem = vm.runInContext('AffiliationSystem', ctx);
+    const busho = { id: 10, clan: 1, castleId: 1, isCommander: true, isCastellan: false };
+    const destination = { id: 2, ownerClan: 2, legionId: 1 };
+    let disbanded = 0;
+    const game = {
+        legions: [{ id: 101, clanId: 1, legionNo: 1, commanderId: 10 }],
+        getCastle: id => Number(id) === 2 ? destination : null,
+        castleManager: { disbandLegion: id => { disbanded = Number(id); busho.isCommander = false; } }
+    };
+    const affiliation = new AffiliationSystem(game);
+    affiliation.leaveCastle = () => {};
+    affiliation.enterCastle = (b, id) => { b.castleId = Number(id); };
+    affiliation.updateUI = () => {};
+    affiliation.moveCastle(busho, 2, { deferUI: true });
+    assert.strictEqual(disbanded, 101);
+    assert.strictEqual(busho.isCommander, false);
+});
+
+test('城主更新は旧所有家の城主バッジを城側の正本に合わせて掃除する', () => {
+    const ctx = createContext({
+        PersonnelRules: { calcAffinityDiff: () => 0 },
+        BushoStatusRules: { isActive: b => b.status === 'active' }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    const AffiliationSystem = vm.runInContext('AffiliationSystem', ctx);
+    const oldLord = { id: 10, clan: 1, castleId: 1, status: 'active', isCastellan: true };
+    const castle = { id: 1, ownerClan: 2, castellanId: 10 };
+    const game = {
+        getBusho: id => Number(id) === 10 ? oldLord : null,
+        getCastleBushos: () => [oldLord]
+    };
+    const affiliation = new AffiliationSystem(game);
+    affiliation.updateCastleLord(castle);
+    assert.strictEqual(castle.castellanId, 0);
+    assert.strictEqual(oldLord.isCastellan, false);
+});
+
 test('活動状態と生死状態の低レベルAPIは担当外状態を拒否する', () => {
     const silentConsole = { ...console, warn: () => {} };
     const ctx = createContext({ console: silentConsole, PersonnelRules: { calcAffinityDiff: () => 0 } });
@@ -3460,6 +3540,7 @@ test('標準modal-footerは12pxに統一し、シナリオfooterを内部Gridの
     const css = read('css/style.css');
     const html = read('index.html');
     assert.ok(css.includes('--modal-footer-gap: 12px;'), '標準footer間隔12pxをCSS変数で一元化する');
+    assert.ok(css.includes('--dialog-choice-footer-gap: 18px;'), '下部会話は名前札張り出し理由を持つ18px専用変数にする');
     assert.ok(css.includes('.modal-footer { margin-top: var(--modal-footer-gap);'), '標準footerは共通変数を参照する');
     assert.ok(!css.includes('#guide-modal .modal-footer {'), '指南書だけのfooter余白上書きを残さない');
     assert.ok(html.includes('<div class="scenario-main">'), 'シナリオ一覧と説明をfooterから分離した内側Gridへ置く');
@@ -3481,6 +3562,32 @@ test('指南書は合戦を野戦・攻城戦・兵科へ分け、内部倍率�
     assert.ok(guide.includes('移動した直後は攻撃できず'));
     assert.ok(guide.includes('雨や雪では遠距離射撃ができず'));
     assert.ok(!guide.includes('1.5倍') && !guide.includes('0.7倍'), '指南書へ内部戦闘倍率を露出しない');
+});
+
+test('馬・鉄砲の購入可否は受け取ったゲーム状態を価格計算へ渡す', () => {
+    let horseGame = null;
+    let gunGame = null;
+    const ctx = createContext({
+        MainParams: { CommandCost: { Farm:1, Commerce:1, Repair:1, Charity:1, SoldierCharity:1, Reward:1, RewardAll:1 } },
+        EconomyRules: {
+            calcBuyHorseCost: (_amount, _daimyo, _castellan, game) => { horseGame = game; return 1; },
+            calcBuyGunCost: (_amount, _daimyo, _castellan, game) => { gunGame = game; return 1; }
+        }
+    });
+    ctx.window.MainParams = ctx.MainParams;
+    loadScript(ctx, 'js/command_catalog.js');
+    const rules = vm.runInContext('CAN_EXECUTE_RULES', ctx);
+    const daimyo = { id: 1, clan: 1, isDaimyo: true };
+    const castellan = { id: 2, clan: 1, isCastellan: true };
+    const game = {
+        year: 1560, bushos: [daimyo, castellan],
+        getBusho: id => Number(id) === 2 ? castellan : null
+    };
+    const castle = { ownerClan: 1, castellanId: 2, gold: 10 };
+    assert.strictEqual(rules.canBuyHorses(game, castle), true);
+    assert.strictEqual(rules.canBuyGuns(game, castle), true);
+    assert.strictEqual(horseGame, game);
+    assert.strictEqual(gunGame, game);
 });
 
 test('指南書のコマンド解説は command_catalog の階層を使い、全表示コマンドを個別説明できる', () => {
@@ -4874,6 +4981,14 @@ test('セーブデータから一門派生キャッシュを除外する', () =>
 });
 
 
+test('セーブ復元は城主フラグをCastle.castellanIdから再構築する', () => {
+    const save = read('js/save_manager.js');
+    assert.ok(save.includes('this.game.bushos.forEach(busho => { busho.isCastellan = false; });'));
+    assert.ok(save.includes('Number(b.id) === Number(castle.castellanId)'));
+    assert.ok(save.includes('Number(castellan.castleId) === Number(castle.id)'));
+    assert.ok(save.includes('Number(castellan.clan) === Number(castle.ownerClan)'));
+});
+
 test('SaveManager は現行スキーマだけを復元前に受理し、旧形式を移行しない', () => {
     const ctx = createContext({
         SCENARIOS: [{ folder: '1560_okehazama' }]
@@ -4886,7 +5001,7 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
         saveTime: '2026/08/25 23:30',
         year: 1560, month: 4, gameStartYear: 1560, gameStartMonth: 4,
         scenarioFolder: '1560_okehazama', scenarioName: '1560年 桶狭間の戦い', scenarioNo: 'シナリオ1',
-        castles: [{ id: 1, ownerClan: 1, castellanId: 10 }],
+        castles: [{ id: 1, ownerClan: 1, castellanId: 10, samuraiIds: [10] }],
         bushos: [{ id: 10, clan: 1, castleId: 1, nemesisList: [] }],
         clans: [{ id: 1, leaderId: 10 }],
         princesses: [{ id: 90001, isDiplomaticMarriageActive: true }], provinces: [{ id: 1 }], legions: [], kunishus: [],
@@ -4926,6 +5041,10 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
         { id: 10, clan: 1, castleId: 1, nemesisList: [] },
         { id: 11, clan: 2, castleId: 1, nemesisList: [] }
     ], legions: [{ id: 1, clanId: 1, legionNo: 1, commanderId: 11, establishedTurnId: 0 }] }), /所属勢力が一致/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ id: 1, ownerClan: 1, castellanId: 10 }] }), /samuraiIds/, '現行セーブでは在城名簿を明示する');
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ id: 1, ownerClan: 1, castellanId: 10, samuraiIds: [10, 10] }] }), /重複/, '同じ城の在城名簿へ同一武将を重複させない');
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ id: 1, ownerClan: 1, castellanId: 10, samuraiIds: [999] }] }), /参照先/, '在城名簿の不存在武将を拒否する');
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, bushos: [{ id: 10, clan: 1, castleId: 0, nemesisList: [] }] }), /武将castleId/, '在城名簿と武将castleIdの食い違いを拒否する');
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, kunishus: [{ id: 1, castleId: 999, leaderId: 0, networkTag: '' }] }), /kunishus\[0\]\.castleId/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, kunishus: [{ id: 1, castleId: 1, leaderId: 999, networkTag: '' }] }), /leaderId/);
 });
@@ -6990,6 +7109,20 @@ test('現行の隣接・海路判定は MapGraphService を正本にし片方向
     assert.ok(diplomacy.includes('MapGraphService.isAdjacent(c, dc)'));
     const interview = read('js/interview_system.js');
     assert.ok(interview.includes('this.game.mapGraph.getAdjacentIds(row.castle)'));
+});
+
+test('出陣・降伏勧告・従属・臣従のコマンド可否もMapGraphServiceを隣接正本にする', () => {
+    const command = read('js/command_system.js');
+    const catalog = read('js/command_catalog.js');
+    const enemyStart = command.indexOf("case 'enemy_valid':");
+    const enemyEnd = command.indexOf("case 'enemy_all':", enemyStart);
+    const diplomacyStart = command.indexOf("if (type === 'dominate' || type === 'subordinate' || type === 'vassalage')");
+    const diplomacyEnd = command.indexOf("if (type === 'vassalage')", diplomacyStart + 10);
+    const vassalageStart = catalog.indexOf('canVassalage: (game) =>');
+    const vassalageEnd = catalog.indexOf('// --- 情報用 ---', vassalageStart);
+    assert.ok(command.slice(enemyStart, enemyEnd).includes('MapGraphService.isAdjacent'));
+    assert.ok(command.slice(diplomacyStart, diplomacyEnd).includes('MapGraphService.isAdjacent'));
+    assert.ok(catalog.slice(vassalageStart, vassalageEnd).includes('MapGraphService.isAdjacent'));
 });
 
 test('軍師・国主任命コマンドは実際に選べる候補がいる時だけ有効になる', () => {

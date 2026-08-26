@@ -1044,6 +1044,57 @@ async function validateWarAptitudeLayout(cdp) {
 }
 
 
+
+async function validateDialogConfirmPlacement(cdp) {
+    const html = fixtureHtml('dialog_confirm.html');
+    const cases = [
+        { label:'PC', width:1280, height:720, mobile:false, isPc:true },
+        { label:'mobile', width:360, height:640, mobile:true, isPc:false }
+    ];
+
+    for (const cfg of cases) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width:cfg.width, height:cfg.height, deviceScaleFactor:1, mobile:cfg.mobile });
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(() => {
+                document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.classList.toggle('is-pc', ${cfg.isPc});
+                const screen=document.getElementById('game-screen');
+                screen.style.position='absolute';screen.style.left='0px';screen.style.top='0px';
+                screen.style.width='${cfg.width}px';screen.style.height='${cfg.height}px';screen.style.overflow='hidden';
+                const rect=(sel)=>{const r=document.querySelector(sel).getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height};};
+                return {
+                    content:rect('#dialog-modal .modal-content'),
+                    footer:rect('#dialog-modal .modal-footer'),
+                    body:rect('#dialog-modal .dialog-body-container'),
+                    message:rect('#dialog-modal .message-area'),
+                    name:rect('#dialog-left-name'),
+                    ok:rect('#dialog-btn-ok'),
+                    cancel:rect('#dialog-btn-cancel')
+                };
+            })()`,
+            returnByValue: true,
+            awaitPromise: true
+        });
+        const st=result.result.value;
+        assert.ok(st.content.bottom >= cfg.height - 25 && st.content.bottom <= cfg.height + 1, `${cfg.label}: 下部会話枠を画面下端付近に置く`);
+        assert.ok(st.footer.bottom <= st.content.top + 0.5, `${cfg.label}: 選択肢を会話枠より上に置く`);
+        // 見た目の間隔はfooter下端→会話枠上端で測る。bodyには枠内paddingがあるため、
+        // body.topを使うと実際の見た目より約7px広く計測される。
+        const gap=st.content.top-st.footer.bottom;
+        if (cfg.isPc) {
+            approx(gap, 18, 1.5, 'PC: 名前札の張り出しを避ける会話専用18px間隔にする');
+            assert.ok(st.footer.height >= 59, `PC: 標準footer寸法を維持する (${st.footer.height})`);
+        } else {
+            approx(gap, 18, 1.5, 'mobile: 名前札の張り出しを避ける会話専用18px間隔にする');
+            assert.ok(st.footer.height >= 59, `mobile: 他の標準モーダルと同じ60px操作列を維持する (${st.footer.height})`);
+            assert.ok(st.footer.bottom >= cfg.height * 0.70, `mobile: はい/いいえ操作列を下部会話の近傍へ置く (${st.footer.bottom})`);
+            assert.ok(st.ok.bottom <= st.name.top + 0.5 && st.cancel.bottom <= st.name.top + 0.5, `mobile: はい/いいえを武将名札へ重ねない (button=${Math.max(st.ok.bottom, st.cancel.bottom)}, name=${st.name.top})`);
+            assert.ok(st.message.top >= cfg.height * 0.75, `mobile: 本文は従来どおり下部へ置く (${st.message.top})`);
+        }
+    }
+    console.log('✓ 会話確認 はい/いいえ PC維持 / スマホ下部配置 visual/layout regression');
+}
+
 async function validateFieldWarFullscreen(cdp) {
     const html = fixtureHtml('field_war_fullscreen.html');
     const cases = [
@@ -1177,6 +1228,7 @@ async function main() {
         await validateEndingAndWatchStates(cdp);
         await validateGuideLayout(cdp);
         await validateWarAptitudeLayout(cdp);
+        await validateDialogConfirmPlacement(cdp);
         await validateFieldWarFullscreen(cdp);
         await validateFieldTerrainLayout(cdp);
     } finally {

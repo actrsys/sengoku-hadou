@@ -160,6 +160,14 @@ class SaveManager {
             if (ownerClan !== 0 && !clanIds.has(ownerClan)) fail(`castles[${index}].ownerClan の参照先がありません`);
             const castellanId = Number(castle.castellanId || 0);
             if (castellanId !== 0 && !bushoIds.has(castellanId)) fail(`castles[${index}].castellanId の参照先がありません`);
+            if (!Array.isArray(castle.samuraiIds)) fail(`castles[${index}].samuraiIds が現行形式ではありません`);
+            const seenSamuraiIds = new Set();
+            castle.samuraiIds.forEach((rawId, samuraiIndex) => {
+                const id = Number(rawId);
+                if (!Number.isInteger(id) || !bushoIds.has(id)) fail(`castles[${index}].samuraiIds[${samuraiIndex}] の参照先がありません`);
+                if (seenSamuraiIds.has(id)) fail(`castles[${index}].samuraiIds の武将ID ${id} が重複しています`);
+                seenSamuraiIds.add(id);
+            });
         });
 
         data.bushos.forEach((busho, index) => {
@@ -167,6 +175,16 @@ class SaveManager {
             if (clanId !== 0 && !clanIds.has(clanId)) fail(`bushos[${index}].clan の参照先がありません`);
             const castleId = Number(busho.castleId || 0);
             if (castleId !== 0 && !castleIds.has(castleId)) fail(`bushos[${index}].castleId の参照先がありません`);
+        });
+        // 在城名簿は武将の castleId と同じ人物を指す必要があります。
+        // 死亡・未登場など名簿に載らない人物は許容し、名簿に書かれた側だけ整合性を検査します。
+        data.castles.forEach((castle, castleIndex) => {
+            castle.samuraiIds.forEach((rawId, samuraiIndex) => {
+                const busho = bushoById.get(Number(rawId));
+                if (busho && Number(busho.castleId || 0) !== Number(castle.id)) {
+                    fail(`castles[${castleIndex}].samuraiIds[${samuraiIndex}] と武将castleIdが一致しません`);
+                }
+            });
         });
 
         data.clans.forEach((clan, index) => {
@@ -432,6 +450,17 @@ class SaveManager {
         this.game.legions.forEach(legion => {
             const commander = this.game.bushos.find(b => Number(b.id) === Number(legion.commanderId));
             if (commander) commander.isCommander = true;
+        });
+        // isCastellan も Castle.castellanId と対になる実行時キャッシュとして再構築します。
+        // 保存済みフラグをそのまま城主選出へ使うと、壊れた二重城主状態を再現してしまうためです。
+        this.game.bushos.forEach(busho => { busho.isCastellan = false; });
+        this.game.castles.forEach(castle => {
+            const castellan = this.game.bushos.find(b => Number(b.id) === Number(castle.castellanId));
+            if (castellan
+                && Number(castellan.castleId) === Number(castle.id)
+                && Number(castellan.clan) === Number(castle.ownerClan)) {
+                castellan.isCastellan = true;
+            }
         });
 
         this.game.kunishuSystem.setKunishuData(d.kunishus.map(k => new Kunishu(k)));

@@ -1,5 +1,5 @@
 - **フォーム部品のネイティブ入力を壊さない。** `input` / `select` / `textarea` / `contenteditable` へ共通 `touchend` から `blur()` や `preventDefault()` を掛けない。検索中は入力要素そのものを再生成せず、日本語IMEは `compositionend` 後に絞り込みへ反映する。
-- **固定モーダルでは状態切替で外形を動かさない。** 選択肢の有無や外側フッターの有無で内容枠の位置・高さを変えず、必要な操作スロットは固定領域として予約する。会話UIはPC/スマホとも画面・専用モーダルの下部を基準に配置し、選択肢がある場合は会話枠の少し上へ固定する。
+- **固定モーダルでは状態切替で外形を動かさない。** 選択肢の有無や外側フッターの有無で内容枠の位置・高さを変えず、必要な操作スロットは固定領域として予約する。会話UIはPC/スマホとも画面・専用モーダルの下部を基準に配置し、選択肢がある場合は会話枠の少し上へ固定する。標準モーダルの内容枠と操作列の間隔は `--modal-footer-gap: 12px` を正本とする。ただし下部会話は、話者名札がメッセージ枠上端から16〜18px張り出す構造のため、標準12pxでは選択肢と名前札の視覚的クリアランスが不足する。この用途だけ `--dialog-choice-footer-gap: 18px` を意味付きの例外正本として使い、PC/スマホとも同じ値にする。端末別の個別値や、その場限りの数値上書きを増やさない。下部会話では親モーダルの `justify-content:flex-end` を下端配置の正本とし、外側へ出した `modal-footer` と `modal-content` の双方に縦方向の `auto` marginを持たせて空き高さを分配しない。
 # 戦国覇道 コード構成ガイド
 
 この文書は「どこに何があるか」を迷わないための索引です。
@@ -87,6 +87,8 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - 実行中の `castle.ownerClan` は `CastleManager` だけが直接書き換える。通常は `changeOwner`、副作用を起こしたくない特殊ロールバックだけ `setOwnerIdRaw` を使う。
 - `Castle.legionId` は大名家内の軍団番号（`Legion.legionNo`、0〜8）であり、ゲーム全体で一意な `Legion.id` とは別物。城から軍団モデルを引く時は `clanId + legionNo` で照合し、`castle.legionId === legion.id` の比較や `disbandLegion(castle.legionId)` を行わない。
 - `busho.isCommander` は `Legion.commanderId` から導出する実行時キャッシュとする。同一人物を複数軍団の `commanderId` に登録せず、セーブ復元時も保存済みフラグを信頼せず現行 `Legion` 一覧から再構築する。
+- `busho.isCastellan` は `Castle.castellanId` と対になる実行時キャッシュとして扱う。城主交代時は旧 `castle.castellanId` が指していた人物のフラグだけを解除し、城内の無関係な同居者へ一律操作を広げない。セーブ復元時も保存済みフラグを信頼せず `Castle.castellanId` から再構築する。
+- `Castle.samuraiIds` は在城名簿なので、同一武将IDを重複させず、掲載する武将の `busho.castleId` と一致させる。現行セーブは復元前にこの参照整合性を検査し、欠損・重複・別城参照を黙って補完しない。
 - `models.js` と `data_manager.js` のデータ生成・初期読込は上記ルールの例外。
 - 武将の `active / ronin` は活動・所属状態として `AffiliationSystem.setActivityStatusRaw` が低レベル書換窓口を持つ。通常処理は joinClan / becomeRonin 等の高レベルAPIを使う。
 - 武将・姫の `dead / unborn` は生死・登場状態として `LifeSystem.setLifeStatusRaw` が低レベル書換窓口を持つ。死亡処理そのものは executeDeath / processDeath 等の高レベルAPIを優先する。
@@ -162,6 +164,7 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 ## ローディング・低メモリ端末
 
 - ローディング表示は飾りの無限アニメーションではなく、`DataManager -> GameManager -> UIManager` の進捗通知で現在段階と割合を表示する。`prefers-reduced-motion` でも進捗文字とバー幅は更新される。
+- 月末・月初などプレイヤー入力を受け付けない長い月次処理では、新しいオーバーレイを増やさず既存の `#ai-guard` を共通待機表示として再利用し、「月末処理中...」「月初準備中...」のように現在段階を明示する。会話・イベント・カットインは既存の上位レイヤーを優先し、処理再開後はAI進捗表示へ自然に戻す。
 - 3140×2440級の色コード画像は全画面Canvasへ複製して長時間保持しない。`DataManager.scanImageByStrips()` がPCは128行、スマホは32行単位で読み取り、帯ごとにブラウザへ制御を返す。城色画像は種点座標だけを取得し、国IDマップ上で城領域を構築する。これにより古いスマホでもローディング画面の描画・OS監視・GCの機会を確保する。
 - 城ID・国IDは現シナリオの最大IDに応じて最小のTypedArrayを選ぶ。現行1560シナリオでは双方 `Uint8Array` で、1pixel=1byte。`UIManager`、`EventMapEffects`、台風判定は同じ配列を共有する。城領域構築時には各城の外接矩形も同時に小さな配列へ記録し、戦闘点滅のたびに地図全766万pixelを走査し直さない。
 - スマホの勢力色・地方/勢力ハイライトなど全画面Canvasは内部解像度を縦横1/2（面積1/4）にし、CSSで地図サイズへ拡大する。雪Canvasはさらに低解像度で保持し、AI開始時の一時資源解放対象にはせず、表示状態を維持したままメモリ量を抑える。描画時も巨大ImageDataを一枚作らず32行程度の帯へ分割する。城・国の判定用IDマップ自体は正確な当たり判定のため原寸を維持する。

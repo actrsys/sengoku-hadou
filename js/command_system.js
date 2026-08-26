@@ -522,11 +522,11 @@ class CommandSystem {
                 // ★追加：自領と直接隣接している（同盟国などを通らない）城だけに出陣可能にします
                 return baseTargets.filter(targetId => {
                     const targetCastle = this.game.getCastle(targetId);
-                    if (!targetCastle || !targetCastle.adjacentCastleIds) return false;
-                    return targetCastle.adjacentCastleIds.some(adjId => {
-                        const adjCastle = this.game.getCastle(adjId);
-                        return adjCastle && Number(adjCastle.ownerClan) === playerClanId;
-                    });
+                    if (!targetCastle) return false;
+                    return this.game.castles.some(myCastle =>
+                        Number(myCastle.ownerClan) === playerClanId
+                        && MapGraphService.isAdjacent(targetCastle, myCastle)
+                    );
                 });
             }
             
@@ -566,20 +566,11 @@ class CommandSystem {
                     
                     // ★追加：降伏勧告と従属願と臣従願は、自領と接している勢力に限定します！
                     if (type === 'dominate' || type === 'subordinate' || type === 'vassalage') {
-                        let isAdjacent = false;
                         const myCastles = this.game.castles.filter(myC => Number(myC.ownerClan) === playerClanId);
-                        for (let mc of myCastles) {
-                            if (mc.adjacentCastleIds) {
-                                for (let adjId of mc.adjacentCastleIds) {
-                                    const adjC = this.game.getCastle(adjId);
-                                    if (adjC && Number(adjC.ownerClan) === Number(target.ownerClan)) {
-                                        isAdjacent = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (isAdjacent) break;
-                        }
+                        const targetClanCastles = this.game.castles.filter(other => Number(other.ownerClan) === Number(target.ownerClan));
+                        const isAdjacent = myCastles.some(myCastle =>
+                            targetClanCastles.some(otherCastle => MapGraphService.isAdjacent(myCastle, otherCastle))
+                        );
                         if (!isAdjacent) return false;
                     }
 

@@ -37,6 +37,17 @@ class TurnManager {
         }
         
         await game.ui.showCutin(`${game.year}年 ${game.month}月`);
+
+        // 日付カットイン後の月次更新が長い端末でも固まって見えないよう、
+        // 既存のAIガードをそのまま月初準備表示として再利用する。
+        if (game.ui && typeof game.ui.showProcessingStatus === 'function') {
+            game.ui.showProcessingStatus('月初準備中...');
+            if (typeof game.ui.waitForNextPaint === 'function') {
+                await game.ui.waitForNextPaint();
+            } else {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+        }
         
         game.ui.log(`=== ${game.year}年 ${game.month}月 ===`, { history: false });
         
@@ -224,11 +235,9 @@ class TurnManager {
             if (game.isProcessingAI && game.ui && game.turnQueue.length > 0) {
                 game.ui.restoreAIGuardText(true); // ★強制表示
                 game.ui.updateAIProgress(game.turnQueue.length, game.turnQueue.length);
-                // ★追加：MAXになった数字を一瞬だけ見せてから、月末イベントの邪魔にならないように表示を消します！
+                // MAX表示を一瞬見せた後は、月末処理表示へ切り替える。
+                // endMonth() 側でも同じ表示を保証するため、ここでは空白状態を作らない。
                 await new Promise(resolve => setTimeout(resolve, 300));
-                if (game.ui) {
-                    game.ui.hideAIGuardText(); // ★中身を壊さずに、透明にして文字だけを隠します！
-                }
             }
             game.writeSystemDiagnostic('month_transition:before_endMonth');
             await game.endMonth(); // ← ★「await」を書き足します！
@@ -390,6 +399,17 @@ class TurnManager {
     async endMonth() {
         const game = this.game;
         game.writeSystemDiagnostic('month_end:start');
+
+        // 月末の派閥・独立・外交・寿命などは端末によって数秒かかることがあるため、
+        // 既存のAIガードを再利用して「停止ではなく処理中」であることを明示する。
+        if (game.ui && typeof game.ui.showProcessingStatus === 'function') {
+            game.ui.showProcessingStatus('月末処理中...');
+            if (typeof game.ui.waitForNextPaint === 'function') {
+                await game.ui.waitForNextPaint();
+            } else {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+        }
         // ==========================================
         // ★ 新しい一元管理の魔法：「画面にメッセージが出ている間は絶対に待つ」という最強の関所を作ります！
         const waitIfBusy = async () => {
