@@ -1912,8 +1912,8 @@ class UIInfoManager {
                 const fatherB = this.game.getBusho(b.realFatherId);
                 const husbandA = this.game.getBusho(a.husbandId);
                 const husbandB = this.game.getBusho(b.husbandId);
-                const clanA = this.game.clans.find(c => c.id === ((a.husbandId && a.husbandId !== 0) ? a.currentClanId : a.originalClanId));
-                const clanB = this.game.clans.find(c => c.id === ((b.husbandId && b.husbandId !== 0) ? b.currentClanId : b.originalClanId));
+                const clanA = this.game.clans.find(c => Number(c.id) === Number(a.currentClanId));
+                const clanB = this.game.clans.find(c => Number(c.id) === Number(b.currentClanId));
 
                 switch(this.princessCurrentSortKey) {
                     case 'name': 
@@ -1970,7 +1970,7 @@ class UIInfoManager {
             const father = this.game.getBusho(p.realFatherId);
             const husband = this.game.getBusho(p.husbandId);
             
-            const targetClanId = (p.husbandId && p.husbandId !== 0) ? p.currentClanId : p.originalClanId;
+            const targetClanId = Number(p.currentClanId) || 0;
             const targetClan = this.game.clans.find(c => c.id === targetClanId);
             const clanName = targetClan ? targetClan.name : "無所属";
 
@@ -2821,8 +2821,8 @@ class UIInfoManager {
         let isFamily = false;
         let lordName = "なし";
         
-        // 嫁いでいる場合は今の勢力、そうでなければ実家の勢力を調べます
-        const clanId = (princess.husbandId > 0) ? princess.currentClanId : princess.originalClanId;
+        // 所属表示は婚姻状態に関係なく、現在所属 currentClanId を正本にします。
+        const clanId = Number(princess.currentClanId) || 0;
         if (clanId > 0) {
             const clan = this.game.clans.find(c => c.id === clanId);
             if (clan) {

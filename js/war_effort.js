@@ -118,7 +118,10 @@ Object.assign(WarManager.prototype, {
         });
 
         if (s.atkBushos && s.atkBushos.length > 0) {
-            this.game.getCastleBushos(s.defender.id).forEach(b => { b.isCastellan = false; });
+            const previousCastellan = this.game.getBusho(previousCapturedCastellanId);
+            if (previousCastellan && !s.atkBushos.some(b => Number(b.id) === Number(previousCastellan.id))) {
+                previousCastellan.isCastellan = false;
+            }
             const leader = s.atkBushos[0];
             leader.isCastellan = true;
             s.defender.castellanId = leader.id;
@@ -152,8 +155,12 @@ Object.assign(WarManager.prototype, {
         if (busho.isDaimyo && Number(targetCastle.legionId) !== 0) {
             // 大名が他軍団に逃げ込んだ場合は、逃げ込んだ先の軍団を解散して直轄にする
             if (this.game.castleManager && this.game.castleManager.disbandLegion) {
-                this.game.castleManager.disbandLegion(targetCastle.legionId);
+                const targetLegion = this.game.legions
+                    ? this.game.legions.find(l => Number(l.clanId) === Number(targetCastle.ownerClan) && Number(l.legionNo) === Number(targetCastle.legionId))
+                    : null;
+                if (targetLegion) this.game.castleManager.disbandLegion(targetLegion.id);
             }
+            // 有効な軍団モデルがない異常状態でも、大名の居城だけは直轄へ戻しておく。
             targetCastle.legionId = 0;
             targetCastle.isDelegated = false;
         } else if (busho.isCommander) {
@@ -179,7 +186,7 @@ Object.assign(WarManager.prototype, {
         
         if (allFriendlyCastles.length === 0) return [];
         
-        const hasDaimyo = this.game.getCastleBushos(defCastle.id).some(b => b.isDaimyo);
+        const hasDaimyo = this.game.getCastleBushos(defCastle.id).some(b => b.isDaimyo && Number(b.clan) === oldOwner && Number(b.belongKunishuId || 0) === 0);
         
         // 1. まずは同じ軍団IDの城を探す
         let candidates = allFriendlyCastles.filter(c => Number(c.legionId || 0) === oldLegionId);
@@ -193,7 +200,7 @@ Object.assign(WarManager.prototype, {
         if (candidates.length === 0 && hasDaimyo) {
             // 国主がいない城を優先する
             const withoutCommander = allFriendlyCastles.filter(c => {
-                const legion = this.game.legions ? this.game.legions.find(l => Number(l.id) === Number(c.legionId)) : null;
+                const legion = this.game.legions ? this.game.legions.find(l => Number(l.clanId) === oldOwner && Number(l.legionNo) === Number(c.legionId)) : null;
                 return !legion || !legion.commanderId;
             });
             if (withoutCommander.length > 0) {
@@ -576,10 +583,7 @@ Object.assign(WarManager.prototype, {
             const isDaimyoCastle = (defDaimyo && defDaimyo.castleId === defCastle.id);
 
             // ★追加：最短ルートが海路を通るか（海戦か）どうかを判定して記憶します
-            let isSeaBattle = false;
-            if (typeof MapGraphService.isSeaRoute === 'function') {
-                isSeaBattle = MapGraphService.isSeaRoute(this.game, atkCastle, defCastle, atkClan);
-            }
+            const isSeaBattle = MapGraphService.isSeaRoute(this.game, atkCastle, defCastle, atkClan);
 
             // ★ここから追加：お城に「攻撃された記憶」をメモ書きします！
             // ただし、防衛側が諸勢力（鎮圧戦）の場合は、お城の奪い合いではないのでメモしません！
@@ -1558,7 +1562,7 @@ Object.assign(WarManager.prototype, {
                         // ★AIの場合は、そのまま滅亡チェックとターン終了へ進みます！
                         await this.checkTotalTakeover(s); // ★総取りシステムをチェック！
                         const extReason1 = s.isTotalTakeoverExecuted ? 'total_takeover' : 'no_castle';
-                        await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason1);
+                        await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason1, extReason1 === 'no_castle' ? winnerClan : 0);
                         if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige(); // 威信を更新
                         this.game.finishTurn();
                         // ==========================================
@@ -1568,7 +1572,7 @@ Object.assign(WarManager.prototype, {
                     // ★捕虜がいなかった場合も、そのまま滅亡チェックとターン終了へ進みます！
                     await this.checkTotalTakeover(s); // ★総取りシステムをチェック！
                     const extReason2 = s.isTotalTakeoverExecuted ? 'total_takeover' : 'no_castle';
-                    await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason2);
+                    await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason2, extReason2 === 'no_castle' ? winnerClan : 0);
                     if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige(); // 威信を更新
                     this.game.finishTurn();
                     // ==========================================
@@ -1959,7 +1963,7 @@ Object.assign(WarManager.prototype, {
                     
                     // ★城をすべて失ったら、life_system.js の滅亡チェック魔法にお任せします！
                     if (this.game.castles.filter(c => c.ownerClan === oldOwner).length === 0) {
-                        await this.game.lifeSystem.checkClanExtinction(oldOwner, 'no_castle');
+                        await this.game.lifeSystem.checkClanExtinction(oldOwner, 'no_castle', 0);
                     }
                     
                 } else {
@@ -2776,7 +2780,7 @@ Object.assign(WarManager.prototype, {
 
         // 全て終わったので滅亡チェックをしてターンを終了します
         const extReason = this.state.isTotalTakeoverExecuted ? 'total_takeover' : 'no_castle';
-        await this.game.lifeSystem.checkClanExtinction(this.state.oldDefClanId, extReason);
+        await this.game.lifeSystem.checkClanExtinction(this.state.oldDefClanId, extReason, extReason === 'no_castle' ? Number(this.state.attacker.ownerClan) || 0 : 0);
         if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige();
         this.game.finishTurn();
     },

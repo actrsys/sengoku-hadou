@@ -1826,7 +1826,6 @@ window.GameEvents.push({
             const myBushos = game.bushos.filter(b => Number(b.clan) === Number(subordinateClanId));
             myBushos.forEach(b => {
                 b.isDaimyo = false;
-                b.isCommander = false;
                 
                 game.affiliationSystem.transferClanRaw(b, dominantClanId, { syncSpouses: true });
                 

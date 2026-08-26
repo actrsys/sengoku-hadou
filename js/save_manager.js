@@ -39,7 +39,7 @@ class SaveManager {
     _serializePersonForSave(person) {
         const result = {};
         Object.keys(person || {}).forEach(key => {
-            if (key === 'baseFamilyIds' || key === 'familyIds') return;
+            if (key === 'baseFamilyIds' || key === 'familyIds' || key === 'isCommander') return;
             result[key] = person[key];
         });
         return result;
@@ -117,15 +117,29 @@ class SaveManager {
             if (currentClanId !== 0 && !clanIds.has(currentClanId)) fail(`princesses[${index}].currentClanId の参照先がありません`);
             if (husbandId !== 0 && !bushoIds.has(husbandId)) fail(`princesses[${index}].husbandId の参照先がありません`);
         });
+        const bushoById = new Map(data.bushos.map(b => [Number(b.id), b]));
+        const legionSeatKeys = new Set();
+        const legionCommanderIds = new Set();
         data.legions.forEach((legion, index) => {
             if (!Object.prototype.hasOwnProperty.call(legion, 'establishedTurnId')
                 || !Number.isFinite(Number(legion.establishedTurnId))) {
                 fail(`legions[${index}].establishedTurnId が現行形式ではありません`);
             }
             const clanId = Number(legion.clanId || 0);
+            const legionNo = Number(legion.legionNo || 0);
             const commanderId = Number(legion.commanderId || 0);
             if (clanId === 0 || !clanIds.has(clanId)) fail(`legions[${index}].clanId の参照先がありません`);
-            if (commanderId !== 0 && !bushoIds.has(commanderId)) fail(`legions[${index}].commanderId の参照先がありません`);
+            if (!Number.isInteger(legionNo) || legionNo < 1 || legionNo > 8) fail(`legions[${index}].legionNo が不正です`);
+            const seatKey = `${clanId}:${legionNo}`;
+            if (legionSeatKeys.has(seatKey)) fail(`legions の軍団席 ${seatKey} が重複しています`);
+            legionSeatKeys.add(seatKey);
+            if (commanderId !== 0) {
+                if (!bushoIds.has(commanderId)) fail(`legions[${index}].commanderId の参照先がありません`);
+                if (legionCommanderIds.has(commanderId)) fail(`legions の国主 ${commanderId} が重複しています`);
+                legionCommanderIds.add(commanderId);
+                const commander = bushoById.get(commanderId);
+                if (Number(commander?.clan || 0) !== clanId) fail(`legions[${index}].commanderId の所属勢力が一致しません`);
+            }
         });
         data.kunishus.forEach((kunishu, index) => {
             if (typeof kunishu.networkTag !== 'string') fail(`kunishus[${index}].networkTag が現行形式ではありません`);
@@ -412,8 +426,11 @@ class SaveManager {
         
         FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
 
+        // isCommander は Legion.commanderId から導出する実行時キャッシュです。
+        // 保存側の古いフラグを持ち越さず、現行の軍団モデルだけから再構築します。
+        this.game.bushos.forEach(busho => { busho.isCommander = false; });
         this.game.legions.forEach(legion => {
-            const commander = this.game.bushos.find(b => b.id === legion.commanderId);
+            const commander = this.game.bushos.find(b => Number(b.id) === Number(legion.commanderId));
             if (commander) commander.isCommander = true;
         });
 

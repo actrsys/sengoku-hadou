@@ -118,7 +118,7 @@ class WarSystem {
             leaderCastle = null;
 
             if (activeCastle.legionId > 0 && game.legions) {
-                const legion = game.legions.find(l => l.id === activeCastle.legionId);
+                const legion = game.legions.find(l => Number(l.clanId) === Number(activeCastle.ownerClan) && Number(l.legionNo) === Number(activeCastle.legionId));
                 if (legion && legion.commanderId > 0) {
                     const commander = game.getBusho(legion.commanderId);
                     if (commander && commander.castleId) leaderCastle = game.getCastle(commander.castleId);

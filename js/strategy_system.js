@@ -236,13 +236,8 @@ class StrategySystem {
         const castlesB = this.game.getClanCastles(clanBId);
         for (const ca of castlesA) {
             for (const cb of castlesB) {
-                // 隣接しているか調べます
-                if (typeof MapGraphService !== 'undefined' && MapGraphService.isAdjacent) {
-                    if (MapGraphService.isAdjacent(ca, cb)) {
-                        isAdjacent = true;
-                        break;
-                    }
-                } else if (ca.adjacentCastleIds && ca.adjacentCastleIds.includes(cb.id)) {
+                // 隣接判定は片側記載も双方向化する MapGraphService を唯一の正本にします。
+                if (MapGraphService.isAdjacent(ca, cb)) {
                     isAdjacent = true;
                     break;
                 }

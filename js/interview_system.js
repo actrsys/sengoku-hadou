@@ -778,14 +778,7 @@ class InterviewSystem {
         while (head < queue.length) {
             const row = queue[head++];
             if (row.distance >= depth) continue;
-            let adjacentIds = [];
-            if (this.game.mapGraph && typeof this.game.mapGraph.getAdjacentIds === 'function') {
-                adjacentIds = this.game.mapGraph.getAdjacentIds(row.castle);
-            } else {
-                adjacentIds = (this.game.castles || [])
-                    .filter(c => typeof MapGraphService !== 'undefined' && MapGraphService.isAdjacent(row.castle, c))
-                    .map(c => c.id);
-            }
+            const adjacentIds = this.game.mapGraph.getAdjacentIds(row.castle);
             for (const rawId of adjacentIds) {
                 const id = Number(rawId);
                 if (result.has(id)) continue;

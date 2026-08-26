@@ -1360,10 +1360,7 @@ class AIEngine {
             .map(eb => eb.busho); // ★スライスは後回し！魔法の箱から武将データだけを取り出す
 
         // ★追加：海戦が予想される場合、操船スキルが高い武将を確保する
-        let isSeaBattle = false;
-        if (typeof MapGraphService.isSeaRoute === 'function') {
-            isSeaBattle = MapGraphService.isSeaRoute(this.game, source, target, source.ownerClan);
-        }
+        const isSeaBattle = MapGraphService.isSeaRoute(this.game, source, target, source.ownerClan);
 
         if (isSeaBattle && sorted.length > 0) {
             let general = sorted[0];
@@ -1457,11 +1454,9 @@ class AIEngine {
 
         // ★追加：諸勢力との戦いが海戦になる場合、操船スキルが高い武将を確保する
         let isSeaBattle = false;
-        if (typeof MapGraphService.isSeaRoute === 'function') {
-            const targetCastle = this.game.getCastle(kunishu.castleId);
-            if (targetCastle) {
-                isSeaBattle = MapGraphService.isSeaRoute(this.game, sourceCastle, targetCastle, sourceCastle.ownerClan);
-            }
+        const targetCastle = this.game.getCastle(kunishu.castleId);
+        if (targetCastle) {
+            isSeaBattle = MapGraphService.isSeaRoute(this.game, sourceCastle, targetCastle, sourceCastle.ownerClan);
         }
 
         if (isSeaBattle && sorted.length > 0) {

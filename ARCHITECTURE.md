@@ -85,6 +85,8 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - 実行中の `busho.isGunshi` は `AffiliationSystem.clearGunshiRole()` / `appointClanGunshi()` だけが変更する。`appointClanGunshi()` は同勢力の既存軍師をすべて解除して一人だけを任命し、`setClanIdRaw()` は所属勢力が変わる時点で軍師役職を自動解除する。軍師役職を寝返り・独立・吸収先へ持ち越さない。シナリオ初期読込の `models.js` / `data_manager.js` だけは例外。
 - 独立・歴史イベントなど、周辺の名簿や役職処理を呼び出し側が既に管理している特殊処理だけ `setClanIdRaw` / `setCastleIdRaw` を使う。
 - 実行中の `castle.ownerClan` は `CastleManager` だけが直接書き換える。通常は `changeOwner`、副作用を起こしたくない特殊ロールバックだけ `setOwnerIdRaw` を使う。
+- `Castle.legionId` は大名家内の軍団番号（`Legion.legionNo`、0〜8）であり、ゲーム全体で一意な `Legion.id` とは別物。城から軍団モデルを引く時は `clanId + legionNo` で照合し、`castle.legionId === legion.id` の比較や `disbandLegion(castle.legionId)` を行わない。
+- `busho.isCommander` は `Legion.commanderId` から導出する実行時キャッシュとする。同一人物を複数軍団の `commanderId` に登録せず、セーブ復元時も保存済みフラグを信頼せず現行 `Legion` 一覧から再構築する。
 - `models.js` と `data_manager.js` のデータ生成・初期読込は上記ルールの例外。
 - 武将の `active / ronin` は活動・所属状態として `AffiliationSystem.setActivityStatusRaw` が低レベル書換窓口を持つ。通常処理は joinClan / becomeRonin 等の高レベルAPIを使う。
 - 武将・姫の `dead / unborn` は生死・登場状態として `LifeSystem.setLifeStatusRaw` が低レベル書換窓口を持つ。死亡処理そのものは executeDeath / processDeath 等の高レベルAPIを優先する。

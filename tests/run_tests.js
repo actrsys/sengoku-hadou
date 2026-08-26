@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r231');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r232');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -4590,9 +4590,14 @@ test('攻城戦と野戦のホーム補正は WarSystem の共通計算を使う
         [12, { id: 12, provinceId: 3 }]
     ]);
     const game = {
-        legions: [{ id: 5, commanderId: 50 }],
+        legions: [
+            // id=2 は別家の軍団。castle.legionId=2 を Legion.id と誤認するとこちらを拾ってしまう。
+            { id: 2, clanId: 9, legionNo: 7, commanderId: 77 },
+            { id: 500, clanId: 1, legionNo: 2, commanderId: 50 }
+        ],
         bushos: [
             { id: 50, clan: 1, castleId: 10 },
+            { id: 77, clan: 9, castleId: 12 },
             { id: 99, clan: 1, isDaimyo: true, castleId: 12 }
         ],
         provinces: [
@@ -4600,14 +4605,14 @@ test('攻城戦と野戦のホーム補正は WarSystem の共通計算を使う
             { id: 2, regionId: 7 },
             { id: 3, regionId: 8 }
         ],
-        getBusho: id => id === 50 ? { id: 50, castleId: 10 } : null,
+        getBusho: id => id === 50 ? { id: 50, castleId: 10 } : (id === 77 ? { id: 77, castleId: 12 } : null),
         getCastle: id => castles.get(id) || null
     };
     const defender = { id: 20, provinceId: 1 };
 
     // 軍団長居城と同じ国・地方 = 1.2
     assert.ok(Math.abs(WarSystem.calcHomeBonusMultiplier(game,
-        { provinceId: 3, ownerClan: 1, legionId: 5, isKunishu: false }, defender) - 1.2) < 1e-9);
+        { provinceId: 3, ownerClan: 1, legionId: 2, isKunishu: false }, defender) - 1.2) < 1e-9);
     // 大名居城は別地方 = 1.0
     assert.strictEqual(WarSystem.calcHomeBonusMultiplier(game,
         { provinceId: 2, ownerClan: 1, legionId: 0, isKunishu: false }, defender), 1.0);
@@ -4855,6 +4860,7 @@ test('セーブデータから一門派生キャッシュを除外する', () =>
         wifeIds: [3],
         baseFamilyIds: [10, 1, 2],
         familyIds: [10, 1, 2, 3],
+        isCommander: true,
         loyalty: 80
     };
     const saved = manager._serializePersonForSave(source);
@@ -4864,6 +4870,7 @@ test('セーブデータから一門派生キャッシュを除外する', () =>
     assert.strictEqual(saved.loyalty, 80);
     assert.ok(!Object.prototype.hasOwnProperty.call(saved, 'baseFamilyIds'));
     assert.ok(!Object.prototype.hasOwnProperty.call(saved, 'familyIds'));
+    assert.ok(!Object.prototype.hasOwnProperty.call(saved, 'isCommander'));
 });
 
 
@@ -4901,8 +4908,24 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, originalClanId: 999, isDiplomaticMarriageActive: true }] }), /originalClanId/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, currentClanId: 999, isDiplomaticMarriageActive: true }] }), /currentClanId/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, husbandId: 999, isDiplomaticMarriageActive: true }] }), /husbandId/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, legions: [{ id: 1, clanId: 999, commanderId: 0, establishedTurnId: 0 }] }), /legions\[0\]\.clanId/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, legions: [{ id: 1, clanId: 1, commanderId: 999, establishedTurnId: 0 }] }), /commanderId/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, legions: [{ id: 1, clanId: 999, legionNo: 1, commanderId: 0, establishedTurnId: 0 }] }), /legions\[0\]\.clanId/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, legions: [{ id: 1, clanId: 1, legionNo: 1, commanderId: 999, establishedTurnId: 0 }] }), /commanderId/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, legions: [{ id: 1, clanId: 1, legionNo: 0, commanderId: 0, establishedTurnId: 0 }] }), /legionNo/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, legions: [
+        { id: 1, clanId: 1, legionNo: 1, commanderId: 10, establishedTurnId: 0 },
+        { id: 2, clanId: 1, legionNo: 1, commanderId: 0, establishedTurnId: 0 }
+    ] }), /軍団席/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, bushos: [
+        { id: 10, clan: 1, castleId: 1, nemesisList: [] },
+        { id: 11, clan: 1, castleId: 1, nemesisList: [] }
+    ], legions: [
+        { id: 1, clanId: 1, legionNo: 1, commanderId: 10, establishedTurnId: 0 },
+        { id: 2, clanId: 1, legionNo: 2, commanderId: 10, establishedTurnId: 0 }
+    ] }), /国主 10 が重複/);
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, clans: [{ id: 1, leaderId: 10 }, { id: 2, leaderId: 11 }], bushos: [
+        { id: 10, clan: 1, castleId: 1, nemesisList: [] },
+        { id: 11, clan: 2, castleId: 1, nemesisList: [] }
+    ], legions: [{ id: 1, clanId: 1, legionNo: 1, commanderId: 11, establishedTurnId: 0 }] }), /所属勢力が一致/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, kunishus: [{ id: 1, castleId: 999, leaderId: 0, networkTag: '' }] }), /kunishus\[0\]\.castleId/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, kunishus: [{ id: 1, castleId: 1, leaderId: 999, networkTag: '' }] }), /leaderId/);
 });
@@ -6850,6 +6873,374 @@ test('諸勢力鎮圧は WarPreparationController を唯一の戦争開始窓口
     assert.ok(block.includes('this.game.warPreparationController.checkReinforcementAndStartWar('));
     assert.ok(!block.includes('this.game.warManager.startWar(atkCastle, dummyDefender'));
     assert.ok(!block.includes('const dummyDefender ='));
+});
+
+
+test('城の軍団番号は Legion.id ではなく clanId + legionNo で解決する', () => {
+    const war = read('js/war.js');
+    assert.ok(war.includes('Number(l.clanId) === Number(activeCastle.ownerClan)'));
+    assert.ok(war.includes('Number(l.legionNo) === Number(activeCastle.legionId)'));
+
+    const effort = read('js/war_effort.js');
+    assert.ok(effort.includes('Number(l.clanId) === Number(targetCastle.ownerClan)'));
+    assert.ok(effort.includes('Number(l.legionNo) === Number(targetCastle.legionId)'));
+    assert.ok(!effort.includes('disbandLegion(targetCastle.legionId)'));
+    assert.ok(effort.includes('Number(l.clanId) === oldOwner')); 
+    assert.ok(effort.includes('Number(l.legionNo) === Number(c.legionId)'));
+
+    const life = read('js/life_system.js');
+    assert.ok(life.includes('Number(this.game.getCastle(b.castleId)?.legionId || 0) === Number(legion.legionNo)'));
+});
+
+test('大名退避先の軍団解散は別家の同番号 Legion.id を誤って解散しない', () => {
+    const effort = read('js/war_effort.js');
+    const at = effort.indexOf('handleDaimyoEscape(');
+    const block = effort.slice(at, at + 2200);
+    assert.ok(/const targetLegion = this\.game\.legions[\s\S]{0,120}\.find\(l =>/.test(block));
+    assert.ok(block.includes('this.game.castleManager.disbandLegion(targetLegion.id)'));
+    assert.ok(!block.includes('disbandLegion(targetCastle.legionId)'));
+});
+
+test('国主就任は軍師兼任を残さず、軍師選択UIも国主を候補に出さない', () => {
+    const command = read('js/command_system.js');
+    const gunshiAt = command.indexOf("actionType === 'appoint_gunshi'");
+    const gunshiBlock = command.slice(gunshiAt, gunshiAt + 1800);
+    assert.ok(gunshiBlock.includes('!b.isCommander'));
+
+    const leaderAt = command.indexOf('executeAppointLegionLeader(bushoId');
+    const leaderBlock = command.slice(leaderAt, leaderAt + 3600);
+    assert.ok(leaderBlock.includes('if (busho.isGunshi) this.game.affiliationSystem.clearGunshiRole(busho);'));
+
+    const life = read('js/life_system.js');
+    const deathAt = life.indexOf('async handleCommanderDeath');
+    const deathBlock = life.slice(deathAt, deathAt + 7200);
+    assert.ok(deathBlock.includes('if (successor.isGunshi) this.game.affiliationSystem.clearGunshiRole(successor);'));
+});
+
+
+test('プレイヤー軍団新設は Legion 正規モデルを使い発足月を必ず保持する', () => {
+    const command = read('js/command_system.js');
+    const at = command.indexOf('executeAppointLegionLeader(bushoId');
+    const block = command.slice(at, at + 3300);
+    assert.ok(block.includes('legion = new Legion(legionData);'));
+    assert.ok(block.includes('establishedTurnId: this.game.getCurrentTurnId()'));
+    assert.ok(block.includes('legion.establishedTurnId = this.game.getCurrentTurnId();'));
+    assert.ok(!block.includes('window.Legion'));
+
+    const staffing = read('js/ai_staffing.js');
+    assert.ok(staffing.includes('const newLegion = new Legion({'));
+    assert.ok(!staffing.includes("typeof Legion !== 'undefined' ? new Legion"));
+});
+
+test('コマンド候補ソートは DomesticRules と StrategySystem の現行APIへ直接委譲する', () => {
+    const command = read('js/command_system.js');
+    for (const api of [
+        'DomesticRules.calcDevelopment(target, 1.0)',
+        'DomesticRules.calcRepair(target, 1.0)',
+        'DomesticRules.calcCharity(target, 1.0)',
+        'DomesticRules.calcTraining(target, cCastle.soldiers || 1, 1.0)',
+        'DomesticRules.calcSoldierCharity(target, cCastle.soldiers || 1, 1.0)',
+        'DomesticRules.calcDraftEfficiency(target, cCastle.peoplesLoyalty, cCastle.population)',
+        'StrategySystem.calcSabotageScore(target)',
+        'StrategySystem.calcInciteScore(target)',
+        'StrategySystem.calcRumorScore(target)',
+        'StrategySystem.calcHeadhuntScore(target)',
+        'StrategySystem.calcAssassinateScore(target)',
+        'StrategySystem.calcKukoScore(target)'
+    ]) assert.ok(command.includes(api));
+    assert.ok(!command.includes('typeof DomesticRules.calc'));
+    assert.ok(!command.includes('typeof StrategySystem.calc'));
+});
+
+test('外部一門の当主・国主継承は通常所属移籍窓口で妻婚姻まで復帰する', () => {
+    const life = read('js/life_system.js');
+    assert.ok(life.includes('this.game.affiliationSystem.transferClanRaw(successor, commander.clan, { syncSpouses: true });'));
+    assert.ok(life.includes('this.game.affiliationSystem.transferClanRaw(successor, oldDaimyo.clan, { syncSpouses: true });'));
+    assert.ok(!life.includes('this.game.affiliationSystem.setClanIdRaw(successor, commander.clan);'));
+    assert.ok(!life.includes('this.game.affiliationSystem.setClanIdRaw(successor, oldDaimyo.clan);'));
+});
+
+
+test('荒木村重の池田家乗っ取りは国主時も Legion の席次で発生条件を判定する', () => {
+    const historical = read('js/event/historical_event.js');
+    const at = historical.indexOf('id: "historical_araki_takeover"');
+    const block = historical.slice(at, at + 5600);
+    assert.ok(block.includes('Number(l.commanderId) === Number(tomomasa.id)'));
+    assert.ok(block.includes('tomomasaLegionNo = Number(tomomasaLegion.legionNo) || 0'));
+    assert.ok(block.includes('Number(itamiCastle.legionId) === tomomasaLegionNo'));
+    assert.ok(block.includes('Number(murashigeCastle.legionId) !== tomomasaLegionNo'));
+    assert.ok(!block.includes('tomomasa.legionId'));
+    assert.ok(!block.includes('murashige.legionId'));
+});
+
+
+test('現行の隣接・海路判定は MapGraphService を正本にし片方向fallbackへ戻らない', () => {
+    const files = [
+        'js/event/historical_event.js', 'js/strategy_system.js', 'js/diplomacy.js',
+        'js/interview_system.js', 'js/ai.js', 'js/war_effort.js'
+    ];
+    for (const file of files) {
+        const source = read(file);
+        assert.ok(!source.includes('typeof MapGraphService'), `${file} に MapGraphService 存在確認fallbackを残さない`);
+    }
+    const strategy = read('js/strategy_system.js');
+    assert.ok(strategy.includes('MapGraphService.isAdjacent(ca, cb)'));
+    const diplomacy = read('js/diplomacy.js');
+    assert.ok(diplomacy.includes('MapGraphService.isAdjacent(sc, dc)'));
+    assert.ok(diplomacy.includes('MapGraphService.isAdjacent(c, dc)'));
+    const interview = read('js/interview_system.js');
+    assert.ok(interview.includes('this.game.mapGraph.getAdjacentIds(row.castle)'));
+});
+
+test('軍師・国主任命コマンドは実際に選べる候補がいる時だけ有効になる', () => {
+    const catalog = read('js/command_catalog.js');
+    const gunshiAt = catalog.indexOf('hasActiveBushoExceptDaimyoAndCastellan');
+    const gunshiRule = catalog.slice(gunshiAt, gunshiAt + 450);
+    assert.ok(gunshiRule.includes('!b.isCommander'));
+    assert.ok(gunshiRule.includes('!b.isCastellan'));
+
+    const legionAt = catalog.indexOf('canManageLegion:');
+    const legionRule = catalog.slice(legionAt, legionAt + 1100);
+    assert.ok(legionRule.includes('const hasCandidate = game.bushos.some'));
+    assert.ok(legionRule.includes('!b.isDaimyo'));
+    assert.ok(legionRule.includes('!b.isCommander'));
+    assert.ok(legionRule.includes('return hasCandidate && legionNumber <= myCastles.length;'));
+});
+
+
+test('軍団割当は同じ武将を同一家の複数軍団長へ重複登録しない', () => {
+    const staffing = read('js/ai_staffing.js');
+    const at = staffing.indexOf('assignNewLegion(clanId, commanderId)');
+    const block = staffing.slice(at, at + 2100);
+    assert.ok(block.includes('const currentLegion = clanLegions.find'));
+    assert.ok(block.includes('if (currentLegion) return Number(currentLegion.legionNo) || -1;'));
+    assert.ok(block.includes('emptyLegion.commanderId = numericCommanderId;'));
+    assert.ok(block.includes('commanderId: numericCommanderId'));
+});
+
+
+test('将軍家新設は候補の旧軍団・派閥と妻婚姻を通常所属移籍窓口で同期する', () => {
+    const historical = read('js/event/historical_event.js');
+    const at = historical.indexOf('id: "historical_shogun_coronation"');
+    const block = historical.slice(at, at + 6800);
+    assert.ok(block.includes('game.affiliationSystem.transferClanRaw(candidate, newClanId, { syncSpouses: true });'));
+    assert.ok(!block.includes('game.affiliationSystem.setClanIdRaw(candidate, newClanId);'));
+    assert.ok(!block.includes('game.affiliationSystem.resetFactionData(candidate);'));
+});
+
+
+test('歴史イベントの国主・大名任命も軍師との役職排他を守る', () => {
+    const historical = read('js/event/historical_event.js');
+
+    const arakiAt = historical.indexOf('id: "historical_araki_takeover"');
+    const arakiBlock = historical.slice(arakiAt, arakiAt + 6200);
+    assert.ok(arakiBlock.includes('if (murashige.isGunshi) game.affiliationSystem.clearGunshiRole(murashige);'));
+    assert.ok(arakiBlock.includes('murashige.isCommander = true;'));
+
+    const exileAt = historical.indexOf('id: "historical_yoshitsugu_exile"');
+    const exileBlock = historical.slice(exileAt, exileAt + 5000);
+    assert.ok(exileBlock.includes('if (nagayasu.isCommander && game.castleManager && game.legions)'));
+    assert.ok(exileBlock.includes('game.castleManager.disbandLegion(oldLegion.id);'));
+    assert.ok(exileBlock.includes('nagayasu.isCommander = false;'));
+    assert.ok(exileBlock.includes('game.affiliationSystem.clearGunshiRole(nagayasu);'));
+});
+
+
+test('国主フラグは Legion を正本としてセーブ復元時に再構築する', () => {
+    const save = read('js/save_manager.js');
+    assert.ok(save.includes("key === 'isCommander'"));
+    assert.ok(save.includes('this.game.bushos.forEach(busho => { busho.isCommander = false; });'));
+    assert.ok(save.includes('if (commander) commander.isCommander = true;'));
+    assert.ok(save.includes('const legionSeatKeys = new Set();'));
+    assert.ok(save.includes('const legionCommanderIds = new Set();'));
+});
+
+test('荒木村重の軍団引継ぎは既存国主職を二重に残さない', () => {
+    const historical = read('js/event/historical_event.js');
+    const at = historical.indexOf('id: "historical_araki_takeover"');
+    const block = historical.slice(at, at + 6800);
+    assert.ok(block.includes('const oldMurashigeLegion = game.legions.find'));
+    assert.ok(block.includes('game.castleManager.disbandLegion(oldMurashigeLegion.id);'));
+    assert.ok(block.includes('Number(oldMurashigeLegion.id) !== Number(legionToTakeover.id)'));
+});
+
+
+test('荒木村重降伏イベントの退避は国主フラグを先消しせず移動窓口へ軍団解散を任せる', () => {
+    const historical = read('js/event/historical_event.js');
+    const at = historical.indexOf('id: "historical_murashige_submission"');
+    const block = historical.slice(at, at + 9000);
+    const retreatAt = block.indexOf('IDの範囲外の人がいれば、お引越しさせます');
+    const retreat = block.slice(retreatAt, retreatAt + 700);
+    assert.ok(retreat.includes('window.EventAction.moveBusho(game, busho, nagayasu.castleId);'));
+    assert.ok(!retreat.includes('busho.isCommander = false;'));
+});
+
+
+test('城内の大名・退避対象判定は同居者ではなく城主家所属者だけを見る', () => {
+    const historical = read('js/event/historical_event.js');
+    const murashigeAt = historical.indexOf('id: "historical_murashige_submission"');
+    const murashigeBlock = historical.slice(murashigeAt, murashigeAt + 9000);
+    assert.ok(murashigeBlock.includes('Number(b.clan) === Number(miyoshiClanId)'));
+    assert.ok(murashigeBlock.includes('Number(b.belongKunishuId || 0) === 0'));
+
+    const war = read('js/war_effort.js');
+    assert.ok(war.includes('b.isDaimyo && Number(b.clan) === oldOwner && Number(b.belongKunishuId || 0) === 0'));
+
+    const ui = read('js/ui_info_busho.js');
+    assert.ok(ui.includes('b.isDaimyo && Number(b.clan) === Number(this.ui.currentCastle.ownerClan)'));
+});
+
+
+test('城割譲時の国主判定は従属家所属の通常武将だけを見る', () => {
+    const diplomacy = read('js/diplomacy.js');
+    const at = diplomacy.indexOf('applyCastleCessionData(castleId, subordinateClanId, dominantClanId)');
+    const block = diplomacy.slice(at, at + 1800);
+    assert.ok(block.includes('Number(b.clan) === Number(subordinateClanId)'));
+    assert.ok(block.includes('Number(b.belongKunishuId || 0) === 0'));
+});
+
+
+test('将軍候補の二条城主就任は castle.castellanId を正本とする共通窓口を使う', () => {
+    const historical = read('js/event/historical_event.js');
+    const at = historical.indexOf('id: "historical_shogun_setup"');
+    const block = historical.slice(at, at + 4200);
+    assert.ok(block.includes('const nijo = game.getCastle(26);'));
+    assert.ok(block.includes('window.EventAction.appointCastellan(game, candidate, nijo);'));
+    assert.ok(!block.includes('game.bushos.find(b => b.castleId === 26 && b.isCastellan'));
+});
+
+
+test('落城・国主継承・大名継承の城主任命は城内全員ではなく castle.castellanId を正本にする', () => {
+    const war = read('js/war_effort.js');
+    const warAt = war.indexOf('finalizeCapturedCastleStaffing(state)');
+    const warBlock = war.slice(warAt, warAt + 2200);
+    assert.ok(warBlock.includes('const previousCastellan = this.game.getBusho(previousCapturedCastellanId);'));
+    assert.ok(!warBlock.includes('this.game.getCastleBushos(s.defender.id).forEach(b => { b.isCastellan = false; })'));
+
+    const life = read('js/life_system.js');
+    const commanderAt = life.indexOf('async handleCommanderDeath');
+    const commanderBlock = life.slice(commanderAt, commanderAt + 9000);
+    assert.ok(commanderBlock.includes('const oldCastellan = this.game.getBusho(targetCastle.castellanId);'));
+
+    const daimyoAt = life.indexOf('setupNewDaimyo(oldDaimyo');
+    const daimyoBlock = life.slice(daimyoAt, daimyoAt + 9000);
+    assert.ok(daimyoBlock.includes('const oldCastellan = this.game.getBusho(baseCastle.castellanId);'));
+});
+
+
+test('未登場武将が一門を頼る時は諸勢力ではなく通常の大名家所属者だけを候補にする', () => {
+    const life = read('js/life_system.js');
+    const at = life.indexOf('async checkBirth()');
+    const block = life.slice(at, at + 10500);
+    const clanChecks = block.match(/Number\(other\.clan\) > 0/g) || [];
+    const kunishuChecks = block.match(/Number\(other\.belongKunishuId \|\| 0\) === 0/g) || [];
+    assert.ok(clanChecks.length >= 2);
+    assert.ok(kunishuChecks.length >= 2);
+});
+
+
+
+
+test('勢力滅亡時の撃破勢力は過去の失城履歴から推測せず最後の戦争結果を渡す', () => {
+    const life = read('js/life_system.js');
+    assert.ok(life.includes("async checkClanExtinction(clanId, reason = 'no_castle', killerClanId = 0)"));
+    assert.ok(!life.includes('this.game.castles.find(c => c.lastAttackedOwnerId === clan.id'));
+    assert.ok(life.includes("killerClanId = reason === 'no_castle' ? (Number(killerClanId) || 0) : 0;"));
+
+    const war = read('js/war_effort.js');
+    assert.ok(war.includes("checkClanExtinction(s.oldDefClanId, extReason1, extReason1 === 'no_castle' ? winnerClan : 0)"));
+    assert.ok(war.includes("checkClanExtinction(this.state.oldDefClanId, extReason, extReason === 'no_castle' ? Number(this.state.attacker.ownerClan) || 0 : 0)"));
+    assert.ok(war.includes("checkClanExtinction(oldOwner, 'no_castle', 0)"), '諸勢力蜂起は大名家の撃破者として扱わない');
+});
+
+test('AI人事の隣接判定は adjacentCastleIds 直読みではなく MapGraphService 共通窓口を使う', () => {
+    const staffing = read('js/ai_staffing.js');
+    assert.ok(staffing.includes('return this.game.mapGraph.getAdjacentCastles(castle);'));
+    assert.ok(!staffing.includes('.adjacentCastleIds'), 'AIStaffing に片方向CSV直接参照を残さない');
+});
+
+test('AI軍団解散ログは disbandLegion が commanderId を消す前の国主名を保持する', () => {
+    const legion = { id: 701, clanId: 1, legionNo: 1, commanderId: 101, establishedTurnId: 0 };
+    const castles = [
+        { id: 11, legionId: 1, adjacentCastleIds: [] },
+        { id: 12, legionId: 1, adjacentCastleIds: [] }
+    ];
+    const commander = { id: 101, name: '国主太郎', clan: 1, status: 'active' };
+    const logs = [];
+    const testConsole = {
+        log: (...args) => logs.push(args.join(' ')),
+        warn: console.warn,
+        error: console.error
+    };
+    const game = {
+        legions: [legion],
+        clans: [{ id: 1, name: 'テスト家' }],
+        getCurrentTurnId: () => 30,
+        getClanCastles: () => castles,
+        getCastleBushos: castleId => castleId === 11 ? [commander] : [],
+        getBusho: id => Number(id) === 101 ? commander : null,
+        castleManager: {
+            disbandLegion: () => { legion.commanderId = 0; }
+        }
+    };
+    const ctx = createContext({
+        game,
+        console: testConsole,
+        BushoStatusRules: { isActive: b => b && b.status === 'active' },
+        DiplomacyRules: { isAllianceOrVassal: () => false }
+    });
+    loadScript(ctx, 'js/ai_staffing.js');
+    const staffing = vm.runInContext('new AIStaffing(game)', ctx);
+    assert.strictEqual(staffing.checkLegionDisband(1), true);
+    assert.strictEqual(legion.commanderId, 0);
+    assert.ok(logs.some(line => line.includes('国主太郎軍団')), logs.join('\n'));
+    assert.ok(!logs.some(line => line.includes('不明な国主軍団')), logs.join('\n'));
+});
+
+test('吸収・臣従は軍団解散後に isCommander を手動で二重解除しない', () => {
+    const historical = read('js/event/historical_event.js');
+    const common = read('js/event/common_events.js');
+    const diplomacy = read('js/diplomacy.js');
+
+    const absorbStart = historical.indexOf('absorbClan: function');
+    const absorbEnd = historical.indexOf('// ==========================================', absorbStart);
+    const absorb = historical.slice(absorbStart, absorbEnd);
+    assert.ok(absorb.includes('disbandLegion(l.id)'));
+    assert.ok(!/b\.isCommander\s*=\s*false/.test(absorb));
+
+    const arakiStart = historical.indexOf('id: "historical_murashige_submission"');
+    const arakiEnd = historical.indexOf('// ==========================================', arakiStart + 10);
+    const araki = historical.slice(arakiStart, arakiEnd);
+    assert.ok(araki.includes('game.affiliationSystem.joinClan(busho, sponsorClanId, busho.castleId, 100);'));
+    assert.ok(!araki.includes('game.castleManager.disbandLegion(legionToDismiss.id);'));
+
+    const commonStart = common.indexOf('const processSubordination =');
+    const commonBlock = common.slice(commonStart, commonStart + 2600);
+    assert.ok(commonBlock.includes('game.castleManager.disbandLegion(l.id)'));
+    assert.ok(!/b\.isCommander\s*=\s*false/.test(commonBlock));
+
+    const dipStart = diplomacy.indexOf('// 1. プレイヤー側の軍団をすべて解散させます');
+    const dipBlock = diplomacy.slice(dipStart, dipStart + 2300);
+    assert.ok(dipBlock.includes('this.game.castleManager.disbandLegion(l.id)'));
+    assert.ok(!/b\.isCommander\s*=\s*false/.test(dipBlock));
+});
+
+test('お市の婚姻イベントは元の実家ではなく現在所属を正本にする', () => {
+    const historical = read('js/event/historical_event.js');
+    const anchor = historical.indexOf('// 7. お市が未婚で、現在も織田家に所属していることを確認します。');
+    assert.ok(anchor >= 0);
+    const event = historical.slice(Math.max(0, anchor - 1800), anchor + 900);
+    assert.ok(event.includes('Number(oichi.currentClanId) !== Number(nobunaga.clan)'));
+    assert.ok(!event.includes('oichi.originalClanId === nobunaga.clan'));
+});
+
+test('姫一覧と詳細の所属表示は未婚でも currentClanId を正本にする', () => {
+    const ui = read('js/ui_info.js');
+    assert.ok(ui.includes('const clanA = this.game.clans.find(c => Number(c.id) === Number(a.currentClanId));'));
+    assert.ok(ui.includes('const targetClanId = Number(p.currentClanId) || 0;'));
+    assert.ok(ui.includes('const clanId = Number(princess.currentClanId) || 0;'));
+    assert.ok(!ui.includes('(p.husbandId && p.husbandId !== 0) ? p.currentClanId : p.originalClanId'));
+    assert.ok(!ui.includes('(princess.husbandId > 0) ? princess.currentClanId : princess.originalClanId'));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

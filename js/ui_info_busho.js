@@ -557,7 +557,7 @@ Object.assign(UIInfoManager.prototype, {
     // ==========================================
     
     openBushoSelector(actionType, targetId = null, extraData = null, onBack = null) {
-        if (actionType === 'appoint' && this.ui.currentCastle) { const isDaimyoHere = this.game.getCastleBushos(this.ui.currentCastle.id).some(b => b.isDaimyo); if (isDaimyoHere) { this.ui.showDialog("大名の居城は城主を変更できません", false); return; } }
+        if (actionType === 'appoint' && this.ui.currentCastle) { const isDaimyoHere = this.game.getCastleBushos(this.ui.currentCastle.id).some(b => b.isDaimyo && Number(b.clan) === Number(this.ui.currentCastle.ownerClan) && Number(b.belongKunishuId || 0) === 0); if (isDaimyoHere) { this.ui.showDialog("大名の居城は城主を変更できません", false); return; } }
         
         // 新しく武将一覧を開く入口では、前回閉じた時のタブ状態を引き継がず必ず「基本」から始めます。
         // 詳細画面から「戻る」場合は openBushoSelector() を通らず modalHistory から復元されるため、

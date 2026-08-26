@@ -77,7 +77,7 @@ const CAN_EXECUTE_RULES = {
         return game.bushos.some(b => b.clan === game.playerClanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo);
     },
     hasActiveBushoExceptDaimyoAndCastellan: (game) => {
-        return game.bushos.some(b => b.clan === game.playerClanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.isCastellan);
+        return game.bushos.some(b => b.clan === game.playerClanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.isCommander && !b.isCastellan);
     },
     hasEmployableRonin: (game) => {
         return game.bushos.some(b => {
@@ -93,7 +93,13 @@ const CAN_EXECUTE_RULES = {
             const hasLegion = game.legions.some(l => Number(l.clanId) === Number(game.playerClanId) && Number(l.legionNo) === legionNumber && Number(l.commanderId) > 0);
             if (hasLegion) return false;
         }
-        return legionNumber <= myCastles.length;
+        const hasCandidate = game.bushos.some(b =>
+            Number(b.clan) === Number(game.playerClanId) &&
+            window.BushoStatusRules.isActive(b) &&
+            !b.isDaimyo &&
+            !b.isCommander
+        );
+        return hasCandidate && legionNumber <= myCastles.length;
     },
     // 国主解任用の判定ルール（国主が存在する時だけ押せるようにします）
     canDismissLegion: (game, legionNumber) => {

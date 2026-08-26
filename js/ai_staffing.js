@@ -252,8 +252,16 @@ class AIStaffing {
     // ==========================================
     assignNewLegion(clanId, commanderId) {
         if (!this.game.legions) this.game.legions = [];
-        const clanLegions = this.game.legions.filter(l => l.clanId === clanId);
-        const activeNos = clanLegions.filter(l => l.commanderId > 0).map(l => l.legionNo);
+        const numericClanId = Number(clanId);
+        const numericCommanderId = Number(commanderId);
+        const clanLegions = this.game.legions.filter(l => Number(l.clanId) === numericClanId);
+
+        // 同じ武将を複数軍団の国主にしない。歴史イベントなどから再任命要求が来ても、
+        // すでに当家の軍団長なら既存の席次をそのまま返して一元的に再利用する。
+        const currentLegion = clanLegions.find(l => Number(l.commanderId) === numericCommanderId && numericCommanderId > 0);
+        if (currentLegion) return Number(currentLegion.legionNo) || -1;
+
+        const activeNos = clanLegions.filter(l => Number(l.commanderId) > 0).map(l => Number(l.legionNo));
         
         let newLegionNo = -1;
         const emptyLegion = clanLegions.find(l => l.commanderId === 0);
@@ -261,7 +269,7 @@ class AIStaffing {
         // すでに解散済みの空っぽの軍団があれば、その枠を再利用します
         if (emptyLegion) {
             newLegionNo = emptyLegion.legionNo;
-            emptyLegion.commanderId = commanderId;
+            emptyLegion.commanderId = numericCommanderId;
             emptyLegion.establishedTurnId = this.game.getCurrentTurnId(); // 発足月をリセットします
         } else {
             // 無ければ1から8の間で空いている番号を探します
@@ -275,19 +283,13 @@ class AIStaffing {
             if (newLegionNo !== -1) {
                 let maxLegionId = 0;
                 this.game.legions.forEach(l => { if (l.id > maxLegionId) maxLegionId = l.id; });
-                const newLegion = typeof Legion !== 'undefined' ? new Legion({
+                const newLegion = new Legion({
                     id: maxLegionId + 1,
-                    clanId: clanId,
+                    clanId: numericClanId,
                     legionNo: newLegionNo,
-                    commanderId: commanderId,
+                    commanderId: numericCommanderId,
                     establishedTurnId: this.game.getCurrentTurnId()
-                }) : {
-                    id: maxLegionId + 1,
-                    clanId: clanId,
-                    legionNo: newLegionNo,
-                    commanderId: commanderId,
-                    establishedTurnId: this.game.getCurrentTurnId()
-                };
+                });
                 this.game.legions.push(newLegion);
             }
         }
@@ -415,20 +417,15 @@ class AIStaffing {
         // 【ブロック条件①】すべての隣接拠点が「自勢力」または「同盟・支配・従属」しかない場合
         let hasEnemyNeighbor = false;
         for (const castle of targetCastles) {
-            if (castle.adjacentCastleIds) {
-                for (const adjId of castle.adjacentCastleIds) {
-                    const adjCastle = this.game.getCastle(adjId);
-                    if (!adjCastle) continue;
-                    
-                    if (adjCastle.ownerClan === 0) {
-                        hasEnemyNeighbor = true; // 空き城は敵扱い
+            for (const adjCastle of this._getAdjacentCastles(castle)) {
+                if (adjCastle.ownerClan === 0) {
+                    hasEnemyNeighbor = true; // 空き城は敵扱い
+                    break;
+                } else if (adjCastle.ownerClan !== clanId) {
+                    const rel = this.game.getRelation(clanId, adjCastle.ownerClan);
+                    if (!rel || !window.DiplomacyRules.isAllianceOrVassal(rel.status)) {
+                        hasEnemyNeighbor = true; // 敵対や和睦も油断できない敵扱い
                         break;
-                    } else if (adjCastle.ownerClan !== clanId) {
-                        const rel = this.game.getRelation(clanId, adjCastle.ownerClan);
-                        if (!rel || !window.DiplomacyRules.isAllianceOrVassal(rel.status)) {
-                            hasEnemyNeighbor = true; // 敵対や和睦も油断できない敵扱い
-                            break;
-                        }
                     }
                 }
             }
@@ -569,11 +566,12 @@ class AIStaffing {
             });
             
             if (legionBushoCount < legionCastles.length) {
-                // 解散を実行します！
-                if (this.game.castleManager) this.game.castleManager.disbandLegion(legion.id);
+                // 解散前に国主を退避しておく。disbandLegion() は commanderId を0へ戻すため、
+                // 解散後に参照すると履歴・ログ上の国主名を失う。
                 const cmd = this.game.getBusho(legion.commanderId);
                 const clanName = this.game.clans.find(c => c.id === clanId)?.name || "不明な大名家";
                 const cmdName = cmd ? cmd.name : "不明な国主";
+                if (this.game.castleManager) this.game.castleManager.disbandLegion(legion.id);
                 console.log(`【軍団解散】${clanName}の「${cmdName}軍団」は、人手不足（拠点${legionCastles.length}に対して武将${legionBushoCount}人）のため解散されました。`);
                 hasDisbanded = true;
                 return; // 解散したので次の軍団へ
@@ -582,23 +580,18 @@ class AIStaffing {
             // 【条件①】すべての隣接拠点が「自勢力」または「同盟・支配・従属」しかない場合
             let hasEnemyNeighbor = false;
             for (const castle of legionCastles) {
-                if (castle.adjacentCastleIds) {
-                    for (const adjId of castle.adjacentCastleIds) {
-                        const adjCastle = this.game.getCastle(adjId);
-                        if (!adjCastle) continue;
-                        
-                        if (adjCastle.ownerClan === 0) {
-                            // 空き城は敵の扱い（野盗がいるかもしれないので油断できない）
+                for (const adjCastle of this._getAdjacentCastles(castle)) {
+                    if (adjCastle.ownerClan === 0) {
+                        // 空き城は敵の扱い（野盗がいるかもしれないので油断できない）
+                        hasEnemyNeighbor = true;
+                        break;
+                    } else if (adjCastle.ownerClan !== clanId) {
+                        // 自分以外の勢力なら、関係を調べます
+                        const rel = this.game.getRelation(clanId, adjCastle.ownerClan);
+                        // 同盟・支配・従属「以外」なら敵扱い（和睦や友好も油断できないとみなします）
+                        if (!rel || !window.DiplomacyRules.isAllianceOrVassal(rel.status)) {
                             hasEnemyNeighbor = true;
                             break;
-                        } else if (adjCastle.ownerClan !== clanId) {
-                            // 自分以外の勢力なら、関係を調べます
-                            const rel = this.game.getRelation(clanId, adjCastle.ownerClan);
-                            // 同盟・支配・従属「以外」なら敵扱い（和睦や友好も油断できないとみなします）
-                            if (!rel || !window.DiplomacyRules.isAllianceOrVassal(rel.status)) {
-                                hasEnemyNeighbor = true;
-                                break;
-                            }
                         }
                     }
                 }
@@ -609,10 +602,11 @@ class AIStaffing {
             // 「現在の軍団が上限（8枠）まで埋まっている場合のみ」解散します
             const currentActiveCount = this.game.legions.filter(l => l.clanId === clanId && l.commanderId > 0).length;
             if (!hasEnemyNeighbor && currentActiveCount >= 8) {
-                if (this.game.castleManager) this.game.castleManager.disbandLegion(legion.id);
+                // disbandLegion() が commanderId を消す前に表示用情報を確保する。
                 const cmd = this.game.getBusho(legion.commanderId);
                 const clanName = this.game.clans.find(c => c.id === clanId)?.name || "不明な大名家";
                 const cmdName = cmd ? cmd.name : "不明な国主";
+                if (this.game.castleManager) this.game.castleManager.disbandLegion(legion.id);
                 console.log(`【軍団解散】${clanName}の「${cmdName}軍団」は、担当地域が完全に後方化し、かつ軍団枠が上限に達しているため解散され、直轄に編入されました。`);
                 hasDisbanded = true;
                 return;
@@ -726,14 +720,8 @@ class AIStaffing {
         const daimyoCastleId = daimyo ? daimyo.castleId : -1;
 
         myCastles.forEach(castle => {
-            // お隣のお城を調べます
-            const neighbors = [];
-            if (castle.adjacentCastleIds) {
-                castle.adjacentCastleIds.forEach(adjId => {
-                    const adjCastle = this.game.getCastle(adjId);
-                    if (adjCastle) neighbors.push(adjCastle);
-                });
-            }
+            // 隣接関係は MapGraphService を正本にする（CSV片側記載も双方向として扱う）。
+            const neighbors = this._getAdjacentCastles(castle);
 
             let role = '後方拠点';
             let enemyPower = 0;
@@ -756,7 +744,7 @@ class AIStaffing {
             if (role === '後方拠点') {
                 const isSubFront = neighbors.some(n => {
                     if (n.ownerClan === clanId) {
-                        const nNeighbors = n.adjacentCastleIds ? n.adjacentCastleIds.map(id => this.game.getCastle(id)).filter(c => c) : [];
+                        const nNeighbors = this._getAdjacentCastles(n);
                         return nNeighbors.some(nn => {
                             if (nn.ownerClan !== clanId && nn.ownerClan !== 0) {
                                 const rel = this.game.getRelation(clanId, nn.ownerClan);

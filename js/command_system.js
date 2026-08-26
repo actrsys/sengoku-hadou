@@ -196,6 +196,7 @@ class CommandSystem {
                 b.clan === this.game.playerClanId && 
                 window.BushoStatusRules.isActive(b) && 
                 !b.isDaimyo && 
+                !b.isCommander &&
                 !b.isCastellan
             );
             infoHtml = "<div>軍師に任命する武将を選択してください</div>";
@@ -324,23 +325,23 @@ class CommandSystem {
                  const cCastle = currentCastle;
                  try {
                      if (['farm', 'commerce'].includes(actionType)) {
-                         return typeof DomesticRules.calcDevelopment === 'function' ? DomesticRules.calcDevelopment(target, 1.0) : target.politics;
+                         return DomesticRules.calcDevelopment(target, 1.0);
                      }
                      if (actionType === 'repair') {
-                         return typeof DomesticRules.calcRepair === 'function' ? DomesticRules.calcRepair(target, 1.0) : target.politics;
+                         return DomesticRules.calcRepair(target, 1.0);
                      }
                      if (actionType === 'charity') {
-                         return typeof DomesticRules.calcCharity === 'function' ? DomesticRules.calcCharity(target, 1.0) : target.charm;
+                         return DomesticRules.calcCharity(target, 1.0);
                      }
                      if (actionType === 'training') {
-                         return typeof DomesticRules.calcTraining === 'function' ? DomesticRules.calcTraining(target, cCastle.soldiers || 1, 1.0) : target.leadership;
+                         return DomesticRules.calcTraining(target, cCastle.soldiers || 1, 1.0);
                      }
                      if (actionType === 'soldier_charity') {
-                         return typeof DomesticRules.calcSoldierCharity === 'function' ? DomesticRules.calcSoldierCharity(target, cCastle.soldiers || 1, 1.0) : target.leadership;
+                         return DomesticRules.calcSoldierCharity(target, cCastle.soldiers || 1, 1.0);
                      }
                      if (actionType === 'draft') {
                          // ★変更：城の実際の民忠と人口を渡して、リアルな「徴兵効率」でソートします
-                         return typeof DomesticRules.calcDraftEfficiency === 'function' ? DomesticRules.calcDraftEfficiency(target, cCastle.peoplesLoyalty, cCastle.population) : (target.leadership * 1.5) + (target.charm * 1.5);
+                         return DomesticRules.calcDraftEfficiency(target, cCastle.peoplesLoyalty, cCastle.population);
                      }
                      if (['war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy'].includes(actionType)) {
                          return (target.leadership * 1.5) + target.strength;
@@ -350,22 +351,22 @@ class CommandSystem {
                      // ★変更：計算式を strategy_system.js の共通処理から呼び出すようにしました
                      // ==========================================
                      if (actionType === 'sabotage_doer') {
-                         return typeof StrategySystem.calcSabotageScore === 'function' ? StrategySystem.calcSabotageScore(target) : 0;
+                         return StrategySystem.calcSabotageScore(target);
                      }
                      if (actionType === 'incite_doer') {
-                         return typeof StrategySystem.calcInciteScore === 'function' ? StrategySystem.calcInciteScore(target) : 0;
+                         return StrategySystem.calcInciteScore(target);
                      }
                      if (actionType === 'rumor_doer') {
-                         return typeof StrategySystem.calcRumorScore === 'function' ? StrategySystem.calcRumorScore(target) : 0;
+                         return StrategySystem.calcRumorScore(target);
                      }
                      if (actionType === 'headhunt_doer') {
-                         return typeof StrategySystem.calcHeadhuntScore === 'function' ? StrategySystem.calcHeadhuntScore(target) : 0;
+                         return StrategySystem.calcHeadhuntScore(target);
                      }
                      if (actionType === 'assassinate_doer') {
-                         return typeof StrategySystem.calcAssassinateScore === 'function' ? StrategySystem.calcAssassinateScore(target) : 0;
+                         return StrategySystem.calcAssassinateScore(target);
                      }
                      if (actionType === 'kuko_doer') {
-                         return typeof StrategySystem.calcKukoScore === 'function' ? StrategySystem.calcKukoScore(target) : 0;
+                         return StrategySystem.calcKukoScore(target);
                      }
                      // ==========================================
                      // ★追加：外交コマンドの時は、外交の専門部署に「成功率」を計算させてそれで並べ替えます！
@@ -1689,11 +1690,20 @@ class CommandSystem {
         let legion = this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === legionNo);
         if (!legion) {
             const maxId = this.game.legions.length > 0 ? Math.max(...this.game.legions.map(l => Number(l.id) || 0)) : 0;
-            const legionData = { id: maxId + 1, clanId: this.game.playerClanId, legionNo: legionNo };
-            legion = typeof window.Legion === 'function' ? new window.Legion(legionData) : legionData;
+            const legionData = {
+                id: maxId + 1,
+                clanId: this.game.playerClanId,
+                legionNo: legionNo,
+                commanderId: busho.id,
+                establishedTurnId: this.game.getCurrentTurnId()
+            };
+            legion = new Legion(legionData);
             this.game.legions.push(legion);
+        } else {
+            legion.commanderId = busho.id;
+            // 解散済み席次の再利用も「新設」と同じ扱いにして、24ヶ月の整理猶予を正しくリセットする。
+            legion.establishedTurnId = this.game.getCurrentTurnId();
         }
-        legion.commanderId = busho.id;
 
         const oldCastellan = this.game.getBusho(castle.castellanId);
         if (oldCastellan) {
@@ -1702,6 +1712,7 @@ class CommandSystem {
         castle.castellanId = busho.id;
         busho.isCastellan = true;
         busho.isCommander = true;
+        if (busho.isGunshi) this.game.affiliationSystem.clearGunshiRole(busho);
 
         castle.legionId = legionNo;
 

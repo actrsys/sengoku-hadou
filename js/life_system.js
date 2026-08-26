@@ -488,6 +488,8 @@ class LifeSystem {
                     // 活動中の一門武将がいるかチェック
                     const activeRelatives = this.game.bushos.filter(other => 
                         window.BushoStatusRules.isActive(other) &&
+                        Number(other.clan) > 0 &&
+                        Number(other.belongKunishuId || 0) === 0 &&
                         other.id !== b.id &&
                         b.familyIds.some(fId => other.familyIds.includes(fId))
                     );
@@ -542,6 +544,8 @@ class LifeSystem {
                 // 条件：すでに登場して活動している、自分自身ではない、一門IDが共通している
                 const activeRelatives = this.game.bushos.filter(other => 
                     window.BushoStatusRules.isActive(other) &&
+                    Number(other.clan) > 0 &&
+                    Number(other.belongKunishuId || 0) === 0 &&
                     other.id !== b.id &&
                     b.familyIds.some(fId => other.familyIds.includes(fId))
                 );
@@ -1276,7 +1280,7 @@ class LifeSystem {
 
         // もし一門の候補が誰もいなければ、特例として「同じ軍団で活躍している家臣」を候補にします！
         if (allCandidates.length === 0) {
-            allCandidates = activeBushos.filter(b => Number(this.game.getCastle(b.castleId)?.legionId || 0) === Number(legion.id));
+            allCandidates = activeBushos.filter(b => Number(this.game.getCastle(b.castleId)?.legionId || 0) === Number(legion.legionNo));
         }
 
         if (allCandidates.length > 0) {
@@ -1335,7 +1339,7 @@ class LifeSystem {
                 }
 
                 this.game.affiliationSystem.setActivityStatusRaw(successor, window.GameConstants.BushoStatus.ACTIVE);
-                this.game.affiliationSystem.setClanIdRaw(successor, commander.clan);
+                this.game.affiliationSystem.transferClanRaw(successor, commander.clan, { syncSpouses: true });
                 this.game.affiliationSystem.setCastleIdRaw(successor, baseCastle.id);
                 successor.loyalty = 100;
                 if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
@@ -1344,18 +1348,17 @@ class LifeSystem {
             // 国主の役職を引き継ぎます
             commander.isCommander = false;
             successor.isCommander = true;
+            if (successor.isGunshi) this.game.affiliationSystem.clearGunshiRole(successor);
             legion.commanderId = successor.id;
             
             // 国主になったら城主にします
             successor.isCastellan = true;
             const targetCastle = this.game.getCastle(successor.castleId);
             if (targetCastle) {
-                const castleBushos = this.game.getCastleBushos(targetCastle.id);
-                castleBushos.forEach(b => {
-                    if (b.id !== successor.id && b.isCastellan) {
-                        b.isCastellan = false;
-                    }
-                });
+                const oldCastellan = this.game.getBusho(targetCastle.castellanId);
+                if (oldCastellan && Number(oldCastellan.id) !== Number(successor.id)) {
+                    oldCastellan.isCastellan = false;
+                }
                 targetCastle.castellanId = successor.id;
             }
 
@@ -1543,7 +1546,7 @@ class LifeSystem {
                 this.game.affiliationSystem.leaveCastle(successor);
             }
             this.game.affiliationSystem.setActivityStatusRaw(successor, window.GameConstants.BushoStatus.ACTIVE);
-            this.game.affiliationSystem.setClanIdRaw(successor, oldDaimyo.clan);
+            this.game.affiliationSystem.transferClanRaw(successor, oldDaimyo.clan, { syncSpouses: true });
             this.game.affiliationSystem.setCastleIdRaw(successor, baseCastle.id);
             successor.loyalty = 100;
             if (!baseCastle.samuraiIds.includes(successor.id)) {
@@ -1559,12 +1562,10 @@ class LifeSystem {
         }
 
         if (baseCastle) {
-            const castleBushos = this.game.getCastleBushos(baseCastle.id);
-            castleBushos.forEach(b => {
-                if (b.id !== successor.id && b.isCastellan) {
-                    b.isCastellan = false;
-                }
-            });
+            const oldCastellan = this.game.getBusho(baseCastle.castellanId);
+            if (oldCastellan && Number(oldCastellan.id) !== Number(successor.id)) {
+                oldCastellan.isCastellan = false;
+            }
             baseCastle.castellanId = successor.id;
         }
 
@@ -1632,7 +1633,7 @@ class LifeSystem {
     }
 
     // ★大名家の滅亡を処理する魔法です！
-    async checkClanExtinction(clanId, reason = 'no_castle') {
+    async checkClanExtinction(clanId, reason = 'no_castle', killerClanId = 0) {
         if (!clanId || clanId === 0) return;
         
         // 大名家のデータを探します
@@ -1645,20 +1646,10 @@ class LifeSystem {
         // 滅亡の条件：お城が0個になった、または後継ぎがいない場合です
         if (clanCastles.length === 0 || reason === 'no_heir') {
             
-            // ★追加：滅ぼした勢力を探します
-            let killerClanId = 0;
-            if (reason === 'no_castle') {
-                // 最後に攻撃されて奪われたお城の記録から、滅ぼした勢力を探します
-                const lastLostCastle = this.game.castles.find(c => c.lastAttackedOwnerId === clan.id && c.ownerClan !== clan.id);
-                if (lastLostCastle) {
-                    killerClanId = lastLostCastle.ownerClan; // 今の持ち主（攻め滅ぼした大名家）
-                    
-                    // 万が一いまの持ち主が諸勢力や空き城（中立）だった場合のための保険
-                    if (killerClanId === 0 && lastLostCastle.lastAttackerClanId > 0 && !lastLostCastle.lastAttackerIsKunishu) {
-                        killerClanId = lastLostCastle.lastAttackerClanId;
-                    }
-                }
-            }
+            // 滅ぼした勢力は、最後の戦争を処理している呼出元が持つ確定値を使う。
+            // 過去に奪われた城を配列先頭から探すと、複数勢力に領地を失った家で
+            // 「最後の一城を落とした家」と別の勢力を誤認するため、履歴から推測しない。
+            killerClanId = reason === 'no_castle' ? (Number(killerClanId) || 0) : 0;
 
             // ★ここから追加：未婚の姫を、攻め滅ぼした大名家が総取りする魔法
             if (killerClanId > 0 && killerClanId !== clan.id) {

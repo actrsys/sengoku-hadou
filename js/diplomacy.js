@@ -2391,7 +2391,13 @@ class DiplomacyManager {
         const myLegionCastles = myCastles.filter(c => c.legionId === castleA.legionId);
         const daimyo = this.game.getClanDaimyo(subordinateClanId);
         const isDaimyoInA = (daimyo && daimyo.castleId === castleId);
-        const commanderInA = this.game.bushos.find(b => b.castleId === castleId && b.isCommander && window.BushoStatusRules.isActive(b));
+        const commanderInA = this.game.bushos.find(b =>
+            Number(b.castleId) === Number(castleId) &&
+            b.isCommander &&
+            Number(b.clan) === Number(subordinateClanId) &&
+            Number(b.belongKunishuId || 0) === 0 &&
+            window.BushoStatusRules.isActive(b)
+        );
 
         let castleB = null;
 
@@ -2575,10 +2581,7 @@ class DiplomacyManager {
             const targetCastle = subCastles.find(sc => {
                 const castellan = this.game.getBusho(sc.castellanId);
                 if (castellan && castellan.isDaimyo) return false;
-                return domCastles.some(dc => {
-                    if (typeof MapGraphService !== 'undefined' && MapGraphService.isAdjacent) return window.MapGraphService.isAdjacent(sc, dc);
-                    return sc.adjacentCastleIds && sc.adjacentCastleIds.includes(dc.id);
-                });
+                return domCastles.some(dc => MapGraphService.isAdjacent(sc, dc));
             });
             if (targetCastle) options.push({ type: 'castle', castle: targetCastle });
         }
@@ -2797,7 +2800,6 @@ class DiplomacyManager {
         const myBushos = this.game.bushos.filter(b => Number(b.clan) === Number(myClanId));
         myBushos.forEach(b => {
             b.isDaimyo = false;
-            b.isCommander = false;
             
             this.game.affiliationSystem.transferClanRaw(b, targetClanId, { syncSpouses: true });
             
@@ -3972,10 +3974,7 @@ class DiplomacyManager {
                 if (aiVsAi && Number(c.legionId || 0) !== 0) return false;
                 const castellan = this.game.getBusho(c.castellanId);
                 if (!aiVsAi && castellan && castellan.isDaimyo) return false;
-                return tgtCastles.some(dc => {
-                    if (typeof MapGraphService !== 'undefined' && MapGraphService.isAdjacent) return MapGraphService.isAdjacent(c, dc);
-                    return Array.isArray(c.adjacentCastleIds) && c.adjacentCastleIds.includes(dc.id);
-                });
+                return tgtCastles.some(dc => MapGraphService.isAdjacent(c, dc));
             });
             if (candidateCastles[0]) options.push({ type: 'castle', castle: candidateCastles[0] });
         }
