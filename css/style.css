@@ -2579,6 +2579,42 @@ body:not(.is-pc) .busho-detail-label-compact {
 body:not(.is-pc) .busho-skill-desc-text { font-size: 0.68rem; }
 body:not(.is-pc) .busho-skill-desc-body { font-size: 0.62rem; }
 
+/* 列伝は基本タブと同じ表示範囲を透明な参照レイアウトで確保します。 */
+.busho-detail-biography-layout {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+}
+.busho-detail-biography-placeholder {
+    visibility: hidden;
+    pointer-events: none;
+}
+.busho-detail-biography-panel {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+}
+.busho-detail-biography-text {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 8px;
+    color: #eee;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    text-align: left;
+    text-shadow: 1px 1px 1px #000;
+}
+body:not(.is-pc) .busho-detail-biography-text {
+    padding: 5px 6px;
+    font-size: 0.78rem;
+    line-height: 1.65;
+}
+
 /* 勢力情報モーダルの専用アクションボタン */
 .daimyo-detail-action-btn {
     min-width: 68px; /* 姫の1文字でも他と同じサイズになるように幅を確保します */
@@ -5374,7 +5410,6 @@ body:not(.is-pc) .setting-row {
     display: flex;
     gap: 10px;
 }
-.setting-toggle-group .troop-type-btn,
 .setting-toggle-group .ui-toggle-btn {
     flex: 1; /* ボタンを横幅いっぱいに等分する */
     padding: 8px 12px;

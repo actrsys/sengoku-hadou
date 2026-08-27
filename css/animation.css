@@ -116,16 +116,12 @@ body:not(.is-pc) #war-visual-area .war-mobile-card-popup {
 }
 
 /* -----------------------------------------
-   5. 野戦での交互点滅アニメーション
+   5. 野戦での交互点滅
+   - 低FPS端末でCSSアニメーションの途中フレームが飛ばないよう、
+     明滅の時間管理はFieldWarManager側で描画フレームを確認して行います。
    ----------------------------------------- */
 .anim-battle-flash {
-    /* 0.15秒でパッと白く光って戻る動きです */
-    animation: battle-flash 0.15s ease-in-out;
-}
-
-@keyframes battle-flash {
-    0%, 100% { filter: brightness(1); }
-    50% { filter: brightness(2) drop-shadow(0 0 10px #ffffff); }
+    filter: brightness(2) drop-shadow(0 0 10px #ffffff);
 }
 
 /* -----------------------------------------
@@ -146,8 +142,10 @@ body:not(.is-pc) #war-visual-area .war-mobile-card-popup {
     pointer-events: none;
     /* ★修正: z-indexを大きくして、全ての部隊アイコンより上に表示されるようにします */
     z-index: 1000;
-    /* 野戦の小さな画面に合わせて、少しだけ上に上がる専用の動きを使います */
-    animation: fw-popup 1s ease-out forwards;
+}
+
+.fw-damage-popup.is-leaving {
+    animation: fw-popup 0.45s ease-out forwards;
 }
 
 @keyframes fw-popup {

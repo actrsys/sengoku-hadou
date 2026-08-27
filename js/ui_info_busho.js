@@ -5,6 +5,28 @@
  */
 Object.assign(UIInfoManager.prototype, {
 
+    _getBushoBiographyText(busho) {
+        return (busho && busho.biography !== undefined && busho.biography !== null) ? String(busho.biography).trim() : '';
+    },
+
+    // 列伝タブの表示可否は見た目の文字量で判断します。
+    // 半角英数字・半角カナは0.5、全角文字は1として数え、空白と改行は数えません。
+    _getBushoBiographyFullWidthLength(text) {
+        const value = String(text || '').replace(/\s+/g, '');
+        let length = 0;
+        for (const ch of value) {
+            const code = ch.codePointAt(0);
+            const isHalfWidth = (code >= 0x20 && code <= 0x7e) || (code >= 0xff61 && code <= 0xff9f);
+            length += isHalfWidth ? 0.5 : 1;
+        }
+        return length;
+    },
+
+    _hasDisplayableBushoBiography(busho) {
+        const text = this._getBushoBiographyText(busho);
+        return text !== '' && this._getBushoBiographyFullWidthLength(text) > 10;
+    },
+
     showBushoDetailModal(busho) {
         this.bushoDetailCurrentTab = 'status';
         this.pushModal('busho_detail', [busho]);
@@ -17,6 +39,11 @@ Object.assign(UIInfoManager.prototype, {
         const isPc = document.body.classList.contains('is-pc');
 
         if (!this.bushoDetailCurrentTab) this.bushoDetailCurrentTab = 'status';
+        const biographyText = this._getBushoBiographyText(busho);
+        const hasBiography = this._hasDisplayableBushoBiography(busho);
+        if (this.bushoDetailCurrentTab === 'biography' && !hasBiography) {
+            this.bushoDetailCurrentTab = 'status';
+        }
 
         // 武将詳細では本来のタブ領域（枠の上）を使います。
         if (tabsEl) {
@@ -26,12 +53,14 @@ Object.assign(UIInfoManager.prototype, {
                 <div class="busho-detail-tab-buttons">
                     <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'status' ? 'active' : ''}" id="busho-detail-tab-status">${isPc ? '基本' : '基'}</button>
                     <button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'aptitude' ? 'active' : ''}" id="busho-detail-tab-aptitude">${isPc ? '技能' : '技'}</button>
+                    ${hasBiography ? `<button class="busho-tab-btn ${this.bushoDetailCurrentTab === 'biography' ? 'active' : ''}" id="busho-detail-tab-biography">${isPc ? '列伝' : '伝'}</button>` : ''}
                 </div>
             `;
             
             // innerHTML反映直後に同じタブ領域から取得できるため、遅延せず現在のDOMへだけ結び付けます。
             const tabStatus = tabsEl.querySelector('#busho-detail-tab-status');
             const tabAptitude = tabsEl.querySelector('#busho-detail-tab-aptitude');
+            const tabBiography = tabsEl.querySelector('#busho-detail-tab-biography');
             if (tabStatus) {
                 tabStatus.onclick = (e) => {
                     e.stopPropagation();
@@ -45,6 +74,14 @@ Object.assign(UIInfoManager.prototype, {
                     e.stopPropagation();
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                     this.bushoDetailCurrentTab = 'aptitude';
+                    this._renderBushoDetail(busho, listContainer.scrollTop);
+                };
+            }
+            if (tabBiography) {
+                tabBiography.onclick = (e) => {
+                    e.stopPropagation();
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    this.bushoDetailCurrentTab = 'biography';
                     this._renderBushoDetail(busho, listContainer.scrollTop);
                 };
             }
@@ -234,7 +271,8 @@ Object.assign(UIInfoManager.prototype, {
             return `<div class="daimyo-detail-stat-box"><span class="daimyo-detail-label${compactClass}">${label}</span><span class="daimyo-detail-value">${value}</span></div>`;
         };
 
-        if (this.bushoDetailCurrentTab === 'status') {
+        let statusReferenceHtml = '';
+        if (this.bushoDetailCurrentTab === 'status' || this.bushoDetailCurrentTab === 'biography') {
             const statHtml = `
                 <div class="busho-detail-group busho-detail-group-grow">
                     ${getStatRow('leadership', '統率')}
@@ -261,12 +299,16 @@ Object.assign(UIInfoManager.prototype, {
                 </div>
             `;
 
-            rightContentHtml = `
+            statusReferenceHtml = `
                 <div class="busho-detail-status-layout">
                     ${statHtml}
                     ${infoHtml}
                 </div>
             `;
+        }
+
+        if (this.bushoDetailCurrentTab === 'status') {
+            rightContentHtml = statusReferenceHtml;
         } else if (this.bushoDetailCurrentTab === 'aptitude') {
             // 適性のランク表示を綺麗にする魔法
             const getAptGradeHtml = (val) => StatPresenter.toAptitudeHTML(val);
@@ -350,6 +392,19 @@ Object.assign(UIInfoManager.prototype, {
                     </div>
                 </div>
             `;
+        } else if (this.bushoDetailCurrentTab === 'biography' && hasBiography) {
+            // 基本タブと完全に同じ高さを透明な参照レイアウトで確保し、
+            // 列伝本文だけをその範囲内へ重ねます。タブ切替でモーダル内部の表示範囲を動かしません。
+            rightContentHtml = `
+                <div class="busho-detail-biography-layout">
+                    <div class="busho-detail-biography-placeholder" aria-hidden="true">
+                        ${statusReferenceHtml}
+                    </div>
+                    <div class="busho-detail-group busho-detail-biography-panel">
+                        <div id="busho-detail-biography-text" class="busho-detail-biography-text"></div>
+                    </div>
+                </div>
+            `;
         }
 
         if (listContainer) {
@@ -394,6 +449,11 @@ Object.assign(UIInfoManager.prototype, {
                     </div>
                 </div>
             `;
+
+            if (this.bushoDetailCurrentTab === 'biography') {
+                const biographyEl = listContainer.querySelector('#busho-detail-biography-text');
+                if (biographyEl) biographyEl.textContent = biographyText;
+            }
 
             const detailFace = listContainer.querySelector('.busho-detail-face');
             if (detailFace) {
@@ -624,7 +684,7 @@ Object.assign(UIInfoManager.prototype, {
             if (extraData && extraData.customBushos) {
                 bushos = extraData.customBushos;
                 infoHtml = extraData.customInfoHtml || "";
-                isMulti = false;
+                isMulti = extraData.customIsMulti === true;
                 spec = {};
                 this.bushoSavedData = { actionType, targetId, bushos, infoHtml, isMulti, spec };
             } else {
@@ -992,6 +1052,10 @@ Object.assign(UIInfoManager.prototype, {
             
             let isSelectable = !b.isActionDone; 
             if (isActionFree) isSelectable = true; 
+            if (extraData && Array.isArray(extraData.customDisabledIds)) {
+                const disabledIds = extraData.customDisabledIds;
+                if (disabledIds.includes(Number(b.id))) isSelectable = false;
+            }
             
             const isSelected = (this.commonSelectedIds || []).includes(b.id);
             

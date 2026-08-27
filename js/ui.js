@@ -479,6 +479,14 @@ class UIManager {
             this.game.writeSystemDiagnostic(`${diagnosticPrefix}:${stage}`);
         };
 
+        // すでに通常地図が動いている時は、Canvas健全性確認や全表示更新を重ねない。
+        // 共通モーダルを開く直前の close→pause などで復帰処理が二重に走ると、
+        // 古いスマホでは一時的なメモリ・描画負荷の山になる。
+        if (!this.isBackgroundPaused) {
+            mark('already_active');
+            return;
+        }
+
         this.isBackgroundPaused = false;
         document.body.classList.remove('background-paused');
         mark('recover_map_start');

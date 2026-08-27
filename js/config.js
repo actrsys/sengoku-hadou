@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r240'
+        Version: 'r244'
     },
 
     History: {
@@ -204,6 +204,26 @@ window.GameConfig = {
             MaxTeppoUnitRatio: 0.5,
             // 兵科装備の自動割当では能力値を主軸にしつつ、対応適性1段階につきこの値を加点する。
             EquipmentAptitudeWeight: 6
+        },
+        FieldAI: {
+            // 味方の交戦、とくに総大将の直接交戦をターゲット・移動・攻撃の全段階で同じ基準にする。
+            Support: {
+                GeneralThreatTargetBonus: 100,
+                GeneralSelfThreatTargetBonus: 40,
+                EngagedTargetBonus: 55,
+                ExtraEngagedAllyBonus: 10,
+                EngagedUrgency: 0.7,
+                GeneralThreatUrgency: 1.0,
+                TerrainPreferenceMinScale: 0.2,
+                TerrainPreferenceReduction: 0.8,
+                CautionMinScale: 0.15,
+                CautionReduction: 0.85,
+                ProgressBaseBonus: 30,
+                ProgressUrgencyBonus: 20,
+                NearTargetBonus: 30,
+                AttackOpportunityBonus: 220,
+                PreferredAttackTargetBonus: 40
+            }
         },
         Reinforcement: {
             SelfSoldierRatio: 0.5,

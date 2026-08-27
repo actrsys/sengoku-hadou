@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r240');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r244');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -122,6 +122,13 @@ test('設定の二択ボタンは兵科classを流用せず共通button SEへ委
     });
     const settingsBlock = html.slice(html.indexOf('id="settings-modal"'), html.indexOf('id="saveload-modal"'));
     assert.ok(!settingsBlock.includes('troop-type-btn'), '設定画面に兵科ボタンclassを流用しない');
+    const saveloadBlock = html.slice(html.indexOf('id="saveload-modal"'), html.indexOf('id="custom-context-menu"'));
+    assert.ok(!saveloadBlock.includes('troop-type-btn'), 'セーブ／ロード切替に兵科ボタンclassを流用しない');
+    ['saveload-tab-manual', 'saveload-tab-auto'].forEach(id => {
+        const re = new RegExp(`<button[^>]*id="${id}"[^>]*class="ui-toggle-btn(?: active)?"[^>]*data-se="choice\\.ogg"|<button[^>]*class="ui-toggle-btn(?: active)?"[^>]*data-se="choice\\.ogg"[^>]*id="${id}"`);
+        assert.ok(re.test(html), `${id} は汎用切替classとchoice SEを使う`);
+    });
+    assert.ok(!read('css/style.css').includes('.setting-toggle-group .troop-type-btn'), '設定系レイアウトCSSへ兵科class依存を残さない');
     assert.ok(!settingsJs.includes("playSE('choice.ogg')"), '設定Viewからbutton SEを重ねて鳴らさない');
     assert.ok(read('ARCHITECTURE.md').includes('汎用の二択・切替操作は `.ui-toggle-btn`、兵科選択だけは `.troop-type-btn`'), '切替ボタンと兵科ボタンの意味上の責務を設計文書へ残す');
 });
@@ -6889,16 +6896,143 @@ test('AI上洛判断は自家所属の通常活動中武将だけを将軍候補
     assert.ok(!block.includes('getCastleBushos'));
 });
 
-test('野戦スクロール操作は前回イベントリスナーを解除してから再登録する', () => {
+test('野戦スクロール操作は共通解除処理を通してから再登録する', () => {
     const field = read('js/field_war.js');
-    const at = field.indexOf('if (this._fwScrollEventBindings)');
-    assert.ok(at >= 0);
-    const block = field.slice(at, at + 9000);
+    const unbindAt = field.indexOf('_unbindFieldWarScrollEvents()');
+    assert.ok(unbindAt >= 0);
+    const unbindBlock = field.slice(unbindAt, unbindAt + 1800);
     for (const type of ['click', 'wheel', 'touchstart', 'touchmove', 'touchend']) {
-        assert.ok(block.includes(`removeEventListener('${type}'`), `${type} を解除する`);
-        assert.ok(block.includes(`addEventListener('${type}'`), `${type} を再登録する`);
+        assert.ok(unbindBlock.includes(`removeEventListener('${type}'`), `${type} を解除する`);
     }
-    assert.ok(block.includes('this._fwScrollEventBindings = {'));
+
+    const initAt = field.indexOf("const scrollEl = document.getElementById('fw-map-scroll');");
+    assert.ok(initAt >= 0);
+    const initBlock = field.slice(initAt, initAt + 9000);
+    assert.ok(initBlock.includes('this._unbindFieldWarScrollEvents();'));
+    for (const type of ['click', 'wheel', 'touchstart', 'touchmove', 'touchend']) {
+        assert.ok(initBlock.includes(`addEventListener('${type}'`), `${type} を再登録する`);
+    }
+    assert.ok(initBlock.includes('this._fwScrollEventBindings = {'));
+});
+
+test('捕虜処遇は専用武将一覧を持たず既存の行動列なし共通武将選択を使う', () => {
+    const info = read('js/ui_info.js');
+    const busho = read('js/ui_info_busho.js');
+    const at = info.indexOf('showPrisonerSelector(phaseType, captives, onConfirm, onBack)');
+    assert.ok(at >= 0);
+    const block = info.slice(at, at + 1600);
+    assert.ok(block.includes("this.openBushoSelector('prisoner_treatment'"));
+    assert.ok(block.includes('customBushos: captives'));
+    assert.ok(block.includes('customIsMulti: true'));
+    assert.ok(block.includes('customDisabledIds: disabledIds'));
+    assert.ok(block.includes('allowDone: true'));
+    assert.ok(!info.includes('_renderPrisonerSelector('));
+    assert.ok(!info.includes('handlePrisonerSelect('));
+    assert.ok(busho.includes('const hideActionCol = isViewMode || isActionFree;'));
+    assert.ok(busho.includes('isMulti = extraData.customIsMulti === true;'));
+});
+
+test('共通武将選択は個別の選択不可IDを共通経路で扱える', () => {
+    const busho = read('js/ui_info_busho.js');
+    const at = busho.indexOf('const buildBushoListItem = (b) => {');
+    assert.ok(at >= 0);
+    const block = busho.slice(at, at + 1200);
+    assert.ok(block.includes('Array.isArray(extraData.customDisabledIds)'));
+    assert.ok(block.includes('disabledIds.includes(Number(b.id))'));
+    assert.ok(block.includes('isSelectable = false'));
+});
+
+test('野戦終了時は通常地図復帰より先に重い戦場DOMを解放する', () => {
+    const field = read('js/field_war.js');
+    const finishAt = field.indexOf('const finishProcess = async () => {');
+    assert.ok(finishAt >= 0);
+    const block = field.slice(finishAt, finishAt + 1600);
+    const releaseAt = block.indexOf('this.releaseFieldWarVisualResources();');
+    const resumeAt = block.indexOf("this.game.ui.resumeMainMapAfterBattle('field-war')");
+    assert.ok(releaseAt >= 0);
+    assert.ok(resumeAt >= 0);
+    assert.ok(releaseAt < resumeAt, '戦場DOM解放を通常地図復帰より先に行う');
+
+    const releaseDefAt = field.indexOf('releaseFieldWarVisualResources()');
+    const releaseBlock = field.slice(releaseDefAt, releaseDefAt + 1800);
+    assert.ok(releaseBlock.includes('this._unbindFieldWarScrollEvents();'));
+    assert.ok(releaseBlock.includes('mapEl.replaceChildren();'));
+    assert.ok(releaseBlock.includes('this.hexElements = null;'));
+    assert.ok(releaseBlock.includes('this._fwUnitElementCache = new Map();'));
+});
+
+test('野戦AIは交戦支援をターゲット・移動・攻撃で共通評価する', () => {
+    const ctx = createContext({ addEventListener() {} });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/field_war.js');
+
+    const manager = new ctx.FieldWarManager({});
+    const unit = { id: 'support', isGeneral: false, ap: 3, direction: 0, troopType: 'ashigaru', hasMoved: false };
+    const general = { id: 'general', isGeneral: true, x: 5, y: 4 };
+    const ally = { id: 'ally', isGeneral: false, x: 4, y: 6 };
+    const threat = { id: 'threat', x: 6, y: 5, isGeneral: false, troopType: 'ashigaru' };
+    const other = { id: 'other', x: 9, y: 8, isGeneral: true, troopType: 'teppo' };
+
+    const context = manager._buildAIEngagementContext(unit, [threat, other], [general, ally]);
+    assert.strictEqual(context.ownGeneralEngaged, true, '総大将に隣接する敵を救援対象として認識する');
+    assert.ok(context.generalThreatEnemyIds.has('threat'));
+    assert.ok(manager._getAITargetEngagementBonus(unit, threat, context) > manager._getAITargetEngagementBonus(unit, other, context), '総大将へ取り付く敵へ追加優先度を与える');
+    assert.strictEqual(manager._getAISupportUrgency(threat, context), ctx.WarParams.FieldAI.Support.GeneralThreatUrgency);
+
+    assert.strictEqual(manager._getAIMoveBudget(unit, 0), 2, '通常時は攻撃1APを残す');
+    assert.strictEqual(manager._getAIMoveBudget(unit, 1), 3, '交戦救援時は川越え等のため全APを前進へ使える');
+});
+
+test('野戦AIの攻撃可否は向き変更APに加えて攻撃1APまで確保する', () => {
+    const ctx = createContext({ addEventListener() {} });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/field_war.js');
+
+    const manager = new ctx.FieldWarManager({});
+    manager.canAttackTarget = () => true;
+    manager.getDirection = () => 1;
+    manager.getTurnCost = () => 1;
+    const unit = { id: 'u', isGeneral: false, direction: 0, troopType: 'ashigaru', hasMoved: false };
+    const enemy = { id: 'e', x: 1, y: 1, isGeneral: false, troopType: 'ashigaru' };
+    const context = {
+        generalThreatEnemyIds: new Set(),
+        engagedEnemyIds: new Set(),
+        engagementCountByEnemy: new Map()
+    };
+
+    assert.strictEqual(manager._getAIAttackOpportunityAt(unit, 0, 0, 0, 1, false, [enemy], context), null, '向き変更だけでAPを使い切る場合は攻撃可能扱いにしない');
+    assert.ok(manager._getAIAttackOpportunityAt(unit, 0, 0, 0, 2, false, [enemy], context), '向き変更1＋攻撃1を確保できる場合だけ攻撃候補にする');
+
+    const field = read('js/field_war.js');
+    assert.ok(field.includes('unit.ap >= turnCost + 1 && this.canAttackTarget(tempUnit, e.x, e.y)'), '実行直前の攻撃対象選択も同じAP基準を使う');
+});
+
+test('野戦ダメージ演出は低FPS端末でも描画機会を通してから進行する', () => {
+    const field = read('js/field_war.js');
+    const css = read('css/animation.css');
+    assert.ok(field.includes('async _waitForFieldWarVisualState(minMs = 0)'));
+    assert.ok(field.includes('this.game.ui.waitForNextPaint()'));
+    assert.ok(field.includes('await this._waitForFieldWarVisualState(120);'));
+    assert.ok(field.includes('await this._waitForFieldWarVisualState(35);'));
+    assert.ok(field.includes('await this._waitForFieldWarVisualState(0);'));
+    assert.ok(field.includes("popup.classList.add('is-leaving');"));
+    assert.ok(css.includes('.fw-damage-popup.is-leaving'));
+    const popupRuleAt = css.indexOf('.fw-damage-popup {');
+    const popupRuleEnd = css.indexOf('}', popupRuleAt);
+    const popupRule = css.slice(popupRuleAt, popupRuleEnd + 1);
+    assert.ok(!popupRule.includes('animation:'), 'append直後からwall-clock animationを走らせない');
+});
+
+test('背景復帰はすでにactiveなら重い地図復旧を二重実行しない', () => {
+    const ui = read('js/ui.js');
+    const at = ui.indexOf("if (!this.isBackgroundPaused) {");
+    assert.ok(at >= 0);
+    const block = ui.slice(at, at + 850);
+    assert.ok(block.includes("mark('already_active');"));
+    assert.ok(block.includes('return;'));
+    const recoverAt = block.indexOf('recoverMobileMapResources');
+    const returnAt = block.indexOf('return;');
+    assert.ok(recoverAt < 0 || returnAt < recoverAt);
 });
 
 test('独立・寝返り・謀反履歴は当事者勢力IDを明示する', () => {
@@ -7012,7 +7146,36 @@ test('武将詳細タブは遅延bindせず現在のタブDOMへ直接結び付�
     const source = read('js/ui_info_busho.js');
     assert.ok(source.includes("tabsEl.querySelector('#busho-detail-tab-status')"));
     assert.ok(source.includes("tabsEl.querySelector('#busho-detail-tab-aptitude')"));
-    assert.ok(!/busho-detail-tab-status[\s\S]{0,900}setTimeout\s*\(/.test(source));
+    assert.ok(source.includes("tabsEl.querySelector('#busho-detail-tab-biography')"));
+    assert.ok(!/busho-detail-tab-status[\s\S]{0,1200}setTimeout\s*\(/.test(source));
+});
+
+test('武将詳細の列伝タブは空欄・全角換算10文字以下を表示対象外にする', () => {
+    function UIInfoManager() {}
+    const ctx = createContext({ UIInfoManager });
+    loadScript(ctx, 'js/ui_info_busho.js');
+    const info = new UIInfoManager();
+    assert.strictEqual(info._hasDisplayableBushoBiography({ biography: '' }), false);
+    assert.strictEqual(info._hasDisplayableBushoBiography({ biography: '田村家臣。' }), false);
+    assert.strictEqual(info._hasDisplayableBushoBiography({ biography: '阿波国衆。白地城主。' }), false);
+    assert.strictEqual(info._hasDisplayableBushoBiography({ biography: 'あ'.repeat(10) }), false);
+    assert.strictEqual(info._hasDisplayableBushoBiography({ biography: 'あ'.repeat(11) }), true);
+    assert.strictEqual(info._hasDisplayableBushoBiography({ biography: '12345678901234567890' }), false);
+    assert.strictEqual(info._hasDisplayableBushoBiography({ biography: '123456789012345678901' }), true);
+    assert.strictEqual(info._hasDisplayableBushoBiography({ biography: 'あああああ　あああああ\n' }), false);
+});
+
+test('武将詳細の列伝は条件付きタブ・スマホ短縮名・基本タブ同高の表示枠を使う', () => {
+    const source = read('js/ui_info_busho.js');
+    const css = read('css/style.css');
+    assert.ok(source.includes("isPc ? '列伝' : '伝'"));
+    assert.ok(source.includes("this.bushoDetailCurrentTab === 'biography' && hasBiography"));
+    assert.ok(source.includes('busho-detail-biography-placeholder'));
+    assert.ok(source.includes('biographyEl.textContent = biographyText'));
+    assert.ok(css.includes('.busho-detail-biography-placeholder'));
+    assert.ok(css.includes('visibility: hidden;'));
+    assert.ok(css.includes('.busho-detail-biography-panel'));
+    assert.ok(css.includes('overflow-y: auto;'));
 });
 
 

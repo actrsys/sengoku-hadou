@@ -351,7 +351,6 @@ class UIInfoManager {
         else if (info.pageType === 'princess_list') this._renderPrincessList(...info.args, info.scrollPos);
         else if (info.pageType === 'delegate_list') this._renderDelegateList(...info.args, info.scrollPos);
         else if (info.pageType === 'delegate_setting') this._renderDelegateSetting(...info.args, info.scrollPos);
-        else if (info.pageType === 'prisoner_selector') this._renderPrisonerSelector(...info.args, info.scrollPos);
         else if (info.pageType === 'history_list') this._renderHistoryList(...info.args, info.scrollPos);
         else if (info.pageType === 'kunishu_list') this._renderKunishuList(...info.args, info.scrollPos);
         else if (info.pageType === 'kunishu_detail') this._renderKunishuDetail(...info.args, info.scrollPos);
@@ -1247,109 +1246,26 @@ class UIInfoManager {
     }
     
     showPrisonerSelector(phaseType, captives, onConfirm, onBack) {
-        this.closeCommonModal(); 
-        this.pushModal('prisoner_selector', [phaseType, captives, onConfirm, onBack]);
+        const contextHtml = phaseType === 'hire'
+            ? "<div>登用する武将を選択してください</div>"
+            : "<div>処断する武将を選択してください</div>";
+        const disabledIds = phaseType === 'hire'
+            ? captives.filter(b => b.hasRefusedHire).map(b => Number(b.id))
+            : [];
+
+        // 捕虜だけの専用一覧は持たず、既存の「行動列なし」共通武将選択を使う。
+        // allowDone は既存の行動非消費経路で、スマホ用の幅・タブ・ソートも共通化される。
+        this.openBushoSelector('prisoner_treatment', null, {
+            customBushos: captives,
+            customInfoHtml: contextHtml,
+            customTitle: "武将を選択（複数可）",
+            customIsMulti: true,
+            customDisabledIds: disabledIds,
+            allowDone: true,
+            onConfirm
+        }, onBack);
     }
 
-    _renderPrisonerSelector(phaseType, captives, onConfirm, onBack, scrollPos = 0) {
-        const titleStr = phaseType === 'hire' ? "武将を選択（複数可）" : "武将を選択（複数可）";
-        const contextHtml = phaseType === 'hire' ? "<div>登用する武将を選択してください</div>" : "<div>処断する武将を選択してください</div>";
-
-        let items = [];
-        const gunshi = this.game.getClanGunshi(this.game.playerClanId);
-        const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
-
-        captives.forEach((b) => {
-            let isSelectable = true;
-            // 登用フェーズで断った人は選べないようにします
-            if (phaseType === 'hire' && b.hasRefusedHire) isSelectable = false;
-
-            const inputType = 'checkbox';
-            let inputHtml = `<input type="${inputType}" name="sel_prisoner" value="${b.id}" ${!isSelectable ? 'disabled' : ''} class="hidden-selection-input">`;
-
-            const getStat = (stat) => StatPresenter.getDisplayStatHTML(b, stat, gunshi, null, this.game.playerClanId, myDaimyo);
-
-            let cells = [
-                `<span class="col-act">${inputHtml}${!isSelectable ? '済' : '未'}</span>`,
-                `<span class="col-name">${b.name}</span>`,
-                `<span class="col-rank">${StatPresenter.getBushoRankName(b, this.game)}</span>`,
-                `<span class="col-stat">${getStat('leadership')}</span>`,
-                `<span class="col-stat">${getStat('strength')}</span>`,
-                `<span class="col-stat">${getStat('politics')}</span>`,
-                `<span class="col-stat">${getStat('diplomacy')}</span>`,
-                `<span class="col-stat">${getStat('intelligence')}</span>`,
-                `<span class="col-stat">${getStat('charm')}</span>`
-            ];
-
-            // 断った武将は暗くして触れないようにします
-            let itemClassThis = "stats-mode";
-            if (!isSelectable) itemClassThis += " disabled";
-
-            items.push({
-                onClick: !isSelectable ? null : this._withChoiceSound((e) => this.handlePrisonerSelect(e)),
-                cells: cells,
-                itemClass: itemClassThis
-            });
-        });
-
-        this._renderListModal({
-            title: titleStr,
-            contextHtml: contextHtml,
-            headers: [
-                `<span class="col-act">行動</span>`,
-                `<span class="col-name">名前</span>`,
-                `<span class="col-rank">身分</span>`,
-                `<span class="col-stat">統率</span>`,
-                `<span class="col-stat">武勇</span>`,
-                `<span class="col-stat">内政</span>`,
-                `<span class="col-stat">外交</span>`,
-                `<span class="col-stat">智謀</span>`,
-                `<span class="col-stat">魅力</span>`
-            ],
-            headerClass: "sortable-header stats-mode",
-            itemClass: "",
-            listClass: "",
-            items: items,
-            scrollPos: scrollPos,
-            minWidth: "750px",
-            gridTemplateSp: "25px 2fr 1.8fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr",
-            gridTemplatePc: "35px 100px 60px 1fr 1fr 1fr 1fr 1fr 1fr",
-            onBack: onBack,
-            onConfirm: () => {
-                const inputs = document.querySelectorAll('input[name="sel_prisoner"]:checked'); 
-                if (inputs.length === 0) return;
-                const selectedIds = Array.from(inputs).map(i => parseInt(i.value)); 
-                this.closeCommonModal(); 
-                if (onConfirm) onConfirm(selectedIds);
-            }
-        });
-
-        this._updatePrisonerSelectorUI();
-    }
-
-    handlePrisonerSelect(e) {
-        let div = e.currentTarget;
-        let input = e.target.tagName === 'INPUT' ? e.target : div.querySelector('input');
-        if (!input) return;
-
-        if (e.target.tagName !== 'INPUT') {
-             input.checked = !input.checked; 
-        }
-        if(input.checked) div.classList.add('selected'); else div.classList.remove('selected');
-        this._updatePrisonerSelectorUI();
-    }
-
-    _updatePrisonerSelectorUI() {
-        const checkedCount = document.querySelectorAll('input[name="sel_prisoner"]:checked').length; 
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-
-        if (this.selectorView && typeof this.selectorView.setConfirmEnabled === 'function') {
-            this.selectorView.setConfirmEnabled(checkedCount > 0);
-        } else if (confirmBtn) {
-            confirmBtn.disabled = checkedCount === 0;
-        }
-    }
-    
     showDaimyoPrisonerModal(prisoner, options = {}) {
         this.ui.hideAIGuardTemporarily();
 

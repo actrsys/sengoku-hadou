@@ -575,6 +575,66 @@ class FieldWarManager {
         this.startTurn();
     }
 
+    _unbindFieldWarScrollEvents() {
+        if (!this._fwScrollEventBindings) return;
+        const previous = this._fwScrollEventBindings;
+        const el = previous.element;
+        const h = previous.handlers || {};
+        if (el) {
+            if (h.click) el.removeEventListener('click', h.click, true);
+            if (h.wheel) el.removeEventListener('wheel', h.wheel, false);
+            if (h.touchstart) el.removeEventListener('touchstart', h.touchstart, false);
+            if (h.touchmove) el.removeEventListener('touchmove', h.touchmove, false);
+            if (h.touchend) el.removeEventListener('touchend', h.touchend, false);
+        }
+        this._fwScrollEventBindings = null;
+    }
+
+    releaseFieldWarVisualResources() {
+        this._unbindFieldWarScrollEvents();
+
+        const mapEl = this.mapEl || document.getElementById('fw-map');
+        if (mapEl) {
+            mapEl.oncontextmenu = null;
+            mapEl.replaceChildren();
+            mapEl.style.transform = '';
+            mapEl.style.transformOrigin = '';
+            mapEl.style.width = '';
+            mapEl.style.height = '';
+            mapEl.style.margin = '';
+        }
+
+        const clearIds = ['fw-atk-status', 'fw-def-status', 'fw-atk-tabs', 'fw-def-tabs', 'fw-unit-info', 'fw-log'];
+        clearIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.replaceChildren();
+        });
+        const unitInfo = document.getElementById('fw-unit-info');
+        const statusBar = document.getElementById('fw-status-bar');
+        const logEl = document.getElementById('fw-log');
+        if (unitInfo) unitInfo.classList.add('hidden');
+        if (statusBar) statusBar.classList.add('hidden');
+        if (logEl) logEl.classList.add('hidden');
+
+        this.hexElements = null;
+        this._fwUnitElementCache = new Map();
+        this._fwHighlightedHexes = new Set();
+        this._fwPreviewRefs = null;
+        this.mapEl = mapEl || null;
+        this.logEl = logEl || null;
+    }
+
+    async _waitForFieldWarVisualState(minMs = 0) {
+        const delay = new Promise(resolve => setTimeout(resolve, Math.max(0, minMs)));
+        const paint = this.game.ui && typeof this.game.ui.waitForNextPaint === 'function'
+            ? this.game.ui.waitForNextPaint()
+            : new Promise(resolve => {
+                if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => setTimeout(resolve, 0));
+                else setTimeout(resolve, 0);
+            });
+        await Promise.all([delay, paint]);
+    }
+
     initUI() {
         this.modal = document.getElementById('field-war-modal');
         this.mapEl = document.getElementById('fw-map');
@@ -599,21 +659,8 @@ class FieldWarManager {
         // ★追加：マウスのドラッグでマップをぐりぐりスクロールする魔法
         const scrollEl = document.getElementById('fw-map-scroll');
         if (scrollEl) {
-            // 野戦UIは同じ固定DOMを再利用するため、前回の addEventListener を必ず解除してから再登録する。
-            // 解除しないと野戦回数に比例して wheel/touch/click のクロージャが蓄積する。
-            if (this._fwScrollEventBindings) {
-                const previous = this._fwScrollEventBindings;
-                const el = previous.element;
-                const h = previous.handlers || {};
-                if (el) {
-                    if (h.click) el.removeEventListener('click', h.click, true);
-                    if (h.wheel) el.removeEventListener('wheel', h.wheel, false);
-                    if (h.touchstart) el.removeEventListener('touchstart', h.touchstart, false);
-                    if (h.touchmove) el.removeEventListener('touchmove', h.touchmove, false);
-                    if (h.touchend) el.removeEventListener('touchend', h.touchend, false);
-                }
-                this._fwScrollEventBindings = null;
-            }
+            // 野戦UIは同じ固定DOMを再利用するため、前回のイベントを共通窓口で解除してから再登録する。
+            this._unbindFieldWarScrollEvents();
 
             let isDragging = false;
             let isMoved = false; // ★ドラッグで動かしたかどうかのメモ
@@ -2764,6 +2811,11 @@ class FieldWarManager {
         
         const finishProcess = async () => {
             if (this.modal) this.modal.classList.add('hidden');
+
+            // 古いスマホでは、非表示の野戦DOMを保持したまま通常地図を復帰すると
+            // 240HEX・部隊DOMと通常地図Canvasが同時常駐して一時メモリの山になる。
+            // 戦闘計算の書き戻しが完了したこの地点で、表示資源だけ先に解放する。
+            this.releaseFieldWarVisualResources();
             
             // 戦闘用の共通窓口だけが、最後の戦闘所有者が閉じた時に背景を戻します。
             if (this.game.ui && typeof this.game.ui.resumeMainMapAfterBattle === 'function') {
@@ -3410,16 +3462,18 @@ class FieldWarManager {
             const atkEl = document.getElementById(`fw-unit-el-${attacker.id}`);
             const defEl = document.getElementById(`fw-unit-el-${defender.id}`);
 
-            // 交互に4度ずつ点滅させます（awaitを使って順番を待ちます）
+            // 交互に4度ずつ点滅。低FPS端末でも class の付け外しが同じ描画へ潰れないよう、
+            // 明状態・通常状態の双方で最低1回は描画機会を通す。
             if (atkEl && defEl) {
+                const flashOnce = async (el) => {
+                    el.classList.add('anim-battle-flash');
+                    await this._waitForFieldWarVisualState(120);
+                    el.classList.remove('anim-battle-flash');
+                    await this._waitForFieldWarVisualState(35);
+                };
                 for (let i = 0; i < 4; i++) {
-                    atkEl.classList.add('anim-battle-flash');
-                    await new Promise(r => setTimeout(r, 150));
-                    atkEl.classList.remove('anim-battle-flash');
-                    
-                    defEl.classList.add('anim-battle-flash');
-                    await new Promise(r => setTimeout(r, 150));
-                    defEl.classList.remove('anim-battle-flash');
+                    await flashOnce(atkEl);
+                    await flashOnce(defEl);
                 }
             }
 
@@ -3446,10 +3500,21 @@ class FieldWarManager {
                 popup.style.left = `${elLeft + (elWidth / 2)}px`;
                 popup.style.top = `${elTop}px`;
                 
-                // 1秒経ったら自動でお掃除します
-                setTimeout(() => {
-                    if (popup.parentNode) popup.parentNode.removeChild(popup);
-                }, 1000);
+                // 低FPS端末でも最低1回は完全表示されたフレームを通してから保持時間を数える。
+                // CSSアニメーションをappend直後から走らせると、重い実機では最終フレームへ飛んで一瞬に見える。
+                const retirePopup = async () => {
+                    await this._waitForFieldWarVisualState(0);
+                    await new Promise(r => setTimeout(r, 650));
+                    if (!popup.parentNode) return;
+
+                    const remove = () => {
+                        if (popup.parentNode) popup.parentNode.removeChild(popup);
+                    };
+                    popup.addEventListener('animationend', remove, { once: true });
+                    popup.classList.add('is-leaving');
+                    setTimeout(remove, 700);
+                };
+                retirePopup();
             };
 
             showDamagePopup(dmgToDef, defEl);
@@ -3751,7 +3816,101 @@ class FieldWarManager {
         }
     }
 
-    // ★修正: AIの行動スコアに「智謀」「性格」に加えて「孤立ペナルティ（5マス以上離れない）」を追加！
+    // AIが「誰を助けるべきか」を、ターゲット選択・移動・攻撃で共通して参照する。
+    // 総大将が直接交戦中なのに周囲が地形や性格だけを見て傍観する、といった判断の分断を避ける。
+    _buildAIEngagementContext(unit, enemies, allies) {
+        const ownGeneral = unit.isGeneral ? unit : (allies.find(a => a.isGeneral) || null);
+        const engagedEnemyIds = new Set();
+        const generalThreatEnemyIds = new Set();
+        const engagementCountByEnemy = new Map();
+
+        enemies.forEach(enemy => {
+            let count = 0;
+            allies.forEach(ally => {
+                if (this.getDistance(enemy.x, enemy.y, ally.x, ally.y) === 1) count++;
+            });
+            if (count > 0) {
+                engagedEnemyIds.add(enemy.id);
+                engagementCountByEnemy.set(enemy.id, count);
+            }
+            if (ownGeneral && this.getDistance(enemy.x, enemy.y, ownGeneral.x, ownGeneral.y) === 1) {
+                generalThreatEnemyIds.add(enemy.id);
+            }
+        });
+
+        return {
+            ownGeneral,
+            engagedEnemyIds,
+            generalThreatEnemyIds,
+            engagementCountByEnemy,
+            anyAllyEngaged: engagedEnemyIds.size > 0,
+            ownGeneralEngaged: generalThreatEnemyIds.size > 0
+        };
+    }
+
+    _getAITargetEngagementBonus(unit, enemy, engagementContext) {
+        if (!engagementContext || !enemy) return 0;
+        let bonus = 0;
+
+        // 総大将へ直接取り付いている敵は、一般部隊にとって最優先の救援対象。
+        // 総大将本人のターンでは過剰な全軍救援補正にせず、目前の敵を選びやすくする程度に留める。
+        if (engagementContext.generalThreatEnemyIds.has(enemy.id)) {
+            bonus += unit.isGeneral ? WarParams.FieldAI.Support.GeneralSelfThreatTargetBonus : WarParams.FieldAI.Support.GeneralThreatTargetBonus;
+        }
+
+        if (engagementContext.engagedEnemyIds.has(enemy.id)) {
+            const count = engagementContext.engagementCountByEnemy.get(enemy.id) || 1;
+            bonus += WarParams.FieldAI.Support.EngagedTargetBonus + Math.max(0, count - 1) * WarParams.FieldAI.Support.ExtraEngagedAllyBonus;
+        }
+        return bonus;
+    }
+
+    _getAISupportUrgency(targetEnemy, engagementContext) {
+        if (!targetEnemy || !engagementContext) return 0;
+        if (engagementContext.generalThreatEnemyIds.has(targetEnemy.id)) return WarParams.FieldAI.Support.GeneralThreatUrgency;
+        if (engagementContext.engagedEnemyIds.has(targetEnemy.id)) return WarParams.FieldAI.Support.EngagedUrgency;
+        return 0;
+    }
+
+    _getAIMoveBudget(unit, supportUrgency) {
+        if (!unit) return 0;
+        return Math.max(0, unit.ap - (supportUrgency > 0 ? 0 : 1));
+    }
+
+    // 候補地点から「向き変更＋攻撃」まで今ターンに実行できるかを調べる。
+    // 移動先評価と実際の攻撃フェイズが別々の都合で判断し、攻撃可能地点の一歩手前で止まるのを防ぐ。
+    _getAIAttackOpportunityAt(unit, x, y, direction, remainingAP, hasMoved, enemies, engagementContext, preferredTargetId = null) {
+        if (remainingAP < 1) return null;
+        let best = null;
+
+        enemies.forEach(enemy => {
+            const targetDir = this.getDirection(x, y, enemy.x, enemy.y);
+            const turnCost = this.getTurnCost(direction, targetDir);
+            if (remainingAP < turnCost + 1) return;
+
+            const tempUnit = Object.assign({}, unit, {
+                x,
+                y,
+                direction: targetDir,
+                hasMoved
+            });
+            if (!this.canAttackTarget(tempUnit, enemy.x, enemy.y)) return;
+
+            let score = 0;
+            if (enemy.id === preferredTargetId) score += WarParams.FieldAI.Support.PreferredAttackTargetBonus;
+            score += this._getAITargetEngagementBonus(unit, enemy, engagementContext);
+            if (enemy.isGeneral) score += 30;
+            if (enemy.troopType === 'teppo') score += 20;
+
+            if (!best || score > best.score) {
+                best = { enemy, score, turnCost };
+            }
+        });
+
+        return best;
+    }
+
+    // ★修正: AIの行動スコアに「智謀」「性格」に加えて、交戦支援を全判断段階で共有する。
     async processAITurn() {
         if (!this.active) return;
         const unit = this.turnQueue[0];
@@ -3810,6 +3969,7 @@ class FieldWarManager {
         }
 
         const maxEnemySoldiers = Math.max(...enemies.map(e => e.soldiers), 1);
+        const engagementContext = this._buildAIEngagementContext(unit, enemies, allies);
 
         // --- 1. ターゲット敵の選定 (スコア制) ---
         let targetEnemy = null;
@@ -3824,15 +3984,8 @@ class FieldWarManager {
             if (e.isGeneral) score += 30; 
             if (e.troopType === 'teppo') score += 20; 
             
-            // ★追加: 味方と隣接して戦っている敵を優先的に狙って前に出るようにします！
-            let isEngaged = false;
-            for (let a of allies) {
-                if (this.getDistance(e.x, e.y, a.x, a.y) === 1) {
-                    isEngaged = true;
-                    break;
-                }
-            }
-            if (isEngaged) score += 30;
+            // 交戦中の味方、とくに総大将へ取り付いている敵を優先する。
+            score += this._getAITargetEngagementBonus(unit, e, engagementContext);
             
             score += Math.random() * 10 * randMult; 
             
@@ -3843,6 +3996,7 @@ class FieldWarManager {
         });
 
         let distToTarget = this.getDistance(unit.x, unit.y, targetEnemy.x, targetEnemy.y);
+        const supportUrgency = this._getAISupportUrgency(targetEnemy, engagementContext);
 
         // --- 2. 逃走・移動判定 ---
         // ★追加: 現在地の地形を調べます（川からの脱出ロジックなどに使います）
@@ -3880,7 +4034,7 @@ class FieldWarManager {
                     let tempUnit = Object.assign({}, unit);
                     tempUnit.direction = targetDir; // 仮に振り向かせてみる
                     
-                    if (unit.ap >= turnCost && this.canAttackTarget(tempUnit, e.x, e.y)) {
+                    if (unit.ap >= turnCost + 1 && this.canAttackTarget(tempUnit, e.x, e.y)) {
                         canAttackNow = true;
                         break;
                     }
@@ -3906,7 +4060,10 @@ class FieldWarManager {
 
         // --- 3. 移動先マスの選定 (スコア制) ---
         if (shouldMove) {
-            let reachable = this.findPaths(unit, unit.ap - 1); 
+            // 通常は攻撃APを1残すが、味方がすでに交戦している時は全APを移動にも使えるようにする。
+            // 川・悪天候などで「攻撃APを残すと一歩も前進できない」状態を永久待機にしない。
+            const moveBudget = this._getAIMoveBudget(unit, supportUrgency);
+            let reachable = this.findPaths(unit, moveBudget); 
             let bestTargetHex = null;
             let bestMoveScore = -Infinity;
 
@@ -3914,17 +4071,8 @@ class FieldWarManager {
             let myGeneral = allies.find(a => a.isGeneral);
             if (unit.isGeneral) myGeneral = unit;
 
-            // ★追加: 戦場で味方の誰かがすでに敵と殴り合っているか（交戦中か）を全体チェック
-            let isAnyAllyEngaged = false;
-            for (let a of allies) {
-                for (let e of enemies) {
-                    if (this.getDistance(a.x, a.y, e.x, e.y) === 1) {
-                        isAnyAllyEngaged = true; 
-                        break;
-                    }
-                }
-                if (isAnyAllyEngaged) break;
-            }
+            // ターゲット選択と同じ交戦コンテキストを移動にも使う。
+            const isAnyAllyEngaged = engagementContext.anyAllyEngaged;
 
             // ★お掃除: 逃げている時は無駄に重いルート検索(A*)をしないようにブロック
             let aStarIdealHexes = {};
@@ -3935,7 +4083,7 @@ class FieldWarManager {
                     for (let i = 0; i < aStarPath.length; i++) {
                         let step = aStarPath[i];
                         accumulatedCost += step.cost;
-                        if (accumulatedCost <= unit.ap - 1) {
+                        if (accumulatedCost <= moveBudget) {
                             aStarIdealHexes[`${step.x},${step.y}`] = true;
                         } else break;
                     }
@@ -3958,24 +4106,48 @@ class FieldWarManager {
                 let score = 0;
                 let dToEnemy = this.getDistance(nx, ny, targetEnemy.x, targetEnemy.y);
 
-                // 今いる場所（動かない）への軽いボーナス（反復横跳び防止）
-                if (nx === unit.x && ny === unit.y) {
+                let candidateDirection = unit.direction;
+                if ((nx !== unit.x || ny !== unit.y) && hexInfo.path && hexInfo.path.length > 0) {
+                    let fromX = unit.x;
+                    let fromY = unit.y;
+                    if (hexInfo.path.length > 1) {
+                        const prevStep = hexInfo.path[hexInfo.path.length - 2];
+                        fromX = prevStep.x;
+                        fromY = prevStep.y;
+                    }
+                    candidateDirection = this.getDirection(fromX, fromY, nx, ny);
+                }
+                const remainingAP = Math.max(0, unit.ap - hexInfo.cost);
+                const movedToCandidate = (nx !== unit.x || ny !== unit.y);
+                const attackOpportunity = !isFleeing
+                    ? this._getAIAttackOpportunityAt(
+                        unit, nx, ny, candidateDirection, remainingAP, movedToCandidate || unit.hasMoved,
+                        enemies, engagementContext, targetEnemy.id
+                    )
+                    : null;
+
+                // 今いる場所への軽いボーナスは、救援が必要な時には待機理由にしない。
+                if (nx === unit.x && ny === unit.y && supportUrgency <= 0) {
                     score += 5; 
                 }
 
-                // 地形による評価（距離に応じたグラデーション）
+                // 味方が交戦中なら地形の好悪は残しつつ、救援より優先して足を止めない。
+                const terrainPreferenceScale = Math.max(
+                    WarParams.FieldAI.Support.TerrainPreferenceMinScale,
+                    1.0 - supportUrgency * WarParams.FieldAI.Support.TerrainPreferenceReduction
+                );
                 let row_t = Math.floor(ny / 2);
                 let terrain_t = (this.grid && this.grid[row_t] && this.grid[row_t][nx]) ? this.grid[row_t][nx].terrain : 'plain';
                 
                 if (terrain_t === 'river') {
                     let riverDanger = Math.max(0.1, 1.0 - (dToEnemy / 10)); 
-                    score -= 30 * riverDanger;
+                    score -= 30 * riverDanger * terrainPreferenceScale;
                 } else if (terrain_t === 'mountain') {
-                    score += 15; 
-                    if (!unit.isAttacker) score += 20;
+                    score += 15 * terrainPreferenceScale; 
+                    if (!unit.isAttacker) score += 20 * terrainPreferenceScale;
                 } else if (terrain_t === 'forest') {
-                    score += 10; 
-                    if (!unit.isAttacker) score += 10;
+                    score += 10 * terrainPreferenceScale; 
+                    if (!unit.isAttacker) score += 10 * terrainPreferenceScale;
                 }
 
                 // 兵科ごとの移動評価（無限に逃げる計算をすべて廃止し、適切な距離を目標にさせる）
@@ -4062,8 +4234,9 @@ class FieldWarManager {
                         let dToGen = this.getDistance(nx, ny, myGeneral.x, myGeneral.y);
                         let isKiba = unit.troopType === 'kiba';
                         
-                        // 敵が近い(交戦中)ほど、総大将から離れて自由に戦う
+                        // 通常は敵が近いほど隊形拘束を弱めるが、総大将自身が交戦中なら救援のため逆に結束を優先する。
                         let dangerFactor = Math.max(0.0, Math.min(1.0, distToTarget / 10));
+                        if (engagementContext.ownGeneralEngaged) dangerFactor = Math.max(dangerFactor, 1.0);
                         
                         if (dToGen >= 1 && dToGen <= 3) {
                             score += (isKiba ? 10 : 30) * dangerFactor; 
@@ -4073,7 +4246,10 @@ class FieldWarManager {
                         }
                     }
 
-                    // ★修正: 総大将や性格による逃げ腰も「無限に端に逃げる」のを修正
+                    // 性格は平時の間合いには反映するが、一般部隊が交戦中の味方を見捨てる理由にはしない。
+                    const cautionScale = (!unit.isGeneral && supportUrgency > 0)
+                        ? Math.max(WarParams.FieldAI.Support.CautionMinScale, 1.0 - supportUrgency * WarParams.FieldAI.Support.CautionReduction)
+                        : 1.0;
                     if (unit.isGeneral && myPersonality !== 'aggressive') {
                         // 後方の安全な距離（4〜5）を維持しようとする
                         let safeDist = 5;
@@ -4082,9 +4258,21 @@ class FieldWarManager {
                     } else if (myPersonality === 'conservative') {
                         let safeDist = 3;
                         let distDiff = Math.abs(dToEnemy - safeDist);
-                        score -= distDiff * 10;
+                        score -= distDiff * 10 * cautionScale;
                     } else if (myPersonality === 'aggressive') {
                         score -= dToEnemy * 5; 
+                    }
+
+                    // 交戦中の目標へ実際に近づいた分を、地形・性格とは独立した「救援行動」として評価する。
+                    if (supportUrgency > 0) {
+                        const progress = distToTarget - dToEnemy;
+                        score += progress * (WarParams.FieldAI.Support.ProgressBaseBonus + supportUrgency * WarParams.FieldAI.Support.ProgressUrgencyBonus);
+                        if (dToEnemy <= 2) score += (3 - dToEnemy) * WarParams.FieldAI.Support.NearTargetBonus * supportUrgency;
+                    }
+
+                    // 今ターンに「向き変更＋攻撃」まで完遂できる候補を強く優先する。
+                    if (attackOpportunity) {
+                        score += WarParams.FieldAI.Support.AttackOpportunityBonus + attackOpportunity.score;
                     }
 
                     // 孤立ペナルティ
@@ -4169,7 +4357,7 @@ class FieldWarManager {
             tempUnit.direction = targetDir; // 仮に敵の方を向かせる
 
             // 振り向く体力（turnCost）を引いても攻撃できるかチェック！
-            if (unit.ap >= turnCost && this.canAttackTarget(tempUnit, e.x, e.y)) {
+            if (unit.ap >= turnCost + 1 && this.canAttackTarget(tempUnit, e.x, e.y)) {
                 let score = 0;
                 let d = this.getDistance(unit.x, unit.y, e.x, e.y);
                 score += (50 - d * 2); 
@@ -4190,15 +4378,8 @@ class FieldWarManager {
                     else if (defToAtkDiff === 2) score += 20; // 側面
                 }
 
-                // ★追加: 味方と隣接して戦っている敵を優先して叩く！
-                let isEngaged = false;
-                for (let a of allies) {
-                    if (this.getDistance(e.x, e.y, a.x, a.y) === 1) {
-                        isEngaged = true;
-                        break;
-                    }
-                }
-                if (isEngaged) score += 30;
+                // 移動時と同じ交戦優先度を、最終攻撃対象にもそのまま使う。
+                score += this._getAITargetEngagementBonus(unit, e, engagementContext);
                 
                 score += Math.random() * 5 * randMult;
 

@@ -1136,6 +1136,49 @@ async function validateFieldWarFullscreen(cdp) {
     console.log('✓ 野戦 PC/スマホ full-screen visual/layout regression');
 }
 
+async function validateBushoBiographyLayout(cdp) {
+    const html = fixtureHtml('busho_detail_biography.html');
+    const cases = [
+        { label:'PC', width:1280, height:720, mobile:false, isPc:true, tab:'列伝' },
+        { label:'mobile', width:360, height:640, mobile:true, isPc:false, tab:'伝' }
+    ];
+    for (const cfg of cases) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width:cfg.width, height:cfg.height, deviceScaleFactor:1, mobile:cfg.mobile });
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(() => {
+                document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.classList.toggle('is-pc', ${cfg.isPc});
+                const screen=document.getElementById('game-screen');
+                screen.style.width='${cfg.width}px';screen.style.height='${cfg.height}px';screen.style.transform='none';
+                document.getElementById('fixture-biography-tab').textContent=${JSON.stringify(cfg.tab)};
+                const rect=id=>{const r=document.getElementById(id).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
+                const text=document.getElementById('fixture-biography-text');
+                const tab=document.getElementById('fixture-biography-tab');
+                const tabs=tab.parentElement.getBoundingClientRect();
+                const tr=tab.getBoundingClientRect();
+                const ts=getComputedStyle(text);
+                return {
+                    layout:rect('fixture-biography-layout'), placeholder:rect('fixture-placeholder'), reference:rect('fixture-status-reference'), panel:rect('fixture-biography-panel'), right:rect('fixture-right'),
+                    text:{...rect('fixture-biography-text'),clientHeight:text.clientHeight,scrollHeight:text.scrollHeight,overflowY:ts.overflowY,fontSize:parseFloat(ts.fontSize),lineHeight:parseFloat(ts.lineHeight)},
+                    tab:{text:tab.textContent,left:tr.left,right:tr.right,top:tr.top,bottom:tr.bottom}, tabs:{left:tabs.left,right:tabs.right}
+                };
+            })()`, returnByValue:true, awaitPromise:true
+        });
+        const st=result.result.value;
+        approx(st.layout.height, st.placeholder.height, 0.5, `${cfg.label}: 列伝レイアウト高は基本参照高と一致する`);
+        approx(st.placeholder.height, st.reference.height, 0.5, `${cfg.label}: 透明参照枠は基本タブ高をそのまま確保する`);
+        approx(st.panel.height, st.placeholder.height, 0.5, `${cfg.label}: 列伝本文枠は基本タブと同じ高さにする`);
+        approx(st.panel.width, st.placeholder.width, 0.5, `${cfg.label}: 列伝本文枠は基本タブと同じ幅にする`);
+        assert.ok(st.panel.left >= st.right.left - 0.5 && st.panel.right <= st.right.right + 0.5, `${cfg.label}: 列伝本文が右側表示範囲からはみ出す`);
+        assert.strictEqual(st.text.overflowY, 'auto', `${cfg.label}: 長い列伝は本文枠内だけでスクロールする`);
+        assert.ok(st.text.clientHeight <= st.panel.height + 1, `${cfg.label}: 列伝本文の表示高が本文枠を越える`);
+        assert.strictEqual(st.tab.text, cfg.tab, `${cfg.label}: 列伝タブ表記が違う`);
+        assert.ok(st.tab.left >= st.tabs.left - 0.5 && st.tab.right <= st.tabs.right + 0.5, `${cfg.label}: 列伝タブがタブ列からはみ出す`);
+        if (!cfg.isPc) assert.ok(st.text.fontSize >= 12, `mobile: 列伝文字が小さすぎます (${st.text.fontSize})`);
+    }
+    console.log('✓ 武将詳細 列伝タブ PC/スマホ同一表示範囲 visual/layout regression');
+}
+
 async function validateFieldTerrainLayout(cdp) {
     const html = fixtureHtml('field_terrain.html');
     await cdp.call('Emulation.setDeviceMetricsOverride', { width: 720, height: 420, deviceScaleFactor: 1, mobile: false });
@@ -1229,6 +1272,7 @@ async function main() {
         await validateGuideLayout(cdp);
         await validateWarAptitudeLayout(cdp);
         await validateDialogConfirmPlacement(cdp);
+        await validateBushoBiographyLayout(cdp);
         await validateFieldWarFullscreen(cdp);
         await validateFieldTerrainLayout(cdp);
     } finally {
