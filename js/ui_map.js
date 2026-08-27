@@ -1063,6 +1063,162 @@ Object.assign(UIManager.prototype, {
         this.mapZoomOutBtn.style.display = (this.zoomLevel <= 0) ? 'none' : 'flex';
     },
     
+    // シナリオ中に変化しない道路SVGは、renderMap() のたびに作り直さず同じDOMを再利用します。
+    // 所有勢力・兵数・外交状態は道路レイヤーへ含めないため、ゲーム中の状態変化とは独立した静的層です。
+    _getOrBuildMapRouteSvg(mapW, mapH) {
+        const castles = Array.isArray(this.game.castles) ? this.game.castles : [];
+        if (this._staticRouteSvg
+            && this._staticRouteCastlesSource === castles
+            && this._staticRouteCastlesSize === castles.length
+            && this._staticRouteMapW === mapW
+            && this._staticRouteMapH === mapH) {
+            return this._staticRouteSvg;
+        }
+
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(svgNS, "svg");
+        
+        svg.setAttribute("width", mapW);
+        svg.setAttribute("height", mapH);
+        
+        svg.style.position = "absolute";
+        svg.style.left = "0px";
+        svg.style.top = "0px";
+        svg.style.pointerEvents = "none"; 
+        svg.style.zIndex = "5"; 
+
+        const drawnLines = new Set();
+        
+        // ★特定の道だけ形を変えるためのリストです！
+
+        // Ｓ字：例：["1-2"] と書くと1番と2番の城の道がS字になります
+        const forceSCurve = [];
+        
+        // 直線：例：["3-4"] と書くと3番と4番の城の道が真っ直ぐになります
+        const forceStraight = ["17-74"];
+        
+        // 逆転：例：["5-6"] と書くと5番と6番の城の道の曲がる向きが逆になります
+        const forceReverse = ["2-95", "15-20", "17-24", "33-42", "35-186", "38-102", "47-78", "49-78", "56-102", "58-67", "62-213", "65-99", "78-178", "78-251", "79-81", "98-101", "126-155", "153-155", "154-157", "169-171"];
+
+        // 普通カーブ：S字を強制的に「普通のカーブ」に戻すリストです
+        const forceNormalCurve = ["33-42", "47-178", "126-155"];
+
+        // 個別にカーブの角度（深さ）を調整する箱です！
+        // 今の標準サイズは「0.05 ～ 0.095」くらいです。
+        const customCurveSizes = {"13-100": 1.0, "17-72": 0.3, "33-42": 0.2, "35-186": 0.3, "78-178": 0.2, "87-175": 0.16, "187-219": 0.3, "191-192": 1.1};
+            // 例："7-12": 0.2,   ←かなり大回りなカーブになります
+            // 例："3-5": 0.02    ←かなり直線に近い浅いカーブになります
+
+        this.game.castles.forEach(c1 => {
+            const pos1X = c1.pixelX !== undefined ? c1.pixelX : 0;
+            const pos1Y = c1.pixelY !== undefined ? c1.pixelY : 0;
+
+            if (c1.adjacentCastleIds) {
+                c1.adjacentCastleIds.forEach(adjId => {
+                    const c2 = this.game.getCastle(adjId);
+                    if (!c2) return;
+
+                    const pairKey = c1.id < adjId ? `${c1.id}-${adjId}` : `${adjId}-${c1.id}`;
+
+                    if (!drawnLines.has(pairKey)) {
+                        drawnLines.add(pairKey);
+
+                        const pos2X = c2.pixelX !== undefined ? c2.pixelX : 0;
+                        const pos2Y = c2.pixelY !== undefined ? c2.pixelY : 0;
+
+                        const dx = pos2X - pos1X;
+                        const dy = pos2Y - pos1Y;
+                        const dist = Math.hypot(dx, dy);
+
+                        // ★追加：距離が0（スタートとゴールが同じ場所）の時は、計算が壊れてしまうので線を引くのをやめます！
+                        if (dist === 0) return;
+
+                        let curveSize = dist * (0.05 + ((c1.id * c2.id) % 10) * 0.005);
+                        
+                        // もし「個別に角度を調整する箱」に数字が書かれていたら、それで上書きします！
+                        if (customCurveSizes[pairKey] !== undefined) {
+                            curveSize = dist * customCurveSizes[pairKey];
+                        }
+
+                        let dir = ((c1.id + c2.id) % 2 === 0) ? 1 : -1;
+
+                        // もし「曲がる向きを逆にするリスト」にこの道が入っていたら、向きを反対にします！
+                        if (forceReverse.includes(pairKey)) {
+                            dir = dir * -1;
+                        }
+
+                        const nx = -dy / dist;
+                        const ny = dx / dist;
+
+                        const path = document.createElementNS(svgNS, "path");
+
+                        let lineType = "curve"; 
+                        
+                        if (((c1.id + c2.id) % 3 === 0)) {
+                            lineType = "s-curve";
+                        }
+                        
+                        if (forceSCurve.includes(pairKey)) lineType = "s-curve";
+                        if (forceStraight.includes(pairKey)) lineType = "straight";
+                        
+                        // もし「強制的に普通のカーブにするリスト」に入っていたら、S字をやめてカーブに戻します！
+                        if (forceNormalCurve.includes(pairKey)) {
+                            lineType = "curve";
+                        }
+
+                        if (lineType === "s-curve") {
+                            const cp1X = pos1X + dx * 0.33 + nx * curveSize * dir;
+                            const cp1Y = pos1Y + dy * 0.33 + ny * curveSize * dir;
+                            const cp2X = pos1X + dx * 0.67 + nx * curveSize * -dir; 
+                            const cp2Y = pos1Y + dy * 0.67 + ny * curveSize * -dir; 
+                            
+                            path.setAttribute("d", `M ${pos1X} ${pos1Y} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${pos2X} ${pos2Y}`);
+                        } else if (lineType === "straight") {
+                            path.setAttribute("d", `M ${pos1X} ${pos1Y} L ${pos2X} ${pos2Y}`);
+                        } else {
+                            const midX = (pos1X + pos2X) / 2;
+                            const midY = (pos1Y + pos2Y) / 2;
+                            const cpX = midX + nx * curveSize * dir;
+                            const cpY = midY + ny * curveSize * dir;
+                            
+                            path.setAttribute("d", `M ${pos1X} ${pos1Y} Q ${cpX} ${cpY} ${pos2X} ${pos2Y}`);
+                        }
+
+                        // ★超重要な修正：念のため、お互いの出席番号を絶対に「数字」として扱ってから確認します！
+                        const numAdjId = Number(adjId);
+                        const numC1Id = Number(c1.id);
+                        const isSeaRoute = (c1.seaRouteIds && c1.seaRouteIds.includes(numAdjId)) || 
+                                           (c2.seaRouteIds && c2.seaRouteIds.includes(numC1Id));
+
+                        path.setAttribute("fill", "transparent");
+                        
+                        if (isSeaRoute) {
+                            // 海路の時：少し青っぽくして、透明にして、海路っぽく点線にします！
+                            path.setAttribute("stroke", "rgba(100, 200, 255, 0.7)"); 
+                            path.setAttribute("stroke-width", "2.0");
+                            path.setAttribute("stroke-dasharray", "6, 4"); // 6ピクセル描いて4ピクセル休む「点線」の魔法です
+                        } else {
+                            // 普通の陸路の時：今まで通りです
+                            path.setAttribute("stroke", "rgba(255, 250, 200, 0.9)"); 
+                            path.setAttribute("stroke-width", "1.5");
+                            path.removeAttribute("stroke-dasharray"); // 念のため点線の魔法を消しておきます
+                        }
+                        
+                        svg.appendChild(path);
+                    }
+                });
+            }
+        });
+        
+
+        this._staticRouteSvg = svg;
+        this._staticRouteCastlesSource = castles;
+        this._staticRouteCastlesSize = castles.length;
+        this._staticRouteMapW = mapW;
+        this._staticRouteMapH = mapH;
+        return svg;
+    },
+
     renderMap() {
         if (!this.mapEl) return;
 
@@ -1249,142 +1405,7 @@ Object.assign(UIManager.prototype, {
             this._ensureMapOverlayCanvas('hover-blink-overlay', 3);
         }
 
-        const svgNS = "http://www.w3.org/2000/svg";
-        const svg = document.createElementNS(svgNS, "svg");
-        
-        svg.setAttribute("width", mapW);
-        svg.setAttribute("height", mapH);
-        
-        svg.style.position = "absolute";
-        svg.style.left = "0px";
-        svg.style.top = "0px";
-        svg.style.pointerEvents = "none"; 
-        svg.style.zIndex = "5"; 
-
-        const drawnLines = new Set();
-        
-        // ★特定の道だけ形を変えるためのリストです！
-
-        // Ｓ字：例：["1-2"] と書くと1番と2番の城の道がS字になります
-        const forceSCurve = [];
-        
-        // 直線：例：["3-4"] と書くと3番と4番の城の道が真っ直ぐになります
-        const forceStraight = ["17-74"];
-        
-        // 逆転：例：["5-6"] と書くと5番と6番の城の道の曲がる向きが逆になります
-        const forceReverse = ["2-95", "15-20", "17-24", "33-42", "35-186", "38-102", "47-78", "49-78", "56-102", "58-67", "62-213", "65-99", "78-178", "78-251", "79-81", "98-101", "126-155", "153-155", "154-157", "169-171"];
-
-        // 普通カーブ：S字を強制的に「普通のカーブ」に戻すリストです
-        const forceNormalCurve = ["33-42", "47-178", "126-155"];
-
-        // 個別にカーブの角度（深さ）を調整する箱です！
-        // 今の標準サイズは「0.05 ～ 0.095」くらいです。
-        const customCurveSizes = {"13-100": 1.0, "17-72": 0.3, "33-42": 0.2, "35-186": 0.3, "78-178": 0.2, "87-175": 0.16, "187-219": 0.3, "191-192": 1.1};
-            // 例："7-12": 0.2,   ←かなり大回りなカーブになります
-            // 例："3-5": 0.02    ←かなり直線に近い浅いカーブになります
-
-        this.game.castles.forEach(c1 => {
-            const pos1X = c1.pixelX !== undefined ? c1.pixelX : 0;
-            const pos1Y = c1.pixelY !== undefined ? c1.pixelY : 0;
-
-            if (c1.adjacentCastleIds) {
-                c1.adjacentCastleIds.forEach(adjId => {
-                    const c2 = this.game.getCastle(adjId);
-                    if (!c2) return;
-
-                    const pairKey = c1.id < adjId ? `${c1.id}-${adjId}` : `${adjId}-${c1.id}`;
-
-                    if (!drawnLines.has(pairKey)) {
-                        drawnLines.add(pairKey);
-
-                        const pos2X = c2.pixelX !== undefined ? c2.pixelX : 0;
-                        const pos2Y = c2.pixelY !== undefined ? c2.pixelY : 0;
-
-                        const dx = pos2X - pos1X;
-                        const dy = pos2Y - pos1Y;
-                        const dist = Math.hypot(dx, dy);
-
-                        // ★追加：距離が0（スタートとゴールが同じ場所）の時は、計算が壊れてしまうので線を引くのをやめます！
-                        if (dist === 0) return;
-
-                        let curveSize = dist * (0.05 + ((c1.id * c2.id) % 10) * 0.005);
-                        
-                        // もし「個別に角度を調整する箱」に数字が書かれていたら、それで上書きします！
-                        if (customCurveSizes[pairKey] !== undefined) {
-                            curveSize = dist * customCurveSizes[pairKey];
-                        }
-
-                        let dir = ((c1.id + c2.id) % 2 === 0) ? 1 : -1;
-
-                        // もし「曲がる向きを逆にするリスト」にこの道が入っていたら、向きを反対にします！
-                        if (forceReverse.includes(pairKey)) {
-                            dir = dir * -1;
-                        }
-
-                        const nx = -dy / dist;
-                        const ny = dx / dist;
-
-                        const path = document.createElementNS(svgNS, "path");
-
-                        let lineType = "curve"; 
-                        
-                        if (((c1.id + c2.id) % 3 === 0)) {
-                            lineType = "s-curve";
-                        }
-                        
-                        if (forceSCurve.includes(pairKey)) lineType = "s-curve";
-                        if (forceStraight.includes(pairKey)) lineType = "straight";
-                        
-                        // もし「強制的に普通のカーブにするリスト」に入っていたら、S字をやめてカーブに戻します！
-                        if (forceNormalCurve.includes(pairKey)) {
-                            lineType = "curve";
-                        }
-
-                        if (lineType === "s-curve") {
-                            const cp1X = pos1X + dx * 0.33 + nx * curveSize * dir;
-                            const cp1Y = pos1Y + dy * 0.33 + ny * curveSize * dir;
-                            const cp2X = pos1X + dx * 0.67 + nx * curveSize * -dir; 
-                            const cp2Y = pos1Y + dy * 0.67 + ny * curveSize * -dir; 
-                            
-                            path.setAttribute("d", `M ${pos1X} ${pos1Y} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${pos2X} ${pos2Y}`);
-                        } else if (lineType === "straight") {
-                            path.setAttribute("d", `M ${pos1X} ${pos1Y} L ${pos2X} ${pos2Y}`);
-                        } else {
-                            const midX = (pos1X + pos2X) / 2;
-                            const midY = (pos1Y + pos2Y) / 2;
-                            const cpX = midX + nx * curveSize * dir;
-                            const cpY = midY + ny * curveSize * dir;
-                            
-                            path.setAttribute("d", `M ${pos1X} ${pos1Y} Q ${cpX} ${cpY} ${pos2X} ${pos2Y}`);
-                        }
-
-                        // ★超重要な修正：念のため、お互いの出席番号を絶対に「数字」として扱ってから確認します！
-                        const numAdjId = Number(adjId);
-                        const numC1Id = Number(c1.id);
-                        const isSeaRoute = (c1.seaRouteIds && c1.seaRouteIds.includes(numAdjId)) || 
-                                           (c2.seaRouteIds && c2.seaRouteIds.includes(numC1Id));
-
-                        path.setAttribute("fill", "transparent");
-                        
-                        if (isSeaRoute) {
-                            // 海路の時：少し青っぽくして、透明にして、海路っぽく点線にします！
-                            path.setAttribute("stroke", "rgba(100, 200, 255, 0.7)"); 
-                            path.setAttribute("stroke-width", "2.0");
-                            path.setAttribute("stroke-dasharray", "6, 4"); // 6ピクセル描いて4ピクセル休む「点線」の魔法です
-                        } else {
-                            // 普通の陸路の時：今まで通りです
-                            path.setAttribute("stroke", "rgba(255, 250, 200, 0.9)"); 
-                            path.setAttribute("stroke-width", "1.5");
-                            path.removeAttribute("stroke-dasharray"); // 念のため点線の魔法を消しておきます
-                        }
-                        
-                        svg.appendChild(path);
-                    }
-                });
-            }
-        });
-        
-        this.mapEl.appendChild(svg);
+        this.mapEl.appendChild(this._getOrBuildMapRouteSvg(mapW, mapH));
         
         this.game.castles.forEach(c => {
             const el = document.createElement('div'); el.className = 'castle-card';

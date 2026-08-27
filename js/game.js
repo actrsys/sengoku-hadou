@@ -205,16 +205,26 @@ class GameManager {
         this._territoryIndexCastlesSize = -1;
         this._territoryIndexProvincesSource = null;
         this._territoryIndexProvincesSize = -1;
+
+        // MapGraphService も旧 castles 配列と隣接Mapを保持するため、同じ切替境界で必ず解放する。
+        if (this.mapGraph && typeof this.mapGraph.invalidate === 'function') {
+            this.mapGraph.invalidate();
+        }
     }
 
     // タイトル復帰・新規シナリオ読込前に、旧シナリオの巨大IDマップ共有参照をまとめて切る。
     // 地図画像そのものは共通資産なので解放対象にせず、シナリオごとに再構築されるTypedArrayだけを対象とする。
     releaseScenarioMapResources() {
         this.releaseScenarioDataIndexes();
+        // PC向け顔画像のアイドル先読みが旧シナリオのまま後続batchを開始しないよう世代を進める。
+        this._facePreloadGeneration = Number(this._facePreloadGeneration || 0) + 1;
         if (this.ui) {
             this.ui.pixelCastleMap = null;
             this.ui.pixelProvinceMap = null;
             this.ui.lastClanColorsHash = null;
+            if (typeof this.ui.releaseScenarioTransientCaches === 'function') {
+                this.ui.releaseScenarioTransientCaches();
+            }
         }
         if (window.EventMapEffects && typeof window.EventMapEffects.invalidateCaches === 'function') {
             window.EventMapEffects.invalidateCaches();
@@ -491,6 +501,13 @@ class GameManager {
         const isPc = document.body.classList.contains('is-pc');
         if (!isPc) return;
 
+        // 同一GameManagerで再読込された場合、前回のrequestIdleCallback/setTimeout予約は
+        // キャンセルAPIの有無に依存せず世代tokenで無効化する。実行中batchは最大4枚だけで、
+        // 完了後に次batchを予約しないため旧シナリオの先読みが新シナリオと並走し続けない。
+        const preloadGeneration = Number(this._facePreloadGeneration || 0) + 1;
+        this._facePreloadGeneration = preloadGeneration;
+        const isCurrentGeneration = () => preloadGeneration === Number(this._facePreloadGeneration || 0);
+
         const faceFiles = new Set();
         const addFaceByBushoId = (id) => {
             const b = this.getBusho(id);
@@ -507,15 +524,19 @@ class GameManager {
         const batchSize = 4;
 
         const scheduleIdle = (fn) => {
-            if ('requestIdleCallback' in window) {
-                window.requestIdleCallback(fn, { timeout: 500 });
+            const guarded = () => {
+                if (!isCurrentGeneration()) return;
+                fn();
+            };
+            if ('requestIdleCallback' in window && typeof window.requestIdleCallback === 'function') {
+                window.requestIdleCallback(guarded, { timeout: 500 });
             } else {
-                setTimeout(fn, 50);
+                setTimeout(guarded, 50);
             }
         };
 
         const loadBatch = async (startIndex) => {
-            if (startIndex >= urls.length) return;
+            if (!isCurrentGeneration() || startIndex >= urls.length) return;
             const batch = urls.slice(startIndex, startIndex + batchSize);
             await Promise.all(batch.map(url => new Promise(resolve => {
                 const img = new Image();
@@ -523,6 +544,7 @@ class GameManager {
                 img.decoding = 'async';
                 img.src = url;
             })));
+            if (!isCurrentGeneration()) return;
             scheduleIdle(() => loadBatch(startIndex + batchSize));
         };
 

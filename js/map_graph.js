@@ -53,6 +53,23 @@ class MapGraphService {
         const visited = new Set([Number(startCastle.id)]);
         const queue = [startCastle];
         let head = 0;
+        const movingId = Number(movingClanId);
+        const passableClanCache = new Map([[0, false]]);
+        if (Number.isFinite(movingId)) passableClanCache.set(movingId, true);
+
+        const canPassClan = (ownerClan) => {
+            const ownerId = Number(ownerClan);
+            if (ownerId === movingId) return true;
+            if (ownerId === 0) return false;
+            // 不正値は別々の生値を同一候補へ丸めないためキャッシュしない。
+            if (Number.isFinite(ownerId) && passableClanCache.has(ownerId)) {
+                return passableClanCache.get(ownerId);
+            }
+            const rel = game.getRelation(movingClanId, ownerClan);
+            const passable = !!(rel && window.DiplomacyRules.canPassTerritory(rel.status));
+            if (Number.isFinite(ownerId)) passableClanCache.set(ownerId, passable);
+            return passable;
+        };
 
         while (head < queue.length) {
             const current = queue[head++];
@@ -65,15 +82,7 @@ class MapGraphService {
                 const nextId = Number(next.id);
                 if (visited.has(nextId)) continue;
 
-                let canPass = false;
-                if (Number(next.ownerClan) === Number(movingClanId)) {
-                    canPass = true;
-                } else if (Number(next.ownerClan) !== 0) {
-                    const rel = game.getRelation(movingClanId, next.ownerClan);
-                    if (rel && window.DiplomacyRules.canPassTerritory(rel.status)) canPass = true;
-                }
-
-                if (canPass) {
+                if (canPassClan(next.ownerClan)) {
                     visited.add(nextId);
                     queue.push(next);
                 }
@@ -131,6 +140,22 @@ class MapGraphService {
         const visited = new Set([startCastle.id]);
         const queue = [startCastle];
         let head = 0;
+        const movingId = Number(movingClanId);
+        const passableClanCache = new Map([[0, false]]);
+        if (Number.isFinite(movingId)) passableClanCache.set(movingId, true);
+
+        const canPassClan = (ownerClan) => {
+            const ownerId = Number(ownerClan);
+            if (ownerId === movingId) return true;
+            if (ownerId === 0) return false;
+            if (Number.isFinite(ownerId) && passableClanCache.has(ownerId)) {
+                return passableClanCache.get(ownerId);
+            }
+            const rel = game.getRelation(movingClanId, ownerClan);
+            const passable = !!(rel && window.DiplomacyRules.canPassTerritory(rel.status));
+            if (Number.isFinite(ownerId)) passableClanCache.set(ownerId, passable);
+            return passable;
+        };
 
         while (head < queue.length) {
             const current = queue[head++];
@@ -145,14 +170,7 @@ class MapGraphService {
                 }
 
                 if (visited.has(next.id)) continue;
-                let canPass = false;
-                if (Number(next.ownerClan) === Number(movingClanId)) {
-                    canPass = true;
-                } else if (Number(next.ownerClan) !== 0) {
-                    const rel = game.getRelation(movingClanId, next.ownerClan);
-                    if (rel && window.DiplomacyRules.canPassTerritory(rel.status)) canPass = true;
-                }
-                if (canPass) {
+                if (canPassClan(next.ownerClan)) {
                     visited.add(next.id);
                     queue.push(next);
                 }

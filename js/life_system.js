@@ -1920,19 +1920,55 @@ class LifeSystem {
         return princess;
     }
 
+    // 姫生成判定で使う「家ごとの既存未婚姫数」と「父親候補」を全国から1回だけ集計します。
+    // MapのキーにはNumber化せず元のclan値をそのまま使い、旧条件の `===` と同じ厳密一致を維持します。
+    // 配列への追加順もgame.bushos順なので、後段のランダム抽選で候補順を変えません。
+    _buildPrincessAppearanceContext() {
+        const unmarriedCountByClan = new Map();
+        for (const princess of (this.game.princesses || [])) {
+            if (!princess || princess.status !== 'unmarried') continue;
+            const key = princess.currentClanId;
+            unmarriedCountByClan.set(key, (unmarriedCountByClan.get(key) || 0) + 1);
+        }
+
+        const fatherCandidatesByClan = new Map();
+        for (const busho of (this.game.bushos || [])) {
+            if (!busho || !window.BushoStatusRules.isActive(busho) || busho.female || busho.childless) continue;
+            const key = busho.clan;
+            let candidates = fatherCandidatesByClan.get(key);
+            if (!candidates) {
+                candidates = [];
+                fatherCandidatesByClan.set(key, candidates);
+            }
+            candidates.push(busho);
+        }
+        return { unmarriedCountByClan, fatherCandidatesByClan };
+    }
+
+    _getPrincessFamilyFatherCandidates(clan, leader, fatherCandidatesByClan) {
+        if (!clan || !leader) return [];
+        const sameClanCandidates = fatherCandidatesByClan.get(clan.id) || [];
+        return sameClanCandidates.filter(b =>
+            b.id !== leader.id &&
+            leader.familyIds.some(fId => b.familyIds.includes(fId))
+        );
+    }
+
     // ② ゲーム開始時に、各家に姫を分配する機能です
     distributeInitialPrincesses() {
         const currentYear = this.game.year;
         let familyRebuildNeeded = false;
+        const princessContext = this._buildPrincessAppearanceContext();
         
         this.game.clans.forEach(clan => {
             if (clan.id === 0) return; // 空き家（中立）は無視します
 
-            // すでにCSVで設定された「史実の姫」がいるか数えます
-            const existingPrincesses = this.game.princesses.filter(p => p.currentClanId === clan.id && p.status === 'unmarried');
+            // すでにCSVで設定された「史実の姫」がいるか数えます。
+            // 全国姫を勢力ごとに再filterせず、旧 `currentClanId === clan.id` と同じ厳密キーで参照します。
+            const existingPrincessCount = princessContext.unmarriedCountByClan.get(clan.id) || 0;
             
             // 史実の姫が誰もいない大名家にだけ、ランダムな姫を登場させます
-            if (existingPrincesses.length === 0) {
+            if (existingPrincessCount === 0) {
                 // 大名のデータを取得します
                 const leader = this.game.getBusho(clan.leaderId);
                 
@@ -1946,12 +1982,8 @@ class LifeSystem {
 
                 // ★追加：一門武将の姫の登場判定（大名とは別枠で、半分の25%の確率）
                 if (leader) {
-                    const familyBushos = this.game.bushos.filter(b => 
-                        b.clan === clan.id && 
-                        window.BushoStatusRules.isActive(b) && 
-                        b.id !== leader.id && 
-                        !b.female && !b.childless &&
-                        leader.familyIds.some(fId => b.familyIds.includes(fId))
+                    const familyBushos = this._getPrincessFamilyFatherCandidates(
+                        clan, leader, princessContext.fatherCandidatesByClan
                     );
 
                     if (familyBushos.length > 0) {
@@ -1974,18 +2006,21 @@ class LifeSystem {
     async checkRandomPrincessAppearance() {
         const currentYear = this.game.year;
         let familyRebuildNeeded = false;
+        // この年初処理中に武将の所属・活動状態は変えないため、父親候補は冒頭の1回集計を共用できます。
+        // 姫数も各勢力を1回ずつしか処理しないので、誕生前の旧判定値をそのまま保持します。
+        const princessContext = this._buildPrincessAppearanceContext();
 
         for (const clan of this.game.clans) {
             if (clan.id === 0) continue;
 
-            // 今その家にいる未婚の姫を数えます
-            const currentPrincesses = this.game.princesses.filter(p => p.currentClanId === clan.id && p.status === 'unmarried');
+            // 今その家にいる未婚の姫を数えます（旧 `currentClanId === clan.id` の厳密一致）。
+            const currentPrincessCount = princessContext.unmarriedCountByClan.get(clan.id) || 0;
             
             // 姫が少ない家ほど、新しい姫が生まれやすくします
             // （姫0人：20%、姫1人：10%、姫2人以上：5% の確率）
             let prob = 0.05;
-            if (currentPrincesses.length === 0) prob = 0.20;
-            else if (currentPrincesses.length === 1) prob = 0.10;
+            if (currentPrincessCount === 0) prob = 0.20;
+            else if (currentPrincessCount === 1) prob = 0.10;
 
             // 大名のデータを取得します
             const leader = this.game.getBusho(clan.leaderId);
@@ -2011,13 +2046,10 @@ class LifeSystem {
 
             // ★追加：一門武将の姫の誕生判定（大名の姫とは別枠で、確率を半分にして判定します）
             if (leader) {
-                // 生きている同じ家の一門武将（大名本人と女性・子供なしの武将を除く）を探します
-                const familyBushos = this.game.bushos.filter(b => 
-                    b.clan === clan.id && 
-                    window.BushoStatusRules.isActive(b) && 
-                    b.id !== leader.id && 
-                    !b.female && !b.childless &&
-                    leader.familyIds.some(fId => b.familyIds.includes(fId))
+                // 生きている同じ家の一門武将（大名本人と女性・子供なしの武将を除く）を、
+                // game.bushos順を保った勢力別候補から絞ります。
+                const familyBushos = this._getPrincessFamilyFatherCandidates(
+                    clan, leader, princessContext.fatherCandidatesByClan
                 );
 
                 if (familyBushos.length > 0) {

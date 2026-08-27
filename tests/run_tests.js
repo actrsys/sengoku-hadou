@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r252');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r255');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2545,6 +2545,37 @@ test('MapGraphService のstatic探索も片側記載の隣接を双方向とし�
     assert.deepStrictEqual(Array.from(game.mapGraph.getAdjacentIds(castles[0])), [2]);
     assert.strictEqual(ctx.MapGraphService.isReachable(game, castles[0], castles[2], 1), true);
     assert.strictEqual(ctx.MapGraphService.isSeaRoute(game, castles[0], castles[1], 1), true, '海路情報も逆側だけの記載を認識する');
+});
+
+
+test('MapGraphService の経路探索は同一勢力の通行可否を1探索内だけ再利用する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/map_graph.js');
+    const castles = [
+        { id: 1, ownerClan: 1, adjacentCastleIds: [2], seaRouteIds: [] },
+        { id: 2, ownerClan: 2, adjacentCastleIds: [1, 3], seaRouteIds: [] },
+        { id: 3, ownerClan: 2, adjacentCastleIds: [2, 4], seaRouteIds: [] },
+        { id: 4, ownerClan: 3, adjacentCastleIds: [3], seaRouteIds: [3] }
+    ];
+    const relationCalls = new Map();
+    const game = {
+        castles,
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getRelation: (a, b) => {
+            const key = `${a}:${b}`;
+            relationCalls.set(key, (relationCalls.get(key) || 0) + 1);
+            return Number(b) === 2 ? { status: '同盟' } : null;
+        }
+    };
+    game.mapGraph = new ctx.MapGraphService(game);
+
+    assert.strictEqual(ctx.MapGraphService.isReachable(game, castles[0], castles[3], 1), true);
+    assert.strictEqual(relationCalls.get('1:2'), 1, '同じ中継勢力の外交判定を城ごとに繰り返さない');
+
+    relationCalls.clear();
+    assert.strictEqual(ctx.MapGraphService.isSeaRoute(game, castles[0], castles[3], 1), true);
+    assert.strictEqual(relationCalls.get('1:2'), 1, '海路判定でも同じ探索内の通行可否だけを再利用する');
 });
 
 test('TroopAllocationService の配分合計は総兵数と一致する', () => {
@@ -6664,7 +6695,11 @@ test('シナリオ切替時は巨大地図IDマップとイベント側共有キ
     assert.ok(game.includes('releaseScenarioMapResources()'));
     assert.ok(game.includes('DataManager.releaseMapResources();'));
     assert.ok(game.includes('window.EventMapEffects.invalidateCaches();'));
+    assert.ok(game.includes('this.mapGraph.invalidate();'), '旧castles配列を保持する地図グラフ索引も切替時に解放する');
+    assert.ok(game.includes('this.ui.releaseScenarioTransientCaches();'), 'UIの再生成可能な短命キャッシュも切替時に解放する');
     assert.ok(events.includes('const invalidateCaches = () =>'));
+    assert.ok(ui.includes('releaseScenarioTransientCaches()'));
+    assert.ok(ui.includes('this._dialogFacePreloadCache.clear();'));
     assert.ok(ui.includes('this.game.releaseScenarioMapResources();'));
 });
 
@@ -7966,8 +8001,11 @@ test('シナリオ・セーブ切替は旧検索索引とturnQueue参照を新�
     ['_bushoMap = null', '_castleMap = null', '_clanMap = null', '_provinceMap = null', '_princessMap = null',
      '_clanBushosMap = null', '_clanCastlesMap = null', '_provinceCastlesMap = null', '_regionCastlesMap = null']
         .forEach(text => assert.ok(block.includes(text), text));
+    assert.ok(block.includes('this.mapGraph.invalidate();'), '隣接索引が旧拠点配列を保持し続けない');
     const releaseAt = game.indexOf('releaseScenarioMapResources()');
-    assert.ok(game.slice(releaseAt, releaseAt + 280).includes('this.releaseScenarioDataIndexes();'));
+    const releaseBlock = game.slice(releaseAt, releaseAt + 700);
+    assert.ok(releaseBlock.includes('this.releaseScenarioDataIndexes();'));
+    assert.ok(releaseBlock.includes('this.ui.releaseScenarioTransientCaches();'));
 
     const save = read('js/save_manager.js');
     const restoreAt = save.indexOf('async _restoreSaveDataObj(d)');
@@ -8150,6 +8188,137 @@ test('AI内政の装備産地判定は行動ループ外で一度だけ計算し
     assert.ok(!loopBlock.includes('const hasHorseCastleAI ='));
 });
 
+
+
+test('姫生成の年次文脈集計は旧===条件・候補順を維持し文字列IDを数値IDへ混ぜない', () => {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b.status === 'active' }
+    });
+    loadScript(ctx, 'js/life_system.js');
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    const game = {
+        princesses: [
+            { id: 1, currentClanId: 1, status: 'unmarried' },
+            { id: 2, currentClanId: '1', status: 'unmarried' },
+            { id: 3, currentClanId: 1, status: 'married' }
+        ],
+        bushos: [
+            { id: 10, clan: 1, status: 'active', female: false, childless: false, familyIds: [100] },
+            { id: 11, clan: '1', status: 'active', female: false, childless: false, familyIds: [100] },
+            { id: 12, clan: 1, status: 'active', female: false, childless: false, familyIds: [100, 200] },
+            { id: 13, clan: 1, status: 'dead', female: false, childless: false, familyIds: [100] },
+            { id: 14, clan: 1, status: 'active', female: true, childless: false, familyIds: [100] },
+            { id: 15, clan: 1, status: 'active', female: false, childless: true, familyIds: [100] },
+            { id: 16, clan: 1, status: 'active', female: false, childless: false, familyIds: [999] }
+        ]
+    };
+    const life = new LifeSystem(game);
+    const context = life._buildPrincessAppearanceContext();
+    assert.strictEqual(context.unmarriedCountByClan.get(1), 1);
+    assert.strictEqual(context.unmarriedCountByClan.get('1'), 1);
+    assert.deepStrictEqual(Array.from(context.fatherCandidatesByClan.get(1), b => b.id), [10, 12, 16]);
+    assert.deepStrictEqual(Array.from(context.fatherCandidatesByClan.get('1'), b => b.id), [11]);
+
+    const clan = { id: 1 };
+    const leader = game.bushos[0];
+    const relatives = life._getPrincessFamilyFatherCandidates(clan, leader, context.fatherCandidatesByClan);
+    assert.deepStrictEqual(Array.from(relatives, b => b.id), [12], '大名本人を除外し、旧game.bushos順を維持する');
+});
+
+test('姫生成は勢力ごとの全国filterを繰り返さず安全な年次文脈を共用する', () => {
+    const life = read('js/life_system.js');
+    const initialAt = life.indexOf('distributeInitialPrincesses()');
+    const yearlyAt = life.indexOf('async checkRandomPrincessAppearance()');
+    const initialBlock = life.slice(initialAt, yearlyAt);
+    const yearlyBlock = life.slice(yearlyAt, yearlyAt + 6500);
+    assert.ok(initialBlock.includes('const princessContext = this._buildPrincessAppearanceContext();'));
+    assert.ok(yearlyBlock.includes('const princessContext = this._buildPrincessAppearanceContext();'));
+    assert.ok(initialBlock.includes('this._getPrincessFamilyFatherCandidates('));
+    assert.ok(yearlyBlock.includes('this._getPrincessFamilyFatherCandidates('));
+    assert.ok(!initialBlock.includes('this.game.princesses.filter('));
+    assert.ok(!initialBlock.includes('this.game.bushos.filter('));
+    assert.ok(!yearlyBlock.includes('this.game.princesses.filter('));
+    assert.ok(!yearlyBlock.includes('this.game.bushos.filter('));
+
+    // 登場処理は先に登場した一門が後続武将の候補になり得るため、固定文脈へ狭めない。
+    const birthAt = life.indexOf('async checkBirth()');
+    const birthBlock = life.slice(birthAt, birthAt + 10500);
+    assert.ok((birthBlock.match(/this\.game\.bushos\.filter\(other =>/g) || []).length >= 2);
+});
+
+test('城所有者と武将所属の実行時直接代入は専門窓口に限定し索引versionを必ず進める', () => {
+    const jsFiles = [];
+    const walk = dir => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) walk(full);
+            else if (entry.name.endsWith('.js') && !entry.name.endsWith('.min.js')) jsFiles.push(full);
+        }
+    };
+    walk(path.join(ROOT, 'js'));
+    const stripComments = source => source
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/\/\/.*$/gm, '');
+    const ownerAllowed = new Set(['js/castle_manager.js', 'js/models.js']);
+    const clanAllowed = new Set(['js/affiliation_system.js', 'js/models.js']);
+    const ownerOffenders = [];
+    const clanOffenders = [];
+
+    for (const file of jsFiles) {
+        const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+        const source = stripComments(fs.readFileSync(file, 'utf8'));
+        const lines = source.split(/\r?\n/);
+        lines.forEach((line, index) => {
+            if (!ownerAllowed.has(rel) && /(?:^|[^.\w$])[A-Za-z_$][\w$]*\.ownerClan\s*=(?!=)/.test(line)) {
+                ownerOffenders.push(`${rel}:${index + 1}`);
+            }
+            // `el.dataset.clan = ...` のようなDOM datasetはbusho.clanではないため対象外。
+            if (!clanAllowed.has(rel) && /(?:^|[^.\w$])[A-Za-z_$][\w$]*\.clan\s*=(?!=)/.test(line)) {
+                clanOffenders.push(`${rel}:${index + 1}`);
+            }
+        });
+    }
+    assert.deepStrictEqual(ownerOffenders, [], `ownerClan直接代入: ${ownerOffenders.join(', ')}`);
+    assert.deepStrictEqual(clanOffenders, [], `busho.clan直接代入: ${clanOffenders.join(', ')}`);
+
+    const castleManager = read('js/castle_manager.js');
+    const ownerAt = castleManager.indexOf('setOwnerIdRaw(castle, newOwnerId)');
+    const ownerBlock = castleManager.slice(ownerAt, ownerAt + 650);
+    assert.ok(ownerBlock.includes('castle.ownerClan = Number(newOwnerId) || 0;'));
+    assert.ok(ownerBlock.includes('this.game.castleOwnershipVersion = (this.game.castleOwnershipVersion || 0) + 1;'));
+
+    const affiliation = read('js/affiliation_system.js');
+    const clanAt = affiliation.indexOf('setClanIdRaw(busho, newClanId)');
+    const clanBlock = affiliation.slice(clanAt, clanAt + 900);
+    assert.ok(clanBlock.includes('busho.clan = nextClanId;'));
+    assert.ok(clanBlock.includes('this.game.bushoAffiliationVersion = (this.game.bushoAffiliationVersion || 0) + 1;'));
+});
+
+
+
+test('地図道路SVGはシナリオ静的層としてrenderMap間で再利用し切替時に解放する', () => {
+    const uiMap = read('js/ui_map.js');
+    const ui = read('js/ui.js');
+    assert.ok(uiMap.includes('_getOrBuildMapRouteSvg(mapW, mapH)'));
+    assert.ok(uiMap.includes('this.mapEl.appendChild(this._getOrBuildMapRouteSvg(mapW, mapH));'));
+    assert.strictEqual((uiMap.match(/document\.createElementNS\(svgNS, "svg"\)/g) || []).length, 1, '道路SVG生成は静的層builderの1箇所に限定する');
+    assert.ok(uiMap.includes('this._staticRouteCastlesSource === castles'));
+    assert.ok(uiMap.includes('this._staticRouteCastlesSize === castles.length'));
+    assert.ok(ui.includes('this._staticRouteSvg = null;'));
+    assert.ok(ui.includes('this._staticRouteCastlesSource = null;'));
+});
+
+test('顔画像アイドル先読みはシナリオ世代tokenで旧batchを継続しない', () => {
+    const game = read('js/game.js');
+    const preloadAt = game.indexOf('preloadFaceIcons()');
+    const preloadBlock = game.slice(preloadAt, preloadAt + 4200);
+    assert.ok(preloadBlock.includes('const preloadGeneration = Number(this._facePreloadGeneration || 0) + 1;'));
+    assert.ok(preloadBlock.includes('if (!isCurrentGeneration() || startIndex >= urls.length) return;'));
+    assert.ok(preloadBlock.includes('if (!isCurrentGeneration()) return;'));
+    const releaseAt = game.indexOf('releaseScenarioMapResources()');
+    const releaseBlock = game.slice(releaseAt, releaseAt + 1200);
+    assert.ok(releaseBlock.includes('this._facePreloadGeneration = Number(this._facePreloadGeneration || 0) + 1;'));
+});
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
 

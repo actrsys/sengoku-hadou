@@ -715,6 +715,25 @@ class UIManager {
         });
     }
 
+    // シナリオ／セーブ切替時だけ、再生成可能な短命・静的描画キャッシュを解放します。
+    // 表示中モーダルDOMは各終了処理へ任せ、ここでは次シナリオへ持ち越す意味のない参照だけを切ります。
+    releaseScenarioTransientCaches() {
+        if (this._dialogFacePreloadCache && typeof this._dialogFacePreloadCache.clear === 'function') {
+            this._dialogFacePreloadCache.clear();
+        }
+
+        // 道路SVGはシナリオの城座標・隣接関係にだけ依存する静的層。
+        // 旧castles配列を保持したまま次シナリオへ進まないよう、切替境界でDOMごと参照を切ります。
+        if (this._staticRouteSvg && this._staticRouteSvg.parentNode) {
+            this._staticRouteSvg.parentNode.removeChild(this._staticRouteSvg);
+        }
+        this._staticRouteSvg = null;
+        this._staticRouteCastlesSource = null;
+        this._staticRouteCastlesSize = -1;
+        this._staticRouteMapW = 0;
+        this._staticRouteMapH = 0;
+    }
+
     // ★Round12：会話用の顔画像を、DOMへ出す前に読み込み・デコードしておきます。
     // 同じ顔を短時間に何度も使う場合は、小さな先読みキャッシュを共有します。
     _getDialogFaceTemplatePromise(faceIcon) {
