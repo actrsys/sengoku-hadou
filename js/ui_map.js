@@ -1929,9 +1929,11 @@ Object.assign(UIManager.prototype, {
             this._releaseMapOverlayCanvas('province-overlay');
             return;
         }
-        const ctx = overlay.getContext('2d');
-        // PCでは再利用するため中身だけ消します。context喪失時は次回描画へ任せます。
-        if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+        try {
+            const ctx = overlay.getContext('2d');
+            // PCでは再利用するため中身だけ消します。context喪失時は次回描画へ任せます。
+            if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+        } catch (e) {}
         overlay.classList.remove('anim-map-glow');
     },
 
@@ -2098,8 +2100,10 @@ Object.assign(UIManager.prototype, {
         if (targetIdsSet.size === 0) {
             overlay.style.filter = 'none';
             overlay.classList.remove('anim-map-glow', 'anim-map-glow-fast');
-            const ctx = overlay.getContext('2d');
-            if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+            try {
+                const ctx = overlay.getContext('2d');
+                if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+            } catch (e) {}
             return;
         }
 
@@ -2126,8 +2130,10 @@ Object.assign(UIManager.prototype, {
         overlay.style.filter = 'none';
         overlay.classList.remove('anim-map-glow', 'anim-map-glow-fast');
         
-        const ctx = overlay.getContext('2d');
-        if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+        try {
+            const ctx = overlay.getContext('2d');
+            if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+        } catch (e) {}
     },
 
     // 駆虎呑狼の計などで、1つ目の勢力をキープして光らせる魔法
@@ -2301,23 +2307,30 @@ Object.assign(UIManager.prototype, {
         const maskCanvas = document.createElement('canvas');
         maskCanvas.width = width;
         maskCanvas.height = height;
-        const maskCtx = maskCanvas.getContext('2d');
-        if (!maskCtx) {
-            // 低メモリ等で2D contextを確保できない時は演出を省略し、巨大Canvasを残さない。
+        try {
+            const maskCtx = maskCanvas.getContext('2d');
+            if (!maskCtx) {
+                // 低メモリ等で2D contextを確保できない時は演出を省略し、巨大Canvasを残さない。
+                try { maskCanvas.width = 1; maskCanvas.height = 1; } catch (ignore) {}
+                return null;
+            }
+            const maskData = maskCtx.createImageData(width, height);
+
+            for (let i = 0; i < targetPixels.length; i++) {
+                if (targetPixels[i] !== 1) continue;
+                const idx = i * 4;
+                maskData.data[idx] = 255;
+                maskData.data[idx + 1] = 255;
+                maskData.data[idx + 2] = 255;
+                maskData.data[idx + 3] = 255;
+            }
+            maskCtx.putImageData(maskData, 0, 0);
+        } catch (error) {
+            // ImageData確保・転送まで含め、演出用Canvas失敗は本処理を止めない。
+            console.warn('戦闘領域マスクCanvasの生成を省略しました:', error);
             try { maskCanvas.width = 1; maskCanvas.height = 1; } catch (ignore) {}
             return null;
         }
-        const maskData = maskCtx.createImageData(width, height);
-
-        for (let i = 0; i < targetPixels.length; i++) {
-            if (targetPixels[i] !== 1) continue;
-            const idx = i * 4;
-            maskData.data[idx] = 255;
-            maskData.data[idx + 1] = 255;
-            maskData.data[idx + 2] = 255;
-            maskData.data[idx + 3] = 255;
-        }
-        maskCtx.putImageData(maskData, 0, 0);
 
         return {
             left, top, width, height, canvas: maskCanvas,
@@ -2348,8 +2361,18 @@ Object.assign(UIManager.prototype, {
         overlay.style.top = `${maskInfo.top}px`;
         overlay.style.pointerEvents = 'none';
         overlay.style.zIndex = String(zIndex);
-        this.mapEl.appendChild(overlay);
-        return overlay;
+        try {
+            this.mapEl.appendChild(overlay);
+            return overlay;
+        } catch (error) {
+            // DOM追加の途中で失敗しても一時Canvasを残さない。
+            try {
+                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                overlay.width = 1;
+                overlay.height = 1;
+            } catch (ignore) {}
+            throw error;
+        }
     },
 
     _releaseEffectOverlay(overlay, maskInfo) {
@@ -2394,8 +2417,18 @@ Object.assign(UIManager.prototype, {
                 this.game.writeSystemDiagnostic('battle_blink:mask_ready', this.game.getCastle(Number(firstId)) || null);
             }
 
-            const overlay = this._createCroppedEffectOverlay('battle-blink-overlay', maskInfo, 6);
-            const ctx = overlay.getContext('2d');
+            let overlay = null;
+            let ctx = null;
+            try {
+                overlay = this._createCroppedEffectOverlay('battle-blink-overlay', maskInfo, 6);
+                ctx = overlay.getContext('2d');
+            } catch (error) {
+                console.warn('戦闘点滅Canvasの準備を省略しました:', error);
+                this._releaseEffectOverlay(overlay, maskInfo);
+                this.hideMapGuard();
+                resolve();
+                return;
+            }
             if (!ctx) {
                 this._releaseEffectOverlay(overlay, maskInfo);
                 this.hideMapGuard();
@@ -2501,8 +2534,24 @@ Object.assign(UIManager.prototype, {
                 return;
             }
 
-            const overlay = this._createCroppedEffectOverlay('capture-effect-overlay', maskInfo, 7);
-            const ctx = overlay.getContext('2d');
+            let overlay = null;
+            let ctx = null;
+            try {
+                overlay = this._createCroppedEffectOverlay('capture-effect-overlay', maskInfo, 7);
+                ctx = overlay.getContext('2d');
+            } catch (error) {
+                // 制圧演出の準備だけ失敗した場合も、所有変更等の中間処理は必ず一度進める。
+                console.warn('制圧Canvasの準備を省略しました:', error);
+                this._releaseEffectOverlay(overlay, maskInfo);
+                this.hideMapGuard();
+                try {
+                    if (typeof onHalfway === 'function') onHalfway();
+                    resolve();
+                } catch (halfwayError) {
+                    reject(halfwayError);
+                }
+                return;
+            }
             const width = overlay.width;
             const height = overlay.height;
 

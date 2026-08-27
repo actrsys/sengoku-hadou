@@ -78,7 +78,9 @@ window.GameEvents.push({
             return;
         }
         const { mapOverlay, mapContainer } = overlayParts;
+        let overlayCleaned = false;
 
+        try {
         // ゲーム開始時に作った共有の城IDマップを再利用します。
         // 台風専用に巨大画像や全画面TypedArrayを作り直さず、城IDから小さなgroup表だけを引きます。
         writeDiag('castle_index');
@@ -246,49 +248,61 @@ window.GameEvents.push({
                 { r: 0, g: 0, b: 255, a: 180 },
                 { animation: damagedProvinceMap.size > 0 ? 'blink 1s 2' : '', diagPrefix }
             );
-            const ctx = canvas.getContext('2d');
 
-            if (SHOW_TYPHOON_PATH && pathData.length > 0) {
-                const sx = canvas.width / srcW;
-                const sy = canvas.height / srcH;
-                ctx.save();
-                ctx.scale(sx, sy);
+            if (!canvas) {
+                console.warn('台風の地図演出Canvasを確保できなかったため、進路表示を省略します。');
+            } else {
+                try {
+                    const ctx = canvas.getContext('2d');
 
-                ctx.lineWidth = 6;
-                ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
-                ctx.setLineDash([8, 8]);
-                for (let i = 0; i < pathData.length; i++) {
-                    if (i % 2 === 0 || i === pathData.length - 1) {
+                    if (ctx && SHOW_TYPHOON_PATH && pathData.length > 0) {
+                        const sx = canvas.width / srcW;
+                        const sy = canvas.height / srcH;
+                        ctx.save();
+                        ctx.scale(sx, sy);
+
+                        ctx.lineWidth = 6;
+                        ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+                        ctx.setLineDash([8, 8]);
+                        for (let i = 0; i < pathData.length; i++) {
+                            if (i % 2 === 0 || i === pathData.length - 1) {
+                                ctx.beginPath();
+                                ctx.arc(pathData[i].x, pathData[i].y, Math.max(0, pathData[i].radius), 0, Math.PI * 2);
+                                ctx.stroke();
+                            }
+                        }
+
                         ctx.beginPath();
-                        ctx.arc(pathData[i].x, pathData[i].y, Math.max(0, pathData[i].radius), 0, Math.PI * 2);
+                        ctx.setLineDash([20, 20]);
+                        ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+                        ctx.lineWidth = 4;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                        ctx.moveTo(pathData[0].x, pathData[0].y);
+                        for (let i = 1; i < pathData.length; i++) ctx.lineTo(pathData[i].x, pathData[i].y);
                         ctx.stroke();
+                        ctx.setLineDash([]);
+                        ctx.restore();
                     }
+
+                    mapContainer.appendChild(canvas);
+                    writeDiag('visual_done');
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    canvas.style.animation = 'none';
+                    canvas.style.opacity = '1.0';
+
+                    writeDiag('wait_input');
+                    await fx.waitForDismiss(game, mapOverlay);
+                } catch (visualError) {
+                    // 台風の被害計算・結果通知は演出より優先。Canvas/DOM/input待ちの失敗だけを隔離する。
+                    console.warn('台風の地図演出を途中で省略しました:', visualError);
+                    try { canvas.width = 1; canvas.height = 1; } catch (ignore) {}
                 }
-
-                ctx.beginPath();
-                ctx.setLineDash([20, 20]);
-                ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
-                ctx.lineWidth = 4;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                ctx.moveTo(pathData[0].x, pathData[0].y);
-                for (let i = 1; i < pathData.length; i++) ctx.lineTo(pathData[i].x, pathData[i].y);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.restore();
             }
-
-            mapContainer.appendChild(canvas);
-            writeDiag('visual_done');
-            await new Promise(resolve => setTimeout(resolve, 0));
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            canvas.style.animation = 'none';
-            canvas.style.opacity = '1.0';
-
-            writeDiag('wait_input');
-            await fx.waitForDismiss(game, mapOverlay);
             writeDiag('cleanup');
             await fx.cleanupOverlay(mapOverlay);
+            overlayCleaned = true;
             writeDiag('cleanup_done');
 
             if (damagedProvinceMap.size > 0) {
@@ -309,12 +323,23 @@ window.GameEvents.push({
             }
         } else {
             await fx.cleanupOverlay(mapOverlay);
+            overlayCleaned = true;
             await game.ui.showDialogAsync("今回は大きな被害はなかったようです。", false, 0);
         }
 
         await new Promise(resolve => setTimeout(resolve, 1000));
         for (const data of damagedPlayerCastles) {
             await game.ui.showDialogAsync(` ${data.castle.name} が台風の被害を受けました……`, false, 0);
+        }
+        } finally {
+            // 進路計算・Canvas・入力待ちのどこで例外が出ても、暗幕と通常地図の休止を残さない。
+            if (!overlayCleaned && mapOverlay && fx && typeof fx.cleanupOverlay === 'function') {
+                try {
+                    await fx.cleanupOverlay(mapOverlay);
+                } catch (cleanupError) {
+                    console.warn('台風イベント地図の後始末に失敗しました:', cleanupError);
+                }
+            }
         }
     }
 });

@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r257');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r258');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -8489,11 +8489,14 @@ test('地図演出Canvasはcontext喪失時もmap guardと資源を残さず本�
     const maskAt = source.indexOf('_buildCastleEffectMask(');
     const maskBlock = source.slice(maskAt, maskAt + 5200);
     assert.ok(maskBlock.includes('if (!maskCtx)'));
+    assert.ok(maskBlock.includes('maskCtx.createImageData'));
+    assert.ok(maskBlock.includes("console.warn('戦闘領域マスクCanvasの生成を省略しました:'"));
     assert.ok(maskBlock.includes('maskCanvas.width = 1'));
 
     const blinkAt = source.indexOf('async playBattleBlink(');
     const blinkBlock = source.slice(blinkAt, blinkAt + 6500);
     assert.ok(blinkBlock.includes('if (!ctx)'));
+    assert.ok(blinkBlock.includes("console.warn('戦闘点滅Canvasの準備を省略しました:'"));
     assert.ok(blinkBlock.includes('this._releaseEffectOverlay(overlay, maskInfo);'));
     assert.ok(blinkBlock.includes('this.hideMapGuard();'));
 
@@ -8502,7 +8505,74 @@ test('地図演出Canvasはcontext喪失時もmap guardと資源を残さず本�
     assert.ok(captureBlock.includes('const runHalfway = () =>'));
     assert.ok(captureBlock.includes('if (!ctx)'));
     assert.ok(captureBlock.includes('runHalfway();'));
+    assert.ok(captureBlock.includes("console.warn('制圧Canvasの準備を省略しました:'"));
     assert.ok(captureBlock.includes('const fail = (error) =>'));
+});
+
+test('戦闘地図演出はImageData確保・overlay context準備例外でも入力guardを残さない', async () => {
+    function UIManager() {}
+    let lastMaskCanvas = null;
+    const ctx = createContext({
+        UIManager,
+        console: { ...console, warn() {} },
+        DataManager: {
+            castlePixelBounds: [null, { minX: 0, maxX: 0, minY: 0, maxY: 0 }]
+        },
+        document: {
+            createElement(tag) {
+                if (tag !== 'canvas') return { style: {}, parentNode: null };
+                lastMaskCanvas = {
+                    width: 0, height: 0, style: {}, parentNode: null,
+                    getContext() {
+                        return { createImageData() { throw new Error('oom'); } };
+                    }
+                };
+                return lastMaskCanvas;
+            },
+            getElementById() { return null; },
+            body: { classList: { contains: () => false } }
+        }
+    });
+    loadScript(ctx, 'js/ui_map.js');
+
+    const maskOwner = {
+        game: { mapWidth: 2, mapHeight: 2 },
+        pixelCastleMap: [1, 0, 0, 0]
+    };
+    const mask = ctx.UIManager.prototype._buildCastleEffectMask.call(maskOwner, 1, 0, 0);
+    assert.strictEqual(mask, null);
+    assert.strictEqual(lastMaskCanvas.width, 1);
+    assert.strictEqual(lastMaskCanvas.height, 1);
+
+    const makeEffectOwner = () => {
+        let guard = 0;
+        let released = 0;
+        const owner = {
+            game: { warManager: { state: {} } },
+            withAIGuardTextHiddenForMapEffect(fn) { return fn(); },
+            async focusMapOnCastle() {},
+            showMapGuard() { guard += 1; },
+            hideMapGuard() { guard -= 1; },
+            _buildCastleEffectMask() { return { width: 1, height: 1, canvas: {}, release() {} }; },
+            _createCroppedEffectOverlay() { return { width: 1, height: 1, getContext() { throw new Error('context lost'); } }; },
+            _releaseEffectOverlay() { released += 1; },
+            get guard() { return guard; },
+            get released() { return released; }
+        };
+        return owner;
+    };
+
+    const blinkOwner = makeEffectOwner();
+    await ctx.UIManager.prototype.playBattleBlink.call(blinkOwner, 1, null, null, 100, { focus: false });
+    assert.strictEqual(blinkOwner.guard, 0);
+    assert.strictEqual(blinkOwner.released, 1);
+
+    const captureOwner = makeEffectOwner();
+    let halfway = 0;
+    await ctx.UIManager.prototype.playCaptureEffect.call(captureOwner, 1, () => { halfway += 1; }, { focus: false });
+    assert.strictEqual(captureOwner.guard, 0);
+    assert.strictEqual(captureOwner.released, 1);
+    assert.strictEqual(halfway, 1, '制圧本処理は演出準備失敗でも一度だけ進める');
 });
 
 test('プレイヤー滅亡の遅延処理はasync setTimeout callbackで未解決Promiseを作らない', () => {
@@ -8513,6 +8583,121 @@ test('プレイヤー滅亡の遅延処理はasync setTimeout callbackで未解�
     assert.ok(block.includes('await new Promise(resolve => setTimeout(resolve, 1000));'));
     assert.ok(!block.includes('setTimeout(async'));
 });
+
+
+test('イベント地方Canvasはcontext取得失敗時にbacking storeを即時解放する', async () => {
+    let lastCanvas = null;
+    const ctx = createContext({
+        console: { ...console, warn() {} },
+        document: {
+            body: { classList: { contains: () => false } },
+            createElement(tag) {
+                if (tag !== 'canvas') return { style: {}, appendChild() {}, classList: new FakeClassList() };
+                lastCanvas = { width: 0, height: 0, style: {}, className: '', getContext: () => null };
+                return lastCanvas;
+            },
+            getElementById() { return null; }
+        }
+    });
+    ctx.window.GameEvents = [];
+    loadScript(ctx, 'js/event/common_events.js');
+    const result = await ctx.window.EventMapEffects.createProvinceCanvas(
+        { mapWidth: 4, mapHeight: 4, ui: { pixelProvinceMap: new Array(16).fill(1) } },
+        new Set([1]),
+        { r: 1, g: 2, b: 3, a: 180 }
+    );
+    assert.strictEqual(result.canvas, null);
+    assert.strictEqual(lastCanvas.width, 1);
+    assert.strictEqual(lastCanvas.height, 1);
+});
+
+test('イベント地図shellは返却前のpause失敗でも暗幕を自前rollbackする', async () => {
+    const children = [];
+    const makeElement = () => ({
+        style: {},
+        className: '',
+        parentNode: null,
+        appendChild(child) { child.parentNode = this; },
+        querySelectorAll() { return []; }
+    });
+    const body = makeElement();
+    body.classList = { contains: () => false };
+    body.appendChild = child => { child.parentNode = body; children.push(child); };
+    body.removeChild = child => {
+        const index = children.indexOf(child);
+        if (index >= 0) children.splice(index, 1);
+        child.parentNode = null;
+    };
+    const scroll = { style: { display: 'block' } };
+    const ctx = createContext({
+        console: { ...console, warn() {} },
+        setTimeout,
+        document: {
+            body,
+            createElement() { return makeElement(); },
+            getElementById(id) { return id === 'map-scroll-container' ? scroll : null; }
+        }
+    });
+    ctx.window.GameEvents = [];
+    loadScript(ctx, 'js/event/common_events.js');
+    let resumed = 0;
+    const game = {
+        ui: {
+            isBackgroundPaused: false,
+            pauseBackgroundUpdates() { throw new Error('pause failed'); },
+            resumeBackgroundUpdates() { resumed += 1; }
+        }
+    };
+    await assert.rejects(() => ctx.window.EventMapEffects.createOverlay(game), /pause failed/);
+    assert.strictEqual(children.length, 0, '返却前に失敗しても暗幕DOMを残さない');
+    assert.strictEqual(resumed, 1, '途中までpauseした可能性を考慮してresumeを試す');
+    assert.strictEqual(scroll.style.display, 'block');
+});
+
+test('災害イベント地図の描画失敗は暗幕を後始末して結果処理を継続する', async () => {
+    const ctx = createContext({ console: { ...console, warn() {} } });
+    ctx.window.GameEvents = [];
+    ctx.document = { body: { classList: { contains: () => false } } };
+    loadScript(ctx, 'js/event/common_events.js');
+    let cleaned = 0;
+    ctx.window.EventMapEffects = {
+        writeDiag() {},
+        async createOverlay() { return { mapOverlay: {}, mapContainer: { appendChild() {} } }; },
+        async createProvinceCanvas() { throw new Error('context lost'); },
+        async waitForDismiss() {},
+        async cleanupOverlay() { cleaned += 1; }
+    };
+    const game = {
+        ui: { async showDialogAsync() {} },
+        castles: [],
+        playerClanId: 1,
+        getProvince() { return null; }
+    };
+    await ctx.window.playProvinceMapEffect(game, '大雪', 'test', new Set([1]), 1, 2, 3);
+    assert.strictEqual(cleaned, 1);
+});
+
+test('台風イベント地図は途中例外でもfinallyで通常地図へ復帰する', () => {
+    const source = read('js/event/typhoon_event.js');
+    const at = source.indexOf('execute: async function(game)');
+    const block = source.slice(at, at + 18000);
+    assert.ok(block.includes('let overlayCleaned = false;'));
+    assert.ok(block.includes('if (!canvas)'));
+    assert.ok(block.includes("console.warn('台風の地図演出を途中で省略しました:'"));
+    assert.ok(block.includes('canvas.width = 1; canvas.height = 1;'));
+    assert.ok(block.includes('} finally {'));
+    assert.ok(block.includes('if (!overlayCleaned && mapOverlay'));
+});
+
+test('ロード時の地図寸法確認Imageは次の巨大画像解析前に解放する', () => {
+    const source = read('js/save_manager.js');
+    const at = source.indexOf("img.src = './data/images/map/japan_map.png';");
+    const block = source.slice(Math.max(0, at - 1000), at + 200);
+    assert.ok(block.includes('img.onload = null;'));
+    assert.ok(block.includes('img.onerror = null;'));
+    assert.ok(block.includes("img.src = '';"));
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);

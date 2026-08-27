@@ -71,14 +71,17 @@ window.EventMapEffects = window.EventMapEffects || (() => {
             isPC
         };
 
+        // 暗幕生成途中で例外になってもcleanupOverlay()が復帰情報を拾えるよう、
+        // 通常マップを触る前にrestore stateを暗幕へ結び付ける。
+        mapOverlay._eventMapRestoreState = state;
         if (ui && typeof ui.pauseBackgroundUpdates === 'function' && !ui.isBackgroundPaused) {
-            ui.pauseBackgroundUpdates();
+            // pauseBackgroundUpdates()自身が途中で例外化しても、cleanup側でresumeを試せるよう先に記録する。
             state.pausedByUs = true;
+            ui.pauseBackgroundUpdates();
         }
 
         // PCは余裕があるため従来表示を維持。スマホだけ巨大マップを一時的に外します。
         if (!isPC && scroll) scroll.style.display = 'none';
-        mapOverlay._eventMapRestoreState = state;
         if (diagPrefix) writeDiag(game, `${diagPrefix}:main_map_suspended`);
 
         // display:none をcompositorへ反映してからイベント地図を作ります。
@@ -142,6 +145,11 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         }
     };
 
+    const releaseCanvasBackingStore = (canvas) => {
+        if (!canvas) return;
+        try { canvas.width = 1; canvas.height = 1; } catch (e) {}
+    };
+
     const createLightweightBaseCanvas = (game, options = {}) => {
         const mapW = game && game.mapWidth ? game.mapWidth : 1200;
         const mapH = game && game.mapHeight ? game.mapHeight : 800;
@@ -158,44 +166,54 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         canvas.style.display = 'block';
         canvas.style.pointerEvents = 'none';
 
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return null;
-        const img = ctx.createImageData(canvas.width, canvas.height);
-        const dst = img.data;
+        try {
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                releaseCanvasBackingStore(canvas);
+                return null;
+            }
+            const img = ctx.createImageData(canvas.width, canvas.height);
+            const dst = img.data;
 
-        // Round24：海もこの既存Canvasへ直接描きます。
-        // 追加CanvasやCSSフィルタは使わず、1回のImageData生成の中だけで完結させるためGPU負荷は増やしません。
-        // 海は青水色、陸地は明るい生成り色。海には18px間隔で短い1px線を入れて、
-        // 古いスマホでも地図らしさを出しつつ合成レイヤーを増やさないようにします。
-        for (let y = 0; y < canvas.height; y++) {
-            const seaPatternRow = (y % 18) === 7;
-            const seaPatternShift = (Math.floor(y / 18) * 11) % 42;
-            for (let x = 0; x < canvas.width; x++) {
-                const pid = sampleProvinceForCanvas(pixelProvinceMap, mapW, mapH, canvas.width, canvas.height, x, y);
-                const di = (y * canvas.width + x) * 4;
-                if (pid) {
-                    // 陸地の色
-                    dst[di] = 248;
-                    dst[di + 1] = 248;
-                    dst[di + 2] = 244;
-                    dst[di + 3] = 255;
-                } else {
-                    const wave = seaPatternRow && ((x + seaPatternShift) % 42) < 16;
-                    // 海・波模様
-                    dst[di] = wave ? 146 : 59;
-                    dst[di + 1] = wave ? 194 : 139;
-                    dst[di + 2] = wave ? 238 : 199;
-                    dst[di + 3] = 255;
+            // Round24：海もこの既存Canvasへ直接描きます。
+            // 追加CanvasやCSSフィルタは使わず、1回のImageData生成の中だけで完結させるためGPU負荷は増やしません。
+            // 海は青水色、陸地は明るい生成り色。海には18px間隔で短い1px線を入れて、
+            // 古いスマホでも地図らしさを出しつつ合成レイヤーを増やさないようにします。
+            for (let y = 0; y < canvas.height; y++) {
+                const seaPatternRow = (y % 18) === 7;
+                const seaPatternShift = (Math.floor(y / 18) * 11) % 42;
+                for (let x = 0; x < canvas.width; x++) {
+                    const pid = sampleProvinceForCanvas(pixelProvinceMap, mapW, mapH, canvas.width, canvas.height, x, y);
+                    const di = (y * canvas.width + x) * 4;
+                    if (pid) {
+                        // 陸地の色
+                        dst[di] = 248;
+                        dst[di + 1] = 248;
+                        dst[di + 2] = 244;
+                        dst[di + 3] = 255;
+                    } else {
+                        const wave = seaPatternRow && ((x + seaPatternShift) % 42) < 16;
+                        // 海・波模様
+                        dst[di] = wave ? 146 : 59;
+                        dst[di + 1] = wave ? 194 : 139;
+                        dst[di + 2] = wave ? 238 : 199;
+                        dst[di + 3] = 255;
+                    }
                 }
             }
+
+            // 最後に海岸線・国境線を濃く上書きします。
+            // 「透明な国境ピクセル」も復元するため、白い一枚板に見える問題を防ぎます。
+            drawProvinceBoundaries(dst, pixelProvinceMap, mapW, mapH, canvas.width, canvas.height, 28, 255, 2);
+
+            ctx.putImageData(img, 0, 0);
+            return canvas;
+        } catch (error) {
+            // context loss / ImageData確保失敗は演出だけを諦め、通常イベント進行を止めない。
+            console.warn('イベント用軽量地図Canvasの生成をスキップしました:', error);
+            releaseCanvasBackingStore(canvas);
+            return null;
         }
-
-        // 最後に海岸線・国境線を濃く上書きします。
-        // 「透明な国境ピクセル」も復元するため、白い一枚板に見える問題を防ぎます。
-        drawProvinceBoundaries(dst, pixelProvinceMap, mapW, mapH, canvas.width, canvas.height, 28, 255, 2);
-
-        ctx.putImageData(img, 0, 0);
-        return canvas;
     };
 
     const createOverlay = async (game, options = {}) => {
@@ -215,53 +233,63 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         mapOverlay.style.display = 'flex';
         mapOverlay.style.justifyContent = 'center';
         mapOverlay.style.alignItems = 'center';
-        document.body.appendChild(mapOverlay);
-        if (diagPrefix) writeDiag(game, `${diagPrefix}:overlay_dom`);
+        try {
+            document.body.appendChild(mapOverlay);
+            if (diagPrefix) writeDiag(game, `${diagPrefix}:overlay_dom`);
 
-        await suspendMainMapForOverlay(game, mapOverlay, diagPrefix);
+            // createOverlay()が返る前の失敗は呼び出し側がmapOverlayを保持できないため、
+            // shell生成責務の中で必ず自前rollbackする。
+            await suspendMainMapForOverlay(game, mapOverlay, diagPrefix);
 
-        const mapContainer = document.createElement('div');
-        mapContainer.className = 'event-map-container';
-        mapContainer.style.position = 'relative';
-        mapContainer.style.width = options.width || '95%';
-        mapContainer.style.maxWidth = options.maxWidth || '800px';
-        mapContainer.style.border = options.border || '4px solid #fff';
-        mapContainer.style.borderRadius = options.borderRadius || '8px';
-        mapContainer.style.backgroundColor = options.backgroundColor || (isPC ? '#81c784' : '#b7e0f0');
-        mapContainer.style.overflow = 'hidden';
+            const mapContainer = document.createElement('div');
+            mapContainer.className = 'event-map-container';
+            mapContainer.style.position = 'relative';
+            mapContainer.style.width = options.width || '95%';
+            mapContainer.style.maxWidth = options.maxWidth || '800px';
+            mapContainer.style.border = options.border || '4px solid #fff';
+            mapContainer.style.borderRadius = options.borderRadius || '8px';
+            mapContainer.style.backgroundColor = options.backgroundColor || (isPC ? '#81c784' : '#b7e0f0');
+            mapContainer.style.overflow = 'hidden';
 
-        let whiteMapImg = null;
-        let baseCanvas = null;
+            let whiteMapImg = null;
+            let baseCanvas = null;
 
-        if (!isPC && !options.forceImageBase) {
-            if (diagPrefix) writeDiag(game, `${diagPrefix}:base_canvas_build`);
-            baseCanvas = createLightweightBaseCanvas(game, { renderScale: options.renderScale || 0.5 });
-            if (baseCanvas) {
-                mapContainer.appendChild(baseCanvas);
-                if (diagPrefix) writeDiag(game, `${diagPrefix}:base_canvas_done`);
+            if (!isPC && !options.forceImageBase) {
+                if (diagPrefix) writeDiag(game, `${diagPrefix}:base_canvas_build`);
+                baseCanvas = createLightweightBaseCanvas(game, { renderScale: options.renderScale || 0.5 });
+                if (baseCanvas) {
+                    mapContainer.appendChild(baseCanvas);
+                    if (diagPrefix) writeDiag(game, `${diagPrefix}:base_canvas_done`);
+                }
             }
+
+            // pixelProvinceMapがまだ無い特殊ケース、またはPCだけ従来の白地図画像へフォールバックします。
+            if (!baseCanvas) {
+                if (diagPrefix) writeDiag(game, `${diagPrefix}:base_image_load`);
+                whiteMapImg = new Image();
+                whiteMapImg.src = options.mapSrc || WHITE_MAP_SRC;
+                whiteMapImg.style.width = '100%';
+                whiteMapImg.style.display = 'block';
+                whiteMapImg.style.pointerEvents = 'none';
+                mapContainer.appendChild(whiteMapImg);
+            }
+
+            mapOverlay.appendChild(mapContainer);
+
+            if (whiteMapImg) {
+                await waitForImage(whiteMapImg, options.imageTimeoutMs || 1000);
+                if (diagPrefix) writeDiag(game, `${diagPrefix}:base_image_done`);
+            }
+
+            if (diagPrefix) writeDiag(game, `${diagPrefix}:overlay_ready`);
+            return { mapOverlay, mapContainer, whiteMapImg, baseCanvas };
+        } catch (error) {
+            // 呼び出し側へ暗幕参照を返す前の失敗なので、ここで通常地図まで戻す。
+            try { await cleanupOverlay(mapOverlay); } catch (cleanupError) {
+                console.warn('イベント地図shell失敗後の後始末にも失敗しました:', cleanupError);
+            }
+            throw error;
         }
-
-        // pixelProvinceMapがまだ無い特殊ケース、またはPCだけ従来の白地図画像へフォールバックします。
-        if (!baseCanvas) {
-            if (diagPrefix) writeDiag(game, `${diagPrefix}:base_image_load`);
-            whiteMapImg = new Image();
-            whiteMapImg.src = options.mapSrc || WHITE_MAP_SRC;
-            whiteMapImg.style.width = '100%';
-            whiteMapImg.style.display = 'block';
-            whiteMapImg.style.pointerEvents = 'none';
-            mapContainer.appendChild(whiteMapImg);
-        }
-
-        mapOverlay.appendChild(mapContainer);
-
-        if (whiteMapImg) {
-            await waitForImage(whiteMapImg, options.imageTimeoutMs || 1000);
-            if (diagPrefix) writeDiag(game, `${diagPrefix}:base_image_done`);
-        }
-
-        if (diagPrefix) writeDiag(game, `${diagPrefix}:overlay_ready`);
-        return { mapOverlay, mapContainer, whiteMapImg, baseCanvas };
     };
 
     const getRenderScale = () => document.body.classList.contains('is-pc') ? 1 : 0.5;
@@ -310,35 +338,47 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         canvas.style.pointerEvents = 'none';
         if (options.animation) canvas.style.animation = options.animation;
 
-        const targetProvIds = affectedProvIds instanceof Set ? affectedProvIds : new Set(affectedProvIds || []);
-        if (targetProvIds.size > 0 && src.pixelProvinceMap) {
+        try {
+            // 台風進路も同じCanvasへ追加描画するため、対象国が0件でもcontextは先に確認する。
             const ctx = canvas.getContext('2d');
-            const img = ctx.createImageData(canvas.width, canvas.height);
-            const dst = img.data;
-            const drawR = color.r | 0, drawG = color.g | 0, drawB = color.b | 0;
-            const alpha = color.a === undefined ? 180 : color.a | 0;
+            if (!ctx) {
+                releaseCanvasBackingStore(canvas);
+                return { canvas: null, srcW: src.srcW, srcH: src.srcH, renderScale };
+            }
 
-            for (let y = 0; y < canvas.height; y++) {
-                const sy = Math.min(src.srcH - 1, Math.floor(((y + 0.5) * src.srcH) / canvas.height));
-                for (let x = 0; x < canvas.width; x++) {
-                    const sx = Math.min(src.srcW - 1, Math.floor(((x + 0.5) * src.srcW) / canvas.width));
-                    if (!targetProvIds.has(src.pixelProvinceMap[sy * src.srcW + sx])) continue;
-                    const di = (y * canvas.width + x) * 4;
-                    dst[di] = drawR; dst[di + 1] = drawG; dst[di + 2] = drawB; dst[di + 3] = alpha;
+            const targetProvIds = affectedProvIds instanceof Set ? affectedProvIds : new Set(affectedProvIds || []);
+            if (targetProvIds.size > 0 && src.pixelProvinceMap) {
+                const img = ctx.createImageData(canvas.width, canvas.height);
+                const dst = img.data;
+                const drawR = color.r | 0, drawG = color.g | 0, drawB = color.b | 0;
+                const alpha = color.a === undefined ? 180 : color.a | 0;
+
+                for (let y = 0; y < canvas.height; y++) {
+                    const sy = Math.min(src.srcH - 1, Math.floor(((y + 0.5) * src.srcH) / canvas.height));
+                    for (let x = 0; x < canvas.width; x++) {
+                        const sx = Math.min(src.srcW - 1, Math.floor(((x + 0.5) * src.srcW) / canvas.width));
+                        if (!targetProvIds.has(src.pixelProvinceMap[sy * src.srcW + sx])) continue;
+                        const di = (y * canvas.width + x) * 4;
+                        dst[di] = drawR; dst[di + 1] = drawG; dst[di + 2] = drawB; dst[di + 3] = alpha;
+                    }
                 }
+
+                // Round22: スマホでは災害色の上からも国境線を描き直します。
+                // ベース地図に線があっても半透明/点滅色で埋もれるため、効果Canvas自身に線を持たせます。
+                // 新しいCanvasは増やさないので、Round20のメモリ削減効果は維持されます。
+                if (src.pixelProvinceMap && renderScale < 1) {
+                    drawProvinceBoundaries(dst, src.pixelProvinceMap, src.srcW, src.srcH, canvas.width, canvas.height, 28, 245, 2);
+                }
+
+                ctx.putImageData(img, 0, 0);
             }
 
-            // Round22: スマホでは災害色の上からも国境線を描き直します。
-            // ベース地図に線があっても半透明/点滅色で埋もれるため、効果Canvas自身に線を持たせます。
-            // 新しいCanvasは増やさないので、Round20のメモリ削減効果は維持されます。
-            if (src.pixelProvinceMap && renderScale < 1) {
-                drawProvinceBoundaries(dst, src.pixelProvinceMap, src.srcW, src.srcH, canvas.width, canvas.height, 28, 245, 2);
-            }
-
-            ctx.putImageData(img, 0, 0);
+            return { canvas, srcW: src.srcW, srcH: src.srcH, renderScale };
+        } catch (error) {
+            console.warn('イベント用地方効果Canvasの生成をスキップしました:', error);
+            releaseCanvasBackingStore(canvas);
+            return { canvas: null, srcW: src.srcW, srcH: src.srcH, renderScale };
         }
-
-        return { canvas, srcW: src.srcW, srcH: src.srcH, renderScale };
     };
 
     // 台風の正確な拠点当たり判定用。
@@ -486,29 +526,48 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
     fx.writeDiag(game, `${diagPrefix}:dialog`);
     await game.ui.showDialogAsync(initialMsg, false, 0);
 
-    fx.writeDiag(game, `${diagPrefix}:overlay_shell`);
-    const { mapOverlay, mapContainer } = await fx.createOverlay(game, { diagPrefix });
+    let mapOverlay = null;
+    try {
+        fx.writeDiag(game, `${diagPrefix}:overlay_shell`);
+        const overlayParts = await fx.createOverlay(game, { diagPrefix });
+        mapOverlay = overlayParts && overlayParts.mapOverlay;
+        const mapContainer = overlayParts && overlayParts.mapContainer;
 
-    fx.writeDiag(game, `${diagPrefix}:mask_build`);
-    const { canvas } = await fx.createProvinceCanvas(
-        game,
-        affectedProvIds,
-        { r: drawR, g: drawG, b: drawB, a: 180 },
-        { animation: 'blink 1s 2', diagPrefix }
-    );
-    mapContainer.appendChild(canvas);
-    fx.writeDiag(game, `${diagPrefix}:mask_done`);
+        fx.writeDiag(game, `${diagPrefix}:mask_build`);
+        const { canvas } = await fx.createProvinceCanvas(
+            game,
+            affectedProvIds,
+            { r: drawR, g: drawG, b: drawB, a: 180 },
+            { animation: 'blink 1s 2', diagPrefix }
+        );
+        if (!canvas || !mapContainer) {
+            console.warn(`${eventType}の地図演出を省略しました。`);
+        } else {
+            mapContainer.appendChild(canvas);
+            fx.writeDiag(game, `${diagPrefix}:mask_done`);
 
-    await new Promise(resolve => setTimeout(resolve, 0));
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    canvas.style.animation = 'none';
-    canvas.style.opacity = '1.0';
+            await new Promise(resolve => setTimeout(resolve, 0));
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            canvas.style.animation = 'none';
+            canvas.style.opacity = '1.0';
 
-    fx.writeDiag(game, `${diagPrefix}:wait_input`);
-    await fx.waitForDismiss(game, mapOverlay);
-    fx.writeDiag(game, `${diagPrefix}:cleanup`);
-    await fx.cleanupOverlay(mapOverlay);
-    fx.writeDiag(game, `${diagPrefix}:cleanup_done`);
+            fx.writeDiag(game, `${diagPrefix}:wait_input`);
+            await fx.waitForDismiss(game, mapOverlay);
+        }
+    } catch (error) {
+        // 災害のゲーム処理と結果通知は継続し、補助地図だけを省略する。
+        console.warn(`${eventType}の地図演出中にエラーが出たため、演出を省略します:`, error);
+    } finally {
+        if (mapOverlay) {
+            fx.writeDiag(game, `${diagPrefix}:cleanup`);
+            try {
+                await fx.cleanupOverlay(mapOverlay);
+            } catch (cleanupError) {
+                console.warn(`${eventType}の地図演出後始末に失敗しました:`, cleanupError);
+            }
+            fx.writeDiag(game, `${diagPrefix}:cleanup_done`);
+        }
+    }
 
     const playerAffectedProvinces = new Set();
     game.castles.forEach(c => {

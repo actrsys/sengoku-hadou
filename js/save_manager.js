@@ -417,12 +417,19 @@ class SaveManager {
         await new Promise(resolve => {
             const img = new Image();
             img.decoding = 'async';
-            img.onload = () => {
-                this.game.mapWidth = img.naturalWidth || img.width || this.game.mapWidth || 1200;
-                this.game.mapHeight = img.naturalHeight || img.height || this.game.mapHeight || 800;
+            const finish = (loaded) => {
+                if (loaded) {
+                    this.game.mapWidth = img.naturalWidth || img.width || this.game.mapWidth || 1200;
+                    this.game.mapHeight = img.naturalHeight || img.height || this.game.mapHeight || 800;
+                }
+                img.onload = null;
+                img.onerror = null;
+                // 寸法確認だけの一時Imageなので、次の巨大地図解析へ進む前にdecode資源を解放する。
+                try { img.src = ''; } catch (e) {}
                 resolve();
             };
-            img.onerror = () => resolve();
+            img.onload = () => finish(true);
+            img.onerror = () => finish(false);
             img.src = './data/images/map/japan_map.png';
         });
         if (this.game.ui && typeof this.game.ui.waitForNextPaint === 'function') await this.game.ui.waitForNextPaint();
