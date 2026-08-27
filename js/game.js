@@ -539,6 +539,16 @@ class GameManager {
         }
         return this._clanMap.get(Number(id));
     }
+    getProvince(id) {
+        // 国データもUI更新や一覧ソートから頻繁に参照するため、毎回findせず共通索引を使います。
+        if (this._provinceMapSource !== this.provinces || this._provinceMapSize !== this.provinces.length) {
+            this._provinceMap = new Map();
+            this.provinces.forEach(p => this._provinceMap.set(Number(p.id), p));
+            this._provinceMapSource = this.provinces;
+            this._provinceMapSize = this.provinces.length;
+        }
+        return this._provinceMap.get(Number(id));
+    }
     // ★高速化：「勢力ID→大名武将」を一瞬で取り出します（毎回全武将から探す代わりに、勢力が覚えているIDを使います）
     getClanDaimyo(clanId) {
         const numericClanId = Number(clanId);

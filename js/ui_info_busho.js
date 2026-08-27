@@ -133,7 +133,7 @@ Object.assign(UIInfoManager.prototype, {
                 affiliationName = "諸勢力";
             }
         } else if (busho.clan > 0) {
-            const clan = this.game.clans.find(c => c.id === busho.clan);
+            const clan = this.game.getClan(busho.clan);
             if (clan) {
                 affiliationName = clan.name;
                 const daimyo = this.game.getBusho(clan.leaderId); 

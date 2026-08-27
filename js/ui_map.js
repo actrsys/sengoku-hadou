@@ -1406,7 +1406,7 @@ Object.assign(UIManager.prototype, {
             el.style.setProperty('--castle-scale', currentScale);
 
             if (c.isDone) el.classList.add('done');
-            const castellan = this.game.getBusho(c.castellanId); const clanData = this.game.clans.find(cl => cl.id === c.ownerClan);
+            const castellan = this.game.getBusho(c.castellanId); const clanData = this.game.getClan(c.ownerClan);
             
             const castellanName = castellan ? castellan.name : '-';            
             
@@ -2173,6 +2173,18 @@ Object.assign(UIManager.prototype, {
         }
     },
 
+    // 地図上の所有変更・戦闘点滅など、プレイヤーに見せる演出中は
+    // 「思考中...」「月末処理中...」といった裏側の進捗文字を重ねない。
+    // スタック式の既存APIを共通利用し、呼び出し元ごとの隠し忘れを防ぐ。
+    async withAIGuardTextHiddenForMapEffect(task) {
+        this.hideAIGuardText();
+        try {
+            return await task();
+        } finally {
+            this.restoreAIGuardText();
+        }
+    },
+
     // ==========================================
     // ★追加：指定したお城の領地だけをチカチカ点滅させる魔法です！
     // ==========================================
@@ -2316,6 +2328,7 @@ Object.assign(UIManager.prototype, {
     },
 
     async playBattleBlink(castleIdOrIds, colorA, colorB, durationMs, options = {}) {
+        return this.withAIGuardTextHiddenForMapEffect(async () => {
         // 戦争中は開戦時に確定した戦場カメラを維持します。
         // 開始/終了点滅のたびに同じ地点を再計算すると、スマホではモーダル開閉による
         // viewport差で数pxずれるため、戦場ロック中は再フォーカスしません。
@@ -2394,12 +2407,14 @@ Object.assign(UIManager.prototype, {
 
             requestAnimationFrame(animate);
         });
+        });
     },
 
     // ==========================================
     // ★城が落ちた時の、フワッと白く光る魔法！
     // ==========================================
     async playCaptureEffect(castleIdOrIds, onHalfway, options = {}) {
+        return this.withAIGuardTextHiddenForMapEffect(async () => {
         // 戦争中は開始時から同じ戦場カメラを維持し、制圧演出でも再フォーカスしません。
         const warState = this.game && this.game.warManager ? this.game.warManager.state : null;
         const firstId = Array.isArray(castleIdOrIds) ? Number(castleIdOrIds[0]) : Number(castleIdOrIds);
@@ -2472,6 +2487,7 @@ Object.assign(UIManager.prototype, {
             };
 
             requestAnimationFrame(animate);
+        });
         });
     }
 });

@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r246');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r248');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2321,6 +2321,19 @@ test('PC攻城戦は部隊戦力を主役にしつつ部隊長3能力を既存�
     assert.ok(ui.includes('StatPresenter.toGradeHTML(value)'), '能力ランクは StatPresenter を共用する');
     assert.ok(css.includes('grid-template-columns: 62px 76px minmax(0, 1fr)'));
     assert.ok(css.includes('#war-modal .war-leader-abilities {\n    display: none;'), 'スマホ既定では能力欄を表示しない');
+});
+
+test('地図上の所有変更・戦闘演出中はAI/月末処理テキストを共通部品で退避する', () => {
+    const map = read('js/ui_map.js');
+    const independence = read('js/independence_system.js');
+
+    assert.ok(map.includes('async withAIGuardTextHiddenForMapEffect(task)'));
+    assert.ok(map.includes('this.hideAIGuardText();'));
+    assert.ok(map.includes('this.restoreAIGuardText();'));
+    assert.ok(map.includes('async playBattleBlink(castleIdOrIds, colorA, colorB, durationMs, options = {}) {\n        return this.withAIGuardTextHiddenForMapEffect(async () => {'));
+    assert.ok(map.includes('async playCaptureEffect(castleIdOrIds, onHalfway, options = {}) {\n        return this.withAIGuardTextHiddenForMapEffect(async () => {'));
+    assert.ok(independence.includes('await this.game.ui.playBattleBlink(changedCastleIds, oldColor, newColorRgb, 1000);'));
+    assert.ok(independence.includes('await this.game.ui.playCaptureEffect(changedCastleIds, applyNewClanColor);'));
 });
 
 test('タイトル版表示は GameConfig.Meta.Version を正本にする', () => {
@@ -7754,5 +7767,97 @@ test('スマホ仮想スクロールは表示外DOMを抑えつつ数pxごとの
     assert.ok(block.includes('Math.floor(rawStartIndex / WINDOW_STEP_ROWS) * WINDOW_STEP_ROWS'));
 });
 
+
+test('国データもGameManager共通索引を使いUIから毎回findしない', () => {
+    const game = read('js/game.js');
+    assert.ok(game.includes('getProvince(id)'));
+    assert.ok(game.includes('this._provinceMap = new Map()'));
+    const ui = read('js/ui.js');
+    const at = ui.indexOf('updateInfoPanel(castle)');
+    assert.ok(at >= 0);
+    const block = ui.slice(at, at + 9000);
+    assert.ok(block.includes('this.game.getProvince(castle.provinceId)'));
+    assert.ok(!block.includes('this.game.provinces.find'));
+});
+
+test('拠点情報は全武将走査をせずsamuraiIds正本から在城者を一度だけ分類する', () => {
+    const ui = read('js/ui.js');
+    const at = ui.indexOf('updateInfoPanel(castle)');
+    const block = ui.slice(at, at + 9000);
+    assert.ok(block.includes('const castleBushos = this.game.getCastleBushos(castle.id);'));
+    assert.ok(!block.includes('this.game.bushos.filter'));
+
+    const kyoten = read('js/ui_info_kyoten.js');
+    const detailAt = kyoten.indexOf('_renderCastleDetail(castleId, scrollPos = 0)');
+    const detailBlock = kyoten.slice(detailAt, detailAt + 7000);
+    assert.ok(detailBlock.includes('const castleBushos = this.game.getCastleBushos(castle.id);'));
+    assert.ok(!detailBlock.includes('this.game.bushos.filter'));
+});
+
+test('拠点一覧は既存ID索引を再利用し人数俸禄集計をタブ切替ごとに作り直さない', () => {
+    const kyoten = read('js/ui_info_kyoten.js');
+    const at = kyoten.indexOf('_renderKyotenList(clanId, isSelectMode = false');
+    const block = kyoten.slice(at, at + 15000);
+    assert.ok(block.includes('this.kyotenCastleBushoStatsMap'));
+    assert.ok(block.includes('this.game.getClan('));
+    assert.ok(block.includes('this.game.getBusho('));
+    assert.ok(block.includes('this.game.getProvince('));
+    assert.ok(!block.includes('const clanMap = new Map()'));
+    assert.ok(!block.includes('const bushoMap = new Map()'));
+    assert.ok(!block.includes('const provinceMap = new Map()'));
+    const opener = kyoten.slice(kyoten.indexOf('showKyotenList('), kyoten.indexOf('_renderKyotenList('));
+    assert.ok(opener.includes('this.kyotenCastleBushoStatsMap = null;'));
+    const selectAt = kyoten.indexOf('showAppointLegionCastleSelector(');
+    const selectBlock = kyoten.slice(selectAt, selectAt + 800);
+    assert.ok(selectBlock.includes('this.kyotenCastleBushoStatsMap = null;'));
+});
+
+test('勢力一覧は勢力ごとの全武将filterをやめ一度のグループ化と所有城索引を使う', () => {
+    const info = read('js/ui_info.js');
+    const at = info.indexOf('_renderDaimyoList(isSelectMode = false');
+    const block = info.slice(at, at + 7000);
+    assert.ok(block.includes('const activeBushosByClan = new Map();'));
+    assert.ok(block.includes('this.game.getClanCastles(c.id).length > 0'));
+    assert.ok(block.includes('activeBushosByClan.get(Number(clan.id)) || []'));
+    assert.ok(!block.includes('this.game.bushos.filter(b => b.clan === clan.id'));
+    assert.ok(!block.includes('this.game.castles.filter(c => c.ownerClan === clan.id)'));
+});
+
+test('端末別情報パネルは非表示側へ同じ情報DOMを複製しない', () => {
+    const ui = read('js/ui.js');
+    const at = ui.indexOf('updateInfoPanel(castle)');
+    const block = ui.slice(at, at + 15000);
+    assert.ok(block.includes('if (!isPc && this.mobileTopLeft)'));
+    assert.ok(block.includes('if (isPc) this.pcNewStatusPanel.innerHTML = content;'));
+    assert.ok(!block.includes('if (this.statusContainer && isPc)'));
+});
+
+test('諸勢力のID・拠点検索は専門System内の索引を共用し壊滅判定だけ局所化する', () => {
+    const src = read('js/kunishu_system.js');
+    const ensureAt = src.indexOf('_ensureKunishuIndexes()');
+    const ensureBlock = src.slice(ensureAt, ensureAt + 1800);
+    assert.ok(ensureBlock.includes('const byId = new Map();'));
+    assert.ok(ensureBlock.includes('const byCastle = new Map();'));
+    assert.ok(ensureBlock.includes('this._kunishuById = byId;'));
+    assert.ok(ensureBlock.includes('this._kunishusByCastle = byCastle;'));
+
+    const getAt = src.indexOf('getKunishu(id)');
+    const getBlock = src.slice(getAt, getAt + 260);
+    assert.ok(getBlock.includes('this._ensureKunishuIndexes();'));
+    assert.ok(getBlock.includes('this._kunishuById.get(Number(id))'));
+    assert.ok(!getBlock.includes('.find('));
+
+    const castleAt = src.indexOf('getKunishusInCastle(castleId)');
+    const castleBlock = src.slice(castleAt, castleAt + 420);
+    assert.ok(castleBlock.includes('this._kunishusByCastle.get(Number(castleId)) || []'));
+    assert.ok(castleBlock.includes('list.filter(k => !k.isDestroyed)'));
+    assert.ok(!castleBlock.includes('getAliveKunishus().filter'));
+
+    const setAt = src.indexOf('setKunishuData(kunishus)');
+    const setBlock = src.slice(setAt, setAt + 360);
+    assert.ok(setBlock.includes('this._kunishuIndexSource = null;'));
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
+

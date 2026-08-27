@@ -1983,7 +1983,7 @@ class UIManager {
         const maskPop = (val) => isVisible ? `${val}人` : "不明";
         
         const castellan = this.game.getBusho(castle.castellanId);
-        const clanData = this.game.clans.find(cd => cd.id === castle.ownerClan);
+        const clanData = this.game.getClan(castle.ownerClan);
         const clanName = clanData ? clanData.name : "中立";
         
         const getCompressedBushoNameHtml = (busho) => {
@@ -1998,23 +1998,24 @@ class UIManager {
         const compressedClanName = this._getCompressedTextHtml(clanName, 4);
         const compressedCastellanName = getCompressedBushoNameHtml(castellan);
         
-        let provinceName = "";
-        if (this.game.provinces) {
-            const province = this.game.provinces.find(p => p.id === castle.provinceId);
-            if (province) {
-                provinceName = province.province;
-            }
-        }
+        const province = this.game.getProvince(castle.provinceId);
+        const provinceName = province ? province.province : "";
         
         let faceHtml = "";
         if (castellan && castellan.faceIcon) {
             faceHtml = `<img class="sp-castellan-face" src="data/images/faceicons/${castellan.faceIcon}">`;
         }
 
-        // ★城にいるアクティブな自軍武将の数を数える魔法です！
+        // 拠点の在城者は Castle.samuraiIds が正本。全武将を走査せず、同じ拠点の数十人だけを1回見ます。
+        const castleBushos = this.game.getCastleBushos(castle.id);
         let activeBushoCount = 0;
-        if (castle.ownerClan !== 0 && this.game && this.game.bushos) {
-            activeBushoCount = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b)).length;
+        let roninCount = 0;
+        for (const b of castleBushos) {
+            if (window.BushoStatusRules.isRonin(b)) {
+                roninCount++;
+            } else if (castle.ownerClan !== 0 && Number(b.clan) === Number(castle.ownerClan) && window.BushoStatusRules.isActive(b)) {
+                activeBushoCount++;
+            }
         }
 
         // ★ここから追加：城が「保護期間（戦乱）」かどうかをチェックする魔法です！
@@ -2042,12 +2043,9 @@ class UIManager {
             }
         }
 
-        // 大雪のシールは「城」ではなく「国（地方）」に貼られているので、国をチェックします
-        if (this.game.provinces) {
-            const province = this.game.provinces.find(p => p.id === castle.provinceId);
-            if (province && province.statusEffects && province.statusEffects.includes('heavySnow')) {
-                statusMarksHtml += `<div class="status-mark mark-snow">大雪</div>`;
-            }
+        // 大雪のシールは「城」ではなく「国（地方）」に貼られているので、上で取得した国データを再利用します。
+        if (province && province.statusEffects && province.statusEffects.includes('heavySnow')) {
+            statusMarksHtml += `<div class="status-mark mark-snow">大雪</div>`;
         }
 
         let clanHtml = "";
@@ -2127,55 +2125,58 @@ class UIManager {
             this._statusCarouselTimer = null;
         }
 
-        if (this.mobileTopLeft) {
+        // 端末ごとに実際に表示する情報パネルだけを生成します。
+        // PCでは #top-info-bar / #pc-sidebar が常時非表示なので、そこへ同じ顔画像DOMを複製しません。
+        if (!isPc && this.mobileTopLeft) {
             this.mobileTopLeft.innerHTML = content;
 
             const castellanFace = this.mobileTopLeft.querySelector('.sp-castellan-face');
             if (castellanFace) {
                 castellanFace.addEventListener('error', () => castellanFace.classList.add('is-broken'), { once: true });
             }
-            
-            if (!isPc) {
-                const carousel = this.mobileTopLeft.querySelector('.status-marks-carousel');
-                if (carousel) {
-                    const marks = carousel.querySelectorAll('.status-mark');
-                    if (marks.length > 0) {
-                        let currentIndex = 0;
-                        marks[0].classList.add('active'); // fade-inクラスを付けないので初回は一瞬で出ます
-                        
-                        if (marks.length > 1) {
-                            // 複数ある場合はタップ可能にし、タイマーを回す
-                            carousel.style.cursor = 'pointer';
-                            
-                            const showNext = () => {
-                                marks[currentIndex].classList.remove('active', 'fade-in');
-                                currentIndex = (currentIndex + 1) % marks.length;
-                                marks[currentIndex].classList.add('active', 'fade-in'); // 切り替わる時だけふわっとさせる
-                            };
+
+            const carousel = this.mobileTopLeft.querySelector('.status-marks-carousel');
+            if (carousel) {
+                const marks = carousel.querySelectorAll('.status-mark');
+                if (marks.length > 0) {
+                    let currentIndex = 0;
+                    marks[0].classList.add('active'); // fade-inクラスを付けないので初回は一瞬で出ます
+
+                    if (marks.length > 1) {
+                        // 複数ある場合はタップ可能にし、タイマーを回す
+                        carousel.style.cursor = 'pointer';
+
+                        const showNext = () => {
+                            marks[currentIndex].classList.remove('active', 'fade-in');
+                            currentIndex = (currentIndex + 1) % marks.length;
+                            marks[currentIndex].classList.add('active', 'fade-in'); // 切り替わる時だけふわっとさせる
+                        };
+                        this._statusCarouselTimer = setInterval(showNext, 2500);
+
+                        carousel.onclick = (e) => {
+                            e.stopPropagation();
+                            clearInterval(this._statusCarouselTimer);
+                            showNext();
                             this._statusCarouselTimer = setInterval(showNext, 2500);
-                            
-                            carousel.onclick = (e) => {
-                                e.stopPropagation();
-                                clearInterval(this._statusCarouselTimer);
-                                showNext();
-                                this._statusCarouselTimer = setInterval(showNext, 2500);
-                            };
-                        } else {
-                            // 1つしかない場合はタップ反応を完全に消す
-                            carousel.style.cursor = 'default';
-                            carousel.onclick = (e) => { e.stopPropagation(); };
-                        }
+                        };
+                    } else {
+                        // 1つしかない場合はタップ反応を完全に消す
+                        carousel.style.cursor = 'default';
+                        carousel.onclick = (e) => { e.stopPropagation(); };
                     }
                 }
             }
+        } else if (this.mobileTopLeft && this.mobileTopLeft.innerHTML) {
+            this.mobileTopLeft.innerHTML = '';
         }
-        
-        if (this.statusContainer && isPc) {
-            this.statusContainer.innerHTML = content;
+
+        // #pc-status-panel は旧サイドバー内で常時非表示。表示中の新PCパネルだけ更新します。
+        if (this.statusContainer && this.statusContainer.innerHTML) {
+            this.statusContainer.innerHTML = '';
         }
-        
-        if (this.pcNewStatusPanel && isPc) {
-            this.pcNewStatusPanel.innerHTML = content;
+        if (this.pcNewStatusPanel) {
+            if (isPc) this.pcNewStatusPanel.innerHTML = content;
+            else if (this.pcNewStatusPanel.innerHTML) this.pcNewStatusPanel.innerHTML = '';
         }
 
         if (this.mobileFloatingInfo) {
@@ -2184,20 +2185,10 @@ class UIManager {
             `;
         }
 
-        // ★城にいる浪人の数を数える魔法！
-        let roninCount = 0;
-        if (this.game && this.game.bushos) {
-            // 状態が「浪人（ronin）」になっている人を数えるように変更します！
-            roninCount = this.game.bushos.filter(b => b.castleId === castle.id && window.BushoStatusRules.isRonin(b)).length;
-        }
-
-        // ★今の城がある「国（地方）」の米相場を調べます！
+        // ★今の城がある「国（地方）」の米相場を調べます。国データも上で取得済みのものを再利用します。
         let currentRate = 1.0;
-        if (castle && this.game.provinces) {
-            const province = this.game.provinces.find(p => p.id === castle.provinceId);
-            if (province && province.marketRate !== undefined) {
-                currentRate = province.marketRate;
-            }
+        if (province && province.marketRate !== undefined) {
+            currentRate = province.marketRate;
         }
 
         if (this.mobileFloatingMarket) {

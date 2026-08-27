@@ -12,6 +12,29 @@ class KunishuSystem {
     // ゲーム開始時・ロード時にデータをセットする
     setKunishuData(kunishus) {
         this.kunishus = kunishus;
+        this._kunishuIndexSource = null;
+        this._kunishuIndexSize = -1;
+        this._kunishuById = null;
+        this._kunishusByCastle = null;
+    }
+
+    _ensureKunishuIndexes() {
+        // 諸勢力は数こそ武将より少ないものの、地図描画では全拠点から繰り返し参照される。
+        // 配列の差し替え・動的追加時だけ索引を作り直し、isDestroyedは参照時に判定する。
+        if (this._kunishuIndexSource === this.kunishus && this._kunishuIndexSize === this.kunishus.length && this._kunishuById && this._kunishusByCastle) return;
+
+        const byId = new Map();
+        const byCastle = new Map();
+        for (const k of this.kunishus) {
+            byId.set(Number(k.id), k);
+            const castleId = Number(k.castleId);
+            if (!byCastle.has(castleId)) byCastle.set(castleId, []);
+            byCastle.get(castleId).push(k);
+        }
+        this._kunishuById = byId;
+        this._kunishusByCastle = byCastle;
+        this._kunishuIndexSource = this.kunishus;
+        this._kunishuIndexSize = this.kunishus.length;
     }
 
     // ★追加：頭領を自動生成する「共通の魔法（システム）」です！いつでも使い回せます。
@@ -71,7 +94,8 @@ class KunishuSystem {
     }
     
     getKunishu(id) {
-        return this.kunishus.find(k => k.id === id);
+        this._ensureKunishuIndexes();
+        return this._kunishuById.get(Number(id));
     }
 
     getAliveKunishus() {
@@ -244,7 +268,10 @@ class KunishuSystem {
 
     // 指定した城にいる諸勢力を取得
     getKunishusInCastle(castleId) {
-        return this.getAliveKunishus().filter(k => Number(k.castleId) === Number(castleId));
+        this._ensureKunishuIndexes();
+        const list = this._kunishusByCastle.get(Number(castleId)) || [];
+        // 壊滅状態はゲーム中に変化するため索引へ焼き込まず、その拠点の少数要素だけを都度判定する。
+        return list.filter(k => !k.isDestroyed);
     }
 
     // 特定の諸勢力に所属している武将一覧を取得

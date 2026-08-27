@@ -66,6 +66,7 @@ class UIInfoManager {
         this.isKyotenSortAsc = false;
         this.kyotenSavedCastles = null;
         this.kyotenSavedSortedCastles = null;
+        this.kyotenCastleBushoStatsMap = null;
         this.kyotenLastSortStateKey = null;
         this.kyotenLastScope = null;
         
@@ -415,8 +416,17 @@ class UIInfoManager {
     }
 
     _renderDaimyoList(isSelectMode = false, onSelect = null, onBack = null, scrollPos = 0) {
-        const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
+        const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.getClanCastles(c.id).length > 0);
         this.game.updateAllClanPrestige();
+
+        // 勢力ごとの武将一覧を先に1回だけ作り、勢力ごとに全武将filterを繰り返しません。
+        const activeBushosByClan = new Map();
+        for (const b of this.game.bushos) {
+            if (!window.BushoStatusRules.isActive(b) || Number(b.clan) <= 0) continue;
+            const clanId = Number(b.clan);
+            if (!activeBushosByClan.has(clanId)) activeBushosByClan.set(clanId, []);
+            activeBushosByClan.get(clanId).push(b);
+        }
         
         if (!this.daimyoCurrentTab) this.daimyoCurrentTab = 'status';
 
@@ -438,7 +448,7 @@ class UIInfoManager {
             let totalKokudaka = 0, totalCommerce = 0, totalGold = 0, totalRice = 0;
             let totalPopulation = 0, totalMaxKokudaka = 0, totalMaxCommerce = 0;
             
-            const clanCastles = this.game.castles.filter(c => c.ownerClan === clan.id);
+            const clanCastles = this.game.getClanCastles(clan.id);
             const castlesCount = clanCastles.length;
             
             clanCastles.forEach(c => {
@@ -458,7 +468,7 @@ class UIInfoManager {
             let totalGoldIncome = clan.goldIncome || 0;
             let totalRiceIncome = clan.riceIncome || 0;
             
-            const clanBushos = this.game.bushos.filter(b => b.clan === clan.id && window.BushoStatusRules.isActive(b));
+            const clanBushos = activeBushosByClan.get(Number(clan.id)) || [];
             const bushosCount = clanBushos.length;
 
             let totalGoldConsume = 0;
@@ -770,7 +780,7 @@ class UIInfoManager {
     }
 
     _renderDaimyoDetail(clanId, scrollPos = 0) {
-        const clan = this.game.clans.find(c => c.id === clanId);
+        const clan = this.game.getClan(clanId);
         if (!clan) return;
 
         const shell = this._openInfoShell("勢力情報");
@@ -781,11 +791,11 @@ class UIInfoManager {
         const leaderName = leader ? leader.name.replace('|', '') : "不明";
         let baseCastleName = "不明";
         if (leader && leader.castleId) {
-            const baseCastle = this.game.castles.find(c => c.id === leader.castleId);
+            const baseCastle = this.game.getCastle(leader.castleId);
             if (baseCastle) baseCastleName = baseCastle.name;
         }
         
-        const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        const clanCastles = this.game.getClanCastles(clanId);
         const castlesCount = clanCastles.length;
         
         // ★武将のリストを取得して、人数と「派閥があるか」を調べます
@@ -808,7 +818,9 @@ class UIInfoManager {
             totalPopulation += c.population || 0;
             totalKokudaka += c.kokudaka || 0;
             totalCommerce += c.commerce || 0;
-            roninCount += this.game.bushos.filter(b => b.castleId === c.id && window.BushoStatusRules.isRonin(b)).length;
+            for (const b of this.game.getCastleBushos(c.id)) {
+                if (window.BushoStatusRules.isRonin(b)) roninCount++;
+            }
         });
 
         // ★表示側で計算は行わず、勢力データに保存されている値を読むだけにします
@@ -2037,7 +2049,7 @@ class UIInfoManager {
     _renderDelegateList(scrollPos = 0) {
         const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
         const daimyoCastleId = daimyo ? daimyo.castleId : -1;
-        const myCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId && c.id !== daimyoCastleId);
+        const myCastles = this.game.getClanCastles(this.game.playerClanId).filter(c => c.id !== daimyoCastleId);
 
         const isAllDelegated = myCastles.length > 0 && myCastles.every(c => c.isDelegated);
         let toggleBtnClass = isAllDelegated ? "btn-toggle-delegated" : "btn-toggle-direct";
@@ -2187,7 +2199,7 @@ class UIInfoManager {
         if (backToScenarioBtn) backToScenarioBtn.classList.add('hidden');
         
         // 大名の情報を集めて合算します
-        const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        const clanCastles = this.game.getClanCastles(clanId);
         const castlesCount = clanCastles.length;
         
         let totalPopulation = 0;
@@ -2210,7 +2222,7 @@ class UIInfoManager {
 
         // 武将の数と姫の数も数えます
         const bushosCount = this.game.bushos.filter(b => b.clan === clanId && window.LifeStatusRules.isPresent(b)).length;
-        const clanData = this.game.clans.find(c => c.id === clanId);
+        const clanData = this.game.getClan(clanId);
         const princessCount = clanData && clanData.princessIds ? clanData.princessIds.length : 0;
         const clanYomi = clanData ? (clanData.yomi || "") : "";
 

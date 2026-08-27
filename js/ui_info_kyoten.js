@@ -12,49 +12,43 @@ Object.assign(UIInfoManager.prototype, {
         this.pushModal('castle_detail', [castleId]);
     },
     _renderCastleDetail(castleId, scrollPos = 0) {
-        const castle = this.game.castles.find(c => c.id === castleId);
+        const castle = this.game.getCastle(castleId);
         if (!castle) return;
 
         const shell = this._openInfoShell("拠点情報");
         if (!shell) return;
         const { listContainer } = shell;
 
-        const clanData = this.game.clans.find(cd => cd.id === castle.ownerClan);
+        const clanData = this.game.getClan(castle.ownerClan);
         const clanName = clanData ? clanData.name : "無所属";
         const castellan = this.game.getBusho(castle.castellanId);
         const castellanName = castellan ? castellan.name : "なし";
 
         let provinceName = "不明";
         let provinceYomi = "";
-        if (this.game.provinces) {
-            const province = this.game.provinces.find(p => p.id === castle.provinceId);
-            if (province) {
-                provinceName = province.province;
-                provinceYomi = province.provinceYomi || "";
-            }
+        const province = this.game.getProvince(castle.provinceId);
+        if (province) {
+            provinceName = province.province;
+            provinceYomi = province.provinceYomi || "";
         }
 
         const kunishus = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishusInCastle(castle.id) : [];
         const kunishuCount = kunishus.length;
 
-        // ★ メイン画面と全く同じ仕様での「武将」と「浪人」のカウント
+        // 在城者は Castle.samuraiIds が正本。全武将を3回走査せず、在城者を1回だけ分類します。
+        const castleBushos = this.game.getCastleBushos(castle.id);
         let activeBushoCount = 0;
-        if (castle.ownerClan !== 0 && this.game && this.game.bushos) {
-            activeBushoCount = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b)).length;
-        }
-
         let roninCount = 0;
-        if (this.game && this.game.bushos) {
-            roninCount = this.game.bushos.filter(b => b.castleId === castle.id && window.BushoStatusRules.isRonin(b)).length;
+        const targetBushos = [];
+        for (const b of castleBushos) {
+            if (window.BushoStatusRules.isRonin(b)) {
+                roninCount++;
+                targetBushos.push(b);
+            } else if (castle.ownerClan > 0 && Number(b.clan) === Number(castle.ownerClan) && window.BushoStatusRules.isActive(b)) {
+                activeBushoCount++;
+                targetBushos.push(b);
+            }
         }
-
-        // ボタン活性化チェック用（武将＋浪人）
-        const targetBushos = this.game.bushos.filter(b => {
-            if (b.castleId !== castle.id) return false;
-            if (window.BushoStatusRules.isRonin(b)) return true;
-            if (castle.ownerClan > 0 && window.BushoStatusRules.isActive(b) && b.clan === castle.ownerClan) return true;
-            return false;
-        });
         const bushoCount = targetBushos.length;
 
         let totalGoldIncome = EconomyRules.calcBaseGoldIncome(castle);
@@ -250,6 +244,7 @@ Object.assign(UIInfoManager.prototype, {
         }
         this.kyotenSavedCastles = null;
         this.kyotenSavedSortedCastles = null;
+        this.kyotenCastleBushoStatsMap = null;
         this.kyotenLastSortStateKey = null;
         this.kyotenLastScope = null;
         this.pushModal('kyoten_list', [clanId, false, null]); // ★選択モードではない、という合図を渡します
@@ -259,42 +254,28 @@ Object.assign(UIInfoManager.prototype, {
     _renderKyotenList(clanId, isSelectMode = false, selectData = null, scrollPos = 0) {
         this.kyotenTargetClanId = clanId !== null ? clanId : this.game.playerClanId;
         
-        // ==========================================
-        // ★高速化：ソートや表示のループに入る前に、早見表を一気に作ります！
-        // ==========================================
-        const clanMap = new Map();
-        if (this.game.clans) this.game.clans.forEach(c => clanMap.set(c.id, c));
-        
-        const bushoMap = new Map();
-        if (this.game.bushos) this.game.bushos.forEach(b => bushoMap.set(b.id, b));
-        
-        const provinceMap = new Map();
-        if (this.game.provinces) this.game.provinces.forEach(p => provinceMap.set(p.id, p));
+        // 武将・勢力・国のID索引はGameManagerが正本として保持するため、一覧描画ごとの重複Map生成はしません。
+        // 拠点別の人数・俸禄集計も、同じ一覧を開いてタブ/ソートを切り替える間は不変なので1回だけ作ります。
+        if (!this.kyotenCastleBushoStatsMap) {
+            const statsMap = new Map();
+            if (this.game.bushos) {
+                this.game.bushos.forEach(b => {
+                    if (window.BushoStatusRules.isActive(b) && b.clan > 0) {
+                        if (!statsMap.has(b.castleId)) statsMap.set(b.castleId, { count: 0, salary: 0 });
+                        const stats = statsMap.get(b.castleId);
+                        stats.count++;
 
-        // ★超高速化：お城ごとの「武将の数」と「毎月の給料合計」を、事前に1回の計算で済ませて箱に入れておきます！
-        // （今まで：表示や並べ替えのたびに、毎回4000人の武将リストからお城の住人を探して計算していたので激重でした）
-        const castleBushoStatsMap = new Map();
-        if (this.game.bushos) {
-            this.game.bushos.forEach(b => {
-                if (window.BushoStatusRules.isActive(b) && b.clan > 0) {
-                    if (!castleBushoStatsMap.has(b.castleId)) {
-                        castleBushoStatsMap.set(b.castleId, { count: 0, salary: 0 });
-                    }
-                    const stats = castleBushoStatsMap.get(b.castleId);
-                    stats.count++;
-                    
-                    // 給料の計算もここで一緒にやってしまいます
-                    const clan = clanMap.get(b.clan);
-                    if (clan && clan.leaderId) {
-                        const daimyo = bushoMap.get(clan.leaderId);
-                        if (daimyo) {
-                            stats.salary += b.getSalary(daimyo);
+                        const clan = this.game.getClan(b.clan);
+                        if (clan && clan.leaderId) {
+                            const daimyo = this.game.getBusho(clan.leaderId);
+                            if (daimyo) stats.salary += b.getSalary(daimyo);
                         }
                     }
-                }
-            });
+                });
+            }
+            this.kyotenCastleBushoStatsMap = statsMap;
         }
-        // ==========================================
+        const castleBushoStatsMap = this.kyotenCastleBushoStatsMap;
 
         if (!this.currentKyotenTab) this.currentKyotenTab = 'status';
         if (!this.currentKyotenScope) this.currentKyotenScope = 'clan';
@@ -329,12 +310,12 @@ Object.assign(UIInfoManager.prototype, {
             if (this.currentKyotenScope === 'all') {
                 this.kyotenCastles = this.game.castles;
             } else {
-                this.kyotenCastles = this.game.castles.filter(c => c.ownerClan === this.kyotenTargetClanId);
+                this.kyotenCastles = this.game.getClanCastles(this.kyotenTargetClanId);
             }
 
             // ★選択モード（国主任命）の時だけ、選んではいけないお城（大名の居城や、すでに国主がいる城）を隠します！
             if (isSelectMode && selectData) {
-                const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+                const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
                 this.kyotenCastles = this.kyotenCastles.filter(c => {
                     if (daimyo && Number(c.id) === Number(daimyo.castleId)) return false;
                     const isCommanderCastle = this.game.bushos.some(b => Number(b.castleId) === Number(c.id) && b.isCommander && b.clan === this.game.playerClanId);
@@ -366,12 +347,12 @@ Object.assign(UIInfoManager.prototype, {
                     let valA = 0, valB = 0;
 
                     // ★高速化：早見表から一瞬で引き出します！
-                    const getClanYomi = (c) => { const cd = clanMap.get(c.ownerClan); return cd ? (cd.yomi || cd.name) : "んんん"; };
-                    const getClanName = (c) => { const cd = clanMap.get(c.ownerClan); return cd ? cd.name : ""; };
-                    const getCastellanYomi = (c) => { const cb = bushoMap.get(c.castellanId); return cb ? (cb.yomi || cb.name) : "んんん"; };
-                    const getCastellanName = (c) => { const cb = bushoMap.get(c.castellanId); return cb ? cb.name : ""; };
-                    const getProvinceYomi = (c) => { const p = provinceMap.get(c.provinceId); return p ? (p.provinceYomi || p.province) : "んんん"; };
-                    const getProvinceName = (c) => { const p = provinceMap.get(c.provinceId); return p ? p.province : ""; };
+                    const getClanYomi = (c) => { const cd = this.game.getClan(c.ownerClan); return cd ? (cd.yomi || cd.name) : "んんん"; };
+                    const getClanName = (c) => { const cd = this.game.getClan(c.ownerClan); return cd ? cd.name : ""; };
+                    const getCastellanYomi = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? (cb.yomi || cb.name) : "んんん"; };
+                    const getCastellanName = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? cb.name : ""; };
+                    const getProvinceYomi = (c) => { const p = this.game.getProvince(c.provinceId); return p ? (p.provinceYomi || p.province) : "んんん"; };
+                    const getProvinceName = (c) => { const p = this.game.getProvince(c.provinceId); return p ? p.province : ""; };
                     
                     // ★超高速化：事前に作った早見表（castleBushoStatsMap）から数や費用を取り出します！
                     const getBushoCount = (c) => { const stats = castleBushoStatsMap.get(c.id); return (c.ownerClan > 0 && stats) ? stats.count : 0; };
@@ -635,6 +616,7 @@ Object.assign(UIInfoManager.prototype, {
         this.closeCommonModal();
         this.kyotenSavedCastles = null;
         this.kyotenSavedSortedCastles = null;
+        this.kyotenCastleBushoStatsMap = null;
         this.kyotenLastSortStateKey = null;
         this.kyotenLastScope = null;
         // 拠点一覧（kyoten_list）を選択モードで呼び出します
@@ -652,14 +634,14 @@ Object.assign(UIInfoManager.prototype, {
     },
 
     _renderAllotFief(legionNo, scrollPos = 0) {
-        const daimyo = this.game.bushos.find(b => Number(b.clan) === Number(this.game.playerClanId) && b.isDaimyo);
+        const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
         const daimyoCastleId = daimyo ? Number(daimyo.castleId) : -1;
         
         const commanderCastleIds = [];
         if (this.game.legions) {
             this.game.legions.forEach(l => {
                 if (Number(l.clanId) === Number(this.game.playerClanId)) {
-                    const leader = this.game.bushos.find(b => Number(b.id) === Number(l.commanderId));
+                    const leader = this.game.getBusho(l.commanderId);
                     if (leader) {
                         commanderCastleIds.push(Number(leader.castleId));
                     }
