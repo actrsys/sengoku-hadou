@@ -2057,7 +2057,7 @@ Object.assign(UIManager.prototype, {
         const mapW = Number(this.game.mapWidth || 1200);
         const mapH = Number(this.game.mapHeight || 800);
 
-        const targetCastleIds = this.game.castles.filter(c => c.ownerClan === clanId).map(c => Number(c.id));
+        const targetCastleIds = this.game.getClanCastles(clanId).map(c => Number(c.id));
         const targetIdsSet = new Set(targetCastleIds);
         if (targetIdsSet.size === 0) {
             overlay.style.filter = 'none';

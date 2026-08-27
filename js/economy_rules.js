@@ -107,7 +107,7 @@ class EconomyRules {
         const myClanId = daimyo ? daimyo.clan : (castellan ? castellan.clan : 0);
         
         if (daimyo && game && game.castles) {
-            hasProdCastle = game.castles.some(c => c.ownerClan === daimyo.clan && this.isProdCastle(c, itemType, game.provinces));
+            hasProdCastle = game.getClanCastles(daimyo.clan).some(c => this.isProdCastle(c, itemType, game.provinces));
         } else if (castellan && game && game.castles) {
             const myCastle = game.getCastle(castellan.castleId);
             hasProdCastle = this.isProdCastle(myCastle, itemType, game.provinces);
@@ -124,7 +124,7 @@ class EconomyRules {
                 // 自分から見て相手を「支配」している場合
                 if (rel && rel.status === '支配') {
                     // その支配勢力が産地を持っているかチェック
-                    const vassalHasProd = game.castles.some(c => c.ownerClan === otherClan.id && this.isProdCastle(c, itemType, game.provinces));
+                    const vassalHasProd = game.getClanCastles(otherClan.id).some(c => this.isProdCastle(c, itemType, game.provinces));
                     if (vassalHasProd) {
                         hasVassalProdCastle = true;
                         break; // 1つでも見つかればOK
@@ -342,7 +342,7 @@ class EconomyRules {
     static calcPortBonus(castle, game) {
         let portBonus = 0;
         if (this.isPortCastle(castle) && game) {
-            const clanCastles = game.castles.filter(c => c.ownerClan === castle.ownerClan);
+            const clanCastles = game.getClanCastles(castle.ownerClan);
             const totalClanPopulation = clanCastles.reduce((sum, c) => sum + c.population, 0);
             portBonus = Math.floor((castle.population / 500) + (castle.peoplesLoyalty / 2) + (totalClanPopulation / 1000));
         }

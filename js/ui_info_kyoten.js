@@ -316,10 +316,18 @@ Object.assign(UIInfoManager.prototype, {
             // ★選択モード（国主任命）の時だけ、選んではいけないお城（大名の居城や、すでに国主がいる城）を隠します！
             if (isSelectMode && selectData) {
                 const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
+                // 旧条件は「自家所属かつisCommander」の所在地だけ。候補城ごとに全国武将をsomeせず、
+                // 同じ所属集合から1回だけ所在地Setを作ります（生死等の条件は旧処理にも無いため加えません）。
+                const commanderCastleIds = new Set();
+                this.game.bushos.forEach(b => {
+                    // 旧実装の厳密一致条件までそのまま維持し、候補城ごとの全武将someだけを除きます。
+                    if (b.isCommander && b.clan === this.game.playerClanId) {
+                        commanderCastleIds.add(Number(b.castleId));
+                    }
+                });
                 this.kyotenCastles = this.kyotenCastles.filter(c => {
                     if (daimyo && Number(c.id) === Number(daimyo.castleId)) return false;
-                    const isCommanderCastle = this.game.bushos.some(b => Number(b.castleId) === Number(c.id) && b.isCommander && b.clan === this.game.playerClanId);
-                    if (isCommanderCastle) return false;
+                    if (commanderCastleIds.has(Number(c.id))) return false;
                     return true;
                 });
                 this.selectedCastleIdForLegion = null; // リセットしておきます
@@ -637,13 +645,13 @@ Object.assign(UIInfoManager.prototype, {
         const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
         const daimyoCastleId = daimyo ? Number(daimyo.castleId) : -1;
         
-        const commanderCastleIds = [];
+        const commanderCastleIds = new Set();
         if (this.game.legions) {
             this.game.legions.forEach(l => {
                 if (Number(l.clanId) === Number(this.game.playerClanId)) {
                     const leader = this.game.getBusho(l.commanderId);
                     if (leader) {
-                        commanderCastleIds.push(Number(leader.castleId));
+                        commanderCastleIds.add(Number(leader.castleId));
                     }
                 }
             });
@@ -653,11 +661,10 @@ Object.assign(UIInfoManager.prototype, {
         const numberNames = ["直轄", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
         let legionName = numberNames[legionNo] || `第${legionNo}席`;
 
-        const myCastles = this.game.castles.filter(c => {
+        const myCastles = this.game.getClanCastles(this.game.playerClanId).filter(c => {
             const cId = Number(c.id);
-            if (Number(c.ownerClan) !== Number(this.game.playerClanId)) return false;
             if (cId === daimyoCastleId) return false;
-            if (commanderCastleIds.includes(cId)) return false;
+            if (commanderCastleIds.has(cId)) return false;
             return true;
         });
 

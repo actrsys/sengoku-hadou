@@ -1092,9 +1092,9 @@ class DiplomacyManager {
                 let isAlreadyAdjacent = false;
                 let willBeAdjacent = false;
                 
-                const helperCastles = this.game.castles.filter(c => c.ownerClan === helperForceId);
-                const enemyCastles = this.game.castles.filter(c => c.ownerClan === enemyClanId);
-                const myCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
+                const helperCastles = this.game.getClanCastles(helperForceId);
+                const enemyCastles = this.game.getClanCastles(enemyClanId);
+                const myCastles = this.game.getClanCastles(myClanId);
                 
                 // 初めから隣接しているかチェック
                 for (let hc of helperCastles) {
@@ -1259,7 +1259,7 @@ class DiplomacyManager {
         hostage.isHostage = false;
         hostage.originalClanId = undefined;
 
-        const friendlyCastles = this.game.castles.filter(c => Number(c.ownerClan) === originClanId);
+        const friendlyCastles = this.game.getClanCastles(originClanId);
         if (originClanId > 0 && friendlyCastles.length > 0) {
             const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
             // joinClan は人質受け渡し時の功績・派閥処理をもう一度発生させるため使わない。
@@ -2385,7 +2385,7 @@ class DiplomacyManager {
         const castleA = this.game.getCastle(castleId);
         if (!castleA) return;
 
-        const myCastles = this.game.castles.filter(c => c.ownerClan === subordinateClanId && c.id !== castleId);
+        const myCastles = this.game.getClanCastles(subordinateClanId).filter(c => c.id !== castleId);
         if (myCastles.length === 0) return;
 
         const myLegionCastles = myCastles.filter(c => c.legionId === castleA.legionId);
@@ -2567,17 +2567,17 @@ class DiplomacyManager {
         const daimyo = this.game.getClanDaimyo(subordinateClanId);
         if (daimyo) {
             const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-            const kinsmen = this.game.bushos.filter(b => {
-                if (b.clan !== subordinateClanId || b.isDaimyo || !window.BushoStatusRules.isActive(b)) return false;
+            const kinsmen = this.game.getClanBushos(subordinateClanId).filter(b => {
+                if (b.isDaimyo || !window.BushoStatusRules.isActive(b)) return false;
                 const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                 return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
             });
             if (kinsmen.length > 0) options.push({ type: 'hostage', busho: kinsmen[0] });
         }
 
-        const subCastles = this.game.castles.filter(c => Number(c.ownerClan) === subordinateClanId);
+        const subCastles = this.game.getClanCastles(subordinateClanId);
         if (subCastles.length >= 2) {
-            const domCastles = this.game.castles.filter(c => Number(c.ownerClan) === dominantClanId);
+            const domCastles = this.game.getClanCastles(dominantClanId);
             const targetCastle = subCastles.find(sc => {
                 const castellan = this.game.getBusho(sc.castellanId);
                 if (castellan && castellan.isDaimyo) return false;
@@ -3954,8 +3954,8 @@ class DiplomacyManager {
         // 人質。AI同士は一門が少ない家から自動で取り上げない既存の安全策を維持する。
         if (reqDaimyo) {
             const dFamily = Array.isArray(reqDaimyo.familyIds) ? reqDaimyo.familyIds : [];
-            const kinsmen = this.game.bushos.filter(b => {
-                if (Number(b.clan) !== Number(requestClanId) || b.isDaimyo || !window.BushoStatusRules.isActive(b)) return false;
+            const kinsmen = this.game.getClanBushos(requestClanId).filter(b => {
+                if (b.isDaimyo || !window.BushoStatusRules.isActive(b)) return false;
                 const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                 return bFamily.includes(reqDaimyo.id) || dFamily.includes(b.id);
             });
@@ -3965,10 +3965,10 @@ class DiplomacyManager {
         }
 
         // 城割譲。大名居城は除外し、相手領と接する境目の城だけを候補にする。
-        const reqCastles = this.game.castles.filter(c => Number(c.ownerClan) === Number(requestClanId));
+        const reqCastles = this.game.getClanCastles(requestClanId);
         if (reqCastles.length >= 2) {
             const reqDaimyoCastleId = reqDaimyo ? Number(reqDaimyo.castleId) : -1;
-            const tgtCastles = this.game.castles.filter(c => Number(c.ownerClan) === Number(targetClanId));
+            const tgtCastles = this.game.getClanCastles(targetClanId);
             const candidateCastles = reqCastles.filter(c => {
                 if (Number(c.id) === reqDaimyoCastleId) return false;
                 if (aiVsAi && Number(c.legionId || 0) !== 0) return false;

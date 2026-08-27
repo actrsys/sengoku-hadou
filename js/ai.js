@@ -457,7 +457,7 @@ class AIEngine {
         if (hasShogunCandidate) {
             // まだ持っていない二条城（ID: 26）と槇島城（ID: 90）を探します
             // すでに片方を持っていても、もう片方を狙うようになります
-            const unownedKyotoCastles = this.game.castles.filter(c => (c.id === 26 || c.id === 90) && c.ownerClan !== myClanId);
+            const unownedKyotoCastles = [this.game.getCastle(26), this.game.getCastle(90)].filter(c => c && c.ownerClan !== myClanId);
             
             if (unownedKyotoCastles.length > 0) {
                 // 距離を測るためのノートを作ります
@@ -1625,6 +1625,20 @@ class AIEngine {
             });
         }
         const isSrcHeavySnow = heavySnowProvIds.has(castle.provinceId);
+
+        // 装備産地の有無は、この城の内政行動ループ中に変わらない勢力所有地だけで決まります。
+        // 行動候補を作るたびに全国/自勢力拠点を再走査せず、1回だけ同じ答えを確定します。
+        const clanCastlesForEquipment = this.game.getClanCastles(castle.ownerClan);
+        const hasGunCastleAI = clanCastlesForEquipment.some(c => [33, 42, 185, 186].includes(c.id));
+        // 軍馬産地は旧実装が ownerClan の厳密一致で全国を見ていたため、候補集合は狭めません。
+        // 全件走査そのものを行動ループ外へ出し、旧条件をそのまま1回だけ評価します。
+        const hasHorseCastleAI = this.game.castles.some(c => {
+            if (c.ownerClan !== castle.ownerClan) return false;
+            if (c.id === 157) return true;
+            if ([15, 36, 61, 62, 63, 64, 68].includes(c.provinceId)) return true;
+            const prov = this.game.getProvince(c.provinceId);
+            return !!prov && (prov.regionId === 1 || prov.regionId === 3);
+        });
         
         // ③ 決められた回数だけ、行動を繰り返します！
         for (let step = 0; step < maxActions; step++) {
@@ -1746,25 +1760,12 @@ class AIEngine {
                 gunScore += (gunRatio * 5);
 
                 // ★変更：大名家が鉄砲産地の城（石山御坊:33、雑賀城:42、赤尾木城:185、今浜城:186）を1つでも持っているなら、鉄砲を少し優先して騎馬を控えます
-                // 先ほどと同じように、自分と同じ持ち主の城の中に鉄砲産地があるか探します
-                const hasGunCastleAI = this.game.castles.some(c => c.ownerClan === castle.ownerClan && [33, 42, 185, 186].includes(c.id));
                 if (hasGunCastleAI) {
                     gunScore += 3;
                     horseScore -= 3;
                 }
 
                 // ★追加：大名家が軍馬産地の城を持っているなら、軍馬を少し優先して鉄砲を控えます
-                const hasHorseCastleAI = this.game.castles.some(c => {
-                    if (c.ownerClan !== castle.ownerClan) return false;
-                    // ①拠点単位（日野江城）
-                    if (c.id === 157) return true;
-                    // ②国単位（常陸、淡路、肥後、日向、薩摩、大隅、対馬）
-                    if ([15, 36, 61, 62, 63, 64, 68].includes(c.provinceId)) return true;
-                    const prov = this.game.getProvince(c.provinceId);
-                    // ③地方単位（東北、甲信）
-                    if (prov && (prov.regionId === 1 || prov.regionId === 3)) return true;
-                    return false;
-                });
                 if (hasHorseCastleAI) {
                     horseScore += 3;
                     gunScore -= 3;

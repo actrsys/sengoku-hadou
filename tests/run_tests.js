@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r250');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r252');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -315,6 +315,7 @@ test('人質の脱走は実家所属まで復元し、拘束継続時は通常�
             clans, castles, bushos: [hostage], princesses: [],
             getClan(id) { return clans.find(c => Number(c.id) === Number(id)); },
             getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)); },
+            getClanCastles(id) { return this.castles.filter(c => Number(c.ownerClan) === Number(id)); },
             affiliationSystem: {
                 setClanIdRaw(b, id) { b.clan = Number(id) || 0; },
                 moveCastle(b, id) { b.castleId = Number(id) || 0; },
@@ -1364,7 +1365,9 @@ test('和睦条件の姫はAI同士で架空姫だけ、プレイヤーへの要
         getClan: id => clans.find(c => Number(c.id) === Number(id)) || null,
         getClanDaimyo: () => null,
         getBusho: id => Number(id) === targetBusho.id ? targetBusho : null,
-        getPrincess: id => [historical, generated].find(p => Number(p.id) === Number(id)) || null
+        getPrincess: id => [historical, generated].find(p => Number(p.id) === Number(id)) || null,
+        getClanCastles: id => game.castles.filter(c => Number(c.ownerClan) === Number(id)),
+        getClanBushos: id => game.bushos.filter(b => Number(b.clan) === Number(id))
     };
     const dm = new ctx.DiplomacyManager(game);
 
@@ -7880,7 +7883,8 @@ test('勢力別武将索引は所属versionだけで無効化し活動状態を�
     assert.ok(at >= 0);
     assert.ok(block.includes('const version = this.bushoAffiliationVersion || 0;'));
     assert.ok(block.includes('this._clanBushosVersion !== version'));
-    assert.ok(block.includes('const id = Number(busho.clan) || 0;'));
+    assert.ok(block.includes('const id = Number(busho.clan);'));
+    assert.ok(block.includes('if (!Number.isFinite(id)) continue;'));
     assert.ok(!block.includes('BushoStatusRules'));
     assert.ok(!block.includes('LifeStatusRules'));
     const gunshiAt = game.indexOf('getClanGunshi(clanId)');
@@ -7939,7 +7943,9 @@ test('国・地方の拠点探索は静的地理索引を共用し変動状態�
     assert.ok(block.includes('const provinceMap = new Map();'));
     assert.ok(block.includes('const regionCastleMap = new Map();'));
     assert.ok(block.includes('const regionProvinceMap = new Map();'));
-    assert.ok(block.includes('const provinceId = Number(castle.provinceId) || 0;'));
+    assert.ok(block.includes('const provinceId = Number(castle.provinceId);'));
+    assert.ok(block.includes('if (!Number.isFinite(provinceId)) continue;'));
+    assert.ok(block.includes('if (!provinceRegionMap.has(provinceId)) continue;'));
     assert.ok(!block.includes('ownerClan'));
     assert.ok(!block.includes('soldiers'));
     assert.ok(game.includes('getProvinceCastles(provinceId)'));
@@ -7999,6 +8005,149 @@ test('登用候補は全国武将走査ではなく自領拠点の在城者だ�
     assert.ok(block.includes('this.game.getCastleBushos(ownedCastle.id)'));
     assert.ok(block.includes('BushoStatusRules.isRonin(b)'));
     assert.ok(!block.includes('this.game.bushos.filter'));
+});
+
+
+test('限定索引は旧全件走査と同じ候補集合・順序を返し未知IDを0へ混ぜない', () => {
+    const ctx = createContext({ addEventListener() {} });
+    vm.runInContext(`${read('js/game.js')}\nwindow.__GameManager = GameManager;`, ctx, { filename: 'js/game.js' });
+    const game = Object.create(ctx.__GameManager.prototype);
+    game.castleOwnershipVersion = 0;
+    game.bushoAffiliationVersion = 0;
+    game.provinces = [
+        { id: 0, regionId: 0, province: '仮国' },
+        { id: 1, regionId: 10, province: '甲' },
+        { id: 2, regionId: 10, province: '乙' },
+        { id: 3, regionId: 20, province: '丙' },
+        { id: 'bad', regionId: 0, province: '不正国' }
+    ];
+    game.castles = [
+        { id: 1, ownerClan: 1, provinceId: 1 },
+        { id: 2, ownerClan: '2', provinceId: 2 },
+        { id: 3, ownerClan: 1, provinceId: 3 },
+        { id: 4, ownerClan: 0, provinceId: 0 },
+        { id: 5, ownerClan: 'bad', provinceId: 999 },
+        { id: 6, ownerClan: 2, provinceId: 'bad' }
+    ];
+    game.bushos = [
+        { id: 11, clan: 1 },
+        { id: 12, clan: '2' },
+        { id: 13, clan: 1 },
+        { id: 14, clan: 0 },
+        { id: 15, clan: 'bad' }
+    ];
+
+    const ids = arr => Array.from(arr, x => Number(x.id));
+    const validNum = value => Number.isFinite(Number(value)) ? Number(value) : null;
+
+    for (const clanId of [0, 1, 2, 99]) {
+        const expectedBushos = game.bushos.filter(b => validNum(b.clan) === clanId);
+        const expectedCastles = game.castles.filter(c => validNum(c.ownerClan) === clanId);
+        assert.deepStrictEqual(ids(game.getClanBushos(clanId)), ids(expectedBushos), `clan bushos ${clanId}`);
+        assert.deepStrictEqual(ids(game.getClanCastles(clanId)), ids(expectedCastles), `clan castles ${clanId}`);
+    }
+    assert.deepStrictEqual(ids(game.getClanBushos(0)), [14], '不正所属をclan 0へ混ぜない');
+    assert.deepStrictEqual(ids(game.getClanCastles(0)), [4], '不正ownerClanを0へ混ぜない');
+
+    for (const provinceId of [0, 1, 2, 3, 999]) {
+        const expected = game.castles.filter(c => validNum(c.provinceId) === provinceId);
+        assert.deepStrictEqual(ids(game.getProvinceCastles(provinceId)), ids(expected), `province castles ${provinceId}`);
+    }
+    for (const regionId of [0, 10, 20, 99]) {
+        const expectedProvinces = game.provinces.filter(p => validNum(p.regionId) === regionId && validNum(p.id) !== null);
+        const expectedCastles = game.castles.filter(c => {
+            const pid = validNum(c.provinceId);
+            if (pid === null) return false;
+            const prov = game.provinces.find(p => validNum(p.id) === pid && validNum(p.id) !== null);
+            return !!prov && validNum(prov.regionId) === regionId;
+        });
+        assert.deepStrictEqual(ids(game.getRegionProvinces(regionId)), ids(expectedProvinces), `region provinces ${regionId}`);
+        assert.deepStrictEqual(ids(game.getRegionCastles(regionId)), ids(expectedCastles), `region castles ${regionId}`);
+    }
+    assert.deepStrictEqual(ids(game.getRegionCastles(0)), [4], '未知provinceIdの城をregion 0へ混ぜない');
+    assert.deepStrictEqual(ids(game.getRegionCastles(undefined)), [], '未指定地方を0扱いしない');
+
+    // 配列への追加はversion更新がなくてもサイズ差で再構築し、候補漏れを起こさない。
+    game.castles.push({ id: 7, ownerClan: 1, provinceId: 1 });
+    assert.deepStrictEqual(ids(game.getClanCastles(1)), [1, 3, 7]);
+    assert.deepStrictEqual(ids(game.getProvinceCastles(1)), [1, 7]);
+
+    // 所有・所属変更は各versionで再構築し、旧候補を残さない。
+    game.castles[0].ownerClan = 2;
+    game.castleOwnershipVersion++;
+    assert.deepStrictEqual(ids(game.getClanCastles(1)), [3, 7]);
+    assert.deepStrictEqual(ids(game.getClanCastles(2)), [1, 2, 6]);
+    game.bushos[0].clan = 2;
+    game.bushoAffiliationVersion++;
+    assert.deepStrictEqual(ids(game.getClanBushos(1)), [13]);
+    assert.deepStrictEqual(ids(game.getClanBushos(2)), [11, 12]);
+});
+
+test('読み取り専用の勢力城探索だけをgetClanCastlesへ寄せ、所有変更中の処理は一括置換しない', () => {
+    const diplomacy = read('js/diplomacy.js');
+    const war = read('js/war.js');
+    const ui = read('js/ui.js');
+    const map = read('js/ui_map.js');
+    const economy = read('js/economy_rules.js');
+    const life = read('js/life_system.js');
+    const castleManager = read('js/castle_manager.js');
+
+    assert.ok(diplomacy.includes('const helperCastles = this.game.getClanCastles(helperForceId);'));
+    assert.ok(diplomacy.includes('const reqCastles = this.game.getClanCastles(requestClanId);'));
+    assert.ok(diplomacy.includes('const kinsmen = this.game.getClanBushos(requestClanId).filter'));
+    assert.ok(war.includes('this.game.getClanCastles(s.defender.ownerClan).some'));
+    assert.ok(ui.includes('this.game.getClanCastles(s.defender.ownerClan).some'));
+    assert.ok(map.includes('this.game.getClanCastles(clanId).map(c => Number(c.id))'));
+    assert.ok(economy.includes('game.getClanCastles(daimyo.clan).some'));
+    assert.ok(economy.includes('const clanCastles = game.getClanCastles(castle.ownerClan);'));
+    assert.ok(life.includes('const clanCastles = this.game.getClanCastles(p.originalClanId);'));
+    const ai = read('js/ai.js');
+    const command = read('js/command_system.js');
+    assert.ok(ai.includes('[this.game.getCastle(26), this.game.getCastle(90)].filter'));
+    assert.ok(command.includes('const targetCastles = candidateCastles || this.game.getClanCastles(this.game.playerClanId);'));
+    assert.ok(command.includes('const numSelectedIds = new Set(selectedCastleIds.map'));
+    assert.ok(command.includes('numSelectedIds.has(Number(realCastle.id))'));
+
+    // CastleManagerは所有者を変更しながら残存城を判定する責務なので、機械的に全件索引へ置換しない。
+    assert.ok(castleManager.includes('this.game.castles.filter(c => Number(c.ownerClan) === oldOwnerId'));
+});
+
+
+test('高頻度の候補探索は同値な所有集合を1回だけ共用し、旧条件を狭めすぎない', () => {
+    const command = read('js/command_system.js');
+    const start = command.indexOf('getValidTargets(type)');
+    const end = command.indexOf('\n    //', start + 1);
+    const block = command.slice(start, end > start ? end : start + 12000);
+    assert.ok((block.match(/const playerClanCastles = this\.game\.getClanCastles\(playerClanId\);/g) || []).length >= 3);
+    assert.ok(block.includes('return playerClanCastles.some(myCastle =>'));
+    assert.ok(block.includes('return playerClanCastles.filter(target =>'));
+    assert.ok(block.includes('const targetClanCastles = this.game.getClanCastles(target.ownerClan);'));
+    assert.ok(!block.includes('const myCastles = this.game.castles.filter(myC => Number(myC.ownerClan) === playerClanId);'));
+
+    const kyoten = read('js/ui_info_kyoten.js');
+    const selectStart = kyoten.indexOf('// ★選択モード（国主任命）');
+    const selectBlock = kyoten.slice(selectStart, selectStart + 1800);
+    assert.ok(selectBlock.includes('const commanderCastleIds = new Set();'));
+    assert.ok(selectBlock.includes('this.game.bushos.forEach(b =>'));
+    assert.ok(selectBlock.includes('b.isCommander && b.clan === this.game.playerClanId'));
+    assert.ok(!selectBlock.includes('getClanBushos(this.game.playerClanId)'));
+});
+
+test('AI内政の装備産地判定は行動ループ外で一度だけ計算し旧候補条件を維持する', () => {
+    const ai = read('js/ai.js');
+    const fnStart = ai.indexOf('async execInternalAffairs');
+    const loopStart = ai.indexOf('for (let step = 0; step < maxActions; step++)', fnStart);
+    assert.ok(fnStart >= 0 && loopStart > fnStart);
+    const beforeLoop = ai.slice(fnStart, loopStart);
+    const loopBlock = ai.slice(loopStart, ai.indexOf('\n    }\n', loopStart) + 7);
+
+    assert.ok(beforeLoop.includes('const clanCastlesForEquipment = this.game.getClanCastles(castle.ownerClan);'));
+    assert.ok(beforeLoop.includes('const hasGunCastleAI = clanCastlesForEquipment.some'));
+    // 旧実装はownerClanの厳密一致で全国を見ていたため、その候補条件は狭めず1回だけ評価する。
+    assert.ok(beforeLoop.includes('const hasHorseCastleAI = this.game.castles.some(c => {'));
+    assert.ok(beforeLoop.includes('if (c.ownerClan !== castle.ownerClan) return false;'));
+    assert.ok(!loopBlock.includes('const hasGunCastleAI ='));
+    assert.ok(!loopBlock.includes('const hasHorseCastleAI ='));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

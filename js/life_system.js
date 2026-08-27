@@ -637,7 +637,7 @@ class LifeSystem {
             
             // ★お父さんが設定されていない、またはお父さんが死んだり浪人していて大名家が見つからなかった場合！
             if (targetClanId === 0 && p.originalClanId > 0) {
-                const clanCastles = this.game.castles.filter(c => c.ownerClan === p.originalClanId);
+                const clanCastles = this.game.getClanCastles(p.originalClanId);
                 // その大名家が滅亡していなければ（お城を持っていれば）
                 if (clanCastles.length > 0) {
                     targetClanId = p.originalClanId;

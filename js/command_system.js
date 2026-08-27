@@ -513,18 +513,17 @@ class CommandSystem {
 
         const c = this.game.getCurrentTurnCastle();
         const playerClanId = Number(this.game.playerClanId);
-        
         switch (targetType) {
             case 'enemy_valid': {
                 // warManagerからの基本リストを取得
                 const baseTargets = this.game.warManager.getValidWarTargets(c);
+                const playerClanCastles = this.game.getClanCastles(playerClanId);
                 // ★追加：自領と直接隣接している（同盟国などを通らない）城だけに出陣可能にします
                 return baseTargets.filter(targetId => {
                     const targetCastle = this.game.getCastle(targetId);
                     if (!targetCastle) return false;
-                    return this.game.castles.some(myCastle =>
-                        Number(myCastle.ownerClan) === playerClanId
-                        && MapGraphService.isAdjacent(targetCastle, myCastle)
+                    return playerClanCastles.some(myCastle =>
+                        MapGraphService.isAdjacent(targetCastle, myCastle)
                     );
                 });
             }
@@ -537,8 +536,9 @@ class CommandSystem {
             case 'ally_other': {
                 // ★修正：同盟・支配・従属を通って繋がっている領土をまとめて取得します！
                 const connectedForAlly = this.getConnectedCastlesForMove(c, playerClanId);
-                return this.game.castles.filter(target => {
-                    if (Number(target.ownerClan) !== playerClanId || target.id === c.id) return false;
+                const playerClanCastles = this.game.getClanCastles(playerClanId);
+                return playerClanCastles.filter(target => {
+                    if (target.id === c.id) return false;
                     
                     // ★追加：大雪の国の城は移動・輸送先に選べないようにします！
                     const tgtProv = this.game.getProvince(target.provinceId);
@@ -550,7 +550,9 @@ class CommandSystem {
                 }).map(t => t.id);
             }
             
-            case 'other_clan_all':
+            case 'other_clan_all': {
+                // 自領という候補集合はこの1回の判定中は不変。各候補勢力ごとに全国拠点を再検索しません。
+                const playerClanCastles = this.game.getClanCastles(playerClanId);
                 return this.game.castles.filter(target => {
                     if (target.ownerClan === 0 || Number(target.ownerClan) === playerClanId) return false;
 
@@ -565,9 +567,8 @@ class CommandSystem {
                     
                     // ★追加：降伏勧告と従属願と臣従願は、自領と接している勢力に限定します！
                     if (type === 'dominate' || type === 'subordinate' || type === 'vassalage') {
-                        const myCastles = this.game.castles.filter(myC => Number(myC.ownerClan) === playerClanId);
-                        const targetClanCastles = this.game.castles.filter(other => Number(other.ownerClan) === Number(target.ownerClan));
-                        const isAdjacent = myCastles.some(myCastle =>
+                        const targetClanCastles = this.game.getClanCastles(target.ownerClan);
+                        const isAdjacent = playerClanCastles.some(myCastle =>
                             targetClanCastles.some(otherCastle => MapGraphService.isAdjacent(myCastle, otherCastle))
                         );
                         if (!isAdjacent) return false;
@@ -594,6 +595,7 @@ class CommandSystem {
 
                     return daimyo && Number(daimyo.castleId) === Number(target.id);
                 }).map(t => t.id);
+            }
                 
             case 'kuko_target_b':
                 return this.game.castles.filter(target => {
@@ -2106,13 +2108,14 @@ class CommandSystem {
         const legion = this.game.legions ? this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === Number(legionNo)) : null;
         
         // どんな形でIDが送られてきても、確実に「数字」として取り出せるようにする安全装置です
-        const numSelectedIds = selectedCastleIds.map(item => {
+        const numSelectedIds = new Set(selectedCastleIds.map(item => {
             if (typeof item === 'object' && item !== null) return Number(item.id);
             return Number(item);
-        });
+        }));
 
-        // 候補リストが空っぽで送られてきた場合の保険として、自分の全てのお城を対象にします
-        const targetCastles = candidateCastles || this.game.castles.filter(c => Number(c.ownerClan) === Number(this.game.playerClanId));
+        // 候補リストが空っぽで送られてきた場合の保険として、自分の全てのお城を対象にします。
+        // ownerClan一致だけが旧条件なので、同値な勢力別所有城索引を使います。
+        const targetCastles = candidateCastles || this.game.getClanCastles(this.game.playerClanId);
         
         targetCastles.forEach(c => {
             // ★ここが一番重要です！画面用の「コピー」ではなく、ゲーム本体の「本物のお城データ」を直接引っ張り出して書き換えます
@@ -2120,7 +2123,7 @@ class CommandSystem {
             if (!realCastle) return;
 
             const isCommanderCastle = legion && Number(realCastle.castellanId) === Number(legion.commanderId);
-            const isSelected = numSelectedIds.includes(Number(realCastle.id)) || isCommanderCastle;
+            const isSelected = numSelectedIds.has(Number(realCastle.id)) || isCommanderCastle;
 
             if (isSelected) {
                 if (Number(realCastle.legionId) !== Number(legionNo)) {

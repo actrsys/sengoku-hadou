@@ -195,6 +195,7 @@ class GameManager {
         this._clanBushosVersion = -1;
         this._clanCastlesMap = null;
         this._clanCastlesSource = null;
+        this._clanCastlesSize = -1;
         this._clanCastlesVersion = -1;
 
         this._provinceCastlesMap = null;
@@ -614,8 +615,10 @@ class GameManager {
         const provinceRegionMap = new Map();
 
         for (const province of provinces) {
-            const provinceId = Number(province.id) || 0;
-            const regionId = Number(province.regionId) || 0;
+            const provinceId = Number(province.id);
+            const regionId = Number(province.regionId);
+            // 不正IDを0へ丸めると旧filter/findより候補が広がるため、索引へ混ぜない。
+            if (!Number.isFinite(provinceId) || !Number.isFinite(regionId)) continue;
             provinceRegionMap.set(provinceId, regionId);
             let regionProvinces = regionProvinceMap.get(regionId);
             if (!regionProvinces) {
@@ -626,7 +629,8 @@ class GameManager {
         }
 
         for (const castle of castles) {
-            const provinceId = Number(castle.provinceId) || 0;
+            const provinceId = Number(castle.provinceId);
+            if (!Number.isFinite(provinceId)) continue;
             let provinceCastles = provinceMap.get(provinceId);
             if (!provinceCastles) {
                 provinceCastles = [];
@@ -634,7 +638,11 @@ class GameManager {
             }
             provinceCastles.push(castle);
 
-            const regionId = provinceRegionMap.get(provinceId) || 0;
+            // 旧ロジックは「対応する国データが存在し、そのregionIdが一致する城」だけを
+            // 地方候補にしていた。未知provinceIdをregion 0へ丸めると候補が広がるため、
+            // 国が見つからない城は地方索引へ入れない。
+            if (!provinceRegionMap.has(provinceId)) continue;
+            const regionId = provinceRegionMap.get(provinceId);
             let regionCastles = regionCastleMap.get(regionId);
             if (!regionCastles) {
                 regionCastles = [];
@@ -653,15 +661,18 @@ class GameManager {
     }
     getProvinceCastles(provinceId) {
         this._ensureTerritoryStaticIndexes();
-        return this._provinceCastlesMap.get(Number(provinceId) || 0) || [];
+        const numericProvinceId = Number(provinceId);
+        return Number.isFinite(numericProvinceId) ? (this._provinceCastlesMap.get(numericProvinceId) || []) : [];
     }
     getRegionProvinces(regionId) {
         this._ensureTerritoryStaticIndexes();
-        return this._regionProvincesMap.get(Number(regionId) || 0) || [];
+        const numericRegionId = Number(regionId);
+        return Number.isFinite(numericRegionId) ? (this._regionProvincesMap.get(numericRegionId) || []) : [];
     }
     getRegionCastles(regionId) {
         this._ensureTerritoryStaticIndexes();
-        return this._regionCastlesMap.get(Number(regionId) || 0) || [];
+        const numericRegionId = Number(regionId);
+        return Number.isFinite(numericRegionId) ? (this._regionCastlesMap.get(numericRegionId) || []) : [];
     }
     // 勢力所属は AffiliationSystem が唯一の書換窓口なので、所属変更versionを使って
     // 「勢力ID→所属武将配列」を安全に共有します。活動中/死亡などの状態は変動するため
@@ -673,7 +684,9 @@ class GameManager {
             || this._clanBushosVersion !== version) {
             this._clanBushosMap = new Map();
             for (const busho of this.bushos) {
-                const id = Number(busho.clan) || 0;
+                const id = Number(busho.clan);
+                // 不正な所属値を clan 0 へ丸めると浪人候補を広げるため、旧Number比較同様に除外する。
+                if (!Number.isFinite(id)) continue;
                 let members = this._clanBushosMap.get(id);
                 if (!members) {
                     members = [];
@@ -685,7 +698,8 @@ class GameManager {
             this._clanBushosSize = this.bushos.length;
             this._clanBushosVersion = version;
         }
-        return this._clanBushosMap.get(Number(clanId) || 0) || [];
+        const numericClanId = Number(clanId);
+        return Number.isFinite(numericClanId) ? (this._clanBushosMap.get(numericClanId) || []) : [];
     }
     // ★高速化：「勢力ID→大名武将」を一瞬で取り出します（毎回全武将から探す代わりに、勢力が覚えているIDを使います）
     getClanDaimyo(clanId) {
@@ -704,16 +718,29 @@ class GameManager {
     // castle_manager.js と affiliation_system.js 側で this.castleOwnershipVersion を1つ増やしてもらいます。
     getClanCastles(clanId) {
         const version = this.castleOwnershipVersion || 0;
-        if (this._clanCastlesSource !== this.castles || this._clanCastlesVersion !== version) {
+        const castles = this.castles || [];
+        if (this._clanCastlesSource !== castles
+            || this._clanCastlesSize !== castles.length
+            || this._clanCastlesVersion !== version) {
             this._clanCastlesMap = new Map();
-            this.castles.forEach(c => {
-                if (!this._clanCastlesMap.has(c.ownerClan)) this._clanCastlesMap.set(c.ownerClan, []);
-                this._clanCastlesMap.get(c.ownerClan).push(c);
-            });
-            this._clanCastlesSource = this.castles;
+            for (const castle of castles) {
+                const ownerClanId = Number(castle.ownerClan);
+                // ownerClanはモデル上numberだが、復元境界の文字列数値も旧Number比較と同じ集合へ入れる。
+                // NaN等の不正値を「0」に丸めると浪人/無所属城へ候補が広がるので索引しない。
+                if (!Number.isFinite(ownerClanId)) continue;
+                let owned = this._clanCastlesMap.get(ownerClanId);
+                if (!owned) {
+                    owned = [];
+                    this._clanCastlesMap.set(ownerClanId, owned);
+                }
+                owned.push(castle);
+            }
+            this._clanCastlesSource = castles;
+            this._clanCastlesSize = castles.length;
             this._clanCastlesVersion = version;
         }
-        return this._clanCastlesMap.get(Number(clanId)) || [];
+        const numericClanId = Number(clanId);
+        return Number.isFinite(numericClanId) ? (this._clanCastlesMap.get(numericClanId) || []) : [];
     }
     // ★ 修正：まだ生まれていない人（unborn）や亡くなった人（dead）は無視するようにします。
     // map→filter の二重配列を作らず、一度の走査で必要な人物だけ返します。

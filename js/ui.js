@@ -3599,7 +3599,7 @@ class UIManager {
             options.push({ label: "撤退", type: "retreat", desc: "戦場から離脱し、自領へと退却します。" });
         } else if (s.turn === 'defender') {
             // ★修正：中立の空き城（ownerClanが0）の守備軍は、撤退できないようにガードを追加します！
-            if (s.defender.ownerClan !== 0 && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && MapGraphService.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
+            if (s.defender.ownerClan !== 0 && this.game.getClanCastles(s.defender.ownerClan).some(c => c.id !== s.defender.id && MapGraphService.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
                 options.push({ label: "撤退", type: "retreat", desc: "拠点を捨てて、近隣の安全な拠点へ退却します。" });
             }
         } else {
