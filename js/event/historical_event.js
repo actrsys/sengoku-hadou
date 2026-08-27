@@ -1644,10 +1644,10 @@ window.GameEvents.push({
         const nobunaga = game.getBusho(1006006);
         const inabayama = game.getCastle(3);
         const kiyosu = game.getCastle(7); // ★追加：清洲城のデータも準備します
-        const odaClanId = nobunaga.clan;
 
         // 万が一データがない場合のエラーを防ぎます
-        if (!nobunaga || !inabayama || !kiyosu) return; 
+        if (!nobunaga || !inabayama || !kiyosu) return;
+        const odaClanId = nobunaga.clan;
 
         // 名前が変わってしまう前に、「現在の武将の名前」と「現在のお城の名前」をメモしておきます！
         const nobunagaName = nobunaga.fullName;
@@ -1786,10 +1786,10 @@ window.GameEvents.push({
         const motoyasu = game.getBusho(1301006);
         const hikuma = game.getCastle(12);
         const okazaki = game.getCastle(48);
-        const matsudairaClanId = motoyasu.clan;
 
         // 万が一データがない場合のエラーを防ぎます
-        if (!motoyasu || !hikuma || !okazaki) return; 
+        if (!motoyasu || !hikuma || !okazaki) return;
+        const matsudairaClanId = motoyasu.clan;
 
         // Round23: 改称イベントの舞台である曳馬城（ID12）へ、イベント表示前にカメラを寄せます。
         if (game.ui && typeof game.ui.focusMapOnCastle === 'function') {
@@ -3032,8 +3032,8 @@ window.GameEvents.push({
     execute: async function(game) {
         const yoshitsugu = game.getBusho(1020014);
         const hisahide = game.getBusho(1202002);
+        if (!yoshitsugu || !hisahide) return;
         const castle = game.getCastle(hisahide.castleId);
-
         if (!castle) return;
 
         // ★独立させる直前に、三好家に所属する松永系（1202000～1202999）の武将の忠誠度を15下げます
@@ -3874,8 +3874,8 @@ window.GameEvents.push({
     execute: async function(game) {
         const munekage = game.getBusho(1044005);
         const naoie = game.getBusho(1210003);
+        if (!munekage || !naoie) return;
         const castle = game.getCastle(naoie.castleId);
-
         if (!castle) return;
 
         // ★謀反を起こす直前に、浦上家に所属する宇喜多系（1210000～1210999）の武将の忠誠度を15下げます

@@ -260,7 +260,17 @@ class EventManager {
                 continue;
             }
 
-            if (ev.checkCondition(this.game, context)) {
+            let matched = false;
+            try {
+                matched = !!ev.checkCondition(this.game, context);
+            } catch (error) {
+                // 常駐イベント・面談イベントと同じく、1イベントの条件判定失敗で
+                // 月初/月末や戦闘進行そのものを止めない。
+                console.warn(`イベント ${ev.id} の条件判定中にエラーが出ましたが、進行を継続します:`, error);
+                continue;
+            }
+
+            if (matched) {
 
                 // 「try〜catch」という安全装置で魔法を実行します
                 try {

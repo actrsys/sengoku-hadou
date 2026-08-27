@@ -447,34 +447,41 @@ class DataManager {
         const img = await this.loadImageElement(url);
         if (!img) return null;
 
-        const width = img.naturalWidth || img.width;
-        const height = img.naturalHeight || img.height;
-        if (!width || !height) return null;
+        let canvas = null;
+        try {
+            const width = img.naturalWidth || img.width;
+            const height = img.naturalHeight || img.height;
+            if (!width || !height) return null;
 
-        const isPC = document.body && document.body.classList.contains('is-pc');
-        // 古いスマホは一時RGBAと連続CPU時間を抑え、PCはyield回数を減らします。
-        const stripHeightBase = isPC ? 128 : 32;
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = Math.min(stripHeightBase, height);
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (!ctx) return null;
+            const isPC = document.body && document.body.classList.contains('is-pc');
+            // 古いスマホは一時RGBAと連続CPU時間を抑え、PCはyield回数を減らします。
+            const stripHeightBase = isPC ? 128 : 32;
+            canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = Math.min(stripHeightBase, height);
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            if (!ctx) return null;
 
-        for (let yStart = 0; yStart < height; yStart += stripHeightBase) {
-            const stripHeight = Math.min(stripHeightBase, height - yStart);
-            ctx.clearRect(0, 0, width, canvas.height);
-            ctx.drawImage(img, 0, yStart, width, stripHeight, 0, 0, width, stripHeight);
-            let imageData = ctx.getImageData(0, 0, width, stripHeight);
-            await onStrip(imageData.data, width, stripHeight, yStart, height);
-            imageData = null;
-            if (onProgress) onProgress((yStart + stripHeight) / height);
+            for (let yStart = 0; yStart < height; yStart += stripHeightBase) {
+                const stripHeight = Math.min(stripHeightBase, height - yStart);
+                ctx.clearRect(0, 0, width, canvas.height);
+                ctx.drawImage(img, 0, yStart, width, stripHeight, 0, 0, width, stripHeight);
+                let imageData = ctx.getImageData(0, 0, width, stripHeight);
+                await onStrip(imageData.data, width, stripHeight, yStart, height);
+                imageData = null;
+                if (onProgress) onProgress((yStart + stripHeight) / height);
+                await this.yieldToBrowser();
+            }
+
+            return { width, height };
+        } finally {
+            // getContext / drawImage / getImageData / onStrip の失敗時も巨大資源を解放する。
+            if (canvas) {
+                try { canvas.width = 1; canvas.height = 1; } catch (ignore) {}
+            }
+            try { img.src = ''; } catch (ignore) {}
             await this.yieldToBrowser();
         }
-
-        try { canvas.width = 1; canvas.height = 1; } catch (e) {}
-        try { img.src = ''; } catch (e) {}
-        await this.yieldToBrowser();
-        return { width, height };
     }
 
     // 城色画像は各領域を塗った画像ではなく、各城の位置を示す数ピクセルの種点画像です。

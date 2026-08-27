@@ -1744,13 +1744,11 @@ class LifeSystem {
             if (clanId === this.game.playerClanId) {
                 // 滅亡状態の印をつけます
                 clan.isDestroyed = true;
-                return new Promise(resolve => {
-                    setTimeout(async () => {
-                        // ★修正：ゲームオーバーの処理を EndingSystem に任せます！
-                        await this.game.endingSystem.processGameOver("全拠点を失いました。我が大名家は滅亡しました……");
-                        resolve();
-                    }, 1000);
-                });
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                // ★修正：ゲームオーバーの処理を EndingSystem に任せます！
+                // async setTimeout callbackにせず、例外は通常のawait経路へ返して待機Promiseを残さない。
+                await this.game.endingSystem.processGameOver("全拠点を失いました。我が大名家は滅亡しました……");
+                return;
             } else {
                 // プレイヤー以外の滅亡時、大名が生きていれば浪人にします
                 const leader = this.game.getBusho(clan.leaderId);

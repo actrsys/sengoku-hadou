@@ -1930,8 +1930,8 @@ Object.assign(UIManager.prototype, {
             return;
         }
         const ctx = overlay.getContext('2d');
-        // PCでは再利用するため中身だけ消します。
-        ctx.clearRect(0, 0, overlay.width, overlay.height);
+        // PCでは再利用するため中身だけ消します。context喪失時は次回描画へ任せます。
+        if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
         overlay.classList.remove('anim-map-glow');
     },
 
@@ -2127,7 +2127,7 @@ Object.assign(UIManager.prototype, {
         overlay.classList.remove('anim-map-glow', 'anim-map-glow-fast');
         
         const ctx = overlay.getContext('2d');
-        ctx.clearRect(0, 0, overlay.width, overlay.height);
+        if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
     },
 
     // 駆虎呑狼の計などで、1つ目の勢力をキープして光らせる魔法
@@ -2302,6 +2302,11 @@ Object.assign(UIManager.prototype, {
         maskCanvas.width = width;
         maskCanvas.height = height;
         const maskCtx = maskCanvas.getContext('2d');
+        if (!maskCtx) {
+            // 低メモリ等で2D contextを確保できない時は演出を省略し、巨大Canvasを残さない。
+            try { maskCanvas.width = 1; maskCanvas.height = 1; } catch (ignore) {}
+            return null;
+        }
         const maskData = maskCtx.createImageData(width, height);
 
         for (let i = 0; i < targetPixels.length; i++) {
@@ -2391,6 +2396,12 @@ Object.assign(UIManager.prototype, {
 
             const overlay = this._createCroppedEffectOverlay('battle-blink-overlay', maskInfo, 6);
             const ctx = overlay.getContext('2d');
+            if (!ctx) {
+                this._releaseEffectOverlay(overlay, maskInfo);
+                this.hideMapGuard();
+                resolve();
+                return;
+            }
             const width = overlay.width;
             const height = overlay.height;
 
@@ -2414,9 +2425,10 @@ Object.assign(UIManager.prototype, {
             const blinkInterval = 250;
             let lastSwitchTime = startTime;
 
-            paintColor(colorA_RGB);
-
+            let finished = false;
             const finish = () => {
+                if (finished) return;
+                finished = true;
                 this._releaseEffectOverlay(overlay, maskInfo);
                 this.hideMapGuard();
                 if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
@@ -2426,19 +2438,34 @@ Object.assign(UIManager.prototype, {
                 resolve();
             };
 
+            try {
+                paintColor(colorA_RGB);
+            } catch (error) {
+                console.warn('戦闘点滅Canvasの描画を省略しました:', error);
+                finish();
+                return;
+            }
+
             const animate = (currentTime) => {
-                if (currentTime - startTime > durationMs) {
+                if (finished) return;
+                try {
+                    if (currentTime - startTime > durationMs) {
+                        finish();
+                        return;
+                    }
+
+                    if (currentTime - lastSwitchTime > blinkInterval) {
+                        isA = !isA;
+                        lastSwitchTime = currentTime;
+                        paintColor(isA ? colorA_RGB : colorB_RGB);
+                    }
+
+                    requestAnimationFrame(animate);
+                } catch (error) {
+                    // context喪失等で演出だけ失敗しても戦争進行を止めない。
+                    console.warn('戦闘点滅Canvasの描画を途中で終了しました:', error);
                     finish();
-                    return;
                 }
-
-                if (currentTime - lastSwitchTime > blinkInterval) {
-                    isA = !isA;
-                    lastSwitchTime = currentTime;
-                    paintColor(isA ? colorA_RGB : colorB_RGB);
-                }
-
-                requestAnimationFrame(animate);
             };
 
             requestAnimationFrame(animate);
@@ -2458,15 +2485,19 @@ Object.assign(UIManager.prototype, {
         if (options.focus !== false && !usesLockedBattleCamera) {
             await this.focusMapOnCastle(castleIdOrIds, { transition: options.transition || 'smooth', reason: options.reason || 'capture_effect', anchor: 'territory' });
         }
-        return new Promise(resolve => {
+        return new Promise((resolve, reject) => {
             this.showMapGuard();
 
             // Round7: こちらも対象城周辺だけに限定します。
             const maskInfo = this._buildCastleEffectMask(castleIdOrIds, 0, 24);
             if (!maskInfo) {
-                if (typeof onHalfway === 'function') onHalfway();
                 this.hideMapGuard();
-                resolve();
+                try {
+                    if (typeof onHalfway === 'function') onHalfway();
+                    resolve();
+                } catch (error) {
+                    reject(error);
+                }
                 return;
             }
 
@@ -2474,6 +2505,39 @@ Object.assign(UIManager.prototype, {
             const ctx = overlay.getContext('2d');
             const width = overlay.width;
             const height = overlay.height;
+
+            let halfwayDone = false;
+            let finished = false;
+            const runHalfway = () => {
+                if (halfwayDone) return;
+                halfwayDone = true;
+                if (typeof onHalfway === 'function') onHalfway();
+            };
+            const finish = () => {
+                if (finished) return;
+                finished = true;
+                this._releaseEffectOverlay(overlay, maskInfo);
+                this.hideMapGuard();
+                resolve();
+            };
+            const fail = (error) => {
+                if (finished) return;
+                finished = true;
+                this._releaseEffectOverlay(overlay, maskInfo);
+                this.hideMapGuard();
+                reject(error);
+            };
+
+            if (!ctx) {
+                // 所有変更などの本処理は演出より重要。演出だけ省略して中間処理を実行する。
+                try {
+                    runHalfway();
+                    finish();
+                } catch (error) {
+                    fail(error);
+                }
+                return;
+            }
 
             overlay.style.filter = 'drop-shadow(0px 0px 15px rgba(255, 255, 255, 1)) blur(3px)';
 
@@ -2492,33 +2556,37 @@ Object.assign(UIManager.prototype, {
             const durationRise = 800;
             const durationFlash = 600;
             const totalDuration = durationRise + durationFlash;
-            let halfwayDone = false;
-
-            const finish = () => {
-                this._releaseEffectOverlay(overlay, maskInfo);
-                this.hideMapGuard();
-                resolve();
-            };
 
             const animate = (currentTime) => {
-                const elapsed = currentTime - startTime;
+                if (finished) return;
+                try {
+                    const elapsed = currentTime - startTime;
 
-                if (elapsed < durationRise) {
-                    const progress = elapsed / durationRise;
-                    drawWhiteMask(progress * 0.9);
-                } else if (elapsed < totalDuration) {
-                    if (!halfwayDone) {
-                        halfwayDone = true;
-                        if (typeof onHalfway === 'function') onHalfway();
+                    if (elapsed < durationRise) {
+                        const progress = elapsed / durationRise;
+                        drawWhiteMask(progress * 0.9);
+                    } else if (elapsed < totalDuration) {
+                        runHalfway();
+                        const progress = (elapsed - durationRise) / durationFlash;
+                        drawWhiteMask(1.0 - progress);
                     }
-                    const progress = (elapsed - durationRise) / durationFlash;
-                    drawWhiteMask(1.0 - progress);
-                }
 
-                if (elapsed < totalDuration) {
-                    requestAnimationFrame(animate);
-                } else {
-                    finish();
+                    if (elapsed < totalDuration) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        runHalfway();
+                        finish();
+                    }
+                } catch (error) {
+                    // Canvasだけ失敗した場合は所有変更等の中間処理を落とさず演出を終了する。
+                    try {
+                        runHalfway();
+                        console.warn('制圧Canvasの描画を途中で終了しました:', error);
+                        finish();
+                    } catch (halfwayError) {
+                        // 本処理自体の例外は隠さず、資源を解放して呼び出し元へ返す。
+                        fail(halfwayError);
+                    }
                 }
             };
 

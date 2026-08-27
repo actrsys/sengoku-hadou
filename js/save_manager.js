@@ -311,36 +311,32 @@ class SaveManager {
     // ★追加：セーブデータ用の勢力図画像を生成する魔法（修正版）
     // ==========================================
     async generateSaveMapImage() {
-        return new Promise(async (resolve) => {
-            const w = this.game.mapWidth || 1200;
-            const h = this.game.mapHeight || 800;
-            const scale = 0.25;
-            const thumbW = Math.max(1, Math.round(w * scale));
-            const thumbH = Math.max(1, Math.round(h * scale));
+        const w = this.game.mapWidth || 1200;
+        const h = this.game.mapHeight || 800;
+        const scale = 0.25;
+        const thumbW = Math.max(1, Math.round(w * scale));
+        const thumbH = Math.max(1, Math.round(h * scale));
 
-            // サムネイルのためだけに3140x2440の白地図とCanvasを確保しない。
-            // 1/4サイズの専用画像へ、勢力色Canvasを直接縮小合成します。
-            const loadImg = (src) => new Promise(res => {
-                const img = new Image();
-                img.decoding = 'async';
-                img.onload = () => res(img);
-                img.onerror = () => res(null);
-                img.src = src;
-            });
-            const whiteMapImg = await loadImg('./data/images/map/japan_white_map_thumb.png');
-            if (!whiteMapImg) {
-                resolve(null);
-                return;
-            }
+        // サムネイルのためだけに3140x2440の白地図とCanvasを確保しない。
+        // 1/4サイズの専用画像へ、勢力色Canvasを直接縮小合成します。
+        const loadImg = (src) => new Promise(res => {
+            const img = new Image();
+            img.decoding = 'async';
+            img.onload = () => res(img);
+            img.onerror = () => res(null);
+            img.src = src;
+        });
+        const whiteMapImg = await loadImg('./data/images/map/japan_white_map_thumb.png');
+        if (!whiteMapImg) return null;
 
-            const thumbCanvas = document.createElement('canvas');
+        let thumbCanvas = null;
+        try {
+            thumbCanvas = document.createElement('canvas');
             thumbCanvas.width = thumbW;
             thumbCanvas.height = thumbH;
             const thumbCtx = thumbCanvas.getContext('2d');
-            if (!thumbCtx) {
-                resolve(null);
-                return;
-            }
+            if (!thumbCtx) return null;
+
             thumbCtx.imageSmoothingEnabled = true;
             thumbCtx.imageSmoothingQuality = 'medium';
             thumbCtx.drawImage(whiteMapImg, 0, 0, thumbW, thumbH);
@@ -350,19 +346,19 @@ class SaveManager {
                 thumbCtx.drawImage(clanColorOverlay, 0, 0, thumbW, thumbH);
             }
 
-            try {
-                const dataUrl = thumbCanvas.toDataURL('image/jpeg', 0.6);
-                // 参照とbacking storeを早めに小さくして、古いWebViewのGC待ちを減らします。
-                thumbCanvas.width = 1;
-                thumbCanvas.height = 1;
-                try { whiteMapImg.src = ''; } catch (e) {}
-                resolve(dataUrl);
-            } catch (e) {
-                console.warn("セキュリティ制限により、セーブ用画像の生成をスキップしました:", e);
+            return thumbCanvas.toDataURL('image/jpeg', 0.6);
+        } catch (e) {
+            // 画像デコード・Canvas生成・drawImage・toDataURLのどこで失敗しても、
+            // セーブ全体を待機状態にせずサムネイルなしで継続します。
+            console.warn('セーブ用勢力図画像の生成をスキップしました:', e);
+            return null;
+        } finally {
+            // 失敗経路を含め、低メモリ端末で画像/Canvas backing storeを保持しない。
+            if (thumbCanvas) {
                 try { thumbCanvas.width = 1; thumbCanvas.height = 1; } catch (ignore) {}
-                resolve(null);
             }
-        });
+            try { whiteMapImg.src = ''; } catch (ignore) {}
+        }
     }
     
     // どんな方法でロードした時も、この魔法で「受け取ったデータ」をゲーム内に展開します

@@ -245,6 +245,18 @@ class TurnManager {
         }
     
         const castle = game.turnQueue[game.currentIndex]; 
+
+        // turnQueue は通常Castleだけで構成されますが、復元失敗や将来の処理変更で
+        // 欠損要素が混じっても、isDone参照より先に安全に飛ばします。
+        if (!castle) {
+            console.warn('ターン列に存在しない拠点が含まれていたため、安全にスキップしました。');
+            if (game.isProcessingAI && game.ui) {
+                game.ui.updateAIProgress(game.currentIndex + 1, game.turnQueue.length);
+            }
+            game.currentIndex++;
+            setTimeout(() => game.processTurn(), 0);
+            return;
+        }
         
         if (castle.isDone) {
             // ★ここを書き足し：行動済みの城をスキップする時も、一瞬だけ数字を進めます！
@@ -258,7 +270,7 @@ class TurnManager {
             return;
         }
         
-        if(!castle || castle.ownerClan === 0 || !game.getClan(castle.ownerClan)) { 
+        if(castle.ownerClan === 0 || !game.getClan(castle.ownerClan)) { 
             console.log(`空き城またはデータのない城をスキップしました。`);
             // ★ここを書き足し：空城をスキップする時も、一瞬だけ数字を進めます！
             if (game.isProcessingAI && game.ui) {

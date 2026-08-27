@@ -329,3 +329,14 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - 通常の引抜・臣従・勢力吸収では、既婚武将の妻の `currentClanId` と各家の `princessIds` を夫の新所属へ同期し、外交婚姻 `isMarriage` は姫の実家と夫の現在所属から `DiplomacyManager.refreshMarriageRelation()` で再評価する。人質は妻同行自体の仕様が別途未確定のため、現行挙動を維持し外交婚姻の自動張替え対象外とする。
 - 平和的な臣従・勢力吸収で旧家が消える場合、夫への追従で移動しない未婚姫も吸収先へ移し、滅亡済み大名家の `currentClanId` / `princessIds` に取り残さない。
 - 独立・謀反の婚姻は通常移籍とは別ルールであり、`DiplomacyManager.reorganizeRelationsAfterRebellion()` を正本とする。独立参加者は旧派閥・承認欲求だけ破棄し、妻・外交婚姻を通常移籍ルールで自動追従させない。
+
+
+## 例外境界と一時資源の解放（r257）
+- 月初・月末・戦闘等の通常イベントも、常駐イベント・面談イベントと同様に `checkCondition()` の例外をイベント1件の失敗として隔離する。条件判定1件の欠損で月進行全体を停止させない。イベント本体の責務不備を隠すためではなく、ログを残して他イベントと進行を継続する最後の安全境界とする。
+- `turnQueue` の要素は通常Castleであるが、復元失敗等の異常系で欠損してもプロパティ参照前に検査する。安全判定を置く場合は、その判定より先に対象へアクセスしない。
+- 画像解析・サムネイル生成など一時的にCanvas/Image backing storeを持つ処理は、成功時だけでなく `getContext` / `drawImage` / `getImageData` / callback失敗時も `finally` 相当の境界で参照とbacking storeを解放する。
+- `new Promise(async (...) => ...)` は使わない。async executor内の例外が外側Promiseへ伝播せず待機が終わらない構造を避け、`async` 関数自身のPromiseを正本とする。
+- 回帰テストランナーはPromiseを返すテストを完了まで待ってから成功/失敗を集計する。非同期処理を未完了のまま成功扱いしない。
+
+- 地図演出用Canvasは表示上の補助であり、2D context確保・描画が失敗しても戦争・所有変更の本処理を待機させない。点滅は省略して完了し、制圧演出は `onHalfway` の状態変更を一度だけ保証したうえで資源とmap guardを解放する。本処理コールバック自身の例外は隠さず呼び出し元へ返す。
+- `setTimeout(async () => ...)` の完了を外側Promiseの `resolve()` に依存させない。遅延が必要なら先にdelay Promiseを `await` し、その後の非同期処理は通常のawait例外経路へ載せる。

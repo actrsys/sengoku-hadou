@@ -11,16 +11,30 @@ const ROOT = path.resolve(__dirname, '..');
 
 let passed = 0;
 let failed = 0;
+const pendingTests = [];
+
+function _recordTestFailure(name, error) {
+    failed++;
+    console.error(`✗ ${name}`);
+    console.error(error && error.stack ? error.stack : error);
+}
 
 function test(name, fn) {
     try {
-        fn();
+        const result = fn();
+        if (result && typeof result.then === 'function') {
+            pendingTests.push(Promise.resolve(result).then(() => {
+                passed++;
+                console.log(`✓ ${name}`);
+            }).catch(error => {
+                _recordTestFailure(name, error);
+            }));
+            return;
+        }
         passed++;
         console.log(`✓ ${name}`);
     } catch (error) {
-        failed++;
-        console.error(`✗ ${name}`);
-        console.error(error && error.stack ? error.stack : error);
+        _recordTestFailure(name, error);
     }
 }
 
@@ -88,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r256');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r257');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -8361,6 +8375,150 @@ test('スマホ固定HUDは同じ年月・相場HTMLを毎回再生成しない'
     assert.ok(block.includes('if (this.mobileBottomInfo && this.mobileBottomInfo.innerHTML)'));
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+
+
+test('TurnManagerはturnQueue欠損をisDone参照より先に処理する', () => {
+    const source = read('js/turn_manager.js');
+    const at = source.indexOf('const castle = game.turnQueue[game.currentIndex]');
+    const block = source.slice(at, at + 1700);
+    assert.ok(block.indexOf('if (!castle)') >= 0);
+    assert.ok(block.indexOf('if (!castle)') < block.indexOf('if (castle.isDone)'));
+    assert.ok(!block.includes('if(!castle || castle.ownerClan'));
+});
+
+test('通常イベントも条件判定例外を局所隔離して進行を継続する', () => {
+    const source = read('js/event_manager.js');
+    const at = source.indexOf('async processEvents(timing, context = null)');
+    const block = source.slice(at, at + 7000);
+    assert.ok(block.includes('matched = !!ev.checkCondition(this.game, context);'));
+    assert.ok(block.includes('条件判定中にエラーが出ましたが、進行を継続します'));
+    assert.ok(block.includes('continue;'));
+});
+
+test('セーブ用勢力図生成はasync Promise executorを使わず失敗時も必ず資源解放する', () => {
+    const source = read('js/save_manager.js');
+    const at = source.indexOf('async generateSaveMapImage()');
+    const block = source.slice(at, at + 3600);
+    assert.ok(!block.includes('new Promise(async'));
+    assert.ok(block.includes('finally {'));
+    assert.ok(block.includes("whiteMapImg.src = ''"));
+    assert.ok(block.includes('thumbCanvas.width = 1'));
+});
+
+test('地図画像帯解析は成功・失敗の全経路でImageとCanvasを解放する', () => {
+    const source = read('js/data_manager.js');
+    const at = source.indexOf('static async scanImageByStrips');
+    const block = source.slice(at, at + 3600);
+    assert.ok(block.includes('finally {'));
+    assert.ok(block.includes("img.src = ''"));
+    assert.ok(block.includes('canvas.width = 1'));
+});
+
+
+test('通常イベントの条件判定が例外でも後続イベントを実行できる', async () => {
+    const quietConsole = { ...console, warn() {} };
+    const ctx = createContext({ console: quietConsole });
+    let executed = 0;
+    ctx.window.GameEvents = [
+        { id: 'broken_condition', timing: 'startMonth_before', checkCondition() { throw new Error('broken'); }, execute: async () => {} },
+        { id: 'healthy_event', timing: 'startMonth_before', checkCondition: () => true, execute: async () => { executed += 1; } }
+    ];
+    ctx.window.UserSettings = { historicalEvent: true };
+    loadScript(ctx, 'js/event_manager.js');
+    const EventManager = vm.runInContext('EventManager', ctx);
+    const manager = new EventManager({ flags: {}, writeSystemDiagnostic() {} });
+    await manager.processEvents('startMonth_before');
+    assert.strictEqual(executed, 1);
+});
+
+test('セーブ用勢力図の描画例外は待機を残さずnullで完了しImageを解放する', async () => {
+    let lastImage = null;
+    class FakeImage {
+        constructor() { this.decoding = ''; this.onload = null; this.onerror = null; this._src = ''; lastImage = this; }
+        set src(value) { this._src = value; if (value && this.onload) this.onload(); }
+        get src() { return this._src; }
+    }
+    const ctx = createContext({
+        console: { ...console, warn() {} },
+        Image: FakeImage,
+        document: {
+            createElement() { return { width: 0, height: 0, getContext() { return { drawImage() { throw new Error('draw failed'); } }; } }; },
+            getElementById() { return null; }
+        }
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    const SaveManager = vm.runInContext('SaveManager', ctx);
+    const result = await new SaveManager({ mapWidth: 1200, mapHeight: 800 }).generateSaveMapImage();
+    assert.strictEqual(result, null);
+    assert.strictEqual(lastImage.src, '');
+});
+
+test('帯状地図解析はCanvas context取得失敗でも読み込みImageを解放する', async () => {
+    const img = { naturalWidth: 100, naturalHeight: 100, width: 100, height: 100, src: 'map.png' };
+    const ctx = createContext({
+        document: {
+            body: { classList: { contains: () => false } },
+            createElement() { return { width: 0, height: 0, getContext: () => null }; }
+        }
+    });
+    ctx.window.MainParams = { StartYear: 1560, StartMonth: 4, System: { UseRandomNames: false } };
+    loadScript(ctx, 'js/data_manager.js');
+    const DataManager = vm.runInContext('DataManager', ctx);
+    DataManager.loadImageElement = async () => img;
+    DataManager.yieldToBrowser = async () => {};
+    const result = await DataManager.scanImageByStrips('dummy.png', async () => {});
+    assert.strictEqual(result, null);
+    assert.strictEqual(img.src, '');
+});
+
+test('歴史イベントexecuteの欠損ガードは対象プロパティ参照より先に置く', () => {
+    const source = read('js/event/historical_event.js');
+    const gifuAt = source.indexOf('id: "historical_rename_gifu_castle"');
+    const gifuExecAt = source.indexOf('execute: async function(game)', gifuAt);
+    const gifu = source.slice(gifuExecAt, gifuExecAt + 2500);
+    assert.ok(gifu.indexOf('if (!nobunaga || !inabayama || !kiyosu) return;') < gifu.indexOf('const odaClanId = nobunaga.clan;'));
+    const hamamatsuAt = source.indexOf('id: "historical_rename_hamamatsu_castle"');
+    const hamamatsuExecAt = source.indexOf('execute: async function(game)', hamamatsuAt);
+    const hamamatsu = source.slice(hamamatsuExecAt, hamamatsuExecAt + 2200);
+    assert.ok(hamamatsu.indexOf('if (!motoyasu || !hikuma || !okazaki) return;') < hamamatsu.indexOf('const matsudairaClanId = motoyasu.clan;'));
+});
+
+
+test('地図演出Canvasはcontext喪失時もmap guardと資源を残さず本処理を進める', () => {
+    const source = read('js/ui_map.js');
+    const maskAt = source.indexOf('_buildCastleEffectMask(');
+    const maskBlock = source.slice(maskAt, maskAt + 5200);
+    assert.ok(maskBlock.includes('if (!maskCtx)'));
+    assert.ok(maskBlock.includes('maskCanvas.width = 1'));
+
+    const blinkAt = source.indexOf('async playBattleBlink(');
+    const blinkBlock = source.slice(blinkAt, blinkAt + 6500);
+    assert.ok(blinkBlock.includes('if (!ctx)'));
+    assert.ok(blinkBlock.includes('this._releaseEffectOverlay(overlay, maskInfo);'));
+    assert.ok(blinkBlock.includes('this.hideMapGuard();'));
+
+    const captureAt = source.indexOf('async playCaptureEffect(');
+    const captureBlock = source.slice(captureAt, captureAt + 7600);
+    assert.ok(captureBlock.includes('const runHalfway = () =>'));
+    assert.ok(captureBlock.includes('if (!ctx)'));
+    assert.ok(captureBlock.includes('runHalfway();'));
+    assert.ok(captureBlock.includes('const fail = (error) =>'));
+});
+
+test('プレイヤー滅亡の遅延処理はasync setTimeout callbackで未解決Promiseを作らない', () => {
+    const source = read('js/life_system.js');
+    const needle = '全拠点を失いました。我が大名家は滅亡しました';
+    const at = source.indexOf(needle);
+    const block = source.slice(Math.max(0, at - 800), at + 500);
+    assert.ok(block.includes('await new Promise(resolve => setTimeout(resolve, 1000));'));
+    assert.ok(!block.includes('setTimeout(async'));
+});
+Promise.all(pendingTests).then(() => {
+    console.log(`\n${passed} passed, ${failed} failed`);
+    if (failed > 0) process.exit(1);
+}).catch(error => {
+    _recordTestFailure('非同期テストランナー', error);
+    console.log(`\n${passed} passed, ${failed} failed`);
+    process.exit(1);
+});
 
