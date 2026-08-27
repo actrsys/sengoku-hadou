@@ -186,7 +186,7 @@ window.GameEvents.push({
         // 7月・8月の台風は被害国に凶作を付与
         if (game.month === 7 || game.month === 8) {
             damagedProvinceMap.forEach((scale, pId) => {
-                const p = game.provinces.find(prov => prov.id === pId);
+                const p = game.getProvince(pId);
                 if (p) {
                     if (!p.statusEffects) p.statusEffects = [];
                     if (!p.statusEffects.includes('badHarvest')) p.statusEffects.push('badHarvest');

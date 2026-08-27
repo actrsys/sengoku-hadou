@@ -575,13 +575,13 @@ window.GameEvents.push({
         let owariProvinceShort = "尾張";
         
         if (game.provinces) {
-            const pSuruga = game.provinces.find(prov => prov.id === 20);
+            const pSuruga = game.getProvince(20);
             if (pSuruga) surugaProvinceShort = pSuruga.shortName;
-            const pToutoumi = game.provinces.find(prov => prov.id === 21);
+            const pToutoumi = game.getProvince(21);
             if (pToutoumi) toutoumiProvinceShort = pToutoumi.shortName;
-            const pMikawa = game.provinces.find(prov => prov.id === 22);
+            const pMikawa = game.getProvince(22);
             if (pMikawa) mikawaProvinceShort = pMikawa.shortName;
-            const pOwari = game.provinces.find(prov => prov.id === 23);
+            const pOwari = game.getProvince(23);
             if (pOwari) {
                 owariProvinceName = pOwari.province;
                 owariProvinceShort = pOwari.shortName;
@@ -1075,7 +1075,7 @@ window.GameEvents.push({
         // ★追加：三河国の名前を取得します
         let mikawaProvinceShort = "三河";
         if (game.provinces) {
-            const pMikawa = game.provinces.find(prov => prov.id === 22);
+            const pMikawa = game.getProvince(22);
             if (pMikawa) mikawaProvinceShort = pMikawa.shortName;
         }
 
@@ -2444,7 +2444,7 @@ window.GameEvents.push({
         if (nobunagaDaimyo.castleId) {
             const c = game.getCastle(nobunagaDaimyo.castleId);
             if (c) {
-                const p = game.provinces.find(prov => prov.id === c.provinceId);
+                const p = game.getProvince(c.provinceId);
                 if (p) nobunagaProvinceName = p.shortName;
             }
         }
@@ -2459,7 +2459,7 @@ window.GameEvents.push({
             const c = game.getCastle(asakuraDaimyo.castleId);
             if (c) {
                 asakuraCastleName = c.name;
-                const p = game.provinces.find(prov => prov.id === c.provinceId);
+                const p = game.getProvince(c.provinceId);
                 if (p) asakuraProvinceName = p.shortName;
             }
         }
@@ -2629,7 +2629,7 @@ window.GameEvents.push({
         if (game.aiOperationManager && typeof game.aiOperationManager.setGrandObjectiveToAllLegions === 'function') {
             // 山城国（ID: 30）などの近畿地方の地方IDを取得します
             let kinkiRegionId = 5; // 見つからなかった時のための基本の数字です
-            const yamashiro = game.provinces.find(p => p.id === 30);
+            const yamashiro = game.getProvince(30);
             if (yamashiro && yamashiro.regionId) {
                 kinkiRegionId = yamashiro.regionId;
             } else {

@@ -31,7 +31,7 @@ class UISliderManager {
         const c = this.ui.currentCastle;
 
         // ★Round12：input中に同じ武将やDOMを全件検索しないため、この画面を開いた時に一度だけ保持します。
-        const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
+        const daimyo = this.game.getClanDaimyo(c.ownerClan);
         const castellan = this.game.getBusho(c.castellanId);
         let inputs = {};
         const sliderRefs = new Map();
@@ -741,7 +741,7 @@ class UISliderManager {
         };
         
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
-        const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const myDaimyo = this.game.getClanDaimyo(this.game.playerClanId);
 
         bushos.forEach((b, index) => {
             const div = document.createElement('div');

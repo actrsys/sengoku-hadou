@@ -258,7 +258,7 @@ class TurnManager {
             return;
         }
         
-        if(!castle || castle.ownerClan === 0 || !game.clans.find(c => Number(c.id) === Number(castle.ownerClan))) { 
+        if(!castle || castle.ownerClan === 0 || !game.getClan(castle.ownerClan)) { 
             console.log(`空き城またはデータのない城をスキップしました。`);
             // ★ここを書き足し：空城をスキップする時も、一瞬だけ数字を進めます！
             if (game.isProcessingAI && game.ui) {

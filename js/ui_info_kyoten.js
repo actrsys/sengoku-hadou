@@ -707,7 +707,7 @@ Object.assign(UIInfoManager.prototype, {
 
             let provinceName = "不明";
             if (this.game.provinces) {
-                const province = this.game.provinces.find(p => p.id === c.provinceId);
+                const province = this.game.getProvince(c.provinceId);
                 if (province) provinceName = province.province;
             }
 

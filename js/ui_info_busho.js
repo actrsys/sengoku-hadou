@@ -176,7 +176,7 @@ Object.assign(UIInfoManager.prototype, {
 
         let salary = "";
         if (busho.clan > 0 && !busho.isDaimyo && !window.BushoStatusRules.isRonin(busho)) {
-            const clan = this.game.clans.find(c => c.id === busho.clan);
+            const clan = this.game.getClan(busho.clan);
             const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
             salary = busho.getSalary(daimyo);
             if (salary === 0) salary = "";
@@ -211,12 +211,12 @@ Object.assign(UIInfoManager.prototype, {
                     const commander = this.game.getBusho(legion.commanderId);
                     lordName = commander ? commander.name : "不明";
                 } else {
-                    const clan = this.game.clans.find(c => c.id === busho.clan);
+                    const clan = this.game.getClan(busho.clan);
                     const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
                     lordName = daimyo ? daimyo.name : "なし";
                 }
             } else {
-                const clan = this.game.clans.find(c => c.id === busho.clan);
+                const clan = this.game.getClan(busho.clan);
                 const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
                 lordName = daimyo ? daimyo.name : "なし";
             }

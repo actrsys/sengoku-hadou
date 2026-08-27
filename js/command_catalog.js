@@ -74,10 +74,10 @@ const COMMAND_MENU_STRUCTURE = [
 const CAN_EXECUTE_RULES = {
     // --- 人事用 ---
     hasActiveBushoExceptDaimyo: (game) => {
-        return game.bushos.some(b => b.clan === game.playerClanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo);
+        return game.getClanBushos(game.playerClanId).some(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo);
     },
     hasActiveBushoExceptDaimyoAndCastellan: (game) => {
-        return game.bushos.some(b => b.clan === game.playerClanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.isCommander && !b.isCastellan);
+        return game.getClanBushos(game.playerClanId).some(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.isCommander && !b.isCastellan);
     },
     hasEmployableRonin: (game) => {
         return game.bushos.some(b => {
@@ -87,14 +87,13 @@ const CAN_EXECUTE_RULES = {
         });
     },
     canManageLegion: (game, legionNumber) => {
-        const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(game.playerClanId));
+        const myCastles = game.getClanCastles(game.playerClanId);
         if (myCastles.length <= 1) return false;
         if (game.legions) {
             const hasLegion = game.legions.some(l => Number(l.clanId) === Number(game.playerClanId) && Number(l.legionNo) === legionNumber && Number(l.commanderId) > 0);
             if (hasLegion) return false;
         }
-        const hasCandidate = game.bushos.some(b =>
-            Number(b.clan) === Number(game.playerClanId) &&
+        const hasCandidate = game.getClanBushos(game.playerClanId).some(b =>
             window.BushoStatusRules.isActive(b) &&
             !b.isDaimyo &&
             !b.isCommander
@@ -109,7 +108,7 @@ const CAN_EXECUTE_RULES = {
     },
     // 所領分配用の判定ルール（国主が存在する時だけ押せるようにします）
     canAllotFief: (game, legionNumber) => {
-        const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(game.playerClanId));
+        const myCastles = game.getClanCastles(game.playerClanId);
         if (myCastles.length <= 1) return false;
         if (game.legions) {
             const hasLegion = game.legions.some(l => Number(l.clanId) === Number(game.playerClanId) && Number(l.legionNo) === legionNumber && Number(l.commanderId) > 0);
@@ -118,13 +117,13 @@ const CAN_EXECUTE_RULES = {
         return false;
     },
     hasSuccessor: (game) => {
-        const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
+        const daimyo = game.getClanDaimyo(game.playerClanId);
         if (!daimyo) return false;
         const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-        return game.bushos.some(b => {
+        return game.getClanBushos(game.playerClanId).some(b => {
             // active（登場済み）または unborn（元服前）を対象にする
             // 隠居状態（isRetired）は除外する
-            if (b.clan !== game.playerClanId || b.isDaimyo || b.isRetired) return false;
+            if (b.isDaimyo || b.isRetired) return false;
             if (!window.BushoStatusRules.isActive(b) && !window.LifeStatusRules.isUnborn(b)) return false;
             
             // unborn の中でも「出生前」フラグが立っている場合は除外する
@@ -139,11 +138,11 @@ const CAN_EXECUTE_RULES = {
         if (CAN_EXECUTE_RULES.hasSuccessor(game)) return false;
 
         // 条件②：養子にできる武将（自勢力で活動中、大名ではなく、15歳以上若い）が1人以上いること
-        const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
+        const daimyo = game.getClanDaimyo(game.playerClanId);
         if (!daimyo) return false;
         
-        return game.bushos.some(b => {
-            if (b.clan !== game.playerClanId || !window.BushoStatusRules.isActive(b) || b.isDaimyo) return false;
+        return game.getClanBushos(game.playerClanId).some(b => {
+            if (!window.BushoStatusRules.isActive(b) || b.isDaimyo) return false;
             return b.birthYear >= daimyo.birthYear + 15;
         });
     },
@@ -165,9 +164,9 @@ const CAN_EXECUTE_RULES = {
         return castle.gold >= 200;
     },
     hasUnmarriedPrincess: (game) => {
-        const myClan = game.clans.find(c => c.id === game.playerClanId);
+        const myClan = game.getClan(game.playerClanId);
         return myClan && myClan.princessIds && myClan.princessIds.some(pId => {
-            const p = game.princesses.find(princess => princess.id === pId);
+            const p = game.getPrincess(pId);
             return p && p.status === 'unmarried';
         });
     },
@@ -190,20 +189,20 @@ const CAN_EXECUTE_RULES = {
     canSubordinate: (game, castle) => {
         const myClanId = game.playerClanId;
         // 条件①：未婚の一門の姫がいるか
-        const myClan = game.clans.find(c => c.id === myClanId);
+        const myClan = game.getClan(myClanId);
         const hasPrincess = myClan && myClan.princessIds && myClan.princessIds.some(pId => {
-            const p = game.princesses.find(princess => princess.id === pId);
+            const p = game.getPrincess(pId);
             return p && p.status === 'unmarried';
         });
         if (hasPrincess) return true;
 
         // 条件②：大名以外の一門武将がいるか
-        const daimyo = game.bushos.find(b => b.clan === myClanId && b.isDaimyo);
+        const daimyo = game.getClanDaimyo(myClanId);
         let hasKinsman = false;
         if (daimyo) {
             const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-            hasKinsman = game.bushos.some(b => {
-                if (b.clan !== myClanId || b.isDaimyo || !window.BushoStatusRules.isActive(b)) return false;
+            hasKinsman = game.getClanBushos(myClanId).some(b => {
+                if (b.isDaimyo || !window.BushoStatusRules.isActive(b)) return false;
                 const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                 return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
             });
@@ -211,14 +210,14 @@ const CAN_EXECUTE_RULES = {
         if (hasKinsman) return true;
 
         // 条件③：城を２つ以上持っているか
-        const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(myClanId));
+        const myCastles = game.getClanCastles(myClanId);
         if (myCastles.length >= 2) return true;
 
         return false;
     },
     // --- 移動・輸送用 ---
     canMoveOrTransport: (game, castle) => {
-        const province = game.provinces.find(p => p.id === castle.provinceId);
+        const province = game.getProvince(castle.provinceId);
         if (province && province.statusEffects && province.statusEffects.includes('heavySnow')) {
             return false;
         }
@@ -240,7 +239,7 @@ const CAN_EXECUTE_RULES = {
         return castle.rice >= 1 && (castle.tradeLimit || 0) > 0;
     },
     canBuyHorses: (game, castle) => {
-        const daimyo = game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
+        const daimyo = game.getClanDaimyo(castle.ownerClan);
         const castellan = game.getBusho(castle.castellanId);
         const cost = EconomyRules.calcBuyHorseCost(1, daimyo, castellan, game);
         return castle.gold >= cost;
@@ -249,7 +248,7 @@ const CAN_EXECUTE_RULES = {
         // ★追加：1542年以前は鉄砲伝来前なので買えません！
         if (game.year <= 1542) return false;
         
-        const daimyo = game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
+        const daimyo = game.getClanDaimyo(castle.ownerClan);
         const castellan = game.getBusho(castle.castellanId);
         const cost = EconomyRules.calcBuyGunCost(1, daimyo, castellan, game);
         return castle.gold >= cost;
@@ -262,24 +261,24 @@ const CAN_EXECUTE_RULES = {
         
         // 条件②：お隣さんの大名家の中に、自家の「5倍以上」の威信を持つ大名家があるかチェックします
         const myClanId = game.playerClanId;
-        const myClan = game.clans.find(c => c.id === myClanId);
+        const myClan = game.getClan(myClanId);
         if (!myClan) return false;
         
         const myPrestige = myClan.daimyoPrestige;
-        const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(myClanId));
+        const myCastles = game.getClanCastles(myClanId);
         
         return myCastles.some(myCastle => game.castles.some(adjacentCastle => {
             if (!MapGraphService.isAdjacent(myCastle, adjacentCastle)) return false;
             const targetClanId = Number(adjacentCastle.ownerClan) || 0;
             if (targetClanId === 0 || targetClanId === Number(myClanId)) return false;
-            const targetClan = game.clans.find(c => Number(c.id) === targetClanId);
+            const targetClan = game.getClan(targetClanId);
             return !!targetClan && targetClan.daimyoPrestige >= myPrestige * 5;
         }));
     },
     // --- 情報用 ---
     hasFaction: (game) => {
         // 自勢力の武将の中に、派閥（factionIdが1以上）に所属している人がいるかチェックします
-        return game.bushos.some(b => b.clan === game.playerClanId && b.factionId > 0);
+        return game.getClanBushos(game.playerClanId).some(b => b.factionId > 0);
     }
 };
 
@@ -432,7 +431,7 @@ const COMMAND_SPECS = {
         startMode: 'busho_select_special', subType: 'arrange_marriage_busho',
         sortKey: 'leadership',
         msg: "姫を嫁がせる武将を選択してください",
-        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasUnmarriedPrincess(game) && game.bushos.some(b => b.clan === game.playerClanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.female)
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasUnmarriedPrincess(game) && game.getClanBushos(game.playerClanId).some(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.female)
     },
     'employ': {
         label: "登用", category: 'PERSONNEL', 
@@ -494,7 +493,7 @@ const COMMAND_SPECS = {
         startMode: 'busho_select', sortKey: 'leadership',
         msg: "城主を任命します",
         canExecute: (game, castle) => {
-            const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
+            const daimyo = game.getClanDaimyo(game.playerClanId);
             if (daimyo && Number(daimyo.castleId) === Number(castle.id)) return false;
             
             // ★追加：国主の居城の城主も、勝手に変えられないようにします

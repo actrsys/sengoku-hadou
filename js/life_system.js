@@ -867,7 +867,7 @@ class LifeSystem {
         // 夫が死亡したことによる姫の帰還処理と婚姻関係の再評価
         if (busho.wifeIds && busho.wifeIds.length > 0) {
             for (const wifeId of busho.wifeIds) {
-                const princess = this.game.princesses.find(p => p.id === wifeId);
+                const princess = this.game.getPrincess(wifeId);
                 if (princess && princess.status === 'married') {
                     princess.husbandId = 0; // 未亡人になります
                     
@@ -1033,7 +1033,7 @@ class LifeSystem {
         // もし大名だったら、後継ぎを決めます
         if (busho.isDaimyo) {
             // ★追加：大名が死亡した時、勢力の朝廷貢献度を5分の1に減らします
-            const clan = this.game.clans.find(c => c.id === busho.clan);
+            const clan = this.game.getClan(busho.clan);
             if (clan) {
                 clan.courtContribution = Math.floor((clan.courtContribution || 0) / 5);
             }
@@ -1078,7 +1078,7 @@ class LifeSystem {
         const currentYear = this.game.year;
 
         // 1. 今活躍している家臣たちを集めます！
-        const activeBushos = this.game.bushos.filter(b => b.clan === daimyo.clan && b.id !== daimyo.id && window.BushoStatusRules.isActive(b) && !b.isDaimyo);
+        const activeBushos = this.game.getClanBushos(daimyo.clan).filter(b => b.id !== daimyo.id && window.BushoStatusRules.isActive(b) && !b.isDaimyo);
         
         // その中で「一門」の武将だけを抽出します！
         const activeFamily = activeBushos.filter(b => daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
@@ -1251,7 +1251,7 @@ class LifeSystem {
         const currentYear = this.game.year;
         
         // 1. 今活躍している家臣たちを集めます！（大名と国主は弾きます）
-        const activeBushos = this.game.bushos.filter(b => b.clan === commander.clan && b.id !== commander.id && window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.isCommander);
+        const activeBushos = this.game.getClanBushos(commander.clan).filter(b => b.id !== commander.id && window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.isCommander);
         
         // その中で国主の「一門」の武将だけを抽出します！
         const activeFamily = activeBushos.filter(b => commander.familyIds.some(fId => b.familyIds.includes(fId)));
@@ -1426,7 +1426,7 @@ class LifeSystem {
         }
 
         if (changeVal !== 0) {
-            const retainers = this.game.bushos.filter(b => b.clan === oldDaimyo.clan && b.id !== successor.id && window.BushoStatusRules.isActive(b));
+            const retainers = this.game.getClanBushos(oldDaimyo.clan).filter(b => b.id !== successor.id && window.BushoStatusRules.isActive(b));
             retainers.forEach(b => {
                 b.loyalty = Math.max(0, Math.min(100, b.loyalty + changeVal));
             });
@@ -1709,7 +1709,7 @@ class LifeSystem {
             }
 
             // もし残っている武将がいたら、全員「浪人」にします
-            this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b)).forEach(b => {
+            this.game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b)).forEach(b => {
                 if ((b.belongKunishuId || 0) === 0) {
                     b.achievementTotal = Math.floor((b.achievementTotal || 0) / 2);
                 }
@@ -2063,7 +2063,7 @@ class LifeSystem {
             let parent = this.game.getBusho(parentId);
             // 見つからなければ、姫の名簿から探します
             if (!parent) {
-                parent = this.game.princesses.find(p => p.id === parentId);
+                parent = this.game.getPrincess(parentId);
             }
             
             if (!parent) return false; // どちらにもいなければ死んでいるのと同じ扱いにします

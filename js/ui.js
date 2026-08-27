@@ -3292,7 +3292,7 @@ class UIManager {
                 if (isMobileWar) {
                     // スマホの諸勢力戦はブラウザ任せの折返しにせず、
                     // 「国名 / 勢力名 / 鎮圧戦」の3行を最初から確保します。
-                    const province = this.game.provinces.find(p => Number(p.id) === Number(s.defender.provinceId));
+                    const province = this.game.getProvince(s.defender.provinceId);
                     const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(s.defender.kunishuId) : null;
                     let provinceName = province && province.province ? province.province : '';
                     let factionName = kunishu && typeof kunishu.getName === 'function' ? kunishu.getName(this.game) : '';
@@ -3318,7 +3318,7 @@ class UIManager {
             }
         }
         
-        const atkClan = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+        const atkClan = this.game.getClan(s.attacker.ownerClan);
         let atkName = "土豪";
         if (s.attacker.isKunishu) {
             const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(s.attacker.kunishuId) : null;
@@ -3326,7 +3326,7 @@ class UIManager {
         } else if (atkClan) {
             atkName = atkClan.name;
         } else {
-            const prov = this.game.provinces.find(p => p.id === s.sourceCastle.provinceId);
+            const prov = this.game.getProvince(s.sourceCastle.provinceId);
             atkName = prov ? prov.province : "土豪";
         }
         
@@ -3354,7 +3354,7 @@ class UIManager {
         updateFace('war-atk-face', s.atkBushos[0]);
         updateWarLeaderAbilities('war-atk-leader-abilities', s.atkBushos[0]);
         
-        const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
+        const defClan = this.game.getClan(s.defender.ownerClan);
         let defNameText = "土豪";
         if (s.defender.isKunishu) {
             const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(s.defender.kunishuId) : null;
@@ -3362,7 +3362,7 @@ class UIManager {
         } else if (defClan) {
             defNameText = defClan.name;
         } else {
-            const prov = this.game.provinces.find(p => p.id === s.defender.provinceId);
+            const prov = this.game.getProvince(s.defender.provinceId);
             defNameText = prov ? prov.province : "土豪";
         }
         
@@ -3490,7 +3490,7 @@ class UIManager {
                     } else if (reinfData.castle && reinfData.castle.ownerClan !== undefined) {
                         targetClanId = reinfData.castle.ownerClan;
                     }
-                    const clan = this.game.clans.find(c => c.id === targetClanId);
+                    const clan = this.game.getClan(targetClanId);
                     orgName = clan ? clan.name : "土豪";
                 }
 
@@ -3711,7 +3711,7 @@ class UIManager {
             this.successionList.innerHTML = '';
 
             const gunshi = this.game.getClanGunshi(this.game.playerClanId);
-            const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+            const myDaimyo = this.game.getClanDaimyo(this.game.playerClanId);
 
             candidates.forEach(c => {
                 const div = document.createElement('div');

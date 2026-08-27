@@ -174,8 +174,8 @@ class AIEngine {
                                                     isStillEnemy = false; 
                                                 } else {
                                                     // ★今回追加：大名家の名前を調べて、関係に合わせたメッセージを作ります！
-                                                    const myClanData = this.game.clans.find(c => c.id === castle.ownerClan);
-                                                    const targetClanData = this.game.clans.find(c => c.id === targetCastle.ownerClan);
+                                                    const myClanData = this.game.getClan(castle.ownerClan);
+                                                    const targetClanData = this.game.getClan(targetCastle.ownerClan);
                                                     const myClanName = myClanData ? myClanData.name : "不明な勢力";
                                                     const targetClanName = targetClanData ? targetClanData.name : "不明な勢力";
                                                     
@@ -221,12 +221,12 @@ class AIEngine {
                         // ★追加：自分のお城か目的地が大雪になっていないかチェックをします！
                         let isHeavySnow = false;
                         if (!myOperation.isEventOperation) {
-                            const srcProv = this.game.provinces.find(p => p.id === castle.provinceId);
+                            const srcProv = this.game.getProvince(castle.provinceId);
                             if (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) {
                                 isHeavySnow = true;
                             }
                             if (!isHeavySnow) {
-                                const tgtProv = this.game.provinces.find(p => p.id === targetProvId);
+                                const tgtProv = this.game.getProvince(targetProvId);
                                 if (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow')) {
                                     isHeavySnow = true;
                                 }
@@ -323,7 +323,7 @@ class AIEngine {
             if (Number(castle.ownerClan) !== Number(this.game.playerClanId)) {
                 
                 // ★今回変更：大名家が今月「この相手と外交するぞ！」と決めているか、記憶を確認します
-                const myClan = this.game.clans.find(c => c.id === castle.ownerClan);
+                const myClan = this.game.getClan(castle.ownerClan);
                 
                 if (myClan && myClan.currentDiplomacyTarget) {
                     // まずは自分のお殿様（大名）を探します。いない時は城主を大名の代わりにします
@@ -420,7 +420,7 @@ class AIEngine {
         if (leader && leader.castleId) {
             const leaderCastle = this.game.getCastle(leader.castleId);
             if (leaderCastle) {
-                const leaderProv = this.game.provinces.find(p => p.id === leaderCastle.provinceId);
+                const leaderProv = this.game.getProvince(leaderCastle.provinceId);
                 if (leaderProv) {
                     leaderRegionId = leaderProv.regionId;
                 }
@@ -442,9 +442,8 @@ class AIEngine {
         
         // 自勢力に正式所属する通常の活動中武将だけから「左馬頭（ID: 80）」を探す。
         // 自領に滞在している浪人・諸勢力人物を、自家の将軍候補として誤認しない。
-        const myBushos = this.game.bushos.filter(b =>
-            Number(b.clan) === Number(myClanId)
-            && Number(b.belongKunishuId || 0) === 0
+        const myBushos = this.game.getClanBushos(myClanId).filter(b =>
+            Number(b.belongKunishuId || 0) === 0
             && window.BushoStatusRules.isActive(b)
         );
         for (const b of myBushos) {
@@ -582,7 +581,7 @@ class AIEngine {
         const myRegionIds = new Set();
         myClanCastles.forEach(c => {
             myProvIds.add(c.provinceId);
-            const prov = this.game.provinces.find(p => p.id === c.provinceId);
+            const prov = this.game.getProvince(c.provinceId);
             if (prov) myRegionIds.add(prov.regionId);
         });
 
@@ -594,7 +593,7 @@ class AIEngine {
                 if (myProvIds.has(c.provinceId)) {
                     ununifiedProvIds.add(c.provinceId);
                 }
-                const prov = this.game.provinces.find(p => p.id === c.provinceId);
+                const prov = this.game.getProvince(c.provinceId);
                 if (prov && myRegionIds.has(prov.regionId)) {
                     ununifiedRegionIds.add(prov.regionId);
                 }
@@ -1220,7 +1219,7 @@ class AIEngine {
                 prob += 5; // 国を統一するために少し頑張ります！
             } else {
                 // 国は違うけど、ターゲットの城がある地方が、自分が持っているけどまだ統一していない地方だったら
-                const tgtProv = this.game.provinces.find(p => p.id === target.provinceId);
+                const tgtProv = this.game.getProvince(target.provinceId);
                 if (tgtProv && ununifiedRegionIds.has(tgtProv.regionId)) {
                     prob += 5; // 地方を統一するためにちょっと頑張ります！
                 }
@@ -1238,7 +1237,7 @@ class AIEngine {
                     prob -= 5;
                 }
                 // 自分が１つもお城を持っていない「地方」への攻撃はさらに気が進まない
-                const tgtProv = this.game.provinces.find(p => p.id === target.provinceId);
+                const tgtProv = this.game.getProvince(target.provinceId);
                 if (tgtProv && !myRegionIds.has(tgtProv.regionId)) {
                     prob -= 5;
                 }
@@ -1247,7 +1246,7 @@ class AIEngine {
             // ★今回追加：四国と九州をまたぐ攻撃のスコアを大きく下げる魔法！
             // 中国地方のIDは7、四国地方のIDは8、九州地方のIDは9です。
             let targetRegionId = 0;
-            const targetProv = this.game.provinces.find(p => p.id === target.provinceId);
+            const targetProv = this.game.getProvince(target.provinceId);
             if (targetProv) {
                 targetRegionId = targetProv.regionId;
             }
@@ -1761,7 +1760,7 @@ class AIEngine {
                     if (c.id === 157) return true;
                     // ②国単位（常陸、淡路、肥後、日向、薩摩、大隅、対馬）
                     if ([15, 36, 61, 62, 63, 64, 68].includes(c.provinceId)) return true;
-                    const prov = this.game.provinces.find(p => p.id === c.provinceId);
+                    const prov = this.game.getProvince(c.provinceId);
                     // ③地方単位（東北、甲信）
                     if (prov && (prov.regionId === 1 || prov.regionId === 3)) return true;
                     return false;
@@ -3166,7 +3165,7 @@ class AIEngine {
         if ((targetData.action === 'truce' || targetData.action === 'court_truce')
             && this.game.diplomacyManager
             && !this.game.diplomacyManager.canAttemptAITruce(castle.ownerClan, targetClanId)) {
-            const clan = this.game.clans.find(c => Number(c.id) === Number(castle.ownerClan));
+            const clan = this.game.getClan(castle.ownerClan);
             if (clan && clan.currentDiplomacyTarget && Number(clan.currentDiplomacyTarget.targetId) === Number(targetClanId)) {
                 clan.currentDiplomacyTarget = null;
             }

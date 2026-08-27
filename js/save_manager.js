@@ -232,6 +232,9 @@ class SaveManager {
         this.game.selectionMode = null;
         this.game.validTargets = [];
         this.game.lastMenuState = null;
+        // turnQueue は旧Castleオブジェクトを直接保持するため、新配列生成前に参照を切ります。
+        this.game.turnQueue = [];
+        this.game.currentIndex = 0;
         if (this.game.aiTimer) { clearTimeout(this.game.aiTimer); this.game.aiTimer = null; }
         if (this.game.warManager && this.game.warManager.state) this.game.warManager.state.active = false;
         if (this.game.ui) {
@@ -367,6 +370,9 @@ class SaveManager {
         this._validateSaveDataStructure(d);
         this.game.isRestoringSave = true;
         if (this.game.ui) this.game.ui.updateLoadingProgress(5, 'セーブデータを復元しています');
+        // 前ゲームの巨大地図TypedArrayと各種ID索引を、新しい保存データ展開より先に解放します。
+        // 低メモリ端末で旧データと新データが同時に保持される時間を短くします。
+        if (typeof this.game.releaseScenarioMapResources === 'function') this.game.releaseScenarioMapResources();
         // --- お掃除作業 ---
         this.game.isProcessingAI = false; 
         this.game.isWatchMode = false; 
@@ -377,6 +383,9 @@ class SaveManager {
         this.game.selectionMode = null;
         this.game.validTargets = [];
         this.game.lastMenuState = null;
+        // turnQueue は旧Castleオブジェクトを直接保持するため、新配列生成前に参照を切ります。
+        this.game.turnQueue = [];
+        this.game.currentIndex = 0;
         if (this.game.warManager && this.game.warManager.state) this.game.warManager.state.active = false;
         if (this.game.ui) {
             if (this.game.historySystem) this.game.historySystem.clear();
@@ -448,14 +457,14 @@ class SaveManager {
         // 保存側の古いフラグを持ち越さず、現行の軍団モデルだけから再構築します。
         this.game.bushos.forEach(busho => { busho.isCommander = false; });
         this.game.legions.forEach(legion => {
-            const commander = this.game.bushos.find(b => Number(b.id) === Number(legion.commanderId));
+            const commander = this.game.getBusho(legion.commanderId);
             if (commander) commander.isCommander = true;
         });
         // isCastellan も Castle.castellanId と対になる実行時キャッシュとして再構築します。
         // 保存済みフラグをそのまま城主選出へ使うと、壊れた二重城主状態を再現してしまうためです。
         this.game.bushos.forEach(busho => { busho.isCastellan = false; });
         this.game.castles.forEach(castle => {
-            const castellan = this.game.bushos.find(b => Number(b.id) === Number(castle.castellanId));
+            const castellan = this.game.getBusho(castle.castellanId);
             if (castellan
                 && Number(castellan.castleId) === Number(castle.id)
                 && Number(castellan.clan) === Number(castle.ownerClan)) {
@@ -475,7 +484,7 @@ class SaveManager {
         
         this.game.phase = 'game';
         
-        this.game.turnQueue = d.turnQueueIds.map(id => this.game.castles.find(c => c.id === id));
+        this.game.turnQueue = d.turnQueueIds.map(id => this.game.getCastle(id));
         this.game.currentIndex = d.currentIndex;
         
         if (typeof SkillManager !== 'undefined') {

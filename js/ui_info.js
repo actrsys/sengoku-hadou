@@ -419,13 +419,15 @@ class UIInfoManager {
         const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.getClanCastles(c.id).length > 0);
         this.game.updateAllClanPrestige();
 
-        // 勢力ごとの武将一覧を先に1回だけ作り、勢力ごとに全武将filterを繰り返しません。
+        // 所属索引が正本になったので、全国4000人を一覧表示のたびに再グループ化せず、
+        // 実際に表示する現存勢力の所属者だけを局所的に活動中判定します。
         const activeBushosByClan = new Map();
-        for (const b of this.game.bushos) {
-            if (!window.BushoStatusRules.isActive(b) || Number(b.clan) <= 0) continue;
-            const clanId = Number(b.clan);
-            if (!activeBushosByClan.has(clanId)) activeBushosByClan.set(clanId, []);
-            activeBushosByClan.get(clanId).push(b);
+        for (const clan of activeClans) {
+            const activeMembers = [];
+            for (const b of this.game.getClanBushos(clan.id)) {
+                if (window.BushoStatusRules.isActive(b)) activeMembers.push(b);
+            }
+            activeBushosByClan.set(Number(clan.id), activeMembers);
         }
         
         if (!this.daimyoCurrentTab) this.daimyoCurrentTab = 'status';
@@ -799,7 +801,7 @@ class UIInfoManager {
         const castlesCount = clanCastles.length;
         
         // ★武将のリストを取得して、人数と「派閥があるか」を調べます
-        const clanBushos = this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b));
+        const clanBushos = this.game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b));
         const bushosCount = clanBushos.length;
         const hasFaction = clanBushos.some(b => (b.factionId || 0) > 0);
         
@@ -968,7 +970,7 @@ class UIInfoManager {
             document.getElementById('temp-busho-btn').onclick = (e) => {
                 e.stopPropagation();
                 this.openBushoSelector('view_only', null, { 
-                    customBushos: this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b)),
+                    customBushos: this.game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b)),
                     customInfoHtml: `<div>${clan.name} 所属武将</div>`
                 });
             };
@@ -1012,7 +1014,7 @@ class UIInfoManager {
         let relations = [];
 
         if (type === 'daimyo' && this.diploCurrentTab === 'daimyo') {
-            const activeClans = this.game.clans.filter(c => c.id !== 0 && c.id !== id && this.game.castles.some(cs => cs.ownerClan === c.id));
+            const activeClans = this.game.clans.filter(c => c.id !== 0 && c.id !== id && this.game.getClanCastles(c.id).length > 0);
             relations = activeClans.map(c => {
                 const rel = this.game.getRelation(id, c.id);
                 return {
@@ -1040,7 +1042,7 @@ class UIInfoManager {
         } else if (type === 'kunishu') {
             const kunishu = this.game.kunishuSystem.getKunishu(id);
             if (kunishu) {
-                const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
+                const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.getClanCastles(c.id).length > 0);
                 relations = activeClans.map(c => {
                     return {
                         id: c.id,
@@ -1159,10 +1161,10 @@ class UIInfoManager {
     }
 
     _renderFactionList(clanId, isDirect, scrollPos = 0) {
-        const clan = this.game.clans.find(c => c.id === clanId);
+        const clan = this.game.getClan(clanId);
         if (!clan) return;
         
-        const bushos = this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b));
+        const bushos = this.game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b));
         const factions = {};
         
         bushos.forEach(b => {
@@ -1288,10 +1290,10 @@ class UIInfoManager {
     }
 
     showFactionBushoList(clanId, factionId, factionName) {
-        const clan = this.game.clans.find(c => c.id === clanId);
+        const clan = this.game.getClan(clanId);
         if (!clan) return;
 
-        const targetBushos = this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b) && (b.factionId || 0) === factionId);
+        const targetBushos = this.game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b) && (b.factionId || 0) === factionId);
 
         this.openBushoSelector('view_only', null, { 
             customBushos: targetBushos,
@@ -1803,12 +1805,12 @@ class UIInfoManager {
     
     _renderPrincessList(isSelectMode, targetCastleId, doerId, scrollPos = 0) {
         const myClanId = this.game.playerClanId;
-        const myClan = this.game.clans.find(c => c.id === myClanId);
+        const myClan = this.game.getClan(myClanId);
         
         let myPrincesses = [];
         if (myClan) {
             let pIds = Array.isArray(myClan.princessIds) ? [...myClan.princessIds] : [];
-            const myBushos = this.game.bushos.filter(b => b.clan === myClanId && window.BushoStatusRules.isActive(b));
+            const myBushos = this.game.getClanBushos(myClanId).filter(b => window.BushoStatusRules.isActive(b));
             myBushos.forEach(b => {
                 if (Array.isArray(b.wifeIds)) {
                     b.wifeIds.forEach(wId => {
@@ -1819,7 +1821,7 @@ class UIInfoManager {
                 }
             });
             myPrincesses = pIds
-                .map(id => this.game.princesses.find(p => p.id === id))
+                .map(id => this.game.getPrincess(id))
                 .filter(p => p !== undefined); 
         }
 
@@ -1828,7 +1830,7 @@ class UIInfoManager {
         
         if (isSelectMode) {
             // ★自家の大名を取得します
-            const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo);
+            const myDaimyo = this.game.getClanDaimyo(myClanId);
             
             princesses = myPrincesses.filter(p => {
                 // 未婚でなければリストに入れません
@@ -1847,9 +1849,9 @@ class UIInfoManager {
             this.selectedPrincessId = null; 
         } else if (doerId === 'view_clan_princess') {
             const viewClanId = targetCastleId;
-            const viewClan = this.game.clans.find(c => c.id === viewClanId);
+            const viewClan = this.game.getClan(viewClanId);
             let pIds = viewClan && Array.isArray(viewClan.princessIds) ? [...viewClan.princessIds] : [];
-            const clanBushos = this.game.bushos.filter(b => b.clan === viewClanId && window.BushoStatusRules.isActive(b));
+            const clanBushos = this.game.getClanBushos(viewClanId).filter(b => window.BushoStatusRules.isActive(b));
             clanBushos.forEach(b => {
                 if (Array.isArray(b.wifeIds)) {
                     b.wifeIds.forEach(wId => {
@@ -1857,11 +1859,11 @@ class UIInfoManager {
                     });
                 }
             });
-            princesses = pIds.map(id => this.game.princesses.find(p => p.id === id)).filter(p => p !== undefined && window.LifeStatusRules.isPresent(p));
+            princesses = pIds.map(id => this.game.getPrincess(id)).filter(p => p !== undefined && window.LifeStatusRules.isPresent(p));
         } else if (doerId === 'view_busho_wife') {
             const targetBusho = this.game.getBusho(targetCastleId);
             let pIds = targetBusho && Array.isArray(targetBusho.wifeIds) ? targetBusho.wifeIds : [];
-            princesses = pIds.map(id => this.game.princesses.find(p => p.id === id)).filter(p => p !== undefined && window.LifeStatusRules.isPresent(p));
+            princesses = pIds.map(id => this.game.getPrincess(id)).filter(p => p !== undefined && window.LifeStatusRules.isPresent(p));
         } else {
             if (!this.princessCurrentScope) this.princessCurrentScope = 'clan';
 
@@ -1893,8 +1895,8 @@ class UIInfoManager {
                 const fatherB = this.game.getBusho(b.realFatherId);
                 const husbandA = this.game.getBusho(a.husbandId);
                 const husbandB = this.game.getBusho(b.husbandId);
-                const clanA = this.game.clans.find(c => Number(c.id) === Number(a.currentClanId));
-                const clanB = this.game.clans.find(c => Number(c.id) === Number(b.currentClanId));
+                const clanA = this.game.getClan(a.currentClanId);
+                const clanB = this.game.getClan(b.currentClanId);
 
                 switch(this.princessCurrentSortKey) {
                     case 'name': 
@@ -1952,7 +1954,7 @@ class UIInfoManager {
             const husband = this.game.getBusho(p.husbandId);
             
             const targetClanId = Number(p.currentClanId) || 0;
-            const targetClan = this.game.clans.find(c => c.id === targetClanId);
+            const targetClan = this.game.getClan(targetClanId);
             const clanName = targetClan ? targetClan.name : "無所属";
 
             let familyMark = "";
@@ -2047,7 +2049,7 @@ class UIInfoManager {
     }
 
     _renderDelegateList(scrollPos = 0) {
-        const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
         const daimyoCastleId = daimyo ? daimyo.castleId : -1;
         const myCastles = this.game.getClanCastles(this.game.playerClanId).filter(c => c.id !== daimyoCastleId);
 
@@ -2110,7 +2112,7 @@ class UIInfoManager {
     }
 
     _renderDelegateSetting(castleId, scrollPos = 0) {
-        const castle = this.game.castles.find(c => c.id === castleId);
+        const castle = this.game.getCastle(castleId);
         if (!castle) return;
 
         const shell = this._openInfoShell(`${castle.name} の委任設定`);
@@ -2221,7 +2223,7 @@ class UIInfoManager {
         });
 
         // 武将の数と姫の数も数えます
-        const bushosCount = this.game.bushos.filter(b => b.clan === clanId && window.LifeStatusRules.isPresent(b)).length;
+        const bushosCount = this.game.getClanBushos(clanId).filter(b => window.LifeStatusRules.isPresent(b)).length;
         const clanData = this.game.getClan(clanId);
         const princessCount = clanData && clanData.princessIds ? clanData.princessIds.length : 0;
         const clanYomi = clanData ? (clanData.yomi || "") : "";
@@ -2349,11 +2351,11 @@ class UIInfoManager {
         let provinceName = "不明";
         let provinceYomi = "";
         if (kunishu.castleId) {
-            const baseCastle = this.game.castles.find(c => c.id === kunishu.castleId);
+            const baseCastle = this.game.getCastle(kunishu.castleId);
             if (baseCastle) {
                 baseCastleName = baseCastle.name;
                 if (this.game.provinces) {
-                    const province = this.game.provinces.find(p => p.id === baseCastle.provinceId);
+                    const province = this.game.getProvince(baseCastle.provinceId);
                     if (province) {
                         provinceName = province.province;
                         provinceYomi = province.provinceYomi || "";
@@ -2504,8 +2506,8 @@ class UIInfoManager {
                 const castleB = this.game.getCastle(b.castleId);
                 
                 let provinceA = null, provinceB = null;
-                if (castleA && this.game.provinces) provinceA = this.game.provinces.find(p => p.id === castleA.provinceId);
-                if (castleB && this.game.provinces) provinceB = this.game.provinces.find(p => p.id === castleB.provinceId);
+                if (castleA && this.game.provinces) provinceA = this.game.getProvince(castleA.provinceId);
+                if (castleB && this.game.provinces) provinceB = this.game.getProvince(castleB.provinceId);
 
                 switch(this.kunishuCurrentSortKey) {
                     case 'name':
@@ -2568,7 +2570,7 @@ class UIInfoManager {
             
             let provinceName = "不明";
             if (castleObj && this.game.provinces) {
-                const province = this.game.provinces.find(p => p.id === castleObj.provinceId);
+                const province = this.game.getProvince(castleObj.provinceId);
                 if (province) provinceName = province.province;
             }
 
@@ -2789,7 +2791,7 @@ class UIInfoManager {
     }
 
     _renderPrincessDetail(princessId, scrollPos = 0) {
-        const princess = this.game.princesses.find(p => p.id === princessId);
+        const princess = this.game.getPrincess(princessId);
         if (!princess) return;
 
         const shell = this._openInfoShell("姫情報");
@@ -2805,7 +2807,7 @@ class UIInfoManager {
         // 所属表示は婚姻状態に関係なく、現在所属 currentClanId を正本にします。
         const clanId = Number(princess.currentClanId) || 0;
         if (clanId > 0) {
-            const clan = this.game.clans.find(c => c.id === clanId);
+            const clan = this.game.getClan(clanId);
             if (clan) {
                 affiliationName = clan.name;
                 const daimyo = this.game.getBusho(clan.leaderId); 

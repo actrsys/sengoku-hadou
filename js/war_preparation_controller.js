@@ -23,7 +23,7 @@ class WarPreparationController {
         // ★追加：諸勢力の場合はダミーのターゲットオブジェクトを作る
         if (extraData && extraData.isKunishu) {
             const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
-            const tgtProv = this.game.provinces.find(p => p.id === targetCastle.provinceId);
+            const tgtProv = this.game.getProvince(targetCastle.provinceId);
             const provName = tgtProv ? tgtProv.province : "不明な国";
             targetCastle = Object.assign({}, targetCastle, {
                 name: `${provName} ${kunishu.getName(this.game)}`,
@@ -221,8 +221,8 @@ class WarPreparationController {
                 const reinfHorses = inputData.horses ? parseInt(inputData.horses.num.value) : 0;
                 const reinfGuns = inputData.guns ? parseInt(inputData.guns.num.value) : 0;
 
-                const srcProv = this.game.provinces.find(p => p.id === helperCastle.provinceId);
-                const tgtProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
+                const srcProv = this.game.getProvince(helperCastle.provinceId);
+                const tgtProv = this.game.getProvince(defCastle.provinceId);
                 const isHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) || 
                                     (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
 
@@ -257,9 +257,9 @@ class WarPreparationController {
         const myClanId = atkCastle.ownerClan;
         
         // ★ここから追加：大雪の判定です
-        const srcProv1 = this.game.provinces.find(p => p.id === helperCastle.provinceId);
-        const srcProv2 = this.game.provinces.find(p => p.id === atkCastle.provinceId);
-        const tgtProv = this.game.provinces.find(p => p.id === targetCastle.provinceId);
+        const srcProv1 = this.game.getProvince(helperCastle.provinceId);
+        const srcProv2 = this.game.getProvince(atkCastle.provinceId);
+        const tgtProv = this.game.getProvince(targetCastle.provinceId);
         const isHeavySnow = (srcProv1 && srcProv1.statusEffects && srcProv1.statusEffects.includes('heavySnow')) ||
                             (srcProv2 && srcProv2.statusEffects && srcProv2.statusEffects.includes('heavySnow')) ||
                             (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
@@ -334,10 +334,10 @@ class WarPreparationController {
         // helperToEnemyRel は外交専門部署で使うので、ここでは消しておきます
 
         if (helperClanId === this.game.playerClanId) {
-            const myClanName = this.game.clans.find(c => c.id === myClanId)?.name || "不明";
+            const myClanName = this.game.getClan(myClanId)?.name || "不明";
             
             let targetInfoStr = "";
-            const provData = this.game.provinces.find(p => p.id === targetCastle.provinceId);
+            const provData = this.game.getProvince(targetCastle.provinceId);
             const provName = provData ? provData.province : "不明な国";
 
             if (targetCastle.isKunishu) {
@@ -347,7 +347,7 @@ class WarPreparationController {
             } else if (targetCastle.ownerClan === 0) {
                 targetInfoStr = `${provName}の${targetCastle.name}の攻略のため、\n`;
             } else {
-                const targetClanName = this.game.clans.find(c => c.id === enemyClanId)?.name || "中立勢力";
+                const targetClanName = this.game.getClan(enemyClanId)?.name || "中立勢力";
                 targetInfoStr = `${targetClanName}の${targetCastle.name}の攻略のため、\n`;
             }
 
@@ -395,7 +395,7 @@ class WarPreparationController {
 
         if (!window.DiplomacyRules.isAllianceOrVassal(myToHelperRel.status)) this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
 
-        const helperDaimyo = this.game.bushos.find(b => b.clan === helperClanId && b.isDaimyo) || { duty: 50 };
+        const helperDaimyo = this.game.getClanDaimyo(helperClanId) || { duty: 50 };
         const reinforcementData = this.game.reinforcementService.createAutoClanReinforcement(
             helperCastle,
             myToHelperRel,

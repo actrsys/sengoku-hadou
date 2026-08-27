@@ -126,7 +126,7 @@ class WarSystem {
             }
 
             if (!leaderCastle) {
-                const daimyo = game.bushos.find(b => b.clan === activeCastle.ownerClan && b.isDaimyo);
+                const daimyo = game.getClanDaimyo(activeCastle.ownerClan);
                 if (daimyo && daimyo.castleId) leaderCastle = game.getCastle(daimyo.castleId);
             }
 
@@ -136,8 +136,8 @@ class WarSystem {
         let mult = 1.0;
         if (leaderCastle.provinceId === defenderCastle.provinceId) mult += 0.1;
 
-        const leaderProv = game.provinces.find(p => p.id === leaderCastle.provinceId);
-        const defProv = game.provinces.find(p => p.id === defenderCastle.provinceId);
+        const leaderProv = game.getProvince(leaderCastle.provinceId);
+        const defProv = game.getProvince(defenderCastle.provinceId);
         if (leaderProv && defProv && leaderProv.regionId === defProv.regionId) mult += 0.1;
 
         return mult;
@@ -511,7 +511,7 @@ class WarManager {
             if (s.isHeavySnow === undefined) {
                 s.isHeavySnow = false;
                 if (s.defender && s.defender.provinceId && this.game && this.game.provinces) {
-                    const defProv = this.game.provinces.find(p => p.id === s.defender.provinceId);
+                    const defProv = this.game.getProvince(s.defender.provinceId);
                     if (defProv && defProv.statusEffects && defProv.statusEffects.includes('heavySnow')) {
                         s.isHeavySnow = true;
                     }
@@ -1125,7 +1125,7 @@ class WarManager {
                         return "土豪軍";
                     }
                     
-                    const clan = this.game.clans.find(c => c.id === Number(clanId));
+                    const clan = this.game.getClan(Number(clanId));
                     if (clan && clan.name) factionName = clan.name;
                 }
             }
@@ -1885,7 +1885,7 @@ class WarManager {
                                 if (Number(clanId) === 0) {
                                     isDogou = true;
                                 } else {
-                                    const clan = this.game.clans.find(c => c.id === Number(clanId));
+                                    const clan = this.game.getClan(Number(clanId));
                                     // ★修正：最初から「家」の文字が入っているので、そのまま使うように直しました！
                                     if (clan) factionName = clan.name;
                                 }

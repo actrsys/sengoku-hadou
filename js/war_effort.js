@@ -295,9 +295,9 @@ Object.assign(WarManager.prototype, {
         const atkClanId = atkCastle.isKunishu ? atkCastle.kunishuId : atkCastle.ownerClan;
         const defClanId = defCastle.isKunishu ? defCastle.kunishuId : defCastle.ownerClan;
         
-        const atkClanName = atkClanId === pid ? "当家" : (atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : (this.game.clans.find(c => c.id === atkClanId)?.name || "敵軍"));
-        const defClanName = defClanId === pid ? "当家" : (defCastle.isKunishu ? (defCastle.getName ? defCastle.getName(this.game) : defCastle.name) : (this.game.clans.find(c => c.id === defClanId)?.name || "敵軍"));
-        const defProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
+        const atkClanName = atkClanId === pid ? "当家" : (atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : (this.game.getClan(atkClanId)?.name || "敵軍"));
+        const defClanName = defClanId === pid ? "当家" : (defCastle.isKunishu ? (defCastle.getName ? defCastle.getName(this.game) : defCastle.name) : (this.game.getClan(defClanId)?.name || "敵軍"));
+        const defProv = this.game.getProvince(defCastle.provinceId);
         const defProvName = defProv ? defProv.province : "不明な国";
 
         const atkLeader = atkBushos && atkBushos.length > 0 ? atkBushos[0] : null;
@@ -330,7 +330,7 @@ Object.assign(WarManager.prototype, {
                 const candidates = this.game.diplomacyManager.findAvailableReinforcements(false, true, defCastle.id, defCastle, defClanId, atkClanId, connected);
                 if (candidates && candidates.length > 0) {
                     const cand = candidates[0];
-                    const rClan = this.game.clans.find(c => c.id === cand.force.id);
+                    const rClan = this.game.getClan(cand.force.id);
                     enemyReinfMsg = `さらに、${cand.castle.name}や${cand.force.isKunishu ? (cand.force.getName ? cand.force.getName(this.game) : cand.force.name) : (rClan ? rClan.name : "他勢力")}からの援軍が予想されます。`;
                 }
             } else {
@@ -338,7 +338,7 @@ Object.assign(WarManager.prototype, {
                 const candidates = this.game.diplomacyManager.findAvailableReinforcements(false, false, atkCastle.id, atkCastle, atkClanId, defClanId, connected);
                 if (candidates && candidates.length > 0) {
                     const cand = candidates[0];
-                    const rClan = this.game.clans.find(c => c.id === cand.force.id);
+                    const rClan = this.game.getClan(cand.force.id);
                     enemyReinfMsg = `さらに、${cand.castle.name}や${cand.force.isKunishu ? (cand.force.getName ? cand.force.getName(this.game) : cand.force.name) : (rClan ? rClan.name : "他勢力")}からの援軍が予想されます。`;
                 }
             }
@@ -372,7 +372,7 @@ Object.assign(WarManager.prototype, {
             }
         } else {
             if (atkCastle.isKunishu) {
-                const atkProv = this.game.provinces.find(p => p.id === atkCastle.provinceId);
+                const atkProv = this.game.getProvince(atkCastle.provinceId);
                 const atkProvName = atkProv ? atkProv.province : "不明な国";
                 msgs.push(`「${styleAdvisorText(`${atkProvName}の国衆・${atkClanName}が、${defClanName}の${defCastle.name}を攻撃するべく迫っております`)}」`);
             } else {
@@ -569,13 +569,13 @@ Object.assign(WarManager.prototype, {
                 atkGuns = atkCastle.guns || 0;
             }
 
-            const atkClanData = this.game.clans.find(c => c.id === atkClan);
-            const atkProvData = this.game.provinces.find(p => p.id === atkCastle.provinceId);
+            const atkClanData = this.game.getClan(atkClan);
+            const atkProvData = this.game.getProvince(atkCastle.provinceId);
             const atkArmyName = atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : (atkClanData ? atkClanData.getArmyName() : "敵軍");
             const atkDaimyoName = this.getDisplayClanName(atkClan, (atkClanData && atkClanData.name) ? atkClanData.name : (atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : (atkProvData ? atkProvData.province : "中立")));
             
-            const defClanData = this.game.clans.find(c => c.id === defClan);
-            const defProvData = this.game.provinces.find(p => p.id === defCastle.provinceId);
+            const defClanData = this.game.getClan(defClan);
+            const defProvData = this.game.getProvince(defCastle.provinceId);
             const defDaimyoName = this.getDisplayClanName(defClan, (defClanData && defClanData.name) ? defClanData.name : (defCastle.isKunishu ? defCastle.name : (defProvData ? defProvData.province : "中立")));
             
             // ★追加：大名の居城かどうかを判定して記憶します
@@ -638,12 +638,12 @@ Object.assign(WarManager.prototype, {
                     
                     let atkColor = { r: 255, g: 255, b: 255 };
                     if (!atkCastle.isKunishu && atkClan !== 0) {
-                        const clanData = this.game.clans.find(c => c.id === atkClan);
+                        const clanData = this.game.getClan(atkClan);
                         if (clanData && clanData.color) atkColor = DataManager.hexToRgb(clanData.color);
                     }
                     let defColor = { r: 255, g: 255, b: 255 };
                     if (!defCastle.isKunishu && defClan !== 0) {
-                        const clanData = this.game.clans.find(c => c.id === defClan);
+                        const clanData = this.game.getClan(defClan);
                         if (clanData && clanData.color) defColor = DataManager.hexToRgb(clanData.color);
                     }
                     
@@ -667,8 +667,8 @@ Object.assign(WarManager.prototype, {
 
             // 出陣で兵糧需要が増えるため、金1で得られる兵糧量が下がります。
             const minTradeRate = window.MainParams.Economy.TradeRateMin;
-            const atkProv = this.game.provinces.find(p => p.id === atkCastle.provinceId);
-            const defProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
+            const atkProv = this.game.getProvince(atkCastle.provinceId);
+            const defProv = this.game.getProvince(defCastle.provinceId);
             
             if (atkProv) {
                 atkProv.marketRate = Math.max(minTradeRate, atkProv.marketRate - 0.3);
@@ -1360,7 +1360,7 @@ Object.assign(WarManager.prototype, {
         
         const runRetreat = (targetId) => {
             if (!targetId) { this.endWar(true); return; } 
-            const target = this.game.castles.find(c => c.id === targetId);
+            const target = this.game.getCastle(targetId);
             if(target) {
                 let lossRate = Math.min(0.9, Math.max(0.05, window.WarParams.War.RetreatResourceLossFactor + (s.attacker.soldiers / (defCastle.soldiers + 1)) * 0.1)); 
                 const carryGold = Math.floor(defCastle.gold * (1.0 - lossRate)); const carryRice = Math.floor(defCastle.rice * (1.0 - lossRate));
@@ -1472,12 +1472,12 @@ Object.assign(WarManager.prototype, {
             // ==========================================
             let atkColor = { r: 255, g: 255, b: 255 };
             if (!s.attacker.isKunishu && s.attacker.ownerClan !== 0) {
-                const clanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+                const clanData = this.game.getClan(s.attacker.ownerClan);
                 if (clanData && clanData.color) atkColor = DataManager.hexToRgb(clanData.color);
             }
             let defColor = { r: 255, g: 255, b: 255 };
             if (!s.defender.isKunishu && s.oldDefClanId !== 0) {
-                const clanData = this.game.clans.find(c => c.id === s.oldDefClanId);
+                const clanData = this.game.getClan(s.oldDefClanId);
                 if (clanData && clanData.color) defColor = DataManager.hexToRgb(clanData.color);
             }
             
@@ -1502,10 +1502,10 @@ Object.assign(WarManager.prototype, {
             // ★ここから追加：AI同士の戦争の結果メッセージを記憶しておきます（表示は色が塗られた一番最後にします！）
             let aiResultMsg = "";
             if (!s.isPlayerInvolved && !s.isKunishuSubjugation && !s.attacker.isKunishu) {
-                const atkClanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
-                const atkProvData = this.game.provinces.find(p => p.id === s.sourceCastle.provinceId);
-                const defClanData = this.game.clans.find(c => c.id === s.oldDefClanId);
-                const defProvData = this.game.provinces.find(p => p.id === s.defender.provinceId);
+                const atkClanData = this.game.getClan(s.attacker.ownerClan);
+                const atkProvData = this.game.getProvince(s.sourceCastle.provinceId);
+                const defClanData = this.game.getClan(s.oldDefClanId);
+                const defProvData = this.game.getProvince(s.defender.provinceId);
                 const atkDaimyoName = this.getDisplayClanName(s.attacker.ownerClan, atkClanData ? atkClanData.name : (s.attacker.isKunishu ? s.attacker.name : (atkProvData ? atkProvData.province : "中立")));
                 const defDaimyoName = this.getDisplayClanName(s.oldDefClanId, defClanData ? defClanData.name : (s.defender.isKunishu ? s.defender.name : (defProvData ? defProvData.province : "中立")));
                 
@@ -1718,7 +1718,7 @@ Object.assign(WarManager.prototype, {
                             let isWin = isAttackerData ? attackerWon : !attackerWon;
                             if (isWin) {
                                 this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, 5);
-                                if (s.isPlayerInvolved) this.game.ui.log(`(援軍が勝利に貢献し、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が上がりました)`, { history: false });
+                                if (s.isPlayerInvolved) this.game.ui.log(`(援軍が勝利に貢献し、${this.game.getClan(helperClanId)?.name}との友好度が上がりました)`, { history: false });
                             }
                         }
                     }
@@ -1817,7 +1817,7 @@ Object.assign(WarManager.prototype, {
                 let resultMsg = ""; 
                 
                 // ★追加：誰が鎮圧したのか分かるように、攻撃側の情報を取得します
-                const atkClanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+                const atkClanData = this.game.getClan(s.attacker.ownerClan);
                 const atkDaimyoName = this.getDisplayClanName(s.attacker.ownerClan, atkClanData ? atkClanData.name : "大名家");
                 const leaderName = s.atkBushos[0].name;
                 
@@ -2150,7 +2150,7 @@ Object.assign(WarManager.prototype, {
                 this.finalizeCapturedCastleStaffing(s);
                 
                 // ★書き足し１：守備側が撤退した時の履歴ログ
-                const atkClanData1 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+                const atkClanData1 = this.game.getClan(s.attacker.ownerClan);
                 const atkArmyName1 = s.attacker.isKunishu ? s.attacker.name : (atkClanData1 ? atkClanData1.getArmyName() : "敵軍");
                 this.game.ui.log(`【合戦結果】守備軍の撤退により、${atkArmyName1}が${s.defender.name}を占領しました。`, { history: false });
                 
@@ -2184,7 +2184,7 @@ Object.assign(WarManager.prototype, {
                 
             let resultMsg = "";
             // pid, isAtkPlayer, isDefPlayer の定義は上部に移動したため、ここでは敵の名前だけ決めます
-            const enemyName = isAtkPlayer ? (this.game.clans.find(c => c.id === s.oldDefClanId)?.getArmyName() || "敵軍") : s.attacker.name;
+            const enemyName = isAtkPlayer ? (this.game.getClan(s.oldDefClanId)?.getArmyName() || "敵軍") : s.attacker.name;
 
             if (attackerWon) {
                 // ★ここから書き足し：城側が負けた・撤退した時の追加減少
@@ -2247,7 +2247,7 @@ Object.assign(WarManager.prototype, {
                 else if (isDefPlayer) resultMsg = isRetreat ? `${s.defender.name}を放棄し、後退します……` : `${s.defender.name}が陥落しました。敵軍がなだれ込んできます……`;
                 else resultMsg = `${s.defender.name}が制圧されました！\n勝者: ${s.attacker.name}`;
                 // ★書き足し２：攻撃側が勝利して制圧した時の履歴ログ
-                const atkClanData2 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+                const atkClanData2 = this.game.getClan(s.attacker.ownerClan);
                 const atkArmyName2 = s.attacker.isKunishu ? s.attacker.name : (atkClanData2 ? atkClanData2.getArmyName() : "敵軍");
                 this.game.ui.log(`【合戦結果】${atkArmyName2}が${s.defender.name}を制圧しました。`, { history: false });
             } else {
@@ -2256,10 +2256,10 @@ Object.assign(WarManager.prototype, {
                 else if (isDefPlayer) resultMsg = isRetreat ? `${enemyName}は攻略を諦め、撤退していきました！` : `${s.defender.name}を守り抜きました！`;
                 else resultMsg = isRetreat ? `${s.defender.name}から撤退しました……` : `${s.defender.name}を守り抜きました！\n敗者: ${s.attacker.name}`;
                 // ★書き足し３：攻撃側が負けた（または撤退した）時の履歴ログ
-                const defClanData = this.game.clans.find(c => c.id === s.defender.ownerClan);
+                const defClanData = this.game.getClan(s.defender.ownerClan);
                 const defArmyName = s.defender.isKunishu ? s.defender.name : (defClanData ? defClanData.getArmyName() : "守備軍");
                 if (isRetreat) {
-                     const atkClanData3 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+                     const atkClanData3 = this.game.getClan(s.attacker.ownerClan);
                      const atkArmyName3 = s.attacker.isKunishu ? s.attacker.name : (atkClanData3 ? atkClanData3.getArmyName() : "攻撃軍");
                      this.game.ui.log(`【合戦結果】${atkArmyName3}は${s.defender.name}の攻略を諦め、撤退しました。`, { history: false });
                 } else {
@@ -2381,7 +2381,7 @@ Object.assign(WarManager.prototype, {
         // ★追加：3回以上チャレンジしていたら「押せない状態」にするフラグを作ります。
         const isHireDisabled = prisoner.hireChallengeCount >= 3;
 
-        const clanData = this.game.clans.find(c => c.id === prisoner.clan);
+        const clanData = this.game.getClan(prisoner.clan);
         const clanName = clanData ? clanData.name : "不明";
         
         const msg = `${clanName}当主・${prisoner.name}を捕えました。処遇を決定してください。`;
@@ -2432,7 +2432,7 @@ Object.assign(WarManager.prototype, {
             // ★追加：登用を選んだので、チャレンジ回数を1回増やします！
             prisoner.hireChallengeCount = (prisoner.hireChallengeCount || 0) + 1;
 
-            const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId && !window.LifeStatusRules.isUnborn(b));
+            const myBushos = this.game.getClanBushos(this.game.playerClanId).filter(b => !window.LifeStatusRules.isUnborn(b));
             const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0];
             
             if (!isExtinct) {
@@ -2551,7 +2551,7 @@ Object.assign(WarManager.prototype, {
 
     async processHireList(selectedIds) {
         // 選ばれた武将たちを順番に登用していきます
-        const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId && !window.LifeStatusRules.isUnborn(b)); 
+        const myBushos = this.game.getClanBushos(this.game.playerClanId).filter(b => !window.LifeStatusRules.isUnborn(b)); 
         const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0];
         const currentTurnCastle = this.game.getCurrentTurnCastle();
 
@@ -2585,7 +2585,7 @@ Object.assign(WarManager.prototype, {
                     ? heldCastle
                     : (currentTurnCastle && Number(currentTurnCastle.ownerClan) === Number(this.game.playerClanId)
                         ? currentTurnCastle
-                        : this.game.castles.find(c => Number(c.ownerClan) === Number(this.game.playerClanId)));
+                        : this.game.getClanCastles(this.game.playerClanId)[0]);
                 if(targetC) { 
                     this.game.affiliationSystem.joinClan(prisoner, this.game.playerClanId, targetC.id);
                 }
@@ -2789,7 +2789,7 @@ Object.assign(WarManager.prototype, {
         // ★軽量化：勝者勢力の全武将を毎回filterせず、既存の大名索引を使います。
         // 大名が存在しない特殊ケースだけ従来相当の代表者検索へフォールバックします。
         const recruiter = this.game.getClanDaimyo(winnerClanId) ||
-            this.game.bushos.find(b => b.clan === winnerClanId && !window.LifeStatusRules.isUnborn(b)) ||
+            this.game.getClanBushos(winnerClanId).find(b => !window.LifeStatusRules.isUnborn(b)) ||
             { charm: 50, affinity: 0 };
 
         // ★大名から先に処理するように並べ替えます
@@ -3003,7 +3003,7 @@ Object.assign(WarManager.prototype, {
         }
 
         // ★追加：守備側（目的地）のお城がある国が大雪だったら、誰も助けに来られないので諦めます！
-        const defProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
+        const defProv = this.game.getProvince(defCastle.provinceId);
         if (defProv && defProv.statusEffects && defProv.statusEffects.includes('heavySnow')) {
             onComplete(null);
             return;
@@ -3100,7 +3100,7 @@ Object.assign(WarManager.prototype, {
 
         // 目的地の大雪もAI受諾確率へ渡します。ここで一律中止せず、
         // 「支配による強制参加」なども含めてDiplomacyManagerの共通判定に任せます。
-        const defProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
+        const defProv = this.game.getProvince(defCastle.provinceId);
         const isDefHeavySnow = !!(defProv && defProv.statusEffects && defProv.statusEffects.includes('heavySnow'));
 
         // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
@@ -3164,7 +3164,7 @@ Object.assign(WarManager.prototype, {
                 let realProb = 0; // 本当の成功確率
                 let reinfGold = 0;
                 
-                const candidateProv = this.game.provinces.find(p => p.id === candidate.castle.provinceId);
+                const candidateProv = this.game.getProvince(candidate.castle.provinceId);
                 const candidateHeavySnow = isDefHeavySnow || !!(candidateProv && candidateProv.statusEffects && candidateProv.statusEffects.includes('heavySnow'));
 
                 if (candidate.force.isKunishu) {
@@ -3243,8 +3243,8 @@ Object.assign(WarManager.prototype, {
         const myClanId = defCastle.ownerClan;
         
         // ★大雪判定
-        const srcProv = this.game.provinces.find(p => p.id === helperCastle.provinceId);
-        const tgtProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
+        const srcProv = this.game.getProvince(helperCastle.provinceId);
+        const tgtProv = this.game.getProvince(defCastle.provinceId);
         const isHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) || 
                             (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
 
@@ -3315,10 +3315,10 @@ Object.assign(WarManager.prototype, {
         const myToHelperRel = this.game.getRelation(myClanId, helperClanId);
         
         if (helperClanId === this.game.playerClanId) {
-            const myClanName = this.game.clans.find(c => c.id === myClanId)?.name || "不明";
+            const myClanName = this.game.getClan(myClanId)?.name || "不明";
             
             let targetInfoStr = "";
-            const provData = this.game.provinces.find(p => p.id === defCastle.provinceId);
+            const provData = this.game.getProvince(defCastle.provinceId);
             const provName = provData ? provData.province : "不明な国";
 
             if (defCastle.isKunishu) {
@@ -3451,7 +3451,7 @@ Object.assign(WarManager.prototype, {
         }
         
         this.state.isPlayerInvolved = true;
-        const helperClanName = this.game.clans.find(c => c.id === helperClanId)?.name || "援軍";
+        const helperClanName = this.game.getClan(helperClanId)?.name || "援軍";
         const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
         this.game.ui.showDialog(`${helperClanName}の${leaderName} (${helperCastle.name}) が守備側の援軍として出発しました！`, false, onComplete, null, { closeBeforeOk: true });
     },
@@ -3510,7 +3510,7 @@ Object.assign(WarManager.prototype, {
         }
 
         // 一門の武将が自勢力にいる場合は成功率+0.2
-        const hasFamily = this.game.bushos.some(b => b.clan === targetClanId && !window.LifeStatusRules.isDead(b) && b.id !== prisoner.id && b.familyIds && prisoner.familyIds && b.familyIds.some(fId => prisoner.familyIds.includes(fId)));
+        const hasFamily = this.game.getClanBushos(targetClanId).some(b => !window.LifeStatusRules.isDead(b) && b.id !== prisoner.id && b.familyIds && prisoner.familyIds && b.familyIds.some(fId => prisoner.familyIds.includes(fId)));
         if (hasFamily) {
             hireProb += 0.2;
             hireProb = Math.max(0, Math.min(0.99, hireProb));
@@ -3549,8 +3549,8 @@ Object.assign(WarManager.prototype, {
         const defCastles = this.game.castles.filter(c => c.ownerClan === defClanId);
         if (defCastles.length === 0) return false; 
 
-        const atkClan = this.game.clans.find(c => c.id === atkClanId);
-        const defClan = this.game.clans.find(c => c.id === defClanId);
+        const atkClan = this.game.getClan(atkClanId);
+        const defClan = this.game.getClan(defClanId);
         
         if (!atkClan || !defClan) return false;
         
@@ -3574,8 +3574,8 @@ Object.assign(WarManager.prototype, {
     },
 
     async executeTotalTakeover(atkClanId, defClanId, defCastles) {
-        const atkClan = this.game.clans.find(c => c.id === atkClanId);
-        const defClan = this.game.clans.find(c => c.id === defClanId);
+        const atkClan = this.game.getClan(atkClanId);
+        const defClan = this.game.getClan(defClanId);
         
         const msg = `${defClan.name}の居城が陥落しました。`;
         this.game.ui.log(msg.replace(/\n/g, ''), { history: false });
@@ -3585,7 +3585,7 @@ Object.assign(WarManager.prototype, {
             await this.game.ui.showDialogAsync(msg);
         }
 
-        const defBushos = this.game.bushos.filter(b => b.clan === defClanId && window.BushoStatusRules.isActive(b));
+        const defBushos = this.game.getClanBushos(defClanId).filter(b => window.BushoStatusRules.isActive(b));
         const oldDaimyo = defBushos.find(b => b.isDaimyo) || defBushos[0];
 
         // 1. 落とされた側の全武将の忠誠度を30下げます（大名以外）

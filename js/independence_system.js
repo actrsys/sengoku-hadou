@@ -96,7 +96,7 @@ class IndependenceSystem {
         const oldClanId = castle.ownerClan;
         
         // ★追加：誰が裏切ったか後で確認するために、今の「主家」の武将たちをメモしておきます！
-        const oldClanBushoIds = this.game.bushos.filter(b => b.clan === oldClanId).map(b => b.id);
+        const oldClanBushoIds = this.game.getClanBushos(oldClanId).map(b => b.id);
 
         // ★追加：複数のお城が同時に寝返ったか調べるために、最初のお城の持ち主を全部メモしておきます！
         const initialClanMap = new Map();
@@ -111,7 +111,7 @@ class IndependenceSystem {
         // もし独立を起こす城主が派閥に属していて、なおかつ派閥主ではない場合
         if (castellan.factionId !== 0 && !castellan.isFactionLeader) {
             // 同じ大名家で、同じ派閥のリーダー（派閥主）を探す
-            const factionLeader = this.game.bushos.find(b => b.clan === oldClanId && b.factionId === castellan.factionId && b.isFactionLeader && !b.belongKunishuId);
+            const factionLeader = this.game.getClanBushos(oldClanId).find(b => b.factionId === castellan.factionId && b.isFactionLeader && !b.belongKunishuId);
             if (factionLeader) {
                 // 派閥主が、今の殿様よりも独立計画に賛同してくれるかを計算
                 const { joinScore, stayScore } = this.calculateLoyaltyScores(factionLeader, castellan, oldDaimyo);
@@ -178,10 +178,10 @@ class IndependenceSystem {
                 
                 // 地続きの城を一つずつ調べます
                 for (const connectedId of connectedCastleIds) {
-                    const connectedCastle = this.game.castles.find(c => c.id === connectedId);
+                    const connectedCastle = this.game.getCastle(connectedId);
                     if (connectedCastle && connectedCastle.adjacentCastleIds) {
                         for (const adjId of connectedCastle.adjacentCastleIds) {
-                            const adjCastle = this.game.castles.find(c => c.id === adjId);
+                            const adjCastle = this.game.getCastle(adjId);
                             if (adjCastle && adjCastle.ownerClan === clan.id) {
                                 isNear = true; // 隣接する城の持ち主がこの敵対大名家なら「近い！」とメモします
                                 break;
@@ -201,7 +201,7 @@ class IndependenceSystem {
                 let isDirectlyNear = false;
                 if (castle.adjacentCastleIds) {
                     for (const adjId of castle.adjacentCastleIds) {
-                        const adjCastle = this.game.castles.find(c => c.id === adjId);
+                        const adjCastle = this.game.getCastle(adjId);
                         if (adjCastle && adjCastle.ownerClan === clan.id) {
                             isDirectlyNear = true;
                             break;
@@ -303,7 +303,7 @@ class IndependenceSystem {
             rebellionLeader.isDaimyo = true;
             
             // ★追加：新しい大名が住んでいるお城のおまかせ（委任）を解除します
-            const daimyoCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
+            const daimyoCastle = this.game.getCastle(rebellionLeader.castleId);
             if (daimyoCastle) {
                 daimyoCastle.isDelegated = false;
             }
@@ -324,7 +324,7 @@ class IndependenceSystem {
 
         // ★神輿（派閥主）本人の処遇
         if (isProxyRebellion) {
-            const leaderCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
+            const leaderCastle = this.game.getCastle(rebellionLeader.castleId);
             // ★神輿（派閥主）も大名家が変わるので功績半分！
             if (rebellionLeader.clan !== 0 && rebellionLeader.clan !== newClanId) {
                 rebellionLeader.achievementTotal = Math.floor((rebellionLeader.achievementTotal || 0) / 2);
@@ -410,7 +410,7 @@ class IndependenceSystem {
 
         // ★派閥主が別の城の城主だった場合、その城の部下たちも処遇を決定する
         if (isProxyRebellion && rebellionLeader.isCastellan) {
-            const leaderCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
+            const leaderCastle = this.game.getCastle(rebellionLeader.castleId);
             if (leaderCastle && leaderCastle.id !== castle.id) {
                 const extraMsgs = this.resolveSubordinates(leaderCastle, rebellionLeader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId);
                 if (extraMsgs.length > 0) captiveMsgs = captiveMsgs.concat(extraMsgs);
@@ -492,7 +492,7 @@ class IndependenceSystem {
         let newColorRgb = { r: 255, g: 255, b: 255 };
         const oldClanData = this.game.getClan(oldClanId);
         if (oldClanData && oldClanData.color && typeof DataManager !== 'undefined') oldColor = DataManager.hexToRgb(oldClanData.color);
-        const newClanDataObj = this.game.clans.find(c => c.id === newClanId);
+        const newClanDataObj = this.game.getClan(newClanId);
         if (newClanDataObj && newClanDataObj.color && typeof DataManager !== 'undefined') newColorRgb = DataManager.hexToRgb(newClanDataObj.color);
 
         // 参加したお城をすべて同時にチカチカ点滅させます！
@@ -755,7 +755,7 @@ class IndependenceSystem {
         const targetFactionId = (leaderOriginalFactionId !== null && leaderOriginalFactionId !== 0) ? leaderOriginalFactionId : newDaimyo.factionId;
         if (!targetFactionId || targetFactionId === 0) return; 
         
-        const potential = this.game.bushos.filter(b => b.clan === oldClanId && window.BushoStatusRules.isActive(b) && !b.isCastellan && b.factionId === targetFactionId && !b.isDaimyo && !b.isCommander && !b.isFactionLeader);
+        const potential = this.game.getClanBushos(oldClanId).filter(b => window.BushoStatusRules.isActive(b) && !b.isCastellan && b.factionId === targetFactionId && !b.isDaimyo && !b.isCommander && !b.isFactionLeader);
         const mainCastle = this.game.castles.find(c => c.castellanId === newDaimyo.id);
         if (!mainCastle) return;
 
@@ -763,7 +763,7 @@ class IndependenceSystem {
             // ★修正：記憶しておいた元の派閥IDを渡します
             const { joinScore, stayScore } = this.calculateLoyaltyScores(busho, newDaimyo, oldDaimyo, leaderOriginalFactionId);
             if (joinScore > stayScore && Math.random() * 300 < joinScore) {
-                const oldCastle = this.game.castles.find(c => c.id === busho.castleId);
+                const oldCastle = this.game.getCastle(busho.castleId);
                 if (oldCastle) {
                     oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== busho.id);
                     this.game.updateCastleLord(oldCastle);
@@ -862,7 +862,7 @@ class IndependenceSystem {
         const oldClanId = castle.ownerClan;
         
         if (castellan.factionId !== 0 && !castellan.isFactionLeader) {
-            const factionLeader = this.game.bushos.find(b => b.clan === oldClanId && b.factionId === castellan.factionId && b.isFactionLeader && !b.belongKunishuId);
+            const factionLeader = this.game.getClanBushos(oldClanId).find(b => b.factionId === castellan.factionId && b.isFactionLeader && !b.belongKunishuId);
             if (factionLeader) {
                 const { joinScore, stayScore } = this.calculateLoyaltyScores(factionLeader, castellan, oldDaimyo);
                 if (joinScore > stayScore) {
@@ -872,7 +872,7 @@ class IndependenceSystem {
         }
 
         // 2. 勢力内の全員を呼び出して、どっちの味方か振り分けます。
-        const allMembers = this.game.bushos.filter(b => b.clan === oldClanId && window.BushoStatusRules.isActive(b));
+        const allMembers = this.game.getClanBushos(oldClanId).filter(b => window.BushoStatusRules.isActive(b));
         const totalMembers = allMembers.length;
 
         let rebelMembers = [];
@@ -1033,7 +1033,7 @@ class IndependenceSystem {
                 // 元の色を調べて、謀反軍の仮の色（少し赤っぽく）と交互に点滅させます
                 let oldColor = { r: 255, g: 255, b: 255 };
                 let rebelColor = { r: 255, g: 100, b: 100 }; 
-                const oldClanData = this.game.clans.find(c => c.id === oldClanId);
+                const oldClanData = this.game.getClan(oldClanId);
                 if (oldClanData && oldClanData.color && typeof DataManager !== 'undefined') oldColor = DataManager.hexToRgb(oldClanData.color);
 
                 // 反乱軍の城をすべて同時に点滅させます！
@@ -1205,7 +1205,7 @@ class IndependenceSystem {
                 // ==========================================
 
                 // ★追加：新しい大名が住んでいるお城のおまかせ（委任）を解除します
-                const daimyoCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
+                const daimyoCastle = this.game.getCastle(rebellionLeader.castleId);
                 if (daimyoCastle) {
                     daimyoCastle.isDelegated = false;
                 }
@@ -1217,7 +1217,7 @@ class IndependenceSystem {
                 }
 
                 // 勢力名を変更
-                const clan = this.game.clans.find(c => c.id === oldClanId);
+                const clan = this.game.getClan(oldClanId);
                 if (clan) {
                     clan.name = rebellionLeader.clanNameStr;
                     
@@ -1460,7 +1460,7 @@ class IndependenceSystem {
         // 1. 独立する城に直接隣接する城の持ち主（第1隣接）を取得します
         if (castle.adjacentCastleIds) {
             for (const adjId of castle.adjacentCastleIds) {
-                const adjCastle = this.game.castles.find(c => c.id === adjId);
+                const adjCastle = this.game.getCastle(adjId);
                 if (adjCastle && adjCastle.ownerClan !== 0) {
                     degree1Clans.add(adjCastle.ownerClan);
                 }
@@ -1472,7 +1472,7 @@ class IndependenceSystem {
             if (degree1Clans.has(c.ownerClan)) {
                 if (c.adjacentCastleIds) {
                     for (const adjId of c.adjacentCastleIds) {
-                        const adjCastle = this.game.castles.find(c2 => c2.id === adjId);
+                        const adjCastle = this.game.getCastle(adjId);
                         if (adjCastle && adjCastle.ownerClan !== 0 && !degree1Clans.has(adjCastle.ownerClan)) {
                             degree2Clans.add(adjCastle.ownerClan);
                         }
@@ -1486,7 +1486,7 @@ class IndependenceSystem {
             if (degree2Clans.has(c.ownerClan)) {
                 if (c.adjacentCastleIds) {
                     for (const adjId of c.adjacentCastleIds) {
-                        const adjCastle = this.game.castles.find(c2 => c2.id === adjId);
+                        const adjCastle = this.game.getCastle(adjId);
                         if (adjCastle && adjCastle.ownerClan !== 0 && !degree1Clans.has(adjCastle.ownerClan) && !degree2Clans.has(adjCastle.ownerClan)) {
                             degree3Clans.add(adjCastle.ownerClan);
                         }
@@ -1500,7 +1500,7 @@ class IndependenceSystem {
             if (degree3Clans.has(c.ownerClan)) {
                 if (c.adjacentCastleIds) {
                     for (const adjId of c.adjacentCastleIds) {
-                        const adjCastle = this.game.castles.find(c2 => c2.id === adjId);
+                        const adjCastle = this.game.getCastle(adjId);
                         if (adjCastle && adjCastle.ownerClan !== 0 && !degree1Clans.has(adjCastle.ownerClan) && !degree2Clans.has(adjCastle.ownerClan) && !degree3Clans.has(adjCastle.ownerClan)) {
                             degree4Clans.add(adjCastle.ownerClan);
                         }
@@ -1520,7 +1520,7 @@ class IndependenceSystem {
         const otherColors = [];
         
         for (const clanId of aliveClanIds) {
-            const clan = this.game.clans.find(c => c.id === clanId);
+            const clan = this.game.getClan(clanId);
             if (clan && clan.color) {
                 const rgb = this.hexToRgb(clan.color);
                 if (rgb) {
@@ -1636,7 +1636,7 @@ class IndependenceSystem {
             // 案内役の取得 (小姓など)
             let myCastle = null;
             if (myDaimyo) myCastle = this.game.getCastle(myDaimyo.castleId);
-            if (!myCastle) myCastle = this.game.castles.find(c => c.ownerClan === this.game.playerClanId);
+            if (!myCastle) myCastle = this.game.getClanCastles(this.game.playerClanId)[0];
             const nav = myCastle ? this.game.getNavigatorInfo(myCastle) : { faceIcon: 'unknown_face.webp', name: '小姓' };
 
             const oldClanName = this.game.getClan(oldClanId)?.name || "不明";

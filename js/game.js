@@ -169,9 +169,47 @@ class GameManager {
         return this.diplomacyManager.getRelation(id1, id2);
     }
 
+    // シナリオ／セーブ切替時に、前データを参照している検索索引を先に切ります。
+    // 配列そのものは復元処理が置き換えますが、Mapが旧武将・旧拠点を保持したままだと
+    // 古い低メモリ端末で新旧データが重なる瞬間のピークが大きくなります。
+    releaseScenarioDataIndexes() {
+        this._bushoMap = null;
+        this._bushoMapSource = null;
+        this._bushoMapSize = -1;
+        this._castleMap = null;
+        this._castleMapSource = null;
+        this._castleMapSize = -1;
+        this._clanMap = null;
+        this._clanMapSource = null;
+        this._clanMapSize = -1;
+        this._provinceMap = null;
+        this._provinceMapSource = null;
+        this._provinceMapSize = -1;
+        this._princessMap = null;
+        this._princessMapSource = null;
+        this._princessMapSize = -1;
+
+        this._clanBushosMap = null;
+        this._clanBushosSource = null;
+        this._clanBushosSize = -1;
+        this._clanBushosVersion = -1;
+        this._clanCastlesMap = null;
+        this._clanCastlesSource = null;
+        this._clanCastlesVersion = -1;
+
+        this._provinceCastlesMap = null;
+        this._regionProvincesMap = null;
+        this._regionCastlesMap = null;
+        this._territoryIndexCastlesSource = null;
+        this._territoryIndexCastlesSize = -1;
+        this._territoryIndexProvincesSource = null;
+        this._territoryIndexProvincesSize = -1;
+    }
+
     // タイトル復帰・新規シナリオ読込前に、旧シナリオの巨大IDマップ共有参照をまとめて切る。
     // 地図画像そのものは共通資産なので解放対象にせず、シナリオごとに再構築されるTypedArrayだけを対象とする。
     releaseScenarioMapResources() {
+        this.releaseScenarioDataIndexes();
         if (this.ui) {
             this.ui.pixelCastleMap = null;
             this.ui.pixelProvinceMap = null;
@@ -491,7 +529,7 @@ class GameManager {
     }
     
     handleDaimyoSelect(castle) {
-        const clan = this.clans.find(c => c.id === castle.ownerClan);
+        const clan = this.getClan(castle.ownerClan);
         if (!clan) return;
 
         const totalSoldiers = this.getClanTotalSoldiers(clan.id);
@@ -549,6 +587,106 @@ class GameManager {
         }
         return this._provinceMap.get(Number(id));
     }
+    getPrincess(id) {
+        // 姫も婚姻・会話・情報表示からID参照されるため、配列の先頭から毎回探さない。
+        // ランダム姫追加時は配列長が変わるので自動的に再構築される。
+        if (this._princessMapSource !== this.princesses || this._princessMapSize !== this.princesses.length) {
+            this._princessMap = new Map();
+            this.princesses.forEach(p => this._princessMap.set(Number(p.id), p));
+            this._princessMapSource = this.princesses;
+            this._princessMapSize = this.princesses.length;
+        }
+        return this._princessMap.get(Number(id));
+    }
+    _ensureTerritoryStaticIndexes() {
+        // provinceId / regionId はシナリオ地理の静的構造なので、国・地方ごとの拠点集合を共有する。
+        // 所有者などゲーム中に変化する状態は索引へ焼き込まない。
+        const castles = this.castles || [];
+        const provinces = this.provinces || [];
+        if (this._territoryIndexCastlesSource === castles
+            && this._territoryIndexCastlesSize === castles.length
+            && this._territoryIndexProvincesSource === provinces
+            && this._territoryIndexProvincesSize === provinces.length) return;
+
+        const provinceMap = new Map();
+        const regionProvinceMap = new Map();
+        const regionCastleMap = new Map();
+        const provinceRegionMap = new Map();
+
+        for (const province of provinces) {
+            const provinceId = Number(province.id) || 0;
+            const regionId = Number(province.regionId) || 0;
+            provinceRegionMap.set(provinceId, regionId);
+            let regionProvinces = regionProvinceMap.get(regionId);
+            if (!regionProvinces) {
+                regionProvinces = [];
+                regionProvinceMap.set(regionId, regionProvinces);
+            }
+            regionProvinces.push(province);
+        }
+
+        for (const castle of castles) {
+            const provinceId = Number(castle.provinceId) || 0;
+            let provinceCastles = provinceMap.get(provinceId);
+            if (!provinceCastles) {
+                provinceCastles = [];
+                provinceMap.set(provinceId, provinceCastles);
+            }
+            provinceCastles.push(castle);
+
+            const regionId = provinceRegionMap.get(provinceId) || 0;
+            let regionCastles = regionCastleMap.get(regionId);
+            if (!regionCastles) {
+                regionCastles = [];
+                regionCastleMap.set(regionId, regionCastles);
+            }
+            regionCastles.push(castle);
+        }
+
+        this._provinceCastlesMap = provinceMap;
+        this._regionProvincesMap = regionProvinceMap;
+        this._regionCastlesMap = regionCastleMap;
+        this._territoryIndexCastlesSource = castles;
+        this._territoryIndexCastlesSize = castles.length;
+        this._territoryIndexProvincesSource = provinces;
+        this._territoryIndexProvincesSize = provinces.length;
+    }
+    getProvinceCastles(provinceId) {
+        this._ensureTerritoryStaticIndexes();
+        return this._provinceCastlesMap.get(Number(provinceId) || 0) || [];
+    }
+    getRegionProvinces(regionId) {
+        this._ensureTerritoryStaticIndexes();
+        return this._regionProvincesMap.get(Number(regionId) || 0) || [];
+    }
+    getRegionCastles(regionId) {
+        this._ensureTerritoryStaticIndexes();
+        return this._regionCastlesMap.get(Number(regionId) || 0) || [];
+    }
+    // 勢力所属は AffiliationSystem が唯一の書換窓口なので、所属変更versionを使って
+    // 「勢力ID→所属武将配列」を安全に共有します。活動中/死亡などの状態は変動するため
+    // 索引へ焼き込まず、呼び出し側がこの小さな候補集合に対して判定します。
+    getClanBushos(clanId) {
+        const version = this.bushoAffiliationVersion || 0;
+        if (this._clanBushosSource !== this.bushos
+            || this._clanBushosSize !== this.bushos.length
+            || this._clanBushosVersion !== version) {
+            this._clanBushosMap = new Map();
+            for (const busho of this.bushos) {
+                const id = Number(busho.clan) || 0;
+                let members = this._clanBushosMap.get(id);
+                if (!members) {
+                    members = [];
+                    this._clanBushosMap.set(id, members);
+                }
+                members.push(busho);
+            }
+            this._clanBushosSource = this.bushos;
+            this._clanBushosSize = this.bushos.length;
+            this._clanBushosVersion = version;
+        }
+        return this._clanBushosMap.get(Number(clanId) || 0) || [];
+    }
     // ★高速化：「勢力ID→大名武将」を一瞬で取り出します（毎回全武将から探す代わりに、勢力が覚えているIDを使います）
     getClanDaimyo(clanId) {
         const numericClanId = Number(clanId);
@@ -559,7 +697,7 @@ class GameManager {
             // 以前の「clan + isDaimyo 検索」と同じ結果へフォールバックします。
             if (leader && Number(leader.clan) === numericClanId && leader.isDaimyo) return leader;
         }
-        return this.bushos.find(b => Number(b.clan) === numericClanId && b.isDaimyo);
+        return this.getClanBushos(numericClanId).find(b => b.isDaimyo);
     }
     // ★高速化：「勢力ID→持ち城リスト」を一瞬で取り出します。
     // お城の持ち主（ownerClan）が変わった時だけ索引を作り直すよう、
@@ -577,14 +715,23 @@ class GameManager {
         }
         return this._clanCastlesMap.get(Number(clanId)) || [];
     }
-    // ★ 修正：まだ生まれていない人（unborn）や亡くなった人（dead）は無視するようにします
-    getCastleBushos(cid) { const c = this.getCastle(cid); return c ? c.samuraiIds.map(id => this.getBusho(id)).filter(b => b && window.LifeStatusRules.isPresent(b)) : []; }
+    // ★ 修正：まだ生まれていない人（unborn）や亡くなった人（dead）は無視するようにします。
+    // map→filter の二重配列を作らず、一度の走査で必要な人物だけ返します。
+    getCastleBushos(cid) {
+        const castle = this.getCastle(cid);
+        if (!castle || !Array.isArray(castle.samuraiIds) || castle.samuraiIds.length === 0) return [];
+        const result = [];
+        for (const id of castle.samuraiIds) {
+            const busho = this.getBusho(id);
+            if (busho && window.LifeStatusRules.isPresent(busho)) result.push(busho);
+        }
+        return result;
+    }
     getCurrentTurnCastle() { return this.turnQueue[this.currentIndex]; }
     getCurrentTurnId() { return this.year * 12 + this.month; }
     getClanTotalSoldiers(clanId) { return this.getClanCastles(clanId).reduce((sum, c) => sum + c.soldiers, 0); }
     getClanGunshi(clanId) {
-        const numericClanId = Number(clanId);
-        return this.bushos.find(b => Number(b.clan) === numericClanId && b.isGunshi && window.BushoStatusRules.isActive(b));
+        return this.getClanBushos(clanId).find(b => b.isGunshi && window.BushoStatusRules.isActive(b));
     }
 
     getNavigatorInfo(castle) {
@@ -598,7 +745,7 @@ class GameManager {
             let hasSpecialPrincess = false;
             if (daimyo.wifeIds && daimyo.wifeIds.length > 0) {
                 for (const wId of daimyo.wifeIds) {
-                    const wife = this.princesses.find(p => Number(p.id) === Number(wId));
+                    const wife = this.getPrincess(wId);
                     if (wife && wife.faceIcon && wife.faceIcon !== 'unknown_princess_face.webp') {
                         faceIcon = wife.faceIcon;
                         name = wife.name;
@@ -765,7 +912,7 @@ class GameManager {
                                 }
                             } else {
                                 // いなければ今まで通り国名をつける
-                                const province = this.provinces.find(p => p.id === myProvId);
+                                const province = this.getProvince(myProvId);
                                 if (province && province.province) {
                                     const provName = province.shortName;
                                     // ★国名の読みから「のくに」を抜きます
@@ -833,7 +980,7 @@ class GameManager {
     checkAllActionsDone() { return this.turnManager.checkAllActionsDone(); }
 
     changeLeader(clanId, newLeaderId) { 
-        this.bushos.filter(b => b.clan === clanId).forEach(b => b.isDaimyo = false); 
+        this.getClanBushos(clanId).forEach(b => b.isDaimyo = false); 
         const newLeader = this.getBusho(newLeaderId); 
         if(newLeader) { 
             newLeader.isDaimyo = true; 
@@ -1000,7 +1147,7 @@ class GameManager {
         }
 
         this.ui.info.showDaimyoSelector((selectedClanId) => {
-            const selectedClan = this.clans.find(c => c.id === selectedClanId);
+            const selectedClan = this.getClan(selectedClanId);
             if (!selectedClan) {
                 this.cancelQueuedWatchReturn();
                 return;

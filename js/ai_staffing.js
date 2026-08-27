@@ -13,7 +13,7 @@ class AIStaffing {
         if (!leader || (!leader.isDaimyo && !leader.isCommander) || leader.castleId !== castle.id) return false;
 
         // ★追加：今いるお城が大雪なら、お引越しできません！
-        const srcProv = this.game.provinces.find(p => p.id === castle.provinceId);
+        const srcProv = this.game.getProvince(castle.provinceId);
         if (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) {
             return false;
         }
@@ -116,7 +116,7 @@ class AIStaffing {
             if (target.id === castle.id) continue;
 
             // ★追加：目的地のお城が大雪なら、お引越し先候補から除外します！
-            const tgtProv = this.game.provinces.find(p => p.id === target.provinceId);
+            const tgtProv = this.game.getProvince(target.provinceId);
             if (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow')) {
                 continue;
             }
@@ -321,7 +321,7 @@ class AIStaffing {
         });
 
         const occupiedProvinces = new Set();
-        const daimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo);
+        const daimyo = this.game.getClanDaimyo(clanId);
         if (daimyo && daimyo.castleId) {
             const dCastle = this.game.getCastle(daimyo.castleId);
             if(dCastle) occupiedProvinces.add(dCastle.provinceId);
@@ -348,7 +348,7 @@ class AIStaffing {
         if (candidateCastles.length === 0) return false; // ★変更：失敗時は false を返す
         
         // 新国主の選定
-        const myBushos = this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b));
+        const myBushos = this.game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b));
         let candidates = myBushos.filter(b => !b.isDaimyo && !b.isCommander && (b.achievementTotal || 0) >= 1000);
         if (candidates.length === 0) return false; // ★変更：失敗時は false を返す
         
@@ -447,8 +447,7 @@ class AIStaffing {
         
         // 3. お供の武将をカウント（同じ派閥の直轄武将の1/3）
         if (newCommander.factionId !== 0) {
-            const sameFactionBushos = this.game.bushos.filter(b => 
-                b.clan === clanId && 
+            const sameFactionBushos = this.game.getClanBushos(clanId).filter(b => 
                 window.BushoStatusRules.isActive(b) && 
                 b.factionId === newCommander.factionId && 
                 !b.isDaimyo && 
@@ -484,8 +483,7 @@ class AIStaffing {
         // ★追加：新国主が派閥に所属している場合、同じ派閥の武将を移動先に集める
         if (newCommander.factionId !== 0) {
             // 同じ大名家で、活動中で、同じ派閥で、大名・国主・城主・軍師ではない人を探します
-            const sameFactionBushos = this.game.bushos.filter(b => 
-                b.clan === clanId && 
+            const sameFactionBushos = this.game.getClanBushos(clanId).filter(b => 
                 window.BushoStatusRules.isActive(b) && 
                 b.factionId === newCommander.factionId && 
                 !b.isDaimyo && 
@@ -569,7 +567,7 @@ class AIStaffing {
                 // 解散前に国主を退避しておく。disbandLegion() は commanderId を0へ戻すため、
                 // 解散後に参照すると履歴・ログ上の国主名を失う。
                 const cmd = this.game.getBusho(legion.commanderId);
-                const clanName = this.game.clans.find(c => c.id === clanId)?.name || "不明な大名家";
+                const clanName = this.game.getClan(clanId)?.name || "不明な大名家";
                 const cmdName = cmd ? cmd.name : "不明な国主";
                 if (this.game.castleManager) this.game.castleManager.disbandLegion(legion.id);
                 console.log(`【軍団解散】${clanName}の「${cmdName}軍団」は、人手不足（拠点${legionCastles.length}に対して武将${legionBushoCount}人）のため解散されました。`);
@@ -604,7 +602,7 @@ class AIStaffing {
             if (!hasEnemyNeighbor && currentActiveCount >= 8) {
                 // disbandLegion() が commanderId を消す前に表示用情報を確保する。
                 const cmd = this.game.getBusho(legion.commanderId);
-                const clanName = this.game.clans.find(c => c.id === clanId)?.name || "不明な大名家";
+                const clanName = this.game.getClan(clanId)?.name || "不明な大名家";
                 const cmdName = cmd ? cmd.name : "不明な国主";
                 if (this.game.castleManager) this.game.castleManager.disbandLegion(legion.id);
                 console.log(`【軍団解散】${clanName}の「${cmdName}軍団」は、担当地域が完全に後方化し、かつ軍団枠が上限に達しているため解散され、直轄に編入されました。`);
@@ -633,7 +631,7 @@ class AIStaffing {
             return this.evaluationCache[clanId].bushoTypes;
         }
 
-        const myBushos = this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b));
+        const myBushos = this.game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b));
         
         let totalSum = 0;
         let highestTotal = 0;

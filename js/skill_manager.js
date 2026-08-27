@@ -561,7 +561,7 @@ class SkillManager {
     // ＜暗殺防諜＞ ターゲット勢力全体の忍術レベルを合計して、暗殺の成功率を下げる（重複可）
     static calcNinjutsuAssassinateDefense(clanId, game) {
         if (!game || clanId === 0) return 0;
-        const bushos = game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b));
+        const bushos = game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b));
         let totalLvl = 0;
         bushos.forEach(b => {
             totalLvl += this.getNinjutsuLevel(b);

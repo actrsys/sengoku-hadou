@@ -109,7 +109,7 @@ class EconomyRules {
         if (daimyo && game && game.castles) {
             hasProdCastle = game.castles.some(c => c.ownerClan === daimyo.clan && this.isProdCastle(c, itemType, game.provinces));
         } else if (castellan && game && game.castles) {
-            const myCastle = game.castles.find(c => c.id === castellan.castleId);
+            const myCastle = game.getCastle(castellan.castleId);
             hasProdCastle = this.isProdCastle(myCastle, itemType, game.provinces);
         } else if (castellan && itemType === 'gun') {
             // 万が一の予備チェック（鉄砲用）
@@ -162,7 +162,7 @@ class EconomyRules {
         if (myClanId > 0 && game && game.kunishuSystem && game.castles) {
             const kunishus = game.kunishuSystem.getAliveKunishus();
             for (let k of kunishus) {
-                const castle = game.castles.find(c => c.id === k.castleId);
+                const castle = game.getCastle(k.castleId);
                 // その諸勢力がいる城が、馬や鉄砲の産地かどうかチェック
                 if (this.isProdCastle(castle, itemType, game.provinces)) {
                     const rel = k.getRelation(myClanId);
@@ -406,7 +406,7 @@ class EconomyRules {
     static calcCastleSalary(castle, game) {
         if (!game) return 0;
         const bushos = game.getCastleBushos(castle.id).filter(b => Number(b.clan) === Number(castle.ownerClan) && Number(b.belongKunishuId || 0) === 0 && window.BushoStatusRules.isActive(b));
-        const daimyo = game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
+        const daimyo = game.getClanDaimyo(castle.ownerClan);
         let consumeGold = 0;
         bushos.forEach(b => {
             consumeGold += b.getSalary(daimyo);
@@ -449,7 +449,7 @@ class EconomyRules {
             if (neighborIds && neighborIds.size > 0) {
                 let neighborTotalRate = 0;
                 neighborIds.forEach(nId => {
-                    const neighborProvince = game.provinces.find(p => p.id === nId);
+                    const neighborProvince = game.getProvince(nId);
                     if (neighborProvince) neighborTotalRate += neighborProvince.marketRate;
                 });
                 const neighborAverage = neighborTotalRate / neighborIds.size;

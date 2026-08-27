@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r248');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r250');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1361,8 +1361,10 @@ test('和睦条件の姫はAI同士で架空姫だけ、プレイヤーへの要
     ];
     const game = {
         playerClanId: 1, clans, princesses: [historical, generated], bushos: [targetBusho], castles: [],
+        getClan: id => clans.find(c => Number(c.id) === Number(id)) || null,
         getClanDaimyo: () => null,
-        getBusho: id => Number(id) === targetBusho.id ? targetBusho : null
+        getBusho: id => Number(id) === targetBusho.id ? targetBusho : null,
+        getPrincess: id => [historical, generated].find(p => Number(p.id) === Number(id)) || null
     };
     const dm = new ctx.DiplomacyManager(game);
 
@@ -1455,7 +1457,11 @@ test('AI同士の条件付き和睦は提示条件を申し込んだ側が再判
     const ctx = createContext();
     loadScript(ctx, 'js/diplomacy.js');
     vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
-    const game = { clans: [{ id: 1 }, { id: 2 }], playerClanId: 99 };
+    const game = {
+        clans: [{ id: 1 }, { id: 2 }],
+        playerClanId: 99,
+        getClan(id) { return this.clans.find(c => Number(c.id) === Number(id)) || null; }
+    };
     const dm = new ctx.DiplomacyManager(game);
     dm._buildTruceConditionOptions = () => [{ type: 'castle', castle: { id: 10 } }];
     dm._selectTruceConditionOption = options => options[0];
@@ -1622,7 +1628,8 @@ test('婚姻は基本外交statusを上書きせず友好度と外交補正だ�
         princesses: [princess],
         bushos: [husband],
         getClan: id => clans.find(c => Number(c.id) === Number(id)) || null,
-        getBusho: id => Number(id) === 20 ? husband : null
+        getBusho: id => Number(id) === 20 ? husband : null,
+        getPrincess: id => Number(id) === 1 ? princess : null
     };
     const dm = new ctx.DiplomacyManager(game);
     assert.strictEqual(dm.applyMarriageData(1, 20, 2, false), true);
@@ -1665,7 +1672,8 @@ test('和睦条件の婚姻は婚姻関係だけ成立させ、通常婚姻の�
         princesses: [princess],
         bushos: [husband],
         getClan: id => clans.find(c => Number(c.id) === Number(id)) || null,
-        getBusho: id => Number(id) === 20 ? husband : null
+        getBusho: id => Number(id) === 20 ? husband : null,
+        getPrincess: id => Number(id) === 1 ? princess : null
     };
     const dm = new ctx.DiplomacyManager(game);
     dm._applyTruceConditionData('marriage', { princess, busho: husband }, 1, 2);
@@ -3065,6 +3073,7 @@ test('浪人化は妻を無所属へ移し旧家姫名簿と外交婚姻を同�
         princesses: [wife],
         bushos: [],
         getClan: id => Number(id) === 1 ? oldClan : null,
+        getPrincess: id => Number(id) === 11 ? wife : null,
         getClanCastles: () => [{ id: 10 }],
         getClanDaimyo: () => null,
         diplomacyManager: { refreshMarriageRelation: (a, b) => refreshed.push([Number(a), Number(b)]) },
@@ -3612,7 +3621,8 @@ test('馬・鉄砲の購入可否は受け取ったゲーム状態を価格計�
     const castellan = { id: 2, clan: 1, isCastellan: true };
     const game = {
         year: 1560, bushos: [daimyo, castellan],
-        getBusho: id => Number(id) === 2 ? castellan : null
+        getBusho: id => Number(id) === 2 ? castellan : null,
+        getClanDaimyo: id => Number(id) === 1 ? daimyo : null
     };
     const castle = { ownerClan: 1, castellanId: 2, gold: 10 };
     assert.strictEqual(rules.canBuyHorses(game, castle), true);
@@ -4765,7 +4775,9 @@ test('攻城戦と野戦のホーム補正は WarSystem の共通計算を使う
             { id: 3, regionId: 8 }
         ],
         getBusho: id => id === 50 ? { id: 50, castleId: 10 } : (id === 77 ? { id: 77, castleId: 12 } : null),
-        getCastle: id => castles.get(id) || null
+        getCastle: id => castles.get(id) || null,
+        getProvince(id) { return this.provinces.find(p => Number(p.id) === Number(id)); },
+        getClanDaimyo: id => Number(id) === 1 ? { id: 99, clan: 1, isDaimyo: true, castleId: 12 } : null
     };
     const defender = { id: 20, provinceId: 1 };
 
@@ -5036,7 +5048,7 @@ test('セーブデータから一門派生キャッシュを除外する', () =>
 test('セーブ復元は城主フラグをCastle.castellanIdから再構築する', () => {
     const save = read('js/save_manager.js');
     assert.ok(save.includes('this.game.bushos.forEach(busho => { busho.isCastellan = false; });'));
-    assert.ok(save.includes('Number(b.id) === Number(castle.castellanId)'));
+    assert.ok(save.includes('const castellan = this.game.getBusho(castle.castellanId);'));
     assert.ok(save.includes('Number(castellan.castleId) === Number(castle.id)'));
     assert.ok(save.includes('Number(castellan.clan) === Number(castle.ownerClan)'));
 });
@@ -6206,7 +6218,8 @@ test('総取りは守備側が撤退成功した場合は発生せず、撤退�
         clans: [
             { id: 1, daimyoPrestige: 300 },
             { id: 2, daimyoPrestige: 100 }
-        ]
+        ],
+        getClan(id) { return this.clans.find(c => Number(c.id) === Number(id)); }
     };
     wm.state = {
         isDaimyoCastleFallen: true,
@@ -6903,7 +6916,7 @@ test('AI上洛判断は自家所属の通常活動中武将だけを将軍候補
     const at = ai.indexOf('// 自勢力に正式所属する通常の活動中武将だけから「左馬頭（ID: 80）」を探す。');
     assert.ok(at >= 0);
     const block = ai.slice(at, at + 900);
-    assert.ok(block.includes('Number(b.clan) === Number(myClanId)'));
+    assert.ok(block.includes('this.game.getClanBushos(myClanId)'));
     assert.ok(block.includes('Number(b.belongKunishuId || 0) === 0'));
     assert.ok(block.includes('window.BushoStatusRules.isActive(b)'));
     assert.ok(!block.includes('getCastleBushos'));
@@ -7367,7 +7380,7 @@ test('軍師・国主任命コマンドは実際に選べる候補がいる時�
 
     const legionAt = catalog.indexOf('canManageLegion:');
     const legionRule = catalog.slice(legionAt, legionAt + 1100);
-    assert.ok(legionRule.includes('const hasCandidate = game.bushos.some'));
+    assert.ok(legionRule.includes('const hasCandidate = game.getClanBushos(game.playerClanId).some'));
     assert.ok(legionRule.includes('!b.isDaimyo'));
     assert.ok(legionRule.includes('!b.isCommander'));
     assert.ok(legionRule.includes('return hasCandidate && legionNumber <= myCastles.length;'));
@@ -7545,6 +7558,7 @@ test('AI軍団解散ログは disbandLegion が commanderId を消す前の国�
         getClanCastles: () => castles,
         getCastleBushos: castleId => castleId === 11 ? [commander] : [],
         getBusho: id => Number(id) === 101 ? commander : null,
+        getClan(id) { return this.clans.find(c => Number(c.id) === Number(id)); },
         castleManager: {
             disbandLegion: () => { legion.commanderId = 0; }
         }
@@ -7602,7 +7616,7 @@ test('お市の婚姻イベントは元の実家ではなく現在所属を正�
 
 test('姫一覧と詳細の所属表示は未婚でも currentClanId を正本にする', () => {
     const ui = read('js/ui_info.js');
-    assert.ok(ui.includes('const clanA = this.game.clans.find(c => Number(c.id) === Number(a.currentClanId));'));
+    assert.ok(ui.includes('const clanA = this.game.getClan(a.currentClanId);'));
     assert.ok(ui.includes('const targetClanId = Number(p.currentClanId) || 0;'));
     assert.ok(ui.includes('const clanId = Number(princess.currentClanId) || 0;'));
     assert.ok(!ui.includes('(p.husbandId && p.husbandId !== 0) ? p.currentClanId : p.originalClanId'));
@@ -7856,6 +7870,135 @@ test('諸勢力のID・拠点検索は専門System内の索引を共用し壊滅
     const setAt = src.indexOf('setKunishuData(kunishus)');
     const setBlock = src.slice(setAt, setAt + 360);
     assert.ok(setBlock.includes('this._kunishuIndexSource = null;'));
+});
+
+
+test('勢力別武将索引は所属versionだけで無効化し活動状態をキャッシュへ焼き込まない', () => {
+    const game = read('js/game.js');
+    const at = game.indexOf('getClanBushos(clanId)');
+    const block = game.slice(at, at + 1700);
+    assert.ok(at >= 0);
+    assert.ok(block.includes('const version = this.bushoAffiliationVersion || 0;'));
+    assert.ok(block.includes('this._clanBushosVersion !== version'));
+    assert.ok(block.includes('const id = Number(busho.clan) || 0;'));
+    assert.ok(!block.includes('BushoStatusRules'));
+    assert.ok(!block.includes('LifeStatusRules'));
+    const gunshiAt = game.indexOf('getClanGunshi(clanId)');
+    const gunshiBlock = game.slice(gunshiAt, gunshiAt + 260);
+    assert.ok(gunshiBlock.includes('this.getClanBushos(clanId).find'));
+    assert.ok(gunshiBlock.includes('BushoStatusRules.isActive(b)'));
+});
+
+test('武将所属の実変更だけが勢力別武将索引versionを進める', () => {
+    const affiliation = read('js/affiliation_system.js');
+    const at = affiliation.indexOf('setClanIdRaw(busho, newClanId)');
+    const block = affiliation.slice(at, at + 900);
+    assert.ok(at >= 0);
+    assert.ok(block.includes('if (oldClanId === nextClanId) return;'));
+    assert.ok(block.includes('busho.clan = nextClanId;'));
+    assert.ok(block.includes('this.game.bushoAffiliationVersion = (this.game.bushoAffiliationVersion || 0) + 1;'));
+    assert.ok(block.indexOf('if (oldClanId === nextClanId) return;') < block.indexOf('bushoAffiliationVersion'));
+});
+
+test('勢力別武将索引の共有配列を呼び出し側から直接破壊しない', () => {
+    const files = fs.readdirSync(path.join(ROOT, 'js'), { withFileTypes: true });
+    const jsFiles = [];
+    const walk = dir => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) walk(full);
+            else if (entry.isFile() && entry.name.endsWith('.js')) jsFiles.push(full);
+        }
+    };
+    walk(path.join(ROOT, 'js'));
+    const destructive = /getClanBushos\([^)]*\)\s*\.\s*(?:sort|reverse|splice|push|pop|shift|unshift)\s*\(/;
+    const offenders = jsFiles.filter(file => destructive.test(fs.readFileSync(file, 'utf8')));
+    assert.deepStrictEqual(offenders, []);
+});
+
+test('高頻度の人事・コマンド・AI候補抽出は勢力別武将索引を共用する', () => {
+    const game = read('js/game.js');
+    assert.ok(game.slice(game.indexOf('getClanDaimyo(clanId)'), game.indexOf('getClanCastles(clanId)')).includes('this.getClanBushos(numericClanId).find'));
+    const catalog = read('js/command_catalog.js');
+    assert.ok(catalog.includes('game.getClanBushos(game.playerClanId)'));
+    const command = read('js/command_system.js');
+    assert.ok(command.includes('this.game.getClanBushos(this.game.playerClanId)'));
+    const staffing = read('js/ai_staffing.js');
+    assert.ok(staffing.includes('this.game.getClanBushos(clanId)'));
+    const diplomacy = read('js/diplomacy.js');
+    assert.ok(diplomacy.includes('this.game.getClanBushos(myClanId).slice()'));
+});
+
+
+
+test('国・地方の拠点探索は静的地理索引を共用し変動状態をキャッシュしない', () => {
+    const game = read('js/game.js');
+    const at = game.indexOf('_ensureTerritoryStaticIndexes()');
+    const block = game.slice(at, at + 3600);
+    assert.ok(at >= 0);
+    assert.ok(block.includes('const provinceMap = new Map();'));
+    assert.ok(block.includes('const regionCastleMap = new Map();'));
+    assert.ok(block.includes('const regionProvinceMap = new Map();'));
+    assert.ok(block.includes('const provinceId = Number(castle.provinceId) || 0;'));
+    assert.ok(!block.includes('ownerClan'));
+    assert.ok(!block.includes('soldiers'));
+    assert.ok(game.includes('getProvinceCastles(provinceId)'));
+    assert.ok(game.includes('getRegionCastles(regionId)'));
+    assert.ok(game.includes('getRegionProvinces(regionId)'));
+
+    const operation = read('js/ai_operation.js');
+    assert.ok(operation.includes('this.game.getRegionCastles('));
+    assert.ok(operation.includes('this.game.getProvinceCastles('));
+    assert.ok(operation.includes('this.game.getRegionProvinces('));
+});
+
+test('シナリオ・セーブ切替は旧検索索引とturnQueue参照を新データ展開前に解放する', () => {
+    const game = read('js/game.js');
+    const at = game.indexOf('releaseScenarioDataIndexes()');
+    const block = game.slice(at, at + 2200);
+    assert.ok(at >= 0);
+    ['_bushoMap = null', '_castleMap = null', '_clanMap = null', '_provinceMap = null', '_princessMap = null',
+     '_clanBushosMap = null', '_clanCastlesMap = null', '_provinceCastlesMap = null', '_regionCastlesMap = null']
+        .forEach(text => assert.ok(block.includes(text), text));
+    const releaseAt = game.indexOf('releaseScenarioMapResources()');
+    assert.ok(game.slice(releaseAt, releaseAt + 280).includes('this.releaseScenarioDataIndexes();'));
+
+    const save = read('js/save_manager.js');
+    const restoreAt = save.indexOf('async _restoreSaveDataObj(d)');
+    const replaceAt = save.indexOf('this.game.castles = d.castles.map', restoreAt);
+    const beforeReplace = save.slice(restoreAt, replaceAt);
+    assert.ok(beforeReplace.includes('this.game.releaseScenarioMapResources()'));
+    assert.ok(beforeReplace.includes('this.game.turnQueue = [];'));
+    assert.ok(beforeReplace.includes('this.game.currentIndex = 0;'));
+});
+
+test('姫のID参照はGameManager共通索引を使い婚姻UIから全姫findを繰り返さない', () => {
+    const game = read('js/game.js');
+    const at = game.indexOf('getPrincess(id)');
+    const block = game.slice(at, at + 650);
+    assert.ok(at >= 0);
+    assert.ok(block.includes('this._princessMap = new Map();'));
+    assert.ok(block.includes('return this._princessMap.get(Number(id));'));
+
+    const catalog = read('js/command_catalog.js');
+    assert.ok(catalog.includes('game.getPrincess(pId)'));
+    const command = read('js/command_system.js');
+    assert.ok(command.includes('this.game.getPrincess(firstId)'));
+    const info = read('js/ui_info.js');
+    assert.ok(info.includes('.map(id => this.game.getPrincess(id))'));
+    const diplomacy = read('js/diplomacy.js');
+    assert.ok(diplomacy.includes('const princess = this.game.getPrincess(princessId);'));
+});
+
+test('登用候補は全国武将走査ではなく自領拠点の在城者だけから抽出する', () => {
+    const command = read('js/command_system.js');
+    const at = command.indexOf("if (actionType === 'employ_target')");
+    const block = command.slice(at, at + 1800);
+    assert.ok(at >= 0);
+    assert.ok(block.includes('this.game.getClanCastles(this.game.playerClanId)'));
+    assert.ok(block.includes('this.game.getCastleBushos(ownedCastle.id)'));
+    assert.ok(block.includes('BushoStatusRules.isRonin(b)'));
+    assert.ok(!block.includes('this.game.bushos.filter'));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

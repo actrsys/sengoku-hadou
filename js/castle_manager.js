@@ -82,7 +82,7 @@ class CastleManager {
         if (oldOwnerId !== 0 && oldOwnerId !== newOwnerId) {
             const allRemainingCastles = this.game.castles.filter(c => Number(c.ownerClan) === oldOwnerId);
             if (allRemainingCastles.length === 0) {
-                const destroyedClan = this.game.clans.find(c => c.id === oldOwnerId);
+                const destroyedClan = this.game.getClan(oldOwnerId);
                 if (destroyedClan) {
                     destroyedClan.isDestroyed = true;
                 }
@@ -280,7 +280,7 @@ class CastleManager {
     // ★追加：城を失った勢力の、大名以外の武将の忠誠度を全員３ダウンさせる魔法です
     decreaseLoyaltyOnCastleLost(clanId) {
         // その勢力に所属している、活動中で大名ではない武将をみんな集めます
-        const bushsoInClan = this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo);
+        const bushsoInClan = this.game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo);
         
         bushsoInClan.forEach(b => {
             // 忠誠度を3引きます。0より小さくならないように、ストッパー（Math.max）をかけておきます
@@ -291,7 +291,7 @@ class CastleManager {
     // ★追加：新しく城を得た勢力の、大名以外の武将の忠誠度を全員３アップさせる魔法です
     increaseLoyaltyOnCastleGained(clanId) {
         // その勢力に所属している、活動中で大名ではない武将をみんな集めます
-        const bushsoInClan = this.game.bushos.filter(b => b.clan === clanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo);
+        const bushsoInClan = this.game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo);
         
         bushsoInClan.forEach(b => {
             // 忠誠度を3足します。100より大きくならないように、ストッパー（Math.min）をかけておきます

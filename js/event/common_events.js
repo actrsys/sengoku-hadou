@@ -518,7 +518,7 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
     });
 
     for (const pid of playerAffectedProvinces) {
-        const p = game.provinces.find(prov => prov.id === pid);
+        const p = game.getProvince(pid);
         const pName = p ? p.province : 'どこかの国';
         let msg = '';
         if (eventType === '豊作') msg = `${pName}は豊作です！`;
@@ -856,7 +856,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        const getProv = (pId) => game.provinces.find(p => p.id === pId);
+        const getProv = (pId) => game.getProvince(pId);
         
         const addStatus = (pId, status) => {
             const p = getProv(pId);
@@ -1527,7 +1527,7 @@ window.GameEvents.push({
         // ③-1 雪が降っている国では米が不足し、金1で得られる兵糧量がジワジワ減ります。
         const baseRate = window.MainParams.Economy.TradeRateBase;
         snowProvIds.forEach(pId => {
-            const prov = game.provinces.find(p => p.id === pId);
+            const prov = game.getProvince(pId);
             if (prov && prov.marketRate !== undefined) {
                 // 基本相場の0.1倍ずつ交換量を下げます。
                 prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - (baseRate * 0.1));
@@ -1676,7 +1676,7 @@ window.GameEvents.push({
             
             const clanId = currentCastle.ownerClan;
             const daimyo = game.getClanDaimyo(clanId);
-            const clanBushos = game.bushos.filter(b => b.clan === clanId && !window.LifeStatusRules.isDead(b));
+            const clanBushos = game.getClanBushos(clanId).filter(b => !window.LifeStatusRules.isDead(b));
             
             // 何らかの理由でその大名家に大名がいなければスキップします
             if (!daimyo) continue;
@@ -1823,7 +1823,7 @@ window.GameEvents.push({
             });
 
             // 3. 吸収される側の武将のバッジ（身分）を外し、吸収する大名家に入れます
-            const myBushos = game.bushos.filter(b => Number(b.clan) === Number(subordinateClanId));
+            const myBushos = game.getClanBushos(subordinateClanId).slice();
             myBushos.forEach(b => {
                 b.isDaimyo = false;
                 
@@ -1933,7 +1933,7 @@ window.GameEvents.push({
                 playerOffered = true; // 今月はもうプレイヤーには臣従イベントが来ないようにします
 
                 // 使者役として、対象勢力の武将の中から一番「外交」の能力が高い人を選びます
-                const envoys = game.bushos.filter(b => b.clan === clan.id && window.BushoStatusRules.isActive(b) && !b.isDaimyo).sort((a,b) => b.diplomacy - a.diplomacy);
+                const envoys = game.getClanBushos(clan.id).filter(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo).sort((a,b) => b.diplomacy - a.diplomacy);
                 const envoy = envoys.length > 0 ? envoys[0] : aiDaimyo;
 
                 // メッセージでお見せするための名前を綺麗に整えます

@@ -30,10 +30,12 @@ class AffiliationSystem {
         if (busho.isDaimyo || busho.isCommander || busho.isCastellan) return false;
         if (window.BushoStatusRules && !window.BushoStatusRules.isActive(busho)) return false;
 
-        const members = Array.isArray(this.game && this.game.bushos) ? this.game.bushos : [];
-        const previousGunshi = members.find(member => Number(member.clan) === numericClanId && member.isGunshi) || null;
+        const members = this.game && typeof this.game.getClanBushos === 'function'
+            ? this.game.getClanBushos(numericClanId)
+            : (Array.isArray(this.game && this.game.bushos) ? this.game.bushos.filter(member => Number(member.clan) === numericClanId) : []);
+        const previousGunshi = members.find(member => member.isGunshi) || null;
         members.forEach(member => {
-            if (Number(member.clan) === numericClanId && member.isGunshi) this.clearGunshiRole(member);
+            if (member.isGunshi) this.clearGunshiRole(member);
         });
         busho.isGunshi = true;
         if ((!previousGunshi || Number(previousGunshi.id) !== Number(busho.id))
@@ -60,7 +62,11 @@ class AffiliationSystem {
             // 軍師は「人物の属性」ではなく所属大名家での役職。別家へ持ち越さない。
             this.clearGunshiRole(busho);
         }
+        if (oldClanId === nextClanId) return;
         busho.clan = nextClanId;
+        // GameManager の勢力別武将索引だけを無効化します。活動状態や生死は索引へ焼き込まないため、
+        // それらの変更ではversion更新不要です。
+        this.game.bushoAffiliationVersion = (this.game.bushoAffiliationVersion || 0) + 1;
     }
 
     /**
@@ -528,9 +534,7 @@ class AffiliationSystem {
         // 同じ実家の妻が複数いる場合も、途中状態で旧婚姻を残さないため順序を分ける。
         const touchedPairs = new Map();
         busho.wifeIds.forEach(wId => {
-            const wife = Array.isArray(this.game.princesses)
-                ? this.game.princesses.find(p => Number(p.id) === Number(wId))
-                : null;
+            const wife = this.game.getPrincess(wId);
             if (!wife) return;
             const originId = Number(wife.originalClanId) || 0;
             wife.currentClanId = newId;

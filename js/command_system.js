@@ -83,16 +83,19 @@ class CommandSystem {
         }
 
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
-        const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const myDaimyo = this.game.getClanDaimyo(this.game.playerClanId);
         const c = currentCastle;
 
         // --- 条件分岐（誰をリストに出すか） ---
         if (actionType === 'employ_target') { 
-            bushos = this.game.bushos.filter(b => {
-                if (!window.BushoStatusRules.isRonin(b) || b.belongKunishuId > 0) return false;
-                const targetCastle = this.game.getCastle(b.castleId);
-                return targetCastle && targetCastle.ownerClan === this.game.playerClanId;
-            });
+            bushos = [];
+            // 登用対象は自領拠点に実在する浪人だけなので、全国武将を走査せず
+            // 自領の samuraiIds 正本から候補を集めます。
+            for (const ownedCastle of this.game.getClanCastles(this.game.playerClanId)) {
+                for (const b of this.game.getCastleBushos(ownedCastle.id)) {
+                    if (window.BushoStatusRules.isRonin(b) && Number(b.belongKunishuId || 0) === 0) bushos.push(b);
+                }
+            }
             infoHtml = "<div>登用する浪人を選択してください</div>"; 
         }
         else if (actionType === 'employ_doer') {
@@ -152,7 +155,7 @@ class CommandSystem {
             infoHtml = "<div>暗殺を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'arrange_marriage_busho') { 
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.female); 
+            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.female); 
             infoHtml = "<div>姫を嫁がせる武将を選択してください</div>"; 
             if (extraData) extraData.allowDone = true;
         }
@@ -165,17 +168,17 @@ class CommandSystem {
             infoHtml = "<div>武将一覧です</div>"; 
         }
         else if (actionType === 'all_busho_list') { 
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && window.BushoStatusRules.isActive(b));
+            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => window.BushoStatusRules.isActive(b));
             infoHtml = "<div>武将一覧です</div>"; 
             isMulti = false;
         }
         else if (actionType === 'marriage_kinsman') {
             const targetClanId = this.game.getCastle(targetId).ownerClan;
-            const targetLeaderId = this.game.clans.find(c => c.id === targetClanId)?.leaderId;
+            const targetLeaderId = this.game.getClan(targetClanId)?.leaderId;
             const targetLeader = this.game.getBusho(targetLeaderId);
             
-            bushos = this.game.bushos.filter(b => {
-                if (b.clan !== targetClanId || !window.BushoStatusRules.isActive(b) || b.female) return false;
+            bushos = this.game.getClanBushos(targetClanId).filter(b => {
+                if (!window.BushoStatusRules.isActive(b) || b.female) return false;
                 // 大名本人か、直接の血縁（お互いのリストに直接IDが含まれている）かをチェックします
                 const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                 const lFamily = Array.isArray(targetLeader.familyIds) ? targetLeader.familyIds : [];
@@ -192,8 +195,7 @@ class CommandSystem {
             isMulti = false;
         }
         else if (actionType === 'appoint_gunshi') {
-            bushos = this.game.bushos.filter(b => 
-                b.clan === this.game.playerClanId && 
+            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => 
                 window.BushoStatusRules.isActive(b) && 
                 !b.isDaimyo && 
                 !b.isCommander &&
@@ -202,8 +204,7 @@ class CommandSystem {
             infoHtml = "<div>軍師に任命する武将を選択してください</div>";
         }
         else if (actionType === 'appoint_legion_leader') {
-            bushos = this.game.bushos.filter(b => 
-                b.clan === this.game.playerClanId && 
+            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => 
                 window.BushoStatusRules.isActive(b) && 
                 !b.isDaimyo &&
                 !b.isCommander
@@ -227,27 +228,25 @@ class CommandSystem {
             infoHtml = "<div>出陣武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'reward') {
-            bushos = this.game.bushos.filter(b => 
-                b.clan === this.game.playerClanId && 
+            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => 
                 window.BushoStatusRules.isActive(b) && 
                 !b.isDaimyo                          
             );
             infoHtml = "<div>褒美を与える武将を選択してください</div>"; 
         }
         else if (actionType === 'banish') {
-            bushos = this.game.bushos.filter(b => 
-                b.clan === this.game.playerClanId && 
+            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => 
                 window.BushoStatusRules.isActive(b) && 
                 !b.isDaimyo                          
             );
             infoHtml = "<div>追放する武将を選択してください</div>"; 
         }
         else if (actionType === 'succession_target') {
-            const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+            const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
             if (daimyo) {
                 const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-                bushos = this.game.bushos.filter(b => {
-                    if (b.clan !== this.game.playerClanId || b.isDaimyo || b.isRetired) return false; // 隠居状態（isRetired）は除外する
+                bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => {
+                    if (b.isDaimyo || b.isRetired) return false; // 隠居状態（isRetired）は除外する
                     if (!window.BushoStatusRules.isActive(b) && !window.LifeStatusRules.isUnborn(b)) return false;
 
                     // ★追加：unborn の中でも「出生前」フラグが立っている場合は除外する
@@ -260,10 +259,10 @@ class CommandSystem {
             infoHtml = "<div>家督を譲る一門武将を選択してください</div>";
         }
         else if (actionType === 'adopt_son_target') {
-            const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+            const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
             if (daimyo) {
-                bushos = this.game.bushos.filter(b => {
-                    if (b.clan !== this.game.playerClanId || !window.BushoStatusRules.isActive(b) || b.isDaimyo) return false;
+                bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => {
+                    if (!window.BushoStatusRules.isActive(b) || b.isDaimyo) return false;
                     return b.birthYear >= daimyo.birthYear + 15;
                 });
             }
@@ -468,7 +467,7 @@ class CommandSystem {
         ];
         if (actionRequiredCommands.includes(type)) {
             // ★Round12：可否判定だけなので配列を作らず、1人見つかった時点で終了します。
-            const hasActiveBusho = this.game.bushos.some(b => b.castleId === castle.id && b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b) && !b.isActionDone);
+            const hasActiveBusho = this.game.getCastleBushos(castle.id).some(b => b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b) && !b.isActionDone);
             if (!hasActiveBusho) return false;
         }
 
@@ -542,7 +541,7 @@ class CommandSystem {
                     if (Number(target.ownerClan) !== playerClanId || target.id === c.id) return false;
                     
                     // ★追加：大雪の国の城は移動・輸送先に選べないようにします！
-                    const tgtProv = this.game.provinces.find(p => p.id === target.provinceId);
+                    const tgtProv = this.game.getProvince(target.provinceId);
                     if (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow')) {
                         return false;
                     }
@@ -576,8 +575,8 @@ class CommandSystem {
 
                     // ★今回追加：臣従願は、相手の威信が自家の「5倍以上」ないと選べないようにします！
                     if (type === 'vassalage') {
-                        const myClan = this.game.clans.find(myC => Number(myC.id) === playerClanId);
-                        const targetClan = this.game.clans.find(tgtC => Number(tgtC.id) === target.ownerClan);
+                        const myClan = this.game.getClan(playerClanId);
+                        const targetClan = this.game.getClan(target.ownerClan);
                         if (myClan && targetClan) {
                             if (targetClan.daimyoPrestige < myClan.daimyoPrestige * 5) {
                                 return false;
@@ -586,7 +585,7 @@ class CommandSystem {
                     }
                     
                     // その大名家の「大名（当主）」を探して、その人がいる城だけをOK（選択可能）にします！
-                    const daimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);
+                    const daimyo = this.game.getClanDaimyo(target.ownerClan);
                     
                     // ★追加：降伏勧告のとき、相手の大名が「征夷大将軍（ID1の官位）」を持っていたら選べなくします！
                     if (type === 'dominate' && daimyo && daimyo.courtRankIds && daimyo.courtRankIds.includes(1)) {
@@ -603,7 +602,7 @@ class CommandSystem {
                     // すでに1回目で選んだ勢力Aも選べないようにします
                     if (Number(target.ownerClan) === this.game.tempKukoData.clanAId) return false;
                     
-                    const daimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);
+                    const daimyo = this.game.getClanDaimyo(target.ownerClan);
                     return daimyo && Number(daimyo.castleId) === Number(target.id);
                 }).map(t => t.id);
 
@@ -622,7 +621,7 @@ class CommandSystem {
                     // ★バリア追加：rel が空っぽの時に落ちないようにガードしました！
                     if (!rel || !window.DiplomacyRules.isAllianceOrVassal(rel.status)) return false;
                     
-                    const daimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);
+                    const daimyo = this.game.getClanDaimyo(target.ownerClan);
                     return daimyo && Number(daimyo.castleId) === Number(target.id);
                 }).map(t => t.id);
                 
@@ -634,7 +633,7 @@ class CommandSystem {
                     // 敵対状態のみ選択可能にします！
                     if (!rel || rel.status !== window.GameConstants.DiplomacyStatus.HOSTILE) return false;
                     
-                    const daimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);
+                    const daimyo = this.game.getClanDaimyo(target.ownerClan);
                     return daimyo && Number(daimyo.castleId) === Number(target.id);
                 }).map(t => t.id);
 
@@ -652,7 +651,7 @@ class CommandSystem {
             case 'kunishu_incorporate_valid': {
                 const activeKunishus = this.game.kunishuSystem.getAliveKunishus();
                 const myClanId = playerClanId;
-                const myClan = this.game.clans.find(clan => clan.id === myClanId);
+                const myClan = this.game.getClan(myClanId);
                 const myPrestige = myClan ? myClan.daimyoPrestige : 0;
 
                 const validKunishus = activeKunishus.filter(k => {
@@ -697,9 +696,9 @@ class CommandSystem {
             
             case 'marriage_valid': {
                 // 1. まず、自分の大名家に嫁がせられる姫（未婚の姫）がいるかチェックします
-                const myClan = this.game.clans.find(clan => clan.id === playerClanId);
+                const myClan = this.game.getClan(playerClanId);
                 const hasUnmarriedPrincess = myClan && myClan.princessIds && myClan.princessIds.some(pId => {
-                    const p = this.game.princesses.find(princess => princess.id === pId);
+                    const p = this.game.getPrincess(pId);
                     return p && p.status === 'unmarried';
                 });
                 // 未婚の姫が一人もいなければ、選べる城は「ゼロ」にしておきます
@@ -710,15 +709,15 @@ class CommandSystem {
                     if (target.ownerClan === 0 || Number(target.ownerClan) === playerClanId) return false;
                     
                     // ★追加：その大名家の「大名（当主）」を探して、その人がいる城（居城）だけをOKにします！
-                    const daimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);
+                    const daimyo = this.game.getClanDaimyo(target.ownerClan);
                     if (!daimyo || Number(daimyo.castleId) !== Number(target.id)) return false;
 
-                    const targetLeaderId = this.game.clans.find(clan => clan.id === target.ownerClan)?.leaderId;
+                    const targetLeaderId = this.game.getClan(target.ownerClan)?.leaderId;
                     const targetLeader = this.game.getBusho(targetLeaderId);
                     if (targetLeader) {
                         // 相手の家の一門武将を探します
-                        const kinsmen = this.game.bushos.filter(b => {
-                            if (b.clan !== target.ownerClan || !window.BushoStatusRules.isActive(b)) return false;
+                        const kinsmen = this.game.getClanBushos(target.ownerClan).filter(b => {
+                            if (!window.BushoStatusRules.isActive(b)) return false;
                             const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                             const lFamily = Array.isArray(targetLeader.familyIds) ? targetLeader.familyIds : [];
                             return b.id === targetLeader.id || bFamily.includes(targetLeader.id) || lFamily.includes(b.id);
@@ -906,7 +905,7 @@ class CommandSystem {
             // 自勢力の縁組の場合は、確認ダイアログを出してから結婚させます
             if (!targetId && this.game.ui.info && this.game.ui.info.arrangeMarriageBushoId) {
                 const busho = this.game.getBusho(this.game.ui.info.arrangeMarriageBushoId);
-                const princess = this.game.princesses.find(p => p.id === firstId);
+                const princess = this.game.getPrincess(firstId);
                 
                 const msg = `${busho.name} に ${princess.name} を嫁がせます。よろしいですか？`;
                 
@@ -934,9 +933,9 @@ class CommandSystem {
             const targetBushoId = firstId;
             
             const targetClanId = this.game.getCastle(targetId).ownerClan;
-            const targetClan = this.game.clans.find(c => c.id === targetClanId);
+            const targetClan = this.game.getClan(targetClanId);
             const targetBusho = this.game.getBusho(targetBushoId);
-            const princess = this.game.princesses.find(p => p.id === princessId);
+            const princess = this.game.getPrincess(princessId);
             const doer = this.game.getBusho(doerId);
 
             const msg = `${targetClan.name} の ${targetBusho.name} に、当家の ${princess.name} を嫁がせます。よろしいですか？`;
@@ -1249,8 +1248,8 @@ class CommandSystem {
             
             const targetCastle = this.game.getCastle(targetId);
             
-            const srcProv = this.game.provinces.find(p => p.id === castle.provinceId);
-            const tgtProv = this.game.provinces.find(p => p.id === targetCastle.provinceId);
+            const srcProv = this.game.getProvince(castle.provinceId);
+            const tgtProv = this.game.getProvince(targetCastle.provinceId);
             const isHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) || 
                                 (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
 
@@ -1334,8 +1333,7 @@ class CommandSystem {
                 
                 // ★追加：追放される武将がいた場合、自勢力の他の武将全員にショックを与えます！
                 // 同じ大名家で、大名と追放される本人を除いた全員を集めます
-                const otherMembers = this.game.bushos.filter(b => 
-                    b.clan === busho.clan && 
+                const otherMembers = this.game.getClanBushos(busho.clan).filter(b => 
                     b.id !== busho.id &&
                     !b.isDaimyo &&
                     window.BushoStatusRules.isActive(b)
@@ -1542,7 +1540,7 @@ class CommandSystem {
     
     executeReward(bushoIds) {
         const castle = this.game.getCurrentTurnCastle();
-        const daimyo = this.game.bushos.find(b => b.id === this.game.clans.find(c => c.id === this.game.playerClanId).leaderId);
+        const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
         const spec = COMMAND_SPECS['reward'];
         
         // ★追加：実行前に1人分の褒美すら払えない場合は、共通魔法で弾きます
@@ -1583,11 +1581,10 @@ class CommandSystem {
         // ★変更：共通魔法でチェックします
         if (!this.checkResource(castle, cost, 0)) return;
 
-        const daimyo = this.game.bushos.find(b => b.id === this.game.clans.find(c => c.id === this.game.playerClanId).leaderId);
+        const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
         
         // 褒美の対象となる武将を集める
-        const targets = this.game.bushos.filter(b => 
-            b.clan === this.game.playerClanId && 
+        const targets = this.game.getClanBushos(this.game.playerClanId).filter(b => 
             window.BushoStatusRules.isActive(b) && 
             !b.isDaimyo
         );
@@ -1717,7 +1714,7 @@ class CommandSystem {
     
     executeTrade(type, amount) {
         const castle = this.game.getCurrentTurnCastle(); 
-        const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
+        const daimyo = this.game.getClanDaimyo(castle.ownerClan);
         const castellan = this.game.getBusho(castle.castellanId);
 
         // ★一元化された共通魔法を呼び出して、必要な費用（または利益）を一発で計算します！
@@ -1995,7 +1992,7 @@ class CommandSystem {
             // ★追加：取込の場合はさらに条件で絞り込みます
             if (mode === 'kunishu_incorporate') {
                 const myClanId = this.game.playerClanId;
-                const myClan = this.game.clans.find(c => c.id === myClanId);
+                const myClan = this.game.getClan(myClanId);
                 const myPrestige = myClan ? myClan.daimyoPrestige : 0;
                 
                 kunishus = kunishus.filter(k => {
@@ -2090,7 +2087,7 @@ class CommandSystem {
 
     executeAdoptSon(targetId) {
         const targetBusho = this.game.getBusho(targetId);
-        const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
         if (!targetBusho || !daimyo) return;
 
         // ① 子供側に養父（大名）のIDをセットします

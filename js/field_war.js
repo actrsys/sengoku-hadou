@@ -241,7 +241,7 @@ class FieldWarManager {
         // ★修正：出撃拠点か守備拠点の「ある国（Province）」が「大雪」かどうかを判定する
         let isSourceSnow = false;
         if (warState.sourceCastle && warState.sourceCastle.provinceId) {
-            const sourceProv = this.game.provinces.find(p => p.id === warState.sourceCastle.provinceId);
+            const sourceProv = this.game.getProvince(warState.sourceCastle.provinceId);
             if (sourceProv && sourceProv.statusEffects) {
                 isSourceSnow = sourceProv.statusEffects.includes('heavySnow');
             }
@@ -249,7 +249,7 @@ class FieldWarManager {
 
         let isDefSnow = false;
         if (warState.defender && warState.defender.provinceId) {
-            const defProv = this.game.provinces.find(p => p.id === warState.defender.provinceId);
+            const defProv = this.game.getProvince(warState.defender.provinceId);
             if (defProv && defProv.statusEffects) {
                 isDefSnow = defProv.statusEffects.includes('heavySnow');
             }
@@ -1111,7 +1111,7 @@ class FieldWarManager {
             } else if (leader.bushoId) {
                 const busho = this.game.getBusho(leader.bushoId);
                 if (busho && busho.clan > 0) {
-                    const clanData = this.game.clans.find(c => c.id === busho.clan);
+                    const clanData = this.game.getClan(busho.clan);
                     if (clanData) clanNameText = clanData.name;
                 } else if (busho && busho.clan === 0) {
                     clanNameText = "中立勢力";
@@ -1303,7 +1303,7 @@ class FieldWarManager {
             const kunishu = this.game.kunishuSystem.getKunishu(unit.kunishuId);
             if (kunishu) affiliationName = kunishu.getName(this.game);
         } else if (unitBusho && unitBusho.clan > 0) {
-            const clanData = this.game.clans.find(c => c.id === unitBusho.clan);
+            const clanData = this.game.getClan(unitBusho.clan);
             if (clanData) affiliationName = clanData.name;
         }
         const affiliationNameHtml = compressText(affiliationName || '所属不明', 5);

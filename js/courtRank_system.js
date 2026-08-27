@@ -314,7 +314,7 @@ class CourtRankSystem {
             // 2. 国主たちの官位チェック（大名が官位を持っている場合のみ）
             // ------------------------------------------
             if (currentMaxRankNo < 20) {
-                const commanders = this.game.bushos.filter(b => b.clan === clan.id && b.isCommander && window.BushoStatusRules.isActive(b));
+                const commanders = this.game.getClanBushos(clan.id).filter(b => b.isCommander && window.BushoStatusRules.isActive(b));
                 
                 commanders.forEach(commander => {
                     let cmdrMaxRankNo = 20; 
@@ -344,7 +344,7 @@ class CourtRankSystem {
 
                     // 国主がいるお城の国名を調べます
                     const cmdrProvinces = [];
-                    const cmdrCastle = this.game.castles ? this.game.castles.find(c => c.id === commander.castleId) : null;
+                    const cmdrCastle = this.game.castles ? this.game.getCastle(commander.castleId) : null;
                     if (cmdrCastle && cmdrCastle.province) {
                         cmdrProvinces.push(cmdrCastle.province.replace(/国$/, ''));
                     }

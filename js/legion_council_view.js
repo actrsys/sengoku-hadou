@@ -77,7 +77,7 @@ class LegionCouncilView {
         this.editingPolicy = null;
         this.editingTouched.clear();
 
-        const clan = this.game.clans.find(c => Number(c.id) === clanId);
+        const clan = this.game.getClan(clanId);
         if (this.clanName) this.clanName.textContent = clan ? `${clan.name} 評定` : '評定';
         if (this.date) this.date.textContent = `${this.game.year}年 ${this.game.month}月`;
 
