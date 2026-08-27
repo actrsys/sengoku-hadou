@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r245');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r246');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7666,7 +7666,7 @@ test('第三者の忠誠・不満所見は高精度でも内心を断定しな�
 
 
 
-test('共通一覧は詳細遷移・終了時に仮想スクロールの参照と遅延描画を解放する', () => {
+test('共通一覧は詳細遷移・終了時に仮想スクロールの参照と旧DOMを先に解放する', () => {
     const info = read('js/ui_info.js');
     const selector = read('js/selector_modal_view.js');
     const stopStart = info.indexOf('_stopActiveListRendering() {');
@@ -7676,13 +7676,58 @@ test('共通一覧は詳細遷移・終了時に仮想スクロールの参照�
     assert.ok(stopBlock.includes("removeEventListener('scroll', listContainer._virtualScrollHandler)"));
     assert.ok(stopBlock.includes('listContainer._virtualScrollCleanup();'));
     const shellStart = info.indexOf('_openInfoShell(');
-    const shellBlock = info.slice(shellStart, shellStart + 700);
+    const shellBlock = info.slice(shellStart, shellStart + 1100);
     assert.ok(shellBlock.includes('this._stopActiveListRendering();'));
+    assert.ok(shellBlock.includes('this.selectorView.releaseListContent({ resetScroll: true });'));
+    const releaseStart = selector.indexOf('releaseListContent(');
+    const releaseBlock = selector.slice(releaseStart, releaseStart + 1800);
+    assert.ok(releaseBlock.includes("listContainer.removeEventListener('scroll', listContainer._virtualScrollHandler)"));
+    assert.ok(releaseBlock.includes("images[i].removeAttribute('src')"));
+    assert.ok(releaseBlock.includes("listContainer.innerHTML = '';"));
     const closeStart = selector.indexOf('close() {');
-    const closeBlock = selector.slice(closeStart, closeStart + 1800);
-    assert.ok(closeBlock.includes("listContainer.removeEventListener('scroll', listContainer._virtualScrollHandler)"));
-    assert.ok(closeBlock.includes("listContainer.querySelectorAll('img').forEach(img => img.removeAttribute('src'))"));
-    assert.ok(closeBlock.includes("listContainer.innerHTML = '';"));
+    const closeBlock = selector.slice(closeStart, closeStart + 1000);
+    assert.ok(closeBlock.includes('this.releaseListContent({ resetScroll: true });'));
+});
+
+test('共通一覧の行クリックは古いWebView非対応のProxyを使わない', () => {
+    const info = read('js/ui_info.js');
+    assert.ok(!info.includes('new Proxy('));
+    assert.ok(info.includes('_createDelegatedListEvent(nativeEvent, currentTarget)'));
+    assert.ok(info.includes('item.onClick(this._createDelegatedListEvent(e, targetItem));'));
+});
+
+test('仮想スクロール終了時は保留中のrequestAnimationFrameもcancelする', () => {
+    const info = read('js/ui_info.js');
+    const start = info.indexOf('let scrollRafId = null;');
+    const block = info.slice(start, start + 2600);
+    assert.ok(start >= 0);
+    assert.ok(block.includes('let measureRafId = null;'));
+    assert.ok(block.includes('cancelAnimationFrame(scrollRafId)'));
+    assert.ok(block.includes('cancelAnimationFrame(measureRafId)'));
+});
+
+test('武将詳細へ入る前に再生成可能な一覧キャッシュを解放する', () => {
+    const busho = read('js/ui_info_busho.js');
+    const releaseStart = busho.indexOf('_releaseBushoSelectorTransientStateForDetail()');
+    const releaseBlock = busho.slice(releaseStart, releaseStart + 1000);
+    assert.ok(releaseStart >= 0);
+    assert.ok(releaseBlock.includes('this.bushoSavedBushos = null;'));
+    assert.ok(releaseBlock.includes('this.bushoSavedSortedBushos = null;'));
+    assert.ok(releaseBlock.includes('this.bushoSavedData = null;'));
+    assert.ok(releaseBlock.includes("this._invalidateListItemsCache('busho');"));
+    const detailStart = busho.indexOf('_renderBushoDetail(busho, scrollPos = 0)');
+    const detailBlock = busho.slice(detailStart, detailStart + 550);
+    assert.ok(detailBlock.indexOf('this._releaseBushoSelectorTransientStateForDetail();') < detailBlock.indexOf("this._openInfoShell('武将情報'"));
+});
+
+test('列伝表示可否の文字数判定はString iteratorとcodePointAtを必須にしない', () => {
+    const busho = read('js/ui_info_busho.js');
+    const start = busho.indexOf('_getBushoBiographyFullWidthLength(text)');
+    const end = busho.indexOf('_hasDisplayableBushoBiography', start);
+    const block = busho.slice(start, end);
+    assert.ok(block.includes('value.charCodeAt(i)'));
+    assert.ok(!block.includes('codePointAt'));
+    assert.ok(!block.includes('for (const ch of value)'));
 });
 
 test('武将一覧はGameManagerの既存ID索引を再利用して再描画ごとの大規模Map複製を行わない', () => {

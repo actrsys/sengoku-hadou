@@ -121,30 +121,41 @@ class SelectorModalView {
         return elements;
     }
 
+    releaseListContent({ resetScroll = true } = {}) {
+        const elements = this.getElements();
+        if (!elements || !elements.listContainer) return;
+
+        const { listContainer } = elements;
+        if (listContainer._virtualScrollHandler) {
+            listContainer.removeEventListener('scroll', listContainer._virtualScrollHandler);
+            listContainer._virtualScrollHandler = null;
+        }
+        if (listContainer._virtualScrollCleanup) {
+            listContainer._virtualScrollCleanup();
+            listContainer._virtualScrollCleanup = null;
+        }
+
+        // 旧一覧の画像decode領域とDOMを、次画面のHTMLを組み立てる前に解放できる共通窓口。
+        // innerHTML置換だけだとブラウザ実装によっては新旧DOMが一時的に重なるため、
+        // 先にsrc参照を切ってから内容を空にし、古いスマホの瞬間メモリを抑えます。
+        const images = listContainer.querySelectorAll('img');
+        for (let i = 0; i < images.length; i++) images[i].removeAttribute('src');
+        listContainer.innerHTML = '';
+        if (resetScroll) listContainer.scrollTop = 0;
+    }
+
     close() {
         const elements = this.getElements();
         if (!elements) return;
 
-        const { modal, listContainer, contextEl, tabsEl, confirmBtn, backBtn } = elements;
+        const { modal, contextEl, tabsEl, confirmBtn, backBtn } = elements;
         modal.classList.add('hidden');
 
         // 非表示にするだけだと、仮想スクロールのクロージャや画像DOMが大量データへの参照を
         // 保持したままになります。通常地図を復帰する前に画面内容を解放し、古いスマホの
         // 一時メモリピークを下げます。見た目が必要な間は close() 自体が呼ばれないため、
         // handoff 中の表示は従来どおり維持されます。
-        if (listContainer) {
-            if (listContainer._virtualScrollHandler) {
-                listContainer.removeEventListener('scroll', listContainer._virtualScrollHandler);
-                listContainer._virtualScrollHandler = null;
-            }
-            if (listContainer._virtualScrollCleanup) {
-                listContainer._virtualScrollCleanup();
-                listContainer._virtualScrollCleanup = null;
-            }
-            listContainer.querySelectorAll('img').forEach(img => img.removeAttribute('src'));
-            listContainer.innerHTML = '';
-            listContainer.scrollTop = 0;
-        }
+        this.releaseListContent({ resetScroll: true });
         if (contextEl) contextEl.innerHTML = '';
         if (tabsEl) tabsEl.innerHTML = '';
         if (confirmBtn) confirmBtn.onclick = null;

@@ -118,6 +118,11 @@ class UIInfoManager {
     _openInfoShell(title, { tabsHtml = null, showTabs = false } = {}) {
         // 一覧→詳細の遷移でも、旧一覧の仮想スクロール処理を詳細画面の裏へ残しません。
         this._stopActiveListRendering();
+        // 詳細DOMを生成する前に旧一覧DOMと画像参照を解放します。履歴には画面条件と
+        // scrollPosだけを保持しているため、戻る時は正本データから安全に再描画できます。
+        if (this.selectorView && typeof this.selectorView.releaseListContent === 'function') {
+            this.selectorView.releaseListContent({ resetScroll: true });
+        }
         return this.selectorView.open({
             title,
             tabsHtml,
@@ -237,6 +242,24 @@ class UIInfoManager {
         return (event) => {
             if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
             return action(event);
+        };
+    }
+
+    _createDelegatedListEvent(nativeEvent, currentTarget) {
+        // Proxyは古いAndroid WebViewで未実装の世代があり、一覧行を押した瞬間だけ
+        // ReferenceErrorになるため使用しません。リスト側が実際に必要とするイベント情報だけを
+        // 小さな互換オブジェクトにして渡します。
+        return {
+            originalEvent: nativeEvent,
+            type: nativeEvent ? nativeEvent.type : 'click',
+            target: nativeEvent ? nativeEvent.target : currentTarget,
+            currentTarget: currentTarget,
+            preventDefault: () => { if (nativeEvent && nativeEvent.preventDefault) nativeEvent.preventDefault(); },
+            stopPropagation: () => { if (nativeEvent && nativeEvent.stopPropagation) nativeEvent.stopPropagation(); },
+            stopImmediatePropagation: () => {
+                if (nativeEvent && nativeEvent.stopImmediatePropagation) nativeEvent.stopImmediatePropagation();
+                else if (nativeEvent && nativeEvent.stopPropagation) nativeEvent.stopPropagation();
+            }
         };
     }
 
@@ -1533,16 +1556,9 @@ class UIInfoManager {
                     const index = parseInt(targetItem.getAttribute('data-action-index'));
                     const item = getItemAt(index);
                     if (item && typeof item.onClick === 'function') {
-                        // ★修正：大枠の監視を使うと「枠」がクリックされたことになってしまうので、
-                        // 該当の「行」がクリックされたと錯覚させる「身代わりのイベント（Proxy）」を作って渡します！
-                        const pseudoEvent = new Proxy(e, {
-                            get: function(target, prop) {
-                                if (prop === 'currentTarget') return targetItem;
-                                const value = target[prop];
-                                return typeof value === 'function' ? value.bind(target) : value;
-                            }
-                        });
-                        item.onClick(pseudoEvent);
+                        // 大枠のイベントを行クリックとして扱うため、必要な情報だけを持つ
+                        // 古いWebView互換のイベントオブジェクトへ置き換えて渡します。
+                        item.onClick(this._createDelegatedListEvent(e, targetItem));
                     }
                 }
             });
@@ -1619,6 +1635,8 @@ class UIInfoManager {
             // ★追加：スクロールのたびに毎回計算しすぎないよう、アニメーションフレームとタイマーで間引きます！
             let scrollTicking = false;
             let scrollTimeout = null;
+            let scrollRafId = null;
+            let measureRafId = null;
 
             const scrollHandler = () => {
                 // 指を離してスクロールがピタッと止まった時のための保険タイマーです
@@ -1631,7 +1649,8 @@ class UIInfoManager {
                 if (scrollTicking) return;
                 scrollTicking = true;
 
-                requestAnimationFrame(() => {
+                scrollRafId = requestAnimationFrame(() => {
+                    scrollRafId = null;
                     renderVisibleWindow();
                     scrollTicking = false; // 次のフレームですぐに描画を許可します
                 });
@@ -1645,6 +1664,14 @@ class UIInfoManager {
                     clearTimeout(scrollTimeout);
                     scrollTimeout = null;
                 }
+                if (scrollRafId !== null && typeof cancelAnimationFrame === 'function') {
+                    cancelAnimationFrame(scrollRafId);
+                    scrollRafId = null;
+                }
+                if (measureRafId !== null && typeof cancelAnimationFrame === 'function') {
+                    cancelAnimationFrame(measureRafId);
+                    measureRafId = null;
+                }
                 scrollTicking = false;
             };
 
@@ -1655,7 +1682,8 @@ class UIInfoManager {
 
             renderVisibleWindow(true);
 
-            requestAnimationFrame(() => {
+            measureRafId = requestAnimationFrame(() => {
+                measureRafId = null;
                 // ★実際の行の高さを測って、仮の値とズレていたら補正して描画し直します
                 const sample = scrollBody.querySelector('.select-item');
                 if (sample) {

@@ -14,8 +14,16 @@ Object.assign(UIInfoManager.prototype, {
     _getBushoBiographyFullWidthLength(text) {
         const value = String(text || '').replace(/\s+/g, '');
         let length = 0;
-        for (const ch of value) {
-            const code = ch.codePointAt(0);
+        // 文字列のイテレータや新しめのUnicode APIに依存せず、古いAndroid WebViewでも同じ全角換算を行います。
+        for (let i = 0; i < value.length; i++) {
+            const code = value.charCodeAt(i);
+            const isHighSurrogate = code >= 0xd800 && code <= 0xdbff;
+            const nextCode = i + 1 < value.length ? value.charCodeAt(i + 1) : 0;
+            if (isHighSurrogate && nextCode >= 0xdc00 && nextCode <= 0xdfff) {
+                length += 1;
+                i++;
+                continue;
+            }
             const isHalfWidth = (code >= 0x20 && code <= 0x7e) || (code >= 0xff61 && code <= 0xff9f);
             length += isHalfWidth ? 0.5 : 1;
         }
@@ -27,12 +35,28 @@ Object.assign(UIInfoManager.prototype, {
         return text !== '' && this._getBushoBiographyFullWidthLength(text) > 10;
     },
 
+    _releaseBushoSelectorTransientStateForDetail() {
+        // 一覧へ戻るために必要な条件はmodalHistoryのargs/scrollPosに保持されています。
+        // 詳細表示中まで全国武将の派生配列・ソート結果を重ねて持つ必要はないため、
+        // 一覧→詳細の瞬間メモリを下げる目的で再生成可能なキャッシュだけを解放します。
+        this.bushoSavedBushos = null;
+        this.bushoSavedSortedBushos = null;
+        this.bushoSavedData = null;
+        this.bushoLastSortStateKey = null;
+        this._bushoSelectorContext = null;
+        if (this._stableSortBases) delete this._stableSortBases.busho;
+        this._invalidateListItemsCache('busho');
+    },
+
     showBushoDetailModal(busho) {
         this.bushoDetailCurrentTab = 'status';
         this.pushModal('busho_detail', [busho]);
     },
     
     _renderBushoDetail(busho, scrollPos = 0) {
+        // pushModal()が一覧の復元条件を履歴へ保存した後なので、詳細HTMLを組み立てる前に
+        // 一覧専用の派生キャッシュを落として一時メモリの重なりを避けます。
+        this._releaseBushoSelectorTransientStateForDetail();
         const shell = this._openInfoShell('武将情報', { showTabs: true });
         if (!shell) return;
         const { listContainer, tabsEl } = shell;
