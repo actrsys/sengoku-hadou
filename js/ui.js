@@ -2199,9 +2199,10 @@ class UIManager {
         }
 
         if (this.mobileFloatingInfo) {
-            this.mobileFloatingInfo.innerHTML = `
-                <div class="floating-time">${this.game.year}年 ${this.game.month}月</div>
-            `;
+            const nextTimeHtml = `<div class="floating-time">${this.game.year}年 ${this.game.month}月</div>`;
+            if (this.mobileFloatingInfo.innerHTML !== nextTimeHtml) {
+                this.mobileFloatingInfo.innerHTML = nextTimeHtml;
+            }
         }
 
         // ★今の城がある「国（地方）」の米相場を調べます。国データも上で取得済みのものを再利用します。
@@ -2210,16 +2211,19 @@ class UIManager {
             currentRate = province.marketRate;
         }
 
-        if (this.mobileFloatingMarket) {
-            this.mobileFloatingMarket.innerHTML = `<div class="floating-market">浪人 ${roninCount}人</div><div class="floating-market">米相場＝${EconomyRules.formatRiceMarketValue(currentRate)}</div>`;
+        if (this.mobileFloatingMarket) {
+            const nextMarketHtml = `<div class="floating-market">浪人 ${roninCount}人</div><div class="floating-market">米相場＝${EconomyRules.formatRiceMarketValue(currentRate)}</div>`;
+            if (this.mobileFloatingMarket.innerHTML !== nextMarketHtml) {
+                this.mobileFloatingMarket.innerHTML = nextMarketHtml;
+            }
         }
 
         const cmdGrid = document.getElementById('command-area');
         if(cmdGrid) {
             cmdGrid.style.display = 'grid'; 
         }
-        if (this.mobileBottomInfo) {
-            this.mobileBottomInfo.innerHTML = ``; 
+        if (this.mobileBottomInfo && this.mobileBottomInfo.innerHTML) {
+            this.mobileBottomInfo.innerHTML = '';
         }
     }
     

@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r255');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r256');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7825,7 +7825,7 @@ test('国データもGameManager共通索引を使いUIから毎回findしない
     assert.ok(game.includes('getProvince(id)'));
     assert.ok(game.includes('this._provinceMap = new Map()'));
     const ui = read('js/ui.js');
-    const at = ui.indexOf('updateInfoPanel(castle)');
+    const at = ui.indexOf('    updateInfoPanel(castle) {');
     assert.ok(at >= 0);
     const block = ui.slice(at, at + 9000);
     assert.ok(block.includes('this.game.getProvince(castle.provinceId)'));
@@ -8319,6 +8319,48 @@ test('顔画像アイドル先読みはシナリオ世代tokenで旧batchを継�
     const releaseBlock = game.slice(releaseAt, releaseAt + 1200);
     assert.ok(releaseBlock.includes('this._facePreloadGeneration = Number(this._facePreloadGeneration || 0) + 1;'));
 });
+
+
+test('地図選択UIはvalidTargetsの同じincludesを全拠点・ラベルで繰り返さずSetを局所共用する', () => {
+    const uiMap = read('js/ui_map.js');
+    assert.ok(uiMap.includes('const validTargetSet = isSelectionMode ? new Set(this.game.validTargets) : null;'));
+    assert.ok(uiMap.includes('if (validTargetSet.has(c.id))'));
+    assert.ok(uiMap.includes('this.renderDaimyoLabels(validTargetSet);'));
+    const labelAt = uiMap.indexOf('renderDaimyoLabels(validTargetSet = null)');
+    const labelBlock = uiMap.slice(labelAt, labelAt + 7200);
+    assert.ok(labelBlock.includes('selectionTargetSet.has(castle.id)'));
+    assert.ok(labelBlock.includes('selectionTargetSet.has(l.castle.id)'));
+    assert.ok(!labelBlock.includes('validTargets.includes('));
+});
+
+test('拠点光彩更新は同一勢力の外交関係を1回の描画内でだけ再利用する', () => {
+    const uiMap = read('js/ui_map.js');
+    const at = uiMap.indexOf('    updateCastleGlows() {');
+    const block = uiMap.slice(at, at + 3600);
+    assert.ok(block.includes('const relationByClan = new Map();'));
+    assert.ok(block.includes('if (!relationByClan.has(clanId))'));
+    assert.ok(block.includes('this.game.getRelation(baseClanId, clanId)'));
+});
+
+test('勢力色Canvasの再描画判定は全ownerClan文字列化でなく所有versionを使う', () => {
+    const uiMap = read('js/ui_map.js');
+    const at = uiMap.indexOf('    updateClanColors() {');
+    const block = uiMap.slice(at, at + 4200);
+    assert.ok(block.includes('this.game.castleOwnershipVersion'));
+    assert.ok(block.includes('this.game.castles.length'));
+    assert.ok(!block.includes("this.game.castles.map(c => c.ownerClan).join(',' )"));
+    assert.ok(!block.includes("this.game.castles.map(c => c.ownerClan).join(',')"));
+});
+
+test('スマホ固定HUDは同じ年月・相場HTMLを毎回再生成しない', () => {
+    const ui = read('js/ui.js');
+    const at = ui.indexOf('updateInfoPanel(castle)');
+    const block = ui.slice(at, at + 14000);
+    assert.ok(block.includes('if (this.mobileFloatingInfo.innerHTML !== nextTimeHtml)'));
+    assert.ok(block.includes('if (this.mobileFloatingMarket.innerHTML !== nextMarketHtml)'));
+    assert.ok(block.includes('if (this.mobileBottomInfo && this.mobileBottomInfo.innerHTML)'));
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
 

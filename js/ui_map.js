@@ -1293,6 +1293,9 @@ Object.assign(UIManager.prototype, {
         document.body.classList.remove('showing-daimyo-labels');
 
         const isSelectionMode = (this.game.selectionMode !== null);
+        // 選択モード中は、同じvalidTargetsを全拠点カード・勢力名ラベルから何度もincludesしない。
+        // Setはincludesと同じSameValueZero比較なので候補範囲・ID型の意味を変えない。
+        const validTargetSet = isSelectionMode ? new Set(this.game.validTargets) : null;
         const isDaimyoSelect = (this.game.phase === 'daimyo_select');
 
         // ★超重要修正：マップの大きさを計算する前に、大名選択モードの目印をつけて画面を広げておきます！
@@ -1507,7 +1510,7 @@ Object.assign(UIManager.prototype, {
             // ★修正：AIのターン中であっても、援軍などで「城を選んでいる最中(isSelectionMode)」なら操作できるようにバリアを解除します！
             else if (!this.game.isProcessingAI || isSelectionMode) {
                 if (isSelectionMode) { 
-                    if (this.game.validTargets.includes(c.id)) {
+                    if (validTargetSet.has(c.id)) {
                         el.classList.add('selectable-target'); 
                         el.onclick = (e) => { 
                             e.stopPropagation(); 
@@ -1584,7 +1587,7 @@ Object.assign(UIManager.prototype, {
         // ==========================================
         // ★書き換え：大名選択の時だけじゃなく、外交などを選んでいる時(isSelectionMode)にもシールを出します！
         if (isDaimyoSelect || isSelectionMode) {
-            this.renderDaimyoLabels();
+            this.renderDaimyoLabels(validTargetSet);
         }
         
         this.updateCastleGlows();
@@ -1637,8 +1640,11 @@ Object.assign(UIManager.prototype, {
     },
     
     // ★新魔法：勢力の名前を賢く並べる魔法です
-    renderDaimyoLabels() {
+    renderDaimyoLabels(validTargetSet = null) {
         const labelsData = [];
+        const selectionTargetSet = this.game.selectionMode
+            ? (validTargetSet || new Set(this.game.validTargets))
+            : null;
 
         // ★追加：諸勢力コマンドや、出陣・援軍、調査などで城を選ぶ時は大名の名前シールを出さないようにします！
         const hiddenModes = [
@@ -1680,7 +1686,7 @@ Object.assign(UIManager.prototype, {
                     // ★ここから追加：選べない相手の時は、名前シールを「出さない」ようにする魔法！
                     // マップ上で何かを選んでいる最中（selectionMode）で、
                     // かつ、その城が「選べるリスト（validTargets）」に入っていないなら、ここでストップします。
-                    if (this.game.selectionMode && !this.game.validTargets.includes(castle.id)) {
+                    if (this.game.selectionMode && !selectionTargetSet.has(castle.id)) {
                         return;
                     }
                     // ★追加ここまで！
@@ -1784,7 +1790,7 @@ Object.assign(UIManager.prototype, {
             el.style.zIndex = '200';
 
             // ★追加：外交先などを選んでいる時で、もし選べない相手なら少し暗くします
-            if (this.game.selectionMode && !this.game.validTargets.includes(l.castle.id)) {
+            if (this.game.selectionMode && !selectionTargetSet.has(l.castle.id)) {
                 el.classList.add('dimmed');
             }
             
@@ -1794,7 +1800,7 @@ Object.assign(UIManager.prototype, {
                 if (this.isDraggingMap) return; // スクロール中は反応しないようにします
                 
                 // ★選べない相手の時は反応しないようにします
-                if (this.game.selectionMode && !this.game.validTargets.includes(l.castle.id)) return;
+                if (this.game.selectionMode && !selectionTargetSet.has(l.castle.id)) return;
 
                 if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                 
@@ -1848,6 +1854,9 @@ Object.assign(UIManager.prototype, {
         }
 
         const cards = this.mapEl.querySelectorAll('.castle-card');
+        // 同一勢力の拠点が複数あっても、1回の光彩更新中は同じ外交関係を1度だけ取得する。
+        // キャッシュはこの同期処理のローカルだけなので外交状態の変更を跨がない。
+        const relationByClan = new Map();
         cards.forEach(card => {
             const clanId = parseInt(card.dataset.clan, 10);
             
@@ -1868,7 +1877,11 @@ Object.assign(UIManager.prototype, {
             if (clanId === baseClanId) {
                 card.classList.add('glow-blue');
             } else {
-                const rel = this.game.getRelation(baseClanId, clanId);
+                let rel = relationByClan.get(clanId);
+                if (!relationByClan.has(clanId)) {
+                    rel = this.game.getRelation(baseClanId, clanId);
+                    relationByClan.set(clanId, rel || null);
+                }
                 if (rel) {
                     if (rel.status === '敵対') {
                         card.classList.add('glow-red');   
@@ -2018,7 +2031,9 @@ Object.assign(UIManager.prototype, {
         const height = overlay.height;
         if (width <= 0 || height <= 0) return;
 
-        const currentOwnerHash = `${width}x${height}:` + this.game.castles.map(c => c.ownerClan).join(',');
+        // 所有者一覧を毎回map→joinして巨大文字列化せず、CastleManagerが更新する所有versionを使う。
+        // ownerClan直接代入は禁止・回帰監査済みなので、同じversionなら所有状態は同一。
+        const currentOwnerHash = `${width}x${height}:${Number(this.game.castleOwnershipVersion || 0)}:${this.game.castles.length}`;
         if (this.lastClanColorsHash === currentOwnerHash && this._lastClanColorOverlay === overlay) return;
 
         const clanColors = new Map();
