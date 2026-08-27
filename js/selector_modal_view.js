@@ -123,7 +123,32 @@ class SelectorModalView {
 
     close() {
         const elements = this.getElements();
-        if (elements) elements.modal.classList.add('hidden');
+        if (!elements) return;
+
+        const { modal, listContainer, contextEl, tabsEl, confirmBtn, backBtn } = elements;
+        modal.classList.add('hidden');
+
+        // 非表示にするだけだと、仮想スクロールのクロージャや画像DOMが大量データへの参照を
+        // 保持したままになります。通常地図を復帰する前に画面内容を解放し、古いスマホの
+        // 一時メモリピークを下げます。見た目が必要な間は close() 自体が呼ばれないため、
+        // handoff 中の表示は従来どおり維持されます。
+        if (listContainer) {
+            if (listContainer._virtualScrollHandler) {
+                listContainer.removeEventListener('scroll', listContainer._virtualScrollHandler);
+                listContainer._virtualScrollHandler = null;
+            }
+            if (listContainer._virtualScrollCleanup) {
+                listContainer._virtualScrollCleanup();
+                listContainer._virtualScrollCleanup = null;
+            }
+            listContainer.querySelectorAll('img').forEach(img => img.removeAttribute('src'));
+            listContainer.innerHTML = '';
+            listContainer.scrollTop = 0;
+        }
+        if (contextEl) contextEl.innerHTML = '';
+        if (tabsEl) tabsEl.innerHTML = '';
+        if (confirmBtn) confirmBtn.onclick = null;
+        if (backBtn) backBtn.onclick = null;
     }
 }
 

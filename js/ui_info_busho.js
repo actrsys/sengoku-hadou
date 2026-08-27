@@ -645,19 +645,12 @@ Object.assign(UIInfoManager.prototype, {
     _renderBushoSelector(actionType, targetId, extraData, onBack, scrollPos = 0) {
         this.ui.hideAIGuardTemporarily(); 
         
-        // ==========================================
-        // ★高速化：ソートや表示のループに入る前に、早見表を一気に作ります！
-        // ==========================================
-        const clanMap = new Map();
-        if (this.game.clans) this.game.clans.forEach(c => clanMap.set(c.id, c));
-        
-        const castleMap = new Map();
-        if (this.game.castles) this.game.castles.forEach(c => castleMap.set(c.id, c));
-        
-        const bushoMap = new Map();
-        if (this.game.bushos) this.game.bushos.forEach(b => bushoMap.set(b.id, b));
-
-        // ==========================================
+        // 武将・拠点・勢力のID索引は GameManager が正本として保持しています。
+        // 一覧を描くたびに4000人規模の Map を重複生成すると、古いスマホではタブ切替時の
+        // 一時メモリが増えるため、既存の索引をそのまま利用します。
+        const getClanById = (id) => this.game.getClan(id);
+        const getCastleById = (id) => this.game.getCastle(id);
+        const getBushoById = (id) => this.game.getBusho(id);
         
         const isViewMode = (actionType === 'view_only' || actionType === 'all_busho_list');
         
@@ -722,7 +715,7 @@ Object.assign(UIInfoManager.prototype, {
         let targetCastle = null;
         if (['rumor_target_busho','headhunt_target','view_only'].includes(actionType)) {
              isEnemyTarget = true;
-             targetCastle = castleMap.get(targetId);
+             targetCastle = getCastleById(targetId);
         }
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
         const myDaimyo = this.game.getClanDaimyo(this.game.playerClanId);
@@ -781,7 +774,8 @@ Object.assign(UIInfoManager.prototype, {
         let acc = null;
         if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
 
-        const selectedIdsStr = [...(this.commonSelectedIds || [])].sort((a, b) => a - b).join('_');
+        const selectedIdSet = new Set((this.commonSelectedIds || []).map(Number));
+        const selectedIdsStr = [...selectedIdSet].sort((a, b) => a - b).join('_');
         // 行動を消費する武将一覧では、どの並び順でも「未行動 → 行動済」を最優先にします。
         // 行動状態が変わった直後も古いソートキャッシュを使わないよう、状態自体をキーへ含めます。
         const actionStateKey = hideActionCol ? '' : (this.bushoSavedBushos || [])
@@ -803,8 +797,8 @@ Object.assign(UIInfoManager.prototype, {
 
             if (this.bushoCurrentSortKey) {
                 displayBushos.sort((a, b) => {
-                    const selA = (this.commonSelectedIds || []).includes(a.id) ? 1 : 0;
-                    const selB = (this.commonSelectedIds || []).includes(b.id) ? 1 : 0;
+                    const selA = selectedIdSet.has(Number(a.id)) ? 1 : 0;
+                    const selB = selectedIdSet.has(Number(b.id)) ? 1 : 0;
                     if (selA !== selB) return selB - selA;
 
                     let valA = 0, valB = 0;
@@ -823,7 +817,7 @@ Object.assign(UIInfoManager.prototype, {
                                 const kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
                                 return { yomi: kunishu ? (kunishu.yomi || kunishu.name || "") : "んんん", name: kunishu ? (kunishu.name || "") : "んんん" };
                             } else if (busho.clan > 0) {
-                                const clan = clanMap.get(busho.clan);
+                                const clan = getClanById(busho.clan);
                                 return { yomi: clan ? (clan.yomi || clan.name || "") : "んんん", name: clan ? (clan.name || "") : "んんん" };
                             }
                             return { yomi: "んんん", name: "んんん" };
@@ -854,8 +848,8 @@ Object.assign(UIInfoManager.prototype, {
                     } else if (this.bushoCurrentSortKey === 'family') {
                         const checkFamily = (busho) => {
                             if (busho.clan > 0) {
-                                const clan = clanMap.get(busho.clan);
-                                const daimyo = clan ? bushoMap.get(clan.leaderId) : null;
+                                const clan = getClanById(busho.clan);
+                                const daimyo = clan ? getBushoById(clan.leaderId) : null;
                                 if (daimyo && (busho.id === daimyo.id || busho.isDaimyo)) return 1;
                                 if (daimyo) {
                                     const bFam = Array.isArray(busho.familyIds) ? busho.familyIds : [];
@@ -867,8 +861,8 @@ Object.assign(UIInfoManager.prototype, {
                         };
                         valA = checkFamily(a); valB = checkFamily(b);
                     } else if (this.bushoCurrentSortKey === 'salary') {
-                        const daimyoA = a.clan > 0 ? bushoMap.get(clanMap.get(a.clan)?.leaderId) : null;
-                        const daimyoB = b.clan > 0 ? bushoMap.get(clanMap.get(b.clan)?.leaderId) : null;
+                        const daimyoA = a.clan > 0 ? getBushoById(getClanById(a.clan)?.leaderId) : null;
+                        const daimyoB = b.clan > 0 ? getBushoById(getClanById(b.clan)?.leaderId) : null;
                         valA = a.clan > 0 && !a.isDaimyo && !window.BushoStatusRules.isRonin(a) ? a.getSalary(daimyoA) : 0;
                         valB = b.clan > 0 && !b.isDaimyo && !window.BushoStatusRules.isRonin(b) ? b.getSalary(daimyoB) : 0;
                     } else if (['aptAshigaru', 'aptKiba', 'aptTeppo', 'aptYumi', 'aptBugei', 'aptNinjutsu', 'aptMaritime'].includes(this.bushoCurrentSortKey)) {
@@ -876,7 +870,7 @@ Object.assign(UIInfoManager.prototype, {
                         valB = typeof SkillManager !== 'undefined' ? SkillManager.getAptitudeLevel(b[this.bushoCurrentSortKey]) : 0;
                     } else {
                         const getAccForSort = (busho) => {
-                            const c = castleMap.get(busho.castleId);
+                            const c = getCastleById(busho.castleId);
                             if (c && c.investigatedUntil >= this.game.getCurrentTurnId()) return c.investigatedAccuracy;
                             return acc;
                         };
@@ -920,8 +914,8 @@ Object.assign(UIInfoManager.prototype, {
             } else {
                 if (extraData && extraData.isFactionView) {
                     displayBushos.sort((a, b) => {
-                        const selA = (this.commonSelectedIds || []).includes(a.id) ? 1 : 0;
-                        const selB = (this.commonSelectedIds || []).includes(b.id) ? 1 : 0;
+                        const selA = selectedIdSet.has(Number(a.id)) ? 1 : 0;
+                        const selB = selectedIdSet.has(Number(b.id)) ? 1 : 0;
                         if (selA !== selB) return selB - selA;
 
                         if (a.isFactionLeader && !b.isFactionLeader) return -1;
@@ -932,16 +926,16 @@ Object.assign(UIInfoManager.prototype, {
                     });
                 } else if (actionType === 'all_busho_list' && this.bushoCurrentScope === 'all') {
                     displayBushos.sort((a, b) => {
-                        const selA = (this.commonSelectedIds || []).includes(a.id) ? 1 : 0;
-                        const selB = (this.commonSelectedIds || []).includes(b.id) ? 1 : 0;
+                        const selA = selectedIdSet.has(Number(a.id)) ? 1 : 0;
+                        const selB = selectedIdSet.has(Number(b.id)) ? 1 : 0;
                         if (selA !== selB) return selB - selA;
                         
                         return getSortRankAll(b) - getSortRankAll(a);
                     });
                 } else if (isViewMode) {
                     displayBushos.sort((a, b) => {
-                        const selA = (this.commonSelectedIds || []).includes(a.id) ? 1 : 0;
-                        const selB = (this.commonSelectedIds || []).includes(b.id) ? 1 : 0;
+                        const selA = selectedIdSet.has(Number(a.id)) ? 1 : 0;
+                        const selB = selectedIdSet.has(Number(b.id)) ? 1 : 0;
                         if (selA !== selB) return selB - selA;
                         
                         return getSortRankClan(b) - getSortRankClan(a);
@@ -1040,27 +1034,29 @@ Object.assign(UIInfoManager.prototype, {
         // ★高速化：タブ・範囲・並び順・選択状態が前回と同じなら、重い行生成をサボって使い回します
         const itemsCacheKey = `${actionType}|${targetId}|${this.bushoCurrentTab}|${this.bushoCurrentScope}|${hideActionCol}|${currentSortStateKey}`;
 
-        // ★軽量化：表示対象だけを先に絞り込み、150件超では行HTMLを全件作りません。
-        const renderBushos = displayBushos.filter(b => {
+        // 表示除外が必要なコマンドだけ配列を作り直します。閲覧用の全国一覧などは
+        // ソート済み配列をそのまま使い、数千要素の一時配列を増やしません。
+        const needsRenderFilter = actionType === 'banish' || actionType === 'employ_target' || actionType === 'reward';
+        const renderBushos = needsRenderFilter ? displayBushos.filter(b => {
             if (actionType === 'banish' && b.isCastellan) return false;
             if (actionType === 'employ_target' && b.isDaimyo) return false;
             if (actionType === 'reward' && b.isDaimyo) return false;
             return true;
-        });
+        }) : displayBushos;
+        const customDisabledIdSet = extraData && Array.isArray(extraData.customDisabledIds)
+            ? new Set(extraData.customDisabledIds.map(Number))
+            : null;
 
         const buildBushoListItem = (b) => {
             
             let isSelectable = !b.isActionDone; 
             if (isActionFree) isSelectable = true; 
-            if (extraData && Array.isArray(extraData.customDisabledIds)) {
-                const disabledIds = extraData.customDisabledIds;
-                if (disabledIds.includes(Number(b.id))) isSelectable = false;
-            }
+            if (customDisabledIdSet && customDisabledIdSet.has(Number(b.id))) isSelectable = false;
             
-            const isSelected = (this.commonSelectedIds || []).includes(b.id);
+            const isSelected = selectedIdSet.has(Number(b.id));
             
             let currentAcc = null;
-            const bCastle = castleMap.get(b.castleId);
+            const bCastle = getCastleById(b.castleId);
             if (bCastle && bCastle.investigatedUntil >= this.game.getCurrentTurnId()) {
                 currentAcc = bCastle.investigatedAccuracy;
             } else if (isEnemyTarget && targetCastle) {
@@ -1137,9 +1133,9 @@ Object.assign(UIInfoManager.prototype, {
                     const kunishu = this.game.kunishuSystem.getKunishu(b.belongKunishuId);
                     forceName = kunishu ? kunishu.getName(this.game) : "諸勢力";
                 } else if (b.clan > 0) {
-                    const clan = clanMap.get(b.clan);
+                    const clan = getClanById(b.clan);
                     forceName = clan ? clan.name : "大名家";
-                    const daimyo = clan ? bushoMap.get(clan.leaderId) : null;
+                    const daimyo = clan ? getBushoById(clan.leaderId) : null;
                     if (daimyo && (b.id === daimyo.id || b.isDaimyo)) { familyMark = "◯"; }
                     else if (daimyo) {
                         const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
@@ -1151,8 +1147,8 @@ Object.assign(UIInfoManager.prototype, {
                 const age = b.isAutoLeader ? "" : (this.game.year - b.birthYear + 1);
                 let salary = "";
                 if (b.clan > 0 && !b.isDaimyo && !window.BushoStatusRules.isRonin(b)) {
-                    const clan = clanMap.get(b.clan);
-                    const daimyo = clan ? bushoMap.get(clan.leaderId) : null;
+                    const clan = getClanById(b.clan);
+                    const daimyo = clan ? getBushoById(clan.leaderId) : null;
                     salary = b.getSalary(daimyo);
                     if (salary === 0) salary = "";
                 }
@@ -1200,8 +1196,9 @@ Object.assign(UIInfoManager.prototype, {
         let lazyGetItem = null;
 
         if (renderBushos.length > 150) {
-            // 見えている周辺だけ最大240行ぶんキャッシュ。全国4000人でも巨大なHTML文字列を抱えません。
+            // 見えている周辺だけをキャッシュ。スマホは画面内行数が少ないため保持量も抑えます。
             const lazyRowCache = new Map();
+            const lazyRowCacheLimit = document.body.classList.contains('is-pc') ? 240 : 96;
             lazyItemCount = renderBushos.length;
             lazyGetItem = (index) => {
                 if (index < 0 || index >= renderBushos.length) return null;
@@ -1212,7 +1209,7 @@ Object.assign(UIInfoManager.prototype, {
 
                 if (lazyRowCache.has(index)) return lazyRowCache.get(index);
                 const item = buildBushoListItem(renderBushos[index]);
-                if (lazyRowCache.size >= 240) lazyRowCache.clear();
+                if (lazyRowCache.size >= lazyRowCacheLimit) lazyRowCache.clear();
                 lazyRowCache.set(index, item);
                 return item;
             };
@@ -1274,6 +1271,9 @@ Object.assign(UIInfoManager.prototype, {
             minWidth: minW,
             gridTemplateSp: gridSpStr,
             gridTemplatePc: gridPcStr,
+            // 武将名は buildBushoListItem 側で既に同じ基準の圧縮を済ませています。
+            // 共通側の全表示行DOM走査を重ねないことで、仮想スクロール中のレイアウト負荷を下げます。
+            skipTextFit: true,
             onBack: () => {
                 if (onBack) onBack(); 
                 else if (extraData && extraData.onCancel) extraData.onCancel();

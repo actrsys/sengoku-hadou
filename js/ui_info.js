@@ -13,6 +13,10 @@ class UIInfoManager {
     
     // --- 共通モーダル（枠の使い回し）管理 ---
     closeCommonModal() {
+        // 閉じた画面の遅延描画・仮想スクロール処理を即座に無効化します。
+        // 古いスマホでは、非表示DOMの裏で分割描画が続いたり、scroll handler のクロージャが
+        // 大量の武将配列を保持し続けるだけでも、通常地図復帰時のメモリピークに繋がります。
+        this._stopActiveListRendering();
         this._stableSortBases = {}; // ★全リスト共通の「前回の並び順」を記憶する箱をリセットします
         this._listItemsCache = {};  // ★全リスト共通の「重い一覧HTML生成結果」を記憶する箱をリセットします
 
@@ -96,8 +100,24 @@ class UIInfoManager {
         }
     }
 
+    _stopActiveListRendering() {
+        this._currentListRenderId = (this._currentListRenderId || 0) + 1;
+        const listContainer = (this.ui && this.ui.selectorList) || document.getElementById('selector-list');
+        if (!listContainer) return;
+        if (listContainer._virtualScrollHandler) {
+            listContainer.removeEventListener('scroll', listContainer._virtualScrollHandler);
+            listContainer._virtualScrollHandler = null;
+        }
+        if (listContainer._virtualScrollCleanup) {
+            listContainer._virtualScrollCleanup();
+            listContainer._virtualScrollCleanup = null;
+        }
+    }
+
     // --- 共通モーダルのガワ ---
     _openInfoShell(title, { tabsHtml = null, showTabs = false } = {}) {
+        // 一覧→詳細の遷移でも、旧一覧の仮想スクロール処理を詳細画面の裏へ残しません。
+        this._stopActiveListRendering();
         return this.selectorView.open({
             title,
             tabsHtml,
@@ -1362,7 +1382,7 @@ class UIInfoManager {
     }
 
     _renderListModal(config) {
-        this._currentListRenderId = (this._currentListRenderId || 0) + 1;
+        this._stopActiveListRendering();
         const currentRenderId = this._currentListRenderId;
 
         const shell = this.selectorView.open({
@@ -1387,12 +1407,6 @@ class UIInfoManager {
         const { listContainer, tabsEl } = shell;
         listContainer.style.display = 'none';
         listContainer.innerHTML = '';
-        // 前回このリストに付けていた仮想スクロール監視が残っていたら必ず外す。
-        if (listContainer._virtualScrollHandler) {
-            listContainer.removeEventListener('scroll', listContainer._virtualScrollHandler);
-            listContainer._virtualScrollHandler = null;
-        }
-
         // タブ切り替えとスコープ切り替えは一覧内容側の責務としてここで登録する。
         if (tabsEl && config.tabsHtml) {
             if (config.onTabClick) {
@@ -1468,6 +1482,7 @@ class UIInfoManager {
         // ★「文字数」を数えて、文字数が多い場合だけ文字を小さくします
         // （仮想スクロールでは常に「今表示中の行」だけをチェックすれば十分なので引数なしにしました）
         const adjustTextFit = () => {
+            if (config.skipTextFit) return;
             const listInner = listContainer.querySelector('.list-inner-wrapper');
             if (!listInner) return;
             const itemEls = listInner.querySelectorAll('.select-item');
@@ -1552,7 +1567,9 @@ class UIInfoManager {
         // ==========================================
         if (!config.disableVirtualization && totalItems > VIRTUALIZE_THRESHOLD) {
             let rowHeight = 40; // 仮の行の高さ（実測できたら後で補正します）
-            const BUFFER_ROWS = 15; // 画面外にも少し多めに描画しておく余裕（バッファ）
+            const isMobile = !document.body.classList.contains('is-pc');
+            const BUFFER_ROWS = isMobile ? 10 : 15; // 低メモリ端末では画面外DOMを少しだけ減らします
+            const WINDOW_STEP_ROWS = isMobile ? 4 : 2; // 数pxごとの全行作り直しを避け、見た目を変えずDOM churnを抑えます
             let lastRange = { start: -1, end: -1 };
 
             let headerHtml = '';
@@ -1579,8 +1596,9 @@ class UIInfoManager {
                 const viewportHeight = listContainer.clientHeight || 400;
                 const scrollTop = listContainer.scrollTop;
 
-                const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - BUFFER_ROWS);
-                const visibleRowCount = Math.ceil(viewportHeight / rowHeight) + BUFFER_ROWS * 2;
+                const rawStartIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - BUFFER_ROWS);
+                const startIndex = Math.floor(rawStartIndex / WINDOW_STEP_ROWS) * WINDOW_STEP_ROWS;
+                const visibleRowCount = Math.ceil(viewportHeight / rowHeight) + BUFFER_ROWS * 2 + WINDOW_STEP_ROWS;
                 const endIndex = Math.min(totalItems, startIndex + visibleRowCount);
 
                 if (!force && startIndex === lastRange.start && endIndex === lastRange.end) return;
@@ -1595,7 +1613,7 @@ class UIInfoManager {
                 scrollBody.style.paddingBottom = `${Math.max(0, (totalItems - endIndex) * rowHeight)}px`;
                 scrollBody.innerHTML = rowsHtml.join('');
 
-                requestAnimationFrame(adjustTextFit);
+                if (!config.skipTextFit) requestAnimationFrame(adjustTextFit);
             };
 
             // ★追加：スクロールのたびに毎回計算しすぎないよう、アニメーションフレームとタイマーで間引きます！
@@ -1622,6 +1640,13 @@ class UIInfoManager {
             // passive: true をつけることで、スクロール自体が指に吸い付くように滑らかになります
             listContainer.addEventListener('scroll', scrollHandler, { passive: true });
             listContainer._virtualScrollHandler = scrollHandler;
+            listContainer._virtualScrollCleanup = () => {
+                if (scrollTimeout) {
+                    clearTimeout(scrollTimeout);
+                    scrollTimeout = null;
+                }
+                scrollTicking = false;
+            };
 
             // ★スクロール位置を復元できるように、まず仮の行の高さで全体の高さだけ確保してからスクロールさせます
             scrollBody.style.paddingBottom = `${Math.max(0, (totalItems - 1) * rowHeight)}px`;
@@ -1677,7 +1702,7 @@ class UIInfoManager {
         const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
         attachDelegatedClick(innerWrapper);
 
-        requestAnimationFrame(adjustTextFit);
+        if (!config.skipTextFit) requestAnimationFrame(adjustTextFit);
         attachSortClicks();
 
         listContainer.style.display = 'block';
@@ -1706,7 +1731,7 @@ class UIInfoManager {
                     innerWrapper.insertAdjacentHTML('beforeend', chunkParts.join(''));
                 }
 
-                requestAnimationFrame(adjustTextFit);
+                if (!config.skipTextFit) requestAnimationFrame(adjustTextFit);
                 currentIndex = endLimit;
 
                 setTimeout(() => {

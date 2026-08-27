@@ -88,7 +88,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r244');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r245');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -6934,12 +6934,15 @@ test('捕虜処遇は専用武将一覧を持たず既存の行動列なし共�
 
 test('共通武将選択は個別の選択不可IDを共通経路で扱える', () => {
     const busho = read('js/ui_info_busho.js');
-    const at = busho.indexOf('const buildBushoListItem = (b) => {');
-    assert.ok(at >= 0);
-    const block = busho.slice(at, at + 1200);
-    assert.ok(block.includes('Array.isArray(extraData.customDisabledIds)'));
-    assert.ok(block.includes('disabledIds.includes(Number(b.id))'));
-    assert.ok(block.includes('isSelectable = false'));
+    const setAt = busho.indexOf('const customDisabledIdSet =');
+    const itemAt = busho.indexOf('const buildBushoListItem = (b) => {');
+    assert.ok(setAt >= 0 && itemAt >= 0);
+    const setBlock = busho.slice(setAt, setAt + 400);
+    const itemBlock = busho.slice(itemAt, itemAt + 500);
+    assert.ok(setBlock.includes('Array.isArray(extraData.customDisabledIds)'));
+    assert.ok(setBlock.includes('new Set(extraData.customDisabledIds.map(Number))'));
+    assert.ok(itemBlock.includes('customDisabledIdSet.has(Number(b.id))'));
+    assert.ok(itemBlock.includes('isSelectable = false'));
 });
 
 test('野戦終了時は通常地図復帰より先に重い戦場DOMを解放する', () => {
@@ -7659,6 +7662,51 @@ test('第三者の忠誠・不満所見は高精度でも内心を断定しな�
     assert.ok(!block.includes('殿から心が離れております'));
     const architecture = read('ARCHITECTURE.md');
     assert.ok(architecture.includes('第三者の内心は、短縮のために断定形へ変えない'));
+});
+
+
+
+test('共通一覧は詳細遷移・終了時に仮想スクロールの参照と遅延描画を解放する', () => {
+    const info = read('js/ui_info.js');
+    const selector = read('js/selector_modal_view.js');
+    const stopStart = info.indexOf('_stopActiveListRendering() {');
+    const stopBlock = info.slice(stopStart, stopStart + 1000);
+    assert.ok(stopStart >= 0);
+    assert.ok(stopBlock.includes('this._currentListRenderId = (this._currentListRenderId || 0) + 1;'));
+    assert.ok(stopBlock.includes("removeEventListener('scroll', listContainer._virtualScrollHandler)"));
+    assert.ok(stopBlock.includes('listContainer._virtualScrollCleanup();'));
+    const shellStart = info.indexOf('_openInfoShell(');
+    const shellBlock = info.slice(shellStart, shellStart + 700);
+    assert.ok(shellBlock.includes('this._stopActiveListRendering();'));
+    const closeStart = selector.indexOf('close() {');
+    const closeBlock = selector.slice(closeStart, closeStart + 1800);
+    assert.ok(closeBlock.includes("listContainer.removeEventListener('scroll', listContainer._virtualScrollHandler)"));
+    assert.ok(closeBlock.includes("listContainer.querySelectorAll('img').forEach(img => img.removeAttribute('src'))"));
+    assert.ok(closeBlock.includes("listContainer.innerHTML = '';"));
+});
+
+test('武将一覧はGameManagerの既存ID索引を再利用して再描画ごとの大規模Map複製を行わない', () => {
+    const busho = read('js/ui_info_busho.js');
+    const start = busho.indexOf('_renderBushoSelector(');
+    const end = busho.indexOf('this._updateBushoSelectorUI();', start);
+    const block = busho.slice(start, end);
+    assert.ok(block.includes('const getClanById = (id) => this.game.getClan(id);'));
+    assert.ok(block.includes('const getCastleById = (id) => this.game.getCastle(id);'));
+    assert.ok(block.includes('const getBushoById = (id) => this.game.getBusho(id);'));
+    assert.ok(!block.includes('const clanMap = new Map()'));
+    assert.ok(!block.includes('const castleMap = new Map()'));
+    assert.ok(!block.includes('const bushoMap = new Map()'));
+    assert.ok(block.includes('skipTextFit: true'));
+    assert.ok(block.includes("const lazyRowCacheLimit = document.body.classList.contains('is-pc') ? 240 : 96;"));
+});
+
+test('スマホ仮想スクロールは表示外DOMを抑えつつ数pxごとの全行再生成を避ける', () => {
+    const info = read('js/ui_info.js');
+    const start = info.indexOf('const isMobile = !document.body.classList.contains');
+    const block = info.slice(start, start + 2200);
+    assert.ok(block.includes('const BUFFER_ROWS = isMobile ? 10 : 15;'));
+    assert.ok(block.includes('const WINDOW_STEP_ROWS = isMobile ? 4 : 2;'));
+    assert.ok(block.includes('Math.floor(rawStartIndex / WINDOW_STEP_ROWS) * WINDOW_STEP_ROWS'));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
