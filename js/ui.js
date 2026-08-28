@@ -1697,6 +1697,9 @@ class UIManager {
         this._dialogGeneration = Number(this._dialogGeneration || 0) + 1;
         this._cutinGeneration = Number(this._cutinGeneration || 0) + 1;
         this._warActionMessageGeneration = Number(this._warActionMessageGeneration || 0) + 1;
+        document.querySelectorAll('.responsive-army-box, .army-box').forEach(card => {
+            this._cancelEmptyCardAnimation(card);
+        });
         this._cancelDialogHandoffClose();
         this._dialogHandoffHoldCount = 0;
         this._visualHandoffCloseFn = null;
@@ -2056,6 +2059,12 @@ class UIManager {
         else this.updateLoadingProgress(10, 'タイトル画面へ戻っています');
         await this.waitForNextPaint();
 
+        if (this.game && this.game.warManager && typeof this.game.warManager.abortForScenarioTransition === 'function') {
+            this.game.warManager.abortForScenarioTransition();
+        }
+        if (this.game && this.game.fieldWarManager && typeof this.game.fieldWarManager.abortForScenarioTransition === 'function') {
+            this.game.fieldWarManager.abortForScenarioTransition();
+        }
         this.forceResetModals({ skipBackgroundRecovery: true });
         if (typeof this.resetMapViewState === 'function') this.resetMapViewState();
         if (this.game && typeof this.game.releaseScenarioMapResources === 'function') {
@@ -2873,6 +2882,7 @@ class UIManager {
             // ★追加：戦争が終わって画面を閉じる時に、カードの「部隊がいたよシール」を全部ひっぺがします
             const allCards = document.querySelectorAll('.responsive-army-box, .army-box');
             allCards.forEach(card => {
+                this._cancelEmptyCardAnimation(card);
                 card.dataset.hasUnit = 'false';
             });
         }
@@ -3593,6 +3603,9 @@ class UIManager {
                 }
             } else {
                 // 援軍が来ている時は、所属に応じた鮮やかなグラデーションにします！
+                // 直前に消滅アニメーションが走っていても、再び部隊が入ったカードを
+                // 旧1秒timerが空にしないよう、この固定カードの旧寿命をここで終了する。
+                this._cancelEmptyCardAnimation(card);
                 card.dataset.hasUnit = 'true'; // ★追加：部隊が「いる」というシールを貼ります！
                 
                 setStyleEl(card, 'backgroundColor', ''); 
@@ -3950,10 +3963,23 @@ class UIManager {
     // ==========================================
     // ★追加：部隊が消滅した時に、上からからっぽのカードをフェードインさせる魔法
     // ==========================================
+    _cancelEmptyCardAnimation(card) {
+        if (!card) return;
+        card._emptyCardAnimationGeneration = Number(card._emptyCardAnimationGeneration || 0) + 1;
+        if (card._emptyCardAnimationTimer) {
+            clearTimeout(card._emptyCardAnimationTimer);
+            card._emptyCardAnimationTimer = null;
+        }
+        card.querySelectorAll('.empty-cover-overlay').forEach(overlay => overlay.remove());
+    }
+
     applyEmptyCardAnimation(card) {
         if (!card) return;
         // 既にアニメーション中なら何もしない
         if (card.querySelector('.empty-cover-overlay')) return;
+
+        card._emptyCardAnimationGeneration = Number(card._emptyCardAnimationGeneration || 0) + 1;
+        const animationGeneration = card._emptyCardAnimationGeneration;
 
         // 魔法の幕（グラデーションのカバー）を作ってカードに被せます
         const overlay = document.createElement('div');
@@ -3962,13 +3988,17 @@ class UIManager {
 
         // ほんの少し待ってから、フワッと表示（フェードイン）させます
         requestAnimationFrame(() => {
+            if (animationGeneration !== card._emptyCardAnimationGeneration || !overlay.parentNode) return;
             requestAnimationFrame(() => {
+                if (animationGeneration !== card._emptyCardAnimationGeneration || !overlay.parentNode) return;
                 overlay.classList.add('show-overlay');
             });
         });
 
         // 1秒後（フェードインが完全に終わった後）に、中身を透明にして幕を取り外します
-        setTimeout(() => {
+        card._emptyCardAnimationTimer = setTimeout(() => {
+            if (animationGeneration !== card._emptyCardAnimationGeneration) return;
+            card._emptyCardAnimationTimer = null;
             card.style.background = 'linear-gradient(to top right, #eeeeee, #777777)';
             
             const titleEl = card.querySelector('.responsive-army-title');

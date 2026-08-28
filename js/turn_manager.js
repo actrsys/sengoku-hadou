@@ -6,10 +6,18 @@
 class TurnManager {
     constructor(game) {
         this.game = game;
+        this._allActionsDonePromptTimer = null;
+    }
+
+    _cancelAllActionsDonePromptTimer() {
+        if (!this._allActionsDonePromptTimer) return;
+        clearTimeout(this._allActionsDonePromptTimer);
+        this._allActionsDonePromptTimer = null;
     }
 
     async startMonth() { 
         const game = this.game;
+        this._cancelAllActionsDonePromptTimer();
         game.hasAutoSavedThisMonth = false; // ★月が替わったので、オートセーブ済みの印を消します
         game.writeSystemDiagnostic('month_start:start');
     
@@ -247,6 +255,9 @@ class TurnManager {
             clearTimeout(game.aiTimer);
             game.aiTimer = null;
         }
+        // タイトル復帰・ロード開始後に旧ターンのsetTimeout(0)が発火しても、
+        // 旧turnQueueを裏で進めない。phaseは画面より上位のゲーム寿命境界として扱う。
+        if (game.phase !== 'game') return;
     
         // ★最強ストッパー１：合戦中やマップ選択中にフライングで呼ばれたら絶対に弾く！
         if (game.warManager && game.warManager.state && game.warManager.state.active) return;
@@ -385,6 +396,8 @@ class TurnManager {
 
     async finishTurn() { 
         const game = this.game;
+        this._cancelAllActionsDonePromptTimer();
+        if (game.phase !== 'game') return;
         const wasProcessingAI = game.isProcessingAI;
     
         // ★最強ストッパー２：合戦中やマップ選択中なら、絶対にターンを勝手に終わらせない！
@@ -535,8 +548,24 @@ class TurnManager {
         const bushos = game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === window.GameConstants.BushoStatus.ACTIVE);
         
         if(bushos.length > 0 && bushos.every(b => b.isActionDone)) {
-             setTimeout(() => {
-                 const nav = game.getNavigatorInfo(c);
+             // 同じ固定ダイアログへ複数の遅延確認を積まず、100ms後にも同じ拠点・同じターンで
+             // 全員行動済みかを再確認する。旧ターンの確認が戦闘開始後や次の拠点へ遅れて出ないようにする。
+             if (this._allActionsDonePromptTimer) return;
+             const expectedCastleId = Number(c.id);
+             const expectedTurnIndex = Number(game.currentIndex);
+             this._allActionsDonePromptTimer = setTimeout(() => {
+                 this._allActionsDonePromptTimer = null;
+                 const currentCastle = game.getCurrentTurnCastle();
+                 if (game.phase !== 'game' || game.isProcessingAI || game.selectionMode != null) return;
+                 if (!currentCastle || Number(currentCastle.id) !== expectedCastleId || Number(game.currentIndex) !== expectedTurnIndex) return;
+                 if (Number(currentCastle.ownerClan) !== Number(game.playerClanId) || currentCastle.isDone) return;
+                 if (game.warManager && game.warManager.state && game.warManager.state.active) return;
+                 if (game.fieldWarManager && game.fieldWarManager.active) return;
+                 const currentBushos = game.getCastleBushos(currentCastle.id)
+                     .filter(b => b.clan === currentCastle.ownerClan && b.status === window.GameConstants.BushoStatus.ACTIVE);
+                 if (currentBushos.length === 0 || !currentBushos.every(b => b.isActionDone)) return;
+
+                 const nav = game.getNavigatorInfo(currentCastle);
                  game.ui.showDialog("「すべての武将が行動を終えました。\n今月の命令を終了しますか？」", true, () => {
                      game.finishTurn();
                  }, null, {

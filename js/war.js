@@ -151,7 +151,44 @@ class WarSystem {
 }
 
 class WarManager {
-    constructor(game) { this.game = game; this.state = { active: false }; this.pendingPrisoners = []; }
+    constructor(game) {
+        this.game = game;
+        this.state = { active: false };
+        this.pendingPrisoners = [];
+        this._warGeneration = 0;
+        this._warEnding = false;
+    }
+
+    _beginWarLifecycle() {
+        this._warGeneration = Number(this._warGeneration || 0) + 1;
+        this._warEnding = false;
+        return this._warGeneration;
+    }
+
+    _isWarLifecycleCurrent(generation, requireActive = true) {
+        if (Number(generation) !== Number(this._warGeneration || 0)) return false;
+        return !requireActive || !!(this.state && this.state.active);
+    }
+
+    _scheduleWarCallback(callback, delay = 0, requireActive = true) {
+        const generation = Number(this._warGeneration || 0);
+        return setTimeout(() => {
+            if (!this._isWarLifecycleCurrent(generation, requireActive)) return;
+            callback();
+        }, Math.max(0, Number(delay) || 0));
+    }
+
+    abortForScenarioTransition() {
+        this._warGeneration = Number(this._warGeneration || 0) + 1;
+        this._warEnding = false;
+        if (this.state) this.state.active = false;
+        this.pendingPrisoners = [];
+        const warModal = this.game && this.game.ui ? this.game.ui.warModal : document.getElementById('war-modal');
+        if (warModal) warModal.classList.add('hidden');
+        if (this.game && this.game.ui && typeof this.game.ui.resumeMainMapAfterBattle === 'function') {
+            this.game.ui.resumeMainMapAfterBattle('siege-war');
+        }
+    }
     
     // ★追加：AIとプレイヤーで共通して使う、賢い部隊分割の魔法です！
     /**
@@ -356,11 +393,11 @@ class WarManager {
                 window.AudioManager.playBGM('07_Underworld dance.ogg'); 
             }
             
-            setTimeout(() => {
+            this._scheduleWarCallback(() => {
                 this.game.ui.log(`★ ${s.sourceCastle.name}軍が${s.defender.name}への攻城戦を開始！`, { history: false });
                 this.game.ui.updateWarUI(); this.processWarRound(); 
             }, 500); 
-        } else { setTimeout(() => { this.resolveAutoWar(); }, 100); }
+        } else { this._scheduleWarCallback(() => { this.resolveAutoWar(); }, 100); }
     }
     
     distributeDamage(isTargetDefSide, totalDamage) {
@@ -1901,9 +1938,9 @@ class WarManager {
                     // ★追加：裏で高速計算する時は待たずにすぐ実行、画面に出す時だけ待ちます！
                     if (!s.isPlayerInvolved) {
                         // ★修正：AIの作戦立案も、一瞬だけ息継ぎ（0秒待機）をしてフリーズを防ぎます！
-                        setTimeout(() => this.execWarAI(), 0);
+                        this._scheduleWarCallback(() => this.execWarAI(), 0);
                     } else {
-                        setTimeout(() => this.execWarAI(), 800); 
+                        this._scheduleWarCallback(() => this.execWarAI(), 800); 
                     }
                 }
             } else {
@@ -1981,10 +2018,10 @@ class WarManager {
                     // ★追加：裏で高速計算する時は待たずにすぐ実行、画面に出す時だけ待ちます！
                     if (!s.isPlayerInvolved) {
                         // ★修正：AI同士の高速戦闘でも、一瞬だけ息継ぎを入れてスマホのパンクを防ぎます！
-                        setTimeout(() => this.resolveWarAction(action.type, action.extraVal), 0);
+                        this._scheduleWarCallback(() => this.resolveWarAction(action.type, action.extraVal), 0);
                     } else {
                         // 少し間をあけて（演出を見やすくして）実行します
-                        setTimeout(() => {
+                        this._scheduleWarCallback(() => {
                             this.resolveWarAction(action.type, action.extraVal);
                         }, 800);
                     }

@@ -538,10 +538,12 @@ Object.assign(WarManager.prototype, {
     // ★修正：AIが鉄砲・騎馬を「強さ順」に賢く配分し、余った兵士を足軽で均等に分けるロジックを追加
     // ★追加：ui_sliderからの呼び出しを受け取れるように引数（isSeaBattleParam, isPlayerUI）を追加します！
     async startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses = 0, atkGuns = 0, reinforcementData = null, selfReinforcementData = null) {
+        const warGeneration = this._beginWarLifecycle();
         // ★追加：戦争全体の「開始処理前」の合図を出します
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('before_war', { atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses, atkGuns, reinforcementData, selfReinforcementData });
         }
+        if (!this._isWarLifecycleCurrent(warGeneration, false)) return;
         
         this.state = this.state || {};
         this.state.active = true;
@@ -629,7 +631,7 @@ Object.assign(WarManager.prototype, {
                     if (window.AudioManager) {
                         window.AudioManager.playSE('katana001.ogg');
                         // 0.4秒（400ミリ秒）待ってから、次の音を鳴らします
-                        setTimeout(() => {
+                        this._scheduleWarCallback(() => {
                             if (window.AudioManager) window.AudioManager.playSE('katana002.ogg');
                         }, 400);
                     }
@@ -1319,6 +1321,7 @@ Object.assign(WarManager.prototype, {
                 });
             }
         } catch(e) {
+            if (!this._isWarLifecycleCurrent(warGeneration, false)) return;
             console.error("StartWar Error:", e); 
             if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true); 
 
@@ -1430,17 +1433,21 @@ Object.assign(WarManager.prototype, {
     
     async endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { // ★ async を追加
         // ★ここを書き足します：既に「終わったよ」の処理中なら、2回目は無視するストッパーです！
-        if (!this.state.active) return;
+        if (!this.state.active || this._warEnding) return;
+        const warGeneration = Number(this._warGeneration || 0);
+        this._warEnding = true;
 
         // ★追加：戦争全体の「終了処理前」の合図を出します
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('before_war_end', this.state);
+            if (!this._isWarLifecycleCurrent(warGeneration, false)) return;
         }
 
         // ★追加：籠城戦（攻城戦）の「戦闘終了前」の合図を出します
         // ※野戦だけで決着がついた場合も呼ばれますが、イベント側で区別できます！
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('before_siege_war_end', this.state);
+            if (!this._isWarLifecycleCurrent(warGeneration, false)) return;
         }
 
         // ★追加：合戦終了の演出中に触られないようにバリアを張ります！
@@ -2990,6 +2997,7 @@ Object.assign(WarManager.prototype, {
         // ★追加：戦争全体の「終了処理後」の合図を出します
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('after_war', this.state);
+            if (!this._isWarLifecycleCurrent(warGeneration, false)) return;
         }
         
         // setTimeout中に別処理が state を触っても対象がぶれないよう、ここで必要なIDだけ退避します。
@@ -3002,7 +3010,7 @@ Object.assign(WarManager.prototype, {
         ]);
         prestigeClanIds.delete(0);
 
-        setTimeout(() => {
+        this._scheduleWarCallback(() => {
             // ★Round10：1回の戦争で変化し得る勢力だけ威信を更新します。
             // 全国再計算を毎戦争ごとに行う必要はありません。
             if (typeof this.game.writeSystemDiagnostic === 'function') {
@@ -3017,7 +3025,7 @@ Object.assign(WarManager.prototype, {
                 this.game.writeSystemDiagnostic('war:prestige:done', prestigeDiagnosticCastle);
             }
             this.game.finishTurn(); 
-        }, 100);
+        }, 100, false);
     },
     
     // ★守備側が「自分の別の城」から援軍を呼べるかチェックする魔法

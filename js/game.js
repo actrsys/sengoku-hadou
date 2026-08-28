@@ -236,6 +236,12 @@ class GameManager {
     
     startNewGame(options = {}) {
         const startInWatchMode = !!(options && options.watchMode);
+        if (this.warManager && typeof this.warManager.abortForScenarioTransition === 'function') {
+            this.warManager.abortForScenarioTransition();
+        }
+        if (this.fieldWarManager && typeof this.fieldWarManager.abortForScenarioTransition === 'function') {
+            this.fieldWarManager.abortForScenarioTransition();
+        }
         this.releaseScenarioMapResources();
         if(this.ui) this.ui.forceResetModals();
         

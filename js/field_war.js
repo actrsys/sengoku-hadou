@@ -34,11 +34,53 @@ class FieldWarManager {
         this._fwUnitElementCache = new Map();
         this._fwHighlightedHexes = new Set();
         this._fwPreviewRefs = null;
+        // 固定の野戦Managerを複数戦闘で再利用するため、遅延callback/await後の継続を
+        // 戦闘世代で分離する。旧戦闘のtimerが次のturnQueueや固定DOMへ触れないようにする。
+        this._fieldWarGeneration = 0;
         window.addEventListener('resize', () => {
             if (this.active) {
                 this.adjustMapScale();
             }
         });
+    }
+
+    _beginFieldWarLifecycle() {
+        this._fieldWarGeneration = Number(this._fieldWarGeneration || 0) + 1;
+        return this._fieldWarGeneration;
+    }
+
+    _isFieldWarLifecycleCurrent(generation, requireActive = true) {
+        if (Number(generation) !== Number(this._fieldWarGeneration || 0)) return false;
+        return !requireActive || this.active === true;
+    }
+
+    _scheduleFieldWarCallback(callback, delay = 0, requireActive = true) {
+        const generation = Number(this._fieldWarGeneration || 0);
+        return setTimeout(() => {
+            if (!this._isFieldWarLifecycleCurrent(generation, requireActive)) return;
+            callback();
+        }, Math.max(0, Number(delay) || 0));
+    }
+
+    // タイトル復帰・新規開始・ロードは戦闘より強い寿命境界。
+    // 終了演出やAI待機の旧callbackを完走させず、固定野戦DOMの表示資源だけ解放する。
+    abortForScenarioTransition() {
+        this._fieldWarGeneration = Number(this._fieldWarGeneration || 0) + 1;
+        this.active = false;
+        this.state = 'IDLE';
+        const modal = this.modal || document.getElementById('field-war-modal');
+        if (modal) modal.classList.add('hidden');
+        if (typeof this.releaseFieldWarVisualResources === 'function') {
+            this.releaseFieldWarVisualResources();
+        }
+        if (this.game && this.game.ui && typeof this.game.ui.resumeMainMapAfterBattle === 'function') {
+            this.game.ui.resumeMainMapAfterBattle('field-war');
+        }
+        this.onComplete = null;
+        this.warState = null;
+        this.turnQueue = [];
+        this.units = [];
+        this.retreatedUnits = [];
     }
     
     /**
@@ -227,7 +269,7 @@ class FieldWarManager {
             const currentUnit = this.turnQueue[0];
             const activeEl = document.getElementById(`fw-unit-el-${currentUnit.id}`);
             if (activeEl && activeEl.classList.contains('active')) {
-                setTimeout(() => {
+                this._scheduleFieldWarCallback(() => {
                     this.showUnitInfo(currentUnit);
                 }, 50);
             }
@@ -235,6 +277,7 @@ class FieldWarManager {
     }
     
     async startFieldWar(warState, onComplete) {
+        const fieldWarGeneration = this._beginFieldWarLifecycle();
         this.warState = warState;
         this.onComplete = onComplete;
         
@@ -260,6 +303,7 @@ class FieldWarManager {
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('before_field_war', this.warState);
         }
+        if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration, false)) return;
 
         this.turnCount = 1;
         this.maxTurns = 30; // 30ターンに固定
@@ -539,6 +583,7 @@ class FieldWarManager {
             // 240HEXと部隊DOMを組み立て、瞬間的なメモリピークを重ねない。
             if (!document.body.classList.contains('is-pc') && this.game.ui && typeof this.game.ui.waitForNextPaint === 'function') {
                 await this.game.ui.waitForNextPaint();
+                if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
             }
 
             // ★追加：野戦が始まる時に、平時のコマンドリストを綺麗にお掃除して非表示にします！
@@ -558,7 +603,7 @@ class FieldWarManager {
             }
             
             // 野戦の画面が表示されたあとに、大きさをピッタリに合わせる魔法を使います
-            setTimeout(() => {
+            this._scheduleFieldWarCallback(() => {
                 this.adjustMapScale();
             }, 50); // 画面ができるまで一瞬（0.05秒）だけ待ってからサイズを合わせます
         } else {
@@ -571,6 +616,7 @@ class FieldWarManager {
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('start_field_war', this.warState);
         }
+        if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
 
         this.startTurn();
     }
@@ -834,7 +880,7 @@ class FieldWarManager {
             this.updateMenu(); 
             this.updateMap(); 
             if (this.turnQueue && this.turnQueue.length > 0) {
-                setTimeout(() => this.scrollToUnit(this.turnQueue[0]), 100);
+                this._scheduleFieldWarCallback(() => this.scrollToUnit(this.turnQueue[0]), 100);
             }
         };
 
@@ -2201,7 +2247,7 @@ class FieldWarManager {
         // ★追加：AI同士の高速戦闘でブラウザがフリーズしないように、ターンの最初に少しだけ息継ぎをします！
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         if (!isPlayerInvolved) {
-            setTimeout(() => this.processQueue(), 0);
+            this._scheduleFieldWarCallback(() => this.processQueue(), 0);
         } else {
             this.processQueue();
         }
@@ -2250,7 +2296,7 @@ class FieldWarManager {
         
         if (isPlayerInvolved) {
             // マップの大きさが確実に決まってからカメラを動かすために、0.2秒（200）待ちます
-            setTimeout(() => this.scrollToUnit(unit), 200);
+            this._scheduleFieldWarCallback(() => this.scrollToUnit(unit), 200);
         }
 
         if (unit.isPlayer) {
@@ -2265,10 +2311,10 @@ class FieldWarManager {
             if (isPlayerInvolved) {
                 this.updateMap();
                 this.updateStatus();
-                setTimeout(() => this.processAITurn(), 600);
+                this._scheduleFieldWarCallback(() => this.processAITurn(), 600);
             } else {
                 // ★修正：野戦のAIターンでも、一瞬だけ息継ぎを入れてパンクを防ぎます！
-                setTimeout(() => this.processAITurn(), 0);
+                this._scheduleFieldWarCallback(() => this.processAITurn(), 0);
             }
         }
     }
@@ -2319,7 +2365,7 @@ class FieldWarManager {
             if (isPlayerInvolved) {
                 this.updateMap();
                 this.updateStatus();
-                setTimeout(() => this.nextPhaseTurn(), 300);
+                this._scheduleFieldWarCallback(() => this.nextPhaseTurn(), 300);
             } else {
                 this.nextPhaseTurn();
             }
@@ -2327,6 +2373,7 @@ class FieldWarManager {
     }
 
     nextPhaseTurn() {
+        if (!this.active) return;
         if (this.checkEndCondition()) return;
         this.turnQueue.shift();
         this.processQueue();
@@ -2453,7 +2500,7 @@ class FieldWarManager {
         if (isPlayerInvolved) {
             this.updateMap();
             this.updateStatus();
-            setTimeout(() => {
+            this._scheduleFieldWarCallback(() => {
                 this.nextPhaseTurn();
             }, 500);
         } else {
@@ -2588,12 +2635,15 @@ class FieldWarManager {
     }
     
     async endFieldWar(resultType) {
+        if (!this.active) return;
+        const fieldWarGeneration = Number(this._fieldWarGeneration || 0);
         this.active = false;
 
         // ★追加：野戦の「戦闘終了前」の合図を出します
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('before_field_war_end', this.warState);
         }
+        if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration, false)) return;
 
         // ★野戦開始時に「待機していた（部隊に配備しなかった）馬・鉄砲」を計算するための箱を用意します
         let atkMainWaitHorses = this.warState.attacker.horses || 0;
@@ -2810,6 +2860,7 @@ class FieldWarManager {
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         
         const finishProcess = async () => {
+            if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration, false)) return;
             if (this.modal) this.modal.classList.add('hidden');
 
             // 古いスマホでは、非表示の野戦DOMを保持したまま通常地図を復帰すると
@@ -2828,15 +2879,20 @@ class FieldWarManager {
             if (this.game.eventManager) {
                 // イベントマネージャー（受付）を経由させることでフラグが保存されます
                 await this.game.eventManager.processEvents('after_field_war', this.warState);
+                if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration, false)) return;
             }
             
-            if (this.onComplete) this.onComplete(resultType);
+            if (this.onComplete) {
+                const onComplete = this.onComplete;
+                this.onComplete = null;
+                onComplete(resultType);
+            }
         };
 
         if (isPlayerInvolved) {
-            setTimeout(() => {                
+            this._scheduleFieldWarCallback(() => {
                 finishProcess();
-            }, 1500);
+            }, 1500, false);
         } else {
             finishProcess();
         }
@@ -3024,6 +3080,8 @@ class FieldWarManager {
     }
 
     async executeAttack(attacker, defender) {
+        if (!this.active) return;
+        const fieldWarGeneration = Number(this._fieldWarGeneration || 0);
         // ★追加：クリック連打によるバグを防ぐため、一番最初にシールドを展開して他の操作をブロックします！
         this.state = 'ANIMATING';
 
@@ -3036,6 +3094,7 @@ class FieldWarManager {
             // ★追加：攻撃を仕掛ける部隊と対象の部隊の「中間」にカメラを移動させます
             this.scrollToCenterPos(attacker.x, attacker.y, defender.x, defender.y);
             await new Promise(r => setTimeout(r, 200)); // 0.2秒待ってから計算とアニメーション開始
+            if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
         }
 
         // それぞれの部隊の専用の箱から、士気と訓練度を取り出します
@@ -3532,6 +3591,7 @@ class FieldWarManager {
 
             // ポップアップをしっかり見せるために少しだけ待ちます
             await new Promise(r => setTimeout(r, 800));
+            if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
         } else {
             // プレイヤーがいない（AI同士）ならアニメーションをスキップしてパパッと減らします
             defender.soldiers -= dmgToDef;
@@ -3794,7 +3854,7 @@ class FieldWarManager {
         if (stillPlayerInvolved) {
             this.updateMap();
             this.updateStatus();
-            setTimeout(() => {
+            this._scheduleFieldWarCallback(() => {
                 this.nextPhaseTurn();
             }, 800);
         } else {
@@ -3913,7 +3973,9 @@ class FieldWarManager {
     // ★修正: AIの行動スコアに「智謀」「性格」に加えて、交戦支援を全判断段階で共有する。
     async processAITurn() {
         if (!this.active) return;
+        const fieldWarGeneration = Number(this._fieldWarGeneration || 0);
         const unit = this.turnQueue[0];
+        if (!unit) return;
         const enemies = this.units.filter(u => u.isAttacker !== unit.isAttacker);
         const allies = this.units.filter(u => u.isAttacker === unit.isAttacker && u.id !== unit.id);
         
@@ -3924,7 +3986,8 @@ class FieldWarManager {
 
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         if (isPlayerInvolved) {
-            await new Promise(r => setTimeout(r, 600)); 
+            await new Promise(r => setTimeout(r, 600));
+            if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
         }
 
         // --- 武将のデータ（智謀・性格）を読み込む ---
@@ -4341,6 +4404,7 @@ class FieldWarManager {
                     this.updateMap();
                     this.updateStatus();
                     await new Promise(r => setTimeout(r, 400));
+                    if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
                 }
             }
         }
@@ -4401,6 +4465,7 @@ class FieldWarManager {
                     this.updateMap();
                     this.updateStatus();
                     await new Promise(r => setTimeout(r, 300));
+                    if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
                 }
             }
         } else {
@@ -4412,6 +4477,7 @@ class FieldWarManager {
                 if (isPlayerInvolved) {
                     this.updateMap();
                     await new Promise(r => setTimeout(r, 100));
+                    if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
                 }
             }
         }

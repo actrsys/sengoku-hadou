@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r283');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r284');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7671,7 +7671,7 @@ test('野戦終了時は通常地図復帰より先に重い戦場DOMを解放�
     assert.ok(resumeAt >= 0);
     assert.ok(releaseAt < resumeAt, '戦場DOM解放を通常地図復帰より先に行う');
 
-    const releaseDefAt = field.indexOf('releaseFieldWarVisualResources()');
+    const releaseDefAt = field.indexOf('\n    releaseFieldWarVisualResources() {');
     const releaseBlock = field.slice(releaseDefAt, releaseDefAt + 1800);
     assert.ok(releaseBlock.includes('this._unbindFieldWarScrollEvents();'));
     assert.ok(releaseBlock.includes('mapEl.replaceChildren();'));
@@ -9839,6 +9839,93 @@ test('武将一覧の選択同期は仮想一覧DOMだけを走査する', () =>
     assert.ok(block.includes("const selectorList = (this.ui && this.ui.selectorList) || document.getElementById('selector-list');"), '現在のSelector一覧を走査起点にする');
     assert.ok(block.includes("selectorList.querySelectorAll('input[name=\"sel_busho\"]')"), '表示中の武将inputだけ同期する');
     assert.ok(!block.includes("document.querySelectorAll('input[name=\"sel_busho\"]')"), 'document全体を毎選択で走査しない');
+});
+
+
+test('野戦の遅延callbackとawait継続は戦闘世代をまたいで次の戦闘へ触れない', () => {
+    const field = read('js/field_war.js');
+    assert.ok(field.includes('this._fieldWarGeneration = 0;'));
+    assert.ok(field.includes('_scheduleFieldWarCallback(callback, delay = 0, requireActive = true)'));
+    assert.ok(field.includes('const fieldWarGeneration = this._beginFieldWarLifecycle();'));
+    assert.ok(field.includes("if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration, false)) return;"));
+    assert.ok(field.includes("if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;"));
+    assert.ok(field.includes('abortForScenarioTransition()'));
+    assert.ok(field.includes('nextPhaseTurn() {\n        if (!this.active) return;'));
+    assert.ok(field.includes('this._scheduleFieldWarCallback(() => this.processAITurn(), 600);'));
+    assert.ok(field.includes('this._scheduleFieldWarCallback(() => this.nextPhaseTurn(), 300);'));
+    assert.ok(field.includes('}, 1500, false);'));
+
+    const game = read('js/game.js');
+    const ui = read('js/ui.js');
+    const save = read('js/save_manager.js');
+    assert.ok(game.includes('this.fieldWarManager.abortForScenarioTransition();'), '新規開始で旧野戦寿命を終了する');
+    assert.ok(ui.includes('this.game.fieldWarManager.abortForScenarioTransition();'), 'タイトル復帰で旧野戦寿命を終了する');
+    assert.ok(save.includes('this.game.fieldWarManager.abortForScenarioTransition();'), 'ロードで旧野戦寿命を終了する');
+});
+
+test('全武将行動済み確認は遅延中にターン状態を再検証して多重表示しない', () => {
+    const turn = read('js/turn_manager.js');
+    const at = turn.indexOf('checkAllActionsDone()');
+    const block = turn.slice(at, at + 2600);
+    assert.ok(block.includes('if (this._allActionsDonePromptTimer) return;'));
+    assert.ok(block.includes('const expectedCastleId = Number(c.id);'));
+    assert.ok(block.includes('const expectedTurnIndex = Number(game.currentIndex);'));
+    assert.ok(block.includes("if (game.phase !== 'game' || game.isProcessingAI || game.selectionMode != null) return;"));
+    assert.ok(block.includes('Number(currentCastle.id) !== expectedCastleId'));
+    assert.ok(block.includes('Number(game.currentIndex) !== expectedTurnIndex'));
+    assert.ok(block.includes('game.fieldWarManager && game.fieldWarManager.active'));
+    assert.ok(block.includes('!currentBushos.every(b => b.isActionDone)'));
+    assert.ok(turn.includes('this._cancelAllActionsDonePromptTimer();'), '月/ターン寿命境界で保留確認を破棄する');
+});
+
+test('攻城戦の援軍消滅アニメーションは固定カード再利用時に旧timerを持ち越さない', () => {
+    const ui = read('js/ui.js');
+    const cancelAt = ui.indexOf('\n    _cancelEmptyCardAnimation(card) {');
+    const applyAt = ui.indexOf('\n    applyEmptyCardAnimation(card) {');
+    assert.ok(cancelAt >= 0 && applyAt >= 0);
+    const cancelBlock = ui.slice(cancelAt, cancelAt + 700);
+    const applyBlock = ui.slice(applyAt, applyAt + 2100);
+    assert.ok(cancelBlock.includes('card._emptyCardAnimationGeneration'));
+    assert.ok(cancelBlock.includes('clearTimeout(card._emptyCardAnimationTimer)'));
+    assert.ok(cancelBlock.includes("card.querySelectorAll('.empty-cover-overlay')"));
+    assert.ok(applyBlock.includes('const animationGeneration = card._emptyCardAnimationGeneration;'));
+    assert.ok(applyBlock.includes('animationGeneration !== card._emptyCardAnimationGeneration'));
+    assert.ok(applyBlock.includes('card._emptyCardAnimationTimer = setTimeout'));
+
+    const warCloseAt = ui.indexOf('setWarModalVisible(visible)');
+    const warCloseBlock = ui.slice(warCloseAt, warCloseAt + 3000);
+    assert.ok(warCloseBlock.includes('this._cancelEmptyCardAnimation(card);'), '攻城戦固定DOMを閉じる時に旧アニメーションを破棄する');
+    const reinfAt = ui.indexOf("const updateReinfCardUI = (prefix, reinfData, fallbackClanId) => {");
+    const reinfBlock = ui.slice(reinfAt, reinfAt + 5000);
+    assert.ok(reinfBlock.includes('this._cancelEmptyCardAnimation(card);'), '同じ固定カードへ援軍を再表示する前に旧timerを破棄する');
+});
+
+
+test('攻城戦の進行timerは戦争世代をまたいで次の戦争や次ターンへ触れない', () => {
+    const war = read('js/war.js');
+    const effort = read('js/war_effort.js');
+    assert.ok(war.includes('this._warGeneration = 0;'));
+    assert.ok(war.includes('_scheduleWarCallback(callback, delay = 0, requireActive = true)'));
+    assert.ok(war.includes('abortForScenarioTransition()'));
+    assert.ok(war.includes('this._scheduleWarCallback(() => this.execWarAI(), 800);'));
+    assert.ok(war.includes('this._scheduleWarCallback(() => this.resolveWarAction(action.type, action.extraVal), 0);'));
+    assert.ok(war.includes('this._scheduleWarCallback(() => { this.resolveAutoWar(); }, 100);'));
+    assert.ok(effort.includes('const warGeneration = this._beginWarLifecycle();'));
+    assert.ok(effort.includes('if (!this._isWarLifecycleCurrent(warGeneration, false)) return;'));
+    assert.ok(effort.includes('this._scheduleWarCallback(() => {'));
+    assert.ok(effort.includes('}, 100, false);'), '戦後の威信更新とfinishTurnも旧戦争世代では実行しない');
+    assert.ok(effort.includes('if (!this.state.active || this._warEnding) return;'), '終了処理の多重開始も同期的に防ぐ');
+});
+
+
+test('旧ターンの0ms継続はタイトル・ロード後にphase境界を越えて進行しない', () => {
+    const turn = read('js/turn_manager.js');
+    const processAt = turn.indexOf('async processTurn()');
+    const processBlock = turn.slice(processAt, processAt + 900);
+    assert.ok(processBlock.includes("if (game.phase !== 'game') return;"));
+    const finishAt = turn.indexOf('async finishTurn()');
+    const finishBlock = turn.slice(finishAt, finishAt + 500);
+    assert.ok(finishBlock.includes("if (game.phase !== 'game') return;"));
 });
 
 Promise.all(pendingTests).then(() => {

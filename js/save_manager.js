@@ -366,6 +366,12 @@ class SaveManager {
         this._validateSaveDataStructure(d);
         this.game.isRestoringSave = true;
         if (this.game.ui) this.game.ui.updateLoadingProgress(5, 'セーブデータを復元しています');
+        if (this.game.warManager && typeof this.game.warManager.abortForScenarioTransition === 'function') {
+            this.game.warManager.abortForScenarioTransition();
+        }
+        if (this.game.fieldWarManager && typeof this.game.fieldWarManager.abortForScenarioTransition === 'function') {
+            this.game.fieldWarManager.abortForScenarioTransition();
+        }
         // 前ゲームの巨大地図TypedArrayと各種ID索引を、新しい保存データ展開より先に解放します。
         // 低メモリ端末で旧データと新データが同時に保持される時間を短くします。
         if (typeof this.game.releaseScenarioMapResources === 'function') this.game.releaseScenarioMapResources();
