@@ -790,7 +790,7 @@ class CommandSystem {
             case 'reward_all':
                 this.game.ui.showDialog(`金${window.MainParams.CommandCost.RewardAll}を支払い、家臣全員に褒美を与えます。よろしいですか？`, true, () => {
                     this.executeRewardAll();
-                }, null, { okText: '実行', cancelText: 'やめる' });
+                }, null, { okText: '実行', cancelText: 'やめる', closeBeforeCancel: true });
                 break;
             case 'load':
                 // ロード画面（スロット選択）を開きます
@@ -817,7 +817,7 @@ class CommandSystem {
             case 'watch':
                 this.game.ui.showDialog("AI同士の戦いを観戦しますか？\n（画面の右クリック、または長押しで中断できます）", true, () => {
                     this.game.startWatchMode();
-                }, null, { okText: '観戦する', okClass: 'btn-primary', cancelText: 'やめる' });
+                }, null, { okText: '観戦する', okClass: 'btn-primary', cancelText: 'やめる', closeBeforeOk: true, closeBeforeCancel: true });
                 break;
             case 'title':
                 this.game.ui.showDialog("タイトル画面に戻りますか？\n保存していないデータは失われます。", true, () => {
@@ -825,7 +825,7 @@ class CommandSystem {
                     this.game.ui.returnToTitle();
                     const appScreen = document.getElementById('app');
                     if (appScreen) appScreen.classList.add('hidden');
-                });
+                }, null, { closeBeforeOk: true, closeBeforeCancel: true });
                 break;
             default:
                 // ★追加：1〜8までの数字がついている軍団系のコマンドを一つにまとめます！
@@ -848,6 +848,44 @@ class CommandSystem {
     // ==========================================
 
     
+    openWarSuppliesSelectorWithWeatherWarning(selectedIds, targetId, extraData = {}) {
+        const sourceCastle = this.game.ui.currentCastle || (this.game.getCurrentTurnCastle ? this.game.getCurrentTurnCastle() : null);
+        const targetCastle = this.game.getCastle(targetId);
+        const sourceProvince = sourceCastle ? this.game.getProvince(sourceCastle.provinceId) : null;
+        const targetProvince = targetCastle ? this.game.getProvince(targetCastle.provinceId) : null;
+        const isHeavySnow = !!(
+            (sourceProvince && sourceProvince.statusEffects && sourceProvince.statusEffects.includes('heavySnow')) ||
+            (targetProvince && targetProvince.statusEffects && targetProvince.statusEffects.includes('heavySnow'))
+        );
+
+        const openSupplies = () => {
+            this.game.ui.openQuantitySelector('war_supplies', selectedIds, targetId, {
+                ...extraData,
+                returnToParentSelector: true
+            });
+        };
+
+        if (!isHeavySnow) {
+            openSupplies();
+            return;
+        }
+
+        // 大雪警告は数量画面へ進む前に出し、［戻る］なら背後の武将選択へそのまま戻します。
+        this.game.ui.showDialog(
+            "大雪の影響により、出陣すると被害が出る場合があります。\n出陣準備を続けますか？",
+            true,
+            openSupplies,
+            null,
+            {
+                okText: '準備を続ける',
+                okClass: 'btn-danger',
+                cancelText: '戻る',
+                closeBeforeOk: true,
+                closeBeforeCancel: true
+            }
+        );
+    }
+
     handleBushoSelection(actionType, selectedIds, targetId, extraData) {
         if (!selectedIds || selectedIds.length === 0) return;
         const firstId = selectedIds[0];
@@ -918,7 +956,7 @@ class CommandSystem {
                         this.game.ui.info.arrangeMarriageBushoId = null; // リセット
                     },
                     null,
-                    { okText: '嫁がせる', cancelText: 'やめる' }
+                    { okText: '嫁がせる', cancelText: 'やめる', closeBeforeCancel: true }
                 );
                 return;
             }
@@ -954,7 +992,7 @@ class CommandSystem {
                     }, { trueProb: prob / 100 });
                 },
                 null,
-                { okText: '嫁がせる', cancelText: 'やめる' }
+                { okText: '嫁がせる', cancelText: 'やめる', closeBeforeCancel: true }
             );
             return;
         }
@@ -997,7 +1035,7 @@ class CommandSystem {
                         this.executeWithEvent('vassalage', () => this.game.diplomacyManager.executeVassalage(firstId, targetId));
                     },
                     null,
-                    { okText: '臣従する', okClass: 'btn-danger', cancelText: 'やめる' }
+                    { okText: '臣従する', okClass: 'btn-danger', cancelText: 'やめる', closeBeforeCancel: true }
                 );
             } else if (extraData.subAction === 'dominate') {
                 const prob = this.game.diplomacyManager.getDiplomacyProb(firstId, targetId, 'dominate');
@@ -1047,7 +1085,7 @@ class CommandSystem {
                  const leaderId = leader ? leader.id : selectedIds[0];
                  const others = selectedIds.filter(id => id !== leaderId);
                  const sortedIds = [leaderId, ...others];
-                 this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId, returnToParentSelector: true });
+                 this.openWarSuppliesSelectorWithWeatherWarning(sortedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId });
              } else {
                  this.game.ui.openBushoSelector('kunishu_war_general', targetId, { candidates: selectedIds, kunishuId: extraData.kunishuId, preserveModalHistory: true });
              }
@@ -1057,7 +1095,7 @@ class CommandSystem {
             const leaderId = firstId;
             const others = extraData.candidates.filter(id => id !== leaderId);
             const sortedIds = [leaderId, ...others];
-            this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId, returnToParentSelector: true });
+            this.openWarSuppliesSelectorWithWeatherWarning(sortedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId });
             return;
         }
 
@@ -1082,7 +1120,7 @@ class CommandSystem {
                  const leaderId = leader ? leader.id : selectedIds[0];
                  const others = selectedIds.filter(id => id !== leaderId);
                  const sortedIds = [leaderId, ...others];
-                 this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { returnToParentSelector: true });
+                 this.openWarSuppliesSelectorWithWeatherWarning(sortedIds, targetId);
              } else {
                  this.game.ui.openBushoSelector('war_general', targetId, { candidates: selectedIds, preserveModalHistory: true });
              }
@@ -1092,7 +1130,7 @@ class CommandSystem {
             const leaderId = firstId;
             const others = extraData.candidates.filter(id => id !== leaderId);
             const sortedIds = [leaderId, ...others];
-            this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { returnToParentSelector: true });
+            this.openWarSuppliesSelectorWithWeatherWarning(sortedIds, targetId);
             return;
         }
 
@@ -1157,7 +1195,7 @@ class CommandSystem {
                     this.executeWithEvent('succession', () => this.executeSuccession(firstId));
                 },
                 null,
-                { okText: '家督を譲る', okClass: 'btn-danger', cancelText: 'やめる' }
+                { okText: '家督を譲る', okClass: 'btn-danger', cancelText: 'やめる', closeBeforeCancel: true }
             );
             return;
         }
@@ -1171,7 +1209,7 @@ class CommandSystem {
                     this.executeWithEvent('adopt_son', () => this.executeAdoptSon(firstId));
                 },
                 null,
-                { okText: '養子にする', cancelText: 'やめる' }
+                { okText: '養子にする', cancelText: 'やめる', closeBeforeCancel: true }
             );
             return;
         }
@@ -1189,7 +1227,7 @@ class CommandSystem {
             this.game.ui.showDialog(`本当に${busho.name}を追放しますか？`, true, () => {
                 if (this.game.ui.info && typeof this.game.ui.info.closeCommonModal === 'function') this.game.ui.info.closeCommonModal();
                 this.executeWithEvent('banish', () => this.executeCommand('banish', selectedIds, targetId));
-            }, null, { cancelText: 'やめる' });
+            }, null, { cancelText: 'やめる', closeBeforeCancel: true });
             return;
         }
 
@@ -1275,24 +1313,12 @@ class CommandSystem {
             const gVal = inputs.guns ? parseInt(inputs.guns.num.value) : 0;
             if (sVal <= 0) { this.game.ui.showDialog("兵士0では出陣できません", false); return; }
             
-            const targetCastle = this.game.getCastle(targetId);
-            
-            const srcProv = this.game.getProvince(castle.provinceId);
-            const tgtProv = this.game.getProvince(targetCastle.provinceId);
-            const isHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) || 
-                                (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
-
             const proceedWar = () => {
                 this.game.warPreparationController.checkReinforcementAndStartWar(castle, targetId, data.map(id => this.game.getBusho(id)), sVal, rVal, hVal, gVal, extraData);
             };
 
-            if (isHeavySnow) {
-                this.game.ui.showDialog("大雪の影響により、被害が出る場合があります。\nそれでも出陣しますか？", true, () => {
-                    this.executeWithEvent('war', () => proceedWar());
-                }, null, { closeBeforeOk: true });
-            } else {
-                this.executeWithEvent('war', () => proceedWar());
-            }
+            // 大雪警告は数量指定前に済ませているため、ここでは確定した物資をそのまま開戦準備へ渡します。
+            this.executeWithEvent('war', () => proceedWar());
         }
     }
 

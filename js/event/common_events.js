@@ -1797,7 +1797,8 @@ window.GameEvents.push({
                                     leftFace: nav.faceIcon, 
                                     leftName: nav.name,
                                     okText: '家臣にする', // ←決定ボタンの文字を変更
-                                    cancelText: '追い払う'     // ←キャンセルボタンの文字を変更
+                                    cancelText: '追い払う',    // ←キャンセルボタンの文字を変更
+                                    closeBeforeCancel: true
                                 }
                             );
                         } else {

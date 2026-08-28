@@ -247,7 +247,7 @@ class WarPreparationController {
                 true,
                 openSupplies,
                 null,
-                { okText: '出陣する', cancelText: '戻る', closeBeforeOk: true }
+                { okText: '出陣する', cancelText: '戻る', closeBeforeOk: true, closeBeforeCancel: true }
             );
         } else {
             openSupplies();

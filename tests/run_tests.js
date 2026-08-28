@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r271');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r273');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2264,7 +2264,7 @@ test('国主任命の最終確認取消は拠点一覧の位置を保持する',
     const selectEnd = kyoten.indexOf('this._renderListModal({', selectStart);
     const block = kyoten.slice(selectStart, selectEnd);
     assert.ok(block.includes('`${busho.name}を国主に任命し、${castle.name}を本拠としますか？`'), '確認文だけで任命人物と本拠が分かる');
-    assert.ok(block.includes("{ okText: '任命する', cancelText: 'やめる' }"), '確定・取消の意味を明示する');
+    assert.ok(block.includes("{ okText: '任命する', cancelText: 'やめる', closeBeforeCancel: true }"), '確定・取消の意味を明示し取消時は背後の一覧へ即復帰する');
     assert.ok(!block.includes('this._renderKyotenList(clanId, isSelectMode, selectData, 0);'), '取消時に拠点一覧を先頭から再描画しない');
     assert.ok(block.includes('this.closeCommonModal();'), '確定時だけ選択一覧を閉じる');
 });
@@ -4016,13 +4016,13 @@ test('出陣武将が一人だけなら総大将選択リストを省略する',
     const normalEnd = command.indexOf("if (actionType === 'war_general')", normalStart);
     const normalBlock = command.slice(normalStart, normalEnd);
     assert.ok(normalBlock.includes('leader || selectedIds.length === 1'));
-    assert.ok(normalBlock.includes("this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { returnToParentSelector: true })"));
+    assert.ok(normalBlock.includes("this.openWarSuppliesSelectorWithWeatherWarning(sortedIds, targetId)"));
 
     const kunishuStart = command.indexOf("if (actionType === 'kunishu_subjugate_deploy')");
     const kunishuEnd = command.indexOf("if (actionType === 'kunishu_war_general')", kunishuStart);
     const kunishuBlock = command.slice(kunishuStart, kunishuEnd);
     assert.ok(kunishuBlock.includes('leader || selectedIds.length === 1'));
-    assert.ok(kunishuBlock.includes("this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { isKunishu: true"));
+    assert.ok(kunishuBlock.includes("this.openWarSuppliesSelectorWithWeatherWarning(sortedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId })"));
 });
 
 // ---------------------------------------------------------------------------
@@ -9377,6 +9377,114 @@ test('部隊分割は確定・取消・強制終了前に遅延UI更新を破棄
     assert.ok(slider.includes('this._unitDivideScrollbarRaf = raf(() => {'), 'スクロールバー更新のRAFも画面寿命へ紐付ける');
     assert.ok(slider.includes("this.cancelUnitDivideDeferredUpdates();\n            modal.classList.add('hidden');"), '画面を隠す前に遅延更新を止める');
     assert.ok(ui.includes("typeof this.slider.cancelUnitDivideDeferredUpdates === 'function'"), '強制モーダルリセットでも遅延更新を破棄する');
+});
+
+
+test('通常出陣の大雪警告は数量指定前に出し、戻るで親武将一覧を維持する', () => {
+    const source = read('js/command_system.js');
+    assert.ok(source.includes('openWarSuppliesSelectorWithWeatherWarning(selectedIds, targetId, extraData = {})'));
+    assert.ok(source.includes("cancelText: '戻る'"));
+    assert.ok(source.includes('closeBeforeOk: true'));
+    assert.ok(source.includes('closeBeforeCancel: true'));
+    assert.ok(source.includes('this.openWarSuppliesSelectorWithWeatherWarning(sortedIds, targetId);'));
+    assert.ok(source.includes("this.openWarSuppliesSelectorWithWeatherWarning(sortedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId });"));
+    const quantityAt = source.indexOf("else if (type === 'war_supplies')");
+    const quantityBlock = source.slice(quantityAt, quantityAt + 1800);
+    assert.ok(!quantityBlock.includes('isHeavySnow'), '数量確定後に大雪警告を重ねない');
+    assert.ok(quantityBlock.includes("this.executeWithEvent('war', () => proceedWar());"));
+});
+
+test('確認後に非会話画面へ移る主要操作は先に確認ダイアログを閉じる', () => {
+    const council = read('js/legion_council_view.js');
+    const turn = read('js/turn_manager.js');
+    const ui = read('js/ui.js');
+    const command = read('js/command_system.js');
+    const load = read('js/save_load_view.js');
+    const game = read('js/game.js');
+
+    const councilOpen = council.slice(council.indexOf("this.ui.showDialog('評定を開きますか？"), council.indexOf('    open() {'));
+    assert.ok(councilOpen.includes('closeBeforeOk: true'));
+    assert.ok(councilOpen.includes('closeBeforeCancel: true'));
+    const councilFinish = council.slice(council.indexOf('    confirmFinish()'), council.indexOf('window.LegionCouncilView'));
+    assert.ok(councilFinish.includes('closeBeforeOk: true'));
+    assert.ok(councilFinish.includes('closeBeforeCancel: true'));
+
+    const autoFinish = turn.slice(turn.indexOf('checkAllActionsDone()'));
+    assert.ok(autoFinish.includes('closeBeforeOk: true'));
+    assert.ok(autoFinish.includes('closeBeforeCancel: true'));
+    assert.ok((ui.match(/closeBeforeOk: true/g) || []).length >= 2, 'PC/スマホの命令終了確認を先に閉じる');
+
+    const watchBlock = command.slice(command.indexOf("case 'watch':"), command.indexOf("case 'title':"));
+    assert.ok(watchBlock.includes('closeBeforeOk: true'));
+    assert.ok(watchBlock.includes('closeBeforeCancel: true'));
+    const titleBlock = command.slice(command.indexOf("case 'title':"), command.indexOf('default:', command.indexOf("case 'title':")));
+    assert.ok(titleBlock.includes('closeBeforeOk: true'));
+    assert.ok(titleBlock.includes('closeBeforeCancel: true'));
+
+    const loadStart = load.indexOf('のデータをロードしますか？');
+    const loadBlock = load.slice(loadStart, loadStart + 900);
+    assert.ok(loadBlock.includes('closeBeforeOk: true'));
+    assert.ok(loadBlock.includes('closeBeforeCancel: true'));
+
+    const watchReturn = game.slice(game.indexOf("this.ui.showDialog('観戦をやめますか？"), game.indexOf('    _resetWatchReturnState()'));
+    assert.ok(watchReturn.includes('closeBeforeOk: true'));
+    assert.ok(watchReturn.includes('closeBeforeCancel: true'));
+});
+
+
+test('セーブ・ロードの確認取消はスロット一覧を閉じず、確定時だけ閉じる', () => {
+    const source = read('js/save_load_view.js');
+    const start = source.indexOf('btn.onclick = () => {');
+    const block = source.slice(start, start + 2600);
+    assert.ok(block.includes('const closeSlotList = () => {'));
+    assert.ok(block.includes('closeBeforeCancel: true'));
+    assert.ok(block.includes('closeSlotList();\n                            this.game.saveGameToLocal(i);'));
+    assert.ok(block.includes('closeSlotList();\n                                this.game.loadGameFromLocal(i, prefix);'));
+    const beforeSave = block.slice(0, block.indexOf("if (mode === 'save')"));
+    const closeFnEnd = beforeSave.indexOf('};', beforeSave.indexOf('const closeSlotList'));
+    const afterCloseFn = beforeSave.slice(closeFnEnd + 2);
+    assert.ok(!afterCloseFn.includes('closeSlotList();'), 'スロット選択直後には一覧を閉じない');
+});
+
+
+
+test('野戦撤退と援軍大雪警告の取消は確認画面を戦場・親一覧へ残さない', () => {
+    const field = read('js/field_war.js');
+    const prep = read('js/war_preparation_controller.js');
+    const retreatBlock = field.slice(field.indexOf('if (btnRetreat)'), field.indexOf('    cancelAction()'));
+    assert.ok((retreatBlock.match(/closeBeforeCancel: true/g) || []).length >= 2, '総大将・一般部隊の撤退取消を即時に戦場へ戻す');
+    const snowAt = prep.indexOf('handleBushoSelectionForDefSelfReinf');
+    const snowBlock = prep.slice(snowAt, snowAt + 2600);
+    assert.ok(snowBlock.includes("cancelText: '戻る'"));
+    assert.ok(snowBlock.includes('closeBeforeOk: true, closeBeforeCancel: true'));
+});
+
+test('確認取消で非会話の親画面へ戻る主要経路はcloseBeforeCancelを明示する', () => {
+    const ui = read('js/ui.js');
+    const command = read('js/command_system.js');
+    const kyoten = read('js/ui_info_kyoten.js');
+
+    const gunshi = ui.slice(ui.indexOf('openGunshiModal('), ui.indexOf('    openBushoSelector', ui.indexOf('openGunshiModal(')));
+    assert.ok(gunshi.includes('closeBeforeCancel: true'), '軍師助言の戻るは背後の一覧/戦場へ即復帰する');
+
+    const reinfMap = ui.slice(ui.indexOf('援軍を要請するのをやめますか？'), ui.indexOf('    renderEnemyViewMenu()'));
+    assert.ok(reinfMap.includes('closeBeforeOk: true, closeBeforeCancel: true'), '援軍地図選択のやめる/続ける双方で確認を先に閉じる');
+
+    for (const marker of ['家督を譲りますか？', '養子にしますか？', '追放しますか？', '本当に臣従しますか？']) {
+        const at = command.indexOf(marker);
+        const block = command.slice(Math.max(0, at - 250), at + 900);
+        assert.ok(block.includes('closeBeforeCancel: true'), `${marker} の取消は保持済み親一覧へ即復帰する`);
+    }
+    const appointAt = kyoten.indexOf('この内容で国主に任命しますか？');
+    const appointBlock = kyoten.slice(Math.max(0, appointAt - 450), appointAt + 800);
+    assert.ok(appointBlock.includes('closeBeforeCancel: true'));
+});
+
+test('浪人仕官を断った時は会話handoffを残さず通常画面へ戻る', () => {
+    const common = read('js/event/common_events.js');
+    const at = common.indexOf("cancelText: '追い払う'");
+    const block = common.slice(Math.max(0, at - 500), at + 500);
+    assert.ok(block.includes('closeBeforeCancel: true'));
 });
 
 Promise.all(pendingTests).then(() => {

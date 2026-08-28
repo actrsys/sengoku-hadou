@@ -514,7 +514,9 @@ class TurnManager {
                      game.finishTurn();
                  }, null, {
                      leftFace: nav.faceIcon,
-                     leftName: nav.name
+                     leftName: nav.name,
+                     closeBeforeOk: true,
+                     closeBeforeCancel: true
                  });
              }, 100);
         }

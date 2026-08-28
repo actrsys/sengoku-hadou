@@ -60,7 +60,9 @@ class LegionCouncilView {
             okClass: 'btn-primary',
             cancelText: '戻る',
             leftFace: nav ? nav.faceIcon : null,
-            leftName: nav ? nav.name : ''
+            leftName: nav ? nav.name : '',
+            closeBeforeOk: true,
+            closeBeforeCancel: true
         });
     }
 
@@ -296,7 +298,9 @@ class LegionCouncilView {
         }, null, {
             okText: '命令を確定',
             okClass: 'btn-primary',
-            cancelText: '戻る'
+            cancelText: '戻る',
+            closeBeforeOk: true,
+            closeBeforeCancel: true
         });
     }
 }

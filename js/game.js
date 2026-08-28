@@ -484,7 +484,7 @@ class GameManager {
             if (this.ui) {
                 this.ui.showDialog("シナリオデータの読み込みに失敗しました。", false, () => {
                     this.ui.returnToTitle();
-                });
+                }, null, { closeBeforeOk: true });
             } else {
                 this.returnToTitle();
             }
@@ -1152,7 +1152,13 @@ class GameManager {
             this.stopWatchMode();
         }, () => {
             this.cancelQueuedWatchReturn();
-        }, { okText: '観戦をやめる', okClass: 'btn-primary', cancelText: '観戦を続ける' });
+        }, {
+            okText: '観戦をやめる',
+            okClass: 'btn-primary',
+            cancelText: '観戦を続ける',
+            closeBeforeOk: true,
+            closeBeforeCancel: true
+        });
         return true;
     }
 
@@ -1219,7 +1225,13 @@ class GameManager {
                 setTimeout(() => this.processTurn(), 0);
             }, () => {
                 this.cancelQueuedWatchReturn();
-            }, { okText: '再開する', okClass: 'btn-primary', cancelText: '観戦を続ける' });
+            }, {
+                okText: '再開する',
+                okClass: 'btn-primary',
+                cancelText: '観戦を続ける',
+                closeBeforeOk: true,
+                closeBeforeCancel: true
+            });
         }, () => {
             this.cancelQueuedWatchReturn();
         });

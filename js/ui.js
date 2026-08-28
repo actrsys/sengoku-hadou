@@ -1743,7 +1743,7 @@ class UIManager {
                 this.game.commandSystem.executeDismissLegionLeader(legionNo);
             },
             null,
-            { okText: '解任する', okClass: 'btn-danger', cancelText: 'やめる' }
+            { okText: '解任する', okClass: 'btn-danger', cancelText: 'やめる', closeBeforeCancel: true }
         );
     }
 
@@ -2378,7 +2378,7 @@ class UIManager {
                         () => {
                             // 「いいえ（やめない）」を選んだ時は何もしません
                         },
-                        { okText: 'やめる', okClass: 'btn-danger', cancelText: '続ける' }
+                        { okText: 'やめる', okClass: 'btn-danger', cancelText: '続ける', closeBeforeOk: true, closeBeforeCancel: true }
                     );
                 } else {
                     // 援軍以外の普通の行動なら、小窓を出さずにすぐキャンセル
@@ -2490,7 +2490,9 @@ class UIManager {
                         this.game.finishTurn();
                     }, null, {
                         leftFace: nav.faceIcon,
-                        leftName: nav.name
+                        leftName: nav.name,
+                        closeBeforeOk: true,
+                        closeBeforeCancel: true
                     });
                 };
                 mobileArea.appendChild(finishBtn);
@@ -2601,7 +2603,9 @@ class UIManager {
                 this.game.finishTurn();
             }, null, {
                 leftFace: nav.faceIcon,
-                leftName: nav.name
+                leftName: nav.name,
+                closeBeforeOk: true,
+                closeBeforeCancel: true
             });
         });
         
@@ -2663,7 +2667,8 @@ class UIManager {
             okText: '実行',
             okClass: 'btn-primary',
             cancelText: '戻る',
-            cancelClass: 'btn-secondary'
+            cancelClass: 'btn-secondary',
+            closeBeforeCancel: true
         });
     }
     

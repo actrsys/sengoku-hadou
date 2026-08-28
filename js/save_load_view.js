@@ -199,19 +199,36 @@ class SaveLoadView {
 
                 btn.onclick = () => {
                     const modal = document.getElementById('saveload-modal');
-                    if (modal) modal.classList.add('hidden');
+                    const closeSlotList = () => {
+                        if (modal) modal.classList.add('hidden');
+                    };
                     
                     if (mode === 'save') {
+                        // 確認を取り消した時はスロット一覧をそのまま残し、別スロットを選び直せるようにします。
                         this.ui.showDialog(`${displayTitle}に現在の状態をセーブ（上書き）しますか？`, true, () => {
+                            closeSlotList();
                             this.game.saveGameToLocal(i);
-                        }, null, { okText: 'セーブする', okClass: 'btn-primary', cancelText: 'やめる' });
+                        }, null, {
+                            okText: 'セーブする',
+                            okClass: 'btn-primary',
+                            cancelText: 'やめる',
+                            closeBeforeCancel: true
+                        });
                     } else {
                         if (this.game.phase === 'title') {
+                            closeSlotList();
                             this.game.loadGameFromLocal(i, prefix); 
                         } else {
                             this.ui.showDialog(`${displayTitle}のデータをロードしますか？\n（現在の進行状況は失われます）`, true, () => {
+                                closeSlotList();
                                 this.game.loadGameFromLocal(i, prefix); 
-                            }, null, { okText: 'ロードする', okClass: 'btn-danger', cancelText: 'やめる' });
+                            }, null, {
+                                okText: 'ロードする',
+                                okClass: 'btn-danger',
+                                cancelText: 'やめる',
+                                closeBeforeOk: true,
+                                closeBeforeCancel: true
+                            });
                         }
                     }
                 };
