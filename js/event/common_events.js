@@ -1679,13 +1679,13 @@ window.GameEvents.push({
                     if (clan.id === game.playerClanId) {
                         // 自分が得た収入の場合
                         logMessages.push({
-                            text: `【交易】${targetClan.name}との往来により、金${targetIncome} の収入を得ました`,
+                            text: `【交易】${targetClan.name}との往来により、金${targetIncome}の収入を得ました`,
                             clanIds: [clan.id, targetClan.id]
                         });
                     } else if (targetClan.id === game.playerClanId) {
                         // 相手が自分（プレイヤー）の領地のおかげで収入を得た場合
                         logMessages.push({
-                            text: `【交易】${clan.name}が当家との往来により、金${targetIncome} の利益を得ました`,
+                            text: `【交易】${clan.name}が当家との往来により、金${targetIncome}の利益を得ました`,
                             clanIds: [clan.id, targetClan.id]
                         });
                     }
@@ -2096,8 +2096,8 @@ window.GameEvents.push({
                         leftFace: envoy.faceIcon, leftName: envoyName
                     });
 
-                    await game.ui.showDialogAsync(`${aiClanName} が ${playerClan.name} に臣従しました！`, false, 0);
-                    if (game.ui.log) game.ui.log(`${aiClanName} が ${playerClan.name} に臣従しました`, { clanIds: [clan.id, playerClanId], category: 'diplomacy', inferCurrentTurn: false });
+                    await game.ui.showDialogAsync(`${aiClanName}が${playerClan.name}に臣従しました！`, false, 0);
+                    if (game.ui.log) game.ui.log(`${aiClanName}が${playerClan.name}に臣従しました`, { clanIds: [clan.id, playerClanId], category: 'diplomacy', inferCurrentTurn: false });
 
                     // 臣従の処理を呼び出します
                     processSubordination(clan.id, playerClanId);
@@ -2116,7 +2116,7 @@ window.GameEvents.push({
                 // ==========================================
                 // 【AI同士の臣従処理（会話イベントなし）】
                 // ==========================================
-                const msg = `${clan.name} が ${selectedTarget.name} に臣従しました。`;
+                const msg = `${clan.name}が${selectedTarget.name}に臣従しました。`;
                 
                 // おしらせメッセージとログだけを出します
                 await game.ui.showDialogAsync(msg, false, 0);

@@ -916,7 +916,7 @@ class KunishuSystem {
         doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
         this.game.factionSystem.updateRecognition(doer, 15);
 
-        this.game.ui.showResultModal(`${doer.name}が ${kunishuName} と親善を行いました\n友好度が上昇しました`);
+        this.game.ui.showResultModal(`${doer.name}が${kunishuName}と親善を行いました\n友好度が上昇しました`);
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
     }
@@ -976,13 +976,13 @@ class KunishuSystem {
                     clanIds: [this.game.playerClanId], category: 'kunishu', inferCurrentTurn: false
                 });
             }
-            this.game.ui.showResultModal(`${doer.name}の説得により、${kunishuName} が我が傘下に加わりました！`);
+            this.game.ui.showResultModal(`${doer.name}の説得により、${kunishuName}が我が傘下に加わりました！`);
             
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.3) + 30;
             this.game.factionSystem.updateRecognition(doer, 30);
         } else {
             const kunishuName = kunishu.getName(this.game);
-            this.game.ui.showResultModal(`${doer.name}は ${kunishuName} に合流を提案しましたが、\n丁重に断られてしまいました……`);
+            this.game.ui.showResultModal(`${doer.name}は${kunishuName}に合流を提案しましたが、\n丁重に断られてしまいました……`);
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
         }

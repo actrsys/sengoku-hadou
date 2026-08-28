@@ -1214,7 +1214,7 @@ window.GameEvents.push({
             }
 
             // 汎用メッセージの表示
-            await game.ui.showDialogAsync(`${args.odaClanName} が ${args.matsudairaClanName} と同盟を締結しました！`, false, 0);
+            await game.ui.showDialogAsync(`${args.odaClanName}が${args.matsudairaClanName}と同盟を締結しました！`, false, 0);
         } 
         // 追い返す（同盟を結ばない）ルート
         else {

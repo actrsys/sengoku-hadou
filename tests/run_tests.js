@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r262');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r263');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1801,6 +1801,106 @@ test('従属願の条件提示は事務確認へ切らず外交会話のまま�
     assert.ok(src.includes('従属の証として'), '従属条件を相手当主の具体的な台詞として示す');
     assert.ok(src.includes("{ label: '条件を受ける', className: 'btn-primary', onClick: acceptCondition }"), '条件提示の直後に会話内で判断する');
     assert.ok(!src.includes('従属の条件として${selectedOption.busho.name}を人質として差し出すことを要求してきました'), '旧い事務的な条件確認文を残さない');
+});
+
+
+test('外交条件の人物呼称は共通規則を使い当主本人を自己敬称しない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/busho_list_sort_rules.js');
+    loadScript(ctx, 'js/conversation_standing_rules.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+
+    const ranks = new Map([[20, { id: 20, rankNo: 8, rankName2: '参議' }]]);
+    const speaker = { id: 201, clan: 2, isDaimyo: true, fullName: '織田信長', familyNameStr: '織田', givenName: '信長', courtRankIds: [] };
+    const ranked = { id: 202, clan: 2, isDaimyo: false, fullName: '細川藤孝', familyNameStr: '細川', givenName: '藤孝', courtRankIds: [20] };
+    const envoy = { id: 101, clan: 1, isDaimyo: false, fullName: '明智光秀', familyNameStr: '明智', givenName: '光秀', courtRankIds: [] };
+    const game = {
+        clans: [{ id: 1, leaderId: 0 }, { id: 2, leaderId: 201 }],
+        bushos: [speaker, ranked, envoy], legions: [],
+        getClan: id => ({ id: Number(id), daimyoPrestige: 1000, diplomacyValue: {} }),
+        getBusho: id => [speaker, ranked, envoy].find(b => Number(b.id) === Number(id)) || null,
+        getClanDaimyo: id => Number(id) === 2 ? speaker : null,
+        courtRankSystem: {
+            RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [],
+            getRankData: id => ranks.get(Number(id)) || null,
+            getHighestRankData(busho) { return (busho.courtRankIds || []).map(id => this.getRankData(id)).filter(Boolean).sort((a, b) => a.rankNo - b.rankNo)[0] || null; }
+        }
+    };
+    const dm = new ctx.DiplomacyManager(game);
+    const selfMarriage = { type: 'marriage', princess: { name: '市' }, busho: speaker };
+    const selfText = dm._getTruceConditionDemandText(selfMarriage, null, speaker);
+    assert.ok(selfText.includes('市姫を我がもとへ迎えたい'), '当主本人が婚姻相手なら一人称で示す');
+    assert.ok(!selfText.includes('織田信長殿') && !selfText.includes('織田殿'), '本人が自分へ殿を付けない');
+
+    const rankedMarriage = { type: 'marriage', princess: { name: '市' }, busho: ranked };
+    const rankedDemand = dm._getTruceConditionDemandText(rankedMarriage, null, speaker);
+    assert.ok(rankedDemand.includes('参議殿との縁組'), '第三者の婚姻相手は共通官位呼称へ通す');
+    const rankedOffer = dm._getTruceConditionOfferText(rankedMarriage, null, envoy);
+    assert.ok(rankedOffer.includes('参議殿へ嫁がせ'), '条件を差し出す側も第三者呼称を共通化する');
+
+    const src = read('js/diplomacy.js');
+    assert.ok(!src.includes('${selectedOption.busho.name}殿'), '従属条件にも氏名+殿の直書きを残さない');
+    assert.ok(!src.includes('${option.busho.name}殿'), '和睦条件にも氏名+殿の直書きを残さない');
+});
+
+test('外交の取り次ぎは他家当主を特殊権威・官位・近親の順で自然に呼ぶ', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/busho_list_sort_rules.js');
+    loadScript(ctx, 'js/conversation_standing_rules.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+
+    const ranks = new Map([
+        [1, { id: 1, rankNo: 1, rankName2: '征夷大将軍' }],
+        [20, { id: 20, rankNo: 8, rankName2: '参議' }]
+    ]);
+    const father = { id: 201, clan: 2, isDaimyo: true, fullName: '織田信秀', familyNameStr: '織田', givenName: '信秀', courtRankIds: [] };
+    const questioner = { id: 301, clan: 1, isDaimyo: true, fullName: '織田信長', familyNameStr: '織田', givenName: '信長', realFatherId: 201, courtRankIds: [] };
+    const ranked = { id: 202, clan: 3, isDaimyo: true, fullName: '近衛前久', familyNameStr: '近衛', givenName: '前久', courtRankIds: [20] };
+    const shogun = { id: 203, clan: 4, isDaimyo: true, fullName: '足利義昭', familyNameStr: '足利', givenName: '義昭', courtRankIds: [1] };
+    const normal = { id: 204, clan: 5, isDaimyo: true, fullName: '毛利元就', familyNameStr: '毛利', givenName: '元就', courtRankIds: [] };
+    const bushos = [father, questioner, ranked, shogun, normal];
+    const game = {
+        bushos, clans: [], legions: [],
+        getBusho: id => bushos.find(b => Number(b.id) === Number(id)) || null,
+        getClanDaimyo: id => bushos.find(b => Number(b.clan) === Number(id) && b.isDaimyo) || null,
+        courtRankSystem: {
+            RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [],
+            getRankData: id => ranks.get(Number(id)) || null,
+            getHighestRankData(busho) { return (busho.courtRankIds || []).map(id => this.getRankData(id)).filter(Boolean).sort((a, b) => a.rankNo - b.rankNo)[0] || null; }
+        }
+    };
+    const dm = new ctx.DiplomacyManager(game);
+    assert.strictEqual(dm._getThirdPartyDaimyoReference(father, '織田家', questioner, { hostile: true }), '御父君', '無官の近親当主は御父君等で取り次ぐ');
+    assert.strictEqual(dm._getThirdPartyDaimyoReference(ranked, '近衛家', questioner, { hostile: true }), '参議殿', '高官当主は氏名でなく官位名で取り次ぐ');
+    assert.strictEqual(dm._getThirdPartyDaimyoReference(shogun, '足利家', questioner, { hostile: true }), '公方様', '敵対中でも将軍を通常の氏名+殿へ落とさない');
+    assert.strictEqual(dm._getThirdPartyDaimyoReference(normal, '毛利家', questioner), '毛利家当主・毛利元就様', '通常の他家当主は家名と氏名で識別する');
+    const diplomacySource = fs.readFileSync(path.join(ROOT, 'js/diplomacy.js'), 'utf8');
+    assert.ok(diplomacySource.includes('const enemyDaimyoRef = this._getThirdPartyDaimyoReference('), '実際の取り次ぎ経路が第三者呼称ヘルパーを使う');
+    assert.ok(diplomacySource.includes('${enemyDaimyoRef}が面会を求めております'), '来訪案内本文が第三者呼称を使用する');
+    assert.ok(!diplomacySource.includes('${doerClan.name}当主・${enemyDaimyoName}'), '旧来の当主名直書き経路を残さない');
+
+});
+
+test('軽微な結果通知は日本語本文へ不要な半角空白を混ぜない', () => {
+    const diplomacy = read('js/diplomacy.js');
+    const kunishu = read('js/kunishu_system.js');
+    const typhoon = read('js/event/typhoon_event.js');
+    const common = read('js/event/common_events.js');
+    const historical = read('js/event/historical_event.js');
+    assert.ok(!diplomacy.includes('${doerClanName} と ${targetClanName} が和睦しました。'), '外交結果の固有名と助詞の間へ空白を入れない');
+    assert.ok(!kunishu.includes('${kunishuName} が我が傘下に加わりました！'), '諸勢力結果の固有名と助詞の間へ空白を入れない');
+    assert.ok(!typhoon.includes('` ${data.castle.name} が台風の被害'), '台風通知の先頭空白を残さない');
+    assert.ok(!common.includes('${aiClanName} が ${playerClan.name} に臣従しました'), '臣従イベント通知の固有名周辺へ空白を入れない');
+    assert.ok(!historical.includes('${args.odaClanName} が ${args.matsudairaClanName} と同盟'), '歴史イベント結果の固有名周辺へ空白を入れない');
+    assert.ok(!diplomacy.includes('人質として送っていた ${busho.name} は${clanName} に'), '人質結果通知の固有名周辺へ空白を戻さない');
+    assert.ok(!diplomacy.includes('${this.game.getClan(targetClanId).name} との和睦'), '和睦結果・失敗文の固有名直後へ空白を戻さない');
+    assert.ok(!common.includes('金${targetIncome} の収入'), '交易結果の数値と助詞の間へ空白を入れない');
 });
 
 test('外交導入と臣従会話は話しかけ方と実際の操作を食い違わせない', () => {

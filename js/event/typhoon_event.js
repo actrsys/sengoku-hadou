@@ -329,7 +329,7 @@ window.GameEvents.push({
 
         await new Promise(resolve => setTimeout(resolve, 1000));
         for (const data of damagedPlayerCastles) {
-            await game.ui.showDialogAsync(` ${data.castle.name} が台風の被害を受けました……`, false, 0);
+            await game.ui.showDialogAsync(`${data.castle.name}が台風の被害を受けました……`, false, 0);
         }
         } finally {
             // 進路計算・Canvas・入力待ちのどこで例外が出ても、暗幕と通常地図の休止を残さない。
