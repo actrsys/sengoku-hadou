@@ -39,10 +39,6 @@ class UIManager {
         this.mapGuide = document.getElementById('map-guide'); 
         this.resultModal = document.getElementById('result-modal');
         this.resultBody = document.getElementById('result-body'); 
-        this.gunshiModal = document.getElementById('gunshi-modal');
-        this.gunshiName = document.getElementById('gunshi-name'); 
-        this.gunshiMessage = document.getElementById('gunshi-message');
-        this.gunshiExecuteBtn = document.getElementById('gunshi-execute-btn');
         this.charityTypeSelector = document.getElementById('charity-type-selector');
         this.aiGuard = document.getElementById('ai-guard');
         this.tradeTypeInfo = document.getElementById('trade-type-info');
@@ -304,6 +300,12 @@ class UIManager {
 
         this.dialogQueue = []; 
         this.isDialogShowing = false; 
+        // 共通会話は同じ固定DOMを使い回すため、強制リセットをまたぐ古いdecode/自動閉じを世代で無効化する。
+        this._dialogGeneration = 0;
+        this._dialogAutoCloseTimer = null;
+        // カットインと攻城戦メッセージも固定DOMを使い回すため、旧timerを次画面へ作用させない。
+        this._cutinGeneration = 0;
+        this._warActionMessageGeneration = 0;
         // ★Round12：会話顔は直近だけを小さく先読みし、登場人物が多いイベントでも次行待ちを減らします。
         this._dialogFacePreloadCache = new Map();
         this._dialogFacePreloadCacheLimit = 4;
@@ -968,6 +970,9 @@ class UIManager {
 
         this.isDialogShowing = true;
         const dialog = this.dialogQueue.shift();
+        // 顔画像decode待ちの間にタイトル復帰・ロード失敗復帰・別フローへの強制切替が入った場合、
+        // 古い処理が共有dialog DOMへ戻ってこないよう、この表示処理の世代を固定する。
+        const dialogGeneration = Number(this._dialogGeneration || 0);
         
         const modal = document.getElementById('dialog-modal');
 
@@ -1037,6 +1042,9 @@ class UIManager {
             preparedFaces.rightImg = null;
         }
 
+        // forceResetModals() 後に完了した旧decodeは、現在の固定DOM・新しい会話状態へ一切触れない。
+        if (dialogGeneration !== Number(this._dialogGeneration || 0)) return;
+
         // ★Round12：ここまでは現在表示中の会話画面に一切触れません。
         // 次の顔が準備できた後で初めて前回の配置を掃除し、同じ処理単位で次の内容へ切り替えます。
         if (modal) {
@@ -1085,7 +1093,11 @@ class UIManager {
         let autoCloseTimer = null;
 
         const cleanupAndNext = (callback, closeBeforeAction = false) => {
-            if (autoCloseTimer) clearTimeout(autoCloseTimer);
+            if (autoCloseTimer) {
+                clearTimeout(autoCloseTimer);
+                if (this._dialogAutoCloseTimer === autoCloseTimer) this._dialogAutoCloseTimer = null;
+                autoCloseTimer = null;
+            }
 
             // ★Round19：選択肢の有無に関係なく、次の会話が来る可能性がある間は
             // 暗幕・会話枠・現在の本文/顔を維持します。
@@ -1296,7 +1308,14 @@ class UIManager {
                     const canB = document.createElement('button');
                     canB.id = 'dialog-btn-cancel'; 
                     canB.className = dialog.customOpts?.cancelClass || 'btn-secondary';
-                    canB.textContent = dialog.customOpts?.cancelText || 'いいえ';
+                    const cancelText = dialog.customOpts?.cancelText || 'いいえ';
+                    canB.textContent = cancelText;
+                    // ［続ける］など具体的な文言でも、実際の役割が「確認を取り消して元の操作を続ける」場合だけ
+                    // cancel意味を明示する。歴史イベントの［出陣しない］［断る］等は意味ある分岐なので含めない。
+                    const genericCancelLabels = new Set(['いいえ', '戻る', 'やめる', '続ける', '観戦を続ける']);
+                    if (genericCancelLabels.has(cancelText) || dialog.customOpts?.isContextCancel === true) {
+                        canB.dataset.se = 'cancel.ogg';
+                    }
                     canB.onclick = (e) => {
                         e.stopPropagation();
                         if (modal.classList.contains('event-dialog-modal') && window.AudioManager) {
@@ -1326,6 +1345,9 @@ class UIManager {
 
         if (dialog.autoCloseTime > 0) {
             autoCloseTimer = setTimeout(() => {
+                if (this._dialogAutoCloseTimer === autoCloseTimer) this._dialogAutoCloseTimer = null;
+                // 強制リセット後に同じ固定DOMへ新しい会話が表示されても、旧タイマーで押さない。
+                if (dialogGeneration !== Number(this._dialogGeneration || 0)) return;
                 if (!modal.classList.contains('hidden')) {
                     // ★修正：今の画面にある本物のokBtnを探して押します
                     const currentOkBtn = document.getElementById('dialog-btn-ok');
@@ -1337,6 +1359,7 @@ class UIManager {
                     }
                 }
             }, dialog.autoCloseTime);
+            this._dialogAutoCloseTimer = autoCloseTimer;
         }
     }
 
@@ -1391,6 +1414,14 @@ class UIManager {
 
         // ★右クリックやスマホの長押しで実行する中身をひとまとめにします
         const executeContextMenuAction = (e) => {
+            // 検索欄・選択欄・テキスト入力では、ブラウザ／OSのネイティブ編集操作を最優先します。
+            // document共通の右クリック／長押しをここで発火させると、検索中にモーダルを閉じたり
+            // テキスト選択・IME・selectの長押し操作を奪うため、共通ショートカットの対象外にします。
+            const actionTarget = e && e.target instanceof Element ? e.target : null;
+            if (actionTarget && actionTarget.closest('input, select, textarea, option, [contenteditable="true"]')) {
+                return;
+            }
+
             // Round26：観戦中の右クリック／長押しは、どんなイベント画面の最中でも
             // 「閉じる」等を押さず、まず観戦終了の予約だけを行います。
             // 2回目以降はGameManager側の予約フラグで無視されます。
@@ -1413,19 +1444,62 @@ class UIManager {
                 return;
             }
 
+            // ロード・保存・AI思考・カットイン・イベント地図などは、モーダルではなくても
+            // 画面全体の入力を遮断する正規レイヤーです。documentへ登録した右クリック／長押しが
+            // これらを貫通して背後の［戻る］や［命令終了］を実行しないよう、共通操作より先に止めます。
+            // 観戦中だけは上の専用経路が安全地点への帰還予約を担当するため、このガードより先に処理します。
+            const inputShieldSelectors = [
+                '#global-loading-screen',
+                '#save-guard',
+                '#ai-guard',
+                '#war-ai-guard',
+                '#cutin-overlay',
+                '#ending-screen',
+                '.event-map-overlay',
+                '#battle-blink-guard'
+            ];
+            const hasActiveInputShield = inputShieldSelectors.some(selector => {
+                const shield = document.querySelector(selector);
+                if (!shield || shield.closest('.hidden')) return false;
+                const style = window.getComputedStyle(shield);
+                return style.display !== 'none'
+                    && style.visibility !== 'hidden'
+                    && style.pointerEvents !== 'none';
+            });
+            if (hasActiveInputShield) {
+                if (e && e.preventDefault) e.preventDefault();
+                return;
+            }
+
             // ==========================================
-            // ★PC版のみ「閉じる」「戻る」「いいえ」を右クリックで押せる魔法！
+            // ★PC版のみ、現在の最前面UIの「閉じる」「戻る」「いいえ」「やめる」を右クリックで押します。
             // ==========================================
             if (document.body.classList.contains('is-pc')) {
-                const buttons = Array.from(document.querySelectorAll('button'));
-                const targetTexts = ['閉じる', '戻る', 'いいえ'];
-                // 一番手前にあるボタンを見つけるために、リストを逆順にしてから探します
-                const cancelBtn = buttons.reverse().find(btn => 
-                    targetTexts.includes(btn.textContent.trim()) && 
-                    btn.offsetParent !== null && // 画面に表示されているか
-                    !btn.closest('.hidden') &&   // 親の枠ごと隠されていないか
-                    !btn.disabled                // 押せない状態になっていないか
-                );
+                const targetTexts = ['閉じる', '戻る', 'いいえ', 'やめる'];
+                // 背後のSelector等を保持したまま確認ダイアログを重ねる場合があるため、
+                // document全体から探すのではなく最前面の可視modalだけを検索します。
+                // 最前面に汎用キャンセルが無ければ、背後の［戻る］を誤って押しません。
+                const visibleModals = Array.from(document.querySelectorAll('.modal:not(.hidden)'))
+                    .filter(modal => modal.offsetParent !== null && !modal.closest('.hidden'));
+                const topModal = visibleModals.reduce((best, modal) => {
+                    if (!best) return modal;
+                    const z = Number.parseInt(window.getComputedStyle(modal).zIndex, 10) || 0;
+                    const bestZ = Number.parseInt(window.getComputedStyle(best).zIndex, 10) || 0;
+                    return z >= bestZ ? modal : best;
+                }, null);
+                const buttonScope = topModal || document;
+                const buttons = Array.from(buttonScope.querySelectorAll('button'));
+
+                // 文言が「タイトルへ戻る」のように具体化されても、data-se で cancel と宣言された
+                // 標準操作は右クリックの戻る操作として扱います。
+                const cancelBtn = buttons.reverse().find(btn => {
+                    const isCancelAction = targetTexts.includes(btn.textContent.trim())
+                        || (btn.dataset && btn.dataset.se === 'cancel.ogg');
+                    return isCancelAction
+                        && btn.offsetParent !== null // 画面に表示されているか
+                        && !btn.closest('.hidden')   // 親の枠ごと隠されていないか
+                        && !btn.disabled;            // 押せない状態になっていないか
+                });
 
                 if (cancelBtn) {
                     if (e && e.preventDefault) e.preventDefault();
@@ -1612,6 +1686,33 @@ class UIManager {
     }
 
     forceResetModals(options = {}) {
+        // 共通会話も固定DOMを共有する非同期Viewとして扱う。顔画像decode・handoff・自動閉じを
+        // 現在世代から切り離し、強制切替後に古い会話が復活／新しい会話を自動操作しないようにする。
+        this._dialogGeneration = Number(this._dialogGeneration || 0) + 1;
+        this._cutinGeneration = Number(this._cutinGeneration || 0) + 1;
+        this._warActionMessageGeneration = Number(this._warActionMessageGeneration || 0) + 1;
+        this._cancelDialogHandoffClose();
+        this._dialogHandoffHoldCount = 0;
+        this._visualHandoffCloseFn = null;
+        if (this._dialogAutoCloseTimer) {
+            clearTimeout(this._dialogAutoCloseTimer);
+            this._dialogAutoCloseTimer = null;
+        }
+        this.dialogQueue = [];
+        this.isDialogShowing = false;
+        this._dialogGuardHeld = false;
+        const dialogModal = document.getElementById('dialog-modal');
+        if (dialogModal && this._currentEventClickHandler) {
+            dialogModal.removeEventListener('click', this._currentEventClickHandler);
+            const dialogContent = dialogModal.querySelector('.modal-content');
+            if (dialogContent) dialogContent.removeEventListener('click', this._currentEventClickHandler);
+        }
+        this._currentEventClickHandler = null;
+
+        // セーブ／ロードの非同期読込は、画面を強制終了した時点で古い世代として無効化します。
+        if (this.saveLoadView && typeof this.saveLoadView.invalidatePendingRenders === 'function') {
+            this.saveLoadView.invalidatePendingRenders();
+        }
         // 強制終了で部隊分割の遅延描画だけが次画面へ残らないよう、専門Managerへ破棄を依頼する。
         if (this.slider && typeof this.slider.cancelUnitDivideDeferredUpdates === 'function') {
             this.slider.cancelUnitDivideDeferredUpdates();
@@ -1830,17 +1931,23 @@ class UIManager {
     }
     
     showCutin(msg) { 
+        // 同じ固定overlayを使い回すため、先に開始したカットインのtimerは世代で無効化する。
+        // 強制リセットや次のカットイン後に、旧timerが新しい表示をfade-out/hiddenへ戻してはいけない。
+        this._cutinGeneration = Number(this._cutinGeneration || 0) + 1;
+        const cutinGeneration = this._cutinGeneration;
         return new Promise((resolve) => {
             if (this.cutinMessage) this.cutinMessage.textContent = msg; 
             if (this.cutinOverlay) {
-                this.cutinOverlay.classList.remove('hidden'); 
+                this.cutinOverlay.classList.remove('hidden', 'fade-out'); 
                 this.cutinOverlay.classList.add('fade-in'); 
                 
                 setTimeout(() => { 
+                    if (cutinGeneration !== Number(this._cutinGeneration || 0)) { resolve(); return; }
                     this.cutinOverlay.classList.remove('fade-in'); 
                     this.cutinOverlay.classList.add('fade-out'); 
                     
                     setTimeout(() => { 
+                        if (cutinGeneration !== Number(this._cutinGeneration || 0)) { resolve(); return; }
                         this.cutinOverlay.classList.add('hidden'); 
                         this.cutinOverlay.classList.remove('fade-out'); 
                         resolve();
@@ -2735,6 +2842,8 @@ class UIManager {
                 this.clearCommandMenu();
             }
         } else {
+            // 固定war DOMを閉じる時点で、旧メッセージのtimer/callbackを次の戦闘から切り離す。
+            this._warActionMessageGeneration = Number(this._warActionMessageGeneration || 0) + 1;
             this.warModal.classList.add('hidden');
             if (typeof this.resumeMainMapAfterBattle === 'function') {
                 this.resumeMainMapAfterBattle('siege-war');
@@ -2778,6 +2887,10 @@ class UIManager {
     
     showWarActionMessage(messages, onClick) {
         if (!this.warControls) return;
+
+        this._warActionMessageGeneration = Number(this._warActionMessageGeneration || 0) + 1;
+        const warActionGeneration = this._warActionMessageGeneration;
+        const isCurrentWarAction = () => warActionGeneration === Number(this._warActionMessageGeneration || 0);
 
         const warAiGuard = document.getElementById('war-ai-guard');
         if (warAiGuard) warAiGuard.classList.add('hidden');
@@ -2851,7 +2964,7 @@ class UIManager {
                 if (item.se && window.AudioManager && item.type !== 'damage' && item.type !== 'recover') {
                     window.AudioManager.playSE(item.se);
                 }
-                if (item.type === 'damage' || item.type === 'recover') this.playDamageAnimation(item);
+                if (item.type === 'damage' || item.type === 'recover') this.playDamageAnimation(item, warActionGeneration);
             }
 
             textContainer.scrollTop = textContainer.scrollHeight;
@@ -2859,7 +2972,7 @@ class UIManager {
         };
 
         const skipToEnd = () => {
-            if (isFinished) return;
+            if (!isCurrentWarAction() || isFinished) return;
             isFinished = true;
             if (currentTimer) clearTimeout(currentTimer);
 
@@ -2867,13 +2980,13 @@ class UIManager {
                 appendMessage(messages[currentIndex++], true);
             }
             if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
-            setTimeout(onClick, 300);
+            setTimeout(() => { if (isCurrentWarAction()) onClick(); }, 300);
         };
 
         msgContainer.onclick = (e) => {
             e.stopPropagation();
             e.preventDefault();
-            if (isClickLocked || isFinished) return;
+            if (!isCurrentWarAction() || isClickLocked || isFinished) return;
 
             if (isPaused) {
                 isPaused = false;
@@ -2886,11 +2999,11 @@ class UIManager {
         };
 
         const processNext = () => {
-            if (isFinished) return;
+            if (!isCurrentWarAction() || isFinished) return;
             if (currentIndex >= messages.length) {
                 promptContainer.style.visibility = 'hidden';
                 currentTimer = setTimeout(() => {
-                    if (!isFinished) {
+                    if (isCurrentWarAction() && !isFinished) {
                         isFinished = true;
                         onClick();
                     }
@@ -2912,6 +3025,7 @@ class UIManager {
                 promptContainer.style.visibility = 'hidden';
 
                 setTimeout(() => {
+                    if (!isCurrentWarAction()) return;
                     isClickLocked = false;
                     if (!isFinished && isPaused) {
                         promptContainer.textContent = '▼';
@@ -2926,20 +3040,22 @@ class UIManager {
         processNext();
     }
 
-    playDamageAnimation(data) {
+    playDamageAnimation(data, warActionGeneration = null) {
+        const isCurrentWarAction = () => warActionGeneration === null || warActionGeneration === Number(this._warActionMessageGeneration || 0);
+        if (!isCurrentWarAction()) return;
         // 送られてきたお手紙（data）の中に音（se）の指定があればそれを鳴らします
         if (window.AudioManager) {
             let soundFile = data.se || 'damage001.ogg';
             if (soundFile === 'bow_double') {
                 // 発射音のタイマー
                 window.AudioManager.playSE('bow001.mp3');
-                setTimeout(() => { window.AudioManager.playSE('bow001.mp3'); }, 150);
-                setTimeout(() => { window.AudioManager.playSE('bow001.mp3'); }, 300);
+                setTimeout(() => { if (isCurrentWarAction()) window.AudioManager.playSE('bow001.mp3'); }, 150);
+                setTimeout(() => { if (isCurrentWarAction()) window.AudioManager.playSE('bow001.mp3'); }, 300);
 
                 // 命中音のタイマー
-                setTimeout(() => { window.AudioManager.playSE('bow_hit001.mp3'); }, 550);
-                setTimeout(() => { window.AudioManager.playSE('bow_hit001.mp3'); }, 700);
-                setTimeout(() => { window.AudioManager.playSE('bow_hit001.mp3'); }, 950);
+                setTimeout(() => { if (isCurrentWarAction()) window.AudioManager.playSE('bow_hit001.mp3'); }, 550);
+                setTimeout(() => { if (isCurrentWarAction()) window.AudioManager.playSE('bow_hit001.mp3'); }, 700);
+                setTimeout(() => { if (isCurrentWarAction()) window.AudioManager.playSE('bow_hit001.mp3'); }, 950);
             } else {
                 window.AudioManager.playSE(soundFile);
             }
@@ -3110,6 +3226,7 @@ class UIManager {
         // アニメーションが始まって少し経った時（0.4秒後）に、画面の数字を更新する魔法
         if (data.currentStats) {
             setTimeout(() => {
+                if (!isCurrentWarAction()) return;
                 const updateTxt = (id, val) => {
                     const el = document.getElementById(id);
                     if (el) {
@@ -3156,7 +3273,7 @@ class UIManager {
                     if (wallEl) {
                         wallEl.style.transition = 'color 0.2s';
                         wallEl.style.color = '#388e3c'; // 緑色！
-                        setTimeout(() => { wallEl.style.color = ''; }, 300);
+                        setTimeout(() => { if (isCurrentWarAction()) wallEl.style.color = ''; }, 300);
                     }
                 } else {
                     const addHighlight = (role) => {
@@ -3186,7 +3303,7 @@ class UIManager {
                         if (wallEl) {
                             wallEl.style.transition = 'color 0.2s';
                             wallEl.style.color = '#fdea60'; // 黄色！
-                            setTimeout(() => { wallEl.style.color = ''; }, 300);
+                            setTimeout(() => { if (isCurrentWarAction()) wallEl.style.color = ''; }, 300);
                         }
                     }
                 }
@@ -3198,7 +3315,7 @@ class UIManager {
                     if (el && el.textContent !== '---') { 
                         el.style.transition = 'color 0.2s';
                         el.style.color = '#fdea60'; // 兵士が減った時は黄色
-                        setTimeout(() => { el.style.color = ''; }, 300); 
+                        setTimeout(() => { if (isCurrentWarAction()) el.style.color = ''; }, 300); 
                     }
                 });
 

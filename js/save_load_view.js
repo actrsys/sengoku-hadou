@@ -8,6 +8,20 @@ class SaveLoadView {
     constructor(ui, game) {
         this.ui = ui;
         this.game = game;
+        // タブ切替や閉じる→再表示をまたいだ古い非同期読込が、現在の一覧を上書きしないための世代番号です。
+        this._openGeneration = 0;
+        this._renderGeneration = 0;
+    }
+
+    invalidatePendingRenders() {
+        this._openGeneration++;
+        this._renderGeneration++;
+    }
+
+    close() {
+        this.invalidatePendingRenders();
+        const modal = document.getElementById('saveload-modal');
+        if (modal) modal.classList.add('hidden');
     }
 
     async open(mode) {
@@ -15,6 +29,8 @@ class SaveLoadView {
         const title = document.getElementById('saveload-title');
         const list = document.getElementById('saveload-list');
         const tabs = document.getElementById('saveload-tabs'); // ★追加：タブを入れる箱を見つけます
+        const openGeneration = ++this._openGeneration;
+        const isOpenCurrent = () => openGeneration === this._openGeneration;
         
         title.innerText = mode === 'save' ? 'セーブするスロットを選択' : 'ロードするスロットを選択';
         
@@ -40,6 +56,9 @@ class SaveLoadView {
 
         // リストの中身を作る魔法を、タブで切り替えるために別にしてまとめます
         const renderSlots = async (prefix) => {
+            const renderGeneration = ++this._renderGeneration;
+            const isRenderCurrent = () => isOpenCurrent() && renderGeneration === this._renderGeneration;
+            if (!isRenderCurrent()) return;
             list.innerHTML = '';
             
             // 画面をカクカクさせないために、先に「読み込み中...」の枠を5つ出しておきます
@@ -65,6 +84,8 @@ class SaveLoadView {
                 this.game.saveManager.readSaveSlots(otherPrefix),
                 new Promise(resolve => setTimeout(resolve, 300))
             ]);
+            // 途中で別タブへ切り替えた／画面を閉じて開き直した場合、古い結果はDOMへ触れません。
+            if (!isRenderCurrent()) return;
 
             // 2. View側では表示順と「最新」表示に必要な値だけ整えます。
             let otherLatestTime = 0;
@@ -198,9 +219,8 @@ class SaveLoadView {
                 const displayTitle = prefix === 'sengoku_autosave_slot' ? `オート ${displayIndex}` : `スロット ${i}`;
 
                 btn.onclick = () => {
-                    const modal = document.getElementById('saveload-modal');
                     const closeSlotList = () => {
-                        if (modal) modal.classList.add('hidden');
+                        this.close();
                     };
                     
                     if (mode === 'save') {
@@ -211,7 +231,7 @@ class SaveLoadView {
                         }, null, {
                             okText: 'セーブする',
                             okClass: 'btn-primary',
-                            cancelText: 'やめる',
+                            cancelText: '戻る',
                             closeBeforeCancel: true
                         });
                     } else {
@@ -225,7 +245,7 @@ class SaveLoadView {
                             }, null, {
                                 okText: 'ロードする',
                                 okClass: 'btn-danger',
-                                cancelText: 'やめる',
+                                cancelText: '戻る',
                                 closeBeforeOk: true,
                                 closeBeforeCancel: true
                             });
@@ -238,6 +258,7 @@ class SaveLoadView {
 
             // カスタムスクロールバーを更新して、縦スクロールができるようにします
             setTimeout(() => {
+                if (!isRenderCurrent()) return;
                 if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
                     this.ui.updateCustomScrollbars(list);
                 }
@@ -282,6 +303,7 @@ class SaveLoadView {
         modal.classList.remove('hidden');
         // display:none が解除された次フレームで実寸を取り直します。
         requestAnimationFrame(() => {
+            if (!isOpenCurrent()) return;
             if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
                 this.ui.updateCustomScrollbars(list);
             }

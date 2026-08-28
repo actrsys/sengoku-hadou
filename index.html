@@ -65,7 +65,7 @@
                 </div>
                 <div class="modal-footer">
                     <button id="scenario-confirm-btn" class="btn-primary">決定</button>
-                    <button id="scenario-close-btn" class="btn-secondary">閉じる</button>
+                    <button id="scenario-close-btn" class="btn-secondary" data-se="cancel.ogg">タイトルへ戻る</button>
                 </div>
             </div>
         </div>
@@ -82,7 +82,7 @@
             </div>
         </div>
         
-        <button id="btn-back-to-scenario" class="btn-secondary floating-back-btn hidden">シナリオ選択に戻る</button>
+        <button id="btn-back-to-scenario" class="btn-secondary floating-back-btn hidden" data-se="cancel.ogg">シナリオ選択に戻る</button>
         
         <div id="daimyo-confirm-modal" class="modal hidden">
             <div class="modal-content daimyo-confirm-content">
@@ -143,7 +143,7 @@
                 </div>
                 <div class="modal-footer">
                     <button id="selector-confirm-btn" class="btn-primary">決定</button>
-                    <button id="selector-back-btn" class="btn-secondary">戻る</button>
+                    <button id="selector-back-btn" class="btn-secondary">閉じる</button>
                 </div>
             </div>
         </div>
@@ -263,17 +263,6 @@
                 <div class="modal-footer legion-council-order-footer">
                     <button id="legion-council-order-confirm-btn" class="btn-primary">確定</button>
                     <button id="legion-council-order-back-btn" class="btn-secondary">戻る</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="gunshi-modal" class="modal hidden">
-            <div class="modal-content modal-small">
-                <h3 id="gunshi-name">軍師</h3>
-                <div id="gunshi-message" class="message-area"></div>
-                <div class="modal-footer right">
-                    <button id="gunshi-execute-btn" class="btn-primary">実行</button>
-                    <button id="gunshi-back-btn" class="btn-secondary">戻る</button>
                 </div>
             </div>
         </div>
@@ -560,7 +549,7 @@
         </div>
         <div id="intercept-confirm-modal" class="modal hidden">
             <div class="modal-content modal-small">
-                <h3>城を出て迎え撃ちますか？</h3>
+                <h3>拠点を出て迎え撃ちますか？</h3>
                 <div id="intercept-msg" class="message-area"></div>
                 <div class="modal-footer right">
                     <button id="btn-intercept" class="btn-danger">迎撃</button>

@@ -2564,9 +2564,9 @@ Object.assign(WarManager.prototype, {
 
     checkFinishHirePhase() {
         this.game.ui.showDialog("登用を終了しますか？", true, 
-            () => { this.startKillPhaseIntro(); }, // はい：次のフェーズへ
-            () => { this.openHireSelector(); }, // いいえ：リストに戻る
-            { closeBeforeOk: true, closeBeforeCancel: true }
+            () => { this.startKillPhaseIntro(); }, // 終了する：次のフェーズへ
+            () => { this.openHireSelector(); }, // 続ける：リストへ戻る
+            { okText: '終了する', cancelText: '続ける', closeBeforeOk: true, closeBeforeCancel: true }
         );
     },
 
@@ -2673,9 +2673,9 @@ Object.assign(WarManager.prototype, {
 
     checkFinishKillPhase() {
         this.game.ui.showDialog("処断を終了しますか？", true, 
-            () => { this.finishPrisonerPhase(); }, // はい：全員の処遇を確定させます
-            () => { this.openKillSelector(); }, // いいえ：リストに戻る
-            { closeBeforeOk: true, closeBeforeCancel: true }
+            () => { this.finishPrisonerPhase(); }, // 終了する：全員の処遇を確定させます
+            () => { this.openKillSelector(); }, // 続ける：リストへ戻る
+            { okText: '終了する', cancelText: '続ける', closeBeforeOk: true, closeBeforeCancel: true }
         );
     },
 
@@ -2724,13 +2724,13 @@ Object.assign(WarManager.prototype, {
                 }, null, { closeBeforeOk: true });
             },
             () => { 
-                // 「やめる」を選んだ時の処理：武将は移さず、そのままリストに戻ります
+                // 「戻る」を選んだ時の処理：武将は移さず、そのままリストに戻ります
                 this.openKillSelector();
             },
             {
                 okText: '処断する',
                 okClass: 'btn-danger',
-                cancelText: 'やめる',
+                cancelText: '戻る',
                 cancelClass: 'btn-secondary',
                 closeBeforeCancel: true
             }

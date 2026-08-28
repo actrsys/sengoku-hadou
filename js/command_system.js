@@ -956,7 +956,7 @@ class CommandSystem {
                         this.game.ui.info.arrangeMarriageBushoId = null; // リセット
                     },
                     null,
-                    { okText: '嫁がせる', cancelText: 'やめる', closeBeforeCancel: true }
+                    { okText: '嫁がせる', cancelText: '戻る', closeBeforeCancel: true }
                 );
                 return;
             }
@@ -992,7 +992,7 @@ class CommandSystem {
                     }, { trueProb: prob / 100 });
                 },
                 null,
-                { okText: '嫁がせる', cancelText: 'やめる', closeBeforeCancel: true }
+                { okText: '嫁がせる', cancelText: '戻る', closeBeforeCancel: true }
             );
             return;
         }
@@ -1035,7 +1035,7 @@ class CommandSystem {
                         this.executeWithEvent('vassalage', () => this.game.diplomacyManager.executeVassalage(firstId, targetId));
                     },
                     null,
-                    { okText: '臣従する', okClass: 'btn-danger', cancelText: 'やめる', closeBeforeCancel: true }
+                    { okText: '臣従する', okClass: 'btn-danger', cancelText: '戻る', closeBeforeCancel: true }
                 );
             } else if (extraData.subAction === 'dominate') {
                 const prob = this.game.diplomacyManager.getDiplomacyProb(firstId, targetId, 'dominate');
@@ -1190,12 +1190,12 @@ class CommandSystem {
             const bushoA = this.game.getBusho(firstId);
             this.game.ui.showDialog(`${bushoA.name}に家督を譲りますか？`, true, 
                 () => {
-                    // 確定時だけ候補一覧を正式終了。［やめる］なら背後の候補一覧へ戻ります。
+                    // 確定時だけ候補一覧を正式終了。［戻る］なら背後の候補一覧へ戻ります。
                     if (this.game.ui.info && typeof this.game.ui.info.closeCommonModal === 'function') this.game.ui.info.closeCommonModal();
                     this.executeWithEvent('succession', () => this.executeSuccession(firstId));
                 },
                 null,
-                { okText: '家督を譲る', okClass: 'btn-danger', cancelText: 'やめる', closeBeforeCancel: true }
+                { okText: '家督を譲る', okClass: 'btn-danger', cancelText: '戻る', closeBeforeCancel: true }
             );
             return;
         }
@@ -1204,12 +1204,12 @@ class CommandSystem {
             const bushoA = this.game.getBusho(firstId);
             this.game.ui.showDialog(`${bushoA.name}を養子にしますか？`, true, 
                 () => {
-                    // 確定時だけ候補一覧を正式終了。［やめる］なら背後の候補一覧へ戻ります。
+                    // 確定時だけ候補一覧を正式終了。［戻る］なら背後の候補一覧へ戻ります。
                     if (this.game.ui.info && typeof this.game.ui.info.closeCommonModal === 'function') this.game.ui.info.closeCommonModal();
                     this.executeWithEvent('adopt_son', () => this.executeAdoptSon(firstId));
                 },
                 null,
-                { okText: '養子にする', cancelText: 'やめる', closeBeforeCancel: true }
+                { okText: '養子にする', cancelText: '戻る', closeBeforeCancel: true }
             );
             return;
         }
@@ -1227,7 +1227,7 @@ class CommandSystem {
             this.game.ui.showDialog(`本当に${busho.name}を追放しますか？`, true, () => {
                 if (this.game.ui.info && typeof this.game.ui.info.closeCommonModal === 'function') this.game.ui.info.closeCommonModal();
                 this.executeWithEvent('banish', () => this.executeCommand('banish', selectedIds, targetId));
-            }, null, { cancelText: 'やめる', closeBeforeCancel: true });
+            }, null, { cancelText: '戻る', closeBeforeCancel: true });
             return;
         }
 

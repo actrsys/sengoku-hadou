@@ -84,10 +84,6 @@
             if (element) element.addEventListener('click', handler);
         };
         const getGame = () => window.GameApp;
-        const hide = (id) => {
-            const element = document.getElementById(id);
-            if (element) element.classList.add('hidden');
-        };
 
         bind('start-btn', () => getGame()?.startNewGame());
         bind('continue-btn', () => getGame()?.continueGame());
@@ -97,8 +93,7 @@
         bind('settings-btn', () => getGame()?.commandSystem?.executeSystemCommand('settings'));
         bind('scenario-close-btn', () => getGame()?.ui?.returnToTitle());
         bind('result-close-btn', () => getGame()?.ui?.closeResultModal());
-        bind('gunshi-back-btn', () => hide('gunshi-modal'));
-        bind('saveload-close-btn', () => hide('saveload-modal'));
+        bind('saveload-close-btn', () => getGame()?.ui?.saveLoadView?.close());
     }
 
     function resizeGameScreen() {

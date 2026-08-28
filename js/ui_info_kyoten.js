@@ -573,7 +573,7 @@ Object.assign(UIInfoManager.prototype, {
                 this.ui.showDialog(confirmMsg, true, () => {
                     this.closeCommonModal();
                     this.game.commandSystem.executeAppointLegionLeader(selectData.bushoId, selectData.legionNo, castleId);
-                }, null, { okText: '任命する', cancelText: 'やめる', closeBeforeCancel: true });
+                }, null, { okText: '任命する', cancelText: '戻る', closeBeforeCancel: true });
             };
         }
 

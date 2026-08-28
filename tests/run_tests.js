@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r273');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r281');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2005,6 +2005,11 @@ test('選択画面の標準ボタンは実際の戻り先に合わせて［戻�
     assert.ok(uiInfo.includes("backLabel: isSelectMode && onBack ? '戻る' : null"), '勢力・諸勢力の選択画面は戻り先があれば戻ると表示する');
     assert.ok(uiInfo.includes("backLabel: onCancel ? '戻る' : null"), '援軍等の勢力選択も地図へ戻る時は戻ると表示する');
     assert.ok(uiBusho.includes("backLabel: (onBack || (extraData && extraData.onCancel)) ? '戻る' : null"), '武将選択も明示的な戻り先に合わせる');
+
+    const html = read('index.html');
+    assert.ok(html.includes('id="selector-back-btn" class="btn-secondary">閉じる</button>'), '共通SelectorのHTML初期値もView既定の閉じるへ揃える');
+    assert.ok(html.includes('id="scenario-close-btn" class="btn-secondary" data-se="cancel.ogg">タイトルへ戻る</button>'), 'シナリオ選択は実際の遷移先であるタイトルを明示する');
+    assert.ok(read('js/app_bootstrap.js').includes("bind('scenario-close-btn', () => getGame()?.ui?.returnToTitle())"), 'シナリオ選択の戻る先はタイトル画面である');
 });
 
 test('登用・引抜・暗殺・離間の対象→実行武将は一段戻れる履歴を維持する', () => {
@@ -2216,8 +2221,8 @@ test('家督相続・養子縁組・追放の最終確認取消は候補一覧�
     const adoptBlock = command.slice(adoptStart, rewardStart);
     assert.ok(successionBlock.includes('closeCommonModal'), '家督確定時だけ候補一覧を正式終了する');
     assert.ok(adoptBlock.includes('closeCommonModal'), '養子確定時だけ候補一覧を正式終了する');
-    assert.ok(successionBlock.includes("cancelText: 'やめる'"));
-    assert.ok(adoptBlock.includes("cancelText: 'やめる'"));
+    assert.ok(successionBlock.includes("cancelText: '戻る'"));
+    assert.ok(adoptBlock.includes("cancelText: '戻る'"));
     const banishHandlerStart = command.indexOf("if (actionType === 'banish')", handlerStart);
     const genericSpecStart = command.indexOf("if (spec &&", banishHandlerStart);
     const banishHandlerBlock = command.slice(banishHandlerStart, genericSpecStart);
@@ -2250,7 +2255,7 @@ test('外交の軍師助言・臣従確認取消は外交担当一覧へ戻れ�
     const dominateStart = diploBlock.indexOf("extraData.subAction === 'dominate'", vassalageStart);
     const vassalageBlock = diploBlock.slice(vassalageStart, dominateStart);
     assert.ok(vassalageBlock.indexOf('beginDiplomacySelectorHandoff();') < vassalageBlock.indexOf("executeWithEvent('vassalage'"), '臣従確定時だけ担当一覧handoffを開始してから実行する');
-    assert.ok(vassalageBlock.includes("cancelText: 'やめる'"), '臣従取消は担当一覧を残す');
+    assert.ok(vassalageBlock.includes("cancelText: '戻る'"), '臣従取消は担当一覧へ戻る');
 
     const adviceStart = command.indexOf('\n    showAdviceAndExecute(actionType');
     const adviceBlock = command.slice(adviceStart, adviceStart + 900);
@@ -2264,7 +2269,7 @@ test('国主任命の最終確認取消は拠点一覧の位置を保持する',
     const selectEnd = kyoten.indexOf('this._renderListModal({', selectStart);
     const block = kyoten.slice(selectStart, selectEnd);
     assert.ok(block.includes('`${busho.name}を国主に任命し、${castle.name}を本拠としますか？`'), '確認文だけで任命人物と本拠が分かる');
-    assert.ok(block.includes("{ okText: '任命する', cancelText: 'やめる', closeBeforeCancel: true }"), '確定・取消の意味を明示し取消時は背後の一覧へ即復帰する');
+    assert.ok(block.includes("{ okText: '任命する', cancelText: '戻る', closeBeforeCancel: true }"), '確定・取消の意味を明示し取消時は背後の一覧へ即復帰する');
     assert.ok(!block.includes('this._renderKyotenList(clanId, isSelectMode, selectData, 0);'), '取消時に拠点一覧を先頭から再描画しない');
     assert.ok(block.includes('this.closeCommonModal();'), '確定時だけ選択一覧を閉じる');
 });
@@ -4941,7 +4946,8 @@ test('評定UIとAIは方針専門部署を正本として参照する', () => {
     assert.ok(hoverStart >= 0 && !councilCss.slice(hoverStart, hoverEnd).includes('translateY(-1px)'), '軍団カードはhover/focusで上へ動かして見切れさせない');
     assert.ok(!html.includes('modal-footer modal-footer-inside legion-council-order-footer'), '命令画面だけフッターを内部保持する例外を残さない');
     assert.ok(html.includes('id="legion-council-order-back-btn"') && html.includes('>戻る</button>'), '命令画面に右クリック互換の戻るボタンを置く');
-    assert.ok(ui.includes("const targetTexts = ['閉じる', '戻る', 'いいえ']"), 'PC右クリックは戻るボタンを共通キャンセル操作として扱う');
+    assert.ok(ui.includes("const targetTexts = ['閉じる', '戻る', 'いいえ', 'やめる']"), 'PC右クリックは標準の戻る・中止系文言を共通キャンセル操作として扱う');
+    assert.ok(ui.includes("btn.dataset && btn.dataset.se === 'cancel.ogg'"), '具体的な○○へ戻る表記もdata-seの意味宣言で右クリック取消対象にできる');
     assert.ok(!councilView.includes('legion-council-order-btn'), '軍団カード内に個別命令ボタンを残さない');
 });
 
@@ -7454,7 +7460,8 @@ test('BGM停止APIはstopBGMへ統一し旧stopBgmを残さない', () => {
 test('強制モーダルリセットは状態マークタイマーを破棄しタイトル復帰では背景Canvasを再生成しない', () => {
     const ui = read('js/ui.js');
     const resetAt = ui.indexOf('forceResetModals(options = {})');
-    const resetBlock = ui.slice(resetAt, resetAt + 1300);
+    const resetEnd = ui.indexOf('\n    log(msg', resetAt);
+    const resetBlock = ui.slice(resetAt, resetEnd > resetAt ? resetEnd : resetAt + 3600);
     assert.ok(resetBlock.includes('clearInterval(this._statusCarouselTimer);'));
     assert.ok(resetBlock.includes('this._statusCarouselTimer = null;'));
     assert.ok(resetBlock.includes('options.skipBackgroundRecovery === true'));
@@ -9485,6 +9492,236 @@ test('浪人仕官を断った時は会話handoffを残さず通常画面へ戻�
     const at = common.indexOf("cancelText: '追い払う'");
     const block = common.slice(Math.max(0, at - 500), at + 500);
     assert.ok(block.includes('closeBeforeCancel: true'));
+});
+
+
+test('寝返り希望者との面会は共通呼称を使い、最初から断る時は通常画面へ即復帰する', () => {
+    const source = read('js/independence_system.js');
+    const start = source.indexOf('async askPlayerForDefection(');
+    const block = source.slice(start, source.indexOf('\n    }\n}', start) + 7);
+    assert.ok(block.includes('ConversationStandingRules.getDiplomaticCallName'));
+    assert.ok(!block.includes('givenNameStr + "とやら"'));
+    assert.ok(!block.includes("rankName + '殿'"));
+    const greetAt = block.indexOf("okText: '面会する'");
+    const greetBlock = block.slice(Math.max(0, greetAt - 500), greetAt + 700);
+    assert.ok(greetBlock.includes("cancelText: '断る'"));
+    assert.ok(greetBlock.includes('closeBeforeCancel: true'));
+});
+
+test('共通ダイアログ移行済みの旧軍師モーダルを残さない', () => {
+    const html = read('index.html');
+    const ui = read('js/ui.js');
+    const boot = read('js/app_bootstrap.js');
+    const css = read('css/style.css');
+    for (const token of ['gunshi-modal', 'gunshi-name', 'gunshi-message', 'gunshi-execute-btn', 'gunshi-back-btn']) {
+        assert.ok(!html.includes(token), `${token} の旧HTMLを残さない`);
+    }
+    for (const token of ['this.gunshiModal', 'this.gunshiName', 'this.gunshiMessage', 'this.gunshiExecuteBtn']) {
+        assert.ok(!ui.includes(token), `${token} の旧DOM参照を残さない`);
+    }
+    assert.ok(!boot.includes('gunshi-back-btn'));
+    for (const selector of ['#gunshi-modal', '#daimyo-list-modal', '#daimyo-detail-modal', '#faction-list-modal', '#princess-list-modal', '#diplo-list-modal']) {
+        assert.ok(!css.includes(selector), `${selector} の死んだCSSを残さない`);
+    }
+    const openAt = ui.indexOf('openGunshiModal(');
+    const openBlock = ui.slice(openAt, ui.indexOf('    openBushoSelector', openAt));
+    assert.ok(openBlock.includes('this.showDialog('));
+    assert.ok(openBlock.includes('closeBeforeCancel: true'));
+});
+
+test('迎撃専用画面の一般地点表記は城ではなく拠点を使う', () => {
+    const html = read('index.html');
+    assert.ok(html.includes('<h3>拠点を出て迎え撃ちますか？</h3>'));
+    assert.ok(!html.includes('<h3>城を出て迎え撃ちますか？</h3>'));
+});
+
+
+test('セーブ・ロードの非同期タブ描画は世代tokenで古い結果を破棄する', () => {
+    const source = read('js/save_load_view.js');
+    const bootstrap = read('js/app_bootstrap.js');
+    const ui = read('js/ui.js');
+    assert.ok(source.includes('this._openGeneration = 0;'));
+    assert.ok(source.includes('this._renderGeneration = 0;'));
+    assert.ok(source.includes('const openGeneration = ++this._openGeneration;'));
+    assert.ok(source.includes('const renderGeneration = ++this._renderGeneration;'));
+    assert.ok(source.includes('if (!isRenderCurrent()) return;'), '非同期読込完了後に古い描画を破棄する');
+    assert.ok(source.includes('if (!isOpenCurrent()) return;'), '表示直後の遅延スクロール更新も旧open世代から触らない');
+    assert.ok(source.includes('invalidatePendingRenders()'));
+    assert.ok(source.includes('close() {'));
+    assert.ok(source.includes('this.close();'), 'スロット確定時もViewのclose経路で世代を無効化する');
+    assert.ok(bootstrap.includes("getGame()?.ui?.saveLoadView?.close()"), '固定閉じるボタンもSaveLoadViewへ委譲する');
+    assert.ok(!bootstrap.includes("hide('saveload-modal')"), '固定DOMを直接隠す旧close経路を残さない');
+    assert.ok(ui.includes("this.saveLoadView.invalidatePendingRenders()"), 'forceResetでも保留中の読込を無効化する');
+});
+
+test('具体名のシナリオ選択戻りボタンもPC右クリックのcancel意味を持つ', () => {
+    const html = read('index.html');
+    assert.ok(/id="btn-back-to-scenario"[^>]*data-se="cancel\.ogg"[^>]*>シナリオ選択に戻る<\/button>/.test(html));
+});
+
+
+test('［やめる］は操作全体の中止に限定し、一段戻りや物語分岐は具体表記を使う', () => {
+    const command = read('js/command_system.js');
+    const saveView = read('js/save_load_view.js');
+    const warEffort = read('js/war_effort.js');
+    const kyoten = read('js/ui_info_kyoten.js');
+    const historical = read('js/event/historical_event.js');
+    const warPrep = read('js/war_preparation_controller.js');
+    const ui = read('js/ui.js');
+
+    for (const token of [
+        "{ okText: '嫁がせる', cancelText: '戻る', closeBeforeCancel: true }",
+        "{ okText: '臣従する', okClass: 'btn-danger', cancelText: '戻る', closeBeforeCancel: true }",
+        "{ okText: '家督を譲る', okClass: 'btn-danger', cancelText: '戻る', closeBeforeCancel: true }",
+        "{ okText: '養子にする', cancelText: '戻る', closeBeforeCancel: true }",
+        "cancelText: '戻る', closeBeforeCancel: true"
+    ]) assert.ok(command.includes(token), `一段戻り確認は戻る表記を使う: ${token}`);
+
+    assert.strictEqual((saveView.match(/cancelText: '戻る'/g) || []).length >= 2, true, 'セーブ/ロード確認はスロット一覧へ戻る');
+    assert.ok(warEffort.includes("cancelText: '戻る'"), '捕虜処断取消は捕虜一覧へ戻る');
+    assert.ok(kyoten.includes("{ okText: '任命する', cancelText: '戻る', closeBeforeCancel: true }"), '国主任命取消は拠点一覧へ戻る');
+    assert.ok(historical.includes('cancelText: "出陣しない"'), '桶狭間の分岐は取消ではなく具体的な選択結果を表示する');
+
+    assert.ok(warPrep.includes("cancelText: 'やめる'"), '出陣準備そのものを中止する最終確認はやめるを維持する');
+    assert.ok(command.includes("okText: '実行', cancelText: 'やめる'"), '一括褒美を取りやめる確認はやめるを維持する');
+    assert.ok(command.includes("okText: '観戦する', okClass: 'btn-primary', cancelText: 'やめる'"), '観戦開始を取りやめる確認はやめるを維持する');
+    assert.ok(ui.includes("okText: '解任する', okClass: 'btn-danger', cancelText: 'やめる'"), '国主解任を取りやめる確認はやめるを維持する');
+});
+
+
+test('PC右クリックは最前面モーダルだけを対象にし［やめる］も操作中止として扱う', () => {
+    const ui = read('js/ui.js');
+    assert.ok(ui.includes("const targetTexts = ['閉じる', '戻る', 'いいえ', 'やめる'];"), 'やめるも操作全体の中止として右クリック対象に含める');
+    assert.ok(ui.includes("const visibleModals = Array.from(document.querySelectorAll('.modal:not(.hidden)'))"), '表示中モーダルを抽出する');
+    assert.ok(ui.includes('const topModal = visibleModals.reduce((best, modal) => {'), '最前面モーダルを決める');
+    assert.ok(ui.includes('const buttonScope = topModal || document;'), 'モーダルがある時は前面だけをキャンセル検索範囲にする');
+    assert.ok(ui.includes("Number.parseInt(window.getComputedStyle(modal).zIndex, 10) || 0"), '重なり順は実際のz-indexを参照する');
+});
+
+test('フォーム部品上の右クリックと長押しはネイティブ入力を優先する', () => {
+    const ui = read('js/ui.js');
+    const formGuard = 'actionTarget.closest(\'input, select, textarea, option, [contenteditable="true"]\')';
+    assert.ok(ui.includes(formGuard), 'フォーム部品を共通右クリック／長押しの対象外にする');
+    const actionAt = ui.indexOf('const executeContextMenuAction = (e) => {');
+    const formAt = ui.indexOf(formGuard, actionAt);
+    const watchAt = ui.indexOf('if (this.game && this.game.isWatchMode)', actionAt);
+    assert.ok(actionAt >= 0 && formAt > actionAt && watchAt > formAt, '観戦終了予約より先にフォームのネイティブ操作を保護する');
+});
+
+test('右クリックと長押しは非モーダル入力遮断レイヤーを貫通しない', () => {
+    const ui = read('js/ui.js');
+    for (const selector of [
+        '#global-loading-screen',
+        '#save-guard',
+        '#ai-guard',
+        '#war-ai-guard',
+        '#cutin-overlay',
+        '#ending-screen',
+        '.event-map-overlay',
+        '#battle-blink-guard'
+    ]) {
+        assert.ok(ui.includes(`'${selector}'`), `${selector} を共通操作の入力遮断対象に含める`);
+    }
+    assert.ok(ui.includes("shield.closest('.hidden')"), '親画面ごと隠れた遮断レイヤーは有効扱いしない');
+    assert.ok(ui.includes("style.pointerEvents !== 'none'"), '入力を実際に遮断するレイヤーだけを対象にする');
+    assert.ok(!ui.includes("style.opacity !== '0'\n                    && style.pointerEvents"), '透明化したAI guardも入力壁なのでopacityでは除外しない');
+
+    const watchAt = ui.indexOf('if (this.game && this.game.isWatchMode)');
+    const shieldAt = ui.indexOf('const inputShieldSelectors = [', watchAt);
+    const pcAt = ui.indexOf("if (document.body.classList.contains('is-pc'))", shieldAt);
+    assert.ok(watchAt >= 0 && shieldAt > watchAt && pcAt > shieldAt, '観戦終了予約だけを例外として入力遮断判定より先に処理する');
+});
+
+test('確認取消の具体文言は役割が取消の場合だけcancel意味を宣言する', () => {
+    const ui = read('js/ui.js');
+    assert.ok(ui.includes("const genericCancelLabels = new Set(['いいえ', '戻る', 'やめる', '続ける', '観戦を続ける']);"), '操作取消として使う具体文言を限定列挙する');
+    assert.ok(ui.includes("canB.dataset.se = 'cancel.ogg';"), '対象だけcancel意味をdata-seで宣言する');
+    assert.ok(ui.includes("dialog.customOpts?.isContextCancel === true"), '将来の具体文言は明示フラグでも取消役割を宣言できる');
+    assert.ok(!ui.includes("genericCancelLabels = new Set(['いいえ', '戻る', 'やめる', '続ける', '観戦を続ける', '出陣しない'"), '歴史イベントの意味ある否定分岐は汎用取消へ混ぜない');
+});
+
+test('確認文のボタンは実際の遷移を具体的に表す', () => {
+    const warEffort = read('js/war_effort.js');
+    const independence = read('js/independence_system.js');
+    assert.strictEqual((warEffort.match(/okText: '終了する', cancelText: '続ける'/g) || []).length, 2, '捕虜の登用・処断フェーズ終了確認は終了/続行を具体表示する');
+    assert.ok(independence.includes("{ okText: 'この勢力を操作', cancelText: '戻る' }"), '独立後の担当勢力確認は一段前へ戻る意味を戻ると表示する');
+});
+
+test('共通会話は強制モーダルリセットを世代境界として古い非同期処理を破棄する', () => {
+    const ui = read('js/ui.js');
+    assert.ok(ui.includes('this._dialogGeneration = 0;'), '会話表示世代をUIManagerが所有する');
+    assert.ok(ui.includes('this._dialogAutoCloseTimer = null;'), '現在の自動閉じtimerをUIManagerが追跡する');
+
+    const processAt = ui.indexOf('async processDialogQueue()');
+    const resetAt = ui.indexOf('forceResetModals(options = {})');
+    const processBlock = ui.slice(processAt, resetAt);
+    assert.ok(processBlock.includes('const dialogGeneration = Number(this._dialogGeneration || 0);'), '各会話処理は開始時の世代を固定する');
+    assert.ok(processBlock.includes('if (dialogGeneration !== Number(this._dialogGeneration || 0)) return;'), '顔画像decode後に古い世代ならDOMへ戻らない');
+    assert.ok(processBlock.includes('this._dialogAutoCloseTimer = autoCloseTimer;'), '自動閉じtimerを強制リセットから破棄できる');
+    assert.ok(processBlock.includes('if (this._dialogAutoCloseTimer === autoCloseTimer) this._dialogAutoCloseTimer = null;'), '通常完了でもtimer参照を残さない');
+
+    const resetBlock = ui.slice(resetAt, resetAt + 2200);
+    assert.ok(resetBlock.includes('this._dialogGeneration = Number(this._dialogGeneration || 0) + 1;'), '強制リセットで旧decode/timer世代を無効化する');
+    assert.ok(resetBlock.includes('this._cancelDialogHandoffClose();'), '旧handoffの閉じ予約を残さない');
+    assert.ok(resetBlock.includes('clearTimeout(this._dialogAutoCloseTimer);'), '旧自動閉じtimerを破棄する');
+    assert.ok(resetBlock.includes('this.dialogQueue = [];'), '旧会話キューを新しい画面へ持ち越さない');
+    assert.ok(resetBlock.includes('this.isDialogShowing = false;'), '内部の表示中フラグも戻し次の会話を開始可能にする');
+    assert.ok(resetBlock.includes('this._currentEventClickHandler = null;'), '旧イベント送りhandlerの固定DOM参照を解放する');
+});
+
+test('委任一覧の一括ボタンは遅延bindせず現在の固定DOMへ直接結び付ける', () => {
+    const info = read('js/ui_info.js');
+    const start = info.indexOf('\n    _renderDelegateList(scrollPos = 0)');
+    const end = info.indexOf('\n    showDelegateSettingModal(', start);
+    const block = info.slice(start, end);
+    assert.ok(block.includes("const toggleAllBtn = document.getElementById('btn-toggle-all-delegate');"));
+    assert.ok(block.includes('toggleAllBtn.onclick = () => {'));
+    assert.ok(!block.includes('setTimeout('), '同期生成済みの一括ボタンへ旧timer経由でbindしない');
+});
+
+
+test('カットインは固定overlayの旧timerを世代境界で次画面へ作用させない', () => {
+    const ui = read('js/ui.js');
+    assert.ok(ui.includes('this._cutinGeneration = 0;'), 'カットイン世代をUIManagerが所有する');
+    const cutinAt = ui.indexOf('showCutin(msg)');
+    const scenarioAt = ui.indexOf('showScenarioSelection(', cutinAt);
+    const cutinBlock = ui.slice(cutinAt, scenarioAt);
+    assert.ok(cutinBlock.includes('this._cutinGeneration = Number(this._cutinGeneration || 0) + 1;'), '新しいカットイン開始で前世代を無効化する');
+    assert.ok(cutinBlock.includes('const cutinGeneration = this._cutinGeneration;'), '各カットインは開始世代を固定する');
+    assert.strictEqual((cutinBlock.match(/cutinGeneration !== Number\(this\._cutinGeneration \|\| 0\)/g) || []).length, 2, 'fade-outとhiddenの両段階で旧世代を拒否する');
+    assert.ok(cutinBlock.includes("this.cutinOverlay.classList.remove('hidden', 'fade-out');"), '次の表示開始時に旧fade-out状態も掃除する');
+
+    const resetAt = ui.indexOf('forceResetModals(options = {})');
+    const resetBlock = ui.slice(resetAt, resetAt + 900);
+    assert.ok(resetBlock.includes('this._cutinGeneration = Number(this._cutinGeneration || 0) + 1;'), '強制リセットもカットイン寿命境界にする');
+});
+
+test('攻城戦メッセージの遅延callbackと数値更新は次の戦況・次の戦闘へ持ち越さない', () => {
+    const ui = read('js/ui.js');
+    assert.ok(ui.includes('this._warActionMessageGeneration = 0;'), '戦況メッセージ世代をUIManagerが所有する');
+
+    const showAt = ui.indexOf('showWarActionMessage(messages, onClick)');
+    const damageAt = ui.indexOf('\n    playDamageAnimation(data', showAt);
+    const showBlock = ui.slice(showAt, damageAt);
+    assert.ok(showBlock.includes('this._warActionMessageGeneration = Number(this._warActionMessageGeneration || 0) + 1;'), '新しい戦況表示で旧timerを無効化する');
+    assert.ok(showBlock.includes('const isCurrentWarAction = () => warActionGeneration === Number(this._warActionMessageGeneration || 0);'), '遅延callbackは現在世代を確認する');
+    assert.ok(showBlock.includes('setTimeout(() => { if (isCurrentWarAction()) onClick(); }, 300);'), '早送り後callbackは旧戦況から発火しない');
+    assert.ok(showBlock.includes('if (isCurrentWarAction() && !isFinished)'), '自動送り完了も旧戦況から発火しない');
+
+    const damageEnd = ui.indexOf('\n    updateWarUI()', damageAt);
+    const damageBlock = ui.slice(damageAt, damageEnd);
+    assert.ok(damageBlock.includes('if (!isCurrentWarAction()) return;'), '旧ダメージ演出は開始時点で拒否する');
+    assert.ok(damageBlock.includes('if (!isCurrentWarAction()) return;\n                const updateTxt'), '400ms後の旧currentStatsを固定DOMへ書き戻さない');
+    assert.ok(damageBlock.includes("if (isCurrentWarAction()) window.AudioManager.playSE('bow_hit001.mp3')"), '連続弓SEも戦況終了後へ持ち越さない');
+
+    const visibleAt = ui.indexOf('setWarModalVisible(visible)');
+    const visibleEnd = ui.indexOf('\n    clearWarLog()', visibleAt);
+    const visibleBlock = ui.slice(visibleAt, visibleEnd);
+    assert.ok(visibleBlock.includes('this._warActionMessageGeneration = Number(this._warActionMessageGeneration || 0) + 1;'), '攻城戦画面を閉じる時も旧timerを無効化する');
+
+    const resetAt = ui.indexOf('forceResetModals(options = {})');
+    const resetBlock = ui.slice(resetAt, resetAt + 1000);
+    assert.ok(resetBlock.includes('this._warActionMessageGeneration = Number(this._warActionMessageGeneration || 0) + 1;'), '強制リセットも戦況メッセージ寿命境界にする');
 });
 
 Promise.all(pendingTests).then(() => {

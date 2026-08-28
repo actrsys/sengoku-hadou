@@ -617,7 +617,7 @@ class IndependenceSystem {
                     const confirmSelection = (targetClanName, targetClanId) => {
                         this.game.ui.showDialog(`${targetClanName}を操作します。本当によろしいですか？`, true, 
                             () => {
-                                // 「はい」を選んだら担当大名家を決定
+                                // ［この勢力を操作］を選んだら担当大名家を決定
                                 this.game.playerClanId = targetClanId;
                                 
                                 // パネルを新しい担当勢力の情報で更新します（メニューの描画は消しました！）
@@ -628,9 +628,10 @@ class IndependenceSystem {
                                 resolve(targetClanId);
                             },
                             () => {
-                                // 「いいえ」を選んだら最初の選択画面に戻る
+                                // ［戻る］なら最初の勢力選択へ一段戻ります。
                                 showSelectMenu();
-                            }
+                            },
+                            { okText: 'この勢力を操作', cancelText: '戻る' }
                         );
                     };
 
@@ -1643,19 +1644,12 @@ class IndependenceSystem {
             const traitorNameStr = rebellionLeader.fullName;
             const myDaimyoNameStr = myDaimyo ? myDaimyo.fullName : '当主';
 
-            // 呼び名の判定
-            let traitorCallName = "";
-            // 官位があるかチェック
-            if (rebellionLeader.courtRankIds && rebellionLeader.courtRankIds.length > 0 && this.game.courtRankSystem) {
-                const rankName = this.game.courtRankSystem.getHighestRankName(rebellionLeader);
-                if (rankName !== "なし") {
-                    traitorCallName = rankName + "殿";
-                }
-            }
-            if (!traitorCallName) {
-                // 官位がなければ下の名（givenNameが無い場合はnameを分割）＋とやら
-                traitorCallName = rebellionLeader.givenNameStr + "とやら";
-            }
+            // 寝返り希望者との直接会話も、面談・外交と同じ呼称正本を使います。
+            // 将軍・官位・近親関係・同姓人物の識別をこのイベントだけ独自に組み立てません。
+            const traitorCallName = (window.ConversationStandingRules
+                && typeof window.ConversationStandingRules.getDiplomaticCallName === 'function')
+                ? window.ConversationStandingRules.getDiplomaticCallName(this.game, rebellionLeader, myDaimyo)
+                : `${rebellionLeader.familyNameStr || rebellionLeader.fullName || rebellionLeader.name || 'その者'}殿`;
 
             const greetMsg = `「${oldClanName}の${traitorNameStr}と申す者が殿を頼って参りました。お会いになりますか？」`;
             
@@ -1709,7 +1703,9 @@ class IndependenceSystem {
                 {
                     leftFace: nav.faceIcon, leftName: nav.name,
                     okText: '面会する', okClass: 'btn-primary',
-                    cancelText: '断る', cancelClass: 'btn-secondary'
+                    cancelText: '断る', cancelClass: 'btn-secondary',
+                    // 面会を断った時は次の会話へ続かず通常画面へ戻るため、確認を先に閉じます。
+                    closeBeforeCancel: true
                 }
             );
         });

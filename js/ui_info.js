@@ -2112,17 +2112,17 @@ class UIInfoManager {
             gridTemplatePc: "200px 100px 100px 100px"
         });
 
-        setTimeout(() => {
-            const toggleAllBtn = document.getElementById('btn-toggle-all-delegate');
-            if (toggleAllBtn) {
-                toggleAllBtn.onclick = () => {
-                    const newState = !isAllDelegated;
-                    myCastles.forEach(c => c.isDelegated = newState);
-                    const listContainer = document.getElementById('selector-list');
-                    this._renderDelegateList(listContainer ? listContainer.scrollTop : 0);
-                };
-            }
-        }, 10);
+        // contextHtml は _renderListModal() 内で同期生成済みなので、旧timerを挟まず現在DOMへ直接bindする。
+        // 画面を素早く切り替えた時に古い委任一覧のクロージャが次の固定DOMへ結び付く経路を作らない。
+        const toggleAllBtn = document.getElementById('btn-toggle-all-delegate');
+        if (toggleAllBtn) {
+            toggleAllBtn.onclick = () => {
+                const newState = !isAllDelegated;
+                myCastles.forEach(c => c.isDelegated = newState);
+                const listContainer = document.getElementById('selector-list');
+                this._renderDelegateList(listContainer ? listContainer.scrollTop : 0);
+            };
+        }
     }
 
     showDelegateSettingModal(castleId) {

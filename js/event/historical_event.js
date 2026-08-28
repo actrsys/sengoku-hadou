@@ -651,7 +651,7 @@ window.GameEvents.push({
                         leftFace: args.juushinFFace,
                         okText: "出陣する",
                         okClass: "btn-danger",
-                        cancelText: "やめる",
+                        cancelText: "出陣しない",
                         cancelClass: "btn-primary"
                     }
                 );

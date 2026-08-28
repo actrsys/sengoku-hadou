@@ -1268,14 +1268,8 @@ body:not(.is-pc) .saveload-slot-time {
 #quantity-modal { z-index: 6500; }
 #settings-modal { z-index: 7000; }
 #unit-divide-modal { z-index: 8010; }
-#daimyo-list-modal { z-index: 8100; }
-#daimyo-detail-modal { z-index: 8150; }
-#faction-list-modal { z-index: 8160; }
-#princess-list-modal { z-index: 8170; }
 #selector-modal { z-index: 8200; }
 #busho-detail-modal { z-index: 8300; }
-#diplo-list-modal { z-index: 8400; }
-#gunshi-modal { z-index: 8500; }
 
 /* 【システム・最前面ダイアログ層】（絶対に見えなければならないもの） */
 #saveload-modal { z-index: 9500; }
