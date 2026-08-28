@@ -73,8 +73,13 @@ class CustomScrollbar {
     }
 
     get isMobile() {
-        // 端末UAではなく、固定論理画面の正本であるbody.is-pcに従う。
+        // レイアウト上のスマホ/PC。表示密度の判断にだけ使う。
         return !document.body.classList.contains('is-pc');
+    }
+
+    get isTouchInput() {
+        // 入力方式はレイアウトと分離する。横向きタブレットのPC UIでもタッチ安定化を維持する。
+        return document.body.classList.contains('is-touch-input');
     }
 
     getScrollStep() {
@@ -197,8 +202,9 @@ class CustomScrollbar {
     initEvents() {
         this.onListScroll = () => this.scheduleUpdate();
 
-        // スマホ用：ローディング中やAIガード中はリスト側の指スクロールを止めます。
-        if (this.isMobile) {
+        // タッチ入力用：ローディング中やAIガード中はリスト側の指スクロールを止めます。
+        // PCレイアウトのタブレットでも同じ入力保護を使います。
+        if (this.isTouchInput) {
             this.onListTouchMove = (e) => {
                 const globalLoading = document.getElementById('global-loading-screen');
                 const aiGuard = document.getElementById('ai-guard');
@@ -290,7 +296,7 @@ class CustomScrollbar {
         this.onBtnUp = () => {
             const step = this.getScrollStep();
             if (typeof this.list.scrollBy === 'function') {
-                this.list.scrollBy({ top: -step, behavior: this.isMobile ? 'auto' : 'smooth' });
+                this.list.scrollBy({ top: -step, behavior: this.isTouchInput ? 'auto' : 'smooth' });
             } else {
                 this.list.scrollTop -= step;
             }
@@ -298,14 +304,14 @@ class CustomScrollbar {
         this.onBtnDown = () => {
             const step = this.getScrollStep();
             if (typeof this.list.scrollBy === 'function') {
-                this.list.scrollBy({ top: step, behavior: this.isMobile ? 'auto' : 'smooth' });
+                this.list.scrollBy({ top: step, behavior: this.isTouchInput ? 'auto' : 'smooth' });
             } else {
                 this.list.scrollTop += step;
             }
         };
 
         this.list.addEventListener('scroll', this.onListScroll, { passive: true });
-        if (this.isMobile) {
+        if (this.isTouchInput) {
             this.list.addEventListener('touchmove', this.onListTouchMove, { passive: false });
         }
         this.thumbY.addEventListener('mousedown', this.onStartY);
@@ -329,7 +335,7 @@ class CustomScrollbar {
         if (this.list) {
             this.list.classList.remove('hide-native-scroll');
             if (this.onListScroll) this.list.removeEventListener('scroll', this.onListScroll);
-            if (this.isMobile && this.onListTouchMove) this.list.removeEventListener('touchmove', this.onListTouchMove);
+            if (this.isTouchInput && this.onListTouchMove) this.list.removeEventListener('touchmove', this.onListTouchMove);
         }
         if (this.thumbY && this.onStartY) {
             this.thumbY.removeEventListener('mousedown', this.onStartY);

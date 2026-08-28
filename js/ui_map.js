@@ -1420,7 +1420,7 @@ Object.assign(UIManager.prototype, {
         // ★Round14：普段透明な全画面Canvasは常駐させません。
         // PCのhoverだけは頻繁に使うためPC時のみ先に確保し、
         // 地方ハイライト・キープ光・雪は実際に必要になった時だけ生成します。
-        if (document.body.classList.contains('is-pc')) {
+        if (document.body.classList.contains('is-pc') && !document.body.classList.contains('is-touch-input')) {
             this._ensureMapOverlayCanvas('hover-blink-overlay', 3);
         }
 
@@ -1559,7 +1559,7 @@ Object.assign(UIManager.prototype, {
             
             el.onmouseenter = () => {
                 // ★ここを書き足し：スマホ版の時は、カーソルを乗せた時の魔法（吹き出しなど）を使わないようにします！
-                if (!document.body.classList.contains('is-pc')) return;
+                if (!document.body.classList.contains('is-pc') || document.body.classList.contains('is-touch-input')) return;
 
                 const rect = el.getBoundingClientRect();
                 const containerRect = document.getElementById('map-scroll-container').getBoundingClientRect();
@@ -1588,7 +1588,7 @@ Object.assign(UIManager.prototype, {
 
             el.onmouseleave = () => {
                 // ★ここを書き足し：スマホ版の時は何もしません
-                if (!document.body.classList.contains('is-pc')) return;
+                if (!document.body.classList.contains('is-pc') || document.body.classList.contains('is-touch-input')) return;
 
                 el.classList.remove('tooltip-bottom', 'tooltip-left', 'tooltip-right');
 
@@ -1901,11 +1901,11 @@ Object.assign(UIManager.prototype, {
 
             // ★追加：名前シールにカーソルを合わせた時も、領土を光らせます！
             el.onmouseenter = () => {
-                if (!document.body.classList.contains('is-pc')) return;
+                if (!document.body.classList.contains('is-pc') || document.body.classList.contains('is-touch-input')) return;
                 this.drawClanHighlight('hover-blink-overlay', l.clanId, {r: 255, g: 255, b: 255}, 120);
             };
             el.onmouseleave = () => {
-                if (!document.body.classList.contains('is-pc')) return;
+                if (!document.body.classList.contains('is-pc') || document.body.classList.contains('is-touch-input')) return;
                 this.clearClanHighlight('hover-blink-overlay');
             };
             // ★追加ここまで！

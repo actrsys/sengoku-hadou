@@ -1618,15 +1618,17 @@ class UIInfoManager {
         if (!config.disableVirtualization && totalItems > VIRTUALIZE_THRESHOLD) {
             let rowHeight = 40; // 仮の行の高さ（実測できたら後で補正します）
             const isMobile = !document.body.classList.contains('is-pc');
+            const isTouchInput = document.body.classList.contains('is-touch-input');
             const BUFFER_ROWS = isMobile ? 10 : 15; // 低メモリ端末では画面外DOMを少しだけ減らします
             const WINDOW_STEP_ROWS = isMobile ? 4 : 2; // 数pxごとの全行作り直しを避け、見た目を変えずDOM churnを抑えます
             let lastRange = { start: -1, end: -1 };
 
             // 古いWebViewでは「仮想DOM差し替え」とCSS mandatory scroll-snapの組み合わせで、
             // snap対象が消えるたび次候補へ再評価され、指を離しても端まで自走することがあります。
-            // スマホの仮想一覧だけnative snapを止め、スクロール停止後の一回だけJSで行境界へ揃えます。
-            // PCと150件以下の通常一覧は従来のCSS snapをそのまま使います。
-            const useManagedMobileSnap = isMobile;
+            // タッチ入力の仮想一覧ではnative snapを止め、スクロール停止後の一回だけJSで行境界へ揃えます。
+            // 横向きタブレットがPCレイアウトでも、古いWebViewのsnap自走対策は外しません。
+            // マウス入力PCと150件以下の通常一覧は従来のCSS snapをそのまま使います。
+            const useManagedMobileSnap = isTouchInput;
             const previousInlineScrollSnapType = listContainer.style.scrollSnapType || '';
             let managedSnapTimer = null;
             if (useManagedMobileSnap) {

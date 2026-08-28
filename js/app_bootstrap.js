@@ -121,8 +121,8 @@
         return mobileUa || ipadDesktopUa || coarseTouchDevice;
     }
 
-    function resolveGameLayoutMode(layoutW, layoutH) {
-        if (!isTouchFirstDevice()) return 'pc';
+    function resolveGameLayoutMode(layoutW, layoutH, touchInput = isTouchFirstDevice()) {
+        if (!touchInput) return 'pc';
 
         // タッチ主体端末は縦持ちならスマホUIを正本にする。横持ちでも
         // PC論理画面を75%以上で収められない場合は、PC UIを押し潰さずスマホUIへ寄せる。
@@ -146,12 +146,16 @@
         // ソフトキーボードで縮む visualViewport ではなく、レイアウトviewportをモード判定の正本にする。
         const layoutW = window.innerWidth || windowW;
         const layoutH = window.innerHeight || windowH;
-        const layoutMode = resolveGameLayoutMode(layoutW, layoutH);
+        const isTouchInput = isTouchFirstDevice();
+        const layoutMode = resolveGameLayoutMode(layoutW, layoutH, isTouchInput);
         const isPC = layoutMode === 'pc';
         const previousLayoutMode = document.body.dataset.layoutMode || '';
 
         document.body.classList.toggle('is-pc', isPC);
+        // レイアウト方式と入力方式は別物。横向きタブレットはPCレイアウトでも入力はタッチのまま。
+        document.body.classList.toggle('is-touch-input', isTouchInput);
         document.body.dataset.layoutMode = layoutMode;
+        document.body.dataset.inputMode = isTouchInput ? 'touch' : 'mouse';
 
         screen.style.setProperty('--screen-edge-bleed', `${onePhysicalPixel}px`);
 

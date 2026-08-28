@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r300');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r301');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -10091,13 +10091,13 @@ test('仮想一覧のカスタムスクロールはドラッグ中だけsnapを�
 });
 
 
-test('スマホ仮想一覧はnative mandatory snapを使わず停止後の一回補正だけで行境界へ揃える', () => {
+test('タッチ入力の仮想一覧はPCレイアウトのタブレットでもnative mandatory snapを使わない', () => {
     const info = read('js/ui_info.js');
     const scroll = read('js/custom_scrollbar.js');
-    const at = info.indexOf('const useManagedMobileSnap = isMobile;');
+    const at = info.indexOf('const useManagedMobileSnap = isTouchInput;');
     const block = info.slice(at, at + 7200);
     assert.ok(at >= 0);
-    assert.ok(block.includes("listContainer.style.scrollSnapType = 'none';"), 'スマホ仮想一覧はnative snapを無効化する');
+    assert.ok(block.includes("listContainer.style.scrollSnapType = 'none';"), 'タッチ入力の仮想一覧はnative snapを無効化する');
     assert.ok(block.includes("listContainer.dataset.virtualManagedSnap = 'true';"), 'CustomScrollbarへmanaged snap中であることを明示する');
     assert.ok(block.includes('const scheduleManagedRowSnap = (delay = 120) => {'));
     assert.ok(block.includes('Math.round(currentScrollTop / rowHeight) * rowHeight'), '停止後に最寄り行へ一回だけ補正する');
@@ -10613,6 +10613,26 @@ test('途中観戦開始のAI作戦準備は開始時turn-flow世代を跨いで
     assert.ok(!block.includes('.finally(() => this.processTurn())'), '非同期作戦準備のfinallyから生processTurnを呼ばない');
 });
 
+
+
+test('PCレイアウトのタブレットはhover前提にせず既存タッチ代替操作を使う', () => {
+    const bootstrap = read('js/app_bootstrap.js');
+    const map = read('js/ui_map.js');
+    const fieldWar = read('js/field_war.js');
+    const ui = read('js/ui.js');
+    const css = read('css/style.css');
+
+    assert.ok(bootstrap.includes("document.body.classList.toggle('is-touch-input', isTouchInput);"));
+    assert.ok(map.includes("document.body.classList.contains('is-pc') && !document.body.classList.contains('is-touch-input')"), 'hover用全国Canvasをtouch PCで常駐させない');
+    assert.ok((map.match(/document\.body\.classList\.contains\('is-touch-input'\)/g) || []).length >= 5, '城/大名ラベルのmouseenter系もtouch入力では無効化する');
+    assert.ok(css.includes('body:not(.is-touch-input) .castle-card:hover .hover-info'), 'タッチSafariの擬似hoverで城tooltipを張り付かせない');
+    assert.ok(css.includes('.castle-card.current-turn .hover-info'), '現在ターン城の常時情報はhoverなしでも維持する');
+    assert.ok(fieldWar.includes("scrollEl.addEventListener('touchstart', touchStartHandler"), '野戦ズームにはtouch経路がある');
+    assert.ok(fieldWar.includes("scrollEl.addEventListener('touchmove', touchMoveHandler"));
+    assert.ok(read('js/ui_map.js').includes("sc.addEventListener('touchmove'"), '全国地図にもtouch移動/ピンチ経路がある');
+    assert.ok(ui.includes("document.addEventListener('touchstart', (e) => {"), '右クリック相当には既存長押し経路がある');
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);
@@ -10630,7 +10650,7 @@ test('タブレットを含む固定論理画面のPC/スマホ判定はapp_boot
     const scrollbar = read('js/custom_scrollbar.js');
     const css = read('css/style.css');
 
-    assert.ok(bootstrap.includes('function resolveGameLayoutMode(layoutW, layoutH)'));
+    assert.ok(bootstrap.includes('function resolveGameLayoutMode(layoutW, layoutH, touchInput = isTouchFirstDevice())'));
     assert.ok(bootstrap.includes("const ipadDesktopUa = /Macintosh/i.test(ua) && maxTouchPoints > 1;"), 'iPadOSのdesktop UAもタッチ端末として認識する');
     assert.ok(bootstrap.includes('const MIN_TOUCH_PC_SCALE = 0.75;'));
     assert.ok(bootstrap.includes("document.body.classList.toggle('is-pc', isPC);"));
@@ -10640,7 +10660,9 @@ test('タブレットを含む固定論理画面のPC/スマホ判定はapp_boot
     assert.ok(fieldWar.includes("window.addEventListener('game-layout-mode-change', refreshScale);"));
     assert.ok(bootstrap.includes('const layoutW = window.innerWidth || windowW;'), 'ソフトキーボードで縮むvisualViewportをmode判定へ使わない');
     assert.ok(!fieldWar.includes('window.innerWidth >= 768'), '野戦だけ物理幅でPCへ戻す例外を残さない');
-    assert.ok(scrollbar.includes("return !document.body.classList.contains('is-pc');"), 'カスタムスクロールもUAでなく論理modeへ従う');
+    assert.ok(scrollbar.includes("return !document.body.classList.contains('is-pc');"), '表示密度の判断は論理modeへ従う');
+    assert.ok(scrollbar.includes("return document.body.classList.contains('is-touch-input');"), 'スクロール入力安定化はレイアウトとは別にtouch入力へ従う');
+    assert.ok(bootstrap.includes("document.body.classList.toggle('is-touch-input', isTouchInput);"), '入力方式をbodyへ独立して公開する');
     assert.ok(!/navigator\.userAgent/.test(scrollbar), 'スクロール部品へ端末UA判定を複製しない');
     assert.ok(css.includes('body:not(.is-pc) #title-screen { padding: 14px; }'));
     assert.ok(css.includes('body:not(.is-pc) #scenario-modal .scenario-main'));
@@ -10691,6 +10713,8 @@ test('タブレットを含む固定論理画面のPC/スマホ判定はapp_boot
         return {
             isPc: bodyClasses.has('is-pc'),
             mode: context.document.body.dataset.layoutMode,
+            inputMode: context.document.body.dataset.inputMode,
+            isTouchInput: bodyClasses.has('is-touch-input'),
             width: screen.style.width,
             height: screen.style.height
         };
@@ -10698,11 +10722,13 @@ test('タブレットを含む固定論理画面のPC/スマホ判定はapp_boot
 
     const ipadDesktopUa = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15';
     const portraitTablet = runBootstrap({ width: 820, height: 1180, userAgent: ipadDesktopUa, maxTouchPoints: 5 });
-    assert.deepStrictEqual(portraitTablet, { isPc: false, mode: 'mobile', width: '663.75px', height: '1180px' });
+    assert.deepStrictEqual(portraitTablet, { isPc: false, mode: 'mobile', inputMode: 'touch', isTouchInput: true, width: '663.75px', height: '1180px' });
 
     const landscapeTablet = runBootstrap({ width: 1024, height: 768, userAgent: ipadDesktopUa, maxTouchPoints: 5 });
     assert.strictEqual(landscapeTablet.isPc, true);
     assert.strictEqual(landscapeTablet.mode, 'pc');
+    assert.strictEqual(landscapeTablet.inputMode, 'touch', 'PCレイアウトでもタブレット入力はtouchのまま');
+    assert.strictEqual(landscapeTablet.isTouchInput, true);
     assert.strictEqual(landscapeTablet.width, '1280px');
     assert.strictEqual(landscapeTablet.height, '720px');
 
@@ -10711,4 +10737,6 @@ test('タブレットを含む固定論理画面のPC/スマホ判定はapp_boot
 
     const narrowDesktop = runBootstrap({ width: 700, height: 1000, userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', maxTouchPoints: 0, coarse: false, hoverNone: false });
     assert.strictEqual(narrowDesktop.isPc, true, '通常PCは物理viewportが縦長でも従来どおりPC論理画面を維持する');
+    assert.strictEqual(narrowDesktop.inputMode, 'mouse');
+    assert.strictEqual(narrowDesktop.isTouchInput, false);
 });

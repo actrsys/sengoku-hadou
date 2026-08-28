@@ -487,7 +487,7 @@ body:not(.is-pc) #map-base-image { transform: translateZ(0); backface-visibility
 .castle-card { width: var(--map-tile-size); height: var(--map-tile-size); background-color: transparent; border: none; box-shadow: none; border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; padding: 2px; cursor: pointer; font-size: 0.75rem; position: absolute; transform: translate(-50%, -60%) scale(var(--castle-scale, 0.41)); z-index: 10; filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5)); }
 .castle-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url('../data/images/map/shiro_icon001.png'); background-size: contain; background-position: center; background-repeat: no-repeat; z-index: 2; pointer-events: none; }
 .castle-card::after { content: ""; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); width: 90%; height: 15%; background: rgba(0, 0, 0, 1.0); border-radius: 50%; z-index: 1; pointer-events: none; }
-.castle-card:hover { transform: translate(-50%, calc(-60% - 2px)) scale(var(--castle-scale, 0.41)); filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.5)); z-index: 100 !important; }
+body:not(.is-touch-input) .castle-card:hover { transform: translate(-50%, calc(-60% - 2px)) scale(var(--castle-scale, 0.41)); filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.5)); z-index: 100 !important; }
 .castle-card.active-turn { filter: drop-shadow(0 0 8px #ff9800); z-index: 15; }
 .castle-card.selectable-target { filter: drop-shadow(0 0 8px #e91e63); animation: pulse-shadow 1s infinite; z-index: 25; cursor: crosshair; }
 .castle-card.dimmed { opacity: 0.3; filter: grayscale(80%); }
@@ -495,17 +495,17 @@ body:not(.is-pc) #map-base-image { transform: translateZ(0); backface-visibility
 
 /* 城の光る縁取り（外交） */
 .castle-card.glow-blue { filter: drop-shadow(0 0 6px rgba(66, 165, 245, 0.8)) drop-shadow(0 0 10px rgba(30, 136, 229, 0.8)) !important; }
-.castle-card.glow-blue:hover { filter: drop-shadow(0 0 8px rgba(66, 165, 245, 1)) drop-shadow(0 0 12px rgba(30, 136, 229, 1)) !important; transform: translate(-50%, calc(-60% - 2px)) scale(var(--castle-scale, 0.41)); z-index: 100 !important; }
+body:not(.is-touch-input) .castle-card.glow-blue:hover { filter: drop-shadow(0 0 8px rgba(66, 165, 245, 1)) drop-shadow(0 0 12px rgba(30, 136, 229, 1)) !important; transform: translate(-50%, calc(-60% - 2px)) scale(var(--castle-scale, 0.41)); z-index: 100 !important; }
 .castle-card.glow-red { filter: drop-shadow(0 0 6px rgba(239, 83, 80, 0.8)) drop-shadow(0 0 10px rgba(229, 57, 53, 0.8)) !important; }
-.castle-card.glow-red:hover { filter: drop-shadow(0 0 8px rgba(239, 83, 80, 1)) drop-shadow(0 0 12px rgba(229, 57, 53, 1)) !important; transform: translate(-50%, calc(-60% - 2px)) scale(var(--castle-scale, 0.41)); z-index: 100 !important; }
+body:not(.is-touch-input) .castle-card.glow-red:hover { filter: drop-shadow(0 0 8px rgba(239, 83, 80, 1)) drop-shadow(0 0 12px rgba(229, 57, 53, 1)) !important; transform: translate(-50%, calc(-60% - 2px)) scale(var(--castle-scale, 0.41)); z-index: 100 !important; }
 .castle-card.glow-green { filter: drop-shadow(0 0 6px rgba(59, 255, 156, 0.8)) drop-shadow(0 0 10px rgba(67, 160, 71, 0.8)) !important; }
-.castle-card.glow-green:hover { filter: drop-shadow(0 0 8px rgba(59, 255, 156, 1)) drop-shadow(0 0 12px rgba(67, 160, 71, 1)) !important; transform: translate(-50%, calc(-60% - 2px)) scale(var(--castle-scale, 0.41)); z-index: 100 !important; }
+body:not(.is-touch-input) .castle-card.glow-green:hover { filter: drop-shadow(0 0 8px rgba(59, 255, 156, 1)) drop-shadow(0 0 12px rgba(67, 160, 71, 1)) !important; transform: translate(-50%, calc(-60% - 2px)) scale(var(--castle-scale, 0.41)); z-index: 100 !important; }
 
 /* 城のホバー情報 */
 .hover-info { position: absolute; bottom: 80%; left: -200%; right: -200%; margin: 0 auto; width: max-content; transform: scale(0.5); transform-origin: bottom center; background: rgba(0, 0, 0, 0.85); color: #fff; padding: 8px 15px; border-radius: 6px; border: 1px solid #777; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 0.15s ease-out, transform 0.15s ease-out; display: flex; flex-direction: column; align-items: flex-start; white-space: nowrap; z-index: 100; }
-.castle-card:hover .hover-info { opacity: 1; visibility: visible; transform: scale(1); }
+body:not(.is-touch-input) .castle-card:hover .hover-info { opacity: 1; visibility: visible; transform: scale(1); }
 .castle-card.current-turn .hover-info { opacity: 1; visibility: visible; transform: scale(1); z-index: 90; }
-#map-container:has(.castle-card:hover) .castle-card.current-turn:not(:hover) .hover-info { opacity: 0; visibility: hidden; transform: scale(0.5); }
+body:not(.is-touch-input) #map-container:has(.castle-card:hover) .castle-card.current-turn:not(:hover) .hover-info { opacity: 0; visibility: hidden; transform: scale(0.5); }
 .hover-info .info-line { font-size: 2.2em; line-height: 1.4; text-shadow: 1px 1px 2px #000; }
 .hover-info .name { font-size: 2.8em; font-weight: 900; color: #ffd700; margin-bottom: 5px; }
 
@@ -514,12 +514,12 @@ body.showing-daimyo-labels .hover-info { display: none !important; }
 
 /* ツールチップ位置ズラし */
 .castle-card.tooltip-left .hover-info { left: 0; right: auto; margin: 0; transform: scale(0.5); transform-origin: bottom left; }
-.castle-card.tooltip-left:hover .hover-info { transform: scale(1); }
+body:not(.is-touch-input) .castle-card.tooltip-left:hover .hover-info { transform: scale(1); }
 .castle-card.tooltip-right .hover-info { left: auto; right: 0; margin: 0; transform: scale(0.5); transform-origin: bottom right; }
-.castle-card.tooltip-right:hover .hover-info { transform: scale(1); }
+body:not(.is-touch-input) .castle-card.tooltip-right:hover .hover-info { transform: scale(1); }
 .castle-card.tooltip-bottom .hover-info { bottom: auto; top: 80%; transform-origin: top center; }
 .castle-card.tooltip-bottom:not(.tooltip-left):not(.tooltip-right) .hover-info { transform: scale(0.5); }
-.castle-card.tooltip-bottom:not(.tooltip-left):not(.tooltip-right):hover .hover-info { transform: scale(1); }
+body:not(.is-touch-input) .castle-card.tooltip-bottom:not(.tooltip-left):not(.tooltip-right):hover .hover-info { transform: scale(1); }
 .castle-card.tooltip-bottom.tooltip-left .hover-info { transform-origin: top left; }
 .castle-card.tooltip-bottom.tooltip-right .hover-info { transform-origin: top right; }
 
@@ -528,18 +528,18 @@ body.showing-daimyo-labels .hover-info { display: none !important; }
 .kunishu-icon-wrap { position: relative; width: 18px; height: 18px; cursor: pointer; }
 .kunishu-icon-img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transition: transform 0.2s; }
 .kunishu-icon-img.is-broken { display: none; }
-.kunishu-icon-wrap:hover .kunishu-icon-img { transform: scale(1.2); }
+body:not(.is-touch-input) .kunishu-icon-wrap:hover .kunishu-icon-img { transform: scale(1.2); }
 .kunishu-icon-wrap .kunishu-hover-info { bottom: 150%; left: 50%; right: auto; transform: translate(-50%, 0) scale(0.5) !important; transform-origin: bottom center; z-index: 110; opacity: 0 !important; visibility: hidden !important; }
-.kunishu-icon-wrap:hover .kunishu-hover-info { opacity: 1 !important; visibility: visible !important; transform: translate(-50%, 0) scale(1) !important; }
-.castle-card:has(.kunishu-icon-wrap:hover) > .hover-info:not(.kunishu-hover-info) { opacity: 0 !important; visibility: hidden !important; transform: scale(0.5) !important; }
+body:not(.is-touch-input) .kunishu-icon-wrap:hover .kunishu-hover-info { opacity: 1 !important; visibility: visible !important; transform: translate(-50%, 0) scale(1) !important; }
+body:not(.is-touch-input) .castle-card:has(.kunishu-icon-wrap:hover) > .hover-info:not(.kunishu-hover-info) { opacity: 0 !important; visibility: hidden !important; transform: scale(0.5) !important; }
 .castle-card.tooltip-left .kunishu-hover-info { left: 0 !important; transform: translate(0, 0) scale(0.5) !important; transform-origin: bottom left !important; }
-.castle-card.tooltip-left .kunishu-icon-wrap:hover .kunishu-hover-info { transform: translate(0, 0) scale(1) !important; }
+body:not(.is-touch-input) .castle-card.tooltip-left .kunishu-icon-wrap:hover .kunishu-hover-info { transform: translate(0, 0) scale(1) !important; }
 .castle-card.tooltip-right .kunishu-hover-info { left: auto !important; right: 0 !important; transform: translate(0, 0) scale(0.5) !important; transform-origin: bottom right !important; }
-.castle-card.tooltip-right .kunishu-icon-wrap:hover .kunishu-hover-info { transform: translate(0, 0) scale(1) !important; }
+body:not(.is-touch-input) .castle-card.tooltip-right .kunishu-icon-wrap:hover .kunishu-hover-info { transform: translate(0, 0) scale(1) !important; }
 
 /* 大名名ラベル */
 .daimyo-name-label { background: rgba(0, 0, 0, 0.8); border: 2px solid #d4af37; color: #fff; padding: 4px 10px; border-radius: 4px; font-size: 1.1rem; white-space: nowrap; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.5); z-index: 200; pointer-events: auto; cursor: pointer; transition: opacity 0.3s, transform 0.2s; }
-.daimyo-name-label:hover { background: rgba(50, 50, 50, 0.9) !important; border-color: #ffe066 !important; transform: translate(-50%, -100%) scale(1.05) !important; }
+body:not(.is-touch-input) .daimyo-name-label:hover { background: rgba(50, 50, 50, 0.9) !important; border-color: #ffe066 !important; transform: translate(-50%, -100%) scale(1.05) !important; }
 
 /* ★追加：大名選択の確認画面が出ている時は名前シールを隠す魔法 */
 body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
