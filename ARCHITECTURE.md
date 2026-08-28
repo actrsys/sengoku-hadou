@@ -568,3 +568,7 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 ## r297 追加監査：地図ズーム診断のシナリオ寿命
 - 地図ズームの実機診断は一時的に `map_zoom:start:<level>` を記録し、正常終了時に開始前checkpointへ戻す。ロード・タイトル復帰・新規開始で `resetMapViewState()` がズームrAFを中断する場合も、同じ診断終了処理を先に通して `_mapZoomPreviousDiagnostic` を解放する。旧シナリオの開始前checkpointを内部へ保持したまま次シナリオへ渡し、後日の正常なズーム終了時に古い停止位置をsessionStorageへ書き戻さない。地図座標・ズーム倍率・入力挙動は変更しない。
 
+## r298 追加監査：途中観戦開始のAI作戦準備寿命
+- ゲーム途中からAI観戦へ切り替える `startWatchMode()` は、直轄軍団0のAI作戦準備が大勢力時に協調yieldを挟む非同期処理であることを前提にする。準備開始時のTurnManager turn-flow世代・`currentIndex`・Castle参照を保持し、ロード・タイトル復帰・新規開始や別ターンへの遷移後に旧準備の `finally` から `processTurn()` を再開しない。
+- 作戦準備完了後のターン再開も生の `processTurn()` 呼出しへ戻さず、同じ文脈が有効な場合だけ `TurnManager.scheduleTurnFlowContinuation()` へ渡す。観戦開始中のAI作戦内容・候補順・観戦復帰予約の仕様は変更せず、シナリオ切替時の旧callbackだけを破棄する。
+

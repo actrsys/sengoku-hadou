@@ -1094,13 +1094,40 @@ class GameManager {
     startWatchMode() {
         // ゲーム途中から観戦する場合は、戻る時の参考として元の担当勢力を覚えておきます。
         const previousPlayerClanId = Number(this.playerClanId);
+        const turnManager = this.turnManager;
+        const watchFlowGeneration = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+            ? turnManager.captureTurnFlowGeneration()
+            : null;
+        const expectedIndex = Number(this.currentIndex);
+        const expectedCastle = this.turnQueue && Number.isInteger(expectedIndex)
+            ? this.turnQueue[expectedIndex] || null
+            : null;
+
         this._prepareFreshWatchMode(previousPlayerClanId);
         const prepare = this.aiOperationManager && typeof this.aiOperationManager.onClanBecameAIControlled === 'function'
             ? this.aiOperationManager.onClanBecameAIControlled(previousPlayerClanId)
             : null;
         Promise.resolve(prepare)
             .catch(error => console.error('観戦開始時のAI作戦準備に失敗しました:', error))
-            .finally(() => this.processTurn());
+            .finally(() => {
+                // AI作戦準備は大勢力では協調yieldを挟む。待機中にロード／タイトル復帰が入った場合、
+                // 準備完了後の旧processTurnを新シナリオへ持ち込まない。
+                if (this.phase !== 'game' || this.isRestoringSave || !this.isWatchMode) return;
+                if (watchFlowGeneration !== null
+                    && turnManager && typeof turnManager.isTurnFlowGenerationCurrent === 'function'
+                    && !turnManager.isTurnFlowGenerationCurrent(watchFlowGeneration)) return;
+                if (Number.isInteger(expectedIndex) && Number(this.currentIndex) !== expectedIndex) return;
+                if (expectedCastle && this.turnQueue && this.turnQueue[this.currentIndex] !== expectedCastle) return;
+
+                if (turnManager && typeof turnManager.scheduleTurnFlowContinuation === 'function') {
+                    turnManager.scheduleTurnFlowContinuation(() => this.processTurn(), 0, {
+                        expectedIndex: Number.isInteger(expectedIndex) ? expectedIndex : null,
+                        expectedCastle
+                    });
+                } else {
+                    this.processTurn();
+                }
+            });
     }
 
     // Round26：右クリック／長押しでは、その場で選択画面を出さず「帰還予約」だけを立てます。

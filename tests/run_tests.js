@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r297');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r298');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -10583,6 +10583,20 @@ test('AI外交の戦略価値比較は同じ主敵拠点配列を一候補リス
     assert.ok(block.includes('this.evaluateStrategicValue(myClanId, targetClanId, mainThreatId, strategicContext)'));
     assert.ok(block.includes('for (let tc of targetCastles)'));
     assert.ok(block.includes('for (let mc of threatCastles)'));
+});
+
+
+test('途中観戦開始のAI作戦準備は開始時turn-flow世代を跨いで旧processTurnを再開しない', () => {
+    const gameJs = read('js/game.js');
+    const startAt = gameJs.indexOf('startWatchMode() {');
+    const endAt = gameJs.indexOf('\n    // Round26：右クリック／長押しでは', startAt);
+    assert.ok(startAt >= 0 && endAt > startAt, 'startWatchMode本体を取得できる');
+    const block = gameJs.slice(startAt, endAt);
+    assert.ok(block.includes('const watchFlowGeneration = turnManager && typeof turnManager.captureTurnFlowGeneration'));
+    assert.ok(block.includes("!turnManager.isTurnFlowGenerationCurrent(watchFlowGeneration)"));
+    assert.ok(block.includes("this.phase !== 'game' || this.isRestoringSave || !this.isWatchMode"));
+    assert.ok(block.includes('turnManager.scheduleTurnFlowContinuation(() => this.processTurn(), 0, {'));
+    assert.ok(!block.includes('.finally(() => this.processTurn())'), '非同期作戦準備のfinallyから生processTurnを呼ばない');
 });
 
 Promise.all(pendingTests).then(() => {
