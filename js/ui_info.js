@@ -1373,53 +1373,6 @@ class UIInfoManager {
         }, onBack);
     }
 
-    showDaimyoPrisonerModal(prisoner, options = {}) {
-        this.ui.hideAIGuardTemporarily();
-
-        let hireBtnHtml = '';
-        if (!options.hideHire) {
-            hireBtnHtml = prisoner.hasRefusedHire
-                ? '<button class="btn-primary prisoner-refused-btn" disabled>拒否</button>'
-                : '<button class="btn-primary" data-prisoner-action="hire">登用</button>';
-        }
-
-        const titleText = options.hideHire ? '姫の処遇' : '敵大名 捕縛！';
-        const descText = options.hideHire
-            ? `<strong>${prisoner.name}</strong>を捕らえました。<br>処遇を決めてください。`
-            : `敵大名・<strong>${prisoner.name}</strong>を捕縛しました。<br>処遇を決めてください。`;
-
-        const buttonsHtml = options.hideHire
-            ? `
-                <button class="btn-secondary" data-prisoner-action="release">解放</button>
-                <button class="btn-primary" data-prisoner-action="keep">据置</button>
-                <button class="btn-danger" data-prisoner-action="kill">処断</button>
-            `
-            : `
-                ${hireBtnHtml}
-                <button class="btn-secondary" data-prisoner-action="release">解放</button>
-                <button class="btn-danger" data-prisoner-action="kill">処断</button>
-            `;
-
-        const content = `
-            <div class="prisoner-result">
-                <h3 class="prisoner-result-title">${titleText}</h3>
-                <p class="prisoner-result-desc">${descText}</p>
-                <div class="prisoner-result-actions">
-                    ${buttonsHtml}
-                </div>
-            </div>
-        `;
-        this.ui.showResultModal(content, null, "");
-
-        if (this.ui.resultBody) {
-            this.ui.resultBody.querySelectorAll('[data-prisoner-action]').forEach(button => {
-                button.addEventListener('click', () => {
-                    this.game.warManager.handleDaimyoPrisonerAction(button.dataset.prisonerAction);
-                });
-            });
-        }
-    }
-
     showSettingsModal() {
         const modal = document.getElementById('settings-modal');
         const bgmSlider = document.getElementById('setting-bgm-volume');

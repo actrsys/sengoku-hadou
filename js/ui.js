@@ -37,10 +37,6 @@ class UIManager {
         this.quantityContainer = document.getElementById('quantity-container'); 
         this.quantityConfirmBtn = document.getElementById('quantity-confirm-btn');
         this.mapGuide = document.getElementById('map-guide'); 
-        this.prisonerModal = document.getElementById('prisoner-modal');
-        this.prisonerList = document.getElementById('prisoner-list'); 
-        this.successionModal = document.getElementById('succession-modal');
-        this.successionList = document.getElementById('succession-list'); 
         this.resultModal = document.getElementById('result-modal');
         this.resultBody = document.getElementById('result-body'); 
         this.gunshiModal = document.getElementById('gunshi-modal');
@@ -555,7 +551,6 @@ class UIManager {
             visible('result-modal') ||
             visible('intercept-confirm-modal') ||
             visible('unit-divide-modal') ||
-            visible('prisoner-modal') ||
             visible('selector-modal') ||
             visible('quantity-modal') ||
             visible('war-modal') ||
@@ -642,7 +637,6 @@ class UIManager {
             isVisible('result-modal') ||
             isVisible('intercept-confirm-modal') ||
             isVisible('unit-divide-modal') ||
-            isVisible('prisoner-modal') ||
             isVisible('selector-modal') || 
             isVisible('quantity-modal') || 
             isVisible('war-modal') ||      // 戦争画面が開いている間も待ちます！
@@ -3713,45 +3707,6 @@ class UIManager {
         } else {
             this.warControls.classList.remove('disabled-area');
             if (guard) guard.classList.add('hidden');
-        }
-    }
-    
-    showPrisonerModal(captives) {
-        this.info.showPrisonerModal(captives);
-    }
-    closePrisonerModal() {
-        this.info.closePrisonerModal();
-    }
-    
-    showDaimyoPrisonerModal(prisoner) {
-        this.info.showDaimyoPrisonerModal(prisoner);
-    }
-    
-    showSuccessionModal(candidates, onSelect) {
-        if (!this.successionModal) return;
-        this.successionModal.classList.remove('hidden');
-        if (this.successionList) {
-            this.successionList.innerHTML = '';
-
-            const gunshi = this.game.getClanGunshi(this.game.playerClanId);
-            const myDaimyo = this.game.getClanDaimyo(this.game.playerClanId);
-
-            candidates.forEach(c => {
-                const div = document.createElement('div');
-                div.className = 'select-item succession-select-item';
-                
-                const getStat = (stat) => StatPresenter.getDisplayStatHTML(c, stat, gunshi, null, this.game.playerClanId, myDaimyo);
-
-                div.innerHTML = `
-                    <span class="succession-candidate-name">${c.name}</span> 
-                    <span class="succession-candidate-stats">統:${getStat('leadership')} 政:${getStat('politics')}</span>
-                `;
-                div.onclick = () => {
-                    this.successionModal.classList.add('hidden');
-                    onSelect(c.id);
-                };
-                this.successionList.appendChild(div);
-            });
         }
     }
     

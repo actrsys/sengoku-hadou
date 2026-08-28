@@ -2405,7 +2405,7 @@ Object.assign(WarManager.prototype, {
                 {
                     label: '処断',
                     className: 'btn-danger',
-                    onClick: () => this.handleDaimyoPrisonerAction(prisoner, 'kill')
+                    onClick: () => this.confirmDaimyoPrisonerKill(prisoner)
                 },
                 {
                     label: '解放',
@@ -2414,6 +2414,20 @@ Object.assign(WarManager.prototype, {
                 }
             ]
         });
+    },
+
+    confirmDaimyoPrisonerKill(prisoner) {
+        if (!prisoner) return;
+        this.game.ui.showDialog(`${prisoner.name}を本当に処断しますか？`, true,
+            () => this.handleDaimyoPrisonerAction(prisoner, 'kill'),
+            () => this.showDaimyoDialog(prisoner),
+            {
+                okText: '処断する',
+                okClass: 'btn-danger',
+                cancelText: '戻る',
+                cancelClass: 'btn-secondary'
+            }
+        );
     },
 
     async handleDaimyoPrisonerAction(prisoner, action) {
@@ -2767,7 +2781,7 @@ Object.assign(WarManager.prototype, {
                 releasedNames.push(prisoner.name);
             }
             if (releasedNames.length > 0) {
-                this.game.ui.log(`(捕虜となっていた${releasedNames.join('、')}を解放しました)`, { history: false });
+                this.game.ui.log(`（捕虜となっていた${releasedNames.join('、')}を解放しました）`, { history: false });
             }
         }
         

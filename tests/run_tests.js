@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r268');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r269');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -6985,6 +6985,63 @@ test('断交時のAI捕虜処遇はasync完了を待ってから結果を表示�
     assert.ok(diplomacy.includes('_convertCapturedHostageToPrisoner(record)'));
 });
 
+test('断交後にAIがプレイヤー人質を処遇しても元recordを保持して履歴化できる', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    ctx.LifeStatusRules = { isDead: busho => busho && busho.status === 'dead' };
+
+    const logs = [];
+    const dialogs = [];
+    const prisoners = [
+        { id: 11, name: '処断人質', clan: 1, status: 'active' },
+        { id: 12, name: '登用人質', clan: 1, status: 'active' },
+        { id: 13, name: '解放人質', clan: 1, status: 'active' }
+    ];
+    ctx.game = {
+        playerClanId: 1,
+        getClan(id) { return Number(id) === 2 ? { id: 2, name: '相手家' } : { id: 1, name: '自家' }; },
+        warManager: {
+            async autoResolvePrisoners(hostages, captorClanId) {
+                assert.strictEqual(Number(captorClanId), 2);
+                hostages[0].status = 'dead';
+                hostages[1].clan = 2;
+                hostages[2].clan = 1;
+            }
+        },
+        ui: {
+            log(msg, opts) { logs.push({ msg, opts }); },
+            async showDialogAsync(msg) { dialogs.push(msg); }
+        }
+    };
+    loadScript(ctx, 'js/diplomacy.js');
+    const manager = vm.runInContext('new DiplomacyManager(game)', ctx);
+    manager._convertCapturedHostageToPrisoner = () => {};
+    const records = prisoners.map(busho => ({ busho, originClanId: 1, captorClanId: 2 }));
+
+    await manager._resolveCapturedHostagesAfterBreak(records);
+
+    assert.strictEqual(logs.length, 3);
+    logs.forEach(entry => assert.deepStrictEqual(Array.from(entry.opts.clanIds), [1, 2]));
+    assert.ok(dialogs[0].includes('処断人質'));
+    assert.ok(dialogs[0].includes('登用人質'));
+    assert.ok(dialogs[0].includes('解放人質'));
+});
+
+test('不可逆な特殊処遇の処断は最終確認を挟む', () => {
+    const war = read('js/war_effort.js');
+    assert.ok(war.includes("onClick: () => this.confirmDaimyoPrisonerKill(prisoner)"));
+    assert.ok(war.includes('confirmDaimyoPrisonerKill(prisoner)'));
+    assert.ok(war.includes('`${prisoner.name}を本当に処断しますか？`'));
+    assert.ok(war.includes("okText: '処断する'"));
+    assert.ok(war.includes("cancelText: '戻る'"));
+
+    const diplomacy = read('js/diplomacy.js');
+    assert.ok(diplomacy.includes('`${princess.name}を本当に処断しますか？`'));
+    assert.ok(diplomacy.includes("{ label: '処断する', value: 'yes', className: 'btn-danger' }"));
+    assert.ok(diplomacy.includes("{ label: '戻る', value: 'no', className: 'btn-secondary' }"));
+});
+
 test('AIが断交して攻撃する場合も人質・姫の処遇完了を待ってから進む', () => {
     const ai = read('js/ai.js');
     const start = ai.indexOf('const breakResult = this.game.diplomacyManager.applyBreakAlliancePenalty');
@@ -9184,6 +9241,30 @@ test('ロード時の地図寸法確認Imageは次の巨大画像解析前に解
     assert.ok(block.includes('img.onload = null;'));
     assert.ok(block.includes('img.onerror = null;'));
     assert.ok(block.includes("img.src = '';"));
+});
+
+
+test('捕虜大名の旧専用UI経路を残さず正規処遇へ一本化する', () => {
+    const uiInfoSource = read('js/ui_info.js');
+    const uiSource = read('js/ui.js');
+    const warSource = read('js/war_effort.js');
+    assert.ok(!uiInfoSource.includes('showDaimyoPrisonerModal('));
+    assert.ok(!uiInfoSource.includes('data-prisoner-action'));
+    assert.ok(!uiSource.includes('showDaimyoPrisonerModal('));
+    assert.ok(warSource.includes('showDaimyoDialog(prisoner)'));
+    assert.ok(warSource.includes('confirmDaimyoPrisonerKill(prisoner)'));
+    assert.ok(warSource.includes("handleDaimyoPrisonerAction(prisoner, 'kill')"));
+});
+
+test('共通Selectorへ移行済みの捕虜・家督旧専用モーダル参照を残さない', () => {
+    const uiSource = read('js/ui.js');
+    const html = read('index.html');
+    assert.ok(!html.includes('id="prisoner-modal"'));
+    assert.ok(!html.includes('id="succession-modal"'));
+    assert.ok(!uiSource.includes('prisoner-modal'));
+    assert.ok(!uiSource.includes('succession-modal'));
+    assert.ok(!uiSource.includes('showPrisonerModal('));
+    assert.ok(!uiSource.includes('showSuccessionModal('));
 });
 
 Promise.all(pendingTests).then(() => {

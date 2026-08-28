@@ -393,14 +393,30 @@ class DiplomacyManager {
         const historyClanIds = [originClanId, holderClanId];
         const originClan = this.game.getClan(originClanId);
         const originClanName = originClan ? originClan.name : "他勢力";
-        const choice = await this._awaitDiplomacyChoice(
-            `${originClanName}から嫁いできた${princess.name}の処遇を決定してください。`,
-            [
-                { label: '据置', value: 'stay', className: 'btn-primary' },
-                { label: '処断', value: 'kill', className: 'btn-danger' },
-                { label: '送り返す', value: 'release', className: 'btn-secondary' }
-            ]
-        );
+        let choice = null;
+        while (!choice) {
+            const selected = await this._awaitDiplomacyChoice(
+                `${originClanName}から嫁いできた${princess.name}の処遇を決定してください。`,
+                [
+                    { label: '据置', value: 'stay', className: 'btn-primary' },
+                    { label: '処断', value: 'kill', className: 'btn-danger' },
+                    { label: '送り返す', value: 'release', className: 'btn-secondary' }
+                ]
+            );
+            if (selected !== 'kill') {
+                choice = selected;
+                break;
+            }
+
+            const killConfirmed = await this._awaitDiplomacyChoice(
+                `${princess.name}を本当に処断しますか？`,
+                [
+                    { label: '処断する', value: 'yes', className: 'btn-danger' },
+                    { label: '戻る', value: 'no', className: 'btn-secondary' }
+                ]
+            );
+            if (killConfirmed === 'yes') choice = 'kill';
+        }
 
         if (choice === 'stay') {
             await this.game.ui.showDialogAsync(
@@ -510,14 +526,15 @@ class DiplomacyManager {
                 const hostages = clanRecords.map(record => record.busho).filter(Boolean);
                 const clan = this.game.getClan(captorClanId);
                 const clanName = clan ? clan.name : "他勢力";
-                const playerOriginHostages = clanRecords
-                    .filter(record => Number(record.originClanId) === playerClanId)
-                    .map(record => record.busho)
-                    .filter(Boolean);
+                const playerOriginRecords = clanRecords
+                    .filter(record => Number(record.originClanId) === playerClanId && record.busho);
 
                 await this.game.warManager.autoResolvePrisoners(hostages, captorClanId);
 
-                playerOriginHostages.forEach(busho => {
+                // AI処遇後の表示でも「どの家からどの家へ送られていた人質か」を失わないよう、
+                // 武将だけへ写して元recordを捨てず、履歴の当事者IDも同じrecordを正本にする。
+                playerOriginRecords.forEach(record => {
+                    const busho = record.busho;
                     if (window.LifeStatusRules.isDead(busho)) {
                         aiResultMsgs.push(`人質として送っていた${busho.name}は${clanName}によって処断されました……`);
                         this.game.ui.log(`${busho.name}は${clanName}によって処断されました`, { clanIds: [record.originClanId, record.captorClanId], category: 'diplomacy', inferCurrentTurn: false });
