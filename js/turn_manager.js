@@ -35,6 +35,20 @@ class TurnManager {
             && !game.isRestoringSave;
     }
 
+    // Event/AI/Diplomacyなど専門部署がawait前後で同じシナリオ寿命か確認するための公開読取窓口。
+    // 世代値の更新責務はTurnManagerだけに残し、呼び出し側はtokenを比較するだけにします。
+    captureTurnFlowGeneration() {
+        return Number(this._turnFlowGeneration || 0);
+    }
+
+    isTurnFlowGenerationCurrent(generation) {
+        return this._isTurnFlowCurrent(generation);
+    }
+
+    scheduleTurnFlowContinuation(callback, delay = 0, options = {}) {
+        return this._scheduleTurnFlowContinuation(callback, delay, options);
+    }
+
     _cancelAllActionsDonePromptTimer() {
         if (!this._allActionsDonePromptTimer) return;
         clearTimeout(this._allActionsDonePromptTimer);

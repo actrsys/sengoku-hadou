@@ -2889,6 +2889,30 @@ class DiplomacyManager {
         }
     }
     
+    // AI→プレイヤー外交の結果画面後に旧ターンのcallbackを残さない。
+    // 完了通知はTurnManagerのturn-flow世代へ結び、ロード／タイトル復帰／別ターンへ進んだ後は実行しません。
+    _scheduleProposalCompletion(onComplete, delay = 100) {
+        if (typeof onComplete !== 'function') return null;
+        const game = this.game;
+        const turnManager = game && game.turnManager;
+        const expectedIndex = Number(game && game.currentIndex);
+        const expectedCastle = game && game.turnQueue && Number.isInteger(expectedIndex)
+            ? game.turnQueue[expectedIndex] || null
+            : null;
+
+        if (turnManager && typeof turnManager.scheduleTurnFlowContinuation === 'function') {
+            return turnManager.scheduleTurnFlowContinuation(onComplete, delay, {
+                expectedIndex: Number.isInteger(expectedIndex) ? expectedIndex : null,
+                expectedCastle
+            });
+        }
+
+        return setTimeout(() => {
+            if (!game || game.phase !== 'game' || game.isRestoringSave) return;
+            onComplete();
+        }, Math.max(0, Number(delay) || 0));
+    }
+
     /**
      * AIからプレイヤーへの外交提案を受ける処理です
      */
@@ -2971,22 +2995,22 @@ class DiplomacyManager {
                 const doerCastle = this.game.getCastle(doer.castleId);
                 if (doerCastle) doerCastle.gold = Math.min(99999, doerCastle.gold + gold);
                 this.game.ui.showResultModal(`親善の品を突き返しました。`, () => {
-                    if (onComplete) setTimeout(onComplete, 100);
+                    this._scheduleProposalCompletion(onComplete, 100);
                 });
             } else if (type === 'alliance') {
                 this.updateSentiment(doer.clan, targetClanId, window.MainParams.Diplomacy.FailureSentiment.Alliance);
                 this.game.ui.showResultModal(isVassalAllianceUpgrade ? `主従関係の解消と同盟への移行を見送りました。` : `同盟の提案を拒否しました。`, () => {
-                    if (onComplete) setTimeout(onComplete, 100);
+                    this._scheduleProposalCompletion(onComplete, 100);
                 });
             } else if (type === 'dominate') {
                 this.updateSentiment(doer.clan, targetClanId, window.MainParams.Diplomacy.FailureSentiment.Dominate);
                 this.game.ui.showResultModal(`従属の要求を断固として拒否しました！`, () => {
-                    if (onComplete) setTimeout(onComplete, 100);
+                    this._scheduleProposalCompletion(onComplete, 100);
                 });
             } else if (type === 'truce') {
                 this.updateSentiment(doer.clan, targetClanId, window.MainParams.Diplomacy.FailureSentiment.Alliance);
                 this.game.ui.showResultModal(`和睦の打診を拒否しました。`, () => {
-                    if (onComplete) setTimeout(onComplete, 100);
+                    this._scheduleProposalCompletion(onComplete, 100);
                 });
             }
         };
@@ -3014,7 +3038,7 @@ class DiplomacyManager {
                 this.updateSentiment(doer.clan, targetClanId, increase);
                 this.game.ui.log(`【外交】${targetClan.name}は${doerClan.name}からの親善を受け入れました。`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(`${doerClan.name}との関係が改善しました！`, () => {
-                    if (onComplete) setTimeout(onComplete, 100);
+                    this._scheduleProposalCompletion(onComplete, 100);
                 });
             } else if (type === 'alliance') {
                 this.applyAllianceData(doer.clan, targetClanId);
@@ -3024,14 +3048,14 @@ class DiplomacyManager {
                     : `【外交】${targetClan.name}は${doerClan.name}と同盟を結びました。`;
                 this.game.ui.log(allianceLog, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(isVassalAllianceUpgrade ? `${doerClan.name}との主従関係を解き、同盟を結びました！` : `${doerClan.name}と同盟を結びました！`, () => {
-                    if (onComplete) setTimeout(onComplete, 100);
+                    this._scheduleProposalCompletion(onComplete, 100);
                 });
             } else if (type === 'dominate') {
                 this.applyDominationData(doer.clan, targetClanId);
 
                 this.game.ui.log(`【外交】${targetClan.name}は${doerClan.name}に従属しました。`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(`${doerClan.name}に従属しました……`, () => {
-                    if (onComplete) setTimeout(onComplete, 100);
+                    this._scheduleProposalCompletion(onComplete, 100);
                 });
             } else if (type === 'truce') {
                 this.changeStatus(doer.clan, targetClanId, '和睦', 6);
@@ -3042,7 +3066,7 @@ class DiplomacyManager {
 
                 this.game.ui.log(`【外交】${targetClan.name}は${doerClan.name}と和睦しました。`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(`${doerClan.name}と和睦しました。`, () => {
-                    if (onComplete) setTimeout(onComplete, 100);
+                    this._scheduleProposalCompletion(onComplete, 100);
                 });
             }
         };
@@ -3130,7 +3154,7 @@ class DiplomacyManager {
                 this.calcDiplomacyExp(doer, type, true, true);
                 this.game.ui.log(`【外交】${targetClan.name}は${doerClan.name}と条件付きで和睦しました。`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(`${doerClan.name}と和睦しました。${conditionMsg}`, () => {
-                    if (onComplete) setTimeout(onComplete, 100);
+                    this._scheduleProposalCompletion(onComplete, 100);
                 });
             };
 

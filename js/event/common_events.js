@@ -436,13 +436,44 @@ window.EventMapEffects = window.EventMapEffects || (() => {
             if (castleId >= 0 && castleId < groupByCastleId.length) groupByCastleId[castleId] = groupId;
         });
 
+        // 台風の円判定は同じ行を何度も走査します。巨大な別TypedArrayは作らず、
+        // 実際に参照された行だけ「同一groupIdの連続区間」へ遅延変換して再利用します。
+        // groupId=0（城でない画素）は保持しないため、旧1px判定と同じ当たり集合を軽く確認できます。
+        const groupRunsByRow = new Array(height);
+        const getGroupRunsForRow = (y) => {
+            const rowY = Number(y);
+            if (!Number.isInteger(rowY) || rowY < 0 || rowY >= height) return [];
+            if (groupRunsByRow[rowY]) return groupRunsByRow[rowY];
+
+            const runs = [];
+            const rowOffset = rowY * width;
+            let currentGroupId = 0;
+            let runStart = 0;
+            for (let x = 0; x < width; x++) {
+                const castleId = pixelCastleMap[rowOffset + x] || 0;
+                const groupId = castleId < groupByCastleId.length ? groupByCastleId[castleId] : 0;
+                if (groupId === currentGroupId) continue;
+                if (currentGroupId !== 0) runs.push(runStart, x - 1, currentGroupId);
+                currentGroupId = groupId;
+                runStart = x;
+            }
+            if (currentGroupId !== 0) runs.push(runStart, width - 1, currentGroupId);
+            groupRunsByRow[rowY] = runs;
+            return runs;
+        };
+        const clearGroupRuns = () => {
+            for (let i = 0; i < groupRunsByRow.length; i++) groupRunsByRow[i] = null;
+        };
+
         castleColorIndexCache = {
             signature,
             width,
             height,
             pixelCastleMap,
             groupByCastleId,
-            castleGroupById
+            castleGroupById,
+            getGroupRunsForRow,
+            clearGroupRuns
         };
         if (diagPrefix) writeDiag(game, `${diagPrefix}:castle_index_done`);
         return castleColorIndexCache;
@@ -526,6 +557,17 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
     const diagName = diagNameMap[eventType] || 'province_effect';
     const diagPrefix = `event_effect:${diagName}`;
     const fx = window.EventMapEffects;
+    const turnManager = game && game.turnManager;
+    const turnFlowGeneration = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+        ? turnManager.captureTurnFlowGeneration()
+        : null;
+    const isCurrentEventFlow = () => {
+        if (!game || (game.phase !== undefined && game.phase !== 'game') || game.isRestoringSave) return false;
+        if (turnFlowGeneration !== null && turnManager && typeof turnManager.isTurnFlowGenerationCurrent === 'function') {
+            return turnManager.isTurnFlowGenerationCurrent(turnFlowGeneration);
+        }
+        return true;
+    };
     const isMobileWatch = !!(
         game && game.isProcessingAI && game.isWatchMode &&
         typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')
@@ -537,6 +579,11 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
     // この災害だけ診断できるようprefixを渡します。表示・自動閉じ時間は従来どおりです。
     await game.ui.showDialogAsync(initialMsg, false, 0, { diagnosticPrefix: diagPrefix });
     fx.writeDiag(game, `${diagPrefix}:dialog_done`);
+    // 強制リセットで会話待ちが解除された後、旧シナリオの災害地図を新ゲームへ生成しません。
+    if (!isCurrentEventFlow()) {
+        fx.writeDiag(game, `${diagPrefix}:flow_cancelled_after_dialog`);
+        return;
+    }
 
     let mapOverlay = null;
     try {
@@ -599,6 +646,11 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
         }
     }
 
+    if (!isCurrentEventFlow()) {
+        fx.writeDiag(game, `${diagPrefix}:flow_cancelled_after_overlay`);
+        return;
+    }
+
     const playerAffectedProvinces = new Set();
     game.castles.forEach(c => {
         if (c.ownerClan === game.playerClanId && affectedProvIds.has(c.provinceId)) {
@@ -616,7 +668,10 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
         else if (eventType === '疫病') msg = `${pName}で恐ろしい疫病が猛威を振るっています……`;
         else if (eventType === '地震') msg = `${pName}で大地震による甚大な被害が出ています……`;
         else if (eventType === '大雪') msg = `${pName}は深い雪に閉ざされています……`;
-        if (msg) await game.ui.showDialogAsync(msg, false, 0);
+        if (msg) {
+            await game.ui.showDialogAsync(msg, false, 0);
+            if (!isCurrentEventFlow()) return;
+        }
     }
 };
 

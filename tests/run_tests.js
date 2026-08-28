@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r291');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r292');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -9353,7 +9353,7 @@ test('災害イベント地図の描画失敗は暗幕を後始末して結果�
 test('台風イベント地図は途中例外でもfinallyで通常地図へ復帰する', () => {
     const source = read('js/event/typhoon_event.js');
     const at = source.indexOf('execute: async function(game)');
-    const block = source.slice(at, at + 18000);
+    const block = source.slice(at, at + 22000);
     assert.ok(block.includes('let overlayCleaned = false;'));
     assert.ok(block.includes('if (!canvas)'));
     assert.ok(block.includes("console.warn('台風の地図演出を途中で省略しました:'"));
@@ -10330,6 +10330,76 @@ test('イベント地図の観戦自動送りtimerは先行タップ時に解放
     assert.ok(block.includes('let autoDismissTimer = null;'));
     assert.ok(block.includes('clearTimeout(autoDismissTimer);'));
     assert.ok(block.includes('autoDismissTimer = setTimeout(onTouch, 1000)'));
+});
+
+
+test('AI城ターンはイベント・捕虜処遇・作戦・内政await後に同じturn-flowだけを継続する', () => {
+    const ai = read('js/ai.js');
+    const execAt = ai.indexOf('async execAI(castle)');
+    const execEnd = ai.indexOf('\n    decideAttackTarget(', execAt);
+    const internalAt = ai.indexOf('async execInternalAffairs(', execEnd);
+    const execBlock = ai.slice(execAt, execEnd);
+    assert.ok(execBlock.includes('const turnFlowContext = this._captureTurnFlowContext(castle);'));
+    assert.ok(execBlock.includes("await this.game.eventManager.processEvents('before_command', castle);"));
+    assert.ok(execBlock.includes('await this.game.diplomacyManager.resolveBreakAllianceConsequences(breakResult);'));
+    assert.ok(execBlock.includes('await this.game.aiOperationManager.generateOperation(castle.ownerClan, castle.legionId);'));
+    assert.ok(execBlock.includes('await this.execInternalAffairs(castle, castellan, mods, smartness, turnFlowContext);'));
+    assert.ok((execBlock.match(/if \(!isCurrentTurnFlow\(\)\) return;/g) || []).length >= 4, '主要await後に旧AIターンを再開しない');
+    assert.ok(!execBlock.includes('this.game.finishTurn();'), 'execAI本体は生のfinishTurnで新ターンを進めない');
+    assert.ok(execBlock.includes('this._finishTurnForContext(turnFlowContext)'));
+    const internalBlock = ai.slice(internalAt, internalAt + 9000);
+    assert.ok(internalBlock.includes('const isCurrentTurnFlow = () => !turnFlowContext || this._isTurnFlowContextCurrent(turnFlowContext);'));
+    assert.ok(internalBlock.includes('await new Promise(resolve => setTimeout(resolve, 0));'));
+    assert.ok(internalBlock.includes('if (!isCurrentTurnFlow()) return;'));
+});
+
+test('AIからプレイヤーへの外交結果完了はTurnManager世代へ結び旧100ms callbackを残さない', () => {
+    const diplomacy = read('js/diplomacy.js');
+    const helperAt = diplomacy.indexOf('_scheduleProposalCompletion(onComplete, delay = 100)');
+    const proposalAt = diplomacy.indexOf('proposeDiplomacyToPlayer(', helperAt);
+    const helperBlock = diplomacy.slice(helperAt, proposalAt);
+    assert.ok(helperBlock.includes('turnManager.scheduleTurnFlowContinuation(onComplete, delay'));
+    assert.ok(helperBlock.includes('expectedIndex'));
+    assert.ok(helperBlock.includes('expectedCastle'));
+    const proposalBlock = diplomacy.slice(proposalAt, diplomacy.indexOf('\n    /**', proposalAt + 100));
+    assert.ok((proposalBlock.match(/this\._scheduleProposalCompletion\(onComplete, 100\)/g) || []).length >= 9);
+    assert.ok(!proposalBlock.includes('setTimeout(onComplete, 100)'));
+});
+
+test('観戦再開の0ms processTurnもTurnManager寿命窓口を使う', () => {
+    const game = read('js/game.js');
+    const helperAt = game.indexOf('_scheduleWatchTurnResume()');
+    const stopAt = game.indexOf('stopWatchMode()', helperAt);
+    const block = game.slice(helperAt, stopAt + 2200);
+    assert.ok(block.includes('turnManager.scheduleTurnFlowContinuation(resume, 0'));
+    assert.ok((block.match(/this\._scheduleWatchTurnResume\(\)/g) || []).length >= 2);
+    assert.ok(!block.includes('setTimeout(() => this.processTurn(), 0)'));
+});
+
+test('共通災害は初回会話後にturn-flowを再確認し旧シナリオへ地図を生成しない', () => {
+    const events = read('js/event/common_events.js');
+    const at = events.indexOf('window.playProvinceMapEffect = async function');
+    const block = events.slice(at, events.indexOf('\n// ==========================================\n// ★ 面談', at));
+    assert.ok(block.includes('captureTurnFlowGeneration'));
+    assert.ok(block.includes('isTurnFlowGenerationCurrent'));
+    assert.ok(block.includes('flow_cancelled_after_dialog'));
+    assert.ok(block.indexOf('if (!isCurrentEventFlow())') < block.indexOf('fx.createOverlay(game, { diagPrefix })'));
+    assert.ok(block.includes('flow_cancelled_after_overlay'));
+});
+
+test('台風の城当たり判定は行別短命run索引で旧1px命中集合を保ちスマホ観戦は点滅しない', () => {
+    const events = read('js/event/common_events.js');
+    const typhoon = read('js/event/typhoon_event.js');
+    assert.ok(events.includes('const getGroupRunsForRow = (y) => {'));
+    assert.ok(events.includes('const clearGroupRuns = () => {'));
+    assert.ok(events.includes('getGroupRunsForRow,\n            clearGroupRuns'));
+    assert.ok(typhoon.includes("const getGroupRunsForRow = typeof castleIndex.getGroupRunsForRow === 'function'"));
+    assert.ok(typhoon.includes('const span = Math.sqrt(remain);'));
+    assert.ok(typhoon.includes('const runs = getGroupRunsForRow(y);'));
+    assert.ok(typhoon.includes("damagedProvinceMap.size > 0 && !isMobileWatch ? 'blink 1s 2' : ''"));
+    assert.ok(typhoon.includes("writeDiag('visual_mobile_watch_static');"));
+    assert.ok(typhoon.includes("writeDiag('flow_cancelled_after_dialog');"));
+    assert.ok(typhoon.includes("castleIndex.clearGroupRuns();"));
 });
 
 Promise.all(pendingTests).then(() => {

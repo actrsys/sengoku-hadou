@@ -1180,6 +1180,27 @@ class GameManager {
         }
     }
 
+    // 観戦復帰で止めていたターンを再開する予約もTurnManagerの寿命管理へ統合します。
+    // 0msでもロード／タイトル復帰と競合し得るため、生のsetTimeoutからprocessTurnを呼びません。
+    _scheduleWatchTurnResume() {
+        const resume = () => this.processTurn();
+        const turnManager = this.turnManager;
+        if (turnManager && typeof turnManager.scheduleTurnFlowContinuation === 'function') {
+            const expectedIndex = Number(this.currentIndex);
+            const expectedCastle = this.turnQueue && Number.isInteger(expectedIndex)
+                ? this.turnQueue[expectedIndex] || null
+                : null;
+            return turnManager.scheduleTurnFlowContinuation(resume, 0, {
+                expectedIndex: Number.isInteger(expectedIndex) ? expectedIndex : null,
+                expectedCastle
+            });
+        }
+        return setTimeout(() => {
+            if (this.phase !== 'game' || this.isRestoringSave) return;
+            resume();
+        }, 0);
+    }
+
     // 帰還確認・勢力選択をキャンセルした時は、止めていた安全地点から観戦を再開します。
     cancelQueuedWatchReturn() {
         const shouldResume = this.isWatchMode;
@@ -1195,7 +1216,7 @@ class GameManager {
                 this.ui.updateAIProgress(displayIndex, this.turnQueue.length);
             }
         }
-        setTimeout(() => this.processTurn(), 0);
+        this._scheduleWatchTurnResume();
     }
 
     stopWatchMode() {
@@ -1231,7 +1252,7 @@ class GameManager {
                 this.ui.renderMap();
 
                 // Round26：安全地点でAI進行を止めているため、担当勢力決定後に明示的に再開します。
-                setTimeout(() => this.processTurn(), 0);
+                this._scheduleWatchTurnResume();
             }, () => {
                 this.cancelQueuedWatchReturn();
             }, {

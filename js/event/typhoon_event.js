@@ -28,6 +28,21 @@ window.GameEvents.push({
         const SHOW_TYPHOON_PATH = true;
         const fx = window.EventMapEffects;
         const diagPrefix = 'event_effect:typhoon';
+        const turnManager = game && game.turnManager;
+        const turnFlowGeneration = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+            ? turnManager.captureTurnFlowGeneration()
+            : null;
+        const isCurrentEventFlow = () => {
+            if (!game || (game.phase !== undefined && game.phase !== 'game') || game.isRestoringSave) return false;
+            if (turnFlowGeneration !== null && turnManager && typeof turnManager.isTurnFlowGenerationCurrent === 'function') {
+                return turnManager.isTurnFlowGenerationCurrent(turnFlowGeneration);
+            }
+            return true;
+        };
+        const isMobileWatch = !!(
+            game && game.isProcessingAI && game.isWatchMode &&
+            typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')
+        );
         const writeDiag = (stage) => {
             if (fx && typeof fx.writeDiag === 'function') fx.writeDiag(game, `${diagPrefix}:${stage}`);
             else if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic(`${diagPrefix}:${stage}`);
@@ -35,7 +50,12 @@ window.GameEvents.push({
 
         if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
         writeDiag('dialog');
-        await game.ui.showDialogAsync("台風が接近しています……", false, 0);
+        await game.ui.showDialogAsync("台風が接近しています……", false, 0, { diagnosticPrefix: diagPrefix });
+        writeDiag('dialog_done');
+        if (!isCurrentEventFlow()) {
+            writeDiag('flow_cancelled_after_dialog');
+            return;
+        }
 
         // ★Round16：イベント用地図は通常マップと独立しているため、裏側のズームは触りません。
         // 旧版の map-reset-zoom.click() は、巨大マップ再ラスタライズとイベントCanvas確保を
@@ -79,12 +99,13 @@ window.GameEvents.push({
         }
         const { mapOverlay, mapContainer } = overlayParts;
         let overlayCleaned = false;
+        let castleIndex = null;
 
         try {
         // ゲーム開始時に作った共有の城IDマップを再利用します。
         // 台風専用に巨大画像や全画面TypedArrayを作り直さず、城IDから小さなgroup表だけを引きます。
         writeDiag('castle_index');
-        const castleIndex = await fx.ensureCastleColorIndex(game, diagPrefix);
+        castleIndex = await fx.ensureCastleColorIndex(game, diagPrefix);
 
         const pathData = [];
         const damagedCastleMap = new Map();
@@ -95,6 +116,9 @@ window.GameEvents.push({
             const pixelCastleMap = castleIndex.pixelCastleMap;
             const groupByCastleId = castleIndex.groupByCastleId;
             const castleGroupById = castleIndex.castleGroupById;
+            const getGroupRunsForRow = typeof castleIndex.getGroupRunsForRow === 'function'
+                ? castleIndex.getGroupRunsForRow
+                : null;
 
             let r = Math.pow(Math.random(), 3);
             let typhoonX = -500 + (r * (width * 0.7 + 500));
@@ -127,23 +151,50 @@ window.GameEvents.push({
                 if (typhoonX > -typhoonRadius && typhoonX < width + typhoonRadius &&
                     typhoonY > -typhoonRadius && typhoonY < height + typhoonRadius) {
                     const rSq = typhoonRadius * typhoonRadius;
-                    const startX = Math.max(0, Math.floor(typhoonX - typhoonRadius));
-                    const endX = Math.min(width - 1, Math.ceil(typhoonX + typhoonRadius));
                     const startY = Math.max(0, Math.floor(typhoonY - typhoonRadius));
                     const endY = Math.min(height - 1, Math.ceil(typhoonY + typhoonRadius));
 
-                    // 判定密度は旧版と同じ1ピクセル単位です。
-                    for (let y = startY; y <= endY; y++) {
-                        const row = y * width;
-                        for (let x = startX; x <= endX; x++) {
-                            const dx = x - typhoonX;
+                    if (getGroupRunsForRow) {
+                        // 旧版と同じ「円内の1pxでも城色groupがあれば命中」を保ったまま、
+                        // 円の全画素を毎ステップ総当たりせず、各行の城色連続区間との交差だけを確認します。
+                        for (let y = startY; y <= endY; y++) {
                             const dy = y - typhoonY;
-                            if (dx * dx + dy * dy > rSq) continue;
-                            const castleId = pixelCastleMap[row + x];
-                            const groupId = castleId < groupByCastleId.length ? groupByCastleId[castleId] : 0;
-                            if (groupId !== 0) {
-                                damagedGroupIds.add(groupId);
-                                onCastle = true;
+                            const remain = rSq - (dy * dy);
+                            if (remain < 0) continue;
+                            const span = Math.sqrt(remain);
+                            const rowStartX = Math.max(0, Math.ceil(typhoonX - span));
+                            const rowEndX = Math.min(width - 1, Math.floor(typhoonX + span));
+                            if (rowStartX > rowEndX) continue;
+
+                            const runs = getGroupRunsForRow(y);
+                            for (let i = 0; i < runs.length; i += 3) {
+                                const runStart = runs[i];
+                                const runEnd = runs[i + 1];
+                                if (runEnd < rowStartX) continue;
+                                if (runStart > rowEndX) break;
+                                const groupId = runs[i + 2];
+                                if (groupId !== 0) {
+                                    damagedGroupIds.add(groupId);
+                                    onCastle = true;
+                                }
+                            }
+                        }
+                    } else {
+                        // 共有索引を利用できない旧環境だけ、従来の1px判定へフォールバックします。
+                        const startX = Math.max(0, Math.floor(typhoonX - typhoonRadius));
+                        const endX = Math.min(width - 1, Math.ceil(typhoonX + typhoonRadius));
+                        for (let y = startY; y <= endY; y++) {
+                            const row = y * width;
+                            for (let x = startX; x <= endX; x++) {
+                                const dx = x - typhoonX;
+                                const dy = y - typhoonY;
+                                if (dx * dx + dy * dy > rSq) continue;
+                                const castleId = pixelCastleMap[row + x];
+                                const groupId = castleId < groupByCastleId.length ? groupByCastleId[castleId] : 0;
+                                if (groupId !== 0) {
+                                    damagedGroupIds.add(groupId);
+                                    onCastle = true;
+                                }
                             }
                         }
                     }
@@ -246,7 +297,7 @@ window.GameEvents.push({
                 game,
                 affectedProvIds,
                 { r: 0, g: 0, b: 255, a: 180 },
-                { animation: damagedProvinceMap.size > 0 ? 'blink 1s 2' : '', diagPrefix }
+                { animation: damagedProvinceMap.size > 0 && !isMobileWatch ? 'blink 1s 2' : '', diagPrefix }
             );
 
             if (!canvas) {
@@ -287,10 +338,22 @@ window.GameEvents.push({
 
                     mapContainer.appendChild(canvas);
                     writeDiag('visual_done');
-                    await new Promise(resolve => setTimeout(resolve, 0));
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    canvas.style.animation = 'none';
-                    canvas.style.opacity = '1.0';
+                    if (isMobileWatch) {
+                        // 共通災害と同じく、古いスマホのAI観戦では大型Canvasの連続opacity合成を避けます。
+                        canvas.style.animation = 'none';
+                        canvas.style.opacity = '1.0';
+                        writeDiag('visual_mobile_watch_static');
+                        await new Promise(resolve => {
+                            if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
+                            else setTimeout(resolve, 0);
+                        });
+                        writeDiag('visual_presented');
+                    } else {
+                        await new Promise(resolve => setTimeout(resolve, 0));
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        canvas.style.animation = 'none';
+                        canvas.style.opacity = '1.0';
+                    }
 
                     writeDiag('wait_input');
                     await fx.waitForDismiss(game, mapOverlay);
@@ -304,6 +367,10 @@ window.GameEvents.push({
             await fx.cleanupOverlay(mapOverlay);
             overlayCleaned = true;
             writeDiag('cleanup_done');
+            if (!isCurrentEventFlow()) {
+                writeDiag('flow_cancelled_after_overlay');
+                return;
+            }
 
             if (damagedProvinceMap.size > 0) {
                 let maxDamageScale = 0;
@@ -324,14 +391,22 @@ window.GameEvents.push({
         } else {
             await fx.cleanupOverlay(mapOverlay);
             overlayCleaned = true;
+            if (!isCurrentEventFlow()) {
+                writeDiag('flow_cancelled_after_overlay');
+                return;
+            }
             await game.ui.showDialogAsync("今回は大きな被害はなかったようです。", false, 0);
         }
 
         await new Promise(resolve => setTimeout(resolve, 1000));
+        if (!isCurrentEventFlow()) return;
         for (const data of damagedPlayerCastles) {
             await game.ui.showDialogAsync(`${data.castle.name}が台風の被害を受けました……`, false, 0);
+            if (!isCurrentEventFlow()) return;
         }
         } finally {
+            // 行別の台風当たり判定索引はイベント中だけの短命cacheとし、古いスマホへ保持し続けません。
+            if (castleIndex && typeof castleIndex.clearGroupRuns === 'function') castleIndex.clearGroupRuns();
             // 進路計算・Canvas・入力待ちのどこで例外が出ても、暗幕と通常地図の休止を残さない。
             if (!overlayCleaned && mapOverlay && fx && typeof fx.cleanupOverlay === 'function') {
                 try {

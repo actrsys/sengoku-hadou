@@ -10,6 +10,34 @@ class AIEngine {
         this.game = game;
     }
 
+    _captureTurnFlowContext(castle) {
+        const turnManager = this.game && this.game.turnManager;
+        return {
+            generation: turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+                ? turnManager.captureTurnFlowGeneration()
+                : null,
+            index: Number(this.game && this.game.currentIndex),
+            castle: castle || null
+        };
+    }
+
+    _isTurnFlowContextCurrent(context) {
+        const game = this.game;
+        if (!context || !game || game.phase !== 'game' || game.isRestoringSave) return false;
+        const turnManager = game.turnManager;
+        if (context.generation !== null && turnManager && typeof turnManager.isTurnFlowGenerationCurrent === 'function'
+            && !turnManager.isTurnFlowGenerationCurrent(context.generation)) return false;
+        if (Number(game.currentIndex) !== Number(context.index)) return false;
+        if (context.castle && (!game.turnQueue || game.turnQueue[game.currentIndex] !== context.castle)) return false;
+        return true;
+    }
+
+    _finishTurnForContext(context) {
+        if (!this._isTurnFlowContextCurrent(context)) return false;
+        this.game.finishTurn();
+        return true;
+    }
+
     // ★追加：大名の威信（daimyoPrestige）を取り出す魔法です！
     getClanPrestige(clanId) {
         const numericClanId = Number(clanId);
@@ -51,14 +79,18 @@ class AIEngine {
     }
     
     async execAI(castle) {
+        const turnFlowContext = this._captureTurnFlowContext(castle);
+        const isCurrentTurnFlow = () => this._isTurnFlowContextCurrent(turnFlowContext);
         try {
             // ★追加：AIが考え始める前に一瞬だけ処理を休ませて（息継ぎをして）、スマホがパンクするのを防ぎます！
             await new Promise(resolve => setTimeout(resolve, 0));
+            if (!isCurrentTurnFlow()) return;
             if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'exec:start');
             
             // ★イベント追加：コマンドの選択前（AI操作時）
             if (this.game.eventManager) {
                 await this.game.eventManager.processEvents('before_command', castle);
+                if (!isCurrentTurnFlow()) return;
             }
 
             // ★軽量化：このAI思考中に威信を最新化した勢力を記録します。
@@ -80,7 +112,7 @@ class AIEngine {
 
             const castellan = this.game.getBusho(castle.castellanId);
             if (!castellan || castellan.isActionDone) { 
-                this.game.finishTurn(); 
+                this._finishTurnForContext(turnFlowContext); 
                 return; 
             }
             
@@ -90,7 +122,7 @@ class AIEngine {
             
             if (isRelocated) {
                 // お引越しをしたなら、このお城のターンはおしまいです！
-                this.game.finishTurn();
+                this._finishTurnForContext(turnFlowContext);
                 return;
             }
             
@@ -197,6 +229,7 @@ class AIEngine {
                                                     // 断交で発生した人質・婚姻の処遇も、攻撃へ進む前に必ず完了させる。
                                                     // プレイヤーが拘束側なら既存の捕虜処遇UIを戦後処理なしで再利用する。
                                                     await this.game.diplomacyManager.resolveBreakAllianceConsequences(breakResult);
+                                                    if (!isCurrentTurnFlow()) return;
                                                     isStillEnemy = breakResult.becameHostile === true;
                                                 }
                                             } else if (!rel || !this.game.diplomacyManager.isNonAggression(rel.status)) {
@@ -217,6 +250,7 @@ class AIEngine {
                     if (!canReach || !isStillEnemy) {
                         delete this.game.aiOperationManager.operations[castle.ownerClan][castle.legionId];
                         await this.game.aiOperationManager.generateOperation(castle.ownerClan, castle.legionId);
+                        if (!isCurrentTurnFlow()) return;
                     } else {
                         // ★追加：自分のお城か目的地が大雪になっていないかチェックをします！
                         let isHeavySnow = false;
@@ -313,8 +347,9 @@ class AIEngine {
 
             // ★追加：緊急の修復や施しを行ったら、戦争などは行わずに残りの内政のみ行います
             if (emergencyActionDone) {
-                await this.execInternalAffairs(castle, castellan, mods, smartness);
-                this.game.finishTurn();
+                await this.execInternalAffairs(castle, castellan, mods, smartness, turnFlowContext);
+                if (!isCurrentTurnFlow()) return;
+                this._finishTurnForContext(turnFlowContext);
                 return;
             }
 
@@ -370,18 +405,19 @@ class AIEngine {
                     if (Math.random() < diplomacyChance) {
                         const dipResult = this.execAIDiplomacy(castle, castellan, smartness, myClan.currentDiplomacyTarget); 
                         if (dipResult === 'waiting') return; // プレイヤーのお返事待ちならここで一旦ストップ！
-                        if (castellan.isActionDone) { this.game.finishTurn(); return; }
+                        if (castellan.isActionDone) { this._finishTurnForContext(turnFlowContext); return; }
                     }
                 }
             }
             
             // 内政フェーズ (軍事行動をしなかった場合)
-            await this.execInternalAffairs(castle, castellan, mods, smartness);
-            this.game.finishTurn();
+            await this.execInternalAffairs(castle, castellan, mods, smartness, turnFlowContext);
+            if (!isCurrentTurnFlow()) return;
+            this._finishTurnForContext(turnFlowContext);
 
         } catch(e) {
             console.error("AI Logic Error:", e);
-            this.game.finishTurn();
+            this._finishTurnForContext(turnFlowContext);
         }
     }
 
@@ -1507,7 +1543,9 @@ class AIEngine {
         this.game.kunishuSystem.executeKunishuSubjugate(sourceCastle, Number(kunishu.castleId), sorted.map(b => b.id), sendSoldiers, sendRice, sendHorses, sendGuns, kunishu);
     }
     
-    async execInternalAffairs(castle, castellan, mods, smartness) {
+    async execInternalAffairs(castle, castellan, mods, smartness, turnFlowContext = null) {
+        const isCurrentTurnFlow = () => !turnFlowContext || this._isTurnFlowContextCurrent(turnFlowContext);
+        if (!isCurrentTurnFlow()) return;
         if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'internal:start');
 
         // ① 大名を取得します（全体で使う用）
@@ -1663,6 +1701,7 @@ class AIEngine {
         for (let step = 0; step < maxActions; step++) {
             // ★追加：スマホの強制リロード対策。行動を1回考えるごとに一瞬「息継ぎ」をして、ブラウザのフリーズを防ぎます！
             await new Promise(resolve => setTimeout(resolve, 0));
+            if (!isCurrentTurnFlow()) return;
 
             // ★毎回、AIが安全に使えるお金（給金と余裕分を引いた額）を計算します！
             const availableGold = EconomyRules.calcAvailableGoldForAI(castle, this.game);
