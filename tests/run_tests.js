@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r261');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r262');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -4630,7 +4630,9 @@ test('武将寿命のゲーム中変更は LifeSystem を唯一の正規窓口�
     assert.ok(common.includes("id: 'common_interview_doctor'") && common.includes("timing: 'interview_after_greeting'"), '医師延命を面談コモンイベントとして登録する');
     assert.ok(common.includes("const returnToInterviewTop = typeof context.returnToInterviewTop === 'function'"), '医師イベントは面談トップ復帰コールバックを使う');
     assert.ok(!common.includes('const endInterview ='), '医師イベントに面談全体を閉じる専用コールバックを残さない');
-    assert.ok((common.match(/returnToInterviewTop/g) || []).length >= 5, '成功・資金不足・辞退を面談トップ復帰へ統一する');
+    assert.ok(common.includes("['金が足りないため、医師を呼べませんでした……'],\n                                resumeInterview,"), '資金不足なら同じ武将の通常会話へ復帰する');
+    assert.ok(common.includes("label: '診せない'") && common.includes('onClick: resumeInterview'), '医師を辞退したら同じ武将の通常会話へ進める');
+    assert.ok(common.includes("[`${busho.name}は少し顔色が良くなったようです。`],\n                            returnToInterviewTop,"), '治療成功後だけ面談トップへ戻す');
     assert.ok(common.includes('hasBattleDeathLifespanExtension(busho)'), '従来どおり討死初期延命済み武将には医師延命を重ねない');
     assert.ok(common.includes('game.lifeSystem.setLifespanModifier(busho, this.id, extensionYears)'), '医師コモンイベントは寿命変更をLifeSystemへ委譲する');
     assert.ok(!interview.includes("'system:battle_death_initial'"), '面談側は討死補正sourceIdを直接知らない');
@@ -4642,6 +4644,70 @@ test('武将寿命のゲーム中変更は LifeSystem を唯一の正規窓口�
         const src = read(file);
         assert.ok(!/\.endYear\s*(?:\+?=|-=)/.test(src), `${file} に寿命の直接書換を残さない`);
     }
+});
+
+test('医師面談は辞退・資金不足でも通常会話を塞がない', () => {
+    const common = read('js/event/common_events.js');
+    const doctorStart = common.indexOf("id: 'common_interview_doctor'");
+    const doctorEnd = common.indexOf('// ==========================================\n// ★ ゲーム開始時：特定武将の寿命延長', doctorStart);
+    assert.ok(doctorStart >= 0 && doctorEnd > doctorStart, '医師イベント範囲を取得できる');
+    const doctor = common.slice(doctorStart, doctorEnd);
+
+    const noDoctorPos = doctor.indexOf("label: '診せない'");
+    assert.ok(noDoctorPos >= 0, '診せない選択肢が存在する');
+    assert.ok(doctor.slice(noDoctorPos, noDoctorPos + 320).includes('onClick: resumeInterview'), '診せないは同じ武将の会話メニューへ進む');
+
+    const noGoldPos = doctor.indexOf('金が足りないため、医師を呼べませんでした');
+    assert.ok(noGoldPos >= 0, '資金不足メッセージが存在する');
+    assert.ok(doctor.slice(noGoldPos, noGoldPos + 260).includes('resumeInterview'), '資金不足後も同じ武将の会話メニューへ進む');
+
+    const successPos = doctor.indexOf('少し顔色が良くなったようです');
+    assert.ok(successPos >= 0, '治療成功メッセージが存在する');
+    assert.ok(doctor.slice(successPos, successPos + 260).includes('returnToInterviewTop'), '治療成功後は面談トップへ戻る');
+});
+
+test('医師面談の選択後遷移は辞退・資金不足・治療成功で正しく分かれる', async () => {
+    const ctx = createContext({ GameEvents: [], Promise, setTimeout, clearTimeout });
+    loadScript(ctx, 'js/event/common_events.js');
+    const doctor = ctx.GameEvents.find(event => event && event.id === 'common_interview_doctor');
+    assert.ok(doctor, '医師イベントを登録できる');
+
+    async function runScenario(gold, label) {
+        let choices = null;
+        let messageCallback = null;
+        let resumed = 0;
+        let returnedTop = 0;
+        const castle = { gold };
+        const busho = { id: 1, name: '試験武将', birthYear: 1500, endYear: 1560 };
+        const view = {
+            showPrompt(_busho, _message, promptChoices) { choices = promptChoices; },
+            showMessages(_busho, _messages, callback) { messageCallback = callback; }
+        };
+        const game = {
+            ui: { interviewView: view },
+            getCurrentTurnCastle: () => castle,
+            lifeSystem: {
+                setLifespanModifier() {},
+                hasLifespanModifier: () => false,
+                hasBattleDeathLifespanExtension: () => false
+            }
+        };
+
+        await doctor.execute(game, {
+            busho,
+            resumeInterview: () => { resumed++; },
+            returnToInterviewTop: () => { returnedTop++; }
+        });
+        const choice = choices && choices.find(item => item.label === label);
+        assert.ok(choice, `${label} の選択肢を取得できる`);
+        choice.onClick();
+        if (messageCallback) messageCallback();
+        return { resumed, returnedTop, gold: castle.gold };
+    }
+
+    assert.deepStrictEqual(await runScenario(500, '診せない'), { resumed: 1, returnedTop: 0, gold: 500 });
+    assert.deepStrictEqual(await runScenario(100, '医師に診せる'), { resumed: 1, returnedTop: 0, gold: 100 });
+    assert.deepStrictEqual(await runScenario(500, '医師に診せる'), { resumed: 0, returnedTop: 1, gold: 300 });
 });
 
 test('討死武将の初期延命は LifeSystem が従来ルールを再現する', () => {

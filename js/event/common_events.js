@@ -633,10 +633,12 @@ window.GameEvents.push({
                     className: 'btn-primary',
                     onClick: () => {
                         if (!castle || Number(castle.gold || 0) < 200) {
+                            // 治療できなかっただけで面談自体を中断しない。
+                            // 同じ武将の通常会話へ進めない再発ループを防ぐ。
                             view.showMessages(
                                 busho,
                                 ['金が足りないため、医師を呼べませんでした……'],
-                                returnToInterviewTop,
+                                resumeInterview,
                                 '面談',
                                 { narration: true }
                             );
@@ -664,7 +666,9 @@ window.GameEvents.push({
                 {
                     label: '診せない',
                     className: 'btn-secondary',
-                    onClick: returnToInterviewTop
+                    // 辞退した場合は同じ武将との通常会話を続ける。
+                    // 面談トップへ戻すと再選択時に同じ医師イベントが再発し、会話へ進めない。
+                    onClick: resumeInterview
                 }
             ],
             '面談',
