@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r301');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r302');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -10251,7 +10251,8 @@ test('月初月末とAI予約はシナリオ世代をまたいでロード・タ
     assert.ok(startBlock.includes('await game.ui.showCutin'));
     assert.ok(startBlock.includes('if (!isCurrentFlow()) return;'));
     assert.ok(endBlock.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);'));
-    assert.ok(endBlock.includes('return isCurrentFlow();'), '月末ダイアログ待ち後も同じ世代だけ続行する');
+    assert.ok(endBlock.includes('if (!isCurrentFlow()) return false;'), '月末ダイアログ待ち後も同じ世代だけ続行する');
+    assert.ok(endBlock.includes('return true;'), '重複待機を除いても有効世代だけ次段へ進める');
     const scheduleAt = turn.indexOf('_scheduleAITurn(castle)');
     const scheduleBlock = turn.slice(scheduleAt, turn.indexOf('async processTurn()', scheduleAt));
     assert.ok(scheduleBlock.includes('const turnFlowGeneration = Number(this._turnFlowGeneration || 0);'));
@@ -10631,6 +10632,28 @@ test('PCレイアウトのタブレットはhover前提にせず既存タッチ�
     assert.ok(fieldWar.includes("scrollEl.addEventListener('touchmove', touchMoveHandler"));
     assert.ok(read('js/ui_map.js').includes("sc.addEventListener('touchmove'"), '全国地図にもtouch移動/ピンチ経路がある');
     assert.ok(ui.includes("document.addEventListener('touchstart', (e) => {"), '右クリック相当には既存長押し経路がある');
+});
+
+
+
+test('月初月末の処理ラベルは会話直後に即復帰せず短い会話間ギャップを吸収する', () => {
+    const ui = read('js/ui.js');
+    const uiMap = read('js/ui_map.js');
+    const turn = read('js/turn_manager.js');
+
+    assert.ok(ui.includes("this._processingStatusRevealTimer = null;"));
+    assert.ok(ui.includes("this._processingStatusRevealDeferred = false;"));
+    assert.ok(ui.includes("_deferProcessingStatusReveal(delayMs = 1200)"), '会話後の処理ラベルは1.2秒の静穏期間後だけ復帰する');
+    assert.ok(ui.includes("const deferredProcessingStatus = !!(this._processingStatusText && this.game && this.game.isProcessingAI);"));
+    assert.ok(ui.includes("if (deferredProcessingStatus) this._deferProcessingStatusReveal(1200);"));
+    assert.ok(ui.includes("this.clearProcessingStatus();"), 'AI城進捗へ切り替える時は月次ラベルの遅延状態を破棄する');
+    assert.ok(uiMap.includes("(this.guardTextHiddenCount || 0) > 0 || this._processingStatusRevealDeferred"), 'hide-textの正本に遅延復帰状態も含める');
+
+    const waitAt = turn.indexOf('const waitIfBusy = async () => {');
+    const waitEnd = turn.indexOf('// ==========================================', waitAt + 1);
+    const waitBlock = turn.slice(waitAt, waitEnd);
+    assert.ok(waitBlock.includes('await game.ui.waitForDialogs();'));
+    assert.ok(!waitBlock.includes('setTimeout(resolve, 300)'), 'waitForDialogs後の重複300ms待機を残さない');
 });
 
 Promise.all(pendingTests).then(() => {

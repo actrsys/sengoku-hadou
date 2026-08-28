@@ -2321,7 +2321,7 @@ Object.assign(UIManager.prototype, {
         const guard = this.aiGuard || document.getElementById('ai-guard');
         if (!guard) return;
         
-        if ((this.guardTextHiddenCount || 0) > 0) {
+        if ((this.guardTextHiddenCount || 0) > 0 || this._processingStatusRevealDeferred) {
             guard.classList.add('hide-text');
         } else {
             guard.classList.remove('hide-text');

@@ -483,6 +483,7 @@ class TurnManager {
             } else {
                 // 直轄（今まで通りプレイヤーが動かす）の場合
                 game.isProcessingAI = false; 
+                if (game.ui && typeof game.ui.clearProcessingStatus === 'function') game.ui.clearProcessingStatus();
                 if (typeof document !== 'undefined' && document.body) document.body.classList.remove('mobile-ai-light-mode');
                 if (game.ui && typeof game.ui.recoverMobileMapResources === 'function') game.ui.recoverMobileMapResources();
                 game.writeSystemDiagnostic('player_turn:enter', castle);
@@ -604,9 +605,10 @@ class TurnManager {
                 await game.ui.waitForDialogs();
             }
             if (!isCurrentFlow()) return false;
-            // 少しだけ隙間を待つ（メッセージが連続で出るときの安全対策です）
-            await new Promise(resolve => setTimeout(resolve, 300));
-            return isCurrentFlow();
+            // waitForDialogs() 自身が、会話消失後に500ms＋100msの猶予を持っています。
+            // ここでさらに固定300msを足すと、その間だけ「月末処理中…」が復帰して
+            // 次の会話との間でチラつくため、重複待機は置きません。
+            return true;
         };
         // ==========================================
     
