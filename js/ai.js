@@ -465,11 +465,13 @@ class AIEngine {
                 const prev = {};
                 this.game.castles.forEach(c => dist[c.id] = Infinity); // 最初は全部「無限遠」にしておきます
                 const queue = [];
+                const queuedCastleIds = new Set();
                 
                 // 自分の領地は「距離0」として出発点にします
                 myClanCastles.forEach(c => {
                     dist[c.id] = 0;
                     queue.push(c.id);
+                    queuedCastleIds.add(c.id);
                 });
                 
                 // 道が繋がっているお城を順番に調べていきます
@@ -487,6 +489,7 @@ class AIEngine {
                     }
                     if (u === -1) break;
                     queue.splice(uIdx, 1);
+                    queuedCastleIds.delete(u);
                     
                     const uCastle = this.game.getCastle(u);
                     if (!uCastle.adjacentCastleIds) continue;
@@ -520,8 +523,9 @@ class AIEngine {
                             if (dist[u] + cost < dist[vCastle.id]) {
                                 dist[vCastle.id] = dist[u] + cost;
                                 prev[vCastle.id] = u; // どこから来たかメモしておきます
-                                if (!queue.includes(vCastle.id)) {
+                                if (!queuedCastleIds.has(vCastle.id)) {
                                     queue.push(vCastle.id);
+                                    queuedCastleIds.add(vCastle.id);
                                 }
                             }
                         }
@@ -696,6 +700,31 @@ class AIEngine {
         // ★自分がいる国が大雪かどうか調べます！
         const isSrcHeavySnow = heavySnowProvIds.has(myCastle.provinceId);
 
+        // この1回の攻撃候補比較中は城兵数も諸勢力関係も変化しません。
+        // 候補ごとに同じ勢力の全城reduce・自領全拠点の諸勢力走査を繰り返さない短命キャッシュです。
+        const clanSoldierTotalCache = new Map();
+        const getClanTotalSoldiersForDecision = (clanId) => {
+            const id = Number(clanId) || 0;
+            if (!clanSoldierTotalCache.has(id)) {
+                clanSoldierTotalCache.set(id, this.game.getClanTotalSoldiers(id) || 0);
+            }
+            return clanSoldierTotalCache.get(id);
+        };
+        let hostileKunishuCountForDecision = null;
+        const getHostileKunishuCountForDecision = () => {
+            if (hostileKunishuCountForDecision !== null) return hostileKunishuCountForDecision;
+            let count = 0;
+            myClanCastles.forEach(c => {
+                const ks = this.game.kunishuSystem.getKunishusInCastle(c.id);
+                if (!ks) return;
+                ks.forEach(k => {
+                    if (k.getRelation(myClanId) <= 30 && k.ideology !== '商人') count++;
+                });
+            });
+            hostileKunishuCountForDecision = count;
+            return count;
+        };
+
         enemies.forEach(target => {
             // ★目的地が大雪か調べます！
             // ★諸勢力も自領の別のお城にいるかもしれないので、ターゲットの国の天気を見ます
@@ -768,17 +797,7 @@ class AIEngine {
 
                 // ★自領内にいる敵対諸勢力（関係30以下で商人以外）の数を数えて、
                 // その数 × 5点 分だけスコアを上乗せします！
-                let totalHostileKunishus = 0;
-                myClanCastles.forEach(c => {
-                    const ks = this.game.kunishuSystem.getKunishusInCastle(c.id);
-                    if (ks) {
-                        ks.forEach(k => {
-                            if (k.getRelation(myClanId) <= 30 && k.ideology !== '商人') {
-                                totalHostileKunishus++;
-                            }
-                        });
-                    }
-                });
+                const totalHostileKunishus = getHostileKunishuCountForDecision();
                 prob += (totalHostileKunishus * 5); // 領内に敵対している諸勢力が多いほど優先度が上がります
 
                 // ★国内平定が方針の時は、最優先で諸勢力を鎮圧します！
@@ -875,7 +894,7 @@ class AIEngine {
                 if (c.id === 0 || c.id === myCastle.ownerClan || c.id === target.ownerClan) return;
                 
                 // その大名から来てくれそうな兵士数を予想します（大体の目安として総兵力の15%くらいと予想）
-                const trueClanPower = this.game.getClanTotalSoldiers(c.id) || 0;
+                const trueClanPower = getClanTotalSoldiersForDecision(c.id);
                 let expectedReinf = (trueClanPower * 0.15) * errorRate; // ここでも智謀で見誤る魔法がかかります！
                 
                 // 自分が呼べそうか？（同盟等で仲良し＆相手とは仲良くない）

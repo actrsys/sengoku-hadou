@@ -7,6 +7,26 @@ class TurnManager {
     constructor(game) {
         this.game = game;
         this._allActionsDonePromptTimer = null;
+        // 月初・月末・AI予約など「通常ターン進行」の寿命。ロード／タイトル復帰／新規開始で進め、
+        // await後や遅延callbackが次シナリオの状態へ戻らないための単一世代境界にします。
+        this._turnFlowGeneration = 0;
+    }
+
+    abortForScenarioTransition() {
+        this._turnFlowGeneration = Number(this._turnFlowGeneration || 0) + 1;
+        this._cancelAllActionsDonePromptTimer();
+        if (this.game && this.game.aiTimer) {
+            clearTimeout(this.game.aiTimer);
+            this.game.aiTimer = null;
+        }
+    }
+
+    _isTurnFlowCurrent(generation) {
+        const game = this.game;
+        return Number(this._turnFlowGeneration || 0) === Number(generation)
+            && !!game
+            && game.phase === 'game'
+            && !game.isRestoringSave;
     }
 
     _cancelAllActionsDonePromptTimer() {
@@ -17,6 +37,9 @@ class TurnManager {
 
     async startMonth() { 
         const game = this.game;
+        const turnFlowGeneration = Number(this._turnFlowGeneration || 0);
+        const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);
+        if (!isCurrentFlow()) return;
         this._cancelAllActionsDonePromptTimer();
         game.hasAutoSavedThisMonth = false; // ★月が替わったので、オートセーブ済みの印を消します
         game.writeSystemDiagnostic('month_start:start');
@@ -45,6 +68,7 @@ class TurnManager {
         }
         
         await game.ui.showCutin(`${game.year}年 ${game.month}月`);
+        if (!isCurrentFlow()) return;
 
         // 日付カットイン後の月次更新が長い端末でも固まって見えないよう、
         // 既存のAIガードをそのまま月初準備表示として再利用する。
@@ -55,6 +79,7 @@ class TurnManager {
             } else {
                 await new Promise(resolve => setTimeout(resolve, 0));
             }
+            if (!isCurrentFlow()) return;
         }
         
         game.ui.log(`=== ${game.year}年 ${game.month}月 ===`, { history: false });
@@ -62,20 +87,24 @@ class TurnManager {
         // 月初イベント【前】をチェックして実行します
         if (game.eventManager) {
             await game.eventManager.processEvents('startMonth_before');
+            if (!isCurrentFlow()) return;
             game.writeSystemDiagnostic('month_start:event_before_done');
         }
         
         // 元服の処理が終わるまでしっかり待ちます！
         await game.lifeSystem.processStartMonth();
+        if (!isCurrentFlow()) return;
         game.writeSystemDiagnostic('month_start:life_done');
         
         // 武将の下野（出奔）が終わるまで待ちます！
         await game.factionSystem.processStartMonth(); 
+        if (!isCurrentFlow()) return;
         game.writeSystemDiagnostic('month_start:faction_done');
     
         // ★安定化：全国派閥再編などで作った一時配列を解放できるよう、
         // 次の全国処理へ入る前にブラウザへ一度制御を返します。
-        await new Promise(resolve => setTimeout(resolve, 0));        
+        await new Promise(resolve => setTimeout(resolve, 0));
+        if (!isCurrentFlow()) return;
         game.affiliationSystem.processRoninMovements();
         
         game.updateAllCastlesLords();
@@ -131,6 +160,7 @@ class TurnManager {
             // 複数の大名が受かった場合は、一人ずつ順番にお知らせを出します
             for (const msg of promotionMsgs) {
                 await game.ui.showDialogAsync(msg, false, 0);
+                if (!isCurrentFlow()) return;
             }
             
             // 官位をもらったことで威信が増えるので、念のためもう一度最新の威信を計算し直しておきます！
@@ -142,6 +172,7 @@ class TurnManager {
         // ここで9月の兵糧収穫イベントなどが実行されます！
         if (game.eventManager) {
             await game.eventManager.processEvents('startMonth_after');
+            if (!isCurrentFlow()) return;
             game.writeSystemDiagnostic('month_start:event_after_done');
         }
     
@@ -171,10 +202,12 @@ class TurnManager {
         if (game.aiStaffing) {
             game.writeSystemDiagnostic('month_start:staffing:start');
             await game.aiStaffing.processQuarterlyStaffing(game.month, game.playerClanId);
+            if (!isCurrentFlow()) return;
         }
         game.writeSystemDiagnostic('month_start:staffing_done');
         if (game.aiOperationManager) {
             await game.aiOperationManager.processMonthlyOperations();
+            if (!isCurrentFlow()) return;
         }
         game.writeSystemDiagnostic('month_start:operations_done');
 
@@ -190,6 +223,7 @@ class TurnManager {
                 game.ui.releaseMobileTransientMapResources();
             }
             await new Promise(resolve => setTimeout(resolve, 0));
+            if (!isCurrentFlow()) return;
             try {
                 game.ui.renderMap();
                 game._aiDeferredMapRefresh = false;
@@ -198,6 +232,7 @@ class TurnManager {
                 } else {
                     await new Promise(resolve => setTimeout(resolve, 0));
                 }
+                if (!isCurrentFlow()) return;
                 game.writeSystemDiagnostic('month_start:watch_map_refresh:done');
             } catch (error) {
                 console.warn('観戦中の月次地図再描画を延期しました:', error);
@@ -211,6 +246,7 @@ class TurnManager {
         // Round26：月末～月初の一連処理中に観戦終了が予約されていた場合は、
         // ここを「月処理が完全に一段落した安全地点」として帰還確認へ移ります。
         if (await game.tryProcessQueuedWatchReturn('month_start_complete')) return;
+        if (!isCurrentFlow()) return;
     
         game.processTurn();
     }
@@ -218,6 +254,7 @@ class TurnManager {
     /** 委任城・他勢力で共通のAIターン開始処理。 */
     _scheduleAITurn(castle) {
         const game = this.game;
+        const turnFlowGeneration = Number(this._turnFlowGeneration || 0);
         game.isProcessingAI = true;
         // AI進行中は操作できないため、スマホでは背面マップの非必須Canvas/フィルタを外して
         // GPUメモリの余裕を作ります。戦闘演出は必要時に小さなCanvasを作り直します。
@@ -239,6 +276,7 @@ class TurnManager {
 
         const delay = 30;
         game.aiTimer = setTimeout(async () => {
+            if (!this._isTurnFlowCurrent(turnFlowGeneration)) return;
             if (game.warManager.state.active) return;
             if (game.turnQueue[game.currentIndex] !== castle) return;
             try {
@@ -461,6 +499,9 @@ class TurnManager {
 
     async endMonth() {
         const game = this.game;
+        const turnFlowGeneration = Number(this._turnFlowGeneration || 0);
+        const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);
+        if (!isCurrentFlow()) return;
         game.writeSystemDiagnostic('month_end:start');
 
         // 月末の派閥・独立・外交・寿命などは端末によって数秒かかることがあるため、
@@ -472,6 +513,7 @@ class TurnManager {
             } else {
                 await new Promise(resolve => setTimeout(resolve, 0));
             }
+            if (!isCurrentFlow()) return;
         }
         // ==========================================
         // ★ 新しい一元管理の魔法：「画面にメッセージが出ている間は絶対に待つ」という最強の関所を作ります！
@@ -479,59 +521,67 @@ class TurnManager {
             if (game.ui && typeof game.ui.waitForDialogs === 'function') {
                 await game.ui.waitForDialogs();
             }
+            if (!isCurrentFlow()) return false;
             // 少しだけ隙間を待つ（メッセージが連続で出るときの安全対策です）
             await new Promise(resolve => setTimeout(resolve, 300));
+            return isCurrentFlow();
         };
         // ==========================================
     
         // ★ここを書き足し！：月末イベント【前】（寿命などの処理が始まる前）を実行します
         if (game.eventManager) {
             await game.eventManager.processEvents('endMonth_before');
+            if (!isCurrentFlow()) return;
             game.writeSystemDiagnostic('month_end:event_before_done');
         }
-        await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
+        if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
     
         // 1つ目の係員：派閥
         if (game.factionSystem && typeof game.factionSystem.processEndMonth === 'function') {
             await game.factionSystem.processEndMonth(); 
+            if (!isCurrentFlow()) return;
             game.writeSystemDiagnostic('month_end:faction_done');
         }
-        await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
+        if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
     
         // 2つ目の係員：独立（反乱して空白地になる処理など）
         if (game.independenceSystem && typeof game.independenceSystem.checkIndependence === 'function') {
             await game.independenceSystem.checkIndependence();
+            if (!isCurrentFlow()) return;
             game.writeSystemDiagnostic('month_end:independence_done');
         }
-        await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
+        if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
         
         // 3つ目の係員：外交
         if (game.diplomacyManager && typeof game.diplomacyManager.processEndMonth === 'function') {
             game.diplomacyManager.processEndMonth();
             game.writeSystemDiagnostic('month_end:diplomacy_done');
         }
-        await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
+        if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
     
         // 4つ目の係員：諸勢力（反乱など）
         if (game.kunishuSystem && typeof game.kunishuSystem.processEndMonth === 'function') {
             await game.kunishuSystem.processEndMonth();
+            if (!isCurrentFlow()) return;
             game.writeSystemDiagnostic('month_end:kunishu_done');
         }
-        await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
+        if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
         
         // 5つ目の係員：寿命
         if (game.lifeSystem && typeof game.lifeSystem.processEndMonth === 'function') {
             await game.lifeSystem.processEndMonth(); 
+            if (!isCurrentFlow()) return;
             game.writeSystemDiagnostic('month_end:life_done');
         }
-        await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
+        if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
     
         // 6つ目の係員：月末の特別イベント（災害など）
         if (game.eventManager) {
             await game.eventManager.processEvents('endMonth_after');
+            if (!isCurrentFlow()) return;
             game.writeSystemDiagnostic('month_end:event_after_done');
         }
-        await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
+        if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
     
         // すべての月末イベントとメッセージが完全に終わってから、ようやく時間を進めます！
         game.month++;
@@ -542,6 +592,7 @@ class TurnManager {
         
         // ★修正：クリアとゲームオーバーの判定を EndingSystem (エンディング係) に任せます！
         const isEnding = await game.endingSystem.checkEnding();
+        if (!isCurrentFlow()) return;
         if (!isEnding) {
             // エンディングでなければ次の月へ進みます
             game.writeSystemDiagnostic('month_end:before_startMonth');

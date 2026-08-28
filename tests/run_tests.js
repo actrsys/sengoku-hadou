@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r288');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r289');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7466,7 +7466,7 @@ test('強制モーダルリセットは状態マークタイマーを破棄し�
     assert.ok(resetBlock.includes('this._statusCarouselTimer = null;'));
     assert.ok(resetBlock.includes('options.skipBackgroundRecovery === true'));
     const titleAt = ui.indexOf('async returnToTitle(options = {})');
-    const titleBlock = ui.slice(titleAt, titleAt + 900);
+    const titleBlock = ui.slice(titleAt, titleAt + 1500);
     assert.ok(titleBlock.includes('this.forceResetModals({ skipBackgroundRecovery: true });'));
 });
 
@@ -10169,6 +10169,82 @@ test('月初浪人移動は隣接索引を使い旧候補順と乱数契約を�
     assert.ok(roninBlock.includes('while (queueHead < queue.length)'));
     assert.ok(roninBlock.includes('queue[queueHead++]'));
     assert.ok(!roninBlock.includes('queue.shift()'), '出奔BFSでArray.shiftを残さない');
+});
+
+
+test('月初月末とAI予約はシナリオ世代をまたいでロード・タイトル後へ継続しない', () => {
+    const turn = read('js/turn_manager.js');
+    const game = read('js/game.js');
+    const save = read('js/save_manager.js');
+    const ui = read('js/ui.js');
+    assert.ok(turn.includes('this._turnFlowGeneration = 0;'));
+    assert.ok(turn.includes('abortForScenarioTransition()'));
+    assert.ok(turn.includes('_isTurnFlowCurrent(generation)'));
+    const startAt = turn.indexOf('async startMonth()');
+    const endAt = turn.indexOf('async endMonth()');
+    const startBlock = turn.slice(startAt, turn.indexOf('/** 委任城', startAt));
+    const endBlock = turn.slice(endAt, turn.indexOf('checkAllActionsDone()', endAt));
+    assert.ok(startBlock.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);'));
+    assert.ok(startBlock.includes('await game.ui.showCutin'));
+    assert.ok(startBlock.includes('if (!isCurrentFlow()) return;'));
+    assert.ok(endBlock.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);'));
+    assert.ok(endBlock.includes('return isCurrentFlow();'), '月末ダイアログ待ち後も同じ世代だけ続行する');
+    const scheduleAt = turn.indexOf('_scheduleAITurn(castle)');
+    const scheduleBlock = turn.slice(scheduleAt, turn.indexOf('async processTurn()', scheduleAt));
+    assert.ok(scheduleBlock.includes('const turnFlowGeneration = Number(this._turnFlowGeneration || 0);'));
+    assert.ok(scheduleBlock.includes('if (!this._isTurnFlowCurrent(turnFlowGeneration)) return;'));
+    assert.ok(game.includes('this.turnManager.abortForScenarioTransition();'), '新規開始で旧ターン世代を切る');
+    assert.ok(save.includes('this.game.turnManager.abortForScenarioTransition();'), 'ロード復元開始で旧ターン世代を切る');
+    const titleAt = ui.indexOf('async returnToTitle(options = {})');
+    const titleBlock = ui.slice(titleAt, titleAt + 2200);
+    assert.ok(titleBlock.indexOf('this.game.turnManager.abortForScenarioTransition();') < titleBlock.indexOf('await this.waitForNextPaint();'), 'タイトル復帰は最初のawaitより先に旧ターン世代を切る');
+});
+
+test('派閥再編は同じ武将組の履歴・能力・功績補正を一再編内だけ再利用する', () => {
+    const faction = read('js/faction_system.js');
+    const at = faction.indexOf('updateFactions(targetClanId = null)');
+    const block = faction.slice(at, faction.indexOf('    /**', at + 10) > 0 ? faction.indexOf('    /**', at + 10) : faction.length);
+    assert.ok(block.includes('const factionAchievementBonusCache = new WeakMap();'));
+    assert.ok(block.includes('const voterBestStatCache = new WeakMap();'));
+    assert.ok(block.includes('const pairInvariantCache = new WeakMap();'));
+    assert.ok(block.includes('voterPairs = new WeakMap();'));
+    assert.ok(block.includes('voter.stayHistory.forEach'));
+    assert.ok(block.includes('voterPairs.set(leader, pair);'));
+    assert.ok(block.includes('const leaderGroupMeta = getLeaderGroupMeta(availableLeaders);'), '候補集合依存の最大能力値は従来どおり候補集合ごとに判定する');
+    assert.ok(faction.includes("this.game.writeSystemDiagnostic('month_start:faction:rebuild_start');"));
+    assert.ok(faction.includes("this.game.writeSystemDiagnostic('month_start:faction:rebuild_done');"));
+});
+
+test('外交の血縁・二条経路BFSはArray.shift再詰めを避け探索順を維持する', () => {
+    const diplomacy = read('js/diplomacy.js');
+    const kinAt = diplomacy.indexOf('\n    _hasBloodFamilyMemberInSuccessor(princess, husband, successorClanId, kinContext)');
+    const kinBlock = diplomacy.slice(kinAt, kinAt + 1800);
+    assert.ok(kinBlock.includes('let queueHead = 0;'));
+    assert.ok(kinBlock.includes('while (queueHead < queue.length)'));
+    assert.ok(kinBlock.includes('queue[queueHead++]'));
+    assert.ok(!kinBlock.includes('queue.shift()'));
+    const nijoAt = diplomacy.indexOf('const nijoCastleId = 26;');
+    const nijoBlock = diplomacy.slice(nijoAt, nijoAt + 2600);
+    assert.ok(nijoBlock.includes('let queueHead = 0;'));
+    assert.ok(nijoBlock.includes('while (queueHead < queue.length)'));
+    assert.ok(nijoBlock.includes('queue[queueHead++]'));
+    assert.ok(!nijoBlock.includes('queue.shift()'));
+});
+
+
+test('AI攻撃候補比較は不変な勢力兵数・領内敵対諸勢力を一判断内だけ再利用する', () => {
+    const ai = read('js/ai.js');
+    const at = ai.indexOf('decideAttackTarget(myCastle, myGeneral, enemies)');
+    const end = ai.indexOf('\n    //', at + 100);
+    const block = ai.slice(at, end > at ? end : at + 17000);
+    assert.ok(block.includes('const clanSoldierTotalCache = new Map();'));
+    assert.ok(block.includes('const getClanTotalSoldiersForDecision = (clanId) => {'));
+    assert.ok(block.includes('this.game.getClanTotalSoldiers(id) || 0'));
+    assert.ok(block.includes('const getHostileKunishuCountForDecision = () => {'));
+    assert.ok(block.includes('const totalHostileKunishus = getHostileKunishuCountForDecision();'));
+    assert.ok(block.includes('const queuedCastleIds = new Set();'), '上洛経路のqueue membershipも線形includesを繰り返さない');
+    assert.ok(block.includes('queuedCastleIds.delete(u);'));
+    assert.ok(block.includes('if (!queuedCastleIds.has(vCastle.id))'));
 });
 
 Promise.all(pendingTests).then(() => {

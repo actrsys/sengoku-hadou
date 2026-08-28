@@ -2072,6 +2072,11 @@ class UIManager {
         // タイトル復帰は必ずロード画面で覆います。EndingSystemから呼ぶ場合は既に表示済みです。
         if (!loadingAlreadyVisible) this.showLoadingScreen('タイトル画面へ戻っています', 10);
         else this.updateLoadingProgress(10, 'タイトル画面へ戻っています');
+        // ロード画面を1フレーム出すawaitより先に通常ターン世代を切る。
+        // 旧月初/月末やAI予約が、この待ち時間に再開して現在状態へ触れないようにする。
+        if (this.game && this.game.turnManager && typeof this.game.turnManager.abortForScenarioTransition === 'function') {
+            this.game.turnManager.abortForScenarioTransition();
+        }
         await this.waitForNextPaint();
 
         if (this.game && this.game.warManager && typeof this.game.warManager.abortForScenarioTransition === 'function') {

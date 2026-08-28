@@ -163,7 +163,13 @@ class FactionSystem {
         }
 
         // 2. 派閥形成・更新
+        if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+            this.game.writeSystemDiagnostic('month_start:faction:rebuild_start');
+        }
         this.updateFactions();
+        if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+            this.game.writeSystemDiagnostic('month_start:faction:rebuild_done');
+        }
     }
 
     async executeRonin(busho) { // ★ async を追加します！
@@ -237,12 +243,18 @@ class FactionSystem {
 
             // リーダー候補選出
             // 条件: 功績500以上 かつ 方針がhermit(隠遁者)ではない かつ 隠居ではない
+            // 同じ武将の派閥功績補正は候補判定と多数の得点比較で不変なので、この再編1回だけ再利用します。
+            const factionAchievementBonusCache = new WeakMap();
+            const getFactionAchievementBonus = (b) => {
+                if (typeof SkillManager === 'undefined') return 0;
+                if (!factionAchievementBonusCache.has(b)) {
+                    factionAchievementBonusCache.set(b, SkillManager.calcFactionAchievementBonus(b, this.game));
+                }
+                return Number(factionAchievementBonusCache.get(b)) || 0;
+            };
             const candidates = members.filter(b => {
                 let ach = b.achievementTotal || 0;
-                // ★追加：スキルマネージャーから派閥用の功績ボーナスを受け取ります
-                if (typeof SkillManager !== 'undefined') {
-                    ach += SkillManager.calcFactionAchievementBonus(b, this.game);
-                }
+                ach += getFactionAchievementBonus(b);
                 return !b.isDaimyo && 
                        !b.isRetired && 
                        ach >= achieveLeader && 
@@ -262,6 +274,8 @@ class FactionSystem {
             const leaderGroupMetaCache = new WeakMap();
             const battleSetCache = new WeakMap();
             const familySetCache = new WeakMap();
+            const voterBestStatCache = new WeakMap();
+            const pairInvariantCache = new WeakMap();
             const getLeaderGroupMeta = (availableLeaders) => {
                 let meta = leaderGroupMetaCache.get(availableLeaders);
                 if (meta) return meta;
@@ -291,47 +305,69 @@ class FactionSystem {
 
             // 点数計算ルールを「共通の道具（calcScore）」としてまとめました
             const calcScore = (voter, leader, availableLeaders) => {
-                const stats = [
-                    { key: 'leadership', val: Number(voter.leadership) || 0 },
-                    { key: 'strength', val: Number(voter.strength) || 0 },
-                    { key: 'politics', val: Number(voter.politics) || 0 },
-                    { key: 'diplomacy', val: Number(voter.diplomacy) || 0 },
-                    { key: 'intelligence', val: Number(voter.intelligence) || 0 }
-                ];
-                const bestStatKey = stats.reduce((max, stat) => stat.val > max.val ? stat : max, stats[0]).key;
+                let bestStatKey = voterBestStatCache.get(voter);
+                if (!bestStatKey) {
+                    const stats = [
+                        { key: 'leadership', val: Number(voter.leadership) || 0 },
+                        { key: 'strength', val: Number(voter.strength) || 0 },
+                        { key: 'politics', val: Number(voter.politics) || 0 },
+                        { key: 'diplomacy', val: Number(voter.diplomacy) || 0 },
+                        { key: 'intelligence', val: Number(voter.intelligence) || 0 }
+                    ];
+                    bestStatKey = stats.reduce((max, stat) => stat.val > max.val ? stat : max, stats[0]).key;
+                    voterBestStatCache.set(voter, bestStatKey);
+                }
 
                 const leaderGroupMeta = getLeaderGroupMeta(availableLeaders);
                 const maxLeaderStatVal = leaderGroupMeta.maxByStat[bestStatKey];
 
-                const affDiff = PersonnelRules.calcAffinityDiff(voter.affinity, leader.affinity);
-                const innoDiff = Math.abs(voter.innovation - leader.innovation);
+                // 相性・思想差・戦歴/在城重複・一門などは同じ voter×leader なら
+                // モック選挙と正式加入判定をまたいでも不変。高価な履歴二重走査を1組1回へ抑えます。
+                let voterPairs = pairInvariantCache.get(voter);
+                if (!voterPairs) {
+                    voterPairs = new WeakMap();
+                    pairInvariantCache.set(voter, voterPairs);
+                }
+                let pair = voterPairs.get(leader);
+                if (!pair) {
+                    const affDiff = PersonnelRules.calcAffinityDiff(voter.affinity, leader.affinity);
+                    const innoDiff = Math.abs(voter.innovation - leader.innovation);
 
-                let solidarityBonus = 0;
-                const leaderBattleSet = getBattleSet(leader);
-                let battleOverlap = 0;
-                (voter.battleHistory || []).forEach(h => { if (leaderBattleSet.has(h)) battleOverlap++; });
-                solidarityBonus += battleOverlap * battleBonus;
+                    let solidarityBonus = 0;
+                    const leaderBattleSet = getBattleSet(leader);
+                    let battleOverlap = 0;
+                    (voter.battleHistory || []).forEach(h => { if (leaderBattleSet.has(h)) battleOverlap++; });
+                    solidarityBonus += battleOverlap * battleBonus;
 
-                let totalOverlapMonths = 0;
-                voter.stayHistory.forEach(bHist => {
-                    leader.stayHistory.forEach(lHist => {
-                        if (bHist.castleId === lHist.castleId) {
-                            const start = Math.max(bHist.start, lHist.start);
-                            const end = Math.min(bHist.end, lHist.end);
-                            if (end > start) {
-                                totalOverlapMonths += (end - start);
+                    let totalOverlapMonths = 0;
+                    voter.stayHistory.forEach(bHist => {
+                        leader.stayHistory.forEach(lHist => {
+                            if (bHist.castleId === lHist.castleId) {
+                                const start = Math.max(bHist.start, lHist.start);
+                                const end = Math.min(bHist.end, lHist.end);
+                                if (end > start) totalOverlapMonths += (end - start);
                             }
-                        }
+                        });
                     });
-                });
-
-                if (totalOverlapMonths >= stayBonusTrigger) {
-                    solidarityBonus += Math.floor((totalOverlapMonths - stayBonusBase) / stayBonusDiv);
+                    if (totalOverlapMonths >= stayBonusTrigger) {
+                        solidarityBonus += Math.floor((totalOverlapMonths - stayBonusBase) / stayBonusDiv);
+                    }
+                    const correction = Math.max(0, 1.0 - (affDiff / 50.0));
+                    const finalBonus = solidarityBonus * correction;
+                    const charmBonus = Math.floor((50 - (Number(leader.charm) || 0)) * 0.1);
+                    let leaderAchievement = Number(leader.achievementTotal) || 0;
+                    leaderAchievement += getFactionAchievementBonus(leader);
+                    const merit = Math.max(0, leaderAchievement - 500);
+                    const achievementBonus = Math.floor(Math.cbrt(merit) * 1.85);
+                    const personalityBonus = voter.personality && leader.personality && voter.personality === leader.personality ? 5 : 0;
+                    const leaderFamilySet = getFamilySet(leader);
+                    const isFamily = voter.familyIds && leader.familyIds && voter.familyIds.some(fId => leaderFamilySet.has(fId));
+                    const familyPenalty = isFamily ? 0 : 5;
+                    pair = { affDiff, innoDiff, finalBonus, charmBonus, achievementBonus, personalityBonus, familyPenalty };
+                    voterPairs.set(leader, pair);
                 }
 
-                const correction = Math.max(0, 1.0 - (affDiff / 50.0));
-                const finalBonus = solidarityBonus * correction;
-                
+                const { affDiff, innoDiff, finalBonus, charmBonus, achievementBonus, personalityBonus, familyPenalty } = pair;
                 let abilityBonus = 0;
                 const leaderStatVal = Number(leader[bestStatKey]) || 0;
                 const myStatVal = Number(voter[bestStatKey]) || 0;
@@ -340,25 +376,6 @@ class FactionSystem {
                     abilityBonus = Math.min(10, Math.floor(leaderStatVal * 0.15));
                 }
                 
-                const charmBonus = Math.floor((50 - (Number(leader.charm) || 0)) * 0.1);
-                
-                // 功績500を超えた分を「merit（はみ出し功績）」として覚えます
-                let leaderAchievement = Number(leader.achievementTotal) || 0;
-                // ★追加：スキルマネージャーから派閥用の功績ボーナスを受け取ります
-                if (typeof SkillManager !== 'undefined') {
-                    leaderAchievement += SkillManager.calcFactionAchievementBonus(leader, this.game);
-                }
-                const merit = Math.max(0, leaderAchievement - 500);
-
-                // 「3乗根（Math.cbrt）」の魔法を使って、点数が上がるごとに必要な功績がどんどん増えるようにします！
-                // 最後に 1.85 をかけることで、功績1万のときに「約40点」に収まるように調整しています。
-                const achievementBonus = Math.floor(Math.cbrt(merit) * 1.85);
-
-                let personalityBonus = 0;
-                if (voter.personality && leader.personality && voter.personality === leader.personality) {
-                    personalityBonus = 5;
-                }
-
                 // ★追加：前回の派閥リーダーに関するボーナスとペナルティ
                 let stayFactionBonus = 0;
                 let factionChangePenalty = 0;
@@ -376,16 +393,6 @@ class FactionSystem {
                     }
                 }
 
-                // ★追加：一門じゃない場合は少しだけ入りにくくする（点数を上げる）魔法です！
-                let familyPenalty = 0;
-                // 投票する武将とリーダーが、お互いの一門リストに同じ番号を持っているか確認します
-                const leaderFamilySet = getFamilySet(leader);
-                const isFamily = voter.familyIds && leader.familyIds && voter.familyIds.some(fId => leaderFamilySet.has(fId));
-                // もし一門じゃなかったら、ペナルティとして点数を増やします
-                if (!isFamily) {
-                    familyPenalty = 5; // ちょっとだけ入りにくくするために5点を足します
-                }
-                
                 //基準となる持ち点を「35」点に設定しました。
                 return ((affDiff * 0.5) + (innoDiff * 0.25) + 35) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus - stayFactionBonus + factionChangePenalty + familyPenalty;
             };

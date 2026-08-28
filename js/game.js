@@ -236,6 +236,9 @@ class GameManager {
     
     startNewGame(options = {}) {
         const startInWatchMode = !!(options && options.watchMode);
+        if (this.turnManager && typeof this.turnManager.abortForScenarioTransition === 'function') {
+            this.turnManager.abortForScenarioTransition();
+        }
         if (this.warManager && typeof this.warManager.abortForScenarioTransition === 'function') {
             this.warManager.abortForScenarioTransition();
         }

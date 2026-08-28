@@ -365,6 +365,9 @@ class SaveManager {
     async _restoreSaveDataObj(d) {
         this._validateSaveDataStructure(d);
         this.game.isRestoringSave = true;
+        if (this.game.turnManager && typeof this.game.turnManager.abortForScenarioTransition === 'function') {
+            this.game.turnManager.abortForScenarioTransition();
+        }
         if (this.game.ui) this.game.ui.updateLoadingProgress(5, 'セーブデータを復元しています');
         if (this.game.warManager && typeof this.game.warManager.abortForScenarioTransition === 'function') {
             this.game.warManager.abortForScenarioTransition();

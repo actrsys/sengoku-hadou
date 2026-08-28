@@ -286,9 +286,10 @@ class DiplomacyManager {
 
         const bloodKinIds = new Set([startId]);
         const queue = [startId];
+        let queueHead = 0;
         const adjacency = kinContext && kinContext.adjacency ? kinContext.adjacency : new Map();
-        while (queue.length > 0) {
-            const current = queue.shift();
+        while (queueHead < queue.length) {
+            const current = queue[queueHead++];
             const relatives = adjacency.get(current) || [];
             relatives.forEach(relativeId => {
                 const id = Number(relativeId) || 0;
@@ -3526,6 +3527,7 @@ class DiplomacyManager {
                 
                 if (nijoCastle && nijoCastle.ownerClan !== myClanId) {
                     let queue = [];
+                    let queueHead = 0;
                     let visited = new Set();
                     let parentMap = new Map(); 
                     
@@ -3536,8 +3538,8 @@ class DiplomacyManager {
                     
                     let foundNijo = false;
                     
-                    while (queue.length > 0) {
-                        let currentId = queue.shift();
+                    while (queueHead < queue.length) {
+                        let currentId = queue[queueHead++];
                         
                         if (currentId === nijoCastleId) {
                             foundNijo = true;
