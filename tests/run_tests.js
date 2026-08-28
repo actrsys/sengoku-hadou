@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r290');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r291');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -10279,6 +10279,57 @@ test('AI攻撃候補比較は不変な勢力兵数・領内敵対諸勢力を一
     assert.ok(block.includes('const queuedCastleIds = new Set();'), '上洛経路のqueue membershipも線形includesを繰り返さない');
     assert.ok(block.includes('queuedCastleIds.delete(u);'));
     assert.ok(block.includes('if (!queuedCastleIds.has(vCastle.id))'));
+});
+
+
+test('通常ターンの0ms継続はTurnManager世代で一元管理しシナリオ切替時に破棄する', () => {
+    const turn = read('js/turn_manager.js');
+    assert.ok(turn.includes('this._turnContinuationTimers = new Set();'));
+    assert.ok(turn.includes('this._turnContinuationTimers.forEach(timerId => clearTimeout(timerId));'));
+    assert.ok(turn.includes('_scheduleTurnFlowContinuation(callback, delay = 0, options = {})'));
+    const usages = (turn.match(/_scheduleTurnFlowContinuation\(/g) || []).length;
+    assert.ok(usages >= 5, '定義に加え空城・行動済み・通常finish等が共通窓口を使う');
+    assert.ok(!turn.includes('setTimeout(() => game.processTurn(), 0)'), 'TurnManager内に生のprocessTurn 0ms予約を残さない');
+    assert.ok(!turn.includes('setTimeout(() => { game.finishTurn(); }, 0)'), 'TurnManager内に生のfinishTurn 0ms予約を残さない');
+});
+
+test('地図戦闘演出はシナリオ切替でrAFと固定Canvasを中断し旧onHalfwayを進めない', () => {
+    const map = read('js/ui_map.js');
+    const ui = read('js/ui.js');
+    const war = read('js/war_effort.js');
+    const indep = read('js/independence_system.js');
+    assert.ok(map.includes('abortMapEffectsForScenarioTransition()'));
+    assert.ok(map.includes('this._mapEffectGeneration = Number(this._mapEffectGeneration || 0) + 1;'));
+    assert.ok(map.includes("['battle-blink-overlay', 'capture-effect-overlay']"));
+    assert.ok(map.includes('this.hideMapGuard(true);'));
+    assert.ok(map.includes("if (typeof this.abortMapEffectsForScenarioTransition === 'function') {"), 'resetMapViewStateから地図演出を中断する');
+    assert.ok(map.includes('if (!isCurrentEffect()) return false;'), 'focus待ち後にも旧演出を開始しない');
+    assert.ok(map.includes('const runHalfway = () => {\n                if (halfwayDone || !isCurrentEffect()) return;'), '中断済み制圧演出は所有変更callbackを呼ばない');
+    assert.ok(war.includes('if (openingBlinkCompleted === false) return;'));
+    assert.ok(war.includes('if (resultBlinkCompleted === false) return;'));
+    assert.ok((war.match(/if \(captureCompleted === false\) return;/g) || []).length >= 3);
+    assert.ok(indep.includes('if (independenceBlinkCompleted === false) return;'));
+    assert.ok(indep.includes('if (independenceCaptureCompleted === false) return;'));
+    assert.ok(indep.includes('if (rebellionBlinkCompleted === false) return;'));
+});
+
+test('地図ズームrAFはresetMapViewState後の新しい地図へ旧座標を書き戻さない', () => {
+    const map = read('js/ui_map.js');
+    const at = map.indexOf('changeMapZoom(direction, cx = null, cy = null)');
+    const block = map.slice(at, map.indexOf('focusMapOnCastle(', at));
+    assert.ok(block.includes('const mapViewResetToken = Number(this._mapViewResetToken || 0);'));
+    assert.ok(block.includes('const isCurrentMapView = () => Number(this._mapViewResetToken || 0) === mapViewResetToken;'));
+    assert.ok(block.includes('if (!isCurrentMapView()) {\n                    this.isAnimatingZoom = false;'));
+    assert.ok(block.includes('if (!isCurrentMapView()) return;'), 'スマホ次フレーム補正も世代切替後は書き戻さない');
+});
+
+test('イベント地図の観戦自動送りtimerは先行タップ時に解放する', () => {
+    const events = read('js/event/common_events.js');
+    const at = events.indexOf('const waitForDismiss = async (game, mapOverlay) => {');
+    const block = events.slice(at, at + 1400);
+    assert.ok(block.includes('let autoDismissTimer = null;'));
+    assert.ok(block.includes('clearTimeout(autoDismissTimer);'));
+    assert.ok(block.includes('autoDismissTimer = setTimeout(onTouch, 1000)'));
 });
 
 Promise.all(pendingTests).then(() => {

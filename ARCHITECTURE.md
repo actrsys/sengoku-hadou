@@ -524,3 +524,11 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - 共通 `#ai-guard` をダイアログ等の前で一時透明化する場合、`opacity:0` だけで子spinnerのCSS animationを動かし続けない。既存 `hide-text` を併用し、非表示中の子要素animation/transitionを停止する。最終復帰時は `guardTextHiddenCount` と `applyAIGuardTextState()` を正本として、元から文字非表示だった状態も正しく維持する。
 - 災害イベントの初回会話は共通 `showDialogAsync()` と観戦1秒自動閉じを維持し、イベント固有の擬似クリックや別UIを増やさない。実機停止切り分け用に災害側から診断prefixだけを渡し、`dialog_rendered` / `dialog_autoclose_armed` / `dialog_autoclose_fire` / 既存 `dialog_done` を区別する。
 - SEは短命 `Howl` を使う現行方式を維持するが、`onend` / `onloaderror` に加えて `onplayerror` と15秒安全弁でも必ず `unload()` する。完全ミュート時は無音SE用Howlを生成しない。古いWebViewで終了通知が欠落しても長時間AI観戦中に一時音声資源を蓄積させない。
+
+
+## r291 追加監査：ターン0ms継続／地図戦闘演出のシナリオ寿命
+- 空城・行動済み城のスキップ、通常 `finishTurn()` 後などの `setTimeout(0)` 継続は、直接 `game.processTurn()` / `game.finishTurn()` を予約しない。`TurnManager._scheduleTurnFlowContinuation()` を共通窓口とし、予約時の `_turnFlowGeneration` と必要な `currentIndex` / Castle参照を保持する。新規開始・ロード・タイトル復帰では保留timerを明示的にclearし、旧turnQueueの息継ぎcallbackを次シナリオへ持ち越さない。
+- 戦闘点滅・制圧発光は固定マップDOM上の非同期Viewとして `UIManager` の地図演出世代へ所属させる。`resetMapViewState()` は保留中の地図演出を中断し、戦闘点滅／制圧Canvasのbacking storeと `battle-blink-guard` を即時解放する。中断された演出は `false` を返し、独立・謀反・戦争の呼出元は旧処理をその場で終了して、新シナリオへ古い結果会話や後処理を再開しない。
+- 地図演出の正常時の色、時間、カメラ、制圧中間処理は変更しない。世代中断時だけ `onHalfway` を実行せず、古いCanvas callbackが現在の勢力色や固定DOMへ触れないようにする。
+- 災害イベント地図の観戦自動送りtimerは、ユーザー操作等で先に終了した時点でclearする。解決済みPromiseを保持する1秒timerを長時間観戦中に不要に残さない。
+- 地図ズームのPC補間rAFとスマホの次フレーム位置補正も `resetMapViewState()` の `_mapViewResetToken` を寿命境界として使う。タイトル復帰・ロード・新規シナリオ開始で地図状態を初期化した後、旧ズームrAFがtransform／spacer／scroll位置を書き戻さない。

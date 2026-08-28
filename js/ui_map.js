@@ -48,6 +48,9 @@ Object.assign(UIManager.prototype, {
     // initialZoomLevel は 0=最小、1=標準、2=最大。通常は標準、タイトルからの観戦だけ0を指定する。
     resetMapViewState(options = {}) {
         this._stopMapInertia();
+        if (typeof this.abortMapEffectsForScenarioTransition === 'function') {
+            this.abortMapEffectsForScenarioTransition();
+        }
         if (typeof this._cancelActiveMapFocus === 'function') this._cancelActiveMapFocus();
         this._cancelActiveMapFocus = null;
         this._mapViewResetToken = Number(this._mapViewResetToken || 0) + 1;
@@ -704,6 +707,10 @@ Object.assign(UIManager.prototype, {
     changeMapZoom(direction, cx = null, cy = null) {
         const sc = document.getElementById('map-scroll-container');
         const isPC = document.body.classList.contains('is-pc');
+        // タイトル復帰／ロードでresetMapViewState()された後に、旧ズームrAFが新しい地図へ
+        // transform/scrollを戻さないため、既存のmap view世代をこの1操作の寿命として使います。
+        const mapViewResetToken = Number(this._mapViewResetToken || 0);
+        const isCurrentMapView = () => Number(this._mapViewResetToken || 0) === mapViewResetToken;
 
         if (!sc || !this.mapEl || !Array.isArray(this.zoomStages) || this.zoomStages.length === 0) return;
         if (this.isAnimatingZoom) return;
@@ -781,6 +788,10 @@ Object.assign(UIManager.prototype, {
             const startTime = performance.now();
 
             const animate = (currentTime) => {
+                if (!isCurrentMapView()) {
+                    this.isAnimatingZoom = false;
+                    return;
+                }
                 let progress = (currentTime - startTime) / duration;
                 if (progress < 0) progress = 0; 
                 if (progress > 1) progress = 1;
@@ -835,6 +846,7 @@ Object.assign(UIManager.prototype, {
             // 一部の古いWebViewはレイアウト確定前のscroll値を丸めるため、
             // 次フレームに「ずれていた時だけ」1回補正します。
             requestAnimationFrame(() => {
+                if (!isCurrentMapView()) return;
                 if (Math.abs(sc.scrollLeft - targetScrollLeft) > 0.5) sc.scrollLeft = targetScrollLeft;
                 if (Math.abs(sc.scrollTop - targetScrollTop) > 0.5) sc.scrollTop = targetScrollTop;
                 this._endMapZoomDiagnostic();
@@ -2256,6 +2268,32 @@ Object.assign(UIManager.prototype, {
             }
         }
     },
+
+    // 戦闘点滅・制圧発光は固定マップDOM上の非同期Viewです。
+    // ロード／タイトル復帰／新規開始では保留rAFを同期的に完了扱いへせず「中断」として解放し、
+    // 旧演出のonHalfwayや後続処理が新シナリオへ戻るための入口を残しません。
+    abortMapEffectsForScenarioTransition() {
+        this._mapEffectGeneration = Number(this._mapEffectGeneration || 0) + 1;
+        if (this._activeMapEffectCancels && this._activeMapEffectCancels.size > 0) {
+            [...this._activeMapEffectCancels].forEach(cancel => {
+                try { cancel(); } catch (e) {}
+            });
+            this._activeMapEffectCancels.clear();
+        }
+        ['battle-blink-overlay', 'capture-effect-overlay'].forEach(id => {
+            const canvas = document.getElementById(id);
+            if (!canvas) return;
+            try {
+                const ctx = canvas.getContext('2d');
+                if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+                canvas.style.filter = 'none';
+                canvas.width = 1;
+                canvas.height = 1;
+            } catch (e) {}
+            if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+        });
+        this.hideMapGuard(true);
+    },
     
     // ==========================================
     // ★追加：AIの「思考中...」の文字を一時的に透明にする魔法を一元管理（スタック式）します！
@@ -2464,6 +2502,8 @@ Object.assign(UIManager.prototype, {
 
     async playBattleBlink(castleIdOrIds, colorA, colorB, durationMs, options = {}) {
         return this.withAIGuardTextHiddenForMapEffect(async () => {
+        const effectGeneration = Number(this._mapEffectGeneration || 0);
+        const isCurrentEffect = () => Number(this._mapEffectGeneration || 0) === effectGeneration;
         // 戦争中は開戦時に確定した戦場カメラを維持します。
         // 開始/終了点滅のたびに同じ地点を再計算すると、スマホではモーダル開閉による
         // viewport差で数pxずれるため、戦場ロック中は再フォーカスしません。
@@ -2473,6 +2513,7 @@ Object.assign(UIManager.prototype, {
         if (options.focus !== false && !usesLockedBattleCamera) {
             await this.focusMapOnCastle(castleIdOrIds, { transition: options.transition || 'smooth', reason: options.reason || 'battle_blink', anchor: 'territory' });
         }
+        if (!isCurrentEffect()) return false;
         return new Promise(resolve => {
             this.showMapGuard();
 
@@ -2530,17 +2571,21 @@ Object.assign(UIManager.prototype, {
             let lastSwitchTime = startTime;
 
             let finished = false;
-            const finish = () => {
+            const cancelEffect = () => finish(false);
+            const finish = (completed = true) => {
                 if (finished) return;
                 finished = true;
+                if (this._activeMapEffectCancels) this._activeMapEffectCancels.delete(cancelEffect);
                 this._releaseEffectOverlay(overlay, maskInfo);
                 this.hideMapGuard();
-                if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                if (completed && this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                     const firstId = Array.isArray(castleIdOrIds) ? castleIdOrIds[0] : castleIdOrIds;
                     this.game.writeSystemDiagnostic('battle_blink:done', this.game.getCastle(Number(firstId)) || null);
                 }
-                resolve();
+                resolve(completed);
             };
+            if (!this._activeMapEffectCancels) this._activeMapEffectCancels = new Set();
+            this._activeMapEffectCancels.add(cancelEffect);
 
             try {
                 paintColor(colorA_RGB);
@@ -2552,6 +2597,10 @@ Object.assign(UIManager.prototype, {
 
             const animate = (currentTime) => {
                 if (finished) return;
+                if (!isCurrentEffect()) {
+                    finish(false);
+                    return;
+                }
                 try {
                     if (currentTime - startTime > durationMs) {
                         finish();
@@ -2582,6 +2631,8 @@ Object.assign(UIManager.prototype, {
     // ==========================================
     async playCaptureEffect(castleIdOrIds, onHalfway, options = {}) {
         return this.withAIGuardTextHiddenForMapEffect(async () => {
+        const effectGeneration = Number(this._mapEffectGeneration || 0);
+        const isCurrentEffect = () => Number(this._mapEffectGeneration || 0) === effectGeneration;
         // 戦争中は開始時から同じ戦場カメラを維持し、制圧演出でも再フォーカスしません。
         const warState = this.game && this.game.warManager ? this.game.warManager.state : null;
         const firstId = Array.isArray(castleIdOrIds) ? Number(castleIdOrIds[0]) : Number(castleIdOrIds);
@@ -2589,6 +2640,7 @@ Object.assign(UIManager.prototype, {
         if (options.focus !== false && !usesLockedBattleCamera) {
             await this.focusMapOnCastle(castleIdOrIds, { transition: options.transition || 'smooth', reason: options.reason || 'capture_effect', anchor: 'territory' });
         }
+        if (!isCurrentEffect()) return false;
         return new Promise((resolve, reject) => {
             this.showMapGuard();
 
@@ -2629,24 +2681,29 @@ Object.assign(UIManager.prototype, {
             let halfwayDone = false;
             let finished = false;
             const runHalfway = () => {
-                if (halfwayDone) return;
+                if (halfwayDone || !isCurrentEffect()) return;
                 halfwayDone = true;
                 if (typeof onHalfway === 'function') onHalfway();
             };
-            const finish = () => {
+            const cancelEffect = () => finish(false);
+            const finish = (completed = true) => {
                 if (finished) return;
                 finished = true;
+                if (this._activeMapEffectCancels) this._activeMapEffectCancels.delete(cancelEffect);
                 this._releaseEffectOverlay(overlay, maskInfo);
                 this.hideMapGuard();
-                resolve();
+                resolve(completed);
             };
             const fail = (error) => {
                 if (finished) return;
                 finished = true;
+                if (this._activeMapEffectCancels) this._activeMapEffectCancels.delete(cancelEffect);
                 this._releaseEffectOverlay(overlay, maskInfo);
                 this.hideMapGuard();
                 reject(error);
             };
+            if (!this._activeMapEffectCancels) this._activeMapEffectCancels = new Set();
+            this._activeMapEffectCancels.add(cancelEffect);
 
             if (!ctx) {
                 // 所有変更などの本処理は演出より重要。演出だけ省略して中間処理を実行する。
@@ -2679,6 +2736,10 @@ Object.assign(UIManager.prototype, {
 
             const animate = (currentTime) => {
                 if (finished) return;
+                if (!isCurrentEffect()) {
+                    finish(false);
+                    return;
+                }
                 try {
                     const elapsed = currentTime - startTime;
 

@@ -499,7 +499,8 @@ class IndependenceSystem {
         if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
             this.game.writeSystemDiagnostic('independence:blink_start');
         }
-        await this.game.ui.playBattleBlink(changedCastleIds, oldColor, newColorRgb, 1000);
+        const independenceBlinkCompleted = await this.game.ui.playBattleBlink(changedCastleIds, oldColor, newColorRgb, 1000);
+        if (independenceBlinkCompleted === false) return;
         if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
             this.game.writeSystemDiagnostic('independence:blink_done');
         }
@@ -534,7 +535,8 @@ class IndependenceSystem {
         };
 
         if (typeof this.game.ui.playCaptureEffect === 'function') {
-            await this.game.ui.playCaptureEffect(changedCastleIds, applyNewClanColor);
+            const independenceCaptureCompleted = await this.game.ui.playCaptureEffect(changedCastleIds, applyNewClanColor);
+            if (independenceCaptureCompleted === false) return;
         } else {
             applyNewClanColor();
         }
@@ -1057,8 +1059,9 @@ class IndependenceSystem {
                 if (oldClanData && oldClanData.color && typeof DataManager !== 'undefined') oldColor = DataManager.hexToRgb(oldClanData.color);
 
                 // 反乱軍の城をすべて同時に点滅させます！
-                await this.game.ui.playBattleBlink(rebelCastleIds, oldColor, rebelColor, 1000);
+                const rebellionBlinkCompleted = await this.game.ui.playBattleBlink(rebelCastleIds, oldColor, rebelColor, 1000);
                 if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+                if (rebellionBlinkCompleted === false) return;
             }
 
             // 裏で野戦を行います！

@@ -455,16 +455,21 @@ window.EventMapEffects = window.EventMapEffects || (() => {
 
         await new Promise(resolve => {
             let finished = false;
+            let autoDismissTimer = null;
             const onTouch = () => {
                 if (finished) return;
                 finished = true;
+                if (autoDismissTimer) {
+                    clearTimeout(autoDismissTimer);
+                    autoDismissTimer = null;
+                }
                 mapOverlay.removeEventListener('click', onTouch);
                 mapOverlay.removeEventListener('touchstart', onTouch);
                 resolve();
             };
             mapOverlay.addEventListener('click', onTouch);
             mapOverlay.addEventListener('touchstart', onTouch, { passive: true });
-            if (game && game.isWatchMode) setTimeout(onTouch, 1000);
+            if (game && game.isWatchMode) autoDismissTimer = setTimeout(onTouch, 1000);
         });
     };
 

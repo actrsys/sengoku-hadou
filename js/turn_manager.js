@@ -10,11 +10,17 @@ class TurnManager {
         // 月初・月末・AI予約など「通常ターン進行」の寿命。ロード／タイトル復帰／新規開始で進め、
         // await後や遅延callbackが次シナリオの状態へ戻らないための単一世代境界にします。
         this._turnFlowGeneration = 0;
+        // 0msの息継ぎもシナリオ遷移をまたがないよう、通常ターン継続timerを一元管理します。
+        this._turnContinuationTimers = new Set();
     }
 
     abortForScenarioTransition() {
         this._turnFlowGeneration = Number(this._turnFlowGeneration || 0) + 1;
         this._cancelAllActionsDonePromptTimer();
+        if (this._turnContinuationTimers && this._turnContinuationTimers.size > 0) {
+            this._turnContinuationTimers.forEach(timerId => clearTimeout(timerId));
+            this._turnContinuationTimers.clear();
+        }
         if (this.game && this.game.aiTimer) {
             clearTimeout(this.game.aiTimer);
             this.game.aiTimer = null;
@@ -33,6 +39,32 @@ class TurnManager {
         if (!this._allActionsDonePromptTimer) return;
         clearTimeout(this._allActionsDonePromptTimer);
         this._allActionsDonePromptTimer = null;
+    }
+
+    // 空城スキップ・行動済みスキップ・通常ターン終了後の0ms継続も、AI予約と同じturn-flow世代へ統合します。
+    // 予約後にロード／タイトル復帰／新規開始が入った場合はcallback自体を実行せず、旧turnQueueを進めません。
+    _scheduleTurnFlowContinuation(callback, delay = 0, options = {}) {
+        if (typeof callback !== 'function') return null;
+        const game = this.game;
+        const generation = Number(this._turnFlowGeneration || 0);
+        const expectedIndex = Number.isInteger(options.expectedIndex) ? Number(options.expectedIndex) : null;
+        const expectedCastle = options.expectedCastle || null;
+        const timerId = setTimeout(() => {
+            if (this._turnContinuationTimers) this._turnContinuationTimers.delete(timerId);
+            if (!this._isTurnFlowCurrent(generation)) return;
+            if (expectedIndex !== null && Number(game.currentIndex) !== expectedIndex) return;
+            if (expectedCastle && game.turnQueue && game.turnQueue[game.currentIndex] !== expectedCastle) return;
+            try {
+                const result = callback();
+                if (result && typeof result.catch === 'function') {
+                    result.catch(error => console.error('ターン継続処理でエラーが発生しました:', error));
+                }
+            } catch (error) {
+                console.error('ターン継続処理でエラーが発生しました:', error);
+            }
+        }, Math.max(0, Number(delay) || 0));
+        this._turnContinuationTimers.add(timerId);
+        return timerId;
     }
 
     async startMonth() { 
@@ -344,7 +376,7 @@ class TurnManager {
                 game.ui.updateAIProgress(game.currentIndex + 1, game.turnQueue.length);
             }
             game.currentIndex++;
-            setTimeout(() => game.processTurn(), 0);
+            this._scheduleTurnFlowContinuation(() => game.processTurn(), 0, { expectedIndex: game.currentIndex });
             return;
         }
         
@@ -354,9 +386,10 @@ class TurnManager {
                 game.ui.updateAIProgress(game.currentIndex + 1, game.turnQueue.length);
             }
             // ★追加：スマホがパンクしないように、ここでほんの一瞬だけ「息継ぎ（お休み）」をさせます！
-            setTimeout(() => {
-                game.finishTurn();
-            }, 0);
+            this._scheduleTurnFlowContinuation(() => game.finishTurn(), 0, {
+                expectedIndex: expectedTurnIndex,
+                expectedCastle: castle
+            });
             return;
         }
         
@@ -368,9 +401,7 @@ class TurnManager {
             }
             game.currentIndex++; 
             // ★追加：空き城を連続で飛ばす時も、スマホがパンクしないように一瞬「息継ぎ」をさせます！
-            setTimeout(() => {
-                game.processTurn(); 
-            }, 0);
+            this._scheduleTurnFlowContinuation(() => game.processTurn(), 0, { expectedIndex: game.currentIndex });
             return; 
         }
         
@@ -501,9 +532,7 @@ class TurnManager {
         if (await game.tryProcessQueuedWatchReturn('turn_complete')) return;
     
         // ★追加：ターンが終わって次に行く時も、スマホがパンクしないように一瞬「息継ぎ」をさせます！
-        setTimeout(() => {
-            game.processTurn(); 
-        }, 0);
+        this._scheduleTurnFlowContinuation(() => game.processTurn(), 0, { expectedIndex: game.currentIndex });
     }
 
     async endMonth() {

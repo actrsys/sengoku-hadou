@@ -657,7 +657,8 @@ Object.assign(WarManager.prototype, {
                     }
                     
                     // ★１秒間点滅させます
-                    await this.game.ui.playBattleBlink(defCastle.id, atkColor, defColor, 1000);
+                    const openingBlinkCompleted = await this.game.ui.playBattleBlink(defCastle.id, atkColor, defColor, 1000);
+                    if (openingBlinkCompleted === false) return;
                     
                     // ★追加：点滅が終わったらバリアを外します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard();
@@ -1498,7 +1499,8 @@ Object.assign(WarManager.prototype, {
             
             // 勝敗が決まる前に、戦場となった城の領土を2秒間点滅させる（この間は操作不可）
             if (this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
-                await this.game.ui.playBattleBlink(s.defender.id, atkColor, defColor, 2000);
+                const resultBlinkCompleted = await this.game.ui.playBattleBlink(s.defender.id, atkColor, defColor, 2000);
+                if (resultBlinkCompleted === false) return;
             }
             
             // ★追加：点滅が終わったこのタイミングで「戦闘直後」の歴史イベントをチェック・実行します！
@@ -1923,11 +1925,12 @@ Object.assign(WarManager.prototype, {
                     // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
                     if (typeof this.game.ui.playCaptureEffect === 'function' && this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                         // 画面が真っ白になった瞬間に色を塗り替えるお願いを渡します
-                        await this.game.ui.playCaptureEffect(targetC.id, () => {
+                        const captureCompleted = await this.game.ui.playCaptureEffect(targetC.id, () => {
                             if (typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('war:capture_color:start', targetC);
                             this.game.ui.updateClanColors();
                             if (typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('war:capture_color:done', targetC);
                         });
+                        if (captureCompleted === false) return;
                     } else {
                         // ★Round10：通知されないAI戦争では、見えていない地図の色計算を毎回行わず復帰時へまとめます。
                         if (this.game.isProcessingAI && !this.game.isWatchMode && !s.isPlayerInvolved) {
@@ -2135,11 +2138,12 @@ Object.assign(WarManager.prototype, {
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
                 // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
                 if (typeof this.game.ui.playCaptureEffect === 'function' && this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
-                    await this.game.ui.playCaptureEffect(s.defender.id, () => {
+                    const captureCompleted = await this.game.ui.playCaptureEffect(s.defender.id, () => {
                         if (typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('war:capture_color:start', s.defender);
                         this.game.ui.updateClanColors();
                         if (typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('war:capture_color:done', s.defender);
                     });
+                    if (captureCompleted === false) return;
                 } else {
                     // ★Round10：通知されないAI戦争では色更新もプレイヤー復帰時へまとめます。
                     if (this.game.isProcessingAI && !this.game.isWatchMode && !s.isPlayerInvolved) {
@@ -2237,11 +2241,12 @@ Object.assign(WarManager.prototype, {
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
                 // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
                 if (typeof this.game.ui.playCaptureEffect === 'function' && this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
-                    await this.game.ui.playCaptureEffect(s.defender.id, () => {
+                    const captureCompleted = await this.game.ui.playCaptureEffect(s.defender.id, () => {
                         if (typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('war:capture_color:start', s.defender);
                         this.game.ui.updateClanColors();
                         if (typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('war:capture_color:done', s.defender);
                     });
+                    if (captureCompleted === false) return;
                 } else {
                     // ★Round10：通知されないAI戦争では色更新もプレイヤー復帰時へまとめます。
                     if (this.game.isProcessingAI && !this.game.isWatchMode && !s.isPlayerInvolved) {
