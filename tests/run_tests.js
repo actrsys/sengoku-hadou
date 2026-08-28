@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r289');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r290');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -203,10 +203,39 @@ test('月末・月初の長い処理は既存AIガードへ進行中表示を出
     assert.ok(!read('index.html').includes('month-processing-guard'), '月処理専用オーバーレイを重複追加しない');
 });
 
-test('SEは一時Howlを再生終了または読込失敗時に解放する', () => {
+
+test('スマホ月初処理は災害会話前からAI軽量モードへ入り一時地図資源を解放する', () => {
+    const turn = read('js/turn_manager.js');
+    const start = turn.indexOf('async startMonth()');
+    const cutin = turn.indexOf('await game.ui.showCutin', start);
+    const block = turn.slice(start, cutin);
+    assert.ok(block.includes("document.body.classList.add('mobile-ai-light-mode')"), '月初イベントより前から城カードのGPU装飾を軽量化する');
+    assert.ok(block.includes('game.ui.releaseMobileTransientMapResources()'), '月初イベント前に非必須Canvas/慣性を解放する');
+    assert.ok(block.indexOf("mobile-ai-light-mode") < block.indexOf('await game.ui.showCutin') || !block.includes('await game.ui.showCutin'), '軽量化は月初カットインより前に入る');
+});
+
+test('透明化したAIガードは見えない子アニメーションも停止して復帰時は既存状態へ戻す', () => {
+    const ui = read('js/ui.js');
+    const css = read('css/style.css');
+    const at = ui.indexOf('hideAIGuardTemporarily()');
+    const end = ui.indexOf('_hasAIProgressBlockingUI()', at);
+    const block = ui.slice(at, end);
+    assert.ok(block.includes("aiGuard.classList.add('hide-text')"), 'opacityだけでなく既存hide-textを併用する');
+    assert.ok(css.includes('#ai-guard.hide-text *'));
+    assert.ok(css.includes('animation: none !important;'), '非表示spinnerのCSS animationを止める');
+    assert.ok(css.includes('transition: none !important;'), '非表示子要素のtransitionも止める');
+    const restoreAt = ui.indexOf('restoreAIGuard()');
+    const restoreBlock = ui.slice(restoreAt, restoreAt + 1300);
+    assert.ok(restoreBlock.includes('this.applyAIGuardTextState()'), '復帰時はguardTextHiddenCountの正本へ戻す');
+});
+
+test('SEは一時Howlを終了・失敗・安全弁で解放し完全ミュート時は生成しない', () => {
     const source = read('js/audio.js');
     assert.ok(source.includes('onend: cleanup'));
     assert.ok(source.includes('onloaderror: cleanup'));
+    assert.ok(source.includes('onplayerror: cleanup'), '古いWebViewで再生開始に失敗してもHowlを残さない');
+    assert.ok(source.includes('if (!(finalVolume > 0)) return;'), '完全ミュート時は無音SEのdecode自体を行わない');
+    assert.ok(source.includes('safetyTimer = setTimeout(cleanup, 15000)'), '終了通知欠落時も一時Howlを永久保持しない');
     assert.ok(source.includes('se.unload()'));
 });
 
@@ -9781,10 +9810,15 @@ test('AI月次作戦は大勢力の探索順を変えずスマホへ定期的に
     assert.ok(ops.includes('month_start:operations:clan_${clan.id}:legion_${legionId}:operation_done'), '軍団作戦完了まで到達したか識別できる');
 });
 
-test('災害と独立の停止診断は会話待ちの前後を区別する', () => {
+test('災害と独立の停止診断は会話待ちの前後と災害会話内部段階を区別する', () => {
     const events = read('js/event/common_events.js');
+    const ui = read('js/ui.js');
     const independence = read('js/independence_system.js');
     assert.ok(events.includes('fx.writeDiag(game, `${diagPrefix}:dialog_done`);'), '災害初回会話の完了checkpointを残す');
+    assert.ok(events.includes('{ diagnosticPrefix: diagPrefix }'), '災害会話だけ共通Dialogへ診断prefixを渡す');
+    assert.ok(ui.includes('`${diagnosticPrefix}:dialog_rendered`'), '固定dialog DOMが表示された地点を識別する');
+    assert.ok(ui.includes('`${diagnosticPrefix}:dialog_autoclose_armed`'), '観戦自動閉じtimer設定まで到達したか識別する');
+    assert.ok(ui.includes('`${diagnosticPrefix}:dialog_autoclose_fire`'), '自動閉じtimer発火まで到達したか識別する');
     assert.ok(independence.includes("this.game.writeSystemDiagnostic('independence:post_render');"), '独立描画後の次処理到達を記録する');
     assert.ok(independence.includes("this.game.writeSystemDiagnostic('independence:result_dialog_start');"), '独立結果会話の開始を記録する');
     assert.ok(independence.includes("this.game.writeSystemDiagnostic('independence:result_dialog_done');"), '独立結果会話の完了を記録する');

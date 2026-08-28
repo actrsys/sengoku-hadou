@@ -538,6 +538,10 @@ class UIManager {
         // ★変更：壁そのものを消すのではなく、文字だけを透明にして壁を残します！
         if (aiGuard && !aiGuard.classList.contains('hidden') && aiGuard.style.opacity !== '0') {
             aiGuard.style.opacity = '0';
+            // opacity:0 だけでは子のspinner/CSS animationは動き続けるため、
+            // 見えない間は既存hide-text状態も併用してGPU合成を止めます。
+            // 最終restore時はguardTextHiddenCountを正本にapplyAIGuardTextState()で戻します。
+            aiGuard.classList.add('hide-text');
             this.guardHiddenCount = (this.guardHiddenCount || 0) + 1;
         } else if (this.guardHiddenCount > 0) {
             this.guardHiddenCount++; 
@@ -1348,10 +1352,20 @@ class UIManager {
         // 引き渡し先の会話を先に可視化してから、使者選択など直前の画面を閉じます。
         modal.classList.remove('hidden');
         this.completeVisualHandoff();
+        const diagnosticPrefix = dialog.customOpts?.diagnosticPrefix || '';
+        if (diagnosticPrefix && this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+            this.game.writeSystemDiagnostic(`${diagnosticPrefix}:dialog_rendered`);
+        }
 
         if (dialog.autoCloseTime > 0) {
+            if (diagnosticPrefix && this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic(`${diagnosticPrefix}:dialog_autoclose_armed`);
+            }
             autoCloseTimer = setTimeout(() => {
                 if (this._dialogAutoCloseTimer === autoCloseTimer) this._dialogAutoCloseTimer = null;
+                if (diagnosticPrefix && this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic(`${diagnosticPrefix}:dialog_autoclose_fire`);
+                }
                 // 強制リセット後に同じ固定DOMへ新しい会話が表示されても、旧タイマーで押さない。
                 if (dialogGeneration !== Number(this._dialogGeneration || 0)) return;
                 if (!modal.classList.contains('hidden')) {

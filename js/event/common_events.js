@@ -528,7 +528,9 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
 
     if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
     fx.writeDiag(game, `${diagPrefix}:dialog`);
-    await game.ui.showDialogAsync(initialMsg, false, 0);
+    // r290：実機強制リロードがdialog地点で残ったため、共通Dialogの内部段階も
+    // この災害だけ診断できるようprefixを渡します。表示・自動閉じ時間は従来どおりです。
+    await game.ui.showDialogAsync(initialMsg, false, 0, { diagnosticPrefix: diagPrefix });
     fx.writeDiag(game, `${diagPrefix}:dialog_done`);
 
     let mapOverlay = null;

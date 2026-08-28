@@ -1764,6 +1764,10 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 }
 #ai-guard.hide-text * {
     opacity: 0 !important;
+    /* r290: 見えないspinner等のanimation/transitionまで走らせない。
+       hide-text解除時は通常CSSへ戻るため見た目は変えません。 */
+    animation: none !important;
+    transition: none !important;
 }
 
 .cutin-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 7000; pointer-events: auto; display: flex; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.5s; }

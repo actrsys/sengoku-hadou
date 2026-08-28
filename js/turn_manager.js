@@ -46,6 +46,15 @@ class TurnManager {
     
         // ★追加：月初の処理が始まったら、ユーザーが勝手に操作できないように膜（ガード）を張ります！
         game.isProcessingAI = true;
+        // r290：AI城ターンだけでなく月初のイベント／派閥／人事処理も長時間AI処理です。
+        // 古いスマホではこの区間から地図上252城のfilter/animationと一時Canvasを軽量化し、
+        // 災害ダイアログ表示中に背面の見えないGPU処理を抱え込まないようにします。
+        if (typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')) {
+            document.body.classList.add('mobile-ai-light-mode');
+            if (game.ui && typeof game.ui.releaseMobileTransientMapResources === 'function') {
+                game.ui.releaseMobileTransientMapResources();
+            }
+        }
         if (game.ui && game.ui.aiGuard) {
             game.ui.aiGuard.classList.remove('hidden');
             game.ui.hideAIGuardText(); // ★中身を壊さずに、透明にして文字だけ隠します！

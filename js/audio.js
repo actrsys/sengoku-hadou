@@ -214,20 +214,32 @@ class AudioManager {
         // ★ここでも「基本の音量」と「ユーザー設定」を掛け算します！
         const baseVol = seData && seData.baseVolume !== undefined ? seData.baseVolume : this.fallbackSeVolume;
         const finalVolume = baseVol * this.userSeVolume;
+        // 完全ミュートならHowl/AudioBufferを作る意味がありません。長時間AI観戦では
+        // 無音SEのdecodeを積み重ねない方が古い端末のメモリ安定性に有利です。
+        if (!(finalVolume > 0)) return;
 
         let se = null;
+        let safetyTimer = null;
         const cleanup = () => {
+            if (safetyTimer) {
+                clearTimeout(safetyTimer);
+                safetyTimer = null;
+            }
             if (!se) return;
-            se.unload();
+            try { se.unload(); } catch (e) {}
             se = null;
         };
         se = new window.Howl({
             src: [`data/music/se/${fileName}`],
             volume: finalVolume,
             onend: cleanup,
-            onloaderror: cleanup
+            onloaderror: cleanup,
+            onplayerror: cleanup
         });
         se.play();
+        // 全SEは約11秒以下。古いWebViewでonend/onplayerrorが欠落しても
+        // 一時Howlを永久保持しないよう、十分長い安全弁で必ず解放します。
+        if (se) safetyTimer = setTimeout(cleanup, 15000);
     }
     
     // 今のBGMをメモ帳に書き写す魔法（上書き禁止バージョン！）

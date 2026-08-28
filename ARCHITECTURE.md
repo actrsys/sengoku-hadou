@@ -518,3 +518,9 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - 外交の血縁到達判定と二条御所への経路確認は、BFSの探索順・親記録を変えず `Array.shift()` をhead indexへ置き換える。判定結果を変える探索順変更や新しい近道判定は行わない。
 - AIの攻撃候補比較では、1回の同期 `decideAttackTarget()` 中に不変な勢力総兵数と自領内の敵対諸勢力数だけを短命キャッシュする。上洛経路探索のqueue membershipも短命 `Set` で補助するが、最小距離要素の選択・同点順・`splice` の順序は従来どおり保つ。乱数誤差・援軍加算の浮動小数演算・候補順そのものはキャッシュや並べ替えで変えない。
 - 野戦の移動可能範囲探索／A*に残る `sort()` + `shift()` は高頻度でも、同値距離時の安定ソート順や選ばれる経路へ影響し得るため、性能だけを理由にheap等へ置換しない。経路結果まで同値と証明できる専門的な置換手段が得られるまでは現行挙動を正本として維持する。
+
+## r290 追加監査：スマホ月初の背面GPU負荷／災害会話診断／SE寿命
+- 古いスマホのAI観戦では、AI城ターンだけでなく `startMonth()` 開始時点から `mobile-ai-light-mode` を有効にし、非必須の一時地図Canvas・慣性も解放する。月初イベント・派閥・人事の間に252城のfilter/animationを背面で合成し続けず、プレイヤーターン復帰時は既存の復帰窓口で通常表示へ戻す。ゲーム状態・AI判断・地図座標は変更しない。
+- 共通 `#ai-guard` をダイアログ等の前で一時透明化する場合、`opacity:0` だけで子spinnerのCSS animationを動かし続けない。既存 `hide-text` を併用し、非表示中の子要素animation/transitionを停止する。最終復帰時は `guardTextHiddenCount` と `applyAIGuardTextState()` を正本として、元から文字非表示だった状態も正しく維持する。
+- 災害イベントの初回会話は共通 `showDialogAsync()` と観戦1秒自動閉じを維持し、イベント固有の擬似クリックや別UIを増やさない。実機停止切り分け用に災害側から診断prefixだけを渡し、`dialog_rendered` / `dialog_autoclose_armed` / `dialog_autoclose_fire` / 既存 `dialog_done` を区別する。
+- SEは短命 `Howl` を使う現行方式を維持するが、`onend` / `onloaderror` に加えて `onplayerror` と15秒安全弁でも必ず `unload()` する。完全ミュート時は無音SE用Howlを生成しない。古いWebViewで終了通知が欠落しても長時間AI観戦中に一時音声資源を蓄積させない。
