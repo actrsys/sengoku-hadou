@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r296');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r297');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -10336,6 +10336,16 @@ test('地図ズームrAFはresetMapViewState後の新しい地図へ旧座標を
     assert.ok(block.includes('const isCurrentMapView = () => Number(this._mapViewResetToken || 0) === mapViewResetToken;'));
     assert.ok(block.includes('if (!isCurrentMapView()) {\n                    this.isAnimatingZoom = false;'));
     assert.ok(block.includes('if (!isCurrentMapView()) return;'), 'スマホ次フレーム補正も世代切替後は書き戻さない');
+});
+
+test('地図リセットは中断したズーム診断を終了し次シナリオへ旧checkpoint復元状態を持ち越さない', () => {
+    const map = read('js/ui_map.js');
+    const at = map.indexOf('resetMapViewState(options = {})');
+    const block = map.slice(at, map.indexOf('_getMapScaleTransform(', at));
+    assert.ok(block.includes("if (typeof this._endMapZoomDiagnostic === 'function') this._endMapZoomDiagnostic();"));
+    const endAt = map.indexOf('_endMapZoomDiagnostic()');
+    const endBlock = map.slice(endAt, map.indexOf('initMapDrag()', endAt));
+    assert.ok(endBlock.includes('this._mapZoomPreviousDiagnostic = undefined;'), '診断終了時に旧checkpoint保持状態を必ず解放する');
 });
 
 test('イベント地図の観戦自動送りtimerは先行タップ時に解放する', () => {

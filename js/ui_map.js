@@ -47,6 +47,10 @@ Object.assign(UIManager.prototype, {
     // タイトル復帰・新規開始・ロードで前のカメラ状態を持ち越さないための正本。
     // initialZoomLevel は 0=最小、1=標準、2=最大。通常は標準、タイトルからの観戦だけ0を指定する。
     resetMapViewState(options = {}) {
+        // ズーム診断は通常完了時に開始前checkpointへ戻しますが、ロード／タイトル復帰で
+        // rAFを中断した場合も同じ終了境界を通します。旧シナリオの一時診断状態を
+        // 内部へ残すと、次シナリオの正常なズーム完了時に古いcheckpointを書き戻し得ます。
+        if (typeof this._endMapZoomDiagnostic === 'function') this._endMapZoomDiagnostic();
         this._stopMapInertia();
         if (typeof this.abortMapEffectsForScenarioTransition === 'function') {
             this.abortMapEffectsForScenarioTransition();
