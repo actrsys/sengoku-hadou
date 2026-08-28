@@ -169,6 +169,7 @@ class TurnManager {
 
         // 四半期の全国AI人事はAIStaffingへ委譲し、TurnManagerは実行時期だけを指示します。
         if (game.aiStaffing) {
+            game.writeSystemDiagnostic('month_start:staffing:start');
             await game.aiStaffing.processQuarterlyStaffing(game.month, game.playerClanId);
         }
         game.writeSystemDiagnostic('month_start:staffing_done');

@@ -244,7 +244,19 @@ class AIStaffing {
     }
 
     _getActiveClanBushoCount(castle, clanId = castle ? castle.ownerClan : 0) {
-        return this._getActiveClanBushosInCastle(castle, clanId).length;
+        if (!castle || !Array.isArray(castle.samuraiIds) || castle.samuraiIds.length === 0) return 0;
+        const numericClanId = Number(clanId);
+        let count = 0;
+        // 人数だけ欲しい高頻度経路では、一度配列を作ってfilterする処理を避けます。
+        // getCastleBushos() と同じく未登場・死亡を除外し、AI配置人数の意味は従来どおりです。
+        for (const id of castle.samuraiIds) {
+            const b = this.game.getBusho(id);
+            if (!b || !window.LifeStatusRules.isPresent(b)) continue;
+            if (Number(b.clan) !== numericClanId || Number(b.belongKunishuId || 0) !== 0) continue;
+            if (!window.BushoStatusRules.isActive(b)) continue;
+            count++;
+        }
+        return count;
     }
 
     // ==========================================
@@ -880,6 +892,14 @@ class AIStaffing {
         
         // ★追加：武将の移動先を「同じ軍団のお城」だけに限定します！
         const sameLegionCastles = myReachableCastles.filter(c => Number(c.legionId) === Number(castle.legionId));
+
+        // 1回の移動計画中は実際の所属変更を行わないため、各拠点の配置人数は不変です。
+        // 候補武将×移動先の評価ごとに同じsamuraiIdsを数え直さず、この同期計画内だけ再利用します。
+        const activeClanBushoCountByCastleId = new Map();
+        for (const c of sameLegionCastles) {
+            activeClanBushoCountByCastleId.set(Number(c.id), this._getActiveClanBushoCount(c, clanId));
+        }
+        const getActiveClanBushoCount = (c) => activeClanBushoCountByCastleId.get(Number(c && c.id)) || 0;
         
         const bushoTypes = this.evaluateBushos(clanId);
         const castleRoles = this.evaluateCastles(clanId);
@@ -893,7 +913,7 @@ class AIStaffing {
         let totalScale = 0;
         
         sameLegionCastles.forEach(c => {
-            totalBushosInNetwork += this._getActiveClanBushoCount(c, clanId);
+            totalBushosInNetwork += getActiveClanBushoCount(c);
             totalScale += (c.maxKokudaka + c.maxCommerce);
         });
 
@@ -932,7 +952,7 @@ class AIStaffing {
 
                 let countScore = 0;
                 
-                const targetBushoCount = this._getActiveClanBushoCount(target, clanId);
+                const targetBushoCount = getActiveClanBushoCount(target);
                 if (targetBushoCount === 0) {
                     countScore += 200; 
                 } else {
@@ -1065,7 +1085,7 @@ class AIStaffing {
         }
 
         // お城に残る人数のカウンターです（最初は今いる全員の数）
-        let remainingCount = this._getActiveClanBushoCount(castle, clanId);
+        let remainingCount = getActiveClanBushoCount(castle);
         const moveActions = []; // まとめた行動を入れる箱です
 
         // 人数による点数を計算する魔法の道具です（全体の状況とお城の大きさの両方を考慮します）
@@ -1091,7 +1111,7 @@ class AIStaffing {
         // 目的地ごとに、まとめて移動の行動を作ります
         targetGroups.forEach(group => {
             let actualMovers = [];
-            let targetCount = this._getActiveClanBushoCount(group.target, clanId);
+            let targetCount = getActiveClanBushoCount(group.target);
             
             for (let busho of group.movers) {
                 // 最低でも城主1人は残すため、1人になったら絶対にお引越しさせません
@@ -1125,8 +1145,8 @@ class AIStaffing {
 
         // もし行きたい人が誰もいなくて、空き城があった時のお留守番機能です
         if (moveActions.length === 0) {
-            const emptyCastles = sameLegionCastles.filter(c => this._getActiveClanBushoCount(c, clanId) <= 1 && c.id !== castle.id);
-            if (emptyCastles.length > 0 && this._getActiveClanBushoCount(castle, clanId) > 4) {
+            const emptyCastles = sameLegionCastles.filter(c => getActiveClanBushoCount(c) <= 1 && c.id !== castle.id);
+            if (emptyCastles.length > 0 && getActiveClanBushoCount(castle) > 4) {
                 const lowSkillMovers = availableBushos
                     .filter(b => b.id !== castle.castellanId && !b.isCastellan)
                     .sort((a, b) => {
@@ -1159,6 +1179,11 @@ class AIStaffing {
 
         for (const clan of this.game.clans) {
             if (clan.id === 0 || clan.isDestroyed || clan.id === playerClanId) continue;
+
+            // 四半期だけの全国処理なので、実機停止時にどの勢力の人事で止まったかを1勢力1回だけ記録します。
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic(`month_start:staffing:clan_${clan.id}`);
+            }
 
             const daimyo = this.game.getBusho(clan.leaderId);
             if (daimyo && daimyo.castleId) {

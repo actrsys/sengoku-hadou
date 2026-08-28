@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r284');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r286');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7512,13 +7512,18 @@ test('一般地点の表示語は拠点を正本とし、城主・城壁・攻�
 test('AI人事の配置人数は同居人物数ではなく自家の通常活動中武将だけを数える', () => {
     const staffing = read('js/ai_staffing.js');
     assert.ok(staffing.includes('_getActiveClanBushosInCastle(castle'));
-    assert.ok(staffing.includes('Number(b.clan) === Number(clanId)'));
-    assert.ok(staffing.includes('Number(b.belongKunishuId || 0) === 0'));
-    assert.ok(staffing.includes('window.BushoStatusRules.isActive(b)'));
-    assert.ok(!staffing.includes('samuraiIds.length'), 'AI人事の人数評価へ物理在城人数を直接使わない');
-    ['totalBushosInNetwork += this._getActiveClanBushoCount(c, clanId);',
-     'let remainingCount = this._getActiveClanBushoCount(castle, clanId);',
-     'let targetCount = this._getActiveClanBushoCount(group.target, clanId);'].forEach(text => assert.ok(staffing.includes(text)));
+    const countAt = staffing.indexOf('_getActiveClanBushoCount(castle');
+    const countBlock = staffing.slice(countAt, countAt + 1200);
+    assert.ok(countBlock.includes('for (const id of castle.samuraiIds)'), '人数取得は在城IDを直接走査して一時配列を作らない');
+    assert.ok(countBlock.includes('Number(b.clan) !== numericClanId'));
+    assert.ok(countBlock.includes('Number(b.belongKunishuId || 0) !== 0'));
+    assert.ok(countBlock.includes('window.LifeStatusRules.isPresent(b)'));
+    assert.ok(countBlock.includes('window.BushoStatusRules.isActive(b)'));
+    assert.ok(!countBlock.includes('return castle.samuraiIds.length'), '物理在城人数をそのままAI配置人数として使わない');
+    assert.ok(staffing.includes('activeClanBushoCountByCastleId.set(Number(c.id), this._getActiveClanBushoCount(c, clanId));'), '移動計画開始時に従来条件で各拠点を一度だけ集計する');
+    ['totalBushosInNetwork += getActiveClanBushoCount(c);',
+     'let remainingCount = getActiveClanBushoCount(castle);',
+     'let targetCount = getActiveClanBushoCount(group.target);'].forEach(text => assert.ok(staffing.includes(text)));
 });
 
 test('諸勢力蜂起の勝利時は旧城主家臣だけを退避させ同居諸勢力を巻き込まない', () => {
@@ -9926,6 +9931,91 @@ test('旧ターンの0ms継続はタイトル・ロード後にphase境界を越
     const finishAt = turn.indexOf('async finishTurn()');
     const finishBlock = turn.slice(finishAt, finishAt + 500);
     assert.ok(finishBlock.includes("if (game.phase !== 'game') return;"));
+});
+
+
+test('戦後closeWarは開始時の戦争世代を固定しafter_war後も未定義参照で停止しない', () => {
+    const effort = read('js/war_effort.js');
+    const at = effort.indexOf('async closeWar()');
+    const block = effort.slice(at, at + 8000);
+    assert.ok(block.includes('const warGeneration = Number(this._warGeneration || 0);'), 'closeWar開始時に戦争世代をローカルへ固定する');
+    assert.ok(block.includes("await this.game.eventManager.processEvents('after_war', this.state);"), 'after_war完了を待つ');
+    assert.ok(block.includes('if (!this._isWarLifecycleCurrent(warGeneration, false)) return;'), 'await後は同じ戦争世代か再確認する');
+    assert.ok(block.includes('this._markWarClosed(warGeneration);'), '通常ターン復帰完了後をWarManager自身から通知する');
+});
+
+test('諸勢力戦の完了待ちはWarManagerの世代Promiseを使いcloseWar上書きとDOMポーリングを残さない', () => {
+    const war = read('js/war.js');
+    const kunishu = read('js/kunishu_system.js');
+    assert.ok(war.includes('waitForWarClose(generation = this.getCurrentWarGeneration())'));
+    assert.ok(war.includes('this._warCloseWaiters = new Map();'));
+    assert.ok(war.includes('_resolveWarCloseWaiters(null, false);'), '新戦争・シナリオ遷移で旧完了待ちを解放する');
+    assert.ok(kunishu.includes('await this.game.warManager.waitForWarClose(uprisingWarGeneration);'), '蜂起は専門Managerの完了通知を待つ');
+    assert.ok(kunishu.includes('await this.game.warManager.waitForWarClose(subjugationWarGeneration);'), '鎮圧も同じ完了通知を使う');
+    assert.ok(!kunishu.includes('this.game.warManager.closeWar = function'), '固定ManagerのcloseWarを一時上書きしない');
+    assert.ok(!kunishu.includes('while (!isWarReallyFinished)'), '500msのDOMポーリングを完了判定へ使わない');
+});
+
+test('スマホAI観戦の月次所属変化は途中の全国renderMapを安全地点へ集約する', () => {
+    const life = read('js/life_system.js');
+    const independence = read('js/independence_system.js');
+    const events = read('js/event/common_events.js');
+    assert.ok(life.includes('_shouldDeferMapRefreshForMobileWatch()'));
+    assert.ok(life.includes('this.game._aiDeferredMapRefresh = true;'));
+    assert.ok(life.includes('this._requestMapRefresh({ updatePanelHeader: true });'), '年初改名の地図更新も共通軽量窓口へ寄せる');
+    assert.ok(life.includes('this._requestMapRefresh();'), '大名継承の地図更新も共通軽量窓口へ寄せる');
+    assert.ok(independence.includes("this.game.writeSystemDiagnostic('rebellion:map:mobile_watch_deferred'"), '月末謀反の全国再描画も延期する');
+    assert.ok(events.includes("game.writeSystemDiagnostic('subordination:map:mobile_watch_deferred');"), 'AI臣従の全国再描画も延期する');
+});
+
+test('スマホ観戦の災害・イベント画面更新は専用演出後の重い再描画を月初安全地点へまとめる', () => {
+    const historical = read('js/event/historical_event.js');
+    const events = read('js/event/common_events.js');
+    assert.ok(historical.includes("game.writeSystemDiagnostic(isMobileWatch ? 'event_refresh:map:mobile_watch_deferred' : 'event_refresh:map:deferred')"));
+    assert.ok(events.includes("game.writeSystemDiagnostic('event:startMonth_before:heavy_snow_trigger:snow_overlay_deferred');"));
+    const heavyAt = events.indexOf('id: "heavy_snow_trigger"');
+    const heavyBlock = events.slice(heavyAt, heavyAt + 7500);
+    assert.ok(heavyBlock.includes('const isMobileWatch = !!('));
+    assert.ok(heavyBlock.includes('game._aiDeferredMapRefresh = true;'));
+    assert.ok(heavyBlock.includes("if (game.ui && game.ui.updateSnowOverlay && (!game.isProcessingAI || (game.isWatchMode && !isMobileWatch)))"), 'PC観戦と非AI時の即時雪Canvas更新を維持する');
+});
+
+
+test('諸勢力戦の完了Promiseは100ms後のfinishTurn完了まで待つ', () => {
+    const effort = read('js/war_effort.js');
+    const at = effort.indexOf('async closeWar()');
+    const block = effort.slice(at, at + 7200);
+    assert.ok(block.includes('let closeCompletionScheduled = false;'), 'close本体とターン復帰予約の完了地点を区別する');
+    assert.ok(block.includes("this.game.writeSystemDiagnostic('war:turn_return:start'"), '戦後ターン復帰開始を診断できる');
+    assert.ok(block.includes('Promise.resolve(this.game.finishTurn())'), 'finishTurnの非同期完了を待つ');
+    const finishAt = block.indexOf('Promise.resolve(this.game.finishTurn())');
+    const markAt = block.indexOf('this._markWarClosed(warGeneration);', finishAt);
+    assert.ok(finishAt >= 0 && markAt > finishAt, '正常系closed通知はfinishTurn完了側に置く');
+    assert.ok(block.includes('if (!closeCompletionScheduled) {'), '予約前の例外だけfinallyから待機を解放する');
+});
+
+test('AI武将移動計画は拠点人数を短命Mapで一度だけ集計する', () => {
+    const staffing = read('js/ai_staffing.js');
+    const countAt = staffing.indexOf('_getActiveClanBushoCount(castle');
+    const countBlock = staffing.slice(countAt, countAt + 1200);
+    assert.ok(countBlock.includes('for (const id of castle.samuraiIds)'), '人数だけの経路はsamuraiIdsを直接数える');
+    assert.ok(!countBlock.includes('this._getActiveClanBushosInCastle(castle, clanId).length'), '人数取得のための一時配列生成を残さない');
+    assert.ok(countBlock.includes('window.LifeStatusRules.isPresent(b)'), '未登場・死亡除外の従来集合を維持する');
+    assert.ok(countBlock.includes('window.BushoStatusRules.isActive(b)'), '活動中条件を維持する');
+
+    const planAt = staffing.indexOf('planMoveAction(castle, availableBushos, reachableMyCastles)');
+    const planEnd = staffing.indexOf('/** 四半期の全国AI人事。', planAt);
+    const planBlock = staffing.slice(planAt, planEnd);
+    assert.ok(planBlock.includes('const activeClanBushoCountByCastleId = new Map();'), '1計画内だけの人数Mapを作る');
+    assert.ok(planBlock.includes('const getActiveClanBushoCount = (c) => activeClanBushoCountByCastleId.get('), '候補評価は短命Mapを読む');
+    assert.ok(!planBlock.includes('this._getActiveClanBushoCount(target, clanId)'), '候補武将×移動先ごとの再集計をしない');
+});
+
+test('四半期AI人事は実機停止位置を勢力単位で診断する', () => {
+    const turn = read('js/turn_manager.js');
+    const staffing = read('js/ai_staffing.js');
+    assert.ok(turn.includes("game.writeSystemDiagnostic('month_start:staffing:start');"), 'AI人事開始地点を月初診断へ残す');
+    assert.ok(staffing.includes('this.game.writeSystemDiagnostic(`month_start:staffing:clan_${clan.id}`);'), '停止時に処理中勢力を識別できる');
 });
 
 Promise.all(pendingTests).then(() => {

@@ -201,6 +201,28 @@ class LifeSystem {
         await this.checkDeath();
     }
 
+    _shouldDeferMapRefreshForMobileWatch() {
+        return !!(
+            this.game && this.game.isWatchMode && this.game.isProcessingAI &&
+            typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')
+        );
+    }
+
+    _requestMapRefresh({ updatePanelHeader = false } = {}) {
+        if (!this.game || !this.game.ui) return;
+        if (this._shouldDeferMapRefreshForMobileWatch()) {
+            this.game._aiDeferredMapRefresh = true;
+            // ヘッダーは軽量なので従来の情報鮮度を保ち、全国地図DOMだけを延期します。
+            if (updatePanelHeader && typeof this.game.ui.updatePanelHeader === 'function') this.game.ui.updatePanelHeader();
+            if (typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic('life:map_refresh:mobile_watch_deferred');
+            }
+            return;
+        }
+        if (typeof this.game.ui.renderMap === 'function') this.game.ui.renderMap();
+        if (updatePanelHeader && typeof this.game.ui.updatePanelHeader === 'function') this.game.ui.updatePanelHeader();
+    }
+
     _yieldToBrowserForLife() {
         return new Promise(resolve => {
             if (typeof requestAnimationFrame === 'function') {
@@ -394,13 +416,9 @@ class LifeSystem {
             if (this.game.updateClanDisplayNames) {
                 this.game.updateClanDisplayNames();
             }
-            // 確定した情報でマップやパネルを描き直します
-            if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
-                this.game.ui.renderMap();
-            }
-            if (this.game.ui && typeof this.game.ui.updatePanelHeader === 'function') {
-                this.game.ui.updatePanelHeader();
-            }
+            // 確定した情報でマップやパネルを描き直します。
+            // 古いスマホの観戦中はこの直後も月初処理が続くため、全国DOM再生成は安全地点へまとめます。
+            this._requestMapRefresh({ updatePanelHeader: true });
         }
     }
 
@@ -1509,9 +1527,7 @@ class LifeSystem {
             }
         }
         
-        if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
-            this.game.ui.renderMap();
-        }
+        this._requestMapRefresh();
     }
     
     // ==========================================
@@ -1733,7 +1749,23 @@ class LifeSystem {
             clan.isDestroyed = true; 
 
             if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
-                this.game.ui.renderMap();
+                const isMobileWatch = !!(
+                    this.game.isWatchMode && this.game.isProcessingAI &&
+                    typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')
+                );
+                if (isMobileWatch) {
+                    // 戦争・独立と同様、古いスマホ観戦では滅亡直後に全国DOMを作り直さない。
+                    // 後継者不在で中立化した城だけ局所反映し、完全再描画は月初安全地点へまとめる。
+                    this.game._aiDeferredMapRefresh = true;
+                    if (typeof this.game.ui.refreshCastleOwnershipPresentation === 'function' && clanCastles.length > 0) {
+                        this.game.ui.refreshCastleOwnershipPresentation(clanCastles.map(c => c.id));
+                    }
+                    if (typeof this.game.writeSystemDiagnostic === 'function') {
+                        this.game.writeSystemDiagnostic('clan_extinction:map_light_done', clanCastles[0] || null);
+                    }
+                } else {
+                    this.game.ui.renderMap();
+                }
             }
 
             // ★すべての裏処理が終わってから、画面にメッセージを出して待ちます！

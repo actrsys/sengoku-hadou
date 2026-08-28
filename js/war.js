@@ -157,12 +157,60 @@ class WarManager {
         this.pendingPrisoners = [];
         this._warGeneration = 0;
         this._warEnding = false;
+        this._warCloseWaiters = new Map();
+        this._lastClosedWarGeneration = 0;
     }
 
     _beginWarLifecycle() {
+        // 前戦の完了待ちは新しい戦争へ持ち越さない。諸勢力戦など、
+        // 戦争の完全終了を待つ呼出元へ false を返して旧待機を解放する。
+        this._resolveWarCloseWaiters(null, false);
         this._warGeneration = Number(this._warGeneration || 0) + 1;
         this._warEnding = false;
         return this._warGeneration;
+    }
+
+    getCurrentWarGeneration() {
+        return Number(this._warGeneration || 0);
+    }
+
+    waitForWarClose(generation = this.getCurrentWarGeneration()) {
+        const targetGeneration = Number(generation || 0);
+        if (targetGeneration <= 0) return Promise.resolve(false);
+        if (Number(this._lastClosedWarGeneration || 0) === targetGeneration) return Promise.resolve(true);
+        if (targetGeneration !== this.getCurrentWarGeneration()) return Promise.resolve(false);
+
+        return new Promise(resolve => {
+            let waiters = this._warCloseWaiters.get(targetGeneration);
+            if (!waiters) {
+                waiters = new Set();
+                this._warCloseWaiters.set(targetGeneration, waiters);
+            }
+            waiters.add(resolve);
+        });
+    }
+
+    _resolveWarCloseWaiters(generation = null, completed = true) {
+        if (!(this._warCloseWaiters instanceof Map) || this._warCloseWaiters.size === 0) return;
+        const targets = generation == null
+            ? Array.from(this._warCloseWaiters.keys())
+            : [Number(generation || 0)];
+        for (const gen of targets) {
+            const waiters = this._warCloseWaiters.get(gen);
+            if (!waiters) continue;
+            this._warCloseWaiters.delete(gen);
+            for (const resolve of waiters) {
+                try { resolve(!!completed); } catch (e) {}
+            }
+        }
+    }
+
+    _markWarClosed(generation) {
+        const targetGeneration = Number(generation || 0);
+        if (targetGeneration > 0) {
+            this._lastClosedWarGeneration = targetGeneration;
+            this._resolveWarCloseWaiters(targetGeneration, true);
+        }
     }
 
     _isWarLifecycleCurrent(generation, requireActive = true) {
@@ -179,6 +227,7 @@ class WarManager {
     }
 
     abortForScenarioTransition() {
+        this._resolveWarCloseWaiters(null, false);
         this._warGeneration = Number(this._warGeneration || 0) + 1;
         this._warEnding = false;
         if (this.state) this.state.active = false;

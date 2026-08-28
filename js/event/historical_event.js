@@ -152,9 +152,17 @@ window.EventAction = {
         await new Promise(resolve => setTimeout(resolve, 0));
 
         if (game.ui) {
-            if (game.isProcessingAI && !game.isWatchMode) {
+            const isMobileWatch = !!(
+                game.isProcessingAI && game.isWatchMode &&
+                typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')
+            );
+            if (game.isProcessingAI && (!game.isWatchMode || isMobileWatch)) {
+                // 通常AIと低メモリのスマホ観戦では、イベント直後の全国DOM再生成を月初安全地点へまとめる。
+                // 観戦イベント中は専用地図で変化を見せており、通常地図は再び操作可能になる前に同期される。
                 game._aiDeferredMapRefresh = true;
-                if (typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:map:deferred');
+                if (typeof game.writeSystemDiagnostic === 'function') {
+                    game.writeSystemDiagnostic(isMobileWatch ? 'event_refresh:map:mobile_watch_deferred' : 'event_refresh:map:deferred');
+                }
             } else {
                 if (typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:map:start');
                 game.ui.renderMap();

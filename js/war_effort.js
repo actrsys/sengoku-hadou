@@ -1332,6 +1332,7 @@ Object.assign(WarManager.prototype, {
             }
 
             this.state.active = false; 
+            this._resolveWarCloseWaiters(warGeneration, false);
             this.game.finishTurn(); 
         }
     },
@@ -2937,6 +2938,11 @@ Object.assign(WarManager.prototype, {
     },
     
     async closeWar() { 
+        // closeWar() は after_war と、その後の通常ターン復帰までを1つの完了契約として扱う。
+        // 旧戦争の非同期継続が次戦へ触れないだけでなく、諸勢力側の完了待ちもこの世代を正本にする。
+        const warGeneration = Number(this._warGeneration || 0);
+        let closeCompletionScheduled = false;
+        try {
         // ここまでで戦闘演出は完了。以後は通常のターンカメラへ戻れるようロックを解除します。
         if (this.state) this.state.battleCameraLocked = false;
 
@@ -3016,16 +3022,42 @@ Object.assign(WarManager.prototype, {
             if (typeof this.game.writeSystemDiagnostic === 'function') {
                 this.game.writeSystemDiagnostic('war:prestige:start', prestigeDiagnosticCastle);
             }
-            if (typeof this.game.updateClanPrestige === 'function') {
-                prestigeClanIds.forEach(clanId => this.game.updateClanPrestige(clanId));
-            } else if (typeof this.game.updateAllClanPrestige === 'function') {
-                this.game.updateAllClanPrestige();
+            try {
+                if (typeof this.game.updateClanPrestige === 'function') {
+                    prestigeClanIds.forEach(clanId => this.game.updateClanPrestige(clanId));
+                } else if (typeof this.game.updateAllClanPrestige === 'function') {
+                    this.game.updateAllClanPrestige();
+                }
+                if (typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic('war:prestige:done', prestigeDiagnosticCastle);
+                    this.game.writeSystemDiagnostic('war:turn_return:start', prestigeDiagnosticCastle);
+                }
+            } catch (error) {
+                console.error('戦後の威信更新でエラーが発生しました:', error);
             }
-            if (typeof this.game.writeSystemDiagnostic === 'function') {
-                this.game.writeSystemDiagnostic('war:prestige:done', prestigeDiagnosticCastle);
-            }
-            this.game.finishTurn(); 
+
+            // waitForWarClose() の「close」は、closeWar()の関数本体だけでなく
+            // 旧戦争が通常ターンへ制御を返すところまでを意味する。
+            // finishTurn() は観戦終了予約などをawaitするため、完了を待ってから世代Promiseを解放する。
+            Promise.resolve(this.game.finishTurn()).catch(error => {
+                console.error('戦後のターン復帰でエラーが発生しました:', error);
+            }).finally(() => {
+                if (typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic('war:turn_return:done', prestigeDiagnosticCastle);
+                }
+                if (this._isWarLifecycleCurrent(warGeneration, false)) this._markWarClosed(warGeneration);
+                else this._resolveWarCloseWaiters(warGeneration, false);
+            });
         }, 100, false);
+        closeCompletionScheduled = true;
+        } finally {
+            // after_war以前の例外や、100ms復帰予約へ到達する前のシナリオ切替では待機Promiseを残さない。
+            // 正常系はfinishTurn()完了側が唯一のclosed通知地点になる。
+            if (!closeCompletionScheduled) {
+                if (this._isWarLifecycleCurrent(warGeneration, false)) this._markWarClosed(warGeneration);
+                else this._resolveWarCloseWaiters(warGeneration, false);
+            }
+        }
     },
     
     // ★守備側が「自分の別の城」から援軍を呼べるかチェックする魔法

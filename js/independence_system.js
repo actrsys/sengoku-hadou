@@ -1262,9 +1262,18 @@ class IndependenceSystem {
                 // ★追加：ストッパーを外して、新しい色を塗れるようにします！
                 this.game.isSuspendingColorUpdate = false;
 
-                // 謀反成功時は大名家の色がそのまま引き継がれるため、
-                // 光るアニメーションは出さずに、マップをそのまま描き直します。
-                if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+                // 謀反成功時は大名家の色がそのまま引き継がれるため光る演出は不要です。
+                // ただし古いスマホのAI観戦中は、月末処理の途中で全国DOMを再生成せず月初安全地点へまとめます。
+                const isMobileWatch = !!(
+                    this.game.isWatchMode && this.game.isProcessingAI &&
+                    typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')
+                );
+                if (isMobileWatch) {
+                    this.game._aiDeferredMapRefresh = true;
+                    if (typeof this.game.writeSystemDiagnostic === 'function') {
+                        this.game.writeSystemDiagnostic('rebellion:map:mobile_watch_deferred', daimyoCastle || null);
+                    }
+                } else if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
                     this.game.ui.renderMap();
                 }
 

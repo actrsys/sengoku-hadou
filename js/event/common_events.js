@@ -1534,10 +1534,20 @@ window.GameEvents.push({
             }
 
             // 通常プレイの月初ではisProcessingAI=trueなので描画を重ねません。
-            // 非AI実行/観戦時だけ、イベント用Canvas解放後に通常マップへ反映します。
-            if (game.ui && game.ui.updateSnowOverlay && (!game.isProcessingAI || game.isWatchMode)) {
+            // PC観戦は従来どおり即時反映する一方、古いスマホ観戦ではイベント地図解放直後に
+            // 雪Canvas→全国地図再描画を連続生成せず、月初安全地点の1回へまとめます。
+            const isMobileWatch = !!(
+                game.isProcessingAI && game.isWatchMode &&
+                typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')
+            );
+            if (game.ui && game.ui.updateSnowOverlay && (!game.isProcessingAI || (game.isWatchMode && !isMobileWatch))) {
                 await new Promise(resolve => setTimeout(resolve, 0));
                 game.ui.updateSnowOverlay();
+            } else if (isMobileWatch) {
+                game._aiDeferredMapRefresh = true;
+                if (typeof game.writeSystemDiagnostic === 'function') {
+                    game.writeSystemDiagnostic('event:startMonth_before:heavy_snow_trigger:snow_overlay_deferred');
+                }
             }
         }
     }
@@ -2134,8 +2144,15 @@ window.GameEvents.push({
 
         // 最後に、誰かが臣従して地図に変化があった場合のみ、画面を綺麗に描き直します
         if (needMapUpdate) {
-            if (game.isProcessingAI && !game.isWatchMode) {
+            const isMobileWatch = !!(
+                game.isProcessingAI && game.isWatchMode &&
+                typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')
+            );
+            if (game.isProcessingAI && (!game.isWatchMode || isMobileWatch)) {
                 game._aiDeferredMapRefresh = true;
+                if (isMobileWatch && typeof game.writeSystemDiagnostic === 'function') {
+                    game.writeSystemDiagnostic('subordination:map:mobile_watch_deferred');
+                }
             } else {
                 if (game.ui.updatePanelHeader) game.ui.updatePanelHeader();
                 if (game.ui.renderCommandMenu) game.ui.renderCommandMenu();

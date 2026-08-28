@@ -637,57 +637,12 @@ class KunishuSystem {
             kunishuId: kunishu.id
         };
 
-        // ==========================================
-        // ★ここから修正！：戦争が「完全に」終わるまで見届ける監視カメラの魔法！
-        // ==========================================
-        let isWarReallyFinished = false;
-        const originalCloseWar = this.game.warManager.closeWar;
-        
-        // closeWar（合戦画面を閉じる最後の処理）が呼ばれたら、監視カメラに「終わったよ！」と報告させます
-        this.game.warManager.closeWar = function() {
-            if (originalCloseWar) originalCloseWar.call(this); // 元の終了処理をちゃんと実行します
-            isWarReallyFinished = true;  // 報告！
-        };
-
-        // WarManagerの開始フローに合流（いざ、戦争スタート！）
-        this.game.warManager.startWar(dummyAttacker, castle, atkBushos, atkSoldiers, atkRice, atkHorses, atkGuns); 
-        
-        // 戦争とメッセージ表示が完全に終わるまでじっと待ちます
-        let failSafeCounter = 0; 
-        
-        while (!isWarReallyFinished) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // 安全装置：裏でエラーが起きて closeWar が一生呼ばれない場合のためのタイマー
-            if (this.game.warManager.state && !this.game.warManager.state.active) {
-                let anyModalOpen = false;
-                if (this.game.ui) {
-                    const isVisible = (id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
-                    if (isVisible('result-modal') || isVisible('dialog-modal') || isVisible('war-modal')) {
-                        anyModalOpen = true;
-                    }
-                    // タップメッセージ等、名前がわからない画面が出ている場合も検知します
-                    const overlay = document.querySelector('[class*="tap"], [id*="tap"]');
-                    if (overlay && !overlay.classList.contains('hidden') && overlay.style.display !== 'none') {
-                        anyModalOpen = true;
-                    }
-                }
-                
-                if (!anyModalOpen) {
-                    failSafeCounter++;
-                    // 何の画面も出ていないのに3秒（6回）止まっていたら、エラーとみなして強制的に次へ進めます
-                    if (failSafeCounter > 6) {
-                        break;
-                    }
-                } else {
-                    failSafeCounter = 0; // 画面が出ている間は大人しく待ちます
-                }
-            }
-        }
-        
-        // 監視カメラを片付けて、元の状態に綺麗に戻します！
-        delete this.game.warManager.closeWar;
-        // ==========================================
+        // WarManager 自身の戦争世代を正本にし、closeWar の上書きや500msポーリングを行わない。
+        // 固定Managerへ一時メソッドを生やすと、旧戦争の非同期closeと次戦の開始が重なった時に
+        // 別戦争のcloseWar契約まで書き換え得るため、専門Managerの完了Promiseだけを待つ。
+        this.game.warManager.startWar(dummyAttacker, castle, atkBushos, atkSoldiers, atkRice, atkHorses, atkGuns);
+        const uprisingWarGeneration = this.game.warManager.getCurrentWarGeneration();
+        await this.game.warManager.waitForWarClose(uprisingWarGeneration);
         // ★修正ここまで
     }
 
@@ -1004,51 +959,15 @@ class KunishuSystem {
 
         this.applySubjugationHostility(kunishu, atkCastle.ownerClan);
 
-        // ==========================================
-        // ★蜂起(executeUprising)と同じように、startWarに合流させます！
-        // ==========================================
-        let isWarReallyFinished = false;
-        const originalCloseWar = this.game.warManager.closeWar;
-        
-        // closeWarが呼ばれたら、終わったよと報告させます
-        this.game.warManager.closeWar = function() {
-            if (originalCloseWar) originalCloseWar.call(this); 
-            isWarReallyFinished = true;  
-        };
-
         // 鎮圧戦も通常戦と同じ戦争準備の正規窓口へ必ず合流させます。
+        // 開戦準備側が同期的に startWar() へ到達した時点の戦争世代を完了待ちの正本にする。
+        const beforeGeneration = this.game.warManager.getCurrentWarGeneration();
         const extraData = { isKunishu: true, kunishuId: kunishu.id };
         this.game.warPreparationController.checkReinforcementAndStartWar(atkCastle, actualTargetCastleId, atkBushos, sendSoldiers, sendRice, sendHorses, sendGuns, extraData);
-        
-        // 戦争とメッセージ表示が完全に終わるまで待ちます
-        let failSafeCounter = 0; 
-        
-        while (!isWarReallyFinished) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            if (this.game.warManager.state && !this.game.warManager.state.active) {
-                let anyModalOpen = false;
-                if (this.game.ui) {
-                    const isVisible = (id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
-                    if (isVisible('result-modal') || isVisible('dialog-modal') || isVisible('war-modal')) {
-                        anyModalOpen = true;
-                    }
-                    const overlay = document.querySelector('[class*="tap"], [id*="tap"]');
-                    if (overlay && !overlay.classList.contains('hidden') && overlay.style.display !== 'none') {
-                        anyModalOpen = true;
-                    }
-                }
-                
-                if (!anyModalOpen) {
-                    failSafeCounter++;
-                    if (failSafeCounter > 6) break;
-                } else {
-                    failSafeCounter = 0; 
-                }
-            }
+        const subjugationWarGeneration = this.game.warManager.getCurrentWarGeneration();
+        if (subjugationWarGeneration !== beforeGeneration) {
+            await this.game.warManager.waitForWarClose(subjugationWarGeneration);
         }
-        
-        delete this.game.warManager.closeWar;
         
         // プレイヤー関与時のUI更新
         const isPlayer = (Number(atkCastle.ownerClan) === Number(this.game.playerClanId) && !atkCastle.isDelegated);
