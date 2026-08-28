@@ -281,14 +281,21 @@ Object.assign(WarManager.prototype, {
         }
 
         // 戦況報告も通常の軍師助言と同じ「話者→当主」の会話レジスターを使う。
-        // 小姓代行時は従来文のままにし、軍師がいる時だけ GunshiSystem を正本として整える。
+        // 軍師がいる時は GunshiSystem を正本とし、小姓代行時も人物呼称だけは ConversationStandingRules へ揃える。
         const gunshiDialogue = gunshi && this.game.gunshiSystem ? this.game.gunshiSystem : null;
         const styleAdvisorText = text => gunshiDialogue
             ? gunshiDialogue._styleForSpeaker(gunshi, text)
             : String(text || '');
-        const getAdvisorTargetCallName = target => gunshiDialogue
-            ? gunshiDialogue._getTargetCallName(gunshi, target)
-            : `${target && (target.fullName || target.name) ? (target.fullName || target.name) : '武将'}殿`;
+        const getAdvisorTargetCallName = target => {
+            if (gunshiDialogue) return gunshiDialogue._getTargetCallName(gunshi, target);
+            const playerDaimyo = this.game.getClanDaimyo ? this.game.getClanDaimyo(this.game.playerClanId) : null;
+            if (target && playerDaimyo && Number(target.id) === Number(playerDaimyo.id)) return '殿';
+            if (target && window.ConversationStandingRules
+                && typeof window.ConversationStandingRules.getInterviewTargetCallName === 'function') {
+                return window.ConversationStandingRules.getInterviewTargetCallName(this.game, null, target, playerDaimyo);
+            }
+            return `${target && (target.fullName || target.name) ? (target.fullName || target.name) : '武将'}殿`;
+        };
 
         const pid = this.game.playerClanId;
         
@@ -416,14 +423,14 @@ Object.assign(WarManager.prototype, {
                 const gunshi = game.getClanGunshi(game.playerClanId);
                 if (isBoss && !canDeclineBoss) {
                     const bossMsg = isAttack 
-                        ? `主家である ${myClanName} が\n${targetInfoStr}侵攻します。\n当家は従属しているため直ちに出陣します！`
-                        : `主家である ${myClanName} から${typeStr}援軍要請が届きました。\n当家は従属しているため直ちに出陣します！`;
+                        ? `主家である${myClanName}が\n${targetInfoStr}侵攻します。\n当家は従属しているため直ちに出陣します！`
+                        : `主家である${myClanName}から${typeStr}援軍要請が届きました。\n当家は従属しているため直ちに出陣します！`;
                     game.ui.showDialog(bossMsg, false, onAccept, null, { closeBeforeOk: true });
                 } else {
-                    let dialogMsg = `${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。(持参金: ${gold})\n援軍要請に応じますか？`;
+                    let dialogMsg = `${myClanName}から\n${targetInfoStr}${typeStr}援軍要請が届きました。（持参金：${gold}）\n援軍要請に応じますか？`;
                     // スキルを持っている場合は専用のメッセージになります
                     if (isBoss && canDeclineBoss) {
-                        dialogMsg = `主家である ${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。\n援軍要請に応じますか？`;
+                        dialogMsg = `主家である${myClanName}から\n${targetInfoStr}${typeStr}援軍要請が届きました。\n援軍要請に応じますか？`;
                     }
                     
                     const choices = [
@@ -2212,7 +2219,7 @@ Object.assign(WarManager.prototype, {
                 if (lossRate > 0) {
                     const lostGold = Math.floor(s.defender.gold * lossRate); const lostRice = Math.floor(s.defender.rice * lossRate);
                     s.defender.gold -= lostGold; s.defender.rice -= lostRice;
-                    if (s.isPlayerInvolved) this.game.ui.log(`(敵兵の持ち逃げにより 金${lostGold}, 米${lostRice} が失われた)`, { history: false });
+                    if (s.isPlayerInvolved) this.game.ui.log(`(敵兵の持ち逃げにより金${lostGold}、米${lostRice}が失われた)`, { history: false });
                 }
                 
                 // ★城の管理システムにお任せします！
@@ -2609,8 +2616,8 @@ Object.assign(WarManager.prototype, {
         };
 
         let msg = "";
-        if (hiredNames.length > 0) msg += `${formatNames(hiredNames)} を登用しました。\n`;
-        if (refusedNames.length > 0) msg += `${formatNames(refusedNames)} には登用を断られました。`;
+        if (hiredNames.length > 0) msg += `${formatNames(hiredNames)}を登用しました。\n`;
+        if (refusedNames.length > 0) msg += `${formatNames(refusedNames)}には登用を断られました。`;
         if (msg === "") msg = "登用処理が完了しました。";
 
         this.game.ui.showDialog(msg, false, () => {
@@ -2687,7 +2694,7 @@ Object.assign(WarManager.prototype, {
 
         // 確認のメッセージダイアログを出します（true にして、２つの選択肢が出るようにします）
         // オプション機能を使って、ボタンの文字と色を直接指定します
-        this.game.ui.showDialog(`${displayName} を本当に処断してよろしいですか？`, true, 
+        this.game.ui.showDialog(`${displayName}を本当に処断してよろしいですか？`, true, 
             () => { 
                 // 「処断する」を選んだ時の処理：ここで初めて処断予定リストに移します
                 for (let id of selectedIds) {
@@ -2698,7 +2705,7 @@ Object.assign(WarManager.prototype, {
                     }
                 }
                 // そして、処断完了のメッセージを出します
-                this.game.ui.showDialog(`${displayName} を処断しました。`, false, () => {
+                this.game.ui.showDialog(`${displayName}を処断しました。`, false, () => {
                     this.openKillSelector();
                 }, null, { closeBeforeOk: true });
             },
@@ -2760,7 +2767,7 @@ Object.assign(WarManager.prototype, {
                 releasedNames.push(prisoner.name);
             }
             if (releasedNames.length > 0) {
-                this.game.ui.log(`(捕虜となっていた ${releasedNames.join('、')} を解放しました)`, { history: false });
+                this.game.ui.log(`(捕虜となっていた${releasedNames.join('、')}を解放しました)`, { history: false });
             }
         }
         

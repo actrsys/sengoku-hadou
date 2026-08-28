@@ -12,7 +12,28 @@ class UIInfoManager {
     }
     
     // --- 共通モーダル（枠の使い回し）管理 ---
+    // 数量指定など別モーダルを一段だけ重ねる時は、親の一覧状態を破棄せず一時的に隠します。
+    // close→open で作り直すと選択ID・タブ・ソート・modalHistoryを失うため、子画面の戻り先保持はこの窓口を使います。
+    suspendCommonModalForChild() {
+        if (this._commonModalSuspendedForChild) return true;
+        const elements = this.selectorView ? this.selectorView.getElements() : null;
+        if (!this.currentModalInfo || !elements || !elements.modal || elements.modal.classList.contains('hidden')) return false;
+        elements.modal.classList.add('hidden');
+        this._commonModalSuspendedForChild = true;
+        return true;
+    }
+
+    resumeCommonModalFromChild() {
+        if (!this._commonModalSuspendedForChild) return false;
+        const elements = this.selectorView ? this.selectorView.getElements() : null;
+        this._commonModalSuspendedForChild = false;
+        if (!this.currentModalInfo || !elements || !elements.modal) return false;
+        elements.modal.classList.remove('hidden');
+        return true;
+    }
+
     closeCommonModal() {
+        this._commonModalSuspendedForChild = false;
         // 閉じた画面の遅延描画・仮想スクロール処理を即座に無効化します。
         // 古いスマホでは、非表示DOMの裏で分割描画が続いたり、scroll handler のクロージャが
         // 大量の武将配列を保持し続けるだけでも、通常地図復帰時のメモリピークに繋がります。
@@ -331,6 +352,17 @@ class UIInfoManager {
         this._renderCurrentModal();
     }
 
+    // 婚姻などの多段選択では、親画面の選択状態を履歴側へ預けてから子画面を開く。
+    // close→openで擬似的に戻り先を作ると、共通Back処理のpopと競合して新しい画面まで閉じるため、
+    // 「履歴を積む」「子画面の選択は空から始める」を一つの入口にまとめる。
+    pushSelectionModal(pageType, renderArgs) {
+        if (this.currentModalInfo) {
+            this.currentModalInfo.selectedIds = [...(this.commonSelectedIds || [])];
+        }
+        this.commonSelectedIds = [];
+        this.pushModal(pageType, renderArgs);
+    }
+
     popModal() {
         if (!this.modalHistory || this.modalHistory.length === 0) {
             this.closeCommonModal();
@@ -338,6 +370,23 @@ class UIInfoManager {
         }
         // 履歴から一つ前の画面を取り出して復元します
         this.currentModalInfo = this.modalHistory.pop();
+        this.commonSelectedIds = Array.isArray(this.currentModalInfo.selectedIds)
+            ? [...this.currentModalInfo.selectedIds]
+            : [];
+        if (this.currentModalInfo.pageType === 'busho_selector' && this.currentModalInfo.bushoViewState) {
+            const view = this.currentModalInfo.bushoViewState;
+            this.bushoCurrentTab = view.tab || 'stats';
+            this.bushoCurrentScope = view.scope || 'clan';
+            this.bushoCurrentSortKey = view.sortKey || null;
+            this.bushoIsSortAsc = !!view.isSortAsc;
+            // 子一覧の再生成可能キャッシュは親へ持ち越さず、復元した条件で作り直します。
+            this.bushoSavedBushos = null;
+            this.bushoSavedSortedBushos = null;
+            this.bushoLastSortStateKey = null;
+            this.bushoLastScope = null;
+            this.bushoSavedData = null;
+            this._invalidateListItemsCache('busho');
+        }
         this._renderCurrentModal();
     }
     
@@ -751,6 +800,7 @@ class UIInfoManager {
             gridTemplateSp: gridSpStr,
             gridTemplatePc: gridPcStr,
             onBack: isSelectMode ? onBack : null,
+            backLabel: isSelectMode && onBack ? '戻る' : null,
             onConfirm: isSelectMode ? () => {
                 if (!this.commonSelectedIds || this.commonSelectedIds.length === 0) return;
                 const selectedId = this.commonSelectedIds[0];
@@ -1427,7 +1477,7 @@ class UIInfoManager {
             contextHtml: config.contextHtml || null,
             tabsHtml: config.tabsHtml || null,
             hideBackBtn: !!config.hideBackBtn,
-            backLabel: (this.modalHistory && this.modalHistory.length > 0) ? '戻る' : '閉じる',
+            backLabel: config.backLabel || ((this.modalHistory && this.modalHistory.length > 0) ? '戻る' : '閉じる'),
             onBack: () => {
                 if (config.onBack) config.onBack();
                 this._currentListRenderId++;
@@ -1799,8 +1849,7 @@ class UIInfoManager {
     }
 
     showPrincessSelector(targetCastleId, doerId) {
-        this.closeCommonModal(); 
-        this.pushModal('princess_list', [true, targetCastleId, doerId]);
+        this.pushSelectionModal('princess_list', [true, targetCastleId, doerId]);
     }
     
     _renderPrincessList(isSelectMode, targetCastleId, doerId, scrollPos = 0) {
@@ -2010,7 +2059,8 @@ class UIInfoManager {
             scrollPos: scrollPos,
             gridTemplateSp: "1.3fr 1.5fr 0.8fr 0.8fr 1.5fr 1.5fr",
             gridTemplatePc: "95px 100px 50px 50px 100px 100px 1fr",
-            onBack: isSelectMode ? () => this.openBushoSelector('diplomacy_doer', targetCastleId, { subAction: 'marriage' }) : null,
+            // 選択モードも共通のmodalHistoryへ一段だけ戻す。外交・自家婚姻で戻り先を直書きしない。
+            onBack: null,
             onConfirm: isSelectMode ? () => this.confirmPrincessSelection(targetCastleId, doerId) : null,
             onScopeClick: (scopeKey) => {
                 this.princessCurrentScope = scopeKey;
@@ -2034,8 +2084,6 @@ class UIInfoManager {
     confirmPrincessSelection(targetCastleId, doerId) {
         if (!this.commonSelectedIds || this.commonSelectedIds.length === 0) return;
         const selectedId = this.commonSelectedIds[0];
-        
-        this.closeCommonModal(); 
         
         this.game.commandSystem.handleBushoSelection('marriage_princess', [selectedId], targetCastleId, { doerId: doerId });
     }
@@ -2115,7 +2163,7 @@ class UIInfoManager {
         const castle = this.game.getCastle(castleId);
         if (!castle) return;
 
-        const shell = this._openInfoShell(`${castle.name} の委任設定`);
+        const shell = this._openInfoShell(`${castle.name}の委任設定`);
         if (!shell) return;
         const { listContainer } = shell;
 
@@ -2490,7 +2538,7 @@ class UIInfoManager {
 
     // ★引数に isSelectMode と onConfirm を追加して両対応にしました
     _renderKunishuList(kunishus, castle, isSelectMode = false, onBack = null, onConfirm = null, scrollPos = 0) {
-        let contextHtml = `<div>${castle ? castle.name + ' に存在する諸勢力です' : '全国の諸勢力一覧です'}</div>`;
+        let contextHtml = `<div>${castle ? castle.name + 'に存在する諸勢力です' : '全国の諸勢力一覧です'}</div>`;
         if (isSelectMode) {
             contextHtml = "<div>対象とする諸勢力をお選びください</div>";
         }
@@ -2629,6 +2677,7 @@ class UIInfoManager {
             gridTemplateSp: "2.0fr 2.3fr 2.3fr 1.5fr 1.5fr 1.8fr 1fr",
             gridTemplatePc: "120px 120px 120px 60px 80px 100px 60px 1fr",
             onBack: onBack,
+            backLabel: isSelectMode && onBack ? '戻る' : null,
             onConfirm: isSelectMode ? () => {
                 if (!this.commonSelectedIds || this.commonSelectedIds.length === 0) return;
                 const selectedId = this.commonSelectedIds[0];
@@ -2770,6 +2819,7 @@ class UIInfoManager {
             gridTemplateSp: "1.5fr 1fr 1fr 1.5fr 1fr",
             gridTemplatePc: "150px 120px 100px 1fr 80px",
             onBack: onCancel,
+            backLabel: onCancel ? '戻る' : null,
             onConfirm: () => {
                 if (!this.commonSelectedIds || this.commonSelectedIds.length === 0) return;
                 const selectedIndex = this.commonSelectedIds[0];

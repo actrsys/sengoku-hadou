@@ -1619,7 +1619,7 @@ class LifeSystem {
         // ==========================================
 
         // ★修正：改名する前の「元の名前」を使ってメッセージを作ります！
-        const mainMsg = `${originalName} が家督を継ぎ、新たな大名となりました！`;
+        const mainMsg = `${originalName}が家督を継ぎ、新たな大名となりました！`;
         this.game.ui.log(`【家督相続】${mainMsg}`, { clanIds: [clan.id], category: 'succession', inferCurrentTurn: false });
         messages.unshift(mainMsg);
 

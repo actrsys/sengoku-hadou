@@ -96,7 +96,6 @@
         bind('guide-title-btn', () => getGame()?.commandSystem?.executeSystemCommand('guide'));
         bind('settings-btn', () => getGame()?.commandSystem?.executeSystemCommand('settings'));
         bind('scenario-close-btn', () => getGame()?.ui?.returnToTitle());
-        bind('quantity-back-btn', () => hide('quantity-modal'));
         bind('result-close-btn', () => getGame()?.ui?.closeResultModal());
         bind('gunshi-back-btn', () => hide('gunshi-modal'));
         bind('saveload-close-btn', () => hide('saveload-modal'));

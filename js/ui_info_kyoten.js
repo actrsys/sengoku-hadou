@@ -558,20 +558,22 @@ Object.assign(UIInfoManager.prototype, {
         if (isSelectMode && selectData) {
             titleStr = "任せる拠点を選択してください";
             contextHtmlStr = "<div>任せる拠点を選択してください</div>";
-            onBackFunc = () => {
-                this.closeCommonModal();
-                this.ui.showAppointLegionLeaderModal(selectData.legionNo);
-            };
+            // 武将選択→拠点選択は共通 modalHistory に積んでいるため、
+            // 標準［戻る］の popModal() だけで一段前へ戻します。
+            onBackFunc = null;
             onConfirmFunc = () => {
                 if (!this.commonSelectedIds || this.commonSelectedIds.length === 0) return;
                 const castleId = this.commonSelectedIds[0];
                 
-                this.ui.showDialog("よろしいですか？", true, () => {
+                const busho = this.game.getBusho(selectData.bushoId);
+                const castle = this.game.getCastle(castleId);
+                const confirmMsg = busho && castle
+                    ? `${busho.name}を国主に任命し、${castle.name}を本拠としますか？`
+                    : "この内容で国主に任命しますか？";
+                this.ui.showDialog(confirmMsg, true, () => {
                     this.closeCommonModal();
                     this.game.commandSystem.executeAppointLegionLeader(selectData.bushoId, selectData.legionNo, castleId);
-                }, () => {
-                    this._renderKyotenList(clanId, isSelectMode, selectData, 0);
-                });
+                }, null, { okText: '任命する', cancelText: 'やめる' });
             };
         }
 
@@ -621,14 +623,13 @@ Object.assign(UIInfoManager.prototype, {
     },
 
     showAppointLegionCastleSelector(bushoId, legionNo) {
-        this.closeCommonModal();
         this.kyotenSavedCastles = null;
         this.kyotenSavedSortedCastles = null;
         this.kyotenCastleBushoStatsMap = null;
         this.kyotenLastSortStateKey = null;
         this.kyotenLastScope = null;
-        // 拠点一覧（kyoten_list）を選択モードで呼び出します
-        this.pushModal('kyoten_list', [this.game.playerClanId, true, { bushoId: bushoId, legionNo: legionNo }]);
+        // 親の武将選択と選択状態を履歴へ預け、拠点一覧を子画面として開きます。
+        this.pushSelectionModal('kyoten_list', [this.game.playerClanId, true, { bushoId: bushoId, legionNo: legionNo }]);
     },
 
     // ==========================================

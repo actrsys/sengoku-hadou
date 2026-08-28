@@ -642,11 +642,23 @@ Object.assign(UIInfoManager.prototype, {
     
     openBushoSelector(actionType, targetId = null, extraData = null, onBack = null) {
         if (actionType === 'appoint' && this.ui.currentCastle) { const isDaimyoHere = this.game.getCastleBushos(this.ui.currentCastle.id).some(b => b.isDaimyo && Number(b.clan) === Number(this.ui.currentCastle.ownerClan) && Number(b.belongKunishuId || 0) === 0); if (isDaimyoHere) { this.ui.showDialog("大名の居城は城主を変更できません", false); return; } }
+
+        const preserveModalHistory = !!(extraData && extraData.preserveModalHistory);
+        // 武将一覧→武将一覧の子選択へ進む場合、親のタブ・範囲・ソートも選択IDと同じく履歴へ預けます。
+        // 子画面は通常の新規一覧と同じ初期状態から始め、戻った時だけ親の見た目を復元します。
+        if (preserveModalHistory && this.currentModalInfo && this.currentModalInfo.pageType === 'busho_selector') {
+            this.currentModalInfo.bushoViewState = {
+                tab: this.bushoCurrentTab,
+                scope: this.bushoCurrentScope,
+                sortKey: this.bushoCurrentSortKey,
+                isSortAsc: this.bushoIsSortAsc
+            };
+        }
         
-        // 新しく武将一覧を開く入口では、前回閉じた時のタブ状態を引き継がず必ず「基本」から始めます。
-        // 詳細画面から「戻る」場合は openBushoSelector() を通らず modalHistory から復元されるため、
-        // 一覧内での一時的なタブ状態は従来どおり保持されます。
+        // 新しく武将一覧を開く入口では、前回の表示状態を引き継がず必ず基本・自家範囲から始めます。
+        // 詳細画面や多段選択から「戻る」場合は modalHistory に保存した親状態を復元します。
         this.bushoCurrentTab = 'stats';
+        this.bushoCurrentScope = 'clan';
 
         // ★修正：新しく武将一覧を開くときは、以前開いたリストの記憶（キャッシュ）を消してリセットします
         this.bushoCurrentSortKey = null;
@@ -660,6 +672,8 @@ Object.assign(UIInfoManager.prototype, {
 
         if (actionType === 'view_only' || actionType === 'all_busho_list') {
             this.pushModal('busho_selector', [actionType, targetId, extraData, onBack]);
+        } else if (preserveModalHistory) {
+            this.pushSelectionModal('busho_selector', [actionType, targetId, extraData, onBack]);
         } else {
             this.closeCommonModal(); // アクションの時は新しく開くので履歴ごとリセットします
             this.pushModal('busho_selector', [actionType, targetId, extraData, onBack]);
@@ -1250,12 +1264,39 @@ Object.assign(UIInfoManager.prototype, {
 
                 // 外交の使者決定から直接会話へ進む経路は、次のダイアログが実際に描画されるまで
                 // この選択画面を残します。先に閉じると画像decode等の待ち時間に黒い背景が露出します。
+                // 外交担当選択の直後に最終確認・軍師助言が入る経路では、取消時に担当官一覧へ戻れるよう
+                // 親一覧を保持します。会話へ直行する断交だけは、次の会話が可視化されるまでのhandoffをここで開始します。
+                const diplomacySubAction = actionType === 'diplomacy_doer' && extraData ? extraData.subAction : null;
+                const diplomacyKeepsSelectorForConfirmation = ['alliance', 'subordinate', 'vassalage', 'dominate', 'truce', 'court_truce'].includes(diplomacySubAction);
                 const directDiplomacyHandoff = actionType === 'diplomacy_doer'
-                    && extraData
-                    && !['goodwill', 'marriage'].includes(extraData.subAction);
+                    && diplomacySubAction === 'break_alliance';
+                const keepSelectorForMarriageStep = actionType === 'arrange_marriage_busho'
+                    || actionType === 'marriage_kinsman'
+                    || (actionType === 'diplomacy_doer' && extraData && extraData.subAction === 'marriage');
+                // 対象→実行武将の二段選択も、婚姻と同じく親一覧を履歴へ積めるようにする。
+                // ここで先に閉じると子のopen時には親状態が失われ、［戻る］がコマンド終了になってしまう。
+                const keepSelectorForNestedBushoStep = ['employ_target', 'headhunt_target', 'assassinate_target', 'rumor_target_busho'].includes(actionType);
+                // 出陣武将→総大将、国主候補→任せる拠点も固定の一覧→一覧遷移です。
+                // ただし出陣は総大将を自動確定できる場合、そのまま数量画面へ進むため親一覧を残しません。
+                const selectedBushosForLeader = ['war_deploy', 'kunishu_subjugate_deploy'].includes(actionType)
+                    ? selectedIds.map(id => this.game.getBusho(id)).filter(Boolean)
+                    : [];
+                const needsGeneralSelection = selectedBushosForLeader.length > 1
+                    && !selectedBushosForLeader.some(b => b.isDaimyo || b.isCastellan);
+                const keepSelectorForListStep = actionType === 'appoint_legion_leader'
+                    || (['war_deploy', 'kunishu_subjugate_deploy'].includes(actionType) && needsGeneralSelection);
+                // 武将選択の次が数量指定になる固定経路では、親一覧を閉じずに子モーダルへ預けます。
+                // 数量画面の［戻る］で選択・タブ・ソートをそのまま復元し、確定時だけ親一覧を破棄します。
+                const keepSelectorForQuantityStep = ['headhunt_doer', 'tribute_doer', 'kunishu_goodwill_doer',
+                    'war_deploy', 'war_general', 'kunishu_subjugate_deploy', 'kunishu_war_general',
+                    'transport_deploy', 'draft'].includes(actionType)
+                    || (actionType === 'diplomacy_doer' && extraData && extraData.subAction === 'goodwill');
+                // 候補を選んだ後の最終確認だけを重ねる経路では、取消時に候補一覧へ戻れるよう親を保持します。
+                const keepSelectorForConfirmationStep = ['succession_target', 'adopt_son_target', 'banish'].includes(actionType)
+                    || diplomacyKeepsSelectorForConfirmation;
                 if (directDiplomacyHandoff && this.ui && typeof this.ui.beginVisualHandoff === 'function') {
                     this.ui.beginVisualHandoff(() => this.closeCommonModal());
-                } else {
+                } else if (!keepSelectorForMarriageStep && !keepSelectorForNestedBushoStep && !keepSelectorForListStep && !keepSelectorForQuantityStep && !keepSelectorForConfirmationStep) {
                     this.closeCommonModal();
                 }
 
@@ -1302,6 +1343,7 @@ Object.assign(UIInfoManager.prototype, {
                 if (onBack) onBack(); 
                 else if (extraData && extraData.onCancel) extraData.onCancel();
             },
+            backLabel: (onBack || (extraData && extraData.onCancel)) ? '戻る' : null,
             onConfirm: onConfirmHandler,
             hideBackBtn: extraData && extraData.hideCancel,
             onTabClick: (tabKey) => {

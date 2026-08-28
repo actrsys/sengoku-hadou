@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r263');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r268');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1903,6 +1903,308 @@ test('軽微な結果通知は日本語本文へ不要な半角空白を混ぜ�
     assert.ok(!common.includes('金${targetIncome} の収入'), '交易結果の数値と助詞の間へ空白を入れない');
 });
 
+
+test('婚姻の多段選択は履歴と選択状態を一段ずつ保存・復元する', () => {
+    const ctx = createContext({
+        document: { getElementById: () => null },
+        requestAnimationFrame: () => 0,
+        SelectorModalView: class {
+            constructor() {}
+            close() {}
+        }
+    });
+    loadScript(ctx, 'js/ui_info.js');
+    vm.runInContext('this.UIInfoManager = UIInfoManager;', ctx);
+    const manager = new ctx.UIInfoManager({
+        pauseBackgroundUpdates() {},
+        resumeBackgroundUpdates() {}
+    }, { phase: 'title' });
+    manager._renderCurrentModal = () => {};
+    manager.currentModalInfo = { pageType: 'busho_selector', args: ['arrange_marriage_busho'], scrollPos: 12 };
+    manager.commonSelectedIds = [101];
+    manager.pushSelectionModal('princess_list', [true, null, null]);
+    assert.deepStrictEqual(Array.from(manager.modalHistory[0].selectedIds), [101], '親の武将選択を履歴へ保存する');
+    assert.deepStrictEqual(Array.from(manager.commonSelectedIds), [], '子の姫選択は空の選択状態から始める');
+    manager.commonSelectedIds = [501];
+    manager.popModal();
+    assert.strictEqual(manager.currentModalInfo.pageType, 'busho_selector');
+    assert.deepStrictEqual(Array.from(manager.commonSelectedIds), [101], '戻ると親の選択状態を復元する');
+
+    const uiInfo = read('js/ui_info.js');
+    const uiBusho = read('js/ui_info_busho.js');
+    const command = read('js/command_system.js');
+    assert.ok(uiInfo.includes("this.pushSelectionModal('princess_list', [true, targetCastleId, doerId])"), '姫選択は親モーダルを閉じず履歴へ積む');
+    assert.ok(!uiInfo.includes("onBack: isSelectMode ? () => this.openBushoSelector('diplomacy_doer'"), '姫選択の戻り先を外交専用に直書きしない');
+    assert.ok(uiBusho.includes('const preserveModalHistory = !!(extraData && extraData.preserveModalHistory);'), '子の武将選択も履歴維持を明示できる');
+    assert.ok(uiBusho.includes("actionType === 'marriage_kinsman'"), '婚姻相手の最終確認中は背後の選択画面を保持する');
+    assert.ok(command.includes('preserveModalHistory: true'), '姫から婚姻相手へ進む時に履歴維持を指定する');
+    assert.ok(!command.includes("// いいえ：もう一度相手武将選びに戻る"), '確認キャンセルで選択画面を開き直す旧経路を残さない');
+});
+
+test('自発臣従の大名本人来訪も通常外交と同じ第三者呼称を使う', () => {
+    const diplomacy = read('js/diplomacy.js');
+    const common = read('js/event/common_events.js');
+    assert.ok(diplomacy.includes('getThirdPartyDaimyoReference(daimyo, clanName, questioner = null, options = {})'), '第三者大名呼称を共通イベントから使える公開窓口を持つ');
+    assert.ok(common.includes('diplomacyManager.getThirdPartyDaimyoReference(aiDaimyo, aiClanName, playerDaimyo)'), '自発臣従の取り次ぎも共通呼称窓口を使う');
+    assert.ok(common.includes('`「殿、${aiDaimyoRef}がお見えになっております」`'), '小姓の案内本文へ共通呼称を差し込む');
+    assert.ok(!common.includes('introMsg = `「殿、${aiClanName}当主・${aiDaimyoName}様がお見えになっております」`'), '大名本人の氏名+様直書きを残さない');
+});
+
+test('人事・婚姻・官位の主要確認文も日本語本文へ不要な半角空白を入れない', () => {
+    const command = read('js/command_system.js');
+    const court = read('js/courtRank_system.js');
+    const ui = read('js/ui.js');
+    const info = read('js/ui_info.js');
+    assert.ok(!command.includes('${busho.name} に ${princess.name} を嫁がせます'), '自家婚姻確認の空白を残さない');
+    assert.ok(!command.includes('${targetClan.name} の ${targetBusho.name} に、当家の ${princess.name} を嫁がせます'), '外交婚姻確認の空白を残さない');
+    assert.ok(!command.includes('${busho.name} と ${princess.name} の祝言'), '祝言結果の空白を残さない');
+    assert.ok(!command.includes('${commanderName} を ${legionName} の国主から解任'), '国主解任結果の空白を残さない');
+    assert.ok(!court.includes('${bushoName} が ${rankFullName} に叙されました'), '官位叙任通知の空白を残さない');
+    assert.ok(!ui.includes('${commander.name} を国主の座から解任しますか'), '国主解任確認の空白を残さない');
+    assert.ok(!info.includes('${castle.name} の委任設定'), '委任設定タイトルの空白を残さない');
+    const life = read('js/life_system.js');
+    const save = read('js/save_manager.js');
+    const saveView = read('js/save_load_view.js');
+    const warPrep = read('js/war_preparation_controller.js');
+    const warEffort = read('js/war_effort.js');
+    assert.ok(!life.includes('${originalName} が家督を継ぎ'), '家督継承結果の空白を残さない');
+    assert.ok(!save.includes('スロット ${slotNo} にセーブ'), 'セーブ結果文の空白を残さない');
+    assert.ok(!saveView.includes('${displayTitle} のデータをロード'), 'ロード確認文の空白を残さない');
+    assert.ok(!warPrep.includes('${targetCastle.name} を鎮圧しますか'), '諸勢力鎮圧確認の空白を残さない');
+    assert.ok(!warEffort.includes('${displayName} を本当に処断'), '捕虜処断確認の空白を残さない');
+});
+
+
+
+test('選択画面の標準ボタンは実際の戻り先に合わせて［戻る］と［閉じる］を使い分ける', () => {
+    const ctx = createContext({
+        document: { getElementById: () => null },
+        requestAnimationFrame: () => 0,
+        SelectorModalView: class { constructor() {} close() {} releaseListContent() {} }
+    });
+    loadScript(ctx, 'js/ui_info.js');
+    vm.runInContext('this.UIInfoManager = UIInfoManager;', ctx);
+    const manager = new ctx.UIInfoManager({ pauseBackgroundUpdates() {}, resumeBackgroundUpdates() {} }, { phase: 'title' });
+    let opened = null;
+    manager.selectorView = {
+        open(options) { opened = options; return null; },
+        releaseListContent() {}
+    };
+    manager.modalHistory = [];
+    manager._renderListModal({ title: '通常一覧', items: [] });
+    assert.strictEqual(opened.backLabel, '閉じる', '戻り先も履歴もない通常一覧は閉じる');
+    manager._renderListModal({ title: '地図からの選択', items: [], onBack() {}, backLabel: '戻る' });
+    assert.strictEqual(opened.backLabel, '戻る', '明示的な戻り先がある選択一覧は戻る');
+    manager.modalHistory = [{ pageType: 'dummy', args: [] }];
+    manager._renderListModal({ title: '子一覧', items: [] });
+    assert.strictEqual(opened.backLabel, '戻る', '履歴上の親画面がある子一覧は戻る');
+
+    const uiInfo = read('js/ui_info.js');
+    const uiBusho = read('js/ui_info_busho.js');
+    assert.ok(uiInfo.includes("backLabel: config.backLabel || ((this.modalHistory && this.modalHistory.length > 0) ? '戻る' : '閉じる')"), '共通一覧は明示ラベルを優先する');
+    assert.ok(uiInfo.includes("backLabel: isSelectMode && onBack ? '戻る' : null"), '勢力・諸勢力の選択画面は戻り先があれば戻ると表示する');
+    assert.ok(uiInfo.includes("backLabel: onCancel ? '戻る' : null"), '援軍等の勢力選択も地図へ戻る時は戻ると表示する');
+    assert.ok(uiBusho.includes("backLabel: (onBack || (extraData && extraData.onCancel)) ? '戻る' : null"), '武将選択も明示的な戻り先に合わせる');
+});
+
+test('登用・引抜・暗殺・離間の対象→実行武将は一段戻れる履歴を維持する', () => {
+    const uiBusho = read('js/ui_info_busho.js');
+    const command = read('js/command_system.js');
+    assert.ok(uiBusho.includes("['employ_target', 'headhunt_target', 'assassinate_target', 'rumor_target_busho'].includes(actionType)"), '固定二段選択の親一覧を子画面へ進む前に閉じない');
+    assert.ok(command.includes("openBushoSelector('employ_doer', null, { targetId: firstId, preserveModalHistory: true })"), '登用は対象一覧を履歴へ残す');
+    assert.ok(command.includes("openBushoSelector('headhunt_doer', null, { targetId: firstId, preserveModalHistory: true })"), '引抜は対象一覧を履歴へ残す');
+    assert.ok(command.includes("openBushoSelector('assassinate_doer', null, { targetId: firstId, preserveModalHistory: true })"), '暗殺は対象一覧を履歴へ残す');
+    assert.ok(command.includes("openBushoSelector('rumor_doer', targetId, { targetBushoId: firstId, preserveModalHistory: true })"), '離間は対象一覧を履歴へ残す');
+});
+
+test('出陣・諸勢力鎮圧の総大将選択は出陣武将一覧へ一段戻れる', () => {
+    const uiBusho = read('js/ui_info_busho.js');
+    const command = read('js/command_system.js');
+    assert.ok(uiBusho.includes("const needsGeneralSelection = selectedBushosForLeader.length > 1"), '総大将の追加選択が必要な時だけ親一覧を保持する');
+    assert.ok(uiBusho.includes("['war_deploy', 'kunishu_subjugate_deploy'].includes(actionType) && needsGeneralSelection"), '通常出陣と諸勢力鎮圧の固定一覧遷移を履歴対象にする');
+    assert.ok(command.includes("openBushoSelector('war_general', targetId, { candidates: selectedIds, preserveModalHistory: true })"), '通常出陣の総大将選択を子履歴として開く');
+    assert.ok(command.includes("openBushoSelector('kunishu_war_general', targetId, { candidates: selectedIds, kunishuId: extraData.kunishuId, preserveModalHistory: true })"), '諸勢力鎮圧の総大将選択を子履歴として開く');
+});
+
+test('武将→武将の多段選択は親のタブ・範囲・ソート状態も復元する', () => {
+    const ctx = createContext({
+        document: { getElementById: () => null },
+        requestAnimationFrame: () => 0,
+        SelectorModalView: class { constructor() {} close() {} }
+    });
+    loadScript(ctx, 'js/ui_info.js');
+    vm.runInContext('this.UIInfoManager = UIInfoManager;', ctx);
+    const manager = new ctx.UIInfoManager({ pauseBackgroundUpdates() {}, resumeBackgroundUpdates() {} }, { phase: 'title' });
+    manager._renderCurrentModal = () => {};
+    manager.currentModalInfo = { pageType: 'busho_selector', args: ['headhunt_doer'] };
+    manager.modalHistory = [{
+        pageType: 'busho_selector',
+        args: ['headhunt_target'],
+        selectedIds: [101],
+        bushoViewState: { tab: 'status', scope: 'all', sortKey: 'intelligence', isSortAsc: false }
+    }];
+    manager.bushoCurrentTab = 'stats';
+    manager.bushoCurrentScope = 'clan';
+    manager.bushoCurrentSortKey = null;
+    manager.bushoIsSortAsc = true;
+    manager.popModal();
+    assert.strictEqual(manager.bushoCurrentTab, 'status');
+    assert.strictEqual(manager.bushoCurrentScope, 'all');
+    assert.strictEqual(manager.bushoCurrentSortKey, 'intelligence');
+    assert.strictEqual(manager.bushoIsSortAsc, false);
+    assert.deepStrictEqual(Array.from(manager.commonSelectedIds), [101]);
+
+    const uiBusho = read('js/ui_info_busho.js');
+    assert.ok(uiBusho.includes('this.currentModalInfo.bushoViewState = {'), '子武将一覧を開く前に親表示状態を保存する');
+    assert.ok(uiBusho.includes("this.bushoCurrentScope = 'clan';"), '子武将一覧は親の範囲を無意識に引き継がず新規状態から始める');
+});
+
+test('国主任命の武将→拠点選択は共通履歴だけで一段戻る', () => {
+    const uiBusho = read('js/ui_info_busho.js');
+    const kyoten = read('js/ui_info_kyoten.js');
+    assert.ok(uiBusho.includes("actionType === 'appoint_legion_leader'"), '国主候補の親武将一覧を子画面へ進む前に保持する');
+    assert.ok(kyoten.includes("this.pushSelectionModal('kyoten_list', [this.game.playerClanId, true, { bushoId: bushoId, legionNo: legionNo }])"), '任せる拠点は選択履歴へ積む');
+    assert.ok(!kyoten.includes('this.ui.showAppointLegionLeaderModal(selectData.legionNo);'), '子画面のBackから親武将一覧を開き直す旧経路を残さない');
+    assert.ok(!kyoten.includes("this.closeCommonModal();\n        this.kyotenSavedCastles = null;"), '拠点子画面を開く前に親選択を閉じない');
+});
+
+test('数量画面は閉じる時に保留UI更新を破棄しBack処理を専門Viewへ一元化する', () => {
+    const slider = read('js/ui_slider.js');
+    const bootstrap = read('js/app_bootstrap.js');
+    assert.ok(slider.includes('const cancelQuantityUIUpdate = () => {'), '数量UIの保留更新を取消す窓口を持つ');
+    assert.ok(slider.includes('if (window.cancelAnimationFrame) window.cancelAnimationFrame(quantityUiRaf);'), 'requestAnimationFrameを閉じる時に取消す');
+    assert.ok(slider.includes('cancelQuantityUIUpdate();\n            this.ui.quantityModal.classList.add'), 'モーダルを隠す前に旧画面の更新を止める');
+    assert.ok(!bootstrap.includes("bind('quantity-back-btn'"), '起動時の単純hideでUISliderのonCancel/guard復帰を横取りしない');
+    assert.ok(slider.includes('（取引上限：<span class="slider-emphasis">'), '取引上限の補足も既存の日本語表記へ揃える');
+});
+
+test('武将選択の子数量画面は戻る時に親一覧状態をそのまま復元する', () => {
+    const ctx = createContext({
+        document: { getElementById: () => null },
+        requestAnimationFrame: () => 0,
+        SelectorModalView: class { constructor() {} close() {} }
+    });
+    loadScript(ctx, 'js/ui_info.js');
+    vm.runInContext('this.UIInfoManager = UIInfoManager;', ctx);
+    const manager = new ctx.UIInfoManager({ pauseBackgroundUpdates() {}, resumeBackgroundUpdates() {} }, { phase: 'title' });
+    const classes = new Set();
+    const modal = { classList: {
+        contains: (name) => classes.has(name),
+        add: (name) => classes.add(name),
+        remove: (name) => classes.delete(name)
+    }};
+    manager.selectorView = { getElements: () => ({ modal }), close() {} };
+    manager.currentModalInfo = { pageType: 'busho_selector', args: ['headhunt_doer'], selectedIds: [202] };
+    manager.modalHistory = [{ pageType: 'busho_selector', args: ['headhunt_target'], selectedIds: [101] }];
+    manager.commonSelectedIds = [202];
+    assert.strictEqual(manager.suspendCommonModalForChild(), true);
+    assert.strictEqual(classes.has('hidden'), true, '子数量画面の間は親一覧だけを一時非表示にする');
+    assert.strictEqual(manager.currentModalInfo.args[0], 'headhunt_doer');
+    assert.deepStrictEqual(Array.from(manager.commonSelectedIds), [202]);
+    assert.strictEqual(manager.modalHistory.length, 1, '親のさらに前段の履歴も保持する');
+    assert.strictEqual(manager.resumeCommonModalFromChild(), true);
+    assert.strictEqual(classes.has('hidden'), false, '数量画面の戻るで親一覧を再表示する');
+
+    const slider = read('js/ui_slider.js');
+    const uiBusho = read('js/ui_info_busho.js');
+    const command = read('js/command_system.js');
+    assert.ok(slider.includes('suspendCommonModalForChild'), '数量画面は親一覧の一時退避窓口を使う');
+    assert.ok(slider.includes('resumeCommonModalFromChild'), '数量画面のキャンセルは親一覧を作り直さず復帰する');
+    assert.ok(slider.includes("delete selectionExtraData.returnToParentSelector;"), 'UI遷移専用フラグをゲームロジックへ漏らさない');
+    assert.ok(uiBusho.includes("const keepSelectorForQuantityStep = ['headhunt_doer', 'tribute_doer', 'kunishu_goodwill_doer'"), '数量指定へ進む武将一覧を先に閉じない');
+    assert.ok(uiBusho.includes("'transport_deploy', 'draft'].includes(actionType)"), '徴兵・輸送も数量画面から直前の武将選択へ戻れる');
+    assert.ok(command.includes("openQuantitySelector('headhunt_gold', selectedIds, extraData.targetId, { returnToParentSelector: true })"), '引抜持参金は実行武将一覧を親として保持する');
+    assert.ok(command.includes("openQuantitySelector('transport', selectedIds, targetId, { returnToParentSelector: true })"), '輸送量は出発武将一覧を親として保持する');
+    assert.ok(command.includes("openQuantitySelector(actionType, selectedIds, targetId, { returnToParentSelector: true })"), '徴兵量は担当武将一覧を親として保持する');
+});
+
+test('家督相続・養子縁組・追放の最終確認取消は候補一覧へ戻る', () => {
+    const uiBusho = read('js/ui_info_busho.js');
+    const command = read('js/command_system.js');
+    assert.ok(uiBusho.includes("const keepSelectorForConfirmationStep = ['succession_target', 'adopt_son_target', 'banish'].includes(actionType)"), '最終確認を重ねる候補一覧を先に閉じない');
+    assert.ok(uiBusho.includes('!keepSelectorForConfirmationStep'), '共通close条件は最終確認保持を尊重する');
+    const handlerStart = command.indexOf('handleBushoSelection(actionType');
+    const successionStart = command.indexOf("if (actionType === 'succession_target')", handlerStart);
+    const adoptStart = command.indexOf("if (actionType === 'adopt_son_target')", successionStart);
+    const rewardStart = command.indexOf("if (actionType === 'reward')", adoptStart);
+    const successionBlock = command.slice(successionStart, adoptStart);
+    const adoptBlock = command.slice(adoptStart, rewardStart);
+    assert.ok(successionBlock.includes('closeCommonModal'), '家督確定時だけ候補一覧を正式終了する');
+    assert.ok(adoptBlock.includes('closeCommonModal'), '養子確定時だけ候補一覧を正式終了する');
+    assert.ok(successionBlock.includes("cancelText: 'やめる'"));
+    assert.ok(adoptBlock.includes("cancelText: 'やめる'"));
+    const banishHandlerStart = command.indexOf("if (actionType === 'banish')", handlerStart);
+    const genericSpecStart = command.indexOf("if (spec &&", banishHandlerStart);
+    const banishHandlerBlock = command.slice(banishHandlerStart, genericSpecStart);
+    assert.ok(banishHandlerBlock.includes("showDialog(`本当に${busho.name}を追放しますか？`"), '追放確認はexecuteWithEventの外側で行う');
+    assert.ok(banishHandlerBlock.indexOf('showDialog') < banishHandlerBlock.indexOf("executeWithEvent('banish'"), '確定してから実行イベントへ入る');
+    const executeCommandStart = command.indexOf('executeCommand(type');
+    const banishExecStart = command.indexOf("if (type === 'banish')", executeCommandStart);
+    const bushoLoopStart = command.indexOf('bushoIds.forEach', banishExecStart);
+    const banishExecBlock = command.slice(banishExecStart, bushoLoopStart);
+    assert.ok(!banishExecBlock.includes('showDialog'), '追放の実処理側へ確認ダイアログを残さない');
+});
+
+test('外交の軍師助言・臣従確認取消は外交担当一覧へ戻れる', () => {
+    const uiBusho = read('js/ui_info_busho.js');
+    const command = read('js/command_system.js');
+    assert.ok(uiBusho.includes("const diplomacyKeepsSelectorForConfirmation = ['alliance', 'subordinate', 'vassalage', 'dominate', 'truce', 'court_truce'].includes(diplomacySubAction);"), '取消可能な外交は担当武将一覧を確認中も保持する');
+    assert.ok(uiBusho.includes("diplomacySubAction === 'break_alliance'"), '会話へ直行する断交だけを担当選択から直接handoffする');
+    assert.ok(!uiBusho.includes("!['goodwill', 'marriage'].includes(extraData.subAction)"), '確認を挟む外交まで一律に担当一覧を閉じる旧条件を残さない');
+    const handlerStart = command.indexOf('handleBushoSelection(actionType');
+    const diploStart = command.indexOf("if (actionType === 'diplomacy_doer')", handlerStart);
+    const tributeStart = command.indexOf("if (actionType === 'tribute_doer')", diploStart);
+    const diploBlock = command.slice(diploStart, tributeStart);
+    assert.ok(diploBlock.includes('const beginDiplomacySelectorHandoff = () => {'), '外交確定後だけ担当一覧を次画面へhandoffする窓口を持つ');
+    assert.ok(diploBlock.includes("ui.beginVisualHandoff(() => ui.info.closeCommonModal())"), '次の会話が見えるまで担当一覧を保持する');
+    ['alliance', 'subordinate', 'dominate', 'truce', 'court_truce'].forEach(type => {
+        assert.ok(diploBlock.includes(`this.showAdviceAndExecute('${type}'`), `${type} は軍師助言経路を維持する`);
+    });
+    assert.ok(diploBlock.includes('{ beforeConfirm: beginDiplomacySelectorHandoff }'), '軍師助言を了承した時だけhandoffを開始する');
+    const vassalageStart = diploBlock.indexOf("extraData.subAction === 'vassalage'");
+    const dominateStart = diploBlock.indexOf("extraData.subAction === 'dominate'", vassalageStart);
+    const vassalageBlock = diploBlock.slice(vassalageStart, dominateStart);
+    assert.ok(vassalageBlock.indexOf('beginDiplomacySelectorHandoff();') < vassalageBlock.indexOf("executeWithEvent('vassalage'"), '臣従確定時だけ担当一覧handoffを開始してから実行する');
+    assert.ok(vassalageBlock.includes("cancelText: 'やめる'"), '臣従取消は担当一覧を残す');
+
+    const adviceStart = command.indexOf('\n    showAdviceAndExecute(actionType');
+    const adviceBlock = command.slice(adviceStart, adviceStart + 900);
+    assert.ok(adviceBlock.includes("if (uiFlow && typeof uiFlow.beforeConfirm === 'function') uiFlow.beforeConfirm();"), '軍師助言のOK時だけUI遷移処理を差し込める');
+    assert.ok(adviceBlock.indexOf('uiFlow.beforeConfirm()') < adviceBlock.indexOf('this.executeWithEvent(actionType'), 'handoff開始後に実行へ進む');
+});
+
+test('国主任命の最終確認取消は拠点一覧の位置を保持する', () => {
+    const kyoten = read('js/ui_info_kyoten.js');
+    const selectStart = kyoten.indexOf('if (isSelectMode && selectData)');
+    const selectEnd = kyoten.indexOf('this._renderListModal({', selectStart);
+    const block = kyoten.slice(selectStart, selectEnd);
+    assert.ok(block.includes('`${busho.name}を国主に任命し、${castle.name}を本拠としますか？`'), '確認文だけで任命人物と本拠が分かる');
+    assert.ok(block.includes("{ okText: '任命する', cancelText: 'やめる' }"), '確定・取消の意味を明示する');
+    assert.ok(!block.includes('this._renderKyotenList(clanId, isSelectMode, selectData, 0);'), '取消時に拠点一覧を先頭から再描画しない');
+    assert.ok(block.includes('this.closeCommonModal();'), '確定時だけ選択一覧を閉じる');
+});
+
+test('軍師不在の戦況報告も人物の共通呼称と当主本人の自己呼称を使う', () => {
+    const warEffort = read('js/war_effort.js');
+    assert.ok(warEffort.includes("Number(target.id) === Number(playerDaimyo.id)) return '殿';"), '小姓代行時にプレイヤー当主本人を氏名+殿で報告しない');
+    assert.ok(warEffort.includes('ConversationStandingRules.getInterviewTargetCallName(this.game, null, target, playerDaimyo)'), '軍師不在でも第三者人物を共通呼称規則へ通す');
+    assert.ok(!warEffort.includes(': `${target.fullName || target.name}殿`;'), '小姓専用の氏名+殿フォールバックを通常経路として残さない');
+});
+
+test('援軍・独立結果と持参金表示も通常の日本語表記へ揃える', () => {
+    const warEffort = read('js/war_effort.js');
+    const independence = read('js/independence_system.js');
+    const slider = read('js/ui_slider.js');
+    assert.ok(!warEffort.includes('主家である ${myClanName} から'), '援軍文で固有名と助詞の間へ空白を入れない');
+    assert.ok(!warEffort.includes('${myClanName} から\\n'), '援軍依頼文の固有名直後へ空白を残さない');
+    assert.ok(!warEffort.includes('(持参金:'), '補足の括弧と区切りを半角英語表記へ戻さない');
+    assert.ok(!independence.includes('${p.name} は処断されました'), '独立後処遇の固有名と助詞の間へ空白を入れない');
+    assert.ok(!independence.includes('${p.name} は解放されました'), '独立後処遇の解放文にも空白を入れない');
+    assert.ok(slider.includes('持参金（任意）'), '持参金UIは日本語の全角括弧を使う');
+    assert.ok(!slider.includes('持参金 (任意)'), '旧半角括弧表記を残さない');
+    assert.ok(slider.includes('使者に持たせる金（最大1500）') && slider.includes('献上金（最大1500）'), '援軍・献上金タイトルも同じ全角括弧へ揃える');
+});
+
 test('外交導入と臣従会話は話しかけ方と実際の操作を食い違わせない', () => {
     const diplomacy = read('js/diplomacy.js');
     const common = read('js/event/common_events.js');
@@ -3629,7 +3931,7 @@ test('出陣武将が一人だけなら総大将選択リストを省略する',
     const normalEnd = command.indexOf("if (actionType === 'war_general')", normalStart);
     const normalBlock = command.slice(normalStart, normalEnd);
     assert.ok(normalBlock.includes('leader || selectedIds.length === 1'));
-    assert.ok(normalBlock.includes("this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId)"));
+    assert.ok(normalBlock.includes("this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { returnToParentSelector: true })"));
 
     const kunishuStart = command.indexOf("if (actionType === 'kunishu_subjugate_deploy')");
     const kunishuEnd = command.indexOf("if (actionType === 'kunishu_war_general')", kunishuStart);
@@ -6559,7 +6861,8 @@ test('外交の使者選択画面は次の会話が可視化されるまで保�
     const handoffAfterDialog = ui.indexOf('this.completeVisualHandoff();', dialogVisible);
     assert.ok(dialogVisible >= 0 && handoffAfterDialog > dialogVisible, '次の会話を表示した後で元画面を閉じる');
     assert.ok(busho.includes("actionType === 'diplomacy_doer'"));
-    assert.ok(busho.includes("!['goodwill', 'marriage'].includes(extraData.subAction)"), '別の入力画面へ進む親善・婚姻は直接handoff対象にしない');
+    assert.ok(busho.includes("diplomacySubAction === 'break_alliance'"), '会話へ直行する断交は担当選択から直接handoffする');
+    assert.ok(busho.includes('diplomacyKeepsSelectorForConfirmation'), '最終確認・軍師助言を挟む外交は取消用に担当一覧を保持する');
     assert.ok(busho.includes('this.ui.beginVisualHandoff(() => this.closeCommonModal())'));
 });
 

@@ -202,14 +202,14 @@ class SaveLoadView {
                     if (modal) modal.classList.add('hidden');
                     
                     if (mode === 'save') {
-                        this.ui.showDialog(`${displayTitle} に現在の状態をセーブ（上書き）しますか？`, true, () => {
+                        this.ui.showDialog(`${displayTitle}に現在の状態をセーブ（上書き）しますか？`, true, () => {
                             this.game.saveGameToLocal(i);
                         }, null, { okText: 'セーブする', okClass: 'btn-primary', cancelText: 'やめる' });
                     } else {
                         if (this.game.phase === 'title') {
                             this.game.loadGameFromLocal(i, prefix); 
                         } else {
-                            this.ui.showDialog(`${displayTitle} のデータをロードしますか？\n（現在の進行状況は失われます）`, true, () => {
+                            this.ui.showDialog(`${displayTitle}のデータをロードしますか？\n（現在の進行状況は失われます）`, true, () => {
                                 this.game.loadGameFromLocal(i, prefix); 
                             }, null, { okText: 'ロードする', okClass: 'btn-danger', cancelText: 'やめる' });
                         }

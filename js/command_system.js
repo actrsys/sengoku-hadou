@@ -853,7 +853,7 @@ class CommandSystem {
         const firstId = selectedIds[0];
 
         if (actionType === 'employ_target') {
-            this.game.ui.openBushoSelector('employ_doer', null, { targetId: firstId });
+            this.game.ui.openBushoSelector('employ_doer', null, { targetId: firstId, preserveModalHistory: true });
             return;
         }
         if (actionType === 'employ_doer') {
@@ -867,17 +867,17 @@ class CommandSystem {
         }
         
         if (actionType === 'headhunt_target') {
-            this.game.ui.openBushoSelector('headhunt_doer', null, { targetId: firstId });
+            this.game.ui.openBushoSelector('headhunt_doer', null, { targetId: firstId, preserveModalHistory: true });
             return;
         }
         
         if (actionType === 'headhunt_doer') {
-            this.game.ui.openQuantitySelector('headhunt_gold', selectedIds, extraData.targetId);
+            this.game.ui.openQuantitySelector('headhunt_gold', selectedIds, extraData.targetId, { returnToParentSelector: true });
             return;
         }
 
         if (actionType === 'assassinate_target') {
-            this.game.ui.openBushoSelector('assassinate_doer', null, { targetId: firstId });
+            this.game.ui.openBushoSelector('assassinate_doer', null, { targetId: firstId, preserveModalHistory: true });
             return;
         }
         
@@ -898,7 +898,7 @@ class CommandSystem {
         }
 
         if (actionType === 'rumor_target_busho') {
-            this.game.ui.openBushoSelector('rumor_doer', targetId, { targetBushoId: firstId });
+            this.game.ui.openBushoSelector('rumor_doer', targetId, { targetBushoId: firstId, preserveModalHistory: true });
             return;
         }
 
@@ -909,10 +909,11 @@ class CommandSystem {
                 const busho = this.game.getBusho(this.game.ui.info.arrangeMarriageBushoId);
                 const princess = this.game.getPrincess(firstId);
                 
-                const msg = `${busho.name} に ${princess.name} を嫁がせます。よろしいですか？`;
+                const msg = `${busho.name}に${princess.name}を嫁がせます。よろしいですか？`;
                 
                 this.game.ui.showDialog(msg, true, 
                     () => {
+                        this.game.ui.info.closeCommonModal();
                         this.executeWithEvent('arrange_marriage', () => this.executeArrangeMarriage(busho, princess));
                         this.game.ui.info.arrangeMarriageBushoId = null; // リセット
                     },
@@ -925,7 +926,8 @@ class CommandSystem {
             // 使者と姫のIDを覚えて、相手武将のリストを開きます
             this.game.ui.openBushoSelector('marriage_kinsman', targetId, { 
                 doerId: extraData.doerId, 
-                princessId: firstId 
+                princessId: firstId,
+                preserveModalHistory: true
             });
             return;
         }
@@ -940,21 +942,18 @@ class CommandSystem {
             const princess = this.game.getPrincess(princessId);
             const doer = this.game.getBusho(doerId);
 
-            const msg = `${targetClan.name} の ${targetBusho.name} に、当家の ${princess.name} を嫁がせます。よろしいですか？`;
+            const msg = `${targetClan.name}の${targetBusho.name}に、当家の${princess.name}を嫁がせます。よろしいですか？`;
 
             this.game.ui.showDialog(msg, true, 
                 () => {
-                    // ここも合図だけでとっても綺麗！
+                    // 最終確認が通った時だけ選択セッションを閉じ、軍師助言・外交会話へ引き渡します。
                     const prob = this.game.diplomacyManager.getDiplomacyProb(doerId, targetId, 'marriage');
-                    
+                    this.game.ui.info.closeCommonModal();
                     this.showAdviceAndExecute('marriage', () => {
                         this.game.diplomacyManager.executeMarriage(doerId, targetId, princessId, targetBushoId);
                     }, { trueProb: prob / 100 });
                 },
-                () => {
-                    // いいえ：もう一度相手武将選びに戻る
-                    this.game.ui.openBushoSelector('marriage_kinsman', targetId, extraData);
-                },
+                null,
                 { okText: '嫁がせる', cancelText: 'やめる' }
             );
             return;
@@ -969,20 +968,32 @@ class CommandSystem {
         }
 
         if (actionType === 'diplomacy_doer') {
+            // 最終確認や軍師助言を取り消した時は、選んだ外交担当官の一覧へ戻れるようにします。
+            // 確定した時だけ、現在の一覧を「次の会話/結果が実際に見えるまで」保持してhandoffします。
+            const beginDiplomacySelectorHandoff = () => {
+                const ui = this.game && this.game.ui;
+                if (ui && typeof ui.beginVisualHandoff === 'function' && ui.info && typeof ui.info.closeCommonModal === 'function') {
+                    ui.beginVisualHandoff(() => ui.info.closeCommonModal());
+                } else if (ui && ui.info && typeof ui.info.closeCommonModal === 'function') {
+                    ui.info.closeCommonModal();
+                }
+            };
+
             if (extraData.subAction === 'goodwill') {
-                this.game.ui.openQuantitySelector('goodwill', selectedIds, targetId);
+                this.game.ui.openQuantitySelector('goodwill', selectedIds, targetId, { returnToParentSelector: true });
             } else if (extraData.subAction === 'alliance') {
                 // 外交担当に「この条件で確率教えて！」と合図を送るだけ！
                 const prob = this.game.diplomacyManager.getDiplomacyProb(firstId, targetId, 'alliance');
-                this.showAdviceAndExecute('alliance', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'alliance'), { trueProb: prob / 100 });
+                this.showAdviceAndExecute('alliance', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'alliance'), { trueProb: prob / 100 }, { beforeConfirm: beginDiplomacySelectorHandoff });
             } else if (extraData.subAction === 'break_alliance') {
                 this.executeWithEvent('break_alliance', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'break_alliance'));
             } else if (extraData.subAction === 'subordinate') {
                 const prob = this.game.diplomacyManager.getDiplomacyProb(firstId, targetId, 'subordinate');
-                this.showAdviceAndExecute('subordinate', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'subordinate'), { trueProb: prob / 100 });
+                this.showAdviceAndExecute('subordinate', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'subordinate'), { trueProb: prob / 100 }, { beforeConfirm: beginDiplomacySelectorHandoff });
             } else if (extraData.subAction === 'vassalage') {
                 this.game.ui.showDialog(`本当に臣従しますか？\n当家は滅亡し、全ての領地を明け渡します。`, true, 
                     () => {
+                        beginDiplomacySelectorHandoff();
                         this.executeWithEvent('vassalage', () => this.game.diplomacyManager.executeVassalage(firstId, targetId));
                     },
                     null,
@@ -990,13 +1001,13 @@ class CommandSystem {
                 );
             } else if (extraData.subAction === 'dominate') {
                 const prob = this.game.diplomacyManager.getDiplomacyProb(firstId, targetId, 'dominate');
-                this.showAdviceAndExecute('dominate', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: prob / 100 });
+                this.showAdviceAndExecute('dominate', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: prob / 100 }, { beforeConfirm: beginDiplomacySelectorHandoff });
             } else if (extraData.subAction === 'truce') {
                 const prob = this.game.diplomacyManager.getDiplomacyProb(firstId, targetId, 'truce');
-                this.showAdviceAndExecute('truce', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'truce'), { trueProb: prob / 100 });
+                this.showAdviceAndExecute('truce', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'truce'), { trueProb: prob / 100 }, { beforeConfirm: beginDiplomacySelectorHandoff });
             } else if (extraData.subAction === 'court_truce') {
                 // ★追加：朝廷和睦は条件を満たしていれば確実に成功します！
-                this.showAdviceAndExecute('court_truce', () => this.game.courtRankSystem.executeCourtTruce(firstId, targetId), { trueProb: 1.0 });
+                this.showAdviceAndExecute('court_truce', () => this.game.courtRankSystem.executeCourtTruce(firstId, targetId), { trueProb: 1.0 }, { beforeConfirm: beginDiplomacySelectorHandoff });
             } else if (extraData.subAction === 'marriage') {
                 // ★変更：新しく作った「姫専用の画面」を開きます！
                 this.game.ui.showPrincessSelector(targetId, firstId);
@@ -1006,13 +1017,13 @@ class CommandSystem {
 
         // ★追加: 貢物の使者を選んだら、いくら払うか（金額指定）の画面を開きます！
         if (actionType === 'tribute_doer') {
-            this.game.ui.openQuantitySelector('tribute_gold', selectedIds, null);
+            this.game.ui.openQuantitySelector('tribute_gold', selectedIds, null, { returnToParentSelector: true });
             return;
         }
 
         // ★追加: 諸勢力のコマンド用
         if (actionType === 'kunishu_goodwill_doer') {
-            this.game.ui.openQuantitySelector('goodwill', selectedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId });
+            this.game.ui.openQuantitySelector('goodwill', selectedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId, returnToParentSelector: true });
             return;
         }
         if (actionType === 'kunishu_incorporate_doer') {
@@ -1036,9 +1047,9 @@ class CommandSystem {
                  const leaderId = leader ? leader.id : selectedIds[0];
                  const others = selectedIds.filter(id => id !== leaderId);
                  const sortedIds = [leaderId, ...others];
-                 this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId });
+                 this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId, returnToParentSelector: true });
              } else {
-                 this.game.ui.openBushoSelector('kunishu_war_general', targetId, { candidates: selectedIds, kunishuId: extraData.kunishuId });
+                 this.game.ui.openBushoSelector('kunishu_war_general', targetId, { candidates: selectedIds, kunishuId: extraData.kunishuId, preserveModalHistory: true });
              }
              return;
         }
@@ -1046,7 +1057,7 @@ class CommandSystem {
             const leaderId = firstId;
             const others = extraData.candidates.filter(id => id !== leaderId);
             const sortedIds = [leaderId, ...others];
-            this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId });
+            this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId, returnToParentSelector: true });
             return;
         }
 
@@ -1071,9 +1082,9 @@ class CommandSystem {
                  const leaderId = leader ? leader.id : selectedIds[0];
                  const others = selectedIds.filter(id => id !== leaderId);
                  const sortedIds = [leaderId, ...others];
-                 this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId);
+                 this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { returnToParentSelector: true });
              } else {
-                 this.game.ui.openBushoSelector('war_general', targetId, { candidates: selectedIds });
+                 this.game.ui.openBushoSelector('war_general', targetId, { candidates: selectedIds, preserveModalHistory: true });
              }
              return;
         }
@@ -1081,12 +1092,12 @@ class CommandSystem {
             const leaderId = firstId;
             const others = extraData.candidates.filter(id => id !== leaderId);
             const sortedIds = [leaderId, ...others];
-            this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId);
+            this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { returnToParentSelector: true });
             return;
         }
 
         if (actionType === 'transport_deploy') {
-            this.game.ui.openQuantitySelector('transport', selectedIds, targetId);
+            this.game.ui.openQuantitySelector('transport', selectedIds, targetId, { returnToParentSelector: true });
             return;
         }
         if (actionType === 'move_deploy') {
@@ -1122,7 +1133,7 @@ class CommandSystem {
         }
 
         if (['draft'].includes(actionType)) {
-            this.game.ui.openQuantitySelector(actionType, selectedIds, targetId);
+            this.game.ui.openQuantitySelector(actionType, selectedIds, targetId, { returnToParentSelector: true });
             return;
         }
         
@@ -1139,8 +1150,10 @@ class CommandSystem {
 
         if (actionType === 'succession_target') {
             const bushoA = this.game.getBusho(firstId);
-            this.game.ui.showDialog(`${bushoA.name} に家督を譲りますか？`, true, 
+            this.game.ui.showDialog(`${bushoA.name}に家督を譲りますか？`, true, 
                 () => {
+                    // 確定時だけ候補一覧を正式終了。［やめる］なら背後の候補一覧へ戻ります。
+                    if (this.game.ui.info && typeof this.game.ui.info.closeCommonModal === 'function') this.game.ui.info.closeCommonModal();
                     this.executeWithEvent('succession', () => this.executeSuccession(firstId));
                 },
                 null,
@@ -1151,8 +1164,10 @@ class CommandSystem {
 
         if (actionType === 'adopt_son_target') {
             const bushoA = this.game.getBusho(firstId);
-            this.game.ui.showDialog(`${bushoA.name} を養子にしますか？`, true, 
+            this.game.ui.showDialog(`${bushoA.name}を養子にしますか？`, true, 
                 () => {
+                    // 確定時だけ候補一覧を正式終了。［やめる］なら背後の候補一覧へ戻ります。
+                    if (this.game.ui.info && typeof this.game.ui.info.closeCommonModal === 'function') this.game.ui.info.closeCommonModal();
                     this.executeWithEvent('adopt_son', () => this.executeAdoptSon(firstId));
                 },
                 null,
@@ -1166,7 +1181,19 @@ class CommandSystem {
             return;
         }
 
-        if (spec && ['farm', 'commerce', 'repair', 'training', 'soldier_charity', 'appoint', 'banish'].includes(actionType)) {
+        if (actionType === 'banish') {
+            const busho = this.game.getBusho(firstId);
+            if (!busho) return;
+            // 追放は実行イベントへ入る前に確認します。取消時は候補一覧を残し、
+            // 確定時だけ一覧を閉じて before/after_command を実行します。
+            this.game.ui.showDialog(`本当に${busho.name}を追放しますか？`, true, () => {
+                if (this.game.ui.info && typeof this.game.ui.info.closeCommonModal === 'function') this.game.ui.info.closeCommonModal();
+                this.executeWithEvent('banish', () => this.executeCommand('banish', selectedIds, targetId));
+            }, null, { cancelText: 'やめる' });
+            return;
+        }
+
+        if (spec && ['farm', 'commerce', 'repair', 'training', 'soldier_charity', 'appoint'].includes(actionType)) {
             if (spec.hasAdvice) {
                 this.showAdviceAndExecute(actionType, () => this.executeCommand(actionType, selectedIds, targetId), { trueProb: 1.0 });
             } else {
@@ -1298,9 +1325,12 @@ class CommandSystem {
         }
     }
 
-    showAdviceAndExecute(actionType, executeCallback, extraContext = {}) {
+    showAdviceAndExecute(actionType, executeCallback, extraContext = {}, uiFlow = null) {
         const adviceAction = { type: actionType, ...extraContext };
         this.game.gunshiSystem.showCommandAdvice(adviceAction, () => {
+            // 候補一覧の上に軍師助言を重ねている経路は、助言を了承した時だけ次画面へhandoffします。
+            // ［戻る］で助言を取り消した場合は何も閉じず、背後の候補一覧へそのまま戻せます。
+            if (uiFlow && typeof uiFlow.beforeConfirm === 'function') uiFlow.beforeConfirm();
             this.executeWithEvent(actionType, executeCallback, extraContext);
         });
     }
@@ -1329,45 +1359,36 @@ class CommandSystem {
             return;
         }
 
-        if (type === 'banish') { 
+        if (type === 'banish') {
             const busho = this.game.getBusho(bushoIds[0]);
-            this.game.ui.showDialog(`本当に ${busho.name} を追放しますか？`, true, () => {
-                
-                // ★追加：追放される武将がいた場合、自勢力の他の武将全員にショックを与えます！
-                // 同じ大名家で、大名と追放される本人を除いた全員を集めます
-                const otherMembers = this.game.getClanBushos(busho.clan).filter(b => 
-                    b.id !== busho.id &&
-                    !b.isDaimyo &&
-                    window.BushoStatusRules.isActive(b)
-                );
+            if (!busho) return;
 
-                const isLeader = busho.isFactionLeader;
+            // 追放される武将がいた場合、自勢力の他の武将全員にショックを与えます。
+            const otherMembers = this.game.getClanBushos(busho.clan).filter(b =>
+                b.id !== busho.id &&
+                !b.isDaimyo &&
+                window.BushoStatusRules.isActive(b)
+            );
 
-                // 集めたメンバー全員に順番にショックを与えます
-                otherMembers.forEach(member => {
-                    // 同じ派閥の場合（追放される武将が派閥に属している場合のみ）
-                    if (busho.factionId > 0 && member.factionId === busho.factionId) {
-                        if (isLeader) {
-                            // リーダーが追放された場合：承認欲求を50上げてから、忠誠度を10下げます
-                            this.game.factionSystem.updateRecognition(member, 50);
-                            member.loyalty = Math.max(0, member.loyalty - 10);
-                        } else {
-                            // ただのメンバーが追放された場合：承認欲求を25上げてから、忠誠度を3下げます
-                            this.game.factionSystem.updateRecognition(member, 25);
-                            member.loyalty = Math.max(0, member.loyalty - 3);
-                        }
+            const isLeader = busho.isFactionLeader;
+            otherMembers.forEach(member => {
+                if (busho.factionId > 0 && member.factionId === busho.factionId) {
+                    if (isLeader) {
+                        this.game.factionSystem.updateRecognition(member, 50);
+                        member.loyalty = Math.max(0, member.loyalty - 10);
                     } else {
-                        // 違う派閥、または無派閥の場合：承認欲求を5上げてから、忠誠度を1下げます
-                        this.game.factionSystem.updateRecognition(member, 5);
-                        member.loyalty = Math.max(0, member.loyalty - 1);
+                        this.game.factionSystem.updateRecognition(member, 25);
+                        member.loyalty = Math.max(0, member.loyalty - 3);
                     }
-                });
-                
-                this.game.affiliationSystem.becomeRonin(busho, 'banish');
-
-                this.finishCommand(`${busho.name}を追放しました`, false, `【追放】${this.game.getClan(this.game.playerClanId)?.name || '当家'}は${busho.fullName || busho.name}を追放しました。`);
+                } else {
+                    this.game.factionSystem.updateRecognition(member, 5);
+                    member.loyalty = Math.max(0, member.loyalty - 1);
+                }
             });
-            return; 
+
+            this.game.affiliationSystem.becomeRonin(busho, 'banish');
+            this.finishCommand(`${busho.name}を追放しました`, false, `【追放】${this.game.getClan(this.game.playerClanId)?.name || '当家'}は${busho.fullName || busho.name}を追放しました。`);
+            return;
         }
 
         bushoIds.forEach(bid => {
@@ -1709,7 +1730,7 @@ class CommandSystem {
         const numberNames = ["", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
         const legionName = numberNames[legionNo] || `第${legionNo}席`;
         
-        const displayMessage = `${busho.name} を「${legionName}」の国主に任命し、\n${castle.name} を本拠としました`;
+        const displayMessage = `${busho.name}を「${legionName}」の国主に任命し、\n${castle.name}を本拠としました`;
         
         this.finishCommand(displayMessage, true, `【国主任命】${this.game.getClan(this.game.playerClanId)?.name || '当家'}は${busho.fullName || busho.name}を国主に任命し、${castle.name}を本拠としました。`);
     }
@@ -2098,7 +2119,7 @@ class CommandSystem {
         // baseFamilyIds / familyIds は派生値なので直接編集せず、正本の養父IDから全体を再構築します。
         FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
 
-        this.finishCommand(`${targetBusho.name} を養子として迎え入れました。以降、${targetBusho.name} は当家の一門武将となります。`);
+        this.finishCommand(`${targetBusho.name}を養子として迎え入れました。以降、${targetBusho.name}は当家の一門武将となります。`);
     }
 
     // ★追加：所領分配の実行
@@ -2157,7 +2178,7 @@ class CommandSystem {
 
         busho.loyalty = 100;
 
-        this.finishCommand(`${busho.name} と ${princess.name} の祝言が執り行われました。新たな縁によって、当家の結束はより一層強固なものとなりました。`, false, `【婚姻】${this.game.getClan(this.game.playerClanId)?.name || '当家'}で${busho.fullName || busho.name}と${princess.name}の祝言が執り行われました。`);
+        this.finishCommand(`${busho.name}と${princess.name}の祝言が執り行われました。新たな縁によって、当家の結束はより一層強固なものとなりました。`, false, `【婚姻】${this.game.getClan(this.game.playerClanId)?.name || '当家'}で${busho.fullName || busho.name}と${princess.name}の祝言が執り行われました。`);
     }
 
     // ★追加：国主解任の実行
@@ -2175,6 +2196,6 @@ class CommandSystem {
         
         const commanderName = commander ? commander.name : "不明";
 
-        this.finishCommand(`${commanderName} を ${legionName} の国主から解任しました。所属していた ${count} 件の拠点はすべて直轄領に変更されました。`, true, `【国主解任】${this.game.getClan(this.game.playerClanId)?.name || '当家'}は${commanderName}を国主から解任し、所領を直轄へ戻しました。`);
+        this.finishCommand(`${commanderName}を${legionName}の国主から解任しました。所属していた${count}件の拠点はすべて直轄領に変更されました。`, true, `【国主解任】${this.game.getClan(this.game.playerClanId)?.name || '当家'}は${commanderName}を国主から解任し、所領を直轄へ戻しました。`);
     }
 }

@@ -1137,7 +1137,7 @@ class WarManager {
 
         if (type === 'retreat') { 
             if (s.turn === 'attacker') { 
-                pushMsg({ text: `<span class="war-critical-message">攻撃本隊は撤退を開始し、合戦は終結しました。</span>`, log: `${activeArmyName} が撤退を開始した！` });
+                pushMsg({ text: `<span class="war-critical-message">攻撃本隊は撤退を開始し、合戦は終結しました。</span>`, log: `${activeArmyName}が撤退を開始した！` });
                 const finalize = () => { this.endWar(false, true); };
                 if (s.isPlayerInvolved && actionMessages.length > 0) {
                     this.game.ui.showWarActionMessage(actionMessages, finalize);
@@ -1145,7 +1145,7 @@ class WarManager {
                     finalize();
                 }
             } else if (s.turn === 'defender') { 
-                pushMsg({ text: `<span class="war-critical-message">守備本隊は拠点を放棄して撤退し、合戦は終結しました。</span>`, log: `${activeArmyName} が拠点を放棄し撤退した！` });
+                pushMsg({ text: `<span class="war-critical-message">守備本隊は拠点を放棄して撤退し、合戦は終結しました。</span>`, log: `${activeArmyName}が拠点を放棄し撤退した！` });
                 const finalize = () => { this.executeRetreatLogic(s.defender); };
                 if (s.isPlayerInvolved && actionMessages.length > 0) {
                     this.game.ui.showWarActionMessage(actionMessages, finalize);

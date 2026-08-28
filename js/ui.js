@@ -1740,7 +1740,7 @@ class UIManager {
         const commander = this.game.getBusho(legion.commanderId);
         if (!commander) return;
 
-        this.showDialog(`${commander.name} を国主の座から解任しますか？`, true, 
+        this.showDialog(`${commander.name}を国主の座から解任しますか？`, true, 
             () => {
                 this.game.commandSystem.executeDismissLegionLeader(legionNo);
             },
@@ -3922,7 +3922,7 @@ class UIManager {
         
         const textContainer = document.createElement('div');
         textContainer.className = 'war-action-message-text';
-        textContainer.innerHTML = `<span>${armyName} が作戦を思案中...</span>`;
+        textContainer.innerHTML = `<span>${armyName}が作戦を思案中...</span>`;
         
         msgContainer.onclick = (e) => {
             e.stopPropagation();

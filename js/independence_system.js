@@ -788,7 +788,7 @@ class IndependenceSystem {
             if (oldClanId === this.game.playerClanId) {
                 if (PersonnelRules.calcAffinityDiff(p.affinity, newDaimyo.affinity) > 60) {
                     this.game.lifeSystem.setLifeStatusRaw(p, window.GameConstants.BushoStatus.DEAD); this.game.affiliationSystem.setClanIdRaw(p, 0);
-                    alertMsgs.push(`処断：${p.name} は処断されました。`);
+                    alertMsgs.push(`処断：${p.name}は処断されました。`);
                 } else {
                     if (returnCastles.length > 0) {
                         const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
@@ -798,7 +798,7 @@ class IndependenceSystem {
                         // ★新しいお引越しセンターの魔法を使います！
                         this.game.affiliationSystem.becomeRonin(p);
                     }
-                    alertMsgs.push(`解放：${p.name} は解放されました。`);
+                    alertMsgs.push(`解放：${p.name}は解放されました。`);
                 }
             } else if (newClanId === this.game.playerClanId) {
                 // ★プレイヤーの城に寝返った場合、戦争画面ではないので捕虜画面を出さず、逃がしてあげる魔法にします！
@@ -810,7 +810,7 @@ class IndependenceSystem {
                     // ★逃げる城がなければ浪にします
                     this.game.affiliationSystem.becomeRonin(p);
                 }
-                alertMsgs.push(`${p.name} は元の主君のもとへ逃げ去りました。`);
+                alertMsgs.push(`${p.name}は元の主君のもとへ逃げ去りました。`);
             } else {
                 if (Math.random() < 0.3) { this.game.lifeSystem.setLifeStatusRaw(p, window.GameConstants.BushoStatus.DEAD); this.game.affiliationSystem.setClanIdRaw(p, 0); }
                 else if (returnCastles.length > 0) {

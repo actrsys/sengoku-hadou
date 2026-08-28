@@ -101,7 +101,7 @@ class WarPreparationController {
 
         const askConfirmAndProceedToAlly = (selfReinfData) => {
             if (myClanId === pid && !atkCastle.isDelegated) {
-                const confirmMsg = targetCastle.isKunishu ? `${targetCastle.name} を鎮圧しますか？\n今月の命令は終了となります` : `${targetCastle.name}に攻め込みますか？\n今月の命令は終了となります`;
+                const confirmMsg = targetCastle.isKunishu ? `${targetCastle.name}を鎮圧しますか？\n今月の命令は終了となります` : `${targetCastle.name}に攻め込みますか？\n今月の命令は終了となります`;
                 this.game.ui.showDialog(confirmMsg, true, 
                     async () => {
                         proceedToAlly(selfReinfData, atkBushos, sVal);
@@ -453,7 +453,7 @@ class WarPreparationController {
         this.game.warManager.applyWarHostility(helperCastle.ownerClan, false, targetCastle.ownerClan, targetCastle.isKunishu, true);
         
         // ★修正：手動で友軍を出した時の「出発しました！」のお返事を復活させます！
-        this.game.ui.showDialog(`自軍の同盟援軍が出発しました！\n共に ${targetCastle.name} へ侵攻します！`, false, () => {
+        this.game.ui.showDialog(`自軍の同盟援軍が出発しました！\n共に${targetCastle.name}へ侵攻します！`, false, () => {
             this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
         });
     }

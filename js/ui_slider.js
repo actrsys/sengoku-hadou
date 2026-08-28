@@ -13,7 +13,22 @@ class UISliderManager {
     // ==========================================
     openQuantitySelector(type, data, targetId, extraData = null) {
         if (!this.ui.quantityModal) return;
-        this.ui.hideAIGuardTemporarily(); // ★これを追加します！
+
+        // 武将選択の子として開く数量画面では、親一覧を状態ごと一時退避します。
+        // 子から戻る時は再生成せずそのまま復帰し、確定時だけ親の選択セッションを終了します。
+        const wantsParentSelector = !!(extraData && extraData.returnToParentSelector);
+        const parentSelectorSuspended = wantsParentSelector
+            && this.ui.info
+            && typeof this.ui.info.suspendCommonModalForChild === 'function'
+            && this.ui.info.suspendCommonModalForChild();
+        // UI遷移専用フラグをゲームロジック側へ渡さないよう、実行用データからは取り除きます。
+        let selectionExtraData = extraData;
+        if (extraData && Object.prototype.hasOwnProperty.call(extraData, 'returnToParentSelector')) {
+            selectionExtraData = { ...extraData };
+            delete selectionExtraData.returnToParentSelector;
+        }
+        const quantityOwnsAIGuardHide = !parentSelectorSuspended;
+        if (quantityOwnsAIGuardHide) this.ui.hideAIGuardTemporarily();
         
         // ★追加：複数スライダーの時だけ全画面にするための目印をつけます
         const multiSliderTypes = new Set(['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport']);
@@ -161,6 +176,12 @@ class UISliderManager {
                 quantityUiRaf = 0;
                 checkValidQuantity();
             });
+        };
+        const cancelQuantityUIUpdate = () => {
+            if (!quantityUiRaf) return;
+            if (window.cancelAnimationFrame) window.cancelAnimationFrame(quantityUiRaf);
+            else clearTimeout(quantityUiRaf);
+            quantityUiRaf = 0;
         };
         
         const createSlider = (label, id, max, currentVal, minVal = 0, isTransport = false, targetCurrent = 0, targetMaxLimit = 99999) => {
@@ -399,14 +420,14 @@ class UISliderManager {
             const maxGoodwillGold = Math.max(200, Math.min(1500, c.gold));
             inputs.gold = createSlider("金", "gold", maxGoodwillGold, 200, 200);
         } else if (type === 'headhunt_gold') {
-            document.getElementById('quantity-title').textContent = "持参金 (任意)"; inputs.gold = createSlider("金", "gold", c.gold, 0);
+            document.getElementById('quantity-title').textContent = "持参金（任意）"; inputs.gold = createSlider("金", "gold", c.gold, 0);
         } else if (type === 'reinf_gold') {
-            document.getElementById('quantity-title').textContent = "使者に持たせる金 (最大1500)"; 
+            document.getElementById('quantity-title').textContent = "使者に持たせる金（最大1500）"; 
             const baseCastle = (data && data.length > 0) ? data[0] : c;
             const maxGold = Math.min(1500, baseCastle.gold);
             inputs.gold = createSlider("持参金", "gold", maxGold, 0);
         } else if (type === 'tribute_gold') {
-            document.getElementById('quantity-title').textContent = "献上金 (最大1500)"; 
+            document.getElementById('quantity-title').textContent = "献上金（最大1500）"; 
             const maxTributeGold = Math.max(200, Math.min(1500, c.gold));
             inputs.gold = createSlider("金", "gold", maxTributeGold, 200, 200);
         } else if (type === 'war_supplies') {
@@ -476,7 +497,7 @@ class UISliderManager {
 
             let extraStr = "";
             if (type === 'buy_rice' || type === 'sell_rice') {
-                extraStr = `(取引上限: <span class="slider-emphasis">${c.tradeLimit || 0}</span>)`;
+                extraStr = `（取引上限：<span class="slider-emphasis">${c.tradeLimit || 0}</span>）`;
                 const rateInfo = EconomyRules.getRiceActualRate(type, c, this.game.provinces, this.game);
                 this.ui.tradeTypeInfo.classList.remove('hidden');
                 this.ui.tradeTypeInfo.innerHTML = `${EconomyRules.formatRiceMarketRate(rateInfo.ricePerGold)} ${extraStr}`;
@@ -495,8 +516,10 @@ class UISliderManager {
         checkValidQuantity(); 
 
         const closeQuantityModal = () => {
+            // input直後に予約された旧画面の更新が、次に開いた数量画面へ遅れて当たらないよう破棄します。
+            cancelQuantityUIUpdate();
             this.ui.quantityModal.classList.add('hidden');
-            this.ui.restoreAIGuard(); // ★これを追加します！
+            if (quantityOwnsAIGuardHide) this.ui.restoreAIGuard();
             if (this.ui.quantityConfirmBtn) {
                 this.ui.quantityConfirmBtn.disabled = false;
                 this.ui.quantityConfirmBtn.style.opacity = 1.0;
@@ -504,18 +527,24 @@ class UISliderManager {
         };
 
         this.ui.quantityConfirmBtn.onclick = () => {
-            closeQuantityModal(); 
+            closeQuantityModal();
+            if (parentSelectorSuspended && this.ui.info && typeof this.ui.info.closeCommonModal === 'function') {
+                this.ui.info.closeCommonModal();
+            }
             if (extraData && extraData.onConfirm) {
                 extraData.onConfirm(inputs);
             } else {
-                this.game.commandSystem.handleQuantitySelection(type, inputs, targetId, data, extraData);
+                this.game.commandSystem.handleQuantitySelection(type, inputs, targetId, data, selectionExtraData);
             }
         };
 
         const cancelBtn = this.ui.quantityModal.querySelector('.btn-secondary');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
-                closeQuantityModal(); 
+                closeQuantityModal();
+                if (parentSelectorSuspended && this.ui.info && typeof this.ui.info.resumeCommonModalFromChild === 'function') {
+                    this.ui.info.resumeCommonModalFromChild();
+                }
                 if (extraData && extraData.onCancel) {
                     extraData.onCancel(); 
                 }

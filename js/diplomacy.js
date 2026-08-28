@@ -1484,6 +1484,10 @@ class DiplomacyManager {
         return `${clanName || '当家'}当主・${daimyo.fullName || daimyo.name || '当主'}${suffix}`;
     }
 
+    getThirdPartyDaimyoReference(daimyo, clanName, questioner = null, options = {}) {
+        return this._getThirdPartyDaimyoReference(daimyo, clanName, questioner, options);
+    }
+
     /**
      * 外交会話用の関係温度を返す。
      * 格式とは混ぜず、敵対なら少し硬く、友好的な関係なら少し柔らかい言い回しへ使う。

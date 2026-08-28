@@ -2015,6 +2015,9 @@ window.GameEvents.push({
                 const isDaimyoSelf = (envoy.id === aiDaimyo.id);
                 const myCallName = diplomacyManager ? diplomacyManager.getCallName(playerDaimyo, envoy) : `${playerDaimyo.familyNameStr || playerDaimyoName}殿`;
                 const envoyCallName = diplomacyManager ? diplomacyManager.getCallName(envoy, playerDaimyo) : `${envoy.familyNameStr || envoyName}殿`;
+                const aiDaimyoRef = diplomacyManager && typeof diplomacyManager.getThirdPartyDaimyoReference === 'function'
+                    ? diplomacyManager.getThirdPartyDaimyoReference(aiDaimyo, aiClanName, playerDaimyo)
+                    : `${aiClanName}当主・${aiDaimyoName}様`;
                 const greeting = diplomacyManager
                     ? diplomacyManager.buildDiplomacyGreeting(envoy, playerDaimyo)
                     : {
@@ -2037,7 +2040,7 @@ window.GameEvents.push({
 
                 let introMsg = "";
                 if (isDaimyoSelf) {
-                    introMsg = `「殿、${aiClanName}当主・${aiDaimyoName}様がお見えになっております」`;
+                    introMsg = `「殿、${aiDaimyoRef}がお見えになっております」`;
                 } else if (greeting.context && greeting.context.envoySpecial && greeting.context.envoySpecial.level >= 2) {
                     introMsg = `「殿、${aiClanName}より${envoyCallName}がお見えになっております。使者として参られたとのことです」`;
                 } else {

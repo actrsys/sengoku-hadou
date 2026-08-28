@@ -224,7 +224,7 @@ class CourtRankSystem {
         if (this.grantRank(busho, selectedRank.id)) {
             const rankFullName = selectedRank.rankName1 ? `${selectedRank.rankName1} ${selectedRank.rankName2}` : selectedRank.rankName2;
             
-            const msg = `朝廷より、${bushoName} が ${rankFullName} に叙されました。`;
+            const msg = `朝廷より、${bushoName}が${rankFullName}に叙されました。`;
             messages.push(msg);
             this.game.ui.log(`【叙任】${msg}`, { clanIds: Number(busho.clan) > 0 ? [busho.clan] : [], category: 'court', inferCurrentTurn: false });
             
@@ -411,7 +411,7 @@ class CourtRankSystem {
         doer.achievementTotal += this.calcTributeAchievement(gold);
         this.game.factionSystem.updateRecognition(doer, 10);
         
-        this.game.ui.showResultModal(`${doer.name}を使者として、朝廷に 金${gold} を献上しました！`);
+        this.game.ui.showResultModal(`${doer.name}を使者として、朝廷に金${gold}を献上しました！`);
         
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();

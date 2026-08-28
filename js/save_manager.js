@@ -639,7 +639,7 @@ class SaveManager {
                 this.game.ui.renderCommandMenu();
             }
 
-            if (this.game.ui) this.game.ui.showDialog(`スロット ${slotNo} にセーブが完了しました。`, false);
+            if (this.game.ui) this.game.ui.showDialog(`スロット${slotNo}にセーブが完了しました。`, false);
         } catch (e) {
             console.error("セーブエラーの詳細:", e);
             if (this.game.ui) {
@@ -665,7 +665,7 @@ class SaveManager {
         if (!rawData) {
             if (this.game.ui) {
                 this.game.ui.hideLoadingScreen(); // ★エラーで止まる時は蓋を開けます
-                this.game.ui.showDialog(`スロット ${slotNo} にはセーブデータがありません。`, false);
+                this.game.ui.showDialog(`スロット${slotNo}にはセーブデータがありません。`, false);
             }
             return;
         }
