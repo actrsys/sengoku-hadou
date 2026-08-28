@@ -168,6 +168,33 @@ class TurnManager {
             await game.aiOperationManager.processMonthlyOperations();
         }
         game.writeSystemDiagnostic('month_start:operations_done');
+
+        // スマホ観戦中に戦争・独立で延期したフル地図再描画は、戦闘Canvasやイベント地図が片付いた
+        // 月初の安全地点で最大1回だけ実行します。失敗してもゲーム進行は止めず、次の安全地点へ持ち越します。
+        const isMobileWatch = !!(
+            game.isWatchMode && game._aiDeferredMapRefresh && game.ui &&
+            typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')
+        );
+        if (isMobileWatch) {
+            game.writeSystemDiagnostic('month_start:watch_map_refresh:start');
+            if (typeof game.ui.releaseMobileTransientMapResources === 'function') {
+                game.ui.releaseMobileTransientMapResources();
+            }
+            await new Promise(resolve => setTimeout(resolve, 0));
+            try {
+                game.ui.renderMap();
+                game._aiDeferredMapRefresh = false;
+                if (typeof game.ui.waitForNextPaint === 'function') {
+                    await game.ui.waitForNextPaint();
+                } else {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
+                game.writeSystemDiagnostic('month_start:watch_map_refresh:done');
+            } catch (error) {
+                console.warn('観戦中の月次地図再描画を延期しました:', error);
+                game.writeSystemDiagnostic('month_start:watch_map_refresh:deferred');
+            }
+        }
     
         game.currentIndex = 0; 
         game.writeSystemDiagnostic('month_start:before_turn_queue');

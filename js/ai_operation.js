@@ -285,6 +285,9 @@ class AIOperationManager {
                 // ★追加：毎月、まずは大名家単位で「誰と外交するか」を考えます！
                 this.thinkMonthlyDiplomacy(clan);
             }
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:diplomacy_done`);
+            }
             
             // ★今回追加：過去60ヶ月分の所持拠点を記憶する魔法です
             if (!this.historyOwnedCastles) this.historyOwnedCastles = {};
@@ -539,14 +542,24 @@ class AIOperationManager {
                 // 評定で今月の方針が変わっていた場合、古い攻撃作戦を持ち越しません。
                 this.reconcileLegionPolicy(clan.id, legionId);
 
-                if (!this.operations[clan.id][legionId]) {
+                const operationAction = !this.operations[clan.id][legionId] ? 'generate' : 'update';
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:legion_${legionId}:${operationAction}_start`);
+                }
+                if (operationAction === 'generate') {
                     await this.generateOperation(clan.id, legionId);
                 } else {
                     await this.updateOperation(clan.id, legionId);
                 }
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:legion_${legionId}:operation_done`);
+                }
 
                 // ★追加：作戦とは別に、毎月「徴兵用のお城」を考えて選びます！
                 this.selectDraftBase(clan.id, legionId);
+            }
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:done`);
             }
         }
     }
@@ -647,10 +660,11 @@ class AIOperationManager {
         const reachableMyCastles = [];
         const visitedCastles = new Set();
         const searchQueue = [startCastle];
+        let searchHead = 0;
         visitedCastles.add(startCastle.id);
 
-        while (searchQueue.length > 0) {
-            const current = searchQueue.shift();
+        while (searchHead < searchQueue.length) {
+            const current = searchQueue[searchHead++];
             reachableMyCastles.push(current);
 
             if (current.adjacentCastleIds) {
@@ -849,7 +863,15 @@ class AIOperationManager {
         });
 
         // 大名家のすべてのお城を順番に見て、一番攻めやすい場所を探します！
+        // 大勢力では各出撃元の到達圏探索が連続しやすい。判定順・乱数順は変えず、
+        // スマホだけ数城ごとにイベントループへ制御を返してOSの長時間占有を避けます。
+        const isPC = typeof document !== 'undefined' && document.body && document.body.classList.contains('is-pc');
+        let scannedOperationBases = 0;
         for (const myCastle of myClanCastles) {
+            scannedOperationBases++;
+            if (!isPC && scannedOperationBases % 4 === 0) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
             // プレイヤーの委任城で攻撃禁止なら飛ばします
             if (clanId === this.game.playerClanId && myCastle.isDelegated && !myCastle.allowAttack) {
                 continue;
@@ -867,10 +889,11 @@ class AIOperationManager {
             const neighbors = [];
             const visited = new Set();
             const queue = [{ castle: myCastle, distance: 0 }];
+            let queueHead = 0;
             visited.add(myCastle.id);
 
-            while (queue.length > 0) {
-                const currentData = queue.shift();
+            while (queueHead < queue.length) {
+                const currentData = queue[queueHead++];
                 const current = currentData.castle;
                 const currentDist = currentData.distance;
 

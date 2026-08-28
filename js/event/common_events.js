@@ -525,6 +525,7 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
     if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
     fx.writeDiag(game, `${diagPrefix}:dialog`);
     await game.ui.showDialogAsync(initialMsg, false, 0);
+    fx.writeDiag(game, `${diagPrefix}:dialog_done`);
 
     let mapOverlay = null;
     try {

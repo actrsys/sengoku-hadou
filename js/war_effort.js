@@ -2956,12 +2956,22 @@ Object.assign(WarManager.prototype, {
             this.game.affiliationSystem.updateCastleLord(this.state.defender);
         }
 
-        // ★Round10：AI戦争の終了ごとにフル renderMap() していた漏れを修正します。
-        // AI中はプレイヤー復帰時の1回にまとめ、観戦中またはプレイヤー参戦時だけ即時描画します。
-        const deferWarMapRefresh = this.game.isProcessingAI && !this.game.isWatchMode && !this.state.isPlayerInvolved;
+        // AI戦争終了時のフルrenderMap()は、非観戦AIだけでなく低メモリのスマホ観戦でも安全地点へまとめます。
+        // 観戦表示は変化した出撃元/防御拠点カードと勢力色だけ局所更新し、PC観戦とプレイヤー参戦は従来どおり即時描画します。
+        const isMobileWatch = !!(
+            this.game.isProcessingAI && this.game.isWatchMode && !this.state.isPlayerInvolved &&
+            typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')
+        );
+        const deferWarMapRefresh = this.game.isProcessingAI && !this.state.isPlayerInvolved && (!this.game.isWatchMode || isMobileWatch);
         if (deferWarMapRefresh) {
             this.game._aiDeferredMapRefresh = true;
-            if (typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('war:close_map:deferred', this.state.defender || this.state.sourceCastle);
+            if (isMobileWatch && this.game.ui && typeof this.game.ui.refreshCastleOwnershipPresentation === 'function') {
+                const changedCastleIds = [this.state.sourceCastle?.id, this.state.defender?.id].filter(id => id != null);
+                this.game.ui.refreshCastleOwnershipPresentation(changedCastleIds);
+                if (typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('war:close_map:light_done', this.state.defender || this.state.sourceCastle);
+            } else if (typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic('war:close_map:deferred', this.state.defender || this.state.sourceCastle);
+            }
         } else {
             if (typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('war:close_map:start', this.state.defender || this.state.sourceCastle);
             this.game.ui.renderMap();

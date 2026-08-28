@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r281');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r282');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -9722,6 +9722,65 @@ test('攻城戦メッセージの遅延callbackと数値更新は次の戦況・
     const resetAt = ui.indexOf('forceResetModals(options = {})');
     const resetBlock = ui.slice(resetAt, resetAt + 1000);
     assert.ok(resetBlock.includes('this._warActionMessageGeneration = Number(this._warActionMessageGeneration || 0) + 1;'), '強制リセットも戦況メッセージ寿命境界にする');
+});
+
+
+test('スマホ観戦の戦争・独立は全城再描画を演出直後に重ねず局所反映へ寄せる', () => {
+    const uiMap = read('js/ui_map.js');
+    const independence = read('js/independence_system.js');
+    const warEffort = read('js/war_effort.js');
+    const turnManager = read('js/turn_manager.js');
+
+    assert.ok(uiMap.includes("el.setAttribute('data-castle-id', String(c.id));"), '既存城カードをIDで局所更新できる');
+    assert.ok(uiMap.includes('refreshCastleOwnershipPresentation(castleIds = [])'), '所有変更の局所反映窓口をUI地図へ置く');
+    assert.ok(uiMap.includes('this.updateCastleGlows();') && uiMap.includes('this.updateClanColors();'), '局所反映後も光彩と勢力色を現在状態へ同期する');
+
+    const indAt = independence.indexOf("this.game.writeSystemDiagnostic('independence:capture_done')");
+    const indEnd = independence.indexOf('// ★追加：自分の担当大名家から独立', indAt);
+    const indBlock = independence.slice(indAt, indEnd);
+    assert.ok(indBlock.includes('const isMobileWatch = !!('), '独立はスマホ観戦を低メモリ経路として判定する');
+    assert.ok(indBlock.includes('this.game.ui.refreshCastleOwnershipPresentation(changedCastleIds);'), '独立直後は変更城だけを局所反映する');
+    assert.ok(indBlock.includes("this.game.writeSystemDiagnostic('independence:render_light_done');"), '実機停止位置で軽量描画到達を識別できる');
+
+    const warAt = warEffort.indexOf('// AI戦争終了時のフルrenderMap()');
+    const warEnd = warEffort.indexOf('if (this.state.isPlayerInvolved)', warAt);
+    const warBlock = warEffort.slice(warAt, warEnd);
+    assert.ok(warBlock.includes('const isMobileWatch = !!('), 'AI戦争終了もスマホ観戦を低メモリ経路へ入れる');
+    assert.ok(warBlock.includes('this.game.ui.refreshCastleOwnershipPresentation(changedCastleIds);'), '戦争後も出撃元/防御拠点だけを局所反映する');
+
+    const monthAt = turnManager.indexOf("game.writeSystemDiagnostic('month_start:operations_done');");
+    const queueAt = turnManager.indexOf('game.currentIndex = 0;', monthAt);
+    const monthBlock = turnManager.slice(monthAt, queueAt);
+    assert.ok(monthBlock.includes("game.writeSystemDiagnostic('month_start:watch_map_refresh:start');"), '延期したフル描画は月初安全地点で開始を記録する');
+    assert.ok(monthBlock.includes('game.ui.releaseMobileTransientMapResources();'), '完全再描画前に非必須モバイル地図資源を解放する');
+    assert.ok(monthBlock.includes('game.ui.renderMap();'), '月初安全地点では最大1回の完全再描画を行う');
+    assert.ok(monthBlock.includes("console.warn('観戦中の月次地図再描画を延期しました:'"), '描画例外でゲーム進行を止めず次回へ持ち越す');
+});
+
+test('AI月次作戦は大勢力の探索順を変えずスマホへ定期的に制御を返す', () => {
+    const ops = read('js/ai_operation.js');
+    const genAt = ops.indexOf('async generateOperation(clanId, legionId)');
+    const nextAt = ops.indexOf('\n    async updateOperation(', genAt);
+    const block = ops.slice(genAt, nextAt);
+    assert.ok(block.includes('let scannedOperationBases = 0;'), '出撃元走査数をローカルに数える');
+    assert.ok(block.includes('scannedOperationBases % 4 === 0'), 'スマホは複数出撃元ごとに息継ぎする');
+    assert.ok(block.includes('await new Promise(resolve => setTimeout(resolve, 0));'), '同期CPU占有をイベントループへ返す');
+    assert.ok(block.includes('let queueHead = 0;'), 'BFSキューはhead indexで順序を維持する');
+    assert.ok(block.includes('const currentData = queue[queueHead++];'), 'shiftによる配列再配置を避ける');
+    assert.ok(!block.includes('const currentData = queue.shift();'), '攻撃候補BFSにshiftを残さない');
+
+    assert.ok(ops.includes('month_start:operations:clan_${clan.id}:diplomacy_done'), '勢力内の外交処理完了を実機診断できる');
+    assert.ok(ops.includes('month_start:operations:clan_${clan.id}:legion_${legionId}:${operationAction}_start'), '軍団ごとの作戦生成/更新開始を識別できる');
+    assert.ok(ops.includes('month_start:operations:clan_${clan.id}:legion_${legionId}:operation_done'), '軍団作戦完了まで到達したか識別できる');
+});
+
+test('災害と独立の停止診断は会話待ちの前後を区別する', () => {
+    const events = read('js/event/common_events.js');
+    const independence = read('js/independence_system.js');
+    assert.ok(events.includes('fx.writeDiag(game, `${diagPrefix}:dialog_done`);'), '災害初回会話の完了checkpointを残す');
+    assert.ok(independence.includes("this.game.writeSystemDiagnostic('independence:post_render');"), '独立描画後の次処理到達を記録する');
+    assert.ok(independence.includes("this.game.writeSystemDiagnostic('independence:result_dialog_start');"), '独立結果会話の開始を記録する');
+    assert.ok(independence.includes("this.game.writeSystemDiagnostic('independence:result_dialog_done');"), '独立結果会話の完了を記録する');
 });
 
 Promise.all(pendingTests).then(() => {

@@ -551,12 +551,22 @@ class IndependenceSystem {
             else setTimeout(resolve, 0);
         });
 
-        // AI/月末処理中はRound5以降の方針どおり、プレイヤー復帰時の1回へ描画を延期します。
-        // 観戦中や通常操作中だけ、ここで1回描き直します。
+        // AI/月末処理中はフルrenderMap()を安全地点へまとめます。
+        // 特にスマホ観戦は制圧演出直後に全城DOMを再生成するとGPU/DOMメモリの山ができるため、
+        // 変わった城カードと勢力色だけを局所反映し、完全再描画は月次の安全地点へ延期します。
         if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
-            if (this.game.isProcessingAI && !this.game.isWatchMode) {
+            const isMobileWatch = !!(
+                this.game.isProcessingAI && this.game.isWatchMode &&
+                typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')
+            );
+            if (this.game.isProcessingAI && (!this.game.isWatchMode || isMobileWatch)) {
                 this.game._aiDeferredMapRefresh = true;
-                if (typeof this.game.writeSystemDiagnostic === 'function') {
+                if (isMobileWatch && typeof this.game.ui.refreshCastleOwnershipPresentation === 'function') {
+                    this.game.ui.refreshCastleOwnershipPresentation(changedCastleIds);
+                    if (typeof this.game.writeSystemDiagnostic === 'function') {
+                        this.game.writeSystemDiagnostic('independence:render_light_done');
+                    }
+                } else if (typeof this.game.writeSystemDiagnostic === 'function') {
                     this.game.writeSystemDiagnostic('independence:render_deferred');
                 }
             } else {
@@ -568,6 +578,9 @@ class IndependenceSystem {
         }
         // バリアを解除します
         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+        if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+            this.game.writeSystemDiagnostic('independence:post_render');
+        }
         // 追加のメッセージを作ります
         let extraMsg = "";
         if (!isDefection) {
@@ -583,7 +596,13 @@ class IndependenceSystem {
         }
         // もし表示する文字が何かあれば、画面にメッセージを出します
         if (extraMsg !== "") {
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic('independence:result_dialog_start');
+            }
             await this.game.ui.showDialogAsync(extraMsg, false, 0);
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic('independence:result_dialog_done');
+            }
         }
 
         // ★追加：自分の担当大名家から独立が起きて新大名家が誕生した場合に、どちらを担当するか選べる魔法！

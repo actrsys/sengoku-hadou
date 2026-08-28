@@ -1413,6 +1413,7 @@ Object.assign(UIManager.prototype, {
         this.game.castles.forEach(c => {
             const el = document.createElement('div'); el.className = 'castle-card';
 
+            el.setAttribute('data-castle-id', String(c.id));
             el.dataset.clan = c.ownerClan;
             
             const posX = c.pixelX !== undefined ? c.pixelX : 0;
@@ -1639,6 +1640,76 @@ Object.assign(UIManager.prototype, {
         }
     },
     
+
+    /**
+     * AI観戦中の所有変更を、全城DOMを作り直さず既存カードへ反映します。
+     * フルrenderMap()は低メモリ端末で大きなDOM/GPUピークになるため、
+     * 城所有・城主・軍団表示と勢力色だけを局所更新し、完全再描画は安全地点へ延期します。
+     */
+    refreshCastleOwnershipPresentation(castleIds = []) {
+        if (!this.mapEl || this.isBackgroundPaused) return false;
+        const targetIds = new Set((castleIds || []).map(id => Number(id)).filter(Number.isFinite));
+        if (targetIds.size === 0) return false;
+
+        let changed = false;
+        const cards = this.mapEl.querySelectorAll('.castle-card');
+        cards.forEach(card => {
+            const castleId = Number(card.dataset.castleId || 0);
+            if (!targetIds.has(castleId)) return;
+            const castle = this.game.getCastle(castleId);
+            if (!castle) return;
+
+            card.dataset.clan = castle.ownerClan;
+            const clan = this.game.getClan(castle.ownerClan);
+            const castellan = this.game.getBusho(castle.castellanId);
+
+            // 城カード直下の通常hoverだけ更新し、諸勢力アイコン内のhoverは触らない。
+            let hover = null;
+            for (const child of card.children) {
+                if (child.classList && child.classList.contains('hover-info')) {
+                    hover = child;
+                    break;
+                }
+            }
+            if (hover) {
+                const lines = Array.from(hover.children).filter(el => el.classList && el.classList.contains('info-line'));
+                if (lines[0]) lines[0].textContent = castle.name;
+                if (lines[1]) lines[1].textContent = clan ? clan.name : '中立';
+                if (lines[2]) lines[2].textContent = castellan ? castellan.name : '-';
+            }
+
+            // 軍団番号は所有変更・軍団整理で変わり得るため、現在値へ同期する。
+            let marker = null;
+            for (const child of card.children) {
+                if (child.classList && child.classList.contains('legion-marker-base')) {
+                    marker = child;
+                    break;
+                }
+            }
+            const legionId = Number(castle.legionId || 0);
+            if (legionId > 0) {
+                const kanjiNumbers = ['', '一', '二', '三', '四', '五', '六', '七', '八'];
+                if (!marker) {
+                    marker = document.createElement('div');
+                    card.appendChild(marker);
+                }
+                marker.className = `legion-marker-base legion-color-${legionId} hidden`;
+                marker.textContent = kanjiNumbers[legionId] || String(legionId);
+            } else if (marker) {
+                marker.remove();
+            }
+            changed = true;
+        });
+
+        if (!changed) return false;
+        this.updateCastleGlows();
+        this.updateClanColors();
+        if (this.currentCastle && targetIds.has(Number(this.currentCastle.id))) {
+            this.updateInfoPanel(this.currentCastle);
+        }
+        return true;
+    },
+
     // ★新魔法：勢力の名前を賢く並べる魔法です
     renderDaimyoLabels(validTargetSet = null) {
         const labelsData = [];
