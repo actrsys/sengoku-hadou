@@ -1203,6 +1203,23 @@ class UIInfoManager {
         });
     }
 
+    // 派閥再編で現在表示中の派閥一覧だけを更新します。
+    // 旧専用modalを探したり新規openし直さず、共通Selectorの現在画面を正本として再描画します。
+    refreshOpenFactionList(targetClanId = null) {
+        const info = this.currentModalInfo;
+        const elements = this.selectorView ? this.selectorView.getElements() : null;
+        if (!info || info.pageType !== 'faction_list' || !elements || !elements.modal) return false;
+        if (elements.modal.classList.contains('hidden') || this._commonModalSuspendedForChild) return false;
+
+        const openClanId = info.args ? info.args[0] : null;
+        if (targetClanId !== null && Number(openClanId) !== Number(targetClanId)) return false;
+
+        const listEl = document.getElementById('selector-list');
+        info.scrollPos = listEl ? listEl.scrollTop : (info.scrollPos || 0);
+        this._renderCurrentModal();
+        return true;
+    }
+
     showFactionList(clanId, isDirect = false) {
         if (isDirect) {
             this.closeCommonModal(); 

@@ -1289,7 +1289,9 @@ Object.assign(UIInfoManager.prototype, {
                 // 数量画面の［戻る］で選択・タブ・ソートをそのまま復元し、確定時だけ親一覧を破棄します。
                 const keepSelectorForQuantityStep = ['headhunt_doer', 'tribute_doer', 'kunishu_goodwill_doer',
                     'war_deploy', 'war_general', 'kunishu_subjugate_deploy', 'kunishu_war_general',
-                    'transport_deploy', 'draft'].includes(actionType)
+                    'transport_deploy', 'draft',
+                    'def_intercept_deploy', 'atk_self_reinf_deploy', 'def_self_reinf_deploy',
+                    'atk_reinf_deploy', 'def_reinf_deploy'].includes(actionType)
                     || (actionType === 'diplomacy_doer' && extraData && extraData.subAction === 'goodwill');
                 // 候補を選んだ後の最終確認だけを重ねる経路では、取消時に候補一覧へ戻れるよう親を保持します。
                 const keepSelectorForConfirmationStep = ['succession_target', 'adopt_son_target', 'banish'].includes(actionType)

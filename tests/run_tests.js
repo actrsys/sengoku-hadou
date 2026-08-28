@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r269');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r271');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2112,10 +2112,95 @@ test('武将選択の子数量画面は戻る時に親一覧状態をそのま�
     assert.ok(slider.includes('resumeCommonModalFromChild'), '数量画面のキャンセルは親一覧を作り直さず復帰する');
     assert.ok(slider.includes("delete selectionExtraData.returnToParentSelector;"), 'UI遷移専用フラグをゲームロジックへ漏らさない');
     assert.ok(uiBusho.includes("const keepSelectorForQuantityStep = ['headhunt_doer', 'tribute_doer', 'kunishu_goodwill_doer'"), '数量指定へ進む武将一覧を先に閉じない');
-    assert.ok(uiBusho.includes("'transport_deploy', 'draft'].includes(actionType)"), '徴兵・輸送も数量画面から直前の武将選択へ戻れる');
+    assert.ok(uiBusho.includes("'transport_deploy', 'draft',"), '徴兵・輸送も数量画面から直前の武将選択へ戻れる');
     assert.ok(command.includes("openQuantitySelector('headhunt_gold', selectedIds, extraData.targetId, { returnToParentSelector: true })"), '引抜持参金は実行武将一覧を親として保持する');
     assert.ok(command.includes("openQuantitySelector('transport', selectedIds, targetId, { returnToParentSelector: true })"), '輸送量は出発武将一覧を親として保持する');
     assert.ok(command.includes("openQuantitySelector(actionType, selectedIds, targetId, { returnToParentSelector: true })"), '徴兵量は担当武将一覧を親として保持する');
+});
+
+test('迎撃・自軍援軍・同盟援軍の数量画面は武将一覧へ一段戻る', () => {
+    const uiBusho = read('js/ui_info_busho.js');
+    const prep = read('js/war_preparation_controller.js');
+    const effort = read('js/war_effort.js');
+    ['def_intercept_deploy', 'atk_self_reinf_deploy', 'def_self_reinf_deploy', 'atk_reinf_deploy', 'def_reinf_deploy'].forEach(type => {
+        assert.ok(uiBusho.includes(`'${type}'`), `${type} は数量画面へ進む時に親武将一覧を保持する`);
+    });
+    assert.ok(prep.includes("openQuantitySelector('atk_self_reinf_supplies', [helperCastle], null, {"));
+    assert.ok(prep.includes("openQuantitySelector('def_self_reinf_supplies', [helperCastle], null, {"));
+    assert.ok(prep.includes("openQuantitySelector('atk_reinf_supplies', [helperCastle], null, {"));
+    assert.ok(effort.includes("openQuantitySelector('def_intercept', [defCastle], null, {"));
+    assert.ok(effort.includes("openQuantitySelector('def_reinf_supplies', [helperCastle], null, {"));
+    const returnCount = (prep.match(/returnToParentSelector: true/g) || []).length + (effort.match(/returnToParentSelector: true/g) || []).length;
+    assert.ok(returnCount >= 5, '特殊援軍の数量画面も共通の親Selector復帰を使う');
+    assert.ok(!prep.includes('onCancel: promptBusho'), '援軍数量画面から親一覧を新規openし直す旧キャンセル経路を残さない');
+});
+
+test('守備側自軍援軍の大雪警告は数量指定前に戻れる', () => {
+    const prep = read('js/war_preparation_controller.js');
+    const start = prep.indexOf('handleBushoSelectionForDefSelfReinf(');
+    const end = prep.indexOf('executeReinforcementRequest(', start);
+    const block = prep.slice(start, end);
+    assert.ok(block.includes('const openSupplies = () => {'), '数量画面を警告後に開く専用関数を持つ');
+    assert.ok(block.indexOf('if (isHeavySnow)') < block.lastIndexOf('openSupplies();'), '大雪警告を数量確定後ではなく数量画面の前へ置く');
+    assert.ok(block.includes("okText: '出陣する'"));
+    assert.ok(block.includes("cancelText: '戻る'"));
+    assert.ok(block.includes('closeBeforeOk: true'));
+    assert.ok(!block.includes('onCancel: promptBusho'), '大雪取消で旧selector再生成へ戻さない');
+});
+
+test('守備側自軍援軍の大雪確認は戻れる親一覧を残してから数量画面へ進む', () => {
+    let dialogArgs = null;
+    let quantityArgs = null;
+    let completed = null;
+    const helperCastle = { id: 10, provinceId: 1 };
+    const defCastle = { id: 20, provinceId: 2 };
+    const bushos = { 101: { id: 101, name: '援軍武将' } };
+    const game = {
+        getCastle: id => id === 10 ? helperCastle : defCastle,
+        getProvince: id => ({ id, statusEffects: id === 1 ? ['heavySnow'] : [] }),
+        getBusho: id => bushos[id],
+        reinforcementService: {
+            createManualCastleReinforcement: (_castle, selected, resources, flags) => ({ selected, resources, flags })
+        },
+        ui: {
+            showDialog: (...args) => { dialogArgs = args; },
+            openQuantitySelector: (...args) => { quantityArgs = args; }
+        }
+    };
+    const ctx = createContext();
+    loadScript(ctx, 'js/war_preparation_controller.js');
+    vm.runInContext('this.WarPreparationController = WarPreparationController;', ctx);
+    const controller = new ctx.WarPreparationController(game);
+    controller.handleBushoSelectionForDefSelfReinf(10, [101], defCastle, data => { completed = data; });
+
+    assert.ok(dialogArgs, '大雪時はまず警告を出す');
+    assert.strictEqual(quantityArgs, null, '警告を了承するまでは数量画面へ進まない');
+    assert.strictEqual(dialogArgs[3], null, '戻る側で別selectorを新規openするコールバックを持たない');
+    assert.strictEqual(dialogArgs[4].cancelText, '戻る');
+    dialogArgs[2]();
+    assert.ok(quantityArgs, '出陣するを選んだ後だけ数量画面へ進む');
+    const extra = quantityArgs[3];
+    assert.strictEqual(extra.returnToParentSelector, true, '数量画面は保持した援軍武将一覧の子として開く');
+    extra.onConfirm({ 10: {
+        soldiers: { num: { value: '600' } }, rice: { num: { value: '700' } },
+        horses: { num: { value: '20' } }, guns: { num: { value: '10' } }
+    }});
+    assert.ok(completed, '数量確定後は援軍データを返す');
+    assert.strictEqual(completed.resources.soldiers, 600);
+    assert.strictEqual(completed.flags.isAttacker, false);
+    assert.strictEqual(completed.flags.isSelf, true);
+});
+
+test('派閥再編後の一覧更新は共通Selectorの現在画面を正本にする', () => {
+    const faction = read('js/faction_system.js');
+    const info = read('js/ui_info.js');
+    assert.ok(!faction.includes("getElementById('faction-list-modal')"), '削除済みの派閥専用modalを探さない');
+    assert.ok(!faction.includes('currentFactionClanId'), '旧専用画面の保持変数を使わない');
+    assert.ok(!faction.includes('isFactionListDirect'), '旧専用画面の保持変数を使わない');
+    assert.ok(faction.includes('this.game.ui.info.refreshOpenFactionList(targetId);'), '派閥SystemはUI側の公開更新窓口へ委譲する');
+    assert.ok(info.includes("info.pageType !== 'faction_list'"), '現在画面が派閥一覧の時だけ更新する');
+    assert.ok(info.includes('info.scrollPos = listEl ? listEl.scrollTop'), '再描画前にスクロール位置を保持する');
+    assert.ok(info.includes('this._renderCurrentModal();'), '共通Selectorの現在画面をその場で再描画する');
 });
 
 test('家督相続・養子縁組・追放の最終確認取消は候補一覧へ戻る', () => {
@@ -9265,6 +9350,33 @@ test('共通Selectorへ移行済みの捕虜・家督旧専用モーダル参照
     assert.ok(!uiSource.includes('succession-modal'));
     assert.ok(!uiSource.includes('showPrisonerModal('));
     assert.ok(!uiSource.includes('showSuccessionModal('));
+});
+
+
+test('援軍で選んだ勢力はCastleへ一時プロパティを貼らず明示引数で渡す', () => {
+    const command = read('js/command_system.js');
+    const prep = read('js/war_preparation_controller.js');
+    const effort = read('js/war_effort.js');
+    const ui = read('js/ui.js');
+    const gameSources = [command, prep, effort].join('\n');
+    assert.ok(!gameSources.includes('.selectedForce ='), '援軍選択をCastleへ一時保存しない');
+    assert.ok(prep.includes('executeReinforcementRequest(gold, helperCastle, force,'), '攻撃側援軍は選択勢力を明示引数で受け取る');
+    assert.ok(effort.includes('executeDefReinforcement(gold, helperCastle, force, defCastle, onComplete)'), '守備側援軍も選択勢力を明示引数で受け取る');
+    assert.ok(command.includes('showReinforcementGoldSelector(targetCastle, force,'), '地図選択した勢力を攻撃側持参金画面へそのまま渡す');
+    assert.ok(command.includes('showDefReinforcementGoldSelector(targetCastle, force,'), '地図選択した勢力を守備側持参金画面へそのまま渡す');
+    assert.ok(ui.includes('showReinforcementGoldSelector(helperCastle, selectedForce,'));
+    assert.ok(ui.includes('showDefReinforcementGoldSelector(helperCastle, selectedForce,'));
+});
+
+test('部隊分割は確定・取消・強制終了前に遅延UI更新を破棄する', () => {
+    const slider = read('js/ui_slider.js');
+    const ui = read('js/ui.js');
+    assert.ok(slider.includes('cancelUnitDivideDeferredUpdates() {'), '部隊分割専用の遅延更新破棄窓口を持つ');
+    assert.ok(slider.includes("this.cancelUnitDivideDeferredUpdates();\n        const modal = document.getElementById('unit-divide-modal')"), '次の部隊分割開始前に旧画面の更新を破棄する');
+    assert.ok(slider.includes('this._unitDivideUiRaf = raf(() => {'), '残数・確定可否更新のRAFを画面寿命へ紐付ける');
+    assert.ok(slider.includes('this._unitDivideScrollbarRaf = raf(() => {'), 'スクロールバー更新のRAFも画面寿命へ紐付ける');
+    assert.ok(slider.includes("this.cancelUnitDivideDeferredUpdates();\n            modal.classList.add('hidden');"), '画面を隠す前に遅延更新を止める');
+    assert.ok(ui.includes("typeof this.slider.cancelUnitDivideDeferredUpdates === 'function'"), '強制モーダルリセットでも遅延更新を破棄する');
 });
 
 Promise.all(pendingTests).then(() => {

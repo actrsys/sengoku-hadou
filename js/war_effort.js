@@ -948,7 +948,7 @@ Object.assign(WarManager.prototype, {
                                                     () => { this.game.ui.hideAIGuardTemporarily(); modal.classList.remove('hidden'); }
                                                     );
                                                 },
-                                                onCancel: () => { this.game.ui.hideAIGuardTemporarily(); modal.classList.remove('hidden'); }
+                                                returnToParentSelector: true
                                             });
                                         },
                                         onCancel: () => { this.game.ui.hideAIGuardTemporarily(); modal.classList.remove('hidden'); }
@@ -3076,7 +3076,7 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.openBushoSelector('def_self_reinf_deploy', bestCastle.id, {
                         hideCancel: false, 
                         onConfirm: (selectedBushoIds) => {
-                            this.game.warPreparationController.handleBushoSelectionForDefSelfReinf(bestCastle.id, selectedBushoIds, defCastle, onComplete, promptBusho);
+                            this.game.warPreparationController.handleBushoSelectionForDefSelfReinf(bestCastle.id, selectedBushoIds, defCastle, onComplete);
                         },
                         onCancel: () => {
                             this.game.ui.showDialog("援軍の派遣を取りやめました。", false, () => onComplete(null), null, { closeBeforeOk: true });
@@ -3237,7 +3237,6 @@ Object.assign(WarManager.prototype, {
             // ★追加：スコアが高い順に並べ替えて、一番高いところを選びます
             allyForceCandidates.sort((a,b) => b.score - a.score);
             const best = allyForceCandidates[0];
-            best.castle.selectedForce = best.force; // シールを貼る
             console.log(`他勢力の援軍を呼ぶ勢力（お城）を選びました: ${best.castle.name} の ${best.force.name} (スコア: ${Math.floor(best.score)})`);
 
             let finalGold = 0;
@@ -3245,7 +3244,7 @@ Object.assign(WarManager.prototype, {
                 finalGold = best.expectedGold || 0;
             }
 
-            this.executeDefReinforcement(finalGold, best.castle, defCastle, onComplete);
+            this.executeDefReinforcement(finalGold, best.castle, best.force, defCastle, onComplete);
         }
     },
     
@@ -3257,10 +3256,9 @@ Object.assign(WarManager.prototype, {
         onComplete(selfReinfData);
     },
 
-    executeDefReinforcement(gold, helperCastle, defCastle, onComplete) {
+    executeDefReinforcement(gold, helperCastle, force, defCastle, onComplete) {
         if (gold > 0) defCastle.gold -= gold;
 
-        const force = helperCastle.selectedForce;
         const myClanId = defCastle.ownerClan;
         
         // ★大雪判定
@@ -3443,7 +3441,7 @@ Object.assign(WarManager.prototype, {
                     const rG = i.guns ? parseInt(i.guns.num.value) : 0;
                     this._applyManualDefReinforcement(helperCastle, defCastle, myToHelperRel, reinfBushos, rS, rR, rH, rG, onComplete);
                 },
-                onCancel: promptBusho
+                returnToParentSelector: true
             });
         };
         promptBusho();

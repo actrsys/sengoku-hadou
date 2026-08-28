@@ -1612,6 +1612,10 @@ class UIManager {
     }
 
     forceResetModals(options = {}) {
+        // 強制終了で部隊分割の遅延描画だけが次画面へ残らないよう、専門Managerへ破棄を依頼する。
+        if (this.slider && typeof this.slider.cancelUnitDivideDeferredUpdates === 'function') {
+            this.slider.cancelUnitDivideDeferredUpdates();
+        }
         // 戦闘途中のタイトル復帰・強制終了でも、スマホ地図を display:none のまま持ち越さない。
         const battleState = this._battleSuspendState;
         if (battleState && battleState.scroll) battleState.scroll.style.display = battleState.oldDisplay;
@@ -3724,10 +3728,10 @@ class UIManager {
         this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
 
-    showReinforcementGoldSelector(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData, backToMap) {
+    showReinforcementGoldSelector(helperCastle, selectedForce, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData, backToMap) {
         const rel = this.game.getRelation(this.game.playerClanId, helperCastle.ownerClan);
         if (rel.status === '支配') {
-            this.game.warPreparationController.executeReinforcementRequest(0, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
+            this.game.warPreparationController.executeReinforcementRequest(0, helperCastle, selectedForce, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
             return;
         }
 
@@ -3735,7 +3739,7 @@ class UIManager {
         this.slider.openQuantitySelector('reinf_gold', [atkCastle], null, {
             onConfirm: (inputs) => {
                 const gold = inputs.gold ? parseInt(inputs.gold.num.value) : 0;
-                this.game.warPreparationController.executeReinforcementRequest(gold, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
+                this.game.warPreparationController.executeReinforcementRequest(gold, helperCastle, selectedForce, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
             },
             onCancel: () => {
                 if (backToMap) backToMap();
@@ -3777,10 +3781,10 @@ class UIManager {
         this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
 
-    showDefReinforcementGoldSelector(helperCastle, defCastle, onComplete, backToMap) {
+    showDefReinforcementGoldSelector(helperCastle, selectedForce, defCastle, onComplete, backToMap) {
         const rel = this.game.getRelation(this.game.playerClanId, helperCastle.ownerClan);
         if (rel.status === '支配') {
-            this.game.warManager.executeDefReinforcement(0, helperCastle, defCastle, onComplete);
+            this.game.warManager.executeDefReinforcement(0, helperCastle, selectedForce, defCastle, onComplete);
             return;
         }
 
@@ -3788,7 +3792,7 @@ class UIManager {
         this.slider.openQuantitySelector('reinf_gold', [defCastle], null, {
             onConfirm: (inputs) => {
                 const gold = inputs.gold ? parseInt(inputs.gold.num.value) : 0;
-                this.game.warManager.executeDefReinforcement(gold, helperCastle, defCastle, onComplete);
+                this.game.warManager.executeDefReinforcement(gold, helperCastle, selectedForce, defCastle, onComplete);
             },
             onCancel: () => {
                 if (backToMap) backToMap();

@@ -568,14 +568,10 @@ class FactionSystem {
             
         });
 
-        // ★ここから追加：派閥が新しくなったので、もし派閥の画面が開いていたら描き直す魔法です！
-        if (this.game && this.game.ui && this.game.ui.info) {
-            const modal = document.getElementById('faction-list-modal');
-            const info = this.game.ui.info;
-            // 画面が隠れていなくて、どの勢力を見ているか覚えているなら描き直します
-            if (modal && !modal.classList.contains('hidden') && info.currentFactionClanId) {
-                info.showFactionList(info.currentFactionClanId, info.isFactionListDirect);
-            }
+        // 派閥一覧が現在開いている場合だけ、共通Selectorの現在画面をその場で更新します。
+        // 旧専用modalをopenし直す経路は持たず、スクロール位置もUI側で維持します。
+        if (this.game && this.game.ui && this.game.ui.info && typeof this.game.ui.info.refreshOpenFactionList === 'function') {
+            this.game.ui.info.refreshOpenFactionList(targetId);
         }
     }
 

@@ -88,14 +88,13 @@ class WarPreparationController {
             } else {
                 allyForceCandidates.sort((a,b) => b.force.soldiers - a.force.soldiers);
                 const best = allyForceCandidates[0];
-                best.castle.selectedForce = best.force; 
 
                 // 大名家への持参金は攻守共通でDiplomacyManagerを正本とします。
                 const reinfGold = best.force.isKunishu
                     ? 0
                     : this.game.diplomacyManager.calcReinforcementOfferGold(myClanId, best.force.id, atkCastle.gold);
 
-                this.executeReinforcementRequest(reinfGold, best.castle, atkCastle, targetCastle, currentAtkBushos, currentSVal, rVal, hVal, gVal, selfReinfData);
+                this.executeReinforcementRequest(reinfGold, best.castle, best.force, atkCastle, targetCastle, currentAtkBushos, currentSVal, rVal, hVal, gVal, selfReinfData);
             }
         };
 
@@ -157,7 +156,7 @@ class WarPreparationController {
             this.game.ui.openBushoSelector('atk_self_reinf_deploy', helperCastle.id, {
                 onConfirm: (selectedIds) => {
                     // ★追加：大雪の判定に使うために「targetCastle」を渡してあげます
-                    this.handleBushoSelectionForSelfReinf(helperCastle.id, selectedIds, targetCastle, onComplete, promptBusho, backToMap);
+                    this.handleBushoSelectionForSelfReinf(helperCastle.id, selectedIds, targetCastle, onComplete);
                 },
                 onCancel: () => {
                     // ★ 変更：キャンセルした時は、完全にやめるのではなく城選択マップに戻ります！
@@ -169,7 +168,7 @@ class WarPreparationController {
         promptBusho();
     }
 
-    handleBushoSelectionForSelfReinf(helperCastleId, selectedIds, targetCastle, onComplete, promptBusho) {
+    handleBushoSelectionForSelfReinf(helperCastleId, selectedIds, targetCastle, onComplete) {
         const helperCastle = this.game.getCastle(helperCastleId);
         const reinfBushos = selectedIds.map(id => this.game.getBusho(id));
         this.game.ui.openQuantitySelector('atk_self_reinf_supplies', [helperCastle], null, {
@@ -189,7 +188,7 @@ class WarPreparationController {
                 
                 onComplete(selfReinfData);
             },
-            onCancel: promptBusho
+            returnToParentSelector: true
         });
     }
     
@@ -199,7 +198,7 @@ class WarPreparationController {
             this.game.ui.openBushoSelector('def_self_reinf_deploy', helperCastle.id, {
                 onConfirm: (selectedIds) => {
                     // ★追加：大雪の判定に使うために「defCastle」を渡してあげます
-                    this.handleBushoSelectionForDefSelfReinf(helperCastle.id, selectedIds, defCastle, onComplete, promptBusho);
+                    this.handleBushoSelectionForDefSelfReinf(helperCastle.id, selectedIds, defCastle, onComplete);
                 },
                 onCancel: () => {
                     if (backToMap) backToMap();
@@ -210,50 +209,54 @@ class WarPreparationController {
         promptBusho();
     }
 
-    handleBushoSelectionForDefSelfReinf(helperCastleId, selectedIds, defCastle, onComplete, promptBusho) {
+    handleBushoSelectionForDefSelfReinf(helperCastleId, selectedIds, defCastle, onComplete) {
         const helperCastle = this.game.getCastle(helperCastleId);
         const reinfBushosData = selectedIds;
-        this.game.ui.openQuantitySelector('def_self_reinf_supplies', [helperCastle], null, {
-            onConfirm: (inputs) => {
-                const inputData = inputs[helperCastle.id] || inputs;
-                const reinfSoldiers = inputData.soldiers ? parseInt(inputData.soldiers.num.value) : 500;
-                const reinfRice = inputData.rice ? parseInt(inputData.rice.num.value) : 500;
-                const reinfHorses = inputData.horses ? parseInt(inputData.horses.num.value) : 0;
-                const reinfGuns = inputData.guns ? parseInt(inputData.guns.num.value) : 0;
+        const srcProv = this.game.getProvince(helperCastle.provinceId);
+        const tgtProv = this.game.getProvince(defCastle.provinceId);
+        const isHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) ||
+                            (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
 
-                const srcProv = this.game.getProvince(helperCastle.provinceId);
-                const tgtProv = this.game.getProvince(defCastle.provinceId);
-                const isHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) || 
-                                    (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
-
-                const proceedWar = async () => {
-                    let finalBushos = reinfBushosData.map(id => this.game.getBusho(id));
+        // 大雪警告は数量画面を開く前に出します。
+        // 親の武将一覧を保持したままなので、［戻る］ならそのまま援軍武将を選び直せます。
+        const openSupplies = () => {
+            this.game.ui.openQuantitySelector('def_self_reinf_supplies', [helperCastle], null, {
+                returnToParentSelector: true,
+                onConfirm: (inputs) => {
+                    const inputData = inputs[helperCastle.id] || inputs;
+                    const reinfSoldiers = inputData.soldiers ? parseInt(inputData.soldiers.num.value) : 500;
+                    const reinfRice = inputData.rice ? parseInt(inputData.rice.num.value) : 500;
+                    const reinfHorses = inputData.horses ? parseInt(inputData.horses.num.value) : 0;
+                    const reinfGuns = inputData.guns ? parseInt(inputData.guns.num.value) : 0;
+                    const finalBushos = reinfBushosData.map(id => this.game.getBusho(id));
 
                     const selfReinfData = this.game.reinforcementService.createManualCastleReinforcement(
                         helperCastle, finalBushos,
                         { soldiers: reinfSoldiers, rice: reinfRice, horses: reinfHorses, guns: reinfGuns },
                         { isAttacker: false, isSelf: true }
                     );
-                    
-                    onComplete(selfReinfData);
-                };
 
-                if (isHeavySnow) {
-                    this.game.ui.showDialog("大雪の影響により、被害が出る場合があります。\nそれでも出陣しますか？", true, () => {
-                        proceedWar(); 
-                    }, null, { closeBeforeOk: true });
-                } else {
-                    proceedWar();
+                    onComplete(selfReinfData);
                 }
-            },
-            onCancel: promptBusho
-        });
+            });
+        };
+
+        if (isHeavySnow) {
+            this.game.ui.showDialog(
+                "大雪の影響により、被害が出る場合があります。\nそれでも出陣しますか？",
+                true,
+                openSupplies,
+                null,
+                { okText: '出陣する', cancelText: '戻る', closeBeforeOk: true }
+            );
+        } else {
+            openSupplies();
+        }
     }
 
-    executeReinforcementRequest(gold, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData) {
+    executeReinforcementRequest(gold, helperCastle, force, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData) {
         if (gold > 0) atkCastle.gold -= gold;
 
-        const force = helperCastle.selectedForce;
         const myClanId = atkCastle.ownerClan;
         
         // ★ここから追加：大雪の判定です
@@ -437,7 +440,7 @@ class WarPreparationController {
                     const rG = i.guns ? parseInt(i.guns.num.value) : 0;
                     this._applyManualAtkReinforcement(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinfBushos, rS, rR, rH, rG, selfReinfData);
                 },
-                onCancel: promptBusho
+                returnToParentSelector: true
             });
         };
         promptBusho();

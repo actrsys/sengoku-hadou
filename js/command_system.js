@@ -1973,11 +1973,11 @@ class CommandSystem {
                 }
 
                 const proceedWithForce = (force) => {
-                    targetCastle.selectedForce = force; // 目印のシールを貼ります！
+                    // 援軍勢力はこの選択フローだけの一時値。Castleへ貼らず次処理へ明示的に渡す。
                     if (mode === 'atk_ally_reinforcement') {
-                        this.game.ui.showReinforcementGoldSelector(targetCastle, temp.atkCastle, temp.targetCastle, temp.atkBushos, temp.sVal, temp.rVal, temp.hVal, temp.gVal, temp.selfReinfData, backToMap);
+                        this.game.ui.showReinforcementGoldSelector(targetCastle, force, temp.atkCastle, temp.targetCastle, temp.atkBushos, temp.sVal, temp.rVal, temp.hVal, temp.gVal, temp.selfReinfData, backToMap);
                     } else {
-                        this.game.ui.showDefReinforcementGoldSelector(targetCastle, temp.defCastle, temp.onComplete, backToMap);
+                        this.game.ui.showDefReinforcementGoldSelector(targetCastle, force, temp.defCastle, temp.onComplete, backToMap);
                     }
                 };
 

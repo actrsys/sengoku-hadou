@@ -6,6 +6,23 @@ class UISliderManager {
     constructor(ui, game) {
         this.ui = ui;
         this.game = game;
+        this._unitDivideUiRaf = 0;
+        this._unitDivideScrollbarRaf = 0;
+    }
+
+    cancelUnitDivideDeferredUpdates() {
+        const cancel = (handle) => {
+            if (!handle) return;
+            if (typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
+                window.cancelAnimationFrame(handle);
+            } else {
+                clearTimeout(handle);
+            }
+        };
+        cancel(this._unitDivideUiRaf);
+        cancel(this._unitDivideScrollbarRaf);
+        this._unitDivideUiRaf = 0;
+        this._unitDivideScrollbarRaf = 0;
     }
 
     // ==========================================
@@ -556,6 +573,8 @@ class UISliderManager {
     // ★部隊分割（スライダー）の魔法です！
     // ==========================================
     showUnitDivideModal(bushos, totalSoldiers, totalHorses, totalGuns, onConfirm, onCancel = null) {
+        // 援軍→本隊など部隊分割画面を連続して開く場合、前画面の遅延描画を次画面へ持ち越さない。
+        this.cancelUnitDivideDeferredUpdates();
         const modal = document.getElementById('unit-divide-modal');
         const listEl = document.getElementById('divide-list');
         const confirmBtn = document.getElementById('divide-confirm-btn');
@@ -575,6 +594,7 @@ class UISliderManager {
         const cancelBtn = modal.querySelector('.btn-secondary');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
+                this.cancelUnitDivideDeferredUpdates();
                 modal.classList.add('hidden');
                 this.ui.restoreAIGuard();
                 if (onCancel) onCancel(); 
@@ -759,12 +779,11 @@ class UISliderManager {
         };
 
         // ★Round12：ドラッグ中の全行再描画は1フレーム1回にまとめます。
-        let divideUiRaf = 0;
         const scheduleDivideUIUpdate = () => {
-            if (divideUiRaf) return;
+            if (this._unitDivideUiRaf) return;
             const raf = window.requestAnimationFrame || ((cb) => setTimeout(cb, 16));
-            divideUiRaf = raf(() => {
-                divideUiRaf = 0;
+            this._unitDivideUiRaf = raf(() => {
+                this._unitDivideUiRaf = 0;
                 updateRemain();
             });
         };
@@ -960,7 +979,9 @@ class UISliderManager {
         updateRemain();
 
         // ★軽量化＆修正：画面の高さが確定するのを一瞬待ってからスクロールバーを呼び出します！
-        requestAnimationFrame(() => {
+        const raf = window.requestAnimationFrame || ((cb) => setTimeout(cb, 16));
+        this._unitDivideScrollbarRaf = raf(() => {
+            this._unitDivideScrollbarRaf = 0;
             if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
                 this.ui.updateCustomScrollbars(listEl);
             }
@@ -982,6 +1003,7 @@ class UISliderManager {
                 return;
             }
             
+            this.cancelUnitDivideDeferredUpdates();
             modal.classList.add('hidden');
             this.ui.restoreAIGuard(); 
             onConfirm(finalAssignments);
