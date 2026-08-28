@@ -9,6 +9,11 @@ window.EventTextManager = {
     // ★ 共通のテキスト再生プレイヤー
     // ==========================================
     playSequence: async function(game, sequence) {
+        const flowGeneration = window.EventFlowGuard ? window.EventFlowGuard.capture(game) : null;
+        const assertCurrentFlow = () => {
+            if (window.EventFlowGuard) window.EventFlowGuard.assertCurrent(game, flowGeneration);
+        };
+        assertCurrentFlow();
         // ★Round12：次に使う顔を最大2会話先までだけ先読みします。
         // 大量に保持せず、現在の会話を読んでいる時間を次のdecodeに使うための小さな先読みです。
         const preloadItemFaces = (item) => {
@@ -34,15 +39,17 @@ window.EventTextManager = {
                 // transition:'smooth' はイベント開始、'instant' はイベント中の場面転換に使います。
                 // 拠点IDが不明・未指定なら何もしません。ズーム倍率も変更しません。
                 if (item.castleId !== undefined && item.castleId !== null && game.ui && typeof game.ui.focusMapOnCastle === 'function') {
-                    await game.ui.focusMapOnCastle(item.castleId, {
+                    await window.EventFlowGuard.focusMapOnCastle(game, item.castleId, {
                         transition: item.transition || (item.immediate === false ? 'smooth' : 'instant'),
                         duration: item.duration,
                         reason: 'historical_event'
                     });
+                    assertCurrentFlow();
                 }
             } else if (item.type === 'log') {
                 // 顔画像のない、ただのメッセージとして表示します
-                await game.ui.showDialogAsync(item.msg, false, 0, { isEvent: true });
+                await window.EventFlowGuard.showDialogAsync(game, item.msg, false, 0, { isEvent: true });
+                assertCurrentFlow();
             } else if (item.type === 'dialog') {
                 // 顔画像や名前をつけて、会話として表示します
                 const opts = {};
@@ -63,7 +70,8 @@ window.EventTextManager = {
                     opts.rightFace = 'koshou.webp';
                 }
                 
-                await game.ui.showDialogAsync(item.msg, false, 0, opts);
+                await window.EventFlowGuard.showDialogAsync(game, item.msg, false, 0, opts);
+                assertCurrentFlow();
             }
         }
     },

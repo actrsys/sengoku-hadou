@@ -3,6 +3,20 @@
  * ゲーム内の共通イベント（毎月発生するものなど）を入れるファイルです。
  */
 
+const _commonEventShowDialogAsync = (game, ...args) => {
+    const guard = window.EventFlowGuard;
+    return guard && typeof guard.showDialogAsync === 'function'
+        ? guard.showDialogAsync(game, ...args)
+        : game.ui.showDialogAsync(...args);
+};
+
+const _commonEventWaitChoice = (game, registerChoice) => {
+    const guard = window.EventFlowGuard;
+    return guard && typeof guard.waitForChoice === 'function'
+        ? guard.waitForChoice(game, registerChoice)
+        : new Promise(resolve => registerChoice(resolve));
+};
+
 // ==========================================
 // ★ イベントの始まりに音を鳴らして、少しの間画面を守る魔法
 // ==========================================
@@ -482,24 +496,38 @@ window.EventMapEffects = window.EventMapEffects || (() => {
     const waitForDismiss = async (game, mapOverlay) => {
         // Round26：観戦終了予約が、災害地図の点滅中（入力待ち開始前）に入っていた場合、
         // 後からここで永久にタップ待ちにならないよう「見終えた」扱いで先へ進めます。
-        if (game && game.isWatchMode && game._watchReturnRequested) return;
+        if (game && game.isWatchMode && game._watchReturnRequested) return true;
 
-        await new Promise(resolve => {
+        // r296：会話・選択待ちだけでなくイベント地図のタップ待ちもturn-flow寿命へ所属させます。
+        // ロード／タイトル復帰で旧シナリオになった場合は、UI callbackを擬似発火せず、
+        // listener/timerだけ即時解放してfalseを返し、呼び出し側のfinallyでCanvas/暗幕を片付けます。
+        const turnManager = game && game.turnManager;
+        const generation = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+            ? turnManager.captureTurnFlowGeneration()
+            : null;
+
+        return await new Promise(resolve => {
             let finished = false;
             let autoDismissTimer = null;
-            const onTouch = () => {
+            let unsubscribeAbort = () => {};
+            const finish = (dismissed) => {
                 if (finished) return;
                 finished = true;
                 if (autoDismissTimer) {
                     clearTimeout(autoDismissTimer);
                     autoDismissTimer = null;
                 }
+                unsubscribeAbort();
                 mapOverlay.removeEventListener('click', onTouch);
                 mapOverlay.removeEventListener('touchstart', onTouch);
-                resolve();
+                resolve(!!dismissed);
             };
+            const onTouch = () => finish(true);
             mapOverlay.addEventListener('click', onTouch);
             mapOverlay.addEventListener('touchstart', onTouch, { passive: true });
+            if (turnManager && generation !== null && typeof turnManager.subscribeTurnFlowAbort === 'function') {
+                unsubscribeAbort = turnManager.subscribeTurnFlowAbort(generation, () => finish(false));
+            }
             if (game && game.isWatchMode) autoDismissTimer = setTimeout(onTouch, 1000);
         });
     };
@@ -577,7 +605,7 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
     fx.writeDiag(game, `${diagPrefix}:dialog`);
     // r290：実機強制リロードがdialog地点で残ったため、共通Dialogの内部段階も
     // この災害だけ診断できるようprefixを渡します。表示・自動閉じ時間は従来どおりです。
-    await game.ui.showDialogAsync(initialMsg, false, 0, { diagnosticPrefix: diagPrefix });
+    await _commonEventShowDialogAsync(game, initialMsg, false, 0, { diagnosticPrefix: diagPrefix });
     fx.writeDiag(game, `${diagPrefix}:dialog_done`);
     // 強制リセットで会話待ちが解除された後、旧シナリオの災害地図を新ゲームへ生成しません。
     if (!isCurrentEventFlow()) {
@@ -629,7 +657,8 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
             }
 
             fx.writeDiag(game, `${diagPrefix}:wait_input`);
-            await fx.waitForDismiss(game, mapOverlay);
+            const dismissed = await fx.waitForDismiss(game, mapOverlay);
+            if (dismissed === false) fx.writeDiag(game, `${diagPrefix}:wait_aborted`);
         }
     } catch (error) {
         // 災害のゲーム処理と結果通知は継続し、補助地図だけを省略する。
@@ -669,7 +698,7 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
         else if (eventType === '地震') msg = `${pName}で大地震による甚大な被害が出ています……`;
         else if (eventType === '大雪') msg = `${pName}は深い雪に閉ざされています……`;
         if (msg) {
-            await game.ui.showDialogAsync(msg, false, 0);
+            await _commonEventShowDialogAsync(game, msg, false, 0);
             if (!isCurrentEventFlow()) return;
         }
     }
@@ -909,7 +938,7 @@ window.GameEvents.push({
             
             for (let cName of playerIkkiCastles) {
                 const msg = `領民の不満が爆発し、当家の「${cName}」で一揆が発生しました！`;
-                await game.ui.showDialogAsync(msg, false, 0);
+                await _commonEventShowDialogAsync(game, msg, false, 0);
             }
         }
     }
@@ -1672,7 +1701,7 @@ window.GameEvents.push({
                 // ★春の訪れとともに、マップの水玉模様を消します！
                 if (game.ui.updateSnowOverlay) game.ui.updateSnowOverlay();
 
-                await game.ui.showDialogAsync("雪解けの季節です", false, 0);
+                await _commonEventShowDialogAsync(game, "雪解けの季節です", false, 0);
             }
             
             return; // ここで処理はおしまいです
@@ -1885,7 +1914,7 @@ window.GameEvents.push({
                     if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
                     
                     // ゲームに元々あるダイアログ機能（決定・キャンセル付き）を呼び出します
-                    const isEmployed = await new Promise(resolve => {
+                    const isEmployed = await _commonEventWaitChoice(game, resolve => {
                         if (game.ui && game.ui.showDialog) {
                             // 第2引数を true にすると、自動で決定・キャンセルボタンが出ます
                             game.ui.showDialog(msg, true, 
@@ -1912,13 +1941,13 @@ window.GameEvents.push({
                         const clanData = game.getClan(clanId);
                         const clanName = clanData ? clanData.name : "当家";
                         if (game.ui && game.ui.showDialogAsync) {
-                            await game.ui.showDialogAsync(`「ははっ！　これから${clanName}のために身命を賭して働きまする！」`, false, 0, {
+                            await _commonEventShowDialogAsync(game, `「ははっ！　これから${clanName}のために身命を賭して働きまする！」`, false, 0, {
                                 leftFace: ronin.faceIcon,
                                 leftName: rName,
                                 isEvent: true
                             });
                             // さらにシステムメッセージを追加します。
-                            await game.ui.showDialogAsync(`${rName}が${clanName}に加わりました！`, false, 0);
+                            await _commonEventShowDialogAsync(game, `${rName}が${clanName}に加わりました！`, false, 0);
                         }
                         
                     } else {
@@ -2149,18 +2178,18 @@ window.GameEvents.push({
                 // ダイアログを出す前に、音を鳴らしてバリアを張る魔法を呼びます！
                 if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
                 
-                await game.ui.showDialogAsync(introMsg, false, 0, {
+                await _commonEventShowDialogAsync(game, introMsg, false, 0, {
                     leftFace: nav.faceIcon, leftName: nav.name
                 });
 
                 const greetMsg1 = greeting.greetMsg1;
                 const greetMsg2 = greeting.greetMsg2;
 
-                await game.ui.showDialogAsync(greetMsg1, false, 0, {
+                await _commonEventShowDialogAsync(game, greetMsg1, false, 0, {
                     leftFace: envoy.faceIcon, leftName: envoyName
                 });
 
-                await game.ui.showDialogAsync(greetMsg2, false, 0, {
+                await _commonEventShowDialogAsync(game, greetMsg2, false, 0, {
                     leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
                 });
 
@@ -2171,16 +2200,16 @@ window.GameEvents.push({
                     )
                     : { demandMsg: `「どうか我らを${playerClan.name}の末席にお加えいただきたく存じます」` };
 
-                await game.ui.showDialogAsync(commonMsgs.demandMsg, false, 0, {
+                await _commonEventShowDialogAsync(game, commonMsgs.demandMsg, false, 0, {
                     leftFace: envoy.faceIcon, leftName: envoyName
                 });
 
-                await game.ui.showDialogAsync(`「……当家に臣従したい、ということか」`, false, 0, {
+                await _commonEventShowDialogAsync(game, `「……当家に臣従したい、ということか」`, false, 0, {
                     leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
                 });
 
                 // プレイヤーに決断してもらいます！
-                const isAccepted = await new Promise(resolve => {
+                const isAccepted = await _commonEventWaitChoice(game, resolve => {
                     game.ui.showDialog(`${aiClanName}を家臣に加えますか？`, true, 
                         () => resolve(true),
                         () => resolve(false),
@@ -2190,15 +2219,15 @@ window.GameEvents.push({
 
                 if (isAccepted) {
                     // 家臣にすることを承諾した時のお返事です
-                    await game.ui.showDialogAsync(`「よくぞご決心なされた。今後はその力、${playerClan.name}で存分に振るわれよ」`, false, 0, {
+                    await _commonEventShowDialogAsync(game, `「よくぞご決心なされた。今後はその力、${playerClan.name}で存分に振るわれよ」`, false, 0, {
                         leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
                     });
                     let replyAccept = commonMsgs.replyAcceptMsg || (isDaimyoSelf ? `「恐悦至極……今日より${myCallName.replace('殿', '様')}を主君と仰ぎ奉りまする」` : `「ははっ！ ありがたき幸せに存じまする！」`);
-                    await game.ui.showDialogAsync(replyAccept, false, 0, {
+                    await _commonEventShowDialogAsync(game, replyAccept, false, 0, {
                         leftFace: envoy.faceIcon, leftName: envoyName
                     });
 
-                    await game.ui.showDialogAsync(`${aiClanName}が${playerClan.name}に臣従しました！`, false, 0);
+                    await _commonEventShowDialogAsync(game, `${aiClanName}が${playerClan.name}に臣従しました！`, false, 0);
                     if (game.ui.log) game.ui.log(`${aiClanName}が${playerClan.name}に臣従しました`, { clanIds: [clan.id, playerClanId], category: 'diplomacy', inferCurrentTurn: false });
 
                     // 臣従の処理を呼び出します
@@ -2206,11 +2235,11 @@ window.GameEvents.push({
 
                 } else {
                     // 家臣にすることを断った時のお返事です
-                    await game.ui.showDialogAsync(`「申し出の趣は承った。されど今は、他家を取り込むつもりはない。これまでどおり当家を支えてもらいたい」`, false, 0, {
+                    await _commonEventShowDialogAsync(game, `「申し出の趣は承った。されど今は、他家を取り込むつもりはない。これまでどおり当家を支えてもらいたい」`, false, 0, {
                         leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
                     });
                     let replyReject = commonMsgs.replyRejectMsg || (isDaimyoSelf ? `「承知いたしました。此度は願いを収めます」` : `「承知いたしました。${aiDaimyoGivenName}様にはそのように申し伝えます」`);
-                    await game.ui.showDialogAsync(replyReject, false, 0, {
+                    await _commonEventShowDialogAsync(game, replyReject, false, 0, {
                         leftFace: envoy.faceIcon, leftName: envoyName
                     });
                 }
@@ -2221,7 +2250,7 @@ window.GameEvents.push({
                 const msg = `${clan.name}が${selectedTarget.name}に臣従しました。`;
                 
                 // おしらせメッセージとログだけを出します
-                await game.ui.showDialogAsync(msg, false, 0);
+                await _commonEventShowDialogAsync(game, msg, false, 0);
                 if (game.ui.log) game.ui.log(msg, { clanIds: [clan.id, selectedTarget.id], category: 'diplomacy', inferCurrentTurn: false });
 
                 // 自動的に臣従の処理を呼び出します

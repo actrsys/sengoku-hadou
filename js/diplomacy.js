@@ -746,7 +746,7 @@ class DiplomacyManager {
     /**
      * 戦略的パートナー（共通の敵がいる、または背後を突ける）かどうかと、そのスコアを判定します
      */
-    evaluateStrategicValue(myClanId, targetClanId, mainThreatId) {
+    evaluateStrategicValue(myClanId, targetClanId, mainThreatId, context = null) {
         let isStrategicPartner = false;
         let priorityBonus = 0;
 
@@ -765,7 +765,9 @@ class DiplomacyManager {
                 const isFriendlyWithThreat = targetToThreatRel && window.DiplomacyRules.isFriendly(targetToThreatRel.status);
                 if (!isFriendlyWithThreat) {
                     let isAdjacent = false;
-                    const threatCastles = this.game.getClanCastles(mainThreatId);
+                    const threatCastles = context && context.mainThreatId === mainThreatId && Array.isArray(context.threatCastles)
+                        ? context.threatCastles
+                        : this.game.getClanCastles(mainThreatId);
                     const targetCastles = this.game.getClanCastles(targetClanId);
                     
                     for (let tc of targetCastles) {
@@ -791,12 +793,18 @@ class DiplomacyManager {
      */
     getDiplomacyPriorityList(myClanId, uniqueNeighbors, mainThreatId) {
         const diplomacyTargets = [];
+        // 1回の候補比較中に主敵は変わらない。同じ主敵拠点の全件抽出を候補数ぶん繰り返さない。
+        // 配列順は getClanCastles() の従来順をそのまま保持し、隣接判定の順序も変えない。
+        const strategicContext = {
+            mainThreatId,
+            threatCastles: mainThreatId ? this.game.getClanCastles(mainThreatId) : []
+        };
         uniqueNeighbors.forEach(targetClanId => {
             let priority = 0;
             const rel = this.getRelation(myClanId, targetClanId);
             
             // 1. 戦略的価値を調べる
-            const strategic = this.evaluateStrategicValue(myClanId, targetClanId, mainThreatId);
+            const strategic = this.evaluateStrategicValue(myClanId, targetClanId, mainThreatId, strategicContext);
             priority += strategic.priorityBonus;
             
             // 2. 現在の仲の良さで評価する

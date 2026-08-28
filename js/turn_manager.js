@@ -12,6 +12,9 @@ class TurnManager {
         this._turnFlowGeneration = 0;
         // 0msの息継ぎもシナリオ遷移をまたがないよう、通常ターン継続timerを一元管理します。
         this._turnContinuationTimers = new Set();
+        // 会話・選択待ちなどtimerを持たないawaitも、シナリオ切替時に旧Promiseを参照ごと残さない。
+        // 世代更新の正本はこのTurnManagerに残し、購読者は中断通知だけを受ける。
+        this._turnFlowAbortSubscribers = new Set();
     }
 
     abortForScenarioTransition() {
@@ -24,6 +27,17 @@ class TurnManager {
         if (this.game && this.game.aiTimer) {
             clearTimeout(this.game.aiTimer);
             this.game.aiTimer = null;
+        }
+        if (this._turnFlowAbortSubscribers && this._turnFlowAbortSubscribers.size > 0) {
+            const subscribers = Array.from(this._turnFlowAbortSubscribers);
+            this._turnFlowAbortSubscribers.clear();
+            subscribers.forEach(entry => {
+                try {
+                    if (entry && typeof entry.callback === 'function') entry.callback();
+                } catch (error) {
+                    console.warn('ターン寿命中断通知でエラーが発生しました:', error);
+                }
+            });
         }
     }
 
@@ -43,6 +57,22 @@ class TurnManager {
 
     isTurnFlowGenerationCurrent(generation) {
         return this._isTurnFlowCurrent(generation);
+    }
+
+    // timerを持たない会話・選択Promiseも、ロード／タイトル復帰で旧awaitを残さず終了するための通知窓口。
+    // 正常終了時は返したunsubscribeで即座に購読を外し、長時間プレイ中に購読者を蓄積しない。
+    subscribeTurnFlowAbort(generation, callback) {
+        if (typeof callback !== 'function') return () => {};
+        const expectedGeneration = Number(generation);
+        if (!this._isTurnFlowCurrent(expectedGeneration)) {
+            Promise.resolve().then(() => callback());
+            return () => {};
+        }
+        const entry = { generation: expectedGeneration, callback };
+        this._turnFlowAbortSubscribers.add(entry);
+        return () => {
+            if (this._turnFlowAbortSubscribers) this._turnFlowAbortSubscribers.delete(entry);
+        };
     }
 
     scheduleTurnFlowContinuation(callback, delay = 0, options = {}) {

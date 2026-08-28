@@ -7,6 +7,27 @@
 
 window.GameEvents = window.GameEvents || [];
 
+const _historicalEventShowDialogAsync = (game, ...args) => {
+    const guard = window.EventFlowGuard;
+    return guard && typeof guard.showDialogAsync === 'function'
+        ? guard.showDialogAsync(game, ...args)
+        : game.ui.showDialogAsync(...args);
+};
+const _historicalEventFocusMapOnCastle = (game, castleId, options = {}) => {
+    const guard = window.EventFlowGuard;
+    return guard && typeof guard.focusMapOnCastle === 'function'
+        ? guard.focusMapOnCastle(game, castleId, options)
+        : game.ui.focusMapOnCastle(castleId, options);
+};
+
+const _historicalEventWaitChoice = (game, registerChoice) => {
+    const guard = window.EventFlowGuard;
+    return guard && typeof guard.waitForChoice === 'function'
+        ? guard.waitForChoice(game, registerChoice)
+        : new Promise(resolve => registerChoice(resolve));
+};
+
+
 // ==========================================
 // ★ イベント用の便利なチェック係（共通の魔法）
 // ==========================================
@@ -133,23 +154,31 @@ window.EventCheck = {
 window.EventAction = {
     // ① 画面の見た目や情報を最新の状態に描き直します（お片付け）
     refreshScreen: async function(game) {
+        const flowGeneration = window.EventFlowGuard ? window.EventFlowGuard.capture(game) : null;
+        const assertCurrentFlow = () => {
+            if (window.EventFlowGuard) window.EventFlowGuard.assertCurrent(game, flowGeneration);
+        };
+        assertCurrentFlow();
         // ★Round10：イベント直後の全国更新を一気に重ねず、処理ごとにブラウザへ制御を返します。
         // 更新内容と順序は従来どおり「派閥 → 威信 → 画面」です。
         // まずイベント本体が作った一時データを解放できる隙を1回作ります。
         if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:pre_yield');
         await new Promise(resolve => setTimeout(resolve, 0));
+        assertCurrentFlow();
 
         if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:faction:start');
         if (game.factionSystem) game.factionSystem.updateFactions();
         if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:faction:done');
 
         await new Promise(resolve => setTimeout(resolve, 0));
+        assertCurrentFlow();
 
         if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:prestige:start');
         if (typeof game.updateAllClanPrestige === 'function') game.updateAllClanPrestige();
         if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:prestige:done');
 
         await new Promise(resolve => setTimeout(resolve, 0));
+        assertCurrentFlow();
 
         if (game.ui) {
             const isMobileWatch = !!(
@@ -211,7 +240,7 @@ window.EventAction = {
             // 固定城IDを持たせないので、ゲーム進行で居城が変わっていても追従します。
             const successorCastleId = Number(successor && successor.castleId);
             if (successorCastleId > 0 && game.ui && typeof game.ui.focusMapOnCastle === 'function') {
-                await game.ui.focusMapOnCastle(successorCastleId, {
+                await _historicalEventFocusMapOnCastle(game, successorCastleId, {
                     transition: 'smooth',
                     reason: 'historical_succession'
                 });
@@ -650,7 +679,7 @@ window.GameEvents.push({
             }
             
             // 出陣するかどうかの選択肢を出します
-            await new Promise(resolve => {
+            await _historicalEventWaitChoice(game, resolve => {
                 game.ui.showDialog("尾張国に出陣しますか？", true, 
                     () => { imagawaAttack = true; resolve(); },
                     () => { imagawaAttack = false; resolve(); },
@@ -695,7 +724,7 @@ window.GameEvents.push({
 
         // プレイヤーが織田家の場合は、選択肢の窓を出して待ちます
         if (game.playerClanId === nobunaga.clan) {
-            await new Promise(resolve => {
+            await _historicalEventWaitChoice(game, resolve => {
                 game.ui.showDialog("「殿、どうなさりまするか？」", true, 
                     () => { isAttack = true; resolve(); },
                     () => { isAttack = false; resolve(); },
@@ -756,7 +785,7 @@ window.GameEvents.push({
                         const msg = `${prefix}の${bushoName}が討死しました。`;
                         
                         game.ui.log(msg); // ログにも残します
-                        await game.ui.showDialogAsync(msg, false, 0); // 画面に出して「OK」を押すまで待ちます
+                        await _historicalEventShowDialogAsync(game, msg, false, 0); // 画面に出して「OK」を押すまで待ちます
                     }
                 }
             }
@@ -1135,7 +1164,7 @@ window.GameEvents.push({
         // ★今回追加：徳川プレイヤー専用の使者派遣選択肢
         let isSendEnvoy = true;
         if (game.playerClanId === motoyasu.clan) {
-            await new Promise(resolve => {
+            await _historicalEventWaitChoice(game, resolve => {
                 game.ui.showDialog(`「${args.odaFamilyName}家に同盟の使者を送りますか？」`, true, 
                     () => { isSendEnvoy = true; resolve(); },
                     () => { isSendEnvoy = false; resolve(); },
@@ -1179,7 +1208,7 @@ window.GameEvents.push({
                 await window.EventTextManager.playSequence(game, window.EventTextManager.kiyosu_alliance_oda_arrival(args));
             }
 
-            await new Promise(resolve => {
+            await _historicalEventWaitChoice(game, resolve => {
                 game.ui.showDialog(`「${args.matsudairaFamilyName}家の使者とお会いになられまするか？」`, true, 
                     () => { isAccept = true; resolve(); },
                     () => { isAccept = false; resolve(); },
@@ -1222,7 +1251,7 @@ window.GameEvents.push({
             }
 
             // 汎用メッセージの表示
-            await game.ui.showDialogAsync(`${args.odaClanName}が${args.matsudairaClanName}と同盟を締結しました！`, false, 0);
+            await _historicalEventShowDialogAsync(game, `${args.odaClanName}が${args.matsudairaClanName}と同盟を締結しました！`, false, 0);
         } 
         // 追い返す（同盟を結ばない）ルート
         else {
@@ -1354,7 +1383,7 @@ window.GameEvents.push({
 
         // 溜めておいたメッセージを順番に出します
         for (const msg of messages) {
-            await game.ui.showDialogAsync(msg, false, 0);
+            await _historicalEventShowDialogAsync(game, msg, false, 0);
         }
     }
 });
@@ -1456,7 +1485,7 @@ window.GameEvents.push({
         const msg = `亡き将軍の後継者である${candidateName}公の要請に応じ、${azaiName}が${odaName}に従属しました。\n${odaName}の${oichiName}が${nagamasaName}に輿入れしました。`;
         
         game.ui.log(`【イベント】織田・浅井婚姻：${msg}`);
-        await game.ui.showDialogAsync(msg, false, 0);
+        await _historicalEventShowDialogAsync(game, msg, false, 0);
     }
 });
 
@@ -1571,7 +1600,7 @@ window.GameEvents.push({
             // ★Round25：養子入りによる家督継承も、継承後の勝長の実際の居城へ
             // メッセージ表示前にぬるっとカメラを寄せます。
             if (game.ui && typeof game.ui.focusMapOnCastle === 'function' && Number(katsunaga.castleId) > 0) {
-                await game.ui.focusMapOnCastle(Number(katsunaga.castleId), {
+                await _historicalEventFocusMapOnCastle(game, Number(katsunaga.castleId), {
                     transition: 'smooth',
                     reason: 'historical_adoptive_succession'
                 });
@@ -1592,7 +1621,7 @@ window.GameEvents.push({
         const msg = `${toyamaClanName}の${deadName}が死亡し、${odaName}の${katsunagaName}が養子入りして家督を継ぎました。`;
         
         game.ui.log(`【当主交代】${msg}`);
-        await game.ui.showDialogAsync(msg, false, 0);
+        await _historicalEventShowDialogAsync(game, msg, false, 0);
     }
 });
 
@@ -1801,7 +1830,7 @@ window.GameEvents.push({
 
         // Round23: 改称イベントの舞台である曳馬城（ID12）へ、イベント表示前にカメラを寄せます。
         if (game.ui && typeof game.ui.focusMapOnCastle === 'function') {
-            await game.ui.focusMapOnCastle(12, { transition: 'smooth', reason: 'historical_event' });
+            await _historicalEventFocusMapOnCastle(game, 12, { transition: 'smooth', reason: 'historical_event' });
         }
 
         // 名前が変わってしまう前に、「現在の武将の名前」と「現在のお城の名前」をメモしておきます
@@ -1868,7 +1897,7 @@ window.GameEvents.push({
         // ⑧ 画面にイベントが起きたことのメッセージを出してお知らせします
         const msg = `${motoyasuName}が居城を${oldCastleName}に移し、「浜松城」と改称しました！`;
         game.ui.log(`【イベント】${motoyasuName}が${oldCastleName}を「浜松城」と改称しました。`);
-        await game.ui.showDialogAsync(msg, false, 0);
+        await _historicalEventShowDialogAsync(game, msg, false, 0);
     }
 });
 
@@ -2086,7 +2115,7 @@ window.GameEvents.push({
         // ⑦ メッセージ表示（動的な名前を使用）
         const msg = `${yoshitsuguName}が二条御所を襲撃、${yoshiteruName}は討死し、${ashikagaClanName}の旧領はすべて${miyoshiClanName}の手に落ちました。`;
         game.ui.log(`【イベント】永禄の変：${msg}`);
-        await game.ui.showDialogAsync(msg, false, 0);
+        await _historicalEventShowDialogAsync(game, msg, false, 0);
         
     }
 });
@@ -2999,10 +3028,10 @@ window.GameEvents.push({
         
         // Round23: 将軍就任の舞台である二条城（ID26）へ寄せてから結果を表示します。
         if (game.ui && typeof game.ui.focusMapOnCastle === 'function') {
-            await game.ui.focusMapOnCastle(26, { transition: 'smooth', reason: 'historical_event' });
+            await _historicalEventFocusMapOnCastle(game, 26, { transition: 'smooth', reason: 'historical_event' });
         }
 
-        await game.ui.showDialogAsync(`${candidateName}が征夷大将軍に就任しました！\n${sponsorName}と${newClanName}は固い同盟で結ばれました。`, false, 0);
+        await _historicalEventShowDialogAsync(game, `${candidateName}が征夷大将軍に就任しました！\n${sponsorName}と${newClanName}は固い同盟で結ばれました。`, false, 0);
     }
 });
 
@@ -3157,7 +3186,7 @@ window.GameEvents.push({
 
         // ⑤ 画面にメッセージを出してお知らせします
         game.ui.log(`【イベント】三好当主・三好義継が出奔し、松永久秀の元へ逃れました。`);
-        await game.ui.showDialogAsync(`三好義継が悪逆無道の三好三人衆に愛想をつかし、三好家の忠臣・松永久秀の元へ逃れました。三好家は三好長逸が新たな当主となります。`, false, 0);
+        await _historicalEventShowDialogAsync(game, `三好義継が悪逆無道の三好三人衆に愛想をつかし、三好家の忠臣・松永久秀の元へ逃れました。三好家は三好長逸が新たな当主となります。`, false, 0);
         
     }
 });
@@ -3295,7 +3324,7 @@ window.GameEvents.push({
         const msg = `${hisahideName}が${sponsorName}の上洛に同調し臣従しました！`;
         
         game.ui.log(`【イベント】${msg}`);
-        await game.ui.showDialogAsync(msg, false, 0);
+        await _historicalEventShowDialogAsync(game, msg, false, 0);
     }
 });
 
@@ -3429,14 +3458,14 @@ window.GameEvents.push({
         game.ui.log(`【イベント】荒木村重の池田家乗っ取り：${murashigeName}が${tomomasaFamilyName}家の実権を握りました。`);
         // Round23: 強襲の舞台である伊丹城（ID51）へ寄せてから通知します。
         if (game.ui && typeof game.ui.focusMapOnCastle === 'function') {
-            await game.ui.focusMapOnCastle(51, { transition: 'smooth', reason: 'historical_event' });
+            await _historicalEventFocusMapOnCastle(game, 51, { transition: 'smooth', reason: 'historical_event' });
         }
-        await game.ui.showDialogAsync(msg1, false, 0);
+        await _historicalEventShowDialogAsync(game, msg1, false, 0);
 
         // メッセージ2：大改修と改名
         if (isRenamed) {
             const msg2 = `${murashigeName}は伊丹城を自らの居城と定めて大改修を施し、有岡城と改称しました！`;
-            await game.ui.showDialogAsync(msg2, false, 0);
+            await _historicalEventShowDialogAsync(game, msg2, false, 0);
         }
     }
 });
@@ -3680,7 +3709,7 @@ window.GameEvents.push({
         const msg = `\n${miyoshiClanName}の${itamiLordName}が${sponsorName}の上洛に同調し臣従しました！`;
         
         game.ui.log(`【イベント】${msg}`);
-        await game.ui.showDialogAsync(msg, false, 0);
+        await _historicalEventShowDialogAsync(game, msg, false, 0);
     }
 });
 
@@ -3782,7 +3811,7 @@ window.GameEvents.push({
         const msg = `${hatakeyamaName}が${sponsorName}の上洛に同調し臣従しました！`;
         
         game.ui.log(`【イベント】${msg}`);
-        await game.ui.showDialogAsync(msg, false, 0);
+        await _historicalEventShowDialogAsync(game, msg, false, 0);
     }
 });
 
@@ -3846,7 +3875,7 @@ window.GameEvents.push({
 
         // 溜めておいたメッセージを順番に出します
         for (const msg of messages) {
-            await game.ui.showDialogAsync(msg, false, 0);
+            await _historicalEventShowDialogAsync(game, msg, false, 0);
         }
     }
 });
@@ -3948,7 +3977,7 @@ window.GameEvents.push({
         messages.unshift(mainMsg);
 
         for (const msg of messages) {
-            await game.ui.showDialogAsync(msg, false, 0);
+            await _historicalEventShowDialogAsync(game, msg, false, 0);
         }
     }
 });
@@ -4001,7 +4030,7 @@ window.GameEvents.push({
         messages.unshift(mainMsg);
 
         for (const msg of messages) {
-            await game.ui.showDialogAsync(msg, false, 0);
+            await _historicalEventShowDialogAsync(game, msg, false, 0);
         }
     }
 });

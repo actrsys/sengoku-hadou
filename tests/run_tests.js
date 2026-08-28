@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r292');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r296');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -5050,7 +5050,7 @@ test('常駐歴史イベントは EventManager が状態遷移だけを管理し
     const source = read('js/event_manager.js');
     assert.ok(source.includes("eventData.type === 'resident'"));
     assert.ok(source.includes('this.game.flags.__residentEventStates'));
-    assert.ok(source.includes("await this.processResidentEvents(timing, context, isHistoricalOff);"));
+    assert.ok(source.includes("await this.processResidentEvents(timing, context, isHistoricalOff, flowGeneration)"));
     assert.ok(source.includes("stateBook[ev.id] = { active: isActive };"));
 
     // resident は通常 events 配列へ入れず、通常歴史イベントの historicalEventOccurred を立てない。
@@ -9978,6 +9978,21 @@ test('戦後closeWarは開始時の戦争世代を固定しafter_war後も未定
     assert.ok(block.includes('this._markWarClosed(warGeneration);'), '通常ターン復帰完了後をWarManager自身から通知する');
 });
 
+test('戦後endWarはイベント・結果待ち後に旧戦争世代を継続しない', () => {
+    const effort = read('js/war_effort.js');
+    const at = effort.indexOf('async endWar(attackerWon');
+    const end = effort.indexOf('processCaptures(defeatedCastle', at);
+    const block = effort.slice(at, end);
+    assert.ok(block.includes('const isCurrentWar = () => this._isWarLifecycleCurrent(warGeneration, false);'), 'endWar全体で同じ戦争世代を正本にする');
+    assert.ok(block.includes("await this.game.eventManager.processEvents('after_battle_blink', eventContext);\n                if (!isCurrentWar()) return;"), '戦闘直後イベント待ち後に旧戦争を止める');
+    assert.ok(block.includes("await this.game.eventManager.processEvents('after_siege_war', s);\n                    if (!isCurrentWar()) return;"), '籠城戦後イベント待ち後に旧戦争を止める');
+    assert.ok(block.includes('await this.autoResolvePrisoners(this.pendingPrisoners, winnerClan);\n                        if (!isCurrentWar()) return;'), 'AI捕虜処遇待ち後に旧戦争を止める');
+    assert.ok(block.includes('await this.game.lifeSystem.checkClanExtinction'), '滅亡判定の非同期完了を待つ');
+    assert.ok(block.includes('await this.game.ui.showDialogAsync(aiResultMsg);\n                    if (!isCurrentWar()) return;'), 'AI結果会話待ち後に旧戦争を止める');
+    assert.ok(block.includes('await finishWarProcess();'), 'AI戦後処理は未監視Promiseとして投げっぱなしにしない');
+    assert.ok(block.includes('} catch (e) {\n            if (!isCurrentWar()) return;'), '旧戦争由来の例外から新シナリオのfinishTurnへ進まない');
+});
+
 test('諸勢力戦の完了待ちはWarManagerの世代Promiseを使いcloseWar上書きとDOMポーリングを残さない', () => {
     const war = read('js/war.js');
     const kunishu = read('js/kunishu_system.js');
@@ -10326,10 +10341,25 @@ test('地図ズームrAFはresetMapViewState後の新しい地図へ旧座標を
 test('イベント地図の観戦自動送りtimerは先行タップ時に解放する', () => {
     const events = read('js/event/common_events.js');
     const at = events.indexOf('const waitForDismiss = async (game, mapOverlay) => {');
-    const block = events.slice(at, at + 1400);
+    const block = events.slice(at, at + 2800);
     assert.ok(block.includes('let autoDismissTimer = null;'));
     assert.ok(block.includes('clearTimeout(autoDismissTimer);'));
     assert.ok(block.includes('autoDismissTimer = setTimeout(onTouch, 1000)'));
+});
+
+test('イベント地図の入力待ちはturn-flow中断でlistenerとtimerを解放する', () => {
+    const events = read('js/event/common_events.js');
+    const at = events.indexOf('const waitForDismiss = async (game, mapOverlay) => {');
+    const block = events.slice(at, at + 2600);
+    assert.ok(block.includes('turnManager.captureTurnFlowGeneration()'));
+    assert.ok(block.includes('turnManager.subscribeTurnFlowAbort(generation, () => finish(false))'));
+    assert.ok(block.includes('unsubscribeAbort();'));
+    assert.ok(block.includes("mapOverlay.removeEventListener('click', onTouch);"));
+    assert.ok(block.includes("mapOverlay.removeEventListener('touchstart', onTouch);"));
+    assert.ok(block.includes('resolve(!!dismissed);'));
+    assert.ok(events.includes('if (dismissed === false) fx.writeDiag(game, `${diagPrefix}:wait_aborted`);'));
+    const typhoon = read('js/event/typhoon_event.js');
+    assert.ok(typhoon.includes("if (dismissed === false) writeDiag('wait_aborted');"));
 });
 
 
@@ -10400,6 +10430,149 @@ test('台風の城当たり判定は行別短命run索引で旧1px命中集合�
     assert.ok(typhoon.includes("writeDiag('visual_mobile_watch_static');"));
     assert.ok(typhoon.includes("writeDiag('flow_cancelled_after_dialog');"));
     assert.ok(typhoon.includes("castleIndex.clearGroupRuns();"));
+});
+
+
+test('EventManagerはイベントawait中のシナリオ切替後に後続イベント・flag確定・refreshへ進まない', async () => {
+    const ctx = createContext();
+    ctx.window.GameEvents = [];
+    ctx.window.UserSettings = { historicalEvent: true };
+    vm.runInContext(read('js/event_manager.js'), ctx);
+    const EventManager = vm.runInContext('EventManager', ctx);
+
+    let generation = 1;
+    let releaseFirst;
+    let firstStartedResolve;
+    const firstStarted = new Promise(resolve => { firstStartedResolve = resolve; });
+    let secondExecuted = false;
+    let refreshCount = 0;
+    const game = {
+        phase: 'game',
+        isRestoringSave: false,
+        flags: {},
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationCurrent: token => token === generation && game.phase === 'game' && !game.isRestoringSave
+        },
+        writeSystemDiagnostic: () => {}
+    };
+    ctx.window.EventAction = { refreshScreen: async () => { refreshCount++; } };
+    const manager = new EventManager(game);
+    manager.registerEvent({
+        id: 'historical_flow_abort_first', timing: 'startMonth_before', isOneTime: true,
+        checkCondition: () => true,
+        execute: async () => {
+            firstStartedResolve();
+            await new Promise(resolve => { releaseFirst = resolve; });
+        }
+    });
+    manager.registerEvent({
+        id: 'common_flow_abort_second', timing: 'startMonth_before', isOneTime: true,
+        checkCondition: () => true,
+        execute: async () => { secondExecuted = true; }
+    });
+
+    const running = manager.processEvents('startMonth_before');
+    await firstStarted;
+    generation = 2;
+    releaseFirst();
+    await running;
+
+    assert.strictEqual(secondExecuted, false, '旧イベント完了後に次イベントへ進めない');
+    assert.strictEqual(game.flags.historical_flow_abort_first, undefined, '旧シナリオのone-time flagを新状態へ確定しない');
+    assert.strictEqual(refreshCount, 0, '旧イベント由来の画面refreshを新状態へ実行しない');
+});
+
+test('歴史イベント共通台本は会話・カメラawait後にturn-flow世代を再確認する', async () => {
+    const ctx = createContext();
+    ctx.window.GameEvents = [];
+    vm.runInContext(read('js/event_manager.js'), ctx);
+    vm.runInContext(read('js/event/event_text.js'), ctx);
+
+    let generation = 7;
+    let releaseDialog;
+    let dialogStartedResolve;
+    const dialogStarted = new Promise(resolve => { dialogStartedResolve = resolve; });
+    let secondDialogCount = 0;
+    const game = {
+        phase: 'game',
+        isRestoringSave: false,
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationCurrent: token => token === generation && game.phase === 'game'
+        },
+        ui: {
+            preloadDialogFace: () => {},
+            showDialogAsync: async () => {
+                secondDialogCount++;
+                if (secondDialogCount === 1) {
+                    dialogStartedResolve();
+                    await new Promise(resolve => { releaseDialog = resolve; });
+                }
+            },
+            focusMapOnCastle: async () => {}
+        }
+    };
+
+    const running = ctx.window.EventTextManager.playSequence(game, [
+        { type: 'log', msg: '一' },
+        { type: 'log', msg: '二' }
+    ]);
+    await dialogStarted;
+    generation = 8;
+    releaseDialog();
+    await assert.rejects(running, error => error && error.code === 'EVENT_FLOW_ABORTED');
+    assert.strictEqual(secondDialogCount, 1, '世代切替後の次台詞を表示しない');
+});
+
+test('イベント会話・選択待ちはturn-flow中断通知で未解決Promiseを旧シナリオへ残さない', async () => {
+    const ctx = createContext();
+    ctx.window.GameEvents = [];
+    vm.runInContext(read('js/turn_manager.js'), ctx);
+    vm.runInContext(read('js/event_manager.js'), ctx);
+    const TurnManager = vm.runInContext('TurnManager', ctx);
+
+    const game = { phase: 'game', isRestoringSave: false };
+    const turnManager = new TurnManager(game);
+    game.turnManager = turnManager;
+    game.ui = { showDialogAsync: () => new Promise(() => {}) };
+
+    const pendingDialog = ctx.window.EventFlowGuard.showDialogAsync(game, '旧イベント会話');
+    assert.strictEqual(turnManager._turnFlowAbortSubscribers.size, 1, '待機中だけ中断購読を保持する');
+    turnManager.abortForScenarioTransition();
+    await assert.rejects(pendingDialog, error => error && error.code === 'EVENT_FLOW_ABORTED');
+    assert.strictEqual(turnManager._turnFlowAbortSubscribers.size, 0, 'シナリオ切替時に中断購読を解放する');
+
+    let selected = false;
+    const generation = turnManager.captureTurnFlowGeneration();
+    const choice = ctx.window.EventFlowGuard.waitForChoice(game, resolve => { selected = true; resolve('ok'); });
+    assert.strictEqual(await choice, 'ok');
+    assert.strictEqual(selected, true);
+    assert.strictEqual(turnManager.isTurnFlowGenerationCurrent(generation), true);
+    assert.strictEqual(turnManager._turnFlowAbortSubscribers.size, 0, '正常終了時にも購読を即解除する');
+});
+
+test('歴史・共通イベントの直接選択PromiseはEventFlowGuardの選択待ち窓口を通す', () => {
+    const historical = read('js/event/historical_event.js');
+    const common = read('js/event/common_events.js');
+    assert.ok(historical.includes('const _historicalEventWaitChoice = (game, registerChoice) => {'));
+    assert.ok((historical.match(/await _historicalEventWaitChoice\(game, resolve => \{/g) || []).length >= 4);
+    assert.ok(!/await new Promise\(resolve => \{\n\s*game\.ui\.showDialog\(/.test(historical), '歴史イベントに生の選択待ちを残さない');
+    assert.ok(common.includes('const _commonEventWaitChoice = (game, registerChoice) => {'));
+    assert.ok((common.match(/await _commonEventWaitChoice\(game, resolve => \{/g) || []).length >= 2);
+    assert.ok(!/await new Promise\(resolve => \{\n\s*game\.ui\.showDialog\(/.test(common), '共通イベントに生の選択待ちを残さない');
+});
+
+test('AI外交の戦略価値比較は同じ主敵拠点配列を一候補リスト内だけ共用する', () => {
+    const diplomacy = read('js/diplomacy.js');
+    const evalAt = diplomacy.indexOf('evaluateStrategicValue(myClanId, targetClanId, mainThreatId, context = null)');
+    const listAt = diplomacy.indexOf('getDiplomacyPriorityList(myClanId, uniqueNeighbors, mainThreatId)', evalAt);
+    const block = diplomacy.slice(evalAt, listAt + 2400);
+    assert.ok(block.includes('context && context.mainThreatId === mainThreatId'));
+    assert.ok(block.includes('threatCastles: mainThreatId ? this.game.getClanCastles(mainThreatId) : []'));
+    assert.ok(block.includes('this.evaluateStrategicValue(myClanId, targetClanId, mainThreatId, strategicContext)'));
+    assert.ok(block.includes('for (let tc of targetCastles)'));
+    assert.ok(block.includes('for (let mc of threatCastles)'));
 });
 
 Promise.all(pendingTests).then(() => {

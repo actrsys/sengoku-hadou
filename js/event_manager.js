@@ -5,6 +5,98 @@
 
 window.GameEvents = window.GameEvents || [];
 
+
+// 月初/月末・戦闘イベントも通常ターン進行の一部なので、await後にロード／タイトル復帰を跨がない。
+// EventManager自身がTurnManagerの世代を読むだけにし、世代更新責務はTurnManagerへ残す。
+window.EventFlowGuard = window.EventFlowGuard || {
+    capture(game) {
+        const tm = game && game.turnManager;
+        if (tm && typeof tm.captureTurnFlowGeneration === 'function') {
+            return tm.captureTurnFlowGeneration();
+        }
+        return null;
+    },
+    isCurrent(game, generation) {
+        if (!game) return false;
+        const tm = game.turnManager;
+        if (generation !== null && generation !== undefined
+            && tm && typeof tm.isTurnFlowGenerationCurrent === 'function') {
+            return tm.isTurnFlowGenerationCurrent(generation);
+        }
+        if (game.isRestoringSave) return false;
+        return typeof game.phase !== 'string' || game.phase === 'game';
+    },
+    assertCurrent(game, generation) {
+        if (this.isCurrent(game, generation)) return;
+        const error = new Error('イベント実行中にシナリオ寿命が切り替わりました');
+        error.code = 'EVENT_FLOW_ABORTED';
+        throw error;
+    },
+    isAbortError(error) {
+        return !!error && error.code === 'EVENT_FLOW_ABORTED';
+    },
+    _createAbortError() {
+        const error = new Error('イベント実行中にシナリオ寿命が切り替わりました');
+        error.code = 'EVENT_FLOW_ABORTED';
+        return error;
+    },
+    async _awaitWithAbort(game, generation, pending) {
+        this.assertCurrent(game, generation);
+        const tm = game && game.turnManager;
+        if (!tm || typeof tm.subscribeTurnFlowAbort !== 'function') {
+            const result = await pending;
+            this.assertCurrent(game, generation);
+            return result;
+        }
+
+        return await new Promise((resolve, reject) => {
+            let settled = false;
+            let unsubscribe = () => {};
+            const settleAbort = () => {
+                if (settled) return;
+                settled = true;
+                unsubscribe();
+                reject(this._createAbortError());
+            };
+            unsubscribe = tm.subscribeTurnFlowAbort(generation, settleAbort);
+
+            Promise.resolve(pending).then(result => {
+                if (settled) return;
+                settled = true;
+                unsubscribe();
+                try {
+                    this.assertCurrent(game, generation);
+                    resolve(result);
+                } catch (error) {
+                    reject(error);
+                }
+            }, error => {
+                if (settled) return;
+                settled = true;
+                unsubscribe();
+                reject(error);
+            });
+        });
+    },
+    async showDialogAsync(game, ...args) {
+        const generation = this.capture(game);
+        return this._awaitWithAbort(game, generation, game.ui.showDialogAsync(...args));
+    },
+    async waitForChoice(game, registerChoice) {
+        const generation = this.capture(game);
+        this.assertCurrent(game, generation);
+        const pending = new Promise(resolve => registerChoice(resolve));
+        return this._awaitWithAbort(game, generation, pending);
+    },
+    async focusMapOnCastle(game, castleId, options = {}) {
+        const generation = this.capture(game);
+        this.assertCurrent(game, generation);
+        const result = await game.ui.focusMapOnCastle(castleId, options);
+        this.assertCurrent(game, generation);
+        return result;
+    }
+};
+
 class EventManager {
     constructor(game) {
         this.game = game;
@@ -92,14 +184,18 @@ class EventManager {
      * 歴史イベントをOFFにした場合、historical_ 常駐イベントは条件を評価せず false へ遷移させ、
      * 適用中の常駐効果を onExit で解除します。再ON後は次の登録タイミングで条件を再評価します。
      */
-    async processResidentEvents(timing, context = null, isHistoricalOff = false) {
+    async processResidentEvents(timing, context = null, isHistoricalOff = false, flowGeneration = undefined) {
         const targetEvents = this.residentEvents[timing];
-        if (!targetEvents || targetEvents.length === 0) return;
+        if (!targetEvents || targetEvents.length === 0) return true;
+        const generation = flowGeneration === undefined ? window.EventFlowGuard.capture(this.game) : flowGeneration;
+        const isCurrentFlow = () => window.EventFlowGuard.isCurrent(this.game, generation);
+        if (!isCurrentFlow()) return false;
 
         this.game.flags = this.game.flags || {};
         const stateBook = this.game.flags.__residentEventStates || (this.game.flags.__residentEventStates = {});
 
         for (const ev of targetEvents) {
+            if (!isCurrentFlow()) return false;
             const isHistorical = ev.id && ev.id.startsWith('historical_');
             const saved = stateBook[ev.id];
             const wasActive = saved === true || (saved && saved.active === true);
@@ -133,12 +229,15 @@ class EventManager {
                     await ev.onExit(this.game, context);
                 }
 
-                // 効果の適用/解除が正常終了してから状態を保存します。
+                if (!isCurrentFlow()) return false;
+                // 効果の適用/解除が正常終了し、同じシナリオ寿命であることを確認してから状態を保存します。
                 stateBook[ev.id] = { active: isActive };
             } catch (error) {
+                if (window.EventFlowGuard.isAbortError(error) || !isCurrentFlow()) return false;
                 console.warn(`常駐イベント ${ev.id} の状態更新中にエラーが出ましたが、進行を継続します:`, error);
             }
         }
+        return isCurrentFlow();
     }
 
     /**
@@ -212,6 +311,7 @@ class EventManager {
                 }
                 return true;
             } catch (error) {
+                if (window.EventFlowGuard.isAbortError(error)) return false;
                 console.warn(`面談イベント ${ev.id} の実行中にエラーが出ましたが、通常面談へ戻します:`, error);
                 return false;
             }
@@ -223,6 +323,9 @@ class EventManager {
     async processEvents(timing, context = null) { 
         const targetEvents = this.events[timing];
         if (!targetEvents) return;
+        const flowGeneration = window.EventFlowGuard.capture(this.game);
+        const isCurrentFlow = () => window.EventFlowGuard.isCurrent(this.game, flowGeneration);
+        if (!isCurrentFlow()) return;
 
         // ゲームのセーブデータに残る「スタンプ帳（flags）」を準備します
         this.game.flags = this.game.flags || {};
@@ -232,7 +335,8 @@ class EventManager {
 
         // 常駐イベントは通常イベントとは別枠で先に同期します。
         // 常駐イベントの状態変化は「その月に起きた歴史イベント1件」には数えません。
-        await this.processResidentEvents(timing, context, isHistoricalOff);
+        if (!await this.processResidentEvents(timing, context, isHistoricalOff, flowGeneration)) return;
+        if (!isCurrentFlow()) return;
 
         // ★追加：このタイミングで歴史イベントがすでに起きたかをメモする変数です
         let historicalEventOccurred = false;
@@ -278,6 +382,7 @@ class EventManager {
                         this.game.writeSystemDiagnostic(`event:${timing}:${ev.id}:execute`);
                     }
                     await ev.execute(this.game, context);
+                    if (!isCurrentFlow()) return;
                     if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                         this.game.writeSystemDiagnostic(`event:${timing}:${ev.id}:done`);
                     }
@@ -300,6 +405,7 @@ class EventManager {
                     }
 
                 } catch (error) {
+                    if (window.EventFlowGuard.isAbortError(error) || !isCurrentFlow()) return;
                     // 裏側で透明なエラーが起きても、ゲームが止まらないようにしてここで受け止めます
                     console.warn(`イベント ${ev.id} の実行中にエラーが出ましたが、進行を継続します:`, error);
                 }
@@ -307,6 +413,7 @@ class EventManager {
         }
 
         // ★追加：全てのイベントのチェックと実行が終わった後、お片付けシールが貼られていたら1回だけ画面を更新します
+        if (!isCurrentFlow()) return;
         if (needRefreshScreen && timing !== 'game_start' && window.EventAction && window.EventAction.refreshScreen) {
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                 this.game.writeSystemDiagnostic(`event:${timing}:refresh`);
@@ -314,6 +421,7 @@ class EventManager {
             // event_managerの中では「this.game」という名前でゲームデータを管理しているので、それを渡します
             // ★Round10：段階更新が終わるまで待ちます。
             await window.EventAction.refreshScreen(this.game);
+            if (!isCurrentFlow()) return;
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                 this.game.writeSystemDiagnostic(`event:${timing}:refresh_done`);
             }

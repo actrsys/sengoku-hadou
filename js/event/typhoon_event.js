@@ -7,6 +7,14 @@
 
 window.GameEvents = window.GameEvents || [];
 
+const _typhoonEventShowDialogAsync = (game, ...args) => {
+    const guard = window.EventFlowGuard;
+    return guard && typeof guard.showDialogAsync === 'function'
+        ? guard.showDialogAsync(game, ...args)
+        : game.ui.showDialogAsync(...args);
+};
+
+
 window.GameEvents.push({
     id: "typhoon_event_01",
     timing: "endMonth_after",
@@ -50,7 +58,7 @@ window.GameEvents.push({
 
         if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
         writeDiag('dialog');
-        await game.ui.showDialogAsync("台風が接近しています……", false, 0, { diagnosticPrefix: diagPrefix });
+        await _typhoonEventShowDialogAsync(game, "台風が接近しています……", false, 0, { diagnosticPrefix: diagPrefix });
         writeDiag('dialog_done');
         if (!isCurrentEventFlow()) {
             writeDiag('flow_cancelled_after_dialog');
@@ -356,7 +364,8 @@ window.GameEvents.push({
                     }
 
                     writeDiag('wait_input');
-                    await fx.waitForDismiss(game, mapOverlay);
+                    const dismissed = await fx.waitForDismiss(game, mapOverlay);
+                    if (dismissed === false) writeDiag('wait_aborted');
                 } catch (visualError) {
                     // 台風の被害計算・結果通知は演出より優先。Canvas/DOM/input待ちの失敗だけを隔離する。
                     console.warn('台風の地図演出を途中で省略しました:', visualError);
@@ -379,14 +388,14 @@ window.GameEvents.push({
                 });
 
                 if (maxDamageScale <= 3) {
-                    await game.ui.showDialogAsync("小規模な台風により、各地で軽微な被害が発生しているようです……", false, 0);
+                    await _typhoonEventShowDialogAsync(game, "小規模な台風により、各地で軽微な被害が発生しているようです……", false, 0);
                 } else if (maxDamageScale <= 7) {
-                    await game.ui.showDialogAsync("強い台風が上陸し、各地で被害が発生しているようです……", false, 0);
+                    await _typhoonEventShowDialogAsync(game, "強い台風が上陸し、各地で被害が発生しているようです……", false, 0);
                 } else {
-                    await game.ui.showDialogAsync("猛烈な台風が直撃し、各地で甚大な被害が発生しているようです……", false, 0);
+                    await _typhoonEventShowDialogAsync(game, "猛烈な台風が直撃し、各地で甚大な被害が発生しているようです……", false, 0);
                 }
             } else {
-                await game.ui.showDialogAsync("今回は大きな被害はなかったようです。", false, 0);
+                await _typhoonEventShowDialogAsync(game, "今回は大きな被害はなかったようです。", false, 0);
             }
         } else {
             await fx.cleanupOverlay(mapOverlay);
@@ -395,13 +404,13 @@ window.GameEvents.push({
                 writeDiag('flow_cancelled_after_overlay');
                 return;
             }
-            await game.ui.showDialogAsync("今回は大きな被害はなかったようです。", false, 0);
+            await _typhoonEventShowDialogAsync(game, "今回は大きな被害はなかったようです。", false, 0);
         }
 
         await new Promise(resolve => setTimeout(resolve, 1000));
         if (!isCurrentEventFlow()) return;
         for (const data of damagedPlayerCastles) {
-            await game.ui.showDialogAsync(`${data.castle.name}が台風の被害を受けました……`, false, 0);
+            await _typhoonEventShowDialogAsync(game, `${data.castle.name}が台風の被害を受けました……`, false, 0);
             if (!isCurrentEventFlow()) return;
         }
         } finally {

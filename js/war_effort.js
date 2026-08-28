@@ -1438,6 +1438,7 @@ Object.assign(WarManager.prototype, {
         if (!this.state.active || this._warEnding) return;
         const warGeneration = Number(this._warGeneration || 0);
         this._warEnding = true;
+        const isCurrentWar = () => this._isWarLifecycleCurrent(warGeneration, false);
 
         // ★追加：戦争全体の「終了処理前」の合図を出します
         if (this.game.eventManager) {
@@ -1510,6 +1511,7 @@ Object.assign(WarManager.prototype, {
                 });
                 // イベントマネージャー（受付）を経由させることでフラグが保存されます
                 await this.game.eventManager.processEvents('after_battle_blink', eventContext);
+                if (!isCurrentWar()) return;
             }
             // ==========================================
 
@@ -1554,6 +1556,7 @@ Object.assign(WarManager.prototype, {
                 // ★追加：籠城戦（攻城戦）の「戦闘終了後」の合図を出します
                 if (this.game.eventManager) {
                     await this.game.eventManager.processEvents('after_siege_war', s);
+                    if (!isCurrentWar()) return;
                 }
 
                 const winnerClan = s.attacker.ownerClan; // 勝ったのは攻撃側です
@@ -1573,13 +1576,16 @@ Object.assign(WarManager.prototype, {
                     } else {
                         // AIが勝った場合は自動で処理します
                         await this.autoResolvePrisoners(this.pendingPrisoners, winnerClan);
+                        if (!isCurrentWar()) return;
                         this.pendingPrisoners = [];
                         
                         // ==========================================
                         // ★AIの場合は、そのまま滅亡チェックとターン終了へ進みます！
                         await this.checkTotalTakeover(s); // ★総取りシステムをチェック！
+                        if (!isCurrentWar()) return;
                         const extReason1 = s.isTotalTakeoverExecuted ? 'total_takeover' : 'no_castle';
                         await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason1, extReason1 === 'no_castle' ? winnerClan : 0);
+                        if (!isCurrentWar()) return;
                         if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige(); // 威信を更新
                         this.game.finishTurn();
                         // ==========================================
@@ -1588,8 +1594,10 @@ Object.assign(WarManager.prototype, {
                     // ==========================================
                     // ★捕虜がいなかった場合も、そのまま滅亡チェックとターン終了へ進みます！
                     await this.checkTotalTakeover(s); // ★総取りシステムをチェック！
+                    if (!isCurrentWar()) return;
                     const extReason2 = s.isTotalTakeoverExecuted ? 'total_takeover' : 'no_castle';
                     await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason2, extReason2 === 'no_castle' ? winnerClan : 0);
+                    if (!isCurrentWar()) return;
                     if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige(); // 威信を更新
                     this.game.finishTurn();
                     // ==========================================
@@ -1901,6 +1909,7 @@ Object.assign(WarManager.prototype, {
                         // ★追加：ダイアログを出す前にバリアを解除します！
                         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                         await this.game.ui.showDialogAsync(resultMsg);
+                        if (!isCurrentWar()) return;
                     }
                     this.closeWar();
                 }
@@ -1982,6 +1991,7 @@ Object.assign(WarManager.prototype, {
                     // ★城をすべて失ったら、life_system.js の滅亡チェック魔法にお任せします！
                     if (this.game.castles.filter(c => c.ownerClan === oldOwner).length === 0) {
                         await this.game.lifeSystem.checkClanExtinction(oldOwner, 'no_castle', 0);
+                        if (!isCurrentWar()) return;
                     }
                     
                 } else {
@@ -2016,6 +2026,7 @@ Object.assign(WarManager.prototype, {
                         // ★追加：ダイアログを出す前にバリアを解除します！
                         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                         await this.game.ui.showDialogAsync(resultMsg);
+                        if (!isCurrentWar()) return;
                     }
                     this.closeWar();
                 }
@@ -2195,8 +2206,9 @@ Object.assign(WarManager.prototype, {
                         // ★追加：ダイアログを出す前にバリアを解除します！
                         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                         await this.game.ui.showDialogAsync(aiResultMsg);
+                        if (!isCurrentWar()) return;
                     }
-                    finishWarProcess();
+                    await finishWarProcess();
                 }
                 return;
             }
@@ -2318,10 +2330,12 @@ Object.assign(WarManager.prototype, {
                     // ★追加：ダイアログを出す前にバリアを解除します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                     await this.game.ui.showDialogAsync(aiResultMsg);
+                    if (!isCurrentWar()) return;
                 }
-                finishWarProcess();
+                await finishWarProcess();
             }
         } catch (e) {
+            if (!isCurrentWar()) return;
             console.error("EndWar Error: ", e);
             if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 

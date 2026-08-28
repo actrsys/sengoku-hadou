@@ -540,3 +540,27 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - 凶作・豊作・大雪等の共通地方イベントは、初回 `showDialogAsync()` 前にturn-flow世代を取得し、会話完了後に同じゲーム世代でなければイベント専用地図を生成しない。専用地図の後始末後も同じ世代を再確認し、旧イベントの結果会話を新シナリオへ表示しない。強制モーダルリセット時に旧会話を擬似確定して進めるのではなく、通常の会話寿命契約とTurnManager寿命を二重の安全境界として使う。
 - 台風の城当たり判定は「円内の1ピクセルでも同一城色groupがあれば命中」という現行意味と乱数呼出順を維持する。共有 `pixelCastleMap` を巨大な別配列へ複製せず、実際に参照した行だけ `groupId` の連続区間へ遅延変換し、各円では整数ピクセルとして円内に入るX範囲と区間の交差だけを判定する。行区間cacheは台風イベント終了時に破棄し、長時間観戦へ残さない。
 - 台風の地方色／進路Canvasも他の災害と同様、古いスマホのAI観戦では大型Canvasの2秒opacity点滅を行わない。同じ色・進路を静止Canvasで1フレーム提示し、既存の観戦1秒自動送りへ進む。通常プレイとPC観戦は従来点滅を維持する。初回台風会話と地図後にもturn-flow世代を確認し、旧イベントをシナリオ切替後へ継続しない。
+
+
+## r293 追加監査：イベント実行寿命とAI外交候補比較
+- `EventManager.processEvents()` / `processResidentEvents()` は `TurnManager` のturn-flow世代を読取専用tokenとして保持し、常駐イベント・通常イベント・イベント後refreshの各 `await` 後に同じシナリオ寿命か確認する。ロード／タイトル復帰／新規開始で世代が変わった旧イベントは、後続イベント・one-time flag確定・全国refreshへ進めない。
+- イベントの寿命更新責務を `EventManager` 側へ複製しない。世代を進める正本は従来どおり `TurnManager.abortForScenarioTransition()` とし、イベント層は `EventFlowGuard` からcapture / checkするだけにする。
+- 長い歴史イベント台本 `EventTextManager.playSequence()` は、会話・カメラ移動の各await後に開始時のturn-flow世代を確認する。シナリオ切替で共通ダイアログが強制解除されても、旧台本の次台詞・次カメラへ進まない。イベントファイルの直接 `showDialogAsync()` / `focusMapOnCastle()` も `EventFlowGuard` の共通待機窓口を通し、待機中の世代切替をイベント中断として上位へ返す。
+- `EventAction.refreshScreen()` の段階yieldも開始時世代へ結び、旧イベント由来の派閥再編・威信再計算・地図refreshをロード後へ持ち越さない。
+- AI外交の優先度リストでは、1回の候補比較中に変わらない「主敵の所有拠点配列」を短命contextで1回だけ取得する。候補勢力の順序、`MapGraphService.isAdjacent()` の二重ループ順、優先度計算、sort規則は変更せず、長期キャッシュは持たない。
+
+
+## r294 追加監査：戦後endWarの呼出元寿命補完
+- `EventManager` がイベント内部でturn-flow世代切替を検知して中断しても、その呼出元が旧戦争の処理を続けてはならない。`WarManager.endWar()` は開始時の `warGeneration` をローカル正本とし、`after_battle_blink` / `after_siege_war`、AI捕虜処遇、総取り、滅亡判定、AI向け結果会話などの `await` 後に同じ戦争世代か再確認する。ロード・タイトル復帰・新規開始で戦争世代が変わった場合は、旧戦争の履歴追加・捕虜処理・威信更新・`finishTurn()`・`closeWar()` へ進めない。
+- AI戦争側の `finishWarProcess()` はasync処理を未監視で投げっぱなしにせず `endWar()` から `await` する。正常時の表示順・捕虜処遇・滅亡判定・ターン復帰順は変更せず、例外は既存の `endWar()` 境界へ返す。プレイヤー結果画面のcallback経路は従来どおりユーザー確定後に開始し、共通会話の強制リセット時にはcallbackを擬似発火させない。
+- 月末死亡処理は大名継承・姫帰還・婚姻再評価など複数の不可逆な専門処理を跨ぐため、部分的な寿命ガードだけを足すと半端な状態を作り得る。明確なトランザクション境界を設計せず、今回の巡回では変更しない。
+
+## r295 追加監査：イベント会話・選択待ちPromiseのシナリオ寿命
+- `EventFlowGuard` が会話・選択肢をawaitする時は、await後の世代確認だけに依存しない。`TurnManager.subscribeTurnFlowAbort()` を読取専用の中断通知窓口として使い、ロード・タイトル復帰・新規開始でturn-flow世代が切り替わった時点で旧イベント側の待機を `EVENT_FLOW_ABORTED` として終了する。通常終了時は購読を即解除し、長時間プレイ中にabort購読を蓄積しない。世代を進める責務は従来どおり `TurnManager.abortForScenarioTransition()` のみに残す。
+- 共通 `showDialogAsync()` は強制モーダルリセット時に旧callbackを擬似確定しない既存方針を維持する。その代わりEventFlowGuard側がUI Promiseとturn-flow中断通知を競合待ちし、旧会話Promiseが未解決のままイベントasyncスタック全体を参照保持し続けないようにする。UIの確定・取消callback自体はシナリオ切替時に発火させない。
+- 歴史イベントの「出陣する／しない」「使者を送る／送らない」等と、共通イベントの登用・臣従受諾のように `new Promise(resolve => showDialog(...))` で直接選択を待つ経路も `EventFlowGuard.waitForChoice()` を通す。通常時の選択肢文言・分岐・callback順は変更せず、シナリオ切替時だけ旧選択待ちを中断する。
+- イベント外の通常UI選択や不可逆処理へ機械的に同じ仕組みを広げない。今回の対象はEventManager配下で、既存turn-flow世代が正本として成立している会話・選択待ちに限定する。
+
+## r296 追加監査：イベント地図の入力待ち寿命
+- 凶作・豊作・大雪・台風等のイベント専用地図で行う「タップして進む」待機も、会話・選択待ちと同じturn-flow寿命へ所属させる。ロード・タイトル復帰・新規開始で世代が切れた時は、旧地図のclick/touch listenerと観戦自動送りtimerを即時解放して待機Promiseを終了する。選択callbackやタップ処理を擬似発火してイベントを進めず、呼び出し側の既存finally/cleanupでCanvas・暗幕・背景休止を片付ける。
+- 通常のタップ／観戦1秒自動送りは従来どおり `true` 完了、シナリオ切替による中断だけ `false` 完了として診断できるようにする。イベント被害計算・表示時間・通常時の入力挙動は変更しない。
