@@ -37,11 +37,11 @@ class FieldWarManager {
         // 固定の野戦Managerを複数戦闘で再利用するため、遅延callback/await後の継続を
         // 戦闘世代で分離する。旧戦闘のtimerが次のturnQueueや固定DOMへ触れないようにする。
         this._fieldWarGeneration = 0;
-        window.addEventListener('resize', () => {
-            if (this.active) {
-                this.adjustMapScale();
-            }
-        });
+        const refreshScale = () => {
+            if (this.active) this.adjustMapScale();
+        };
+        window.addEventListener('resize', refreshScale);
+        window.addEventListener('game-layout-mode-change', refreshScale);
     }
 
     _beginFieldWarLifecycle() {
@@ -166,7 +166,7 @@ class FieldWarManager {
         if (!mapArea || !scrollArea) return;
 
         // スマホかPCかによって、画面横幅に表示するマス数を固定します
-        const isPC = document.body.classList.contains('is-pc') || window.innerWidth >= 768;
+        const isPC = document.body.classList.contains('is-pc');
         const targetCols = isPC ? 16 : 10;
 
         // 目標とするマス数分の「本来の横幅(ピクセル)」を計算します

@@ -96,11 +96,45 @@
         bind('saveload-close-btn', () => getGame()?.ui?.saveLoadView?.close());
     }
 
+    const PC_LOGICAL_WIDTH = 1280;
+    const PC_LOGICAL_HEIGHT = 720;
+    const MOBILE_TARGET_RATIO = 9 / 16;
+    const MIN_TOUCH_PC_SCALE = 0.75;
+
+    function mediaMatches(query) {
+        try {
+            return !!(window.matchMedia && window.matchMedia(query).matches);
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function isTouchFirstDevice() {
+        const ua = navigator.userAgent || '';
+        const maxTouchPoints = Number(navigator.maxTouchPoints || 0);
+        const mobileUa = /iPhone|iPad|iPod|Android|Mobile/i.test(ua);
+        // iPadOS はデスクトップ向けUAで Macintosh を名乗る場合がある。
+        const ipadDesktopUa = /Macintosh/i.test(ua) && maxTouchPoints > 1;
+        const coarseTouchDevice = maxTouchPoints > 0
+            && mediaMatches('(pointer: coarse)')
+            && mediaMatches('(hover: none)');
+        return mobileUa || ipadDesktopUa || coarseTouchDevice;
+    }
+
+    function resolveGameLayoutMode(layoutW, layoutH) {
+        if (!isTouchFirstDevice()) return 'pc';
+
+        // タッチ主体端末は縦持ちならスマホUIを正本にする。横持ちでも
+        // PC論理画面を75%以上で収められない場合は、PC UIを押し潰さずスマホUIへ寄せる。
+        const isLandscape = layoutW > layoutH;
+        const pcScale = Math.min(layoutW / PC_LOGICAL_WIDTH, layoutH / PC_LOGICAL_HEIGHT);
+        return isLandscape && pcScale >= MIN_TOUCH_PC_SCALE ? 'pc' : 'mobile';
+    }
+
     function resizeGameScreen() {
         const screen = document.getElementById('game-screen');
         if (!screen) return;
 
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         const viewport = window.visualViewport || null;
         const dpr = Math.max(1, window.devicePixelRatio || 1);
         const snapPhysicalPixel = value => Math.round(value * dpr) / dpr;
@@ -109,6 +143,15 @@
         const windowH = viewport ? viewport.height : window.innerHeight;
         const viewportLeft = viewport ? viewport.offsetLeft : 0;
         const viewportTop = viewport ? viewport.offsetTop : 0;
+        // ソフトキーボードで縮む visualViewport ではなく、レイアウトviewportをモード判定の正本にする。
+        const layoutW = window.innerWidth || windowW;
+        const layoutH = window.innerHeight || windowH;
+        const layoutMode = resolveGameLayoutMode(layoutW, layoutH);
+        const isPC = layoutMode === 'pc';
+        const previousLayoutMode = document.body.dataset.layoutMode || '';
+
+        document.body.classList.toggle('is-pc', isPC);
+        document.body.dataset.layoutMode = layoutMode;
 
         screen.style.setProperty('--screen-edge-bleed', `${onePhysicalPixel}px`);
 
@@ -129,15 +172,11 @@
             screen.style.backgroundColor = '#000000';
         };
 
-        if (!isMobile) {
-            document.body.classList.add('is-pc');
-            const baseWidth = 1280;
-            const baseHeight = 720;
-            const scale = Math.min(windowW / baseWidth, windowH / baseHeight);
-            applyScreenGeometry(baseWidth, baseHeight, scale);
+        if (isPC) {
+            const scale = Math.min(windowW / PC_LOGICAL_WIDTH, windowH / PC_LOGICAL_HEIGHT);
+            applyScreenGeometry(PC_LOGICAL_WIDTH, PC_LOGICAL_HEIGHT, scale);
         } else {
-            document.body.classList.remove('is-pc');
-            const targetRatio = 9 / 16;
+            const targetRatio = MOBILE_TARGET_RATIO;
             const currentRatio = windowW / windowH;
             let finalW;
             let finalH;
@@ -165,6 +204,13 @@
         }
 
         screen.style.zoom = '';
+
+        if (previousLayoutMode && previousLayoutMode !== layoutMode
+            && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('game-layout-mode-change', {
+                detail: { mode: layoutMode, previousMode: previousLayoutMode }
+            }));
+        }
     }
 
     let resizeGameScreenFrame = null;
@@ -184,6 +230,7 @@
 
     initializeFonts();
     window.addEventListener('resize', scheduleResizeGameScreen, { passive: true });
+    window.addEventListener('orientationchange', scheduleResizeGameScreen, { passive: true });
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', scheduleResizeGameScreen, { passive: true });
     }

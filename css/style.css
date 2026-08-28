@@ -5883,62 +5883,36 @@ body:not(.is-pc) #map-container {
     .loading-track span { transition: none !important; }
 }
 
-/* 縦長・狭幅端末：題字とメニューを上下にして、5項目以上でも収めやすくします。 */
-@media (max-width: 720px), (max-height: 560px) {
-    #title-screen { padding: 14px; }
-    .title-version { left: 18px; bottom: 14px; font-size: 0.62rem; letter-spacing: 0.08em; }
-    #title-screen::before,
-    #global-loading-screen::before { inset: 9px; }
-    .title-content {
-        width: min(620px, 94%);
-        min-height: 0;
-        max-height: 94%;
-        padding: clamp(20px, 4vw, 30px);
-        grid-template-columns: 1fr;
-        gap: 20px;
-        overflow-y: auto;
-        overscroll-behavior: contain;
-    }
-    .title-content::before { display: none; }
-    .title-brand { text-align: center; padding-left: 0; }
-    .game-title { font-size: clamp(3.1rem, 13vw, 5.2rem); }
-    .title-kicker { margin-bottom: 8px; }
-    .title-rule { margin: 14px auto 10px; }
-    .title-subtitle { font-size: 0.82rem; }
-    .title-menu { justify-self: center; max-width: 360px; }
-    #title-screen #menu-buttons { gap: 6px; }
-    .title-btn {
-        min-height: 43px;
-        padding-top: 7px;
-        padding-bottom: 7px;
-        font-size: 0.94rem;
-    }
-    .title-tap-message { padding: 15px 8px; }
+/* スマホ論理画面：物理viewport幅ではなく body.is-pc を正本にする。 */
+body:not(.is-pc) #title-screen { padding: 14px; }
+body:not(.is-pc) .title-version { left: 18px; bottom: 14px; font-size: 0.62rem; letter-spacing: 0.08em; }
+body:not(.is-pc) #title-screen::before,
+body:not(.is-pc) #global-loading-screen::before { inset: 9px; }
+body:not(.is-pc) .title-content {
+    width: min(620px, 94%);
+    min-height: 0;
+    max-height: 94%;
+    padding: clamp(20px, 4vw, 30px);
+    grid-template-columns: 1fr;
+    gap: 20px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
-
-/* 特に高さの低い横持ちスマホでは題字をさらに縮め、メニューを2列にします。 */
-@media (max-height: 430px) and (min-width: 560px) {
-    .title-content {
-        width: min(900px, 95%);
-        padding: 18px 24px;
-        grid-template-columns: minmax(190px, 0.8fr) minmax(320px, 1.2fr);
-        gap: 28px;
-        overflow: hidden;
-    }
-    .title-brand { text-align: left; }
-    .game-title { font-size: clamp(2.9rem, 7vw, 4.1rem); }
-    .title-rule { margin: 11px 0 8px; }
-    .title-subtitle { font-size: 0.72rem; }
-    #title-screen #menu-buttons {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 6px;
-    }
-    .title-btn { min-height: 42px; font-size: 0.88rem; padding-left: 16px; padding-right: 30px; }
-    .title-btn:hover,
-    .title-btn:focus-visible { padding-left: 20px; }
-    .title-btn::after { right: 10px; }
+body:not(.is-pc) .title-content::before { display: none; }
+body:not(.is-pc) .title-brand { text-align: center; padding-left: 0; }
+body:not(.is-pc) .game-title { font-size: clamp(3.1rem, 13vw, 5.2rem); }
+body:not(.is-pc) .title-kicker { margin-bottom: 8px; }
+body:not(.is-pc) .title-rule { margin: 14px auto 10px; }
+body:not(.is-pc) .title-subtitle { font-size: 0.82rem; }
+body:not(.is-pc) .title-menu { justify-self: center; max-width: 360px; }
+body:not(.is-pc) #title-screen #menu-buttons { gap: 6px; }
+body:not(.is-pc) .title-btn {
+    min-height: 43px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+    font-size: 0.94rem;
 }
+body:not(.is-pc) .title-tap-message { padding: 15px 8px; }
 
 /* =========================================================
    シナリオ選択
@@ -6167,151 +6141,73 @@ body:not(.is-pc) #map-container {
     min-width: 130px;
 }
 
-/* 200半角文字程度なら通常はスクロールせず読める広さを確保。 */
-@media (min-width: 721px) {
-    #scenario-modal .scenario-desc-text {
-        min-height: 190px;
-    }
+/* シナリオ選択も固定論理画面のPC/スマホmodeを正本にする。 */
+body.is-pc #scenario-modal .scenario-desc-text {
+    min-height: 190px;
 }
 
-/* 縦持ちスマホ：一覧→説明→決定の位置を固定。 */
-@media (max-width: 720px) {
-    #scenario-modal .start-content {
-        width: min(620px, 94%);
-        max-width: 620px;
-        height: min(600px, calc(100vh - 88px));
-        min-height: 0;
-        max-height: calc(100vh - 88px);
-    }
-
-    #scenario-modal .scenario-main {
-        grid-template-columns: minmax(0, 1fr);
-        grid-template-rows: minmax(205px, 0.95fr) minmax(155px, 0.85fr);
-        row-gap: 10px;
-        margin-top: 10px;
-    }
-
-    #scenario-modal .start-content > h3 {
-        margin-bottom: 0;
-    }
-
-    #scenario-modal #scenario-list {
-        padding: 4px;
-        gap: 5px;
-    }
-
-    #scenario-modal .clan-btn {
-        min-height: 42px;
-        padding: 7px 10px;
-        font-size: 0.86rem;
-    }
-
-    #scenario-modal .start-content.scenario-layout-many {
-        width: min(620px, 94%);
-        max-width: 620px;
-    }
-
-    #scenario-modal .start-content.scenario-layout-many .scenario-main {
-        grid-template-columns: minmax(0, 1fr);
-        grid-template-rows: minmax(250px, 1.15fr) minmax(130px, 0.65fr);
-    }
-
-    #scenario-modal #scenario-list.scenario-list-many {
-        grid-auto-rows: minmax(40px, auto);
-        gap: 5px;
-    }
-
-    #scenario-modal #scenario-list.scenario-list-many .clan-btn {
-        min-height: 40px;
-        padding: 5px 7px;
-        font-size: 0.78rem;
-        letter-spacing: 0.04em;
-    }
-
-    #scenario-modal .scenario-desc-text {
-        padding: 13px 14px 15px;
-        font-size: 0.88rem;
-        line-height: 1.62;
-    }
-
-    #scenario-modal .modal-footer {
-        min-height: 60px;
-        padding: 0;
-    }
+body:not(.is-pc) #scenario-modal .start-content {
+    width: min(620px, 94%);
+    max-width: 620px;
+    height: min(600px, calc(100vh - 88px));
+    min-height: 0;
+    max-height: calc(100vh - 88px);
 }
 
-/* 高さの低い横持ちスマホ：上下積みでは窮屈なので2ペイン。 */
-@media (max-height: 430px) and (min-width: 560px) {
-    #scenario-modal .start-content {
-        width: min(900px, 95%);
-        max-width: 900px;
-        height: calc(100vh - 76px);
-        max-height: calc(100vh - 76px);
-    }
-
-    #scenario-modal .scenario-main {
-        grid-template-columns: minmax(210px, 0.8fr) minmax(0, 1.2fr);
-        grid-template-rows: minmax(0, 1fr);
-        column-gap: 12px;
-        row-gap: 0;
-        margin-top: 7px;
-    }
-
-    #scenario-modal .start-content.scenario-layout-many {
-        width: min(960px, 97%);
-        max-width: 960px;
-    }
-
-    #scenario-modal .start-content.scenario-layout-many .scenario-main {
-        grid-template-columns: minmax(390px, 1.05fr) minmax(0, 0.95fr);
-    }
-
-    #scenario-modal .start-content > h3 {
-        margin-bottom: 0;
-    }
-
-    #scenario-modal .clan-btn {
-        font-size: 0.82rem;
-    }
-
-    #scenario-modal #scenario-list.scenario-list-many {
-        grid-auto-rows: minmax(34px, auto);
-        gap: 4px;
-    }
-
-    #scenario-modal #scenario-list.scenario-list-many .clan-btn {
-        min-height: 34px;
-        padding: 4px 6px;
-        font-size: 0.74rem;
-    }
-
-    #scenario-modal .scenario-desc-text {
-        min-height: 0;
-        padding: 13px 14px 15px;
-        font-size: 0.8rem;
-        line-height: 1.48;
-    }
-
-    #scenario-modal .modal-footer {
-        min-height: 60px;
-        padding: 0;
-    }
-
-    #scenario-modal .btn-primary,
-    #scenario-modal .btn-secondary {
-        min-height: 34px;
-        padding-top: 5px;
-        padding-bottom: 5px;
-    }
+body:not(.is-pc) #scenario-modal .scenario-main {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(205px, 0.95fr) minmax(155px, 0.85fr);
+    row-gap: 10px;
+    margin-top: 10px;
 }
 
-/* PCでも高さが低い場合は説明欄の余白を少し圧縮する。 */
-@media (min-width: 721px) and (max-height: 560px) {
-    #scenario-modal .scenario-desc-text {
-        padding: 13px 14px 15px;
-    }
+body:not(.is-pc) #scenario-modal .start-content > h3 {
+    margin-bottom: 0;
 }
 
+body:not(.is-pc) #scenario-modal #scenario-list {
+    padding: 4px;
+    gap: 5px;
+}
+
+body:not(.is-pc) #scenario-modal .clan-btn {
+    min-height: 42px;
+    padding: 7px 10px;
+    font-size: 0.86rem;
+}
+
+body:not(.is-pc) #scenario-modal .start-content.scenario-layout-many {
+    width: min(620px, 94%);
+    max-width: 620px;
+}
+
+body:not(.is-pc) #scenario-modal .start-content.scenario-layout-many .scenario-main {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(250px, 1.15fr) minmax(130px, 0.65fr);
+}
+
+body:not(.is-pc) #scenario-modal #scenario-list.scenario-list-many {
+    grid-auto-rows: minmax(40px, auto);
+    gap: 5px;
+}
+
+body:not(.is-pc) #scenario-modal #scenario-list.scenario-list-many .clan-btn {
+    min-height: 40px;
+    padding: 5px 7px;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+}
+
+body:not(.is-pc) #scenario-modal .scenario-desc-text {
+    padding: 13px 14px 15px;
+    font-size: 0.88rem;
+    line-height: 1.62;
+}
+
+body:not(.is-pc) #scenario-modal .modal-footer {
+    min-height: 60px;
+    padding: 0;
+}
 
 /* =========================================================
    CURRENT UI TUNING

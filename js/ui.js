@@ -356,6 +356,8 @@ class UIManager {
         let savedLogicalX = null;
         let savedLogicalY = null;
 
+        window.addEventListener('game-layout-mode-change', () => this.handleLayoutModeChange());
+
         window.addEventListener('resize', () => {
             if (this.hasInitializedMap && this.game && (this.game.phase === 'game' || this.game.phase === 'daimyo_select')) {
                 const sc = document.getElementById('map-scroll-container');
@@ -400,6 +402,35 @@ class UIManager {
                 modal.appendChild(footer);
             }
         });
+    }
+
+    handleLayoutModeChange() {
+        if (!this.game) return;
+
+        // 固定論理画面のmodeが縦横回転などで切り替わった時だけ、
+        // 端末別に生成している通常画面DOMを現在modeへ同期する。
+        if (this.game.phase === 'game' && this.currentCastle && !this.isBackgroundPaused) {
+            const isPc = document.body.classList.contains('is-pc');
+            if (this.panelEl) this.panelEl.classList.toggle('hidden', isPc);
+            if (this.pcNewUiContainer) this.pcNewUiContainer.classList.toggle('hidden', !isPc);
+
+            this.updatePanelHeader();
+
+            if (this.game.selectionMode) {
+                this.renderSelectionModeMenu();
+            } else if (this.game.isProcessingAI) {
+                this.clearCommandMenu();
+            } else if (Number(this.currentCastle.ownerClan) === Number(this.game.playerClanId)
+                && this.game.getCurrentTurnCastle() === this.currentCastle) {
+                this.renderCommandMenu();
+            } else {
+                this.renderEnemyViewMenu();
+            }
+
+            this.updateCastleGlows();
+        }
+
+        this.updateCustomScrollbars();
     }
 
     _getCompressedTextHtml(text, threshold, isStrong = false) {

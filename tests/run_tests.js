@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r299');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r300');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -10622,3 +10622,93 @@ Promise.all(pendingTests).then(() => {
     process.exit(1);
 });
 
+
+
+test('タブレットを含む固定論理画面のPC/スマホ判定はapp_bootstrapのbody.is-pcへ一元化する', async () => {
+    const bootstrap = read('js/app_bootstrap.js');
+    const fieldWar = read('js/field_war.js');
+    const scrollbar = read('js/custom_scrollbar.js');
+    const css = read('css/style.css');
+
+    assert.ok(bootstrap.includes('function resolveGameLayoutMode(layoutW, layoutH)'));
+    assert.ok(bootstrap.includes("const ipadDesktopUa = /Macintosh/i.test(ua) && maxTouchPoints > 1;"), 'iPadOSのdesktop UAもタッチ端末として認識する');
+    assert.ok(bootstrap.includes('const MIN_TOUCH_PC_SCALE = 0.75;'));
+    assert.ok(bootstrap.includes("document.body.classList.toggle('is-pc', isPC);"));
+    assert.ok(bootstrap.includes("document.body.dataset.layoutMode = layoutMode;"));
+    assert.ok(bootstrap.includes("new CustomEvent('game-layout-mode-change'"), 'mode変更は専用通知で既存UIへ伝える');
+    assert.ok(read('js/ui.js').includes("window.addEventListener('game-layout-mode-change', () => this.handleLayoutModeChange());"));
+    assert.ok(fieldWar.includes("window.addEventListener('game-layout-mode-change', refreshScale);"));
+    assert.ok(bootstrap.includes('const layoutW = window.innerWidth || windowW;'), 'ソフトキーボードで縮むvisualViewportをmode判定へ使わない');
+    assert.ok(!fieldWar.includes('window.innerWidth >= 768'), '野戦だけ物理幅でPCへ戻す例外を残さない');
+    assert.ok(scrollbar.includes("return !document.body.classList.contains('is-pc');"), 'カスタムスクロールもUAでなく論理modeへ従う');
+    assert.ok(!/navigator\.userAgent/.test(scrollbar), 'スクロール部品へ端末UA判定を複製しない');
+    assert.ok(css.includes('body:not(.is-pc) #title-screen { padding: 14px; }'));
+    assert.ok(css.includes('body:not(.is-pc) #scenario-modal .scenario-main'));
+    assert.ok(!/@media\s*\([^)]*(?:min|max)-(?:width|height)/.test(css), '固定論理UIを物理viewport media queryで再判定しない');
+
+    const runBootstrap = ({ width, height, userAgent, maxTouchPoints, coarse = true, hoverNone = true }) => {
+        const listeners = {};
+        const bodyClasses = new Set();
+        const screenStyle = { setProperty() {} };
+        const screen = { style: screenStyle };
+        const classList = {
+            add: (...names) => names.forEach(n => bodyClasses.add(n)),
+            remove: (...names) => names.forEach(n => bodyClasses.delete(n)),
+            contains: (name) => bodyClasses.has(name),
+            toggle: (name, force) => {
+                const next = force === undefined ? !bodyClasses.has(name) : !!force;
+                if (next) bodyClasses.add(name); else bodyClasses.delete(name);
+                return next;
+            }
+        };
+        const context = createContext({
+            navigator: { userAgent, maxTouchPoints },
+            document: {
+                documentElement: { classList: { add() {}, remove() {} } },
+                body: { classList, dataset: {} },
+                fonts: null,
+                getElementById(id) { return id === 'game-screen' ? screen : null; }
+            },
+            innerWidth: width,
+            innerHeight: height,
+            devicePixelRatio: 1,
+            visualViewport: null,
+            addEventListener(type, fn) { listeners[type] = fn; },
+            matchMedia(query) {
+                if (query === '(pointer: coarse)') return { matches: coarse };
+                if (query === '(hover: none)') return { matches: hoverNone };
+                return { matches: false };
+            },
+            requestAnimationFrame(fn) { fn(); return 1; },
+            cancelAnimationFrame() {},
+            setTimeout,
+            clearTimeout,
+            Promise,
+            console
+        });
+        vm.runInContext(read('js/app_bootstrap.js'), context);
+        listeners.DOMContentLoaded();
+        return {
+            isPc: bodyClasses.has('is-pc'),
+            mode: context.document.body.dataset.layoutMode,
+            width: screen.style.width,
+            height: screen.style.height
+        };
+    };
+
+    const ipadDesktopUa = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15';
+    const portraitTablet = runBootstrap({ width: 820, height: 1180, userAgent: ipadDesktopUa, maxTouchPoints: 5 });
+    assert.deepStrictEqual(portraitTablet, { isPc: false, mode: 'mobile', width: '663.75px', height: '1180px' });
+
+    const landscapeTablet = runBootstrap({ width: 1024, height: 768, userAgent: ipadDesktopUa, maxTouchPoints: 5 });
+    assert.strictEqual(landscapeTablet.isPc, true);
+    assert.strictEqual(landscapeTablet.mode, 'pc');
+    assert.strictEqual(landscapeTablet.width, '1280px');
+    assert.strictEqual(landscapeTablet.height, '720px');
+
+    const smallLandscapeTouch = runBootstrap({ width: 800, height: 600, userAgent: 'Mozilla/5.0 (Linux; Android 12)', maxTouchPoints: 5 });
+    assert.strictEqual(smallLandscapeTouch.isPc, false, '横持ちでもPC論理画面を十分な倍率で表示できない端末はスマホUIへ寄せる');
+
+    const narrowDesktop = runBootstrap({ width: 700, height: 1000, userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', maxTouchPoints: 0, coarse: false, hoverNone: false });
+    assert.strictEqual(narrowDesktop.isPc, true, '通常PCは物理viewportが縦長でも従来どおりPC論理画面を維持する');
+});

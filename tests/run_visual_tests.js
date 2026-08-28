@@ -908,7 +908,8 @@ async function validateGuideLayout(cdp) {
 
     for (const cfg of [
         { width: 1280, height: 720, mobile: false, isPc: true, label: 'PC' },
-        { width: 390, height: 844, mobile: true, isPc: false, label: 'mobile' }
+        { width: 390, height: 844, mobile: true, isPc: false, label: 'mobile' },
+        { width: 820, height: 1180, mobile: true, isPc: false, label: 'tablet-mobile' }
     ]) {
         const state = await loadAt(cfg.width, cfg.height, cfg.mobile, cfg.isPc);
         assert.ok(state.content.left >= state.screen.left - 1 && state.content.right <= state.screen.right + 1, `${cfg.label}: 指南書が横にはみ出す`);

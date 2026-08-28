@@ -14,8 +14,6 @@ class CustomScrollbar {
         this._savedScrollSnapType = null;
         this._scrollSnapRestoreToken = 0;
 
-        // スマホ版（モバイル）かPC版かを自動で見分ける設定です
-        this.isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         this.isLocked = false;
 
         // 親が 'scroll-wrapper' じゃなければ、自動で枠を作って囲みます
@@ -72,6 +70,11 @@ class CustomScrollbar {
 
         // 初回は1フレーム後に寸法を合わせます。
         this.scheduleUpdate();
+    }
+
+    get isMobile() {
+        // 端末UAではなく、固定論理画面の正本であるbody.is-pcに従う。
+        return !document.body.classList.contains('is-pc');
     }
 
     getScrollStep() {
