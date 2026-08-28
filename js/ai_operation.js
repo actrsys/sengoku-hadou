@@ -263,11 +263,23 @@ class AIOperationManager {
         // ★追加：毎月の作戦会議を始める前に、まず全体の健康診断を行います！
         this.validateAllOperations();
         const isPC = typeof document !== 'undefined' && document.body && document.body.classList.contains('is-pc');
+        const turnManager = this.game && this.game.turnManager;
+        const turnFlowGeneration = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+            ? turnManager.captureTurnFlowGeneration()
+            : null;
+        const isCurrentFlow = () => {
+            if (!this.game || this.game.phase !== 'game' || this.game.isRestoringSave) return false;
+            if (turnFlowGeneration !== null && turnManager && typeof turnManager.isTurnFlowGenerationCurrent === 'function') {
+                return turnManager.isTurnFlowGenerationCurrent(turnFlowGeneration);
+            }
+            return true;
+        };
         let processedLegions = 0;
 
         for (const clan of this.game.clans) {
             // ★追加：大名家ごとに一瞬「息継ぎ」を入れて、月替わりの激しい計算の重さを軽減します！
             await new Promise(resolve => setTimeout(resolve, 0));
+            if (!isCurrentFlow()) return;
 
             if (clan.id === 0 || clan.isDestroyed) continue; // ★滅亡した勢力はスキップします！
             // 実機診断は月初の古い253/252表示ではなく、作戦更新中の勢力を直接残します。
@@ -319,6 +331,7 @@ class AIOperationManager {
                 // 古いスマホでは一勢力が複数軍団を持つ時も連続CPU時間を切ります。
                 if (!isPC && processedLegions % 2 === 0) {
                     await new Promise(resolve => setTimeout(resolve, 0));
+                    if (!isCurrentFlow()) return;
                 }
                 // ★追加：プレイヤー大名家で、かつ直轄（ID0）の場合は、勝手に作戦を立てないようにスキップします！
                 if (isPlayerClan && legionId === 0) continue;
@@ -551,12 +564,26 @@ class AIOperationManager {
                 } else {
                     await this.updateOperation(clan.id, legionId);
                 }
+                if (!isCurrentFlow()) return;
                 if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                     this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:legion_${legionId}:operation_done`);
                 }
 
+                // r299実機停止記録がoperation_doneで残ったため、重い作戦生成の一時配列が
+                // GC可能になった直後に古いスマホだけ一度息継ぎします。AI判断・作戦内容は変えません。
+                if (!isPC) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    if (!isCurrentFlow()) return;
+                }
+
                 // ★追加：作戦とは別に、毎月「徴兵用のお城」を考えて選びます！
-                this.selectDraftBase(clan.id, legionId);
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:legion_${legionId}:draft_base_start`);
+                }
+                this.selectDraftBase(clan.id, legionId, myLegionCastles);
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:legion_${legionId}:draft_base_done`);
+                }
             }
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                 this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:done`);
@@ -624,11 +651,15 @@ class AIOperationManager {
     }
 
     // ★ここから追加：徴兵用の拠点を選ぶ魔法です
-    selectDraftBase(clanId, legionId) {
+    selectDraftBase(clanId, legionId, precomputedLegionCastles = null) {
         // まずは前の月の記憶を消しておきます
         this.draftBases[clanId][legionId] = null;
 
-        const myClanCastles = this.game.getClanCastles(clanId).filter(c => c.legionId === legionId);
+        // 月次作戦ループですでに同じ軍団城配列を持っている場合は再filterしません。
+        // 所有権・軍団所属は作戦生成では変化しないため、選定集合と順序は従来と同一です。
+        const myClanCastles = Array.isArray(precomputedLegionCastles)
+            ? precomputedLegionCastles
+            : this.game.getClanCastles(clanId).filter(c => c.legionId === legionId);
         // お城が1つしかない時は、輸送できないので選びません！
         if (myClanCastles.length <= 1) return; 
 

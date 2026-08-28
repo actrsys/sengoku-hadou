@@ -171,6 +171,16 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         if (!pixelProvinceMap || pixelProvinceMap.length < mapW * mapH) return null;
 
         const renderScale = options.renderScale || 0.5;
+        // r299: 古いスマホのAI観戦では、災害色を別Canvasとして重ねるだけでも
+        // compositor/GPUメモリのピークになり得るため、最終見た目をこの軽量ベースCanvasへ
+        // 直接合成できるようにします。通常表示では未指定のまま従来経路を維持します。
+        const precompositeEffect = options.precompositeEffect || null;
+        const effectProvIds = precompositeEffect && precompositeEffect.affectedProvIds instanceof Set
+            ? precompositeEffect.affectedProvIds
+            : (precompositeEffect ? new Set(precompositeEffect.affectedProvIds || []) : null);
+        const effectColor = precompositeEffect && precompositeEffect.color ? precompositeEffect.color : null;
+        const effectAlpha = effectColor ? Math.max(0, Math.min(255, effectColor.a === undefined ? 180 : effectColor.a | 0)) : 0;
+        const effectInvAlpha = 255 - effectAlpha;
         const canvas = document.createElement('canvas');
         canvas.className = 'event-map-base-canvas';
         canvas.width = Math.max(1, Math.round(mapW * renderScale));
@@ -201,9 +211,17 @@ window.EventMapEffects = window.EventMapEffects || (() => {
                     const di = (y * canvas.width + x) * 4;
                     if (pid) {
                         // 陸地の色
-                        dst[di] = 248;
-                        dst[di + 1] = 248;
-                        dst[di + 2] = 244;
+                        let baseR = 248, baseG = 248, baseB = 244;
+                        // スマホAI観戦の災害色は、従来の半透明effect Canvasと同じsource-over結果を
+                        // ここで一度だけ焼き込みます。これにより600x400級の2枚目Canvasを保持しません。
+                        if (effectProvIds && effectColor && effectAlpha > 0 && effectProvIds.has(pid)) {
+                            baseR = Math.round(((effectColor.r | 0) * effectAlpha + baseR * effectInvAlpha) / 255);
+                            baseG = Math.round(((effectColor.g | 0) * effectAlpha + baseG * effectInvAlpha) / 255);
+                            baseB = Math.round(((effectColor.b | 0) * effectAlpha + baseB * effectInvAlpha) / 255);
+                        }
+                        dst[di] = baseR;
+                        dst[di + 1] = baseG;
+                        dst[di + 2] = baseB;
                         dst[di + 3] = 255;
                     } else {
                         const wave = seaPatternRow && ((x + seaPatternShift) % 42) < 16;
@@ -270,7 +288,10 @@ window.EventMapEffects = window.EventMapEffects || (() => {
 
             if (!isPC && !options.forceImageBase) {
                 if (diagPrefix) writeDiag(game, `${diagPrefix}:base_canvas_build`);
-                baseCanvas = createLightweightBaseCanvas(game, { renderScale: options.renderScale || 0.5 });
+                baseCanvas = createLightweightBaseCanvas(game, {
+                    renderScale: options.renderScale || 0.5,
+                    precompositeEffect: options.precompositeEffect || null
+                });
                 if (baseCanvas) {
                     mapContainer.appendChild(baseCanvas);
                     if (diagPrefix) writeDiag(game, `${diagPrefix}:base_canvas_done`);
@@ -296,7 +317,13 @@ window.EventMapEffects = window.EventMapEffects || (() => {
             }
 
             if (diagPrefix) writeDiag(game, `${diagPrefix}:overlay_ready`);
-            return { mapOverlay, mapContainer, whiteMapImg, baseCanvas };
+            return {
+                mapOverlay,
+                mapContainer,
+                whiteMapImg,
+                baseCanvas,
+                effectPrecomposited: !!(baseCanvas && options.precompositeEffect)
+            };
         } catch (error) {
             // 呼び出し側へ暗幕参照を返す前の失敗なので、ここで通常地図まで戻す。
             try { await cleanupOverlay(mapOverlay); } catch (cleanupError) {
@@ -616,49 +643,62 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
     let mapOverlay = null;
     try {
         fx.writeDiag(game, `${diagPrefix}:overlay_shell`);
-        const overlayParts = await fx.createOverlay(game, { diagPrefix });
+        const effectColor = { r: drawR, g: drawG, b: drawB, a: 180 };
+        const overlayParts = await fx.createOverlay(game, {
+            diagPrefix,
+            // r299: 実機でmask_mobile_watch_static停止がr290/r296の両方で再現したため、
+            // スマホAI観戦ではベース地図と災害色を1枚の軽量Canvasへ事前合成します。
+            // 通常/PCは従来どおり別effect Canvasを使い、点滅表現も維持します。
+            precompositeEffect: isMobileWatch ? { affectedProvIds, color: effectColor } : null
+        });
         mapOverlay = overlayParts && overlayParts.mapOverlay;
         const mapContainer = overlayParts && overlayParts.mapContainer;
 
-        fx.writeDiag(game, `${diagPrefix}:mask_build`);
-        const { canvas } = await fx.createProvinceCanvas(
-            game,
-            affectedProvIds,
-            { r: drawR, g: drawG, b: drawB, a: 180 },
-            // 古いスマホのAI観戦では大きなCanvasの連続opacityアニメーションを避けます。
-            // 地図色そのものは同じで、通常プレイ/PC観戦の従来点滅は維持します。
-            { animation: isMobileWatch ? null : 'blink 1s 2', diagPrefix }
-        );
-        if (!canvas || !mapContainer) {
-            console.warn(`${eventType}の地図演出を省略しました。`);
-        } else {
-            mapContainer.appendChild(canvas);
-            fx.writeDiag(game, `${diagPrefix}:mask_done`);
-
-            if (isMobileWatch) {
-                // r283実機停止記録がmask_done直後だったため、旧端末の観戦時だけ
-                // 2秒間のCSS点滅をやめ、同じ色の静止Canvasを1フレーム描画して先へ進めます。
-                // 観戦の入力待ちは共通waitForDismiss()の1秒自動送りをそのまま正本にします。
-                canvas.style.animation = 'none';
-                canvas.style.opacity = '1.0';
-                fx.writeDiag(game, `${diagPrefix}:mask_mobile_watch_static`);
-                await new Promise(resolve => {
-                    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
-                    else setTimeout(resolve, 0);
-                });
-                fx.writeDiag(game, `${diagPrefix}:mask_presented`);
-            } else {
-                fx.writeDiag(game, `${diagPrefix}:mask_animation_start`);
-                await new Promise(resolve => setTimeout(resolve, 0));
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                canvas.style.animation = 'none';
-                canvas.style.opacity = '1.0';
-                fx.writeDiag(game, `${diagPrefix}:mask_animation_done`);
-            }
-
+        if (isMobileWatch && overlayParts && overlayParts.effectPrecomposited && mapContainer) {
+            // 2枚目の600x400級Canvasを作らないので、古いWebViewのcompositor/GPU面ピークを抑えます。
+            fx.writeDiag(game, `${diagPrefix}:mask_mobile_watch_single_canvas`);
+            fx.writeDiag(game, `${diagPrefix}:mask_mobile_watch_static`);
+            // rAF完了を必須にすると古いWebViewのcompositor待ちへ診断ごと張り付く可能性があるため、
+            // ここではイベントループへ一度だけ制御を返します。表示自体は後続1秒待ち中に通常どおり描画されます。
+            await new Promise(resolve => setTimeout(resolve, 0));
+            fx.writeDiag(game, `${diagPrefix}:mask_mobile_watch_yield_done`);
             fx.writeDiag(game, `${diagPrefix}:wait_input`);
             const dismissed = await fx.waitForDismiss(game, mapOverlay);
             if (dismissed === false) fx.writeDiag(game, `${diagPrefix}:wait_aborted`);
+        } else {
+            fx.writeDiag(game, `${diagPrefix}:mask_build`);
+            const { canvas } = await fx.createProvinceCanvas(
+                game,
+                affectedProvIds,
+                effectColor,
+                { animation: isMobileWatch ? null : 'blink 1s 2', diagPrefix }
+            );
+            if (!canvas || !mapContainer) {
+                console.warn(`${eventType}の地図演出を省略しました。`);
+            } else {
+                mapContainer.appendChild(canvas);
+                fx.writeDiag(game, `${diagPrefix}:mask_done`);
+
+                if (isMobileWatch) {
+                    // 軽量ベースCanvasを作れなかった特殊フォールバックだけ、従来の静止2枚構成を使います。
+                    canvas.style.animation = 'none';
+                    canvas.style.opacity = '1.0';
+                    fx.writeDiag(game, `${diagPrefix}:mask_mobile_watch_static_fallback`);
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    fx.writeDiag(game, `${diagPrefix}:mask_mobile_watch_yield_done`);
+                } else {
+                    fx.writeDiag(game, `${diagPrefix}:mask_animation_start`);
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    canvas.style.animation = 'none';
+                    canvas.style.opacity = '1.0';
+                    fx.writeDiag(game, `${diagPrefix}:mask_animation_done`);
+                }
+
+                fx.writeDiag(game, `${diagPrefix}:wait_input`);
+                const dismissed = await fx.waitForDismiss(game, mapOverlay);
+                if (dismissed === false) fx.writeDiag(game, `${diagPrefix}:wait_aborted`);
+            }
         }
     } catch (error) {
         // 災害のゲーム処理と結果通知は継続し、補助地図だけを省略する。

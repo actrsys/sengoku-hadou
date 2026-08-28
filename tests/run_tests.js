@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r298');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r299');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -9808,6 +9808,12 @@ test('AI月次作戦は大勢力の探索順を変えずスマホへ定期的に
     assert.ok(ops.includes('month_start:operations:clan_${clan.id}:diplomacy_done'), '勢力内の外交処理完了を実機診断できる');
     assert.ok(ops.includes('month_start:operations:clan_${clan.id}:legion_${legionId}:${operationAction}_start'), '軍団ごとの作戦生成/更新開始を識別できる');
     assert.ok(ops.includes('month_start:operations:clan_${clan.id}:legion_${legionId}:operation_done'), '軍団作戦完了まで到達したか識別できる');
+    assert.ok(ops.includes('captureTurnFlowGeneration'), '月次作戦自身もロード/タイトル復帰のturn-flow寿命を読む');
+    assert.ok(ops.includes('if (!isCurrentFlow()) return;'), '内部yield後に旧月次作戦を続けない');
+    assert.ok(ops.includes('month_start:operations:clan_${clan.id}:legion_${legionId}:draft_base_start'), '作戦完了後と徴兵拠点探索中を診断で分ける');
+    assert.ok(ops.includes('month_start:operations:clan_${clan.id}:legion_${legionId}:draft_base_done'), '徴兵拠点探索完了まで到達したか識別できる');
+    assert.ok(ops.includes('this.selectDraftBase(clan.id, legionId, myLegionCastles);'), '同じ軍団城配列を再利用して再filterを避ける');
+    assert.ok(ops.includes('selectDraftBase(clanId, legionId, precomputedLegionCastles = null)'), '徴兵拠点選定は既存集合を任意利用できる');
 });
 
 test('災害と独立の停止診断は会話待ちの前後と災害会話内部段階を区別する', () => {
@@ -10109,17 +10115,25 @@ test('スマホ仮想一覧はnative mandatory snapを使わず停止後の一�
     assert.ok(scroll.includes('if (e.touches && e.touches.length !== 1) return;'), '最初から複数指ならつまみドラッグを開始しない');
 });
 
-test('スマホAI観戦の災害地方Canvasはmask_done後の連続GPU点滅を避け診断を細分化する', () => {
+test('スマホAI観戦の災害地方表示はベースへ事前合成し2枚目CanvasとrAF必須待ちを避ける', () => {
     const events = read('js/event/common_events.js');
+    const baseAt = events.indexOf('const createLightweightBaseCanvas = (game, options = {}) => {');
+    const overlayAt = events.indexOf('const createOverlay = async (game, options = {}) => {', baseAt);
+    const baseBlock = events.slice(baseAt, overlayAt);
+    assert.ok(baseBlock.includes('const precompositeEffect = options.precompositeEffect || null;'));
+    assert.ok(baseBlock.includes('effectProvIds.has(pid)'), '対象国だけを軽量ベースCanvasへ直接合成する');
+    assert.ok(baseBlock.includes('effectAlpha + baseR * effectInvAlpha'), '従来半透明effectのsource-over相当で色を焼き込む');
+
     const at = events.indexOf('window.playProvinceMapEffect = async function');
     const end = events.indexOf('// ==========================================\n// ★ 面談', at);
     const block = events.slice(at, end);
-    assert.ok(block.includes('const isMobileWatch = !!('));
-    assert.ok(block.includes("{ animation: isMobileWatch ? null : 'blink 1s 2', diagPrefix }"), '通常/PCの従来点滅だけ維持する');
-    assert.ok(block.includes('if (isMobileWatch) {'));
-    assert.ok(block.includes('canvas.style.animation = \'none\';'));
+    assert.ok(block.includes('precompositeEffect: isMobileWatch ? { affectedProvIds, color: effectColor } : null'));
+    assert.ok(block.includes('overlayParts.effectPrecomposited'), 'スマホ観戦は1枚Canvas経路へ入る');
+    assert.ok(block.includes('`${diagPrefix}:mask_mobile_watch_single_canvas`'));
     assert.ok(block.includes('`${diagPrefix}:mask_mobile_watch_static`'));
-    assert.ok(block.includes('`${diagPrefix}:mask_presented`'));
+    assert.ok(block.includes('`${diagPrefix}:mask_mobile_watch_yield_done`'));
+    assert.ok(block.includes('await new Promise(resolve => setTimeout(resolve, 0));'), '古いWebViewでcompositor rAF完了を必須にしない');
+    assert.ok(block.includes("{ animation: isMobileWatch ? null : 'blink 1s 2', diagPrefix }"), 'フォールバック/通常経路の点滅契約は維持する');
     assert.ok(block.includes('`${diagPrefix}:mask_animation_start`'));
     assert.ok(block.includes('`${diagPrefix}:mask_animation_done`'));
     assert.ok(block.includes('await fx.waitForDismiss(game, mapOverlay);'), '観戦自動送りの正本は共通waitForDismissを維持する');
@@ -10423,7 +10437,7 @@ test('共通災害は初回会話後にturn-flowを再確認し旧シナリオ�
     assert.ok(block.includes('captureTurnFlowGeneration'));
     assert.ok(block.includes('isTurnFlowGenerationCurrent'));
     assert.ok(block.includes('flow_cancelled_after_dialog'));
-    assert.ok(block.indexOf('if (!isCurrentEventFlow())') < block.indexOf('fx.createOverlay(game, { diagPrefix })'));
+    assert.ok(block.indexOf('if (!isCurrentEventFlow())') < block.indexOf('const overlayParts = await fx.createOverlay'));
     assert.ok(block.includes('flow_cancelled_after_overlay'));
 });
 

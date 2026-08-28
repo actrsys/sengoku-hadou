@@ -572,3 +572,10 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - ゲーム途中からAI観戦へ切り替える `startWatchMode()` は、直轄軍団0のAI作戦準備が大勢力時に協調yieldを挟む非同期処理であることを前提にする。準備開始時のTurnManager turn-flow世代・`currentIndex`・Castle参照を保持し、ロード・タイトル復帰・新規開始や別ターンへの遷移後に旧準備の `finally` から `processTurn()` を再開しない。
 - 作戦準備完了後のターン再開も生の `processTurn()` 呼出しへ戻さず、同じ文脈が有効な場合だけ `TurnManager.scheduleTurnFlowContinuation()` へ渡す。観戦開始中のAI作戦内容・候補順・観戦復帰予約の仕様は変更せず、シナリオ切替時の旧callbackだけを破棄する。
 
+
+## r299 追加監査：スマホ観戦の災害Canvas単一化／月次AI作戦後のメモリ息継ぎ
+- 古い実機スマホのAI観戦で `event_effect:heavy_snow:mask_mobile_watch_static` がr290・r296の複数回で強制リロード直前checkpointとして再現したため、スマホ観戦の共通災害地図は「軽量ベースCanvas + 半透明災害effect Canvas」の2枚同時合成を正本にしない。`createLightweightBaseCanvas()` の1回のImageData生成中に対象国だけ従来のsource-over相当色を直接焼き込み、国境線を最後に描き直して最終見た目を保つ。通常プレイ・PC観戦は従来の別effect Canvasと2秒点滅を維持する。
+- スマホ観戦の単一Canvas経路では、Canvas append直後に `requestAnimationFrame()` の完了を必須条件として待たない。古いWebViewでcompositor提示待ちへ張り付く可能性を避け、0msのイベントループyield後に既存の1秒観戦自動送りへ進む。診断は `mask_mobile_watch_single_canvas` → `mask_mobile_watch_static` → `mask_mobile_watch_yield_done` → `wait_input` と分け、単一Canvas生成・yield・入力待ちを識別する。軽量ベースを生成できない特殊ケースだけ従来の静止2枚Canvasへフォールバックする。
+- 月次AI作戦で `month_start:operations:clan_<id>:legion_<id>:operation_done` が強制リロード直前checkpointとして観測されたため、スマホでは `generateOperation()` / `updateOperation()` が返った直後に1回だけイベントループへ制御を返す。重い作戦候補探索の一時配列がGC可能になった直後に徴兵拠点探索・次軍団へ連続突入せず、AI判断・作戦内容・乱数順は変更しない。
+- 月次AI作戦自身も開始時のTurnManager turn-flow世代を保持し、既存の勢力／軍団yieldと作戦生成await後に同じシナリオ寿命か確認する。ロード・タイトル復帰・新規開始中に旧 `processMonthlyOperations()` を新状態へ継続しない。徴兵拠点選定は同ループですでに保持している `myLegionCastles` を任意入力として再利用し、候補集合・順序を変えず重複filterだけを避ける。
+- 実機診断は `operation_done` の後を `draft_base_start` / `draft_base_done` へ分割し、今後の停止が作戦生成直後のメモリ息継ぎ前なのか、徴兵拠点BFS中なのか、その後なのかを切り分ける。診断追加はスマホでのみ実際にsessionStorageへ書かれる既存窓口を使い、ゲーム判断には関与させない。
