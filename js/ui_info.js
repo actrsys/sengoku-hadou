@@ -1622,6 +1622,18 @@ class UIInfoManager {
             const WINDOW_STEP_ROWS = isMobile ? 4 : 2; // 数pxごとの全行作り直しを避け、見た目を変えずDOM churnを抑えます
             let lastRange = { start: -1, end: -1 };
 
+            // 古いWebViewでは「仮想DOM差し替え」とCSS mandatory scroll-snapの組み合わせで、
+            // snap対象が消えるたび次候補へ再評価され、指を離しても端まで自走することがあります。
+            // スマホの仮想一覧だけnative snapを止め、スクロール停止後の一回だけJSで行境界へ揃えます。
+            // PCと150件以下の通常一覧は従来のCSS snapをそのまま使います。
+            const useManagedMobileSnap = isMobile;
+            const previousInlineScrollSnapType = listContainer.style.scrollSnapType || '';
+            let managedSnapTimer = null;
+            if (useManagedMobileSnap) {
+                listContainer.style.scrollSnapType = 'none';
+                listContainer.dataset.virtualManagedSnap = 'true';
+            }
+
             let headerHtml = '';
             if (config.headers && config.headers.length > 0) {
                 const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
@@ -1672,6 +1684,27 @@ class UIInfoManager {
             let scrollRafId = null;
             let measureRafId = null;
 
+            const scheduleManagedRowSnap = (delay = 120) => {
+                if (!useManagedMobileSnap) return;
+                if (managedSnapTimer) clearTimeout(managedSnapTimer);
+                managedSnapTimer = setTimeout(() => {
+                    managedSnapTimer = null;
+                    if (this._currentListRenderId !== currentRenderId || !listContainer.isConnected || document.hidden) return;
+                    const scrollbar = listContainer.customScrollbar;
+                    if (scrollbar && scrollbar.isDraggingY) return;
+
+                    const maxScrollTop = Math.max(0, listContainer.scrollHeight - listContainer.clientHeight);
+                    if (maxScrollTop <= 0 || rowHeight <= 0) return;
+                    const currentScrollTop = Math.max(0, Math.min(maxScrollTop, Number(listContainer.scrollTop) || 0));
+                    const snappedScrollTop = Math.max(0, Math.min(maxScrollTop, Math.round(currentScrollTop / rowHeight) * rowHeight));
+                    if (Math.abs(snappedScrollTop - currentScrollTop) <= 0.5) return;
+
+                    // smoothは使わず1回だけ確定位置へ置く。scrollイベントが1回増えても次回は同値なので収束します。
+                    listContainer.scrollTop = snappedScrollTop;
+                }, Math.max(0, Number(delay) || 0));
+            };
+            if (useManagedMobileSnap) listContainer._scheduleVirtualRowSnap = scheduleManagedRowSnap;
+
             const scrollHandler = () => {
                 // 指を離してスクロールがピタッと止まった時のための保険タイマーです
                 if (scrollTimeout) clearTimeout(scrollTimeout);
@@ -1688,6 +1721,7 @@ class UIInfoManager {
                     renderVisibleWindow();
                     scrollTicking = false; // 次のフレームですぐに描画を許可します
                 });
+                if (useManagedMobileSnap) scheduleManagedRowSnap(120);
             };
 
             // passive: true をつけることで、スクロール自体が指に吸い付くように滑らかになります
@@ -1705,6 +1739,15 @@ class UIInfoManager {
                 if (measureRafId !== null && typeof cancelAnimationFrame === 'function') {
                     cancelAnimationFrame(measureRafId);
                     measureRafId = null;
+                }
+                if (managedSnapTimer) {
+                    clearTimeout(managedSnapTimer);
+                    managedSnapTimer = null;
+                }
+                if (useManagedMobileSnap) {
+                    if (listContainer._scheduleVirtualRowSnap === scheduleManagedRowSnap) listContainer._scheduleVirtualRowSnap = null;
+                    delete listContainer.dataset.virtualManagedSnap;
+                    listContainer.style.scrollSnapType = previousInlineScrollSnapType;
                 }
                 scrollTicking = false;
             };

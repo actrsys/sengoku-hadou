@@ -166,9 +166,13 @@ class CustomScrollbar {
 
     _suspendScrollSnapForDrag() {
         if (!this.list) return;
-        // 仮想リストはスクロール中に行DOMを差し替えるため、古いWebViewで mandatory snap が
-        // 新しいsnap先を連続再評価して自走することがあります。ドラッグ中だけsnapを止め、
-        // 指を離した後に現在のDOMが落ち着いてから元のCSS指定へ戻します。
+        // スマホの仮想一覧は native scroll-snap 自体を使わず、一覧側の一回だけの行補正を正本にします。
+        // ここでCSS snapを復帰対象にすると、古いWebViewでは仮想DOM差し替え→snap候補再評価が連鎖し、
+        // 指を離した後も端まで自走することがあるため、managed snap中は触りません。
+        if (this.list.dataset && this.list.dataset.virtualManagedSnap === 'true') {
+            this._scrollSnapRestoreToken++;
+            return;
+        }
         this._scrollSnapRestoreToken++;
         if (this._savedScrollSnapType === null) this._savedScrollSnapType = this.list.style.scrollSnapType || '';
         this.list.style.scrollSnapType = 'none';
@@ -209,6 +213,9 @@ class CustomScrollbar {
 
         this.onStartY = (e) => {
             if (this._destroyed || !this._hasOverflow) return;
+            // つまみドラッグは1本指だけを正本にする。途中から複数指になった場合はdocument側moveで
+            // 開始指だけを追いますが、最初から複数指ならピンチ等の別操作として開始しません。
+            if (e.touches && e.touches.length !== 1) return;
             const touch = e.touches && e.touches.length ? e.touches[0] : null;
             this._activeTouchId = touch ? touch.identifier : null;
             this.isDraggingY = true;
@@ -260,6 +267,11 @@ class CustomScrollbar {
             this._detachDragListeners();
             this.scheduleUpdate();
             this._restoreScrollSnapAfterDrag();
+            // スマホ仮想一覧ではnative mandatory snapを戻さず、停止後に一度だけ行境界へ補正します。
+            // 最後のtouchmoveから時間が空いてから指を離した場合でも、この終了地点から必ず予約します。
+            if (this.list && typeof this.list._scheduleVirtualRowSnap === 'function') {
+                this.list._scheduleVirtualRowSnap(80);
+            }
         };
 
         this.onVisibilityChange = () => {

@@ -251,12 +251,13 @@ class AffiliationSystem {
             if (oldClanId !== 0 && !isClanDestroyed && currentCastle) {
                 // --- 波紋のように道を辿って、一番近いお城を探す魔法（幅優先探索） ---
                 let queue = [{ castle: currentCastle, steps: 0 }];
+                let queueHead = 0;
                 let visited = new Set([currentCastle.id]);
                 let foundCandidates = [];
                 let maxSearchSteps = 15; // 念のため、15歩以上遠くは探さないようにします
 
-                while (queue.length > 0) {
-                    let { castle, steps } = queue.shift();
+                while (queueHead < queue.length) {
+                    let { castle, steps } = queue[queueHead++];
                     
                     // すでに一番近い階層の候補が見つかっていて、さらに遠い階層を見ようとしているなら探索終了！
                     if (foundCandidates.length > 0 && steps > foundCandidates[0].steps) break;
@@ -864,13 +865,20 @@ class AffiliationSystem {
      processRoninMovements() {
         // 全武将から「浪人」かつ「諸勢力に所属していない（IDが0または未定義）」武将を抽出
         const ronins = this.game.bushos.filter(b => window.BushoStatusRules.isRonin(b) && !b.belongKunishuId);
+        // 旧実装は各浪人ごとに全国の全拠点をfilterしていました。隣接索引を使いつつ、
+        // 移動先抽選へ渡す候補順だけは従来のgame.castles順へ戻し、同じ乱数値なら同じ城を選ばせます。
+        const castleOrderById = new Map(this.game.castles.map((castle, index) => [Number(castle.id), index]));
         
         ronins.forEach(r => {
             const currentC = this.game.getCastle(r.castleId); 
             if(!currentC) return; 
             
-            // 隣接する城のリストを作る
-            const neighbors = this.game.castles.filter(c => MapGraphService.isAdjacent(currentC, c)); 
+            // 隣接関係はMapGraphServiceを正本にする。候補順は従来の全国拠点順を維持する。
+            const neighbors = this.game.mapGraph
+                .getAdjacentCastles(currentC)
+                .slice()
+                .sort((a, b) => (castleOrderById.get(Number(a.id)) ?? Number.MAX_SAFE_INTEGER)
+                    - (castleOrderById.get(Number(b.id)) ?? Number.MAX_SAFE_INTEGER));
             
             // 隣に城があって、かつ5%の確率(サイコロ)に当たったらお引越しする
             if (neighbors.length > 0 && Math.random() < 0.05) {

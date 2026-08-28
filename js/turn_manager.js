@@ -258,7 +258,7 @@ class TurnManager {
         }
         // タイトル復帰・ロード開始後に旧ターンのsetTimeout(0)が発火しても、
         // 旧turnQueueを裏で進めない。phaseは画面より上位のゲーム寿命境界として扱う。
-        if (game.phase !== 'game') return;
+        if (game.phase !== 'game' || game.isRestoringSave) return;
     
         // ★最強ストッパー１：合戦中やマップ選択中にフライングで呼ばれたら絶対に弾く！
         if (game.warManager && game.warManager.state && game.warManager.state.active) return;
@@ -270,6 +270,8 @@ class TurnManager {
             if (game.ui && game.ui.waitForDialogs) {
                 await game.ui.waitForDialogs();
             }
+            // ロード開始などで待機中の旧月末処理が解放された場合は、復元途中の状態へ進入しません。
+            if (game.phase !== 'game' || game.isRestoringSave) return;
             // ★ここから追加：全部終わって翌月に行く前に、安心感のために数字を「MAX/MAX」にしておきます！
             if (game.isProcessingAI && game.ui && game.turnQueue.length > 0) {
                 game.ui.restoreAIGuardText(true); // ★強制表示
@@ -278,12 +280,14 @@ class TurnManager {
                 // endMonth() 側でも同じ表示を保証するため、ここでは空白状態を作らない。
                 await new Promise(resolve => setTimeout(resolve, 300));
             }
+            if (game.phase !== 'game' || game.isRestoringSave) return;
             game.writeSystemDiagnostic('month_transition:before_endMonth');
             await game.endMonth(); // ← ★「await」を書き足します！
             return; 
         }
     
-        const castle = game.turnQueue[game.currentIndex]; 
+        const expectedTurnIndex = Number(game.currentIndex);
+        const castle = game.turnQueue[expectedTurnIndex]; 
 
         // turnQueue は通常Castleだけで構成されますが、復元失敗や将来の処理変更で
         // 欠損要素が混じっても、isDone参照より先に安全に飛ばします。
@@ -323,10 +327,6 @@ class TurnManager {
             return; 
         }
         
-        const ownerId = Number(castle.ownerClan);
-        const playerId = Number(game.playerClanId);
-        const isPlayerCastle = (ownerId === playerId);
-    
         // ==========================================
         // ★ここに追加：画面を動かしたり「ご命令ください」を出す前に、
         // 画面上のメッセージが全部終わるまでじっと待ちます！
@@ -334,7 +334,17 @@ class TurnManager {
             await game.ui.waitForDialogs();
         }
         // ==========================================
+
+        // waitForDialogs() はロード時のforceResetModals()でも解放されます。
+        // 待機前の旧turnQueue要素を復元後のゲームへ持ち込まないよう、寿命と同一要素を再確認します。
+        if (game.phase !== 'game' || game.isRestoringSave) return;
+        if (Number(game.currentIndex) !== expectedTurnIndex || game.turnQueue[expectedTurnIndex] !== castle) return;
         
+        // 所有者判定も待機後の現在値を正本にする。会話待ちの間にイベント等で所属が変わっても古い分類を使わない。
+        const ownerId = Number(castle.ownerClan);
+        const playerId = Number(game.playerClanId);
+        const isPlayerCastle = (ownerId === playerId);
+
         // 行動開始前に城の持ち主や状態が変わっていた場合の安全措置
         if (castle.isDone || castle.ownerClan === 0) {
             game.finishTurn();
@@ -398,7 +408,7 @@ class TurnManager {
     async finishTurn() { 
         const game = this.game;
         this._cancelAllActionsDonePromptTimer();
-        if (game.phase !== 'game') return;
+        if (game.phase !== 'game' || game.isRestoringSave) return;
         const wasProcessingAI = game.isProcessingAI;
     
         // ★最強ストッパー２：合戦中やマップ選択中なら、絶対にターンを勝手に終わらせない！

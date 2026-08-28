@@ -312,8 +312,9 @@ class HexMapGenerator {
         }
 
         let canReachRight = false;
-        while (queue.length > 0) {
-            let curr = queue.shift();
+        let queueHead = 0;
+        while (queueHead < queue.length) {
+            let curr = queue[queueHead++];
             if (curr.x === cols - 1) {
                 canReachRight = true;
                 break;
@@ -358,8 +359,9 @@ class HexMapGenerator {
         }
 
         // 2. 端っこの海から繋がっている海を、どんどん「外海」としてマーキングしていきます
-        while (queue.length > 0) {
-            let curr = queue.shift();
+        let queueHead = 0;
+        while (queueHead < queue.length) {
+            let curr = queue[queueHead++];
             let neighbors = this._getNeighbors(curr.x, curr.y, cols, rows);
             for (let n of neighbors) {
                 // まだパトロールしていない海があれば、リストに追加します

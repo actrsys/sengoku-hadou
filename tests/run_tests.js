@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r287');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r288');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -8420,7 +8420,7 @@ test('共通一覧の行クリックは古いWebView非対応のProxyを使わ�
 test('仮想スクロール終了時は保留中のrequestAnimationFrameもcancelする', () => {
     const info = read('js/ui_info.js');
     const start = info.indexOf('let scrollRafId = null;');
-    const block = info.slice(start, start + 2600);
+    const block = info.slice(start, start + 5200);
     assert.ok(start >= 0);
     assert.ok(block.includes('let measureRafId = null;'));
     assert.ok(block.includes('cancelAnimationFrame(scrollRafId)'));
@@ -8471,7 +8471,7 @@ test('武将一覧はGameManagerの既存ID索引を再利用して再描画ご�
 test('スマホ仮想スクロールは表示外DOMを抑えつつ数pxごとの全行再生成を避ける', () => {
     const info = read('js/ui_info.js');
     const start = info.indexOf('const isMobile = !document.body.classList.contains');
-    const block = info.slice(start, start + 2200);
+    const block = info.slice(start, start + 5200);
     assert.ok(block.includes('const BUFFER_ROWS = isMobile ? 10 : 15;'));
     assert.ok(block.includes('const WINDOW_STEP_ROWS = isMobile ? 4 : 2;'));
     assert.ok(block.includes('Math.floor(rawStartIndex / WINDOW_STEP_ROWS) * WINDOW_STEP_ROWS'));
@@ -9023,7 +9023,7 @@ test('スマホ固定HUDは同じ年月・相場HTMLを毎回再生成しない'
 
 test('TurnManagerはturnQueue欠損をisDone参照より先に処理する', () => {
     const source = read('js/turn_manager.js');
-    const at = source.indexOf('const castle = game.turnQueue[game.currentIndex]');
+    const at = source.indexOf('const expectedTurnIndex = Number(game.currentIndex);');
     const block = source.slice(at, at + 1700);
     assert.ok(block.indexOf('if (!castle)') >= 0);
     assert.ok(block.indexOf('if (!castle)') < block.indexOf('if (castle.isDone)'));
@@ -9607,8 +9607,8 @@ test('PC右クリックは最前面モーダルだけを対象にし［やめる
 
 test('フォーム部品上の右クリックと長押しはネイティブ入力を優先する', () => {
     const ui = read('js/ui.js');
-    const formGuard = 'actionTarget.closest(\'input, select, textarea, option, [contenteditable="true"]\')';
-    assert.ok(ui.includes(formGuard), 'フォーム部品を共通右クリック／長押しの対象外にする');
+    const formGuard = 'actionTarget.closest(\'input, select, textarea, option, [contenteditable="true"], .custom-scrollbar-thumb, .custom-scrollbar-track, .custom-scrollbar-btn\')';
+    assert.ok(ui.includes(formGuard), 'フォーム部品と独自スクロールバーを共通右クリック／長押しの対象外にする');
     const actionAt = ui.indexOf('const executeContextMenuAction = (e) => {');
     const formAt = ui.indexOf(formGuard, actionAt);
     const watchAt = ui.indexOf('if (this.game && this.game.isWatchMode)', actionAt);
@@ -9927,10 +9927,10 @@ test('旧ターンの0ms継続はタイトル・ロード後にphase境界を越
     const turn = read('js/turn_manager.js');
     const processAt = turn.indexOf('async processTurn()');
     const processBlock = turn.slice(processAt, processAt + 900);
-    assert.ok(processBlock.includes("if (game.phase !== 'game') return;"));
+    assert.ok(processBlock.includes("if (game.phase !== 'game' || game.isRestoringSave) return;"));
     const finishAt = turn.indexOf('async finishTurn()');
     const finishBlock = turn.slice(finishAt, finishAt + 500);
-    assert.ok(finishBlock.includes("if (game.phase !== 'game') return;"));
+    assert.ok(finishBlock.includes("if (game.phase !== 'game' || game.isRestoringSave) return;"));
 });
 
 
@@ -10035,6 +10035,31 @@ test('仮想一覧のカスタムスクロールはドラッグ中だけsnapを�
     assert.ok(scroll.includes('Math.max(0, Math.min(maxScrollTop, nextScrollTop))'), '古いWebViewでもscrollTopを有効範囲外へ押し出さない');
 });
 
+
+test('スマホ仮想一覧はnative mandatory snapを使わず停止後の一回補正だけで行境界へ揃える', () => {
+    const info = read('js/ui_info.js');
+    const scroll = read('js/custom_scrollbar.js');
+    const at = info.indexOf('const useManagedMobileSnap = isMobile;');
+    const block = info.slice(at, at + 7200);
+    assert.ok(at >= 0);
+    assert.ok(block.includes("listContainer.style.scrollSnapType = 'none';"), 'スマホ仮想一覧はnative snapを無効化する');
+    assert.ok(block.includes("listContainer.dataset.virtualManagedSnap = 'true';"), 'CustomScrollbarへmanaged snap中であることを明示する');
+    assert.ok(block.includes('const scheduleManagedRowSnap = (delay = 120) => {'));
+    assert.ok(block.includes('Math.round(currentScrollTop / rowHeight) * rowHeight'), '停止後に最寄り行へ一回だけ補正する');
+    assert.ok(block.includes('listContainer.scrollTop = snappedScrollTop;'), 'smooth連続移動ではなく即時1回で確定する');
+    assert.ok(block.includes('if (scrollbar && scrollbar.isDraggingY) return;'), 'つまみを掴んでいる間は行補正を割り込ませない');
+    assert.ok(block.includes('clearTimeout(managedSnapTimer)'), '一覧破棄時に補正timerを残さない');
+    assert.ok(block.includes('listContainer.style.scrollSnapType = previousInlineScrollSnapType;'), '仮想一覧を離れたら通常一覧のCSS snap契約へ戻す');
+
+    const suspendAt = scroll.indexOf('_suspendScrollSnapForDrag()');
+    const suspendBlock = scroll.slice(suspendAt, suspendAt + 1700);
+    assert.ok(suspendBlock.includes("this.list.dataset.virtualManagedSnap === 'true'"), 'managed snap一覧ではドラッグ終了時にnative mandatoryを復帰させない');
+    const endAt = scroll.indexOf('this.onEnd = () => {');
+    const endBlock = scroll.slice(endAt, endAt + 1200);
+    assert.ok(endBlock.includes("typeof this.list._scheduleVirtualRowSnap === 'function'"), '最後のmoveから時間が空いても指を離した地点から一回補正を予約する');
+    assert.ok(scroll.includes('if (e.touches && e.touches.length !== 1) return;'), '最初から複数指ならつまみドラッグを開始しない');
+});
+
 test('スマホAI観戦の災害地方Canvasはmask_done後の連続GPU点滅を避け診断を細分化する', () => {
     const events = read('js/event/common_events.js');
     const at = events.indexOf('window.playProvinceMapEffect = async function');
@@ -10066,6 +10091,84 @@ test('凶作・豊作・地震の波及FIFOはshift再詰めを避け探索順�
     assert.ok(!events.includes('badQueue.shift()'), '凶作FIFOでArray.shiftを使わない');
     assert.ok(!events.includes('goodQueue.shift()'), '豊作FIFOでArray.shiftを使わない');
     assert.ok(!events.includes('eqQueue.shift()'), '地震FIFOでArray.shiftを使わない');
+});
+
+
+
+test('野戦マップ生成の連結・外海FIFOはshift再詰めを避け探索順を維持する', () => {
+    const mapGen = read('js/map_generator.js');
+    const connectivityAt = mapGen.indexOf('\n    _ensureConnectivity(map, cols, rows) {');
+    const seaAt = mapGen.indexOf('\n    _fillEnclosedSea(map, cols, rows) {', connectivityAt);
+    const connectivityBlock = mapGen.slice(connectivityAt, seaAt);
+    const seaBlock = mapGen.slice(seaAt, seaAt + 2600);
+    assert.ok(connectivityBlock.includes('let queueHead = 0;'));
+    assert.ok(connectivityBlock.includes('while (queueHead < queue.length)'));
+    assert.ok(connectivityBlock.includes('queue[queueHead++]'));
+    assert.ok(!connectivityBlock.includes('queue.shift()'));
+    assert.ok(seaBlock.includes('let queueHead = 0;'));
+    assert.ok(seaBlock.includes('while (queueHead < queue.length)'));
+    assert.ok(seaBlock.includes('queue[queueHead++]'));
+    assert.ok(!seaBlock.includes('queue.shift()'));
+});
+
+test('共通スマホ長押しはカスタムスクロールを奪わずOS割込みで保留timerを残さない', () => {
+    const ui = read('js/ui.js');
+    const at = ui.indexOf('initContextMenu() {');
+    const block = ui.slice(at, at + 15000);
+    assert.ok(block.includes('.custom-scrollbar-thumb'));
+    assert.ok(block.includes('.custom-scrollbar-track'));
+    assert.ok(block.includes('.custom-scrollbar-btn'));
+    assert.ok(block.includes('const cancelPendingLongPress = () => {'));
+    assert.ok(block.includes('if (e.touches.length > 1) {'));
+    assert.ok(block.includes('cancelPendingLongPress();'), '2本目の指が加わった時も先行timerを残さない');
+    assert.ok(block.includes("document.addEventListener('touchcancel', cancelPendingLongPress"), 'touchcancelで未発火長押しを破棄する');
+    assert.ok(block.includes("window.addEventListener('blur', cancelPendingLongPress)"), 'OS/ウインドウ割込みで未発火長押しを破棄する');
+    assert.ok(block.includes("window.addEventListener('pagehide', cancelPendingLongPress)"), 'ページ非表示で未発火長押しを破棄する');
+    assert.ok(block.includes("document.addEventListener('visibilitychange'"), 'アプリ非表示でも未発火長押しを破棄する');
+});
+
+test('ターン処理はダイアログ待ち中のロードで旧Castle参照を再開しない', () => {
+    const turn = read('js/turn_manager.js');
+    const at = turn.indexOf('async processTurn()');
+    const end = turn.indexOf('async finishTurn()', at);
+    const block = turn.slice(at, end);
+    assert.ok(block.includes("if (game.phase !== 'game' || game.isRestoringSave) return;"), 'processTurn開始時に復元中を弾く');
+    assert.ok(block.includes('const expectedTurnIndex = Number(game.currentIndex);'));
+    assert.ok(block.includes('const castle = game.turnQueue[expectedTurnIndex];'));
+    const waitAt = block.indexOf('await game.ui.waitForDialogs();', block.indexOf('const expectedTurnIndex'));
+    const recheckAt = block.indexOf("if (game.phase !== 'game' || game.isRestoringSave) return;", waitAt);
+    const sameTurnAt = block.indexOf('game.turnQueue[expectedTurnIndex] !== castle', waitAt);
+    const ownerAt = block.indexOf('const ownerId = Number(castle.ownerClan);', waitAt);
+    assert.ok(waitAt >= 0 && recheckAt > waitAt, 'waitForDialogs後にロード寿命を再確認する');
+    assert.ok(sameTurnAt > recheckAt, '待機前と同じturnQueue要素か確認する');
+    assert.ok(ownerAt > sameTurnAt, '所有者分類はawait後の現在値から計算する');
+    const monthWaitAt = block.indexOf('await game.ui.waitForDialogs();');
+    const monthEndAt = block.indexOf('await game.endMonth();');
+    assert.ok(block.indexOf("if (game.phase !== 'game' || game.isRestoringSave) return;", monthWaitAt) < monthEndAt, '月末遷移も待機後に復元中を弾く');
+
+    const finishAt = turn.indexOf('async finishTurn()');
+    const finishBlock = turn.slice(finishAt, finishAt + 1200);
+    assert.ok(finishBlock.includes("if (game.phase !== 'game' || game.isRestoringSave) return;"), 'finishTurnも復元中に旧ターンを進めない');
+});
+
+test('月初浪人移動は隣接索引を使い旧候補順と乱数契約を維持する', () => {
+    const affiliation = read('js/affiliation_system.js');
+    const at = affiliation.indexOf('processRoninMovements()');
+    const block = affiliation.slice(at, at + 2400);
+    assert.ok(block.includes('const castleOrderById = new Map(this.game.castles.map('), '全国拠点順は1回だけ短命Map化する');
+    assert.ok(block.includes('.getAdjacentCastles(currentC)'), '浪人ごとの全国全件隣接filterをやめる');
+    assert.ok(block.includes('.sort((a, b) => (castleOrderById.get(Number(a.id))'), '抽選候補は従来のgame.castles順へ戻す');
+    assert.ok(!block.includes('this.game.castles.filter(c => MapGraphService.isAdjacent(currentC, c))'));
+    const chanceAt = block.indexOf('Math.random() < 0.05');
+    const targetAt = block.indexOf('Math.random() * neighbors.length');
+    assert.ok(chanceAt >= 0 && targetAt > chanceAt, '5%判定→移動先抽選の乱数順を維持する');
+
+    const roninAt = affiliation.indexOf('becomeRonin(busho');
+    const roninBlock = affiliation.slice(roninAt, roninAt + 9000);
+    assert.ok(roninBlock.includes('let queueHead = 0;'));
+    assert.ok(roninBlock.includes('while (queueHead < queue.length)'));
+    assert.ok(roninBlock.includes('queue[queueHead++]'));
+    assert.ok(!roninBlock.includes('queue.shift()'), '出奔BFSでArray.shiftを残さない');
 });
 
 Promise.all(pendingTests).then(() => {

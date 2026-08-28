@@ -500,3 +500,13 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - 災害の地方色Canvasは表示上の補助であり、スマホAI観戦では安定性を優先して大きなCanvasの連続opacity CSSアニメーションを行わない。同じ地方色の静止Canvasを1描画フレーム提示した後、既存の観戦1秒自動送りへ進む。通常プレイとPC観戦の2秒点滅は維持する。
 - 実機停止診断は `event_effect:<name>:mask_done` の後を `mask_mobile_watch_static` / `mask_presented`（スマホ観戦）または `mask_animation_start` / `mask_animation_done`（通常経路）へ分割し、Canvas append直後・compositor描画待ち・入力待ちを区別する。
 - 凶作・豊作・地震の波及探索はFIFO順序と乱数呼出順を変えず、`Array.shift()` ではなくhead indexでキューを消費する。隣接候補の列挙・判定順は従来のままとし、月次イベント中の不要な配列再詰めを避ける。
+
+## r288 追加監査：共通長押し入力境界／ロード中ターン寿命／月初浪人移動
+- r287の実機再確認で、スマホの全国武将リストはつまみ終了検知を強化しても端まで自走する場合が残った。原因境界を「drag終了」だけに置かず、スマホの仮想一覧ではCSS `scroll-snap-type: y mandatory` と仮想DOM差し替えを同時に成立させない。仮想一覧表示中はnative snapをinlineで無効化し、スクロール停止後に現在の `rowHeight` から最寄り行へ `scrollTop` を一度だけ即時補正する。上下ボタン・指スクロール・つまみドラッグの全経路を同じ一回補正へ収束させ、smooth連続移動やブラウザのsnap候補再評価へ委ねない。PCおよび150件以下の通常一覧は従来のCSS mandatory snapを維持し、仮想一覧終了時はinline指定と保留timerを必ず解放する。
+- document共通のスマホ長押しは、フォーム部品だけでなく `.custom-scrollbar-thumb` / `.custom-scrollbar-track` / `.custom-scrollbar-btn` 上でも発火させない。独自スクロール操作中の長押しを観戦終了予約・モーダル取消・命令終了へ誤接続せず、スクロール部品自身のpointer/touch責務を優先する。
+- 共通長押しの600ms保留timerは `touchend` / `touchmove` だけに依存しない。2本目の指が加わった時点と `touchcancel` / `blur` / `pagehide` / `visibilitychange` も寿命境界として未発火timerを破棄し、古いWebViewでマルチタッチ・OS割込み後に前画面の長押し処理を遅延発火させない。
+- `TurnManager.processTurn()` / `finishTurn()` は `game.phase === 'game'` に加えて `game.isRestoringSave` を最上位の寿命条件とする。`waitForDialogs()` はロード時の `forceResetModals()` でも解放され得るため、await後にphase・復元中フラグ・`currentIndex`・同一`turnQueue`要素を再確認し、旧ターンのCastle参照を復元途中／復元後のゲームへ持ち込まない。所有者／プレイヤー城判定もawait後の現在値から行う。
+- 月初の浪人移動は、浪人1人ごとに全国拠点を全走査して隣接判定しない。共有 `MapGraphService` の隣接索引を正本にし、1回の月初処理中だけ作る拠点順Mapで候補を従来の `game.castles` 順へ戻す。5%判定・乱数呼出回数・同じ乱数値で選ばれる移動先を変更しない。
+- 出奔時の最寄り拠点BFSはFIFO探索順を変えず、`Array.shift()` ではなくhead indexで消費する。最短距離・相性比較・候補選択・乱数順は従来どおりとする。
+- 野戦マップ生成の連結確認と外海判定もFIFO順を変えずhead indexで消費する。地形生成規則・隣接列挙順・トンネル位置・湖→川判定は変更せず、戦場生成時の不要な配列再詰めだけを除く。
+

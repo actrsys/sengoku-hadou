@@ -1424,7 +1424,9 @@ class UIManager {
             // document共通の右クリック／長押しをここで発火させると、検索中にモーダルを閉じたり
             // テキスト選択・IME・selectの長押し操作を奪うため、共通ショートカットの対象外にします。
             const actionTarget = e && e.target instanceof Element ? e.target : null;
-            if (actionTarget && actionTarget.closest('input, select, textarea, option, [contenteditable="true"]')) {
+            // フォームだけでなく、独自スクロールバーもその操作自体を優先します。
+            // document共通の長押しがつまみ操作中に発火すると、観戦終了予約やモーダル取消へ誤接続するためです。
+            if (actionTarget && actionTarget.closest('input, select, textarea, option, [contenteditable="true"], .custom-scrollbar-thumb, .custom-scrollbar-track, .custom-scrollbar-btn')) {
                 return;
             }
 
@@ -1560,10 +1562,20 @@ class UIManager {
         // ★ここからさらに追加！：スマホでは「contextmenu」がうまく動かないので、自分で長押しを数える魔法を追加します！
         let longPressTimer = null;
         let isLongPress = false;
+        const cancelPendingLongPress = () => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        };
 
         document.addEventListener('touchstart', (e) => {
-            // 指が2本以上の時は無視します
-            if (e.touches.length > 1) return;
+            // 指が2本以上になった時は、先に始まっていた1本指長押しtimerも破棄します。
+            if (e.touches.length > 1) {
+                cancelPendingLongPress();
+                isLongPress = false;
+                return;
+            }
             isLongPress = false;
             
             // 指を置いた瞬間にタイマーをスタートします（0.6秒）
@@ -1575,23 +1587,26 @@ class UIManager {
 
         document.addEventListener('touchmove', () => {
             // 指が動いたら長押しのキャンセルです
-            if (longPressTimer) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
-            }
+            cancelPendingLongPress();
         }, { passive: false });
 
         document.addEventListener('touchend', (e) => {
             // 指を離した時もタイマーを止めます
-            if (longPressTimer) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
-            }
+            cancelPendingLongPress();
             // もし既に長押しが発動していたら、余計なクリックが起きないように防ぎます
             if (isLongPress) {
                 if (e.cancelable) e.preventDefault();
             }
         }, { passive: false });
+
+        // 古いWebViewではOS割込み・タブ非表示などでtouchend自体を受け取れないことがあります。
+        // 未発火の600ms timerだけは必ず破棄し、画面復帰後に古い長押しを発火させません。
+        document.addEventListener('touchcancel', cancelPendingLongPress, { passive: true, capture: true });
+        window.addEventListener('blur', cancelPendingLongPress);
+        window.addEventListener('pagehide', cancelPendingLongPress);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) cancelPendingLongPress();
+        });
     }
 
     showContextMenu(x, y) {
