@@ -458,6 +458,12 @@ class UIManager {
     // ★ここから追加：背景の更新をストップして超軽量化する魔法！
     // ==========================================
     pauseBackgroundUpdates() {
+        // 共通モーダルの一覧→詳細など、背景停止中に子画面を開いても
+        // 同じCanvas解放・慣性停止・body class更新を重ねません。
+        // 背景はすでに停止しているため、再実行しても表示上の意味はなく、
+        // 古いスマホではDOM/Canvas探索とスタイル再評価だけが余計な負荷になります。
+        if (this.isBackgroundPaused) return;
+
         this.isBackgroundPaused = true;
         document.body.classList.add('background-paused');
         if (typeof this.releaseMobileTransientMapResources === 'function') {

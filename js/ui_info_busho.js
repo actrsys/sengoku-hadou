@@ -36,13 +36,12 @@ Object.assign(UIInfoManager.prototype, {
     },
 
     _releaseBushoSelectorTransientStateForDetail() {
-        // 一覧へ戻るために必要な条件はmodalHistoryのargs/scrollPosに保持されています。
-        // 詳細表示中まで全国武将の派生配列・ソート結果を重ねて持つ必要はないため、
-        // 一覧→詳細の瞬間メモリを下げる目的で再生成可能なキャッシュだけを解放します。
-        this.bushoSavedBushos = null;
-        this.bushoSavedSortedBushos = null;
-        this.bushoSavedData = null;
-        this.bushoLastSortStateKey = null;
+        // 一覧DOM・仮想スクロールhandlerは _openInfoShell() 側で必ず解放します。
+        // ここでは行HTML/onclickなどDOM寄りのキャッシュだけを捨て、
+        // 武将オブジェクトへの参照配列・ソート済み配列・SelectorDataは保持します。
+        // これらは数千件でも軽い参照配列で、背景更新停止中は内容も変化しません。
+        // 詳細から［戻る］たびに全国抽出・身分ソートをやり直す方が古いスマホでは重いため、
+        // 表示条件が同じ間だけ再利用し、一覧を完全に閉じる時は従来どおり closeCommonModal() が破棄します。
         this._bushoSelectorContext = null;
         if (this._stableSortBases) delete this._stableSortBases.busho;
         this._invalidateListItemsCache('busho');
@@ -64,7 +63,7 @@ Object.assign(UIInfoManager.prototype, {
 
         if (!this.bushoDetailCurrentTab) this.bushoDetailCurrentTab = 'status';
         const biographyText = this._getBushoBiographyText(busho);
-        const hasBiography = this._hasDisplayableBushoBiography(busho);
+        const hasBiography = biographyText !== '' && this._getBushoBiographyFullWidthLength(biographyText) > 10;
         if (this.bushoDetailCurrentTab === 'biography' && !hasBiography) {
             this.bushoDetailCurrentTab = 'status';
         }
@@ -114,16 +113,25 @@ Object.assign(UIInfoManager.prototype, {
         const faceSrc = busho.faceIcon ? `data/images/faceicons/${busho.faceIcon}` : 'data/images/faceicons/unknown_face.webp';
         let faceHtml = `<img src="${faceSrc}" class="daimyo-detail-face busho-detail-face" alt="">`;
 
+        // 詳細1描画の間だけ、所属・主君関連の正本参照を共有します。
+        // 長期cacheにはせず、所属変更後の再描画では必ずGameManager/Systemから取り直します。
+        const bushoKunishuId = Number(busho.belongKunishuId || 0);
+        const bushoClanId = Number(busho.clan || 0);
+        const isRonin = window.BushoStatusRules.isRonin(busho);
+        let bushoKunishu = null;
+        if (bushoKunishuId > 0) {
+            if (this.game.kunishuSystem && typeof this.game.kunishuSystem.getKunishu === 'function') bushoKunishu = this.game.kunishuSystem.getKunishu(bushoKunishuId);
+            else if (this.game.kunishus) bushoKunishu = this.game.kunishus.find(k => Number(k.id) === bushoKunishuId);
+        }
+        const bushoClan = bushoClanId > 0 ? this.game.getClan(bushoClanId) : null;
+        const clanDaimyo = bushoClan ? this.game.getBusho(bushoClan.leaderId) : null;
+
         let affiliationName = "なし";
         let isFamily = false; 
-        if (busho.belongKunishuId > 0) {
-            let kunishu = null;
-            if (this.game.kunishuSystem && typeof this.game.kunishuSystem.getKunishu === 'function') kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
-            else if (this.game.kunishus) kunishu = this.game.kunishus.find(k => k.id === busho.belongKunishuId);
-            
-            if (kunishu) {
-                affiliationName = kunishu.getName(this.game);
-                const leader = this.game.getBusho(kunishu.leaderId);
+        if (bushoKunishuId > 0) {
+            if (bushoKunishu) {
+                affiliationName = bushoKunishu.getName(this.game);
+                const leader = this.game.getBusho(bushoKunishu.leaderId);
                 if (leader && busho.id !== leader.id) {
                     const bFamily = Array.isArray(busho.familyIds) ? busho.familyIds : [];
                     const lFamily = Array.isArray(leader.familyIds) ? leader.familyIds : [];
@@ -132,16 +140,12 @@ Object.assign(UIInfoManager.prototype, {
             } else {
                 affiliationName = "諸勢力";
             }
-        } else if (busho.clan > 0) {
-            const clan = this.game.getClan(busho.clan);
-            if (clan) {
-                affiliationName = clan.name;
-                const daimyo = this.game.getBusho(clan.leaderId); 
-                if (daimyo && busho.id !== daimyo.id && !busho.isDaimyo) {
-                    const bFamily = Array.isArray(busho.familyIds) ? busho.familyIds : [];
-                    const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-                    if (bFamily.some(fId => dFamily.includes(fId))) isFamily = true;
-                }
+        } else if (bushoClanId > 0 && bushoClan) {
+            affiliationName = bushoClan.name;
+            if (clanDaimyo && busho.id !== clanDaimyo.id && !busho.isDaimyo) {
+                const bFamily = Array.isArray(busho.familyIds) ? busho.familyIds : [];
+                const dFamily = Array.isArray(clanDaimyo.familyIds) ? clanDaimyo.familyIds : [];
+                if (bFamily.some(fId => dFamily.includes(fId))) isFamily = true;
             }
         }
 
@@ -175,10 +179,8 @@ Object.assign(UIInfoManager.prototype, {
         } catch (error) {}
 
         let salary = "";
-        if (busho.clan > 0 && !busho.isDaimyo && !window.BushoStatusRules.isRonin(busho)) {
-            const clan = this.game.getClan(busho.clan);
-            const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
-            salary = busho.getSalary(daimyo);
+        if (bushoClanId > 0 && !busho.isDaimyo && !isRonin) {
+            salary = busho.getSalary(clanDaimyo);
             if (salary === 0) salary = "";
         }
 
@@ -190,18 +192,14 @@ Object.assign(UIInfoManager.prototype, {
         let lordName = "なし";
         if (busho.isDaimyo) {
             lordName = "なし";
-        } else if (window.BushoStatusRules.isRonin(busho)) {
+        } else if (isRonin) {
             lordName = "なし";
-        } else if (busho.belongKunishuId > 0) {
-            let kunishu = null;
-            if (this.game.kunishuSystem && typeof this.game.kunishuSystem.getKunishu === 'function') kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
-            else if (this.game.kunishus) kunishu = this.game.kunishus.find(k => k.id === busho.belongKunishuId);
-            
-            if (kunishu && kunishu.leaderId !== busho.id) {
-                const leader = this.game.getBusho(kunishu.leaderId);
+        } else if (bushoKunishuId > 0) {
+            if (bushoKunishu && bushoKunishu.leaderId !== busho.id) {
+                const leader = this.game.getBusho(bushoKunishu.leaderId);
                 lordName = leader ? leader.name : "不明";
             }
-        } else if (busho.clan > 0) {
+        } else if (bushoClanId > 0) {
             if (castle && castle.legionId > 0) {
                 let legion = null;
                 if (this.game.legions) {
@@ -211,14 +209,10 @@ Object.assign(UIInfoManager.prototype, {
                     const commander = this.game.getBusho(legion.commanderId);
                     lordName = commander ? commander.name : "不明";
                 } else {
-                    const clan = this.game.getClan(busho.clan);
-                    const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
-                    lordName = daimyo ? daimyo.name : "なし";
+                    lordName = clanDaimyo ? clanDaimyo.name : "なし";
                 }
             } else {
-                const clan = this.game.getClan(busho.clan);
-                const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
-                lordName = daimyo ? daimyo.name : "なし";
+                lordName = clanDaimyo ? clanDaimyo.name : "なし";
             }
         }
 
@@ -289,6 +283,7 @@ Object.assign(UIInfoManager.prototype, {
         }
 
         let rightContentHtml = '';
+        const bushoRankName = StatPresenter.getBushoRankName(busho, this.game);
         
         const makeRow = (label, value) => {
             const compactClass = label.length >= 3 ? ' busho-detail-label-compact' : '';
@@ -445,7 +440,7 @@ Object.assign(UIInfoManager.prototype, {
                             </div>
                             <div class="busho-detail-meta pc-meta">
                                 <span>${affiliationName}</span>
-                                <span>${StatPresenter.getBushoRankName(busho, this.game)}</span>
+                                <span>${bushoRankName}</span>
                             </div>
                         </div>
                     </div>
@@ -460,7 +455,7 @@ Object.assign(UIInfoManager.prototype, {
                                 </div>
                                 <div class="busho-detail-meta sp-meta">
                                     <span>${affiliationName}</span>
-                                    <span>${StatPresenter.getBushoRankName(busho, this.game)}</span>
+                                    <span>${bushoRankName}</span>
                                 </div>
                             </div>
                         </div>
@@ -487,7 +482,7 @@ Object.assign(UIInfoManager.prototype, {
                 }, { once: true });
             }
 
-            const btnWife = document.getElementById('busho-wife-btn');
+            const btnWife = listContainer.querySelector('#busho-wife-btn');
             if (btnWife && Array.isArray(busho.wifeIds) && busho.wifeIds.length > 0) {
                 btnWife.onclick = (e) => {
                     e.stopPropagation();
@@ -499,10 +494,10 @@ Object.assign(UIInfoManager.prototype, {
 
             // ★技能の箱をクリックした時に説明を出す魔法
             if (this.bushoDetailCurrentTab === 'aptitude') {
-                const aptArea = document.getElementById('busho-aptitude-area');
-                const descArea = document.getElementById('busho-skill-desc-area');
-                const descText = document.getElementById('busho-skill-desc-text');
-                const skillBoxes = document.querySelectorAll('.skill-box-clickable');
+                const aptArea = listContainer.querySelector('#busho-aptitude-area');
+                const descArea = listContainer.querySelector('#busho-skill-desc-area');
+                const descText = listContainer.querySelector('#busho-skill-desc-text');
+                const skillBoxes = listContainer.querySelectorAll('.skill-box-clickable');
                 const detailContainer = listContainer.querySelector('.daimyo-detail-container');
 
                 if (detailContainer && aptArea && descArea) {
@@ -559,13 +554,18 @@ Object.assign(UIInfoManager.prototype, {
         this.commonSelectedIds = Array.from(selectedSet);
         const checkedCount = this.commonSelectedIds.length;
 
-        document.querySelectorAll('input[name="sel_busho"]').forEach(input => {
-            const id = Number(input.value);
-            const selected = selectedSet.has(id);
-            input.checked = selected;
-            const row = input.closest('.select-item');
-            if (row) row.classList.toggle('selected', selected);
-        });
+        // 仮想一覧で現在DOMに存在する行だけ同期すればよいので、document全体を走査しません。
+        // selector-list 配下へ限定すると、詳細や他モーダルのDOMが大きい古い端末でも選択更新を軽く保てます。
+        const selectorList = (this.ui && this.ui.selectorList) || document.getElementById('selector-list');
+        if (selectorList) {
+            selectorList.querySelectorAll('input[name="sel_busho"]').forEach(input => {
+                const id = Number(input.value);
+                const selected = selectedSet.has(id);
+                input.checked = selected;
+                const row = input.closest('.select-item');
+                if (row) row.classList.toggle('selected', selected);
+            });
+        }
 
         const contextEl = document.getElementById('selector-context-info');
         const confirmBtn = document.getElementById('selector-confirm-btn');
@@ -796,17 +796,33 @@ Object.assign(UIInfoManager.prototype, {
             this.bushoSavedSortedBushos = null; // スコープが変わったらソートキャッシュは破棄
         }
 
-        const getSortRankClan = (b) => window.BushoListSortRules
-            ? BushoListSortRules.getClanRank(this.game, b)
-            : 0;
+        // 全国一覧の初期身分順では sort comparator が数万回呼ばれます。
+        // 身分の意味そのものは BushoListSortRules を正本とし、必要になった時だけ
+        // その同期描画専用contextを1つ作って国主ID・身分値を再利用します。
+        let clanRankContext = null;
+        const getClanRankContext = () => {
+            if (!clanRankContext && window.BushoListSortRules && typeof BushoListSortRules.createClanRankContext === 'function') {
+                clanRankContext = BushoListSortRules.createClanRankContext(this.game);
+            }
+            return clanRankContext;
+        };
+        const getSortRankClan = (b) => {
+            if (!window.BushoListSortRules) return 0;
+            return BushoListSortRules.getClanRank(this.game, b, getClanRankContext());
+        };
+        const allRankCache = new Map();
         const getSortRankAll = (b) => {
+            const id = Number(b && b.id);
+            if (allRankCache.has(id)) return allRankCache.get(id);
             const clanRank = getSortRankClan(b);
+            let rank = 0;
             // 勢力内の身分序列は BushoListSortRules を唯一の正本とし、全国一覧では勢力グループ用の点数だけを足す。
-            if (b.clan === this.game.playerClanId) return 6000 + clanRank * 500;
-            if (b.clan > 0) return 5000 - b.clan * 10 + clanRank * 0.1;
-            if (b.belongKunishuId > 0) return 2000 - b.belongKunishuId * 10 + (b.id === (this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0) ? 2 : 1);
-            if (window.BushoStatusRules.isRonin(b)) return 1000;
-            return 0;
+            if (b.clan === this.game.playerClanId) rank = 6000 + clanRank * 500;
+            else if (b.clan > 0) rank = 5000 - b.clan * 10 + clanRank * 0.1;
+            else if (b.belongKunishuId > 0) rank = 2000 - b.belongKunishuId * 10 + (clanRank === 3 ? 2 : 1);
+            else if (window.BushoStatusRules.isRonin(b)) rank = 1000;
+            allRankCache.set(id, rank);
+            return rank;
         };
         
         let acc = null;
@@ -845,7 +861,7 @@ Object.assign(UIInfoManager.prototype, {
                     } else if (this.bushoCurrentSortKey === 'name') {
                         return BushoListSortRules.compareKnown(this.game, a, b, 'name', this.bushoIsSortAsc);
                     } else if (this.bushoCurrentSortKey === 'rank') {
-                        return BushoListSortRules.compareKnown(this.game, a, b, 'rank', this.bushoIsSortAsc);
+                        return BushoListSortRules.compareKnown(this.game, a, b, 'rank', this.bushoIsSortAsc, getClanRankContext());
                     } else if (this.bushoCurrentSortKey === 'faction') {
                         const isRoninA = window.BushoStatusRules.isRonin(a); const isRoninB = window.BushoStatusRules.isRonin(b);
                         if (isRoninA && !isRoninB) return 1;

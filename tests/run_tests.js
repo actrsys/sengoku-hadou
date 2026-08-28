@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r282');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r283');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -6514,13 +6514,13 @@ test('武将一覧共通ソートは面談用検索と既知能力順を安定�
     const rankGame = { clans: [], legions: [{ commanderId: 102 }] };
     const rankList = [
         { id: 101, name: '軍師役', isGunshi: true, clan: 1 },
-        { id: 102, name: '国主役', isCommander: true, clan: 1 },
+        { id: 102, name: '国主役', isCommander: false, clan: 1 },
         { id: 103, name: '城主役', isCastellan: true, clan: 1 },
     ];
     assert.deepStrictEqual(
         Array.from(ctx.BushoListSortRules.sortKnown(rankGame, rankList, 'rank', false)).map(b => b.id),
         [101, 102, 103],
-        '身分降順では軍師を国主より上、国主を城主より上に並べる'
+        '身分降順ではLegion正本fallbackの国主も軍師より下・城主より上に並べる'
     );
     assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'rank', false)).map(b => b.id), [1, 4, 3, 2], '身分降順は上位身分優先、同身分は功績降順にする');
     assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'rank', true)).map(b => b.id), [2, 3, 4, 1], '身分昇順は下位身分優先、同身分は功績昇順にする');
@@ -8422,15 +8422,17 @@ test('仮想スクロール終了時は保留中のrequestAnimationFrameもcance
     assert.ok(block.includes('cancelAnimationFrame(measureRafId)'));
 });
 
-test('武将詳細へ入る前に再生成可能な一覧キャッシュを解放する', () => {
+test('武将詳細へ入る前にDOM寄りキャッシュだけを解放し戻り用の軽い一覧条件は保持する', () => {
     const busho = read('js/ui_info_busho.js');
     const releaseStart = busho.indexOf('_releaseBushoSelectorTransientStateForDetail()');
-    const releaseBlock = busho.slice(releaseStart, releaseStart + 1000);
+    const detailEntry = busho.indexOf('showBushoDetailModal(busho)', releaseStart);
+    const releaseBlock = busho.slice(releaseStart, detailEntry);
     assert.ok(releaseStart >= 0);
-    assert.ok(releaseBlock.includes('this.bushoSavedBushos = null;'));
-    assert.ok(releaseBlock.includes('this.bushoSavedSortedBushos = null;'));
-    assert.ok(releaseBlock.includes('this.bushoSavedData = null;'));
     assert.ok(releaseBlock.includes("this._invalidateListItemsCache('busho');"));
+    assert.ok(releaseBlock.includes('this._bushoSelectorContext = null;'));
+    assert.ok(!releaseBlock.includes('this.bushoSavedBushos = null;'));
+    assert.ok(!releaseBlock.includes('this.bushoSavedSortedBushos = null;'));
+    assert.ok(!releaseBlock.includes('this.bushoSavedData = null;'));
     const detailStart = busho.indexOf('_renderBushoDetail(busho, scrollPos = 0)');
     const detailBlock = busho.slice(detailStart, detailStart + 550);
     assert.ok(detailBlock.indexOf('this._releaseBushoSelectorTransientStateForDetail();') < detailBlock.indexOf("this._openInfoShell('武将情報'"));
@@ -9781,6 +9783,62 @@ test('災害と独立の停止診断は会話待ちの前後を区別する', ()
     assert.ok(independence.includes("this.game.writeSystemDiagnostic('independence:post_render');"), '独立描画後の次処理到達を記録する');
     assert.ok(independence.includes("this.game.writeSystemDiagnostic('independence:result_dialog_start');"), '独立結果会話の開始を記録する');
     assert.ok(independence.includes("this.game.writeSystemDiagnostic('independence:result_dialog_done');"), '独立結果会話の完了を記録する');
+});
+
+
+test('武将一覧から詳細への遷移は背景軽量化を二重実行せず軽い一覧キャッシュを再利用する', () => {
+    const ui = read('js/ui.js');
+    const bushoUi = read('js/ui_info_busho.js');
+
+    const pauseAt = ui.indexOf('pauseBackgroundUpdates() {');
+    const resumeAt = ui.indexOf('resumeBackgroundUpdates(', pauseAt);
+    const pauseBlock = ui.slice(pauseAt, resumeAt);
+    assert.ok(pauseBlock.includes('if (this.isBackgroundPaused) return;'), '背景停止済みの一覧→詳細でCanvas解放を重ねない');
+    assert.ok(pauseBlock.indexOf('if (this.isBackgroundPaused) return;') < pauseBlock.indexOf("document.body.classList.add('background-paused')"), '冪等判定はbody class/Canvas操作より先に行う');
+
+    const releaseAt = bushoUi.indexOf('_releaseBushoSelectorTransientStateForDetail()');
+    const detailAt = bushoUi.indexOf('showBushoDetailModal(busho)', releaseAt);
+    const releaseBlock = bushoUi.slice(releaseAt, detailAt);
+    assert.ok(releaseBlock.includes("this._invalidateListItemsCache('busho');"), 'DOM寄りの行HTMLキャッシュは詳細前に捨てる');
+    assert.ok(releaseBlock.includes('this._bushoSelectorContext = null;'), '一覧クリック用コンテキストは詳細へ持ち込まない');
+    assert.ok(!releaseBlock.includes('this.bushoSavedBushos = null;'), '候補参照配列は戻り再描画用に保持する');
+    assert.ok(!releaseBlock.includes('this.bushoSavedSortedBushos = null;'), 'ソート済み参照配列は戻り再ソート回避のため保持する');
+    assert.ok(!releaseBlock.includes('this.bushoSavedData = null;'), 'SelectorDataを詳細往復だけで再問い合わせしない');
+});
+
+test('全国武将一覧の身分順は正本Rulesの短命contextで軍団走査を再利用する', () => {
+    const rules = read('js/busho_list_sort_rules.js');
+    const bushoUi = read('js/ui_info_busho.js');
+    assert.ok(rules.includes('static createClanRankContext(game) {'), '身分規則の正本側が短命context生成を担当する');
+    assert.ok(rules.includes('const commanderIdSet = new Set();'), '国主IDを一同期処理だけSet化する');
+    assert.ok(rules.includes('return { commanderIdSet, rankById: new Map() };'), '身分値も一同期処理だけMapへ保存する');
+    assert.ok(rules.includes("const context = key === 'rank' ? this.createClanRankContext(game) : null;"), '共通身分ソートも同じcontextを一回だけ作る');
+    assert.ok(rules.includes('this.getClanRank(game, a, context) - this.getClanRank(game, b, context)'), '比較中は正本の身分値cacheを共有する');
+    assert.ok(rules.includes('context.commanderIdSet instanceof Set'), 'context利用時は軍団全走査を避ける');
+    assert.ok(rules.includes('game.legions.some('), 'contextなしの互換fallbackは正本に残す');
+
+    const rankAt = bushoUi.indexOf('let clanRankContext = null;');
+    const accAt = bushoUi.indexOf('let acc = null;', rankAt);
+    const rankBlock = bushoUi.slice(rankAt, accAt);
+    assert.ok(rankAt >= 0, '全国一覧は同期描画中だけRules contextを保持する');
+    assert.ok(rankBlock.includes('BushoListSortRules.createClanRankContext(this.game)'), '全国一覧も正本Rulesからcontextを得る');
+    assert.ok(rankBlock.includes('BushoListSortRules.getClanRank(this.game, b, getClanRankContext())'), '身分の意味をUI側へ複製しない');
+    assert.ok(rankBlock.includes('const allRankCache = new Map();'), '全国用グループ並び値だけUIの短命Mapへ保存する');
+    assert.ok(!rankBlock.includes('game.legions.some('), '全国一覧の比較経路から全軍団someを除く');
+
+    const detailRankMatches = (bushoUi.match(/const bushoRankName = StatPresenter\.getBushoRankName\(busho, this\.game\);/g) || []).length;
+    assert.strictEqual(detailRankMatches, 1, '武将詳細の身分文字列は1描画につき一度だけ算出する');
+    assert.ok((bushoUi.match(/\$\{bushoRankName\}/g) || []).length >= 2, 'PC/スマホ表示で同じ身分結果を共用する');
+});
+
+test('武将一覧の選択同期は仮想一覧DOMだけを走査する', () => {
+    const bushoUi = read('js/ui_info_busho.js');
+    const at = bushoUi.indexOf('_updateBushoSelectorUI()');
+    const end = bushoUi.indexOf('handleBushoSelect(', at);
+    const block = bushoUi.slice(at, end);
+    assert.ok(block.includes("const selectorList = (this.ui && this.ui.selectorList) || document.getElementById('selector-list');"), '現在のSelector一覧を走査起点にする');
+    assert.ok(block.includes("selectorList.querySelectorAll('input[name=\"sel_busho\"]')"), '表示中の武将inputだけ同期する');
+    assert.ok(!block.includes("document.querySelectorAll('input[name=\"sel_busho\"]')"), 'document全体を毎選択で走査しない');
 });
 
 Promise.all(pendingTests).then(() => {

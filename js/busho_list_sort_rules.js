@@ -33,14 +33,17 @@ class BushoListSortRules {
 
     static sortKnown(game, items, key = 'rank', isAsc = false) {
         const list = Array.isArray(items) ? items.slice() : [];
+        // 身分ソートだけは軍団所属確認が比較回数ぶん発生しやすいため、
+        // この1回の同期ソート中だけ短命contextを共有します。
+        const context = key === 'rank' ? this.createClanRankContext(game) : null;
         return list.sort((a, b) => {
-            const cmp = this.compareKnown(game, a, b, key, isAsc);
+            const cmp = this.compareKnown(game, a, b, key, isAsc, context);
             if (cmp !== 0) return cmp;
             return Number(a && a.id || 0) - Number(b && b.id || 0);
         });
     }
 
-    static compareKnown(game, a, b, key, isAsc) {
+    static compareKnown(game, a, b, key, isAsc, context = null) {
         const direction = isAsc ? 1 : -1;
 
         if (key === 'name') {
@@ -60,7 +63,7 @@ class BushoListSortRules {
         }
 
         if (key === 'rank') {
-            const rankDiff = (this.getClanRank(game, a) - this.getClanRank(game, b)) * direction;
+            const rankDiff = (this.getClanRank(game, a, context) - this.getClanRank(game, b, context)) * direction;
             if (rankDiff !== 0) return rankDiff;
 
             // 功績値そのものは非公開だが、身分順の第二キーとして同じ昇降順へ揃える。
@@ -89,21 +92,47 @@ class BushoListSortRules {
         return 0;
     }
 
-    static getClanRank(game, busho) {
-        if (!busho) return 0;
-        const isGunshi = !!busho.isGunshi;
-        const isCommander = !!busho.isCommander || !!(game && game.legions
-            && game.legions.some(l => Number(l.commanderId) === Number(busho.id)));
-        if (busho.isDaimyo) return 8;
-        if (isGunshi) return 7;
-        if (isCommander) return 6;
-        if (busho.isCastellan) return 5;
-        if (window.BushoStatusRules && window.BushoStatusRules.isRonin(busho)) return 1;
-        if (Number(busho.belongKunishuId || 0) > 0) {
-            const kunishu = game && game.kunishuSystem ? game.kunishuSystem.getKunishu(busho.belongKunishuId) : null;
-            return kunishu && Number(kunishu.leaderId) === Number(busho.id) ? 3 : 2;
+    static createClanRankContext(game) {
+        const commanderIdSet = new Set();
+        if (game && Array.isArray(game.legions)) {
+            for (let i = 0; i < game.legions.length; i++) {
+                const commanderId = Number(game.legions[i] && game.legions[i].commanderId);
+                if (Number.isFinite(commanderId) && commanderId > 0) commanderIdSet.add(commanderId);
+            }
         }
-        return 4;
+        return { commanderIdSet, rankById: new Map() };
+    }
+
+    static getClanRank(game, busho, context = null) {
+        if (!busho) return 0;
+        const bushoId = Number(busho.id);
+        const rankById = context && context.rankById instanceof Map ? context.rankById : null;
+        if (rankById && Number.isFinite(bushoId) && rankById.has(bushoId)) return rankById.get(bushoId);
+
+        const isGunshi = !!busho.isGunshi;
+        let isCommander = !!busho.isCommander;
+        if (!isCommander) {
+            if (context && context.commanderIdSet instanceof Set) {
+                isCommander = context.commanderIdSet.has(bushoId);
+            } else {
+                isCommander = !!(game && game.legions
+                    && game.legions.some(l => Number(l.commanderId) === bushoId));
+            }
+        }
+
+        let rank = 4;
+        if (busho.isDaimyo) rank = 8;
+        else if (isGunshi) rank = 7;
+        else if (isCommander) rank = 6;
+        else if (busho.isCastellan) rank = 5;
+        else if (window.BushoStatusRules && window.BushoStatusRules.isRonin(busho)) rank = 1;
+        else if (Number(busho.belongKunishuId || 0) > 0) {
+            const kunishu = game && game.kunishuSystem ? game.kunishuSystem.getKunishu(busho.belongKunishuId) : null;
+            rank = kunishu && Number(kunishu.leaderId) === bushoId ? 3 : 2;
+        }
+
+        if (rankById && Number.isFinite(bushoId)) rankById.set(bushoId, rank);
+        return rank;
     }
 
     static _getCastleInfo(game, busho) {
