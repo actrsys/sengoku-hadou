@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r258');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r260');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -5978,9 +5978,9 @@ test('面談の選択肢は簡潔な4項目表記に統一する', () => {
     assert.deepStrictEqual(Array.from(shown), ['調子について', '方針について', '他者について', '武将の噂']);
 });
 
-test('武将の噂は他家武将を官位の有無にかかわらずフルネームで識別する', () => {
+test('武将の噂は他家をフルネーム＋殿、浪人・諸勢力を無官ならフルネーム呼び捨てで識別する', () => {
     const ctx = createContext({
-        BushoStatusRules: { isRonin() { return false; } },
+        BushoStatusRules: { isRonin(b) { return b.status === 'ronin'; } },
         ConversationStandingRules: {
             getInterviewTargetCallName() { return '参議殿'; }
         }
@@ -5992,12 +5992,26 @@ test('武将の噂は他家武将を官位の有無にかかわらずフルネ�
         playerClanId: 1,
         getClanDaimyo() { return null; },
         getClan(id) { return clans.find(c => c.id === Number(id)) || null; },
-        kunishuSystem: { getKunishu() { return null; } }
+        kunishuSystem: {
+            getKunishu(id) {
+                if (Number(id) === 5) return { id: 5, leaderId: 4, getName() { return '川並衆'; } };
+                if (Number(id) === 6) return { id: 6, leaderId: 0, getName() { return '雑賀衆'; } };
+                return null;
+            }
+        }
     };
     const system = new ctx.InterviewSystem(game);
     const interviewer = { id: 1, clan: 1, fullName: '柴田勝家' };
-    const other = { id: 2, clan: 2, name: '佐久間信盛', fullName: '佐久間信盛', familyNameStr: '佐久間', courtRankIds: [10] };
-    assert.strictEqual(system._getRumorSubjectText(other, interviewer), '他家の佐久間信盛殿');
+    const otherNoRank = { id: 2, clan: 2, name: '佐久間信盛', fullName: '佐久間信盛', familyNameStr: '佐久間', courtRankIds: [] };
+    const roninNoRank = { id: 3, clan: 0, status: 'ronin', name: '山本勘助', fullName: '山本勘助', familyNameStr: '山本', courtRankIds: [] };
+    const kunishuLeaderNoRank = { id: 4, clan: 0, status: 'active', belongKunishuId: 5, name: '蜂須賀政勝', fullName: '蜂須賀政勝', familyNameStr: '蜂須賀', courtRankIds: [] };
+    const roninRanked = { id: 5, clan: 0, status: 'ronin', name: '山名豊国', fullName: '山名豊国', familyNameStr: '山名', courtRankIds: [10] };
+    const kunishuRanked = { id: 6, clan: 0, status: 'active', belongKunishuId: 6, name: '鈴木重意', fullName: '鈴木重意', familyNameStr: '鈴木', courtRankIds: [11] };
+    assert.strictEqual(system._getRumorSubjectText(otherNoRank, interviewer), '他家の佐久間信盛殿', '他家武将は無官でも殿を付ける');
+    assert.strictEqual(system._getRumorSubjectText(roninNoRank, interviewer), '山本勘助という浪人', '無官浪人は殿を付けない');
+    assert.strictEqual(system._getRumorSubjectText(kunishuLeaderNoRank, interviewer), '川並衆の頭領、蜂須賀政勝', '無官の諸勢力武将は殿を付けない');
+    assert.strictEqual(system._getRumorSubjectText(roninRanked, interviewer), '山名豊国殿という浪人', '官位持ち浪人は殿を付ける');
+    assert.strictEqual(system._getRumorSubjectText(kunishuRanked, interviewer), '雑賀衆の鈴木重意殿', '官位持ち諸勢力武将は殿を付ける');
 });
 
 test('武将の噂は主君の近親者を外し話者自身の近親者だけ例外として残す', () => {

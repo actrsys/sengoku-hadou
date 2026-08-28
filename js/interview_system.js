@@ -947,16 +947,27 @@ class InterviewSystem {
             ? window.ConversationStandingRules.getInterviewTargetCallName(this.game, interviewer, target, daimyo)
             : `${target.name}殿`;
 
-        // 噂では人物の特定を優先する。他家所属なら官位の有無にかかわらずフルネームで示す。
-        // 将軍・左馬頭は候補選定側で除外するため、ここでは一般の他家武将を明確に識別することへ専念する。
-        if (targetClanId > 0 && interviewerClanId > 0 && targetClanId !== interviewerClanId) {
+        // 噂では人物の特定を優先する。他家・浪人・諸勢力の武将は、
+        // 官位や通常の姓呼びよりフルネームを優先して「誰のことか」を明確にする。
+        // 他家武将は従来どおり「殿」を付ける一方、浪人・諸勢力は無官なら敬称を付けず、
+        // 官位持ちだけ「殿」を付けて身分感を文章上へ薄く反映する。
+        // 将軍・左馬頭は候補選定側で除外するため、ここでは一般の噂対象の識別に専念する。
+        const isRonin = !!(window.BushoStatusRules && window.BushoStatusRules.isRonin(target));
+        const belongsToKunishu = Number(target.belongKunishuId || 0) > 0;
+        const isOtherClan = targetClanId > 0 && interviewerClanId > 0 && targetClanId !== interviewerClanId;
+        if (isOtherClan || isRonin || belongsToKunishu) {
             const fullName = String(target.fullName || target.name || '').replace(/\|/g, '').trim();
-            if (fullName) callName = `${fullName}殿`;
+            if (fullName) {
+                const hasCourtRank = Array.isArray(target.courtRankIds)
+                    && target.courtRankIds.some(id => Number(id) > 0);
+                const useHonorific = isOtherClan || hasCourtRank;
+                callName = `${fullName}${useHonorific ? '殿' : ''}`;
+            }
         }
-        if (window.BushoStatusRules && window.BushoStatusRules.isRonin(target)) {
+        if (isRonin) {
             return `${callName}という浪人`;
         }
-        if (Number(target.belongKunishuId || 0) > 0) {
+        if (belongsToKunishu) {
             const kunishu = this.game.kunishuSystem && this.game.kunishuSystem.getKunishu(target.belongKunishuId);
             if (kunishu) {
                 const name = kunishu.getName(this.game);
