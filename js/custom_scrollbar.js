@@ -10,6 +10,9 @@ class CustomScrollbar {
         this._scrollTicking = false;
         this._dragListenersAttached = false;
         this._hasOverflow = null;
+        this._activeTouchId = null;
+        this._savedScrollSnapType = null;
+        this._scrollSnapRestoreToken = 0;
 
         // スマホ版（モバイル）かPC版かを自動で見分ける設定です
         this.isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -138,21 +141,50 @@ class CustomScrollbar {
     _attachDragListeners() {
         if (this._dragListenersAttached) return;
         this._dragListenersAttached = true;
-        document.addEventListener('mousemove', this.onDocMouseMove, { passive: false });
-        document.addEventListener('touchmove', this.onDocMouseMove, { passive: false });
-        document.addEventListener('mouseup', this.onEnd);
-        document.addEventListener('touchend', this.onEnd);
-        document.addEventListener('touchcancel', this.onEnd);
+        document.addEventListener('mousemove', this.onDocMouseMove, { passive: false, capture: true });
+        document.addEventListener('touchmove', this.onDocMouseMove, { passive: false, capture: true });
+        document.addEventListener('mouseup', this.onEnd, true);
+        document.addEventListener('touchend', this.onEnd, true);
+        document.addEventListener('touchcancel', this.onEnd, true);
+        window.addEventListener('blur', this.onEnd, true);
+        window.addEventListener('pagehide', this.onEnd, true);
+        document.addEventListener('visibilitychange', this.onVisibilityChange, true);
     }
 
     _detachDragListeners() {
         if (!this._dragListenersAttached) return;
         this._dragListenersAttached = false;
-        document.removeEventListener('mousemove', this.onDocMouseMove);
-        document.removeEventListener('touchmove', this.onDocMouseMove);
-        document.removeEventListener('mouseup', this.onEnd);
-        document.removeEventListener('touchend', this.onEnd);
-        document.removeEventListener('touchcancel', this.onEnd);
+        document.removeEventListener('mousemove', this.onDocMouseMove, true);
+        document.removeEventListener('touchmove', this.onDocMouseMove, true);
+        document.removeEventListener('mouseup', this.onEnd, true);
+        document.removeEventListener('touchend', this.onEnd, true);
+        document.removeEventListener('touchcancel', this.onEnd, true);
+        window.removeEventListener('blur', this.onEnd, true);
+        window.removeEventListener('pagehide', this.onEnd, true);
+        document.removeEventListener('visibilitychange', this.onVisibilityChange, true);
+    }
+
+    _suspendScrollSnapForDrag() {
+        if (!this.list) return;
+        // 仮想リストはスクロール中に行DOMを差し替えるため、古いWebViewで mandatory snap が
+        // 新しいsnap先を連続再評価して自走することがあります。ドラッグ中だけsnapを止め、
+        // 指を離した後に現在のDOMが落ち着いてから元のCSS指定へ戻します。
+        this._scrollSnapRestoreToken++;
+        if (this._savedScrollSnapType === null) this._savedScrollSnapType = this.list.style.scrollSnapType || '';
+        this.list.style.scrollSnapType = 'none';
+    }
+
+    _restoreScrollSnapAfterDrag() {
+        if (!this.list || this._savedScrollSnapType === null) return;
+        const restoreValue = this._savedScrollSnapType;
+        const token = ++this._scrollSnapRestoreToken;
+        const raf = window.requestAnimationFrame || ((cb) => setTimeout(cb, 16));
+        // 2フレーム待って、仮想スクロールの表示窓とつまみ位置を現在scrollTopへ同期してから戻します。
+        raf(() => raf(() => {
+            if (this._destroyed || this.isDraggingY || token !== this._scrollSnapRestoreToken || !this.list) return;
+            this.list.style.scrollSnapType = restoreValue;
+            this._savedScrollSnapType = null;
+        }));
     }
 
     initEvents() {
@@ -177,17 +209,30 @@ class CustomScrollbar {
 
         this.onStartY = (e) => {
             if (this._destroyed || !this._hasOverflow) return;
+            const touch = e.touches && e.touches.length ? e.touches[0] : null;
+            this._activeTouchId = touch ? touch.identifier : null;
             this.isDraggingY = true;
             this.thumbY.classList.add('dragging');
-            this.startY = e.touches ? e.touches[0].clientY : e.clientY;
+            this.startY = touch ? touch.clientY : e.clientY;
             this.startScrollTop = this.list.scrollTop;
+            this._suspendScrollSnapForDrag();
             this._attachDragListeners();
             if (e.cancelable) e.preventDefault();
         };
 
         this.onMoveY = (e) => {
             if (!this.isDraggingY || this._destroyed) return;
-            const point = e.touches ? e.touches[0] : e;
+            let point = e;
+            if (e.touches) {
+                point = null;
+                for (let i = 0; i < e.touches.length; i++) {
+                    const candidate = e.touches[i];
+                    if (this._activeTouchId === null || candidate.identifier === this._activeTouchId) {
+                        point = candidate;
+                        break;
+                    }
+                }
+            }
             if (!point) return;
             const currentY = point.clientY;
             const deltaY = currentY - this.startY;
@@ -201,7 +246,8 @@ class CustomScrollbar {
             if (maxScrollTop <= 0 || maxThumbTop <= 0) return;
 
             const scrollRatio = deltaY / maxThumbTop;
-            this.list.scrollTop = this.startScrollTop + (scrollRatio * maxScrollTop);
+            const nextScrollTop = this.startScrollTop + (scrollRatio * maxScrollTop);
+            this.list.scrollTop = Math.max(0, Math.min(maxScrollTop, nextScrollTop));
             // ★Round12：ここではupdate()を直接呼びません。
             // scrollイベント側で1フレーム1回にまとめることで二重更新を防ぎます。
         };
@@ -209,9 +255,15 @@ class CustomScrollbar {
         this.onEnd = () => {
             if (!this.isDraggingY && !this._dragListenersAttached) return;
             this.isDraggingY = false;
+            this._activeTouchId = null;
             if (this.thumbY) this.thumbY.classList.remove('dragging');
             this._detachDragListeners();
             this.scheduleUpdate();
+            this._restoreScrollSnapAfterDrag();
+        };
+
+        this.onVisibilityChange = () => {
+            if (document.hidden) this.onEnd();
         };
 
         this.onDocMouseMove = (e) => {
@@ -251,6 +303,12 @@ class CustomScrollbar {
         if (this._destroyed) return;
         this._destroyed = true;
         this.isDraggingY = false;
+        this._activeTouchId = null;
+        this._scrollSnapRestoreToken++;
+        if (this.list && this._savedScrollSnapType !== null) {
+            this.list.style.scrollSnapType = this._savedScrollSnapType;
+            this._savedScrollSnapType = null;
+        }
         this._detachDragListeners();
 
         if (this.list) {

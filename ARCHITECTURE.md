@@ -492,3 +492,11 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - `WarManager.waitForWarClose(generation)` の完了は、`closeWar()` の関数本体や `after_war` 終了だけではなく、その戦争が予約した威信更新と `finishTurn()` の完了までを含む。諸勢力蜂起・鎮圧など呼出元が完了Promiseを待っている場合、100ms後の旧戦争ターン復帰だけを待機Promiseより後へ残して月末処理・次画面と競合させない。正常系の `_markWarClosed()` は `finishTurn()` 完了側を唯一の通知地点とし、予約前の例外・新戦争・ロード・タイトル遷移では旧待機を未完了として解放する。
 - AI人事の配置人数は従来どおり『当該大名家所属・諸勢力でない・活動中』だけを数える。人数だけ必要な高頻度経路では一時配列を作らず `castle.samuraiIds` を直接数え、1回の `planMoveAction()` 中は同じ軍団内の拠点人数を短命 `Map` で1回だけ集計する。候補順・点数式・移動結果・乱数順を変えない。
 - 四半期AI人事は `month_start:staffing:start` と処理中の `month_start:staffing:clan_<id>` を実機診断へ残す。1勢力1回以上の細かな診断書込みは増やさず、古いスマホでの診断自体の同期I/O負荷を抑える。
+
+
+## r287 追加監査：仮想一覧のカスタムスクロール／スマホ観戦の災害Canvas
+- `CustomScrollbar` のつまみドラッグ中は、仮想一覧が行DOMを差し替える間だけ `scroll-snap-type` を一時停止し、ドラッグ終了後に2描画フレーム待って元の指定へ戻す。通常のリストスクロール／行スナップの見た目は維持し、カスタムつまみ操作と mandatory snap の再評価を同時に走らせない。
+- カスタムスクロールバーのドラッグ終了は対象要素の通常bubbleだけに依存しない。`touchend` / `touchcancel` / `mouseup` をcaptureで拾い、`blur` / `pagehide` / `visibilitychange` も終了境界として扱う。開始したtouch identifier以外の指移動でつまみを動かさず、古いWebViewで終了イベントを取りこぼした状態を次の操作へ持ち越さない。
+- 災害の地方色Canvasは表示上の補助であり、スマホAI観戦では安定性を優先して大きなCanvasの連続opacity CSSアニメーションを行わない。同じ地方色の静止Canvasを1描画フレーム提示した後、既存の観戦1秒自動送りへ進む。通常プレイとPC観戦の2秒点滅は維持する。
+- 実機停止診断は `event_effect:<name>:mask_done` の後を `mask_mobile_watch_static` / `mask_presented`（スマホ観戦）または `mask_animation_start` / `mask_animation_done`（通常経路）へ分割し、Canvas append直後・compositor描画待ち・入力待ちを区別する。
+- 凶作・豊作・地震の波及探索はFIFO順序と乱数呼出順を変えず、`Array.shift()` ではなくhead indexでキューを消費する。隣接候補の列挙・判定順は従来のままとし、月次イベント中の不要な配列再詰めを避ける。

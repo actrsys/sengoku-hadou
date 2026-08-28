@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r286');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r287');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -10016,6 +10016,56 @@ test('四半期AI人事は実機停止位置を勢力単位で診断する', () 
     const staffing = read('js/ai_staffing.js');
     assert.ok(turn.includes("game.writeSystemDiagnostic('month_start:staffing:start');"), 'AI人事開始地点を月初診断へ残す');
     assert.ok(staffing.includes('this.game.writeSystemDiagnostic(`month_start:staffing:clan_${clan.id}`);'), '停止時に処理中勢力を識別できる');
+});
+
+
+test('仮想一覧のカスタムスクロールはドラッグ中だけsnapを止め終了取りこぼしで自走しない', () => {
+    const scroll = read('js/custom_scrollbar.js');
+    const css = read('css/style.css');
+    assert.ok(css.includes('scroll-snap-type: y mandatory;'), '通常の行スナップ表示は維持する');
+    assert.ok(scroll.includes('_suspendScrollSnapForDrag()'));
+    assert.ok(scroll.includes("this.list.style.scrollSnapType = 'none';"), 'つまみドラッグ中だけmandatory snapを止める');
+    assert.ok(scroll.includes('_restoreScrollSnapAfterDrag()'));
+    assert.ok(scroll.includes('raf(() => raf(() => {'), '仮想DOMが現在scrollTopへ追随してからsnapを戻す');
+    assert.ok(scroll.includes("document.addEventListener('touchend', this.onEnd, true);"), 'touchendをcaptureで拾う');
+    assert.ok(scroll.includes("document.addEventListener('touchcancel', this.onEnd, true);"), 'touchcancelも終了扱いにする');
+    assert.ok(scroll.includes("window.addEventListener('blur', this.onEnd, true);"), '画面フォーカス喪失も終了境界にする');
+    assert.ok(scroll.includes("document.addEventListener('visibilitychange', this.onVisibilityChange, true);"), 'アプリ非表示でもドラッグ状態を残さない');
+    assert.ok(scroll.includes('candidate.identifier === this._activeTouchId'), '開始した指以外のtouchmoveをドラッグへ流用しない');
+    assert.ok(scroll.includes('Math.max(0, Math.min(maxScrollTop, nextScrollTop))'), '古いWebViewでもscrollTopを有効範囲外へ押し出さない');
+});
+
+test('スマホAI観戦の災害地方Canvasはmask_done後の連続GPU点滅を避け診断を細分化する', () => {
+    const events = read('js/event/common_events.js');
+    const at = events.indexOf('window.playProvinceMapEffect = async function');
+    const end = events.indexOf('// ==========================================\n// ★ 面談', at);
+    const block = events.slice(at, end);
+    assert.ok(block.includes('const isMobileWatch = !!('));
+    assert.ok(block.includes("{ animation: isMobileWatch ? null : 'blink 1s 2', diagPrefix }"), '通常/PCの従来点滅だけ維持する');
+    assert.ok(block.includes('if (isMobileWatch) {'));
+    assert.ok(block.includes('canvas.style.animation = \'none\';'));
+    assert.ok(block.includes('`${diagPrefix}:mask_mobile_watch_static`'));
+    assert.ok(block.includes('`${diagPrefix}:mask_presented`'));
+    assert.ok(block.includes('`${diagPrefix}:mask_animation_start`'));
+    assert.ok(block.includes('`${diagPrefix}:mask_animation_done`'));
+    assert.ok(block.includes('await fx.waitForDismiss(game, mapOverlay);'), '観戦自動送りの正本は共通waitForDismissを維持する');
+});
+
+
+test('凶作・豊作・地震の波及FIFOはshift再詰めを避け探索順を維持する', () => {
+    const events = read('js/event/common_events.js');
+    assert.ok(events.includes('let badQueueHead = 0;'));
+    assert.ok(events.includes('while (badQueueHead < badQueue.length)'));
+    assert.ok(events.includes('const current = badQueue[badQueueHead++];'));
+    assert.ok(events.includes('let goodQueueHead = 0;'));
+    assert.ok(events.includes('while (goodQueueHead < goodQueue.length)'));
+    assert.ok(events.includes('const current = goodQueue[goodQueueHead++];'));
+    assert.ok(events.includes('let eqQueueHead = 0;'));
+    assert.ok(events.includes('while (eqQueueHead < eqQueue.length)'));
+    assert.ok(events.includes('const current = eqQueue[eqQueueHead++];'));
+    assert.ok(!events.includes('badQueue.shift()'), '凶作FIFOでArray.shiftを使わない');
+    assert.ok(!events.includes('goodQueue.shift()'), '豊作FIFOでArray.shiftを使わない');
+    assert.ok(!events.includes('eqQueue.shift()'), '地震FIFOでArray.shiftを使わない');
 });
 
 Promise.all(pendingTests).then(() => {

@@ -521,6 +521,10 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
     const diagName = diagNameMap[eventType] || 'province_effect';
     const diagPrefix = `event_effect:${diagName}`;
     const fx = window.EventMapEffects;
+    const isMobileWatch = !!(
+        game && game.isProcessingAI && game.isWatchMode &&
+        typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')
+    );
 
     if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
     fx.writeDiag(game, `${diagPrefix}:dialog`);
@@ -539,7 +543,9 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
             game,
             affectedProvIds,
             { r: drawR, g: drawG, b: drawB, a: 180 },
-            { animation: 'blink 1s 2', diagPrefix }
+            // 古いスマホのAI観戦では大きなCanvasの連続opacityアニメーションを避けます。
+            // 地図色そのものは同じで、通常プレイ/PC観戦の従来点滅は維持します。
+            { animation: isMobileWatch ? null : 'blink 1s 2', diagPrefix }
         );
         if (!canvas || !mapContainer) {
             console.warn(`${eventType}の地図演出を省略しました。`);
@@ -547,10 +553,26 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
             mapContainer.appendChild(canvas);
             fx.writeDiag(game, `${diagPrefix}:mask_done`);
 
-            await new Promise(resolve => setTimeout(resolve, 0));
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            canvas.style.animation = 'none';
-            canvas.style.opacity = '1.0';
+            if (isMobileWatch) {
+                // r283実機停止記録がmask_done直後だったため、旧端末の観戦時だけ
+                // 2秒間のCSS点滅をやめ、同じ色の静止Canvasを1フレーム描画して先へ進めます。
+                // 観戦の入力待ちは共通waitForDismiss()の1秒自動送りをそのまま正本にします。
+                canvas.style.animation = 'none';
+                canvas.style.opacity = '1.0';
+                fx.writeDiag(game, `${diagPrefix}:mask_mobile_watch_static`);
+                await new Promise(resolve => {
+                    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
+                    else setTimeout(resolve, 0);
+                });
+                fx.writeDiag(game, `${diagPrefix}:mask_presented`);
+            } else {
+                fx.writeDiag(game, `${diagPrefix}:mask_animation_start`);
+                await new Promise(resolve => setTimeout(resolve, 0));
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                canvas.style.animation = 'none';
+                canvas.style.opacity = '1.0';
+                fx.writeDiag(game, `${diagPrefix}:mask_animation_done`);
+            }
 
             fx.writeDiag(game, `${diagPrefix}:wait_input`);
             await fx.waitForDismiss(game, mapOverlay);
@@ -987,8 +1009,9 @@ window.GameEvents.push({
         let visitedBadCastles = new Set();
         badQueue.forEach(q => visitedBadCastles.add(q.castle.id));
 
-        while (badQueue.length > 0) {
-            const current = badQueue.shift();
+        let badQueueHead = 0;
+        while (badQueueHead < badQueue.length) {
+            const current = badQueue[badQueueHead++];
             if (current.distance >= 5) continue; 
 
             const neighbors = game.castles.filter(c => MapGraphService.isAdjacent(current.castle, c));
@@ -1075,8 +1098,9 @@ window.GameEvents.push({
         let visitedGoodCastles = new Set();
         goodQueue.forEach(q => visitedGoodCastles.add(q.castle.id));
 
-        while (goodQueue.length > 0) {
-            const current = goodQueue.shift();
+        let goodQueueHead = 0;
+        while (goodQueueHead < goodQueue.length) {
+            const current = goodQueue[goodQueueHead++];
             if (current.distance >= 5) continue; 
 
             const neighbors = game.castles.filter(c => MapGraphService.isAdjacent(current.castle, c));
@@ -1346,8 +1370,9 @@ window.GameEvents.push({
         let visitedCastles = new Set();
         eqQueue.forEach(q => visitedCastles.add(q.castle.id));
 
-        while (eqQueue.length > 0) {
-            const current = eqQueue.shift();
+        let eqQueueHead = 0;
+        while (eqQueueHead < eqQueue.length) {
+            const current = eqQueue[eqQueueHead++];
             // 遠くまで広がりすぎないようにストッパーをかけます
             if (current.distance >= 5) continue; 
             
