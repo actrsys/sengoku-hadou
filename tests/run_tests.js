@@ -102,7 +102,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r260');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r261');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -4625,7 +4625,12 @@ test('武将寿命のゲーム中変更は LifeSystem を唯一の正規窓口�
     assert.ok(!interview.includes('busho.endYear ='), '面談はendYearを直接変更しない');
     assert.ok(!interview.includes('_shouldOfferDoctor') && !interview.includes('_showDoctorPrompt'), 'InterviewSystem に医師固有処理を残さない');
     assert.ok(interview.includes('processInterviewEvent({'), '面談挨拶後の特殊処理はEventManagerへ委譲する');
+    assert.ok(interview.includes('returnToInterviewTop: () => this.showInterviewerList()'), '面談内イベント終了後は面談セッションを閉じずトップへ戻せる');
+    assert.ok(!interview.includes('endInterview: () => this.close()'), '面談内イベントから面談セッションを直接閉じる旧経路を残さない');
     assert.ok(common.includes("id: 'common_interview_doctor'") && common.includes("timing: 'interview_after_greeting'"), '医師延命を面談コモンイベントとして登録する');
+    assert.ok(common.includes("const returnToInterviewTop = typeof context.returnToInterviewTop === 'function'"), '医師イベントは面談トップ復帰コールバックを使う');
+    assert.ok(!common.includes('const endInterview ='), '医師イベントに面談全体を閉じる専用コールバックを残さない');
+    assert.ok((common.match(/returnToInterviewTop/g) || []).length >= 5, '成功・資金不足・辞退を面談トップ復帰へ統一する');
     assert.ok(common.includes('hasBattleDeathLifespanExtension(busho)'), '従来どおり討死初期延命済み武将には医師延命を重ねない');
     assert.ok(common.includes('game.lifeSystem.setLifespanModifier(busho, this.id, extensionYears)'), '医師コモンイベントは寿命変更をLifeSystemへ委譲する');
     assert.ok(!interview.includes("'system:battle_death_initial'"), '面談側は討死補正sourceIdを直接知らない');

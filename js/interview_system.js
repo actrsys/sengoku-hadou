@@ -79,7 +79,9 @@ class InterviewSystem {
             const handled = await eventManager.processInterviewEvent({
                 busho,
                 resumeInterview: () => this.showMainMenu(busho),
-                endInterview: () => this.close()
+                // 面談内の特殊イベントを終えた後も面談セッション自体は閉じない。
+                // 将来、面談中だけBGMを切り替える場合も open/close の境界を保てる。
+                returnToInterviewTop: () => this.showInterviewerList()
             });
             if (handled) return;
         }

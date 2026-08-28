@@ -618,7 +618,11 @@ window.GameEvents.push({
 
         const castle = game.getCurrentTurnCastle();
         const resumeInterview = typeof context.resumeInterview === 'function' ? context.resumeInterview : () => {};
-        const endInterview = typeof context.endInterview === 'function' ? context.endInterview : resumeInterview;
+        // 医師イベントは面談の内部イベント。終了時に面談そのものを閉じず、
+        // 面談相手選択のトップへ戻す。呼び出し側が未対応なら通常面談へ戻して安全に継続する。
+        const returnToInterviewTop = typeof context.returnToInterviewTop === 'function'
+            ? context.returnToInterviewTop
+            : resumeInterview;
 
         view.showPrompt(
             busho,
@@ -632,7 +636,7 @@ window.GameEvents.push({
                             view.showMessages(
                                 busho,
                                 ['金が足りないため、医師を呼べませんでした……'],
-                                resumeInterview,
+                                returnToInterviewTop,
                                 '面談',
                                 { narration: true }
                             );
@@ -651,7 +655,7 @@ window.GameEvents.push({
                         view.showMessages(
                             busho,
                             [`${busho.name}は少し顔色が良くなったようです。`],
-                            endInterview,
+                            returnToInterviewTop,
                             '面談',
                             { narration: true }
                         );
@@ -660,7 +664,7 @@ window.GameEvents.push({
                 {
                     label: '診せない',
                     className: 'btn-secondary',
-                    onClick: resumeInterview
+                    onClick: returnToInterviewTop
                 }
             ],
             '面談',
