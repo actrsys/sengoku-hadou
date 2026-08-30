@@ -3,18 +3,6 @@
  * 画面の見た目（ui.js）のうち、マップを動かす魔法だけを担当する別館です。
  */
 
-// ★ シナリオ別・デバイス別で最初に映すお城のIDを管理する箱
-const INITIAL_MAP_CENTER_CONFIG = {
-    "1560_okehazama": { // 1560年 桶狭間の戦いシナリオ
-        PC: 7,      // PC版で最初に中心にする城のID
-        MOBILE: 36   // スマホ版で最初に中心にする城のID
-    },
-    "DEFAULT": {       // 上記以外のシナリオの場合のお守り
-        PC: 7,
-        MOBILE: 7
-    }
-};
-
 // ★ マップのズーム設定を1箇所で管理する箱
 // ここでの数字は「画面にピッタリ収まる（または覆い尽くす）最小サイズ」を『 1.0 』とした時の倍率です！
 const MAP_ZOOM_CONFIG = {
@@ -1334,8 +1322,9 @@ Object.assign(UIManager.prototype, {
                     if (initToken !== Number(this._mapViewResetToken || 0) || !this.hasInitializedMap) return;
                     const isPC = document.body.classList.contains('is-pc');
                     const folderName = this.game.scenarioFolder;
-                    const config = INITIAL_MAP_CENTER_CONFIG[folderName] || INITIAL_MAP_CENTER_CONFIG.DEFAULT;
-                    const centerCastleId = isPC ? config.PC : config.MOBILE;
+                    const scenario = this.game.scenarioDefinition || (typeof DataManager !== 'undefined' ? DataManager.getScenarioDefinition(folderName) : null);
+                    const configuredId = scenario ? (isPC ? scenario.initialMapCenterPC : scenario.initialMapCenterMobile) : 0;
+                    const centerCastleId = Number(configuredId) || 7;
                     // 初回表示は常にシナリオ既定地点。前回選択城や現在ターン城を初期中心には使わない。
                     const centerCastle = this.game.getCastle(centerCastleId);
                     if (centerCastle) {

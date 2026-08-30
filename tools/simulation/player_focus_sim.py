@@ -7,12 +7,12 @@ of the original player_focus_sim.py supplied for the 1560 Okehazama scenario.
 """
 
 import argparse
-import csv
 import json
 import math
 import random
 import re
 import statistics
+import zlib
 from collections import Counter, defaultdict, deque
 from pathlib import Path
 
@@ -32,36 +32,59 @@ SCENARIO_START = {
 def I(x,d=0):
     try:return int(float(x)) if x not in ('',None) else d
     except:return d
+def _read_bin_json(path):
+ with Path(path).open('rb') as f:
+  return json.loads(zlib.decompress(f.read()).decode('utf-8'))
+
+def _enabled(value):
+ if value is True or value == 1:return True
+ return str(value or '').strip().lower() in ('1','true','yes','on')
+
 def load_scenario(project_root, scenario):
  global C0, W, Qcache, CLAN_NAMES, SCENARIO_KEY, START_YEAR, START_MONTH
- scenario_dir = Path(project_root) / 'data' / 'scenarios' / scenario
- castles_path = scenario_dir / 'castles.csv'
- warriors_path = scenario_dir / 'warriors.csv'
- clans_path = scenario_dir / 'clans.csv'
- if not castles_path.exists():
-  raise FileNotFoundError(f'castles.csv not found: {castles_path}')
- if not warriors_path.exists():
-  raise FileNotFoundError(
-   f'warriors.csv not found: {warriors_path}\n'
-   'This balance tool reads the source CSV rather than warriors.bin.'
-  )
- with castles_path.open(encoding='utf-8-sig', newline='') as f:
-  cr=list(csv.DictReader(f))
- C0={I(r['id']):{'id':I(r['id']),'name':r['name'],'owner':I(r['ownerClan']),'soldiers':I(r['soldiers']),'population':I(r['population']),'defense':I(r['defense']),'maxDefense':I(r['maxDefense']),'rice':I(r['rice']),'gold':I(r['gold']),'commerce':I(r['commerce']),'kokudaka':I(r['kokudaka']),'loyalty':I(r['peoplesLoyalty']),'adj':[I(m.group(1)) for p in r['adjacentCastle'].split('|') if (m:=re.match(r'(\d+)',p))]} for r in cr}
- with warriors_path.open(encoding='utf-8-sig', newline='') as f:
-  wr=list(csv.DictReader(f))
+ root=Path(project_root)
+ common_path=root/'data'/'common.bin'
+ scenario_dir=root/'data'/'scenarios'/scenario
+ scenario_path=scenario_dir/'scenario.bin'
+ if not common_path.exists():
+  raise FileNotFoundError(f'common.bin not found: {common_path}')
+ if not scenario_path.exists():
+  raise FileNotFoundError(f'scenario.bin not found: {scenario_path}')
+ common=_read_bin_json(common_path)
+ bundle=_read_bin_json(scenario_path)
+ if common.get('format')!='sengoku-common-v1':
+  raise ValueError(f'unsupported common format: {common.get("format")}')
+ if bundle.get('format')!='sengoku-scenario-v1':
+  raise ValueError(f'unsupported scenario format: {bundle.get("format")}')
+
+ castle_master={I(r.get('id')):r for r in common.get('castlesMaster',[])}
+ cr=[]
+ for state in bundle.get('castlesState',[]):
+  if not _enabled(state.get('enabled')):continue
+  cid=I(state.get('id')); master=castle_master.get(cid)
+  if not master:continue
+  cr.append({**master,**state})
+ C0={I(r['id']):{'id':I(r['id']),'name':r.get('name',''),'owner':I(r.get('ownerClan')),'soldiers':I(r.get('soldiers')),'population':I(r.get('population')),'defense':I(r.get('defense')),'maxDefense':I(r.get('maxDefense')),'rice':I(r.get('rice')),'gold':I(r.get('gold')),'commerce':I(r.get('commerce')),'kokudaka':I(r.get('kokudaka')),'loyalty':I(r.get('peoplesLoyalty')),'adj':[I(m.group(1)) for part in str(r.get('adjacentCastle','')).split('|') if (m:=re.match(r'(\d+)',part))]} for r in cr}
+
+ warrior_master={I(r.get('id')):r for r in common.get('warriorsMaster',[])}
  W=defaultdict(list)
- for r in wr:
-  cid=I(r.get('clan'))
-  if cid>0: W[cid].append({'start':I(r.get('startYear'),9999),'end':I(r.get('endYear'),9999),'lead':I(r.get('leadership')),'str':I(r.get('strength')),'pol':I(r.get('politics')),'int':I(r.get('intelligence')),'cha':I(r.get('charm'))})
+ for state in bundle.get('warriorsState',[]):
+  wid=I(state.get('id')); master=warrior_master.get(wid)
+  if not master:continue
+  r={**master,**state}; cid=I(r.get('clan'))
+  if cid>0:W[cid].append({'start':I(r.get('startYear'),9999),'end':I(r.get('endYear'),9999),'lead':I(r.get('leadership')),'str':I(r.get('strength')),'pol':I(r.get('politics')),'int':I(r.get('intelligence')),'cha':I(r.get('charm'))})
+
+ clan_master={I(r.get('id')):r for r in common.get('clansMaster',[])}
  CLAN_NAMES={}
- if clans_path.exists():
-  with clans_path.open(encoding='utf-8-sig', newline='') as f:
-   for r in csv.DictReader(f):
-    CLAN_NAMES[I(r.get('id'))]=r.get('name','')
+ for state in bundle.get('clansState',[]):
+  if not _enabled(state.get('enabled')):continue
+  cid=I(state.get('id')); master=clan_master.get(cid,{})
+  CLAN_NAMES[cid]=master.get('name','')
  Qcache={}
  SCENARIO_KEY=scenario
- START_YEAR, START_MONTH=SCENARIO_START.get(scenario, (1560, 4))
+ info=bundle.get('scenario') or {}
+ START_YEAR=I(info.get('startYear'),1560)
+ START_MONTH=I(info.get('startMonth'),4)
  return scenario_dir
 
 Qcache={}

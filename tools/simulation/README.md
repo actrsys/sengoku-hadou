@@ -40,11 +40,10 @@ python tools/simulation/player_focus_sim.py 500 standard --json-out tools/simula
 
 The tool resolves the project root automatically from its own location and reads:
 
-- `data/scenarios/<scenario>/castles.csv`
-- `data/scenarios/<scenario>/warriors.csv`
-- `data/scenarios/<scenario>/clans.csv`
+- `data/common.bin`
+- `data/scenarios/<scenario>/scenario.bin`
 
-`warriors.csv` is intentionally used as the readable source data instead of `warriors.bin`.
+ゲーム本体と同じBINを読み、共通masterとシナリオstateをIDで結合してシミュレーション初期値を作ります。
 
 ## Important limitation
 

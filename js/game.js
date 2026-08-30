@@ -234,7 +234,7 @@ class GameManager {
         }
     }
     
-    startNewGame(options = {}) {
+    async startNewGame(options = {}) {
         const startInWatchMode = !!(options && options.watchMode);
         if (this.turnManager && typeof this.turnManager.abortForScenarioTransition === 'function') {
             this.turnManager.abortForScenarioTransition();
@@ -289,6 +289,17 @@ class GameManager {
             this.aiStaffing.resetCaches();
         }
         
+        try {
+            await DataManager.loadScenarioDefinitions();
+        } catch (error) {
+            console.error(error);
+            if (this.ui) {
+                this.ui.showDialog("シナリオ一覧の読み込みに失敗しました。", false, () => {
+                    this.ui.returnToTitle();
+                }, null, { closeBeforeOk: true });
+            }
+            return;
+        }
         this.ui.showScenarioSelection(SCENARIOS, (folder) => {
             this.loadScenario(folder, { startInWatchMode });
         });
@@ -320,6 +331,7 @@ class GameManager {
                     if (this.ui) this.ui.updateLoadingProgress(Math.round(value * 0.72), label);
                 }
             }); 
+            this.scenarioDefinition = data.scenario || DataManager.getScenarioDefinition(folder) || null;
             this.clans = data.clans; this.castles = data.castles; this.bushos = data.bushos;
             // 地図IDマップはDataManagerとUIで同じTypedArrayを共有し、巨大な複製を作りません。
             if (this.ui) {

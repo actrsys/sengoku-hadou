@@ -65,7 +65,7 @@ class SaveManager {
 
         if (typeof data.scenarioFolder !== 'string' || !data.scenarioFolder.trim()) fail('scenarioFolder がありません');
         const scenarioFolder = data.scenarioFolder;
-        if (typeof SCENARIOS !== 'undefined' && Array.isArray(SCENARIOS)
+        if (typeof SCENARIOS !== 'undefined' && Array.isArray(SCENARIOS) && SCENARIOS.length > 0
             && !SCENARIOS.some(s => s && s.folder === scenarioFolder)) {
             fail(`未登録のシナリオです (${scenarioFolder})`);
         }
@@ -363,6 +363,7 @@ class SaveManager {
     
     // どんな方法でロードした時も、この魔法で「受け取ったデータ」をゲーム内に展開します
     async _restoreSaveDataObj(d) {
+        await DataManager.loadScenarioDefinitions();
         this._validateSaveDataStructure(d);
         this.game.isRestoringSave = true;
         if (this.game.turnManager && typeof this.game.turnManager.abortForScenarioTransition === 'function') {
@@ -415,6 +416,7 @@ class SaveManager {
         this.game.scenarioFolder = d.scenarioFolder;
         this.game.scenarioName = d.scenarioName;
         this.game.scenarioNo = d.scenarioNo;
+        this.game.scenarioDefinition = DataManager.getScenarioDefinition(d.scenarioFolder) || null;
         
         this.game.mapWidth = d.mapWidth;
         this.game.mapHeight = d.mapHeight;
@@ -487,8 +489,8 @@ class SaveManager {
         this.game.kunishuSystem.setKunishuData(d.kunishus.map(k => new Kunishu(k)));
         this.game.clans = d.clans.map(c => new Clan(c));
         
-        const courtRanksText = await DataManager.fetchText("./data/imperialCourtRank.csv").catch(() => "");
-        const courtRanks = courtRanksText ? DataManager.parseCSV(courtRanksText, CourtRank) : [];
+        const commonData = await DataManager.loadCommonData();
+        const courtRanks = commonData.courtRanks.map(row => new CourtRank(row));
         this.game.courtRankSystem.setRankData(courtRanks);
 
         document.getElementById('title-screen').classList.add('hidden');

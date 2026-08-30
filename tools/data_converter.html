@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>戦国覇道 シナリオBIN変換ツール</title>
+<script src="lib/pako.min.js"></script>
+<style>
+  :root { color-scheme: light; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  body { margin: 0; background: #f3f4f6; color: #1f2937; }
+  main { max-width: 940px; margin: 0 auto; padding: 28px 18px 48px; }
+  h1 { font-size: 1.55rem; margin: 0 0 8px; }
+  .lead { margin: 0 0 20px; line-height: 1.7; color: #4b5563; }
+  .card { background: #fff; border: 1px solid #d1d5db; border-radius: 12px; padding: 18px; margin-top: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+  #dropZone { border: 3px dashed #9ca3af; border-radius: 12px; min-height: 180px; display: flex; align-items: center; justify-content: center; text-align: center; cursor: pointer; background: #fafafa; transition: .15s; }
+  #dropZone.dragover { border-color: #2563eb; background: #eff6ff; }
+  #dropZone strong { display:block; font-size: 1.08rem; margin-bottom: 8px; }
+  #fileInput { display:none; }
+  .file-list { margin: 14px 0 0; padding:0; list-style:none; }
+  .file-list li { padding: 8px 10px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:7px; margin-top:6px; display:flex; justify-content:space-between; gap:10px; }
+  .tag { font-size:.78rem; border-radius:999px; padding:2px 8px; background:#e5e7eb; white-space:nowrap; }
+  button { border:0; border-radius:8px; padding:11px 18px; font-weight:700; cursor:pointer; background:#166534; color:white; font-size:1rem; }
+  button:disabled { cursor:not-allowed; opacity:.45; }
+  .actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .subtle { color:#6b7280; font-size:.9rem; }
+  .log { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space:pre-wrap; word-break:break-word; font-size:.86rem; line-height:1.55; max-height:420px; overflow:auto; background:#111827; color:#e5e7eb; border-radius:8px; padding:12px; min-height:85px; }
+  .ok { color:#86efac; } .warn { color:#fde68a; } .err { color:#fca5a5; }
+  .schema { border-collapse:collapse; width:100%; font-size:.9rem; }
+  .schema th,.schema td { border-bottom:1px solid #e5e7eb; text-align:left; padding:8px 6px; vertical-align:top; }
+  .schema th { background:#f9fafb; }
+</style>
+</head>
+<body>
+<main>
+  <h1>戦国覇道 シナリオBIN変換ツール</h1>
+  <p class="lead">管理用の「共通データ.xlsm」と、1つ以上のシナリオ用 .xlsm/.xlsx を読み込み、ゲームが直接読むBINだけを生成します。確認用の名前列・備考・参照シートはExcel側に残したまま、出力から自動的に除外します。</p>
+
+  <section class="card">
+    <div id="dropZone" tabindex="0">
+      <div><strong>共通データ + シナリオファイルをまとめてドロップ</strong><span>.xlsm / .xlsx（シナリオは複数同時可）</span><br><span class="subtle">クリックしてファイル選択もできます</span></div>
+    </div>
+    <input id="fileInput" type="file" accept=".xlsm,.xlsx" multiple>
+    <ul id="fileList" class="file-list"></ul>
+  </section>
+
+  <section class="card">
+    <div class="actions">
+      <button id="convertBtn" disabled>BIN一式を生成</button>
+      <span class="subtle">出力: sengoku_runtime_data.zip</span>
+    </div>
+    <div id="log" class="log" style="margin-top:14px">ファイルを選択してください。</div>
+  </section>
+
+  <section class="card">
+    <strong>生成されるデータ</strong>
+    <table class="schema" style="margin-top:8px">
+      <tr><th>ファイル</th><th>内容</th></tr>
+      <tr><td>data/common.bin</td><td>武将・姫・勢力・拠点の共通マスター、官位、国、汎用姫名</td></tr>
+      <tr><td>data/scenarios/index.bin</td><td>シナリオ一覧、開始年月、説明文、開始カメラ位置</td></tr>
+      <tr><td>data/scenarios/&lt;folder&gt;/scenario.bin</td><td>その年代の武将・姫・勢力・城状態、外交、国衆、軍団</td></tr>
+    </table>
+  </section>
+</main>
+<script>
+(() => {
+'use strict';
+const DATA_SCHEMA_VERSION = 1;
+const RUNTIME_ERROR_RE = /^#(?:REF!|VALUE!|N\/A|NAME\?|DIV\/0!|NUM!|NULL!|SPILL!|CALC!|FIELD!|BLOCKED!|UNKNOWN!|CONNECT!|GETTING_DATA)/i;
+
+const COMMON_FIELDS = {
+  warriors_master: ['id','sortNo','name','yomi','nameChange','biography','leadership','strength','politics','diplomacy','intelligence','charm','aptAshigaru','aptKiba','aptTeppo','aptYumi','aptBugei','aptNinjutsu','aptMaritime','skill','innovation','ambition','duty','affinity','personality','birthYear','startYear','endYear','isKilledInBattle','realFatherId','adoptiveFather','realMotherId','female','childless','faceIcon','nemesis'],
+  princess_master: ['id','name','yomi','birthYear','startYear','endYear','originalClanId','realFatherId','realMotherId','faceIcon'],
+  clans_master: ['id','name','yomi','color'],
+  castles_master: ['id','sortNo','provinceId','castlesColorCode','adjacentCastle'],
+  imperialCourtRank: ['id','rankNo','rankName1','rankName2','rankNameFurigana','necessaryPrestige','gainPrestige'],
+  provinces_map: ['id','sortNo','province','provinceYomi','regionId','region','regionYomi','color_code'],
+  generic_princess: ['name','yomi']
+};
+const SCENARIO_FIELDS = {
+  warriors_state: ['id','clan','belongKunishuId','castleId','wife','loyalty','achievementTotal','isGunshi','isRetired','courtRank'],
+  princess_state: ['id','currentClanId','husbandId','status'],
+  clans_state: ['id','enabled','leaderId','daimyoPrestige','imperialCourtCredibility','princess'],
+  diplomacy: ['sourceClanId','targetClanId','relationType','value'],
+  castles_state: ['id','enabled','name','yomi','ownerClan','legionId','castellanId','soldiers','training','morale','gold','rice','ammo','horses','guns','kokudaka','maxKokudaka','commerce','maxCommerce','defense','maxDefense','peoplesLoyalty','population'],
+  kunishuClan: ['id','name','yomi','leaderId','castleId','maxSoldiers','soldiers','training','defaultTraining','morale','defaultMorale','horses','maxHorses','guns','maxGuns','defense','maxDefense','ideology','networkTag','daimyoRelations'],
+  legions: ['id','clanId','legionNo','commanderId']
+};
+const REQUIRED_COMMON_SHEETS = Object.keys(COMMON_FIELDS);
+const REQUIRED_SCENARIO_SHEETS = ['scenario_info', ...Object.keys(SCENARIO_FIELDS)];
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+const convertBtn = document.getElementById('convertBtn');
+const logEl = document.getElementById('log');
+let selectedFiles = [];
+
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function setLog(lines) { logEl.innerHTML = lines.join('\n'); logEl.scrollTop = logEl.scrollHeight; }
+function addLog(lines, msg, cls='') { lines.push(cls ? `<span class="${cls}">${esc(msg)}</span>` : esc(msg)); setLog(lines); }
+function humanBytes(n) { if (n < 1024) return `${n} B`; if (n < 1024*1024) return `${(n/1024).toFixed(1)} KB`; return `${(n/1024/1024).toFixed(2)} MB`; }
+
+function u16(d,o){ return d[o] | (d[o+1]<<8); }
+function u32(d,o){ return (d[o] | (d[o+1]<<8) | (d[o+2]<<16) | (d[o+3]<<24)) >>> 0; }
+function writeU16(a,o,v){ a[o]=v&255; a[o+1]=(v>>>8)&255; }
+function writeU32(a,o,v){ a[o]=v&255; a[o+1]=(v>>>8)&255; a[o+2]=(v>>>16)&255; a[o+3]=(v>>>24)&255; }
+function concatArrays(parts){ const len=parts.reduce((s,p)=>s+p.length,0); const out=new Uint8Array(len); let at=0; for(const p of parts){ out.set(p,at); at+=p.length; } return out; }
+
+class SimpleZipReader {
+  constructor(bytes) { this.bytes = bytes; this.entries = this.parseCentralDirectory(); }
+  parseCentralDirectory() {
+    const d=this.bytes; let eocd=-1;
+    for(let i=d.length-22;i>=Math.max(0,d.length-65557);i--){ if(u32(d,i)===0x06054b50){ eocd=i; break; } }
+    if(eocd<0) throw new Error('ExcelファイルのZIP終端が見つかりません');
+    const count=u16(d,eocd+10), cdOffset=u32(d,eocd+16); let p=cdOffset; const map=new Map(); const dec=new TextDecoder('utf-8');
+    for(let i=0;i<count;i++){
+      if(u32(d,p)!==0x02014b50) throw new Error('ExcelファイルのZIP索引が壊れています');
+      const method=u16(d,p+10), compSize=u32(d,p+20), uncompSize=u32(d,p+24), nameLen=u16(d,p+28), extraLen=u16(d,p+30), commentLen=u16(d,p+32), localOffset=u32(d,p+42);
+      const name=dec.decode(d.subarray(p+46,p+46+nameLen)).replace(/^\//,'');
+      map.set(name,{method,compSize,uncompSize,localOffset,name});
+      p += 46+nameLen+extraLen+commentLen;
+    }
+    return map;
+  }
+  getBytes(name) {
+    name=String(name).replace(/^\//,''); const e=this.entries.get(name); if(!e) throw new Error(`Excel内部ファイルがありません: ${name}`);
+    const d=this.bytes,p=e.localOffset; if(u32(d,p)!==0x04034b50) throw new Error(`ZIPローカルヘッダ破損: ${name}`);
+    const nameLen=u16(d,p+26), extraLen=u16(d,p+28), start=p+30+nameLen+extraLen, comp=d.subarray(start,start+e.compSize);
+    if(e.method===0) return new Uint8Array(comp);
+    if(e.method===8) return pako.inflateRaw(comp);
+    throw new Error(`未対応のZIP圧縮方式 ${e.method}: ${name}`);
+  }
+  getText(name){ return new TextDecoder('utf-8').decode(this.getBytes(name)); }
+  has(name){ return this.entries.has(String(name).replace(/^\//,'')); }
+}
+
+function xml(text,label) {
+  const doc=new DOMParser().parseFromString(text,'application/xml');
+  const err=doc.getElementsByTagName('parsererror')[0];
+  if(err) throw new Error(`${label} のXML解析に失敗しました`);
+  return doc;
+}
+function els(parent, local){ return Array.from(parent.getElementsByTagNameNS('*',local)); }
+function first(parent, local){ return els(parent,local)[0] || null; }
+function colIndex(ref){ const m=/^([A-Z]+)/i.exec(ref||''); if(!m) return -1; let n=0; for(const ch of m[1].toUpperCase()) n=n*26+ch.charCodeAt(0)-64; return n-1; }
+function normalizeValue(v){ if(v===null||v===undefined) return ''; return typeof v==='string' ? v.trim() : v; }
+
+async function readOfficeWorkbook(file) {
+  const bytes=new Uint8Array(await file.arrayBuffer()); const z=new SimpleZipReader(bytes);
+  const shared=[];
+  if(z.has('xl/sharedStrings.xml')){
+    const doc=xml(z.getText('xl/sharedStrings.xml'),'sharedStrings');
+    for(const si of els(doc,'si')) shared.push(els(si,'t').map(t=>t.textContent||'').join(''));
+  }
+  const wb=xml(z.getText('xl/workbook.xml'),'workbook');
+  const rel=xml(z.getText('xl/_rels/workbook.xml.rels'),'workbook relationships');
+  const relMap=new Map(); for(const r of els(rel,'Relationship')) relMap.set(r.getAttribute('Id'),r.getAttribute('Target'));
+  const out={};
+  for(const s of els(wb,'sheet')){
+    const sheetName=s.getAttribute('name');
+    const rid=s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id') || s.getAttribute('r:id');
+    let target=relMap.get(rid); if(!target) continue;
+    if(target.startsWith('/')) target=target.slice(1); else if(!target.startsWith('xl/')) target='xl/'+target.replace(/^\.\//,'');
+    const sd=xml(z.getText(target),sheetName); const rows=[];
+    for(const row of els(sd,'row')){
+      const values=[];
+      for(const c of Array.from(row.children).filter(x=>x.localName==='c')){
+        const idx=colIndex(c.getAttribute('r')); if(idx<0) continue;
+        const type=c.getAttribute('t')||''; const v=first(c,'v'); let value='';
+        if(type==='s' && v) value=shared[Number(v.textContent)] ?? '';
+        else if(type==='inlineStr') value=els(c,'t').map(t=>t.textContent||'').join('');
+        else if(type==='b' && v) value=v.textContent==='1';
+        else if(v){ const txt=v.textContent??''; if(type==='str'||type==='e') value=txt; else { const num=Number(txt); value=(txt!==''&&Number.isFinite(num))?num:txt; } }
+        values[idx]=normalizeValue(value);
+      }
+      if(values.some(v=>v!==undefined&&v!=='')) rows.push(values.map(v=>v===undefined?'':v));
+    }
+    out[sheetName]=rows;
+  }
+  return out;
+}
+
+function rowsAsDicts(book,sheet,requiredFields){
+  const rows=book[sheet]; if(!rows||!rows.length) throw new Error(`必須シート「${sheet}」がありません`);
+  const headers=rows[0].map(v=>String(v??'').trim()); const pos={}; headers.forEach((h,i)=>{if(h)pos[h]=i;});
+  const missing=(requiredFields||[]).filter(f=>!(f in pos)); if(missing.length) throw new Error(`${sheet}: 必須列がありません: ${missing.join(', ')}`);
+  return rows.slice(1).map(arr=>{ const o={}; Object.entries(pos).forEach(([h,i])=>o[h]=normalizeValue(arr[i]??'')); return o; }).filter(o=>Object.values(o).some(v=>v!==''));
+}
+function pickRows(book,sheet,fields,idField='id'){
+  const rows=rowsAsDicts(book,sheet,fields); return rows.filter(r=>idField===null || r[idField]!=='' ).map(r=>Object.fromEntries(fields.map(f=>[f,r[f]??''])));
+}
+function scenarioInfo(book){
+  const rows=rowsAsDicts(book,'scenario_info',['key','value']); const src={}; rows.forEach(r=>{ const k=String(r.key||'').trim(); if(k)src[k]=r.value; });
+  for(const k of ['folder','name','startYear','startMonth']) if(src[k]===''||src[k]===undefined) throw new Error(`scenario_info: ${k} がありません`);
+  const num=(k,d=0)=>{ const n=Number(src[k]); return Number.isFinite(n)?n:d; };
+  const folder=String(src.folder).trim(); if(!/^[A-Za-z0-9_-]+$/.test(folder)) throw new Error(`scenario_info: folder に使用できない文字があります: ${folder}`);
+  return {folder,name:String(src.name).trim(),desc:String(src.desc||'').trim(),startYear:num('startYear'),startMonth:num('startMonth'),initialMapCenterPC:num('initialMapCenterPC',7),initialMapCenterMobile:num('initialMapCenterMobile',7),sortNo:num('sortNo',0)};
+}
+function buildCommon(book){ return {format:'sengoku-common-v1',schemaVersion:DATA_SCHEMA_VERSION,warriorsMaster:pickRows(book,'warriors_master',COMMON_FIELDS.warriors_master),princessMaster:pickRows(book,'princess_master',COMMON_FIELDS.princess_master),clansMaster:pickRows(book,'clans_master',COMMON_FIELDS.clans_master),castlesMaster:pickRows(book,'castles_master',COMMON_FIELDS.castles_master),courtRanks:pickRows(book,'imperialCourtRank',COMMON_FIELDS.imperialCourtRank),provinces:pickRows(book,'provinces_map',COMMON_FIELDS.provinces_map),genericPrincessProfiles:pickRows(book,'generic_princess',COMMON_FIELDS.generic_princess,null)}; }
+function buildScenario(book){ const info=scenarioInfo(book); return {format:'sengoku-scenario-v1',schemaVersion:DATA_SCHEMA_VERSION,scenario:info,warriorsState:pickRows(book,'warriors_state',SCENARIO_FIELDS.warriors_state),princessState:pickRows(book,'princess_state',SCENARIO_FIELDS.princess_state),clansState:pickRows(book,'clans_state',SCENARIO_FIELDS.clans_state),diplomacy:pickRows(book,'diplomacy',SCENARIO_FIELDS.diplomacy,'sourceClanId'),castlesState:pickRows(book,'castles_state',SCENARIO_FIELDS.castles_state),kunishus:pickRows(book,'kunishuClan',SCENARIO_FIELDS.kunishuClan),legions:pickRows(book,'legions',SCENARIO_FIELDS.legions)}; }
+function ids(rows,label,errors){ const set=new Set(); for(const r of rows){ const n=Number(r.id); if(!Number.isFinite(n)||n<=0){errors.push(`${label}: 不正なID「${r.id}」`);continue;} if(set.has(n))errors.push(`${label}: ID ${n} が重複しています`); set.add(n);} return set; }
+function isEnabled(v){ if(v===true||v===1)return true; const s=String(v??'').trim().toLowerCase(); return ['1','true','yes','on'].includes(s); }
+function checkErrorValues(bundle,label,errors,warnings){
+  for(const [group,rows] of Object.entries(bundle)){
+    if(!Array.isArray(rows)) continue;
+    for(const r of rows){
+      for(const [field,v] of Object.entries(r)){
+        if(typeof v==='string' && RUNTIME_ERROR_RE.test(v)) errors.push(`${label}/${group} ID=${r.id??'-'} ${field}: Excelエラー「${v}」`);
+        else if(typeof v==='string' && v.includes('見つかりません')) warnings.push(`${label}/${group} ID=${r.id??'-'} ${field}: 「見つかりません」→ ゲームでは未設定扱いになる可能性があります`);
+      }
+    }
+  }
+}
+function validate(common,scenarios){
+  const errors=[],warnings=[]; checkErrorValues(common,'共通',errors,warnings);
+  const wm=ids(common.warriorsMaster,'武将master',errors), pm=ids(common.princessMaster,'姫master',errors), cm=ids(common.clansMaster,'勢力master',errors), xm=ids(common.castlesMaster,'拠点master',errors);
+  for(const p of common.princessMaster){ for(const f of ['birthYear','startYear','endYear']) if(!Number.isFinite(Number(p[f]))) errors.push(`姫master ID=${p.id} ${f} が数値ではありません: ${p[f]}`); }
+  const folderSet=new Set();
+  for(const s of scenarios){
+    const folder=s.scenario.folder; if(folderSet.has(folder)) errors.push(`シナリオfolderが重複しています: ${folder}`); folderSet.add(folder);
+    checkErrorValues(s,folder,errors,warnings); if(!s.scenario.desc) warnings.push(`${folder}: scenario_info の desc が空です`);
+    const ws=ids(s.warriorsState,`${folder}/武将state`,errors), ps=ids(s.princessState,`${folder}/姫state`,errors), cs=ids(s.clansState,`${folder}/勢力state`,errors), xs=ids(s.castlesState,`${folder}/拠点state`,errors);
+    if(wm.size!==ws.size || [...wm].some(id=>!ws.has(id))) errors.push(`${folder}: 武将masterとwarriors_stateのID集合が一致しません`);
+    if(pm.size!==ps.size || [...pm].some(id=>!ps.has(id))) errors.push(`${folder}: 姫masterとprincess_stateのID集合が一致しません`);
+    for(const id of cs) if(!cm.has(id)) errors.push(`${folder}: clans_state ID ${id} はclans_masterにありません`);
+    for(const id of xs) if(!xm.has(id)) errors.push(`${folder}: castles_state ID ${id} はcastles_masterにありません`);
+    const activeClanIds=new Set(s.clansState.filter(r=>isEnabled(r.enabled)).map(r=>Number(r.id)));
+    for(const r of s.diplomacy){ const a=Number(r.sourceClanId),b=Number(r.targetClanId); if(!cm.has(a)||!cm.has(b)) errors.push(`${folder}: diplomacy ${r.sourceClanId}→${r.targetClanId} に未登録勢力があります`); if(!activeClanIds.has(a)||!activeClanIds.has(b)) warnings.push(`${folder}: diplomacy ${a}→${b} は無効勢力を含むためゲーム読込時に無視されます`); }
+    for(const r of s.clansState.filter(r=>isEnabled(r.enabled))){ const lid=Number(r.leaderId); if(!wm.has(lid)) errors.push(`${folder}: 有効勢力 ID=${r.id} のleaderId ${r.leaderId} が武将masterにありません`); }
+  }
+  return {errors:[...new Set(errors)],warnings:[...new Set(warnings)]};
+}
+function compressedJson(obj){ return pako.deflate(new TextEncoder().encode(JSON.stringify(obj)),{level:9}); }
+
+const CRC_TABLE=(()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);t[n]=c>>>0;} return t;})();
+function crc32(data){ let c=0xffffffff; for(const b of data)c=CRC_TABLE[(c^b)&255]^(c>>>8); return (c^0xffffffff)>>>0; }
+function dosDateTime(){ const d=new Date(); const year=Math.max(1980,d.getFullYear()); return {time:((d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1))&0xffff,date:(((year-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate())&0xffff}; }
+function createStoredZip(files){
+  const enc=new TextEncoder(), locals=[], centrals=[]; let offset=0; const dt=dosDateTime();
+  for(const f of files){ const name=enc.encode(f.name.replace(/\\/g,'/')); const data=f.data instanceof Uint8Array?f.data:new Uint8Array(f.data); const crc=crc32(data);
+    const lh=new Uint8Array(30+name.length); writeU32(lh,0,0x04034b50);writeU16(lh,4,20);writeU16(lh,6,0x0800);writeU16(lh,8,0);writeU16(lh,10,dt.time);writeU16(lh,12,dt.date);writeU32(lh,14,crc);writeU32(lh,18,data.length);writeU32(lh,22,data.length);writeU16(lh,26,name.length);writeU16(lh,28,0);lh.set(name,30); locals.push(lh,data);
+    const ch=new Uint8Array(46+name.length); writeU32(ch,0,0x02014b50);writeU16(ch,4,20);writeU16(ch,6,20);writeU16(ch,8,0x0800);writeU16(ch,10,0);writeU16(ch,12,dt.time);writeU16(ch,14,dt.date);writeU32(ch,16,crc);writeU32(ch,20,data.length);writeU32(ch,24,data.length);writeU16(ch,28,name.length);writeU16(ch,30,0);writeU16(ch,32,0);writeU16(ch,34,0);writeU16(ch,36,0);writeU32(ch,38,0);writeU32(ch,42,offset);ch.set(name,46);centrals.push(ch); offset+=lh.length+data.length;
+  }
+  const central=concatArrays(centrals), local=concatArrays(locals), end=new Uint8Array(22); writeU32(end,0,0x06054b50);writeU16(end,4,0);writeU16(end,6,0);writeU16(end,8,files.length);writeU16(end,10,files.length);writeU32(end,12,central.length);writeU32(end,16,local.length);writeU16(end,20,0); return concatArrays([local,central,end]);
+}
+function downloadBlob(blob,name){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000); }
+function recognize(book){ const names=new Set(Object.keys(book)); const common=REQUIRED_COMMON_SHEETS.every(s=>names.has(s)); const scenario=REQUIRED_SCENARIO_SHEETS.every(s=>names.has(s)); return common?'common':(scenario?'scenario':'unknown'); }
+
+async function prepareFiles(files, lines){
+  const loaded=[];
+  for(const f of files){ addLog(lines,`読み込み中: ${f.name}`); const book=await readOfficeWorkbook(f); loaded.push({file:f,book,type:recognize(book)}); }
+  const commons=loaded.filter(x=>x.type==='common'), scenarios=loaded.filter(x=>x.type==='scenario'), unknown=loaded.filter(x=>x.type==='unknown');
+  if(unknown.length) throw new Error(`種類を判定できないファイル: ${unknown.map(x=>x.file.name).join(', ')}`);
+  if(commons.length!==1) throw new Error(`共通データは1ファイル必要です（認識数: ${commons.length}）`);
+  if(!scenarios.length) throw new Error('シナリオデータが1ファイル以上必要です');
+  return {common:buildCommon(commons[0].book),scenarios:scenarios.map(x=>buildScenario(x.book)),loaded};
+}
+
+function renderFiles(){ fileList.innerHTML=''; for(const f of selectedFiles){ const li=document.createElement('li'); li.innerHTML=`<span>${esc(f.name)}</span><span class="tag">${humanBytes(f.size)}</span>`; fileList.appendChild(li); } convertBtn.disabled=selectedFiles.length<2; }
+function acceptFiles(list){ selectedFiles=[...list].filter(f=>/\.(?:xlsm|xlsx)$/i.test(f.name)); renderFiles(); setLog([selectedFiles.length?`${selectedFiles.length} ファイルを選択しました。変換を実行できます。`:'対象ファイルがありません。']); }
+
+dropZone.addEventListener('click',()=>fileInput.click()); dropZone.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fileInput.click();}});
+fileInput.addEventListener('change',e=>acceptFiles(e.target.files));
+for(const ev of ['dragenter','dragover']) dropZone.addEventListener(ev,e=>{e.preventDefault();dropZone.classList.add('dragover');});
+for(const ev of ['dragleave','drop']) dropZone.addEventListener(ev,e=>{e.preventDefault();dropZone.classList.remove('dragover');});
+dropZone.addEventListener('drop',e=>acceptFiles(e.dataTransfer.files));
+
+convertBtn.addEventListener('click',async()=>{
+  const lines=[]; convertBtn.disabled=true;
+  try{
+    if(typeof pako==='undefined') throw new Error('pako の読み込みに失敗しました');
+    const prepared=await prepareFiles(selectedFiles,lines); const {common,scenarios}=prepared; const checked=validate(common,scenarios);
+    checked.warnings.forEach(w=>addLog(lines,'警告: '+w,'warn'));
+    if(checked.errors.length){ checked.errors.forEach(e=>addLog(lines,'エラー: '+e,'err')); throw new Error(`検証エラー ${checked.errors.length} 件。BINは生成しませんでした。`); }
+    addLog(lines,`共通: 武将 ${common.warriorsMaster.length} / 姫 ${common.princessMaster.length} / 勢力 ${common.clansMaster.length} / 拠点 ${common.castlesMaster.length}`,'ok');
+    const files=[]; const commonBin=compressedJson(common); files.push({name:'data/common.bin',data:commonBin}); addLog(lines,`common.bin: ${humanBytes(commonBin.length)}`);
+    const defs=scenarios.map(s=>s.scenario).sort((a,b)=>(a.sortNo||999999)-(b.sortNo||999999)||(a.startYear-b.startYear)||(a.startMonth-b.startMonth)||a.folder.localeCompare(b.folder));
+    const indexBin=compressedJson({format:'sengoku-scenario-index-v1',schemaVersion:DATA_SCHEMA_VERSION,scenarios:defs}); files.push({name:'data/scenarios/index.bin',data:indexBin}); addLog(lines,`index.bin: ${humanBytes(indexBin.length)}`);
+    for(const s of scenarios){ const bin=compressedJson(s); files.push({name:`data/scenarios/${s.scenario.folder}/scenario.bin`,data:bin}); addLog(lines,`${s.scenario.folder}/scenario.bin: ${humanBytes(bin.length)}`); }
+    const zip=createStoredZip(files); downloadBlob(new Blob([zip],{type:'application/zip'}),'sengoku_runtime_data.zip'); addLog(lines,'変換完了: sengoku_runtime_data.zip を出力しました。','ok');
+  }catch(e){ addLog(lines,e&&e.message?e.message:String(e),'err'); }
+  finally{ convertBtn.disabled=selectedFiles.length<2; }
+});
+
+// テスト用に主要関数を公開（通常利用には影響しません）
+window.SengokuBinConverter={readOfficeWorkbook,recognize,buildCommon,buildScenario,validate,compressedJson,createStoredZip,prepareFiles};
+})();
+</script>
+</body>
+</html>

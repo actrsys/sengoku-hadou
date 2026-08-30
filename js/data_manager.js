@@ -7,9 +7,8 @@
 /* ==========================================================================
    ★ シナリオ定義 & 設定
    ========================================================================== */
-const SCENARIOS = [
-    { name: "1560年 桶狭間の戦い", desc: "永禄三年、畿内では三好氏が権勢を誇っていた。東国では武田・北条・長尾が覇を競い、中国地方では毛利氏が雄飛し、諸大名の争いの火は絶えない。そのような折、海道一の弓取り・今川義元が大軍を率いて尾張へ侵攻を開始した。これを迎え撃つは織田信長。彼はいまだ、尾張一国すら纏め上げられていない。", folder: "1560_okehazama", startYear: 1560, startMonth: 4 }
-];
+const DATA_SCHEMA_VERSION = 1;
+const SCENARIOS = [];
 
 
 
@@ -32,129 +31,183 @@ class DataManager {
         this.mapImageHeight = 0;
     }
     
-    static async loadAll(folderName, options = {}) {
-        const selectedScenario = SCENARIOS.find(s => s.folder === folderName);
-        if (selectedScenario) {
-            window.MainParams.StartYear = selectedScenario.startYear;
-            window.MainParams.StartMonth = selectedScenario.startMonth;
+    static scenarioDefinitionsLoaded = false;
+    static scenarioDefinitionsPromise = null;
+    static commonDataCache = null;
+    static commonDataPromise = null;
+
+    static async loadScenarioDefinitions(force = false) {
+        if (!force && this.scenarioDefinitionsLoaded && SCENARIOS.length > 0) return SCENARIOS;
+        if (!force && this.scenarioDefinitionsPromise) return this.scenarioDefinitionsPromise;
+        this.scenarioDefinitionsPromise = (async () => {
+            const bundle = await this.fetchCompressedJson('./data/scenarios/index.bin');
+            this.assertDataBundle(bundle, 'sengoku-scenario-index-v1');
+            const definitions = Array.isArray(bundle.scenarios) ? bundle.scenarios : [];
+            if (definitions.length === 0) throw new Error('シナリオ一覧が空です');
+            SCENARIOS.splice(0, SCENARIOS.length, ...definitions.map(item => ({
+                folder: String(item.folder || '').trim(),
+                name: String(item.name || '').trim(),
+                desc: String(item.desc || '').trim(),
+                startYear: Number(item.startYear || 0),
+                startMonth: Number(item.startMonth || 0),
+                initialMapCenterPC: Number(item.initialMapCenterPC || 0),
+                initialMapCenterMobile: Number(item.initialMapCenterMobile || 0),
+                sortNo: Number(item.sortNo || 0)
+            })).filter(item => item.folder && item.name));
+            this.scenarioDefinitionsLoaded = true;
+            return SCENARIOS;
+        })();
+        try { return await this.scenarioDefinitionsPromise; }
+        finally { this.scenarioDefinitionsPromise = null; }
+    }
+
+    static getScenarioDefinition(folderName) {
+        return SCENARIOS.find(s => s.folder === folderName) || null;
+    }
+
+    static async loadCommonData(force = false) {
+        if (!force && this.commonDataCache) return this.commonDataCache;
+        if (!force && this.commonDataPromise) return this.commonDataPromise;
+        this.commonDataPromise = (async () => {
+            const bundle = await this.fetchCompressedJson('./data/common.bin');
+            this.assertDataBundle(bundle, 'sengoku-common-v1');
+            const required = ['warriorsMaster','princessMaster','clansMaster','castlesMaster','courtRanks','provinces','genericPrincessProfiles'];
+            required.forEach(key => { if (!Array.isArray(bundle[key])) throw new Error(`common.bin: ${key} が配列ではありません`); });
+            this.commonDataCache = bundle;
+            this.genericPrincessProfiles = bundle.genericPrincessProfiles.map(p => ({ name: String(p.name || ''), yomi: String(p.yomi || '') })).filter(p => p.name);
+            return bundle;
+        })();
+        try { return await this.commonDataPromise; }
+        finally { this.commonDataPromise = null; }
+    }
+
+    static assertDataBundle(bundle, expectedFormat) {
+        if (!bundle || typeof bundle !== 'object') throw new Error(`${expectedFormat}: データ形式が不正です`);
+        if (bundle.format !== expectedFormat) throw new Error(`データ形式が一致しません: ${bundle.format || 'unknown'}`);
+        if (Number(bundle.schemaVersion) !== DATA_SCHEMA_VERSION) throw new Error(`データschemaが一致しません: ${bundle.schemaVersion}`);
+    }
+
+    static isEnabledValue(value) {
+        if (value === true || value === 1) return true;
+        const text = String(value ?? '').trim().toLowerCase();
+        return text === '1' || text === 'true' || text === 'yes' || text === 'on';
+    }
+
+    static mapRowsById(rows, label) {
+        const map = new Map();
+        (rows || []).forEach(row => {
+            const id = Number(row && row.id);
+            if (!Number.isFinite(id) || id <= 0) throw new Error(`${label}: 不正なID ${row && row.id}`);
+            if (map.has(id)) throw new Error(`${label}: ID ${id} が重複しています`);
+            map.set(id, row);
+        });
+        return map;
+    }
+
+    static mergeMasterAndState(masterRows, stateRows, label, options = {}) {
+        const masterMap = this.mapRowsById(masterRows, `${label} master`);
+        const stateMap = this.mapRowsById(stateRows, `${label} state`);
+        const requireAllMaster = options.requireAllMaster === true;
+        const enabledOnly = options.enabledOnly === true;
+        const result = [];
+        if (requireAllMaster) {
+            for (const [id, master] of masterMap) {
+                const state = stateMap.get(id);
+                if (!state) throw new Error(`${label}: ID ${id} のstateがありません`);
+                result.push({ ...master, ...state });
+            }
+        } else {
+            for (const [id, state] of stateMap) {
+                if (enabledOnly && !this.isEnabledValue(state.enabled)) continue;
+                const master = masterMap.get(id);
+                if (!master) throw new Error(`${label}: ID ${id} のmasterがありません`);
+                result.push({ ...master, ...state });
+            }
         }
-        const path = `./data/scenarios/${folderName}/`;
+        return result;
+    }
+
+    static applyDiplomacyToClanRows(clanRows, diplomacyRows) {
+        const activeIds = new Set(clanRows.map(row => Number(row.id)));
+        const bySource = new Map();
+        (diplomacyRows || []).forEach(row => {
+            const source = Number(row.sourceClanId);
+            const target = Number(row.targetClanId);
+            if (!activeIds.has(source) || !activeIds.has(target)) return;
+            const type = String(row.relationType || '').trim();
+            const value = Number(row.value || 0);
+            if (!type) return;
+            if (!bySource.has(source)) bySource.set(source, []);
+            bySource.get(source).push(`${target}:${type}:${Number.isFinite(value) ? value : 0}`);
+        });
+        return clanRows.map(row => ({ ...row, initDiplomacy: (bySource.get(Number(row.id)) || []).join('|') }));
+    }
+
+    static async loadAll(folderName, options = {}) {
         const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
-        const progress = (value, label) => {
-            if (onProgress) onProgress(Math.max(0, Math.min(100, Number(value) || 0)), label || '');
-        };
+        const progress = (value, label) => { if (onProgress) onProgress(Math.max(0, Math.min(100, Number(value) || 0)), label || ''); };
         try {
             progress(4, 'シナリオデータを読み込んでいます');
-            if (window.MainParams.System.UseRandomNames) {
-                // ★ここから追加：generic_princess.csv を読み込む魔法です！
-                try {
-                    const princessNamesText = await this.fetchText("./data/generic_princess.csv");
-                    this.parseGenericPrincessProfiles(princessNamesText);
-                } catch (e) { console.warn("汎用姫名ファイルなし"); }
-            }
-            // ★今回追加：princess.csv と legions.csv も一緒に読み込むようにリストに加えます！
-            const [clansText, castlesText, bushosText, kunishusText, courtRanksText, princessesText, provincesText, legionsText] = await Promise.all([                
-                this.fetchText(path + "clans.csv"),                
-                this.fetchText(path + "castles.csv"),                
-                this.fetchCompressed(path + "warriors.bin").catch(() => this.fetchText(path + "warriors.csv")), // ★ .binがない場合は .csv を読み込む魔法です！
-                this.fetchText(path + "kunishuClan.csv").catch(() => ""),
-                this.fetchText("./data/imperialCourtRank.csv").catch(() => ""),
-                this.fetchText(path + "princess.csv").catch(() => ""), 
-                this.fetchText("./data/provinces_map.csv").catch(() => ""),
-                this.fetchText(path + "legions.csv").catch(() => "") // ★軍団データを読み込みます（なければ空文字）
-            ]);
+            await this.loadScenarioDefinitions();
+            const selectedScenario = this.getScenarioDefinition(folderName);
+            if (!selectedScenario) throw new Error(`未登録のシナリオです: ${folderName}`);
+            const path = `./data/scenarios/${folderName}/scenario.bin`;
+            const [common, scenarioBundle] = await Promise.all([this.loadCommonData(), this.fetchCompressedJson(path)]);
+            this.assertDataBundle(scenarioBundle, 'sengoku-scenario-v1');
+            const scenario = { ...selectedScenario, ...(scenarioBundle.scenario || {}) };
+            if (String(scenario.folder || '') !== folderName) throw new Error(`scenario.bin のfolderが一致しません: ${scenario.folder}`);
+            window.MainParams.StartYear = Number(scenario.startYear || selectedScenario.startYear);
+            window.MainParams.StartMonth = Number(scenario.startMonth || selectedScenario.startMonth);
+
             progress(20, 'データを展開しています');
             await this.yieldToBrowser();
-            const clans = this.parseCSV(clansText, Clan);
-            const castles = this.parseCSV(castlesText, Castle);
-            const bushos = this.parseCSV(bushosText, Busho);
-            const kunishus = kunishusText ? this.parseCSV(kunishusText, Kunishu) : [];
-            const courtRanks = courtRanksText ? this.parseCSV(courtRanksText, CourtRank) : [];
-            const princesses = princessesText ? this.parseCSV(princessesText, Princess) : [];
-            const provinces = provincesText ? this.parseCSV(provincesText, Province) : [];
-            // ★新しく作った軍団クラス（器）に流し込みます
-            const legions = legionsText ? this.parseCSV(legionsText, Legion) : [];
-            
-            // ★準備係（joinData）に、軍団の名簿も一緒に渡して初期設定を行います
+            let clanRows = this.mergeMasterAndState(common.clansMaster, scenarioBundle.clansState, '勢力', { enabledOnly: true });
+            clanRows = this.applyDiplomacyToClanRows(clanRows, scenarioBundle.diplomacy);
+            const castleRows = this.mergeMasterAndState(common.castlesMaster, scenarioBundle.castlesState, '拠点', { enabledOnly: true });
+            const bushoRows = this.mergeMasterAndState(common.warriorsMaster, scenarioBundle.warriorsState, '武将', { requireAllMaster: true });
+            const princessRows = this.mergeMasterAndState(common.princessMaster, scenarioBundle.princessState, '姫', { requireAllMaster: true });
+
+            const clans = clanRows.map(row => new Clan(row));
+            const castles = castleRows.map(row => new Castle(row));
+            const bushos = bushoRows.map(row => new Busho(row));
+            const kunishus = (scenarioBundle.kunishus || []).map(row => new Kunishu(row));
+            const courtRanks = common.courtRanks.map(row => new CourtRank(row));
+            const princesses = princessRows.map(row => new Princess(row));
+            const provinces = common.provinces.map(row => new Province(row));
+            const legions = (scenarioBundle.legions || []).map(row => new Legion(row));
+
             this.joinData(clans, castles, bushos, princesses, legions);
             progress(34, '地図データを準備しています');
             await this.yieldToBrowser();
 
-            // 城色画像は「領域」ではなく各城の種点だけを持つため、まず座標だけを低メモリで取得します。
-            // その後、国IDマップを1回走査で生成し、国内の最寄り城へ各ピクセルを割り当てて領土IDマップを作ります。
-            // 巨大RGBA配列や全画面BFSキューは保持せず、古いスマホでは帯ごとにブラウザへ制御を返します。
             try {
-                await this.loadCastleSeedPoints('./data/images/map/japan_colorcode_map.png', castles, {
-                    onProgress: ratio => progress(36 + ratio * 12, '拠点の位置を解析しています')
-                });
-            } catch (e) {
-                console.log("城位置画像の解析をスキップしました");
-            }
-
+                await this.loadCastleSeedPoints('./data/images/map/japan_colorcode_map.png', castles, { onProgress: ratio => progress(36 + ratio * 12, '拠点の位置を解析しています') });
+            } catch (e) { console.log('城位置画像の解析をスキップしました'); }
             try {
-                await this.loadProvinceMap('./data/images/map/japan_provinces.png', provinces, {
-                    onProgress: ratio => progress(48 + ratio * 18, '国境データを解析しています')
-                });
-                await this.buildCastleTerritoryMap(castles, provinces, {
-                    onProgress: ratio => progress(66 + ratio * 20, '勢力領域を準備しています')
-                });
-            } catch (e) {
-                console.log("領土地図の解析をスキップしました");
-            }
+                await this.loadProvinceMap('./data/images/map/japan_provinces.png', provinces, { onProgress: ratio => progress(48 + ratio * 18, '国境データを解析しています') });
+                await this.buildCastleTerritoryMap(castles, provinces, { onProgress: ratio => progress(66 + ratio * 20, '勢力領域を準備しています') });
+            } catch (e) { console.log('領土地図の解析をスキップしました'); }
             progress(88, 'ゲームデータを仕上げています');
             await this.yieldToBrowser();
-
-            // ★完成した全データをゲーム本体に返します！
-            return { clans, castles, bushos, kunishus, courtRanks, princesses, provinces, legions, mapWidth: this.mapImageWidth, mapHeight: this.mapImageHeight };
+            return { scenario, clans, castles, bushos, kunishus, courtRanks, princesses, provinces, legions, mapWidth: this.mapImageWidth, mapHeight: this.mapImageHeight };
         } catch (error) {
             console.error(error);
             throw error;
         }
     }
-    
-    static async fetchText(url) {
-        // ★ここから追加した魔法です！
-        // 「Date.now()」を使って、今この瞬間の「時間」の数字を作ります。
-        // それをURLの最後にくっつけることで、ブラウザに「これは新しいファイルだよ！」と信じ込ませます。
+
+    static async fetchCompressedJson(url) {
         const mark = url.includes('?') ? '&v=' : '?v=';
-        const noCacheUrl = url + mark + Date.now();
-        
-        // 元々は fetch(url) だったところを、おまじない付きの fetch(noCacheUrl) に変えています！
-        const response = await fetch(noCacheUrl);
-        
+        const response = await fetch(url + mark + Date.now());
         if (!response.ok) throw new Error(`Failed to load ${url}`);
-        let text = await response.text();
-        if (text.charCodeAt(0) === 0xFEFF) {
-            text = text.slice(1);
-        }
-        return text;
-    }
-    
-    static async fetchCompressed(url) {
-        // キャッシュ（古いデータ）を読み込まないためのおまじないです
-        const mark = url.includes('?') ? '&v=' : '?v=';
-        const noCacheUrl = url + mark + Date.now();
-        
-        const response = await fetch(noCacheUrl);
-        if (!response.ok) throw new Error(`Failed to load ${url}`);
-        
-        // 1. データを「文字」ではなく「バイナリ（ArrayBuffer）」として受け取ります
         const arrayBuffer = await response.arrayBuffer();
-        
-        // 2. pakoを使って、圧縮されたバイナリデータを元の状態に解凍します
         const decompressed = pako.inflate(new Uint8Array(arrayBuffer));
-        
-        // 3. 解凍したデータを、人間の読める「文字（テキスト）」に戻します
-        const textDecoder = new TextDecoder("utf-8");
-        let text = textDecoder.decode(decompressed);
-        
-        // 先頭に不要な見えない文字（BOM）があれば取り除きます
-        if (text.charCodeAt(0) === 0xFEFF) {
-            text = text.slice(1);
-        }
-        return text; // 解凍済みのCSVテキストとして返します
+        let text = new TextDecoder('utf-8').decode(decompressed);
+        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+        try { return JSON.parse(text); }
+        catch (error) { throw new Error(`${url} のJSON展開に失敗しました: ${error.message}`); }
     }
-    
+
     // ★ゲーム開始時の状態を作る魔法です！（今回から軍団の名簿も受け取ります）
     static joinData(clans, castles, bushos, princesses = [], legions = []) {
         const startYear = window.MainParams.StartYear; // 今のシナリオの開始年（例：1560年）
@@ -365,53 +418,6 @@ class DataManager {
         });
     }
     
-    static parseCSV(text, ModelClass) {
-        const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-        if (lines.length === 0) return [];
-        
-        const headers = lines[0].split(',').map(h => {
-            let val = h.trim();
-            if (val.charCodeAt(0) === 0xFEFF) val = val.slice(1);
-            if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
-            return val;
-        });
-
-        const result = [];
-        for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split(',');
-            if(values.length < headers.length) continue;
-            
-            const data = {};
-            headers.forEach((header, index) => {
-                let val = values[index];
-                if (val !== undefined) {
-                    val = val.trim();
-                    if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
-                    
-                    if (!isNaN(Number(val)) && val !== "") val = Number(val);
-                    if (val === "true" || val === "TRUE") val = true;
-                    if (val === "false" || val === "FALSE") val = false;
-                }
-                data[header] = val;
-            });
-            result.push(new ModelClass(data));
-        }
-        return result;
-    }
-    // generic_princess.csv の名前と読みを、架空姫生成用プロフィールとして保持します。
-    static parseGenericPrincessProfiles(text) {
-        const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-        this.genericPrincessProfiles = [];
-        if (lines.length < 2) return;
-
-        for (let i = 1; i < lines.length; i++) {
-            const parts = lines[i].split(',');
-            const name = (parts[0] || '').trim();
-            const yomi = (parts[1] || '').trim();
-            if (name) this.genericPrincessProfiles.push({ name, yomi });
-        }
-    }
-
     /** ブラウザへ描画・入力処理の時間を返します。古いスマホで長時間メインスレッドを占有しないために使います。 */
     static yieldToBrowser() {
         return new Promise(resolve => {

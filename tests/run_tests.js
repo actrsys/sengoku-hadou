@@ -69,6 +69,23 @@ function read(relativePath) {
     return fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
 }
 
+function readBinJson(relativePath) {
+    return JSON.parse(zlib.inflateSync(fs.readFileSync(path.join(ROOT, relativePath))).toString('utf8'));
+}
+
+function getRuntimeData(folder = '1560_okehazama') {
+    return {
+        common: readBinJson('data/common.bin'),
+        index: readBinJson('data/scenarios/index.bin'),
+        scenario: readBinJson(`data/scenarios/${folder}/scenario.bin`)
+    };
+}
+
+function mergeRuntimeRows(masterRows, stateRows) {
+    const stateById = new Map(stateRows.map(row => [Number(row.id), row]));
+    return masterRows.map(master => ({ ...master, ...(stateById.get(Number(master.id)) || {}) }));
+}
+
 class FakeClassList {
     constructor(initial = []) { this.values = new Set(initial); }
     add(...names) { names.forEach(name => this.values.add(name)); }
@@ -102,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r302');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r303');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -590,23 +607,15 @@ test('設定値はGameConfigを正本とし、戦闘・経済・外交にロー�
     assert.ok(diplomacy.includes('MainParams.Diplomacy.FailureSentiment.Dominate'));
 });
 
-test('本筋1560シナリオの主従外交データは3要素形式で相互に整合する', () => {
-    const csv = read('data/scenarios/1560_okehazama/clans.csv');
-
-    const lines = csv.replace(/^\uFEFF/, '').trim().split(/\r?\n/);
-    const header = lines[0].split(',');
-    const idxId = header.indexOf('id');
-    const idxDip = header.indexOf('initDiplomacy');
+test('本筋1560シナリオの主従外交データはBIN内で相互に整合する', () => {
+    const { scenario } = getRuntimeData();
     const relations = new Map();
-    for (const line of lines.slice(1)) {
-        const cols = line.split(',');
-        const id = Number(cols[idxId]);
-        const value = cols[idxDip] || '';
-        for (const token of value.split('|').filter(Boolean)) {
-            const parts = token.split(':');
-            assert.strictEqual(parts.length, 3, `外交初期値は target:status:sentiment 形式: clan=${id}, token=${token}`);
-            relations.set(`${id}:${Number(parts[0])}`, parts[1]);
-        }
+    for (const row of scenario.diplomacy) {
+        const from = Number(row.sourceClanId);
+        const to = Number(row.targetClanId);
+        const status = String(row.relationType || '');
+        assert.ok(Number.isFinite(from) && Number.isFinite(to) && status, '外交初期値はsource/target/relationTypeを持つ');
+        relations.set(`${from}:${to}`, status);
     }
     for (const [key, status] of relations) {
         if (status !== '支配' && status !== '従属') continue;
@@ -1431,17 +1440,16 @@ test('和睦条件の姫はAI同士で架空姫だけ、プレイヤーへの要
     assert.strictEqual(marriage, undefined, 'AI同士で架空姫がいなければ史実姫を自動消費しない');
 });
 
-test('架空姫は汎用姫CSVの読みを保持して姫情報画面へ渡す', () => {
+test('架空姫は共通BINの汎用姫名と読みを保持して姫情報画面へ渡す', () => {
     const ctx = createContext({
         FamilyLinker: { rebuildAllFamilyIds() {} },
         Princess: class { constructor(data) { Object.assign(this, data); } }
     });
     loadScript(ctx, 'js/data_manager.js');
     vm.runInContext('this.DataManager = DataManager;', ctx);
-    ctx.DataManager.parseGenericPrincessProfiles('name,yomi\n愛,あい\n菊,きく\n');
-    assert.deepStrictEqual(JSON.parse(JSON.stringify(ctx.DataManager.genericPrincessProfiles)), [
-        { name: '愛', yomi: 'あい' }, { name: '菊', yomi: 'きく' }
-    ], '汎用姫CSVは名前だけでなく読みも保持する');
+    const profiles = getRuntimeData().common.genericPrincessProfiles;
+    assert.ok(profiles.length > 0 && profiles.every(p => p.name && p.yomi), 'common.binは汎用姫の名前と読みを対で保持する');
+    ctx.DataManager.genericPrincessProfiles = [{ name: '愛', yomi: 'あい' }, { name: '菊', yomi: 'きく' }];
 
     // 生成処理がプロフィールの読みを Princess データへ渡すことを実動作で確認する。
     const fixedMath = Object.create(Math);
@@ -4748,22 +4756,8 @@ test('一向宗予約IDと通常の動的諸勢力IDは KunishuSystem で分離�
 });
 
 test('1560桶狭間データは願証寺と既存一向一揆だけに ikko シールを持たせる', () => {
-    const csv = read('data/scenarios/1560_okehazama/kunishuClan.csv');
-    const lines = csv.trimEnd().split(/\r?\n/);
-    const header = lines[0].split(',');
-    const nameIndex = header.indexOf('name');
-    const idIndex = header.indexOf('id');
-    const ideologyIndex = header.indexOf('ideology');
-    const tagIndex = header.indexOf('networkTag');
-    assert.ok(tagIndex >= 0);
-
-    const tagged = [];
-    for (const line of lines.slice(1)) {
-        const cols = line.split(',');
-        if (cols[tagIndex] === 'ikko') {
-            tagged.push({ id: Number(cols[idIndex]), name: cols[nameIndex], ideology: cols[ideologyIndex] });
-        }
-    }
+    const rows = getRuntimeData().scenario.kunishus;
+    const tagged = rows.filter(row => row.networkTag === 'ikko').map(row => ({ id: Number(row.id), name: row.name, ideology: row.ideology }));
     assert.strictEqual(tagged.length, 19);
     assert.ok(tagged.some(row => row.id === 4 && row.name === '願証寺'));
     assert.strictEqual(tagged.filter(row => row.id >= 10001 && row.id <= 10018).length, 18);
@@ -5262,13 +5256,12 @@ test('討死武将の初期延命は LifeSystem が従来ルールを再現す�
     assert.strictEqual(older.lifespanModifiers['system:battle_death_initial'], 10);
 });
 
-test('実データのシナリオ登録は本筋だけにし、シナリオ選択UIはレイアウト確認用に残す', () => {
-    const dataManager = read('js/data_manager.js');
+test('実データのシナリオ登録はindex.binを正本にし、シナリオ選択UIはレイアウト確認用に残す', () => {
+    const runtimeIndex = getRuntimeData().index;
     const index = read('index.html');
     const visualGuide = read('tests/visual/guide.html');
-    assert.ok(dataManager.includes('folder: "1560_okehazama"'));
-    assert.ok(!dataManager.includes('folder: "1560_test"'));
-    assert.ok(!dataManager.includes('folder: "1562_kiyosudoumei"'));
+    assert.strictEqual(runtimeIndex.format, 'sengoku-scenario-index-v1');
+    assert.deepStrictEqual(runtimeIndex.scenarios.map(s => s.folder), ['1560_okehazama']);
     assert.ok(index.includes('id="scenario-modal"'), '実ゲームのシナリオ選択画面は残す');
     assert.ok(visualGuide.includes('id="scenario-modal"'), 'レイアウト回帰用のシナリオ選択画面も残す');
     assert.ok(visualGuide.match(/scenario-placeholder/g)?.length >= 8, 'レイアウト確認用ダミースロットを8枠表示する');
@@ -5276,11 +5269,11 @@ test('実データのシナリオ登録は本筋だけにし、シナリオ選�
 
 test('シナリオ選択のダミー8枠は実シナリオへ混ぜず、件数増加時だけ多列化する', () => {
     const config = read('js/config.js');
-    const dataManager = read('js/data_manager.js');
+    const runtimeIndex = getRuntimeData().index;
     const ui = read('js/ui.js');
     const css = read('css/style.css');
     assert.ok(config.includes('PlaceholderSlots: 8'));
-    assert.strictEqual((dataManager.match(/folder:\s*"/g) || []).length, 1, '実データ登録は桶狭間1件だけにする');
+    assert.strictEqual(runtimeIndex.scenarios.length, 1, '実データ登録は桶狭間1件だけにする');
     assert.ok(ui.includes("div.className = 'clan-btn scenario-placeholder'"));
     assert.ok(ui.includes("div.setAttribute('aria-disabled', 'true')"));
     assert.ok(ui.includes("const useMultiColumnLayout = totalScenarioSlots > 4"));
@@ -5291,10 +5284,10 @@ test('シナリオ選択のダミー8枠は実シナリオへ混ぜず、件数�
     assert.ok(css.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'));
 });
 
-test('1560シナリオ説明はユーザー調整版を維持する', () => {
-    const data = read('js/data_manager.js');
-    assert.ok(data.includes('永禄三年、畿内では三好氏が権勢を誇っていた。'));
-    assert.ok(data.includes('彼はいまだ、尾張一国すら纏め上げられていない。'));
+test('1560シナリオ説明はindex.binでユーザー調整版を維持する', () => {
+    const data = getRuntimeData().index.scenarios.find(s => s.folder === '1560_okehazama');
+    assert.ok(data.desc.includes('永禄三年、畿内では三好氏が権勢を誇っていた。'));
+    assert.ok(data.desc.includes('彼はいまだ、尾張一国すら纏め上げられていない。'));
 });
 
 test('selector決定ボタンは再有効化時に旧inline透明度を持ち越さない', () => {
@@ -5569,55 +5562,40 @@ test('セーブ用勢力図はフルサイズCanvasを作らず1/4専用画像�
 });
 
 
-test('武将CSVから旧familyId列を廃止しBINも同じCSV内容へ同期する', () => {
-    const csvPath = path.join(ROOT, 'data/scenarios/1560_okehazama/warriors.csv');
-    const binPath = path.join(ROOT, 'data/scenarios/1560_okehazama/warriors.bin');
-    const csv = fs.readFileSync(csvPath, 'utf8');
-    const lines = csv.trimEnd().split(/\r?\n/);
-    const headers = lines[0].split(',');
-    assert.ok(!headers.includes('familyId'));
-    lines.slice(1).forEach((line, index) => {
-        assert.strictEqual(line.split(',').length, headers.length, `warriors.csv line ${index + 2}`);
-    });
-    const inflated = zlib.inflateSync(fs.readFileSync(binPath)).toString('utf8');
-    assert.strictEqual(inflated, csv, 'warriors.bin は最新CSVと完全一致すること');
+test('実行データはBINだけを正本とし武将masterから旧familyId列を廃止する', () => {
+    const { common, index, scenario } = getRuntimeData();
+    assert.strictEqual(common.format, 'sengoku-common-v1');
+    assert.strictEqual(index.format, 'sengoku-scenario-index-v1');
+    assert.strictEqual(scenario.format, 'sengoku-scenario-v1');
+    assert.ok(common.warriorsMaster.length > 4000);
+    assert.strictEqual(common.warriorsMaster.length, scenario.warriorsState.length, '武将master/stateは同じID集合を持つ');
+    assert.ok(common.warriorsMaster.every(row => !Object.prototype.hasOwnProperty.call(row, 'familyId')));
+    assert.ok(!fs.existsSync(path.join(ROOT, 'data/scenarios/1560_okehazama/warriors.csv')), '旧CSVを実行データとして残さない');
 });
 
-
-test('藤田信吉の系譜・北条家ID再配置と城主・軍団長参照を同期する', () => {
-    const parseSimpleCsv = (relativePath) => {
-        const lines = read(relativePath).trimEnd().split(/\r?\n/);
-        const headers = lines[0].split(',');
-        return lines.slice(1).map(line => {
-            const values = line.split(',');
-            return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? '']));
-        });
-    };
-
-    const warriors = parseSimpleCsv('data/scenarios/1560_okehazama/warriors.csv');
-    const castles = parseSimpleCsv('data/scenarios/1560_okehazama/castles.csv');
-    const legions = parseSimpleCsv('data/scenarios/1560_okehazama/legions.csv');
-    const byId = new Map(warriors.map(row => [row.id, row]));
-    const byName = new Map(warriors.map(row => [row['名前'], row]));
-
+test('藤田信吉の系譜・北条家ID再配置と城主・軍団長参照をBINで同期する', () => {
+    const { common, scenario } = getRuntimeData();
+    const warriors = mergeRuntimeRows(common.warriorsMaster, scenario.warriorsState);
+    const byId = new Map(warriors.map(row => [Number(row.id), row]));
+    const displayName = row => String(row.name || '').replace(/\|/g, '');
+    const byName = new Map(warriors.map(row => [displayName(row), row]));
     const yasukuni = byName.get('藤田康邦');
     const nobuyoshi = byName.get('藤田信吉');
     assert.ok(yasukuni && nobuyoshi, '藤田康邦・藤田信吉が存在すること');
-    assert.strictEqual(yasukuni.id, '1003065');
-    assert.strictEqual(nobuyoshi.id, '1003066');
-    assert.strictEqual(nobuyoshi.realFatherId, yasukuni.id, '藤田信吉の実父は藤田康邦');
+    assert.strictEqual(Number(yasukuni.id), 1003065);
+    assert.strictEqual(Number(nobuyoshi.id), 1003066);
+    assert.strictEqual(Number(nobuyoshi.realFatherId), Number(yasukuni.id), '藤田信吉の実父は藤田康邦');
     assert.strictEqual(Number(nobuyoshi.sortNo), Number(yasukuni.sortNo) + 1, '藤田信吉は藤田康邦の直下に並ぶ');
-
-    castles.forEach(castle => {
-        if (castle.castellanId === '0') return;
-        const castellan = byId.get(castle.castellanId);
-        assert.ok(castellan, `${castle.name} の城主ID ${castle.castellanId} が存在すること`);
-        assert.strictEqual(castellan['名前'], castle['城主名確認用'], `${castle.name} の城主名とIDを同期する`);
+    scenario.castlesState.forEach(castle => {
+        const castellanId = Number(castle.castellanId || 0);
+        if (!castellanId) return;
+        assert.ok(byId.has(castellanId), `${castle.name} の城主ID ${castellanId} が存在すること`);
+        assert.ok(!Object.prototype.hasOwnProperty.call(castle, '城主名確認用'), '確認用列はBINへ出力しない');
     });
-    legions.forEach(legion => {
-        const commander = byId.get(legion.commanderId);
-        assert.ok(commander, `${legion['軍団']} の軍団長ID ${legion.commanderId} が存在すること`);
-        assert.strictEqual(commander['名前'], legion['軍団長名'], `${legion['軍団']} の軍団長名とIDを同期する`);
+    scenario.legions.forEach(legion => {
+        const commanderId = Number(legion.commanderId || 0);
+        assert.ok(byId.has(commanderId), `軍団長ID ${commanderId} が存在すること`);
+        assert.ok(!Object.prototype.hasOwnProperty.call(legion, '軍団長名'), '確認用列はBINへ出力しない');
     });
 });
 
@@ -5763,7 +5741,7 @@ test('旧セーブ互換の移行処理をSaveManager・AI作戦・宿敵・諸�
     const models = read('js/models.js');
     const kunishu = read('js/kunishu_system.js');
     const history = read('js/history_system.js');
-    const mainKunishuCsv = read('data/scenarios/1560_okehazama/kunishuClan.csv');
+    const mainKunishus = getRuntimeData().scenario.kunishus;
 
     assert.ok(save.includes('saveSchemaVersion: SAVE_SCHEMA_VERSION'));
     assert.ok(save.includes('Number(data.saveSchemaVersion) !== SAVE_SCHEMA_VERSION'));
@@ -5778,11 +5756,8 @@ test('旧セーブ互換の移行処理をSaveManager・AI作戦・宿敵・諸�
     assert.ok(!kunishu.includes("kunishu.name === '願証寺'"));
     assert.ok(!kunishu.includes('id >= 10001 && id <= 10018'));
     assert.ok(!history.includes("category: 'legacy'"));
-    const mainKunishuLines = mainKunishuCsv.trimEnd().split(/\r?\n/);
-    const mainKunishuHeader = mainKunishuLines[0].split(',');
-    const mainTagIndex = mainKunishuHeader.indexOf('networkTag');
-    assert.ok(mainTagIndex >= 0, '本筋シナリオは現行networkTag列を明示する');
-    assert.strictEqual(mainKunishuLines.slice(1).filter(line => line.split(',')[mainTagIndex] === 'ikko').length, 19, '本筋シナリオは一向宗タグをデータ側で保持する');
+    assert.ok(mainKunishus.every(row => Object.prototype.hasOwnProperty.call(row, 'networkTag')), '本筋シナリオは現行networkTag列を明示する');
+    assert.strictEqual(mainKunishus.filter(row => row.networkTag === 'ikko').length, 19, '本筋シナリオは一向宗タグをデータ側で保持する');
 });
 
 test('ロード失敗時は事前検証と復元後安全復帰を分離し、復帰前に案内する', () => {
@@ -6775,7 +6750,7 @@ test('協調性を廃止し人物関係は義理・野望・相性差を正本�
     const models = read('js/models.js');
     const save = read('js/save_manager.js');
     const kunishu = read('js/kunishu_system.js');
-    const csv = read('data/scenarios/1560_okehazama/warriors.csv');
+    const warriorsMaster = getRuntimeData().common.warriorsMaster;
 
     assert.ok(personnel.includes('calcRelationshipProfile(a, b)'), '人物関係の共通計算を持つ');
     assert.ok(personnel.includes('affinityDiff'));
@@ -6784,7 +6759,7 @@ test('協調性を廃止し人物関係は義理・野望・相性差を正本�
     assert.ok(!models.includes('cooperation'), 'Bushoモデルから協調性を完全に除去する');
     assert.ok(!save.includes('savedBusho.cooperation'), '保存復元処理に協調性を残さない');
     assert.ok(!kunishu.includes('cooperation:'), '自動生成武将にも協調性を持たせない');
-    assert.ok(!csv.split(/\r?\n/, 1)[0].split(',').includes('cooperation'), '武将CSVから協調性列を削除する');
+    assert.ok(warriorsMaster.every(row => !Object.prototype.hasOwnProperty.call(row, 'cooperation')), '武将master BINから協調性列を削除する');
 });
 
 
@@ -7615,24 +7590,15 @@ test('実機診断はUI初期化前からtitle扱いにして前回checkpointを
 });
 
 test('所在地修正版の下河原恒忠・恒長は葛西家の寺池城に配置する', () => {
-    const csv = read('data/scenarios/1560_okehazama/warriors.csv');
-    const lines = csv.trimEnd().split(/\r?\n/);
-    const headers = lines[0].split(',');
-    const idIndex = headers.indexOf('id');
-    const castleIndex = headers.indexOf('castleId');
-    const clanIndex = headers.indexOf('clan');
-    const byId = new Map(lines.slice(1).map(line => {
-        const cols = line.split(',');
-        return [cols[idIndex], cols];
-    }));
-    for (const id of ['1070038', '1070039']) {
+    const state = getRuntimeData().scenario.warriorsState;
+    const byId = new Map(state.map(row => [Number(row.id), row]));
+    for (const id of [1070038, 1070039]) {
         const row = byId.get(id);
         assert.ok(row, `${id} が存在する`);
-        assert.strictEqual(row[clanIndex], '70');
-        assert.strictEqual(row[castleIndex], '200');
+        assert.strictEqual(Number(row.clan), 70);
+        assert.strictEqual(Number(row.castleId), 200);
     }
 });
-
 
 test('AI上洛判断は自家所属の通常活動中武将だけを将軍候補に数える', () => {
     const ai = read('js/ai.js');
