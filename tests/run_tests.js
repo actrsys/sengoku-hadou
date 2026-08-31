@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r321');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r322');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -150,6 +150,15 @@ test('城アイコンは4段階のWebPと個別の楕円影補正を使う', () 
     assert.ok(uiMap.includes('for (let tier = 1; tier <= 4; tier++)'));
 });
 
+
+
+test('スマホ武将一覧から詳細へ入る瞬間だけchoice SEを省略して音声負荷を重ねない', () => {
+    const bushoUi = read('js/ui_info_busho.js');
+    assert.ok(bushoUi.includes("const isMobileDetailTransition = !!(document.body && !document.body.classList.contains('is-pc'));"));
+    assert.ok(bushoUi.includes("? (() => this.showBushoDetailModalById(b.id))"));
+    assert.ok(bushoUi.includes(": this._withChoiceSound(() => this.showBushoDetailModalById(b.id));"));
+    assert.ok(bushoUi.includes("this._withChoiceSound((e) => this.handleBushoSelect"), '選択モードのSEは維持する');
+});
 test('士気上限は内部120・通常100・ゲージ100を設定の正本から使う', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');

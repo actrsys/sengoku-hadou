@@ -1244,7 +1244,14 @@ Object.assign(UIInfoManager.prototype, {
                 }
                 
                 if (isViewMode) {
-                    onClickStr = this._withChoiceSound(() => this.showBushoDetailModalById(b.id));
+                    // 古いスマホでは、一覧行のchoice SEをWeb Audioで鳴らす瞬間と
+                    // 一覧DOM解放→詳細DOM生成が重なると、短い擦過ノイズが出る実機がある。
+                    // ここは白画面対策で最も負荷を下げたい遷移でもあるため、スマホだけ
+                    // この1クリックのSEを省略する。PC・選択モード・詳細内タブ等のSEは従来どおり。
+                    const isMobileDetailTransition = !!(document.body && !document.body.classList.contains('is-pc'));
+                    onClickStr = isMobileDetailTransition
+                        ? (() => this.showBushoDetailModalById(b.id))
+                        : this._withChoiceSound(() => this.showBushoDetailModalById(b.id));
                 } else {
                     onClickStr = this._withChoiceSound((e) => this.handleBushoSelect(e, isMulti, spec.costGold || 0, spec.costRice || 0, actionType));
                 }
