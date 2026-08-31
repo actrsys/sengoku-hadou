@@ -1432,8 +1432,12 @@ Object.assign(UIManager.prototype, {
             const deficit = Math.max(0, 4000 - totalValue); // 4000に足りない分を計算します
             const scaleDownPercent = Math.floor(deficit / 200); // 200不足するごとに1%縮小します
             const scaleRatio = 1 - (scaleDownPercent * 0.01);
-            const currentScale = 0.41 * scaleRatio; // 基本のサイズ(0.41)に倍率を掛けます
+            const baseScale = window.GameConfig?.Map?.CastleCard?.BaseScale || 0.41;
+            const largeIconScaleThreshold = window.GameConfig?.Map?.CastleCard?.LargeIconScaleThreshold || 0.39;
+            const currentScale = baseScale * scaleRatio; // 基本のサイズに倍率を掛けます
             el.style.setProperty('--castle-scale', currentScale);
+            el.classList.toggle('icon-large', currentScale >= largeIconScaleThreshold);
+            el.classList.toggle('icon-small', currentScale < largeIconScaleThreshold);
 
             if (c.isDone) el.classList.add('done');
             const castellan = this.game.getBusho(c.castellanId); const clanData = this.game.getClan(c.ownerClan);

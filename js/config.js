@@ -10,12 +10,19 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r308'
+        Version: 'r309'
     },
 
     History: {
         // 構造化した行動履歴の保持上限。UIの一時ログとは分離してセーブにも保存する。
         MaxEntries: 500
+    },
+
+    Map: {
+        CastleCard: {
+            BaseScale: 0.41,
+            LargeIconScaleThreshold: 0.39
+        }
     },
 
     Main: {
