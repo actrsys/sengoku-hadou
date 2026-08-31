@@ -5467,6 +5467,14 @@ body.background-paused #map-container {
     pointer-events: none; /* マップのクリック反応なども無効化して無駄な計算を省きます */
 }
 
+/* 情報モーダル中はスマホの静的地図画像を独立GPUレイヤーへ固定し続けない。
+   transformを外しても座標・大きさ・見た目は変わらず、モーダルを閉じれば通常指定へ戻る。 */
+body:not(.is-pc).background-paused #map-base-image {
+    transform: none !important;
+    backface-visibility: visible !important;
+    will-change: auto !important;
+}
+
 /* =========================================================
    エンディング・ゲームオーバー画面
    ========================================================= */

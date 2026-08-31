@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r318');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r319');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -10138,6 +10138,37 @@ test('武将一覧から詳細への遷移は背景軽量化を二重実行せ�
     assert.ok(!releaseBlock.includes('this.bushoSavedBushos = null;'), '候補参照配列は戻り再描画用に保持する');
     assert.ok(!releaseBlock.includes('this.bushoSavedSortedBushos = null;'), 'ソート済み参照配列は戻り再ソート回避のため保持する');
     assert.ok(!releaseBlock.includes('this.bushoSavedData = null;'), 'SelectorDataを詳細往復だけで再問い合わせしない');
+});
+
+
+test('スマホ武将一覧→詳細は旧一覧DOMを解放してから一度イベントループへ制御を返す', () => {
+    const info = read('js/ui_info.js');
+    const bushoUi = read('js/ui_info_busho.js');
+    const css = read('css/style.css');
+
+    const detailStart = bushoUi.indexOf('showBushoDetailModal(busho)');
+    const detailBlock = bushoUi.slice(detailStart, detailStart + 1200);
+    assert.ok(detailBlock.includes("!document.body.classList.contains('is-pc')"), '遅延遷移はスマホレイアウトだけに限定する');
+    assert.ok(detailBlock.includes("this.currentModalInfo.pageType === 'busho_selector'"), '通常の詳細再描画や他画面からの遷移へ広げない');
+    assert.ok(detailBlock.includes("this._pushModalAfterMobileYield('busho_detail'"), 'スマホ一覧からだけ専用のyield遷移を使う');
+    assert.ok(detailBlock.includes("this.pushModal('busho_detail', [busho]);"), 'PC等は従来の同期遷移を維持する');
+
+    const helperStart = info.indexOf('_pushModalAfterMobileYield(pageType, renderArgs');
+    const helperEnd = info.indexOf('// --- 共通モーダルのガワ ---', helperStart);
+    const helper = info.slice(helperStart, helperEnd);
+    assert.ok(helperStart >= 0);
+    assert.ok(helper.indexOf('this._stopActiveListRendering();') < helper.indexOf('setTimeout(() => {'), '仮想一覧停止をyieldより先に行う');
+    assert.ok(helper.indexOf('this.selectorView.releaseListContent({ resetScroll: true });') < helper.indexOf('setTimeout(() => {'), '画像srcと一覧DOMをyieldより先に解放する');
+    assert.ok(helper.includes("mark('list_dom_released');"));
+    assert.ok(helper.includes("mark('yield_done');"));
+    assert.ok(helper.includes("mark('dom_start');"));
+    assert.ok(helper.includes("mark('dom_done');"));
+    assert.ok(helper.includes("mark('next_frame_done');"));
+    assert.ok(helper.includes('transitionGeneration !== this._deferredModalGeneration'), '古いtimerは次画面やクローズ後へ作用しない');
+
+    assert.ok(css.includes('body:not(.is-pc).background-paused #map-base-image {'));
+    assert.ok(css.includes('transform: none !important;'), 'モーダル中だけスマホ地図画像の独立GPUレイヤー固定を外す');
+    assert.ok(css.includes('backface-visibility: visible !important;'));
 });
 
 test('全国武将一覧の身分順は正本Rulesの短命contextで軍団走査を再利用する', () => {

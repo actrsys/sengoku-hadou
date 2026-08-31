@@ -8,6 +8,8 @@ class UIInfoManager {
         this.ui = ui;
         this.game = game;
         this.selectorView = new SelectorModalView(ui);
+        this._deferredModalGeneration = 0;
+        this._deferredModalTimer = null;
         this.closeCommonModal(); // 履歴や状態変数の初期化
     }
     
@@ -34,6 +36,7 @@ class UIInfoManager {
 
     closeCommonModal() {
         this._commonModalSuspendedForChild = false;
+        this._cancelDeferredModalTransition();
         // 閉じた画面の遅延描画・仮想スクロール処理を即座に無効化します。
         // 古いスマホでは、非表示DOMの裏で分割描画が続いたり、scroll handler のクロージャが
         // 大量の武将配列を保持し続けるだけでも、通常地図復帰時のメモリピークに繋がります。
@@ -134,6 +137,72 @@ class UIInfoManager {
             listContainer._virtualScrollCleanup();
             listContainer._virtualScrollCleanup = null;
         }
+    }
+
+    _cancelDeferredModalTransition() {
+        this._deferredModalGeneration = (this._deferredModalGeneration || 0) + 1;
+        if (this._deferredModalTimer !== null && this._deferredModalTimer !== undefined) {
+            clearTimeout(this._deferredModalTimer);
+            this._deferredModalTimer = null;
+        }
+    }
+
+    // 古いスマホでは「一覧DOMを消す」と「詳細DOMを作る」を同じイベント処理内で続けると、
+    // 旧一覧のクロージャ/画像decode領域と新詳細DOMが一時的に重なりやすい。
+    // スマホの一覧→詳細だけ、履歴とスクロール位置を先に保存して旧DOMを解放し、
+    // 0ms timerで一度イベントループへ制御を返してから次画面を描く。PCや通常の多段UIは従来どおり同期描画する。
+    _pushModalAfterMobileYield(pageType, renderArgs, { beforeYield = null, diagnosticPrefix = '' } = {}) {
+        const isMobileLayout = !!(document.body && !document.body.classList.contains('is-pc'));
+        if (!isMobileLayout || !this.currentModalInfo) {
+            this.pushModal(pageType, renderArgs);
+            return;
+        }
+
+        this._cancelDeferredModalTransition();
+        const transitionGeneration = this._deferredModalGeneration;
+        const mark = (stage) => {
+            if (!diagnosticPrefix || !this.game || typeof this.game.writeSystemDiagnostic !== 'function') return;
+            this.game.writeSystemDiagnostic(`${diagnosticPrefix}:${stage}`);
+        };
+
+        if (this.ui && typeof this.ui.pauseBackgroundUpdates === 'function') {
+            this.ui.pauseBackgroundUpdates();
+        }
+        if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+            this.game.writeSystemDiagnostic(`ui:modal:${pageType}`);
+        }
+        mark('transition_start');
+
+        const listEl = document.getElementById('selector-list');
+        this.currentModalInfo.scrollPos = listEl ? listEl.scrollTop : 0;
+        if (!this.modalHistory) this.modalHistory = [];
+        this.modalHistory.push(this.currentModalInfo);
+        this.currentModalInfo = { pageType, args: renderArgs, scrollPos: 0 };
+
+        this._stopActiveListRendering();
+        mark('list_render_stopped');
+        if (typeof beforeYield === 'function') beforeYield();
+        mark('transient_released');
+        if (this.selectorView && typeof this.selectorView.releaseListContent === 'function') {
+            this.selectorView.releaseListContent({ resetScroll: true });
+        }
+        mark('list_dom_released');
+        mark('yield_scheduled');
+
+        this._deferredModalTimer = setTimeout(() => {
+            if (transitionGeneration !== this._deferredModalGeneration) return;
+            if (!this.currentModalInfo || this.currentModalInfo.pageType !== pageType) return;
+            this._deferredModalTimer = null;
+            mark('yield_done');
+            mark('dom_start');
+            this._renderCurrentModal();
+            mark('dom_done');
+            requestAnimationFrame(() => {
+                if (transitionGeneration !== this._deferredModalGeneration) return;
+                if (!this.currentModalInfo || this.currentModalInfo.pageType !== pageType) return;
+                mark('next_frame_done');
+            });
+        }, 0);
     }
 
     // --- 共通モーダルのガワ ---
@@ -331,6 +400,7 @@ class UIInfoManager {
     }
 
     pushModal(pageType, renderArgs) {
+        this._cancelDeferredModalTransition();
         if (!this.modalHistory) this.modalHistory = [];
         
         // ★ここを書き足し：新しい画面（リストなど）を開く時に、背景の更新をストップします！
@@ -364,6 +434,7 @@ class UIInfoManager {
     }
 
     popModal() {
+        this._cancelDeferredModalTransition();
         if (!this.modalHistory || this.modalHistory.length === 0) {
             this.closeCommonModal();
             return;

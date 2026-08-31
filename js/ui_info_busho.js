@@ -49,6 +49,19 @@ Object.assign(UIInfoManager.prototype, {
 
     showBushoDetailModal(busho) {
         this.bushoDetailCurrentTab = 'status';
+        const isMobileListTransition = !!(
+            document.body &&
+            !document.body.classList.contains('is-pc') &&
+            this.currentModalInfo &&
+            this.currentModalInfo.pageType === 'busho_selector'
+        );
+        if (isMobileListTransition && typeof this._pushModalAfterMobileYield === 'function') {
+            this._pushModalAfterMobileYield('busho_detail', [busho], {
+                diagnosticPrefix: 'ui:busho_detail',
+                beforeYield: () => this._releaseBushoSelectorTransientStateForDetail()
+            });
+            return;
+        }
         this.pushModal('busho_detail', [busho]);
     },
     

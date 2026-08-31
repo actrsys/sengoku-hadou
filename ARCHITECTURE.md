@@ -635,3 +635,10 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - AI月次作戦では同一勢力の所有拠点を軍団ごとに短命Mapへ一度だけ分類し、各軍団の到達可能領域・国内平定・徴兵拠点選定で同じ `filter(c => c.legionId === legionId)` を繰り返さない。Map keyは数値化したlegionIdへ一括正規化せず、従来の厳密比較と同じkey一致だけで配列へ入れるため、候補集合と順序を変えない。
 - AI人事の派閥代表比較では `sort()` comparatorのたびに全所属武将をfilterせず、同一 `factionId` の人数を短命Mapで一度だけ数える。NaNは `NaN === NaN` が従来falseだった意味を保つため集計対象外とし、人数同率時の功績比較・元配列順は維持する。
 - 入力系のコマンドメニューDOM固定化や、戦闘・イベントDOMの常駐化は今回も行わない。CPU削減より入力回帰・旧端末のメモリ常駐増加リスクが高い箇所は、明確な効果測定と別の寿命設計なしに固定化しない。
+
+
+## r319 追加監査：古いスマホの一覧→詳細遷移メモリピーク分離
+- 武将一覧から武将詳細へ進むスマホ経路は、一覧DOM・画像src・仮想スクロールhandler・DOM寄り行キャッシュの解放と、詳細DOM生成を同じイベント処理内で連続させない。親一覧のscrollPosとmodalHistoryを先に保存し、旧一覧を解放した後に0ms timerで一度イベントループへ制御を返してから詳細を描く。PC、武将詳細タブ切替、他の多段UIは従来の同期遷移を維持し、見た目・選択・戻る階層を変えない。
+- 遅延遷移は `_deferredModalGeneration` を寿命境界とし、閉じる・戻る・別modal pushで必ず旧timerを無効化する。遅延callbackが新しい画面やロード後のDOMへ触れない。親一覧の軽い候補参照配列とSelectorDataは従来どおり戻り再描画用に保持し、重いDOM寄りキャッシュだけを先に捨てる。
+- スマホで `background-paused` 中は静的 `#map-base-image` の `translateZ(0)` を一時的に解除し、情報モーダルの背後で巨大な地図画像を独立GPUレイヤーへ固定し続けない。位置・寸法・画像srcは変更せず、モーダル終了時はclass解除だけで従来の通常地図指定へ戻す。地図DOMやdecode済み画像そのものは破棄せず、復帰時の再decodeピークを作らない。
+- 実機診断は `ui:busho_detail:transition_start` → `list_render_stopped` → `transient_released` → `list_dom_released` → `yield_scheduled` → `yield_done` → `dom_start` → `dom_done` → `next_frame_done` と段階化する。再発時に旧一覧解放前、イベントループyield前後、詳細DOM生成中、compositor反映前後のどこで停止したかを区別する。診断はsessionStorageへの既存スマホ窓口だけを使い、ゲーム状態・乱数・描画内容には関与させない。
