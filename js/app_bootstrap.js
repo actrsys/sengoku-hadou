@@ -12,6 +12,52 @@
  */
 (function bootstrapApplication() {
     const FONT_TIMEOUT_MS = 6000;
+    const MOBILE_TRANSITION_CHECKPOINT_KEY = 'sengoku_mobile_transition_checkpoint_v1';
+
+    function resolveEarlyMobileLowMemoryMode() {
+        const nav = window.navigator || {};
+        const ua = String(nav.userAgent || '');
+        const touch = Number(nav.maxTouchPoints || 0) > 0 || /iPhone|iPad|iPod|Android|Mobile/i.test(ua);
+        if (!touch) return false;
+
+        // iPhone 6/7/8/SE級の小さい論理画面を主対象にする。モデル名はWebKitから取得できないため、
+        // 画面寸法だけを保守的な低メモリ判定に使う。新しい大画面スマホやPC表示は従来の書体を維持する。
+        const screenObj = window.screen || {};
+        const width = Number(screenObj.width || window.innerWidth || 0);
+        const height = Number(screenObj.height || window.innerHeight || 0);
+        if (!(width > 0 && height > 0)) return false;
+        const shortEdge = Math.min(width, height);
+        const longEdge = Math.max(width, height);
+        return shortEdge <= 390 && longEdge <= 700;
+    }
+
+    const earlyMobileLowMemoryMode = resolveEarlyMobileLowMemoryMode();
+    window.__mobileLowMemoryMode = earlyMobileLowMemoryMode;
+    if (earlyMobileLowMemoryMode) document.documentElement.classList.add('mobile-low-memory');
+
+    function showEarlyPersistentTransitionCheckpoint() {
+        if (typeof localStorage === 'undefined') return;
+        try {
+            const raw = localStorage.getItem(MOBILE_TRANSITION_CHECKPOINT_KEY);
+            if (!raw) return;
+            const data = JSON.parse(raw);
+            if (!data || !data.phase) return;
+            if (data.time && Date.now() - data.time > 2 * 60 * 60 * 1000) {
+                localStorage.removeItem(MOBILE_TRANSITION_CHECKPOINT_KEY);
+                return;
+            }
+            if (document.getElementById('ai-last-checkpoint-badge')) return;
+            const el = document.createElement('div');
+            el.id = 'ai-last-checkpoint-badge';
+            el.textContent = `前回停止位置: 画面操作　${data.phase}`;
+            el.title = 'タップすると閉じます';
+            el.addEventListener('click', () => {
+                el.remove();
+                try { localStorage.removeItem(MOBILE_TRANSITION_CHECKPOINT_KEY); } catch (_) {}
+            });
+            document.body.appendChild(el);
+        } catch (_) {}
+    }
 
     function initializeFonts() {
         const root = document.documentElement;
@@ -38,10 +84,16 @@
 
         const requests = [
             ['400 16px "abashiri-mincho"', '戦国覇道徳川家康今川織田武田上杉一二三四五六七八九〇'],
-            ['700 16px "abashiri-mincho"', '戦国覇道徳川家康今川織田武田上杉一二三四五六七八九〇'],
-            ['400 16px "FudeGoshirae"', '戦国覇道決定取消攻撃内政外交軍団一二三四五六七八九〇'],
-            ['700 16px "FudeGoshirae"', '戦国覇道決定取消攻撃内政外交軍団一二三四五六七八九〇']
+            ['700 16px "abashiri-mincho"', '戦国覇道徳川家康今川織田武田上杉一二三四五六七八九〇']
         ];
+        // 小画面の低メモリ端末だけはFudeGoshiraeを明示ロードしない。
+        // CSS側も同時に網走明朝へフォールバックするため、後から遅延ロードされることもない。
+        if (!earlyMobileLowMemoryMode) {
+            requests.push(
+                ['400 16px "FudeGoshirae"', '戦国覇道決定取消攻撃内政外交軍団一二三四五六七八九〇'],
+                ['700 16px "FudeGoshirae"', '戦国覇道決定取消攻撃内政外交軍団一二三四五六七八九〇']
+            );
+        }
 
         window.__gameFontLoadPromise = Promise.all(
             requests.map(([font, text]) => document.fonts.load(font, text))
@@ -53,7 +105,7 @@
             await document.fonts.ready;
             clearTimeout(failSafeTimer);
             reveal('loaded');
-            console.info('【FontLoader】Webフォント2書体の明示ロードが完了しました。');
+            console.info(`【FontLoader】Webフォント${earlyMobileLowMemoryMode ? '1書体（低メモリ）' : '2書体'}の明示ロードが完了しました。`);
             return true;
         }).catch((err) => {
             clearTimeout(failSafeTimer);
@@ -230,6 +282,8 @@
         renderTitleVersion();
         bindStaticUiEvents();
         resizeGameScreen();
+        // GameManager生成より前でも、前回WebKitプロセス停止のcheckpointをタイトル上へ表示できるようにする。
+        showEarlyPersistentTransitionCheckpoint();
     }
 
     initializeFonts();

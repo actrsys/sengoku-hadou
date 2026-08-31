@@ -191,36 +191,58 @@ class AudioManager {
                         }
                     }
 
-                    try {
-                        if (typeof self.ctx.resume === 'function') {
-                            const resumeResult = self.ctx.resume();
-                            if (resumeResult && typeof resumeResult.catch === 'function') resumeResult.catch(() => {});
-                        }
-
-                        const source = self.ctx.createBufferSource();
-                        const silentGain = typeof self.ctx.createGain === 'function' ? self.ctx.createGain() : null;
-                        source.buffer = self.ctx.createBuffer(1, 1, Math.max(22050, Number(self.ctx.sampleRate) || 44100));
-                        if (silentGain) {
-                            // 解除bufferは必ずゼロGainを通す。古いDAC/WebViewでも出力波形へ出さない。
-                            silentGain.gain.setValueAtTime(0, self.ctx.currentTime);
-                            source.connect(silentGain);
-                            silentGain.connect(self.ctx.destination);
-                        } else {
-                            source.connect(self.ctx.destination);
-                        }
-                        source.onended = () => {
-                            try { source.disconnect(0); } catch (_) {}
+                    let fallbackStarted = false;
+                    const startSilentFallback = () => {
+                        if (finished || fallbackStarted) return;
+                        fallbackStarted = true;
+                        try {
+                            const source = self.ctx.createBufferSource();
+                            const silentGain = typeof self.ctx.createGain === 'function' ? self.ctx.createGain() : null;
+                            source.buffer = self.ctx.createBuffer(1, 1, Math.max(22050, Number(self.ctx.sampleRate) || 44100));
                             if (silentGain) {
-                                try { silentGain.disconnect(0); } catch (_) {}
+                                // resume()だけでは解除できない古いWebView向けの最終fallback。必ずゼロGainを通す。
+                                silentGain.gain.setValueAtTime(0, self.ctx.currentTime);
+                                source.connect(silentGain);
+                                silentGain.connect(self.ctx.destination);
+                            } else {
+                                source.connect(self.ctx.destination);
                             }
+                            source.onended = () => {
+                                try { source.disconnect(0); } catch (_) {}
+                                if (silentGain) {
+                                    try { silentGain.disconnect(0); } catch (_) {}
+                                }
+                                finishUnlock();
+                            };
+                            if (typeof source.start === 'undefined') source.noteOn(0);
+                            else source.start(0);
+                            setTimeout(finishUnlock, 80);
+                        } catch (_) {
                             finishUnlock();
-                        };
-                        if (typeof source.start === 'undefined') source.noteOn(0);
-                        else source.start(0);
-                        // 極端に古いWebViewでonendedが来なくてもunlock待ちを残さない。
-                        setTimeout(finishUnlock, 80);
+                        }
+                    };
+
+                    try {
+                        // 現行iOS/WebKitではユーザー操作中のresume()だけで解除できるため、まず無音bufferを一切再生しない。
+                        // r323でも最初の数回だけ擦過ノイズが残った実機があるため、buffer再生は本当に必要な旧WebViewだけへ限定する。
+                        const resumeResult = typeof self.ctx.resume === 'function' ? self.ctx.resume() : null;
+                        if (resumeResult && typeof resumeResult.then === 'function') {
+                            resumeResult.then(() => {
+                                if (self.ctx.state === 'running') finishUnlock();
+                                else startSilentFallback();
+                            }).catch(startSilentFallback);
+                            setTimeout(() => {
+                                if (finished) return;
+                                if (self.ctx.state === 'running') finishUnlock();
+                                else startSilentFallback();
+                            }, 80);
+                        } else if (self.ctx.state === 'running') {
+                            finishUnlock();
+                        } else {
+                            startSilentFallback();
+                        }
                     } catch (_) {
-                        finishUnlock();
+                        startSilentFallback();
                     }
                 };
 

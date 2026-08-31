@@ -63,6 +63,13 @@ html.fonts-fallback body { visibility: visible; }
     --font-readable-ja: "UD Digi Kyokasho N-R", "UD Digi Kyokasho NK-R", "Yu Mincho", YuMincho, "Hiragino Mincho ProN", "Hiragino Mincho Pro", "Noto Serif JP", "Noto Serif CJK JP", "BIZ UDPMincho Medium", serif;
     --font-readable-weight: 600;
     --font-numeric-ui: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --font-decorative-ja: 'FudeGoshirae', 'abashiri-mincho', serif;
+}
+
+/* 古い小画面スマホでは、約38MB相当まで展開される筆文字Webフォントを追加常駐させない。
+   本文の網走明朝は維持し、装飾箇所だけ同じ明朝へフォールバックするためレイアウト差を最小限にする。 */
+html.mobile-low-memory {
+    --font-decorative-ja: 'abashiri-mincho', serif;
 }
 
 body {
@@ -311,7 +318,7 @@ body:not(.is-pc):has(.modal:not(.hidden)) #bottom-command-bar {
     border-color: #e6e3d8 #d1c18c #a88a2c #d1c18c;
     background: linear-gradient(135deg, #b0c4b1 0%, #6e8c81 100%); 
     color: #ffffff; 
-    font-family: 'FudeGoshirae', serif;
+    font-family: var(--font-decorative-ja);
     letter-spacing: 0.5px;
     text-shadow: 
         1px 1px 0 #0f2b21, -1px -1px 0 #0f2b21, 
@@ -837,7 +844,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
         radial-gradient(circle 12px at bottom left, transparent 11.5px, #000 12px);
     -webkit-mask-composite: source-in;
     mask-composite: intersect;
-    font-family: 'FudeGoshirae', serif;
+    font-family: var(--font-decorative-ja);
     letter-spacing: 0.5px;
     font-size: 1.2rem; 
     font-weight: normal; 
@@ -1346,7 +1353,7 @@ body:not(.is-pc) .saveload-slot-time {
     white-space: nowrap;
     z-index: 1000; 
     box-shadow: 0 2px 6px rgba(0,0,0,0.8), inset 0 0 5px rgba(212,175,55,0.4);
-    font-family: 'FudeGoshirae', serif;
+    font-family: var(--font-decorative-ja);
     letter-spacing: 1px;
 }
 
@@ -1541,7 +1548,7 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 }
 .troop-aptitude-label {
     color: #f4df9a;
-    font-family: 'FudeGoshirae', serif;
+    font-family: var(--font-decorative-ja);
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
 }
 .troop-aptitude-item + .troop-aptitude-item {
@@ -1598,7 +1605,7 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 .ui-toggle-btn { 
     padding: 4px 12px; 
     font-size: 0.95rem; 
-    font-family: 'FudeGoshirae', serif;
+    font-family: var(--font-decorative-ja);
     background: linear-gradient(135deg, #5d4037 0%, #3e2723 100%);
     color: #d7ccc8; 
     border-style: solid;
@@ -1687,7 +1694,7 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
     flex: none;
     padding: 4px 10px;
     font-size: 0.9rem;
-    font-family: 'FudeGoshirae', serif;
+    font-family: var(--font-decorative-ja);
     color: #ffffff;
     background: linear-gradient(135deg, #6c757d 0%, #495057 100%); 
     border-style: solid;
@@ -2661,7 +2668,7 @@ body:not(.is-pc) .busho-detail-biography-text {
     border: 2px solid #d4af37;
     border-radius: 4px;
     cursor: pointer;
-    font-family: 'FudeGoshirae', serif;
+    font-family: var(--font-decorative-ja);
     letter-spacing: 1px;
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
     transition: all 0.2s ease;
@@ -5714,7 +5721,7 @@ body:not(.is-pc) #map-container {
 
 .game-title {
     margin: 0;
-    font-family: 'FudeGoshirae', 'abashiri-mincho', serif;
+    font-family: var(--font-decorative-ja);
     font-size: clamp(4rem, 8.4vw, 7rem);
     line-height: 0.98;
     font-weight: 400;
@@ -5870,7 +5877,7 @@ body:not(.is-pc) #map-container {
     color: var(--title-paper);
 }
 .loading-title {
-    font-family: 'FudeGoshirae', 'abashiri-mincho', serif;
+    font-family: var(--font-decorative-ja);
     font-size: clamp(2.6rem, 7vw, 4.6rem);
     line-height: 1;
     font-weight: 400;
@@ -6817,7 +6824,7 @@ body.is-pc .legion-council-actions {
     min-width: 62px;
     min-height: 38px;
     padding: 6px 10px;
-    font-family: 'FudeGoshirae', serif;
+    font-family: var(--font-decorative-ja);
 }
 
 .legion-council-toggle .ui-toggle-btn:disabled { cursor: default; }
@@ -7097,7 +7104,7 @@ body.is-pc #interview-modal .interview-session-content.interview-conversation-ac
     /* 面談内容の選択肢は、緑の情報ウインドウから明確に分離する藍鉄系。 */
     background: linear-gradient(to bottom, #586979 0%, #344553 52%, #202d38 100%);
     color: #fff8dc;
-    font-family: 'FudeGoshirae', serif;
+    font-family: var(--font-decorative-ja);
     font-size: 1.08rem;
     font-weight: bold;
     letter-spacing: .04em;

@@ -175,9 +175,12 @@ class GameManager {
             el.addEventListener('click', () => el.remove());
             document.body.appendChild(el);
 
-            // 永続checkpointは一度画面へ回収できれば役目を終える。DOMの表示は残るので報告・確認は可能。
-            if (fromPersistentTransition && typeof localStorage !== 'undefined') {
-                localStorage.removeItem('sengoku_mobile_transition_checkpoint_v1');
+            // ページプロセス停止後はユーザーが報告する前に再度落ちる可能性があるため、
+            // 永続checkpointは表示しただけでは消さない。バッジをユーザーが閉じた時、または正常遷移完了時に消す。
+            if (fromPersistentTransition) {
+                el.addEventListener('click', () => {
+                    try { localStorage.removeItem('sengoku_mobile_transition_checkpoint_v1'); } catch (_) {}
+                }, { once: true });
             }
         } catch (e) {
         }

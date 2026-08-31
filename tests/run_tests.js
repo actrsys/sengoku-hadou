@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r323');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r324');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -260,6 +260,37 @@ test('長文本文は装飾書体と分離し、可読性と歴史物の柔ら�
         assert.ok(at >= 0 && block.includes('font-family: var(--font-readable-ja);'), `${selector} は長文用フォントを使う`);
     }
 });
+
+test('小画面タッチ端末は筆文字Webフォントを追加常駐させず既存明朝へフォールバックする', () => {
+    const bootstrap = read('js/app_bootstrap.js');
+    const css = read('css/style.css');
+    const html = read('index.html');
+    assert.ok(bootstrap.includes('resolveEarlyMobileLowMemoryMode()'));
+    assert.ok(bootstrap.includes('shortEdge <= 390 && longEdge <= 700'));
+    assert.ok(bootstrap.includes("document.documentElement.classList.add('mobile-low-memory')"));
+    assert.ok(bootstrap.includes('if (!earlyMobileLowMemoryMode)'));
+    assert.ok(css.includes("html.mobile-low-memory"));
+    assert.ok(css.includes("--font-decorative-ja: 'abashiri-mincho', serif"));
+    assert.ok(!html.includes('preload" href="data/fonts/fude-goshirae.woff2'));
+});
+
+test('WebKit停止checkpointはGameManager前のタイトル初期化でも回収できる', () => {
+    const bootstrap = read('js/app_bootstrap.js');
+    const game = read('js/game.js');
+    assert.ok(bootstrap.includes('showEarlyPersistentTransitionCheckpoint()'));
+    assert.ok(bootstrap.includes("localStorage.getItem(MOBILE_TRANSITION_CHECKPOINT_KEY)"));
+    assert.ok(bootstrap.includes('前回停止位置: 画面操作'));
+    assert.ok(game.includes('永続checkpointは表示しただけでは消さない'));
+});
+
+test('タッチ音声unlockはresumeを優先し無音bufferを旧WebView fallbackに限定する', () => {
+    const audio = read('js/audio.js');
+    assert.ok(audio.includes("if (self.ctx.state === 'running') finishUnlock()"));
+    assert.ok(audio.includes('startSilentFallback'));
+    assert.ok(audio.includes('buffer再生は本当に必要な旧WebViewだけへ限定する'));
+});
+
+
 
 test('AI思考中の進捗数字は等幅数字と総桁幅固定で桁上がり時に左右へ揺れない', () => {
     const css = read('css/style.css');

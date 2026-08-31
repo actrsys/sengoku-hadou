@@ -657,3 +657,10 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - unlock用bufferはゼロGainを経由し、古い実機で解除音が擦過ノイズとして出力されないようにする。
 - グローバル `Howler.unload()` によるBGM破棄は行わず、現在のAudioContextをresumeする。
 - 武将一覧→詳細の `choice.ogg` は姫一覧等と同じ通常挙動へ戻し、特定UIだけSEを消す回避策は残さない。
+
+
+### r324: 小画面スマホのWebフォント常駐削減／Renderer停止診断の早期回収
+- WebKitのページプロセス自体が落ち、ゲーム内ログも消える小画面スマホでは、ゲームロジックより先に常駐メモリ余裕を確保する。`app_bootstrap.js` はタッチ端末かつ論理画面の短辺390以下・長辺700以下を保守的な `mobile-low-memory` 対象とし、PC・大画面スマホ・タブレットの通常表示は変えない。
+- `FudeGoshirae` はWOFF2約12.8MiBだが展開後font tableが約38MiBあるため、低メモリ対象では明示ロードせず、装飾文字だけ既に読み込む `abashiri-mincho` へフォールバックする。本文書体・UI寸法・ゲーム情報は変えず、通常端末では従来の筆文字を維持する。Fudeの静的preloadも外し、低メモリ対象で未使用フォントを先に取得しない。
+- 武将一覧→詳細の永続checkpointはGameManager生成後だけでなく、DOMContentLoaded直後にbootstrapから直接回収してタイトル上へ表示できるようにする。表示しただけではlocalStorageから消さず、ユーザーがバッジを閉じるか正常遷移が完了した時だけ削除する。Renderer再停止が連続しても診断情報を報告前に失わない。
+- タッチ音声unlockは `AudioContext.resume()` を第一経路とし、現行WebKitで不要な極短bufferを再生しない。resume後もcontextがrunningにならない旧WebViewだけ、r323のゼロGain無音bufferへfallbackする。SEカタログ・音量・BGMストリーミングは変更しない。
