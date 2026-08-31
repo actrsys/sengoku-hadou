@@ -5503,6 +5503,11 @@ html.mobile-low-memory body:not(.is-pc).background-paused #map-scroll-container 
 html.mobile-low-memory body:not(.is-pc) .modal {
     background: #080b09 !important;
 }
+/* 短い会話・確認は地図を見せたままにする。重い一覧/詳細は従来どおり背景停止で黒幕化する。 */
+html.mobile-low-memory body:not(.is-pc) #dialog-modal,
+html.mobile-low-memory body:not(.is-pc) #intercept-confirm-modal {
+    background: rgba(0, 0, 0, 0.6) !important;
+}
 html.mobile-low-memory body:not(.is-pc) .modal .modal-content {
     background: #1b3822 !important;
 }
