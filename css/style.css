@@ -490,15 +490,22 @@ body:not(.is-pc) #map-base-image { transform: translateZ(0); backface-visibility
 #map-guide { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 8px 20px; border-radius: 20px; pointer-events: none; z-index: 600; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
 
 /* --- 城カード --- */
-.castle-card { width: var(--map-tile-size); height: var(--map-tile-size); background-color: transparent; border: none; box-shadow: none; border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; padding: 2px; cursor: pointer; font-size: 0.75rem; position: absolute; transform: translate(-50%, -60%) scale(var(--castle-scale, 0.41)); z-index: 10; filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5)); --castle-shadow-bottom: 2.1px; }
+.castle-card { width: var(--map-tile-size); height: var(--map-tile-size); background-color: transparent; border: none; box-shadow: none; border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; padding: 2px; cursor: pointer; font-size: 0.75rem; position: absolute; transform: translate(-50%, -60%) scale(var(--castle-scale, 0.41)); z-index: 10; filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5)); --castle-shadow-bottom: 11.5px; }
 .castle-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url('../data/images/map/shiro_icon001.webp'); background-size: contain; background-position: center; background-repeat: no-repeat; z-index: 2; pointer-events: none; }
-/* 001は1254px中72pxの下透明余白。80px枠へcontain後の見かけの下余白は約4.59px。
-   影は実絵の接地線より約2.5pxだけ下へ出すため2.1pxを採用する。 */
-.castle-card.icon-large { --castle-shadow-bottom: 2px; }
-.castle-card.icon-large::before { background-image: url('../data/images/map/shiro_icon002.webp'); }
-/* 002は元画像の下透明余白0pxだが、1331x1182を80px正方形へcontainすると上下に約4.49px空く。
-   001と同じ接地感になるよう、実表示後の余白を基準に影位置を補正する。 */
-.castle-card::after { content: ""; position: absolute; bottom: var(--castle-shadow-bottom, 2px); left: 50%; transform: translateX(-50%); width: 90%; height: 15%; background: rgba(0, 0, 0, 1.0); border-radius: 50%; z-index: 1; pointer-events: none; }
+/* 001(最小・木造砦)は384x256を80px枠へcontainすると実表示後の下余白が約13.958px。
+   接地線から約2.5pxだけ下へ楕円影を出すため、影下端は11.5pxに補正する。 */
+.castle-card.icon-tier-1 { --castle-shadow-bottom: 11.5px; }
+.castle-card.icon-tier-1::before { background-image: url('../data/images/map/shiro_icon001.webp'); }
+/* 002(小城)は実表示後の下余白が約6.134px。 */
+.castle-card.icon-tier-2 { --castle-shadow-bottom: 3.6px; }
+.castle-card.icon-tier-2::before { background-image: url('../data/images/map/shiro_icon002.webp'); }
+/* 003(中城)は実表示後の下余白が約4.458px。 */
+.castle-card.icon-tier-3 { --castle-shadow-bottom: 2.0px; }
+.castle-card.icon-tier-3::before { background-image: url('../data/images/map/shiro_icon003.webp'); }
+/* 004(最大・巨城)は実表示後の下余白が約6.647px。新画像は横に広く、見かけの最大サイズが落ちやすいので、表示スケール側で軽く補正する。 */
+.castle-card.icon-tier-4 { --castle-shadow-bottom: 4.1px; }
+.castle-card.icon-tier-4::before { background-image: url('../data/images/map/shiro_icon004.webp'); }
+.castle-card::after { content: ""; position: absolute; bottom: var(--castle-shadow-bottom, 11.5px); left: 50%; transform: translateX(-50%); width: 90%; height: 15%; background: rgba(0, 0, 0, 1.0); border-radius: 50%; z-index: 1; pointer-events: none; }
 body:not(.is-touch-input) .castle-card:hover { transform: translate(-50%, calc(-60% - 2px)) scale(var(--castle-scale, 0.41)); filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.5)); z-index: 100 !important; }
 .castle-card.active-turn { filter: drop-shadow(0 0 8px #ff9800); z-index: 15; }
 .castle-card.selectable-target { filter: drop-shadow(0 0 8px #e91e63); animation: pulse-shadow 1s infinite; z-index: 25; cursor: crosshair; }

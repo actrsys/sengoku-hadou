@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r313'
+        Version: 'r314'
     },
 
     History: {
@@ -18,10 +18,19 @@ window.GameConfig = {
         MaxEntries: 500
     },
 
+
     Map: {
         CastleCard: {
             BaseScale: 0.41,
-            LargeIconScaleThreshold: 0.39
+            Tier2MinScale: 0.355,
+            Tier3MinScale: 0.375,
+            Tier4MinScale: 0.395,
+            IconScaleMultipliers: {
+                1: 1.0,
+                2: 1.0,
+                3: 1.0,
+                4: 1.065
+            }
         }
     },
 

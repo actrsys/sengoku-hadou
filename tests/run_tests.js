@@ -119,20 +119,32 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r313');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r314');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('友好'), false);
 });
 
-test('城アイコンの楕円影は各WebPの実表示下端に合わせて個別補正する', () => {
+test('城アイコンは4段階のWebPと個別の楕円影補正を使う', () => {
     const css = read('css/style.css');
-    assert.ok(css.includes('--castle-shadow-bottom: 2.1px'));
-    assert.ok(css.includes('.castle-card.icon-large { --castle-shadow-bottom: 2px; }'));
-    assert.ok(css.includes('bottom: var(--castle-shadow-bottom, 2px)'));
-    assert.ok(css.includes("shiro_icon001.webp"));
-    assert.ok(css.includes("shiro_icon002.webp"));
+    const uiMap = read('js/ui_map.js');
+    const config = read('js/config.js');
+    assert.ok(css.includes('.castle-card.icon-tier-1 { --castle-shadow-bottom: 11.5px; }'));
+    assert.ok(css.includes('.castle-card.icon-tier-2 { --castle-shadow-bottom: 3.6px; }'));
+    assert.ok(css.includes('.castle-card.icon-tier-3 { --castle-shadow-bottom: 2.0px; }'));
+    assert.ok(css.includes('.castle-card.icon-tier-4 { --castle-shadow-bottom: 4.1px; }'));
+    assert.ok(css.includes('bottom: var(--castle-shadow-bottom, 11.5px)'));
+    assert.ok(css.includes('shiro_icon001.webp'));
+    assert.ok(css.includes('shiro_icon002.webp'));
+    assert.ok(css.includes('shiro_icon003.webp'));
+    assert.ok(css.includes('shiro_icon004.webp'));
+    assert.ok(config.includes('Tier2MinScale: 0.355'));
+    assert.ok(config.includes('Tier3MinScale: 0.375'));
+    assert.ok(config.includes('Tier4MinScale: 0.395'));
+    assert.ok(config.includes('4: 1.065'));
+    assert.ok(uiMap.includes('el.dataset.iconTier = String(iconTier);'));
+    assert.ok(uiMap.includes('for (let tier = 1; tier <= 4; tier++)'));
 });
 
 test('士気上限は内部120・通常100・ゲージ100を設定の正本から使う', () => {

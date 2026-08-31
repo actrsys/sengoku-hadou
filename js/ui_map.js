@@ -1432,12 +1432,24 @@ Object.assign(UIManager.prototype, {
             const deficit = Math.max(0, 4000 - totalValue); // 4000に足りない分を計算します
             const scaleDownPercent = Math.floor(deficit / 200); // 200不足するごとに1%縮小します
             const scaleRatio = 1 - (scaleDownPercent * 0.01);
-            const baseScale = window.GameConfig?.Map?.CastleCard?.BaseScale || 0.41;
-            const largeIconScaleThreshold = window.GameConfig?.Map?.CastleCard?.LargeIconScaleThreshold || 0.39;
-            const currentScale = baseScale * scaleRatio; // 基本のサイズに倍率を掛けます
+            const castleCardConfig = window.GameConfig?.Map?.CastleCard || {};
+            const baseScale = castleCardConfig.BaseScale || 0.41;
+            const tier2MinScale = castleCardConfig.Tier2MinScale || 0.355;
+            const tier3MinScale = castleCardConfig.Tier3MinScale || 0.375;
+            const tier4MinScale = castleCardConfig.Tier4MinScale || 0.395;
+            const rawScale = baseScale * scaleRatio;
+            let iconTier = 1;
+            if (rawScale >= tier4MinScale) iconTier = 4;
+            else if (rawScale >= tier3MinScale) iconTier = 3;
+            else if (rawScale >= tier2MinScale) iconTier = 2;
+            const tierScaleMultipliers = castleCardConfig.IconScaleMultipliers || {};
+            const tierScaleMultiplier = Number(tierScaleMultipliers[iconTier]) || 1;
+            const currentScale = rawScale * tierScaleMultiplier;
             el.style.setProperty('--castle-scale', currentScale);
-            el.classList.toggle('icon-large', currentScale >= largeIconScaleThreshold);
-            el.classList.toggle('icon-small', currentScale < largeIconScaleThreshold);
+            el.dataset.iconTier = String(iconTier);
+            for (let tier = 1; tier <= 4; tier++) {
+                el.classList.toggle(`icon-tier-${tier}`, iconTier === tier);
+            }
 
             if (c.isDone) el.classList.add('done');
             const castellan = this.game.getBusho(c.castellanId); const clanData = this.game.getClan(c.ownerClan);
