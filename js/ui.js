@@ -200,7 +200,7 @@ class UIManager {
                     const img = new Image();
                     img.onload = img.onerror = res;
                     img.decoding = 'async';
-                    img.src = './data/images/map/shiro_icon001.png';
+                    img.src = './data/images/map/shiro_icon001.webp';
                 });
                 this.updateLoadingProgress(85, '基本データを準備しています');
                 await this.waitForNextPaint();

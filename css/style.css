@@ -491,8 +491,8 @@ body:not(.is-pc) #map-base-image { transform: translateZ(0); backface-visibility
 
 /* --- 城カード --- */
 .castle-card { width: var(--map-tile-size); height: var(--map-tile-size); background-color: transparent; border: none; box-shadow: none; border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; padding: 2px; cursor: pointer; font-size: 0.75rem; position: absolute; transform: translate(-50%, -60%) scale(var(--castle-scale, 0.41)); z-index: 10; filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5)); }
-.castle-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url('../data/images/map/shiro_icon001.png'); background-size: contain; background-position: center; background-repeat: no-repeat; z-index: 2; pointer-events: none; }
-.castle-card.icon-large::before { background-image: url('../data/images/map/shiro_icon002.png'); }
+.castle-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url('../data/images/map/shiro_icon001.webp'); background-size: contain; background-position: center; background-repeat: no-repeat; z-index: 2; pointer-events: none; }
+.castle-card.icon-large::before { background-image: url('../data/images/map/shiro_icon002.webp'); }
 .castle-card::after { content: ""; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); width: 90%; height: 15%; background: rgba(0, 0, 0, 1.0); border-radius: 50%; z-index: 1; pointer-events: none; }
 body:not(.is-touch-input) .castle-card:hover { transform: translate(-50%, calc(-60% - 2px)) scale(var(--castle-scale, 0.41)); filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.5)); z-index: 100 !important; }
 .castle-card.active-turn { filter: drop-shadow(0 0 8px #ff9800); z-index: 15; }

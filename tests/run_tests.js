@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r309');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r310');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -5342,7 +5342,7 @@ test('地図ロードは帯状1走査とコンパクトIDマップで古いス�
     assert.ok(html.includes('id="loading-progress-text"'));
     assert.ok(ui.includes('updateLoadingProgress(progress, label = null)'), 'ロード画面は実進捗を表示する');
     assert.ok(!ui.includes('audio.oncanplaythrough = audio.onerror'), 'タイトルロードでSEのcanplaythrough待ちをしない');
-    assert.ok(ui.includes("img.src = './data/images/map/shiro_icon001.png'"), 'タイトル段階の先読みは必要最小限にする');
+    assert.ok(ui.includes("img.src = './data/images/map/shiro_icon001.webp'"), 'タイトル段階の先読みは必要最小限にする');
 });
 
 test('イベント地図も共有IDマップを再利用し巨大RGBAを作り直さない', () => {
