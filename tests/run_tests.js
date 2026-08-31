@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r324');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r325');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -261,7 +261,7 @@ test('長文本文は装飾書体と分離し、可読性と歴史物の柔ら�
     }
 });
 
-test('小画面タッチ端末は筆文字Webフォントを追加常駐させず既存明朝へフォールバックする', () => {
+test('小画面タッチ端末はWebフォントを常駐させずシステム明朝へフォールバックする', () => {
     const bootstrap = read('js/app_bootstrap.js');
     const css = read('css/style.css');
     const html = read('index.html');
@@ -270,8 +270,28 @@ test('小画面タッチ端末は筆文字Webフォントを追加常駐させ�
     assert.ok(bootstrap.includes("document.documentElement.classList.add('mobile-low-memory')"));
     assert.ok(bootstrap.includes('if (!earlyMobileLowMemoryMode)'));
     assert.ok(css.includes("html.mobile-low-memory"));
-    assert.ok(css.includes("--font-decorative-ja: 'abashiri-mincho', serif"));
+    assert.ok(bootstrap.includes('低メモリ端末ではWebフォントを読み込まずシステム明朝を使用します'));
+    assert.ok(css.includes('html.mobile-low-memory body,'));
+    assert.ok(css.includes('Hiragino Mincho ProN'));
     assert.ok(!html.includes('preload" href="data/fonts/fude-goshirae.woff2'));
+    assert.ok(!html.includes('data/fonts/abashiri-mincho.woff2?v=1" as="font'), '低メモリ判定前の静的font preloadを置かない');
+    assert.ok(bootstrap.includes("fontPreload.href = 'data/fonts/abashiri-mincho.woff2?v=1'"), '通常端末だけbootstrapからpreloadする');
+});
+
+test('低メモリ端末はモーダル中の地図と独自スクロールbarをcompositorから外す', () => {
+    const css = read('css/style.css');
+    const ui = read('js/ui.js');
+    const bootstrap = read('js/app_bootstrap.js');
+    const game = read('js/game.js');
+    assert.ok(css.includes('html.mobile-low-memory body:not(.is-pc).background-paused #map-scroll-container'));
+    assert.ok(css.includes('display: none !important;'));
+    assert.ok(css.includes('html.mobile-low-memory body:not(.is-pc) .modal .modal-content'));
+    assert.ok(css.includes('box-shadow: none !important;'));
+    assert.ok(ui.includes('const useNativeLowMemoryScroll = !!(window.__mobileLowMemoryMode'));
+    assert.ok(ui.includes('Array.from(CustomScrollbar.instances).forEach(instance => instance.destroy());'));
+    assert.ok(ui.includes("listEl.classList.remove('hide-native-scroll')"));
+    assert.ok(bootstrap.includes("el.id = 'mobile-transition-checkpoint-badge'"));
+    assert.ok(game.includes("document.getElementById('mobile-transition-checkpoint-badge')"));
 });
 
 test('WebKit停止checkpointはGameManager前のタイトル初期化でも回収できる', () => {
@@ -5408,7 +5428,7 @@ test('地図ロードは帯状1走査とコンパクトIDマップで古いス�
     assert.ok(data.includes('if (maxId <= 255) return new Uint8Array(length);'), '現行城/国IDでは1pixel=1byteを選べる');
     assert.ok(!data.includes('this.provinceImageData = ctx.getImageData'), '巨大province RGBAを常駐保持しない');
     assert.ok(!uiMap.includes('const queue = new Int32Array(pixelSize)'), '初回描画で全画面BFSキューを確保しない');
-    assert.ok(uiMap.includes('const scale = isPC ? 1 : 0.5;'), 'スマホ勢力色Canvasは内部解像度を半分にする');
+    assert.ok(uiMap.includes('const scale = isPC ? 1 : (lowMemoryMobile ? 0.25 : 0.5);'), '通常スマホは半解像度、低メモリ端末は1/4解像度を使う');
     assert.ok(html.includes('id="loading-progress-text"'));
     assert.ok(ui.includes('updateLoadingProgress(progress, label = null)'), 'ロード画面は実進捗を表示する');
     assert.ok(!ui.includes('audio.oncanplaythrough = audio.onerror'), 'タイトルロードでSEのcanplaythrough待ちをしない');
@@ -5555,8 +5575,9 @@ test('古いスマホ向け地図演出は城領域boundsと低解像度帯描�
     assert.ok(!map.includes('for (let i = 0; i < mapWidth * mapHeight; i++)'), '戦闘点滅に全地図走査fallbackを残さない');
     assert.ok(map.includes('_getMapOverlayRasterSize(mapW, mapH)'), '全画面エフェクトは端末別内部解像度を使う');
     assert.ok(map.includes('_paintCanvasByStrips(canvas, paintPixel'), '巨大ImageDataを一枚作らず帯状描画する');
-    assert.ok(map.includes("img.src = isPC ? './data/images/map/japan_map.png' : './data/images/map/japan_map_mobile.png'"), 'スマホ表示地図は軽量専用画像を使う');
+    assert.ok(map.includes("lowMemoryMobile ? './data/images/map/japan_map_lowmem.png' : './data/images/map/japan_map_mobile.png'"), '低メモリ端末はさらに縮小した表示専用地図を使う');
     assert.ok(fs.existsSync(path.join(ROOT, 'data/images/map/japan_map_mobile.png')));
+    assert.ok(fs.existsSync(path.join(ROOT, 'data/images/map/japan_map_lowmem.png')));
 });
 
 
@@ -5568,7 +5589,7 @@ test('新規開始とロードは実表示用地図Imageの読込・decode完了
 
     assert.ok(map.includes('async prepareMapBaseImage(mapW, mapH)'));
     assert.ok(map.includes("await img.decode();"), '表示用Imageは対応ブラウザでdecode完了まで待つ');
-    assert.ok(map.includes("img.src = isPC ? './data/images/map/japan_map.png' : './data/images/map/japan_map_mobile.png'"), '実際の端末で表示するImageを待つ');
+    assert.ok(map.includes("lowMemoryMobile ? './data/images/map/japan_map_lowmem.png' : './data/images/map/japan_map_mobile.png'"), '実際の端末種別に応じた表示用Imageを待つ');
 
     const scenarioStart = game.indexOf("this.ui.updateLoadingProgress(90, '地図を読み込んでいます')");
     const scenarioEnd = game.indexOf('// 観戦開始はロード画面を閉じてから。', scenarioStart);
@@ -7162,7 +7183,7 @@ test('前回AI停止位置の診断表示は静的inline styleとonclick代入�
     assert.ok(!block.includes('style.cssText'));
     assert.ok(!block.includes('.onclick ='));
     assert.ok(block.includes("addEventListener('click'"));
-    assert.ok(css.includes('#ai-last-checkpoint-badge {'));
+    assert.ok(css.includes('#ai-last-checkpoint-badge,\n#mobile-transition-checkpoint-badge {'));
 });
 
 test('断交時のAI捕虜処遇はasync完了を待ってから結果を表示する', () => {
@@ -7452,6 +7473,10 @@ test('武将一覧→詳細のRenderer停止診断は一時的にlocalStorageへ
     const info = read('js/ui_info.js');
     const game = read('js/game.js');
     assert.ok(info.includes("'sengoku_mobile_transition_checkpoint_v1'"));
+    assert.ok(info.includes("mark('transition_start')"));
+    assert.ok(info.includes("mark('background_pause_start')"));
+    assert.ok(info.includes("mark('background_pause_done')"));
+    assert.ok(info.indexOf("mark('transition_start')") < info.indexOf('this.ui.pauseBackgroundUpdates();'), '永続checkpointは背景GPU切替より先に保存する');
     assert.ok(info.includes("mark('list_dom_released')"));
     assert.ok(info.includes("mark('dom_start')"));
     assert.ok(info.includes("mark('dom_done')"));

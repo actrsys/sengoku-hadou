@@ -113,9 +113,12 @@ Object.assign(UIManager.prototype, {
             };
             img.addEventListener('load', markReady, { once: true });
             const isPC = document.body.classList.contains('is-pc');
-            // スマホは表示専用地図だけ75%解像度版を使い、常駐デコードメモリを約45%削減します。
+            const lowMemoryMobile = !isPC && !!window.__mobileLowMemoryMode;
+            // 通常スマホは75%解像度、古い小画面端末は50%解像度の表示専用画像を使う。
             // 論理座標・城/国IDマップは従来どおり3140x2440なのでゲーム判定には影響しません。
-            img.src = isPC ? './data/images/map/japan_map.png' : './data/images/map/japan_map_mobile.png';
+            img.src = isPC
+                ? './data/images/map/japan_map.png'
+                : (lowMemoryMobile ? './data/images/map/japan_map_lowmem.png' : './data/images/map/japan_map_mobile.png');
             this._mapBaseImage = img;
 
             // preload済みでもdecode済みとは限らないので、要素を保持したままdecodeを促します。
@@ -179,7 +182,8 @@ Object.assign(UIManager.prototype, {
     // CSS上の大きさは元地図と同じなので、9:16画面で見た目のサイズは変わりません。
     _getClanColorRasterSize(mapW, mapH) {
         const isPC = document.body.classList.contains('is-pc');
-        const scale = isPC ? 1 : 0.5;
+        const lowMemoryMobile = !isPC && !!window.__mobileLowMemoryMode;
+        const scale = isPC ? 1 : (lowMemoryMobile ? 0.25 : 0.5);
         return {
             width: Math.max(1, Math.round(mapW * scale)),
             height: Math.max(1, Math.round(mapH * scale)),
@@ -191,7 +195,8 @@ Object.assign(UIManager.prototype, {
     // CSS上は原寸地図サイズへ拡大するため、城・国の論理座標や当たり判定は変わりません。
     _getMapOverlayRasterSize(mapW, mapH) {
         const isPC = document.body.classList.contains('is-pc');
-        const scale = isPC ? 1 : 0.5;
+        const lowMemoryMobile = !isPC && !!window.__mobileLowMemoryMode;
+        const scale = isPC ? 1 : (lowMemoryMobile ? 0.25 : 0.5);
         return {
             width: Math.max(1, Math.round(mapW * scale)),
             height: Math.max(1, Math.round(mapH * scale)),

@@ -664,3 +664,13 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - `FudeGoshirae` はWOFF2約12.8MiBだが展開後font tableが約38MiBあるため、低メモリ対象では明示ロードせず、装飾文字だけ既に読み込む `abashiri-mincho` へフォールバックする。本文書体・UI寸法・ゲーム情報は変えず、通常端末では従来の筆文字を維持する。Fudeの静的preloadも外し、低メモリ対象で未使用フォントを先に取得しない。
 - 武将一覧→詳細の永続checkpointはGameManager生成後だけでなく、DOMContentLoaded直後にbootstrapから直接回収してタイトル上へ表示できるようにする。表示しただけではlocalStorageから消さず、ユーザーがバッジを閉じるか正常遷移が完了した時だけ削除する。Renderer再停止が連続しても診断情報を報告前に失わない。
 - タッチ音声unlockは `AudioContext.resume()` を第一経路とし、現行WebKitで不要な極短bufferを再生しない。resume後もcontextがrunningにならない旧WebViewだけ、r323のゼロGain無音bufferへfallbackする。SEカタログ・音量・BGMストリーミングは変更しない。
+
+
+### r325: 古い小画面iPhoneのcompositor黒化対策
+- スクロールバーやモーダルが黒化してからWebKitページプロセスが落ちる実機症状は、通常JS例外ではなく描画/compositorの資源逼迫として扱う。`mobile-low-memory` 対象だけ安全側へ寄せ、通常スマホ・タブレット・PCの表示は維持する。
+- 低メモリ端末は同梱Webフォントを2書体とも明示ロードせず、静的preloadも開始しない。iOS標準の明朝系へフォールバックする。装飾書体だけでなく本文の`abashiri-mincho`直接指定もCSS上書きし、後からfont-faceが遅延取得されないようにする。
+- 表示専用地図は通常スマホ75%版に対して低メモリ端末だけ50%版を使う。論理地図3140x2440、国ID/拠点ID、当たり判定、カメラ座標は変更しない。勢力色・一時地図Canvasも低メモリ端末だけ1/4解像度とし、CSS表示寸法は従来どおりに保つ。
+- 低メモリ端末の情報/コマンドモーダル中は`#map-scroll-container`を`display:none`でcompositor対象から外す。モーダルを閉じた時は既存`background-paused`解除だけで同じ地図DOMとscroll位置へ復帰し、再decodeや地図再構築は行わない。
+- 低メモリ端末ではCustomScrollbarを生成せずnative touch scrollを使う。黒化が観測されたgradient/filter付きthumb/trackと追加drag layerを常駐させない。PC・通常スマホは従来の独自スクロールバーを維持する。
+- 低メモリ地図では252拠点すべての通常drop-shadowと諸勢力/大名ラベルの影を停止する。ただし現在ターン・選択可能・外交glowなど意味を持つ発光は維持する。
+- 武将一覧→詳細の永続checkpointは`pauseBackgroundUpdates()`より前に`transition_start`を保存し、背景停止の前後も`background_pause_start/done`で区別する。起動直後の永続診断バッジは通常診断と別IDにし、通常`writeSystemDiagnostic()`が誤って消さない。

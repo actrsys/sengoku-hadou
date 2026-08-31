@@ -66,10 +66,20 @@ html.fonts-fallback body { visibility: visible; }
     --font-decorative-ja: 'FudeGoshirae', 'abashiri-mincho', serif;
 }
 
-/* 古い小画面スマホでは、約38MB相当まで展開される筆文字Webフォントを追加常駐させない。
-   本文の網走明朝は維持し、装飾箇所だけ同じ明朝へフォールバックするためレイアウト差を最小限にする。 */
+/* 古い小画面スマホではWebフォント2書体を読み込まず、OS標準の明朝系へ寄せる。
+   フォント展開とglyph atlasの常駐メモリを抑え、WebKit compositorの余裕を確保する。 */
 html.mobile-low-memory {
-    --font-decorative-ja: 'abashiri-mincho', serif;
+    --font-decorative-ja: "Hiragino Mincho ProN", "Hiragino Mincho Pro", "Yu Mincho", serif;
+}
+
+/* 古い小画面iPhone系はWebフォントを一切使わず、標準の明朝系へ寄せる。
+   glyph atlas/フォント展開メモリを減らすための低メモリ端末限定フォールバック。 */
+html.mobile-low-memory body,
+html.mobile-low-memory .title-version,
+html.mobile-low-memory .title-btn,
+html.mobile-low-memory .guide-nav-btn,
+html.mobile-low-memory .guide-command-btn {
+    font-family: "Hiragino Mincho ProN", "Hiragino Mincho Pro", "Yu Mincho", serif !important;
 }
 
 body {
@@ -5482,6 +5492,48 @@ body:not(.is-pc).background-paused #map-base-image {
     will-change: auto !important;
 }
 
+/* Rendererの黒化が先行する低メモリ端末では、情報/コマンドモーダル中の巨大地図を
+   compositorから完全に外す。battle画面で既に使っているdisplay:noneと同じ安全策で、
+   モーダルを閉じればbackground-paused解除だけで元のscroll位置・地図DOMへ戻る。 */
+html.mobile-low-memory body:not(.is-pc).background-paused #map-scroll-container {
+    display: none !important;
+}
+
+/* 低メモリ端末ではスクロール層・大枠のoffscreen shadowを作らない。 */
+html.mobile-low-memory body:not(.is-pc) .modal {
+    background: #080b09 !important;
+}
+html.mobile-low-memory body:not(.is-pc) .modal .modal-content {
+    background: #1b3822 !important;
+}
+html.mobile-low-memory body:not(.is-pc) .modal .modal-content,
+html.mobile-low-memory body:not(.is-pc) .scroll-wrapper {
+    box-shadow: none !important;
+}
+html.mobile-low-memory body:not(.is-pc) .scroll-wrapper {
+    padding-right: 0 !important;
+}
+html.mobile-low-memory body:not(.is-pc) .custom-scrollbar-track,
+html.mobile-low-memory body:not(.is-pc) .custom-scrollbar-btn {
+    display: none !important;
+}
+
+/* 252拠点すべての常時drop-shadow合成を避ける。選択/現在ターンの意味付き発光は維持する。 */
+html.mobile-low-memory body:not(.is-pc) .castle-card {
+    filter: none;
+}
+html.mobile-low-memory body:not(.is-pc) .castle-card.active-turn {
+    filter: drop-shadow(0 0 8px #ff9800);
+}
+html.mobile-low-memory body:not(.is-pc) .castle-card.selectable-target {
+    filter: drop-shadow(0 0 8px #e91e63);
+}
+html.mobile-low-memory body:not(.is-pc) .kunishu-icon-img,
+html.mobile-low-memory body:not(.is-pc) .daimyo-name-label {
+    filter: none !important;
+    box-shadow: none !important;
+}
+
 /* =========================================================
    エンディング・ゲームオーバー画面
    ========================================================= */
@@ -8053,7 +8105,8 @@ body:not(.is-pc) #war-title-name.war-title-three-lines .war-title-fixed-line:nth
 
 
 /* 実機診断：前回AI処理の停止位置。静的見た目はCSS、操作はaddEventListenerで管理する。 */
-#ai-last-checkpoint-badge {
+#ai-last-checkpoint-badge,
+#mobile-transition-checkpoint-badge {
     position: fixed;
     left: 8px;
     bottom: 8px;

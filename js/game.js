@@ -161,7 +161,7 @@ class GameManager {
                 }
                 return;
             }
-            if (document.getElementById('ai-last-checkpoint-badge')) return;
+            if (document.getElementById('ai-last-checkpoint-badge') || document.getElementById('mobile-transition-checkpoint-badge')) return;
 
             const el = document.createElement('div');
             el.id = 'ai-last-checkpoint-badge';

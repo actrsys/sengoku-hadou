@@ -204,13 +204,17 @@ class UIInfoManager {
             }
         };
 
+        // 背景レイヤー切替そのものが古いWebKitのcompositor停止点になり得るため、
+        // 最初の永続checkpointはpauseBackgroundUpdatesより必ず先に残す。
+        mark('transition_start');
+        mark('background_pause_start');
         if (this.ui && typeof this.ui.pauseBackgroundUpdates === 'function') {
             this.ui.pauseBackgroundUpdates();
         }
+        mark('background_pause_done');
         if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
             this.game.writeSystemDiagnostic(`ui:modal:${pageType}`);
         }
-        mark('transition_start');
 
         const listEl = document.getElementById('selector-list');
         this.currentModalInfo.scrollPos = listEl ? listEl.scrollTop : 0;

@@ -33,7 +33,18 @@
 
     const earlyMobileLowMemoryMode = resolveEarlyMobileLowMemoryMode();
     window.__mobileLowMemoryMode = earlyMobileLowMemoryMode;
-    if (earlyMobileLowMemoryMode) document.documentElement.classList.add('mobile-low-memory');
+    if (earlyMobileLowMemoryMode) {
+        document.documentElement.classList.add('mobile-low-memory');
+    } else if (document && typeof document.createElement === 'function' && document.head) {
+        // 通常端末だけ従来の網走明朝preloadを維持する。低メモリ端末はfont fetch自体を始めない。
+        const fontPreload = document.createElement('link');
+        fontPreload.rel = 'preload';
+        fontPreload.href = 'data/fonts/abashiri-mincho.woff2?v=1';
+        fontPreload.as = 'font';
+        fontPreload.type = 'font/woff2';
+        fontPreload.crossOrigin = 'anonymous';
+        document.head.appendChild(fontPreload);
+    }
 
     function showEarlyPersistentTransitionCheckpoint() {
         if (typeof localStorage === 'undefined') return;
@@ -46,9 +57,9 @@
                 localStorage.removeItem(MOBILE_TRANSITION_CHECKPOINT_KEY);
                 return;
             }
-            if (document.getElementById('ai-last-checkpoint-badge')) return;
+            if (document.getElementById('mobile-transition-checkpoint-badge') || document.getElementById('ai-last-checkpoint-badge')) return;
             const el = document.createElement('div');
-            el.id = 'ai-last-checkpoint-badge';
+            el.id = 'mobile-transition-checkpoint-badge';
             el.textContent = `前回停止位置: 画面操作　${data.phase}`;
             el.title = 'タップすると閉じます';
             el.addEventListener('click', () => {
@@ -70,6 +81,15 @@
             root.classList.add(reason === 'loaded' ? 'fonts-ready' : 'fonts-fallback');
         };
 
+        // iPhone 6/7/8/SE級の低メモリ端末ではWebフォント2書体とも読まない。
+        // iOS標準の明朝系へ寄せ、フォント展開・glyph atlasの常駐メモリを抑える。
+        if (earlyMobileLowMemoryMode) {
+            reveal('unsupported');
+            window.__gameFontLoadPromise = Promise.resolve(false);
+            console.info('【FontLoader】低メモリ端末ではWebフォントを読み込まずシステム明朝を使用します。');
+            return;
+        }
+
         const failSafeTimer = setTimeout(() => {
             console.warn('【FontLoader】フォント待機がタイムアウトしたため、画面表示を優先します。');
             reveal('timeout');
@@ -86,8 +106,7 @@
             ['400 16px "abashiri-mincho"', '戦国覇道徳川家康今川織田武田上杉一二三四五六七八九〇'],
             ['700 16px "abashiri-mincho"', '戦国覇道徳川家康今川織田武田上杉一二三四五六七八九〇']
         ];
-        // 小画面の低メモリ端末だけはFudeGoshiraeを明示ロードしない。
-        // CSS側も同時に網走明朝へフォールバックするため、後から遅延ロードされることもない。
+        // 低メモリ端末は上でreturn済み。通常端末だけ従来どおり2書体を明示ロードする。
         if (!earlyMobileLowMemoryMode) {
             requests.push(
                 ['400 16px "FudeGoshirae"', '戦国覇道決定取消攻撃内政外交軍団一二三四五六七八九〇'],

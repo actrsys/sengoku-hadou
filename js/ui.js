@@ -1766,6 +1766,23 @@ class UIManager {
         if (root.matches && root.matches(selectors.join(', '))) targets.push(root);
         root.querySelectorAll(selectors.join(', ')).forEach(el => targets.push(el));
 
+        // 古い小画面iPhone系では独自スクロールバーのgradient/filter/drag layerを作らない。
+        // タッチスクロール自体はlist本体のnative overflowで維持する。
+        const useNativeLowMemoryScroll = !!(window.__mobileLowMemoryMode
+            && document.body && document.body.classList.contains('is-touch-input'));
+        if (useNativeLowMemoryScroll) {
+            if (typeof CustomScrollbar !== 'undefined' && CustomScrollbar.instances) {
+                Array.from(CustomScrollbar.instances).forEach(instance => instance.destroy());
+            }
+            targets.forEach(listEl => {
+                if (listEl.customScrollbar && typeof listEl.customScrollbar.destroy === 'function') {
+                    listEl.customScrollbar.destroy();
+                }
+                listEl.classList.remove('hide-native-scroll');
+            });
+            return;
+        }
+
         targets.forEach(listEl => {
             if (listEl.customScrollbar && !listEl.customScrollbar._destroyed) {
                 // update()直呼びではなく1フレームにまとめます。
