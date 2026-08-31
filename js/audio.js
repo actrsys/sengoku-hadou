@@ -9,6 +9,10 @@ class AudioManager {
         this._bgmUsesBakedBaseVolume = false; // mobile AACは基本音量を音源へ焼き込んでいる
         // min版の読込失敗時だけAudioManager自身が通常版を補います。HTMLへinline onerrorを置かないための正規窓口です。
         this._howlerReadyPromise = this._ensureHowlerReady();
+        // Howler 2.2.4 の標準モバイルunlockは touchstart/touchend/click の複数イベントで
+        // scratch buffer をdestinationへ直結する。古い実機では最初の数タップだけ擦過ノイズに
+        // 聞こえる場合があるため、タッチ端末だけ1回限り・ゼロGain経由の安定版へ差し替える。
+        this._installStableTouchAudioUnlock();
         
         // ★ユーザーが設定した音量（最初は1.0＝100%）を覚えておきます。
         // ブラウザに記憶があればそれを読み込みます！
@@ -124,6 +128,113 @@ class AudioManager {
             .then(() => action())
             .catch(error => console.error('【AudioManager】Howlerの読み込みに失敗しました。', error));
         return true;
+    }
+
+    _isTouchAudioDevice() {
+        if (typeof window === 'undefined') return false;
+        const nav = window.navigator || {};
+        const ua = String(nav.userAgent || '');
+        const maxTouchPoints = Number(nav.maxTouchPoints || 0);
+        return maxTouchPoints > 0 || /iPhone|iPad|iPod|Android|Mobile/i.test(ua);
+    }
+
+    _installStableTouchAudioUnlock() {
+        const install = () => {
+            const howler = window.Howler;
+            if (!howler || !this._isTouchAudioDevice() || howler.__sengokuStableUnlockInstalled) return;
+            howler.__sengokuStableUnlockInstalled = true;
+
+            // Howler本体は変更せず、このアプリ内だけunlock手順を置き換える。
+            // 重要なのは「同じタップのtouchstart/touchend/clickで複数回走らせない」ことと、
+            // unlock用の極短bufferを直接destinationへ流さないこと。
+            howler._unlockAudio = function stableSengokuUnlock() {
+                const self = this || howler;
+                if (self._audioUnlocked || !self.ctx || self.__sengokuUnlockListenerInstalled) return self;
+
+                self._audioUnlocked = false;
+                self.autoUnlock = false;
+                self.__sengokuUnlockListenerInstalled = true;
+
+                let handled = false;
+                let finished = false;
+                const removeListeners = () => {
+                    document.removeEventListener('touchstart', unlock, true);
+                    document.removeEventListener('pointerdown', unlock, true);
+                    document.removeEventListener('click', unlock, true);
+                    document.removeEventListener('keydown', unlock, true);
+                    self.__sengokuUnlockListenerInstalled = false;
+                };
+                const finishUnlock = () => {
+                    if (finished) return;
+                    finished = true;
+                    self._audioUnlocked = true;
+                    removeListeners();
+                    for (let i = 0; i < self._howls.length; i++) self._howls[i]._emit('unlock');
+                };
+
+                const unlock = () => {
+                    if (handled) return;
+                    handled = true;
+                    // touchend/clickが同じ物理タップから続いても再入しないよう、最初に外す。
+                    removeListeners();
+
+                    // HTML5 Audio(BGM)側はHowler標準unlockと同じく、既存nodeを使用可能状態へ寄せる。
+                    for (let i = 0; i < self._howls.length; i++) {
+                        if (self._howls[i]._webAudio) continue;
+                        const ids = self._howls[i]._getSoundIds();
+                        for (let j = 0; j < ids.length; j++) {
+                            const sound = self._howls[i]._soundById(ids[j]);
+                            if (sound && sound._node && !sound._node._unlocked) {
+                                sound._node._unlocked = true;
+                                try { sound._node.load(); } catch (_) {}
+                            }
+                        }
+                    }
+
+                    try {
+                        if (typeof self.ctx.resume === 'function') {
+                            const resumeResult = self.ctx.resume();
+                            if (resumeResult && typeof resumeResult.catch === 'function') resumeResult.catch(() => {});
+                        }
+
+                        const source = self.ctx.createBufferSource();
+                        const silentGain = typeof self.ctx.createGain === 'function' ? self.ctx.createGain() : null;
+                        source.buffer = self.ctx.createBuffer(1, 1, Math.max(22050, Number(self.ctx.sampleRate) || 44100));
+                        if (silentGain) {
+                            // 解除bufferは必ずゼロGainを通す。古いDAC/WebViewでも出力波形へ出さない。
+                            silentGain.gain.setValueAtTime(0, self.ctx.currentTime);
+                            source.connect(silentGain);
+                            silentGain.connect(self.ctx.destination);
+                        } else {
+                            source.connect(self.ctx.destination);
+                        }
+                        source.onended = () => {
+                            try { source.disconnect(0); } catch (_) {}
+                            if (silentGain) {
+                                try { silentGain.disconnect(0); } catch (_) {}
+                            }
+                            finishUnlock();
+                        };
+                        if (typeof source.start === 'undefined') source.noteOn(0);
+                        else source.start(0);
+                        // 極端に古いWebViewでonendedが来なくてもunlock待ちを残さない。
+                        setTimeout(finishUnlock, 80);
+                    } catch (_) {
+                        finishUnlock();
+                    }
+                };
+
+                // タッチ端末ではtouchstartを主経路にし、pointer/click/keyboardは代替入力用。
+                document.addEventListener('touchstart', unlock, true);
+                document.addEventListener('pointerdown', unlock, true);
+                document.addEventListener('click', unlock, true);
+                document.addEventListener('keydown', unlock, true);
+                return self;
+            };
+        };
+
+        if (window.Howler) install();
+        else this._howlerReadyPromise.then(install).catch(() => {});
     }
 
     _shouldUseMobileBgmStreaming() {

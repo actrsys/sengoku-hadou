@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r322');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r323');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -152,12 +152,18 @@ test('城アイコンは4段階のWebPと個別の楕円影補正を使う', () 
 
 
 
-test('スマホ武将一覧から詳細へ入る瞬間だけchoice SEを省略して音声負荷を重ねない', () => {
+test('タッチ端末のHowler初回unlockは単発・ゼロGain経路にし武将一覧choice SEを維持する', () => {
+    const audio = read('js/audio.js');
     const bushoUi = read('js/ui_info_busho.js');
-    assert.ok(bushoUi.includes("const isMobileDetailTransition = !!(document.body && !document.body.classList.contains('is-pc'));"));
-    assert.ok(bushoUi.includes("? (() => this.showBushoDetailModalById(b.id))"));
-    assert.ok(bushoUi.includes(": this._withChoiceSound(() => this.showBushoDetailModalById(b.id));"));
-    assert.ok(bushoUi.includes("this._withChoiceSound((e) => this.handleBushoSelect"), '選択モードのSEは維持する');
+    assert.ok(audio.includes('_installStableTouchAudioUnlock()'));
+    assert.ok(audio.includes('howler.__sengokuStableUnlockInstalled = true'));
+    assert.ok(audio.includes('self.__sengokuUnlockListenerInstalled'));
+    assert.ok(audio.includes("document.addEventListener('touchstart', unlock, true)"));
+    assert.ok(audio.includes("document.removeEventListener('touchstart', unlock, true)"));
+    assert.ok(audio.includes('silentGain.gain.setValueAtTime(0, self.ctx.currentTime)'));
+    assert.ok(audio.includes('source.connect(silentGain)'));
+    assert.ok(bushoUi.includes("onClickStr = this._withChoiceSound(() => this.showBushoDetailModalById(b.id));"));
+    assert.ok(!bushoUi.includes('isMobileDetailTransition'), 'スマホだけ武将一覧SEを消す旧回避策を残さない');
 });
 test('士気上限は内部120・通常100・ゲージ100を設定の正本から使う', () => {
     const ctx = createContext();
