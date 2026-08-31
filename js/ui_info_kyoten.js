@@ -82,7 +82,7 @@ Object.assign(UIInfoManager.prototype, {
                 legionInfoStr = `${clanName} 直轄領`;
             } else {
                 if (this.game.legions) {
-                    const legion = this.game.legions.find(l => Number(l.legionNo) === Number(castle.legionId) && Number(l.clanId) === Number(castle.ownerClan));
+                    const legion = this.game.getLegionByClanNo(castle.ownerClan, castle.legionId);
                     if (legion && legion.commanderId > 0) {
                         const commander = this.game.getBusho(legion.commanderId);
                         if (commander) {

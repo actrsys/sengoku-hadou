@@ -846,6 +846,8 @@ class UIManager {
         if (typeof this._releaseCastleCardCache === 'function') {
             this._releaseCastleCardCache();
         }
+        this._lastInfoPanelTarget = null;
+        this._lastInfoPanelHtml = null;
     }
 
     // ★Round12：会話用の顔画像を、DOMへ出す前に読み込み・デコードしておきます。
@@ -1982,7 +1984,7 @@ class UIManager {
 
     showDismissLegionLeaderConfirm(legionNo) {
         if (!this.game.legions) return;
-        const legion = this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === legionNo);
+        const legion = this.game.getLegionByClanNo(this.game.playerClanId, legionNo);
         if (!legion || !legion.commanderId) return;
         
         const commander = this.game.getBusho(legion.commanderId);
@@ -2402,66 +2404,65 @@ class UIManager {
             `;
         }
 
-        // 城を切り替えた時は、前の城の状態マーク用タイマーを必ず先に破棄する。
-        // 状態0個/1個の城へ移った場合も古いDOMを定期参照させない。
-        if (this._statusCarouselTimer) {
-            clearInterval(this._statusCarouselTimer);
-            this._statusCarouselTimer = null;
-        }
+        // 情報内容が同じなら、顔・ゲージ・状態マークDOMを丸ごと作り直さない。
+        // 年月・浪人・相場はこの後で別更新するため、パネル本体だけを差分化する。
+        const targetPanel = isPc ? this.pcNewStatusPanel : this.mobileTopLeft;
+        const panelNeedsRender = !!targetPanel && (
+            this._lastInfoPanelTarget !== targetPanel
+            || this._lastInfoPanelHtml !== content
+            || !targetPanel.firstElementChild
+        );
 
-        // 端末ごとに実際に表示する情報パネルだけを生成します。
-        // PCでは #top-info-bar / #pc-sidebar が常時非表示なので、そこへ同じ顔画像DOMを複製しません。
-        if (!isPc && this.mobileTopLeft) {
-            this.mobileTopLeft.innerHTML = content;
-
-            const castellanFace = this.mobileTopLeft.querySelector('.sp-castellan-face');
-            if (castellanFace) {
-                castellanFace.addEventListener('error', () => castellanFace.classList.add('is-broken'), { once: true });
+        if (panelNeedsRender) {
+            // 城や状態が変わる時だけ、前のスマホ状態マークタイマーを破棄する。
+            if (this._statusCarouselTimer) {
+                clearInterval(this._statusCarouselTimer);
+                this._statusCarouselTimer = null;
             }
 
-            const carousel = this.mobileTopLeft.querySelector('.status-marks-carousel');
-            if (carousel) {
-                const marks = carousel.querySelectorAll('.status-mark');
-                if (marks.length > 0) {
-                    let currentIndex = 0;
-                    marks[0].classList.add('active'); // fade-inクラスを付けないので初回は一瞬で出ます
+            targetPanel.innerHTML = content;
+            this._lastInfoPanelTarget = targetPanel;
+            this._lastInfoPanelHtml = content;
 
-                    if (marks.length > 1) {
-                        // 複数ある場合はタップ可能にし、タイマーを回す
-                        carousel.style.cursor = 'pointer';
+            if (!isPc) {
+                const castellanFace = targetPanel.querySelector('.sp-castellan-face');
+                if (castellanFace) {
+                    castellanFace.addEventListener('error', () => castellanFace.classList.add('is-broken'), { once: true });
+                }
 
-                        const showNext = () => {
-                            marks[currentIndex].classList.remove('active', 'fade-in');
-                            currentIndex = (currentIndex + 1) % marks.length;
-                            marks[currentIndex].classList.add('active', 'fade-in'); // 切り替わる時だけふわっとさせる
-                        };
-                        this._statusCarouselTimer = setInterval(showNext, 2500);
-
-                        carousel.onclick = (e) => {
-                            e.stopPropagation();
-                            clearInterval(this._statusCarouselTimer);
-                            showNext();
+                const carousel = targetPanel.querySelector('.status-marks-carousel');
+                if (carousel) {
+                    const marks = carousel.querySelectorAll('.status-mark');
+                    if (marks.length > 0) {
+                        let currentIndex = 0;
+                        marks[0].classList.add('active');
+                        if (marks.length > 1) {
+                            carousel.style.cursor = 'pointer';
+                            const showNext = () => {
+                                marks[currentIndex].classList.remove('active', 'fade-in');
+                                currentIndex = (currentIndex + 1) % marks.length;
+                                marks[currentIndex].classList.add('active', 'fade-in');
+                            };
                             this._statusCarouselTimer = setInterval(showNext, 2500);
-                        };
-                    } else {
-                        // 1つしかない場合はタップ反応を完全に消す
-                        carousel.style.cursor = 'default';
-                        carousel.onclick = (e) => { e.stopPropagation(); };
+                            carousel.onclick = (e) => {
+                                e.stopPropagation();
+                                clearInterval(this._statusCarouselTimer);
+                                showNext();
+                                this._statusCarouselTimer = setInterval(showNext, 2500);
+                            };
+                        } else {
+                            carousel.style.cursor = 'default';
+                            carousel.onclick = (e) => { e.stopPropagation(); };
+                        }
                     }
                 }
             }
-        } else if (this.mobileTopLeft && this.mobileTopLeft.innerHTML) {
-            this.mobileTopLeft.innerHTML = '';
         }
 
-        // #pc-status-panel は旧サイドバー内で常時非表示。表示中の新PCパネルだけ更新します。
-        if (this.statusContainer && this.statusContainer.innerHTML) {
-            this.statusContainer.innerHTML = '';
-        }
-        if (this.pcNewStatusPanel) {
-            if (isPc) this.pcNewStatusPanel.innerHTML = content;
-            else if (this.pcNewStatusPanel.innerHTML) this.pcNewStatusPanel.innerHTML = '';
-        }
+        // 非表示側へ同じ情報DOMを複製しない。端末モード切替時だけ古い側を掃除する。
+        if (!isPc && this.pcNewStatusPanel && this.pcNewStatusPanel.innerHTML) this.pcNewStatusPanel.innerHTML = '';
+        if (isPc && this.mobileTopLeft && this.mobileTopLeft.innerHTML) this.mobileTopLeft.innerHTML = '';
+        if (this.statusContainer && this.statusContainer.innerHTML) this.statusContainer.innerHTML = '';
 
         if (this.mobileFloatingInfo) {
             const nextTimeHtml = `<div class="floating-time">${this.game.year}年 ${this.game.month}月</div>`;

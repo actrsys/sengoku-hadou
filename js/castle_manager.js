@@ -16,6 +16,11 @@ class CastleManager {
         if (!castle) return;
         castle.ownerClan = Number(newOwnerId) || 0;
         this.game.castleOwnershipVersion = (this.game.castleOwnershipVersion || 0) + 1;
+        // 勢力色Canvasは通常、所有者が変わった拠点の領域だけを局所更新する。
+        // シナリオ切替・初回描画ではupdateClanColors側が全描画へ自動フォールバックする。
+        if (!(this.game._castleColorDirtyIds instanceof Set)) this.game._castleColorDirtyIds = new Set();
+        const castleId = Number(castle.id);
+        if (Number.isFinite(castleId)) this.game._castleColorDirtyIds.add(castleId);
     }
 
     // 城の持ち主を変更する魔法です。isEventがtrueの時は、イベントによる平和的な変更として扱います。

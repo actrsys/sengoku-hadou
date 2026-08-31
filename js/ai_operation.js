@@ -102,12 +102,8 @@ class AIOperationManager {
         if (legionId === 0) return true;
         if (!this.game.legions) return false;
 
-        const legion = this.game.legions.find(l =>
-            Number(l.clanId) === clanId &&
-            Number(l.legionNo) === legionId &&
-            Number(l.commanderId || 0) > 0
-        );
-        if (!legion) return false;
+        const legion = this.game.getLegionByClanNo(clanId, legionId);
+        if (!legion || Number(legion.commanderId || 0) <= 0) return false;
 
         const commander = this.game.getBusho(legion.commanderId);
         return !!(
@@ -1586,7 +1582,7 @@ class AIOperationManager {
             const daimyo = this.game.getClanDaimyo(clanId);
             commanderName = daimyo ? daimyo.name : "大名直轄";
         } else {
-            const legion = this.game.legions ? this.game.legions.find(l => l.clanId === clanId && l.legionNo === legionId) : null;
+            const legion = this.game.getLegionByClanNo(clanId, legionId) || null;
             if (legion && legion.commanderId) {
                 const commander = this.game.getBusho(legion.commanderId);
                 commanderName = commander ? commander.name : "不明";

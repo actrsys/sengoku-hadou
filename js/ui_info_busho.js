@@ -203,7 +203,7 @@ Object.assign(UIInfoManager.prototype, {
             if (castle && castle.legionId > 0) {
                 let legion = null;
                 if (this.game.legions) {
-                    legion = this.game.legions.find(l => Number(l.legionNo) === Number(castle.legionId) && Number(l.clanId) === Number(busho.clan));
+                    legion = this.game.getLegionByClanNo(busho.clan, castle.legionId);
                 }
                 if (legion && legion.commanderId > 0 && legion.commanderId !== busho.id) {
                     const commander = this.game.getBusho(legion.commanderId);

@@ -261,6 +261,43 @@ Object.assign(UIManager.prototype, {
         }
     },
 
+    _paintCanvasRegions(canvas, regions, paintPixel) {
+        if (!canvas || !Array.isArray(regions) || regions.length === 0 || typeof paintPixel !== 'function') return false;
+        try {
+            const ctx = canvas.getContext('2d', canvas.id === 'clan-color-overlay' ? { willReadFrequently: true } : undefined);
+            if (!ctx) return false;
+            const width = canvas.width;
+            const height = canvas.height;
+            for (const region of regions) {
+                const x0 = Math.max(0, Math.min(width, Math.floor(Number(region.x0) || 0)));
+                const y0 = Math.max(0, Math.min(height, Math.floor(Number(region.y0) || 0)));
+                const x1 = Math.max(x0, Math.min(width, Math.ceil(Number(region.x1) || 0)));
+                const y1 = Math.max(y0, Math.min(height, Math.ceil(Number(region.y1) || 0)));
+                const w = x1 - x0;
+                const h = y1 - y0;
+                if (w <= 0 || h <= 0) continue;
+                const imageData = ctx.createImageData(w, h);
+                const data = imageData.data;
+                for (let localY = 0; localY < h; localY++) {
+                    const y = y0 + localY;
+                    for (let localX = 0; localX < w; localX++) {
+                        const x = x0 + localX;
+                        paintPixel(data, (localY * w + localX) * 4, x, y, width, height);
+                    }
+                }
+                ctx.putImageData(imageData, x0, y0);
+            }
+            return true;
+        } catch (error) {
+            if (canvas.id === 'clan-color-overlay') {
+                this.lastClanColorsHash = null;
+                this._lastClanColorOverlay = null;
+            }
+            console.warn(`地図Canvas(${canvas.id || 'unknown'})の局所描画をスキップしました:`, error);
+            return false;
+        }
+    },
+
     _bindMapCanvasRecovery(canvas, canvasId) {
         if (!canvas || canvas.dataset.mapRecoveryBound === '1') return;
         canvas.dataset.mapRecoveryBound = '1';
@@ -2193,7 +2230,6 @@ Object.assign(UIManager.prototype, {
         if (width <= 0 || height <= 0) return;
 
         // 所有者一覧を毎回map→joinして巨大文字列化せず、CastleManagerが更新する所有versionを使う。
-        // ownerClan直接代入は禁止・回帰監査済みなので、同じversionなら所有状態は同一。
         const currentOwnerHash = `${width}x${height}:${Number(this.game.castleOwnershipVersion || 0)}:${this.game.castles.length}`;
         if (this.lastClanColorsHash === currentOwnerHash && this._lastClanColorOverlay === overlay) return;
 
@@ -2212,7 +2248,7 @@ Object.assign(UIManager.prototype, {
         for (const c of this.game.castles) castleToClanMap[Number(c.id)] = Number(c.ownerClan) || 0;
 
         const sampleCastleId = (x, y) => this._sampleIdMap(sourcePixelMap, mapW, mapH, width, height, x, y);
-        const painted = this._paintCanvasByStrips(overlay, (data, i, x, y) => {
+        const paintPixel = (data, i, x, y) => {
             const castleId = sampleCastleId(x, y);
             if (!castleId) return;
             const clanId = castleToClanMap[castleId] || 0;
@@ -2236,12 +2272,47 @@ Object.assign(UIManager.prototype, {
             data[i + 1] = Math.max(0, data[i + 1] - 50);
             data[i + 2] = Math.max(0, data[i + 2] - 50);
             data[i + 3] = 160;
-        });
+        };
+
+        // 初回描画・Canvas復旧・大量変更では従来どおり全画面を描く。
+        // 通常の落城/譲渡のように変更拠点が少数なら、その外接矩形だけを更新する。
+        const dirtyIds = this.game._castleColorDirtyIds instanceof Set ? this.game._castleColorDirtyIds : null;
+        const boundsByCastleId = DataManager.castlePixelBounds || null;
+        const canPartialPaint = this.lastClanColorsHash !== null
+            && this._lastClanColorOverlay === overlay
+            && dirtyIds && dirtyIds.size > 0 && dirtyIds.size <= 12
+            && boundsByCastleId;
+        let painted = false;
+        if (canPartialPaint) {
+            const regions = [];
+            let allBoundsKnown = true;
+            for (const castleId of dirtyIds) {
+                const bounds = boundsByCastleId[Number(castleId)];
+                if (!bounds) {
+                    allBoundsKnown = false;
+                    break;
+                }
+                // 1拠点の所有変更は、その領域だけでなく隣接領域側の境界色も変える。
+                // source→raster変換後に2px余分に広げて、境界の両側を確実に再描画する。
+                regions.push({
+                    x0: Math.floor((bounds.minX * width) / mapW) - 2,
+                    y0: Math.floor((bounds.minY * height) / mapH) - 2,
+                    x1: Math.ceil(((bounds.maxX + 1) * width) / mapW) + 2,
+                    y1: Math.ceil(((bounds.maxY + 1) * height) / mapH) + 2
+                });
+            }
+            if (allBoundsKnown && regions.length > 0) {
+                painted = this._paintCanvasRegions(overlay, regions, paintPixel);
+            }
+        }
+
+        if (!painted) painted = this._paintCanvasByStrips(overlay, paintPixel);
         if (!painted) return;
 
         this.lastClanColorsHash = currentOwnerHash;
         this.lastClanColorsImageData = null;
         this._lastClanColorOverlay = overlay;
+        if (dirtyIds) dirtyIds.clear();
     },
 
     // ==========================================

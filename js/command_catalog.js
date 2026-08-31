@@ -103,7 +103,8 @@ const CAN_EXECUTE_RULES = {
     // 国主解任用の判定ルール（国主が存在する時だけ押せるようにします）
     canDismissLegion: (game, legionNumber) => {
         if (!game.legions) return false;
-        const legion = game.legions.find(l => Number(l.clanId) === Number(game.playerClanId) && Number(l.legionNo) === legionNumber && Number(l.commanderId) > 0);
+        const legion = game.getLegionByClanNo(game.playerClanId, legionNumber);
+        if (!legion || Number(legion.commanderId) <= 0) return false;
         return !!legion;
     },
     // 所領分配用の判定ルール（国主が存在する時だけ押せるようにします）

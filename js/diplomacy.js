@@ -2496,7 +2496,7 @@ class DiplomacyManager {
         if (isDaimyoInA && castleB.legionId !== 0 && lordB && lordB.isCommander) {
             lordB.isCastellan = false;
             const targetLegionNo = Number(castleB.legionId);
-            const legion = this.game.legions.find(l => Number(l.clanId) === Number(subordinateClanId) && Number(l.legionNo) === targetLegionNo);
+            const legion = this.game.getLegionByClanNo(subordinateClanId, targetLegionNo);
             if (legion) this.game.castleManager.disbandLegion(legion.id);
         }
 
@@ -2504,7 +2504,7 @@ class DiplomacyManager {
         if (commanderInA && myLegionCastles.length === 0) {
             commanderInA.isCastellan = false;
             const targetLegionNo = Number(castleA.legionId);
-            const legion = this.game.legions.find(l => Number(l.clanId) === Number(subordinateClanId) && Number(l.legionNo) === targetLegionNo);
+            const legion = this.game.getLegionByClanNo(subordinateClanId, targetLegionNo);
             if (legion) this.game.castleManager.disbandLegion(legion.id);
             disbandedCommander = true;
         }
@@ -2844,7 +2844,7 @@ class DiplomacyManager {
         
         // 1. プレイヤー側の軍団をすべて解散させます（お片付け）
         if (this.game.legions) {
-            const myLegions = this.game.legions.filter(l => Number(l.clanId) === Number(myClanId));
+            const myLegions = this.game.getClanLegions(myClanId);
             myLegions.forEach(l => {
                 this.game.castleManager.disbandLegion(l.id);
             });

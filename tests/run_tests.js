@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r316');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r317');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7350,14 +7350,16 @@ test('BGMはstart=0でもloopEndを適用し音量変更はcurrentBgmNameを正�
     assert.ok(!source.includes('if (loopStart > 0 && this.bgmPlayer)'));
 });
 
-test('スマホ状態マークのタイマーは城情報更新のたび先に停止する', () => {
+test('スマホ状態マークのタイマーは情報パネル内容が変わる時だけ作り直す', () => {
     const source = read('js/ui.js');
-    const clearAt = source.indexOf('// 城を切り替えた時は、前の城の状態マーク用タイマーを必ず先に破棄する。');
-    const renderAt = source.indexOf('this.mobileTopLeft.innerHTML = content;', clearAt);
-    assert.ok(clearAt >= 0 && renderAt > clearAt);
-    const block = source.slice(clearAt, renderAt);
+    const at = source.indexOf('const panelNeedsRender = !!targetPanel');
+    const block = source.slice(at, at + 4200);
+    assert.ok(at >= 0);
+    assert.ok(block.includes('this._lastInfoPanelHtml !== content'));
+    assert.ok(block.includes('if (panelNeedsRender) {'));
     assert.ok(block.includes('clearInterval(this._statusCarouselTimer);'));
     assert.ok(block.includes('this._statusCarouselTimer = null;'));
+    assert.ok(block.includes('targetPanel.innerHTML = content;'));
 });
 
 test('大名選択からシナリオへ戻る時はタイトル復帰完了を待ってから新規開始する', () => {
@@ -7982,11 +7984,9 @@ test('城の軍団番号は Legion.id ではなく clanId + legionNo で解決�
     assert.ok(war.includes('Number(l.legionNo) === Number(activeCastle.legionId)'));
 
     const effort = read('js/war_effort.js');
-    assert.ok(effort.includes('Number(l.clanId) === Number(targetCastle.ownerClan)'));
-    assert.ok(effort.includes('Number(l.legionNo) === Number(targetCastle.legionId)'));
+    assert.ok(effort.includes('getLegionByClanNo(targetCastle.ownerClan, targetCastle.legionId)'));
     assert.ok(!effort.includes('disbandLegion(targetCastle.legionId)'));
-    assert.ok(effort.includes('Number(l.clanId) === oldOwner')); 
-    assert.ok(effort.includes('Number(l.legionNo) === Number(c.legionId)'));
+    assert.ok(effort.includes('getLegionByClanNo(oldOwner, c.legionId)'));
 
     const life = read('js/life_system.js');
     assert.ok(life.includes('Number(this.game.getCastle(b.castleId)?.legionId || 0) === Number(legion.legionNo)'));
@@ -7996,7 +7996,7 @@ test('大名退避先の軍団解散は別家の同番号 Legion.id を誤って
     const effort = read('js/war_effort.js');
     const at = effort.indexOf('handleDaimyoEscape(');
     const block = effort.slice(at, at + 2200);
-    assert.ok(/const targetLegion = this\.game\.legions[\s\S]{0,120}\.find\(l =>/.test(block));
+    assert.ok(block.includes('const targetLegion = this.game.getLegionByClanNo(targetCastle.ownerClan, targetCastle.legionId)'));
     assert.ok(block.includes('this.game.castleManager.disbandLegion(targetLegion.id)'));
     assert.ok(!block.includes('disbandLegion(targetCastle.legionId)'));
 });
@@ -8577,12 +8577,16 @@ test('勢力一覧は勢力ごとの全武将filterをやめ一度のグルー�
     assert.ok(!block.includes('this.game.castles.filter(c => c.ownerClan === clan.id)'));
 });
 
-test('端末別情報パネルは非表示側へ同じ情報DOMを複製しない', () => {
+test('端末別情報パネルは表示側だけを保持し同一内容ならDOMを再生成しない', () => {
     const ui = read('js/ui.js');
     const at = ui.indexOf('updateInfoPanel(castle)');
-    const block = ui.slice(at, at + 15000);
-    assert.ok(block.includes('if (!isPc && this.mobileTopLeft)'));
-    assert.ok(block.includes('if (isPc) this.pcNewStatusPanel.innerHTML = content;'));
+    const block = ui.slice(at, at + 16000);
+    assert.ok(block.includes('const targetPanel = isPc ? this.pcNewStatusPanel : this.mobileTopLeft;'));
+    assert.ok(block.includes('this._lastInfoPanelHtml !== content'));
+    assert.ok(block.includes('|| !targetPanel.firstElementChild'));
+    assert.ok(block.includes('targetPanel.innerHTML = content;'));
+    assert.ok(block.includes("if (!isPc && this.pcNewStatusPanel && this.pcNewStatusPanel.innerHTML)"));
+    assert.ok(block.includes("if (isPc && this.mobileTopLeft && this.mobileTopLeft.innerHTML)"));
     assert.ok(!block.includes('if (this.statusContainer && isPc)'));
 });
 
@@ -9062,14 +9066,129 @@ test('拠点光彩更新は同一勢力の外交関係を1回の描画内でだ�
     assert.ok(block.includes('this.game.getRelation(baseClanId, clanId)'));
 });
 
-test('勢力色Canvasの再描画判定は全ownerClan文字列化でなく所有versionを使う', () => {
+test('勢力色Canvasは所有versionを使い少数の落城では拠点領域だけ局所更新する', () => {
     const uiMap = read('js/ui_map.js');
+    const castleManager = read('js/castle_manager.js');
     const at = uiMap.indexOf('    updateClanColors() {');
-    const block = uiMap.slice(at, at + 4200);
+    const block = uiMap.slice(at, at + 7000);
     assert.ok(block.includes('this.game.castleOwnershipVersion'));
     assert.ok(block.includes('this.game.castles.length'));
+    assert.ok(block.includes('this.game._castleColorDirtyIds'));
+    assert.ok(block.includes('dirtyIds.size <= 12'));
+    assert.ok(block.includes('DataManager.castlePixelBounds'));
+    assert.ok(block.includes('this._paintCanvasRegions(overlay, regions, paintPixel)'));
+    assert.ok(block.includes('if (!painted) painted = this._paintCanvasByStrips(overlay, paintPixel);'), '局所更新不可時は従来の全描画へ戻す');
+    assert.ok(castleManager.includes('this.game._castleColorDirtyIds.add(castleId)'));
     assert.ok(!block.includes("this.game.castles.map(c => c.ownerClan).join(',' )"));
     assert.ok(!block.includes("this.game.castles.map(c => c.ownerClan).join(',')"));
+});
+
+test('勢力色Canvasの局所更新は同じ所有状態の全描画と同じpixel結果になる', () => {
+    class TestUIManager {}
+    let currentOverlay = null;
+    const bodyClassList = { contains(name) { return name === 'is-pc'; } };
+    const ctx = createContext({
+        UIManager: TestUIManager,
+        document: {
+            body: { classList: bodyClassList },
+            getElementById(id) { return id === 'clan-color-overlay' ? currentOverlay : null; }
+        }
+    });
+    ctx.DataManager = {
+        castlePixelMap: new Uint8Array([
+            1, 1, 1, 2, 2, 2,
+            1, 1, 1, 2, 2, 2
+        ]),
+        castlePixelBounds: [null,
+            { minX: 0, maxX: 2, minY: 0, maxY: 1 },
+            { minX: 3, maxX: 5, minY: 0, maxY: 1 }
+        ],
+        hexToRgb(hex) {
+            const n = parseInt(String(hex).replace('#', ''), 16);
+            return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+        }
+    };
+    loadScript(ctx, 'js/ui_map.js');
+
+    const createOverlay = () => {
+        const width = 6, height = 2;
+        const buffer = new Uint8ClampedArray(width * height * 4);
+        const context2d = {
+            clearRect() { buffer.fill(0); },
+            createImageData(w, h) { return { data: new Uint8ClampedArray(w * h * 4), width: w, height: h }; },
+            putImageData(imageData, x0, y0) {
+                for (let y = 0; y < imageData.height; y++) {
+                    for (let x = 0; x < imageData.width; x++) {
+                        const src = (y * imageData.width + x) * 4;
+                        const dst = ((y0 + y) * width + (x0 + x)) * 4;
+                        buffer.set(imageData.data.subarray(src, src + 4), dst);
+                    }
+                }
+            }
+        };
+        return { id: 'clan-color-overlay', width, height, buffer, getContext() { return context2d; } };
+    };
+    const makeGame = () => ({
+        mapWidth: 6,
+        mapHeight: 2,
+        castleOwnershipVersion: 0,
+        castles: [{ id: 1, ownerClan: 1 }, { id: 2, ownerClan: 1 }],
+        clans: [{ id: 1, color: '#ff0000' }, { id: 2, color: '#00ff00' }],
+        isSuspendingColorUpdate: false,
+        _castleColorDirtyIds: new Set()
+    });
+
+    const game = makeGame();
+    const ui = Object.create(ctx.UIManager.prototype);
+    ui.game = game;
+    ui.pixelCastleMap = ctx.DataManager.castlePixelMap;
+    ui.lastClanColorsHash = null;
+    ui._lastClanColorOverlay = null;
+    currentOverlay = createOverlay();
+    ui.updateClanColors();
+
+    game.castles[1].ownerClan = 2;
+    game.castleOwnershipVersion++;
+    game._castleColorDirtyIds.add(2);
+    ui.updateClanColors();
+    const partialResult = Array.from(currentOverlay.buffer);
+
+    const fullGame = makeGame();
+    fullGame.castles[1].ownerClan = 2;
+    fullGame.castleOwnershipVersion = 1;
+    const fullUi = Object.create(ctx.UIManager.prototype);
+    fullUi.game = fullGame;
+    fullUi.pixelCastleMap = ctx.DataManager.castlePixelMap;
+    fullUi.lastClanColorsHash = null;
+    fullUi._lastClanColorOverlay = null;
+    currentOverlay = createOverlay();
+    fullUi.updateClanColors();
+    const fullResult = Array.from(currentOverlay.buffer);
+
+    assert.deepStrictEqual(partialResult, fullResult);
+    assert.strictEqual(game._castleColorDirtyIds.size, 0, '局所更新成功後はdirty集合を空にする');
+});
+
+
+
+test('軍団の静的識別子は共通索引を使い動的な国主IDは索引へ焼き込まない', () => {
+    const game = read('js/game.js');
+    const at = game.indexOf('_ensureLegionStaticIndexes()');
+    const block = game.slice(at, at + 3300);
+    assert.ok(block.includes('const byClanNo = new Map();'));
+    assert.ok(block.includes('const byId = new Map();'));
+    assert.ok(block.includes('const byClan = new Map();'));
+    assert.ok(block.includes('if (!byClanNo.has(key)) byClanNo.set(key, legion);'), '旧findと同じく先頭一致を維持する');
+    assert.ok(block.includes('getLegionByClanNo(clanId, legionNo)'));
+    assert.ok(block.includes('getLegionById(id)'));
+    assert.ok(block.includes('getClanLegions(clanId)'));
+    assert.ok(!block.includes('commanderIdMap'), '在職状況は変動するので静的索引にしない');
+
+    const hotSources = [
+        read('js/ai.js'), read('js/ai_operation.js'), read('js/command_system.js'),
+        read('js/ui_info_kyoten.js'), read('js/skill_manager.js')
+    ].join('\n');
+    assert.ok(hotSources.includes('getLegionByClanNo('));
 });
 
 test('スマホ固定HUDは同じ年月・相場HTMLを毎回再生成しない', () => {

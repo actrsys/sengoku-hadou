@@ -189,6 +189,15 @@ class GameManager {
         this._princessMapSource = null;
         this._princessMapSize = -1;
 
+        // 軍団の clanId / legionNo / id は軍団生成後に変えない静的識別子なので、
+        // 武将・拠点と同じく短命索引をシナリオ境界で解放する。
+        this._legionByClanNoMap = null;
+        this._legionByIdMap = null;
+        this._clanLegionsMap = null;
+        this._legionIndexSource = null;
+        this._legionIndexSize = -1;
+        this._castleColorDirtyIds = null;
+
         this._clanBushosMap = null;
         this._clanBushosSource = null;
         this._clanBushosSize = -1;
@@ -641,6 +650,57 @@ class GameManager {
             this._princessMapSize = this.princesses.length;
         }
         return this._princessMap.get(Number(id));
+    }
+    _ensureLegionStaticIndexes() {
+        // Legion の clanId / legionNo / id は生成・ロード時に確定し、在職状況は commanderId だけが変わる。
+        // そのため静的識別子だけを索引化し、動的な commanderId は索引へ焼き込まない。
+        const legions = Array.isArray(this.legions) ? this.legions : [];
+        if (this._legionIndexSource === legions && this._legionIndexSize === legions.length) return;
+
+        const byClanNo = new Map();
+        const byId = new Map();
+        const byClan = new Map();
+        for (const legion of legions) {
+            const clanId = Number(legion.clanId);
+            const legionNo = Number(legion.legionNo);
+            const id = Number(legion.id);
+            if (Number.isFinite(clanId)) {
+                let list = byClan.get(clanId);
+                if (!list) {
+                    list = [];
+                    byClan.set(clanId, list);
+                }
+                list.push(legion);
+                // 旧 find() と同じく、重複があっても先頭の軍団を返す。
+                if (Number.isFinite(legionNo)) {
+                    const key = `${clanId}:${legionNo}`;
+                    if (!byClanNo.has(key)) byClanNo.set(key, legion);
+                }
+            }
+            if (Number.isFinite(id) && !byId.has(id)) byId.set(id, legion);
+        }
+        this._legionByClanNoMap = byClanNo;
+        this._legionByIdMap = byId;
+        this._clanLegionsMap = byClan;
+        this._legionIndexSource = legions;
+        this._legionIndexSize = legions.length;
+    }
+    getLegionByClanNo(clanId, legionNo) {
+        this._ensureLegionStaticIndexes();
+        const c = Number(clanId);
+        const n = Number(legionNo);
+        if (!Number.isFinite(c) || !Number.isFinite(n)) return undefined;
+        return this._legionByClanNoMap.get(`${c}:${n}`);
+    }
+    getLegionById(id) {
+        this._ensureLegionStaticIndexes();
+        const numericId = Number(id);
+        return Number.isFinite(numericId) ? this._legionByIdMap.get(numericId) : undefined;
+    }
+    getClanLegions(clanId) {
+        this._ensureLegionStaticIndexes();
+        const numericClanId = Number(clanId);
+        return Number.isFinite(numericClanId) ? (this._clanLegionsMap.get(numericClanId) || []) : [];
     }
     _ensureTerritoryStaticIndexes() {
         // provinceId / regionId はシナリオ地理の静的構造なので、国・地方ごとの拠点集合を共有する。

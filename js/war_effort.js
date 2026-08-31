@@ -155,9 +155,7 @@ Object.assign(WarManager.prototype, {
         if (busho.isDaimyo && Number(targetCastle.legionId) !== 0) {
             // 大名が他軍団に逃げ込んだ場合は、逃げ込んだ先の軍団を解散して直轄にする
             if (this.game.castleManager && this.game.castleManager.disbandLegion) {
-                const targetLegion = this.game.legions
-                    ? this.game.legions.find(l => Number(l.clanId) === Number(targetCastle.ownerClan) && Number(l.legionNo) === Number(targetCastle.legionId))
-                    : null;
+                const targetLegion = this.game.getLegionByClanNo(targetCastle.ownerClan, targetCastle.legionId) || null;
                 if (targetLegion) this.game.castleManager.disbandLegion(targetLegion.id);
             }
             // 有効な軍団モデルがない異常状態でも、大名の居城だけは直轄へ戻しておく。
@@ -200,7 +198,7 @@ Object.assign(WarManager.prototype, {
         if (candidates.length === 0 && hasDaimyo) {
             // 国主がいない城を優先する
             const withoutCommander = allFriendlyCastles.filter(c => {
-                const legion = this.game.legions ? this.game.legions.find(l => Number(l.clanId) === oldOwner && Number(l.legionNo) === Number(c.legionId)) : null;
+                const legion = this.game.getLegionByClanNo(oldOwner, c.legionId) || null;
                 return !legion || !legion.commanderId;
             });
             if (withoutCommander.length > 0) {

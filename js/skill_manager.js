@@ -1023,7 +1023,7 @@ class SkillManager {
                 } else {
                     const doerCastle = game.getCastle(busho.castleId);
                     if (doerCastle && doerCastle.legionId !== 0) {
-                        const legion = game.legions ? game.legions.find(l => l.clanId === busho.clan && l.legionNo === doerCastle.legionId) : null;
+                        const legion = game.getLegionByClanNo(busho.clan, doerCastle.legionId) || null;
                         if (legion && legion.commanderId) {
                             const commander = game.getBusho(legion.commanderId);
                             if (commander && this.hasSkill(commander, SKILL_NAMES.OU_NO_GYOSHO, game)) {
@@ -1199,7 +1199,7 @@ class SkillManager {
             if (daimyo && this.hasSkill(daimyo, skillName, game)) return true;
             const doerCastle = game.getCastle(doer.castleId);
             if (doerCastle && doerCastle.legionId !== 0) {
-                const legion = game.legions ? game.legions.find(l => l.clanId === doer.clan && l.legionNo === doerCastle.legionId) : null;
+                const legion = game.getLegionByClanNo(doer.clan, doerCastle.legionId) || null;
                 if (legion && legion.commanderId) {
                     const commander = game.getBusho(legion.commanderId);
                     if (commander && this.hasSkill(commander, skillName, game)) return true;

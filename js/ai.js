@@ -443,7 +443,7 @@ class AIEngine {
         // ★追加：リーダー（直轄なら大名、それ以外なら国主）を特定して、その居城がある地方を調べます！
         let leader = myDaimyo;
         if (myCastle.legionId !== 0) {
-            const legion = this.game.legions ? this.game.legions.find(l => l.clanId === myCastle.ownerClan && l.legionNo === myCastle.legionId) : null;
+            const legion = this.game.getLegionByClanNo(myCastle.ownerClan, myCastle.legionId) || null;
             if (legion && legion.commanderId) {
                 const commander = this.game.getBusho(legion.commanderId);
                 if (commander) {
@@ -1556,7 +1556,7 @@ class AIEngine {
 
         if (castle.legionId !== 0) {
             // 軍団所属城の場合
-            const legion = this.game.legions ? this.game.legions.find(l => l.clanId === castle.ownerClan && l.legionNo === castle.legionId) : null;
+            const legion = this.game.getLegionByClanNo(castle.ownerClan, castle.legionId) || null;
             if (legion && legion.commanderId) {
                 const commander = this.game.getBusho(legion.commanderId);
                 if (commander) {

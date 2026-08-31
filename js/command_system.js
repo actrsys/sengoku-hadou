@@ -1724,7 +1724,7 @@ class CommandSystem {
         this.game.affiliationSystem.moveCastle(busho, castleId);
 
         if (!this.game.legions) this.game.legions = [];
-        let legion = this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === legionNo);
+        let legion = this.game.getLegionByClanNo(this.game.playerClanId, legionNo);
         if (!legion) {
             const maxId = this.game.legions.length > 0 ? Math.max(...this.game.legions.map(l => Number(l.id) || 0)) : 0;
             const legionData = {
@@ -2152,7 +2152,7 @@ class CommandSystem {
     executeAllotFief(legionNo, selectedCastleIds, candidateCastles) {
         let count = 0;
         
-        const legion = this.game.legions ? this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === Number(legionNo)) : null;
+        const legion = this.game.getLegionByClanNo(this.game.playerClanId, legionNo) || null;
         
         // どんな形でIDが送られてきても、確実に「数字」として取り出せるようにする安全装置です
         const numSelectedIds = new Set(selectedCastleIds.map(item => {
@@ -2210,7 +2210,7 @@ class CommandSystem {
     // ★追加：国主解任の実行
     executeDismissLegionLeader(legionNo) {
         if (!this.game.legions) return;
-        const legion = this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === legionNo);
+        const legion = this.game.getLegionByClanNo(this.game.playerClanId, legionNo);
         if (!legion || !legion.commanderId) return;
 
         const commander = this.game.getBusho(legion.commanderId);

@@ -370,7 +370,7 @@ window.GameEvents.push({
             // 軍団のシステムが存在するか確認します
             if (game.legions) {
                 // 今川家の該当する軍団のデータを探します
-                const legion = game.legions.find(l => l.clanId === motoyasu.clan && l.legionNo === oldLegionId);
+                const legion = game.getLegionByClanNo(motoyasu.clan, oldLegionId);
                 
                 if (legion) {
                     const commander = game.getBusho(legion.commanderId);

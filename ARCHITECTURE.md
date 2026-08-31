@@ -619,3 +619,11 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - 所有変更の `refreshCastleOwnershipPresentation()` は独自の城主・軍団DOM書換を持たず、`refreshCastlePresentations()` へ委譲する。背景停止中に変化した拠点表示も `resumeBackgroundUpdates()` で同じ差分同期を通してから光彩・勢力色・雪を復帰させ、表示更新経路を複製しない。
 - シナリオ境界では `releaseScenarioTransientCaches()` から拠点DOMキャッシュをDOMごと解放し、旧 `game.castles`・旧イベントhandler・表示signatureを次シナリオへ持ち越さない。地図本体画像は共通資産として従来どおり保持し、道路SVG・拠点DOMはシナリオ単位の静的層として扱う。
 - `renderMap()` 再利用時も一時戦闘Canvas・地方ハイライト・キープ光・大名名ラベルは静的層へ昇格させない。勢力色Canvasと雪Canvasは既存の継続状態キャッシュ、PC hover Canvasは既存の短命再利用方針を維持し、ゲーム判断・AI候補・乱数順には一切影響させない。
+
+## r317 追加監査：勢力色Canvas局所更新／情報パネル差分DOM／軍団静的索引
+- 勢力色Canvasは `castleOwnershipVersion` を再描画の正本として維持しつつ、`CastleManager.setOwnerIdRaw()` が変更拠点IDを短命 `Set` へ記録する。通常の落城・譲渡など少数（12拠点以下）の所有変更では `DataManager.castlePixelBounds` を使い、変更拠点の外接矩形をCanvas内部解像度へ変換して境界2pxぶんを含む領域だけ再描画する。初回表示・Canvas復旧・bounds欠損・大量変更・局所描画失敗では従来の全画面帯状描画へ必ずフォールバックし、勢力色の意味・境界暗色化・所有判定を変えない。
+- 局所Canvas描画は `_paintCanvasRegions()` を共通窓口とし、巨大な全画面ImageDataを新たに確保しない。各矩形ぶんのImageDataだけを生成し、描画失敗時はhashを無効化して次回の全描画を許可する。シナリオ切替ではdirty集合も破棄し、旧拠点IDを次シナリオへ持ち越さない。
+- 上部拠点情報パネルは表示内容HTMLが前回と同一で、同じ端末側DOMが残っている場合は `innerHTML` を再代入しない。顔画像・ゲージ・状態マーク・状態カルーセルtimerを毎回作り直さず、内容変更時だけ更新する。年月・浪人数・米相場は従来どおり別の軽量差分更新を行い、同一パネル内容を再利用したことでそれらの更新を省略しない。
+- スマホ状態マークのtimerは「updateInfoPanelが呼ばれた時」ではなく「実際にパネル内容が変わる時」を寿命境界とする。状態0/1/複数への変化、城主・城・表示可否の変化では従来どおり古いtimerを破棄して再構築し、同一内容の再表示では現在のカルーセルを継続する。
+- Legion の `clanId` / `legionNo` / `id` は生成・ロード後に変えない静的識別子として、GameManagerが `getLegionByClanNo()` / `getLegionById()` / `getClanLegions()` の短命索引を提供する。重複異常時も旧 `find()` と同じ先頭一致を返し、配列参照または件数が変われば自動再構築する。`commanderId` は任命・解任で変動するため静的索引へ焼き込まない。
+- 軍団索引は高頻度のUI・AI・コマンド・技能等の clanId+legionNo 参照だけへ段階導入し、独立したSystemの単体契約や動的 commanderId 検索を性能目的だけで一括置換しない。候補集合・軍団順・AI判断・乱数順には影響させない。
