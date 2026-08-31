@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r327');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r328');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -289,8 +289,8 @@ test('低メモリ端末はモーダル中の地図と独自スクロールbar�
     assert.ok(css.includes('html.mobile-low-memory body:not(.is-pc) #dialog-modal'));
     assert.ok(css.includes('html.mobile-low-memory body:not(.is-pc) #intercept-confirm-modal'));
     assert.ok(css.includes('background: rgba(0, 0, 0, 0.6) !important;'));
-    assert.ok(css.includes('background-color: #0f130f !important;'));
-    assert.ok(css.includes('background-image: linear-gradient(180deg, #1a1813 0%, #121710 46%, #0c120d 100%) !important;'));
+    assert.ok(css.includes('background-color: #394238 !important;'));
+    assert.ok(css.includes('background-image: linear-gradient(180deg, #4a4033 0%, #39483a 48%, #2d372f 100%) !important;'));
     assert.ok(!css.includes('html.mobile-low-memory body:not(.is-pc) .modal {\n    backdrop-filter:'));
     assert.ok(css.includes('box-shadow: none !important;'));
     assert.ok(ui.includes('const useNativeLowMemoryScroll = !!(window.__mobileLowMemoryMode'));
