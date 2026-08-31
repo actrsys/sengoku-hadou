@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r314'
+        Version: 'r315'
     },
 
     History: {
@@ -22,9 +22,9 @@ window.GameConfig = {
     Map: {
         CastleCard: {
             BaseScale: 0.41,
-            Tier2MinScale: 0.355,
-            Tier3MinScale: 0.375,
-            Tier4MinScale: 0.395,
+            Tier2MinTotal: 500,
+            Tier3MinTotal: 1500,
+            Tier4MinTotal: 2500,
             IconScaleMultipliers: {
                 1: 1.0,
                 2: 1.0,

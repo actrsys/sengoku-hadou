@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r314');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r315');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -139,10 +139,13 @@ test('城アイコンは4段階のWebPと個別の楕円影補正を使う', () 
     assert.ok(css.includes('shiro_icon002.webp'));
     assert.ok(css.includes('shiro_icon003.webp'));
     assert.ok(css.includes('shiro_icon004.webp'));
-    assert.ok(config.includes('Tier2MinScale: 0.355'));
-    assert.ok(config.includes('Tier3MinScale: 0.375'));
-    assert.ok(config.includes('Tier4MinScale: 0.395'));
+    assert.ok(config.includes('Tier2MinTotal: 500'));
+    assert.ok(config.includes('Tier3MinTotal: 1500'));
+    assert.ok(config.includes('Tier4MinTotal: 2500'));
     assert.ok(config.includes('4: 1.065'));
+    assert.ok(uiMap.includes('if (totalValue >= tier4MinTotal) iconTier = 4;'));
+    assert.ok(uiMap.includes('else if (totalValue >= tier3MinTotal) iconTier = 3;'));
+    assert.ok(uiMap.includes('else if (totalValue >= tier2MinTotal) iconTier = 2;'));
     assert.ok(uiMap.includes('el.dataset.iconTier = String(iconTier);'));
     assert.ok(uiMap.includes('for (let tier = 1; tier <= 4; tier++)'));
 });
