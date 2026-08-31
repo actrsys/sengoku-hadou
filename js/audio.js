@@ -6,6 +6,7 @@ class AudioManager {
         this.bgmPlayer = null;
         this.currentBgmName = null; // 今鳴っている曲の名前を入れておく箱
         this.memoBgmName = null;    // 元の曲を覚えておくためのメモ帳
+        this._bgmUsesBakedBaseVolume = false; // mobile AACは基本音量を音源へ焼き込んでいる
         // min版の読込失敗時だけAudioManager自身が通常版を補います。HTMLへinline onerrorを置かないための正規窓口です。
         this._howlerReadyPromise = this._ensureHowlerReady();
         
@@ -168,7 +169,9 @@ class AudioManager {
             let mobilePlayer = null;
             const options = {
                 src: [this._getMobileBgmSource(fileName)],
-                volume: finalVolume,
+                // iOS系ではHTMLMediaElement.volumeが固定される端末があるため、
+                // mobile AAC側へbaseVolumeを焼き込み、ここではユーザー音量だけを渡す。
+                volume: this.userBgmVolume,
                 html5: true,
                 preload: 'metadata'
             };
@@ -188,11 +191,14 @@ class AudioManager {
             }
             mobilePlayer = new window.Howl(options);
             this.bgmPlayer = mobilePlayer;
+            this._bgmUsesBakedBaseVolume = true;
+            if (!(this.userBgmVolume > 0) && typeof mobilePlayer.mute === 'function') mobilePlayer.mute(true);
             mobilePlayer.play();
             return;
         }
 
         // PCは従来どおりWeb Audioを使い、サンプル単位のloopStart/loopEndを維持する。
+        this._bgmUsesBakedBaseVolume = false;
         this.bgmPlayer = new window.Howl({
             src: [`data/music/bgm/${fileName}`],
             volume: finalVolume,
@@ -218,6 +224,7 @@ class AudioManager {
             this.bgmPlayer.unload();
             this.bgmPlayer = null;
         }
+        this._bgmUsesBakedBaseVolume = false;
     }
 
     // BGMをゆっくり消す魔法（指定した秒数かけてフェードアウトします）
@@ -245,8 +252,11 @@ class AudioManager {
             // AudioManager自身が保持する正規の曲名を使う。
             const bgmData = this.bgmList[this.currentBgmName];
             const baseVol = bgmData && bgmData.baseVolume !== undefined ? bgmData.baseVolume : this.fallbackBgmVolume;
-            
-            this.bgmPlayer.volume(baseVol * this.userBgmVolume);
+            const runtimeBaseVol = this._bgmUsesBakedBaseVolume ? 1 : baseVol;
+            if (this._bgmUsesBakedBaseVolume && typeof this.bgmPlayer.mute === 'function') {
+                this.bgmPlayer.mute(!(this.userBgmVolume > 0));
+            }
+            this.bgmPlayer.volume(runtimeBaseVol * this.userBgmVolume);
         }
     }
 

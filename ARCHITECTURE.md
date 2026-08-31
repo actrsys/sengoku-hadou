@@ -45,7 +45,7 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 ## 入口・基盤
 
 - `js/app_bootstrap.js` — ブラウザ起動処理。フォント、固定HTMLボタン、タイトル版表示、viewport、離脱警告。
-- `js/audio.js` — BGM/SE再生と音量設定反映の正本。Howlerのmin版が読めない場合の通常版フォールバックもここで管理し、一時SE用Howlは再生終了・読込失敗時に解放する。BGMのループ開始・終了はカタログ値を独立して適用し、`start: 0` でも終了点を無視しない。再生中の音量変更はHowler内部プロパティから曲名を推測せず `currentBgmName` を正本にする。タッチ端末の長尺BGMは `data/music/bgm_mobile/*.m4a` をHowlerのHTML5 Audio経路でストリーミングし、Web Audioの巨大な全曲PCM AudioBuffer常駐を避ける。PCは従来のOGG/Web Audio経路を維持する。
+- `js/audio.js` — BGM/SE再生と音量設定反映の正本。Howlerのmin版が読めない場合の通常版フォールバックもここで管理し、一時SE用Howlは再生終了・読込失敗時に解放する。BGMのループ開始・終了はカタログ値を独立して適用し、`start: 0` でも終了点を無視しない。再生中の音量変更はHowler内部プロパティから曲名を推測せず `currentBgmName` を正本にする。タッチ端末の長尺BGMは `data/music/bgm_mobile/*.m4a` をHowlerのHTML5 Audio経路でストリーミングし、Web Audioの巨大な全曲PCM AudioBuffer常駐を避ける。mobile AACには各曲の `baseVolume` を音源側へ焼き込み、HTMLMediaElement.volumeが固定される古いiOSでもBGMだけ過大音量にならないようにする。PCは従来のOGG/Web Audio経路を維持する。
 - `js/config.js` — ゲームルール・バランス値と開発版メタ情報の正本。ユーザー個人の設定は置かない。タイトルの版番号は `GameConfig.Meta.Version` だけを参照する。
 - `js/constants.js` — 状態文字列と、複数状態をまとめた意味判定（LifeStatusRules / BushoStatusRules / DiplomacyRules）の正本。
 - `js/user_settings.js` — 通知・歴史イベント・オートセーブ・音量などユーザー個人設定とlocalStorageの正本。
@@ -645,7 +645,7 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 
 ## r320 追加監査：古いスマホのWebKitページプロセス落ち対策／BGM常駐メモリ削減
 - 古い実機でゲーム内DOM・下部診断も残らず、ブラウザ自身の「このページで問題が繰り返し起きました」相当の白画面へ遷移する症状は、通常のJavaScript例外としてゲーム側で捕捉できる範囲より外側のRenderer/Web Contentプロセス停止を強く疑う。原因を単一要素へ断定せず、まず通常プレイ中の常駐メモリ余裕を増やして一覧→詳細等の瞬間確保へ耐えられるようにする。
-- BGMはPCでは従来どおり `data/music/bgm/*.ogg` + Howler Web Audioを使い、既存カタログのloop start/endをAudioBufferSourceへ適用する。タッチ端末では同じ9曲を44.1kHz stereo AACへ変換した `data/music/bgm_mobile/*.m4a` を `html5: true` で再生し、長尺曲全体をPCM AudioBufferへ展開して常駐させない。曲選択、基本音量、ユーザー音量、再生開始契機は変更しない。
+- BGMはPCでは従来どおり `data/music/bgm/*.ogg` + Howler Web Audioを使い、既存カタログのloop start/endをAudioBufferSourceへ適用する。タッチ端末では同じ9曲を44.1kHz stereo AACへ変換した `data/music/bgm_mobile/*.m4a` を `html5: true` で再生し、長尺曲全体をPCM AudioBufferへ展開して常駐させない。曲選択、基本音量、再生開始契機は変更しない。タッチ端末用AACには基本音量を焼き込み、HTML5 Audio側ではユーザー音量だけを掛けることで二重減衰を避ける。
 - タッチ端末用AACは各曲の既存loopEndで物理的に終端させる。初回は従来どおり0秒からintroを再生し、loopStartが0より大きい曲だけ終端イベント後に同じHTML5 AudioをloopStartへseekして再開する。loopStart=0はnative loopを使う。audio spriteを直接再生して初回introを飛ばさず、HTML5 Audio経路ではWeb Audio `bufferSource` に触れない。タッチ判定はレイアウトではなく `body.is-touch-input` を正本とし、PCレイアウトを使うタブレットでも長尺BGMをストリーミングする。
 - 武将一覧→詳細の短時間診断は従来のsessionStorageに加え、Renderer停止後にも回収できる小さな `sengoku_mobile_transition_checkpoint_v1` をlocalStorageへ一時退避する。`transition_start` / 一覧解放 / yield / 詳細DOM生成 / 次フレームの各段階を更新し、詳細表示後750ms生存した時点で正常として永続checkpointを削除する。750ms前でも正常に戻る・閉じる・別画面へ進んだ場合は遅延遷移取消時にcheckpointを消し、次回起動へ誤検知を残さない。正常前にページプロセスが停止した場合だけ、次回正常起動時に一度だけ回収・表示して削除する。
 - localStorage診断はゲーム状態やセーブデータの代替ではなく、画面遷移中の数十～数百byte程度の停止位置だけを扱う。診断書込み失敗は握りつぶしてゲーム進行を優先し、診断のために新しい失敗条件を作らない。

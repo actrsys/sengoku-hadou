@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r320');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r321');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7363,7 +7363,8 @@ test('タッチ端末BGMはAACをHTML5ストリーミングし初回intro後だ�
         seek(value, id) { this.seekArgs.push([value, id]); return this; }
         stop() {}
         unload() {}
-        volume() { return this.options.volume; }
+        volume(value) { if (value !== undefined) this.lastVolume = value; return value === undefined ? this.options.volume : this; }
+        mute(value) { this.lastMute = value; return this; }
     }
     MockHowl.instances = [];
     const document = { body: { classList: new FakeClassList(['is-touch-input']) } };
@@ -7376,6 +7377,7 @@ test('タッチ端末BGMはAACをHTML5ストリーミングし初回intro後だ�
     assert.strictEqual(howl.options.html5, true);
     assert.strictEqual(howl.options.preload, 'metadata');
     assert.strictEqual(howl.options.src[0], 'data/music/bgm_mobile/SC_ex_Town2_Fortress.m4a');
+    assert.strictEqual(howl.options.volume, 1, 'mobile AACへbaseVolumeを焼き込みHTML5側はユーザー音量だけを使う');
     assert.strictEqual(howl.playArgs[0], undefined, '初回は0秒から再生してintroを維持する');
     assert.strictEqual(howl.options.sprite, undefined, '初回からloopStartへ飛ぶaudio spriteは使わない');
     assert.strictEqual(typeof howl.options.onend, 'function');
@@ -7383,6 +7385,11 @@ test('タッチ端末BGMはAACをHTML5ストリーミングし初回intro後だ�
     assert.ok(Math.abs(howl.seekArgs[0][0] - data.start) < 1e-12);
     assert.strictEqual(howl.seekArgs[0][1], 1);
     assert.strictEqual(howl.playArgs[1], 1, '物理終端(loopEnd)後は同じHTML5 AudioをloopStartから再開する');
+    ctx.AudioManager.setBgmVolume(0.5);
+    assert.strictEqual(howl.lastVolume, 0.5, 'mobile AACはbaseVolumeを二重に掛けずユーザー音量だけ反映する');
+    assert.strictEqual(howl.lastMute, false);
+    ctx.AudioManager.setBgmVolume(0);
+    assert.strictEqual(howl.lastMute, true, 'volume固定端末でも0指定はmuteで無音にできる');
 
     ctx.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
     const startZero = MockHowl.instances.at(-1);
