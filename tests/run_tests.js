@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r306');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r308');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -210,9 +210,11 @@ test('会話確認visual fixtureは実ゲーム同様footerをmodal-content外�
     assert.ok(contentClose >= 0 && footerAt > contentClose, 'fixtureでfooterをmodal-contentの兄弟要素にする');
 });
 
-test('長文本文は装飾書体と分離した可読性重視の日本語フォントを共用する', () => {
+test('長文本文は装飾書体と分離し、可読性と歴史物の柔らかさを両立する本文書体を共用する', () => {
     const css = read('css/style.css');
     assert.ok(css.includes('--font-readable-ja:'), '長文用フォントスタックを共通変数として正本化する');
+    assert.ok(css.includes('\"UD Digi Kyokasho N-R\"'), '日本語WindowsではUDデジタル教科書体を最優先する');
+    assert.ok(css.includes('\"Yu Mincho\"'), '教科書体が無い環境では明朝系へ自然にフォールバックする');
     for (const selector of ['.message-area {', '.busho-detail-biography-text {', '#scenario-modal .scenario-desc-text {', '.guide-section p,']) {
         const at = css.indexOf(selector);
         const block = css.slice(at, css.indexOf('}', at) + 1);

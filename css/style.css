@@ -57,8 +57,10 @@ html.fonts-fallback body { visibility: visible; }
     /* 下部会話だけは名前札がメッセージ枠の上へ16〜18px張り出すため、
        標準12pxでは視覚的クリアランスが不足する。会話選択肢専用の例外値として18pxを正本化する。 */
     --dialog-choice-footer-gap: 18px;
-    /* 長文は装飾書体ではなく、画面で読みやすい日本語UI書体を共通利用する。 */
-    --font-readable-ja: "Yu Gothic", "Yu Gothic UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+    /* 長文はUI的なゴシックへ寄せ過ぎず、可読性と歴史物らしい柔らかさを両立する。
+       日本語WindowsではUDデジタル教科書体を優先し、無い環境では端正な明朝系へフォールバックする。
+       いずれもOS側の書体を参照するだけで、新しいフォントファイルは同梱しない。 */
+    --font-readable-ja: "UD Digi Kyokasho N-R", "UD Digi Kyokasho NK-R", "Yu Mincho", YuMincho, "Hiragino Mincho ProN", "Hiragino Mincho Pro", "Noto Serif JP", "Noto Serif CJK JP", "BIZ UDPMincho Medium", serif;
     --font-numeric-ui: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -737,7 +739,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 /* ※見出し（.list-header）および上記以外の列は、ベース設定の「中央寄せ」が適用されます */
 
 /* 履歴リストアイテム */
-.history-list-item { scroll-snap-align: start; padding: 8px 10px; border-bottom: 1px solid rgba(255, 215, 79, 0.3); font-family: var(--font-readable-ja); font-size: 0.9rem; font-weight: 600; line-height: 1.5; letter-spacing: 0.01em; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.history-list-item { scroll-snap-align: start; padding: 8px 10px; border-bottom: 1px solid rgba(255, 215, 79, 0.3); font-family: var(--font-readable-ja); font-size: 0.9rem; font-weight: 500; line-height: 1.5; letter-spacing: 0.01em; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .history-list-item.row-striped { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
 .history-list-item:last-child { border-bottom: none; }
 .select-item.history-month-divider {
@@ -1349,7 +1351,7 @@ body:not(.is-pc) .saveload-slot-time {
     border-radius: 8px;
     font-family: var(--font-readable-ja);
     font-size: 1.1rem;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 1.62;
     letter-spacing: 0.015em;
     white-space: pre-wrap;
@@ -2620,7 +2622,7 @@ body:not(.is-pc) .busho-skill-desc-body { font-size: 0.62rem; }
     color: #eee;
     font-family: var(--font-readable-ja);
     font-size: 0.95rem;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 1.72;
     letter-spacing: 0.015em;
     white-space: pre-wrap;
@@ -2972,7 +2974,7 @@ body:not(.is-pc) .busho-detail-biography-text {
 
 .war-controls-area { display: flex !important; width: 100%; gap: 10px; flex-shrink: 0; height: auto; min-height: 100px; box-sizing: border-box; padding: 10px; background: transparent; border-top: none; }
 .war-controls-buttons { flex: 2; display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: max-content; gap: 5px; height: auto; box-sizing: border-box; }
-.war-controls-desc { flex: 3; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 8px; padding: 8px 15px; font-family: var(--font-readable-ja); font-size: 0.95rem; font-weight: 600; line-height: 1.5; letter-spacing: 0.01em; color: #fff; text-shadow: 1px 1px 1px #000; text-align: left; overflow-y: auto; height: 100%; box-sizing: border-box; }
+.war-controls-desc { flex: 3; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 8px; padding: 8px 15px; font-family: var(--font-readable-ja); font-size: 0.95rem; font-weight: 500; line-height: 1.5; letter-spacing: 0.01em; color: #fff; text-shadow: 1px 1px 1px #000; text-align: left; overflow-y: auto; height: 100%; box-sizing: border-box; }
 .war-command-placeholder { color: #aaa; text-align: center; margin-top: 15px; }
 .war-command-desc-title { font-weight: bold; font-size: 1.1rem; border-bottom: 1px solid rgba(212, 175, 55, 0.5); padding-bottom: 5px; margin-bottom: 5px; color: #ffd54f; }
 .war-command-desc-confirm { margin-top: 8px; color: #ff8a80; font-weight: bold; font-size: 0.85rem; }
@@ -3147,7 +3149,7 @@ body:not(.is-pc) .war-action-message-prompt { left: auto; right: 15px; transform
 .fw-unit-aptitudes .grade-main { font-size: 0.78rem !important; }
 .fw-unit-aptitude-empty { width: 20px; text-align: center; color: #777; font-size: 0.78rem; line-height: 1; }
 
-.fw-floating-log { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 600px; height: 100px; overflow-y: auto; background: rgba(0, 0, 0, 0.6); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; padding: 5px 10px; font-family: var(--font-readable-ja); font-size: 0.85rem; font-weight: 600; z-index: 100; pointer-events: auto; text-shadow: 1px 1px 1px #000; }
+.fw-floating-log { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 600px; height: 100px; overflow-y: auto; background: rgba(0, 0, 0, 0.6); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; padding: 5px 10px; font-family: var(--font-readable-ja); font-size: 0.85rem; font-weight: 500; z-index: 100; pointer-events: auto; text-shadow: 1px 1px 1px #000; }
 
 .fw-controls { height: 10vh; min-height: 50px; background: #000; display: flex; justify-content: flex-end; align-items: center; padding: 0 20px; flex-shrink: 0; border-top: 2px solid #111; }
 .fw-menu-group { display: flex; gap: 15px; height: 100%; align-items: center; }
@@ -5504,7 +5506,7 @@ body.background-paused #map-container {
 #ending-message {
     font-family: var(--font-readable-ja);
     font-size: 1.5rem;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 2;
     text-align: center;
     margin-top: 20px;
@@ -6149,7 +6151,7 @@ body:not(.is-pc) .title-tap-message { padding: 15px 8px; }
     color: #f3efe0;
     font-family: var(--font-readable-ja);
     font-size: 0.95rem;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 1.72;
     letter-spacing: 0.015em;
     white-space: pre-wrap;
@@ -7385,7 +7387,7 @@ body:not(.is-pc) .legion-council-order-label small { font-size: 11px; }
     color: #e4e9e2;
     font-family: var(--font-readable-ja);
     font-size: 0.76rem;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 1.58;
     letter-spacing: 0.01em;
 }
