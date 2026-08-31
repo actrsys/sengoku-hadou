@@ -139,13 +139,28 @@ class GameManager {
     }
 
     _showPreviousAIDiagnostic() {
-        if (typeof sessionStorage === 'undefined') return;
+        if (typeof sessionStorage === 'undefined' && typeof localStorage === 'undefined') return;
         try {
-            const raw = sessionStorage.getItem('sengoku_ai_last_checkpoint_v1');
+            // WebKitのページプロセスが強制終了すると、ゲームDOM自体が消えてその場ではログを表示できない。
+            // 一覧→詳細の短い遷移だけはlocalStorageへも退避しているため、次回正常起動時はそちらを優先して回収する。
+            let raw = null;
+            let fromPersistentTransition = false;
+            if (typeof localStorage !== 'undefined') {
+                raw = localStorage.getItem('sengoku_mobile_transition_checkpoint_v1');
+                fromPersistentTransition = !!raw;
+            }
+            if (!raw && typeof sessionStorage !== 'undefined') {
+                raw = sessionStorage.getItem('sengoku_ai_last_checkpoint_v1');
+            }
             if (!raw) return;
             const data = JSON.parse(raw);
             if (!data || data.phase === 'turn_finished' || data.phase === 'player_turn:ready') return;
-            if (data.time && Date.now() - data.time > 2 * 60 * 60 * 1000) return;
+            if (data.time && Date.now() - data.time > 2 * 60 * 60 * 1000) {
+                if (fromPersistentTransition && typeof localStorage !== 'undefined') {
+                    localStorage.removeItem('sengoku_mobile_transition_checkpoint_v1');
+                }
+                return;
+            }
             if (document.getElementById('ai-last-checkpoint-badge')) return;
 
             const el = document.createElement('div');
@@ -159,6 +174,11 @@ class GameManager {
             el.title = 'タップすると閉じます';
             el.addEventListener('click', () => el.remove());
             document.body.appendChild(el);
+
+            // 永続checkpointは一度画面へ回収できれば役目を終える。DOMの表示は残るので報告・確認は可能。
+            if (fromPersistentTransition && typeof localStorage !== 'undefined') {
+                localStorage.removeItem('sengoku_mobile_transition_checkpoint_v1');
+            }
         } catch (e) {
         }
     }

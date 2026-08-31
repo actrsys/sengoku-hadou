@@ -125,6 +125,18 @@ class AudioManager {
         return true;
     }
 
+    _shouldUseMobileBgmStreaming() {
+        // タッチ端末では長尺BGMをWeb AudioのAudioBufferへ全展開せず、
+        // HTML5 Audioでストリーミング再生する。PCは従来のWeb Audio経路を維持する。
+        return !!(typeof document !== 'undefined' && document.body && document.body.classList
+            && document.body.classList.contains('is-touch-input'));
+    }
+
+    _getMobileBgmSource(fileName) {
+        const name = String(fileName || '');
+        return `data/music/bgm_mobile/${name.replace(/\.[^.]+$/, '')}.m4a`;
+    }
+
     // BGMを鳴らす魔法
     playBGM(fileName, fallbackStart = 0, fallbackEnd = 0) {
         if (this._retryWhenHowlerReady(() => this.playBGM(fileName, fallbackStart, fallbackEnd))) return;
@@ -142,10 +154,49 @@ class AudioManager {
         const baseVol = bgmData && bgmData.baseVolume !== undefined ? bgmData.baseVolume : this.fallbackBgmVolume;
         const finalVolume = baseVol * this.userBgmVolume;
 
+        const hasLoopWindow = Number.isFinite(loopStart) && loopStart >= 0
+            && Number.isFinite(loopEnd) && loopEnd > loopStart;
+        const useMobileStream = this._shouldUseMobileBgmStreaming() && !!bgmData;
+
+        if (useMobileStream) {
+            // HowlerのWeb Audio既定経路では長尺BGM全体がPCMのAudioBufferへ展開される。
+            // 古いスマホでは通常BGMだけでも数十MB規模になり、一覧→詳細などの瞬間メモリと重なる。
+            // HTML5 Audio + AACへ切り替えることで曲をストリーミングし、常駐PCMを避ける。
+            // mobile版AACは各曲のloopEndで物理的に終端している。これにより初回は従来どおり0秒から
+            // introを再生し、終端到達後だけloopStartへseekして同じ区間を繰り返せる。
+            // audio spriteを直接playすると初回からloopStartへ飛んでintroを失うため使用しない。
+            let mobilePlayer = null;
+            const options = {
+                src: [this._getMobileBgmSource(fileName)],
+                volume: finalVolume,
+                html5: true,
+                preload: 'metadata'
+            };
+            if (hasLoopWindow && loopStart > 0) {
+                options.onend = (id) => {
+                    if (!mobilePlayer || this.bgmPlayer !== mobilePlayer) return;
+                    try {
+                        mobilePlayer.seek(loopStart, id);
+                        mobilePlayer.play(id);
+                    } catch (e) {
+                        // HTML5 Audio側のseek/replayが失敗してもゲーム処理は止めない。
+                    }
+                };
+            } else {
+                // loopStart=0 の曲はloopEndで切ったmobile音源をnative loopするだけで同じ範囲になる。
+                options.loop = true;
+            }
+            mobilePlayer = new window.Howl(options);
+            this.bgmPlayer = mobilePlayer;
+            mobilePlayer.play();
+            return;
+        }
+
+        // PCは従来どおりWeb Audioを使い、サンプル単位のloopStart/loopEndを維持する。
         this.bgmPlayer = new window.Howl({
             src: [`data/music/bgm/${fileName}`],
             volume: finalVolume,
-            loop: true, 
+            loop: true,
             onplay: (id) => {
                 if (!this.bgmPlayer) return;
                 const sound = this.bgmPlayer._soundById(id);

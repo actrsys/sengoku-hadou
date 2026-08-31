@@ -10,6 +10,8 @@ class UIInfoManager {
         this.selectorView = new SelectorModalView(ui);
         this._deferredModalGeneration = 0;
         this._deferredModalTimer = null;
+        this._deferredModalStabilityTimer = null;
+        this._activePersistentTransitionKey = '';
         this.closeCommonModal(); // 履歴や状態変数の初期化
     }
     
@@ -145,6 +147,17 @@ class UIInfoManager {
             clearTimeout(this._deferredModalTimer);
             this._deferredModalTimer = null;
         }
+        if (this._deferredModalStabilityTimer !== null && this._deferredModalStabilityTimer !== undefined) {
+            clearTimeout(this._deferredModalStabilityTimer);
+            this._deferredModalStabilityTimer = null;
+        }
+        // 正常な「戻る／閉じる／別画面へ進む」で遅延遷移を中断した場合は、
+        // crash診断を次回起動へ誤って残さない。新規UIInfoManager生成時はkeyが空なので、
+        // 前回ページプロセス停止で残ったlocalStorage checkpointはGameManagerが回収できる。
+        if (this._activePersistentTransitionKey && typeof localStorage !== 'undefined') {
+            try { localStorage.removeItem(this._activePersistentTransitionKey); } catch (e) {}
+        }
+        this._activePersistentTransitionKey = '';
     }
 
     // 古いスマホでは「一覧DOMを消す」と「詳細DOMを作る」を同じイベント処理内で続けると、
@@ -160,9 +173,35 @@ class UIInfoManager {
 
         this._cancelDeferredModalTransition();
         const transitionGeneration = this._deferredModalGeneration;
+        const persistentDiagnosticKey = diagnosticPrefix === 'ui:busho_detail'
+            ? 'sengoku_mobile_transition_checkpoint_v1'
+            : '';
+        this._activePersistentTransitionKey = persistentDiagnosticKey;
         const mark = (stage) => {
-            if (!diagnosticPrefix || !this.game || typeof this.game.writeSystemDiagnostic !== 'function') return;
-            this.game.writeSystemDiagnostic(`${diagnosticPrefix}:${stage}`);
+            const phase = diagnosticPrefix ? `${diagnosticPrefix}:${stage}` : '';
+            if (phase && this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic(phase);
+            }
+            // Safari/WebKitのページプロセス自体が落ちるとゲーム内DOMは表示できない。
+            // 武将一覧→詳細だけは小さなcheckpointをlocalStorageにも残し、次回起動で回収できるようにする。
+            if (!persistentDiagnosticKey || typeof localStorage === 'undefined') return;
+            try {
+                localStorage.setItem(persistentDiagnosticKey, JSON.stringify({
+                    phase,
+                    stage,
+                    year: this.game ? this.game.year : 0,
+                    month: this.game ? this.game.month : 0,
+                    time: Date.now()
+                }));
+            } catch (e) {}
+        };
+        const clearPersistentDiagnostic = () => {
+            if (persistentDiagnosticKey && typeof localStorage !== 'undefined') {
+                try { localStorage.removeItem(persistentDiagnosticKey); } catch (e) {}
+            }
+            if (this._activePersistentTransitionKey === persistentDiagnosticKey) {
+                this._activePersistentTransitionKey = '';
+            }
         };
 
         if (this.ui && typeof this.ui.pauseBackgroundUpdates === 'function') {
@@ -201,6 +240,15 @@ class UIInfoManager {
                 if (transitionGeneration !== this._deferredModalGeneration) return;
                 if (!this.currentModalInfo || this.currentModalInfo.pageType !== pageType) return;
                 mark('next_frame_done');
+                // 画像decode・font rasterizeなどはDOM生成直後より少し遅れて走ることがある。
+                // 750ms安定して詳細画面が生存した時だけ永続checkpointを消す。
+                this._deferredModalStabilityTimer = setTimeout(() => {
+                    if (transitionGeneration !== this._deferredModalGeneration) return;
+                    if (!this.currentModalInfo || this.currentModalInfo.pageType !== pageType) return;
+                    this._deferredModalStabilityTimer = null;
+                    mark('stable_750ms');
+                    clearPersistentDiagnostic();
+                }, 750);
             });
         }, 0);
     }

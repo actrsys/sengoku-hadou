@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r319');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r320');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7348,6 +7348,67 @@ test('BGMはstart=0でもloopEndを適用し音量変更はcurrentBgmNameを正�
     const source = read('js/audio.js');
     assert.ok(!source.includes('this.bgmPlayer._src[0]'));
     assert.ok(!source.includes('if (loopStart > 0 && this.bgmPlayer)'));
+});
+
+
+test('タッチ端末BGMはAACをHTML5ストリーミングし初回intro後だけloopStartへ戻る', () => {
+    class MockHowl {
+        constructor(options) {
+            this.options = options;
+            this.playArgs = [];
+            this.seekArgs = [];
+            MockHowl.instances.push(this);
+        }
+        play(arg) { this.playArgs.push(arg); return 1; }
+        seek(value, id) { this.seekArgs.push([value, id]); return this; }
+        stop() {}
+        unload() {}
+        volume() { return this.options.volume; }
+    }
+    MockHowl.instances = [];
+    const document = { body: { classList: new FakeClassList(['is-touch-input']) } };
+    const ctx = createContext({ Howl: MockHowl, document });
+    loadScript(ctx, 'js/audio.js');
+
+    ctx.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
+    const howl = MockHowl.instances.at(-1);
+    const data = ctx.AudioManager.bgmList['SC_ex_Town2_Fortress.ogg'];
+    assert.strictEqual(howl.options.html5, true);
+    assert.strictEqual(howl.options.preload, 'metadata');
+    assert.strictEqual(howl.options.src[0], 'data/music/bgm_mobile/SC_ex_Town2_Fortress.m4a');
+    assert.strictEqual(howl.playArgs[0], undefined, '初回は0秒から再生してintroを維持する');
+    assert.strictEqual(howl.options.sprite, undefined, '初回からloopStartへ飛ぶaudio spriteは使わない');
+    assert.strictEqual(typeof howl.options.onend, 'function');
+    howl.options.onend(1);
+    assert.ok(Math.abs(howl.seekArgs[0][0] - data.start) < 1e-12);
+    assert.strictEqual(howl.seekArgs[0][1], 1);
+    assert.strictEqual(howl.playArgs[1], 1, '物理終端(loopEnd)後は同じHTML5 AudioをloopStartから再開する');
+
+    ctx.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
+    const startZero = MockHowl.instances.at(-1);
+    assert.strictEqual(startZero.options.loop, true, 'loopStart=0はtrim済み音源をnative loopする');
+    assert.strictEqual(startZero.options.onend, undefined);
+
+    Object.keys(ctx.AudioManager.bgmList).forEach(fileName => {
+        const mobileName = fileName.replace(/\.[^.]+$/, '') + '.m4a';
+        assert.ok(fs.existsSync(path.join(ROOT, 'data/music/bgm_mobile', mobileName)), `mobile BGM missing: ${mobileName}`);
+    });
+});
+
+test('武将一覧→詳細のRenderer停止診断は一時的にlocalStorageへ退避し安定後に消す', () => {
+    const info = read('js/ui_info.js');
+    const game = read('js/game.js');
+    assert.ok(info.includes("'sengoku_mobile_transition_checkpoint_v1'"));
+    assert.ok(info.includes("mark('list_dom_released')"));
+    assert.ok(info.includes("mark('dom_start')"));
+    assert.ok(info.includes("mark('dom_done')"));
+    assert.ok(info.includes("mark('next_frame_done')"));
+    assert.ok(info.includes("mark('stable_750ms')"));
+    assert.ok(info.includes('clearPersistentDiagnostic();'));
+    assert.ok(info.includes('this._activePersistentTransitionKey = persistentDiagnosticKey;'));
+    assert.ok(info.includes('localStorage.removeItem(this._activePersistentTransitionKey)'));
+    assert.ok(game.includes("localStorage.getItem('sengoku_mobile_transition_checkpoint_v1')"));
+    assert.ok(game.includes('fromPersistentTransition'));
 });
 
 test('スマホ状態マークのタイマーは情報パネル内容が変わる時だけ作り直す', () => {
