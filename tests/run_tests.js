@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r305');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r306');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -208,6 +208,26 @@ test('会話確認visual fixtureは実ゲーム同様footerをmodal-content外�
     const contentClose = html.indexOf('</div>\n        <!-- 実ゲームでは UIManager 初期化時');
     const footerAt = html.indexOf('<div class="modal-footer right">');
     assert.ok(contentClose >= 0 && footerAt > contentClose, 'fixtureでfooterをmodal-contentの兄弟要素にする');
+});
+
+test('長文本文は装飾書体と分離した可読性重視の日本語フォントを共用する', () => {
+    const css = read('css/style.css');
+    assert.ok(css.includes('--font-readable-ja:'), '長文用フォントスタックを共通変数として正本化する');
+    for (const selector of ['.message-area {', '.busho-detail-biography-text {', '#scenario-modal .scenario-desc-text {', '.guide-section p,']) {
+        const at = css.indexOf(selector);
+        const block = css.slice(at, css.indexOf('}', at) + 1);
+        assert.ok(at >= 0 && block.includes('font-family: var(--font-readable-ja);'), `${selector} は長文用フォントを使う`);
+    }
+});
+
+test('AI思考中の進捗数字は等幅数字と総桁幅固定で桁上がり時に左右へ揺れない', () => {
+    const css = read('css/style.css');
+    const ui = read('js/ui.js');
+    assert.ok(css.includes('font-variant-numeric: tabular-nums;'), '数字はtabular numsを使う');
+    assert.ok(css.includes('width: var(--ai-progress-digit-width, 2ch);'), '数字欄の幅をCSS変数で固定する');
+    assert.ok(ui.includes('const progressDigits = Math.max(2, totalText.length, currentText.length);'), '進捗の最大桁数を現在値と総数から求める');
+    assert.ok(ui.includes("this.aiGuard.style.setProperty('--ai-progress-digit-width', `${progressDigits}ch`);"), '進行中は同じ桁幅を両数字欄へ適用する');
+    assert.ok(ui.includes('class=\"ai-progress-line\"'), '進捗行をnowrapの専用要素にする');
 });
 
 test('月末・月初の長い処理は既存AIガードへ進行中表示を出す', () => {

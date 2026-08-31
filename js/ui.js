@@ -680,12 +680,16 @@ class UIManager {
         let currentEl = this.aiGuard.querySelector('[data-ai-progress-current]');
         let totalEl = this.aiGuard.querySelector('[data-ai-progress-total]');
         if (!currentEl || !totalEl) {
-            this.aiGuard.innerHTML = `<div class="loading-spinner"></div><div>思考中... (<span data-ai-progress-current class="ai-progress-number is-current"></span> / <span data-ai-progress-total class="ai-progress-number is-total"></span>)</div>`;
+            this.aiGuard.innerHTML = `<div class="loading-spinner"></div><div class="ai-progress-line">思考中... (<span data-ai-progress-current class="ai-progress-number is-current"></span> / <span data-ai-progress-total class="ai-progress-number is-total"></span>)</div>`;
             currentEl = this.aiGuard.querySelector('[data-ai-progress-current]');
             totalEl = this.aiGuard.querySelector('[data-ai-progress-total]');
         }
         const currentText = String(current);
         const totalText = String(total);
+        // 進捗中に 9→10、99→100 と桁が増えても表示全体が左右へ揺れないよう、
+        // 最終値(total)の桁数を正本にして双方の数字欄を同じ幅へ固定します。
+        const progressDigits = Math.max(2, totalText.length, currentText.length);
+        this.aiGuard.style.setProperty('--ai-progress-digit-width', `${progressDigits}ch`);
         if (currentEl && currentEl.textContent !== currentText) currentEl.textContent = currentText;
         if (totalEl && totalEl.textContent !== totalText) totalEl.textContent = totalText;
     }
