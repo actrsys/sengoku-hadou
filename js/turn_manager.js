@@ -208,17 +208,36 @@ class TurnManager {
             if (daimyo) daimyoByClanIdForGrowth.set(clan.id, daimyo);
             ownedCastleCountByClanId.set(clan.id, game.getClanCastles(clan.id).length);
         });
+        // 港収入で同じ勢力総人口を拠点ごとに再reduceしない。
+        // game.castlesの元順で一度だけ足すので、従来のgetClanCastles(...).reduceと同じ合計になる。
+        const clanPopulationById = new Map();
+        game.castles.forEach(castle => {
+            const clanId = Number(castle.ownerClan);
+            if (!Number.isFinite(clanId)) return;
+            // getClanCastles()と同じNumber正規化でまとめ、復元境界の文字列数値でも従来と同じ勢力合計にする。
+            clanPopulationById.set(clanId, (clanPopulationById.get(clanId) || 0) + castle.population);
+        });
 
         game.castles.forEach(castle => {
             if (castle.ownerClan === 0) return;
             castle.isDone = false;
 
-            const income = EconomyRules.calcMonthlyGoldIncome(castle, game);
+            const clanPopulationKey = Number(castle.ownerClan);
+            const populationBeforeGrowth = castle.population;
+            const income = EconomyRules.calcMonthlyGoldIncome(castle, game, clanPopulationById.get(clanPopulationKey));
             castle.gold = Math.min(99999, castle.gold + income);
 
             const neighborMultiplier = DomesticRules.calcNeighborGrowthMultiplier(castle, game);
             const populationGrowth = DomesticRules.calcMonthlyPopulationGrowth(castle, neighborMultiplier);
             castle.population = Math.min(999999, Math.max(0, castle.population + populationGrowth));
+            // 従来は各拠点の港収入計算時にreduceしていたため、先に処理済みの拠点の人口増加は
+            // 後続拠点の港ボーナスへ反映されていた。短命集計Mapも同じ順序で差分更新する。
+            const trackedClanPopulation = clanPopulationById.get(clanPopulationKey);
+            if (Number.isFinite(trackedClanPopulation)
+                && Number.isFinite(populationBeforeGrowth)
+                && Number.isFinite(castle.population)) {
+                clanPopulationById.set(clanPopulationKey, trackedClanPopulation + (castle.population - populationBeforeGrowth));
+            }
 
             const daimyo = daimyoByClanIdForGrowth.get(castle.ownerClan);
             if (daimyo) {

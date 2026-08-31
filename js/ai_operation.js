@@ -321,6 +321,13 @@ class AIOperationManager {
             // ★修正：数値の0と文字の"0"が混ざって重複しないように、必ず数値(Number)に統一します！
             const legionIds = [...new Set(myCastles.map(c => Number(c.legionId || 0)))]
                 .filter(legionId => legionId === 0 || this.isActiveLegion(clan.id, legionId));
+            // 軍団ごとのfilterを月次作戦ループ内で繰り返さない。Mapのkeyは数値legionIdなので、
+            // c.legionId === legionId だった従来の厳密比較（文字列"1"は不一致）もそのまま維持する。
+            const castlesByLegionId = new Map();
+            legionIds.forEach(legionId => castlesByLegionId.set(legionId, []));
+            myCastles.forEach(c => {
+                if (castlesByLegionId.has(c.legionId)) castlesByLegionId.get(c.legionId).push(c);
+            });
 
             for (const legionId of legionIds) {
                 processedLegions++;
@@ -334,7 +341,7 @@ class AIOperationManager {
 
                 // ★変更：新しく一元化した共通魔法を使って、自軍団の領土から直接攻撃できる敵拠点のリストを作ります！
                 const reachableEnemyCastleIds = new Set();
-                const myLegionCastles = this.game.getClanCastles(clan.id).filter(c => c.legionId === legionId);
+                const myLegionCastles = castlesByLegionId.get(legionId) || [];
                 const visitedForRoute = new Set();
                 
                 myLegionCastles.forEach(myC => {
@@ -352,7 +359,7 @@ class AIOperationManager {
                 
                 const grandObj = this.grandObjectives[clan.id][legionId];
                 if (grandObj) {
-                    const currentMyCastleCount = this.game.getClanCastles(clan.id).length;
+                    const currentMyCastleCount = myCastles.length;
                     
                     // 前月よりも自拠点の数が減っていたら方針を消去して再考
                     if (currentMyCastleCount < grandObj.prevMyCastleCount) {
@@ -402,8 +409,8 @@ class AIOperationManager {
                             }
                         } else if (grandObj.type === '国内平定') {
                             // ★追加：国内平定の場合、自軍団の管轄内（自分の城）にいる敵対諸勢力の数を数えます
-                            const myCastles = this.game.getClanCastles(clan.id).filter(c => c.legionId === legionId);
-                            myCastles.forEach(myC => {
+                            const legionCastlesForPacification = myLegionCastles;
+                            legionCastlesForPacification.forEach(myC => {
                                 // ★修正：商人は攻撃対象にならないので、ターゲットから除外します！
                                 const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(myC.id).filter(k => k.getRelation(clan.id) <= 30 && k.ideology !== '商人');
                                 currentTargetCount += kunishusInCastle.length;

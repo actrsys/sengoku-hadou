@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r317');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r318');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -8843,7 +8843,7 @@ test('読み取り専用の勢力城探索だけをgetClanCastlesへ寄せ、所
     assert.ok(ui.includes('this.game.getClanCastles(s.defender.ownerClan).some'));
     assert.ok(map.includes('this.game.getClanCastles(clanId).map(c => Number(c.id))'));
     assert.ok(economy.includes('game.getClanCastles(daimyo.clan).some'));
-    assert.ok(economy.includes('const clanCastles = game.getClanCastles(castle.ownerClan);'));
+    assert.ok(economy.includes('game.getClanCastles(castle.ownerClan).reduce'));
     assert.ok(life.includes('const clanCastles = this.game.getClanCastles(p.originalClanId);'));
     const ai = read('js/ai.js');
     const command = read('js/command_system.js');
@@ -9170,6 +9170,143 @@ test('勢力色Canvasの局所更新は同じ所有状態の全描画と同じpi
 });
 
 
+
+
+test('勢力ハイライトは小中勢力なら拠点boundsだけ描き大勢力・欠損時は全描画へ戻す', () => {
+    const uiMap = read('js/ui_map.js');
+    const at = uiMap.indexOf('    drawClanHighlight(canvasId, clanId');
+    const end = uiMap.indexOf('\n    // 光をサッと消す魔法', at);
+    const block = uiMap.slice(at, end);
+    assert.ok(block.includes('DataManager.castlePixelBounds'));
+    assert.ok(block.includes('coveredArea <= overlay.width * overlay.height * 0.7'));
+    assert.ok(block.includes('this._paintCanvasRegions(overlay, regions, paintPixel)'));
+    assert.ok(block.includes('if (!painted) this._paintCanvasByStrips(overlay, paintPixel);'));
+    assert.ok(block.includes('ctx.clearRect(0, 0, overlay.width, overlay.height)'), '前回勢力の光を局所描画前に消す');
+});
+
+test('勢力ハイライトのbounds局所描画は従来の全画面描画と同じpixel結果になる', () => {
+    class TestUIManager {}
+    const bodyClassList = { contains(name) { return name === 'is-pc'; } };
+    const ctx = createContext({
+        UIManager: TestUIManager,
+        document: { body: { classList: bodyClassList }, getElementById() { return null; } }
+    });
+    ctx.DataManager = {
+        castlePixelBounds: [null,
+            { minX: 0, maxX: 2, minY: 0, maxY: 1 },
+            { minX: 3, maxX: 5, minY: 0, maxY: 1 }
+        ]
+    };
+    loadScript(ctx, 'js/ui_map.js');
+
+    const pixelMap = new Uint8Array([
+        1, 1, 1, 2, 2, 2,
+        1, 1, 1, 2, 2, 2
+    ]);
+    const createOverlay = () => {
+        const width = 6, height = 2;
+        const buffer = new Uint8ClampedArray(width * height * 4);
+        const context2d = {
+            clearRect(x0, y0, w, h) {
+                for (let y = y0; y < Math.min(height, y0 + h); y++) {
+                    for (let x = x0; x < Math.min(width, x0 + w); x++) {
+                        const i = (y * width + x) * 4;
+                        buffer[i] = buffer[i + 1] = buffer[i + 2] = buffer[i + 3] = 0;
+                    }
+                }
+            },
+            createImageData(w, h) { return { data: new Uint8ClampedArray(w * h * 4), width: w, height: h }; },
+            putImageData(imageData, x0, y0) {
+                for (let y = 0; y < imageData.height; y++) {
+                    for (let x = 0; x < imageData.width; x++) {
+                        const src = (y * imageData.width + x) * 4;
+                        const dst = ((y0 + y) * width + (x0 + x)) * 4;
+                        buffer.set(imageData.data.subarray(src, src + 4), dst);
+                    }
+                }
+            }
+        };
+        return {
+            id: 'hover-blink-overlay', width, height, buffer,
+            style: {}, classList: { add() {}, remove() {} },
+            getContext() { return context2d; }
+        };
+    };
+    const game = {
+        mapWidth: 6, mapHeight: 2,
+        castles: [{ id: 1, ownerClan: 1 }, { id: 2, ownerClan: 2 }],
+        getClanCastles(id) { return this.castles.filter(c => Number(c.ownerClan) === Number(id)); }
+    };
+    const partialUi = Object.create(ctx.UIManager.prototype);
+    partialUi.game = game;
+    partialUi.pixelCastleMap = pixelMap;
+    const partialOverlay = createOverlay();
+    partialUi._ensureMapOverlayCanvas = () => partialOverlay;
+    partialUi.drawClanHighlight('hover-blink-overlay', 1, { r: 9, g: 8, b: 7 }, 123);
+    const partialResult = Array.from(partialOverlay.buffer);
+
+    ctx.DataManager.castlePixelBounds = null;
+    const fullUi = Object.create(ctx.UIManager.prototype);
+    fullUi.game = game;
+    fullUi.pixelCastleMap = pixelMap;
+    const fullOverlay = createOverlay();
+    fullUi._ensureMapOverlayCanvas = () => fullOverlay;
+    fullUi.drawClanHighlight('hover-blink-overlay', 1, { r: 9, g: 8, b: 7 }, 123);
+    const fullResult = Array.from(fullOverlay.buffer);
+    assert.deepStrictEqual(partialResult, fullResult);
+});
+
+test('AI援軍見積もりは全国城走査を避けつつ元の勢力内順と乱数契約を維持する', () => {
+    const ai = read('js/ai.js');
+    const start = ai.indexOf('        enemies.forEach(target => {');
+    const end = ai.indexOf('\n        // ★最終的に', start);
+    const block = ai.slice(start, end > start ? end : start + 15000);
+    assert.ok(block.includes('myClanCastles.forEach(c => {'));
+    assert.ok(block.includes('const enemyClanCastles = this.game.getClanCastles(target.ownerClan);'));
+    assert.ok(block.includes('enemyClanCastles.forEach(c => {'));
+    assert.ok(block.includes('c.ownerClan === myCastle.ownerClan'), '諸勢力向け乱数対象の旧厳密条件を維持する');
+    assert.ok(block.includes('const errorRate = 1.0 + (Math.random() - 0.5) * 2 * errorRange;'), '諸勢力向けの拠点別乱数は維持する');
+    assert.ok(!block.includes('this.game.castles.forEach(c => {'), '攻撃候補ごとの全国拠点走査を残さない');
+});
+
+test('月初港収入は勢力総人口を一度だけ集計し個別計算結果を変えない', () => {
+    const economySource = read('js/economy_rules.js');
+    const turn = read('js/turn_manager.js');
+    assert.ok(turn.includes('const clanPopulationById = new Map();'));
+    assert.ok(turn.includes('const populationBeforeGrowth = castle.population;'));
+    assert.ok(turn.includes('EconomyRules.calcMonthlyGoldIncome(castle, game, clanPopulationById.get(clanPopulationKey))'));
+    assert.ok(turn.includes('trackedClanPopulation + (castle.population - populationBeforeGrowth)'), '前の拠点の人口増加を後続拠点の港収入へ従来どおり反映する');
+    assert.ok(economySource.includes('calcPortBonus(castle, game, precomputedClanPopulation = null)'));
+
+    const ctx = createContext();
+    loadScript(ctx, 'js/economy_rules.js');
+    const castle = { id: 2, ownerClan: 1, population: 2000, peoplesLoyalty: 80 };
+    let lookups = 0;
+    const game = {
+        getClanCastles() {
+            lookups++;
+            return [castle, { id: 99, ownerClan: 1, population: 3000 }];
+        }
+    };
+    const fallback = ctx.EconomyRules.calcPortBonus(castle, game);
+    assert.strictEqual(lookups, 1);
+    lookups = 0;
+    const precomputed = ctx.EconomyRules.calcPortBonus(castle, game, 5000);
+    assert.strictEqual(precomputed, fallback);
+    assert.strictEqual(lookups, 0, '月初の事前集計値があれば勢力城reduceを行わない');
+});
+
+test('AI月次作戦と派閥代表選定は同じfilter集計を短命Mapへまとめる', () => {
+    const ops = read('js/ai_operation.js');
+    const staffing = read('js/ai_staffing.js');
+    assert.ok(ops.includes('const castlesByLegionId = new Map();'));
+    assert.ok(ops.includes('const myLegionCastles = castlesByLegionId.get(legionId) || [];'));
+    assert.ok(ops.includes('const legionCastlesForPacification = myLegionCastles;'));
+    assert.ok(ops.includes('const currentMyCastleCount = myCastles.length;'));
+    assert.ok(staffing.includes('const factionMemberCounts = new Map();'));
+    assert.ok(staffing.includes('factionMemberCounts.get(a.factionId)'));
+    assert.ok(staffing.includes('factionMemberCounts.get(b.factionId)'));
+});
 
 test('軍団の静的識別子は共通索引を使い動的な国主IDは索引へ焼き込まない', () => {
     const game = read('js/game.js');

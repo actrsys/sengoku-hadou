@@ -782,8 +782,9 @@ class AIEngine {
                 const enemyForce = (kunishu.soldiers + kunishu.defense) * 1.1;
                 
                 let myReinfPower = 0;
-                // 自軍からの援軍を見積もる
-                this.game.castles.forEach(c => {
+                // 自軍からの援軍を見積もる。getClanCastlesは元のgame.castles順を保持するため、
+                // 対象拠点ごとの乱数呼び出し回数・順序は従来の全国走査と同じままにする。
+                myClanCastles.forEach(c => {
                     if (c.ownerClan === myCastle.ownerClan && c.id !== myCastle.id && c.soldiers >= 1000) {
                         const errorRange = Math.min(0.3, Math.max(0, (100 - myGeneral.intelligence) / 100 * 0.3));
                         const errorRate = 1.0 + (Math.random() - 0.5) * 2 * errorRange;
@@ -907,21 +908,23 @@ class AIEngine {
             let enemyReinfPower = 0;
 
             // ★ここから追加：① 自分と相手の「別の城からの援軍（自家援軍）」を見積もります！
-            this.game.castles.forEach(c => {
-                // ★高速化：事前に作ったリストを使って大雪かどうか調べます！
+            // 全国拠点を毎候補走査せず、所有者索引から関係する勢力だけを見る。
+            // 各配列はgame.castles上の元順を保持し、加算順も従来と一致させる。
+            myClanCastles.forEach(c => {
+                if (c.ownerClan !== myCastle.ownerClan) return; // 文字列数値などの境界でも従来の===条件を維持する
                 const isReinfHeavySnow = heavySnowProvIds.has(c.provinceId);
-
-                // ★大雪の城からは援軍が来ないので、計算に入れません！
-                if (!isReinfHeavySnow) {
-                    // 自分が呼べそうな自家援軍（出撃元の城と同じ軍団で、出撃元の城以外で、兵力1000以上の城）
-                    // ★修正：直轄（軍団ID0）なら、他の軍団の城からも援軍が来ると見積もります！
-                    if (c.ownerClan === myCastle.ownerClan && (c.legionId === myCastle.legionId || myCastle.legionId === 0) && c.id !== myCastle.id && c.soldiers >= 1000) {
-                        myReinfPower += (c.soldiers * window.WarParams.Reinforcement.SelfSoldierRatio) * errorRate; // 兵力の半分くらい来てくれると予想
-                    }
-                    // 相手が呼べそうな自家援軍（守る城以外で、兵力1000以上の城）
-                    if (c.ownerClan === target.ownerClan && c.id !== target.id && c.soldiers >= 1000) {
-                        enemyReinfPower += (c.soldiers * window.WarParams.Reinforcement.SelfSoldierRatio) * errorRate; // 相手の別のお城からの援軍も警戒！
-                    }
+                if (!isReinfHeavySnow
+                    && (c.legionId === myCastle.legionId || myCastle.legionId === 0)
+                    && c.id !== myCastle.id && c.soldiers >= 1000) {
+                    myReinfPower += (c.soldiers * window.WarParams.Reinforcement.SelfSoldierRatio) * errorRate;
+                }
+            });
+            const enemyClanCastles = this.game.getClanCastles(target.ownerClan);
+            enemyClanCastles.forEach(c => {
+                if (c.ownerClan !== target.ownerClan) return; // 従来の===条件を維持する
+                const isReinfHeavySnow = heavySnowProvIds.has(c.provinceId);
+                if (!isReinfHeavySnow && c.id !== target.id && c.soldiers >= 1000) {
+                    enemyReinfPower += (c.soldiers * window.WarParams.Reinforcement.SelfSoldierRatio) * errorRate;
                 }
             });
 

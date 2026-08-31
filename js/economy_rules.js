@@ -339,11 +339,12 @@ class EconomyRules {
         return { cost, rateStr };
     }
 
-    static calcPortBonus(castle, game) {
+    static calcPortBonus(castle, game, precomputedClanPopulation = null) {
         let portBonus = 0;
         if (this.isPortCastle(castle) && game) {
-            const clanCastles = game.getClanCastles(castle.ownerClan);
-            const totalClanPopulation = clanCastles.reduce((sum, c) => sum + c.population, 0);
+            const totalClanPopulation = Number.isFinite(precomputedClanPopulation)
+                ? precomputedClanPopulation
+                : game.getClanCastles(castle.ownerClan).reduce((sum, c) => sum + c.population, 0);
             portBonus = Math.floor((castle.population / 500) + (castle.peoplesLoyalty / 2) + (totalClanPopulation / 1000));
         }
         return portBonus;
@@ -470,11 +471,11 @@ class EconomyRules {
     }
 
     /** 月初の金収入。一揆・3月増収・港収入を含む。 */
-    static calcMonthlyGoldIncome(castle, game) {
+    static calcMonthlyGoldIncome(castle, game, precomputedClanPopulation = null) {
         let income = this.calcBaseGoldIncome(castle);
         income = GameMath.applyVariance(income, window.MainParams.Economy.IncomeFluctuation);
         if (game.month === 3) income += income * 3;
-        income += this.calcPortBonus(castle, game);
+        income += this.calcPortBonus(castle, game, precomputedClanPopulation);
         if (castle.statusEffects && castle.statusEffects.includes('一揆')) income = 0;
         return income;
     }

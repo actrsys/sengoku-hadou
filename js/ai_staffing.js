@@ -370,9 +370,15 @@ class AIStaffing {
             if (factionLeaders.length === 1) {
                 newCommander = factionLeaders[0];
             } else {
+                // sort比較のたびに全所属武将をfilterせず、同じ厳密factionIdごとの人数を一度だけ数える。
+                const factionMemberCounts = new Map();
+                myBushos.forEach(b => {
+                    if (Number.isNaN(b.factionId)) return; // NaN === NaN は従来falseなので数えない
+                    factionMemberCounts.set(b.factionId, (factionMemberCounts.get(b.factionId) || 0) + 1);
+                });
                 factionLeaders.sort((a, b) => {
-                    const countA = myBushos.filter(x => x.factionId === a.factionId).length;
-                    const countB = myBushos.filter(x => x.factionId === b.factionId).length;
+                    const countA = Number.isNaN(a.factionId) ? 0 : (factionMemberCounts.get(a.factionId) || 0);
+                    const countB = Number.isNaN(b.factionId) ? 0 : (factionMemberCounts.get(b.factionId) || 0);
                     if (countA !== countB) return countB - countA;
                     return (b.achievementTotal || 0) - (a.achievementTotal || 0);
                 });

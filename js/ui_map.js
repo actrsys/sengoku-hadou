@@ -2341,14 +2341,50 @@ Object.assign(UIManager.prototype, {
         overlay.classList.remove('anim-map-glow', 'anim-map-glow-fast');
         overlay.classList.add(canvasId === 'keep-blink-overlay' ? 'anim-map-glow-fast' : 'anim-map-glow');
 
-        this._paintCanvasByStrips(overlay, (data, i, x, y, width, height) => {
+        const paintPixel = (data, i, x, y, width, height) => {
             const castleId = this._sampleIdMap(this.pixelCastleMap, mapW, mapH, width, height, x, y);
             if (!targetIdsSet.has(Number(castleId))) return;
             data[i] = colorRGB.r;
             data[i + 1] = colorRGB.g;
             data[i + 2] = colorRGB.b;
             data[i + 3] = alpha;
-        });
+        };
+
+        // hoverのたびに地図全画素を走査せず、対象勢力の拠点領域だけ描く。
+        // 前回別勢力を光らせた画素はclearRectで一度消し、boundsが不足・対象領域が広すぎる時だけ従来の全描画へ戻す。
+        let painted = false;
+        const boundsByCastleId = DataManager.castlePixelBounds || null;
+        if (boundsByCastleId && overlay.width > 0 && overlay.height > 0) {
+            const regions = [];
+            let coveredArea = 0;
+            let allBoundsKnown = true;
+            for (const castleId of targetIdsSet) {
+                const bounds = boundsByCastleId[Number(castleId)];
+                if (!bounds) {
+                    allBoundsKnown = false;
+                    break;
+                }
+                const region = {
+                    x0: Math.floor((bounds.minX * overlay.width) / mapW) - 1,
+                    y0: Math.floor((bounds.minY * overlay.height) / mapH) - 1,
+                    x1: Math.ceil(((bounds.maxX + 1) * overlay.width) / mapW) + 1,
+                    y1: Math.ceil(((bounds.maxY + 1) * overlay.height) / mapH) + 1
+                };
+                regions.push(region);
+                const rw = Math.max(0, Math.min(overlay.width, region.x1) - Math.max(0, region.x0));
+                const rh = Math.max(0, Math.min(overlay.height, region.y1) - Math.max(0, region.y0));
+                coveredArea += rw * rh;
+            }
+            // 大勢力で矩形の重なり総面積が画面の大半を超える場合は、帯状全描画の方が安定して軽い。
+            if (allBoundsKnown && regions.length > 0 && coveredArea <= overlay.width * overlay.height * 0.7) {
+                try {
+                    const ctx = overlay.getContext('2d');
+                    if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+                } catch (e) {}
+                painted = this._paintCanvasRegions(overlay, regions, paintPixel);
+            }
+        }
+        if (!painted) this._paintCanvasByStrips(overlay, paintPixel);
     },
 
     // 光をサッと消す魔法
