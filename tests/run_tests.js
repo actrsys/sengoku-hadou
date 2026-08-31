@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r315');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r316');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -143,10 +143,10 @@ test('城アイコンは4段階のWebPと個別の楕円影補正を使う', () 
     assert.ok(config.includes('Tier3MinTotal: 1500'));
     assert.ok(config.includes('Tier4MinTotal: 2500'));
     assert.ok(config.includes('4: 1.065'));
-    assert.ok(uiMap.includes('if (totalValue >= tier4MinTotal) iconTier = 4;'));
-    assert.ok(uiMap.includes('else if (totalValue >= tier3MinTotal) iconTier = 3;'));
-    assert.ok(uiMap.includes('else if (totalValue >= tier2MinTotal) iconTier = 2;'));
-    assert.ok(uiMap.includes('el.dataset.iconTier = String(iconTier);'));
+    assert.ok(uiMap.includes('if (totalValue >= castleCardConfig.Tier4MinTotal) iconTier = 4;'));
+    assert.ok(uiMap.includes('else if (totalValue >= castleCardConfig.Tier3MinTotal) iconTier = 3;'));
+    assert.ok(uiMap.includes('else if (totalValue >= castleCardConfig.Tier2MinTotal) iconTier = 2;'));
+    assert.ok(uiMap.includes('card.dataset.iconTier = String(visual.iconTier);'));
     assert.ok(uiMap.includes('for (let tier = 1; tier <= 4; tier++)'));
 });
 
@@ -9002,12 +9002,30 @@ test('地図道路SVGはシナリオ静的層としてrenderMap間で再利用�
     const uiMap = read('js/ui_map.js');
     const ui = read('js/ui.js');
     assert.ok(uiMap.includes('_getOrBuildMapRouteSvg(mapW, mapH)'));
-    assert.ok(uiMap.includes('this.mapEl.appendChild(this._getOrBuildMapRouteSvg(mapW, mapH));'));
+    assert.ok(uiMap.includes('const routeSvg = this._getOrBuildMapRouteSvg(mapW, mapH);'));
+    assert.ok(uiMap.includes('if (routeSvg.parentNode !== this.mapEl) this.mapEl.appendChild(routeSvg);'));
     assert.strictEqual((uiMap.match(/document\.createElementNS\(svgNS, "svg"\)/g) || []).length, 1, '道路SVG生成は静的層builderの1箇所に限定する');
     assert.ok(uiMap.includes('this._staticRouteCastlesSource === castles'));
     assert.ok(uiMap.includes('this._staticRouteCastlesSize === castles.length'));
     assert.ok(ui.includes('this._staticRouteSvg = null;'));
     assert.ok(ui.includes('this._staticRouteCastlesSource = null;'));
+});
+
+
+test('地図拠点DOMは同一シナリオ中に再利用し表示内容だけ差分同期する', () => {
+    const uiMap = read('js/ui_map.js');
+    const ui = read('js/ui.js');
+    assert.ok(uiMap.includes('_canReuseCastleCardLayer(mapW, mapH, baseMapImage)'));
+    assert.ok(uiMap.includes('const canReuseCastleLayer = this._canReuseCastleCardLayer(mapW, mapH, baseMapImage);'));
+    assert.ok(uiMap.includes('if (!canReuseCastleLayer) {'));
+    assert.ok(uiMap.includes('this.mapEl.replaceChildren(baseMapImage);'), '静的層の全置換は再利用不能時だけに限定する');
+    assert.ok(uiMap.includes('_syncCastleCardLayer(context)'));
+    assert.ok(uiMap.includes("card._castleContentSignature !== content.signature"), '拠点内部DOMは内容変更時だけ再構築する');
+    assert.ok(uiMap.includes("card._castleSizeSignature !== sizeSignature"), '規模表示は石高/防御変更時だけ更新する');
+    assert.ok(uiMap.includes('refreshCastlePresentations(castleIds = null)'));
+    assert.ok(uiMap.includes('const changed = this.refreshCastlePresentations(Array.from(targetIds));'), '所有変更も共通差分同期へ委譲する');
+    assert.ok(ui.includes("if (typeof this._releaseCastleCardCache === 'function')"), 'シナリオ切替時は旧拠点DOM参照を解放する');
+    assert.ok(ui.includes('this.refreshCastlePresentations();'), '背景停止中の変更は復帰時に差分同期する');
 });
 
 test('顔画像アイドル先読みはシナリオ世代tokenで旧batchを継続しない', () => {
@@ -9026,7 +9044,7 @@ test('顔画像アイドル先読みはシナリオ世代tokenで旧batchを継�
 test('地図選択UIはvalidTargetsの同じincludesを全拠点・ラベルで繰り返さずSetを局所共用する', () => {
     const uiMap = read('js/ui_map.js');
     assert.ok(uiMap.includes('const validTargetSet = isSelectionMode ? new Set(this.game.validTargets) : null;'));
-    assert.ok(uiMap.includes('if (validTargetSet.has(c.id))'));
+    assert.ok(uiMap.includes('if (validTargetSet && validTargetSet.has(castle.id))'));
     assert.ok(uiMap.includes('this.renderDaimyoLabels(validTargetSet);'));
     const labelAt = uiMap.indexOf('renderDaimyoLabels(validTargetSet = null)');
     const labelBlock = uiMap.slice(labelAt, labelAt + 7200);
@@ -9782,7 +9800,7 @@ test('スマホ観戦の戦争・独立は全城再描画を演出直後に重�
     const warEffort = read('js/war_effort.js');
     const turnManager = read('js/turn_manager.js');
 
-    assert.ok(uiMap.includes("el.setAttribute('data-castle-id', String(c.id));"), '既存城カードをIDで局所更新できる');
+    assert.ok(uiMap.includes('this._castleCardCache.get(String(castle.id))'), '既存城カードをIDで局所更新できる');
     assert.ok(uiMap.includes('refreshCastleOwnershipPresentation(castleIds = [])'), '所有変更の局所反映窓口をUI地図へ置く');
     assert.ok(uiMap.includes('this.updateCastleGlows();') && uiMap.includes('this.updateClanColors();'), '局所反映後も光彩と勢力色を現在状態へ同期する');
 

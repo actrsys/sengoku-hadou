@@ -611,3 +611,11 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - 処理ラベルの遅延復帰は `UIManager` が短命timerとして一元管理し、新しい会話開始・AI城進捗への切替・プレイヤーターン復帰・強制モーダルリセットで必ず破棄する。会話が前面に残る間は200ms単位で再確認し、背後でspinnerや文字を復帰させない。
 - `applyAIGuardTextState()` は既存 `guardTextHiddenCount` に加えて処理ラベルの遅延復帰状態も正本として `hide-text` を決める。会話側が直接classを外したり、月初／月末側が個別にopacityを上書きして競合させない。
 - `endMonth()` の段階間待機は共通 `waitForDialogs()` がすでに会話消失後500ms＋100msの猶予を持つため、追加の固定300ms待ちは重複させない。月末の派閥・独立・外交・諸勢力・寿命・イベントの実行順とawait境界は変更せず、表示上の不要な空白時間だけを除く。
+
+## r316 追加監査：通常地図の静的拠点DOM再利用と差分同期
+- 同一シナリオ中の通常地図では、道路SVGだけでなく拠点カードDOMも静的層として保持する。`renderMap()` は `game.castles` の正本配列・拠点数・地図寸法・既存DOMが一致する場合、`#map-container` を `replaceChildren()` で全置換せず、既存の `.castle-card` をIDキャッシュから再利用する。新規開始・ロード・シナリオ切替など正本配列が変わった場合だけ静的層を再構築する。
+- 拠点カードの位置、石高＋防御に基づく表示倍率／4段階アイコン、行動済み状態、所有勢力、城主、軍団、諸勢力は `_syncCastleCard()` を共通差分同期の正本とする。カード内部HTMLは所有・城主・軍団・諸勢力等の表示signatureが変わった時だけ再構築し、規模表示も石高／防御のsignatureが変わった時だけCSS変数とtier classを書き換える。
+- 拠点のclick／hover handlerはカード生成時に一度だけ結び、閉包へ古いCastleオブジェクトや選択モードを固定しない。操作時に `data-castle-id` から現在の `game.getCastle()` と現在の `selectionMode` / `validTargets` / 所有勢力を取り直し、DOM再利用後もロード前状態や古い選択条件へ接続しない。
+- 所有変更の `refreshCastleOwnershipPresentation()` は独自の城主・軍団DOM書換を持たず、`refreshCastlePresentations()` へ委譲する。背景停止中に変化した拠点表示も `resumeBackgroundUpdates()` で同じ差分同期を通してから光彩・勢力色・雪を復帰させ、表示更新経路を複製しない。
+- シナリオ境界では `releaseScenarioTransientCaches()` から拠点DOMキャッシュをDOMごと解放し、旧 `game.castles`・旧イベントhandler・表示signatureを次シナリオへ持ち越さない。地図本体画像は共通資産として従来どおり保持し、道路SVG・拠点DOMはシナリオ単位の静的層として扱う。
+- `renderMap()` 再利用時も一時戦闘Canvas・地方ハイライト・キープ光・大名名ラベルは静的層へ昇格させない。勢力色Canvasと雪Canvasは既存の継続状態キャッシュ、PC hover Canvasは既存の短命再利用方針を維持し、ゲーム判断・AI候補・乱数順には一切影響させない。

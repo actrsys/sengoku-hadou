@@ -547,6 +547,11 @@ class UIManager {
             this.updateInfoPanel(activeCastle);
         }
         mark('info_done');
+        if (typeof this.refreshCastlePresentations === 'function') {
+            mark('castle_cards_start');
+            this.refreshCastlePresentations();
+            mark('castle_cards_done');
+        }
         if (typeof this.updateCastleGlows === 'function') {
             mark('castle_glows_start');
             this.updateCastleGlows();
@@ -835,6 +840,12 @@ class UIManager {
         this._staticRouteCastlesSize = -1;
         this._staticRouteMapW = 0;
         this._staticRouteMapH = 0;
+
+        // 拠点カードDOMも同一シナリオ中だけの静的層。旧Castleオブジェクトやイベントhandlerを
+        // 次シナリオへ持ち越さないよう、切替境界でDOMごと解放します。
+        if (typeof this._releaseCastleCardCache === 'function') {
+            this._releaseCastleCardCache();
+        }
     }
 
     // ★Round12：会話用の顔画像を、DOMへ出す前に読み込み・デコードしておきます。

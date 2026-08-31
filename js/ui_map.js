@@ -1223,6 +1223,288 @@ Object.assign(UIManager.prototype, {
         return svg;
     },
 
+    // 同一シナリオ中は拠点カードDOMを保持し、renderMap() のたびに作り直さない。
+    // 位置・規模・所有・城主・軍団・諸勢力など、表示に必要な状態だけを差分同期する。
+    _releaseCastleCardCache() {
+        if (this._castleCardCache && typeof this._castleCardCache.values === 'function') {
+            for (const card of this._castleCardCache.values()) {
+                if (card && card.parentNode === this.mapEl) card.remove();
+            }
+            this._castleCardCache.clear();
+        }
+        this._castleCardCache = null;
+        this._castleCardCastlesSource = null;
+        this._castleCardCastlesSize = -1;
+        this._castleCardMapW = 0;
+        this._castleCardMapH = 0;
+    },
+
+    _canReuseCastleCardLayer(mapW, mapH, baseMapImage) {
+        const castles = this.game && Array.isArray(this.game.castles) ? this.game.castles : null;
+        if (!castles || !(this._castleCardCache instanceof Map)) return false;
+        if (this._castleCardCastlesSource !== castles) return false;
+        if (this._castleCardCastlesSize !== castles.length || this._castleCardCache.size !== castles.length) return false;
+        if (this._castleCardMapW !== mapW || this._castleCardMapH !== mapH) return false;
+        return !!baseMapImage && baseMapImage.parentNode === this.mapEl;
+    },
+
+    _getCastleCardElements() {
+        if (this._castleCardCache instanceof Map && this._castleCardCache.size > 0) {
+            return Array.from(this._castleCardCache.values());
+        }
+        return this.mapEl ? Array.from(this.mapEl.querySelectorAll('.castle-card')) : [];
+    },
+
+    _getCastleCardVisual(castle) {
+        const totalValue = (castle.kokudaka || 0) + (castle.defense || 0);
+        const deficit = Math.max(0, 4000 - totalValue);
+        const scaleDownPercent = Math.floor(deficit / 200);
+        const scaleRatio = 1 - (scaleDownPercent * 0.01);
+        const castleCardConfig = window.GameConfig.Map.CastleCard;
+        const rawScale = castleCardConfig.BaseScale * scaleRatio;
+        let iconTier = 1;
+        if (totalValue >= castleCardConfig.Tier4MinTotal) iconTier = 4;
+        else if (totalValue >= castleCardConfig.Tier3MinTotal) iconTier = 3;
+        else if (totalValue >= castleCardConfig.Tier2MinTotal) iconTier = 2;
+        const tierScaleMultiplier = Number(castleCardConfig.IconScaleMultipliers[iconTier]);
+        return {
+            totalValue,
+            iconTier,
+            currentScale: rawScale * tierScaleMultiplier
+        };
+    },
+
+    _buildCastleCardContent(castle, isDaimyoSelect) {
+        if (isDaimyoSelect) {
+            return { signature: 'daimyo-select', html: '' };
+        }
+
+        const castellan = this.game.getBusho(castle.castellanId);
+        const clanData = this.game.getClan(castle.ownerClan);
+        const castellanName = castellan ? castellan.name : '-';
+        const clanName = clanData ? clanData.name : '中立';
+        const kunishus = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishusInCastle(castle.id) : [];
+        let kunishuHtml = '';
+        const kunishuSignature = [];
+
+        if (kunishus && kunishus.length > 0) {
+            kunishuHtml = '<div class="kunishu-icons-container">';
+            kunishus.forEach(k => {
+                const kLeader = this.game.getBusho(k.leaderId);
+                const kLeaderName = kLeader ? kLeader.name : '頭領';
+                const kName = k.getName(this.game);
+                kunishuSignature.push([k.id, k.leaderId, kName, kLeaderName]);
+                kunishuHtml += `
+                    <div class="kunishu-icon-wrap">
+                        <img src="data/images/map/various_forces.webp" class="kunishu-icon-img">
+                        <div class="hover-info kunishu-hover-info">
+                            <div class="info-line">${kName}</div>
+                            <div class="info-line">${kLeaderName}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            kunishuHtml += '</div>';
+        }
+
+        let legionMarkerHtml = '';
+        const legionId = Number(castle.legionId || 0);
+        if (legionId > 0) {
+            const kanjiNumbers = ['', '一', '二', '三', '四', '五', '六', '七', '八'];
+            const kanjiLegionId = kanjiNumbers[legionId] || legionId;
+            legionMarkerHtml = `<div class="legion-marker-base legion-color-${legionId} hidden">${kanjiLegionId}</div>`;
+        }
+
+        const signature = JSON.stringify([
+            castle.name,
+            Number(castle.ownerClan || 0),
+            clanName,
+            Number(castle.castellanId || 0),
+            castellanName,
+            legionId,
+            kunishuSignature
+        ]);
+        const html = `
+            <div class="hover-info">
+                <div class="info-line name">${castle.name}</div>
+                <div class="info-line">${clanName}</div>
+                <div class="info-line">${castellanName}</div>
+            </div>
+            ${kunishuHtml}
+            ${legionMarkerHtml}
+        `;
+        return { signature, html };
+    },
+
+    _bindCastleCardEvents(card) {
+        if (!card || card.dataset.mapEventsBound === '1') return;
+        card.dataset.mapEventsBound = '1';
+
+        card.onclick = (e) => {
+            e.stopPropagation();
+            if (this.isDraggingMap || !this.game) return;
+            const castle = this.game.getCastle(Number(card.dataset.castleId || 0));
+            if (!castle) return;
+
+            const isSelectionMode = this.game.selectionMode !== null;
+            if (this.game.phase === 'daimyo_select') {
+                if (Number(castle.ownerClan) === 0) return;
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                this.game.handleDaimyoSelect(castle);
+                return;
+            }
+
+            if (this.game.isProcessingAI && !isSelectionMode) return;
+            if (isSelectionMode) {
+                if (!Array.isArray(this.game.validTargets) || !this.game.validTargets.includes(castle.id)) return;
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                this.game.commandSystem.resolveMapSelection(castle);
+                return;
+            }
+
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            if (this.currentCastle && Number(this.currentCastle.id) === Number(castle.id)) {
+                this.showCastleMenuModal(castle);
+            } else {
+                this.showControlPanel(castle);
+            }
+        };
+
+        card.onmouseenter = () => {
+            if (!document.body.classList.contains('is-pc') || document.body.classList.contains('is-touch-input')) return;
+            const castle = this.game ? this.game.getCastle(Number(card.dataset.castleId || 0)) : null;
+            if (!castle) return;
+            const rect = card.getBoundingClientRect();
+            const scrollContainer = document.getElementById('map-scroll-container');
+            if (!scrollContainer) return;
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+
+            card.classList.remove('tooltip-bottom', 'tooltip-left', 'tooltip-right');
+            if (cy - containerRect.top < 150) card.classList.add('tooltip-bottom');
+            if (cx - containerRect.left < 200) card.classList.add('tooltip-left');
+            else if (containerRect.right - cx < 200) card.classList.add('tooltip-right');
+
+            const clanId = Number(castle.ownerClan || 0);
+            if (clanId !== 0) this.drawClanHighlight('hover-blink-overlay', clanId, {r: 255, g: 255, b: 255}, 120);
+        };
+
+        card.onmouseleave = () => {
+            if (!document.body.classList.contains('is-pc') || document.body.classList.contains('is-touch-input')) return;
+            card.classList.remove('tooltip-bottom', 'tooltip-left', 'tooltip-right');
+            this.clearClanHighlight('hover-blink-overlay');
+        };
+    },
+
+    _syncCastleCard(card, castle, context) {
+        if (!card || !castle) return false;
+        const { isDaimyoSelect, isSelectionMode, validTargetSet } = context;
+        card.setAttribute('data-castle-id', String(castle.id));
+        card.dataset.clan = String(castle.ownerClan);
+
+        const posX = castle.pixelX !== undefined ? castle.pixelX : 0;
+        const posY = castle.pixelY !== undefined ? castle.pixelY : 0;
+        const positionSignature = `${posX},${posY}`;
+        if (card._castlePositionSignature !== positionSignature) {
+            card.style.left = `${posX}px`;
+            card.style.top = `${posY}px`;
+            card._castlePositionSignature = positionSignature;
+        }
+
+        const sizeSignature = `${castle.kokudaka || 0},${castle.defense || 0}`;
+        if (card._castleSizeSignature !== sizeSignature) {
+            const visual = this._getCastleCardVisual(castle);
+            card.style.setProperty('--castle-scale', visual.currentScale);
+            card.dataset.iconTier = String(visual.iconTier);
+            for (let tier = 1; tier <= 4; tier++) {
+                card.classList.toggle(`icon-tier-${tier}`, visual.iconTier === tier);
+            }
+            card._castleSizeSignature = sizeSignature;
+        }
+
+        card.classList.toggle('done', !!castle.isDone);
+
+        const content = this._buildCastleCardContent(castle, isDaimyoSelect);
+        if (card._castleContentSignature !== content.signature) {
+            card.innerHTML = content.html;
+            card._castleContentSignature = content.signature;
+            card.querySelectorAll('.kunishu-icon-img').forEach(img => {
+                img.addEventListener('error', () => img.classList.add('is-broken'), { once: true });
+            });
+        }
+
+        card.classList.remove('dimmed', 'selectable-target');
+        card.style.cursor = '';
+        if (isDaimyoSelect) {
+            if (Number(castle.ownerClan) === 0) {
+                card.style.cursor = 'default';
+                card.classList.add('dimmed');
+            } else {
+                card.style.cursor = 'pointer';
+            }
+        } else if (!this.game.isProcessingAI || isSelectionMode) {
+            if (isSelectionMode) {
+                if (validTargetSet && validTargetSet.has(castle.id)) {
+                    card.classList.add('selectable-target');
+                } else {
+                    card.classList.add('dimmed');
+                }
+            }
+        } else {
+            card.style.cursor = 'default';
+        }
+        return true;
+    },
+
+    _syncCastleCardLayer(context) {
+        if (!(this._castleCardCache instanceof Map)) this._castleCardCache = new Map();
+        this._castleCardCastlesSource = this.game.castles;
+        this._castleCardCastlesSize = this.game.castles.length;
+        this._castleCardMapW = context.mapW;
+        this._castleCardMapH = context.mapH;
+
+        for (const castle of this.game.castles) {
+            const key = String(castle.id);
+            let card = this._castleCardCache.get(key);
+            if (!card) {
+                card = document.createElement('div');
+                card.className = 'castle-card';
+                this._bindCastleCardEvents(card);
+                this._castleCardCache.set(key, card);
+            }
+            if (card.parentNode !== this.mapEl) this.mapEl.appendChild(card);
+            this._syncCastleCard(card, castle, context);
+        }
+    },
+
+    refreshCastlePresentations(castleIds = null) {
+        if (!this.mapEl || this.isBackgroundPaused || !(this._castleCardCache instanceof Map)) return false;
+        const targetIds = Array.isArray(castleIds)
+            ? new Set(castleIds.map(id => Number(id)).filter(Number.isFinite))
+            : null;
+        if (targetIds && targetIds.size === 0) return false;
+
+        const isSelectionMode = this.game.selectionMode !== null;
+        const validTargetSet = isSelectionMode ? new Set(this.game.validTargets) : null;
+        const context = {
+            mapW: this.game.mapWidth || 1200,
+            mapH: this.game.mapHeight || 800,
+            isDaimyoSelect: this.game.phase === 'daimyo_select',
+            isSelectionMode,
+            validTargetSet
+        };
+        let changed = false;
+        for (const castle of this.game.castles) {
+            if (targetIds && !targetIds.has(Number(castle.id))) continue;
+            const card = this._castleCardCache.get(String(castle.id));
+            if (!card || card.parentNode !== this.mapEl) continue;
+            this._syncCastleCard(card, castle, context);
+            changed = true;
+        }
+        return changed;
+    },
+
     renderMap() {
         if (!this.mapEl) return;
 
@@ -1237,6 +1519,7 @@ Object.assign(UIManager.prototype, {
             this.pixelProvinceMap = DataManager.provincePixelMap;
         }
         const baseMapImage = this._ensureMapBaseImage(mapW, mapH);
+        const canReuseCastleLayer = this._canReuseCastleCardLayer(mapW, mapH, baseMapImage);
 
         // ★Round14：勢力色Canvasは地図の静的コア層なので、renderMapをまたいで再利用します。
         // 毎回3.8MB級のCanvasを捨てて作り直すメモリピークを避けます。
@@ -1257,19 +1540,32 @@ Object.assign(UIManager.prototype, {
             this._snowOverlayDirty = false;
         }
 
-        // ★Round5/14/15：一時エフェクトCanvasだけを縮めて解放します。
+        // ★Round5/14/15/16：一時エフェクトCanvasだけを縮めて解放します。
+        // 同一シナリオの差分更新時はPC hover Canvasだけ再利用し、その他の一時Canvasは従来どおり破棄します。
+        const keepHoverOverlay = canReuseCastleLayer
+            && document.body.classList.contains('is-pc')
+            && !document.body.classList.contains('is-touch-input')
+            ? document.getElementById('hover-blink-overlay')
+            : null;
         this.mapEl.querySelectorAll('canvas').forEach(oldCanvas => {
-            if (oldCanvas === persistentClanColor || oldCanvas === persistentSnowOverlay) return;
+            if (oldCanvas === persistentClanColor || oldCanvas === persistentSnowOverlay || oldCanvas === keepHoverOverlay) return;
             try {
                 const oldCtx = oldCanvas.getContext('2d');
                 if (oldCtx) oldCtx.clearRect(0, 0, oldCanvas.width, oldCanvas.height);
                 oldCanvas.width = 1;
                 oldCanvas.height = 1;
             } catch (e) {}
+            if (canReuseCastleLayer && oldCanvas.parentNode === this.mapEl) oldCanvas.remove();
         });
+        if (keepHoverOverlay) this.clearClanHighlight('hover-blink-overlay');
+        this.mapEl.querySelectorAll('.daimyo-name-label').forEach(label => label.remove());
 
-        // 地図画像そのものは同じImage要素を保持し、毎回decode/raster資源を捨てません。
-        this.mapEl.replaceChildren(baseMapImage);
+        // 地図画像と拠点カードは、同一シナリオならDOMを保持したまま使います。
+        // シナリオ切替・ロード等で正本配列が変わった時だけ、従来どおり静的層を作り直します。
+        if (!canReuseCastleLayer) {
+            this._releaseCastleCardCache();
+            this.mapEl.replaceChildren(baseMapImage);
+        }
         if (persistentClanColor) {
             const clanRaster = this._getClanColorRasterSize(mapW, mapH);
             if (persistentClanColor.width !== clanRaster.width || persistentClanColor.height !== clanRaster.height) {
@@ -1278,7 +1574,7 @@ Object.assign(UIManager.prototype, {
             }
             persistentClanColor.style.width = `${mapW}px`;
             persistentClanColor.style.height = `${mapH}px`;
-            this.mapEl.appendChild(persistentClanColor);
+            if (persistentClanColor.parentNode !== this.mapEl) this.mapEl.appendChild(persistentClanColor);
         }
         if (persistentSnowOverlay) {
             const snowRaster = this._getSnowOverlayRasterSize(mapW, mapH);
@@ -1290,7 +1586,7 @@ Object.assign(UIManager.prototype, {
             persistentSnowOverlay.style.width = `${mapW}px`;
             persistentSnowOverlay.style.height = `${mapH}px`;
             this._bindMapCanvasRecovery(persistentSnowOverlay, 'snow-overlay');
-            this.mapEl.appendChild(persistentSnowOverlay);
+            if (persistentSnowOverlay.parentNode !== this.mapEl) this.mapEl.appendChild(persistentSnowOverlay);
         }
         
         // ★追加：一旦、勢力名シールが出ている合図をリセットします
@@ -1382,8 +1678,6 @@ Object.assign(UIManager.prototype, {
         const activeCastle = this.currentCastle || this.game.getCurrentTurnCastle(); // ★今ターンが来ている城を覚えておきます
         this.updateInfoPanel(activeCastle);
 
-        // ★追加：ポップアップの目印シールを貼るために、絶対に「今のターンの城」を取得する魔法です
-        const turnCastle = this.game.getCurrentTurnCastle();
 
         // ==========================================
         // ★最新版：勢力の色で国を塗るための画用紙を敷きます！
@@ -1404,7 +1698,7 @@ Object.assign(UIManager.prototype, {
             clanColorOverlay.style.zIndex = '2'; // マップのすぐ上に敷きます
         }
         this._bindMapCanvasRecovery(clanColorOverlay, 'clan-color-overlay');
-        this.mapEl.appendChild(clanColorOverlay);
+        if (clanColorOverlay.parentNode !== this.mapEl) this.mapEl.appendChild(clanColorOverlay);
 
         // ★Round14：普段透明な全画面Canvasは常駐させません。
         // PCのhoverだけは頻繁に使うためPC時のみ先に確保し、
@@ -1413,195 +1707,15 @@ Object.assign(UIManager.prototype, {
             this._ensureMapOverlayCanvas('hover-blink-overlay', 3);
         }
 
-        this.mapEl.appendChild(this._getOrBuildMapRouteSvg(mapW, mapH));
+        const routeSvg = this._getOrBuildMapRouteSvg(mapW, mapH);
+        if (routeSvg.parentNode !== this.mapEl) this.mapEl.appendChild(routeSvg);
         
-        this.game.castles.forEach(c => {
-            const el = document.createElement('div'); el.className = 'castle-card';
-
-            el.setAttribute('data-castle-id', String(c.id));
-            el.dataset.clan = c.ownerClan;
-            
-            const posX = c.pixelX !== undefined ? c.pixelX : 0;
-            const posY = c.pixelY !== undefined ? c.pixelY : 0;
-            
-            el.style.left = `${posX}px`;
-            el.style.top = `${posY}px`;
-
-            // ★城の石高と城防御の合計値によってサイズを変動させる魔法
-            const totalValue = (c.kokudaka || 0) + (c.defense || 0);
-            const deficit = Math.max(0, 4000 - totalValue); // 4000に足りない分を計算します
-            const scaleDownPercent = Math.floor(deficit / 200); // 200不足するごとに1%縮小します
-            const scaleRatio = 1 - (scaleDownPercent * 0.01);
-            const castleCardConfig = window.GameConfig?.Map?.CastleCard || {};
-            const baseScale = castleCardConfig.BaseScale || 0.41;
-            const tier2MinTotal = castleCardConfig.Tier2MinTotal ?? 500;
-            const tier3MinTotal = castleCardConfig.Tier3MinTotal ?? 1500;
-            const tier4MinTotal = castleCardConfig.Tier4MinTotal ?? 2500;
-            const rawScale = baseScale * scaleRatio;
-            let iconTier = 1;
-            if (totalValue >= tier4MinTotal) iconTier = 4;
-            else if (totalValue >= tier3MinTotal) iconTier = 3;
-            else if (totalValue >= tier2MinTotal) iconTier = 2;
-            const tierScaleMultipliers = castleCardConfig.IconScaleMultipliers || {};
-            const tierScaleMultiplier = Number(tierScaleMultipliers[iconTier]) || 1;
-            const currentScale = rawScale * tierScaleMultiplier;
-            el.style.setProperty('--castle-scale', currentScale);
-            el.dataset.iconTier = String(iconTier);
-            for (let tier = 1; tier <= 4; tier++) {
-                el.classList.toggle(`icon-tier-${tier}`, iconTier === tier);
-            }
-
-            if (c.isDone) el.classList.add('done');
-            const castellan = this.game.getBusho(c.castellanId); const clanData = this.game.getClan(c.ownerClan);
-            
-            const castellanName = castellan ? castellan.name : '-';            
-            
-            // ★ 修正：大名選択画面の時はホバー情報を出さない（名前シールは後でまとめて貼ります！）
-            if (isDaimyoSelect) {
-                el.innerHTML = '';
-            } else {
-                // ★追加：城の中にいる諸勢力を調べて、左下に並べる魔法！
-                let kunishuHtml = '';
-                // この城にいる諸勢力のリストをもらいます
-                const kunishus = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishusInCastle(c.id) : [];
-                
-                // もし諸勢力がいたら、アイコンの箱を作ります
-                if (kunishus && kunishus.length > 0) {
-                    kunishuHtml = `<div class="kunishu-icons-container">`;
-                    kunishus.forEach(k => {
-                        const kLeader = this.game.getBusho(k.leaderId);
-                        const kLeaderName = kLeader ? kLeader.name : "頭領";
-                        const kName = k.getName(this.game);
-                        
-                        // 諸勢力の数だけ、アイコンと吹き出しを追加します！
-                        kunishuHtml += `
-                            <div class="kunishu-icon-wrap">
-                                <img src="data/images/map/various_forces.webp" class="kunishu-icon-img">
-                                <div class="hover-info kunishu-hover-info">
-                                    <div class="info-line">${kName}</div>
-                                    <div class="info-line">${kLeaderName}</div>
-                                </div>
-                            </div>
-                        `;
-                    });
-                    kunishuHtml += `</div>`;
-                }
-
-                // ★軍団マーカーの作成（第1～第8軍団の場合のみ）
-                let legionMarkerHtml = '';
-                // どの勢力でも軍団に所属していればマーカーを作ります
-                if (c.legionId > 0) {
-                    // 漢数字に変換するためのリストを用意します
-                    const kanjiNumbers = ["", "一", "二", "三", "四", "五", "六", "七", "八"];
-                    const kanjiLegionId = kanjiNumbers[c.legionId] || c.legionId;
-                    // 最初は隠しておきます。後で updateCastleGlows() が必要な勢力だけを表示します
-                    legionMarkerHtml = `<div class="legion-marker-base legion-color-${c.legionId} hidden">${kanjiLegionId}</div>`;
-                }
-
-                // 城の吹き出しと、諸勢力のアイコン、そして軍団マーカーを合体させます！
-                el.innerHTML = `
-                    <div class="hover-info">
-                        <div class="info-line name">${c.name}</div>
-                        <div class="info-line">${clanData ? clanData.name : "中立"}</div>
-                        <div class="info-line">${castellanName}</div>
-                    </div>
-                    ${kunishuHtml}
-                    ${legionMarkerHtml}
-                `;
-                el.querySelectorAll('.kunishu-icon-img').forEach(img => {
-                    img.addEventListener('error', () => img.classList.add('is-broken'), { once: true });
-                });
-            }
-            
-            if (isDaimyoSelect) {
-                 if (c.ownerClan === 0) {
-                     el.style.cursor = 'default';
-                     el.classList.add('dimmed');
-                 } else {
-                     el.style.cursor = 'pointer';
-                     el.onclick = (e) => {
-                         e.stopPropagation();
-                         if (this.isDraggingMap) return;
-                         if (window.AudioManager) {
-                             window.AudioManager.playSE('choice.ogg');
-                         }
-                         this.game.handleDaimyoSelect(c);
-                     };
-                 }
-            }
-            // ★修正：AIのターン中であっても、援軍などで「城を選んでいる最中(isSelectionMode)」なら操作できるようにバリアを解除します！
-            else if (!this.game.isProcessingAI || isSelectionMode) {
-                if (isSelectionMode) { 
-                    if (validTargetSet.has(c.id)) {
-                        el.classList.add('selectable-target'); 
-                        el.onclick = (e) => { 
-                            e.stopPropagation(); 
-                            if (this.isDraggingMap) return; 
-                            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                            this.game.commandSystem.resolveMapSelection(c); 
-                        };
-                    } else { 
-                        el.classList.add('dimmed'); 
-                    }
-                } else { 
-                    el.onclick = (e) => {
-                        e.stopPropagation();
-                        if (this.isDraggingMap) return; 
-                        if (this.game.isProcessingAI) return;
-
-                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-
-                        if (this.currentCastle && this.currentCastle.id === c.id) {
-                            this.showCastleMenuModal(c);
-                        } else {
-                            this.showControlPanel(c);
-                        }
-                    };
-                }
-            } else {
-                el.style.cursor = 'default'; 
-            }
-            
-            el.onmouseenter = () => {
-                // ★ここを書き足し：スマホ版の時は、カーソルを乗せた時の魔法（吹き出しなど）を使わないようにします！
-                if (!document.body.classList.contains('is-pc') || document.body.classList.contains('is-touch-input')) return;
-
-                const rect = el.getBoundingClientRect();
-                const containerRect = document.getElementById('map-scroll-container').getBoundingClientRect();
-                
-                const cx = rect.left + rect.width / 2;
-                const cy = rect.top + rect.height / 2;
-
-                el.classList.remove('tooltip-bottom', 'tooltip-left', 'tooltip-right');
-
-                if (cy - containerRect.top < 150) { 
-                    el.classList.add('tooltip-bottom');
-                }
-                if (cx - containerRect.left < 200) { 
-                    el.classList.add('tooltip-left');
-                } 
-                else if (containerRect.right - cx < 200) { 
-                    el.classList.add('tooltip-right');
-                }
-
-                // ★追加：カーソルを合わせた城の勢力の領土を光らせます！
-                const clanId = parseInt(c.ownerClan, 10);
-                if (clanId !== 0) {
-                    this.drawClanHighlight('hover-blink-overlay', clanId, {r: 255, g: 255, b: 255}, 120);
-                }
-            };
-
-            el.onmouseleave = () => {
-                // ★ここを書き足し：スマホ版の時は何もしません
-                if (!document.body.classList.contains('is-pc') || document.body.classList.contains('is-touch-input')) return;
-
-                el.classList.remove('tooltip-bottom', 'tooltip-left', 'tooltip-right');
-
-                // ★追加：光らせていた領土を消します！
-                this.clearClanHighlight('hover-blink-overlay');
-            };
-            
-            this.mapEl.appendChild(el);
+        this._syncCastleCardLayer({
+            mapW,
+            mapH,
+            isDaimyoSelect,
+            isSelectionMode,
+            validTargetSet
         });
 
         // ==========================================
@@ -1672,57 +1786,10 @@ Object.assign(UIManager.prototype, {
         const targetIds = new Set((castleIds || []).map(id => Number(id)).filter(Number.isFinite));
         if (targetIds.size === 0) return false;
 
-        let changed = false;
-        const cards = this.mapEl.querySelectorAll('.castle-card');
-        cards.forEach(card => {
-            const castleId = Number(card.dataset.castleId || 0);
-            if (!targetIds.has(castleId)) return;
-            const castle = this.game.getCastle(castleId);
-            if (!castle) return;
-
-            card.dataset.clan = castle.ownerClan;
-            const clan = this.game.getClan(castle.ownerClan);
-            const castellan = this.game.getBusho(castle.castellanId);
-
-            // 城カード直下の通常hoverだけ更新し、諸勢力アイコン内のhoverは触らない。
-            let hover = null;
-            for (const child of card.children) {
-                if (child.classList && child.classList.contains('hover-info')) {
-                    hover = child;
-                    break;
-                }
-            }
-            if (hover) {
-                const lines = Array.from(hover.children).filter(el => el.classList && el.classList.contains('info-line'));
-                if (lines[0]) lines[0].textContent = castle.name;
-                if (lines[1]) lines[1].textContent = clan ? clan.name : '中立';
-                if (lines[2]) lines[2].textContent = castellan ? castellan.name : '-';
-            }
-
-            // 軍団番号は所有変更・軍団整理で変わり得るため、現在値へ同期する。
-            let marker = null;
-            for (const child of card.children) {
-                if (child.classList && child.classList.contains('legion-marker-base')) {
-                    marker = child;
-                    break;
-                }
-            }
-            const legionId = Number(castle.legionId || 0);
-            if (legionId > 0) {
-                const kanjiNumbers = ['', '一', '二', '三', '四', '五', '六', '七', '八'];
-                if (!marker) {
-                    marker = document.createElement('div');
-                    card.appendChild(marker);
-                }
-                marker.className = `legion-marker-base legion-color-${legionId} hidden`;
-                marker.textContent = kanjiNumbers[legionId] || String(legionId);
-            } else if (marker) {
-                marker.remove();
-            }
-            changed = true;
-        });
-
+        // 所有変更だけの専用DOM書換を増やさず、通常の拠点差分同期を正本として使う。
+        const changed = this.refreshCastlePresentations(Array.from(targetIds));
         if (!changed) return false;
+
         this.updateCastleGlows();
         this.updateClanColors();
         if (this.currentCastle && targetIds.has(Number(this.currentCastle.id))) {
@@ -1925,7 +1992,7 @@ Object.assign(UIManager.prototype, {
         
         // ★ 修正：大名選択画面では、選んだ大名の城だけを青く光らせます
         if (this.game.phase === 'daimyo_select') {
-            const cards = this.mapEl.querySelectorAll('.castle-card');
+            const cards = this._getCastleCardElements();
             cards.forEach(card => {
                 card.classList.remove('glow-blue', 'glow-red', 'glow-green');
                 const clanId = parseInt(card.dataset.clan, 10);
@@ -1945,7 +2012,7 @@ Object.assign(UIManager.prototype, {
             baseClanId = this.currentCastle.ownerClan;
         }
 
-        const cards = this.mapEl.querySelectorAll('.castle-card');
+        const cards = this._getCastleCardElements();
         // 同一勢力の拠点が複数あっても、1回の光彩更新中は同じ外交関係を1度だけ取得する。
         // キャッシュはこの同期処理のローカルだけなので外交状態の変更を跨がない。
         const relationByClan = new Map();
