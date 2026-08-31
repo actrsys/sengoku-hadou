@@ -470,15 +470,15 @@ Object.assign(UIInfoManager.prototype, {
         
         displayCastles.forEach(c => {
             // ★高速化：ループ内でも早見表を使います
-            const clanData = clanMap.get(c.ownerClan);
+            const clanData = this.game.getClan(c.ownerClan);
             const clanName = clanData ? clanData.name : "";
             const compressedClanName = getCompressedTextHtml(clanName, 4); // ★魔法をかけます！
             
-            const castellan = bushoMap.get(c.castellanId);
+            const castellan = this.game.getBusho(c.castellanId);
             const castellanName = castellan ? castellan.name : "";
             
             let provinceName = "";
-            const province = provinceMap.get(c.provinceId);
+            const province = this.game.getProvince(c.provinceId);
             if (province) provinceName = province.province;
             
             const stats = castleBushoStatsMap.get(c.id);

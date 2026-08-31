@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r312');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r313');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -8541,6 +8541,9 @@ test('拠点一覧は既存ID索引を再利用し人数俸禄集計をタブ切
     assert.ok(!block.includes('const clanMap = new Map()'));
     assert.ok(!block.includes('const bushoMap = new Map()'));
     assert.ok(!block.includes('const provinceMap = new Map()'));
+    assert.ok(!block.includes('clanMap.get('), '削除済みのローカルclanMap参照を残さない');
+    assert.ok(!block.includes('bushoMap.get('), '削除済みのローカルbushoMap参照を残さない');
+    assert.ok(!block.includes('provinceMap.get('), '削除済みのローカルprovinceMap参照を残さない');
     const opener = kyoten.slice(kyoten.indexOf('showKyotenList('), kyoten.indexOf('_renderKyotenList('));
     assert.ok(opener.includes('this.kyotenCastleBushoStatsMap = null;'));
     const selectAt = kyoten.indexOf('showAppointLegionCastleSelector(');
