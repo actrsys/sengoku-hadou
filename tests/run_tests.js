@@ -119,11 +119,20 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r311');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r312');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('友好'), false);
+});
+
+test('城アイコンの楕円影は各WebPの実表示下端に合わせて個別補正する', () => {
+    const css = read('css/style.css');
+    assert.ok(css.includes('--castle-shadow-bottom: 2.1px'));
+    assert.ok(css.includes('.castle-card.icon-large { --castle-shadow-bottom: 2px; }'));
+    assert.ok(css.includes('bottom: var(--castle-shadow-bottom, 2px)'));
+    assert.ok(css.includes("shiro_icon001.webp"));
+    assert.ok(css.includes("shiro_icon002.webp"));
 });
 
 test('士気上限は内部120・通常100・ゲージ100を設定の正本から使う', () => {
