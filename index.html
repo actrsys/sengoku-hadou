@@ -16,6 +16,7 @@
     <title>戦国覇道</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/animation.css">
+    <script src="js/user_settings.js"></script>
     <script src="js/app_bootstrap.js"></script>
     <script src="js/pako.min.js"></script>
 </head>
@@ -57,7 +58,7 @@
                 </div>
             </div>
             <div id="title-version" class="title-version" aria-label="ゲームバージョン"></div>
-            <div id="legacy-safe-mode-indicator" class="legacy-safe-mode-indicator" aria-label="旧端末安全モード">旧端末安全モード</div>
+            <div id="legacy-safe-mode-indicator" class="legacy-safe-mode-indicator" aria-label="軽量モード">軽量モード</div>
         </div>
 
         <div id="scenario-modal" class="modal hidden">
@@ -145,6 +146,7 @@
                 <div class="scroll-wrapper" id="selector-list-wrapper">
                     <div id="selector-list" class="list-container hide-native-scroll"></div>
                 </div>
+                <div id="selector-list-pager" class="low-memory-list-pager hidden" aria-label="一覧のページ送り"></div>
                 <div class="modal-footer">
                     <button id="selector-confirm-btn" class="btn-primary">決定</button>
                     <button id="selector-back-btn" class="btn-secondary">閉じる</button>
@@ -600,6 +602,19 @@
                     </div>
                 </div>
 
+
+                <div class="setting-row setting-display-mode-row">
+                    <label class="slider-row-label">表示モード</label>
+                    <div class="setting-display-mode-control">
+                        <div class="setting-toggle-group setting-three-way-toggle">
+                            <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-display-mode-auto">自動</button>
+                            <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-display-mode-normal">通常</button>
+                            <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-display-mode-light">軽量</button>
+                        </div>
+                        <div class="setting-note">変更は次回起動時に反映されます。</div>
+                    </div>
+                </div>
+
                 <div class="setting-row">
                     <label class="slider-row-label">オートセーブ</label>
                     <div class="setting-toggle-group">
@@ -658,7 +673,6 @@
     <script src="js/howler.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/constants.js"></script>
-    <script src="js/user_settings.js"></script>
     <script src="js/game_math.js"></script>
     <script src="js/map_graph.js"></script>
     <script src="js/domestic_rules.js"></script>

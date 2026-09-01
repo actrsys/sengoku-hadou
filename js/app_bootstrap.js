@@ -20,6 +20,10 @@
         const touch = Number(nav.maxTouchPoints || 0) > 0 || /iPhone|iPad|iPod|Android|Mobile/i.test(ua);
         if (!touch) return false;
 
+        const displayMode = window.UserSettings ? window.UserSettings.displayMode : 'auto';
+        if (displayMode === 'light') return true;
+        if (displayMode === 'normal') return false;
+
         // 通常スマホまで安全モードへ巻き込まない。明確に小メモリ、または
         // 375x667級までの旧iPhone画面クラスだけを対象にする。
         // iOSはdeviceMemoryを公開しないうえ、同じ小型筐体へ新しいOSが入ることがあるため、
@@ -50,7 +54,10 @@
         return false;
     }
 
+    const displayModePreference = window.UserSettings ? window.UserSettings.displayMode : 'auto';
     const earlyMobileLowMemoryMode = resolveEarlyMobileLowMemoryMode();
+    window.__displayModePreference = displayModePreference;
+    window.__mobileLowMemoryModeSource = earlyMobileLowMemoryMode ? (displayModePreference === 'light' ? 'manual' : 'auto') : 'normal';
     window.__mobileLowMemoryMode = earlyMobileLowMemoryMode;
     if (earlyMobileLowMemoryMode) {
         document.documentElement.classList.add('mobile-low-memory');
@@ -166,6 +173,16 @@
 
         element.textContent = `ver. ${version}`;
         element.classList.remove('hidden');
+    }
+
+    function renderDisplayModeIndicator() {
+        const element = document.getElementById('legacy-safe-mode-indicator');
+        if (!element) return;
+        if (!earlyMobileLowMemoryMode) {
+            element.textContent = '';
+            return;
+        }
+        element.textContent = displayModePreference === 'light' ? '軽量モード' : '軽量モード（自動）';
     }
 
     function bindStaticUiEvents() {
@@ -318,6 +335,7 @@
 
     function initializeDomBindings() {
         renderTitleVersion();
+        renderDisplayModeIndicator();
         bindStaticUiEvents();
         resizeGameScreen();
         // GameManager生成より前でも、前回WebKitプロセス停止のcheckpointをタイトル上へ表示できるようにする。

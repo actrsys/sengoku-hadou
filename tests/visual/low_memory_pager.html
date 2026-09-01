@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja" class="mobile-low-memory">
+<head><meta charset="utf-8"><!-- APP_CSS --></head>
+<body class="is-touch-input">
+<div id="game-screen" style="width:360px;height:640px;position:relative;overflow:hidden;">
+  <div id="selector-modal" class="modal">
+    <div class="modal-content">
+      <h3 id="selector-title">武将一覧</h3>
+      <div id="selector-context-info" class="context-info hidden"></div>
+      <div id="selector-tabs" class="busho-tabs"><div class="busho-list-tabs"><button class="busho-tab-btn active">基</button></div></div>
+      <div class="scroll-wrapper" id="selector-list-wrapper">
+        <div id="selector-list" class="list-container low-memory-paged-list">
+          <div class="list-inner-wrapper">
+            <div class="list-header"><span>武将</span><span>統率</span></div>
+            <div class="select-item"><span>武将一</span><span>80</span></div>
+            <div class="select-item"><span>武将二</span><span>79</span></div>
+            <div class="select-item"><span>武将三</span><span>78</span></div>
+            <div class="select-item"><span>武将四</span><span>77</span></div>
+            <div class="select-item"><span>武将五</span><span>76</span></div>
+            <div class="select-item"><span>武将六</span><span>75</span></div>
+            <div class="select-item"><span>武将七</span><span>74</span></div>
+            <div class="select-item"><span>武将八</span><span>73</span></div>
+            <div class="select-item"><span>武将九</span><span>72</span></div>
+            <div class="select-item"><span>武将十</span><span>71</span></div>
+          </div>
+        </div>
+      </div>
+      <div id="selector-list-pager" class="low-memory-list-pager" aria-label="一覧のページ送り">
+        <button type="button" class="btn-secondary low-memory-page-prev">前</button>
+        <span class="low-memory-page-label">1 / 3</span>
+        <button type="button" class="btn-secondary low-memory-page-next">次</button>
+      </div>
+      <div class="modal-footer"><button class="btn-secondary">閉じる</button></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -65,6 +65,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+
+    const updateDisplayModeSetting = (mode, persist = true) => {
+        const normalized = ['auto', 'normal', 'light'].includes(mode) ? mode : 'auto';
+        ['auto', 'normal', 'light'].forEach(value => {
+            const btn = document.getElementById(`btn-display-mode-${value}`);
+            if (btn) btn.classList.toggle('active', value === normalized);
+        });
+        if (persist && settings) settings.setDisplayMode(normalized);
+    };
+
+    ['auto', 'normal', 'light'].forEach(mode => {
+        const btn = document.getElementById(`btn-display-mode-${mode}`);
+        if (btn) btn.addEventListener('click', () => updateDisplayModeSetting(mode));
+    });
+
+    updateDisplayModeSetting(settings ? settings.displayMode : 'auto', false);
+
     // UserSettings は user_settings.js の読込時に localStorage から復元済み。
     updateToggleSetting('notify', settings ? settings.aiWarNotify : true, false);
     updateToggleSetting('historical', settings ? settings.historicalEvent : true, false);

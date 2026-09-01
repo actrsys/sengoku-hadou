@@ -1211,6 +1211,35 @@ async function validateFieldTerrainLayout(cdp) {
     console.log('✓ 野戦地形チップ static visual/layout regression');
 }
 
+
+async function validateLowMemoryPagerLayout(cdp) {
+    const html = fixtureHtml('low_memory_pager.html');
+    await cdp.call('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 1, mobile: true });
+    const result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            document.open();document.write(${JSON.stringify(html)});document.close();
+            const rect=id=>{const r=document.getElementById(id).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
+            const pager=document.getElementById('selector-list-pager');
+            const modal=document.querySelector('#selector-modal .modal-content').getBoundingClientRect();
+            const footer=document.querySelector('#selector-modal .modal-footer').getBoundingClientRect();
+            const list=document.getElementById('selector-list').getBoundingClientRect();
+            const next=pager.querySelector('.low-memory-page-next').getBoundingClientRect();
+            const prev=pager.querySelector('.low-memory-page-prev').getBoundingClientRect();
+            const cs=getComputedStyle(pager);
+            return {pager:rect('selector-list-pager'),modal:{top:modal.top,bottom:modal.bottom},footer:{top:footer.top,bottom:footer.bottom},list:{top:list.top,bottom:list.bottom},next:{width:next.width,height:next.height},prev:{width:prev.width,height:prev.height},display:cs.display,visibility:cs.visibility};
+        })()`, returnByValue:true, awaitPromise:true
+    });
+    const st=result.result.value;
+    assert.notStrictEqual(st.display, 'none', '軽量一覧のページャーがdisplay:noneになっている');
+    assert.notStrictEqual(st.visibility, 'hidden', '軽量一覧のページャーが非表示になっている');
+    assert.ok(st.pager.height >= 34, `ページャーが潰れています (${st.pager.height}px)`);
+    assert.ok(st.pager.top >= st.list.bottom - 1, 'ページャーはスクロール一覧の外側・直下に置く');
+    assert.ok(st.pager.bottom <= st.footer.top + 1, 'ページャーは共通footerより上に収める');
+    assert.ok(st.pager.top >= st.modal.top && st.pager.bottom <= st.modal.bottom, 'ページャーがモーダル外へはみ出す');
+    assert.ok(st.prev.width >= 60 && st.next.width >= 60 && st.prev.height >= 28 && st.next.height >= 28, '前/次ボタンのタップ領域が小さすぎる');
+    console.log('✓ 軽量モード一覧 ページ送り操作常時表示 visual/layout regression');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -1274,6 +1303,7 @@ async function main() {
         await validateWarAptitudeLayout(cdp);
         await validateDialogConfirmPlacement(cdp);
         await validateBushoBiographyLayout(cdp);
+        await validateLowMemoryPagerLayout(cdp);
         await validateFieldWarFullscreen(cdp);
         await validateFieldTerrainLayout(cdp);
     } finally {

@@ -11,7 +11,8 @@ class UserSettingsManager {
         historicalEvent: true,
         autoSave: true,
         bgmVolume: 1.0,
-        seVolume: 1.0
+        seVolume: 1.0,
+        displayMode: 'auto'
     });
 
     static STORAGE_KEYS = Object.freeze({
@@ -19,7 +20,8 @@ class UserSettingsManager {
         historicalEvent: 'historicalEvent',
         autoSave: 'autoSave',
         bgmVolume: 'userBgmVolume',
-        seVolume: 'userSeVolume'
+        seVolume: 'userSeVolume',
+        displayMode: 'userDisplayMode'
     });
 
     constructor(storage = null) {
@@ -67,12 +69,21 @@ class UserSettingsManager {
         return Math.max(0, Math.min(1, value));
     }
 
+
+    _readDisplayMode() {
+        const raw = this._read(UserSettingsManager.STORAGE_KEYS.displayMode);
+        return ['auto', 'normal', 'light'].includes(raw)
+            ? raw
+            : UserSettingsManager.DEFAULTS.displayMode;
+    }
+
     reload() {
         this.aiWarNotify = this._readBoolean('aiWarNotify');
         this.historicalEvent = this._readBoolean('historicalEvent');
         this.autoSave = this._readBoolean('autoSave');
         this.bgmVolume = this._readVolume('bgmVolume');
         this.seVolume = this._readVolume('seVolume');
+        this.displayMode = this._readDisplayMode();
         return this;
     }
 
@@ -97,6 +108,15 @@ class UserSettingsManager {
         this.autoSave = !!value;
         this._write(UserSettingsManager.STORAGE_KEYS.autoSave, this.autoSave);
         return this.autoSave;
+    }
+
+    setDisplayMode(value) {
+        const normalized = ['auto', 'normal', 'light'].includes(value)
+            ? value
+            : UserSettingsManager.DEFAULTS.displayMode;
+        this.displayMode = normalized;
+        this._write(UserSettingsManager.STORAGE_KEYS.displayMode, this.displayMode);
+        return this.displayMode;
     }
 
     setBgmVolume(value) {

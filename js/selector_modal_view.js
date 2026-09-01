@@ -19,6 +19,7 @@ class SelectorModalView {
             titleEl: document.getElementById('selector-title'),
             listContainer: (this.ui && this.ui.selectorList) || document.getElementById('selector-list'),
             listWrapper: document.getElementById('selector-list-wrapper'),
+            pagerEl: document.getElementById('selector-list-pager'),
             contextEl: (this.ui && this.ui.selectorContextInfo) || document.getElementById('selector-context-info'),
             tabsEl: document.getElementById('selector-tabs'),
             confirmBtn: (this.ui && this.ui.selectorConfirmBtn) || document.getElementById('selector-confirm-btn'),
@@ -56,7 +57,7 @@ class SelectorModalView {
         const elements = this.getElements();
         if (!elements || !elements.listContainer) return null;
 
-        const { modal, titleEl, contextEl, tabsEl, confirmBtn, backBtn } = elements;
+        const { modal, titleEl, contextEl, tabsEl, pagerEl, confirmBtn, backBtn } = elements;
         modal.classList.remove('hidden');
 
         if (titleEl) titleEl.textContent = title;
@@ -83,6 +84,11 @@ class SelectorModalView {
                 tabsEl.innerHTML = '';
                 tabsEl.classList.add('hidden');
             }
+        }
+
+        if (pagerEl) {
+            pagerEl.innerHTML = '';
+            pagerEl.classList.add('hidden');
         }
 
         if (confirmBtn) {
@@ -125,7 +131,7 @@ class SelectorModalView {
         const elements = this.getElements();
         if (!elements || !elements.listContainer) return;
 
-        const { listContainer } = elements;
+        const { listContainer, pagerEl } = elements;
         if (listContainer._virtualScrollHandler) {
             listContainer.removeEventListener('scroll', listContainer._virtualScrollHandler);
             listContainer._virtualScrollHandler = null;
@@ -141,6 +147,7 @@ class SelectorModalView {
         const images = listContainer.querySelectorAll('img');
         for (let i = 0; i < images.length; i++) images[i].removeAttribute('src');
         listContainer.innerHTML = '';
+        if (pagerEl) { pagerEl.innerHTML = ''; pagerEl.classList.add('hidden'); }
         if (resetScroll) listContainer.scrollTop = 0;
     }
 
@@ -148,7 +155,7 @@ class SelectorModalView {
         const elements = this.getElements();
         if (!elements) return;
 
-        const { modal, contextEl, tabsEl, confirmBtn, backBtn } = elements;
+        const { modal, contextEl, tabsEl, pagerEl, confirmBtn, backBtn } = elements;
         modal.classList.add('hidden');
 
         // 非表示にするだけだと、仮想スクロールのクロージャや画像DOMが大量データへの参照を
@@ -158,6 +165,7 @@ class SelectorModalView {
         this.releaseListContent({ resetScroll: true });
         if (contextEl) contextEl.innerHTML = '';
         if (tabsEl) tabsEl.innerHTML = '';
+        if (pagerEl) { pagerEl.innerHTML = ''; pagerEl.classList.add('hidden'); }
         if (confirmBtn) confirmBtn.onclick = null;
         if (backBtn) backBtn.onclick = null;
     }

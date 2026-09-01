@@ -1591,9 +1591,10 @@ class UIInfoManager {
         });
         if (!shell) return;
 
-        const { listContainer, tabsEl } = shell;
+        const { listContainer, tabsEl, pagerEl } = shell;
         listContainer.style.display = 'none';
         listContainer.innerHTML = '';
+        if (pagerEl) { pagerEl.innerHTML = ''; pagerEl.classList.add('hidden'); }
         // タブ切り替えとスコープ切り替えは一覧内容側の責務としてここで登録する。
         if (tabsEl && config.tabsHtml) {
             if (config.onTabClick) {
@@ -1770,12 +1771,6 @@ class UIInfoManager {
                     const emptyCells = config.headers ? config.headers.map(() => '<span></span>').join('') : '';
                     parts.push(`<div class="select-item ${config.itemClass || ''} is-static is-placeholder-row">${emptyCells}</div>`);
                 }
-                parts.push(`<div class="low-memory-list-pager">
-                    <button type="button" class="btn-secondary low-memory-page-prev" ${pageIndex <= 0 ? 'disabled' : ''}>前</button>
-                    <span class="low-memory-page-label">${pageIndex + 1} / ${totalPages}</span>
-                    <button type="button" class="btn-secondary low-memory-page-next" ${pageIndex >= totalPages - 1 ? 'disabled' : ''}>次</button>
-                </div>`);
-
                 listContainer.classList.add('low-memory-paged-list');
                 listContainer.classList.remove('hide-native-scroll');
                 listContainer.innerHTML = `<div class="list-inner-wrapper${wrapperClass}"${wrapperStyle}>${parts.join('')}</div>`;
@@ -1786,8 +1781,12 @@ class UIInfoManager {
                 const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
                 attachDelegatedClick(innerWrapper);
                 attachSortClicks();
-                const prev = innerWrapper.querySelector('.low-memory-page-prev');
-                const next = innerWrapper.querySelector('.low-memory-page-next');
+                if (pagerEl) {
+                    pagerEl.innerHTML = `<button type="button" class="btn-secondary low-memory-page-prev" ${pageIndex <= 0 ? 'disabled' : ''}>前</button><span class="low-memory-page-label">${pageIndex + 1} / ${totalPages}</span><button type="button" class="btn-secondary low-memory-page-next" ${pageIndex >= totalPages - 1 ? 'disabled' : ''}>次</button>`;
+                    pagerEl.classList.remove('hidden');
+                }
+                const prev = pagerEl ? pagerEl.querySelector('.low-memory-page-prev') : null;
+                const next = pagerEl ? pagerEl.querySelector('.low-memory-page-next') : null;
                 if (prev) prev.addEventListener('click', () => {
                     if (pageIndex <= 0) return;
                     pageIndex--;

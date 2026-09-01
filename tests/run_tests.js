@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r332');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r334');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -280,14 +280,29 @@ test('旧端末安全モードは小型iPhoneをOS世代に関係なく判定し
     assert.ok(bootstrap.includes("fontPreload.href = 'data/fonts/abashiri-mincho.woff2?v=1'"), '通常端末だけbootstrapからpreloadする');
 });
 
-test('旧端末安全モードはタイトル右下に明示し指南書でも違いを説明する', () => {
+test('表示モードは自動判定を既定に通常/軽量を保存でき、軽量時はタイトルと指南書で説明する', () => {
     const html = read('index.html');
     const css = read('css/style.css');
     const guide = read('js/guide_data.js');
+    const bootstrap = read('js/app_bootstrap.js');
+    const settings = read('js/user_settings.js');
+    const settingsUi = read('js/ui_settings.js');
     assert.ok(html.includes('id="legacy-safe-mode-indicator"'));
-    assert.ok(html.includes('旧端末安全モード'));
+    assert.ok(html.includes('aria-label="軽量モード"'));
     assert.ok(css.includes('html.mobile-low-memory .legacy-safe-mode-indicator { display: block; }'));
-    assert.ok(guide.includes("heading: '旧端末安全モード'"));
+    assert.ok(bootstrap.includes("displayMode === 'light'"));
+    assert.ok(bootstrap.includes("displayMode === 'normal'"));
+    assert.ok(bootstrap.includes("'軽量モード（自動）'"));
+    assert.ok(settings.includes("displayMode: 'auto'"));
+    assert.ok(settings.includes("displayMode: 'userDisplayMode'"));
+    assert.ok(settings.includes('setDisplayMode(value)'));
+    assert.ok(settingsUi.includes("['auto', 'normal', 'light']"));
+    assert.ok(html.includes('id="btn-display-mode-auto"'));
+    assert.ok(html.includes('id="btn-display-mode-normal"'));
+    assert.ok(html.includes('id="btn-display-mode-light"'));
+    assert.ok(html.includes('変更は次回起動時に反映されます。'));
+    assert.ok(css.includes('body.is-pc .setting-display-mode-row { display: none; }'), 'PCではスマホ向け表示モード設定を表示しない');
+    assert.ok(guide.includes("heading: '表示モード'"));
     assert.ok(guide.includes('一覧は最初からページ送りになり'));
     assert.ok(guide.includes('ゲームのルールや内容、セーブデータの扱いは通常モードと同じです。'));
 });
@@ -3154,17 +3169,29 @@ test('UserSettings は GameConfig と分離され、localStorage の正本にな
     assert.strictEqual(ctx.UserSettings.autoSave, false);
     assert.strictEqual(ctx.UserSettings.bgmVolume, 0, 'ミュート(0)を再読込時に100%へ戻さない');
     assert.strictEqual(ctx.UserSettings.seVolume, 0.35);
+    assert.strictEqual(ctx.UserSettings.displayMode, 'auto');
 
     ctx.UserSettings.setAutoSave(true);
     ctx.UserSettings.setBgmVolume(0.6);
+    ctx.UserSettings.setDisplayMode('light');
     assert.strictEqual(values.get('autoSave'), 'true');
     assert.strictEqual(values.get('userBgmVolume'), '0.6');
+    assert.strictEqual(values.get('userDisplayMode'), 'light');
 
     assert.ok(!read('js/ui_settings.js').includes('window.GameConfig.'));
     assert.ok(!read('js/ui_settings.js').includes('eventManager'), '設定UIは歴史常駐効果の実処理を直接呼ばない');
     assert.ok(read('js/user_settings.js').includes("'user-setting-changed'"), 'UserSettings が設定変更を通知する');
     assert.ok(read('js/game.js').includes("detail.key !== 'historicalEvent'"), 'GameManager が歴史イベント設定変更だけを EventManager へルーティングする');
     assert.ok(!read('js/audio.js').includes('localStorage.'));
+});
+
+
+test('表示モード設定は起動判定より先にUserSettingsを読み込む', () => {
+    const html = read('index.html');
+    const userAt = html.indexOf('<script src="js/user_settings.js"></script>');
+    const bootstrapAt = html.indexOf('<script src="js/app_bootstrap.js"></script>');
+    assert.ok(userAt >= 0 && bootstrapAt > userAt);
+    assert.strictEqual(html.indexOf('<script src="js/user_settings.js"></script>', userAt + 1), -1, 'UserSettingsを二重読込しない');
 });
 
 test('ユーザー設定キーは user_settings.js 以外で直接localStorage操作しない', () => {
@@ -8672,6 +8699,13 @@ test('旧端末安全モードの共通一覧は件数にかかわらず最初�
     assert.ok(css.includes('.list-container.low-memory-paged-list'));
     assert.ok(css.includes('overflow: hidden !important;'));
     assert.ok(css.includes('.low-memory-list-pager'));
+    const html = read('index.html');
+    const selector = read('js/selector_modal_view.js');
+    assert.ok(html.includes('id="selector-list-pager"'), 'ページ送りはスクロール領域の外へ専用領域を持つ');
+    assert.ok(info.includes('pagerEl.innerHTML = `<button'), '前/次ボタンは専用ページャーへ描画する');
+    assert.ok(info.includes("pagerEl.classList.remove('hidden')"));
+    assert.ok(!info.includes('parts.push(`<div class="low-memory-list-pager">'), 'overflow:hiddenの一覧末尾へページャーを埋め込まない');
+    assert.ok(selector.includes("pagerEl.classList.add('hidden')"), '画面切替時はページャーを必ず片付ける');
 });
 
 test('共通一覧は詳細遷移・終了時に仮想スクロールの参照と旧DOMを先に解放する', () => {
