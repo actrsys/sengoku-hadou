@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r338');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r339');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -333,16 +333,25 @@ test('スマホ設定画面は音・表示/ゲームの2タブに分け、PCは�
 });
 
 
-test('スマホのタイトル設定だけ再起動導線を表示し確認後にreloadする', () => {
+test('スマホのタイトル設定だけ再起動導線を設定内容内へ表示し確認後にreloadする', () => {
     const html = read('index.html');
     const info = read('js/ui_info.js');
+    const css = read('css/style.css');
     const guide = read('js/guide_data.js');
-    assert.ok(html.includes('id="settings-restart-btn" class="btn-secondary hidden"'), '再起動ボタンは初期状態を非表示にする');
+    assert.ok(html.includes('id="settings-restart-row" class="setting-row settings-restart-row hidden"'), '再起動設定行は初期状態を非表示にする');
+    assert.ok(html.includes('id="settings-restart-btn" class="ui-toggle-btn setting-danger-btn"'), '再起動は設定項目と同系統の矩形ボタンを使う');
+    const restartAt = html.indexOf('id="settings-restart-btn"');
+    const audioPanelAt = html.indexOf('id="settings-panel-audio-display"');
+    const gamePanelAt = html.indexOf('id="settings-panel-game"');
+    const footerAt = html.indexOf('class="modal-footer settings-footer"');
+    assert.ok(restartAt > audioPanelAt && restartAt < gamePanelAt, '再起動ボタンは音・表示設定パネルの内部に置く');
+    assert.ok(restartAt < footerAt, '再起動ボタンを設定footerへ置かない');
+    assert.ok(css.includes('#settings-modal .ui-toggle-btn.setting-danger-btn'), '設定内再起動ボタン専用の赤色スタイルを持つ');
     assert.ok(html.includes('id="setting-display-mode-note"'), '表示モード注記を開き元に応じて更新できるようIDを持つ');
     assert.ok(info.includes("const isMobileLayout = !document.body.classList.contains('is-pc');"), 'PCでは再起動導線を出さない');
     assert.ok(info.includes("this.game.phase === 'title'"), 'タイトルphaseだけを対象にする');
     assert.ok(info.includes("!titleScreen.classList.contains('hidden')"), 'タイトル画面が実際に見えていることも確認する');
-    assert.ok(info.includes("restartBtn.classList.toggle('hidden', !openedFromTitle)"), '開き元ごとに再起動ボタン表示を更新する');
+    assert.ok(info.includes("restartRow.classList.toggle('hidden', !openedFromTitle)"), '開き元ごとに再起動設定行の表示を更新する');
     assert.ok(info.includes("'ゲームを再起動します。よろしいですか？'"), '再起動前に確認ダイアログを出す');
     assert.ok(info.includes("{ okText: '再起動', cancelText: '戻る' }"), '確認操作の役割を明示する');
     assert.ok(info.includes('window.location.reload();'), '確認後は現在ページを再読み込みする');

@@ -621,6 +621,13 @@
                                 <div id="setting-display-mode-note" class="setting-note">変更は次回起動時に反映されます。</div>
                             </div>
                         </div>
+
+                        <div id="settings-restart-row" class="setting-row settings-restart-row hidden">
+                            <label class="slider-row-label">設定の反映</label>
+                            <div class="setting-toggle-group">
+                                <button type="button" id="settings-restart-btn" class="ui-toggle-btn setting-danger-btn">再起動</button>
+                            </div>
+                        </div>
                     </section>
 
                     <section id="settings-panel-game" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-game">
@@ -650,7 +657,6 @@
                 </div>
 
                 <div class="modal-footer settings-footer">
-                    <button id="settings-restart-btn" class="btn-secondary hidden">再起動</button>
                     <button id="settings-close-btn" class="btn-secondary">閉じる</button>
                 </div>
             </div>

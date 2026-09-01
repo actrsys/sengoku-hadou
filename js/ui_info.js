@@ -1559,6 +1559,7 @@ class UIInfoManager {
 
         // スマホで「タイトル画面から設定を開いた時」だけ、設定変更をすぐ反映できる再起動導線を出す。
         // ゲーム中には未保存進行を誤って失う導線を置かない。PCではブラウザ側の再読込が容易なため表示しない。
+        const restartRow = document.getElementById('settings-restart-row');
         const restartBtn = document.getElementById('settings-restart-btn');
         const displayModeNote = document.getElementById('setting-display-mode-note');
         const titleScreen = document.getElementById('title-screen');
@@ -1571,8 +1572,8 @@ class UIInfoManager {
             && !titleScreen.classList.contains('hidden')
         );
 
+        if (restartRow) restartRow.classList.toggle('hidden', !openedFromTitle);
         if (restartBtn) {
-            restartBtn.classList.toggle('hidden', !openedFromTitle);
             restartBtn.onclick = openedFromTitle ? () => {
                 if (!this.ui || typeof this.ui.showDialog !== 'function') return;
                 this.ui.showDialog(
