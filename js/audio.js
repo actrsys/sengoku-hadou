@@ -282,95 +282,120 @@ class AudioManager {
         else this._howlerReadyPromise.then(install).catch(() => {});
     }
 
-    _shouldUseMobileBgmStreaming() {
-        // 通常スマホは元のOGG/Web Audio品質・ループ精度へ戻す。
-        // 長尺BGMのPCM常駐が問題になる旧端末の安全モードだけHTML5 Audioへ切り替える。
-        return this._isMobileLowMemoryAudioMode();
+    _isAudioCodecSupported(extension) {
+        // 表示モードと音声互換性は別責務。通常表示を強制した旧Safariでも、
+        // Howler/HTMLAudioが再生できる形式を選べるようcodec判定だけをここへ集約する。
+        const howler = typeof window !== 'undefined' ? window.Howler : null;
+        if (!howler || typeof howler.codecs !== 'function') return true;
+        try {
+            return howler.codecs(String(extension || '').toLowerCase()) === true;
+        } catch (_) {
+            // 判定API自体が使えない環境は従来形式を試し、実loaderror時のfallbackへ委ねる。
+            return true;
+        }
     }
 
-    _getMobileBgmSource(fileName) {
+    _shouldUseCompatibleBgmStreaming() {
+        // 軽量モードはメモリ都合で従来どおりAAC/HTML5を使う。
+        // 通常モードでもOGG/Vorbis非対応端末なら、表示品質を落とさず音声だけAACへfallbackする。
+        return this._isMobileLowMemoryAudioMode() || !this._isAudioCodecSupported('ogg');
+    }
+
+    _getCompatibleBgmSource(fileName) {
         const name = String(fileName || '');
         return `data/music/bgm_mobile/${name.replace(/\.[^.]+$/, '')}.m4a`;
+    }
+
+    _getCompatibleSeSource(fileName) {
+        const name = String(fileName || '');
+        if (!/\.ogg$/i.test(name)) return null;
+        return `data/music/se_compat/${name.replace(/\.ogg$/i, '')}.mp3`;
+    }
+
+    _playCompatibleBgm(fileName, loopStart, loopEnd) {
+        // 互換AACは各曲のbaseVolumeを焼き込み済みなので、HTMLMediaElementには
+        // ユーザー音量だけを渡す。旧iOSのOGG非対応時も低メモリ時も同じ経路を使う。
+        const hasLoopWindow = Number.isFinite(loopStart) && loopStart >= 0
+            && Number.isFinite(loopEnd) && loopEnd > loopStart;
+        let compatiblePlayer = null;
+        const options = {
+            src: [this._getCompatibleBgmSource(fileName), `data/music/bgm/${fileName}`],
+            volume: this.userBgmVolume,
+            html5: true,
+            preload: 'metadata'
+        };
+        if (hasLoopWindow && loopStart > 0) {
+            options.onend = (id) => {
+                if (!compatiblePlayer || this.bgmPlayer !== compatiblePlayer) return;
+                try {
+                    compatiblePlayer.seek(loopStart, id);
+                    compatiblePlayer.play(id);
+                } catch (_) {
+                    // HTML5 Audio側のseek/replayが失敗してもゲーム処理は止めない。
+                }
+            };
+        } else {
+            // loopStart=0 の曲はloopEndで切った互換音源をnative loopするだけで同じ範囲になる。
+            options.loop = true;
+        }
+        compatiblePlayer = new window.Howl(options);
+        this.bgmPlayer = compatiblePlayer;
+        this._bgmUsesBakedBaseVolume = true;
+        if (!(this.userBgmVolume > 0) && typeof compatiblePlayer.mute === 'function') compatiblePlayer.mute(true);
+        compatiblePlayer.play();
+        return compatiblePlayer;
     }
 
     // BGMを鳴らす魔法
     playBGM(fileName, fallbackStart = 0, fallbackEnd = 0) {
         if (this._retryWhenHowlerReady(() => this.playBGM(fileName, fallbackStart, fallbackEnd))) return;
 
-        // 鳴らした曲の名前を覚えさせます
         this.currentBgmName = fileName;
-
         this.stopBGM();
-        
+
         const bgmData = this.bgmList[fileName];
         const loopStart = bgmData && bgmData.start !== undefined ? bgmData.start : fallbackStart;
         const loopEnd = bgmData && bgmData.end !== undefined ? bgmData.end : fallbackEnd;
-        
-        // ★ここで「基本の音量」と「ユーザーが設定した音量」を掛け算します！
         const baseVol = bgmData && bgmData.baseVolume !== undefined ? bgmData.baseVolume : this.fallbackBgmVolume;
         const finalVolume = baseVol * this.userBgmVolume;
 
-        const hasLoopWindow = Number.isFinite(loopStart) && loopStart >= 0
-            && Number.isFinite(loopEnd) && loopEnd > loopStart;
-        const useMobileStream = this._shouldUseMobileBgmStreaming() && !!bgmData;
-
-        if (useMobileStream) {
-            // HowlerのWeb Audio既定経路では長尺BGM全体がPCMのAudioBufferへ展開される。
-            // 古いスマホでは通常BGMだけでも数十MB規模になり、一覧→詳細などの瞬間メモリと重なる。
-            // HTML5 Audio + AACへ切り替えることで曲をストリーミングし、常駐PCMを避ける。
-            // mobile版AACは各曲のloopEndで物理的に終端している。これにより初回は従来どおり0秒から
-            // introを再生し、終端到達後だけloopStartへseekして同じ区間を繰り返せる。
-            // audio spriteを直接playすると初回からloopStartへ飛んでintroを失うため使用しない。
-            let mobilePlayer = null;
-            const options = {
-                src: [this._getMobileBgmSource(fileName)],
-                // iOS系ではHTMLMediaElement.volumeが固定される端末があるため、
-                // mobile AAC側へbaseVolumeを焼き込み、ここではユーザー音量だけを渡す。
-                volume: this.userBgmVolume,
-                html5: true,
-                preload: 'metadata'
-            };
-            if (hasLoopWindow && loopStart > 0) {
-                options.onend = (id) => {
-                    if (!mobilePlayer || this.bgmPlayer !== mobilePlayer) return;
-                    try {
-                        mobilePlayer.seek(loopStart, id);
-                        mobilePlayer.play(id);
-                    } catch (e) {
-                        // HTML5 Audio側のseek/replayが失敗してもゲーム処理は止めない。
-                    }
-                };
-            } else {
-                // loopStart=0 の曲はloopEndで切ったmobile音源をnative loopするだけで同じ範囲になる。
-                options.loop = true;
-            }
-            mobilePlayer = new window.Howl(options);
-            this.bgmPlayer = mobilePlayer;
-            this._bgmUsesBakedBaseVolume = true;
-            if (!(this.userBgmVolume > 0) && typeof mobilePlayer.mute === 'function') mobilePlayer.mute(true);
-            mobilePlayer.play();
+        // 表示モードは音声形式を決めない。軽量モード、またはOGG非対応端末だけAAC/HTML5へ切り替える。
+        if (bgmData && this._shouldUseCompatibleBgmStreaming()) {
+            this._playCompatibleBgm(fileName, loopStart, loopEnd);
             return;
         }
 
-        // PCは従来どおりWeb Audioを使い、サンプル単位のloopStart/loopEndを維持する。
+        // OGG/Vorbisを使える通常端末は従来どおりWeb Audioを使い、
+        // サンプル単位のloopStart/loopEndと元音源の品質を維持する。
         this._bgmUsesBakedBaseVolume = false;
-        this.bgmPlayer = new window.Howl({
+        let oggPlayer = null;
+        let compatibilityFallbackStarted = false;
+        const fallbackToCompatibleBgm = () => {
+            // canPlayTypeが誤ってOGG対応を返してもdecodeに失敗する旧WebKitがある。
+            // その場合だけAAC/HTML5へ1回だけ切り替える。別の曲へ遷移済みなら何もしない。
+            if (compatibilityFallbackStarted || !bgmData || !oggPlayer || this.bgmPlayer !== oggPlayer) return;
+            compatibilityFallbackStarted = true;
+            try { oggPlayer.unload(); } catch (_) {}
+            this.bgmPlayer = null;
+            this._playCompatibleBgm(fileName, loopStart, loopEnd);
+        };
+
+        oggPlayer = new window.Howl({
             src: [`data/music/bgm/${fileName}`],
             volume: finalVolume,
             loop: true,
+            onloaderror: fallbackToCompatibleBgm,
             onplay: (id) => {
-                if (!this.bgmPlayer) return;
+                if (!this.bgmPlayer || this.bgmPlayer !== oggPlayer) return;
                 const sound = this.bgmPlayer._soundById(id);
                 const source = sound && sound._node ? sound._node.bufferSource : null;
                 if (!source) return;
-                // LOOPSTART=0 も正規の値。開始点と終了点を独立して反映し、
-                // start=0 の曲でもメタデータ由来の LOOPEND をファイル末尾へ流さず適用する。
                 if (Number.isFinite(loopStart) && loopStart >= 0) source.loopStart = loopStart;
                 if (Number.isFinite(loopEnd) && loopEnd > loopStart) source.loopEnd = loopEnd;
             }
         });
-
-        this.bgmPlayer.play();
+        this.bgmPlayer = oggPlayer;
+        oggPlayer.play();
     }
 
     stopBGM() {
@@ -427,38 +452,53 @@ class AudioManager {
         if (this._retryWhenHowlerReady(() => this.playSE(fileName))) return;
 
         const seData = this.seList[fileName];
-        
-        // ★ここでも「基本の音量」と「ユーザー設定」を掛け算します！
         const baseVol = seData && seData.baseVolume !== undefined ? seData.baseVolume : this.fallbackSeVolume;
         const finalVolume = baseVol * this.userSeVolume;
-        // 完全ミュートならHowl/AudioBufferを作る意味がありません。長時間AI観戦では
-        // 無音SEのdecodeを積み重ねない方が古い端末のメモリ安定性に有利です。
         if (!(finalVolume > 0)) return;
 
-        let se = null;
-        let safetyTimer = null;
-        const cleanup = () => {
-            if (safetyTimer) {
-                clearTimeout(safetyTimer);
-                safetyTimer = null;
-            }
-            if (!se) return;
-            try { se.unload(); } catch (e) {}
-            se = null;
+        const originalSource = `data/music/se/${fileName}`;
+        const compatibleSource = this._getCompatibleSeSource(fileName);
+        const oggPreferred = !!compatibleSource && this._isAudioCodecSupported('ogg');
+        const firstSources = compatibleSource
+            ? (oggPreferred ? [originalSource, compatibleSource] : [compatibleSource, originalSource])
+            : [originalSource];
+
+        const playAttempt = (sources, allowCompatibleRetry) => {
+            let se = null;
+            let safetyTimer = null;
+            let cleaned = false;
+            const cleanup = () => {
+                if (cleaned) return;
+                cleaned = true;
+                if (safetyTimer) {
+                    clearTimeout(safetyTimer);
+                    safetyTimer = null;
+                }
+                if (!se) return;
+                try { se.unload(); } catch (_) {}
+                se = null;
+            };
+            const onLoadError = () => {
+                cleanup();
+                // codec判定が誤陽性でも、OGG読み込み失敗時だけ互換MP3を1回試す。
+                if (allowCompatibleRetry && compatibleSource) playAttempt([compatibleSource], false);
+            };
+
+            se = new window.Howl({
+                src: sources,
+                volume: finalVolume,
+                onend: cleanup,
+                onloaderror: onLoadError,
+                onplayerror: cleanup
+            });
+            se.play();
+            // 全SEは約11秒以下。古いWebViewで終了通知が欠けても一時Howlを永久保持しない。
+            if (se) safetyTimer = setTimeout(cleanup, 15000);
         };
-        se = new window.Howl({
-            src: [`data/music/se/${fileName}`],
-            volume: finalVolume,
-            onend: cleanup,
-            onloaderror: cleanup,
-            onplayerror: cleanup
-        });
-        se.play();
-        // 全SEは約11秒以下。古いWebViewでonend/onplayerrorが欠落しても
-        // 一時Howlを永久保持しないよう、十分長い安全弁で必ず解放します。
-        if (se) safetyTimer = setTimeout(cleanup, 15000);
+
+        playAttempt(firstSources, oggPreferred);
     }
-    
+
     // 今のBGMをメモ帳に書き写す魔法（上書き禁止バージョン！）
     memorizeCurrentBgm() {
         // ★追加：メモ帳が「白紙」の時だけ書き込みます！

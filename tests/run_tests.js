@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r339');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r340');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -359,11 +359,11 @@ test('スマホのタイトル設定だけ再起動導線を設定内容内へ�
     assert.ok(guide.includes('スマホではタイトル画面から設定を開くと「再起動」が表示され'), '指南書にもタイトル限定の再起動導線を説明する');
 });
 
-test('通常スマホは低メモリ専用の画質・音声・詳細遷移削減を受けない', () => {
+test('通常スマホは低メモリ専用の画質・詳細遷移削減を受けず音声codecだけ独立判定する', () => {
     const audio = read('js/audio.js');
     const busho = read('js/ui_info_busho.js');
     const css = read('css/style.css');
-    assert.ok(audio.includes('return this._isMobileLowMemoryAudioMode();'));
+    assert.ok(audio.includes("return this._isMobileLowMemoryAudioMode() || !this._isAudioCodecSupported('ogg');"), '通常表示でも音声codec非対応なら音声だけ互換経路へ切り替える');
     const detailAt = busho.indexOf('const isMobileListTransition = !!(');
     const detailBlock = busho.slice(detailAt, detailAt + 420);
     assert.ok(detailBlock.includes('window.__mobileLowMemoryMode'));
@@ -460,7 +460,7 @@ test('透明化したAIガードは見えない子アニメーションも停止
 test('SEは一時Howlを終了・失敗・安全弁で解放し完全ミュート時は生成しない', () => {
     const source = read('js/audio.js');
     assert.ok(source.includes('onend: cleanup'));
-    assert.ok(source.includes('onloaderror: cleanup'));
+    assert.ok(source.includes('onloaderror: onLoadError'), 'OGG読込失敗は互換SEの再試行窓口を通す');
     assert.ok(source.includes('onplayerror: cleanup'), '古いWebViewで再生開始に失敗してもHowlを残さない');
     assert.ok(source.includes('if (!(finalVolume > 0)) return;'), '完全ミュート時は無音SEのdecode自体を行わない');
     assert.ok(source.includes('safetyTimer = setTimeout(cleanup, 15000)'), '終了通知欠落時も一時Howlを永久保持しない');
@@ -7581,6 +7581,98 @@ test('旧端末安全モードBGMはAACをHTML5ストリーミングし初回int
         const mobileName = fileName.replace(/\.[^.]+$/, '') + '.m4a';
         assert.ok(fs.existsSync(path.join(ROOT, 'data/music/bgm_mobile', mobileName)), `mobile BGM missing: ${mobileName}`);
     });
+});
+
+test('通常表示でもOGG非対応端末はBGMだけAAC/HTML5互換経路へ切り替える', () => {
+    class MockHowl {
+        constructor(options) { this.options = options; MockHowl.instances.push(this); }
+        play(arg) { this.playArg = arg; return 1; }
+        seek() { return this; }
+        stop() {}
+        unload() {}
+        volume(value) { if (value !== undefined) this.lastVolume = value; return value === undefined ? this.options.volume : this; }
+        mute(value) { this.lastMute = value; return this; }
+    }
+    MockHowl.instances = [];
+    const Howler = { codecs(ext) { return ext !== 'ogg'; } };
+    const document = {
+        documentElement: { classList: new FakeClassList([]) },
+        body: { classList: new FakeClassList(['is-touch-input']) }
+    };
+    const ctx = createContext({ Howl: MockHowl, Howler, document, __mobileLowMemoryMode: false });
+    loadScript(ctx, 'js/audio.js');
+
+    ctx.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
+    const howl = MockHowl.instances.at(-1);
+    assert.strictEqual(howl.options.html5, true, '表示モードが通常でもOGG非対応ならHTML5互換BGMを使う');
+    assert.strictEqual(howl.options.src[0], 'data/music/bgm_mobile/SC_ex_Town2_Fortress.m4a');
+    assert.strictEqual(howl.options.volume, 1, '互換AACはbaseVolume焼き込み済みなのでユーザー音量だけを渡す');
+});
+
+test('OGG対応判定が誤陽性でもBGM decode失敗時はAACへ一度だけfallbackする', () => {
+    class MockHowl {
+        constructor(options) { this.options = options; this.unloaded = false; MockHowl.instances.push(this); }
+        _soundById() { return { _node: { bufferSource: {} } }; }
+        play() { if (this.options.onplay) this.options.onplay(1); return 1; }
+        seek() { return this; }
+        stop() {}
+        unload() { this.unloaded = true; }
+        volume() { return this; }
+        mute() { return this; }
+    }
+    MockHowl.instances = [];
+    const Howler = { codecs() { return true; } };
+    const ctx = createContext({ Howl: MockHowl, Howler });
+    loadScript(ctx, 'js/audio.js');
+
+    ctx.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
+    const first = MockHowl.instances[0];
+    assert.strictEqual(first.options.src[0], 'data/music/bgm/SC_ex_Town1_Castle.ogg');
+    first.options.onloaderror(1, 'Decoding audio data failed.');
+    assert.strictEqual(first.unloaded, true);
+    const fallback = MockHowl.instances[1];
+    assert.strictEqual(fallback.options.src[0], 'data/music/bgm_mobile/SC_ex_Town1_Castle.m4a');
+    assert.strictEqual(fallback.options.html5, true);
+    first.options.onloaderror(1, 'again');
+    assert.strictEqual(MockHowl.instances.length, 2, '同じOGG失敗から互換BGMを重複生成しない');
+});
+
+test('OGG非対応端末のSEは互換MP3を優先しOGG誤陽性時もloaderror後に再試行する', () => {
+    class MockHowl {
+        constructor(options) { this.options = options; this.unloaded = false; MockHowl.instances.push(this); }
+        play() { return 1; }
+        unload() { this.unloaded = true; }
+    }
+    MockHowl.instances = [];
+    const noOggHowler = { codecs(ext) { return ext !== 'ogg'; } };
+    const fastTimer = () => 1;
+    const ctx = createContext({ Howl: MockHowl, Howler: noOggHowler, setTimeout: fastTimer, clearTimeout() {} });
+    loadScript(ctx, 'js/audio.js');
+    ctx.AudioManager.playSE('choice.ogg');
+    assert.deepStrictEqual(Array.from(MockHowl.instances[0].options.src), [
+        'data/music/se_compat/choice.mp3',
+        'data/music/se/choice.ogg'
+    ]);
+    ctx.AudioManager.playSE('bow001.mp3');
+    assert.deepStrictEqual(Array.from(MockHowl.instances[1].options.src), ['data/music/se/bow001.mp3'], '既存MP3は変換せず従来音源を使う');
+
+    MockHowl.instances = [];
+    const oggClaimedHowler = { codecs() { return true; } };
+    const ctx2 = createContext({ Howl: MockHowl, Howler: oggClaimedHowler, setTimeout: fastTimer, clearTimeout() {} });
+    loadScript(ctx2, 'js/audio.js');
+    ctx2.AudioManager.playSE('window.ogg');
+    const first = MockHowl.instances[0];
+    assert.strictEqual(first.options.src[0], 'data/music/se/window.ogg');
+    first.options.onloaderror(1, 'decode failed');
+    assert.strictEqual(first.unloaded, true);
+    assert.deepStrictEqual(Array.from(MockHowl.instances[1].options.src), ['data/music/se_compat/window.mp3']);
+
+    const source = read('js/audio.js');
+    assert.ok(source.includes("data/music/se_compat/"));
+    for (const fileName of Object.keys(ctx2.AudioManager.seList).filter(name => name.endsWith('.ogg'))) {
+        const compatName = fileName.replace(/\.ogg$/i, '.mp3');
+        assert.ok(fs.existsSync(path.join(ROOT, 'data/music/se_compat', compatName)), `compat SE missing: ${compatName}`);
+    }
 });
 
 test('通常タッチ端末BGMは元のOGG/Web Audio経路を維持する', () => {

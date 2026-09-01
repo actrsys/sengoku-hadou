@@ -744,3 +744,10 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - スマホのタイトル設定でのみ表示する再起動導線は、決定・キャンセル系footerへ置かず「音・表示」設定パネル内の通常設定行として配置する。
 - 再起動ボタンは設定項目と同じ `ui-toggle-btn` 系の矩形形状を使い、危険操作であることだけ赤系配色で示す。特殊形状の `btn-danger` は流用しない。
 - 再起動前の確認ダイアログ、タイトル限定表示、設定値の次回起動反映という既存責務は変更しない。
+
+## r340: 表示モードと音声codec互換性の分離
+- `displayMode=normal` は地図・Canvas・フォント・一覧・演出など表示側の通常品質を強制する設定であり、音声codec対応可否までは強制しない。AudioManagerはHowlerのcodec判定を正本にし、通常表示でもOGG/Vorbis非対応ならBGMだけ既存AAC(M4A)+HTML5 Audioへ切り替える。
+- OGG対応端末のBGMは従来どおりOGG/Web Audioとサンプル単位のloopStart/loopEndを維持する。codec判定が誤陽性でもOGG decodeの`loaderror`が出た場合は、その曲が現在曲であることを確認してAACへ一度だけfallbackする。別BGMへ遷移済みの失敗callbackは新しい曲へ作用させない。
+- OGG形式のSEには`data/music/se_compat/*.mp3`を同梱する。OGG非対応なら互換MP3を先に選び、OGG対応判定後の実decode失敗でも同じSEのMP3を一度だけ再試行する。元からMP3のSEは従来パスをそのまま使う。SEの種類・baseVolume・ユーザー音量・選択タイミングは変更しない。
+- 低メモリモードで短いUI SEを省く既存仕様は維持する。音声互換fallbackは表示モードとは独立させ、古い端末で通常表示を手動選択しても、利用可能な音声形式まで意図せずOGGへ固定しない。
+
