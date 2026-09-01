@@ -18,6 +18,11 @@ class AudioManager {
         // ブラウザに記憶があればそれを読み込みます！
         this.userBgmVolume = window.UserSettings ? window.UserSettings.bgmVolume : 1.0;
         this.userSeVolume = window.UserSettings ? window.UserSettings.seVolume : 1.0;
+        // 古い小画面端末では短いUI SEだけHTMLAudioへ分離する。
+        // Web Audioのresume/decodeと画面遷移が同時に走ることで発生する擦過ノイズを避け、
+        // 同じAudio要素を使い回して毎クリックの音声オブジェクト生成も防ぐ。
+        this._lowMemoryUiSePlayers = new Map();
+        this._lowMemoryUiSeNames = new Set(['decision.ogg', 'cancel.ogg', 'choice.ogg', 'window.ogg']);
 
         // ==========================================
         // ★ BGMのカタログ（個別の音量調整つき！）
@@ -104,6 +109,7 @@ class AudioManager {
         // もしカタログに書いていない音が呼ばれたときの「とりあえずの音量」
         this.fallbackBgmVolume = 0.05;
         this.fallbackSeVolume = 0.1;
+        this._prepareLowMemoryUiSePlayers();
     }
 
 
@@ -138,10 +144,80 @@ class AudioManager {
         return maxTouchPoints > 0 || /iPhone|iPad|iPod|Android|Mobile/i.test(ua);
     }
 
+    _isMobileLowMemoryAudioMode() {
+        if (typeof window === 'undefined') return false;
+        if (window.__mobileLowMemoryMode === true) return true;
+        const root = typeof document !== 'undefined' ? document.documentElement : null;
+        return !!(root && root.classList && root.classList.contains('mobile-low-memory'));
+    }
+
+    _getLowMemoryUiSeSource(fileName) {
+        const name = String(fileName || '');
+        return `data/music/se_mobile/${name.replace(/\.[^.]+$/, '')}.wav`;
+    }
+
+    _prepareLowMemoryUiSePlayers() {
+        if (!this._isMobileLowMemoryAudioMode() || typeof window === 'undefined' || typeof window.Audio !== 'function') return;
+        this._lowMemoryUiSeNames.forEach((fileName) => {
+            if (this._lowMemoryUiSePlayers.has(fileName)) return;
+            try {
+                const players = [];
+                // 連打時に再生中Audioをpause→seekすると、その切断自体が古いiOSでクリックノイズに
+                // なることがある。2chだけ用意し、両方再生中ならSEを重ねず捨てる。
+                for (let i = 0; i < 2; i++) {
+                    const audio = new window.Audio();
+                    audio.preload = 'auto';
+                    audio.src = this._getLowMemoryUiSeSource(fileName);
+                    audio.muted = !(this.userSeVolume > 0);
+                    try { audio.volume = Math.max(0, Math.min(1, Number(this.userSeVolume) || 0)); } catch (_) {}
+                    try { audio.load(); } catch (_) {}
+                    players.push(audio);
+                }
+                this._lowMemoryUiSePlayers.set(fileName, players);
+            } catch (_) {
+                // Audio要素を作れない環境では通常Howler経路へ任せる。
+            }
+        });
+    }
+
+    _playLowMemoryUiSe(fileName) {
+        if (!this._isMobileLowMemoryAudioMode() || !this._lowMemoryUiSeNames.has(fileName)) return false;
+        let players = this._lowMemoryUiSePlayers.get(fileName);
+        if (!players) {
+            this._prepareLowMemoryUiSePlayers();
+            players = this._lowMemoryUiSePlayers.get(fileName);
+        }
+        if (!players || !players.length) return false;
+
+        // 低メモリ端末用WAVへ各SEのbaseVolumeを焼き込んでいるため、
+        // HTMLMediaElement側はユーザー音量だけを適用する。古いiOSがvolumeを固定しても
+        // 基本音量が暴れず、0指定だけはmutedで確実に無音化する。
+        const ratio = Math.max(0, Math.min(1, Number(this.userSeVolume) || 0));
+        players.forEach((audio) => {
+            audio.muted = !(ratio > 0);
+            try { audio.volume = ratio; } catch (_) {}
+        });
+        if (!(ratio > 0)) return true;
+
+        // 再生中の要素を強制停止せず、空いているchだけ使う。両方埋まっているほどの連打は
+        // UI SEを1回捨てる方が、古い実機でのノイズ・音声セッション不安定化より安全。
+        const audio = players.find(player => player && (player.paused || player.ended));
+        if (!audio) return true;
+        try {
+            try { audio.currentTime = 0; } catch (_) {}
+            const playResult = audio.play();
+            if (playResult && typeof playResult.catch === 'function') playResult.catch(() => {});
+        } catch (_) {
+            // ノイズ回避を優先し、この端末では失敗時にWeb Audioへフォールバックしない。
+        }
+        return true;
+    }
+
     _installStableTouchAudioUnlock() {
         const install = () => {
             const howler = window.Howler;
             if (!howler || !this._isTouchAudioDevice() || howler.__sengokuStableUnlockInstalled) return;
+            const lowMemoryMode = this._isMobileLowMemoryAudioMode();
             howler.__sengokuStableUnlockInstalled = true;
 
             // Howler本体は変更せず、このアプリ内だけunlock手順を置き換える。
@@ -195,6 +271,17 @@ class AudioManager {
                     const startSilentFallback = () => {
                         if (finished || fallbackStarted) return;
                         fallbackStarted = true;
+                        if (lowMemoryMode) {
+                            // 問題端末ではscratch buffer自体を一切鳴らさない。resumeに失敗した場合は
+                            // 次の実タッチで再試行し、擦過ノイズよりSEの一時欠落を優先する。
+                            handled = false;
+                            fallbackStarted = false;
+                            self.__sengokuUnlockListenerInstalled = true;
+                            document.addEventListener('touchstart', unlock, true);
+                            document.addEventListener('pointerdown', unlock, true);
+                            document.addEventListener('keydown', unlock, true);
+                            return;
+                        }
                         try {
                             const source = self.ctx.createBufferSource();
                             const silentGain = typeof self.ctx.createGain === 'function' ? self.ctx.createGain() : null;
@@ -249,7 +336,7 @@ class AudioManager {
                 // タッチ端末ではtouchstartを主経路にし、pointer/click/keyboardは代替入力用。
                 document.addEventListener('touchstart', unlock, true);
                 document.addEventListener('pointerdown', unlock, true);
-                document.addEventListener('click', unlock, true);
+                if (!lowMemoryMode) document.addEventListener('click', unlock, true);
                 document.addEventListener('keydown', unlock, true);
                 return self;
             };
@@ -397,10 +484,20 @@ class AudioManager {
     setSeVolume(ratio) {
         this.userSeVolume = ratio;
         if (window.UserSettings) window.UserSettings.setSeVolume(ratio);
+        const safeRatio = Math.max(0, Math.min(1, Number(ratio) || 0));
+        this._lowMemoryUiSePlayers.forEach((players) => {
+            if (!players) return;
+            players.forEach((audio) => {
+                if (!audio) return;
+                audio.muted = !(safeRatio > 0);
+                try { audio.volume = safeRatio; } catch (_) {}
+            });
+        });
     }
     
     // SEを鳴らす魔法
     playSE(fileName) {
+        if (this._playLowMemoryUiSe(fileName)) return;
         if (this._retryWhenHowlerReady(() => this.playSE(fileName))) return;
 
         const seData = this.seList[fileName];

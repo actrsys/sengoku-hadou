@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r328');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r329');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7473,6 +7473,67 @@ test('タッチ端末BGMはAACをHTML5ストリーミングし初回intro後だ�
         const mobileName = fileName.replace(/\.[^.]+$/, '') + '.m4a';
         assert.ok(fs.existsSync(path.join(ROOT, 'data/music/bgm_mobile', mobileName)), `mobile BGM missing: ${mobileName}`);
     });
+});
+
+test('低メモリ端末の短いUI SEはbaked WAVをHTMLAudioで再利用しWeb Audioへ流さない', () => {
+    class MockAudio {
+        constructor() {
+            this.preload = '';
+            this.src = '';
+            this.muted = false;
+            this.volume = 1;
+            this.currentTime = 0;
+            this.paused = true;
+            this.ended = true;
+            this.loadCount = 0;
+            this.playCount = 0;
+            MockAudio.instances.push(this);
+        }
+        load() { this.loadCount++; }
+        play() { this.playCount++; this.paused = false; this.ended = false; return Promise.resolve(); }
+    }
+    MockAudio.instances = [];
+    class MockHowl {
+        constructor() { MockHowl.instances.push(this); }
+        play() {}
+    }
+    MockHowl.instances = [];
+    const document = {
+        documentElement: { classList: new FakeClassList(['mobile-low-memory']) },
+        body: { classList: new FakeClassList(['is-touch-input']) }
+    };
+    const ctx = createContext({
+        Audio: MockAudio,
+        Howl: MockHowl,
+        __mobileLowMemoryMode: true,
+        document
+    });
+    loadScript(ctx, 'js/audio.js');
+
+    assert.strictEqual(MockAudio.instances.length, 8, 'choice/decision/cancel/windowを2chずつ事前生成する');
+    ctx.AudioManager.playSE('choice.ogg');
+    const choicePlayers = ctx.AudioManager._lowMemoryUiSePlayers.get('choice.ogg');
+    assert.strictEqual(choicePlayers.length, 2);
+    assert.strictEqual(choicePlayers[0].src, 'data/music/se_mobile/choice.wav');
+    assert.strictEqual(choicePlayers[0].playCount, 1);
+    assert.strictEqual(MockHowl.instances.length, 0, '低メモリUI SEはHowl/Web Audioを生成しない');
+
+    ctx.AudioManager.setSeVolume(0);
+    assert.strictEqual(choicePlayers[0].muted, true);
+    assert.strictEqual(choicePlayers[1].muted, true);
+    ctx.AudioManager.playSE('choice.ogg');
+    assert.strictEqual(choicePlayers[0].playCount + choicePlayers[1].playCount, 1, 'SE音量0ではnative Audioも再生しない');
+
+    ['choice.wav', 'decision.wav', 'cancel.wav', 'window.wav'].forEach(fileName => {
+        const fullPath = path.join(ROOT, 'data/music/se_mobile', fileName);
+        assert.ok(fs.existsSync(fullPath), `low-memory UI SE missing: ${fileName}`);
+        assert.strictEqual(fs.readFileSync(fullPath, { start: 0, end: 3 }).subarray(0, 4).toString('ascii'), 'RIFF');
+    });
+
+    const source = read('js/audio.js');
+    assert.ok(source.includes('if (this._playLowMemoryUiSe(fileName)) return;'));
+    assert.ok(source.includes('if (lowMemoryMode) {'));
+    assert.ok(source.includes('問題端末ではscratch buffer自体を一切鳴らさない'));
 });
 
 test('武将一覧→詳細のRenderer停止診断は一時的にlocalStorageへ退避し安定後に消す', () => {

@@ -674,3 +674,10 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - 低メモリ端末ではCustomScrollbarを生成せずnative touch scrollを使う。黒化が観測されたgradient/filter付きthumb/trackと追加drag layerを常駐させない。PC・通常スマホは従来の独自スクロールバーを維持する。
 - 低メモリ地図では252拠点すべての通常drop-shadowと諸勢力/大名ラベルの影を停止する。ただし現在ターン・選択可能・外交glowなど意味を持つ発光は維持する。
 - 武将一覧→詳細の永続checkpointは`pauseBackgroundUpdates()`より前に`transition_start`を保存し、背景停止の前後も`background_pause_start/done`で区別する。起動直後の永続診断バッジは通常診断と別IDにし、通常`writeSystemDiagnostic()`が誤って消さない。
+
+
+### r329: 低メモリ端末のUI SEをWeb Audioから分離
+- `mobile-low-memory` 対象では、短いUI SEの `choice / decision / cancel / window` だけをHowler/Web Audio経路から外し、baseVolumeを音源へ焼き込んだ44.1kHz stereo PCM WAVをnative `HTMLAudioElement` で再生する。PC・通常スマホ・戦闘SE等は従来のHowler経路を維持し、ゲーム判断・入力順・BGM選択には触れない。
+- UI SEは各音2chだけ事前生成して再利用し、クリックごとのHowl・AudioBuffer生成を行わない。再生中要素を `pause→seek` して切断すると古いiOSでクリックノイズになり得るため、空きchだけを使い、2chとも再生中の過剰な連打はSEを1回捨てる。UI操作そのものは止めない。
+- 低メモリ用WAVには既存SEカタログのbaseVolumeを焼き込み、HTMLAudio側はユーザーSE音量だけを適用する。古いiOSで `HTMLMediaElement.volume` が固定されても基本音量が暴れず、ユーザー音量0だけは `muted` で確実に無音化する。WAV先頭8ms・末尾12msにはごく短いfadeを入れ、codec開始・波形切断由来のクリックを避ける。
+- Howlerのタッチunlockは低メモリ端末ではscratch buffer fallbackを一切再生せず、`AudioContext.resume()` のみを実タッチごとに再試行する。resumeできない瞬間はWeb Audio SEの一時欠落を許容し、ノイズを出してまで強制unlockしない。通常端末は従来のゼロGain fallbackを維持する。
