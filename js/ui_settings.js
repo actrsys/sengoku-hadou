@@ -7,6 +7,33 @@
 document.addEventListener('DOMContentLoaded', () => {
     const settings = window.UserSettings;
 
+    // スマホ設定画面は表示だけを2タブに分ける。設定値の正本・保存処理は従来どおりUserSettingsに委譲する。
+    const settingsTabButtons = Array.from(document.querySelectorAll('[data-settings-tab]'));
+    const settingsPanels = Array.from(document.querySelectorAll('.settings-panel'));
+    const setSettingsTab = (tabName) => {
+        const normalized = tabName === 'game' ? 'game' : 'audio-display';
+        settingsTabButtons.forEach(button => {
+            const active = button.dataset.settingsTab === normalized;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        const isPcLayout = document.body.classList.contains('is-pc');
+        settingsPanels.forEach(panel => {
+            const active = panel.id === `settings-panel-${normalized}`;
+            panel.classList.toggle('active', active);
+            panel.setAttribute('aria-hidden', isPcLayout || active ? 'false' : 'true');
+        });
+    };
+
+    settingsTabButtons.forEach(button => {
+        button.addEventListener('click', () => setSettingsTab(button.dataset.settingsTab));
+    });
+    setSettingsTab('audio-display');
+    window.addEventListener('game-layout-mode-change', () => {
+        const activeButton = settingsTabButtons.find(button => button.classList.contains('active'));
+        setSettingsTab(activeButton ? activeButton.dataset.settingsTab : 'audio-display');
+    });
+
     const updateSettingSlider = (type, value) => {
         const range = document.getElementById(`setting-${type}-volume`);
         const text = document.getElementById(`setting-${type}-text`);

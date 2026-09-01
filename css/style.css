@@ -5417,6 +5417,81 @@ body:not(.is-pc) .interview-session-footer > button {
 /* =========================================================
    設定画面 (#settings-modal) 専用スタイル
    ========================================================= */
+#settings-modal .modal-content.modal-small {
+    justify-content: flex-start;
+}
+#settings-modal .settings-title,
+#settings-modal .modal-footer {
+    flex: 0 0 auto;
+}
+.settings-tabs {
+    display: none;
+}
+.settings-panels {
+    width: 100%;
+    min-width: 0;
+}
+.settings-panel {
+    display: block;
+}
+
+/* スマホだけ設定を2タブに分け、modal-small共通のoverflow:visibleを打ち消す。
+   画面外へ逃がさず、タイトル・タブ・内容・閉じるを1つのモーダル内に固定する。 */
+body:not(.is-pc) #settings-modal .modal-content.modal-small {
+    overflow: hidden !important;
+    max-height: calc(100% - 12px) !important;
+    min-height: 0;
+}
+body:not(.is-pc) #settings-modal .settings-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    width: 100%;
+    gap: 4px;
+    margin: 0 0 6px;
+    padding: 0 4px;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.55);
+    box-sizing: border-box;
+}
+body:not(.is-pc) #settings-modal .settings-tab-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 7px 8px 6px;
+    border: 1px solid rgba(212, 175, 55, 0.45);
+    border-bottom: 0;
+    border-radius: 6px 6px 0 0;
+    background: rgba(0, 0, 0, 0.35);
+    color: #c7c7c7;
+    font: inherit;
+    font-size: 0.84rem;
+    font-weight: bold;
+    line-height: 1.2;
+    text-align: center;
+    box-shadow: none;
+    filter: none;
+    cursor: pointer;
+}
+body:not(.is-pc) #settings-modal .settings-tab-btn.active {
+    background: rgba(212, 175, 55, 0.16);
+    border-color: #d4af37;
+    color: #ffd54f;
+}
+body:not(.is-pc) #settings-modal .settings-panels {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+body:not(.is-pc) #settings-modal .settings-panel {
+    display: none;
+    min-height: 0;
+    width: 100%;
+}
+body:not(.is-pc) #settings-modal .settings-panel.active {
+    display: block;
+}
+body.is-pc #settings-modal .settings-panel {
+    display: block !important;
+}
+
 .setting-row {
     margin: 20px 0;
     text-align: left;

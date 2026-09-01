@@ -1212,6 +1212,108 @@ async function validateFieldTerrainLayout(cdp) {
 }
 
 
+async function validateSettingsTabsLayout(cdp) {
+    const settingsJs = fs.readFileSync(path.join(ROOT, 'js', 'ui_settings.js'), 'utf8');
+    const settingsStub = `<script>window.UserSettings={bgmVolume:1,seVolume:1,displayMode:'auto',aiWarNotify:true,historicalEvent:true,autoSave:true,setDisplayMode(){},setAiWarNotify(){},setHistoricalEvent(){},setAutoSave(){}};<\/script>`;
+    const settingsScript = `<script>${settingsJs.replace(/<\/script/gi, '<\\/script')}<\/script>`;
+    const html = fixtureHtml('settings_tabs.html').replace('<!-- SETTINGS_JS -->', settingsStub + settingsScript);
+
+    await cdp.call('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 1, mobile: true });
+    let result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            document.open();document.write(${JSON.stringify(html)});document.close();
+            document.body.classList.remove('is-pc');
+            const screen=document.getElementById('game-screen');
+            screen.style.width='360px';screen.style.height='640px';screen.style.transform='none';
+            const rect=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
+            const content=document.querySelector('#settings-modal .modal-content');
+            const tabs=document.getElementById('settings-tabs');
+            const audio=document.getElementById('settings-panel-audio-display');
+            const game=document.getElementById('settings-panel-game');
+            const footer=document.querySelector('#settings-modal .modal-footer');
+            const cs=getComputedStyle(content);
+            return {
+                screen:rect(screen), content:rect(content), tabs:rect(tabs), audio:rect(audio), footer:rect(footer),
+                tabsDisplay:getComputedStyle(tabs).display,
+                audioDisplay:getComputedStyle(audio).display,
+                gameDisplay:getComputedStyle(game).display,
+                overflowY:cs.overflowY,
+                clientHeight:content.clientHeight, scrollHeight:content.scrollHeight,
+                firstTab:getComputedStyle(document.getElementById('settings-tab-audio-display')).display
+            };
+        })()`, returnByValue:true, awaitPromise:true
+    });
+    let st=result.result.value;
+    assert.notStrictEqual(st.tabsDisplay, 'none', 'スマホ設定タブが表示されていない');
+    assert.notStrictEqual(st.firstTab, 'none', 'スマホ設定タブボタンが表示されていない');
+    assert.notStrictEqual(st.audioDisplay, 'none', 'スマホ設定の音・表示パネルが初期表示されていない');
+    assert.strictEqual(st.gameDisplay, 'none', 'スマホ設定の非選択ゲームパネルが同時表示されている');
+    assert.strictEqual(st.overflowY, 'hidden', 'スマホ設定モーダルは内容を外へ逃がさない');
+    assert.ok(st.content.top >= st.screen.top - 1 && st.content.bottom <= st.screen.bottom + 1, 'スマホ設定モーダルが画面外へはみ出す');
+    assert.ok(st.tabs.top >= st.content.top - 1 && st.tabs.bottom <= st.content.bottom + 1, 'スマホ設定タブがモーダル外へはみ出す');
+    assert.ok(st.audio.top >= st.tabs.bottom - 1 && st.audio.bottom <= st.footer.top + 1, '音・表示パネルがタブ/閉じる領域へはみ出す');
+    assert.ok(st.footer.bottom <= st.content.bottom + 1, 'スマホ設定の閉じるボタン領域がモーダル外へはみ出す');
+    assert.ok(st.scrollHeight <= st.clientHeight + 1, `スマホ設定に隠れた縦はみ出しがある (${st.scrollHeight} > ${st.clientHeight})`);
+
+    result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            const audio=document.getElementById('settings-panel-audio-display');
+            const game=document.getElementById('settings-panel-game');
+            const aTab=document.getElementById('settings-tab-audio-display');
+            const gTab=document.getElementById('settings-tab-game');
+            gTab.click();
+            const rect=el=>{const r=el.getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:r.height};};
+            const content=document.querySelector('#settings-modal .modal-content');
+            const footer=document.querySelector('#settings-modal .modal-footer');
+            return {
+                audioDisplay:getComputedStyle(audio).display,
+                gameDisplay:getComputedStyle(game).display,
+                audioSelected:aTab.getAttribute('aria-selected'),
+                gameSelected:gTab.getAttribute('aria-selected'),
+                audioHidden:audio.getAttribute('aria-hidden'),
+                gameHidden:game.getAttribute('aria-hidden'),
+                game:rect(game),footer:rect(footer),content:rect(content),
+                clientHeight:content.clientHeight,scrollHeight:content.scrollHeight
+            };
+        })()`, returnByValue:true, awaitPromise:true
+    });
+    st=result.result.value;
+    assert.strictEqual(st.audioDisplay, 'none', 'ゲームタブへ切り替えても音・表示パネルが残っている');
+    assert.notStrictEqual(st.gameDisplay, 'none', 'ゲームタブのパネルが表示されない');
+    assert.strictEqual(st.audioSelected, 'false', 'ゲームタブ切替後のaria-selectedが音・表示に残っている');
+    assert.strictEqual(st.gameSelected, 'true', 'ゲームタブ切替後のaria-selectedが更新されない');
+    assert.strictEqual(st.audioHidden, 'true', '非表示パネルのaria-hiddenが更新されない');
+    assert.strictEqual(st.gameHidden, 'false', '表示パネルのaria-hiddenが更新されない');
+    assert.ok(st.game.bottom <= st.footer.top + 1, 'ゲーム設定パネルが閉じる領域へはみ出す');
+    assert.ok(st.scrollHeight <= st.clientHeight + 1, `ゲームタブで設定内容がモーダル外へあふれる (${st.scrollHeight} > ${st.clientHeight})`);
+
+    await cdp.call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+    result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            document.open();document.write(${JSON.stringify(html)});document.close();
+            document.body.classList.add('is-pc');
+            const screen=document.getElementById('game-screen');
+            screen.style.width='1280px';screen.style.height='720px';screen.style.transform='none';
+            const content=document.querySelector('#settings-modal .modal-content');
+            const rect=el=>{const r=el.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height};};
+            return {
+                screen:rect(screen),content:rect(content),
+                tabsDisplay:getComputedStyle(document.getElementById('settings-tabs')).display,
+                audioDisplay:getComputedStyle(document.getElementById('settings-panel-audio-display')).display,
+                gameDisplay:getComputedStyle(document.getElementById('settings-panel-game')).display,
+                displayModeDisplay:getComputedStyle(document.querySelector('.setting-display-mode-row')).display
+            };
+        })()`, returnByValue:true, awaitPromise:true
+    });
+    st=result.result.value;
+    assert.strictEqual(st.tabsDisplay, 'none', 'PC設定にスマホ用タブを表示しない');
+    assert.notStrictEqual(st.audioDisplay, 'none', 'PC設定では音関連設定を従来どおり表示する');
+    assert.notStrictEqual(st.gameDisplay, 'none', 'PC設定ではゲーム設定を従来どおり同じ画面に表示する');
+    assert.strictEqual(st.displayModeDisplay, 'none', 'PCでは表示モード設定自体を非表示にする');
+    assert.ok(st.content.top >= st.screen.top - 1 && st.content.bottom <= st.screen.bottom + 1, 'PC設定モーダルが画面外へはみ出す');
+    console.log('✓ 設定画面 スマホ2タブ/PC単一画面 visual/layout regression');
+}
+
 async function validateLowMemoryPagerLayout(cdp) {
     const html = fixtureHtml('low_memory_pager.html');
     await cdp.call('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 1, mobile: true });
@@ -1311,6 +1413,7 @@ async function main() {
         await validateWarAptitudeLayout(cdp);
         await validateDialogConfirmPlacement(cdp);
         await validateBushoBiographyLayout(cdp);
+        await validateSettingsTabsLayout(cdp);
         await validateLowMemoryPagerLayout(cdp);
         await validateFieldWarFullscreen(cdp);
         await validateFieldTerrainLayout(cdp);

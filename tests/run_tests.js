@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r335');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r336');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -305,6 +305,27 @@ test('表示モードは自動判定を既定に通常/軽量を保存でき、�
     assert.ok(guide.includes("heading: '表示モード'"));
     assert.ok(guide.includes('一覧は最初からページ送りになり'));
     assert.ok(guide.includes('ゲームのルールや内容、セーブデータの扱いは通常モードと同じです。'));
+});
+
+test('スマホ設定画面は音・表示/ゲームの2タブに分け、PCは従来の1画面表示を維持する', () => {
+    const html = read('index.html');
+    const css = read('css/style.css');
+    const ui = read('js/ui_settings.js');
+    assert.ok(html.includes('id="settings-tabs"'));
+    assert.ok(html.includes('id="settings-tab-audio-display"'));
+    assert.ok(html.includes('id="settings-tab-game"'));
+    assert.ok(html.includes('id="settings-panel-audio-display"'));
+    assert.ok(html.includes('id="settings-panel-game"'));
+    assert.ok(html.indexOf('id="setting-bgm-volume"') > html.indexOf('id="settings-panel-audio-display"'));
+    assert.ok(html.indexOf('id="btn-autosave-true"') > html.indexOf('id="settings-panel-game"'));
+    assert.ok(css.includes('body:not(.is-pc) #settings-modal .settings-tabs'));
+    assert.ok(css.includes('body:not(.is-pc) #settings-modal .modal-content.modal-small'));
+    assert.ok(css.includes('overflow: hidden !important;'), 'スマホ設定はmodal-small共通のoverflow:visibleを上書きする');
+    assert.ok(css.includes('body.is-pc #settings-modal .settings-panel'));
+    assert.ok(ui.includes("const setSettingsTab = (tabName) =>"));
+    assert.ok(ui.includes("button.dataset.settingsTab"));
+    assert.ok(ui.includes("setSettingsTab('audio-display')"));
+    assert.ok(!ui.includes("playSE('choice.ogg')"), '設定タブSEも共通data-se経路へ委譲する');
 });
 
 test('通常スマホは低メモリ専用の画質・音声・詳細遷移削減を受けない', () => {

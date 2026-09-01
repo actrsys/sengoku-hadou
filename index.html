@@ -586,59 +586,68 @@
         <div id="settings-modal" class="modal hidden">
             <div class="modal-content modal-small">
                 <h3 class="settings-title">設定</h3>
-                
-                <div class="setting-row">
-                    <label class="slider-row-label">BGM 音量</label>
-                    <div class="qty-control setting-slider-wrap">
-                        <input type="range" id="setting-bgm-volume" min="0" max="100" value="100">
-                        <div class="setting-value"><span id="setting-bgm-text">100</span><span class="setting-unit">％</span></div>
-                    </div>
+
+                <div id="settings-tabs" class="settings-tabs" role="tablist" aria-label="設定カテゴリ">
+                    <button type="button" id="settings-tab-audio-display" class="settings-tab-btn active" role="tab" aria-selected="true" aria-controls="settings-panel-audio-display" data-settings-tab="audio-display" data-se="choice.ogg">音・表示</button>
+                    <button type="button" id="settings-tab-game" class="settings-tab-btn" role="tab" aria-selected="false" aria-controls="settings-panel-game" data-settings-tab="game" data-se="choice.ogg">ゲーム</button>
                 </div>
 
-                <div class="setting-row">
-                    <label class="slider-row-label">SE 音量</label>
-                    <div class="qty-control setting-slider-wrap">
-                        <input type="range" id="setting-se-volume" min="0" max="100" value="100">
-                        <div class="setting-value"><span id="setting-se-text">100</span><span class="setting-unit">％</span></div>
-                    </div>
-                </div>
-
-
-                <div class="setting-row setting-display-mode-row">
-                    <label class="slider-row-label">表示モード</label>
-                    <div class="setting-display-mode-control">
-                        <div class="setting-toggle-group setting-three-way-toggle">
-                            <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-display-mode-auto">自動</button>
-                            <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-display-mode-normal">通常</button>
-                            <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-display-mode-light">軽量</button>
+                <div class="settings-panels">
+                    <section id="settings-panel-audio-display" class="settings-panel active" role="tabpanel" aria-labelledby="settings-tab-audio-display">
+                        <div class="setting-row">
+                            <label class="slider-row-label">BGM 音量</label>
+                            <div class="qty-control setting-slider-wrap">
+                                <input type="range" id="setting-bgm-volume" min="0" max="100" value="100">
+                                <div class="setting-value"><span id="setting-bgm-text">100</span><span class="setting-unit">％</span></div>
+                            </div>
                         </div>
-                        <div class="setting-note">変更は次回起動時に反映されます。</div>
-                    </div>
-                </div>
 
-                <div class="setting-row">
-                    <label class="slider-row-label">オートセーブ</label>
-                    <div class="setting-toggle-group">
-                        <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-autosave-true">する</button>
-                        <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-autosave-false">しない</button>
-                    </div>
-                </div>
-                <div class="setting-row">
-                    <label class="slider-row-label">他家戦争の通知</label>
-                    <div class="setting-toggle-group">
-                        <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-notify-true">通知する</button>
-                        <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-notify-false">通知しない</button>
-                    </div>
-                </div>
+                        <div class="setting-row">
+                            <label class="slider-row-label">SE 音量</label>
+                            <div class="qty-control setting-slider-wrap">
+                                <input type="range" id="setting-se-volume" min="0" max="100" value="100">
+                                <div class="setting-value"><span id="setting-se-text">100</span><span class="setting-unit">％</span></div>
+                            </div>
+                        </div>
 
-                <div class="setting-row">
-                    <label class="slider-row-label">歴史イベント</label>
-                    <div class="setting-toggle-group">
-                        <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-historical-true">発生する</button>
-                        <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-historical-false">発生しない</button>
-                    </div>
-                </div>
+                        <div class="setting-row setting-display-mode-row">
+                            <label class="slider-row-label">表示モード</label>
+                            <div class="setting-display-mode-control">
+                                <div class="setting-toggle-group setting-three-way-toggle">
+                                    <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-display-mode-auto">自動</button>
+                                    <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-display-mode-normal">通常</button>
+                                    <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-display-mode-light">軽量</button>
+                                </div>
+                                <div class="setting-note">変更は次回起動時に反映されます。</div>
+                            </div>
+                        </div>
+                    </section>
 
+                    <section id="settings-panel-game" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-game">
+                        <div class="setting-row">
+                            <label class="slider-row-label">オートセーブ</label>
+                            <div class="setting-toggle-group">
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-autosave-true">する</button>
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-autosave-false">しない</button>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <label class="slider-row-label">他家戦争の通知</label>
+                            <div class="setting-toggle-group">
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-notify-true">通知する</button>
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-notify-false">通知しない</button>
+                            </div>
+                        </div>
+
+                        <div class="setting-row">
+                            <label class="slider-row-label">歴史イベント</label>
+                            <div class="setting-toggle-group">
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-historical-true">発生する</button>
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-historical-false">発生しない</button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
 
                 <div class="modal-footer">
                     <button id="settings-close-btn" class="btn-secondary">閉じる</button>
