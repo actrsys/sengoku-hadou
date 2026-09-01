@@ -20,8 +20,10 @@
         const touch = Number(nav.maxTouchPoints || 0) > 0 || /iPhone|iPad|iPod|Android|Mobile/i.test(ua);
         if (!touch) return false;
 
-        // 通常スマホまで安全モードへ巻き込まない。明確に古い/小メモリと判断できる端末だけを対象にする。
-        // iOSはdeviceMemoryを公開しないため、旧iPhone系は画面寸法とOS世代を組み合わせる。
+        // 通常スマホまで安全モードへ巻き込まない。明確に小メモリ、または
+        // 375x667級までの旧iPhone画面クラスだけを対象にする。
+        // iOSはdeviceMemoryを公開しないうえ、同じ小型筐体へ新しいOSが入ることがあるため、
+        // 小型iPhoneだけはOS世代で安全モードを解除しない。
         const screenObj = window.screen || {};
         const width = Number(screenObj.width || window.innerWidth || 0);
         const height = Number(screenObj.height || window.innerHeight || 0);
@@ -33,11 +35,8 @@
         if (deviceMemory > 0 && deviceMemory <= 2) return true;
 
         const isIPhoneLike = /iPhone|iPod/i.test(ua);
-        const iosMatch = ua.match(/(?:CPU iPhone OS|iPhone OS|CPU OS)\s*(\d+)[_\.]/i);
-        const iosMajor = iosMatch ? Number(iosMatch[1]) : 0;
         if (isIPhoneLike && shortEdge > 0 && longEdge > 0
-            && shortEdge <= 390 && longEdge <= 700
-            && iosMajor > 0 && iosMajor <= 16) {
+            && shortEdge <= 390 && longEdge <= 700) {
             return true;
         }
 

@@ -1742,16 +1742,15 @@ class UIInfoManager {
             }
         };
 
-        // 旧端末の安全モードでは、長い一覧をスクロールさせず固定件数のページ送りにする。
-        // 仮想DOM差し替え・scroll rAF・momentum scroll・custom scrollbarをまとめて避け、
-        // 武将一覧のスクロール中にWebKit rendererが落ちる経路を使わない。
+        // 旧端末の安全モードでは、件数にかかわらず一覧方式を最初から固定件数のページ送りにする。
+        // タブ切替や絞り込みで件数が変わってもスクロール式へ切り替わらないようにし、
+        // 仮想DOM差し替え・scroll rAF・momentum scroll・custom scrollbarを使わない。
         const LOW_MEMORY_PAGE_SIZE = 10;
-        const LOW_MEMORY_PAGING_THRESHOLD = 20;
         const LOW_MEMORY_PAGE_RESUME_UNIT = 1000;
         const useLowMemoryPaging = !!(window.__mobileLowMemoryMode
             && document.body.classList.contains('is-touch-input')
             && !config.disableLowMemoryPaging
-            && totalItems > LOW_MEMORY_PAGING_THRESHOLD);
+            && totalItems > 0);
         if (useLowMemoryPaging) {
             const totalPages = Math.max(1, Math.ceil(totalItems / LOW_MEMORY_PAGE_SIZE));
             let pageIndex = Math.max(0, Math.min(totalPages - 1,

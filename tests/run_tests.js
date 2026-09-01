@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r331');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r332');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -261,14 +261,14 @@ test('長文本文は装飾書体と分離し、可読性と歴史物の柔ら�
     }
 });
 
-test('旧端末安全モードは通常スマホを巻き込まずWebフォントを省く', () => {
+test('旧端末安全モードは小型iPhoneをOS世代に関係なく判定しWebフォントを省く', () => {
     const bootstrap = read('js/app_bootstrap.js');
     const css = read('css/style.css');
     const html = read('index.html');
     assert.ok(bootstrap.includes('resolveEarlyMobileLowMemoryMode()'));
     assert.ok(bootstrap.includes('deviceMemory > 0 && deviceMemory <= 2'));
     assert.ok(bootstrap.includes('shortEdge <= 390 && longEdge <= 700'));
-    assert.ok(bootstrap.includes('iosMajor > 0 && iosMajor <= 16'));
+    assert.ok(!bootstrap.includes('iosMajor > 0 && iosMajor <= 16'));
     assert.ok(bootstrap.includes("document.documentElement.classList.add('mobile-low-memory')"));
     assert.ok(bootstrap.includes('if (!earlyMobileLowMemoryMode)'));
     assert.ok(css.includes("html.mobile-low-memory"));
@@ -278,6 +278,18 @@ test('旧端末安全モードは通常スマホを巻き込まずWebフォン�
     assert.ok(!html.includes('preload" href="data/fonts/fude-goshirae.woff2'));
     assert.ok(!html.includes('data/fonts/abashiri-mincho.woff2?v=1" as="font'), '安全モード判定前の静的font preloadを置かない');
     assert.ok(bootstrap.includes("fontPreload.href = 'data/fonts/abashiri-mincho.woff2?v=1'"), '通常端末だけbootstrapからpreloadする');
+});
+
+test('旧端末安全モードはタイトル右下に明示し指南書でも違いを説明する', () => {
+    const html = read('index.html');
+    const css = read('css/style.css');
+    const guide = read('js/guide_data.js');
+    assert.ok(html.includes('id="legacy-safe-mode-indicator"'));
+    assert.ok(html.includes('旧端末安全モード'));
+    assert.ok(css.includes('html.mobile-low-memory .legacy-safe-mode-indicator { display: block; }'));
+    assert.ok(guide.includes("heading: '旧端末安全モード'"));
+    assert.ok(guide.includes('一覧は最初からページ送りになり'));
+    assert.ok(guide.includes('ゲームのルールや内容、セーブデータの扱いは通常モードと同じです。'));
 });
 
 test('通常スマホは低メモリ専用の画質・音声・詳細遷移削減を受けない', () => {
@@ -8645,13 +8657,14 @@ test('第三者の忠誠・不満所見は高精度でも内心を断定しな�
 
 
 
-test('旧端末安全モードの長い共通一覧はスクロールせず10行ページ送りを使う', () => {
+test('旧端末安全モードの共通一覧は件数にかかわらず最初から10行ページ送りを使う', () => {
     const info = read('js/ui_info.js');
     const css = read('css/style.css');
     assert.ok(info.includes('const LOW_MEMORY_PAGE_SIZE = 10;'));
-    assert.ok(info.includes('const LOW_MEMORY_PAGING_THRESHOLD = 20;'));
+    assert.ok(!info.includes('LOW_MEMORY_PAGING_THRESHOLD'));
     assert.ok(info.includes('window.__mobileLowMemoryMode'));
     assert.ok(info.includes("document.body.classList.contains('is-touch-input')"));
+    assert.ok(info.includes('&& totalItems > 0);'));
     assert.ok(info.includes("listContainer.classList.add('low-memory-paged-list')"));
     assert.ok(info.includes('data-action-index'));
     assert.ok(info.includes('LOW_MEMORY_PAGE_RESUME_UNIT = 1000'));
