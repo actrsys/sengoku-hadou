@@ -681,6 +681,16 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     border: none; box-shadow: none; border-radius: 0;
     scroll-padding-top: 40px; box-sizing: border-box; -webkit-overflow-scrolling: auto; overscroll-behavior: none; 
 }
+/* 共通選択一覧は、表示可能高さを実測したうえで整数行へ割り切る。
+   JavaScriptが算出した --selector-list-row-height をヘッダーと各固定行の唯一の高さとして使い、
+   ページ送り・通常スクロールのどちらでもviewport下端が行の途中に来ないようにする。 */
+#selector-list.selector-row-fitted {
+    scroll-padding-top: var(--selector-list-row-height, 40px);
+}
+#selector-list.selector-row-fitted .list-header,
+#selector-list.selector-row-fitted .select-item:not(.history-list-item):not(.history-month-divider) {
+    height: var(--selector-list-row-height, 40px) !important;
+}
 .result-body { flex: 1; width: 100%; overflow-y: auto; min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; box-sizing: border-box; overscroll-behavior: none; }
 .select-item:last-child { margin-bottom: 0; }
 .select-item.succession-select-item { display: flex; align-items: center; }
@@ -5476,17 +5486,27 @@ body:not(.is-pc) #settings-modal .settings-tab-btn.active {
     color: #ffd54f;
 }
 body:not(.is-pc) #settings-modal .settings-panels {
-    flex: 1 1 auto;
+    /* 2パネルを同じgridセルへ重ね、背の高い方の高さを常に予約する。
+       タブごとの内容量でモーダル全体の高さが変わらないため、タイトル・タブ・footerの基準位置が動かない。 */
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    flex: 0 0 auto;
     min-height: 0;
     overflow: hidden;
 }
 body:not(.is-pc) #settings-modal .settings-panel {
-    display: none;
+    display: block;
+    grid-column: 1;
+    grid-row: 1;
     min-height: 0;
     width: 100%;
+    visibility: hidden;
+    pointer-events: none;
 }
 body:not(.is-pc) #settings-modal .settings-panel.active {
-    display: block;
+    visibility: visible;
+    pointer-events: auto;
 }
 body.is-pc #settings-modal .settings-panel {
     display: block !important;

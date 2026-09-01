@@ -1237,6 +1237,8 @@ async function validateSettingsTabsLayout(cdp) {
                 tabsDisplay:getComputedStyle(tabs).display,
                 audioDisplay:getComputedStyle(audio).display,
                 gameDisplay:getComputedStyle(game).display,
+                audioVisibility:getComputedStyle(audio).visibility,
+                gameVisibility:getComputedStyle(game).visibility,
                 overflowY:cs.overflowY,
                 clientHeight:content.clientHeight, scrollHeight:content.scrollHeight,
                 firstTab:getComputedStyle(document.getElementById('settings-tab-audio-display')).display
@@ -1246,14 +1248,17 @@ async function validateSettingsTabsLayout(cdp) {
     let st=result.result.value;
     assert.notStrictEqual(st.tabsDisplay, 'none', 'スマホ設定タブが表示されていない');
     assert.notStrictEqual(st.firstTab, 'none', 'スマホ設定タブボタンが表示されていない');
-    assert.notStrictEqual(st.audioDisplay, 'none', 'スマホ設定の音・表示パネルが初期表示されていない');
-    assert.strictEqual(st.gameDisplay, 'none', 'スマホ設定の非選択ゲームパネルが同時表示されている');
+    assert.notStrictEqual(st.audioDisplay, 'none', 'スマホ設定の音・表示パネルがレイアウトから消えている');
+    assert.notStrictEqual(st.gameDisplay, 'none', 'スマホ設定は両パネルを同じgridセルで高さ計算へ参加させる');
+    assert.strictEqual(st.audioVisibility, 'visible', 'スマホ設定の音・表示パネルが初期表示されていない');
+    assert.strictEqual(st.gameVisibility, 'hidden', 'スマホ設定の非選択ゲームパネルが見えている');
     assert.strictEqual(st.overflowY, 'hidden', 'スマホ設定モーダルは内容を外へ逃がさない');
     assert.ok(st.content.top >= st.screen.top - 1 && st.content.bottom <= st.screen.bottom + 1, 'スマホ設定モーダルが画面外へはみ出す');
     assert.ok(st.tabs.top >= st.content.top - 1 && st.tabs.bottom <= st.content.bottom + 1, 'スマホ設定タブがモーダル外へはみ出す');
     assert.ok(st.audio.top >= st.tabs.bottom - 1 && st.audio.bottom <= st.footer.top + 1, '音・表示パネルがタブ/閉じる領域へはみ出す');
     assert.ok(st.footer.bottom <= st.content.bottom + 1, 'スマホ設定の閉じるボタン領域がモーダル外へはみ出す');
     assert.ok(st.scrollHeight <= st.clientHeight + 1, `スマホ設定に隠れた縦はみ出しがある (${st.scrollHeight} > ${st.clientHeight})`);
+    const initialSettingsLayout = { content: st.content, tabs: st.tabs, footer: st.footer };
 
     result = await cdp.call('Runtime.evaluate', {
         expression: `(() => {
@@ -1268,6 +1273,9 @@ async function validateSettingsTabsLayout(cdp) {
             return {
                 audioDisplay:getComputedStyle(audio).display,
                 gameDisplay:getComputedStyle(game).display,
+                audioVisibility:getComputedStyle(audio).visibility,
+                gameVisibility:getComputedStyle(game).visibility,
+                tabs:rect(document.getElementById('settings-tabs')),
                 audioSelected:aTab.getAttribute('aria-selected'),
                 gameSelected:gTab.getAttribute('aria-selected'),
                 audioHidden:audio.getAttribute('aria-hidden'),
@@ -1278,14 +1286,21 @@ async function validateSettingsTabsLayout(cdp) {
         })()`, returnByValue:true, awaitPromise:true
     });
     st=result.result.value;
-    assert.strictEqual(st.audioDisplay, 'none', 'ゲームタブへ切り替えても音・表示パネルが残っている');
-    assert.notStrictEqual(st.gameDisplay, 'none', 'ゲームタブのパネルが表示されない');
+    assert.notStrictEqual(st.audioDisplay, 'none', '非選択パネルをdisplay:noneにすると基準高さが変わる');
+    assert.notStrictEqual(st.gameDisplay, 'none', 'ゲームタブのパネルがレイアウトから消えている');
+    assert.strictEqual(st.audioVisibility, 'hidden', 'ゲームタブ切替後も音・表示パネルが見えている');
+    assert.strictEqual(st.gameVisibility, 'visible', 'ゲームタブのパネルが表示されない');
     assert.strictEqual(st.audioSelected, 'false', 'ゲームタブ切替後のaria-selectedが音・表示に残っている');
     assert.strictEqual(st.gameSelected, 'true', 'ゲームタブ切替後のaria-selectedが更新されない');
     assert.strictEqual(st.audioHidden, 'true', '非表示パネルのaria-hiddenが更新されない');
     assert.strictEqual(st.gameHidden, 'false', '表示パネルのaria-hiddenが更新されない');
     assert.ok(st.game.bottom <= st.footer.top + 1, 'ゲーム設定パネルが閉じる領域へはみ出す');
     assert.ok(st.scrollHeight <= st.clientHeight + 1, `ゲームタブで設定内容がモーダル外へあふれる (${st.scrollHeight} > ${st.clientHeight})`);
+    approx(st.content.top, initialSettingsLayout.content.top, 0.2, '設定タブ切替でモーダル上端を動かさない');
+    approx(st.content.height, initialSettingsLayout.content.height, 0.2, '設定タブ切替でモーダル高を変えない');
+    approx(st.tabs.top, initialSettingsLayout.tabs.top, 0.2, '設定タブ切替でタブボタン位置を上下させない');
+    approx(st.tabs.bottom, initialSettingsLayout.tabs.bottom, 0.2, '設定タブ切替でタブ列の基準線を動かさない');
+    approx(st.footer.top, initialSettingsLayout.footer.top, 0.2, '設定タブ切替で閉じる領域を上下させない');
 
     await cdp.call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
     result = await cdp.call('Runtime.evaluate', {
@@ -1315,11 +1330,15 @@ async function validateSettingsTabsLayout(cdp) {
 }
 
 async function validateLowMemoryPagerLayout(cdp) {
-    const html = fixtureHtml('low_memory_pager.html');
+    const selectorViewJs = fs.readFileSync(path.join(ROOT, 'js', 'selector_modal_view.js'), 'utf8');
+    const selectorScript = `<script>${selectorViewJs.replace(/<\/script/gi, '<\\/script')}<\/script>`;
+    const html = fixtureHtml('low_memory_pager.html').replace('<!-- SELECTOR_VIEW_JS -->', selectorScript);
     await cdp.call('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 1, mobile: true });
     const result = await cdp.call('Runtime.evaluate', {
         expression: `(() => {
             document.open();document.write(${JSON.stringify(html)});document.close();
+            const view = new SelectorModalView(null);
+            const fit = view.fitListViewportToWholeRows({minItemRows:1});
             const rect=id=>{const r=document.getElementById(id).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
             const pager=document.getElementById('selector-list-pager');
             const modal=document.querySelector('#selector-modal .modal-content').getBoundingClientRect();
@@ -1332,7 +1351,9 @@ async function validateLowMemoryPagerLayout(cdp) {
             const assist=document.getElementById('selector-assist-btn').getBoundingClientRect();
             const back=document.getElementById('selector-back-btn').getBoundingClientRect();
             const pageBtnStyle=getComputedStyle(pager.querySelector('.low-memory-page-prev'));
-            return {pager:rect('selector-list-pager'),modal:{top:modal.top,bottom:modal.bottom},footer:{top:footer.top,bottom:footer.bottom,left:footer.left,right:footer.right},list:{top:list.top,bottom:list.bottom},next:{width:next.width,height:next.height},prev:{width:prev.width,height:prev.height},display:cs.display,visibility:cs.visibility,confirm:{left:confirm.left,right:confirm.right},assist:{left:assist.left,right:assist.right},back:{left:back.left,right:back.right},pageBtn:{borderRadius:pageBtnStyle.borderRadius,filter:pageBtnStyle.filter,boxShadow:pageBtnStyle.boxShadow}};
+            const rows=[...document.querySelectorAll('#selector-list .select-item')];
+            const lastVisible=rows[Math.max(0, fit.itemRows - 1)].getBoundingClientRect();
+            return {pager:rect('selector-list-pager'),modal:{top:modal.top,bottom:modal.bottom},footer:{top:footer.top,bottom:footer.bottom,left:footer.left,right:footer.right},list:{top:list.top,bottom:list.bottom,height:list.height},next:{width:next.width,height:next.height},prev:{width:prev.width,height:prev.height},display:cs.display,visibility:cs.visibility,confirm:{left:confirm.left,right:confirm.right},assist:{left:assist.left,right:assist.right},back:{left:back.left,right:back.right},pageBtn:{borderRadius:pageBtnStyle.borderRadius,filter:pageBtnStyle.filter,boxShadow:pageBtnStyle.boxShadow},fit,lastVisibleBottom:lastVisible.bottom};
         })()`, returnByValue:true, awaitPromise:true
     });
     const st=result.result.value;
@@ -1347,7 +1368,34 @@ async function validateLowMemoryPagerLayout(cdp) {
     assert.ok(st.pageBtn.filter === 'none' && st.pageBtn.boxShadow === 'none', 'モーダル内ページボタンへ外側装飾用の影/フィルタを持ち込まない');
     assert.ok(st.back.right <= st.assist.left + 1 && st.assist.right <= st.confirm.left + 1, 'スマホfooterでは戻る/閉じる・補助・決定の順で補助ボタンを中央に置く');
     assert.ok(st.back.left >= st.footer.left - 1 && st.confirm.right <= st.footer.right + 1, '3ボタンfooterが画面幅からはみ出さない');
-    console.log('✓ 軽量モード一覧 ページ送り操作・複数選択補助footer visual/layout regression');
+    assert.ok(st.fit && st.fit.itemRows >= 1, '軽量一覧の完全表示行数を算出できていない');
+    approx(st.lastVisibleBottom, st.list.bottom, 0.6, '軽量ページ送り一覧の最下段をviewport下端へ一致させる');
+
+    const normalResult = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            const view=new SelectorModalView(null);
+            const list=document.getElementById('selector-list');
+            const pager=document.getElementById('selector-list-pager');
+            document.documentElement.classList.remove('mobile-low-memory');
+            list.classList.remove('low-memory-paged-list');
+            list.classList.add('hide-native-scroll');
+            pager.classList.add('hidden');
+            while (list.querySelectorAll('.select-item').length < 20) {
+                const src=list.querySelector('.select-item');
+                list.querySelector('.list-inner-wrapper').appendChild(src.cloneNode(true));
+            }
+            view.resetListRowFit();
+            const fit=view.fitListViewportToWholeRows({minItemRows:1});
+            const rows=[...list.querySelectorAll('.select-item')];
+            const lr=rows[Math.max(0,fit.itemRows-1)].getBoundingClientRect();
+            const vr=list.getBoundingClientRect();
+            return {fit,lastVisibleBottom:lr.bottom,listBottom:vr.bottom};
+        })()`, returnByValue:true, awaitPromise:true
+    });
+    const normal=normalResult.result.value;
+    assert.ok(normal.fit && normal.fit.itemRows >= 1, '通常スクロール一覧の完全表示行数を算出できていない');
+    approx(normal.lastVisibleBottom, normal.listBottom, 0.6, '通常スクロール一覧の最下段をviewport下端へ一致させる');
+    console.log('✓ 共通一覧 完全行フィット + 軽量ページ送り操作・複数選択補助footer visual/layout regression');
 }
 
 async function main() {

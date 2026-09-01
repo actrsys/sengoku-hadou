@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r336');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r337');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -319,6 +319,10 @@ test('スマホ設定画面は音・表示/ゲームの2タブに分け、PCは�
     assert.ok(html.indexOf('id="setting-bgm-volume"') > html.indexOf('id="settings-panel-audio-display"'));
     assert.ok(html.indexOf('id="btn-autosave-true"') > html.indexOf('id="settings-panel-game"'));
     assert.ok(css.includes('body:not(.is-pc) #settings-modal .settings-tabs'));
+    assert.ok(css.includes('grid-template-columns: minmax(0, 1fr);'));
+    assert.ok(css.includes('grid-column: 1;'));
+    assert.ok(css.includes('visibility: hidden;'));
+    assert.ok(css.includes('body:not(.is-pc) #settings-modal .settings-panel.active'));
     assert.ok(css.includes('body:not(.is-pc) #settings-modal .modal-content.modal-small'));
     assert.ok(css.includes('overflow: hidden !important;'), 'スマホ設定はmodal-small共通のoverflow:visibleを上書きする');
     assert.ok(css.includes('body.is-pc #settings-modal .settings-panel'));
@@ -8707,10 +8711,17 @@ test('第三者の忠誠・不満所見は高精度でも内心を断定しな�
 
 
 
-test('旧端末安全モードの共通一覧は件数にかかわらず最初から10行ページ送りを使う', () => {
+test('旧端末安全モードの共通一覧は件数にかかわらず最初から完全表示行数でページ送りを使う', () => {
     const info = read('js/ui_info.js');
+    const selector = read('js/selector_modal_view.js');
     const css = read('css/style.css');
-    assert.ok(info.includes('const LOW_MEMORY_PAGE_SIZE = 10;'));
+    assert.ok(!info.includes('const LOW_MEMORY_PAGE_SIZE = 10;'));
+    assert.ok(info.includes('fitListViewportToWholeRows'));
+    assert.ok(info.includes('const pageSize = Math.max(1, fit && Number(fit.itemRows) > 0'));
+    assert.ok(selector.includes('fitListViewportToWholeRows({ minItemRows = 1 } = {})'));
+    assert.ok(selector.includes("listContainer.dataset.selectorVisibleItemRows = String(itemRows)"));
+    assert.ok(css.includes('#selector-list.selector-row-fitted'));
+    assert.ok(css.includes('--selector-list-row-height'));
     assert.ok(!info.includes('LOW_MEMORY_PAGING_THRESHOLD'));
     assert.ok(info.includes('window.__mobileLowMemoryMode'));
     assert.ok(info.includes("document.body.classList.contains('is-touch-input')"));
@@ -8723,7 +8734,6 @@ test('旧端末安全モードの共通一覧は件数にかかわらず最初�
     assert.ok(css.includes('overflow: hidden !important;'));
     assert.ok(css.includes('.low-memory-list-pager'));
     const html = read('index.html');
-    const selector = read('js/selector_modal_view.js');
     assert.ok(html.includes('id="selector-list-pager"'), 'ページ送りはスクロール領域の外へ専用領域を持つ');
     assert.ok(info.includes('pagerEl.innerHTML = `<button'), '前/次ボタンは専用ページャーへ描画する');
     assert.ok(info.includes('class="low-memory-page-btn low-memory-page-prev"'), '前ボタンはモーダル内専用の軽量ボタンを使う');

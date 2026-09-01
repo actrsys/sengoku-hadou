@@ -1746,31 +1746,55 @@ class UIInfoManager {
             }
         };
 
-        // 旧端末の安全モードでは、件数にかかわらず一覧方式を最初から固定件数のページ送りにする。
+        // 旧端末の安全モードでは、件数にかかわらず一覧方式を最初からページ送りにする。
         // タブ切替や絞り込みで件数が変わってもスクロール式へ切り替わらないようにし、
         // 仮想DOM差し替え・scroll rAF・momentum scroll・custom scrollbarを使わない。
-        const LOW_MEMORY_PAGE_SIZE = 10;
         const LOW_MEMORY_PAGE_RESUME_UNIT = 1000;
         const useLowMemoryPaging = !!(window.__mobileLowMemoryMode
             && document.body.classList.contains('is-touch-input')
             && !config.disableLowMemoryPaging
             && totalItems > 0);
         if (useLowMemoryPaging) {
-            const totalPages = Math.max(1, Math.ceil(totalItems / LOW_MEMORY_PAGE_SIZE));
+            // ページャーを先に表示し、その分を差し引いた「実際の一覧viewport」を確定してから
+            // 1ページの行数を決める。固定10行を押し込まず、端末ごとの高さで完全に見える行だけを使う。
+            if (pagerEl) {
+                pagerEl.innerHTML = '<button type="button" class="low-memory-page-btn low-memory-page-prev" disabled>前</button><span class="low-memory-page-label">1 / 1</span><button type="button" class="low-memory-page-btn low-memory-page-next" disabled>次</button>';
+                pagerEl.classList.remove('hidden');
+            }
+
+            const probeParts = [];
+            if (config.headers && config.headers.length > 0) {
+                const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
+                probeParts.push(`<div class="list-header sortable-header ${config.headerClass || ''}">${headerCols}</div>`);
+            }
+            probeParts.push(buildItemHtml(getItemAt(0), 0));
+
+            listContainer.classList.add('low-memory-paged-list');
+            listContainer.classList.remove('hide-native-scroll');
+            listContainer.style.visibility = 'hidden';
+            listContainer.innerHTML = `<div class="list-inner-wrapper${wrapperClass}"${wrapperStyle}>${probeParts.join('')}</div>`;
+            listContainer.style.display = 'block';
+
+            const fit = !config.disableRowViewportFit && this.selectorView && typeof this.selectorView.fitListViewportToWholeRows === 'function'
+                ? this.selectorView.fitListViewportToWholeRows({ minItemRows: 1 })
+                : null;
+            const pageSize = Math.max(1, fit && Number(fit.itemRows) > 0 ? Number(fit.itemRows) : 1);
+            const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
             let pageIndex = Math.max(0, Math.min(totalPages - 1,
                 Math.floor((Number(config.scrollPos) || 0) / LOW_MEMORY_PAGE_RESUME_UNIT)));
+            listContainer.style.visibility = '';
 
             const renderLowMemoryPage = () => {
                 if (this._currentListRenderId !== currentRenderId) return;
-                const startIndex = pageIndex * LOW_MEMORY_PAGE_SIZE;
-                const endIndex = Math.min(totalItems, startIndex + LOW_MEMORY_PAGE_SIZE);
+                const startIndex = pageIndex * pageSize;
+                const endIndex = Math.min(totalItems, startIndex + pageSize);
                 const parts = [];
                 if (config.headers && config.headers.length > 0) {
                     const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
                     parts.push(`<div class="list-header sortable-header ${config.headerClass || ''}">${headerCols}</div>`);
                 }
                 for (let i = startIndex; i < endIndex; i++) parts.push(buildItemHtml(getItemAt(i), i));
-                for (let i = endIndex - startIndex; i < LOW_MEMORY_PAGE_SIZE; i++) {
+                for (let i = endIndex - startIndex; i < pageSize; i++) {
                     const emptyCells = config.headers ? config.headers.map(() => '<span></span>').join('') : '';
                     parts.push(`<div class="select-item ${config.itemClass || ''} is-static is-placeholder-row">${emptyCells}</div>`);
                 }
@@ -1958,12 +1982,23 @@ class UIInfoManager {
 
             renderVisibleWindow(true);
 
+            // 通常スクロール型もviewport高を実測し、ヘッダー＋整数行でぴったり埋める。
+            // ここで補正した行高を仮想スクロールの計算にも同じ値として使う。
+            const initialFit = !config.disableRowViewportFit && this.selectorView && typeof this.selectorView.fitListViewportToWholeRows === 'function'
+                ? this.selectorView.fitListViewportToWholeRows({ minItemRows: 1 })
+                : null;
+            if (initialFit && initialFit.rowStep > 0) {
+                rowHeight = initialFit.rowStep;
+                lastRange = { start: -1, end: -1 };
+                renderVisibleWindow(true);
+            }
+
             measureRafId = requestAnimationFrame(() => {
                 measureRafId = null;
                 // ★実際の行の高さを測って、仮の値とズレていたら補正して描画し直します
                 const sample = scrollBody.querySelector('.select-item');
                 if (sample) {
-                    const measured = sample.offsetHeight + gapPx;
+                    const measured = sample.getBoundingClientRect().height + gapPx;
                     if (measured > 0 && Math.abs(measured - rowHeight) > 1) {
                         rowHeight = measured;
                         lastRange = { start: -1, end: -1 };
@@ -1996,11 +2031,6 @@ class UIInfoManager {
             initialHtmlParts.push(buildItemHtml(getItemAt(i), i));
         }
 
-        for (let i = totalItems; i < 8; i++) {
-            const emptyCells = config.headers ? config.headers.map(() => `<span></span>`).join('') : '';
-            initialHtmlParts.push(`<div class="select-item ${config.itemClass || ''} is-static is-placeholder-row">${emptyCells}</div>`);
-        }
-
         listContainer.innerHTML = `<div class="list-inner-wrapper${wrapperClass}"${wrapperStyle}>${initialHtmlParts.join('')}</div>`;
         if (typeof config.onItemsRendered === 'function') config.onItemsRendered();
 
@@ -2011,6 +2041,20 @@ class UIInfoManager {
         attachSortClicks();
 
         listContainer.style.display = 'block';
+
+        const rowFit = !config.disableRowViewportFit && this.selectorView && typeof this.selectorView.fitListViewportToWholeRows === 'function'
+            ? this.selectorView.fitListViewportToWholeRows({ minItemRows: 1 })
+            : null;
+        if (rowFit && totalItems < rowFit.itemRows) {
+            const missing = rowFit.itemRows - totalItems;
+            const emptyCells = config.headers ? config.headers.map(() => `<span></span>`).join('') : '';
+            const placeholders = [];
+            for (let i = 0; i < missing; i++) {
+                placeholders.push(`<div class="select-item ${config.itemClass || ''} is-static is-placeholder-row">${emptyCells}</div>`);
+            }
+            if (placeholders.length > 0) innerWrapper.insertAdjacentHTML('beforeend', placeholders.join(''));
+        }
+
         listContainer.scrollTop = config.scrollPos || 0;
 
         setTimeout(() => {
@@ -2964,6 +3008,8 @@ class UIInfoManager {
             // 履歴は折返し行と月区切りで行高が一定ではないため、固定行高前提の仮想スクロールを使わない。
             // 30件ずつ段階描画する通常経路で500件まで滑らかに追加します。
             disableVirtualization: true,
+            disableLowMemoryPaging: true,
+            disableRowViewportFit: true,
             scrollPos
         });
     }

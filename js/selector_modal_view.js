@@ -29,6 +29,86 @@ class SelectorModalView {
         };
     }
 
+
+    resetListRowFit() {
+        const elements = this.getElements();
+        const listContainer = elements && elements.listContainer;
+        if (!listContainer) return;
+        listContainer.classList.remove('selector-row-fitted');
+        if (listContainer.style && typeof listContainer.style.removeProperty === 'function') {
+            listContainer.style.removeProperty('--selector-list-row-height');
+        } else if (listContainer.style) {
+            listContainer.style['--selector-list-row-height'] = '';
+        }
+        delete listContainer.dataset.selectorVisibleItemRows;
+    }
+
+    fitListViewportToWholeRows({ minItemRows = 1 } = {}) {
+        const elements = this.getElements();
+        const listContainer = elements && elements.listContainer;
+        if (!listContainer || !listContainer.isConnected) return null;
+
+        const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
+        if (!innerWrapper) return null;
+
+        // 行高が可変の履歴などは対象外。通常の共通一覧だけを、現在確保されている
+        // viewport 高へ整数行ぴったりで収める。CSSの40/44pxを推測値として
+        // 固定せず、実際に描画された行を測ってから計算する。
+        const sample = innerWrapper.querySelector('.select-item:not(.history-list-item):not(.history-month-divider)');
+        if (!sample) return null;
+
+        // 前回の補正値が残っている場合は一度外し、元のCSS行高を実測する。
+        listContainer.classList.remove('selector-row-fitted');
+        if (listContainer.style && typeof listContainer.style.removeProperty === 'function') {
+            listContainer.style.removeProperty('--selector-list-row-height');
+        } else if (listContainer.style) {
+            listContainer.style['--selector-list-row-height'] = '';
+        }
+
+        const sampleRect = sample.getBoundingClientRect();
+        const header = innerWrapper.querySelector('.list-header');
+        const headerRect = header ? header.getBoundingClientRect() : null;
+        const nominalRowHeight = sampleRect.height;
+        const nominalHeaderHeight = headerRect ? headerRect.height : 0;
+        const viewportHeight = listContainer.clientHeight;
+        const wrapperStyle = window.getComputedStyle(innerWrapper);
+        const gapPx = parseFloat(wrapperStyle.rowGap) || parseFloat(wrapperStyle.gap) || 0;
+
+        if (!(nominalRowHeight > 0) || !(viewportHeight > 0)) return null;
+
+        const headerSlots = header ? 1 : 0;
+        const nominalSlotHeight = nominalHeaderHeight > 0
+            ? Math.max(nominalRowHeight, nominalHeaderHeight)
+            : nominalRowHeight;
+        const minRows = Math.max(1, Number(minItemRows) || 1);
+        const minimumSlots = headerSlots + minRows;
+        const availableWithTrailingGap = viewportHeight + gapPx;
+        let totalSlots = Math.floor(availableWithTrailingGap / Math.max(1, nominalSlotHeight + gapPx));
+        totalSlots = Math.max(minimumSlots, totalSlots);
+
+        const itemRows = Math.max(minRows, totalSlots - headerSlots);
+        totalSlots = itemRows + headerSlots;
+        const totalGap = Math.max(0, totalSlots - 1) * gapPx;
+        const fittedRowHeight = Math.max(1, (viewportHeight - totalGap) / totalSlots);
+
+        if (listContainer.style && typeof listContainer.style.setProperty === 'function') {
+            listContainer.style.setProperty('--selector-list-row-height', `${fittedRowHeight}px`);
+        } else if (listContainer.style) {
+            listContainer.style['--selector-list-row-height'] = `${fittedRowHeight}px`;
+        }
+        listContainer.classList.add('selector-row-fitted');
+        listContainer.dataset.selectorVisibleItemRows = String(itemRows);
+
+        return {
+            itemRows,
+            rowHeight: fittedRowHeight,
+            rowStep: fittedRowHeight + gapPx,
+            headerRows: headerSlots,
+            viewportHeight,
+            gapPx
+        };
+    }
+
     setConfirmEnabled(enabled) {
         const elements = this.getElements();
         const confirmBtn = elements && elements.confirmBtn;
@@ -74,6 +154,7 @@ class SelectorModalView {
 
         const { modal, titleEl, contextEl, tabsEl, pagerEl, confirmBtn, assistBtn, backBtn } = elements;
         modal.classList.remove('hidden');
+        this.resetListRowFit();
 
         if (titleEl) titleEl.textContent = title;
 
@@ -156,6 +237,7 @@ class SelectorModalView {
         if (!elements || !elements.listContainer) return;
 
         const { listContainer, pagerEl } = elements;
+        this.resetListRowFit();
         if (listContainer._virtualScrollHandler) {
             listContainer.removeEventListener('scroll', listContainer._virtualScrollHandler);
             listContainer._virtualScrollHandler = null;
