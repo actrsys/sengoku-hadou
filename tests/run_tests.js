@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r334');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r335');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7956,12 +7956,14 @@ test('共通武将選択は個別の選択不可IDを共通経路で扱える', 
     const setAt = busho.indexOf('const customDisabledIdSet =');
     const itemAt = busho.indexOf('const buildBushoListItem = (b) => {');
     assert.ok(setAt >= 0 && itemAt >= 0);
-    const setBlock = busho.slice(setAt, setAt + 400);
+    const setBlock = busho.slice(setAt, setAt + 900);
     const itemBlock = busho.slice(itemAt, itemAt + 500);
     assert.ok(setBlock.includes('Array.isArray(extraData.customDisabledIds)'));
     assert.ok(setBlock.includes('new Set(extraData.customDisabledIds.map(Number))'));
-    assert.ok(itemBlock.includes('customDisabledIdSet.has(Number(b.id))'));
-    assert.ok(itemBlock.includes('isSelectable = false'));
+    assert.ok(setBlock.includes('const isBushoSelectableForCurrentSelector = (b) => {'));
+    assert.ok(setBlock.includes('customDisabledIdSet.has(Number(b.id))'));
+    assert.ok(setBlock.includes('selectable = false'));
+    assert.ok(itemBlock.includes('const isSelectable = isBushoSelectableForCurrentSelector(b);'), '行表示と一括選択は同じ選択可否判定を使う');
 });
 
 test('野戦終了時は通常地図復帰より先に重い戦場DOMを解放する', () => {
@@ -8703,9 +8705,63 @@ test('旧端末安全モードの共通一覧は件数にかかわらず最初�
     const selector = read('js/selector_modal_view.js');
     assert.ok(html.includes('id="selector-list-pager"'), 'ページ送りはスクロール領域の外へ専用領域を持つ');
     assert.ok(info.includes('pagerEl.innerHTML = `<button'), '前/次ボタンは専用ページャーへ描画する');
+    assert.ok(info.includes('class="low-memory-page-btn low-memory-page-prev"'), '前ボタンはモーダル内専用の軽量ボタンを使う');
+    assert.ok(info.includes('class="low-memory-page-btn low-memory-page-next"'), '次ボタンはモーダル内専用の軽量ボタンを使う');
+    assert.ok(!info.includes('class="btn-secondary low-memory-page-prev"'), 'モーダル外操作用の装飾ボタンをページャーへ流用しない');
+    assert.ok(css.includes('.low-memory-page-btn'));
+    assert.ok(css.includes('box-shadow: none;'));
+    assert.ok(css.includes('filter: none;'));
     assert.ok(info.includes("pagerEl.classList.remove('hidden')"));
     assert.ok(!info.includes('parts.push(`<div class="low-memory-list-pager">'), 'overflow:hiddenの一覧末尾へページャーを埋め込まない');
     assert.ok(selector.includes("pagerEl.classList.add('hidden')"), '画面切替時はページャーを必ず片付ける');
+});
+
+test('武将複数選択の補助ボタンは上から5名・一括・解除を選択上限内で切り替える', () => {
+    function UIInfoManager() {}
+    const ctx = createContext({ UIInfoManager });
+    loadScript(ctx, 'js/ui_info_busho.js');
+    const info = new UIInfoManager();
+    info._updateBushoSelectorUI = () => {};
+    info.commonSelectedIds = [];
+    info._bushoSelectorContext = {
+        isMulti: true, actionType: 'reward', costGold: 0, costRice: 0, c: { gold: 999, rice: 999 },
+        orderedSelectableIds: [9, 7, 5, 3, 1, 2, 4, 6]
+    };
+    assert.strictEqual(info._getBushoAssistState().label, '5名');
+    info._handleBushoAssistSelection();
+    assert.deepStrictEqual(Array.from(info.commonSelectedIds), [9, 7, 5, 3, 1], '現在の並び順の上から5名を選ぶ');
+    assert.strictEqual(info._getBushoAssistState().label, '一括');
+    info._handleBushoAssistSelection();
+    assert.deepStrictEqual(Array.from(info.commonSelectedIds), [9, 7, 5, 3, 1, 2, 4, 6], '一括は選択可能上限まで選ぶ');
+    assert.strictEqual(info._getBushoAssistState().label, '解除');
+    info._handleBushoAssistSelection();
+    assert.deepStrictEqual(Array.from(info.commonSelectedIds), [], '解除は全選択を外す');
+
+    info._bushoSelectorContext.orderedSelectableIds = [4, 3, 2, 1];
+    assert.strictEqual(info._getBushoAssistState().label, '4名', '5名未満なら実際に選べる人数を表示する');
+
+    info._bushoSelectorContext = {
+        isMulti: true, actionType: 'war_deploy', costGold: 0, costRice: 0, c: { gold: 999, rice: 999 },
+        orderedSelectableIds: [1, 2, 3, 4, 5, 6, 7]
+    };
+    info.commonSelectedIds = [];
+    info._handleBushoAssistSelection();
+    assert.strictEqual(info.commonSelectedIds.length, 5);
+    assert.strictEqual(info._getBushoAssistState().label, '解除', '上限5名の画面では5名選択後に直接解除へ切り替える');
+});
+
+test('武将複数選択の補助ボタンは決定と戻るの間に置き、他のselectorでは残留しない', () => {
+    const html = read('index.html');
+    const selector = read('js/selector_modal_view.js');
+    const busho = read('js/ui_info_busho.js');
+    const confirmPos = html.indexOf('id="selector-confirm-btn"');
+    const assistPos = html.indexOf('id="selector-assist-btn"');
+    const backPos = html.indexOf('id="selector-back-btn"');
+    assert.ok(confirmPos >= 0 && assistPos > confirmPos && backPos > assistPos, '補助ボタンは決定と戻る/閉じるの間へ置く');
+    assert.ok(selector.includes("assistBtn.classList.toggle('hidden', !visible)"));
+    assert.ok(selector.includes("assistBtn.classList.add('hidden')"));
+    assert.ok(busho.includes("onAssist: isMulti && !isViewMode ? () => this._handleBushoAssistSelection() : null"));
+    assert.ok(busho.includes('onItemsRendered: isMulti && !isViewMode ? () => this._updateBushoSelectorUI() : null'), 'ページ/仮想スクロールで後から描画した行も選択状態を同期する');
 });
 
 test('共通一覧は詳細遷移・終了時に仮想スクロールの参照と旧DOMを先に解放する', () => {

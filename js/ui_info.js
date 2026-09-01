@@ -1587,7 +1587,10 @@ class UIInfoManager {
                 this._currentListRenderId++;
                 config.onConfirm();
             } : null,
-            confirmDisabled: !!config.onConfirm
+            confirmDisabled: !!config.onConfirm,
+            assistLabel: config.assistLabel || '',
+            onAssist: typeof config.onAssist === 'function' ? config.onAssist : null,
+            assistDisabled: !!config.assistDisabled
         });
         if (!shell) return;
 
@@ -1777,12 +1780,13 @@ class UIInfoManager {
                 listContainer.dataset.lowMemoryResumePosition = String(pageIndex * LOW_MEMORY_PAGE_RESUME_UNIT);
                 listContainer.scrollTop = 0;
                 listContainer.style.display = 'block';
+                if (typeof config.onItemsRendered === 'function') config.onItemsRendered();
 
                 const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
                 attachDelegatedClick(innerWrapper);
                 attachSortClicks();
                 if (pagerEl) {
-                    pagerEl.innerHTML = `<button type="button" class="btn-secondary low-memory-page-prev" ${pageIndex <= 0 ? 'disabled' : ''}>前</button><span class="low-memory-page-label">${pageIndex + 1} / ${totalPages}</span><button type="button" class="btn-secondary low-memory-page-next" ${pageIndex >= totalPages - 1 ? 'disabled' : ''}>次</button>`;
+                    pagerEl.innerHTML = `<button type="button" class="low-memory-page-btn low-memory-page-prev" ${pageIndex <= 0 ? 'disabled' : ''}>前</button><span class="low-memory-page-label">${pageIndex + 1} / ${totalPages}</span><button type="button" class="low-memory-page-btn low-memory-page-next" ${pageIndex >= totalPages - 1 ? 'disabled' : ''}>次</button>`;
                     pagerEl.classList.remove('hidden');
                 }
                 const prev = pagerEl ? pagerEl.querySelector('.low-memory-page-prev') : null;
@@ -1868,6 +1872,7 @@ class UIInfoManager {
                 scrollBody.style.paddingTop = `${startIndex * rowHeight}px`;
                 scrollBody.style.paddingBottom = `${Math.max(0, (totalItems - endIndex) * rowHeight)}px`;
                 scrollBody.innerHTML = rowsHtml.join('');
+                if (typeof config.onItemsRendered === 'function') config.onItemsRendered();
 
                 if (!config.skipTextFit) requestAnimationFrame(adjustTextFit);
             };
@@ -1997,6 +2002,7 @@ class UIInfoManager {
         }
 
         listContainer.innerHTML = `<div class="list-inner-wrapper${wrapperClass}"${wrapperStyle}>${initialHtmlParts.join('')}</div>`;
+        if (typeof config.onItemsRendered === 'function') config.onItemsRendered();
 
         const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
         attachDelegatedClick(innerWrapper);
@@ -2029,6 +2035,7 @@ class UIInfoManager {
                 if (innerWrapper) {
                     innerWrapper.insertAdjacentHTML('beforeend', chunkParts.join(''));
                 }
+                if (typeof config.onItemsRendered === 'function') config.onItemsRendered();
 
                 if (!config.skipTextFit) requestAnimationFrame(adjustTextFit);
                 currentIndex = endLimit;

@@ -1226,7 +1226,11 @@ async function validateLowMemoryPagerLayout(cdp) {
             const next=pager.querySelector('.low-memory-page-next').getBoundingClientRect();
             const prev=pager.querySelector('.low-memory-page-prev').getBoundingClientRect();
             const cs=getComputedStyle(pager);
-            return {pager:rect('selector-list-pager'),modal:{top:modal.top,bottom:modal.bottom},footer:{top:footer.top,bottom:footer.bottom},list:{top:list.top,bottom:list.bottom},next:{width:next.width,height:next.height},prev:{width:prev.width,height:prev.height},display:cs.display,visibility:cs.visibility};
+            const confirm=document.getElementById('selector-confirm-btn').getBoundingClientRect();
+            const assist=document.getElementById('selector-assist-btn').getBoundingClientRect();
+            const back=document.getElementById('selector-back-btn').getBoundingClientRect();
+            const pageBtnStyle=getComputedStyle(pager.querySelector('.low-memory-page-prev'));
+            return {pager:rect('selector-list-pager'),modal:{top:modal.top,bottom:modal.bottom},footer:{top:footer.top,bottom:footer.bottom,left:footer.left,right:footer.right},list:{top:list.top,bottom:list.bottom},next:{width:next.width,height:next.height},prev:{width:prev.width,height:prev.height},display:cs.display,visibility:cs.visibility,confirm:{left:confirm.left,right:confirm.right},assist:{left:assist.left,right:assist.right},back:{left:back.left,right:back.right},pageBtn:{borderRadius:pageBtnStyle.borderRadius,filter:pageBtnStyle.filter,boxShadow:pageBtnStyle.boxShadow}};
         })()`, returnByValue:true, awaitPromise:true
     });
     const st=result.result.value;
@@ -1237,7 +1241,11 @@ async function validateLowMemoryPagerLayout(cdp) {
     assert.ok(st.pager.bottom <= st.footer.top + 1, 'ページャーは共通footerより上に収める');
     assert.ok(st.pager.top >= st.modal.top && st.pager.bottom <= st.modal.bottom, 'ページャーがモーダル外へはみ出す');
     assert.ok(st.prev.width >= 60 && st.next.width >= 60 && st.prev.height >= 28 && st.next.height >= 28, '前/次ボタンのタップ領域が小さすぎる');
-    console.log('✓ 軽量モード一覧 ページ送り操作常時表示 visual/layout regression');
+    assert.ok(st.pageBtn.borderRadius === '4px', `モーダル内ページボタンは単純な矩形系にする (${st.pageBtn.borderRadius})`);
+    assert.ok(st.pageBtn.filter === 'none' && st.pageBtn.boxShadow === 'none', 'モーダル内ページボタンへ外側装飾用の影/フィルタを持ち込まない');
+    assert.ok(st.back.right <= st.assist.left + 1 && st.assist.right <= st.confirm.left + 1, 'スマホfooterでは戻る/閉じる・補助・決定の順で補助ボタンを中央に置く');
+    assert.ok(st.back.left >= st.footer.left - 1 && st.confirm.right <= st.footer.right + 1, '3ボタンfooterが画面幅からはみ出さない');
+    console.log('✓ 軽量モード一覧 ページ送り操作・複数選択補助footer visual/layout regression');
 }
 
 async function main() {

@@ -23,6 +23,7 @@ class SelectorModalView {
             contextEl: (this.ui && this.ui.selectorContextInfo) || document.getElementById('selector-context-info'),
             tabsEl: document.getElementById('selector-tabs'),
             confirmBtn: (this.ui && this.ui.selectorConfirmBtn) || document.getElementById('selector-confirm-btn'),
+            assistBtn: document.getElementById('selector-assist-btn'),
             backBtn: document.getElementById('selector-back-btn') || modal.querySelector('.btn-secondary'),
             modalContent: modal.querySelector('.modal-content')
         };
@@ -43,6 +44,17 @@ class SelectorModalView {
         }
     }
 
+    setAssistState({ visible = false, label = '', disabled = false, onClick = undefined } = {}) {
+        const elements = this.getElements();
+        const assistBtn = elements && elements.assistBtn;
+        if (!assistBtn) return;
+        assistBtn.classList.toggle('hidden', !visible);
+        assistBtn.disabled = !!disabled;
+        if (label) assistBtn.textContent = label;
+        if (onClick !== undefined) assistBtn.onclick = typeof onClick === 'function' ? onClick : null;
+        assistBtn.dataset.se = 'choice.ogg';
+    }
+
     open({
         title = '',
         contextHtml = null,
@@ -52,12 +64,15 @@ class SelectorModalView {
         backLabel = '閉じる',
         onBack = null,
         onConfirm = null,
-        confirmDisabled = false
+        confirmDisabled = false,
+        assistLabel = '',
+        onAssist = null,
+        assistDisabled = false
     } = {}) {
         const elements = this.getElements();
         if (!elements || !elements.listContainer) return null;
 
-        const { modal, titleEl, contextEl, tabsEl, pagerEl, confirmBtn, backBtn } = elements;
+        const { modal, titleEl, contextEl, tabsEl, pagerEl, confirmBtn, assistBtn, backBtn } = elements;
         modal.classList.remove('hidden');
 
         if (titleEl) titleEl.textContent = title;
@@ -112,6 +127,15 @@ class SelectorModalView {
             }
         }
 
+        if (assistBtn) {
+            this.setAssistState({
+                visible: typeof onAssist === 'function',
+                label: assistLabel || '5名',
+                disabled: !!assistDisabled,
+                onClick: onAssist
+            });
+        }
+
         if (backBtn) {
             if (hideBackBtn) {
                 backBtn.style.display = 'none';
@@ -155,7 +179,7 @@ class SelectorModalView {
         const elements = this.getElements();
         if (!elements) return;
 
-        const { modal, contextEl, tabsEl, pagerEl, confirmBtn, backBtn } = elements;
+        const { modal, contextEl, tabsEl, pagerEl, confirmBtn, assistBtn, backBtn } = elements;
         modal.classList.add('hidden');
 
         // 非表示にするだけだと、仮想スクロールのクロージャや画像DOMが大量データへの参照を
@@ -167,6 +191,7 @@ class SelectorModalView {
         if (tabsEl) tabsEl.innerHTML = '';
         if (pagerEl) { pagerEl.innerHTML = ''; pagerEl.classList.add('hidden'); }
         if (confirmBtn) confirmBtn.onclick = null;
+        if (assistBtn) { assistBtn.onclick = null; assistBtn.classList.add('hidden'); assistBtn.disabled = false; }
         if (backBtn) backBtn.onclick = null;
     }
 }

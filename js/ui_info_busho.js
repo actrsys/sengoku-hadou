@@ -558,6 +558,58 @@ Object.assign(UIInfoManager.prototype, {
     
     // _saveBushoSelection()は不要になったので削除し、UI更新の中に一元化します
 
+    _getBushoHardSelectionLimit(actionType) {
+        return ['war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy',
+            'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy'].includes(actionType) ? 5 : 999;
+    },
+
+    _getBushoEffectiveSelectionLimit(ctx = this._bushoSelectorContext) {
+        if (!ctx || !ctx.isMulti) return 0;
+        const orderedIds = Array.isArray(ctx.orderedSelectableIds) ? ctx.orderedSelectableIds : [];
+        let limit = Math.min(orderedIds.length, this._getBushoHardSelectionLimit(ctx.actionType));
+        const castle = ctx.c;
+        if (castle && ctx.costGold > 0) {
+            limit = Math.min(limit, Math.max(0, Math.floor((Number(castle.gold) || 0) / ctx.costGold)));
+        }
+        if (castle && ctx.costRice > 0) {
+            limit = Math.min(limit, Math.max(0, Math.floor((Number(castle.rice) || 0) / ctx.costRice)));
+        }
+        return Math.max(0, limit);
+    },
+
+    _getBushoAssistState(ctx = this._bushoSelectorContext) {
+        const limit = this._getBushoEffectiveSelectionLimit(ctx);
+        if (!ctx || !ctx.isMulti || limit <= 0) return { visible: false, label: '', disabled: true, limit: 0 };
+        const selectedCount = new Set((this.commonSelectedIds || []).map(Number).filter(Number.isFinite)).size;
+        const firstBatch = Math.min(5, limit);
+        if (selectedCount >= limit) return { visible: true, label: '解除', disabled: false, limit, firstBatch };
+        if (selectedCount >= firstBatch && limit > firstBatch) return { visible: true, label: '一括', disabled: false, limit, firstBatch };
+        return { visible: true, label: `${firstBatch}名`, disabled: false, limit, firstBatch };
+    },
+
+    _handleBushoAssistSelection() {
+        const ctx = this._bushoSelectorContext;
+        if (!ctx || !ctx.isMulti) return;
+        const orderedIds = Array.isArray(ctx.orderedSelectableIds) ? ctx.orderedSelectableIds : [];
+        const state = this._getBushoAssistState(ctx);
+        if (!state.visible || state.limit <= 0) return;
+
+        const selectedSet = new Set((this.commonSelectedIds || []).map(Number).filter(Number.isFinite));
+        if (selectedSet.size >= state.limit) {
+            selectedSet.clear();
+        } else {
+            const targetCount = selectedSet.size >= state.firstBatch && state.limit > state.firstBatch
+                ? state.limit
+                : state.firstBatch;
+            for (let i = 0; i < orderedIds.length && selectedSet.size < targetCount; i++) {
+                selectedSet.add(Number(orderedIds[i]));
+            }
+        }
+
+        this.commonSelectedIds = Array.from(selectedSet);
+        this._updateBushoSelectorUI();
+    },
+
     _updateBushoSelectorUI() {
         const ctx = this._bushoSelectorContext;
         if (!ctx) return;
@@ -583,6 +635,15 @@ Object.assign(UIInfoManager.prototype, {
 
         const contextEl = document.getElementById('selector-context-info');
         const confirmBtn = document.getElementById('selector-confirm-btn');
+
+        const assistState = this._getBushoAssistState(ctx);
+        if (this.selectorView && typeof this.selectorView.setAssistState === 'function') {
+            this.selectorView.setAssistState({
+                visible: assistState.visible,
+                label: assistState.label,
+                disabled: assistState.disabled
+            });
+        }
 
         if (contextEl && ctx.isMulti) {
             let cost = 0, item = "";
@@ -616,7 +677,7 @@ Object.assign(UIInfoManager.prototype, {
         const c = this._bushoSelectorContext ? this._bushoSelectorContext.c : this.ui.currentCastle;
         const selectedSet = new Set((this.commonSelectedIds || []).map(Number));
         const wasSelected = selectedSet.has(id);
-        const maxSelect = ['war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy'].includes(actionType) ? 5 : 999;
+        const maxSelect = this._getBushoHardSelectionLimit(actionType);
 
         if (isMulti) {
             if (wasSelected) {
@@ -751,7 +812,11 @@ Object.assign(UIInfoManager.prototype, {
             costRice: spec.costRice || 0,
             actionType: actionType,
             isViewMode: isViewMode,
-            c: c
+            c: c,
+            targetId: targetId,
+            extraData: extraData,
+            onBack: onBack,
+            orderedSelectableIds: []
         };
         
         let titleStr = "";
@@ -1114,13 +1179,21 @@ Object.assign(UIInfoManager.prototype, {
         const customDisabledIdSet = extraData && Array.isArray(extraData.customDisabledIds)
             ? new Set(extraData.customDisabledIds.map(Number))
             : null;
+        const isBushoSelectableForCurrentSelector = (b) => {
+            let selectable = !b.isActionDone;
+            if (isActionFree) selectable = true;
+            if (customDisabledIdSet && customDisabledIdSet.has(Number(b.id))) selectable = false;
+            return selectable;
+        };
+        if (this._bushoSelectorContext) {
+            this._bushoSelectorContext.orderedSelectableIds = (isMulti && !isViewMode)
+                ? renderBushos.filter(isBushoSelectableForCurrentSelector).map(b => Number(b.id)).filter(Number.isFinite)
+                : [];
+        }
 
         const buildBushoListItem = (b) => {
             
-            let isSelectable = !b.isActionDone; 
-            if (isActionFree) isSelectable = true; 
-            if (customDisabledIdSet && customDisabledIdSet.has(Number(b.id))) isSelectable = false;
-            
+            const isSelectable = isBushoSelectableForCurrentSelector(b);
             const isSelected = selectedIdSet.has(Number(b.id));
             
             let currentAcc = null;
@@ -1379,6 +1452,9 @@ Object.assign(UIInfoManager.prototype, {
             },
             backLabel: (onBack || (extraData && extraData.onCancel)) ? '戻る' : null,
             onConfirm: onConfirmHandler,
+            assistLabel: isMulti && !isViewMode ? '5名' : '',
+            onAssist: isMulti && !isViewMode ? () => this._handleBushoAssistSelection() : null,
+            onItemsRendered: isMulti && !isViewMode ? () => this._updateBushoSelectorUI() : null,
             hideBackBtn: extraData && extraData.hideCancel,
             onTabClick: (tabKey) => {
                 this.bushoCurrentTab = tabKey;

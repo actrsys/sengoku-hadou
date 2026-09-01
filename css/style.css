@@ -5553,9 +5553,32 @@ html.mobile-low-memory body:not(.is-pc) .low-memory-page-label {
     text-align: center;
     font-variant-numeric: tabular-nums;
 }
-html.mobile-low-memory body:not(.is-pc) .low-memory-list-pager button {
+/* ページ送りはモーダル内容内の操作なので、外側footer用の装飾ボタンを流用しない。
+   単純な矩形ボタンにして軽量モードでも合成負荷を増やさない。 */
+html.mobile-low-memory body:not(.is-pc) .low-memory-page-btn {
+    min-width: 72px;
     min-height: 32px;
     padding: 4px 10px;
+    border: 1px solid rgba(212,175,55,0.55);
+    border-radius: 4px;
+    background: #27322a;
+    color: #f0eee5;
+    font-family: var(--font-readable-ja);
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1;
+    text-shadow: none;
+    box-shadow: none;
+    filter: none;
+    cursor: pointer;
+}
+html.mobile-low-memory body:not(.is-pc) .low-memory-page-btn:active:not(:disabled) {
+    background: #36463a;
+    border-color: rgba(255,224,112,0.8);
+}
+html.mobile-low-memory body:not(.is-pc) .low-memory-page-btn:disabled {
+    opacity: 0.38;
+    cursor: default;
 }
 
 /* 252拠点すべての常時drop-shadow合成を避ける。選択/現在ターンの意味付き発光は維持する。 */
