@@ -24,7 +24,7 @@
             <label class="slider-row-label">表示モード</label>
             <div class="setting-display-mode-control">
               <div class="setting-toggle-group setting-three-way-toggle"><button class="ui-toggle-btn active">自動</button><button class="ui-toggle-btn">通常</button><button class="ui-toggle-btn">軽量</button></div>
-              <div class="setting-note">変更は次回起動時に反映されます。</div>
+              <div id="setting-display-mode-note" class="setting-note">変更は次回起動時に反映されます。</div>
             </div>
           </div>
         </section>
@@ -34,7 +34,7 @@
           <div class="setting-row"><label class="slider-row-label">歴史イベント</label><div class="setting-toggle-group"><button class="ui-toggle-btn active">発生する</button><button class="ui-toggle-btn">発生しない</button></div></div>
         </section>
       </div>
-      <div class="modal-footer"><button id="settings-close-btn" class="btn-secondary">閉じる</button></div>
+      <div class="modal-footer settings-footer"><button id="settings-restart-btn" class="btn-secondary hidden">再起動</button><button id="settings-close-btn" class="btn-secondary">閉じる</button></div>
     </div>
   </div>
 </div>

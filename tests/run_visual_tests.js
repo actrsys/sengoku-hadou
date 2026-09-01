@@ -1302,6 +1302,31 @@ async function validateSettingsTabsLayout(cdp) {
     approx(st.tabs.bottom, initialSettingsLayout.tabs.bottom, 0.2, '設定タブ切替でタブ列の基準線を動かさない');
     approx(st.footer.top, initialSettingsLayout.footer.top, 0.2, '設定タブ切替で閉じる領域を上下させない');
 
+    result = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            const restart=document.getElementById('settings-restart-btn');
+            const note=document.getElementById('setting-display-mode-note');
+            restart.classList.remove('hidden');
+            note.textContent='変更は次回起動時に反映されます。［再起動］ですぐ反映できます。';
+            document.getElementById('settings-tab-audio-display').click();
+            const rect=el=>{const r=el.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height};};
+            const content=document.querySelector('#settings-modal .modal-content');
+            const footer=document.querySelector('#settings-modal .modal-footer');
+            return {
+                restartDisplay:getComputedStyle(restart).display,
+                restart:rect(restart), close:rect(document.getElementById('settings-close-btn')),
+                footer:rect(footer), content:rect(content),
+                clientHeight:content.clientHeight, scrollHeight:content.scrollHeight
+            };
+        })()`, returnByValue:true, awaitPromise:true
+    });
+    st=result.result.value;
+    assert.notStrictEqual(st.restartDisplay, 'none', 'タイトル用再起動ボタンが表示できない');
+    assert.ok(st.restart.top >= st.footer.top - 1 && st.restart.bottom <= st.footer.bottom + 1, '再起動ボタンが設定footerからはみ出す');
+    assert.ok(st.close.top >= st.footer.top - 1 && st.close.bottom <= st.footer.bottom + 1, '閉じるボタンが設定footerからはみ出す');
+    assert.ok(st.footer.bottom <= st.content.bottom + 1, '再起動表示時に設定footerがモーダル外へはみ出す');
+    assert.ok(st.scrollHeight <= st.clientHeight + 1, `再起動案内表示時にスマホ設定へ隠れた縦はみ出しがある (${st.scrollHeight} > ${st.clientHeight})`);
+
     await cdp.call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
     result = await cdp.call('Runtime.evaluate', {
         expression: `(() => {

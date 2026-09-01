@@ -618,7 +618,7 @@
                                     <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-display-mode-normal">通常</button>
                                     <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-display-mode-light">軽量</button>
                                 </div>
-                                <div class="setting-note">変更は次回起動時に反映されます。</div>
+                                <div id="setting-display-mode-note" class="setting-note">変更は次回起動時に反映されます。</div>
                             </div>
                         </div>
                     </section>
@@ -649,7 +649,8 @@
                     </section>
                 </div>
 
-                <div class="modal-footer">
+                <div class="modal-footer settings-footer">
+                    <button id="settings-restart-btn" class="btn-secondary hidden">再起動</button>
                     <button id="settings-close-btn" class="btn-secondary">閉じる</button>
                 </div>
             </div>

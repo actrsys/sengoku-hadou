@@ -1556,7 +1556,44 @@ class UIInfoManager {
         seSlider.onchange = () => {
              if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
         };
-        
+
+        // スマホで「タイトル画面から設定を開いた時」だけ、設定変更をすぐ反映できる再起動導線を出す。
+        // ゲーム中には未保存進行を誤って失う導線を置かない。PCではブラウザ側の再読込が容易なため表示しない。
+        const restartBtn = document.getElementById('settings-restart-btn');
+        const displayModeNote = document.getElementById('setting-display-mode-note');
+        const titleScreen = document.getElementById('title-screen');
+        const isMobileLayout = !document.body.classList.contains('is-pc');
+        const openedFromTitle = !!(
+            isMobileLayout
+            && this.game
+            && this.game.phase === 'title'
+            && titleScreen
+            && !titleScreen.classList.contains('hidden')
+        );
+
+        if (restartBtn) {
+            restartBtn.classList.toggle('hidden', !openedFromTitle);
+            restartBtn.onclick = openedFromTitle ? () => {
+                if (!this.ui || typeof this.ui.showDialog !== 'function') return;
+                this.ui.showDialog(
+                    'ゲームを再起動します。よろしいですか？',
+                    true,
+                    () => {
+                        // UserSettings / AudioManager は各操作時にlocalStorageへ即時保存済み。
+                        // ここでは保存処理を二重化せず、現在URLをそのまま再読み込みする。
+                        window.location.reload();
+                    },
+                    null,
+                    { okText: '再起動', cancelText: '戻る' }
+                );
+            } : null;
+        }
+        if (displayModeNote) {
+            displayModeNote.textContent = openedFromTitle
+                ? '変更は次回起動時に反映されます。［再起動］ですぐ反映できます。'
+                : '変更は次回起動時に反映されます。';
+        }
+        modal.dataset.openedFromTitle = openedFromTitle ? 'true' : 'false';
         modal.classList.remove('hidden');
     }
 

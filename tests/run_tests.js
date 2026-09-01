@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r337');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r338');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -330,6 +330,24 @@ test('スマホ設定画面は音・表示/ゲームの2タブに分け、PCは�
     assert.ok(ui.includes("button.dataset.settingsTab"));
     assert.ok(ui.includes("setSettingsTab('audio-display')"));
     assert.ok(!ui.includes("playSE('choice.ogg')"), '設定タブSEも共通data-se経路へ委譲する');
+});
+
+
+test('スマホのタイトル設定だけ再起動導線を表示し確認後にreloadする', () => {
+    const html = read('index.html');
+    const info = read('js/ui_info.js');
+    const guide = read('js/guide_data.js');
+    assert.ok(html.includes('id="settings-restart-btn" class="btn-secondary hidden"'), '再起動ボタンは初期状態を非表示にする');
+    assert.ok(html.includes('id="setting-display-mode-note"'), '表示モード注記を開き元に応じて更新できるようIDを持つ');
+    assert.ok(info.includes("const isMobileLayout = !document.body.classList.contains('is-pc');"), 'PCでは再起動導線を出さない');
+    assert.ok(info.includes("this.game.phase === 'title'"), 'タイトルphaseだけを対象にする');
+    assert.ok(info.includes("!titleScreen.classList.contains('hidden')"), 'タイトル画面が実際に見えていることも確認する');
+    assert.ok(info.includes("restartBtn.classList.toggle('hidden', !openedFromTitle)"), '開き元ごとに再起動ボタン表示を更新する');
+    assert.ok(info.includes("'ゲームを再起動します。よろしいですか？'"), '再起動前に確認ダイアログを出す');
+    assert.ok(info.includes("{ okText: '再起動', cancelText: '戻る' }"), '確認操作の役割を明示する');
+    assert.ok(info.includes('window.location.reload();'), '確認後は現在ページを再読み込みする');
+    assert.ok(info.includes('［再起動］ですぐ反映できます。'), 'タイトル設定では表示モードの反映方法を案内する');
+    assert.ok(guide.includes('スマホではタイトル画面から設定を開くと「再起動」が表示され'), '指南書にもタイトル限定の再起動導線を説明する');
 });
 
 test('通常スマホは低メモリ専用の画質・音声・詳細遷移削減を受けない', () => {
