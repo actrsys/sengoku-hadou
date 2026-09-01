@@ -681,3 +681,9 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - UI SEは各音2chだけ事前生成して再利用し、クリックごとのHowl・AudioBuffer生成を行わない。再生中要素を `pause→seek` して切断すると古いiOSでクリックノイズになり得るため、空きchだけを使い、2chとも再生中の過剰な連打はSEを1回捨てる。UI操作そのものは止めない。
 - 低メモリ用WAVには既存SEカタログのbaseVolumeを焼き込み、HTMLAudio側はユーザーSE音量だけを適用する。古いiOSで `HTMLMediaElement.volume` が固定されても基本音量が暴れず、ユーザー音量0だけは `muted` で確実に無音化する。WAV先頭8ms・末尾12msにはごく短いfadeを入れ、codec開始・波形切断由来のクリックを避ける。
 - Howlerのタッチunlockは低メモリ端末ではscratch buffer fallbackを一切再生せず、`AudioContext.resume()` のみを実タッチごとに再試行する。resumeできない瞬間はWeb Audio SEの一時欠落を許容し、ノイズを出してまで強制unlockしない。通常端末は従来のゼロGain fallbackを維持する。
+
+### r330: 最初の必須タップでnative UI音声経路を前倒し準備
+- `mobile-low-memory` 対象では、タイトルの `Tap or click to proceed.` が必ず実ユーザー操作を通ることを利用し、その同じイベント内で通信不要の50ms完全無音PCM WAVを `HTMLAudioElement.play()` してnative media経路を先に起こす。BGMは従来どおり同じ実タップ内で開始し、iOSのautoplay制約を新たに作らない。
+- 起動ロード画面中に `choice / decision / cancel / window` の低メモリ用WAVを2chずつ `load()` し、`loadeddata/canplaythrough` を最大900msだけ待つ。古いWebViewでイベントが欠けてもロード画面を停止させず、timeout後は利用可能な状態で続行する。
+- 読込後は各native Audioを順番に `muted` で約12msだけplayし、pause・currentTime=0まで済ませる。ゲーム中の最初の武将/姫/拠点選択へmedia element・decoderの初回初期化を持ち越さない。8chを同時再生せず、ロード画面中に順番に温めて音声セッションの瞬間負荷を抑える。
+- 完全無音primeは音源PCM自体がゼロであり、通常UI SEを犠牲にして無音化する回避策ではない。ゲーム開始後はr329の2ch使い回し経路をそのまま使い、SE種類・基本音量・BGM・戦闘SE・入力順・ゲーム判断には触れない。

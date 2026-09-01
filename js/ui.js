@@ -182,12 +182,27 @@ class UIManager {
                 // 何度も押されないように、1回押されたらクリックの魔法を解除します
                 titleScreen.removeEventListener('click', onTitleClick);
 
+                // 最初の待機画面は必ず実タップを通る。そのユーザー操作権限が有効な同じイベント内で、
+                // 低メモリ端末のnative UI音声経路を完全無音PCMで先に起こす。
+                const startupAudioPrime = window.AudioManager?.primeLowMemoryUiAudioFromGesture?.() || Promise.resolve(false);
+
                 // ★追加：ここで専用のロード画面をパッと出します！
                 this.showLoadingScreen();
 
-                // 音を鳴らす準備（ブラウザのルールで、ユーザーが画面を触った瞬間に鳴らすのが一番安全です）
+                // BGMは従来どおり最初の実タップ内から開始し、iOSのautoplay制約を避ける。
                 if (window.AudioManager) {
                     window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
+                }
+
+                // 低メモリ端末ではロード画面中にchoice/decision/cancel/windowのnative Audioを
+                // 読込・一度muted再生まで済ませ、ゲーム中の最初の武将選択へ初期化負荷を持ち越さない。
+                if (window.AudioManager?.preloadLowMemoryUiSeForStartup) {
+                    this.updateLoadingProgress(5, '音声を準備しています');
+                    await Promise.all([
+                        Promise.resolve(startupAudioPrime).catch(() => false),
+                        Promise.resolve(window.AudioManager.preloadLowMemoryUiSeForStartup()).catch(() => false)
+                    ]);
+                    await this.waitForNextPaint();
                 }
 
                 // タイトルでは必要最小限だけを準備します。

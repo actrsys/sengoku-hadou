@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r329');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r330');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7475,7 +7475,7 @@ test('タッチ端末BGMはAACをHTML5ストリーミングし初回intro後だ�
     });
 });
 
-test('低メモリ端末の短いUI SEはbaked WAVをHTMLAudioで再利用しWeb Audioへ流さない', () => {
+test('低メモリ端末の短いUI SEはbaked WAVをHTMLAudioで再利用しWeb Audioへ流さない', async () => {
     class MockAudio {
         constructor() {
             this.preload = '';
@@ -7485,12 +7485,14 @@ test('低メモリ端末の短いUI SEはbaked WAVをHTMLAudioで再利用しWeb
             this.currentTime = 0;
             this.paused = true;
             this.ended = true;
+            this.readyState = 4;
             this.loadCount = 0;
             this.playCount = 0;
             MockAudio.instances.push(this);
         }
         load() { this.loadCount++; }
         play() { this.playCount++; this.paused = false; this.ended = false; return Promise.resolve(); }
+        pause() { this.paused = true; }
     }
     MockAudio.instances = [];
     class MockHowl {
@@ -7506,23 +7508,34 @@ test('低メモリ端末の短いUI SEはbaked WAVをHTMLAudioで再利用しWeb
         Audio: MockAudio,
         Howl: MockHowl,
         __mobileLowMemoryMode: true,
-        document
+        document,
+        setTimeout,
+        clearTimeout
     });
     loadScript(ctx, 'js/audio.js');
 
-    assert.strictEqual(MockAudio.instances.length, 8, 'choice/decision/cancel/windowを2chずつ事前生成する');
-    ctx.AudioManager.playSE('choice.ogg');
+    assert.strictEqual(MockAudio.instances.length, 9, '完全無音prime 1ch＋choice/decision/cancel/windowを2chずつ事前生成する');
+    assert.ok(MockAudio.instances[0].src.startsWith('data:audio/wav;base64,'), '最初の実タップ用primeは通信不要の完全無音WAVを使う');
+    await ctx.AudioManager.primeLowMemoryUiAudioFromGesture();
+    assert.strictEqual(MockAudio.instances[0].playCount, 1, '最初の実タップで無音media経路を一度だけ起こす');
+    await ctx.AudioManager.preloadLowMemoryUiSeForStartup();
+    assert.strictEqual(ctx.AudioManager._lowMemoryUiSeStartupPrepared, true, 'ロード画面中にUI SEのnative Audioを温める');
     const choicePlayers = ctx.AudioManager._lowMemoryUiSePlayers.get('choice.ogg');
     assert.strictEqual(choicePlayers.length, 2);
     assert.strictEqual(choicePlayers[0].src, 'data/music/se_mobile/choice.wav');
-    assert.strictEqual(choicePlayers[0].playCount, 1);
+    const warmedPlayCount = choicePlayers[0].playCount + choicePlayers[1].playCount;
+    assert.strictEqual(warmedPlayCount, 2, 'ロード中に2chともmuted再生で初期化しておく');
+    ctx.AudioManager.playSE('choice.ogg');
+    assert.strictEqual(choicePlayers[0].playCount + choicePlayers[1].playCount, warmedPlayCount + 1,
+        'ゲーム中の最初のchoiceは既に温めたnative Audioを再利用する');
     assert.strictEqual(MockHowl.instances.length, 0, '低メモリUI SEはHowl/Web Audioを生成しない');
 
     ctx.AudioManager.setSeVolume(0);
     assert.strictEqual(choicePlayers[0].muted, true);
     assert.strictEqual(choicePlayers[1].muted, true);
+    const mutedBaseline = choicePlayers[0].playCount + choicePlayers[1].playCount;
     ctx.AudioManager.playSE('choice.ogg');
-    assert.strictEqual(choicePlayers[0].playCount + choicePlayers[1].playCount, 1, 'SE音量0ではnative Audioも再生しない');
+    assert.strictEqual(choicePlayers[0].playCount + choicePlayers[1].playCount, mutedBaseline, 'SE音量0ではnative Audioも再生しない');
 
     ['choice.wav', 'decision.wav', 'cancel.wav', 'window.wav'].forEach(fileName => {
         const fullPath = path.join(ROOT, 'data/music/se_mobile', fileName);
@@ -7531,9 +7544,18 @@ test('低メモリ端末の短いUI SEはbaked WAVをHTMLAudioで再利用しWeb
     });
 
     const source = read('js/audio.js');
+    const uiSource = read('js/ui.js');
     assert.ok(source.includes('if (this._playLowMemoryUiSe(fileName)) return;'));
     assert.ok(source.includes('if (lowMemoryMode) {'));
     assert.ok(source.includes('問題端末ではscratch buffer自体を一切鳴らさない'));
+    assert.ok(source.includes('primeLowMemoryUiAudioFromGesture()'));
+    assert.ok(source.includes('preloadLowMemoryUiSeForStartup()'));
+    const primeAt = uiSource.indexOf('primeLowMemoryUiAudioFromGesture');
+    const loadingAt = uiSource.indexOf('this.showLoadingScreen();', primeAt);
+    const bgmAt = uiSource.indexOf("playBGM('SC_ex_Town1_Castle.ogg')", primeAt);
+    const preloadAt = uiSource.indexOf('preloadLowMemoryUiSeForStartup()', primeAt);
+    assert.ok(primeAt >= 0 && loadingAt > primeAt && bgmAt > loadingAt && preloadAt > bgmAt,
+        '最初の実タップで無音prime→ロード表示→BGM開始→ロード中UI SE準備の順を維持する');
 });
 
 test('武将一覧→詳細のRenderer停止診断は一時的にlocalStorageへ退避し安定後に消す', () => {

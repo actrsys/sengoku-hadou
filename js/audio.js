@@ -23,6 +23,10 @@ class AudioManager {
         // 同じAudio要素を使い回して毎クリックの音声オブジェクト生成も防ぐ。
         this._lowMemoryUiSePlayers = new Map();
         this._lowMemoryUiSeNames = new Set(['decision.ogg', 'cancel.ogg', 'choice.ogg', 'window.ogg']);
+        this._lowMemoryUiAudioPrime = null;
+        this._lowMemoryUiAudioPrimePromise = null;
+        this._lowMemoryUiAudioPrimed = false;
+        this._lowMemoryUiSeStartupPrepared = false;
 
         // ==========================================
         // ★ BGMのカタログ（個別の音量調整つき！）
@@ -109,6 +113,7 @@ class AudioManager {
         // もしカタログに書いていない音が呼ばれたときの「とりあえずの音量」
         this.fallbackBgmVolume = 0.05;
         this.fallbackSeVolume = 0.1;
+        this._prepareLowMemoryUiAudioPrime();
         this._prepareLowMemoryUiSePlayers();
     }
 
@@ -154,6 +159,134 @@ class AudioManager {
     _getLowMemoryUiSeSource(fileName) {
         const name = String(fileName || '');
         return `data/music/se_mobile/${name.replace(/\.[^.]+$/, '')}.wav`;
+    }
+
+    _prepareLowMemoryUiAudioPrime() {
+        if (!this._isMobileLowMemoryAudioMode() || this._lowMemoryUiAudioPrime
+            || typeof window === 'undefined' || typeof window.Audio !== 'function') return;
+        try {
+            const audio = new window.Audio();
+            audio.preload = 'auto';
+            audio.src = 'data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
+            audio.muted = false;
+            try { audio.volume = 1; } catch (_) {}
+            try { audio.playsInline = true; } catch (_) {}
+            try { audio.load(); } catch (_) {}
+            this._lowMemoryUiAudioPrime = audio;
+        } catch (_) {
+            this._lowMemoryUiAudioPrime = null;
+        }
+    }
+
+    primeLowMemoryUiAudioFromGesture() {
+        if (!this._isMobileLowMemoryAudioMode()) return Promise.resolve(false);
+        if (this._lowMemoryUiAudioPrimed) return Promise.resolve(true);
+        if (this._lowMemoryUiAudioPrimePromise) return this._lowMemoryUiAudioPrimePromise;
+        this._prepareLowMemoryUiAudioPrime();
+        const audio = this._lowMemoryUiAudioPrime;
+        if (!audio) return Promise.resolve(false);
+
+        // このplay()は必ず最初の待機画面をタップした同じイベント内から呼ぶ。
+        // 音源そのものが完全無音PCMなので、端末のmedia経路だけを先に起こす。
+        let playResult = null;
+        try {
+            audio.muted = false;
+            try { audio.volume = 1; } catch (_) {}
+            try { audio.currentTime = 0; } catch (_) {}
+            playResult = audio.play();
+        } catch (_) {
+            return Promise.resolve(false);
+        }
+
+        const promise = Promise.resolve(playResult).then(() => {
+            this._lowMemoryUiAudioPrimed = true;
+            return true;
+        }).catch(() => false).finally(() => {
+            this._lowMemoryUiAudioPrimePromise = null;
+        });
+        this._lowMemoryUiAudioPrimePromise = promise;
+        // 50msの完全無音WAV。ended欠落端末でも長く保持しない。
+        setTimeout(() => {
+            try { audio.pause(); } catch (_) {}
+            try { audio.currentTime = 0; } catch (_) {}
+        }, 90);
+        return promise;
+    }
+
+    _waitForNativeAudioReady(audio, timeoutMs = 900) {
+        if (!audio) return Promise.resolve(false);
+        if (Number(audio.readyState || 0) >= 2) return Promise.resolve(true);
+        if (typeof audio.addEventListener !== 'function') {
+            try { audio.load(); } catch (_) {}
+            return Promise.resolve(true);
+        }
+        return new Promise((resolve) => {
+            let done = false;
+            let timer = null;
+            const finish = (ok) => {
+                if (done) return;
+                done = true;
+                if (timer) clearTimeout(timer);
+                try { audio.removeEventListener('loadeddata', onReady); } catch (_) {}
+                try { audio.removeEventListener('canplaythrough', onReady); } catch (_) {}
+                try { audio.removeEventListener('error', onError); } catch (_) {}
+                resolve(ok);
+            };
+            const onReady = () => finish(true);
+            const onError = () => finish(false);
+            audio.addEventListener('loadeddata', onReady, { once: true });
+            audio.addEventListener('canplaythrough', onReady, { once: true });
+            audio.addEventListener('error', onError, { once: true });
+            timer = setTimeout(() => finish(Number(audio.readyState || 0) >= 2), timeoutMs);
+            try { audio.load(); } catch (_) { finish(false); }
+        });
+    }
+
+    async _warmLowMemoryUiSePlayersForStartup() {
+        const ratio = Math.max(0, Math.min(1, Number(this.userSeVolume) || 0));
+        for (const players of this._lowMemoryUiSePlayers.values()) {
+            for (const audio of players || []) {
+                if (!audio) continue;
+                audio.muted = true;
+                try { audio.volume = 0; } catch (_) {}
+                try { audio.currentTime = 0; } catch (_) {}
+                try {
+                    const playResult = audio.play();
+                    if (playResult && typeof playResult.then === 'function') await playResult.catch(() => {});
+                    // muted autoplayでdecoder/media elementを一度だけ温める。長く再生する必要はない。
+                    await new Promise(resolve => setTimeout(resolve, 12));
+                } catch (_) {}
+                try { audio.pause(); } catch (_) {}
+                try { audio.currentTime = 0; } catch (_) {}
+                audio.muted = !(ratio > 0);
+                try { audio.volume = ratio; } catch (_) {}
+            }
+        }
+    }
+
+    async preloadLowMemoryUiSeForStartup() {
+        if (!this._isMobileLowMemoryAudioMode()) return false;
+        if (this._lowMemoryUiSeStartupPrepared) return true;
+        this._prepareLowMemoryUiSePlayers();
+        const players = [];
+        this._lowMemoryUiSePlayers.forEach((items) => {
+            (items || []).forEach(audio => players.push(audio));
+        });
+        if (!players.length) return false;
+
+        // 最初の実タップで開始した完全無音primeがある場合は、そのmedia経路開始を先に通してから
+        // 実SE Audioのmuted warm-upへ進む。古い端末でprime完了通知が欠けても180ms以上は待たない。
+        if (this._lowMemoryUiAudioPrimePromise) {
+            await Promise.race([
+                this._lowMemoryUiAudioPrimePromise.catch(() => false),
+                new Promise(resolve => setTimeout(() => resolve(false), 180))
+            ]);
+        }
+        // 起動ロード画面中に実SEの読込・decodeを済ませ、ゲーム開始後の初回クリックへ持ち越さない。
+        await Promise.all(players.map(audio => this._waitForNativeAudioReady(audio, 900)));
+        await this._warmLowMemoryUiSePlayersForStartup();
+        this._lowMemoryUiSeStartupPrepared = true;
+        return true;
     }
 
     _prepareLowMemoryUiSePlayers() {
