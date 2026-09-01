@@ -20,15 +20,35 @@
         const touch = Number(nav.maxTouchPoints || 0) > 0 || /iPhone|iPad|iPod|Android|Mobile/i.test(ua);
         if (!touch) return false;
 
-        // iPhone 6/7/8/SE級の小さい論理画面を主対象にする。モデル名はWebKitから取得できないため、
-        // 画面寸法だけを保守的な低メモリ判定に使う。新しい大画面スマホやPC表示は従来の書体を維持する。
+        // 通常スマホまで安全モードへ巻き込まない。明確に古い/小メモリと判断できる端末だけを対象にする。
+        // iOSはdeviceMemoryを公開しないため、旧iPhone系は画面寸法とOS世代を組み合わせる。
         const screenObj = window.screen || {};
         const width = Number(screenObj.width || window.innerWidth || 0);
         const height = Number(screenObj.height || window.innerHeight || 0);
-        if (!(width > 0 && height > 0)) return false;
-        const shortEdge = Math.min(width, height);
-        const longEdge = Math.max(width, height);
-        return shortEdge <= 390 && longEdge <= 700;
+        const shortEdge = (width > 0 && height > 0) ? Math.min(width, height) : 0;
+        const longEdge = (width > 0 && height > 0) ? Math.max(width, height) : 0;
+        const deviceMemory = Number(nav.deviceMemory || 0);
+        const hardwareConcurrency = Number(nav.hardwareConcurrency || 0);
+
+        if (deviceMemory > 0 && deviceMemory <= 2) return true;
+
+        const isIPhoneLike = /iPhone|iPod/i.test(ua);
+        const iosMatch = ua.match(/(?:CPU iPhone OS|iPhone OS|CPU OS)\s*(\d+)[_\.]/i);
+        const iosMajor = iosMatch ? Number(iosMatch[1]) : 0;
+        if (isIPhoneLike && shortEdge > 0 && longEdge > 0
+            && shortEdge <= 390 && longEdge <= 700
+            && iosMajor > 0 && iosMajor <= 16) {
+            return true;
+        }
+
+        // AndroidはdeviceMemory非対応の古いWebViewだけ補助判定する。現行の大画面端末は対象外。
+        if (/Android/i.test(ua) && !(deviceMemory > 0)
+            && hardwareConcurrency > 0 && hardwareConcurrency <= 4
+            && shortEdge > 0 && longEdge > 0
+            && shortEdge <= 360 && longEdge <= 640) {
+            return true;
+        }
+        return false;
     }
 
     const earlyMobileLowMemoryMode = resolveEarlyMobileLowMemoryMode();

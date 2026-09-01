@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r330');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r331');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -261,12 +261,14 @@ test('長文本文は装飾書体と分離し、可読性と歴史物の柔ら�
     }
 });
 
-test('小画面タッチ端末はWebフォントを常駐させずシステム明朝へフォールバックする', () => {
+test('旧端末安全モードは通常スマホを巻き込まずWebフォントを省く', () => {
     const bootstrap = read('js/app_bootstrap.js');
     const css = read('css/style.css');
     const html = read('index.html');
     assert.ok(bootstrap.includes('resolveEarlyMobileLowMemoryMode()'));
+    assert.ok(bootstrap.includes('deviceMemory > 0 && deviceMemory <= 2'));
     assert.ok(bootstrap.includes('shortEdge <= 390 && longEdge <= 700'));
+    assert.ok(bootstrap.includes('iosMajor > 0 && iosMajor <= 16'));
     assert.ok(bootstrap.includes("document.documentElement.classList.add('mobile-low-memory')"));
     assert.ok(bootstrap.includes('if (!earlyMobileLowMemoryMode)'));
     assert.ok(css.includes("html.mobile-low-memory"));
@@ -274,8 +276,20 @@ test('小画面タッチ端末はWebフォントを常駐させずシステム�
     assert.ok(css.includes('html.mobile-low-memory body,'));
     assert.ok(css.includes('Hiragino Mincho ProN'));
     assert.ok(!html.includes('preload" href="data/fonts/fude-goshirae.woff2'));
-    assert.ok(!html.includes('data/fonts/abashiri-mincho.woff2?v=1" as="font'), '低メモリ判定前の静的font preloadを置かない');
+    assert.ok(!html.includes('data/fonts/abashiri-mincho.woff2?v=1" as="font'), '安全モード判定前の静的font preloadを置かない');
     assert.ok(bootstrap.includes("fontPreload.href = 'data/fonts/abashiri-mincho.woff2?v=1'"), '通常端末だけbootstrapからpreloadする');
+});
+
+test('通常スマホは低メモリ専用の画質・音声・詳細遷移削減を受けない', () => {
+    const audio = read('js/audio.js');
+    const busho = read('js/ui_info_busho.js');
+    const css = read('css/style.css');
+    assert.ok(audio.includes('return this._isMobileLowMemoryAudioMode();'));
+    const detailAt = busho.indexOf('const isMobileListTransition = !!(');
+    const detailBlock = busho.slice(detailAt, detailAt + 420);
+    assert.ok(detailBlock.includes('window.__mobileLowMemoryMode'));
+    assert.ok(css.includes('html.mobile-low-memory body:not(.is-pc).background-paused #map-base-image'));
+    assert.ok(!css.includes('\nbody:not(.is-pc).background-paused #map-base-image {'));
 });
 
 test('低メモリ端末はモーダル中の地図と独自スクロールbarをcompositorから外す', () => {
@@ -2359,7 +2373,7 @@ test('派閥再編後の一覧更新は共通Selectorの現在画面を正本に
     assert.ok(!faction.includes('isFactionListDirect'), '旧専用画面の保持変数を使わない');
     assert.ok(faction.includes('this.game.ui.info.refreshOpenFactionList(targetId);'), '派閥SystemはUI側の公開更新窓口へ委譲する');
     assert.ok(info.includes("info.pageType !== 'faction_list'"), '現在画面が派閥一覧の時だけ更新する');
-    assert.ok(info.includes('info.scrollPos = listEl ? listEl.scrollTop'), '再描画前にスクロール位置を保持する');
+    assert.ok(info.includes('info.scrollPos = listEl ? this._getListResumePosition(listEl)'), '再描画前にスクロール/ページ位置を保持する');
     assert.ok(info.includes('this._renderCurrentModal();'), '共通Selectorの現在画面をその場で再描画する');
 });
 
@@ -7424,7 +7438,7 @@ test('BGMはstart=0でもloopEndを適用し音量変更はcurrentBgmNameを正�
 });
 
 
-test('タッチ端末BGMはAACをHTML5ストリーミングし初回intro後だけloopStartへ戻る', () => {
+test('旧端末安全モードBGMはAACをHTML5ストリーミングし初回intro後だけloopStartへ戻る', () => {
     class MockHowl {
         constructor(options) {
             this.options = options;
@@ -7440,8 +7454,11 @@ test('タッチ端末BGMはAACをHTML5ストリーミングし初回intro後だ�
         mute(value) { this.lastMute = value; return this; }
     }
     MockHowl.instances = [];
-    const document = { body: { classList: new FakeClassList(['is-touch-input']) } };
-    const ctx = createContext({ Howl: MockHowl, document });
+    const document = {
+        documentElement: { classList: new FakeClassList(['mobile-low-memory']) },
+        body: { classList: new FakeClassList(['is-touch-input']) }
+    };
+    const ctx = createContext({ Howl: MockHowl, document, __mobileLowMemoryMode: true });
     loadScript(ctx, 'js/audio.js');
 
     ctx.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
@@ -7475,87 +7492,59 @@ test('タッチ端末BGMはAACをHTML5ストリーミングし初回intro後だ�
     });
 });
 
-test('低メモリ端末の短いUI SEはbaked WAVをHTMLAudioで再利用しWeb Audioへ流さない', async () => {
-    class MockAudio {
-        constructor() {
-            this.preload = '';
-            this.src = '';
-            this.muted = false;
-            this.volume = 1;
-            this.currentTime = 0;
-            this.paused = true;
-            this.ended = true;
-            this.readyState = 4;
-            this.loadCount = 0;
-            this.playCount = 0;
-            MockAudio.instances.push(this);
-        }
-        load() { this.loadCount++; }
-        play() { this.playCount++; this.paused = false; this.ended = false; return Promise.resolve(); }
-        pause() { this.paused = true; }
-    }
-    MockAudio.instances = [];
+test('通常タッチ端末BGMは元のOGG/Web Audio経路を維持する', () => {
     class MockHowl {
-        constructor() { MockHowl.instances.push(this); }
-        play() {}
+        constructor(options) { this.options = options; MockHowl.instances.push(this); }
+        _soundById() { return { _node: { bufferSource: {} } }; }
+        play() { if (this.options.onplay) this.options.onplay(1); return 1; }
+        stop() {}
+        unload() {}
+        volume() { return this; }
+    }
+    MockHowl.instances = [];
+    const document = {
+        documentElement: { classList: new FakeClassList([]) },
+        body: { classList: new FakeClassList(['is-touch-input']) }
+    };
+    const ctx = createContext({ Howl: MockHowl, document, __mobileLowMemoryMode: false });
+    loadScript(ctx, 'js/audio.js');
+    ctx.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
+    const howl = MockHowl.instances.at(-1);
+    assert.strictEqual(howl.options.src[0], 'data/music/bgm/SC_ex_Town2_Fortress.ogg');
+    assert.notStrictEqual(howl.options.html5, true);
+    assert.strictEqual(howl.options.loop, true);
+});
+
+test('旧端末安全モードは短いUIクリックSEを鳴らさず音声初期化を増やさない', () => {
+    class MockHowl {
+        constructor(options) { this.options = options; MockHowl.instances.push(this); }
+        play() { return 1; }
+        stop() {}
+        unload() {}
     }
     MockHowl.instances = [];
     const document = {
         documentElement: { classList: new FakeClassList(['mobile-low-memory']) },
         body: { classList: new FakeClassList(['is-touch-input']) }
     };
-    const ctx = createContext({
-        Audio: MockAudio,
-        Howl: MockHowl,
-        __mobileLowMemoryMode: true,
-        document,
-        setTimeout,
-        clearTimeout
-    });
+    const ctx = createContext({ Howl: MockHowl, document, __mobileLowMemoryMode: true, setTimeout, clearTimeout });
     loadScript(ctx, 'js/audio.js');
 
-    assert.strictEqual(MockAudio.instances.length, 9, '完全無音prime 1ch＋choice/decision/cancel/windowを2chずつ事前生成する');
-    assert.ok(MockAudio.instances[0].src.startsWith('data:audio/wav;base64,'), '最初の実タップ用primeは通信不要の完全無音WAVを使う');
-    await ctx.AudioManager.primeLowMemoryUiAudioFromGesture();
-    assert.strictEqual(MockAudio.instances[0].playCount, 1, '最初の実タップで無音media経路を一度だけ起こす');
-    await ctx.AudioManager.preloadLowMemoryUiSeForStartup();
-    assert.strictEqual(ctx.AudioManager._lowMemoryUiSeStartupPrepared, true, 'ロード画面中にUI SEのnative Audioを温める');
-    const choicePlayers = ctx.AudioManager._lowMemoryUiSePlayers.get('choice.ogg');
-    assert.strictEqual(choicePlayers.length, 2);
-    assert.strictEqual(choicePlayers[0].src, 'data/music/se_mobile/choice.wav');
-    const warmedPlayCount = choicePlayers[0].playCount + choicePlayers[1].playCount;
-    assert.strictEqual(warmedPlayCount, 2, 'ロード中に2chともmuted再生で初期化しておく');
-    ctx.AudioManager.playSE('choice.ogg');
-    assert.strictEqual(choicePlayers[0].playCount + choicePlayers[1].playCount, warmedPlayCount + 1,
-        'ゲーム中の最初のchoiceは既に温めたnative Audioを再利用する');
-    assert.strictEqual(MockHowl.instances.length, 0, '低メモリUI SEはHowl/Web Audioを生成しない');
-
-    ctx.AudioManager.setSeVolume(0);
-    assert.strictEqual(choicePlayers[0].muted, true);
-    assert.strictEqual(choicePlayers[1].muted, true);
-    const mutedBaseline = choicePlayers[0].playCount + choicePlayers[1].playCount;
-    ctx.AudioManager.playSE('choice.ogg');
-    assert.strictEqual(choicePlayers[0].playCount + choicePlayers[1].playCount, mutedBaseline, 'SE音量0ではnative Audioも再生しない');
-
-    ['choice.wav', 'decision.wav', 'cancel.wav', 'window.wav'].forEach(fileName => {
-        const fullPath = path.join(ROOT, 'data/music/se_mobile', fileName);
-        assert.ok(fs.existsSync(fullPath), `low-memory UI SE missing: ${fileName}`);
-        assert.strictEqual(fs.readFileSync(fullPath, { start: 0, end: 3 }).subarray(0, 4).toString('ascii'), 'RIFF');
-    });
+    const before = MockHowl.instances.length;
+    for (const name of ['choice.ogg', 'decision.ogg', 'cancel.ogg', 'window.ogg']) ctx.AudioManager.playSE(name);
+    assert.strictEqual(MockHowl.instances.length, before, '安全モードのUIクリック音はHowl/HTMLAudioを新規生成しない');
+    ctx.AudioManager.playSE('damage001.ogg');
+    assert.strictEqual(MockHowl.instances.length, before + 1, '戦闘など意味のあるSEは従来経路を維持する');
 
     const source = read('js/audio.js');
     const uiSource = read('js/ui.js');
-    assert.ok(source.includes('if (this._playLowMemoryUiSe(fileName)) return;'));
-    assert.ok(source.includes('if (lowMemoryMode) {'));
-    assert.ok(source.includes('問題端末ではscratch buffer自体を一切鳴らさない'));
-    assert.ok(source.includes('primeLowMemoryUiAudioFromGesture()'));
-    assert.ok(source.includes('preloadLowMemoryUiSeForStartup()'));
-    const primeAt = uiSource.indexOf('primeLowMemoryUiAudioFromGesture');
-    const loadingAt = uiSource.indexOf('this.showLoadingScreen();', primeAt);
-    const bgmAt = uiSource.indexOf("playBGM('SC_ex_Town1_Castle.ogg')", primeAt);
-    const preloadAt = uiSource.indexOf('preloadLowMemoryUiSeForStartup()', primeAt);
-    assert.ok(primeAt >= 0 && loadingAt > primeAt && bgmAt > loadingAt && preloadAt > bgmAt,
-        '最初の実タップで無音prime→ロード表示→BGM開始→ロード中UI SE準備の順を維持する');
+    assert.ok(source.includes("this._lowMemoryMutedUiSeNames = new Set(['decision.ogg', 'cancel.ogg', 'choice.ogg', 'window.ogg'])"));
+    assert.ok(source.includes('if (this._isMobileLowMemoryAudioMode() && this._lowMemoryMutedUiSeNames.has(fileName)) return;'));
+    assert.ok(!source.includes('primeLowMemoryUiAudioFromGesture()'));
+    assert.ok(!source.includes('preloadLowMemoryUiSeForStartup()'));
+    assert.ok(!uiSource.includes('primeLowMemoryUiAudioFromGesture'));
+    assert.ok(!uiSource.includes('preloadLowMemoryUiSeForStartup'));
+    assert.ok(!fs.existsSync(path.join(ROOT, 'data/music/se_mobile')), '不要になった低メモリUI SE専用WAVは残さない');
 });
 
 test('武将一覧→詳細のRenderer停止診断は一時的にlocalStorageへ退避し安定後に消す', () => {
@@ -8655,6 +8644,22 @@ test('第三者の忠誠・不満所見は高精度でも内心を断定しな�
 });
 
 
+
+test('旧端末安全モードの長い共通一覧はスクロールせず10行ページ送りを使う', () => {
+    const info = read('js/ui_info.js');
+    const css = read('css/style.css');
+    assert.ok(info.includes('const LOW_MEMORY_PAGE_SIZE = 10;'));
+    assert.ok(info.includes('const LOW_MEMORY_PAGING_THRESHOLD = 20;'));
+    assert.ok(info.includes('window.__mobileLowMemoryMode'));
+    assert.ok(info.includes("document.body.classList.contains('is-touch-input')"));
+    assert.ok(info.includes("listContainer.classList.add('low-memory-paged-list')"));
+    assert.ok(info.includes('data-action-index'));
+    assert.ok(info.includes('LOW_MEMORY_PAGE_RESUME_UNIT = 1000'));
+    assert.ok(info.includes('_getListResumePosition(listEl)'));
+    assert.ok(css.includes('.list-container.low-memory-paged-list'));
+    assert.ok(css.includes('overflow: hidden !important;'));
+    assert.ok(css.includes('.low-memory-list-pager'));
+});
 
 test('共通一覧は詳細遷移・終了時に仮想スクロールの参照と旧DOMを先に解放する', () => {
     const info = read('js/ui_info.js');

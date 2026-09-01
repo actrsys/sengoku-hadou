@@ -5486,7 +5486,7 @@ body.background-paused #map-container {
 
 /* 情報モーダル中はスマホの静的地図画像を独立GPUレイヤーへ固定し続けない。
    transformを外しても座標・大きさ・見た目は変わらず、モーダルを閉じれば通常指定へ戻る。 */
-body:not(.is-pc).background-paused #map-base-image {
+html.mobile-low-memory body:not(.is-pc).background-paused #map-base-image {
     transform: none !important;
     backface-visibility: visible !important;
     will-change: auto !important;
@@ -5524,6 +5524,30 @@ html.mobile-low-memory body:not(.is-pc) .scroll-wrapper {
 html.mobile-low-memory body:not(.is-pc) .custom-scrollbar-track,
 html.mobile-low-memory body:not(.is-pc) .custom-scrollbar-btn {
     display: none !important;
+}
+
+/* 旧端末の長い共通一覧はスクロールを使わず10行ずつページ送りする。 */
+html.mobile-low-memory body:not(.is-pc) .list-container.low-memory-paged-list {
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    scroll-snap-type: none !important;
+}
+html.mobile-low-memory body:not(.is-pc) .low-memory-list-pager {
+    display: grid;
+    grid-template-columns: 88px 1fr 88px;
+    align-items: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 4px 8px;
+    box-sizing: border-box;
+}
+html.mobile-low-memory body:not(.is-pc) .low-memory-page-label {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+html.mobile-low-memory body:not(.is-pc) .low-memory-list-pager button {
+    min-height: 32px;
+    padding: 4px 10px;
 }
 
 /* 252拠点すべての常時drop-shadow合成を避ける。選択/現在ターンの意味付き発光は維持する。 */
@@ -7109,20 +7133,20 @@ body:not(.is-pc) #legion-council-order-back-btn {
 /* =========================================================
    古いスマホ向け：モーダル/大きなリスト表示中の背面マップ軽量化
    ========================================================= */
-body:not(.is-pc).background-paused .castle-card,
+html.mobile-low-memory body:not(.is-pc).background-paused .castle-card,
+html.mobile-low-memory body:not(.is-pc).background-paused .castle-card.glow-blue,
+html.mobile-low-memory body:not(.is-pc).background-paused .castle-card.glow-red,
+html.mobile-low-memory body:not(.is-pc).background-paused .castle-card.glow-green,
 body:not(.is-pc).mobile-memory-guard .castle-card,
-body:not(.is-pc).background-paused .castle-card.glow-blue,
-body:not(.is-pc).background-paused .castle-card.glow-red,
-body:not(.is-pc).background-paused .castle-card.glow-green,
 body:not(.is-pc).mobile-memory-guard .castle-card.glow-blue,
 body:not(.is-pc).mobile-memory-guard .castle-card.glow-red,
 body:not(.is-pc).mobile-memory-guard .castle-card.glow-green {
     filter: none !important;
     animation: none !important;
 }
-body:not(.is-pc).background-paused .kunishu-icon-img,
+html.mobile-low-memory body:not(.is-pc).background-paused .kunishu-icon-img,
+html.mobile-low-memory body:not(.is-pc).background-paused .daimyo-name-label,
 body:not(.is-pc).mobile-memory-guard .kunishu-icon-img,
-body:not(.is-pc).background-paused .daimyo-name-label,
 body:not(.is-pc).mobile-memory-guard .daimyo-name-label {
     filter: none !important;
     box-shadow: none !important;

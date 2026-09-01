@@ -50,6 +50,7 @@ Object.assign(UIInfoManager.prototype, {
     showBushoDetailModal(busho) {
         this.bushoDetailCurrentTab = 'status';
         const isMobileListTransition = !!(
+            window.__mobileLowMemoryMode &&
             document.body &&
             !document.body.classList.contains('is-pc') &&
             this.currentModalInfo &&

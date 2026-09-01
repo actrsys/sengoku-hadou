@@ -687,3 +687,11 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - 起動ロード画面中に `choice / decision / cancel / window` の低メモリ用WAVを2chずつ `load()` し、`loadeddata/canplaythrough` を最大900msだけ待つ。古いWebViewでイベントが欠けてもロード画面を停止させず、timeout後は利用可能な状態で続行する。
 - 読込後は各native Audioを順番に `muted` で約12msだけplayし、pause・currentTime=0まで済ませる。ゲーム中の最初の武将/姫/拠点選択へmedia element・decoderの初回初期化を持ち越さない。8chを同時再生せず、ロード画面中に順番に温めて音声セッションの瞬間負荷を抑える。
 - 完全無音primeは音源PCM自体がゼロであり、通常UI SEを犠牲にして無音化する回避策ではない。ゲーム開始後はr329の2ch使い回し経路をそのまま使い、SE種類・基本音量・BGM・戦闘SE・入力順・ゲーム判断には触れない。
+
+
+## r331: 通常スマホと旧端末安全モードの分離
+- `mobile-low-memory` は画面サイズだけで広く判定せず、2GB以下の `deviceMemory`、または小画面iPhone/iPod + iOS 16以下など、明確に旧端末と判断できる条件に限定する。
+- 通常スマホはWebフォント、通常地図、1/2勢力色Canvas、OGG/Web Audio BGM、通常UI SE、通常の一覧スクロールを維持する。
+- 旧端末安全モードだけ、軽量地図・1/4Canvas・重いモーダル中の背景地図切離し・システムフォント・短いUIクリックSE無効化を使う。
+- 旧端末の20件超の共通一覧は10行ずつのページ送りにし、仮想スクロール、scroll rAF、momentum scroll、custom scrollbarを使わない。表示候補・並び順・選択結果は通常モードと同一とする。
+- 武将一覧→詳細のイベントループyieldも旧端末安全モードだけに限定し、通常スマホの従来の即時遷移を維持する。

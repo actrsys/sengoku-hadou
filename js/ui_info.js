@@ -217,7 +217,7 @@ class UIInfoManager {
         }
 
         const listEl = document.getElementById('selector-list');
-        this.currentModalInfo.scrollPos = listEl ? listEl.scrollTop : 0;
+        this.currentModalInfo.scrollPos = this._getListResumePosition(listEl);
         if (!this.modalHistory) this.modalHistory = [];
         this.modalHistory.push(this.currentModalInfo);
         this.currentModalInfo = { pageType, args: renderArgs, scrollPos: 0 };
@@ -451,6 +451,13 @@ class UIInfoManager {
         return isAsc ? (valA - valB) : (valB - valA);
     }
 
+    _getListResumePosition(listEl) {
+        if (!listEl) return 0;
+        const paged = Number(listEl.dataset ? listEl.dataset.lowMemoryResumePosition : NaN);
+        if (Number.isFinite(paged) && paged >= 0) return paged;
+        return Number(listEl.scrollTop) || 0;
+    }
+
     pushModal(pageType, renderArgs) {
         this._cancelDeferredModalTransition();
         if (!this.modalHistory) this.modalHistory = [];
@@ -466,7 +473,7 @@ class UIInfoManager {
         if (this.currentModalInfo) {
             // 今開いている画面のスクロール位置をメモしておきます
             const listEl = document.getElementById('selector-list');
-            this.currentModalInfo.scrollPos = listEl ? listEl.scrollTop : 0;
+            this.currentModalInfo.scrollPos = this._getListResumePosition(listEl);
             this.modalHistory.push(this.currentModalInfo);
         }
         
@@ -1338,7 +1345,7 @@ class UIInfoManager {
         if (targetClanId !== null && Number(openClanId) !== Number(targetClanId)) return false;
 
         const listEl = document.getElementById('selector-list');
-        info.scrollPos = listEl ? listEl.scrollTop : (info.scrollPos || 0);
+        info.scrollPos = listEl ? this._getListResumePosition(listEl) : (info.scrollPos || 0);
         this._renderCurrentModal();
         return true;
     }
@@ -1734,6 +1741,70 @@ class UIInfoManager {
                 });
             }
         };
+
+        // 旧端末の安全モードでは、長い一覧をスクロールさせず固定件数のページ送りにする。
+        // 仮想DOM差し替え・scroll rAF・momentum scroll・custom scrollbarをまとめて避け、
+        // 武将一覧のスクロール中にWebKit rendererが落ちる経路を使わない。
+        const LOW_MEMORY_PAGE_SIZE = 10;
+        const LOW_MEMORY_PAGING_THRESHOLD = 20;
+        const LOW_MEMORY_PAGE_RESUME_UNIT = 1000;
+        const useLowMemoryPaging = !!(window.__mobileLowMemoryMode
+            && document.body.classList.contains('is-touch-input')
+            && !config.disableLowMemoryPaging
+            && totalItems > LOW_MEMORY_PAGING_THRESHOLD);
+        if (useLowMemoryPaging) {
+            const totalPages = Math.max(1, Math.ceil(totalItems / LOW_MEMORY_PAGE_SIZE));
+            let pageIndex = Math.max(0, Math.min(totalPages - 1,
+                Math.floor((Number(config.scrollPos) || 0) / LOW_MEMORY_PAGE_RESUME_UNIT)));
+
+            const renderLowMemoryPage = () => {
+                if (this._currentListRenderId !== currentRenderId) return;
+                const startIndex = pageIndex * LOW_MEMORY_PAGE_SIZE;
+                const endIndex = Math.min(totalItems, startIndex + LOW_MEMORY_PAGE_SIZE);
+                const parts = [];
+                if (config.headers && config.headers.length > 0) {
+                    const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
+                    parts.push(`<div class="list-header sortable-header ${config.headerClass || ''}">${headerCols}</div>`);
+                }
+                for (let i = startIndex; i < endIndex; i++) parts.push(buildItemHtml(getItemAt(i), i));
+                for (let i = endIndex - startIndex; i < LOW_MEMORY_PAGE_SIZE; i++) {
+                    const emptyCells = config.headers ? config.headers.map(() => '<span></span>').join('') : '';
+                    parts.push(`<div class="select-item ${config.itemClass || ''} is-static is-placeholder-row">${emptyCells}</div>`);
+                }
+                parts.push(`<div class="low-memory-list-pager">
+                    <button type="button" class="btn-secondary low-memory-page-prev" ${pageIndex <= 0 ? 'disabled' : ''}>前</button>
+                    <span class="low-memory-page-label">${pageIndex + 1} / ${totalPages}</span>
+                    <button type="button" class="btn-secondary low-memory-page-next" ${pageIndex >= totalPages - 1 ? 'disabled' : ''}>次</button>
+                </div>`);
+
+                listContainer.classList.add('low-memory-paged-list');
+                listContainer.classList.remove('hide-native-scroll');
+                listContainer.innerHTML = `<div class="list-inner-wrapper${wrapperClass}"${wrapperStyle}>${parts.join('')}</div>`;
+                listContainer.dataset.lowMemoryResumePosition = String(pageIndex * LOW_MEMORY_PAGE_RESUME_UNIT);
+                listContainer.scrollTop = 0;
+                listContainer.style.display = 'block';
+
+                const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
+                attachDelegatedClick(innerWrapper);
+                attachSortClicks();
+                const prev = innerWrapper.querySelector('.low-memory-page-prev');
+                const next = innerWrapper.querySelector('.low-memory-page-next');
+                if (prev) prev.addEventListener('click', () => {
+                    if (pageIndex <= 0) return;
+                    pageIndex--;
+                    renderLowMemoryPage();
+                });
+                if (next) next.addEventListener('click', () => {
+                    if (pageIndex >= totalPages - 1) return;
+                    pageIndex++;
+                    renderLowMemoryPage();
+                });
+                if (!config.skipTextFit) requestAnimationFrame(adjustTextFit);
+            };
+
+            renderLowMemoryPage();
+            return;
+        }
 
         // ==========================================
         // ★新機能：件数が多いリストは「仮想スクロール」にして、見えている行だけ描画します
