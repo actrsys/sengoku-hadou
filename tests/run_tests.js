@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r341');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r342');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -6753,6 +6753,13 @@ test('武将一覧共通ソートは面談用検索と既知能力順を安定�
         [101, 102, 103],
         '身分降順ではLegion正本fallbackの国主も軍師より下・城主より上に並べる'
     );
+    const castleDetailContext = ctx.BushoListSortRules.createClanRankContext(rankGame);
+    castleDetailContext.rankOrderProfile = 'castle_detail';
+    assert.deepStrictEqual(
+        Array.from(rankList).sort((a, b) => ctx.BushoListSortRules.compareKnown(rankGame, a, b, 'rank', false, castleDetailContext)).map(b => b.id),
+        [102, 103, 101],
+        '拠点情報専用の身分降順だけは国主→城主→軍師にする'
+    );
     assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'rank', false)).map(b => b.id), [1, 4, 3, 2], '身分降順は上位身分優先、同身分は功績降順にする');
     assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'rank', true)).map(b => b.id), [2, 3, 4, 1], '身分昇順は下位身分優先、同身分は功績昇順にする');
     assert.deepStrictEqual(Array.from(ctx.BushoListSortRules.sortKnown(game, list, 'leadership', false)).map(b => b.id), [1, 3, 2, 4]);
@@ -10658,6 +10665,15 @@ test('スマホ武将一覧→詳細は旧一覧DOMを解放してから一度�
     assert.ok(css.includes('body:not(.is-pc).background-paused #map-base-image {'));
     assert.ok(css.includes('transform: none !important;'), 'モーダル中だけスマホ地図画像の独立GPUレイヤー固定を外す');
     assert.ok(css.includes('backface-visibility: visible !important;'));
+});
+
+test('拠点情報の武将一覧だけ専用の身分順profileを渡す', () => {
+    const kyotenUi = fs.readFileSync(path.join(ROOT, 'js/ui_info_kyoten.js'), 'utf8');
+    const bushoUi = fs.readFileSync(path.join(ROOT, 'js/ui_info_busho.js'), 'utf8');
+    const rules = fs.readFileSync(path.join(ROOT, 'js/busho_list_sort_rules.js'), 'utf8');
+    assert.ok(kyotenUi.includes("rankOrderProfile: 'castle_detail'"), '拠点情報→武将だけ専用profileを指定する');
+    assert.ok(bushoUi.includes('clanRankContext.rankOrderProfile = rankOrderProfile'), '一覧側は専用profileを正本Rulesのcontextへ渡す');
+    assert.ok(rules.includes("context && context.rankOrderProfile === 'castle_detail'"), '身分順の差分はRules側で一元管理する');
 });
 
 test('全国武将一覧の身分順は正本Rulesの短命contextで軍団走査を再利用する', () => {

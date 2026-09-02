@@ -121,7 +121,19 @@ class BushoListSortRules {
         }
 
         let rank = 4;
-        if (busho.isDaimyo) rank = 8;
+        if (context && context.rankOrderProfile === 'castle_detail') {
+            // 拠点情報から開いた在城武将一覧だけは、現地の指揮系統が見やすい順にする。
+            // 大名は従来どおり最上位に置き、その下を 国主 → 城主 → 軍師 → 武将 とする。
+            if (busho.isDaimyo) rank = 8;
+            else if (isCommander) rank = 7;
+            else if (busho.isCastellan) rank = 6;
+            else if (isGunshi) rank = 5;
+            else if (window.BushoStatusRules && window.BushoStatusRules.isRonin(busho)) rank = 1;
+            else if (Number(busho.belongKunishuId || 0) > 0) {
+                const kunishu = game && game.kunishuSystem ? game.kunishuSystem.getKunishu(busho.belongKunishuId) : null;
+                rank = kunishu && Number(kunishu.leaderId) === bushoId ? 3 : 2;
+            }
+        } else if (busho.isDaimyo) rank = 8;
         else if (isGunshi) rank = 7;
         else if (isCommander) rank = 6;
         else if (busho.isCastellan) rank = 5;

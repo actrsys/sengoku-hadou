@@ -879,9 +879,11 @@ Object.assign(UIInfoManager.prototype, {
         // 身分の意味そのものは BushoListSortRules を正本とし、必要になった時だけ
         // その同期描画専用contextを1つ作って国主ID・身分値を再利用します。
         let clanRankContext = null;
+        const rankOrderProfile = extraData && extraData.rankOrderProfile ? String(extraData.rankOrderProfile) : '';
         const getClanRankContext = () => {
             if (!clanRankContext && window.BushoListSortRules && typeof BushoListSortRules.createClanRankContext === 'function') {
                 clanRankContext = BushoListSortRules.createClanRankContext(this.game);
+                if (rankOrderProfile) clanRankContext.rankOrderProfile = rankOrderProfile;
             }
             return clanRankContext;
         };
@@ -914,7 +916,7 @@ Object.assign(UIInfoManager.prototype, {
         const actionStateKey = hideActionCol ? '' : (this.bushoSavedBushos || [])
             .map(b => `${b.id}:${b.isActionDone === true ? 1 : 0}`)
             .join(',');
-        const currentSortStateKey = `${this.bushoCurrentSortKey}_${this.bushoIsSortAsc}_${selectedIdsStr}_${actionStateKey}`;
+        const currentSortStateKey = `${this.bushoCurrentSortKey}_${this.bushoIsSortAsc}_${rankOrderProfile}_${selectedIdsStr}_${actionStateKey}`;
         const groupActionDoneLast = (list) => {
             if (hideActionCol || !Array.isArray(list)) return list;
             const pending = [];

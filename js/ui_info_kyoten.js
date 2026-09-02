@@ -226,7 +226,8 @@ Object.assign(UIInfoManager.prototype, {
                     e.stopPropagation();
                     this.openBushoSelector('view_only', null, { 
                         customBushos: targetBushos,
-                        customInfoHtml: `<div>${castle.name} 滞在武将</div>`
+                        customInfoHtml: `<div>${castle.name} 滞在武将</div>`,
+                        rankOrderProfile: 'castle_detail'
                     });
                 };
             }
