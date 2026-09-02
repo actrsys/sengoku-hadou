@@ -7,11 +7,11 @@
     <div class="modal-content modal-small">
       <h3 class="settings-title">設定</h3>
       <div id="settings-tabs" class="settings-tabs" role="tablist" aria-label="設定カテゴリ">
-        <button type="button" id="settings-tab-audio-display" class="settings-tab-btn active" role="tab" aria-selected="true" data-settings-tab="audio-display">音・表示</button>
-        <button type="button" id="settings-tab-game" class="settings-tab-btn" role="tab" aria-selected="false" data-settings-tab="game">ゲーム</button>
+        <button type="button" id="settings-tab-game" class="settings-tab-btn active" role="tab" aria-selected="true" data-settings-tab="game">ゲーム</button>
+        <button type="button" id="settings-tab-audio-display" class="settings-tab-btn" role="tab" aria-selected="false" data-settings-tab="audio-display">音・表示</button>
       </div>
       <div class="settings-panels">
-        <section id="settings-panel-audio-display" class="settings-panel active" role="tabpanel">
+        <section id="settings-panel-audio-display" class="settings-panel" role="tabpanel">
           <div class="setting-row">
             <label class="slider-row-label">BGM 音量</label>
             <div class="qty-control setting-slider-wrap"><input type="range" min="0" max="100" value="100"><div class="setting-value">100％</div></div>
@@ -29,7 +29,7 @@
           </div>
           <div id="settings-restart-row" class="setting-row settings-restart-row hidden"><label class="slider-row-label">設定の反映</label><div class="setting-toggle-group"><button id="settings-restart-btn" class="ui-toggle-btn setting-danger-btn">再起動</button></div></div>
         </section>
-        <section id="settings-panel-game" class="settings-panel" role="tabpanel">
+        <section id="settings-panel-game" class="settings-panel active" role="tabpanel">
           <div class="setting-row"><label class="slider-row-label">オートセーブ</label><div class="setting-toggle-group"><button class="ui-toggle-btn active">する</button><button class="ui-toggle-btn">しない</button></div></div>
           <div class="setting-row"><label class="slider-row-label">他家戦争の通知</label><div class="setting-toggle-group"><button class="ui-toggle-btn active">通知する</button><button class="ui-toggle-btn">通知しない</button></div></div>
           <div class="setting-row"><label class="slider-row-label">歴史イベント</label><div class="setting-toggle-group"><button class="ui-toggle-btn active">発生する</button><button class="ui-toggle-btn">発生しない</button></div></div>

@@ -1241,7 +1241,7 @@ async function validateSettingsTabsLayout(cdp) {
                 gameVisibility:getComputedStyle(game).visibility,
                 overflowY:cs.overflowY,
                 clientHeight:content.clientHeight, scrollHeight:content.scrollHeight,
-                firstTab:getComputedStyle(document.getElementById('settings-tab-audio-display')).display
+                firstTab:getComputedStyle(document.getElementById('settings-tab-game')).display
             };
         })()`, returnByValue:true, awaitPromise:true
     });
@@ -1250,12 +1250,12 @@ async function validateSettingsTabsLayout(cdp) {
     assert.notStrictEqual(st.firstTab, 'none', 'スマホ設定タブボタンが表示されていない');
     assert.notStrictEqual(st.audioDisplay, 'none', 'スマホ設定の音・表示パネルがレイアウトから消えている');
     assert.notStrictEqual(st.gameDisplay, 'none', 'スマホ設定は両パネルを同じgridセルで高さ計算へ参加させる');
-    assert.strictEqual(st.audioVisibility, 'visible', 'スマホ設定の音・表示パネルが初期表示されていない');
-    assert.strictEqual(st.gameVisibility, 'hidden', 'スマホ設定の非選択ゲームパネルが見えている');
+    assert.strictEqual(st.audioVisibility, 'hidden', 'スマホ設定の非選択音・表示パネルが初期表示されている');
+    assert.strictEqual(st.gameVisibility, 'visible', 'スマホ設定のゲームパネルが初期表示されていない');
     assert.strictEqual(st.overflowY, 'hidden', 'スマホ設定モーダルは内容を外へ逃がさない');
     assert.ok(st.content.top >= st.screen.top - 1 && st.content.bottom <= st.screen.bottom + 1, 'スマホ設定モーダルが画面外へはみ出す');
     assert.ok(st.tabs.top >= st.content.top - 1 && st.tabs.bottom <= st.content.bottom + 1, 'スマホ設定タブがモーダル外へはみ出す');
-    assert.ok(st.audio.top >= st.tabs.bottom - 1 && st.audio.bottom <= st.footer.top + 1, '音・表示パネルがタブ/閉じる領域へはみ出す');
+    assert.ok(st.audio.top >= st.tabs.bottom - 1 && st.audio.bottom <= st.footer.top + 1, '設定パネルがタブ/閉じる領域へはみ出す');
     assert.ok(st.footer.bottom <= st.content.bottom + 1, 'スマホ設定の閉じるボタン領域がモーダル外へはみ出す');
     assert.ok(st.scrollHeight <= st.clientHeight + 1, `スマホ設定に隠れた縦はみ出しがある (${st.scrollHeight} > ${st.clientHeight})`);
     const initialSettingsLayout = { content: st.content, tabs: st.tabs, footer: st.footer };
@@ -1266,7 +1266,7 @@ async function validateSettingsTabsLayout(cdp) {
             const game=document.getElementById('settings-panel-game');
             const aTab=document.getElementById('settings-tab-audio-display');
             const gTab=document.getElementById('settings-tab-game');
-            gTab.click();
+            aTab.click();
             const rect=el=>{const r=el.getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:r.height};};
             const content=document.querySelector('#settings-modal .modal-content');
             const footer=document.querySelector('#settings-modal .modal-footer');
@@ -1288,19 +1288,45 @@ async function validateSettingsTabsLayout(cdp) {
     st=result.result.value;
     assert.notStrictEqual(st.audioDisplay, 'none', '非選択パネルをdisplay:noneにすると基準高さが変わる');
     assert.notStrictEqual(st.gameDisplay, 'none', 'ゲームタブのパネルがレイアウトから消えている');
-    assert.strictEqual(st.audioVisibility, 'hidden', 'ゲームタブ切替後も音・表示パネルが見えている');
-    assert.strictEqual(st.gameVisibility, 'visible', 'ゲームタブのパネルが表示されない');
-    assert.strictEqual(st.audioSelected, 'false', 'ゲームタブ切替後のaria-selectedが音・表示に残っている');
-    assert.strictEqual(st.gameSelected, 'true', 'ゲームタブ切替後のaria-selectedが更新されない');
-    assert.strictEqual(st.audioHidden, 'true', '非表示パネルのaria-hiddenが更新されない');
-    assert.strictEqual(st.gameHidden, 'false', '表示パネルのaria-hiddenが更新されない');
-    assert.ok(st.game.bottom <= st.footer.top + 1, 'ゲーム設定パネルが閉じる領域へはみ出す');
-    assert.ok(st.scrollHeight <= st.clientHeight + 1, `ゲームタブで設定内容がモーダル外へあふれる (${st.scrollHeight} > ${st.clientHeight})`);
+    assert.strictEqual(st.audioVisibility, 'visible', '音・表示タブへ切替後も音・表示パネルが見えない');
+    assert.strictEqual(st.gameVisibility, 'hidden', '音・表示タブへ切替後もゲームパネルが見えている');
+    assert.strictEqual(st.audioSelected, 'true', '音・表示タブ切替後のaria-selectedが更新されない');
+    assert.strictEqual(st.gameSelected, 'false', '音・表示タブ切替後のaria-selectedがゲームに残っている');
+    assert.strictEqual(st.audioHidden, 'false', '表示パネルのaria-hiddenが更新されない');
+    assert.strictEqual(st.gameHidden, 'true', '非表示パネルのaria-hiddenが更新されない');
+    assert.ok(st.game.bottom <= st.footer.top + 1, '設定パネルが閉じる領域へはみ出す');
+    assert.ok(st.scrollHeight <= st.clientHeight + 1, `音・表示タブで設定内容がモーダル外へあふれる (${st.scrollHeight} > ${st.clientHeight})`);
     approx(st.content.top, initialSettingsLayout.content.top, 0.2, '設定タブ切替でモーダル上端を動かさない');
     approx(st.content.height, initialSettingsLayout.content.height, 0.2, '設定タブ切替でモーダル高を変えない');
     approx(st.tabs.top, initialSettingsLayout.tabs.top, 0.2, '設定タブ切替でタブボタン位置を上下させない');
     approx(st.tabs.bottom, initialSettingsLayout.tabs.bottom, 0.2, '設定タブ切替でタブ列の基準線を動かさない');
     approx(st.footer.top, initialSettingsLayout.footer.top, 0.2, '設定タブ切替で閉じる領域を上下させない');
+
+    // 前回どちらのタブを見ていたかに関係なく、設定を開き直した時はゲームへ戻す。
+    result = await cdp.call('Runtime.evaluate', {
+        expression: `(async () => {
+            const modal=document.getElementById('settings-modal');
+            const audio=document.getElementById('settings-panel-audio-display');
+            const game=document.getElementById('settings-panel-game');
+            const aTab=document.getElementById('settings-tab-audio-display');
+            const gTab=document.getElementById('settings-tab-game');
+            modal.classList.add('hidden');
+            await Promise.resolve();
+            modal.classList.remove('hidden');
+            await Promise.resolve();
+            return {
+                audioVisibility:getComputedStyle(audio).visibility,
+                gameVisibility:getComputedStyle(game).visibility,
+                audioSelected:aTab.getAttribute('aria-selected'),
+                gameSelected:gTab.getAttribute('aria-selected')
+            };
+        })()`, returnByValue:true, awaitPromise:true
+    });
+    st=result.result.value;
+    assert.strictEqual(st.audioVisibility, 'hidden', '設定を開き直した時に音・表示タブを持ち越している');
+    assert.strictEqual(st.gameVisibility, 'visible', '設定を開き直した時にゲームタブへ戻らない');
+    assert.strictEqual(st.audioSelected, 'false', '設定再表示時の音・表示aria-selectedが残っている');
+    assert.strictEqual(st.gameSelected, 'true', '設定再表示時のゲームaria-selectedが更新されない');
 
     result = await cdp.call('Runtime.evaluate', {
         expression: `(() => {
@@ -1362,7 +1388,7 @@ async function validateSettingsTabsLayout(cdp) {
     assert.notStrictEqual(st.gameDisplay, 'none', 'PC設定ではゲーム設定を従来どおり同じ画面に表示する');
     assert.strictEqual(st.displayModeDisplay, 'none', 'PCでは表示モード設定自体を非表示にする');
     assert.ok(st.content.top >= st.screen.top - 1 && st.content.bottom <= st.screen.bottom + 1, 'PC設定モーダルが画面外へはみ出す');
-    console.log('✓ 設定画面 スマホ2タブ/PC単一画面 visual/layout regression');
+    console.log('✓ 設定画面 ゲーム左・毎回ゲーム初期表示 / スマホ2タブ/PC単一画面 visual/layout regression');
 }
 
 async function validateLowMemoryPagerLayout(cdp) {

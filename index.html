@@ -588,12 +588,12 @@
                 <h3 class="settings-title">設定</h3>
 
                 <div id="settings-tabs" class="settings-tabs" role="tablist" aria-label="設定カテゴリ">
-                    <button type="button" id="settings-tab-audio-display" class="settings-tab-btn active" role="tab" aria-selected="true" aria-controls="settings-panel-audio-display" data-settings-tab="audio-display" data-se="choice.ogg">音・表示</button>
-                    <button type="button" id="settings-tab-game" class="settings-tab-btn" role="tab" aria-selected="false" aria-controls="settings-panel-game" data-settings-tab="game" data-se="choice.ogg">ゲーム</button>
+                    <button type="button" id="settings-tab-game" class="settings-tab-btn active" role="tab" aria-selected="true" aria-controls="settings-panel-game" data-settings-tab="game" data-se="choice.ogg">ゲーム</button>
+                    <button type="button" id="settings-tab-audio-display" class="settings-tab-btn" role="tab" aria-selected="false" aria-controls="settings-panel-audio-display" data-settings-tab="audio-display" data-se="choice.ogg">音・表示</button>
                 </div>
 
                 <div class="settings-panels">
-                    <section id="settings-panel-audio-display" class="settings-panel active" role="tabpanel" aria-labelledby="settings-tab-audio-display">
+                    <section id="settings-panel-audio-display" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-audio-display">
                         <div class="setting-row">
                             <label class="slider-row-label">BGM 音量</label>
                             <div class="qty-control setting-slider-wrap">
@@ -630,7 +630,7 @@
                         </div>
                     </section>
 
-                    <section id="settings-panel-game" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-game">
+                    <section id="settings-panel-game" class="settings-panel active" role="tabpanel" aria-labelledby="settings-tab-game">
                         <div class="setting-row">
                             <label class="slider-row-label">オートセーブ</label>
                             <div class="setting-toggle-group">

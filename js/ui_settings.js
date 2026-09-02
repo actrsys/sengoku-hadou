@@ -28,10 +28,10 @@ document.addEventListener('DOMContentLoaded', () => {
     settingsTabButtons.forEach(button => {
         button.addEventListener('click', () => setSettingsTab(button.dataset.settingsTab));
     });
-    setSettingsTab('audio-display');
+    setSettingsTab('game');
     window.addEventListener('game-layout-mode-change', () => {
         const activeButton = settingsTabButtons.find(button => button.classList.contains('active'));
-        setSettingsTab(activeButton ? activeButton.dataset.settingsTab : 'audio-display');
+        setSettingsTab(activeButton ? activeButton.dataset.settingsTab : 'game');
     });
 
     const updateSettingSlider = (type, value) => {
@@ -126,6 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settingsModal) {
         const observer = new MutationObserver(() => {
             if (settingsModal.classList.contains('hidden')) return;
+            // 設定画面は開くたびに基準タブへ戻す。前回閉じたタブ状態は持ち越さない。
+            setSettingsTab('game');
             ['bgm', 'se'].forEach(type => {
                 const range = document.getElementById(`setting-${type}-volume`);
                 if (range) updateSettingSlider(type, range.value);

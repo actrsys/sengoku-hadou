@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r340');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r341');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -307,7 +307,7 @@ test('表示モードは自動判定を既定に通常/軽量を保存でき、�
     assert.ok(guide.includes('ゲームのルールや内容、セーブデータの扱いは通常モードと同じです。'));
 });
 
-test('スマホ設定画面は音・表示/ゲームの2タブに分け、PCは従来の1画面表示を維持する', () => {
+test('スマホ設定画面はゲーム/音・表示の2タブに分け、ゲームを左・毎回の初期表示にし、PCは従来の1画面表示を維持する', () => {
     const html = read('index.html');
     const css = read('css/style.css');
     const ui = read('js/ui_settings.js');
@@ -328,7 +328,10 @@ test('スマホ設定画面は音・表示/ゲームの2タブに分け、PCは�
     assert.ok(css.includes('body.is-pc #settings-modal .settings-panel'));
     assert.ok(ui.includes("const setSettingsTab = (tabName) =>"));
     assert.ok(ui.includes("button.dataset.settingsTab"));
-    assert.ok(ui.includes("setSettingsTab('audio-display')"));
+    assert.ok(html.indexOf('id="settings-tab-game"') < html.indexOf('id="settings-tab-audio-display"'), 'ゲームタブを左に置く');
+    assert.ok(ui.includes("setSettingsTab('game')"), '設定の初期タブはゲームにする');
+    assert.ok(ui.includes("if (settingsModal.classList.contains('hidden')) return;"));
+    assert.ok(ui.includes('設定画面は開くたびに基準タブへ戻す'), '設定を開くたびゲームタブへ戻す処理を持つ');
     assert.ok(!ui.includes("playSE('choice.ogg')"), '設定タブSEも共通data-se経路へ委譲する');
 });
 
