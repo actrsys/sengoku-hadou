@@ -225,6 +225,34 @@ Object.assign(UIManager.prototype, {
         return pixelMap[sy * mapW + sx] || 0;
     },
 
+    // 地図元データの黒い線が少し太いと、中心サンプルだけでは線の内側に1px弱の隙間が見えることがあります。
+    // ただし雑に膨張すると隣国へにじむため、「周囲の非0サンプルがすべて同じ城IDの時だけ」慎重に補完します。
+    _sampleGapFilledIdMap(pixelMap, mapW, mapH, rasterW, rasterH, x, y) {
+        const centerId = this._sampleIdMap(pixelMap, mapW, mapH, rasterW, rasterH, x, y);
+        if (centerId || !pixelMap) return centerId || 0;
+        if (mapW <= 0 || mapH <= 0 || rasterW <= 0 || rasterH <= 0) return 0;
+
+        const samplePoints = [
+            [0.18, 0.50], [0.82, 0.50], [0.50, 0.18], [0.50, 0.82],
+            [0.18, 0.18], [0.82, 0.18], [0.18, 0.82], [0.82, 0.82]
+        ];
+        let filledId = 0;
+        let nonZeroCount = 0;
+        for (const [fx, fy] of samplePoints) {
+            const sx = Math.min(mapW - 1, Math.max(0, Math.floor(((x + fx) * mapW) / rasterW)));
+            const sy = Math.min(mapH - 1, Math.max(0, Math.floor(((y + fy) * mapH) / rasterH)));
+            const sampledId = pixelMap[sy * mapW + sx] || 0;
+            if (!sampledId) continue;
+            nonZeroCount++;
+            if (!filledId) {
+                filledId = sampledId;
+                continue;
+            }
+            if (filledId !== sampledId) return 0;
+        }
+        return nonZeroCount >= 2 ? filledId : 0;
+    },
+
     // 巨大な全画面ImageDataを1枚作らず、短い帯だけを生成して順番にCanvasへ転送します。
     // スマホでは1回の一時RGBAを数百KB以下へ抑えます。
     _paintCanvasByStrips(canvas, paintPixel, stripRows = null) {
@@ -2252,7 +2280,7 @@ Object.assign(UIManager.prototype, {
         const castleToClanMap = new ClanArray(maxCastleId + 1);
         for (const c of this.game.castles) castleToClanMap[Number(c.id)] = Number(c.ownerClan) || 0;
 
-        const sampleCastleId = (x, y) => this._sampleIdMap(sourcePixelMap, mapW, mapH, width, height, x, y);
+        const sampleCastleId = (x, y) => this._sampleGapFilledIdMap(sourcePixelMap, mapW, mapH, width, height, x, y);
         const paintPixel = (data, i, x, y) => {
             const castleId = sampleCastleId(x, y);
             if (!castleId) return;

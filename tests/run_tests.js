@@ -9562,6 +9562,31 @@ test('拠点光彩更新は同一勢力の外交関係を1回の描画内でだ�
     assert.ok(block.includes('this.game.getRelation(baseClanId, clanId)'));
 });
 
+test('勢力色Canvasの城IDサンプルは黒線由来の微小な隙間だけを慎重に補完する', () => {
+    class TestUIManager {}
+    const ctx = createContext({ UIManager: TestUIManager });
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = Object.create(ctx.UIManager.prototype);
+
+    const sameIdGapMap = new Uint8Array([
+        1, 1, 1,
+        1, 0, 1,
+        1, 1, 1
+    ]);
+    assert.strictEqual(ui._sampleGapFilledIdMap(sameIdGapMap, 3, 3, 1, 1, 0, 0), 1, '周囲の非0サンプルが同じ城IDなら線際の隙間を補完する');
+
+    const conflictGapMap = new Uint8Array([
+        1, 1, 2,
+        1, 0, 2,
+        1, 1, 2
+    ]);
+    assert.strictEqual(ui._sampleGapFilledIdMap(conflictGapMap, 3, 3, 1, 1, 0, 0), 0, '隣接領域の候補が混在する時は無理に補完しない');
+
+    const uiMap = read('js/ui_map.js');
+    assert.ok(uiMap.includes('const sampleCastleId = (x, y) => this._sampleGapFilledIdMap(sourcePixelMap, mapW, mapH, width, height, x, y);'));
+});
+
+
 test('勢力色Canvasは所有versionを使い少数の落城では拠点領域だけ局所更新する', () => {
     const uiMap = read('js/ui_map.js');
     const castleManager = read('js/castle_manager.js');
