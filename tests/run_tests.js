@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r342');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r344');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -9562,30 +9562,49 @@ test('拠点光彩更新は同一勢力の外交関係を1回の描画内でだ�
     assert.ok(block.includes('this.game.getRelation(baseClanId, clanId)'));
 });
 
-test('勢力色Canvasの城IDサンプルは黒線由来の微小な隙間だけを慎重に補完する', () => {
+test('勢力色Canvasは元マップの1pixelだけを勢力単位で慎重に補完する', () => {
     class TestUIManager {}
     const ctx = createContext({ UIManager: TestUIManager });
     loadScript(ctx, 'js/ui_map.js');
     const ui = Object.create(ctx.UIManager.prototype);
 
-    const sameIdGapMap = new Uint8Array([
-        1, 1, 1,
-        1, 0, 1,
-        1, 1, 1
-    ]);
-    assert.strictEqual(ui._sampleGapFilledIdMap(sameIdGapMap, 3, 3, 1, 1, 0, 0), 1, '周囲の非0サンプルが同じ城IDなら線際の隙間を補完する');
-
-    const conflictGapMap = new Uint8Array([
+    const castleToClan = new Uint8Array([0, 1, 1, 2]);
+    const sameClanGapMap = new Uint8Array([
         1, 1, 2,
         1, 0, 2,
         1, 1, 2
     ]);
-    assert.strictEqual(ui._sampleGapFilledIdMap(conflictGapMap, 3, 3, 1, 1, 0, 0), 0, '隣接領域の候補が混在する時は無理に補完しない');
+    assert.strictEqual(
+        ui._sampleClanIdWithConservativeGapFill(sameClanGapMap, castleToClan, 3, 3, 3, 3, 1, 1),
+        1,
+        '別の城IDでも同じ勢力なら1pixelの黒線隙間を補完する'
+    );
+
+    const conflictGapMap = new Uint8Array([
+        1, 1, 3,
+        1, 0, 3,
+        1, 1, 3
+    ]);
+    assert.strictEqual(
+        ui._sampleClanIdWithConservativeGapFill(conflictGapMap, castleToClan, 3, 3, 3, 3, 1, 1),
+        0,
+        '異なる勢力が接する境界は補完しない'
+    );
+
+    const onePointMap = new Uint8Array([
+        0, 0, 0,
+        0, 0, 1,
+        0, 0, 0
+    ]);
+    assert.strictEqual(
+        ui._sampleClanIdWithConservativeGapFill(onePointMap, castleToClan, 3, 3, 3, 3, 1, 1),
+        0,
+        '支持が1pixelだけなら海側などへのにじみ防止のため補完しない'
+    );
 
     const uiMap = read('js/ui_map.js');
-    assert.ok(uiMap.includes('const sampleCastleId = (x, y) => this._sampleGapFilledIdMap(sourcePixelMap, mapW, mapH, width, height, x, y);'));
+    assert.ok(uiMap.includes('const sampleClanId = (x, y) => this._sampleClanIdWithConservativeGapFill(sourcePixelMap, castleToClanMap, mapW, mapH, width, height, x, y);'));
 });
-
 
 test('勢力色Canvasは所有versionを使い少数の落城では拠点領域だけ局所更新する', () => {
     const uiMap = read('js/ui_map.js');
