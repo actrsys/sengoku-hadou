@@ -683,6 +683,9 @@ class InterviewSystem {
         if (clanIds.size === 0) return null;
         const candidates = this.game.bushos.filter(target => clanIds.has(Number(target.clan))
             && !target.isDaimyo
+            // 将軍・左馬頭（将軍候補）は、通常の家臣を崩す相手として主君へ推薦しない。
+            // 実際の調略コマンド可否には触れず、面談の助言候補だけ既存の特殊権威判定で除外する。
+            && !this._isHighAuthorityInterviewTarget(target)
             && (!window.BushoStatusRules || window.BushoStatusRules.isActive(target)));
         if (candidates.length === 0) return null;
 

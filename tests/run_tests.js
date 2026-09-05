@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r347');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r348');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2558,7 +2558,7 @@ test('外交導入と臣従会話は話しかけ方と実際の操作を食い�
     assert.ok(!common.includes('いただききたく'), '臣従拒否台詞の旧誤字を残さない');
 });
 
-test('武将の噂は将軍・左馬頭を候補外にし調略方針では従来の特殊呼称を維持する', () => {
+test('武将の噂と面談の調略助言は将軍・左馬頭を候補外にする', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
     loadScript(ctx, 'js/busho_list_sort_rules.js');
@@ -2566,26 +2566,41 @@ test('武将の噂は将軍・左馬頭を候補外にし調略方針では従�
     loadScript(ctx, 'js/interview_system.js');
     vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
 
-    const ranks = new Map([[98, { id: 98, rankNo: 10, rankName2: '左馬頭' }]]);
+    const ranks = new Map([
+        [1, { id: 1, rankNo: 1, rankName2: '征夷大将軍' }],
+        [98, { id: 98, rankNo: 10, rankName2: '左馬頭' }]
+    ]);
     const lord = { id: 10, clan: 2, isDaimyo: true, fullName: '朝倉義景', familyNameStr: '朝倉', givenName: '義景', courtRankIds: [], familyIds: [10] };
-    const samano = { id: 11, clan: 2, isDaimyo: false, name: '足利義昭', fullName: '足利義昭', familyNameStr: '足利', givenName: '義昭', courtRankIds: [98], familyIds: [11] };
+    const samano = { id: 11, clan: 2, isDaimyo: false, name: '足利義昭', fullName: '足利義昭', familyNameStr: '足利', givenName: '義昭', courtRankIds: [98], familyIds: [11], loyalty: 1, duty: 1 };
+    const shogun = { id: 12, clan: 2, isDaimyo: false, name: '足利義輝', fullName: '足利義輝', familyNameStr: '足利', givenName: '義輝', courtRankIds: [1], familyIds: [12], loyalty: 1, duty: 1 };
+    const normal = { id: 13, clan: 2, isDaimyo: false, name: '佐久間信盛', fullName: '佐久間信盛', familyNameStr: '佐久間', givenName: '信盛', courtRankIds: [], familyIds: [13], loyalty: 60, duty: 60 };
     const interviewer = { id: 20, clan: 1, fullName: '明智光秀', familyNameStr: '明智', givenName: '光秀', courtRankIds: [], familyIds: [20] };
     const clans = [{ id: 1, name: '織田家', leaderId: 21 }, { id: 2, name: '朝倉家', leaderId: 10 }];
     const game = {
-        playerClanId: 1, clans, bushos: [lord, samano, interviewer],
+        playerClanId: 1, clans, bushos: [lord, samano, shogun, normal, interviewer],
         getClan: id => clans.find(c => Number(c.id) === Number(id)),
         getClanDaimyo: id => Number(id) === 2 ? lord : null,
         courtRankSystem: {
             RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [98],
             getRankData: id => ranks.get(Number(id)) || null,
             getHighestRankData(busho) { return (busho.courtRankIds || []).map(id => this.getRankData(id)).filter(Boolean)[0] || null; }
+        },
+        strategySystem: {
+            getHeadhuntProb(doerId, targetId) {
+                if (Number(targetId) === 11 || Number(targetId) === 12) return 0.95;
+                return 0.55;
+            }
         }
     };
     const interview = new ctx.InterviewSystem(game);
     assert.strictEqual(interview._isRumorEligibleTarget(interviewer, samano), false, '左馬頭は噂候補にしない');
-    interview._getBestIntrigueTarget = () => ({ target: samano, prob: 0.8, score: 0.8 });
+    assert.strictEqual(interview._isRumorEligibleTarget(interviewer, shogun), false, '将軍は噂候補にしない');
+    interview._getIntrigueCandidateClanIds = () => [2];
+    const best = interview._getBestIntrigueTarget(interviewer);
+    assert.strictEqual(best && best.target && best.target.id, normal.id, '特殊権威の成功率が高くても調略助言では通常武将を優先する');
     const intrigue = interview._getIntelligencePolicyText(interviewer, { level: 'full' });
-    assert.ok(intrigue.includes('左馬頭様') && !intrigue.includes('足利義昭殿'), '噂以外の調略方針では特殊権威の既存呼称を維持する');
+    assert.ok(intrigue.includes('佐久間信盛殿'), '調略助言は特殊権威ではなく通常の他家武将を推薦する');
+    assert.ok(!intrigue.includes('左馬頭様') && !intrigue.includes('公方様'), '将軍・左馬頭を調略の有力候補として挙げない');
 });
 
 test('面談の調略方針は無官の他家武将を武将の噂と同じくフルネームで識別する', () => {
