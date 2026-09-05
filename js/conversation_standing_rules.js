@@ -598,6 +598,47 @@ class ConversationStandingRules {
         return this.getUnrankedCallName(speaker, target, '殿');
     }
 
+    /**
+     * 基準勢力から見た他家武将を、人物特定用のフルネームで呼ぶ共通窓口。
+     * 武将の噂と面談の調略方針で同じ「他家は姓だけにしない」規則を共有する。
+     */
+    static getOtherClanIdentifyingCallName(target, referenceClanId, suffix = '殿') {
+        if (!target) return null;
+        const ownClanId = Number(referenceClanId) || 0;
+        const targetClanId = Number(target.clan) || 0;
+        if (ownClanId <= 0 || targetClanId <= 0 || ownClanId === targetClanId) return null;
+        const fullName = this._getFullName(target);
+        return fullName ? `${fullName}${suffix}` : null;
+    }
+
+    /**
+     * 面談中に他家武将を具体的な人物として指す時の呼称。
+     * 特殊称号・官位・話者/質問者との近親呼称は従来どおり優先し、
+     * それらがない無官の他家武将だけは姓のみで曖昧にせずフルネーム＋殿で識別する。
+     */
+    static getInterviewExternalTargetCallName(game, speaker, target, questioner = null) {
+        const baseCall = this.getInterviewTargetCallName(game, speaker, target, questioner);
+        if (!target) return baseCall;
+
+        const actualQuestioner = questioner || (game && typeof game.getClanDaimyo === 'function'
+            ? game.getClanDaimyo(Number(game.playerClanId) || Number(speaker && speaker.clan) || 0)
+            : null);
+        const referenceClanId = Number(actualQuestioner && actualQuestioner.clan)
+            || Number(game && game.playerClanId)
+            || Number(speaker && speaker.clan)
+            || 0;
+        const externalName = this.getOtherClanIdentifyingCallName(target, referenceClanId, '殿');
+        if (!externalName) return baseCall;
+
+        // 近親者・特殊権威・官位は人物名より意味のある呼称なので維持する。
+        if (this.getSpeakerFamilyReferenceCallName(game, speaker, target)) return baseCall;
+        if (this.getSpecialAuthorityCallName(game, target)) return baseCall;
+        if (this.getHighestCourtRank(game, target)) return baseCall;
+        if (this.getRelativeReferenceCallName(game, actualQuestioner, target)) return baseCall;
+
+        return externalName;
+    }
+
     static getAchievementHint(standing, context = null) {
         if (!standing) return '';
         const achievementRelation = Number(standing.achievementRelation || 0);

@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r345');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r347');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2588,6 +2588,35 @@ test('武将の噂は将軍・左馬頭を候補外にし調略方針では従�
     assert.ok(intrigue.includes('左馬頭様') && !intrigue.includes('足利義昭殿'), '噂以外の調略方針では特殊権威の既存呼称を維持する');
 });
 
+test('面談の調略方針は無官の他家武将を武将の噂と同じくフルネームで識別する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/busho_list_sort_rules.js');
+    loadScript(ctx, 'js/conversation_standing_rules.js');
+    loadScript(ctx, 'js/interview_system.js');
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+
+    const daimyo = { id: 1, clan: 1, isDaimyo: true, name: '織田信長', fullName: '織田信長', familyNameStr: '織田', givenName: '信長', courtRankIds: [], familyIds: [1] };
+    const interviewer = { id: 2, clan: 1, name: '明智光秀', fullName: '明智光秀', familyNameStr: '明智', givenName: '光秀', courtRankIds: [], familyIds: [2] };
+    const target = { id: 3, clan: 2, isDaimyo: false, name: '佐久間信盛', fullName: '佐久間信盛', familyNameStr: '佐久間', givenName: '信盛', courtRankIds: [], familyIds: [3] };
+    const clans = [{ id: 1, name: '織田家', leaderId: 1 }, { id: 2, name: '朝倉家', leaderId: 4 }];
+    const game = {
+        playerClanId: 1, clans, bushos: [daimyo, interviewer, target],
+        getClan: id => clans.find(c => Number(c.id) === Number(id)) || null,
+        getClanDaimyo: id => Number(id) === 1 ? daimyo : null,
+        courtRankSystem: {
+            RANK_ID_SHOGUN: 999, RANK_IDS_CANDIDATE: [],
+            getRankData() { return null; },
+            getHighestRankData() { return null; }
+        }
+    };
+    const interview = new ctx.InterviewSystem(game);
+    interview._getBestIntrigueTarget = () => ({ target, prob: 0.8, score: 0.8 });
+    const text = interview._getIntelligencePolicyText(interviewer, { level: 'full' });
+    assert.ok(text.includes('朝倉家の佐久間信盛殿'), '他家の無官武将は姓だけにせずフルネーム＋殿で示す');
+    assert.ok(!text.includes('朝倉家の佐久間殿'), '調略方針に姓だけの呼称を残さない');
+});
+
 test('官位呼びは姓を付けず官位名だけで呼ぶ', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
@@ -2771,6 +2800,40 @@ test('月次交易履歴は当事者勢力を明示して自家関与分を全�
     assert.ok(common.includes("category: 'trade'"), '交易履歴を専用カテゴリで記録する');
     assert.ok(common.includes('game.ui.log(log.text, {'), '交易履歴は構造化した関連勢力情報とともに記録する');
     assert.ok(!common.includes('logMessages.forEach(msg => game.ui.log(msg))'), '関係勢力不明の旧記録経路を残さない');
+});
+
+test('コマンド履歴は呼び出し側に自家名が含まれていても主語を二重付与しない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const CommandSystemClass = vm.runInContext('CommandSystem', ctx);
+    const logs = [];
+    const game = {
+        playerClanId: 1,
+        getClan: () => ({ name: '織田家' }),
+        ui: {
+            updatePanelHeader() {}, renderCommandMenu() {}, renderMap() {},
+            log(text) { logs.push(text); }, showResultModal() {}
+        }
+    };
+    const system = new CommandSystemClass(game);
+    system.finishCommand(null, false, '【追放】織田家は柴田勝家を追放しました。');
+    system.finishCommand(null, false, '【婚姻】織田家で柴田勝家と姫の祝言が執り行われました。');
+    system.finishCommand(null, false, '【徴兵】岐阜城で徴兵を行いました。');
+    assert.deepStrictEqual(Array.from(logs), [
+        '【追放】織田家は柴田勝家を追放しました。',
+        '【婚姻】織田家で柴田勝家と姫の祝言が執り行われました。',
+        '【徴兵】織田家は岐阜城で徴兵を行いました。'
+    ]);
+});
+
+test('城主任命文は拠点名へ「城主」を直結して城城主表記を作らない', () => {
+    const files = ['js/war_effort.js', 'js/command_system.js', 'js/affiliation_system.js', 'js/independence_system.js'];
+    for (const file of files) {
+        const source = read(file);
+        assert.ok(!/\$\{[^}]*\.name\}城主/.test(source), `${file} に「拠点名+城主」の直結表記を残さない`);
+    }
+    assert.ok(read('js/command_system.js').includes('を${castle.name}の城主に任命しました。'));
+    assert.ok(read('js/independence_system.js').includes('${castle.name}の城主、${busho.name}'));
 });
 
 test('HistorySystem は自国/全国を排他的に振り分け保持上限を守る', () => {
@@ -2992,8 +3055,8 @@ test('落城後の攻略軍移動は城主再選を保留し最終城主だけ�
 test('全国履歴でも自家コマンドと受諾外交の主語を省略しない', () => {
     const command = read('js/command_system.js');
     const diplomacy = read('js/diplomacy.js');
-    assert.ok(command.includes('`${tagged[1]}${clanName}は${tagged[2]}`'));
-    assert.ok(command.includes('`${clanName}は${logMsg}`'));
+    assert.ok(command.includes('const historyBody = body.startsWith(clanName) ? body : `${clanName}は${body}`;'), '自家名を持たないコマンド履歴には主語を補う');
+    assert.ok(command.includes('const historyText = tagged ? `${tagged[1]}${historyBody}` : historyBody;'), 'タグ付き・タグなしの双方で生成済み主語を維持する');
     assert.ok(diplomacy.includes('【外交】${targetClan.name}は${doerClan.name}からの親善を受け入れました。'));
     assert.ok(diplomacy.includes('【外交】${targetClan.name}は${doerClan.name}と同盟を結びました。'));
     assert.ok(diplomacy.includes('【外交】${targetClan.name}は${doerClan.name}に従属しました。'));
@@ -6788,7 +6851,11 @@ test('武将の噂は他家をフルネーム＋殿、浪人・諸勢力を無�
     const ctx = createContext({
         BushoStatusRules: { isRonin(b) { return b.status === 'ronin'; } },
         ConversationStandingRules: {
-            getInterviewTargetCallName() { return '参議殿'; }
+            getInterviewTargetCallName() { return '参議殿'; },
+            getOtherClanIdentifyingCallName(target, referenceClanId, suffix = '殿') {
+                if (Number(target && target.clan) <= 0 || Number(target.clan) === Number(referenceClanId)) return null;
+                return `${target.fullName || target.name}${suffix}`;
+            }
         }
     });
     loadScript(ctx, 'js/interview_system.js');

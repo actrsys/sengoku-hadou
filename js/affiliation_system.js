@@ -849,7 +849,7 @@ class AffiliationSystem {
         if (Number(best.id) !== previousCastellanId && this.game.phase === 'game' && !this.game.isRestoringSave && this.game.historySystem) {
             const clan = this.game.getClan ? this.game.getClan(castle.ownerClan) : null;
             const clanName = clan ? clan.name : '大名家';
-            this.game.historySystem.record(`【城主任命】${clanName}は${best.fullName || best.name}を${castle.name}城主に任命しました。`, {
+            this.game.historySystem.record(`【城主任命】${clanName}は${best.fullName || best.name}を${castle.name}の城主に任命しました。`, {
                 clanIds: [castle.ownerClan], category: 'appointment', inferCurrentTurn: false
             });
         }

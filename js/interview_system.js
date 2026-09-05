@@ -706,9 +706,11 @@ class InterviewSystem {
         const targetClan = this.game.getClan ? this.game.getClan(Number(row.target.clan)) : null;
         const prefix = targetClan ? `${targetClan.name}の` : '';
         const daimyo = this.game.getClanDaimyo ? this.game.getClanDaimyo(Number(this.game.playerClanId) || Number(busho.clan) || 0) : null;
-        const callName = window.ConversationStandingRules && typeof window.ConversationStandingRules.getInterviewTargetCallName === 'function'
-            ? window.ConversationStandingRules.getInterviewTargetCallName(this.game, busho, row.target, daimyo)
-            : `${row.target.name}殿`;
+        const callName = window.ConversationStandingRules && typeof window.ConversationStandingRules.getInterviewExternalTargetCallName === 'function'
+            ? window.ConversationStandingRules.getInterviewExternalTargetCallName(this.game, busho, row.target, daimyo)
+            : (window.ConversationStandingRules && typeof window.ConversationStandingRules.getInterviewTargetCallName === 'function'
+                ? window.ConversationStandingRules.getInterviewTargetCallName(this.game, busho, row.target, daimyo)
+                : `${row.target.name}殿`);
         return `調略なら、${prefix}${callName}が有力かと見ております。`;
     }
 
@@ -943,7 +945,6 @@ class InterviewSystem {
     _getRumorSubjectText(target, interviewer = null) {
         if (!target) return 'ある武将';
         const interviewerClanId = Number(interviewer && interviewer.clan) || Number(this.game.playerClanId) || 0;
-        const targetClanId = Number(target.clan) || 0;
         const daimyo = this.game.getClanDaimyo ? this.game.getClanDaimyo(interviewerClanId) : null;
         let callName = window.ConversationStandingRules && typeof window.ConversationStandingRules.getInterviewTargetCallName === 'function'
             ? window.ConversationStandingRules.getInterviewTargetCallName(this.game, interviewer, target, daimyo)
@@ -956,14 +957,18 @@ class InterviewSystem {
         // 将軍・左馬頭は候補選定側で除外するため、ここでは一般の噂対象の識別に専念する。
         const isRonin = !!(window.BushoStatusRules && window.BushoStatusRules.isRonin(target));
         const belongsToKunishu = Number(target.belongKunishuId || 0) > 0;
-        const isOtherClan = targetClanId > 0 && interviewerClanId > 0 && targetClanId !== interviewerClanId;
-        if (isOtherClan || isRonin || belongsToKunishu) {
+        const otherClanCall = window.ConversationStandingRules
+            && typeof window.ConversationStandingRules.getOtherClanIdentifyingCallName === 'function'
+            ? window.ConversationStandingRules.getOtherClanIdentifyingCallName(target, interviewerClanId, '殿')
+            : null;
+        if (otherClanCall) {
+            callName = otherClanCall;
+        } else if (isRonin || belongsToKunishu) {
             const fullName = String(target.fullName || target.name || '').replace(/\|/g, '').trim();
             if (fullName) {
                 const hasCourtRank = Array.isArray(target.courtRankIds)
                     && target.courtRankIds.some(id => Number(id) > 0);
-                const useHonorific = isOtherClan || hasCourtRank;
-                callName = `${fullName}${useHonorific ? '殿' : ''}`;
+                callName = `${fullName}${hasCourtRank ? '殿' : ''}`;
             }
         }
         if (isRonin) {

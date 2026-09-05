@@ -44,9 +44,11 @@ class CommandSystem {
             const playerClan = this.game.getClan ? this.game.getClan(this.game.playerClanId) : null;
             const clanName = playerClan ? playerClan.name : '自家';
             const tagged = String(logMsg).match(/^(【[^】]+】)(.*)$/);
-            const historyText = tagged
-                ? `${tagged[1]}${clanName}は${tagged[2]}`
-                : `${clanName}は${logMsg}`;
+            const body = tagged ? tagged[2] : String(logMsg);
+            // 呼び出し側が既に自家名を含む既存ログでも、共通窓口で主語を二重付与しない。
+            // 自家名を持たない通常ログだけ、従来どおりここで主語を補う。
+            const historyBody = body.startsWith(clanName) ? body : `${clanName}は${body}`;
+            const historyText = tagged ? `${tagged[1]}${historyBody}` : historyBody;
             this.game.ui.log(historyText, { clanIds: [this.game.playerClanId], category: 'command', inferCurrentTurn: false });
         }
         
@@ -1380,7 +1382,7 @@ class CommandSystem {
                 if (bushos.isGunshi) {
                     this.game.affiliationSystem.clearGunshiRole(bushos);
                 }
-                this.finishCommand(`${bushos.name}を城主に任命しました`, false, `【城主任命】${this.game.getClan(this.game.playerClanId)?.name || '当家'}は${bushos.fullName || bushos.name}を${castle.name}城主に任命しました。`); 
+                this.finishCommand(`${bushos.name}を城主に任命しました`, false, `【城主任命】${this.game.getClan(this.game.playerClanId)?.name || '当家'}は${bushos.fullName || bushos.name}を${castle.name}の城主に任命しました。`); 
             }
             return;
         }

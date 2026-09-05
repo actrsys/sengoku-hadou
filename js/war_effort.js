@@ -127,7 +127,7 @@ Object.assign(WarManager.prototype, {
             s.defender.castellanId = leader.id;
             if (Number(leader.id) !== previousCapturedCastellanId && this.game.historySystem) {
                 const captureClanName = this.getHistoryClanName(s.attacker.ownerClan);
-                this.game.historySystem.record(`【城主任命】${captureClanName}は${leader.fullName || leader.name}を${s.defender.name}城主に任命しました。`, {
+                this.game.historySystem.record(`【城主任命】${captureClanName}は${leader.fullName || leader.name}を${s.defender.name}の城主に任命しました。`, {
                     clanIds: [s.attacker.ownerClan], category: 'appointment', inferCurrentTurn: false
                 });
             }

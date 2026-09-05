@@ -757,7 +757,7 @@ class IndependenceSystem {
                 // ★修正：記憶しておいた元の派閥IDを渡します
                 const { joinScore, stayScore } = this.calculateLoyaltyScores(busho, leader, oldDaimyo, leaderOriginalFactionId);
                 if (joinScore > stayScore) {
-                    this._logIndependence(`  -> 呼応！${castle.name}城主の${busho.name}が${leader.name}に与しました！`, [oldClanId, newClanId]);
+                    this._logIndependence(`  -> 呼応！${castle.name}の城主、${busho.name}が${leader.name}に与しました！`, [oldClanId, newClanId]);
                     this.game.castleManager.changeOwner(castle, newClanId);
                     // ★大名家が変わるので功績半分！
                     if (busho.clan !== 0 && busho.clan !== newClanId) {
