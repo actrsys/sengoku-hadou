@@ -229,55 +229,62 @@ Object.assign(UIManager.prototype, {
     // ただし単純な膨張は隣勢力や海へにじむため、元マップ上で「1 source pixelだけ」慎重に補完します。
     // 描画pixelが覆うsource領域内に1勢力だけ存在すればその勢力を採用し、領域全体が0なら外周1pxを確認します。
     // 外周候補に複数勢力が混ざる場合、または支持pixelが1点しかない場合は補完しません。
-    _sampleClanIdWithConservativeGapFill(pixelMap, castleToClanMap, mapW, mapH, rasterW, rasterH, x, y) {
-        if (!pixelMap || !castleToClanMap || mapW <= 0 || mapH <= 0 || rasterW <= 0 || rasterH <= 0) return 0;
+    _sampleTerritoryOwnerWithConservativeGapFill(pixelMap, castleToClanMap, mapW, mapH, rasterW, rasterH, x, y) {
+        if (!pixelMap || !castleToClanMap || mapW <= 0 || mapH <= 0 || rasterW <= 0 || rasterH <= 0) return -1;
 
+        // 戻り値は -1=地図外/未割当、0=中立領域、1以上=勢力ID。
+        // r344では勢力IDだけを返していたため、中立領域(0)と地図外(0)を区別できず、
+        // 従来の半透明白で表示していた中立領域まで透明化してしまっていた。
         const centerCastleId = this._sampleIdMap(pixelMap, mapW, mapH, rasterW, rasterH, x, y);
-        const centerClanId = centerCastleId ? (castleToClanMap[centerCastleId] || 0) : 0;
-        if (centerClanId) return centerClanId;
+        if (centerCastleId) return Number(castleToClanMap[centerCastleId] || 0);
 
         const sx0 = Math.max(0, Math.min(mapW - 1, Math.floor((x * mapW) / rasterW)));
         const sy0 = Math.max(0, Math.min(mapH - 1, Math.floor((y * mapH) / rasterH)));
         const sx1 = Math.max(sx0, Math.min(mapW - 1, Math.ceil(((x + 1) * mapW) / rasterW) - 1));
         const sy1 = Math.max(sy0, Math.min(mapH - 1, Math.ceil(((y + 1) * mapH) / rasterH) - 1));
 
-        const collectClan = (sx, sy, state) => {
-            const castleId = pixelMap[sy * mapW + sx] || 0;
-            if (!castleId) return true;
-            const clanId = castleToClanMap[castleId] || 0;
-            if (!clanId) return true;
-            if (!state.clanId) state.clanId = clanId;
-            else if (state.clanId !== clanId) return false;
-            state.support++;
-            return true;
-        };
-
-        // スマホの1/2・1/4 Canvasでは1描画pixelが複数source pixelを覆うため、
-        // まずそのfootprint内だけを見ます。同じ勢力しか無ければ境界の取りこぼしとして採用できます。
-        const footprint = { clanId: 0, support: 0 };
+        // ownerToken は 0=候補なし、1=中立、2以上=(勢力ID+1)。
+        // 中立も実在する領域として数えることで、地図外と混同しない。
+        let ownerToken = 0;
+        let support = 0;
         for (let sy = sy0; sy <= sy1; sy++) {
             for (let sx = sx0; sx <= sx1; sx++) {
-                if (!collectClan(sx, sy, footprint)) return 0;
+                const castleId = pixelMap[sy * mapW + sx] || 0;
+                if (!castleId) continue;
+                const token = Number(castleToClanMap[castleId] || 0) + 1;
+                if (!ownerToken) ownerToken = token;
+                else if (ownerToken !== token) return -1;
+                support++;
             }
         }
-        if (footprint.clanId && footprint.support > 0) return footprint.clanId;
+        if (support > 0) return ownerToken - 1;
 
-        // footprintが完全に0なら、その外周「1 source pixel」だけ確認します。
-        // 新しく補完したpixelは参照しないので、この処理が連鎖して2px・3pxと膨張することはありません。
-        const ring = { clanId: 0, support: 0 };
+        // footprintが完全に0なら、その外周「1 source pixel」だけ確認する。
+        // 補完済みpixelは参照しないため、補完が連鎖して2px・3pxへ膨張しない。
+        ownerToken = 0;
+        support = 0;
         const rx0 = Math.max(0, sx0 - 1);
         const ry0 = Math.max(0, sy0 - 1);
         const rx1 = Math.min(mapW - 1, sx1 + 1);
         const ry1 = Math.min(mapH - 1, sy1 + 1);
+        const collectRingPixel = (sx, sy) => {
+            const castleId = pixelMap[sy * mapW + sx] || 0;
+            if (!castleId) return true;
+            const token = Number(castleToClanMap[castleId] || 0) + 1;
+            if (!ownerToken) ownerToken = token;
+            else if (ownerToken !== token) return false;
+            support++;
+            return true;
+        };
         for (let sx = rx0; sx <= rx1; sx++) {
-            if (ry0 < sy0 && !collectClan(sx, ry0, ring)) return 0;
-            if (ry1 > sy1 && !collectClan(sx, ry1, ring)) return 0;
+            if (ry0 < sy0 && !collectRingPixel(sx, ry0)) return -1;
+            if (ry1 > sy1 && !collectRingPixel(sx, ry1)) return -1;
         }
         for (let sy = sy0; sy <= sy1; sy++) {
-            if (rx0 < sx0 && !collectClan(rx0, sy, ring)) return 0;
-            if (rx1 > sx1 && !collectClan(rx1, sy, ring)) return 0;
+            if (rx0 < sx0 && !collectRingPixel(rx0, sy)) return -1;
+            if (rx1 > sx1 && !collectRingPixel(rx1, sy)) return -1;
         }
-        return ring.clanId && ring.support >= 2 ? ring.clanId : 0;
+        return ownerToken && support >= 2 ? ownerToken - 1 : -1;
     },
 
     // 巨大な全画面ImageDataを1枚作らず、短い帯だけを生成して順番にCanvasへ転送します。
@@ -2307,10 +2314,10 @@ Object.assign(UIManager.prototype, {
         const castleToClanMap = new ClanArray(maxCastleId + 1);
         for (const c of this.game.castles) castleToClanMap[Number(c.id)] = Number(c.ownerClan) || 0;
 
-        const sampleClanId = (x, y) => this._sampleClanIdWithConservativeGapFill(sourcePixelMap, castleToClanMap, mapW, mapH, width, height, x, y);
+        const sampleOwnerClanId = (x, y) => this._sampleTerritoryOwnerWithConservativeGapFill(sourcePixelMap, castleToClanMap, mapW, mapH, width, height, x, y);
         const paintPixel = (data, i, x, y) => {
-            const clanId = sampleClanId(x, y);
-            if (!clanId) return;
+            const clanId = sampleOwnerClanId(x, y);
+            if (clanId < 0) return;
             const rgb = clanId !== 0 ? clanColors.get(clanId) : null;
             if (rgb) {
                 data[i] = rgb.r; data[i + 1] = rgb.g; data[i + 2] = rgb.b;
@@ -2321,10 +2328,10 @@ Object.assign(UIManager.prototype, {
 
             if (x <= 0 || y <= 0 || x >= width - 1 || y >= height - 1 || !clanId) return;
             const neighborClanIds = [
-                sampleClanId(x - 1, y),
-                sampleClanId(x + 1, y),
-                sampleClanId(x, y - 1),
-                sampleClanId(x, y + 1)
+                sampleOwnerClanId(x - 1, y),
+                sampleOwnerClanId(x + 1, y),
+                sampleOwnerClanId(x, y - 1),
+                sampleOwnerClanId(x, y + 1)
             ];
             if (!neighborClanIds.some(id => id && id !== clanId)) return;
             data[i] = Math.max(0, data[i] - 50);

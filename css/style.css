@@ -5642,7 +5642,7 @@ html.mobile-low-memory body:not(.is-pc) .custom-scrollbar-btn {
     display: none !important;
 }
 
-/* 軽量モードの共通一覧はスクロールを使わず10行ずつページ送りする。 */
+/* 軽量モードの共通一覧はスクロールせず、実際に完全表示できる整数行数ごとにページ送りする。 */
 html.mobile-low-memory body:not(.is-pc) .list-container.low-memory-paged-list {
     overflow: hidden !important;
     overscroll-behavior: none !important;

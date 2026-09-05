@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r344');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r345');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -265,7 +265,7 @@ test('旧端末安全モードは小型iPhoneをOS世代に関係なく判定し
     const bootstrap = read('js/app_bootstrap.js');
     const css = read('css/style.css');
     const html = read('index.html');
-    assert.ok(bootstrap.includes('resolveEarlyMobileLowMemoryMode()'));
+    assert.ok(bootstrap.includes('resolveEarlyMobileLowMemoryMode('));
     assert.ok(bootstrap.includes('deviceMemory > 0 && deviceMemory <= 2'));
     assert.ok(bootstrap.includes('shortEdge <= 390 && longEdge <= 700'));
     assert.ok(!bootstrap.includes('iosMajor > 0 && iosMajor <= 16'));
@@ -293,6 +293,9 @@ test('表示モードは自動判定を既定に通常/軽量を保存でき、�
     assert.ok(bootstrap.includes("displayMode === 'light'"));
     assert.ok(bootstrap.includes("displayMode === 'normal'"));
     assert.ok(bootstrap.includes("'軽量モード（自動）'"));
+    assert.ok(bootstrap.includes("const active = !!mobileLowMemoryEligible && layoutMode === 'mobile';"), '軽量モードはスマホ論理レイアウトでだけ有効化する');
+    assert.ok(bootstrap.includes('applyMobileLowMemoryModeForLayout(layoutMode);'), '縦横切替で軽量モードの有効状態を論理レイアウトへ同期する');
+    assert.ok(bootstrap.includes("else root.classList.remove('mobile-low-memory');"), 'PCレイアウトへ切替時は軽量CSSクラスを解除する');
     assert.ok(settings.includes("displayMode: 'auto'"));
     assert.ok(settings.includes("displayMode: 'userDisplayMode'"));
     assert.ok(settings.includes('setDisplayMode(value)'));
@@ -367,6 +370,7 @@ test('通常スマホは低メモリ専用の画質・詳細遷移削減を受�
     const busho = read('js/ui_info_busho.js');
     const css = read('css/style.css');
     assert.ok(audio.includes("return this._isMobileLowMemoryAudioMode() || !this._isAudioCodecSupported('ogg');"), '通常表示でも音声codec非対応なら音声だけ互換経路へ切り替える');
+    assert.ok(read('js/app_bootstrap.js').includes("window.__mobileLowMemoryMode = active;"), '軽量音声判定も現在の論理レイアウトと同期したglobalを使う');
     const detailAt = busho.indexOf('const isMobileListTransition = !!(');
     const detailBlock = busho.slice(detailAt, detailAt + 420);
     assert.ok(detailBlock.includes('window.__mobileLowMemoryMode'));
@@ -9562,20 +9566,20 @@ test('拠点光彩更新は同一勢力の外交関係を1回の描画内でだ�
     assert.ok(block.includes('this.game.getRelation(baseClanId, clanId)'));
 });
 
-test('勢力色Canvasは元マップの1pixelだけを勢力単位で慎重に補完する', () => {
+test('勢力色Canvasは地図外と中立領域を区別しつつ元マップの1pixelだけを慎重に補完する', () => {
     class TestUIManager {}
     const ctx = createContext({ UIManager: TestUIManager });
     loadScript(ctx, 'js/ui_map.js');
     const ui = Object.create(ctx.UIManager.prototype);
 
-    const castleToClan = new Uint8Array([0, 1, 1, 2]);
+    const castleToClan = new Uint8Array([0, 1, 1, 2, 0]);
     const sameClanGapMap = new Uint8Array([
         1, 1, 2,
         1, 0, 2,
         1, 1, 2
     ]);
     assert.strictEqual(
-        ui._sampleClanIdWithConservativeGapFill(sameClanGapMap, castleToClan, 3, 3, 3, 3, 1, 1),
+        ui._sampleTerritoryOwnerWithConservativeGapFill(sameClanGapMap, castleToClan, 3, 3, 3, 3, 1, 1),
         1,
         '別の城IDでも同じ勢力なら1pixelの黒線隙間を補完する'
     );
@@ -9586,8 +9590,8 @@ test('勢力色Canvasは元マップの1pixelだけを勢力単位で慎重に�
         1, 1, 3
     ]);
     assert.strictEqual(
-        ui._sampleClanIdWithConservativeGapFill(conflictGapMap, castleToClan, 3, 3, 3, 3, 1, 1),
-        0,
+        ui._sampleTerritoryOwnerWithConservativeGapFill(conflictGapMap, castleToClan, 3, 3, 3, 3, 1, 1),
+        -1,
         '異なる勢力が接する境界は補完しない'
     );
 
@@ -9597,13 +9601,79 @@ test('勢力色Canvasは元マップの1pixelだけを勢力単位で慎重に�
         0, 0, 0
     ]);
     assert.strictEqual(
-        ui._sampleClanIdWithConservativeGapFill(onePointMap, castleToClan, 3, 3, 3, 3, 1, 1),
-        0,
+        ui._sampleTerritoryOwnerWithConservativeGapFill(onePointMap, castleToClan, 3, 3, 3, 3, 1, 1),
+        -1,
         '支持が1pixelだけなら海側などへのにじみ防止のため補完しない'
     );
 
+    const neutralCenterMap = new Uint8Array([4]);
+    assert.strictEqual(
+        ui._sampleTerritoryOwnerWithConservativeGapFill(neutralCenterMap, castleToClan, 1, 1, 1, 1, 0, 0),
+        0,
+        'ownerClan=0の中立領域は地図外ではなく中立として返す'
+    );
+
+    const neutralGapMap = new Uint8Array([
+        4, 4, 0,
+        4, 0, 0,
+        4, 4, 0
+    ]);
+    assert.strictEqual(
+        ui._sampleTerritoryOwnerWithConservativeGapFill(neutralGapMap, castleToClan, 3, 3, 3, 3, 1, 1),
+        0,
+        '中立領域側の黒線隙間も1pixelだけ中立として補完できる'
+    );
+
     const uiMap = read('js/ui_map.js');
-    assert.ok(uiMap.includes('const sampleClanId = (x, y) => this._sampleClanIdWithConservativeGapFill(sourcePixelMap, castleToClanMap, mapW, mapH, width, height, x, y);'));
+    assert.ok(uiMap.includes('const sampleOwnerClanId = (x, y) => this._sampleTerritoryOwnerWithConservativeGapFill(sourcePixelMap, castleToClanMap, mapW, mapH, width, height, x, y);'));
+    assert.ok(uiMap.includes('if (clanId < 0) return;'), '地図外(-1)だけを透明にし、中立(0)は従来どおり描画する');
+});
+
+
+
+test('勢力色Canvasは中立拠点領域を従来どおり半透明白で描画する', () => {
+    class TestUIManager {}
+    const buffer = new Uint8ClampedArray(4);
+    const overlay = {
+        id: 'clan-color-overlay',
+        width: 1,
+        height: 1,
+        getContext() {
+            return {
+                clearRect() { buffer.fill(0); },
+                createImageData() { return { data: new Uint8ClampedArray(4), width: 1, height: 1 }; },
+                putImageData(imageData) { buffer.set(imageData.data); }
+            };
+        }
+    };
+    const ctx = createContext({
+        UIManager: TestUIManager,
+        document: {
+            body: { classList: { contains(name) { return name === 'is-pc'; } } },
+            getElementById(id) { return id === 'clan-color-overlay' ? overlay : null; }
+        }
+    });
+    ctx.DataManager = {
+        castlePixelMap: new Uint8Array([1]),
+        castlePixelBounds: [null, { minX: 0, maxX: 0, minY: 0, maxY: 0 }],
+        hexToRgb() { return { r: 0, g: 0, b: 0 }; }
+    };
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = Object.create(ctx.UIManager.prototype);
+    ui.game = {
+        mapWidth: 1,
+        mapHeight: 1,
+        castleOwnershipVersion: 0,
+        castles: [{ id: 1, ownerClan: 0 }],
+        clans: [],
+        isSuspendingColorUpdate: false,
+        _castleColorDirtyIds: new Set()
+    };
+    ui.pixelCastleMap = ctx.DataManager.castlePixelMap;
+    ui.lastClanColorsHash = null;
+    ui._lastClanColorOverlay = null;
+    ui.updateClanColors();
+    assert.deepStrictEqual(Array.from(buffer), [255, 255, 255, 100]);
 });
 
 test('勢力色Canvasは所有versionを使い少数の落城では拠点領域だけ局所更新する', () => {
@@ -11560,9 +11630,10 @@ test('タブレットを含む固定論理画面のPC/スマホ判定はapp_boot
     assert.ok(css.includes('body:not(.is-pc) #scenario-modal .scenario-main'));
     assert.ok(!/@media\s*\([^)]*(?:min|max)-(?:width|height)/.test(css), '固定論理UIを物理viewport media queryで再判定しない');
 
-    const runBootstrap = ({ width, height, userAgent, maxTouchPoints, coarse = true, hoverNone = true }) => {
+    const runBootstrap = ({ width, height, userAgent, maxTouchPoints, coarse = true, hoverNone = true, displayMode = 'auto' }) => {
         const listeners = {};
         const bodyClasses = new Set();
+        const rootClasses = new Set();
         const screenStyle = { setProperty() {} };
         const screen = { style: screenStyle };
         const classList = {
@@ -11577,8 +11648,13 @@ test('タブレットを含む固定論理画面のPC/スマホ判定はapp_boot
         };
         const context = createContext({
             navigator: { userAgent, maxTouchPoints },
+            UserSettings: { displayMode },
             document: {
-                documentElement: { classList: { add() {}, remove() {} } },
+                documentElement: { classList: {
+                    add(...names) { names.forEach(name => rootClasses.add(name)); },
+                    remove(...names) { names.forEach(name => rootClasses.delete(name)); },
+                    contains(name) { return rootClasses.has(name); }
+                } },
                 body: { classList, dataset: {} },
                 fonts: null,
                 getElementById(id) { return id === 'game-screen' ? screen : null; }
@@ -11607,6 +11683,7 @@ test('タブレットを含む固定論理画面のPC/スマホ判定はapp_boot
             mode: context.document.body.dataset.layoutMode,
             inputMode: context.document.body.dataset.inputMode,
             isTouchInput: bodyClasses.has('is-touch-input'),
+            lowMemory: rootClasses.has('mobile-low-memory'),
             width: screen.style.width,
             height: screen.style.height
         };
@@ -11614,7 +11691,7 @@ test('タブレットを含む固定論理画面のPC/スマホ判定はapp_boot
 
     const ipadDesktopUa = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15';
     const portraitTablet = runBootstrap({ width: 820, height: 1180, userAgent: ipadDesktopUa, maxTouchPoints: 5 });
-    assert.deepStrictEqual(portraitTablet, { isPc: false, mode: 'mobile', inputMode: 'touch', isTouchInput: true, width: '663.75px', height: '1180px' });
+    assert.deepStrictEqual(portraitTablet, { isPc: false, mode: 'mobile', inputMode: 'touch', isTouchInput: true, lowMemory: false, width: '663.75px', height: '1180px' });
 
     const landscapeTablet = runBootstrap({ width: 1024, height: 768, userAgent: ipadDesktopUa, maxTouchPoints: 5 });
     assert.strictEqual(landscapeTablet.isPc, true);
@@ -11623,6 +11700,12 @@ test('タブレットを含む固定論理画面のPC/スマホ判定はapp_boot
     assert.strictEqual(landscapeTablet.isTouchInput, true);
     assert.strictEqual(landscapeTablet.width, '1280px');
     assert.strictEqual(landscapeTablet.height, '720px');
+
+    const portraitManualLight = runBootstrap({ width: 820, height: 1180, userAgent: ipadDesktopUa, maxTouchPoints: 5, displayMode: 'light' });
+    assert.strictEqual(portraitManualLight.lowMemory, true, '手動軽量はスマホ論理レイアウトのタブレットでは有効にする');
+    const landscapeManualLight = runBootstrap({ width: 1024, height: 768, userAgent: ipadDesktopUa, maxTouchPoints: 5, displayMode: 'light' });
+    assert.strictEqual(landscapeManualLight.isPc, true);
+    assert.strictEqual(landscapeManualLight.lowMemory, false, '手動軽量でもPC論理レイアウトにはスマホ専用軽量処理を持ち込まない');
 
     const smallLandscapeTouch = runBootstrap({ width: 800, height: 600, userAgent: 'Mozilla/5.0 (Linux; Android 12)', maxTouchPoints: 5 });
     assert.strictEqual(smallLandscapeTouch.isPc, false, '横持ちでもPC論理画面を十分な倍率で表示できない端末はスマホUIへ寄せる');

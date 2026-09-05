@@ -13,8 +13,20 @@
 (function bootstrapApplication() {
     const FONT_TIMEOUT_MS = 6000;
     const MOBILE_TRANSITION_CHECKPOINT_KEY = 'sengoku_mobile_transition_checkpoint_v1';
+    const PC_LOGICAL_WIDTH = 1280;
+    const PC_LOGICAL_HEIGHT = 720;
+    const MOBILE_TARGET_RATIO = 9 / 16;
+    const MIN_TOUCH_PC_SCALE = 0.75;
+    // 表示モード判定の正本。タッチ端末でも横向きでPC論理画面を十分な倍率で表示できる時はPCレイアウトを使う。
+    // 軽量モードもこの論理レイアウトに従わせ、PCレイアウトへスマホ専用のページ送りや音声制限を持ち込まない。
+    function resolvesToPcGameLayout(layoutW, layoutH, touchInput) {
+        if (!touchInput) return true;
+        const isLandscape = layoutW > layoutH;
+        const pcScale = Math.min(layoutW / PC_LOGICAL_WIDTH, layoutH / PC_LOGICAL_HEIGHT);
+        return isLandscape && pcScale >= MIN_TOUCH_PC_SCALE;
+    }
 
-    function resolveEarlyMobileLowMemoryMode() {
+    function resolveMobileLowMemoryEligibility() {
         const nav = window.navigator || {};
         const ua = String(nav.userAgent || '');
         const touch = Number(nav.maxTouchPoints || 0) > 0 || /iPhone|iPad|iPod|Android|Mobile/i.test(ua);
@@ -54,9 +66,35 @@
         return false;
     }
 
+    function resolveEarlyMobileLowMemoryMode(eligible = resolveMobileLowMemoryEligibility()) {
+        if (!eligible) return false;
+        const nav = window.navigator || {};
+        const ua = String(nav.userAgent || '');
+        const touch = Number(nav.maxTouchPoints || 0) > 0 || /iPhone|iPad|iPod|Android|Mobile/i.test(ua);
+        const screenObj = window.screen || {};
+        const layoutW = Number(window.innerWidth || screenObj.width || 0);
+        const layoutH = Number(window.innerHeight || screenObj.height || 0);
+        return !resolvesToPcGameLayout(layoutW, layoutH, touch);
+    }
+
     const displayModePreference = window.UserSettings ? window.UserSettings.displayMode : 'auto';
-    const earlyMobileLowMemoryMode = resolveEarlyMobileLowMemoryMode();
+    const mobileLowMemoryEligible = resolveMobileLowMemoryEligibility();
+    const earlyMobileLowMemoryMode = resolveEarlyMobileLowMemoryMode(mobileLowMemoryEligible);
     window.__displayModePreference = displayModePreference;
+    window.__mobileLowMemoryEligible = mobileLowMemoryEligible;
+
+    function applyMobileLowMemoryModeForLayout(layoutMode) {
+        const active = !!mobileLowMemoryEligible && layoutMode === 'mobile';
+        window.__mobileLowMemoryMode = active;
+        window.__mobileLowMemoryModeSource = active ? (displayModePreference === 'light' ? 'manual' : 'auto') : 'normal';
+        const root = document && document.documentElement ? document.documentElement : null;
+        if (root && root.classList) {
+            if (active) root.classList.add('mobile-low-memory');
+            else root.classList.remove('mobile-low-memory');
+        }
+        return active;
+    }
+
     window.__mobileLowMemoryModeSource = earlyMobileLowMemoryMode ? (displayModePreference === 'light' ? 'manual' : 'auto') : 'normal';
     window.__mobileLowMemoryMode = earlyMobileLowMemoryMode;
     if (earlyMobileLowMemoryMode) {
@@ -178,7 +216,7 @@
     function renderDisplayModeIndicator() {
         const element = document.getElementById('legacy-safe-mode-indicator');
         if (!element) return;
-        if (!earlyMobileLowMemoryMode) {
+        if (!window.__mobileLowMemoryMode) {
             element.textContent = '';
             return;
         }
@@ -203,11 +241,6 @@
         bind('saveload-close-btn', () => getGame()?.ui?.saveLoadView?.close());
     }
 
-    const PC_LOGICAL_WIDTH = 1280;
-    const PC_LOGICAL_HEIGHT = 720;
-    const MOBILE_TARGET_RATIO = 9 / 16;
-    const MIN_TOUCH_PC_SCALE = 0.75;
-
     function mediaMatches(query) {
         try {
             return !!(window.matchMedia && window.matchMedia(query).matches);
@@ -229,13 +262,7 @@
     }
 
     function resolveGameLayoutMode(layoutW, layoutH, touchInput = isTouchFirstDevice()) {
-        if (!touchInput) return 'pc';
-
-        // タッチ主体端末は縦持ちならスマホUIを正本にする。横持ちでも
-        // PC論理画面を75%以上で収められない場合は、PC UIを押し潰さずスマホUIへ寄せる。
-        const isLandscape = layoutW > layoutH;
-        const pcScale = Math.min(layoutW / PC_LOGICAL_WIDTH, layoutH / PC_LOGICAL_HEIGHT);
-        return isLandscape && pcScale >= MIN_TOUCH_PC_SCALE ? 'pc' : 'mobile';
+        return resolvesToPcGameLayout(layoutW, layoutH, touchInput) ? 'pc' : 'mobile';
     }
 
     function resizeGameScreen() {
@@ -257,12 +284,14 @@
         const layoutMode = resolveGameLayoutMode(layoutW, layoutH, isTouchInput);
         const isPC = layoutMode === 'pc';
         const previousLayoutMode = document.body.dataset.layoutMode || '';
+        applyMobileLowMemoryModeForLayout(layoutMode);
 
         document.body.classList.toggle('is-pc', isPC);
         // レイアウト方式と入力方式は別物。横向きタブレットはPCレイアウトでも入力はタッチのまま。
         document.body.classList.toggle('is-touch-input', isTouchInput);
         document.body.dataset.layoutMode = layoutMode;
         document.body.dataset.inputMode = isTouchInput ? 'touch' : 'mouse';
+        renderDisplayModeIndicator();
 
         screen.style.setProperty('--screen-edge-bleed', `${onePhysicalPixel}px`);
 
