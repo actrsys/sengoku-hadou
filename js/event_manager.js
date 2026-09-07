@@ -145,6 +145,10 @@ class EventManager {
             this.residentEvents[timing] = [];
         });
 
+        // 途中年代シナリオの開始前補正対象。歴史イベント定義側が historicalDate を持つ場合だけ登録します。
+        // シナリオ開始月より前に史実上終了しているイベントは、画面へ見せる前に無演出で解決します。
+        this.scenarioStartHistoricalEvents = [];
+
         window.GameEvents.forEach(ev => this.registerEvent(ev));
     }
 
@@ -155,6 +159,10 @@ class EventManager {
     }
 
     registerEvent(eventData) {
+        if (eventData && eventData.id && eventData.id.startsWith('historical_') && eventData.historicalDate) {
+            this.scenarioStartHistoricalEvents.push(eventData);
+        }
+
         // 常駐イベントだけは複数タイミングを監視できます。
         // 例：月初に適用しつつ、寿命判定直前の月末にも再確認する。
         if (eventData && eventData.type === 'resident') {
@@ -175,6 +183,94 @@ class EventManager {
         if (this.events[t]) {
             this.events[t].push(eventData);
         }
+    }
+
+    _isScenarioStartAfterHistoricalDate(historicalDate) {
+        if (!historicalDate) return false;
+        const targetYear = Number(historicalDate.year);
+        const targetMonth = Number(historicalDate.month || 1);
+        if (!Number.isFinite(targetYear) || !Number.isFinite(targetMonth)) return false;
+
+        const startYear = Number(this.game && (this.game.gameStartYear ?? this.game.year));
+        const startMonth = Number(this.game && (this.game.gameStartMonth ?? this.game.month));
+        if (!Number.isFinite(startYear) || !Number.isFinite(startMonth)) return false;
+
+        // 同じ月から始めるシナリオでは、その月のイベントとして通常発火できる余地を残します。
+        // 「史実月を過ぎたシナリオ」だけを開始前に消化済みへします。
+        return startYear > targetYear || (startYear === targetYear && startMonth > targetMonth);
+    }
+
+    _isScenarioStartAtOrAfterDate(date) {
+        if (!date) return false;
+        const targetYear = Number(date.year);
+        const targetMonth = Number(date.month || 1);
+        if (!Number.isFinite(targetYear) || !Number.isFinite(targetMonth)) return false;
+
+        const startYear = Number(this.game && (this.game.gameStartYear ?? this.game.year));
+        const startMonth = Number(this.game && (this.game.gameStartMonth ?? this.game.month));
+        if (!Number.isFinite(startYear) || !Number.isFinite(startMonth)) return false;
+
+        return startYear > targetYear || (startYear === targetYear && startMonth >= targetMonth);
+    }
+
+    _removeOneTimeEventFromQueues(eventId) {
+        if (!eventId) return;
+        Object.keys(this.events).forEach(timing => {
+            const list = this.events[timing];
+            if (!Array.isArray(list) || list.length === 0) return;
+            this.events[timing] = list.filter(ev => !ev || ev.id !== eventId);
+        });
+    }
+
+    /**
+     * 途中年代から始める新規シナリオ専用の「開始前史実解決」です。
+     * シナリオ選択後のロード画面内で呼び、勢力選択画面などが最初に表示される前に完了させます。
+     *
+     * - historicalDate を開始月がすでに過ぎている一度きり歴史イベントを対象にする。
+     * - イベント本編の execute() は呼ばず、演出・ログ・選択肢を再生しない。
+     * - 必要な派生状態だけ applyScenarioStartState() で補正する。
+     * - 補正成功後に flags[eventId] = true とし、通常進行で再発火させない。
+     * - 「歴史イベントOFF」は未来のスクリプト発火設定であり、過去のシナリオ初期状態には適用しない。
+     */
+    async applyScenarioStartHistoricalSettlements(context = null) {
+        const targets = Array.isArray(this.scenarioStartHistoricalEvents)
+            ? this.scenarioStartHistoricalEvents
+            : [];
+        if (targets.length === 0) return [];
+
+        this.game.flags = this.game.flags || {};
+        const settledIds = [];
+
+        for (const ev of targets) {
+            if (!ev || !ev.id || ev.isOneTime !== true) continue;
+            if (this.game.flags[ev.id]) continue;
+            const shouldSettleAtScenarioStart = ev.scenarioStartSettlementDate
+                ? this._isScenarioStartAtOrAfterDate(ev.scenarioStartSettlementDate)
+                : this._isScenarioStartAfterHistoricalDate(ev.historicalDate);
+            if (!shouldSettleAtScenarioStart) continue;
+
+            try {
+                if (typeof ev.applyScenarioStartState === 'function') {
+                    await ev.applyScenarioStartState(this.game, context);
+                }
+
+                // 状態補正が正常終了してから消化済みにする。途中エラー時に未補正のまま封印しない。
+                this.game.flags[ev.id] = true;
+                this._removeOneTimeEventFromQueues(ev.id);
+                settledIds.push(ev.id);
+
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic(`scenario_start_history:settled:${ev.id}`);
+                }
+            } catch (error) {
+                if (ev.scenarioStartSettlementRequired === true) {
+                    throw new Error(`必須のシナリオ開始前歴史イベント補正 ${ev.id} に失敗しました: ${error && error.message ? error.message : error}`);
+                }
+                console.warn(`シナリオ開始前の歴史イベント補正 ${ev.id} に失敗したため、未発生のまま残します:`, error);
+            }
+        }
+
+        return settledIds;
     }
 
     /**

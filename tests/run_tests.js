@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r348');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r351');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -5361,6 +5361,84 @@ test('常駐歴史イベントは EventManager が状態遷移だけを管理し
     assert.ok(registerBlock.includes('return;'));
 });
 
+test('途中年代シナリオは画面表示前に通過済み歴史イベントを無演出で消化済みにする', async () => {
+    const ctx = createContext();
+    let applied = 0;
+    ctx.window.GameEvents = [{
+        id: 'historical_scenario_start_test',
+        timing: 'startMonth_before',
+        isOneTime: true,
+        historicalDate: { year: 1565, month: 5 },
+        applyScenarioStartState: async game => { applied += 1; game.corrected = true; },
+        checkCondition: () => true,
+        execute: async () => { throw new Error('開始前補正では本編executeを呼ばない'); }
+    }];
+    ctx.window.UserSettings = { historicalEvent: false };
+    loadScript(ctx, 'js/event_manager.js');
+    const EventManager = vm.runInContext('EventManager', ctx);
+    const game = { gameStartYear: 1570, gameStartMonth: 5, year: 1570, month: 5, flags: {}, writeSystemDiagnostic() {} };
+    const manager = new EventManager(game);
+
+    const settled = await manager.applyScenarioStartHistoricalSettlements();
+    assert.deepStrictEqual(Array.from(settled), ['historical_scenario_start_test']);
+    assert.strictEqual(applied, 1);
+    assert.strictEqual(game.corrected, true);
+    assert.strictEqual(game.flags.historical_scenario_start_test, true);
+    assert.strictEqual(manager.events.startMonth_before.length, 0, '消化済みイベントを通常キューから除外する');
+});
+
+test('必須の開始前史実補正は失敗時にシナリオ開始を続行せず、成功時だけ完了扱いにする', async () => {
+    const ctx = createContext();
+    ctx.window.GameEvents = [{
+        id: 'historical_required_scenario_start_test',
+        timing: 'startMonth_before',
+        isOneTime: true,
+        historicalDate: { year: 1565, month: 5 },
+        scenarioStartSettlementDate: { year: 1565, month: 1 },
+        scenarioStartSettlementRequired: true,
+        applyScenarioStartState: async () => { throw new Error('required correction failed'); },
+        checkCondition: () => false,
+        execute: async () => {}
+    }];
+    ctx.window.UserSettings = { historicalEvent: true };
+    loadScript(ctx, 'js/event_manager.js');
+    const EventManager = vm.runInContext('EventManager', ctx);
+    const game = { gameStartYear: 1565, gameStartMonth: 1, year: 1565, month: 1, flags: {}, writeSystemDiagnostic() {} };
+    const manager = new EventManager(game);
+
+    await assert.rejects(
+        () => manager.applyScenarioStartHistoricalSettlements(),
+        /必須のシナリオ開始前歴史イベント補正 historical_required_scenario_start_test に失敗しました/
+    );
+    assert.strictEqual(game.flags.historical_required_scenario_start_test, undefined, '失敗した必須補正を完了扱いにしない');
+    assert.strictEqual(manager.events.startMonth_before.length, 1, '失敗時はイベントキューも消さない');
+});
+
+test('歴史イベント本来月から始めるシナリオは開始前消化せず通常発火の余地を残す', async () => {
+    const ctx = createContext();
+    let applied = 0;
+    ctx.window.GameEvents = [{
+        id: 'historical_same_month_test',
+        timing: 'startMonth_before',
+        isOneTime: true,
+        historicalDate: { year: 1565, month: 5 },
+        applyScenarioStartState: async () => { applied += 1; },
+        checkCondition: () => false,
+        execute: async () => {}
+    }];
+    ctx.window.UserSettings = { historicalEvent: true };
+    loadScript(ctx, 'js/event_manager.js');
+    const EventManager = vm.runInContext('EventManager', ctx);
+    const game = { gameStartYear: 1565, gameStartMonth: 5, year: 1565, month: 5, flags: {}, writeSystemDiagnostic() {} };
+    const manager = new EventManager(game);
+
+    const settled = await manager.applyScenarioStartHistoricalSettlements();
+    assert.strictEqual(settled.length, 0);
+    assert.strictEqual(applied, 0);
+    assert.strictEqual(game.flags.historical_same_month_test, undefined);
+    assert.strictEqual(manager.events.startMonth_before.length, 1);
+});
+
 test('歴史イベントOFF時は適用中の歴史常駐効果を解除し、ON時は次の登録タイミングで再評価する', async () => {
     const ctx = createContext();
     let enters = 0;
@@ -5397,6 +5475,38 @@ test('歴史イベントOFF時は適用中の歴史常駐効果を解除し、ON
     assert.strictEqual(enters, 1, '再ONした瞬間には常駐効果を勝手に再適用しない');
     await manager.processEvents('startMonth_before');
     assert.strictEqual(enters, 2, '再ON後は次の登録タイミングで条件を再評価して適用する');
+});
+
+test('永禄の変を過ぎたシナリオでは三好義継のdaimyo改名を初期状態へ反映する', () => {
+    const historical = read('js/event/historical_event.js');
+    const start = historical.indexOf('id: "historical_eiroku_no_hen"');
+    assert.ok(start >= 0);
+    const end = historical.indexOf('// ==========================================', start + 1);
+    const block = historical.slice(start, end);
+    assert.ok(block.includes('historicalDate: { year: 1565, month: 5 }'));
+    assert.ok(block.includes('scenarioStartSettlementDate: { year: 1565, month: 1 }'));
+    assert.ok(block.includes('scenarioStartSettlementRequired: true'));
+    assert.ok(block.includes('applyScenarioStartState: function(game)'));
+    assert.ok(block.includes('game.getBusho(1020014)'));
+    assert.ok(block.includes("applyNameAndFaceChangeByTrigger(yoshitsugu, 'daimyo')"));
+    assert.ok(block.includes("yoshitsugu.fullName !== '三好義継'"));
+
+    const life = read('js/life_system.js');
+    assert.ok(life.includes('applyNameAndFaceChangeByTrigger(busho, trigger)'));
+    assert.ok(life.includes("this.applyNameAndFaceChangeByTrigger(busho, 'daimyo')"));
+});
+
+test('宇喜多直家の浦上離反は1574年3月以降に限定し旧家乗っ取りではなく独立として扱う', () => {
+    const historical = read('js/event/historical_event.js');
+    const start = historical.indexOf('id: "historical_ukita_coup"');
+    assert.ok(start >= 0, '宇喜多直家の歴史イベントが存在する');
+    const end = historical.indexOf('// ==========================================', start + 1);
+    const block = historical.slice(start, end);
+
+    assert.ok(block.includes('historicalDate: { year: 1574, month: 3 }'));
+    assert.ok(block.includes('game.year < 1574 || (game.year === 1574 && game.month < 3)'));
+    assert.ok(block.includes("forceAction(castle, naoie, munekage, 'indep')"));
+    assert.ok(!block.includes("forceAction(castle, naoie, munekage, 'coup')"));
 });
 
 test('三好長慶の寿命補正は historical_event 側が条件・対象・年数を所有する', () => {
@@ -5569,7 +5679,7 @@ test('実データのシナリオ登録はindex.binを正本にし、シナリ�
     const index = read('index.html');
     const visualGuide = read('tests/visual/guide.html');
     assert.strictEqual(runtimeIndex.format, 'sengoku-scenario-index-v1');
-    assert.deepStrictEqual(runtimeIndex.scenarios.map(s => s.folder), ['1560_okehazama']);
+    assert.deepStrictEqual(runtimeIndex.scenarios.map(s => s.folder), ['1560_okehazama', '1570_anegawa']);
     assert.ok(index.includes('id="scenario-modal"'), '実ゲームのシナリオ選択画面は残す');
     assert.ok(visualGuide.includes('id="scenario-modal"'), 'レイアウト回帰用のシナリオ選択画面も残す');
     assert.ok(visualGuide.match(/scenario-placeholder/g)?.length >= 8, 'レイアウト確認用ダミースロットを8枠表示する');
@@ -5581,7 +5691,7 @@ test('シナリオ選択のダミー8枠は実シナリオへ混ぜず、件数�
     const ui = read('js/ui.js');
     const css = read('css/style.css');
     assert.ok(config.includes('PlaceholderSlots: 8'));
-    assert.strictEqual(runtimeIndex.scenarios.length, 1, '実データ登録は桶狭間1件だけにする');
+    assert.strictEqual(runtimeIndex.scenarios.length, 2, '実データ登録は桶狭間・姉川の2件にする');
     assert.ok(ui.includes("div.className = 'clan-btn scenario-placeholder'"));
     assert.ok(ui.includes("div.setAttribute('aria-disabled', 'true')"));
     assert.ok(ui.includes("const useMultiColumnLayout = totalScenarioSlots > 4"));

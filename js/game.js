@@ -405,6 +405,13 @@ class GameManager {
             this.kunishuSystem.setKunishuData(data.kunishus || []);
             this.courtRankSystem.setRankData(data.courtRanks || []);
 
+            // 途中年代シナリオでは、史実上すでに終了した歴史イベントをロード画面の裏で無演出解決します。
+            // 大名選択・観戦画面を初めて見せる時点で名前・所属等を完成状態にし、開始後の突然変化を防ぎます。
+            if (this.eventManager && typeof this.eventManager.applyScenarioStartHistoricalSettlements === 'function') {
+                if (this.ui) this.ui.updateLoadingProgress(73, '開始時点までの史実を反映しています');
+                await this.eventManager.applyScenarioStartHistoricalSettlements();
+            }
+
             if (this.ui) this.ui.updateLoadingProgress(74, '寿命・登場状態を初期化しています');
             // 討死武将の初期延命はモデル生成時ではなく、寿命専門部署で一度だけ適用します。
             this.lifeSystem.initializeBattleDeathLifespans(this.year);

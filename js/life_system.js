@@ -272,61 +272,58 @@ class LifeSystem {
     }
     
     // ==========================================
-    // ★大名就任時の「改名」と「顔変更」を一元管理する魔法！
+    // 条件付きの「改名」と「顔変更」を一元管理します。
+    // daimyo: だけでなく、歴史イベント開始前補正などが同じデータを再利用できるようにします。
     // ==========================================
-    applyDaimyoNameAndFaceChange(busho, messages = null) {
+    applyNameAndFaceChangeByTrigger(busho, trigger) {
+        const triggerKey = String(trigger || '').trim();
+        const oldNameStr = busho ? busho.fullName : '';
+        let newNameStr = oldNameStr;
         let isNameChanged = false;
-        let oldNameStr = busho.fullName;
-        let newNameStr = "";
+        let isFaceChanged = false;
+        if (!busho || !triggerKey) {
+            return { isNameChanged, isFaceChanged, oldNameStr, newNameStr };
+        }
 
-        // 1. 改名のチェック
-        if (busho.nameChange && busho.nameChange.includes('daimyo:')) {
+        if (busho.nameChange && busho.nameChange.includes(`${triggerKey}:`)) {
             const changes = busho.nameChange.split('/');
             for (const change of changes) {
                 const parts = change.split(':');
-                if (parts.length === 3 && parts[0].trim() === 'daimyo') {
-                    // ★Bushoクラスの共通魔法で名前を書き換えます
-                    if (typeof busho.applyNameChangeData === 'function') {
-                        busho.applyNameChangeData(parts[1].trim(), parts[2].trim());
-                    } else {
-                        // 万が一見つからなかった場合の予備の処理
-                        const newNameParts = parts[1].trim().split('|');
-                        busho.familyName = newNameParts[0] || "";
-                        busho.givenName = newNameParts[1] || "";
-                        busho.name = busho.familyName + busho.givenName;
-                        
-                        const newYomiParts = parts[2].trim().split('|');
-                        busho.familyYomi = newYomiParts[0] || "";
-                        busho.givenYomi = newYomiParts[1] || "";
-                        busho.yomi = busho.familyYomi + busho.givenYomi;
-                    }
-                    
-                    newNameStr = busho.fullName;
-                    isNameChanged = true;
-
-                    // メッセージのリストが渡されていたら、お知らせを追加します
-                    if (messages) {
-                        messages.push(`家督を継ぐにあたり、${oldNameStr}は\n「${newNameStr}」と名を改めました。`);
-                    }
+                if (parts.length !== 3 || parts[0].trim() !== triggerKey) continue;
+                if (typeof busho.applyNameChangeData === 'function') {
+                    busho.applyNameChangeData(parts[1].trim(), parts[2].trim());
                 }
+                newNameStr = busho.fullName;
+                isNameChanged = oldNameStr !== newNameStr;
             }
         }
 
-        // 2. 顔変更のチェック
-        if (busho.faceChange && busho.faceChange.includes('daimyo:')) {
+        if (busho.faceChange && busho.faceChange.includes(`${triggerKey}:`)) {
             const changes = busho.faceChange.split('/');
             for (const change of changes) {
                 const parts = change.split(':');
-                if (parts.length === 2 && parts[0].trim() === 'daimyo') {
-                    const newFace = parts[1].trim();
-                    if (newFace) {
-                        busho.faceIcon = newFace;
-                    }
+                if (parts.length !== 2 || parts[0].trim() !== triggerKey) continue;
+                const newFace = parts[1].trim();
+                if (newFace && busho.faceIcon !== newFace) {
+                    busho.faceIcon = newFace;
+                    isFaceChanged = true;
                 }
             }
         }
 
-        return { isNameChanged, oldNameStr, newNameStr };
+        return { isNameChanged, isFaceChanged, oldNameStr, newNameStr };
+    }
+
+    // ==========================================
+    // ★大名就任時の「改名」と「顔変更」の公開窓口。
+    // 実データ解釈は applyNameAndFaceChangeByTrigger() を正本にします。
+    // ==========================================
+    applyDaimyoNameAndFaceChange(busho, messages = null) {
+        const info = this.applyNameAndFaceChangeByTrigger(busho, 'daimyo');
+        if (messages && info.isNameChanged) {
+            messages.push(`家督を継ぐにあたり、${info.oldNameStr}は\n「${info.newNameStr}」と名を改めました。`);
+        }
+        return info;
     }
     
     // ★ 改名のチェック（毎年1月に行います）

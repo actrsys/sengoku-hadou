@@ -1941,6 +1941,27 @@ window.GameEvents.push({
     id: "historical_eiroku_no_hen",
     timing: "startMonth_before", // 月初の処理前に発生します
     isOneTime: true,             // 一度きりの歴史イベントです
+    // 永禄8年5月。これより後から始まるシナリオでは本編を再演せず、発生済みとして扱います。
+    historicalDate: { year: 1565, month: 5 },
+    // 1565年以降を開始年とするシナリオでは、永禄の変は開始前に必ず解決済みとします。
+    // 史実発生日そのものは historicalDate に残し、途中年代シナリオの初期状態だけ別境界で保証します。
+    scenarioStartSettlementDate: { year: 1565, month: 1 },
+    scenarioStartSettlementRequired: true,
+    // 三好義継の名前は共通マスター上では「daimyo:」改名ですが、1570年等では
+    // 初期身分が大名でないシナリオもあり得るため、過去史実の結果として無条件に解決します。
+    applyScenarioStartState: function(game) {
+        const yoshitsugu = game.getBusho(1020014);
+        if (!yoshitsugu) {
+            throw new Error('三好義継(ID:1020014)が存在しません');
+        }
+        if (!game.lifeSystem || typeof game.lifeSystem.applyNameAndFaceChangeByTrigger !== 'function') {
+            throw new Error('三好義継の改名処理を実行できません');
+        }
+        game.lifeSystem.applyNameAndFaceChangeByTrigger(yoshitsugu, 'daimyo');
+        if (yoshitsugu.fullName !== '三好義継') {
+            throw new Error(`三好義継への改名が完了していません: ${yoshitsugu.fullName || yoshitsugu.name || '名称不明'}`);
+        }
+    },
     
     checkCondition: function(game) {
         // 1. 三好長慶（ID: 1020005）が死亡しているか確認します
@@ -3824,8 +3845,10 @@ window.GameEvents.push({
     isOneTime: true,             // 一度発生したら二度と起きません
     
     checkCondition: function(game) {
-        // １．1561年以降であるか確認します
-        if (game.year < 1561) return false;
+        // １．1571年以降であるか確認します。
+        // 1570年開始シナリオでは最上義守を当主として置くため、
+        // 義光への家督相続を1年前倒ししません。
+        if (game.year < 1571) return false;
         
         // ２．最上義守（ID: 1089011）が存在し、大名であるか確認します
         const yoshimori = window.EventCheck.getDaimyo(game, 1089011);
@@ -3881,16 +3904,18 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 宇喜多直家 謀反イベント
+// ★ 宇喜多直家 浦上家離反イベント
 // ==========================================
 window.GameEvents.push({
+    // セーブ互換のためイベントIDは旧名を維持する。史実上の内容は1574年3月の浦上宗景との断絶。
     id: "historical_ukita_coup",
     timing: "endMonth_before", 
     isOneTime: true,
+    historicalDate: { year: 1574, month: 3 },
     
     checkCondition: function(game) {
-        // 1. 1569年以降であるか確認します
-        if (game.year < 1569) return false;
+        // 備前市・岡山県の近年の整理に合わせ、天正2年（1574）3月以降に限定する。
+        if (game.year < 1574 || (game.year === 1574 && game.month < 3)) return false;
         
         // 2. 浦上宗景（ID: 1044005）が存在し、大名であるか確認します
         const munekage = window.EventCheck.getDaimyo(game, 1044005);
@@ -3921,10 +3946,11 @@ window.GameEvents.push({
             b.loyalty = Math.max(0, (b.loyalty || 0) - 15);
         });
 
-        // 第4引数に 'coup' を渡すことで、「謀反」として処理させます
-        // ※ 'indep' にすれば独立、'defect' にすれば寝返りとして使えます
+        // 1574年3月は浦上宗景との断絶・毛利方への接近の段階であり、
+        // 1575年の天神山城落城・宗景追放までを一度に先取りしない。
+        // そのため旧家乗っ取り(coup)ではなく、浦上家からの独立(indep)として処理する。
         if (game.independenceSystem && typeof game.independenceSystem.forceAction === 'function') {
-            await game.independenceSystem.forceAction(castle, naoie, munekage, 'coup');
+            await game.independenceSystem.forceAction(castle, naoie, munekage, 'indep');
         }
     }
 });
