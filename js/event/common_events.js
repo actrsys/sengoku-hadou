@@ -985,86 +985,6 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 毎月の兵糧攻めイベント（発生・継続・解除）
-// ==========================================
-window.GameEvents.push({
-    id: "starving_tactics_monthly",
-    timing: "startMonth_before", // 収入の前に実行します
-    isOneTime: false,
-    
-    checkCondition: function(game) {
-        return true; // 毎月必ずチェックします
-    },
-    
-    execute: async function(game) {
-        game.castles.forEach(c => {
-            // 城のシール帳がなければ用意します
-            if (!c.statusEffects) c.statusEffects = [];
-
-            if (c.ownerClan === 0) {
-                // 空き城になったら、兵糧攻めのシールを綺麗に剥がしておきます
-                c.statusEffects = c.statusEffects.filter(s => s !== '糧攻');
-                return; // 空き城での兵糧攻め処理はおしまいです
-            }
-
-            let isSurrounded = false;
-            
-            // 道が繋がっている城（お隣さん）がいるかチェックします
-            if (c.adjacentCastleIds && c.adjacentCastleIds.length > 0) {
-                isSurrounded = true; // 最初は「包囲されている」と仮定します
-                
-                for (let adjId of c.adjacentCastleIds) {
-                    const adjCastle = game.getCastle(adjId);
-                    if (!adjCastle) continue;
-                    
-                    // お隣さんが「敵」かどうか調べます
-                    let isEnemy = false;
-                    if (adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== c.ownerClan) {
-                        const rel = game.getRelation(c.ownerClan, adjCastle.ownerClan);
-                        // ★関係が明確に「敵対」の時だけ、包囲している敵としてカウントします！
-                        if (rel && rel.status === '敵対') {
-                            isEnemy = true;
-                        }
-                    }
-                    
-                    // もしお隣さんが「敵じゃない（味方、同盟、支配、空き城）」なら、包囲されていません！
-                    if (!isEnemy) {
-                        isSurrounded = false;
-                        break; // １つでも安全な道があればチェック終了です
-                    }
-                }
-            }
-            
-            const hasSeal = c.statusEffects.includes('糧攻');
-            
-            if (isSurrounded) {
-                // 【兵糧攻め状態】
-                // シールが貼られていなければ貼ります
-                if (!hasSeal) {
-                    c.statusEffects.push('糧攻');
-                }
-                
-                // 毎月のダメージ（士気と民忠が今の数字から10%下がります）
-                c.morale = Math.floor(c.morale * 0.90);
-                c.peoplesLoyalty = Math.floor(c.peoplesLoyalty * 0.90);
-                
-                // 画面には出さず、左下のログにだけこっそり書き残します
-                if (game.ui && game.ui.log) {
-                    const cName = c.name || "どこかの拠点";
-                    game.ui.log(`【兵糧攻め】${cName}は敵軍に完全に包囲されています……`);
-                }
-            } else {
-                // 【解除または安全】
-                if (hasSeal) {
-                    // 包囲が解けたら、シールを綺麗に剥がします
-                    c.statusEffects = c.statusEffects.filter(s => s !== '糧攻');
-                }
-            }
-        });
-    }
-});
-
-// ==========================================
 // ★ ９月の豊作・凶作イベント ＆ 兵糧収入処理（スッキリ版）
 // ==========================================
 window.GameEvents.push({
@@ -1293,11 +1213,6 @@ window.GameEvents.push({
             if (c.statusEffects && c.statusEffects.includes('一揆')) {
                 riceIncome = Math.floor(riceIncome / 4);
             }
-            // ★追加：兵糧攻め状態の城は兵糧収入が８分の１になります！
-            if (c.statusEffects && c.statusEffects.includes('糧攻')) {
-                riceIncome = Math.floor(riceIncome / 8);
-            }
-            
             c.rice = Math.min(99999, c.rice + riceIncome);
         });
 

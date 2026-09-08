@@ -2341,9 +2341,6 @@ class UIManager {
             if (castle.statusEffects.includes('一揆')) {
                 statusMarksHtml += `<div class="status-mark mark-ikki">一揆</div>`;
             }
-            if (castle.statusEffects.includes('糧攻')) {
-                statusMarksHtml += `<div class="status-mark mark-starve">糧攻</div>`;
-            }
         }
 
         // 大雪のシールは「城」ではなく「国（地方）」に貼られているので、上で取得した国データを再利用します。

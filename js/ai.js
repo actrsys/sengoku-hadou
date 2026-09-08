@@ -1154,61 +1154,8 @@ class AIEngine {
                     if (isVulnerable) powerPenalty = powerPenalty / 2;
                     prob -= powerPenalty;
                 }
-
-                // ★今回追加：その城を攻撃して新しく敵対することによって、自軍の城がすべて囲まれてしまう（糧攻状態になってしまう）リスクを計算する魔法！
-                let starvingRiskCount = 0;
-                
-                // 自分のすべての城をチェックします
-                myClanCastles.forEach(c => {
-                    if (c.adjacentCastleIds && c.adjacentCastleIds.length > 0) {
-                        let isSurrounded = true; // 最初は囲まれていると仮定します
-                        
-                        for (let adjId of c.adjacentCastleIds) {
-                            const adjCastle = this.game.getCastle(adjId);
-                            if (!adjCastle) continue;
-                            
-                            // お隣さんが自分と同じ大名家なら、囲まれていません！
-                            if (adjCastle.ownerClan === myClanId) {
-                                isSurrounded = false;
-                                break;
-                            }
-                            
-                            // お隣さんが敵かどうかを調べます
-                            let isEnemy = false;
-                            if (adjCastle.ownerClan !== 0) {
-                                // 今から攻撃する相手なら、新しい敵になります！
-                                if (adjCastle.ownerClan === target.ownerClan) {
-                                    isEnemy = true;
-                                } else {
-                                    // それ以外の相手なら、今の関係を調べます
-                                    const adjRel = this.game.getRelation(myClanId, adjCastle.ownerClan);
-                                    if (adjRel && adjRel.status === '敵対') {
-                                        isEnemy = true;
-                                    }
-                                }
-                            }
-                            
-                            // もしお隣さんが「敵じゃない（味方、同盟、支配、従属、空き城）」なら、安全な道があるので囲まれていません！
-                            if (!isEnemy) {
-                                isSurrounded = false;
-                                break;
-                            }
-                        }
-                        
-                        // 新しく敵対することで、この城が逃げ道なしの包囲状態になってしまうならカウントします
-                        if (isSurrounded) {
-                            starvingRiskCount++;
-                        }
-                    }
-                });
-                
-                // 囲まれてしまう城が1つでもある場合、攻撃スコアを大きく下げます（1城につき -50 点）
-                // 糧攻状態になるのは致命的なので、ここは隙だらけでもペナルティはそのままにします
-                if (starvingRiskCount > 0) {
-                    prob -= (starvingRiskCount * 50);
-                }
             }
-            
+
             // ★恨みを晴らすため、または執着によるスコアアップ！
             // 1. 「敵対」状態の勢力に対する攻撃ボーナス
             if (rel.status === '敵対') {

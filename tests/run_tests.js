@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r351');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r352');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -3184,6 +3184,22 @@ test('地図上の所有変更・戦闘演出中はAI/月末処理テキスト�
     assert.ok(map.includes('async playCaptureEffect(castleIdOrIds, onHalfway, options = {}) {\n        return this.withAIGuardTextHiddenForMapEffect(async () => {'));
     assert.ok(independence.includes('await this.game.ui.playBattleBlink(changedCastleIds, oldColor, newColorRgb, 1000);'));
     assert.ok(independence.includes('await this.game.ui.playCaptureEffect(changedCastleIds, applyNewClanColor);'));
+});
+
+test('拠点の兵糧攻め状態は廃止され、付与・収入減・AI優遇・表示を残さない', () => {
+    const common = fs.readFileSync(path.join(ROOT, 'js/event/common_events.js'), 'utf8');
+    const aiOperation = fs.readFileSync(path.join(ROOT, 'js/ai_operation.js'), 'utf8');
+    const ai = fs.readFileSync(path.join(ROOT, 'js/ai.js'), 'utf8');
+    const ui = fs.readFileSync(path.join(ROOT, 'js/ui.js'), 'utf8');
+    const css = fs.readFileSync(path.join(ROOT, 'css/style.css'), 'utf8');
+    for (const source of [common, aiOperation, ai, ui, css]) {
+        assert.ok(!source.includes('糧攻'), '廃止した糧攻状態の参照を残さない');
+        assert.ok(!source.includes('兵糧攻め'), '廃止した兵糧攻め処理の参照を残さない');
+    }
+    assert.ok(!common.includes('starving_tactics_monthly'));
+    assert.ok(!aiOperation.includes('isTargetStarving'));
+    assert.ok(!ai.includes('starvingRiskCount'));
+    assert.ok(!css.includes('mark-starve'));
 });
 
 test('タイトル版表示は GameConfig.Meta.Version を正本にする', () => {
