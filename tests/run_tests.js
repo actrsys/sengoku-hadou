@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r355');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r365');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -5691,7 +5691,7 @@ test('討死武将の初期延命は LifeSystem が従来ルールを再現す�
 });
 
 
-test('r355の1570初期配置は統合差分・食客所属・寄寓先・軍師整合を維持する', () => {
+test('r365の1570初期配置は1560連続性・忠誠基準・浪人所属・庇護先所属・六角家名称・軍師整合を維持する', () => {
     const { common, scenario } = getRuntimeData('1570_anegawa');
     const stateById = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
     const castleById = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
@@ -5704,18 +5704,129 @@ test('r355の1570初期配置は統合差分・食客所属・寄寓先・軍師
     assert.strictEqual(Number(castleById.get(11).castellanId), 1006069, '名古屋城主は佐久間信盛');
     assert.strictEqual(Number(castleById.get(246).castellanId), 1018039, '多喜山城主は山岡景隆');
 
-    const roninGuestPlacements = new Map([
-        [1008005, 27],  // 畠山義綱 -> 宇佐山城（近江坂本方面）
-        [1220003, 9],   // 土岐頼芸 -> 躑躅ヶ崎館（武田氏庇護）
-        [1224002, 56],  // 斯波義銀 -> 高屋城（畠山高政庇護）
-    ]);
-    for (const [id, castleId] of roninGuestPlacements) {
-        assert.strictEqual(Number(stateById.get(id).clan), 0, `単なる庇護・寄寓人物${id}は浪人を維持する`);
-        assert.strictEqual(Number(stateById.get(id).castleId), castleId, `寄寓人物${id}の1570所在を反映する`);
-    }
+    const rokkaku = scenario.kunishus.find(row => Number(row.id) === 69);
+    assert.ok(rokkaku, '甲賀の六角家（諸勢力ID69）が必要');
+    assert.strictEqual(rokkaku.name, '六角家', '六角衆ではなく六角家と表示する');
+    assert.strictEqual(rokkaku.yomi, 'ろっかくけ', '六角家の読みを統一する');
+
+    assert.strictEqual(Number(stateById.get(1008005).clan), 0, '畠山義綱は通常大名家には所属しない');
+    assert.strictEqual(Number(stateById.get(1008005).belongKunishuId), 69, '畠山義綱は庇護先の六角家（諸勢力）所属とする');
+    assert.strictEqual(Number(stateById.get(1008005).castleId), 40, '畠山義綱は六角家の代理拠点・日野城へ置く');
+
+    assert.strictEqual(Number(stateById.get(1220003).clan), 3, '土岐頼芸は庇護先の武田家所属とする');
+    assert.strictEqual(Number(stateById.get(1220003).belongKunishuId), 0, '土岐頼芸は諸勢力所属ではない');
+    assert.strictEqual(Number(stateById.get(1220003).castleId), 9, '土岐頼芸は躑躅ヶ崎館へ置く');
+
+    assert.strictEqual(Number(stateById.get(1224002).clan), 41, '斯波義銀は庇護先の河内畠山家所属とする');
+    assert.strictEqual(Number(stateById.get(1224002).belongKunishuId), 0, '斯波義銀は諸勢力所属ではない');
+    assert.strictEqual(Number(stateById.get(1224002).castleId), 56, '斯波義銀は高屋城へ置く');
+    assert.strictEqual(Number(stateById.get(1224002).achievementTotal), 200, '斯波義銀は失領した旧守護家当主として功績200');
+
     assert.strictEqual(Number(stateById.get(1011002).clan), 1, '神保長住は信長の食客なので織田家臣として扱う');
     assert.strictEqual(Number(stateById.get(1011002).castleId), 3, '神保長住は岐阜城へ置く');
-    assert.strictEqual(Number(stateById.get(1224002).achievementTotal), 200, '斯波義銀は失領した旧守護家当主として功績200');
+
+
+    assert.strictEqual(Number(stateById.get(1004026).clan), 301, '井伊直虎は1568年以降の遠江支配移行を反映し徳川家所属とする');
+    assert.strictEqual(Number(stateById.get(1004026).castleId), 54, '井伊直虎は犬居城スロットを維持する');
+
+    for (const id of [1052002, 1052003, 1052004, 1052005, 1052006, 1052008, 1052010]) {
+        assert.strictEqual(Number(stateById.get(id).clan), 25, `伊予宇都宮勢 ${id} は毛利方の保護下として毛利家所属に固定する`);
+        assert.strictEqual(Number(stateById.get(id).castleId), 121, `伊予宇都宮勢 ${id} は1570側で成立済みの三原城へ置く`);
+    }
+    for (const id of [1074053, 1074055]) {
+        assert.strictEqual(Number(stateById.get(id).clan), 77, `${id} は1570年4月の相馬逃亡後なので相馬家所属に固定する`);
+        assert.strictEqual(Number(stateById.get(id).castleId), 209, `${id} は相馬領小高城へ置く`);
+    }
+
+
+    // r358 loyalty: scenario consistency plus deliberate 1560 loyalty=100 inheritance.
+    const enabledClanById = new Map(scenario.clansState.filter(row => row.enabled === true).map(row => [Number(row.id), row]));
+    const active1570 = row => {
+        const master = masterById.get(Number(row.id));
+        return master && Number(master.startYear) <= 1570 && Number(master.endYear) >= 1570;
+    };
+    for (const row of scenario.warriorsState.filter(active1570)) {
+        const clanId = Number(row.clan || 0);
+        const kunishuId = Number(row.belongKunishuId || 0);
+        const loyalty = Number(row.loyalty);
+        if (kunishuId > 0 || clanId === 0) {
+            assert.strictEqual(loyalty, 50, `浪人・諸勢力は忠誠50: ${row.id}`);
+            continue;
+        }
+        const clan = enabledClanById.get(clanId);
+        if (clan && Number(clan.leaderId) === Number(row.id)) {
+            assert.strictEqual(loyalty, 100, `現当主は忠誠100: ${row.id}`);
+        } else {
+            assert.ok((loyalty >= 80 && loyalty <= 95) || loyalty === 100, `通常家臣は80～95または特例100: ${row.id}=${loyalty}`);
+        }
+    }
+    for (const id of [1003003, 1015016, 1025002, 1026011, 1209002]) {
+        assert.strictEqual(Number(stateById.get(id).loyalty), 100, `1560から同主家の一門・忠臣等の忠誠100を維持: ${id}`);
+    }
+    assert.strictEqual(Number(stateById.get(1052002).loyalty), 85, '宇都宮豊綱は失領・毛利方保護下への移行で85');
+    for (const id of [1052003,1052004,1052005,1052006,1052008,1052010]) assert.strictEqual(Number(stateById.get(id).loyalty), 90, `伊予宇都宮旧臣は新庇護先で90: ${id}`);
+    assert.strictEqual(Number(stateById.get(1074053).loyalty), 85, '中野宗時は相馬逃亡直後で85');
+    assert.strictEqual(Number(stateById.get(1074055).loyalty), 85, '牧野久仲は相馬逃亡直後で85');
+    assert.strictEqual(Number(stateById.get(1004026).loyalty), 90, '井伊直虎は今川方から徳川方への移行で90');
+    assert.strictEqual(Number(stateById.get(1004039).clan), 301, '安部元真は1570年に徳川家所属');
+    assert.strictEqual(Number(stateById.get(1004039).castleId), 12, '安部元真は遠州代理の浜松城配置');
+    assert.strictEqual(Number(stateById.get(1004039).loyalty), 90, '安部元真は今川から徳川への移行後で90');
+    assert.strictEqual(Number(stateById.get(1006136).clan), 1, '古田重然は1570年に織田家所属');
+    assert.strictEqual(Number(stateById.get(1006136).castleId), 3, '古田重然は岐阜城配置');
+    assert.strictEqual(Number(stateById.get(1006136).loyalty), 90, '古田重然は織田仕官後の通常家臣として90');
+    assert.strictEqual(Number(stateById.get(1005036).clan), 1, '日根野高吉は斎藤氏滅亡後の織田仕官を反映');
+    assert.strictEqual(Number(stateById.get(1005036).castleId), 3, '日根野高吉は岐阜城配置を維持');
+    assert.strictEqual(Number(stateById.get(1005036).loyalty), 90, '日根野高吉は新主家への移行後として90');
+    assert.strictEqual(Number(stateById.get(1005008).clan), 17, '長井道勝は斎藤没落後の足利義昭仕候を反映');
+    assert.strictEqual(Number(stateById.get(1005008).castleId), 26, '長井道勝は足利家の二条城へ置く');
+    assert.strictEqual(Number(stateById.get(1005008).loyalty), 90, '長井道勝は主家移行後として90');
+    assert.strictEqual(Number(stateById.get(1220008).clan), 1, '揖斐光親は斎藤没落後の織田降参を反映');
+    assert.strictEqual(Number(stateById.get(1220008).castleId), 182, '揖斐光親は美濃在地代理の曽根城を維持');
+    assert.strictEqual(Number(stateById.get(1220008).loyalty), 85, '揖斐光親は旧主家側での対織田戦後の降参として85');
+    for (const id of [1401030, 1401031]) {
+        assert.strictEqual(Number(stateById.get(id).clan), 15, `石田家 ${id} は浅井家所属`);
+        assert.strictEqual(Number(stateById.get(id).castleId), 186, `石田家 ${id} は今浜城配置を維持`);
+        assert.strictEqual(Number(stateById.get(id).loyalty), 95, `石田家 ${id} は安定家臣として95`);
+    }
+    assert.strictEqual(Number(stateById.get(1401078).clan), 1, '富田一白は織田信長への仕官を反映');
+    assert.strictEqual(Number(stateById.get(1401078).castleId), 3, '富田一白は岐阜城へ置く');
+    assert.strictEqual(Number(stateById.get(1401078).loyalty), 90, '富田一白は織田家臣として90');
+    assert.strictEqual(Number(stateById.get(1007013).clan), 3, '朝倉在重は今川崩壊後の武田方帰属を反映');
+    assert.strictEqual(Number(stateById.get(1007013).castleId), 13, '朝倉在重は駿府城配置を維持');
+    assert.strictEqual(Number(stateById.get(1007013).loyalty), 85, '朝倉在重は主家転換直後として85');
+    assert.strictEqual(Number(stateById.get(1302015).clan), 301, '大河内秀綱は1570年時点で徳川家臣');
+    assert.strictEqual(Number(stateById.get(1302015).castleId), 48, '大河内秀綱は三河岡崎城配置を維持');
+    assert.strictEqual(Number(stateById.get(1302015).loyalty), 90, '大河内秀綱は徳川家臣として90');
+    assert.strictEqual(Number(stateById.get(1038006).clan), 7, '武田信方は1570年春の朝倉方接近を反映');
+    assert.strictEqual(Number(stateById.get(1038006).castleId), 18, '武田信方は若狭前線に近い金ヶ崎城へ配置');
+    assert.strictEqual(Number(stateById.get(1038006).loyalty), 90, '武田信方は朝倉方として90');
+    assert.strictEqual(Number(stateById.get(1220007).clan), 3, '土岐頼元は斎藤滅亡後の武田仕官を反映');
+    assert.strictEqual(Number(stateById.get(1220007).castleId), 9, '土岐頼元は武田本拠の躑躅ヶ崎館へ配置');
+    assert.strictEqual(Number(stateById.get(1220007).loyalty), 85, '土岐頼元は主家転換を考慮して85');
+    assert.strictEqual(Number(stateById.get(1006152).clan), 1, '前田玄以は織田系仕官を反映');
+    assert.strictEqual(Number(stateById.get(1006152).castleId), 36, '前田玄以は美濃大垣城配置を維持');
+    assert.strictEqual(Number(stateById.get(1006152).loyalty), 90, '前田玄以は織田家臣として90');
+    assert.strictEqual(Number(stateById.get(1043051).clan), 43, '山中幸高は尼子再興軍所属の隠居として固定');
+    assert.strictEqual(Number(stateById.get(1043051).castleId), 109, '山中幸高は尼子方高瀬城配置を維持');
+    assert.strictEqual(Number(stateById.get(1043051).loyalty), 95, '山中幸高は1560の尼子忠誠95を維持');
+    assert.strictEqual(stateById.get(1043051).isRetired, true, '山中幸高は1560の家督譲渡を踏まえ隠居');
+    assert.strictEqual(Number(stateById.get(1038014).clan), 1, '粟屋光若は若狭旧武田家臣の信長掌握を反映して織田家所属');
+    assert.strictEqual(Number(stateById.get(1038014).castleId), 79, '粟屋光若は後瀬山城配置を維持');
+    assert.strictEqual(Number(stateById.get(1038014).loyalty), 90, '粟屋光若は主家転換期として忠誠90');
+    assert.strictEqual(Number(stateById.get(1220005).clan), 1, '土岐頼次は松永久秀配下を織田傘下として表現');
+    assert.strictEqual(Number(stateById.get(1220005).castleId), 39, '土岐頼次は松永久秀の信貴山城へ置く');
+    assert.strictEqual(Number(stateById.get(1220005).loyalty), 90, '土岐頼次は松永配下の通常家臣相当として90');
+    assert.strictEqual(Number(stateById.get(1202004).clan), 1, '松永久秀自身は1570年開始時に織田傘下');
+    assert.strictEqual(Number(stateById.get(1202004).castleId), 39, '松永久秀は信貴山城に在城');
+    assert.strictEqual(Number(stateById.get(1031018).clan), 0, '上泉秀綱は特定主家に仕官せず浪人を維持');
+    assert.strictEqual(Number(stateById.get(1031018).castleId), 26, '上泉秀綱は1570年5月の在京を二条城で表現');
+    assert.strictEqual(Number(stateById.get(1031018).loyalty), 50, '上泉秀綱は浪人なので忠誠50');
+    assert.strictEqual(Number(stateById.get(1002001).clan), 17, '武田信虎は足利義昭への仕候を足利家所属で表現');
+    assert.strictEqual(Number(stateById.get(1002001).castleId), 26, '武田信虎は在京を二条城で表現');
+    assert.strictEqual(Number(stateById.get(1002001).loyalty), 90, '武田信虎は足利家臣として90');
+    assert.strictEqual(stateById.get(1002001).isRetired, true, '武田信虎の隠居設定は維持');
+    assert.strictEqual(Number(stateById.get(1004010).loyalty), 90, '今川氏真は北条庇護下の旧大名として90');
+    assert.strictEqual(Number(stateById.get(1024004).loyalty), 85, '北畠具教は織田との和睦・養子受入れ直後で85');
 
     for (const row of scenario.warriorsState) {
         if (row.isGunshi !== '') assert.strictEqual(typeof row.isGunshi, 'boolean', `isGunshiはboolean: ${row.id}`);
