@@ -85,6 +85,13 @@ const SCENARIO_FIELDS = {
   kunishuClan: ['id','name','yomi','leaderId','castleId','maxSoldiers','soldiers','training','defaultTraining','morale','defaultMorale','horses','maxHorses','guns','maxGuns','defense','maxDefense','ideology','networkTag','daimyoRelations'],
   legions: ['id','clanId','legionNo','commanderId']
 };
+const BOOLEAN_FIELDS = Object.freeze({
+  warriors_master: new Set(['isKilledInBattle','female','childless']),
+  warriors_state: new Set(['isGunshi','isRetired']),
+  clans_state: new Set(['enabled']),
+  castles_state: new Set(['enabled'])
+});
+
 const REQUIRED_COMMON_SHEETS = Object.keys(COMMON_FIELDS);
 const REQUIRED_SCENARIO_SHEETS = ['scenario_info', ...Object.keys(SCENARIO_FIELDS)];
 
@@ -144,6 +151,15 @@ function els(parent, local){ return Array.from(parent.getElementsByTagNameNS('*'
 function first(parent, local){ return els(parent,local)[0] || null; }
 function colIndex(ref){ const m=/^([A-Z]+)/i.exec(ref||''); if(!m) return -1; let n=0; for(const ch of m[1].toUpperCase()) n=n*26+ch.charCodeAt(0)-64; return n-1; }
 function normalizeValue(v){ if(v===null||v===undefined) return ''; return typeof v==='string' ? v.trim() : v; }
+function normalizeBooleanField(v){
+  if(v===null||v===undefined||v==='') return '';
+  if(v===true||v===false) return v;
+  if(v===1||v===0) return v===1;
+  const s=String(v).trim().toLowerCase();
+  if(['true','1','yes','on'].includes(s)) return true;
+  if(['false','0','no','off'].includes(s)) return false;
+  return v;
+}
 
 async function readOfficeWorkbook(file) {
   const bytes=new Uint8Array(await file.arrayBuffer()); const z=new SimpleZipReader(bytes);
@@ -187,7 +203,12 @@ function rowsAsDicts(book,sheet,requiredFields){
   return rows.slice(1).map(arr=>{ const o={}; Object.entries(pos).forEach(([h,i])=>o[h]=normalizeValue(arr[i]??'')); return o; }).filter(o=>Object.values(o).some(v=>v!==''));
 }
 function pickRows(book,sheet,fields,idField='id'){
-  const rows=rowsAsDicts(book,sheet,fields); return rows.filter(r=>idField===null || r[idField]!=='' ).map(r=>Object.fromEntries(fields.map(f=>[f,r[f]??''])));
+  const rows=rowsAsDicts(book,sheet,fields);
+  const booleanFields=BOOLEAN_FIELDS[sheet] || null;
+  return rows.filter(r=>idField===null || r[idField]!=='' ).map(r=>Object.fromEntries(fields.map(f=>{
+    const value=r[f]??'';
+    return [f, booleanFields?.has(f) ? normalizeBooleanField(value) : value];
+  })));
 }
 function scenarioInfo(book){
   const rows=rowsAsDicts(book,'scenario_info',['key','value']); const src={}; rows.forEach(r=>{ const k=String(r.key||'').trim(); if(k)src[k]=r.value; });

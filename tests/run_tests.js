@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r352');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r353');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -5688,6 +5688,47 @@ test('討死武将の初期延命は LifeSystem が従来ルールを再現す�
     assert.strictEqual(alreadyDead.endYear, 1559, '開始前年以前に死亡済みなら延命しない');
     assert.strictEqual(young.lifespanModifiers['system:battle_death_initial'], 25);
     assert.strictEqual(older.lifespanModifiers['system:battle_death_initial'], 10);
+});
+
+
+test('r353の1570初期配置は多喜山・名古屋の統合差分と軍師整合を維持する', () => {
+    const { common, scenario } = getRuntimeData('1570_anegawa');
+    const stateById = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
+    const castleById = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+    const masterById = new Map(common.warriorsMaster.map(row => [Number(row.id), row]));
+
+    assert.strictEqual(Number(stateById.get(1006069).castleId), 11, '佐久間信盛は名古屋城へ戻す');
+    for (const id of [1018039, 1018040, 1018041, 1018042, 1018043]) {
+        assert.strictEqual(Number(stateById.get(id).castleId), 246, `山岡一族 ${id} は多喜山城へ置く`);
+    }
+    assert.strictEqual(Number(castleById.get(11).castellanId), 1006069, '名古屋城主は佐久間信盛');
+    assert.strictEqual(Number(castleById.get(246).castellanId), 1018039, '多喜山城主は山岡景隆');
+
+    for (const row of scenario.warriorsState) {
+        if (row.isGunshi !== '') assert.strictEqual(typeof row.isGunshi, 'boolean', `isGunshiはboolean: ${row.id}`);
+        if (row.isRetired !== '') assert.strictEqual(typeof row.isRetired, 'boolean', `isRetiredはboolean: ${row.id}`);
+    }
+
+    const enabledClanIds = scenario.clansState.filter(row => row.enabled === true).map(row => Number(row.id));
+    for (const clanId of enabledClanIds) {
+        const gunshi = scenario.warriorsState.filter(row => {
+            if (Number(row.clan) !== clanId || row.isGunshi !== true) return false;
+            const master = masterById.get(Number(row.id));
+            return master && Number(master.startYear) <= 1570 && Number(master.endYear) >= 1570;
+        });
+        assert.strictEqual(gunshi.length, 1, `有効勢力${clanId}の1570開始時軍師は1人だけ`);
+    }
+
+    for (const castle of scenario.castlesState.filter(row => row.enabled === true && Number(row.ownerClan) > 0)) {
+        const castellan = stateById.get(Number(castle.castellanId));
+        assert.ok(castellan, `城${castle.id}には城主が必要`);
+        assert.strictEqual(Number(castellan.clan), Number(castle.ownerClan), `城${castle.id}の城主所属を所有勢力に合わせる`);
+        assert.strictEqual(Number(castellan.castleId), Number(castle.id), `城${castle.id}の城主所在を拠点に合わせる`);
+    }
+
+    const converter = read('tools/data_converter.html');
+    assert.ok(converter.includes('function normalizeBooleanField(v)'), 'BIN変換境界でboolean風Excel値を正規化する');
+    assert.ok(converter.includes("warriors_state: new Set(['isGunshi','isRetired'])"), '軍師・隠居フラグを変換時に正規化する');
 });
 
 test('実データのシナリオ登録はindex.binを正本にし、シナリオ選択UIはレイアウト確認用に残す', () => {

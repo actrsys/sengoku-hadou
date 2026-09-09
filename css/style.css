@@ -216,7 +216,6 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 .mark-senran { background-color: #d32f2f; }
 .mark-ikki { background-color: #f57c00; }
 .mark-snow { background-color: #0288d1; }
-.mark-starve { background-color: #5d4037; }
 
 /* PC版：城情報ウインドウの右側に縦に並べる */
 body.is-pc .status-marks-container {
