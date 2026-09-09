@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r353');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r354');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -5691,7 +5691,7 @@ test('討死武将の初期延命は LifeSystem が従来ルールを再現す�
 });
 
 
-test('r353の1570初期配置は多喜山・名古屋の統合差分と軍師整合を維持する', () => {
+test('r354の1570初期配置は統合差分・浪人寄寓先・軍師整合を維持する', () => {
     const { common, scenario } = getRuntimeData('1570_anegawa');
     const stateById = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
     const castleById = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
@@ -5703,6 +5703,18 @@ test('r353の1570初期配置は多喜山・名古屋の統合差分と軍師整
     }
     assert.strictEqual(Number(castleById.get(11).castellanId), 1006069, '名古屋城主は佐久間信盛');
     assert.strictEqual(Number(castleById.get(246).castellanId), 1018039, '多喜山城主は山岡景隆');
+
+    const guestPlacements = new Map([
+        [1008005, 27],  // 畠山義綱 -> 宇佐山城（近江坂本方面）
+        [1011002, 3],   // 神保長住 -> 岐阜城（信長の食客）
+        [1220003, 9],   // 土岐頼芸 -> 躑躅ヶ崎館（武田氏庇護）
+        [1224002, 56],  // 斯波義銀 -> 高屋城（畠山高政庇護）
+    ]);
+    for (const [id, castleId] of guestPlacements) {
+        assert.strictEqual(Number(stateById.get(id).clan), 0, `寄寓人物${id}は正式家臣化せず浪人を維持する`);
+        assert.strictEqual(Number(stateById.get(id).castleId), castleId, `寄寓人物${id}の1570所在を反映する`);
+    }
+    assert.strictEqual(Number(stateById.get(1224002).achievementTotal), 200, '斯波義銀は失領した旧守護家当主として功績200');
 
     for (const row of scenario.warriorsState) {
         if (row.isGunshi !== '') assert.strictEqual(typeof row.isGunshi, 'boolean', `isGunshiはboolean: ${row.id}`);

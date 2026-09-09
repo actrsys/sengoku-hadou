@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r353'
+        Version: 'r354'
     },
 
     History: {
