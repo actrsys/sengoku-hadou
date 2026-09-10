@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r365');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r369');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -5691,7 +5691,7 @@ test('討死武将の初期延命は LifeSystem が従来ルールを再現す�
 });
 
 
-test('r365の1570初期配置は1560連続性・忠誠基準・浪人所属・庇護先所属・六角家名称・軍師整合を維持する', () => {
+test('r369の1570初期配置は池田家独立化を含む連続性・忠誠基準・軍師整合を維持する', () => {
     const { common, scenario } = getRuntimeData('1570_anegawa');
     const stateById = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
     const castleById = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
@@ -5828,6 +5828,44 @@ test('r365の1570初期配置は1560連続性・忠誠基準・浪人所属・�
     assert.strictEqual(Number(stateById.get(1004010).loyalty), 90, '今川氏真は北条庇護下の旧大名として90');
     assert.strictEqual(Number(stateById.get(1024004).loyalty), 85, '北畠具教は織田との和睦・養子受入れ直後で85');
 
+    // r369: 1570年5月は池田勝正追放前。池田家を独立勢力として開始する。
+    const ikedaClanMaster = common.clansMaster.find(row => Number(row.id) === 203);
+    const ikedaClanState = scenario.clansState.find(row => Number(row.id) === 203);
+    assert.strictEqual(ikedaClanMaster.name, '池田家', '勢力ID203は荒木家ではなく池田家');
+    assert.strictEqual(ikedaClanMaster.yomi, 'いけだけ', '池田家の読みを共通masterへ登録');
+    assert.strictEqual(ikedaClanState.enabled, true, '1570開始時に池田家を独立勢力として有効化');
+    assert.strictEqual(Number(ikedaClanState.leaderId), 1203003, '池田家当主は池田勝正');
+    assert.strictEqual(castleById.get(51).name, '池田城', '1570年5月のID51は池田城として扱う');
+    assert.strictEqual(Number(castleById.get(51).ownerClan), 203, '池田城は池田家領');
+    assert.strictEqual(Number(castleById.get(51).castellanId), 1203003, '池田城主は池田勝正');
+    for (const id of [1203003,1203004,1203006,1203008,1203010,1203011,1203013]) {
+        assert.strictEqual(Number(stateById.get(id).clan), 203, `池田城の開始時家中 ${id} は池田家所属`);
+        assert.strictEqual(Number(stateById.get(id).castleId), 51, `池田家中 ${id} は池田城在城`);
+    }
+    assert.strictEqual(Number(stateById.get(1203003).loyalty), 100, '大名・池田勝正は忠誠100');
+    assert.strictEqual(Number(stateById.get(1203003).achievementTotal), 1000, '一城の弱小大名として池田勝正は功績1000');
+    for (const id of [1203004,1203006,1203013]) assert.strictEqual(Number(stateById.get(id).loyalty), 85, `直近の内訌参加者 ${id} は忠誠85`);
+    assert.strictEqual(stateById.get(1203006).isGunshi, true, '池田家の軍師は荒木村重');
+    const relation = (a,b) => scenario.diplomacy.find(row => Number(row.sourceClanId) === a && Number(row.targetClanId) === b);
+    assert.strictEqual(relation(203,1).relationType, '同盟', '池田→織田は同盟');
+    assert.strictEqual(relation(203,17).relationType, '同盟', '池田→足利は同盟');
+    assert.strictEqual(relation(203,20).relationType, '敵対', '池田→三好は敵対');
+
+    // r366-r368: 浪人所属の追加是正と近畿・丹後の拠点連続性。
+    assert.strictEqual(Number(stateById.get(1038003).clan), 1, '武田信豊は織田支配下の旧若狭武田家当主として織田家所属');
+    assert.strictEqual(Number(stateById.get(1038003).castleId), 79, '武田信豊は後瀬山城配置を維持');
+    assert.strictEqual(Number(stateById.get(1038003).loyalty), 85, '武田信豊は旧当主・隠居の主家移行として85');
+    assert.strictEqual(stateById.get(1038003).isRetired, true, '武田信豊の隠居設定は維持');
+    assert.strictEqual(Number(stateById.get(1201016).clan), 1, '木村吉清は織田勢力所属として固定');
+    assert.strictEqual(Number(stateById.get(1201016).castleId), 35, '木村吉清は観音寺城配置を維持');
+    assert.strictEqual(Number(stateById.get(1201016).loyalty), 90, '木村吉清は織田方の通常家臣として90');
+    assert.strictEqual(Number(stateById.get(1401028).clan), 1, '石川貞清は美濃石川氏の織田方移行を反映');
+    assert.strictEqual(Number(stateById.get(1401028).castleId), 3, '石川貞清は岐阜城配置を維持');
+    assert.strictEqual(Number(stateById.get(1401028).loyalty), 90, '石川貞清は織田家臣として90');
+    assert.strictEqual(Number(stateById.get(1014006).castleId), 22, '波多野秀尚は八上城へ移して秀治1名だけの状態を解消');
+    assert.strictEqual(Number(stateById.get(1013005).castleId), 81, '一色義員は1570年の本拠・建部山城へ置く');
+    assert.strictEqual(Number(castleById.get(21).castellanId), 1013006, '弓木城主は同城に残る一色義俊へ交代');
+
     for (const row of scenario.warriorsState) {
         if (row.isGunshi !== '') assert.strictEqual(typeof row.isGunshi, 'boolean', `isGunshiはboolean: ${row.id}`);
         if (row.isRetired !== '') assert.strictEqual(typeof row.isRetired, 'boolean', `isRetiredはboolean: ${row.id}`);
@@ -5853,6 +5891,12 @@ test('r365の1570初期配置は1560連続性・忠誠基準・浪人所属・�
     const converter = read('tools/data_converter.html');
     assert.ok(converter.includes('function normalizeBooleanField(v)'), 'BIN変換境界でboolean風Excel値を正規化する');
     assert.ok(converter.includes("warriors_state: new Set(['isGunshi','isRetired'])"), '軍師・隠居フラグを変換時に正規化する');
+});
+
+test('r369では池田家・荒木村重の旧イベント2件を再設計まで登録停止する', () => {
+    const historical = read('js/event/historical_event.js');
+    assert.ok(historical.includes('//     id: "historical_araki_takeover"'), '池田家乗っ取りイベントはコメントアウト');
+    assert.ok(historical.includes('//     id: "historical_murashige_submission"'), '荒木村重臣従イベントはコメントアウト');
 });
 
 test('実データのシナリオ登録はindex.binを正本にし、シナリオ選択UIはレイアウト確認用に残す', () => {

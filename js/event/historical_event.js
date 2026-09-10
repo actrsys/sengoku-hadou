@@ -3352,387 +3352,389 @@ window.GameEvents.push({
 // ==========================================
 // ★ 荒木村重 池田家乗っ取りイベント
 // ==========================================
-window.GameEvents.push({
-    id: "historical_araki_takeover",
-    timing: "startMonth_before", 
-    isOneTime: true,             
-    
-    checkCondition: function(game) {
-        // 1. 池田長正（ID: 1203002）が死亡しているか確認します
-        const nagamasa = game.getBusho(1203002);
-        if (nagamasa && !window.LifeStatusRules.isDead(nagamasa)) return false;
-        
-        // 2. 三好義継（ID: 1020014）または三好長逸（ID: 1020021）が大名であるか確認します
-        const miyoshiDaimyo = window.EventCheck.getDaimyo(game, [1020014, 1020021]);
-        if (!miyoshiDaimyo) return false;
-        
-        // 3. 池田知正（ID: 1203004）が存在し、三好義継または三好長逸の家に所属する城主または国主であるか確認します
-        const tomomasa = game.getBusho(1203004);
-        if (!tomomasa || tomomasa.clan !== miyoshiDaimyo.clan) return false;
-        if (!tomomasa.isCastellan && !tomomasa.isCommander) return false;
-
-        // 4. 池田知正の居城が伊丹城（ID: 51）であるか、または伊丹城が池田知正の軍団に所属しているか確認します
-        const itamiCastle = game.getCastle(51);
-        if (!itamiCastle || itamiCastle.ownerClan !== miyoshiDaimyo.clan) return false;
-
-        let isItamiInvolved = false;
-        let tomomasaLegionNo = 0;
-        if (tomomasa.isCommander) {
-            // 武将本体に legionId は持たせない。国主が率いる Legion の席次を正本として判定する。
-            const tomomasaLegion = game.legions
-                ? game.legions.find(l => Number(l.clanId) === Number(tomomasa.clan) && Number(l.commanderId) === Number(tomomasa.id))
-                : null;
-            if (!tomomasaLegion) return false;
-            tomomasaLegionNo = Number(tomomasaLegion.legionNo) || 0;
-            // 池田知正が国主の場合、伊丹城が知正の軍団に所属しているか
-            if (Number(itamiCastle.legionId) === tomomasaLegionNo) isItamiInvolved = true;
-        } else {
-            // 池田知正が城主の場合、知正の居城が伊丹城か
-            if (tomomasa.castleId === 51) isItamiInvolved = true;
-        }
-        if (!isItamiInvolved) return false;
-
-        // 5. 荒木村重（ID: 1203006）が存在し、対象の家に所属しているか確認します
-        const murashige = game.getBusho(1203006);
-        if (!murashige || murashige.clan !== miyoshiDaimyo.clan) return false;
-
-        // 6. 荒木村重が池田知正と同じ場所にいるか確認します
-        if (tomomasa.isCommander) {
-            // 池田知正が国主の場合、村重の所在城が同じ軍団に所属しているか
-            const murashigeCastle = game.getCastle(murashige.castleId);
-            if (!murashigeCastle || Number(murashigeCastle.legionId) !== tomomasaLegionNo) return false;
-        } else {
-            // 池田知正が城主の場合、同じ城にいるか
-            if (murashige.castleId !== tomomasa.castleId) return false;
-        }
-
-        return true; 
-    },
-    
-    execute: async function(game) {
-        const tomomasa = game.getBusho(1203004);
-        const murashige = game.getBusho(1203006);
-        const itamiCastle = game.getCastle(51);
-
-        if (!tomomasa || !murashige || !itamiCastle) return;
-
-        // 強襲前の城の名前を覚えておきます
-        const castleNameBefore = itamiCastle.name;
-        const isCommander = tomomasa.isCommander;
-        let legionToTakeover = null;
-
-        if (isCommander && game.legions) {
-            legionToTakeover = game.legions.find(l => l.clanId === tomomasa.clan && l.commanderId === tomomasa.id);
-        }
-        
-        // 1. 荒木村重を伊丹城（ID: 51）へ移動させます
-        window.EventAction.moveBusho(game, murashige, 51);
-
-        // 2. 池田知正の役職を外し、荒木村重を新城主に据えます
-        // 知正が以前いたお城の城主データを解除します
-        const oldCastle = game.getCastle(tomomasa.castleId);
-        if (oldCastle && oldCastle.castellanId === tomomasa.id) {
-            oldCastle.castellanId = 0;
-        }
-
-        tomomasa.isCastellan = false;
-        tomomasa.isCommander = false;
-
-        window.EventAction.appointCastellan(game, murashige, itamiCastle);
-
-        // 国主だった場合は軍団を引き継ぎます
-        if (isCommander && legionToTakeover) {
-            if (murashige.isCommander && game.castleManager && game.legions) {
-                const oldMurashigeLegion = game.legions.find(l => Number(l.commanderId) === Number(murashige.id));
-                if (oldMurashigeLegion && Number(oldMurashigeLegion.id) !== Number(legionToTakeover.id)) {
-                    game.castleManager.disbandLegion(oldMurashigeLegion.id);
-                }
-            }
-            if (murashige.isGunshi) game.affiliationSystem.clearGunshiRole(murashige);
-            murashige.isCommander = true;
-            legionToTakeover.commanderId = murashige.id;
-        }
-
-        // 功績の調整
-        tomomasa.achievementTotal = 0;
-        if ((murashige.achievementTotal || 0) < 700) {
-            murashige.achievementTotal = 700;
-        }
-
-        // 3. 伊丹城の防御力強化と改名
-        if ((itamiCastle.maxDefense || 0) < 1000) itamiCastle.maxDefense = 1000;
-        if ((itamiCastle.defense || 0) < 1000) itamiCastle.defense = 1000;
-
-        let isRenamed = false;
-        if (itamiCastle.name === "伊丹城") {
-            itamiCastle.name = "有岡城";
-            itamiCastle.yomi = "ありおかじょう";
-            isRenamed = true;
-        }
-
-        // 4. メッセージの表示（個別に表示）
-        const murashigeName = murashige.fullName;
-        const tomomasaFamilyName = tomomasa.familyNameStr || "池田";
-        
-        // メッセージ1：強襲と実権奪取
-        const msg1 = `${murashigeName}が${castleNameBefore}を強襲し、${tomomasaFamilyName}家の実権を握りました！`;
-        game.ui.log(`【イベント】荒木村重の池田家乗っ取り：${murashigeName}が${tomomasaFamilyName}家の実権を握りました。`);
-        // Round23: 強襲の舞台である伊丹城（ID51）へ寄せてから通知します。
-        if (game.ui && typeof game.ui.focusMapOnCastle === 'function') {
-            await _historicalEventFocusMapOnCastle(game, 51, { transition: 'smooth', reason: 'historical_event' });
-        }
-        await _historicalEventShowDialogAsync(game, msg1, false, 0);
-
-        // メッセージ2：大改修と改名
-        if (isRenamed) {
-            const msg2 = `${murashigeName}は伊丹城を自らの居城と定めて大改修を施し、有岡城と改称しました！`;
-            await _historicalEventShowDialogAsync(game, msg2, false, 0);
-        }
-    }
-});
+// r369暫定停止: 1570年の池田城内訌と1574年の伊丹城攻略・有岡城改称が混在。史実時系列を分離して再設計するまで登録しない。
+// window.GameEvents.push({
+//     id: "historical_araki_takeover",
+//     timing: "startMonth_before", 
+//     isOneTime: true,             
+//     
+//     checkCondition: function(game) {
+//         // 1. 池田長正（ID: 1203002）が死亡しているか確認します
+//         const nagamasa = game.getBusho(1203002);
+//         if (nagamasa && !window.LifeStatusRules.isDead(nagamasa)) return false;
+//         
+//         // 2. 三好義継（ID: 1020014）または三好長逸（ID: 1020021）が大名であるか確認します
+//         const miyoshiDaimyo = window.EventCheck.getDaimyo(game, [1020014, 1020021]);
+//         if (!miyoshiDaimyo) return false;
+//         
+//         // 3. 池田知正（ID: 1203004）が存在し、三好義継または三好長逸の家に所属する城主または国主であるか確認します
+//         const tomomasa = game.getBusho(1203004);
+//         if (!tomomasa || tomomasa.clan !== miyoshiDaimyo.clan) return false;
+//         if (!tomomasa.isCastellan && !tomomasa.isCommander) return false;
+// 
+//         // 4. 池田知正の居城が伊丹城（ID: 51）であるか、または伊丹城が池田知正の軍団に所属しているか確認します
+//         const itamiCastle = game.getCastle(51);
+//         if (!itamiCastle || itamiCastle.ownerClan !== miyoshiDaimyo.clan) return false;
+// 
+//         let isItamiInvolved = false;
+//         let tomomasaLegionNo = 0;
+//         if (tomomasa.isCommander) {
+//             // 武将本体に legionId は持たせない。国主が率いる Legion の席次を正本として判定する。
+//             const tomomasaLegion = game.legions
+//                 ? game.legions.find(l => Number(l.clanId) === Number(tomomasa.clan) && Number(l.commanderId) === Number(tomomasa.id))
+//                 : null;
+//             if (!tomomasaLegion) return false;
+//             tomomasaLegionNo = Number(tomomasaLegion.legionNo) || 0;
+//             // 池田知正が国主の場合、伊丹城が知正の軍団に所属しているか
+//             if (Number(itamiCastle.legionId) === tomomasaLegionNo) isItamiInvolved = true;
+//         } else {
+//             // 池田知正が城主の場合、知正の居城が伊丹城か
+//             if (tomomasa.castleId === 51) isItamiInvolved = true;
+//         }
+//         if (!isItamiInvolved) return false;
+// 
+//         // 5. 荒木村重（ID: 1203006）が存在し、対象の家に所属しているか確認します
+//         const murashige = game.getBusho(1203006);
+//         if (!murashige || murashige.clan !== miyoshiDaimyo.clan) return false;
+// 
+//         // 6. 荒木村重が池田知正と同じ場所にいるか確認します
+//         if (tomomasa.isCommander) {
+//             // 池田知正が国主の場合、村重の所在城が同じ軍団に所属しているか
+//             const murashigeCastle = game.getCastle(murashige.castleId);
+//             if (!murashigeCastle || Number(murashigeCastle.legionId) !== tomomasaLegionNo) return false;
+//         } else {
+//             // 池田知正が城主の場合、同じ城にいるか
+//             if (murashige.castleId !== tomomasa.castleId) return false;
+//         }
+// 
+//         return true; 
+//     },
+//     
+//     execute: async function(game) {
+//         const tomomasa = game.getBusho(1203004);
+//         const murashige = game.getBusho(1203006);
+//         const itamiCastle = game.getCastle(51);
+// 
+//         if (!tomomasa || !murashige || !itamiCastle) return;
+// 
+//         // 強襲前の城の名前を覚えておきます
+//         const castleNameBefore = itamiCastle.name;
+//         const isCommander = tomomasa.isCommander;
+//         let legionToTakeover = null;
+// 
+//         if (isCommander && game.legions) {
+//             legionToTakeover = game.legions.find(l => l.clanId === tomomasa.clan && l.commanderId === tomomasa.id);
+//         }
+//         
+//         // 1. 荒木村重を伊丹城（ID: 51）へ移動させます
+//         window.EventAction.moveBusho(game, murashige, 51);
+// 
+//         // 2. 池田知正の役職を外し、荒木村重を新城主に据えます
+//         // 知正が以前いたお城の城主データを解除します
+//         const oldCastle = game.getCastle(tomomasa.castleId);
+//         if (oldCastle && oldCastle.castellanId === tomomasa.id) {
+//             oldCastle.castellanId = 0;
+//         }
+// 
+//         tomomasa.isCastellan = false;
+//         tomomasa.isCommander = false;
+// 
+//         window.EventAction.appointCastellan(game, murashige, itamiCastle);
+// 
+//         // 国主だった場合は軍団を引き継ぎます
+//         if (isCommander && legionToTakeover) {
+//             if (murashige.isCommander && game.castleManager && game.legions) {
+//                 const oldMurashigeLegion = game.legions.find(l => Number(l.commanderId) === Number(murashige.id));
+//                 if (oldMurashigeLegion && Number(oldMurashigeLegion.id) !== Number(legionToTakeover.id)) {
+//                     game.castleManager.disbandLegion(oldMurashigeLegion.id);
+//                 }
+//             }
+//             if (murashige.isGunshi) game.affiliationSystem.clearGunshiRole(murashige);
+//             murashige.isCommander = true;
+//             legionToTakeover.commanderId = murashige.id;
+//         }
+// 
+//         // 功績の調整
+//         tomomasa.achievementTotal = 0;
+//         if ((murashige.achievementTotal || 0) < 700) {
+//             murashige.achievementTotal = 700;
+//         }
+// 
+//         // 3. 伊丹城の防御力強化と改名
+//         if ((itamiCastle.maxDefense || 0) < 1000) itamiCastle.maxDefense = 1000;
+//         if ((itamiCastle.defense || 0) < 1000) itamiCastle.defense = 1000;
+// 
+//         let isRenamed = false;
+//         if (itamiCastle.name === "伊丹城") {
+//             itamiCastle.name = "有岡城";
+//             itamiCastle.yomi = "ありおかじょう";
+//             isRenamed = true;
+//         }
+// 
+//         // 4. メッセージの表示（個別に表示）
+//         const murashigeName = murashige.fullName;
+//         const tomomasaFamilyName = tomomasa.familyNameStr || "池田";
+//         
+//         // メッセージ1：強襲と実権奪取
+//         const msg1 = `${murashigeName}が${castleNameBefore}を強襲し、${tomomasaFamilyName}家の実権を握りました！`;
+//         game.ui.log(`【イベント】荒木村重の池田家乗っ取り：${murashigeName}が${tomomasaFamilyName}家の実権を握りました。`);
+//         // Round23: 強襲の舞台である伊丹城（ID51）へ寄せてから通知します。
+//         if (game.ui && typeof game.ui.focusMapOnCastle === 'function') {
+//             await _historicalEventFocusMapOnCastle(game, 51, { transition: 'smooth', reason: 'historical_event' });
+//         }
+//         await _historicalEventShowDialogAsync(game, msg1, false, 0);
+// 
+//         // メッセージ2：大改修と改名
+//         if (isRenamed) {
+//             const msg2 = `${murashigeName}は伊丹城を自らの居城と定めて大改修を施し、有岡城と改称しました！`;
+//             await _historicalEventShowDialogAsync(game, msg2, false, 0);
+//         }
+//     }
+// });
 
 // ==========================================
 // ★ 荒木村重臣従イベント
 // ==========================================
-window.GameEvents.push({
-    id: "historical_murashige_submission",
-    timing: "startMonth_before", 
-    isOneTime: true,             
-    
-    checkCondition: function(game) {
-        // 1. 将軍候補（ID80:左馬頭）または将軍家（ID1:征夷大将軍）と、その擁立勢力を特定します
-        const shogunInfo = window.EventCheck.getShogunInfo(game);
-        if (!shogunInfo) return false;
-        
-        const sponsorClanId = shogunInfo.sponsorClanId;
-        const shogunClanId = shogunInfo.shogunClanId;
-
-        // 2. 三好長逸（ID: 1020021）が大名であるか確認します
-        const nagayasu = game.getBusho(1020021);
-        if (!nagayasu || !nagayasu.isDaimyo) return false;
-        const miyoshiClanId = nagayasu.clan;
-
-        // ストッパー：三好家自身が将軍を擁立している家だった場合は中止します
-        if (miyoshiClanId === sponsorClanId || (shogunClanId !== 0 && miyoshiClanId === shogunClanId)) return false;
-
-        // 3. 荒木村重（ID: 1203006）が、三好家の城主または国主であるか確認します
-        const murashige = game.getBusho(1203006);
-        let targetLord = null;
-        let mainCastle = null;
-
-        if (murashige && murashige.clan === miyoshiClanId && (murashige.isCastellan || murashige.isCommander)) {
-            const c = game.getCastle(murashige.castleId);
-            if (c && c.ownerClan === miyoshiClanId) {
-                targetLord = murashige;
-                mainCastle = c;
-            }
-        }
-        if (!targetLord || !mainCastle) return false;
-        
-        // 対象となる城のリストを作ります（国主なら軍団の全城、城主ならその城のみ）
-        let targetCastles = [];
-        if (targetLord.isCommander && game.legions) {
-            const legion = game.legions.find(l => l.clanId === miyoshiClanId && l.commanderId === targetLord.id);
-            if (legion) {
-                targetCastles = game.getClanCastles(miyoshiClanId).filter(c => c.legionId === legion.legionNo);
-            }
-        }
-        if (targetCastles.length === 0) {
-            targetCastles = [mainCastle];
-        }
-
-        // 4. 将軍擁立勢力と三好家が敵対しているか確認します
-        const rel = game.diplomacyManager ? game.diplomacyManager.getRelation(sponsorClanId, miyoshiClanId) : null;
-        if (!rel || rel.status !== '敵対') return false;
-
-        // 5. 松永久秀（ID: 1202004）が将軍擁立勢力に所属しているか確認します
-        const hisahide = game.getBusho(1202004);
-        if (!hisahide || hisahide.clan !== sponsorClanId) return false;
-        // 差し替え後
-        // 6. 対象の城のいずれかが、将軍擁立勢力または将軍家の城が隣接しているか確認します
-        let isAdjacent = false;
-        
-        const sponsorCastles = game.getClanCastles(sponsorClanId);
-        const shogunCastles = shogunClanId !== 0 ? game.getClanCastles(shogunClanId) : [];
-
-        for (let targetC of targetCastles) {
-            // まず擁立勢力の城と繋がっているか調べます
-            for (let sc of sponsorCastles) {
-                if (MapGraphService.isAdjacent(sc, targetC)) {
-                    isAdjacent = true;
-                    break;
-                }
-            }
-            if (isAdjacent) break;
-
-            // 擁立勢力と繋がっておらず、将軍家が存在する場合は、将軍家の城とも隣接判定します
-            if (shogunClanId !== 0) {
-                for (let sc of shogunCastles) {
-                    if (MapGraphService.isAdjacent(sc, targetC)) {
-                        isAdjacent = true;
-                        break;
-                    }
-                }
-            }
-            if (isAdjacent) break;
-        }
-
-        if (!isAdjacent) return false;
-
-        // すべての条件をクリアしたら、イベント発生です！
-        return true;
-    },
-    
-    execute: async function(game) {
-        // メッセージや処理に必要な情報を集めます
-        const shogunInfo = window.EventCheck.getShogunInfo(game);
-        if (!shogunInfo) return;
-        
-        const sponsorClanId = shogunInfo.sponsorClanId;
-        
-        const sponsorClan = game.getClan(sponsorClanId);
-        const nagayasu = game.getBusho(1020021);
-        const miyoshiClanId = nagayasu.clan;
-
-        const murashige = game.getBusho(1203006);
-        let targetLord = null;
-        let mainCastle = null;
-
-        if (murashige && murashige.clan === miyoshiClanId && (murashige.isCastellan || murashige.isCommander)) {
-            const c = game.getCastle(murashige.castleId);
-            if (c && c.ownerClan === miyoshiClanId) {
-                targetLord = murashige;
-                mainCastle = c;
-            }
-        }
-        if (!targetLord || !mainCastle) return;
-        
-        let targetCastles = [];
-        let legionToDismiss = null;
-        if (targetLord.isCommander && game.legions) {
-            legionToDismiss = game.legions.find(l => l.clanId === miyoshiClanId && l.commanderId === targetLord.id);
-            if (legionToDismiss) {
-                targetCastles = game.getClanCastles(miyoshiClanId).filter(c => c.legionId === legionToDismiss.legionNo);
-            }
-        }
-        if (targetCastles.length === 0) {
-            targetCastles = [mainCastle];
-        }
-        const targetCastleIds = targetCastles.map(c => c.id);
-
-        const sponsorName = sponsorClan ? sponsorClan.name : "擁立勢力";
-        const itamiLordName = targetLord.fullName;
-        const miyoshiClan = game.getClan(miyoshiClanId);
-        const miyoshiClanName = miyoshiClan ? miyoshiClan.name : "三好家";
-        
-        // 対象となる城の、元の城主（出席番号）をそれぞれ記録しておきます
-        const originalCastellans = {};
-        targetCastles.forEach(c => {
-            originalCastellans[c.id] = c.castellanId;
-        });
-
-        // ① 三好家所属でIDが1203000～1203999の武将を全員集めます
-        const targetBushos = game.bushos.filter(b => b.clan === miyoshiClanId && window.BushoStatusRules.isActive(b) && b.id >= 1203000 && b.id <= 1203999);
-        
-        // その人たちのうち、対象の城以外にいる人を本城（mainCastle）に集めます
-        targetBushos.forEach(busho => {
-            if (!targetCastleIds.includes(busho.castleId)) {
-                busho.isCastellan = false;
-                game.affiliationSystem.clearGunshiRole(busho);
-                window.EventAction.moveBusho(game, busho, mainCastle.id);
-            }
-        });
-
-        // ② 対象の城にいる人で、今回は降伏しない人（対象ID以外）を長逸の居城へ逃がします
-        targetCastles.forEach(castle => {
-            const residents = game.bushos.filter(b => b.castleId === castle.id && Number(b.clan) === Number(miyoshiClanId) && Number(b.belongKunishuId || 0) === 0 && window.BushoStatusRules.isActive(b));
-            residents.forEach(busho => {
-                // IDの範囲外の人がいれば、お引越しさせます
-                if (busho.id < 1203000 || busho.id > 1203999) {
-                    busho.isCastellan = false; // 城を追い出されるので城主バッジは外れます
-                    // 国主なら moveCastle() が移動先の軍団所属を見て、必要な軍団解散まで一元処理します。
-                    window.EventAction.moveBusho(game, busho, nagayasu.castleId);
-                }
-            });
-        });
-
-        // ③ 対象の城の持ち主の看板を「将軍擁立勢力」に掛け替えます
-        targetCastles.forEach(castle => {
-            game.castleManager.changeOwner(castle, sponsorClanId, true, 0);
-        });
-
-        // ④ 対象の城に集めた降伏組（対象IDの武将）を、将軍擁立勢力に所属変更させます
-        targetBushos.forEach(busho => {
-            // 第4引数に「100」を渡すことで、忠誠度をピッタリ100にセットできます
-            game.affiliationSystem.joinClan(busho, sponsorClanId, busho.castleId, 100);
-        });
-
-        // ⑤ 降伏を主導した元の城主たちに、もう一度城主のバッジを付けてあげます
-        const itamiCastle = targetCastles.find(c => c.id === 51);
-        let murashigeNewCastle = null;
-
-        targetCastles.forEach(castle => {
-            const oldCastellanId = originalCastellans[castle.id];
-            let newCastellan = game.getBusho(oldCastellanId);
-            
-            // 対象の城の中に伊丹城（ID: 51）がある場合、村重を強制的に伊丹城の城主にします
-            if (itamiCastle) {
-                if (castle.id === 51) {
-                    // もし村重が別のお城にいたら、伊丹城へお引越しさせます
-                    window.EventAction.moveBusho(game, murashige, 51);
-                    murashigeNewCastle = castle;
-                    window.EventAction.appointCastellan(game, murashige, castle);
-                    return; // 伊丹城の処理はこれで終わりなので、次のお城へ進みます
-                } else {
-                    // 伊丹城がある場合、村重は他のお城の城主にはなれません
-                    if (newCastellan && newCastellan.id === murashige.id) {
-                        newCastellan = null;
-                    }
-                }
-            }
-
-            // 元の城主が降伏組なら、そのまま城主に復帰させます
-            if (newCastellan && newCastellan.id >= 1203000 && newCastellan.id <= 1203999 && newCastellan.castleId === castle.id) {
-                newCastellan.isCastellan = true;
-                castle.castellanId = newCastellan.id;
-                // もし村重が伊丹城以外の城主になった場合は、そのお城を記録しておきます
-                if (newCastellan.id === murashige.id) {
-                    murashigeNewCastle = castle;
-                }
-            } else {
-                castle.castellanId = 0; // 誰もいなければ空っぽにしておきます
-            }
-            if (game.affiliationSystem) {
-                game.affiliationSystem.updateCastleLord(castle);
-            }
-        });
-
-        // 臣従先の勢力に軍団の空き（1〜8）があるか確認し、空きがあれば国主に任命します
-        if (game.aiStaffing && murashigeNewCastle) {
-            const newLegionNo = game.aiStaffing.assignNewLegion(sponsorClanId, murashige.id);
-            if (newLegionNo !== -1) {
-                murashige.isCommander = true;
-                if (murashige.isGunshi) game.affiliationSystem.clearGunshiRole(murashige); // 国主就任時は軍師役職を外す
-                murashigeNewCastle.legionId = newLegionNo;
-                murashigeNewCastle.isDelegated = true; // AIに委任する状態にします
-                
-                // ★追加：国主になれた場合、降伏した武将たちを村重の城に集合させます
-                targetBushos.forEach(busho => {
-                    if (busho.id !== murashige.id && busho.castleId !== murashigeNewCastle.id) {
-                        busho.isCastellan = false; // お引越しするので城主のバッジは外します
-                        window.EventAction.moveBusho(game, busho, murashigeNewCastle.id);
-                    }
-                });
-            }
-        }
-
-        // ⑦ 画面に何が起きたかメッセージを出してお知らせします
-        const msg = `\n${miyoshiClanName}の${itamiLordName}が${sponsorName}の上洛に同調し臣従しました！`;
-        
-        game.ui.log(`【イベント】${msg}`);
-        await _historicalEventShowDialogAsync(game, msg, false, 0);
-    }
-});
+// r369暫定停止: 池田家独立化後の臣従時系列を後日再整理。史実時系列を分離して再設計するまで登録しない。
+// window.GameEvents.push({
+//     id: "historical_murashige_submission",
+//     timing: "startMonth_before", 
+//     isOneTime: true,             
+//     
+//     checkCondition: function(game) {
+//         // 1. 将軍候補（ID80:左馬頭）または将軍家（ID1:征夷大将軍）と、その擁立勢力を特定します
+//         const shogunInfo = window.EventCheck.getShogunInfo(game);
+//         if (!shogunInfo) return false;
+//         
+//         const sponsorClanId = shogunInfo.sponsorClanId;
+//         const shogunClanId = shogunInfo.shogunClanId;
+// 
+//         // 2. 三好長逸（ID: 1020021）が大名であるか確認します
+//         const nagayasu = game.getBusho(1020021);
+//         if (!nagayasu || !nagayasu.isDaimyo) return false;
+//         const miyoshiClanId = nagayasu.clan;
+// 
+//         // ストッパー：三好家自身が将軍を擁立している家だった場合は中止します
+//         if (miyoshiClanId === sponsorClanId || (shogunClanId !== 0 && miyoshiClanId === shogunClanId)) return false;
+// 
+//         // 3. 荒木村重（ID: 1203006）が、三好家の城主または国主であるか確認します
+//         const murashige = game.getBusho(1203006);
+//         let targetLord = null;
+//         let mainCastle = null;
+// 
+//         if (murashige && murashige.clan === miyoshiClanId && (murashige.isCastellan || murashige.isCommander)) {
+//             const c = game.getCastle(murashige.castleId);
+//             if (c && c.ownerClan === miyoshiClanId) {
+//                 targetLord = murashige;
+//                 mainCastle = c;
+//             }
+//         }
+//         if (!targetLord || !mainCastle) return false;
+//         
+//         // 対象となる城のリストを作ります（国主なら軍団の全城、城主ならその城のみ）
+//         let targetCastles = [];
+//         if (targetLord.isCommander && game.legions) {
+//             const legion = game.legions.find(l => l.clanId === miyoshiClanId && l.commanderId === targetLord.id);
+//             if (legion) {
+//                 targetCastles = game.getClanCastles(miyoshiClanId).filter(c => c.legionId === legion.legionNo);
+//             }
+//         }
+//         if (targetCastles.length === 0) {
+//             targetCastles = [mainCastle];
+//         }
+// 
+//         // 4. 将軍擁立勢力と三好家が敵対しているか確認します
+//         const rel = game.diplomacyManager ? game.diplomacyManager.getRelation(sponsorClanId, miyoshiClanId) : null;
+//         if (!rel || rel.status !== '敵対') return false;
+// 
+//         // 5. 松永久秀（ID: 1202004）が将軍擁立勢力に所属しているか確認します
+//         const hisahide = game.getBusho(1202004);
+//         if (!hisahide || hisahide.clan !== sponsorClanId) return false;
+//         // 差し替え後
+//         // 6. 対象の城のいずれかが、将軍擁立勢力または将軍家の城が隣接しているか確認します
+//         let isAdjacent = false;
+//         
+//         const sponsorCastles = game.getClanCastles(sponsorClanId);
+//         const shogunCastles = shogunClanId !== 0 ? game.getClanCastles(shogunClanId) : [];
+// 
+//         for (let targetC of targetCastles) {
+//             // まず擁立勢力の城と繋がっているか調べます
+//             for (let sc of sponsorCastles) {
+//                 if (MapGraphService.isAdjacent(sc, targetC)) {
+//                     isAdjacent = true;
+//                     break;
+//                 }
+//             }
+//             if (isAdjacent) break;
+// 
+//             // 擁立勢力と繋がっておらず、将軍家が存在する場合は、将軍家の城とも隣接判定します
+//             if (shogunClanId !== 0) {
+//                 for (let sc of shogunCastles) {
+//                     if (MapGraphService.isAdjacent(sc, targetC)) {
+//                         isAdjacent = true;
+//                         break;
+//                     }
+//                 }
+//             }
+//             if (isAdjacent) break;
+//         }
+// 
+//         if (!isAdjacent) return false;
+// 
+//         // すべての条件をクリアしたら、イベント発生です！
+//         return true;
+//     },
+//     
+//     execute: async function(game) {
+//         // メッセージや処理に必要な情報を集めます
+//         const shogunInfo = window.EventCheck.getShogunInfo(game);
+//         if (!shogunInfo) return;
+//         
+//         const sponsorClanId = shogunInfo.sponsorClanId;
+//         
+//         const sponsorClan = game.getClan(sponsorClanId);
+//         const nagayasu = game.getBusho(1020021);
+//         const miyoshiClanId = nagayasu.clan;
+// 
+//         const murashige = game.getBusho(1203006);
+//         let targetLord = null;
+//         let mainCastle = null;
+// 
+//         if (murashige && murashige.clan === miyoshiClanId && (murashige.isCastellan || murashige.isCommander)) {
+//             const c = game.getCastle(murashige.castleId);
+//             if (c && c.ownerClan === miyoshiClanId) {
+//                 targetLord = murashige;
+//                 mainCastle = c;
+//             }
+//         }
+//         if (!targetLord || !mainCastle) return;
+//         
+//         let targetCastles = [];
+//         let legionToDismiss = null;
+//         if (targetLord.isCommander && game.legions) {
+//             legionToDismiss = game.legions.find(l => l.clanId === miyoshiClanId && l.commanderId === targetLord.id);
+//             if (legionToDismiss) {
+//                 targetCastles = game.getClanCastles(miyoshiClanId).filter(c => c.legionId === legionToDismiss.legionNo);
+//             }
+//         }
+//         if (targetCastles.length === 0) {
+//             targetCastles = [mainCastle];
+//         }
+//         const targetCastleIds = targetCastles.map(c => c.id);
+// 
+//         const sponsorName = sponsorClan ? sponsorClan.name : "擁立勢力";
+//         const itamiLordName = targetLord.fullName;
+//         const miyoshiClan = game.getClan(miyoshiClanId);
+//         const miyoshiClanName = miyoshiClan ? miyoshiClan.name : "三好家";
+//         
+//         // 対象となる城の、元の城主（出席番号）をそれぞれ記録しておきます
+//         const originalCastellans = {};
+//         targetCastles.forEach(c => {
+//             originalCastellans[c.id] = c.castellanId;
+//         });
+// 
+//         // ① 三好家所属でIDが1203000～1203999の武将を全員集めます
+//         const targetBushos = game.bushos.filter(b => b.clan === miyoshiClanId && window.BushoStatusRules.isActive(b) && b.id >= 1203000 && b.id <= 1203999);
+//         
+//         // その人たちのうち、対象の城以外にいる人を本城（mainCastle）に集めます
+//         targetBushos.forEach(busho => {
+//             if (!targetCastleIds.includes(busho.castleId)) {
+//                 busho.isCastellan = false;
+//                 game.affiliationSystem.clearGunshiRole(busho);
+//                 window.EventAction.moveBusho(game, busho, mainCastle.id);
+//             }
+//         });
+// 
+//         // ② 対象の城にいる人で、今回は降伏しない人（対象ID以外）を長逸の居城へ逃がします
+//         targetCastles.forEach(castle => {
+//             const residents = game.bushos.filter(b => b.castleId === castle.id && Number(b.clan) === Number(miyoshiClanId) && Number(b.belongKunishuId || 0) === 0 && window.BushoStatusRules.isActive(b));
+//             residents.forEach(busho => {
+//                 // IDの範囲外の人がいれば、お引越しさせます
+//                 if (busho.id < 1203000 || busho.id > 1203999) {
+//                     busho.isCastellan = false; // 城を追い出されるので城主バッジは外れます
+//                     // 国主なら moveCastle() が移動先の軍団所属を見て、必要な軍団解散まで一元処理します。
+//                     window.EventAction.moveBusho(game, busho, nagayasu.castleId);
+//                 }
+//             });
+//         });
+// 
+//         // ③ 対象の城の持ち主の看板を「将軍擁立勢力」に掛け替えます
+//         targetCastles.forEach(castle => {
+//             game.castleManager.changeOwner(castle, sponsorClanId, true, 0);
+//         });
+// 
+//         // ④ 対象の城に集めた降伏組（対象IDの武将）を、将軍擁立勢力に所属変更させます
+//         targetBushos.forEach(busho => {
+//             // 第4引数に「100」を渡すことで、忠誠度をピッタリ100にセットできます
+//             game.affiliationSystem.joinClan(busho, sponsorClanId, busho.castleId, 100);
+//         });
+// 
+//         // ⑤ 降伏を主導した元の城主たちに、もう一度城主のバッジを付けてあげます
+//         const itamiCastle = targetCastles.find(c => c.id === 51);
+//         let murashigeNewCastle = null;
+// 
+//         targetCastles.forEach(castle => {
+//             const oldCastellanId = originalCastellans[castle.id];
+//             let newCastellan = game.getBusho(oldCastellanId);
+//             
+//             // 対象の城の中に伊丹城（ID: 51）がある場合、村重を強制的に伊丹城の城主にします
+//             if (itamiCastle) {
+//                 if (castle.id === 51) {
+//                     // もし村重が別のお城にいたら、伊丹城へお引越しさせます
+//                     window.EventAction.moveBusho(game, murashige, 51);
+//                     murashigeNewCastle = castle;
+//                     window.EventAction.appointCastellan(game, murashige, castle);
+//                     return; // 伊丹城の処理はこれで終わりなので、次のお城へ進みます
+//                 } else {
+//                     // 伊丹城がある場合、村重は他のお城の城主にはなれません
+//                     if (newCastellan && newCastellan.id === murashige.id) {
+//                         newCastellan = null;
+//                     }
+//                 }
+//             }
+// 
+//             // 元の城主が降伏組なら、そのまま城主に復帰させます
+//             if (newCastellan && newCastellan.id >= 1203000 && newCastellan.id <= 1203999 && newCastellan.castleId === castle.id) {
+//                 newCastellan.isCastellan = true;
+//                 castle.castellanId = newCastellan.id;
+//                 // もし村重が伊丹城以外の城主になった場合は、そのお城を記録しておきます
+//                 if (newCastellan.id === murashige.id) {
+//                     murashigeNewCastle = castle;
+//                 }
+//             } else {
+//                 castle.castellanId = 0; // 誰もいなければ空っぽにしておきます
+//             }
+//             if (game.affiliationSystem) {
+//                 game.affiliationSystem.updateCastleLord(castle);
+//             }
+//         });
+// 
+//         // 臣従先の勢力に軍団の空き（1〜8）があるか確認し、空きがあれば国主に任命します
+//         if (game.aiStaffing && murashigeNewCastle) {
+//             const newLegionNo = game.aiStaffing.assignNewLegion(sponsorClanId, murashige.id);
+//             if (newLegionNo !== -1) {
+//                 murashige.isCommander = true;
+//                 if (murashige.isGunshi) game.affiliationSystem.clearGunshiRole(murashige); // 国主就任時は軍師役職を外す
+//                 murashigeNewCastle.legionId = newLegionNo;
+//                 murashigeNewCastle.isDelegated = true; // AIに委任する状態にします
+//                 
+//                 // ★追加：国主になれた場合、降伏した武将たちを村重の城に集合させます
+//                 targetBushos.forEach(busho => {
+//                     if (busho.id !== murashige.id && busho.castleId !== murashigeNewCastle.id) {
+//                         busho.isCastellan = false; // お引越しするので城主のバッジは外します
+//                         window.EventAction.moveBusho(game, busho, murashigeNewCastle.id);
+//                     }
+//                 });
+//             }
+//         }
+// 
+//         // ⑦ 画面に何が起きたかメッセージを出してお知らせします
+//         const msg = `\n${miyoshiClanName}の${itamiLordName}が${sponsorName}の上洛に同調し臣従しました！`;
+//         
+//         game.ui.log(`【イベント】${msg}`);
+//         await _historicalEventShowDialogAsync(game, msg, false, 0);
+//     }
+// });
 
 // ==========================================
 // ★ 畠山家臣従イベント
