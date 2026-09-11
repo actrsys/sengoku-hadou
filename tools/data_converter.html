@@ -217,7 +217,17 @@ function scenarioInfo(book){
   const folder=String(src.folder).trim(); if(!/^[A-Za-z0-9_-]+$/.test(folder)) throw new Error(`scenario_info: folder に使用できない文字があります: ${folder}`);
   return {folder,name:String(src.name).trim(),desc:String(src.desc||'').trim(),startYear:num('startYear'),startMonth:num('startMonth'),initialMapCenterPC:num('initialMapCenterPC',7),initialMapCenterMobile:num('initialMapCenterMobile',7),sortNo:num('sortNo',0)};
 }
-function buildCommon(book){ return {format:'sengoku-common-v1',schemaVersion:DATA_SCHEMA_VERSION,warriorsMaster:pickRows(book,'warriors_master',COMMON_FIELDS.warriors_master),princessMaster:pickRows(book,'princess_master',COMMON_FIELDS.princess_master),clansMaster:pickRows(book,'clans_master',COMMON_FIELDS.clans_master),castlesMaster:pickRows(book,'castles_master',COMMON_FIELDS.castles_master),courtRanks:pickRows(book,'imperialCourtRank',COMMON_FIELDS.imperialCourtRank),provinces:pickRows(book,'provinces_map',COMMON_FIELDS.provinces_map),genericPrincessProfiles:pickRows(book,'generic_princess',COMMON_FIELDS.generic_princess,null)}; }
+function buildClanMasterRows(book){
+  const src=rowsAsDicts(book,'clans_master',COMMON_FIELDS.clans_master);
+  return src.filter(r=>r.id!=='').map(r=>{
+    const row={id:r.id??'', name:r.name??'', yomi:r.yomi??'', color:r.color??''};
+    // 備考は正本名ではなく、同名勢力をUIで識別するための表示ヒント。空欄はBINへ増やさず旧データとの差分を最小化する。
+    const note=String(r['備考']??'').trim();
+    if(note) row.note=note;
+    return row;
+  });
+}
+function buildCommon(book){ return {format:'sengoku-common-v1',schemaVersion:DATA_SCHEMA_VERSION,warriorsMaster:pickRows(book,'warriors_master',COMMON_FIELDS.warriors_master),princessMaster:pickRows(book,'princess_master',COMMON_FIELDS.princess_master),clansMaster:buildClanMasterRows(book),castlesMaster:pickRows(book,'castles_master',COMMON_FIELDS.castles_master),courtRanks:pickRows(book,'imperialCourtRank',COMMON_FIELDS.imperialCourtRank),provinces:pickRows(book,'provinces_map',COMMON_FIELDS.provinces_map),genericPrincessProfiles:pickRows(book,'generic_princess',COMMON_FIELDS.generic_princess,null)}; }
 function buildScenario(book){ const info=scenarioInfo(book); return {format:'sengoku-scenario-v1',schemaVersion:DATA_SCHEMA_VERSION,scenario:info,warriorsState:pickRows(book,'warriors_state',SCENARIO_FIELDS.warriors_state),princessState:pickRows(book,'princess_state',SCENARIO_FIELDS.princess_state),clansState:pickRows(book,'clans_state',SCENARIO_FIELDS.clans_state),diplomacy:pickRows(book,'diplomacy',SCENARIO_FIELDS.diplomacy,'sourceClanId'),castlesState:pickRows(book,'castles_state',SCENARIO_FIELDS.castles_state),kunishus:pickRows(book,'kunishuClan',SCENARIO_FIELDS.kunishuClan),legions:pickRows(book,'legions',SCENARIO_FIELDS.legions)}; }
 function ids(rows,label,errors){ const set=new Set(); for(const r of rows){ const n=Number(r.id); if(!Number.isFinite(n)||n<=0){errors.push(`${label}: 不正なID「${r.id}」`);continue;} if(set.has(n))errors.push(`${label}: ID ${n} が重複しています`); set.add(n);} return set; }
 function isEnabled(v){ if(v===true||v===1)return true; const s=String(v??'').trim().toLowerCase(); return ['1','true','yes','on'].includes(s); }

@@ -2710,7 +2710,7 @@ class UIInfoManager {
 
         const bushosCount = this.game.kunishuSystem.getKunishuMembers(kunishuId).length;
         const kunishuName = kunishu.getName(this.game);
-        const kunishuYomi = kunishu.yomi || "";
+        const kunishuYomi = typeof kunishu.getYomi === 'function' ? kunishu.getYomi(this.game) : (kunishu.yomi || "");
         const ideology = kunishu.ideology || "地縁";
 
         // 諸勢力のイデオロギーカラー（大名家のCSSを流用します）
@@ -2855,8 +2855,8 @@ class UIInfoManager {
 
                 switch(this.kunishuCurrentSortKey) {
                     case 'name':
-                        valA = a.yomi || a.getName(this.game);
-                        valB = b.yomi || b.getName(this.game);
+                        valA = typeof a.getYomi === 'function' ? a.getYomi(this.game) : (a.yomi || a.getName(this.game));
+                        valB = typeof b.getYomi === 'function' ? b.getYomi(this.game) : (b.yomi || b.getName(this.game));
                         break;
                     case 'leader':
                         valA = leaderA ? (leaderA.yomi || leaderA.name) : "んんん";

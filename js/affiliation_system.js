@@ -390,6 +390,8 @@ class AffiliationSystem {
         });
 
         if (this.game && this.game.factionSystem && oldClanId !== 0) this.game.factionSystem.updateFactions(oldClanId);
+        // 動的諸勢力が既存の大名家・諸勢力と同名でも、作成直後から表示名を識別できるようにする。
+        if (this.game && typeof this.game.updateClanDisplayNames === 'function') this.game.updateClanDisplayNames();
         
         // 画面の絵をすぐに描き直す魔法！
         this.updateUI();

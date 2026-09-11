@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r381');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r384');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -12407,9 +12407,9 @@ test('r379では北九州の旧1560外交を1570へ更新し、諸勢力の固�
     const masterById = new Map(common.warriorsMaster.map(row => [Number(row.id), row]));
 
     const hattori = kunishuById.get(11);
-    assert.ok(hattori, '長島地域の服部党を1570諸勢力として維持');
-    assert.strictEqual(hattori.name, '服部党', '服部友貞個人の家ではなく1570にも活動する集団を表す名称');
-    assert.strictEqual(hattori.yomi, 'はっとりとう');
+    assert.ok(hattori, '長島地域の服部家を1570諸勢力として維持');
+    assert.strictEqual(hattori.name, '服部家', 'r383では諸勢力の正本名を手修正しない');
+    assert.strictEqual(hattori.yomi, 'はっとりけ');
     assert.strictEqual(Number(hattori.leaderId), 0, '共通武将に1570時点の後継頭領がないため抽象集団として頭領0を許容');
     assert.strictEqual(Number(hattori.soldiers), 2000, '名称整理を理由に諸勢力固定兵力を変えない');
     assert.strictEqual(hattori.daimyoRelations, '19:友好:100|21:友好:100');
@@ -12471,15 +12471,15 @@ test('r380では由良家の1570外交を越相同盟期へ更新し、諸勢力
 });
 
 
-test('r381では同名別系統の有馬氏を区別し、1570志知衆の三好従属を外交へ反映する', () => {
+test('r381の志知衆外交を維持し、r383では諸勢力の正本名を手修正しない', () => {
     const { scenario } = getRuntimeData('1570_anegawa');
     const kunishuById = new Map(scenario.kunishus.map(row => [Number(row.id), row]));
     const castleById = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
 
     const arima = kunishuById.get(19);
     assert.ok(arima, '播磨・摂津系の有馬氏を諸勢力として維持');
-    assert.strictEqual(arima.name, '摂津有馬家', '肥前の通常大名有馬家57と同名表示にせず系統を区別する');
-    assert.strictEqual(arima.yomi, 'せっつありまけ');
+    assert.strictEqual(arima.name, '有馬家', '諸勢力の正本名は元データの有馬家を維持する');
+    assert.strictEqual(arima.yomi, 'ありまけ');
     assert.strictEqual(Number(arima.soldiers), 2000, '名称整理を理由に諸勢力固定兵力を変えない');
     assert.strictEqual(arima.daimyoRelations, '16:友好:90|20:友好:90', '既存の別所・三好関係は変更しない');
 
@@ -12492,4 +12492,148 @@ test('r381では同名別系統の有馬氏を区別し、1570志知衆の三好
     assert.strictEqual(Number(shichi.defense), 700);
     assert.strictEqual(Number(castleById.get(87).ownerClan), 20, 'アンカー洲本城の通常勢力所有も三好家のまま');
     assert.strictEqual(Number(castleById.get(87).soldiers), 1760, '外交更新を理由に洲本城兵を変更しない');
+});
+
+
+test('r382の植木家・東金酒井家外交を維持し、r383では同名原田氏の正本名を戻す', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const kunishuById = new Map(scenario.kunishus.map(row => [Number(row.id), row]));
+
+    const ueki = kunishuById.get(37);
+    assert.ok(ueki, '植木家は備中の在地勢力として維持');
+    assert.strictEqual(ueki.daimyoRelations, '44:友好:100|45:敵対:0', '1567以降の宇喜多方転向と1570の対三村抗争を反映');
+    assert.strictEqual(Number(ueki.soldiers), 2000, '外交更新で諸勢力固定兵力を変更しない');
+
+    const togane = kunishuById.get(65);
+    assert.ok(togane, '東金酒井家は独立諸勢力として維持');
+    assert.strictEqual(togane.daimyoRelations, '27:友好:100|4:敵対:0', '1570前後の土気酒井氏との同心を里見友好・北条敵対で表現');
+    assert.strictEqual(Number(togane.soldiers), 2000, '外交更新で諸勢力固定兵力を変更しない');
+
+    const mimasakaHarada = kunishuById.get(33);
+    const chikuzenHarada = kunishuById.get(59);
+    assert.strictEqual(mimasakaHarada.name, '原田家', '美作原田家も正本データでは原田家のまま保持する');
+    assert.strictEqual(mimasakaHarada.yomi, 'はらだけ');
+    assert.strictEqual(chikuzenHarada.name, '原田家', '筑前原田家も正本データでは原田家のまま保持する');
+    assert.strictEqual(chikuzenHarada.yomi, 'はらだけ');
+    assert.strictEqual(mimasakaHarada.daimyoRelations, '44:友好:90', '美作原田家の既存外交は名称整理で変更しない');
+    assert.strictEqual(chikuzenHarada.daimyoRelations, '53:友好:85', '筑前原田家の既存外交は名称整理で変更しない');
+});
+
+test('r384では大名家を優先し、同名諸勢力だけなら全員へ識別名を付ける', () => {
+    const ctx = createContext({
+        document: { getElementById() { return null; }, addEventListener() {} }
+    });
+    ctx.window.addEventListener = () => {};
+    vm.runInContext(read('js/game.js') + '\nthis.__GameManager = GameManager;', ctx, { filename: 'js/game.js' });
+    const updateNames = ctx.__GameManager.prototype.updateClanDisplayNames;
+
+    const provinces = new Map([
+        [1, { id: 1, shortName: '肥前', shortYomi: 'ひぜん' }],
+        [2, { id: 2, shortName: '播磨', shortYomi: 'はりま' }],
+        [3, { id: 3, shortName: '美作', shortYomi: 'みまさか' }],
+        [4, { id: 4, shortName: '筑前', shortYomi: 'ちくぜん' }]
+    ]);
+    const castles = new Map([
+        [1, { id: 1, provinceId: 1, shortName: '日野江', shortYomi: 'ひのえ' }],
+        [2, { id: 2, provinceId: 2, shortName: '三木', shortYomi: 'みき' }],
+        [3, { id: 3, provinceId: 3, shortName: '三星', shortYomi: 'みつぼし' }],
+        [4, { id: 4, provinceId: 4, shortName: '立花山', shortYomi: 'たちばなやま' }]
+    ]);
+    const bushos = new Map([
+        [1, { id: 1, familyName: '有馬', familyYomi: 'ありま', castleId: 1 }]
+    ]);
+    const makeKunishu = (id, name, yomi, castleId) => ({
+        id, name, yomi, baseName: name, baseYomi: yomi, castleId, isDestroyed: false,
+        getBaseName() { return this.baseName; },
+        getBaseYomi() { return this.baseYomi; },
+        getName() { return this.displayName || this.baseName; },
+        getYomi() { return this.displayYomi || this.baseYomi; }
+    });
+    const arimaKunishu = makeKunishu(19, '有馬家', 'ありまけ', 2);
+    const mimasakaHarada = makeKunishu(33, '原田家', 'はらだけ', 3);
+    const chikuzenHarada = makeKunishu(59, '原田家', 'はらだけ', 4);
+    const kunishus = [arimaKunishu, mimasakaHarada, chikuzenHarada];
+    const arimaClan = {
+        id: 57, leaderId: 1, name: '有馬家', yomi: 'ありまけ', baseName: '有馬家', baseYomi: 'ありまけ',
+        daimyoPrestige: 1, isDestroyed: false
+    };
+    const fakeGame = {
+        provinces: Array.from(provinces.values()),
+        clans: [arimaClan],
+        getBusho(id) { return bushos.get(Number(id)); },
+        getCastle(id) { return castles.get(Number(id)); },
+        getProvince(id) { return provinces.get(Number(id)); },
+        kunishuSystem: { getAliveKunishus() { return kunishus; } }
+    };
+
+    updateNames.call(fakeGame);
+
+    assert.strictEqual(arimaClan.name, '有馬家', '同名の諸勢力がいても大名家は無修飾名を保持する');
+    assert.strictEqual(arimaKunishu.name, '有馬家', '諸勢力の正本名そのものは変更しない');
+    assert.strictEqual(arimaKunishu.getName(), '播磨有馬家', '大名家と同名の諸勢力側だけ国名を付けて表示する');
+    assert.strictEqual(arimaKunishu.getYomi(), 'はりまありまけ');
+    assert.strictEqual(mimasakaHarada.name, '原田家');
+    assert.strictEqual(chikuzenHarada.name, '原田家');
+    assert.strictEqual(mimasakaHarada.getName(), '美作原田家', '諸勢力同士の同名では先頭だけ無修飾にせず双方へ国名を付ける');
+    assert.strictEqual(chikuzenHarada.getName(), '筑前原田家', '諸勢力同士の同名では双方へ識別名を付ける');
+ });
+
+test('r384では同名大名家の優先順位は威信、大名家と諸勢力が競合すれば大名家を必ず優先する', () => {
+    const ctx = createContext({ document: { getElementById() { return null; }, addEventListener() {} } });
+    ctx.window.addEventListener = () => {};
+    vm.runInContext(read('js/game.js') + '\nthis.__GameManager = GameManager;', ctx, { filename: 'js/game.js' });
+    const updateNames = ctx.__GameManager.prototype.updateClanDisplayNames;
+    const provinces = new Map([
+        [1, { id: 1, shortName: '甲斐', shortYomi: 'かい' }],
+        [2, { id: 2, shortName: '若狭', shortYomi: 'わかさ' }],
+        [3, { id: 3, shortName: '安芸', shortYomi: 'あき' }]
+    ]);
+    const castles = new Map([
+        [1, { id: 1, provinceId: 1, shortName: '躑躅ヶ崎', shortYomi: 'つつじがさき' }],
+        [2, { id: 2, provinceId: 2, shortName: '後瀬山', shortYomi: 'のちせやま' }],
+        [3, { id: 3, provinceId: 3, shortName: '銀山', shortYomi: 'かなやま' }]
+    ]);
+    const bushos = new Map([
+        [1, { id: 1, familyName: '武田', familyYomi: 'たけだ', castleId: 1 }],
+        [2, { id: 2, familyName: '武田', familyYomi: 'たけだ', castleId: 2 }]
+    ]);
+    const clans = [
+        { id: 3, leaderId: 1, name: '武田家', yomi: 'たけだけ', baseName: '武田家', baseYomi: 'たけだけ', daimyoPrestige: 500, isDestroyed: false, note: '' },
+        { id: 38, leaderId: 2, name: '武田家', yomi: 'たけだけ', baseName: '武田家', baseYomi: 'たけだけ', daimyoPrestige: 100, isDestroyed: false, note: '若狭武田家' }
+    ];
+    const kunishu = {
+        id: 99, name: '武田家', yomi: 'たけだけ', baseName: '武田家', baseYomi: 'たけだけ', castleId: 3, isDestroyed: false,
+        getBaseName() { return this.baseName; }, getBaseYomi() { return this.baseYomi; },
+        getName() { return this.displayName || this.baseName; }, getYomi() { return this.displayYomi || this.baseYomi; }
+    };
+    const fakeGame = {
+        provinces: Array.from(provinces.values()), clans,
+        getBusho(id) { return bushos.get(Number(id)); }, getCastle(id) { return castles.get(Number(id)); }, getProvince(id) { return provinces.get(Number(id)); },
+        kunishuSystem: { getAliveKunishus() { return [kunishu]; } }
+    };
+    updateNames.call(fakeGame);
+    assert.strictEqual(clans[0].name, '武田家', '最高威信の大名家だけが無修飾名を保持する');
+    assert.strictEqual(clans[1].name, '若狭武田家', '低位の大名家は共通データ備考の識別名を使う');
+    assert.strictEqual(kunishu.getName(), '安芸武田家', '諸勢力は大名家より優先されず必ず識別名を付ける');
+});
+
+test('r384 common.bin は clans_master 備考を表示ヒントとして保持する', () => {
+    const { common } = getRuntimeData('1570_anegawa');
+    const akiTakeda = common.clansMaster.find(row => Number(row.id) === 221);
+    const noshimaMurakami = common.clansMaster.find(row => Number(row.id) === 212);
+    assert.ok(akiTakeda && noshimaMurakami);
+    assert.strictEqual(akiTakeda.name, '武田家');
+    assert.strictEqual(akiTakeda.note, '安芸武田家');
+    assert.strictEqual(noshimaMurakami.name, '村上家');
+    assert.strictEqual(noshimaMurakami.note, '能島村上家。瀬戸内水軍');
+    const converter = read('tools/data_converter.html');
+    assert.ok(converter.includes("const note=String(r['備考']??'').trim()"), 'データ変換でも備考をcommon.binへ保持する');
+});
+
+test('r383では服部党への手修正を戻し、諸勢力の正本名を保持する', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const hattori = scenario.kunishus.find(row => Number(row.id) === 11);
+    assert.ok(hattori);
+    assert.strictEqual(hattori.name, '服部家');
+    assert.strictEqual(hattori.yomi, 'はっとりけ');
 });

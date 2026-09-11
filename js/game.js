@@ -975,148 +975,199 @@ class GameManager {
         }
     }
     
-    // ★大名家の表示名を更新する魔法です（同名被りの回避）
+    // ★勢力の表示名を更新します（同名被りの回避）。
+    // 大名家と諸勢力を同じ名前空間で扱いますが、同名時の無修飾名は必ず大名家を優先します。
+    // 諸勢力はデータ上の name / yomi を変更せず、displayName / displayYomi だけを更新します。
     updateClanDisplayNames() {
         if (!this.provinces) return;
 
-        // まず、今の大名に合わせて本来の名前（baseName）と読み（baseYomi）を更新します
-        this.clans.forEach(clan => {
-            // ★修正：城の数ではなく、滅亡フラグ（isDestroyed）で判定するようにしました
-            if (clan.id === 0 || clan.isDestroyed) return; 
+        const activeClans = (this.clans || []).filter(clan => clan && clan.id !== 0 && !clan.isDestroyed);
+        const activeKunishus = this.kunishuSystem && typeof this.kunishuSystem.getAliveKunishus === 'function'
+            ? this.kunishuSystem.getAliveKunishus()
+            : [];
+
+        // 大名家は従来どおり、現在の当主姓を表示名の正本にします。
+        activeClans.forEach(clan => {
             const leader = this.getBusho(clan.leaderId);
             if (leader && leader.familyName) {
                 clan.baseName = leader.familyName + "家";
-                clan.baseYomi = (leader.familyYomi || "") + "け"; // ★読み仮名も「〇〇け」で覚えます
+                clan.baseYomi = (leader.familyYomi || "") + "け";
             } else {
                 if (!clan.baseName) clan.baseName = clan.name;
                 if (!clan.baseYomi) clan.baseYomi = clan.yomi;
             }
-            // 表示用の名前と読みを一旦本来のものにリセットします
             clan.name = clan.baseName;
             clan.yomi = clan.baseYomi;
         });
 
-        // 本来の名前でグループ分けをして、被っている大名家をまとめます
-        const clanGroups = {};
-        this.clans.forEach(clan => {
-            if (clan.id === 0 || clan.isDestroyed) return; 
-            const baseName = clan.baseName;
-            if (!clanGroups[baseName]) clanGroups[baseName] = [];
-            clanGroups[baseName].push(clan);
+        // 諸勢力はシナリオデータ名を正本のまま保持し、表示キャッシュだけを初期化します。
+        activeKunishus.forEach(kunishu => {
+            const baseName = typeof kunishu.getBaseName === 'function' ? kunishu.getBaseName(this) : (kunishu.name || '諸勢力');
+            const baseYomi = typeof kunishu.getBaseYomi === 'function' ? kunishu.getBaseYomi(this) : (kunishu.yomi || '');
+            kunishu.baseName = baseName;
+            kunishu.baseYomi = baseYomi;
+            kunishu.displayName = baseName;
+            kunishu.displayYomi = baseYomi;
         });
 
-        // 1回目のチェック：被っていたら、威信が2位以下の勢力に国名（「国」抜き）をつける
-        // ★追加：ただし、同じ国に同名の勢力がいる場合は、最初から城名をつけるようにします！
-        Object.values(clanGroups).forEach(group => {
-            if (group.length > 1) {
-                // まずは今まで通り、大名の威信（daimyoPrestige）が高い順に並べ替えます
-                group.sort((a, b) => b.daimyoPrestige - a.daimyoPrestige);
+        const getLocation = entry => {
+            let castle = null;
+            if (entry.type === 'clan') {
+                const leader = this.getBusho(entry.force.leaderId);
+                if (leader) castle = this.getCastle(leader.castleId);
+            } else {
+                castle = this.getCastle(entry.force.castleId);
+            }
+            const province = castle ? this.getProvince(castle.provinceId) : null;
+            return { castle, province, provinceId: castle ? Number(castle.provinceId) : 0 };
+        };
 
-                // 各勢力がいる地方（国）をリストアップしておきます
-                const clanProvinces = {};
-                group.forEach(clan => {
-                    const leader = this.getBusho(clan.leaderId);
-                    if (leader) {
-                        const castle = this.getCastle(leader.castleId);
-                        if (castle) {
-                            clanProvinces[clan.id] = castle.provinceId;
-                        }
-                    }
+        const setDisplay = (entry, name, yomi) => {
+            if (entry.type === 'clan') {
+                entry.force.name = name;
+                entry.force.yomi = yomi;
+            } else {
+                entry.force.displayName = name;
+                entry.force.displayYomi = yomi;
+            }
+            entry.displayName = name;
+            entry.displayYomi = yomi;
+        };
+
+        // 共通データの「備考」に移した識別用名称は、同名解消が必要な時だけ使います。
+        // 「能島村上家。瀬戸内水軍」のような補足付き備考は先頭文だけを識別名候補にします。
+        const getDisplayHint = entry => {
+            if (entry.type !== 'clan') return '';
+            const raw = String(entry.force.displayHint || entry.force.note || '').trim();
+            if (!raw) return '';
+            return raw.split(/[。\r\n]/, 1)[0].trim();
+        };
+
+        const entries = [];
+        activeClans.forEach(clan => entries.push({
+            type: 'clan', force: clan, baseName: clan.baseName || clan.name || '', baseYomi: clan.baseYomi || clan.yomi || ''
+        }));
+        activeKunishus.forEach(kunishu => entries.push({
+            type: 'kunishu', force: kunishu, baseName: kunishu.baseName || kunishu.name || '諸勢力', baseYomi: kunishu.baseYomi || kunishu.yomi || ''
+        }));
+
+        const groups = new Map();
+        for (const entry of entries) {
+            if (!groups.has(entry.baseName)) groups.set(entry.baseName, []);
+            groups.get(entry.baseName).push(entry);
+        }
+
+        for (const group of groups.values()) {
+            if (group.length <= 1) continue;
+
+            // 大名家が1つでも存在する同名グループでは、無修飾名の優先権は必ず大名家側にあります。
+            // 大名家同士の優先順位だけ、従来どおり威信→IDで決めます。
+            const clanEntries = group.filter(entry => entry.type === 'clan');
+            clanEntries.sort((a, b) => {
+                const prestigeDiff = Number(b.force.daimyoPrestige || 0) - Number(a.force.daimyoPrestige || 0);
+                if (prestigeDiff !== 0) return prestigeDiff;
+                return Number(a.force.id) - Number(b.force.id);
+            });
+
+            const locationByEntry = new Map(group.map(entry => [entry, getLocation(entry)]));
+
+            // 従来特例：同じ国に同名勢力がいる時、居城名と家名が一致する大名家は本筋として優先。
+            const matchingClanIndex = clanEntries.findIndex(entry => {
+                const loc = locationByEntry.get(entry);
+                if (!loc || !loc.castle) return false;
+                const hasSameProvinceForce = group.some(other => {
+                    if (other === entry) return false;
+                    const otherLoc = locationByEntry.get(other);
+                    return otherLoc && otherLoc.provinceId === loc.provinceId;
+                });
+                if (!hasSameProvinceForce) return false;
+                const castleBase = loc.castle.shortName;
+                const clanBase = entry.baseName.replace(/家$/, "");
+                return !!castleBase && castleBase === clanBase;
+            });
+            if (matchingClanIndex > 0) {
+                const match = clanEntries.splice(matchingClanIndex, 1)[0];
+                clanEntries.unshift(match);
+            }
+
+            const kunishuEntries = group
+                .filter(entry => entry.type === 'kunishu')
+                .sort((a, b) => Number(a.force.id) - Number(b.force.id));
+            const ordered = clanEntries.concat(kunishuEntries);
+
+            // 大名家がある時だけ、その最優先大名家1つが本来名を保持します。
+            // 諸勢力しかない同名グループは威信で優劣を付けられないため、全勢力へ識別語を付けます。
+            const primaryClan = clanEntries.length > 0 ? clanEntries[0] : null;
+            const targets = primaryClan ? ordered.filter(entry => entry !== primaryClan) : ordered.slice();
+
+            for (const entry of targets) {
+                const loc = locationByEntry.get(entry);
+                if (!loc || !loc.castle) continue;
+
+                const hasSameProvinceForce = ordered.some(other => {
+                    if (other === entry) return false;
+                    const otherLoc = locationByEntry.get(other);
+                    return otherLoc && otherLoc.provinceId === loc.provinceId;
                 });
 
-                // ★改修：同じ国に同名の勢力がいて「城名」での判別が必要になる場合のみ、
-                // 居城名と家名が一致する勢力を探し出して、特例として一番上（本筋）に移動させます！
-                const matchingClanIndex = group.findIndex(clan => {
-                    const myProvId = clanProvinces[clan.id];
-                    // 同じ国に別の同名勢力がいるかチェック
-                    const hasSameProvClan = group.some(otherClan => otherClan.id !== clan.id && clanProvinces[otherClan.id] === myProvId);
-                    
-                    if (hasSameProvClan) {
-                        const leader = this.getBusho(clan.leaderId);
-                        if (leader) {
-                            const castle = this.getCastle(leader.castleId);
-                            if (castle && castle.name) {
-                                const castleBase = castle.shortName;
-                                const clanBase = clan.baseName.replace(/家$/, "");
-                                if (castleBase === clanBase) return true;
-                            }
-                        }
-                    }
-                    return false;
-                });
-
-                // 一致する家が見つかった場合（かつ、すでに威信トップではない場合）、先頭に移動させます
-                if (matchingClanIndex > 0) {
-                    const matchClan = group.splice(matchingClanIndex, 1)[0];
-                    group.unshift(matchClan);
+                const castleName = loc.castle.shortName || '';
+                const castleYomi = loc.castle.shortYomi || '';
+                const provName = loc.province ? (loc.province.shortName || '') : '';
+                const provYomi = loc.province ? (loc.province.shortYomi || '') : '';
+                let autoName = '';
+                let autoYomi = '';
+                if (hasSameProvinceForce && castleName) {
+                    autoName = castleName + entry.baseName;
+                    autoYomi = castleYomi + entry.baseYomi;
+                } else if (provName) {
+                    autoName = provName + entry.baseName;
+                    autoYomi = provYomi + entry.baseYomi;
+                } else if (castleName) {
+                    autoName = castleName + entry.baseName;
+                    autoYomi = castleYomi + entry.baseYomi;
                 }
 
-                // 威信トップ（[0]）には何もつけず、2位以下（[1]以降）にだけ名前をつけます
-                for (let i = 1; i < group.length; i++) {
-                    const clan = group[i];
-                    const leader = this.getBusho(clan.leaderId);
-                    if (leader) {
-                        const castle = this.getCastle(leader.castleId);
-                        if (castle) {
-                            const myProvId = castle.provinceId;
-                            // 同じグループの中に、同じ国（provinceId）にいる別の勢力がいるかチェックします
-                            const hasSameProvClan = group.some(otherClan => otherClan.id !== clan.id && clanProvinces[otherClan.id] === myProvId);
-
-                            if (hasSameProvClan) {
-                                // 同じ国に別の同名勢力がいる場合は、国名ではなく最初から城名（拠点名）をつけます
-                                if (castle.name) {
-                                    const castleName = castle.shortName;
-                                    const castleYomi = castle.shortYomi;
-                                    clan.name = castleName + clan.baseName;
-                                    clan.yomi = castleYomi + clan.baseYomi;
-                                }
-                            } else {
-                                // いなければ今まで通り国名をつける
-                                const province = this.getProvince(myProvId);
-                                if (province && province.province) {
-                                    const provName = province.shortName;
-                                    // ★国名の読みから「のくに」を抜きます
-                                    const provYomi = province.shortYomi;
-                                    clan.name = provName + clan.baseName;
-                                    clan.yomi = provYomi + clan.baseYomi;
-                                }
-                            }
-                        }
-                    }
-                }
+                // 大名家の管理表に識別用備考があれば名称だけそれを優先します。
+                // 読みは位置情報から安全に生成できる場合の従来値を使い、備考から無理に推測しません。
+                const hint = getDisplayHint(entry);
+                if (hint) setDisplay(entry, hint, autoYomi || entry.baseYomi);
+                else if (autoName) setDisplay(entry, autoName, autoYomi);
             }
-        });
 
-        // 新しい名前で被っている数をもう一度数えます
-        const newNameCounts = {};
-        this.clans.forEach(clan => {
-            if (clan.id === 0 || clan.isDestroyed) return;
-            newNameCounts[clan.name] = (newNameCounts[clan.name] || 0) + 1;
-        });
-
-        // 2回目のチェック：国名をつけても被っていたら城・館・御所の名前をつける
-        Object.values(clanGroups).forEach(group => {
-            if (group.length > 1) {
-                // ここでも威信2位以下の勢力だけを対象に、まだ名前が被っているかチェックします
-                for (let i = 1; i < group.length; i++) {
-                    const clan = group[i];
-                    if (newNameCounts[clan.name] > 1) {
-                        const leader = this.getBusho(clan.leaderId);
-                        if (leader) {
-                            const castle = this.getCastle(leader.castleId);
-                            if (castle && castle.name) {
-                                // ★城だけでなく、館（やかた）、御所（ごしょ）、御坊（ごぼう）も抜くように対応します
-                                const castleName = castle.shortName;
-                                // ★読み仮名からも、じょう、やかた、ごしょ、ごぼうを抜きます
-                                const castleYomi = castle.shortYomi;
-                                clan.name = castleName + clan.baseName;
-                                clan.yomi = castleYomi + clan.baseYomi;
-                            }
-                        }
+            // 位置情報・備考を使っても衝突が残った場合だけ、城名へ寄せ直します。
+            // それでも同一城の同名諸勢力が残る極端なケースはIDを最終識別子として付け、UI上の同名を残しません。
+            const resolveRemainingDuplicates = () => {
+                const byName = new Map();
+                for (const entry of ordered) {
+                    const currentName = entry.type === 'clan' ? entry.force.name : entry.force.displayName;
+                    if (!byName.has(currentName)) byName.set(currentName, []);
+                    byName.get(currentName).push(entry);
+                }
+                for (const sameNameEntries of byName.values()) {
+                    if (sameNameEntries.length <= 1) continue;
+                    for (const entry of sameNameEntries) {
+                        if (primaryClan && entry === primaryClan) continue;
+                        const loc = locationByEntry.get(entry);
+                        if (!loc || !loc.castle || !loc.castle.shortName) continue;
+                        setDisplay(entry, loc.castle.shortName + entry.baseName, (loc.castle.shortYomi || '') + entry.baseYomi);
                     }
                 }
+            };
+            resolveRemainingDuplicates();
+
+            const finalCounts = new Map();
+            for (const entry of ordered) {
+                const currentName = entry.type === 'clan' ? entry.force.name : entry.force.displayName;
+                finalCounts.set(currentName, (finalCounts.get(currentName) || 0) + 1);
             }
-        });
+            for (const entry of ordered) {
+                if (primaryClan && entry === primaryClan) continue;
+                const currentName = entry.type === 'clan' ? entry.force.name : entry.force.displayName;
+                if ((finalCounts.get(currentName) || 0) <= 1) continue;
+                const suffix = entry.type === 'kunishu' ? `（諸勢力${entry.force.id}）` : `（勢力${entry.force.id}）`;
+                setDisplay(entry, currentName + suffix, entry.displayYomi || entry.baseYomi);
+            }
+        }
     }
 
     // ★城主を決める仕事は、すべて人事部（affiliationSystem）に転送します！

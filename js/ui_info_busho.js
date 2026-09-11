@@ -950,7 +950,7 @@ Object.assign(UIInfoManager.prototype, {
                         const getFactionInfo = (busho) => {
                             if (busho.belongKunishuId > 0) {
                                 const kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
-                                return { yomi: kunishu ? (kunishu.yomi || kunishu.name || "") : "んんん", name: kunishu ? (kunishu.name || "") : "んんん" };
+                                return { yomi: kunishu ? (typeof kunishu.getYomi === 'function' ? kunishu.getYomi(this.game) : (kunishu.yomi || kunishu.name || "")) : "んんん", name: kunishu ? (typeof kunishu.getName === 'function' ? kunishu.getName(this.game) : (kunishu.name || "")) : "んんん" };
                             } else if (busho.clan > 0) {
                                 const clan = getClanById(busho.clan);
                                 return { yomi: clan ? (clan.yomi || clan.name || "") : "んんん", name: clan ? (clan.name || "") : "んんん" };

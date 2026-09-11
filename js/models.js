@@ -23,6 +23,10 @@ class Clan {
         
         // ★元々の大名家の名前を覚える箱を用意します（同名被り回避用）
         this.baseName = data.baseName || data.name || "";
+        // 共通データ clans_master の「備考」は、同名勢力の識別用表示ヒントとしてだけ使います。
+        // 正本名そのものは書き換えません。複数用途の備考に備え、先頭の文だけを識別名候補として扱います。
+        this.note = data.note || data.remarks || "";
+        this.displayHint = data.displayHint || "";
         
         // ★大名家の読み仮名を覚える箱を用意します
         this.yomi = data.yomi || "";
@@ -782,9 +786,15 @@ class Kunishu {
     constructor(data) {
         Object.assign(this, data);
         this.id = Number(this.id);
-        
-        // ★諸勢力の読み仮名を覚える箱を追加します
+
+        // 諸勢力のデータ名は正本として保持し、同名回避の地域名付与は表示専用キャッシュで行います。
+        // セーブに displayName が残っていても、ロード後の全勢力再計算で必ず作り直すため持ち越しません。
+        this.name = data.name || "";
         this.yomi = data.yomi || "";
+        this.baseName = data.baseName || this.name || "";
+        this.baseYomi = data.baseYomi || this.yomi || "";
+        this.displayName = "";
+        this.displayYomi = "";
         
         this.castleId = Number(this.castleId);
         this.leaderId = Number(this.leaderId);
@@ -841,18 +851,34 @@ class Kunishu {
         this.isDestroyed = data.isDestroyed === true;
     }
     
-    getName(game) {
-        // ① まず、CSVに名前が設定されているか確認して、あればそれを答えます
-        if (this.name && this.name.trim() !== "") {
-            return this.name;
-        }
-        // ② もし名前が空っぽなら、頭領の武将データを探します
-        const leader = game.getBusho(this.leaderId);
+    getBaseName(game) {
+        if (this.baseName && this.baseName.trim() !== "") return this.baseName;
+        if (this.name && this.name.trim() !== "") return this.name;
+        const leader = game && typeof game.getBusho === 'function' ? game.getBusho(this.leaderId) : null;
         if (leader) {
-            const surname = leader.familyNameStr;
-            return `${surname}衆`;
+            const surname = leader.familyNameStr || leader.familyName || "";
+            if (surname) return `${surname}衆`;
         }
         return "諸勢力";
+    }
+
+    getBaseYomi(game) {
+        if (this.baseYomi && this.baseYomi.trim() !== "") return this.baseYomi;
+        if (this.yomi && this.yomi.trim() !== "") return this.yomi;
+        const leader = game && typeof game.getBusho === 'function' ? game.getBusho(this.leaderId) : null;
+        if (leader) {
+            const familyYomi = leader.familyYomi || "";
+            if (familyYomi) return `${familyYomi}しゅう`;
+        }
+        return "しょせいりょく";
+    }
+
+    getName(game) {
+        return this.displayName || this.getBaseName(game);
+    }
+
+    getYomi(game) {
+        return this.displayYomi || this.getBaseYomi(game) || this.getName(game);
     }
 
     // ★修正: 仲良し度を調べる機能（大名用の箱だけを見ます）
