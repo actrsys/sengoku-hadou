@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r369');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r381');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -5704,14 +5704,11 @@ test('r369の1570初期配置は池田家独立化を含む連続性・忠誠基
     assert.strictEqual(Number(castleById.get(11).castellanId), 1006069, '名古屋城主は佐久間信盛');
     assert.strictEqual(Number(castleById.get(246).castellanId), 1018039, '多喜山城主は山岡景隆');
 
-    const rokkaku = scenario.kunishus.find(row => Number(row.id) === 69);
-    assert.ok(rokkaku, '甲賀の六角家（諸勢力ID69）が必要');
-    assert.strictEqual(rokkaku.name, '六角家', '六角衆ではなく六角家と表示する');
-    assert.strictEqual(rokkaku.yomi, 'ろっかくけ', '六角家の読みを統一する');
-
-    assert.strictEqual(Number(stateById.get(1008005).clan), 0, '畠山義綱は通常大名家には所属しない');
-    assert.strictEqual(Number(stateById.get(1008005).belongKunishuId), 69, '畠山義綱は庇護先の六角家（諸勢力）所属とする');
-    assert.strictEqual(Number(stateById.get(1008005).castleId), 40, '畠山義綱は六角家の代理拠点・日野城へ置く');
+    // r373で六角家は諸勢力69から通常大名18へ再構成した。
+    assert.ok(!scenario.kunishus.some(row => Number(row.id) === 69), '旧諸勢力69の六角家は廃止する');
+    assert.strictEqual(Number(stateById.get(1008005).clan), 18, '畠山義綱は庇護先の六角家所属とする');
+    assert.strictEqual(Number(stateById.get(1008005).belongKunishuId), 0, '畠山義綱の旧諸勢力参照を外す');
+    assert.strictEqual(Number(stateById.get(1008005).castleId), 43, '畠山義綱は六角家の代理本拠・喰代城へ置く');
 
     assert.strictEqual(Number(stateById.get(1220003).clan), 3, '土岐頼芸は庇護先の武田家所属とする');
     assert.strictEqual(Number(stateById.get(1220003).belongKunishuId), 0, '土岐頼芸は諸勢力所属ではない');
@@ -5897,6 +5894,230 @@ test('r369では池田家・荒木村重の旧イベント2件を再設計まで
     const historical = read('js/event/historical_event.js');
     assert.ok(historical.includes('//     id: "historical_araki_takeover"'), '池田家乗っ取りイベントはコメントアウト');
     assert.ok(historical.includes('//     id: "historical_murashige_submission"'), '荒木村重臣従イベントはコメントアウト');
+});
+
+test('r371では従属と直臣化を分け、和田家・志摩衆を在地諸勢力として維持する', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const stateById = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
+    const kunishuById = new Map(scenario.kunishus.map(row => [Number(row.id), row]));
+    const castleById = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+
+    for (const id of [16,67,68]) {
+        assert.ok(!kunishuById.has(id), `諸勢力${id}は1570開始時の独立軍事勢力から外す`);
+    }
+    assert.ok(kunishuById.has(18), '志摩衆は織田に従属する在地海上勢力として維持');
+    assert.ok(kunishuById.has(55), '和田家は武田に従属する西上野国衆として維持');
+    assert.strictEqual(kunishuById.get(18).daimyoRelations, '1:友好:100', '志摩衆は織田家と強い友好関係');
+    assert.strictEqual(kunishuById.get(55).daimyoRelations, '3:友好:100', '和田家は武田家と強い友好関係');
+    assert.strictEqual(kunishuById.get(6).daimyoRelations, '1:友好:100|301:友好:100', '水野家は織田・徳川双方と友好');
+
+    for (const id of [1302005,1302006,1302007,1302012,1302013]) {
+        assert.strictEqual(Number(stateById.get(id).clan), 301, `大給系${id}は徳川家所属`);
+        assert.strictEqual(Number(stateById.get(id).belongKunishuId), 0, `大給系${id}は諸勢力二重所属を解消`);
+        assert.strictEqual(Number(stateById.get(id).castleId), 48, `大給系${id}は岡崎城を地域アンカーにする`);
+    }
+
+    for (const id of [2018004,2018005,2018006]) {
+        assert.strictEqual(Number(stateById.get(id).clan), 0, `九鬼系${id}を織田家直臣へ吸収しない`);
+        assert.strictEqual(Number(stateById.get(id).belongKunishuId), 18, `九鬼系${id}は志摩衆所属`);
+        assert.strictEqual(Number(stateById.get(id).castleId), 78, `九鬼系${id}は波切城を地域アンカーにする`);
+        assert.strictEqual(Number(stateById.get(id).loyalty), 50, `諸勢力所属の九鬼系${id}は忠誠50`);
+    }
+    assert.strictEqual(Number(kunishuById.get(18).leaderId), 2018005, '志摩衆の実効的頭領は九鬼嘉隆');
+    assert.strictEqual(Number(castleById.get(78).castellanId), 1024030, '九鬼嘉隆を1570年5月の波切城主とは断定しない');
+
+    for (const id of [2055001,2055002]) {
+        assert.strictEqual(Number(stateById.get(id).clan), 0, `和田系${id}を武田家直臣へ吸収しない`);
+        assert.strictEqual(Number(stateById.get(id).belongKunishuId), 55, `和田系${id}は和田家所属`);
+        assert.strictEqual(Number(stateById.get(id).castleId), 31, `和田系${id}は箕輪城を地域アンカーにする`);
+        assert.strictEqual(Number(stateById.get(id).loyalty), 50, `諸勢力所属の和田系${id}は忠誠50`);
+    }
+
+    assert.strictEqual(Number(stateById.get(2016001).clan), 1, '徳山則秀は織田家所属');
+    assert.strictEqual(Number(stateById.get(2016001).belongKunishuId), 0, '徳山家の諸勢力二重所属を解消');
+
+    assert.strictEqual(Number(stateById.get(2067004).clan), 0, '吉良義昭は1570年に三河の独立勢力へ戻さず浪人');
+    assert.strictEqual(Number(stateById.get(2067004).belongKunishuId), 0, '吉良義昭は吉良諸勢力から離脱');
+    assert.strictEqual(Number(stateById.get(2067004).castleId), 181, '吉良義昭は摂津芥川山城を地域アンカーにする');
+    assert.strictEqual(Number(stateById.get(2067003).clan), 0, '吉良義定の1576登場先は徳川直臣と断定せず浪人扱い');
+
+    const activeKunishuIds = new Set(scenario.kunishus.map(row => Number(row.id)));
+    for (const row of scenario.warriorsState) {
+        const k = Number(row.belongKunishuId || 0);
+        assert.ok(k === 0 || activeKunishuIds.has(k), `諸勢力参照切れを作らない: ${row.id}`);
+    }
+});
+
+test('r372では甲賀・大和の旧主家参照を整理し、椎名家を1570年の在地勢力として分離する', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const stateById = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
+    const kunishuById = new Map(scenario.kunishus.map(row => [Number(row.id), row]));
+    const castleById = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+    const enabledClanIds = new Set(scenario.clansState.filter(row => row.enabled === true).map(row => Number(row.id)));
+
+    const expectedRelations = new Map([
+        [1, '1:友好:100'],
+        [2, ''],
+        [8, '1:敵対:30|18:友好:90'],
+        [27, '1:友好:90'],
+        [28, '1:敵対:0|18:友好:100'],
+        [30, '1:敵対:30'],
+        [47, '1:友好:65|20:敵対:30'],
+        [63, ''],
+        [10016, '2:敵対:0|7:敵対:0|19:友好:100|21:友好:100'],
+        [10017, '2:敵対:0|7:敵対:0|19:友好:100|21:友好:100'],
+        [10018, '2:敵対:0|7:敵対:0|19:友好:100|21:友好:100']
+    ]);
+    for (const [id, rel] of expectedRelations) {
+        assert.ok(kunishuById.has(id), `諸勢力${id}が必要`);
+        assert.strictEqual(kunishuById.get(id).daimyoRelations, rel, `諸勢力${id}の1570外交を補正`);
+    }
+
+    const shiina = kunishuById.get(72);
+    assert.ok(shiina, '椎名家を諸勢力72として追加');
+    assert.strictEqual(shiina.name, '椎名家');
+    assert.strictEqual(Number(shiina.leaderId), 1001043, '椎名康胤を頭領にする');
+    assert.strictEqual(Number(shiina.castleId), 242, '増山城は越中西部での抵抗を表す地域アンカー');
+    assert.strictEqual(shiina.daimyoRelations, '2:敵対:0|3:友好:100|19:友好:100', '上杉敵対・武田本願寺友好を表す');
+
+    for (const id of [1001043, 1001044, 1001045]) {
+        const row = stateById.get(id);
+        assert.ok(row, `椎名系${id}が必要`);
+        assert.strictEqual(Number(row.clan), 0, `椎名系${id}を上杉直臣に残さない`);
+        assert.strictEqual(Number(row.belongKunishuId), 72, `椎名系${id}は椎名家所属`);
+        assert.strictEqual(Number(row.castleId), 242, `椎名系${id}は増山城を地域アンカーにする`);
+        assert.strictEqual(Number(row.loyalty), 50, `諸勢力所属の椎名系${id}は忠誠50`);
+    }
+
+    assert.strictEqual(Number(stateById.get(1011001).clan), 2, '神保長職は上杉傘下表現を維持');
+    assert.strictEqual(Number(stateById.get(1011001).castleId), 24, '神保長職を富山城へ置く');
+    assert.strictEqual(Number(castleById.get(24).ownerClan), 2, '富山城は上杉領表現を維持');
+    assert.strictEqual(Number(castleById.get(24).castellanId), 1011001, '富山城主は神保長職');
+    assert.strictEqual(Number(stateById.get(1011003).clan), 2, '神保長城も上杉傘下表現を維持');
+    assert.strictEqual(Number(stateById.get(1011003).castleId), 242, '神保長城を増山城に置く');
+    assert.strictEqual(Number(castleById.get(242).ownerClan), 2, '増山城の通常勢力所有は上杉のまま');
+    assert.strictEqual(Number(castleById.get(242).castellanId), 1011003, '増山城主は神保長城');
+
+    const forbiddenDisabledRefs = new Set([9, 11, 24]);
+    for (const k of scenario.kunishus) {
+        const relationText = String(k.daimyoRelations || '').trim();
+        if (!relationText) continue;
+        for (const part of relationText.split('|')) {
+            const fields = part.split(':');
+            assert.strictEqual(fields.length, 3, `諸勢力${k.id}の外交構文を3項目に統一: ${part}`);
+            const clanId = Number(fields[0]);
+            assert.ok(Number.isInteger(clanId), `諸勢力${k.id}の外交先IDは数値: ${part}`);
+            assert.ok(enabledClanIds.has(clanId), `諸勢力${k.id}の外交先は有効通常勢力のみ: ${part}`);
+            assert.ok(!forbiddenDisabledRefs.has(clanId), `無効化済み旧勢力IDを参照しない: ${part}`);
+            assert.ok(fields[1] === '友好' || fields[1] === '敵対', `外交種別を友好/敵対に限定: ${part}`);
+            const value = Number(fields[2]);
+            assert.ok(Number.isFinite(value) && value >= 0 && value <= 100, `外交値を0-100に収める: ${part}`);
+        }
+    }
+});
+
+
+test('r373では六角家を伊賀・喰代城の一城大名として復活させ、義定家督説をゲーム採用する', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const stateById = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
+    const clanById = new Map(scenario.clansState.map(row => [Number(row.id), row]));
+    const kunishuById = new Map(scenario.kunishus.map(row => [Number(row.id), row]));
+    const castleById = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+
+    const rokkaku = clanById.get(18);
+    assert.ok(rokkaku && rokkaku.enabled === true, '通常大名家18の六角家を有効化する');
+    assert.strictEqual(Number(rokkaku.leaderId), 1018005, '1570では義定家督説をゲーム採用する');
+    assert.ok(!kunishuById.has(69), '旧諸勢力69六角家を二重登録しない');
+
+    const hojiro = castleById.get(43);
+    assert.strictEqual(Number(hojiro.ownerClan), 18, '伊賀・喰代城を六角家の代理本拠にする');
+    assert.strictEqual(Number(hojiro.castellanId), 1018005, '喰代城主も六角義定');
+    assert.strictEqual(Number(hojiro.soldiers), 2357, '喰代城兵は管理表の既存算出式を六角家1城として再計算した値を使う');
+    assert.strictEqual(Number(hojiro.training), 75);
+    assert.strictEqual(Number(hojiro.morale), 75);
+    assert.strictEqual(Number(hojiro.horses), 250);
+    assert.strictEqual(Number(hojiro.guns), 200);
+
+    for (const id of [1018003, 1018004, 1018005, 1018034, 1018037, 1008005]) {
+        const row = stateById.get(id);
+        assert.strictEqual(Number(row.clan), 18, `六角残存勢${id}は通常大名家18所属`);
+        assert.strictEqual(Number(row.belongKunishuId), 0, `六角残存勢${id}の旧諸勢力参照を除去`);
+        assert.strictEqual(Number(row.castleId), 43, `六角残存勢${id}は喰代城へ集約`);
+    }
+    assert.strictEqual(Number(stateById.get(1018005).loyalty), 100, '当主義定は忠誠100');
+    assert.strictEqual(Number(stateById.get(1018005).achievementTotal), 1000, '一城大名の当主として功績1000');
+    assert.strictEqual(stateById.get(1018004).isRetired, '', '義治は家督移譲説を採っても現役武将として残す');
+    assert.strictEqual(stateById.get(1018034).isGunshi, true, '六角家の軍師は三雲定持');
+
+    assert.strictEqual(kunishuById.get(8).daimyoRelations, '1:敵対:30|18:友好:90', '甲賀衆は六角寄りだが一枚岩にはしない');
+    assert.strictEqual(kunishuById.get(12).daimyoRelations, '1:敵対:30|18:友好:85', '伊賀衆は反織田防衛姿勢と六角支援を併記する');
+    assert.strictEqual(kunishuById.get(28).daimyoRelations, '1:敵対:0|18:友好:100', '望月家は六角支援側を明確化');
+
+    const relMap = new Map(scenario.diplomacy.map(r => [`${r.sourceClanId}:${r.targetClanId}`, r]));
+    for (const [other, type, value] of [[1,'敵対',0],[7,'友好',65],[15,'友好',70]]) {
+        const a = relMap.get(`18:${other}`);
+        const b = relMap.get(`${other}:18`);
+        assert.ok(a && b, `六角家と勢力${other}の双方向外交が必要`);
+        assert.strictEqual(a.relationType, type);
+        assert.strictEqual(Number(a.value), value);
+        assert.strictEqual(b.relationType, type);
+        assert.strictEqual(Number(b.value), value);
+    }
+});
+
+
+test('r376では伊賀を一枚岩にせず、越中国衆も1570時点の確度に応じて外交を分ける', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const kunishuById = new Map(scenario.kunishus.map(row => [Number(row.id), row]));
+
+    assert.strictEqual(kunishuById.get(1).daimyoRelations, '1:友好:100', '仁木家は1569年の信長服属を反映して織田友好を維持');
+    assert.strictEqual(kunishuById.get(2).daimyoRelations, '', '百地家は伊賀全体の陣営へ機械的に寄せず中立を維持');
+    assert.strictEqual(kunishuById.get(12).daimyoRelations, '1:敵対:30|18:友好:85', '伊賀衆は惣国一揆の反織田防衛姿勢と六角支援を表現');
+
+    assert.strictEqual(kunishuById.get(21).daimyoRelations, '2:友好:100', '土肥家は上杉方の在地国衆として維持');
+    assert.strictEqual(kunishuById.get(63).daimyoRelations, '', '寺崎家は1570時点で反上杉と断定せず中立の独立国衆とする');
+    assert.strictEqual(kunishuById.get(72).daimyoRelations, '2:敵対:0|3:友好:100|19:友好:100', '椎名家は上杉離反後の武田・本願寺寄りを維持');
+});
+
+test('r375では空城と諸勢力の初期軍備を固定調整値として保持する', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const castleById = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+    const kunishuById = new Map(scenario.kunishus.map(row => [Number(row.id), row]));
+
+    const emptyExpected = new Map([
+        [19, { soldiers:2047, training:30, morale:30, gold:1188, rice:5833, ammo:1000, horses:0, guns:0 }],
+        [80, { soldiers:2257, training:30, morale:30, gold:1408, rice:5216, ammo:1000, horses:0, guns:0 }]
+    ]);
+    for (const [id, expected] of emptyExpected) {
+        const castle = castleById.get(id);
+        assert.ok(castle, `空城${id}が必要`);
+        assert.strictEqual(Number(castle.ownerClan), 0, `城${id}は空城のまま`);
+        assert.strictEqual(Number(castle.castellanId), 0, `空城${id}に城主を置かない`);
+        for (const [field, value] of Object.entries(expected)) {
+            assert.strictEqual(Number(castle[field]), value, `空城${id}.${field}はシナリオ固定調整値を維持`);
+        }
+    }
+
+    const representativeKunishu = new Map([
+        [1,   { soldiers:3000, maxSoldiers:3000, training:70, morale:70, horses:0, maxHorses:1000, guns:0, maxGuns:0, defense:500, maxDefense:500 }],
+        [3,   { soldiers:4000, maxSoldiers:4000, training:90, morale:80, horses:0, maxHorses:0, guns:0, maxGuns:1500, defense:700, maxDefense:700 }],
+        [18,  { soldiers:4000, maxSoldiers:4000, training:90, morale:80, horses:0, maxHorses:500, guns:0, maxGuns:1500, defense:700, maxDefense:700 }],
+        [55,  { soldiers:2000, maxSoldiers:2000, training:70, morale:70, horses:0, maxHorses:1000, guns:0, maxGuns:0, defense:400, maxDefense:400 }],
+        [71,  { soldiers:2800, maxSoldiers:3200, training:72, morale:72, horses:250, maxHorses:700, guns:120, maxGuns:450, defense:550, maxDefense:650 }],
+        [72,  { soldiers:2500, maxSoldiers:3000, training:75, morale:75, horses:200, maxHorses:700, guns:0, maxGuns:300, defense:400, maxDefense:500 }],
+        [901, { soldiers:10000, maxSoldiers:10000, training:70, morale:70, horses:0, maxHorses:0, guns:0, maxGuns:0, defense:1000, maxDefense:1000 }]
+    ]);
+    for (const [id, expected] of representativeKunishu) {
+        const k = kunishuById.get(id);
+        assert.ok(k, `諸勢力${id}が必要`);
+        for (const [field, value] of Object.entries(expected)) {
+            assert.strictEqual(Number(k[field]), value, `諸勢力${id}.${field}は固定入力を維持`);
+        }
+    }
+
+    // 同じ喰代城をアンカーにする仁木家は、喰代城が六角領へ変わっても軍備を連動させない。
+    assert.strictEqual(Number(castleById.get(43).soldiers), 2357, '通常大名領となった喰代城は通常城側の初期値');
+    assert.strictEqual(Number(kunishuById.get(1).soldiers), 3000, '仁木家の固定兵数はアンカー城の兵数へ連動しない');
 });
 
 test('実データのシナリオ登録はindex.binを正本にし、シナリオ選択UIはレイアウト確認用に残す', () => {
@@ -12131,4 +12352,144 @@ test('タブレットを含む固定論理画面のPC/スマホ判定はapp_boot
     assert.strictEqual(narrowDesktop.isPc, true, '通常PCは物理viewportが縦長でも従来どおりPC論理画面を維持する');
     assert.strictEqual(narrowDesktop.inputMode, 'mouse');
     assert.strictEqual(narrowDesktop.isTouchInput, false);
+});
+
+test('r377では1581年の相良頼貞の家督争いを1570へ先取りせず、相良家の二重勢力化を解消する', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const stateById = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
+    const kunishuById = new Map(scenario.kunishus.map(row => [Number(row.id), row]));
+    const castleById = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+
+    assert.ok(!kunishuById.has(7), '1581年の頼貞反乱状態を表す諸勢力7相良家を1570開始時から外す');
+
+    const yorisada = stateById.get(1059010);
+    assert.ok(yorisada, '相良頼貞が必要');
+    assert.strictEqual(Number(yorisada.clan), 59, '1570年の相良頼貞は通常相良家59所属');
+    assert.strictEqual(Number(yorisada.belongKunishuId), 0, '頼貞の旧諸勢力7参照を除去');
+    assert.strictEqual(Number(yorisada.castleId), 160, '個別在城の一点再現より勢力整合を優先して人吉城へ集約');
+    assert.strictEqual(Number(yorisada.loyalty), 80, '後年の家督志向は残すが1570開始時から反乱状態にはしない');
+
+    assert.strictEqual(Number(castleById.get(160).soldiers), 2201, '廃止諸勢力7の兵2000を人吉城兵へ加算しない');
+    assert.strictEqual(Number(castleById.get(161).soldiers), 1771, '廃止諸勢力7の兵2000を古麓城兵へ加算しない');
+    assert.strictEqual(Number(castleById.get(167).soldiers), 1466, '廃止諸勢力7の兵2000を加久藤城兵へ加算しない');
+});
+
+test('r378では北原家の幽霊諸勢力を除去し、1569年降伏後の入来院家を島津友好の在地勢力として残す', () => {
+    const { scenario, common } = getRuntimeData('1570_anegawa');
+    const stateById = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
+    const kunishuById = new Map(scenario.kunishus.map(row => [Number(row.id), row]));
+    const castleById = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+    const masterById = new Map(common.warriorsMaster.map(row => [Number(row.id), row]));
+
+    assert.ok(!kunishuById.has(44), '1564年に真幸院支配を失った北原家44を1570の独立軍事勢力として残さない');
+    const kanetaka = stateById.get(2044001);
+    assert.ok(kanetaka, '北原兼孝の状態行は保持');
+    assert.strictEqual(Number(kanetaka.belongKunishuId), 0, '廃止した北原家44への参照を残さない');
+    assert.ok(Number(masterById.get(2044001).endYear) < 1570, '北原兼孝は1570開始前に死亡済み');
+    assert.strictEqual(Number(castleById.get(167).soldiers), 1466, '北原家固定兵2000を加久藤城へ転記しない');
+
+    const iriki = kunishuById.get(43);
+    assert.ok(iriki, '入来院家は在地領主として諸勢力維持');
+    assert.strictEqual(iriki.daimyoRelations, '26:友好:100', '1569年冬の島津降伏・本領安堵を1570外交へ反映');
+    assert.strictEqual(Number(iriki.soldiers), 2000, '外交変更を理由に入来院家の固定兵力を再計算しない');
+    assert.strictEqual(Number(iriki.maxSoldiers), 2000);
+    assert.strictEqual(Number(iriki.training), 70);
+    assert.strictEqual(Number(iriki.morale), 70);
+    assert.strictEqual(Number(castleById.get(168).ownerClan), 26, '平佐城の通常勢力所有は島津家を維持');
+});
+
+
+test('r379では北九州の旧1560外交を1570へ更新し、諸勢力の固定軍備を変えず地域アンカーを整理する', () => {
+    const { scenario, common } = getRuntimeData('1570_anegawa');
+    const stateById = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
+    const kunishuById = new Map(scenario.kunishus.map(row => [Number(row.id), row]));
+    const castleById = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+    const masterById = new Map(common.warriorsMaster.map(row => [Number(row.id), row]));
+
+    const hattori = kunishuById.get(11);
+    assert.ok(hattori, '長島地域の服部党を1570諸勢力として維持');
+    assert.strictEqual(hattori.name, '服部党', '服部友貞個人の家ではなく1570にも活動する集団を表す名称');
+    assert.strictEqual(hattori.yomi, 'はっとりとう');
+    assert.strictEqual(Number(hattori.leaderId), 0, '共通武将に1570時点の後継頭領がないため抽象集団として頭領0を許容');
+    assert.strictEqual(Number(hattori.soldiers), 2000, '名称整理を理由に諸勢力固定兵力を変えない');
+    assert.strictEqual(hattori.daimyoRelations, '19:友好:100|21:友好:100');
+    assert.ok(Number(masterById.get(2011001).endYear) < 1570, '服部友貞本人は1570開始前に死亡済み');
+
+    const tsukushi = kunishuById.get(42);
+    assert.ok(tsukushi, '筑紫家は大友従属でも在地国衆として維持');
+    assert.strictEqual(Number(tsukushi.castleId), 151, '勝尾城スロットがないため肥前東部の勢福寺城を地域アンカーにする');
+    assert.strictEqual(tsukushi.daimyoRelations, '53:友好:100|54:敵対:30', '1570の大友従属を反映し、後年の秋月同盟を先取りしない');
+    assert.strictEqual(Number(tsukushi.soldiers), 3000, '外交・アンカー変更でも固定兵力を維持');
+    assert.strictEqual(Number(stateById.get(2042002).castleId), 151, '頭領筑紫広門の所在もアンカーへ同期');
+
+    const kumabe = kunishuById.get(46);
+    assert.ok(kumabe, '隈部家は大友軍参加後も在地国衆として維持');
+    assert.strictEqual(Number(kumabe.castleId), 158, '肥後北部勢力を柳川ではなく隈本城へ地域集約');
+    assert.strictEqual(kumabe.daimyoRelations, '53:友好:90|54:敵対:30');
+    assert.strictEqual(Number(kumabe.soldiers), 2000, '固定兵力を維持');
+    assert.strictEqual(Number(stateById.get(2046001).castleId), 158);
+
+    const akahoshi = kunishuById.get(58);
+    assert.ok(akahoshi, '赤星家を肥後の別個の在地勢力として維持');
+    assert.strictEqual(Number(akahoshi.castleId), 158);
+    assert.strictEqual(akahoshi.daimyoRelations, '53:友好:100', '1570の大友後援関係を反映');
+    assert.strictEqual(Number(akahoshi.soldiers), 2000);
+
+    const harada = kunishuById.get(59);
+    assert.ok(harada, '原田家は大友幕下復帰後でも在地勢力として維持');
+    assert.strictEqual(Number(harada.castleId), 148, '高祖城スロットがないため筑前の立花山城を地域アンカーにする');
+    assert.strictEqual(harada.daimyoRelations, '53:友好:85', '1569復帰と1571頃の再離反の間をやや不安定な友好で表現');
+    assert.strictEqual(Number(harada.soldiers), 2000, '固定兵力を維持');
+    assert.strictEqual(Number(stateById.get(2059001).castleId), 148);
+
+    // アンカー移動は通常城の所有・兵力・物資を変更しない。
+    assert.strictEqual(Number(castleById.get(148).ownerClan), 53);
+    assert.strictEqual(Number(castleById.get(151).ownerClan), 53);
+    assert.strictEqual(Number(castleById.get(158).ownerClan), 53);
+    assert.strictEqual(Number(castleById.get(148).soldiers), 1984);
+    assert.strictEqual(Number(castleById.get(151).soldiers), 1629);
+    assert.strictEqual(Number(castleById.get(158).soldiers), 2171);
+});
+
+
+test('r380では由良家の1570外交を越相同盟期へ更新し、諸勢力固定軍備を維持する', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const kunishuById = new Map(scenario.kunishus.map(row => [Number(row.id), row]));
+    const castleById = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+    const yura = kunishuById.get(25);
+
+    assert.ok(yura, '由良家は両毛の独立性を持つ在地勢力として維持');
+    assert.strictEqual(Number(yura.castleId), 6, '厩橋城は両毛方面の地域アンカーとして維持');
+    assert.strictEqual(yura.daimyoRelations, '4:友好:100|2:友好:70|3:敵対:30', '北条方を基軸に越相同盟期の上杉協調と対武田悪化を反映');
+    assert.strictEqual(Number(yura.soldiers), 2000, '外交変更で諸勢力固定兵力を再計算しない');
+    assert.strictEqual(Number(yura.maxSoldiers), 2000);
+    assert.strictEqual(Number(yura.training), 70);
+    assert.strictEqual(Number(yura.morale), 70);
+    assert.strictEqual(Number(yura.defense), 400);
+    assert.strictEqual(Number(castleById.get(6).ownerClan), 2, '地域アンカーの通常城所有は上杉家のまま');
+    assert.strictEqual(Number(castleById.get(6).soldiers), 2338, '諸勢力外交調整を理由に厩橋城兵を変更しない');
+});
+
+
+test('r381では同名別系統の有馬氏を区別し、1570志知衆の三好従属を外交へ反映する', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const kunishuById = new Map(scenario.kunishus.map(row => [Number(row.id), row]));
+    const castleById = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+
+    const arima = kunishuById.get(19);
+    assert.ok(arima, '播磨・摂津系の有馬氏を諸勢力として維持');
+    assert.strictEqual(arima.name, '摂津有馬家', '肥前の通常大名有馬家57と同名表示にせず系統を区別する');
+    assert.strictEqual(arima.yomi, 'せっつありまけ');
+    assert.strictEqual(Number(arima.soldiers), 2000, '名称整理を理由に諸勢力固定兵力を変えない');
+    assert.strictEqual(arima.daimyoRelations, '16:友好:90|20:友好:90', '既存の別所・三好関係は変更しない');
+
+    const shichi = kunishuById.get(35);
+    assert.ok(shichi, '志知衆は淡路の在地勢力として維持');
+    assert.strictEqual(shichi.daimyoRelations, '20:友好:100', '1570時点の三好勢力下を外交関係で表す');
+    assert.strictEqual(Number(shichi.soldiers), 4000, '外交追加で諸勢力固定兵力を再計算しない');
+    assert.strictEqual(Number(shichi.training), 90);
+    assert.strictEqual(Number(shichi.morale), 80);
+    assert.strictEqual(Number(shichi.defense), 700);
+    assert.strictEqual(Number(castleById.get(87).ownerClan), 20, 'アンカー洲本城の通常勢力所有も三好家のまま');
+    assert.strictEqual(Number(castleById.get(87).soldiers), 1760, '外交更新を理由に洲本城兵を変更しない');
 });

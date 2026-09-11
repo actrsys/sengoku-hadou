@@ -1348,8 +1348,8 @@ window.GameEvents.push({
         // 4. 1561年以降であるか確認します
         if (game.year < 1561) return false;
 
-        // 5. 六角義賢（ID: 1018003）または六角義治（ID: 1018004）が大名であるか確認します
-        const rokkakuDaimyo = window.EventCheck.getDaimyo(game, [1018003, 1018004]);
+        // 5. 六角義賢（ID: 1018003）・六角義治（ID: 1018004）・六角義定（ID: 1018005）のいずれかが大名であるか確認します
+        const rokkakuDaimyo = window.EventCheck.getDaimyo(game, [1018003, 1018004, 1018005]);
         if (!rokkakuDaimyo) return false;
 
         // 6. 浅井家と六角家が敵対関係にあるか確認します
@@ -1422,8 +1422,8 @@ window.GameEvents.push({
         const candidate = game.bushos.find(b => b.clan === nobunaga.clan && b.courtRankIds && (game.courtRankSystem.RANK_IDS_CANDIDATE.some(id => b.courtRankIds.includes(id)) || b.courtRankIds.includes(game.courtRankSystem.RANK_ID_SHOGUN)));
         if (!candidate) return false;
 
-        // 9. 六角義賢（ID: 1018003）または六角義治（ID: 1018004）が大名であるか確認します
-        const rokkakuDaimyo = window.EventCheck.getDaimyo(game, [1018003, 1018004]);
+        // 9. 六角義賢（ID: 1018003）・六角義治（ID: 1018004）・六角義定（ID: 1018005）のいずれかが大名であるか確認します
+        const rokkakuDaimyo = window.EventCheck.getDaimyo(game, [1018003, 1018004, 1018005]);
         if (!rokkakuDaimyo) return false;
 
         // 10. 浅井家と六角家が敵対関係にあるか確認します
