@@ -208,6 +208,35 @@ class DataManager {
         catch (error) { throw new Error(`${url} のJSON展開に失敗しました: ${error.message}`); }
     }
 
+    // 姫の現在所属が未設定でも、存続中の未婚姫が大名家の姫名簿に一意に登録されている場合は、
+    // ゲーム開始時だけ名簿側から補完します。婚姻済み・死亡・未登場や、複数家に重複した曖昧データは触りません。
+    static normalizePrincessRosterAffiliations(clans, princesses) {
+        const rosterOwnerByPrincessId = new Map();
+        const ambiguousPrincessIds = new Set();
+
+        (clans || []).forEach(clan => {
+            const clanId = Number(clan && clan.id);
+            if (!Number.isFinite(clanId) || clanId <= 0 || !Array.isArray(clan.princessIds)) return;
+            clan.princessIds.forEach(rawId => {
+                const princessId = Number(rawId);
+                if (!Number.isFinite(princessId) || princessId <= 0) return;
+                if (!rosterOwnerByPrincessId.has(princessId)) {
+                    rosterOwnerByPrincessId.set(princessId, clanId);
+                } else if (rosterOwnerByPrincessId.get(princessId) !== clanId) {
+                    ambiguousPrincessIds.add(princessId);
+                }
+            });
+        });
+
+        (princesses || []).forEach(princess => {
+            if (!princess || princess.status !== 'unmarried' || Number(princess.currentClanId) > 0) return;
+            const princessId = Number(princess.id);
+            if (!Number.isFinite(princessId) || ambiguousPrincessIds.has(princessId)) return;
+            const rosterClanId = Number(rosterOwnerByPrincessId.get(princessId) || 0);
+            if (rosterClanId > 0) princess.currentClanId = rosterClanId;
+        });
+    }
+
     // ★ゲーム開始時の状態を作る魔法です！（今回から軍団の名簿も受け取ります）
     static joinData(clans, castles, bushos, princesses = [], legions = []) {
         const startYear = window.MainParams.StartYear; // 今のシナリオの開始年（例：1560年）
@@ -251,6 +280,9 @@ class DataManager {
                 });
             }
         });
+
+        // 生データ側で currentClanId が空でも、姫名簿に一意な所属が明示されている現役未婚姫は開始時に整合させます。
+        this.normalizePrincessRosterAffiliations(clans, princesses);
 
         castles.forEach(c => c.samuraiIds = []);
         bushos.forEach(b => {

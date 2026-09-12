@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r387');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r389');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -12681,6 +12681,43 @@ test('r386では根来衆・温井家の1570外交を年代整合させ、固定
 });
 
 
+test('姫名簿に一意な所属がある未婚姫だけ、開始時に空のcurrentClanIdを補完する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/data_manager.js');
+    const clans = [
+        { id: 3, princessIds: [4, 5] },
+        { id: 7, princessIds: [6] },
+        { id: 8, princessIds: [6] }
+    ];
+    const princesses = [
+        { id: 4, status: 'unmarried', currentClanId: 0 },
+        { id: 5, status: 'unmarried', currentClanId: 2 },
+        { id: 6, status: 'unmarried', currentClanId: 0 },
+        { id: 7, status: 'married', currentClanId: 0 }
+    ];
+    ctx.DataManager.normalizePrincessRosterAffiliations(clans, princesses);
+    assert.strictEqual(princesses[0].currentClanId, 3, '一意な姫名簿所属を空欄currentClanIdへ補完する');
+    assert.strictEqual(princesses[1].currentClanId, 2, '既存の現在所属は上書きしない');
+    assert.strictEqual(princesses[2].currentClanId, 0, '複数家に重複する曖昧な名簿は補完しない');
+    assert.strictEqual(princesses[3].currentClanId, 0, '未婚以外は補完しない');
+    assert.ok(read('js/data_manager.js').includes('this.normalizePrincessRosterAffiliations(clans, princesses);'), 'joinDataから開始時補完を必ず呼ぶ');
+
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const runtimeClans = scenario.clansState.map(row => ({
+        id: Number(row.id),
+        princessIds: String(row.princess ?? '').split('|').filter(Boolean).map(Number)
+    }));
+    const runtimePrincesses = scenario.princessState.map(row => ({
+        id: Number(row.id),
+        status: row.status || 'unmarried',
+        currentClanId: Number(row.currentClanId) || 0
+    }));
+    ctx.DataManager.normalizePrincessRosterAffiliations(runtimeClans, runtimePrincesses);
+    const kiku = runtimePrincesses.find(p => p.id === 4);
+    assert.ok(kiku);
+    assert.strictEqual(kiku.currentClanId, 3, '1570年の菊は開始時補完後に武田家所属となる');
+});
+
 test('r387では婚姻・軍師・上杉第6軍団を管理表の最終状態へ同期する', () => {
     const { common, scenario } = getRuntimeData('1570_anegawa');
     const warriorState = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
@@ -12738,4 +12775,6 @@ test('r387では婚姻・軍師・上杉第6軍団を管理表の最終状態へ
     }
     assert.strictEqual(Number(princessState.get(8).currentClanId), 4, '春の現在所属は北条家');
     assert.strictEqual(Number(princessState.get(11).currentClanId), 301, '瀬名の現在所属は徳川家');
+    const takedaPrincessIds = String(clanState.get(3).princess ?? '').split('|').filter(Boolean).map(Number);
+    assert.ok(takedaPrincessIds.includes(4), '菊は1570開始時の武田家姫名簿に含まれる');
 });
