@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r389');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r390');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7578,6 +7578,43 @@ test('武将の噂は周辺拠点を一度だけ辿り専門家/総合候補を�
     assert.strictEqual(system._buildRumorCandidateRow(aptitudeTarget, null, 2).mode, 'aptitude', 'A/S適性を独立した噂候補として扱う');
     assert.ok(!system._getRumorRegionalCandidates(region2).includes(tooFar), '探索範囲外の武将は候補にしない');
     assert.ok(!system._getRumorSubjectText(kunishu).includes('城'), '諸勢力の地域アンカーを実所在地の城名として噂に出さない');
+});
+
+test('武将の噂は適性名を会話上の自然な意味へ言い換え、忍術だけ称賛調にしない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/interview_system.js');
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+    const system = new ctx.InterviewSystem({});
+
+    const cases = [
+        [{ key: 'aptAshigaru', label: '足軽' }, '野戦にかけては、かなりの腕前だとの評判です。'],
+        [{ key: 'aptKiba', label: '騎馬' }, '騎馬隊の扱いにかけては、かなりの腕前だとの評判です。'],
+        [{ key: 'aptTeppo', label: '鉄砲' }, '鉄砲隊の扱いにかけては、かなりの腕前だとの評判です。'],
+        [{ key: 'aptYumi', label: '弓術' }, '弓術にかけては、かなりの腕前だとの評判です。'],
+        [{ key: 'aptBugei', label: '武芸' }, '武芸にかけては、かなりの腕前だとの評判です。'],
+        [{ key: 'aptMaritime', label: '操船' }, '船の扱いにかけては、かなりの腕前だとの評判です。']
+    ];
+    for (const [aptitude, expected] of cases) {
+        assert.strictEqual(system._getRumorAptitudeAbilityText(aptitude, 'friendly'), expected);
+    }
+    assert.strictEqual(
+        system._getRumorAptitudeAbilityText({ key: 'aptKiba', label: '騎馬' }, 'reserved'),
+        '騎馬隊の扱いには、かなり長けているそうです。',
+        '控えめな噂でも会話用分野名を共用する'
+    );
+
+    const ninja = system._getRumorAptitudeAbilityText({ key: 'aptNinjutsu', label: '忍術' }, 'friendly');
+    assert.strictEqual(ninja, '何やら、忍びの者を使うことも多いと聞きます。');
+    assert.ok(!/腕前|長け|巧み|秀で/.test(ninja), '忍術適性を称賛する言い方にしない');
+    assert.ok(!ninja.includes('忍術にかけては'), '武将本人を忍術の達人として語らない');
+
+    const ninjaFamily = system._getRumorAptitudeAbilityText(
+        { key: 'aptNinjutsu', label: '忍術' },
+        'friendly',
+        { family: true, senior: false }
+    );
+    assert.strictEqual(ninjaFamily, '忍びの者を用いることもあります。');
+    assert.ok(!/聞き|噂|そうです/.test(ninjaFamily), '話者自身の親族は忍術でも伝聞調に戻さない');
 });
 
 test('武将の噂は表面態度で情報量を変え同一面談中は再抽選しない', () => {

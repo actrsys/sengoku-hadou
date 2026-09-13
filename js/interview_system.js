@@ -827,6 +827,46 @@ class InterviewSystem {
         ];
     }
 
+    _getRumorAptitudeFieldText(aptitude) {
+        if (!aptitude) return '';
+        switch (aptitude.key) {
+            case 'aptAshigaru': return '野戦';
+            case 'aptKiba': return '騎馬隊の扱い';
+            case 'aptTeppo': return '鉄砲隊の扱い';
+            case 'aptYumi': return '弓術';
+            case 'aptBugei': return '武芸';
+            case 'aptMaritime': return '船の扱い';
+            default: return aptitude.label || '';
+        }
+    }
+
+    _getRumorAptitudeAbilityText(aptitude, attitude, { family = false, senior = false } = {}) {
+        if (!aptitude) return '';
+
+        // 忍術は「武将本人の忍術の腕前」を称賛するのでなく、
+        // 当時の忍びへの社会的な距離感も踏まえて、忍びを用いるという含みある評判として語る。
+        if (aptitude.key === 'aptNinjutsu') {
+            if (family) {
+                return senior
+                    ? '忍びの者を用いることもおありです。'
+                    : '忍びの者を用いることもあります。';
+            }
+            return attitude === 'reserved'
+                ? '忍びの者を使うこともあるそうです。'
+                : '何やら、忍びの者を使うことも多いと聞きます。';
+        }
+
+        const field = this._getRumorAptitudeFieldText(aptitude);
+        if (family) {
+            return senior
+                ? `${field}にも長けておられます。`
+                : `${field}には、かなり長けております。`;
+        }
+        return attitude === 'reserved'
+            ? `${field}には、かなり長けているそうです。`
+            : `${field}にかけては、かなりの腕前だとの評判です。`;
+    }
+
     _isRumorExpertCandidate(target, domain) {
         if (!target || !domain) return false;
         const cfg = window.MainParams.Interview.Rumor;
@@ -1067,8 +1107,7 @@ class InterviewSystem {
             return `${row.domain.label}には${strong ? 'かなり' : ''}長けております。`;
         }
         if (row.mode === 'aptitude' && row.aptitude) {
-            if (senior) return `${row.aptitude.label}の扱いにも長けておられます。`;
-            return `${row.aptitude.label}の扱いには、かなり長けております。`;
+            return this._getRumorAptitudeAbilityText(row.aptitude, attitude, { family: true, senior });
         }
         return senior ? '総じて力量は確かな方です。' : '総じて力量は確かなものです。';
     }
@@ -1114,9 +1153,7 @@ class InterviewSystem {
             return `聞けば、${row.domain.label}に秀でた御仁だとか。`;
         }
         if (row.mode === 'aptitude' && row.aptitude) {
-            return attitude === 'reserved'
-                ? `${row.aptitude.label}の扱いには、かなり長けているそうです。`
-                : `${row.aptitude.label}にかけては、かなりの腕前だとの評判です。`;
+            return this._getRumorAptitudeAbilityText(row.aptitude, attitude);
         }
         return attitude === 'reserved'
             ? '総じて隙の少ない御仁だそうです。'
