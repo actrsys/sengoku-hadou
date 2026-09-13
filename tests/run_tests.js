@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r391');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r393');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -12814,4 +12814,49 @@ test('r387では婚姻・軍師・上杉第6軍団を管理表の最終状態へ
     assert.strictEqual(Number(princessState.get(11).currentClanId), 301, '瀬名の現在所属は徳川家');
     const takedaPrincessIds = String(clanState.get(3).princess ?? '').split('|').filter(Boolean).map(Number);
     assert.ok(takedaPrincessIds.includes(4), '菊は1570開始時の武田家姫名簿に含まれる');
+});
+
+test('r393では1570徳川家の軍師を本多正信へ戻す', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const tokugawa = scenario.warriorsState.filter(row => Number(row.clan) === 301);
+    const gunshi = tokugawa.filter(row => row.isGunshi === true);
+    assert.strictEqual(gunshi.length, 1, '徳川家の開始軍師は1名だけ');
+    assert.strictEqual(Number(gunshi[0].id), 1301134, '徳川家の開始軍師は本多正信');
+    const koriki = tokugawa.find(row => Number(row.id) === 1301073);
+    assert.ok(koriki);
+    assert.notStrictEqual(koriki.isGunshi, true, '高力清長に旧軍師フラグを残さない');
+});
+
+test('r392では筒井諸勢力の正本名を筒井家へ戻す', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const tsutsui = scenario.kunishus.find(row => Number(row.id) === 71);
+    assert.ok(tsutsui, '諸勢力71が存在する');
+    assert.strictEqual(tsutsui.name, '筒井家');
+    assert.strictEqual(tsutsui.yomi, 'つついけ');
+});
+
+test('r392では同一拠点の同名諸勢力を区別するために内部IDを表示しない', () => {
+    const ctx = createContext({ document: { getElementById() { return null; }, addEventListener() {} } });
+    ctx.window.addEventListener = () => {};
+    vm.runInContext(read('js/game.js') + '\nthis.__GameManager = GameManager;', ctx, { filename: 'js/game.js' });
+    const updateNames = ctx.__GameManager.prototype.updateClanDisplayNames;
+    const province = { id: 1, shortName: '伊勢', shortYomi: 'いせ' };
+    const castle = { id: 44, provinceId: 1, shortName: '長島', shortYomi: 'ながしま' };
+    const makeKunishu = id => ({
+        id, name: '一向一揆', yomi: 'いっこういっき', baseName: '一向一揆', baseYomi: 'いっこういっき', castleId: 44, isDestroyed: false,
+        getBaseName() { return this.baseName; }, getBaseYomi() { return this.baseYomi; },
+        getName() { return this.displayName || this.baseName; }, getYomi() { return this.displayYomi || this.baseYomi; }
+    });
+    const a = makeKunishu(10001);
+    const b = makeKunishu(10002);
+    const fakeGame = {
+        provinces: [province], clans: [],
+        getBusho() { return null; }, getCastle() { return castle; }, getProvince() { return province; },
+        kunishuSystem: { getAliveKunishus() { return [a, b]; } }
+    };
+    updateNames.call(fakeGame);
+    assert.strictEqual(a.getName(), '長島一向一揆');
+    assert.strictEqual(b.getName(), '長島一向一揆');
+    assert.ok(!a.getName().includes('10001') && !b.getName().includes('10002'), '内部IDを表示名へ露出させない');
+    assert.ok(!a.getName().includes('諸勢力') && !b.getName().includes('諸勢力'), 'ID用の諸勢力接尾辞も出さない');
 });

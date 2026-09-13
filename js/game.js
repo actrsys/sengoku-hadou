@@ -1135,7 +1135,8 @@ class GameManager {
             }
 
             // 位置情報・備考を使っても衝突が残った場合だけ、城名へ寄せ直します。
-            // それでも同一城の同名諸勢力が残る極端なケースはIDを最終識別子として付け、UI上の同名を残しません。
+            // 同一城に同名勢力が複数残る場合は、表示上も同名のまま許容します。
+            // 内部IDは処理用の識別子であり、プレイヤー向けの勢力名へ露出させません。
             const resolveRemainingDuplicates = () => {
                 const byName = new Map();
                 for (const entry of ordered) {
@@ -1155,18 +1156,6 @@ class GameManager {
             };
             resolveRemainingDuplicates();
 
-            const finalCounts = new Map();
-            for (const entry of ordered) {
-                const currentName = entry.type === 'clan' ? entry.force.name : entry.force.displayName;
-                finalCounts.set(currentName, (finalCounts.get(currentName) || 0) + 1);
-            }
-            for (const entry of ordered) {
-                if (primaryClan && entry === primaryClan) continue;
-                const currentName = entry.type === 'clan' ? entry.force.name : entry.force.displayName;
-                if ((finalCounts.get(currentName) || 0) <= 1) continue;
-                const suffix = entry.type === 'kunishu' ? `（諸勢力${entry.force.id}）` : `（勢力${entry.force.id}）`;
-                setDisplay(entry, currentName + suffix, entry.displayYomi || entry.baseYomi);
-            }
         }
     }
 
