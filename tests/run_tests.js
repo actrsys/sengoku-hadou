@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r393');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r398');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -5861,7 +5861,7 @@ test('r369の1570初期配置は池田家独立化を含む連続性・忠誠基
     assert.strictEqual(Number(stateById.get(1401028).loyalty), 90, '石川貞清は織田家臣として90');
     assert.strictEqual(Number(stateById.get(1014006).castleId), 22, '波多野秀尚は八上城へ移して秀治1名だけの状態を解消');
     assert.strictEqual(Number(stateById.get(1013005).castleId), 81, '一色義員は1570年の本拠・建部山城へ置く');
-    assert.strictEqual(Number(castleById.get(21).castellanId), 1013006, '弓木城主は同城に残る一色義俊へ交代');
+    assert.strictEqual(Number(castleById.get(21).castellanId), 1013015, '弓木城主は一色義俊を建部山へ戻し稲富祐直に任せる');
 
     for (const row of scenario.warriorsState) {
         if (row.isGunshi !== '') assert.strictEqual(typeof row.isGunshi, 'boolean', `isGunshiはboolean: ${row.id}`);
@@ -12816,6 +12816,48 @@ test('r387では婚姻・軍師・上杉第6軍団を管理表の最終状態へ
     assert.ok(takedaPrincessIds.includes(4), '菊は1570開始時の武田家姫名簿に含まれる');
 });
 
+test('r394では1570三好家を長逸当主・長治勝瑞国主として配置する', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const clans = new Map(scenario.clansState.map(row => [Number(row.id), row]));
+    const castles = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+    const warriors = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
+
+    const miyoshi = clans.get(20);
+    assert.ok(miyoshi);
+    assert.strictEqual(Number(miyoshi.leaderId), 1020021, '三好家当主は三好長逸');
+
+    const kishiwada = castles.get(38);
+    assert.ok(kishiwada);
+    assert.strictEqual(Number(kishiwada.ownerClan), 20, '岸和田城は三好家領を維持する');
+    assert.strictEqual(Number(kishiwada.castellanId), 1020021, '岸和田城主は三好長逸');
+    assert.strictEqual(Number(kishiwada.legionId), 0, '大名本拠の岸和田城は直轄を維持する');
+
+    const kinaiCore = [1020021, 1020017, 1020025, 1020024, 1020029];
+    for (const id of kinaiCore) {
+        const row = warriors.get(id);
+        assert.ok(row, `畿内三好中核 ${id} が存在する`);
+        assert.strictEqual(Number(row.clan), 20, `畿内三好中核 ${id} は三好家所属`);
+        assert.strictEqual(Number(row.castleId), 38, `畿内三好中核 ${id} は岸和田城配置`);
+    }
+    assert.strictEqual(Number(warriors.get(1020021).achievementTotal), 1500, '当主長逸の功績は1500');
+
+    const shouzui = castles.get(129);
+    assert.ok(shouzui);
+    assert.strictEqual(Number(shouzui.castellanId), 1020009, '勝瑞城主は三好長治を維持する');
+    assert.strictEqual(Number(shouzui.legionId), 4, '勝瑞城は三好家第4軍団の本拠');
+    assert.strictEqual(Number(warriors.get(1020009).castleId), 129, '三好長治は勝瑞城に残る');
+    assert.strictEqual(Number(warriors.get(1020009).achievementTotal), 700, '国主長治の功績は700');
+
+    const shouzuiLegion = scenario.legions.find(row => Number(row.clanId) === 20 && Number(row.legionNo) === 4);
+    assert.ok(shouzuiLegion, '三好家第4軍団が存在する');
+    assert.strictEqual(Number(shouzuiLegion.commanderId), 1020009, '第4軍団国主は三好長治');
+
+    const shinohara = warriors.get(1020036);
+    assert.ok(shinohara);
+    assert.strictEqual(Number(shinohara.castleId), 129, '篠原長房は長治補佐を優先して勝瑞城に残す');
+    assert.strictEqual(shinohara.isGunshi, true, '篠原長房は三好家軍師を維持する');
+});
+
 test('r393では1570徳川家の軍師を本多正信へ戻す', () => {
     const { scenario } = getRuntimeData('1570_anegawa');
     const tokugawa = scenario.warriorsState.filter(row => Number(row.clan) === 301);
@@ -12860,3 +12902,149 @@ test('r392では同一拠点の同名諸勢力を区別するために内部ID�
     assert.ok(!a.getName().includes('10001') && !b.getName().includes('10002'), '内部IDを表示名へ露出させない');
     assert.ok(!a.getName().includes('諸勢力') && !b.getName().includes('諸勢力'), 'ID用の諸勢力接尾辞も出さない');
 });
+
+
+test('r395では三好家当主の岸和田城に家臣団を十分配置する', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const warriors = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
+
+    // 1570年5月の厳密な所在を断定できない人物まで、勝瑞配置だけで地域的な実所在を一括解釈しない。
+    // ゲーム上は当主本拠が5人だけになる不自然さを避け、長逸の親族・中央政務や畿内活動との
+    // 関係が強い家臣を岸和田へ集約する。
+    const daimyoSeat = [
+        1020021, // 三好長逸
+        1020017, // 三好康長
+        1020025, // 三好政康
+        1020024, // 三好政勝
+        1020029, // 石成友通
+        1020022, // 三好長虎
+        1020027, // 伊勢貞助
+        1020031, // 加地久勝
+        1020043, // 松山重治
+        1020044, // 藤沢頼親
+        1020048, // 和久宗是
+    ];
+    for (const id of daimyoSeat) {
+        const row = warriors.get(id);
+        assert.ok(row, `三好家当主直下 ${id} が存在する`);
+        assert.strictEqual(Number(row.clan), 20, `三好家当主直下 ${id} は三好家所属`);
+        assert.strictEqual(Number(row.castleId), 38, `三好家当主直下 ${id} は岸和田城配置`);
+    }
+});
+
+
+test('r396では本拠変更勢力の中核家臣を当主側へ再配置する', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const warriors = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
+    const castles = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+
+    // 徳川：浜松を家康直属の中枢として厚くしつつ、岡崎の信康家臣団も残す。
+    for (const id of [1301134,1301125,1301090,1301103,1301115,1301062,1301073,1301131]) {
+        assert.strictEqual(Number(warriors.get(id).castleId), 12, `徳川家中核 ${id} は浜松城配置`);
+    }
+    // 織田：清洲城主の丹羽長秀は残し、直属・中央実務系を岐阜へ寄せる。
+    for (const id of [1006056,1006077,1006080,1006087,1006142,1006155,1006164,1401002]) {
+        assert.strictEqual(Number(warriors.get(id).castleId), 3, `織田家中核 ${id} は岐阜城配置`);
+    }
+    assert.strictEqual(Number(warriors.get(1006117).castleId), 7, '丹羽長秀は清洲城主として清洲に残す');
+
+    // 波多野：軍師秀親と矢代酒井氏を八上側へ寄せ、籾井綱利は籾井に残す。
+    for (const id of [1014007,1014022,1014023,1014031,1014032,1014035]) {
+        assert.strictEqual(Number(warriors.get(id).castleId), 22, `波多野家中核 ${id} は八上城配置`);
+    }
+    assert.strictEqual(Number(warriors.get(1014038).castleId), 82, '籾井綱利は籾井城に残す');
+
+    // 一色：当主と後継一門を建部山へ集め、弓木は稲富祐直に任せる。
+    for (const id of [1013005,1013006,1013007]) {
+        assert.strictEqual(Number(warriors.get(id).castleId), 81, `一色家一門 ${id} は建部山城配置`);
+    }
+    assert.strictEqual(Number(castles.get(81).castellanId), 1013005, '建部山城主は当主・一色義員');
+    assert.strictEqual(Number(castles.get(21).castellanId), 1013015, '弓木城主は稲富祐直');
+});
+
+test('r396では開始時の大名居城がAI評価で直ちに旧拠点へ移らない', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const castles = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+    const pairs = [
+        [12,48,'徳川・浜松→岡崎'],
+        [22,82,'波多野・八上→籾井'],
+        [81,21,'一色・建部山→弓木'],
+        [9,13,'武田・躑躅ヶ崎→駿府'],
+        [26,181,'足利・二条→芥川山'],
+    ];
+    const score = (base, target) => {
+        let total = 0;
+        for (const [field, pos, neg] of [
+            ['maxKokudaka',30,60], ['maxDefense',30,60],
+            ['kokudaka',50,100], ['defense',50,100],
+        ]) {
+            const b = Math.max(1, Number(base[field]) || 0);
+            const rate = (Number(target[field]) || 0) / b;
+            total += (rate - 1) * (rate >= 1 ? pos : neg);
+        }
+        return total;
+    };
+    for (const [baseId, rivalId, label] of pairs) {
+        const base = castles.get(baseId);
+        const rival = castles.get(rivalId);
+        assert.ok(base && rival, `${label}: 対象拠点が存在する`);
+        assert.ok(score(base, rival) <= 0, `${label}: 開始状態では移転先の方が高得点にならない`);
+    }
+});
+
+test('r396の居城維持調整は最大石高・最大防御を変更せず現在値だけを入れ替える', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const c = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+    const expected = new Map([
+        [12,[380,600,1300,1000]], [48,[320,400,1700,1200]],
+        [22,[220,550,1300,1600]], [82,[100,300,1000,800]],
+        [81,[150,300,900,500]], [21,[150,250,900,600]],
+        [9,[400,600,1100,1200]], [13,[280,600,2000,1200]],
+        [26,[360,600,1100,1000]], [181,[260,500,1200,900]],
+    ]);
+    for (const [id,[koku,def,maxKoku,maxDef]] of expected) {
+        const row = c.get(id);
+        assert.strictEqual(Number(row.kokudaka), koku, `${id}: 現在石高`);
+        assert.strictEqual(Number(row.defense), def, `${id}: 現在防御`);
+        assert.strictEqual(Number(row.maxKokudaka), maxKoku, `${id}: 最大石高は維持`);
+        assert.strictEqual(Number(row.maxDefense), maxDef, `${id}: 最大防御は維持`);
+    }
+});
+
+test('r398では全有効通常勢力で大名が居城の城主を兼ねる', () => {
+    for (const scenarioId of ['1560_okehazama', '1570_anegawa']) {
+        const { scenario } = getRuntimeData(scenarioId);
+        const warriors = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
+        const castles = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+        for (const clan of scenario.clansState.filter(row => row.enabled === true)) {
+            const leaderId = Number(clan.leaderId);
+            const leader = warriors.get(leaderId);
+            assert.ok(leader, `${scenarioId}: 勢力${clan.id}の当主${leaderId}が存在する`);
+            const castle = castles.get(Number(leader.castleId));
+            assert.ok(castle, `${scenarioId}: 勢力${clan.id}の大名居城が存在する`);
+            assert.strictEqual(Number(castle.ownerClan), Number(clan.id), `${scenarioId}: 勢力${clan.id}の大名居城は自勢力所有`);
+            assert.strictEqual(Number(castle.castellanId), leaderId, `${scenarioId}: 勢力${clan.id}は大名＝居城城主`);
+        }
+    }
+});
+
+test('r398では1570尼子家の代表本拠を真山城とし尼子勝久を城主に戻す', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const warriors = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
+    const clans = new Map(scenario.clansState.map(row => [Number(row.id), row]));
+    const castles = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+    const amago = clans.get(43);
+    const katsuhisa = warriors.get(1043011);
+    const yonehara = warriors.get(1043054);
+    const base = castles.get(109);
+    assert.ok(amago && katsuhisa && yonehara && base, '尼子家・勝久・米原綱寛・ID109が存在する');
+    assert.strictEqual(Number(amago.leaderId), 1043011, '尼子家当主は尼子勝久');
+    assert.strictEqual(base.name, '真山城', '1570のID109は実際の再興軍本営を優先して真山城');
+    assert.strictEqual(base.yomi, 'しんやまじょう', '真山城の読み');
+    assert.strictEqual(Number(base.ownerClan), 43, '真山城は尼子家所有');
+    assert.strictEqual(Number(base.castellanId), 1043011, '真山城主は当主・尼子勝久');
+    assert.strictEqual(Number(katsuhisa.castleId), 109, '尼子勝久は真山城所在');
+    assert.strictEqual(Number(yonehara.clan), 43, '米原綱寛は尼子家臣として維持');
+    assert.strictEqual(Number(yonehara.castleId), 109, '高瀬城未収録のため米原綱寛も代表拠点に集約');
+});
+
