@@ -236,6 +236,7 @@
         const infoDetailTitle = document.getElementById('title-info-detail-title');
         const infoDetailBody = document.getElementById('title-info-detail-body');
         let licenseTextPromise = null;
+        let infoDetailScrollbar = null;
 
         const showMainTitleMenu = () => {
             if (!mainTitleMenu || !infoTitleMenu) return;
@@ -257,14 +258,32 @@
             return true;
         };
 
+        const updateInfoDetailScrollbar = () => {
+            if (!infoDetailBody) return;
+            const useNativeScroll = !!window.__mobileLowMemoryMode && !document.body.classList.contains('is-pc');
+            if (useNativeScroll) {
+                if (infoDetailScrollbar && !infoDetailScrollbar._destroyed) infoDetailScrollbar.destroy();
+                infoDetailScrollbar = null;
+                return;
+            }
+            if (typeof CustomScrollbar === 'undefined') return;
+            if (!infoDetailScrollbar || infoDetailScrollbar._destroyed) {
+                infoDetailScrollbar = new CustomScrollbar(infoDetailBody);
+                infoDetailBody.customScrollbar = infoDetailScrollbar;
+            }
+            if (typeof infoDetailScrollbar.scheduleUpdate === 'function') infoDetailScrollbar.scheduleUpdate();
+            else infoDetailScrollbar.update();
+        };
+
         const openInfoDetail = (title, bodyText, extraClass = '') => {
             if (!infoDetailModal || !infoDetailTitle || !infoDetailBody) return;
             infoDetailTitle.textContent = title;
-            infoDetailBody.className = `title-info-detail-body${extraClass ? ` ${extraClass}` : ''}`;
+            infoDetailBody.classList.toggle('license-text', extraClass === 'license-text');
             infoDetailBody.textContent = bodyText;
             infoDetailModal.classList.remove('hidden');
             infoDetailModal.setAttribute('aria-hidden', 'false');
             infoDetailBody.scrollTop = 0;
+            updateInfoDetailScrollbar();
         };
 
         const loadThirdPartyLicenses = async () => {
@@ -292,7 +311,7 @@
         bind('title-info-back-btn', showMainTitleMenu);
         bind('title-credit-btn', () => {
             const version = window.GameConfig?.Meta?.Version;
-            openInfoDetail('クレジット', `戦国覇道${version ? `\nver. ${version}` : ''}`);
+            openInfoDetail('クレジット', `戦国覇道${version ? `\nver. ${version}` : ''}\n\n企画・制作\nACTORS SYSTEM\nあや瀨`);
         });
         bind('title-license-btn', async () => {
             openInfoDetail('ライセンス', '読み込んでいます…', 'license-text');
@@ -301,6 +320,7 @@
             if (infoDetailTitle?.textContent !== 'ライセンス') return;
             infoDetailBody.textContent = text;
             infoDetailBody.scrollTop = 0;
+            updateInfoDetailScrollbar();
         });
         bind('title-info-detail-back-btn', closeInfoDetail);
         bind('scenario-close-btn', () => getGame()?.ui?.returnToTitle());
