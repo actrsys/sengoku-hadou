@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r406');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r407');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -3217,6 +3217,24 @@ test('タイトル版表示は GameConfig.Meta.Version を正本にする', () =
     assert.ok(html.includes('id="title-version"'));
     assert.ok(!html.includes('ver. r102'));
     assert.ok(bootstrap.includes('window.GameConfig?.Meta?.Version'));
+});
+
+test('r407のタイトル情報メニューは設定の下から差し替わり、問い合わせだけを閉じる', () => {
+    const html = read('index.html');
+    const bootstrap = read('js/app_bootstrap.js');
+    const css = read('css/style.css');
+    assert.ok(html.indexOf('id="settings-btn"') < html.indexOf('id="info-title-btn"'), '情報は設定の直下に置く');
+    assert.ok(html.includes('id="title-info-menu" class="title-menu-buttons hidden"'));
+    assert.ok(html.includes('id="title-credit-btn"'));
+    assert.ok(html.includes('id="title-license-btn"'));
+    assert.ok(html.includes('id="title-contact-btn" class="title-btn title-btn-disabled" disabled'), '問い合わせだけを選択不可にする');
+    assert.ok(html.includes('id="title-info-back-btn"'));
+    assert.ok(bootstrap.includes("bind('info-title-btn', showInfoTitleMenu)"));
+    assert.ok(bootstrap.includes("bind('title-info-back-btn', showMainTitleMenu)"));
+    assert.ok(bootstrap.includes("fetch('THIRD_PARTY_LICENSES.txt'"), 'ライセンス本文は既存ファイルを正本にする');
+    assert.ok(bootstrap.includes("titleScreen.addEventListener('contextmenu'"), '情報メニューはPC右クリックでも戻れる');
+    assert.ok(bootstrap.includes("infoDetailModal.addEventListener('contextmenu'"), '情報詳細もPC右クリックで一段戻れる');
+    assert.ok(css.includes('#title-screen .title-menu-buttons'), 'トップと情報メニューは同じ配置規則を共用する');
 });
 
 test('設定値参照側に独自フォールバック値を残さない', () => {

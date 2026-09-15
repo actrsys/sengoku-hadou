@@ -43,13 +43,21 @@
                     <div class="title-subtitle">乱世を駆け、天下への道を拓く</div>
                 </div>
                 <div class="title-menu">
-                    <div id="menu-buttons" class="hidden">
+                    <div id="menu-buttons" class="title-menu-buttons hidden">
                         <button id="start-btn" class="title-btn">はじめから</button>
                         <button id="continue-btn" class="title-btn">続きから</button>
                         <button id="load-btn" class="title-btn">ロード</button>
                         <button id="watch-start-btn" class="title-btn">観戦する</button>
                         <button id="guide-title-btn" class="title-btn">指南書</button>
                         <button id="settings-btn" class="title-btn">設定</button>
+                        <button id="info-title-btn" class="title-btn">情報</button>
+                    </div>
+
+                    <div id="title-info-menu" class="title-menu-buttons hidden" aria-label="情報メニュー">
+                        <button id="title-credit-btn" class="title-btn">クレジット</button>
+                        <button id="title-license-btn" class="title-btn">ライセンス</button>
+                        <button id="title-contact-btn" class="title-btn title-btn-disabled" disabled aria-disabled="true">問い合わせ<span class="title-btn-note">準備中</span></button>
+                        <button id="title-info-back-btn" class="title-btn title-back-btn" data-se="cancel.ogg">戻る</button>
                     </div>
 
                     <div id="tap-to-proceed" class="title-tap-message">
@@ -59,6 +67,16 @@
             </div>
             <div id="title-version" class="title-version" aria-label="ゲームバージョン"></div>
             <div id="legacy-safe-mode-indicator" class="legacy-safe-mode-indicator" aria-label="軽量モード">軽量モード</div>
+        </div>
+
+        <div id="title-info-detail-modal" class="modal hidden" aria-hidden="true">
+            <div class="modal-content title-info-detail-content">
+                <h3 id="title-info-detail-title"></h3>
+                <div id="title-info-detail-body" class="title-info-detail-body"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="title-info-detail-back-btn" class="btn-secondary" data-se="cancel.ogg">戻る</button>
+            </div>
         </div>
 
         <div id="scenario-modal" class="modal hidden">

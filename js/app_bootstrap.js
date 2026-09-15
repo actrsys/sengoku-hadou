@@ -229,6 +229,58 @@
             if (element) element.addEventListener('click', handler);
         };
         const getGame = () => window.GameApp;
+        const mainTitleMenu = document.getElementById('menu-buttons');
+        const infoTitleMenu = document.getElementById('title-info-menu');
+        const titleScreen = document.getElementById('title-screen');
+        const infoDetailModal = document.getElementById('title-info-detail-modal');
+        const infoDetailTitle = document.getElementById('title-info-detail-title');
+        const infoDetailBody = document.getElementById('title-info-detail-body');
+        let licenseTextPromise = null;
+
+        const showMainTitleMenu = () => {
+            if (!mainTitleMenu || !infoTitleMenu) return;
+            infoTitleMenu.classList.add('hidden');
+            mainTitleMenu.classList.remove('hidden');
+        };
+
+        const showInfoTitleMenu = () => {
+            if (!mainTitleMenu || !infoTitleMenu) return;
+            mainTitleMenu.classList.add('hidden');
+            infoTitleMenu.classList.remove('hidden');
+        };
+
+        const closeInfoDetail = () => {
+            if (!infoDetailModal) return false;
+            if (infoDetailModal.classList.contains('hidden')) return false;
+            infoDetailModal.classList.add('hidden');
+            infoDetailModal.setAttribute('aria-hidden', 'true');
+            return true;
+        };
+
+        const openInfoDetail = (title, bodyText, extraClass = '') => {
+            if (!infoDetailModal || !infoDetailTitle || !infoDetailBody) return;
+            infoDetailTitle.textContent = title;
+            infoDetailBody.className = `title-info-detail-body${extraClass ? ` ${extraClass}` : ''}`;
+            infoDetailBody.textContent = bodyText;
+            infoDetailModal.classList.remove('hidden');
+            infoDetailModal.setAttribute('aria-hidden', 'false');
+            infoDetailBody.scrollTop = 0;
+        };
+
+        const loadThirdPartyLicenses = async () => {
+            if (!licenseTextPromise) {
+                licenseTextPromise = fetch('THIRD_PARTY_LICENSES.txt', { cache: 'no-store' })
+                    .then((response) => {
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        return response.text();
+                    })
+                    .catch((error) => {
+                        console.warn('ライセンス文書の読み込みに失敗しました:', error);
+                        return 'ライセンス情報を読み込めませんでした。';
+                    });
+            }
+            return licenseTextPromise;
+        };
 
         bind('start-btn', () => getGame()?.startNewGame());
         bind('continue-btn', () => getGame()?.continueGame());
@@ -236,9 +288,42 @@
         bind('watch-start-btn', () => getGame()?.startWatchGame());
         bind('guide-title-btn', () => getGame()?.commandSystem?.executeSystemCommand('guide'));
         bind('settings-btn', () => getGame()?.commandSystem?.executeSystemCommand('settings'));
+        bind('info-title-btn', showInfoTitleMenu);
+        bind('title-info-back-btn', showMainTitleMenu);
+        bind('title-credit-btn', () => {
+            const version = window.GameConfig?.Meta?.Version;
+            openInfoDetail('クレジット', `戦国覇道${version ? `\nver. ${version}` : ''}`);
+        });
+        bind('title-license-btn', async () => {
+            openInfoDetail('ライセンス', '読み込んでいます…', 'license-text');
+            const text = await loadThirdPartyLicenses();
+            if (!infoDetailModal || infoDetailModal.classList.contains('hidden')) return;
+            if (infoDetailTitle?.textContent !== 'ライセンス') return;
+            infoDetailBody.textContent = text;
+            infoDetailBody.scrollTop = 0;
+        });
+        bind('title-info-detail-back-btn', closeInfoDetail);
         bind('scenario-close-btn', () => getGame()?.ui?.returnToTitle());
         bind('result-close-btn', () => getGame()?.ui?.closeResultModal());
         bind('saveload-close-btn', () => getGame()?.ui?.saveLoadView?.close());
+
+        if (titleScreen) {
+            titleScreen.addEventListener('contextmenu', (event) => {
+                if (titleScreen.classList.contains('hidden')) return;
+                if (infoTitleMenu && !infoTitleMenu.classList.contains('hidden')) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    showMainTitleMenu();
+                }
+            });
+        }
+        if (infoDetailModal) {
+            infoDetailModal.addEventListener('contextmenu', (event) => {
+                if (!closeInfoDetail()) return;
+                event.preventDefault();
+                event.stopPropagation();
+            });
+        }
     }
 
     function mediaMatches(query) {
