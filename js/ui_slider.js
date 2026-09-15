@@ -621,7 +621,7 @@ class UISliderManager {
         const divideRefs = new Map();
         const isSeaBattleForDivide = !!(this.game.warManager && this.game.warManager.state && this.game.warManager.state.isSeaBattle);
         const isPcDivide = document.body.classList.contains('is-pc');
-        listEl.classList.toggle('divide-list-two-column', isPcDivide);
+        listEl.classList.toggle('divide-list-two-column', isPcDivide && bushos.length > 3);
 
         const troopTypeLabel = (type) => type === 'kiba' ? '騎馬' : (type === 'teppo' ? '鉄砲' : '足軽');
         const aptitudeItemHtml = (label, rank) => `
@@ -975,20 +975,6 @@ class UISliderManager {
                 };
             }
         });
-
-        // PC版は部隊数にかかわらず3段×2列の6枠を維持する。
-        // 実部隊が少ない場合は操作対象にならないダミースロットで空きを確保し、
-        // 1～3部隊でもカードが横一杯に伸びてレイアウトが変形しないようにする。
-        if (isPcDivide) {
-            const pcFixedSlotCount = 6;
-            const dummyCount = Math.max(0, pcFixedSlotCount - bushos.length);
-            for (let i = 0; i < dummyCount; i += 1) {
-                const dummy = document.createElement('div');
-                dummy.className = 'qty-row divide-row divide-row-placeholder';
-                dummy.setAttribute('aria-hidden', 'true');
-                listEl.appendChild(dummy);
-            }
-        }
 
         updateRemain();
 

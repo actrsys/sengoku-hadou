@@ -3622,7 +3622,7 @@ body.is-pc {
     .princess-list-header, .princess-list-item { font-size: 0.95rem; height: 44px; }
     .force-list-header, .force-list-item { font-size: 0.95rem; height: 44px; }
     
-    /* PC版の編成画面は3段×2列の6枠を固定し、最大5人＋空き枠でもカード幅を変えません。 */
+    /* PC版の編成画面は横幅を活かし、最大5人を左3・右2の情報カードへ配置します。 */
     #quantity-modal .modal-content { max-width: 700px !important; max-height: 90% !important; }
     #unit-divide-modal .modal-content { max-width: 1160px !important; max-height: 90% !important; }
     #quantity-container { display: flex !important; flex-direction: column; gap: 10px; align-items: stretch; }
@@ -3657,11 +3657,6 @@ body.is-pc {
         background: linear-gradient(135deg, rgba(18,34,24,0.78), rgba(5,12,8,0.58));
         box-shadow: inset 0 0 0 1px rgba(255,255,255,0.035), 0 2px 5px rgba(0,0,0,0.28);
         box-sizing: border-box;
-    }
-    #unit-divide-modal .divide-row-placeholder {
-        visibility: hidden;
-        pointer-events: none;
-        user-select: none;
     }
     #unit-divide-modal .divide-row-header { display: contents; }
     #unit-divide-modal .divide-row .slider-row-label {
