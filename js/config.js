@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r405'
+        Version: 'r406'
     },
 
     History: {
@@ -216,7 +216,7 @@ window.GameConfig = {
         },
         TroopAllocation: {
             // 1武将が率いる1部隊の兵数上限。出撃軍全体は選択武将数×この値まで。
-            MaxSoldiersPerUnit: 20000,
+            MaxSoldiersPerUnit: 15000,
             GeneralRatio: 1.3,
             EquipmentMinimumRatio: 0.5,
             MaxTeppoUnitRatio: 0.5,

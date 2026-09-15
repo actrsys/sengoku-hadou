@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r405');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r406');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -12312,29 +12312,29 @@ test('月初月末の処理ラベルは会話直後に即復帰せず短い会�
 
 
 
-test('r405の部隊兵数上限はconfigの1設定値をTroopAllocationServiceだけが計算する', () => {
+test('r406の部隊兵数上限はconfigの1設定値をTroopAllocationServiceだけが計算する', () => {
     const ctx = createContext({ SkillManager: { getAptitudeLevel: () => 0 } });
     loadScript(ctx, 'js/config.js');
     loadScript(ctx, 'js/troop_allocation.js');
-    assert.strictEqual(ctx.WarParams.TroopAllocation.MaxSoldiersPerUnit, 20000);
-    assert.strictEqual(ctx.TroopAllocationService.getArmySoldierCap(1, 99999), 20000);
-    assert.strictEqual(ctx.TroopAllocationService.getArmySoldierCap(3, 99999), 60000);
-    assert.strictEqual(ctx.TroopAllocationService.getArmySoldierCap(5, 99999), 99999, '城在庫が10万未満なら在庫側で止まる');
-    assert.strictEqual(ctx.TroopAllocationService.clampArmySoldiers(90000, 3, 99999), 60000);
-    assert.strictEqual(ctx.TroopAllocationService.getRequiredUnitCount(40001), 3);
+    assert.strictEqual(ctx.WarParams.TroopAllocation.MaxSoldiersPerUnit, 15000);
+    assert.strictEqual(ctx.TroopAllocationService.getArmySoldierCap(1, 99999), 15000);
+    assert.strictEqual(ctx.TroopAllocationService.getArmySoldierCap(3, 99999), 45000);
+    assert.strictEqual(ctx.TroopAllocationService.getArmySoldierCap(5, 99999), 75000, '5武将なら総兵数7万5千で止まる');
+    assert.strictEqual(ctx.TroopAllocationService.clampArmySoldiers(90000, 3, 99999), 45000);
+    assert.strictEqual(ctx.TroopAllocationService.getRequiredUnitCount(30001), 3);
 });
 
-test('r405の自動部隊配分は各部隊2万・選択武将数×2万を超えない', () => {
+test('r406の自動部隊配分は各部隊1万5千・選択武将数×1万5千を超えない', () => {
     const ctx = createContext({ SkillManager: { getAptitudeLevel: () => 0 } });
     loadScript(ctx, 'js/config.js');
     loadScript(ctx, 'js/troop_allocation.js');
     const bushos = Array.from({ length: 3 }, (_, i) => ({ id: i + 1, leadership: 80 - i, strength: 70 - i, aptKiba: 'E', aptTeppo: 'E' }));
     const result = ctx.TroopAllocationService.autoDivideSoldiers({ bushos, totalSoldiers: 90000, totalHorses: 0, totalGuns: 0 });
-    assert.strictEqual(result.reduce((sum, row) => sum + row.soldiers, 0), 60000, '3武将なら総兵数6万で止まる');
-    assert.ok(result.every(row => row.soldiers <= 20000), '各部隊2万以下');
+    assert.strictEqual(result.reduce((sum, row) => sum + row.soldiers, 0), 45000, '3武将なら総兵数4万5千で止まる');
+    assert.ok(result.every(row => row.soldiers <= 15000), '各部隊1万5千以下');
 });
 
-test('r405の手動・自動援軍も選択武将数に応じた共通兵数上限を使う', () => {
+test('r406の手動・自動援軍も選択武将数に応じた共通兵数上限を使う', () => {
     const ctx = createContext({ SkillManager: { getAptitudeLevel: () => 0 } });
     loadScript(ctx, 'js/config.js');
     loadScript(ctx, 'js/constants.js');
@@ -12347,18 +12347,18 @@ test('r405の手動・自動援軍も選択武将数に応じた共通兵数上�
     const castle = { id: 1, ownerClan: 1, soldiers: 90000, rice: 99999, horses: 0, guns: 0 };
     const service = new ctx.ReinforcementService({ getCastleBushos: () => bushos });
     const manual = service.createManualCastleReinforcement(castle, bushos, { soldiers: 70000, rice: 1000, horses: 0, guns: 0 });
-    assert.strictEqual(manual.soldiers, 40000, '2武将なら手動援軍も4万まで');
-    assert.strictEqual(castle.soldiers, 50000, '実際に出した兵だけ城在庫から減る');
+    assert.strictEqual(manual.soldiers, 30000, '2武将なら手動援軍も3万まで');
+    assert.strictEqual(castle.soldiers, 60000, '実際に出した兵だけ城在庫から減る');
 });
 
-test('r405ではUI・AI・援軍が兵数上限の数値や乗算式を個別実装しない', () => {
+test('r406ではUI・AI・援軍が兵数上限の数値や乗算式を個別実装しない', () => {
     const troop = read('js/troop_allocation.js');
     const config = read('js/config.js');
     for (const file of ['js/ui_slider.js', 'js/ai.js', 'js/war_preparation_controller.js', 'js/war_effort.js', 'js/reinforcement_service.js']) {
         const source = read(file);
-        assert.ok(!/\b20000\b/.test(source), `${file}へ20000を直書きしない`);
+        assert.ok(!/\b15000\b/.test(source), `${file}へ15000を直書きしない`);
     }
-    assert.ok(config.includes('MaxSoldiersPerUnit: 20000'));
+    assert.ok(config.includes('MaxSoldiersPerUnit: 15000'));
     assert.ok(troop.includes('getArmySoldierCap'));
     assert.ok(troop.includes('getUnitSoldierCap'));
     assert.ok(read('js/ui_slider.js').includes('TroopAllocationService.getArmySoldierCap'));
