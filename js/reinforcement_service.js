@@ -21,7 +21,9 @@ class ReinforcementService {
         let bushoCount = 1;
         if (soldierCount >= config.TwoBushoThreshold) bushoCount = 2;
         if (soldierCount >= config.ThreeBushoThreshold) bushoCount = 3;
-        bushoCount = Math.min(bushoCount, sortedBushos.length);
+        // 大兵力援軍では、1部隊上限に必要な人数まで自動で武将を増やす。
+        bushoCount = Math.max(bushoCount, TroopAllocationService.getRequiredUnitCount(soldierCount));
+        bushoCount = Math.min(bushoCount, 5, sortedBushos.length);
         return sortedBushos.slice(0, bushoCount);
     }
 
@@ -49,9 +51,11 @@ class ReinforcementService {
 
     _buildData(helperCastle, soldierCount, { requireMinimumEquipmentStock = false, flags = {} } = {}) {
         const config = this._getConfig();
+        const bushos = this._selectBushos(helperCastle, soldierCount);
+        soldierCount = TroopAllocationService.clampArmySoldiers(soldierCount, bushos, helperCastle.soldiers);
         const data = {
             castle: helperCastle,
-            bushos: this._selectBushos(helperCastle, soldierCount),
+            bushos,
             soldiers: soldierCount,
             rice: soldierCount * config.RicePerSoldier,
             horses: this._calcEquipment(helperCastle.horses, soldierCount, requireMinimumEquipmentStock),
@@ -99,6 +103,7 @@ class ReinforcementService {
             this.game.kunishuSystem.getKunishuMembers(kunishu.id),
             soldierCount
         );
+        soldierCount = TroopAllocationService.clampArmySoldiers(soldierCount, bushos, kunishu.soldiers);
         const data = {
             castle: helperCastle,
             kunishuId: kunishu.id,
@@ -116,10 +121,12 @@ class ReinforcementService {
     }
 
     createManualCastleReinforcement(helperCastle, bushos, resources, flags = {}) {
+        const selectedBushos = Array.isArray(bushos) ? bushos : [];
+        const soldiers = TroopAllocationService.clampArmySoldiers(resources.soldiers, selectedBushos, helperCastle.soldiers);
         const data = {
             castle: helperCastle,
-            bushos: Array.isArray(bushos) ? bushos : [],
-            soldiers: Math.max(0, Number(resources.soldiers) || 0),
+            bushos: selectedBushos,
+            soldiers,
             rice: Math.max(0, Number(resources.rice) || 0),
             horses: Math.max(0, Number(resources.horses) || 0),
             guns: Math.max(0, Number(resources.guns) || 0),

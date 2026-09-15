@@ -546,6 +546,8 @@ Object.assign(WarManager.prototype, {
     // ★修正：AIが鉄砲・騎馬を「強さ順」に賢く配分し、余った兵士を足軽で均等に分けるロジックを追加
     // ★追加：ui_sliderからの呼び出しを受け取れるように引数（isSeaBattleParam, isPlayerUI）を追加します！
     async startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses = 0, atkGuns = 0, reinforcementData = null, selfReinforcementData = null) {
+        // すべての開戦経路の最終安全網。上限計算そのものは TroopAllocationService だけを正本にする。
+        atkSoldierCount = TroopAllocationService.clampArmySoldiers(atkSoldierCount, atkBushos, atkCastle.soldiers);
         const warGeneration = this._beginWarLifecycle();
         // ★追加：戦争全体の「開始処理前」の合図を出します
         if (this.game.eventManager) {
@@ -922,6 +924,7 @@ Object.assign(WarManager.prototype, {
                                             const defBushos = selectedBushoIds.map(id => this.game.getBusho(id));
                                             this.setLeaderToFront(defBushos);
                                             this.game.ui.openQuantitySelector('def_intercept', [defCastle], null, {
+                                                deployBushoCount: defBushos.length,
                                                 onConfirm: (inputs) => {
                                                     const inputData = inputs[defCastle.id] || inputs;
                                                     const interceptSoldiers = inputData.soldiers ? parseInt(inputData.soldiers.num.value) : (inputData.soldiers || 0);
@@ -1004,10 +1007,16 @@ Object.assign(WarManager.prototype, {
                             return val * (1.0 + err);
                         };
 
-                        // 各種数値の見積もり
-                        const perceivedTotalDefSoldiers = getPerceived(totalDefSoldiers);
+                        // 各種数値の見積もり。野戦へ打って出られる本隊兵数は、実際に率いる武将数×共通部隊上限まで。
+                        // 籠城時の城兵在庫そのものは減らさず、野戦を選ぶ判断だけ現実の出撃可能兵数へ合わせる。
+                        const potentialDefUnitCount = Math.max(1, Math.min(5, availableDefBushos.length || 1));
+                        const potentialDefMainSoldiers = TroopAllocationService.clampArmySoldiers(defCastle.soldiers, potentialDefUnitCount, defCastle.soldiers);
+                        const potentialTotalDefSoldiers = potentialDefMainSoldiers
+                            + (this.state.defReinforcement ? this.state.defReinforcement.soldiers : 0)
+                            + (this.state.defSelfReinforcement ? this.state.defSelfReinforcement.soldiers : 0);
+                        const perceivedTotalDefSoldiers = getPerceived(potentialTotalDefSoldiers);
                         const perceivedTotalAtkSoldiers = getPerceived(totalAtkSoldiers);
-                        const perceivedDefSoldiers = getPerceived(defCastle.soldiers);
+                        const perceivedDefSoldiers = getPerceived(potentialDefMainSoldiers);
                         const perceivedDefRice = getPerceived(defCastle.rice);
                         const perceivedDefDefense = getPerceived(defCastle.defense);
 
@@ -1129,7 +1138,8 @@ Object.assign(WarManager.prototype, {
                             const handleDefDivide = (callback) => {
                                 let finalDefAssignments = [];
                                 const finishDef = () => {
-                                    const mainAssigns = this.autoDivideSoldiers(defBushos, defCastle.soldiers, defCastle.horses || 0, defCastle.guns || 0);
+                                    const deploySoldiers = TroopAllocationService.clampArmySoldiers(defCastle.soldiers, defBushos, defCastle.soldiers);
+                                    const mainAssigns = this.autoDivideSoldiers(defBushos, deploySoldiers, defCastle.horses || 0, defCastle.guns || 0);
                                     callback(mainAssigns.concat(finalDefAssignments));
                                 };
                                 const processNextDef = () => {
@@ -3510,6 +3520,7 @@ Object.assign(WarManager.prototype, {
         };
         const promptQuantity = (reinfBushos) => {
             this.game.ui.openQuantitySelector('def_reinf_supplies', [helperCastle], null, {
+                deployBushoCount: reinfBushos.length,
                 onConfirm: (inputs) => {
                     const i = inputs[helperCastle.id] || inputs;
                     const rS = i.soldiers ? parseInt(i.soldiers.num.value) : 500;

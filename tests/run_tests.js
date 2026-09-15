@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r403');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r405');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -791,6 +791,7 @@ test('士気・訓練の0は未設定扱いにせず戦闘・援軍データへ�
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
     loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/troop_allocation.js');
     ctx.game = { getCastleBushos() { return [{ id: 1, clan: 1, strength: 50, status: 'active' }]; } };
     loadScript(ctx, 'js/reinforcement_service.js');
     const service = vm.runInContext('new ReinforcementService(game)', ctx);
@@ -3495,6 +3496,7 @@ test('ReinforcementService は中央設定の比率で資源を消費する', ()
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
     loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/troop_allocation.js');
     loadScript(ctx, 'js/reinforcement_service.js');
     const bushos = [
         { id: 1, clan: 1, status: 'active', strength: 90 },
@@ -3734,7 +3736,10 @@ test('部隊編成はPCカードとスマホ循環ボタンで能力・適性を
     assert.ok(source.includes('class="troop-type-btn troop-type-cycle-btn active"'), 'スマホは兵科切替ボタンを1個だけにする');
     assert.ok(source.includes("isSeaBattleForDivide ? ['ashigaru', 'teppo'] : ['ashigaru', 'kiba', 'teppo']"), 'スマホ海戦では騎馬を循環対象から外す');
     assert.ok(source.includes("if (aptitudeSummary) aptitudeSummary.innerHTML = aptitudeSummaryHtml(b, nextType, isSeaBattleForDivide)"), 'スマホは兵科切替と同時に適性表示を更新する');
-    assert.ok(source.includes("listEl.classList.toggle('divide-list-two-column', isPcDivide && bushos.length > 3)"), 'PCで4人以上なら左3・右2の2列配置を使う');
+    assert.ok(source.includes("listEl.classList.toggle('divide-list-two-column', isPcDivide)"), 'PC版は部隊数にかかわらず2列配置を維持する');
+    assert.ok(source.includes('const pcFixedSlotCount = 6;'), 'PC編成は3段×2列の6枠を固定確保する');
+    assert.ok(source.includes("dummy.className = 'qty-row divide-row divide-row-placeholder';"), '不足枠はダミースロットで補う');
+    assert.ok(source.includes("dummy.setAttribute('aria-hidden', 'true');"), 'ダミースロットは操作・読み上げ対象にしない');
 });
 
 test('野戦の個別部隊情報は固定寸法で全適性と既存の名前圧縮規則を使う', () => {
@@ -4757,12 +4762,16 @@ test('WarPreparationController が開戦準備フローの正本になる', () =
 
 test('手動援軍の資源消費・復元は ReinforcementService を正本とする', () => {
     const ctx = createContext();
-    ctx.window.WarParams = { Reinforcement: {
-        TwoBushoThreshold: 1500, ThreeBushoThreshold: 2500,
-        SelfEquipmentMinimumStockRatio: 0.2, EquipmentCapRatio: 0.5,
-        SelfSoldierRatio: 0.5, MinimumSoldiers: 500, RicePerSoldier: 1,
-        AllyRateDivisor: 400, KunishuRateDivisor: 200
-    }};
+    ctx.window.WarParams = {
+        TroopAllocation: { MaxSoldiersPerUnit: 20000 },
+        Reinforcement: {
+            TwoBushoThreshold: 1500, ThreeBushoThreshold: 2500,
+            SelfEquipmentMinimumStockRatio: 0.2, EquipmentCapRatio: 0.5,
+            SelfSoldierRatio: 0.5, MinimumSoldiers: 500, RicePerSoldier: 1,
+            AllyRateDivisor: 400, KunishuRateDivisor: 200
+        }
+    };
+    loadScript(ctx, 'js/troop_allocation.js');
     loadScript(ctx, 'js/reinforcement_service.js');
     const ReinforcementService = vm.runInContext('ReinforcementService', ctx);
     const service = new ReinforcementService({});
@@ -12299,6 +12308,63 @@ test('月初月末の処理ラベルは会話直後に即復帰せず短い会�
     const waitBlock = turn.slice(waitAt, waitEnd);
     assert.ok(waitBlock.includes('await game.ui.waitForDialogs();'));
     assert.ok(!waitBlock.includes('setTimeout(resolve, 300)'), 'waitForDialogs後の重複300ms待機を残さない');
+});
+
+
+
+test('r405の部隊兵数上限はconfigの1設定値をTroopAllocationServiceだけが計算する', () => {
+    const ctx = createContext({ SkillManager: { getAptitudeLevel: () => 0 } });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/troop_allocation.js');
+    assert.strictEqual(ctx.WarParams.TroopAllocation.MaxSoldiersPerUnit, 20000);
+    assert.strictEqual(ctx.TroopAllocationService.getArmySoldierCap(1, 99999), 20000);
+    assert.strictEqual(ctx.TroopAllocationService.getArmySoldierCap(3, 99999), 60000);
+    assert.strictEqual(ctx.TroopAllocationService.getArmySoldierCap(5, 99999), 99999, '城在庫が10万未満なら在庫側で止まる');
+    assert.strictEqual(ctx.TroopAllocationService.clampArmySoldiers(90000, 3, 99999), 60000);
+    assert.strictEqual(ctx.TroopAllocationService.getRequiredUnitCount(40001), 3);
+});
+
+test('r405の自動部隊配分は各部隊2万・選択武将数×2万を超えない', () => {
+    const ctx = createContext({ SkillManager: { getAptitudeLevel: () => 0 } });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/troop_allocation.js');
+    const bushos = Array.from({ length: 3 }, (_, i) => ({ id: i + 1, leadership: 80 - i, strength: 70 - i, aptKiba: 'E', aptTeppo: 'E' }));
+    const result = ctx.TroopAllocationService.autoDivideSoldiers({ bushos, totalSoldiers: 90000, totalHorses: 0, totalGuns: 0 });
+    assert.strictEqual(result.reduce((sum, row) => sum + row.soldiers, 0), 60000, '3武将なら総兵数6万で止まる');
+    assert.ok(result.every(row => row.soldiers <= 20000), '各部隊2万以下');
+});
+
+test('r405の手動・自動援軍も選択武将数に応じた共通兵数上限を使う', () => {
+    const ctx = createContext({ SkillManager: { getAptitudeLevel: () => 0 } });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/troop_allocation.js');
+    loadScript(ctx, 'js/reinforcement_service.js');
+    const bushos = [
+        { id: 1, clan: 1, status: 'active', strength: 90 },
+        { id: 2, clan: 1, status: 'active', strength: 80 }
+    ];
+    const castle = { id: 1, ownerClan: 1, soldiers: 90000, rice: 99999, horses: 0, guns: 0 };
+    const service = new ctx.ReinforcementService({ getCastleBushos: () => bushos });
+    const manual = service.createManualCastleReinforcement(castle, bushos, { soldiers: 70000, rice: 1000, horses: 0, guns: 0 });
+    assert.strictEqual(manual.soldiers, 40000, '2武将なら手動援軍も4万まで');
+    assert.strictEqual(castle.soldiers, 50000, '実際に出した兵だけ城在庫から減る');
+});
+
+test('r405ではUI・AI・援軍が兵数上限の数値や乗算式を個別実装しない', () => {
+    const troop = read('js/troop_allocation.js');
+    const config = read('js/config.js');
+    for (const file of ['js/ui_slider.js', 'js/ai.js', 'js/war_preparation_controller.js', 'js/war_effort.js', 'js/reinforcement_service.js']) {
+        const source = read(file);
+        assert.ok(!/\b20000\b/.test(source), `${file}へ20000を直書きしない`);
+    }
+    assert.ok(config.includes('MaxSoldiersPerUnit: 20000'));
+    assert.ok(troop.includes('getArmySoldierCap'));
+    assert.ok(troop.includes('getUnitSoldierCap'));
+    assert.ok(read('js/ui_slider.js').includes('TroopAllocationService.getArmySoldierCap'));
+    assert.ok(read('js/ai.js').includes('TroopAllocationService.clampArmySoldiers'));
+    assert.ok(read('js/reinforcement_service.js').includes('TroopAllocationService.clampArmySoldiers'));
+    assert.ok(read('js/war_effort.js').includes('potentialDefMainSoldiers = TroopAllocationService.clampArmySoldiers'), 'AI迎撃判断も実際に出せる本隊兵数を見る');
 });
 
 Promise.all(pendingTests).then(() => {

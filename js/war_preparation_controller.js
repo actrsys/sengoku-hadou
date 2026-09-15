@@ -13,6 +13,8 @@ class WarPreparationController {
     }
 
     checkReinforcementAndStartWar(atkCastle, targetCastleId, atkBushos, sVal, rVal, hVal, gVal, extraData = null) {
+        // 出撃兵数はここで共通ルールへ正規化する。プレイヤー・AI・鎮圧戦で別計算を持たない。
+        sVal = TroopAllocationService.clampArmySoldiers(sVal, atkBushos, atkCastle.soldiers);
         const myClanId = atkCastle.ownerClan;
         let targetCastle = this.game.getCastle(targetCastleId);
         
@@ -172,6 +174,7 @@ class WarPreparationController {
         const helperCastle = this.game.getCastle(helperCastleId);
         const reinfBushos = selectedIds.map(id => this.game.getBusho(id));
         this.game.ui.openQuantitySelector('atk_self_reinf_supplies', [helperCastle], null, {
+            deployBushoCount: reinfBushos.length,
             onConfirm: (inputs) => {
                 const inputData = inputs[helperCastle.id] || inputs;
                 const reinfSoldiers = inputData.soldiers ? parseInt(inputData.soldiers.num.value) : 500;
@@ -221,6 +224,7 @@ class WarPreparationController {
         // 親の武将一覧を保持したままなので、［戻る］ならそのまま援軍武将を選び直せます。
         const openSupplies = () => {
             this.game.ui.openQuantitySelector('def_self_reinf_supplies', [helperCastle], null, {
+                deployBushoCount: reinfBushosData.length,
                 returnToParentSelector: true,
                 onConfirm: (inputs) => {
                     const inputData = inputs[helperCastle.id] || inputs;
@@ -432,6 +436,7 @@ class WarPreparationController {
         };
         const promptQuantity = (reinfBushos) => {
             this.game.ui.openQuantitySelector('atk_reinf_supplies', [helperCastle], null, {
+                deployBushoCount: reinfBushos.length,
                 onConfirm: (inputs) => {
                     const i = inputs[helperCastle.id] || inputs;
                     const rS = i.soldiers ? parseInt(i.soldiers.num.value) : 500;

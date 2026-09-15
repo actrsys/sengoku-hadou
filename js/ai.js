@@ -427,7 +427,10 @@ class AIEngine {
         if (myGeneral.personality === 'aggressive') sendRate = 0.8;
         if (myGeneral.personality === 'conservative') sendRate = 0.4;
         
-        const sendSoldiers = Math.floor(myCastle.soldiers * sendRate);
+        const desiredSoldiers = Math.floor(myCastle.soldiers * sendRate);
+        const deployableBushoCount = Math.min(5, this.game.getCastleBushos(myCastle.id)
+            .filter(b => b.clan === myCastle.ownerClan && window.BushoStatusRules.isActive(b)).length);
+        const sendSoldiers = TroopAllocationService.clampArmySoldiers(desiredSoldiers, deployableBushoCount, myCastle.soldiers);
         
         // ★ここを書き足します：出陣する兵士が0人以下の時は、攻撃を諦めます！
         if (sendSoldiers <= 0) return null;
@@ -1407,6 +1410,9 @@ class AIEngine {
             }
         }
 
+        // 選んだ武将数で実際に率いられる兵数へ正規化する。上限値は共通Serviceだけを見る。
+        sendSoldiers = TroopAllocationService.clampArmySoldiers(sendSoldiers, sorted, source.soldiers);
+
         // 援軍を探す処理へバトンタッチします
         const sendHorses = (source.horses || 0) < sendSoldiers * 0.2 ? 0 : (source.horses || 0);
         const sendGuns = (source.guns || 0) < sendSoldiers * 0.2 ? 0 : (source.guns || 0);
@@ -1485,6 +1491,7 @@ class AIEngine {
         }
 
         sorted = sorted.slice(0, 5);
+        sendSoldiers = TroopAllocationService.clampArmySoldiers(sendSoldiers, sorted, sourceCastle.soldiers);
 
         const sendHorses = (sourceCastle.horses || 0) < sendSoldiers * 0.2 ? 0 : (sourceCastle.horses || 0);
         const sendGuns = (sourceCastle.guns || 0) < sendSoldiers * 0.2 ? 0 : (sourceCastle.guns || 0);

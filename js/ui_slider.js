@@ -75,6 +75,17 @@ class UISliderManager {
             sourceCastleForMulti = (data && data.length > 0) ? data[0] : c;
         }
 
+        const getDeployBushoCount = () => {
+            if (type === 'war_supplies') return Array.isArray(data) ? data.length : 0;
+            if (extraData && Number.isFinite(Number(extraData.deployBushoCount))) return Math.max(0, Math.floor(Number(extraData.deployBushoCount)));
+            return 0;
+        };
+        const getDeploySoldierCap = (sourceCastle) => {
+            const count = getDeployBushoCount();
+            if (count <= 0) return Math.max(0, Number(sourceCastle && sourceCastle.soldiers) || 0);
+            return TroopAllocationService.getArmySoldierCap(count, sourceCastle && sourceCastle.soldiers);
+        };
+
         const getSliderValue = (id) => {
             const ref = sliderRefs.get(id);
             return parseInt(ref && ref.num ? ref.num.value : 0) || 0;
@@ -449,14 +460,16 @@ class UISliderManager {
             inputs.gold = createSlider("金", "gold", maxTributeGold, 200, 200);
         } else if (type === 'war_supplies') {
             document.getElementById('quantity-title').textContent = "出陣用意"; 
-            inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, c.soldiers);
+            const deploySoldierCap = getDeploySoldierCap(c);
+            inputs.soldiers = createSlider("兵士", "soldiers", deploySoldierCap, deploySoldierCap);
             inputs.rice = createSlider("兵糧", "rice", c.rice, c.rice);
             inputs.horses = createSlider("軍馬", "horses", c.horses, 0);
             inputs.guns = createSlider("鉄砲", "guns", c.guns, 0);
         } else if (type === 'def_intercept') { 
             const interceptCastle = (data && data.length > 0) ? data[0] : c;
             document.getElementById('quantity-title').textContent = "迎撃部隊編成"; 
-            inputs.soldiers = createSlider("兵士", "soldiers", interceptCastle.soldiers, interceptCastle.soldiers);
+            const deploySoldierCap = getDeploySoldierCap(interceptCastle);
+            inputs.soldiers = createSlider("兵士", "soldiers", deploySoldierCap, deploySoldierCap);
             inputs.rice = createSlider("兵糧", "rice", interceptCastle.rice, interceptCastle.rice);
             inputs.horses = createSlider("軍馬", "horses", interceptCastle.horses || 0, 0);
             inputs.guns = createSlider("鉄砲", "guns", interceptCastle.guns || 0, 0);
@@ -468,7 +481,8 @@ class UISliderManager {
             else if (type === 'def_self_reinf_supplies') titleText = "守備自軍援軍の部隊編成";
             else if (type === 'atk_self_reinf_supplies') titleText = "攻撃自軍援軍の部隊編成";
             document.getElementById('quantity-title').textContent = titleText;
-            inputs.soldiers = createSlider("兵士", "soldiers", helperCastle.soldiers, helperCastle.soldiers, 500);
+            const deploySoldierCap = getDeploySoldierCap(helperCastle);
+            inputs.soldiers = createSlider("兵士", "soldiers", deploySoldierCap, deploySoldierCap, Math.min(500, deploySoldierCap));
             inputs.rice = createSlider("兵糧", "rice", helperCastle.rice, helperCastle.rice, 500);
             inputs.horses = createSlider("軍馬", "horses", helperCastle.horses || 0, 0, 0);
             inputs.guns = createSlider("鉄砲", "guns", helperCastle.guns || 0, 0, 0);
@@ -621,7 +635,7 @@ class UISliderManager {
         const divideRefs = new Map();
         const isSeaBattleForDivide = !!(this.game.warManager && this.game.warManager.state && this.game.warManager.state.isSeaBattle);
         const isPcDivide = document.body.classList.contains('is-pc');
-        listEl.classList.toggle('divide-list-two-column', isPcDivide && bushos.length > 3);
+        listEl.classList.toggle('divide-list-two-column', isPcDivide);
 
         const troopTypeLabel = (type) => type === 'kiba' ? '騎馬' : (type === 'teppo' ? '鉄砲' : '足軽');
         const aptitudeItemHtml = (label, rank) => `
@@ -697,17 +711,20 @@ class UISliderManager {
                 const percent = actualMax > actualMin ? ((d.count - actualMin) / (actualMax - actualMin)) * 100 : 0;
                 range.style.setProperty('--value', percent + '%');
 
-                let otherSum = sum - d.count;
-                let maxAllowed = totalSoldiers - otherSum;
-                if (d.type === 'kiba') {
-                    const otherHorses = usedHorses - d.count;
-                    maxAllowed = Math.min(maxAllowed, totalHorses - otherHorses);
-                }
-                if (d.type === 'teppo') {
-                    const otherGuns = usedGuns - d.count;
-                    maxAllowed = Math.min(maxAllowed, totalGuns - otherGuns);
-                }
+                const otherSum = sum - d.count;
+                const equipmentStock = d.type === 'kiba' ? totalHorses : (d.type === 'teppo' ? totalGuns : Number.POSITIVE_INFINITY);
+                const equipmentUsedByOthers = d.type === 'kiba'
+                    ? usedHorses - d.count
+                    : (d.type === 'teppo' ? usedGuns - d.count : 0);
+                let maxAllowed = TroopAllocationService.getUnitSoldierCap({
+                    armySoldiers: totalSoldiers,
+                    otherAssignedSoldiers: otherSum,
+                    equipmentStock,
+                    equipmentUsedByOthers
+                });
                 if (maxAllowed < 1) maxAllowed = 1;
+                range.max = maxAllowed;
+                num.max = maxAllowed;
 
                 const btnMin = ref.btnMin;
                 const btnHalf = ref.btnHalf;
@@ -840,9 +857,9 @@ class UISliderManager {
                 <div class="qty-control">
                     <button class="qty-shortcut-btn qty-pos-start" id="div-btn-min-${b.id}">最小</button>
                     <button class="qty-shortcut-btn qty-pos-end" id="div-btn-half-${b.id}">半分</button>
-                    <input class="qty-range-main" type="range" id="div-range-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}">
+                    <input class="qty-range-main" type="range" id="div-range-${b.id}" min="1" max="${Math.max(1, TroopAllocationService.getMaxSoldiersPerUnit())}" value="${assignments[index].count}">
                     <button class="qty-shortcut-btn qty-pos-end" id="div-btn-max-${b.id}">最大</button>
-                    <input class="qty-number-end" type="number" id="div-num-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}">
+                    <input class="qty-number-end" type="number" id="div-num-${b.id}" min="1" max="${Math.max(1, TroopAllocationService.getMaxSoldiersPerUnit())}" value="${assignments[index].count}">
                 </div>
                 ${isPcDivide ? `<div class="troop-type-selector is-pc-selector ${isSeaBattleForDivide ? 'is-sea-battle' : ''}" id="troop-type-group-${b.id}">${pcTroopSelectorHtml}</div>` : ''}
                 <input type="hidden" id="div-type-${b.id}" value="${myType}">
@@ -871,11 +888,18 @@ class UISliderManager {
                     }
                 });
                 
-                let maxAllowed = totalSoldiers - otherSum;
                 const myType = typeSel.value;
-                if (myType === 'kiba') maxAllowed = Math.min(maxAllowed, totalHorses - otherHorses);
-                if (myType === 'teppo') maxAllowed = Math.min(maxAllowed, totalGuns - otherGuns);
+                const equipmentStock = myType === 'kiba' ? totalHorses : (myType === 'teppo' ? totalGuns : Number.POSITIVE_INFINITY);
+                const equipmentUsedByOthers = myType === 'kiba' ? otherHorses : (myType === 'teppo' ? otherGuns : 0);
+                let maxAllowed = TroopAllocationService.getUnitSoldierCap({
+                    armySoldiers: totalSoldiers,
+                    otherAssignedSoldiers: otherSum,
+                    equipmentStock,
+                    equipmentUsedByOthers
+                });
                 if (maxAllowed < 1) maxAllowed = 1;
+                range.max = maxAllowed;
+                num.max = maxAllowed;
 
                 if (mode === 'max') {
                     v = maxAllowed;
@@ -975,6 +999,20 @@ class UISliderManager {
                 };
             }
         });
+
+        // PC版は部隊数にかかわらず3段×2列の6枠を維持する。
+        // 実部隊が少ない場合は操作対象にならないダミースロットで空きを確保し、
+        // 1～3部隊でもカードが横一杯に伸びてレイアウトが変形しないようにする。
+        if (isPcDivide) {
+            const pcFixedSlotCount = 6;
+            const dummyCount = Math.max(0, pcFixedSlotCount - bushos.length);
+            for (let i = 0; i < dummyCount; i += 1) {
+                const dummy = document.createElement('div');
+                dummy.className = 'qty-row divide-row divide-row-placeholder';
+                dummy.setAttribute('aria-hidden', 'true');
+                listEl.appendChild(dummy);
+            }
+        }
 
         updateRemain();
 

@@ -595,7 +595,17 @@ class KunishuSystem {
     // 蜂起処理 (諸勢力からの城攻め)
     // ★変更：async を付けます
     async executeUprising(kunishu, castle) {
-        const atkSoldiers = Math.floor(kunishu.soldiers * 0.5);
+        // 連れてくる武将は最大5人。兵数上限を決める前に部隊数を確定する。
+        const members = this.getKunishuMembers(kunishu.id).sort((a,b) => b.leadership - a.leadership);
+        let atkBushos = [];
+        const leaderIdx = members.findIndex(b => b.id === kunishu.leaderId);
+        if (leaderIdx !== -1) {
+            atkBushos.push(members.splice(leaderIdx, 1)[0]);
+        }
+        atkBushos = atkBushos.concat(members.slice(0, 4));
+
+        const requestedSoldiers = Math.floor(kunishu.soldiers * 0.5);
+        const atkSoldiers = TroopAllocationService.clampArmySoldiers(requestedSoldiers, atkBushos, kunishu.soldiers);
         if (atkSoldiers <= 0) return;
         kunishu.soldiers -= atkSoldiers;
 
@@ -607,16 +617,6 @@ class KunishuSystem {
 
         // 兵糧は無から兵数の1.5倍湧く
         const atkRice = Math.floor(atkSoldiers * 1.5);
-
-        // 連れてくる武将は最大5人
-        const members = this.getKunishuMembers(kunishu.id).sort((a,b) => b.leadership - a.leadership);
-        // リーダーを必ず含める
-        let atkBushos = [];
-        const leaderIdx = members.findIndex(b => b.id === kunishu.leaderId);
-        if (leaderIdx !== -1) {
-            atkBushos.push(members.splice(leaderIdx, 1)[0]);
-        }
-        atkBushos = atkBushos.concat(members.slice(0, 4));
 
         const kunishuName = kunishu.getName(this.game);
         this.game.ui.log(`【諸勢力蜂起】${castle.name}にて、${kunishuName}が反乱を起こしました！`, { history: false });
