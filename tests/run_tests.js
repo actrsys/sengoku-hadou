@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r400');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r401');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1265,7 +1265,7 @@ test('軍師の当主への口調と報告対象への敬意は面談の会話�
     const warEffortSource = read('js/war_effort.js');
     assert.ok(warEffortSource.includes('gunshiDialogue._styleForSpeaker(gunshi, text)'), '戦況報告もGunshiSystemの話者レジスターを通す');
     assert.ok(warEffortSource.includes('gunshiDialogue.getSituationDaimyoSortieText(gunshi)'), '戦況報告の当主出陣文も軍師と当主の関係別に生成する');
-    assert.ok(warEffortSource.includes('atkLeader ? getAdvisorTargetCallName(atkLeader)'), '戦況報告の総大将名も将軍・左馬頭・親族を含む共通呼称へ通す');
+    assert.ok(warEffortSource.includes('isAttack ? getAdvisorTargetCallName(atkLeader) : getHostileLeaderFullName(atkLeader)'), '攻撃側の味方武将は従来呼称を使い、守備時の敵将だけフルネーム呼び捨てへ分ける');
 });
 
 test('無官の会話呼称は異姓なら姓、同姓一門なら諱、同姓非一門ならフルネームを使う', () => {
@@ -2527,6 +2527,14 @@ test('国主任命の最終確認取消は拠点一覧の位置を保持する',
     assert.ok(block.includes("{ okText: '任命する', cancelText: '戻る', closeBeforeCancel: true }"), '確定・取消の意味を明示し取消時は背後の一覧へ即復帰する');
     assert.ok(!block.includes('this._renderKyotenList(clanId, isSelectMode, selectData, 0);'), '取消時に拠点一覧を先頭から再描画しない');
     assert.ok(block.includes('this.closeCommonModal();'), '確定時だけ選択一覧を閉じる');
+});
+
+test('侵攻を受けた時の軍師報告は敵将をフルネーム・敬称なしで呼ぶ', () => {
+    const warEffort = read('js/war_effort.js');
+    assert.ok(warEffort.includes("const getHostileLeaderFullName = target =>"), '敵将専用のフルネーム呼称を持つ');
+    assert.ok(warEffort.includes("String(target.fullName || target.name || '').replace(/\\|/g, '').trim()"), '敵将名は姓だけでなくフルネームを優先する');
+    assert.ok(warEffort.includes('isAttack ? getAdvisorTargetCallName(atkLeader) : getHostileLeaderFullName(atkLeader)'), '守備時だけ敵将専用呼称へ切り替える');
+    assert.ok(!warEffort.includes('getHostileLeaderFullName(atkLeader)}殿'), '敵将専用呼称へ殿を付けない');
 });
 
 test('軍師不在の戦況報告も人物の共通呼称と当主本人の自己呼称を使う', () => {

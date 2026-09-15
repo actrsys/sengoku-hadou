@@ -306,7 +306,17 @@ Object.assign(WarManager.prototype, {
         const defProvName = defProv ? defProv.province : "不明な国";
 
         const atkLeader = atkBushos && atkBushos.length > 0 ? atkBushos[0] : null;
-        const atkLeaderName = atkLeader ? getAdvisorTargetCallName(atkLeader) : "総大将";
+        // 守備側として敵の侵攻を報告する時は、敵将へ敬称を付けず、
+        // 同姓武将がいても誰か分かるよう必ずフルネームで呼ぶ。
+        // 攻撃側として味方の援軍要請を報告する時だけ、従来の人物呼称規則を使う。
+        const getHostileLeaderFullName = target => {
+            if (!target) return "総大将";
+            const fullName = String(target.fullName || target.name || '').replace(/\|/g, '').trim();
+            return fullName || "総大将";
+        };
+        const atkLeaderName = atkLeader
+            ? (isAttack ? getAdvisorTargetCallName(atkLeader) : getHostileLeaderFullName(atkLeader))
+            : "総大将";
 
         const getPerceivedSoldiers = (val) => {
             // ★変更：軍師の智謀の代わりに小姓（または軍師）の智謀を使います
