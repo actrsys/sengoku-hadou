@@ -6016,6 +6016,7 @@ html.mobile-low-memory .legacy-safe-mode-indicator { display: block; }
 }
 
 .title-menu {
+    --title-menu-stack-height: 398px; /* 7 buttons × 50px + 6 gaps × 8px */
     width: 100%;
     max-width: 310px;
     justify-self: end;
@@ -6026,6 +6027,7 @@ html.mobile-low-memory .legacy-safe-mode-indicator { display: block; }
 
 #title-screen .title-menu-buttons {
     width: 100%;
+    min-height: var(--title-menu-stack-height);
     margin: 0;
     display: flex;
     flex-direction: column;
@@ -6269,7 +6271,7 @@ body:not(.is-pc) .game-title { font-size: clamp(3.1rem, 13vw, 5.2rem); }
 body:not(.is-pc) .title-kicker { margin-bottom: 8px; }
 body:not(.is-pc) .title-rule { margin: 14px auto 10px; }
 body:not(.is-pc) .title-subtitle { font-size: 0.82rem; }
-body:not(.is-pc) .title-menu { justify-self: center; max-width: 360px; }
+body:not(.is-pc) .title-menu { --title-menu-stack-height: 337px; justify-self: center; max-width: 360px; } /* 7 × 43px + 6 × 6px */
 body:not(.is-pc) #title-screen .title-menu-buttons { gap: 6px; }
 body:not(.is-pc) .title-btn {
     min-height: 43px;

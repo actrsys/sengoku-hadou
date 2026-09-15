@@ -1460,6 +1460,52 @@ async function validateLowMemoryPagerLayout(cdp) {
     console.log('✓ 共通一覧 完全行フィット + 軽量ページ送り操作・複数選択補助footer visual/layout regression');
 }
 
+
+async function validateTitleMenuStability(cdp) {
+    const html = fixtureHtml('title_menu.html');
+    const checkAt = async (width, height, isPc) => {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: !isPc });
+        await cdp.call('Runtime.evaluate', {
+            expression: `document.open();document.write(${JSON.stringify(html)});document.close();document.body.classList.toggle('is-pc', ${isPc});true`,
+            returnByValue: true,
+            awaitPromise: true
+        });
+        await new Promise(resolve => setTimeout(resolve, 80));
+        const read = async () => {
+            const result = await cdp.call('Runtime.evaluate', {
+                expression: `(() => {
+                    const rect = el => { const r = el.getBoundingClientRect(); return {top:r.top,bottom:r.bottom,height:r.height,left:r.left}; };
+                    return {
+                        brand: rect(document.querySelector('.title-brand')),
+                        content: rect(document.querySelector('.title-content')),
+                        menu: rect(document.querySelector('.title-menu')),
+                        main: rect(document.getElementById('menu-buttons')),
+                        info: rect(document.getElementById('title-info-menu')),
+                        start: rect(document.getElementById('start-btn')),
+                        credit: rect(document.getElementById('title-credit-btn'))
+                    };
+                })()`,
+                returnByValue: true
+            });
+            return result.result.value;
+        };
+        const before = await read();
+        await cdp.call('Runtime.evaluate', {
+            expression: `document.getElementById('menu-buttons').classList.add('hidden');document.getElementById('title-info-menu').classList.remove('hidden');true`,
+            returnByValue: true
+        });
+        const after = await read();
+        approx(after.brand.top, before.brand.top, 0.25, `${isPc ? 'PC' : 'スマホ'}: 情報切替後もロゴ領域Y位置を固定する`);
+        approx(after.content.top, before.content.top, 0.25, `${isPc ? 'PC' : 'スマホ'}: タイトル外枠Y位置を固定する`);
+        approx(after.menu.top, before.menu.top, 0.25, `${isPc ? 'PC' : 'スマホ'}: メニュー領域Y位置を固定する`);
+        approx(after.info.height, before.main.height, 0.25, `${isPc ? 'PC' : 'スマホ'}: 情報メニューと通常メニューの総高さを一致させる`);
+        approx(after.credit.top, before.start.top, 0.25, `${isPc ? 'PC' : 'スマホ'}: クレジットとはじめからの先頭位置を一致させる`);
+    };
+    await checkAt(1200, 800, true);
+    await checkAt(390, 844, false);
+    console.log('✓ タイトル 通常/情報メニュー差し替え時のロゴ・先頭ボタン位置固定 visual/layout regression');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -1527,6 +1573,7 @@ async function main() {
         await validateLowMemoryPagerLayout(cdp);
         await validateFieldWarFullscreen(cdp);
         await validateFieldTerrainLayout(cdp);
+        await validateTitleMenuStability(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');

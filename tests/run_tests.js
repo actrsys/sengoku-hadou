@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r409');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r410');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -3219,7 +3219,7 @@ test('タイトル版表示は GameConfig.Meta.Version を正本にする', () =
     assert.ok(bootstrap.includes('window.GameConfig?.Meta?.Version'));
 });
 
-test('r409のタイトル情報メニューは設定の下から差し替わり、問い合わせだけを閉じる', () => {
+test('r410のタイトル情報メニューは設定の下から差し替わり、問い合わせだけを閉じる', () => {
     const html = read('index.html');
     const bootstrap = read('js/app_bootstrap.js');
     const css = read('css/style.css');
@@ -3235,6 +3235,9 @@ test('r409のタイトル情報メニューは設定の下から差し替わり�
     assert.ok(bootstrap.includes("titleScreen.addEventListener('contextmenu'"), '情報メニューはPC右クリックでも戻れる');
     assert.ok(bootstrap.includes("infoDetailModal.addEventListener('contextmenu'"), '情報詳細もPC右クリックで一段戻れる');
     assert.ok(css.includes('#title-screen .title-menu-buttons'), 'トップと情報メニューは同じ配置規則を共用する');
+    assert.ok(css.includes('--title-menu-stack-height: 398px'), 'PCでは通常メニュー7行ぶんの高さを正本にする');
+    assert.ok(css.includes('min-height: var(--title-menu-stack-height)'), '通常メニューと情報メニューの総高さを固定する');
+    assert.ok(css.includes('--title-menu-stack-height: 337px'), 'スマホでも通常メニュー7行ぶんの高さを維持する');
     assert.ok(bootstrap.includes('new CustomScrollbar(infoDetailBody)'), '情報詳細はゲーム共通の独自スクロールバーを使う');
     assert.ok(bootstrap.includes("window.__mobileLowMemoryMode"), '軽量モードでは独自スクロールバー生成を避ける');
     assert.ok(bootstrap.includes('企画・制作\\nACTORS SYSTEM\\nあや瀨'), 'クレジットにACTORS SYSTEMと制作者名を表示する');
