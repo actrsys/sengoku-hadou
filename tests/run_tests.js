@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r398');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r399');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -12992,23 +12992,35 @@ test('r396では開始時の大名居城がAI評価で直ちに旧拠点へ移�
     }
 });
 
-test('r396の居城維持調整は最大石高・最大防御を変更せず現在値だけを入れ替える', () => {
+test('r396の居城維持調整は現在石高・現在防御の入れ替えを維持する', () => {
     const { scenario } = getRuntimeData('1570_anegawa');
     const c = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
     const expected = new Map([
-        [12,[380,600,1300,1000]], [48,[320,400,1700,1200]],
-        [22,[220,550,1300,1600]], [82,[100,300,1000,800]],
-        [81,[150,300,900,500]], [21,[150,250,900,600]],
-        [9,[400,600,1100,1200]], [13,[280,600,2000,1200]],
-        [26,[360,600,1100,1000]], [181,[260,500,1200,900]],
+        [12,[380,600]], [48,[320,400]],
+        [22,[220,550]], [82,[100,300]],
+        [81,[150,300]], [21,[150,250]],
+        [9,[400,600]], [13,[280,600]],
+        [26,[360,600]], [181,[260,500]],
     ]);
-    for (const [id,[koku,def,maxKoku,maxDef]] of expected) {
+    for (const [id,[koku,def]] of expected) {
         const row = c.get(id);
         assert.strictEqual(Number(row.kokudaka), koku, `${id}: 現在石高`);
         assert.strictEqual(Number(row.defense), def, `${id}: 現在防御`);
-        assert.strictEqual(Number(row.maxKokudaka), maxKoku, `${id}: 最大石高は維持`);
-        assert.strictEqual(Number(row.maxDefense), maxDef, `${id}: 最大防御は維持`);
     }
+});
+
+test('r399では1570岐阜城・浜松城に改称イベントの恒久最大値上昇を反映する', () => {
+    const { scenario } = getRuntimeData('1570_anegawa');
+    const c = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+    const gifu = c.get(3);
+    const hamamatsu = c.get(12);
+    assert.ok(gifu && hamamatsu, '岐阜城・浜松城が存在する');
+    assert.strictEqual(gifu.name, '岐阜城', 'ID3は岐阜城');
+    assert.strictEqual(Number(gifu.maxKokudaka), 2400, '岐阜城は改称イベントの最大石高+500を反映');
+    assert.strictEqual(Number(gifu.maxDefense), 2100, '岐阜城は改称イベントの最大防御+500を反映');
+    assert.strictEqual(hamamatsu.name, '浜松城', 'ID12は浜松城');
+    assert.strictEqual(Number(hamamatsu.maxKokudaka), 2300, '浜松城は改称イベントの最大石高+1000を反映');
+    assert.strictEqual(Number(hamamatsu.maxDefense), 2000, '浜松城は改称イベントの最大防御+1000を反映');
 });
 
 test('r398では全有効通常勢力で大名が居城の城主を兼ねる', () => {
