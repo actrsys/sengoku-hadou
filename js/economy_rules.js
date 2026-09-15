@@ -49,32 +49,15 @@ class EconomyRules {
         return totalEff > 0 ? totalEff : 0.1;
     }
 
-    static isProdCastle(c, itemType, provinces = []) {
+    static isProdCastle(c, itemType) {
         if (!c) return false;
-        
-        if (itemType === 'horse') {
-            // 岩村城(4)、黒川城(61)、塩生城(62)、日野江城(157)、隈本城(158)、岩尾城(159)、蠣崎城(191)、野辺地城(192)、八戸城(193)、三戸城(194)、花輪館(196)、白石城(206)、三春城(211)、須賀川城(212)、杉目城(214)、二本松城(215)、猪苗代城(216)
-            if ([4, 61, 62, 157, 158, 159, 191, 192, 193, 194, 196, 206, 211, 212, 214, 215, 216].includes(c.id)) return true;
-            // 常陸国(ID15)、淡路国(ID36)、日向国(ID62)、薩摩国(ID63)、大隅国(ID64)、対馬国(ID68)
-            if ([15, 36, 62, 63, 64, 68].includes(c.provinceId)) return true; 
-            if (provinces) {
-                const prov = provinces.find(p => p.id === c.provinceId);
-                // 甲信地方(ID3)
-                if (prov && prov.regionId === 3) return true;
-            }
-        } else if (itemType === 'gun') {
-            // 石山御坊(ID33)、雑賀城(ID42)、赤尾木城(ID185)、今浜城(ID186)
-            if ([33, 42, 185, 186].includes(c.id)) return true;
-        }
+        if (itemType === 'horse') return c.isHorseProd === true;
+        if (itemType === 'gun') return c.isGunProd === true;
         return false;
     }
 
     static isPortCastle(c) {
-        if (!c) return false;
-        // 港となる拠点のIDを、ここ一箇所だけで管理します
-        //春日山城(ID2)、石山御坊(ID33)、松波城(ID72)、尾山御坊(ID74)、北庄城(ID76)、立花山城(ID148)、平戸城(ID155)、内城(ID169)、厳原城(ID174)、湊城(ID219)、安濃津城(ID251)
-        const portCastleIds = [2, 33, 72, 74, 76, 148, 155, 169, 174, 219, 251];
-        return portCastleIds.includes(c.id);
+        return !!c && c.isPort === true;
     }
 
     static calcBuyEquipUnitPrice(daimyo, castellan, itemType, game) {
@@ -107,13 +90,10 @@ class EconomyRules {
         const myClanId = daimyo ? daimyo.clan : (castellan ? castellan.clan : 0);
         
         if (daimyo && game && game.castles) {
-            hasProdCastle = game.getClanCastles(daimyo.clan).some(c => this.isProdCastle(c, itemType, game.provinces));
+            hasProdCastle = game.getClanCastles(daimyo.clan).some(c => this.isProdCastle(c, itemType));
         } else if (castellan && game && game.castles) {
             const myCastle = game.getCastle(castellan.castleId);
-            hasProdCastle = this.isProdCastle(myCastle, itemType, game.provinces);
-        } else if (castellan && itemType === 'gun') {
-            // 万が一の予備チェック（鉄砲用）
-            hasProdCastle = [33, 42, 185, 186].includes(castellan.castleId);
+            hasProdCastle = this.isProdCastle(myCastle, itemType);
         }
         
         // ★追加：自分が産地を持っていなければ、支配している勢力が産地を持っているか探します
@@ -124,7 +104,7 @@ class EconomyRules {
                 // 自分から見て相手を「支配」している場合
                 if (rel && rel.status === '支配') {
                     // その支配勢力が産地を持っているかチェック
-                    const vassalHasProd = game.getClanCastles(otherClan.id).some(c => this.isProdCastle(c, itemType, game.provinces));
+                    const vassalHasProd = game.getClanCastles(otherClan.id).some(c => this.isProdCastle(c, itemType));
                     if (vassalHasProd) {
                         hasVassalProdCastle = true;
                         break; // 1つでも見つかればOK
@@ -164,7 +144,7 @@ class EconomyRules {
             for (let k of kunishus) {
                 const castle = game.getCastle(k.castleId);
                 // その諸勢力がいる城が、馬や鉄砲の産地かどうかチェック
-                if (this.isProdCastle(castle, itemType, game.provinces)) {
+                if (this.isProdCastle(castle, itemType)) {
                     const rel = k.getRelation(myClanId);
                     if (rel >= 60) {
                         // 友好度60以上の時、友好度2につき1%（0.01）割引します

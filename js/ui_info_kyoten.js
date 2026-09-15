@@ -55,8 +55,8 @@ Object.assign(UIInfoManager.prototype, {
         let totalRiceIncome = EconomyRules.calcBaseRiceIncome(castle);
 
         const isPort = EconomyRules.isPortCastle(castle);
-        const isHorse = EconomyRules.isProdCastle(castle, 'horse', this.game.provinces);
-        const isGun = EconomyRules.isProdCastle(castle, 'gun', this.game.provinces);
+        const isHorse = EconomyRules.isProdCastle(castle, 'horse');
+        const isGun = EconomyRules.isProdCastle(castle, 'gun');
 
         // スマホ版かどうかをチェックして、文字サイズや隙間を切り替える魔法です！
         const isPc = document.body.classList.contains('is-pc');

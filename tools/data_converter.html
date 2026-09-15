@@ -71,7 +71,7 @@ const COMMON_FIELDS = {
   warriors_master: ['id','sortNo','name','yomi','nameChange','biography','leadership','strength','politics','diplomacy','intelligence','charm','aptAshigaru','aptKiba','aptTeppo','aptYumi','aptBugei','aptNinjutsu','aptMaritime','skill','innovation','ambition','duty','affinity','personality','birthYear','startYear','endYear','isKilledInBattle','realFatherId','adoptiveFather','realMotherId','female','childless','faceIcon','nemesis'],
   princess_master: ['id','name','yomi','birthYear','startYear','endYear','originalClanId','realFatherId','realMotherId','faceIcon'],
   clans_master: ['id','name','yomi','color'],
-  castles_master: ['id','sortNo','provinceId','castlesColorCode','adjacentCastle'],
+  castles_master: ['id','sortNo','provinceId','castlesColorCode','adjacentCastle','isPort','isHorseProd','isGunProd'],
   imperialCourtRank: ['id','rankNo','rankName1','rankName2','rankNameFurigana','necessaryPrestige','gainPrestige'],
   provinces_map: ['id','sortNo','province','provinceYomi','regionId','region','regionYomi','color_code'],
   generic_princess: ['name','yomi']
@@ -87,6 +87,7 @@ const SCENARIO_FIELDS = {
 };
 const BOOLEAN_FIELDS = Object.freeze({
   warriors_master: new Set(['isKilledInBattle','female','childless']),
+  castles_master: new Set(['isPort','isHorseProd','isGunProd']),
   warriors_state: new Set(['isGunshi','isRetired']),
   clans_state: new Set(['enabled']),
   castles_state: new Set(['enabled'])

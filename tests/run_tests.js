@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r399');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r400');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -10052,7 +10052,7 @@ test('高頻度の候補探索は同値な所有集合を1回だけ共用し、�
     assert.ok(!selectBlock.includes('getClanBushos(this.game.playerClanId)'));
 });
 
-test('AI内政の装備産地判定は行動ループ外で一度だけ計算し旧候補条件を維持する', () => {
+test('AI内政の装備産地判定は行動ループ外で一度だけ計算し拠点master属性へ統一する', () => {
     const ai = read('js/ai.js');
     const fnStart = ai.indexOf('async execInternalAffairs');
     const loopStart = ai.indexOf('for (let step = 0; step < maxActions; step++)', fnStart);
@@ -10061,10 +10061,9 @@ test('AI内政の装備産地判定は行動ループ外で一度だけ計算し
     const loopBlock = ai.slice(loopStart, ai.indexOf('\n    }\n', loopStart) + 7);
 
     assert.ok(beforeLoop.includes('const clanCastlesForEquipment = this.game.getClanCastles(castle.ownerClan);'));
-    assert.ok(beforeLoop.includes('const hasGunCastleAI = clanCastlesForEquipment.some'));
-    // 旧実装はownerClanの厳密一致で全国を見ていたため、その候補条件は狭めず1回だけ評価する。
-    assert.ok(beforeLoop.includes('const hasHorseCastleAI = this.game.castles.some(c => {'));
-    assert.ok(beforeLoop.includes('if (c.ownerClan !== castle.ownerClan) return false;'));
+    assert.ok(beforeLoop.includes("const hasGunCastleAI = clanCastlesForEquipment.some(c => EconomyRules.isProdCastle(c, 'gun'));"));
+    assert.ok(beforeLoop.includes("const hasHorseCastleAI = clanCastlesForEquipment.some(c => EconomyRules.isProdCastle(c, 'horse'));"));
+    assert.ok(!beforeLoop.includes('this.game.castles.some(c => {'), 'AIだけ国・地方由来の旧軍馬判定へ戻さない');
     assert.ok(!loopBlock.includes('const hasGunCastleAI ='));
     assert.ok(!loopBlock.includes('const hasHorseCastleAI ='));
 });
@@ -10565,7 +10564,7 @@ test('月初港収入は勢力総人口を一度だけ集計し個別計算結�
 
     const ctx = createContext();
     loadScript(ctx, 'js/economy_rules.js');
-    const castle = { id: 2, ownerClan: 1, population: 2000, peoplesLoyalty: 80 };
+    const castle = { id: 2, ownerClan: 1, population: 2000, peoplesLoyalty: 80, isPort: true };
     let lookups = 0;
     const game = {
         getClanCastles() {
@@ -13058,5 +13057,48 @@ test('r398では1570尼子家の代表本拠を真山城とし尼子勝久を城
     assert.strictEqual(Number(katsuhisa.castleId), 109, '尼子勝久は真山城所在');
     assert.strictEqual(Number(yonehara.clan), 43, '米原綱寛は尼子家臣として維持');
     assert.strictEqual(Number(yonehara.castleId), 109, '高瀬城未収録のため米原綱寛も代表拠点に集約');
+});
+
+test('r400では港・軍馬産地・鉄砲産地をcastles_masterの明示属性だけで判定する', () => {
+    const { common } = getRuntimeData('1570_anegawa');
+    const castles = common.castlesMaster;
+    assert.strictEqual(castles.length, 252, '拠点master件数を維持する');
+    for (const row of castles) {
+        for (const field of ['isPort', 'isHorseProd', 'isGunProd']) {
+            assert.ok(Object.prototype.hasOwnProperty.call(row, field), `${row.id}: ${field}をcommon.binへ出力する`);
+            assert.ok(row[field] === true || row[field] === false || row[field] === '', `${row.id}: ${field}は真偽値または空欄`);
+        }
+    }
+    assert.strictEqual(castles.filter(c => c.isPort === true).length, 11, '港はmaster上の11拠点');
+    assert.strictEqual(castles.filter(c => c.isHorseProd === true).length, 48, '軍馬産地はmaster上の48拠点');
+    assert.strictEqual(castles.filter(c => c.isGunProd === true).length, 4, '鉄砲産地はmaster上の4拠点');
+
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/economy_rules.js');
+    assert.strictEqual(ctx.EconomyRules.isPortCastle({ id: 999, isPort: true }), true, 'IDではなくisPortを見る');
+    assert.strictEqual(ctx.EconomyRules.isPortCastle({ id: 2, isPort: false }), false, '旧港IDでもmasterがfalseなら港にしない');
+    assert.strictEqual(ctx.EconomyRules.isProdCastle({ id: 999, isHorseProd: true }, 'horse'), true);
+    assert.strictEqual(ctx.EconomyRules.isProdCastle({ id: 4, isHorseProd: false }, 'horse'), false, '旧軍馬IDでもmasterがfalseなら産地にしない');
+    assert.strictEqual(ctx.EconomyRules.isProdCastle({ id: 999, isGunProd: true }, 'gun'), true);
+    assert.strictEqual(ctx.EconomyRules.isProdCastle({ id: 33, isGunProd: false }, 'gun'), false, '旧鉄砲IDでもmasterがfalseなら産地にしない');
+});
+
+test('r400では変換ツールとAIも拠点masterの港・産地属性を同じ正本として使う', () => {
+    const converter = read('tools/data_converter.html');
+    const economy = read('js/economy_rules.js');
+    const ai = read('js/ai.js');
+    assert.ok(converter.includes("castles_master: ['id','sortNo','provinceId','castlesColorCode','adjacentCastle','isPort','isHorseProd','isGunProd']"));
+    assert.ok(converter.includes("castles_master: new Set(['isPort','isHorseProd','isGunProd'])"), 'Excelのtrue/false文字列を真偽値へ正規化する');
+    assert.ok(economy.includes("if (itemType === 'horse') return c.isHorseProd === true;"));
+    assert.ok(economy.includes("if (itemType === 'gun') return c.isGunProd === true;"));
+    assert.ok(economy.includes('return !!c && c.isPort === true;'));
+    assert.ok(!economy.includes('const portCastleIds = ['), '港ID直書きを再導入しない');
+    assert.ok(!economy.includes('[33, 42, 185, 186].includes'), '鉄砲産地ID直書きを再導入しない');
+    assert.ok(ai.includes("clanCastlesForEquipment.some(c => EconomyRules.isProdCastle(c, 'gun'))"));
+    assert.ok(ai.includes("clanCastlesForEquipment.some(c => EconomyRules.isProdCastle(c, 'horse'))"));
+    const prodAt = ai.indexOf('const clanCastlesForEquipment = this.game.getClanCastles(castle.ownerClan);');
+    const prodBlock = ai.slice(prodAt, prodAt + 900);
+    assert.ok(!prodBlock.includes('.provinceId'), 'AIの装備産地判定で国・地方から産地を推測しない');
 });
 

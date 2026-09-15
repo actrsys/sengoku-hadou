@@ -1636,16 +1636,8 @@ class AIEngine {
         // 装備産地の有無は、この城の内政行動ループ中に変わらない勢力所有地だけで決まります。
         // 行動候補を作るたびに全国/自勢力拠点を再走査せず、1回だけ同じ答えを確定します。
         const clanCastlesForEquipment = this.game.getClanCastles(castle.ownerClan);
-        const hasGunCastleAI = clanCastlesForEquipment.some(c => [33, 42, 185, 186].includes(c.id));
-        // 軍馬産地は旧実装が ownerClan の厳密一致で全国を見ていたため、候補集合は狭めません。
-        // 全件走査そのものを行動ループ外へ出し、旧条件をそのまま1回だけ評価します。
-        const hasHorseCastleAI = this.game.castles.some(c => {
-            if (c.ownerClan !== castle.ownerClan) return false;
-            if (c.id === 157) return true;
-            if ([15, 36, 61, 62, 63, 64, 68].includes(c.provinceId)) return true;
-            const prov = this.game.getProvince(c.provinceId);
-            return !!prov && (prov.regionId === 1 || prov.regionId === 3);
-        });
+        const hasGunCastleAI = clanCastlesForEquipment.some(c => EconomyRules.isProdCastle(c, 'gun'));
+        const hasHorseCastleAI = clanCastlesForEquipment.some(c => EconomyRules.isProdCastle(c, 'horse'));
         
         // ③ 決められた回数だけ、行動を繰り返します！
         for (let step = 0; step < maxActions; step++) {
@@ -1767,13 +1759,13 @@ class AIEngine {
                 horseScore += (horseRatio * 5);
                 gunScore += (gunRatio * 5);
 
-                // ★変更：大名家が鉄砲産地の城（石山御坊:33、雑賀城:42、赤尾木城:185、今浜城:186）を1つでも持っているなら、鉄砲を少し優先して騎馬を控えます
+                // 大名家が拠点マスター上の鉄砲産地を1つでも持っているなら、鉄砲を少し優先して騎馬を控えます
                 if (hasGunCastleAI) {
                     gunScore += 3;
                     horseScore -= 3;
                 }
 
-                // ★追加：大名家が軍馬産地の城を持っているなら、軍馬を少し優先して鉄砲を控えます
+                // 大名家が拠点マスター上の軍馬産地を持っているなら、軍馬を少し優先して鉄砲を控えます
                 if (hasHorseCastleAI) {
                     horseScore += 3;
                     gunScore -= 3;
