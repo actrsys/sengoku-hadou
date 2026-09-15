@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="ja" class="fonts-loading">
+<head>
+    <meta charset="UTF-8">
+    <meta name="robots" content="noindex, nofollow, noarchive, noimageai">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="icon" href="favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="data/images/app/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="data/images/app/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="data/images/app/apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#0b0e0f">
+    <title>戦国覇道</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/animation.css">
+    <script src="js/user_settings.js"></script>
+    <script src="js/app_bootstrap.js"></script>
+    <script src="js/pako.min.js"></script>
+</head>
+<body>
+    <div id="game-screen">
+    
+    <div id="global-loading-screen" class="hidden">
+            <div class="loading-stage" aria-live="polite">
+                <div class="loading-title">戦国覇道</div>
+                <div class="loading-rule" aria-hidden="true"><span></span></div>
+                <div class="loading-text">NOW LOADING</div>
+                <div id="loading-status" class="loading-status">準備しています</div>
+                <div class="loading-track" aria-hidden="true"><span id="loading-progress-bar"></span></div>
+                <div id="loading-progress-text" class="loading-progress-text">0%</div>
+            </div>
+        </div>
+
+        <div id="title-screen">
+            <div class="title-content">
+                <div class="title-brand">
+                    <div class="title-kicker">SENGOKU STRATEGY</div>
+                    <h1 class="game-title">戦国覇道</h1>
+                    <div class="title-rule" aria-hidden="true"><span></span></div>
+                    <div class="title-subtitle">乱世を駆け、天下への道を拓く</div>
+                </div>
+                <div class="title-menu">
+                    <div id="menu-buttons" class="hidden">
+                        <button id="start-btn" class="title-btn">はじめから</button>
+                        <button id="continue-btn" class="title-btn">続きから</button>
+                        <button id="load-btn" class="title-btn">ロード</button>
+                        <button id="watch-start-btn" class="title-btn">観戦する</button>
+                        <button id="guide-title-btn" class="title-btn">指南書</button>
+                        <button id="settings-btn" class="title-btn">設定</button>
+                    </div>
+
+                    <div id="tap-to-proceed" class="title-tap-message">
+                        Tap or click to proceed.
+                    </div>
+                </div>
+            </div>
+            <div id="title-version" class="title-version" aria-label="ゲームバージョン"></div>
+            <div id="legacy-safe-mode-indicator" class="legacy-safe-mode-indicator" aria-label="軽量モード">軽量モード</div>
+        </div>
+
+        <div id="scenario-modal" class="modal hidden">
+            <div class="modal-content start-content">
+                <h3>シナリオ選択</h3>
+                <div class="scenario-main">
+                    <div id="scenario-list" class="clan-grid"></div>
+                    <div id="scenario-desc-box" class="scenario-desc-box"></div>
+                </div>
+                <div class="modal-footer">
+                    <button id="scenario-confirm-btn" class="btn-primary">決定</button>
+                    <button id="scenario-close-btn" class="btn-secondary" data-se="cancel.ogg">タイトルへ戻る</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="start-screen" class="modal hidden"></div>
+        
+        <div id="ending-screen" class="hidden">
+            <div id="ending-content">
+                <h1 id="ending-title"></h1>
+                <div id="ending-message"></div>
+                <div id="staff-roll-container">
+                    <div id="staff-roll-content"></div>
+                </div>
+            </div>
+        </div>
+        
+        <button id="btn-back-to-scenario" class="btn-secondary floating-back-btn hidden" data-se="cancel.ogg">シナリオ選択に戻る</button>
+        
+        <div id="daimyo-confirm-modal" class="modal hidden">
+            <div class="modal-content daimyo-confirm-content">
+                <div id="daimyo-confirm-body"></div>
+            </div>
+            <div class="daimyo-confirm-buttons hidden">
+                <button id="daimyo-confirm-start-btn" class="btn-primary">この勢力で開始</button>
+                <button id="daimyo-confirm-back-btn" class="btn-secondary">戻る</button>
+            </div>
+        </div>
+        <div id="app" class="hidden">
+            <div id="top-info-bar">
+                <div id="mobile-top-left"></div>
+            </div>
+
+            <div id="map-wrapper">
+                <div id="map-scroll-container">
+                    <div id="map-container"></div>
+                </div>
+                
+                <div id="map-floating-status">
+                    <div id="mobile-floating-info"></div>
+                    <div id="mobile-floating-market"></div>
+                </div>
+
+                <div id="map-guide" class="hidden">対象を選択してください</div>
+                <div id="zoom-controls">
+                    <button id="map-zoom-out" class="zoom-btn">-</button>
+                    <button id="map-zoom-in" class="zoom-btn">+</button>
+                </div>
+            </div>
+
+            <div id="bottom-command-bar">
+                 <div id="mobile-bottom-info"></div>
+                 <div id="command-area" class="command-grid"></div>
+            </div>
+            
+            <div id="pc-sidebar">
+                <div id="pc-status-panel"></div>
+                <div id="pc-command-area" class="command-grid"></div>
+            </div>
+            
+            <div id="pc-new-ui-container" class="hidden">
+                <div id="pc-new-status-panel"></div>
+                <div id="pc-new-command-area"></div>
+            </div>
+        </div>
+
+        <div id="ai-guard" class="hidden"><div class="loading-spinner"></div>思考中...</div>
+        
+        <div id="selector-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3 id="selector-title">選択</h3>
+                <div id="selector-context-info" class="context-info"></div>
+                <div id="selector-tabs" class="busho-tabs hidden"></div>
+                <div class="scroll-wrapper" id="selector-list-wrapper">
+                    <div id="selector-list" class="list-container hide-native-scroll"></div>
+                </div>
+                <div id="selector-list-pager" class="low-memory-list-pager hidden" aria-label="一覧のページ送り"></div>
+                <div class="modal-footer">
+                    <button id="selector-confirm-btn" class="btn-primary">決定</button>
+                    <button id="selector-assist-btn" class="btn-secondary hidden" data-se="choice.ogg">5名</button>
+                    <button id="selector-back-btn" class="btn-secondary">閉じる</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="quantity-modal" class="modal hidden">
+            <div class="modal-content quantity-content">
+                <h3 id="quantity-title">数量指定</h3>
+                <div id="trade-type-info" class="info-text hidden"></div>
+                <div id="charity-type-selector" class="radio-group hidden">
+                    <label><input type="radio" name="charityType" value="gold" checked> 金のみ</label>
+                    <label><input type="radio" name="charityType" value="rice"> 米のみ</label>
+                </div>
+                <div id="quantity-container"></div>
+                <div class="modal-footer">
+                    <button id="quantity-confirm-btn" class="btn-primary">決定</button>
+                    <button id="quantity-back-btn" class="btn-secondary">戻る</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="unit-divide-modal" class="modal hidden">
+            <div class="modal-content divide-content">
+                <h3>部隊編成</h3>
+                <div id="divide-stock-container"></div>
+                <div id="divide-list" class="list-container"></div>
+                <div class="modal-footer right">
+                    <button id="divide-confirm-btn" class="btn-primary" disabled>決定</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="cutin-overlay" class="cutin-overlay hidden">
+            <div class="cutin-text" id="cutin-message"></div>
+        </div>
+
+        <div id="result-modal" class="modal hidden">
+            <div class="modal-content result-content">
+                <div id="result-body" class="result-body message-area"></div>
+                <div class="modal-footer" id="result-footer">
+                    <button id="result-close-btn" class="btn-secondary">閉じる</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="interview-modal" class="modal hidden">
+            <div id="interview-session-content" class="modal-content interview-session-content">
+                <div class="interview-session-header">
+                    <div class="interview-session-kicker">家臣面談</div>
+                    <h3 id="interview-session-title">面談</h3>
+                    <div id="interview-session-hint" class="interview-session-hint"></div>
+                </div>
+
+                <div class="interview-session-main">
+                    <div id="interview-session-summary-panel" class="interview-session-summary-panel hidden">
+                        <div class="interview-session-summary-head">
+                            <div class="interview-session-summary-caption">面談相手</div>
+                            <div id="interview-session-name" class="interview-session-name"></div>
+                        </div>
+                        <div id="interview-session-meta" class="interview-session-meta"></div>
+                        <div id="interview-session-stats" class="interview-session-stats"></div>
+                    </div>
+                    <div class="interview-session-stage">
+                        <div id="interview-session-body" class="interview-session-body"></div>
+                    </div>
+                </div>
+
+                <div id="interview-session-pager" class="interview-session-pager hidden">
+                    <button id="interview-session-prev-btn" type="button" data-se="choice.ogg" class="daimyo-detail-action-btn">前へ</button>
+                    <span id="interview-session-page-label" class="interview-session-page-label">1 / 1</span>
+                    <button id="interview-session-next-btn" type="button" data-se="choice.ogg" class="daimyo-detail-action-btn">次へ</button>
+                </div>
+            </div>
+            <div id="interview-session-inline-actions" class="interview-session-inline-actions hidden"></div>
+            <div id="interview-session-footer" class="modal-footer interview-session-footer"></div>
+            <div id="interview-session-dialog" class="modal-content modal-small interview-session-dialog hidden">
+                <div class="dialog-body-container">
+                    <div class="dialog-face-column">
+                        <div id="interview-session-dialog-name" class="dialog-name-label hidden"></div>
+                        <div id="interview-session-dialog-face" class="dialog-face-space"></div>
+                    </div>
+                    <div id="interview-session-dialog-message" class="message-area"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="legion-council-modal" class="modal hidden">
+            <div class="modal-content legion-council-content">
+                <div class="legion-council-header">
+                    <div class="legion-council-kicker">国主評定</div>
+                    <h3 id="legion-council-clan-name">評定</h3>
+                    <div id="legion-council-date" class="legion-council-date"></div>
+                    <div class="legion-council-guidance">命令を変更する国主を選んでください。</div>
+                </div>
+                <div class="legion-council-stage">
+                    <div id="legion-council-left" class="legion-council-seats legion-council-left"></div>
+                    <div class="legion-council-center" aria-hidden="true">
+                        <div class="legion-council-emblem">評</div>
+                    </div>
+                    <div id="legion-council-right" class="legion-council-seats legion-council-right"></div>
+                </div>
+                <div class="legion-council-actions">
+                    <button id="legion-council-bulk-btn" type="button" data-se="choice.ogg" class="daimyo-detail-action-btn legion-council-bulk-btn">一括</button>
+                </div>
+                <div class="modal-footer legion-council-footer">
+                    <button id="legion-council-finish-btn" data-se="cancel.ogg" class="btn-secondary">評定を終える</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="legion-council-order-modal" class="modal hidden">
+            <div class="modal-content legion-council-order-content">
+                <div class="legion-council-order-header">
+                    <div id="legion-council-order-kicker" class="legion-council-kicker">国主への命令</div>
+                    <h3 id="legion-council-order-title">命令</h3>
+                </div>
+                <div id="legion-council-order-body" class="legion-council-order-body"></div>
+                <div class="modal-footer legion-council-order-footer">
+                    <button id="legion-council-order-confirm-btn" class="btn-primary">確定</button>
+                    <button id="legion-council-order-back-btn" class="btn-secondary">戻る</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="war-modal" class="modal hidden">
+            <div class="modal-content war-modal-content">
+                
+                <div class="war-screen responsive-war-layout">
+                    
+                    <div class="responsive-war-left">
+                        <div id="war-top-bar" class="war-top-bar">
+                            <span id="war-date-info"></span>
+                            <span id="war-weather-info">☀ 晴れ</span>
+                        </div>
+                        <div class="war-wall-container">
+                            <div class="war-wall-side left">
+                                <h2 class="war-title" id="war-title-name"></h2>
+                            </div>
+                            <div class="war-wall-center">
+                                <span class="war-wall-label">城防御</span>
+                                <div class="war-wall-hexagon-wrap">
+                                    <div class="war-wall-hexagon-inner">
+                                        <span id="war-def-wall-info"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="war-wall-side right">
+                                <span id="war-turn-info"></span>
+                            </div>
+                        </div>
+                        <div id="war-visual-area" class="war-visual responsive-war-visual">
+                            <div id="war-weather-layer" class="hidden"></div>
+                            
+                            <div class="war-side-wrapper war-side-wrapper-atk">
+                                <div class="war-reinf-col">
+                                    
+                                    <!-- 【攻撃側・応援軍】（メイン軍と同じ勢力からの援軍） -->
+                                    <div id="war-atk-self-reinf-card" class="war-side-info war-reinf-card responsive-army-box atk-self">
+                                        <div class="responsive-army-title">
+                                            <span id="war-atk-self-reinf-org">---</span>
+                                        </div>
+                                        <div id="war-atk-self-reinf-busho" class="stat-busho reinf-busho-label">---</div>
+                                        <div class="reinf-content-wrap">
+                                            <div class="reinf-face-container">
+                                                <div id="war-atk-self-reinf-face-container">
+                                                    <img id="war-atk-self-reinf-face" class="responsive-war-face" src="data/images/faceicons/unknown_face.webp">
+                                                </div>
+                                                <div id="war-atk-self-reinf-empty-icon" class="hidden empty-icon">なし</div>
+                                            </div>
+                                            <div id="war-atk-self-reinf-leader-abilities" class="war-leader-abilities war-leader-abilities-reinf" aria-label="部隊長能力"></div>
+                                            
+                                            <div class="responsive-army-stats">
+                                                <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-atk-self-reinf-soldier" class="stat-val-large">---</span></div>
+                                                <div class="stat-row-group">
+                                                    <div class="stat-row"><div><span class="label-pc">訓練</span><span class="label-sp">練</span></div><span id="war-atk-self-reinf-training">---</span></div>
+                                                    <div class="stat-row"><div><span class="label-pc">士気</span><span class="label-sp">士</span></div><span id="war-atk-self-reinf-morale">---</span></div>
+                                                </div>
+                                                <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp">糧</span></div><span id="war-atk-self-reinf-rice">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">軍馬</span><span class="label-sp">馬</span></div><span id="war-atk-self-reinf-horses">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">鉄砲</span><span class="label-sp">砲</span></div><span id="war-atk-self-reinf-guns">---</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 【攻撃側・友軍】（メイン軍とは異なる同盟国や諸勢力からの援軍） -->
+                                    <div id="war-atk-ally-reinf-card" class="war-side-info war-reinf-card responsive-army-box atk-ally">
+                                        <div class="responsive-army-title">
+                                            <span id="war-atk-ally-reinf-org">---</span>
+                                        </div>
+                                        <div id="war-atk-ally-reinf-busho" class="stat-busho reinf-busho-label">---</div>
+                                        <div class="reinf-content-wrap">
+                                            <div class="reinf-face-container">
+                                                <div id="war-atk-ally-reinf-face-container">
+                                                    <img id="war-atk-ally-reinf-face" class="responsive-war-face" src="data/images/faceicons/unknown_face.webp">
+                                                </div>
+                                                <div id="war-atk-ally-reinf-empty-icon" class="hidden empty-icon">なし</div>
+                                            </div>
+                                            <div id="war-atk-ally-reinf-leader-abilities" class="war-leader-abilities war-leader-abilities-reinf" aria-label="部隊長能力"></div>
+                                            
+                                            <div class="responsive-army-stats">
+                                                <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-atk-ally-reinf-soldier" class="stat-val-large">---</span></div>
+                                                <div class="stat-row-group">
+                                                    <div class="stat-row"><div><span class="label-pc">訓練</span><span class="label-sp">練</span></div><span id="war-atk-ally-reinf-training">---</span></div>
+                                                    <div class="stat-row"><div><span class="label-pc">士気</span><span class="label-sp">士</span></div><span id="war-atk-ally-reinf-morale">---</span></div>
+                                                </div>
+                                                <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp">糧</span></div><span id="war-atk-ally-reinf-rice">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">軍馬</span><span class="label-sp">馬</span></div><span id="war-atk-ally-reinf-horses">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">鉄砲</span><span class="label-sp">砲</span></div><span id="war-atk-ally-reinf-guns">---</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                                
+                                <!-- 【攻撃側・メイン軍】 -->
+                                <div class="army-box attacker responsive-army-box main-army-box">
+                                    <h3 class="army-title responsive-army-title"><span id="war-atk-name"></span></h3>
+                                    <div class="stat-busho main-busho-label"><span id="war-atk-busho"></span></div>
+                                    <div class="responsive-army-content">
+                                        <img id="war-atk-face" class="war-face hidden responsive-war-face" src="" alt="">
+                                        <div class="responsive-army-stats">
+                                            <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-atk-soldier" class="stat-val-large"></span></div>
+                                            <div class="stat-row-group">
+                                                <div class="stat-row"><div><span class="label-pc">訓練</span><span class="label-sp">練</span></div><span id="war-atk-training"></span></div>
+                                                <div class="stat-row"><div><span class="label-pc">士気</span><span class="label-sp">士</span></div><span id="war-atk-morale"></span></div>
+                                            </div>
+                                            <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp">糧</span></div><span id="war-atk-rice"></span></div>
+                                            <div class="stat-row"><div><span class="label-pc">軍馬</span><span class="label-sp">馬</span></div><span id="war-atk-horses"></span></div>
+                                            <div class="stat-row"><div><span class="label-pc">鉄砲</span><span class="label-sp">砲</span></div><span id="war-atk-guns"></span></div>
+                                        </div>
+                                        <div id="war-atk-leader-abilities" class="war-leader-abilities war-leader-abilities-main" aria-label="部隊長能力"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="war-side-wrapper war-side-wrapper-def">
+                            
+                                <!-- 【守備側・メイン軍】 -->
+                                <div class="army-box defender responsive-army-box main-army-box">
+                                    <h3 class="army-title responsive-army-title"><span id="war-def-name"></span></h3>
+                                    <div class="stat-busho main-busho-label"><span id="war-def-busho"></span></div>
+                                    <div class="responsive-army-content">
+                                        <img id="war-def-face" class="war-face hidden responsive-war-face" src="" alt="">
+                                        <div class="responsive-army-stats">
+                                            <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-def-soldier" class="stat-val-large"></span></div>
+                                            <div class="stat-row-group">
+                                                <div class="stat-row"><div><span class="label-pc">訓練</span><span class="label-sp">練</span></div><span id="war-def-training"></span></div>
+                                                <div class="stat-row"><div><span class="label-pc">士気</span><span class="label-sp">士</span></div><span id="war-def-morale"></span></div>
+                                            </div>
+                                            <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp">糧</span></div><span id="war-def-rice"></span></div>
+                                            <div class="stat-row"><div><span class="label-pc">軍馬</span><span class="label-sp">馬</span></div><span id="war-def-horses"></span></div>
+                                            <div class="stat-row"><div><span class="label-pc">鉄砲</span><span class="label-sp">砲</span></div><span id="war-def-guns"></span></div>
+                                        </div>
+                                        <div id="war-def-leader-abilities" class="war-leader-abilities war-leader-abilities-main" aria-label="部隊長能力"></div>
+                                    </div>
+                                </div>
+
+                                <div class="war-reinf-col">
+                                    
+                                    <!-- 【守備側・応援軍】（メイン軍と同じ勢力からの援軍） -->
+                                    <div id="war-def-self-reinf-card" class="war-side-info war-reinf-card responsive-army-box def-self">
+                                        <div class="responsive-army-title">
+                                            <span id="war-def-self-reinf-org">---</span>
+                                        </div>
+                                        <div id="war-def-self-reinf-busho" class="stat-busho reinf-busho-label">---</div>
+                                        <div class="reinf-content-wrap">
+                                            <div class="reinf-face-container">
+                                                <div id="war-def-self-reinf-face-container">
+                                                    <img id="war-def-self-reinf-face" class="responsive-war-face" src="data/images/faceicons/unknown_face.webp">
+                                                </div>
+                                                <div id="war-def-self-reinf-empty-icon" class="hidden empty-icon">なし</div>
+                                            </div>
+                                            <div id="war-def-self-reinf-leader-abilities" class="war-leader-abilities war-leader-abilities-reinf" aria-label="部隊長能力"></div>
+                                            
+                                            <div class="responsive-army-stats">
+                                                <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-def-self-reinf-soldier" class="stat-val-large">---</span></div>
+                                                <div class="stat-row-group">
+                                                    <div class="stat-row"><div><span class="label-pc">訓練</span><span class="label-sp">練</span></div><span id="war-def-self-reinf-training">---</span></div>
+                                                    <div class="stat-row"><div><span class="label-pc">士気</span><span class="label-sp">士</span></div><span id="war-def-self-reinf-morale">---</span></div>
+                                                </div>
+                                                <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp">糧</span></div><span id="war-def-self-reinf-rice">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">軍馬</span><span class="label-sp">馬</span></div><span id="war-def-self-reinf-horses">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">鉄砲</span><span class="label-sp">砲</span></div><span id="war-def-self-reinf-guns">---</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 【守備側・友軍】（メイン軍とは異なる同盟国や諸勢力からの援軍） -->
+                                    <div id="war-def-ally-reinf-card" class="war-side-info war-reinf-card responsive-army-box def-ally">
+                                        <div class="responsive-army-title">
+                                            <span id="war-def-ally-reinf-org">---</span>
+                                        </div>
+                                        <div id="war-def-ally-reinf-busho" class="stat-busho reinf-busho-label">---</div>
+                                        <div class="reinf-content-wrap">
+                                            <div class="reinf-face-container">
+                                                <div id="war-def-ally-reinf-face-container">
+                                                    <img id="war-def-ally-reinf-face" class="responsive-war-face" src="data/images/faceicons/unknown_face.webp">
+                                                </div>
+                                                <div id="war-def-ally-reinf-empty-icon" class="hidden empty-icon">なし</div>
+                                            </div>
+                                            <div id="war-def-ally-reinf-leader-abilities" class="war-leader-abilities war-leader-abilities-reinf" aria-label="部隊長能力"></div>
+                                            
+                                            <div class="responsive-army-stats">
+                                                <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-def-ally-reinf-soldier" class="stat-val-large">---</span></div>
+                                                <div class="stat-row-group">
+                                                    <div class="stat-row"><div><span class="label-pc">訓練</span><span class="label-sp">練</span></div><span id="war-def-ally-reinf-training">---</span></div>
+                                                    <div class="stat-row"><div><span class="label-pc">士気</span><span class="label-sp">士</span></div><span id="war-def-ally-reinf-morale">---</span></div>
+                                                </div>
+                                                <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp">糧</span></div><span id="war-def-ally-reinf-rice">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">軍馬</span><span class="label-sp">馬</span></div><span id="war-def-ally-reinf-horses">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">鉄砲</span><span class="label-sp">砲</span></div><span id="war-def-ally-reinf-guns">---</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                            
+                        </div>
+                        
+                        <div class="war-controls-shell">
+                            <div id="war-controls" class="war-controls-area disabled-area"></div>
+                            
+                            <div id="war-ai-guard" class="hidden">
+                                <div class="loading-spinner war-ai-spinner"></div>
+                                <span id="war-ai-guard-text">敵軍思考中...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="war-log" class="responsive-war-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="dialog-modal" class="modal hidden">
+            <div class="modal-content modal-small">
+                <div class="dialog-body-container">
+                    <div class="dialog-face-column">
+                        <div id="dialog-left-name" class="dialog-name-label hidden"></div>
+                        <div id="dialog-left-face" class="dialog-face-space"></div>
+                    </div>
+
+                    <div id="dialog-message" class="message-area"></div>
+
+                    <div class="dialog-face-column">
+                        <div id="dialog-right-name" class="dialog-name-label hidden"></div>
+                        <div id="dialog-right-face" class="dialog-face-space"></div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer right">
+                    <button id="dialog-btn-ok" class="btn-primary">はい</button>
+                    <button id="dialog-btn-cancel" class="btn-secondary">いいえ</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="field-war-modal" class="modal hidden">
+            <div class="modal-content fw-fullscreen-content">
+                <div id="fw-top-bar" class="fw-top-bar">
+                    <span id="fw-date-info"></span>
+                    <span id="fw-weather-info">☀ 晴れ</span>
+                    <span id="fw-turn-info">残りターン 1/20</span>
+                </div>
+                
+                <div id="fw-main-area" class="fw-main-area">
+                    <div id="fw-weather-layer" class="hidden"></div>
+                    <div id="fw-map-scroll" class="fw-map-scroll">
+                        <div id="fw-map"></div>
+                    </div>
+                    
+                    <div id="fw-status-bar" class="fw-floating-status hidden">
+                        <div class="fw-status-wrapper" id="fw-atk-wrapper">
+                            <div id="fw-atk-status" class="fw-status-container attacker"></div>
+                            <div id="fw-atk-tabs" class="fw-tabs"></div>
+                        </div>
+                        <div class="fw-status-wrapper" id="fw-def-wrapper">
+                            <div id="fw-def-status" class="fw-status-container defender"></div>
+                            <div id="fw-def-tabs" class="fw-tabs right-align"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="fw-unit-info" class="fw-floating-unit hidden"></div>
+                    
+                    <div id="fw-log" class="fw-floating-log hidden"></div>
+                </div>
+
+                <div id="fw-controls" class="fw-controls">
+                    <div id="fw-menu-main" class="fw-menu-group hidden">
+                        <button id="fw-btn-cmd" class="btn-primary">命令</button>
+                        <button id="fw-btn-wait" class="btn-secondary">待機</button>
+                        <button id="fw-btn-info" class="btn-secondary">情報</button>
+                    </div>
+                    <div id="fw-menu-cmd" class="fw-menu-group hidden">
+                        <button id="fw-btn-retreat" class="btn-danger">撤退</button>
+                        <button id="fw-btn-cmd-back" class="btn-secondary">戻る</button>
+                    </div>
+                    <div id="fw-menu-info" class="fw-menu-group hidden">
+                        <button id="fw-btn-info-back" class="btn-secondary">戻る</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="intercept-confirm-modal" class="modal hidden">
+            <div class="modal-content modal-small">
+                <h3>拠点を出て迎え撃ちますか？</h3>
+                <div id="intercept-msg" class="message-area"></div>
+                <div class="modal-footer right">
+                    <button id="btn-intercept" class="btn-danger">迎撃</button>
+                    <button id="btn-siege" class="btn-primary">籠城</button>
+                </div>
+            </div>
+        </div>
+        <div id="guide-modal" class="modal hidden">
+            <div class="modal-content guide-content">
+                <h3>指南書</h3>
+                <div class="guide-layout">
+                    <nav id="guide-nav" class="guide-nav" aria-label="指南書の項目"></nav>
+                    <article class="guide-article">
+                        <div class="guide-article-header">
+                            <h2 id="guide-article-title"></h2>
+                        </div>
+                        <div id="guide-command-list" class="guide-command-list hidden"></div>
+                        <div id="guide-article-body" class="guide-article-body"></div>
+                    </article>
+                </div>
+                <div class="modal-footer">
+                    <button id="guide-close-btn" class="btn-secondary">閉じる</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="settings-modal" class="modal hidden">
+            <div class="modal-content modal-small">
+                <h3 class="settings-title">設定</h3>
+
+                <div id="settings-tabs" class="settings-tabs" role="tablist" aria-label="設定カテゴリ">
+                    <button type="button" id="settings-tab-game" class="settings-tab-btn active" role="tab" aria-selected="true" aria-controls="settings-panel-game" data-settings-tab="game" data-se="choice.ogg">ゲーム</button>
+                    <button type="button" id="settings-tab-audio-display" class="settings-tab-btn" role="tab" aria-selected="false" aria-controls="settings-panel-audio-display" data-settings-tab="audio-display" data-se="choice.ogg">音・表示</button>
+                </div>
+
+                <div class="settings-panels">
+                    <section id="settings-panel-audio-display" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-audio-display">
+                        <div class="setting-row">
+                            <label class="slider-row-label">BGM 音量</label>
+                            <div class="qty-control setting-slider-wrap">
+                                <input type="range" id="setting-bgm-volume" min="0" max="100" value="100">
+                                <div class="setting-value"><span id="setting-bgm-text">100</span><span class="setting-unit">％</span></div>
+                            </div>
+                        </div>
+
+                        <div class="setting-row">
+                            <label class="slider-row-label">SE 音量</label>
+                            <div class="qty-control setting-slider-wrap">
+                                <input type="range" id="setting-se-volume" min="0" max="100" value="100">
+                                <div class="setting-value"><span id="setting-se-text">100</span><span class="setting-unit">％</span></div>
+                            </div>
+                        </div>
+
+                        <div class="setting-row setting-display-mode-row">
+                            <label class="slider-row-label">表示モード</label>
+                            <div class="setting-display-mode-control">
+                                <div class="setting-toggle-group setting-three-way-toggle">
+                                    <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-display-mode-auto">自動</button>
+                                    <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-display-mode-normal">通常</button>
+                                    <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-display-mode-light">軽量</button>
+                                </div>
+                                <div id="setting-display-mode-note" class="setting-note">変更は次回起動時に反映されます。</div>
+                            </div>
+                        </div>
+
+                        <div id="settings-restart-row" class="setting-row settings-restart-row hidden">
+                            <label class="slider-row-label">設定の反映</label>
+                            <div class="setting-toggle-group">
+                                <button type="button" id="settings-restart-btn" class="ui-toggle-btn setting-danger-btn">再起動</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section id="settings-panel-game" class="settings-panel active" role="tabpanel" aria-labelledby="settings-tab-game">
+                        <div class="setting-row">
+                            <label class="slider-row-label">オートセーブ</label>
+                            <div class="setting-toggle-group">
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-autosave-true">する</button>
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-autosave-false">しない</button>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <label class="slider-row-label">他家戦争の通知</label>
+                            <div class="setting-toggle-group">
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-notify-true">通知する</button>
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-notify-false">通知しない</button>
+                            </div>
+                        </div>
+
+                        <div class="setting-row">
+                            <label class="slider-row-label">歴史イベント</label>
+                            <div class="setting-toggle-group">
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-historical-true">発生する</button>
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-historical-false">発生しない</button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="modal-footer settings-footer">
+                    <button id="settings-close-btn" class="btn-secondary">閉じる</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="saveload-modal" class="modal hidden">
+            <div class="modal-content modal-small">
+                <h3 id="saveload-title">セーブ / ロード</h3>
+                
+                <!-- セーブ種別の切替は汎用トグルを使い、兵科選択のclassとは分離する -->
+                <div id="saveload-tabs" class="hidden setting-toggle-group">
+                    <button type="button" id="saveload-tab-manual" class="ui-toggle-btn active" data-se="choice.ogg" disabled>手動データ</button>
+                    <button type="button" id="saveload-tab-auto" class="ui-toggle-btn" data-se="choice.ogg">オートセーブ</button>
+                </div>
+                
+                <div id="saveload-list" class="list-container">
+                    </div>
+                    
+                <div class="modal-footer">
+                    <button id="saveload-close-btn" class="btn-secondary">閉じる</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="custom-context-menu" class="hidden context-menu">
+            <div class="context-menu-item" id="ctx-menu-back">自拠点に戻る</div>
+            <div class="context-menu-item" id="ctx-menu-finish">命令終了</div>
+        </div>
+    </div>
+    <!-- Round5: Howlerは1本だけ読み込み、min版が無い環境では通常版へフォールバック -->
+    <script src="js/howler.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/constants.js"></script>
+    <script src="js/game_math.js"></script>
+    <script src="js/map_graph.js"></script>
+    <script src="js/domestic_rules.js"></script>
+    <script src="js/economy_rules.js"></script>
+    <script src="js/personnel_rules.js"></script>
+    <script src="js/loyalty_insight_rules.js"></script>
+    <script src="js/ai_domestic_priority_rules.js"></script>
+    <script src="js/stat_presenter.js"></script>
+    <script src="js/busho_list_sort_rules.js"></script>
+    <script src="js/conversation_standing_rules.js"></script>
+    <script src="js/dialogue_text_rules.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/models.js"></script>
+    <script src="js/family_system.js"></script>
+    <script src="js/portrait_rules.js"></script>
+    <script src="js/history_system.js"></script>
+    <script src="js/data_manager.js"></script>
+    <script src="js/skill_manager.js"></script>
+    <script src="js/courtRank_system.js"></script>
+    <script src="js/diplomacy.js"></script>
+    <script src="js/kunishu_system.js"></script>
+    <script src="js/legion_policy_system.js"></script>
+    <script src="js/life_system.js"></script>
+    <script src="js/gunshi_system.js"></script>
+    <script src="js/troop_allocation.js"></script>
+    <script src="js/reinforcement_service.js"></script>
+    <script src="js/war.js"></script>
+    <script src="js/war_effort.js"></script>
+    <script src="js/map_generator.js"></script>
+    <script src="js/field_war.js?v=1"></script>
+    <script src="js/faction_system.js"></script>
+    <script src="js/strategy_system.js"></script>
+    <script src="js/command_catalog.js"></script>
+    <script src="js/guide_data.js"></script>
+    <script src="js/guide_view.js"></script>
+    <script src="js/save_load_view.js"></script>
+    <script src="js/war_preparation_controller.js"></script>
+    <script src="js/command_system.js"></script>
+    <script src="js/interview_system.js"></script>
+    <script src="js/ending_system.js"></script>
+    <script src="js/ai_staffing.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/ai_operation.js"></script>
+    <script src="js/independence_system.js"></script>
+    <script src="js/affiliation_system.js"></script>
+    <script src="js/selector_modal_view.js"></script>
+    <script src="js/ui_info.js"></script>
+    <script src="js/ui_info_busho.js"></script>
+    <script src="js/ui_info_kyoten.js"></script>
+    <script src="js/ui_slider.js"></script>
+    <script src="js/ui_settings.js"></script>
+    <script src="js/legion_council_view.js"></script>
+    <script src="js/interview_view.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/ui_map.js"></script>
+    <script src="js/castle_manager.js"></script>
+    <script src="js/custom_scrollbar.js"></script>
+    <script src="js/event_manager.js"></script>
+    <script src="js/event/event_text.js"></script>
+    <script src="js/event/common_events.js"></script>
+    <script src="js/event/typhoon_event.js"></script>
+    <script src="js/event/historical_event.js"></script>
+    <script src="js/save_manager.js"></script>
+    <script src="js/turn_manager.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>

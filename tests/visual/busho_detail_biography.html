@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- APP_CSS -->
+<style>
+html,body{margin:0;width:100%;height:100%;background:#101610;color:#fff;font-family:serif;overflow:hidden}
+#game-screen{position:absolute;left:0;top:0;box-sizing:border-box;background:#18231b;overflow:hidden}
+.fixture-modal{position:absolute;left:7%;top:7%;width:86%;height:86%;box-sizing:border-box;border:2px solid #d4af37;background:rgba(10,14,10,.96);padding:8px;display:flex;flex-direction:column}
+.fixture-tabs{height:34px;flex:0 0 34px;box-sizing:border-box}
+.fixture-list{flex:1;min-height:0;overflow:hidden;border:1px solid rgba(212,175,55,.25)}
+.fixture-list>.daimyo-detail-container{height:100%}
+.fixture-face{background:#2e3b32}
+.fixture-status-row{min-height:22px}
+.fixture-status-row .daimyo-detail-label{width:auto;min-width:30px}
+.fixture-status-row .daimyo-detail-value{min-width:20px}
+</style>
+</head>
+<body class="is-pc">
+<div id="game-screen">
+  <div class="fixture-modal">
+    <div class="fixture-tabs busho-detail-tabs">
+      <div class="busho-detail-tab-buttons">
+        <button class="busho-tab-btn">基本</button>
+        <button class="busho-tab-btn">技能</button>
+        <button class="busho-tab-btn active" id="fixture-biography-tab">列伝</button>
+      </div>
+    </div>
+    <div class="fixture-list">
+      <div class="daimyo-detail-container busho-detail-container">
+        <div class="daimyo-detail-header pc-only busho-detail-header-pc">
+          <div class="busho-detail-heading-stack">
+            <span class="busho-detail-yomi pc-only-yomi">おだ のぶなが</span>
+            <div class="busho-detail-name-row pc-name-row"><div class="daimyo-detail-name busho-detail-name-pc">織田 信長</div></div>
+            <div class="busho-detail-meta pc-meta"><span>織田家</span><span>大名</span></div>
+          </div>
+        </div>
+        <div class="daimyo-detail-body">
+          <div class="daimyo-detail-left">
+            <div class="daimyo-detail-face fixture-face"></div>
+            <div class="daimyo-detail-header sp-only busho-detail-header-sp">
+              <span class="busho-detail-yomi sp-yomi">おだ のぶなが</span>
+              <div class="busho-detail-name-row sp-name-row"><div class="daimyo-detail-name busho-detail-name-sp">織田 信長</div></div>
+              <div class="busho-detail-meta sp-meta"><span>織田家</span><span>大名</span></div>
+            </div>
+          </div>
+          <div class="daimyo-detail-right busho-detail-right" id="fixture-right">
+            <div class="busho-detail-biography-layout" id="fixture-biography-layout">
+              <div class="busho-detail-biography-placeholder" id="fixture-placeholder" aria-hidden="true">
+                <div class="busho-detail-status-layout" id="fixture-status-reference">
+                  <div class="busho-detail-group busho-detail-group-grow">
+                    <div class="daimyo-detail-stat-box fixture-status-row"><span class="daimyo-detail-label">統率</span><span class="daimyo-detail-value">A</span></div>
+                    <div class="daimyo-detail-stat-box fixture-status-row"><span class="daimyo-detail-label">武勇</span><span class="daimyo-detail-value">A</span></div>
+                    <div class="daimyo-detail-stat-box fixture-status-row"><span class="daimyo-detail-label">内政</span><span class="daimyo-detail-value">A</span></div>
+                    <div class="daimyo-detail-stat-box fixture-status-row"><span class="daimyo-detail-label">外交</span><span class="daimyo-detail-value">B</span></div>
+                    <div class="daimyo-detail-stat-box fixture-status-row"><span class="daimyo-detail-label">智謀</span><span class="daimyo-detail-value">A</span></div>
+                    <div class="daimyo-detail-stat-box fixture-status-row"><span class="daimyo-detail-label">魅力</span><span class="daimyo-detail-value">A</span></div>
+                  </div>
+                  <div class="busho-detail-info-column">
+                    <div class="busho-detail-group">
+                      <div class="daimyo-detail-stat-box fixture-status-row"><span class="daimyo-detail-label">所在</span><span class="daimyo-detail-value">清洲城</span></div>
+                      <div class="daimyo-detail-stat-box fixture-status-row"><span class="daimyo-detail-label">主君</span><span class="daimyo-detail-value">なし</span></div>
+                    </div>
+                    <div class="busho-detail-group">
+                      <div class="daimyo-detail-stat-box fixture-status-row"><span class="daimyo-detail-label">年齢</span><span class="daimyo-detail-value">27歳</span></div>
+                      <div class="daimyo-detail-stat-box fixture-status-row"><span class="daimyo-detail-label">俸禄</span><span class="daimyo-detail-value">&nbsp;</span></div>
+                      <div class="daimyo-detail-stat-box fixture-status-row"><span class="daimyo-detail-label">一門</span><span class="daimyo-detail-value">&nbsp;</span></div>
+                      <div class="daimyo-detail-stat-box fixture-status-row"><span class="daimyo-detail-label">派閥</span><span class="daimyo-detail-value">&nbsp;</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="busho-detail-group busho-detail-biography-panel" id="fixture-biography-panel">
+                <div class="busho-detail-biography-text" id="fixture-biography-text">織田家当主。尾張国の統一を進め、桶狭間で今川義元を破った。のち美濃へ進出して岐阜を拠点とし、足利義昭を奉じて上洛する。天下布武を掲げて畿内へ勢力を伸ばし、各地の諸大名と戦った。長篠では鉄砲を活用して武田軍を破り、安土城を築いた。</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="busho-detail-action-footer"><button class="daimyo-detail-action-btn">配偶者</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

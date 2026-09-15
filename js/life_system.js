@@ -1,0 +1,2195 @@
+/**
+ * life_system.js
+ * 武将の登場・死亡を管理するシステムです！
+ */
+
+class LifeSystem {
+    constructor(game) {
+        this.game = game;
+    }
+
+    /**
+     * 低レベル生死・登場状態書換API。dead / unborn は LifeSystem が所有します。
+     * active / ronin は AffiliationSystem の責務です。
+     */
+    setLifeStatusRaw(person, newStatus) {
+        if (!person) return;
+        const S = window.GameConstants.BushoStatus;
+        if (newStatus !== S.DEAD && newStatus !== S.UNBORN) {
+            console.warn('LifeSystem: life status 以外の書換要求を拒否しました', newStatus, person.id);
+            return;
+        }
+        person.status = newStatus;
+    }
+
+    /**
+     * 寿命補正の低レベル公開窓口です。
+     * LifeSystem は「なぜ何年変えるか」を判断せず、呼び出し元が指定した sourceId と年数だけを安全に反映します。
+     * 同じ sourceId を再適用しても二重加算せず、別の寿命変更を壊さずに解除できます。
+     */
+    setLifespanModifier(personOrId, sourceId, years) {
+        const person = (typeof personOrId === 'object' && personOrId)
+            ? personOrId
+            : (this.game && typeof this.game.getBusho === 'function' ? this.game.getBusho(Number(personOrId)) : null);
+        if (!person || !sourceId) return 0;
+
+        if (!person.lifespanModifiers || typeof person.lifespanModifiers !== 'object' || Array.isArray(person.lifespanModifiers)) {
+            person.lifespanModifiers = {};
+        }
+
+        const oldYears = Number(person.lifespanModifiers[sourceId] || 0);
+        const newYears = Number(years || 0);
+        if (!Number.isFinite(newYears)) return 0;
+
+        const delta = newYears - oldYears;
+        if (delta !== 0) {
+            person.endYear = Number(person.endYear) + delta;
+        }
+
+        if (newYears === 0) {
+            delete person.lifespanModifiers[sourceId];
+        } else {
+            person.lifespanModifiers[sourceId] = newYears;
+        }
+
+        // endYear は寿命前能力補正にも使われるため、寿命変更と能力表示を同じ瞬間に同期します。
+        if (delta !== 0) this.recalculateBushoAgeStats(person);
+        return delta;
+    }
+
+    removeLifespanModifier(personOrId, sourceId) {
+        return this.setLifespanModifier(personOrId, sourceId, 0);
+    }
+
+    getLifespanModifier(personOrId, sourceId) {
+        const person = (typeof personOrId === 'object' && personOrId)
+            ? personOrId
+            : (this.game && typeof this.game.getBusho === 'function' ? this.game.getBusho(Number(personOrId)) : null);
+        if (!person || !sourceId || !person.lifespanModifiers) return 0;
+        const value = Number(person.lifespanModifiers[sourceId] || 0);
+        return Number.isFinite(value) ? value : 0;
+    }
+
+    hasLifespanModifier(personOrId, sourceId) {
+        return this.getLifespanModifier(personOrId, sourceId) !== 0;
+    }
+
+    hasBattleDeathLifespanExtension(personOrId) {
+        return this.hasLifespanModifier(personOrId, 'system:battle_death_initial');
+    }
+
+    /**
+     * 新規シナリオ開始時の討死武将延命を一元適用します。
+     * 「討死ならどう延命するか」は寿命ルールなので models ではなく LifeSystem が所有します。
+     * 本来の没年がシナリオ開始前の人物は延命対象にしません。
+     */
+    initializeBattleDeathLifespans(startYear = null) {
+        const year = Number(startYear !== null ? startYear : (this.game ? this.game.year : NaN));
+        if (!Number.isFinite(year) || !this.game || !Array.isArray(this.game.bushos)) return 0;
+
+        let changed = 0;
+        const sourceId = 'system:battle_death_initial';
+        for (const busho of this.game.bushos) {
+            if (!busho || !busho.isKilledInBattle) continue;
+            const originalEndYear = Number(busho.originalEndYear);
+            const birthYear = Number(busho.birthYear);
+            if (!Number.isFinite(originalEndYear) || !Number.isFinite(birthYear)) continue;
+            if (originalEndYear < year) continue;
+
+            const originalDeathAge = originalEndYear - birthYear;
+            const targetEndYear = originalDeathAge < 45
+                ? birthYear + 55
+                : originalEndYear + 10;
+            const years = targetEndYear - originalEndYear;
+            if (years <= 0) continue;
+
+            if (this.setLifespanModifier(busho, sourceId, years) !== 0) changed++;
+        }
+        return changed;
+    }
+
+    /**
+     * 1人分の年齢・寿命由来の能力補正を再計算します。
+     * LifeSystem が能力計算の正本を持ち、寿命補正の付け外し時にも同じ計算を即時反映します。
+     */
+    recalculateBushoAgeStats(busho, currentYear = null) {
+        if (!busho) return false;
+        const year = Number(currentYear !== null ? currentYear : (this.game ? this.game.year : NaN));
+        if (!Number.isFinite(year) || !Number.isFinite(Number(busho.birthYear)) || !Number.isFinite(Number(busho.endYear))) return false;
+        if (busho.isNotBorn || (window.LifeStatusRules && window.LifeStatusRules.isUnborn(busho))) return false;
+
+        const requiredBaseStats = ['baseLeadership', 'baseStrength', 'basePolitics', 'baseDiplomacy', 'baseIntelligence'];
+        if (requiredBaseStats.some(key => !Number.isFinite(Number(busho[key])))) return false;
+
+        const age = year - Number(busho.birthYear);
+        let penaltyYoung = 0;
+        let penaltyOldGeneral = 0;
+        let penaltyOldInt = 0;
+
+        if (age < 20) {
+            penaltyYoung = 5 + (20 - age);
+        } else if (age < 30) {
+            penaltyYoung = Math.ceil((30 - age) / 2);
+        }
+
+        if (age >= 61) {
+            penaltyOldGeneral = 5 + Math.ceil((age - 60) / 2);
+        } else if (age >= 46) {
+            penaltyOldGeneral = Math.ceil((age - 45) / 3);
+        }
+
+        if (age >= 71) {
+            penaltyOldInt = 5 + Math.ceil((age - 70) / 2);
+        } else if (age >= 56) {
+            penaltyOldInt = Math.ceil((age - 55) / 3);
+        }
+
+        let penaltyLifespan = 0;
+        const actualEndYear = Number(busho.endYear);
+        if (year >= actualEndYear - 5) {
+            const yearsPassed = year - (actualEndYear - 5) + 1;
+            penaltyLifespan = yearsPassed * 2;
+        }
+
+        busho.leadership = Math.max(1, Number(busho.baseLeadership) - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
+        busho.strength = Math.max(1, Number(busho.baseStrength) - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
+        busho.politics = Math.max(1, Number(busho.basePolitics) - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
+        busho.diplomacy = Math.max(1, Number(busho.baseDiplomacy) - penaltyYoung - penaltyOldGeneral - penaltyLifespan);
+        busho.intelligence = Math.max(1, Number(busho.baseIntelligence) - penaltyYoung - penaltyOldInt - penaltyLifespan);
+        return true;
+    }
+
+    // 毎月の初め（1月）に「新しく登場する武将がいないか」をチェックします
+    async processStartMonth() {
+        if (this.game.month === 1) {
+            // 4000人超を一気に再計算すると古いWebViewのwatchdog/メモリ回収が追いつかないため、
+            // 月初だけは小分けにしてブラウザへ制御を返します。
+            await this.updateAllBushosAgeCooperatively();
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:age_done');
+            
+            // ★ここから追加：姫の年齢（出生前かどうか）も毎年1月にチェックします！
+            const currentYear = this.game.year;
+            for (const p of this.game.princesses) {
+                if (p.birthYear > currentYear) {
+                    this.setLifeStatusRaw(p, window.GameConstants.BushoStatus.UNBORN);
+                    p.isNotBorn = true;
+                } else if (p.isNotBorn && p.birthYear <= currentYear) {
+                    p.isNotBorn = false; // 生まれたのでフラグを下ろします
+                }
+            }
+
+            await this.checkBirth();
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:birth_done');
+            await this._yieldToBrowserForLife();
+            await this.checkNameChange();
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:name_done');
+            this.checkFaceChange();
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:face_done');
+            await this._yieldToBrowserForLife();
+
+            // ★追加：毎年1月に、ランダムで新しい姫が登場するかチェックします！
+            await this.checkRandomPrincessAppearance();
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:princess_done');
+
+            // ★高速化：派閥再編は、この直後に GameManager → factionSystem.processStartMonth() から
+            // 必ず1回実行されるため、1月だけ同じ全国再編を二重実行するのをやめます。
+        }
+    }
+
+    // 毎月の終わりに「寿命を迎えて亡くなる武将がいないか」をチェックします
+    async processEndMonth() {
+        await this.checkDeath();
+    }
+
+    _shouldDeferMapRefreshForMobileWatch() {
+        return !!(
+            this.game && this.game.isWatchMode && this.game.isProcessingAI &&
+            typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')
+        );
+    }
+
+    _requestMapRefresh({ updatePanelHeader = false } = {}) {
+        if (!this.game || !this.game.ui) return;
+        if (this._shouldDeferMapRefreshForMobileWatch()) {
+            this.game._aiDeferredMapRefresh = true;
+            // ヘッダーは軽量なので従来の情報鮮度を保ち、全国地図DOMだけを延期します。
+            if (updatePanelHeader && typeof this.game.ui.updatePanelHeader === 'function') this.game.ui.updatePanelHeader();
+            if (typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic('life:map_refresh:mobile_watch_deferred');
+            }
+            return;
+        }
+        if (typeof this.game.ui.renderMap === 'function') this.game.ui.renderMap();
+        if (updatePanelHeader && typeof this.game.ui.updatePanelHeader === 'function') this.game.ui.updatePanelHeader();
+    }
+
+    _yieldToBrowserForLife() {
+        return new Promise(resolve => {
+            if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(() => setTimeout(resolve, 0));
+            } else {
+                setTimeout(resolve, 0);
+            }
+        });
+    }
+
+    async updateAllBushosAgeCooperatively() {
+        const currentYear = this.game.year;
+        const bushos = this.game.bushos || [];
+        const isPC = typeof document !== 'undefined' && document.body && document.body.classList.contains('is-pc');
+        const chunkSize = isPC ? 768 : 128;
+        for (let start = 0; start < bushos.length; start += chunkSize) {
+            const end = Math.min(bushos.length, start + chunkSize);
+            for (let i = start; i < end; i++) {
+                const b = bushos[i];
+                if (b.birthYear > currentYear) {
+                    this.setLifeStatusRaw(b, window.GameConstants.BushoStatus.UNBORN);
+                    b.isNotBorn = true;
+                } else if (b.isNotBorn && b.birthYear <= currentYear) {
+                    b.isNotBorn = false;
+                }
+                this.recalculateBushoAgeStats(b, currentYear);
+            }
+            if (end < bushos.length) await this._yieldToBrowserForLife();
+        }
+    }
+
+    // ★ 全員の年齢から能力値を計算し直します。
+    updateAllBushosAge() {
+        const currentYear = this.game.year;
+
+        for (const b of this.game.bushos) {
+            // 出生状態の同期は年次処理だけで行い、寿命補正の付け外しからは触りません。
+            if (b.birthYear > currentYear) {
+                this.setLifeStatusRaw(b, window.GameConstants.BushoStatus.UNBORN);
+                b.isNotBorn = true;
+            } else if (b.isNotBorn && b.birthYear <= currentYear) {
+                b.isNotBorn = false;
+            }
+
+            this.recalculateBushoAgeStats(b, currentYear);
+        }
+    }
+    
+    // ==========================================
+    // 条件付きの「改名」と「顔変更」を一元管理します。
+    // daimyo: だけでなく、歴史イベント開始前補正などが同じデータを再利用できるようにします。
+    // ==========================================
+    applyNameAndFaceChangeByTrigger(busho, trigger) {
+        const triggerKey = String(trigger || '').trim();
+        const oldNameStr = busho ? busho.fullName : '';
+        let newNameStr = oldNameStr;
+        let isNameChanged = false;
+        let isFaceChanged = false;
+        if (!busho || !triggerKey) {
+            return { isNameChanged, isFaceChanged, oldNameStr, newNameStr };
+        }
+
+        if (busho.nameChange && busho.nameChange.includes(`${triggerKey}:`)) {
+            const changes = busho.nameChange.split('/');
+            for (const change of changes) {
+                const parts = change.split(':');
+                if (parts.length !== 3 || parts[0].trim() !== triggerKey) continue;
+                if (typeof busho.applyNameChangeData === 'function') {
+                    busho.applyNameChangeData(parts[1].trim(), parts[2].trim());
+                }
+                newNameStr = busho.fullName;
+                isNameChanged = oldNameStr !== newNameStr;
+            }
+        }
+
+        if (busho.faceChange && busho.faceChange.includes(`${triggerKey}:`)) {
+            const changes = busho.faceChange.split('/');
+            for (const change of changes) {
+                const parts = change.split(':');
+                if (parts.length !== 2 || parts[0].trim() !== triggerKey) continue;
+                const newFace = parts[1].trim();
+                if (newFace && busho.faceIcon !== newFace) {
+                    busho.faceIcon = newFace;
+                    isFaceChanged = true;
+                }
+            }
+        }
+
+        return { isNameChanged, isFaceChanged, oldNameStr, newNameStr };
+    }
+
+    // ==========================================
+    // ★大名就任時の「改名」と「顔変更」の公開窓口。
+    // 実データ解釈は applyNameAndFaceChangeByTrigger() を正本にします。
+    // ==========================================
+    applyDaimyoNameAndFaceChange(busho, messages = null) {
+        const info = this.applyNameAndFaceChangeByTrigger(busho, 'daimyo');
+        if (messages && info.isNameChanged) {
+            messages.push(`家督を継ぐにあたり、${info.oldNameStr}は\n「${info.newNameStr}」と名を改めました。`);
+        }
+        return info;
+    }
+    
+    // ★ 改名のチェック（毎年1月に行います）
+    async checkNameChange() {
+        const currentYear = this.game.year;
+        let isDaimyoChanged = false; // ★追加：大名家が改名したかどうかをメモする旗
+
+        // 武将全員をチェックします（まだ登場していない人や亡くなった人も、内部的に名前は変えておきます）
+        for (const b of this.game.bushos) {
+            if (!b.nameChange) continue;
+
+            // 「/」で区切られている複数の改名予定を一つずつ確認します
+            const changes = b.nameChange.split('/');
+            for (const change of changes) {
+                const parts = change.split(':');
+                // 年、名前（姓|名）、読み仮名（姓|名）の３つが揃っているか確認します
+                if (parts.length === 3) {
+                    const targetYear = Number(parts[0].trim());
+                    
+                    // ★修正：今の年と「ピッタリ同じ」データだけ名前を更新するようにします！（これで重さが解消されます！）
+                    if (targetYear === currentYear) {
+                        const oldName = b.name; // 今の名前をメモしておきます
+                        
+                        // ★修正：新しく作った共通の改名魔法を呼び出します！
+                        b.applyNameChangeData(parts[1].trim(), parts[2].trim());
+                        
+                        const newName = b.name; // 新しいフルネーム
+
+                        // ★お知らせを出す準備をします
+                        if (window.BushoStatusRules.isActive(b) || window.BushoStatusRules.isRonin(b)) {
+                            if (oldName !== newName) {
+                                let prefix = "";
+                                if (b.clan !== 0) {
+                                    const currentClan = this.game.getClan(b.clan);
+                                    if (currentClan) prefix = `${currentClan.name}の`;
+                                }
+                                
+                                const msg = `${prefix}${oldName}は「${newName}」に改名しました。`;
+                                let clanMsg = "";
+                                
+                                // ★先に大名家の名前を新しくする処理を終わらせます！
+                                // （先ほど消してしまった変数ではなく、新しい共通の b.familyName を使います）
+                                if (b.isDaimyo && b.clan !== 0) {
+                                    const clan = this.game.getClan(b.clan);
+                                    if (clan) {
+                                        const oldClanName = clan.name;
+                                        const newBaseName = b.clanNameStr;
+                                        const newClanYomi = b.clanYomiStr;
+                                        
+                                        if (clan.baseName !== newBaseName) {
+                                            clan.baseName = newBaseName; 
+                                            clan.name = newBaseName;
+                                            clan.yomi = newClanYomi; 
+                                            
+                                            clanMsg = `当主の改名により、${oldClanName}は今後「${clan.name}」となります。`;
+                                            isDaimyoChanged = true; // ★追加：大名家が改名したので旗を立てます！
+                                        }
+                                    }
+                                }
+                                
+                                // ==========================================
+                                // ★ここから追加：名前が変わって画面がパニック（フリーズ）になるのを防ぐため、
+                                // メッセージを出す前に一瞬だけ息継ぎ（お休み）をさせます！
+                                await new Promise(resolve => setTimeout(resolve, 50));
+
+                                // ★すべての裏処理が終わってから、メッセージを出して待ちます！
+                                this.game.ui.log(msg, { clanIds: Number(b.clan) > 0 ? [Number(b.clan)] : [], category: 'family', inferCurrentTurn: false });
+                                if (b.clan === this.game.playerClanId || b.isDaimyo) {
+                                    await this.game.ui.showDialogAsync(msg); 
+                                }
+                                
+                                if (clanMsg !== "") {
+                                    this.game.ui.log(clanMsg, { clanIds: Number(b.clan) > 0 ? [Number(b.clan)] : [], category: 'family', inferCurrentTurn: false });
+                                    await this.game.ui.showDialogAsync(clanMsg);
+                                }
+                                // ==========================================
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ★追加：すべての武将のチェックが終わった後、大名が改名していたら1回だけ情報を最新にします！
+        if (isDaimyoChanged) {
+            // 同名被りの回避を行い、家名を確定させます
+            if (this.game.updateClanDisplayNames) {
+                this.game.updateClanDisplayNames();
+            }
+            // 確定した情報でマップやパネルを描き直します。
+            // 古いスマホの観戦中はこの直後も月初処理が続くため、全国DOM再生成は安全地点へまとめます。
+            this._requestMapRefresh({ updatePanelHeader: true });
+        }
+    }
+
+    // ★ 年指定で顔グラフィックを変更する魔法！（毎年1月に行います）
+    checkFaceChange() {
+        const currentYear = this.game.year;
+
+        for (const b of this.game.bushos) {
+            if (!b.faceChange || !window.PortraitRules) continue;
+            const newFace = window.PortraitRules.getExactYearFace(b.faceChange, currentYear);
+            if (newFace) b.faceIcon = newFace;
+        }
+    }
+    
+    _recordBushoAppearance(busho) {
+        if (!busho || !this.game.historySystem) return;
+        const name = busho.fullName || busho.name;
+        let text = `【武将登場】${name}が登場しました。`;
+        let clanIds = [];
+        if ((busho.belongKunishuId || 0) > 0 && this.game.kunishuSystem) {
+            const kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
+            const groupName = kunishu && typeof kunishu.getName === 'function' ? kunishu.getName(this.game) : '諸勢力';
+            text = `【武将登場】${name}が${groupName}に加わりました。`;
+        } else if (window.BushoStatusRules.isRonin(busho) || Number(busho.clan) === 0) {
+            text = `【武将登場】${name}が浪人として現れました。`;
+        } else if (Number(busho.clan) > 0) {
+            const clan = this.game.getClan(busho.clan);
+            text = `【武将登場】${clan ? clan.name : '大名家'}に${name}が加わりました。`;
+            clanIds = [busho.clan];
+        }
+        this.game.historySystem.record(text, { clanIds, category: 'appearance', inferCurrentTurn: false });
+    }
+
+    // ★ 登場のチェック（毎年1月に行います）
+    async checkBirth() {
+        const currentYear = this.game.year;
+        
+        // まだ登場していない（statusが'unborn'）武将の中で、登場年を迎えた人を探します
+        const unbornBushos = this.game.bushos.filter(b => window.LifeStatusRules.isUnborn(b) && b.startYear <= currentYear);
+        
+        // ★変更：メッセージをためる箱（配列）は使わず、一つずつ順番に出すために「for...of」という魔法の繰り返しを使います！
+        for (const b of unbornBushos) {
+            // ★変更：大名家に所属しておらず、諸勢力でもない場合は「浪人」になります
+            if (b.clan === 0 && (b.belongKunishuId || 0) === 0) {
+                // 登場前:浪人 の場合
+                this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.RONIN);
+                b.loyalty = 50; // ★浪人として登場したので、忠誠度を50にします！
+                const targetCastle = this.game.getCastle(b.castleId);
+                if (targetCastle) {
+                    targetCastle.samuraiIds.push(b.id);
+                }
+            } else if ((b.belongKunishuId || 0) > 0) {
+                // 諸勢力データの取得と生存チェック
+                const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId) : null;
+                const isKunishuAlive = kunishu && !kunishu.isDestroyed;
+
+                if (isKunishuAlive) {
+                    // ★ 諸勢力が健在な場合：そのまま加入
+                    this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.ACTIVE);
+                    const targetCastle = this.game.getCastle(b.castleId);
+                    if (targetCastle) {
+                        targetCastle.samuraiIds.push(b.id);
+                    }
+
+                    // もし今の頭領が「モブ頭領」なら、新しく登場した武将と交代してモブ頭領を消します
+                    const currentLeader = this.game.getBusho(kunishu.leaderId);
+                    if (currentLeader && currentLeader.isAutoLeader) {
+                        kunishu.leaderId = b.id;
+                        this.setLifeStatusRaw(currentLeader, window.GameConstants.BushoStatus.DEAD);
+                        if (targetCastle) {
+                            targetCastle.samuraiIds = targetCastle.samuraiIds.filter(id => id !== currentLeader.id);
+                        }
+                        
+                        const bushoName = b.fullName;
+                        const kunishuName = kunishu.getName(this.game);
+                        const msg = `${bushoName}が${kunishuName}の頭領に就任しました。`;
+                        
+                        this.game.ui.log(`【頭領交代】${msg}`);
+                        await this.game.ui.showDialogAsync(msg, false, 0);
+                    }
+                } else {
+                    // ★ 諸勢力が壊滅している場合：一門を頼るか浪人になる
+                    b.belongKunishuId = 0; // 諸勢力所属を解除
+
+                    // 活動中の一門武将がいるかチェック
+                    const activeRelatives = this.game.bushos.filter(other => 
+                        window.BushoStatusRules.isActive(other) &&
+                        Number(other.clan) > 0 &&
+                        Number(other.belongKunishuId || 0) === 0 &&
+                        other.id !== b.id &&
+                        b.familyIds.some(fId => other.familyIds.includes(fId))
+                    );
+
+                    if (activeRelatives.length > 0) {
+                        // 一門がいる場合：一番相性や年齢の近い一門を頼って大名家に仕官
+                        activeRelatives.sort((x, y) => {
+                            const diffAffinityX = PersonnelRules.calcAffinityDiff(b.affinity || 0, x.affinity || 0);
+                            const diffAffinityY = PersonnelRules.calcAffinityDiff(b.affinity || 0, y.affinity || 0);
+                            if (diffAffinityX !== diffAffinityY) {
+                                return diffAffinityX - diffAffinityY;
+                            }
+                            const diffAgeX = Math.abs((b.birthYear || 1500) - (x.birthYear || 1500));
+                            const diffAgeY = Math.abs((b.birthYear || 1500) - (y.birthYear || 1500));
+                            return diffAgeX - diffAgeY;
+                        });
+
+                        const targetRelative = activeRelatives[0];
+                        this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.ACTIVE);
+                        this.game.affiliationSystem.setClanIdRaw(b, targetRelative.clan);
+                        this.game.affiliationSystem.setCastleIdRaw(b, targetRelative.castleId);
+
+                        const targetCastle = this.game.getCastle(b.castleId);
+                        if (targetCastle) {
+                            targetCastle.samuraiIds.push(b.id);
+                        }
+
+                        // プレイヤーの大名家に仕官した場合のお知らせ表示
+                        if (b.clan === this.game.playerClanId) {
+                            const nameStr = b.fullName;
+                            const msg = `${nameStr}が元服し、当家に加わりました！`;
+                            this.game.ui.log(msg, { history: false });
+                            await this.game.ui.showDialogAsync(msg, false, 0);
+                        }
+                    } else {
+                        // 一門がいない場合：浪人として登場
+                        this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.RONIN);
+                        this.game.affiliationSystem.setClanIdRaw(b, 0);
+                        b.loyalty = 50;
+                        const targetCastle = this.game.getCastle(b.castleId);
+                        if (targetCastle) {
+                            targetCastle.samuraiIds.push(b.id);
+                        }
+                    }
+                }
+
+            } else {
+                // 登場前:仕官 の場合
+                this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.ACTIVE);
+                
+                // ★追加：「登場前:仕官」の武将に一門武将がいるかチェックします
+                // 条件：すでに登場して活動している、自分自身ではない、一門IDが共通している
+                const activeRelatives = this.game.bushos.filter(other => 
+                    window.BushoStatusRules.isActive(other) &&
+                    Number(other.clan) > 0 &&
+                    Number(other.belongKunishuId || 0) === 0 &&
+                    other.id !== b.id &&
+                    b.familyIds.some(fId => other.familyIds.includes(fId))
+                );
+
+                let hasRelative = false;
+                if (activeRelatives.length > 0) {
+                    hasRelative = true;
+                    // ★ここから変更：複数いる場合は、相性と年齢で一番ピッタリな人を選びます！
+                    activeRelatives.sort((x, y) => {
+                        // 相性の差を計算します
+                        const diffAffinityX = PersonnelRules.calcAffinityDiff(b.affinity || 0, x.affinity || 0);
+                        const diffAffinityY = PersonnelRules.calcAffinityDiff(b.affinity || 0, y.affinity || 0);
+                        
+                        // 相性の差が違えば、差が小さい（相性が近い）人を優先します
+                        if (diffAffinityX !== diffAffinityY) {
+                            return diffAffinityX - diffAffinityY;
+                        }
+                        
+                        // 相性の差が全く同じなら、年齢（生まれた年）の差が小さい人を優先します
+                        const diffAgeX = Math.abs((b.birthYear || 1500) - (x.birthYear || 1500));
+                        const diffAgeY = Math.abs((b.birthYear || 1500) - (y.birthYear || 1500));
+                        return diffAgeX - diffAgeY;
+                    });
+
+                    // 並び替えて1番上に来た武将のお城に移動して、所属する大名家も合わせます
+                    this.game.affiliationSystem.setCastleIdRaw(b, activeRelatives[0].castleId);
+                    this.game.affiliationSystem.setClanIdRaw(b, activeRelatives[0].clan);
+                }
+
+                const targetCastle = this.game.getCastle(b.castleId);
+                
+                if (targetCastle) {
+                    // もし一門がいなくて、予定されていた城の持ち主が変わっていたら、その城の今の大名家に仕えます
+                    if (!hasRelative) {
+                        const ownerClanId = targetCastle.ownerClan;
+                        if (ownerClanId === 0) {
+                            // 城が空き城なら、仕方なく浪人になります
+                            this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.RONIN);
+                            this.game.affiliationSystem.setClanIdRaw(b, 0);
+                            b.loyalty = 50; // ★浪人になったので忠誠度を50にします！
+                        } else {
+                            this.game.affiliationSystem.setClanIdRaw(b, ownerClanId);
+                        }
+                    }
+
+                    targetCastle.samuraiIds.push(b.id);
+                    
+                    // プレイヤーの大名家にやってきた場合は、お知らせのメッセージを作ります
+                    if (window.BushoStatusRules.isActive(b) && b.clan === this.game.playerClanId) {
+                        const nameStr = b.fullName;
+                        let msg = "";
+                        if (hasRelative) {
+                            msg = `${nameStr}が元服し、当家に加わりました！`;
+                        } else {
+                            msg = `${nameStr}が当家に仕官しました！`;
+                        }
+                        // ★変更：リストに溜め込まず、ここで直接画面に出して「OK」を押すまで待ちます！
+                        this.game.ui.log(msg, { history: false });
+                        await this.game.ui.showDialogAsync(msg, false, 0);
+                    }
+                } else {
+                    // 万が一城が見つからなかった時の安全策
+                    this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.RONIN);
+                    this.game.affiliationSystem.setClanIdRaw(b, 0);
+                    b.loyalty = 50; // ★浪人になったので忠誠度を50にします！
+                }
+            }
+
+            this._recordBushoAppearance(b);
+        }
+
+        // ★ここから追加：姫の登場チェックを書き足します！
+        const unbornPrincesses = this.game.princesses.filter(p => window.LifeStatusRules.isUnborn(p) && p.startYear <= currentYear);
+
+        // ★変更：ここも「for...of」の魔法の繰り返しに変えて、一つずつ待ちます！
+        for (const p of unbornPrincesses) {
+            let targetClanId = 0;
+            let fatherNameStr = ""; // ★お父さんの名前を書いておくメモ帳です
+
+            // ★修正：p.fatherId から p.realFatherId に名前を変更します
+            if (p.realFatherId > 0) {
+                // お父さんがいる場合は、お父さんのいる大名家を探します
+                const father = this.game.getBusho(p.realFatherId);
+                if (father && window.LifeStatusRules.isPresent(father) && father.clan !== 0) {
+                    targetClanId = father.clan;
+                    fatherNameStr = father.fullName; // ★お父さんの名前から「|」を消してメモします
+                }
+            }
+            
+            // ★お父さんが設定されていない、またはお父さんが死んだり浪人していて大名家が見つからなかった場合！
+            if (targetClanId === 0 && p.originalClanId > 0) {
+                const clanCastles = this.game.getClanCastles(p.originalClanId);
+                // その大名家が滅亡していなければ（お城を持っていれば）
+                if (clanCastles.length > 0) {
+                    targetClanId = p.originalClanId;
+                }
+            }
+
+            if (targetClanId > 0) {
+                p.status = 'unmarried'; // 登場して「未婚」になります
+                p.currentClanId = targetClanId;
+                
+                // ★ここを追加：登場した姫を、大名家の「姫の名簿」にしっかり登録します！
+                const targetClan = this.game.getClan(targetClanId);
+                if (targetClan) {
+                    if (!targetClan.princessIds) targetClan.princessIds = [];
+                    if (!targetClan.princessIds.includes(p.id)) {
+                        targetClan.princessIds.push(p.id);
+                    }
+                }
+                
+                // プレイヤーの大名家に姫がやってきたらお知らせのメッセージを作ります
+                if (targetClanId === this.game.playerClanId) {
+                    let msg = "";
+                    if (fatherNameStr !== "") {
+                        // ★ここから変更：お父さんの身分によってメッセージを切り替えます！
+                        let isRoyal = false;
+                        const playerDaimyo = this.game.getClanDaimyo(this.game.playerClanId);
+                        const fatherData = this.game.getBusho(p.realFatherId); // お父さんのデータをもう一度呼び出します
+                        
+                        if (playerDaimyo && fatherData) {
+                            // お父さんが大名本人か、血の繋がった直接の一門（baseFamilyIdsが共通）かをチェックします
+                            const isDirectFamily = fatherData.baseFamilyIds.some(fId => playerDaimyo.baseFamilyIds.includes(fId));
+                            if (fatherData.id === playerDaimyo.id || isDirectFamily) {
+                                isRoyal = true;
+                            }
+                        }
+
+                        // 大名や直接の一門の場合は特別なお知らせ！
+                        if (isRoyal) {
+                            msg = `${fatherNameStr}様の姫君、${p.name}様がお生まれになりました！`;
+                        } else {
+                            // 間接的な一門や、普通の家臣の場合はこちらになります
+                            msg = `${fatherNameStr}のご息女、${p.name}が誕生しました！`;
+                        }
+                    } else {
+                        msg = `${p.name}が誕生しました！`;
+                    }
+                    // ★変更：リストに溜め込まず、ここで直接画面に出して「OK」を押すまで待ちます！
+                    this.game.ui.log(msg, { clanIds: [targetClanId], category: 'family', inferCurrentTurn: false });
+                    await this.game.ui.showDialogAsync(msg, false, 0);
+                }
+            }
+        }
+        // ★追加ここまで！
+    }
+
+    // ★ 寿命のチェック（毎月行います）
+    async checkDeath() {
+        const startY = this.game.gameStartYear || window.MainParams.StartYear;
+        const startM = this.game.gameStartMonth || window.MainParams.StartMonth;
+        const elapsedTurns = ((this.game.year - startY) * 12) + (this.game.month - startM);
+        
+        if (elapsedTurns < 3) {
+            return; 
+        }
+
+        const currentYear = this.game.year;
+
+        // ★高速化：同じ月に複数人が死亡しても、死亡者ごとに全国の派閥を再編しません。
+        // 変化した勢力IDだけを集め、死亡判定が終わった後に各勢力1回だけ再編します。
+        const factionDirtyClanIds = new Set();
+        
+        // 【変更点①】没年の「1年前（endYear - 1）」を迎えている武将を探すようにしました！
+        const targetBushos = this.game.bushos.filter(b => {
+            if (window.LifeStatusRules.isDead(b)) return false; // ★変更：未登場（unborn）を除外しないようにしました
+            const actualEndYear = b.endYear;
+            return currentYear >= (actualEndYear - 1);
+        });
+
+        for (const b of targetBushos) {
+            // 【変更点②】没年の「1年前」をスタート地点として、そこから何年過ぎたかを計算します
+            const actualEndYear = b.endYear;
+            const yearsPassed = currentYear - (actualEndYear - 1);
+            
+            // 【変更点③】確率は、スタート（没年1年前）が2%(0.02)、次の年（没年）が4%(0.04)...と増えます
+            const deathProb = 0.02 + (yearsPassed * 0.02);
+
+            // サイコロを振って、確率に当たってしまったらお別れです…
+            if (Math.random() < deathProb) {
+                const wasUnborn = (window.LifeStatusRules.isUnborn(b)); // ★追加：死ぬ前に未登場だったかメモしておく
+                
+                // ★ここから追加：武将死亡時のイベント専用の引き出しを開けます
+                const formerClanId = Number(b.clan) || 0;
+                let context = { deadBusho: b, skipNormalMessage: false, skipDaimyoSuccession: false, deferFactionUpdate: true };
+                if (this.game.eventManager) {
+                    await this.game.eventManager.processEvents('busho_death', context);
+                }
+
+                await this.executeDeath(b, context); // ★修正：イベントの結果（context）を渡します
+                if (formerClanId > 0) factionDirtyClanIds.add(formerClanId);
+                
+                // もしプレイヤーの家臣で、すでに登場していて、かつ「イベントで通常のメッセージを消す」指示がなければお知らせを出します
+                if (formerClanId === this.game.playerClanId && !wasUnborn && !context.skipNormalMessage) {
+                    const name = b.fullName;
+                    this.game.ui.log(`${name}が死亡しました……`, { history: false });
+                    // ★一人ずつ順番にダイアログを出して、押すまで待ちます！
+                    await this.game.ui.showDialogAsync(`${name}が死亡しました……`, false, 0);
+                }
+            }
+        }
+
+        // ★追加：死亡フラグ（deathFlag）が立っている武将の死亡判定
+        // すでに寿命で死んだ武将（statusがdead）を除外して、フラグが立っている武将だけを集めます
+        const flagTargetBushos = this.game.bushos.filter(b => !window.LifeStatusRules.isDead(b) && b.deathFlag === true);
+        
+        for (const b of flagTargetBushos) {
+            // ★追加：討死武将が本来の寿命を過ぎているかチェックして、確率を変えます
+            let deathProb = 0.20; // 基本は20%の確率です
+            if (b.isKilledInBattle && currentYear >= b.originalEndYear) {
+                deathProb = 0.95; // 条件に当てはまれば、95%の確率で死亡するようにします
+            }
+
+            // ★追加：スキルマネージャーに「スキルによる死亡確率の倍率」を聞いて計算します
+            if (typeof SkillManager !== 'undefined') {
+                deathProb *= SkillManager.calcDeathProbModifier(b, this.game);
+            }
+
+            // 指定された確率で死亡します
+            if (Math.random() < deathProb) {
+                const wasUnborn = (window.LifeStatusRules.isUnborn(b));
+                
+                // ★ここから追加：武将死亡時のイベント専用の引き出しを開けます
+                const formerClanId = Number(b.clan) || 0;
+                let context = { deadBusho: b, skipNormalMessage: false, skipDaimyoSuccession: false, deferFactionUpdate: true };
+                if (this.game.eventManager) {
+                    await this.game.eventManager.processEvents('busho_death', context);
+                }
+
+                await this.executeDeath(b, context); // ★修正：イベントの結果（context）を渡します
+                if (formerClanId > 0) factionDirtyClanIds.add(formerClanId);
+                
+                // もしプレイヤーの家臣で、すでに登場していて、かつ「イベントで通常のメッセージを消す」指示がなければお知らせを出します
+                if (formerClanId === this.game.playerClanId && !wasUnborn && !context.skipNormalMessage) {
+                    const name = b.fullName;
+                    this.game.ui.log(`戦傷が元となり${name}が死亡しました……`, { history: false });
+                    await this.game.ui.showDialogAsync(`戦傷が元となり${name}が死亡しました……`, false, 0);
+                }
+            }
+        }
+
+        // ★高速化：死亡で変化した勢力だけ、まとめて1回ずつ派閥を再編します。
+        if (this.game.factionSystem && factionDirtyClanIds.size > 0) {
+            for (const clanId of factionDirtyClanIds) {
+                this.game.factionSystem.updateFactions(clanId);
+            }
+            // 大きな月でもブラウザへ制御を返す機会を作ります。
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        // ★追加：全ての死亡判定が終わったので、全員のdeathFlagを綺麗にお掃除（false）します！
+        this.game.bushos.forEach(b => {
+            b.deathFlag = false;
+        });
+
+        // ★ここから追加：姫の寿命チェックを書き足します！
+        const targetPrincesses = this.game.princesses.filter(p =>
+            !window.LifeStatusRules.isDead(p) && currentYear >= (p.endYear - 1) // ★変更：未登場（unborn）を除外しないようにしました
+        );
+
+        for (const p of targetPrincesses) {
+            const yearsPassed = currentYear - (p.endYear - 1);
+            const deathProb = 0.02 + (yearsPassed * 0.02);
+
+            if (Math.random() < deathProb) {
+                const wasUnborn = (window.LifeStatusRules.isUnborn(p)); // ★追加：死ぬ前に未登場だったかメモしておく
+                this.setLifeStatusRaw(p, window.GameConstants.BushoStatus.DEAD); // 「死亡」の印をつけます
+                
+                // もし結婚していたら、旦那さんの奥さんリストから外します
+                if (p.husbandId > 0) {
+                    const husband = this.game.getBusho(p.husbandId);
+                    if (husband) {
+                        husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
+                        
+                        // 婚姻フラグの正本は DiplomacyManager。死亡した姫を除外して再評価する。
+                        const clanA = p.originalClanId;
+                        const clanB = husband.clan;
+                        if (clanA > 0 && clanB > 0 && clanA !== clanB && this.game.diplomacyManager) {
+                            const stillMarried = this.game.diplomacyManager.refreshMarriageRelation(clanA, clanB);
+                            if (!stillMarried && (clanA === this.game.playerClanId || clanB === this.game.playerClanId)) {
+                                const otherClan = this.game.getClan(clanA === this.game.playerClanId ? clanB : clanA);
+                                if (otherClan) {
+                                    const breakMsg = `${p.name}の死により、${otherClan.name}との婚姻関係は解消されました。`;
+                                    this.game.ui.log(breakMsg, { clanIds: [clanA, clanB], category: 'family', inferCurrentTurn: false });
+                                    await this.game.ui.showDialogAsync(breakMsg, false, 0);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // プレイヤーの家にいる姫だったら、悲しいお知らせを表示します（未登場の場合は出しません）
+                if (p.currentClanId === this.game.playerClanId && !wasUnborn) {
+                    this.game.ui.log(`${p.name}が死亡しました……`, { clanIds: Number(p.currentClanId) > 0 ? [Number(p.currentClanId)] : [], category: 'death', inferCurrentTurn: false });
+                    await this.game.ui.showDialogAsync(`${p.name}が死亡しました……`, false, 0);
+                }
+            }
+        }
+        // ★追加ここまで！
+    }
+
+    // お別れの処理をするところです
+    async executeDeath(busho, context = {}) { // ★修正：イベントの指示（context）を受け取れるようにします
+        // ★高速化：最後に所属を0へ変更する前の勢力IDを覚えておきます。
+        const formerClanId = Number(busho.clan) || 0;
+        const wasUnbornBeforeDeath = window.LifeStatusRules.isUnborn(busho);
+        if (!wasUnbornBeforeDeath && this.game.historySystem) {
+            const clan = formerClanId > 0 ? this.game.getClan(formerClanId) : null;
+            const prefix = clan ? `${clan.name}の` : '';
+            this.game.historySystem.record(`【武将死亡】${prefix}${busho.fullName || busho.name}が死亡しました。`, {
+                clanIds: formerClanId > 0 ? [formerClanId] : [], category: 'death', inferCurrentTurn: false
+            });
+        }
+        this.setLifeStatusRaw(busho, window.GameConstants.BushoStatus.DEAD); // ステータスを「死亡」にします
+        
+        // ★追加：自分が死んだ年より後に生まれる予定だった子供（実父としている武将・姫）を連鎖的に死亡させます
+        this.cascadeDeathToUnbornChildren(busho.id, this.game.year);
+        
+        // 夫が死亡したことによる姫の帰還処理と婚姻関係の再評価
+        if (busho.wifeIds && busho.wifeIds.length > 0) {
+            for (const wifeId of busho.wifeIds) {
+                const princess = this.game.getPrincess(wifeId);
+                if (princess && princess.status === 'married') {
+                    princess.husbandId = 0; // 未亡人になります
+                    
+                    // 1. 婚姻関係の再評価。夫IDを外した後なので、他の婚姻がなければここでだけフラグが落ちる。
+                    const clanA = princess.originalClanId;
+                    const clanB = busho.clan;
+                    if (clanA > 0 && clanB > 0 && clanA !== clanB && this.game.diplomacyManager) {
+                        const stillMarried = this.game.diplomacyManager.refreshMarriageRelation(clanA, clanB);
+                        if (!stillMarried && (clanA === this.game.playerClanId || clanB === this.game.playerClanId)) {
+                            const otherClan = this.game.getClan(clanA === this.game.playerClanId ? clanB : clanA);
+                            if (otherClan) {
+                                const breakMsg = `夫である${busho.fullName}の死により、${otherClan.name}との婚姻関係は解消されました。`;
+                                this.game.ui.log(breakMsg, { clanIds: [clanA, clanB], category: 'family', inferCurrentTurn: false });
+                                await this.game.ui.showDialogAsync(breakMsg, false, 0);
+                            }
+                        }
+                    }
+
+                    // 2. 姫の帰還先を探す
+                    let nextClanId = 0;
+                    
+                    // 実家（originalClanId）が残っているか
+                    if (princess.originalClanId > 0) {
+                        const originalClanCastles = this.game.getClanCastles(princess.originalClanId);
+                        if (originalClanCastles.length > 0) {
+                            nextClanId = princess.originalClanId;
+                        }
+                    }
+
+                    // 実家がない場合、お父さんの一門武将を頼る
+                    if (nextClanId === 0 && princess.realFatherId > 0) {
+                        const father = this.game.getBusho(princess.realFatherId);
+                        if (father) {
+                            const relatives = this.game.bushos.filter(b => 
+                                window.LifeStatusRules.isPresent(b) && b.clan > 0 &&
+                                father.familyIds.some(fId => b.familyIds.includes(fId))
+                            );
+
+                            if (relatives.length > 0) {
+                                let maxAchieve = -1;
+                                let candidates = [];
+                                for (const rel of relatives) {
+                                    const achieve = rel.achievementTotal || 0;
+                                    if (achieve > maxAchieve) {
+                                        maxAchieve = achieve;
+                                        candidates = [rel];
+                                    } else if (achieve === maxAchieve) {
+                                        candidates.push(rel);
+                                    }
+                                }
+                                if (candidates.length > 0) {
+                                    const targetBusho = candidates[Math.floor(Math.random() * candidates.length)];
+                                    nextClanId = targetBusho.clan;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 行き先の決定
+                    if (nextClanId > 0) {
+                        // ★ここから書き足し：大名家の「姫の名簿」も書き換えます！
+                        // 1. 今までいた大名家（亡くなった夫の家）の名簿から名前を消します
+                        if (busho.clan !== 0) {
+                            const oldClan = this.game.getClan(busho.clan);
+                            if (oldClan && oldClan.princessIds) {
+                                oldClan.princessIds = oldClan.princessIds.filter(id => id !== princess.id);
+                            }
+                        }
+                        
+                        // 2. 新しく帰る大名家の名簿に名前を書き足します
+                        const newClan = this.game.getClan(nextClanId);
+                        if (newClan) {
+                            if (!newClan.princessIds) newClan.princessIds = [];
+                            if (!newClan.princessIds.includes(princess.id)) {
+                                newClan.princessIds.push(princess.id);
+                            }
+                        }
+                        
+                        princess.currentClanId = nextClanId;
+                        princess.status = 'unmarried'; // 再び未婚に戻ります
+                    } else {
+                        // ★ここから修正：実家も親戚もない場合、夫の家が残っているかチェックします
+                        const husbandClanCastles = busho.clan > 0 ? this.game.getClanCastles(busho.clan) : [];
+                        
+                        if (husbandClanCastles.length > 0) {
+                            // 夫の家がまだお城を持っていれば、所属も名簿も変えず、「未婚」に戻って居座ります
+                            princess.status = 'unmarried';
+                        } else {
+                            // 夫の家も滅びていて完全に身寄りがないなら、ゲームから退場（死亡）させます
+                            this.setLifeStatusRaw(princess, window.GameConstants.BushoStatus.DEAD);
+                            
+                            if (busho.clan !== 0) {
+                                const oldClan = this.game.getClan(busho.clan);
+                                if (oldClan && oldClan.princessIds) {
+                                    oldClan.princessIds = oldClan.princessIds.filter(id => id !== princess.id);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // ★修正：夫が死亡したので、司令塔を使って姫本人や、
+                    // 婿を失ったお父さん（大名）の親戚リストもまとめて最新に更新します！
+                    FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
+                }
+            }
+            busho.wifeIds = []; // リストを空にします
+        }
+        
+        // ★ここを追加：官位を持っていたら朝廷に返す魔法！
+        if (busho.courtRankIds && busho.courtRankIds.length > 0) {
+            let wasShogun = false;
+            // ★追加：もし征夷大将軍を持っていたら、後継ぎのためにメモを残しておきます！
+            if (busho.courtRankIds.includes(this.game.courtRankSystem.RANK_ID_SHOGUN)) {
+                busho._wasShogun = true;
+                wasShogun = true;
+            }
+            busho.courtRankIds.forEach(rankId => {
+                this.game.courtRankSystem.returnRank(rankId);
+            });
+            busho.courtRankIds = []; // 自分の持ち物リストは空っぽにします
+
+            // 死亡した武将が将軍なら生き残っている一門に「左馬頭」を託します！
+            if (wasShogun) {
+                const relative = this.game.bushos.find(b => 
+                    window.LifeStatusRules.isPresent(b) && 
+                    b.id !== busho.id && 
+                    busho.familyIds.some(fId => b.familyIds.includes(fId))
+                );
+                
+                if (relative) {
+                    // ★修正：一元化したリストのIDを順番に試します！
+                    if (this.game.courtRankSystem) {
+                        for (let id of this.game.courtRankSystem.RANK_IDS_CANDIDATE) {
+                            if (this.game.courtRankSystem.grantRank(relative, id)) {
+                                break; // 授与できたら終了
+                            }
+                        }
+                    } else {
+                        if (!relative.courtRankIds) relative.courtRankIds = [];
+                        const hasCandidateRank = this.game.courtRankSystem.RANK_IDS_CANDIDATE.some(id => relative.courtRankIds.includes(id));
+                        if (!hasCandidateRank) {
+                            relative.courtRankIds.push(this.game.courtRankSystem.RANK_IDS_CANDIDATE[0]);
+                        }
+                    }
+                }
+            }
+        }
+        
+        const castle = this.game.getCastle(busho.castleId);
+        if (castle) {
+            // お城の武将リストから外します
+            castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
+        }
+        
+        // もし城主だったら、役職を外して新しい城主を決めます
+        if (busho.isCastellan) {
+            busho.isCastellan = false;
+            if (castle) {
+                this.game.updateCastleLord(castle);
+            }
+        }
+
+        // もし大名だったら、後継ぎを決めます
+        if (busho.isDaimyo) {
+            // ★追加：大名が死亡した時、勢力の朝廷貢献度を5分の1に減らします
+            const clan = this.game.getClan(busho.clan);
+            if (clan) {
+                clan.courtContribution = Math.floor((clan.courtContribution || 0) / 5);
+            }
+
+            // ★修正：イベントで「通常の家督相続をしない」指示がなければ、後継ぎを決めます
+            if (!context.skipDaimyoSuccession) {
+                await this.handleDaimyoDeath(busho);
+            } else {
+                busho.isDaimyo = false; // イベントで乗っ取られた場合でも、大名バッジはしっかり外しておきます
+            }
+        }
+
+        // ★もし国主だったら、後任を決めます
+        if (busho.isCommander) {
+            await this.handleCommanderDeath(busho);
+        }
+        this.game.affiliationSystem.setClanIdRaw(busho, 0);
+        this.game.affiliationSystem.setCastleIdRaw(busho, 0);
+        busho.belongKunishuId = 0;
+
+        // ★高速化：通常の単発死亡なら、その武将がいた勢力だけ再編します。
+        // 月末の一括死亡判定中は checkDeath() 側でまとめて処理します。
+        if (!context.deferFactionUpdate && this.game.factionSystem && formerClanId > 0) {
+            this.game.factionSystem.updateFactions(formerClanId);
+        }
+    }
+
+    // 大名が亡くなった時の後継ぎ選びです
+    async handleDaimyoDeath(daimyo) {
+        // ==========================================
+        // ★すでにすべてのお城を失って「滅亡」している場合は、後継ぎは選びません！
+        const clanCastles = this.game.getClanCastles(daimyo.clan);
+        if (clanCastles.length === 0) {
+            daimyo.isDaimyo = false;
+            return; 
+        }
+        // ==========================================
+
+        const messages = []; // ★順番に出すメッセージを溜めておくリストを作ります
+
+        // 今のゲームの年を時計で確認します
+        const currentYear = this.game.year;
+
+        // 1. 今活躍している家臣たちを集めます！
+        const activeBushos = this.game.getClanBushos(daimyo.clan).filter(b => b.id !== daimyo.id && window.BushoStatusRules.isActive(b) && !b.isDaimyo);
+        
+        // その中で「一門」の武将だけを抽出します！
+        const activeFamily = activeBushos.filter(b => daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
+
+        // まだ登場していない一門（※他勢力所属予定の武将を弾くため、自勢力予定か無所属に限定します）
+        const unbornFamily = this.game.bushos.filter(b => window.LifeStatusRules.isUnborn(b) && !b.isNotBorn && (b.clan === daimyo.clan || b.clan === 0) && daimyo.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
+
+        // ★追加：AI大名の場合のみ、浪人や諸勢力に所属している一門武将も探します！
+        let externalFamily = [];
+        if (Number(daimyo.clan) !== Number(this.game.playerClanId)) {
+            externalFamily = this.game.bushos.filter(b => {
+                // 自分自身は除外します
+                if (b.id === daimyo.id) return false;
+                // 一門ではない武将も除外します
+                if (!daimyo.familyIds.some(fId => b.familyIds.includes(fId))) return false;
+                
+                // 浪人なら候補に入れます
+                if (window.BushoStatusRules.isRonin(b)) return true;
+                
+                // 諸勢力に所属している武将の場合
+                if ((b.belongKunishuId || 0) > 0 && b.clan === 0) {
+                    // 諸勢力のデータを調べて、その武将が頭領かどうかを確認します
+                    const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId) : null;
+                    // 頭領だった場合は、候補から外します
+                    if (kunishu && kunishu.leaderId === b.id) {
+                        return false; 
+                    }
+                    // 頭領ではない普通の武将なら候補に入れます
+                    return true;
+                }
+                return false;
+            });
+        }
+
+        // まずは一門だけで候補リストを作ります
+        let allCandidates = [...activeFamily, ...unbornFamily, ...externalFamily];
+
+        // もし一門の候補が誰もいなければ、特例として「今活躍している家臣全員」を候補にします！
+        if (allCandidates.length === 0) {
+            allCandidates = [...activeBushos];
+        }
+
+        if (allCandidates.length > 0) {
+            let successor = null;
+
+            // 相続比較用の値は武将モデルへ一時プロパティとして書き込まず、この処理内だけで保持します。
+            const successionMetrics = new Map(allCandidates.map(b => [Number(b.id), {
+                isRelative: daimyo.familyIds.some(fId => b.familyIds.includes(fId)),
+                affinityDiff: Math.abs((daimyo.affinity || 0) - (b.affinity || 0)),
+                baseScore: b.leadership + b.intelligence,
+                isDirectSon: (b.realFatherId === daimyo.id || b.adoptiveFatherId === daimyo.id)
+            }]));
+
+            allCandidates.sort((a, b) => {
+                const am = successionMetrics.get(Number(a.id));
+                const bm = successionMetrics.get(Number(b.id));
+                // ★追加：隠居している武将は優先度を一番低く（後回しに）します！
+                if (a.isRetired && !b.isRetired) return 1;
+                if (!a.isRetired && b.isRetired) return -1;
+
+                // 一門（親戚）を優先します
+                if (am.isRelative && !bm.isRelative) return -1;
+                if (!am.isRelative && bm.isRelative) return 1;
+                
+                if (am.isRelative && bm.isRelative) {
+                    if (am.affinityDiff !== bm.affinityDiff) return am.affinityDiff - bm.affinityDiff;
+                    if (am.isDirectSon && !bm.isDirectSon) return -1;
+                    if (!am.isDirectSon && bm.isDirectSon) return 1;
+
+                    const aIsYounger = a.birthYear > daimyo.birthYear;
+                    const bIsYounger = b.birthYear > daimyo.birthYear;
+                    if (aIsYounger && !bIsYounger) return -1;
+                    if (!aIsYounger && bIsYounger) return 1;
+                    if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
+                }
+                return bm.baseScore - am.baseScore;
+            });
+
+            // ★ここから変更：プレイヤーの家なら自分で選ぶ魔法を復活させます！
+            // 念のため、文字と数字の違いで誤判定（勝手にAIが決めてしまうバグ）が起きないように Number() で包んで比較します
+            if (Number(daimyo.clan) === Number(this.game.playerClanId)) {
+                // プレイヤーが選ぶまで「待つ」魔法です
+                await new Promise(resolve => {
+                    this.game.ui.info.openBushoSelector('succession', null, {
+                        customBushos: allCandidates, // ★上で並び替えたリストをそのまま渡します
+                        customTitle: "後継者を選択",
+                        hideCancel: true, // 逃げられないように戻るボタンを消します
+                        onConfirm: (selectedIds) => {
+                            // 選ばれたリストの1番目の人（[0]）を後継ぎにします
+                            successor = this.game.getBusho(selectedIds[0]);
+                            resolve();
+                        }
+                    });
+                });
+            } else {
+                // AIの場合は、自動で一番ふさわしい人（一番上に来た人）を後継ぎにします！
+                successor = allCandidates[0];
+            }
+
+            // ★修正：改名前の「元の名前」をメモしておきます！
+            const originalName = successor.fullName;
+
+            let isExternalSuccessor = false;
+
+            // 外部の武将（未登場、浪人、諸勢力）だった場合はメッセージを用意します
+            if (window.LifeStatusRules.isUnborn(successor) || window.BushoStatusRules.isRonin(successor) || (successor.belongKunishuId || 0) > 0) {
+                isExternalSuccessor = true;
+                
+                if ((successor.belongKunishuId || 0) > 0) {
+                    const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(successor.belongKunishuId) : null;
+                    const kunishuName = kunishu ? kunishu.getName(this.game) : "諸勢力";
+                    successor.belongKunishuId = 0;
+                    messages.push(`${kunishuName}より${successor.fullName}が\n当主として迎え入れられました。`);
+                } else if (window.BushoStatusRules.isRonin(successor)) {
+                    messages.push(`${successor.fullName}が当主として迎え入れられました。`);
+                } else {
+                    messages.push(`${successor.fullName}が急遽元服し、家督を継ぎました。`);
+                }
+            }
+
+            // ==========================================
+            // ★大名交代の共通の魔法を呼び出します！
+            const clan = this.game.getClan(daimyo.clan);
+            const originalClanName = clan ? clan.name : ""; // ★元の家名をメモしておきます
+            
+            // ★一元化した引き継ぎセットアップ魔法にお任せします（死亡による交代なので、生前退位のフラグは false にします）
+            this.setupNewDaimyo(daimyo, successor, messages, false);
+            // ==========================================
+            
+            // ★メモしておいた家名を使って「〇〇家の」という言葉を作ります
+            const clanPrefix = originalClanName ? `${originalClanName}の` : "";
+            
+            let mainMsg = "";
+            if (isExternalSuccessor) {
+                mainMsg = `${clanPrefix}${daimyo.fullName}が死亡しました。`;
+                this.game.ui.log(`【当主交代】${mainMsg}`, { clanIds: [daimyo.clan], category: 'succession', inferCurrentTurn: false });
+            } else {
+                // ★修正：改名する前の「元の名前」を使います！
+                mainMsg = `${clanPrefix}${daimyo.fullName}が死亡し、${originalName}が家督を継ぎました。`;
+                this.game.ui.log(`【当主交代】${mainMsg}`, { clanIds: [daimyo.clan], category: 'succession', inferCurrentTurn: false });
+            }
+            
+            // ★一番最初に出すメインの死亡メッセージをリストの先頭に追加します
+            messages.unshift(mainMsg);
+
+            // ★追加：メッセージを出す「前」に、死んだ大名のマークを外す処理を終わらせます
+            daimyo.isDaimyo = false;
+
+            // ★順番に1つずつダイアログを出して、クリックされるまで待ちます！
+            for (const msg of messages) {
+                await this.game.ui.showDialogAsync(msg, false, 0);
+            }
+
+        } else {
+            // ★誰もいなかったら、新しく作った滅亡チェックの魔法にバトンタッチします！
+            daimyo.isDaimyo = false;
+            await this.checkClanExtinction(daimyo.clan, 'no_heir');
+        }
+    }
+    
+    // ★国主が亡くなった時の後任選びです
+    async handleCommanderDeath(commander) {
+        const legion = this.game.legions ? this.game.legions.find(l => l.commanderId === commander.id) : null;
+        if (!legion) {
+            commander.isCommander = false;
+            return; 
+        }
+
+        const messages = []; 
+        const currentYear = this.game.year;
+        
+        // 1. 今活躍している家臣たちを集めます！（大名と国主は弾きます）
+        const activeBushos = this.game.getClanBushos(commander.clan).filter(b => b.id !== commander.id && window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.isCommander);
+        
+        // その中で国主の「一門」の武将だけを抽出します！
+        const activeFamily = activeBushos.filter(b => commander.familyIds.some(fId => b.familyIds.includes(fId)));
+
+        // まだ登場していない一門（※他勢力所属予定の武将を弾くため、自勢力予定か無所属に限定します）
+        const unbornFamily = this.game.bushos.filter(b => window.LifeStatusRules.isUnborn(b) && !b.isNotBorn && (b.clan === commander.clan || b.clan === 0) && commander.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
+
+        // ★追加：AI国主の場合のみ、浪人や諸勢力に所属している一門武将も探します！
+        let externalFamily = [];
+        if (Number(commander.clan) !== Number(this.game.playerClanId)) {
+            externalFamily = this.game.bushos.filter(b => {
+                if (b.id === commander.id || b.isDaimyo || b.isCommander) return false;
+                if (!commander.familyIds.some(fId => b.familyIds.includes(fId))) return false;
+                if (window.BushoStatusRules.isRonin(b)) return true;
+                if ((b.belongKunishuId || 0) > 0 && b.clan === 0) {
+                    const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId) : null;
+                    if (kunishu && kunishu.leaderId === b.id) return false; 
+                    return true;
+                }
+                return false;
+            });
+        }
+
+        // まずは一門だけで候補リストを作ります
+        let allCandidates = [...activeFamily, ...unbornFamily, ...externalFamily];
+
+        // もし一門の候補が誰もいなければ、特例として「同じ軍団で活躍している家臣」を候補にします！
+        if (allCandidates.length === 0) {
+            allCandidates = activeBushos.filter(b => Number(this.game.getCastle(b.castleId)?.legionId || 0) === Number(legion.legionNo));
+        }
+
+        if (allCandidates.length > 0) {
+            let successor = null;
+
+            // 国主継承の比較値も武将本体へ残さず、ローカルな比較データとして扱います。
+            const successionMetrics = new Map(allCandidates.map(b => [Number(b.id), {
+                isRelative: commander.familyIds.some(fId => b.familyIds.includes(fId)),
+                affinityDiff: Math.abs((commander.affinity || 0) - (b.affinity || 0)),
+                baseScore: b.leadership + b.intelligence,
+                isDirectSon: (b.realFatherId === commander.id || b.adoptiveFatherId === commander.id)
+            }]));
+
+            allCandidates.sort((a, b) => {
+                const am = successionMetrics.get(Number(a.id));
+                const bm = successionMetrics.get(Number(b.id));
+                if (a.isRetired && !b.isRetired) return 1;
+                if (!a.isRetired && b.isRetired) return -1;
+
+                if (am.isRelative && !bm.isRelative) return -1;
+                if (!am.isRelative && bm.isRelative) return 1;
+                if (am.isRelative && bm.isRelative) {
+                    if (am.affinityDiff !== bm.affinityDiff) return am.affinityDiff - bm.affinityDiff;
+                    if (am.isDirectSon && !bm.isDirectSon) return -1;
+                    if (!am.isDirectSon && bm.isDirectSon) return 1;
+                }
+                return bm.baseScore - am.baseScore;
+            });
+
+            // ★並び替えて一番上に来た人を、自動で後任の国主にします！
+            successor = allCandidates[0];
+
+            const originalName = successor.fullName;
+            let isExternalSuccessor = false;
+
+            if (window.LifeStatusRules.isUnborn(successor) || window.BushoStatusRules.isRonin(successor) || (successor.belongKunishuId || 0) > 0) {
+                isExternalSuccessor = true;
+                
+                if ((successor.belongKunishuId || 0) > 0) {
+                    const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(successor.belongKunishuId) : null;
+                    const kunishuName = kunishu ? kunishu.getName(this.game) : "諸勢力";
+                    successor.belongKunishuId = 0;
+                    messages.push(`${kunishuName}より${successor.fullName}が\n跡継ぎとして迎え入れられました。`);
+                } else if (window.BushoStatusRules.isRonin(successor)) {
+                    messages.push(`${successor.fullName}が跡を継ぎました。`);
+                } else {
+                    messages.push(`${successor.fullName}が急遽元服し、跡を継ぎました。`);
+                }
+            }
+
+            // 選ばれた後任者を、死亡した国主がいた城に移動させます
+            const baseCastle = this.game.getCastle(commander.castleId);
+            if (baseCastle) {
+                if (window.BushoStatusRules.isRonin(successor) || window.BushoStatusRules.isActive(successor)) {
+                    this.game.affiliationSystem.leaveCastle(successor);
+                }
+
+                this.game.affiliationSystem.setActivityStatusRaw(successor, window.GameConstants.BushoStatus.ACTIVE);
+                this.game.affiliationSystem.transferClanRaw(successor, commander.clan, { syncSpouses: true });
+                this.game.affiliationSystem.setCastleIdRaw(successor, baseCastle.id);
+                successor.loyalty = 100;
+                if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
+            }
+
+            // 国主の役職を引き継ぎます
+            commander.isCommander = false;
+            successor.isCommander = true;
+            if (successor.isGunshi) this.game.affiliationSystem.clearGunshiRole(successor);
+            legion.commanderId = successor.id;
+            
+            // 国主になったら城主にします
+            successor.isCastellan = true;
+            const targetCastle = this.game.getCastle(successor.castleId);
+            if (targetCastle) {
+                const oldCastellan = this.game.getBusho(targetCastle.castellanId);
+                if (oldCastellan && Number(oldCastellan.id) !== Number(successor.id)) {
+                    oldCastellan.isCastellan = false;
+                }
+                targetCastle.castellanId = successor.id;
+            }
+
+            const clan = this.game.getClan(commander.clan);
+            const clanPrefix = clan ? `${clan.name}の` : "";
+            
+            let mainMsg = "";
+            if (isExternalSuccessor) {
+                mainMsg = `${clanPrefix}国主・${commander.fullName}が死亡しました。`;
+            } else {
+                mainMsg = `${clanPrefix}国主・${commander.fullName}が死亡し、${originalName}が新たな国主となりました。`;
+            }
+            this.game.ui.log(`【国主交代】${mainMsg}`, { clanIds: [commander.clan], category: 'appointment', inferCurrentTurn: false });
+            messages.unshift(mainMsg);
+
+            for (const msg of messages) {
+                await this.game.ui.showDialogAsync(msg, false, 0);
+            }
+
+        } else {
+            commander.isCommander = false;
+            if (this.game.castleManager) {
+                this.game.castleManager.disbandLegion(legion.id);
+            }
+            
+            const clan = this.game.getClan(commander.clan);
+            const clanPrefix = clan ? `${clan.name}の` : "";
+            
+            const msg = `${clanPrefix}国主・${commander.fullName}が死亡しました。\n後任となる武将がいないため、軍団は解散されました。`;
+            this.game.ui.log(msg, { clanIds: [commander.clan], category: 'appointment', inferCurrentTurn: false });
+            await this.game.ui.showDialogAsync(msg, false, 0);
+        }
+    }
+
+    // ==========================================
+    // ★ここから追加：大名が交代した時に起こる変化をまとめた「共通の魔法」です！
+    // ==========================================
+    // ★変更：4つ目の枠に「isSuccession（生前退位かどうか）」の目印を受け取れるようにしました
+    applyDaimyoChangeEffects(oldDaimyo, successor, messages, isSuccession = false) {
+        // ★当主交代があったら、今まで進めていた作戦（攻撃準備など）を一旦キャンセルして白紙に戻します！
+        if (this.game.aiOperationManager) {
+            if (this.game.aiOperationManager.operations[oldDaimyo.clan]) {
+                delete this.game.aiOperationManager.operations[oldDaimyo.clan];
+            }
+            // ★追加：長期的な「大目標（方針）」も白紙に戻して、新当主で考え直させます！
+            if (this.game.aiOperationManager.grandObjectives && this.game.aiOperationManager.grandObjectives[oldDaimyo.clan]) {
+                delete this.game.aiOperationManager.grandObjectives[oldDaimyo.clan];
+            }
+        }
+        
+        // ★新旧大名の能力比較と、忠誠・民忠への影響！
+        const oldTotal = oldDaimyo.leadership + oldDaimyo.strength + (oldDaimyo.politics || 0) + (oldDaimyo.diplomacy || 0) + oldDaimyo.intelligence + oldDaimyo.charm;
+        const newTotal = successor.leadership + successor.strength + (successor.politics || 0) + (successor.diplomacy || 0) + successor.intelligence + successor.charm;
+        const diff = newTotal - oldTotal;
+        let changeVal = 0;
+        if (Math.abs(diff) >= 101) {
+            const overDiff = diff > 0 ? diff - 100 : diff + 100;
+            changeVal = Math.floor(overDiff * 0.2);
+        }
+        changeVal = Math.max(-30, Math.min(30, changeVal));
+
+        // ★追加：生前退位（家督相続コマンド）の場合は、能力差によるショックの揺れを半分にします！
+        if (isSuccession) {
+            changeVal = Math.floor(changeVal / 2);
+        }
+
+        if (changeVal !== 0) {
+            const retainers = this.game.getClanBushos(oldDaimyo.clan).filter(b => b.id !== successor.id && window.BushoStatusRules.isActive(b));
+            retainers.forEach(b => {
+                b.loyalty = Math.max(0, Math.min(100, b.loyalty + changeVal));
+            });
+            
+            const clanCastlesInfo = this.game.getClanCastles(oldDaimyo.clan);
+            clanCastlesInfo.forEach(c => {
+                c.peoplesLoyalty = Math.max(0, Math.min(100, (c.peoplesLoyalty ?? 50) + changeVal));
+                if (changeVal < 0) {
+                    const decreasePercent = Math.abs(changeVal);
+                    c.soldiers = Math.floor(c.soldiers * ((100 - decreasePercent) / 100));
+                    c.population = Math.floor(c.population * ((100 - (decreasePercent / 2)) / 100));
+                }
+            });
+
+            if (oldDaimyo.clan === this.game.playerClanId) {
+                if (changeVal > 0) {
+                    messages.push(`新当主への期待から、家臣団の気勢が高まっています！`);
+                } else {
+                    messages.push(`当主交代による不安から、家臣団が動揺しています……`);
+                }
+            }
+        }
+        
+        // ★当主交代による外交関係の変動！
+        this.game.clans.forEach(otherClan => {
+            if (otherClan.id === 0 || otherClan.id === oldDaimyo.clan) return;
+            const rel = this.game.diplomacyManager.getRelation(oldDaimyo.clan, otherClan.id);
+            if (!rel) return;
+
+            let changeAmount = 0;
+            if (rel.status === '普通' || rel.status === '友好') {
+                if (rel.sentiment >= 51 && rel.sentiment <= 54) {
+                    changeAmount = 50 - rel.sentiment; 
+                    if (isSuccession) changeAmount = Math.floor(changeAmount / 2); // ★生前退位なら半減
+                } else if (rel.sentiment >= 55) {
+                    changeAmount = isSuccession ? -2 : -5; // ★生前退位なら半減
+                }
+            } else if (rel.status === '同盟' || rel.status === '従属' || rel.status === '支配') {
+                const baseDrop = isSuccession ? -5 : -10; // ★生前退位なら基本の低下分も半減（-10を-5に）
+                changeAmount = baseDrop + changeVal;
+            }
+
+            if (changeAmount !== 0) {
+                this.game.diplomacyManager.updateSentiment(oldDaimyo.clan, otherClan.id, changeAmount);
+            }
+        });
+
+        // ★当主交代による諸勢力との友好度の変動！
+        if (this.game.kunishuSystem) {
+            const aliveKunishus = this.game.kunishuSystem.getAliveKunishus();
+            aliveKunishus.forEach(kunishu => {
+                const currentRel = kunishu.getRelation(oldDaimyo.clan);
+                let changeAmount = 0;
+                if (currentRel >= 51 && currentRel <= 54) {
+                    changeAmount = 50 - currentRel; 
+                    if (isSuccession) changeAmount = Math.floor(changeAmount / 2); // ★生前退位なら半減
+                } else if (currentRel >= 55) {
+                    changeAmount = isSuccession ? -2 : -5; // ★生前退位なら半減
+                }
+                if (changeAmount !== 0) {
+                    this.game.kunishuSystem.setRelation(kunishu, oldDaimyo.clan, currentRel + changeAmount);
+                }
+            });
+        }
+
+        // ★当主交代に合わせて大名家の名前を変更し、マップを更新します！
+        const clan = this.game.getClan(oldDaimyo.clan);
+        if (clan) {
+            const oldClanName = clan.name;
+            const newBaseName = successor.clanNameStr;
+            const newClanYomi = successor.clanYomiStr;
+            
+            // ★修正：今の家名（例：若狭武田家）ではなく、本来の家名（baseName：武田家）と比べるようにします！
+            // そうしないと、同じ武田家が跡を継いだ時に「若狭武田家は武田家になります」と出てしまいます。
+            if (clan.baseName !== newBaseName) {
+                clan.baseName = newBaseName; // ★本来の家名も更新しておきます
+                clan.name = newBaseName;
+                clan.yomi = newClanYomi; 
+                messages.push(`当主の交代により、${oldClanName}は今後「${newBaseName}」となります。`);
+            }
+        }
+        
+        this._requestMapRefresh();
+    }
+    
+    // ==========================================
+    // ★新旧の大名が交代する時の「引き継ぎ作業」をひとまとめにした魔法です！
+    // ==========================================
+    setupNewDaimyo(oldDaimyo, successor, messages, isAliveSuccession = false) {
+        // 1. 生前退位（家督相続コマンドやイベント）の時だけの特別な処理です
+        if (isAliveSuccession) {
+            // 功績の譲渡
+            const meritTransfer = Math.floor((oldDaimyo.achievementTotal || 0) / 3);
+            successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
+            oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
+
+            // 先代大名の役職を外し、隠居状態にします
+            oldDaimyo.isDaimyo = false;
+            oldDaimyo.isRetired = true;
+        }
+
+        // 2. 新大名がもし国主だった場合、その軍団を解散させます
+        if (successor.isCommander && this.game.castleManager) {
+            const oldLegion = this.game.legions ? this.game.legions.find(l => l.commanderId === successor.id) : null;
+            if (oldLegion) {
+                this.game.castleManager.disbandLegion(oldLegion.id);
+            }
+            successor.isCommander = false;
+        }
+
+        // 3. 選ばれた後継者を、先代の大名がいたお城へお引越しさせます
+        const baseCastle = this.game.getCastle(oldDaimyo.castleId);
+        if (baseCastle) {
+            if (window.BushoStatusRules.isRonin(successor) || window.BushoStatusRules.isActive(successor)) {
+                this.game.affiliationSystem.leaveCastle(successor);
+            }
+            this.game.affiliationSystem.setActivityStatusRaw(successor, window.GameConstants.BushoStatus.ACTIVE);
+            this.game.affiliationSystem.transferClanRaw(successor, oldDaimyo.clan, { syncSpouses: true });
+            this.game.affiliationSystem.setCastleIdRaw(successor, baseCastle.id);
+            successor.loyalty = 100;
+            if (!baseCastle.samuraiIds.includes(successor.id)) {
+                baseCastle.samuraiIds.push(successor.id);
+            }
+        }
+
+        // 4. 新しい大名を任命し、城主のバッジもつけます
+        successor.isDaimyo = true;
+        successor.isCastellan = true;
+        if (successor.isGunshi) {
+            this.game.affiliationSystem.clearGunshiRole(successor);
+        }
+
+        if (baseCastle) {
+            const oldCastellan = this.game.getBusho(baseCastle.castellanId);
+            if (oldCastellan && Number(oldCastellan.id) !== Number(successor.id)) {
+                oldCastellan.isCastellan = false;
+            }
+            baseCastle.castellanId = successor.id;
+        }
+
+        // 5. 大名就任時の改名と顔変更を行います
+        this.applyDaimyoNameAndFaceChange(successor, messages);
+
+        // 6. 先代が将軍職を持っていて生前退位の場合、後継ぎに左馬頭を与えます
+        if (isAliveSuccession && oldDaimyo.courtRankIds && oldDaimyo.courtRankIds.includes(this.game.courtRankSystem.RANK_ID_SHOGUN)) {
+            const isRelative = oldDaimyo.familyIds.some(fId => successor.familyIds.includes(fId));
+            if (isRelative) {
+                // 直書きの番号ではなく、一元化したリストのIDを順番に試します
+                for (let id of this.game.courtRankSystem.RANK_IDS_CANDIDATE) {
+                    if (this.game.courtRankSystem.grantRank(successor, id)) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 7. システム上のリーダー情報を書き換えます
+        this.game.changeLeader(oldDaimyo.clan, successor.id);
+
+        // 城主が入れ替わったことをシステムに報告します
+        if (baseCastle && this.game.affiliationSystem) {
+            this.game.affiliationSystem.updateCastleLord(baseCastle);
+        }
+
+        // 8. 忠誠度や外交関係など、大名交代による影響を計算します
+        this.applyDaimyoChangeEffects(oldDaimyo, successor, messages, isAliveSuccession);
+    }
+    
+    // ==========================================
+    // ★ここから追加：コマンドから「生前退位（家督相続）」を実行する魔法です！
+    // ==========================================
+    async executeSuccessionCommand(newDaimyoId) {
+        const successor = this.game.getBusho(newDaimyoId);
+        const clan = this.game.getClan(this.game.playerClanId);
+        const oldDaimyo = this.game.getBusho(clan.leaderId);
+
+        if (!oldDaimyo || !successor) return;
+
+        // ★追加：改名する前に、いまの「元の名前」をメモしておきます！
+        const originalName = successor.fullName;
+
+        const messages = []; // 順番に出すメッセージを溜めておくリスト
+
+        // ==========================================
+        // ★一元化した引き継ぎセットアップ魔法にすべてお任せします！
+        // （生前退位のコマンドなので、フラグは true にします）
+        this.setupNewDaimyo(oldDaimyo, successor, messages, true);
+        // ==========================================
+
+        // ★修正：改名する前の「元の名前」を使ってメッセージを作ります！
+        const mainMsg = `${originalName}が家督を継ぎ、新たな大名となりました！`;
+        this.game.ui.log(`【家督相続】${mainMsg}`, { clanIds: [clan.id], category: 'succession', inferCurrentTurn: false });
+        messages.unshift(mainMsg);
+
+        // 順番にダイアログを出します
+        for (const msg of messages) {
+            await this.game.ui.showDialogAsync(msg, false, 0);
+        }
+
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
+    }
+
+    // ★大名家の滅亡を処理する魔法です！
+    async checkClanExtinction(clanId, reason = 'no_castle', killerClanId = 0) {
+        if (!clanId || clanId === 0) return;
+        
+        // 大名家のデータを探します
+        const clan = this.game.getClan(clanId);
+        if (!clan || clan.extinctionNotified) return; // すでに通知済みなら二重に出さないようにします
+
+        // その大名家が持っているお城を数えます
+        const clanCastles = this.game.getClanCastles(clanId);
+        
+        // 滅亡の条件：お城が0個になった、または後継ぎがいない場合です
+        if (clanCastles.length === 0 || reason === 'no_heir') {
+            
+            // 滅ぼした勢力は、最後の戦争を処理している呼出元が持つ確定値を使う。
+            // 過去に奪われた城を配列先頭から探すと、複数勢力に領地を失った家で
+            // 「最後の一城を落とした家」と別の勢力を誤認するため、履歴から推測しない。
+            killerClanId = reason === 'no_castle' ? (Number(killerClanId) || 0) : 0;
+
+            // ★ここから追加：未婚の姫を、攻め滅ぼした大名家が総取りする魔法
+            if (killerClanId > 0 && killerClanId !== clan.id) {
+                const killerClan = this.game.getClan(killerClanId);
+                if (killerClan) {
+                    // その家にいる未婚の姫を全員集めます
+                    const targetPrincesses = this.game.princesses.filter(p => p.currentClanId === clan.id && p.status === 'unmarried');
+                    for (const p of targetPrincesses) {
+                        p.originalClanId = killerClanId; // 実家も書き換えます
+                        p.currentClanId = killerClanId;  // 現在の所属も書き換えます
+                        
+                        // 滅亡した家のリストから外します
+                        if (clan.princessIds) {
+                            clan.princessIds = clan.princessIds.filter(id => id !== p.id);
+                        }
+                        
+                        // 攻め滅ぼした家のリストに加えます
+                        if (!killerClan.princessIds) {
+                            killerClan.princessIds = [];
+                        }
+                        if (!killerClan.princessIds.includes(p.id)) {
+                            killerClan.princessIds.push(p.id);
+                        }
+                    }
+                }
+            }
+            // ★追加ここまで
+
+            clan.extinctionNotified = true; // 二度と呼ばれないように印をつけます
+            
+            const displayClanName = clan.name.endsWith('家') ? clan.name : clan.name + '家';
+            
+            let extMsg = "";
+            if (reason === 'no_heir') {
+                extMsg = `当主が死亡し、後継ぎがいないため\n${displayClanName}は滅亡しました。`;
+            } else if (reason === 'total_takeover') {
+                // ★追加：総取り発動時の専用メッセージです！
+                extMsg = `居城を失い、${displayClanName}は滅亡しました。`;
+            } else {
+                extMsg = `拠点を全て失い、${displayClanName}は滅亡しました。`;
+            }
+            
+            // 履歴にメッセージを残します
+            this.game.ui.log(extMsg, { clanIds: [clanId, killerClanId], category: 'extinction', inferCurrentTurn: false });
+            
+            // ==========================================
+            // ★修正：メッセージを出す「前」に、武将や城の処理を終わらせます！
+
+            // ★追加：滅亡した大名家の作戦や大目標のデータが残らないように綺麗にお掃除します！
+            if (this.game.aiOperationManager) {
+                if (this.game.aiOperationManager.operations[clanId]) {
+                    delete this.game.aiOperationManager.operations[clanId];
+                }
+                if (this.game.aiOperationManager.grandObjectives && this.game.aiOperationManager.grandObjectives[clanId]) {
+                    delete this.game.aiOperationManager.grandObjectives[clanId];
+                }
+            }
+
+            // もし残っている武将がいたら、全員「浪人」にします
+            this.game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b)).forEach(b => {
+                if ((b.belongKunishuId || 0) === 0) {
+                    b.achievementTotal = Math.floor((b.achievementTotal || 0) / 2);
+                }
+                this.game.affiliationSystem.becomeRonin(b);
+            });
+
+            // 城主や大名がまだ城に残っている判定になっていれば、お城を空っぽにします
+            clanCastles.forEach(c => {
+                this.game.castleManager.changeOwner(c, 0);
+                c.castellanId = 0;
+                this.game.getCastleBushos(c.id).forEach(l => {
+                    if (window.LifeStatusRules.isUnavailable(l)) return;
+                    // 後継者不在で処分するのは滅亡した大名家の通常武将だけ。
+                    // 同居する浪人・諸勢力・他家武将は巻き込まない。
+                    if (Number(l.clan) !== Number(clanId) || Number(l.belongKunishuId || 0) > 0) return;
+                    this.game.affiliationSystem.becomeRonin(l);
+                });
+                this.game.updateCastleLord(c); 
+            });
+
+            clan.isDestroyed = true; 
+
+            if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+                const isMobileWatch = !!(
+                    this.game.isWatchMode && this.game.isProcessingAI &&
+                    typeof document !== 'undefined' && document.body && !document.body.classList.contains('is-pc')
+                );
+                if (isMobileWatch) {
+                    // 戦争・独立と同様、古いスマホ観戦では滅亡直後に全国DOMを作り直さない。
+                    // 後継者不在で中立化した城だけ局所反映し、完全再描画は月初安全地点へまとめる。
+                    this.game._aiDeferredMapRefresh = true;
+                    if (typeof this.game.ui.refreshCastleOwnershipPresentation === 'function' && clanCastles.length > 0) {
+                        this.game.ui.refreshCastleOwnershipPresentation(clanCastles.map(c => c.id));
+                    }
+                    if (typeof this.game.writeSystemDiagnostic === 'function') {
+                        this.game.writeSystemDiagnostic('clan_extinction:map_light_done', clanCastles[0] || null);
+                    }
+                } else {
+                    this.game.ui.renderMap();
+                }
+            }
+
+            // ★すべての裏処理が終わってから、画面にメッセージを出して待ちます！
+            await this.game.ui.showDialogAsync(extMsg, false, 0);
+            // ==========================================
+
+            // もしプレイヤーの大名家が滅亡してしまったら…ゲームオーバーです！
+            if (clanId === this.game.playerClanId) {
+                // 滅亡状態の印をつけます
+                clan.isDestroyed = true;
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                // ★修正：ゲームオーバーの処理を EndingSystem に任せます！
+                // async setTimeout callbackにせず、例外は通常のawait経路へ返して待機Promiseを残さない。
+                await this.game.endingSystem.processGameOver("全拠点を失いました。我が大名家は滅亡しました……");
+                return;
+            } else {
+                // プレイヤー以外の滅亡時、大名が生きていれば浪人にします
+                const leader = this.game.getBusho(clan.leaderId);
+                // ★まだ滅亡した大名家に所属したまま（leader.clan === clan.id）の場合だけ浪人にします！
+                // これにより、諸勢力化した大名や、登用された大名が浪人になってしまうのを防ぎます。
+                if (leader && !window.LifeStatusRules.isDead(leader) && leader.clan === clan.id) {
+                    leader.isDaimyo = false;
+                    this.game.affiliationSystem.becomeRonin(leader);
+                }
+                
+                // 滅亡した大名家に印をつけます
+                clan.isDestroyed = true;
+            }
+        }
+    }
+    
+    // ==========================================
+    // ★ここから追加：架空姫システム用の機能です！
+    // ==========================================
+
+    // ① ランダムな姫のプロフィール（データ）を作る機能です
+    createRandomPrincess(clanId, currentYear, isInitial, specificFatherId = null, deferFamilyRebuild = false) {
+        let selectedProfile = { name: "姫", yomi: "ひめ" };
+        let candidateProfiles = [];
+
+        // 1. 名前と読みを必ず対で扱い、姫情報画面でも架空姫の読みを表示できるようにします。
+        if (typeof DataManager !== 'undefined' && DataManager.genericPrincessProfiles && DataManager.genericPrincessProfiles.length > 0) {
+            candidateProfiles = DataManager.genericPrincessProfiles;
+        } else {
+            candidateProfiles = [
+                { name: "雪", yomi: "ゆき" }, { name: "桜", yomi: "さくら" }, { name: "琴", yomi: "こと" },
+                { name: "菊", yomi: "きく" }, { name: "桔梗", yomi: "ききょう" }, { name: "百合", yomi: "ゆり" },
+                { name: "藤", yomi: "ふじ" }, { name: "萩", yomi: "はぎ" }, { name: "蘭", yomi: "らん" },
+                { name: "梅", yomi: "うめ" }, { name: "楓", yomi: "かえで" }, { name: "桂", yomi: "かつら" },
+                { name: "椿", yomi: "つばき" }, { name: "凛", yomi: "りん" }, { name: "華", yomi: "はな" },
+                { name: "千代", yomi: "ちよ" }, { name: "鶴", yomi: "つる" }, { name: "亀", yomi: "かめ" },
+                { name: "松", yomi: "まつ" }, { name: "竹", yomi: "たけ" }
+            ];
+        }
+
+        // 2. ゲーム内で同名の姫が少ない候補を優先します。
+        const nameCounts = {};
+        candidateProfiles.forEach(profile => nameCounts[profile.name] = 0);
+        this.game.princesses.forEach(p => {
+            if (nameCounts[p.name] !== undefined) nameCounts[p.name]++;
+        });
+
+        let minCount = Infinity;
+        for (const profile of candidateProfiles) {
+            if (nameCounts[profile.name] < minCount) minCount = nameCounts[profile.name];
+        }
+
+        const leastUsedProfiles = candidateProfiles.filter(profile => nameCounts[profile.name] === minCount);
+        selectedProfile = leastUsedProfiles[Math.floor(Math.random() * leastUsedProfiles.length)] || selectedProfile;
+        const randomName = selectedProfile.name;
+        const randomYomi = selectedProfile.yomi || "";
+        
+        // 既存の姫と出席番号が被らないように、90000番台から自動で番号を割り振ります
+        let nextId = 90000; 
+        if (this.game.princesses.length > 0) {
+            const maxId = Math.max(...this.game.princesses.map(p => p.id));
+            if (maxId >= 90000) {
+                nextId = maxId + 1;
+            }
+        }
+
+        // ★変更：お父さんを探してメモします（一門武将も選べるようにしました）
+        const clan = this.game.getClan(clanId);
+        if (!clan) return null;
+        
+        let father = null;
+        if (specificFatherId) {
+            father = this.game.getBusho(specificFatherId);
+        } else {
+            father = this.game.getBusho(clan.leaderId);
+        }
+        
+        // ★修正：仕様上、父親なしはありえないため、お父さんが見つからない場合は姫の誕生をキャンセルします
+        if (!father) {
+            return null;
+        }
+        
+        const fatherId = father.id;
+
+        // ★追加：お父さんの年齢をチェックして、15歳以上離れるようにします！
+        let age = 0;
+        const fatherAge = currentYear - father.birthYear;
+        
+        // お父さんが14歳以下の場合は、15歳以上離れた子供は作れないので誕生をキャンセルします
+        if (fatherAge < 15) {
+            return null;
+        }
+        
+        if (isInitial) {
+            // 初期登場時は0〜15歳の中から選びますが、お父さんとの年齢差が最低15歳になるように年齢の上限を制限します
+            const maxAge = Math.min(15, fatherAge - 15);
+            age = Math.floor(Math.random() * (maxAge + 1));
+        }
+
+        // 年齢の設定です
+        const birthYear = currentYear - age;
+        const startYear = birthYear; // 誕生と同時に登場（ゲームにアクセス可能）になります！
+        
+        // 寿命の設定です
+        // 50歳前後を基準（平均）としつつ、たまに80歳まで長生きし、低確率で早死する魔法です
+        let lifespan = 50;
+        const lifeRand = Math.random();
+        if (lifeRand < 0.10) {
+            // 10%の確率で20〜39歳の早死に
+            lifespan = 20 + Math.floor(Math.random() * 20);
+        } else if (lifeRand < 0.80) {
+            // 70%の確率で40〜59歳（ここが一番多い基準の層になります）
+            lifespan = 40 + Math.floor(Math.random() * 20);
+        } else {
+            // 20%の確率で60〜80歳の長生き
+            lifespan = 60 + Math.floor(Math.random() * 21);
+        }
+        const endYear = startYear + lifespan;
+
+        // ★ここから追加：お父さんに奥さんがいるか確認して、お母さんを決めます！
+        let motherId = 0; // 最初は「お母さんなし」としておきます
+        if (father.wifeIds && father.wifeIds.length > 0) {
+            // お父さんに奥さんがいる場合は、その奥さんをお母さんにします
+            // （もし奥さんが複数いる場合は、その中からランダムで一人を選びます）
+            motherId = father.wifeIds[Math.floor(Math.random() * father.wifeIds.length)];
+        }
+
+        // 上で作った情報をひとつの箱（データ）にまとめます
+        const princessData = {
+            id: nextId,
+            name: randomName,
+            yomi: randomYomi,
+            birthYear: birthYear,
+            startYear: startYear,
+            endYear: endYear,
+            faceIcon: 'unknown_princess_face.webp', // 汎用の姫画像
+            originalClanId: clanId,
+            currentClanId: clanId,
+            realFatherId: fatherId,
+            realMotherId: motherId,
+            husbandId: 0,
+            status: 'unmarried' // 最初から「未婚（結婚可能）」として登場させます
+        };
+        
+        // 完成したデータを正式な「姫クラス」にして、ゲーム本体の名簿に登録します
+        const princess = new Princess(princessData);
+        
+        
+        // ★修正：先に名簿へ追加してから一門関係を更新します。
+        // 旧処理は追加前にrebuildしていたため、その姫自身が再構築対象に入っていませんでした。
+        this.game.princesses.push(princess);
+
+        // ★安定化：年初などで複数の姫をまとめて生成する時は、全国一門再構築を最後の1回にまとめられます。
+        if (!deferFamilyRebuild) {
+            FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
+        }
+
+        // ★ここを書き足し！：大名家の「所有している姫リスト」にしっかり登録します！
+        if (!clan.princessIds) {
+            clan.princessIds = [];
+        }
+        // 出席番号をリストに追加して、システムに「この家の姫ですよ」と教えます
+        if (!clan.princessIds.includes(princess.id)) {
+            clan.princessIds.push(princess.id);
+        }
+
+        return princess;
+    }
+
+    // 姫生成判定で使う「家ごとの既存未婚姫数」と「父親候補」を全国から1回だけ集計します。
+    // MapのキーにはNumber化せず元のclan値をそのまま使い、旧条件の `===` と同じ厳密一致を維持します。
+    // 配列への追加順もgame.bushos順なので、後段のランダム抽選で候補順を変えません。
+    _buildPrincessAppearanceContext() {
+        const unmarriedCountByClan = new Map();
+        for (const princess of (this.game.princesses || [])) {
+            if (!princess || princess.status !== 'unmarried') continue;
+            const key = princess.currentClanId;
+            unmarriedCountByClan.set(key, (unmarriedCountByClan.get(key) || 0) + 1);
+        }
+
+        const fatherCandidatesByClan = new Map();
+        for (const busho of (this.game.bushos || [])) {
+            if (!busho || !window.BushoStatusRules.isActive(busho) || busho.female || busho.childless) continue;
+            const key = busho.clan;
+            let candidates = fatherCandidatesByClan.get(key);
+            if (!candidates) {
+                candidates = [];
+                fatherCandidatesByClan.set(key, candidates);
+            }
+            candidates.push(busho);
+        }
+        return { unmarriedCountByClan, fatherCandidatesByClan };
+    }
+
+    _getPrincessFamilyFatherCandidates(clan, leader, fatherCandidatesByClan) {
+        if (!clan || !leader) return [];
+        const sameClanCandidates = fatherCandidatesByClan.get(clan.id) || [];
+        return sameClanCandidates.filter(b =>
+            b.id !== leader.id &&
+            leader.familyIds.some(fId => b.familyIds.includes(fId))
+        );
+    }
+
+    // ② ゲーム開始時に、各家に姫を分配する機能です
+    distributeInitialPrincesses() {
+        const currentYear = this.game.year;
+        let familyRebuildNeeded = false;
+        const princessContext = this._buildPrincessAppearanceContext();
+        
+        this.game.clans.forEach(clan => {
+            if (clan.id === 0) return; // 空き家（中立）は無視します
+
+            // すでにCSVで設定された「史実の姫」がいるか数えます。
+            // 全国姫を勢力ごとに再filterせず、旧 `currentClanId === clan.id` と同じ厳密キーで参照します。
+            const existingPrincessCount = princessContext.unmarriedCountByClan.get(clan.id) || 0;
+            
+            // 史実の姫が誰もいない大名家にだけ、ランダムな姫を登場させます
+            if (existingPrincessCount === 0) {
+                // 大名のデータを取得します
+                const leader = this.game.getBusho(clan.leaderId);
+                
+                // ★大名の姫の登場判定（50%の確率）
+                // 女性（female）や子供なし（childless）のシールが貼られていないかチェックします
+                if (leader && !leader.female && !leader.childless) {
+                    if (Math.random() < 0.5) {
+                        if (this.createRandomPrincess(clan.id, currentYear, true, clan.leaderId, true)) familyRebuildNeeded = true;
+                    }
+                }
+
+                // ★追加：一門武将の姫の登場判定（大名とは別枠で、半分の25%の確率）
+                if (leader) {
+                    const familyBushos = this._getPrincessFamilyFatherCandidates(
+                        clan, leader, princessContext.fatherCandidatesByClan
+                    );
+
+                    if (familyBushos.length > 0) {
+                        if (Math.random() < 0.25) {
+                            const randomFather = familyBushos[Math.floor(Math.random() * familyBushos.length)];
+                            if (this.createRandomPrincess(clan.id, currentYear, true, randomFather.id, true)) familyRebuildNeeded = true;
+                        }
+                    }
+                }
+            }
+        });
+
+        // ★安定化：初期配置で何人生成されても、全国一門再構築は最後に1回だけ行います。
+        if (familyRebuildNeeded) {
+            FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
+        }
+    }
+
+    // ③ 毎年1月にランダムで新しい姫を登場させる機能です
+    async checkRandomPrincessAppearance() {
+        const currentYear = this.game.year;
+        let familyRebuildNeeded = false;
+        // この年初処理中に武将の所属・活動状態は変えないため、父親候補は冒頭の1回集計を共用できます。
+        // 姫数も各勢力を1回ずつしか処理しないので、誕生前の旧判定値をそのまま保持します。
+        const princessContext = this._buildPrincessAppearanceContext();
+
+        for (const clan of this.game.clans) {
+            if (clan.id === 0) continue;
+
+            // 今その家にいる未婚の姫を数えます（旧 `currentClanId === clan.id` の厳密一致）。
+            const currentPrincessCount = princessContext.unmarriedCountByClan.get(clan.id) || 0;
+            
+            // 姫が少ない家ほど、新しい姫が生まれやすくします
+            // （姫0人：20%、姫1人：10%、姫2人以上：5% の確率）
+            let prob = 0.05;
+            if (currentPrincessCount === 0) prob = 0.20;
+            else if (currentPrincessCount === 1) prob = 0.10;
+
+            // 大名のデータを取得します
+            const leader = this.game.getBusho(clan.leaderId);
+
+            // ★変更：大名の姫の誕生判定
+            // 女性（female）や子供なし（childless）のシールが貼られていないかチェックします
+            if (leader && !leader.female && !leader.childless) {
+                if (Math.random() < prob) {
+                    const newPrincess = this.createRandomPrincess(clan.id, currentYear, false, clan.leaderId, true);
+                    if (newPrincess) familyRebuildNeeded = true;
+                    
+                    // プレイヤーの大名家だった場合は、画面にお知らせのメッセージを出します
+                    if (newPrincess && clan.id === this.game.playerClanId) {
+                        const father = this.game.getBusho(newPrincess.realFatherId);
+                        const fatherName = father ? father.name.replace('|', '') : "当家";
+                        const msg = `${fatherName}の息女、${newPrincess.name}が誕生しました！`;
+                        
+                        this.game.ui.log(msg, { clanIds: [clan.id], category: 'family', inferCurrentTurn: false });
+                        await this.game.ui.showDialogAsync(msg, false, 0); 
+                    }
+                }
+            }
+
+            // ★追加：一門武将の姫の誕生判定（大名の姫とは別枠で、確率を半分にして判定します）
+            if (leader) {
+                // 生きている同じ家の一門武将（大名本人と女性・子供なしの武将を除く）を、
+                // game.bushos順を保った勢力別候補から絞ります。
+                const familyBushos = this._getPrincessFamilyFatherCandidates(
+                    clan, leader, princessContext.fatherCandidatesByClan
+                );
+
+                if (familyBushos.length > 0) {
+                    const familyProb = prob / 2; // 確率は半枠
+                    if (Math.random() < familyProb) {
+                        // 一門武将の中からランダムに一人を父親に選びます
+                        const randomFather = familyBushos[Math.floor(Math.random() * familyBushos.length)];
+                        const newPrincess = this.createRandomPrincess(clan.id, currentYear, false, randomFather.id, true);
+                        if (newPrincess) familyRebuildNeeded = true;
+                        
+                        if (newPrincess && clan.id === this.game.playerClanId) {
+                            const fatherName = randomFather.name.replace('|', '');
+                            const msg = `${fatherName}のご息女、${newPrincess.name}が誕生しました！`;
+                            
+                            this.game.ui.log(msg, { clanIds: [clan.id], category: 'family', inferCurrentTurn: false });
+                            await this.game.ui.showDialogAsync(msg, false, 0);
+                        }
+                    }
+                }
+            }
+        }
+        // ★安定化：1月に複数家で姫が誕生しても、4000人規模の全国一門再構築は1回だけ。
+        // 一門索引自体は全武将・全姫を対象にするため、他勢力・浪人・未所属との血縁も維持されます。
+        if (familyRebuildNeeded) {
+            FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
+        }
+    }
+
+    // ==========================================
+    // ★ここから追加：死亡した武将の未誕生の子供を連鎖的に死亡させる魔法です！
+    // ==========================================
+    cascadeDeathToUnbornChildren(deadBushoId, currentYear) {
+        // ★安全装置：IDが0や空っぽだった場合、親なし武将を全員巻き込む事故を防ぐために処理をストップします！
+        if (!deadBushoId || deadBushoId === 0) {
+            return;
+        }
+
+        // ★追加：親が生きているか（またはダミー親か）を判定する便利なお道具
+        const isParentAlive = (parentId) => {
+            if (!parentId || parentId === 0) return false;
+            
+            // まずは武将の名簿から探します
+            let parent = this.game.getBusho(parentId);
+            // 見つからなければ、姫の名簿から探します
+            if (!parent) {
+                parent = this.game.getPrincess(parentId);
+            }
+            
+            if (!parent) return false; // どちらにもいなければ死んでいるのと同じ扱いにします
+            
+            // startYearが9999のダミー親なら「生きている」とみなします
+            if (parent.startYear === 9999) return true;
+            
+            // statusがdeadでなければ生きています
+            if (!window.LifeStatusRules.isDead(parent)) return true;
+            
+            return false;
+        };
+
+        // 武将や姫の子供に対する共通の死亡判定処理
+        const processChild = (child, isPrincess) => {
+            // 最初から死亡扱い（startYearが9999）の子供は除外します
+            if (child.startYear === 9999) return;
+            // すでに死亡している子供も除外します
+            if (window.LifeStatusRules.isDead(child)) return;
+            
+            // 子供の誕生年が、親の死亡した年より後（未来）かどうかチェックします
+            if (child.birthYear > currentYear) {
+                // もう一方の親（今回死んでいない方の親）を探します
+                let otherParentId = 0;
+                if (child.realFatherId === deadBushoId) {
+                    otherParentId = child.realMotherId;
+                } else if (child.realMotherId === deadBushoId) {
+                    otherParentId = child.realFatherId;
+                }
+                
+                // もう一方の親が設定されている場合、その親が生きているかチェックします
+                if (otherParentId > 0) {
+                    // 片方の親が生きている（またはダミー親）なら、この子供は生き残り（登場OK）ます！
+                    if (isParentAlive(otherParentId)) {
+                        return;
+                    }
+                }
+                
+                // どちらの親も死んでいる（または片親しかおらず死んだ）場合は、子供も死亡扱いにします
+                this.setLifeStatusRaw(child, window.GameConstants.BushoStatus.DEAD);
+                if (!isPrincess) {
+                    child.isDaimyo = false;
+                    child.isCastellan = false;
+                    child.isCommander = false;
+                    this.game.affiliationSystem.setClanIdRaw(child, 0);
+                    this.game.affiliationSystem.setCastleIdRaw(child, 0);
+                    child.belongKunishuId = 0;
+                } else {
+                    child.currentClanId = 0;
+                    child.husbandId = 0;
+                }
+                
+                // 死亡した子供にさらに子供（孫）が設定されていたら、連鎖的に処理します！
+                this.cascadeDeathToUnbornChildren(child.id, currentYear);
+            }
+        };
+
+        // 実父または実母が今回死んだ武将（deadBushoId）である武将を探して処理します
+        const children = this.game.bushos.filter(b => b.realFatherId === deadBushoId || b.realMotherId === deadBushoId);
+        for (const child of children) {
+            processChild(child, false);
+        }
+
+        // 姫についても同じように探して処理します
+        const princessChildren = this.game.princesses.filter(p => p.realFatherId === deadBushoId || p.realMotherId === deadBushoId);
+        for (const pChild of princessChildren) {
+            processChild(pChild, true);
+        }
+    }
+}

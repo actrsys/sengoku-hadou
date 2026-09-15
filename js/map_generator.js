@@ -1,0 +1,384 @@
+/**
+ * map_generator.js
+ * 野戦用のHEXマップを毎回ランダムに生成する専用の工場です。
+ */
+
+class HexMapGenerator {
+    constructor() {
+        // 地形ごとの情報（今回は生成だけなのでデータとして持っておきます）
+        this.terrains = {
+            plain: { id: 'plain', cost: 1, name: '平地' },
+            forest: { id: 'forest', cost: 2, name: '森' },
+            river: { id: 'river', cost: 3, name: '川' },
+            mountain: { id: 'mountain', cost: 3, name: '山' },
+            sea: { id: 'sea', cost: 3, name: '海' } // ★追加: 川と同じ効果の海
+        };
+    }
+
+    // サイコロを振る魔法（最小値〜最大値の間でランダムな数字を出します）
+    rand(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    // マップを作るメインの魔法。戦争状態そのものは参照せず、必要な海戦フラグだけ受け取ります。
+    generate(isSeaBattle = false) {
+        // 1. マップの広さをランダムに決める（横16〜22、縦10〜16）
+        const cols = this.rand(16, 26);
+        const rows = this.rand(10, 20);
+        const totalHexes = cols * rows;
+
+        // ★追加: 海戦の場合は専用の海戦マップを返します！
+        if (isSeaBattle) {
+            let seaMapData = this._generateSeaMap(cols, rows, totalHexes);
+            
+            // 海戦マップの時だけ、ここで「海」を「海マーク付きの川」に変換します！
+            for (let y = 0; y < seaMapData.rows; y++) {
+                for (let x = 0; x < seaMapData.cols; x++) {
+                    if (seaMapData.grid[y][x].terrain === 'sea') {
+                        seaMapData.grid[y][x].terrain = 'river';
+                        seaMapData.grid[y][x].isSea = true;
+                    }
+                }
+            }
+            return seaMapData;
+        }
+
+        // 2. 地形の割合（ノルマ）を決める
+        // 平地は最低40%。ここでは「40%〜80%」を平地にします。
+        const plainPercent = this.rand(40, 80);
+        const remainHexes = Math.floor(totalHexes * (100 - plainPercent) / 100);
+
+        // 平地以外の残りマスを、森(1~6) : 川(0~3) : 山(0~3) の割合で分けます
+        const wForest = this.rand(1, 6);
+        const wRiver = this.rand(0, 3);
+        const wMountain = this.rand(0, 3);
+        const wTotal = wForest + wRiver + wMountain;
+
+        let targetForest = Math.floor(remainHexes * (wForest / wTotal));
+        let targetRiver = Math.floor(remainHexes * (wRiver / wTotal));
+        let targetMountain = Math.floor(remainHexes * (wMountain / wTotal));
+
+        // 3. マップの土台（すべて平地）を用意する
+        let map = [];
+        for (let y = 0; y < rows; y++) {
+            let row = [];
+            for (let x = 0; x < cols; x++) {
+                row.push({ x: x, y: y, terrain: 'plain' });
+            }
+            map.push(row);
+        }
+
+        // 4. 川を生成する（線を描き、段差のように曲がる）
+        this._generateRivers(map, cols, rows, targetRiver);
+
+        // 5. 山を生成する（塊になるように配置）
+        this._generateClusters(map, cols, rows, 'mountain', targetMountain, 2, 4);
+
+        // ★重要：山でマップが分断されていないかチェック＆修正する
+        this._ensureConnectivity(map, cols, rows);
+
+        // 6. 森を生成する（塊になるように配置）
+        this._generateClusters(map, cols, rows, 'forest', targetForest, 1, 5);
+        
+        // 完成したマップのデータを返します！
+        return {
+            cols: cols,
+            rows: rows,
+            grid: map
+        };
+    }
+
+    // ★追加：海を中心としたマップを作る魔法
+    _generateSeaMap(cols, rows, totalHexes) {
+        // ★修正: 陸地を少なくするため、海を85〜95%にします
+        const seaPercent = this.rand(85, 95);
+        const seaTargetCount = Math.floor(totalHexes * (seaPercent / 100));
+
+        // 残りが平地とたまに森
+        const remainHexes = totalHexes - seaTargetCount;
+        
+        // 平地ベースに森を少しだけ（10%〜30%くらい）
+        const forestPercent = this.rand(10, 30);
+        const forestTargetCount = Math.floor(remainHexes * (forestPercent / 100));
+
+        // 1. まず全てを海で埋める
+        let map = [];
+        for (let y = 0; y < rows; y++) {
+            let row = [];
+            for (let x = 0; x < cols; x++) {
+                row.push({ x: x, y: y, terrain: 'sea' });
+            }
+            map.push(row);
+        }
+
+        // 2. 陸地（平地）の島を作る
+        // ★修正: 塊のサイズを少し大きく（4〜12）して島っぽくし、一番後ろに「2」を渡して、マップの端2マスには絶対に作らないようにします！
+        this._generateClustersOn(map, cols, rows, 'plain', remainHexes, 4, 12, 'sea', 2);
+
+        // 3. 陸地（平地）の上に森の塊を作る
+        // 森は今まで通りで大丈夫です（端には平地がないので、自動的に森もできません）
+        this._generateClustersOn(map, cols, rows, 'forest', forestTargetCount, 1, 3, 'plain', 0);
+
+        // ★追加：最後に、陸地に完全に囲まれた海（湖）を探して、川に変える魔法を使います！
+        this._fillEnclosedSea(map, cols, rows);
+
+        return {
+            cols: cols,
+            rows: rows,
+            grid: map
+        };
+    }
+
+    // ★追加：特定の地形（baseTerrain）の上に塊を作る魔法
+    // ★修正: 端っこに作らないための「見えないバリア（padding）」機能を追加しました！
+    _generateClustersOn(map, cols, rows, terrainType, targetCount, minSize, maxSize, baseTerrain, padding = 0) {
+        let currentCount = 0;
+        let attempts = 0;
+
+        while (currentCount < targetCount && attempts < 1000) {
+            attempts++;
+            
+            let startX = this.rand(padding, cols - 1 - padding);
+            let startY = this.rand(padding, rows - 1 - padding);
+
+            if (startX < 0 || startX >= cols || startY < 0 || startY >= rows) continue;
+            if (map[startY][startX].terrain !== baseTerrain) continue;
+
+            let clusterSize = this.rand(minSize, maxSize);
+            // ★変更：「今どっちから来たか（prevDir）」と「何マスまっすぐ進んだか（straightCount）」のメモを持たせます！
+            let queue = [{ x: startX, y: startY, prevDir: null, straightCount: 1 }];
+            let clustered = 0;
+
+            while (queue.length > 0 && clustered < clusterSize && currentCount < targetCount) {
+                let idx = this.rand(0, queue.length - 1);
+                let pos = queue.splice(idx, 1)[0];
+
+                if (pos.x < padding || pos.x >= cols - padding || pos.y < padding || pos.y >= rows - padding) {
+                    continue;
+                }
+
+                if (map[pos.y][pos.x].terrain === baseTerrain) {
+                    map[pos.y][pos.x].terrain = terrainType;
+                    currentCount++;
+                    clustered++;
+
+                    // ★変更：方向（0〜5）付きで隣のマスを取得して、まっすぐ進みすぎていないかチェックします
+                    const isEven = (pos.x % 2 === 0);
+                    let dirs = isEven 
+                        ? [[0, -1], [1, -1], [1, 0], [0, 1], [-1, 0], [-1, -1]]
+                        : [[0, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0]];
+                    
+                    for (let d = 0; d < dirs.length; d++) {
+                        let nx = pos.x + dirs[d][0];
+                        let ny = pos.y + dirs[d][1];
+                        
+                        if (nx >= padding && nx < cols - padding && ny >= padding && ny < rows - padding) {
+                            if (map[ny][nx].terrain === baseTerrain) {
+                                
+                                // まっすぐ進んでいるかどうかのチェック
+                                let nextStraightCount = 1;
+                                if (pos.prevDir === d) {
+                                    // 前回と同じ方向なら、まっすぐ進んだ数を増やします
+                                    nextStraightCount = pos.straightCount + 1;
+                                }
+                                
+                                // ★まっすぐ3マス目に行こうとしたら、そこには進まないようにストップをかけます！
+                                if (nextStraightCount >= 3) {
+                                    continue; // この方向はスキップして別の方向を探します
+                                }
+                                
+                                queue.push({ x: nx, y: ny, prevDir: d, straightCount: nextStraightCount });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 川を作る魔法（上から下へ、クネクネと線を引きます）
+    _generateRivers(map, cols, rows, targetCount) {
+        let currentCount = 0;
+        let maxRivers = 3; 
+        
+        // ★修正: 川のスタート位置が右に偏らないように、「左・中・右」の候補地を用意してシャッフルします！
+        let startXCandidates = [
+            this.rand(1, Math.floor(cols / 3)),                          // 左側
+            this.rand(Math.floor(cols / 3), Math.floor(cols * 2 / 3)),   // 真ん中
+            this.rand(Math.floor(cols * 2 / 3), cols - 2)                // 右側
+        ];
+        startXCandidates.sort(() => Math.random() - 0.5); // 順番をランダムに！
+
+        for (let i = 0; i < maxRivers; i++) {
+            if (currentCount >= targetCount) break;
+            
+            // 用意した候補地からスタート
+            let x = startXCandidates[i];
+            let y = 0;
+
+            while (y < rows && currentCount < targetCount) {
+                if (map[y][x].terrain === 'plain') {
+                    map[y][x].terrain = 'river';
+                    currentCount++;
+                }
+
+                let dirs = [];
+                const isEven = (x % 2 === 0);
+                if (isEven) dirs = [ [0, 1], [-1, 0], [1, 0] ];  
+                else        dirs = [ [0, 1], [-1, 1], [1, 1] ];  
+
+                let d = dirs[this.rand(0, 2)];
+                x += d[0];
+                y += d[1];
+
+                if (x < 0) x = 0;
+                if (x >= cols) x = cols - 1;
+            }
+        }
+    }
+
+    // 森や山の「塊」を作る魔法
+    _generateClusters(map, cols, rows, terrainType, targetCount, minSize, maxSize) {
+        let currentCount = 0;
+        let attempts = 0; // 無限ループ防止用
+
+        while (currentCount < targetCount && attempts < 1000) {
+            attempts++;
+            let startX = this.rand(0, cols - 1);
+            let startY = this.rand(0, rows - 1);
+
+            // ★修正：山の場合、初期位置が塞がれないように「左端から2列」「右端から2列」には絶対に生成しません！
+            if (terrainType === 'mountain' && (startX <= 1 || startX >= cols - 2)) continue;
+
+            // 平地じゃなければやり直し
+            if (map[startY][startX].terrain !== 'plain') continue;
+
+            let clusterSize = this.rand(minSize, maxSize);
+            let queue = [{ x: startX, y: startY }];
+            let clustered = 0;
+
+            while (queue.length > 0 && clustered < clusterSize && currentCount < targetCount) {
+                let idx = this.rand(0, queue.length - 1);
+                let pos = queue.splice(idx, 1)[0];
+
+                // ★修正：塊が広がる時も、端っこのエリアには絶対に入らないようにします！
+                if (terrainType === 'mountain' && (pos.x <= 1 || pos.x >= cols - 2)) continue;
+
+                if (map[pos.y][pos.x].terrain === 'plain') {
+                    map[pos.y][pos.x].terrain = terrainType;
+                    currentCount++;
+                    clustered++;
+
+                    let neighbors = this._getNeighbors(pos.x, pos.y, cols, rows);
+                    for (let n of neighbors) {
+                        if (map[n.y][n.x].terrain === 'plain') {
+                            queue.push(n);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // HEXの隣のマス（最大6個）を計算する魔法
+    _getNeighbors(x, y, cols, rows) {
+        const isEven = (x % 2 === 0);
+        let dirs = isEven 
+            ? [[0, -1], [1, -1], [1, 0], [0, 1], [-1, 0], [-1, -1]]
+            : [[0, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0]];
+        
+        let neighbors = [];
+        for (let d of dirs) {
+            let nx = x + d[0];
+            let ny = y + d[1];
+            if (nx >= 0 && nx < cols && ny >= 0 && ny < rows) {
+                neighbors.push({ x: nx, y: ny });
+            }
+        }
+        return neighbors;
+    }
+
+    // 山でマップが完全に分断されないようにする魔法
+    _ensureConnectivity(map, cols, rows) {
+        // 「塗りつぶし」の要領で、左端から右端まで「山以外」を通って行けるか調べます
+        let visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+        let queue = [];
+        
+        for (let y = 0; y < rows; y++) {
+            if (map[y][0].terrain !== 'mountain') {
+                queue.push({ x: 0, y: y });
+                visited[y][0] = true;
+            }
+        }
+
+        let canReachRight = false;
+        let queueHead = 0;
+        while (queueHead < queue.length) {
+            let curr = queue[queueHead++];
+            if (curr.x === cols - 1) {
+                canReachRight = true;
+                break;
+            }
+            let neighbors = this._getNeighbors(curr.x, curr.y, cols, rows);
+            for (let n of neighbors) {
+                if (!visited[n.y][n.x] && map[n.y][n.x].terrain !== 'mountain') {
+                    visited[n.y][n.x] = true;
+                    queue.push(n);
+                }
+            }
+        }
+
+        // もし山で分断されていたら、真ん中あたりに強引に「平地のトンネル」を開通させます！
+        if (!canReachRight) {
+            let tunnelY = Math.floor(rows / 2);
+            for (let x = 0; x < cols; x++) {
+                if (map[tunnelY][x].terrain === 'mountain') {
+                    map[tunnelY][x].terrain = 'plain';
+                }
+            }
+        }
+    }
+    
+    // ★追加：陸地に完全に囲まれてしまった海（湖）を探し出して、川に変える魔法です
+    _fillEnclosedSea(map, cols, rows) {
+        // パトロール済みのマスをメモする地図を作ります
+        let visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+        let queue = [];
+
+        // 1. まず、マップの「一番端っこ」にある海をすべて探して、調査リストに入れます
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                // 端っこのマスかどうかをチェック
+                if (x === 0 || x === cols - 1 || y === 0 || y === rows - 1) {
+                    if (map[y][x].terrain === 'sea') {
+                        queue.push({ x: x, y: y });
+                        visited[y][x] = true; // 外海としてパトロール済みにします
+                    }
+                }
+            }
+        }
+
+        // 2. 端っこの海から繋がっている海を、どんどん「外海」としてマーキングしていきます
+        let queueHead = 0;
+        while (queueHead < queue.length) {
+            let curr = queue[queueHead++];
+            let neighbors = this._getNeighbors(curr.x, curr.y, cols, rows);
+            for (let n of neighbors) {
+                // まだパトロールしていない海があれば、リストに追加します
+                if (!visited[n.y][n.x] && map[n.y][n.x].terrain === 'sea') {
+                    visited[n.y][n.x] = true;
+                    queue.push(n);
+                }
+            }
+        }
+
+        // 3. 最後にマップ全体を見渡します。海なのに「外海マーキング」がされていないマスは「川」に変えます
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                if (map[y][x].terrain === 'sea' && !visited[y][x]) {
+                    map[y][x].terrain = 'river';
+                }
+            }
+        }
+    }
+}

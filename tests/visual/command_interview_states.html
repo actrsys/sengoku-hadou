@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><!-- APP_CSS --></head>
+<body class="is-pc">
+  <div id="game-screen" style="width:1280px;height:720px;background:#1b3822;box-sizing:border-box;position:relative;overflow:hidden;">
+    <div id="pc-new-command-area" style="display:flex;gap:5px;padding:24px;">
+      <div class="pc-cmd-col">
+        <button id="cmd-normal" class="cmd-btn category">内政</button>
+        <button id="cmd-active" class="cmd-btn category active">軍事</button>
+      </div>
+    </div>
+
+    <div id="interview-modal" class="modal interview-conversation-mode">
+      <div id="interview-session-content" class="modal-content interview-session-content interview-conversation-active">
+        <div class="interview-session-header">
+          <div class="interview-session-kicker">家臣面談</div>
+          <h3 id="interview-session-title">面談</h3>
+          <div id="interview-session-hint" class="interview-session-hint">話したい内容を選んでください。</div>
+        </div>
+        <div class="interview-session-main">
+          <div id="interview-session-summary-panel" class="interview-session-summary-panel">
+            <div class="interview-session-summary-head">
+              <div class="interview-session-summary-caption">面談相手</div>
+              <div id="interview-session-name" class="interview-session-name">武将名</div>
+            </div>
+            <div id="interview-session-meta" class="interview-session-meta">
+              <span class="interview-session-meta-row">清洲城</span>
+              <span class="interview-session-meta-row">城主</span>
+              <span class="interview-session-meta-row">35歳</span>
+            </div>
+            <div id="interview-session-stats" class="interview-session-stats">
+              <div class="interview-session-stat"><span class="interview-session-stat-label">統率</span><span class="interview-session-stat-value"><span class="grade-container rank-a"><span class="grade-main">A</span></span></span></div>
+              <div class="interview-session-stat"><span class="interview-session-stat-label">武勇</span><span class="interview-session-stat-value"><span class="grade-container rank-b"><span class="grade-main">B</span><span class="grade-sub">+</span></span></span></div>
+              <div class="interview-session-stat"><span class="interview-session-stat-label">内政</span><span class="interview-session-stat-value"><span class="grade-container rank-b"><span class="grade-main">B</span><span class="grade-sub">+</span></span></span></div>
+              <div class="interview-session-stat"><span class="interview-session-stat-label">外交</span><span class="interview-session-stat-value"><span class="grade-container rank-b"><span class="grade-main">B</span></span></span></div>
+              <div class="interview-session-stat"><span class="interview-session-stat-label">智謀</span><span class="interview-session-stat-value"><span class="grade-container rank-b"><span class="grade-main">B</span><span class="grade-sub">+</span></span></span></div>
+              <div class="interview-session-stat"><span class="interview-session-stat-label">魅力</span><span class="interview-session-stat-value"><span class="grade-container rank-b"><span class="grade-main">B</span><span class="grade-sub">+</span></span></span></div>
+            </div>
+          </div>
+          <div class="interview-session-stage"><div id="interview-session-body" class="interview-session-body"></div></div>
+        </div>
+        <div id="interview-session-pager" class="interview-session-pager hidden"></div>
+      </div>
+      <div id="interview-session-inline-actions" class="interview-session-inline-actions">
+        <button class="interview-choice-btn">調子について</button>
+        <button class="interview-choice-btn">方針について</button>
+        <button class="interview-choice-btn">他者について</button>
+        <button class="interview-choice-btn">武将の噂</button>
+      </div>
+      <div id="interview-session-footer" class="modal-footer interview-session-footer">
+        <button class="btn-secondary">戻る</button>
+      </div>
+      <div id="interview-session-dialog" class="modal-content modal-small interview-session-dialog">
+        <div class="dialog-body-container">
+          <div class="dialog-face-column">
+            <div id="interview-session-dialog-name" class="dialog-name-label">武将名</div>
+            <div id="interview-session-dialog-face" class="dialog-face-space"><div class="sp-face-wrapper dialog-face-wrapper"></div></div>
+          </div>
+          <div id="interview-session-dialog-message" class="message-area">「殿、どのようなご用件でしょうか？」</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

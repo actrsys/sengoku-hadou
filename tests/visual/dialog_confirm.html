@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<!-- APP_CSS -->
+</head>
+<body>
+<div id="game-screen">
+    <div id="dialog-modal" class="modal event-dialog-modal event-choices-active">
+        <div class="modal-content modal-small">
+            <div class="dialog-body-container">
+                <div class="dialog-face-column">
+                    <div id="dialog-left-name" class="dialog-name-label">家臣</div>
+                    <div id="dialog-left-face"><div class="sp-face-wrapper dialog-face-wrapper"></div></div>
+                </div>
+                <div id="dialog-message" class="message-area">「今月の命令を終了しますか？」</div>
+                <div class="dialog-face-column hidden"></div>
+            </div>
+        </div>
+        <!-- 実ゲームでは UIManager 初期化時に標準footerを modal-content の外へ移す。
+             fixtureも実DOMと同じ兄弟構造にして配置回帰を検出する。 -->
+        <div class="modal-footer right">
+            <button id="dialog-btn-ok" class="btn-primary">はい</button>
+            <button id="dialog-btn-cancel" class="btn-secondary">いいえ</button>
+        </div>
+    </div>
+</div>
+</body>
+</html>

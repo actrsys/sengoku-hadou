@@ -1,0 +1,1612 @@
+/**
+ * ai_operation.js - AIの作戦（長期計画）システム
+ * 大名家ごとの作戦（攻撃、防衛、集結、内政）の立案・準備・実行の管理
+ */
+
+class AIOperationManager {
+    constructor(game) {
+        this.game = game;
+        this.operations = {};
+        // ★追加：徴兵用のお城を記憶しておく箱です
+        this.draftBases = {}; 
+        // ★追加：各大名の各軍団に作戦の方針を持たせるための箱です
+        this.grandObjectives = {};
+        // ★今回追加：各大名家の過去60ヶ月分の所持拠点を記憶する箱です
+        this.historyOwnedCastles = {};
+    }
+
+    save() {
+        return {
+            operations: this.operations,
+            draftBases: this.draftBases, // ★追加：セーブデータに残します
+            grandObjectives: this.grandObjectives, // ★追加：方針もセーブに残します
+            historyOwnedCastles: this.historyOwnedCastles // ★今回追加：過去の所持拠点もセーブに残します
+        };
+    }
+
+    load(data) {
+        this.operations = data.operations;
+        this.draftBases = data.draftBases;
+        this.grandObjectives = data.grandObjectives;
+        this.historyOwnedCastles = data.historyOwnedCastles;
+    }
+
+    // 新しいゲームでは、前ゲームの作戦・徴兵拠点・大方針・旧所領履歴をすべて破棄する。
+    resetAllState() {
+        this.operations = {};
+        this.draftBases = {};
+        this.grandObjectives = {};
+        this.historyOwnedCastles = {};
+    }
+
+    // ★Round6：軍団が解散・国主不在になった時、その軍団専用の作戦メモをまとめて片付けます。
+    // operationsだけを消すとgrandObjectivesやdraftBasesが同じ軍団Noの再利用時に残るため、3種類を一括処理します。
+    clearLegionPlanning(clanId, legionId) {
+        clanId = Number(clanId);
+        legionId = Number(legionId || 0);
+
+        const clearFrom = (store) => {
+            if (!store || !store[clanId]) return;
+            delete store[clanId][legionId];
+            if (Object.keys(store[clanId]).length === 0) {
+                delete store[clanId];
+            }
+        };
+
+        clearFrom(this.operations);
+        clearFrom(this.draftBases);
+        clearFrom(this.grandObjectives);
+    }
+
+    // 評定方針に反する既存の攻撃作戦だけを即時整理します。
+    // 方針の意味判定は LegionPolicySystem、作戦データの破棄は作戦専門部署で担当します。
+    reconcileLegionPolicy(clanId, legionId) {
+        clanId = Number(clanId);
+        legionId = Number(legionId || 0);
+        const clanOps = this.operations && this.operations[clanId];
+        const op = clanOps ? clanOps[legionId] : null;
+        if (!op || op.type !== '攻撃') return true;
+        if (!this.game.legionPolicySystem || this.game.legionPolicySystem.isOperationAllowed(clanId, legionId, op)) return true;
+
+        delete this.operations[clanId][legionId];
+        const logInfo = this.getOperationLogInfo(clanId, legionId);
+        console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) の攻撃作戦を、評定方針に従って中止しました。`);
+        return false;
+    }
+
+    async onClanBecameAIControlled(clanId) {
+        clanId = Number(clanId || 0);
+        if (!clanId || !this.game.getClan(clanId)) return;
+        // プレイヤー時は月次作戦会議から除外される直轄軍団0だけ、観戦開始時にAI用作戦を補う。
+        if (!this.operations[clanId]) this.operations[clanId] = {};
+        if (!this.operations[clanId][0] && this.game.getClanCastles(clanId).some(c => Number(c.legionId || 0) === 0)) {
+            await this.generateOperation(clanId, 0);
+        }
+    }
+
+    onClanBecamePlayerControlled(clanId) {
+        clanId = Number(clanId || 0);
+        if (!clanId) return;
+        // 直轄はプレイヤー自身が判断するため、観戦中にAIが作った直轄作戦を残さない。
+        this.clearLegionPlanning(clanId, 0);
+        // 非直轄軍団はAI運用を継続するが、以前の評定命令がある場合は復帰時点で再適用する。
+        for (let legionNo = 1; legionNo <= 8; legionNo++) {
+            if (this.isActiveLegion(clanId, legionNo)) this.reconcileLegionPolicy(clanId, legionNo);
+        }
+    }
+
+    // ★Round6：非直轄軍団が「現在も有効な軍団」かを一元判定します。
+    isActiveLegion(clanId, legionId) {
+        clanId = Number(clanId);
+        legionId = Number(legionId || 0);
+        if (legionId === 0) return true;
+        if (!this.game.legions) return false;
+
+        const legion = this.game.getLegionByClanNo(clanId, legionId);
+        if (!legion || Number(legion.commanderId || 0) <= 0) return false;
+
+        const commander = this.game.getBusho(legion.commanderId);
+        return !!(
+            commander &&
+            window.BushoStatusRules.isActive(commander) &&
+            Number(commander.clan) === clanId
+        );
+    }
+
+    // ★追加：特定の大名勢力のすべての軍団に、一括で方針を持たせる一元化ロジックです！
+    setGrandObjectiveToAllLegions(clanId, objectiveType, targetId, turnCount) {
+        if (!this.grandObjectives) this.grandObjectives = {};
+        if (!this.grandObjectives[clanId]) this.grandObjectives[clanId] = {};
+
+        const clanCastles = this.game.getClanCastles(clanId);
+        const myCastleCount = clanCastles.length;
+        
+        // その大名家が持っているすべての軍団ID（0の直轄や1～8の軍団）を重複なく集めます
+        const legionIds = [...new Set(clanCastles.map(c => Number(c.legionId || 0)))]
+            .filter(legionId => legionId === 0 || this.isActiveLegion(clanId, legionId));
+
+        // ターゲットの初期数を数えます
+        let initialTargetCount = 0;
+        if (objectiveType === '大名攻略') {
+            initialTargetCount = this.game.getClanCastles(targetId).length;
+        } else if (objectiveType === '地方統一') {
+            initialTargetCount = this.game.getRegionCastles(targetId).filter(c => {
+                if (c.ownerClan !== clanId) {
+                    const rel = this.game.getRelation(clanId, c.ownerClan);
+                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
+                }
+                return false;
+            }).length;
+        } else if (objectiveType === '国攻略') {
+            initialTargetCount = this.game.getProvinceCastles(targetId).filter(c => {
+                if (c.ownerClan !== clanId) {
+                    const rel = this.game.getRelation(clanId, c.ownerClan);
+                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
+                }
+                return false;
+            }).length;
+        } else if (objectiveType === '反攻作戦') {
+            const history = this.historyOwnedCastles[clanId] || [];
+            const pastOwnedSet = new Set();
+            history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
+            const currentMyCastles = new Set(clanCastles.map(c => c.id));
+            for (const cid of pastOwnedSet) {
+                if (!currentMyCastles.has(cid)) {
+                    const c = this.game.getCastle(cid);
+                    if (c) {
+                        const rel = this.game.getRelation(clanId, c.ownerClan);
+                        // 友好勢力でなければ取り返す拠点としてカウント
+                        if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) {
+                            initialTargetCount++;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 見つかったすべての軍団に、方針をセットします！
+        for (const legionId of legionIds) {
+            let legionTargetCount = initialTargetCount;
+            // 国内平定だけは、自軍団の領内にいる諸勢力の数を数えるので軍団ごとに計算します
+            if (objectiveType === '国内平定') {
+                legionTargetCount = 0;
+                const legionCastles = clanCastles.filter(c => c.legionId === legionId);
+                legionCastles.forEach(myC => {
+                    const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(myC.id).filter(k => k.getRelation(clanId) <= 30 && k.ideology !== '商人');
+                    legionTargetCount += kunishusInCastle.length;
+                });
+            }
+
+            this.grandObjectives[clanId][legionId] = {
+                type: objectiveType,
+                targetClanId: objectiveType === '大名攻略' ? targetId : 0,
+                targetProvId: objectiveType === '国攻略' ? targetId : 0,
+                targetRegionId: objectiveType === '地方統一' ? targetId : 0,
+                turnCount: turnCount,
+                historyTargetCount: [legionTargetCount], // 目標の初期数を記憶させます
+                prevMyCastleCount: myCastleCount // 自分の拠点数を記憶させます
+            };
+        }
+    }
+
+    // ★追加：すべての作戦を巡回して、不正なデータ（矛盾）がないか健康診断をする魔法です！
+    validateAllOperations() {
+        for (const clanIdStr in this.operations) {
+            const clanId = Number(clanIdStr);
+            const clanOps = this.operations[clanId];
+            if (!clanOps || typeof clanOps !== 'object') {
+                delete this.operations[clanId];
+                continue;
+            }
+
+            for (const legionIdStr of Object.keys(clanOps)) {
+                const legionId = Number(legionIdStr);
+                const op = clanOps[legionId];
+                let isInvalid = false;
+                let invalidReason = '';
+
+                const clan = typeof this.game.getClan === 'function'
+                    ? this.game.getClan(clanId)
+                    : this.game.clans.find(c => Number(c.id) === clanId);
+
+                if (!clan || clan.id === 0 || clan.isDestroyed) {
+                    isInvalid = true;
+                    invalidReason = '勢力消滅';
+                } else if (!op || typeof op !== 'object') {
+                    isInvalid = true;
+                    invalidReason = '作戦データ欠損';
+                } else if (legionId !== 0 && !this.isActiveLegion(clanId, legionId)) {
+                    // イベント・死亡・軍団再編で作戦より先に軍団が消えた正常な後片付け対象です
+                    const logInfo = this.getOperationLogInfo(clanId, legionId);
+                    console.info(`【AI作戦整理】${logInfo.clanName} の旧軍団${legionId}の作戦記録(${op.type || '不明'})を整理しました。`);
+                    this.clearLegionPlanning(clanId, legionId);
+                    continue;
+                } else {
+                    if (op.type === '攻撃') {
+                        if (!op.stagingBase || isNaN(op.requiredForce) || isNaN(op.requiredRice) || isNaN(op.turnsRemaining) || isNaN(op.maxTurns)) {
+                            isInvalid = true;
+                            invalidReason = '攻撃作戦の数値/出撃元不整合';
+                        } else {
+                            const stagingCastle = this.game.getCastle(op.stagingBase);
+                            if (!stagingCastle ||
+                                Number(stagingCastle.ownerClan) !== clanId ||
+                                Number(stagingCastle.legionId || 0) !== legionId) {
+                                isInvalid = true;
+                                invalidReason = '出撃元の所属変更';
+                            }
+                        }
+                    } else if (op.type === '外交' || op.type === '内政') {
+                        if (isNaN(op.turnsRemaining) || isNaN(op.maxTurns)) {
+                            isInvalid = true;
+                            invalidReason = '期間データ不整合';
+                        }
+                    } else {
+                        isInvalid = true;
+                        invalidReason = '未知の作戦種別';
+                    }
+                }
+
+                if (isInvalid) {
+                    const logInfo = this.getOperationLogInfo(clanId, legionId);
+                    console.warn(`【AI自己診断】${logInfo.clanName} (軍団長: ${logInfo.commanderName}) の不正な作戦データ(${op ? op.type : '不明'} / ${invalidReason})を検知したため、破棄しました。`);
+                    this.clearLegionPlanning(clanId, legionId);
+                }
+            }
+        }
+    }
+
+    async processMonthlyOperations() {
+        // ★追加：毎月の作戦会議を始める前に、まず全体の健康診断を行います！
+        this.validateAllOperations();
+        const isPC = typeof document !== 'undefined' && document.body && document.body.classList.contains('is-pc');
+        const turnManager = this.game && this.game.turnManager;
+        const turnFlowGeneration = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+            ? turnManager.captureTurnFlowGeneration()
+            : null;
+        const isCurrentFlow = () => {
+            if (!this.game || this.game.phase !== 'game' || this.game.isRestoringSave) return false;
+            if (turnFlowGeneration !== null && turnManager && typeof turnManager.isTurnFlowGenerationCurrent === 'function') {
+                return turnManager.isTurnFlowGenerationCurrent(turnFlowGeneration);
+            }
+            return true;
+        };
+        let processedLegions = 0;
+
+        for (const clan of this.game.clans) {
+            // ★追加：大名家ごとに一瞬「息継ぎ」を入れて、月替わりの激しい計算の重さを軽減します！
+            await new Promise(resolve => setTimeout(resolve, 0));
+            if (!isCurrentFlow()) return;
+
+            if (clan.id === 0 || clan.isDestroyed) continue; // ★滅亡した勢力はスキップします！
+            // 実機診断は月初の古い253/252表示ではなく、作戦更新中の勢力を直接残します。
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}`);
+            }
+
+            const isPlayerClan = (clan.id === this.game.playerClanId);
+
+            // ★変更：外交などの全体方針は、プレイヤー大名家以外の時だけAIに考えさせます
+            if (!isPlayerClan) {
+                // ★追加：毎月、同盟や自分を支配している相手への不満を溜める魔法です！
+                this.decreaseSentimentForHighTension(clan.id);
+
+                // ★追加：毎月、まずは大名家単位で「誰と外交するか」を考えます！
+                this.thinkMonthlyDiplomacy(clan);
+            }
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:diplomacy_done`);
+            }
+            
+            // ★今回追加：過去60ヶ月分の所持拠点を記憶する魔法です
+            if (!this.historyOwnedCastles) this.historyOwnedCastles = {};
+            if (!this.historyOwnedCastles[clan.id]) this.historyOwnedCastles[clan.id] = [];
+            
+            // 現在の所持拠点を調べてリストの先頭に追加します
+            const currentCastleIds = this.game.getClanCastles(clan.id).map(c => c.id);
+            this.historyOwnedCastles[clan.id].unshift(currentCastleIds);
+            
+            // もし記憶が60ヶ月分を超えたら、一番古い記憶（最後尾）を消します
+            if (this.historyOwnedCastles[clan.id].length > 60) {
+                this.historyOwnedCastles[clan.id].pop();
+            }
+            
+            if (!this.operations[clan.id]) {
+                this.operations[clan.id] = {};
+            }
+            if (!this.draftBases[clan.id]) {
+                this.draftBases[clan.id] = {};
+            }
+
+            const myCastles = this.game.getClanCastles(clan.id);
+            // ★修正：数値の0と文字の"0"が混ざって重複しないように、必ず数値(Number)に統一します！
+            const legionIds = [...new Set(myCastles.map(c => Number(c.legionId || 0)))]
+                .filter(legionId => legionId === 0 || this.isActiveLegion(clan.id, legionId));
+            // 軍団ごとのfilterを月次作戦ループ内で繰り返さない。Mapのkeyは数値legionIdなので、
+            // c.legionId === legionId だった従来の厳密比較（文字列"1"は不一致）もそのまま維持する。
+            const castlesByLegionId = new Map();
+            legionIds.forEach(legionId => castlesByLegionId.set(legionId, []));
+            myCastles.forEach(c => {
+                if (castlesByLegionId.has(c.legionId)) castlesByLegionId.get(c.legionId).push(c);
+            });
+
+            for (const legionId of legionIds) {
+                processedLegions++;
+                // 古いスマホでは一勢力が複数軍団を持つ時も連続CPU時間を切ります。
+                if (!isPC && processedLegions % 2 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    if (!isCurrentFlow()) return;
+                }
+                // ★追加：プレイヤー大名家で、かつ直轄（ID0）の場合は、勝手に作戦を立てないようにスキップします！
+                if (isPlayerClan && legionId === 0) continue;
+
+                // ★変更：新しく一元化した共通魔法を使って、自軍団の領土から直接攻撃できる敵拠点のリストを作ります！
+                const reachableEnemyCastleIds = new Set();
+                const myLegionCastles = castlesByLegionId.get(legionId) || [];
+                const visitedForRoute = new Set();
+                
+                myLegionCastles.forEach(myC => {
+                    if (!visitedForRoute.has(myC.id)) {
+                        // isLegionOnlyを「true」にして、自軍団のみに絞ります
+                        const territory = MapGraphService.getReachableTerritory(this.game, myC, true);
+                        territory.myCastles.forEach(c => visitedForRoute.add(c.id));
+                        territory.enemyCastles.forEach(c => reachableEnemyCastleIds.add(c.id));
+                    }
+                });
+
+                // ★ここから追加：方針のカウントと成果チェック
+                if (!this.grandObjectives) this.grandObjectives = {};
+                if (!this.grandObjectives[clan.id]) this.grandObjectives[clan.id] = {};
+                
+                const grandObj = this.grandObjectives[clan.id][legionId];
+                if (grandObj) {
+                    const currentMyCastleCount = myCastles.length;
+                    
+                    // 前月よりも自拠点の数が減っていたら方針を消去して再考
+                    if (currentMyCastleCount < grandObj.prevMyCastleCount) {
+                        delete this.grandObjectives[clan.id][legionId];
+                    } else {
+                        grandObj.prevMyCastleCount = currentMyCastleCount;
+                        
+                        let currentTargetCount = 0;
+                        if (grandObj.type === '大名攻略') {
+                            currentTargetCount = this.game.getClanCastles(grandObj.targetClanId).length;
+                        } else if (grandObj.type === '地方統一') {
+                            currentTargetCount = this.game.getRegionCastles(grandObj.targetRegionId).filter(c => {
+                                if (c.ownerClan !== clan.id) {
+                                    const rel = this.game.getRelation(clan.id, c.ownerClan);
+                                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
+                                }
+                                return false;
+                            }).length;
+                        } else if (grandObj.type === '国攻略') {
+                            currentTargetCount = this.game.getProvinceCastles(grandObj.targetProvId).filter(c => {
+                                if (c.ownerClan !== clan.id) {
+                                    const rel = this.game.getRelation(clan.id, c.ownerClan);
+                                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
+                                }
+                                return false;
+                            }).length;
+                        } else if (grandObj.type === '反攻作戦') {
+                            // ★今回追加：反攻作戦の時の、取り返すべき拠点の数を調べます
+                            const history = this.historyOwnedCastles[clan.id] || [];
+                            const pastOwnedSet = new Set();
+                            history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
+                            
+                            const currentMyCastles = new Set(this.game.getClanCastles(clan.id).map(c => c.id));
+                            
+                            for (const cid of pastOwnedSet) {
+                                // 今は自分のものではない場合
+                                if (!currentMyCastles.has(cid)) {
+                                    const c = this.game.getCastle(cid);
+                                    if (c) {
+                                        const rel = this.game.getRelation(clan.id, c.ownerClan);
+                                        // 友好勢力（同盟・支配・従属・友好）でなければ、取り返す拠点としてカウント
+                                        if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) {
+                                            currentTargetCount++;
+                                        }
+                                    }
+                                }
+                            }
+                        } else if (grandObj.type === '国内平定') {
+                            // ★追加：国内平定の場合、自軍団の管轄内（自分の城）にいる敵対諸勢力の数を数えます
+                            const legionCastlesForPacification = myLegionCastles;
+                            legionCastlesForPacification.forEach(myC => {
+                                // ★修正：商人は攻撃対象にならないので、ターゲットから除外します！
+                                const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(myC.id).filter(k => k.getRelation(clan.id) <= 30 && k.ideology !== '商人');
+                                currentTargetCount += kunishusInCastle.length;
+                            });
+                        }
+
+                        let shouldCancel = false;
+
+                       // ターゲット拠点が0になったら達成として消去
+                        if (currentTargetCount === 0 && (grandObj.type === '大名攻略' || grandObj.type === '地方統一' || grandObj.type === '国攻略' || grandObj.type === '反攻作戦' || grandObj.type === '国内平定')) {
+                            shouldCancel = true;
+                        }
+
+                        if (!shouldCancel && grandObj.type === '大名攻略') {
+                            const targetClanId = grandObj.targetClanId;
+                            const rel = this.game.getRelation(clan.id, targetClanId);
+                            // 友好的になっていたら消去
+                            if (rel && window.DiplomacyRules.isFriendly(rel.status)) {
+                                shouldCancel = true;
+                            } else {
+                                // ★変更：MapGraphService.isReachableを使わず、自領から直接攻撃できるか判定します
+                                const targetCastles = this.game.getClanCastles(targetClanId);
+                                
+                                let hasRoute = false;
+                                for (const tgtC of targetCastles) {
+                                    if (reachableEnemyCastleIds.has(tgtC.id)) {
+                                        hasRoute = true;
+                                        break;
+                                    }
+                                }
+                                
+                                // どの拠点へも道が繋がっていなければ消去
+                                if (!hasRoute) {
+                                    shouldCancel = true;
+                                }
+                            }
+                        } else if (!shouldCancel && grandObj.type === '地方統一') {
+                            // ★追加：地方統一の場合も、目標の地方へ直接攻撃できる道があるかチェックします！
+                            let hasRoute = false;
+                            const targetCastles = this.game.getRegionCastles(grandObj.targetRegionId).filter(c => {
+                                if (c.ownerClan !== clan.id) {
+                                    const rel = this.game.getRelation(clan.id, c.ownerClan);
+                                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
+                                }
+                                return false;
+                            });
+                            
+                            for (const tgtC of targetCastles) {
+                                if (reachableEnemyCastleIds.has(tgtC.id)) {
+                                    hasRoute = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (!hasRoute) {
+                                shouldCancel = true;
+                            }
+                        } else if (!shouldCancel && grandObj.type === '国攻略') {
+                            // ★追加：国攻略の場合も、目標の国へ直接攻撃できる道があるかチェックします！
+                            let hasRoute = false;
+                            const targetCastles = this.game.getProvinceCastles(grandObj.targetProvId).filter(c => {
+                                if (c.ownerClan !== clan.id) {
+                                    const rel = this.game.getRelation(clan.id, c.ownerClan);
+                                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
+                                }
+                                return false;
+                            });
+                            
+                            for (const tgtC of targetCastles) {
+                                if (reachableEnemyCastleIds.has(tgtC.id)) {
+                                    hasRoute = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (!hasRoute) {
+                                shouldCancel = true;
+                            }
+                        } else if (!shouldCancel && grandObj.type === '反攻作戦') {
+                            // ★変更：反攻作戦でも、同盟国を挟まずに直接攻撃できるか判定します
+                            const history = this.historyOwnedCastles[clan.id] || [];
+                            const pastOwnedSet = new Set();
+                            history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
+                            
+                            const currentMyCastleIds = new Set(this.game.getClanCastles(clan.id).map(c => c.id));
+                            
+                            let hasRoute = false;
+                            
+                            for (const cid of pastOwnedSet) {
+                                // 今は自分のものではない場合
+                                if (!currentMyCastleIds.has(cid)) {
+                                    const tgtC = this.game.getCastle(cid);
+                                    if (tgtC) {
+                                        const rel = this.game.getRelation(clan.id, tgtC.ownerClan);
+                                        // 友好勢力でなければ、取り返す拠点候補
+                                        if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) {
+                                            // その拠点へ直接攻撃できるかチェックします
+                                            if (reachableEnemyCastleIds.has(tgtC.id)) {
+                                                hasRoute = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // どの取り返す拠点へも道が繋がっていなければ、作戦を諦めて消去します
+                            if (!hasRoute) {
+                                shouldCancel = true;
+                            }
+                        }
+
+                        if (shouldCancel) {
+                            delete this.grandObjectives[clan.id][legionId];
+                        } else {
+                            // 過去の履歴の最後（前月）よりも数が減っていたらターンをリセット
+                            if (grandObj.historyTargetCount && grandObj.historyTargetCount.length > 0) {
+                                const lastCount = grandObj.historyTargetCount[grandObj.historyTargetCount.length - 1];
+                                if (currentTargetCount < lastCount) {
+                                    grandObj.turnCount = 24;
+                                } else {
+                                    grandObj.turnCount--;
+                                }
+                            } else {
+                                grandObj.turnCount--;
+                            }
+    
+                            if (!grandObj.historyTargetCount) grandObj.historyTargetCount = [];
+                            grandObj.historyTargetCount.push(currentTargetCount);
+                            
+                            // 過去24回分毎月覚えておく
+                            if (grandObj.historyTargetCount.length > 24) {
+                                grandObj.historyTargetCount.shift();
+                            }
+    
+                            // 24ヶ月成果が出なかったら消去
+                            if (grandObj.turnCount <= 0) {
+                                delete this.grandObjectives[clan.id][legionId];
+                            }
+                        }
+                    }
+                }
+                // ★ここまで追加
+
+                // 評定で今月の方針が変わっていた場合、古い攻撃作戦を持ち越しません。
+                this.reconcileLegionPolicy(clan.id, legionId);
+
+                const operationAction = !this.operations[clan.id][legionId] ? 'generate' : 'update';
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:legion_${legionId}:${operationAction}_start`);
+                }
+                if (operationAction === 'generate') {
+                    await this.generateOperation(clan.id, legionId);
+                } else {
+                    await this.updateOperation(clan.id, legionId);
+                }
+                if (!isCurrentFlow()) return;
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:legion_${legionId}:operation_done`);
+                }
+
+                // r299実機停止記録がoperation_doneで残ったため、重い作戦生成の一時配列が
+                // GC可能になった直後に古いスマホだけ一度息継ぎします。AI判断・作戦内容は変えません。
+                if (!isPC) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    if (!isCurrentFlow()) return;
+                }
+
+                // ★追加：作戦とは別に、毎月「徴兵用のお城」を考えて選びます！
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:legion_${legionId}:draft_base_start`);
+                }
+                this.selectDraftBase(clan.id, legionId, myLegionCastles);
+                if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                    this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:legion_${legionId}:draft_base_done`);
+                }
+            }
+            if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
+                this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:done`);
+            }
+        }
+    }
+
+    // ★追加：同盟や支配されている相手に攻撃したいけど友好度が高くて我慢している時に、友好度を1下げる魔法です
+    decreaseSentimentForHighTension(clanId) {
+        const myPower = this.game.aiEngine.getClanPrestige(clanId);
+        const myDaimyo = this.game.getClanDaimyo(clanId) || { duty: 50 };
+
+        const myClanCastles = this.game.getClanCastles(clanId);
+        const neighborCastles = [];
+        myClanCastles.forEach(myC => {
+            if (myC.adjacentCastleIds) {
+                myC.adjacentCastleIds.forEach(adjId => {
+                    const adjCastle = this.game.getCastle(adjId);
+                    if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== clanId) {
+                        neighborCastles.push(adjCastle);
+                    }
+                });
+            }
+        });
+
+        const adjacentClans = [...new Set(neighborCastles.map(c => c.ownerClan))];
+
+        adjacentClans.forEach(targetClanId => {
+            const rel = this.game.getRelation(clanId, targetClanId);
+            // 相手が「同盟」か、自分を支配している（自分の視点で相手が「支配」）場合で、友好度が50以上
+            // ★追加：ただし、イベントによる関係（isEvent）の場合はストレスを溜めません
+            if (rel && (rel.status === '同盟' || rel.status === '支配') && rel.sentiment >= 50 && !rel.isEvent) {
+                const targetPower = this.game.aiEngine.getClanPrestige(targetClanId);
+                
+                let breakScore = 0; 
+                let minEnemyPower = -1; 
+                
+                adjacentClans.forEach(cId => {
+                    const r = this.game.getRelation(clanId, cId);
+                    if (r && !window.DiplomacyRules.isAllianceOrVassal(r.status)) {
+                        const p = this.game.aiEngine.getClanPrestige(cId);
+                        if (minEnemyPower === -1 || p < minEnemyPower) {
+                            minEnemyPower = p;
+                        }
+                    }
+                });
+
+                let comparePower = minEnemyPower !== -1 ? minEnemyPower : myPower;
+                const powerRatio = targetPower / comparePower;
+                
+                // 相手が相対的に弱いほど攻撃したくなります
+                if (powerRatio < 1.0) {
+                    breakScore += (1.0 - powerRatio) * 2.5;
+                }
+                
+                // 自分の義理が低いほど攻撃したくなります
+                breakScore += (50 - myDaimyo.duty) * 0.3;
+
+                // 攻撃したいスコア（0より大きい）なら、我慢しているストレスで友好度を1下げます！
+                if (breakScore > 0) {
+                    this.game.diplomacyManager.updateSentiment(clanId, targetClanId, -0.5);
+                }
+            }
+        });
+    }
+
+    // ★ここから追加：徴兵用の拠点を選ぶ魔法です
+    selectDraftBase(clanId, legionId, precomputedLegionCastles = null) {
+        // まずは前の月の記憶を消しておきます
+        this.draftBases[clanId][legionId] = null;
+
+        // 月次作戦ループですでに同じ軍団城配列を持っている場合は再filterしません。
+        // 所有権・軍団所属は作戦生成では変化しないため、選定集合と順序は従来と同一です。
+        const myClanCastles = Array.isArray(precomputedLegionCastles)
+            ? precomputedLegionCastles
+            : this.game.getClanCastles(clanId).filter(c => c.legionId === legionId);
+        // お城が1つしかない時は、輸送できないので選びません！
+        if (myClanCastles.length <= 1) return; 
+
+        let startCastleId = null;
+        const op = this.operations[clanId][legionId];
+        
+        // 攻撃作戦中なら、出撃するお城をスタート地点にします
+        if (op && op.type === '攻撃' && op.stagingBase) {
+            startCastleId = op.stagingBase;
+        } else {
+            // そうでなければ、お殿様がいるお城をスタート地点にします
+            const daimyo = this.game.getClanDaimyo(clanId);
+            if (daimyo && daimyo.castleId) {
+                const daimyoCastle = this.game.getCastle(daimyo.castleId);
+                if (daimyoCastle && daimyoCastle.legionId === legionId) {
+                    startCastleId = daimyo.castleId;
+                } else {
+                    startCastleId = myClanCastles[0].id;
+                }
+            } else {
+                startCastleId = myClanCastles[0].id;
+            }
+        }
+
+        const startCastle = this.game.getCastle(startCastleId);
+        if (!startCastle) return;
+
+        // スタート地点から、道が繋がっている自分のお城を探し出します（飛び地対策）
+        const reachableMyCastles = [];
+        const visitedCastles = new Set();
+        const searchQueue = [startCastle];
+        let searchHead = 0;
+        visitedCastles.add(startCastle.id);
+
+        while (searchHead < searchQueue.length) {
+            const current = searchQueue[searchHead++];
+            reachableMyCastles.push(current);
+
+            if (current.adjacentCastleIds) {
+                current.adjacentCastleIds.forEach(adjId => {
+                    const c = this.game.getCastle(adjId);
+                    if (c && c.ownerClan === clanId && c.legionId === legionId && !visitedCastles.has(c.id)) {
+                        visitedCastles.add(c.id);
+                        searchQueue.push(c);
+                    }
+                });
+            }
+        }
+
+        // 繋がっているお城の中から、一番「人口」が多いお城を探します！
+        let bestCastle = null;
+        let maxPopulation = -1;
+
+        reachableMyCastles.forEach(c => {
+            if (c.population > maxPopulation) {
+                maxPopulation = c.population;
+                bestCastle = c;
+            }
+        });
+
+        // 決まったら、記憶の箱にしまいます
+        if (bestCastle) {
+            this.draftBases[clanId][legionId] = bestCastle.id;
+        }
+    }
+
+    // ★今回追加：毎月1回だけ、大名家として外交の狙いを1つに絞って覚えておく魔法です！
+    thinkMonthlyDiplomacy(clan) {
+        // 一旦、今までの記憶を忘れます
+        clan.currentDiplomacyTarget = null;
+
+        const myClanId = clan.id;
+        const myPower = this.game.aiEngine.getClanPrestige(myClanId);
+        const myDaimyo = this.game.getClanDaimyo(myClanId) || { duty: 50, intelligence: 50 };
+        const smartness = this.game.aiEngine.getAISmartness(myDaimyo.intelligence);
+
+        // 周りのお城を探します
+        const myCastles = this.game.getClanCastles(myClanId);
+        const neighborCastles = [];
+        myCastles.forEach(myCastle => {
+            if (myCastle.adjacentCastleIds) {
+                myCastle.adjacentCastleIds.forEach(adjId => {
+                    const adjCastle = this.game.getCastle(adjId);
+                    if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== myClanId) {
+                        neighborCastles.push(adjCastle);
+                    }
+                });
+            }
+        });
+
+        // まずは直接お隣さんのリストを作ります
+        const directNeighbors = [...new Set(neighborCastles.map(c => c.ownerClan))];
+        let diplomacyCandidates = [...directNeighbors];
+
+        // 従属先とは領地が離れていても主従関係そのものが外交経路になる。
+        // 平和的な「従属→同盟」格上げや関係改善を検討できるよう、主家を候補へ必ず含める。
+        for (const otherClan of this.game.clans) {
+            if (!otherClan || Number(otherClan.id) <= 0 || Number(otherClan.id) === Number(myClanId) || otherClan.isDestroyed) continue;
+            const rel = this.game.getRelation(myClanId, otherClan.id);
+            if (rel && rel.status === window.GameConstants.DiplomacyStatus.SUBORDINATE && !diplomacyCandidates.includes(otherClan.id)) {
+                diplomacyCandidates.push(otherClan.id);
+            }
+        }
+
+        // ★追加：お隣さんの中で「敵対」している相手がいれば、さらにその向こう隣の勢力もリストに入れます！
+        directNeighbors.forEach(neighborId => {
+            const rel = this.game.getRelation(myClanId, neighborId);
+            if (rel && rel.status === '敵対') {
+                const enemyCastles = this.game.getClanCastles(neighborId);
+                enemyCastles.forEach(enemyCastle => {
+                    if (enemyCastle.adjacentCastleIds) {
+                        enemyCastle.adjacentCastleIds.forEach(adjId => {
+                            const adjCastle = this.game.getCastle(adjId);
+                            // 空き城(0)でもなく、自分でもなく、その敵対勢力自身でもないなら、リストに追加します！
+                            if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== myClanId && adjCastle.ownerClan !== neighborId) {
+                                if (!diplomacyCandidates.includes(adjCastle.ownerClan)) {
+                                    diplomacyCandidates.push(adjCastle.ownerClan);
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+        });
+
+        // 出来上がったリストを、いつもの名前の箱に入れ直します
+        const uniqueNeighbors = diplomacyCandidates;
+        if (uniqueNeighbors.length === 0) return;
+
+        const allyCount = this.game.diplomacyManager.getAllyCount(myClanId);
+        const enemyThreats = [];
+        uniqueNeighbors.forEach(targetClanId => {
+            const rel = this.game.getRelation(myClanId, targetClanId);
+            const isProtected = rel && this.game.diplomacyManager.isNonAggression(rel.status);
+            if (!isProtected) {
+                const trueEnemyPower = this.game.aiEngine.getClanPrestige(targetClanId);
+                const errorRange = Math.min(0.3, Math.max(0, (100 - myDaimyo.intelligence) / 100 * 0.3));
+                const errorRate = 1.0 + (Math.random() - 0.5) * 2 * errorRange;
+                enemyThreats.push({ clanId: targetClanId, power: trueEnemyPower * errorRate });
+            }
+        });
+        
+        enemyThreats.sort((a, b) => b.power - a.power);
+        const mainThreatId = enemyThreats.length > 0 ? enemyThreats[0].clanId : 0; 
+
+        // 優先度が高い順に並べたリストをもらいます
+        const diplomacyTargets = this.game.diplomacyManager.getDiplomacyPriorityList(myClanId, uniqueNeighbors, mainThreatId);
+
+        // 順番に見て、最初に「これをやる！」と決めた相手1人を記憶します
+        for (let targetData of diplomacyTargets) {
+            const targetClanId = targetData.clanId;
+            const targetClanTotal = this.game.aiEngine.getClanPrestige(targetClanId);
+            const threatData = enemyThreats.find(t => t.clanId === targetClanId);
+            const perceivedTargetTotal = threatData ? threatData.power : targetClanTotal;
+
+            // 外交の専門部署に、この相手に何をするか相談します
+            const decision = this.game.diplomacyManager.determineAIDiplomacyAction(
+                myClanId, targetClanId, myPower, targetClanTotal, perceivedTargetTotal, 
+                myDaimyo.duty, smartness, targetData.isStrategicPartner, allyCount
+            );
+
+            // もし「何もしない」以外なら、これを今月の目標に決定します！
+            if (decision.action !== 'none') {
+                clan.currentDiplomacyTarget = {
+                    targetId: targetClanId,
+                    action: decision.action,
+                    gold: decision.gold,
+                    reason: decision.reason || ''
+                };
+                break; // 1つ決めたら探すのをおしまいにします
+            }
+        }
+    }
+
+    async generateOperation(clanId, legionId) {
+        const myClanCastles = this.game.getClanCastles(clanId).filter(c => c.legionId === legionId);
+        if (myClanCastles.length === 0) return;
+
+        const startY = Number(this.game.gameStartYear || window.MainParams.StartYear);
+        const startM = Number(this.game.gameStartMonth || window.MainParams.StartMonth);
+        const currentY = Number(this.game.year);
+        const currentM = Number(this.game.month);
+        const elapsedTurns = ((currentY - startY) * 12) + (currentM - startM);
+        
+        // ★修正：ゲーム開始3ヶ月間の攻撃作戦禁止期間を削除し、開幕から作戦を立てるようにします
+        if (isNaN(elapsedTurns)) {
+            this.setInternalOperation(clanId, legionId);
+            return;
+        }
+        
+        // 親大名がいるか探します
+        let myBossId = 0;
+        for (const c of this.game.clans) {
+            if (c.id !== clanId) {
+                const r = this.game.getRelation(clanId, c.id);
+                if (r && r.status === '従属') {
+                    myBossId = c.id;
+                    break;
+                }
+            }
+        }
+
+        // ★追加：周りの敵対勢力の数を数えます！
+        const adjacentEnemyClans = new Set();
+
+        for (const myCastle of myClanCastles) {
+            if (myCastle.adjacentCastleIds) {
+                for (const adjId of myCastle.adjacentCastleIds) {
+                    const adjCastle = this.game.getCastle(adjId);
+                    // 空き城(0)ではなく、自分の家でもないお城を調べます
+                    if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== clanId) {
+                        const rel = this.game.getRelation(clanId, adjCastle.ownerClan);
+                        if (rel && rel.status === '敵対') {
+                            adjacentEnemyClans.add(adjCastle.ownerClan);
+                        }
+                    }
+                }
+            }
+        }
+
+        const enemyCount = adjacentEnemyClans.size;
+
+        // 攻撃作戦の候補を全部記録しておく箱を用意します
+        let operationCandidates = [];
+
+        // ★大雪が降っている国（provinceId）のリストを最初に作っておきます！
+        const heavySnowProvIds = new Set();
+        this.game.provinces.forEach(p => {
+            if (p.statusEffects && p.statusEffects.includes('heavySnow')) {
+                heavySnowProvIds.add(p.id);
+            }
+        });
+
+        // 大名家のすべてのお城を順番に見て、一番攻めやすい場所を探します！
+        // 大勢力では各出撃元の到達圏探索が連続しやすい。判定順・乱数順は変えず、
+        // スマホだけ数城ごとにイベントループへ制御を返してOSの長時間占有を避けます。
+        const isPC = typeof document !== 'undefined' && document.body && document.body.classList.contains('is-pc');
+        let scannedOperationBases = 0;
+        for (const myCastle of myClanCastles) {
+            scannedOperationBases++;
+            if (!isPC && scannedOperationBases % 4 === 0) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+            // プレイヤーの委任城で攻撃禁止なら飛ばします
+            if (clanId === this.game.playerClanId && myCastle.isDelegated && !myCastle.allowAttack) {
+                continue;
+            }
+
+            // ★出撃する自分のお城が大雪の時は、出陣できないので重い計算をスパッと飛ばします！
+            if (heavySnowProvIds.has(myCastle.provinceId)) {
+                continue;
+            }
+
+            const myGeneral = this.game.getBusho(myCastle.castellanId);
+            if (!myGeneral || myGeneral.isActionDone) continue; 
+
+            // ★飛び地対応＆超高速化：このお城から「自領だけを通って」辿り着ける敵城を直接探し出します！
+            const neighbors = [];
+            const visited = new Set();
+            const queue = [{ castle: myCastle, distance: 0 }];
+            let queueHead = 0;
+            visited.add(myCastle.id);
+
+            while (queueHead < queue.length) {
+                const currentData = queue[queueHead++];
+                const current = currentData.castle;
+                const currentDist = currentData.distance;
+
+                if (current.adjacentCastleIds) {
+                    current.adjacentCastleIds.forEach(adjId => {
+                        if (!visited.has(adjId)) {
+                            visited.add(adjId);
+                            const adjCastle = this.game.getCastle(adjId);
+                            if (adjCastle) {
+                                // ★修正：直轄（軍団ID0）なら、他の軍団の城も通過OKにします！
+                                if (adjCastle.ownerClan === clanId && (adjCastle.legionId === legionId || legionId === 0)) {
+                                    // 自領ならさらに奥へ進めます
+                                    queue.push({ castle: adjCastle, distance: currentDist + 1 });
+                                } else if (adjCastle.ownerClan !== clanId) {
+                                    // 自領以外（敵や空き城）なら、そこが攻撃可能な目標です！
+                                    neighbors.push(adjCastle);
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            const validEnemies = neighbors.filter(target => {
+                let isDirectlyAdjacent = false;
+                if (target.adjacentCastleIds) {
+                    isDirectlyAdjacent = target.adjacentCastleIds.some(adjId => {
+                        const adjCastle = this.game.getCastle(adjId);
+                        // ★修正：ここも直轄なら他の軍団を隣接の足場にできるようにします！
+                        return adjCastle && adjCastle.ownerClan === clanId && (adjCastle.legionId === legionId || legionId === 0);
+                    });
+                }
+                if (!isDirectlyAdjacent) return false;
+
+                // 国主評定の軍事方針を専門部署に確認します。
+                if (this.game.legionPolicySystem && !this.game.legionPolicySystem.canAttackClan(clanId, legionId, target.ownerClan)) {
+                    return false;
+                }
+
+                if (target.ownerClan === 0) {
+                    if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
+                    return true;
+                }
+                
+                const rel = this.game.getRelation(clanId, target.ownerClan);
+                const isProtected = rel && this.game.diplomacyManager.isNonAggression(rel.status);
+                
+                // ★書き換え：同盟国と従属先も、破棄して攻撃する候補として特別に入れます！
+                // ただし和睦期間中や、自分が支配している相手には攻め込みません
+                if (isProtected) {
+                    if (rel.status === '和睦' || rel.status === '支配') return false; 
+                } else if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) {
+                    return false;
+                }
+
+                if (myBossId !== 0) {
+                    const bossRel = this.game.getRelation(myBossId, target.ownerClan);
+                    if (bossRel && this.game.diplomacyManager.isNonAggression(bossRel.status)) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+
+            // 諸勢力も敵のリストに入れます。攻勢禁止なら自主鎮圧も立案しません。
+            // ★繋がっている自領のお城すべてにいる諸勢力を探します！
+            const councilAllowsOffense = !this.game.legionPolicySystem || this.game.legionPolicySystem.isOffenseAllowed(clanId, legionId);
+            if (!myCastle.isDelegated && councilAllowsOffense) {
+                visited.forEach(visitedCastleId => {
+                    const vCastle = this.game.getCastle(visitedCastleId);
+                    if (vCastle) {
+                        const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(vCastle.id).filter(k => k.getRelation(clanId) <= 30);
+                        kunishusInCastle.forEach(k => {
+                            validEnemies.push({
+                                isKunishuTarget: true,
+                                kunishu: k,
+                                id: vCastle.id, // ★その諸勢力がいるお城のID
+                                ownerClan: -1,
+                                soldiers: k.soldiers,
+                                defense: k.defense,
+                                name: k.getName(this.game),
+                                provinceId: vCastle.provinceId // ★追加：AIの雪判定などで使うために国のIDも入れます
+                            });
+                        });
+                    }
+                });
+            }
+
+            // 敵がいたら、ai.jsの戦力分析を使って点数をつけてもらいます！
+            if (validEnemies.length > 0) {
+                const decision = this.game.aiEngine.decideAttackTarget(myCastle, myGeneral, validEnemies);
+                
+                // 点数がついたら、とりあえず候補の箱に入れておきます
+                if (decision && decision.score > 0) {
+                    let finalScore = decision.score;
+
+                    // ★ここから追加：方針に合致する目標なら、スコアを大幅にアップ（ただし絶対ではない程度）
+                    const myGrandObj = (this.grandObjectives && this.grandObjectives[clanId] && this.grandObjectives[clanId][legionId]) 
+                                        ? this.grandObjectives[clanId][legionId] : null;
+
+                    if (myGrandObj) {
+                        let isTargetMatch = false;
+                        if (!decision.target.isKunishuTarget) {
+                            if (myGrandObj.type === '大名攻略' && decision.target.ownerClan === myGrandObj.targetClanId) {
+                                isTargetMatch = true;
+                            } else if (myGrandObj.type === '地方統一') {
+                                const tgtProv = this.game.getProvince(decision.target.provinceId);
+                                if (tgtProv && tgtProv.regionId === myGrandObj.targetRegionId) {
+                                    isTargetMatch = true;
+                                }
+                            } else if (myGrandObj.type === '国攻略' && decision.target.provinceId === myGrandObj.targetProvId) {
+                                isTargetMatch = true;
+                            } else if (myGrandObj.type === '反攻作戦') {
+                                // ★今回追加：反攻作戦の場合、目標が過去60ヶ月に持っていた拠点ならマッチ
+                                const history = (this.historyOwnedCastles && this.historyOwnedCastles[clanId]) ? this.historyOwnedCastles[clanId] : [];
+                                const pastOwnedSet = new Set();
+                                history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
+                                if (pastOwnedSet.has(decision.target.id)) {
+                                    isTargetMatch = true;
+                                }
+                            }
+                        } else {
+                            // 諸勢力の場合、お城の国（provinceId）で判定します
+                            if (myGrandObj.type === '地方統一') {
+                                const myProv = this.game.getProvince(myCastle.provinceId);
+                                if (myProv && myProv.regionId === myGrandObj.targetRegionId) {
+                                    isTargetMatch = true;
+                                }
+                            } else if (myGrandObj.type === '国攻略' && myCastle.provinceId === myGrandObj.targetProvId) {
+                                isTargetMatch = true;
+                            } else if (myGrandObj.type === '反攻作戦') {
+                                // ★今回追加：諸勢力の場合でも、その居城が奪還対象ならマッチ
+                                const history = (this.historyOwnedCastles && this.historyOwnedCastles[clanId]) ? this.historyOwnedCastles[clanId] : [];
+                                const pastOwnedSet = new Set();
+                                history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
+                                if (pastOwnedSet.has(decision.target.id)) {
+                                    isTargetMatch = true;
+                                }
+                            } else if (myGrandObj.type === '国内平定') {
+                                // ★追加：国内平定が目標なら、諸勢力への攻撃はすべて対象！
+                                isTargetMatch = true;
+                            }
+                        }
+
+                        if (isTargetMatch) {
+                            // 100%ではない絶妙なバランスでスコアを引き上げます（+40点）
+                            finalScore += 40;
+                        }
+                    }
+                    
+                    operationCandidates.push({
+                        castleId: myCastle.id,
+                        target: decision.target,
+                        sendSoldiers: decision.sendSoldiers,
+                        sendRice: decision.sendRice,
+                        score: finalScore
+                    });
+                }
+            }
+        }
+
+        // 候補の箱をスコアの高い順に並べ替えます！
+        operationCandidates.sort((a, b) => b.score - a.score);
+
+        // ★追加：攻撃目標のスコア順から、調略の第一～第三目標を抽出します！
+        const myDaimyo = this.game.getClanDaimyo(clanId) || { intelligence: 50 };
+        const myDaimyoInt = myDaimyo.intelligence;
+        
+        let maxSabotageTargets = 1; // 智謀69以下は第一目標まで
+        if (myDaimyoInt >= 90) maxSabotageTargets = 3; // 智謀90以上は第三目標まで
+        else if (myDaimyoInt >= 70) maxSabotageTargets = 2; // 智謀70～89は第二目標まで
+
+        let sabotageTargets = [];
+        let addedCastleIds = new Set();
+
+        for (const cand of operationCandidates) {
+            if (cand.target.isKunishuTarget) continue; // 諸勢力は除外
+            if (cand.target.ownerClan === 0) continue; // 空き城は除外
+            
+            // 同盟・支配・従属・和睦関係ではないかをチェック
+            const rel = this.game.getRelation(clanId, cand.target.ownerClan);
+            const isProtected = rel && window.DiplomacyRules.isProtectedFromImmediateAttack(rel.status);
+            
+            if (!isProtected && !addedCastleIds.has(cand.target.id)) {
+                // 城IDとその城を所有している大名家IDをセットで記憶します
+                sabotageTargets.push({
+                    castleId: cand.target.id,
+                    clanId: cand.target.ownerClan
+                });
+                addedCastleIds.add(cand.target.id);
+                
+                // 上限に達したら探すのをやめます
+                if (sabotageTargets.length >= maxSabotageTargets) break;
+            }
+        }
+
+        // 敵が2つ以上いたら「外交作戦」を考えます！
+        if (enemyCount >= 2) {
+            // 1年（12ヶ月）の間にどれくらいの確率で立案するかを決めます
+            let yearlyProb = 0;
+            if (enemyCount === 2) yearlyProb = 0.10;      // 2勢力：ごくまれ (10%)
+            else if (enemyCount === 3) yearlyProb = 0.20; 
+            else if (enemyCount === 4) yearlyProb = 0.35; 
+            else if (enemyCount === 5) yearlyProb = 0.50; // 5勢力：そこそこ (50%)
+            else if (enemyCount === 6) yearlyProb = 0.65; 
+            else if (enemyCount >= 7) yearlyProb = 0.80;  // 7勢力以上：かなりの高確率 (80%)
+
+            // 12ヶ月で上の確率になるように、1ヶ月あたりのサイコロの確率を計算する魔法です！
+            const monthlyProb = 1 - Math.pow(1 - yearlyProb, 1 / 12);
+
+            // サイコロを振ります！
+            if (Math.random() < monthlyProb) {
+                // 期間の計算：敵が2勢力なら3ヶ月。そこから敵が2つ増えるごとに1ヶ月プラスします
+                const duration = 3 + Math.floor((enemyCount - 2) / 2);
+                
+                this.operations[clanId][legionId] = {
+                    type: '外交',
+                    sabotageTargets: sabotageTargets, // ★変更：新しく作った調略目標を記憶させます
+                    turnsRemaining: 0, // すぐに実行するので準備期間はゼロです
+                    maxTurns: duration,
+                    status: '実行中'
+                };
+                // ★変更：大名家名や軍団長名、方針を取得してコンソールに出力します
+                const logInfo = this.getOperationLogInfo(clanId, legionId);
+                console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) が【外交作戦】を立案しました！(方針: ${logInfo.grandObjStr}, 隣接敵対: ${enemyCount}勢力, 期間: ${duration}ヶ月, 調略目標: ${sabotageTargets.length}件)`);
+                return; // 外交作戦が決まったら、今回の作戦会議はこれでおしまいです
+            }
+        }
+
+        let attackTargets = [];
+        let highestScore = -1;
+        
+        // ★追加：大名の智謀に合わせて、攻撃目標をいくつまで覚えるか（最大1～3個）決めます
+        let maxAttackTargets = 1;
+        if (myDaimyoInt >= 90) maxAttackTargets = 3;
+        else if (myDaimyoInt >= 70) maxAttackTargets = 2;
+
+        // 候補の箱の中から、点数が高い作戦を順番に見つけます！
+        if (operationCandidates.length > 0) {
+            // ★変更：最高の作戦を1つだけでなく、複数見つけるようにループの条件を変えます
+            for (const cand of operationCandidates) {
+                let supportBaseId = null;
+                const targetId = cand.target.isKunishuTarget ? cand.target.kunishu.id : cand.target.id;
+                const isKunishuTarget = cand.target.isKunishuTarget === true;
+
+                // ★追加：すでに同じ目標がリストに入っていたら、飛ばして次を探します
+                const isAlreadyAdded = attackTargets.some(t => t.targetId === targetId && t.isKunishuTarget === isKunishuTarget);
+                if (isAlreadyAdded) continue;
+
+                const sameTargetCands = operationCandidates.filter(c => {
+                    const cTargetId = c.target.isKunishuTarget ? c.target.kunishu.id : c.target.id;
+                    const cIsKunishu = c.target.isKunishuTarget === true;
+                    return cTargetId === targetId && cIsKunishu === isKunishuTarget && c.castleId !== cand.castleId;
+                });
+
+                if (sameTargetCands.length > 0) {
+                    supportBaseId = sameTargetCands[0].castleId; // 同じ目標への点数が2番目に高かった城
+                } else {
+                    // 同じ目標に届く他の城がなかった場合、出撃元のお隣の城（自領）を予備として選ぶ魔法
+                    const stagingCastle = this.game.getCastle(cand.castleId);
+                    if (stagingCastle && stagingCastle.adjacentCastleIds) {
+                        const adjMyCastles = stagingCastle.adjacentCastleIds
+                            .map(id => this.game.getCastle(id))
+                            // ★修正：直轄なら他の軍団の城も予備拠点候補にします！
+                            .filter(c => c && c.ownerClan === clanId && (c.legionId === legionId || legionId === 0))
+                            .sort((a, b) => (b.soldiers + b.defense) - (a.soldiers + a.defense));
+                        if (adjMyCastles.length > 0) {
+                            supportBaseId = adjMyCastles[0].id;
+                        }
+                    }
+                }
+
+                // 最初の（一番点数が高い）作戦の点数を記録しておきます
+                if (highestScore === -1) {
+                    highestScore = cand.score;
+                }
+                
+                // ★追加：敵との戦力差（見込み）を計算して、準備期間を決めます！
+                const enemyForce = cand.target.isKunishuTarget ? 
+                    (cand.target.kunishu.soldiers + cand.target.kunishu.defense) : 
+                    (cand.target.soldiers + cand.target.defense);
+                const myForce = this.game.getCastle(cand.castleId).soldiers;
+                const ratio = enemyForce / Math.max(1, myForce); // 敵の戦力が自分の何倍か？
+
+                let prepTurns = 4;
+                if (ratio <= 0.25) {
+                    prepTurns = 0; // 敵が1/4以下なら0ヶ月（すぐに実行）
+                } else if (ratio >= 1.3) {
+                    prepTurns = 4; // ★敵が1.3倍以上の時の最大準備期間4ヶ月
+                } else {
+                    // ★\なめらかに0〜4ヶ月の間で計算します
+                    prepTurns = Math.round(((ratio - 0.25) / 1.05) * 4);
+                }
+                
+                // ★雪国かどうかを判定するための準備をします
+                // 陸奥、出羽、越後、越中、越前、加賀、能登、若狭、信濃、上野、下野、飛騨、佐渡、蝦夷
+                const snowProvs = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 28, 65, 67];
+                const myCastle = this.game.getCastle(cand.castleId);
+                const targetProvId = cand.target.provinceId; // ★諸勢力も別のお城にいる可能性があるので、ターゲットの国のIDをそのまま使います
+                const isSnowArea = snowProvs.includes(myCastle.provinceId) || snowProvs.includes(targetProvId);
+                
+                // ★ここから変更：「他の軍団との目標・タイミング被り」と「雪の期間」を両方チェックして調整する魔法！
+                let isAdjusting = true;
+                
+                // 調整が必要なくなる（isAdjusting が false になる）まで、何度も繰り返しチェックします
+                while (isAdjusting) {
+                    isAdjusting = false; // 一旦「調整は不要」としておきます
+                    
+                    // 1. まず、雪の期間（12, 1, 2月）にぶつからないかチェックして、ぶつかるならズラします
+                    if (isSnowArea) {
+                        let execMonth = (this.game.month + prepTurns) % 12;
+                        if (execMonth === 0) execMonth = 12;
+                        
+                        while (execMonth === 12 || execMonth === 1 || execMonth === 2) {
+                            prepTurns++; // 出撃を1ヶ月遅らせます
+                            execMonth = (this.game.month + prepTurns) % 12;
+                            if (execMonth === 0) execMonth = 12;
+                            
+                            // 月をズラしたので、他の軍団とタイミングが被ってしまったかもしれません。
+                            // もう一度チェックをやり直すために、調整中フラグを立てます。
+                            isAdjusting = true; 
+                        }
+                    }
+
+                    // 2. 次に、同じ大名家の「他の軍団」が、同じ目標に同じタイミングで攻めようとしていないかチェックします
+                    if (this.operations[clanId]) {
+                        for (const otherLegionIdStr in this.operations[clanId]) {
+                            const otherLegionId = Number(otherLegionIdStr);
+                            
+                            // 自分以外の軍団の作戦だけを見ます
+                            if (otherLegionId !== legionId) {
+                                const otherOp = this.operations[clanId][otherLegionId];
+                                
+                                // もし「攻撃」作戦で、目標が全く同じで、出撃するタイミング（残り準備期間）も同じだったら
+                                if (otherOp && otherOp.type === '攻撃' && otherOp.targetId === targetId && otherOp.isKunishuTarget === isKunishuTarget && otherOp.turnsRemaining === prepTurns) {
+                                    prepTurns++; // 渋滞を避けるために、出撃を1ヶ月遅らせます
+                                    
+                                    // 月をズラしたので、今度は雪の期間にぶつかってしまったかもしれません。
+                                    // もう一度雪のチェックからやり直すために、調整中フラグを立ててループを最初からやり直します。
+                                    isAdjusting = true; 
+                                    break; 
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // ★変更：作戦をリストの箱にしまいます
+                attackTargets.push({
+                    targetId: targetId, 
+                    isKunishuTarget: isKunishuTarget,
+                    score: cand.score,
+                    stagingBase: cand.castleId,
+                    supportBase: supportBaseId,
+                    requiredForce: cand.sendSoldiers, 
+                    requiredRice: cand.sendRice,      
+                    turnsRemaining: prepTurns, 
+                    maxTurns: prepTurns + 3
+                });
+
+                // ★変更：決めた数（最大1～3個）まで目標を見つけたら、探すのをやめます
+                if (attackTargets.length >= maxAttackTargets) break;
+            }
+        }
+
+        // すべてのお城を見終わって、もし攻撃の作戦が見つかっていたらサイコロを振ります！
+        if (attackTargets.length > 0) {
+            // 第一目標のデータを取り出します
+            const firstTarget = attackTargets[0];
+            
+            // ★追加：一番点数が高かった出撃元のお城の兵士数が、√石高×200以上あるかチェックします！
+            const stagingCastle = this.game.getCastle(firstTarget.stagingBase);
+            if (stagingCastle) {
+                // ★新規追加：諸勢力への攻撃なら、必要な兵士数のハードルを下げます（200 から 120 に）
+                let requiredSoldiers = Math.sqrt(stagingCastle.kokudaka) * 200;
+                if (firstTarget.isKunishuTarget) {
+                    requiredSoldiers = Math.sqrt(stagingCastle.kokudaka) * 120;
+                }
+
+                if (stagingCastle.soldiers < requiredSoldiers) {
+                    // 兵士が足りない場合は、この月の攻撃作戦を諦めて内政にします
+                    this.setInternalOperation(clanId, legionId, sabotageTargets);
+                    return;
+                }
+            }
+
+            // ai.jsでやっていた確率のサイコロをここで振って、やるかどうか決めます
+            // 調整：highestScore（点数）を 1.5倍 にして、作戦を実行しやすくします！
+            if (Math.random() * 100 < (highestScore * 1.5)) {
+                this.operations[clanId][legionId] = {
+                    type: '攻撃',
+                    attackTargets: attackTargets, // ★追加：第一～第三までの目標リストを全部記憶します
+                    planningScore: firstTarget.score,
+                    targetId: firstTarget.targetId, 
+                    isKunishuTarget: firstTarget.isKunishuTarget,
+                    stagingBase: firstTarget.stagingBase,
+                    supportBase: firstTarget.supportBase,
+                    requiredForce: firstTarget.requiredForce, 
+                    requiredRice: firstTarget.requiredRice,      
+                    assignedUnits: [], 
+                    turnsRemaining: firstTarget.turnsRemaining, 
+                    maxTurns: firstTarget.maxTurns,   
+                    status: firstTarget.turnsRemaining <= 0 ? '実行中' : '準備中',
+                    sabotageTargets: sabotageTargets
+                };
+
+                // ★ここから追加：攻撃作戦が決まった時に、方針を決定します！
+                if (!this.grandObjectives) this.grandObjectives = {};
+                if (!this.grandObjectives[clanId]) this.grandObjectives[clanId] = {};
+                
+                // ★今回追加：すでに方針が存在している場合は、上書きせずにそのまま維持します！
+                if (!this.grandObjectives[clanId][legionId]) {
+                    const targetCastle = this.game.getCastle(firstTarget.targetId);
+                    if (targetCastle) {
+                        const myTotalSoldiers = this.game.getClanTotalSoldiers(clanId);
+                        const targetClanId = targetCastle.ownerClan;
+                        const targetProvId = targetCastle.provinceId;
+                        
+                        // 初期値を '拠点攻略' から null に変更します
+                        let objectiveType = null; 
+                        let targetRegionId = 0; // ★追加：地方のIDを覚えておく箱
+
+                        // 攻撃先が空き拠点(IDが0)や諸勢力でない場合
+                        if (targetClanId !== 0 && !firstTarget.isKunishuTarget) {
+                            // ★追加：大名攻略より先に、規模の大きい「地方統一」ができるかチェックします！
+                            if (targetProvId > 0) {
+                                const targetProv = this.game.getProvince(targetProvId);
+                                if (targetProv && targetProv.regionId > 0) {
+                                    targetRegionId = targetProv.regionId;
+                                    let enemyRegionSoldiers = 0;
+                                    
+                                    this.game.getRegionCastles(targetRegionId).forEach(c => {
+                                        if (c.ownerClan !== clanId) {
+                                            const rel = this.game.getRelation(clanId, c.ownerClan);
+                                            if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) {
+                                                enemyRegionSoldiers += c.soldiers;
+                                            }
+                                        }
+                                    });
+
+                                    if (myTotalSoldiers > enemyRegionSoldiers) {
+                                        objectiveType = '地方統一';
+                                    }
+                                }
+                            }
+                            
+                            // 地方統一にならなかった場合、大名攻略の判定
+                            if (!objectiveType) {
+                                const targetClanTotalSoldiers = this.game.getClanTotalSoldiers(targetClanId);
+                                if (myTotalSoldiers > targetClanTotalSoldiers) {
+                                    objectiveType = '大名攻略';
+                                }
+                            }
+                        }
+
+                        // 大名攻略にならなかった場合、国攻略の判定
+                        // !objectiveType（nullの時）だけ計算を行います
+                        if (!objectiveType && !firstTarget.isKunishuTarget && targetProvId > 0) {
+                            let enemyProvSoldiers = 0;
+                            this.game.getProvinceCastles(targetProvId).forEach(c => {
+                                if (c.ownerClan !== clanId) {
+                                    const rel = this.game.getRelation(clanId, c.ownerClan);
+                                    if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) {
+                                        enemyProvSoldiers += c.soldiers;
+                                    }
+                                }
+                            });
+
+                            if (myTotalSoldiers > enemyProvSoldiers) {
+                                objectiveType = '国攻略';
+                            }
+                        }
+
+                        // ★今回追加：国攻略にもならなかった場合、反攻作戦の判定
+                        if (!objectiveType && !firstTarget.isKunishuTarget) {
+                            if (this.historyOwnedCastles && this.historyOwnedCastles[clanId]) {
+                                const history = this.historyOwnedCastles[clanId];
+                                const pastOwnedSet = new Set();
+                                history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
+                                
+                                // 攻めようとしている相手の城が、過去に持っていた城なら反攻作戦にします
+                                if (pastOwnedSet.has(firstTarget.targetId)) {
+                                    objectiveType = '反攻作戦';
+                                }
+                            }
+                        }
+
+                        // ★追加：諸勢力への攻撃作戦になった場合は、「国内平定」を方針に設定します！
+                        if (!objectiveType && firstTarget.isKunishuTarget) {
+                            objectiveType = '国内平定';
+                        }
+
+                        // ★objectiveTypeがセットされている時だけ、方針を記録します
+                        if (objectiveType) {
+                            let initialTargetCount = 0;
+                            if (objectiveType === '大名攻略') {
+                                initialTargetCount = this.game.getClanCastles(targetClanId).length;
+                            } else if (objectiveType === '地方統一') {
+                                initialTargetCount = this.game.getRegionCastles(targetRegionId).filter(c => {
+                                    if (c.ownerClan !== clanId) {
+                                        const rel = this.game.getRelation(clanId, c.ownerClan);
+                                        return !rel || !window.DiplomacyRules.isFriendly(rel.status);
+                                    }
+                                    return false;
+                                }).length;
+                            } else if (objectiveType === '国攻略') {
+                                initialTargetCount = this.game.getProvinceCastles(targetProvId).filter(c => {
+                                    if (c.ownerClan !== clanId) {
+                                        const rel = this.game.getRelation(clanId, c.ownerClan);
+                                        return !rel || !window.DiplomacyRules.isFriendly(rel.status);
+                                    }
+                                    return false;
+                                }).length;
+                            } else if (objectiveType === '反攻作戦') {
+                                // ★今回追加：反攻作戦の時の初期ターゲット数（取り返すべき拠点数）を計算します
+                                const history = this.historyOwnedCastles[clanId];
+                                const currentMyCastles = new Set(this.game.getClanCastles(clanId).map(c => c.id));
+                                const pastOwnedSet = new Set();
+                                history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
+                                
+                                for (const cid of pastOwnedSet) {
+                                    if (!currentMyCastles.has(cid)) {
+                                        const c = this.game.getCastle(cid);
+                                        if (c) {
+                                            const rel = this.game.getRelation(clanId, c.ownerClan);
+                                            // 友好勢力でなければ、取り返す拠点としてカウント
+                                            if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) {
+                                                initialTargetCount++;
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if (objectiveType === '国内平定') {
+                                // ★追加：初期ターゲット数として、自軍団内の敵対諸勢力の数をカウントします
+                                const myCastles = this.game.getClanCastles(clanId).filter(c => c.legionId === legionId);
+                                myCastles.forEach(myC => {
+                                    // ★修正：商人は攻撃対象にならないので、ターゲットから除外します！
+                                    const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(myC.id).filter(k => k.getRelation(clanId) <= 30 && k.ideology !== '商人');
+                                    initialTargetCount += kunishusInCastle.length;
+                                });
+                            }
+                            
+                            const myCastleCount = this.game.getClanCastles(clanId).length;
+                            
+                            this.grandObjectives[clanId][legionId] = {
+                                type: objectiveType,
+                                targetClanId: targetClanId,
+                                targetProvId: targetProvId,
+                                targetRegionId: targetRegionId, // ★追加：地方のIDも保存します
+                                turnCount: 24, // 24ターン（2年間）待機
+                                historyTargetCount: [initialTargetCount], // 過去24回分を毎月覚える箱
+                                prevMyCastleCount: myCastleCount // 前月分の自拠点数
+                            };
+                        }
+                    }
+                }
+                
+                // ★変更：大名家名や軍団長名、方針、具体的な攻撃先や出撃元の名前を取得して出力します
+                const logInfo = this.getOperationLogInfo(clanId, legionId);
+                let targetName = "不明な目標";
+                if (firstTarget.isKunishuTarget) {
+                    const kunishu = this.game.kunishuSystem.getKunishu(firstTarget.targetId);
+                    targetName = kunishu ? kunishu.getName(this.game) : "不明な諸勢力";
+                } else {
+                    const tCastle = this.game.getCastle(firstTarget.targetId);
+                    targetName = tCastle ? tCastle.name : "不明な拠点";
+                }
+                const stagingCastle = this.game.getCastle(firstTarget.stagingBase);
+                const stagingName = stagingCastle ? stagingCastle.name : "不明な拠点";
+
+                console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) が ${targetName} への【攻撃作戦】を立案しました！(方針: ${logInfo.grandObjStr}, 第一出撃元: ${stagingName}, 準備: ${firstTarget.turnsRemaining}ヶ月)`);
+                return;
+            }
+        }
+
+        // 攻撃する場所がなかったり、サイコロに外れたら、おとなしく内政作戦にします
+        this.setInternalOperation(clanId, legionId, sabotageTargets);
+    }
+
+    setInternalOperation(clanId, legionId, sabotageTargets = []) {
+        this.operations[clanId][legionId] = {
+            type: '内政',
+            targetId: null,
+            sabotageTargets: sabotageTargets, // ★変更：新しく作った調略目標を記憶させます
+            isKunishuTarget: false,
+            stagingBase: null,
+            requiredForce: 0,
+            requiredRice: 0,
+            assignedUnits: [],
+            turnsRemaining: 1, // 内政はすぐに実行中になります
+            maxTurns: 1,
+            status: '準備中'
+        };
+        // ★変更：大名家名や軍団長名、方針を取得して出力します
+        const logInfo = this.getOperationLogInfo(clanId, legionId);
+        console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) は今月、【内政作戦】を行います。(方針: ${logInfo.grandObjStr}, 調略目標: ${sabotageTargets.length}件)`);
+    }
+
+    async updateOperation(clanId, legionId) {
+        const op = this.operations[clanId][legionId];
+        // ★変更：大名家名や軍団長名、方針を最初に取得しておきます
+        const logInfo = this.getOperationLogInfo(clanId, legionId);
+
+        // 1. 期限切れのチェック
+        op.maxTurns--;
+        if (op.maxTurns <= 0) {
+            console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) の作戦【${op.type}】は期限切れで中止されました。(方針: ${logInfo.grandObjStr})`);
+            delete this.operations[clanId][legionId];
+            await this.generateOperation(clanId, legionId);
+            return;
+        }
+
+        // 2. 準備中の場合
+        if (op.status === '準備中') {
+            // ★今後の拡張：ここで武将を集める命令を出します。
+            
+            // 今回はカウントダウンを進めるだけです
+            op.turnsRemaining--;
+            if (op.turnsRemaining <= 0) {
+                op.status = '実行中';
+                console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) の作戦【${op.type}】の準備が完了し、実行フェーズに入りました！`);
+            } else if (op.type === '攻撃') {
+                // ★追加：作戦の具体的な目標拠点や出撃元の名前を取得します
+                let targetName = "不明な目標";
+                if (op.isKunishuTarget) {
+                    const kunishu = this.game.kunishuSystem.getKunishu(op.targetId);
+                    targetName = kunishu ? kunishu.getName(this.game) : "不明な諸勢力";
+                } else {
+                    const tCastle = this.game.getCastle(op.targetId);
+                    targetName = tCastle ? tCastle.name : "不明な拠点";
+                }
+                const stagingCastle = this.game.getCastle(op.stagingBase);
+                const stagingName = stagingCastle ? stagingCastle.name : "不明な拠点";
+
+                // ★追加：まだ準備中の場合（カウントダウンが0より大きい時）にログを出します
+                console.log(`${logInfo.clanName} (軍団長: ${logInfo.commanderName}) は ${targetName} への【攻撃作戦】を準備中です。(方針: ${logInfo.grandObjStr}, 出撃元: ${stagingName}, 残り準備期間: ${op.turnsRemaining}ヶ月)`);
+            }
+        }
+    }
+    
+    // ★追加：コンソール表示用に大名家名、軍団長名、方針をまとめて取得する魔法です！
+    getOperationLogInfo(clanId, legionId) {
+        const clan = this.game.getClan(clanId);
+        const clanName = clan ? clan.name : "不明な大名家";
+
+        let commanderName = "不明";
+        if (legionId === 0) {
+            const daimyo = this.game.getClanDaimyo(clanId);
+            commanderName = daimyo ? daimyo.name : "大名直轄";
+        } else {
+            const legion = this.game.getLegionByClanNo(clanId, legionId) || null;
+            if (legion && legion.commanderId) {
+                const commander = this.game.getBusho(legion.commanderId);
+                commanderName = commander ? commander.name : "不明";
+            }
+        }
+
+        let grandObjStr = "なし";
+        if (this.grandObjectives && this.grandObjectives[clanId] && this.grandObjectives[clanId][legionId]) {
+            const obj = this.grandObjectives[clanId][legionId];
+            if (obj.type === '大名攻略') {
+                const targetClan = this.game.getClan(obj.targetClanId);
+                grandObjStr = targetClan ? `【${targetClan.name}の攻略】` : "【不明な大名の攻略】";
+            } else if (obj.type === '地方統一') {
+                const provs = this.game.getRegionProvinces(obj.targetRegionId);
+                const regionName = (provs.length > 0 && provs[0].region) ? provs[0].region : "不明な";
+                grandObjStr = `【${regionName}地方の統一】`;
+            } else if (obj.type === '国攻略') {
+                const targetProv = this.game.getProvince(obj.targetProvId);
+                grandObjStr = targetProv ? `【${targetProv.province}の統一】` : "【不明な国の攻略】";
+            } else if (obj.type === '反攻作戦') {
+                // ★今回追加：反攻作戦の時の表示です
+                grandObjStr = "【反攻作戦(失地回復)】";
+            } else if (obj.type === '国内平定') {
+                // ★追加：国内平定の時の表示です
+                grandObjStr = "【国内平定(諸勢力鎮圧)】";
+            }
+        }
+
+        return { clanName, commanderName, grandObjStr };
+    }
+}

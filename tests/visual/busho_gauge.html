@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- APP_CSS -->
+<style>
+html,body{margin:0;width:100%;min-height:100%;background:#15251c;color:#fff;font-family:serif}
+.visual-fixture{width:900px;margin:32px auto;padding:16px;box-sizing:border-box}
+.fixture-row{display:flex;gap:20px;width:100%;align-items:stretch}
+.fixture-left,.fixture-right{flex:1;min-width:0;padding:12px;border:1px solid #d4af37;box-sizing:border-box}
+.fixture-right{background:rgba(0,0,0,.25)}
+.fixture-label{margin-bottom:10px;color:#ffd54f;font-weight:bold}
+.fixture-left .daimyo-detail-stat-box{margin-bottom:8px}
+</style>
+</head>
+<body class="is-pc">
+<div class="visual-fixture busho-detail-container">
+  <div class="fixture-row">
+    <section class="fixture-left" id="ability-column">
+      <div class="fixture-label">能力ゲージ回帰テスト</div>
+      <div class="daimyo-detail-stat-box busho-detail-stat-box" data-value="80">
+        <span class="daimyo-detail-label busho-detail-stat-label">統率</span>
+        <span class="busho-detail-stat-grade">B</span>
+        <div class="busho-stat-bar-wrapper busho-detail-stat-bar">
+          <div class="bar-bg-busho busho-detail-bar-base"><div class="bar-fill-busho" style="--bar-value:80%"></div></div>
+        </div>
+      </div>
+      <div class="daimyo-detail-stat-box busho-detail-stat-box" data-value="100">
+        <span class="daimyo-detail-label busho-detail-stat-label">武勇</span>
+        <span class="busho-detail-stat-grade">A</span>
+        <div class="busho-stat-bar-wrapper busho-detail-stat-bar">
+          <div class="bar-bg-busho busho-detail-bar-base"><div class="bar-fill-busho" style="--bar-value:100%"></div></div>
+        </div>
+      </div>
+      <div class="daimyo-detail-stat-box busho-detail-stat-box" data-value="110">
+        <span class="daimyo-detail-label busho-detail-stat-label">智謀</span>
+        <span class="busho-detail-stat-grade">S</span>
+        <div class="busho-stat-bar-wrapper busho-detail-stat-bar">
+          <div class="bar-bg-busho busho-detail-bar-base"><div class="bar-fill-busho over-connected" style="--bar-value:110%"></div></div>
+        </div>
+      </div>
+      <div class="daimyo-detail-stat-box busho-detail-stat-box" data-value="120">
+        <span class="daimyo-detail-label busho-detail-stat-label">政治</span>
+        <span class="busho-detail-stat-grade">S</span>
+        <div class="busho-stat-bar-wrapper busho-detail-stat-bar">
+          <div class="bar-bg-busho busho-detail-bar-base"><div class="bar-fill-busho over-connected" style="--bar-value:120%"></div></div>
+        </div>
+      </div>
+    </section>
+    <aside class="fixture-right" id="right-column">
+      <div class="fixture-label">右側情報欄</div>
+      <p>所在・主君などの隣接項目を想定。</p>
+    </aside>
+  </div>
+</div>
+</body>
+</html>
