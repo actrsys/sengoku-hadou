@@ -966,16 +966,31 @@ class FieldWarManager {
             if (match && match[1]) scale = parseFloat(match[1]);
         }
 
-        // 2つの座標の中心を計算します
-        const midX = (x1 + x2) / 2;
-        const midY = (y1 + y2) / 2;
-
-        // 拡大率を掛け算して、本当のピクセル位置を計算します
-        const px = (midX * (this.hexW * 0.75) + this.hexW / 2) * scale;
-        const py = (midY * (this.hexH / 2) + this.hexH / 2) * scale;
-
         const containerW = scrollEl.clientWidth;
         const containerH = scrollEl.clientHeight;
+        const toPixel = (x, y) => ({
+            x: (x * (this.hexW * 0.75) + this.hexW / 2) * scale,
+            y: (y * (this.hexH / 2) + this.hexH / 2) * scale
+        });
+        const p1 = toPixel(x1, y1);
+        const p2 = toPixel(x2, y2);
+
+        // r402: 交戦する2部隊がすでに画面中央寄りへ収まっている場合は、
+        // 毎攻撃ごとのsmooth scrollを発生させない。近接戦はほぼこの条件に入り、
+        // ダメージ点滅とスクロール合成が同時に走る負荷を避けられる。
+        const marginX = Math.min(120, Math.max(20, containerW * 0.15));
+        const marginY = Math.min(90, Math.max(16, containerH * 0.15));
+        const left = scrollEl.scrollLeft + marginX;
+        const right = scrollEl.scrollLeft + containerW - marginX;
+        const top = scrollEl.scrollTop + marginY;
+        const bottom = scrollEl.scrollTop + containerH - marginY;
+        const p1Visible = p1.x >= left && p1.x <= right && p1.y >= top && p1.y <= bottom;
+        const p2Visible = p2.x >= left && p2.x <= right && p2.y >= top && p2.y <= bottom;
+        if (p1Visible && p2Visible) return;
+
+        // 2つの座標の中心を計算します
+        const px = (p1.x + p2.x) / 2;
+        const py = (p1.y + p2.y) / 2;
 
         scrollEl.scrollTo({
             left: px - containerW / 2,
@@ -1004,6 +1019,18 @@ class FieldWarManager {
         const containerW = scrollEl.clientWidth;
         const containerH = scrollEl.clientHeight;
 
+        // r402: 行動部隊がすでに見やすい範囲へ収まっているなら、ターンごとに
+        // 同じ場所へsmooth scrollし直さない。戦場が密集した後半ほど無駄な合成を減らす。
+        const marginX = Math.min(120, Math.max(20, containerW * 0.15));
+        const marginY = Math.min(90, Math.max(16, containerH * 0.15));
+        const isComfortablyVisible = (
+            px >= scrollEl.scrollLeft + marginX &&
+            px <= scrollEl.scrollLeft + containerW - marginX &&
+            py >= scrollEl.scrollTop + marginY &&
+            py <= scrollEl.scrollTop + containerH - marginY
+        );
+        if (isComfortablyVisible) return;
+
         scrollEl.scrollTo({
             left: px - containerW / 2,
             top: py - containerH / 2,
@@ -1014,10 +1041,14 @@ class FieldWarManager {
     log(msg) {
         if (!this.logEl) return;
         const div = document.createElement('div');
-        div.innerText = `[T${this.turnCount}] ${msg}`;
+        div.textContent = `[T${this.turnCount}] ${msg}`;
         div.style.marginBottom = '2px';
         this.logEl.appendChild(div);
-        this.logEl.scrollTop = this.logEl.scrollHeight;
+        // r402: 通常は非表示のログに対してscrollHeightを読むと、戦闘のたびに
+        // 不要な同期layoutが発生する。表示中だけ末尾へ追従させる。
+        if (!this.logEl.classList.contains('hidden')) {
+            this.logEl.scrollTop = this.logEl.scrollHeight;
+        }
     }
 
     _updateFieldWarHeader() {
@@ -3518,8 +3549,11 @@ class FieldWarManager {
         // ==========================================
         if (isPlayerInvolved) {
         
-            const atkEl = document.getElementById(`fw-unit-el-${attacker.id}`);
-            const defEl = document.getElementById(`fw-unit-el-${defender.id}`);
+            // updateMap用に保持している参照をそのまま使い、攻撃ごとのDOM再探索を避けます。
+            const atkRefs = this._fwUnitElementCache.get(attacker.id);
+            const defRefs = this._fwUnitElementCache.get(defender.id);
+            const atkEl = atkRefs && atkRefs.el;
+            const defEl = defRefs && defRefs.el;
 
             // 交互に4度ずつ点滅。低FPS端末でも class の付け外しが同じ描画へ潰れないよう、
             // 明状態・通常状態の双方で最低1回は描画機会を通す。
@@ -3545,7 +3579,7 @@ class FieldWarManager {
                 if (!el || damage <= 0) return;
                 const popup = document.createElement('div');
                 popup.className = 'fw-damage-popup';
-                popup.innerText = `-${damage}`;
+                popup.textContent = `-${damage}`;
                 
                 this.mapEl.appendChild(popup);
                 
@@ -3580,13 +3614,11 @@ class FieldWarManager {
             showDamagePopup(dmgToAtk, atkEl);
 
             // 画面上の兵士の数字を書き換えます
-            if (defEl) {
-                const soldierText = defEl.querySelector('.fw-unit-soldiers');
-                if (soldierText) soldierText.innerText = defender.soldiers;
+            if (defRefs && defRefs.soldierEl) {
+                defRefs.soldierEl.textContent = String(defender.soldiers);
             }
-            if (atkEl) {
-                const soldierText = atkEl.querySelector('.fw-unit-soldiers');
-                if (soldierText) soldierText.innerText = attacker.soldiers;
+            if (atkRefs && atkRefs.soldierEl) {
+                atkRefs.soldierEl.textContent = String(attacker.soldiers);
             }
 
             // ポップアップをしっかり見せるために少しだけ待ちます

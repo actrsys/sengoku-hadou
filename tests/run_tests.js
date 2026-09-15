@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r401');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r403');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -8872,9 +8872,10 @@ test('野戦AIの攻撃可否は向き変更APに加えて攻撃1APまで確保�
     assert.ok(field.includes('unit.ap >= turnCost + 1 && this.canAttackTarget(tempUnit, e.x, e.y)'), '実行直前の攻撃対象選択も同じAP基準を使う');
 });
 
-test('野戦ダメージ演出は低FPS端末でも描画機会を通してから進行する', () => {
+test('野戦ダメージ演出は低FPS端末でも描画機会を通し、従来の交互点滅の見た目を維持する', () => {
     const field = read('js/field_war.js');
     const css = read('css/animation.css');
+    const style = read('css/style.css');
     assert.ok(field.includes('async _waitForFieldWarVisualState(minMs = 0)'));
     assert.ok(field.includes('this.game.ui.waitForNextPaint()'));
     assert.ok(field.includes('await this._waitForFieldWarVisualState(120);'));
@@ -8886,6 +8887,29 @@ test('野戦ダメージ演出は低FPS端末でも描画機会を通してか�
     const popupRuleEnd = css.indexOf('}', popupRuleAt);
     const popupRule = css.slice(popupRuleAt, popupRuleEnd + 1);
     assert.ok(!popupRule.includes('animation:'), 'append直後からwall-clock animationを走らせない');
+
+    assert.ok(css.includes('.anim-battle-flash {\n    filter: brightness(2) drop-shadow(0 0 10px #ffffff);'), '攻守の部隊全体が交互に光る従来表現を維持する');
+    assert.ok(!css.includes('.anim-battle-flash::after'), 'リング表示への置換を行わない');
+
+    const unitRulesAt = style.indexOf('/* 野戦の部隊カラーと影 */');
+    const unitRulesEnd = style.indexOf('/* 友軍カラー（野戦・ログ共通） */', unitRulesAt);
+    const unitRules = style.slice(unitRulesAt, unitRulesEnd);
+    assert.ok(unitRules.includes('drop-shadow(1px 0 0'), '通常時の従来の縁取りを維持する');
+    assert.ok(unitRules.includes('drop-shadow(-1px 0 0'), '通常時の従来の縁取りを維持する');
+    assert.ok(unitRules.includes('drop-shadow(0 0 6px #ffff00)'), '選択中の従来の発光を維持する');
+});
+
+test('野戦の交戦時は不要なsmooth scroll・DOM再探索・非表示ログlayoutを避ける', () => {
+    const field = read('js/field_war.js');
+    assert.ok(field.includes('const p1Visible = p1.x >= left && p1.x <= right'));
+    assert.ok(field.includes('if (p1Visible && p2Visible) return;'), '交戦両部隊が見えている時は再センタリングしない');
+    assert.ok(field.includes('const isComfortablyVisible = ('));
+    assert.ok(field.includes('if (isComfortablyVisible) return;'), '行動部隊が見えている時は毎ターン再センタリングしない');
+    assert.ok(field.includes('const atkRefs = this._fwUnitElementCache.get(attacker.id);'));
+    assert.ok(field.includes('const defRefs = this._fwUnitElementCache.get(defender.id);'));
+    assert.ok(field.includes("if (!this.logEl.classList.contains('hidden'))"), '非表示ログでscrollHeightを読まない');
+    assert.ok(field.includes('popup.textContent = `-${damage}`;'));
+    assert.ok(field.includes('defRefs.soldierEl.textContent = String(defender.soldiers);'));
 });
 
 test('背景復帰はすでにactiveなら重い地図復旧を二重実行しない', () => {
