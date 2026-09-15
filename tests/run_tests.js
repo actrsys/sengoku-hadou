@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r403');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r404');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -3734,7 +3734,10 @@ test('部隊編成はPCカードとスマホ循環ボタンで能力・適性を
     assert.ok(source.includes('class="troop-type-btn troop-type-cycle-btn active"'), 'スマホは兵科切替ボタンを1個だけにする');
     assert.ok(source.includes("isSeaBattleForDivide ? ['ashigaru', 'teppo'] : ['ashigaru', 'kiba', 'teppo']"), 'スマホ海戦では騎馬を循環対象から外す');
     assert.ok(source.includes("if (aptitudeSummary) aptitudeSummary.innerHTML = aptitudeSummaryHtml(b, nextType, isSeaBattleForDivide)"), 'スマホは兵科切替と同時に適性表示を更新する');
-    assert.ok(source.includes("listEl.classList.toggle('divide-list-two-column', isPcDivide && bushos.length > 3)"), 'PCで4人以上なら左3・右2の2列配置を使う');
+    assert.ok(source.includes("listEl.classList.toggle('divide-list-two-column', isPcDivide)"), 'PC版は部隊数にかかわらず2列配置を維持する');
+    assert.ok(source.includes('const pcFixedSlotCount = 6;'), 'PC編成は3段×2列の6枠を固定確保する');
+    assert.ok(source.includes("dummy.className = 'qty-row divide-row divide-row-placeholder';"), '不足枠はダミースロットで補う');
+    assert.ok(source.includes("dummy.setAttribute('aria-hidden', 'true');"), 'ダミースロットは操作・読み上げ対象にしない');
 });
 
 test('野戦の個別部隊情報は固定寸法で全適性と既存の名前圧縮規則を使う', () => {
