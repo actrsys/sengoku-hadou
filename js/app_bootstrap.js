@@ -6,6 +6,7 @@
  * - Webフォントの先行ロードと初期表示制御
  * - 固定HTMLボタンのイベント登録
  * - game-screen のPC/スマホ表示領域調整
+ * - ブラウザの戻る／進む履歴の吸収
  * - ページ離脱時の警告
  *
  * ゲームルールや画面固有の描画はここに置かない。
@@ -17,6 +18,52 @@
     const PC_LOGICAL_HEIGHT = 720;
     const MOBILE_TARGET_RATIO = 9 / 16;
     const MIN_TOUCH_PC_SCALE = 0.75;
+    const BROWSER_HISTORY_GUARD_KEY = '__sengokuHadouHistoryGuard';
+
+    /**
+     * ゲーム内の画面遷移はHistory APIを使わないため、ブラウザの戻る／進むは
+     * ゲーム状態の「一段戻る」と一致しない。現在ページ内にガード用履歴を1段だけ
+     * 置き、通常の履歴移動を同一document内で吸収する。
+     *
+     * ブラウザの履歴一覧から複数entryを直接選ぶ等、document自体を飛び越える
+     * 操作まではWeb標準上完全には禁止できないため、beforeunloadの離脱警告も維持する。
+     */
+    function initializeBrowserHistoryGuard() {
+        const browserHistory = window.history;
+        if (!browserHistory
+            || typeof browserHistory.replaceState !== 'function'
+            || typeof browserHistory.pushState !== 'function'
+            || typeof browserHistory.go !== 'function') return;
+
+        const restoreTrap = (event) => {
+            const guardState = event.state && event.state[BROWSER_HISTORY_GUARD_KEY];
+            if (guardState !== 'base') return;
+            // baseへ戻った直後に既存trapへ進ませる。pushStateで積み続けず、
+            // 履歴を2entryのまま固定してメモリと履歴汚染を増やさない。
+            browserHistory.go(1);
+        };
+        window.addEventListener('popstate', restoreTrap);
+
+        const currentState = browserHistory.state;
+        const currentGuardState = currentState && currentState[BROWSER_HISTORY_GUARD_KEY];
+        // trap上での通常reloadは既存のbase/trapをそのまま再利用する。
+        // 再起動のたびに同一ページの履歴を1件ずつ増やさない。
+        if (currentGuardState === 'trap') return;
+
+        const preservedState = (currentState && typeof currentState === 'object')
+            ? currentState
+            : {};
+        const baseState = { ...preservedState, [BROWSER_HISTORY_GUARD_KEY]: 'base' };
+        const trapState = { ...preservedState, [BROWSER_HISTORY_GUARD_KEY]: 'trap' };
+
+        try {
+            if (currentGuardState !== 'base') browserHistory.replaceState(baseState, '');
+            browserHistory.pushState(trapState, '');
+        } catch (error) {
+            window.removeEventListener('popstate', restoreTrap);
+            console.warn('ブラウザ履歴ガードを初期化できませんでした:', error);
+        }
+    }
     // 表示モード判定の正本。タッチ端末でも横向きでPC論理画面を十分な倍率で表示できる時はPCレイアウトを使う。
     // 軽量モードもこの論理レイアウトに従わせ、PCレイアウトへスマホ専用のページ送りや音声制限を持ち込まない。
     function resolvesToPcGameLayout(layoutW, layoutH, touchInput) {
@@ -477,6 +524,7 @@
     }
 
     initializeFonts();
+    initializeBrowserHistoryGuard();
     window.addEventListener('resize', scheduleResizeGameScreen, { passive: true });
     window.addEventListener('orientationchange', scheduleResizeGameScreen, { passive: true });
     if (window.visualViewport) {

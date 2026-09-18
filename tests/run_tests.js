@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r410');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r411');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -3219,7 +3219,21 @@ test('タイトル版表示は GameConfig.Meta.Version を正本にする', () =
     assert.ok(bootstrap.includes('window.GameConfig?.Meta?.Version'));
 });
 
-test('r410のタイトル情報メニューは設定の下から差し替わり、問い合わせだけを閉じる', () => {
+test('r411はブラウザの戻る進むをHistory APIのガードで吸収する', () => {
+    const bootstrap = read('js/app_bootstrap.js');
+    assert.ok(bootstrap.includes('function initializeBrowserHistoryGuard()'), '履歴ガードの初期化窓口を一元化する');
+    assert.ok(bootstrap.includes("browserHistory.replaceState(baseState, '')"), '現在entryをガード基点として置換する');
+    assert.ok(bootstrap.includes("browserHistory.pushState(trapState, '')"), '同一document内に吸収用entryを1段だけ積む');
+    assert.ok(bootstrap.includes("if (currentGuardState === 'trap') return"), '通常reloadでは既存trapを再利用して履歴を増やさない');
+    assert.ok(bootstrap.includes("window.addEventListener('popstate'"), 'ブラウザ履歴移動を監視する');
+    assert.ok(bootstrap.includes("if (guardState !== 'base') return"), 'ガード基点へ戻った時だけ復帰させる');
+    assert.ok(bootstrap.includes('browserHistory.go(1)'), '戻る操作は既存trapへ進ませて吸収する');
+    assert.ok(!bootstrap.includes("browserHistory.pushState(trapState, '');\n            browserHistory.pushState"), '履歴を操作ごとに積み増さない');
+    assert.ok(bootstrap.includes('initializeBrowserHistoryGuard();'), '起動時に履歴ガードを有効化する');
+    assert.ok(bootstrap.includes("window.addEventListener('beforeunload'"), '複数entryを飛び越える離脱には既存警告も維持する');
+});
+
+test('r411のタイトル情報メニューは設定の下から差し替わり、問い合わせだけを閉じる', () => {
     const html = read('index.html');
     const bootstrap = read('js/app_bootstrap.js');
     const css = read('css/style.css');
