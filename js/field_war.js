@@ -622,11 +622,20 @@ class FieldWarManager {
     }
 
     _unbindFieldWarScrollEvents() {
+        if (this._fieldWarDragReleaseTimer) {
+            clearTimeout(this._fieldWarDragReleaseTimer);
+            this._fieldWarDragReleaseTimer = null;
+        }
         if (!this._fwScrollEventBindings) return;
         const previous = this._fwScrollEventBindings;
         const el = previous.element;
         const h = previous.handlers || {};
         if (el) {
+            // on* プロパティも固定DOMに残るため、addEventListener分と同じ寿命窓口で解放します。
+            el.onmousedown = null;
+            el.onmouseleave = null;
+            el.onmouseup = null;
+            el.onmousemove = null;
             if (h.click) el.removeEventListener('click', h.click, true);
             if (h.wheel) el.removeEventListener('wheel', h.wheel, false);
             if (h.touchstart) el.removeEventListener('touchstart', h.touchstart, false);
@@ -715,6 +724,10 @@ class FieldWarManager {
             scrollEl.onmousedown = (e) => {
                 // 左クリック以外（右クリックなど）は無視します
                 if (e.button !== 0) return;
+                if (this._fieldWarDragReleaseTimer) {
+                    clearTimeout(this._fieldWarDragReleaseTimer);
+                    this._fieldWarDragReleaseTimer = null;
+                }
                 
                 // ★追加: 操作できる部隊のターン（入力待ち）または情報モード以外はドラッグできないようにガードします！
                 const isWaitingInput = this.isPlayerTurn() && ['PHASE_MOVE', 'MOVE_PREVIEW', 'PHASE_DIR', 'PHASE_ATTACK'].includes(this.state);
@@ -740,8 +753,13 @@ class FieldWarManager {
                 isDragging = false;
                 scrollEl.classList.remove('grabbing');
                 
-                // 指を離した直後にクリック判定が暴発しないように、少しだけ待ってからメモを白紙にする魔法です
-                setTimeout(() => { isMoved = false; }, 50);
+                // 指を離した直後にクリック判定が暴発しないように、少しだけ待ってからメモを白紙にします。
+                // 次のドラッグ開始時に旧timerを破棄し、前回操作が新しいドラッグ判定を解除しないようにします。
+                if (this._fieldWarDragReleaseTimer) clearTimeout(this._fieldWarDragReleaseTimer);
+                this._fieldWarDragReleaseTimer = setTimeout(() => {
+                    this._fieldWarDragReleaseTimer = null;
+                    isMoved = false;
+                }, 50);
             };
 
             scrollEl.onmousemove = (e) => {

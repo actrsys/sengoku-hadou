@@ -1645,6 +1645,11 @@ class AIEngine {
         const clanCastlesForEquipment = this.game.getClanCastles(castle.ownerClan);
         const hasGunCastleAI = clanCastlesForEquipment.some(c => EconomyRules.isProdCastle(c, 'gun'));
         const hasHorseCastleAI = clanCastlesForEquipment.some(c => EconomyRules.isProdCastle(c, 'horse'));
+
+        // 同じ内政コンテキスト中は城の所属勢力・軍団は変わらないため、軍団所属城の集合も1回だけ確定します。
+        // 兵士数など可変値はこの配列の現在値を都度reduceし、所属集合の再抽出だけを省きます。
+        const legionCastlesForInternalAffairs = clanCastlesForEquipment.filter(c => c.legionId === castle.legionId);
+        const totalLegionKokudaka = legionCastlesForInternalAffairs.reduce((sum, c) => sum + c.kokudaka, 0);
         
         // ③ 決められた回数だけ、行動を繰り返します！
         for (let step = 0; step < maxActions; step++) {
@@ -1855,8 +1860,7 @@ class AIEngine {
 
                 // ===== 目標兵力の計算 =====
                 // 自分の軍団全体の「総石高」を調べます！
-                const myCastles = this.game.getClanCastles(castle.ownerClan).filter(c => c.legionId === castle.legionId);
-                const totalKokudaka = myCastles.reduce((sum, c) => sum + c.kokudaka, 0);
+                const totalKokudaka = totalLegionKokudaka;
 
                 // 石高をベースにした新しい計算式で、目標にする兵士の数を決めます
                 const kokudakaBonus = 1 + (Math.sqrt(totalKokudaka) / 100) + (Math.sqrt(castle.kokudaka) / 10);
@@ -2129,8 +2133,7 @@ class AIEngine {
                         keepSoldiers = Math.floor(maxEnemyMaxCastleSoldiers * 0.5);
 
                         // でも、自分の軍団全体の兵力が、敵の全体の半分以下なら…
-                        const myCastles = this.game.getClanCastles(castle.ownerClan).filter(c => c.legionId === castle.legionId);
-                        const myTotalSoldiers = myCastles.reduce((sum, c) => sum + c.soldiers, 0);
+                        const myTotalSoldiers = legionCastlesForInternalAffairs.reduce((sum, c) => sum + c.soldiers, 0);
                         const enemyHalf = maxEnemyTotalSoldiers * 0.5;
 
                         if (enemyHalf > 0 && myTotalSoldiers <= enemyHalf) {

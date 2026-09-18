@@ -234,7 +234,8 @@ class UIManager {
         let listStartY = 0;
         let listStartScrollY = 0;
         let currentDragList = null;
-        let lastDragDelta = 0; 
+        let lastDragDelta = 0;
+        let listDragReleaseTimer = null;
 
         document.addEventListener('mousedown', (e) => {
             if (!document.body.classList.contains('is-pc')) return;
@@ -245,6 +246,10 @@ class UIManager {
                 const isScrollbar = (e.clientX > rect.right - 20); 
                 
                 if (!isScrollbar) {
+                    if (listDragReleaseTimer) {
+                        clearTimeout(listDragReleaseTimer);
+                        listDragReleaseTimer = null;
+                    }
                     isListMouseDown = true;
                     hasListDragged = false;
                     currentDragList = listObj;
@@ -279,7 +284,9 @@ class UIManager {
                         currentDragList.scrollBy({ top: -15, behavior: 'smooth' }); 
                     }
                     
-                    setTimeout(() => {
+                    if (listDragReleaseTimer) clearTimeout(listDragReleaseTimer);
+                    listDragReleaseTimer = setTimeout(() => {
+                        listDragReleaseTimer = null;
                         hasListDragged = false;
                     }, 100);
                 }
@@ -294,7 +301,11 @@ class UIManager {
             if (hasListDragged) {
                 e.stopPropagation();
                 e.preventDefault();
-                hasListDragged = false; 
+                if (listDragReleaseTimer) {
+                    clearTimeout(listDragReleaseTimer);
+                    listDragReleaseTimer = null;
+                }
+                hasListDragged = false;
             }
         }, true);
 

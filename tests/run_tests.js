@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r413');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r414');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -12410,6 +12410,71 @@ test('r406ではUI・AI・援軍が兵数上限の数値や乗算式を個別実
     assert.ok(read('js/ai.js').includes('TroopAllocationService.clampArmySoldiers'));
     assert.ok(read('js/reinforcement_service.js').includes('TroopAllocationService.clampArmySoldiers'));
     assert.ok(read('js/war_effort.js').includes('potentialDefMainSoldiers = TroopAllocationService.clampArmySoldiers'), 'AI迎撃判断も実際に出せる本隊兵数を見る');
+});
+
+
+
+test('共通単一選択はselector-list内だけを解除し他UIの同名classへ干渉しない', () => {
+    const info = read('js/ui_info.js');
+    const at = info.indexOf('handleCommonSelect(itemId, element, isMulti = false)');
+    const block = info.slice(at, at + 1900);
+    assert.ok(block.includes("const listRoot = (this.ui && this.ui.selectorList) || document.getElementById('selector-list');"));
+    assert.ok(block.includes("listRoot ? listRoot.querySelectorAll('.select-item') : []"));
+    assert.ok(!block.includes("document.querySelectorAll('.select-item')"), '共通選択でdocument全体を走査しない');
+});
+
+test('PC地図の連続ドラッグは前回終了timerを新しいmousedownで破棄する', () => {
+    const map = read('js/ui_map.js');
+    const at = map.indexOf('initMapDrag()');
+    const block = map.slice(at, map.indexOf('applyInertia(', at));
+    assert.ok(block.includes('this._mapDragReleaseTimer = null;'));
+    assert.ok(block.includes('clearTimeout(this._mapDragReleaseTimer);'));
+    const mouseDownAt = block.indexOf("sc.addEventListener('mousedown'");
+    const mouseMoveAt = block.indexOf("sc.addEventListener('mousemove'");
+    const mouseDownBlock = block.slice(mouseDownAt, mouseMoveAt);
+    assert.ok(mouseDownBlock.includes('if (this._mapDragReleaseTimer) {'));
+    assert.ok(mouseDownBlock.includes('this._mapDragReleaseTimer = null;'));
+    assert.ok(block.includes('this._mapDragReleaseTimer = setTimeout(() => {'));
+    assert.ok(!block.includes("\n            setTimeout(() => {\n                this.isDraggingMap = false;"), '寿命管理されない旧50ms timerを残さない');
+});
+
+test('AI内政は同じ軍団所属城を行動ごとに再抽出せず同一コンテキストで共用する', () => {
+    const ai = read('js/ai.js');
+    const fnStart = ai.indexOf('async execInternalAffairs');
+    const fnEnd = ai.indexOf('\n    async ', fnStart + 10);
+    const block = ai.slice(fnStart, fnEnd > fnStart ? fnEnd : fnStart + 30000);
+    assert.ok(block.includes('const legionCastlesForInternalAffairs = clanCastlesForEquipment.filter(c => c.legionId === castle.legionId);'));
+    assert.ok(block.includes('const totalLegionKokudaka = legionCastlesForInternalAffairs.reduce((sum, c) => sum + c.kokudaka, 0);'));
+    assert.ok(block.includes('const myTotalSoldiers = legionCastlesForInternalAffairs.reduce((sum, c) => sum + c.soldiers, 0);'));
+    assert.strictEqual((block.match(/getClanCastles\(castle\.ownerClan\)/g) || []).length, 1, '内政1回の所属城集合取得は1回だけ');
+    assert.ok(!block.includes('this.game.getClanCastles(castle.ownerClan).filter(c => c.legionId === castle.legionId)'));
+});
+
+
+
+test('野戦地図の連続ドラッグは旧クリック抑止timerを次操作へ持ち越さず固定DOM handlerも解放する', () => {
+    const field = read('js/field_war.js');
+    const unbindAt = field.indexOf('_unbindFieldWarScrollEvents()');
+    const unbindBlock = field.slice(unbindAt, field.indexOf('releaseFieldWarVisualResources()', unbindAt));
+    assert.ok(unbindBlock.includes('clearTimeout(this._fieldWarDragReleaseTimer);'));
+    assert.ok(unbindBlock.includes('el.onmousedown = null;'));
+    assert.ok(unbindBlock.includes('el.onmousemove = null;'));
+    const setupAt = field.indexOf("scrollEl.onmousedown = (e) => {");
+    const setupBlock = field.slice(setupAt, field.indexOf("scrollEl.addEventListener('click'", setupAt));
+    assert.ok(setupBlock.includes('if (this._fieldWarDragReleaseTimer) {'));
+    assert.ok(setupBlock.includes('this._fieldWarDragReleaseTimer = setTimeout(() => {'));
+    assert.ok(!setupBlock.includes('setTimeout(() => { isMoved = false; }, 50);'), '寿命管理されない旧50ms timerを残さない');
+});
+
+test('PC共通リストの連続ドラッグは前回release timerで新しいドラッグ判定を解除しない', () => {
+    const ui = read('js/ui.js');
+    const at = ui.indexOf('let isListMouseDown = false;');
+    const block = ui.slice(at, ui.indexOf('this.dialogQueue = [];', at));
+    assert.ok(block.includes('let listDragReleaseTimer = null;'));
+    assert.ok(block.includes('clearTimeout(listDragReleaseTimer);'));
+    assert.ok(block.includes('listDragReleaseTimer = setTimeout(() => {'));
+    assert.ok(block.includes('listDragReleaseTimer = null;'));
+    assert.ok(!block.includes("\n                    setTimeout(() => {\n                        hasListDragged = false;"), '寿命管理されない旧100ms timerを残さない');
 });
 
 Promise.all(pendingTests).then(() => {

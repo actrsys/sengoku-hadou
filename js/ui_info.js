@@ -345,8 +345,11 @@ class UIInfoManager {
         let input = element.querySelector('input[type="checkbox"], input[type="radio"]');
 
         if (!isMulti) {
-            // 単一選択の場合：他の選択をすべて消す
-            const allItems = document.querySelectorAll('.select-item');
+            // 単一選択の場合：この共通選択リストの中だけ選択を解除します。
+            // document 全体を走査すると、将来別UIが同じ .select-item を使った時に誤解除するため、
+            // 一覧のDOM責務を持つ selectorList を探索範囲の正本にします。
+            const listRoot = (this.ui && this.ui.selectorList) || document.getElementById('selector-list');
+            const allItems = listRoot ? listRoot.querySelectorAll('.select-item') : [];
             allItems.forEach(item => {
                 item.classList.remove('selected');
                 const inp = item.querySelector('input[type="checkbox"], input[type="radio"]');

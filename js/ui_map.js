@@ -534,6 +534,7 @@ Object.assign(UIManager.prototype, {
         this.lastDragX = 0;
         this.lastDragY = 0;
         this.inertiaFrame = null;
+        this._mapDragReleaseTimer = null;
         
         const sc = document.getElementById('map-scroll-container');
         if (!sc) return;
@@ -544,6 +545,10 @@ Object.assign(UIManager.prototype, {
             const isPC = document.body.classList.contains('is-pc');
 
             this._stopMapInertia();
+            if (this._mapDragReleaseTimer) {
+                clearTimeout(this._mapDragReleaseTimer);
+                this._mapDragReleaseTimer = null;
+            }
 
             this.isMouseDown = true;
             this.isDraggingMap = false;
@@ -568,7 +573,9 @@ Object.assign(UIManager.prototype, {
             this.isMouseDown = false;
             sc.classList.remove('grabbing');
             
-            setTimeout(() => {
+            if (this._mapDragReleaseTimer) clearTimeout(this._mapDragReleaseTimer);
+            this._mapDragReleaseTimer = setTimeout(() => {
+                this._mapDragReleaseTimer = null;
                 this.isDraggingMap = false;
             }, 50);
 
