@@ -43,6 +43,31 @@ class SelectorModalView {
         delete listContainer.dataset.selectorVisibleItemRows;
     }
 
+    _getLogicalElementHeight(element) {
+        if (!element) return 0;
+        // #game-screen はPCで transform: scale(...) されるため、getBoundingClientRect() は
+        // 物理表示倍率を含む。固定論理画面内のレイアウト計算では computed style / offsetHeight
+        // の論理CSS pxを使い、物理viewportの大きさを内部レイアウトへ逆流させない。
+        const style = window.getComputedStyle(element);
+        const computedHeight = parseFloat(style && style.height);
+        if (computedHeight > 0) return computedHeight;
+        const offsetHeight = Number(element.offsetHeight) || 0;
+        return offsetHeight > 0 ? offsetHeight : 0;
+    }
+
+    measureLogicalListRowStep(listContainer = null) {
+        const target = listContainer || (this.getElements() && this.getElements().listContainer);
+        if (!target || !target.isConnected) return 0;
+        const innerWrapper = target.querySelector('.list-inner-wrapper');
+        if (!innerWrapper) return 0;
+        const sample = innerWrapper.querySelector('.select-item:not(.history-list-item):not(.history-month-divider)');
+        if (!sample) return 0;
+        const wrapperStyle = window.getComputedStyle(innerWrapper);
+        const gapPx = parseFloat(wrapperStyle.rowGap) || parseFloat(wrapperStyle.gap) || 0;
+        const rowHeight = this._getLogicalElementHeight(sample);
+        return rowHeight > 0 ? rowHeight + gapPx : 0;
+    }
+
     fitListViewportToWholeRows({ minItemRows = 1 } = {}) {
         const elements = this.getElements();
         const listContainer = elements && elements.listContainer;
@@ -53,7 +78,7 @@ class SelectorModalView {
 
         // 行高が可変の履歴などは対象外。通常の共通一覧だけを、現在確保されている
         // viewport 高へ整数行ぴったりで収める。CSSの40/44pxを推測値として
-        // 固定せず、実際に描画された行を測ってから計算する。
+        // 固定せず、固定論理画面内のCSS pxで実際の行高を測ってから計算する。
         const sample = innerWrapper.querySelector('.select-item:not(.history-list-item):not(.history-month-divider)');
         if (!sample) return null;
 
@@ -65,11 +90,9 @@ class SelectorModalView {
             listContainer.style['--selector-list-row-height'] = '';
         }
 
-        const sampleRect = sample.getBoundingClientRect();
         const header = innerWrapper.querySelector('.list-header');
-        const headerRect = header ? header.getBoundingClientRect() : null;
-        const nominalRowHeight = sampleRect.height;
-        const nominalHeaderHeight = headerRect ? headerRect.height : 0;
+        const nominalRowHeight = this._getLogicalElementHeight(sample);
+        const nominalHeaderHeight = this._getLogicalElementHeight(header);
         const viewportHeight = listContainer.clientHeight;
         const wrapperStyle = window.getComputedStyle(innerWrapper);
         const gapPx = parseFloat(wrapperStyle.rowGap) || parseFloat(wrapperStyle.gap) || 0;

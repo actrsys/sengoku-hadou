@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r412');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r413');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -9606,6 +9606,13 @@ test('旧端末安全モードの共通一覧は件数にかかわらず最初�
     assert.ok(info.includes('fitListViewportToWholeRows'));
     assert.ok(info.includes('const pageSize = Math.max(1, fit && Number(fit.itemRows) > 0'));
     assert.ok(selector.includes('fitListViewportToWholeRows({ minItemRows = 1 } = {})'));
+    assert.ok(selector.includes('measureLogicalListRowStep(listContainer = null)'));
+    assert.ok(selector.includes('_getLogicalElementHeight(element)'));
+    const fitStart = selector.indexOf('fitListViewportToWholeRows({ minItemRows = 1 } = {})');
+    const fitEnd = selector.indexOf('setConfirmEnabled(', fitStart);
+    const fitBlock = selector.slice(fitStart, fitEnd);
+    assert.ok(!fitBlock.includes('getBoundingClientRect()'), '固定論理画面の一覧行数計算へ物理transform後の寸法を混ぜない');
+    assert.ok(info.includes('this.selectorView.measureLogicalListRowStep(listContainer)'));
     assert.ok(selector.includes("listContainer.dataset.selectorVisibleItemRows = String(itemRows)"));
     assert.ok(css.includes('#selector-list.selector-row-fitted'));
     assert.ok(css.includes('--selector-list-row-height'));

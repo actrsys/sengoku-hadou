@@ -2034,14 +2034,13 @@ class UIInfoManager {
             measureRafId = requestAnimationFrame(() => {
                 measureRafId = null;
                 // ★実際の行の高さを測って、仮の値とズレていたら補正して描画し直します
-                const sample = scrollBody.querySelector('.select-item');
-                if (sample) {
-                    const measured = sample.getBoundingClientRect().height + gapPx;
-                    if (measured > 0 && Math.abs(measured - rowHeight) > 1) {
-                        rowHeight = measured;
-                        lastRange = { start: -1, end: -1 };
-                        renderVisibleWindow(true);
-                    }
+                const measured = this.selectorView && typeof this.selectorView.measureLogicalListRowStep === 'function'
+                    ? this.selectorView.measureLogicalListRowStep(listContainer)
+                    : 0;
+                if (measured > 0 && Math.abs(measured - rowHeight) > 1) {
+                    rowHeight = measured;
+                    lastRange = { start: -1, end: -1 };
+                    renderVisibleWindow(true);
                 }
                 if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
                     this.ui.updateCustomScrollbars(listContainer);

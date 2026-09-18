@@ -1457,7 +1457,40 @@ async function validateLowMemoryPagerLayout(cdp) {
     const normal=normalResult.result.value;
     assert.ok(normal.fit && normal.fit.itemRows >= 1, '通常スクロール一覧の完全表示行数を算出できていない');
     approx(normal.lastVisibleBottom, normal.listBottom, 0.6, '通常スクロール一覧の最下段をviewport下端へ一致させる');
-    console.log('✓ 共通一覧 完全行フィット + 軽量ページ送り操作・複数選択補助footer visual/layout regression');
+
+    // PC固定論理画面は物理ウインドウに合わせて #game-screen 自体をtransform縮小する。
+    // 一覧の収容行数は論理CSS pxで決め、表示倍率が変わっても増減してはならない。
+    await cdp.call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+    const scaledResult = await cdp.call('Runtime.evaluate', {
+        expression: `(() => {
+            document.open();document.write(${JSON.stringify(html)});document.close();
+            document.documentElement.classList.remove('mobile-low-memory');
+            document.body.classList.add('is-pc');
+            document.body.classList.remove('is-touch-input');
+            const screen=document.getElementById('game-screen');
+            screen.style.width='1280px';screen.style.height='720px';screen.style.position='absolute';screen.style.left='0';screen.style.top='0';screen.style.transformOrigin='top left';screen.style.transform='none';
+            const pager=document.getElementById('selector-list-pager');
+            pager.classList.add('hidden');
+            const list=document.getElementById('selector-list');
+            list.classList.remove('low-memory-paged-list');
+            const view=new SelectorModalView(null);
+            view.resetListRowFit();
+            const normalFit=view.fitListViewportToWholeRows({minItemRows:1});
+            const normalPhysicalRowHeight=list.querySelector('.select-item').getBoundingClientRect().height;
+            view.resetListRowFit();
+            screen.style.transform='scale(0.5)';
+            const scaledFit=view.fitListViewportToWholeRows({minItemRows:1});
+            const scaledPhysicalRowHeight=list.querySelector('.select-item').getBoundingClientRect().height;
+            return {normalFit,scaledFit,normalPhysicalRowHeight,scaledPhysicalRowHeight};
+        })()`, returnByValue:true, awaitPromise:true
+    });
+    const scaled=scaledResult.result.value;
+    assert.ok(scaled.normalFit && scaled.scaledFit, 'PC一覧の倍率別行数を算出できていない');
+    assert.strictEqual(scaled.scaledFit.itemRows, scaled.normalFit.itemRows, 'PC一覧の表示行数が物理ウインドウ倍率で変化する');
+    approx(scaled.scaledFit.rowHeight, scaled.normalFit.rowHeight, 0.01, 'PC一覧の論理行高が物理ウインドウ倍率で変化する');
+    assert.ok(scaled.scaledPhysicalRowHeight < scaled.normalPhysicalRowHeight * 0.75, 'テスト上でgame-screenの物理縮小が反映されていない');
+
+    console.log('✓ 共通一覧 完全行フィット + PC論理行高倍率不変 + 軽量ページ送り操作・複数選択補助footer visual/layout regression');
 }
 
 
