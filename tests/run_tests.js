@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r415');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r416');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -13259,6 +13259,27 @@ test('r398では全有効通常勢力で大名が居城の城主を兼ねる', (
             assert.strictEqual(Number(castle.castellanId), leaderId, `${scenarioId}: 勢力${clan.id}は大名＝居城城主`);
         }
     }
+});
+
+test('r416では1560三木家当主を三木良頼とし居城城主も同期する', () => {
+    const { scenario } = getRuntimeData('1560_okehazama');
+    const warriors = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
+    const clans = new Map(scenario.clansState.map(row => [Number(row.id), row]));
+    const castles = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+    const miki = clans.get(10);
+    const yoshiyori = warriors.get(1010002);
+    const mitsuyori = warriors.get(1010003);
+    const akitsuna = warriors.get(1010004);
+    const base = castles.get(29);
+    assert.ok(miki && yoshiyori && mitsuyori && akitsuna && base, '三木家と対象人物・居城が存在する');
+    assert.strictEqual(Number(miki.leaderId), 1010002, '1560三木家当主は三木良頼');
+    assert.strictEqual(yoshiyori.isRetired, '', '三木良頼は隠居扱いにしない');
+    assert.strictEqual(Number(yoshiyori.loyalty), 100, '三木良頼の忠誠');
+    assert.strictEqual(Number(yoshiyori.achievementTotal), 1000, '三木良頼の功績');
+    assert.strictEqual(Number(mitsuyori.loyalty), 95, '三木光頼の忠誠');
+    assert.strictEqual(Number(mitsuyori.achievementTotal), 500, '三木光頼の功績');
+    assert.strictEqual(Number(akitsuna.achievementTotal), 200, '鍋山顕綱の功績');
+    assert.strictEqual(Number(base.castellanId), 1010002, '当主変更に合わせて居城城主も三木良頼');
 });
 
 test('r398では1570尼子家の代表本拠を真山城とし尼子勝久を城主に戻す', () => {
