@@ -2822,23 +2822,6 @@ body:not(.is-pc) .busho-detail-biography-text {
     top: 0 !important;
     left: 0 !important;
 }
-#war-modal .modal-content { 
-    width: 100% !important; 
-    height: 100% !important; 
-    max-width: none !important; 
-    max-height: none !important; 
-    margin: 0 !important; 
-    border-radius: 0 !important; 
-    border: none !important; 
-    background: #fff !important;
-    padding: 0 !important;
-    box-sizing: border-box !important;
-    overflow: hidden !important;
-    padding-top: env(safe-area-inset-top) !important;
-    padding-bottom: env(safe-area-inset-bottom) !important;
-    padding-left: env(safe-area-inset-left) !important;
-    padding-right: env(safe-area-inset-right) !important;
-}
 
 /* 自作スクロールバーが攻城戦画面に誤爆するのを完全に防ぐ設定 */
 #war-modal .custom-scrollbar-track {
@@ -2849,72 +2832,14 @@ body:not(.is-pc) .busho-detail-biography-text {
     padding-bottom: 0 !important;
     border: none !important;
 }
-.war-screen { flex: 1; display: flex; flex-direction: column; background: radial-gradient(circle, #1b3822 0%, #0d1a10 100%), repeating-radial-gradient(circle, rgba(255,255,255,0.03) 0px, transparent 2px, rgba(0,0,0,0.05) 4px) !important; padding: 0 !important; border-radius: 0 !important; overflow: hidden;}
 #war-log { height: 45px !important; min-height: 45px !important; margin-bottom: 5px !important; display: none !important; }
 .responsive-war-log { overflow-y: auto; background: #fff; padding: 5px; font-size: 0.85rem; color:#333; text-align:left; }
 
 /* 上部ステータスバー（1段目） */
-.war-top-bar {
-    background: #000;
-    color: #a0a0a0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 5px 15px;
-    font-size: 1rem;
-    font-weight: normal;
-    flex-shrink: 0;
-}
-.war-title {
-    margin: 0;
-    padding: 0;
-    text-align: inherit;
-    border-bottom: none;
-    font-size: 1.1rem;
-    font-weight: normal;
-    background: transparent;
-    color: #fff;
-    line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: flex-end;
-    flex-wrap: wrap;
-}
 
 /* 城防御表示（2段目） */
-.war-wall-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 18px 10px 10px;
-    background: #111;
-    color: #fff;
-    flex-shrink: 0;
-    border-bottom: 2px solid #555;
-    gap: 15px;
-}
-.war-wall-side {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    font-size: 1.1rem;
-    line-height: 1;
-}
-.war-wall-side.left {
-    justify-content: flex-end;
-    text-align: right;
-}
-.war-wall-side.right {
-    justify-content: flex-start;
-    text-align: left;
-}
 
 /* ターン数全体を、文字の縦の中心でピタッと揃える設定 */
-#war-turn-info {
-    display: inline-flex;
-    align-items: center;
-}
-#war-weather-info { margin-left: 15px; }
 .label-sp { display: none; }
 
 /* ターン数の数字だけ特別扱いする設定 */
@@ -2925,49 +2850,6 @@ body:not(.is-pc) .busho-detail-biography-text {
     margin: 0 5px;
     line-height: 1;
 }
-.war-wall-center {
-    position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-.war-wall-hexagon-wrap {
-    position: relative;
-    padding: 2px;
-    background: #d4af37;
-    clip-path: polygon(15px 0, calc(100% - 15px) 0, 100% 15px, 100% calc(100% - 15px), calc(100% - 15px) 100%, 15px 100%, 0 calc(100% - 15px), 0 15px);
-    margin-top: 0;
-    flex-shrink: 0;
-}
-.war-wall-hexagon-inner {
-    background: #1a1a1a;
-    padding: 10px 30px;
-    clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) 100%, 14px 100%, 0 calc(100% - 14px), 0 14px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-width: 60px;
-}
-.war-wall-label {
-    position: absolute;
-    top: -8px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #111;
-    color: #d4af37;
-    font-size: 0.8rem;
-    padding: 0 10px;
-    border: 1px solid #d4af37;
-    border-radius: 3px;
-    z-index: 2;
-    white-space: nowrap;
-}
-#war-def-wall-info {
-    font-size: 1.8rem;
-    font-weight: bold;
-    color: #fff;
-    letter-spacing: 2px;
-}
 .war-highlight-value { color: #fdea60; }
 .war-title-segment { display: inline-block; }
 
@@ -2975,24 +2857,16 @@ body:not(.is-pc) .busho-detail-biography-text {
 .responsive-war-left { display: flex; flex-direction: column; flex: 1; overflow: hidden; border-right: none !important; }
 
 .war-visual { flex: 1; display: flex; flex-direction: column; justify-content: space-around; align-items: center; background: transparent; margin-bottom: 5px; padding: 10px; overflow-y: auto;}
-.responsive-war-visual { flex: 1; display: flex !important; flex-direction: row !important; width: 100% !important; background: transparent; overflow: hidden; align-items: flex-start !important; justify-content: center; padding: 10px 4px !important; gap: 8px !important; margin: 0 !important; box-sizing: border-box !important; }
-.war-side-wrapper { display: flex !important; flex-direction: row !important; align-items: stretch !important; flex: 1 !important; max-width: calc(50% - 10px) !important; box-sizing: border-box !important; overflow: hidden !important; justify-content: center !important; height: 100% !important; gap: 8px !important; }
 
 .war-reinf-col { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
 .war-reinf-card { color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding: 5px; margin: 0; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; flex: 1; }
 
 .main-army-box { margin: 0 !important; flex: 1 !important; min-width: 0 !important; }
-.atk-self { background-color: #ef9a9a !important; }
-.atk-ally { background-color: #ffcc80 !important; }
-.def-self { background-color: #81d4fa !important; }
-.def-ally { background-color: #80cbc4 !important; }
 
 .army-box { width: 90%; padding: 10px; border-radius: 8px; color: #fff; margin: 5px 0; display:flex; flex-direction:column; align-items:center; }
 .army-box.attacker { background: #ef5350 !important; }
 .army-box.defender { background: #42a5f5 !important; }
 .responsive-army-box { flex: 1; max-width: none !important; padding: 4px 6px !important; margin: 0 !important; border-radius: 4px !important; display: flex; flex-direction: column; overflow-y: hidden !important; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); box-sizing: border-box !important; border: 1px solid #555; box-shadow: inset 0 0 0 1px #eee, inset 0 0 0 2px #555, 2px 2px 6px rgba(0,0,0,0.5); position: relative; }
-
-.responsive-army-title { margin: 0 0 5px 0; border-bottom: none !important; width: 100%; text-align: left; font-size: 1.2rem; padding: 0 !important; color: #ffd54f !important; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; line-height: 1.4; display: flex; align-items: center; justify-content: flex-start; height: 28px; box-sizing: border-box; }
 .title-long-text { font-size: 0.95rem !important; }
 
 .responsive-army-content { width: 100% !important; box-sizing: border-box !important; }
@@ -3004,88 +2878,22 @@ body:not(.is-pc) .busho-detail-biography-text {
 
 .stat-busho { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; color: #fff; font-weight: bold; }
 .reinf-content-wrap { display: flex; width: 100%; }
-.stat-row { display: flex; justify-content: space-between; align-items: center !important; background: rgba(0, 0, 0, 0.4) !important; border-radius: 4px; padding: 2px 6px !important; border-bottom: none !important; font-weight: bold; font-size: 0.8rem !important; box-sizing: border-box !important; min-width: 0; }
-.stat-row > div:first-child { color: #ffd54f; flex-shrink: 0; white-space: nowrap; }
-.stat-row > :last-child { white-space: nowrap; }
-.stat-row-group { display: flex; width: 100%; gap: 10px; border-bottom: none; padding-bottom: 0; align-items: center; }
 .stat-row-group .stat-row { flex: 1; border-bottom: none !important; padding: 2px 6px !important; min-width: 0; }
-.stat-val-large { font-size: 0.95rem !important; }
 .war-reinf-card .stat-row { display: flex !important; justify-content: space-between !important; width: 100% !important; box-sizing: border-box !important; }
-
-.war-controls-area { display: flex !important; width: 100%; gap: 10px; flex-shrink: 0; height: auto; min-height: 100px; box-sizing: border-box; padding: 10px; background: transparent; border-top: none; }
-.war-controls-buttons { flex: 2; display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: max-content; gap: 5px; height: auto; box-sizing: border-box; }
-.war-controls-desc { flex: 3; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 8px; padding: 8px 15px; font-family: var(--font-readable-ja); font-size: 0.95rem; font-weight: var(--font-readable-weight); line-height: 1.5; letter-spacing: 0.01em; color: #fff; text-shadow: 1px 1px 1px #000; text-align: left; overflow-y: auto; height: 100%; box-sizing: border-box; }
-.war-command-placeholder { color: #aaa; text-align: center; margin-top: 15px; }
-.war-command-desc-title { font-weight: bold; font-size: 1.1rem; border-bottom: 1px solid rgba(212, 175, 55, 0.5); padding-bottom: 5px; margin-bottom: 5px; color: #ffd54f; }
-.war-command-desc-confirm { margin-top: 8px; color: #ff8a80; font-weight: bold; font-size: 0.85rem; }
 /* ★攻城戦のコマンドボタンを重厚な「いくさ」仕様にチューン */
-.war-controls-buttons .cmd-btn { 
-    width: 100%; 
-    font-size: 1rem; 
-    padding: 0; 
-    background: linear-gradient(135deg, #333333 0%, #000000 100%); /* 鉄色の重厚感 */
-    border-color: #fce8a1 #d4af37 #e6c55c #d4af37; /* 枠線を明るくして境界をくっきりさせる */
-    text-shadow: 2px 2px 2px #000;
-}
 
 /* 攻城戦の「撤退」ボタンを烈火のような赤に（最優先の視認性） */
-.war-controls-buttons .cmd-btn.back { 
-    background: linear-gradient(135deg, #d32f2f 0%, #7b1fa2 100%); /* 危機感を煽る紫がかった赤 */
-    border-color: #ffcdd2 #ff8a80 #ffb3b3 #ff8a80; /* 暗い背景に負けない明るい赤枠 */
-    box-shadow: inset 0 0 10px rgba(255,0,0,0.4), 0 2px 4px rgba(0,0,0,0.4);
-}
 
 /* 選択中のコマンドを鮮やかに発光させる */
-.war-controls-buttons .cmd-btn.active-cmd { 
-    background: linear-gradient(135deg, #825a2c 0%, #d4af37 100%);
-    color: #ffffff;
-    border-color: #ffffff #fff2cc #e6c55c #fff2cc;
-    box-shadow: 0 0 15px #ffd54f, inset 0 2px 6px rgba(0,0,0,0.5);
-    transform: translateY(1px) scale(1.02); 
-}
 
 /* 撤退ボタン選択時はさらに激しく発光 */
-.war-controls-buttons .cmd-btn.back.active-cmd {
-    background: linear-gradient(135deg, #f44336 0%, #b71c1c 100%);
-    border-color: #ffffff #ffcdd2 #ffb3b3 #ffcdd2;
-    box-shadow: 0 0 20px #ff5252, inset 0 2px 6px rgba(0,0,0,0.5);
-}
-
-#war-ai-guard { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 1.5rem; font-weight: bold; z-index: 10; }
-.war-controls-shell { position: relative; flex-shrink: 0; }
 .war-ai-spinner { margin-bottom: 10px; }
 
 .war-critical-message { color: #d32f2f; font-size: 1.2rem; font-weight: bold; }
 
 /* 攻城戦アクションメッセージ */
-.war-action-message-container {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: flex-start;
-    background: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(212, 175, 55, 0.3);
-    border-radius: 8px;
-    padding: 15px;
-    box-sizing: border-box;
-    cursor: pointer;
-    transition: background 0.2s;
-    color: #fff;
-    text-shadow: 1px 1px 1px #000;
-}
 .war-action-message-container:hover {
     background: rgba(30, 30, 30, 0.6);
-}
-.war-action-message-text {
-    font-size: 1.1rem;
-    color: #fff;
-    text-align: left;
-    line-height: 1.5;
-    margin-bottom: 12px;
-    text-shadow: 1px 1px 1px #000;
-    width: 100%;
 }
 .war-action-message-entry {
     display: block;
@@ -3106,8 +2914,6 @@ body:not(.is-pc) .busho-detail-biography-text {
     animation: fw-blink 1.5s infinite;
     font-weight: bold;
 }
-body:not(.is-pc) .war-action-message-text { font-size: 60%; line-height: 1.4; }
-body:not(.is-pc) .war-action-message-prompt { left: auto; right: 15px; transform: none; font-size: 0.8rem; }
 
 /* アクティブ部隊ハイライト */
 @keyframes active-army-glow {
@@ -3467,26 +3273,17 @@ body:not(.is-pc) .daimyo-confirm-buttons button { width: 100%; box-sizing: borde
    スマホ版: 攻城戦メイン軍・援軍レイアウト（★整理整頓版）
    ========================================================= */
 /* 基本の配置ルール */
-body:not(.is-pc) .war-side-wrapper { flex-direction: column !important; gap: 2px !important; }
 body:not(.is-pc) .war-side-wrapper > :not(.war-reinf-col) { order: 1 !important; width: 100% !important; flex-shrink: 0 !important; }
 body:not(.is-pc) .war-side-wrapper > .war-reinf-col { order: 2 !important; flex-direction: row !important; width: 100% !important; flex-shrink: 1 !important; min-height: 0 !important; gap: 2px !important; }
 body:not(.is-pc) .war-side-wrapper > .war-reinf-col:first-child { flex-direction: row-reverse !important; }
 
 body:not(.is-pc) .responsive-army-content .stat-busho > * { font-size: 0.75rem !important; }
 body:not(.is-pc) .war-visual { padding: 3px 1px !important; margin-bottom: 0 !important; flex-shrink: 1 !important; min-height: 0 !important; overflow-y: auto !important; }
-body:not(.is-pc) .responsive-war-visual { padding: 2px 0px !important; gap: 2px !important; }
 body:not(.is-pc) #war-title-name { font-size: 1.05rem !important; margin: 1px 0 !important; }
 body:not(.is-pc) .war-header-info, body:not(.is-pc) #war-date-info, body:not(.is-pc) #war-turn-info { font-size: 0.8rem !important; margin-bottom: 1px !important; }
-body:not(.is-pc) .war-top-bar { gap: 10px !important; padding: 4px 8px !important; font-size: 0.9rem !important; }
-body:not(.is-pc) .war-wall-container { padding: 5px 0 !important; }
 body:not(.is-pc) .turn-number { font-size: 1.1rem !important; }
-body:not(.is-pc) #war-def-wall-info { font-size: 1.4rem !important; }
 
 /* ① 【スマホ版】メイン軍・援軍 共通の魔法 */
-body:not(.is-pc) .responsive-army-box,
-body:not(.is-pc) .war-reinf-card { 
-    align-items: stretch !important; 
-}
 body:not(.is-pc) .responsive-army-title,
 body:not(.is-pc) .war-reinf-card .responsive-army-title { 
     text-align: left !important; 
@@ -3511,9 +3308,6 @@ body:not(.is-pc) .responsive-army-box .responsive-army-title {
     font-size: 1.05rem !important;
     height: 22px !important;
     margin-bottom: 2px !important;
-}
-body:not(.is-pc) .main-busho-label { 
-    font-size: 0.95rem !important; 
 }
 body:not(.is-pc) .responsive-army-content { 
     display: flex !important; flex-direction: row !important; align-items: flex-start !important; padding: 0 !important; gap: 10px !important; min-height: auto !important; 
@@ -3540,22 +3334,11 @@ body:not(.is-pc) .responsive-army-stats .stat-row-group .stat-row > :last-child 
 }
 
 /* ③ 【スマホ版】援軍だけの魔法 */
-body:not(.is-pc) .war-reinf-card .responsive-army-title { 
-    font-size: 0.85rem !important; margin-bottom: 2px !important; height: 20px !important; 
-}
-body:not(.is-pc) .war-reinf-card .reinf-busho-label { 
-    font-size: 0.6rem !important; 
-}
-body:not(.is-pc) .war-reinf-card .stat-row { font-size: 0.65rem !important; padding: 1px 4px !important; }
-body:not(.is-pc) .war-reinf-card .stat-val-large { font-size: 0.75rem !important; }
 body:not(.is-pc) .war-reinf-card .reinf-content-wrap { flex-direction: column; align-items: flex-start; gap: 2px; }
 body:not(.is-pc) .war-reinf-card .reinf-face-container { display: flex; justify-content: flex-start; width: 100%; }
 body:not(.is-pc) .war-reinf-card .responsive-war-face { width: 40px !important; height: 40px !important; }
 
 /* コントロールパネル周り */
-body:not(.is-pc) .war-controls-area { height: auto !important; min-height: 80px !important; gap: 5px !important; flex-shrink: 0 !important; margin-bottom: 5px !important; padding-bottom: 5px !important; box-sizing: border-box !important; }
-body:not(.is-pc) .war-controls-desc { display: none !important; }
-body:not(.is-pc) .war-controls-buttons { flex: 1 !important; width: 100% !important; align-content: start !important; }
 body:not(.is-pc) .war-controls-buttons button { font-size: clamp(0.75rem, 4vw, 1.1rem) !important; letter-spacing: 0px !important; }
 
 /* =========================================================
@@ -3736,7 +3519,7 @@ body.is-pc {
     #daimyo-confirm-body { display: block; }
 
     /* ---------------------------------------------------------
-       ★ 管理しやすい統一版！攻城戦の部隊カード（PC版）
+       攻城戦：PC部隊カードの基礎レイアウト
        --------------------------------------------------------- */
     /* コントロールエリア */
     .war-controls-area { height: 130px; gap: 10px; } /* 高さを固定し、説明文の変化でガタガタ動かないようにする */
@@ -3814,17 +3597,31 @@ body.is-pc {
 }
 
 /* =========================================================
-   ★ r184 攻城戦UIリフレッシュ
-   - 情報の読み取りやすさを保ったまま、攻撃/守備の陣営差と
-     「作戦盤らしさ」を強めます。
+   攻城戦UI：共通の表示基礎
+   - 攻撃/守備の陣営差と作戦盤らしさを担う共通外観。
+   - 端末別の差分は body.is-pc / body:not(.is-pc) 側へ置く。
    ========================================================= */
-#war-modal .modal-content {
+#war-modal .modal-content { 
+    width: 100% !important; 
+    height: 100% !important; 
+    max-width: none !important; 
+    max-height: none !important; 
+    margin: 0 !important; 
+    border-radius: 0 !important; 
+    border: none !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    padding-top: env(safe-area-inset-top) !important;
+    padding-bottom: env(safe-area-inset-bottom) !important;
+    padding-left: env(safe-area-inset-left) !important;
+    padding-right: env(safe-area-inset-right) !important;
     background:
         radial-gradient(circle at top center, rgba(250, 221, 131, 0.08) 0%, transparent 34%),
         linear-gradient(180deg, #142117 0%, #0c130e 58%, #080d0a 100%) !important;
 }
 
-.war-screen {
+.war-screen { flex: 1; display: flex; flex-direction: column; padding: 0 !important; border-radius: 0 !important; overflow: hidden;
     background:
         radial-gradient(circle at 50% -10%, rgba(255, 220, 120, 0.14) 0%, rgba(255, 220, 120, 0) 34%),
         linear-gradient(180deg, #1c2c1f 0%, #111912 48%, #0b100c 100%) !important;
@@ -3832,6 +3629,12 @@ body.is-pc {
 }
 
 .war-top-bar {
+    color: #a0a0a0;
+    display: flex;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: normal;
+    flex-shrink: 0;
     justify-content: space-between;
     gap: 12px;
     padding: 8px 16px;
@@ -3853,6 +3656,11 @@ body.is-pc {
 #war-weather-info { margin-left: 0; }
 
 .war-wall-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    flex-shrink: 0;
     padding: 12px 16px 14px;
     background:
         linear-gradient(180deg, rgba(23, 29, 24, 0.98) 0%, rgba(16, 21, 17, 0.98) 100%);
@@ -3860,6 +3668,11 @@ body.is-pc {
     gap: 12px;
 }
 .war-wall-side {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    font-size: 1.1rem;
+    line-height: 1;
     min-width: 0;
     min-height: 72px;
     padding: 10px 14px;
@@ -3877,9 +3690,22 @@ body.is-pc {
     text-align: right;
 }
 .war-wall-center {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     min-width: 150px;
 }
 .war-title {
+    margin: 0;
+    padding: 0;
+    text-align: inherit;
+    border-bottom: none;
+    background: transparent;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
     width: 100%;
     justify-content: flex-start;
     font-size: 1.28rem;
@@ -3888,28 +3714,38 @@ body.is-pc {
     letter-spacing: 0.02em;
 }
 .war-title-segment + .war-title-segment { margin-left: 0.25em; }
-#war-turn-info {
-    justify-content: flex-end;
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: #f5f0da;
-}
 .turn-number {
     font-size: 1.8rem;
     color: #ffeb75 !important;
     text-shadow: 0 0 8px rgba(255, 235, 117, 0.38);
 }
 .war-wall-hexagon-wrap {
+    position: relative;
+    clip-path: polygon(15px 0, calc(100% - 15px) 0, 100% 15px, 100% calc(100% - 15px), calc(100% - 15px) 100%, 15px 100%, 0 calc(100% - 15px), 0 15px);
+    margin-top: 0;
+    flex-shrink: 0;
     padding: 2px;
     background: linear-gradient(180deg, #f1d77a 0%, #b18526 100%);
     filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.35));
 }
 .war-wall-hexagon-inner {
+    clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) 100%, 14px 100%, 0 calc(100% - 14px), 0 14px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
     min-width: 88px;
     padding: 12px 34px;
     background: linear-gradient(180deg, #161c17 0%, #0b0f0c 100%);
 }
 .war-wall-label {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #d4af37;
+    font-size: 0.8rem;
+    border: 1px solid #d4af37;
+    z-index: 2;
+    white-space: nowrap;
     top: -10px;
     padding: 1px 10px;
     border-radius: 999px;
@@ -3918,16 +3754,18 @@ body.is-pc {
     letter-spacing: 0.08em;
 }
 #war-def-wall-info {
+    font-weight: bold;
+    color: #fff;
     font-size: 2rem;
     letter-spacing: 0.08em;
     text-shadow: 0 0 10px rgba(255, 235, 117, 0.25);
 }
 
-.responsive-war-visual {
+.responsive-war-visual { flex: 1; display: flex !important; flex-direction: row !important; width: 100% !important; background: transparent; overflow: hidden; align-items: flex-start !important; justify-content: center; margin: 0 !important; box-sizing: border-box !important;
     padding: 10px 10px 8px !important;
     gap: 10px !important;
 }
-.war-side-wrapper {
+.war-side-wrapper { display: flex !important; flex-direction: row !important; align-items: stretch !important; flex: 1 !important; max-width: calc(50% - 10px) !important; box-sizing: border-box !important; justify-content: center !important; height: 100% !important; gap: 8px !important;
     position: relative;
     padding: 34px 8px 8px;
     border-radius: 18px;
@@ -4007,19 +3845,19 @@ body.is-pc {
 .war-side-wrapper-def .main-army-box {
     background: linear-gradient(180deg, #4596eb 0%, #1f5ca8 100%) !important;
 }
-.atk-self {
+.atk-self { background-color: #ef9a9a !important;
     background: linear-gradient(180deg, #da6d83 0%, #9a2e4c 100%) !important;
 }
-.atk-ally {
+.atk-ally { background-color: #ffcc80 !important;
     background: linear-gradient(180deg, #eea646 0%, #a45c12 100%) !important;
 }
-.def-self {
+.def-self { background-color: #81d4fa !important;
     background: linear-gradient(180deg, #52b6e7 0%, #1c6c9e 100%) !important;
 }
-.def-ally {
+.def-ally { background-color: #80cbc4 !important;
     background: linear-gradient(180deg, #48b6a2 0%, #1d7a6e 100%) !important;
 }
-.responsive-army-title {
+.responsive-army-title { margin: 0 0 5px 0; border-bottom: none !important; width: 100%; text-align: left; font-size: 1.2rem; padding: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; line-height: 1.4; display: flex; align-items: center; justify-content: flex-start; height: 28px; box-sizing: border-box;
     color: #fff1be !important;
     text-shadow: 0 2px 4px rgba(0,0,0,0.38), 0 0 6px rgba(0,0,0,0.18) !important;
 }
@@ -4030,22 +3868,22 @@ body.is-pc {
 .stat-busho {
     letter-spacing: 0.02em;
 }
-.stat-row {
+.stat-row { display: flex; justify-content: space-between; align-items: center !important; padding: 2px 6px !important; border-bottom: none !important; font-weight: bold; font-size: 0.8rem !important; box-sizing: border-box !important; min-width: 0;
     background: linear-gradient(180deg, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0.44) 100%) !important;
     border: 1px solid rgba(255,255,255,0.10);
     border-radius: 8px;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
 }
-.stat-row > div:first-child {
+.stat-row > div:first-child { flex-shrink: 0; white-space: nowrap;
     color: #ffe39f;
 }
-.stat-row > :last-child {
+.stat-row > :last-child { white-space: nowrap;
     font-weight: 700;
 }
-.stat-row-group {
+.stat-row-group { display: flex; width: 100%; border-bottom: none; padding-bottom: 0; align-items: center;
     gap: 8px;
 }
-.stat-val-large {
+.stat-val-large { font-size: 0.95rem !important;
     color: #fff8d4;
     text-shadow: 0 0 8px rgba(255,255,255,0.18);
 }
@@ -4092,7 +3930,7 @@ body.is-pc {
     box-shadow: 0 0 0 2px rgba(255, 240, 160, 0.65), 0 0 20px rgba(255, 228, 122, 0.34), inset 0 1px 0 rgba(255,255,255,0.08) !important;
 }
 
-.war-controls-shell {
+.war-controls-shell { position: relative; flex-shrink: 0;
     margin: 0 10px 10px;
     border-radius: 18px;
     border: 1px solid rgba(212, 175, 55, 0.28);
@@ -4100,22 +3938,20 @@ body.is-pc {
     box-shadow: 0 10px 24px rgba(0,0,0,0.24);
     overflow: hidden;
 }
-.war-controls-area {
-    min-height: 120px;
-    padding: 12px;
-    gap: 12px;
-    background: transparent;
-}
 .war-controls-area.is-attacker-turn .war-controls-desc {
     border-color: rgba(232, 115, 115, 0.42);
 }
 .war-controls-area.is-defender-turn .war-controls-desc {
     border-color: rgba(97, 175, 255, 0.42);
 }
-.war-controls-buttons {
+.war-controls-buttons { flex: 2; display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: max-content; height: auto; box-sizing: border-box;
     gap: 8px;
 }
-.war-controls-buttons .cmd-btn {
+.war-controls-buttons .cmd-btn { 
+    width: 100%; 
+    font-size: 1rem; 
+    padding: 0;
+    text-shadow: 2px 2px 2px #000;
     min-height: 52px;
     border-radius: 12px;
     border-width: 1px;
@@ -4135,30 +3971,21 @@ body.is-pc {
     transform: translateY(0);
 }
 .war-controls-buttons .cmd-btn.back {
+    box-shadow: inset 0 0 10px rgba(255,0,0,0.4), 0 2px 4px rgba(0,0,0,0.4);
     background: linear-gradient(180deg, #a03a38 0%, #5a1d1c 100%);
     border-color: rgba(255, 205, 205, 0.48);
 }
 .war-controls-buttons .cmd-btn.active-cmd {
+    color: #ffffff;
     background: linear-gradient(180deg, #c79437 0%, #6a4b1c 100%);
     border-color: rgba(255, 244, 197, 0.68);
     box-shadow: 0 0 18px rgba(255, 221, 109, 0.25), inset 0 1px 0 rgba(255,255,255,0.12);
     transform: translateY(1px) scale(1.01);
 }
 .war-controls-buttons .cmd-btn.back.active-cmd {
+    border-color: #ffffff #ffcdd2 #ffb3b3 #ffcdd2;
     background: linear-gradient(180deg, #e05f4f 0%, #7b2521 100%);
     box-shadow: 0 0 18px rgba(255, 104, 104, 0.28), inset 0 1px 0 rgba(255,255,255,0.10);
-}
-.war-controls-desc {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    gap: 8px;
-    padding: 14px 16px 12px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.02) 100%);
-    border-radius: 14px;
-    border: 1px solid rgba(212,175,55,0.25);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
 }
 .war-command-board-label {
     display: inline-flex;
@@ -4174,24 +4001,24 @@ body.is-pc {
     font-weight: 700;
     letter-spacing: 0.08em;
 }
-.war-command-placeholder {
+.war-command-placeholder { text-align: center;
     margin-top: 6px;
     color: #c5c1b4;
 }
-.war-command-desc-title {
+.war-command-desc-title { font-weight: bold; font-size: 1.1rem; border-bottom: 1px solid rgba(212, 175, 55, 0.5); margin-bottom: 5px; color: #ffd54f;
     margin-top: 2px;
     padding-bottom: 6px;
     border-bottom-color: rgba(255,255,255,0.12);
 }
-.war-command-desc-confirm {
+.war-command-desc-confirm { margin-top: 8px; font-weight: bold; font-size: 0.85rem;
     color: #ffd0b9;
 }
 
-#war-ai-guard {
+#war-ai-guard { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 1.5rem; font-weight: bold; z-index: 10;
     backdrop-filter: blur(2px);
 }
 
-body:not(.is-pc) .war-top-bar {
+body:not(.is-pc) .war-top-bar { font-size: 0.9rem !important;
     flex-wrap: wrap;
     justify-content: center;
     padding: 6px 8px !important;
@@ -4219,9 +4046,6 @@ body:not(.is-pc) .war-title {
     font-size: 0.98rem !important;
     line-height: 1.2;
 }
-body:not(.is-pc) #war-turn-info {
-    font-size: 0.78rem !important;
-}
 body:not(.is-pc) .turn-number {
     font-size: 1.2rem !important;
 }
@@ -4229,19 +4053,9 @@ body:not(.is-pc) .war-wall-hexagon-inner {
     min-width: 58px;
     padding: 8px 18px;
 }
-body:not(.is-pc) #war-def-wall-info {
-    font-size: 1.45rem !important;
-}
-body:not(.is-pc) .war-side-wrapper {
+body:not(.is-pc) .war-side-wrapper { flex-direction: column !important; gap: 2px !important;
     padding: 24px 4px 4px;
     border-radius: 10px;
-}
-body:not(.is-pc) .war-side-wrapper::before,
-body:not(.is-pc) .war-side-wrapper.is-active-side::after {
-    top: 4px;
-    height: 16px;
-    padding: 0 6px;
-    font-size: 0.60rem;
 }
 body:not(.is-pc) .war-side-wrapper::before { left: 6px; }
 body:not(.is-pc) .war-side-wrapper.is-active-side::after { right: 6px; }
@@ -4250,48 +4064,18 @@ body:not(.is-pc) .responsive-war-visual {
     gap: 4px !important;
 }
 body:not(.is-pc) .responsive-army-box,
-body:not(.is-pc) .war-reinf-card {
+body:not(.is-pc) .war-reinf-card { 
+    align-items: stretch !important;
     border-radius: 10px !important;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 10px rgba(0,0,0,0.18) !important;
 }
-body:not(.is-pc) .war-reinf-card::after,
-body:not(.is-pc) .main-army-box::after {
-    top: 4px;
-    right: 4px;
-    padding: 0 6px;
-    min-height: 15px;
-    font-size: 0.56rem;
-}
 body:not(.is-pc) .stat-row {
     border-radius: 6px;
-}
-body:not(.is-pc) .war-controls-shell {
-    margin: 4px 4px 6px;
-    border-radius: 10px;
-}
-body:not(.is-pc) .war-controls-area {
-    min-height: 92px;
-    padding: 6px;
-    gap: 6px;
-}
-body:not(.is-pc) .war-controls-buttons {
-    gap: 4px;
 }
 body:not(.is-pc) .war-controls-buttons .cmd-btn {
     min-height: 38px;
     font-size: 0.86rem !important;
     letter-spacing: 0.02em;
-}
-body:not(.is-pc) .war-controls-desc {
-    padding: 8px 10px;
-    border-radius: 10px;
-    font-size: 0.8rem;
-    gap: 5px;
-}
-body:not(.is-pc) .war-command-board-label {
-    min-height: 18px;
-    padding: 0 8px;
-    font-size: 0.60rem;
 }
 body:not(.is-pc) .war-command-placeholder {
     margin-top: 2px;
@@ -4302,12 +4086,6 @@ body.is-pc .war-top-bar {
 }
 body.is-pc .war-controls-shell {
     margin: 0 12px 12px;
-}
-body.is-pc .war-controls-area {
-    min-height: 132px;
-}
-body.is-pc .war-controls-desc {
-    font-size: 0.98rem;
 }
 
 /* =========================================================
@@ -7843,18 +7621,26 @@ body:not(.is-pc) .guide-section ul {
 
 
 /* =========================================================
-   ★ r185 攻城戦UI 微調整
-   - スマホのカード見出し衝突回避
-   - ターン表示の改行防止
-   - PC/スマホ下部メッセージ領域の安定化
+   攻城戦UI：下部操作領域とターン表示
+   - 端末共通の操作領域・戦闘メッセージの基礎寸法を管理する。
    ========================================================= */
 #war-turn-info {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #f5f0da;
     white-space: nowrap;
     word-break: keep-all;
     line-break: strict;
 }
 
-.war-controls-area {
+.war-controls-area { display: flex !important; width: 100%; flex-shrink: 0; height: auto; box-sizing: border-box; border-top: none;
+    min-height: 120px;
+    padding: 12px;
+    gap: 12px;
+    background: transparent;
     align-items: stretch;
 }
 .war-controls-buttons,
@@ -7862,14 +7648,44 @@ body:not(.is-pc) .guide-section ul {
 .war-action-message-container {
     min-height: 100%;
 }
-.war-controls-desc {
+.war-controls-desc { flex: 3; font-family: var(--font-readable-ja); font-size: 0.95rem; font-weight: var(--font-readable-weight); line-height: 1.5; letter-spacing: 0.01em; color: #fff; text-shadow: 1px 1px 1px #000; text-align: left; height: 100%; box-sizing: border-box;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 14px 16px 12px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.02) 100%);
+    border-radius: 14px;
+    border: 1px solid rgba(212,175,55,0.25);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
     overflow-y: auto;
 }
 .war-action-message-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 8px;
+    padding: 15px;
+    box-sizing: border-box;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: #fff;
+    text-shadow: 1px 1px 1px #000;
     justify-content: flex-start;
     overflow: hidden;
 }
 .war-action-message-text {
+    font-size: 1.1rem;
+    color: #fff;
+    text-align: left;
+    line-height: 1.5;
+    text-shadow: 1px 1px 1px #000;
+    width: 100%;
     flex: 1 1 auto;
     overflow-y: auto;
     margin-bottom: 4px;
@@ -7884,6 +7700,7 @@ body.is-pc .war-controls-buttons {
     max-width: clamp(330px, 40%, 420px);
 }
 body.is-pc .war-controls-desc {
+    font-size: 0.98rem;
     flex: 1 1 auto;
 }
 body.is-pc .war-controls-buttons .cmd-btn {
@@ -7891,33 +7708,36 @@ body.is-pc .war-controls-buttons .cmd-btn {
 }
 
 body:not(.is-pc) #war-turn-info {
+    font-size: 0.78rem !important;
     white-space: nowrap !important;
     word-break: keep-all !important;
     overflow-wrap: normal !important;
-}
-body:not(.is-pc) .war-controls-area {
-    height: 106px;
-    min-height: 106px;
 }
 body:not(.is-pc) .war-controls-desc,
 body:not(.is-pc) .war-action-message-container {
     min-height: 100%;
 }
-body:not(.is-pc) .war-controls-desc {
+body:not(.is-pc) .war-controls-desc { display: none !important;
+    padding: 8px 10px;
+    border-radius: 10px;
+    gap: 5px;
     font-size: 0.78rem;
 }
 body:not(.is-pc) .war-reinf-card::after,
 body:not(.is-pc) .main-army-box::after {
+    top: 4px;
+    right: 4px;
+    padding: 0 6px;
+    min-height: 15px;
+    font-size: 0.56rem;
     display: none;
 }
 
 
 
 /* =========================================================
-   ★ r186 攻城戦スマホUI仕上げ
-   - 「本隊 / 援軍」補助ラベルをスマホでは完全非表示
-   - コマンド時 / メッセージ時の下部領域を同一高さに固定
-   - スマホ攻城戦の文字サイズを全体的に約0.9倍へ調整
+   攻城戦UI：スマホ表示密度
+   - 本隊/援軍の補助ラベルを省き、限られた縦幅へ情報を収める。
    ========================================================= */
 body:not(.is-pc) #war-atk-self-reinf-card::after,
 body:not(.is-pc) #war-atk-ally-reinf-card::after,
@@ -7929,42 +7749,10 @@ body:not(.is-pc) .war-side-wrapper-def .main-army-box::after {
     display: none !important;
 }
 body:not(.is-pc) .war-command-board-label {
+    min-height: 18px;
+    padding: 0 8px;
+    font-size: 0.60rem;
     display: none !important;
-}
-
-body:not(.is-pc) .war-controls-shell {
-    height: 116px !important;
-    min-height: 116px !important;
-    max-height: 116px !important;
-    flex: 0 0 116px !important;
-}
-body:not(.is-pc) .war-controls-area {
-    width: 100% !important;
-    height: 106px !important;
-    min-height: 106px !important;
-    max-height: 106px !important;
-    flex: 0 0 106px !important;
-    margin: 0 !important;
-    padding: 6px !important;
-    overflow: hidden !important;
-    box-sizing: border-box !important;
-}
-body:not(.is-pc) .war-controls-buttons,
-body:not(.is-pc) .war-action-message-container {
-    width: 100% !important;
-    height: 94px !important;
-    min-height: 94px !important;
-    max-height: 94px !important;
-    box-sizing: border-box !important;
-}
-body:not(.is-pc) .war-action-message-container {
-    padding: 8px 10px !important;
-}
-body:not(.is-pc) .war-action-message-text {
-    min-height: 0 !important;
-    max-height: 76px !important;
-    margin-bottom: 0 !important;
-    overflow-y: auto !important;
 }
 
 /* スマホ攻城戦の文字密度を約0.9倍へ */
@@ -7985,6 +7773,9 @@ body:not(.is-pc) #war-def-wall-info {
 }
 body:not(.is-pc) .war-side-wrapper::before,
 body:not(.is-pc) .war-side-wrapper.is-active-side::after {
+    top: 4px;
+    height: 16px;
+    padding: 0 6px;
     font-size: 0.54rem !important;
 }
 body:not(.is-pc) .main-army-box .responsive-army-title {
@@ -7999,13 +7790,13 @@ body:not(.is-pc) .main-army-box .stat-row {
 body:not(.is-pc) .main-army-box .stat-val-large {
     font-size: 0.86rem !important;
 }
-body:not(.is-pc) .war-reinf-card .responsive-army-title {
+body:not(.is-pc) .war-reinf-card .responsive-army-title { margin-bottom: 2px !important; height: 20px !important;
     font-size: 0.77rem !important;
 }
 body:not(.is-pc) .war-reinf-card .reinf-busho-label {
     font-size: 0.54rem !important;
 }
-body:not(.is-pc) .war-reinf-card .stat-row {
+body:not(.is-pc) .war-reinf-card .stat-row { padding: 1px 4px !important;
     font-size: 0.59rem !important;
 }
 body:not(.is-pc) .war-reinf-card .stat-val-large {
@@ -8015,10 +7806,7 @@ body:not(.is-pc) .war-controls-buttons .cmd-btn,
 body:not(.is-pc) .war-controls-buttons button {
     font-size: 0.77rem !important;
 }
-body:not(.is-pc) .war-action-message-text {
-    font-size: 54% !important;
-}
-body:not(.is-pc) .war-action-message-prompt {
+body:not(.is-pc) .war-action-message-prompt { left: auto; right: 15px; transform: none;
     font-size: 0.72rem !important;
 }
 body:not(.is-pc) #war-ai-guard {
@@ -8028,11 +7816,11 @@ body:not(.is-pc) #war-ai-guard {
 
 
 /* =========================================================
-   ★ r188 攻城戦スマホ下部領域の圧縮
-   - コマンド/戦闘メッセージの固定高は維持
-   - 下側の余白を削り、その分を部隊カード領域へ返す
+   攻城戦UI：スマホ下部操作領域
+   - コマンド/戦闘メッセージを同じ固定高にし、戦場領域を確保する。
    ========================================================= */
 body:not(.is-pc) .war-controls-shell {
+    border-radius: 10px;
     height: 94px !important;
     min-height: 94px !important;
     max-height: 94px !important;
@@ -8040,7 +7828,10 @@ body:not(.is-pc) .war-controls-shell {
     margin: 2px 4px 2px !important;
     box-sizing: border-box !important;
 }
-body:not(.is-pc) .war-controls-area {
+body:not(.is-pc) .war-controls-area { flex-shrink: 0 !important; margin-bottom: 5px !important; padding-bottom: 5px !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
     height: 92px !important;
     min-height: 92px !important;
     max-height: 92px !important;
@@ -8051,26 +7842,31 @@ body:not(.is-pc) .war-controls-area {
 }
 body:not(.is-pc) .war-controls-buttons,
 body:not(.is-pc) .war-action-message-container {
+    width: 100% !important;
+    box-sizing: border-box !important;
     height: 82px !important;
     min-height: 82px !important;
     max-height: 82px !important;
 }
-body:not(.is-pc) .war-controls-buttons {
+body:not(.is-pc) .war-controls-buttons { flex: 1 !important; width: 100% !important; align-content: start !important;
     gap: 4px !important;
 }
 body:not(.is-pc) .war-action-message-container {
     padding: 6px 9px !important;
 }
-body:not(.is-pc) .war-action-message-text {
+body:not(.is-pc) .war-action-message-text { line-height: 1.4;
+    min-height: 0 !important;
+    margin-bottom: 0 !important;
+    overflow-y: auto !important;
+    font-size: 54% !important;
     max-height: 68px !important;
 }
 
 
 
 /* =========================================================
-   ★ r189 攻城戦スマホ・入力対象の明示
-   - 入力対象カードは位置を動かさず、縁の光だけで強く示す
-   - 「行動選択中」はコマンド選択中だけ表示し、実行時は消す
+   攻城戦UI：スマホ入力対象の明示
+   - 入力対象カードは位置を動かさず、縁の光だけで強く示す。
    ========================================================= */
 @keyframes siege-mobile-command-focus {
     0%, 100% {
@@ -8111,35 +7907,14 @@ body:not(.is-pc) #war-modal .war-side-wrapper.is-active-side::after {
 
 
 /* =========================================================
-   ★ r190 攻城戦PCカード収まり調整
-   - スマホの既存レイアウトは変更しない
-   - PC本隊は顔と能力欄を横並びにして縦方向を節約
-   - PC援軍も余白と行間を詰め、軍馬・鉄砲まで確実に収める
+   攻城戦UI：PC部隊カード
+   - 本隊・援軍とも縦積みを避け、軍馬・鉄砲まで一画面へ収める。
    ========================================================= */
-body.is-pc #war-modal .main-army-box .responsive-army-content {
-    display: grid !important;
-    grid-template-columns: 84px minmax(0, 1fr) !important;
-    grid-template-rows: auto !important;
-    align-items: start !important;
-    column-gap: 10px !important;
-    row-gap: 0 !important;
-}
 body.is-pc #war-modal .main-army-box .responsive-war-face {
     width: 84px !important;
     height: 84px !important;
     grid-column: 1 !important;
     margin: 0 !important;
-}
-body.is-pc #war-modal .main-army-box .responsive-army-stats {
-    grid-column: 2 !important;
-    margin-top: 0 !important;
-    gap: 5px !important;
-    min-width: 0 !important;
-}
-body.is-pc #war-modal .main-army-box .stat-row {
-    font-size: 1rem !important;
-    padding: 3px 8px !important;
-    line-height: 1.15 !important;
 }
 body.is-pc #war-modal .main-army-box .stat-val-large {
     font-size: 1.25rem !important;
@@ -8153,16 +7928,9 @@ body.is-pc #war-modal .war-reinf-card .reinf-busho-label {
     margin-bottom: 3px !important;
     line-height: 1.15 !important;
 }
-body.is-pc #war-modal .war-reinf-card .reinf-content-wrap {
-    gap: 9px !important;
-}
 body.is-pc #war-modal .war-reinf-card .responsive-war-face {
     width: 62px !important;
     height: 62px !important;
-}
-body.is-pc #war-modal .war-reinf-card .responsive-army-stats {
-    gap: 3px !important;
-    margin-top: 0 !important;
 }
 body.is-pc #war-modal .war-reinf-card .stat-row {
     font-size: 0.76rem !important;
@@ -8178,10 +7946,8 @@ body.is-pc #war-modal .war-reinf-card .stat-val-large {
 
 
 /* =========================================================
-   ★ r191 攻城戦PC・部隊長能力ランク
-   - 部隊戦力を主役にし、統率/武勇/智謀は余白の補助情報として表示
-   - ランク表現は StatPresenter / grade-* の既存デザインを共用
-   - スマホ版は表示・配置とも変更しない
+   攻城戦UI：PC部隊長能力
+   - 部隊戦力を主役にし、統率/武勇/智謀は既存grade表現で補助表示する。
    ========================================================= */
 #war-modal .war-leader-abilities {
     display: none;
@@ -8222,22 +7988,14 @@ body.is-pc #war-modal .war-leader-abilities .grade-sub {
 
 /* 本隊：戦力欄の下の余白へ横3項目だけ置く。 */
 body.is-pc #war-modal .main-army-box .responsive-army-content {
+    display: grid !important;
+    grid-template-columns: 84px minmax(0, 1fr) !important;
+    align-items: start !important;
+    column-gap: 10px !important;
+    row-gap: 0 !important;
     grid-template-rows: auto minmax(0, 1fr) !important;
     height: 100% !important;
     min-height: 0 !important;
-}
-body.is-pc #war-modal .main-army-box .war-leader-abilities-main {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-column: 1 / span 2;
-    grid-row: 2;
-    align-self: end;
-    gap: 5px;
-    width: 100%;
-    padding-top: 7px;
-    margin-top: 7px;
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
-    box-sizing: border-box;
 }
 body.is-pc #war-modal .main-army-box .war-leader-ability {
     min-height: 28px;
@@ -8245,31 +8003,13 @@ body.is-pc #war-modal .main-army-box .war-leader-ability {
 }
 
 /* 援軍：顔｜統率・武勇・智謀｜部隊戦力 の3列。 */
-body.is-pc #war-modal .war-reinf-card .reinf-content-wrap {
-    display: grid !important;
-    grid-template-columns: 62px 76px minmax(0, 1fr) !important;
-    column-gap: 8px !important;
-    align-items: start !important;
-}
 body.is-pc #war-modal .war-reinf-card .reinf-face-container {
     grid-column: 1;
     min-width: 0;
 }
-body.is-pc #war-modal .war-reinf-card .war-leader-abilities-reinf {
-    display: flex;
-    grid-column: 2;
-    flex-direction: column;
-    gap: 4px;
-    width: 76px;
-    min-width: 76px;
-}
-body.is-pc #war-modal .war-reinf-card .war-leader-abilities-reinf .war-leader-ability {
-    height: 22px;
-    min-height: 22px;
-    padding: 2px 4px;
-    justify-content: space-between;
-}
 body.is-pc #war-modal .war-reinf-card .responsive-army-stats {
+    gap: 3px !important;
+    margin-top: 0 !important;
     grid-column: 3;
     min-width: 0 !important;
     width: 100% !important;
@@ -8278,22 +8018,28 @@ body.is-pc #war-modal .war-reinf-card .responsive-army-stats {
 
 
 /* =========================================================
-   ★ r192 攻城戦PC・情報密度微調整
-   - 援軍能力列を約0.8倍へ縮め、部隊戦力欄へ横幅を戻す
-   - 本隊は余っている縦方向を戦力行へ少し配分する
-   - 命令対象ラベルを説明欄右上へ浮かせ、不要なスクロールをなくす
-   - スマホ版には適用しない
+   攻城戦UI：PC情報密度と命令説明
+   - 援軍能力列・本隊戦力行・命令説明欄の最終寸法をここで管理する。
    ========================================================= */
 body.is-pc #war-modal .war-reinf-card .reinf-content-wrap {
+    gap: 9px !important;
+    display: grid !important;
+    align-items: start !important;
     grid-template-columns: 62px 60px minmax(0, 1fr) !important;
     column-gap: 7px !important;
 }
 body.is-pc #war-modal .war-reinf-card .war-leader-abilities-reinf {
+    display: flex;
+    grid-column: 2;
+    flex-direction: column;
     width: 60px;
     min-width: 60px;
     gap: 3px;
 }
 body.is-pc #war-modal .war-reinf-card .war-leader-abilities-reinf .war-leader-ability {
+    height: 22px;
+    min-height: 22px;
+    justify-content: space-between;
     padding: 2px 3px;
     gap: 3px;
 }
@@ -8312,13 +8058,26 @@ body.is-pc #war-modal .war-reinf-card .war-leader-abilities .grade-sub {
 }
 
 body.is-pc #war-modal .main-army-box .responsive-army-stats {
+    grid-column: 2 !important;
+    margin-top: 0 !important;
+    min-width: 0 !important;
     gap: 6px !important;
 }
 body.is-pc #war-modal .main-army-box .stat-row {
+    font-size: 1rem !important;
     padding: 4px 8px !important;
     line-height: 1.2 !important;
 }
 body.is-pc #war-modal .main-army-box .war-leader-abilities-main {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-column: 1 / span 2;
+    grid-row: 2;
+    align-self: end;
+    gap: 5px;
+    width: 100%;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    box-sizing: border-box;
     padding-top: 6px;
     margin-top: 6px;
 }
@@ -8344,9 +8103,8 @@ body.is-pc #war-modal .war-command-placeholder {
 
 
 /* =========================================================
-   ★ r193 スマホ攻城戦：諸勢力戦タイトルを意図した3行に固定
-   - 通常の攻防戦は従来表示のまま
-   - 諸勢力戦だけ「国名 / 勢力名 / 鎮圧戦」で自然に揃える
+   攻城戦UI：スマホ諸勢力戦タイトル
+   - 諸勢力戦だけ「国名 / 勢力名 / 鎮圧戦」の3行へ固定する。
    ========================================================= */
 body:not(.is-pc) #war-title-name.war-title-three-lines {
     display: flex !important;

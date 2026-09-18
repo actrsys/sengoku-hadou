@@ -1494,6 +1494,82 @@ async function validateLowMemoryPagerLayout(cdp) {
 }
 
 
+async function validateSiegeLayout(cdp) {
+    const html = fixtureHtml('siege_layout.html');
+    const loadAt = async (width, height, isPc) => {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: !isPc });
+        await cdp.call('Runtime.evaluate', {
+            expression: `document.open();document.write(${JSON.stringify(html)});document.close();true`,
+            returnByValue: true,
+            awaitPromise: true
+        });
+        await cdp.call('Runtime.evaluate', {
+            expression: `(() => {
+                document.body.classList.toggle('is-pc', ${isPc});
+                const screen = document.getElementById('game-screen');
+                screen.style.width = '${width}px';
+                screen.style.height = '${height}px';
+                screen.style.position = 'absolute';
+                screen.style.left = '0';
+                screen.style.top = '0';
+                screen.style.transform = 'none';
+                return true;
+            })()`,
+            returnByValue: true,
+            awaitPromise: true
+        });
+        await new Promise(resolve => setTimeout(resolve, 80));
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(() => {
+                const rect = el => { const r = el.getBoundingClientRect(); return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}; };
+                const style = el => { const s = getComputedStyle(el); return {display:s.display,overflow:s.overflow,padding:s.padding,gap:s.gap,minHeight:s.minHeight,fontSize:s.fontSize}; };
+                const modalEl = document.getElementById('war-modal');
+                const visualEl = document.getElementById('war-visual-area');
+                const controlsEl = document.getElementById('war-controls');
+                const buttonEl = document.querySelector('.war-controls-buttons .cmd-btn');
+                const mainEl = document.querySelector('.main-army-box');
+                const reinf = [...document.querySelectorAll('.war-reinf-card')].map(el => ({rect:rect(el),style:style(el)}));
+                return {
+                    modal: rect(modalEl),
+                    visual: {rect:rect(visualEl),style:style(visualEl)},
+                    controls: {rect:rect(controlsEl),style:style(controlsEl)},
+                    button: {rect:rect(buttonEl),style:style(buttonEl)},
+                    main: {rect:rect(mainEl),style:style(mainEl)},
+                    reinf
+                };
+            })()`,
+            returnByValue: true
+        });
+        return result.result.value;
+    };
+
+    const pc = await loadAt(1280, 720, true);
+    approx(pc.modal.width, 1280, 0.5, 'PC攻城戦モーダル幅');
+    approx(pc.modal.height, 720, 0.5, 'PC攻城戦モーダル高');
+    approx(pc.controls.rect.height, 146, 0.75, 'PC攻城戦下部操作領域高');
+    assert.ok(parseFloat(pc.button.style.minHeight) >= 48, 'PC攻城戦コマンドの最低高を維持する');
+    assert.strictEqual(pc.main.style.display, 'grid', 'PC攻城戦本隊カードはgrid配置を維持する');
+    assert.ok(pc.reinf.every(item => item.style.display === 'grid'), 'PC攻城戦援軍カードはgrid配置を維持する');
+    assert.ok(pc.reinf.every(item => item.rect.left >= pc.modal.left - 1 && item.rect.right <= pc.modal.right + 1), 'PC攻城戦援軍カードを画面外へ出さない');
+    assert.ok(pc.visual.rect.bottom <= pc.controls.rect.top + 1, 'PC攻城戦の戦場と操作領域を重ねない');
+    assert.ok(pc.controls.rect.bottom <= pc.modal.bottom + 1, 'PC攻城戦操作領域を画面内へ収める');
+
+    const mobile = await loadAt(360, 640, false);
+    approx(mobile.modal.width, 360, 0.5, 'スマホ攻城戦モーダル幅');
+    approx(mobile.modal.height, 640, 0.5, 'スマホ攻城戦モーダル高');
+    approx(mobile.controls.rect.height, 92, 0.75, 'スマホ攻城戦下部操作領域高');
+    assert.strictEqual(mobile.controls.style.overflow, 'hidden', 'スマホ攻城戦下部操作領域は固定高内へ収める');
+    assert.ok(parseFloat(mobile.button.style.minHeight) >= 38, 'スマホ攻城戦コマンドの最低高を維持する');
+    assert.strictEqual(mobile.main.style.display, 'flex', 'スマホ攻城戦本隊カードは既存flex配置を維持する');
+    assert.ok(mobile.reinf.every(item => item.style.display === 'flex'), 'スマホ攻城戦援軍カードは既存flex配置を維持する');
+    assert.ok(mobile.reinf.every(item => item.rect.left >= mobile.modal.left - 1 && item.rect.right <= mobile.modal.right + 1), 'スマホ攻城戦援軍カードを画面外へ出さない');
+    assert.ok(mobile.visual.rect.bottom <= mobile.controls.rect.top + 4, 'スマホ攻城戦の戦場と操作領域を大きく重ねない');
+    assert.ok(mobile.controls.rect.bottom <= mobile.modal.bottom + 1, 'スマホ攻城戦操作領域を画面内へ収める');
+
+    console.log('✓ 攻城戦 PC/スマホ最終computed layout visual regression');
+}
+
+
 async function validateTitleMenuStability(cdp) {
     const html = fixtureHtml('title_menu.html');
     const checkAt = async (width, height, isPc) => {
@@ -1606,6 +1682,7 @@ async function main() {
         await validateLowMemoryPagerLayout(cdp);
         await validateFieldWarFullscreen(cdp);
         await validateFieldTerrainLayout(cdp);
+        await validateSiegeLayout(cdp);
         await validateTitleMenuStability(cdp);
     } finally {
         if (cdp) cdp.close();

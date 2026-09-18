@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r414');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r415');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -3178,7 +3178,8 @@ test('PC攻城戦は部隊戦力を主役にしつつ部隊長3能力を既存�
     assert.ok(ui.includes("['武勇', busho.strength]"));
     assert.ok(ui.includes("['智謀', busho.intelligence]"));
     assert.ok(ui.includes('StatPresenter.toGradeHTML(value)'), '能力ランクは StatPresenter を共用する');
-    assert.ok(css.includes('grid-template-columns: 62px 76px minmax(0, 1fr)'));
+    assert.ok(css.includes('grid-template-columns: 62px 60px minmax(0, 1fr) !important;'));
+    assert.ok(!css.includes('grid-template-columns: 62px 76px minmax(0, 1fr)'), '旧中間値76pxを残さない');
     assert.ok(css.includes('#war-modal .war-leader-abilities {\n    display: none;'), 'スマホ既定では能力欄を表示しない');
 });
 
@@ -4421,7 +4422,8 @@ test('攻城戦ポップアップは戦場レイヤーを座標基準にし城�
 
 test('PC攻城戦の部隊カードは縦積みを避け軍馬・鉄砲まで収める専用レイアウトを持つ', () => {
     const css = read('css/style.css');
-    assert.ok(css.includes('★ r190 攻城戦PCカード収まり調整'));
+    assert.ok(css.includes('攻城戦UI：PC部隊カード'));
+    assert.ok(!/★ r(?:18[4-9]|19[0-3]) 攻城戦/.test(css), 'Round別の旧追記見出しを残さない');
     assert.ok(css.includes('body.is-pc #war-modal .main-army-box .responsive-army-content'));
     assert.ok(css.includes('grid-template-columns: 84px minmax(0, 1fr) !important'));
     assert.ok(css.includes('body.is-pc #war-modal .war-reinf-card .responsive-army-stats'));
@@ -7988,10 +7990,22 @@ test('雨雪は背景座標の全画面再描画ではなく少数の合成レ�
 test('攻城戦PCの援軍能力列・本隊戦力行・命令説明欄を横幅優先で整える', () => {
     const css = fs.readFileSync(path.join(ROOT, 'css/style.css'), 'utf8');
     assert.ok(css.includes('grid-template-columns: 62px 60px minmax(0, 1fr) !important;'), '援軍能力列を約0.8倍へ縮める');
-    assert.ok(css.includes('body.is-pc #war-modal .war-reinf-card .war-leader-abilities-reinf {\n    width: 60px;\n    min-width: 60px;'), '援軍能力欄自体も60pxへ揃える');
-    assert.ok(css.includes('body.is-pc #war-modal .main-army-box .stat-row {\n    padding: 4px 8px !important;'), '本隊戦力行の縦幅を少し広げる');
-    assert.ok(css.includes('body.is-pc #war-modal .war-command-board-label {\n    position: absolute;\n    top: 11px;\n    right: 14px;'), '入力対象部隊ラベルを説明欄右上へ置く');
-    assert.ok(css.includes('body.is-pc #war-modal .war-controls-desc {\n    overflow-y: hidden;'), 'PC説明欄は不要なスクロールを出さない');
+    assert.match(css, /body\.is-pc #war-modal \.war-reinf-card \.war-leader-abilities-reinf\s*\{[^}]*\bwidth:\s*60px;[^}]*\bmin-width:\s*60px;/s, '援軍能力欄自体も60pxへ揃える');
+    assert.match(css, /body\.is-pc #war-modal \.main-army-box \.stat-row\s*\{[^}]*\bpadding:\s*4px 8px !important;/s, '本隊戦力行の縦幅を少し広げる');
+    assert.match(css, /body\.is-pc #war-modal \.war-command-board-label\s*\{[^}]*\bposition:\s*absolute;[^}]*\btop:\s*11px;[^}]*\bright:\s*14px;/s, '入力対象部隊ラベルを説明欄右上へ置く');
+    assert.match(css, /body\.is-pc #war-modal \.war-controls-desc\s*\{[^}]*\boverflow-y:\s*hidden;/s, 'PC説明欄は不要なスクロールを出さない');
+});
+
+
+test('攻城戦CSSは旧Round追記と上書き途中値を正本へ持ち越さない', () => {
+    const css = read('css/style.css');
+    ['r184', 'r185', 'r186', 'r188', 'r189', 'r190', 'r191', 'r192', 'r193'].forEach(version => {
+        assert.ok(!css.includes(`★ ${version} 攻城戦`), `${version} の歴史的追記見出しを残さない`);
+    });
+    assert.ok(!css.includes('grid-template-columns: 62px 76px minmax(0, 1fr)'), '援軍能力列の旧76px中間値を残さない');
+    assert.ok(css.includes('攻城戦UI：共通の表示基礎'), '攻城戦の共通正本ブロックを明示する');
+    assert.ok(css.includes('攻城戦UI：スマホ下部操作領域'), 'スマホ下部領域の正本ブロックを明示する');
+    assert.ok(css.includes('攻城戦UI：PC情報密度と命令説明'), 'PC情報密度の正本ブロックを明示する');
 });
 
 test('外交関係の表示補助値はGameManagerから正本データへ書き込まない', () => {
