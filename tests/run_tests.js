@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r416');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r417');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -13343,5 +13343,15 @@ test('r400では変換ツールとAIも拠点masterの港・産地属性を同�
     const prodAt = ai.indexOf('const clanCastlesForEquipment = this.game.getClanCastles(castle.ownerClan);');
     const prodBlock = ai.slice(prodAt, prodAt + 900);
     assert.ok(!prodBlock.includes('.provinceId'), 'AIの装備産地判定で国・地方から産地を推測しない');
+});
+
+test('r417では織田秀信・豊臣秀頼の登場年を共通マスター最新版へ同期する', () => {
+    const { common } = getRuntimeData('1570_anegawa');
+    const warriors = new Map(common.warriorsMaster.map(row => [Number(row.id), row]));
+    const hidenobu = warriors.get(1006008);
+    const hideyori = warriors.get(1401003);
+    assert.ok(hidenobu && hideyori, '織田秀信・豊臣秀頼が共通マスターに存在する');
+    assert.strictEqual(Number(hidenobu.startYear), 1588, '織田秀信の登場年は1588');
+    assert.strictEqual(Number(hideyori.startYear), 1598, '豊臣秀頼の登場年は1598');
 });
 
