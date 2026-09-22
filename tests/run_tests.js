@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r417');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r418');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -13353,5 +13353,14 @@ test('r417では織田秀信・豊臣秀頼の登場年を共通マスター最�
     assert.ok(hidenobu && hideyori, '織田秀信・豊臣秀頼が共通マスターに存在する');
     assert.strictEqual(Number(hidenobu.startYear), 1588, '織田秀信の登場年は1588');
     assert.strictEqual(Number(hideyori.startYear), 1598, '豊臣秀頼の登場年は1598');
+});
+
+test('r418では山本晴幸の顔画像を共通マスターとfaceiconsへ登録する', () => {
+    const { common } = getRuntimeData('1570_anegawa');
+    const yamamoto = common.warriorsMaster.find(row => Number(row.id) === 1002077);
+    assert.ok(yamamoto, '山本晴幸が共通マスターに存在する');
+    assert.strictEqual(yamamoto.name, '山本|晴幸');
+    assert.strictEqual(yamamoto.faceIcon, 'yamamoto_kansuke.webp');
+    assert.ok(fs.existsSync(path.join(ROOT, 'data/images/faceicons/yamamoto_kansuke.webp')), '山本晴幸の顔画像ファイルが存在する');
 });
 
