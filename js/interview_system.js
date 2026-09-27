@@ -1115,10 +1115,13 @@ class InterviewSystem {
     _getRumorFamilyLoyaltyText(interviewer, target) {
         if (!target) return '';
         if (window.BushoStatusRules && window.BushoStatusRules.isRonin(target)) return '';
+        // 諸勢力所属者の忠誠50は内部上の便宜値で、通常調略の手掛かりではない。
+        // 諸勢力は個人忠誠ではなく勢力そのものへの戦略評価へ回す。
+        if (Number(target.belongKunishuId || 0) > 0) return '';
         if (this._isRumorLeader(target)) return '';
 
         const band = this._getConcealmentProfile(target).perceivedBand;
-        const lordText = Number(target.belongKunishuId || 0) > 0 ? '今の頭領' : '今の主君';
+        const lordText = '今の主君';
         if (band === 'stable') return `${lordText}との間に、今のところ悪い様子はございませぬ。`;
         if (band === 'warning') return `${lordText}について、時折思うところはあるようです。`;
         if (band === 'danger' || band === 'dissatisfied') return `${lordText}とは、少し考えが合わぬところもあるようです。`;
@@ -1169,16 +1172,129 @@ class InterviewSystem {
         return !!kunishu && Number(kunishu.leaderId) === Number(target.id);
     }
 
+    _getRumorKunishuStrategyMessages(interviewer, target, attitude = this.activeInterviewAttitude) {
+        const kunishuId = Number(target && target.belongKunishuId || 0);
+        const system = this.game && this.game.kunishuSystem;
+        if (kunishuId <= 0 || !system || typeof system.getKunishu !== 'function') return [];
+        const kunishu = system.getKunishu(kunishuId);
+        if (!kunishu) return [];
+
+        const name = kunishu.getName(this.game);
+        const clanId = Number(this.game.playerClanId) || Number(interviewer && interviewer.clan) || 0;
+        const originCastle = this.game.getCurrentTurnCastle ? this.game.getCurrentTurnCastle() : null;
+        const assessment = typeof system.assessStrategicOptions === 'function'
+            ? system.assessStrategicOptions(kunishu, clanId, originCastle)
+            : null;
+        const reserved = attitude === 'reserved';
+        const warm = attitude === 'welcoming' || attitude === 'friendly';
+
+        if (!assessment) {
+            if (reserved) return [`……${name}の者は、個人を引き抜く相手ではありませぬ。`];
+            return [
+                `${name}の者は、個人で引き抜けませぬ。`,
+                '動かすなら、衆そのものを相手になさるべきでしょう。'
+            ];
+        }
+
+        const incorporate = assessment.incorporate || {};
+        const subjugate = assessment.subjugate || {};
+
+        if (incorporate.band === 'ready') {
+            if (reserved) return [`……${name}なら、取り込む話をしてもよい頃でしょう。`];
+            // 「関係が深いので今が取込好機」は一つの因果判断。字数だけを理由に分断しない。
+            if (warm) return [`${name}とは十分に縁が深まっております。今なら取り込む好機かと存じます。`];
+            return [`${name}とは関係も深まっております。取り込みを持ちかけてもよい頃でしょう。`];
+        }
+        if (incorporate.band === 'near') {
+            if (reserved) return [`……${name}は、あと一押しでこちらへ寄せられそうです。`];
+            if (incorporate.reason === 'relation') {
+                return [`${name}を寄せるには、あと少し関係を深めるのがよろしいでしょう。`];
+            }
+            if (incorporate.reason === 'strength') {
+                return [`${name}にはまだ少し力があります。取り込みまではあと一歩でしょう。`];
+            }
+            return [
+                `${name}の取り込みまでは、あと一歩と見ます。`,
+                '今は親善を重ねるのがよろしいでしょう。'
+            ];
+        }
+        if (incorporate.reason === 'merchant') {
+            if (reserved) return [`……${name}は商いの衆です。取り込んだり討ったりする相手ではありませぬ。`];
+            return [
+                `${name}は商いの衆ゆえ、取込や鎮圧の相手とはなりませぬ。`,
+                '関わるなら、親善を保つのがよろしいでしょう。'
+            ];
+        }
+
+        let opening = '';
+        let reservedOpening = '';
+        if (incorporate.reason === 'religion') {
+            opening = `${name}は宗門の衆ゆえ、こちらへ取り込むことは望めませぬ。`;
+            reservedOpening = `……${name}は、こちらへ取り込めませぬ。`;
+        } else if (incorporate.reason === 'outside_territory') {
+            opening = `${name}を取り込むには、まずその地を支配する必要がございます。`;
+            reservedOpening = `……${name}は、まだこちらの支配外です。`;
+        } else if (incorporate.reason === 'relation') {
+            opening = `${name}とは、まだ縁が浅いようです。`;
+            reservedOpening = `……${name}とは、まだ縁が浅いようです。`;
+        } else if (incorporate.reason === 'strength') {
+            opening = `${name}はまだ力を持ち、取り込みを持ちかけるには早いでしょう。`;
+            reservedOpening = `……${name}は、取り込むにはまだ強すぎます。`;
+        } else {
+            opening = `${name}を取り込む話は、今はまだ早いでしょう。`;
+            reservedOpening = `……${name}を取り込むには、まだ早いでしょう。`;
+        }
+
+        if (!subjugate.eligible) {
+            if (reserved) {
+                if (subjugate.reason === 'out_of_range' || subjugate.reason === 'unreachable') {
+                    return [reservedOpening, '……ここから討つにも、まだ手が届きませぬ。'];
+                }
+                return [reservedOpening];
+            }
+            if (subjugate.reason === 'out_of_range' || subjugate.reason === 'unreachable') {
+                return [opening, '鎮圧するにも、今の拠点からはまだ手が届きませぬ。'];
+            }
+            return [opening];
+        }
+
+        let military = '';
+        let reservedMilitary = '';
+        switch (subjugate.band) {
+            case 'clear_advantage':
+                military = '兵はこちらが大きく上回っております。今なら鎮圧の好機かと存じます。';
+                reservedMilitary = `……兵はこちらが上です。${name}を討つなら、機はありましょう。`;
+                break;
+            case 'advantage':
+                military = '兵はこちらが優勢です。鎮圧を考えてもよいでしょう。';
+                reservedMilitary = `……兵はこちらが上です。${name}を討つなら、機はありましょう。`;
+                break;
+            case 'even':
+                military = '兵はおおむね拮抗しております。力攻めは慎重になさるべきでしょう。';
+                reservedMilitary = `……${name}と兵は五分ほど。力攻めは勧めませぬ。`;
+                break;
+            default:
+                military = '先方の兵は侮れませぬ。今は鎮圧を急ぐ時ではありますまい。';
+                reservedMilitary = `……${name}の兵は侮れませぬ。今は討つ時ではないでしょう。`;
+                break;
+        }
+        if (reserved) return [reservedOpening, reservedMilitary];
+        // 取込判断と武力判断は独立した情報なので、一発言へ詰め込まず二段に分ける。
+        // 文字数だけを理由に意味を削らず、一発言一判断を優先する。
+        return [opening, military];
+    }
+
     _getRumorLoyaltyText(target) {
         if (!target) return '';
         if (window.BushoStatusRules && window.BushoStatusRules.isRonin(target)) {
             return '今は仕える主を持たず、浪々の身だそうです。';
         }
+        if (Number(target.belongKunishuId || 0) > 0) return '';
 
         const band = this._getConcealmentProfile(target).perceivedBand;
-        const lordText = Number(target.belongKunishuId || 0) > 0 ? '今の頭領' : '今の主君';
+        const lordText = '今の主君';
         let style = 'fealty';
-        if (Number(target.belongKunishuId || 0) <= 0 && this.game.getClanDaimyo && window.ConversationStandingRules
+        if (this.game.getClanDaimyo && window.ConversationStandingRules
             && typeof window.ConversationStandingRules.getLoyaltyExpressionStyle === 'function') {
             const lord = this.game.getClanDaimyo(Number(target.clan) || 0);
             if (lord) style = window.ConversationStandingRules.getLoyaltyExpressionStyle(this.game, lord, target);
@@ -1205,20 +1321,35 @@ class InterviewSystem {
         if (!row || !row.target) return [];
         const attitude = this.activeInterviewAttitude;
         const familyRelation = this._getRumorFamilyRelation(interviewer, row.target);
+        const belongsToKunishu = Number(row.target.belongKunishuId || 0) > 0;
         let messages;
 
         if (familyRelation !== 'none') {
             // 話者自身の近親者は「噂を聞いた」という伝聞型にせず、現在の身の置き所から自然に語る。
-            messages = [
-                this._getRumorFamilyAffiliationText(interviewer, row.target),
-                this._getRumorFamilyAbilityText(interviewer, row, attitude)
-            ];
-            if (attitude !== 'reserved') messages.push(this._getRumorFamilyLoyaltyText(interviewer, row.target));
+            messages = [this._getRumorFamilyAffiliationText(interviewer, row.target)];
+            // reserved は口数を抑える。諸勢力所属者では無意味な忠誠評ではなく、
+            // 能力評より次の一手を優先する。取込と武力が別要点なら短い連続台詞へ分ける。
+            if (belongsToKunishu && attitude === 'reserved') {
+                messages.push(...this._getRumorKunishuStrategyMessages(interviewer, row.target, attitude));
+            } else {
+                messages.push(this._getRumorFamilyAbilityText(interviewer, row, attitude));
+                if (belongsToKunishu) {
+                    messages.push(...this._getRumorKunishuStrategyMessages(interviewer, row.target, attitude));
+                } else if (attitude !== 'reserved') {
+                    messages.push(this._getRumorFamilyLoyaltyText(interviewer, row.target));
+                }
+            }
         } else {
-            messages = [this._getRumorOpeningText(row, attitude, interviewer), this._getRumorAbilityText(row, attitude)];
-            // reserved は口数を抑え、人物名と評判まで。大名・諸勢力頭領も主君評判を語る意味がないため2段で止める。
-            if (attitude !== 'reserved' && !this._isRumorLeader(row.target)) {
-                messages.push(this._getRumorLoyaltyText(row.target));
+            messages = [this._getRumorOpeningText(row, attitude, interviewer)];
+            if (belongsToKunishu && attitude === 'reserved') {
+                messages.push(...this._getRumorKunishuStrategyMessages(interviewer, row.target, attitude));
+            } else {
+                messages.push(this._getRumorAbilityText(row, attitude));
+                if (belongsToKunishu) {
+                    messages.push(...this._getRumorKunishuStrategyMessages(interviewer, row.target, attitude));
+                } else if (attitude !== 'reserved' && !this._isRumorLeader(row.target)) {
+                    messages.push(this._getRumorLoyaltyText(row.target));
+                }
             }
         }
         return messages.filter(Boolean)

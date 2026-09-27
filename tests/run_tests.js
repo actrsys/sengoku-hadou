@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r418');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r423');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -164,6 +164,56 @@ test('タッチ端末のHowler初回unlockは単発・ゼロGain経路にし武�
     assert.ok(audio.includes('source.connect(silentGain)'));
     assert.ok(bushoUi.includes("onClickStr = this._withChoiceSound(() => this.showBushoDetailModalById(b.id));"));
     assert.ok(!bushoUi.includes('isMobileDetailTransition'), 'スマホだけ武将一覧SEを消す旧回避策を残さない');
+});
+
+
+test('iOS/iPadOSはAudio Sessionをambientに固定しマナーモードへ従う', () => {
+    class MockHowl {
+        constructor(options) { this.options = options; MockHowl.instances.push(this); }
+        play() { return 1; }
+        stop() {}
+        unload() {}
+        volume() { return this; }
+    }
+    MockHowl.instances = [];
+    const audioSession = { type: 'auto' };
+    const navigator = {
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)',
+        platform: 'iPhone',
+        maxTouchPoints: 5,
+        audioSession
+    };
+    const Howler = { codecs(ext) { return ext !== 'ogg'; } };
+    const ctx = createContext({ Howl: MockHowl, Howler, navigator, setTimeout, clearTimeout });
+    loadScript(ctx, 'js/audio.js');
+    assert.strictEqual(audioSession.type, 'ambient', '起動時にiOSのaudio sessionをambientへ切り替える');
+
+    audioSession.type = 'auto';
+    ctx.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
+    assert.strictEqual(audioSession.type, 'ambient', 'BGM再生直前にもOS消音方針を再確認する');
+    assert.strictEqual(MockHowl.instances.at(-1).options.html5, true, 'HTML5互換BGMでもambient sessionを使う');
+
+    audioSession.type = 'auto';
+    ctx.AudioManager.playSE('damage001.ogg');
+    assert.strictEqual(audioSession.type, 'ambient', 'SE再生直前にもOS消音方針を再確認する');
+
+    const ipadSession = { type: 'auto' };
+    const ipadCtx = createContext({
+        Howl: MockHowl,
+        setTimeout, clearTimeout,
+        navigator: { userAgent: 'Mozilla/5.0', platform: 'MacIntel', maxTouchPoints: 5, audioSession: ipadSession }
+    });
+    loadScript(ipadCtx, 'js/audio.js');
+    assert.strictEqual(ipadSession.type, 'ambient', 'MacIntelを名乗るiPadOSも対象にする');
+
+    const desktopSession = { type: 'auto' };
+    const desktopCtx = createContext({
+        Howl: MockHowl,
+        setTimeout, clearTimeout,
+        navigator: { userAgent: 'Mozilla/5.0 (Macintosh)', platform: 'MacIntel', maxTouchPoints: 0, audioSession: desktopSession }
+    });
+    loadScript(desktopCtx, 'js/audio.js');
+    assert.strictEqual(desktopSession.type, 'auto', 'Macデスクトップのaudio sessionは変更しない');
 });
 test('士気上限は内部120・通常100・ゲージ100を設定の正本から使う', () => {
     const ctx = createContext();
@@ -4906,6 +4956,75 @@ test('諸勢力取込成功率は KunishuSystem を正本とし、軍師助言�
 });
 
 
+test('諸勢力の取込・鎮圧可否と戦力評価は KunishuSystem を正本にしてコマンドと面談で共有する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    ctx.LifeStatusRules = { isPresent: () => true };
+    ctx.PersonnelRules = { calcAffinityDiff: () => 0 };
+    loadScript(ctx, 'js/kunishu_system.js');
+    const KunishuSystem = vm.runInContext('KunishuSystem', ctx);
+
+    const castles = [
+        { id: 1, ownerClan: 1, soldiers: 5000 },
+        { id: 2, ownerClan: 2, soldiers: 2000 },
+        { id: 3, ownerClan: 1, soldiers: 3000 }
+    ];
+    const adjacency = new Map([[1, [2, 3]], [2, [1]], [3, [1]]]);
+    const game = {
+        playerClanId: 1,
+        bushos: [],
+        getClan(id) { return Number(id) === 1 ? { id: 1, daimyoPrestige: 4000 } : null; },
+        getCastle(id) { return castles.find(c => Number(c.id) === Number(id)) || null; },
+        getCurrentTurnCastle() { return castles[0]; },
+        mapGraph: {
+            getOwnedConnectedIds() { return new Set([1, 3]); },
+            getAdjacentIds(castle) { return adjacency.get(Number(castle.id)) || []; }
+        }
+    };
+    const system = new KunishuSystem(game);
+    const makeKunishu = (overrides = {}) => ({
+        id: 10, castleId: 3, soldiers: 2000, defense: 500, ideology: '地縁', isDestroyed: false,
+        getRelation() { return 95; },
+        ...overrides
+    });
+
+    let k = makeKunishu();
+    let inc = system.getIncorporateEligibility(k, 1);
+    assert.strictEqual(inc.eligible, true, '自領・友好・兵力条件を満たせば取込可能');
+    assert.strictEqual(inc.band, 'ready');
+
+    k = makeKunishu({ soldiers: 2500, getRelation() { return 90; } });
+    inc = system.getIncorporateEligibility(k, 1);
+    assert.strictEqual(inc.eligible, false);
+    assert.strictEqual(inc.band, 'near', '友好と兵力が実条件の近傍なら「あと一歩」と評価する');
+
+    k = makeKunishu({ ideology: '宗教' });
+    inc = system.getIncorporateEligibility(k, 1);
+    assert.strictEqual(inc.band, 'blocked');
+    assert.strictEqual(inc.reason, 'religion', '宗教勢力は友好や兵力に関係なく取込不可');
+
+    k = makeKunishu({ castleId: 2, soldiers: 1500, defense: 500 });
+    inc = system.getIncorporateEligibility(k, 1);
+    assert.strictEqual(inc.band, 'territory', '他家領内の諸勢力を即取込可能とは扱わない');
+    const sub = system.assessSubjugationOpportunity(k, 1, castles[0], new Set([1, 3]));
+    assert.strictEqual(sub.eligible, true, '現在行動中の自領と隣接していれば実際の鎮圧範囲に入る');
+    assert.strictEqual(sub.band, 'clear_advantage', '5000対(1500+500)なら大きな優勢として定性評価する');
+
+    const merchant = makeKunishu({ castleId: 2, ideology: '商人' });
+    assert.strictEqual(system.getSubjugationEligibility(merchant, 1, castles[0], new Set([1, 3])).reason, 'merchant', '商人は鎮圧対象外');
+    assert.strictEqual(system.calcMilitaryStrength({ soldiers: 1200, defense: 300 }), 1500, '諸勢力の兵＋防御の基礎戦力を共通窓口で返す');
+
+    const commandSource = read('js/command_system.js');
+    const aiSource = read('js/ai.js');
+    const operationSource = read('js/ai_operation.js');
+    assert.ok(commandSource.includes('getIncorporateEligibility(k, playerClanId).eligible'), '地図の取込対象も専門部署へ委譲する');
+    assert.ok(commandSource.includes('getSubjugationEligibility(k, playerClanId, c, connectedCastles).eligible'), '地図の鎮圧対象も専門部署へ委譲する');
+    assert.ok(!commandSource.includes('k.getRelation(myClanId) < 95'), '取込友好閾値をコマンドへ重複させない');
+    assert.ok(!commandSource.includes('k.soldiers > myPrestige / 2'), '取込兵力閾値をコマンドへ重複させない');
+    assert.ok(aiSource.includes('kunishuSystem.calcMilitaryStrength(kunishu) * 1.1'), 'AI固有補正の前の基礎戦力は共通窓口を使う');
+    assert.ok(operationSource.includes('kunishuSystem.calcMilitaryStrength(cand.target.kunishu)'), '作戦AIも同じ基礎戦力を使う');
+});
+
 test('一向宗ネットワークは ideology と分離し、本願寺家は本願寺系大名の威信最大で決まる', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
@@ -7674,6 +7793,102 @@ test('武将の噂は適性名を会話上の自然な意味へ言い換え、�
     assert.ok(!/聞き|噂|そうです/.test(ninjaFamily), '話者自身の親族は忍術でも伝聞調に戻さない');
 });
 
+test('諸勢力武将の噂は固定忠誠を語らず、取込距離と鎮圧機会を身分・態度に応じて話す', () => {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' },
+        LoyaltyInsightRules: { getConcealmentProfile() { return { perceivedBand: 'danger' }; } },
+        ConversationStandingRules: {
+            getInterviewSpeakerPosture() { return { key: 'normal', relation: 'none' }; },
+            applyIndependentDaimyoRegister(text) {
+                return String(text).replace(/ございます/g, 'ある').replace(/かと存じます/g, 'と思う').replace(/でしょう/g, 'だろう');
+            }
+        }
+    });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/interview_system.js');
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+
+    const kunishu = { id: 5, leaderId: 99, getName() { return '川並衆'; } };
+    let strategic = {
+        incorporate: { band: 'near', reason: 'relation' },
+        subjugate: { eligible: true, band: 'advantage' }
+    };
+    const game = {
+        playerClanId: 1,
+        getCurrentTurnCastle() { return { id: 1, ownerClan: 1, soldiers: 5000 }; },
+        getClanDaimyo() { return null; },
+        kunishuSystem: {
+            getKunishu(id) { return Number(id) === 5 ? kunishu : null; },
+            assessStrategicOptions() { return strategic; }
+        }
+    };
+    const system = new ctx.InterviewSystem(game);
+    const interviewer = { id: 1, clan: 1 };
+    const target = { id: 20, clan: 0, belongKunishuId: 5, status: 'active', loyalty: 50, fullName: '蜂須賀政勝', courtRankIds: [] };
+    const row = { target, mode: 'expert', domain: { key: 'leadership', label: '統率' } };
+
+    system.activeInterviewAttitude = 'friendly';
+    let text = system._getRumorMessages(interviewer, row).join('');
+    assert.ok(text.includes('あと少し関係を深める'), '取込条件に近い時は個人忠誠でなく勢力ごとの取り込みを助言する');
+    assert.ok(!text.includes('今の頭領') && !text.includes('思うところ'), '諸勢力の固定忠誠50を通常忠誠噂へ流さない');
+    assert.strictEqual(system._getRumorLoyaltyText(target), '', '諸勢力所属者は忠誠噂そのものを生成しない');
+
+    const assessmentBackup = game.kunishuSystem.assessStrategicOptions;
+    game.kunishuSystem.assessStrategicOptions = () => null;
+    const fallback = system._getRumorKunishuStrategyMessages(interviewer, target, 'friendly');
+    assert.strictEqual(fallback.length, 2, '評価不能時も個人引抜不可と勢力単位の対応を一発言へ詰め込まない');
+    assert.ok(fallback[0].includes('個人で引き抜けませぬ') && fallback[1].includes('衆そのもの'), '分割しても意味を落とさない');
+    game.kunishuSystem.assessStrategicOptions = assessmentBackup;
+
+    const compactCases = [
+        { incorporate: { band: 'ready', reason: null }, subjugate: { eligible: false, reason: 'out_of_range' } },
+        { incorporate: { band: 'near', reason: 'strength' }, subjugate: { eligible: true, band: 'advantage' } },
+        { incorporate: { band: 'far', reason: 'merchant' }, subjugate: { eligible: false, reason: 'merchant' } },
+        { incorporate: { band: 'far', reason: 'relation' }, subjugate: { eligible: false, reason: 'out_of_range' } },
+        { incorporate: { band: 'far', reason: 'strength' }, subjugate: { eligible: true, band: 'even' } }
+    ];
+    for (const item of compactCases) {
+        strategic = item;
+        const strategyMessages = system._getRumorKunishuStrategyMessages(interviewer, target, 'friendly');
+        assert.ok(strategyMessages.length >= 1, '諸勢力戦略所見は必要な情報を最低1発言で返す');
+        assert.ok(strategyMessages.length <= 2, '戦略所見は独立した取込判断と武力判断の最大2要点に収める');
+        assert.strictEqual(new Set(strategyMessages).size, strategyMessages.length, '同じ戦略所見を重複して発言しない');
+    }
+
+    strategic = {
+        incorporate: { band: 'ready', reason: null },
+        subjugate: { eligible: false, reason: 'out_of_range' }
+    };
+    const readyFriendly = system._getRumorKunishuStrategyMessages(interviewer, target, 'friendly');
+    assert.strictEqual(readyFriendly.length, 1, '縁が深い→取込好機という一つの因果判断を字数だけで二分しない');
+    assert.ok(readyFriendly[0].includes('縁が深ま') && readyFriendly[0].includes('取り込む好機'), '一発言のまま根拠と結論を保持する');
+
+    strategic = {
+        incorporate: { band: 'far', reason: 'relation' },
+        subjugate: { eligible: true, band: 'clear_advantage' }
+    };
+    const splitFriendly = system._getRumorMessages(interviewer, row);
+    text = splitFriendly.join('');
+    assert.ok(text.includes('今なら鎮圧の好機'), '取込が遠く戦力優勢なら鎮圧の機会を話す');
+    assert.strictEqual(splitFriendly.length, 4, '通常の噂2段に、独立した取込判断と武力判断を別発言で加える');
+    assert.ok(splitFriendly.some(message => message.includes('縁が浅い')), '取込が難しい理由を独立した発言で保持する');
+    assert.ok(splitFriendly.some(message => message.includes('今なら鎮圧の好機')), '武力判断を別発言へ分ける');
+    assert.ok(!splitFriendly.some(message => message.includes('縁が浅い') && message.includes('鎮圧の好機')), '二つの判断を一発言へ詰め込まない');
+
+    system.activeInterviewAttitude = 'reserved';
+    const reserved = system._getRumorMessages(interviewer, row);
+    assert.strictEqual(reserved.length, 3, '控えめな態度は能力評を省き、必要な取込判断と武力判断だけを短く分ける');
+    assert.ok(reserved.join('').includes('縁が浅い'), '控えめでも取込が難しい理由を落とさない');
+    assert.ok(reserved.join('').includes('兵はこちらが上'), '控えめでも武力所見を落とさない');
+
+    system.activeInterviewAttitude = 'friendly';
+    system._usesIndependentInterviewRegister = () => true;
+    const higherStanding = system._getRumorMessages(interviewer, row);
+    text = higherStanding.join('');
+    assert.ok(!/存じます|ございます/.test(text), '年長者・高格式者は分割した戦略所見でも一般家臣敬語へ戻らない');
+    assert.ok(higherStanding.some(message => message.includes('縁が浅い')) && higherStanding.some(message => message.includes('鎮圧')), '口調変換後も分割した二つの判断を維持する');
+});
+
 test('武将の噂は表面態度で情報量を変え同一面談中は再抽選しない', () => {
     const ctx = createContext({
         BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' },
@@ -7700,7 +7915,7 @@ test('武将の噂は表面態度で情報量を変え同一面談中は再抽�
     const daimyoRow = { ...row, target: { ...target, id: 21, isDaimyo: true } };
     assert.strictEqual(system._getRumorMessages({}, daimyoRow).length, 2, '噂対象が大名本人なら自明な立場説明を重ねず2項目で終える');
     const leaderRow = { ...row, target: { ...target, id: 22, clan: 0, belongKunishuId: 5 } };
-    assert.strictEqual(system._getRumorMessages({}, leaderRow).length, 2, '噂対象が諸勢力頭領本人なら自明な立場説明を重ねず2項目で終える');
+    assert.strictEqual(system._getRumorMessages({}, leaderRow).length, 4, '諸勢力頭領本人でも個人忠誠ではなく、評価不能時の説明を意味の切れ目で分けて話す');
     system.activeInterviewAttitude = 'reserved';
     assert.strictEqual(system._getRumorMessages({}, row).length, 2, '控えめな態度なら2項目に口数を減らす');
     let picks = 0;

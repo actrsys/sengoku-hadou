@@ -279,6 +279,134 @@ class KunishuSystem {
         return this.game.bushos.filter(b => b.belongKunishuId === kunishuId && window.LifeStatusRules.isPresent(b));
     }
 
+    // 取込コマンドの入口条件を一元判定する正本。
+    // UI・コマンド・面談は友好度や威信閾値を個別に持たず、この結果だけを参照する。
+    getIncorporateEligibility(kunishu, clanId = this.game.playerClanId) {
+        const cfg = window.MainParams.Kunishu.Incorporate;
+        const targetClanId = Number(clanId) || 0;
+        const castle = kunishu ? this.game.getCastle(kunishu.castleId) : null;
+        const clan = targetClanId > 0 ? this.game.getClan(targetClanId) : null;
+        const prestige = Math.max(0, Number(clan && clan.daimyoPrestige) || 0);
+        const relation = kunishu && typeof kunishu.getRelation === 'function'
+            ? Number(kunishu.getRelation(targetClanId)) || 0
+            : 0;
+        const soldiers = Math.max(0, Number(kunishu && kunishu.soldiers) || 0);
+        const soldierLimit = prestige * Number(cfg.SoldierPrestigeRatioMax);
+        const relationRequired = Number(cfg.RelationRequired);
+        const relationNear = relation >= Math.max(0, relationRequired - Number(cfg.NearRelationMargin));
+        const soldierNearLimit = soldierLimit * Number(cfg.NearSoldierLimitMultiplier);
+        const strengthNear = soldiers <= soldierNearLimit;
+        const ownsCastle = !!castle && Number(castle.ownerClan) === targetClanId;
+        const ideology = kunishu ? String(kunishu.ideology || '') : '';
+        const blockedReason = ideology === '商人' ? 'merchant' : (ideology === '宗教' ? 'religion' : null);
+        const alive = !!kunishu && kunishu.isDestroyed !== true;
+        const relationReady = relation >= relationRequired;
+        const strengthReady = soldiers <= soldierLimit;
+        const eligible = alive && targetClanId > 0 && ownsCastle && !blockedReason && relationReady && strengthReady;
+
+        let band = 'far';
+        let reason = null;
+        if (!alive) {
+            band = 'unavailable';
+            reason = 'destroyed';
+        } else if (blockedReason) {
+            band = 'blocked';
+            reason = blockedReason;
+        } else if (!ownsCastle) {
+            band = 'territory';
+            reason = 'outside_territory';
+        } else if (eligible) {
+            band = 'ready';
+        } else if (relationNear && strengthNear) {
+            band = 'near';
+            reason = !relationReady && !strengthReady ? 'mixed' : (!relationReady ? 'relation' : 'strength');
+        } else {
+            reason = !relationNear && !strengthNear ? 'mixed' : (!relationNear ? 'relation' : 'strength');
+        }
+
+        return {
+            eligible,
+            band,
+            reason,
+            castle,
+            relation,
+            soldiers,
+            prestige,
+            soldierLimit,
+            relationReady,
+            strengthReady,
+            relationNear,
+            strengthNear
+        };
+    }
+
+    // 諸勢力の基礎的な防衛戦力。AI・面談など、兵＋防御を意味する箇所の共通窓口。
+    // 戦術・援軍・乱数等の用途固有補正は呼び出し側で別に扱う。
+    calcMilitaryStrength(kunishu) {
+        if (!kunishu) return 0;
+        return Math.max(0, Number(kunishu.soldiers) || 0) + Math.max(0, Number(kunishu.defense) || 0);
+    }
+
+    // 現在行動中の城から、その諸勢力へ鎮圧コマンドを実際に出せるかを一元判定する。
+    // connectedCastleIds は一覧走査時だけ短命キャッシュとして渡せる。
+    getSubjugationEligibility(kunishu, clanId = this.game.playerClanId, originCastle = null, connectedCastleIds = null) {
+        const targetClanId = Number(clanId) || 0;
+        const origin = originCastle || (typeof this.game.getCurrentTurnCastle === 'function' ? this.game.getCurrentTurnCastle() : null);
+        const targetCastle = kunishu ? this.game.getCastle(kunishu.castleId) : null;
+        if (!kunishu || kunishu.isDestroyed === true) {
+            return { eligible: false, reason: 'destroyed', originCastle: origin, targetCastle, connectedCastleIds: connectedCastleIds || null };
+        }
+        if (String(kunishu.ideology || '') === '商人') {
+            return { eligible: false, reason: 'merchant', originCastle: origin, targetCastle, connectedCastleIds: connectedCastleIds || null };
+        }
+        if (!origin || Number(origin.ownerClan) !== targetClanId || !targetCastle || !this.game.mapGraph) {
+            return { eligible: false, reason: 'unreachable', originCastle: origin, targetCastle, connectedCastleIds: connectedCastleIds || null };
+        }
+
+        const connected = connectedCastleIds || this.game.mapGraph.getOwnedConnectedIds(origin, targetClanId);
+        const targetCastleId = Number(targetCastle.id);
+        const inConnectedTerritory = connected.has(targetCastleId);
+        const adjacentIds = this.game.mapGraph.getAdjacentIds(targetCastle);
+        const nextToConnectedTerritory = adjacentIds.some(id => connected.has(Number(id)));
+        const eligible = inConnectedTerritory || nextToConnectedTerritory;
+        return {
+            eligible,
+            reason: eligible ? null : 'out_of_range',
+            originCastle: origin,
+            targetCastle,
+            connectedCastleIds: connected,
+            inConnectedTerritory,
+            nextToConnectedTerritory
+        };
+    }
+
+    // 面談などで使う定性的な鎮圧機会。実戦の勝敗確率ではなく、
+    // 現在行動中の城の兵数と諸勢力の基礎防衛戦力を比較する慎重な目安を返す。
+    assessSubjugationOpportunity(kunishu, clanId = this.game.playerClanId, originCastle = null, connectedCastleIds = null) {
+        const eligibility = this.getSubjugationEligibility(kunishu, clanId, originCastle, connectedCastleIds);
+        const origin = eligibility.originCastle;
+        const ownStrength = origin && Number(origin.ownerClan) === Number(clanId)
+            ? Math.max(0, Number(origin.soldiers) || 0)
+            : 0;
+        const enemyStrength = this.calcMilitaryStrength(kunishu);
+        const ratio = ownStrength / Math.max(1, enemyStrength);
+        const cfg = window.MainParams.Kunishu.StrategicAssessment;
+        let band = 'unfavorable';
+        if (ratio >= Number(cfg.ClearAdvantageRatio)) band = 'clear_advantage';
+        else if (ratio >= Number(cfg.AdvantageRatio)) band = 'advantage';
+        else if (ratio >= Number(cfg.EvenRatio)) band = 'even';
+
+        return { ...eligibility, ownStrength, enemyStrength, ratio, band };
+    }
+
+    // 諸勢力への次の一手を返す共通評価。面談は文章化だけを担当する。
+    assessStrategicOptions(kunishu, clanId = this.game.playerClanId, originCastle = null, connectedCastleIds = null) {
+        return {
+            incorporate: this.getIncorporateEligibility(kunishu, clanId),
+            subjugate: this.assessSubjugationOpportunity(kunishu, clanId, originCastle, connectedCastleIds)
+        };
+    }
+
     // イデオロギーによる相性計算の補正
     calcIdeologyAffinity(kunishu, targetBusho) {
         if (!targetBusho) return 25;
@@ -905,7 +1033,12 @@ class KunishuSystem {
         const kunishu = this.getKunishu(kunishuId);
         const castle = this.game.getCastle(castleId);
         
-        if (!kunishu) return;
+        if (!kunishu || !castle) return;
+        const eligibility = this.getIncorporateEligibility(kunishu, this.game.playerClanId);
+        if (!eligibility.eligible || Number(kunishu.castleId) !== Number(castle.id)) {
+            this.game.ui.showDialog('今はこの諸勢力を取り込めません。', false);
+            return;
+        }
         
         const totalProb = this.calcIncorporateProbability(doer, kunishu, this.game.playerClanId);
         const isSuccess = (Math.random() * 100) < totalProb;

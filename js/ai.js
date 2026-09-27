@@ -782,7 +782,7 @@ class AIEngine {
                 if (kunishu.ideology === '商人') return;
 
                 // ★修正：諸勢力は兵力が少ないため、計算上は「1.1倍」にして大名家の城と同じ難易度として評価します！
-                const enemyForce = (kunishu.soldiers + kunishu.defense) * 1.1;
+                const enemyForce = this.game.kunishuSystem.calcMilitaryStrength(kunishu) * 1.1;
                 
                 let myReinfPower = 0;
                 // 自軍からの援軍を見積もる。getClanCastlesは元のgame.castles順を保持するため、

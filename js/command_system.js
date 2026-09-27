@@ -653,49 +653,19 @@ class CommandSystem {
             }
 
             case 'kunishu_incorporate_valid': {
-                const activeKunishus = this.game.kunishuSystem.getAliveKunishus();
-                const myClanId = playerClanId;
-                const myClan = this.game.getClan(myClanId);
-                const myPrestige = myClan ? myClan.daimyoPrestige : 0;
-
-                const validKunishus = activeKunishus.filter(k => {
-                    const castle = this.game.getCastle(k.castleId);
-                    // 自分の城にいること
-                    if (!castle || Number(castle.ownerClan) !== myClanId) return false;
-                    // 宗教、商人ではないこと
-                    if (k.ideology === '宗教' || k.ideology === '商人') return false;
-                    // 友好度95以上
-                    if (k.getRelation(myClanId) < 95) return false;
-                    // 兵士数が自軍威信の半分以下
-                    if (k.soldiers > myPrestige / 2) return false;
-                    return true;
-                });
-                return [...new Set(validKunishus.map(k => k.castleId))];
+                const validKunishus = this.game.kunishuSystem.getAliveKunishus().filter(k =>
+                    this.game.kunishuSystem.getIncorporateEligibility(k, playerClanId).eligible
+                );
+                return [...new Set(validKunishus.map(k => Number(k.castleId)))];
             }
 
-            // ★追加: 鎮圧コマンド専用！自分の城か、隣の城だけを選べるようにします
+            // 鎮圧可否は諸勢力の専門部署を正本にし、地図表示と実選択で同じ条件を使う。
             case 'kunishu_subjugate_valid': {
-                // 商人以外の生きている諸勢力を取得します
-                const activeKunishus = this.game.kunishuSystem.getAliveKunishus().filter(k => k.ideology !== '商人');
-                // まず諸勢力がいる城を全部集めます（Numberで数字に揃えます）
-                const allKunishuCastleIds = [...new Set(activeKunishus.map(k => Number(k.castleId)))];
-                
-                // ★修正：共通の魔法を使って、繋がっている領土をサクッと取得します！
                 const connectedCastles = this.getConnectedCastles(c, playerClanId);
-                
-                // 集めた城を「フィルター（ふるい）」にかけて、条件に合うものだけを残します！
-                return allKunishuCastleIds.filter(targetCastleId => {
-                    const targetCastle = this.game.getCastle(targetCastleId);
-                    if (!targetCastle) return false; // 安全のためのストッパー
-                    
-                    // 条件①：道が繋がっている自分の領土かどうか？
-                    const isConnected = connectedCastles.has(Number(targetCastleId));
-                    // 条件②：道が繋がっている領土の「すぐ隣の城」かどうか？
-                    const isNextToConnected = this.game.castles.some(myC => connectedCastles.has(Number(myC.id)) && MapGraphService.isAdjacent(targetCastle, myC));
-                    
-                    // どちらか1つでも当てはまればOK（地図で光らせる）！
-                    return isConnected || isNextToConnected;
-                });
+                const validKunishus = this.game.kunishuSystem.getAliveKunishus().filter(k =>
+                    this.game.kunishuSystem.getSubjugationEligibility(k, playerClanId, c, connectedCastles).eligible
+                );
+                return [...new Set(validKunishus.map(k => Number(k.castleId)))];
             }
             
             case 'marriage_valid': {
@@ -2040,21 +2010,18 @@ class CommandSystem {
         if (['kunishu_subjugate', 'kunishu_goodwill', 'kunishu_incorporate'].includes(mode)) {
             let kunishus = this.game.kunishuSystem.getKunishusInCastle(targetCastle.id);
 
-            // ★追加：取込の場合はさらに条件で絞り込みます
             if (mode === 'kunishu_incorporate') {
                 const myClanId = this.game.playerClanId;
-                const myClan = this.game.getClan(myClanId);
-                const myPrestige = myClan ? myClan.daimyoPrestige : 0;
-                
-                kunishus = kunishus.filter(k => {
-                    if (k.ideology === '宗教' || k.ideology === '商人') return false;
-                    if (k.getRelation(myClanId) < 95) return false;
-                    if (k.soldiers > myPrestige / 2) return false;
-                    return true;
-                });
+                kunishus = kunishus.filter(k =>
+                    this.game.kunishuSystem.getIncorporateEligibility(k, myClanId).eligible
+                );
             } else if (mode === 'kunishu_subjugate') {
-                // 鎮圧の場合も商人は対象外にします
-                kunishus = kunishus.filter(k => k.ideology !== '商人');
+                const myClanId = Number(this.game.playerClanId);
+                const originCastle = this.game.getCurrentTurnCastle();
+                const connectedCastles = originCastle ? this.getConnectedCastles(originCastle, myClanId) : new Set();
+                kunishus = kunishus.filter(k =>
+                    this.game.kunishuSystem.getSubjugationEligibility(k, myClanId, originCastle, connectedCastles).eligible
+                );
             }
 
             if (kunishus.length === 0) {

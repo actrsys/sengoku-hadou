@@ -1207,7 +1207,7 @@ class AIOperationManager {
                 
                 // ★追加：敵との戦力差（見込み）を計算して、準備期間を決めます！
                 const enemyForce = cand.target.isKunishuTarget ? 
-                    (cand.target.kunishu.soldiers + cand.target.kunishu.defense) : 
+                    this.game.kunishuSystem.calcMilitaryStrength(cand.target.kunishu) : 
                     (cand.target.soldiers + cand.target.defense);
                 const myForce = this.game.getCastle(cand.castleId).soldiers;
                 const ratio = enemyForce / Math.max(1, myForce); // 敵の戦力が自分の何倍か？

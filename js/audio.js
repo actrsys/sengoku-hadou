@@ -7,6 +7,9 @@ class AudioManager {
         this.currentBgmName = null; // 今鳴っている曲の名前を入れておく箱
         this.memoBgmName = null;    // 元の曲を覚えておくためのメモ帳
         this._bgmUsesBakedBaseVolume = false; // mobile AACは基本音量を音源へ焼き込んでいる
+        // iOS/iPadOSではゲーム音をambient audio sessionとして明示し、
+        // Ring/Silent（マナーモード）に従わせる。HTML5 BGM経路でも同じ方針を使う。
+        this._applySystemSilentModePolicy();
         // min版の読込失敗時だけAudioManager自身が通常版を補います。HTMLへinline onerrorを置かないための正規窓口です。
         this._howlerReadyPromise = this._ensureHowlerReady();
         // Howler 2.2.4 の標準モバイルunlockは touchstart/touchend/click の複数イベントで
@@ -140,6 +143,34 @@ class AudioManager {
         const ua = String(nav.userAgent || '');
         const maxTouchPoints = Number(nav.maxTouchPoints || 0);
         return maxTouchPoints > 0 || /iPhone|iPad|iPod|Android|Mobile/i.test(ua);
+    }
+
+    _isAppleMobileAudioDevice() {
+        if (typeof window === 'undefined') return false;
+        const nav = window.navigator || {};
+        const ua = String(nav.userAgent || '');
+        const platform = String(nav.platform || '');
+        const maxTouchPoints = Number(nav.maxTouchPoints || 0);
+        // iPadOS 13以降はMacIntelを名乗るため、タッチ点数も合わせて判定する。
+        return /iPhone|iPad|iPod/i.test(ua)
+            || /iPhone|iPad|iPod/i.test(platform)
+            || (platform === 'MacIntel' && maxTouchPoints > 1);
+    }
+
+    _applySystemSilentModePolicy() {
+        if (!this._isAppleMobileAudioDevice()) return false;
+        const nav = window.navigator || {};
+        const audioSession = nav.audioSession;
+        if (!audioSession || !('type' in audioSession)) return false;
+        try {
+            // WebKitのautoはHTMLMediaElement再生時にplaybackへ寄り、
+            // Ring/Silentを無視し得る。ゲーム音はambientとして明示する。
+            if (audioSession.type !== 'ambient') audioSession.type = 'ambient';
+            return audioSession.type === 'ambient';
+        } catch (_) {
+            // Audio Session APIが部分実装のWebViewでも、音声再生そのものは従来経路を継続する。
+            return false;
+        }
     }
 
     _isMobileLowMemoryAudioMode() {
@@ -349,6 +380,8 @@ class AudioManager {
     // BGMを鳴らす魔法
     playBGM(fileName, fallbackStart = 0, fallbackEnd = 0) {
         if (this._retryWhenHowlerReady(() => this.playBGM(fileName, fallbackStart, fallbackEnd))) return;
+        // HTML5 Audioを使う互換BGMでも、再生直前にambient方針を再確認する。
+        this._applySystemSilentModePolicy();
 
         this.currentBgmName = fileName;
         this.stopBGM();
@@ -450,6 +483,7 @@ class AudioManager {
     playSE(fileName) {
         if (this._isMobileLowMemoryAudioMode() && this._lowMemoryMutedUiSeNames.has(fileName)) return;
         if (this._retryWhenHowlerReady(() => this.playSE(fileName))) return;
+        this._applySystemSilentModePolicy();
 
         const seData = this.seList[fileName];
         const baseVol = seData && seData.baseVolume !== undefined ? seData.baseVolume : this.fallbackSeVolume;
