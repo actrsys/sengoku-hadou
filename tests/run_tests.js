@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r423');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r424');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7829,15 +7829,15 @@ test('諸勢力武将の噂は固定忠誠を語らず、取込距離と鎮圧�
 
     system.activeInterviewAttitude = 'friendly';
     let text = system._getRumorMessages(interviewer, row).join('');
-    assert.ok(text.includes('あと少し関係を深める'), '取込条件に近い時は個人忠誠でなく勢力ごとの取り込みを助言する');
+    assert.ok(text.includes('もう少し誼を重ねれば'), '取込条件に近い時は制度説明ではなく関係の深まりとして語る');
     assert.ok(!text.includes('今の頭領') && !text.includes('思うところ'), '諸勢力の固定忠誠50を通常忠誠噂へ流さない');
     assert.strictEqual(system._getRumorLoyaltyText(target), '', '諸勢力所属者は忠誠噂そのものを生成しない');
 
     const assessmentBackup = game.kunishuSystem.assessStrategicOptions;
     game.kunishuSystem.assessStrategicOptions = () => null;
     const fallback = system._getRumorKunishuStrategyMessages(interviewer, target, 'friendly');
-    assert.strictEqual(fallback.length, 2, '評価不能時も個人引抜不可と勢力単位の対応を一発言へ詰め込まない');
-    assert.ok(fallback[0].includes('個人で引き抜けませぬ') && fallback[1].includes('衆そのもの'), '分割しても意味を落とさない');
+    assert.strictEqual(fallback.length, 2, '評価不能時も個人切崩し不可と勢力単位の対応を一発言へ詰め込まない');
+    assert.ok(fallback[0].includes('一人だけ切り崩せる') && fallback[1].includes('衆全体'), '分割しても意味を落とさない');
     game.kunishuSystem.assessStrategicOptions = assessmentBackup;
 
     const compactCases = [
@@ -7851,8 +7851,9 @@ test('諸勢力武将の噂は固定忠誠を語らず、取込距離と鎮圧�
         strategic = item;
         const strategyMessages = system._getRumorKunishuStrategyMessages(interviewer, target, 'friendly');
         assert.ok(strategyMessages.length >= 1, '諸勢力戦略所見は必要な情報を最低1発言で返す');
-        assert.ok(strategyMessages.length <= 2, '戦略所見は独立した取込判断と武力判断の最大2要点に収める');
+        assert.ok(strategyMessages.length <= 2, '戦略所見は独立した帰順判断と武力判断の最大2要点に収める');
         assert.strictEqual(new Set(strategyMessages).size, strategyMessages.length, '同じ戦略所見を重複して発言しない');
+        assert.ok(!strategyMessages.some(message => /取込|取り込|鎮圧|戦力|優勢|拮抗/.test(message)), '内部の判定ラベルを家臣の台詞へそのまま露出しない');
     }
 
     strategic = {
@@ -7860,8 +7861,8 @@ test('諸勢力武将の噂は固定忠誠を語らず、取込距離と鎮圧�
         subjugate: { eligible: false, reason: 'out_of_range' }
     };
     const readyFriendly = system._getRumorKunishuStrategyMessages(interviewer, target, 'friendly');
-    assert.strictEqual(readyFriendly.length, 1, '縁が深い→取込好機という一つの因果判断を字数だけで二分しない');
-    assert.ok(readyFriendly[0].includes('縁が深ま') && readyFriendly[0].includes('取り込む好機'), '一発言のまま根拠と結論を保持する');
+    assert.strictEqual(readyFriendly.length, 1, 'こちらへ心を寄せる→声をかける頃合いという一つの因果判断を不要に分けない');
+    assert.ok(readyFriendly[0].includes('心を寄せ') && readyFriendly[0].includes('よい頃合い'), '制度用語を使わず根拠と判断を一発言で保持する');
 
     strategic = {
         incorporate: { band: 'far', reason: 'relation' },
@@ -7869,24 +7870,24 @@ test('諸勢力武将の噂は固定忠誠を語らず、取込距離と鎮圧�
     };
     const splitFriendly = system._getRumorMessages(interviewer, row);
     text = splitFriendly.join('');
-    assert.ok(text.includes('今なら鎮圧の好機'), '取込が遠く戦力優勢なら鎮圧の機会を話す');
-    assert.strictEqual(splitFriendly.length, 4, '通常の噂2段に、独立した取込判断と武力判断を別発言で加える');
-    assert.ok(splitFriendly.some(message => message.includes('縁が浅い')), '取込が難しい理由を独立した発言で保持する');
-    assert.ok(splitFriendly.some(message => message.includes('今なら鎮圧の好機')), '武力判断を別発言へ分ける');
-    assert.ok(!splitFriendly.some(message => message.includes('縁が浅い') && message.includes('鎮圧の好機')), '二つの判断を一発言へ詰め込まない');
+    assert.ok(text.includes('手勢はこちらに分があります') && text.includes('打って出るなら'), '武力上の機会を戦力ラベルではなく情勢評として話す');
+    assert.strictEqual(splitFriendly.length, 4, '通常の噂2段に、独立した帰順判断と武力判断を別発言で加える');
+    assert.ok(splitFriendly.some(message => message.includes('心を寄せてはおりませぬ')), 'こちらへ寄らない理由を独立した発言で保持する');
+    assert.ok(splitFriendly.some(message => message.includes('打って出るなら')), '武力判断を別発言へ分ける');
+    assert.ok(!splitFriendly.some(message => message.includes('心を寄せてはおりませぬ') && message.includes('打って出るなら')), '二つの判断を一発言へ詰め込まない');
 
     system.activeInterviewAttitude = 'reserved';
     const reserved = system._getRumorMessages(interviewer, row);
-    assert.strictEqual(reserved.length, 3, '控えめな態度は能力評を省き、必要な取込判断と武力判断だけを短く分ける');
-    assert.ok(reserved.join('').includes('縁が浅い'), '控えめでも取込が難しい理由を落とさない');
-    assert.ok(reserved.join('').includes('兵はこちらが上'), '控えめでも武力所見を落とさない');
+    assert.strictEqual(reserved.length, 3, '控えめな態度は能力評を省き、必要な帰順判断と武力判断だけを短く分ける');
+    assert.ok(reserved.join('').includes('心を寄せてはおりませぬ'), '控えめでもこちらへ寄らない事情を落とさない');
+    assert.ok(reserved.join('').includes('手勢はこちらに分があります'), '控えめでも武力所見を落とさない');
 
     system.activeInterviewAttitude = 'friendly';
     system._usesIndependentInterviewRegister = () => true;
     const higherStanding = system._getRumorMessages(interviewer, row);
     text = higherStanding.join('');
     assert.ok(!/存じます|ございます/.test(text), '年長者・高格式者は分割した戦略所見でも一般家臣敬語へ戻らない');
-    assert.ok(higherStanding.some(message => message.includes('縁が浅い')) && higherStanding.some(message => message.includes('鎮圧')), '口調変換後も分割した二つの判断を維持する');
+    assert.ok(higherStanding.some(message => message.includes('心を寄せてはおりませぬ')) && higherStanding.some(message => message.includes('打って出る')), '口調変換後も分割した二つの判断を維持する');
 });
 
 test('武将の噂は表面態度で情報量を変え同一面談中は再抽選しない', () => {

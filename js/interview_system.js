@@ -1188,11 +1188,13 @@ class InterviewSystem {
         const reserved = attitude === 'reserved';
         const warm = attitude === 'welcoming' || attitude === 'friendly';
 
+        // 判定結果のラベル（取込・鎮圧・優勢等）をそのまま読み上げず、
+        // 家臣が情勢を評する世界内の言葉へ置き換える。判定自体は KunishuSystem を正本とする。
         if (!assessment) {
-            if (reserved) return [`……${name}の者は、個人を引き抜く相手ではありませぬ。`];
+            if (reserved) return [`……${name}は、一人だけこちらへ誘えるような相手ではありませぬ。`];
             return [
-                `${name}の者は、個人で引き抜けませぬ。`,
-                '動かすなら、衆そのものを相手になさるべきでしょう。'
+                `${name}は、一人だけ切り崩せるような衆ではありませぬ。`,
+                '話をするなら、衆全体を相手になさるのがよろしいでしょう。'
             ];
         }
 
@@ -1200,60 +1202,59 @@ class InterviewSystem {
         const subjugate = assessment.subjugate || {};
 
         if (incorporate.band === 'ready') {
-            if (reserved) return [`……${name}なら、取り込む話をしてもよい頃でしょう。`];
-            // 「関係が深いので今が取込好機」は一つの因果判断。字数だけを理由に分断しない。
-            if (warm) return [`${name}とは十分に縁が深まっております。今なら取り込む好機かと存じます。`];
-            return [`${name}とは関係も深まっております。取り込みを持ちかけてもよい頃でしょう。`];
+            if (reserved) return [`……${name}も、今ならこちらへなびくでしょう。`];
+            if (warm) return [`${name}も、今ならこちらへ心を寄せるでしょう。声をかけるにはよい頃合いかと存じます。`];
+            return [`${name}も、今ならこちらの話に耳を傾けるでしょう。声をかけるにはよい頃合いでしょう。`];
         }
         if (incorporate.band === 'near') {
-            if (reserved) return [`……${name}は、あと一押しでこちらへ寄せられそうです。`];
+            if (reserved) return [`……${name}も、あと一押しでこちらへ寄りそうです。`];
             if (incorporate.reason === 'relation') {
-                return [`${name}を寄せるには、あと少し関係を深めるのがよろしいでしょう。`];
+                return [`${name}も、もう少し誼を重ねればこちらへ心を寄せるでしょう。`];
             }
             if (incorporate.reason === 'strength') {
-                return [`${name}にはまだ少し力があります。取り込みまではあと一歩でしょう。`];
+                return [`${name}はまだ自ら立てるだけの力があります。今は声をかけても動きますまい。`];
             }
             return [
-                `${name}の取り込みまでは、あと一歩と見ます。`,
-                '今は親善を重ねるのがよろしいでしょう。'
+                `${name}も、あと一押しでこちらへ寄りそうです。`,
+                '今は誼を重ねておくのがよろしいでしょう。'
             ];
         }
         if (incorporate.reason === 'merchant') {
-            if (reserved) return [`……${name}は商いの衆です。取り込んだり討ったりする相手ではありませぬ。`];
+            if (reserved) return [`……${name}は商いの衆です。無理に従わせる相手ではありませぬ。`];
             return [
-                `${name}は商いの衆ゆえ、取込や鎮圧の相手とはなりませぬ。`,
-                '関わるなら、親善を保つのがよろしいでしょう。'
+                `${name}は商いを生業とする衆。無理に従わせる相手ではありますまい。`,
+                '誼を絶やさぬのがよろしいでしょう。'
             ];
         }
 
         let opening = '';
         let reservedOpening = '';
         if (incorporate.reason === 'religion') {
-            opening = `${name}は宗門の衆ゆえ、こちらへ取り込むことは望めませぬ。`;
-            reservedOpening = `……${name}は、こちらへ取り込めませぬ。`;
+            opening = `${name}は宗門の衆。こちらへ従わせるのは難しいでしょう。`;
+            reservedOpening = `……${name}は宗門の衆です。こちらへ従わせるのは難しいでしょう。`;
         } else if (incorporate.reason === 'outside_territory') {
-            opening = `${name}を取り込むには、まずその地を支配する必要がございます。`;
-            reservedOpening = `……${name}は、まだこちらの支配外です。`;
+            opening = `あの地を押さえぬうちは、${name}もこちらへは動きますまい。`;
+            reservedOpening = `……あの地を押さえぬうちは、${name}も動きますまい。`;
         } else if (incorporate.reason === 'relation') {
-            opening = `${name}とは、まだ縁が浅いようです。`;
-            reservedOpening = `……${name}とは、まだ縁が浅いようです。`;
+            opening = `${name}は、まだこちらへ心を寄せてはおりませぬ。`;
+            reservedOpening = `……${name}は、まだこちらへ心を寄せてはおりませぬ。`;
         } else if (incorporate.reason === 'strength') {
-            opening = `${name}はまだ力を持ち、取り込みを持ちかけるには早いでしょう。`;
-            reservedOpening = `……${name}は、取り込むにはまだ強すぎます。`;
+            opening = `${name}はまだ自ら立てるだけの力があります。こちらへなびくには早いでしょう。`;
+            reservedOpening = `……${name}は、まだこちらへなびく気はありますまい。`;
         } else {
-            opening = `${name}を取り込む話は、今はまだ早いでしょう。`;
-            reservedOpening = `……${name}を取り込むには、まだ早いでしょう。`;
+            opening = `${name}がこちらへなびくには、まだ時期が早いでしょう。`;
+            reservedOpening = `……${name}が動くには、まだ早いでしょう。`;
         }
 
         if (!subjugate.eligible) {
             if (reserved) {
                 if (subjugate.reason === 'out_of_range' || subjugate.reason === 'unreachable') {
-                    return [reservedOpening, '……ここから討つにも、まだ手が届きませぬ。'];
+                    return [reservedOpening, '……ここから兵を向けるにも、まだ手が届きませぬ。'];
                 }
                 return [reservedOpening];
             }
             if (subjugate.reason === 'out_of_range' || subjugate.reason === 'unreachable') {
-                return [opening, '鎮圧するにも、今の拠点からはまだ手が届きませぬ。'];
+                return [opening, 'ここから兵を向けるにも、まだ手が届きませぬ。'];
             }
             return [opening];
         }
@@ -1262,25 +1263,23 @@ class InterviewSystem {
         let reservedMilitary = '';
         switch (subjugate.band) {
             case 'clear_advantage':
-                military = '兵はこちらが大きく上回っております。今なら鎮圧の好機かと存じます。';
-                reservedMilitary = `……兵はこちらが上です。${name}を討つなら、機はありましょう。`;
+                military = '手勢はこちらに分があります。打って出るなら、今は悪くない頃合いかと存じます。';
+                reservedMilitary = '……手勢はこちらに分があります。討つなら今も悪くないでしょう。';
                 break;
             case 'advantage':
-                military = '兵はこちらが優勢です。鎮圧を考えてもよいでしょう。';
-                reservedMilitary = `……兵はこちらが上です。${name}を討つなら、機はありましょう。`;
+                military = '手勢はこちらに分があります。仕掛けるなら悪くないでしょう。';
+                reservedMilitary = '……手勢はこちらに分があります。仕掛ける手はありましょう。';
                 break;
             case 'even':
-                military = '兵はおおむね拮抗しております。力攻めは慎重になさるべきでしょう。';
-                reservedMilitary = `……${name}と兵は五分ほど。力攻めは勧めませぬ。`;
+                military = '手勢に大きな差はありませぬ。力押しは危ういかと存じます。';
+                reservedMilitary = '……手勢は五分ほど。力押しは勧めませぬ。';
                 break;
             default:
-                military = '先方の兵は侮れませぬ。今は鎮圧を急ぐ時ではありますまい。';
-                reservedMilitary = `……${name}の兵は侮れませぬ。今は討つ時ではないでしょう。`;
+                military = '向こうもなかなかの手勢です。今ぶつかるのは得策ではありますまい。';
+                reservedMilitary = '……向こうの手勢も侮れませぬ。今ぶつかるのは避けたいところです。';
                 break;
         }
         if (reserved) return [reservedOpening, reservedMilitary];
-        // 取込判断と武力判断は独立した情報なので、一発言へ詰め込まず二段に分ける。
-        // 文字数だけを理由に意味を削らず、一発言一判断を優先する。
         return [opening, military];
     }
 
