@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r425'
+        Version: 'r426'
     },
 
     History: {
@@ -145,20 +145,10 @@ window.GameConfig = {
         },
         Kunishu: {
             CaptureRelationDrop: 20,
-            // 取込コマンドの入口条件と、面談で『あと一歩か』を判断する目安を同じ正本に置く。
-            // 面談側は数値を直接読まず KunishuSystem の評価結果だけを使う。
+            // 取込コマンドの入口条件。閾値は KunishuSystem に委譲し、呼び出し元へ複製しない。
             Incorporate: {
                 RelationRequired: 95,
-                SoldierPrestigeRatioMax: 0.5,
-                NearRelationMargin: 10,
-                NearSoldierLimitMultiplier: 1.5
-            },
-            // 『鎮圧の好機か』を定性的に返すための戦力比。実戦の勝敗確率ではなく、
-            // 現在行動中の城から見た慎重な目安として扱う。
-            StrategicAssessment: {
-                ClearAdvantageRatio: 2.0,
-                AdvantageRatio: 1.25,
-                EvenRatio: 0.8
+                SoldierPrestigeRatioMax: 0.5
             },
             IkkoNetwork: {
                 HonganjiDaimyoIdMin: 1019000,
