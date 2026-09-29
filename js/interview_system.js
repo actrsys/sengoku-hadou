@@ -1172,7 +1172,78 @@ class InterviewSystem {
         return !!kunishu && Number(kunishu.leaderId) === Number(target.id);
     }
 
-    _getRumorKunishuStrategyMessages(interviewer, target, attitude = this.activeInterviewAttitude) {
+    _getRumorKunishuComparison(interviewer, row) {
+        if (!interviewer || !row || !row.target) return { band: 'unknown', kind: null };
+        const target = row.target;
+
+        if (row.mode === 'expert' && row.domain) {
+            const own = Number(interviewer[row.domain.key] || 0);
+            const other = Number(target[row.domain.key] || 0);
+            if (other >= own + 8) return { band: 'superior', kind: 'ability', own, other };
+            if (other >= own - 5) return { band: 'peer', kind: 'ability', own, other };
+            return { band: 'other', kind: 'ability', own, other };
+        }
+
+        if (row.mode === 'aptitude' && row.aptitude
+            && typeof SkillManager !== 'undefined' && typeof SkillManager.getAptitudeLevel === 'function') {
+            const key = row.aptitude.key;
+            const own = Number(SkillManager.getAptitudeLevel(interviewer[key] || 'E'));
+            const other = Number(row.aptitude.level != null
+                ? row.aptitude.level
+                : SkillManager.getAptitudeLevel(target[key] || 'E'));
+            if (key === 'aptNinjutsu' && own <= 0) {
+                return { band: 'ninjutsu_outsider', kind: 'aptitude', own, other };
+            }
+            if (other > own) return { band: 'superior', kind: 'aptitude', own, other };
+            if (other === own) return { band: 'peer', kind: 'aptitude', own, other };
+            return { band: 'other', kind: 'aptitude', own, other };
+        }
+
+        if (row.mode === 'general') {
+            const own = this._getRumorGeneralTotal(interviewer);
+            const other = this._getRumorGeneralTotal(target);
+            if (other >= own + 25) return { band: 'superior', kind: 'general', own, other };
+            if (other >= own - 20) return { band: 'peer', kind: 'general', own, other };
+            return { band: 'other', kind: 'general', own, other };
+        }
+
+        return { band: 'unknown', kind: null };
+    }
+
+    _getRumorKunishuPersonalInterestMessages(interviewer, row, attitude = this.activeInterviewAttitude) {
+        if (!row || !row.target) return [];
+        // 話者自身の近親者なら、すでに所属・能力を直接語っているため、
+        // 「一度話してみたい」という他人行儀な補足は重ねない。
+        if (this._getRumorFamilyRelation(interviewer, row.target) !== 'none') return [];
+
+        const comparison = this._getRumorKunishuComparison(interviewer, row);
+        const reserved = attitude === 'reserved';
+        const warm = attitude === 'welcoming' || attitude === 'friendly';
+
+        // 忍術だけは既存の社会的距離を維持する。話者自身に心得が全くない場合、
+        // 高適性をそのまま「教えを請いたい技能」とは扱わない。
+        if (comparison.band === 'ninjutsu_outsider') {
+            if (reserved) return ['……忍びの者をよく使う御仁ですか。某には得体が知れませぬ。'];
+            if (warm) return ['忍びの者をよく使うとは聞きますが、所詮は日陰の業。某には得体が知れませぬ。'];
+            return ['忍びの者を用いるそうですが、日陰の業は某にはどうにも馴染めませぬ。'];
+        }
+
+        if (comparison.band === 'superior') {
+            if (reserved) return ['……機会があれば、その話を聞いてみたいものです。'];
+            if (warm) return ['それほどの御仁なら、機会があれば一度話を聞いてみたいものです。'];
+            return ['その御仁には、機会があれば一度話を伺ってみたいものです。'];
+        }
+        if (comparison.band === 'peer') {
+            if (reserved) return ['……機会があれば、一度話してみたいものです。'];
+            if (warm) return ['機会があれば、一度じっくり語り合ってみたいものです。'];
+            return ['機会があれば、一度話を交わしてみたいものです。'];
+        }
+
+        if (reserved) return ['……機会があれば、一度話してみたいものです。'];
+        return ['どのような御仁か、機会があれば一度話してみたいものです。'];
+    }
+
+    _getRumorKunishuStrategyMessages(interviewer, target, attitude = this.activeInterviewAttitude, row = null) {
         const kunishuId = Number(target && target.belongKunishuId || 0);
         const system = this.game && this.game.kunishuSystem;
         if (kunishuId <= 0 || !system || typeof system.getKunishu !== 'function') return [];
@@ -1187,16 +1258,11 @@ class InterviewSystem {
             : null;
         const reserved = attitude === 'reserved';
         const warm = attitude === 'welcoming' || attitude === 'friendly';
+        const interestFallback = () => this._getRumorKunishuPersonalInterestMessages(interviewer, row, attitude);
 
-        // 判定結果のラベル（取込・鎮圧・優勢等）をそのまま読み上げず、
-        // 家臣が情勢を評する世界内の言葉へ置き換える。判定自体は KunishuSystem を正本とする。
-        if (!assessment) {
-            if (reserved) return [`……${name}は、一人だけこちらへ誘えるような相手ではありませぬ。`];
-            return [
-                `${name}は、一人だけ切り崩せるような衆ではありませぬ。`,
-                '話をするなら、衆全体を相手になさるのがよろしいでしょう。'
-            ];
-        }
+        // 判定不能や位置関係だけで今は手を出せない場合、制度上の不可理由を会話へ露出しない。
+        // 噂で注目した人物そのものへの関心へ戻し、面談を攻略ヘルプだけの機能にしない。
+        if (!assessment) return interestFallback();
 
         const incorporate = assessment.incorporate || {};
         const subjugate = assessment.subjugate || {};
@@ -1233,8 +1299,9 @@ class InterviewSystem {
             opening = `${name}は宗門の衆。こちらへ従わせるのは難しいでしょう。`;
             reservedOpening = `……${name}は宗門の衆です。こちらへ従わせるのは難しいでしょう。`;
         } else if (incorporate.reason === 'outside_territory') {
-            opening = `あの地を押さえぬうちは、${name}もこちらへは動きますまい。`;
-            reservedOpening = `……あの地を押さえぬうちは、${name}も動きますまい。`;
+            // 位置条件は地図を見れば分かる制度事情なので、噂ではわざわざ説明しない。
+            opening = '';
+            reservedOpening = '';
         } else if (incorporate.reason === 'relation') {
             opening = `${name}は、まだこちらへ心を寄せてはおりませぬ。`;
             reservedOpening = `……${name}は、まだこちらへ心を寄せてはおりませぬ。`;
@@ -1247,16 +1314,14 @@ class InterviewSystem {
         }
 
         if (!subjugate.eligible) {
-            if (reserved) {
-                if (subjugate.reason === 'out_of_range' || subjugate.reason === 'unreachable') {
-                    return [reservedOpening, '……ここから兵を向けるにも、まだ手が届きませぬ。'];
-                }
-                return [reservedOpening];
-            }
-            if (subjugate.reason === 'out_of_range' || subjugate.reason === 'unreachable') {
-                return [opening, 'ここから兵を向けるにも、まだ手が届きませぬ。'];
-            }
-            return [opening];
+            // 「ここからは届かない」等の位置説明は噂として価値が薄い。
+            // 取込側に関係・勢力差など語る意味のある所見があればそれだけ残し、
+            // 位置理由しかない時は人物評へフォールバックする。
+            const positional = subjugate.reason === 'out_of_range' || subjugate.reason === 'unreachable';
+            if (reservedOpening) return [reservedOpening];
+            if (opening) return [opening];
+            if (positional) return interestFallback();
+            return interestFallback();
         }
 
         let military = '';
@@ -1279,8 +1344,8 @@ class InterviewSystem {
                 reservedMilitary = '……向こうの手勢も侮れませぬ。今ぶつかるのは避けたいところです。';
                 break;
         }
-        if (reserved) return [reservedOpening, reservedMilitary];
-        return [opening, military];
+        if (reserved) return reservedOpening ? [reservedOpening, reservedMilitary] : [reservedMilitary];
+        return opening ? [opening, military] : [military];
     }
 
     _getRumorLoyaltyText(target) {
@@ -1329,11 +1394,11 @@ class InterviewSystem {
             // reserved は口数を抑える。諸勢力所属者では無意味な忠誠評ではなく、
             // 能力評より次の一手を優先する。取込と武力が別要点なら短い連続台詞へ分ける。
             if (belongsToKunishu && attitude === 'reserved') {
-                messages.push(...this._getRumorKunishuStrategyMessages(interviewer, row.target, attitude));
+                messages.push(...this._getRumorKunishuStrategyMessages(interviewer, row.target, attitude, row));
             } else {
                 messages.push(this._getRumorFamilyAbilityText(interviewer, row, attitude));
                 if (belongsToKunishu) {
-                    messages.push(...this._getRumorKunishuStrategyMessages(interviewer, row.target, attitude));
+                    messages.push(...this._getRumorKunishuStrategyMessages(interviewer, row.target, attitude, row));
                 } else if (attitude !== 'reserved') {
                     messages.push(this._getRumorFamilyLoyaltyText(interviewer, row.target));
                 }
@@ -1341,11 +1406,11 @@ class InterviewSystem {
         } else {
             messages = [this._getRumorOpeningText(row, attitude, interviewer)];
             if (belongsToKunishu && attitude === 'reserved') {
-                messages.push(...this._getRumorKunishuStrategyMessages(interviewer, row.target, attitude));
+                messages.push(...this._getRumorKunishuStrategyMessages(interviewer, row.target, attitude, row));
             } else {
                 messages.push(this._getRumorAbilityText(row, attitude));
                 if (belongsToKunishu) {
-                    messages.push(...this._getRumorKunishuStrategyMessages(interviewer, row.target, attitude));
+                    messages.push(...this._getRumorKunishuStrategyMessages(interviewer, row.target, attitude, row));
                 } else if (attitude !== 'reserved' && !this._isRumorLeader(row.target)) {
                     messages.push(this._getRumorLoyaltyText(row.target));
                 }
