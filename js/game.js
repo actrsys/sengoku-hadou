@@ -525,9 +525,10 @@ class GameManager {
             if (this.ui && typeof this.ui.waitForNextPaint === 'function') await this.ui.waitForNextPaint();
             if (this.ui) this.ui.hideLoadingScreen();
 
-            // 観戦開始はロード画面を閉じてから。通常の「はじめから」と同じ startMonth() を入口にします。
+            // 観戦開始はロード画面を閉じてから。0ms継続もTurnManagerの世代管理へ結び、
+            // 直後のタイトル復帰・別シナリオ読込で旧initを持ち越さない。
             if (startInWatchMode) {
-                setTimeout(() => this.init(), 0);
+                this.turnManager.scheduleTurnFlowContinuation(() => this.init(), 0);
             }
             
         } catch (e) {
@@ -1261,14 +1262,11 @@ class GameManager {
                 if (Number.isInteger(expectedIndex) && Number(this.currentIndex) !== expectedIndex) return;
                 if (expectedCastle && this.turnQueue && this.turnQueue[this.currentIndex] !== expectedCastle) return;
 
-                if (turnManager && typeof turnManager.scheduleTurnFlowContinuation === 'function') {
-                    turnManager.scheduleTurnFlowContinuation(() => this.processTurn(), 0, {
-                        expectedIndex: Number.isInteger(expectedIndex) ? expectedIndex : null,
-                        expectedCastle
-                    });
-                } else {
-                    this.processTurn();
-                }
+                if (!turnManager || typeof turnManager.scheduleTurnFlowContinuation !== 'function') return;
+                turnManager.scheduleTurnFlowContinuation(() => this.processTurn(), 0, {
+                    expectedIndex: Number.isInteger(expectedIndex) ? expectedIndex : null,
+                    expectedCastle
+                });
             });
     }
 
@@ -1354,20 +1352,15 @@ class GameManager {
     _scheduleWatchTurnResume() {
         const resume = () => this.processTurn();
         const turnManager = this.turnManager;
-        if (turnManager && typeof turnManager.scheduleTurnFlowContinuation === 'function') {
-            const expectedIndex = Number(this.currentIndex);
-            const expectedCastle = this.turnQueue && Number.isInteger(expectedIndex)
-                ? this.turnQueue[expectedIndex] || null
-                : null;
-            return turnManager.scheduleTurnFlowContinuation(resume, 0, {
-                expectedIndex: Number.isInteger(expectedIndex) ? expectedIndex : null,
-                expectedCastle
-            });
-        }
-        return setTimeout(() => {
-            if (this.phase !== 'game' || this.isRestoringSave) return;
-            resume();
-        }, 0);
+        if (!turnManager || typeof turnManager.scheduleTurnFlowContinuation !== 'function') return null;
+        const expectedIndex = Number(this.currentIndex);
+        const expectedCastle = this.turnQueue && Number.isInteger(expectedIndex)
+            ? this.turnQueue[expectedIndex] || null
+            : null;
+        return turnManager.scheduleTurnFlowContinuation(resume, 0, {
+            expectedIndex: Number.isInteger(expectedIndex) ? expectedIndex : null,
+            expectedCastle
+        });
     }
 
     // 帰還確認・勢力選択をキャンセルした時は、止めていた安全地点から観戦を再開します。

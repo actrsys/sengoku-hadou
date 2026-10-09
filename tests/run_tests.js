@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r428');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r429');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -12340,6 +12340,7 @@ test('AIからプレイヤーへの外交結果完了はTurnManager世代へ結�
     assert.ok(helperBlock.includes('turnManager.scheduleTurnFlowContinuation(onComplete, delay'));
     assert.ok(helperBlock.includes('expectedIndex'));
     assert.ok(helperBlock.includes('expectedCastle'));
+    assert.ok(!helperBlock.includes('setTimeout('), '外交完了helperにも生timerの退避経路を残さない');
     const proposalBlock = diplomacy.slice(proposalAt, diplomacy.indexOf('\n    /**', proposalAt + 100));
     assert.ok((proposalBlock.match(/this\._scheduleProposalCompletion\(onComplete, 100\)/g) || []).length >= 9);
     assert.ok(!proposalBlock.includes('setTimeout(onComplete, 100)'));
@@ -12352,7 +12353,8 @@ test('観戦再開の0ms processTurnもTurnManager寿命窓口を使う', () => 
     const block = game.slice(helperAt, stopAt + 2200);
     assert.ok(block.includes('turnManager.scheduleTurnFlowContinuation(resume, 0'));
     assert.ok((block.match(/this\._scheduleWatchTurnResume\(\)/g) || []).length >= 2);
-    assert.ok(!block.includes('setTimeout(() => this.processTurn(), 0)'));
+    const helperOnly = game.slice(helperAt, game.indexOf('// 帰還確認・勢力選択をキャンセルした時は', helperAt));
+    assert.ok(!helperOnly.includes('setTimeout('), '観戦再開helperに生timerの退避経路を残さない');
 });
 
 test('共通災害は初回会話後にturn-flowを再確認し旧シナリオへ地図を生成しない', () => {
@@ -12536,6 +12538,12 @@ test('途中観戦開始のAI作戦準備は開始時turn-flow世代を跨いで
     assert.ok(block.includes("this.phase !== 'game' || this.isRestoringSave || !this.isWatchMode"));
     assert.ok(block.includes('turnManager.scheduleTurnFlowContinuation(() => this.processTurn(), 0, {'));
     assert.ok(!block.includes('.finally(() => this.processTurn())'), '非同期作戦準備のfinallyから生processTurnを呼ばない');
+    assert.ok(!block.includes('this.processTurn();'), 'TurnManager欠落時にも生processTurnへ退避しない');
+
+    const loadAt = gameJs.indexOf('// 観戦開始はロード画面を閉じてから。');
+    const loadBlock = gameJs.slice(loadAt, loadAt + 520);
+    assert.ok(loadBlock.includes('this.turnManager.scheduleTurnFlowContinuation(() => this.init(), 0);'), 'タイトル観戦開始のinitもTurnManager寿命窓口を使う');
+    assert.ok(!loadBlock.includes('setTimeout('), 'タイトル観戦開始に生の0ms timerを残さない');
 });
 
 
@@ -13587,6 +13595,19 @@ test('操作不能状態では通常コマンドUIを入口で遮断し、情報
     assert.ok(infoAt >= 0 && infoEnd > infoAt, 'updateInfoPanelとコマンド可視性窓口が存在する');
     assert.ok(!infoBlock.includes("cmdGrid.style.display = 'grid'"), '情報更新だけでコマンド領域を再表示しない');
 
+    const resetAt = ui.indexOf('    forceResetModals(options = {}) {');
+    const resetEnd = ui.indexOf('    log(msg, historyOptions = null)', resetAt);
+    const resetBlock = ui.slice(resetAt, resetEnd);
+    assert.ok(resetBlock.includes('this.clearCommandMenu();'), '強制画面リセットも共通のコマンド消去窓口を使う');
+    assert.ok(!resetBlock.includes("getElementById('command-area')"), '強制画面リセットからスマホコマンド領域を直接操作しない');
+
+    const availabilityAt = ui.indexOf('    _isPlayerCommandInputAvailable() {');
+    const availabilityEnd = ui.indexOf('    _canRenderCommandMenuForCurrentCastle() {', availabilityAt);
+    const availabilityBlock = ui.slice(availabilityAt, availabilityEnd);
+    assert.ok(availabilityBlock.includes('game.commandSystem.canAcceptPlayerCommandInput()'), 'UIはCommandSystemの入力可否だけを参照する');
+    assert.ok(!availabilityBlock.includes("game.phase !== 'game'"), 'UI側に通常入力可否の重複条件を持たない');
+    assert.ok(!availabilityBlock.includes('getCurrentTurnCastle'), 'UI側で所属・委任判定を再実装しない');
+
     const menuAt = ui.indexOf('    renderCommandMenu() {');
     const menuBlock = ui.slice(menuAt, menuAt + 500);
     assert.ok(menuBlock.includes('if (!this._canRenderCommandMenuForCurrentCastle()) {'), '通常コマンド描画は操作可否を入口で確認する');
@@ -13598,8 +13619,15 @@ test('操作不能状態では通常コマンドUIを入口で遮断し、情報
     assert.ok(clearBlock.includes('this._setCommandAreasVisible(false);'), 'clearCommandMenuはPC/スマホ双方の領域自体を隠す');
 
     const selectionAt = ui.indexOf('    renderSelectionModeMenu() {');
-    const selectionBlock = ui.slice(selectionAt, selectionAt + 360);
+    const selectionEnd = ui.indexOf('    renderEnemyViewMenu() {', selectionAt);
+    const selectionBlock = ui.slice(selectionAt, selectionEnd);
     assert.ok(selectionBlock.includes('if (!this._canRenderSelectionModeMenu()) {'), '対象選択UIも観戦・復元時には表示しない');
+    assert.ok(!selectionBlock.includes("mobileArea.style.display = 'grid'"), '対象選択UIも可視性窓口の後段でdisplayを上書きしない');
+
+    const enemyAt = ui.indexOf('    renderEnemyViewMenu() {');
+    const enemyEnd = ui.indexOf('    cancelMapSelection(', enemyAt);
+    const enemyBlock = ui.slice(enemyAt, enemyEnd);
+    assert.ok(enemyBlock.includes('if (!this._canRenderEnemyViewMenu()) return;'), '描画後に状態が変わった古い自拠点ボタンも同じ入力可否で遮断する');
 
     assert.ok(command.includes("if (!game || game.phase !== 'game' || game.isRestoringSave || game.isWatchMode || game.isProcessingAI || game.selectionMode != null) return false;"), 'CommandSystemが通常コマンド入力可否の正本を持つ');
     assert.ok(command.includes('if (!this.canAcceptPlayerCommandInput()) return;'), '古いDOM経由でもstartCommandを開始しない');

@@ -1339,3 +1339,12 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - `updateInfoPanel()` は年月・相場・拠点情報だけを更新し、コマンド領域の `display` を変更しない。コマンド領域を可視化できる窓口は `renderCommandMenu()`、通常プレイ中の敵拠点閲覧 `renderEnemyViewMenu()`、明示的な対象選択 `renderSelectionModeMenu()` に限定する。
 - `clearCommandMenu()` はDOM内容を消すだけでなくPC/スマホ双方のコマンド領域自体を隠す。観戦開始、月初処理、AIターン開始など操作不能へ入る境界では先に `clearCommandMenu()` を通し、その後の情報更新や地図再描画が古いコマンドDOMを再露出させないようにする。
 - 合戦コマンドはAI/観戦ターンの遮蔽状態をボタンDOM再構築より先に確定する。野戦は既存どおり `updateMenu()` 冒頭で全操作群を隠してから `isPlayerTurn()` を判定する。表示後に無効化する順序へ戻さない。
+
+## r428 追加巡回監査：入力可否正本とターン継続寿命の再統一
+
+- 通常コマンド入力可否は `CommandSystem.canAcceptPlayerCommandInput()` だけを正本とする。`UIManager` は同じ `phase / isWatchMode / isProcessingAI / selectionMode / ownerClan / isDelegated` 条件を独自に複製せず、専門部署が未準備なら安全側で非表示・操作不可とする。
+- 敵拠点閲覧中の「自拠点へ」など、描画後も残り得る操作DOMはクリック時にも同じ入力可否を再確認する。観戦・AI処理・復元へ遷移した後の古いDOMから操作を通さない。
+- コマンド領域の可視性は `_setCommandAreasVisible()` を正規窓口とし、対象選択メニューなどが後段でスマホ `display` を直接上書きしない。PC側で親コンテナ自体を復帰させる処理は別責務として維持する。
+- タイトルからの観戦開始、途中観戦開始、観戦復帰、AI→プレイヤー外交結果後の継続は、0ms/100msを含め `TurnManager.scheduleTurnFlowContinuation()` の世代管理へ統一する。`TurnManager` 欠落時に生 `setTimeout` や直接 `processTurn()` へ退避する旧フォールバックは持たない。
+- 上記は状態管理の正本・非同期寿命管理を揃えるための保守改修であり、ゲームルール・シナリオデータ・レイアウト・版番号は変更しない。版番号は `r428` のままとする。
+- `forceResetModals()` も `clearCommandMenu()` を通してコマンド領域を閉じる。リセット側から `command-area` の `display` を直接二重操作しない。

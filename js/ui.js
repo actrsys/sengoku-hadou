@@ -1974,8 +1974,6 @@ class UIManager {
         if(this.mobileTopLeft) this.mobileTopLeft.innerHTML = ''; // スマホ版の上の情報を消します
         if(this.mobileFloatingInfo) this.mobileFloatingInfo.innerHTML = ''; // スマホ版の時計を消します
         if(this.mobileFloatingMarket) this.mobileFloatingMarket.innerHTML = ''; // スマホ版の相場を消します
-        const cmdGrid = document.getElementById('command-area');
-        if(cmdGrid) cmdGrid.style.display = 'none'; // スマホ版のボタン置き場を隠します0
 
         this.hideContextMenu();
     }
@@ -2554,15 +2552,10 @@ class UIManager {
 
     _isPlayerCommandInputAvailable() {
         const game = this.game;
-        if (!game) return false;
-        if (game.commandSystem && typeof game.commandSystem.canAcceptPlayerCommandInput === 'function') {
-            return game.commandSystem.canAcceptPlayerCommandInput();
-        }
-        if (game.phase !== 'game' || game.isRestoringSave || game.isWatchMode || game.isProcessingAI || game.selectionMode != null) return false;
-        const current = typeof game.getCurrentTurnCastle === 'function' ? game.getCurrentTurnCastle() : null;
-        return !!(current
-            && Number(current.ownerClan) === Number(game.playerClanId)
-            && !current.isDelegated);
+        // 通常コマンドの入力可否はCommandSystemだけを正本とする。
+        // 初期化途中などで専門部署が未準備なら、UI側で条件を再実装せず安全側へ閉じる。
+        if (!game || !game.commandSystem || typeof game.commandSystem.canAcceptPlayerCommandInput !== 'function') return false;
+        return game.commandSystem.canAcceptPlayerCommandInput();
     }
 
     _canRenderCommandMenuForCurrentCastle() {
@@ -2657,13 +2650,11 @@ class UIManager {
         const mobileArea = document.getElementById('command-area');
         const pcArea = document.getElementById('pc-new-command-area');
         
-        // ★ここから追加：親の箱が隠れていてボタンが見えなくなるのを防ぐ魔法です！
+        // PCはコマンド領域の親コンテナも明示的に戻す。
+        // スマホ側の可視性は_setCommandAreasVisible()だけを正規窓口とし、後段でdisplayを上書きしない。
         if (document.body.classList.contains('is-pc')) {
             const pcContainer = document.getElementById('pc-new-ui-container');
             if (pcContainer) pcContainer.classList.remove('hidden');
-        } else {
-            // スマホ版の場合も念のため表示状態に戻します
-            if (mobileArea) mobileArea.style.display = 'grid';
         }
         
         const areas = [mobileArea, pcArea];
@@ -2779,8 +2770,10 @@ class UIManager {
             btn.className = 'cmd-btn back';
             btn.textContent = "自拠点へ";
             btn.onclick = () => {
-                if(this.game.isProcessingAI) return;
+                // 描画後に観戦・AI処理・復元へ遷移していても、古いDOMから操作を通さない。
+                if (!this._canRenderEnemyViewMenu()) return;
                 const myCastle = this.game.getCurrentTurnCastle();
+                if (!myCastle) return;
                 this.showControlPanel(myCastle);
                 this.scrollToActiveCastle(myCastle);
             };

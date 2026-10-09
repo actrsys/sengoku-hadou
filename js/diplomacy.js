@@ -2908,17 +2908,13 @@ class DiplomacyManager {
             ? game.turnQueue[expectedIndex] || null
             : null;
 
-        if (turnManager && typeof turnManager.scheduleTurnFlowContinuation === 'function') {
-            return turnManager.scheduleTurnFlowContinuation(onComplete, delay, {
-                expectedIndex: Number.isInteger(expectedIndex) ? expectedIndex : null,
-                expectedCastle
-            });
-        }
-
-        return setTimeout(() => {
-            if (!game || game.phase !== 'game' || game.isRestoringSave) return;
-            onComplete();
-        }, Math.max(0, Number(delay) || 0));
+        // GameManagerではTurnManagerが常設される。専門部署が欠ける異常状態では、
+        // UI都合の生timerへ退避せず完了callbackを安全側で破棄する。
+        if (!turnManager || typeof turnManager.scheduleTurnFlowContinuation !== 'function') return null;
+        return turnManager.scheduleTurnFlowContinuation(onComplete, delay, {
+            expectedIndex: Number.isInteger(expectedIndex) ? expectedIndex : null,
+            expectedCastle
+        });
     }
 
     /**
