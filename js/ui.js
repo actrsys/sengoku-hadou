@@ -481,7 +481,12 @@ class UIManager {
             }
             // PCでは通常地図を保持しても余裕がある。スマホだけ巨大レイヤーを
             // compositor の対象から外し、戦闘画面へGPU/メモリを譲る。
-            if (!isPC && scroll) scroll.style.display = 'none';
+            if (!isPC && scroll) {
+                // display:noneをまたぐとWebViewが巨大Canvasの一部だけを復元しない場合がある。
+                // 復帰時はhash一致を信用せず、静的な勢力色レイヤーを一度正規描画し直す。
+                this._mapPresentationNeedsFullRecovery = true;
+                scroll.style.display = 'none';
+            }
             document.body.classList.add('battle-lightweight-mode');
         }
 
@@ -513,6 +518,11 @@ class UIManager {
         if (this.isBackgroundPaused) return;
 
         this.isBackgroundPaused = true;
+        // 低メモリ端末ではbackground-paused中にCSSで地図全体をdisplay:noneにする。
+        // その復帰は通常の「同じhashなら描かない」経路では不十分なので、全復旧を予約する。
+        if (!document.body.classList.contains('is-pc') && !!window.__mobileLowMemoryMode) {
+            this._mapPresentationNeedsFullRecovery = true;
+        }
         document.body.classList.add('background-paused');
         if (typeof this.releaseMobileTransientMapResources === 'function') {
             this.releaseMobileTransientMapResources();
@@ -544,6 +554,17 @@ class UIManager {
         mark('recover_map_start');
         if (typeof this.recoverMobileMapResources === 'function') {
             this.recoverMobileMapResources();
+        }
+        // 勢力色Canvasは「画面復帰」の正規窓口で健全性を確認し、部分欠落または
+        // display:none/OS切替をまたいだ場合だけ全描画する。hashだけで復帰済みと判断しない。
+        if (typeof this.recoverPersistentMapPresentation === 'function') {
+            this.recoverPersistentMapPresentation(false);
+        }
+        // 結果画面などは「背景を覆ったまま復旧→直後にモーダルを閉じる」ため、
+        // 同期復旧だけでは背面mapが実際に露出した後のcompositor再提示が行われないことがある。
+        // 次の描画フレームでもう一度軽い表示復旧を通し、白抜けを画面遷移後へ残さない。
+        if (typeof this._schedulePersistentMapPresentationRecovery === 'function') {
+            this._schedulePersistentMapPresentationRecovery(false);
         }
         mark('recover_map_done');
         

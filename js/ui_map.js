@@ -46,6 +46,13 @@ Object.assign(UIManager.prototype, {
         if (typeof this._cancelActiveMapFocus === 'function') this._cancelActiveMapFocus();
         this._cancelActiveMapFocus = null;
         this._mapViewResetToken = Number(this._mapViewResetToken || 0) + 1;
+        if (this._mapPresentationRecoveryFrame) {
+            cancelAnimationFrame(this._mapPresentationRecoveryFrame);
+            this._mapPresentationRecoveryFrame = null;
+        }
+        // シナリオ境界では新しいrenderMap()が静的レイヤーを正規生成するため、
+        // 旧画面の「復帰時に全再描画する」予約を持ち越さない。
+        this._mapPresentationNeedsFullRecovery = false;
         this._mapFocusLockCount = 0;
         this._mapFocusPrevPointerEvents = '';
         this.isZooming = false;
@@ -445,48 +452,169 @@ Object.assign(UIManager.prototype, {
         document.body.classList.add('mobile-memory-guard');
     },
 
+    _getClanColorOverlayHealthProbes(overlay) {
+        if (!overlay || !this.game || !Array.isArray(this.game.castles)) return [];
+        const mapW = Number(this.game.mapWidth || 1200);
+        const mapH = Number(this.game.mapHeight || 800);
+        const sourcePixelMap = this.pixelCastleMap || (typeof DataManager !== 'undefined' ? DataManager.castlePixelMap : null);
+        if (!sourcePixelMap || sourcePixelMap.length !== mapW * mapH) return [];
+
+        // 1点だけの健全性確認では、WebViewがCanvasの一部タイルだけ失った場合を見逃す。
+        // 実際に領土内にある拠点種点を候補にし、地図上の4x4アンカーへ最も近い点を選んで
+        // 東西南北へ分散した最大16点を検査する。海上の固定格子点を直接検査しないので誤判定しない。
+        const candidates = [];
+        for (const castle of this.game.castles) {
+            const sx = Math.round(Number(castle && castle.pixelX));
+            const sy = Math.round(Number(castle && castle.pixelY));
+            if (!Number.isFinite(sx) || !Number.isFinite(sy) || sx < 0 || sy < 0 || sx >= mapW || sy >= mapH) continue;
+            if (!sourcePixelMap[sy * mapW + sx]) continue;
+            candidates.push({ sx, sy });
+        }
+        if (candidates.length === 0) return [];
+
+        const probes = [];
+        const used = new Set();
+        const cols = 4, rows = 4;
+        for (let gy = 0; gy < rows; gy++) {
+            for (let gx = 0; gx < cols; gx++) {
+                const tx = ((gx + 0.5) / cols) * mapW;
+                const ty = ((gy + 0.5) / rows) * mapH;
+                let best = null;
+                let bestDist = Infinity;
+                for (const point of candidates) {
+                    const dx = (point.sx - tx) / mapW;
+                    const dy = (point.sy - ty) / mapH;
+                    const dist = dx * dx + dy * dy;
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        best = point;
+                    }
+                }
+                if (!best) continue;
+                const x = Math.max(0, Math.min(overlay.width - 1, Math.floor((best.sx / mapW) * overlay.width)));
+                const y = Math.max(0, Math.min(overlay.height - 1, Math.floor((best.sy / mapH) * overlay.height)));
+                const key = `${x},${y}`;
+                if (used.has(key)) continue;
+                used.add(key);
+                probes.push({ x, y });
+            }
+        }
+        return probes;
+    },
+
     _isClanColorOverlayHealthy() {
         const overlay = document.getElementById('clan-color-overlay');
         if (!overlay || overlay.width <= 1 || overlay.height <= 1) return false;
-        const mapW = Number(this.game.mapWidth || 1200);
-        const mapH = Number(this.game.mapHeight || 800);
-        const owned = this.game.castles.find(c => Number(c.ownerClan) !== 0 && Number.isFinite(Number(c.pixelX)) && Number.isFinite(Number(c.pixelY)));
-        if (!owned) return true;
-        const x = Math.max(0, Math.min(overlay.width - 1, Math.floor((Number(owned.pixelX) / mapW) * overlay.width)));
-        const y = Math.max(0, Math.min(overlay.height - 1, Math.floor((Number(owned.pixelY) / mapH) * overlay.height)));
+        const mapW = Number(this.game && this.game.mapWidth || 1200);
+        const mapH = Number(this.game && this.game.mapHeight || 800);
+        const expected = this._getClanColorRasterSize(mapW, mapH);
+        if (overlay.width !== expected.width || overlay.height !== expected.height) return false;
+
+        const probes = this._getClanColorOverlayHealthProbes(overlay);
+        if (probes.length === 0) return true;
         try {
             const ctx = overlay.getContext('2d', { willReadFrequently: true });
             if (!ctx) return false;
-            return ctx.getImageData(x, y, 1, 1).data[3] > 0;
+            // 一部だけ白く抜ける症状を拾うため、分散した領土点を複数確認する。
+            // 1x1 readbackだけなので全CanvasのgetImageDataは行わない。
+            for (const probe of probes) {
+                if (ctx.getImageData(probe.x, probe.y, 1, 1).data[3] <= 0) return false;
+            }
+            return true;
         } catch (e) {
             return false;
         }
     },
 
-    recoverMobileMapResources() {
-        if (document.body.classList.contains('is-pc')) return;
-        document.body.classList.remove('mobile-memory-guard');
-        // 低メモリ時にCanvas backing storeだけ失われてもhashが同じだと再描画されないため、
-        // 所有城の1pixelだけ確認して空なら勢力色を作り直します。
-        if (!this._isClanColorOverlayHealthy()) {
-            this.lastClanColorsHash = null;
-            this._lastClanColorOverlay = null;
+    _invalidatePersistentMapCanvasesForRecovery(includeSnow = false) {
+        this.lastClanColorsHash = null;
+        this._lastClanColorOverlay = null;
+        if (includeSnow) {
+            this.lastSnowHash = null;
+            this._snowOverlayDirty = true;
+            this._lastSnowOverlay = null;
         }
+    },
 
-        const hasHeavySnow = Array.isArray(this.game && this.game.provinces) && this.game.provinces.some(
+    _refreshPersistentMapCompositeLayers() {
+        if (!this.mapEl || this.isBackgroundPaused) return false;
+
+        // Canvas/ImageのCPU側内容が健全でも、画面切替でcompositorの一部タイルだけが
+        // 白抜けするWebView/Chromium系の症状がある。全pixelを再計算する代わりに、
+        // 静的3層を「同じDOM・同じ兄弟位置」のまま一度だけ付け直し、合成面を再提示する。
+        // nextSiblingを保持して元の位置へ戻すため、道路SVG・城カードとの重なり順は変えない。
+        const layers = [
+            this._mapBaseImage || document.getElementById('map-base-image'),
+            document.getElementById('clan-color-overlay'),
+            document.getElementById('snow-overlay')
+        ].filter(Boolean);
+        let refreshed = false;
+        for (const layer of layers) {
+            if (layer.parentNode !== this.mapEl) continue;
+            const nextSibling = layer.nextSibling;
+            this.mapEl.removeChild(layer);
+            this.mapEl.insertBefore(layer, nextSibling);
+            refreshed = true;
+        }
+        return refreshed;
+    },
+
+    recoverPersistentMapPresentation(forceFull = false) {
+        if (!this.game || this.game.phase === 'title' || !this.mapEl || this.isBackgroundPaused) return false;
+        const forced = !!forceFull || !!this._mapPresentationNeedsFullRecovery;
+        this._mapPresentationNeedsFullRecovery = false;
+
+        const hasHeavySnow = Array.isArray(this.game.provinces) && this.game.provinces.some(
             p => p.statusEffects && p.statusEffects.includes('heavySnow')
         );
+        const clanHealthy = !forced && this._isClanColorOverlayHealthy();
+        let recovered = false;
+
+        // display:noneをまたいだ復帰・OSの画面切替後は、Canvas内容がCPU側に残っていても
+        // compositor側だけ部分欠落する端末があるため、強制予約時はhash一致を信用せず全描画する。
+        // 通常のモーダル復帰では16点までの軽い健全性確認に失敗した時だけ全描画する。
+        if (!clanHealthy) {
+            this._invalidatePersistentMapCanvasesForRecovery(false);
+            if (typeof this.updateClanColors === 'function') this.updateClanColors();
+            recovered = true;
+        }
+
         if (hasHeavySnow) {
-            // 雪Canvasはモーダル/AI中も保持するため、復帰のたびに全地図を再描画しません。
-            // DOM自体が無い、または明示的に縮退している時だけ再生成を予約します。
-            // backing store喪失はcontextlost/contextrestoredで別途無効化します。
             const snowOverlay = document.getElementById('snow-overlay');
-            if (!snowOverlay || snowOverlay.width <= 1 || snowOverlay.height <= 1) {
+            const snowMissing = !snowOverlay || snowOverlay.width <= 1 || snowOverlay.height <= 1;
+            if (forced || snowMissing) {
                 this.lastSnowHash = null;
                 this._snowOverlayDirty = true;
                 this._lastSnowOverlay = null;
+                if (typeof this.updateSnowOverlay === 'function') this.updateSnowOverlay();
+                recovered = true;
             }
         }
+
+        // getImageDataでは検知できない「backing storeは健全だがcompositorだけ白抜け」も
+        // 画面復帰時には直す必要がある。pixel再計算の有無にかかわらず静的層を再提示する。
+        // これはDOMを作り直さず同じImage/Canvasを付け直すだけなので、通常モーダル復帰で
+        // 3140x2440級の勢力色を毎回フル再生成する負荷は増やさない。
+        if (this._refreshPersistentMapCompositeLayers()) recovered = true;
+        return recovered;
+    },
+
+    _schedulePersistentMapPresentationRecovery(forceFull = false) {
+        if (forceFull) this._mapPresentationNeedsFullRecovery = true;
+        if (this._mapPresentationRecoveryFrame) return;
+        this._mapPresentationRecoveryFrame = requestAnimationFrame(() => {
+            this._mapPresentationRecoveryFrame = null;
+            if (typeof document !== 'undefined' && document.hidden) return;
+            if (this.isBackgroundPaused || !this.game || this.game.phase === 'title') return;
+            this.recoverPersistentMapPresentation(false);
+        });
+    },
+
+    recoverMobileMapResources() {
+        if (document.body.classList.contains('is-pc')) return;
+        document.body.classList.remove('mobile-memory-guard');
+        // 継続Canvasの復旧自体は端末共通のrecoverPersistentMapPresentationへ集約する。
+        // ここではスマホ固有の一時資源ガードだけを解除する。
     },
 
     // ★Round14：ズーム中に強制リロードされた場合だけ既存の実機診断に痕跡を残します。
@@ -701,6 +829,23 @@ Object.assign(UIManager.prototype, {
 
         sc.addEventListener('touchend', resetPinch, { passive: true });
         sc.addEventListener('touchcancel', resetPinch, { passive: true });
+
+        // OSのアプリ切替・ブラウザタブ切替では、WebViewが巨大Canvasの一部だけを破棄して
+        // contextlostを通知しない場合がある。非表示になった時点で全復旧予約だけ立て、
+        // 復帰後の最初の描画フレームで勢力色/雪を正規描画し直す。
+        if (!this._mapVisibilityRecoveryBound) {
+            this._mapVisibilityRecoveryBound = true;
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    this._mapPresentationNeedsFullRecovery = true;
+                    return;
+                }
+                this._schedulePersistentMapPresentationRecovery(false);
+            });
+            window.addEventListener('pageshow', () => {
+                this._schedulePersistentMapPresentationRecovery(true);
+            });
+        }
     },
 
     applyInertia(sc) {
@@ -1840,6 +1985,11 @@ Object.assign(UIManager.prototype, {
         this.updateCastleGlows();
         this.updateSnowOverlay(); // ★大雪の表示を更新します！
         this.updateClanColors(); // ★勢力の色で地図を塗る魔法を実行します！
+
+        // 同一シナリオのrenderMapでは静的DOM/Canvasを再利用するため、hash一致だけでは
+        // 画面遷移中に生じたcompositor白抜けを直せない。pixel再計算は行わず、
+        // 既存の表示層だけを同じ位置へ再提示してから通常の一時演出を更新する。
+        if (canReuseCastleLayer) this._refreshPersistentMapCompositeLayers();
 
         // ★追加：駆虎呑狼などで、キープして光らせる魔法を実行します！
         this.updateKeepHighlight();
