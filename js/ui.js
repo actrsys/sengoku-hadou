@@ -2530,15 +2530,60 @@ class UIManager {
             }
         }
 
-        const cmdGrid = document.getElementById('command-area');
-        if(cmdGrid) {
-            cmdGrid.style.display = 'grid'; 
-        }
+        // 情報パネル更新はコマンド領域の表示可否へ触れない。
+        // 観戦・AI処理・画面復帰中に古いボタンDOMを一瞬再露出させないため、
+        // 操作UIの表示は renderCommandMenu / renderEnemyViewMenu / renderSelectionModeMenu だけを正本とする。
         if (this.mobileBottomInfo && this.mobileBottomInfo.innerHTML) {
             this.mobileBottomInfo.innerHTML = '';
         }
     }
     
+    _setCommandAreasVisible(visible) {
+        const shouldShow = !!visible;
+        const mobileArea = document.getElementById('command-area');
+        if (mobileArea) {
+            mobileArea.classList.toggle('hidden', !shouldShow);
+            mobileArea.style.display = shouldShow ? 'grid' : 'none';
+        }
+        const pcArea = document.getElementById('pc-new-command-area');
+        if (pcArea) {
+            pcArea.classList.toggle('hidden', !shouldShow);
+            if (!shouldShow) pcArea.innerHTML = '';
+        }
+    }
+
+    _isPlayerCommandInputAvailable() {
+        const game = this.game;
+        if (!game) return false;
+        if (game.commandSystem && typeof game.commandSystem.canAcceptPlayerCommandInput === 'function') {
+            return game.commandSystem.canAcceptPlayerCommandInput();
+        }
+        if (game.phase !== 'game' || game.isRestoringSave || game.isWatchMode || game.isProcessingAI || game.selectionMode != null) return false;
+        const current = typeof game.getCurrentTurnCastle === 'function' ? game.getCurrentTurnCastle() : null;
+        return !!(current
+            && Number(current.ownerClan) === Number(game.playerClanId)
+            && !current.isDelegated);
+    }
+
+    _canRenderCommandMenuForCurrentCastle() {
+        if (!this._isPlayerCommandInputAvailable()) return false;
+        const current = this.game && typeof this.game.getCurrentTurnCastle === 'function'
+            ? this.game.getCurrentTurnCastle()
+            : null;
+        return !!(this.currentCastle && current
+            && Number(this.currentCastle.id) === Number(current.id));
+    }
+
+    _canRenderEnemyViewMenu() {
+        return this._isPlayerCommandInputAvailable();
+    }
+
+    _canRenderSelectionModeMenu() {
+        const game = this.game;
+        if (!game || game.phase !== 'game' || game.isRestoringSave || game.isWatchMode) return false;
+        return game.selectionMode != null;
+    }
+
     showControlPanel(castle) { 
         this.currentCastle = castle; 
         
@@ -2595,6 +2640,11 @@ class UIManager {
     
     // ★ マップ選択中専用の、スッキリしたメニューを描く魔法
     renderSelectionModeMenu() {
+        if (!this._canRenderSelectionModeMenu()) {
+            this.clearCommandMenu();
+            return;
+        }
+        this._setCommandAreasVisible(true);
         const capturedMode = this.game.selectionMode;
         const capturedData = this.game.tempReinfData;
 
@@ -2705,6 +2755,11 @@ class UIManager {
     }
     
     renderEnemyViewMenu() {
+        if (!this._canRenderEnemyViewMenu()) {
+            this.clearCommandMenu();
+            return;
+        }
+        this._setCommandAreasVisible(true);
         const mobileArea = document.getElementById('command-area');
         const pcArea = document.getElementById('pc-new-command-area');
         const areas = [mobileArea, pcArea];
@@ -2760,6 +2815,11 @@ class UIManager {
     }
     
     renderCommandMenu() {
+        if (!this._canRenderCommandMenuForCurrentCastle()) {
+            this.clearCommandMenu();
+            return;
+        }
+        this._setCommandAreasVisible(true);
         const overlay = document.getElementById('command-overlay');
         const mobileArea = document.getElementById('command-area');
         if (mobileArea) {
@@ -2773,7 +2833,7 @@ class UIManager {
                     btn.classList.add('disabled');
                 }
                 btn.onclick = () => {
-                    if (this.game.isProcessingAI) return;
+                    if (!this._canRenderCommandMenuForCurrentCastle()) return;
                     this.cancelMapSelection(true);
                     onClick();
                 };
@@ -2797,7 +2857,7 @@ class UIManager {
                 finishBtn.className = `cmd-btn finish`;
                 finishBtn.textContent = "命令終了";
                 finishBtn.onclick = () => {
-                    if (this.game.isProcessingAI) return;
+                    if (!this._canRenderCommandMenuForCurrentCastle()) return;
                     this.cancelMapSelection(true);
                     const nav = this.game.getNavigatorInfo(this.currentCastle);
                     this.showDialog("「今月の命令を終了しますか？」", true, () => {
@@ -2867,6 +2927,11 @@ class UIManager {
     }
 
     renderPcCommandMenu() {
+        if (!this._canRenderCommandMenuForCurrentCastle()) {
+            this.clearCommandMenu();
+            return;
+        }
+        this._setCommandAreasVisible(true);
         const pcArea = document.getElementById('pc-new-command-area');
         if (!pcArea) return;
         pcArea.innerHTML = '';
@@ -2888,7 +2953,7 @@ class UIManager {
                 btn.classList.add('disabled');
             }
             btn.onclick = () => {
-                if (this.game.isProcessingAI) return;
+                if (!this._canRenderCommandMenuForCurrentCastle()) return;
                 this.cancelMapSelection(true);
                 onClick();
             };
@@ -2910,7 +2975,7 @@ class UIManager {
             }, isDisabled); // ★ここも忘れずに isDisabled を渡します
         });
         createBtn(col1, "命令終了", "finish", () => {
-            if (this.game.isProcessingAI) return;
+            if (!this._canRenderCommandMenuForCurrentCastle()) return;
             this.cancelMapSelection(true);
             const nav = this.game.getNavigatorInfo(this.currentCastle);
             this.showDialog("「今月の命令を終了しますか？」", true, () => {
@@ -2964,6 +3029,7 @@ class UIManager {
         if (mobileArea) mobileArea.innerHTML = '';
         const pcArea = document.getElementById('pc-new-command-area');
         if (pcArea) pcArea.innerHTML = '';
+        this._setCommandAreasVisible(false);
     }
     
     openGunshiModal(gunshi, msg, onConfirm) {
@@ -3926,6 +3992,19 @@ class UIManager {
         if (s.turn === 'defender' && Number(s.defender.ownerClan) === pid && !s.defender.isDelegated) isMyTurn = true;
         if (s.turn === 'defender_self_reinf' && Number(s.defSelfReinforcement.castle.ownerClan) === pid && !s.defSelfReinforcement.castle.isDelegated) isMyTurn = true;
         if (s.turn === 'defender_ally_reinf' && Number(s.defReinforcement.castle.ownerClan) === pid && !s.defReinforcement.castle.isDelegated) isMyTurn = true;
+        if (this.game.isWatchMode) isMyTurn = false;
+
+        // 操作不可ターンでは、旧プレイヤー用コマンドDOMを書き換える前に遮蔽状態を確定する。
+        // 観戦・AIターンへの切替時に一瞬だけ操作ボタンが露出する余地を作らない。
+        const guard = document.getElementById('war-ai-guard');
+        this.warControls.classList.toggle('disabled-area', !isMyTurn);
+        if (guard) {
+            guard.classList.toggle('hidden', isMyTurn);
+            if (!isMyTurn) {
+                const textEl = document.getElementById('war-ai-guard-text');
+                if (textEl) textEl.textContent = isAtkTurn ? "攻撃軍 思考中..." : "守備軍 思考中...";
+            }
+        }
         
         let options = [];
         
@@ -4033,18 +4112,6 @@ class UIManager {
             btnContainer.appendChild(btn);
         });
 
-        const guard = document.getElementById('war-ai-guard');
-        if (!isMyTurn) {
-            this.warControls.classList.add('disabled-area');
-            if (guard) {
-                guard.classList.remove('hidden');
-                const textEl = document.getElementById('war-ai-guard-text');
-                if (textEl) textEl.textContent = isAtkTurn ? "攻撃軍 思考中..." : "守備軍 思考中...";
-            }
-        } else {
-            this.warControls.classList.remove('disabled-area');
-            if (guard) guard.classList.add('hidden');
-        }
     }
     
     showReinforcementSelector(candidateCastles, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData) {

@@ -122,6 +122,7 @@ class TurnManager {
     
         // ★追加：月初の処理が始まったら、ユーザーが勝手に操作できないように膜（ガード）を張ります！
         game.isProcessingAI = true;
+        if (game.ui && typeof game.ui.clearCommandMenu === 'function') game.ui.clearCommandMenu();
         // r290：AI城ターンだけでなく月初のイベント／派閥／人事処理も長時間AI処理です。
         // 古いスマホではこの区間から地図上252城のfilter/animationと一時Canvasを軽量化し、
         // 災害ダイアログ表示中に背面の見えないGPU処理を抱え込まないようにします。
@@ -360,6 +361,7 @@ class TurnManager {
         const game = this.game;
         const turnFlowGeneration = Number(this._turnFlowGeneration || 0);
         game.isProcessingAI = true;
+        if (game.ui && typeof game.ui.clearCommandMenu === 'function') game.ui.clearCommandMenu();
         // AI進行中は操作できないため、スマホでは背面マップの非必須Canvas/フィルタを外して
         // GPUメモリの余裕を作ります。戦闘演出は必要時に小さなCanvasを作り直します。
         if (game.ui && typeof game.ui.releaseMobileTransientMapResources === 'function') {

@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r427');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r428');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -13575,3 +13575,77 @@ test('r418では山本晴幸の顔画像を共通マスターとfaceiconsへ登�
     assert.ok(fs.existsSync(path.join(ROOT, 'data/images/faceicons/yamamoto_kansuke.webp')), '山本晴幸の顔画像ファイルが存在する');
 });
 
+
+test('操作不能状態では通常コマンドUIを入口で遮断し、情報更新から再表示しない', () => {
+    const ui = read('js/ui.js');
+    const command = read('js/command_system.js');
+    const turn = read('js/turn_manager.js');
+
+    const infoAt = ui.indexOf('    updateInfoPanel(castle) {');
+    const infoEnd = ui.indexOf('    _setCommandAreasVisible(visible) {', infoAt);
+    const infoBlock = ui.slice(infoAt, infoEnd);
+    assert.ok(infoAt >= 0 && infoEnd > infoAt, 'updateInfoPanelとコマンド可視性窓口が存在する');
+    assert.ok(!infoBlock.includes("cmdGrid.style.display = 'grid'"), '情報更新だけでコマンド領域を再表示しない');
+
+    const menuAt = ui.indexOf('    renderCommandMenu() {');
+    const menuBlock = ui.slice(menuAt, menuAt + 500);
+    assert.ok(menuBlock.includes('if (!this._canRenderCommandMenuForCurrentCastle()) {'), '通常コマンド描画は操作可否を入口で確認する');
+    assert.ok(menuBlock.includes('this.clearCommandMenu();'), '操作不可なら古いコマンドDOMを消す');
+    assert.ok(menuBlock.includes('this._setCommandAreasVisible(true);'), '操作可能時だけ領域を可視化する');
+
+    const clearAt = ui.indexOf('    clearCommandMenu() {');
+    const clearBlock = ui.slice(clearAt, clearAt + 420);
+    assert.ok(clearBlock.includes('this._setCommandAreasVisible(false);'), 'clearCommandMenuはPC/スマホ双方の領域自体を隠す');
+
+    const selectionAt = ui.indexOf('    renderSelectionModeMenu() {');
+    const selectionBlock = ui.slice(selectionAt, selectionAt + 360);
+    assert.ok(selectionBlock.includes('if (!this._canRenderSelectionModeMenu()) {'), '対象選択UIも観戦・復元時には表示しない');
+
+    assert.ok(command.includes("if (!game || game.phase !== 'game' || game.isRestoringSave || game.isWatchMode || game.isProcessingAI || game.selectionMode != null) return false;"), 'CommandSystemが通常コマンド入力可否の正本を持つ');
+    assert.ok(command.includes('if (!this.canAcceptPlayerCommandInput()) return;'), '古いDOM経由でもstartCommandを開始しない');
+
+    const warAt = ui.indexOf('    renderWarControls(isAtkTurn) {');
+    const warBlock = ui.slice(warAt, warAt + 7200);
+    const warLockAt = warBlock.indexOf("this.warControls.classList.toggle('disabled-area', !isMyTurn);");
+    const warRebuildAt = warBlock.indexOf("this.warControls.innerHTML = '';");
+    assert.ok(warLockAt >= 0 && warRebuildAt > warLockAt, '攻城戦はAI/観戦遮蔽をコマンドDOM再構築より先に確定する');
+    assert.ok(warBlock.includes('if (this.game.isWatchMode) isMyTurn = false;'), '観戦中は攻城戦コマンドを操作可能扱いにしない');
+
+    const processingAssignments = [...turn.matchAll(/game\.isProcessingAI = true;/g)].map(m => m.index);
+    assert.ok(processingAssignments.length >= 2, '月初とAIターン開始の操作不能境界が存在する');
+    const earlyLocks = processingAssignments.slice(0, 2).map(at => turn.slice(at, at + 220));
+    assert.ok(earlyLocks.every(block => block.includes('game.ui.clearCommandMenu')), '操作不能へ入る時は情報描画より先にコマンドUIを消す');
+});
+
+test('CommandSystemの通常入力可否は観戦・AI・委任・他勢力ターンを拒否する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const result = vm.runInContext(`(() => {
+        const castle = { id: 10, ownerClan: 1, isDelegated: false };
+        const game = {
+            phase: 'game', isRestoringSave: false, isWatchMode: false, isProcessingAI: false,
+            selectionMode: null, playerClanId: 1, getCurrentTurnCastle: () => castle
+        };
+        const system = new CommandSystem(game);
+        const valid = system.canAcceptPlayerCommandInput();
+        game.isWatchMode = true;
+        const watch = system.canAcceptPlayerCommandInput();
+        game.isWatchMode = false; game.isProcessingAI = true;
+        const ai = system.canAcceptPlayerCommandInput();
+        game.isProcessingAI = false; castle.isDelegated = true;
+        const delegated = system.canAcceptPlayerCommandInput();
+        castle.isDelegated = false; castle.ownerClan = 2;
+        const enemy = system.canAcceptPlayerCommandInput();
+        castle.ownerClan = 1; game.selectionMode = 'war';
+        const selecting = system.canAcceptPlayerCommandInput();
+        return { valid, watch, ai, delegated, enemy, selecting };
+    })()`, ctx);
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(result)), {
+        valid: true,
+        watch: false,
+        ai: false,
+        delegated: false,
+        enemy: false,
+        selecting: false
+    });
+});

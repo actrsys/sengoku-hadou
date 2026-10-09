@@ -449,6 +449,15 @@ class CommandSystem {
         return this.game.mapGraph.getConnectedOwnIdsForMove(startCastle, clanId);
     }
 
+    canAcceptPlayerCommandInput() {
+        const game = this.game;
+        if (!game || game.phase !== 'game' || game.isRestoringSave || game.isWatchMode || game.isProcessingAI || game.selectionMode != null) return false;
+        const castle = typeof game.getCurrentTurnCastle === 'function' ? game.getCurrentTurnCastle() : null;
+        return !!(castle
+            && Number(castle.ownerClan) === Number(game.playerClanId)
+            && !castle.isDelegated);
+    }
+
     canExecuteCommand(type) {
         const spec = COMMAND_SPECS[type];
         if (!spec) return true;
@@ -708,6 +717,9 @@ class CommandSystem {
     }
 
     startCommand(type, targetId = null, extraData = null) {
+        // 表示側のガードをすり抜けた古いDOMや遅延イベントからも、操作不能時はコマンドを開始しない。
+        if (!this.canAcceptPlayerCommandInput()) return;
+
         const spec = COMMAND_SPECS[type];
         if (!spec) {
             console.warn("Unknown command:", type);
