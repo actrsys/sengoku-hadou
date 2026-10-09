@@ -1324,3 +1324,10 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - 通常の他家武将は、`LoyaltyInsightRules` の偽装後 `perceivedBand` が `stable` / `warning` の場合、能力/適性の後へ忠誠所見を重ねない。`danger` 以下で明確な不満が見える場合だけ、主君との折り合いを1発言追加する。
 - r419〜r425で面談専用に追加した諸勢力の「取込までの近さ」「定性的な鎮圧機会」「行動不能時の人物比較」は不要になったため、表示停止だけで残さず `InterviewSystem` の専用処理を削除する。あわせて、それだけのために持っていた `KunishuSystem.assessSubjugationOpportunity()` / `assessStrategicOptions()` と `MainParams.Kunishu.StrategicAssessment`、取込近傍判定用設定を削除する。
 - 実際の取込可否 `getIncorporateEligibility()`、鎮圧到達可否 `getSubjugationEligibility()`、AIが使う基礎戦力 `calcMilitaryStrength()` は引き続き諸勢力Systemの正本として維持し、コマンド・AI側へ計算を戻さない。
+
+## r427: 面談「方針について」の年長者・高格式者口調を統一
+
+- 面談の「方針について」は、助言内容を `InterviewSystem` が既存ゲーム状態から生成し、当主への話者姿勢は引き続き `ConversationStandingRules` を正本として最終整形する。方針専用の第二の口調体系は作らない。
+- 父・祖父・実兄などの年長近親者、伯父・叔父、当主より高格式の人物では、一連の方針助言を常体で通す。武勇・内政系の一部に残っていた「足りませぬ」「目立ちます」「伸ばせます」を共通レジスターで「足りぬ」「目立つ」「伸ばせる」へ揃え、途中だけ一般家臣の敬語へ戻る状態を解消する。
+- 回帰テストは統率系だけでなく、訓練不足・城壁修復・石高/鉱山開発の助言も横断して確認し、年長近親者・高格式者の方針会話に `です/ます/ませぬ/おります/でしょう` 等の聞き手向け家臣敬語が残らないことを検査する。
+

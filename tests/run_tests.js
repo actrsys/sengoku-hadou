@@ -1527,6 +1527,13 @@ test('面談の実父系呼称は話者本人・質問者との関係を分け�
     const policyStyled = interview._applyIndependentInterviewRegister('攻めるなら東を第一に見るのがよろしいでしょう。今の軍勢の動きとも合っております。', nobuhide);
     assert.ok(policyStyled.includes('よいだろう') && policyStyled.includes('合っておる'), '父・祖父・兄などの方針助言は途中だけ一般家臣敬語へ戻らない');
     assert.ok(!/よろしいでしょう|おります|申し上げ/.test(policyStyled));
+    const policyStrengthStyled = interview._applyIndependentInterviewRegister('清洲城の兵は、まだ訓練が足りませぬ。もう少し鍛えておくべきかと。', nobuhide);
+    assert.strictEqual(policyStrengthStyled, '清洲城の兵は、まだ訓練が足りぬ。もう少し鍛えておくべきだろう。', '武勇系方針でも年長者の常体を最後まで保つ');
+    const policyRepairStyled = interview._applyIndependentInterviewRegister('清洲城の城壁は傷みが目立ちます。修復を優先した方がよろしいかと。', nobuhide);
+    assert.strictEqual(policyRepairStyled, '清洲城の城壁は傷みが目立つ。修復を優先した方がよいと思う。', '城壁方針でも一般家臣の「ます」へ戻らない');
+    const policyDevelopStyled = interview._applyIndependentInterviewRegister('清洲城はまだ石高を伸ばせます。田畑を整えるのがよろしいでしょう。', nobuhide);
+    assert.strictEqual(policyDevelopStyled, '清洲城はまだ石高を伸ばせる。田畑を整えるのがよいだろう。', '開発方針でも一般家臣の「ます」へ戻らない');
+    assert.ok(!/です|ます|ませぬ|ございます|おります|でしょう|ましょう|申し上げ/.test([policyStyled, policyStrengthStyled, policyRepairStyled, policyDevelopStyled].join('')), '方針助言の主要分岐は年長近親者・高格式者の常体を一貫させる');
     const loyaltyStyled = interview._applyIndependentInterviewRegister('信忠への忠義は本物でしょう。疑う余地もありません。', nobuhide);
     assert.strictEqual(loyaltyStyled, '信忠への忠義は本物だろう。疑う余地もない。', '家中年長者が他者忠誠を評する最後の一言も同じ口調を保つ');
     interview.activeInterviewAttitude = 'friendly';
